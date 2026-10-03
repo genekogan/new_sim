@@ -1,0 +1,194 @@
+import type { Obstacle } from '../spatial/types.ts';
+// Semantic world model (spec §5, §21). Three layers are kept distinct:
+//   AssetDef   — reusable description of a kind of thing (catalog.ts)
+//   Entity     — a placement in one world state, with provenance
+//   SimState   — transient operational state during a run (held, supported…)
+// A WorldState is plain JSON: it can be hashed, checkpointed, forked, sent to
+// a Durable Object and replayed without any rendering objects.
+import type { Vec3 } from '../core/math.ts';
+import type { RngState } from '../core/rng.ts';
+
+export const WORLD_SCHEMA = 'mars-world/1';
+
+/** Rotation: yaw about +Y, then pitch about local X, then roll about local Z (radians). */
+export type Pose = { p: Vec3; yaw: number; pitch?: number; roll?: number };
+
+export type Confidence = 'documented' | 'participant' | 'inferred' | 'provisional' | 'hypothetical';
+
+/** Epistemic status is independent of dimensional precision (spec §4). */
+export type Provenance = {
+  /** How this placement came to exist in this state. */
+  origin: 'canonical' | 'reconstruction-edit' | 'design-edit' | 'simulation' | 'test-fixture';
+  confidence: Confidence;
+  evidence?: string[];
+  note?: string;
+};
+
+export type EntityKind = 'human' | 'component' | 'vehicle' | 'fixture' | 'marker';
+
+/** How an entity is currently held up. `none` is only legal transiently and is a violation at tick end. */
+export type Support =
+  | { kind: 'ground' }
+  | { kind: 'resting-on'; on: string; slot?: string } // slot: a table surfaceSlot id, or 'lap' (engine/items)
+  | { kind: 'held'; by: string[] }
+  | { kind: 'in-hand'; by: string; hand: 'left' | 'right' } // a small item in one person's hand (engine/items)
+  | { kind: 'connected'; to: string[] }
+  | { kind: 'forks'; vehicle: string }
+  | { kind: 'ridden-by'; by: string } // a vehicle under its rider (engine/vehicles)
+  | { kind: 'none' };
+
+export type Connection = { socket: string; to: string; toSocket: string };
+
+export type ComponentPhase =
+  | 'stored' // in a pile/stock, stacked
+  | 'reserved'
+  | 'carried'
+  | 'staged' // lying at a work area
+  | 'raising'
+  | 'placed' // in final pose, possibly still needing support
+  | 'installed'; // connected and self-supporting under the assembly rules
+
+export type HumanState = {
+  activity: string; // 'idle' | 'walk' | 'carry' | 'support' | 'climb' | 'sit' | ...
+  task?: string; // action id currently owning this actor
+  grip?: { entity: string; slot: string };
+  riding?: string; // vehicle id while mounted (engine/vehicles)
+  level: number; // walkable level index (0 = ground)
+  /** Id of the rack-structure link (construction/frame.ts: `beam:<id>` / `climb:<…>`) the person stands on, if any. */
+  on?: string;
+  /**
+   * Hand points (world frame, metres), published every tick by engine/items while the person holds a
+   * small item or an items verb drives a hand (reach, serve, eat); a hand without a point is free /
+   * at rest. Absent when neither hand is published. ITEMS.md "Hand points".
+   */
+  hands?: { left?: Vec3; right?: Vec3 };
+  /** While an overlay activity (`eat`) runs: the activity it is layered on ('sit' = seated, 'talk', 'idle'…). */
+  baseActivity?: string;
+  /**
+   * Ground speed (m/s, horizontal, rounded to mm/s) over the last tick, published by walk_to while it
+   * owns the person (absent otherwise). Renderers key the Walk clip on it: activity 'walk' is set only
+   * when speed ≥ 0.08 (locomotion/walk.ts WALK_MIN), a blocked walker is 'wait' with speed 0.
+   */
+  speed?: number;
+  /**
+   * Prone receiver only (construction/handup.ts, HANDUP.md "Prone receiver"): progress 0–1 within the current hand-up
+   * phase (lie-down, then each receiver phase), every tick from lie-down to the release; absent otherwise.
+   */
+  phaseK?: number;
+  /**
+   * Prone receiver only: world yaw of the lying body's axis (S → head, through the grip), from lie-down through
+   * kneel-up; `pose.yaw` keeps facing straight out over the edge (the lip PRONE_BACK ahead of `pose.p` along it).
+   */
+  proneYaw?: number;
+  /** Ground-mat sleep only: semantic progress, independent of renderer rig coordinates. */
+  sleepPose?: { mat: string; standingFraction: number };
+};
+
+/** Persistent committed quantities for one bounded cold preparation batch. */
+export type FoodPreparation = {
+  kind: 'cold-two-ingredient-v1';
+  ingredients: [
+    { item: string; food: string; initial: number; deposited: number },
+    { item: string; food: string; initial: number; deposited: number },
+  ];
+  mixedTicks: number;
+  complete: boolean;
+};
+
+export type Entity = {
+  id: string;
+  def: string; // AssetDef id
+  kind: EntityKind;
+  label?: string;
+  tags?: string[];
+  pose: Pose;
+  provenance: Provenance;
+  /** Components */
+  phase?: ComponentPhase;
+  support?: Support;
+  connections?: Connection[];
+  assembly?: string;
+  /** Humans */
+  human?: HumanState;
+  /** Owning action while reserved/held. */
+  reservedBy?: string;
+  /** Containers (bowl, pot…; catalog-items.ts CONTAINERS): what food is in it and how full (0..1). */
+  contents?: { food: string; fraction: number };
+  /** Partial preparation survives interruption; incomplete contents cannot be served. */
+  foodPreparation?: FoodPreparation;
+  /** Placed electrical equipment (construction/solar.ts place_equipment, spec §19): kind + configuration. */
+  equipment?: { kind: string; config: Record<string, number | string | boolean> };
+  /** Paint on a paintable face (engine/work/paint.ts): colour or texture, coverage 0..1 of the face, per reach band. */
+  paint?: PaintState;
+};
+
+/** Paint progress on a face (engine/work/paint.ts). Heights are metres above the face's bottom edge. */
+export type PaintState = {
+  face: 'front' | 'back';
+  color?: string;
+  texture?: string;
+  /** Painted fraction of the whole face (area-weighted over its bands), 0..1, rounded to 0.01. */
+  coverage: number;
+  bands: { from: number; to: number; coverage: number }[];
+};
+
+export type Region = {
+  id: string;
+  label: string;
+  kind: 'place' | 'staging' | 'material-pile' | 'work-area' | 'walkable' | 'no-go';
+  /** Ground polygon (x, z), counter-clockwise. */
+  polygon: [number, number][];
+  level?: number;
+  provenance: Provenance;
+};
+
+/** Immutable static geometry the entity layer sits on (canonical baseline or a test fixture). */
+export type BaseRef = {
+  campus: string; // e.g. 'mars-2026', 'proving-ground'
+  /** Content hash of the static collision/walkable description used by the runtime. */
+  staticHash: string;
+};
+
+export type Environment = {
+  /** ISO local date/time at the campus (visual only — independent of sim elapsed time, spec §19). */
+  datetime: string;
+  weather: { clouds: number; rain: number; wind: number; dust: number; wet: number };
+};
+
+export type WorldState = {
+  schema: typeof WORLD_SCHEMA;
+  base: BaseRef;
+  tick: number;
+  entities: Record<string, Entity>;
+  regions: Record<string, Region>;
+  /** Fork-local static obstacle overrides; null removes a source obstacle. Source base stays immutable. */
+  obstacleEdits?: Record<string, Obstacle | null>;
+  env: Environment;
+  inventory: 'finite' | 'unlimited';
+  rng: RngState;
+};
+
+/** The portion of state that physical plans depend on (spec §16: camera/env changes must not invalidate plans). */
+export function physicalView(w: WorldState) {
+  const entities: Record<string, unknown> = {};
+  for (const [id, e] of Object.entries(w.entities)) {
+    const { label: _l, tags: _t, provenance: _p, ...rest } = e;
+    entities[id] = rest;
+  }
+  // inventory mode and RNG state change what a run produces (finite stock, seeded
+  // choices), so a plan rehearsed under one cannot be trusted under another.
+  // Deliberately excluded: tick (clock only), env (visual, §19), labels/tags/provenance.
+  // A 'place' region's audience `layout` (engine_edit_world, social/slots.ts) decides where gather/take_slot
+  // send people, so it is physical (LAST_MILE LM-003); a region without one hashes exactly as before.
+  return {
+    base: w.base,
+    ...(w.obstacleEdits ? { obstacleEdits: w.obstacleEdits } : {}),
+    entities,
+    regions: Object.values(w.regions).map((r) => {
+      const layout = (r as { layout?: unknown }).layout;
+      return layout === undefined ? [r.id, r.kind, r.polygon, r.level ?? 0] : [r.id, r.kind, r.polygon, r.level ?? 0, layout];
+    }),
+    inventory: w.inventory,
+    rng: w.rng,
+  };
+}

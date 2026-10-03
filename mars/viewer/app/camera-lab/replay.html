@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Camera replay comparison</title>
+    <style>
+      body {
+        margin: 0;
+        background: #101820;
+        color: white;
+        font: 16px system-ui;
+      }
+      #view {
+        height: 100vh;
+      }
+      header {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        padding: 12px;
+        background: #101820d9;
+        z-index: 2;
+      }
+      #status {
+        position: absolute;
+        bottom: 15px;
+        left: 15px;
+        background: #101820d9;
+        padding: 10px;
+        z-index: 2;
+      }
+    </style>
+  </head>
+  <body>
+    <header id="label"></header>
+    <div id="view"></div>
+    <div id="status">Loading recorded runtime…</div>
+    <script type="module" src="./replay-view.ts"></script>
+  </body>
+</html>

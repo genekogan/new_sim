@@ -1,0 +1,32 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { FixtureViews } from '../app/engine-view/fixtures.ts';
+const chair = () => ({ id: 'chair', def: 'camp-chair', kind: 'fixture', pose: { p: [0, 0, 0], yaw: 3.1 }, support: { kind: 'ground' } });
+await test('movable chair render interpolates a detached pose and follows the short yaw arc', () => {
+  const e = chair(), world = { entities: { chair: e } }, views = new FixtureViews();
+  views.reset(world);
+  e.pose = { p: [2, 1, 4], yaw: -3.1 };
+  views.onTick(world);
+  const before = structuredClone(world);
+  views.render(1, 0.5);
+  assert.deepEqual(views.poses()[0].p, [1, 0.5, 2]);
+  assert.ok(Math.abs(views.poses()[0].yaw - Math.PI) < 1e-10);
+  assert.deepEqual(world, before);
+  views.render(1, 1);
+  assert.deepEqual(views.poses()[0].p, e.pose.p);
+  assert.ok(Math.abs(Math.sin(views.poses()[0].yaw) - Math.sin(e.pose.yaw)) < 1e-10);
+  views.reset(world);
+  views.render(1, 0);
+  assert.deepEqual(views.poses()[0].p, e.pose.p);
+  views.dispose();
+  assert.deepEqual(views.poses(), []);
+});
+await test('static fixtures preserve direct poses independently of interpolation alpha', () => {
+  const e = { ...chair(), def: 'bench-6ft' }, world = { entities: { chair: e } }, views = new FixtureViews();
+  views.reset(world);
+  e.pose = { p: [2, 0, 4], yaw: 0 };
+  views.onTick(world);
+  views.render(1, 0.5);
+  assert.deepEqual(views.poses()[0].p, e.pose.p);
+  views.dispose();
+});

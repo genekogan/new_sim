@@ -1,0 +1,1997 @@
+[
+  {
+    "ticks": 0,
+    "control": "continue",
+    "pause": {
+      "tick": 77,
+      "hash": "868a3c539e00ea08a49ef9b87e61f8ad471d659adc1cc9872ef6831f1706af5f"
+    },
+    "result": {
+      "world": {
+        "schema": "mars-world/1",
+        "base": {
+          "campus": "social-resume",
+          "staticHash": "fdbb797772808a3e8d8cd77a56d12e064ff0cb10fb870c017cc23b683491f97e"
+        },
+        "tick": 497,
+        "entities": {
+          "chair": {
+            "id": "chair",
+            "kind": "fixture",
+            "def": "camp-chair",
+            "pose": {
+              "p": [
+                0,
+                0,
+                -5
+              ],
+              "yaw": 0
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            }
+          },
+          "p1": {
+            "id": "p1",
+            "def": "human",
+            "kind": "human",
+            "label": "p1",
+            "pose": {
+              "p": [
+                0,
+                0,
+                -5
+              ],
+              "yaw": 1.5707963267948966
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "sit",
+              "level": 0,
+              "task": "a1:resume:a3"
+            }
+          },
+          "p2": {
+            "id": "p2",
+            "def": "human",
+            "kind": "human",
+            "label": "p2",
+            "pose": {
+              "p": [
+                -3,
+                0,
+                -7
+              ],
+              "yaw": 0
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "idle",
+              "level": 0
+            }
+          }
+        },
+        "regions": {},
+        "env": {
+          "datetime": "2026-03-01T16:00",
+          "weather": {
+            "clouds": 0,
+            "rain": 0,
+            "wind": 0,
+            "dust": 0,
+            "wet": 0
+          }
+        },
+        "inventory": "finite",
+        "rng": [
+          1929661853,
+          3925456204,
+          1193021468,
+          2516681427
+        ]
+      },
+      "records": [
+        {
+          "id": "a1",
+          "verb": "sit",
+          "params": {
+            "actor": "p1",
+            "fixture": "chair"
+          },
+          "status": "cancelled",
+          "history": [
+            {
+              "tick": 0,
+              "status": "requested"
+            },
+            {
+              "tick": 0,
+              "status": "validated"
+            },
+            {
+              "tick": 0,
+              "status": "reserved"
+            },
+            {
+              "tick": 0,
+              "status": "executing"
+            },
+            {
+              "tick": 1,
+              "status": "executing",
+              "phase": "approach"
+            },
+            {
+              "tick": 66,
+              "status": "executing",
+              "phase": "sit-down"
+            },
+            {
+              "tick": 77,
+              "status": "executing",
+              "phase": "occupied"
+            },
+            {
+              "tick": 77,
+              "status": "executing",
+              "phase": "cancelling",
+              "code": "social.pre-empted"
+            },
+            {
+              "tick": 78,
+              "status": "executing",
+              "phase": "stand-up"
+            },
+            {
+              "tick": 89,
+              "status": "cancelled",
+              "phase": "stand-up",
+              "code": "social.pre-empted"
+            }
+          ],
+          "requestedTick": 0,
+          "diagnostic": {
+            "code": "social.pre-empted",
+            "message": "pre-empted by a3 (walk_to)",
+            "subjects": [
+              "a3"
+            ],
+            "details": {
+              "reason": "pre-empted by a3",
+              "by": "a3"
+            }
+          },
+          "phase": "stand-up",
+          "outputs": {
+            "stoodAt": [
+              3.827021247335479e-17,
+              -4.375
+            ]
+          },
+          "endedTick": 89
+        },
+        {
+          "id": "a2",
+          "verb": "walk_to",
+          "params": {
+            "actor": "p1",
+            "x": 3.827021247335479e-17,
+            "z": -4.375,
+            "level": 0,
+            "face": 1.5707963267948966
+          },
+          "status": "completed",
+          "history": [
+            {
+              "tick": 0,
+              "status": "requested"
+            },
+            {
+              "tick": 0,
+              "status": "validated"
+            },
+            {
+              "tick": 0,
+              "status": "reserved"
+            },
+            {
+              "tick": 0,
+              "status": "executing"
+            },
+            {
+              "tick": 1,
+              "status": "executing",
+              "phase": "walk"
+            },
+            {
+              "tick": 54,
+              "status": "executing",
+              "phase": "face"
+            },
+            {
+              "tick": 66,
+              "status": "completed",
+              "phase": "face"
+            }
+          ],
+          "requestedTick": 0,
+          "parent": "a1",
+          "phase": "face",
+          "outputs": {
+            "replans": 0,
+            "length": 2.191502719665379,
+            "snapped": 0,
+            "pushes": 0
+          },
+          "endedTick": 66
+        },
+        {
+          "id": "a3",
+          "verb": "walk_to",
+          "params": {
+            "actor": "p1",
+            "x": -4,
+            "z": -7
+          },
+          "status": "completed",
+          "history": [
+            {
+              "tick": 77,
+              "status": "requested"
+            },
+            {
+              "tick": 77,
+              "status": "requested",
+              "phase": "pre-empting"
+            },
+            {
+              "tick": 89,
+              "status": "validated"
+            },
+            {
+              "tick": 89,
+              "status": "reserved"
+            },
+            {
+              "tick": 89,
+              "status": "executing"
+            },
+            {
+              "tick": 90,
+              "status": "executing",
+              "phase": "walk"
+            },
+            {
+              "tick": 183,
+              "status": "completed",
+              "phase": "walk"
+            }
+          ],
+          "requestedTick": 77,
+          "phase": "walk",
+          "outputs": {
+            "replans": 0,
+            "length": 5.069281265790661,
+            "snapped": 0,
+            "pushes": 0
+          },
+          "endedTick": 183
+        },
+        {
+          "id": "a1:resume:a3",
+          "verb": "sit",
+          "params": {
+            "actor": "p1",
+            "slot": "chair#seat"
+          },
+          "status": "executing",
+          "history": [
+            {
+              "tick": 183,
+              "status": "requested"
+            },
+            {
+              "tick": 183,
+              "status": "validated"
+            },
+            {
+              "tick": 183,
+              "status": "reserved"
+            },
+            {
+              "tick": 183,
+              "status": "executing"
+            },
+            {
+              "tick": 184,
+              "status": "executing",
+              "phase": "approach"
+            },
+            {
+              "tick": 294,
+              "status": "executing",
+              "phase": "sit-down"
+            },
+            {
+              "tick": 305,
+              "status": "executing",
+              "phase": "occupied"
+            }
+          ],
+          "requestedTick": 183,
+          "phase": "occupied"
+        },
+        {
+          "id": "a4",
+          "verb": "walk_to",
+          "params": {
+            "actor": "p1",
+            "x": 3.827021247335479e-17,
+            "z": -4.375,
+            "level": 0,
+            "face": 1.5707963267948966
+          },
+          "status": "completed",
+          "history": [
+            {
+              "tick": 183,
+              "status": "requested"
+            },
+            {
+              "tick": 183,
+              "status": "validated"
+            },
+            {
+              "tick": 183,
+              "status": "reserved"
+            },
+            {
+              "tick": 183,
+              "status": "executing"
+            },
+            {
+              "tick": 184,
+              "status": "executing",
+              "phase": "turn"
+            },
+            {
+              "tick": 189,
+              "status": "executing",
+              "phase": "walk"
+            },
+            {
+              "tick": 284,
+              "status": "executing",
+              "phase": "face"
+            },
+            {
+              "tick": 294,
+              "status": "completed",
+              "phase": "face"
+            }
+          ],
+          "requestedTick": 183,
+          "parent": "a1:resume:a3",
+          "phase": "face",
+          "outputs": {
+            "replans": 0,
+            "length": 4.9416626595889035,
+            "snapped": 0,
+            "pushes": 0
+          },
+          "endedTick": 294
+        }
+      ],
+      "violations": []
+    }
+  },
+  {
+    "ticks": 0,
+    "control": "cancel",
+    "pause": {
+      "tick": 77,
+      "hash": "868a3c539e00ea08a49ef9b87e61f8ad471d659adc1cc9872ef6831f1706af5f"
+    },
+    "result": {
+      "world": {
+        "schema": "mars-world/1",
+        "base": {
+          "campus": "social-resume",
+          "staticHash": "fdbb797772808a3e8d8cd77a56d12e064ff0cb10fb870c017cc23b683491f97e"
+        },
+        "tick": 497,
+        "entities": {
+          "chair": {
+            "id": "chair",
+            "kind": "fixture",
+            "def": "camp-chair",
+            "pose": {
+              "p": [
+                0,
+                0,
+                -5
+              ],
+              "yaw": 0
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            }
+          },
+          "p1": {
+            "id": "p1",
+            "def": "human",
+            "kind": "human",
+            "label": "p1",
+            "pose": {
+              "p": [
+                3.827021247335479e-17,
+                0,
+                -4.375
+              ],
+              "yaw": 1.5707963267948966
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "idle",
+              "level": 0
+            }
+          },
+          "p2": {
+            "id": "p2",
+            "def": "human",
+            "kind": "human",
+            "label": "p2",
+            "pose": {
+              "p": [
+                -3,
+                0,
+                -7
+              ],
+              "yaw": 0
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "idle",
+              "level": 0
+            }
+          }
+        },
+        "regions": {},
+        "env": {
+          "datetime": "2026-03-01T16:00",
+          "weather": {
+            "clouds": 0,
+            "rain": 0,
+            "wind": 0,
+            "dust": 0,
+            "wet": 0
+          }
+        },
+        "inventory": "finite",
+        "rng": [
+          1929661853,
+          3925456204,
+          1193021468,
+          2516681427
+        ]
+      },
+      "records": [
+        {
+          "id": "a1",
+          "verb": "sit",
+          "params": {
+            "actor": "p1",
+            "fixture": "chair"
+          },
+          "status": "cancelled",
+          "history": [
+            {
+              "tick": 0,
+              "status": "requested"
+            },
+            {
+              "tick": 0,
+              "status": "validated"
+            },
+            {
+              "tick": 0,
+              "status": "reserved"
+            },
+            {
+              "tick": 0,
+              "status": "executing"
+            },
+            {
+              "tick": 1,
+              "status": "executing",
+              "phase": "approach"
+            },
+            {
+              "tick": 66,
+              "status": "executing",
+              "phase": "sit-down"
+            },
+            {
+              "tick": 77,
+              "status": "executing",
+              "phase": "occupied"
+            },
+            {
+              "tick": 77,
+              "status": "executing",
+              "phase": "cancelling",
+              "code": "social.pre-empted"
+            },
+            {
+              "tick": 78,
+              "status": "executing",
+              "phase": "stand-up"
+            },
+            {
+              "tick": 89,
+              "status": "cancelled",
+              "phase": "stand-up",
+              "code": "social.pre-empted"
+            }
+          ],
+          "requestedTick": 0,
+          "diagnostic": {
+            "code": "social.pre-empted",
+            "message": "pre-empted by a3 (walk_to)",
+            "subjects": [
+              "a3"
+            ],
+            "details": {
+              "reason": "pre-empted by a3",
+              "by": "a3"
+            }
+          },
+          "phase": "stand-up",
+          "outputs": {
+            "stoodAt": [
+              3.827021247335479e-17,
+              -4.375
+            ]
+          },
+          "endedTick": 89
+        },
+        {
+          "id": "a2",
+          "verb": "walk_to",
+          "params": {
+            "actor": "p1",
+            "x": 3.827021247335479e-17,
+            "z": -4.375,
+            "level": 0,
+            "face": 1.5707963267948966
+          },
+          "status": "completed",
+          "history": [
+            {
+              "tick": 0,
+              "status": "requested"
+            },
+            {
+              "tick": 0,
+              "status": "validated"
+            },
+            {
+              "tick": 0,
+              "status": "reserved"
+            },
+            {
+              "tick": 0,
+              "status": "executing"
+            },
+            {
+              "tick": 1,
+              "status": "executing",
+              "phase": "walk"
+            },
+            {
+              "tick": 54,
+              "status": "executing",
+              "phase": "face"
+            },
+            {
+              "tick": 66,
+              "status": "completed",
+              "phase": "face"
+            }
+          ],
+          "requestedTick": 0,
+          "parent": "a1",
+          "phase": "face",
+          "outputs": {
+            "replans": 0,
+            "length": 2.191502719665379,
+            "snapped": 0,
+            "pushes": 0
+          },
+          "endedTick": 66
+        },
+        {
+          "id": "a3",
+          "verb": "walk_to",
+          "params": {
+            "actor": "p1",
+            "x": -4,
+            "z": -7
+          },
+          "status": "cancelled",
+          "history": [
+            {
+              "tick": 77,
+              "status": "requested"
+            },
+            {
+              "tick": 77,
+              "status": "requested",
+              "phase": "pre-empting"
+            },
+            {
+              "tick": 77,
+              "status": "cancelled",
+              "phase": "pre-empting"
+            }
+          ],
+          "requestedTick": 77,
+          "phase": "pre-empting",
+          "endedTick": 77
+        }
+      ],
+      "violations": []
+    }
+  },
+  {
+    "ticks": 0,
+    "control": "newer",
+    "pause": {
+      "tick": 77,
+      "hash": "868a3c539e00ea08a49ef9b87e61f8ad471d659adc1cc9872ef6831f1706af5f"
+    },
+    "result": {
+      "world": {
+        "schema": "mars-world/1",
+        "base": {
+          "campus": "social-resume",
+          "staticHash": "fdbb797772808a3e8d8cd77a56d12e064ff0cb10fb870c017cc23b683491f97e"
+        },
+        "tick": 497,
+        "entities": {
+          "chair": {
+            "id": "chair",
+            "kind": "fixture",
+            "def": "camp-chair",
+            "pose": {
+              "p": [
+                0,
+                0,
+                -5
+              ],
+              "yaw": 0
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            }
+          },
+          "p1": {
+            "id": "p1",
+            "def": "human",
+            "kind": "human",
+            "label": "p1",
+            "pose": {
+              "p": [
+                -4,
+                0,
+                -7
+              ],
+              "yaw": -2.374710892260354
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "idle",
+              "level": 0
+            }
+          },
+          "p2": {
+            "id": "p2",
+            "def": "human",
+            "kind": "human",
+            "label": "p2",
+            "pose": {
+              "p": [
+                -3,
+                0,
+                -7
+              ],
+              "yaw": 0
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "idle",
+              "level": 0
+            }
+          }
+        },
+        "regions": {},
+        "env": {
+          "datetime": "2026-03-01T16:00",
+          "weather": {
+            "clouds": 0,
+            "rain": 0,
+            "wind": 0,
+            "dust": 0,
+            "wet": 0
+          }
+        },
+        "inventory": "finite",
+        "rng": [
+          1929661853,
+          3925456204,
+          1193021468,
+          2516681427
+        ]
+      },
+      "records": [
+        {
+          "id": "a1",
+          "verb": "sit",
+          "params": {
+            "actor": "p1",
+            "fixture": "chair"
+          },
+          "status": "cancelled",
+          "history": [
+            {
+              "tick": 0,
+              "status": "requested"
+            },
+            {
+              "tick": 0,
+              "status": "validated"
+            },
+            {
+              "tick": 0,
+              "status": "reserved"
+            },
+            {
+              "tick": 0,
+              "status": "executing"
+            },
+            {
+              "tick": 1,
+              "status": "executing",
+              "phase": "approach"
+            },
+            {
+              "tick": 66,
+              "status": "executing",
+              "phase": "sit-down"
+            },
+            {
+              "tick": 77,
+              "status": "executing",
+              "phase": "occupied"
+            },
+            {
+              "tick": 77,
+              "status": "executing",
+              "phase": "cancelling",
+              "code": "social.pre-empted"
+            },
+            {
+              "tick": 77,
+              "status": "executing",
+              "phase": "cancelling",
+              "code": "social.pre-empted"
+            },
+            {
+              "tick": 78,
+              "status": "executing",
+              "phase": "stand-up"
+            },
+            {
+              "tick": 89,
+              "status": "cancelled",
+              "phase": "stand-up",
+              "code": "social.pre-empted"
+            }
+          ],
+          "requestedTick": 0,
+          "diagnostic": {
+            "code": "social.pre-empted",
+            "message": "pre-empted by a4 (walk_to)",
+            "subjects": [
+              "a4"
+            ],
+            "details": {
+              "reason": "pre-empted by a4",
+              "by": "a4"
+            }
+          },
+          "phase": "stand-up",
+          "outputs": {
+            "stoodAt": [
+              3.827021247335479e-17,
+              -4.375
+            ]
+          },
+          "endedTick": 89
+        },
+        {
+          "id": "a2",
+          "verb": "walk_to",
+          "params": {
+            "actor": "p1",
+            "x": 3.827021247335479e-17,
+            "z": -4.375,
+            "level": 0,
+            "face": 1.5707963267948966
+          },
+          "status": "completed",
+          "history": [
+            {
+              "tick": 0,
+              "status": "requested"
+            },
+            {
+              "tick": 0,
+              "status": "validated"
+            },
+            {
+              "tick": 0,
+              "status": "reserved"
+            },
+            {
+              "tick": 0,
+              "status": "executing"
+            },
+            {
+              "tick": 1,
+              "status": "executing",
+              "phase": "walk"
+            },
+            {
+              "tick": 54,
+              "status": "executing",
+              "phase": "face"
+            },
+            {
+              "tick": 66,
+              "status": "completed",
+              "phase": "face"
+            }
+          ],
+          "requestedTick": 0,
+          "parent": "a1",
+          "phase": "face",
+          "outputs": {
+            "replans": 0,
+            "length": 2.191502719665379,
+            "snapped": 0,
+            "pushes": 0
+          },
+          "endedTick": 66
+        },
+        {
+          "id": "a3",
+          "verb": "walk_to",
+          "params": {
+            "actor": "p1",
+            "x": -4,
+            "z": -7
+          },
+          "status": "completed",
+          "history": [
+            {
+              "tick": 77,
+              "status": "requested"
+            },
+            {
+              "tick": 77,
+              "status": "requested",
+              "phase": "pre-empting"
+            },
+            {
+              "tick": 89,
+              "status": "validated"
+            },
+            {
+              "tick": 89,
+              "status": "reserved"
+            },
+            {
+              "tick": 89,
+              "status": "executing"
+            },
+            {
+              "tick": 90,
+              "status": "executing",
+              "phase": "walk"
+            },
+            {
+              "tick": 183,
+              "status": "completed",
+              "phase": "walk"
+            }
+          ],
+          "requestedTick": 77,
+          "phase": "walk",
+          "outputs": {
+            "replans": 0,
+            "length": 5.069281265790661,
+            "snapped": 0,
+            "pushes": 0
+          },
+          "endedTick": 183
+        },
+        {
+          "id": "a4",
+          "verb": "walk_to",
+          "params": {
+            "actor": "p1",
+            "x": -8,
+            "z": -7
+          },
+          "status": "failed",
+          "history": [
+            {
+              "tick": 77,
+              "status": "requested"
+            },
+            {
+              "tick": 77,
+              "status": "requested",
+              "phase": "pre-empting"
+            },
+            {
+              "tick": 89,
+              "status": "validated"
+            },
+            {
+              "tick": 89,
+              "status": "failed",
+              "code": "reservation.conflict"
+            }
+          ],
+          "requestedTick": 77,
+          "diagnostic": {
+            "code": "reservation.conflict",
+            "message": "actor:p1 is already reserved by action a3 (walk_to, executing)",
+            "subjects": [
+              "p1"
+            ],
+            "details": {
+              "resource": "actor:p1",
+              "holder": "a3"
+            }
+          },
+          "endedTick": 89
+        }
+      ],
+      "violations": []
+    }
+  },
+  {
+    "ticks": 5,
+    "control": "continue",
+    "pause": {
+      "tick": 82,
+      "hash": "d36924585230a454a70cc31f5834f990bf902e8d0b0ef999d8f9a7cc2e5bc7b9"
+    },
+    "result": {
+      "world": {
+        "schema": "mars-world/1",
+        "base": {
+          "campus": "social-resume",
+          "staticHash": "fdbb797772808a3e8d8cd77a56d12e064ff0cb10fb870c017cc23b683491f97e"
+        },
+        "tick": 502,
+        "entities": {
+          "chair": {
+            "id": "chair",
+            "kind": "fixture",
+            "def": "camp-chair",
+            "pose": {
+              "p": [
+                0,
+                0,
+                -5
+              ],
+              "yaw": 0
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            }
+          },
+          "p1": {
+            "id": "p1",
+            "def": "human",
+            "kind": "human",
+            "label": "p1",
+            "pose": {
+              "p": [
+                0,
+                0,
+                -5
+              ],
+              "yaw": 1.5707963267948966
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "sit",
+              "level": 0,
+              "task": "a1:resume:a3"
+            }
+          },
+          "p2": {
+            "id": "p2",
+            "def": "human",
+            "kind": "human",
+            "label": "p2",
+            "pose": {
+              "p": [
+                -3,
+                0,
+                -7
+              ],
+              "yaw": 0
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "idle",
+              "level": 0
+            }
+          }
+        },
+        "regions": {},
+        "env": {
+          "datetime": "2026-03-01T16:00",
+          "weather": {
+            "clouds": 0,
+            "rain": 0,
+            "wind": 0,
+            "dust": 0,
+            "wet": 0
+          }
+        },
+        "inventory": "finite",
+        "rng": [
+          1929661853,
+          3925456204,
+          1193021468,
+          2516681427
+        ]
+      },
+      "records": [
+        {
+          "id": "a1",
+          "verb": "sit",
+          "params": {
+            "actor": "p1",
+            "fixture": "chair"
+          },
+          "status": "cancelled",
+          "history": [
+            {
+              "tick": 0,
+              "status": "requested"
+            },
+            {
+              "tick": 0,
+              "status": "validated"
+            },
+            {
+              "tick": 0,
+              "status": "reserved"
+            },
+            {
+              "tick": 0,
+              "status": "executing"
+            },
+            {
+              "tick": 1,
+              "status": "executing",
+              "phase": "approach"
+            },
+            {
+              "tick": 66,
+              "status": "executing",
+              "phase": "sit-down"
+            },
+            {
+              "tick": 77,
+              "status": "executing",
+              "phase": "occupied"
+            },
+            {
+              "tick": 77,
+              "status": "executing",
+              "phase": "cancelling",
+              "code": "social.pre-empted"
+            },
+            {
+              "tick": 78,
+              "status": "executing",
+              "phase": "stand-up"
+            },
+            {
+              "tick": 89,
+              "status": "cancelled",
+              "phase": "stand-up",
+              "code": "social.pre-empted"
+            }
+          ],
+          "requestedTick": 0,
+          "diagnostic": {
+            "code": "social.pre-empted",
+            "message": "pre-empted by a3 (walk_to)",
+            "subjects": [
+              "a3"
+            ],
+            "details": {
+              "reason": "pre-empted by a3",
+              "by": "a3"
+            }
+          },
+          "phase": "stand-up",
+          "outputs": {
+            "stoodAt": [
+              3.827021247335479e-17,
+              -4.375
+            ]
+          },
+          "endedTick": 89
+        },
+        {
+          "id": "a2",
+          "verb": "walk_to",
+          "params": {
+            "actor": "p1",
+            "x": 3.827021247335479e-17,
+            "z": -4.375,
+            "level": 0,
+            "face": 1.5707963267948966
+          },
+          "status": "completed",
+          "history": [
+            {
+              "tick": 0,
+              "status": "requested"
+            },
+            {
+              "tick": 0,
+              "status": "validated"
+            },
+            {
+              "tick": 0,
+              "status": "reserved"
+            },
+            {
+              "tick": 0,
+              "status": "executing"
+            },
+            {
+              "tick": 1,
+              "status": "executing",
+              "phase": "walk"
+            },
+            {
+              "tick": 54,
+              "status": "executing",
+              "phase": "face"
+            },
+            {
+              "tick": 66,
+              "status": "completed",
+              "phase": "face"
+            }
+          ],
+          "requestedTick": 0,
+          "parent": "a1",
+          "phase": "face",
+          "outputs": {
+            "replans": 0,
+            "length": 2.191502719665379,
+            "snapped": 0,
+            "pushes": 0
+          },
+          "endedTick": 66
+        },
+        {
+          "id": "a3",
+          "verb": "walk_to",
+          "params": {
+            "actor": "p1",
+            "x": -4,
+            "z": -7
+          },
+          "status": "completed",
+          "history": [
+            {
+              "tick": 77,
+              "status": "requested"
+            },
+            {
+              "tick": 77,
+              "status": "requested",
+              "phase": "pre-empting"
+            },
+            {
+              "tick": 89,
+              "status": "validated"
+            },
+            {
+              "tick": 89,
+              "status": "reserved"
+            },
+            {
+              "tick": 89,
+              "status": "executing"
+            },
+            {
+              "tick": 90,
+              "status": "executing",
+              "phase": "walk"
+            },
+            {
+              "tick": 183,
+              "status": "completed",
+              "phase": "walk"
+            }
+          ],
+          "requestedTick": 77,
+          "phase": "walk",
+          "outputs": {
+            "replans": 0,
+            "length": 5.069281265790661,
+            "snapped": 0,
+            "pushes": 0
+          },
+          "endedTick": 183
+        },
+        {
+          "id": "a1:resume:a3",
+          "verb": "sit",
+          "params": {
+            "actor": "p1",
+            "slot": "chair#seat"
+          },
+          "status": "executing",
+          "history": [
+            {
+              "tick": 183,
+              "status": "requested"
+            },
+            {
+              "tick": 183,
+              "status": "validated"
+            },
+            {
+              "tick": 183,
+              "status": "reserved"
+            },
+            {
+              "tick": 183,
+              "status": "executing"
+            },
+            {
+              "tick": 184,
+              "status": "executing",
+              "phase": "approach"
+            },
+            {
+              "tick": 294,
+              "status": "executing",
+              "phase": "sit-down"
+            },
+            {
+              "tick": 305,
+              "status": "executing",
+              "phase": "occupied"
+            }
+          ],
+          "requestedTick": 183,
+          "phase": "occupied"
+        },
+        {
+          "id": "a4",
+          "verb": "walk_to",
+          "params": {
+            "actor": "p1",
+            "x": 3.827021247335479e-17,
+            "z": -4.375,
+            "level": 0,
+            "face": 1.5707963267948966
+          },
+          "status": "completed",
+          "history": [
+            {
+              "tick": 183,
+              "status": "requested"
+            },
+            {
+              "tick": 183,
+              "status": "validated"
+            },
+            {
+              "tick": 183,
+              "status": "reserved"
+            },
+            {
+              "tick": 183,
+              "status": "executing"
+            },
+            {
+              "tick": 184,
+              "status": "executing",
+              "phase": "turn"
+            },
+            {
+              "tick": 189,
+              "status": "executing",
+              "phase": "walk"
+            },
+            {
+              "tick": 284,
+              "status": "executing",
+              "phase": "face"
+            },
+            {
+              "tick": 294,
+              "status": "completed",
+              "phase": "face"
+            }
+          ],
+          "requestedTick": 183,
+          "parent": "a1:resume:a3",
+          "phase": "face",
+          "outputs": {
+            "replans": 0,
+            "length": 4.9416626595889035,
+            "snapped": 0,
+            "pushes": 0
+          },
+          "endedTick": 294
+        }
+      ],
+      "violations": []
+    }
+  },
+  {
+    "ticks": 5,
+    "control": "cancel",
+    "pause": {
+      "tick": 82,
+      "hash": "d36924585230a454a70cc31f5834f990bf902e8d0b0ef999d8f9a7cc2e5bc7b9"
+    },
+    "result": {
+      "world": {
+        "schema": "mars-world/1",
+        "base": {
+          "campus": "social-resume",
+          "staticHash": "fdbb797772808a3e8d8cd77a56d12e064ff0cb10fb870c017cc23b683491f97e"
+        },
+        "tick": 502,
+        "entities": {
+          "chair": {
+            "id": "chair",
+            "kind": "fixture",
+            "def": "camp-chair",
+            "pose": {
+              "p": [
+                0,
+                0,
+                -5
+              ],
+              "yaw": 0
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            }
+          },
+          "p1": {
+            "id": "p1",
+            "def": "human",
+            "kind": "human",
+            "label": "p1",
+            "pose": {
+              "p": [
+                3.827021247335479e-17,
+                0,
+                -4.375
+              ],
+              "yaw": 1.5707963267948966
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "idle",
+              "level": 0
+            }
+          },
+          "p2": {
+            "id": "p2",
+            "def": "human",
+            "kind": "human",
+            "label": "p2",
+            "pose": {
+              "p": [
+                -3,
+                0,
+                -7
+              ],
+              "yaw": 0
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "idle",
+              "level": 0
+            }
+          }
+        },
+        "regions": {},
+        "env": {
+          "datetime": "2026-03-01T16:00",
+          "weather": {
+            "clouds": 0,
+            "rain": 0,
+            "wind": 0,
+            "dust": 0,
+            "wet": 0
+          }
+        },
+        "inventory": "finite",
+        "rng": [
+          1929661853,
+          3925456204,
+          1193021468,
+          2516681427
+        ]
+      },
+      "records": [
+        {
+          "id": "a1",
+          "verb": "sit",
+          "params": {
+            "actor": "p1",
+            "fixture": "chair"
+          },
+          "status": "cancelled",
+          "history": [
+            {
+              "tick": 0,
+              "status": "requested"
+            },
+            {
+              "tick": 0,
+              "status": "validated"
+            },
+            {
+              "tick": 0,
+              "status": "reserved"
+            },
+            {
+              "tick": 0,
+              "status": "executing"
+            },
+            {
+              "tick": 1,
+              "status": "executing",
+              "phase": "approach"
+            },
+            {
+              "tick": 66,
+              "status": "executing",
+              "phase": "sit-down"
+            },
+            {
+              "tick": 77,
+              "status": "executing",
+              "phase": "occupied"
+            },
+            {
+              "tick": 77,
+              "status": "executing",
+              "phase": "cancelling",
+              "code": "social.pre-empted"
+            },
+            {
+              "tick": 78,
+              "status": "executing",
+              "phase": "stand-up"
+            },
+            {
+              "tick": 89,
+              "status": "cancelled",
+              "phase": "stand-up",
+              "code": "social.pre-empted"
+            }
+          ],
+          "requestedTick": 0,
+          "diagnostic": {
+            "code": "social.pre-empted",
+            "message": "pre-empted by a3 (walk_to)",
+            "subjects": [
+              "a3"
+            ],
+            "details": {
+              "reason": "pre-empted by a3",
+              "by": "a3"
+            }
+          },
+          "phase": "stand-up",
+          "outputs": {
+            "stoodAt": [
+              3.827021247335479e-17,
+              -4.375
+            ]
+          },
+          "endedTick": 89
+        },
+        {
+          "id": "a2",
+          "verb": "walk_to",
+          "params": {
+            "actor": "p1",
+            "x": 3.827021247335479e-17,
+            "z": -4.375,
+            "level": 0,
+            "face": 1.5707963267948966
+          },
+          "status": "completed",
+          "history": [
+            {
+              "tick": 0,
+              "status": "requested"
+            },
+            {
+              "tick": 0,
+              "status": "validated"
+            },
+            {
+              "tick": 0,
+              "status": "reserved"
+            },
+            {
+              "tick": 0,
+              "status": "executing"
+            },
+            {
+              "tick": 1,
+              "status": "executing",
+              "phase": "walk"
+            },
+            {
+              "tick": 54,
+              "status": "executing",
+              "phase": "face"
+            },
+            {
+              "tick": 66,
+              "status": "completed",
+              "phase": "face"
+            }
+          ],
+          "requestedTick": 0,
+          "parent": "a1",
+          "phase": "face",
+          "outputs": {
+            "replans": 0,
+            "length": 2.191502719665379,
+            "snapped": 0,
+            "pushes": 0
+          },
+          "endedTick": 66
+        },
+        {
+          "id": "a3",
+          "verb": "walk_to",
+          "params": {
+            "actor": "p1",
+            "x": -4,
+            "z": -7
+          },
+          "status": "cancelled",
+          "history": [
+            {
+              "tick": 77,
+              "status": "requested"
+            },
+            {
+              "tick": 77,
+              "status": "requested",
+              "phase": "pre-empting"
+            },
+            {
+              "tick": 82,
+              "status": "cancelled",
+              "phase": "pre-empting"
+            }
+          ],
+          "requestedTick": 77,
+          "phase": "pre-empting",
+          "endedTick": 82
+        }
+      ],
+      "violations": []
+    }
+  },
+  {
+    "ticks": 5,
+    "control": "newer",
+    "pause": {
+      "tick": 82,
+      "hash": "d36924585230a454a70cc31f5834f990bf902e8d0b0ef999d8f9a7cc2e5bc7b9"
+    },
+    "result": {
+      "world": {
+        "schema": "mars-world/1",
+        "base": {
+          "campus": "social-resume",
+          "staticHash": "fdbb797772808a3e8d8cd77a56d12e064ff0cb10fb870c017cc23b683491f97e"
+        },
+        "tick": 502,
+        "entities": {
+          "chair": {
+            "id": "chair",
+            "kind": "fixture",
+            "def": "camp-chair",
+            "pose": {
+              "p": [
+                0,
+                0,
+                -5
+              ],
+              "yaw": 0
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            }
+          },
+          "p1": {
+            "id": "p1",
+            "def": "human",
+            "kind": "human",
+            "label": "p1",
+            "pose": {
+              "p": [
+                -4,
+                0,
+                -7
+              ],
+              "yaw": -2.374710892260354
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "idle",
+              "level": 0
+            }
+          },
+          "p2": {
+            "id": "p2",
+            "def": "human",
+            "kind": "human",
+            "label": "p2",
+            "pose": {
+              "p": [
+                -3,
+                0,
+                -7
+              ],
+              "yaw": 0
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "idle",
+              "level": 0
+            }
+          }
+        },
+        "regions": {},
+        "env": {
+          "datetime": "2026-03-01T16:00",
+          "weather": {
+            "clouds": 0,
+            "rain": 0,
+            "wind": 0,
+            "dust": 0,
+            "wet": 0
+          }
+        },
+        "inventory": "finite",
+        "rng": [
+          1929661853,
+          3925456204,
+          1193021468,
+          2516681427
+        ]
+      },
+      "records": [
+        {
+          "id": "a1",
+          "verb": "sit",
+          "params": {
+            "actor": "p1",
+            "fixture": "chair"
+          },
+          "status": "cancelled",
+          "history": [
+            {
+              "tick": 0,
+              "status": "requested"
+            },
+            {
+              "tick": 0,
+              "status": "validated"
+            },
+            {
+              "tick": 0,
+              "status": "reserved"
+            },
+            {
+              "tick": 0,
+              "status": "executing"
+            },
+            {
+              "tick": 1,
+              "status": "executing",
+              "phase": "approach"
+            },
+            {
+              "tick": 66,
+              "status": "executing",
+              "phase": "sit-down"
+            },
+            {
+              "tick": 77,
+              "status": "executing",
+              "phase": "occupied"
+            },
+            {
+              "tick": 77,
+              "status": "executing",
+              "phase": "cancelling",
+              "code": "social.pre-empted"
+            },
+            {
+              "tick": 78,
+              "status": "executing",
+              "phase": "stand-up"
+            },
+            {
+              "tick": 82,
+              "status": "executing",
+              "phase": "cancelling",
+              "code": "social.pre-empted"
+            },
+            {
+              "tick": 83,
+              "status": "executing",
+              "phase": "stand-up"
+            },
+            {
+              "tick": 89,
+              "status": "cancelled",
+              "phase": "stand-up",
+              "code": "social.pre-empted"
+            }
+          ],
+          "requestedTick": 0,
+          "diagnostic": {
+            "code": "social.pre-empted",
+            "message": "pre-empted by a4 (walk_to)",
+            "subjects": [
+              "a4"
+            ],
+            "details": {
+              "reason": "pre-empted by a4",
+              "by": "a4"
+            }
+          },
+          "phase": "stand-up",
+          "outputs": {
+            "stoodAt": [
+              3.827021247335479e-17,
+              -4.375
+            ]
+          },
+          "endedTick": 89
+        },
+        {
+          "id": "a2",
+          "verb": "walk_to",
+          "params": {
+            "actor": "p1",
+            "x": 3.827021247335479e-17,
+            "z": -4.375,
+            "level": 0,
+            "face": 1.5707963267948966
+          },
+          "status": "completed",
+          "history": [
+            {
+              "tick": 0,
+              "status": "requested"
+            },
+            {
+              "tick": 0,
+              "status": "validated"
+            },
+            {
+              "tick": 0,
+              "status": "reserved"
+            },
+            {
+              "tick": 0,
+              "status": "executing"
+            },
+            {
+              "tick": 1,
+              "status": "executing",
+              "phase": "walk"
+            },
+            {
+              "tick": 54,
+              "status": "executing",
+              "phase": "face"
+            },
+            {
+              "tick": 66,
+              "status": "completed",
+              "phase": "face"
+            }
+          ],
+          "requestedTick": 0,
+          "parent": "a1",
+          "phase": "face",
+          "outputs": {
+            "replans": 0,
+            "length": 2.191502719665379,
+            "snapped": 0,
+            "pushes": 0
+          },
+          "endedTick": 66
+        },
+        {
+          "id": "a3",
+          "verb": "walk_to",
+          "params": {
+            "actor": "p1",
+            "x": -4,
+            "z": -7
+          },
+          "status": "completed",
+          "history": [
+            {
+              "tick": 77,
+              "status": "requested"
+            },
+            {
+              "tick": 77,
+              "status": "requested",
+              "phase": "pre-empting"
+            },
+            {
+              "tick": 89,
+              "status": "validated"
+            },
+            {
+              "tick": 89,
+              "status": "reserved"
+            },
+            {
+              "tick": 89,
+              "status": "executing"
+            },
+            {
+              "tick": 90,
+              "status": "executing",
+              "phase": "walk"
+            },
+            {
+              "tick": 183,
+              "status": "completed",
+              "phase": "walk"
+            }
+          ],
+          "requestedTick": 77,
+          "phase": "walk",
+          "outputs": {
+            "replans": 0,
+            "length": 5.069281265790661,
+            "snapped": 0,
+            "pushes": 0
+          },
+          "endedTick": 183
+        },
+        {
+          "id": "a4",
+          "verb": "walk_to",
+          "params": {
+            "actor": "p1",
+            "x": -8,
+            "z": -7
+          },
+          "status": "failed",
+          "history": [
+            {
+              "tick": 82,
+              "status": "requested"
+            },
+            {
+              "tick": 82,
+              "status": "requested",
+              "phase": "pre-empting"
+            },
+            {
+              "tick": 89,
+              "status": "validated"
+            },
+            {
+              "tick": 89,
+              "status": "failed",
+              "code": "reservation.conflict"
+            }
+          ],
+          "requestedTick": 82,
+          "diagnostic": {
+            "code": "reservation.conflict",
+            "message": "actor:p1 is already reserved by action a3 (walk_to, executing)",
+            "subjects": [
+              "p1"
+            ],
+            "details": {
+              "resource": "actor:p1",
+              "holder": "a3"
+            }
+          },
+          "endedTick": 89
+        }
+      ],
+      "violations": []
+    }
+  }
+]

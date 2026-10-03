@@ -1,0 +1,7 @@
+# LM076 live-link admission
+
+Candidate only; full gate/pin comparison pending. Current scene link, copied planned link geometry, and future corridor validity now guard stair movement. Before entry invalidation fails; mid-flight it blocks with current pose, actor/traffic claims and named diagnostic. It neither replans onto the lower floor nor cancels into an unusable path. Restoring the link permits ordinary completion or deferred cancellation.
+
+Three tests cover seven captured cases: entry closure, mid-flight closure/removal/replacement geometry/in-place geometry/cancellation, and future-corridor invalidation. Navigation regressions and source scan pass (16 checks total). Capture JSON personally inspected. Removed-link fixture retains the physical stair body; actual destruction of occupied structure is not authorized or synthesized by this feature. Body sweeps remain LM032. Pins unchanged in this branch; integrated verification required.
+
+Integration review follow-up: deferred cancellation now validates the chosen entry/exit landing against current floor surfaces and grid clearance before any motion. Missing/obstructed support gives `route.landing-unavailable`, preserving pose and actor/traffic claims until restoration; both endpoints tested and two new JSON states inspected. Link alignment reuses its earlier Spatial.sync rather than scanning twice; stress-work proof pending. Four link tests pass, tsc/lint clean.

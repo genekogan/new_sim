@@ -1,0 +1,54 @@
+# Design studio candidate — 2026-09-30
+
+Branch `codex/design-studio`, fresh worktree/base `a6c98852e0a714999fb744b87d9d3a8271aedbb9`; existing worktrees preserved. Local Git only. Root's after-gathering gate/release remains independent and frozen.
+
+## User-visible candidate
+
+Fresh hypothetical independent design studio with nine differently named people, own fixture/item IDs, offset critique seating, east computer/work chair, west lunch table and wider/shallower ground room. Existing classroom/workstation/food/rest and purposeful/after-gathering coordinators execute everything. No activity logic copied, shared factory modified, new capability/imported engine asset introduced or historical claim made.
+
+Exported `DesignStudioBindings` holds roles (two presenters, audience string array with four authored reviewers, worker and companion), typed `workBreak`, `session`, `rest`, `departure`, `followUpWork` and `followUpDiscussion`. `designStudioBindings()` returns fresh clones. `designStudioRoutineParams(session)` and `designStudioContinuationParams(session,routine)` only produce typed ordinary params bound to explicit action identities. `designStudioWorld()` starts no actions and `designStudioScene()` supplies its ground geometry.
+
+Root owns shared Lab binding adapter/admission/HUD/hooks, renderer and optional separately attributed computer appearance. First studio arrangement excludes layout-moving UI. Engine reuses existing generic dimensions/capabilities; the catalog asset's actual dimensions/scale are not certified by this scene.
+
+## Owned paths and validation status
+
+- New `viewer/engine/scenarios/design-studio.ts`: scenario data/world/geometry and typed binding helpers only.
+- New `viewer/engine/test/design-studio.test.ts`: full ordinary journey/concurrent continuing purposes, actual seated worker and changing pair floor, local direction/resume, occupied computer/foreign unfinished task, unavailable required display/refusal/remedy, reset isolation and timed deterministic replay.
+- This PLAN and REPORT.
+
+Source/tests authored under root's no-heavy-check hold. No tests, TypeScript, lint, browser/build/deploy/full gate process run. No shared APIs, assets, registry/version, pins or baselines changed. Queued focused commands from `viewer/` after slot grant:
+
+```sh
+node --test engine/test/design-studio.test.ts
+npx --no-install tsc --noEmit -p .
+npx --no-install tsc --noEmit -p cinematography/tsconfig.json
+npx --no-install oxlint engine/scenarios/design-studio.ts engine/test/design-studio.test.ts
+```
+
+No green/release claim or runtime capture yet. Root owns integrated actual browser proof, full gate and release. No shared prerequisite was discovered during bounded authoring; geometry remains unverified until focused tests can run. No extra agents, downloads or network used.
+
+Root expressly requested an UNVERIFIED source candidate commit during the full-gate hold for static wiring in its separate Lab worktree. Exactly these four owned paths were reviewed for secrets and whitespace before staging. This source commit does not certify geometry or replace the queued focused checks.
+
+
+## Root Lab wiring checkpoint (unverified runtime)
+
+Root selected source78470ce as c8e647a into independent codex/design-studio-lab. Existing panels resolve fresh authored bindings, so the new studio exposes the same work/session/routine/continuation controls with its own people, soup and project labels. New selectable preset and quick-tour link are authored; a bounded light floor/wall palette clones/disposes local materials without changing defaults. This first room intentionally excludes Mars-specific belongings/layout-moving controls. Two complete browser journeys are authored, including actual Play, question, all ordinary effects, continuation pause/End, reset and switching back. No imported mesh, autonomous choice, camera policy or new execution path.
+
+Root viewer TypeScript and scoped lint pass; no Node/browser checks or captures yet because release25 fullgate owns the heavy slot. Read-only Sol6.1 review found notes controls selected any active workstation work; root now restricts Interrupt/Resume to the exact authored actor/station/seat/task/duration and retains independent station-busy gating. Regression assertions cover foreign-user follow-up in old4/8 and the studio, including partial foreign work after safe Pause. No expected outcome/tolerance edits. Physical geometry/routes and captures remain unverified; do not report this candidate released.
+
+
+## Small archive appearance candidate (not imported)
+
+Read-only source inspection selected **Retro Computer & Monitor**, JasperTobias, CC-BY-4.0: `<lm-3d-models>/sketchfab/lore4/ai-computers/retro-computer-monitor-2.glb`. Original is untouched;139184bytes, SHA256 `6f36a07dd2feeb36227f5b308e331b63e7bf3965b06c14e53204353e98180bf5`. Embedded GLB attribution names [JasperTobias](https://sketchfab.com/JasperTobias), [source model](https://sketchfab.com/3d-models/retro-computer-monitor-8926293078874194b551e74c40a3debf), [CC-BY4.0](https://creativecommons.org/licenses/by/4.0/). Embedded buffers/images have no external URI dependencies. Nested node transforms include large scales and translation: raw accessor dimensions must not be treated as meters or valid support.
+
+Promotion task: inspect a rendered preview and transformed bounds, fit an optional appearance inside the existing workstation's supported desktop/envelope, retain meaningful work-state display, verify load/reset/disposal and actor clearance, and ship attribution with the copied asset. Engine capability remains ordinary computer-workstation; no imported mesh may imply new physical capabilities. This is a bounded appearance increment after the plain activity-reuse journey works, not a new asset-system prerequisite or current runtime claim.
+## Focused validation after slot grant
+
+Source candidate `78470ce` was selected by root as `c8e647a`. First focused run:1 passed /5 failed /0 skipped (0.25s), all five runtime cases failing before actions with `no spatial scene registered for campus "design-studio"`. The test had registered the new scene under `classroom` instead of the world's actual campus key. Corrected only the test map to `servicesFor({ 'design-studio': designStudioScene() })`; root was notified of the identical Lab factory wiring fix in its owned path. First RED preserved here; no assertions/tolerances, geometry or shared APIs changed.
+
+Final focused six tests:6 passed /0 failed /0 skipped (3.13s). They physically complete the critique/question/rotation/group/departure/lunch/returns/rest/same unfinished project and both follow-ups, local discussion direction/resume, occupied/foreign unfinished computer refusals and unavailable required display/remedy. Reset isolation and exact state/action/attention-mark replay pass. Both `npx --no-install tsc --noEmit -p .` and `npx --no-install tsc --noEmit -p cinematography/tsconfig.json` clean; scoped scenario/test oxlint clean; diffcheck clean. Root owns integrated browser captures and combined full gate/release; no pins/baselines or engine assets changed.
+
+
+## Actual Lab proof
+
+Root corrected the Lab service registration key to design-studio (same source wiring issue as the first Node run). Focused2/2 browser journeys pass15.7s, with actual automatic Play, live question, complete day effects and independent same-computer follow-up, local Pause/End and clean claims/support, Reset and switch back. Root personally inspected all3actual PNGs: seated critique/meaningful screen, designer using the computer for distinct critique decisions, and ended partial work with safe physical stand-up/remaining progress visible. Current primitive appearance and fixed arrangement are explicit; archive appearance is not imported. ViewerTSc/scopedlint clean. Old4/8 notes-control ownership proof is copied from root's focused4/4passing candidate, including partial foreign-task Pause/Resume. Prepare a bounded compatible combined release candidate after rebase; fullgate/deployedproof still required, release24 remains live.

@@ -1,0 +1,44 @@
+# Optional design-studio computer appearance candidate
+
+Source candidate only: runtime preview, NPC use and focused tests remain UNVERIFIED while root gate 90526 owns the serialized heavy slot. Light viewer TSC and scoped lint pass. Eight focused tests are authored in viewer/deploy/imported-workstation.test.mjs; parent will grant their execution separately and inspect actual browser captures before release claims.
+
+The optional fifth argument is WorkstationAppearanceOptions { kind: 'retro-computer'; onStatus?: (state: WorkstationAppearanceState) => void }. WorkstationVisual gains optional appearanceState(), which returns a fresh object. Status is loading/ready/failed/disposed, with fixed modelUrl, optional local fitted bounds and named diagnostic. Ordinary default construction, task/status/progress canvas and workstation capability are unchanged. Primitive remains until import completes; failure keeps it. Owned ThreeResources, abort and closed guards dispose parsed models and palette decoded after reset.
+
+The renderer fits complete transformed GLTF bounds, rotating source front -X toward the worker's -Z approach, then uniformly scales into desk width/depth minus modest margins and desktop-to-envelope height. Source physical dimensions are undocumented; raw accessor bounds are not metres. Actual CRT faces use the selected source palette UV region, preserving curved geometry while displaying the ordinary live state canvas. Screen orientation/readability is a source proposal pending actual preview. Current Three ignores the asset's legacy KHR_materials_pbrSpecularGlossiness extension, so the helper explicitly restores its embedded diffuse palette through the loader's texture dependency. No binary changes, engine state edits, support overwrite or alternate mover.
+
+Copied only <lm-3d-models>/sketchfab/lore4/ai-computers/retro-computer-monitor-2.glb to viewer/public/models/retro-computer-monitor.glb. Original preserved. Size 139184 bytes; SHA256 6f36a07dd2feeb36227f5b308e331b63e7bf3965b06c14e53204353e98180bf5. Embedded attribution: “Retro Computer & Monitor” by JasperTobias, https://sketchfab.com/JasperTobias; source https://sketchfab.com/3d-models/retro-computer-monitor-8926293078874194b551e74c40a3debf; CC-BY-4.0 https://creativecommons.org/licenses/by/4.0/. Public credit metadata records attribution, unchanged binary and runtime scale/rotation/media mapping changes. No other models imported.
+
+Focused authored coverage: hash/embedded credit; real transformed complete geometry fit; real curved CRT mapping without source geometry mutation; unchanged default geometry/canvas and detached entity read; HTTP refusal/fresh diagnostic; reset during late parse and texture decode; successful load/readout isolation/idempotent disposal. No full gate/browser/build/deploy run by this task.
+
+
+## Root appearance wiring (runtime unverified)
+
+Root owns optional FixtureViews.reset appearance map and detached appearance readouts; LabView opts in only studio-computer/design-studio. Read-only hook exposes renderer status/local bounds, and panel visibly credits JasperTobias/source/CC BY4.0 with scaled/rotated/live screen adaptation disclosure. Named load failure remains visible with primitive fallback; no authoritative world, actor, capability, support or camera state changes. Three focused browser checks are authored: supported envelope and actual NPC notes, injected503visiblefailure with usable same workstation, repeatedReset/switch cleanup. ViewerTSc/scopedlint pass; nofocusedNode/browser/runtimecaptures yet while frozen73eda39fullgate owns heavy slot. Sourcecommit is a durable candidate, not a working/released appearance claim.
+
+Public credit metadata uses the archive-relative source identifier; the exact local original remains documented in design-studio.REPORT. Author/source/license/unchanged binary hash and runtime adaptation disclosure remain public. No original asset edits.
+
+
+## Focused slot result
+
+After release25fullgate finished GREEN, worker ran only `node --test deploy/imported-workstation.test.mjs`:8/8pass,0failure/skip,191.555ms (wall0.734s). Exact copied binary/credit, transformed fit, authored CRT geometry mapping, unchanged primitive task canvas, named404fallback, lateparse/palette cleanup and detached/idempotent lifetime proof pass. No source change was required. Heavy slot immediately released for25deployment; no actualbrowserimportcapture or full26gate yet. Root authored actualNPC/fallback/reset checks remains queued, and the importedappearance is NOT in25source73eda39.
+
+## Bounded draw-group correction
+
+Read-only indexed-geometry inspection found 352 monitor triangles and seven contiguous material runs (three CRT runs containing the same eight screen triangles). The initial helper created one draw group per triangle. Coalescing adjacent same-material triangles now yields seven monitor groups without index reordering, position/normal changes, or alteration to non-screen UVs. Focused assertions bound groups to seven, prove contiguous complete coverage and exact per-triangle material selection, retain eight CRT faces, and preserve original source UV plus non-screen mapped UVs. This correction's focused tests remain queued while the release25 deployment owns the heavy slot; no browser/performance claims. Light TSC/scoped lint validation is recorded with the correction commit.
+
+## Actual-loader node identity correction
+
+The first actual browser attempt failed to reach ready: the CRT mesh lookup used raw glTF node name Monitor.002_RetroPalette2_0, whereas installed GLTFLoader.createUniqueName uses PropertyBinding.sanitizeNodeName and removes periods, yielding Monitor002_RetroPalette2_0. GLTFLoader._loadNodeShallow retains the exact original node identity in userData.name. The focused geometry fixture assigned raw names directly, so eight passing Node tests did not exercise this loader convention; this was a fixture fidelity defect, not proof that the browser loaded the asset.
+
+The helper now accepts exactly one node matching preserved authored userData.name or the exact Three-sanitized name, still requiring the same Mesh, indexed geometry and authored CRT region. The binary, positions, indices, materials selection and UV tolerances are unchanged. The fixture now mirrors loader name sanitization and original identity metadata; its CRT regression asserts that the raw lookup fails and the sanitized node retains the exact original identity before attaching the same eight faces. This correction awaits focused tests and actual browser proof under root's serialized slot. No historical or root-owned wiring/e2e edits.
+
+After root's first browser proof ended (one named-fallback pass, two ready/reset failures retained), the granted focused slot ran the corrected fixture/helper: 8/8 Node tests PASS, zero failures/skips, 145.509 ms. This also validates the seven-group coalescing regression. Viewer TSC and scoped lint PASS. Browser readiness, screen orientation and actual NPC use still await root rerun; no browser/full suite/deploy executed by this worker.
+
+
+## Root actual runtime and reset repairs
+
+First browser attempt1/3pass2fail4.2m: exact loader identity error preventedready; named503fallback stayed usable. Corrected sanitized identity then4/5pass28.2s: both complete studio journeys, actualNPC/taskdisplay and fallback passed; resetgeometries64→72 failed. Root retained traces before reruns and inspected actualloaded/fallbackNPC PNGs. Three-reset diagnostics withunchangedassertions showedgeometry64→72→80→88 andtextures192→285→378→471; calls403stable/peoplefullyloaded.
+
+Actual causes were existing room/actor lifetimes: cloned human skeleton GPUtextures were never disposed on reset/removal; standing display PlaneGeometry was retained until finalviewdispose; folding table creates seven private geometries perinstance butclear/removal hadnoowner release. Importedmodel resources emittedall6currentmeshgeometrydisposeevents; it was not the remainingseven leak. Root now disposes onlyowned human skeletons, per-viewdisplay andtable geometries; sharedtemplategeometries/materials remainowned by their originallifetimes. Temporary diagnosticlogging removed. No geometry/animation/support/invariant/tolerance changes.
+
+Finalfocused5/5browserpass29.5s (twofullstudiojourneys +loadedNPC +503fallback +3strictreset/switchcycles),115/115unitpass0fail/skip/TODO,viewerTSc/scopedlintclean. Resetassertions remain <= initialgeometry/texturecounts, nocushion. Root inspected newloadedNPC, critique andpresenterfollowupcaptures at codex-workstation-appearance-3. Namedfallbackcapture inspectedpreviousruns. Fullcombinedgate/deployment remains pending; production24live and25hostresourcecause not established.

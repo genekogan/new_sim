@@ -1,0 +1,699 @@
+{
+  "states": [
+    {
+      "label": "formed",
+      "tick": 72,
+      "world": {
+        "schema": "mars-world/1",
+        "base": {
+          "campus": "converse-return",
+          "staticHash": "fdbb797772808a3e8d8cd77a56d12e064ff0cb10fb870c017cc23b683491f97e"
+        },
+        "tick": 72,
+        "entities": {
+          "a": {
+            "id": "a",
+            "def": "human",
+            "kind": "human",
+            "label": "a",
+            "pose": {
+              "p": [
+                -5.045,
+                0,
+                -5.6
+              ],
+              "yaw": 1.5707963267948966
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "talk",
+              "level": 0,
+              "task": "a1"
+            }
+          },
+          "b": {
+            "id": "b",
+            "def": "human",
+            "kind": "human",
+            "label": "b",
+            "pose": {
+              "p": [
+                -5.519615242270663,
+                0,
+                -4.7
+              ],
+              "yaw": -0.5235987755982987
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "talk",
+              "level": 0,
+              "task": "a1"
+            }
+          },
+          "c": {
+            "id": "c",
+            "def": "human",
+            "kind": "human",
+            "label": "c",
+            "pose": {
+              "p": [
+                -4.480384757729337,
+                0,
+                -4.7
+              ],
+              "yaw": -2.6179938779914944
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "talk",
+              "level": 0,
+              "task": "a1"
+            }
+          }
+        },
+        "regions": {},
+        "env": {
+          "datetime": "2026-03-01T16:00",
+          "weather": {
+            "clouds": 0,
+            "rain": 0,
+            "wind": 0,
+            "dust": 0,
+            "wet": 0
+          }
+        },
+        "inventory": "finite",
+        "rng": [
+          4106463266,
+          4152369438,
+          506093720,
+          1860005965
+        ]
+      }
+    },
+    {
+      "label": "directive-completed",
+      "tick": 161,
+      "world": {
+        "schema": "mars-world/1",
+        "base": {
+          "campus": "converse-return",
+          "staticHash": "fdbb797772808a3e8d8cd77a56d12e064ff0cb10fb870c017cc23b683491f97e"
+        },
+        "tick": 161,
+        "entities": {
+          "a": {
+            "id": "a",
+            "def": "human",
+            "kind": "human",
+            "label": "a",
+            "pose": {
+              "p": [
+                -9,
+                0,
+                -8
+              ],
+              "yaw": -2.5961685611809067
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "idle",
+              "level": 0
+            }
+          },
+          "b": {
+            "id": "b",
+            "def": "human",
+            "kind": "human",
+            "label": "b",
+            "pose": {
+              "p": [
+                -5.519615242270663,
+                0,
+                -4.7
+              ],
+              "yaw": -0.5235987755982987
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "talk",
+              "level": 0,
+              "task": "a1"
+            }
+          },
+          "c": {
+            "id": "c",
+            "def": "human",
+            "kind": "human",
+            "label": "c",
+            "pose": {
+              "p": [
+                -4.480384757729337,
+                0,
+                -4.7
+              ],
+              "yaw": -2.6179938779914944
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "talk",
+              "level": 0,
+              "task": "a1"
+            }
+          }
+        },
+        "regions": {},
+        "env": {
+          "datetime": "2026-03-01T16:00",
+          "weather": {
+            "clouds": 0,
+            "rain": 0,
+            "wind": 0,
+            "dust": 0,
+            "wet": 0
+          }
+        },
+        "inventory": "finite",
+        "rng": [
+          4106463266,
+          4152369438,
+          506093720,
+          1860005965
+        ]
+      }
+    },
+    {
+      "label": "rejoined",
+      "tick": 284,
+      "world": {
+        "schema": "mars-world/1",
+        "base": {
+          "campus": "converse-return",
+          "staticHash": "fdbb797772808a3e8d8cd77a56d12e064ff0cb10fb870c017cc23b683491f97e"
+        },
+        "tick": 284,
+        "entities": {
+          "a": {
+            "id": "a",
+            "def": "human",
+            "kind": "human",
+            "label": "a",
+            "pose": {
+              "p": [
+                -5,
+                0,
+                -5.6
+              ],
+              "yaw": 1.5707963267948966
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "talk",
+              "level": 0,
+              "task": "a1"
+            }
+          },
+          "b": {
+            "id": "b",
+            "def": "human",
+            "kind": "human",
+            "label": "b",
+            "pose": {
+              "p": [
+                -5.519615242270663,
+                0,
+                -4.7
+              ],
+              "yaw": -0.5235987755982987
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "talk",
+              "level": 0,
+              "task": "a1"
+            }
+          },
+          "c": {
+            "id": "c",
+            "def": "human",
+            "kind": "human",
+            "label": "c",
+            "pose": {
+              "p": [
+                -4.480384757729337,
+                0,
+                -4.7
+              ],
+              "yaw": -2.6179938779914944
+            },
+            "provenance": {
+              "origin": "test-fixture",
+              "confidence": "hypothetical"
+            },
+            "human": {
+              "activity": "talk",
+              "level": 0,
+              "task": "a1"
+            }
+          }
+        },
+        "regions": {},
+        "env": {
+          "datetime": "2026-03-01T16:00",
+          "weather": {
+            "clouds": 0,
+            "rain": 0,
+            "wind": 0,
+            "dust": 0,
+            "wet": 0
+          }
+        },
+        "inventory": "finite",
+        "rng": [
+          4106463266,
+          4152369438,
+          506093720,
+          1860005965
+        ]
+      }
+    }
+  ],
+  "records": [
+    {
+      "id": "a1",
+      "verb": "converse",
+      "params": {
+        "actors": [
+          "a",
+          "b",
+          "c"
+        ],
+        "at": [
+          -5,
+          -5
+        ]
+      },
+      "status": "executing",
+      "history": [
+        {
+          "tick": 0,
+          "status": "requested"
+        },
+        {
+          "tick": 0,
+          "status": "validated"
+        },
+        {
+          "tick": 0,
+          "status": "reserved"
+        },
+        {
+          "tick": 0,
+          "status": "executing"
+        },
+        {
+          "tick": 1,
+          "status": "executing",
+          "phase": "gathering"
+        },
+        {
+          "tick": 72,
+          "status": "executing",
+          "phase": "talking"
+        }
+      ],
+      "requestedTick": 0,
+      "phase": "talking"
+    },
+    {
+      "id": "a2",
+      "verb": "walk_to",
+      "params": {
+        "actor": "a",
+        "x": -5,
+        "z": -5.6,
+        "level": 0,
+        "face": 1.5707963267948966
+      },
+      "status": "completed",
+      "history": [
+        {
+          "tick": 0,
+          "status": "requested"
+        },
+        {
+          "tick": 0,
+          "status": "validated"
+        },
+        {
+          "tick": 0,
+          "status": "reserved"
+        },
+        {
+          "tick": 0,
+          "status": "executing"
+        },
+        {
+          "tick": 1,
+          "status": "executing",
+          "phase": "walk"
+        },
+        {
+          "tick": 21,
+          "status": "completed",
+          "phase": "walk"
+        }
+      ],
+      "requestedTick": 0,
+      "parent": "a1",
+      "phase": "walk",
+      "outputs": {
+        "replans": 0,
+        "length": 0.40000000000000036,
+        "snapped": 0,
+        "pushes": 0
+      },
+      "endedTick": 21
+    },
+    {
+      "id": "a3",
+      "verb": "walk_to",
+      "params": {
+        "actor": "b",
+        "x": -5.519615242270663,
+        "z": -4.7,
+        "level": 0,
+        "face": -0.5235987755982987
+      },
+      "status": "completed",
+      "history": [
+        {
+          "tick": 0,
+          "status": "requested"
+        },
+        {
+          "tick": 0,
+          "status": "validated"
+        },
+        {
+          "tick": 0,
+          "status": "reserved"
+        },
+        {
+          "tick": 0,
+          "status": "executing"
+        },
+        {
+          "tick": 1,
+          "status": "executing",
+          "phase": "walk"
+        },
+        {
+          "tick": 24,
+          "status": "blocked",
+          "phase": "walk",
+          "code": "traffic.person"
+        },
+        {
+          "tick": 33,
+          "status": "executing",
+          "phase": "replan"
+        },
+        {
+          "tick": 34,
+          "status": "executing",
+          "phase": "walk"
+        },
+        {
+          "tick": 66,
+          "status": "executing",
+          "phase": "face"
+        },
+        {
+          "tick": 72,
+          "status": "completed",
+          "phase": "face"
+        }
+      ],
+      "requestedTick": 0,
+      "parent": "a1",
+      "phase": "face",
+      "outputs": {
+        "replans": 1,
+        "length": 0.9149943542586056,
+        "snapped": 0,
+        "pushes": 0
+      },
+      "endedTick": 72
+    },
+    {
+      "id": "a4",
+      "verb": "walk_to",
+      "params": {
+        "actor": "c",
+        "x": -4.480384757729337,
+        "z": -4.7,
+        "level": 0,
+        "face": -2.6179938779914944
+      },
+      "status": "completed",
+      "history": [
+        {
+          "tick": 0,
+          "status": "requested"
+        },
+        {
+          "tick": 0,
+          "status": "validated"
+        },
+        {
+          "tick": 0,
+          "status": "reserved"
+        },
+        {
+          "tick": 0,
+          "status": "executing"
+        },
+        {
+          "tick": 1,
+          "status": "executing",
+          "phase": "turn"
+        },
+        {
+          "tick": 2,
+          "status": "executing",
+          "phase": "walk"
+        },
+        {
+          "tick": 24,
+          "status": "blocked",
+          "phase": "walk",
+          "code": "traffic.person"
+        },
+        {
+          "tick": 33,
+          "status": "executing",
+          "phase": "replan"
+        },
+        {
+          "tick": 34,
+          "status": "executing",
+          "phase": "walk"
+        },
+        {
+          "tick": 60,
+          "status": "executing",
+          "phase": "face"
+        },
+        {
+          "tick": 65,
+          "status": "completed",
+          "phase": "face"
+        }
+      ],
+      "requestedTick": 0,
+      "parent": "a1",
+      "phase": "face",
+      "outputs": {
+        "replans": 1,
+        "length": 0.6719107110306569,
+        "snapped": 0,
+        "pushes": 0
+      },
+      "endedTick": 65
+    },
+    {
+      "id": "a5",
+      "verb": "walk_to",
+      "params": {
+        "actor": "a",
+        "x": -9,
+        "z": -8
+      },
+      "status": "completed",
+      "history": [
+        {
+          "tick": 72,
+          "status": "requested"
+        },
+        {
+          "tick": 72,
+          "status": "validated"
+        },
+        {
+          "tick": 72,
+          "status": "reserved"
+        },
+        {
+          "tick": 72,
+          "status": "executing"
+        },
+        {
+          "tick": 73,
+          "status": "executing",
+          "phase": "turn"
+        },
+        {
+          "tick": 74,
+          "status": "executing",
+          "phase": "walk"
+        },
+        {
+          "tick": 161,
+          "status": "completed",
+          "phase": "walk"
+        }
+      ],
+      "requestedTick": 72,
+      "phase": "walk",
+      "outputs": {
+        "replans": 0,
+        "length": 4.626232268271882,
+        "snapped": 0,
+        "pushes": 0
+      },
+      "endedTick": 161
+    },
+    {
+      "id": "a6",
+      "verb": "walk_to",
+      "params": {
+        "actor": "a",
+        "x": -5,
+        "z": -5.6,
+        "level": 0,
+        "face": 1.5707963267948966
+      },
+      "status": "completed",
+      "history": [
+        {
+          "tick": 162,
+          "status": "requested"
+        },
+        {
+          "tick": 162,
+          "status": "validated"
+        },
+        {
+          "tick": 162,
+          "status": "reserved"
+        },
+        {
+          "tick": 162,
+          "status": "executing"
+        },
+        {
+          "tick": 163,
+          "status": "executing",
+          "phase": "turn"
+        },
+        {
+          "tick": 169,
+          "status": "executing",
+          "phase": "walk"
+        },
+        {
+          "tick": 261,
+          "status": "executing",
+          "phase": "settle"
+        },
+        {
+          "tick": 277,
+          "status": "executing",
+          "phase": "face"
+        },
+        {
+          "tick": 283,
+          "status": "completed",
+          "phase": "face"
+        }
+      ],
+      "requestedTick": 162,
+      "parent": "a1",
+      "phase": "face",
+      "outputs": {
+        "replans": 0,
+        "length": 4.664761515876241,
+        "snapped": 0,
+        "pushes": 0
+      },
+      "endedTick": 283
+    }
+  ],
+  "marks": [
+    {
+      "tick": 72,
+      "type": "mark",
+      "name": "converse.member-left",
+      "data": {
+        "group": "a1",
+        "actor": "a",
+        "directive": "a5"
+      }
+    },
+    {
+      "tick": 162,
+      "type": "mark",
+      "name": "converse.return-started",
+      "data": {
+        "group": "a1",
+        "actor": "a",
+        "action": "a6"
+      }
+    },
+    {
+      "tick": 284,
+      "type": "mark",
+      "name": "converse.rejoined",
+      "data": {
+        "group": "a1",
+        "actor": "a"
+      }
+    }
+  ]
+}

@@ -1,0 +1,67 @@
+[
+  {
+    "terminal": false,
+    "duplicate": "original",
+    "diagnostic": {
+      "code": "action.duplicate-id",
+      "message": "action id \"original\" already exists",
+      "subjects": [
+        "original"
+      ]
+    },
+    "originalStatus": "executing",
+    "holders": [
+      "original"
+    ],
+    "snapshotUnchanged": true,
+    "eventsUnchanged": true
+  },
+  {
+    "terminal": true,
+    "duplicate": "original",
+    "diagnostic": {
+      "code": "action.duplicate-id",
+      "message": "action id \"original\" already exists",
+      "subjects": [
+        "original"
+      ]
+    },
+    "originalStatus": "completed",
+    "holders": [],
+    "snapshotUnchanged": true,
+    "eventsUnchanged": true
+  },
+  {
+    "case": "repeated refused nudge",
+    "id": "p1:make-way:0",
+    "diagnostic": {
+      "code": "action.unknown-verb",
+      "message": "no action verb \"walk_to\""
+    },
+    "eventsUnchanged": true
+  },
+  {
+    "case": "return id collision",
+    "id": "a1:resume:a3",
+    "directive": "completed",
+    "refusal": {
+      "tick": 137,
+      "type": "mark",
+      "name": "social.resume-refused",
+      "data": {
+        "source": "a1",
+        "directive": "a3",
+        "actor": "p1",
+        "action": "a1:resume:a3",
+        "diagnostic": {
+          "code": "action.duplicate-id",
+          "message": "action id \"a1:resume:a3\" already exists",
+          "subjects": [
+            "a1:resume:a3"
+          ]
+        }
+      }
+    },
+    "originalUnchanged": true
+  }
+]

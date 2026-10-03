@@ -1,0 +1,1239 @@
+{
+  "source": "/tmp/mars-studio-interim-20261001",
+  "base": "7648dbf",
+  "frozenLiveVersion": "ad241a52-e8d6-4c47-831e-557df9d5692a",
+  "files": [
+    {
+      "path": "viewer/app/history/cad-components.ts",
+      "bytes": 564,
+      "sha256": "3846d66b114b1e8c3bc2b87e5595a85dd80de0ac93e4c4adaf7a3d28eb6d68b7",
+      "candidateSha256": "3846d66b114b1e8c3bc2b87e5595a85dd80de0ac93e4c4adaf7a3d28eb6d68b7"
+    },
+    {
+      "path": "viewer/app/history/details-2025-reconciliation.ts",
+      "bytes": 17995,
+      "sha256": "50a29e2f845ee1b83ac99d4170075c9bcffec1eb6cbec1d0d86ca252ef7eacee",
+      "candidateSha256": "50a29e2f845ee1b83ac99d4170075c9bcffec1eb6cbec1d0d86ca252ef7eacee"
+    },
+    {
+      "path": "viewer/app/history/details-2026-auditorium.ts",
+      "bytes": 9816,
+      "sha256": "b92e35a92babd4c9dbcdced15b177f680473828a67bf154cb7f255594bc35486",
+      "candidateSha256": "4883b6dfcee82d0c480971faadcb55f6656d55aa93008716c0981e9eb7668df0"
+    },
+    {
+      "path": "viewer/app/history/details-2026-chiba.ts",
+      "bytes": 23868,
+      "sha256": "0ba3eb5ab3c7a1d7f61c8b3d7a9e1308d8f762e4b28658ec06825643381c4970",
+      "candidateSha256": "0ba3eb5ab3c7a1d7f61c8b3d7a9e1308d8f762e4b28658ec06825643381c4970"
+    },
+    {
+      "path": "viewer/app/history/details-2026-compound.ts",
+      "bytes": 47223,
+      "sha256": "250997b5cd695998ceb72ac8bc2e66c1ce3bb41d16348a4255973b9423ff17f1",
+      "candidateSha256": "114085ee1626af56a80e1e1b6611b29cf5cb794fa1744793727b1f90bb301820"
+    },
+    {
+      "path": "viewer/app/history/details-2026-facade.ts",
+      "bytes": 10023,
+      "sha256": "7a8f400f27596e20d6c6c49f045d07983f7f5aaf298dbf34592ffd358c981f0b",
+      "candidateSha256": "7a8f400f27596e20d6c6c49f045d07983f7f5aaf298dbf34592ffd358c981f0b"
+    },
+    {
+      "path": "viewer/app/history/details-2026-gallery.ts",
+      "bytes": 3984,
+      "sha256": "bfa677f427b718ac34f95a99a38a97f692d4889ba752cfbd3247b3065999e188",
+      "candidateSha256": "bfa677f427b718ac34f95a99a38a97f692d4889ba752cfbd3247b3065999e188"
+    },
+    {
+      "path": "viewer/app/history/details-2026-ground-life.ts",
+      "bytes": 5730,
+      "sha256": "3565ff33511c8a16b91f1a63549d0009927d3585ebd87ecf669681dd14747e47",
+      "candidateSha256": "3565ff33511c8a16b91f1a63549d0009927d3585ebd87ecf669681dd14747e47"
+    },
+    {
+      "path": "viewer/app/history/details-2026-mimos-home.ts",
+      "bytes": 8486,
+      "sha256": "c21aac1d6541cc2af540b90b2895398770920b8c9fdd6b437733ec31a4d14497",
+      "candidateSha256": "c21aac1d6541cc2af540b90b2895398770920b8c9fdd6b437733ec31a4d14497"
+    },
+    {
+      "path": "viewer/app/history/details-2026-mimos-topology.ts",
+      "bytes": 9976,
+      "sha256": "c384ee785be9eba917c663bda890a76ec43f9a702cdecdb98de1a4ad1ffcf4b9",
+      "candidateSha256": "d29e39a205b6fccbcdaf4f8acb150c6412e0fd08765908a0268fdadfe656aa8a"
+    },
+    {
+      "path": "viewer/app/history/details-2026-og-vehicles.ts",
+      "bytes": 18181,
+      "sha256": "4c2f142fbdb1bf21d471790ef3e15393223109d17943dba351480fd9c5677246",
+      "candidateSha256": "4c2f142fbdb1bf21d471790ef3e15393223109d17943dba351480fd9c5677246"
+    },
+    {
+      "path": "viewer/app/history/details-2026-structure.ts",
+      "bytes": 7452,
+      "sha256": "4fdec811bbe2e588adb4524dac8626d3b98ab8429b1e3260e0ecaf8fdf29b149",
+      "candidateSha256": "4fdec811bbe2e588adb4524dac8626d3b98ab8429b1e3260e0ecaf8fdf29b149"
+    },
+    {
+      "path": "viewer/app/history/details-2026-tool-library.ts",
+      "bytes": 9563,
+      "sha256": "a6ccf636ce88f35b1483c0a4b7e2f7402764f3d849d7dbdf76518be165d61fd5",
+      "candidateSha256": "96187a65fbadfc9509289b3c8b10d28c0372f84a515c9279b719d0213c80c700"
+    },
+    {
+      "path": "viewer/app/history/details-2026.ts",
+      "bytes": 1785,
+      "sha256": "fca150f26f5363d923805285793ce1877782d3a6c837f6834016c2e7a493628d",
+      "candidateSha256": "fca150f26f5363d923805285793ce1877782d3a6c837f6834016c2e7a493628d"
+    },
+    {
+      "path": "viewer/app/history/id-migration.json",
+      "bytes": 244835,
+      "sha256": "f4386dc8f75d83cc62a4daf2822d99de34f312d9665b242e0f04f24e426e9ab0",
+      "candidateSha256": "f4386dc8f75d83cc62a4daf2822d99de34f312d9665b242e0f04f24e426e9ab0"
+    },
+    {
+      "path": "viewer/app/history/interior-2026-views.ts",
+      "bytes": 580,
+      "sha256": "9aec68e163431109ae54c8d055fed790bed95a1dac66771e4e37472c48e41aec",
+      "candidateSha256": "9aec68e163431109ae54c8d055fed790bed95a1dac66771e4e37472c48e41aec"
+    },
+    {
+      "path": "viewer/app/history/kit.ts",
+      "bytes": 16918,
+      "sha256": "268d2ae9b1752593c32dd79d9f89bbcde4a387f1b473bd64b8172517e66e4826",
+      "candidateSha256": "268d2ae9b1752593c32dd79d9f89bbcde4a387f1b473bd64b8172517e66e4826"
+    },
+    {
+      "path": "viewer/app/history/og-bus-cad-ids.json",
+      "bytes": 6747,
+      "sha256": "58a2d0cc758dad0c53a8f2b41ffa4b5d3e985c6475afcf2a0a01b55682837b27",
+      "candidateSha256": "58a2d0cc758dad0c53a8f2b41ffa4b5d3e985c6475afcf2a0a01b55682837b27"
+    },
+    {
+      "path": "viewer/app/history/photographic-corrections.ts",
+      "bytes": 18348,
+      "sha256": "882258d4875386b677f17c2b266e34ee52b59a0cf5ccdb7363d09ac364f9cb5e",
+      "candidateSha256": "e3d78aabd61966e610b8b0fda240caf550ace3e8bd8f7291c666a1128e80bfe3"
+    },
+    {
+      "path": "viewer/app/history/scenes.ts",
+      "bytes": 141476,
+      "sha256": "b0b13e3632aaa534652974825b6571310fb5ea762b8351d483829a2ed09f9f07",
+      "candidateSha256": "9b00752676cc180014d7d3a0e32885e5ea59f469e469d91ed195638b0c1b7f95"
+    },
+    {
+      "path": "viewer/app/studio-2020/scene.ts",
+      "bytes": 29223,
+      "sha256": "de01598115adc01ebca3fcb5e357744289d8fe7c32a94a0651b516082173c000",
+      "candidateSha256": "de01598115adc01ebca3fcb5e357744289d8fe7c32a94a0651b516082173c000"
+    },
+    {
+      "path": "viewer/public/engine/campus-2021.json",
+      "bytes": 234648,
+      "sha256": "4313b9a59ef273bba83ceef1efd3ccea4d4e6a26c8311559ff45641ed2cb0d9a",
+      "candidateSha256": "4313b9a59ef273bba83ceef1efd3ccea4d4e6a26c8311559ff45641ed2cb0d9a"
+    },
+    {
+      "path": "viewer/public/engine/campus-2022.json",
+      "bytes": 331394,
+      "sha256": "1ced6815764958314b506f2e4437f45a5e0e1261d5bc26617a42da19e1dd269c",
+      "candidateSha256": "1ced6815764958314b506f2e4437f45a5e0e1261d5bc26617a42da19e1dd269c"
+    },
+    {
+      "path": "viewer/public/engine/campus-2023.json",
+      "bytes": 285835,
+      "sha256": "81d44903d7b2996572d62cb6416880e31f420ac2d13f62196f631eb404f8f4eb",
+      "candidateSha256": "81d44903d7b2996572d62cb6416880e31f420ac2d13f62196f631eb404f8f4eb"
+    },
+    {
+      "path": "viewer/public/engine/campus-2024.json",
+      "bytes": 421605,
+      "sha256": "cb02047977ce303b6a049aac823a0376d44d7144df07feb11e2fd06aaba8c324",
+      "candidateSha256": "cb02047977ce303b6a049aac823a0376d44d7144df07feb11e2fd06aaba8c324"
+    },
+    {
+      "path": "viewer/public/engine/campus-2025.json",
+      "bytes": 531603,
+      "sha256": "5f117386d53eb67a5afc2df5be8ffaa6ad3f65cbbffa9dec5e39c9a9d62afe69",
+      "candidateSha256": "5f117386d53eb67a5afc2df5be8ffaa6ad3f65cbbffa9dec5e39c9a9d62afe69"
+    },
+    {
+      "path": "viewer/public/engine/campus-2026.json",
+      "bytes": 1397406,
+      "sha256": "5925f107dc123da87b7c1878ac83c7f83ca27af1b49ae383ebff4c0a6355fd90",
+      "candidateSha256": "5925f107dc123da87b7c1878ac83c7f83ca27af1b49ae383ebff4c0a6355fd90"
+    },
+    {
+      "path": "viewer/public/history/2021/drone-corridor-c6730-f10.webp",
+      "bytes": 300158,
+      "sha256": "fc2de22f74741b629981790ebfe83dc34cdcb0f9971ec23e9b9759d82fb1c717",
+      "candidateSha256": "fc2de22f74741b629981790ebfe83dc34cdcb0f9971ec23e9b9759d82fb1c717"
+    },
+    {
+      "path": "viewer/public/history/2021/drone-midseason-c6735-f42.webp",
+      "bytes": 272368,
+      "sha256": "8902ce356369f95570ef78a4155782c1fbd0d7ce129150de2bb6aaf91c5352e8",
+      "candidateSha256": "8902ce356369f95570ef78a4155782c1fbd0d7ce129150de2bb6aaf91c5352e8"
+    },
+    {
+      "path": "viewer/public/history/2021/references.json",
+      "bytes": 9195,
+      "sha256": "6d8c3c9ca6668e0c6747738e942e64f60f4cc5872ea1ef116c1b781bcd170212",
+      "candidateSha256": "6d8c3c9ca6668e0c6747738e942e64f60f4cc5872ea1ef116c1b781bcd170212"
+    },
+    {
+      "path": "viewer/public/history/2021/review2-c1464.webp",
+      "bytes": 188624,
+      "sha256": "48b5c43e531c2cab2f044a81700402856b6e45686fe6ad2d650132dabbd50f91",
+      "candidateSha256": "48b5c43e531c2cab2f044a81700402856b6e45686fe6ad2d650132dabbd50f91"
+    },
+    {
+      "path": "viewer/public/history/2021/review3-transverse-terraces.webp",
+      "bytes": 465666,
+      "sha256": "23bdbb259df54758f70f3bcbfc92fbb64643d4d87c84ae3981e309ee72a668c7",
+      "candidateSha256": "23bdbb259df54758f70f3bcbfc92fbb64643d4d87c84ae3981e309ee72a668c7"
+    },
+    {
+      "path": "viewer/public/history/2021/review5-user-aerial-1.webp",
+      "bytes": 224378,
+      "sha256": "e03cb1025dd1ebc24f54d01cdf751390ceb26b8d6a6b64a2b09c7e4cceb64a73",
+      "candidateSha256": "e03cb1025dd1ebc24f54d01cdf751390ceb26b8d6a6b64a2b09c7e4cceb64a73"
+    },
+    {
+      "path": "viewer/public/history/2021/review5-user-aerial-2.webp",
+      "bytes": 222352,
+      "sha256": "6669ec071fbed83e358c8481524be0011a14977dafcaf4ea1aab1e2253bc9923",
+      "candidateSha256": "6669ec071fbed83e358c8481524be0011a14977dafcaf4ea1aab1e2253bc9923"
+    },
+    {
+      "path": "viewer/public/history/2022/cahuilla-kitchen-c55395.webp",
+      "bytes": 168706,
+      "sha256": "2ee54468d9f4e8538e107d3c8e30097706b4e4760c99a15a375b101803b2b739",
+      "candidateSha256": "2ee54468d9f4e8538e107d3c8e30097706b4e4760c99a15a375b101803b2b739"
+    },
+    {
+      "path": "viewer/public/history/2022/cahuilla-mural-c57008.webp",
+      "bytes": 153482,
+      "sha256": "161e71086c878ea0d758b5fe19720206f85e6afdf765a6a584de6883bab96e86",
+      "candidateSha256": "161e71086c878ea0d758b5fe19720206f85e6afdf765a6a584de6883bab96e86"
+    },
+    {
+      "path": "viewer/public/history/2022/chatsubo-bar-c395.webp",
+      "bytes": 44586,
+      "sha256": "31c454c46208af22c1ad9a3e90c5aae85e516e0cb421e9ccd4cca7e1d363214d",
+      "candidateSha256": "31c454c46208af22c1ad9a3e90c5aae85e516e0cb421e9ccd4cca7e1d363214d"
+    },
+    {
+      "path": "viewer/public/history/2022/courtyard-c477.webp",
+      "bytes": 95592,
+      "sha256": "482b7afa5608b717fe846bfcf175b3e9d2aafd6161a72a2caf0b73885658f9a1",
+      "candidateSha256": "482b7afa5608b717fe846bfcf175b3e9d2aafd6161a72a2caf0b73885658f9a1"
+    },
+    {
+      "path": "viewer/public/history/2022/drone-four-wings-c6649-f34.webp",
+      "bytes": 270530,
+      "sha256": "6de12fa9893ff86a31e30aec8adc347872e089cb29ac4a192357fbc86fcd2290",
+      "candidateSha256": "6de12fa9893ff86a31e30aec8adc347872e089cb29ac4a192357fbc86fcd2290"
+    },
+    {
+      "path": "viewer/public/history/2022/huaqiangbei-c247.webp",
+      "bytes": 94110,
+      "sha256": "2d997d4a0bf53be9ddc3dcedf203554663744c0cd192fb276adfd2f16d03061e",
+      "candidateSha256": "2d997d4a0bf53be9ddc3dcedf203554663744c0cd192fb276adfd2f16d03061e"
+    },
+    {
+      "path": "viewer/public/history/2022/projection-c111.webp",
+      "bytes": 125130,
+      "sha256": "8e6efbc805b5ac279024708975c44a7fdf81d2bc749cf88dd37f7d4caa882a17",
+      "candidateSha256": "8e6efbc805b5ac279024708975c44a7fdf81d2bc749cf88dd37f7d4caa882a17"
+    },
+    {
+      "path": "viewer/public/history/2022/references.json",
+      "bytes": 13053,
+      "sha256": "aef09e93cab48f646b6bbbf1adeb539acf4821f7fb362a650d67921bd211af7e",
+      "candidateSha256": "aef09e93cab48f646b6bbbf1adeb539acf4821f7fb362a650d67921bd211af7e"
+    },
+    {
+      "path": "viewer/public/history/2022/review5-bss-center.webp",
+      "bytes": 88870,
+      "sha256": "6f027a171751e5d7965c5fbbbb3da26d03b7f75ea98df11d88e92594bca5942d",
+      "candidateSha256": "6f027a171751e5d7965c5fbbbb3da26d03b7f75ea98df11d88e92594bca5942d"
+    },
+    {
+      "path": "viewer/public/history/2022/review5-bss-end.webp",
+      "bytes": 84746,
+      "sha256": "6f8e351c8587f28d50888c9bb30484052d401b61bce1a0970d601703d719fdc3",
+      "candidateSha256": "6f8e351c8587f28d50888c9bb30484052d401b61bce1a0970d601703d719fdc3"
+    },
+    {
+      "path": "viewer/public/history/2022/review5-bss-left.webp",
+      "bytes": 132562,
+      "sha256": "79e6e31606eabfbab82cd9809d1da5b0287acffdc02d021388f32f94e42cb9c7",
+      "candidateSha256": "79e6e31606eabfbab82cd9809d1da5b0287acffdc02d021388f32f94e42cb9c7"
+    },
+    {
+      "path": "viewer/public/history/2022/review5-bss-right.webp",
+      "bytes": 61578,
+      "sha256": "215c39bf1b888a05bf8b62b882cf9515c66e90f6aaf24cb2576da5f87a2abe79",
+      "candidateSha256": "215c39bf1b888a05bf8b62b882cf9515c66e90f6aaf24cb2576da5f87a2abe79"
+    },
+    {
+      "path": "viewer/public/history/2022/review5-c192.webp",
+      "bytes": 71816,
+      "sha256": "0765a0435fd567513ebfbe463d6c60e9fbfac1e5d74085db8fb8568836d2b452",
+      "candidateSha256": "0765a0435fd567513ebfbe463d6c60e9fbfac1e5d74085db8fb8568836d2b452"
+    },
+    {
+      "path": "viewer/public/history/2022/review5-c33159.webp",
+      "bytes": 143428,
+      "sha256": "14eb6c2c951752ae568ac3b2d703925c8c6d4effef778d9f8f02feff9c7f5c0e",
+      "candidateSha256": "14eb6c2c951752ae568ac3b2d703925c8c6d4effef778d9f8f02feff9c7f5c0e"
+    },
+    {
+      "path": "viewer/public/history/2022/review5-c63403.webp",
+      "bytes": 207630,
+      "sha256": "52b427a82b96668d56de9fb75e941d9685bcdec5cdad4c22aef730b9f0b01d8e",
+      "candidateSha256": "52b427a82b96668d56de9fb75e941d9685bcdec5cdad4c22aef730b9f0b01d8e"
+    },
+    {
+      "path": "viewer/public/history/2022/review5-cahuilla-end.webp",
+      "bytes": 80954,
+      "sha256": "1286d8dc0f98bb098ed2322a14611edb9e4269232ec47cb3ff253ca3485ebb5d",
+      "candidateSha256": "1286d8dc0f98bb098ed2322a14611edb9e4269232ec47cb3ff253ca3485ebb5d"
+    },
+    {
+      "path": "viewer/public/history/2022/review5-cahuilla-front.webp",
+      "bytes": 49854,
+      "sha256": "27c15359a647556a32dd5cf3d1856e29a7122a7367611d1376d25384861f959c",
+      "candidateSha256": "27c15359a647556a32dd5cf3d1856e29a7122a7367611d1376d25384861f959c"
+    },
+    {
+      "path": "viewer/public/history/2023/ant-mural-c69219.webp",
+      "bytes": 236720,
+      "sha256": "7116e8f52d00fc7cc66a1350d5f892662773e82a12697b66b110bc041f0aaef5",
+      "candidateSha256": "7116e8f52d00fc7cc66a1350d5f892662773e82a12697b66b110bc041f0aaef5"
+    },
+    {
+      "path": "viewer/public/history/2023/drone-roof-c6656-f92.webp",
+      "bytes": 158940,
+      "sha256": "5e4f0497ff66d9967dde244302540ad91ce7878027f76d021e9d4a4d5efb34e9",
+      "candidateSha256": "5e4f0497ff66d9967dde244302540ad91ce7878027f76d021e9d4a4d5efb34e9"
+    },
+    {
+      "path": "viewer/public/history/2023/drone-site-c6656-f1.webp",
+      "bytes": 199068,
+      "sha256": "e4846e1e42a75d786b48cf0b0055fcb3e77f3148a42bde64abaa0640c9e85aec",
+      "candidateSha256": "e4846e1e42a75d786b48cf0b0055fcb3e77f3148a42bde64abaa0640c9e85aec"
+    },
+    {
+      "path": "viewer/public/history/2023/front-arches-v2.webp",
+      "bytes": 2662,
+      "sha256": "c5b8f3559f89d2b5e61db9ab00536ec805cd9c0ba58345f9c3cf174d4ea5a3bd",
+      "candidateSha256": "c5b8f3559f89d2b5e61db9ab00536ec805cd9c0ba58345f9c3cf174d4ea5a3bd"
+    },
+    {
+      "path": "viewer/public/history/2023/hexapod-fabric-c6656-t12.webp",
+      "bytes": 1072,
+      "sha256": "64d3ed26d53e0cd6415ff74c3468d525473b8bc6b2ad1cea59c2815c65b2fde6",
+      "candidateSha256": "64d3ed26d53e0cd6415ff74c3468d525473b8bc6b2ad1cea59c2815c65b2fde6"
+    },
+    {
+      "path": "viewer/public/history/2023/references.json",
+      "bytes": 10025,
+      "sha256": "432899001ad077e35a7a235c890ec444c8b01951f31ddf6d83e6a9743b1f6cfb",
+      "candidateSha256": "432899001ad077e35a7a235c890ec444c8b01951f31ddf6d83e6a9743b1f6cfb"
+    },
+    {
+      "path": "viewer/public/history/2023/review4-hexapod-hoist.webp",
+      "bytes": 96718,
+      "sha256": "700932692269f8cf3aa38262036c4d1427d11bdf1503dafe7f42a51f9575c662",
+      "candidateSha256": "700932692269f8cf3aa38262036c4d1427d11bdf1503dafe7f42a51f9575c662"
+    },
+    {
+      "path": "viewer/public/history/2023/review4-hexapod-occupied.webp",
+      "bytes": 105042,
+      "sha256": "64439f6ba0eb4d6b6793dd5f1c87ee2feb8c89bba148fb4cf5fdb44c391ccecd",
+      "candidateSha256": "64439f6ba0eb4d6b6793dd5f1c87ee2feb8c89bba148fb4cf5fdb44c391ccecd"
+    },
+    {
+      "path": "viewer/public/history/2023/review5-rear-c6656-t80.jpg",
+      "bytes": 229493,
+      "sha256": "8659600ea85d01da09818e9325ab6940aa0b01c13f2b85c1e56f74a8f32701c7",
+      "candidateSha256": "8659600ea85d01da09818e9325ab6940aa0b01c13f2b85c1e56f74a8f32701c7"
+    },
+    {
+      "path": "viewer/public/history/2024/gene-aerial-c30786.webp",
+      "bytes": 343834,
+      "sha256": "bffec33c401d618c7d26af7f31d7f6b11af36b8ee4a695c3bf988830918c51df",
+      "candidateSha256": "bffec33c401d618c7d26af7f31d7f6b11af36b8ee4a695c3bf988830918c51df"
+    },
+    {
+      "path": "viewer/public/history/2024/gene-interior-c43084.webp",
+      "bytes": 465682,
+      "sha256": "70237933195913e0d1b8439c1fa7442c2864f95629a01038c0d78f189f6ce681",
+      "candidateSha256": "70237933195913e0d1b8439c1fa7442c2864f95629a01038c0d78f189f6ce681"
+    },
+    {
+      "path": "viewer/public/history/2024/interior-mural-c43728.webp",
+      "bytes": 101642,
+      "sha256": "e9d9cfa06c9e9d2752b7f3c4d12ab852a5cc3b3fc981f3d58d4429cfc88888ff",
+      "candidateSha256": "e9d9cfa06c9e9d2752b7f3c4d12ab852a5cc3b3fc981f3d58d4429cfc88888ff"
+    },
+    {
+      "path": "viewer/public/history/2024/references.json",
+      "bytes": 11802,
+      "sha256": "e8ed943a83fa8292412e88d70e800605cd9cbf1b447df28156abfc32c10b91f0",
+      "candidateSha256": "e8ed943a83fa8292412e88d70e800605cd9cbf1b447df28156abfc32c10b91f0"
+    },
+    {
+      "path": "viewer/public/history/2024/review2-c32034.webp",
+      "bytes": 148934,
+      "sha256": "94bb557ff2af1fe783ca0ba352f2d47ace568cd3f56f4e73c39f96e39aa76d59",
+      "candidateSha256": "94bb557ff2af1fe783ca0ba352f2d47ace568cd3f56f4e73c39f96e39aa76d59"
+    },
+    {
+      "path": "viewer/public/history/2024/review2-c42733.webp",
+      "bytes": 185102,
+      "sha256": "1aa49ca660df861db2daa76a04eb6368a8ab095f1a558a4e02f689c82adb8c22",
+      "candidateSha256": "1aa49ca660df861db2daa76a04eb6368a8ab095f1a558a4e02f689c82adb8c22"
+    },
+    {
+      "path": "viewer/public/history/2024/review5-c41728.webp",
+      "bytes": 191384,
+      "sha256": "5f4a31191af70a291f06d656a83f31d03348805e202efc357c32a335460141f7",
+      "candidateSha256": "5f4a31191af70a291f06d656a83f31d03348805e202efc357c32a335460141f7"
+    },
+    {
+      "path": "viewer/public/history/2024/review5-c42483.webp",
+      "bytes": 231012,
+      "sha256": "7fed058ea4d0b7b99e19bbf546b0831eee85617c3c62c2ccf85bd7f349a5efd4",
+      "candidateSha256": "7fed058ea4d0b7b99e19bbf546b0831eee85617c3c62c2ccf85bd7f349a5efd4"
+    },
+    {
+      "path": "viewer/public/history/2024/review5-north-access-c42733.jpg",
+      "bytes": 1130071,
+      "sha256": "1377fe9208dc6810f86206aec7176aac2e677ec56b8bec49d82bc6d901433c99",
+      "candidateSha256": "1377fe9208dc6810f86206aec7176aac2e677ec56b8bec49d82bc6d901433c99"
+    },
+    {
+      "path": "viewer/public/history/2024/review6-west-facade.webp",
+      "bytes": 50294,
+      "sha256": "4f2d64f637f4ca7fcc3224db127728c0729f77da350ebc77905d0975face1837",
+      "candidateSha256": "4f2d64f637f4ca7fcc3224db127728c0729f77da350ebc77905d0975face1837"
+    },
+    {
+      "path": "viewer/public/history/2025/c509-roof-source.jpg",
+      "bytes": 205598,
+      "sha256": "bd660b77c4ff2521a7265c9966709a7531398ee83f48498f8f7110b00ed6b97d",
+      "candidateSha256": "bd660b77c4ff2521a7265c9966709a7531398ee83f48498f8f7110b00ed6b97d"
+    },
+    {
+      "path": "viewer/public/history/2025/c538-freeside-source.jpg",
+      "bytes": 361289,
+      "sha256": "d5a447d4aeaba5a4013fbf6c88671ed9baab6eee775a88eb1e0d758346204189",
+      "candidateSha256": "d5a447d4aeaba5a4013fbf6c88671ed9baab6eee775a88eb1e0d758346204189"
+    },
+    {
+      "path": "viewer/public/history/2025/chiba-east-c72596.webp",
+      "bytes": 83692,
+      "sha256": "4a70724bd3de04e744a6e8db005f5304cbc4c44ef85e9d7e30cc01ec466ed2a5",
+      "candidateSha256": "4a70724bd3de04e744a6e8db005f5304cbc4c44ef85e9d7e30cc01ec466ed2a5"
+    },
+    {
+      "path": "viewer/public/history/2025/chiba-north-c72594.webp",
+      "bytes": 95924,
+      "sha256": "05650388194cb1cd269a9758e0016edad3a0c30a62f6d54dbce39c3c17c2e92f",
+      "candidateSha256": "05650388194cb1cd269a9758e0016edad3a0c30a62f6d54dbce39c3c17c2e92f"
+    },
+    {
+      "path": "viewer/public/history/2025/chiba-west-c549.webp",
+      "bytes": 113998,
+      "sha256": "2679be9db21692e307a3a0878cace3c3040f4e8b7ca59308c3e6e463262808c3",
+      "candidateSha256": "2679be9db21692e307a3a0878cace3c3040f4e8b7ca59308c3e6e463262808c3"
+    },
+    {
+      "path": "viewer/public/history/2025/chiba-west-c72598.webp",
+      "bytes": 183376,
+      "sha256": "03f3f28e931f55ea23ec8e18ffde7d49a1fd0b099fa9ab931a91a5881b8c125a",
+      "candidateSha256": "03f3f28e931f55ea23ec8e18ffde7d49a1fd0b099fa9ab931a91a5881b8c125a"
+    },
+    {
+      "path": "viewer/public/history/2025/gene-auditorium-c46581.webp",
+      "bytes": 223490,
+      "sha256": "8ec851b36824d078ccdd4d738477126fd688d6bb67c2594e288cba684e5ab5d6",
+      "candidateSha256": "8ec851b36824d078ccdd4d738477126fd688d6bb67c2594e288cba684e5ab5d6"
+    },
+    {
+      "path": "viewer/public/history/2025/gene-chiba-west-c72598.webp",
+      "bytes": 197358,
+      "sha256": "e659d6314ed19165224e0d77a4c5f006ffd33822a81a037ea852369191b7fa8a",
+      "candidateSha256": "e659d6314ed19165224e0d77a4c5f006ffd33822a81a037ea852369191b7fa8a"
+    },
+    {
+      "path": "viewer/public/history/2025/gene-site-c543.webp",
+      "bytes": 186036,
+      "sha256": "fb6b13390961ee1e48fb665ab2b67242a69606536af4b710e605cfeda06089c6",
+      "candidateSha256": "fb6b13390961ee1e48fb665ab2b67242a69606536af4b710e605cfeda06089c6"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/auditorium-ceiling-pattern.webp",
+      "bytes": 50332,
+      "sha256": "c39cb623a7e9a4d9d3d831670a1a0982add919041be1b94401c15cc881042821",
+      "candidateSha256": "c39cb623a7e9a4d9d3d831670a1a0982add919041be1b94401c15cc881042821"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/bodywork-entry-render.webp",
+      "bytes": 5676,
+      "sha256": "e985d43ecd19747c007e63d65917b62f7ad59a61c6938680fbb0505225385258",
+      "candidateSha256": "e985d43ecd19747c007e63d65917b62f7ad59a61c6938680fbb0505225385258"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/bodywork-interior-render.webp",
+      "bytes": 23472,
+      "sha256": "684438d96f4486b20122ad3d699db2d450ce7d72c7ffb6a6ec749870cdb8f920",
+      "candidateSha256": "684438d96f4486b20122ad3d699db2d450ce7d72c7ffb6a6ec749870cdb8f920"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/c44577-reference.webp",
+      "bytes": 114406,
+      "sha256": "bd300b424abf7db48a9e1f03e5f81a7103d205097517cad9cf92aeddbfd2fcd6",
+      "candidateSha256": "bd300b424abf7db48a9e1f03e5f81a7103d205097517cad9cf92aeddbfd2fcd6"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/c45838-reference.webp",
+      "bytes": 99704,
+      "sha256": "1fa87a117047705367d26fba677b681b0079d3bb5d715dcf46074c00f670e1b0",
+      "candidateSha256": "1fa87a117047705367d26fba677b681b0079d3bb5d715dcf46074c00f670e1b0"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/c46125-reference.webp",
+      "bytes": 98722,
+      "sha256": "cfd102067ce78db22bb527134b5ba91074e695aaa8caa79993f7362e1c63a515",
+      "candidateSha256": "cfd102067ce78db22bb527134b5ba91074e695aaa8caa79993f7362e1c63a515"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/c46384-reference.webp",
+      "bytes": 97850,
+      "sha256": "61204c7e0eaf9679555b3465871973863bdd75368702afc125378dc05ad2bbc4",
+      "candidateSha256": "61204c7e0eaf9679555b3465871973863bdd75368702afc125378dc05ad2bbc4"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/c46525-reference.webp",
+      "bytes": 84846,
+      "sha256": "5812e1f98a1f0ff9fc86a57f653962f83590c7688ca291af054339eb0191785b",
+      "candidateSha256": "5812e1f98a1f0ff9fc86a57f653962f83590c7688ca291af054339eb0191785b"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/c518-reference.webp",
+      "bytes": 98910,
+      "sha256": "25295af9fc2e8c4d12f037d24fec04e8bdf97bdef63dc033f9a976f25ca3de0f",
+      "candidateSha256": "25295af9fc2e8c4d12f037d24fec04e8bdf97bdef63dc033f9a976f25ca3de0f"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/c526-reference.webp",
+      "bytes": 55192,
+      "sha256": "f5800a020379a735774446974bab9b88a0809568b51eae28b4282fee0ca17ac8",
+      "candidateSha256": "f5800a020379a735774446974bab9b88a0809568b51eae28b4282fee0ca17ac8"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/chiba-interior-render.webp",
+      "bytes": 76632,
+      "sha256": "e8b12b2f56cf203d53a8936f9950b5640d08ad1396dfe4a74868ce5b5519d803",
+      "candidateSha256": "e8b12b2f56cf203d53a8936f9950b5640d08ad1396dfe4a74868ce5b5519d803"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/courtyard-render.webp",
+      "bytes": 30326,
+      "sha256": "35f0904ef0328e3bdc83ee96f911cdecee27c4b285e99e506ed9fe854e39ffb5",
+      "candidateSha256": "35f0904ef0328e3bdc83ee96f911cdecee27c4b285e99e506ed9fe854e39ffb5"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/freeside-painted-rear-render.webp",
+      "bytes": 46722,
+      "sha256": "7f1b9fb24ec4b5bae135c4726594fbb9f179f4545ce73785e99b6895bf726971",
+      "candidateSha256": "7f1b9fb24ec4b5bae135c4726594fbb9f179f4545ce73785e99b6895bf726971"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/freeside-pods-render.webp",
+      "bytes": 37552,
+      "sha256": "fb5a033f4071126870dfa89bebf438fdc5c903f5b08a18b5c5047de7a75a80bb",
+      "candidateSha256": "fb5a033f4071126870dfa89bebf438fdc5c903f5b08a18b5c5047de7a75a80bb"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/freeside-rear-paint-native.webp",
+      "bytes": 446758,
+      "sha256": "1868984c69aed0a66d710697d462fe951a9453677a7de535407ec99d20971507",
+      "candidateSha256": "1868984c69aed0a66d710697d462fe951a9453677a7de535407ec99d20971507"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/freeside-roof-native.webp",
+      "bytes": 331992,
+      "sha256": "94690c686176984f350c797da442614fb1dd6a27ccfdfdc6469b9de9830c345c",
+      "candidateSha256": "94690c686176984f350c797da442614fb1dd6a27ccfdfdc6469b9de9830c345c"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/freeside-roof-render.webp",
+      "bytes": 83218,
+      "sha256": "95bf7f9c092facb6930a44ce7faa119793dc09933c41f1b7bcd39514ed853e47",
+      "candidateSha256": "95bf7f9c092facb6930a44ce7faa119793dc09933c41f1b7bcd39514ed853e47"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/pods-c46384-native.webp",
+      "bytes": 440514,
+      "sha256": "0b3085df08e9a3ecbccb771c40b6b3885eeb400157df912aa3761fdc84580587",
+      "candidateSha256": "0b3085df08e9a3ecbccb771c40b6b3885eeb400157df912aa3761fdc84580587"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/scissor-chiba-sign.webp",
+      "bytes": 17486,
+      "sha256": "9793b9ee8f3cb24c85c283d918a2d30fa45f62bd6c8f6e843dba74bb134a4a7b",
+      "candidateSha256": "9793b9ee8f3cb24c85c283d918a2d30fa45f62bd6c8f6e843dba74bb134a4a7b"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/star-pod-render.webp",
+      "bytes": 13808,
+      "sha256": "a74d8b3fa00e7f802e99bd0ee351882c96d33d8783c3773667250fa548832e00",
+      "candidateSha256": "a74d8b3fa00e7f802e99bd0ee351882c96d33d8783c3773667250fa548832e00"
+    },
+    {
+      "path": "viewer/public/history/2025/reconciliation/tool-courtyard-render.webp",
+      "bytes": 30298,
+      "sha256": "d94a55d7f42e76a588f6cc274af8991c801bc142b9102e754e20d42428f21fee",
+      "candidateSha256": "d94a55d7f42e76a588f6cc274af8991c801bc142b9102e754e20d42428f21fee"
+    },
+    {
+      "path": "viewer/public/history/2025/references.json",
+      "bytes": 19920,
+      "sha256": "3e2dbe27be82fc5ce1b0780f19e4d19b6bda00526fc53e6ecc12297648e6b70b",
+      "candidateSha256": "3e2dbe27be82fc5ce1b0780f19e4d19b6bda00526fc53e6ecc12297648e6b70b"
+    },
+    {
+      "path": "viewer/public/history/2025/review.html",
+      "bytes": 4936,
+      "sha256": "27bb48ca181ede2ee031f2c202bc1b800234591797b9f93473051f5b6a17f5ea",
+      "candidateSha256": "27bb48ca181ede2ee031f2c202bc1b800234591797b9f93473051f5b6a17f5ea"
+    },
+    {
+      "path": "viewer/public/history/2025/review2-c543.webp",
+      "bytes": 192616,
+      "sha256": "f769e19a3bfc32499bdffdf0b78cd1f4f269ac64e6a21a600f67a568134cd110",
+      "candidateSha256": "f769e19a3bfc32499bdffdf0b78cd1f4f269ac64e6a21a600f67a568134cd110"
+    },
+    {
+      "path": "viewer/public/history/2025/review2-c72595.webp",
+      "bytes": 187030,
+      "sha256": "e045445eb785ec2e62b1530fae36b57f195e1772ae1464bf0e5abb25ea8903fe",
+      "candidateSha256": "e045445eb785ec2e62b1530fae36b57f195e1772ae1464bf0e5abb25ea8903fe"
+    },
+    {
+      "path": "viewer/public/history/2025/review4-c46581.webp",
+      "bytes": 204162,
+      "sha256": "1ff1239a9b8d6fcc8a4bb2a38e7b6f0bb4cfc92663a122aaad46757470fd92f4",
+      "candidateSha256": "1ff1239a9b8d6fcc8a4bb2a38e7b6f0bb4cfc92663a122aaad46757470fd92f4"
+    },
+    {
+      "path": "viewer/public/history/2025/review4-c549.webp",
+      "bytes": 205554,
+      "sha256": "b86fad00fc7c425261a941bc4e52dad56bb19db6cc7ce36dd8bbd047f594acb2",
+      "candidateSha256": "b86fad00fc7c425261a941bc4e52dad56bb19db6cc7ce36dd8bbd047f594acb2"
+    },
+    {
+      "path": "viewer/public/history/2025/review4-c72610.webp",
+      "bytes": 191286,
+      "sha256": "1de35cc2bf002ed50a25ecb4670e53fc68560997a398d9999ea6aa8a9830637a",
+      "candidateSha256": "1de35cc2bf002ed50a25ecb4670e53fc68560997a398d9999ea6aa8a9830637a"
+    },
+    {
+      "path": "viewer/public/history/2025/review5-east-c72596.jpg",
+      "bytes": 221086,
+      "sha256": "e7095e51ad1459abca3ff623aaaa6e3cefe8e510c370fdfa810ff3b7b8ebe4b9",
+      "candidateSha256": "e7095e51ad1459abca3ff623aaaa6e3cefe8e510c370fdfa810ff3b7b8ebe4b9"
+    },
+    {
+      "path": "viewer/public/history/2025/review6-completed-front-c47268.webp",
+      "bytes": 29748,
+      "sha256": "b0b446dc7e70176aecaa58315553982185e2e63973b09fadea18f3cd3e1c61d2",
+      "candidateSha256": "b0b446dc7e70176aecaa58315553982185e2e63973b09fadea18f3cd3e1c61d2"
+    },
+    {
+      "path": "viewer/public/history/2025/review6-late-terraces-c47305-t1425.jpg",
+      "bytes": 155680,
+      "sha256": "b5830f21a095388695e6cdeab81624c2bdf0b1b6fa20540d479e56d486801a14",
+      "candidateSha256": "b5830f21a095388695e6cdeab81624c2bdf0b1b6fa20540d479e56d486801a14"
+    },
+    {
+      "path": "viewer/public/history/2025/review6-room-front.webp",
+      "bytes": 63192,
+      "sha256": "98b973c1db011d9714cb77f5640f65ed441620b7fc1e5b3a493dc9aeee5ffce8",
+      "candidateSha256": "98b973c1db011d9714cb77f5640f65ed441620b7fc1e5b3a493dc9aeee5ffce8"
+    },
+    {
+      "path": "viewer/public/history/2025/review6-room-side.webp",
+      "bytes": 42688,
+      "sha256": "05f2623780b80cfee52e602239083a6e9b719e317749ecdc021d6834fed74566",
+      "candidateSha256": "05f2623780b80cfee52e602239083a6e9b719e317749ecdc021d6834fed74566"
+    },
+    {
+      "path": "viewer/public/history/2025/review7-c44696.webp",
+      "bytes": 122740,
+      "sha256": "5f5b914c17c096d5fdcd31bcc36ea8ae000ef3a06d6f8a44ff71867f0c87363f",
+      "candidateSha256": "5f5b914c17c096d5fdcd31bcc36ea8ae000ef3a06d6f8a44ff71867f0c87363f"
+    },
+    {
+      "path": "viewer/public/history/2025/review7-c46813.webp",
+      "bytes": 67608,
+      "sha256": "e0f104a5b17164c1f660a256c80ae2551e16576c63ef426761aa80bb3312dba8",
+      "candidateSha256": "e0f104a5b17164c1f660a256c80ae2551e16576c63ef426761aa80bb3312dba8"
+    },
+    {
+      "path": "viewer/public/history/2025/review7-c46869.webp",
+      "bytes": 119418,
+      "sha256": "fe618729ed5f3a2a0f147ddb24dd548a23a3ac093a51c09fae68a7cf4ea2efff",
+      "candidateSha256": "fe618729ed5f3a2a0f147ddb24dd548a23a3ac093a51c09fae68a7cf4ea2efff"
+    },
+    {
+      "path": "viewer/public/history/2026/accuracy/colab-native-curtain.webp",
+      "bytes": 68592,
+      "sha256": "af49e5cf7964c1c35bddc381a5669f3638dfd2de6a25d45b73720760827ed1a5",
+      "candidateSha256": "af49e5cf7964c1c35bddc381a5669f3638dfd2de6a25d45b73720760827ed1a5"
+    },
+    {
+      "path": "viewer/public/history/2026/accuracy/freeside-native-bread-sign.webp",
+      "bytes": 106530,
+      "sha256": "3e4b0bc2e82fbc479db3f1f4ec8dcefc5e5fdb9e277dd95cb5e785fbdeed5e54",
+      "candidateSha256": "3e4b0bc2e82fbc479db3f1f4ec8dcefc5e5fdb9e277dd95cb5e785fbdeed5e54"
+    },
+    {
+      "path": "viewer/public/history/2026/accuracy/freeside-native-entry-paint.webp",
+      "bytes": 12102,
+      "sha256": "ebab6098f5e463ae787db4edfbc1d819242fbb58219884771e5b860312bd910b",
+      "candidateSha256": "ebab6098f5e463ae787db4edfbc1d819242fbb58219884771e5b860312bd910b"
+    },
+    {
+      "path": "viewer/public/history/2026/accuracy/gallery-native-c80-0.webp",
+      "bytes": 82988,
+      "sha256": "8e8331ddb650044449504a2800ba5d33c5ae973095ba1291535d7f7c6a1abef2",
+      "candidateSha256": "8e8331ddb650044449504a2800ba5d33c5ae973095ba1291535d7f7c6a1abef2"
+    },
+    {
+      "path": "viewer/public/history/2026/accuracy/gallery-native-c80-1.webp",
+      "bytes": 79172,
+      "sha256": "8a7924e5417b45b4abfc890a709885c55592a88ef40a0775bd97b8f7e37d7e27",
+      "candidateSha256": "8a7924e5417b45b4abfc890a709885c55592a88ef40a0775bd97b8f7e37d7e27"
+    },
+    {
+      "path": "viewer/public/history/2026/accuracy/gallery-native-c80-2.webp",
+      "bytes": 67962,
+      "sha256": "9a006568d6353df534700feecb9fad21eef2b6ef4056630905110f33af985a29",
+      "candidateSha256": "9a006568d6353df534700feecb9fad21eef2b6ef4056630905110f33af985a29"
+    },
+    {
+      "path": "viewer/public/history/2026/accuracy/mimos-east-posters.webp",
+      "bytes": 92614,
+      "sha256": "adcdd8b6b63b59418a39d9918d82b6db783cfd0ad834d2065708226973a91222",
+      "candidateSha256": "adcdd8b6b63b59418a39d9918d82b6db783cfd0ad834d2065708226973a91222"
+    },
+    {
+      "path": "viewer/public/history/2026/accuracy/stair-white-pixel-motif.webp",
+      "bytes": 79390,
+      "sha256": "3c3f9401bb825df5f45327d5c4497a7f409eb803858044a4d0332417562d0c81",
+      "candidateSha256": "3c3f9401bb825df5f45327d5c4497a7f409eb803858044a4d0332417562d0c81"
+    },
+    {
+      "path": "viewer/public/history/2026/accuracy/tool-library-books.webp",
+      "bytes": 216632,
+      "sha256": "cbba73e9aba1e4549690040b1f1fca77deef613cff8dc2fd411d876c23baceaa",
+      "candidateSha256": "cbba73e9aba1e4549690040b1f1fca77deef613cff8dc2fd411d876c23baceaa"
+    },
+    {
+      "path": "viewer/public/history/2026/auditorium-c33334.webp",
+      "bytes": 219406,
+      "sha256": "40da99f1ddbefaacf68bb7c2cdfd1c33f9f5bbb00bdcac40674b168145519adb",
+      "candidateSha256": "40da99f1ddbefaacf68bb7c2cdfd1c33f9f5bbb00bdcac40674b168145519adb"
+    },
+    {
+      "path": "viewer/public/history/2026/auditorium-c33350.webp",
+      "bytes": 173500,
+      "sha256": "15d9e228dfd8537556bd1e2e98270211860f63b5b9992732d08e240a3973327d",
+      "candidateSha256": "15d9e228dfd8537556bd1e2e98270211860f63b5b9992732d08e240a3973327d"
+    },
+    {
+      "path": "viewer/public/history/2026/auditorium-c33355.webp",
+      "bytes": 157876,
+      "sha256": "ccaff3120234ff994d5f1ccb48d2ba308442c04e90ac06ba7c7c056a9cf41a61",
+      "candidateSha256": "ccaff3120234ff994d5f1ccb48d2ba308442c04e90ac06ba7c7c056a9cf41a61"
+    },
+    {
+      "path": "viewer/public/history/2026/auditorium-references.json",
+      "bytes": 2022,
+      "sha256": "2d5ba24d7b0cbc4797e48a97f773137a4c07b57c8076ec2865b792ad04533d73",
+      "candidateSha256": "2d5ba24d7b0cbc4797e48a97f773137a4c07b57c8076ec2865b792ad04533d73"
+    },
+    {
+      "path": "viewer/public/history/2026/auditorium-source-portrait.webp",
+      "bytes": 5070,
+      "sha256": "3322ddbdf21509a6c69d890e4410d4bd3c479b2312461aec9563c70096594069",
+      "candidateSha256": "3322ddbdf21509a6c69d890e4410d4bd3c479b2312461aec9563c70096594069"
+    },
+    {
+      "path": "viewer/public/history/2026/cabin-c50706.webp",
+      "bytes": 136610,
+      "sha256": "cca036ca015f8b134f758b553f7e5a5fa1ce8ea6b577a36e641d6bc29c3b528b",
+      "candidateSha256": "cca036ca015f8b134f758b553f7e5a5fa1ce8ea6b577a36e641d6bc29c3b528b"
+    },
+    {
+      "path": "viewer/public/history/2026/cabin-c50707.webp",
+      "bytes": 131288,
+      "sha256": "eda80f4476f20b8b359341d6a47a134b1ccee74d987a5124bbf5bba0243d3991",
+      "candidateSha256": "eda80f4476f20b8b359341d6a47a134b1ccee74d987a5124bbf5bba0243d3991"
+    },
+    {
+      "path": "viewer/public/history/2026/cabin-references.json",
+      "bytes": 1235,
+      "sha256": "dd48e0c2ba0a8d6e5dd43196635d2c56b9ad4b5fae52fa7f496b3b35d5ab7415",
+      "candidateSha256": "dd48e0c2ba0a8d6e5dd43196635d2c56b9ad4b5fae52fa7f496b3b35d5ab7415"
+    },
+    {
+      "path": "viewer/public/history/2026/completion/c47830.webp",
+      "bytes": 194968,
+      "sha256": "82c2f55cdc04903754d07569daf32267540c551e39f419549869713e4e43b245",
+      "candidateSha256": "82c2f55cdc04903754d07569daf32267540c551e39f419549869713e4e43b245"
+    },
+    {
+      "path": "viewer/public/history/2026/completion/c47857.webp",
+      "bytes": 170392,
+      "sha256": "8a7762ec94dc4e001408df6cc6d11d062cf34b7397ff2196974a8f07fd292f34",
+      "candidateSha256": "8a7762ec94dc4e001408df6cc6d11d062cf34b7397ff2196974a8f07fd292f34"
+    },
+    {
+      "path": "viewer/public/history/2026/completion/c48576.webp",
+      "bytes": 240868,
+      "sha256": "fce2386bd08da3571c2b8f07e35a22af34debbf22fdf3c9e43d38f5ea90bfc6a",
+      "candidateSha256": "fce2386bd08da3571c2b8f07e35a22af34debbf22fdf3c9e43d38f5ea90bfc6a"
+    },
+    {
+      "path": "viewer/public/history/2026/completion/tan-door-paint.webp",
+      "bytes": 2520,
+      "sha256": "bf41ce83fb1bfdcfea9c27b551aee558156c7b94d56a7d09d6f39c55eb7c5ebb",
+      "candidateSha256": "bf41ce83fb1bfdcfea9c27b551aee558156c7b94d56a7d09d6f39c55eb7c5ebb"
+    },
+    {
+      "path": "viewer/public/history/2026/completion/yellow-door-paint.webp",
+      "bytes": 4016,
+      "sha256": "8cff37816e58c16dccc37649ecc696a18c559a3a2739160bd926eccc1bd6761c",
+      "candidateSha256": "8cff37816e58c16dccc37649ecc696a18c559a3a2739160bd926eccc1bd6761c"
+    },
+    {
+      "path": "viewer/public/history/2026/compound-c28.webp",
+      "bytes": 224968,
+      "sha256": "e0bc22dbdde7a5168caa9125521ea0d4063e53272661841adc6032164ce3fb43",
+      "candidateSha256": "e0bc22dbdde7a5168caa9125521ea0d4063e53272661841adc6032164ce3fb43"
+    },
+    {
+      "path": "viewer/public/history/2026/compound-c33330.webp",
+      "bytes": 168338,
+      "sha256": "1fe5f8d4525488a11bb219e1bdfb6497ddc1bc8be4715d1e2ee068648479507a",
+      "candidateSha256": "1fe5f8d4525488a11bb219e1bdfb6497ddc1bc8be4715d1e2ee068648479507a"
+    },
+    {
+      "path": "viewer/public/history/2026/compound-c47911.webp",
+      "bytes": 131308,
+      "sha256": "9e297c0c5aa630195b4b92e9f84a118e6ee4f8346800e90404b27e8692fb17ee",
+      "candidateSha256": "9e297c0c5aa630195b4b92e9f84a118e6ee4f8346800e90404b27e8692fb17ee"
+    },
+    {
+      "path": "viewer/public/history/2026/compound-c47947.webp",
+      "bytes": 78318,
+      "sha256": "0c198fefcfee5d1353dfb2e16d11cc641c95761fe03a961d4eea69bb0244af49",
+      "candidateSha256": "0c198fefcfee5d1353dfb2e16d11cc641c95761fe03a961d4eea69bb0244af49"
+    },
+    {
+      "path": "viewer/public/history/2026/compound-c50418.webp",
+      "bytes": 191442,
+      "sha256": "d805ec9c73d4dc895b02863cf8b02600cdb2c2f696c060614987a5ed366d43ce",
+      "candidateSha256": "d805ec9c73d4dc895b02863cf8b02600cdb2c2f696c060614987a5ed366d43ce"
+    },
+    {
+      "path": "viewer/public/history/2026/compound-references.json",
+      "bytes": 2841,
+      "sha256": "be038ffee69c0bd5e59dd3db01c7acb5871a51e269e79d6bb1bfd1fd2f0eafcb",
+      "candidateSha256": "be038ffee69c0bd5e59dd3db01c7acb5871a51e269e79d6bb1bfd1fd2f0eafcb"
+    },
+    {
+      "path": "viewer/public/history/2026/dojo-c48391.webp",
+      "bytes": 162932,
+      "sha256": "50a5079aee38c473ecadad322251b274e02e43d18b8459554bb8678f544b7eb9",
+      "candidateSha256": "50a5079aee38c473ecadad322251b274e02e43d18b8459554bb8678f544b7eb9"
+    },
+    {
+      "path": "viewer/public/history/2026/dojo-c50580.webp",
+      "bytes": 74120,
+      "sha256": "0385c68506450aa437aa4316e4c9bfdb3bf81d16c7d8083cea43b70c41981144",
+      "candidateSha256": "0385c68506450aa437aa4316e4c9bfdb3bf81d16c7d8083cea43b70c41981144"
+    },
+    {
+      "path": "viewer/public/history/2026/dojo-c50720.webp",
+      "bytes": 99782,
+      "sha256": "5e5d264a296dd5a8b651a876838cb39577acd7bc5b5e96446cda3dbea5dfdd9d",
+      "candidateSha256": "5e5d264a296dd5a8b651a876838cb39577acd7bc5b5e96446cda3dbea5dfdd9d"
+    },
+    {
+      "path": "viewer/public/history/2026/dojo-references-pending.json",
+      "bytes": 1406,
+      "sha256": "dfa59f4e13a277893b5af740ce5db1d53500b0dafcdf7fe00a061213e73c1b41",
+      "candidateSha256": "dfa59f4e13a277893b5af740ce5db1d53500b0dafcdf7fe00a061213e73c1b41"
+    },
+    {
+      "path": "viewer/public/history/2026/dojo-references.json",
+      "bytes": 1979,
+      "sha256": "1064f8f5ba8cf49b7a92b3480ba3a26ee82d5db234e939db183303da2ec9a6fa",
+      "candidateSha256": "1064f8f5ba8cf49b7a92b3480ba3a26ee82d5db234e939db183303da2ec9a6fa"
+    },
+    {
+      "path": "viewer/public/history/2026/home/mimos-lounge-home.webp",
+      "bytes": 148360,
+      "sha256": "bb9927ea7a5d2cae21d7113b54d2a01ba280ea6772b324055e0398a20e16e7ac",
+      "candidateSha256": "bb9927ea7a5d2cae21d7113b54d2a01ba280ea6772b324055e0398a20e16e7ac"
+    },
+    {
+      "path": "viewer/public/history/2026/home/mimos-room-home.webp",
+      "bytes": 238094,
+      "sha256": "060efdbce0466699391f89eeae38505139496c8a7b86e3b17ddee97a4c91805f",
+      "candidateSha256": "060efdbce0466699391f89eeae38505139496c8a7b86e3b17ddee97a4c91805f"
+    },
+    {
+      "path": "viewer/public/history/2026/home/mimos-rug.webp",
+      "bytes": 103446,
+      "sha256": "a19981561c1dfdc7b5f50c5627e032abf814cb4985ca8a08f4d6cc2f3b56b10b",
+      "candidateSha256": "a19981561c1dfdc7b5f50c5627e032abf814cb4985ca8a08f4d6cc2f3b56b10b"
+    },
+    {
+      "path": "viewer/public/history/2026/home/mimos-study-home.webp",
+      "bytes": 195776,
+      "sha256": "8f9c56a7a5adb966c576c06cfdb19dad38614cd6481a01157f10522d4f077609",
+      "candidateSha256": "8f9c56a7a5adb966c576c06cfdb19dad38614cd6481a01157f10522d4f077609"
+    },
+    {
+      "path": "viewer/public/history/2026/og-references.json",
+      "bytes": 5316,
+      "sha256": "8531183e42d7b60cf8248a4d08b2d9169f31509db48fd8e8553194d82db6d6bf",
+      "candidateSha256": "8531183e42d7b60cf8248a4d08b2d9169f31509db48fd8e8553194d82db6d6bf"
+    },
+    {
+      "path": "viewer/public/history/2026/references.json",
+      "bytes": 34835,
+      "sha256": "ee80595e5b71553dec69cd04b669a1d336721ad0039b0057983ea0f5dbddbb71",
+      "candidateSha256": "ee80595e5b71553dec69cd04b669a1d336721ad0039b0057983ea0f5dbddbb71"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/auditorium-home-stage-after.webp",
+      "bytes": 84770,
+      "sha256": "99db2d413187c79018b28aef5bc69b2c3594fc3f1e884d4876f1c6f11347e082",
+      "candidateSha256": "99db2d413187c79018b28aef5bc69b2c3594fc3f1e884d4876f1c6f11347e082"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/campus-forklift.webp",
+      "bytes": 114778,
+      "sha256": "f63e5825fa10ca1676d2754ddfbb49bf06fed123671d273afec1246aaa79d084",
+      "candidateSha256": "f63e5825fa10ca1676d2754ddfbb49bf06fed123671d273afec1246aaa79d084"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/chiba-west-upper-wall.webp",
+      "bytes": 56338,
+      "sha256": "5d9e1c2e9cdd9a3d0fb5bdeca8730e8cd17265441c3cc1353bcf449b83ef7efc",
+      "candidateSha256": "5d9e1c2e9cdd9a3d0fb5bdeca8730e8cd17265441c3cc1353bcf449b83ef7efc"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/colab-completed-back-20260930.webp",
+      "bytes": 27120,
+      "sha256": "a1a19917795f5f55cc6c28c88aecc94a27c8f0f3604f28c7c8ff3166063a9416",
+      "candidateSha256": "a1a19917795f5f55cc6c28c88aecc94a27c8f0f3604f28c7c8ff3166063a9416"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/compound-enclosure-20260930.webp",
+      "bytes": 27814,
+      "sha256": "1cec0510843c777e8332422f612c519c11a7c043f148419b7cd2cdf3d47056b3",
+      "candidateSha256": "1cec0510843c777e8332422f612c519c11a7c043f148419b7cd2cdf3d47056b3"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/diner-empty-bay.webp",
+      "bytes": 160650,
+      "sha256": "dfdfe9ade86ceb307f96028288a46f376a237289f8045b8993f2b9322d960408",
+      "candidateSha256": "dfdfe9ade86ceb307f96028288a46f376a237289f8045b8993f2b9322d960408"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/diner-finished-blue-booths.webp",
+      "bytes": 260760,
+      "sha256": "cc46ff2686715e3b3af8469ebd92629a40fdb74c7d9300c5eb8f71c5439cac8e",
+      "candidateSha256": "cc46ff2686715e3b3af8469ebd92629a40fdb74c7d9300c5eb8f71c5439cac8e"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/diner-home-after.webp",
+      "bytes": 57078,
+      "sha256": "ba90e2e417ee2eb2c1bb6ac4432f00d306ba09f39752075f5479632915b72e25",
+      "candidateSha256": "ba90e2e417ee2eb2c1bb6ac4432f00d306ba09f39752075f5479632915b72e25"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/diner-maroon-seats.webp",
+      "bytes": 209312,
+      "sha256": "0268016ec029a7bb1161c7d7c96944d0b84140865505dc918361fcfde229db73",
+      "candidateSha256": "0268016ec029a7bb1161c7d7c96944d0b84140865505dc918361fcfde229db73"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/kitchen-community-prep.webp",
+      "bytes": 151670,
+      "sha256": "f14ed06e7af4a73b80460d844c9acb7c6477fc3d3415d9f6242d42a120cb2335",
+      "candidateSha256": "f14ed06e7af4a73b80460d844c9acb7c6477fc3d3415d9f6242d42a120cb2335"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/kitchen-cookware-pegboard.webp",
+      "bytes": 279630,
+      "sha256": "797c18315c117af1bf5e68d3e7ff1c2746b6cd00736e3424e06a2e8c412a112f",
+      "candidateSha256": "797c18315c117af1bf5e68d3e7ff1c2746b6cd00736e3424e06a2e8c412a112f"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/kitchen-entrance-commercial.webp",
+      "bytes": 151430,
+      "sha256": "b1656959b0c3bc81df1df5f362ee97b69532db13ec45728b3e647998aa9552fb",
+      "candidateSha256": "b1656959b0c3bc81df1df5f362ee97b69532db13ec45728b3e647998aa9552fb"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/kitchen-entrance-freezer.webp",
+      "bytes": 131998,
+      "sha256": "6da45ba842411cf951476d28ce7099fc7abc11ceaadab3da6a6bcf935937e7f3",
+      "candidateSha256": "6da45ba842411cf951476d28ce7099fc7abc11ceaadab3da6a6bcf935937e7f3"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/kitchen-home-after.webp",
+      "bytes": 104210,
+      "sha256": "716d8c5ce3b0c47c28f7914ddeef0ffb696af78735aac30958e6856f1c3b3ace",
+      "candidateSha256": "716d8c5ce3b0c47c28f7914ddeef0ffb696af78735aac30958e6856f1c3b3ace"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/kitchen-organized-pantry.webp",
+      "bytes": 215710,
+      "sha256": "3117fc86bbd74a7aed37216411759a82531b800cb9a226a1daeca3daf5a2a88c",
+      "candidateSha256": "3117fc86bbd74a7aed37216411759a82531b800cb9a226a1daeca3daf5a2a88c"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/kitchen-working-aisle.webp",
+      "bytes": 178912,
+      "sha256": "1a02dd0551b5c4d062379d73ce2bc5efa7924e1cff340769b76d56c9e1c68ba7",
+      "candidateSha256": "1a02dd0551b5c4d062379d73ce2bc5efa7924e1cff340769b76d56c9e1c68ba7"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/mimos-coffee-counter.webp",
+      "bytes": 125880,
+      "sha256": "0de6ab25627125d2790f6abbab93cc8db5a4eced8ab79965cc1a7e117fa3578b",
+      "candidateSha256": "0de6ab25627125d2790f6abbab93cc8db5a4eced8ab79965cc1a7e117fa3578b"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/mimos-espresso.webp",
+      "bytes": 209054,
+      "sha256": "f974a8522f40a6c95b67f5011fad7d0982d46fb72613ffb52fa3edfbdeecf5d6",
+      "candidateSha256": "f974a8522f40a6c95b67f5011fad7d0982d46fb72613ffb52fa3edfbdeecf5d6"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/mimos-gallery.jpg",
+      "bytes": 471723,
+      "sha256": "6fb96a469f1171a54fb6c05a1f3193f45da8e09b69cf60e6a2167d93b882a158",
+      "candidateSha256": "6fb96a469f1171a54fb6c05a1f3193f45da8e09b69cf60e6a2167d93b882a158"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/mimos-gallery.webp",
+      "bytes": 482610,
+      "sha256": "fb46d8887144413a85026a41ae706bb7d9549cae9e4b5de991787a05fa046bae",
+      "candidateSha256": "fb46d8887144413a85026a41ae706bb7d9549cae9e4b5de991787a05fa046bae"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/mimos-glazed-seating.webp",
+      "bytes": 226338,
+      "sha256": "1edca61aa087e960823df023bc46ebba92a6799b4b877190c9de2c47d416e264",
+      "candidateSha256": "1edca61aa087e960823df023bc46ebba92a6799b4b877190c9de2c47d416e264"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/mimos-home-cutaway.webp",
+      "bytes": 82384,
+      "sha256": "7e187fc2dde2e28d0df7bff3b01cd3cdf3997c1094c3371a3fa432f964290c74",
+      "candidateSha256": "7e187fc2dde2e28d0df7bff3b01cd3cdf3997c1094c3371a3fa432f964290c74"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/mimos-sign.jpg",
+      "bytes": 41228,
+      "sha256": "ed659f9f91dfdc5e468e2e40815a1a8cc64698c1f19c428d61ce0b5f5b50e16f",
+      "candidateSha256": "ed659f9f91dfdc5e468e2e40815a1a8cc64698c1f19c428d61ce0b5f5b50e16f"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/mimos-sign.webp",
+      "bytes": 28726,
+      "sha256": "2a1fc97b0bb0532df36df90b37a16fc76888a6e469067c48e0098eeaed339d65",
+      "candidateSha256": "2a1fc97b0bb0532df36df90b37a16fc76888a6e469067c48e0098eeaed339d65"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/og-boat.webp",
+      "bytes": 112654,
+      "sha256": "97c59deb34d1508226a6d5d039e76549b976631ca86918eb1b673b656db501fe",
+      "candidateSha256": "97c59deb34d1508226a6d5d039e76549b976631ca86918eb1b673b656db501fe"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/og-breakfast.webp",
+      "bytes": 105400,
+      "sha256": "4552fb62b03bc9f5191cab4d214e3312af1ff8e145c47469533d7d2e3d6528cd",
+      "candidateSha256": "4552fb62b03bc9f5191cab4d214e3312af1ff8e145c47469533d7d2e3d6528cd"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/og-bus-and-solar.webp",
+      "bytes": 65304,
+      "sha256": "f5713df947016983406b949934e3391d60ae1fb5f71273f954b109a955421f73",
+      "candidateSha256": "f5713df947016983406b949934e3391d60ae1fb5f71273f954b109a955421f73"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/og-clubhouse.webp",
+      "bytes": 74936,
+      "sha256": "20c888db82c28cd074d21ed3f84aa0a01cb2ca8fc4ec1acaa43fe0e06083cfb4",
+      "candidateSha256": "20c888db82c28cd074d21ed3f84aa0a01cb2ca8fc4ec1acaa43fe0e06083cfb4"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/og-kitchen.webp",
+      "bytes": 72024,
+      "sha256": "9a6685bafc55fcc421b9601b04be580fc104148819590adc8a802337d608ef21",
+      "candidateSha256": "9a6685bafc55fcc421b9601b04be580fc104148819590adc8a802337d608ef21"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/og-solar.webp",
+      "bytes": 78872,
+      "sha256": "43964c992c6960675d25509f80b2dc44db0c15ac0cc21a3bc464b46ce12ea93f",
+      "candidateSha256": "43964c992c6960675d25509f80b2dc44db0c15ac0cc21a3bc464b46ce12ea93f"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/review-cabins-after.webp",
+      "bytes": 13718,
+      "sha256": "7261d17b3d333e936b8f643299882785280c62859b7ca7fec19b6d5726222458",
+      "candidateSha256": "7261d17b3d333e936b8f643299882785280c62859b7ca7fec19b6d5726222458"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/review-chiba-roof-after.webp",
+      "bytes": 41102,
+      "sha256": "12bc736506ebe63182b688c843a099b72bed6b6814b4d974ee72e779230f23fb",
+      "candidateSha256": "12bc736506ebe63182b688c843a099b72bed6b6814b4d974ee72e779230f23fb"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/review-chiba-roof-before.webp",
+      "bytes": 37390,
+      "sha256": "00cf43a286c9386157cfb7044332ffc1e76b528c83d8e5a4ea43f34b04118a34",
+      "candidateSha256": "00cf43a286c9386157cfb7044332ffc1e76b528c83d8e5a4ea43f34b04118a34"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/review-chiba-south-after.webp",
+      "bytes": 48552,
+      "sha256": "ba3bc6423b7a39a885e0c11e22bc74bd077aabe965bd044eb1da4a4bad5dff2e",
+      "candidateSha256": "ba3bc6423b7a39a885e0c11e22bc74bd077aabe965bd044eb1da4a4bad5dff2e"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/review-chiba-south-before.webp",
+      "bytes": 37378,
+      "sha256": "09b57c30fc64daf49a03a0eb8ca9762ec405d3583f6b13efd1fc3c517b1cd8b2",
+      "candidateSha256": "09b57c30fc64daf49a03a0eb8ca9762ec405d3583f6b13efd1fc3c517b1cd8b2"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/review-compound-after.webp",
+      "bytes": 27204,
+      "sha256": "430927a70d65c568f7442ea688003d869e38bf51e1eeb297b7acc7ebe60bed10",
+      "candidateSha256": "430927a70d65c568f7442ea688003d869e38bf51e1eeb297b7acc7ebe60bed10"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/review-compound-before.webp",
+      "bytes": 23910,
+      "sha256": "1aa94da3d03fb1eda33b39c27439e61291ca941222d4eef67b47e79cbbe9955d",
+      "candidateSha256": "1aa94da3d03fb1eda33b39c27439e61291ca941222d4eef67b47e79cbbe9955d"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/review-dojo-front-after.webp",
+      "bytes": 20780,
+      "sha256": "b444bf227cf62b0c141b08f47da04e1a6f10ab6dc7d0ee2a52a916a5837f3551",
+      "candidateSha256": "b444bf227cf62b0c141b08f47da04e1a6f10ab6dc7d0ee2a52a916a5837f3551"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/review-forklift-after.webp",
+      "bytes": 26602,
+      "sha256": "1da41c22bf07b39f8745e3191faf0c3c52c8adbfcaf1a7a807355cc8ab905686",
+      "candidateSha256": "1da41c22bf07b39f8745e3191faf0c3c52c8adbfcaf1a7a807355cc8ab905686"
+    },
+    {
+      "path": "viewer/public/history/2026/review-20260929/south-access-t160.webp",
+      "bytes": 226484,
+      "sha256": "2c6ea1496c877345cff0bf94b95edd6e7ff46230897ceafc4761e1e57e061c25",
+      "candidateSha256": "2c6ea1496c877345cff0bf94b95edd6e7ff46230897ceafc4761e1e57e061c25"
+    },
+    {
+      "path": "viewer/public/history/2026/review.html",
+      "bytes": 3212,
+      "sha256": "4aa9fc7cf96d417d688a290675960572d1a1a07d7120d7c9869e3935fc81bc1a",
+      "candidateSha256": "4aa9fc7cf96d417d688a290675960572d1a1a07d7120d7c9869e3935fc81bc1a"
+    },
+    {
+      "path": "viewer/public/history/README.html",
+      "bytes": 39298,
+      "sha256": "26713c585438862c2452df584ebafd88ed173dddca2c6ef756ef7340d40b67e7",
+      "candidateSha256": "26713c585438862c2452df584ebafd88ed173dddca2c6ef756ef7340d40b67e7"
+    },
+    {
+      "path": "viewer/app/studio/page.tsx",
+      "bytes": 67859,
+      "snapshotSha256": "fb0c5304b11c438b157ba02a2e00f486cb43c292e1f8d7b4608397cbc9a8a940",
+      "mergedSha256": "bcfa32c55259af4dbfe86c9432f1850dd87115e274be55994f2da50c9de9abca",
+      "candidateSha256": "bcfa32c55259af4dbfe86c9432f1850dd87115e274be55994f2da50c9de9abca"
+    },
+    {
+      "path": "viewer/deploy/prepare.py",
+      "bytes": 8801,
+      "snapshotSha256": "23f617d17293a111e801ee82c461fc5e8d1bb22723d5c1f78d08e265a732e93f",
+      "mergedSha256": "b371759338a78ca7e8c3506dd9463374dfcf461a49169672958054e21ea110f6",
+      "candidateSha256": "b371759338a78ca7e8c3506dd9463374dfcf461a49169672958054e21ea110f6"
+    }
+  ],
+  "tests": [
+    {
+      "path": "viewer/deploy/history-2026-actual-browser.test.mjs",
+      "sha256": "51a9407cb4c53650a5582332712da602f57dbe92efde950c89d4613e2e5b533f",
+      "candidateSha256": "51a9407cb4c53650a5582332712da602f57dbe92efde950c89d4613e2e5b533f"
+    },
+    {
+      "path": "viewer/deploy/history-2026-structure.test.mjs",
+      "sha256": "e67ec747e5c61b11e0448d8526c1b67be3347f99f58177c5b9f00ff9d1592de6",
+      "candidateSha256": "e67ec747e5c61b11e0448d8526c1b67be3347f99f58177c5b9f00ff9d1592de6"
+    },
+    {
+      "path": "viewer/deploy/history-2026-interiors.test.mjs",
+      "sha256": "32515c5cfd02cd5285cef3457c525b287088cc6a8bc736be91f4ccbe73ba422f",
+      "candidateSha256": "32515c5cfd02cd5285cef3457c525b287088cc6a8bc736be91f4ccbe73ba422f"
+    },
+    {
+      "path": "viewer/deploy/history-2026-compound.test.mjs",
+      "sha256": "bad01abd9aa375e8662d52f4193c09c61c6cbbadb61e4d7e0830da6723601604",
+      "candidateSha256": "035c55849d7144b46f533058bdee7778a18b9774816d36292a7cf2190c685e66"
+    },
+    {
+      "path": "viewer/deploy/history-2026-facade.test.mjs",
+      "sha256": "b53751c1e3a231c22e836b6e88d8b9b24a78f30f5b0b9fba782f5a9ab39bf3de",
+      "candidateSha256": "b53751c1e3a231c22e836b6e88d8b9b24a78f30f5b0b9fba782f5a9ab39bf3de"
+    },
+    {
+      "path": "viewer/deploy/history-ids.test.mjs",
+      "sha256": "46386af035ce3aa035355ee597146a9e29b7a3e8f5b6551142f91319a2aec84a",
+      "candidateSha256": "46386af035ce3aa035355ee597146a9e29b7a3e8f5b6551142f91319a2aec84a"
+    },
+    {
+      "path": "viewer/deploy/history-geometry.test.mjs",
+      "sha256": "0f1c5a7bd249f7c75502f45210a7aff2fa650f22a4a4804e7ca05aa35d9ae85b",
+      "candidateSha256": "afbcb06eb1d614c99f92e717d9290dadf81d66d59f2b8a5f7bba45de04773985"
+    },
+    {
+      "path": "viewer/deploy/history-2025.test.mjs",
+      "sha256": "1ae814bf7435a49e9a26f44b39a205def807b2427a0abe988e1126c225cf5259",
+      "candidateSha256": "84da9d10cfb5c52ee8bb5d6880d100189a6e5f775486bd8bb02b9870604b565a"
+    }
+  ]
+}

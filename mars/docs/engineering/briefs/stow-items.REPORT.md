@@ -1,0 +1,19 @@
+# Explicit surface preparation
+
+`stow_items {actor, placements:[{item,surfaceSlot}], allowGround?}` accepts exactly 1–2 explicit placements covering all held small items. The caller supplies author-approved fixed surface slots; the engine never selects a destination or starts another activity. `readStow(rt,action)` exposes status/phase, current placement, physically completed placements, remaining in-hand IDs, waiting reason and diagnostic, including refused and interrupted records.
+
+Admission supports an idle standing ground actor in a room without usable access links. It refuses construction grips, other actor/hand/item/destination ownership, incomplete/duplicate placements, incompatible/missing items, occupied/unreachable destinations and missing put_item. Parent preclaims actor, both hands, item entities and canonical surface slots; serial ordinary put_item children perform all physical motion/support writes. Parent is reservation-only for hand following. Stow refuses directed preemption; explicit cancellation safely stops children and preserves released items plus remaining in-hand support. A fixed 120-simulation-second deadline reports stow.timeout and performs the same cleanup.
+
+Destinations are bound to their admitted surface definition/pose/point. Changed later destinations refuse without rebinding. Already released placements count even if cancellation happens during withdrawal. Active snapshots explicitly refuse snapshot.non-resumable; quiescent object/support state remains snapshotable.
+
+Scope adjustment from durable stow-activity.PLAN.md: ground is deferred pending shared standalone ground placement safety/reservation semantics. Literal ground reports stow.ground-unsupported even with allowGround:true. No ground token, scan arbitration, automatic activity switch, UI/camera, access-link flow or inventory framework is introduced.
+
+Validation: 26 dedicated stow cases plus 5 driver, 12 destination and 6 meal cases pass (49 focused tests). Typecheck and scoped oxlint pass. Existing meal 608-tick outcome/hash remains unchanged. activities/4 is the next unreleased semantics window: older bound plans become stale and must rebind. Deliberate external surface removal/movement tests assert refusal and resource cleanup; externally invalidated placed support is not claimed to remain invariant-valid. No full gate/browser/golden edits; root owns visible two-item table proof and integration.
+
+## Bounded follow-up review
+
+Normal quiescent snapshots encode the plain stowActivities store, including terminal exec data. Completed, partial-cancelled and failed readouts survive restore; a missing exec is not normal quiescent behavior. The explicit Runtime allowDrop path can omit an active pre-child exec and restore its record as cancelled/snapshot.dropped. readStow now honors that terminal record rather than mislabeling it failed; without exec history it reports placements currently resting on approved slots and actual remaining held IDs. This does not enable active resumption or certify arbitrary partial graph drops.
+
+Final success previously checked only the latest child placement and empty hands. If an earlier item was externally moved to another valid slot during the second put, stow could report prepared despite the unmet approved destination. Final completion now rechecks every placement and safely fails stow.support-changed without moving released items. Historical completed placements remain physical release history, and the diagnostic explains the failed final condition.
+
+Follow-up validation: 29 stow tests + 6 meal tests pass (35 focused), typecheck and scoped lint pass. Three new cases cover explicit pre-child snapshot drop, changed earlier placement during the second put, and restored partial cancellation; the completed restore test now compares the full readout. Meal pin remains unchanged. No Runtime, registry, pose/support, browser/full-gate or golden changes.

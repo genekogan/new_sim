@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Mars live camera review</title>
+    <style>
+      body {
+        margin: 0;
+        background: #101820;
+        color: white;
+        font: 15px system-ui;
+      }
+      header {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        padding: 12px;
+      }
+      button,
+      select {
+        padding: 8px;
+        background: #284455;
+        color: white;
+        border: 1px solid #7092a4;
+        border-radius: 4px;
+      }
+      iframe {
+        width: 100%;
+        height: calc(100vh - 68px);
+        border: 0;
+      }
+      small {
+        color: #aabec8;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <b>Live cinematographer</b
+      ><select id="policy" aria-label="Camera policy">
+        <option value="clear">Clear activity coverage</option>
+        <option value="restrained">Restrained observation</option>
+        <option value="continuous">Continuous following</option></select
+      ><button id="subject">Follow guest2 for 6s</button
+      ><button id="auto">Return to auto</button
+      ><label id="jev-control"
+        ><input type="checkbox" id="jev" />Bounded Jev bridge (local
+        only)</label
+      ><small id="scope">Hypothetical classroom · observational camera prototype</small>
+    </header>
+    <iframe title="Live Mars Lab"></iframe>
+    <script type="module">
+      import { attachLabCamera } from './lab-driver.ts';
+      import { activityCameraScenario } from './activity-observation.ts';
+      import { BridgeProvider } from './jev-client.ts';
+      const frame = document.querySelector('iframe');
+      const localBridge =
+        ['localhost', '127.0.0.1'].includes(location.hostname) &&
+        location.port === '5593';
+      document.querySelector('#jev').disabled = !localBridge;
+      document.querySelector('#jev-control').hidden = !localBridge;
+      let camera;
+      let ready;
+      const start = () => {
+        const hook = frame.contentWindow.__marsEngine;
+        if (!hook?.ready) return;
+        camera?.dispose();
+        camera = attachLabCamera(
+          hook,
+          document.querySelector('#policy').value,
+          localBridge && document.querySelector('#jev').checked
+            ? new BridgeProvider()
+            : undefined,
+          { document: frame.contentDocument },
+        );
+        window.__cameraReview = camera;
+      };
+      frame.onload = () => {
+        clearInterval(ready);
+        ready = setInterval(() => {
+          if (frame.contentWindow.__marsEngine?.ready) {
+            clearInterval(ready);
+            start();
+          }
+        }, 100);
+      };
+      const requestedScenario = new URLSearchParams(location.search).get(
+        'scenario',
+      );
+      const selectedScenario = requestedScenario === 'classroom-8' ||
+        (requestedScenario && activityCameraScenario(requestedScenario))
+        ? requestedScenario : 'classroom-4';
+      // Load only the selected authoritative world, after installing readiness.
+      frame.src = `/lab?scenario=${encodeURIComponent(selectedScenario)}`;
+      const classroom = selectedScenario.startsWith('classroom-');
+      if (!classroom) {
+        document.querySelector('#subject').textContent = 'Follow activity person for 6s';
+        document.querySelector('#scope').textContent =
+          `Hypothetical ${selectedScenario} · observational camera prototype`;
+      }
+      document.querySelector('#policy').onchange = start;
+      document.querySelector('#jev').onchange = start;
+      document.querySelector('#subject').onclick = () => {
+        const subject = classroom ? 'guest2' : camera?.preferredSubject();
+        if (subject) camera?.takeover(subject, 6);
+      };
+      document.querySelector('#auto').onclick = () => camera?.release();
+      window.addEventListener('beforeunload', () => {
+        clearInterval(ready);
+        camera?.dispose();
+      });
+    </script>
+  </body>
+</html>

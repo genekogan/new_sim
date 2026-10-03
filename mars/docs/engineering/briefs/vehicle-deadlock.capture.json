@@ -1,0 +1,852 @@
+{
+  "result": {
+    "status": "blocked",
+    "steps": [
+      {
+        "id": "ride0",
+        "verb": "ride_to",
+        "status": "blocked",
+        "started": true,
+        "blockedTicks": 404,
+        "actionId": "step:ride0",
+        "submittedTick": 44,
+        "diagnostic": {
+          "code": "deadlock.cycle",
+          "message": "persistent wait cycle: v0, v1, v2; movement remains blocked pending recovery",
+          "subjects": [
+            "v0",
+            "v1",
+            "v2"
+          ],
+          "details": {
+            "sinceTick": 151,
+            "thresholdTicks": 200,
+            "movers": [
+              {
+                "mover": "v0",
+                "action": "step:ride0",
+                "blockedBy": [
+                  "p2",
+                  "v2"
+                ],
+                "code": "traffic.vehicle"
+              },
+              {
+                "mover": "v1",
+                "action": "step:ride1",
+                "blockedBy": [
+                  "p0",
+                  "v0"
+                ],
+                "code": "traffic.vehicle"
+              },
+              {
+                "mover": "v2",
+                "action": "step:ride2",
+                "blockedBy": [
+                  "p1",
+                  "v1"
+                ],
+                "code": "traffic.vehicle"
+              }
+            ],
+            "edges": [
+              {
+                "from": "v0",
+                "to": "v2"
+              },
+              {
+                "from": "v1",
+                "to": "v0"
+              },
+              {
+                "from": "v2",
+                "to": "v1"
+              }
+            ],
+            "exhausted": true,
+            "recovery": [
+              {
+                "mover": "v0",
+                "status": "attempted",
+                "diagnostic": {
+                  "code": "deadlock.replan-refused",
+                  "message": "p0 on v0 has no euc route from (-1.26, 0.00) to (1.20, 0.00): the euc radius 0.35 m + 0.15 m tracking margin needs 1.12 m clear width; the only way (walkable) squeezes to 0.35 m clearance at (0.31, -0.27) between v2#7 and v2#6",
+                  "subjects": [
+                    "v0"
+                  ]
+                },
+                "requestedTick": 346,
+                "completedTick": 346
+              },
+              {
+                "mover": "v1",
+                "status": "attempted",
+                "diagnostic": {
+                  "code": "deadlock.replan-refused",
+                  "message": "p1 on v1 (euc): no route from level 0 (0.00, -1.77) to level 0 (0.00, 5.00) for a 0.56 m-radius agent",
+                  "subjects": [
+                    "v1"
+                  ]
+                },
+                "requestedTick": 350,
+                "completedTick": 350
+              },
+              {
+                "mover": "v2",
+                "status": "unavailable",
+                "diagnostic": {
+                  "code": "deadlock.recovery-unavailable",
+                  "message": "ride recovery has no applicable stopped-route retry; pull-over/resume retains its own bounded retry policy",
+                  "subjects": [
+                    "v2"
+                  ]
+                },
+                "requestedTick": 349,
+                "completedTick": 349
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "ride1",
+        "verb": "ride_to",
+        "status": "blocked",
+        "started": true,
+        "blockedTicks": 403,
+        "actionId": "step:ride1",
+        "submittedTick": 44,
+        "diagnostic": {
+          "code": "deadlock.cycle",
+          "message": "persistent wait cycle: v0, v1, v2; movement remains blocked pending recovery",
+          "subjects": [
+            "v0",
+            "v1",
+            "v2"
+          ],
+          "details": {
+            "sinceTick": 151,
+            "thresholdTicks": 200,
+            "movers": [
+              {
+                "mover": "v0",
+                "action": "step:ride0",
+                "blockedBy": [
+                  "p2",
+                  "v2"
+                ],
+                "code": "traffic.vehicle"
+              },
+              {
+                "mover": "v1",
+                "action": "step:ride1",
+                "blockedBy": [
+                  "p0",
+                  "v0"
+                ],
+                "code": "traffic.vehicle"
+              },
+              {
+                "mover": "v2",
+                "action": "step:ride2",
+                "blockedBy": [
+                  "p1",
+                  "v1"
+                ],
+                "code": "traffic.vehicle"
+              }
+            ],
+            "edges": [
+              {
+                "from": "v0",
+                "to": "v2"
+              },
+              {
+                "from": "v1",
+                "to": "v0"
+              },
+              {
+                "from": "v2",
+                "to": "v1"
+              }
+            ],
+            "exhausted": true,
+            "recovery": [
+              {
+                "mover": "v0",
+                "status": "attempted",
+                "diagnostic": {
+                  "code": "deadlock.replan-refused",
+                  "message": "p0 on v0 has no euc route from (-1.26, 0.00) to (1.20, 0.00): the euc radius 0.35 m + 0.15 m tracking margin needs 1.12 m clear width; the only way (walkable) squeezes to 0.35 m clearance at (0.31, -0.27) between v2#7 and v2#6",
+                  "subjects": [
+                    "v0"
+                  ]
+                },
+                "requestedTick": 346,
+                "completedTick": 346
+              },
+              {
+                "mover": "v1",
+                "status": "attempted",
+                "diagnostic": {
+                  "code": "deadlock.replan-refused",
+                  "message": "p1 on v1 (euc): no route from level 0 (0.00, -1.77) to level 0 (0.00, 5.00) for a 0.56 m-radius agent",
+                  "subjects": [
+                    "v1"
+                  ]
+                },
+                "requestedTick": 350,
+                "completedTick": 350
+              },
+              {
+                "mover": "v2",
+                "status": "unavailable",
+                "diagnostic": {
+                  "code": "deadlock.recovery-unavailable",
+                  "message": "ride recovery has no applicable stopped-route retry; pull-over/resume retains its own bounded retry policy",
+                  "subjects": [
+                    "v2"
+                  ]
+                },
+                "requestedTick": 349,
+                "completedTick": 349
+              }
+            ]
+          }
+        }
+      },
+      {
+        "id": "ride2",
+        "verb": "ride_to",
+        "status": "blocked",
+        "started": true,
+        "blockedTicks": 426,
+        "actionId": "step:ride2",
+        "submittedTick": 44,
+        "diagnostic": {
+          "code": "deadlock.cycle",
+          "message": "persistent wait cycle: v0, v1, v2; movement remains blocked pending recovery",
+          "subjects": [
+            "v0",
+            "v1",
+            "v2"
+          ],
+          "details": {
+            "sinceTick": 151,
+            "thresholdTicks": 200,
+            "movers": [
+              {
+                "mover": "v0",
+                "action": "step:ride0",
+                "blockedBy": [
+                  "p2",
+                  "v2"
+                ],
+                "code": "traffic.vehicle"
+              },
+              {
+                "mover": "v1",
+                "action": "step:ride1",
+                "blockedBy": [
+                  "p0",
+                  "v0"
+                ],
+                "code": "traffic.vehicle"
+              },
+              {
+                "mover": "v2",
+                "action": "step:ride2",
+                "blockedBy": [
+                  "p1",
+                  "v1"
+                ],
+                "code": "traffic.vehicle"
+              }
+            ],
+            "edges": [
+              {
+                "from": "v0",
+                "to": "v2"
+              },
+              {
+                "from": "v1",
+                "to": "v0"
+              },
+              {
+                "from": "v2",
+                "to": "v1"
+              }
+            ],
+            "exhausted": true,
+            "recovery": [
+              {
+                "mover": "v0",
+                "status": "attempted",
+                "diagnostic": {
+                  "code": "deadlock.replan-refused",
+                  "message": "p0 on v0 has no euc route from (-1.26, 0.00) to (1.20, 0.00): the euc radius 0.35 m + 0.15 m tracking margin needs 1.12 m clear width; the only way (walkable) squeezes to 0.35 m clearance at (0.31, -0.27) between v2#7 and v2#6",
+                  "subjects": [
+                    "v0"
+                  ]
+                },
+                "requestedTick": 346,
+                "completedTick": 346
+              },
+              {
+                "mover": "v1",
+                "status": "attempted",
+                "diagnostic": {
+                  "code": "deadlock.replan-refused",
+                  "message": "p1 on v1 (euc): no route from level 0 (0.00, -1.77) to level 0 (0.00, 5.00) for a 0.56 m-radius agent",
+                  "subjects": [
+                    "v1"
+                  ]
+                },
+                "requestedTick": 350,
+                "completedTick": 350
+              },
+              {
+                "mover": "v2",
+                "status": "unavailable",
+                "diagnostic": {
+                  "code": "deadlock.recovery-unavailable",
+                  "message": "ride recovery has no applicable stopped-route retry; pull-over/resume retains its own bounded retry policy",
+                  "subjects": [
+                    "v2"
+                  ]
+                },
+                "requestedTick": 349,
+                "completedTick": 349
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "violations": [],
+    "diagnostics": [
+      {
+        "code": "sequence.blocked",
+        "message": "all live work remains blocked after bounded recovery; supports and reservations remain live",
+        "subjects": [
+          "v0",
+          "v1",
+          "v2"
+        ],
+        "details": {
+          "waits": [
+            {
+              "code": "deadlock.cycle",
+              "message": "persistent wait cycle: v0, v1, v2; movement remains blocked pending recovery",
+              "subjects": [
+                "v0",
+                "v1",
+                "v2"
+              ],
+              "details": {
+                "sinceTick": 151,
+                "thresholdTicks": 200,
+                "movers": [
+                  {
+                    "mover": "v0",
+                    "action": "step:ride0",
+                    "blockedBy": [
+                      "p2",
+                      "v2"
+                    ],
+                    "code": "traffic.vehicle"
+                  },
+                  {
+                    "mover": "v1",
+                    "action": "step:ride1",
+                    "blockedBy": [
+                      "p0",
+                      "v0"
+                    ],
+                    "code": "traffic.vehicle"
+                  },
+                  {
+                    "mover": "v2",
+                    "action": "step:ride2",
+                    "blockedBy": [
+                      "p1",
+                      "v1"
+                    ],
+                    "code": "traffic.vehicle"
+                  }
+                ],
+                "edges": [
+                  {
+                    "from": "v0",
+                    "to": "v2"
+                  },
+                  {
+                    "from": "v1",
+                    "to": "v0"
+                  },
+                  {
+                    "from": "v2",
+                    "to": "v1"
+                  }
+                ],
+                "exhausted": true,
+                "recovery": [
+                  {
+                    "mover": "v0",
+                    "status": "attempted",
+                    "diagnostic": {
+                      "code": "deadlock.replan-refused",
+                      "message": "p0 on v0 has no euc route from (-1.26, 0.00) to (1.20, 0.00): the euc radius 0.35 m + 0.15 m tracking margin needs 1.12 m clear width; the only way (walkable) squeezes to 0.35 m clearance at (0.31, -0.27) between v2#7 and v2#6",
+                      "subjects": [
+                        "v0"
+                      ]
+                    },
+                    "requestedTick": 346,
+                    "completedTick": 346
+                  },
+                  {
+                    "mover": "v1",
+                    "status": "attempted",
+                    "diagnostic": {
+                      "code": "deadlock.replan-refused",
+                      "message": "p1 on v1 (euc): no route from level 0 (0.00, -1.77) to level 0 (0.00, 5.00) for a 0.56 m-radius agent",
+                      "subjects": [
+                        "v1"
+                      ]
+                    },
+                    "requestedTick": 350,
+                    "completedTick": 350
+                  },
+                  {
+                    "mover": "v2",
+                    "status": "unavailable",
+                    "diagnostic": {
+                      "code": "deadlock.recovery-unavailable",
+                      "message": "ride recovery has no applicable stopped-route retry; pull-over/resume retains its own bounded retry policy",
+                      "subjects": [
+                        "v2"
+                      ]
+                    },
+                    "requestedTick": 349,
+                    "completedTick": 349
+                  }
+                ]
+              }
+            },
+            {
+              "code": "deadlock.cycle",
+              "message": "persistent wait cycle: v0, v1, v2; movement remains blocked pending recovery",
+              "subjects": [
+                "v0",
+                "v1",
+                "v2"
+              ],
+              "details": {
+                "sinceTick": 151,
+                "thresholdTicks": 200,
+                "movers": [
+                  {
+                    "mover": "v0",
+                    "action": "step:ride0",
+                    "blockedBy": [
+                      "p2",
+                      "v2"
+                    ],
+                    "code": "traffic.vehicle"
+                  },
+                  {
+                    "mover": "v1",
+                    "action": "step:ride1",
+                    "blockedBy": [
+                      "p0",
+                      "v0"
+                    ],
+                    "code": "traffic.vehicle"
+                  },
+                  {
+                    "mover": "v2",
+                    "action": "step:ride2",
+                    "blockedBy": [
+                      "p1",
+                      "v1"
+                    ],
+                    "code": "traffic.vehicle"
+                  }
+                ],
+                "edges": [
+                  {
+                    "from": "v0",
+                    "to": "v2"
+                  },
+                  {
+                    "from": "v1",
+                    "to": "v0"
+                  },
+                  {
+                    "from": "v2",
+                    "to": "v1"
+                  }
+                ],
+                "exhausted": true,
+                "recovery": [
+                  {
+                    "mover": "v0",
+                    "status": "attempted",
+                    "diagnostic": {
+                      "code": "deadlock.replan-refused",
+                      "message": "p0 on v0 has no euc route from (-1.26, 0.00) to (1.20, 0.00): the euc radius 0.35 m + 0.15 m tracking margin needs 1.12 m clear width; the only way (walkable) squeezes to 0.35 m clearance at (0.31, -0.27) between v2#7 and v2#6",
+                      "subjects": [
+                        "v0"
+                      ]
+                    },
+                    "requestedTick": 346,
+                    "completedTick": 346
+                  },
+                  {
+                    "mover": "v1",
+                    "status": "attempted",
+                    "diagnostic": {
+                      "code": "deadlock.replan-refused",
+                      "message": "p1 on v1 (euc): no route from level 0 (0.00, -1.77) to level 0 (0.00, 5.00) for a 0.56 m-radius agent",
+                      "subjects": [
+                        "v1"
+                      ]
+                    },
+                    "requestedTick": 350,
+                    "completedTick": 350
+                  },
+                  {
+                    "mover": "v2",
+                    "status": "unavailable",
+                    "diagnostic": {
+                      "code": "deadlock.recovery-unavailable",
+                      "message": "ride recovery has no applicable stopped-route retry; pull-over/resume retains its own bounded retry policy",
+                      "subjects": [
+                        "v2"
+                      ]
+                    },
+                    "requestedTick": 349,
+                    "completedTick": 349
+                  }
+                ]
+              }
+            },
+            {
+              "code": "deadlock.cycle",
+              "message": "persistent wait cycle: v0, v1, v2; movement remains blocked pending recovery",
+              "subjects": [
+                "v0",
+                "v1",
+                "v2"
+              ],
+              "details": {
+                "sinceTick": 151,
+                "thresholdTicks": 200,
+                "movers": [
+                  {
+                    "mover": "v0",
+                    "action": "step:ride0",
+                    "blockedBy": [
+                      "p2",
+                      "v2"
+                    ],
+                    "code": "traffic.vehicle"
+                  },
+                  {
+                    "mover": "v1",
+                    "action": "step:ride1",
+                    "blockedBy": [
+                      "p0",
+                      "v0"
+                    ],
+                    "code": "traffic.vehicle"
+                  },
+                  {
+                    "mover": "v2",
+                    "action": "step:ride2",
+                    "blockedBy": [
+                      "p1",
+                      "v1"
+                    ],
+                    "code": "traffic.vehicle"
+                  }
+                ],
+                "edges": [
+                  {
+                    "from": "v0",
+                    "to": "v2"
+                  },
+                  {
+                    "from": "v1",
+                    "to": "v0"
+                  },
+                  {
+                    "from": "v2",
+                    "to": "v1"
+                  }
+                ],
+                "exhausted": true,
+                "recovery": [
+                  {
+                    "mover": "v0",
+                    "status": "attempted",
+                    "diagnostic": {
+                      "code": "deadlock.replan-refused",
+                      "message": "p0 on v0 has no euc route from (-1.26, 0.00) to (1.20, 0.00): the euc radius 0.35 m + 0.15 m tracking margin needs 1.12 m clear width; the only way (walkable) squeezes to 0.35 m clearance at (0.31, -0.27) between v2#7 and v2#6",
+                      "subjects": [
+                        "v0"
+                      ]
+                    },
+                    "requestedTick": 346,
+                    "completedTick": 346
+                  },
+                  {
+                    "mover": "v1",
+                    "status": "attempted",
+                    "diagnostic": {
+                      "code": "deadlock.replan-refused",
+                      "message": "p1 on v1 (euc): no route from level 0 (0.00, -1.77) to level 0 (0.00, 5.00) for a 0.56 m-radius agent",
+                      "subjects": [
+                        "v1"
+                      ]
+                    },
+                    "requestedTick": 350,
+                    "completedTick": 350
+                  },
+                  {
+                    "mover": "v2",
+                    "status": "unavailable",
+                    "diagnostic": {
+                      "code": "deadlock.recovery-unavailable",
+                      "message": "ride recovery has no applicable stopped-route retry; pull-over/resume retains its own bounded retry policy",
+                      "subjects": [
+                        "v2"
+                      ]
+                    },
+                    "requestedTick": 349,
+                    "completedTick": 349
+                  }
+                ]
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "startTick": 44,
+    "endTick": 550,
+    "ticks": 506,
+    "finalStateHash": "3c89a6d50c7a875fb2ee807b6591a5dcc96e26fe5ffe4e1d7ced65820978fa60",
+    "cut": [],
+    "settled": false,
+    "unsettled": [
+      "action step:ride0 (ride_to) is still blocked (ride)",
+      "action step:ride1 (ride_to) is still blocked (pivot)",
+      "action step:ride2 (ride_to) is still blocked (ride)"
+    ],
+    "settleTicks": 0
+  },
+  "continuationTicks": 240,
+  "autonomousRetryBoundaries": [
+    {
+      "tick": 573,
+      "vehicle": "v0",
+      "stuckBefore": 60,
+      "stuckAfter": 0,
+      "replans": 0
+    },
+    {
+      "tick": 634,
+      "vehicle": "v0",
+      "stuckBefore": 60,
+      "stuckAfter": 0,
+      "replans": 0
+    },
+    {
+      "tick": 695,
+      "vehicle": "v0",
+      "stuckBefore": 60,
+      "stuckAfter": 0,
+      "replans": 0
+    },
+    {
+      "tick": 756,
+      "vehicle": "v0",
+      "stuckBefore": 60,
+      "stuckAfter": 0,
+      "replans": 0
+    }
+  ],
+  "vehicles": [
+    {
+      "vehicle": {
+        "id": "v0",
+        "def": "euc",
+        "kind": "vehicle",
+        "label": "v0",
+        "pose": {
+          "p": [
+            -1.2649986268267077,
+            0,
+            0
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "support": {
+          "kind": "ridden-by",
+          "by": "p0"
+        },
+        "phase": "carried"
+      },
+      "rider": {
+        "id": "p0",
+        "def": "human",
+        "kind": "human",
+        "label": "p0",
+        "pose": {
+          "p": [
+            -1.2649986268267077,
+            0.15,
+            0
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "ride",
+          "level": 0,
+          "task": "step:ride0",
+          "grip": {
+            "entity": "v0",
+            "slot": "rider"
+          },
+          "riding": "v0"
+        }
+      },
+      "owners": [
+        "step:ride0"
+      ]
+    },
+    {
+      "vehicle": {
+        "id": "v1",
+        "def": "euc",
+        "kind": "vehicle",
+        "label": "v1",
+        "pose": {
+          "p": [
+            0.004452409100806789,
+            0,
+            -1.7742781703673212
+          ],
+          "yaw": 1.6094458518518486
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "support": {
+          "kind": "ridden-by",
+          "by": "p1"
+        },
+        "phase": "carried"
+      },
+      "rider": {
+        "id": "p1",
+        "def": "human",
+        "kind": "human",
+        "label": "p1",
+        "pose": {
+          "p": [
+            0.004452409100806789,
+            0.15,
+            -1.7742781703673212
+          ],
+          "yaw": 1.6094458518518486
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "ride",
+          "level": 0,
+          "task": "step:ride1",
+          "grip": {
+            "entity": "v1",
+            "slot": "rider"
+          },
+          "riding": "v1"
+        }
+      },
+      "owners": [
+        "step:ride1"
+      ]
+    },
+    {
+      "vehicle": {
+        "id": "v2",
+        "def": "euc",
+        "kind": "vehicle",
+        "label": "v2",
+        "pose": {
+          "p": [
+            0.30374892048224555,
+            0,
+            0.8578909722950077
+          ],
+          "yaw": 2.306420168238194
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "support": {
+          "kind": "ridden-by",
+          "by": "p2"
+        },
+        "phase": "carried"
+      },
+      "rider": {
+        "id": "p2",
+        "def": "human",
+        "kind": "human",
+        "label": "p2",
+        "pose": {
+          "p": [
+            0.30374892048224555,
+            0.15,
+            0.8578909722950077
+          ],
+          "yaw": 2.306420168238194
+        },
+        "provenance": {
+          "origin": "test-fixture",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "ride",
+          "level": 0,
+          "task": "step:ride2",
+          "grip": {
+            "entity": "v2",
+            "slot": "rider"
+          },
+          "riding": "v2"
+        }
+      },
+      "owners": [
+        "step:ride2"
+      ]
+    }
+  ],
+  "snapshotRefusedWithoutMutation": true
+}

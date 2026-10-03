@@ -1,0 +1,11 @@
+# Independent design studio reuse
+
+Authorized 2026-09-30; new `codex/design-studio` worktree based on root `a6c98852e0a714999fb744b87d9d3a8271aedbb9`. Root's after-gathering release candidate/gate remains separate. No heavy check process starts until root grants the serialized slot.
+
+A hypothetical independent studio has a facilitator, two designers, four reviewers, project editor and lunch companion; its own computer, chairs, required critique display/lectern, lunch table and utensils. Fresh ground scene is wider/shallower with its own walls, offset audience block, east work area and west lunch area. Actors, objects, world and task IDs are distinct. No historical reconstruction, imported engine assets, new capabilities or duplicated activity execution.
+
+Expose `designStudioBindings():DesignStudioBindings`, `designStudioWorld()` and `designStudioScene()`. Bindings contain role aliases, existing `WorkBreakBinding`, `ClassroomParams`, rest/departure and typed work/discussion follow-ups. Fresh clones prevent controls or reset from mutating source data. Pure params helpers bind explicit session/routine action IDs; they dispatch nothing. Root reuses the existing Lab panels through this shape and owns any optional attributed computer appearance fit. No physical arrangement-changing panel is promised for this first scene.
+
+Use ordinary work_at to start/interrupt Prototype project notes, existing purposeful_routine to join critique/ask/observe both presenters/smaller group/depart/lunch/return/rest/finish the same notes, then existing independent gathering_continuation records for one designer's critique decisions and a continuing reviewer pair. Ordinary claims, support, handoffs, diagnostics and fixed ticks remain authoritative.
+
+Acceptance: full actual critique/food/rest/work/continuation journey with clean claims/support and formed attention; representative local direction pauses only reviewer commitment; occupied computer/foreign unfinished work and unavailable required display refuse without overwrite; reset independence and deterministic timed replay. Tests use the new room, names and bindings. Stop before shared action/API or larger geometry redesign; root owns browser evidence and combined full gate/release.

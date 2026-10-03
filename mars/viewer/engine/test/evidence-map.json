@@ -1,0 +1,831 @@
+{
+  "about": "Hand-curated map from SPEC.md §28 rows and §30 milestones to the engine tests that prove them. Consumed by deploy/evidence-report.mjs, which runs engine/test/*.test.ts and writes docs/engineering/EVIDENCE.md + evidence.json. `title` is a substring of the exact test(...) title in `file`; it must match exactly one test in that file or the report fails. Keep `approximate` honest: say what the tests do NOT show. Rows = SPEC §28; capabilities = engine capabilities beyond §28 (same shape); milestones = §30. A row with no test keeps `tests: []` and says so in `untested`.",
+  "spec": "docs/engineering/SPEC.md",
+  "rows": [
+    {
+      "id": "wall-avoidance",
+      "name": "Wall avoidance",
+      "required": "A human given a destination on the other side of a wall chooses a route around it before contact; no penetration or prolonged wall sliding.",
+      "tests": [
+        { "file": "navigation.test.ts", "title": "wall: plans around the wall before contact" },
+        { "file": "navigation.test.ts", "title": "goal inside a wall is rejected with the blocking object named" },
+        { "file": "walk.test.ts", "title": "walk around wall: completes, no penetration, no teleport, little heading jitter" }
+      ],
+      "approximate": "No explicit wall-contact-duration metric: 'no sliding' is inferred from the clearance invariant (zero violations), path length and a heading-flip bound on one synthetic wall."
+    },
+    {
+      "id": "u-trap",
+      "name": "U-shaped trap",
+      "required": "Global planning escapes the shape; local steering alone does not oscillate indefinitely.",
+      "tests": [
+        { "file": "navigation.test.ts", "title": "U-shaped trap: global route exits via the open side" },
+        { "file": "gaps.test.ts", "title": "U-trap: a walker starting at the inner back wall" }
+      ],
+      "approximate": "One synthetic U and one start/goal pair; oscillation is bounded by heading flips (≤ 6) and clearance is sampled per tick from the 0.1 m clearance grid (EDT), not continuously."
+    },
+    {
+      "id": "narrow-passage",
+      "name": "Narrow passage / two agents",
+      "required": "Agents pass if clearance allows; otherwise one yields/waits without jitter or repeated path flipping.",
+      "tests": [
+        { "file": "navigation.test.ts", "title": "narrow passage: uses the 1.0 m gap rather than a long detour" },
+        { "file": "navigation.test.ts", "title": "too-narrow passage for a wide profile is rejected / detoured, never squeezed" },
+        { "file": "walk.test.ts", "title": "narrow passage: opposing walkers take turns, no overlap, no oscillation" },
+        { "file": "walk.test.ts", "title": "standing person on the route: brief pause at most" },
+        { "file": "sequence.test.ts", "title": "runner: proving-ground walkers" },
+        { "file": "review.test.ts", "title": "C3: a walker crossing a carry waits for the load to pass" },
+        { "file": "gaps.test.ts", "title": "2.0 m corridor: two walkers head-on pass side by side without yielding" },
+        { "file": "gaps.test.ts", "title": "1.0 m gap (same scene): opposing walkers still take turns" },
+        { "file": "gaps.test.ts", "title": "2.0 m corridor: both walkers keep moving while passing" },
+        { "file": "deadlock-recovery.test.ts", "title": "actual opposing stair-passage walkers stop as blocked" },
+        { "file": "deadlock-recovery.test.ts", "title": "actual supported held carry stops blocked" },
+        { "file": "deadlock-recovery.test.ts", "title": "future independent cue and future timeout prevent early blocked termination" },
+        { "file": "deadlock-recovery.test.ts", "title": "completion-dependent two-level tails preserve live ownership and snapshot identity" },
+        { "file": "deadlock-recovery.test.ts", "title": "independent future cancel can still release a certified wait with an inert tail" },
+        { "file": "vehicle-deadlock.test.ts", "title": "real three-EUC cycle is certified blocked while riders and vehicle ownership remain supported" }
+      ],
+      "approximate": "Yielding is heuristic (traffic resources, right-of-way, passing offset), not ORCA, and not proven deadlock-free."
+    },
+    {
+      "id": "stair-approach",
+      "name": "Stair approach",
+      "required": "Agent approaches an entry region, orients appropriately, ascends valid completed steps, exits at the landing; does not climb from the side.",
+      "tests": [
+        { "file": "navigation.test.ts", "title": "stairs: oblique approach goes to the entry, faces up-stair, exits at landing" },
+        { "file": "walk.test.ts", "title": "stairs: oblique start climbs real steps to the deck and ends on level 1" },
+        { "file": "walk.test.ts", "title": "cancel mid-climb (review M2)" }
+      ],
+      "approximate": "Root-motion only: no foot IK, so rendered feet sink/hover by about 0.09 m on treads. Climb is a link traversal with an align phase; one straight flight on the proving ground, no landings or turns."
+    },
+    {
+      "id": "multiple-floors",
+      "name": "Multiple floors",
+      "required": "Agent remains on the correct level and uses actual vertical connections instead of selecting the closest X/Y point on another floor.",
+      "tests": [
+        { "file": "navigation.test.ts", "title": "multi-level: deck → ground directly below uses stairs, never drops through" },
+        { "file": "walk.test.ts", "title": "stairs: oblique start climbs real steps to the deck and ends on level 1" },
+        { "file": "walk.test.ts", "title": "replan around people on the deck (review M3)" }
+      ],
+      "approximate": "Two levels (ground + one deck) on the proving ground plus progressive decks. The 2026 campus has only ground level 0 walkable (interiors and upper floors are blocked by design)."
+    },
+    {
+      "id": "long-load-corner",
+      "name": "Long load around corner",
+      "required": "Crew + load trajectory remains collision-free through the full maneuver; reject if rotation/clearance is impossible.",
+      "tests": [
+        { "file": "carry.test.ts", "title": "carry: 2 people carry a 12 ft beam around the L corner of the 2.5 m corridor" },
+        { "file": "carry.test.ts", "title": "carry: 19 ft upright with 4 people cannot use the 1.5 m corridor" },
+        { "file": "carry.test.ts", "title": "carry: 19 ft upright goes straight down the 2.5 m corridor but cannot turn its corner" },
+        { "file": "carry.test.ts", "title": "carry invariant: detects grip drift, a load inside a wall, and a wrong holder" },
+        { "file": "review.test.ts", "title": "C1: a mid-carry replan never flips the formation" }
+      ],
+      "approximate": "Rigid formation, load held level, no re-grip. Crews carry on one level only; only a single carrier may take a load up a flight (see capability 'Loads on stairs'). Collision is exact OBB vs prisms every tick; carriers have no carry/lift poses in the renderer."
+    },
+    {
+      "id": "raise-tall-frame",
+      "name": "Raise tall frame",
+      "required": "Required crew supports the component through the raising arc; frame cannot be released before support predicate passes.",
+      "tests": [
+        { "file": "construction.test.ts", "title": "supported bay: raise, hold, premature release refused, beams, stable release" },
+        { "file": "construction.test.ts", "title": "raising arc blocked by an overhead obstacle is rejected and names it" },
+        { "file": "construction.test.ts", "title": "crew too small for a 19 ft upright" },
+        { "file": "construction.test.ts", "title": "raise choreography (2 people)" },
+        { "file": "construction.test.ts", "title": "raise choreography (4 people)" },
+        { "file": "construction.test.ts", "title": "raise choreography: an obstacle on the lifter" },
+        { "file": "construction.test.ts", "title": "raise choreography (1 person, 8 ft frame)" },
+        { "file": "construction.test.ts", "title": "19 ft bay: 3 people raise each 19 ft frame" },
+        { "file": "review.test.ts", "title": "C2: people holding up a frame cannot be assigned to carry" }
+      ],
+      "approximate": "The arc is sampled, not continuous; the support predicate is a rule (connections + holders), not rigid-body dynamics. The 19 ft raise is proven on open ground only (no 19 ft raise beside other structures)."
+    },
+    {
+      "id": "construction-changes-navigation",
+      "name": "Construction changes navigation",
+      "required": "Installing a wall invalidates affected routes; installing usable stairs/floor can create valid new routes.",
+      "tests": [
+        { "file": "navigation.test.ts", "title": "construction changes navigation: a new wall in the gap forces a detour" },
+        { "file": "walk.test.ts", "title": "construction mid-walk: new obstacle on the route triggers one replan" },
+        { "file": "progressive.test.ts", "title": "construction changes navigation: a stair flight set down across a walker" },
+        { "file": "progressive.test.ts", "title": "progressive floor: after 1 of 2 sheets only the installed sheet is walkable" },
+        { "file": "progressive.test.ts", "title": "full sequence: uprights → beams → release → joists → plywood → stairs → a person walks up" },
+        { "file": "planning.test.ts", "title": "replan budget: construction replans are staggered deterministically" }
+      ],
+      "approximate": "Each construction epoch patches the affected grid region (bit-identical to a rebuild; no navmesh); proven on the proving ground and the progressive fixture, not on the full campus."
+    },
+    {
+      "id": "incomplete-floor-stairs",
+      "name": "Incomplete floor/stairs",
+      "required": "No invisible traversable surface appears simply because the final building definition contains one.",
+      "tests": [
+        { "file": "navigation.test.ts", "title": "incomplete stairs are not traversable and the failure names them" },
+        { "file": "progressive.test.ts", "title": "progressive floor: after 1 of 2 sheets only the installed sheet is walkable" },
+        { "file": "progressive.test.ts", "title": "progressive stairs: incomplete flight is not traversable and names what is missing" },
+        { "file": "progressive.test.ts", "title": "a sheet whose support goes missing stops being floor and is flagged" }
+      ],
+      "approximate": "Holds for engine-built decks/stairs only. The 2026 campus has no decks or stairs at all (upper floors are blocked, not modelled), so the rule is untested against historical geometry."
+    },
+    {
+      "id": "reservation-conflict",
+      "name": "Reservation conflict",
+      "required": "One actor/object/seat/work position cannot be simultaneously owned by incompatible actions.",
+      "tests": [
+        { "file": "core.test.ts", "title": "action lifecycle, reservations and diagnostics" },
+        { "file": "carry.test.ts", "title": "carry: a second carry using a busy person fails with reservation.conflict" },
+        { "file": "review.test.ts", "title": "C2: people holding up a frame cannot be assigned to carry" },
+        { "file": "review.test.ts", "title": "H1: an unreachable hold station is refused at plan time" },
+        { "file": "social.test.ts", "title": "sit: two people cannot hold one camp-chair" }
+      ],
+      "approximate": "Reservations are per actor/object/slot. There are no space-time reservations: simultaneous carries are not co-planned, so sequences must order them with `after` dependencies."
+    },
+    {
+      "id": "graceful-cancellation",
+      "name": "Graceful cancellation",
+      "required": "Cancelling a carry/raise does not cause unsupported floating/dropping unless explicitly modeled.",
+      "tests": [
+        { "file": "carry.test.ts", "title": "carry: cancel mid-move performs a controlled set-down where the ground is clear" },
+        { "file": "carry.test.ts", "title": "carry: cancel over an obstruction is refused (carry.cancel-unsafe)" },
+        { "file": "carry.test.ts", "title": "carry: cancel during gather releases the crew immediately" },
+        { "file": "construction.test.ts", "title": "cancel mid-raise continuously lowers to supported lying instead of abandoning the frame" },
+        { "file": "raise-cancel.test.ts", "title": "lowering snapshots restore tick-exactly and normal phases still refuse" },
+        { "file": "raise-cancel.test.ts", "title": "obstacles appearing during lowering block and retain the load until cleared" },
+        { "file": "raise-cancel.test.ts", "title": "missing floor support refuses before motion" },
+        { "file": "construction.test.ts", "title": "connect_beam mid-lift cancellation retains" },
+        { "file": "progressive.test.ts", "title": "install_joist mid-install cancellation retains" },
+        { "file": "progressive.test.ts", "title": "install_plywood mid-install cancellation retains" },
+        { "file": "progressive.test.ts", "title": "install_stair_flight mid-install cancellation retains" },
+        { "file": "progressive.test.ts", "title": "install_tread mid-install cancellation retains" },
+        { "file": "walk.test.ts", "title": "cancel mid-climb (review M2)" },
+        { "file": "review.test.ts", "title": "H1: an unreachable hold station is refused at plan time" },
+        { "file": "sequence.test.ts", "title": "runner: timeout settles deferred cancels" }
+      ],
+      "approximate": "Mid-raise cancellation retraces bounded physical choreography to supported lying, with obstruction/floor refusals and lowering-only snapshot restore. Beam, joist, plywood, tread and flight cancellation tests prove named unsafe refusal and support/resource retention. A carry on a stair flight still refuses cancellation; other raise phases remain non-resumable."
+    },
+    {
+      "id": "camera-collision",
+      "name": "Camera collision",
+      "required": "Cinematic camera does not pass through opaque architecture during a normal shot.",
+      "tests": [
+        { "file": "camera.test.ts", "title": "camera collision: path keyed through the test wall is corrected" },
+        { "file": "camera.test.ts", "title": "camera collision: impossible clearance is reported as rejection" },
+        { "file": "camera.test.ts", "title": "camera glass: subject behind plexiglass stays readable" },
+        { "file": "camera-replay.test.ts", "title": "camera collision: a wall too tall to clear forces a deliberate, explained cut" },
+        { "file": "camera-geom.test.ts", "title": "camera geom: slab test hits walls in OBB frame and respects y range" },
+        { "file": "camera-geom.test.ts", "title": "camera geom: signed distance, placement validity, pushout" }
+      ],
+      "approximate": "The camera collides with obstacle prisms (OBBs fitted to geometry), not the render mesh; checked on 10 Hz samples plus swept segments, on the proving ground with synthetic subjects."
+    },
+    {
+      "id": "camera-readability",
+      "name": "Camera readability",
+      "required": "Important action remains visible/readable or the camera deliberately replans/cuts; no rapid oscillation.",
+      "tests": [
+        { "file": "camera.test.ts", "title": "camera readability: subject walking behind U walls is reported" },
+        { "file": "camera.test.ts", "title": "camera temporal: hysteresis prevents oscillation between two equal alternatives" },
+        { "file": "camera-geom.test.ts", "title": "camera readability: occlusion fraction, frustum, size, named reasons" },
+        { "file": "camera-geom.test.ts", "title": "camera temporal: detects A→B→A oscillation and cut density" }
+      ],
+      "approximate": "Occlusion is ray-tested against obstacle prisms, not the render mesh (no GPU/pixel visibility check); subjects are synthetic walkers, and no camera track has been rendered to video and reviewed."
+    },
+    {
+      "id": "replay-independence",
+      "name": "Replay independence",
+      "required": "Changing camera track does not alter actor routes, action results, inventory, or final world state.",
+      "tests": [
+        { "file": "take.test.ts", "title": "replay camera independence: camera tracks never change the take" },
+        { "file": "camera-replay.test.ts", "title": "camera replay independence: live camera solving and different planned tracks never change the take" },
+        { "file": "camera-take.test.ts", "title": "planShotList: contiguous windows" },
+        { "file": "api.test.ts", "title": "api: take replay is independent of camera track attachment" }
+      ],
+      "approximate": "Proven at the engine/API level (take hash and final state unchanged). The browser renderer's camera path is not part of this suite."
+    },
+    {
+      "id": "fork-isolation",
+      "name": "Fork isolation",
+      "required": "Edits in a workspace branch do not mutate canonical historical state or sibling branches.",
+      "tests": [
+        { "file": "core.test.ts", "title": "fork isolation: canonical protected; sibling branches independent" },
+        { "file": "rehearsal.test.ts", "title": "fork isolation: canonical refuses execution" },
+        { "file": "rehearsal.test.ts", "title": "rehearsal is private: history, heads and checkpoints untouched" },
+        { "file": "campus.test.ts", "title": "canonical mars-2026 is protected; flagship work happens in a fork" },
+        { "file": "api.test.ts", "title": "fork isolation (room): a fork executes without touching canonical or a sibling fork" }
+      ],
+      "outsideSuite": ["viewer/deploy/simulation-integration.mjs"],
+      "approximate": "Forks start from quiescent checkpoints, or mid-action only for the walking/social subset (capability 'Mid-action resumability'); there is no branch merge. The room path (EngineRoom over SQLite, the Durable Object's code) is covered here; deploy/simulation-integration.mjs repeats it over real MCP against `wrangler dev` (or SIM_BASE), whose result this report consumes from the current gate."
+    },
+    {
+      "id": "plan-invalidation",
+      "name": "Plan invalidation",
+      "required": "Changing a relevant obstacle after rehearsal causes validation failure/replan before official execution.",
+      "tests": [
+        { "file": "rehearsal.test.ts", "title": "plan invalidation: moving an obstacle into the route after rehearsal makes execution stale" },
+        { "file": "rehearsal.test.ts", "title": "plan invalidation: env/weather, labels and provenance edits do NOT stale a plan" },
+        { "file": "rehearsal.test.ts", "title": "plan invalidation: inventory mode, RNG state and rules version are physical assumptions" },
+        { "file": "rehearsal.test.ts", "title": "tampered plans and mismatched service scenes fail loudly" },
+        { "file": "api.test.ts", "title": "api: stale plans and protected canonical workspaces are refused" },
+        { "file": "api.test.ts", "title": "plan invalidation (room): another run moving a walker onto the route stales a rehearsed plan" },
+        { "file": "api.test.ts", "title": "staleness (LM-004): an edit far" },
+        { "file": "api.test.ts", "title": "staleness (LM-003):" },
+        { "file": "api.test.ts", "title": "rebind (LM-001):" },
+        { "file": "edit-static.test.ts", "title": "static edits (LM-002): removing a wall" }
+      ],
+      "outsideSuite": ["viewer/deploy/simulation-integration.mjs"],
+      "approximate": "Region/route-scoped staleness keeps unrelated physical edits valid. Explicit rebind:auto binds and rehearses against the current head; failed bindings return named diagnostics. Static-prism edits conservatively stale plans; static support/assembly changes are refused. MCP proof is consumed from the current gate."
+    },
+    {
+      "id": "replay-isolation",
+      "name": "Replay isolation",
+      "required": "Viewing an old take cannot mutate a live simulation room.",
+      "tests": [
+        { "file": "take.test.ts", "title": "replay isolation: sampling an old take never touches history, the live workspace or the take" },
+        { "file": "take.test.ts", "title": "tampered takes are rejected" },
+        { "file": "api.test.ts", "title": "replay isolation (room): take fetches and camera tracks never change heads" }
+      ],
+      "outsideSuite": ["viewer/deploy/simulation-integration.mjs"],
+      "approximate": "Engine level plus the room code (EngineRoom over node:sqlite: take fetches write zero bytes; heads, log lengths and every pose unchanged after fetches and a camera track; two rooms share nothing). The Durable Object/HTTP path — view capability refused MCP and commands, REST take fetches at several t, cross-room 404s — is proven by deploy/simulation-integration.mjs against `wrangler dev`/SIM_BASE, whose result this report consumes from the current gate. A camera track needs the control capability (MCP) and is stored beside the take."
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "carry-stairs",
+      "name": "Loads on stairs (single carrier)",
+      "required": "One person carries a component up or down a completed stair flight between levels: tilted load with step-profile clearance, exclusive flight, refusals that name the stair or missing treads.",
+      "tests": [
+        { "file": "carry-stairs.test.ts", "title": "one person carries a stair tread from the ground up stairs A" },
+        { "file": "carry-stairs.test.ts", "title": "an 8 ft 2x4 goes up too (tilted along the flight)" },
+        { "file": "carry-stairs.test.ts", "title": "a 4x6 plywood panel on the 1.0 m stairs is refused" },
+        { "file": "carry-stairs.test.ts", "title": "carry-stairs invariant: a load pushed into the steps mid-climb is reported" },
+        { "file": "carry-stairs.test.ts", "title": "carry-stairs: determinism" },
+        { "file": "carry-stairs.test.ts", "title": "someone on the flight or at its top makes the carrier wait" },
+        { "file": "carry-stairs.test.ts", "title": "a walker heading up behind the carrier waits at the foot" }
+      ],
+      "approximate": "Single carrier only: no crews on a flight, no ladders, no turning flights or more than one flight per carry, no loads whose carry pose has a pitch (plywood on edge), no mid-flight replanning, and cancel on the flight is refused rather than modelled. One straight flight on the proving ground; the set-down check is distance only (CARRY.md 'Between levels')."
+    },
+    {
+      "id": "social-slots",
+      "name": "Social vocabulary + slots (reservation semantics)",
+      "required": "sit/stand/take_slot/face/converse/gather/campfire_circle/ambient_wander over claimable slots: one person per slot, refusals name the slot and its holder, seat fixtures block walking and are entered through approach points.",
+      "tests": [
+        { "file": "social.test.ts", "title": "social verbs are registered in the one engine registry" },
+        { "file": "social.test.ts", "title": "catalog slots: campfire has 8 fire-circle places" },
+        { "file": "social.test.ts", "title": "sit: two people cannot hold one camp-chair" },
+        { "file": "social.test.ts", "title": "converse: 4 people form a circle" },
+        { "file": "social.test.ts", "title": "converse refusals" },
+        { "file": "social.test.ts", "title": "campfire_circle with 10 people" },
+        { "file": "social.test.ts", "title": "gather onto a place region with an audience layout" },
+        { "file": "social.test.ts", "title": "ambient_wander: 6 people for 60 s" },
+        { "file": "social.test.ts", "title": "determinism: gather + converse + ambient twice" },
+        { "file": "social.test.ts", "title": "seat fixtures and the campfire block walking" },
+        { "file": "social.test.ts", "title": "sitters walk around other chairs/benches" },
+        { "file": "social.test.ts", "title": "a seat whose approach point is walled in front and behind is refused" },
+        { "file": "api.test.ts", "title": "api: seeds carry regions and a campfire + benches" }
+      ],
+      "approximate": "Seats have no armrest or leg geometry: each fixture is one catalog box (a chair's includes its back), and the seated exemption is by activity, not per fixture. Approach points are not reserved (a person standing on one makes the sitter yield/replan). No turn-taking, gaze, gestures or group re-forming; ambient never re-adopts a released person. Automatic pre-emption by directed tasks is its own row (social-preemption) (SOCIAL.md)."
+    },
+    {
+      "id": "vehicles",
+      "name": "EUC / bicycle riding",
+      "required": "mount/ride_to/ride_loop/dismount on curvature- and acceleration-limited curves; stop short of and ask people to step aside; never use links; a parked vehicle is an obstacle; vehicle invariants catch close passes and teleports.",
+      "tests": [
+        { "file": "vehicles.test.ts", "title": "EUC rides around the proving-ground wall" },
+        { "file": "vehicles.test.ts", "title": "refused: a target on the deck (vehicles never use links)" },
+        { "file": "vehicles.test.ts", "title": "person on the path: the EUC slows, stops" },
+        { "file": "vehicles.test.ts", "title": "dismount: the rider steps off beside it" },
+        { "file": "vehicles.test.ts", "title": "ride_loop: a closed 2-lap perimeter" },
+        { "file": "vehicles.test.ts", "title": "bicycle in the 1.0 m passage is refused" },
+        { "file": "vehicles.test.ts", "title": "kerbs: a 12 cm kerb a walker steps over blocks the EUC" },
+        { "file": "vehicles.test.ts", "title": "vehicle invariants fire on deliberately invalid states" }
+      ],
+      "approximate": "Vehicles are discs for walkers and for their own path planning (the bicycle's 1.75 m length is not swept), with no lean, wheel or balance kinematics and no reversing; one level only (no links). Walkers see a rider as a 0.28 m person, not the vehicle disc. Proving ground only, not the campus. Vehicle–vehicle collision and right of way are their own row (vehicle-traffic) (VEHICLES.md)."
+    },
+    {
+      "id": "forklift",
+      "name": "Forklift to deck edges (rule-based)",
+      "required": "forklift_pick / forklift_deliver move a sheet from the ground onto a deck edge within lift range and fork reach, refusing unreachable placements and blocked lanes by name, stopping for people.",
+      "tests": [
+        { "file": "forklift.test.ts", "title": "forklift picks plywood off the ground and stages it on the 3 m deck" },
+        { "file": "forklift.test.ts", "title": "refused: a placement deeper than fork reach" },
+        { "file": "forklift.test.ts", "title": "refused: a 3.5 m surface is above the 3.2 m lift range" },
+        { "file": "forklift.test.ts", "title": "refused: an overhead beam lower than mast + load" },
+        { "file": "forklift.test.ts", "title": "refused: both fork-side approach lanes blocked" },
+        { "file": "forklift.test.ts", "title": "a person walking into the lane stops the truck" },
+        { "file": "forklift.test.ts", "title": "determinism: two identical runs of pick + deliver" }
+      ],
+      "approximate": "Rule-based, not dynamics: no tilt, pallets or dunnage, flat 1000 kg capacity (no load-moment chart), final alignment by standstill pivot + side-shift (no three-point turns); the truck body is not swept against people beyond the 1.5 m stop rule. Proving ground only (VEHICLES.md)."
+    },
+    {
+      "id": "historical-years",
+      "name": "Historical years as protected states (2020–2025)",
+      "required": "Each year 2020–2025 loads as a canonical, protected campus state with provenance on every obstacle; people route through that year's geometry; edits happen only in forks; a year room seeds it without touching 2026.",
+      "tests": [
+        { "file": "campus-history.test.ts", "title": "each year 2020–2025 loads as a ground-only scene" },
+        { "file": "campus-history.test.ts", "title": "grids build for every year" },
+        { "file": "campus-history.test.ts", "title": "2022: a walker routes around the courtyard buildings" },
+        { "file": "campus-history.test.ts", "title": "2021: a walker goes straight through the corridor" },
+        { "file": "campus-history.test.ts", "title": "building interiors are not walkable" },
+        { "file": "campus-history.test.ts", "title": "canonical mars-<year> is protected" },
+        { "file": "campus-history.test.ts", "title": "extraction is deterministic: two --check runs" },
+        { "file": "api.test.ts", "title": "api: a historical year room (2022) seeds protected canonical mars-2022" }
+      ],
+      "approximate": "The years are the procedural reconstructions from app/history (hypothesis-grade geometry, not surveys), ground-only (decks block; no upper floors or stairs). Routes are proven in 2021 and 2022 only; no build or carry has been run in a historical year."
+    },
+    {
+      "id": "camera-render-parity",
+      "name": "Camera occlusion parity with the render",
+      "required": "The planner's readability (prisms + per-tick take-part occluders + person capsules) agrees with ray casts against the rendered mesh.",
+      "tests": [
+        { "file": "camera-occluders.test.ts", "title": "part occluders: full boxes match entityCorners at any pose" },
+        { "file": "camera-occluders.test.ts", "title": "a subject behind a rack-upright post is partly occluded" },
+        { "file": "camera-occluders.test.ts", "title": "a person under a seated deck slab is occluded from a high wide" },
+        { "file": "camera-occluders.test.ts", "title": "crew is see-through only within 0.6 m of its grip" },
+        { "file": "camera-framing.test.ts", "title": "a bystander between camera and subject occludes" }
+      ],
+      "outsideSuite": ["viewer/e2e/camera-verify.spec.ts", "docs/engineering/CAMERA_VERIFY.md"],
+      "approximate": "The parity numbers come from /studio against the rendered GLB (CAMERA_VERIFY.md, flagship take @ 2 Hz): meanPlanner 0.953 vs meanReal 0.963, maxAbsDiff 0.20, 1 sample differing by >= 0.2 (was 40), 0 hidden by the real mesh. That is one take, measured by the Playwright spec, which this report does not run; the engine tests here only pin the occluder geometry. Skinned bodies vs 0.2 m capsules still differ by up to 0.15."
+    },
+    {
+      "id": "grid-incremental",
+      "name": "Incremental grids bit-identical",
+      "required": "Region-local grid updates on construction sync (and patched carry grids) equal a from-scratch buildGrids bit for bit: free cells, clearance and blocker names.",
+      "tests": [
+        { "file": "grid-incremental.test.ts", "title": "updateGrids === buildGrids over 240 seeded random scenes" },
+        { "file": "grid-incremental.test.ts", "title": "updateGrids: reordered or duplicate obstacles fall back" },
+        { "file": "grid-incremental.test.ts", "title": "BlockerMap behaves as a Map<number, string>" },
+        { "file": "grid-incremental.test.ts", "title": "build-bay on open ground (probe) + lab construction" },
+        { "file": "grid-incremental.test.ts", "title": "campus flagship (staging-east crop)" },
+        { "file": "grid-incremental.test.ts", "title": "Spatial.gridsFor === buildGrids for every carry plan" }
+      ],
+      "approximate": "Equality is checked on 240 random scenes and on every sync of the build-bay probe, the lab construction and the cropped campus flagship, not on the uncropped campus. Reordered or duplicate obstacle lists fall back to a full rebuild. Grids stay 0.1 m rasters with an exact EDT (no navmesh)."
+    },
+    {
+      "id": "stable-ids",
+      "name": "Stable historical ids + migration",
+      "required": "Historical components keep `${assembly}-${kind}-${hash}` ids across unrelated scene edits; pinned names survive; legacy serial ids in saved layouts migrate through a frozen table.",
+      "tests": [
+        { "file": "campus-history.test.ts", "title": "obstacle ids are the stable Kit ids (pinned names survive)" }
+      ],
+      "outsideSuite": ["viewer/deploy/history-ids.test.mjs", "docs/engineering/HISTORY_IDS.md"],
+      "approximate": "The engine suite checks only that the extracted year obstacles carry the stable Kit ids and pinned names. The id scheme itself (determinism, insertion-independence) and the legacy-layout migration table are proven by deploy/history-ids.test.mjs (`npm test`), whose result this report consumes from the current gate. Ids still change when a piece moves ~2.5 cm, rotates ~1° or changes kind/assembly."
+    },
+    {
+      "id": "room-storage",
+      "name": "DO storage caps + isolation through the room",
+      "required": "EngineRoom (the Durable Object's code over SQLite) stores content-addressed state blobs, caps stored plans/takes per room without evicting referenced takes, and keeps replay, forks, plan staleness and year rooms isolated.",
+      "tests": [
+        { "file": "api.test.ts", "title": "api: EngineRoom stores states as content-addressed blobs" },
+        { "file": "api.test.ts", "title": "api: EngineRoom caps stored plans/takes per room" },
+        { "file": "api.test.ts", "title": "replay isolation (room)" },
+        { "file": "api.test.ts", "title": "fork isolation (room)" },
+        { "file": "api.test.ts", "title": "plan invalidation (room)" },
+        { "file": "api.test.ts", "title": "api: list (plans/takes/workspaces/cameras ledger) and delete_workspace" },
+        { "file": "room-storage.test.ts", "title": "room storage: UTF-8" },
+        { "file": "room-storage.test.ts", "title": "room storage: oversized" },
+        { "file": "room-storage.test.ts", "title": "room storage: aggregate" },
+        { "file": "room-storage.test.ts", "title": "room workload: real year-build" },
+        { "file": "room-campus-2026.test.ts", "title": "room 2026: canonical" },
+        { "file": "room-campus-2026.test.ts", "title": "room 2026: migration" }
+      ],
+      "outsideSuite": ["viewer/deploy/simulation-integration.mjs"],
+      "approximate": "UTF-8 byte caps (8 MiB/blob, 64 MiB/room-year) and 512 KiB codepoint-safe chunks are exercised over SQLite, including rollback. The gate runs isolation over workerd/MCP. A real 185-step chapter exceeds the 32 KiB transport cap and receives a named refusal; saved oversized plans also refuse workload admission. This does not prove every admitted workload meets the host CPU limit."
+    },
+    {
+      "id": "deterministic-trig",
+      "name": "Deterministic trig across hosts",
+      "required": "Engine math uses pure IEEE-754 d* functions (never host Math.sin…), so Node, browsers and workerd produce the same state hashes.",
+      "tests": [
+        { "file": "core.test.ts", "title": "deterministic trig: <= 2 ulp of Math.*" },
+        { "file": "core.test.ts", "title": "deterministic trig: edge cases" },
+        { "file": "core.test.ts", "title": "datan2: quadrants, signed zeros" },
+        { "file": "core.test.ts", "title": "deterministic trig: golden bit patterns" },
+        { "file": "source-scan.test.ts", "title": "engine production source excludes host Math transcendentals and new ** / **= operators; 14 existing sites are allowlisted" }
+      ],
+      "outsideSuite": ["viewer/deploy/determinism-probe.mjs", "docs/engineering/RELEASE_CHECKLIST.md"],
+      "approximate": "This suite runs on one host; golden bit patterns and the source scan are the in-suite guard. Cross-host equality is evidenced by the determinism probe hash (header above) matching the production browser stateHash (RELEASE_CHECKLIST.md, deploy 4) and Node = workerd take ids (HANDOFF.md), checked by hand, not by this report. Non-Chromium browsers are unverified."
+    },
+    {
+      "id": "resumable",
+      "name": "Mid-action resumability (walking/social subset)",
+      "required": "Runtime.snapshot/restore mid-action: a restored runtime steps tick-for-tick like an unpaused one; forks from a pause diverge deterministically; unsupported actions are refused by name.",
+      "tests": [
+        { "file": "resume.test.ts", "title": "pause mid stair climb: restore continues identically" },
+        { "file": "resume.test.ts", "title": "converse circle paused mid-formation resumes identically" },
+        { "file": "resume.test.ts", "title": "gather paused mid-approach resumes identically" },
+        { "file": "resume.test.ts", "title": "a sequence paused between steps" },
+        { "file": "resume.test.ts", "title": "a snapshot during a carry is refused naming the action" },
+        { "file": "resume.test.ts", "title": "an exec holding a closure is refused naming the path" }
+      ],
+      "approximate": "Walking, stairs and social verbs only: carry, construction lifts, vehicles and ambient_wander are not resumable (a snapshot is refused naming the action). Each restored runtime needs its own Spatial; the teleport check has no prior poses on the first restored tick (TAKES_AND_PLANS.md)."
+    },
+    {
+      "id": "campus-full",
+      "name": "Flagship on the full uncropped 2026 campus",
+      "required": "The campus flagship runs on the whole campus scene (7.6k obstacles, no crop) with 0 violations and the same final state as the ±40 m staging-east crop.",
+      "tests": [
+        { "file": "campus-full.test.ts", "title": "ends identical to the cropped run" },
+        { "file": "campus-full.test.ts", "title": "final-state hash === the cropped run" }
+      ],
+      "approximate": "Bit-identical since W1's global grid lattice (cell coordinates on one world lattice, not the crop's origin): the former todo is an assertion. Proven for this one scenario at the staging-east site; the whole campus is still ground level 0 only, and it costs about 2.5–3× the compute of the crop."
+    },
+    {
+      "id": "hand-up",
+      "name": "Hand-up to people on the rack (and off the forklift)",
+      "required": "Materials go up by hand: a ground crew hands a sheet or joist up to two receivers standing on beam walkways or a deck, or two on the beams take it off the forklift's forks; every hand point stays in reach every tick; impossible hand-offs (too high, receiver not on a walkable beam, giver on a beam, unbalanced one-end hold, sheet presented out of reach) are refused by name (owner feedback §5–§6).",
+      "tests": [
+        { "file": "handup.test.ts", "title": "hand_up green: a sheet from the ground to staged on a 2.4 m deck" },
+        { "file": "handup.test.ts", "title": "hand_up refuses a deck too high for a genuine hand-off" },
+        { "file": "handup.test.ts", "title": "hand_up refuses receivers who are not on a walkable beam or deck" },
+        { "file": "handup.test.ts", "title": "hand_up refuses a giver standing on a beam" },
+        { "file": "handup.test.ts", "title": "hand points: the invariant flags a receiver whose hands are out of reach" },
+        { "file": "handup.test.ts", "title": "hand_up via forklift: the forks present the sheet at deck height" },
+        { "file": "handup.test.ts", "title": "hand_up via forklift is refused when the forks hold it too low" },
+        { "file": "handup-rules.test.ts", "title": "hand_up receiver rule: a sheet presented 0.7 m out from the beam edge is refused" },
+        { "file": "handup-rules.test.ts", "title": "hand_up balance: a joist handed up end-first by one giver uses a two-handed lever grip" },
+        { "file": "handup-rules.test.ts", "title": "hand_up balance: an 8 ft 2x4 held by one end by one giver is refused" },
+        { "file": "build-bay-v3.test.ts", "title": "flagship v3: deck handed up" }
+      ],
+      "approximate": "Reach is a cylinder + arm-length envelope (the body model), not IK; receivers feed hand over hand from a fixed station and a sheet is never turned over the bay; balance is checked for a single giver only (sheets and single receivers are not checked); reach-down is capped at 0.5 m below the feet, so receivers more than ~2.55 m above the givers need the forklift (HANDUP.md). The v3 build passes at its pinned open-ground site but its onto_s2_4 beam_walk fails beam.no-room (clearance 0.25 < 0.28 m on s2) at most other sites tried, including the 2026 staging-east clearing (W17, PROGRESS.md), so v3 is not a campus take."
+    },
+    {
+      "id": "rack-access",
+      "name": "Standing on the rack: climb links and beam walkways",
+      "required": "People climb installed frames only by their climb links (one per column and beam seat) and walk a beam only where both beams connect the frames at that height, slowly; walk_to cannot reach a beam; loads are refused on beams and frames; removing a partner beam under someone is flagged; nobody walks a beam under a deck.",
+      "tests": [
+        { "file": "frame.test.ts", "title": "climb links exist only on installed uprights" },
+        { "file": "frame.test.ts", "title": "a beam walkway exists only when both beams connect the frames at that height" },
+        { "file": "frame.test.ts", "title": "climb up, walk a beam at ≤ 0.4 m/s" },
+        { "file": "frame.test.ts", "title": "no carrying a sheet on a beam or up a frame" },
+        { "file": "frame.test.ts", "title": "someone on a beam whose partner beam is removed is flagged" },
+        { "file": "frame.test.ts", "title": "nobody walks a beam under a deck" },
+        { "file": "handup-rules.test.ts", "title": "API spatial scene: frame climb links / beam walkways are in it by default" },
+        { "file": "climb-reservation.test.ts", "title": "climb reservations (LM-022): different seats" },
+        { "file": "climb-reservation.test.ts", "title": "climb reservations (LM-022): safe cancellation" },
+        { "file": "climb-reservation.test.ts", "title": "climb reservations (LM-022): missing links" }
+      ],
+      "approximate": "Climb paths are three straight segments with no body check; one exclusive reservation per physical column face across seat heights and directions; nobody clips on and frame load is not checked; there are no foot/hand holds (which bracing node a climber is on) (HANDUP.md, YEAR_BUILD.md)."
+    },
+    {
+      "id": "items-eat",
+      "name": "Items, serving and eating",
+      "required": "People take bowls and spoons, serve from a pot, sit and eat in cycles until the bowls are empty, eat while conversing; eating is resumable mid-cycle; refusals (out of reach, hand full, held by someone else, eat while walking, empty bowl, occupied slot or chair, item behind a wall) name the problem (owner feedback §12).",
+      "tests": [
+        { "file": "meal.test.ts", "title": "items: verbs are registered in the one engine registry" },
+        { "file": "meal.test.ts", "title": "meal: four people take bowl + spoon, serve, sit round the fire and eat together" },
+        { "file": "meal.test.ts", "title": "meal: eat is resumable mid-cycle" },
+        { "file": "meal.test.ts", "title": "eat inside a converse" },
+        { "file": "meal.test.ts", "title": "items refusals: out of reach, hand full" },
+        { "file": "meal.test.ts", "title": "take_item: an item out of reach behind a wall is refused" }
+      ],
+      "approximate": "Items do not collide with each other; reach over a table assumes a forward bend (only eating is checked against the 0.62 m arm envelope); a carried item trails its hand by one tick (≤ 7 cm) while walking; no drinking cycle, ladle, food geometry or spill, and `contents` is a number (ITEMS.md)."
+    },
+    {
+      "id": "solar",
+      "name": "Solar panels, rails and equipment",
+      "required": "Rails are fastened on a deck, a panel is handed up onto them and mounted at a tilt, a battery is placed and configured; a panel on a single or uninstalled rail, rails on nothing, equipment off the deck, a ground panel mounted without a hand-up, and a tilted fragile panel carried up a steep stair are refused by name (owner feedback §9).",
+      "tests": [
+        { "file": "solar.test.ts", "title": "solar green: rails fastened on a 2.4 m deck" },
+        { "file": "solar.test.ts", "title": "solar refusals: a panel on a single rail" },
+        { "file": "solar.test.ts", "title": "solar refusal: a panel lying on the ground cannot be mounted on rails 2.48 m up" },
+        { "file": "solar.test.ts", "title": "fragile: two people carrying a solar panel up a 37° stair are refused" }
+      ],
+      "approximate": "Tilt legs / rear risers are implied and the tilt direction is fixed (no azimuth choice); rails, equipment and low panels are set from ≤ 1 m; rails are assumed screwed to the sheets; sloped roofs are not modelled; no wiring (SOLAR_PAINT.md). Proven on a synthetic deck, not in a year build."
+    },
+    {
+      "id": "paint",
+      "name": "Painting a wall",
+      "required": "A person standing in front of an upright sheet paints the bands in reach, coverage progresses in the take, hands stay in the envelope; non-paintable parts, bands above reach and painting while walking are refused; the top band needs a platform (owner feedback §8).",
+      "tests": [
+        { "file": "paint.test.ts", "title": "paint green: a person on the ground paints a standing 4x8 sheet" },
+        { "file": "paint.test.ts", "title": "paint refusals: a non-paintable beam" },
+        { "file": "paint.test.ts", "title": "paint top band: the top 0.38 m of a standing 4x8" }
+      ],
+      "approximate": "Flat upright faces only, one rectangular face per call, no drips, layers or drying; coverage is an area fraction, not a texture mask; the band below 0.5 m (crouching) is out of reach (SOLAR_PAINT.md). Renderer texture = colour + stripe until textures exist."
+    },
+    {
+      "id": "year-build-a",
+      "name": "Year build phase A: a historical skeleton from the piles",
+      "required": "For Mars 2022's east-house: the assembly graph of every year, a bill of materials and pile yard, pieces taken off bundles and cut at a station, frames raised and beams hung by a crew from the piles in a fork of the protected year, every sequenced part ending at its canonical pose (≤ 1 cm / 1°), with 0 violations; what cannot be sequenced is reported, not faked (owner feedback §7).",
+      "tests": [
+        { "file": "year-assembly.test.ts", "title": "assembly graph 2022: 4 houses × (12 frames + 54 beams)" },
+        { "file": "year-assembly.test.ts", "title": "assembly graph: every year builds and orders" },
+        { "file": "year-assembly.test.ts", "title": "assembly graph: deliberately broken geometry is reported with a reason" },
+        { "file": "year-stock.test.ts", "title": "bill of materials + piles, 2022 east-house" },
+        { "file": "year-stock.test.ts", "title": "take_from_bundle: pieces come off the stack one at a time" },
+        { "file": "year-stock.test.ts", "title": "cut: 4x8 → 4x6 + a 4x2 offcut stored at the station" },
+        { "file": "year-hang.test.ts", "title": "hang_beam: a 16 ft reconstruction bay" },
+        { "file": "year-build.test.ts", "title": "year build 2022 east-house, phase A: plan" },
+        { "file": "year-build.test.ts", "title": "year build 2022 east-house, phase A, first bay (6 frames + 18 beams)" }
+      ],
+      "approximate": "The default suite runs the first bay (6 frames + 18 beams, 41 182 ticks); the whole house (12 + 54, 117 125 ticks) is a skipped test unless YEAR_BUILD_FULL=1 and is not counted here. Order, piles and crew are hypothetical; stances are points on a Kit-shaped bracing lattice with unchecked climbing paths; beam balance on two hands and the pull off a bundle are not modelled; the build ground is the Kit datum y = 0, 0.16 m above the published year scenes. Only 2022's east-house is built (YEAR_BUILD.md)."
+    },
+    {
+      "id": "year-build-b",
+      "name": "Year build phase B: floors, stairs, walls, solar in the year sequence",
+      "required": "The skeleton is completed from the piles: deck sheets cut and handed up, the Kit stair built from stringers and treads, plywood walls, solar modules on rails — ending equal to the year's protected checkpoint (owner feedback §7–§9).",
+      "tests": [
+        { "file": "year-build-b.test.ts", "title": "year build 2022 east-house A+B: plan — material rules, bill of materials, yard, what is left unplaced and why, deterministic; the skeleton steps unchanged" },
+        { "file": "year-build-b.test.ts", "title": "year build 2022, report only: the other three rack houses plan through the same rules (counts, reasons)" },
+        { "file": "year-build-b.test.ts", "title": "year build 2022 east-house, first bay + its first ground-floor deck strip" },
+        { "file": "year-build-b.test.ts", "title": "year build 2022 east-house A+B (skeleton, decks, stair, walls, solar) from the piles" }
+      ],
+      "approximate": "PARTIAL by construction: the default suite executes only the plan (material rules for deck strips, the Kit stair, walls and solar; BOM; yard; unplaced reasons; determinism), the report-only plans of the other three 2022 houses, and ONE executed phase-B section — the first bay + its first ground-floor deck strip (3 pieces cut from 4x8s, notched, offcuts stacked, pass_up, screwed; 0 violations, pinned 94db263e… @53604). The whole east-house A+B run (decks, stair, walls, solar) is gated YEAR_BUILD_FULL=1, is skipped here and has no pin yet (PIN_FULL_AB empty at HEAD); W13 reports each section (ground / first-floor / roof deck, Kit stair, walls, solar) running clean in its own runs (commits d44c601…c3405da), but no committed test executes the stair, wall or solar sections — in this suite they are proven only as plans. Kit geometry (deck strips at beam height without joists, an 8-tread stair without stringers) is a reconstruction guess — open questions for Gene (PROGRESS.md).",
+      "outsideSuite": ["docs/engineering/YEAR_BUILD.md"]
+    },
+    {
+      "id": "movement",
+      "name": "Natural walking: splined turns, block reaction, stall metric",
+      "required": "Routes turn on fillets inside the corridor clearance with a bounded heading rate; a person or panel appearing ahead is reacted to within 2 ticks with no forward motion into it and a decision within 0.5 s; stationary and moving blockers, crowds, curved head-ons and corner crossings resolve without pushing or walking on the spot; a walk-in-place (stall) metric computed from the take equals the live meter and is 0 on the flagship, stress-30 and the campfire evening (owner feedback §2–§3).",
+      "tests": [
+        { "file": "movement.test.ts", "title": "spline: proving-ground routes" },
+        { "file": "movement.test.ts", "title": "spline (adversarial)" },
+        { "file": "movement.test.ts", "title": "heading rate: never more than turnRate·dt per tick" },
+        { "file": "movement.test.ts", "title": "curved footprints" },
+        { "file": "movement.test.ts", "title": "animation signal: activity" },
+        { "file": "movement.test.ts", "title": "block reaction: a person appearing 0.4 m ahead" },
+        { "file": "movement.test.ts", "title": "block reaction: a panel placed 0.4 m ahead" },
+        { "file": "movement.test.ts", "title": "head-on in the 1 m passage: both walkers get through" },
+        { "file": "movement.test.ts", "title": "stall metric: the take computation equals the live meter" },
+        { "file": "movement.test.ts", "title": "stall metric = 0: build-bay flagship rehearsal take" },
+        { "file": "movement.test.ts", "title": "stationary blocker (warm / idle / sit, speed 0)" },
+        { "file": "movement.test.ts", "title": "moving blocker: a walker catching up" },
+        { "file": "movement.test.ts", "title": "campfire evening: x1 (take_slot at 42 s) decides within DECIDE_TICKS" },
+        { "file": "movement.test.ts", "title": "squeezed people-replan" },
+        { "file": "movement.test.ts", "title": "head-on in the 1 m passage on curved approaches" },
+        { "file": "movement.test.ts", "title": "crossing at a corner" },
+        { "file": "movement.test.ts", "title": "encounters follow the smoothed path" }
+      ],
+      "approximate": "Walker–walker encounters use the smoothed path ahead and a 1 s chord of the other's path — no time-to-collision model; head-on round a tight corner falls to the single-file rule; the emergency stop is velocity to 0 in one tick; a walker walled in by a crowd that never moves waits with a named reason; 1.08–1.5 m gaps between people are walkable but not plannable at 0.1 m cells (MOVEMENT.md §6). Still heuristic, not ORCA, not proven deadlock-free."
+    },
+    {
+      "id": "body-model",
+      "name": "One body model (engine reach = the measured rig) and mars-take/2 fields",
+      "required": "Engine reach, crouch, overhead and reach-down limits come from one body model measured on the rendered rig and are internally consistent; takes (mars-take/2) record what a replay needs to pose people exactly as the engine did: hand points, base activity under an overlay (eat over sit / talk), the rack link someone stands on, walking speed and container contents.",
+      "tests": [
+        { "file": "body-model.test.ts", "title": "body model = the measured rig" },
+        { "file": "body-model.test.ts", "title": "body model is internally consistent" },
+        { "file": "take-fields.test.ts", "title": "take fields (mars-take/2): the meal take carries hands, baseActivity, speed and bowl contents" },
+        { "file": "take-fields.test.ts", "title": "take fields (mars-take/2): a hand-up take carries every holder" },
+        { "file": "take-fields.test.ts", "title": "take fields (mars-take/3): thinChanges" }
+      ],
+      "outsideSuite": ["viewer/e2e/poses.spec.ts", "docs/engineering/BODY_MODEL.md"],
+      "approximate": "The envelope is a cylinder + arm test, not IK; one reach-down cap (0.5 m) for three templates that reach 0.35–0.54 m; band proportions are from the casual/punk rig, not the woman template; release is not blended in the engine (BODY_MODEL.md). The rig measurements themselves come from poses.spec.ts (Playwright), whose result this report consumes from the current gate. Since mars-take/3 `hands` / `speed` are thinned keyframes (5 mm / 1 cm/s, interpolated; TAKES_AND_PLANS.md): a replay is within 5.5 mm / 1.5 cm/s of the engine, not exact (releases are exact)."
+    },
+    {
+      "id": "composite-flagships",
+      "name": "Composite flagship builds (v2: forklift + stairs carry + campfire)",
+      "required": "The rack-bay build composed with other capabilities in one plan: plywood picked by the forklift and staged beside the bay, a spare tread carried up the finished stair, a campfire ending with seated people and wanderers — 0 violations, rehearse = execute, canonical untouched, also on the 2026 campus fork.",
+      "tests": [
+        { "file": "build-bay-v2.test.ts", "title": "flagship v2: forklift sheet, stairs carry, campfire ending" },
+        { "file": "build-bay-v2.test.ts", "title": "flagship v2 layout: the forklift cannot stage s2 on the half-built deck" },
+        { "file": "build-bay-v2.test.ts", "title": "flagship v2 on Mars 2026: fork canonical, build at staging-east" }
+      ],
+      "approximate": "Layouts were adjusted until refusals stopped (the forklift stages s2 beside the bay, benches use gather); the engine gap `carryIntegrity` flags fork loads is routed around in the scenario (HANDOFF flagship v2). v3 (hand-up) is in the hand-up row and has no campus variant."
+    },
+    {
+      "id": "camera-direct",
+      "name": "Camera direction, phase 1: directions compile to computed trajectories",
+      "required": "Owner feedback §11: typed directions (pan / tilt / dolly / orbit / crane / push_in / pull_out / fly_through / hold, subject entity / structure / region / group, framing, sun-behind, interior) compile to shot programs whose trajectories are computed — orbit radius from subject extent and lens, sun-behind windows from the sun model, interior moves routed through openings on a camera navmesh — under motion caps; ambiguous or unknown subjects are refused with candidates, never guessed; exposed as engine_direct_camera.",
+      "tests": [
+        { "file": "camera-direct.test.ts", "title": "vocabulary: invalid verbs" },
+        { "file": "camera-direct.test.ts", "title": "do a 270° revolution around the main pallet racks over 2 minutes" },
+        { "file": "camera-direct.test.ts", "title": "do a pan across Chiba with the sunset in the background" },
+        { "file": "camera-direct.test.ts", "title": "go inside the kitchen and face the sink" },
+        { "file": "camera-direct.test.ts", "title": "look at this crowd of people having this activity" },
+        { "file": "camera-direct.test.ts", "title": "resolver: ambiguous and unknown names are refused" },
+        { "file": "camera-direct.test.ts", "title": "program: lead-in hold" },
+        { "file": "camera-direct.test.ts", "title": "api: engine_direct_camera plans + stores a directed track beside the take" },
+        { "file": "camera-synth.test.ts", "title": "(b) 2026: pan across Chiba with the sunset behind" },
+        { "file": "camera-synth.test.ts", "title": "(c) source-era 2024: go inside the kitchen and face the sink — routed through the opening, never through a wall" },
+        { "file": "camera-synth.test.ts", "title": "group: the carry crew is orbited" },
+        { "file": "camera-synth.test.ts", "title": "navmesh: through the door" },
+        { "file": "camera-synth.test.ts", "title": "motion caps: too-fast moves are refused" },
+        { "file": "camera-synth.test.ts", "title": "verbs: tilt / dolly / crane / pull_out / hold" },
+        { "file": "camera-synth.test.ts", "title": "determinism: the same directions give the identical track hash" },
+        { "file": "camera-parse-fixtures.test.ts", "title": "LM-009: sentence fixture cluster" },
+        { "file": "camera-parse-fixtures.test.ts", "title": "LM-009: separate sinks" },
+        { "file": "camera-parse-fixtures.test.ts", "title": "LM-009: source-era 2024 kitchen sink compiles with no invalid samples or world mutation" },
+        { "file": "camera-worker.test.ts", "title": "camera worker kernel preserves" },
+        { "file": "camera-worker.test.ts", "title": "worker abort before start" },
+        { "file": "camera-worker.test.ts", "title": "creation, delivery, runtime" },
+        { "file": "camera-sampler-budget.test.ts", "title": "synthetic long lead-in" }
+      ],
+      "outsideSuite": ["viewer/e2e/studio-direct.spec.ts", "viewer/e2e/studio-camera-vocab.spec.ts", "viewer/e2e/camera-fixture.spec.ts", "viewer/e2e/camera-worker.spec.ts", "docs/engineering/CAMERA_DIRECT.md"],
+      "approximate": "Fixture subjects resolve touching clusters with ambiguity refusals. Studio and room sentences use the same semantic vocabulary and aliases; bare 2026 main racks remain an explicit ambiguity where needed. Synthesis still plans against static geometry; moving people/parts are phase2 checks. Scene bearings and site fidelity remain reconstruction limitations. File-take compilation runs in a cancellable worker with identical results; scene preparation, directOnYear, faster hashing and per-subject sampling remain LM012 follow-ups."
+    },
+    {
+      "id": "camera-correct",
+      "name": "Camera direction, phase 2: every shot simulated and self-corrected (incl. occluded)",
+      "required": "Every directed shot is simulated sample by sample against the take (people and parts per tick, the sun, the motion caps) for collision, squeeze (stuck between plywood), foreground (behind a head), flare, subject leaving frame, horizon, motion and occlusion of the subject by non-subjects (planner readability < 0.6); failures are fixed by an explicit ladder (raise → widen → swing → re-route → shorten → split → cut), one knob per correction with the searched start heading kept, each recorded with failure, samples, strategy, before/after and reason; nothing works → refused with every strategy listed. The take sampler classifies entities by kind (piles are boxes, removed entities leave at their removal tick).",
+      "tests": [
+        { "file": "camera-correct.test.ts", "title": "checks: squeeze is a sustained narrow gap" },
+        { "file": "camera-correct.test.ts", "title": "fixture \"stuck between plywood\"" },
+        { "file": "camera-correct.test.ts", "title": "fixture \"behind a head\"" },
+        { "file": "camera-correct.test.ts", "title": "fixture \"the group outgrows the frame\"" },
+        { "file": "camera-correct.test.ts", "title": "fixture \"subject leaves frame\"" },
+        { "file": "camera-correct.test.ts", "title": "fixture \"flare\"" },
+        { "file": "camera-correct.test.ts", "title": "fixture \"impossible\"" },
+        { "file": "camera-correct.test.ts", "title": "phase-1 flagship shots through phase 2" },
+        { "file": "camera-synth.test.ts", "title": "(a) flagship: 270° orbit of the rack bay over 120 s" },
+        { "file": "camera-take-file.test.ts", "title": "takeSampler: piles are boxes" },
+        { "file": "camera-take-file.test.ts", "title": "takeSampler: the flagship has no piles" }
+      ],
+      "outsideSuite": ["viewer/e2e/camera-verify.spec.ts", "viewer/e2e/studio-direct.spec.ts", "docs/engineering/CAMERA_DIRECT.md", "docs/engineering/CAMERA_VERIFY.md"],
+      "approximate": "Ladders are fixed and the first candidate valid on every sample wins — not an optimiser (the flagship orbit needed raise +2.5 m after +0.5/+1/+1.5 m stayed occluded). Thresholds (squeeze 1.2 m wide / 1.0 m high / 0.3 m from a part for ≥ 0.3 m or 0.5 s; bystander ≤ 1.5 m covering ≥ 25 %; sun < 6°; < 75 % framed; readability 0.6) are chosen, not measured against footage. Occlusion and readability use the planner's prisms and per-tick people / part boxes, not the render mesh; the render comparison (verifyCamera over directed tracks) runs only in Playwright, not in this report. Fixtures are synthetic yards; the only real takes exercised are the flagship and the 2024 kitchen route. Readability of the year-build takes stays low (bay 1 min 0.42, whole house 0.31) — the planner's 0.5 Hz slow shots accept it."
+    },
+    {
+      "id": "take-schema-4",
+      "name": "Takes mars-take/3 + /4: thinned hands / speed, entities0 + removed, compact events, file cameras",
+      "required": "Long year-build takes stay small without changing what a replay shows: hands / speed thinned to keyframes (5 mm / 1 cm/s, releases exact), pose tracks at 4 mm / 8 mrad with exact hold ends, every tracked entity's initial state (entities0) and removal tick so emptied piles stay drawable, same-tick lifecycle runs and repeated blocked waits folded losslessly, and extra camera tracks carried beside the planned one in the take file; final state and every pin unchanged.",
+      "tests": [
+        { "file": "take-fields.test.ts", "title": "take fields (mars-take/3): thinChanges" },
+        { "file": "take-fields.test.ts", "title": "take fields (mars-take/4): entities0 + removed" },
+        { "file": "take-fields.test.ts", "title": "take events (mars-take/4): compactEvents folds same-tick lifecycles losslessly" },
+        { "file": "camera-take-file.test.ts", "title": "take file: a directed track is carried beside the planned camera" }
+      ],
+      "outsideSuite": ["viewer/deploy/record-campus-take.mjs", "viewer/e2e/studio-build.spec.ts", "viewer/e2e/studio-take.spec.ts", "docs/engineering/TAKES_AND_PLANS.md"],
+      "approximate": "A replay is within 5.5 mm / 1.5 cm/s of the engine for hands / speed and 4.5 mm / 8.5 mrad for poses, not exact. Planned cameras come from an exact 1 mm re-run, not from the shipped tracks (thinning moved 99 of 2933 whole-house samples). The studio loader checks only the wrapper, the camera / take id and the final hash. That the shipped take files reproduce their pins is checked by `record-campus-take.mjs --check` and the studio specs, not by this suite. Phase A + B is not recordable yet. Saving a directed track produces a download the owner copies into public/ — no room op stores a precomputed track."
+    },
+    {
+      "id": "no-jumps",
+      "name": "No walker jumps: per-tick step budget, teleport and overspeed invariants",
+      "required": "A person on foot moves at most min(speed, 1.4 m/s)·DT per tick — forward progress, sidestep and pull-back share one budget, offsets are reverted with a cancelled step and narrow by bisection, stair entries and frame climbs start from the body — and publishes an honest speed; the invariants motion.teleport (0.15 m/tick on foot; riders and carried loads 0.6 m) and motion.overspeed (published speed ≤ activity cap + 5 %) fail loudly otherwise.",
+      "tests": [
+        { "file": "movement.test.ts", "title": "no jumps: a walker moves at most min(speed, 1.4 m/s)·DT per tick" },
+        { "file": "review.test.ts", "title": "no jumps (W21): a person on foot moves ≤ 0.15 m per tick" }
+      ],
+      "outsideSuite": ["docs/engineering/MOVEMENT.md"],
+      "approximate": "The suite measures the per-tick bound on stress-30 and the campfire evening (max 0.0675 m); the six-run diagnosis (classes A–C) was a scratch spy, and the other pinned runs are covered only through the invariants during their own tests. Carry, climb, stance and sit publish no speed, so they are bounded only by motion.teleport. The look-ahead still assumes 0.9 m/s lateral, so walkers briefly slow while sidestepping. Runs got 1–2 % longer (MOVEMENT.md §7)."
+    },
+    {
+      "id": "social-preemption",
+      "name": "Automatic pre-emption of social holds by directed tasks",
+      "required": "A directed task whose only conflicts are actor claims held by social actions pre-empts them: the smallest unit is released (the person's own seat / slot — a gather keeps the rest; the ambient walk; the whole converse / face), a seated person stands up (0.6 s) before the directive plans, the reason 'pre-empted by <id> (<verb>)' is recorded on the action and in take events; social vs social stays a reservation conflict; autonomous make-way nudges are not directives; preempt: false restores the refusal; deterministic.",
+      "tests": [
+        { "file": "social.test.ts", "title": "pre-emption: a seated person given a directed carry stands up" },
+        { "file": "social.test.ts", "title": "pre-emption: cancelling a waiting directive" },
+        { "file": "social.test.ts", "title": "pre-emption: one of a converse pair gets a directed walk" },
+        { "file": "social.test.ts", "title": "pre-emption: a gather of 4 round the campfire" },
+        { "file": "social.test.ts", "title": "pre-emption: a social verb never pre-empts another" },
+        { "file": "social.test.ts", "title": "pre-emption: an autonomous make-way nudge" },
+        { "file": "social.test.ts", "title": "pre-emption determinism" }
+      ],
+      "outsideSuite": ["docs/engineering/SOCIAL.md"],
+      "approximate": "No resumption: a pre-empted sit or conversation is not resumed after the task; a converse loses all its members, not only the directed one. Only actor claims under social actions are pre-emptible — any other conflict is still refused. snapshot() refuses while a directive waits for a stand-up. Proven on proving-ground fixtures, not on a campus scene."
+    },
+    {
+      "id": "vehicle-traffic",
+      "name": "Vehicle–vehicle collision and right of way",
+      "required": "Ridden vehicles see each other's footprints (box + rider + tines + fork load): an invariant collision.vehicle-vehicle names both; right of way (smaller yields, then the earlier ride, then id); a follower stops ≥ 1 m short of a vehicle on its path with traffic.vehicle naming it, yields 1 m clear of a right-of-way lane or pulls over and resumes; stationary ridden vehicles are planned round; an unyieldable conflict is refused at plan time as vehicle.path-conflict naming both.",
+      "tests": [
+        { "file": "forklift.test.ts", "title": "traffic: head-on forklift vs EUC in one 3 m lane" },
+        { "file": "forklift.test.ts", "title": "traffic: a rider stopped in the forklift's lane" },
+        { "file": "forklift.test.ts", "title": "traffic: two forklifts crossing" },
+        { "file": "forklift.test.ts", "title": "traffic: plan-time vehicle.path-conflict" },
+        { "file": "forklift.test.ts", "title": "traffic: forced overlaps fire collision.vehicle-vehicle" },
+        { "file": "forklift.test.ts", "title": "traffic determinism" }
+      ],
+      "outsideSuite": ["docs/engineering/VEHICLES.md"],
+      "approximate": "Engages only with ≥ 2 ridden vehicles. A forklift stopped behind a parked-but-ridden EUC cannot swerve (2.5 m turn radius, no reversing) and waits until the rider leaves — indefinitely if they never do. Forklift reach, side-shift and raise are not checked against other vehicles; 3-vehicle yield cycles are not detected; edit_world moves parked vehicles with footprint and carried-load collision checks. Impossible overlaps remain explicit fault injections solely to test invariant diagnostics; they are refused by the public edit API. Proving ground only."
+    }
+  ],
+  "milestones": [
+    {
+      "id": "A",
+      "name": "Audited foundation",
+      "demonstration": "Document current world/state/control architecture; establish Git/reproducible build; create proving-ground scene; preserve existing rendering and characters.",
+      "tests": [
+        { "file": "core.test.ts", "title": "sha256 matches node:crypto" },
+        { "file": "core.test.ts", "title": "stableStringify is key-order independent" },
+        { "file": "core.test.ts", "title": "rng is seeded, resumable and uniform-ish" },
+        { "file": "core.test.ts", "title": "deterministic trig: golden bit patterns" },
+        { "file": "source-scan.test.ts", "title": "engine production source excludes host Math transcendentals and new ** / **= operators; 14 existing sites are allowlisted" },
+        { "file": "navigation.test.ts", "title": "deterministic: identical routes on repeat" },
+        { "file": "walk.test.ts", "title": "entity insertion order does not change behaviour (review M6)" },
+        { "file": "campus.test.ts", "title": "campus 2026 scene file loads with provenance on every obstacle" },
+        { "file": "campus.test.ts", "title": "Chiba interior is not walkable" },
+        { "file": "campus.test.ts", "title": "loading is deterministic" },
+        { "file": "campus-extract.test.ts", "title": "extraction is deterministic and independent of input order" }
+      ],
+      "outsideSuite": ["docs/engineering/AUDIT.md", "viewer/engine/scenes/proving-ground.ts", "viewer/e2e/baselines"],
+      "approximate": "The audit, Git discipline and 'preserve existing rendering and characters' are evidenced by AUDIT.md and the Playwright baselines, whose result this report consumes from the current gate. Full GLB re-extraction is skipped unless CAMPUS_FULL=1."
+    },
+    {
+      "id": "B",
+      "name": "Natural individual movement",
+      "demonstration": "Humans route around static obstacles, handle stairs/levels, avoid oscillation, yield appropriately, and never walk through walls.",
+      "tests": [
+        { "file": "navigation.test.ts", "title": "wall: plans around the wall before contact" },
+        { "file": "navigation.test.ts", "title": "U-shaped trap: global route exits via the open side" },
+        { "file": "navigation.test.ts", "title": "stairs: oblique approach goes to the entry" },
+        { "file": "navigation.test.ts", "title": "multi-level: deck → ground directly below uses stairs" },
+        { "file": "walk.test.ts", "title": "walk around wall: completes, no penetration" },
+        { "file": "walk.test.ts", "title": "stairs: oblique start climbs real steps" },
+        { "file": "walk.test.ts", "title": "narrow passage: opposing walkers take turns" },
+        { "file": "walk.test.ts", "title": "standing person on the route: brief pause at most" },
+        { "file": "walk.test.ts", "title": "unreachable goal is rejected before any movement" },
+        { "file": "review.test.ts", "title": "H2: a snapped walk_to goal ends at the snapped standable point" },
+        { "file": "planning.test.ts", "title": "planner equality: production findRoute === frozen reference" },
+        { "file": "planning.test.ts", "title": "stress-30: exact planner keeps the pinned result" }
+      ],
+      "approximate": "No foot IK or turning animation (turn-in-place plays Idle). People-avoidance is heuristic, not ORCA, and not proven deadlock-free; persistent certified stationary waits receive bounded recovery and can stop as blocked without releasing loads. Oscillating corridor movement, pending sequence tails, unknown actions and vehicle-specific cycles remain conservatively unresolved."
+    },
+    {
+      "id": "C",
+      "name": "Coordinated carry",
+      "demonstration": "2-4 humans collect and carry a real Mars component around obstacles with stable grips and whole-formation clearance.",
+      "tests": [
+        { "file": "carry.test.ts", "title": "carry: 2 people carry a 12 ft beam around the L corner" },
+        { "file": "carry.test.ts", "title": "carry: 19 ft upright with 4 people cannot use the 1.5 m corridor" },
+        { "file": "carry.test.ts", "title": "carry: 19 ft upright goes straight down the 2.5 m corridor" },
+        { "file": "carry.test.ts", "title": "carry: crew too small / too large for the load is rejected" },
+        { "file": "carry.test.ts", "title": "carry: determinism" },
+        { "file": "carry.test.ts", "title": "carry invariant: detects grip drift" },
+        { "file": "review.test.ts", "title": "C1: a mid-carry replan never flips the formation" }
+      ],
+      "approximate": "Grips are fixed points on a rigid, level load; carriers play Walk/Idle with a procedural carry lean (no hand IK). Crews do not carry on stairs (one carrier may); simultaneous formations are not co-planned."
+    },
+    {
+      "id": "D",
+      "name": "Supported rack bay",
+      "demonstration": "Raise a tall frame, hold/support it, install stabilizing connections, and release only after predicate passes; invalid variants fail intelligibly.",
+      "tests": [
+        { "file": "construction.test.ts", "title": "supported bay: raise, hold, premature release refused" },
+        { "file": "construction.test.ts", "title": "connect_beam lifts a symmetric beam without spinning it" },
+        { "file": "construction.test.ts", "title": "raising arc blocked by an overhead obstacle" },
+        { "file": "construction.test.ts", "title": "crew too small for a 19 ft upright" },
+        { "file": "construction.test.ts", "title": "cancel mid-raise continuously lowers" },
+        { "file": "construction.test.ts", "title": "raise choreography (2 people)" },
+        { "file": "construction.test.ts", "title": "raise choreography (4 people)" },
+        { "file": "review.test.ts", "title": "C2: people holding up a frame cannot be assigned to carry" }
+      ],
+      "approximate": "Both 12 ft and 19 ft supported bays are tested; normal raise compatibility covers every catalog frame/allowed crew size. Stability is a rule-based predicate, not physics; the 9 ft frame size is provisional in the catalog."
+    },
+    {
+      "id": "E",
+      "name": "Progressive construction",
+      "demonstration": "Extend bays; add timber subfloor, plywood, progressive stairs; update walkable world; optionally use forklift.",
+      "tests": [
+        { "file": "progressive.test.ts", "title": "progressive floor: after 1 of 2 sheets" },
+        { "file": "progressive.test.ts", "title": "progressive stairs: incomplete flight is not traversable" },
+        { "file": "progressive.test.ts", "title": "plywood without joists is rejected" },
+        { "file": "progressive.test.ts", "title": "joist without beams is rejected" },
+        { "file": "progressive.test.ts", "title": "full sequence: uprights" },
+        { "file": "progressive.test.ts", "title": "work from deck: a joist above standing reach" },
+        { "file": "progressive.test.ts", "title": "swept lift: a joist whose straight path is obstructed" },
+        { "file": "progressive.test.ts", "title": "lift crew: a plywood lift-over keeps both holders" },
+        { "file": "build-bay.test.ts", "title": "flagship: rehearse the full build from material piles, then execute it" },
+        { "file": "build-bay-v2.test.ts", "title": "flagship v2: forklift sheet, stairs carry, campfire ending" },
+        { "file": "build-bay-v3.test.ts", "title": "flagship v3: deck handed up" }
+      ],
+      "approximate": "One bay on the proving ground, not an extended multi-bay run; the 2022 first bay (capability 'Year build phase A') is the multi-frame case. The forklift is used inside the v2/v3 sequences (staging beside the bay, presenting s2 at deck height), and people now climb frames and stand on beams, but there are still no ladders or scaffold. Deck/stair/tread dimensions and the plywood span rule are provisional."
+    },
+    {
+      "id": "F",
+      "name": "Rehearsal + official execution",
+      "demonstration": "Agent rehearses privately, detects and fixes failures, then executes accepted sequence from matching baseline.",
+      "tests": [
+        { "file": "rehearsal.test.ts", "title": "rehearsal/live consistency" },
+        { "file": "rehearsal.test.ts", "title": "rehearsal is private" },
+        { "file": "rehearsal.test.ts", "title": "plan invalidation: moving an obstacle into the route" },
+        { "file": "rehearsal.test.ts", "title": "failed official runs are not committed" },
+        { "file": "history.test.ts", "title": "official execution appends a simulation-run checkpoint" },
+        { "file": "api.test.ts", "title": "api: bind → rehearse → execute → get_take" },
+        { "file": "build-bay.test.ts", "title": "flagship: rehearse the full build from material piles" },
+        { "file": "campus-flagship.test.ts", "title": "flagship on Mars 2026: fork canonical" }
+      ],
+      "approximate": "Automatic rebind is opt-in and reports its diff; execution still requires a clean rehearsal. The campus flagship is hypothetical design-edit inventory and crew, not a documented historical build."
+    },
+    {
+      "id": "G",
+      "name": "Replay + branching",
+      "demonstration": "Save take; replay from independent cameras; fork at checkpoint; produce alternative successor without mutating original.",
+      "tests": [
+        { "file": "take.test.ts", "title": "take fidelity: sampling at every tick" },
+        { "file": "take.test.ts", "title": "deterministic take bytes" },
+        { "file": "take.test.ts", "title": "replay camera independence" },
+        { "file": "take.test.ts", "title": "replay isolation" },
+        { "file": "camera-replay.test.ts", "title": "camera replay independence" },
+        { "file": "camera-take.test.ts", "title": "takeSampler: same entities and poses as sampleTake" },
+        { "file": "camera.test.ts", "title": "camera determinism + CameraTrack payload round trip" },
+        { "file": "rehearsal.test.ts", "title": "fork isolation: canonical refuses execution" },
+        { "file": "core.test.ts", "title": "fork isolation: canonical protected" }
+      ],
+      "approximate": "Forks resume from quiescent checkpoints, or mid-action for walking/social only (sampleTake(t) is a visual frame, not a resumable state); no branch merge; no camera track has been rendered to video."
+    },
+    {
+      "id": "H",
+      "name": "Inhabited Mars scenes",
+      "demonstration": "Compose campfire/class/party/dance/riding/social activities using the same action/interaction framework.",
+      "tests": [
+        { "file": "social.test.ts", "title": "social verbs are registered in the one engine registry" },
+        { "file": "social.test.ts", "title": "catalog slots: campfire has 8 fire-circle places" },
+        { "file": "social.test.ts", "title": "sit: two people cannot hold one camp-chair" },
+        { "file": "social.test.ts", "title": "converse: 4 people form a circle" },
+        { "file": "social.test.ts", "title": "converse refusals" },
+        { "file": "social.test.ts", "title": "campfire_circle with 10 people" },
+        { "file": "social.test.ts", "title": "gather onto a place region with an audience layout" },
+        { "file": "social.test.ts", "title": "ambient_wander: 6 people for 60 s" },
+        { "file": "social.test.ts", "title": "determinism: gather + converse + ambient twice" }
+      ],
+      "approximate": "Campfire, class/audience gather, conversation, sitting and ambient wandering; EUC/bicycle riding exists as vehicle verbs (capability row) but is not composed into a social scene here; no party or dance verbs. No seat collision, turn-taking, gaze or gestures; pre-emption by directed tasks exists (capability social-preemption) but a pre-empted sit / conversation is not resumed (SOCIAL.md)."
+    }
+  ]
+}

@@ -1,0 +1,488 @@
+{
+  "connect_beam": {
+    "verb": "connect_beam",
+    "item": "b1",
+    "tick": 1068,
+    "phase": "lift",
+    "groundTranslation": false,
+    "before": {
+      "pose": {
+        "p": [
+          -0.6096,
+          0.05035458559999999,
+          1.3716000000000002
+        ],
+        "yaw": 1.5707963267948966,
+        "pitch": 0,
+        "roll": 0
+      },
+      "support": {
+        "kind": "held",
+        "by": [
+          "p5",
+          "p6"
+        ]
+      }
+    },
+    "after": {
+      "pose": {
+        "p": [
+          -0.6096,
+          0.05035458559999999,
+          1.3716000000000002
+        ],
+        "yaw": 1.5707963267948966,
+        "pitch": 0,
+        "roll": 0
+      },
+      "support": {
+        "kind": "held",
+        "by": [
+          "p5",
+          "p6"
+        ]
+      },
+      "diagnostic": {
+        "code": "beam.cancel-unsafe",
+        "message": "b1 is being lifted; it cannot be abandoned mid-air",
+        "subjects": [
+          "b1"
+        ]
+      },
+      "reservations": {
+        "actor:p5": [
+          "a8"
+        ],
+        "actor:p6": [
+          "a8"
+        ],
+        "entity:b1": [
+          "a8"
+        ]
+      }
+    },
+    "reservations": {
+      "actor:p5": [
+        "a8"
+      ],
+      "actor:p6": [
+        "a8"
+      ],
+      "entity:b1": [
+        "a8"
+      ]
+    },
+    "final": {
+      "tick": 1107,
+      "status": "completed",
+      "pose": {
+        "p": [
+          -0.6096,
+          0.40639999999999993,
+          1.3716000000000002
+        ],
+        "yaw": 1.5707963267948966,
+        "pitch": 0,
+        "roll": 0
+      },
+      "support": {
+        "kind": "connected",
+        "to": [
+          "A",
+          "B"
+        ]
+      },
+      "reservations": {
+        "actor:p5": [],
+        "actor:p6": [],
+        "entity:b1": []
+      },
+      "violations": []
+    }
+  },
+  "install_joist": {
+    "verb": "install_joist",
+    "item": "j1",
+    "tick": 1524,
+    "phase": "place",
+    "groundTranslation": false,
+    "before": {
+      "pose": {
+        "p": [
+          -1.5552000000000001,
+          0.05262880000000001,
+          1.33724
+        ],
+        "yaw": 1.6147786239451536,
+        "pitch": 0,
+        "roll": 0
+      },
+      "support": {
+        "kind": "held",
+        "by": [
+          "p5"
+        ]
+      }
+    },
+    "after": {
+      "pose": {
+        "p": [
+          -1.5552000000000001,
+          0.05262880000000001,
+          1.33724
+        ],
+        "yaw": 1.6147786239451536,
+        "pitch": 0,
+        "roll": 0
+      },
+      "support": {
+        "kind": "held",
+        "by": [
+          "p5"
+        ]
+      },
+      "diagnostic": {
+        "code": "joist.cancel-unsafe",
+        "message": "j1 is being lifted into place; it cannot be abandoned mid-air",
+        "subjects": [
+          "j1"
+        ]
+      },
+      "reservations": {
+        "actor:p5": [
+          "a22"
+        ],
+        "entity:j1": [
+          "a22"
+        ]
+      }
+    },
+    "reservations": {
+      "actor:p5": [
+        "a22"
+      ],
+      "entity:j1": [
+        "a22"
+      ]
+    },
+    "final": {
+      "tick": 1578,
+      "status": "completed",
+      "pose": {
+        "p": [
+          0,
+          1.8796000000000002,
+          0.19999999999999996
+        ],
+        "yaw": 3.1415926535897936,
+        "pitch": 0,
+        "roll": 0
+      },
+      "support": {
+        "kind": "resting-on",
+        "on": "b4"
+      },
+      "reservations": {
+        "actor:p5": [],
+        "entity:j1": []
+      },
+      "violations": []
+    }
+  },
+  "install_plywood": {
+    "verb": "install_plywood",
+    "item": "s1",
+    "tick": 2219,
+    "phase": "place",
+    "groundTranslation": false,
+    "before": {
+      "pose": {
+        "p": [
+          -2.7,
+          0.075993572361701,
+          0.7596
+        ],
+        "yaw": 0,
+        "pitch": 0,
+        "roll": 0
+      },
+      "support": {
+        "kind": "held",
+        "by": [
+          "p3",
+          "p4"
+        ]
+      }
+    },
+    "after": {
+      "pose": {
+        "p": [
+          -2.7,
+          0.075993572361701,
+          0.7596
+        ],
+        "yaw": 0,
+        "pitch": 0,
+        "roll": 0
+      },
+      "support": {
+        "kind": "held",
+        "by": [
+          "p3",
+          "p4"
+        ]
+      },
+      "diagnostic": {
+        "code": "plywood.cancel-unsafe",
+        "message": "s1 is being lifted into place; it cannot be abandoned mid-air",
+        "subjects": [
+          "s1"
+        ]
+      },
+      "reservations": {
+        "actor:p3": [
+          "a32"
+        ],
+        "actor:p4": [
+          "a32"
+        ],
+        "entity:s1": [
+          "a32"
+        ]
+      }
+    },
+    "reservations": {
+      "actor:p3": [
+        "a32"
+      ],
+      "actor:p4": [
+        "a32"
+      ],
+      "entity:s1": [
+        "a32"
+      ]
+    },
+    "final": {
+      "tick": 2338,
+      "status": "completed",
+      "pose": {
+        "p": [
+          0,
+          1.9685000000000001,
+          0.7596
+        ],
+        "yaw": 0,
+        "pitch": 0,
+        "roll": 0
+      },
+      "support": {
+        "kind": "resting-on",
+        "on": "j1"
+      },
+      "reservations": {
+        "actor:p3": [],
+        "actor:p4": [],
+        "entity:s1": []
+      },
+      "violations": []
+    }
+  },
+  "install_stair_flight": {
+    "verb": "install_stair_flight",
+    "item": "st",
+    "tick": 2662,
+    "phase": "place",
+    "groundTranslation": true,
+    "before": {
+      "pose": {
+        "p": [
+          4.942006813490204,
+          0,
+          0.75
+        ],
+        "yaw": 3.141592653589793,
+        "pitch": 0,
+        "roll": 0
+      },
+      "support": {
+        "kind": "held",
+        "by": [
+          "p1",
+          "p2"
+        ]
+      }
+    },
+    "after": {
+      "pose": {
+        "p": [
+          4.942006813490204,
+          0,
+          0.75
+        ],
+        "yaw": 3.141592653589793,
+        "pitch": 0,
+        "roll": 0
+      },
+      "support": {
+        "kind": "held",
+        "by": [
+          "p1",
+          "p2"
+        ]
+      },
+      "diagnostic": {
+        "code": "stair.cancel-unsafe",
+        "message": "st is being carried into its installation position; the crew cannot safely abandon it during this movement",
+        "subjects": [
+          "st"
+        ]
+      },
+      "reservations": {
+        "actor:p1": [
+          "a35"
+        ],
+        "actor:p2": [
+          "a35"
+        ],
+        "entity:st": [
+          "a35"
+        ]
+      }
+    },
+    "reservations": {
+      "actor:p1": [
+        "a35"
+      ],
+      "actor:p2": [
+        "a35"
+      ],
+      "entity:st": [
+        "a35"
+      ]
+    },
+    "final": {
+      "tick": 2748,
+      "status": "completed",
+      "pose": {
+        "p": [
+          2.19,
+          0,
+          0.7500000000000001
+        ],
+        "yaw": 3.141592653589793,
+        "pitch": 0,
+        "roll": 0
+      },
+      "support": {
+        "kind": "connected",
+        "to": [
+          "j2"
+        ]
+      },
+      "reservations": {
+        "actor:p1": [],
+        "actor:p2": [],
+        "entity:st": []
+      },
+      "violations": []
+    }
+  },
+  "install_tread": {
+    "verb": "install_tread",
+    "item": "t1",
+    "tick": 2841,
+    "phase": "place",
+    "groundTranslation": false,
+    "before": {
+      "pose": {
+        "p": [
+          3.315,
+          0.05052463125880952,
+          1.8125042876882613
+        ],
+        "yaw": 1.5707963267948966,
+        "pitch": 0,
+        "roll": 0
+      },
+      "support": {
+        "kind": "held",
+        "by": [
+          "p6"
+        ]
+      }
+    },
+    "after": {
+      "pose": {
+        "p": [
+          3.315,
+          0.05052463125880952,
+          1.8125042876882613
+        ],
+        "yaw": 1.5707963267948966,
+        "pitch": 0,
+        "roll": 0
+      },
+      "support": {
+        "kind": "held",
+        "by": [
+          "p6"
+        ]
+      },
+      "diagnostic": {
+        "code": "tread.cancel-unsafe",
+        "message": "t1 is being lifted into place; it cannot be abandoned mid-air",
+        "subjects": [
+          "t1"
+        ]
+      },
+      "reservations": {
+        "actor:p6": [
+          "a38"
+        ],
+        "entity:t1": [
+          "a38"
+        ],
+        "tread:st:1": [
+          "a38"
+        ]
+      }
+    },
+    "reservations": {
+      "actor:p6": [
+        "a38"
+      ],
+      "entity:t1": [
+        "a38"
+      ],
+      "tread:st:1": [
+        "a38"
+      ]
+    },
+    "final": {
+      "tick": 2868,
+      "status": "completed",
+      "pose": {
+        "p": [
+          3.315,
+          0.1419,
+          0.75
+        ],
+        "yaw": 1.5707963267948963,
+        "pitch": 0,
+        "roll": 0
+      },
+      "support": {
+        "kind": "connected",
+        "to": [
+          "st"
+        ]
+      },
+      "reservations": {
+        "actor:p6": [],
+        "entity:t1": [],
+        "tread:st:1": []
+      },
+      "violations": []
+    }
+  }
+}

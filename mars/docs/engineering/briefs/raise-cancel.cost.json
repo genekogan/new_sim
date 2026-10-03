@@ -1,0 +1,54 @@
+{
+  "baselineRef": "8decb07",
+  "method": "One warmup then three alternating passes of all 16 catalog/crew fixtures; action.step only, host wall clock, informational (not a pin or threshold).",
+  "runs": [
+    {
+      "baseline": {
+        "stepMs": 16.67241900002182,
+        "calls": 6635,
+        "microsecondsPerStep": 2.5127986435601835,
+        "cases": 16,
+        "violations": 0
+      },
+      "current": {
+        "stepMs": 43.26607399993554,
+        "calls": 6635,
+        "microsecondsPerStep": 6.520885305189984,
+        "cases": 16,
+        "violations": 0
+      }
+    },
+    {
+      "baseline": {
+        "stepMs": 14.581668000004356,
+        "calls": 6635,
+        "microsecondsPerStep": 2.197689223813769,
+        "cases": 16,
+        "violations": 0
+      },
+      "current": {
+        "stepMs": 45.688102000046456,
+        "calls": 6635,
+        "microsecondsPerStep": 6.885923436329533,
+        "cases": 16,
+        "violations": 0
+      }
+    },
+    {
+      "baseline": {
+        "stepMs": 14.249344999932873,
+        "calls": 6635,
+        "microsecondsPerStep": 2.147602863591993,
+        "cases": 16,
+        "violations": 0
+      },
+      "current": {
+        "stepMs": 42.35161399993376,
+        "calls": 6635,
+        "microsecondsPerStep": 6.383061642793333,
+        "cases": 16,
+        "violations": 0
+      }
+    }
+  ]
+}

@@ -1,0 +1,53 @@
+.brahman{height:100dvh;display:flex;flex-direction:column;background:#101a1a;color:#e8ece5;font-family:Arial,Helvetica,sans-serif;overflow:hidden}
+.brahman-header{height:70px;min-height:70px;display:flex;align-items:center;gap:16px;padding:0 22px;background:#14211e;border-bottom:1px solid #3c4d46}
+.brahman-logo{display:block;flex:none;border:1px solid #859779;color:#d5e7ba;text-decoration:none;font-weight:700;font-size:29px;line-height:40px;padding:1px 8px}
+.brahman-logo span{font-size:10px;vertical-align:top}
+.brahman-title{display:flex;flex-direction:column;gap:4px;min-width:0}
+.brahman-title strong{font-size:17px;font-weight:500}
+.brahman-title small{font-size:10px;text-transform:uppercase;letter-spacing:1.6px;color:#a5b9ac}
+.brahman-years{margin-left:auto;display:flex;gap:4px;align-self:center}
+.brahman-years a{display:block;padding:10px 14px;color:#cad3c9;text-decoration:none;font-size:13px;border-radius:4px}
+.brahman-years a.current{background:#31463b;color:#eff7e5}
+.brahman-export{padding:10px 15px;background:#d3e3ac;color:#1c3327;border-radius:4px;font-size:12px;white-space:nowrap}
+.brahman-export:disabled{opacity:.6}
+.brahman-body{display:flex;flex:1;min-height:0}
+.brahman-sidebar{width:300px;flex:none;padding:24px 18px;background:#17241f;border-right:1px solid #3c4d46;overflow:auto}
+.brahman-eyebrow{font-size:9px;letter-spacing:1.7px;color:#b3c8ac;font-weight:700}
+.brahman-sidebar h1{font-size:30px;letter-spacing:-.9px;font-weight:400;margin:12px 0}
+.brahman-sidebar p{color:#aebdb3;font-size:12px;line-height:1.55;margin:0 0 17px}
+.brahman-sidebar h2{font-size:11px;text-transform:uppercase;letter-spacing:1.1px;color:#b2c6af;margin:26px 0 9px}
+.brahman-actions{display:flex;gap:7px}
+.brahman-actions button{flex:1;padding:10px 5px;border:1px solid #658067;border-radius:3px;font-size:12px;background:#24372b}
+.brahman-feature-list{display:flex;flex-direction:column;border-top:1px solid #3b4b40}
+.brahman-feature-list button{font-size:12px;text-align:left;display:flex;justify-content:space-between;padding:11px 8px;border-bottom:1px solid #3b4b40;color:#dae4d8}
+.brahman-feature-list button.selected{background:#344a3d;color:#f7fbe9}
+.brahman-feature-list span{color:#9bb095}
+.brahman-feature-detail{background:#22352c;margin-top:15px;padding:13px;border:1px solid #49614e}
+.brahman-feature-detail strong{font-size:12px;display:block}
+.brahman-feature-detail .confidence{display:inline-block;font-size:9px;text-transform:uppercase;letter-spacing:.7px;margin:8px 0;color:#c9e8be}
+.brahman-feature-detail .confidence.low{color:#eac38e}
+.brahman-feature-detail p{font-size:11px;margin:0}
+.brahman-limits{padding:15px 0 0;margin-top:20px;border-top:1px solid #405147}
+.brahman-limits strong{font-size:11px}
+.brahman-limits p{font-size:11px;margin:6px 0 0}
+.brahman-stage{position:relative;flex:1;min-width:0;overflow:hidden}
+.brahman-viewport{position:absolute;inset:0}
+.brahman-viewport canvas{display:block;width:100%;height:100%;outline:none}
+.brahman-stage-top{position:absolute;top:17px;left:18px;display:flex;gap:8px;z-index:2}
+.brahman-stage-top label,.brahman-stage-toolbar label{display:flex;align-items:center;gap:8px;font-size:10px;color:#d2daca;background:#223129ee;padding:6px 9px;border-radius:4px}
+.brahman-stage-top select,.brahman-stage-toolbar select{font-size:11px;color:#e0e7d4;background:#293a2d;border:1px solid #5d6d51;padding:5px 6px;border-radius:3px;max-width:170px}
+.brahman-stage-toolbar{position:absolute;top:69px;left:18px;z-index:2;display:flex;align-items:center;gap:2px;padding:4px 7px;background:#223129eb;border-radius:4px}
+.brahman-stage-toolbar button{padding:8px;font-size:11px;color:#c1ceb6;white-space:nowrap}
+.brahman-stage-toolbar button.active{background:#647650;color:#fff;border-radius:3px}
+.brahman-stage-toolbar label{margin-right:8px;background:none;padding:0 3px}
+.brahman-hud{position:absolute;top:120px;left:18px;padding:9px 12px;border-radius:3px;color:#eaf3e5;background:#17241edb;font-size:11px;pointer-events:none}
+.brahman-source{position:absolute;bottom:18px;left:18px;right:18px;max-width:610px;height:104px;display:flex;align-items:stretch;gap:0;background:#13231ff0;border:1px solid #779077;box-shadow:0 8px 25px #0007}
+.brahman-source button{font-size:22px;width:35px;flex:none;color:#d9e7d5}
+.brahman-source img{width:146px;height:100%;object-fit:cover;flex:none}
+.brahman-source>div{padding:11px;min-width:0;display:flex;flex-direction:column;gap:4px}
+.brahman-source b{font-size:12px}
+.brahman-source span{font-size:10px;line-height:1.3;color:#c2d1c4}
+.brahman-source small{font-size:9px;color:#91a999;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brahman-error{position:absolute;top:55px;left:17px;background:#4a211b;padding:10px 14px;font-size:12px}
+@media(max-width:800px){.brahman-header{height:62px;min-height:62px;padding:0 10px;gap:8px}.brahman-title strong{font-size:13px}.brahman-title small{font-size:8px;letter-spacing:.6px}.brahman-years a{padding:8px 9px}.brahman-export{font-size:10px;padding:9px}.brahman-sidebar{width:220px;padding:16px 12px}.brahman-source{height:88px;bottom:10px;left:10px;right:10px}.brahman-source img{width:100px}.brahman-hud{top:120px;left:8px;max-width:80%;font-size:10px}.brahman-stage-toolbar{left:8px;right:8px;overflow-x:auto;max-width:calc(100% - 16px)}.brahman-stage-top{left:8px}}
+@media(max-width:600px){.brahman-header{flex-wrap:wrap;height:auto;min-height:64px;padding:8px}.brahman-title small{display:none}.brahman-export{display:none}.brahman-body{flex-direction:column}.brahman-sidebar{order:2;width:100%;height:185px;border-right:0;border-top:1px solid #3c4d46;padding:12px;display:grid;grid-template-columns:1fr auto;gap:4px 12px}.brahman-sidebar>p,.brahman-sidebar h2,.brahman-feature-detail,.brahman-limits{display:none}.brahman-sidebar h1{font-size:20px;margin:0}.brahman-actions{grid-column:2;grid-row:1/3;min-width:170px}.brahman-feature-list{grid-column:1/3;display:flex;flex-direction:row;overflow-x:auto;border:0;gap:5px}.brahman-feature-list button{flex:none;border:1px solid #3b4b40;padding:7px;font-size:10px;gap:8px}.brahman-stage{order:1;min-height:0}.brahman-source{height:72px}.brahman-source img{width:80px}.brahman-source span{display:none}}

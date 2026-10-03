@@ -1,0 +1,324 @@
+.lab {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  background: #171c20;
+  color: #e7ecee;
+  font-size: 13px;
+}
+.lab-stage {
+  position: relative;
+  overflow: hidden;
+  min-width: 0;
+}
+.lab-canvas {
+  position: absolute;
+  inset: 0;
+}
+.lab-canvas canvas {
+  display: block;
+}
+.lab-banners {
+  position: absolute;
+  z-index: 3;
+  top: 0;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+.lab-css {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.lab-label {
+  white-space: pre;
+  font: 11px/1.25 ui-monospace, Menlo, monospace;
+  color: #fff;
+  background: #10161bcc;
+  padding: 2px 5px;
+  border-radius: 3px;
+  text-align: center;
+}
+.lab-label.bad {
+  background: #b0142ccc;
+}
+.lab-banner {
+  position: relative;
+  z-index: 2;
+  margin: 8px 8px 0;
+  padding: 8px 12px;
+  font-weight: bold;
+  border-radius: 4px;
+}
+.lab-banner.error {
+  background: #c0122cee;
+  color: #fff;
+}
+.lab-verdict {
+  position: absolute;
+  z-index: 2;
+  right: 10px;
+  bottom: 10px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-weight: bold;
+}
+.lab-verdict.ok {
+  background: #1f7a3aee;
+}
+.lab-verdict.bad {
+  background: #c0122cee;
+}
+.lab-panel {
+  overflow-y: auto;
+  padding: 14px 16px;
+  border-left: 1px solid #ffffff1a;
+  background: #1c2227;
+}
+.lab-panel h1 {
+  font-size: 18px;
+  margin: 0;
+}
+.lab-panel h2 {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #9fb0b8;
+  margin: 16px 0 6px;
+}
+.lab-panel h2 button {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 11px;
+  padding: 1px 6px;
+}
+.lab-sub,
+.lab-meta {
+  color: #9fb0b8;
+  margin: 4px 0;
+  font-size: 12px;
+}
+.lab-sub a {
+  color: #d3e697;
+}
+.lab-desc {
+  line-height: 1.4;
+}
+.lab-field {
+  display: grid;
+  gap: 4px;
+  margin-top: 12px;
+}
+.lab-panel select,
+.lab-panel button {
+  background: #2a3238;
+  color: #e7ecee;
+  border: 1px solid #ffffff22;
+  border-radius: 4px;
+  padding: 5px 9px;
+}
+.lab-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 8px 0;
+}
+.lab-drop {
+  width: 100%;
+  background: #8a4a12 !important;
+}
+.lab-checks {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.lab-checks li.ok {
+  color: #8fe3a4;
+}
+.lab-checks li.bad {
+  color: #ff7d8f;
+  font-weight: bold;
+}
+.lab-overlays {
+  display: grid;
+  gap: 3px;
+}
+.lab-log {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font: 11px/1.35 ui-monospace, Menlo, monospace;
+}
+.lab-log li {
+  padding: 2px 0;
+  border-bottom: 1px solid #ffffff0d;
+}
+.lab-log li span {
+  color: #7d8c93;
+}
+.lab-log li.warn {
+  color: #ffc233;
+}
+.lab-log li.error {
+  color: #ff5d73;
+  font-weight: bold;
+}
+@media (max-width: 800px) {
+  .lab {
+    grid-template-columns: 1fr;
+    grid-template-rows: 60vh 1fr;
+  }
+}
+.lab-hud {
+  position: absolute;
+  z-index: 2;
+  left: 10px;
+  bottom: 10px;
+  max-width: min(640px, calc(100% - 260px));
+  padding: 8px 10px;
+  border-radius: 4px;
+  background: #10161bdd;
+  font: 11px/1.4 ui-monospace, Menlo, monospace;
+  pointer-events: none;
+}
+.lab-hud-head {
+  color: #d3e697;
+  font-weight: bold;
+  margin-bottom: 3px;
+}
+.lab-hud-step {
+  color: #9fe6ff;
+}
+.lab-hud-step.blocked {
+  color: #ffc233;
+  font-weight: bold;
+}
+.lab-hud-diags {
+  list-style: none;
+  margin: 5px 0 0;
+  padding: 4px 0 0;
+  border-top: 1px solid #ffffff22;
+}
+.lab-hud-diags li,
+.lab-hud-diags li span {
+  color: #ffc233;
+}
+.lab-hud-diags li.error {
+  color: #ff5d73;
+}
+.lab-hud-diags li span {
+  opacity: 0.7;
+}
+.lab-steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  font: 10px/1.2 ui-monospace, Menlo, monospace;
+}
+.lab-steps li {
+  padding: 2px 4px;
+  border-radius: 3px;
+  background: #2a3238;
+  color: #9fb0b8;
+}
+.lab-steps li.executing {
+  background: #0f6f8f;
+  color: #fff;
+}
+.lab-steps li.blocked {
+  background: #b07a00;
+  color: #fff;
+  font-weight: bold;
+}
+.lab-steps li.completed {
+  background: #1f5a32;
+  color: #cdf5d8;
+}
+.lab-steps li.failed,
+.lab-steps li.skipped,
+.lab-steps li.cancelled {
+  background: #c0122c;
+  color: #fff;
+}
+.lab-steps sup {
+  color: #ffc233;
+  margin-left: 1px;
+}
+.lab-banner.expected {
+  background: #b87400ee;
+  color: #fff;
+  font-weight: normal;
+  font-size: 12px;
+  padding: 4px 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lab-social {
+  font-size: 10px;
+  line-height: 1.35;
+  width: min(430px, calc(100% - 40px));
+  padding: 5px 8px;
+}
+.lab-social li,
+.lab-social-legend,
+.lab-social-notes {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lab-social-notes {
+  color: #ffc233;
+}
+.lab-social-legend {
+  color: #cfd8dc;
+  margin-bottom: 3px;
+}
+.lab-social-events {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.lab-social-events li.on {
+  color: #9fe6ff;
+}
+.lab-social-events li.warn {
+  color: #ffc233;
+}
+.lab-social-events li.todo {
+  color: #ffffff66;
+}
+.lab-social-events li span {
+  opacity: 0.7;
+}
+.lab-social-slots {
+  margin-top: 3px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+  color: #cfd8dc;
+}
+.lab-social-slots i {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 2px;
+  border-radius: 50%;
+}
+
+.lab-classroom { position: static; max-width: none; margin: 10px 0; pointer-events: auto; background: rgba(16, 23, 31, .94); padding: 12px; font-size: 12px; }
+.lab-classroom-controls { display: flex; flex-wrap: wrap; gap: 5px; margin: 8px 0; }
+.lab-classroom-controls button, .lab-classroom-controls select { padding: 5px 8px; border: 1px solid #647484; border-radius: 3px; background: #253442; color: #f0f4f6; }
+.lab-classroom-controls button:disabled { opacity: .4; }
+.lab-classroom-people { display: flex; flex-wrap: wrap; gap: 3px 10px; margin: 5px 0; }
+.lab-classroom small { display: block; opacity: .75; margin-top: 7px; }
+
+/* Keep an unsupported layout inspectable without covering the world. Full
+   diagnostics remain selectable and scrollable; the failure status stays visible. */
+.lab-admission-diags { max-height: 120px; overflow-y: auto; }
+.lab-admission-checks { max-height: 180px; overflow-y: auto; }

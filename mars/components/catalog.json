@@ -1,0 +1,101 @@
+{
+  "schema_version": 1,
+  "status": "nominal_stock_geometry_built_and_exported",
+  "source": {
+    "kind": "user_instruction",
+    "date": "2026-09-05",
+    "description": "Gene's description of the Mars College pallet-rack building ingredients"
+  },
+  "canonical_units": "metres",
+  "metres_per_foot": 0.3048,
+  "dimension_status": "user_specified_nominal_stock_dimensions",
+  "parts": [
+    {
+      "id": "upright_frame_8ft_4ft",
+      "type": "pallet_rack_upright_frame",
+      "color": "blue",
+      "nominal_height_ft": 8,
+      "nominal_frame_width_ft": 4,
+      "nominal_height_m": 2.4384,
+      "nominal_frame_width_m": 1.2192
+    },
+    {
+      "id": "upright_frame_12ft_4ft",
+      "type": "pallet_rack_upright_frame",
+      "color": "blue",
+      "nominal_height_ft": 12,
+      "nominal_frame_width_ft": 4,
+      "nominal_height_m": 3.6576,
+      "nominal_frame_width_m": 1.2192
+    },
+    {
+      "id": "upright_frame_16ft_3ft",
+      "type": "pallet_rack_upright_frame",
+      "color": "blue",
+      "nominal_height_ft": 16,
+      "nominal_frame_width_ft": 3,
+      "nominal_height_m": 4.8768,
+      "nominal_frame_width_m": 0.9144
+    },
+    {
+      "id": "upright_frame_19ft_3ft",
+      "type": "pallet_rack_upright_frame",
+      "color": "blue",
+      "nominal_height_ft": 19,
+      "nominal_frame_width_ft": 3,
+      "nominal_height_m": 5.7912,
+      "nominal_frame_width_m": 0.9144
+    },
+    {
+      "id": "horizontal_beam_12ft",
+      "type": "pallet_rack_horizontal_beam",
+      "color": "orange",
+      "nominal_length_ft": 12,
+      "nominal_length_m": 3.6576,
+      "function": "Horizontally connects upright frames",
+      "clear_span_m": null,
+      "post_center_spacing_m": null
+    },
+    {
+      "id": "plywood_panel",
+      "type": "panel",
+      "material": "plywood",
+      "uses": [
+        "floor",
+        "wall",
+        "other_cladding"
+      ],
+      "dimensions_m": null
+    },
+    {
+      "id": "wood_construction",
+      "type": "custom_assembly",
+      "material": "wood",
+      "uses": [
+        "stairs",
+        "other_wood_construction"
+      ],
+      "dimensions_m": null
+    },
+    {
+      "id": "plexiglass_panel",
+      "type": "panel",
+      "material": "plexiglass",
+      "uses": [
+        "occasional_transparent_panel"
+      ],
+      "dimensions_m": null
+    }
+  ],
+  "unresolved": [
+    "Physical reference faces for nominal frame widths and heights",
+    "Post and beam profiles and material thicknesses",
+    "Frame bracing layout",
+    "Beam connectors and end offsets",
+    "Attachment-height increments",
+    "Panel dimensions and thicknesses",
+    "Stair member dimensions and joinery"
+  ],
+  "geometry_path": "<mars-media>/reconstruction/2026-campus/modular/deliverable/component-library.glb",
+  "profile_status": "overall nominal rack dimensions modeled; profiles and bracing illustrative"
+}

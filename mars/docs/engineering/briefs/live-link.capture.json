@@ -1,0 +1,257 @@
+[
+  {
+    "case": "before entry",
+    "action": {
+      "id": "a1",
+      "verb": "walk_to",
+      "params": {
+        "actor": "p1",
+        "x": 9,
+        "z": 10,
+        "level": 1
+      },
+      "status": "failed",
+      "history": [
+        {
+          "tick": 0,
+          "status": "requested"
+        },
+        {
+          "tick": 0,
+          "status": "validated"
+        },
+        {
+          "tick": 0,
+          "status": "reserved"
+        },
+        {
+          "tick": 0,
+          "status": "executing"
+        },
+        {
+          "tick": 1,
+          "status": "executing",
+          "phase": "align"
+        },
+        {
+          "tick": 2,
+          "status": "failed",
+          "phase": "align",
+          "code": "route.link-unusable"
+        }
+      ],
+      "requestedTick": 0,
+      "diagnostic": {
+        "code": "route.link-unusable",
+        "message": "stairs stairs-a became unusable: test closure",
+        "subjects": [
+          "p1",
+          "stairs-a"
+        ]
+      },
+      "phase": "align",
+      "endedTick": 2
+    },
+    "pose": {
+      "p": [
+        1.55,
+        0,
+        10
+      ],
+      "yaw": 0
+    },
+    "violations": []
+  },
+  {
+    "case": "closed",
+    "tick": 79,
+    "pose": {
+      "p": [
+        2.6839999999999993,
+        0.5129999999999995,
+        10
+      ],
+      "yaw": 0
+    },
+    "holders": [
+      "a1"
+    ],
+    "diagnostic": {
+      "code": "route.link-unusable",
+      "message": "stairs stairs-a became unusable: missing tread ahead",
+      "subjects": [
+        "p1",
+        "stairs-a"
+      ]
+    },
+    "violations": []
+  },
+  {
+    "case": "removed",
+    "tick": 79,
+    "pose": {
+      "p": [
+        2.6839999999999993,
+        0.5129999999999995,
+        10
+      ],
+      "yaw": 0
+    },
+    "holders": [
+      "a1"
+    ],
+    "diagnostic": {
+      "code": "route.link-unusable",
+      "message": "stairs stairs-a became unusable: link removed",
+      "subjects": [
+        "p1",
+        "stairs-a"
+      ]
+    },
+    "violations": []
+  },
+  {
+    "case": "geometry",
+    "tick": 79,
+    "pose": {
+      "p": [
+        2.6839999999999993,
+        0.5129999999999995,
+        10
+      ],
+      "yaw": 0
+    },
+    "holders": [
+      "a1"
+    ],
+    "diagnostic": {
+      "code": "route.link-unusable",
+      "message": "stairs stairs-a became unusable: link geometry changed",
+      "subjects": [
+        "p1",
+        "stairs-a"
+      ]
+    },
+    "violations": []
+  },
+  {
+    "case": "in-place",
+    "tick": 79,
+    "pose": {
+      "p": [
+        2.6839999999999993,
+        0.5129999999999995,
+        10
+      ],
+      "yaw": 0
+    },
+    "holders": [
+      "a1"
+    ],
+    "diagnostic": {
+      "code": "route.link-unusable",
+      "message": "stairs stairs-a became unusable: link geometry changed",
+      "subjects": [
+        "p1",
+        "stairs-a"
+      ]
+    },
+    "violations": []
+  },
+  {
+    "case": "cancel",
+    "tick": 79,
+    "pose": {
+      "p": [
+        2.6839999999999993,
+        0.5129999999999995,
+        10
+      ],
+      "yaw": 0
+    },
+    "holders": [
+      "a1"
+    ],
+    "diagnostic": {
+      "code": "route.link-unusable",
+      "message": "stairs stairs-a became unusable: missing tread ahead",
+      "subjects": [
+        "p1",
+        "stairs-a"
+      ]
+    },
+    "violations": []
+  },
+  {
+    "case": "future corridor invalidation",
+    "heldPose": {
+      "p": [
+        2.6839999999999993,
+        0.5129999999999995,
+        10
+      ],
+      "yaw": 0
+    },
+    "holders": [
+      "a1"
+    ],
+    "final": "completed",
+    "violations": []
+  },
+  {
+    "case": "cancel missing entry landing",
+    "pose": {
+      "p": [
+        2.6839999999999993,
+        0.5129999999999995,
+        10
+      ],
+      "yaw": 0
+    },
+    "holders": [
+      "a1"
+    ],
+    "diagnostic": {
+      "code": "route.landing-unavailable",
+      "message": "p1 waits on stairs-a: the cancellation entry landing has no supported clear floor",
+      "subjects": [
+        "p1",
+        "stairs-a"
+      ],
+      "at": [
+        1.55,
+        0,
+        10
+      ]
+    },
+    "violations": []
+  },
+  {
+    "case": "cancel missing exit landing",
+    "pose": {
+      "p": [
+        4.681999999999997,
+        2.011499999999997,
+        10
+      ],
+      "yaw": 0
+    },
+    "holders": [
+      "a1"
+    ],
+    "diagnostic": {
+      "code": "route.landing-unavailable",
+      "message": "p1 waits on stairs-a: the cancellation exit landing has no supported clear floor",
+      "subjects": [
+        "p1",
+        "stairs-a"
+      ],
+      "at": [
+        6.4,
+        3,
+        10
+      ]
+    },
+    "violations": []
+  }
+]

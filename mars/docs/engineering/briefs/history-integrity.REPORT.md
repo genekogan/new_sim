@@ -1,0 +1,11 @@
+# LM075 — isolated history and verified persistence
+
+Candidate, not yet fully gated or deployed. No checkpoint/state hash formula, world schema, snapshot format, pins or historical content values changed.
+
+WorldHistory keeps private maps and exposes read-only views with copied values. Returned workspace/checkpoint metadata, nested causes, logs and serialization cannot mutate stored history. Caller-owned states, causes and lazy-store values are cloned before freezing. Duplicate publication refuses before storing any state; deletion uses a protected/nonleaf guard. The fork API rereads its head after an optional inventory-edit commit, preserving the response contract now that returned workspace values are snapshots.
+
+Inline import validates the index with zod, state/checkpoint/resume content hashes, physical hashes, unique IDs/ordinals, checkpoint ancestry, workspace ancestry and canonical protection/head consistency. Index-only histories remain supported: missing state/resume blobs load lazily and are hash-checked before caching. Every resume return checks that the snapshot world matches the referencing checkpoint, including cached blobs. Physical hashes are memoized per immutable loaded state, avoiding repeated whole-world hashing on reads. Invalid stored values report `corrupt-history`; unavailable blobs retain `missing-state`. These checks detect corruption; they are not authentication against a writer who deliberately recomputes an entire valid history.
+
+Five new tests cover mutation paths, atomic duplicate publication, protected/nonleaf deletion, inline corruption/duplicate and cyclic indexes, input alias isolation, lazy corruption/recovery, caller ownership of lazy blobs, and cross-world references to a cached pause snapshot. API regression covers inventory-changing fork response identity. Focused history tests and existing API/resume/source-scan tests pass; tsc and scoped oxlint clean. No broad gate or performance claim yet. Lead personally inspected the named-refusal/hash JSON capture.
+
+Independent review caught and closed stale fork-response identity, missing workspace cycles/canonical-head checks and cached-resume world consistency. The same review identified redundant physical hashing, replaced with immutable-state memoization. No skipped proof counts as execution.
