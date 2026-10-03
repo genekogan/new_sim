@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { marsFactory } from '@sim/engine-mars';
 import { toyFactory } from '@sim/engine-toy';
 import type { Engine, EngineFactory } from '@sim/engine-contract';
 import { kernelHash } from '@sim/kernel';
@@ -36,4 +37,13 @@ test('fault restores checkpoint and filtered log; three faults quarantine; resta
   const next=new WorldHost(db,factory,'recovery',1e9); next.boot(); assert.equal(next.engine.stateHash(),h.engine.stateHash()); assert.equal(kernelHash(next.kernel),kernelHash(h.kernel)); assert.deepEqual(next.extra.cardFaults,h.extra.cardFaults);
   const repair=events.filter(e=>e.payload?.recovery).at(-1)!; assert.ok(JSON.stringify(repair).includes('private-owner')); assert.ok(!JSON.stringify(publicEvent(repair)).includes('private-owner')); assert.ok(!JSON.stringify(publicEvent(repair)).includes('baseline'));
   db.close();
+});
+
+test('historical Mars invariant receipts survive restart without being treated as fresh faults',async()=>{
+ const db=new Db(join(mkdtempSync(join(tmpdir(),'sim-old-receipts-')),'sim.db')),factory=await marsFactory();
+ const h=new WorldHost(db,factory,'historic',1e9);h.boot();
+ void h.enqueue('birth','test',{soulId:'s_A',entityId:'h_A',name:'A',description:'quiet',owner:'test'});h.tickOnce();
+ h.engine.runtime.violations.push({tick:0,code:'historic.receipt',message:'A previously recorded violation, already resolved'});h.saveSnapshot();
+ const fresh=new WorldHost(db,factory,'historic',1e9);fresh.boot();assert.equal(fresh.engine.runtime.violations.length,1);fresh.tickOnce();
+ assert.equal(fresh.engine.runtime.violations.length,1);assert.equal(db.events(h.worldId).filter(e=>e.payload?.recovery).length,0);db.close();
 });

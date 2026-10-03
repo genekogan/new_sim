@@ -194,7 +194,8 @@ export class WorldHost {
     this.drainInputs();
     // 2. step the engine
     let out: ReturnType<Engine['step']>;
-    try { out = this.engine.step(); if (this.engine.runtime.violations.length) throw new Error(JSON.stringify(this.engine.runtime.violations)); }
+    const previousViolations = this.engine.runtime.violations.length;
+    try { out = this.engine.step(); if (this.engine.runtime.violations.length > previousViolations) throw new Error(JSON.stringify(this.engine.runtime.violations.slice(previousViolations))); }
     catch (error) { this.recoverFault(error); return; }
     this.advanceLives();
     this.kernel.tick = this.engine.world.tick;
@@ -408,6 +409,7 @@ export class WorldHost {
   }
   private restoreRecovery(recipe: RecoveryRecipe) {
     this.restoreBody(recipe.baseline);
+    const historicViolations=this.engine.runtime.violations.length;
     // The baseline may contain a resumable program whose later tick proved faulty.
     for (const m of this.minds.values()) if (m.pending && recipe.excluded.includes(m.pending.card)) { this.engine.stop(m.pending.program); m.pending=null; }
     for (const e of recipe.events) {
@@ -415,7 +417,7 @@ export class WorldHost {
       this.apply(e,true); this.seq=e.seq;
     }
     while (this.engine.world.tick < recipe.untilTick) { const out=this.engine.step(); this.advanceLives(); this.afterPrograms(out.programs,true); }
-    if (this.engine.runtime.violations.length) throw new Error('recovery replay still violates the engine');
+    if (this.engine.runtime.violations.length > historicViolations) throw new Error('recovery replay still violates the engine');
     this.extra.cardFaults = {...recipe.faults};
     this.extra.cardCooldown = {...this.extra.cardCooldown as Record<string,number>, ...Object.fromEntries(recipe.excluded.map(card=>[card,recipe.untilTick+1200]))};
     for (const m of this.minds.values()) { m.nextEvalTick=this.engine.world.tick+1; m.evalTrigger='activity-failed'; m.lastFingerprint=''; if (m.pending && recipe.excluded.includes(m.pending.card)) m.pending=null; }
