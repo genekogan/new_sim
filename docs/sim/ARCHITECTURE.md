@@ -34,6 +34,8 @@ and serializable landing clearances live in ordinary locomotion. Humans retain
 the original profile and refuse these shafts. Ceramic recharge and quiet company
 are enacted during settled rest; they are not a scheduled replenishment.
 
+Toy has a recording-only factory that observes the original engine through the shared recorder and a separate bounded event buffer. Its rules, state/hash, outputs and checkpoint schema remain identical to the original engine. All four live worlds use the shared 3D shell.
+
 The observer records server takes in bounded chunks; the browser draws sampled
 poses through TakePeople and FloaterView, about one second behind. Selection,
 follow and rewind share this path. Five-minute archives are compressed off-loop,

@@ -212,3 +212,5 @@ before any symlink or service changes. Never reset or restore a production DB to
 make old code accept it. The world route/API prefix must match its process.
 
 New-world release proof (October 3): Little Martians completed the 48-day fake soak with zero physical recovery and bounded memory; paid proof $0.014983694, server stopped. Three paused Lab snapshots passed actual movement, Play/Pause, Reset and exact initial-state reload. Sim/46 server tests and 1542 Mars engine tests passed; 6 skips/11 TODOs remain upstream. Full Mars gate is reserved for tranche end.
+
+Toy observer release: all four live worlds now have shared 3D playback. Toy retains its original rules/checkpoint format and database. Deploy ensures `ARCHIVE_TAKES=1` in the two Sim process envs, preserving other settings; staging prefix is `sim/staging`, production uses existing scoped R2. This starts recording from the release, without inventing earlier physical takes. 47 server tests, 1542 Mars tests and actual loaded-model selection/follow proof passed.

@@ -118,7 +118,7 @@ export function LiveWorld({ sim, selected, onSelect }: { sim: Sim; selected: str
     const light = new Daylight(scene);
     let geometry = new WorldGeometry(null);
     scene.add(geometry.group);
-    let framed = false;
+    let framed = false, followed: string | null = null;
     const overview = (b: readonly [number, number, number, number]) => {
       const [x0, z0, x1, z1] = b, span = Math.max(10, x1 - x0, z1 - z0);
       controls.target.set((x0 + x1) / 2, 0, (z0 + z1) / 2);
@@ -336,11 +336,15 @@ export function LiveWorld({ sim, selected, onSelect }: { sim: Sim; selected: str
         if (q) focus = spot.set(q[0], q[1], q[2]);
       }
       ring.visible = !!focus;
+      if (!following) followed = null;
       if (focus) {
         ring.position.set(focus.x, (thingId?.startsWith('kin:') ? 0 : focus.y) + 0.03, focus.z);
         if (following) {
           const target = new THREE.Vector3(focus.x, (thingId?.startsWith('kin:') ? 0 : focus.y) + 1, focus.z);
           const offset = camera.position.clone().sub(controls.target);
+          const focusId = soulId ?? thingId;
+          if (followed !== focusId && offset.length() > 12) offset.setLength(12);
+          followed = focusId;
           controls.target.lerp(target, 0.1); camera.position.copy(controls.target).add(offset);
         }
       }

@@ -37,7 +37,7 @@ Playback milestone checks (historical): workspace typecheck; 45 server tests; al
 6 inherited skips, 11 inherited TODOs, zero failures. Browser selection/follow/rewind proof
 has zero page errors or HTTP failures. Run the full Mars release gate at tranche end.
 
-Little Martians and Eden candidates are described below for the next world milestone. Construction from the piles and the Toy 3D view remain ahead. All four bounded Opus helpers finished;
+Little Martians and Eden candidates are described below for the next world milestone. Construction from the piles remains ahead. Toy now uses the same recorded 3D view. All four bounded Opus helpers finished;
 building pictures are available at `/buildings`.
 
 ## Mandate milestone
@@ -232,3 +232,11 @@ Browser asset/follow proof loaded all seven heads, six kin and both buildings,
 with zero errors. The short isolated live model pass used one alignment and
 Jev/Speech decisions, cost **$0.014983694**, all reservations settled, server stopped.
 Directed snapshot proof passed for all three places: actual completed movement (including tower level 13), Play/Pause, Reset and reload to exact initial poses/tick, no server API calls, zero page errors. Full workspace release checks passed: Sim and 46 server tests; Mars 1542 passed, 6 inherited skips and 11 inherited TODOs, zero failures; typecheck and lint passed. Existing source proof grades remain separate.
+
+## Preserved Toy 3D milestone
+
+Toy now uses the shared recorded 3D shell, selection/follow and bounded rewind. A recording-only factory wraps the original engine with a separate 20-tick event buffer and twelve hot chunks; it constructs no Mars Runtime and changes no Toy rule, state hash, output or snapshot codec. A focused equivalence test checks moving/settled poses, all outputs and physical/state hashes for 800 ticks, plus an exact mid-walk restore. The original seven fixtures get plain depiction geometry.
+
+The browser proof renders loaded people and selected follow with zero page errors or HTTP failures. The first local capture used a server started before the static asset build; its fallback warning was caught by visual review, retained and corrected by restarting the owned harness after the build. Follow now frames a newly selected person from at most twelve metres, then preserves user zoom.
+
+Full runtime checks passed: 47 server tests and all Sim suites; Mars 1542 passes, 6 inherited skips, 11 inherited TODOs, zero failures. Web typecheck/build passed after the camera change. Production Toy archive capture uses its existing Sim R2 credentials under `sim/takes/toy-1`, separate from other worlds. Staging uses `sim/staging` and no paid models. Earlier Toy records and database remain untouched.

@@ -32,6 +32,16 @@ if [ "$MODE" = --stage ]; then
   # Resolve the one existing admin owner from the toy DB without logging it.
   ssh "$HOST" python3 - <<'PYREMOTE'
 import sqlite3, pathlib, os, grp
+# Toy now records through the same observer. Use its existing scoped Sim R2
+# credentials; preserve every other setting and never log environment values.
+for name in ['sim.env','sim-staging.env']:
+    envpath=pathlib.Path('/home/sim')/name
+    lines=[line for line in envpath.read_text().splitlines() if not line.startswith('ARCHIVE_TAKES=')]
+    lines.append('ARCHIVE_TAKES=1')
+    if name=='sim-staging.env':
+        lines=[line for line in lines if not line.startswith('R2_PREFIX=')]
+        lines.append('R2_PREFIX=sim/staging')
+    envpath.write_text('\n'.join(lines)+'\n')
 conn=sqlite3.connect('file:/srv/sim-data/sim.db?mode=ro',uri=True)
 rows=conn.execute("SELECT id FROM users WHERE role='admin'").fetchall()
 assert len(rows)==1, 'one verified existing admin owner required'

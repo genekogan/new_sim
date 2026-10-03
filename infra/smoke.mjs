@@ -30,12 +30,12 @@ try {
     await page.goto(origin + path, { waitUntil: 'domcontentloaded', timeout: 60_000 });
     if (name.startsWith('year')) await page.locator('body').filter({ hasText: needle }).waitFor({ timeout: 30_000 });
     else await page.getByText(needle, { exact: false }).first().waitFor({ timeout: 30_000 });
-    if (['mars','littlemartians','eden'].includes(name)) {
+    if (['toy','mars','littlemartians','eden'].includes(name)) {
       await page.getByText('Live now', { exact: true }).waitFor({ timeout: 30_000 });
       await page.locator('canvas[aria-label="Live 3D view of the world"]').waitFor();
       // Let templates and two successive take chunks render.
       await page.waitForTimeout(2500);
-      for (const person of name==='mars'?['Alice','Bob','Carol','David']:name==='littlemartians'?['Verdelis','Kalama','Kweku','Mycos','Ada','Shuijing','Nyx']:['Eden']) await page.getByText(person, { exact: true }).first().waitFor();
+      for (const person of name==='toy'?[]:name==='mars'?['Alice','Bob','Carol','David']:name==='littlemartians'?['Verdelis','Kalama','Kweku','Mycos','Ada','Shuijing','Nyx']:['Eden']) await page.getByText(person, { exact: true }).first().waitFor();
     }
     if (name.startsWith('lab') || name.startsWith('year')) {
       await page.locator('canvas').first().waitFor({ timeout: 45_000 });
