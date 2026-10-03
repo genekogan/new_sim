@@ -1,4 +1,34 @@
-# Mars World v1 alpha — stabilization after verified homepage repair
+# Mars World v1 alpha — release42 accepted bounded checkpoint
+
+Release42 is published and verified at 100% from `043957e`, Worker
+`28055d72-9268-4e46-90c5-6066416304fc` (2026-10-03T04:15:14.687Z), after the
+clean nine-stage gate. Supported bounded alpha acceptance was verified at
+2026-10-03T04:25:20.197240+00:00. Rollback41 is
+`9596510b-336a-4519-8dca-5f862acde364`. [Deployment metadata](../../viewer/deploy/deployment.json),
+[release checklist](RELEASE_CHECKLIST.md), [engineering status](INDEX.md) and
+[scenario coverage](SCENARIO_COVERAGE.json) own exact receipts and exclusions.
+Campus `/` remains the homepage; Engine Lab is explicit `/lab`.
+
+## Small closing queue and next authorized work
+
+1. Finish canonical receipt/documentation integration (remaining close work estimate
+   0.5–1.5 working hours), then report stabilization complete. All 63 mapped/local-gate
+   coverage is not 63 fresh public journeys. Preserve the public41 supper race and
+   separate corrected repetitions; four dev-only source-import harness failures remain
+   excluded from public proof. Exact unchanged-runtime full year builds are inherited
+   evidence, not new release42 executions.
+2. Review preserved workshop draft against existing
+   computer/classroom mechanisms and library bookmark draft against existing reading.
+   Select one dependency-ready useful extension; neither draft is already verified.
+3. Preserve 48 protected main paths, all other-owner worktrees and camera/history
+   ownership. No Eden, GUI save/load, rig migration or arbitrary-input recovery scope.
+
+The earlier 20–36, 8–14 and 4–8 hour forecasts below are dated planning snapshots,
+not remaining-time estimates after the completed local gate/deployment. Expansion
+is now authorized following accepted alpha; this documentation task adds no runtime work.
+
+## Dated pre-release42 closing plan — superseded status/estimate provenance
+
 
 Stabilization remains the immediate priority. Gene's latest authorization lifts the
 quota pause and permits useful activity expansion after the verified alpha checkpoint.

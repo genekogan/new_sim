@@ -3,8 +3,8 @@
 Published checkpoint: [campus homepage](https://sim.mars.college/) at `/`,
 [Engine Lab](https://sim.mars.college/lab) at `/lab`. Exact current release/source,
 validation and rollback are authoritative in [deployment metadata](../../viewer/deploy/deployment.json)
-and the [latest release record](RELEASE_CHECKLIST.md). Release41 is deployed from
-`00bd041` after a clean nine-stage gate; final public alpha acceptance is pending.
+and the [latest release record](RELEASE_CHECKLIST.md). Supported alpha42 is published and verified from
+`043957e` after the clean nine-stage gate and bounded public acceptance.
 [Current engineering status](INDEX.md) and [scenario coverage](SCENARIO_COVERAGE.json)
 keep source/proof distinctions explicit; no all63 full-Play claim follows from smoke.
 

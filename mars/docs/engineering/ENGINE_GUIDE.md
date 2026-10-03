@@ -82,8 +82,8 @@ and honest source/proof status there. Generate only the UI contract text with
 `cd viewer && node deploy/scenario-contracts.mjs`; verify parity with
 `node deploy/scenario-contracts.mjs --check` and `engine/test/scenario-contracts.test.ts`.
 `app/lab/scenario-contracts.ts` is generated, not a second hand-maintained catalog.
-The clean combined gate passed at release41 functional source `00bd041`; final
-public alpha acceptance remains pending. See [current status](INDEX.md) and the
+The clean combined gate and supported bounded public alpha acceptance passed at
+release42 functional source `043957e`. See [current status](INDEX.md) and the
 inventory for exact-source scope; a catalog row/generated instruction is not proof
 that the preset completed on the current source.
 
@@ -196,8 +196,9 @@ routes/equipment/furniture/occupancy/departure/player interruption and failure i
 Finite journeys prove meaningful terminal effects; continuous worlds prove sustained
 progress; probes prove full supported controls; diagnostic demos prove exact expected
 refusal and surrounding-world usability. Startup/mixed stepping/FIXME are not substitutes.
-The authoritative coverage inventory and normal gate enforcement are stabilization work;
-this requirement is durable, not a claim that every current preset is already certified.
+The authoritative coverage inventory and normal gate enforcement retain source/proof
+distinctions. Accepted bounded alpha scope does not certify every future input or
+turn all 63 mapped presets into 63 fresh public full-Play journeys.
 
 
 ### Hosting boundaries under stabilization
@@ -223,10 +224,13 @@ Reset/scenario selection, inspection and camera controls. `hook.ts` applies
 `lab.control-quarantined` without new world events/claims. New hook methods inherit
 that fence; add to `QUARANTINE_ALLOWED` only after proving the method returns detached
 observations or operates solely on presentation/a fresh world. Current-source
-final public certification remains pending. Synthetic renderer probes remain detached.
+bounded certification is recorded in [current status](INDEX.md); dev-only source-import
+fixtures carry local gate proof, not production execution proof. Synthetic renderer
+probes remain detached.
 These are bounded host safeguards, not recovery guarantees for arbitrary future
-inputs. These guards are included in deployed release41 source; their final public
-alpha acceptance remains pending. Source inspection alone is not execution proof.
+inputs. These guards are included in deployed release42 source; the product
+acceptance receipts retain their local/public proof distinctions. Source inspection
+alone is not execution proof.
 
 The legacy `Scenario.continuous` flag affects authored completion/budget for
 manually started finite presets; healthy world stepping continues independently
@@ -242,8 +246,8 @@ resume therefore retains an inspectable failed take while leaving the valid
 workspace head unchanged. An invalid private take is evidence, never a resumable
 checkpoint. Ordinary action failures retain their existing cleanup/onFail policies.
 Low-level Runtime stepping is an internal mechanism; hosts must enforce these
-boundaries. These guards have focused deterministic proof and the release41 clean
-combined gate; [current status](INDEX.md) owns pending public acceptance and limits.
+boundaries. These guards have focused deterministic proof and the release42 clean
+combined gate; [current status](INDEX.md) owns accepted proof scope and limits.
 
 
 ## Persistence and extension acceptance
@@ -277,5 +281,5 @@ usability for diagnostic demonstrations. Inspect captures of the physical effect
 Record exact source, executed commands, original failures and limits in the inventory/
 evidence; deterministic Node checks, first-Step smoke, programmatic stepping and mixed
 completion remain distinct from actual Play. Each future extension still requires
-its clean combined gate and source-bound UI proof. Release41 passed its local gate;
-final public alpha acceptance is pending, as recorded in [current status](INDEX.md).
+its clean combined gate and source-bound UI proof. Release42 passed its local gate;
+supported bounded public alpha acceptance is recorded in [current status](INDEX.md).

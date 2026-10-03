@@ -4,9 +4,9 @@
 > and newest [progress](PROGRESS.md)/[release receipt](RELEASE_CHECKLIST.md).
 > Publication status is authoritative in [deployment metadata](../../viewer/deploy/deployment.json).
 > The restored campus homepage remains `/`; simulation entry is `/lab`.
-> Release41 is deployed from `00bd041` after the clean nine-stage gate; final public
-> alpha acceptance remains pending. [INDEX](INDEX.md) owns current status and proof links.
-> Useful activity expansion follows acceptance; do not restart the old release35 queue
+> Supported alpha42 is published and verified from `043957e` after the clean nine-stage gate and bounded public
+> acceptance. [INDEX](INDEX.md) owns current status and proof links.
+> Useful activity expansion is authorized after this accepted checkpoint; do not restart the old release35 queue
 > or begin Eden/save-load/rig migration.
 > Numbered checkpoints and branch lists below describe their dates, not current instructions.
 
