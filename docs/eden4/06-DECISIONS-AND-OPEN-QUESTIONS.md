@@ -111,6 +111,68 @@ revising cards; whether things made by cards last, are owned or decay; a default
 rule of reach; memory beyond two minutes; where the engine's code lives after the
 takeover (`18` §10, `19` §9).
 
+## Decided in round 19 (2026-10-02 → 10-03, many worlds and the merge)
+
+Gene's decisions; the plan that follows from them is `22` (D1–D16 there).
+
+- **Mars direct development stops at its v1 alpha** (release 42). Its code is copied (a hard
+  fork) into the Sim repo with its history; engine work continues there. The old
+  repo and sim.mars.college stay as they are, soft-deprecated. (r19)
+- **One repo, one engine, many worlds; no fork.** Mars is the first world, Little
+  Martians the second, Eden the third. A world is configuration and content;
+  capabilities are general code that a world turns on; code inside a world is
+  allowed and kept practical. (r19)
+- **sim.eden.art is the one app**: `/w/<world>` is the canonical live world,
+  `/l/<world>` its lab. Every world has the same UI (3D plus the shell's panels).
+  sim.mars.college stays on its old codebase, soft-deprecated; the redirect is
+  later. The toy world is kept at `/w/toy` as an explanatory space, outside the
+  durable design. (r19)
+- **Sim drives the Mars engine without stopping**: an objective state at every
+  tick, persistent across browser sessions. (r19)
+- **`/w/mars` starts as a new place of a few basic buildings, with raw piles of
+  building materials** so Souls may build as they go; not the 2026 campus for
+  now. Four fictional Souls: Alice, Bob, Carol, David. (r19)
+- **Every Soul has a human owner.** "there is no such thing as a truly orphaned
+  or ownerless soul." Gene owns all Souls in the new worlds for now. (r19)
+- **One day is one hour.** (r19)
+- **A routine is not a data structure.** "routines are latent in the soul's
+  mandate/context/instructions/memory/observations and are actually carried out
+  by non-deterministic evaluation every day (like humans!) instead of in a
+  programmatic way… an important constraint to keep behavior truly dynamic."
+  (r19; designed in `22` §4: customs, world events, needs, a journal, a mind
+  that chooses, decisions logged)
+- **The lab has no time and no server state**: loaded and run in the browser,
+  "a snapshot of a place, like the mars campuses 2020-2026". (r19)
+- **Steering is general, not a set of categories**: "do this now", "do this at
+  5pm every day", "do this every time bill is having a party", "do this if you
+  feel like it". A Soul turns its owner's mandate "into some kind of ongoing
+  behavior that both never stops, even if steering goes away, but can become
+  increasingly sophisticated with more rules in arbitrary natural language."
+  Souls are polled at an interval that shortens as it gets cheaper. A steer has
+  no time limit; an alignment call turns it into an objective effect. (r19;
+  designed as a mandate of rules in `22` §4.4)
+- **Model spend: at most $1 per world per real day.** (r19)
+- **One login for now: Gene.** The Little Martians artist has a say in Little Martians, and may
+  own that world, later. (r19)
+- **Little Martians gets its own building types**: the Ceramic Tower and the
+  Minaret Temple, rebuilt as clean geometry, larger and enterable. (r19)
+- **This tranche aims at 24–48 hours of work** on what is clearly wanted, done
+  well and not cut to fit; new deployments at least twice a day at self-assessed
+  milestones; production deploys are authorised; terrain, the redirect and
+  engine restructuring are deferred. (r19)
+- **Little Martians**: the six scanned characters plus Nyx and background kin;
+  they float; humanoids remain possible there. (r19)
+- **Eden is a literal green field** for now. (r19)
+- **Keep three.js; Blender only as an offline tool; do not reinvent what exists.** (r19)
+- **The economy and the ontology of worlds stay open.** "for now the worlds are
+  going to be just held and modulated through code manually through me and some
+  enthusiasts until i see this has sticking power." (r19)
+
+Open from this round: everything in `20` §8 and `21` §8 (the line between engine
+and world; Soul travel; constants and laws; birth, death, rent and Harberger;
+who owns a world; world code sandboxing; the morphology vector and capability
+list; terrain), and the items in `22` §8.
+
 ## Withdrawn from Decided (round 8, Gene pulled back)
 
 - *One body minted per day, auctioned, ~30 years, ~10,000 bodies.* Gene: it
@@ -281,3 +343,22 @@ The smallest version worth vibe-coding, reusing the Mars engine (`07`):
 - An append-only input log with rules version tags and periodic state hashes
   (chain integration can come after).
 - Media placement on surfaces (ingested assets).
+
+## October 3 merge implementation record (facts, not new Decided items)
+
+Gene authorized execution of plan v3 through `23` and confirmed autonomous
+production milestone releases while away. Preflight passed. Canonical code is
+`<repo>`; four world processes, one shared 3D playback shell, Gene-owned new
+Souls, private mandate controls and browser-only snapshot Labs are deployed.
+The exact live release and remaining qualification are in MERGE-LOG.
+
+Lead implementation choices: retain the stronger $0.50/world rolling-24-hour
+default beneath the authorized $1 maximum; derive finite construction progress
+from original physical parts; reserve a free crew for a finite phase and drain
+it safely on interruption; add a controller-compatible rollback before installing
+construction cards; retain published derivatives through a narrow asset proxy.
+These choices introduce no routine, property system, economy or world ontology.
+
+Deferred scope remains terrain, redirect, engine repackaging, talking faces, other
+owners/permissions, a persistent 2026 campus, economy and plugins. Questions in
+`20` §8 and `21` §8 stay open; no proposal has been moved to Decided here.

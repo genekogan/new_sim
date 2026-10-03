@@ -39,6 +39,17 @@ export class CampCards {
           good_when: `${a.tags.join(', ')}. ${a.requires ?? a.label}`.slice(0,160), target:null, when:[],
           then:[{set:['$actor','doing',a.label]}], approach:[], during, takes:a.verb==='sleep'?'long':'minutes'});
       }
+      for (const [phase,summary,crew] of [
+        ['stage','Carry the six rack parts from the pile to the lookout build site.',1],
+        ['frame','Raise the two uprights, seat the four beams and release safe support.',4],
+        ['deck','Carry and install the five joists and two sheets as the lookout deck.',2],
+        ['stairs','Install the flight and ten stair treads to make the lookout accessible.',2],
+      ] as const) cards.push({
+        name:`build lookout ${phase} ${m.name.toLowerCase()}`,summary,
+        good_when:`Wanting to build something lasting. Needs ${crew} free ground builders and the physical prerequisites.`,
+        target:null,when:[],then:[{set:['$actor','doing',`building the lookout ${phase}`]}],approach:[],
+        during:[{verb:'build_lookout',params:{phase}}],takes:'minutes',
+      });
       const n = souls.indexOf(m)+1;
       for (const [item,slot] of [[`bowl-${n}`, n<=2?`dining-table#r0c${n===1?0:4}`:`dining-table#r2c${n===3?0:4}`], [`spoon-${n}`,n<=2?`dining-table#r0c${n===1?1:5}`:`dining-table#r2c${n===3?1:5}`]]) cards.push({name:`return ${item.replace('-',' ')} ${m.name.toLowerCase()}`,summary:'Put a held utensil back on the table and free the hand.',good_when:'Tidy up after an interrupted meal. Free hands let you eat, work or sleep.',target:null,when:[],then:[{set:['$actor','doing','tidying utensils']}],approach:[],during:[{verb:'mars:put_item',params:{item,surfaceSlot:slot}}],takes:'minute'});
       cards.push(singleMeal(m, souls.indexOf(m)+1, 'stew-pot'));

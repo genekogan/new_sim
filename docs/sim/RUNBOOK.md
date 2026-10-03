@@ -228,3 +228,20 @@ Once any minted card or accepted decision uses `build_lookout`, code rollback mu
 choose a release with `packages/engine-mars/src/construction.ts`. Never reset a
 world database to make an older reader work. The controller-only release precedes
 autonomous construction cards to retain that compatible rollback.
+
+The camp pack now offers four finite construction phases to every Soul. Installing
+the pack logs normal mint/deck events; existing vocabulary and physical progress
+are preserved. A quiet restart does not replenish building parts or dismantle work.
+Monitor physical support/part states alongside card choices: a crew refusal is
+ordinary admission, while a recovery receipt or stuck quiet barrier needs review.
+The controller release `5d3b69c90078` is the compatible rollback for these cards.
+
+A native `sleep` purpose may retain interrupted work indefinitely for explicit
+Resume in the Lab. After a logged `rules.runtimePolicy:{sleepBlockTicks:1200}` activation, a sleep
+diagnostic blocked for one minute in a persistent body card is cancelled through its ordinary exit and reported as `activity.blocked`.
+This prevents an interrupted sleep from stranding a quiet barrier. No native
+sleep codec, Lab behavior, or world data is rewritten.
+
+Deploy a policy-capable reader before activation. Prior snapshots without the
+policy and replay before its event retain original behavior. The read-only rollback
+guard rejects a reader lacking `configureRuntimePolicy` once that event exists.

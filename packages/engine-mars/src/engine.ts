@@ -36,7 +36,7 @@ type Prog = {
   ops: Op[]; action?: string; settle?: 'done' | 'held'; soft?: boolean; until?: number;
   build?: { phase: BuildPhase; crew: string[]; stopping?: Diag };
 };
-export type MarsWorldConfig = { scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield'; clock?: { origin: number; dayTicks: number }; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
+export type MarsWorldConfig = { scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
 export const LITTLE_MARTIANS_WORLD: MarsWorldConfig={scene:'littlemartians',arrival:[0,18],arrivalPlace:'garden',reference:[0,16],grounds:{id:'grounds',name:'Ceramic garden'}};
 export const GREEN_FIELD_WORLD:MarsWorldConfig={scene:'greenfield',arrival:[0,0],arrivalPlace:'field',reference:[2,0],grounds:{id:'grounds',name:'Green field'}};
 const PROVING_GROUND: MarsWorldConfig = { scene: 'proving-ground', arrival: [-24, -10.5], arrivalPlace: 'lawn', reference: [-24, -8], grounds: { id: 'grounds', name: 'the grounds' } };
@@ -193,9 +193,17 @@ export class MarsEngine implements Engine {
       if (p.action) {
         const rec = this.rt.records.get(p.action);
         if (rec) {
-          if (rec.status === 'blocked' && /deadlock\.|walk.goal-occupied/.test(rec.diagnostic?.code ?? '')) {
+          const routeBlocked = /deadlock\.|walk.goal-occupied/.test(rec.diagnostic?.code ?? '');
+          // Native sleep retains a failed/directed-away purpose for an explicit
+          // Resume in the finite Lab. A living card must instead report blockage
+          // and let the Soul choose again, so it cannot hold the daily barrier.
+          const sleepBlocked = this.cfg.sleepBlockTicks !== undefined && rec.verb === 'sleep' && /^sleep\./.test(rec.diagnostic?.code ?? '');
+          if (rec.status === 'blocked' && (routeBlocked || sleepBlocked)) {
             p.blockedSince ??= tick;
-            if (tick-p.blockedSince > 1200) { this.rt.cancel(rec.id,{code:'route.blocked',message:'the route has remained blocked for a minute'}); return this.end(p,'failed',{code:'route.blocked',message:'the route has remained blocked for a minute'}); }
+            if (tick-p.blockedSince > (sleepBlocked ? this.cfg.sleepBlockTicks! : 1200)) {
+              const why = routeBlocked ? {code:'route.blocked',message:'the route has remained blocked for a minute'} : {code:'activity.blocked',message:`sleep has remained blocked for a minute: ${rec.diagnostic?.code}`};
+              this.rt.cancel(rec.id,why); return this.end(p,'failed',why);
+            }
           } else p.blockedSince = undefined;
           if (rec.status === 'failed') { if (!p.soft) return this.end(p, 'failed', { code: rec.diagnostic?.code ?? 'action.failed', message: rec.diagnostic?.message ?? 'failed' }); }
           else if (rec.status === 'cancelled') { if (!p.soft) return this.end(p, 'failed', { code: rec.diagnostic?.code ?? 'action.interrupted', message: rec.diagnostic?.message ?? 'interrupted' }); }
@@ -512,6 +520,10 @@ export class MarsEngine implements Engine {
     }
   }
 
+  configureRuntimePolicy(policy: {sleepBlockTicks:number}) {
+    if (!Number.isInteger(policy.sleepBlockTicks) || policy.sleepBlockTicks < 20 || policy.sleepBlockTicks > 72000) throw new Error('runtime-policy.sleep-limit');
+    this.cfg.sleepBlockTicks = policy.sleepBlockTicks;
+  }
   configureClock(clock: { origin: number; dayTicks: number }) { this.cfg.clock = { ...clock }; this.updateClock(); }
   private updateClock() {
     const c = this.cfg.clock; if (!c) return;

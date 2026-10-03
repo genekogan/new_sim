@@ -382,6 +382,7 @@ export class WorldHost {
         const p = e.payload;
         if (p?.kernelBootstrap || p?.vocabulary || p?.adoptCamp) this.kernelDirty = true;
         if (p?.dayConfig) { this.extra.living = { ...p.dayConfig, lastDay: -1, event: 'a new place', quiet: false }; for (const m of this.minds.values()) m.life ??= newLife(tick); }
+        if(p?.runtimePolicy)this.extra.runtimePolicy=structuredClone(p.runtimePolicy);
         const day = this.living;
         if (p?.quiet && day) { day.quiet = true; day.quietDay = p.day; }
         if (p?.compact && day) { day.quiet = false; day.lastDay = p.day; if (p.firstLight) day.event = 'first light'; }

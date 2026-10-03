@@ -18,6 +18,7 @@ if (!dir) throw new Error('SOAK_DIR is required and must be an isolated proof di
 mkdirSync(dir,{recursive:true});
 const db = new Db(join(dir,'sim.db')), factory = await marsFactory(), def = worldDefinition('mars');
 const host = new WorldHost(db,factory,'camp-soak',6000,'mars-1'); host.boot();
+void host.enqueue('rules','world',{runtimePolicy:{sleepBlockTicks:1200},why:'bounded live-card sleep blockage, applied prospectively'});
 const living = new LivingWorld(host); living.camp = true; void living.install(def.customs);
 const pack = new CampCards(host); void pack;
 for (const n of def.cast) {
@@ -28,6 +29,7 @@ const brain = new Brain(host,db,{...config,brainMode:'fake',budgetUsdPerDay:1,ty
 void brain;
 const starts = new Map<string,{card:string;soul:string}>(), success: Record<string, Record<string,number>> = {}, failures: Record<string,number> = {}, attendance:Record<string,Set<string>> = {};
 host.listeners.push({onApplied:e=>{
+  if(e.payload?.recovery){writeFileSync(join(dir,'recovery-failure.json'),JSON.stringify(e,null,2));throw Error(`Physical recovery is a failed soak: ${e.payload.recovery.reason}`);}
   if (e.kind==='decision' && !e.payload.continue) {
     const p = e.payload, m = host.minds.get(p.soulId); if (m?.pending) starts.set(m.pending.program,{card:p.card??p.option,soul:m.name});
   }
@@ -72,7 +74,7 @@ for (let day=1;day<=days;day++) {
   globalThis.gc?.();
   const row={day,tick:host.engine.world.tick,wallSec:(performance.now()-begin)/1000,msPerTick:samples.reduce((a,b)=>a+b,0)/samples.length,heap:process.memoryUsage().heapUsed,records:host.engine.runtime.records.size,quiet:host.quietBarrier,lastCompactedDay:host.living?.lastDay,faults:structuredClone(host.extra.cardFaults??{}),needs:structuredClone(Object.fromEntries([...host.minds.values()].map(m=>[m.name,m.life?.needs]))),journals:Object.fromEntries([...host.minds.values()].map(m=>[m.name,m.life?.journal])),activities:Object.fromEntries(def.cast.map(n=>[n.name,success[`${day-1}:${n.name}`]??{}]))};
   rows.push(row); console.log(JSON.stringify(row));
-  writeFileSync(join(dir,'report.json'),JSON.stringify({days:day,rows,restarted,failures,attendance:Object.fromEntries(Object.entries(attendance).map(([k,s])=>[k,[...s]])),spend:db.paidCost()},null,2));
+  writeFileSync(join(dir,'report.json'),JSON.stringify({days:day,rows,restarted,failures,attendance:Object.fromEntries(Object.entries(attendance).map(([k,s])=>[k,[...s]])),spend:db.paidCost(),built:Object.fromEntries(Object.entries(host.engine.world.entities).filter(([id])=>/^(upright-|beam-|joist-|sheet-|lookout-stair|tread-)/.test(id)).map(([id,e])=>[id,{phase:(e as any).phase,support:(e as any).support}]))},null,2));
 }
 assert.equal(db.paidCost(),0);
 assert.ok(restarted,'actual mid-supper engine, meaning and mind restart was observed');

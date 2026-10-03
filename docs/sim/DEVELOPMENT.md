@@ -35,8 +35,8 @@ off, so a typed wish goes to the translator; agendas and card proposals still wo
 
 ## Environment variables
 
-Read in `apps/server/src/config.ts`, except `DEV_AUTH` (`auth.ts`) and
-`MARS_ENGINE_DIR` (`packages/engine-mars/src/load.ts`).
+Read in `apps/server/src/config.ts`, except `DEV_AUTH` (`auth.ts`). The Mars
+engine always loads from the hard fork inside this repository.
 
 | Variable | Default | Meaning |
 |---|---|---|
@@ -48,35 +48,34 @@ Read in `apps/server/src/config.ts`, except `DEV_AUTH` (`auth.ts`) and
 | `TYPESAFE_API_KEY`, `ANTHROPIC_API_KEY` | none | Jev and the Anthropic models; without a key that tier runs fake or is off |
 | `BRAIN_MODE` | `live` | `fake` = no model calls. Any other value means live |
 | `BRAIN_BUDGET_USD_PER_DAY` | 0.5 | rolling real-24-hour budget; clamped to $0–$1, reserved before provider calls |
-| `ENABLE_LIVING_WORLD` | off | `1` enables the qualified living camp in the Mars process |
+| `ENABLE_LIVING_WORLD` | off | `1` enables the persistent non-Toy world day |
 | `NARRATOR_MODEL` | `claude-haiku-4-5-20251001` | narrator, and the translator's second pass |
 | `COMPILER_MODEL` | `NARRATOR_MODEL` | the compiler |
 | `TALK_MODEL` | `NARRATOR_MODEL` | spoken words |
 | `ENGINE` | `toy` | `mars` runs the Mars adapter; any other value means toy |
-| `MARS_ENGINE_DIR` | the bundled `mars/viewer/engine` | where the Mars engine checkout is |
 | `INVITE_REQUIRED` | on (`0` disables) | invite gate |
 | `MAX_SOULS_PER_USER` | 5 | |
 | `SNAPSHOT_EVERY_TICKS` | 6000 | 5 minutes at rate 1 |
-| `SEED_NATIVES` | on (`0` disables) | seed six native Souls into an empty world |
+| `SEED_NATIVES` | on (`0` disables) | Toy seeds its original cast; new worlds seed the defined cast owned by `WORLD_OWNER_ID` |
 | `WORLD_SEED` | `sim-genesis-1` | genesis RNG seed |
 | `DEV_AUTH` | off | `1` accepts `Bearer dev:<name>`; never set in production |
 | `WEB_DIR`, `BUILD_ID` | built web app, `BUILD` file (else `dev`) | |
 
-Cost for the three Anthropic model variables is always computed at Claude Haiku
-4.5 prices, whatever model is named.
+Provider prices come from the named-model admission registry; unknown models
+refuse admission. Durable reservations bound spend before calls.
 
 ## Running on the Mars engine
 
-The Mars engine is not in this repository and is not published. With a checkout
-at the default path or at `MARS_ENGINE_DIR`:
+The Mars engine is hard-forked under `mars/viewer/engine`; deployment and CI
+need no external laptop checkout. For an isolated camp process:
 
 ```bash
-ENGINE=mars BRAIN_MODE=fake DEV_AUTH=1 DATA_DIR=./data-mars node --env-file=.env apps/server/src/main.ts
+WORLD_KEY=mars WORLD_OWNER_ID=dev:admin ENABLE_LIVING_WORLD=1 ENGINE=mars BRAIN_MODE=fake DEV_AUTH=1 DATA_DIR=./data-mars node --env-file=.env apps/server/src/main.ts
 ```
 
 Use a separate `DATA_DIR` per engine: a snapshot is bound to the engine's rules
-version, and the decisions and plays in a log name that engine's places. Without
-a checkout the server exits at start with "Mars engine not found". See
+version, and the decisions and plays in a log name that engine's places. Use `WORLD_KEY=littlemartians` or `eden` for the other places, always with an
+explicit owner; Toy uses its independent original rules and data. See
 `ENGINE-CONTRACT.md` for what the adapter does.
 
 ## Tests

@@ -1,17 +1,21 @@
 # eden4 — Eden as one persistent, simulated world
 
-> Status (2026-10-01): **a vision with a running shell and a first ontology.**
-> Rounds 1–8 (09-27 → 09-29) were brainstorm; rounds 9–15 designed and built
-> **Sim**, the app shell (`<old-sim-repo>`, github.com/genekogan/sim, live at
-> https://sim.eden.art), around a toy engine; rounds 16–18 added the meaning layer
-> (a small kernel, cards, speech) and ran the shell on the real Mars engine. The world itself (building, economy, ritual, rooms, graphics) is
-> not built. Nothing here is decided unless it appears as **Decided** in
-> [`06-DECISIONS-AND-OPEN-QUESTIONS.md`](06-DECISIONS-AND-OPEN-QUESTIONS.md).
-> Inhabitants are now called **Souls**; notes written before 09-30 say "bodies".
-> These notes are mirrored into the Sim repo at `docs/eden4/` (run
-> `infra/sync-docs.sh` there after editing here).
-> **eden4** is the working name (Gene, round 8). Earlier working names:
-> "Eden World", "Eden 2.0", "the Covenant of the City".
+> Status (2026-10-03): **the merge is running at sim.eden.art; canonical code is `<repo>`.**
+> Current release, remaining work, verification and anything needing Gene are in
+> [`MERGE-LOG.md`](MERGE-LOG.md). Preflight passed; Gene owns all twelve Souls
+> in the three new worlds. Four persistent worlds share the 3D shell and private
+> owner mandate controls; browser-only Labs and all eight year pages are mounted.
+> Camp and Little Martians each passed 48 simulated days, exact restart and daily
+> fresh-Runtime renewal. Construction/controller qualification is progressing;
+> the final native Mars gate remains pending.
+> The approved execution brief is [`23`](23-MERGE-KICKOFF-PROMPT.md), with plan
+> v3 in [`22`](22-MERGE-PLAN.md). Original `~/Mars`, `~/Dev/littlemartians` and
+> `<old-sim-repo>` are read-only references. The imported closing unit is exact
+> release43 `fa0c9b6`; sim.mars.college stays on its independent old codebase.
+> Historical rounds and the broader vision below are retained as design context,
+> not a claim that their economy, terrain or community features have been built.
+> Only Gene moves an item to **Decided** in [`06`](06-DECISIONS-AND-OPEN-QUESTIONS.md).
+> Notes are mirrored into the Sim repo through `infra/sync-docs.sh`.
 
 ## Where it sits
 
@@ -65,7 +69,7 @@ Currency: **vision** = still the design intent, open questions included · **led
 | [`06-DECISIONS-AND-OPEN-QUESTIONS.md`](06-DECISIONS-AND-OPEN-QUESTIONS.md) | *(ledger)* Ledger: Decided / Withdrawn / Leaning / Shelved / Open / Rejected |
 | [`07-TRIBUTARIES.md`](07-TRIBUTARIES.md) | Existing code and prior work that feeds in (Abraham, eden3 manna, poop, prior writing), with paths. *Its Mars section is historical* |
 | [`08-CONVERSATION-LOG.md`](08-CONVERSATION-LOG.md) | Chronology: rounds 1–8 in detail (Gene's words separate from Claude's), rounds 9–15 in brief |
-| [`09-ONBOARDING-PROMPT.md`](09-ONBOARDING-PROMPT.md) | A paste-ready prompt for a new local session (current) |
+| [`09-ONBOARDING-PROMPT.md`](09-ONBOARDING-PROMPT.md) | A paste-ready prompt for a new local session (*historical since 10-03*: use `23` for the merge tranche) |
 | [`10-FRONTIER-REPRESENTATION.md`](10-FRONTIER-REPRESENTATION.md) | Round 6: the field (Runway WorldPrompt, World Labs, rigging), Mars engine as of 09-28 (*historical*), nouns-open/verbs-closed, standing intents, any-topology bodies |
 | [`11-STATE-AND-UPDATE-FORMALISM.md`](11-STATE-AND-UPDATE-FORMALISM.md) | *(vision; the log and fold are built in Sim)* Round 7: three layers (edge intents → policy → engine), the log, the fold, the intent payload |
 | [`12-ENGINE-FRONTIER.md`](12-ENGINE-FRONTIER.md) | *(vision; a menu, research dated 2026-09)* Round 7: engine innovation menu (simulation, camera, rendering, NPCs, assets, physics, audio, networking) |
@@ -76,6 +80,11 @@ Currency: **vision** = still the design intent, open questions included · **led
 | [`17-AGENT-INTERFACE.md`](17-AGENT-INTERFACE.md) | Round 15: the arrive → own → steer → attach-an-agent flow, who knows what, open questions, and Gene's answers (round 16) |
 | [`18-KERNEL-CARDS-AND-SELF-CHANGE.md`](18-KERNEL-CARDS-AND-SELF-CHANGE.md) | Rounds 16–18 (*kernel, cards and speech are built; knowing and self-change are proposals*): a kernel that is a grammar (things, links, time, five changes) with open vocabulary; one coherence rule; cards, decks, plans and minting; speech acts; what running it taught; how the world can safely change itself |
 | [`19-MARS-BRIDGE.md`](19-MARS-BRIDGE.md) | Round 18 (*proven on the proving ground, planned for the campus*): the shell running on the real Mars engine; body language as the layer between cards and engine verbs; how Mars's activities become vocabulary; scenes (proposed); what the takeover must change in the engine; first days |
+| [`20-WORLDS-BODIES-AND-LIBRARIES.md`](20-WORLDS-BODIES-AND-LIBRARIES.md) | Round 19 (*a small decided core; the rest is proposal*): many worlds on one codebase; capabilities as general code that worlds turn on; world code; the engine as depiction that a world model may replace; bodies as family + morphology vector + skin; capabilities and landmarks instead of an adapter per body and activity; a library of things; terrain as landforms; build or reuse (three.js, Blender, glTF-Transform) |
+| [`21-WORLD-ECONOMY-OPEN-QUESTIONS.md`](21-WORLD-ECONOMY-OPEN-QUESTIONS.md) | Round 19 (*nothing decided*): anyone mints a world; one birth a day per world; rent; Harberger on worlds and on residency; birth rate and death as constants; who owns a world |
+| [`22-MERGE-PLAN.md`](22-MERGE-PLAN.md) | Round 19 (*plan v3, authorized and executing*): the implementation plan to merge the Mars engine into Sim, run it without stopping (a one-hour day from decisions, steering, quiet-point snapshots, nightly compaction), and add Little Martians and Eden. Decisions D1–D26, measured facts, phases, risks |
+| [`23-MERGE-KICKOFF-PROMPT.md`](23-MERGE-KICKOFF-PROMPT.md) | The long onboarding prompt for the lead agent that executes `22` (a fresh session in `~/Eden`) |
+| [`research/`](research/) | Reports R1–R8 (kernel prior art, agent worlds, ledger options, cheap dialogue, the Mars campus probe, Spore, The Sims, Second Life), two illustrated tours, `RESUME.md` (historical replay faults F1–F9; successor regressions cover F1–F8 and the intentional F9 frontier behavior), and the two books: `EDEN4-COMPENDIUM.html` (full) and `EDEN4-BLUEPRINT-STE.html` (short, plain English, with a worked example and a terms page) |
 | [`report/eden4.html`](report/eden4.html) | The articulation after round 8 as one HTML report (*historical*: predates Sim) |
 
 ## Handoff note for the next agent
@@ -91,11 +100,29 @@ Currency: **vision** = still the design intent, open questions included · **led
 - The HTML report was published as a Claude artifact at
   https://claude.ai/artifact/NXCEKB153vze1nX4mDcUS5 (private). It reflects
   rounds 1–8 and has not been updated for Sim.
-- The shell is built; the world is not. How Sim works, its current state and
+- The persistent camp, ceramic garden, green field and Toy are live; current proofs and limits are in MERGE-LOG. How Sim works, its current state and
   what remains are documented in the Sim repo (`docs/sim/`, `docs/STATUS.md`).
 - The world ontology and anything about topics, regions and subscriptions are
   Gene's to design. Present shapes and trade-offs; do not settle them. The kernel
   in `18` is the ontology he judged "good enough to develop and try"; he intends
   to upgrade it.
-- Engine, camera and animation are the Mars project's scope until the takeover,
-  which Gene expects to begin on 2026-10-02. `19` is the plan for it.
+- The takeover is executing under `22`/`23` (round 19). Mars direct development stops at
+  its v1 alpha (release 42, tag `mars-world-v1-alpha`); from the import onward,
+  engine, camera and animation are developed in the Sim repo. `19` remains the
+  design of the bridge between cards and engine verbs.
+- The economy and the ontology of worlds are deliberately open (`20` §8, `21` §8).
+  Gene holds and tunes the worlds by hand for now. Build practically; do not
+  design a platform.
+
+## Deferred roadmap — outside this merge
+
+Terrain, retiring/redirecting sim.mars.college, restructuring the engine into
+packages, talking faces, logins/permissions for other owners, the 2026 campus as
+a persistent world, economy and plugin platforms stay deferred. The ontology of
+worlds and residency remains Gene’s open design work (`20` §8, `21` §8).
+
+Practical implementation limits are not new product decisions: finite construction
+uses the original small lookout; scenery kin are not Souls; static campus assets
+use the published derivative proxy; a failed model or spent budget uses seeded
+needs/journal choices; building types and floater shafts belong to the ceramic
+garden. New ownership, property and capability policy needs another design pass.

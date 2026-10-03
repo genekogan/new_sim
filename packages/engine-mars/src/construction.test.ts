@@ -30,3 +30,15 @@ test('stop and daily quiet drain an in-flight frame to safe support; crew cannot
  for(const id of ['upright-a','upright-b'])assert.equal((e.world as WorldState).entities[id].support?.kind,'connected');
  assert.deepEqual(e.runtime.violations,[]);
 });
+
+test('a directed-away native sleep purpose reports blockage and releases the daily quiet barrier',async()=>{
+ const {e}=await setup();
+ const r=e.perform({actor:'h0',label:'sleep in camp',steps:[{verb:'mars:sleep',params:{mat:'mat-1',duration:600}}]});assert.equal(r.ok,true);
+ for(let i=0;i<20;i++)e.step();
+ e.submit('walk_to',{actor:'h0',x:0,z:10},{preempt:true});
+ let blocked=false;
+ for(let i=0;i<10000;i++){e.step();if([...e.runtime.records.values()].some(r=>r.verb==='sleep'&&r.status==='blocked')){blocked=true;break;}}
+ assert.ok(blocked);e.beginQuiet!();for(let i=0;i<2000;i++)e.step();assert.equal(e.isQuiet!(),false,'legacy native policy stays unchanged until activation');e.configureRuntimePolicy!({sleepBlockTicks:1200});let failed=false;
+ for(let i=0;i<2000;i++){const out=e.step();if(out.programs.some(p=>p.id===r.id&&p.kind==='failed'&&p.code==='activity.blocked'))failed=true;if(e.isQuiet!())break;}
+ assert.ok(failed);assert.equal(e.isQuiet!(),true);assert.deepEqual(e.runtime.violations,[]);
+});

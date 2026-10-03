@@ -256,3 +256,26 @@ stopped. Earlier refusals are retained; the clarified construction example produ
 a valid optional stage card/mandate on the final run. This release
 exposes the controller to the grammar/compiler; ordinary world cards follow as a
 separate milestone with this controller as their compatible rollback.
+
+## Autonomous construction cards milestone
+
+All four camp Souls receive ordinary stage/frame/deck/stairs cards. They remain
+subject to individual needs, owner words, observations and free crew admission;
+completed phases disappear from playable options because their actual parts are
+finished. Six autonomous days chose and completed all 24 original parts without a
+driver, physical recovery or card faults. A staging-only stalled native sleep
+purpose was found separately; the policy-capable living adapter can bound that blockage after a logged
+prospective activation and allow quiet renewal, preserving the Lab’s explicit Resume semantics. The full
+48-day successor run and final
+Mars gate are still running/pending; the deterministic full-build/interruption and
+host restart/recovery proofs are already qualified.
+
+Rollback for these cards must retain the preceding construction-controller release.
+The grammar/compiler may also reuse them for owner steering. No timetable or
+programmatic daily building assignment was added.
+
+The live-card sleep policy is deployed as a reader first. It is inactive until a
+`rules.runtimePolicy` event is logged; replay before that event retains the native
+behavior. The successor activation release will use this reader as rollback.
+A missing selected 2024 review JPEG is restored from its exact committed release43
+public derivative; the raw source photograph/archive was not accessed or copied.

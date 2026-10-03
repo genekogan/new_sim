@@ -26,3 +26,14 @@ if not (release / 'packages/engine-mars/src/construction.ts').exists():
                 steps = event.get('steps', []) + (card.get('approach', []) + card.get('during', []) if isinstance(card, dict) else [])
                 if any(step.get('verb') == 'build_lookout' for step in steps):
                     sys.exit('Rollback refused: this database contains construction cards/decisions; choose a construction-controller release. Data and services unchanged.')
+
+engine_source = release / 'packages/engine-mars/src/engine.ts'
+if not engine_source.exists() or 'configureRuntimePolicy' not in engine_source.read_text():
+    for filename in sys.argv[2:] or ['/srv/sim-data/sim.db', '/srv/sim-data/mars/sim.db','/srv/sim-data/littlemartians/sim.db','/srv/sim-data/eden/sim.db']:
+        path = pathlib.Path(filename)
+        if not path.exists():
+            continue
+        with sqlite3.connect(f'file:{path}?mode=ro', uri=True) as db:
+            for (payload,) in db.execute("SELECT payload FROM events WHERE kind='rules' AND payload LIKE '%runtimePolicy%'"):
+                if json.loads(payload).get('runtimePolicy'):
+                    sys.exit('Rollback refused: this database has logged live runtime policy; choose a policy-capable release. Data and services unchanged.')
