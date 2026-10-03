@@ -3,8 +3,8 @@
 Owner: floaters helper (Opus), worktree `.merge-work/floaters`, branch `merge/floaters`.
 
 ## Now (2026-10-03)
-- DONE, pending commit: assets, engine bodies module, renderer, tests, policy table, previews.
-- Full Mars engine suite run after the `types.ts` change (result in the commit receipt).
+- DONE, committed f0c0116 (branch merge/floaters).
+- Full Mars engine suite NOT completed here (worktree lacks restored alpha takes/baselines; failures seen were ENOENT on public/engine/takes/*.json). Lead ran the full suite in canonical Sim.
 
 ## Delivered
 - `worlds/littlemartians/characters/`: 7 floaters + 6 kin GLBs (14.3 MB), `manifest.json` (source,
