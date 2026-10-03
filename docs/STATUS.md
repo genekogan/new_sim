@@ -279,3 +279,20 @@ The live-card sleep policy is deployed as a reader first. It is inactive until a
 behavior. The successor activation release will use this reader as rollback.
 A missing selected 2024 review JPEG is restored from its exact committed release43
 public derivative; the raw source photograph/archive was not accessed or copied.
+
+## Prospective sleep policy activation
+
+At startup, living non-Toy worlds log the 1,200-tick sleep-block policy once.
+Restart uses its persisted receipt; earlier history retains native semantics.
+The immediately preceding construction-pack/policy-reader release is the code
+rollback after activation, with databases and physical construction retained.
+Qualification receipts for the copied-state stall, autonomous 48-day build,
+all eight rendered year pages and the native final Mars gate are maintained in
+`<eden4>/MERGE-LOG.md`; do not infer a passing gate from this source note.
+
+Three historical browser fixtures now resolve the filtered fork commit
+`4976745797652847b790a07926824732ae44a134` (original
+`a0c347e0374b473876c97f536dc44dba42399521`) under `mars/`. The selected
+2022 JSON remains byte-identical: SHA-256
+`205d20234f72a5a05da8252262b9b57488080c70727c20a00b6daf08162d6d93`.
+No historical geometry/performance assertion or baseline was changed.

@@ -245,3 +245,8 @@ sleep codec, Lab behavior, or world data is rewritten.
 Deploy a policy-capable reader before activation. Prior snapshots without the
 policy and replay before its event retain original behavior. The read-only rollback
 guard rejects a reader lacking `configureRuntimePolicy` once that event exists.
+
+The activation release logs this policy once on non-Toy living-world startup.
+Its compatible rollback is `4919298` (construction pack plus policy reader).
+Check recent checkpoints and `living.lastDay` after an interrupted sleep; a
+policy receipt should exist once per world, and no policy event exists in Toy.

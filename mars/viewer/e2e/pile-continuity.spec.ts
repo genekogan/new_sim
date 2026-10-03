@@ -88,8 +88,8 @@ test('pile stock matches component palette, consumes one visible piece and prese
 });
 
 test('explicit supported pre-W51 historical source extracts its first frame from counted stock before carrying it', async ({ page }, testInfo) => {
-  const sourceCommit = 'a0c347e0374b473876c97f536dc44dba42399521';
-  const body = execFileSync('git', ['show', `${sourceCommit}:viewer/public/engine/campus-2022.json`], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
+  const sourceCommit = '4976745797652847b790a07926824732ae44a134';
+  const body = execFileSync('git', ['show', `${sourceCommit}:mars/viewer/public/engine/campus-2022.json`], { encoding: 'utf8', maxBuffer: 8 * 1024 * 1024 });
   const sourceSha256 = createHash('sha256').update(body).digest('hex');
   expect(sourceSha256).toBe('205d20234f72a5a05da8252262b9b57488080c70727c20a00b6daf08162d6d93');
   await page.route('**/engine/campus-2022.json', route => route.fulfill({ contentType: 'application/json', body }));

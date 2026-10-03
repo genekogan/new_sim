@@ -74,7 +74,7 @@ test('supported historical 2022 engine upright is green at eye level', async ({ 
   const errors = collectConsoleErrors(page);
   // Renderer colour proof, not current-layout whole-build acceptance.
   // Required current-source refusal checks remain in year-build.spec.ts.
-  const body = execFileSync('git', ['show', 'a0c347e0374b473876c97f536dc44dba42399521:viewer/public/engine/campus-2022.json'], { encoding: 'utf8' });
+  const body = execFileSync('git', ['show', '4976745797652847b790a07926824732ae44a134:mars/viewer/public/engine/campus-2022.json'], { encoding: 'utf8' });
   expect(JSON.parse(body).contentHash).toBe('8b88e6f090c79b92784954787f0329295286d5b6f5e76f0d9d450023da8c49f2');
   await page.route('**/engine/campus-2022.json', route => route.fulfill({ contentType: 'application/json', body }));
   await openLab(page, 'year-build-2022');

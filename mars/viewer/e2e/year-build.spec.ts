@@ -188,7 +188,7 @@ for (const [scenario, bays, parts] of [['year-build-2022', 1, 24], ['year-build-
 
 test('exact pre-W51 historical source: whole skeleton completes live, all 66 parts supported and crew clear, unchanged pin', async ({ page }, testInfo) => {
   test.setTimeout(240_000);
-  const source = execFileSync('git', ['show', 'a0c347e0374b473876c97f536dc44dba42399521:viewer/public/engine/campus-2022.json'], { encoding: 'utf8' });
+  const source = execFileSync('git', ['show', '4976745797652847b790a07926824732ae44a134:mars/viewer/public/engine/campus-2022.json'], { encoding: 'utf8' });
   expect(JSON.parse(source).contentHash).toBe('8b88e6f090c79b92784954787f0329295286d5b6f5e76f0d9d450023da8c49f2');
   await page.route('**/engine/campus-2022.json', (route) => route.fulfill({ contentType: 'application/json', body: source }));
   await openLab(page, 'year-build-2022-house');

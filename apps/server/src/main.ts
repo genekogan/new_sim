@@ -43,6 +43,9 @@ await auth.init().catch((e) => console.error('[auth] init failed:', e.message));
 
 const living = config.worldKey !== 'toy' && config.livingWorld ? new LivingWorld(host) : null;
 if (living) { living.camp = config.worldKey === 'mars'; void living.install(definition.customs); }
+if (living && host.engine.configureRuntimePolicy && !host.extra.runtimePolicy) {
+  void host.enqueue('rules','world',{runtimePolicy:{sleepBlockTicks:1200},why:'bound live-card sleep blockage prospectively; retain historical replay before this event'});
+}
 const campCards = living?.camp ? new CampCards(host) : null;
 if(config.worldKey==='littlemartians')new FloaterCards(host);
 void campCards;
