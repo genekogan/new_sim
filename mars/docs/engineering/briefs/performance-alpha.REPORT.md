@@ -42,13 +42,13 @@ No frame/bundle/mesh optimization is justified by these isolated measurements al
 Existing route chunk splitting works; largest frozen chunk727549B, shared Three
 module/core343807/280284B are separate modules, not established duplication.
 
-Material repairs completed in the alpha candidate: world-owned transient component
+Material repairs deployed in release41 after its clean combined gate: world-owned transient component
 geometries, campfire stone/log geometries, historicalLineSegments, cutting blades
 and paint-overlay image leases now release at the correct lifecycle boundaries.
 Native disposal/alias/late-load/repeated-world regressions pass; actual strict
 Play/Reset counters pass on construction, fire, meal, solar and historical worlds.
 No claimed FPS gain; no original assets, attribution or historical values changed.
-Verified upload-cache reuse already avoids8same-key R2 writes at release40.
+Verified upload-cache reuse avoids eight same-key R2 writes at releases40 and41. Release41 reused all eight identical large assets, with zero new R2 writes; its Wrangler startup was194ms. These deployment observations do not replace browser readiness or server CPU measurements.
 
 Direct Worker MCP/security integration36tools PASS. Observed representative remote
 wall times: rehearsal561ms, execution496ms, camera819ms; these include network and
@@ -67,7 +67,7 @@ alpha-perf-stress-budget.log. Harness hashes/browser/profile/timestamps/requests
 and captures retained. Root inspected the warm campus, design-studio and
 living-day captures against paired measurements; no missing scene or major visible
 support/continuity issue. These capture observations do not establish anatomical
-precision or social quality. Final alpha gate/publication remain pending.
+precision or social quality. Release41 passed its clean combined gate; final alpha acceptance remains pending public verification and the reviewed supper observation test repair. No new performance-affecting runtime change is proposed by that repair.
 
 Deferred: broad dirty-render/parsed-model caching, scenario chunk refactoring,
 texture/mesh reductions and productionCPU observability changes. Current assets
