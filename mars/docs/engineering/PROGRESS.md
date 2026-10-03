@@ -3294,3 +3294,37 @@ Main48pending paths preserved; native artifacts and old snapshots remain in Git/
 ignored receipts. Whole alpha8–14workinghours, medium confidence with final gate/
 publication risks. Keep expansion deferred until alpha acceptance/publication,
 then resume preserved bounded workshop/library queue under owner authorization.
+
+
+## 2026-10-03 02:25 UTC — release41 online; public acceptance gap retained
+
+Clean source00bd041 passed all nine gate stages: zero-warning lint,295 deployment
+checks,1465 engine PASS/6 SKIP/11 TODO, both TypeScript checks,319 browser PASS/7
+SKIP, flagship, unchanged determinism hash and MCP/security integration. Native gate
+`.cloudflare/gate/2026-10-03T00-12-37-155Z/report.json` SHA256
+`4c69d0c3edba588c828371d7e06c959f31956db334ffe19153f7315e5ce0c4af`.
+Local main fast-forward preserved all48 other-owner pending paths. Release41 Worker
+`9596510b-336a-4519-8dca-5f862acde364` is online at https://sim.mars.college/;
+`/` remains the museum homepage and `/lab` the simulation. Final acceptance/receipt
+is pending; tracked deployment metadata still records verified40.
+
+Fresh public entry4PASS,522-asset/24-route HTTP probe,36-tool MCP/security and
+nine-step director checks PASS. Served48 JS/CSS hashes match the clean build.
+Eight immutable large assets reused existing cache keys, with zero new R2 uploads.
+The original identity-encoded gateway HEAD-length assertion remains failing;
+Brotli delivery and range checks pass separately. No gateway/DNS/content change.
+
+The public112-case Play cohort is still running, with one retained supper failure:
+meal returned bytick2368, ordinary cleanup started2369, bowl pickup completed2389,
+and a separate browser Pause click capturedtick2400. Zero invariant violations;
+original bowl ownership remained coherent. Root inspected the actual capture and
+trace. Reviewed54fb847 test repair pauses atomically at the unchanged supported-return
+predicate; expected supports, identities, consumed receipts, full seven-vessel
+storage and original timeouts remain unchanged. Repeated public checks and a new
+clean combined gate are required. This is not counted as a passing public journey.
+
+Reviewed documentation updates and the small test repair are assembled in isolated
+`codex/world-alpha-final-validation`; current public source remains frozen00bd041.
+Original native failures/skips, saved drafts and worktrees are preserved. Remaining
+whole alpha4–8workinghours, medium confidence, assumes no additional functional defect.
+Continue through accepted publication, then resume bounded Mars activities; no Eden.

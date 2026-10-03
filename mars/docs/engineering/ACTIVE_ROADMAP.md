@@ -6,15 +6,15 @@ quota pause and permits useful activity expansion after the verified alpha check
 Published release/source/rollback and executed validation are canonical in
 [deployment metadata](../../viewer/deploy/deployment.json) and the
 [release checklist](RELEASE_CHECKLIST.md). Keep `/` as the campus homepage and
-`/lab` as the simulation entry. The alpha candidate remains unpublished pending
-combined gate/public verification; [scenario coverage](SCENARIO_COVERAGE.json)
+`/lab` as the simulation entry. Release41 is deployed; final alpha acceptance remains pending
+public verification and the reviewed test repair's combined gate; [scenario coverage](SCENARIO_COVERAGE.json)
 tracks exact-source proof and gaps, and the [performance audit](briefs/performance-alpha.REPORT.md)
 records bounded measurements/limits. Preserve camera/historical ownership and
 unverified workshop/library drafts.
 
 ## Saved queue and exit criteria — owner-authorized resume after release40
 
-1. **Latest verified checkpoint:** retain verified40 repair and inherited39 proof and preserve main's48other-owner paths;
+1. **Latest checkpoint:** retain deployed41, verified40 homepage repair and inherited39 proof; preserve main's48other-owner paths;
    use this shipped checkpoint for stabilization. Expose
    all shipped presets and longer runs honestly. Exclude unverified workshop/library
    work; retain their branches/reports without claiming implementation.
@@ -36,19 +36,25 @@ unverified workshop/library drafts.
    the approved activity-expansion queue under Gene's latest continuing authorization.
    Do not begin Eden.
 
-Latest whole v1 alpha planning range **8–14 working hours**, medium confidence after the
-2026-10-02 f7 gate (302 browser PASS/17 visual FAIL/7 SKIP). This assumes a bounded
-reviewed snapshot window, another clean full gate and exact publication verification;
-no substantial new functional defect. The failed gate is retained in the coverage inventory. Main risks:
-full-journey proof gaps hidden behind startup/mixed stepping, local-failure isolation,
-legacy unsupported/fine-pose exclusions and public transport metadata. No general
-priority interview is needed. Surface a major prerequisite with smallest credible
-repair/time impact/recommended scope decision. Do not silently remove required scope.
+Latest whole v1 alpha planning range **4–8 working hours**, medium confidence as of
+2026-10-03 02:25 UTC. Release41 (`00bd041`) is deployed after the clean nine-stage
+gate (319 browser PASS/7 SKIP; 1465 engine PASS/6 SKIP/11 TODO). Final alpha acceptance
+is pending: the public full-Play cohort found a supper observation race, retained as
+native failure. Ordinary cleanup correctly took the original bowl after meal return;
+the test's separate Pause click captured a later state. A bounded test repair freezes
+the exact original return predicate without changing expected ownership or outcomes.
+It needs repeated public proof and a clean combined gate before integration. No
+new functional engine repair has been justified by that failure.
 
-Three separable Sol6.1 lanes: execution coverage inventory, bounded Lab liveness
-repair, performance audit preparation; root owns current release and critical review.
-Browser/performance execution remains serialized. No active save/load, character-rig
-migration, universal planning or arbitrary future-input recovery promise.
+Small closing queue: root owns combined candidate, serialized validation and release;
+reviewed Sol6.1 test and documentation changes are isolated from the current public
+run. Performance audit, recovery contracts and focused coverage are complete within
+their documented limits. Remaining work is repeat proof, combined validation,
+current-source coverage/evidence receipts, final publication and public confirmation.
+The estimate assumes no further full-journey or integration failure. Serious defects
+must be explained and repaired rather than hidden to meet the estimate. No active
+save/load, character-rig migration, universal planning or arbitrary-input recovery
+promise. Useful bounded activity expansion follows accepted alpha publication.
 
 ## Deferred expansion checkpoints
 
