@@ -539,7 +539,15 @@ export class WorldHost {
   /** Capture is synchronous (it must see one consistent tick); the database write is deferred past the current tick. */
   saveSnapshot(sync = true) {
     this.drainInputs();
-    if (this.engine.canSnapshot && !this.engine.canSnapshot()) return { pending: true, tick: this.lastSnapshotTick };
+    if (this.engine.canSnapshot && !this.engine.canSnapshot()) {
+      // A graceful close still needs a durable replay destination when the
+      // controller cannot serialize. Periodic retries must not log every tick.
+      if (sync) {
+        void this.enqueue('rules', 'world', { checkpoint: 'unsnappable-head' });
+        this.drainInputs();
+      }
+      return { pending: true, tick: this.lastSnapshotTick };
+    }
     const t0 = performance.now();
     const runtime = this.engine.snapshot();
     const body = this.captureBody(runtime);

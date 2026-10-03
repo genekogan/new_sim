@@ -272,3 +272,18 @@ Courtesy activation logs one additional policy event per existing living world,
 with both `sleepBlockTicks:1200` and `quietSeatCourtesy:true`. Restart must not log
 another courtesy activation. Toy receives none. Reader `9e78ee416a79` is compatible
 with the new flag; the earlier sleep-only reader is not.
+
+On graceful shutdown, an unsnappable controller leaves the last safe snapshot
+intact and logs `rules:{checkpoint:"unsnappable-head"}` at the current tick.
+That accepted marker is the replay destination; do not force a snapshot or
+rewind the database to avoid replay. Periodic snapshot retries stay quiet.
+Unexpected process loss resumes at the last durable accepted tick, so treat
+recorded takes as depiction rather than a substitute event-log replay cursor.
+
+Native gate fixture preparation also needs the three licensed JPEGs under
+`public/modular/environment/ground-{color,normal,roughness}.jpg`, committed
+`worlds/` mounted as ignored `public/world-assets`, and the matching installed
+Draco decoder at `public/mars-assets/draco`. Use an isolated ignored checkout
+and never deploy it. Missing JPEGs can draw black ground without failing an HTTP
+request because Vite's fallback returns HTML; validate image headers. Exact
+fixture receipts and focused original-baseline comparisons are in MERGE-LOG.

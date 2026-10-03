@@ -27,8 +27,11 @@ test('actual host replays an unsnappable mid-carry from its checkpoint and log; 
  try{
   choose(h,'stage');let carried=false;
   for(let i=0;i<10000;i++){h.tickOnce();if((h.engine.world as WorldState).entities['upright-a'].phase==='carried'){carried=true;break;}}
-  assert.ok(carried);assert.equal(h.engine.canSnapshot!(),false);assert.equal(h.saveSnapshot()!.pending,true);
-  void h.enqueue('rules','proof',{checkpoint:'mid-carry'});h.drainInputs();
+  assert.ok(carried);assert.equal(h.engine.canSnapshot!(),false);
+  const seq=h.seq;assert.equal(h.saveSnapshot(false)!.pending,true);assert.equal(h.seq,seq,'periodic retries do not emit head markers');
+  assert.equal(h.saveSnapshot(true)!.pending,true);
+  assert.equal(db.events(h.worldId).at(-1)!.tick,h.engine.world.tick,'graceful checkpoint retains the actual head');
+  assert.equal(db.events(h.worldId).at(-1)!.payload.checkpoint,'unsnappable-head');
   const fresh=new WorldHost(db,factory,'physical-build',1e9,h.worldId);fresh.boot();
   assert.equal(fresh.engine.stateHash(),h.engine.stateHash());assert.equal(kernelHash(fresh.kernel),kernelHash(h.kernel));assert.equal(fresh.engine.actorBorrowed!('h1'),false);
   for(let i=0;i<300;i++){h.tickOnce();fresh.tickOnce();assert.equal(fresh.engine.stateHash(),h.engine.stateHash());}

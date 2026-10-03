@@ -347,3 +347,15 @@ is its compatible rollback. Promotion waits for fresh 48-day qualification. Focu
 without invariant faults, protection of active work, and policy persistence through
 checkpoint restore and genesis replay. A fresh 48-day construction run is in
 progress; it fails immediately if daily renewal stops releasing.
+
+## Graceful restart at an unsnappable head
+
+A staged restart exposed a separate clock gap: when a controller could not
+serialize, graceful shutdown saved no snapshot and boot replay stopped at the
+last accepted event rather than the actual shutdown tick. An explicit synchronous
+checkpoint now logs a passive `rules` head marker before returning pending.
+Boot replays to that marker without forcing serialization or discarding work.
+Periodic pending retries emit no markers. The real mid-carry regression now uses
+this actual checkpoint path and proves exact engine/kernel restart and continued
+physical progress. A hard crash still resumes from the last durable checkpoint
+and accepted log; this change specifically preserves graceful restart heads.
