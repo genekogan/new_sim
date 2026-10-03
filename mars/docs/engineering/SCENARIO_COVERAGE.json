@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "status": "local-gate-passed-public-acceptance-pending",
+  "status": "accepted-supported-model",
   "inventorySource": "b7128256a196cd0a4a9d7eef422e51d3a9e68d39",
   "selectorSource": "viewer/app/lab/scenarios.ts:SELECTABLE_SCENARIOS",
   "authoredAtUtc": "2026-10-02T14:37:04.420395+00:00",
@@ -31,8 +31,8 @@
     "exactCurrentSourceNativeFullGatePassed": true,
     "exactFunctionalInheritedFocusedUiJourneys": 3,
     "sustainedLivenessProven": 1,
-    "current39Gate": "Historical release39 and release41 proofs remain source-bound. Final clean 043 combined gate passed; release42 publication/public acceptance remain pending.",
-    "countMeaning": "All 63 registrations have exactly named passing mapped tests in clean 043 gate, with per-test methods retained. Public41 completed 111 PASS / 1 FAIL; corrected whole supper journey 3 PASS separately. Full public41 automatic construction passes in YEAR_BUILD_FULL=1 mode. This is not 63 fresh release42 public full-Play passes; final acceptance pending.",
+    "current39Gate": "Historical release39/release41 proof remains source-bound. Exact clean 043 gate passed; release42 supported checkpoint published and verified, with legacy exclusions and public harness failures retained.",
+    "countMeaning": "All 63 registrations have exactly named passing mapped tests in clean 043 local gate with per-test modes. Verified release42 adds five fresh production journey/liveness PASS cases and four entry PASS; it does not freshly execute 63 public full-Play contracts. Public41 remains 111 PASS / 1 FAIL, repaired supper 3 PASS separate, whole automatic construction inherited from unchanged runtime 00bd and exact 48 JS/CSS.",
     "sustainedLivenessMeaning": "One bounded stress30 witness through tick2017; not indefinite liveness.",
     "reconciledAtSource": "c09a8bf77fe909c7639aabc089375be81fec63bc",
     "alphaRecordedPassedScenarioCount": 37,
@@ -62,7 +62,7 @@
     },
     "nativeFullGateFunctionalSource": "043957e8a061868836eacd811d2651e8589bad7d",
     "verifiedGateSourceNativeFullGatePassed": true,
-    "currentRepairCandidateGate": "GREEN at exact clean 043; all nine stages PASS, repaired supper included. Metadata-only follow-up does not constitute a fresh gate at its own future commit.",
+    "currentRepairCandidateGate": "GREEN at exact clean 043; reviewed supper observation repair included. Metadata follow-ups inherit source-bound gate, not a new execution at their commits.",
     "completedPublic41": {
       "source": "00bd041a11c0fe1fe49fba8ca710913f519a24de",
       "proofRef": "alphaPublic41Completed",
@@ -73,6 +73,23 @@
       "repairedSupperProofRef": "alphaSupperPublicRepeat043",
       "repairedSupperPassed": 3,
       "meaning": "Separate completed native receipts, not a rewritten cohort outcome."
+    },
+    "acceptedPublication": {
+      "status": "accepted-supported-model",
+      "release": 42,
+      "source": "043957e8a061868836eacd811d2651e8589bad7d",
+      "proofRef": "alphaRelease42Verified",
+      "version": "28055d72-9268-4e46-90c5-6066416304fc",
+      "rollbackVersion": "9596510b-336a-4519-8dca-5f862acde364",
+      "verifiedAt": "2026-10-03T04:25:20.197240+00:00",
+      "freshEntryPassed": 4,
+      "freshProductionJourneysPassed": 3,
+      "freshRealPresetLivenessPassed": 2,
+      "retainedDevFixtureHarnessFailed": 4,
+      "rootInspectedCaptures": 17,
+      "generatedCaptures": 44,
+      "public41PresetsWithoutExactMappedJourneyProof": 22,
+      "meaning": "Fresh42 covers both living-day castings, supper, incomplete-stairs and stress30. The 22 public41 gaps remain source-era distinctions; all 63 have separate clean local mapped contract proof."
     }
   },
   "proofKinds": [
@@ -596,6 +613,132 @@
         "sha256": "0899ff7ddaeaaa4843c5e580c7b23bec50b267c6c5aefffc7e28ba430df64364"
       },
       "proofScopeNotes": "Same original whole supper journey, three serial actual UI Play repetitions, no retries, after atomic pause at unchanged supported-return predicate. Original 111 PASS / 1 FAIL public cohort remains RED; these 3 PASS are separate evidence. Clean043 combined gate separately passes repaired test. No final42 public acceptance claimed."
+    },
+    "alphaRelease42Verified": {
+      "kind": "source-bound-supported-publication",
+      "source": "043957e8a061868836eacd811d2651e8589bad7d",
+      "release": 42,
+      "version": "28055d72-9268-4e46-90c5-6066416304fc",
+      "rollbackVersion": "9596510b-336a-4519-8dca-5f862acde364",
+      "verifiedAt": "2026-10-03T04:25:20.197240+00:00",
+      "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/release42-network-receipt.json",
+      "sha256": "763f558eb0e5c6076cfac0e412ecaa285d80444351101c3c9b35a1613f06aac8",
+      "supportingReceipts": [
+        {
+          "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-entry-public-results.json",
+          "sha256": "cc3512a8c43c9c87685dea2bbdd70bab3c13ffbcbecbf24d15c34161b2c0fe65"
+        },
+        {
+          "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-critical-results.json",
+          "sha256": "7e9d0101b04ff774f0a045fa19fe5f4222bbc89a7588ff2f5fc3c03ac3a2c0da"
+        },
+        {
+          "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-public-liveness-results.json",
+          "sha256": "a35c226e87be8e7455b706c6cc59c07b6a5980851b75a1354a1babd9dfccfc8c"
+        },
+        {
+          "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-public-harness-diagnosis.json",
+          "sha256": "cfbed202ae8858b2a3eb8360328c5a93da315b26562942263a9d7e3644bd23dd"
+        },
+        {
+          "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-entry-capture-review.json",
+          "sha256": "9ece2611163f30bf6eb3964360c1d77bec85db8287a1d2c70ce3370559157a9a"
+        },
+        {
+          "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-critical-capture-review.json",
+          "sha256": "14a282ce9cf5a83202ee7da637d1931fab47f5571e144c69c0076ea4b7e2afd1"
+        },
+        {
+          "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-liveness-capture-review.json",
+          "sha256": "4794e1e1a3a598e5299448d262f614ffb78dc5081291d1ebaa0f052851df0a1e"
+        },
+        {
+          "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-public-byte-receipt.json",
+          "sha256": "2e942314237f31acf0b0486466a603fdc2b07831a8d7bbe3eb50b43814b6fe7b"
+        },
+        {
+          "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-guide-replay-bytes.json",
+          "sha256": "5ef6a62dde19347d5e847e68c12d80fe2078ff578bcc3edf65775d7559e0017c"
+        },
+        {
+          "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-model-head-encodings.json",
+          "sha256": "5e83a129f0360697ab3d67a9e46f7bd5f2458ccd55f14f08576b59193c64a5d6"
+        },
+        {
+          "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-http.log",
+          "sha256": "53392a53e7ba86c41259a657daf5c484e786102ae1fdc69e26804e987aa93500"
+        },
+        {
+          "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-mcp.log",
+          "sha256": "135fad9c8547129a5c889c61bf9b41dc8f3d81d94f49c13a0f391146488ab5be"
+        },
+        {
+          "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-director.log",
+          "sha256": "8306d6583d536dc28aa5e82c7ea81582f2bcfcefd54303a5c7ba3781e97fedbb"
+        },
+        {
+          "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-live-status.log",
+          "sha256": "519ab4e030824ff28ec898ff9d4b61de0bc8db27409754c32595882391180de8"
+        },
+        {
+          "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-predeploy-status.log",
+          "sha256": "bafedabba7cae87e4f577ebc381c10d11ad6492ca76004e9b2140f25694ecc52"
+        },
+        {
+          "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-build-receipt.json",
+          "sha256": "f5845a7c630980d519335af2983da0546cceec4380db9f4eacbf4fd05ebed0e1"
+        },
+        {
+          "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-deploy.log",
+          "sha256": "69da082a1c4889bc3beeaf13b53e68a33347bbc5fa8b245fdd130087ba898480"
+        },
+        {
+          "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-upload.log",
+          "sha256": "ef6e35269e258d9e46dafad8f61aff001b3844849d497e8342d5be5aa0adb3e1"
+        }
+      ],
+      "proofScopeNotes": "Verified supported Mars World v1 alpha. Exact clean 043 all 63 local mapped contracts plus explicitly inherited public41/runtime 00bd evidence; not 63 fresh public42 full-Play journeys. Fresh42 entry 4 PASS, production critical 3 PASS alongside retained 4 dev-source-import fixture failures, separate real preset liveness 2 PASS. Root inspected17 representative PNGs of 44; no acceptance of undisplayed captures. HTTP 522 assets / 24 routes,48 exact JS/CSS plus guide/replay,36 MCP/security and public director 9 steps per root source-bound receipt. Legacy exclusions remain unproved."
+    },
+    "alphaPublic42Critical": {
+      "kind": "native-public-focused-browser",
+      "source": "043957e8a061868836eacd811d2651e8589bad7d",
+      "release": 42,
+      "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-critical-results.json",
+      "sha256": "7e9d0101b04ff774f0a045fa19fe5f4222bbc89a7588ff2f5fc3c03ac3a2c0da",
+      "result": {
+        "startTime": "2026-10-03T04:16:43.017Z",
+        "duration": 182695.998,
+        "expected": 3,
+        "skipped": 0,
+        "unexpected": 4,
+        "flaky": 0
+      },
+      "proofScopeNotes": "Production supper and both living-day castings pass actual UI Play. Four dev-only source-import fixture native failures retained in the same RED report; no passing public synthetic fault/isolation proof.",
+      "exactPassingTestRefs": [
+        "t003",
+        "t004",
+        "t273"
+      ]
+    },
+    "alphaPublic42Liveness": {
+      "kind": "native-public-focused-browser",
+      "source": "043957e8a061868836eacd811d2651e8589bad7d",
+      "release": 42,
+      "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-public-liveness-results.json",
+      "sha256": "a35c226e87be8e7455b706c6cc59c07b6a5980851b75a1354a1babd9dfccfc8c",
+      "result": {
+        "startTime": "2026-10-03T04:20:14.345Z",
+        "duration": 40034.675,
+        "expected": 2,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "proofScopeNotes": "Separate real selectable incomplete-stairs named-refusal/usable-world and stress30 sustained-retargeting actual UI Play PASS; bounded, not indefinite liveness.",
+      "exactPassingTestRefs": [
+        "alpha-preset-incomplete-stairs",
+        "alpha-preset-stress-30"
+      ]
     }
   },
   "tests": {
@@ -626,7 +769,8 @@
         "gate38",
         "alphaCombinedGate41",
         "alphaCombinedGate043",
-        "alphaPublic41Completed"
+        "alphaPublic41Completed",
+        "alphaPublic42Critical"
       ]
     },
     "t004": {
@@ -641,7 +785,8 @@
         "gate38",
         "alphaCombinedGate41",
         "alphaCombinedGate043",
-        "alphaPublic41Completed"
+        "alphaPublic41Completed",
+        "alphaPublic42Critical"
       ]
     },
     "t005": {
@@ -1544,7 +1689,8 @@
         "focused39",
         "alphaCombinedGate41",
         "alphaCombinedGate043",
-        "alphaSupperPublicRepeat043"
+        "alphaSupperPublicRepeat043",
+        "alphaPublic42Critical"
       ]
     },
     "t274": {
@@ -3102,7 +3248,8 @@
         "alpha40",
         "alphaCombinedGate41",
         "alphaCombinedGate043",
-        "alphaPublic41Completed"
+        "alphaPublic41Completed",
+        "alphaPublic42Liveness"
       ],
       "nativeResults": [
         {
@@ -3137,7 +3284,8 @@
         "alpha40",
         "alphaCombinedGate41",
         "alphaCombinedGate043",
-        "alphaPublic41Completed"
+        "alphaPublic41Completed",
+        "alphaPublic42Liveness"
       ],
       "nativeResults": [
         {
@@ -4448,7 +4596,7 @@
       "setupNotes": [],
       "contractRef": "living-day",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t003"
       ],
@@ -4462,9 +4610,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "priorMissingProofAtInventory": [
@@ -4472,6 +4620,10 @@
       ],
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
+        "t003"
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified",
+      "freshPublic42PassingTestRefs": [
         "t003"
       ]
     },
@@ -4491,7 +4643,7 @@
       "setupNotes": [],
       "contractRef": "living-day",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t004"
       ],
@@ -4505,9 +4657,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "priorMissingProofAtInventory": [
@@ -4515,6 +4667,10 @@
       ],
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
+        "t004"
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified",
+      "freshPublic42PassingTestRefs": [
         "t004"
       ]
     },
@@ -4533,7 +4689,7 @@
       "setupNotes": [],
       "contractRef": "garden-circuit",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t276",
         "t277"
@@ -4545,9 +4701,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "priorMissingProofAtInventory": [
@@ -4557,7 +4713,8 @@
       "public41PassingTestRefs": [
         "t276",
         "t277"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "communal-supper",
@@ -4574,7 +4731,7 @@
       "setupNotes": [],
       "contractRef": "communal-supper",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t273",
         "t274",
@@ -4587,9 +4744,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "priorMissingProofAtInventory": [
@@ -4600,7 +4757,11 @@
         "t274",
         "t275"
       ],
-      "public41RepairedJourneyProofRef": "alphaSupperPublicRepeat043"
+      "public41RepairedJourneyProofRef": "alphaSupperPublicRepeat043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified",
+      "freshPublic42PassingTestRefs": [
+        "t273"
+      ]
     },
     {
       "id": "room-preparation",
@@ -4617,7 +4778,7 @@
       "setupNotes": [],
       "contractRef": "room-preparation",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t281",
         "t282",
@@ -4630,9 +4791,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "priorMissingProofAtInventory": [
@@ -4643,7 +4804,8 @@
         "t281",
         "t282",
         "t283"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "garden-afternoon",
@@ -4660,7 +4822,7 @@
       "setupNotes": [],
       "contractRef": "garden-afternoon",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t019"
       ],
@@ -4673,15 +4835,16 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "garden-afternoon-rotated",
@@ -4698,7 +4861,7 @@
       "setupNotes": [],
       "contractRef": "garden-afternoon",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t020"
       ],
@@ -4711,15 +4874,16 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "seed-planting",
@@ -4737,7 +4901,7 @@
       "setupNotes": [],
       "contractRef": "seed-planting",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t030"
       ],
@@ -4750,9 +4914,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
@@ -4761,7 +4925,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "t030"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "seed-planting-rotated",
@@ -4779,7 +4944,7 @@
       "setupNotes": [],
       "contractRef": "seed-planting",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t031"
       ],
@@ -4792,9 +4957,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "proofRefs": [
@@ -4806,7 +4971,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "t031"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "reading-circle",
@@ -4823,7 +4989,7 @@
       "setupNotes": [],
       "contractRef": "reading-circle",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t028"
       ],
@@ -4837,15 +5003,16 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "reading-circle-rotated",
@@ -4862,7 +5029,7 @@
       "setupNotes": [],
       "contractRef": "reading-circle",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t029"
       ],
@@ -4876,15 +5043,16 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "gallery-tour",
@@ -4901,7 +5069,7 @@
       "setupNotes": [],
       "contractRef": "gallery-tour",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t017",
         "alpha-gallery-tour-natural"
@@ -4916,9 +5084,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "latestAlphaProofRef": "alpha40",
@@ -4928,7 +5096,8 @@
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "gallery-tour-short",
@@ -4945,7 +5114,7 @@
       "setupNotes": [],
       "contractRef": "gallery-tour",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t018"
       ],
@@ -4959,15 +5128,16 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "table-cleanup",
@@ -4984,7 +5154,7 @@
       "setupNotes": [],
       "contractRef": "table-cleanup",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t013",
         "t014"
@@ -4998,15 +5168,16 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "table-cleanup-rotated",
@@ -5023,7 +5194,7 @@
       "setupNotes": [],
       "contractRef": "table-cleanup",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t015",
         "t016"
@@ -5037,15 +5208,16 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "creative-afternoon",
@@ -5062,7 +5234,7 @@
       "setupNotes": [],
       "contractRef": "creative-afternoon",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t012"
       ],
@@ -5075,15 +5247,16 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "art-sharing",
@@ -5100,7 +5273,7 @@
       "setupNotes": [],
       "contractRef": "art-sharing",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t011"
       ],
@@ -5113,15 +5286,16 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "drawing-work",
@@ -5138,7 +5312,7 @@
       "setupNotes": [],
       "contractRef": "drawing-work",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t008"
       ],
@@ -5149,15 +5323,16 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "group-warmup",
@@ -5174,7 +5349,7 @@
       "setupNotes": [],
       "contractRef": "group-warmup",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t009"
       ],
@@ -5187,15 +5362,16 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "open-jam",
@@ -5213,7 +5389,7 @@
       "setupNotes": [],
       "contractRef": "open-jam",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t010"
       ],
@@ -5226,15 +5402,16 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "garden-care",
@@ -5252,7 +5429,7 @@
       "setupNotes": [],
       "contractRef": "garden-care",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t002",
         "alpha-garden-care-full"
@@ -5266,9 +5443,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "latestAlphaProofRef": "alpha40",
@@ -5278,7 +5455,8 @@
       "priorMissingProofAtInventory": [
         "Exact033f8cb combined gate/public alpha acceptance remains unproved; recorded candidate journey PASS is not all63 certification."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "music-dance",
@@ -5296,7 +5474,7 @@
       "setupNotes": [],
       "contractRef": "music-dance",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t005"
       ],
@@ -5307,15 +5485,16 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "classroom-4",
@@ -5332,7 +5511,7 @@
       "setupNotes": [],
       "contractRef": "classroom",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t052",
         "alpha-manual-classroom-4"
@@ -5349,9 +5528,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "latestAlphaProofRef": "alpha107",
@@ -5364,7 +5543,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-manual-classroom-4"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "classroom-8",
@@ -5381,7 +5561,7 @@
       "setupNotes": [],
       "contractRef": "classroom",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t053",
         "alpha-manual-classroom-8"
@@ -5398,9 +5578,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "latestAlphaProofRef": "alpha107",
@@ -5413,7 +5593,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-manual-classroom-8"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "work-break-4",
@@ -5435,7 +5616,7 @@
       "setupNotes": [],
       "contractRef": "work-break",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t262",
         "alpha-manual-work-break-4"
@@ -5449,9 +5630,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "latestAlphaProofRef": "alpha107",
@@ -5464,7 +5645,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-manual-work-break-4"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "work-break-8",
@@ -5488,7 +5670,7 @@
       ],
       "contractRef": "work-break",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t263",
         "alpha-manual-work-break-8"
@@ -5502,9 +5684,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "connected",
       "latestAlphaProofRef": "alpha107",
@@ -5517,7 +5699,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-manual-work-break-8"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "prepared-day-4",
@@ -5538,7 +5721,7 @@
       "setupNotes": [],
       "contractRef": "prepared-day",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t116",
         "alpha-manual-prepared-day-4"
@@ -5553,9 +5736,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "supplementaryProofRefs": [
         "public35"
       ],
@@ -5571,7 +5754,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-manual-prepared-day-4"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "prepared-day-8",
@@ -5594,7 +5778,7 @@
       ],
       "contractRef": "prepared-day",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t117",
         "alpha-manual-prepared-day-8"
@@ -5609,9 +5793,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "supplementaryProofRefs": [
         "public35"
       ],
@@ -5627,7 +5811,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-manual-prepared-day-8"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "prepared-day-studio",
@@ -5648,7 +5833,7 @@
       "setupNotes": [],
       "contractRef": "prepared-day",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t118",
         "alpha-manual-prepared-day-studio"
@@ -5663,9 +5848,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "supplementaryProofRefs": [
         "public35"
       ],
@@ -5681,7 +5866,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-manual-prepared-day-studio"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "quiet-reading",
@@ -5698,7 +5884,7 @@
       "setupNotes": [],
       "contractRef": "quiet-reading",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t145"
       ],
@@ -5709,15 +5895,16 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "computer-music",
@@ -5735,7 +5922,7 @@
       "setupNotes": [],
       "contractRef": "computer-music",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t104"
       ],
@@ -5748,15 +5935,16 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "tabletop-chess",
@@ -5774,7 +5962,7 @@
       "setupNotes": [],
       "contractRef": "tabletop-chess",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t044",
         "t045"
@@ -5786,15 +5974,16 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "design-studio",
@@ -5815,7 +6004,7 @@
       "setupNotes": [],
       "contractRef": "design-studio",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t059",
         "t060",
@@ -5831,9 +6020,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "supplementaryProofRefs": [
         "public35"
       ],
@@ -5849,7 +6038,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-manual-design-studio"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "ground-sleep",
@@ -5866,7 +6056,7 @@
       "setupNotes": [],
       "contractRef": "sleep",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t214"
       ],
@@ -5881,9 +6071,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "supplementaryProofRefs": [
         "public35"
       ],
@@ -5892,7 +6082,8 @@
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "ground-sleep-rotated",
@@ -5909,7 +6100,7 @@
       "setupNotes": [],
       "contractRef": "sleep",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t215"
       ],
@@ -5924,9 +6115,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "supplementaryProofRefs": [
         "public35"
       ],
@@ -5935,7 +6126,8 @@
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "cold-preparation",
@@ -5952,7 +6144,7 @@
       "setupNotes": [],
       "contractRef": "preparation",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t114"
       ],
@@ -5963,15 +6155,16 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "cold-preparation-rotated",
@@ -5988,7 +6181,7 @@
       "setupNotes": [],
       "contractRef": "preparation",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t115"
       ],
@@ -5999,15 +6192,16 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "activities",
       "priorMissingProofAtInventory": [
         "Current b712 combined execution unproved; historical5f proof cannot be blanket inherited across changed shared-food/registry/UI."
       ],
-      "latestCombinedProofRef": "alphaCombinedGate043"
+      "latestCombinedProofRef": "alphaCombinedGate043",
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "wall",
@@ -6024,7 +6218,7 @@
       "setupNotes": [],
       "contractRef": "wall",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t083",
         "alpha-preset-wall"
@@ -6036,9 +6230,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6051,7 +6245,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-wall"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "u-trap",
@@ -6068,7 +6263,7 @@
       "setupNotes": [],
       "contractRef": "u-trap",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t084",
         "alpha-preset-u-trap"
@@ -6080,9 +6275,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6095,7 +6290,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-u-trap"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "narrow-passage",
@@ -6112,7 +6308,7 @@
       "setupNotes": [],
       "contractRef": "narrow-passage",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t085",
         "t093",
@@ -6125,9 +6321,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6140,7 +6336,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-narrow-passage"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "stairs",
@@ -6157,7 +6354,7 @@
       "setupNotes": [],
       "contractRef": "stairs",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t086",
         "t090",
@@ -6172,9 +6369,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6187,7 +6384,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-stairs"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "deck-to-ground",
@@ -6204,7 +6402,7 @@
       "setupNotes": [],
       "contractRef": "deck-to-ground",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t087",
         "t092",
@@ -6217,9 +6415,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6232,7 +6430,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-deck-to-ground"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "incomplete-stairs",
@@ -6249,7 +6448,7 @@
       "setupNotes": [],
       "contractRef": "incomplete-stairs",
       "coverageGrade": "recorded-exact-diagnostic",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t088",
         "alpha-preset-incomplete-stairs"
@@ -6261,9 +6460,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "diagnostics",
       "latestAlphaProofRef": "alpha40",
@@ -6275,6 +6474,10 @@
       ],
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
+        "alpha-preset-incomplete-stairs"
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified",
+      "freshPublic42PassingTestRefs": [
         "alpha-preset-incomplete-stairs"
       ]
     },
@@ -6293,7 +6496,7 @@
       "setupNotes": [],
       "contractRef": "construction",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t089",
         "alpha-preset-construction"
@@ -6307,9 +6510,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha731",
@@ -6322,7 +6525,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-construction"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "trio",
@@ -6339,7 +6543,7 @@
       "setupNotes": [],
       "contractRef": "trio",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t095",
         "alpha-preset-trio"
@@ -6351,9 +6555,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6366,7 +6570,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-trio"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "stress-30",
@@ -6383,7 +6588,7 @@
       "setupNotes": [],
       "contractRef": "stress",
       "coverageGrade": "recorded-ui-play-bounded-liveness",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t095",
         "alpha-preset-stress-30"
@@ -6404,9 +6609,9 @@
         "limits": "Through100.85 simulated seconds only; no indefinite fairness/starvation guarantee."
       },
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "continuous",
       "latestAlphaProofRef": "alpha40",
@@ -6418,6 +6623,10 @@
       ],
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
+        "alpha-preset-stress-30"
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified",
+      "freshPublic42PassingTestRefs": [
         "alpha-preset-stress-30"
       ]
     },
@@ -6436,7 +6645,7 @@
       "setupNotes": [],
       "contractRef": "build-bay",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t071",
         "t072",
@@ -6453,9 +6662,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6468,7 +6677,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-build-bay"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "hand-up",
@@ -6485,7 +6695,7 @@
       "setupNotes": [],
       "contractRef": "hand-up",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t109",
         "t110",
@@ -6499,9 +6709,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha731",
@@ -6514,7 +6724,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-hand-up"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "prone",
@@ -6531,7 +6742,7 @@
       "setupNotes": [],
       "contractRef": "prone",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t128",
         "t130",
@@ -6545,9 +6756,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6560,7 +6771,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-prone"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "prone-forks",
@@ -6577,7 +6789,7 @@
       "setupNotes": [],
       "contractRef": "prone-forks",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t129",
         "alpha-preset-prone-forks"
@@ -6589,9 +6801,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6604,7 +6816,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-prone-forks"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "campfire-evening",
@@ -6621,7 +6834,7 @@
       "setupNotes": [],
       "contractRef": "campfire-evening",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t075",
         "alpha-preset-campfire-evening"
@@ -6633,9 +6846,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha731",
@@ -6648,7 +6861,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-campfire-evening"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "meal",
@@ -6665,7 +6879,7 @@
       "setupNotes": [],
       "contractRef": "meal",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t101",
         "t102",
@@ -6681,9 +6895,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha731",
@@ -6696,7 +6910,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-meal"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "body",
@@ -6713,7 +6928,7 @@
       "setupNotes": [],
       "contractRef": "body",
       "coverageGrade": "recorded-still-probe",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t035",
         "t036",
@@ -6733,9 +6948,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "probes",
       "latestAlphaProofRef": "alphaCore",
@@ -6771,7 +6986,8 @@
         "t037",
         "alpha-body-1",
         "alpha-body-2"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "year-2020",
@@ -6788,7 +7004,7 @@
       "setupNotes": [],
       "contractRef": "year-2020",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t076",
         "alpha-preset-year-2020"
@@ -6800,9 +7016,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha731",
@@ -6815,7 +7031,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-year-2020"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "year-2021",
@@ -6832,7 +7049,7 @@
       "setupNotes": [],
       "contractRef": "year-2021",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t077",
         "alpha-preset-year-2021"
@@ -6844,9 +7061,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6859,7 +7076,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-year-2021"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "year-2022",
@@ -6876,7 +7094,7 @@
       "setupNotes": [],
       "contractRef": "year-2022",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t078",
         "alpha-preset-year-2022"
@@ -6888,9 +7106,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6903,7 +7121,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-year-2022"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "year-2023",
@@ -6920,7 +7139,7 @@
       "setupNotes": [],
       "contractRef": "year-2023",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t079",
         "alpha-preset-year-2023"
@@ -6932,9 +7151,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6947,7 +7166,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-year-2023"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "year-2024",
@@ -6964,7 +7184,7 @@
       "setupNotes": [],
       "contractRef": "year-2024",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t080",
         "alpha-preset-year-2024"
@@ -6976,9 +7196,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -6991,7 +7211,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-year-2024"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "year-2025",
@@ -7008,7 +7229,7 @@
       "setupNotes": [],
       "contractRef": "year-2025",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t081",
         "alpha-preset-year-2025"
@@ -7020,9 +7241,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alpha40",
@@ -7035,7 +7256,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-year-2025"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "year-2026",
@@ -7052,7 +7274,7 @@
       "setupNotes": [],
       "contractRef": "year-2026",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t082",
         "alpha-preset-year-2026"
@@ -7064,9 +7286,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alphaYear2026",
@@ -7079,7 +7301,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-year-2026"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "year-build-2022",
@@ -7096,7 +7319,7 @@
       "setupNotes": [],
       "contractRef": "year-build",
       "coverageGrade": "recorded-actual-ui-play-supported-layout",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t006",
         "t268",
@@ -7116,9 +7339,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "construction",
       "latestAlphaProofRef": "alphaYearBuildFull",
@@ -7132,7 +7355,8 @@
       "public41PassingTestRefs": [
         "t006",
         "alpha-year-build-2022-full"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "year-build-2022-house",
@@ -7149,7 +7373,7 @@
       "setupNotes": [],
       "contractRef": "year-build",
       "coverageGrade": "recorded-actual-ui-play-supported-layout",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t007",
         "t269",
@@ -7169,9 +7393,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "construction",
       "latestAlphaProofRef": "alphaYearBuildFull",
@@ -7185,7 +7409,8 @@
       "public41PassingTestRefs": [
         "t007",
         "alpha-year-build-2022-house-full"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     },
     {
       "id": "solar-paint",
@@ -7202,7 +7427,7 @@
       "setupNotes": [],
       "contractRef": "solar-paint",
       "coverageGrade": "recorded-actual-ui-play",
-      "currentSourceProofRelationship": "exact-clean 043-gate-passed; public41 evidence source-bound/inherited; final42-public-acceptance-pending",
+      "currentSourceProofRelationship": "exact-clean 043-local-gate and verified-supported-release42; public41 inheritance explicit; not 63freshpublicPlay",
       "testRefs": [
         "t216",
         "alpha-preset-solar-paint"
@@ -7214,9 +7439,9 @@
       "nodeFixtureExecutionIsNotUiPlay": true,
       "sustainedLiveness": null,
       "missingProof": [
-        "Final release42 published-source HTTP/MCP/byte and critical actual Play verification/acceptance remain pending. Separate public41 cohort 111 PASS / 1 FAIL and repaired supper 3 PASS are not a fresh all 63 release42 public gate. Per-test methods and legacy exclusions remain explicit."
+        "No fresh public full-Play execution of every selectable contract is claimed. Exact per-test methods, public41 mapping gaps and unproved legacy guarantees remain distinct from supported release42 acceptance."
       ],
-      "boundedNextTest": "Complete root-owned final release42 public verification; preserve exact source inheritance and original failed/skipped evidence.",
+      "boundedNextTest": "Preserve bounded supported release42 acceptance and source-bound evidence; future changes require their own focused proof.",
       "coverageGradeIsHistoricalUnlessExplicitFunctionalInheritance": true,
       "discoveryGroup": "scripted",
       "latestAlphaProofRef": "alphaSolarTexture",
@@ -7229,7 +7454,8 @@
       "latestCombinedProofRef": "alphaCombinedGate043",
       "public41PassingTestRefs": [
         "alpha-preset-solar-paint"
-      ]
+      ],
+      "acceptedPublicationProofRef": "alphaRelease42Verified"
     }
   ],
   "unprovedLegacyChecks": {
@@ -7537,14 +7763,40 @@
         "status": "three public repaired journey repetitions PASS and clean 043 combined gate PASS; original failure retained",
         "finalPublicAcceptance": "pending-release42"
       }
+    },
+    {
+      "source": "043957e8a061868836eacd811d2651e8589bad7d",
+      "release": 42,
+      "receipt": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-critical-results.json",
+      "sha256": "7e9d0101b04ff774f0a045fa19fe5f4222bbc89a7588ff2f5fc3c03ac3a2c0da",
+      "result": {
+        "startTime": "2026-10-03T04:16:43.017Z",
+        "duration": 182695.998,
+        "expected": 3,
+        "skipped": 0,
+        "unexpected": 4,
+        "flaky": 0
+      },
+      "failedCases": [
+        "alpha actual Play: empty terminal script retains a usable world and independent ordinary walk",
+        "alpha actual Play: refusal terminal script retains a usable world and independent ordinary walk",
+        "alpha actual Play: real reading child failure keeps explanation, cleanup and unrelated movement",
+        "alpha actual Play: genuine invalid fixture visibly halts, then explicit fresh valid Reset restores clock"
+      ],
+      "diagnosis": {
+        "path": "<mars-worktrees>/world-alpha-final-validation/viewer/.cloudflare/alpha-final-public-harness-diagnosis.json",
+        "sha256": "cfbed202ae8858b2a3eb8360328c5a93da315b26562942263a9d7e3644bd23dd"
+      },
+      "cause": "Dev-only fixtures import unpublished /app/lab/scenarios.ts and /engine/*.ts before fixture creation; secondary undefined fixture.inspect. Production bundled runtime intentionally does not serve these source modules. Native 4 FAIL retained; exact clean local043 Vite fixture PASS remains separate.",
+      "status": "retained native public harness failures; no public synthetic fixture proof; supported model accepted using separate real selectable native liveness proof"
     }
   ],
   "topGaps": [
-    "Final release42 published-source HTTP/MCP/byte and critical actual Play acceptance pending; root owns publication.",
-    "Public41 cohort remains 111 PASS / 1 FAIL; repaired supper 3 PASS and clean 043 gate are separate source-bound receipts, not an all 63 fresh public42 gate.",
-    "Bounded sustained stress through 2017 ticks is not indefinite fairness/starvation proof.",
-    "Legacy 7 browser SKIP, 6 engine SKIP and 11 TODO remain unproved; original visual/functional failures and historical t035 stop-at-budget proof retained.",
-    "Root reports final42 focused harness included four dev-only liveness fixtures importing unpublished source modules; native failures are retained, with no runtime defect inferred. Public synthetic-fixture proof is not claimed; exact clean 043 local Vite proof remains separate."
+    "Supported release42 accepted; all 63 local mapped contracts are not 63 fresh public full-Play passes. Twenty-two presets lack exact mapped public41 journey proof; fresh42 adds only living-day4/studio, supper, incomplete-stairs and stress30.",
+    "Four dev-source-import public harness FAILs remain retained; synthetic failure/isolation public proof unestablished. Exact clean 043 local fixtures and separate real selectable public liveness PASS are distinct.",
+    "Legacy 7 browser SKIP / 6 engine SKIP / 11 TODO and original historical fine-pose/pin guarantees remain unproved.",
+    "Bounded stress through 2017 ticks does not prove indefinite fairness/starvation/memory plateau or production CPU.",
+    "Root inspected 17 of  44 generated final captures; undisplayed captures are not visually accepted. Identity-encoded model HEAD length remains null; Brotli/range evidence is separate."
   ],
   "schemaNotes": {
     "contracts": "Supported semantic contracts and listed disruptions are bounded to named tests; not all disruptions use UI Play. Consult each test method.",
@@ -7553,7 +7805,8 @@
     "category": "Conditional construction means source/layout admission is checked before actions. Both current2022 profiles completed public38; refused unsupported layouts remain distinct.",
     "registration": "One row and declared contract/test mapping are required for every SELECTABLE_SCENARIOS registration. Generated UI metadata is checked against this inventory in the ordinary engine test path. Authored mappings do not establish executed proof.",
     "generatedContractStatus": "Consumer contract fields unchanged; lightweight scenario-contracts --check validates exact generated parity on this metadata follow-up.",
-    "finalSourceInheritance": "Exact clean 043 local gate PASS; direct Git diff confirms app/engine/simulation unchanged 00bd\u2192043. Root verified all 48 built JS/CSS identical; public41 PASS rows inherited only with exact native basename/title and mode. Atomic-pause supper test-only repair is verified separately 3 public PASS and clean 043gate. Final42 published-source verification/acceptance pending."
+    "finalSourceInheritance": "Verified release42 source 043 supported checkpoint; unchanged app/engine/simulation 00bd\u2192043 and 48 exact built JS/CSS preserve bounded public41 inheritance. No 63 fresh public full-Play claim; native 111 PASS / 1 FAIL, repaired 3 PASS, fresh42critical 3 PASS4harnessFAIL and selectableliveness 2 PASS remain separate. Earlier pending notes in historical proof/failure records describe their recorded checkpoint; alphaRelease42Verified supplies final acceptance.",
+    "acceptedSourceInheritance": "Verified release42 source 043 supported checkpoint; unchanged app/engine/simulation 00bd\u2192043 and 48 exact built JS/CSS preserve bounded public41 inheritance. No 63 fresh public full-Play claim; native 111 PASS / 1 FAIL, repaired 3 PASS, fresh42critical 3 PASS4harnessFAIL and selectableliveness 2 PASS remain separate. Earlier pending notes in historical proof/failure records describe their recorded checkpoint; alphaRelease42Verified supplies final acceptance."
   },
   "discoveryGroups": [
     {
