@@ -1,0 +1,175 @@
+{
+  "status": "planning arithmetic only; no measured model or runtime performance",
+  "researched_at": "2026-10-04 UTC / 2026-10-03 EDT",
+  "proposed_ceiling_usd_per_world_rolling_24h": 2,
+  "runtime_settings_changed": false,
+  "world_days_per_real_24h_assumed": 24,
+  "jev_input_tokens_per_evaluation_assumed": 1500,
+  "gen_cache_assumption": "uncached input; GPT-6 Luna explicit-only without breakpoints; no reasoning tokens; Haiku compiler uses worst-case all 5m cache-write input",
+  "cache_or_batch_or_subscription_savings_assumed": false,
+  "planning_margin": 0.2,
+  "prices": {
+    "jev": {
+      "input_per_million": 0.042,
+      "output_per_million": 0
+    },
+    "gpt-6-luna": {
+      "input_per_million": 0.1,
+      "cache_read_per_million": 0.01,
+      "cache_write_per_million": 0.125,
+      "output_per_million": 0.5
+    },
+    "claude-haiku-4-5": {
+      "input_per_million": 1,
+      "cache_read_per_million": 0.1,
+      "cache_write_5m_per_million": 1.25,
+      "output_per_million": 5
+    },
+    "claude-sonnet-5-5": {
+      "input_per_million": 2,
+      "output_per_million": 10
+    }
+  },
+  "sources": {
+    "jev": "https://docs.typesafe.ai/models",
+    "openai": "https://developers.openai.com/api/docs/pricing",
+    "claude": "https://platform.claude.com/docs/en/about-claude/pricing"
+  },
+  "shared_workload": [
+    {
+      "kind": "dialogue",
+      "calls": 800,
+      "input": 1200,
+      "output": 180,
+      "model": "gpt-6-luna",
+      "input_rate": 0.1,
+      "output_rate": 0.5,
+      "estimated_usd": 0.168
+    },
+    {
+      "kind": "scene",
+      "calls": 144,
+      "input": 3000,
+      "output": 450,
+      "model": "gpt-6-luna",
+      "input_rate": 0.1,
+      "output_rate": 0.5,
+      "estimated_usd": 0.0756
+    },
+    {
+      "kind": "compiler",
+      "calls": 10,
+      "input": 6500,
+      "output": 800,
+      "model": "claude-haiku-4-5",
+      "input_rate": 1.25,
+      "output_rate": 5,
+      "estimated_usd": 0.12125
+    },
+    {
+      "kind": "hard_interpretation",
+      "calls": 12,
+      "input": 3500,
+      "output": 500,
+      "model": "claude-sonnet-5-5",
+      "input_rate": 2,
+      "output_rate": 10,
+      "estimated_usd": 0.144
+    }
+  ],
+  "other_typed_allowance_usd": 0.05,
+  "fixed_usd": 0.55885,
+  "reflection_workload_per_soul": {
+    "calls_per_real_24h": 24,
+    "input_tokens_per_call": 1400,
+    "billed_output_tokens_per_call": 160,
+    "model": "gpt-6-luna",
+    "input_rate_per_million": 0.1,
+    "output_rate_per_million": 0.5
+  },
+  "reflection_per_soul_usd": 0.00528,
+  "formula": "jev = souls * 86400 / mean_interval_seconds * jev_input_tokens * 0.042 / 1000000; total = jev + fixed + souls * reflection_per_soul; planning_total = total * 1.2",
+  "scenarios": [
+    {
+      "souls": 4,
+      "mean_jev_interval_real_seconds": 60,
+      "jev_calls_per_24h": 5760.0,
+      "jev_usd": 0.36288,
+      "reflection_usd": 0.02112,
+      "total_usd": 0.94285,
+      "with_20_percent_margin_usd": 1.13142
+    },
+    {
+      "souls": 7,
+      "mean_jev_interval_real_seconds": 60,
+      "jev_calls_per_24h": 10080.0,
+      "jev_usd": 0.63504,
+      "reflection_usd": 0.03696,
+      "total_usd": 1.23085,
+      "with_20_percent_margin_usd": 1.47702
+    },
+    {
+      "souls": 12,
+      "mean_jev_interval_real_seconds": 90,
+      "jev_calls_per_24h": 11520.0,
+      "jev_usd": 0.72576,
+      "reflection_usd": 0.06336,
+      "total_usd": 1.34797,
+      "with_20_percent_margin_usd": 1.617564
+    },
+    {
+      "souls": 24,
+      "mean_jev_interval_real_seconds": 150,
+      "jev_calls_per_24h": 13824.0,
+      "jev_usd": 0.870912,
+      "reflection_usd": 0.12672,
+      "total_usd": 1.556482,
+      "with_20_percent_margin_usd": 1.8677784
+    },
+    {
+      "souls": 30,
+      "mean_jev_interval_real_seconds": 180,
+      "jev_calls_per_24h": 14400.0,
+      "jev_usd": 0.9072,
+      "reflection_usd": 0.1584,
+      "total_usd": 1.62445,
+      "with_20_percent_margin_usd": 1.94934
+    }
+  ],
+  "context_sensitivity": [
+    {
+      "souls": 12,
+      "jev_input_tokens": 3000,
+      "mean_interval_seconds": 90,
+      "total_with_margin_usd": 2.488476
+    },
+    {
+      "souls": 12,
+      "jev_input_tokens": 3000,
+      "mean_interval_seconds": 150,
+      "total_with_margin_usd": 1.7917464
+    }
+  ],
+  "explicit_google_cache_storage_example": {
+    "tokens_per_cache": 8000,
+    "hours": 24,
+    "storage_rate_per_million_token_hour": 1,
+    "one_cache_usd": 0.192,
+    "thirty_caches_usd": 5.76
+  },
+  "excluded_from_estimate": [
+    "server hosting",
+    "asset generation",
+    "audio synthesis/transcription",
+    "human-owner external-agent costs unknown to host",
+    "embedding service; initial retrieval uses local deterministic/full-text indexes"
+  ],
+  "limits": [
+    "input/output token counts are workload assumptions",
+    "provider/model account access and quality not yet qualified",
+    "retry/failure/cache/storage charges must be reserved against real hard cap",
+    "physical/render capacity at 24 or 30 Souls unmeasured",
+    "all active applicable mandate context retained; larger input lowers paid frequency",
+    "calls are volume caps, not an actor timetable"
+  ]
+}
