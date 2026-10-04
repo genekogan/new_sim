@@ -19,6 +19,7 @@ import { loadMars, type Mars } from './load.ts';
 import { CodecError } from '../../../mars/viewer/engine/runtime/codec.ts';
 import { constructionPlan, unsafeConstruction, type BuildPhase } from './construction.ts';
 import { captureRenderScene, type RenderSceneCaptureV1 } from '@sim/engine-contract';
+import { readNativeGathering } from './gathering-observation.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const TPS = 20;
@@ -413,6 +414,7 @@ export class MarsEngine implements Engine {
       action:{id:r.id as string,verb:r.verb as string,status:r.status as ActionRecord['status'],...(r.phase?{phase:r.phase as string}:{})}};
   }
   bodyResting(actor:string) { const id=this.byActor.get(actor),p=id?this.programs.get(id):undefined; return !!p && p.until!==undefined && p.steps[p.index]?.verb==='rest' && !this.ents[actor]?.human?.task; }
+  gatheringObservation() { return readNativeGathering(this.rt,this.rulesVersion,this.dt); }
   submit(verb: string, params: unknown, opts?: { id?: string; parent?: string; preempt?: boolean }): ActionRecord { return this.rt.submit(verb, params, opts) as ActionRecord; }
   cancel(id: string, reason?: Diag): ActionRecord { return this.rt.cancel(id, reason) as ActionRecord; }
 

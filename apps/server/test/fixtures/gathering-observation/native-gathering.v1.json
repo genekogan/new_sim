@@ -1,0 +1,87 @@
+{
+  "contract": "native-gathering-fixture/1",
+  "stage": "candidate-observation",
+  "scope": "actual native physical fixture with fake bodies; no owner-admission or station proof",
+  "samples": [
+    {
+      "phase": "idle",
+      "observation": {
+        "contract": "native-gathering-observation/1",
+        "sourceRevision": "settled-native-gather-fixtures/1",
+        "tick": 0,
+        "dtSeconds": 0.05,
+        "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+        "situation": "ordinary",
+        "largestCommonTargetMembers": 0
+      }
+    },
+    {
+      "phase": "admitted",
+      "observation": {
+        "contract": "native-gathering-observation/1",
+        "sourceRevision": "settled-native-gather-fixtures/1",
+        "tick": 0,
+        "dtSeconds": 0.05,
+        "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+        "situation": "ordinary",
+        "largestCommonTargetMembers": 0
+      }
+    },
+    {
+      "phase": "settled",
+      "observation": {
+        "contract": "native-gathering-observation/1",
+        "sourceRevision": "settled-native-gather-fixtures/1",
+        "tick": 165,
+        "dtSeconds": 0.05,
+        "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+        "situation": "gathering",
+        "largestCommonTargetMembers": 2
+      }
+    },
+    {
+      "phase": "member-left",
+      "observation": {
+        "contract": "native-gathering-observation/1",
+        "sourceRevision": "settled-native-gather-fixtures/1",
+        "tick": 166,
+        "dtSeconds": 0.05,
+        "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+        "situation": "ordinary",
+        "largestCommonTargetMembers": 1
+      }
+    },
+    {
+      "phase": "cancelled",
+      "observation": {
+        "contract": "native-gathering-observation/1",
+        "sourceRevision": "settled-native-gather-fixtures/1",
+        "tick": 166,
+        "dtSeconds": 0.05,
+        "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+        "situation": "ordinary",
+        "largestCommonTargetMembers": 0
+      }
+    }
+  ],
+  "reconstruction": {
+    "kind": "native-snapshot",
+    "observation": {
+      "contract": "native-gathering-observation/1",
+      "sourceRevision": "settled-native-gather-fixtures/1",
+      "tick": 165,
+      "dtSeconds": 0.05,
+      "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+      "situation": "gathering",
+      "largestCommonTargetMembers": 2
+    },
+    "stateHash": "1dbdb134f105c5be3fdbec2992aa66df0f00b7c6bc69a448ed9bfb088dc5e55a"
+  },
+  "unresolved": [
+    "station-policy-disposition",
+    "durable-cue-clock",
+    "anonymous-HTTP-WS",
+    "recorded-cue-lookup",
+    "two-listener-audio"
+  ]
+}

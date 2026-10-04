@@ -5,6 +5,7 @@ import type { RuntimeEvent } from './runtime.ts';
 import type { WorldState, Vec3 } from './world.ts';
 import type { VerbInfo } from './registry.ts';
 import type { RenderScene,RenderSceneCaptureV1 } from './scene-capture.ts';
+import type { NativeGatheringObservationV1 } from './gathering-observation.ts';
 export type {RenderScene} from './scene-capture.ts';
 
 /** A feasible activity for an actor, params already bound. The brain picks by id only. */
@@ -79,6 +80,9 @@ export interface Engine {
   /** The program an actor is running, if any. */
   programOf(actor: string): string | null;
   programAction?(programId:string): ProgramAction | null;
+  /** Candidate read-only public physical evidence. Native settled gather slots
+   * at fixtures only; no private intent, proximity classifier or music/action admission. */
+  gatheringObservation?(): NativeGatheringObservationV1;
   /** Actual settled body-language rest, distinct from travelling toward it. */
   bodyResting?(actor:string): boolean;
   submit(verb: string, params: unknown, opts?: { id?: string; parent?: string; preempt?: boolean }): ActionRecord;

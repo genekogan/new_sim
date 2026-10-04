@@ -10,4 +10,5 @@ export * from './scene-proposal.ts';
 export * from './scene-capture.ts';
 export * from './terrain.ts';
 export * from './water-geometry.ts';
+export * from './gathering-observation.ts';
 export * from './birth.ts';
