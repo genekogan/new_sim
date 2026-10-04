@@ -88,6 +88,15 @@ export const MIGRATIONS: { id: number; name: string; up(db: DatabaseSync): void 
       PRIMARY KEY(world_id, soul_id, principal_id, request_id)
     )`);
   } },
+  { id: 9, name: 'accepted candidate intent request event references', up(db) {
+    db.exec(`CREATE TABLE intent_request_events_v2 (
+      world_id TEXT NOT NULL, soul_id TEXT NOT NULL, principal_id TEXT NOT NULL, request_id TEXT NOT NULL,
+      seq INTEGER NOT NULL, tick INTEGER NOT NULL, kind TEXT NOT NULL, event_hash TEXT NOT NULL,
+      PRIMARY KEY(world_id,soul_id,principal_id,request_id,seq),
+      FOREIGN KEY(world_id,soul_id,principal_id,request_id) REFERENCES intent_requests_v2(world_id,soul_id,principal_id,request_id),
+      FOREIGN KEY(world_id,seq) REFERENCES events(world_id,seq)
+    )`);
+  } },
 ];
 
 export function migrate(db: DatabaseSync): number[] {

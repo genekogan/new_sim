@@ -5,7 +5,12 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Worker } from 'node:worker_threads';
 import { INTENT_V2 } from '@sim/protocol';
+import { toyFactory } from '@sim/engine-toy';
+import { hashOf } from '@sim/engine-contract';
+import { cardHash, kernelHash, validateCard } from '@sim/kernel';
 import { Db } from './db.ts';
+import { WorldHost, type AcceptanceJournal } from './world.ts';
+import { captureCompilationFence, StaleCompilation } from './compile-fence.ts';
 import { IntentRequests, IntentRequestConflict, IntentRequestUnavailable, IntentRequestLeaseLost, type IntentRequestScope } from './intent-requests.ts';
 
 const source = { kind: 'owner' as const, ownerId: 'owner', principalId: 'owner', channel: 'web' as const };
@@ -46,8 +51,8 @@ test('additive reservation migration upgrades old history without rewriting it a
   const f = fixture(t, true);
   f.db.appendEvent('eden-fixture', { seq: 1, tick: 0, kind: 'rules', author: 'fixture', payload: { why: 'a preserved accepted fact' }, at: 1 });
   const before = JSON.stringify({ events: f.db.events('eden-fixture'), soul: f.db.soul('s_A') });
-  f.db.db.exec('DROP TABLE intent_requests_v2; DELETE FROM schema_migrations WHERE id=8');
-  f.reopen(); assert.deepEqual(f.db.migrated, [8]);
+  f.db.db.exec('DROP TABLE intent_request_events_v2; DROP TABLE intent_requests_v2; DELETE FROM schema_migrations WHERE id>=8');
+  f.reopen(); assert.deepEqual(f.db.migrated, [8, 9]);
   assert.equal(JSON.stringify({ events: f.db.events('eden-fixture'), soul: f.db.soul('s_A') }), before);
   f.store.reserve(f.scope, request); f.reopen(); assert.deepEqual(f.db.migrated, []);
   assert.equal(f.store.reserve(f.scope, request).created, false);
@@ -144,3 +149,76 @@ async function parallelReservations(t: TestContext, conflict: boolean) {
 }
 test('parallel SQLite workers choose one reservation for identical submissions', { timeout: 10000 }, t => parallelReservations(t, false));
 test('parallel SQLite workers refuse conflicting reuse without replacing the winner', { timeout: 10000 }, t => parallelReservations(t, true));
+
+function actorFixture(t: TestContext) {
+  const f = fixture(t), host = new WorldHost(f.db, toyFactory, 'fixture', 1e9, f.scope.worldId); host.boot();
+  void host.enqueue('birth', 'fixture', { soulId: 's_A', entityId: 'h_s_A', owner: 'owner', name: 's_A', description: 'fixture' }); host.drainInputs();
+  const reserved = f.store.reserve(f.scope, request); assert.ok(reserved.created);
+  const card = { name: 'journal rest', summary: 'Rest a moment', target: null, when: [], then: [{ set: ['$actor', 'doing', 'resting'] }], approach: [], during: [{ verb: 'rest', params: { seconds: 1 } }], takes: 'seconds' };
+  const checked = validateCard(card, host.kernel, new Set(host.engine.describeVerbs().map(v => v.verb))); assert.ok(checked.ok);
+  const payload = { card: { ...checked.card, hash: cardHash(checked.card), by: 's_A', mintedAt: 0, origin: 'compiled' }, forSoul: 's_A' };
+  return { ...f, host, reserved, payload, guard: captureCompilationFence(host, f.db, host.minds.get('s_A')!, f.scope.currentAuthority) };
+}
+
+test('accepted log fact and private request reference commit together; current lookup verifies actual canonical content', async t => {
+  const f = actorFixture(t), seq = f.host.seq;
+  const p = f.host.enqueueChecked('mint', 'soul:s_A', f.payload, f.guard, f.store.journal(f.reserved));
+  f.host.drainInputs(); const event = await p;
+  assert.equal(event.seq, seq + 1); assert.ok(f.host.kernel.vocab.cards['journal rest']);
+  assert.deepEqual(f.store.events(f.scope, request.requestId), [{ seq: event.seq, tick: event.tick, kind: 'mint', eventHash: hashOf(event) }]);
+  assert.equal(f.store.lookup(f.scope, request.requestId)?.receipt, null, 'minting is not understanding/admission of a purpose');
+  f.db.db.prepare('UPDATE users SET invited_by=NULL WHERE id=?').run('owner'); assert.equal(f.store.events(f.scope, request.requestId), null);
+  f.db.setInvited('owner', 'fixture');
+  f.db.db.prepare('UPDATE intent_request_events_v2 SET event_hash=?').run('damaged');
+  assert.throws(() => f.store.events(f.scope, request.requestId), /failed verification/);
+});
+
+test('journal failure rolls back both durable fact and reference before any apply; unrelated inputs keep exact sequence', async t => {
+  const f = actorFixture(t), seq = f.host.seq, before = kernelHash(f.host.kernel), applied: number[] = [];
+  f.host.listeners.push({ onApplied: e => applied.push(e.seq) });
+  const writer = f.store.journal(f.reserved);
+  const p = f.host.enqueueChecked('mint', 'soul:s_A', f.payload, f.guard, e => { writer(e); throw new Error('fixture persistence failure'); });
+  const rejection = assert.rejects(p, /persistence failure/);
+  const other = f.host.enqueue('rules', 'fixture', { why: 'unrelated' });
+  f.host.drainInputs(); await rejection;
+  assert.equal((await other).seq, seq + 1); assert.deepEqual(applied, [seq + 1]); assert.equal(kernelHash(f.host.kernel), before);
+  assert.deepEqual(f.store.events(f.scope, request.requestId), []); assert.equal(f.host.kernel.vocab.cards['journal rest'], undefined);
+  assert.deepEqual(f.db.events(f.scope.worldId, seq).map(e => e.kind), ['rules']);
+});
+
+test('current authority, matching canonical Soul and worker lease precede journal acceptance', async t => {
+  const f = actorFixture(t), seq = f.host.seq;
+  const foreign = f.host.enqueueChecked('mint', 'soul:s_B', { ...f.payload, forSoul: 's_B' }, f.guard, f.store.journal(f.reserved));
+  const foreignRejected = assert.rejects(foreign, /own accepted canonical fact/); f.host.drainInputs(); await foreignRejected;
+  assert.equal(f.host.seq, seq); assert.deepEqual(f.store.events(f.scope, request.requestId), []);
+  const denied = f.host.enqueueChecked('mint', 'soul:s_A', f.payload, f.guard, f.store.journal(f.reserved)), deniedResult = assert.rejects(denied, StaleCompilation);
+  f.db.db.prepare('UPDATE users SET invited_by=NULL WHERE id=?').run('owner'); f.host.drainInputs(); await deniedResult;
+  assert.equal(f.host.seq, seq); f.db.setInvited('owner', 'fixture');
+  f.store.finish(f.reserved, refusal);
+  const terminal = f.host.enqueueChecked('mint', 'soul:s_A', f.payload, f.guard, f.store.journal(f.reserved)), terminalResult = assert.rejects(terminal, IntentRequestLeaseLost);
+  f.host.drainInputs(); await terminalResult; assert.equal(f.host.seq, seq); assert.deepEqual(f.store.events(f.scope, request.requestId), []);
+});
+
+test('an asynchronous journal cannot commit a log fact on a truthy Promise', async t => {
+  const f = actorFixture(t), seq = f.host.seq;
+  const journal = (() => Promise.resolve(true)) as unknown as AcceptanceJournal;
+  const p = f.host.enqueueChecked('mint', 'soul:s_A', f.payload, f.guard, journal), rejection = assert.rejects(p, /synchronously/);
+  f.host.drainInputs(); await rejection; assert.equal(f.host.seq, seq); assert.deepEqual(f.store.events(f.scope, request.requestId), []);
+});
+
+for (const crashPhase of ['before-apply', 'after-apply']) test(`real compiler worker termination ${crashPhase} preserves accepted mint/reference and does not issue another lease/call`, { timeout: 10000 }, async t => {
+  const f = fixture(t, true);
+  const worker = new Worker(new URL('../test/fixtures/intent-progress-worker.ts', import.meta.url), { workerData: { path: f.path, crashPhase }, execArgv: [] });
+  t.after(() => worker.terminate());
+  const code = await new Promise<number>((resolve, reject) => { worker.once('error', reject); worker.once('exit', resolve); }); assert.equal(code, 17, 'deliberate worker termination at event/receipt boundary');
+  f.reopen();
+  const original = f.store.lookup(f.scope, 'crash-one'); assert.ok(original); assert.equal(original.receipt, null);
+  const refs = f.store.events(f.scope, 'crash-one'); assert.equal(refs?.length, 1); assert.equal(refs?.[0].kind, 'mint');
+  const restored = new WorldHost(f.db, toyFactory, 'fixture', 1e9, f.scope.worldId); assert.equal(restored.boot().from, 'genesis');
+  assert.ok(restored.kernel.vocab.cards['journal rest']); assert.ok(restored.kernel.decks.s_A.cards.includes('journal rest'));
+  assert.equal(restored.kernel.vocab.cards['journal wait'], undefined, 'second card was never accepted before termination');
+  assert.equal(f.db.events(f.scope.worldId).filter(e => e.kind === 'mint').length, 1);
+  assert.equal(f.store.reserve(f.scope, original.request).created, false);
+  assert.equal(f.db.db.prepare('SELECT COUNT(*) AS n FROM paid_costs').get()!.n, 1, 'one durable SYNTHETIC compiler admission, no provider call');
+  assert.equal(f.db.paidCost(), 0);
+});

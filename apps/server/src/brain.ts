@@ -11,7 +11,7 @@ import {
 import { GOALS, describeIntent, publicIntent, mandateTriggerSchema, type Alignment, type Beat, type BrainCall, type CameraLine, type DecisionPayload, type LogEvent, type NarrativeView, type ScenePayload, type TalkLine, type TickerLine, type WireIntent } from '@sim/protocol';
 import type { Config } from './config.ts';
 import type { Db } from './db.ts';
-import { checkAcceptanceGuard, energyWord, hash32, type AcceptanceGuard, type Mind, type WorldHost } from './world.ts';
+import { checkAcceptanceGuard, energyWord, hash32, type AcceptanceGuard, type AcceptanceJournal, type Mind, type WorldHost } from './world.ts';
 import { StaleCompilation } from './compile-fence.ts';
 import { Governor, SHARES, tierOf, type Tier } from './governor.ts';
 import { awaiting, belongsTo, candidatesFor, optionsFor, situationOf, matchesStep, type CardOption } from './deck.ts';
@@ -373,10 +373,11 @@ export class Brain {
   private engineVerbs() { return new Set(this.host.engine.describeVerbs().map((v) => v.verb).filter((v) => v !== 'do_activity')); }
 
   /** Validate proposed cards and mint the valid ones into the vocabulary and this Soul's deck. No model involved. */
-  async mint(m: Mind, cards: unknown[], links: Record<string, LinkKind> | undefined, kinds: Record<string, { summary: string }> | undefined, origin: MintedCard['origin'], guard?: AcceptanceGuard): Promise<MintVerdict[]> {
+  async mint(m: Mind, cards: unknown[], links: Record<string, LinkKind> | undefined, kinds: Record<string, { summary: string }> | undefined, origin: MintedCard['origin'], guard?: AcceptanceGuard, journal?: AcceptanceJournal): Promise<MintVerdict[]> {
+    if (journal && !guard) throw new Error('request journaling requires a current acceptance guard');
     if (guard) checkAcceptanceGuard(guard);
     const enqueue = (kind: 'deck' | 'mint', payload: unknown) => guard
-      ? this.host.enqueueChecked(kind, `soul:${m.soulId}`, payload, guard)
+      ? this.host.enqueueChecked(kind, `soul:${m.soulId}`, payload, guard, journal)
       : this.host.enqueue(kind, `soul:${m.soulId}`, payload);
     const k = this.host.kernel, verbs = this.engineVerbs(), tick = this.host.engine.world.tick;
     const newLinks: Record<string, LinkKind> = {}; for (const [n, d] of Object.entries(links ?? {})) if (!k.vocab.links[n] && /^[a-z][a-z ]{1,39}$/.test(n) && !SPEECH_LINKS.has(n)) newLinks[n] = { summary: String(d.summary).slice(0, 120), ...(d.control ? { control: true } : {}) };
@@ -416,7 +417,8 @@ export class Brain {
   }
 
   /** A wish in plain words → an agenda of cards, minting what the vocabulary lacks. Returns null when no compiler is available. */
-  async compile(m: Mind, wish: string, align=false, guard?: AcceptanceGuard): Promise<{ ok: true; agenda: { card: string; target: string | null; of?: string }[]; minted: MintVerdict[]; alignment?:Alignment } | { ok: false; reason: string } | null> {
+  async compile(m: Mind, wish: string, align=false, guard?: AcceptanceGuard, journal?: AcceptanceJournal): Promise<{ ok: true; agenda: { card: string; target: string | null; of?: string }[]; minted: MintVerdict[]; alignment?:Alignment } | { ok: false; reason: string } | null> {
+    if (journal && !guard) throw new Error('request journaling requires a current acceptance guard');
     if (this.mode === 'fake' || !this.cfg.anthropicKey) return null;
     if (this.overBudget || !this.gov.allow('user')) return { ok: false, reason: 'the thinking budget is spent for now; try again in a few minutes' };
     const k = this.host.kernel, tick = this.host.engine.world.tick;
@@ -472,11 +474,11 @@ export class Brain {
           this.record({ tick, tier: 'compile', subject: m.name, soulId: m.soulId, model: this.cfg.compilerModel, request: { system: [{ text: system }], messages }, response: r.raw, applied: { wish, understood: true, rejected: problems, attempts }, ms, inputTokens: inTok, outputTokens: outTok, cachedTokens: cached, costUsd: cost, mode: 'live', error: 'the compiled plan did not validate' });
           return { ok: false, reason: `could not turn that into something the world can run (${problems[0]})` };
         }
-        const minted = await this.mint(m, [...validNew.values()], out.new_links, out.new_kinds, 'compiled', guard);
+        const minted = await this.mint(m, [...validNew.values()], out.new_links, out.new_kinds, 'compiled', guard, journal);
         const deal = [...new Set(out.agenda.map((a) => a.card))].filter((c) => this.host.kernel.vocab.cards[c] && !this.host.kernel.decks[m.soulId]?.cards.includes(c));
         if (deal.length) {
           const payload = { soulId: m.soulId, add: deal, why: 'needed for the owner’s wish' };
-          if (guard) await this.host.enqueueChecked('deck', `soul:${m.soulId}`, payload, guard);
+          if (guard) await this.host.enqueueChecked('deck', `soul:${m.soulId}`, payload, guard, journal);
           else await this.host.enqueue('deck', `soul:${m.soulId}`, payload);
         }
         if (guard) checkAcceptanceGuard(guard);

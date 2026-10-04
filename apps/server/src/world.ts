@@ -41,7 +41,9 @@ export type AcceptanceGuard = () => true;
 export function checkAcceptanceGuard(guard: AcceptanceGuard): void {
   if (guard() !== true) throw new TypeError('acceptance guard must synchronously return true');
 }
-type Pending = { kind: EventKind; author: string; payload: any; resolve?: (e: LogEvent) => void; guard?: AcceptanceGuard; reject?: (error: unknown) => void };
+/** Synchronous writes to this host's Db, in the event acceptance transaction. */
+export type AcceptanceJournal = (event: LogEvent) => true;
+type Pending = { kind: EventKind; author: string; payload: any; resolve?: (e: LogEvent) => void; guard?: AcceptanceGuard; journal?: AcceptanceJournal; reject?: (error: unknown) => void };
 export type SnapshotBody = { runtime: EngineSnapshot; minds: Mind[]; seq: number; extra: Record<string, unknown>; kernel?: KState; counts?: Record<string, number> };
 export type HostListener = {
   onBatch?(b: Batch): void;
@@ -230,12 +232,25 @@ export class WorldHost {
       // Live request authority is checked immediately before the acceptance
       // point. Refusals are not simulation faults and consume no log sequence.
       // Accepted events replay as facts, without consulting these closures.
-      if (p.guard) {
+      if (p.guard && !p.journal) {
         try { checkAcceptanceGuard(p.guard); }
         catch (error) { p.reject!(error); continue; }
       }
-      const e: LogEvent = { seq: ++this.seq, tick, kind: p.kind, author: p.author, payload: p.payload, at: Date.now() };
-      this.db.appendEvent(this.worldId, e);
+      const e: LogEvent = { seq: this.seq + 1, tick, kind: p.kind, author: p.author, payload: p.payload, at: Date.now() };
+      if (p.journal) {
+        // Accepted log fact and its private request reference either both exist
+        // or neither does. Check current DB authority under the same write lock.
+        try {
+          this.db.db.exec('BEGIN IMMEDIATE');
+          try {
+            checkAcceptanceGuard(p.guard!);
+            this.db.appendEvent(this.worldId, e);
+            if (p.journal(e) !== true) throw new TypeError('acceptance journal must synchronously return true');
+            this.db.db.exec('COMMIT');
+          } catch (error) { this.db.db.exec('ROLLBACK'); throw error; }
+        } catch (error) { p.reject!(error); continue; }
+      } else this.db.appendEvent(this.worldId, e);
+      this.seq = e.seq;
       let recovered = false;
       try { this.apply(e, false); } catch (error) { this.recoverFault(error, e.kind === 'decision' ? e.payload.card : undefined); recovered = true; }
       if (!recovered) this.acc.log.push(e);
@@ -284,9 +299,10 @@ export class WorldHost {
 
   /** Opt-in live request check at the sequencer, before any durable event/effect.
    * The guard is never serialized or replayed. It must not enqueue or mutate.
+   * An optional journal writes to this Db atomically with the accepted event.
    * Queued requests remain ephemeral; this does not provide durable retries. */
-  enqueueChecked(kind: EventKind, author: string, payload: unknown, guard: AcceptanceGuard): Promise<LogEvent> {
-    return new Promise((resolve, reject) => this.queue.push({ kind, author, payload, guard, resolve, reject }));
+  enqueueChecked(kind: EventKind, author: string, payload: unknown, guard: AcceptanceGuard, journal?: AcceptanceJournal): Promise<LogEvent> {
+    return new Promise((resolve, reject) => this.queue.push({ kind, author, payload, guard, journal, resolve, reject }));
   }
 
   /** Apply a logged event: the fold moves the engine and the kernel; this adds the minds' bookkeeping. */

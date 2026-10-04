@@ -5,12 +5,13 @@ import { hashOf, stableStringify } from '@sim/engine-contract';
 import { intentRequestV2Schema, intentReceiptV2Schema, intentSourceV2Schema, intentRevisionV2Schema,
   type IntentRequestV2, type IntentReceiptV2, type IntentRevisionV2 } from '@sim/protocol';
 import type { Db, SoulRow } from './db.ts';
-import { checkAcceptanceGuard, type AcceptanceGuard } from './world.ts';
+import { checkAcceptanceGuard, type AcceptanceGuard, type AcceptanceJournal } from './world.ts';
 
 type Source = IntentRevisionV2['source'];
 export type IntentRequestScope = { worldId: string; soulId: string; source: Source; currentAuthority: (row: SoulRow) => boolean };
 type Key = { worldId: string; soulId: string; principalId: string; requestId: string };
 type Row = { owner_id: string; body_hash: string; body: string; source: string; lease: string; receipt: string | null };
+export type RequestEventReference = { seq: number; tick: number; kind: string; eventHash: string };
 type View = { key: Key; request: IntentRequestV2; source: Source; receipt: IntentReceiptV2 | null };
 export type RequestReservation = ({ created: true; lease: string } | { created: false }) & View;
 export class IntentRequestConflict extends Error { constructor() { super('that request ID already names different words or settings'); } }
@@ -73,6 +74,39 @@ export class IntentRequests {
       const key = { worldId: scope.worldId, soulId: scope.soulId, principalId: source.principalId, requestId };
       const row = this.row(key);
       return row && row.owner_id === source.ownerId ? view(key, row) : null;
+    });
+  }
+  /** Private worker journal for WorldHost.enqueueChecked on THIS Db. It only
+   * references the actual canonical event; it claims no physical success. */
+  journal(reservation: Extract<RequestReservation, { created: true }>): AcceptanceJournal {
+    return event => {
+      const row = this.row(reservation.key);
+      if (!row || row.lease !== reservation.lease || row.receipt !== null) throw new IntentRequestLeaseLost();
+      const fact = this.db.events(reservation.key.worldId, event.seq - 1, 1)[0];
+      const subject = event.kind === 'mint' ? event.payload?.forSoul : event.payload?.soulId;
+      if (!fact || hashOf(fact) !== hashOf(event)
+        || subject !== reservation.key.soulId || event.author !== `soul:${reservation.key.soulId}`)
+        throw new Error('request journal must reference its own accepted canonical fact');
+      this.db.db.prepare('INSERT INTO intent_request_events_v2(world_id,soul_id,principal_id,request_id,seq,tick,kind,event_hash) VALUES (?,?,?,?,?,?,?,?)')
+        .run(...keyArgs(reservation.key), event.seq, event.tick, event.kind, hashOf(event));
+      return true;
+    };
+  }
+  /** Current private lookup of verified log references, without exposing a
+   * worker lease. Recovery/filtered events still require reconciliation. */
+  events(scope: IntentRequestScope, requestId: string): RequestEventReference[] | null {
+    return this.transaction(() => {
+      let source: Source;
+      try { source = this.check(scope); } catch (error) { if (error instanceof IntentRequestUnavailable) return null; throw error; }
+      const key = { worldId: scope.worldId, soulId: scope.soulId, principalId: source.principalId, requestId }, row = this.row(key);
+      if (!row || row.owner_id !== source.ownerId) return null;
+      const refs = this.db.db.prepare('SELECT seq,tick,kind,event_hash FROM intent_request_events_v2 WHERE world_id=? AND soul_id=? AND principal_id=? AND request_id=? ORDER BY seq')
+        .all(...keyArgs(key)) as { seq: number; tick: number; kind: string; event_hash: string }[];
+      return refs.map(ref => {
+        const fact = this.db.events(scope.worldId, ref.seq - 1, 1)[0];
+        if (!fact || fact.tick !== ref.tick || fact.kind !== ref.kind || hashOf(fact) !== ref.event_hash) throw new Error('request event reference failed verification');
+        return { seq: ref.seq, tick: ref.tick, kind: ref.kind, eventHash: ref.event_hash };
+      });
     });
   }
   /** Trusted worker finalization, never callable with a client-supplied lease.
