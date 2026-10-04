@@ -9,60 +9,16 @@ import {join} from 'node:path';
 import {createServer} from 'node:http';
 import {getRequestListener} from '@hono/node-server';
 import WebSocket from 'ws';
-import {marsFactory} from '@sim/engine-mars';
-import {newLife,type CompileOut,type callTool} from '@sim/brain';
 import {INTENT_V2,PROTO,intentReceiptV2Schema,publicEvent} from '@sim/protocol';
-import {Auth,hashToken} from './auth.ts';
-import {Brain} from './brain.ts';
-import {config} from './config.ts';
-import {Db} from './db.ts';
+import {hashToken} from './auth.ts';
 import {buildApp} from './http.ts';
 import {Hub} from './hub.ts';
 import {IntentControlV2} from './intent-control.ts';
 import {migrate} from './migrations.ts';
-import {Souls} from './souls.ts';
-import {WorldHost,replayFromGenesis} from './world.ts';
+import {replayFromGenesis} from './world.ts';
+import {intentNativeFixture as fixture,seed,worldId} from '../test/intent-native-fixture.ts';
 
-const factory=await marsFactory({scene:'eden-camp',arrival:[16,-10],arrivalPlace:'bunkhouse',reference:[16,-9],grounds:{id:'grounds',name:'grounds'}});
-const seed='wire-intentions',worldId='wire-eden';
 const request=(requestId:string,words='go to the campfire')=>({contract:INTENT_V2,requestId,op:'upsert',words});
-function fixture(t:TestContext,path=':memory:',enabled=true) {
-  const db=new Db(path);t.after(()=>{if(db.db.isOpen)db.close();});
-  for(const id of ['dev:alice','dev:bob','dev:admin']) {
-    db.upsertUser({id,role:id==='dev:admin'?'admin':'user',email:null,wallet:null});db.setInvited(id,'local');
-  }
-  const host=new WorldHost(db,factory,seed,1e9,worldId);host.boot();
-  if(!db.soul('s_A')) {
-    db.createSoul({id:'s_A',worldId,owner:'dev:alice',entityId:'h_A',name:'Alice',description:'local',native:false});
-    void host.enqueue('birth','fixture',{soulId:'s_A',entityId:'h_A',owner:'dev:alice',name:'Alice',description:'local'});host.drainInputs();
-  }
-  const mind=host.minds.get('s_A')!;mind.life=newLife(0);mind.nextEvalTick=1e9;
-  let calls=0,hold:Promise<void>|undefined;
-  const compilerCall:typeof callTool=async<T>(input:Parameters<typeof callTool>[0])=>{
-    calls++;assert.match(input.system,/ordinary actionable present direction/);
-    const standing=JSON.stringify(input.messages).includes('make friends if you feel like it');
-    if(hold)await hold;
-    const out:CompileOut={understood:true,agenda:[{card:standing?'rest':'go to',target:standing?null:'campfire'}],
-      alignment:{understanding:standing?'PRIVATE_STANDING_SUMMARY':'Walk to the campfire.',trigger:{kind:standing?'none':'now'}}};
-    return {out:out as T,ms:0,inputTokens:0,outputTokens:0,cachedTokens:0,costUsd:0,request:null,raw:{synthetic:true}};
-  };
-  const cfg={...config,worldId,worldKey:'eden',worldPath:'/w/eden',brainMode:'fake' as const,publicUrl:'http://127.0.0.1:4957',
-    typesafeKey:undefined,anthropicKey:'synthetic-only',compilerModel:'synthetic-only',privyAppId:'',privyAppSecret:'',inviteRequired:true};
-  const auth=new Auth(cfg,db);auth.devAuth=true;
-  const brain=new Brain(host,db,cfg,{clients:()=>0,onCall(){},onCamera(){},onTicker(){},onNarrative(){},onTalk(){}},{compilerCall,intentV2Choices:enabled});
-  // Exercise the real compiler validation/mint/journal path with the injected
-  // synthetic transport. The native chooser remains the already-created fake Jev.
-  const compile=brain.compile.bind(brain);
-  t.mock.method(brain,'compile',async(...args:Parameters<typeof brain.compile>)=>{
-    brain.mode='live';try{return await compile(...args);}finally{brain.mode='fake';}
-  });
-  const souls=new Souls(host,db,brain,cfg),service=enabled?new IntentControlV2(host,brain,souls):undefined;
-  const deps={cfg,db,host,auth,brain,souls,hub:{clients:new Set(),refreshMe(){}} as unknown as Hub,intentV2:service};
-  const app=buildApp(deps),post=async(input:unknown,credential='dev:alice',agent=false)=>app.request(agent?'/v1/agent/intent-v2':'/v1/souls/s_A/intent-v2',{
-    method:'POST',headers:{authorization:'Bearer '+credential,'content-type':'application/json'},body:JSON.stringify(input)});
-  const lookup=async(id:string,credential='dev:alice',agent=false)=>app.request(agent?'/v1/agent/intent-v2/requests/'+id:'/v1/souls/s_A/intent-v2/requests/'+id,{headers:{authorization:'Bearer '+credential}});
-  return {db,host,mind,brain,souls,auth,deps,app,post,lookup,service:service!,get calls(){return calls;},set hold(value:Promise<void>|undefined){hold=value;}};
-}
 async function accept<T>(f:ReturnType<typeof fixture>,promise:Promise<T>) {
   let done=false;promise.then(()=>done=true,()=>done=true);
   for(let i=0;i<100&&!done;i++){await setImmediate();f.host.drainInputs();}
@@ -110,7 +66,7 @@ test('HTTP ordinary direction wakes native sleep, retains a standing purpose, an
   assert.equal(Object.keys(f.host.intentHistoryOf('s_A').intents).length,2);
   assert.ok(JSON.stringify(f.brain.midContext(f.mind,'timer').purposes).includes('PRIVATE_OWNER_WORDS'));
   assert.ok(!JSON.stringify(f.db.events(worldId).map(publicEvent)).includes('PRIVATE_OWNER_WORDS'));
-  assert.equal(replayFromGenesis(factory,seed,f.db.events(worldId),f.host.engine.world.tick).engine.stateHash(),f.host.engine.stateHash());
+  assert.equal(replayFromGenesis(f.host.factory,seed,f.db.events(worldId),f.host.engine.world.tick).engine.stateHash(),f.host.engine.stateHash());
   assert.equal(f.db.paidCost(),0);assert.deepEqual(f.host.engine.runtime.violations,[]);
   t.diagnostic(`canonical received=${received.phase==='received'?received.tick:-1}; publication=${published.tick}; walking=${walking}; arrival=${f.host.engine.world.tick}; compiler calls=${f.calls}; paid=$0`);
 });
@@ -246,7 +202,7 @@ test('inactive paths, invalid/large bodies, wrong world and unavailable compiler
   const large=await f.post(request('large','X'.repeat(70_000)));assert.equal(large.status,413);assert.equal(large.headers.get('cache-control'),'no-store');
   t.mock.method(f.brain,'compile',async()=>null);
   await receipt(await accept(f,f.post(request('no-compiler'))));await settled(f);await receipt(await f.lookup('no-compiler'),'refused');
-  f.db.createWorld({id:'foreign',schema:f.host.engine.schema,rules_version:factory.rulesVersion,dt:f.host.engine.dt,seed:'other'});
+  f.db.createWorld({id:'foreign',schema:f.host.engine.schema,rules_version:f.host.engine.rulesVersion,dt:f.host.engine.dt,seed:'other'});
   f.db.db.prepare("UPDATE souls SET world_id='foreign' WHERE id='s_A'").run();
   assert.equal((await f.post(request('foreign'))).status,404);assert.equal((await f.lookup('no-compiler')).status,404);
 });

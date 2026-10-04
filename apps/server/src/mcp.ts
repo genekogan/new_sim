@@ -3,14 +3,25 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
-import { GOALS } from '@sim/protocol';
+import { GOALS, intentRequestV2Schema } from '@sim/protocol';
 import type { SoulRow } from './db.ts';
 import { ApiError, type Souls } from './souls.ts';
 import { checkAcceptanceGuard,type AcceptanceGuard } from './world.ts';
+import { intentTransportError,intentLookupError,type IntentControlV2 } from './intent-control.ts';
+import type { IntentRequestScope } from './intent-requests.ts';
 
 const text = (v: unknown, isError = false) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v) }], isError });
 
-function serverFor(souls: Souls, soul: SoulRow,guard?:AcceptanceGuard) {
+// SDK1.31 advertises a union root as an empty object. Give discovery the actual
+// object fields derived from the authoritative union, then delegate conditional
+// validation to that same contract before the SDK and inside the shared service.
+// This object is an adapter for discovery, never a second request grammar.
+const upsert=intentRequestV2Schema.options[0].shape;
+const intentToolInput=z.strictObject({contract:upsert.contract,requestId:upsert.requestId,op:z.enum(['upsert','withdraw']),
+  words:upsert.words.optional(),strict:upsert.strict.removeDefault().optional(),importance:upsert.importance.removeDefault().optional(),edit:upsert.edit});
+const intentLookupInput=z.strictObject({requestId:upsert.requestId});
+
+function serverFor(souls: Souls, soul: SoulRow,guard?:AcceptanceGuard,candidate?:{service:IntentControlV2;scope:IntentRequestScope}) {
   const s = new McpServer({ name: 'sim', version: '0.1.0' });
   const reply=async(run:()=>unknown)=>{
     try{
@@ -38,27 +49,61 @@ function serverFor(souls: Souls, soul: SoulRow,guard?:AcceptanceGuard) {
       note: z.string().max(160).optional().describe('colour for the Soul’s mind; context, not a command'),
     },
   }, async (input) => reply(async()=>{const r=await souls.setIntent(soul,input,'mcp',guard);return {ok:true,accepted_at_tick:r.event.tick,intent:r.intent,text:r.text,status:souls.status(soul)};}));
+  if(candidate) {
+    const {service,scope}=candidate;
+    const intentReply=async(run:()=>unknown,lookup=false)=>{
+      try {if(guard)checkAcceptanceGuard(guard);const result=await run();if(guard)checkAcceptanceGuard(guard);return text(result);}
+      catch(error){const safe=lookup?intentLookupError(error):intentTransportError(error);return text({ok:false,code:safe.code,message:safe.message,...safe.extra},true);}
+    };
+    s.registerTool('soul_intent_v2',{
+      description:'soul-intent/2: submit one retained direction with a durable requestId, or edit/withdraw an exact purpose version. Upsert requires words; withdrawal requires edit and forbids words/strict/importance. Returns a received, understood, refused or withdrawn receipt. Understanding is not physical completion. Retry only this same request identity; no legacy fallback.',
+      inputSchema:intentToolInput,annotations:{readOnlyHint:false,idempotentHint:true,destructiveHint:false},
+    },async input=>intentReply(()=>service.submit(scope,input)));
+    s.registerTool('soul_intent_request_v2',{
+      description:'Read the receipt for this scoped credential generation and requestId. Received may still be awaiting interpretation; no repeated mutation or completion is inferred. Unknown/inaccessible requests are not-found.',
+      inputSchema:intentLookupInput,annotations:{readOnlyHint:true,idempotentHint:true},
+    },async({requestId})=>intentReply(()=>service.lookup(scope,requestId),true));
+  }
   return s;
 }
 
-export async function handleMcp(req: IncomingMessage, res: ServerResponse, souls: Souls) {
-  if(souls.lifecycle)res.setHeader('Cache-Control','no-store');
+export async function handleMcp(req: IncomingMessage, res: ServerResponse, souls: Souls,intentV2?:IntentControlV2) {
+  if(intentV2&&(intentV2.souls!==souls||intentV2.host!==souls.host))throw new Error('MCP intent candidate must belong to selected Souls host');
+  if(souls.lifecycle||intentV2)res.setHeader('Cache-Control','no-store');
   // bearer header, or /mcp/<token> for connector apps that only accept a URL
   const token = req.headers.authorization?.replace(/^Bearer\s+/i, '') ?? req.url?.match(/^\/mcp\/(sim_[A-Za-z0-9_-]+)/)?.[1];
   const soul = souls.soulFromToken(token);
   if (!soul) { res.writeHead(401, { 'content-type': 'application/json', 'www-authenticate': 'Bearer' }).end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32001, message: 'missing or invalid soul token' }, id: null })); return; }
-  const guard=souls.agentControlGuard(soul,token);
+  let candidate:{service:IntentControlV2;scope:IntentRequestScope}|undefined;
+  if(intentV2) {
+    try {candidate={service:intentV2,scope:intentV2.agentScope(token,'mcp')};}
+    catch {res.writeHead(401,{'content-type':'application/json','www-authenticate':'Bearer'}).end(JSON.stringify({jsonrpc:'2.0',error:{code:-32001,message:'missing or invalid soul token'},id:null}));return;}
+  }
+  const legacyGuard=souls.agentControlGuard(soul,token);
+  const guard:AcceptanceGuard|undefined=candidate?()=>{if(legacyGuard)checkAcceptanceGuard(legacyGuard);return candidate!.service.guard(candidate!.scope);}:legacyGuard;
   if (req.method !== 'POST') { res.writeHead(405, { 'content-type': 'application/json', allow: 'POST' }).end(JSON.stringify({ jsonrpc: '2.0', error: { code: -32000, message: 'method not allowed (stateless server: POST only)' }, id: null })); return; }
   const chunks: Buffer[] = []; let size = 0;
   for await (const c of req) { size += (c as Buffer).length; if (size > 64 * 1024) { res.writeHead(413).end(); return; } chunks.push(c as Buffer); }
   // Credential authority can disappear while the transport reads a slow body.
   // Recheck before parsing/registering tools, then retain it through each tool.
   try{if(guard)checkAcceptanceGuard(guard);}catch(error){
-    if(!(error instanceof ApiError))throw error;
+    if(!(error instanceof ApiError)&&!candidate)throw error;
     res.writeHead(401,{'content-type':'application/json','www-authenticate':'Bearer'}).end(JSON.stringify({jsonrpc:'2.0',error:{code:-32001,message:'missing or invalid soul token'},id:null}));return;
   }
   let body: unknown; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { res.writeHead(400).end(); return; }
-  const server = serverFor(souls, soul,guard);
+  if(candidate&&body&&typeof body==='object'&&!Array.isArray(body)) {
+    const rpc=body as {method?:unknown;id?:unknown;params?:{name?:unknown;arguments?:unknown}};
+    if(rpc.method==='tools/call'&&['soul_intent_v2','soul_intent_request_v2'].includes(String(rpc.params?.name))) {
+      const schema=rpc.params!.name==='soul_intent_v2'?intentRequestV2Schema:intentLookupInput;
+      if(!schema.safeParse(rpc.params?.arguments).success) {
+        // SDK validation diagnostics can echo arbitrary unknown property names.
+        // Keep malformed private arguments/credential-shaped keys out of errors.
+        res.writeHead(200,{'content-type':'application/json'}).end(JSON.stringify({jsonrpc:'2.0',id:rpc.id??null,
+          result:text({ok:false,code:'invalid',message:'invalid soul-intent/2 tool arguments'},true)}));return;
+      }
+    }
+  }
+  const server = serverFor(souls, soul,guard,candidate);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   res.on('close', () => { void transport.close(); void server.close(); });
   await server.connect(transport);
