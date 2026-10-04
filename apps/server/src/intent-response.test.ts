@@ -64,6 +64,12 @@ test('ordinary V2 direction wakes an actually sleeping native body; older purpos
   await accept(f.host,f.publisher.publish(f.scope,old,{ summary:'Welcome company.',agenda:[{card:'rest',target:null}],trigger:{kind:'none'} }));
   f.mind.nextEvalTick=1e9;
   const sleeping=await sleep(f); assert.ok(sleeping);
+  assert.equal(f.host.engine.canSnapshot?.(),false,'actual sleep is not a qualified checkpoint; native admission preview must not require it');
+  const sleepHash=f.host.engine.stateHash(),sleepWorld=JSON.stringify(f.host.engine.world),sleepRecords=JSON.stringify([...f.host.engine.runtime.records]);
+  const prepared={actor:'h_A',label:'go to campfire',steps:[{verb:'walk_to',params:{to:'campfire',standoff:1.5}}]};
+  const preview=f.host.engine.previewAdmission!(prepared);assert.equal(preview.ok,true);
+  assert.deepEqual(f.host.engine.previewAdmission!(prepared),preview);assert.equal(f.host.engine.programOf('h_A'),sleeping);
+  assert.equal(f.host.engine.stateHash(),sleepHash);assert.equal(JSON.stringify(f.host.engine.world),sleepWorld);assert.equal(JSON.stringify([...f.host.engine.runtime.records]),sleepRecords);
   const request=await received(f,'campfire','go to the campfire');
   const published=await accept(f.host,f.publisher.interpretAndPublish(f.scope,request,async guard=>{
     f.brain.mode='live';
@@ -110,7 +116,7 @@ test('default reader records understanding without waking the native sleeper',as
   assert.equal(f.brain.midContext(f.mind,'timer').purposes,undefined);
 });
 
-test('Brain preserves its already accepted native choice when private admission persistence fails, without scheduling another fresh-purpose wake',async t=>{
+test('Brain can reconsider an atomic writer refusal because no native decision or admission committed',async t=>{
   const f=fixture(t),request=await received(f,'writer-failure','go to the campfire');
   await accept(f.host,f.publisher.publish(f.scope,request,{summary:'Walk to the campfire.',agenda:[{card:'go to',target:'campfire'}],trigger:{kind:'now'}}));
   const append=f.db.appendEvent.bind(f.db),error=console.error,messages:string[]=[];
@@ -118,12 +124,30 @@ test('Brain preserves its already accepted native choice when private admission 
   f.db.appendEvent=(world,event)=>{if(event.kind==='intent-admission-v2')throw new Error('PRIVATE_WRITER_FAILURE');append(world,event);};
   console.error=(...args)=>messages.push(args.map(String).join(' '));
   await f.brain.evaluate(f.mind,'new-intent-v2');f.host.drainInputs();await setImmediate();
-  assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision').length,1);
-  assert.ok(f.host.engine.programOf('h_A'));assert.deepEqual(f.host.intentHistoryOf('s_A').attempts,{});
-  assert.equal(f.mind.evalTrigger,'timer','persistence uncertainty does not reissue the fresh purpose');
-  assert.ok(f.mind.nextEvalTick>f.host.engine.world.tick+1);
-  assert.equal(messages.length,1);assert.ok(messages[0].includes('requires reconciliation'));assert.ok(!messages[0].includes('PRIVATE_WRITER_FAILURE'));
+  assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision'||e.kind==='intent-admission-v2').length,0);
+  assert.equal(f.host.engine.programOf('h_A'),null);assert.deepEqual(f.host.intentHistoryOf('s_A').attempts,{});
+  assert.equal(f.mind.evalTrigger,'new-intent-v2');assert.equal(f.mind.nextEvalTick,f.host.engine.world.tick+1);
+  assert.equal(messages.length,1);assert.ok(messages[0].includes('persistence failed'));assert.ok(!messages[0].includes('PRIVATE_WRITER_FAILURE'));
+  f.db.appendEvent=append;await f.brain.evaluate(f.mind,'new-intent-v2');f.host.drainInputs();await setImmediate();
+  assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision').length,1);assert.equal(Object.values(f.host.intentHistoryOf('s_A').attempts).length,1);assert.ok(f.host.engine.programOf('h_A'));
   assert.equal(f.db.paidCost(),0);
+});
+
+test('Brain checkpoint deferral waits without paid work or effects and preserves a newer withdrawal wake',async t=>{
+  for(const newer of [false,true])await t.test(newer?'newer withdrawal':'same purpose',async child=>{
+    const f=fixture(child),request=await received(f,'deferred','go to the campfire');
+    const published=await accept(f.host,f.publisher.publish(f.scope,request,{summary:'Walk to the fire.',agenda:[{card:'go to',target:'campfire'}],trigger:{kind:'now'}}));
+    assert.equal(published.receipt?.phase,'understood');const ref=published.receipt!.phase==='understood'?published.receipt.revision:null;assert.ok(ref);
+    f.mind.nextEvalTick=1e9;const sleeping=await sleep(f);const origin=f.host.engine.world.tick;
+    f.host.engine.previewAdmission=undefined;await f.brain.evaluate(f.mind,'new-intent-v2');f.host.drainInputs();
+    if(newer){
+      const r=await accept(f.host,f.publisher.receive(f.scope,{contract:INTENT_V2,requestId:'withdraw-deferred',op:'withdraw',edit:{intentId:ref.intentId,expectedVersion:ref.version}}));
+      assert.ok(r.reservation.created);await accept(f.host,f.publisher.publish(f.scope,r.reservation));
+    }
+    await setImmediate();assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision'&&e.author==='brain:reflex').length,0);
+    assert.equal(f.host.engine.programOf('h_A'),sleeping);assert.deepEqual(f.host.intentHistoryOf('s_A').attempts,{});assert.equal(f.db.paidCost(),0);
+    assert.equal(f.mind.evalTrigger,'new-intent-v2');assert.equal(f.mind.nextEvalTick,origin+(newer?1:40));
+  });
 });
 
 test('a newer standing purpose never reissues an older immediate direction',async t=>{

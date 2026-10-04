@@ -4,6 +4,8 @@ October 4 Eastern. Parent `fad8298`, branch `core/intent-admission-outcomes`.
 Internal opt-in component; no route, capability, configuration or live activation.
 This records the exact `46eaade` component boundary. The later
 [controller component](INTENT-CONTROLLER-20261004.md) adds actual execution facts.
+The later [atomic admission component](INTENT-ATOMIC-ADMISSION-20261004.md)
+changes the two-write boundary for new private attempts; this record stays pinned.
 
 An understood purpose now has an explicitly associated attempt when its first
 qualified immediate choice reaches `Engine.perform`. The existing public

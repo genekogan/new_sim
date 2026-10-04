@@ -13,7 +13,7 @@ import { marsFactory } from '@sim/engine-mars';
 import type { Engine, EngineFactory } from '@sim/engine-contract';
 import { INTENT_V2, intentAdmissionPayloadV2Schema, intentAdmissionFactV2, intentControllerFactV2, intentControllerPayloadV2Schema, publicEvent, type DecisionPayload } from '@sim/protocol';
 import { Db } from './db.ts';
-import { WorldHost, StaleIntentAttempt, UnrecordedIntentAdmission } from './world.ts';
+import { WorldHost, StaleIntentAttempt, IntentAdmissionDeferred, PersistedIntentAdmissionFault } from './world.ts';
 import { IntentPublisher } from './intent-publisher.ts';
 import { IntentRequests, type IntentRequestScope } from './intent-requests.ts';
 import { Auth } from './auth.ts';
@@ -93,14 +93,86 @@ test('private admission origins and progress claims cannot be supplied in its st
   assert.throws(()=>intentAdmissionFactV2({kind:'intent-admission-v2',seq:2,tick:0,payload:{...p,decision:{seq:1,tick:2,entityId:'h'}}}),/future/);
 });
 
-test('an admission write failure reports accepted decision uncertainty and does not undo or reissue its actual native program',async t=>{
+test('an admission write failure rolls back both facts without touching the live native program, counter, take or Mind',async t=>{
   const f=await fixture(t),append=f.db.appendEvent.bind(f.db);
+  const hash=f.host.engine.stateHash(),snapshot=JSON.stringify(f.host.engine.snapshot()),mind=structuredClone(f.host.minds.get('s_A')),seq=f.host.seq;
   f.db.appendEvent=(world,event)=>{if(event.kind==='intent-admission-v2')throw new Error('fixture writer failure');append(world,event);};
-  const queued=f.host.enqueueIntentDecision('brain:reflex',f.decision,f.ref,()=>true),rejected=assert.rejects(queued,UnrecordedIntentAdmission);
-  f.host.drainInputs();await rejected;assert.ok(f.host.engine.programOf('h_A'));
-  assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision').length,1);assert.deepEqual(f.host.intentHistoryOf('s_A').attempts,{});
+  const queued=f.host.enqueueIntentDecision('brain:reflex',f.decision,f.ref,()=>true),rejected=assert.rejects(queued,/fixture writer failure/);
+  f.host.drainInputs();await rejected;assert.equal(f.host.engine.programOf('h_A'),null);
+  assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision'||e.kind==='intent-admission-v2').length,0);assert.deepEqual(f.host.intentHistoryOf('s_A').attempts,{});
+  assert.equal(f.host.seq,seq);assert.equal(f.host.engine.stateHash(),hash);assert.equal(JSON.stringify(f.host.engine.snapshot()),snapshot);assert.deepEqual(f.host.minds.get('s_A'),mind);
   f.db.appendEvent=append;const restarted=new WorldHost(f.db,f.factory,'admission-fixture',1e9,f.host.worldId);restarted.boot();
   assert.equal(restarted.engine.stateHash(),f.host.engine.stateHash());assert.deepEqual(restarted.intentHistoryOf('s_A').attempts,{});
+  const retried=await accept(f.host,f.host.enqueueIntentDecision('brain:reflex',f.decision,f.ref,()=>true));assert.equal(retried.seq,seq+1);
+  assert.equal(Object.values(f.host.intentHistoryOf('s_A').attempts).length,1,'only the later explicit reconsideration committed');
+});
+
+test('native preview is detached and read-only; observers see neither fact before commit and both before live perform',async t=>{
+  const f=await fixture(t,native,true),observer=new Db(f.path);t.after(()=>observer.close());
+  const program={actor:f.decision.entityId,label:f.decision.label,steps:f.decision.steps};
+  const snapshot=JSON.stringify(f.host.engine.snapshot()),hash=f.host.engine.stateHash();
+  const predicted=f.host.engine.previewAdmission!(program);assert.equal(predicted.ok,true);
+  const mutated=f.host.engine.previewAdmission!(program);mutated.id='forged';mutated.ok=false;
+  assert.deepEqual(f.host.engine.previewAdmission!(program),predicted);
+  assert.equal(f.host.engine.stateHash(),hash);assert.equal(JSON.stringify(f.host.engine.snapshot()),snapshot);
+  const append=f.db.appendEvent.bind(f.db),perform=f.host.engine.perform.bind(f.host.engine),seen:string[]=[];
+  f.db.appendEvent=(world,event)=>{append(world,event);if(event.kind==='decision'||event.kind==='intent-admission-v2'){
+    assert.equal(observer.events(world).filter(e=>e.kind==='decision'||e.kind==='intent-admission-v2').length,0,'other connection never sees a partial transaction');
+    assert.equal(JSON.stringify(f.host.engine.snapshot()),snapshot,'preview/write cannot cancel or start live work');seen.push(event.kind);
+  }};
+  f.host.engine.perform=p=>{
+    const pair=observer.events(f.host.worldId).filter(e=>e.kind==='decision'||e.kind==='intent-admission-v2');assert.equal(pair.length,2);
+    assert.equal(pair[1].payload.activityId,predicted.id);assert.equal(pair[1].seq,pair[0].seq+1);assert.equal(pair[1].tick,pair[0].tick);
+    return perform(p);
+  };
+  const applied:string[]=[];f.host.listeners.push({onApplied:e=>{if(e.kind==='decision'||e.kind==='intent-admission-v2'){
+    assert.equal(Object.values(f.host.intentHistoryOf('s_A').attempts)[0].phase,'accepted');assert.equal(f.host.engine.programOf('h_A'),predicted.id);applied.push(e.kind);
+  }}});
+  await accept(f.host,f.host.enqueueIntentDecision('brain:reflex',f.decision,f.ref,()=>true));
+  assert.deepEqual(seen,['decision','intent-admission-v2']);assert.deepEqual(applied,seen);assert.equal(f.db.paidCost(),0);
+});
+
+test('fallback engines defer unsafe or inexact checkpoint preview without creating a decision or changing their body',async t=>{
+  for(const mode of ['non-resumable','wrong-hash'] as const)await t.test(mode,async child=>{
+    const f=await fixture(child,toyFactory),hash=f.host.engine.stateHash(),seq=f.host.seq,restore=f.host.factory.restore;
+    if(mode==='non-resumable')f.host.engine.canSnapshot=()=>false;
+    else f.host.factory={...f.host.factory,restore:snapshot=>{const trial=restore(snapshot);trial.stateHash=()=> 'inexact';return trial;}};
+    const queued=f.host.enqueueIntentDecision('brain:reflex',f.decision,f.ref,()=>true),rejected=assert.rejects(queued,IntentAdmissionDeferred);
+    f.host.drainInputs();await rejected;assert.equal(f.host.seq,seq);assert.equal(f.host.engine.stateHash(),hash);assert.equal(f.host.engine.programOf('h_A'),null);
+    assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision'||e.kind==='intent-admission-v2').length,0);
+  });
+});
+
+test('two queued native choices reserve separate ordered pairs and retain the replaced attempt before the next controller tick',async t=>{
+  const f=await fixture(t),seq=f.host.seq;
+  const one=f.host.enqueueIntentDecision('brain:reflex',f.decision,f.ref,()=>true);
+  const two=f.host.enqueueIntentDecision('brain:reflex',{...f.decision,label:'second go to campfire'},f.ref,()=>true);
+  f.host.drainInputs();const [first,second]=await Promise.all([one,two]);
+  assert.equal(first.seq,seq+1);assert.equal(second.seq,seq+3);assert.equal(f.host.seq,seq+4);
+  const admissions=f.db.events(f.host.worldId).filter(e=>e.kind==='intent-admission-v2');assert.equal(admissions.length,2);
+  assert.notEqual(admissions[0].payload.activityId,admissions[1].payload.activityId);assert.equal(f.host.engine.programOf('h_A'),admissions[1].payload.activityId);
+  f.host.tickOnce();const attempts=f.host.intentHistoryOf('s_A').attempts;
+  assert.equal(attempts[admissions[0].payload.attemptId].phase,'interrupted');assert.equal(attempts[admissions[1].payload.attemptId].phase,'started');
+  const replay=new WorldHost(f.db,native,'admission-fixture',1e9,f.host.worldId);replay.boot();assert.deepEqual(replay.intentHistoryOf('s_A'),f.host.intentHistoryOf('s_A'));assert.equal(replay.engine.stateHash(),f.host.engine.stateHash());
+});
+
+test('committed preview/live mismatch is contained as a physical fault and never retries an already durable pair',async t=>{
+  const f=await fixture(t);f.host.saveSnapshot(true);
+  const perform=f.host.engine.perform.bind(f.host.engine);
+  f.host.engine.perform=program=>({...perform(program),id:'wrong-live-id'});
+  const queued=f.host.enqueueIntentDecision('brain:reflex',f.decision,f.ref,()=>true),rejected=assert.rejects(queued,PersistedIntentAdmissionFault);
+  f.host.drainInputs();await rejected;
+  assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision').length,1);assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='intent-admission-v2').length,1);
+  assert.ok(f.db.events(f.host.worldId).some(e=>e.payload?.recovery));assert.equal(f.host.engine.programOf('h_A'),null);
+  assert.equal(Object.values(f.host.intentHistoryOf('s_A').attempts)[0].phase,'accepted','recorded admission is historical, not current execution after recovery');
+  const replay=new WorldHost(f.db,native,'admission-fixture',1e9,f.host.worldId);replay.boot();assert.deepEqual(replay.intentHistoryOf('s_A'),f.host.intentHistoryOf('s_A'));assert.equal(replay.engine.stateHash(),f.host.engine.stateHash());
+});
+
+test('legacy unassociated decisions stay honestly unassociated after restart; no purpose is inferred or reissued',async t=>{
+  const f=await fixture(t);await accept(f.host,f.host.enqueue('decision','brain:reflex',f.decision));
+  const replay=new WorldHost(f.db,native,'admission-fixture',1e9,f.host.worldId);replay.boot();
+  assert.deepEqual(replay.intentHistoryOf('s_A').attempts,{});assert.equal(replay.engine.programOf('h_A'),f.host.engine.programOf('h_A'));
+  assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision').length,1);assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='intent-admission-v2').length,0);
 });
 
 test('physical recovery retains historical admission while excluding its failed physical decision',async t=>{
@@ -117,13 +189,19 @@ test('physical recovery retains historical admission while excluding its failed 
   const restarted=new WorldHost(f.db,factory,'admission-fixture',1e9,f.host.worldId);restarted.boot();assert.deepEqual(restarted.intentHistoryOf('s_A'),expected);
 });
 
-for(const phase of ['before-fact','after-fact'] as const)test(`real worker termination ${phase} preserves honest admission history without reissuing work`,async t=>{
-  const f=await fixture(t,toyFactory,true),worker=new Worker(new URL('../test/fixtures/intent-admission-worker.ts',import.meta.url),{workerData:{path:f.path,phase},execArgv:[]});
+for(const phase of ['before-fact','after-fact','before-apply','after-apply'] as const)test(`real native worker termination ${phase} preserves the atomic decision/admission boundary`,async t=>{
+  const f=await fixture(t,native,true),worker=new Worker(new URL('../test/fixtures/intent-admission-worker.ts',import.meta.url),{workerData:{path:f.path,phase},execArgv:[]});
   t.after(()=>worker.terminate());const code=await new Promise<number>((resolve,reject)=>{worker.once('error',reject);worker.once('exit',resolve);});assert.equal(code,23);
-  const restarted=new WorldHost(f.db,toyFactory,'admission-fixture',1e9,f.host.worldId);restarted.boot();
-  assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision').length,1);assert.ok(restarted.engine.programOf('h_A'));
-  const attempts=Object.values(restarted.intentHistoryOf('s_A').attempts);assert.equal(attempts.length,phase==='after-fact'?1:0);
-  if(attempts.length)assert.equal(attempts[0].phase,'accepted');assert.equal(f.db.paidCost(),0);
+  const restarted=new WorldHost(f.db,native,'admission-fixture',1e9,f.host.worldId);restarted.boot();
+  const committed=phase==='before-apply'||phase==='after-apply';
+  assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision').length,committed?1:0);
+  assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='intent-admission-v2').length,committed?1:0);
+  assert.equal(!!restarted.engine.programOf('h_A'),committed);
+  const attempts=Object.values(restarted.intentHistoryOf('s_A').attempts);assert.equal(attempts.length,committed?1:0);
+  if(committed){assert.equal(attempts[0].phase,'accepted');assert.equal(restarted.engine.programOf('h_A'),attempts[0].activityId);
+    restarted.tickOnce();assert.equal(Object.values(restarted.intentHistoryOf('s_A').attempts)[0].phase,'started');}
+  const second=new WorldHost(f.db,native,'admission-fixture',1e9,f.host.worldId);second.boot();assert.deepEqual(second.intentHistoryOf('s_A'),restarted.intentHistoryOf('s_A'));
+  assert.equal(second.engine.stateHash(),restarted.engine.stateHash());assert.equal(f.db.paidCost(),0);
 });
 
 test('an actual executing native action establishes start and terminal program establishes completion through snapshot continuation',async t=>{

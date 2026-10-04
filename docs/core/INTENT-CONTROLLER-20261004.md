@@ -3,6 +3,9 @@
 October 4 Eastern. Parent `46eaade`, branch `core/intent-controller-outcomes`.
 Internal producer after the accepted admission component; default bridge and
 V2 routes/capabilities remain inactive. No public take or renderer change.
+This record describes the `d3aba39` boundary. The later
+[atomic admission component](INTENT-ATOMIC-ADMISSION-20261004.md) closes the new
+decision/private admission write gap; controller observation uncertainty remains.
 
 Native `programAction(id)` optionally observes the actual current action bound
 to a program. It returns detached scalar metadata: program/body/step, tick,

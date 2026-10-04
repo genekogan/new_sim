@@ -86,6 +86,12 @@ perception. G-003 will add a synchronized public station cue. Those are not
 implemented endpoints/capabilities in this baseline, and their real fixtures,
 auth checks and compatibility adapters precede shipping a claim.
 
+The internal [atomic admission producer](../core/INTENT-ATOMIC-ADMISSION-20261004.md)
+commits newly associated decisions/private admission together before live effects,
+using qualified read-only engine admission. This adds no authenticated V2 endpoint
+or capability to the current G baseline; controller/purpose/wire/rollback gates
+remain distinct. Historical orphan decisions are not inferred or backfilled.
+
 ## Bounds, errors and qualification
 
 HTTP bodies on `/v1/*` are bounded at 64 KiB. Query limits/cursors/retention,

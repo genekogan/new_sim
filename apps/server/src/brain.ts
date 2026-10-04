@@ -11,7 +11,7 @@ import {
 import { GOALS, describeIntent, publicIntent, mandateTriggerSchema, type Alignment, type Beat, type BrainCall, type CameraLine, type DecisionPayload, type LogEvent, type NarrativeView, type ScenePayload, type TalkLine, type TickerLine, type WireIntent } from '@sim/protocol';
 import type { Config } from './config.ts';
 import type { Db } from './db.ts';
-import { checkAcceptanceGuard, energyWord, hash32, StaleIntentAttempt, UnrecordedIntentAdmission, type AcceptanceGuard, type AcceptanceJournal, type Mind, type WorldHost } from './world.ts';
+import { checkAcceptanceGuard, energyWord, hash32, IntentAdmissionDeferred, StaleIntentAttempt, PersistedIntentAdmissionFault, type AcceptanceGuard, type AcceptanceJournal, type Mind, type WorldHost } from './world.ts';
 import { StaleCompilation } from './compile-fence.ts';
 import { Governor, SHARES, tierOf, type Tier } from './governor.ts';
 import { awaiting, belongsTo, candidatesFor, optionsFor, situationOf, matchesStep, type CardOption } from './deck.ts';
@@ -380,12 +380,21 @@ export class Brain {
 
   private enqueueDecision(m: Mind, author: string, payload: DecisionPayload, guard?: AcceptanceGuard, purpose?: { intentId:string; version:number }) {
     if (!guard) { void this.host.enqueue('decision', author, payload); return; }
+    const legacyVersion = m.intentVersion, willSeq = this.host.intentWillSeqOf(m.soulId);
     const queued = purpose ? this.host.enqueueIntentDecision(author,payload,purpose,guard)
       : this.host.enqueueChecked('decision', author, payload, guard);
     void queued.catch(error => {
-      if (error instanceof UnrecordedIntentAdmission) {
-        console.error('[brain] decision persisted; admission history requires reconciliation');
-        return; // The accepted program is already authoritative; never retry it.
+      if (error instanceof PersistedIntentAdmissionFault) {
+        console.error('[brain] decision and admission persisted; physical application requires reconciliation');
+        return; // The pair is already durable; never issue duplicate work.
+      }
+      if (error instanceof IntentAdmissionDeferred) {
+        if (this.host.minds.get(m.soulId) === m && m.intentVersion === legacyVersion && this.host.intentWillSeqOf(m.soulId) === willSeq) {
+          m.nextEvalTick = Math.min(m.nextEvalTick, this.host.engine.world.tick + 40);
+          m.evalTrigger = 'new-intent-v2';
+          m.lastFingerprint = '';
+        }
+        return; // Checkpoint eligibility is temporary; no durable or body effect.
       }
       if (!(error instanceof StaleCompilation) && !(error instanceof StaleIntentAttempt)) console.error('[brain] checked decision persistence failed');
       if (this.host.minds.get(m.soulId) === m) { m.nextEvalTick = this.host.engine.world.tick + 1; m.evalTrigger = 'new-intent-v2'; m.lastFingerprint = ''; }

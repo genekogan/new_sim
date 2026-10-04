@@ -49,9 +49,10 @@ export type AcceptanceJournal = (event: LogEvent) => true;
 type PurposeRef = { intentId: string; version: number };
 type ActivityBinding = { admissionSeq:number; payload:Extract<IntentAdmissionPayloadV2,{phase:'accepted'}> };
 export class StaleIntentAttempt extends Error { constructor() { super('purpose attempt became stale'); } }
-export class UnrecordedIntentAdmission extends Error {
+export class IntentAdmissionDeferred extends Error { constructor() { super('purpose admission needs a resumable checkpoint'); } }
+export class PersistedIntentAdmissionFault extends Error {
   readonly decisionSeq: number;
-  constructor(decisionSeq:number) { super('decision persisted; admission history requires reconciliation'); this.decisionSeq=decisionSeq; }
+  constructor(decisionSeq:number) { super('decision and admission persisted; physical application requires reconciliation'); this.decisionSeq=decisionSeq; }
 }
 type Pending = { kind: EventKind; author: string; payload: any; resolve?: (e: LogEvent) => void; guard?: AcceptanceGuard; journal?: AcceptanceJournal; reject?: (error: unknown) => void; purpose?: PurposeRef };
 export type SnapshotBody = { runtime: EngineSnapshot; minds: Mind[]; seq: number; extra: Record<string, unknown>; kernel?: KState; counts?: Record<string, number> };
@@ -249,6 +250,8 @@ export class WorldHost {
         catch (error) { p.reject!(error); continue; }
       }
       const e: LogEvent = { seq: this.seq + 1, tick, kind: p.kind, author: p.author, payload: p.payload, at: Date.now() };
+      let admission: LogEvent | undefined;
+      let preview: FoldResult | undefined;
       if (p.journal) {
         // Accepted log fact and its private request reference either both exist
         // or neither does. Check current DB authority under the same write lock.
@@ -256,25 +259,31 @@ export class WorldHost {
           this.db.db.exec('BEGIN IMMEDIATE');
           try {
             checkAcceptanceGuard(p.guard!);
+            if (p.purpose) {
+              preview = this.previewIntentAdmission(e);
+              admission = this.intentAdmissionEvent(e, p.purpose, preview);
+            }
             this.db.appendEvent(this.worldId, e);
+            if (admission) this.db.appendEvent(this.worldId, admission);
             if (p.journal(e) !== true) throw new TypeError('acceptance journal must synchronously return true');
             this.db.db.exec('COMMIT');
           } catch (error) { this.db.db.exec('ROLLBACK'); throw error; }
         } catch (error) { p.reject!(error); continue; }
       } else this.db.appendEvent(this.worldId, e);
-      this.seq = e.seq;
+      this.seq = admission?.seq ?? e.seq;
       let recovered = false;
       let result: FoldResult | undefined;
-      try { result = this.apply(e, false); } catch (error) { this.recoverFault(error, e.kind === 'decision' ? e.payload.card : undefined); recovered = true; }
-      if (!recovered) this.acc.log.push(e);
-      for (const l of this.listeners) l.onApplied?.(e);
-      if (p.purpose && !recovered) {
-        // Record the actual fold result before accepting another input. The
-        // association is explicit queued server context, never timestamp/name
-        // inference or a private field on the public decision payload.
-        try { this.recordIntentAdmission(e, p.purpose, result!); }
-        catch { p.reject?.(new UnrecordedIntentAdmission(e.seq)); continue; }
+      try {
+        result = this.apply(e, false);
+        if (preview && (!result || result.programId !== preview.programId || result.programOk !== preview.programOk || result.programCode !== preview.programCode))
+          throw new Error('purpose admission preview differs from live fold');
+        if (admission) this.apply(admission, false);
+      } catch (error) {
+        this.recoverFault(error, e.kind === 'decision' ? e.payload.card : undefined); recovered = true;
       }
+      if (!recovered) this.acc.log.push(e, ...(admission ? [admission] : []));
+      for (const accepted of admission ? [e, admission] : [e]) for (const l of this.listeners) l.onApplied?.(accepted);
+      if (admission && recovered) { p.reject?.(new PersistedIntentAdmissionFault(e.seq)); continue; }
       p.resolve?.(e);
     }
   }
@@ -345,30 +354,45 @@ export class WorldHost {
         throw new StaleIntentAttempt();
       return true as const;
     };
-    // Same writer-lock authority boundary as guarded compiler effects. This
-    // journal has no private DB writes; pending association remains ephemeral.
+    // Under the writer lock, use the engine's read-only admission calculation
+    // (or a detached exact checkpoint for adapters without that capability).
+    // The ordinary decision and named private fact commit before live effects.
     return new Promise((resolve, reject) => this.queue.push({ kind:'decision', author, payload:decision,
       guard:current, journal:()=>true, purpose, resolve, reject }));
   }
 
-  private recordIntentAdmission(decision: LogEvent, intent: PurposeRef, result: FoldResult) {
+  private previewIntentAdmission(decision: LogEvent): FoldResult {
+    const p = decision.payload as DecisionPayload;
+    const program = structuredClone({ actor:p.entityId, label:p.label, steps:p.steps });
+    let result;
+    if (this.engine.previewAdmission) result = this.engine.previewAdmission(program);
+    else {
+      if (this.engine.canSnapshot?.() === false) throw new IntentAdmissionDeferred();
+      const snapshot = this.engine.snapshot(), trial = this.factory.restore(structuredClone(snapshot));
+      if (trial === this.engine || trial.world === this.engine.world || trial.world.tick !== decision.tick
+        || trial.stateHash() !== snapshot.stateHash || this.engine.stateHash() !== snapshot.stateHash)
+        throw new IntentAdmissionDeferred();
+      result = trial.perform(program);
+    }
+    return { programId:result.id, programOk:result.ok, programCode:result.diagnostic?.code };
+  }
+
+  private intentAdmissionEvent(decision: LogEvent, intent: PurposeRef, result: FoldResult): LogEvent {
     if (decision.kind !== 'decision' || !result.programId || result.programOk === undefined)
-      throw new Error('purpose attempt lacks an observed program admission');
+      throw new Error('purpose attempt lacks an admission result');
     const p = decision.payload as DecisionPayload;
     const body = { contract:INTENT_V2, worldId:this.worldId, soulId:p.soulId, intent,
       attemptId:`a_${decision.seq}`, activityId:result.programId,
       decision:{ seq:decision.seq, tick:decision.tick, entityId:p.entityId } };
     const payload: IntentAdmissionPayloadV2 = result.programOk ? { ...body, phase:'accepted' }
       : { ...body, phase:'blocked', reason:result.programCode ?? 'program refused' };
-    const e: LogEvent = { seq:this.seq+1, tick:this.engine.world.tick, kind:'intent-admission-v2',
+    const e: LogEvent = { seq:decision.seq+1, tick:decision.tick, kind:'intent-admission-v2',
       author:'world:intent-admission', payload, at:Date.now() };
-    // Validate/fold before writing. A persisted fact replays without this
-    // ephemeral producer or consulting today's owner/model/controller.
+    // Validate before committing either fact. Live fold must match this exact
+    // result; replay uses the durable pair without models or current authority.
     const fact = intentAdmissionFactV2(e);
     foldIntentHistoryV2(this.intentHistoryOf(p.soulId), fact);
-    this.db.appendEvent(this.worldId, e); this.seq=e.seq;
-    this.apply(e, false); this.acc.log.push(e);
-    for (const l of this.listeners) l.onApplied?.(e);
+    return e;
   }
 
   private intentBindings():Record<string,ActivityBinding> {

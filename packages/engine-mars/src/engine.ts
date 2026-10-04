@@ -378,17 +378,24 @@ export class MarsEngine implements Engine {
     }
     return null;
   }
-  perform(program: Program) {
+  private prepareAdmission(program: Program) {
     const no = this.canPerform(program);
-    const id = `p${this.nextProg++}`;
-    if (no) { const old = this.byActor.get(program.actor); if (old) this.stop(old); return { id, ok: false, diagnostic: no }; }
+    const id = `p${this.nextProg}`;
+    if (no) return {result:{id,ok:false,diagnostic:no},build:null};
+    const build=program.steps[0]?.verb==='build_lookout'?this.buildPlan(program):null;
+    if (build && 'code' in build) return {result:{id,ok:false,diagnostic:build},build:null};
+    return {result:{id,ok:true},build};
+  }
+  previewAdmission(program:Program) { return structuredClone(this.prepareAdmission(program).result); }
+  perform(program: Program) {
+    const {result,build}=this.prepareAdmission(program),id=result.id;
+    this.nextProg++;
+    if (!result.ok) { const old = this.byActor.get(program.actor); if (old) this.stop(old); return result; }
     const old = this.byActor.get(program.actor);
     if (old) { const o = this.programs.get(old)!; if (o.action && this.rt.isActive(o.action)) this.rt.cancel(o.action, { code: 'program.replaced', message: 'replaced' }); this.end(o, 'cancelled', { code: 'program.replaced', message: 'replaced by a new program' }); }
-    const build=program.steps[0]?.verb==='build_lookout'?this.buildPlan(program):null;
-    if (build && 'code' in build) return {id,ok:false,diagnostic:build};
     const p: Prog = { id, actor: program.actor, label: program.label.slice(0, 200), steps: build?build.steps:program.steps, index: 0, started: false, since: this.rt.tick, ops: [], ...(build?{build:{phase:program.steps[0].params.phase as BuildPhase,crew:build.crew}}:{}) };
     this.programs.set(id, p); this.byActor.set(p.actor, id);
-    return { id, ok: true };
+    return result;
   }
   stop(programId: string) {
     const p = this.programs.get(programId); if (!p) return;

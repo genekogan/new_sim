@@ -50,6 +50,7 @@ export type RenderScene = {
 
 /** A depiction program for one actor: an ordered list of engine verbs. */
 export type Program = { actor: string; label: string; steps: { verb: string; params: Record<string, unknown> }[] };
+export type ProgramAdmission = { id:string; ok:boolean; diagnostic?:{code:string;message:string} };
 /** Progress of a program, reported by the engine each tick. `step` is the index now running; -1 on the events that end a program. */
 export type ProgramEvent = { tick: number; id: string; actor: string; kind: 'step' | 'completed' | 'failed' | 'cancelled'; step: number; code?: string; message?: string };
 /** Detached observation of an actual action bound to this program. A step
@@ -74,7 +75,11 @@ export interface Engine {
   /** Advance one tick. Returns what changed for broadcast. */
   step(): { paths: PathCommit[]; changes: ChangeEvent[]; events: RuntimeEvent[]; programs: ProgramEvent[] };
   /** Start a depiction program for an actor, replacing whatever that actor was doing. */
-  perform(program: Program): { id: string; ok: boolean; diagnostic?: { code: string; message: string } };
+  perform(program: Program): ProgramAdmission;
+  /** Detached admission result for the immediately following perform on the
+   * same state. Read-only: no IDs consumed, cancellation, execution or events.
+   * Optional; the sequencer otherwise requires an exact resumable checkpoint. */
+  previewAdmission?(program: Program): ProgramAdmission;
   /** Stop a running program (the actor is left idle where it is). */
   stop(programId: string): void;
   /** Physical feasibility of a program's first step right now, without running it (Mars: `verb.plan`). Null = feasible. */
