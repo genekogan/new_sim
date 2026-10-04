@@ -47,6 +47,18 @@ export class LifecycleJournal {
     if(!row||!current||current.world_id!==scope.worldId||current.owner!==scope.owner||current.entity_id!==scope.entityId)return undefined;
     return this.checked(row);
   }
+  /** Internal selected-world lookup. Transport must authorize current owner/admin
+   * before returning any private operation projection. */
+  operationInWorld(worldId:string,requestId:string):LifecycleOperation|undefined{
+    id.parse(worldId);lifecycleRequestIdSchema.parse(requestId);
+    const row=this.db.db.prepare('SELECT * FROM lifecycle_operations_v1 WHERE world_id=? AND request_id=?').get(worldId,requestId) as Row|undefined;
+    if(!row)return undefined;return this.get({worldId,soulId:row.soul_id,owner:row.owner_id,entityId:row.entity_id},requestId);
+  }
+  creationOfSoul(worldId:string,soulId:string):LifecycleOperation|undefined{
+    id.parse(worldId);id.parse(soulId);
+    const row=this.db.db.prepare("SELECT request_id FROM lifecycle_operations_v1 WHERE world_id=? AND soul_id=? AND operation='create'").get(worldId,soulId) as {request_id:string}|undefined;
+    return row?this.operationInWorld(worldId,row.request_id):undefined;
+  }
   private insert(scope:LifecycleScope,requestId:string,operation:LifecycleOperation['operation'],row:SoulRow){
     const body={scope,name:row.name,description:row.description,native:!!row.native};
     this.db.db.prepare('INSERT INTO lifecycle_operations_v1(world_id,request_id,soul_id,owner_id,entity_id,operation,state,body,body_hash,revision,requested_at) VALUES (?,?,?,?,?,?,\'pending\',?,?,1,?)')

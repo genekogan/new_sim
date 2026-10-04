@@ -26,7 +26,7 @@ export function buildApp(d: Deps) {
   const ip = (c: Context) => (c.req.header('x-forwarded-for') ?? 'local').split(',')[0].trim();
   const requireUser = async (c: Context): Promise<UserRow> => { const u = await d.auth.userFromToken(bearer(c)); if (!u) throw new ApiError(401, 'unauthorized', 'sign in first'); return u; };
   const requireAdmin = async (c: Context): Promise<UserRow> => { const u = await requireUser(c); if (u.role !== 'admin') throw new ApiError(403, 'forbidden', 'admin only'); return u; };
-  const ownSoul = (u: UserRow, id: string): SoulRow => { const s = d.db.soul(id); if (!s || s.retired_at || s.world_id !== d.host.worldId) throw new ApiError(404, 'not-found', 'no such soul'); if (s.owner !== u.id && u.role !== 'admin') throw new ApiError(403, 'forbidden', 'not your soul'); return s; };
+  const ownSoul = (u: UserRow, id: string): SoulRow => { const s = d.db.soul(id); if (!s || s.retired_at || s.world_id !== d.host.worldId) throw new ApiError(404, 'not-found', 'no such soul'); if (s.owner !== u.id && u.role !== 'admin') throw new ApiError(403, 'forbidden', 'not your soul'); d.souls.requireControlReady(s); return s; };
   const agentSoul = (c: Context): SoulRow => { const s = d.souls.soulFromToken(bearer(c)); if (!s) throw new ApiError(401, 'unauthorized', 'missing or invalid soul token; pair again (see /skill.md)'); return s; };
   /** Public base URL as the caller reached us (works on any hostname pointing at the box). */
   const baseOf = (c: Context) => { const host = c.req.header('x-forwarded-host') ?? c.req.header('host'); const proto = c.req.header('x-forwarded-proto') ?? (host?.startsWith('localhost') || host?.startsWith('127.') ? 'http' : 'https'); return host ? `${proto}://${host}${d.cfg.worldPath}` : d.cfg.publicUrl; };
@@ -45,6 +45,8 @@ export function buildApp(d: Deps) {
   // Apply before parsing/auth/rate errors as well as successful secret responses.
   for (const path of ['/v1/agent/pair', '/v1/agent/pair/*', '/v1/pair/*', '/v1/souls/:id/pair'])
     app.use(path, async (c, next) => { c.header('Cache-Control', 'no-store'); await next(); });
+  for(const path of ['/v1/lifecycle','/v1/lifecycle/*','/v1/me','/v1/souls','/v1/souls/:id'])
+    app.use(path,async(c,next)=>{if(d.souls.lifecycle)c.header('Cache-Control','no-store');await next();});
   app.use('/v1/*', bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({ ok: false, code: 'too-large', message: 'request body is larger than 64 KB' }, 413) }));
 
   // ---- public
@@ -82,19 +84,41 @@ export function buildApp(d: Deps) {
   app.get('/w/:key/llms.txt', c => c.text('No agent reader for this world on this process.', 404));
 
   // ---- signed-in users
-  const mySouls = (u: UserRow) => d.db.soulsOf(u.id).map((s) => ({ id: s.id, name: s.name, description: s.description, entityId: s.entity_id, hasToken: !!s.token_hash, tokenLabel: s.token_label, tokenCreatedAt: s.token_created_at, tokenLastUsed: s.token_last_used }));
-  app.get('/v1/me', async (c) => { const u = await requireUser(c); return c.json({ me: d.auth.me(u), souls: mySouls(u), maxSouls: d.cfg.maxSoulsPerUser }); });
+  const mySouls = (u: UserRow) => d.db.soulsOf(u.id).filter(s=>!d.souls.lifecycle||(s.world_id===d.host.worldId&&d.souls.invited(u)&&d.souls.controlReady(s))).map((s) => ({ id: s.id, name: s.name, description: s.description, entityId: s.entity_id, hasToken: !!s.token_hash, tokenLabel: s.token_label, tokenCreatedAt: s.token_created_at, tokenLastUsed: s.token_last_used }));
+  app.get('/v1/me', async (c) => { const u = await requireUser(c),souls=mySouls(u); return c.json({ me: {...d.auth.me(u),...(d.souls.lifecycle?{souls:souls.map(s=>s.id)}:{})}, souls, maxSouls: d.cfg.maxSoulsPerUser,
+    ...(d.souls.lifecycle?{lifecycleRequests:d.souls.invited(u)?d.souls.lifecycleHistory(u.id):{contract:'owner-lifecycle-list/1',worldId:d.host.worldId,requests:[],nextCursor:null}}:{}) }); });
+  app.get('/v1/lifecycle',async c=>{c.header('Cache-Control','no-store');const u=await requireUser(c);return c.json(d.souls.lifecycleHistory(u.id,c.req.query('cursor')??null,c.req.query('owner')??u.id));});
+  app.get('/v1/lifecycle/:requestId',async c=>{c.header('Cache-Control','no-store');const u=await requireUser(c);return c.json({lifecycle:d.souls.lifecycleReceipt(u.id,c.req.param('requestId'))});});
+  const lifecycleOptIn=(c:Context)=>{
+    const header=c.req.header('X-Sim-Lifecycle');
+    if(header!==undefined&&(header!=='1'||!d.souls.lifecycle))throw new ApiError(400,'lifecycle-unavailable','this lifecycle opt-in is unavailable');
+    return header==='1';
+  };
+  const lifecycleReply=async(c:Context,userId:string,requestId:string,optIn:boolean)=>{
+    if(!optIn)await d.souls.waitLifecycle(userId,requestId);
+    const user=await requireUser(c),lifecycle=d.souls.lifecycleReceipt(user.id,requestId);
+    if(user.id!==userId)throw new ApiError(404,'not-found','no such lifecycle');
+    c.header('Cache-Control','no-store');
+    if(lifecycle.state==='refused')return c.json({ok:false,code:'arrival-unavailable',message:'No safe arrival is available.',lifecycle},409);
+    const terminal=(lifecycle.state==='admitted'&&lifecycle.ready)||lifecycle.state==='retired';
+    if(optIn)return c.json({lifecycle},terminal?200:202);
+    if(!terminal)return c.json({ok:false,code:'lifecycle-pending',message:'Completion is unconfirmed; refresh the private lifecycle receipt.',lifecycle},503);
+    if(lifecycle.operation==='retire')return c.json({ok:true});
+    const soul=d.db.soul(lifecycle.soulId)!;return c.json({ok:true,soul:{id:soul.id,name:soul.name,description:soul.description,entityId:soul.entity_id}});
+  };
   app.post('/v1/invite', async (c) => {
     const u = await requireUser(c); const p = inviteSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'code is required');
     d.souls.redeemInvite(u, p.data.code); d.hub.refreshMe(u.id); return c.json({ ok: true });
   });
   app.post('/v1/souls', async (c) => {
     const u = await requireUser(c); d.souls.requireInvited(u);
+    const optIn=lifecycleOptIn(c);
     const lim = d.souls.limits.allow(`create:${u.id}`, 5, 3600_000); if (!lim.ok) throw new ApiError(429, 'rate-limited', 'too many new souls this hour', { retry_after: lim.retryAfter });
+    if(d.souls.lifecycle){const op=d.souls.acceptLifecycleCreate(u.id,await body(c));d.hub.refreshMe(u.id);return lifecycleReply(c,u.id,op.requestId,optIn);}
     const s = await d.souls.create(u.id, await body(c)); d.hub.refreshMe(u.id);
     return c.json({ ok: true, soul: { id: s.id, name: s.name, description: s.description, entityId: s.entity_id } });
   });
-  app.delete('/v1/souls/:id', async (c) => { const u = await requireUser(c); await d.souls.retire(ownSoul(u, c.req.param('id'))); d.hub.refreshMe(u.id); return c.json({ ok: true }); });
+  app.delete('/v1/souls/:id', async (c) => { const u = await requireUser(c),optIn=lifecycleOptIn(c),soul=ownSoul(u,c.req.param('id'));if(d.souls.lifecycle){const op=d.souls.acceptLifecycleRetire(u.id,soul);d.hub.refreshMe(soul.owner);return lifecycleReply(c,u.id,op.requestId,optIn);}await d.souls.retire(soul); d.hub.refreshMe(u.id); return c.json({ ok: true }); });
   app.get('/v1/souls/:id', async (c) => { const u = await requireUser(c); return c.json(d.souls.dashboard(ownSoul(u, c.req.param('id')))); });
   app.get('/v1/souls/:id/timeline', async (c) => { const u = await requireUser(c); return c.json({ events: d.souls.timeline(ownSoul(u, c.req.param('id')), intQ(c, 'limit', 80, 1, 200)) }); });
   app.get('/v1/souls/:id/deck', async (c) => { const u = await requireUser(c); return c.json(d.souls.deck(ownSoul(u, c.req.param('id')))); });

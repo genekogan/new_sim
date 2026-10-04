@@ -2,7 +2,7 @@
 import { TERMINAL } from '@sim/engine-contract';
 import { probeNativeHumanBirth } from '@sim/engine-mars';
 import { soulLifecycleSchema, ownerLifecycleListSchema, type SoulLifecycle } from '@sim/protocol';
-import { LifecycleJournal, type LifecycleOperation } from './lifecycle-journal.ts';
+import { LifecycleJournal, type LifecycleOperation, type LifecycleScope } from './lifecycle-journal.ts';
 import type { WorldHost } from './world.ts';
 
 class LifecycleDeferred extends Error {}
@@ -18,12 +18,17 @@ function refers(value:unknown,id:string):boolean {
  * evidence of admission, not the current row/Mind/kernel character value.
  * The caller still checks current user/invitation/control authority separately. */
 export function lifecycleBodyReady(host:WorldHost,op:LifecycleOperation):boolean {
-  const s=op.scope,row=host.db.soul(s.soulId),body=host.engine.world.entities[s.entityId],mind=host.minds.get(s.soulId),thing=host.kernel.things[s.soulId];
+  return ownedBodyCorresponds(host,op.scope,op.name);
+}
+/** Shared correspondence for an admitted operation or a verified legacy birth.
+ * A legacy identity does not need a fabricated lifecycle operation. */
+export function ownedBodyCorresponds(host:WorldHost,s:LifecycleScope,name:string):boolean {
+  const row=host.db.soul(s.soulId),body=host.engine.world.entities[s.entityId],mind=host.minds.get(s.soulId),thing=host.kernel.things[s.soulId];
   return !!row&&row.retired_at===null&&row.world_id===host.worldId&&s.worldId===host.worldId
-    &&row.owner===s.owner&&row.entity_id===s.entityId&&row.name===op.name
-    &&body?.kind==='human'&&body.human?.soul===s.soulId&&body.label===op.name
-    &&!!mind&&mind.entityId===s.entityId&&mind.owner===s.owner&&mind.name===op.name&&mind.description===row.description
-    &&host.mindByEntity.get(s.entityId)===mind&&thing?.kind==='soul'&&thing.name===op.name
+    &&row.owner===s.owner&&row.entity_id===s.entityId&&row.name===name
+    &&body?.kind==='human'&&body.human?.soul===s.soulId&&body.label===name
+    &&!!mind&&mind.entityId===s.entityId&&mind.owner===s.owner&&mind.name===name&&mind.description===row.description
+    &&host.mindByEntity.get(s.entityId)===mind&&thing?.kind==='soul'&&thing.name===name
     &&thing.traits.body===s.entityId&&thing.traits.about===row.description&&!!host.kernel.decks[s.soulId];
 }
 export function lifecycleRemovalSettled(host:WorldHost,op:LifecycleOperation):boolean {
@@ -55,6 +60,9 @@ export class LifecycleRunner {
   /** Invariant/persistence failures remain visible and require explicit review.
    * They are never ordinary refusal or an implicit logical release. */
   faults=new Map<string,unknown>();
+  /** An opt-in installer may reconcile after a committed input settles. Failed
+   * or deferred guards never trigger an immediate retry loop. */
+  onCommitted?:()=>void;
   private inflight=new Set<string>();
   private recoveryAfter:{requestedAt:number;requestId:string}|undefined;
   private authority:(op:LifecycleOperation)=>boolean;
@@ -65,8 +73,12 @@ export class LifecycleRunner {
   private current(op:LifecycleOperation){const current=this.journal.get(op.scope,op.requestId);if(!current||current.state!==op.state)throw new LifecycleDeferred('Lifecycle state changed');return current;}
   private queue(op:LifecycleOperation,promise:Promise<unknown>){
     this.inflight.add(op.requestId);
-    void promise.catch(error=>{if(!(error instanceof LifecycleDeferred))this.faults.set(op.requestId,error);})
-      .finally(()=>this.inflight.delete(op.requestId));
+    void promise.then(()=>{
+      this.inflight.delete(op.requestId);this.onCommitted?.();
+    },error=>{
+      this.inflight.delete(op.requestId);
+      if(!(error instanceof LifecycleDeferred))this.faults.set(op.requestId,error);
+    }).catch(error=>this.faults.set(op.requestId,error));
   }
   /** Explicit bounded reconciliation, invoked after boot and on owned ticks by
    * a future opt-in installer. It creates no timers, paid work or default hooks. */

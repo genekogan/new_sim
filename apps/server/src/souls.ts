@@ -10,6 +10,9 @@ import { tickerText } from './brain.ts';
 import type { Config } from './config.ts';
 import type { Db, SoulRow, UserRow } from './db.ts';
 import { energyWord, type WorldHost } from './world.ts';
+import { LifecycleJournal, type LifecycleOperation } from './lifecycle-journal.ts';
+import { LifecycleRunner,ownedBodyCorresponds,projectLifecycle } from './lifecycle-runner.ts';
+import type { SoulLifecycle } from '@sim/protocol';
 
 export class ApiError extends Error {
   status: number; code: string; extra?: Record<string, unknown>;
@@ -30,6 +33,7 @@ export class Souls {
   private waiters = new Map<string, Set<(reason: string) => void>>();
   private lastTouch = new Map<string, number>();
   host: WorldHost; db: Db; brain: Brain; cfg: Config;
+  lifecycle?:LifecycleRunner;
   constructor(host: WorldHost, db: Db, brain: Brain, cfg: Config) {
     this.host = host; this.db = db; this.brain = brain; this.cfg = cfg;
     host.listeners.push({
@@ -54,6 +58,82 @@ export class Souls {
   }
 
   // ------------------------------------------------------------ lifecycle
+  /** Internal candidate installer only; main/bootstrap do not call it. Full
+   * token/queued-write/release conformance still precedes capability publication. */
+  enableLifecycle(){
+    if(this.lifecycle)throw new Error('Lifecycle candidate already installed');
+    const journal=new LifecycleJournal(this.db),runner=new LifecycleRunner(this.host,journal,op=>{
+      const user=this.db.user(op.scope.owner);return !!user&&this.invited(user);
+    });
+    runner.onCommitted=()=>runner.pump();
+    this.lifecycle=runner;this.host.listeners.push({onApplied:()=>runner.pump(),afterTick:()=>runner.pump()});runner.pump();
+    return runner;
+  }
+  controlReady(soul:SoulRow):boolean{
+    if(!this.lifecycle)return true;
+    const current=this.db.soul(soul.id);
+    if(!current||current.owner!==soul.owner||current.world_id!==this.host.worldId||current.entity_id!==soul.entity_id||current.retired_at!==null)return false;
+    const creation=this.lifecycle.journal.creationOfSoul(this.host.worldId,soul.id);
+    if(creation)return creation.state==='complete'&&!creation.retirementAccepted&&projectLifecycle(this.host,creation).ready;
+    // Legacy access requires an exact canonical birth and current correspondence;
+    // never synthesize a request or repair a row simply because it exists.
+    const row=this.db.db.prepare("SELECT seq FROM events WHERE world_id=? AND kind='birth' AND json_extract(payload,'$.soulId')=? ORDER BY seq LIMIT 1").get(this.host.worldId,soul.id) as {seq:number}|undefined;
+    const birth=row?this.db.events(this.host.worldId,row.seq-1,1)[0]:undefined;
+    return !!birth&&birth.kind==='birth'&&birth.payload.owner===current.owner&&birth.payload.entityId===current.entity_id
+      &&birth.payload.name===current.name&&ownedBodyCorresponds(this.host,{worldId:this.host.worldId,soulId:soul.id,entityId:current.entity_id,owner:current.owner},current.name);
+  }
+  requireControlReady(soul:SoulRow){if(!this.controlReady(soul))throw new ApiError(409,'not-in-world','this Soul is not currently admitted and ready');}
+  private lifecycleUser(userId:string,privateRead=false){
+    const user=this.db.user(userId);
+    if(!user||!this.invited(user))throw new ApiError(privateRead?404:403,privateRead?'not-found':'invite-required',privateRead?'no such lifecycle':'an invite code is needed during the alpha');
+    return user;
+  }
+  lifecycleReceipt(userId:string,requestId:string):SoulLifecycle{
+    const user=this.lifecycleUser(userId,true);if(!this.lifecycle)throw new ApiError(404,'not-found','no such lifecycle');
+    let op:LifecycleOperation|undefined;
+    // Invalid IDs use the same unknown response; invariant failures propagate.
+    if(/^lc_[0-9a-f]{32}$/.test(requestId))op=this.lifecycle.journal.operationInWorld(this.host.worldId,requestId);
+    if(!op||(op.scope.owner!==user.id&&user.role!=='admin'))throw new ApiError(404,'not-found','no such lifecycle');
+    return projectLifecycle(this.host,op);
+  }
+  lifecycleHistory(userId:string,cursor:string|null=null,owner=userId){
+    const user=this.lifecycleUser(userId,true);if(!this.lifecycle||(owner!==user.id&&user.role!=='admin')||!owner||owner.length>128)throw new ApiError(404,'not-found','no such lifecycle');
+    if(cursor!==null&&!/^lc1_lc_[0-9a-f]{32}$/.test(cursor))throw new ApiError(404,'not-found','no such lifecycle');
+    try{return this.lifecycle.ownerPage(owner,cursor);}catch(error){if(error instanceof Error&&error.message==='Lifecycle cursor not found')throw new ApiError(404,'not-found','no such lifecycle');throw error;}
+  }
+  acceptLifecycleCreate(userId:string,input:unknown){
+    if(!this.lifecycle)throw new ApiError(400,'lifecycle-unavailable','lifecycle candidate is not installed');
+    const p=createSoulSchema.safeParse(input);if(!p.success)throw new ApiError(400,'invalid',p.error.issues.map(i=>i.message).join('; '));
+    const id=newId('s'),entityId=`h_${id.slice(2)}`,requestId='lc_'+randomBytes(16).toString('hex');
+    const accepted=this.lifecycle.journal.acceptCreate({worldId:this.host.worldId,soulId:id,entityId,owner:userId},requestId,{...p.data,native:false},()=>{
+      this.lifecycleUser(userId);
+      if(this.db.soulsOf(userId).length>=this.cfg.maxSoulsPerUser)throw new ApiError(409,'too-many',`at most ${this.cfg.maxSoulsPerUser} souls per account`);
+      if(this.db.soulByName(this.host.worldId,p.data.name))throw new ApiError(409,'name-taken',`a soul named ${p.data.name} already exists`);
+      return true;
+    });this.lifecycle.pump();return accepted;
+  }
+  acceptLifecycleRetire(userId:string,soul:SoulRow){
+    if(!this.lifecycle)throw new ApiError(400,'lifecycle-unavailable','lifecycle candidate is not installed');
+    const requestId='lc_'+randomBytes(16).toString('hex'),scope={worldId:this.host.worldId,soulId:soul.id,entityId:soul.entity_id,owner:soul.owner};
+    const accepted=this.lifecycle.journal.acceptRetire(scope,requestId,()=>{
+      const user=this.lifecycleUser(userId),current=this.db.soul(soul.id);
+      if(!current||current.retired_at!==null||current.world_id!==this.host.worldId)throw new ApiError(404,'not-found','no such soul');
+      if(current.owner!==user.id&&user.role!=='admin')throw new ApiError(403,'forbidden','not your soul');
+      this.requireControlReady(current);return true;
+    });
+    // Durable revocation is already committed. Remove any pending credential
+    // deliveries; physical occupancy remains native until its safe cleanup.
+    for(const [key,pair] of this.pairings)if(pair.soulId===soul.id)this.pairings.delete(key);
+    this.lifecycle.pump();return accepted;
+  }
+  async waitLifecycle(userId:string,requestId:string):Promise<SoulLifecycle>{
+    const deadline=performance.now()+2000;
+    for(;;){
+      const receipt=this.lifecycleReceipt(userId,requestId);
+      if((receipt.state==='admitted'&&receipt.ready)||receipt.state==='retired'||receipt.state==='refused'||performance.now()>=deadline)return receipt;
+      await new Promise<void>(resolve=>setTimeout(resolve,Math.min(20,Math.max(1,deadline-performance.now()))));
+    }
+  }
   async create(owner: string, input: unknown, native = false): Promise<SoulRow> {
     const p = createSoulSchema.safeParse(input);
     if (!p.success) throw new ApiError(400, 'invalid', p.error.issues.map((i) => i.message).join('; '));
@@ -314,6 +394,7 @@ export class Souls {
   private mint(soulId: string, label: string | null) { const token = newSoulToken(soulId); this.db.setSoulToken(soulId, hashToken(token), label); return token; }
   /** Owner-initiated: a short code the owner pastes to their agent along with the skill link. */
   pairCode(soul: SoulRow, base: string, issuer?: UserRow) {
+    this.requireControlReady(soul);
     for (const [k, p] of this.pairings) if (p.kind === 'owner' && p.soulId === soul.id) this.pairings.delete(k);
     const code = humanCode();
     this.pairings.set(code, { kind: 'owner', code, soulId: soul.id, owner: soul.owner, issuer: issuer?.id ?? soul.owner, expires: Date.now() + PAIR_TTL });
@@ -362,13 +443,14 @@ export class Souls {
   private pairAuthority(soul: SoulRow | undefined, owner: string, issuer: string): soul is SoulRow {
     const user = this.db.user(issuer);
     return !!soul && !soul.retired_at && soul.world_id === this.host.worldId && soul.owner === owner
-      && !!user && this.invited(user) && (user.id === soul.owner || user.role === 'admin');
+      && !!user && this.invited(user) && (user.id === soul.owner || user.role === 'admin') && this.controlReady(soul);
   }
 
   soulFromToken(token: string | undefined): SoulRow | null {
     if (!token?.startsWith('sim_')) return null;
     const soul = this.db.soulByTokenHash(hashToken(token)) ?? null;
     if (soul && soul.world_id !== this.host.worldId) return null;
+    if(soul&&!this.controlReady(soul))return null;
     if (soul) { const now = Date.now(); if (now - (this.lastTouch.get(soul.id) ?? 0) > 30_000) { this.lastTouch.set(soul.id, now); this.db.touchSoulToken(soul.id); } }
     return soul;
   }
