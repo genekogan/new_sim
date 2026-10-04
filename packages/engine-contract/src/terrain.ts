@@ -1,6 +1,13 @@
 import { z } from 'zod';
 
 const coordinate=z.number().finite().min(-10000).max(10000);
+export const terrainPointV1Schema=z.object({atXZ:z.tuple([coordinate,coordinate])}).strict();
+export type TerrainPointGeometryV1={
+  contract:'terrain-point-geometry/1';stage:'geometry-only';terrainId:string;
+  request:z.infer<typeof terrainPointV1Schema>;
+  geometryStatus:'covered'|'outside-terrain';
+  point:[number,number,number]|null;normal:[number,number,number]|null;grade:number|null;
+};
 export const terrainPatchV1Schema=z.object({
   id:z.string().min(1).max(96),originXZ:z.tuple([coordinate,coordinate]),
   spacingMetres:z.number().finite().min(.001).max(10000),

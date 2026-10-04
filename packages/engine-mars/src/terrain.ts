@@ -1,8 +1,8 @@
 // Deterministic, detached terrain-contact geometry for future native traversal.
 // It never installs a scene, assigns a contact or moves an entity. Existing
 // horizontal Spatial grids/locomotion are deliberately not consumers yet.
-import { terrainPatchV1Schema, terrainSweepV1Schema, terrainFootingV1Schema, type TerrainPatchV1,
-  type TerrainSweepGeometryV1, type TerrainTriangleV1, type TerrainSpanV1, type TerrainFootingGeometryV1 } from '@sim/engine-contract';
+import { terrainPatchV1Schema, terrainSweepV1Schema, terrainFootingV1Schema, terrainPointV1Schema, type TerrainPatchV1,
+  type TerrainSweepGeometryV1, type TerrainTriangleV1, type TerrainSpanV1, type TerrainFootingGeometryV1, type TerrainPointGeometryV1 } from '@sim/engine-contract';
 
 type V2=[number,number];
 type Triangle={ref:TerrainTriangleV1;vertices:[V2,V2,V2];baseY:number;dx:number;dz:number;grade:number;normal:[number,number,number]};
@@ -79,6 +79,14 @@ export function createTerrainGeometryProbe(raw:unknown){
   // Validation happens before conversion; nonfinite values cannot become null.
   const p:TerrainPatchV1=JSON.parse(JSON.stringify(terrainPatchV1Schema.parse(raw)));
   return {
+    point(rawRequest:unknown):TerrainPointGeometryV1 {
+      const request=terrainPointV1Schema.parse(rawRequest),[x,z]=request.atXZ,[x0,z0]=p.originXZ;
+      const result:TerrainPointGeometryV1={contract:'terrain-point-geometry/1',stage:'geometry-only',terrainId:p.id,
+        request,geometryStatus:'outside-terrain',point:null,normal:null,grade:null};
+      if(x<x0||z<z0||x>x0+(p.columns-1)*p.spacingMetres||z>z0+(p.rows-1)*p.spacingMetres)return result;
+      const t=centreTriangle(p,[x,z]);result.geometryStatus='covered';result.point=height(t,[x,z]);result.normal=[...t.normal];result.grade=t.grade;
+      return result;
+    },
     footing(rawRequest:unknown):TerrainFootingGeometryV1{
       const request:ReturnType<typeof terrainFootingV1Schema.parse>=JSON.parse(JSON.stringify(terrainFootingV1Schema.parse(rawRequest)));
       const [x,z]=request.centreXZ,[hx,hz]=request.halfXZ,s=p.spacingMetres;

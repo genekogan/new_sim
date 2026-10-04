@@ -1,0 +1,240 @@
+{
+  "contract": "shore-water-geometry-fixture/1",
+  "stage": "geometry-only",
+  "source": {
+    "path": "apps/server/test/fixtures/scene-placement/shore-world.v1.json",
+    "commit": "27879c144ef7716cd0238b5734a93d785e922950",
+    "sha256": "69ac8401b8ff734f8d23acc8088d6e583d29a31d428a0a8f066cf700c85dfb3b"
+  },
+  "columns": [
+    {
+      "contract": "water-column-geometry/1",
+      "stage": "geometry-only",
+      "waterId": "eden-shore-water",
+      "terrainId": "eden-shore-terrain",
+      "request": {
+        "atXZ": [
+          -10,
+          0
+        ],
+        "verticalSpan": [
+          -0.5,
+          1.5
+        ]
+      },
+      "geometryStatus": "wet",
+      "bedY": -1.5,
+      "datumY": 0,
+      "depthMetres": 1.5,
+      "submergedSpanMetres": 0.5,
+      "submergedSpanFraction": 0.25,
+      "unresolved": [
+        "body-anatomy",
+        "physical-support",
+        "water-physics",
+        "canonical-installation"
+      ]
+    },
+    {
+      "contract": "water-column-geometry/1",
+      "stage": "geometry-only",
+      "waterId": "eden-shore-water",
+      "terrainId": "eden-shore-terrain",
+      "request": {
+        "atXZ": [
+          -1,
+          0
+        ]
+      },
+      "geometryStatus": "wet",
+      "bedY": -0.3,
+      "datumY": 0,
+      "depthMetres": 0.3,
+      "submergedSpanMetres": null,
+      "submergedSpanFraction": null,
+      "unresolved": [
+        "body-anatomy",
+        "physical-support",
+        "water-physics",
+        "canonical-installation"
+      ]
+    },
+    {
+      "contract": "water-column-geometry/1",
+      "stage": "geometry-only",
+      "waterId": "eden-shore-water",
+      "terrainId": "eden-shore-terrain",
+      "request": {
+        "atXZ": [
+          0,
+          0
+        ]
+      },
+      "geometryStatus": "dry",
+      "bedY": 0,
+      "datumY": 0,
+      "depthMetres": 0,
+      "submergedSpanMetres": null,
+      "submergedSpanFraction": null,
+      "unresolved": [
+        "body-anatomy",
+        "physical-support",
+        "water-physics",
+        "canonical-installation"
+      ]
+    },
+    {
+      "contract": "water-column-geometry/1",
+      "stage": "geometry-only",
+      "waterId": "eden-shore-water",
+      "terrainId": "eden-shore-terrain",
+      "request": {
+        "atXZ": [
+          1,
+          0
+        ]
+      },
+      "geometryStatus": "dry",
+      "bedY": 0.13,
+      "datumY": 0,
+      "depthMetres": 0,
+      "submergedSpanMetres": null,
+      "submergedSpanFraction": null,
+      "unresolved": [
+        "body-anatomy",
+        "physical-support",
+        "water-physics",
+        "canonical-installation"
+      ]
+    },
+    {
+      "contract": "water-column-geometry/1",
+      "stage": "geometry-only",
+      "waterId": "eden-shore-water",
+      "terrainId": "eden-shore-terrain",
+      "request": {
+        "atXZ": [
+          -16.001,
+          0
+        ]
+      },
+      "geometryStatus": "outside-terrain",
+      "bedY": null,
+      "datumY": 0,
+      "depthMetres": null,
+      "submergedSpanMetres": null,
+      "submergedSpanFraction": null,
+      "unresolved": [
+        "body-anatomy",
+        "physical-support",
+        "water-physics",
+        "canonical-installation"
+      ]
+    }
+  ],
+  "hullClearances": [
+    {
+      "contract": "water-clearance-geometry/1",
+      "stage": "geometry-only",
+      "waterId": "eden-shore-water",
+      "terrainId": "eden-shore-terrain",
+      "request": {
+        "centreXZ": [
+          -4,
+          7
+        ],
+        "halfXZ": [
+          1.5,
+          0.65
+        ],
+        "draftMetres": 0.3,
+        "underKeelMarginMetres": 0.1
+      },
+      "geometryStatus": "sufficient-depth",
+      "checkedTriangles": 16,
+      "depthRangeMetres": [
+        0.75,
+        1.5
+      ],
+      "signedKeelClearanceRangeMetres": [
+        0.45,
+        1.2
+      ],
+      "unresolved": [
+        "yawed-hull",
+        "swept-route",
+        "obstacles",
+        "hydrostatics",
+        "passengers",
+        "canonical-installation"
+      ]
+    },
+    {
+      "contract": "water-clearance-geometry/1",
+      "stage": "geometry-only",
+      "waterId": "eden-shore-water",
+      "terrainId": "eden-shore-terrain",
+      "request": {
+        "centreXZ": [
+          -1.5,
+          7
+        ],
+        "halfXZ": [
+          1.5,
+          0.65
+        ],
+        "draftMetres": 0.3,
+        "underKeelMarginMetres": 0.1
+      },
+      "geometryStatus": "insufficient-depth",
+      "checkedTriangles": 18,
+      "depthRangeMetres": [
+        0,
+        0.9
+      ],
+      "signedKeelClearanceRangeMetres": [
+        -0.3,
+        0.6000000000000001
+      ],
+      "unresolved": [
+        "yawed-hull",
+        "swept-route",
+        "obstacles",
+        "hydrostatics",
+        "passengers",
+        "canonical-installation"
+      ]
+    },
+    {
+      "contract": "water-clearance-geometry/1",
+      "stage": "geometry-only",
+      "waterId": "eden-shore-water",
+      "terrainId": "eden-shore-terrain",
+      "request": {
+        "centreXZ": [
+          -1.49,
+          7
+        ],
+        "halfXZ": [
+          1.5,
+          0.65
+        ],
+        "draftMetres": 0.3,
+        "underKeelMarginMetres": 0.1
+      },
+      "geometryStatus": "outside-water-domain",
+      "checkedTriangles": 0,
+      "depthRangeMetres": null,
+      "signedKeelClearanceRangeMetres": null,
+      "unresolved": [
+        "yawed-hull",
+        "swept-route",
+        "obstacles",
+        "hydrostatics",
+        "passengers",
+        "canonical-installation"
+      ]
+    }
+  ],
+  "suppliedUnderKeelMarginMetres": 0.1
+}
