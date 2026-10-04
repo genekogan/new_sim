@@ -59,8 +59,10 @@ test('actual walking retirement preserves other actor and historical receipt, lo
   const other={...scope,soulId:'s_B',entityId:'h_B'};f.journal.acceptCreate(other,'lc_'+'c'.repeat(32),{...input,name:'Bob'},()=>true);await settle(f);
   const decision=f.host.enqueue('decision','soul:s_A',{soulId:'s_A',entityId:'h_A',label:'native walking',steps:[{verb:'walk_to',params:{to:[12,0,5]}}]});f.host.drainInputs();await decision;
   for(let i=0;i<40;i++)f.host.tickOnce();assert.equal(f.host.engine.world.entities.h_A.human!.activity,'walk');
-  const old=f.journal.get(scope,requestId)!;f.db.setSoulToken('s_A','local-token-hash');f.journal.acceptRetire(scope,retireId,()=>true);
-  const historical=projectLifecycle(f.host,f.journal.get(scope,requestId)!);assert.equal(historical.ready,false);assert.equal(historical.reason,'retirement-accepted');assert.equal(historical.revision,old.revision+1);assert.deepEqual(historical.fact,projectLifecycle(f.host,old).fact);
+  const old=f.journal.get(scope,requestId)!,birthFact=structuredClone(projectLifecycle(f.host,old).fact);
+  assert.deepEqual(birthFact,{seq:old.terminal!.seq,tick:old.terminal!.tick});
+  f.db.setSoulToken('s_A','local-token-hash');f.journal.acceptRetire(scope,retireId,()=>true);
+  const historical=projectLifecycle(f.host,f.journal.get(scope,requestId)!);assert.equal(historical.ready,false);assert.equal(historical.reason,'retirement-accepted');assert.equal(historical.revision,old.revision+1);assert.deepEqual(historical.fact,birthFact);
   assert.ok(f.host.engine.world.entities.h_A);assert.equal(f.db.soul('s_A')!.token_hash,null);await settle(f);
   const removed=f.journal.get(scope,retireId)!;assert.equal(removed.state,'complete');assert.equal(f.runner.faults.size,0);assert.equal(projectLifecycle(f.host,removed).state,'retired');assert.equal(f.host.engine.world.entities.h_A,undefined);assert.ok(f.host.engine.world.entities.h_B);
   const checkpoint=f.db.events(worldId).at(-1)!;assert.equal(checkpoint.kind,'rules');assert.deepEqual(checkpoint.payload,{checkpoint:'lifecycle-removal-confirmed'});

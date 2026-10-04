@@ -79,3 +79,14 @@ response loss, concurrency and admission/retirement races. Until those are prove
 App has no advertised executable transport pin. Auth/skill/UI/root/deploy remain
 outside Core permission. No automatic external request idempotency/retry; no
 historical orphan/ghost repair, real-owner proof, exact-scene capacity or activation.
+
+App's source counterpart found one narrow gap in the original walking-retirement
+assertion: projecting the saved old operation after retirement refreshes it, so
+both sides of the birth-fact comparison read the current record. That comparison
+alone was unqualified evidence of original association preservation; the reported
+41-pass run and its other assertions remain retained. The follow-up saves a
+detached projection fact before retirement, checks it against the original stored
+terminal seq/tick, then compares the post-retirement receipt with that saved fact.
+Only the changed walking-retirement test was rerun:1/1 PASS, including its existing
+actual walking cleanup, other actor, receipt revision, restart and inclusive replay
+checks. No runtime/codec/policy change, unchanged suite rerun or new activation claim.
