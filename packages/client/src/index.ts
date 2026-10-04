@@ -4,7 +4,7 @@
 // carries the server's view hash; the replica recomputes its own at that tick
 // and asks for a resync when they differ. Runs in browsers and in Node.
 import type { Entity, Environment, PathCommit, PoseSample, Region } from '@sim/engine-contract';
-import { samplePath, viewHashOf, viewRow, PROTO, type KernelView, type PlayView, type TalkLine, type Batch, type BrainCall, type CameraLine, type ClientMsg, type Heartbeat, type LogEvent, type Me, type NarrativeView, type PublicSoul, type ServerMsg, type ServerStats, type Snapshot, type TickerLine } from '@sim/protocol';
+import { samplePath, viewHashOf, viewRow, PROTO, stationLiveV1Schema, type StationLiveV1, type KernelView, type PlayView, type TalkLine, type Batch, type BrainCall, type CameraLine, type ClientMsg, type Heartbeat, type LogEvent, type Me, type NarrativeView, type PublicSoul, type ServerMsg, type ServerStats, type Snapshot, type TickerLine } from '@sim/protocol';
 
 export class Replica {
   tick = 0;            // latest tick we have data through
@@ -74,7 +74,18 @@ export class Replica {
 
 export type ConnState = 'connecting' | 'open' | 'closed';
 export type ConnStats = { state: ConnState; resyncs: number; reconnects: number; heartbeats: number; lastCheck: string; lastHash: string; myHash: string; bytesIn: number; msgsIn: number; rttMs: number; lastHeartbeatTick: number; snapshots: number };
+/** A local socket/welcome generation, distinct from the server process epoch. */
+export type ConnectionSession = { generation:number;worldId:string;epoch:string|null };
+export type TransportReceipt = { session:ConnectionSession;receivedAtMs:number };
+export type ClockProbe = { session:ConnectionSession;n:number;sentAtMs:number;automatic:boolean };
+export type PongReceipt = TransportReceipt & { sentAtMs:number;rttMs:number;automatic:boolean };
 export type Handlers = {
+  /** null invalidates the previous station; no playback can rely on it. */
+  onStation?(view:StationLiveV1|null,receipt:TransportReceipt|null):void;
+  /** Called before onWelcome, and with null on disconnect/replacement/close. */
+  onSession?(session:ConnectionSession|null):void;
+  /** Only a strictly valid reply to a current, unconsumed sent probe. */
+  onPong?(pong:Extract<ServerMsg,{t:'pong'}>,receipt:PongReceipt):void;
   onTakes?(stream: Extract<ServerMsg, {t: 'takes'}>): void;
   onChange?(): void; onLog?(e: LogEvent[]): void; onBrain?(c: BrainCall[]): void; onCamera?(l: CameraLine): void; onTicker?(l: TickerLine[]): void;
   onNarrative?(v: NarrativeView): void; onStats?(s: ServerStats): void; onKernel?(v: KernelView): void; onError?(code: string, message: string): void; onPlays?(p: PlayView[]): void; onTalk?(l: TalkLine[]): void; onWelcome?(me: Me | null, w: Extract<ServerMsg, { t: 'welcome' }>): void;
@@ -99,10 +110,54 @@ export class Connection {
   private resyncing = 0;
   /** The server process this replica was built from (batch numbers restart when the server does). */
   private epoch: string | null = null;
+  private sessionSerial=0;
+  private transport:ConnectionSession|null=null;
+  private pendingPings=new Map<number,ClockProbe>();
+  private lastMonotonicAt:number|null=null;
+  private lastExplicitProbeN=-1;
+  private automaticProbeN=0;
+  station:StationLiveV1|null=null;
+  /** Same monotonic domain used for actual send and receive boundaries. */
+  monotonicNow:()=>number;
   url: string; getToken: () => Promise<string | null>; handlers: Handlers; make: (url: string) => WSLike; now: () => number;
 
-  constructor(url: string, getToken: () => Promise<string | null>, handlers: Handlers, make: (url: string) => WSLike, now: () => number = () => Date.now()) {
+  constructor(url: string, getToken: () => Promise<string | null>, handlers: Handlers, make: (url: string) => WSLike, now: () => number = () => Date.now(), monotonicNow:()=>number=()=>performance.now()) {
     this.url = url; this.getToken = getToken; this.handlers = handlers; this.make = make; this.now = now;
+    this.monotonicNow=monotonicNow;
+  }
+
+  get session():ConnectionSession|null {return this.transport?{...this.transport}:null;}
+  private clearTransport() {
+    const hadSession=this.transport!==null,hadStation=this.station!==null;
+    this.transport=null;this.station=null;this.pendingPings.clear();this.lastMonotonicAt=null;
+    if(hadStation)this.handlers.onStation?.(null,null);
+    if(hadSession)this.handlers.onSession?.(null);
+  }
+  private monotonicSample(receivedAtMs?:number):number|null {
+    const at=receivedAtMs??this.monotonicNow();
+    if(!Number.isFinite(at)||at<0||this.lastMonotonicAt!==null&&at<this.lastMonotonicAt){
+      this.clearTransport();this.handlers.onError?.('clock.invalid','The local monotonic clock is unavailable or regressed.');
+      try{this.ws?.close();}catch{/* reconnect will request a fresh welcome */}return null;
+    }
+    this.lastMonotonicAt=at;return at;
+  }
+  /** Build a correlated ping at its actual monotonic send boundary. App's
+   * clock.begin(at) can return this existing public ping; no second socket. */
+  probe(build:(sentAtMs:number)=>Extract<ClientMsg,{t:'ping'}>):ClockProbe|null {
+    if(!this.transport||!this.transport.epoch||this.stats.state!=='open'||this.ws?.readyState!==1)return null;
+    const generation=this.transport.generation;
+    const at=this.monotonicSample();if(at===null)return null;
+    const message=build(at);if(this.transport?.generation!==generation)return null;
+    return this.sendProbe(message,at,false);
+  }
+  private sendProbe(message:Extract<ClientMsg,{t:'ping'}>,at:number,automatic:boolean):ClockProbe|null {
+    if(!this.transport||this.ws?.readyState!==1||!message||typeof message!=='object'||Object.keys(message).length!==2||message.t!=='ping'||!Number.isSafeInteger(message.n)
+      ||(automatic?message.n>=0:message.n<0||message.n<=this.lastExplicitProbeN))return null;
+    for(const [n,p] of this.pendingPings)if(at-p.sentAtMs>12000)this.pendingPings.delete(n);
+    if(this.pendingPings.has(message.n)||this.pendingPings.size>=16)return null;
+    if(!automatic)this.lastExplicitProbeN=message.n;
+    const p={session:{...this.transport},n:message.n,sentAtMs:at,automatic};this.pendingPings.set(message.n,p);
+    try{this.ws.send(JSON.stringify({t:'ping',n:message.n}));return structuredClone(p);}catch{this.pendingPings.delete(message.n);return null;}
   }
 
   connect() {
@@ -110,10 +165,14 @@ export class Connection {
   }
   private open() {
     if (this.closed) return;
+    this.clearTransport();
+    clearInterval(this.pingTimer);
+    const replaced=this.ws;this.ws=null;try{replaced?.close();}catch{/* obsolete socket is already ignored */}
     clearTimeout(this.reconnectTimer);
     this.stats.state = 'connecting'; this.handlers.onChange?.();
     const ws = (this.ws = this.make(this.url));
-    const mine = () => this.ws === ws && !this.closed;      // a socket that has been replaced or closed must not touch the replica
+    let active=true;
+    const mine = () => active && this.ws === ws && !this.closed;      // a socket that has been replaced or closed must not touch the replica
     ws.onopen = async () => {
       if (!mine()) return;
       this.stats.state = 'open'; this.lastMessageAt = this.now(); this.resyncing = 0;
@@ -127,13 +186,19 @@ export class Connection {
         if (!mine()) return;
         // the server speaks every two seconds; long silence means the socket is dead even if the browser has not noticed
         if (this.now() - this.lastMessageAt > 12_000) { try { ws.close(); } catch { /* already closed */ } return; }
-        if (ws.readyState === 1) ws.send(JSON.stringify({ t: 'ping', n: this.now() }));
+        if (ws.readyState === 1) {const at=this.monotonicSample();if(at!==null)this.sendProbe({t:'ping',n:--this.automaticProbeN},at,true);}
       }, 5000);
       this.handlers.onChange?.();
     };
-    ws.onmessage = (ev: { data: unknown }) => { if (!mine()) return; const s = String(ev.data); this.stats.bytesIn += s.length; this.stats.msgsIn++; this.lastMessageAt = this.now(); this.onMessage(JSON.parse(s) as ServerMsg); };
+    ws.onmessage = (ev: { data: unknown }) => {
+      if (!mine()) return;const receivedAtMs=this.monotonicNow(); const s = String(ev.data); this.stats.bytesIn += s.length; this.stats.msgsIn++; this.lastMessageAt = this.now();
+      let m:ServerMsg;try{m=JSON.parse(s) as ServerMsg;}catch{this.handlers.onError?.('message.invalid','The server message is not valid JSON.');return;}
+      if(!m||typeof m!=='object'||typeof m.t!=='string')return;
+      this.onMessage(m,receivedAtMs);
+    };
     ws.onclose = () => {
       if (this.ws !== ws) return;
+      active=false;this.clearTransport();
       clearInterval(this.pingTimer); this.stats.state = 'closed'; this.handlers.onChange?.();
       if (this.closed) return;
       this.stats.reconnects++;
@@ -143,7 +208,7 @@ export class Connection {
     };
     ws.onerror = () => { try { ws.close(); } catch { /* already closed */ } };
   }
-  close() { this.closed = true; clearInterval(this.pingTimer); clearTimeout(this.reconnectTimer); this.ws?.close(); }
+  close() { this.closed = true;this.clearTransport(); clearInterval(this.pingTimer); clearTimeout(this.reconnectTimer); this.ws?.close(); }
   /** Re-send hello (for example after signing in or out) on the same socket. */
   rehello() { this.ws?.close(); }
   /** Ask for a full snapshot. One request at a time: every batch that arrives before the snapshot is another gap, not another reason to ask. */
@@ -163,10 +228,17 @@ export class Connection {
     return Math.min(this.replica.tick + 10, this.anchor.tick + (this.now() - this.anchor.at) * rate);
   }
 
-  private onMessage(m: ServerMsg) {
+  private onMessage(m: ServerMsg,receivedAtMs:number) {
     const r = this.replica, h = this.handlers;
     switch (m.t) {
-      case 'welcome': this.welcome = m; this.retry = 0; this.epoch = m.epoch ?? null; h.onWelcome?.(m.you, m); break;
+      case 'welcome': {
+        this.clearTransport();this.welcome = m; this.retry = 0; this.epoch = m.epoch ?? null;
+        if(typeof m.worldId==='string'&&m.worldId&&(m.epoch===undefined||typeof m.epoch==='string'&&m.epoch.length>0)){
+          this.transport={generation:++this.sessionSerial,worldId:m.worldId,epoch:m.epoch??null};
+          h.onSession?.({...this.transport});
+        }
+        h.onWelcome?.(m.you, m);break;
+      }
       case 'snapshot': r.applySnapshot(m); this.stats.snapshots++; this.setAnchor(m.tick); this.pendingHb = null; this.resyncing = 0; break;
       case 'batch': {
         if (this.resyncing && this.now() - this.resyncing < 5_000) break;      // a snapshot is on its way
@@ -187,7 +259,21 @@ export class Connection {
       case 'plays': h.onPlays?.(m.plays); break;
       case 'talk': h.onTalk?.(m.lines); break;
       case 'takes': h.onTakes?.(m); break;
-      case 'pong': this.stats.rttMs = this.now() - m.n; break;
+      case 'station': {
+        const view=stationLiveV1Schema.safeParse(m.view),session=this.transport;
+        if(Object.keys(m).length!==2||!view.success||!session||view.data.worldId!==session.worldId){
+          this.station=null;h.onStation?.(null,null);h.onError?.('station.invalid','The public station does not match the current world session.');break;
+        }
+        const at=this.monotonicSample(receivedAtMs);if(at===null)break;
+        this.station=structuredClone(view.data);h.onStation?.(structuredClone(view.data),{session:{...session},receivedAtMs:at});break;
+      }
+      case 'pong': {
+        if(Object.keys(m).length!==3||!Number.isSafeInteger(m.n)||!Number.isSafeInteger(m.serverTime)||m.serverTime<0)break;
+        const p=this.pendingPings.get(m.n),session=this.transport;if(!p||!session||p.session.generation!==session.generation)break;
+        const at=this.monotonicSample(receivedAtMs);if(at===null)break;this.pendingPings.delete(m.n);
+        const rttMs=at-p.sentAtMs;if(rttMs<0||rttMs>12000)break;
+        this.stats.rttMs=rttMs;h.onPong?.({...m},{session:{...session},receivedAtMs:at,sentAtMs:p.sentAtMs,rttMs,automatic:p.automatic});break;
+      }
       case 'error': console.warn('[sim] server error', m.code, m.message); h.onError?.(m.code, m.message); break;
     }
     h.onChange?.();
