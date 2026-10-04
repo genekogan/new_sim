@@ -1,7 +1,7 @@
 // Isolated native fixture installation. Intentionally not a living-world
 // factory/default migration: only these certified locomotion verbs are admitted.
 import { readFileSync } from 'node:fs';
-import { hashOf } from '@sim/engine-contract';
+import { hashOf,nativeShoreSceneV1Schema,type RenderScene } from '@sim/engine-contract';
 import { loadMars } from './load.ts';
 import { createTerrainGeometryProbe } from './terrain.ts';
 import { createWaterGeometryProbe } from './water-geometry.ts';
@@ -37,6 +37,8 @@ export async function nativeShoreFixture() {
   };
   return {
     rulesVersion,fixture:structuredClone(fixture),geometry,
+    renderScene():RenderScene {return {scene:structuredClone(scene),shore:nativeShoreSceneV1Schema.parse({
+      contract:'native-shore-scene/1',rulesVersion,physicalBase:base,terrain:fixture.terrain,water:fixture.water})};},
     genesis(seed='shore'):WorldState {
       const w=m.greenFieldWorld(seed) as WorldState;w.base={...base};w.regions={
         bank:{id:'bank',label:'Native sloped shore',kind:'walkable',level:0,polygon:[[0,-12],[16,-12],[16,12],[0,12]],provenance:{origin:'design-edit',confidence:'hypothetical'}},

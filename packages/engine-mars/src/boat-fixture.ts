@@ -1,17 +1,18 @@
 import { nativeBoatFixture } from './boat-runtime.ts';
-import { boatStateV1Schema, boatPassengerV1Schema, boatTransitV1Schema, nativeBoatLayoutV1Schema, hashOf } from '@sim/engine-contract';
+import { boatStateV1Schema, boatPassengerV1Schema, boatTransitV1Schema, nativeBoatLayoutV1Schema, hashOf,captureRenderScene } from '@sim/engine-contract';
 import { TakeRecorder } from '../../../mars/viewer/engine/take/recorder.ts';
 import { BOAT_LAYOUT, BOAT_POLICY } from '../../../mars/viewer/engine/vehicles/boat.ts';
 
 /** An actual native two-person journey. No scripted roots, model outcomes,
  * owners, credentials, server, database, viewer or paid provider. */
-export async function nativeBoatTake() {
+export async function nativeBoatTake(captureScene=false) {
   nativeBoatLayoutV1Schema.parse(BOAT_LAYOUT);
   const f=await nativeBoatFixture(),w=f.genesis('public-native-boat-1');
   // Anonymous fixture identities, including an explicit hypothetical physical
   // pilot capability. They are not Souls admitted to a living owner-world.
   w.entities.pilot=f.human('pilot',4,5);w.entities.guest=f.human('guest',6,5);
-  const genesis=structuredClone(w),rt=f.create(w),recorder=new TakeRecorder(rt,{rulesVersion:f.rulesVersion});
+  const genesis=structuredClone(w),rt=f.create(w),capture=captureScene?captureRenderScene(f.rulesVersion,f.renderScene()):undefined,
+    recorder=new TakeRecorder(rt,{rulesVersion:f.rulesVersion,...(capture?{renderSceneRef:capture.ref}:{})});
   const requests=[
     {verb:'boat_board',params:{actor:'pilot',slot:'seat0'}},
     {verb:'shore_travel',params:{actor:'guest',x:4,z:5}},
@@ -43,5 +44,5 @@ export async function nativeBoatTake() {
     limits:['isolated-native-runtime','fixed-yaw-straight-translation','two-finite-upright-human-seats','prescribed-calm-draft-no-hydrostatics',
       'single-stopped-dock-and-finite-supported-connector','no-living-world-factory-or-history-transition',
       'no-body-rig-leg-contact-or-render-proof','no-seat-derived-pilot-or-owner-permission'],
-    finalStateHash:rt.stateHash(),takeHash:hashOf(take),paidSpendUSD:0};
+    finalStateHash:rt.stateHash(),takeHash:hashOf(take),paidSpendUSD:0,...(capture?{capture}:{})};
 }

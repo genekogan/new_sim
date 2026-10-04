@@ -1,6 +1,6 @@
 // Explicit new fixture version. Existing shore and living factories stay intact.
 import { readFileSync } from 'node:fs';
-import { hashOf } from '@sim/engine-contract';
+import { hashOf,nativeShoreSceneV1Schema,shoreAppearanceSourceV1Schema,SHORE_APPEARANCE_SOURCE_V1,type RenderScene } from '@sim/engine-contract';
 import { loadMars } from './load.ts';
 import { nativeShoreFixture } from './shore-runtime.ts';
 import { createWaterGeometryProbe } from './water-geometry.ts';
@@ -26,6 +26,8 @@ export async function nativeBoatFixture() {
     {id:'shore-clearance',level:0,y:0,obb:{c:[0,0],half:[16,12],yaw:0}}],links:[],obstacles:[]};
   const rulesVersion=`native-boat-fixture/1+${m.rulesVersion}`;
   const base={campus:'eden-boat-fixture/1',staticHash:hashOf({fixture,scene,rulesVersion,policy:BOAT_POLICY,layout:BOAT_LAYOUT})};
+  const appearance=shoreAppearanceSourceV1Schema.parse({contract:'shore-appearance-source/1',source:SHORE_APPEARANCE_SOURCE_V1,
+    utf8:readFileSync(new URL('./fixtures/shore-appearance-source.v1.json',import.meta.url),'utf8')});
   const registry=new Map([...shoreActions(g.shore),...boatActions(g)].map(a=>[a.verb,a]));
   const services=m.servicesFor({[base.campus]:scene});
   const inTransit=(rt:Runtime,id:string)=>!!rt.world.entities[id]?.human?.boatTransit;
@@ -37,6 +39,11 @@ export async function nativeBoatFixture() {
     shoreContactInvariant(g.shore,boatBodyContact),boatInvariant(g)];
   const validate=(w:WorldState)=>{if(w.base.campus!==base.campus||w.base.staticHash!==base.staticHash||w.obstacleEdits)throw new Error('boat fixture physical base/rules differ');};
   return {rulesVersion,geometry:g,fixture:shore.fixture,
+    renderScene():RenderScene {
+      const s=shore.renderScene().shore!;
+      return {scene:structuredClone(scene),shore:nativeShoreSceneV1Schema.parse({...s,rulesVersion,physicalBase:base,
+        boat:{layout:BOAT_LAYOUT,appearance}})};
+    },
     genesis(seed='boat'):WorldState {
       const w=shore.genesis(seed);w.base={...base};
       w.entities['eden-dock']={id:'eden-dock',def:'eden-shore-dock',kind:'fixture',pose:{p:[-3,.5,5],yaw:0},provenance:{origin:'design-edit',confidence:'hypothetical'}};

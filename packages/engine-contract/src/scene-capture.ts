@@ -1,6 +1,7 @@
 // An observation of the public render base, not a physical scene installation.
 import { z } from 'zod';
 import { hashOf } from './hash.ts';
+import { nativeShoreSceneV1Schema,type NativeShoreSceneV1 } from './shore-scene.ts';
 /** Current public render base, without physical controller dependencies. */
 export type RenderScene = {
   scene:unknown;
@@ -8,6 +9,7 @@ export type RenderScene = {
   kin?:{model:string;p:[number,number,number];yaw?:number;radius?:number;hoverHeight?:number;hover?:number}[];
   clock?:{origin:number;dayTicks:number}|null;
   ground?:'grass';
+  shore?:NativeShoreSceneV1;
 };
 
 const finite = z.number().finite();
@@ -24,6 +26,7 @@ const bodySchema = z.object({
   kin: z.array(z.object({model:z.string(),p:vec3,yaw:finite.optional(),radius:finite.positive().optional(),hoverHeight:finite.optional(),hover:finite.optional()}).strict()).optional(),
   clock: z.object({origin:z.number().int().nonnegative(),dayTicks:z.number().int().positive()}).strict().nullable().optional(),
   ground: z.literal('grass').optional(),
+  shore:nativeShoreSceneV1Schema.optional(),
 }).strict();
 export type RenderSceneCaptureV1 = {
   contract:'render-scene-capture/1'; ref:RenderSceneRefV1; body:RenderScene;
@@ -38,6 +41,7 @@ export function captureRenderScene(rules:string, scene:RenderScene):RenderSceneC
   const json=JSON.stringify(scene);
   if (new TextEncoder().encode(json).length>1024*1024) throw new RangeError('render scene capture exceeds 1 MiB');
   const body=bodySchema.parse(JSON.parse(json)) as RenderScene;
+  if(body.shore&&body.shore.rulesVersion!==rules)throw new TypeError('captured shore and render rules versions differ');
   return {contract:'render-scene-capture/1',ref:{contract:'render-scene-ref/1',rulesVersion:rules,
     hash:hashOf({contract:'render-scene-capture/1',rulesVersion:rules,body})},body};
 }

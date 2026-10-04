@@ -1,14 +1,15 @@
 import { nativeShoreFixture } from './shore-runtime.ts';
-import { shoreContactV1Schema, hashOf } from '@sim/engine-contract';
+import { shoreContactV1Schema, hashOf,captureRenderScene } from '@sim/engine-contract';
 import { TakeRecorder } from '../../../mars/viewer/engine/take/recorder.ts';
 import { SHORE_POLICY } from '../../../mars/viewer/engine/locomotion/shore.ts';
 
 /** Actual native events/tracks, not authored poses or fabricated outcomes. No
  * owner credentials, kernel, mind, compiler, paid provider or viewer is used. */
-export async function nativeShoreTake() {
+export async function nativeShoreTake(captureScene=false) {
   const f=await nativeShoreFixture(),w=f.genesis('public-native-shore-1');
   w.entities['shore-resident']=f.human('shore-resident',2,-6);
-  const rt=f.create(w),recorder=new TakeRecorder(rt,{rulesVersion:f.rulesVersion});
+  const rt=f.create(w),capture=captureScene?captureRenderScene(f.rulesVersion,f.renderScene()):undefined,
+    recorder=new TakeRecorder(rt,{rulesVersion:f.rulesVersion,...(capture?{renderSceneRef:capture.ref}:{})});
   const requests=[
     {verb:'shore_travel',params:{actor:'shore-resident',x:-8,z:-6}},
     {verb:'shore_tread',params:{actor:'shore-resident',ticks:60}},
@@ -34,5 +35,6 @@ export async function nativeShoreTake() {
     limits:['isolated-native-runtime','direct-routes-only','upright-human-capsule','prescribed-calm-buoyancy',
       'no-boats-dock-or-passengers','no-living-world-factory-or-history-transition','no-body-rig-or-contact-render-proof'],
     finalStateHash:rt.stateHash(),takeHash:hashOf(take),paidSpendUSD:0,
+    ...(capture?{capture}:{}),
   };
 }
