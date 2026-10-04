@@ -488,7 +488,7 @@ export class MarsEngine implements Engine {
       if (near[0]) e.human.attention = [near[0].o.pose.p[0], near[0].o.pose.p[2]];
     }
   }
-  renderScene() { return {scene: structuredClone(this.m.scenes[this.rt.world.base.campus] ?? null), clock: structuredClone(this.cfg.clock ?? null),...(this.cfg.scene==='littlemartians'?structuredClone(this.m.littleMartiansRender):{}),ground:this.cfg.scene==='greenfield'?'grass' as const:undefined}; }
+  renderScene() { return {scene: structuredClone(this.m.scenes[this.rt.world.base.campus] ?? null), clock: this.cfg.clock?{origin:this.cfg.clock.origin,dayTicks:this.cfg.clock.dayTicks}:null,...(this.cfg.scene==='littlemartians'?structuredClone(this.m.littleMartiansRender):{}),ground:this.cfg.scene==='greenfield'?'grass' as const:undefined}; }
   private startRecorder() {
     // Authored render bases are immutable for this engine instance. Supported
     // campus/clock/config boundaries change this key; actor/object motion is in

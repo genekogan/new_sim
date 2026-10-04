@@ -73,3 +73,15 @@ test('render capture codec rejects tampering, unknown top-level claims, invalid 
   assert.throws(()=>captureRenderScene('fixture/1',{scene:{x:NaN}}),/non-finite/);
   assert.throws(()=>captureRenderScene('fixture/1',{scene:{payload:'x'.repeat(1024*1024)}}),/1 MiB/);
 });
+
+test('canonical dayConfig customs do not enter the public render clock or poison recording',async()=>{
+  const f=await marsFactory(GREEN_FIELD_WORLD),e=f.create(f.genesis('living-clock'));
+  const dayConfig={origin:0,dayTicks:72000,customs:['SYNTHETIC_WORLD_CUSTOM_MARKER']};
+  e.configureClock!(dayConfig);
+  const before=e.stateHash(),snapshot=e.snapshot(),capture=captureRenderScene(e.rulesVersion,e.renderScene!());
+  assert.deepEqual(capture.body.clock,{origin:0,dayTicks:72000});assert.ok(!JSON.stringify(capture).includes('SYNTHETIC_WORLD_CUSTOM_MARKER'));
+  assert.deepEqual((snapshot as any).cfg.clock,dayConfig,'canonical configuration remains intact');assert.equal(e.stateHash(),before);
+  const restored=f.restore(snapshot);assert.equal(restored.stateHash(),before);assert.deepEqual(captureRenderScene(restored.rulesVersion,restored.renderScene!()),capture);
+  for(let i=0;i<20;i++)restored.step();const take=restored.takeChunks!(-1)[0].take as Take;
+  assert.deepEqual(take.renderSceneRef,capture.ref);assert.equal(takeIdOf(take),take.id);assert.deepEqual(restored.runtime.violations,[]);
+});
