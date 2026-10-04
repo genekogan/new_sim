@@ -9,6 +9,7 @@ import type { Auth } from './auth.ts';
 import type { Brain } from './brain.ts';
 import type { Db } from './db.ts';
 import { type WorldHost } from './world.ts';
+import type { Souls } from './souls.ts';
 
 const clientMsg = z.discriminatedUnion('t', [
   z.object({ t: z.literal('hello'), proto: z.number(), token: z.string().max(4000).optional(), since: z.number().optional(), epoch: z.string().max(40).optional() }),
@@ -31,9 +32,15 @@ export class Hub {
   build = 'dev';
   private lastTakeTick = -1;
   host: WorldHost; auth: Auth; db: Db;
+  private lifecycleSouls?:Souls;
 
-  constructor(server: Server, host: WorldHost, auth: Auth, db: Db) {
+  constructor(server: Server, host: WorldHost, auth: Auth, db: Db,lifecycleSouls?:Souls) {
     this.host = host; this.auth = auth; this.db = db;
+    // Internal opt-in only; production bootstrap does not supply this adapter.
+    if(lifecycleSouls){
+      if(!lifecycleSouls.lifecycle||lifecycleSouls.host!==host||lifecycleSouls.db!==db)throw new Error('Lifecycle WS views require the installed candidate on this host/DB');
+      this.lifecycleSouls=lifecycleSouls;
+    }
     this.wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024, perMessageDeflate: {threshold: 1024, clientNoContextTakeover: true, serverNoContextTakeover: true, concurrencyLimit: 4} });
     server.on('upgrade', (req, socket, head) => {
       if (!req.url?.startsWith('/ws')) { socket.destroy(); return; }
@@ -91,7 +98,7 @@ export class Hub {
     if (m.t === 'hello') {
       if (m.proto !== PROTO) { this.send(c, { t: 'welcome', build: this.build, proto: PROTO, worldId: this.host.worldId, rulesVersion: this.host.engine.rulesVersion, schema: this.host.engine.schema, dt: this.host.engine.dt, clockRate: this.host.clockRate, serverTick: this.host.engine.world.tick, you: null, serverTime: Date.now(), epoch: this.epoch }); return this.send(c, { t: 'error', code: 'proto', message: `server speaks protocol ${PROTO}` }); }
       const u = await this.auth.userFromToken(m.token).catch(() => null);
-      c.me = u ? this.auth.me(u) : null;
+      c.me = u ? this.lifecycleSouls?this.currentMe(u.id):this.auth.me(u) : null;
       const e = this.host.engine;
       this.send(c, { t: 'welcome', build: this.build, proto: PROTO, worldId: this.host.worldId, rulesVersion: e.rulesVersion, schema: e.schema, dt: e.dt, clockRate: this.host.clockRate, serverTick: e.world.tick, you: c.me, serverTime: Date.now(), epoch: this.epoch, paused: this.host.paused });
       // resume from the ring buffer if the client only missed a little; otherwise a full snapshot
@@ -116,15 +123,42 @@ export class Hub {
   private send(c: Client, m: ServerMsg) {
     if (c.ws.readyState !== 1) return;
     if (c.ws.bufferedAmount > MAX_BUFFERED) return; // slow client: skip; the heartbeat will make it resync
-    const s = JSON.stringify(m); c.sent += s.length; c.ws.send(s);
+    const current=this.privateMessage(c,m);if(!current)return;
+    const s = JSON.stringify(current); c.sent += s.length; c.ws.send(s);
+  }
+  /** No new private lifecycle fields are added to WS. Me retains its existing
+   * shape but only usable identities; canonical public bodies/takes stay intact. */
+  private currentMe(userId:string):Me|null{
+    const user=this.db.user(userId);if(!user)return null;
+    const me=this.auth.me(user),souls=this.lifecycleSouls;if(!souls)return me;
+    return {...me,souls:souls.invited(user)?this.db.soulsOf(user.id).filter(row=>row.world_id===this.host.worldId&&souls.controlReady(row)).map(row=>row.id):[]};
+  }
+  private refreshAuthority(c:Client){if(this.lifecycleSouls&&c.me)c.me=this.currentMe(c.me.userId);}
+  private privateMessage(c:Client,m:ServerMsg):ServerMsg|null{
+    if(!this.lifecycleSouls)return m;
+    if(m.t==='welcome'){this.refreshAuthority(c);return {...m,you:c.me};}
+    if(m.t==='stats'){this.refreshAuthority(c);return c.me?.role==='admin'?m:{...m,stats:publicStats(m.stats)};}
+    if(m.t==='brain'){
+      this.refreshAuthority(c);if(!c.me)return null;
+      const calls=m.calls.filter(call=>c.me!.role==='admin'||(!!call.soulId&&c.me!.souls.includes(call.soulId)));
+      return calls.length?{t:'brain',calls}:null;
+    }
+    return m;
   }
   broadcast(m: ServerMsg, filter?: (c: Client) => boolean) {
+    if(this.lifecycleSouls&&(m.t==='brain'||m.t==='stats')){
+      for(const c of this.clients){
+        if(!c.ready||c.ws.readyState!==1)continue;
+        this.refreshAuthority(c);if(filter&&!filter(c))continue;this.send(c,m);
+      }
+      return;
+    }
     const s = JSON.stringify(m);
     for (const c of this.clients) { if (!c.ready || c.ws.readyState !== 1 || (filter && !filter(c))) continue; if (c.ws.bufferedAmount > MAX_BUFFERED) continue; c.sent += s.length; c.ws.send(s); }
   }
   /** Model calls go to admins, and to the owner of the Soul a call is about. World-level calls (narrator, director) are admin only. */
   brainCall(call: BrainCall) { this.broadcast({ t: 'brain', calls: [call] }, (c) => !!c.me && (c.me.role === 'admin' || (!!call.soulId && c.me.souls.includes(call.soulId)))); }
-  refreshMe(userId: string) { for (const c of this.clients) if (c.me?.userId === userId) { const u = this.db.user(userId); if (u) c.me = this.auth.me(u); } }
+  refreshMe(userId: string) { for (const c of this.clients) if (c.me?.userId === userId) { if(this.lifecycleSouls)c.me=this.currentMe(userId);else{const u = this.db.user(userId); if (u) c.me = this.auth.me(u);} } }
 
   private sweep() {
     for (const c of this.clients) { if (!c.alive) { c.ws.terminate(); this.clients.delete(c); continue; } c.alive = false; try { c.ws.ping(); } catch { /* closed */ } }
