@@ -111,7 +111,13 @@ export function buildApp(d: Deps) {
     const u = await requireUser(c);
     return c.json({ calls: d.db.brainCalls(intQ(c, 'limit', 100, 1, 500), { tier: c.req.query('tier') || undefined, soulIds: u.role === 'admin' ? (c.req.query('soul') ? [c.req.query('soul')!] : null) : d.db.soulsOf(u.id).map((s) => s.id).filter((id) => !c.req.query('soul') || id === c.req.query('soul')) }) });
   });
-  app.get('/v1/prompt/:hash', async (c) => { await requireUser(c); const t = d.db.prompt(c.req.param('hash')); if (!t) throw new ApiError(404, 'not-found', 'no such prompt'); return c.text(t); });
+  app.get('/v1/prompt/:hash', async (c) => {
+    c.header('Cache-Control', 'no-store');
+    const u = await requireUser(c);
+    const t = d.db.prompt(c.req.param('hash'), { worldId: d.host.worldId, userId: u.id, admin: u.role === 'admin' });
+    if (t === null) throw new ApiError(404, 'not-found', 'no such prompt');
+    return c.text(t);
+  });
 
   // ---- admin
   app.get('/v1/spend', async (c) => { await requireAdmin(c); return c.json(d.brain.spendReport()); });

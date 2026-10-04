@@ -67,6 +67,13 @@ export const MIGRATIONS: { id: number; name: string; up(db: DatabaseSync): void 
     db.exec('CREATE INDEX take_chunks_from ON take_chunks(world_id, from_tick)');
   } },
   {id:6,name:'verified take archives',up(db){db.exec('CREATE TABLE take_archives(world_id TEXT NOT NULL, segment INTEGER NOT NULL, from_tick INTEGER NOT NULL, to_tick INTEGER NOT NULL, key TEXT NOT NULL, sha TEXT NOT NULL, bytes INTEGER NOT NULL, at INTEGER NOT NULL, PRIMARY KEY(world_id,segment))');}},
+  { id: 7, name: 'indexed originating system prompt references', up(db) {
+    // Existing retained calls already contain this reference; index them without
+    // rewriting history or treating arbitrary model/user JSON as an association.
+    db.exec(`CREATE INDEX brain_calls_prompt ON brain_calls(world_id,
+      CASE WHEN json_valid(body) THEN json_extract(body, '$.request.system[0].text.$prompt') END,
+      soul_id)`);
+  } },
 ];
 
 export function migrate(db: DatabaseSync): number[] {

@@ -124,7 +124,21 @@ export class Db {
     this.db.prepare('INSERT OR IGNORE INTO prompts (hash, text, created_at) VALUES (?,?,?)').run(hash, text, Date.now());
     return { $prompt: hash, chars: text.length };
   }
-  prompt(hash: string): string | null { return ((this.db.prepare('SELECT text FROM prompts WHERE hash = ?').get(hash) as any)?.text as string) ?? null; }
+  /** Resolve only a retained originating system reference visible to this caller.
+   * Hash possession, response lookalikes and interned-but-unassociated text are
+   * not authority. Reads recheck current ownership/role; pruning removes access.
+   */
+  prompt(hash: string, access: { worldId: string; userId: string; admin: boolean }): string | null {
+    const owner = access.admin ? '' : `AND b.soul_id IN (
+      SELECT s.id FROM souls s WHERE s.owner = ? AND s.world_id = b.world_id AND s.retired_at IS NULL
+    )`;
+    const row = this.db.prepare(`SELECT p.text FROM prompts p WHERE p.hash = ? AND EXISTS (
+      SELECT 1 FROM brain_calls b WHERE b.world_id = ?
+      AND CASE WHEN json_valid(b.body) THEN json_extract(b.body, '$.request.system[0].text.$prompt') END = p.hash
+      ${owner}
+    )`).get(hash, access.worldId, ...(access.admin ? [] : [access.userId])) as { text: string } | undefined;
+    return row?.text ?? null;
+  }
   saveBrainCall(worldId: string, c: Omit<BrainCall, 'id'>): number {
     const r = this.db.prepare('INSERT INTO brain_calls (world_id, tick, at, tier, subject, body, cost_usd, ms, soul_id, mode) VALUES (?,?,?,?,?,?,?,?,?,?)').run(worldId, c.tick, c.at, c.tier, c.subject, JSON.stringify(c), c.costUsd, c.ms, c.soulId ?? null, c.mode);
     // hourly rollup: survives pruning of brain_calls, so all-time spend stays exact
