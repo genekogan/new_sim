@@ -5,6 +5,7 @@ import type { Engine, EngineFactory, PathCommit, ChangeEvent, ProgramEvent, Engi
 import { kernelHash, sweep, type KState } from '@sim/kernel';
 import {
   describeIntent, publicIntent, viewHashOf, viewRow,
+  intentHistoryFactV2, intentReceivedPayloadV2Schema,
   type AgendaStep, type Batch, type BirthPayload, type DecisionPayload, type EventKind, type Heartbeat, type IntentPayload, type KernelView, type LogEvent,
   type PlayPayload, type PlayView, type PublicSoul, type ScenePayload, type Snapshot, type WireIntent,
 } from '@sim/protocol';
@@ -13,6 +14,7 @@ import { advanceNeeds, newLife, type Life } from '@sim/brain';
 import { arrivalPlace, baseVocabulary, codeVocabulary, foldEvent, initKernel, pinnedVocabulary, soulThing, type Vocabulary } from './fold.ts';
 import { frontier, stepIndex } from './deck.ts';
 import {mandateOf,MANDATE_STATE} from './mandate.ts';
+import { emptyIntentHistoryV2, foldIntentHistoryV2, type IntentHistoryV2 } from './intent-history.ts';
 export { replayFromGenesis, replayKernel } from './fold.ts';
 
 
@@ -315,6 +317,20 @@ export class WorldHost {
     if (e.kind === 'rules' && e.payload?.recovery) { this.restoreRecovery(e.payload.recovery as RecoveryRecipe); this.seq = e.seq; return; }
     const r = foldEvent(this.engine, this.kernel, e, this.counts);
     switch (e.kind) {
+      case 'intent-request-v2': {
+        const p = intentReceivedPayloadV2Schema.parse(e.payload);
+        if (p.worldId !== this.worldId) throw new Error('private request belongs to another world');
+        break;
+      }
+      case 'intent-v2': {
+        const fact = intentHistoryFactV2(e);
+        if (fact.worldId !== this.worldId) throw new Error('private purpose belongs to another world');
+        const histories = (this.extra.intentHistoriesV2 ??= {}) as Record<string, IntentHistoryV2>;
+        histories[fact.soulId] = foldIntentHistoryV2(this.intentHistoryOf(fact.soulId), fact);
+        // Publication records understanding, not an admitted physical activity.
+        // Choice/preemption integration remains behind the behavioral checkpoint.
+        break;
+      }
       case 'birth': {
         const p = e.payload as BirthPayload;
         if (!this.minds.has(p.soulId)) this.addMind({
@@ -518,6 +534,13 @@ export class WorldHost {
   }
   /** A human-readable name for a kernel thing id, an engine entity id or a region id. */
   nameOf(id: string): string { return this.kernel.things[id]?.name ?? this.engine.world.entities[id]?.label ?? this.engine.world.regions[id]?.label ?? id; }
+  /** Trusted internal projection; authorization belongs to its caller. Detached
+   * copies prevent card look-ahead and consumers from mutating private truth. */
+  intentHistoryOf(soulId: string): IntentHistoryV2 {
+    const histories = this.extra.intentHistoriesV2 as Record<string, IntentHistoryV2> | undefined;
+    return histories && Object.hasOwn(histories, soulId)
+      ? structuredClone(histories[soulId]) : emptyIntentHistoryV2(this.worldId, soulId);
+  }
   kernelView(): KernelView {
     const k = this.kernel; k.tick = this.engine.world.tick;
     const links = Object.fromEntries(Object.entries(k.links).filter(([, l]) => l.until === undefined || l.until >= k.tick));

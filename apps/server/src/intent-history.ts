@@ -1,9 +1,9 @@
-// Pure candidate G-002 projection, not yet attached to WorldHost or any route.
+// Pure G-002 private projection used by WorldHost's named opt-in log handler.
 // Caller must authenticate/revalidate producers and retain the canonical events.
 // Evidence references are checked structurally here; this does not prove physics.
 import { intentHistoryEventV2Schema, type IntentHistoryEventV2, type IntentRevisionV2, type IntentOutcomeV2 } from '@sim/protocol';
 
-type Entry = { revision: IntentRevisionV2; status: 'active' | 'blocked' | 'fulfilled' | 'withdrawn'; report: string | null };
+type Entry = { revision: IntentRevisionV2; status: 'active' | 'blocked' | 'fulfilled' | 'withdrawn'; statusSeq: number; report: string | null };
 export type IntentHistoryV2 = {
   worldId: string; soulId: string; lastSeq: number; lastTick: number;
   intents: Record<string, Entry>; attempts: Record<string, IntentOutcomeV2>;
@@ -28,18 +28,18 @@ export function foldIntentHistoryV2(state: IntentHistoryV2, raw: unknown): Inten
     const r = event.revision, old = Object.hasOwn(next.intents, r.intentId) ? next.intents[r.intentId] : undefined;
     if (r.worldId !== event.worldId || r.soulId !== event.soulId || r.submitted.seq !== event.seq || r.submitted.tick !== event.tick) fail('revision scope/origin mismatch');
     if (r.version !== (old?.revision.version ?? 0) + 1) fail('revision must advance exactly once');
-    next.intents[r.intentId] = { revision: r, status: 'active', report: null };
+    next.intents[r.intentId] = { revision: r, status: 'active', statusSeq: event.seq, report: null };
     // Other purposes and all earlier attempt references remain. The accepted
     // event log retains earlier revisions, rather than a daily FIFO of work.
   } else if (event.op === 'withdraw') {
     const current = entry(event.intent);
-    current.status = 'withdrawn'; current.report = 'Withdrawn by an authorized owner instruction.';
+    current.status = 'withdrawn'; current.statusSeq = event.seq; current.report = 'Withdrawn by an authorized owner instruction.';
   } else if (event.op === 'resolve') {
     const current = entry(event.intent);
     if (current.status === 'withdrawn') fail('a withdrawn purpose needs an explicit new revision');
     if (event.evidence.seq > event.seq || event.evidence.tick > event.tick) fail('resolution evidence is in the future');
     if (event.status === 'fulfilled' && event.evidence.kind === 'admission') fail('admission alone cannot fulfil a purpose');
-    current.status = event.status; current.report = event.reason;
+    current.status = event.status; current.statusSeq = event.seq; current.report = event.reason;
   } else {
     const out = event.outcome;
     const previous = Object.hasOwn(next.attempts, out.attemptId) ? next.attempts[out.attemptId] : undefined;

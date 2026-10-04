@@ -1,8 +1,9 @@
-// Candidate private persistence seam. Not a route, worker or received receipt:
-// canonical reservation/admission/publication still needs the G-004 integration.
+// Private persistence and named canonical publication seam. No route/automatic
+// worker or G-004 behavioral activation; pending rows alone are not receipts.
 import { randomUUID } from 'node:crypto';
 import { hashOf, stableStringify } from '@sim/engine-contract';
-import { intentRequestV2Schema, intentReceiptV2Schema, intentSourceV2Schema, intentRevisionV2Schema,
+import { INTENT_V2, intentReceivedPayloadV2Schema, intentHistoryFactV2,
+  intentRequestV2Schema, intentReceiptV2Schema, intentSourceV2Schema, intentRevisionV2Schema,
   type IntentRequestV2, type IntentReceiptV2, type IntentRevisionV2 } from '@sim/protocol';
 import type { Db, SoulRow } from './db.ts';
 import { checkAcceptanceGuard, type AcceptanceGuard, type AcceptanceJournal } from './world.ts';
@@ -10,19 +11,26 @@ import { checkAcceptanceGuard, type AcceptanceGuard, type AcceptanceJournal } fr
 type Source = IntentRevisionV2['source'];
 export type IntentRequestScope = { worldId: string; soulId: string; source: Source; currentAuthority: (row: SoulRow) => boolean };
 type Key = { worldId: string; soulId: string; principalId: string; requestId: string };
-type Row = { owner_id: string; body_hash: string; body: string; source: string; lease: string; receipt: string | null };
+type Row = { owner_id: string; body_hash: string; body: string; source: string; lease: string; receipt: string | null; received: string | null };
 export type RequestEventReference = { seq: number; tick: number; kind: string; eventHash: string };
-type View = { key: Key; request: IntentRequestV2; source: Source; receipt: IntentReceiptV2 | null };
+type View = { key: Key; request: IntentRequestV2; source: Source; receipt: IntentReceiptV2 | null; received: Extract<IntentReceiptV2, { phase: 'received' }> | null };
 export type RequestReservation = ({ created: true; lease: string } | { created: false }) & View;
 export class IntentRequestConflict extends Error { constructor() { super('that request ID already names different words or settings'); } }
 export class IntentRequestUnavailable extends Error { constructor() { super('request unavailable'); } }
 export class IntentRequestLeaseLost extends Error { constructor() { super('request reservation no longer writable'); } }
 
 function keyArgs(k: Key) { return [k.worldId, k.soulId, k.principalId, k.requestId]; }
+function received(raw: string | null): View['received'] {
+  if (raw === null) return null;
+  const receipt = intentReceiptV2Schema.parse(JSON.parse(raw));
+  if (receipt.phase !== 'received') throw new Error('invalid received origin');
+  return receipt;
+}
 function view(k: Key, row: Row): View {
   return { key: k, request: intentRequestV2Schema.parse(JSON.parse(row.body)),
     source: intentSourceV2Schema.parse(JSON.parse(row.source)),
-    receipt: row.receipt === null ? null : intentReceiptV2Schema.parse(JSON.parse(row.receipt)) };
+    receipt: row.receipt === null ? null : intentReceiptV2Schema.parse(JSON.parse(row.receipt)),
+    received: received(row.received) };
 }
 export class IntentRequests {
   readonly db: Db;
@@ -33,8 +41,41 @@ export class IntentRequests {
     catch (error) { this.db.db.exec('ROLLBACK'); throw error; }
   }
   private row(k: Key): Row | undefined {
-    return this.db.db.prepare('SELECT owner_id, body_hash, body, source, lease, receipt FROM intent_requests_v2 WHERE world_id=? AND soul_id=? AND principal_id=? AND request_id=?')
+    return this.db.db.prepare('SELECT owner_id, body_hash, body, source, lease, receipt, received FROM intent_requests_v2 WHERE world_id=? AND soul_id=? AND principal_id=? AND request_id=?')
       .get(...keyArgs(k)) as Row | undefined;
+  }
+  private verifyReceived(key: Key, row: Row) {
+    const origin = received(row.received);
+    if (!origin) throw new Error('publication requires its own canonical received origin');
+    const fact = this.db.events(key.worldId, origin.seq - 1, 1)[0];
+    const ref = this.db.db.prepare('SELECT event_hash FROM intent_request_events_v2 WHERE world_id=? AND soul_id=? AND principal_id=? AND request_id=? AND seq=?')
+      .get(...keyArgs(key), origin.seq);
+    if (!fact || fact.kind !== 'intent-request-v2' || fact.tick !== origin.tick || fact.author !== `soul:${key.soulId}`
+      || origin.worldId !== key.worldId || origin.soulId !== key.soulId || origin.requestId !== key.requestId
+      || !ref || ref.event_hash !== hashOf(fact)) throw new Error('canonical received origin failed verification');
+    const payload = intentReceivedPayloadV2Schema.parse(fact.payload);
+    if (payload.worldId !== key.worldId || payload.soulId !== key.soulId || hashOf(payload.request) !== row.body_hash
+      || stableStringify(payload.source) !== row.source) throw new IntentRequestConflict();
+    return origin;
+  }
+  private verifiedView(key: Key, row: Row): View {
+    const stored = view(key, row);
+    if (stored.received) this.verifyReceived(key, row);
+    if (stored.receipt?.phase === 'understood' || stored.receipt?.phase === 'withdrawn') {
+      this.verifyReceived(key, row);
+      const seq = stored.receipt.phase === 'understood' ? stored.receipt.revision.submitted.seq : stored.receipt.seq;
+      const fact = this.db.events(key.worldId, seq - 1, 1)[0];
+      const ref = this.db.db.prepare('SELECT event_hash FROM intent_request_events_v2 WHERE world_id=? AND soul_id=? AND principal_id=? AND request_id=? AND seq=?')
+        .get(...keyArgs(key), seq);
+      if (!fact || fact.kind !== 'intent-v2' || fact.author !== `soul:${key.soulId}` || !ref || ref.event_hash !== hashOf(fact))
+        throw new Error('canonical terminal receipt failed verification');
+      const history = intentHistoryFactV2(fact);
+      const actual = history.op === 'upsert' ? { contract: INTENT_V2, phase: 'understood', requestId: history.revision.requestId, revision: history.revision }
+        : { contract: INTENT_V2, phase: 'withdrawn', requestId: history.requestId, worldId: history.worldId, soulId: history.soulId,
+          intent: history.intent, seq: history.seq, tick: history.tick };
+      if (stableStringify(actual) !== row.receipt) throw new Error('canonical terminal receipt failed verification');
+    }
+    return stored;
   }
   private check(scope: IntentRequestScope): Source {
     const source = intentSourceV2Schema.parse(scope.source);
@@ -57,7 +98,7 @@ export class IntentRequests {
       if (old) {
         if (old.owner_id !== source.ownerId) throw new IntentRequestUnavailable();
         if (old.body_hash !== hash) throw new IntentRequestConflict();
-        return { created: false, ...view(key, old) };
+        return { created: false, ...this.verifiedView(key, old) };
       }
       const lease = randomUUID(), now = Date.now();
       this.db.db.prepare('INSERT INTO intent_requests_v2(world_id,soul_id,principal_id,request_id,owner_id,body_hash,body,source,lease,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
@@ -73,7 +114,7 @@ export class IntentRequests {
       try { source = this.check(scope); } catch (error) { if (error instanceof IntentRequestUnavailable) return null; throw error; }
       const key = { worldId: scope.worldId, soulId: scope.soulId, principalId: source.principalId, requestId };
       const row = this.row(key);
-      return row && row.owner_id === source.ownerId ? view(key, row) : null;
+      return row && row.owner_id === source.ownerId ? this.verifiedView(key, row) : null;
     });
   }
   /** Private worker journal for WorldHost.enqueueChecked on THIS Db. It only
@@ -89,6 +130,43 @@ export class IntentRequests {
         throw new Error('request journal must reference its own accepted canonical fact');
       this.db.db.prepare('INSERT INTO intent_request_events_v2(world_id,soul_id,principal_id,request_id,seq,tick,kind,event_hash) VALUES (?,?,?,?,?,?,?,?)')
         .run(...keyArgs(reservation.key), event.seq, event.tick, event.kind, hashOf(event));
+      return true;
+    };
+  }
+  /** A real received fact and its private receipt commit inside host acceptance.
+   * No new transaction here; journal verifies the just-appended durable fact. */
+  receivedJournal(reservation: Extract<RequestReservation, { created: true }>): AcceptanceJournal {
+    const reference = this.journal(reservation);
+    return event => {
+      reference(event);
+      if (event.kind !== 'intent-request-v2') throw new Error('received receipt requires its canonical request fact');
+      const p = intentReceivedPayloadV2Schema.parse(event.payload), row = this.row(reservation.key)!;
+      if (row.received !== null || p.worldId !== reservation.key.worldId || p.soulId !== reservation.key.soulId
+        || hashOf(p.request) !== row.body_hash || stableStringify(p.source) !== row.source) throw new IntentRequestConflict();
+      const receipt = intentReceiptV2Schema.parse({ contract: INTENT_V2, phase: 'received', requestId: p.request.requestId,
+        worldId: p.worldId, soulId: p.soulId, seq: event.seq, tick: event.tick });
+      this.db.db.prepare('UPDATE intent_requests_v2 SET received=?,updated_at=? WHERE world_id=? AND soul_id=? AND principal_id=? AND request_id=?')
+        .run(stableStringify(receipt), Date.now(), ...keyArgs(reservation.key));
+      return true;
+    };
+  }
+  /** Named terminal publication writes in the existing acceptance transaction.
+   * It does not call finish(), which owns a separate transaction. */
+  publicationJournal(reservation: Extract<RequestReservation, { created: true }>): AcceptanceJournal {
+    const reference = this.journal(reservation);
+    return event => {
+      reference(event);
+      const fact = intentHistoryFactV2(event), row = this.row(reservation.key)!;
+      if (row.received === null || fact.worldId !== reservation.key.worldId || fact.soulId !== reservation.key.soulId)
+        throw new Error('publication requires its own canonical received origin');
+      this.verifyReceived(reservation.key, row);
+      const source = fact.op === 'upsert' ? fact.revision.source : fact.source;
+      if (stableStringify(source) !== row.source) throw new IntentRequestConflict();
+      const receipt = fact.op === 'upsert'
+        ? { contract: INTENT_V2, phase: 'understood', requestId: fact.revision.requestId, revision: fact.revision }
+        : { contract: INTENT_V2, phase: 'withdrawn', requestId: fact.requestId, worldId: fact.worldId, soulId: fact.soulId,
+          intent: fact.intent, seq: fact.seq, tick: fact.tick };
+      this.writeReceipt(reservation, intentReceiptV2Schema.parse(receipt), () => true);
       return true;
     };
   }
@@ -117,7 +195,9 @@ export class IntentRequests {
   finish(reservation: Extract<RequestReservation, { created: true }>, raw: unknown, canonicalAcceptance?: AcceptanceGuard): IntentReceiptV2 {
     const receipt = intentReceiptV2Schema.parse(raw);
     if (receipt.phase === 'received') throw new Error('a reservation is not a canonical received receipt');
-    return this.transaction(() => {
+    return this.transaction(() => this.writeReceipt(reservation, receipt, canonicalAcceptance));
+  }
+  private writeReceipt(reservation: Extract<RequestReservation, { created: true }>, receipt: IntentReceiptV2, canonicalAcceptance?: AcceptanceGuard): IntentReceiptV2 {
       const row = this.row(reservation.key);
       if (!row || row.lease !== reservation.lease) throw new IntentRequestLeaseLost();
       const stored = view(reservation.key, row), req = stored.request;
@@ -144,6 +224,5 @@ export class IntentRequests {
       this.db.db.prepare('UPDATE intent_requests_v2 SET receipt=?,updated_at=? WHERE world_id=? AND soul_id=? AND principal_id=? AND request_id=?')
         .run(encoded, Date.now(), ...keyArgs(reservation.key));
       return receipt;
-    });
   }
 }

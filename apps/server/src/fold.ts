@@ -8,7 +8,7 @@ import {
   applyAll, bind, changesOf, emptyKernel, kernelHash, seedVocabulary, sweep, whyNot, BASE_MANNERS,
   type Change, type KState, type Thing,
 } from '@sim/kernel';
-import type { BirthPayload, DecisionPayload, DeckPayload, LogEvent, MintPayload, PlayPayload, PlayView } from '@sim/protocol';
+import { intentReceivedPayloadV2Schema, intentHistoryFactV2, type BirthPayload, type DecisionPayload, type DeckPayload, type LogEvent, type MintPayload, type PlayPayload, type PlayView } from '@sim/protocol';
 import {foldMandate} from './mandate.ts';
 
 /**
@@ -59,6 +59,10 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
   k.tick = e.tick;
   sweep(k);
   switch (e.kind) {
+    // Private owner control facts have no public kernel/body effects. The host
+    // folds their private history separately, including snapshot/recovery replay.
+    case 'intent-request-v2': { intentReceivedPayloadV2Schema.parse(e.payload); return {}; }
+    case 'intent-v2': { intentHistoryFactV2(e); return {}; }
     case 'birth': {
       const p = e.payload as BirthPayload;
       engine.spawnHuman({ id: p.entityId, label: p.name, soul: p.soulId });
@@ -179,7 +183,7 @@ export function replayKernel(genesis: KState, events: LogEvent[]): KState {
   const noEngine = { world: { entities: {} as Record<string, unknown> }, spawnHuman() { return ''; }, removeEntity() {}, programOf() { return null; }, stop() {}, perform() { return { id: '', ok: true }; } } as unknown as Engine;
   for (const e of events) {
     if (e.kind === 'rules' && e.payload?.recovery) { const r=e.payload.recovery as import('./world.ts').RecoveryRecipe; const restored=replayKernel(r.baseline.kernel!,r.events); Object.assign(k,restored); k.tick=r.untilTick; sweep(k); continue; }
-    if (e.kind === 'birth' || e.kind === 'play' || e.kind === 'mint' || e.kind === 'deck' || e.kind === 'retire' || e.kind === 'rules' || e.kind==='mandate') foldEvent(noEngine, k, e, counts);
+    if (e.kind === 'birth' || e.kind === 'play' || e.kind === 'mint' || e.kind === 'deck' || e.kind === 'retire' || e.kind === 'rules' || e.kind==='mandate' || e.kind==='intent-request-v2' || e.kind==='intent-v2') foldEvent(noEngine, k, e, counts);
   }
   return k;
 }

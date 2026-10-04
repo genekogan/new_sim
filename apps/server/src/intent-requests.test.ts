@@ -52,7 +52,7 @@ test('additive reservation migration upgrades old history without rewriting it a
   f.db.appendEvent('eden-fixture', { seq: 1, tick: 0, kind: 'rules', author: 'fixture', payload: { why: 'a preserved accepted fact' }, at: 1 });
   const before = JSON.stringify({ events: f.db.events('eden-fixture'), soul: f.db.soul('s_A') });
   f.db.db.exec('DROP TABLE intent_request_events_v2; DROP TABLE intent_requests_v2; DELETE FROM schema_migrations WHERE id>=8');
-  f.reopen(); assert.deepEqual(f.db.migrated, [8, 9]);
+  f.reopen(); assert.deepEqual(f.db.migrated, [8, 9, 10]);
   assert.equal(JSON.stringify({ events: f.db.events('eden-fixture'), soul: f.db.soul('s_A') }), before);
   f.store.reserve(f.scope, request); f.reopen(); assert.deepEqual(f.db.migrated, []);
   assert.equal(f.store.reserve(f.scope, request).created, false);

@@ -1,5 +1,5 @@
-// G-002 candidate, deliberately not used by a route, compiler or canonical log
-// yet. Activating ordinary-language/NOW semantics requires the agreed checkpoint.
+// G-002 candidate. Named private log handlers support isolated backend producers;
+// no route/capability activation until the agreed behavioral checkpoint.
 import { z } from 'zod';
 import { mandateTriggerSchema } from './mandate.ts';
 
@@ -60,6 +60,27 @@ export const intentHistoryEventV2Schema = z.discriminatedUnion('op', [
     status: z.enum(['active', 'blocked', 'fulfilled']), reason: z.string().min(1).max(2000), evidence }),
 ]);
 export type IntentHistoryEventV2 = z.infer<typeof intentHistoryEventV2Schema>;
+
+/** Canonical payloads omit sequence/tick origins: the accepted log envelope
+ * supplies them. A worker cannot predict its queue position or forge an origin. */
+export const intentReceivedPayloadV2Schema = z.strictObject({
+  contract: z.literal(INTENT_V2), worldId: id, soulId: id,
+  request: intentRequestV2Schema, source: intentSourceV2Schema,
+});
+const publicationScope = { contract: z.literal(INTENT_V2), worldId: id, soulId: id };
+export const intentPublicationPayloadV2Schema = z.discriminatedUnion('op', [
+  z.strictObject({ ...publicationScope, op: z.literal('upsert'), revision: intentRevisionV2Schema.omit({ submitted: true }) }),
+  z.strictObject({ ...publicationScope, op: z.literal('withdraw'), intent: intentReferenceV2Schema, requestId: id, source: intentSourceV2Schema }),
+]);
+export type IntentPublicationPayloadV2 = z.infer<typeof intentPublicationPayloadV2Schema>;
+export function intentHistoryFactV2(e: { kind: string; seq: number; tick: number; payload: unknown }): Extract<IntentHistoryEventV2, { op: 'upsert' | 'withdraw' }> {
+  if (e.kind !== 'intent-v2') throw new Error('not an accepted intent-v2 fact');
+  const p = intentPublicationPayloadV2Schema.parse(e.payload);
+  const fact = intentHistoryEventV2Schema.parse({ ...p, seq: e.seq, tick: e.tick,
+    ...(p.op === 'upsert' ? { revision: { ...p.revision, submitted: { seq: e.seq, tick: e.tick } } } : {}) });
+  if (fact.op !== 'upsert' && fact.op !== 'withdraw') throw new Error('unsupported canonical publication');
+  return fact;
+}
 
 /** Explicit public whitelist. The private event must never reach the old generic
  * publicEvent fallback; its integration needs a named new event-kind handler. */

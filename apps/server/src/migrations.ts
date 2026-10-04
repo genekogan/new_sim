@@ -97,6 +97,9 @@ export const MIGRATIONS: { id: number; name: string; up(db: DatabaseSync): void 
       FOREIGN KEY(world_id,seq) REFERENCES events(world_id,seq)
     )`);
   } },
+  { id: 10, name: 'canonical candidate intent receipt origins', up(db) {
+    db.exec('ALTER TABLE intent_requests_v2 ADD COLUMN received TEXT CHECK(received IS NULL OR json_valid(received))');
+  } },
 ];
 
 export function migrate(db: DatabaseSync): number[] {
