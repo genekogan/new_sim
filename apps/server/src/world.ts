@@ -5,13 +5,14 @@ import type { Engine, EngineFactory, PathCommit, ChangeEvent, ProgramEvent, Engi
 import { kernelHash, sweep, type KState } from '@sim/kernel';
 import {
   describeIntent, publicIntent, viewHashOf, viewRow,
-  intentHistoryFactV2, intentReceivedPayloadV2Schema,
+  INTENT_V2, intentHistoryFactV2, intentReceivedPayloadV2Schema, intentReferenceV2Schema, intentAdmissionFactV2,
+  type IntentAdmissionPayloadV2,
   type AgendaStep, type Batch, type BirthPayload, type DecisionPayload, type EventKind, type Heartbeat, type IntentPayload, type KernelView, type LogEvent,
   type PlayPayload, type PlayView, type PublicSoul, type ScenePayload, type Snapshot, type WireIntent,
 } from '@sim/protocol';
 import type { Db } from './db.ts';
 import { advanceNeeds, newLife, type Life } from '@sim/brain';
-import { arrivalPlace, baseVocabulary, codeVocabulary, foldEvent, initKernel, pinnedVocabulary, soulThing, type Vocabulary } from './fold.ts';
+import { arrivalPlace, baseVocabulary, codeVocabulary, foldEvent, initKernel, pinnedVocabulary, soulThing, type Vocabulary, type FoldResult } from './fold.ts';
 import { frontier, stepIndex } from './deck.ts';
 import {mandateOf,MANDATE_STATE} from './mandate.ts';
 import { emptyIntentHistoryV2, foldIntentHistoryV2, type IntentHistoryV2 } from './intent-history.ts';
@@ -45,7 +46,13 @@ export function checkAcceptanceGuard(guard: AcceptanceGuard): void {
 }
 /** Synchronous writes to this host's Db, in the event acceptance transaction. */
 export type AcceptanceJournal = (event: LogEvent) => true;
-type Pending = { kind: EventKind; author: string; payload: any; resolve?: (e: LogEvent) => void; guard?: AcceptanceGuard; journal?: AcceptanceJournal; reject?: (error: unknown) => void };
+type PurposeRef = { intentId: string; version: number };
+export class StaleIntentAttempt extends Error { constructor() { super('purpose attempt became stale'); } }
+export class UnrecordedIntentAdmission extends Error {
+  readonly decisionSeq: number;
+  constructor(decisionSeq:number) { super('decision persisted; admission history requires reconciliation'); this.decisionSeq=decisionSeq; }
+}
+type Pending = { kind: EventKind; author: string; payload: any; resolve?: (e: LogEvent) => void; guard?: AcceptanceGuard; journal?: AcceptanceJournal; reject?: (error: unknown) => void; purpose?: PurposeRef };
 export type SnapshotBody = { runtime: EngineSnapshot; minds: Mind[]; seq: number; extra: Record<string, unknown>; kernel?: KState; counts?: Record<string, number> };
 export type HostListener = {
   onBatch?(b: Batch): void;
@@ -254,9 +261,17 @@ export class WorldHost {
       } else this.db.appendEvent(this.worldId, e);
       this.seq = e.seq;
       let recovered = false;
-      try { this.apply(e, false); } catch (error) { this.recoverFault(error, e.kind === 'decision' ? e.payload.card : undefined); recovered = true; }
+      let result: FoldResult | undefined;
+      try { result = this.apply(e, false); } catch (error) { this.recoverFault(error, e.kind === 'decision' ? e.payload.card : undefined); recovered = true; }
       if (!recovered) this.acc.log.push(e);
       for (const l of this.listeners) l.onApplied?.(e);
+      if (p.purpose && !recovered) {
+        // Record the actual fold result before accepting another input. The
+        // association is explicit queued server context, never timestamp/name
+        // inference or a private field on the public decision payload.
+        try { this.recordIntentAdmission(e, p.purpose, result!); }
+        catch { p.reject?.(new UnrecordedIntentAdmission(e.seq)); continue; }
+      }
       p.resolve?.(e);
     }
   }
@@ -307,6 +322,51 @@ export class WorldHost {
     return new Promise((resolve, reject) => this.queue.push({ kind, author, payload, guard, journal, resolve, reject }));
   }
 
+  /** Internal opt-in choice producer. No wire operation accepts a purpose ref
+   * or activity claim. The original caller fence still owns final authority. */
+  enqueueIntentDecision(author: string, payload: DecisionPayload, raw: PurposeRef, guard: AcceptanceGuard): Promise<LogEvent> {
+    const purpose = intentReferenceV2Schema.parse(raw), mind = this.minds.get(payload.soulId);
+    if (!mind || payload.entityId !== mind.entityId || payload.continue || !payload.steps.length)
+      return Promise.reject(new Error('purpose attempt requires its current body and an actual program'));
+    const decision = structuredClone(payload);
+    const legacyVersion = mind.intentVersion;
+    const current = () => {
+      checkAcceptanceGuard(guard);
+      const row = this.db.soul(decision.soulId), entry = this.intentHistoryOf(decision.soulId).intents[purpose.intentId];
+      if (this.minds.get(decision.soulId) !== mind || mind.intentVersion !== legacyVersion || this.quietBarrier
+        || !row || row.retired_at !== null || row.world_id !== this.worldId
+        || row.owner !== mind.owner || row.entity_id !== decision.entityId
+        || this.kernel.things[decision.soulId]?.traits.body !== decision.entityId || !this.engine.world.entities[decision.entityId]
+        || !entry || entry.status !== 'active' || entry.revision.version !== purpose.version || entry.revision.source.ownerId !== row.owner)
+        throw new StaleIntentAttempt();
+      return true as const;
+    };
+    // Same writer-lock authority boundary as guarded compiler effects. This
+    // journal has no private DB writes; pending association remains ephemeral.
+    return new Promise((resolve, reject) => this.queue.push({ kind:'decision', author, payload:decision,
+      guard:current, journal:()=>true, purpose, resolve, reject }));
+  }
+
+  private recordIntentAdmission(decision: LogEvent, intent: PurposeRef, result: FoldResult) {
+    if (decision.kind !== 'decision' || !result.programId || result.programOk === undefined)
+      throw new Error('purpose attempt lacks an observed program admission');
+    const p = decision.payload as DecisionPayload;
+    const body = { contract:INTENT_V2, worldId:this.worldId, soulId:p.soulId, intent,
+      attemptId:`a_${decision.seq}`, activityId:result.programId,
+      decision:{ seq:decision.seq, tick:decision.tick, entityId:p.entityId } };
+    const payload: IntentAdmissionPayloadV2 = result.programOk ? { ...body, phase:'accepted' }
+      : { ...body, phase:'blocked', reason:result.programCode ?? 'program refused' };
+    const e: LogEvent = { seq:this.seq+1, tick:this.engine.world.tick, kind:'intent-admission-v2',
+      author:'world:intent-admission', payload, at:Date.now() };
+    // Validate/fold before writing. A persisted fact replays without this
+    // ephemeral producer or consulting today's owner/model/controller.
+    const fact = intentAdmissionFactV2(e);
+    foldIntentHistoryV2(this.intentHistoryOf(p.soulId), fact);
+    this.db.appendEvent(this.worldId, e); this.seq=e.seq;
+    this.apply(e, false); this.acc.log.push(e);
+    for (const l of this.listeners) l.onApplied?.(e);
+  }
+
   /** Apply a logged event: the fold moves the engine and the kernel; this adds the minds' bookkeeping. */
   apply(e: LogEvent, replay: boolean) {
     const tick = e.tick;
@@ -329,6 +389,17 @@ export class WorldHost {
         histories[fact.soulId] = foldIntentHistoryV2(this.intentHistoryOf(fact.soulId), fact);
         // Publication records understanding, not an admitted physical activity.
         // Choice/preemption integration remains behind the behavioral checkpoint.
+        break;
+      }
+      case 'intent-admission-v2': {
+        const fact = intentAdmissionFactV2(e), payload = e.payload as IntentAdmissionPayloadV2;
+        if (fact.worldId !== this.worldId) throw new Error('private admission belongs to another world');
+        const source = this.db.events(this.worldId, payload.decision.seq - 1, 1)[0];
+        if (!source || source.seq !== payload.decision.seq || source.tick !== payload.decision.tick || source.kind !== 'decision'
+          || source.payload.soulId !== fact.soulId || source.payload.entityId !== payload.decision.entityId || source.payload.continue)
+          throw new Error('private admission lacks its canonical decision');
+        const histories = (this.extra.intentHistoriesV2 ??= {}) as Record<string, IntentHistoryV2>;
+        histories[fact.soulId] = foldIntentHistoryV2(this.intentHistoryOf(fact.soulId), fact);
         break;
       }
       case 'birth': {
@@ -448,6 +519,7 @@ export class WorldHost {
       }
       case 'admin': break;
     }
+    return r;
   }
 
   addMind(m: Mind) { this.minds.set(m.soulId, m); this.mindByEntity.set(m.entityId, m); }

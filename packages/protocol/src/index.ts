@@ -8,7 +8,7 @@ import { z } from 'zod';
 import type { ChangeEvent, Entity, Environment, PathCommit, PoseSample, Region } from '@sim/engine-contract';
 import { hashOf, samplePath } from '@sim/engine-contract';
 import type { Change, KState, LinkKind, MintedCard } from '@sim/kernel';
-import { intentReceivedPayloadV2Schema, intentHistoryFactV2, publicIntentHistoryEventV2 } from './intent-v2.ts';
+import { intentReceivedPayloadV2Schema, intentHistoryFactV2, intentAdmissionFactV2, publicIntentHistoryEventV2 } from './intent-v2.ts';
 
 export const PROTO = 1;
 
@@ -51,7 +51,7 @@ export const describeIntent = (i: WireIntent | null, nameOf: (id: string) => str
 export const publicIntent = (i: WireIntent | null): WireIntent | null => { if (!i) return null; const { note: _n, text: _t, ...rest } = i; return rest; };
 
 // ---------------------------------------------------------------- log events
-export type EventKind = 'birth' | 'intent' | 'mandate' | 'decision' | 'play' | 'mint' | 'deck' | 'scene' | 'rules' | 'admin' | 'retire' | 'intent-request-v2' | 'intent-v2';
+export type EventKind = 'birth' | 'intent' | 'mandate' | 'decision' | 'play' | 'mint' | 'deck' | 'scene' | 'rules' | 'admin' | 'retire' | 'intent-request-v2' | 'intent-v2' | 'intent-admission-v2';
 export type LogEvent = { seq: number; tick: number; kind: EventKind; author: string; payload: any; at: number };
 
 export type BirthPayload = { soulId: string; entityId: string; name: string; description: string; owner: string };
@@ -80,6 +80,7 @@ export function publicEvent(e: LogEvent): LogEvent {
     return { ...e, payload: { worldId: p.worldId, soulId: p.soulId, privateUpdate: true } };
   }
   if (e.kind === 'intent-v2') return { ...e, payload: publicIntentHistoryEventV2(intentHistoryFactV2(e)) };
+  if (e.kind === 'intent-admission-v2') return { ...e, payload: publicIntentHistoryEventV2(intentAdmissionFactV2(e)) };
   if(e.kind==='mandate')return {...e,payload:{soulId:e.payload?.soulId,op:e.payload?.op,ruleId:e.payload?.ruleId??e.payload?.rule?.id,status:e.payload?.patch?.status??e.payload?.rule?.status}};
   if (e.kind === 'rules' && e.payload?.recovery) { const r=e.payload.recovery; return {...e,payload:{recovery:{excluded:r.excluded,faults:r.faults,restored:true}}}; }
   if (e.kind === 'rules' && e.payload?.reflection) return { ...e, payload: { soulId: e.payload.soulId, reflection: { day: e.payload.reflection.day, written: true } } };

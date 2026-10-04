@@ -52,6 +52,26 @@ export const intentOutcomeV2Schema = z.discriminatedUnion('phase', [
 });
 export type IntentOutcomeV2 = z.infer<typeof intentOutcomeV2Schema>;
 
+/** Trusted sequencer observation of Engine.perform, not a client assertion or
+ * physical start. Origins come from the accepted decision and fact envelopes. */
+const admissionBase = { contract: z.literal(INTENT_V2), worldId: id, soulId: id,
+  intent: intentReferenceV2Schema, attemptId: id,
+  decision: z.strictObject({ seq, tick, entityId: id }), activityId: id };
+export const intentAdmissionPayloadV2Schema = z.discriminatedUnion('phase', [
+  z.strictObject({ ...admissionBase, phase: z.literal('accepted') }),
+  z.strictObject({ ...admissionBase, phase: z.literal('blocked'), reason: z.string().min(1).max(2000) }),
+]);
+export type IntentAdmissionPayloadV2 = z.infer<typeof intentAdmissionPayloadV2Schema>;
+export function intentAdmissionFactV2(e: { kind: string; seq: number; tick: number; payload: unknown }): Extract<IntentHistoryEventV2, { op: 'outcome' }> {
+  if (e.kind !== 'intent-admission-v2') throw new Error('not an accepted intent admission fact');
+  const p = intentAdmissionPayloadV2Schema.parse(e.payload);
+  if (p.decision.seq >= e.seq) throw new Error('admission must follow its accepted decision');
+  const { decision, ...outcome } = p;
+  return { contract: INTENT_V2, worldId: p.worldId, soulId: p.soulId, seq: e.seq, tick: e.tick, op: 'outcome',
+    outcome: intentOutcomeV2Schema.parse({ ...outcome, seq: e.seq, tick: e.tick,
+      evidence: { seq: decision.seq, tick: decision.tick, kind: 'admission' } }) };
+}
+
 export const intentHistoryEventV2Schema = z.discriminatedUnion('op', [
   z.strictObject({ ...scope, op: z.literal('upsert'), revision: intentRevisionV2Schema }),
   z.strictObject({ ...scope, op: z.literal('withdraw'), intent: intentReferenceV2Schema, requestId: id, source: intentSourceV2Schema }),

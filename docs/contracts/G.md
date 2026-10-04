@@ -4,6 +4,14 @@ Publisher: Core; App owns human/agent consumers and permission policy.
 Current scopes and future G-002/G-003 proposals are accepted; executable
 conformance and breaking checkpoints remain distinct from scope signatures.
 
+Internal admission component (October 4): the opt-in native purpose bridge now
+produces private `intent-admission-v2` facts linking an exact purpose version to
+its canonical decision and actual native program admission/refusal. This adds
+no endpoint or capability. Receipt remains understood; admission is distinct
+from controller start/completion and broader fulfilment. Decision/fact crash-gap
+reconciliation, actual lifecycle, authenticated V2 and compatible rollback remain
+activation gates. [Producer evidence](../core/INTENT-ADMISSION-20261004.md).
+
 ## Identity, routes and access
 
 Prefix HTTP/WS/MCP/skill with `/w/<key>` for the selected world. Root aliases

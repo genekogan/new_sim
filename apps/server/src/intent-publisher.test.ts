@@ -238,14 +238,19 @@ test('named public HTTP/real WS handlers and takes exclude private publication; 
   t.after(async () => { ws.terminate(); hub.wss.close(); await new Promise<void>(resolve => server.close(() => resolve())); });
   await once(ws, 'open'); ws.send(JSON.stringify({ t: 'hello', proto: 1 }));
   const result = await publish(f, await receive(f, 'PRIVATE_REQUEST'));
+  assert.equal(result.receipt?.phase,'understood');
+  const revision=result.receipt?.phase==='understood'?result.receipt.revision:null;assert.ok(revision);
+  const decision=f.host.enqueueIntentDecision('brain:reflex',{soulId:'s_A',entityId:'h_A',option:'rest',label:'rest',steps:[{verb:'rest',params:{seconds:1}}],reevalTicks:1200,fallback:false,trigger:'new-intent-v2'},
+    {intentId:revision.intentId,version:revision.version},()=>true);f.host.drainInputs();await decision;
   for (let i = 0; i < 65; i++) f.host.tickOnce();
   for (let i = 0; i < 50 && !messages.some(m => m.t === 'batch' && m.log.some((e: any) => e.kind === 'intent-v2')); i++) await setImmediate();
   assert.ok(messages.some(m => m.t === 'batch' && m.log.some((e: any) => e.kind === 'intent-v2')), 'real socket sees named public publication');
+  assert.ok(messages.some(m => m.t === 'batch' && m.log.some((e: any) => e.kind === 'intent-admission-v2')), 'real socket sees named redacted admission');
   for (const path of ['/v1/log', '/v1/kernel', '/v1/world', '/v1/debug/world', '/v1/takes', '/v1/take']) {
     const response = await app.request(path); assert.equal(response.status, 200); messages.push(await response.json());
   }
   const serialized = JSON.stringify(messages);
-  for (const marker of ['PRIVATE_OWNER_WORDS', 'PRIVATE_INTERPRETATION', 'PRIVATE_PRINCIPAL', 'PRIVATE_REQUEST', 'dev:owner']) assert.ok(!serialized.includes(marker), `${marker} absent from public HTTP/WS/takes`);
+  for (const marker of ['PRIVATE_OWNER_WORDS', 'PRIVATE_INTERPRETATION', 'PRIVATE_PRINCIPAL', 'PRIVATE_REQUEST', 'dev:owner',revision.intentId]) assert.ok(!serialized.includes(marker), `${marker} absent from public HTTP/WS/takes`);
   assert.ok(JSON.stringify(f.host.extra).includes(words)); assert.ok(!JSON.stringify(f.host.kernel).includes(words), 'private history is not card-readable kernel state');
   const detached = f.host.intentHistoryOf('s_A'); Object.values(detached.intents)[0].revision.words = 'mutated consumer';
   assert.ok(JSON.stringify(f.host.intentHistoryOf('s_A')).includes(words));

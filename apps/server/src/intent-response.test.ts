@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { setImmediate } from 'node:timers/promises';
 import { marsFactory } from '@sim/engine-mars';
 import { buildMidRequest, fakeJev, newLife, type CompileOut, type callTool } from '@sim/brain';
-import { INTENT_V2, publicEvent } from '@sim/protocol';
+import { INTENT_V2, intentAdmissionFactV2, publicEvent } from '@sim/protocol';
 import { Brain } from './brain.ts';
 import { config } from './config.ts';
 import { Db } from './db.ts';
@@ -86,6 +86,14 @@ test('ordinary V2 direction wakes an actually sleeping native body; older purpos
   assert.notDeepEqual(f.host.engine.world.entities.h_A.pose.p,before);
   const decisions=f.db.events(f.host.worldId).filter(e=>e.kind==='decision' && e.author==='brain:reflex');
   assert.equal(decisions[0].payload.card,'go to'); assert.equal(decisions[0].tick,published.event.tick+1);
+  const admission=f.db.events(f.host.worldId).find(e=>e.kind==='intent-admission-v2');assert.ok(admission);
+  const admitted=intentAdmissionFactV2(admission).outcome;
+  assert.equal(admitted.phase,'accepted');assert.equal(admitted.evidence.seq,decisions[0].seq);
+  assert.equal(admitted.tick,decisions[0].tick,'admission is recorded before controller ticks or motion');
+  assert.equal(published.receipt.phase,'understood');
+  assert.equal(f.host.intentHistoryOf('s_A').attempts[admitted.attemptId].phase,'accepted','walking/arrival do not manufacture start or completion facts');
+  assert.equal(f.host.intentHistoryOf('s_A').intents[admitted.intent.intentId].status,'active','admission does not fulfil a purpose');
+  assert.ok(!JSON.stringify(publicEvent(admission)).includes(admitted.intent.intentId));
   assert.equal(Object.keys(f.host.intentHistoryOf('s_A').intents).length,2);
   assert.ok(!JSON.stringify(f.db.events(f.host.worldId).map(publicEvent)).includes('PRIVATE_OLDER'));
   assert.deepEqual(f.host.engine.runtime.violations,[]);
@@ -100,6 +108,22 @@ test('default reader records understanding without waking the native sleeper',as
   await ticks(f.host,100);
   assert.equal(f.host.engine.programOf('h_A'),sleeping); assert.equal(f.host.engine.world.entities.h_A.human!.activity,'sleep');
   assert.equal(f.brain.midContext(f.mind,'timer').purposes,undefined);
+});
+
+test('Brain preserves its already accepted native choice when private admission persistence fails, without scheduling another fresh-purpose wake',async t=>{
+  const f=fixture(t),request=await received(f,'writer-failure','go to the campfire');
+  await accept(f.host,f.publisher.publish(f.scope,request,{summary:'Walk to the campfire.',agenda:[{card:'go to',target:'campfire'}],trigger:{kind:'now'}}));
+  const append=f.db.appendEvent.bind(f.db),error=console.error,messages:string[]=[];
+  t.after(()=>{f.db.appendEvent=append;console.error=error;});
+  f.db.appendEvent=(world,event)=>{if(event.kind==='intent-admission-v2')throw new Error('PRIVATE_WRITER_FAILURE');append(world,event);};
+  console.error=(...args)=>messages.push(args.map(String).join(' '));
+  await f.brain.evaluate(f.mind,'new-intent-v2');f.host.drainInputs();await setImmediate();
+  assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision').length,1);
+  assert.ok(f.host.engine.programOf('h_A'));assert.deepEqual(f.host.intentHistoryOf('s_A').attempts,{});
+  assert.equal(f.mind.evalTrigger,'timer','persistence uncertainty does not reissue the fresh purpose');
+  assert.ok(f.mind.nextEvalTick>f.host.engine.world.tick+1);
+  assert.equal(messages.length,1);assert.ok(messages[0].includes('requires reconciliation'));assert.ok(!messages[0].includes('PRIVATE_WRITER_FAILURE'));
+  assert.equal(f.db.paidCost(),0);
 });
 
 test('a newer standing purpose never reissues an older immediate direction',async t=>{

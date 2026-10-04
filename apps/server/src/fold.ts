@@ -8,7 +8,7 @@ import {
   applyAll, bind, changesOf, emptyKernel, kernelHash, seedVocabulary, sweep, whyNot, BASE_MANNERS,
   type Change, type KState, type Thing,
 } from '@sim/kernel';
-import { intentReceivedPayloadV2Schema, intentHistoryFactV2, type BirthPayload, type DecisionPayload, type DeckPayload, type LogEvent, type MintPayload, type PlayPayload, type PlayView } from '@sim/protocol';
+import { intentReceivedPayloadV2Schema, intentHistoryFactV2, intentAdmissionFactV2, type BirthPayload, type DecisionPayload, type DeckPayload, type LogEvent, type MintPayload, type PlayPayload, type PlayView } from '@sim/protocol';
 import {foldMandate} from './mandate.ts';
 
 /**
@@ -63,6 +63,7 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
     // folds their private history separately, including snapshot/recovery replay.
     case 'intent-request-v2': { intentReceivedPayloadV2Schema.parse(e.payload); return {}; }
     case 'intent-v2': { intentHistoryFactV2(e); return {}; }
+    case 'intent-admission-v2': { intentAdmissionFactV2(e); return {}; }
     case 'birth': {
       const p = e.payload as BirthPayload;
       engine.spawnHuman({ id: p.entityId, label: p.name, soul: p.soulId });

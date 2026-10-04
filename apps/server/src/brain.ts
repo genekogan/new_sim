@@ -11,7 +11,7 @@ import {
 import { GOALS, describeIntent, publicIntent, mandateTriggerSchema, type Alignment, type Beat, type BrainCall, type CameraLine, type DecisionPayload, type LogEvent, type NarrativeView, type ScenePayload, type TalkLine, type TickerLine, type WireIntent } from '@sim/protocol';
 import type { Config } from './config.ts';
 import type { Db } from './db.ts';
-import { checkAcceptanceGuard, energyWord, hash32, type AcceptanceGuard, type AcceptanceJournal, type Mind, type WorldHost } from './world.ts';
+import { checkAcceptanceGuard, energyWord, hash32, StaleIntentAttempt, UnrecordedIntentAdmission, type AcceptanceGuard, type AcceptanceJournal, type Mind, type WorldHost } from './world.ts';
 import { StaleCompilation } from './compile-fence.ts';
 import { Governor, SHARES, tierOf, type Tier } from './governor.ts';
 import { awaiting, belongsTo, candidatesFor, optionsFor, situationOf, matchesStep, type CardOption } from './deck.ts';
@@ -201,7 +201,7 @@ export class Brain {
   }
 
   // ------------------------------------------------------------ tier 2: mid-brain
-  midContext(m: Mind, trigger: string): Omit<MidContext, 'options'> & { options: CardOption[] } {
+  midContext(m: Mind, trigger: string): Omit<MidContext, 'options'> & { options: CardOption[]; actingPurpose?: { intentId:string; version:number } } {
     const eng = this.host.engine, w = eng.world, ent = w.entities[m.entityId], k = this.host.kernel;
     const nameOf = (id: string) => this.host.nameOf(id);
     const s = eng.describeSurroundings(m.entityId);
@@ -222,6 +222,7 @@ export class Brain {
     const options=optionsFor(this.host,planningMind);
     if(!m.activeRule)for(const o of options)if(rules.some(r=>r.agenda.some(s=>matchesStep(this.host,s,o.card,o.cardTarget))))o.servesIntent=true;
     return {
+      ...(immediate ? { actingPurpose:{ intentId:immediate.revision.intentId, version:immediate.revision.version } } : {}),
       world: { time: timeWord(w.env.datetime), weather: weatherWord(w.env.weather), happening: this.host.living?.event ?? s.happening },
       ...(this.host.living ? { customs: this.host.living.customs } : {}),
       soul: {
@@ -267,6 +268,12 @@ export class Brain {
     const ent = host.engine.world.entities[m.entityId];
     this.updateEnergy(m, ent, tick);
     const ctx = this.midContext(m, trigger);
+    const purposeFor = (option: CardOption) => {
+      const ref = ctx.actingPurpose;
+      const entry = ref ? host.intentHistoryOf(m.soulId).intents[ref.intentId] : undefined;
+      return ref && entry?.revision.version === ref.version
+        && entry.revision.interpretation.agenda.some(step=>matchesStep(host,step,option.card,option.cardTarget)) ? ref : undefined;
+    };
     if (m.avoid && m.avoid.untilTick > tick) ctx.options = ctx.options.filter((o) => o.id !== m.avoid!.id); else m.avoid = undefined;
     // A plan that has been impossible for ten minutes is given up, so a Soul is never stuck waiting for ever.
     if (m.agendaPos < m.agenda.length) {
@@ -306,7 +313,7 @@ export class Brain {
         soulId: m.soulId, entityId: m.entityId, option: reflex.id, label: reflex.label, steps: reflex.steps, mood: m.mood,
         reevalTicks: (reflex.card === 'wait' ? 10 : durationFloor(reflex.durationHint)) * TPS, fallback: false, call: callId, trigger,
         card: reflex.card, target: reflex.cardTarget, ...(manner ? { manner } : {}), approachLen: reflex.approachLen,
-      } satisfies DecisionPayload, choiceGuard);
+      } satisfies DecisionPayload, choiceGuard, purposeFor(reflex));
       return;
     }
     const fp = fingerprint(ctx);
@@ -368,13 +375,19 @@ export class Brain {
       soulId: m.soulId, entityId: m.entityId, option: opt.id, label: opt.label, steps: opt.steps, mood: decision.mood,
       reevalTicks: Math.max(decision.reevalSeconds, durationFloor(opt.durationHint)) * TPS, fallback: usedFallback, call: callId, trigger,
       card: opt.card, target: opt.cardTarget, ...(decision.manner ? { manner: decision.manner } : {}), approachLen: opt.approachLen,
-    } satisfies DecisionPayload, choiceGuard);
+    } satisfies DecisionPayload, choiceGuard, purposeFor(opt));
   }
 
-  private enqueueDecision(m: Mind, author: string, payload: DecisionPayload, guard?: AcceptanceGuard) {
+  private enqueueDecision(m: Mind, author: string, payload: DecisionPayload, guard?: AcceptanceGuard, purpose?: { intentId:string; version:number }) {
     if (!guard) { void this.host.enqueue('decision', author, payload); return; }
-    void this.host.enqueueChecked('decision', author, payload, guard).catch(error => {
-      if (!(error instanceof StaleCompilation)) console.error('[brain] checked decision persistence failed');
+    const queued = purpose ? this.host.enqueueIntentDecision(author,payload,purpose,guard)
+      : this.host.enqueueChecked('decision', author, payload, guard);
+    void queued.catch(error => {
+      if (error instanceof UnrecordedIntentAdmission) {
+        console.error('[brain] decision persisted; admission history requires reconciliation');
+        return; // The accepted program is already authoritative; never retry it.
+      }
+      if (!(error instanceof StaleCompilation) && !(error instanceof StaleIntentAttempt)) console.error('[brain] checked decision persistence failed');
       if (this.host.minds.get(m.soulId) === m) { m.nextEvalTick = this.host.engine.world.tick + 1; m.evalTrigger = 'new-intent-v2'; m.lastFingerprint = ''; }
     });
   }
