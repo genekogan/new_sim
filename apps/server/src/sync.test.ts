@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import WebSocket from 'ws';
 import { Connection } from '@sim/client';
 
-const PORT = 4600 + Math.floor(Math.random() * 300);
+const PORT = 4951; // Core's reserved local range; suite runs serially.
 const BASE = `http://127.0.0.1:${PORT}`;
 let proc: ChildProcess;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

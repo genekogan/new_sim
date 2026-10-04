@@ -17,8 +17,8 @@ export class ApiError extends Error {
 }
 
 type Pairing =
-  | { kind: 'owner'; code: string; soulId: string; expires: number }                                     // owner made a code; the agent exchanges it
-  | { kind: 'agent'; code: string; poll: string; agent: string; expires: number; token?: string; soulId?: string }; // agent asked; the owner approves
+  | { kind: 'owner'; code: string; soulId: string; owner: string; issuer: string; expires: number }
+  | { kind: 'agent'; code: string; poll: string; agent: string; expires: number; token?: string; soulId?: string; owner?: string; issuer?: string };
 const PAIR_TTL = 15 * 60_000;
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O/1/I/L
 const humanCode = () => { const b = randomBytes(8); let s = ''; for (let i = 0; i < 8; i++) s += ALPHABET[b[i] % ALPHABET.length]; return `${s.slice(0, 4)}-${s.slice(4)}`; };
@@ -313,10 +313,10 @@ export class Souls {
   // ------------------------------------------------------------ pairing an agent
   private mint(soulId: string, label: string | null) { const token = newSoulToken(soulId); this.db.setSoulToken(soulId, hashToken(token), label); return token; }
   /** Owner-initiated: a short code the owner pastes to their agent along with the skill link. */
-  pairCode(soul: SoulRow, base: string) {
+  pairCode(soul: SoulRow, base: string, issuer?: UserRow) {
     for (const [k, p] of this.pairings) if (p.kind === 'owner' && p.soulId === soul.id) this.pairings.delete(k);
     const code = humanCode();
-    this.pairings.set(code, { kind: 'owner', code, soulId: soul.id, expires: Date.now() + PAIR_TTL });
+    this.pairings.set(code, { kind: 'owner', code, soulId: soul.id, owner: soul.owner, issuer: issuer?.id ?? soul.owner, expires: Date.now() + PAIR_TTL });
     return { code, expires_in: PAIR_TTL / 1000, prompt: `Read ${base}/skill.md and follow it to steer my Soul "${soul.name}" in Sim. Pairing code: ${code}` };
   }
   /** Agent side of the owner-initiated flow: exchange the code for a token. One use. */
@@ -325,7 +325,7 @@ export class Souls {
     if (!p || p.kind !== 'owner' || p.expires < Date.now()) throw new ApiError(404, 'pair-invalid', 'that pairing code is invalid, already used, or expired; ask your human for a new one');
     this.pairings.delete(code);
     const soul = this.db.soul(p.soulId);
-    if (!soul || soul.retired_at) throw new ApiError(404, 'pair-invalid', 'that soul no longer exists');
+    if (!this.pairAuthority(soul, p.owner, p.issuer)) throw new ApiError(404, 'pair-invalid', 'that pairing is no longer valid');
     return { token: this.mint(soul.id, agent?.slice(0, 60) || 'agent'), soul: { id: soul.id, name: soul.name, description: soul.description } };
   }
   /** Agent-initiated (no code yet): the agent gets a link for its human to approve, then polls. */
@@ -343,21 +343,32 @@ export class Souls {
     const p = this.pairings.get(normCode(codeRaw));
     if (!p || p.kind !== 'agent' || p.expires < Date.now()) throw new ApiError(404, 'pair-invalid', 'that request is invalid or has expired');
     if (p.token) throw new ApiError(409, 'pair-done', 'already approved');
-    p.token = this.mint(soul.id, p.agent); p.soulId = soul.id;
-    void user;
+    const current = this.db.soul(soul.id);
+    if (!this.pairAuthority(current, soul.owner, user.id)) throw new ApiError(403, 'forbidden', 'pairing authority changed');
+    p.token = this.mint(soul.id, p.agent); p.soulId = soul.id; p.owner = soul.owner; p.issuer = user.id;
   }
   pairPoll(poll: string) {
     const p = [...this.pairings.values()].find((x) => x.kind === 'agent' && x.poll === poll);
     if (!p || p.kind !== 'agent' || p.expires < Date.now()) throw new ApiError(404, 'pair-invalid', 'unknown or expired pairing; start again');
     if (!p.token) return { status: 'pending' as const };
     this.pairings.delete(p.code);
-    const soul = this.db.soul(p.soulId!)!;
+    const soul = this.db.soul(p.soulId!);
+    if (!this.pairAuthority(soul, p.owner!, p.issuer!) || soul.token_hash !== hashToken(p.token))
+      throw new ApiError(404, 'pair-invalid', 'that pairing is no longer valid');
     return { status: 'approved' as const, token: p.token, soul: { id: soul.id, name: soul.name, description: soul.description } };
+  }
+
+  /** Recheck the approving identity and original ownership before releasing a credential. */
+  private pairAuthority(soul: SoulRow | undefined, owner: string, issuer: string): soul is SoulRow {
+    const user = this.db.user(issuer);
+    return !!soul && !soul.retired_at && soul.world_id === this.host.worldId && soul.owner === owner
+      && !!user && this.invited(user) && (user.id === soul.owner || user.role === 'admin');
   }
 
   soulFromToken(token: string | undefined): SoulRow | null {
     if (!token?.startsWith('sim_')) return null;
     const soul = this.db.soulByTokenHash(hashToken(token)) ?? null;
+    if (soul && soul.world_id !== this.host.worldId) return null;
     if (soul) { const now = Date.now(); if (now - (this.lastTouch.get(soul.id) ?? 0) > 30_000) { this.lastTouch.set(soul.id, now); this.db.touchSoulToken(soul.id); } }
     return soul;
   }

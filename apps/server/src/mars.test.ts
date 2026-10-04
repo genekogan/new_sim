@@ -70,7 +70,7 @@ else {
   });
 
   // ---------------------------------------------------------------- a real server process on the Mars engine
-  const PORT = 4950 + Math.floor(Math.random() * 40);
+  const PORT = 4950; // Core's reserved local range; suite runs serially.
   const BASE = `http://127.0.0.1:${PORT}`;
   let proc: ChildProcess;
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));

@@ -188,6 +188,7 @@ export type AdminAction = z.infer<typeof adminSchema>;
 
 export const pairExchangeSchema = z.strictObject({ code: z.string().trim().min(4).max(40), agent: z.string().trim().max(60).optional() });
 export const pairStartSchema = z.strictObject({ agent: z.string().trim().max(60).optional() });
+export const pairPollSchema = z.strictObject({ poll_token: z.string().regex(/^[A-Za-z0-9_-]{32}$/) });
 export const pairApproveSchema = z.strictObject({ code: z.string().trim().min(4).max(40), soulId: z.string() });
 export const inviteSchema = z.strictObject({ code: z.string().trim().min(3).max(40) });
 

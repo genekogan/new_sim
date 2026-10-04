@@ -4,7 +4,7 @@ import type { Db, SoulRow } from './db.ts';
 import type { AcceptanceGuard, Mind, WorldHost } from './world.ts';
 
 export class StaleCompilation extends Error {
-  constructor() { super('this request is stale; submit it again'); this.name = 'StaleCompilation'; }
+  constructor() { super('Request became stale; earlier accepted effects may remain'); this.name = 'StaleCompilation'; }
 }
 
 /** Capture identity and will, not a physical pose: ordinary tick motion must not

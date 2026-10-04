@@ -53,7 +53,7 @@ async function finish<T>(host: WorldHost, promise: Promise<T>) {
   assert.ok(settled, 'operation settled through the actual sequencer'); return promise;
 }
 function staleResult(result: Awaited<ReturnType<Brain['compile']>>) {
-  assert.deepEqual(result, { ok: false, reason: 'this request is stale; submit it again' });
+  assert.deepEqual(result, { ok: false, reason: 'Request became stale; earlier accepted effects may remain' });
 }
 
 test('a refused checked input consumes no sequence, effect, broadcast or recovery and does not lose other inputs', async t => {

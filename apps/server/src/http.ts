@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Hono, type Context } from 'hono';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { adminSchema, commandSchema, inviteSchema, pairApproveSchema, pairExchangeSchema, pairStartSchema, publicEvent, setIntentSchema } from '@sim/protocol';
+import { adminSchema, commandSchema, inviteSchema, pairApproveSchema, pairExchangeSchema, pairPollSchema, pairStartSchema, publicEvent, setIntentSchema } from '@sim/protocol';
 import { newId, type Auth } from './auth.ts';
 import type { Brain } from './brain.ts';
 import type { Config } from './config.ts';
@@ -24,7 +24,7 @@ export function buildApp(d: Deps) {
   const ip = (c: Context) => (c.req.header('x-forwarded-for') ?? 'local').split(',')[0].trim();
   const requireUser = async (c: Context): Promise<UserRow> => { const u = await d.auth.userFromToken(bearer(c)); if (!u) throw new ApiError(401, 'unauthorized', 'sign in first'); return u; };
   const requireAdmin = async (c: Context): Promise<UserRow> => { const u = await requireUser(c); if (u.role !== 'admin') throw new ApiError(403, 'forbidden', 'admin only'); return u; };
-  const ownSoul = (u: UserRow, id: string): SoulRow => { const s = d.db.soul(id); if (!s || s.retired_at) throw new ApiError(404, 'not-found', 'no such soul'); if (s.owner !== u.id && u.role !== 'admin') throw new ApiError(403, 'forbidden', 'not your soul'); return s; };
+  const ownSoul = (u: UserRow, id: string): SoulRow => { const s = d.db.soul(id); if (!s || s.retired_at || s.world_id !== d.host.worldId) throw new ApiError(404, 'not-found', 'no such soul'); if (s.owner !== u.id && u.role !== 'admin') throw new ApiError(403, 'forbidden', 'not your soul'); return s; };
   const agentSoul = (c: Context): SoulRow => { const s = d.souls.soulFromToken(bearer(c)); if (!s) throw new ApiError(401, 'unauthorized', 'missing or invalid soul token; pair again (see /skill.md)'); return s; };
   /** Public base URL as the caller reached us (works on any hostname pointing at the box). */
   const baseOf = (c: Context) => { const host = c.req.header('x-forwarded-host') ?? c.req.header('host'); const proto = c.req.header('x-forwarded-proto') ?? (host?.startsWith('localhost') || host?.startsWith('127.') ? 'http' : 'https'); return host ? `${proto}://${host}${d.cfg.worldPath}` : d.cfg.publicUrl; };
@@ -40,6 +40,9 @@ export function buildApp(d: Deps) {
   });
   app.use('*', async (c, next) => { await next(); c.header('X-Robots-Tag', 'noindex, nofollow'); c.header('X-Frame-Options', 'DENY'); c.header('Content-Security-Policy', "frame-ancestors 'none'"); });
   // Nothing a person or an agent sends is large: a command, an intent, a few cards.
+  // Apply before parsing/auth/rate errors as well as successful secret responses.
+  for (const path of ['/v1/agent/pair', '/v1/agent/pair/*', '/v1/pair/*', '/v1/souls/:id/pair'])
+    app.use(path, async (c, next) => { c.header('Cache-Control', 'no-store'); await next(); });
   app.use('/v1/*', bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({ ok: false, code: 'too-large', message: 'request body is larger than 64 KB' }, 413) }));
 
   // ---- public
@@ -93,7 +96,7 @@ export function buildApp(d: Deps) {
     const p = setIntentSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { intent: { agenda: [{card, target?, of?}], note? } } or { intent: { goal, target?, note? } }; see /skill.md');
     const r = await d.souls.setIntent(s, p.data.intent, 'web'); return c.json({ ok: true, intent: r.intent, text: r.text, tick: r.event.tick, seq: r.event.seq });
   });
-  app.post('/v1/souls/:id/pair', async (c) => { const u = await requireUser(c); d.souls.requireInvited(u); return c.json({ ok: true, ...d.souls.pairCode(ownSoul(u, c.req.param('id')), baseOf(c)) }); });
+  app.post('/v1/souls/:id/pair', async (c) => { const u = await requireUser(c); d.souls.requireInvited(u); return c.json({ ok: true, ...d.souls.pairCode(ownSoul(u, c.req.param('id')), baseOf(c), u) }); });
   app.post('/v1/souls/:id/revoke', async (c) => { const u = await requireUser(c); d.db.setSoulToken(ownSoul(u, c.req.param('id')).id, null); return c.json({ ok: true }); });
   app.post('/v1/souls/:id/shot', async (c) => {
     const u = await requireUser(c); const s = ownSoul(u, c.req.param('id')); const m = d.host.minds.get(s.id); if (!m) throw new ApiError(409, 'not-in-world', 'not in the world');
@@ -149,6 +152,13 @@ export function buildApp(d: Deps) {
     return c.json({ ok: true, token: r.token, soul: r.soul, base: baseOf(c), next: 'Save the token (see skill.md), then call GET /v1/agent/perceive.' }, 200, { 'cache-control': 'no-store' });
   });
   app.post('/v1/agent/pair/start', async (c) => { limitIp(c, 'pairstart', 6, 60_000); const p = pairStartSchema.safeParse(await body(c).catch(() => ({}))); return c.json({ ok: true, ...d.souls.pairStart(p.success ? p.data.agent : undefined, baseOf(c)) }); });
+  app.post('/v1/agent/pair/poll', async (c) => {
+    limitIp(c, 'pairpoll', 60, 60_000);
+    const p = pairPollSchema.safeParse(await body(c));
+    if (!p.success) throw new ApiError(400, 'invalid', 'body must be { poll_token }');
+    return c.json({ ok: true, ...d.souls.pairPoll(p.data.poll_token) });
+  });
+  // Legacy compatibility only; the audited launcher uses the POST body above.
   app.get('/v1/agent/pair/poll', (c) => { limitIp(c, 'pairpoll', 60, 60_000); return c.json({ ok: true, ...d.souls.pairPoll(c.req.query('poll_token') ?? '') }, 200, { 'cache-control': 'no-store' }); });
   app.get('/v1/agent/me', (c) => { const s = agentSoul(c); return c.json({ soul: { id: s.id, name: s.name, description: s.description }, paired_as: s.token_label, since: s.token_created_at }); });
   app.get('/v1/agent/status', (c) => c.json(d.souls.status(agentSoul(c))));
