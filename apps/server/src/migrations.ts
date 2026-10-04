@@ -147,6 +147,11 @@ export const MIGRATIONS: { id: number; name: string; up(db: DatabaseSync): void 
     )`);
     db.exec('CREATE INDEX intent_observations_pending ON intent_observations_v2(world_id,published_seq,observation_tick,admission_seq)');
   } },
+  { id: 14, name: 'opaque scoped credential generation for candidate intents', up(db) {
+    // No backfill, new authority or candidate activation. Old credentials get
+    // a random generation only when an opted-in authenticated adapter uses it.
+    addColumn(db, 'souls', 'token_generation', 'TEXT');
+  } },
 ];
 
 export function migrate(db: DatabaseSync): number[] {

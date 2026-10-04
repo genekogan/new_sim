@@ -1,7 +1,7 @@
 // SQLite via node:sqlite (built in, no native build). One file, WAL.
 import { DatabaseSync, backup } from 'node:sqlite';
 import { statSync } from 'node:fs';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { migrate } from './migrations.ts';
 import type { BrainCall, LogEvent, NarrativeView, TalkLine } from '@sim/protocol';
@@ -9,7 +9,7 @@ import {recordedTakeChunkSchema} from '@sim/protocol';
 import {stableStringify,parseRenderSceneCapture,type RenderSceneCaptureV1} from '@sim/engine-contract';
 
 export type UserRow = { id: string; email: string | null; wallet: string | null; role: 'user' | 'admin'; created_at: number; last_seen: number; invited_by: string | null };
-export type SoulRow = { id: string; world_id: string; owner: string; entity_id: string; name: string; description: string; created_at: number; retired_at: number | null; token_hash: string | null; token_created_at: number | null; native: number; token_label: string | null; token_last_used: number | null };
+export type SoulRow = { id: string; world_id: string; owner: string; entity_id: string; name: string; description: string; created_at: number; retired_at: number | null; token_hash: string | null; token_generation: string | null; token_created_at: number | null; native: number; token_label: string | null; token_last_used: number | null };
 
 export class Db {
   db: DatabaseSync;
@@ -160,8 +160,8 @@ export class Db {
   createSoul(s: { id: string; worldId: string; owner: string; entityId: string; name: string; description: string; native: boolean }) {
     this.db.prepare('INSERT INTO souls (id, world_id, owner, entity_id, name, description, created_at, native) VALUES (?,?,?,?,?,?,?,?)').run(s.id, s.worldId, s.owner, s.entityId, s.name, s.description, Date.now(), s.native ? 1 : 0);
   }
-  retireSoul(id: string) { this.db.prepare('UPDATE souls SET retired_at = ?, token_hash = NULL WHERE id = ?').run(Date.now(), id); }
-  setSoulToken(id: string, hash: string | null, label: string | null = null) { this.db.prepare('UPDATE souls SET token_hash = ?, token_created_at = ?, token_label = ?, token_last_used = NULL WHERE id = ?').run(hash, hash ? Date.now() : null, hash ? label : null, id); }
+  retireSoul(id: string) { this.db.prepare('UPDATE souls SET retired_at = ?, token_hash = NULL, token_generation = NULL WHERE id = ?').run(Date.now(), id); }
+  setSoulToken(id: string, hash: string | null, label: string | null = null) { this.db.prepare('UPDATE souls SET token_hash = ?, token_generation = ?, token_created_at = ?, token_label = ?, token_last_used = NULL WHERE id = ?').run(hash, hash ? `g_${randomUUID()}` : null, hash ? Date.now() : null, hash ? label : null, id); }
   touchSoulToken(id: string) { this.db.prepare('UPDATE souls SET token_last_used = ? WHERE id = ?').run(Date.now(), id); }
 
   // brain calls

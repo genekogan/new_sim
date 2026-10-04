@@ -57,6 +57,7 @@ export class Brain {
   private readonly compilerCall: typeof callTool;
   /** Isolated backend qualification switch. No environment/route activation. */
   private readonly intentV2Choices: boolean;
+  get intentV2Enabled() { return this.intentV2Choices; }
   private purposeWakes = new Map<string, { intentId: string; version: number }>();
 
   constructor(host: WorldHost, db: Db, cfg: Config, sink: BrainSink, services?: { compilerCall?: typeof callTool; intentV2Choices?: boolean }) {

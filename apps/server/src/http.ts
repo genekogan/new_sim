@@ -2,6 +2,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Hono, type Context } from 'hono';
+import { decodeJwt } from 'jose';
 import { serveStatic } from '@hono/node-server/serve-static';
 import { adminSchema, commandSchema, inviteSchema, pairApproveSchema, pairExchangeSchema, pairPollSchema, pairStartSchema, publicEvent, setIntentSchema } from '@sim/protocol';
 import { newId, type Auth } from './auth.ts';
@@ -18,11 +19,13 @@ import type {TakeArchive} from './take-archive.ts';
 import { checkAcceptanceGuard,type AcceptanceGuard,type WorldHost } from './world.ts';
 import {captureRenderScene} from '@sim/engine-contract';
 import type {CandidateStationV1} from './station.ts';
+import { intentTransportError, intentLookupError, type IntentControlV2, type IntentIdentityV2 } from './intent-control.ts';
 
-type Deps = { cfg: Config; db: Db; host: WorldHost; auth: Auth; hub: Hub; brain: Brain; souls: Souls; takes?: TakeArchive; station?:CandidateStationV1 };
+type Deps = { cfg: Config; db: Db; host: WorldHost; auth: Auth; hub: Hub; brain: Brain; souls: Souls; takes?: TakeArchive; station?:CandidateStationV1; intentV2?:IntentControlV2 };
 
 export function buildApp(d: Deps) {
   if(d.station&&d.station.host!==d.host)throw new Error('station must belong to selected host');
+  if(d.intentV2&&(d.intentV2.host!==d.host||d.intentV2.brain!==d.brain||d.intentV2.souls!==d.souls))throw new Error('intent transport must belong to selected host');
   const app = new Hono();
   const bearer = (c: Context) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
   const ip = (c: Context) => (c.req.header('x-forwarded-for') ?? 'local').split(',')[0].trim();
@@ -57,6 +60,8 @@ export function buildApp(d: Deps) {
   // Apply before parsing/auth/rate errors as well as successful secret responses.
   for (const path of ['/v1/agent/pair', '/v1/agent/pair/*', '/v1/pair/*', '/v1/souls/:id/pair'])
     app.use(path, async (c, next) => { c.header('Cache-Control', 'no-store'); await next(); });
+  for(const path of ['/v1/souls/:id/intent-v2','/v1/souls/:id/intent-v2/*','/v1/agent/intent-v2','/v1/agent/intent-v2/*'])
+    app.use(path,async(c,next)=>{c.header('Cache-Control','no-store');await next();});
   for(const path of ['/v1/lifecycle','/v1/lifecycle/*','/v1/me','/v1/souls','/v1/souls/*','/v1/agent/*'])
     app.use(path,async(c,next)=>{if(d.souls.lifecycle)c.header('Cache-Control','no-store');await next();});
   app.use('/v1/brain',async(c,next)=>{if(d.souls.lifecycle)c.header('Cache-Control','no-store');await next();});
@@ -105,6 +110,43 @@ export function buildApp(d: Deps) {
     catch { return c.text('World agent instructions are unavailable.', 503, { 'cache-control':'no-store' }); }
   });
   app.get('/w/:key/llms.txt', c => c.text('No agent reader for this world on this process.', 404));
+
+  // Candidate versioned adapters are installed only by explicit dependency
+  // injection. No default capability advertisement or legacy fallback.
+  const intentService=()=>{if(!d.intentV2)throw new ApiError(404,'not-found','direction version unavailable');return d.intentV2;};
+  const intentIdentity=async(c:Context):Promise<IntentIdentityV2>=>{
+    const user=await requireUser(c),token=bearer(c)!;
+    if(d.auth.devAuth&&token.startsWith('dev:'))return {userId:user.id,expiresAt:Infinity};
+    // userFromToken has verified this exact token. Bind its actual expiry to
+    // synchronous effect/final-response guards without trusting a client claim.
+    try {const exp=decodeJwt(token).exp;if(typeof exp!=='number'||!Number.isFinite(exp))throw new Error();
+      return {userId:user.id,expiresAt:exp*1000};}
+    catch {throw new ApiError(401,'unauthorized','sign in first');}
+  };
+  app.post('/v1/souls/:id/intent-v2',async c=>{
+    try {const service=intentService(),scope=service.ownerScope(await intentIdentity(c),c.req.param('id'));
+      const receipt=await service.submit(scope,await body(c));service.guard(scope);
+      return c.json(receipt,receipt.phase==='received'?202:200);}
+    catch(error){throw intentTransportError(error);}
+  });
+  app.post('/v1/agent/intent-v2',async c=>{
+    try {const service=intentService(),scope=service.agentScope(bearer(c));
+      const receipt=await service.submit(scope,await body(c));service.guard(scope);
+      return c.json(receipt,receipt.phase==='received'?202:200);}
+    catch(error){throw intentTransportError(error);}
+  });
+  app.get('/v1/souls/:id/intent-v2/requests/:requestId',async c=>{
+    const service=intentService(),identity=await intentIdentity(c);
+    try {const scope=service.ownerScope(identity,c.req.param('id')),receipt=service.lookup(scope,c.req.param('requestId'));
+      return c.json(receipt,receipt.phase==='received'?202:200);}
+    catch(error){throw intentLookupError(error);}
+  });
+  app.get('/v1/agent/intent-v2/requests/:requestId',c=>{
+    const service=intentService();let scope;
+    try {scope=service.agentScope(bearer(c));}catch(error){throw intentTransportError(error);}
+    try {const receipt=service.lookup(scope,c.req.param('requestId'));return c.json(receipt,receipt.phase==='received'?202:200);}
+    catch(error){throw intentLookupError(error);}
+  });
 
   // ---- signed-in users
   const mySouls = (u: UserRow) => d.db.soulsOf(u.id).filter(s=>!d.souls.lifecycle||(s.world_id===d.host.worldId&&d.souls.invited(u)&&d.souls.controlReady(s))).map((s) => ({ id: s.id, name: s.name, description: s.description, entityId: s.entity_id, hasToken: !!s.token_hash, tokenLabel: s.token_label, tokenCreatedAt: s.token_created_at, tokenLastUsed: s.token_last_used }));

@@ -1,0 +1,158 @@
+// Explicitly injected candidate transport service. Production bootstrap does
+// not construct this service or advertise the behavioral version.
+import { randomUUID } from 'node:crypto';
+import { ZodError } from 'zod';
+import { INTENT_V2, intentRequestV2Schema, intentSourceV2Schema, type IntentReceiptV2 } from '@sim/protocol';
+import { hashToken } from './auth.ts';
+import type { Brain } from './brain.ts';
+import type { SoulRow } from './db.ts';
+import { IntentPublisher, IntentPurposeConflict } from './intent-publisher.ts';
+import { IntentRequests, IntentRequestConflict, IntentRequestUnavailable, type IntentRequestScope,
+  type RequestReservation } from './intent-requests.ts';
+import { ApiError, type Souls } from './souls.ts';
+import { checkAcceptanceGuard, type WorldHost } from './world.ts';
+
+type Owned = Extract<RequestReservation,{created:true}>;
+export type IntentIdentityV2 = { userId:string; expiresAt:number };
+export class IntentControlV2 {
+  readonly host:WorldHost; readonly brain:Brain; readonly souls:Souls;
+  readonly store:IntentRequests; readonly publisher:IntentPublisher;
+  // Runtime work ownership only; durable reservations retain crash uncertainty.
+  private workers = new Set<Promise<void>>();
+  constructor(host:WorldHost,brain:Brain,souls:Souls) {
+    if(brain.host!==host||souls.host!==host||brain.db!==host.db||souls.db!==host.db||!brain.intentV2Enabled)
+      throw new Error('candidate intent transport requires one opted-in host/brain/database');
+    this.host=host;this.brain=brain;this.souls=souls;
+    this.store=new IntentRequests(host.db);this.publisher=new IntentPublisher(host,this.store);
+  }
+  private available(row:SoulRow|undefined):SoulRow {
+    if(!row||row.world_id!==this.host.worldId||row.retired_at!==null)throw new ApiError(404,'not-found','no such soul');
+    this.souls.requireControlReady(row);
+    const body=this.host.engine.world.entities[row.entity_id],mind=this.host.minds.get(row.id);
+    if(!body||!mind||mind.owner!==row.owner||this.host.kernel.things[row.id]?.traits.body!==row.entity_id
+      ||body.human&&body.human.soul!==row.id)throw new ApiError(409,'not-ready','Soul body is not ready');
+    return row;
+  }
+  ownerScope(identity:IntentIdentityV2,soulId:string,channel:'web'|'api'|'mcp'='web'):IntentRequestScope {
+    const read=()=>{
+      if(Date.now()>=identity.expiresAt)throw new ApiError(401,'unauthorized','sign in first');
+      const user=this.host.db.user(identity.userId);if(!user)throw new ApiError(401,'unauthorized','sign in first');
+      this.souls.requireInvited(user);
+      const row=this.available(this.host.db.soul(soulId));
+      if(row.owner!==user.id&&user.role!=='admin')throw new ApiError(403,'forbidden','not your soul');
+      const owner=this.host.db.user(row.owner);if(!owner||!this.souls.invited(owner))throw new ApiError(403,'invite-required','Soul owner needs an invite');
+      return {row,user};
+    };
+    const {row,user}=read(),owner=row.owner,entity=row.entity_id,mind=this.host.minds.get(row.id);
+    const source=intentSourceV2Schema.parse({kind:user.id===owner?'owner':'operator',ownerId:owner,principalId:user.id,channel});
+    return {worldId:this.host.worldId,soulId:row.id,source,currentAuthority:current=>{
+      const now=read();return current.owner===owner&&current.entity_id===entity&&now.row.owner===owner
+        &&now.row.entity_id===entity&&this.host.minds.get(row.id)===mind;
+    }};
+  }
+  agentScope(token:string|undefined,channel:'api'|'mcp'='api'):IntentRequestScope {
+    const unauthorized=()=>new ApiError(401,'unauthorized','missing or invalid Soul credential');
+    if(!token?.startsWith('sim_'))throw unauthorized();
+    const hash=hashToken(token),first=this.souls.soulFromToken(token);if(!first)throw unauthorized();
+    const read=()=>{
+      const row=this.host.db.soulByTokenHash(hash);if(!row||row.id!==first.id||row.world_id!==this.host.worldId)throw unauthorized();
+      const owner=this.host.db.user(row.owner);if(!owner||!this.souls.invited(owner)||row.retired_at!==null)throw unauthorized();
+      return this.available(row);
+    };
+    let row=read();
+    if(row.token_generation===null) {
+      // Compare-and-set lazily assigns an opaque identity to pre14 credentials.
+      // Never derive it from, or publish, their bearer/hash material.
+      this.host.db.db.prepare('UPDATE souls SET token_generation=? WHERE id=? AND token_hash=? AND token_generation IS NULL')
+        .run(`g_${randomUUID()}`,row.id,hash);
+      row=read();
+    }
+    const generation=row.token_generation,owner=row.owner,entity=row.entity_id,mind=this.host.minds.get(row.id);
+    if(!generation)throw new ApiError(503,'unavailable','credential generation unavailable');
+    const source=intentSourceV2Schema.parse({kind:'owner-agent',ownerId:owner,principalId:generation,channel});
+    return {worldId:this.host.worldId,soulId:row.id,source,currentAuthority:current=>{
+      const now=read();if(now.token_generation!==generation)throw unauthorized();
+      return current.owner===owner&&current.entity_id===entity&&now.owner===owner&&now.entity_id===entity
+        &&this.host.minds.get(row.id)===mind;
+    }};
+  }
+  guard(scope:IntentRequestScope) {
+    const row=this.available(this.host.db.soul(scope.soulId));
+    if(scope.worldId!==this.host.worldId||row.owner!==scope.source.ownerId||scope.currentAuthority(row)!==true)
+      throw new IntentRequestUnavailable();
+    return true as const;
+  }
+  private version(scope:IntentRequestScope,request:ReturnType<typeof intentRequestV2Schema.parse>) {
+    if(!request.edit)return;
+    const history=this.host.intentHistoryOf(scope.soulId),entry=Object.hasOwn(history.intents,request.edit.intentId)?history.intents[request.edit.intentId]:undefined;
+    if(!entry||entry.revision.version!==request.edit.expectedVersion||entry.status==='withdrawn'&&request.op==='withdraw')
+      throw new IntentPurposeConflict();
+  }
+  async submit(scope:IntentRequestScope,raw:unknown):Promise<IntentReceiptV2> {
+    const request=intentRequestV2Schema.parse(raw);this.guard(scope);
+    const existing=this.store.lookup(scope,request.requestId);
+    if(!existing) {
+      this.version(scope,request);
+      if(this.workers.size>=64)throw new ApiError(429,'rate-limited','too many directions being interpreted');
+      const limit=this.souls.limits.allow(`intent-v2:${scope.worldId}:${scope.soulId}:${scope.source.principalId}`,20,60_000);
+      if(!limit.ok)throw new ApiError(429,'rate-limited','too many directions',{retry_after:limit.retryAfter});
+    }
+    const received=await this.publisher.receive(scope,request);
+    this.guard(scope);
+    if(!received.request?.received)throw new ApiError(503,'unavailable','request has no recorded receipt; keep its request ID');
+    if(received.reservation.created)this.start(scope,received.reservation);
+    // Even an immediately completed interpreter returns only recorded facts.
+    return this.lookup(scope,request.requestId);
+  }
+  lookup(scope:IntentRequestScope,requestId:string):IntentReceiptV2 {
+    this.guard(scope);
+    if(!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$/.test(requestId))throw new ApiError(404,'not-found','no such request');
+    const view=this.store.lookup(scope,requestId),receipt=view?.receipt??view?.received;
+    if(!receipt)throw new ApiError(404,'not-found','no such request');
+    this.guard(scope);return receipt;
+  }
+  private start(scope:IntentRequestScope,reservation:Owned) {
+    const work=this.run(scope,reservation).catch(()=>{
+      // Persistence failure leaves the existing recorded received receipt. No
+      // fabricated terminal success, private error logging or automatic retry.
+    });
+    this.workers.add(work);void work.finally(()=>this.workers.delete(work));
+  }
+  private async run(scope:IntentRequestScope,reservation:Owned) {
+    try {
+      if(reservation.request.op==='withdraw')await this.publisher.publish(scope,reservation);
+      else await this.publisher.interpretAndPublish(scope,reservation,async guard=>{
+        checkAcceptanceGuard(guard);
+        const mind=this.host.minds.get(scope.soulId)!;
+        const result=await this.brain.compile(mind,reservation.request.op==='upsert'?reservation.request.words:'','intent-v2',guard,this.store.journal(reservation));
+        checkAcceptanceGuard(guard);
+        if(!result?.ok||!result.alignment)throw new InterpretationUnavailable();
+        return {summary:result.alignment.understanding,agenda:result.agenda,trigger:result.alignment.trigger};
+      });
+    } catch(error) {
+      // This is private worker history, never physics/fulfilment or public log.
+      // The trusted lease can record refusal after revocation; access still
+      // requires current authority. Internal/provider errors never escape.
+      const code=error instanceof IntentPurposeConflict?'version-conflict':error instanceof InterpretationUnavailable?'not-understood':
+        error instanceof ApiError||error instanceof IntentRequestUnavailable?'authority-changed':'interpretation-unavailable';
+      this.store.finish(reservation,{contract:INTENT_V2,requestId:reservation.request.requestId,phase:'refused',code,
+        reason:code==='version-conflict'?'The purpose version changed.':code==='authority-changed'?'Authority changed before acceptance.':'This direction could not be interpreted in this world.'});
+    }
+  }
+  /** Drain existing work for a controlled local shutdown/test, never resume or
+   * reinterpret crash-pending reservations. Caller still advances the host. */
+  async settled() { await Promise.all([...this.workers]); }
+}
+class InterpretationUnavailable extends Error {}
+export function intentTransportError(error:unknown):ApiError {
+  if(error instanceof ApiError)return error;
+  if(error instanceof ZodError)return new ApiError(400,'invalid','invalid soul-intent/2 request');
+  if(error instanceof IntentRequestConflict||error instanceof IntentPurposeConflict)return new ApiError(409,'conflict','request or purpose version conflicts');
+  if(error instanceof IntentRequestUnavailable)return new ApiError(404,'not-found','no such soul');
+  return new ApiError(503,'unavailable','direction unavailable; keep its request ID');
+}
+export function intentLookupError(error:unknown):ApiError {
+  if(error instanceof IntentRequestUnavailable||error instanceof ApiError&&[401,403,404,409].includes(error.status))
+    return new ApiError(404,'not-found','no such request');
+  return new ApiError(503,'unavailable','request lookup unavailable; keep its request ID');
+}
