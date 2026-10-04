@@ -6,6 +6,7 @@ export * from './owner-views.ts';
 export * from './intent-v2.ts';
 export * from './station-v1.ts';
 export * from './station-era-v1.ts';
+export * from './station-v2.ts';
 import { isStationFactV1, parseStationFactV1, type StationLiveV1 } from './station-v1.ts';
 import { z } from 'zod';
 import type { ChangeEvent, Entity, Environment, PathCommit, PoseSample, Region } from '@sim/engine-contract';
