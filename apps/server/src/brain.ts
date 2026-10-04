@@ -11,7 +11,8 @@ import {
 import { GOALS, describeIntent, publicIntent, mandateTriggerSchema, type Alignment, type Beat, type BrainCall, type CameraLine, type DecisionPayload, type LogEvent, type NarrativeView, type ScenePayload, type TalkLine, type TickerLine, type WireIntent } from '@sim/protocol';
 import type { Config } from './config.ts';
 import type { Db } from './db.ts';
-import { energyWord, hash32, type Mind, type WorldHost } from './world.ts';
+import { checkAcceptanceGuard, energyWord, hash32, type AcceptanceGuard, type Mind, type WorldHost } from './world.ts';
+import { StaleCompilation } from './compile-fence.ts';
 import { Governor, SHARES, tierOf, type Tier } from './governor.ts';
 import { awaiting, belongsTo, candidatesFor, optionsFor, situationOf, matchesStep, type CardOption } from './deck.ts';
 import {mandateOf,triggerDue} from './mandate.ts';
@@ -53,9 +54,11 @@ export class Brain {
   private ruleUpdates=new Set<string>();
   private tickerCandidates: { id: string; text: string; tick: number }[] = [];
   host: WorldHost; db: Db; cfg: Config; sink: BrainSink;
+  private readonly compilerCall: typeof callTool;
 
-  constructor(host: WorldHost, db: Db, cfg: Config, sink: BrainSink) {
+  constructor(host: WorldHost, db: Db, cfg: Config, sink: BrainSink, services?: { compilerCall?: typeof callTool }) {
     this.host = host; this.db = db; this.cfg = cfg; this.sink = sink;
+    this.compilerCall = services?.compilerCall ?? callTool;
     this.mode = cfg.brainMode; this.gov = new Governor(cfg.budgetUsdPerDay);
     this.paidGate = (bound, model) => db.reserveCost(bound, model, this.budget);
     db.backfillSpend();
@@ -370,7 +373,11 @@ export class Brain {
   private engineVerbs() { return new Set(this.host.engine.describeVerbs().map((v) => v.verb).filter((v) => v !== 'do_activity')); }
 
   /** Validate proposed cards and mint the valid ones into the vocabulary and this Soul's deck. No model involved. */
-  async mint(m: Mind, cards: unknown[], links: Record<string, LinkKind> | undefined, kinds: Record<string, { summary: string }> | undefined, origin: MintedCard['origin']): Promise<MintVerdict[]> {
+  async mint(m: Mind, cards: unknown[], links: Record<string, LinkKind> | undefined, kinds: Record<string, { summary: string }> | undefined, origin: MintedCard['origin'], guard?: AcceptanceGuard): Promise<MintVerdict[]> {
+    if (guard) checkAcceptanceGuard(guard);
+    const enqueue = (kind: 'deck' | 'mint', payload: unknown) => guard
+      ? this.host.enqueueChecked(kind, `soul:${m.soulId}`, payload, guard)
+      : this.host.enqueue(kind, `soul:${m.soulId}`, payload);
     const k = this.host.kernel, verbs = this.engineVerbs(), tick = this.host.engine.world.tick;
     const newLinks: Record<string, LinkKind> = {}; for (const [n, d] of Object.entries(links ?? {})) if (!k.vocab.links[n] && /^[a-z][a-z ]{1,39}$/.test(n) && !SPEECH_LINKS.has(n)) newLinks[n] = { summary: String(d.summary).slice(0, 120), ...(d.control ? { control: true } : {}) };
     const newKinds: Record<string, { summary: string }> = {}; for (const [n, d] of Object.entries(kinds ?? {})) if (!k.vocab.kinds[n] && /^[a-z][a-z ]{1,39}$/.test(n)) newKinds[n] = { summary: String(d.summary).slice(0, 120) };
@@ -396,10 +403,10 @@ export class Brain {
       if (!v.ok) { verdicts.push({ name, ok: false, problems: v.problems }); continue; }
       const card: Card = v.card; const hash = cardHash(card);
       if (k.vocab.cards[card.name]) { // the same card already exists: just deal it
-        if (!k.decks[m.soulId]?.cards.includes(card.name)) await this.host.enqueue('deck', `soul:${m.soulId}`, { soulId: m.soulId, add: [card.name], why: 'dealt an existing card' });
+        if (!k.decks[m.soulId]?.cards.includes(card.name)) await enqueue('deck', { soulId: m.soulId, add: [card.name], why: 'dealt an existing card' });
         verdicts.push({ name: card.name, ok: true, hash }); continue;
       }
-      await this.host.enqueue('mint', `soul:${m.soulId}`, { card: { ...card, hash, by: m.soulId, mintedAt: tick, origin }, forSoul: m.soulId, ...(first && Object.keys(newLinks).length ? { links: newLinks } : {}), ...(first && Object.keys(newKinds).length ? { kinds: newKinds } : {}) });
+      await enqueue('mint', { card: { ...card, hash, by: m.soulId, mintedAt: tick, origin }, forSoul: m.soulId, ...(first && Object.keys(newLinks).length ? { links: newLinks } : {}), ...(first && Object.keys(newKinds).length ? { kinds: newKinds } : {}) });
       first = false;
       // the mint has been applied by now: if another Soul's card took the name in the same instant, say so
       const won = k.vocab.cards[card.name]?.hash === hash;
@@ -409,7 +416,7 @@ export class Brain {
   }
 
   /** A wish in plain words → an agenda of cards, minting what the vocabulary lacks. Returns null when no compiler is available. */
-  async compile(m: Mind, wish: string, align=false): Promise<{ ok: true; agenda: { card: string; target: string | null; of?: string }[]; minted: MintVerdict[]; alignment?:Alignment } | { ok: false; reason: string } | null> {
+  async compile(m: Mind, wish: string, align=false, guard?: AcceptanceGuard): Promise<{ ok: true; agenda: { card: string; target: string | null; of?: string }[]; minted: MintVerdict[]; alignment?:Alignment } | { ok: false; reason: string } | null> {
     if (this.mode === 'fake' || !this.cfg.anthropicKey) return null;
     if (this.overBudget || !this.gov.allow('user')) return { ok: false, reason: 'the thinking budget is spent for now; try again in a few minutes' };
     const k = this.host.kernel, tick = this.host.engine.world.tick;
@@ -420,8 +427,10 @@ export class Brain {
     let cost = 0, ms = 0, inTok = 0, outTok = 0, cached = 0; const attempts: unknown[] = [];
     try {
       for (let attempt = 0; attempt < (align?1:2); attempt++) {
-        const r = await callTool<CompileOut>({ gate: this.paidGate, apiKey: this.cfg.anthropicKey, model: this.cfg.compilerModel, system, cacheSystem: true, messages, tool: COMPILE_TOOL, maxTokens: 1800 });
+        if (guard) checkAcceptanceGuard(guard);
+        const r = await this.compilerCall<CompileOut>({ gate: this.paidGate, apiKey: this.cfg.anthropicKey, model: this.cfg.compilerModel, system, cacheSystem: true, messages, tool: COMPILE_TOOL, maxTokens: 1800 });
         cost += r.costUsd; ms += r.ms; inTok += r.inputTokens; outTok += r.outputTokens; cached += r.cachedTokens;
+        if (guard) checkAcceptanceGuard(guard);
         const out = r.out;
         if (!out.understood) {
           attempts.push({ out });
@@ -463,15 +472,20 @@ export class Brain {
           this.record({ tick, tier: 'compile', subject: m.name, soulId: m.soulId, model: this.cfg.compilerModel, request: { system: [{ text: system }], messages }, response: r.raw, applied: { wish, understood: true, rejected: problems, attempts }, ms, inputTokens: inTok, outputTokens: outTok, cachedTokens: cached, costUsd: cost, mode: 'live', error: 'the compiled plan did not validate' });
           return { ok: false, reason: `could not turn that into something the world can run (${problems[0]})` };
         }
-        const minted = await this.mint(m, [...validNew.values()], out.new_links, out.new_kinds, 'compiled');
+        const minted = await this.mint(m, [...validNew.values()], out.new_links, out.new_kinds, 'compiled', guard);
         const deal = [...new Set(out.agenda.map((a) => a.card))].filter((c) => this.host.kernel.vocab.cards[c] && !this.host.kernel.decks[m.soulId]?.cards.includes(c));
-        if (deal.length) await this.host.enqueue('deck', `soul:${m.soulId}`, { soulId: m.soulId, add: deal, why: 'needed for the owner’s wish' });
+        if (deal.length) {
+          const payload = { soulId: m.soulId, add: deal, why: 'needed for the owner’s wish' };
+          if (guard) await this.host.enqueueChecked('deck', `soul:${m.soulId}`, payload, guard);
+          else await this.host.enqueue('deck', `soul:${m.soulId}`, payload);
+        }
+        if (guard) checkAcceptanceGuard(guard);
         this.record({ tick, tier: 'compile', subject: m.name, soulId: m.soulId, model: this.cfg.compilerModel, request: { system: [{ text: system }], messages }, response: r.raw, applied: { wish, understood: true, agenda: out.agenda, minted, dealt: deal, attempts }, ms, inputTokens: inTok, outputTokens: outTok, cachedTokens: cached, costUsd: cost, mode: 'live' });
         return { ok: true, agenda: out.agenda.map((a) => ({ card: a.card, target: a.target, ...(a.of ? { of: a.of } : {}) })), minted, ...(align?{alignment:out.alignment}:{}) };
       }
     } catch (e) {
       this.record({ tick, tier: 'compile', subject: m.name, soulId: m.soulId, model: this.cfg.compilerModel, request: { messages }, response: null, applied: { wish, attempts }, ms, inputTokens: inTok, outputTokens: outTok, cachedTokens: cached, costUsd: cost, mode: 'live', error: String((e as Error).message) });
-      return { ok: false, reason: 'the compiler failed; try again' };
+      return { ok: false, reason: e instanceof StaleCompilation ? e.message : 'the compiler failed; try again' };
     }
     return { ok: false, reason: 'the compiler failed; try again' };
   }

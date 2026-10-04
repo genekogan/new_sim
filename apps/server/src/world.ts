@@ -36,7 +36,12 @@ export type Mind = {
   pending: { program: string; card: string; hash: string; target: string | null; option?: string; manner?: string; approachLen: number; applied: boolean } | null;
 };
 export type RecoveryRecipe = { baseline: SnapshotBody; events: LogEvent[]; untilTick: number; faults: Record<string,number>; excluded: string[]; reason: string };
-type Pending = { kind: EventKind; author: string; payload: any; resolve?: (e: LogEvent) => void };
+/** A synchronous, read-only acceptance check. Throw to refuse before logging. */
+export type AcceptanceGuard = () => true;
+export function checkAcceptanceGuard(guard: AcceptanceGuard): void {
+  if (guard() !== true) throw new TypeError('acceptance guard must synchronously return true');
+}
+type Pending = { kind: EventKind; author: string; payload: any; resolve?: (e: LogEvent) => void; guard?: AcceptanceGuard; reject?: (error: unknown) => void };
 export type SnapshotBody = { runtime: EngineSnapshot; minds: Mind[]; seq: number; extra: Record<string, unknown>; kernel?: KState; counts?: Record<string, number> };
 export type HostListener = {
   onBatch?(b: Batch): void;
@@ -217,11 +222,18 @@ export class WorldHost {
     if (this.tickMs.length > 400) this.tickMs.splice(0, 200);
   }
 
-  /** Finish already accepted inputs without advancing the engine or starting new mind work. */
+  /** Accept queued inputs without advancing the engine or starting new mind work. */
   drainInputs() {
     const tick = this.engine.world.tick;
     const pending = this.queue.splice(0);
     for (const p of pending) {
+      // Live request authority is checked immediately before the acceptance
+      // point. Refusals are not simulation faults and consume no log sequence.
+      // Accepted events replay as facts, without consulting these closures.
+      if (p.guard) {
+        try { checkAcceptanceGuard(p.guard); }
+        catch (error) { p.reject!(error); continue; }
+      }
       const e: LogEvent = { seq: ++this.seq, tick, kind: p.kind, author: p.author, payload: p.payload, at: Date.now() };
       this.db.appendEvent(this.worldId, e);
       let recovered = false;
@@ -268,6 +280,13 @@ export class WorldHost {
   /** Queue an input; it is logged and applied at the next tick. Resolves with the logged event. */
   enqueue(kind: EventKind, author: string, payload: unknown): Promise<LogEvent> {
     return new Promise((resolve) => this.queue.push({ kind, author, payload, resolve }));
+  }
+
+  /** Opt-in live request check at the sequencer, before any durable event/effect.
+   * The guard is never serialized or replayed. It must not enqueue or mutate.
+   * Queued requests remain ephemeral; this does not provide durable retries. */
+  enqueueChecked(kind: EventKind, author: string, payload: unknown, guard: AcceptanceGuard): Promise<LogEvent> {
+    return new Promise((resolve, reject) => this.queue.push({ kind, author, payload, guard, resolve, reject }));
   }
 
   /** Apply a logged event: the fold moves the engine and the kernel; this adds the minds' bookkeeping. */
