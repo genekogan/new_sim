@@ -1,0 +1,7 @@
+{
+  "contract": "core-terrain-geometry-source/1",
+  "fixture": "shore-geometry.v1.json",
+  "sha256": "3b356ddd6af55467817e3e15474f4c4779aa9c149baff0eea5509cffc640d36f",
+  "bytes": 7310,
+  "kind": "actual-detached-native-geometry-producer"
+}

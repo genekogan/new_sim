@@ -1,0 +1,1623 @@
+{
+  "status": "proposed-for-core-validation",
+  "source": "shoreGardenPlants/d62f7a0",
+  "beds": [
+    {
+      "id": "eden-shore:raised-bed-1:soil-top",
+      "kind": "proposed-soil-plane",
+      "centreXZ": [
+        7,
+        -1.8
+      ],
+      "halfXZ": [
+        0.49,
+        1.325
+      ],
+      "y": 1.325,
+      "enclosure": {
+        "minXYZ": [
+          6.45,
+          0.935,
+          -3.2
+        ],
+        "maxXYZ": [
+          7.55,
+          1.2850000000000001,
+          -0.4
+        ]
+      },
+      "proposedRootIds": [
+        "shore-preview-31",
+        "shore-preview-32",
+        "shore-preview-33",
+        "shore-preview-34"
+      ],
+      "unresolved": [
+        "load-bearing",
+        "terrain-foundation",
+        "soil-material",
+        "canonical-installation"
+      ]
+    },
+    {
+      "id": "eden-shore:raised-bed-2:soil-top",
+      "kind": "proposed-soil-plane",
+      "centreXZ": [
+        10.3,
+        -1.8
+      ],
+      "halfXZ": [
+        0.49,
+        1.325
+      ],
+      "y": 1.7540000000000002,
+      "enclosure": {
+        "minXYZ": [
+          9.75,
+          1.364,
+          -3.2
+        ],
+        "maxXYZ": [
+          10.850000000000001,
+          1.7140000000000002,
+          -0.4
+        ]
+      },
+      "proposedRootIds": [
+        "shore-preview-35",
+        "shore-preview-36",
+        "shore-preview-37",
+        "shore-preview-38"
+      ],
+      "unresolved": [
+        "load-bearing",
+        "terrain-foundation",
+        "soil-material",
+        "canonical-installation"
+      ]
+    }
+  ],
+  "trellis": {
+    "id": "eden-shore:trellis-1:attachment-plane",
+    "kind": "proposed-vine-attachment",
+    "minXYZ": [
+      6.05,
+      0.7930000000000003,
+      -4.85
+    ],
+    "maxXYZ": [
+      7.95,
+      3.2270000000000003,
+      -4.75
+    ],
+    "proposedRootIds": [
+      "shore-preview-39",
+      "shore-preview-40",
+      "shore-preview-41",
+      "shore-preview-42"
+    ],
+    "posts": [
+      {
+        "id": "eden-shore:trellis-1:post-1",
+        "minXYZ": [
+          6.0625,
+          0.7930000000000003,
+          -4.8375
+        ],
+        "maxXYZ": [
+          6.137499999999999,
+          2.9930000000000003,
+          -4.7625
+        ]
+      },
+      {
+        "id": "eden-shore:trellis-1:post-2",
+        "minXYZ": [
+          7.862500000000001,
+          1.027,
+          -4.8375
+        ],
+        "maxXYZ": [
+          7.9375,
+          3.2270000000000003,
+          -4.7625
+        ]
+      }
+    ],
+    "unresolved": [
+      "attachment-strength",
+      "terrain-foundation",
+      "canonical-installation"
+    ]
+  },
+  "envelopes": [
+    {
+      "plantId": "shore-preview-0",
+      "kind": "canopy-tree",
+      "root": [
+        6,
+        0.78,
+        -9
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          4.771901172058961,
+          0.7799999713897705,
+          -10.27025552426062
+        ],
+        "maxXYZ": [
+          7.0699357572623285,
+          4.613004023997746,
+          -7.7297444757393805
+        ]
+      },
+      "visualStem": {
+        "id": "shore-preview-0:visual-stem",
+        "yaw": 0,
+        "centreXZ": [
+          6,
+          -9
+        ],
+        "radiusXZ": [
+          0.135,
+          0.135
+        ],
+        "y0": 0.78,
+        "y1": 3.636
+      },
+      "rootClearanceProposal": {
+        "id": "shore-preview-0:root-clearance",
+        "yaw": 0,
+        "centreXZ": [
+          6,
+          -9
+        ],
+        "radiusXZ": [
+          0.27,
+          0.27
+        ],
+        "y0": 0.68,
+        "y1": 0.88
+      },
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Root clearance is an authored review envelope, not measured buried roots or admitted collision."
+    },
+    {
+      "plantId": "shore-preview-1",
+      "kind": "canopy-tree",
+      "root": [
+        10,
+        1.3,
+        -8
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          8.771900695221802,
+          1.2999999523162842,
+          -9.27025552426062
+        ],
+        "maxXYZ": [
+          11.069936234099487,
+          5.246184880702458,
+          -6.7297444757393805
+        ]
+      },
+      "visualStem": {
+        "id": "shore-preview-1:visual-stem",
+        "yaw": 0,
+        "centreXZ": [
+          10,
+          -8
+        ],
+        "radiusXZ": [
+          0.135,
+          0.135
+        ],
+        "y0": 1.3,
+        "y1": 4.156000000000001
+      },
+      "rootClearanceProposal": {
+        "id": "shore-preview-1:root-clearance",
+        "yaw": 0,
+        "centreXZ": [
+          10,
+          -8
+        ],
+        "radiusXZ": [
+          0.27,
+          0.27
+        ],
+        "y0": 1.2,
+        "y1": 1.4000000000000001
+      },
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Root clearance is an authored review envelope, not measured buried roots or admitted collision."
+    },
+    {
+      "plantId": "shore-preview-2",
+      "kind": "canopy-tree",
+      "root": [
+        14,
+        1.82,
+        -6
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          12.771900695221802,
+          1.8199999332427979,
+          -7.2702555242606195
+        ],
+        "maxXYZ": [
+          15.069936234099487,
+          5.706221635310612,
+          -4.7297444757393805
+        ]
+      },
+      "visualStem": {
+        "id": "shore-preview-2:visual-stem",
+        "yaw": 0,
+        "centreXZ": [
+          14,
+          -6
+        ],
+        "radiusXZ": [
+          0.135,
+          0.135
+        ],
+        "y0": 1.82,
+        "y1": 4.676
+      },
+      "rootClearanceProposal": {
+        "id": "shore-preview-2:root-clearance",
+        "yaw": 0,
+        "centreXZ": [
+          14,
+          -6
+        ],
+        "radiusXZ": [
+          0.27,
+          0.27
+        ],
+        "y0": 1.72,
+        "y1": 1.9200000000000002
+      },
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Root clearance is an authored review envelope, not measured buried roots or admitted collision."
+    },
+    {
+      "plantId": "shore-preview-3",
+      "kind": "canopy-tree",
+      "root": [
+        14,
+        1.82,
+        1
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          12.771900695221802,
+          1.8199999332427979,
+          -0.2702555540629419
+        ],
+        "maxXYZ": [
+          15.069936234099487,
+          5.740507657496892,
+          2.2702555242606195
+        ]
+      },
+      "visualStem": {
+        "id": "shore-preview-3:visual-stem",
+        "yaw": 0,
+        "centreXZ": [
+          14,
+          1
+        ],
+        "radiusXZ": [
+          0.135,
+          0.135
+        ],
+        "y0": 1.82,
+        "y1": 4.676
+      },
+      "rootClearanceProposal": {
+        "id": "shore-preview-3:root-clearance",
+        "yaw": 0,
+        "centreXZ": [
+          14,
+          1
+        ],
+        "radiusXZ": [
+          0.27,
+          0.27
+        ],
+        "y0": 1.72,
+        "y1": 1.9200000000000002
+      },
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Root clearance is an authored review envelope, not measured buried roots or admitted collision."
+    },
+    {
+      "plantId": "shore-preview-4",
+      "kind": "canopy-tree",
+      "root": [
+        13,
+        1.69,
+        8
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          11.771900695221802,
+          1.690000057220459,
+          6.7297444757393805
+        ],
+        "maxXYZ": [
+          14.069936234099487,
+          5.644793565242253,
+          9.27025552426062
+        ]
+      },
+      "visualStem": {
+        "id": "shore-preview-4:visual-stem",
+        "yaw": 0,
+        "centreXZ": [
+          13,
+          8
+        ],
+        "radiusXZ": [
+          0.135,
+          0.135
+        ],
+        "y0": 1.69,
+        "y1": 4.546
+      },
+      "rootClearanceProposal": {
+        "id": "shore-preview-4:root-clearance",
+        "yaw": 0,
+        "centreXZ": [
+          13,
+          8
+        ],
+        "radiusXZ": [
+          0.27,
+          0.27
+        ],
+        "y0": 1.5899999999999999,
+        "y1": 1.79
+      },
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Root clearance is an authored review envelope, not measured buried roots or admitted collision."
+    },
+    {
+      "plantId": "shore-preview-5",
+      "kind": "canopy-tree",
+      "root": [
+        9,
+        1.17,
+        10
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          7.771900695221802,
+          1.1700000762939453,
+          8.72974447573938
+        ],
+        "maxXYZ": [
+          10.069936234099487,
+          5.100811536281071,
+          11.27025552426062
+        ]
+      },
+      "visualStem": {
+        "id": "shore-preview-5:visual-stem",
+        "yaw": 0,
+        "centreXZ": [
+          9,
+          10
+        ],
+        "radiusXZ": [
+          0.135,
+          0.135
+        ],
+        "y0": 1.17,
+        "y1": 4.026
+      },
+      "rootClearanceProposal": {
+        "id": "shore-preview-5:root-clearance",
+        "yaw": 0,
+        "centreXZ": [
+          9,
+          10
+        ],
+        "radiusXZ": [
+          0.27,
+          0.27
+        ],
+        "y0": 1.0699999999999998,
+        "y1": 1.27
+      },
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Root clearance is an authored review envelope, not measured buried roots or admitted collision."
+    },
+    {
+      "plantId": "shore-preview-6",
+      "kind": "canopy-tree",
+      "root": [
+        5,
+        0.65,
+        10
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          3.7719011720589606,
+          0.6500000953674316,
+          8.72974447573938
+        ],
+        "maxXYZ": [
+          6.0699357572623285,
+          4.566957290141545,
+          11.27025552426062
+        ]
+      },
+      "visualStem": {
+        "id": "shore-preview-6:visual-stem",
+        "yaw": 0,
+        "centreXZ": [
+          5,
+          10
+        ],
+        "radiusXZ": [
+          0.135,
+          0.135
+        ],
+        "y0": 0.65,
+        "y1": 3.5060000000000002
+      },
+      "rootClearanceProposal": {
+        "id": "shore-preview-6:root-clearance",
+        "yaw": 0,
+        "centreXZ": [
+          5,
+          10
+        ],
+        "radiusXZ": [
+          0.27,
+          0.27
+        ],
+        "y0": 0.55,
+        "y1": 0.75
+      },
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Root clearance is an authored review envelope, not measured buried roots or admitted collision."
+    },
+    {
+      "plantId": "shore-preview-7",
+      "kind": "conifer",
+      "root": [
+        8,
+        1.04,
+        -10
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          6.90320611000061,
+          1.040000081062317,
+          -11.013589955866337
+        ],
+        "maxXYZ": [
+          9.09679388999939,
+          5.418000102043152,
+          -8.875
+        ]
+      },
+      "visualStem": {
+        "id": "shore-preview-7:visual-stem",
+        "yaw": 0,
+        "centreXZ": [
+          8,
+          -10
+        ],
+        "radiusXZ": [
+          0.08750000000000001,
+          0.08750000000000001
+        ],
+        "y0": 1.04,
+        "y1": 3.24
+      },
+      "rootClearanceProposal": {
+        "id": "shore-preview-7:root-clearance",
+        "yaw": 0,
+        "centreXZ": [
+          8,
+          -10
+        ],
+        "radiusXZ": [
+          0.17500000000000002,
+          0.17500000000000002
+        ],
+        "y0": 0.9400000000000001,
+        "y1": 1.1400000000000001
+      },
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Root clearance is an authored review envelope, not measured buried roots or admitted collision."
+    },
+    {
+      "plantId": "shore-preview-8",
+      "kind": "conifer",
+      "root": [
+        15,
+        1.95,
+        -2
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          13.90320611000061,
+          1.9499999284744263,
+          -3.013589955866337
+        ],
+        "maxXYZ": [
+          16.09679388999939,
+          6.327999949455261,
+          -0.875
+        ]
+      },
+      "visualStem": {
+        "id": "shore-preview-8:visual-stem",
+        "yaw": 0,
+        "centreXZ": [
+          15,
+          -2
+        ],
+        "radiusXZ": [
+          0.08750000000000001,
+          0.08750000000000001
+        ],
+        "y0": 1.95,
+        "y1": 4.15
+      },
+      "rootClearanceProposal": {
+        "id": "shore-preview-8:root-clearance",
+        "yaw": 0,
+        "centreXZ": [
+          15,
+          -2
+        ],
+        "radiusXZ": [
+          0.17500000000000002,
+          0.17500000000000002
+        ],
+        "y0": 1.8499999999999999,
+        "y1": 2.05
+      },
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Root clearance is an authored review envelope, not measured buried roots or admitted collision."
+    },
+    {
+      "plantId": "shore-preview-9",
+      "kind": "conifer",
+      "root": [
+        15,
+        1.95,
+        6
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          13.90320611000061,
+          1.9499999284744263,
+          4.986410044133663
+        ],
+        "maxXYZ": [
+          16.09679388999939,
+          6.327999949455261,
+          7.125
+        ]
+      },
+      "visualStem": {
+        "id": "shore-preview-9:visual-stem",
+        "yaw": 0,
+        "centreXZ": [
+          15,
+          6
+        ],
+        "radiusXZ": [
+          0.08750000000000001,
+          0.08750000000000001
+        ],
+        "y0": 1.95,
+        "y1": 4.15
+      },
+      "rootClearanceProposal": {
+        "id": "shore-preview-9:root-clearance",
+        "yaw": 0,
+        "centreXZ": [
+          15,
+          6
+        ],
+        "radiusXZ": [
+          0.17500000000000002,
+          0.17500000000000002
+        ],
+        "y0": 1.8499999999999999,
+        "y1": 2.05
+      },
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Root clearance is an authored review envelope, not measured buried roots or admitted collision."
+    },
+    {
+      "plantId": "shore-preview-10",
+      "kind": "shrub",
+      "root": [
+        5,
+        0.65,
+        -7
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          4.370132875032255,
+          0.7114297848738715,
+          -7.590286224684178
+        ],
+        "maxXYZ": [
+          5.633312273435763,
+          1.3355492848359063,
+          -6.452238113084377
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-11",
+      "kind": "shrub",
+      "root": [
+        8,
+        1.04,
+        -7
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          7.370132875032255,
+          1.1098889809645698,
+          -7.590286224684178
+        ],
+        "maxXYZ": [
+          8.633312750272921,
+          1.783526946922393,
+          -6.452238113084377
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-12",
+      "kind": "shrub",
+      "root": [
+        12,
+        1.56,
+        -5
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          11.370132875032255,
+          1.637551377395539,
+          -5.590286224684178
+        ],
+        "maxXYZ": [
+          12.633312750272921,
+          2.283100773712249,
+          -4.452238113084377
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-13",
+      "kind": "shrub",
+      "root": [
+        12,
+        1.56,
+        2
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          11.370132875032255,
+          1.6213052969969795,
+          1.4097138945251118
+        ],
+        "maxXYZ": [
+          12.633312750272921,
+          2.301876236816497,
+          2.547761886915623
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-14",
+      "kind": "shrub",
+      "root": [
+        11,
+        1.43,
+        8
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          10.370132875032255,
+          1.5228760939635322,
+          7.409713775315822
+        ],
+        "maxXYZ": [
+          11.633312750272921,
+          2.1906520623169854,
+          8.547761410078465
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-15",
+      "kind": "shrub",
+      "root": [
+        7,
+        0.91,
+        9
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          6.370132875032255,
+          1.010538528541474,
+          8.40971425215298
+        ],
+        "maxXYZ": [
+          7.633312273435763,
+          1.6894276637040093,
+          9.547761410078465
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-16",
+      "kind": "shrub",
+      "root": [
+        4,
+        0.52,
+        9
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          3.3701328750322546,
+          0.5811808806456611,
+          8.40971425215298
+        ],
+        "maxXYZ": [
+          4.633312273435763,
+          1.1519468921624139,
+          9.547761410078465
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-17",
+      "kind": "reeds",
+      "root": [
+        0.65,
+        0.08449999999999981,
+        -6
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          0.4788944158474222,
+          0.08449998497962952,
+          -6.150561176240444
+        ],
+        "maxXYZ": [
+          0.7646946575721487,
+          1.1580759808421135,
+          -5.85783401876688
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-18",
+      "kind": "reeds",
+      "root": [
+        0.65,
+        0.08449999999999981,
+        -5.4
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          0.5660375091949716,
+          0.08449998497962952,
+          -5.574437938630581
+        ],
+        "maxXYZ": [
+          0.8055402305206045,
+          1.1858543679118156,
+          -5.284553207457066
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-19",
+      "kind": "reeds",
+      "root": [
+        0.65,
+        0.08449999999999981,
+        -4.8
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          0.4831145737091318,
+          0.08449998497962952,
+          -4.970688663423061
+        ],
+        "maxXYZ": [
+          0.7427488234122976,
+          1.149979405105114,
+          -4.66861168295145
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-20",
+      "kind": "reeds",
+      "root": [
+        0.65,
+        0.08449999999999981,
+        -4.2
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          0.50166574453509,
+          0.08449998497962952,
+          -4.369830451905727
+        ],
+        "maxXYZ": [
+          0.7875684764465078,
+          1.1770318076014519,
+          -4.044518627226353
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-21",
+      "kind": "reeds",
+      "root": [
+        0.65,
+        0.08449999999999981,
+        -3.6
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          0.4806637797275797,
+          0.08449998497962952,
+          -3.770561061799526
+        ],
+        "maxXYZ": [
+          0.8202312853416189,
+          1.1147198006510735,
+          -3.4337305203080177
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-22",
+      "kind": "reeds",
+      "root": [
+        0.65,
+        0.08449999999999981,
+        -3
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          0.48540735577738436,
+          0.08449998497962952,
+          -3.1520317420363426
+        ],
+        "maxXYZ": [
+          0.7933204438766226,
+          1.1816537901759148,
+          -2.8496307507157326
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-23",
+      "kind": "reeds",
+      "root": [
+        0.65,
+        0.08449999999999981,
+        -2.4000000000000004
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          0.5439149472633615,
+          0.08449998497962952,
+          -2.5523258075118065
+        ],
+        "maxXYZ": [
+          0.7886110212882742,
+          1.1812286898493767,
+          -2.2594725266098976
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-24",
+      "kind": "grass",
+      "root": [
+        3,
+        0.39,
+        -4
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          2.560189819894731,
+          0.38999998569488525,
+          -4.49795888364315
+        ],
+        "maxXYZ": [
+          3.447472892701626,
+          0.6848470568656921,
+          -3.498320184648037
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-25",
+      "kind": "grass",
+      "root": [
+        3,
+        0.39,
+        -1
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          2.518477100529708,
+          0.38999998569488525,
+          -1.4403582960367203
+        ],
+        "maxXYZ": [
+          3.4649599976837635,
+          0.6750876903533936,
+          -0.5378803908824921
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-26",
+      "kind": "grass",
+      "root": [
+        5,
+        0.65,
+        -5
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          4.528044174425304,
+          0.6499999761581421,
+          -5.480455249547958
+        ],
+        "maxXYZ": [
+          5.501116225030273,
+          0.8877303898334503,
+          -4.487111374735832
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-27",
+      "kind": "grass",
+      "root": [
+        10,
+        1.3,
+        -5
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          9.552938338369131,
+          1.2999999523162842,
+          -5.494610702618957
+        ],
+        "maxXYZ": [
+          10.399952810257673,
+          1.5933088660240173,
+          -4.527045380324125
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-28",
+      "kind": "grass",
+      "root": [
+        12,
+        1.56,
+        4
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          11.47350135842862,
+          1.559999942779541,
+          3.499201187863946
+        ],
+        "maxXYZ": [
+          12.528703562915325,
+          1.8476576209068298,
+          4.518756687641144
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-29",
+      "kind": "grass",
+      "root": [
+        10,
+        1.3,
+        7
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          9.536987695842981,
+          1.2999999523162842,
+          6.52643084526062
+        ],
+        "maxXYZ": [
+          10.48461601138115,
+          1.5946315228939056,
+          7.548275381326675
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-30",
+      "kind": "grass",
+      "root": [
+        6,
+        0.78,
+        8
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          5.528471872210503,
+          0.7799999713897705,
+          7.4648265317082405
+        ],
+        "maxXYZ": [
+          6.440027296426706,
+          1.0526012480258942,
+          8.543725971132517
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-31",
+      "kind": "shrub",
+      "root": [
+        7,
+        1.325,
+        -2.6
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          6.790044291677418,
+          1.351914931685883,
+          -2.810816542444286
+        ],
+        "maxXYZ": [
+          7.211103932199535,
+          1.655548881142181,
+          -2.4043707687281994
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-32",
+      "kind": "shrub",
+      "root": [
+        7,
+        1.325,
+        -2.05
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          6.790044291677418,
+          1.3669357790064396,
+          -2.2608163517094226
+        ],
+        "maxXYZ": [
+          7.211103932199535,
+          1.6589544521260677,
+          -1.8543708164119153
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-33",
+      "kind": "shrub",
+      "root": [
+        7,
+        1.325,
+        -1.5
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          6.790044291677418,
+          1.3750943435740055,
+          -1.710816518602428
+        ],
+        "maxXYZ": [
+          7.211103932199535,
+          1.662359903900665,
+          -1.3043707448863415
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-34",
+      "kind": "shrub",
+      "root": [
+        7,
+        1.325,
+        -0.95
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          6.790044291677418,
+          1.3518596185755314,
+          -1.1608164470768543
+        ],
+        "maxXYZ": [
+          7.211103932199535,
+          1.6657654748845516,
+          -0.7543707925700573
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-35",
+      "kind": "shrub",
+      "root": [
+        10.3,
+        1.7540000000000002,
+        -2.6
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          10.090044482412281,
+          1.800915290267426,
+          -2.810816542444286
+        ],
+        "maxXYZ": [
+          10.511104122934398,
+          2.0981709466863094,
+          -2.4043707687281994
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-36",
+      "kind": "shrub",
+      "root": [
+        10.3,
+        1.7540000000000002,
+        -2.05
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          10.090044482412281,
+          1.8042014135431828,
+          -2.2608163517094226
+        ],
+        "maxXYZ": [
+          10.511104122934398,
+          2.1015763984609066,
+          -1.8543708164119153
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-37",
+      "kind": "shrub",
+      "root": [
+        10.3,
+        1.7540000000000002,
+        -1.5
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          10.090044482412281,
+          1.7808043254923405,
+          -1.710816518602428
+        ],
+        "maxXYZ": [
+          10.511104122934398,
+          2.099996756165069,
+          -1.3043707448863415
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-38",
+      "kind": "shrub",
+      "root": [
+        10.3,
+        1.7540000000000002,
+        -0.95
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          10.090044482412281,
+          1.7849644912790836,
+          -1.1608164470768543
+        ],
+        "maxXYZ": [
+          10.511104122934398,
+          2.073496173470062,
+          -0.7543707925700573
+        ]
+      },
+      "visualStem": null,
+      "rootClearanceProposal": null,
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Soft foliage only in this depiction; Core decides obstruction. No solid stem/root volume supplied."
+    },
+    {
+      "plantId": "shore-preview-39",
+      "kind": "vine",
+      "root": [
+        6.2,
+        0.8059999999999999,
+        -4.8
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          6.025354282664011,
+          0.8059999942779541,
+          -4.839219565686079
+        ],
+        "maxXYZ": [
+          6.376230819417287,
+          2.805999994277954,
+          -4.761512283984331
+        ]
+      },
+      "visualStem": {
+        "id": "shore-preview-39:visual-stem",
+        "yaw": 0,
+        "centreXZ": [
+          6.2,
+          -4.8
+        ],
+        "radiusXZ": [
+          0.0054,
+          0.0036
+        ],
+        "y0": 0.8059999999999999,
+        "y1": 2.806
+      },
+      "rootClearanceProposal": {
+        "id": "shore-preview-39:root-clearance",
+        "yaw": 0,
+        "centreXZ": [
+          6.2,
+          -4.8
+        ],
+        "radiusXZ": [
+          0.0108,
+          0.0072
+        ],
+        "y0": 0.706,
+        "y1": 0.9059999999999999
+      },
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Root clearance is an authored review envelope, not measured buried roots or admitted collision."
+    },
+    {
+      "plantId": "shore-preview-40",
+      "kind": "vine",
+      "root": [
+        6.7,
+        0.871,
+        -4.8
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          6.525354282664011,
+          0.8710000514984131,
+          -4.839219565686079
+        ],
+        "maxXYZ": [
+          6.876230819417287,
+          2.871000051498413,
+          -4.761512283984331
+        ]
+      },
+      "visualStem": {
+        "id": "shore-preview-40:visual-stem",
+        "yaw": 0,
+        "centreXZ": [
+          6.7,
+          -4.8
+        ],
+        "radiusXZ": [
+          0.0054,
+          0.0036
+        ],
+        "y0": 0.871,
+        "y1": 2.871
+      },
+      "rootClearanceProposal": {
+        "id": "shore-preview-40:root-clearance",
+        "yaw": 0,
+        "centreXZ": [
+          6.7,
+          -4.8
+        ],
+        "radiusXZ": [
+          0.0108,
+          0.0072
+        ],
+        "y0": 0.771,
+        "y1": 0.971
+      },
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Root clearance is an authored review envelope, not measured buried roots or admitted collision."
+    },
+    {
+      "plantId": "shore-preview-41",
+      "kind": "vine",
+      "root": [
+        7.2,
+        0.9359999999999999,
+        -4.8
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          7.025354282664011,
+          0.9359999895095825,
+          -4.839219565686079
+        ],
+        "maxXYZ": [
+          7.376230819417287,
+          2.9359999895095825,
+          -4.761512283984331
+        ]
+      },
+      "visualStem": {
+        "id": "shore-preview-41:visual-stem",
+        "yaw": 0,
+        "centreXZ": [
+          7.2,
+          -4.8
+        ],
+        "radiusXZ": [
+          0.0054,
+          0.0036
+        ],
+        "y0": 0.9359999999999999,
+        "y1": 2.936
+      },
+      "rootClearanceProposal": {
+        "id": "shore-preview-41:root-clearance",
+        "yaw": 0,
+        "centreXZ": [
+          7.2,
+          -4.8
+        ],
+        "radiusXZ": [
+          0.0108,
+          0.0072
+        ],
+        "y0": 0.836,
+        "y1": 1.036
+      },
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Root clearance is an authored review envelope, not measured buried roots or admitted collision."
+    },
+    {
+      "plantId": "shore-preview-42",
+      "kind": "vine",
+      "root": [
+        7.7,
+        1.001,
+        -4.8
+      ],
+      "visualBounds": {
+        "minXYZ": [
+          7.525354282664011,
+          1.000999927520752,
+          -4.839219565686079
+        ],
+        "maxXYZ": [
+          7.876230819417287,
+          3.000999927520752,
+          -4.761512283984331
+        ]
+      },
+      "visualStem": {
+        "id": "shore-preview-42:visual-stem",
+        "yaw": 0,
+        "centreXZ": [
+          7.7,
+          -4.8
+        ],
+        "radiusXZ": [
+          0.0054,
+          0.0036
+        ],
+        "y0": 1.001,
+        "y1": 3.001
+      },
+      "rootClearanceProposal": {
+        "id": "shore-preview-42:root-clearance",
+        "yaw": 0,
+        "centreXZ": [
+          7.7,
+          -4.8
+        ],
+        "radiusXZ": [
+          0.0108,
+          0.0072
+        ],
+        "y0": 0.9009999999999999,
+        "y1": 1.101
+      },
+      "policy": "unresolved",
+      "foliageCreatesWalkingSurface": false,
+      "note": "Root clearance is an authored review envelope, not measured buried roots or admitted collision."
+    }
+  ],
+  "unresolved": [
+    "obstruction-policy",
+    "support-admission",
+    "canonical-scene-revision",
+    "installation"
+  ]
+}

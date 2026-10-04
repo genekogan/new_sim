@@ -1,0 +1,34 @@
+# Terrain sweep and footing geometry checkpoint
+
+October 4 Eastern. Additive Core geometry service under W-002, dependent on the existing candidate/pinned public World inputs. This is executable terrain/contact mathematics, **not an installed scene, a walking controller or a load-bearing support grant**. The native horizontal grids, live configurations, event kinds, rules version and snapshots remain unchanged.
+
+`createTerrainGeometryProbe` in `packages/engine-mars/src/terrain.ts` parses and detaches a bounded `TerrainPatchV1` once. The existing terrain schema moved intact into engine-contract; scene-candidate re-exports it, preserving its prior API and sampler. Native probe output uses only IEEE arithmetic and sqrt for normals and lengths; JSON zero is normalized without geometry tolerances or height rounding. The old candidate's Math.hypot sampler remains unchanged. New main package exports expose the opt-in service/types; no root/dependency/lock/static wiring changed, and the five exact f753 capture-leaf files are unchanged.
+
+`sweep({fromXZ,toXZ,radiusMetres,maxGrade})` returns `terrain-sweep-geometry/1`, `stage:geometry-only`. It covers the complete swept circular footprint, not just endpoints or a sampled centre path. Each touched closed triangle is checked against the supplied whole-triangle rise/run limit. This catches a steep sliver between flat endpoints, a steep triangle under the outside edge of the body, and steep contours even when travel itself stays level. Closed tangencies are conservatively included. A convex bounds check rejects the entire sweep if either endpoint disc leaves the heightfield; no extrapolation or flat-ground substitute.
+
+The diagnostic centreline is clipped at grid/triangle crossings. Each span retains triangle address, parameter interval, endpoints on the declared heightfield, upward normal, grade and true 3D length. A slope refusal retains those diagnostics; consumers must check `geometryStatus` before treating them as usable. An outside refusal has no fabricated spans/grade/contact. A stationary disc has one zero-length span. A clear result concerns **only coverage and the supplied slope constraint**. Obstacles, water, stacked supports, dynamic bodies and canonical installation remain explicit unresolved gates on every result. The example radius0.28m/maxGrade0.25 is an illustrative constraint, not new native human policy/anatomy. No arbitrary caller parameter can authorize physical movement.
+
+`footing({centreXZ,halfXZ,bottomY})` returns `terrain-footing-geometry/1` for an axis-aligned enclosure bottom. Triangle/rectangle clipping evaluates affine height extrema at every intersection vertex, including ridges inside the rectangle. Corner-only checks can miss those ridges. Output is the full signed bottom-minus-terrain range: positive gap, negative intersection. Covered means the whole footprint lies over this geometric patch, not that the structure is safe. Foundation policy, loads, materials and installation remain unresolved. Rotated foundations, stacked decks, soil support, attachment strength and general meshes need later mechanisms.
+
+Actual public source inputs:
+
+| Input | World commit | SHA256 |
+|---|---|---|
+| Shore terrain proposal | 27879c144ef7716cd0238b5734a93d785e922950 | 69ac8401b8ff734f8d23acc8088d6e583d29a31d428a0a8f066cf700c85dfb3b |
+| Named beds/trellis/envelopes | 6d665ca34bc8619e2472703cb7e073c7f3047b34 | 5ba65ada39e255a4646f3910b008c7c46f314a5a72533b8e16b79f4373737a60 |
+
+The second public input is copied unchanged into Core's test fixtures; World assets are not edited. The actual native geometry producer supplies `apps/server/test/fixtures/terrain-geometry/shore-geometry.v1.json`: 7,310 bytes, SHA256 `3b356ddd6af55467817e3e15474f4c4779aa9c149baff0eea5509cffc640d36f`, plus manifest and generator. Its three sweeps show the bank geometry clear at grade0.13, a centreline at grade0.13 refused because the footprint reaches grade0.30, and a body disc refused at the terrain edge. Both named bed enclosures have bottom-minus-terrain range **[-0.0465,+0.0965]m** over the full footprint. This automates the previously source-measured foundation gate. Eight raised roots retain their original requires-support status; no lowering/flattening/repair/approval occurs.
+
+Final focused command:
+
+```sh
+node --test --test-concurrency=1 packages/engine-mars/src/terrain.test.ts apps/server/src/terrain-geometry.test.ts apps/server/src/scene-candidate.test.ts apps/server/src/contracts.test.ts
+```
+
+**28/28 PASS**: 15 native geometry checks, two actual serialized producer/subprocess checks, seven retained candidate checks after schema extraction, and four actual W/G world producers. Native cases include both triangles/nonplanarity, millimetre strips, whole disc/closed tangency, contour/stationary checks, exact limit refusal, actual pinned shore/bed inputs, reversal/continuity across24 paths, malformed/unknown/private authority rejection, source/result detachment, interior crest extrema and a largest129x129 grid. A separate fresh Node process reconstructs the exact supplied JSON bytes without models/DBs. Actual native greenfield state/snapshot/render base/tick remains unchanged across64 proposal probes. This establishes an observation-only seam, not terrain engine execution/replay conformance.
+
+The largest-grid sweep plus whole-patch footing inspected at most32,768 triangles and returned finite bounded output; observed combined cost12.77ms once on this shared machine. This is a single query measurement, not a tick budget, population limit or soak. The service retains only its parsed terrain, not per-query caches/history; canonical revision-bound acceleration and actual runtime profiling are later work.
+
+Server/native/engine-contract TypeScript passed. Initial narrow18 then expanded21 checks passed. The first serialized fixture run was **0/2 FAIL**: signed-zero normals differed after JSON parsing, and the fresh-process harness put a literal newline in a JavaScript string. Probe zero normalization and safe code-string newline encoding corrected these; final exact byte reconstruction passes without relaxed assertions. Previous broad MarsDJ120/121 remains failed; no rerun or whole-World/UI qualification is inferred. Fake local/$0; subprocess exits normally. No live server/DB or model invocation.
+
+Next: World reviews geometry/footing interpretation and qualifies its concrete counterpart; Core adds canonical installation/revision/topology and native route/support observation at an explicit compatibility checkpoint, then water/shore transitions. Paired physical producer/controller/recording/replay proof must precede activation. C-072/C-073 two-owner lifecycle/body admission follows the shared support checkpoint; actual owners, capacity, wire/auth/history/feedback and compatible rollback remain separately queued. PM owns main/push/deploy after Gene's explicit merge-closure handover.
