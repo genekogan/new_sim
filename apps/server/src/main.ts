@@ -17,6 +17,7 @@ import { LivingWorld } from './living.ts';
 import { CampCards } from './camp.ts';
 import {FloaterCards} from './floaters.ts';
 import { worldDefinition } from './world-config.ts';
+import { stripWorldRequestPath } from './world-request-path.ts';
 
 /** Seeded only into a world with no live Souls, so it is never empty. */
 const NATIVES: { name: string; description: string }[] = [
@@ -68,11 +69,7 @@ const brain = new Brain(host, db, config, {
 const souls = new Souls(host, db, brain, config);
 
 const server = createServer();
-const stripWorldPath = (url: string | undefined) => {
-  if (!url || /^\/w\/mars\/202[0-7](?:[/?]|$)/.test(url)) return url;
-  if (url === config.worldPath) return '/';
-  return url.startsWith(config.worldPath + '/') ? url.slice(config.worldPath.length) : url;
-};
+const stripWorldPath = (url: string | undefined) => stripWorldRequestPath(url, config.worldPath);
 server.on('upgrade', req => { req.url = stripWorldPath(req.url); });
 hub = new Hub(server, host, auth, db);
 hub.brain = brain; hub.build = config.build;

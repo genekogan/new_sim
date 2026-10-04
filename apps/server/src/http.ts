@@ -11,6 +11,7 @@ import type { Db, SoulRow, UserRow } from './db.ts';
 import type { Hub } from './hub.ts';
 import { cardGrammar } from '@sim/brain';
 import { skillMd } from './skill.ts';
+import { agentReader } from './agent-reader.ts';
 import { ApiError, type Souls } from './souls.ts';
 import { mountMarsStatic } from './mars-static.ts';
 import type {TakeArchive} from './take-archive.ts';
@@ -62,6 +63,13 @@ export function buildApp(d: Deps) {
   const skill = (c: Context) => c.text(skillMd(baseOf(c)), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'public, max-age=60' });
   app.get('/skill.md', skill);
   app.get('/v1/skill.md', skill);
+  // Selected-world text producer, before the SPA fallback. Origin/prefix come
+  // from approved server configuration, never forwarded or caller headers.
+  app.get('/llms.txt', c => {
+    try { return c.text(agentReader(d.cfg), 200, { 'content-type':'text/plain; charset=utf-8', 'cache-control':'public, max-age=60' }); }
+    catch { return c.text('World agent instructions are unavailable.', 503, { 'cache-control':'no-store' }); }
+  });
+  app.get('/w/:key/llms.txt', c => c.text('No agent reader for this world on this process.', 404));
 
   // ---- signed-in users
   const mySouls = (u: UserRow) => d.db.soulsOf(u.id).map((s) => ({ id: s.id, name: s.name, description: s.description, entityId: s.entity_id, hasToken: !!s.token_hash, tokenLabel: s.token_label, tokenCreatedAt: s.token_created_at, tokenLastUsed: s.token_last_used }));

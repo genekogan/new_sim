@@ -18,6 +18,10 @@ log/plays/talk and supported grammar/skill docs. These expose public facts, not
 private minds. Existing whole-world/public shape is not secretly a scoped Soul
 perspective. G-002 will qualify local/regional/atlas and raw-query compatibility;
 do not promise that an omitted perceive fact is secret if a public route shows it.
+The new selected-world `/llms.txt` HTTP producer returns reviewed App copy as
+text/plain before SPA, with links from approved server configuration. Root/proxy,
+secure linked skill/client distribution and installed-host qualification remain
+separate: see `docs/core/AGENT-READER-ROUTE-20261004.md` for pins and local proof.
 
 Signed-in owner routes include Me, Soul dashboard/timeline/deck/talk/perceive,
 command/intent/mandate and pairing/revoke. Existing admin access is explicit;
