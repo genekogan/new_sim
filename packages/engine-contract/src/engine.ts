@@ -6,6 +6,7 @@ import type { WorldState, Vec3 } from './world.ts';
 import type { VerbInfo } from './registry.ts';
 import type { RenderScene,RenderSceneCaptureV1 } from './scene-capture.ts';
 import type { NativeGatheringObservationV1 } from './gathering-observation.ts';
+import type { CommonsTransitionV1,CommonsTransitionAdmissionV1 } from './commons-transition.ts';
 export type {RenderScene} from './scene-capture.ts';
 
 /** A feasible activity for an actor, params already bound. The brain picks by id only. */
@@ -101,6 +102,8 @@ export interface Engine {
   isQuiet?(): boolean;
   compact?(): void;
   adoptCamp?(): void;
+  previewCommonsTransition?(): CommonsTransitionAdmissionV1;
+  adoptCommons?(transition:CommonsTransitionV1): void;
   campAnchors?(): Anchor[];
   restockCamp?(): void;
   actorBorrowed?(actor: string): boolean;
@@ -131,6 +134,8 @@ export interface EngineFactory {
    * or replay; absence preserves existing factories' replay behavior. This does
    * not convert a checkpoint or qualify an upgrade/rollback. */
   canReplayHistory?: (rulesVersion: string) => boolean;
+  /** Optional exact history-head check after all durable events are replayed. */
+  validateHistoryHead?: (engine:Engine,recordedRulesVersion:string)=>void;
   genesis(seed: string): WorldState;
   create(world: WorldState): Engine;
   restore(snap: EngineSnapshot): Engine;

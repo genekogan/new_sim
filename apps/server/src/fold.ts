@@ -129,6 +129,20 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       return {};
     }
     case 'rules': {
+      const transition=(e.payload as {commonsTransition?:import('@sim/engine-contract').CommonsTransitionV1}|null)?.commonsTransition;
+      if(transition){
+        if(!engine.adoptCommons)throw new Error('commons-transition.reader-unavailable');
+        const preview=engine.previewCommonsTransition?.();
+        if(!preview?.ok)throw new Error('commons-transition.preview-unavailable');
+        const previous=new Set(engine.anchors().map(a=>a.id));
+        for(const a of preview.anchors)if(!previous.has(a.id)&&k.things[a.id])throw new Error(`commons-transition.kernel-collision:${a.id}`);
+        engine.adoptCommons(transition);
+        for(const a of engine.anchors())if(!k.things[a.id]){
+          const result=applyAll(k,[{op:'appear',id:a.id,kind:a.kind==='region'?'region':'place',name:a.name,at:a.in??null,
+            traits:{...(a.entity?{entity:a.entity}:{}),...(a.point?{point:a.point}:{}),...(a.tags?{tags:a.tags}:{})}}],'world');
+          if(!result.ok)throw new Error(`commons-transition.anchor:${result.message}`);
+        }
+      }
       const rules = e.payload as { runtimePolicy?: {sleepBlockTicks:number;quietSeatCourtesy?:boolean}; dayConfig?: { origin: number; dayTicks: number }; quiet?: boolean; compact?: boolean; adoptCamp?: boolean; restockCamp?: boolean; anchors?: import('@sim/engine-contract').Anchor[]; soulId?: string; character?: string };
       if (rules?.runtimePolicy) {
         if (!engine.configureRuntimePolicy) throw Error('runtime-policy.unsupported');

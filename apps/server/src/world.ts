@@ -157,6 +157,7 @@ export class WorldHost {
       this.apply(e, true);
       this.seq = e.seq;
     }
+    this.factory.validateHistoryHead?.(this.engine,this.db.world(this.worldId)!.rules_version);
     this.acc.fromTick = this.engine.world.tick;
     this.resetAcc();
     if (snap) this.recoveryBaseline = structuredClone(snap.body as SnapshotBody);
@@ -169,6 +170,30 @@ export class WorldHost {
 
   /** Adopt the code's current starting vocabulary in this world (base cards, kinds, link kinds, manners), as a logged change of rules. */
   adoptVocabulary(author: string) { return this.enqueue('rules', author, { vocabulary: codeVocabulary(), why: 'adopted the current base vocabulary' } satisfies { vocabulary: Vocabulary; why: string }); }
+  /** Trusted internal checkpoint only. No REST/MCP permission is introduced.
+   * Existing station eras need an explicit carry-forward contract first. */
+  adoptCommons(author:string):Promise<LogEvent> {
+    if(this.stationHistoryV1())return Promise.reject(new Error('commons-transition.station-carry-forward-required'));
+    const preview=this.engine.previewCommonsTransition?.();
+    if(!preview?.ok)return Promise.reject(new Error(preview?`${preview.diagnostic.code}: ${preview.diagnostic.message}`:'commons-transition.reader-unavailable'));
+    const previous=new Set(this.engine.anchors().map(a=>a.id));
+    const collision=preview.anchors.find(a=>!previous.has(a.id)&&this.kernel.things[a.id]);
+    if(collision)return Promise.reject(new Error(`commons-transition.kernel-collision:${collision.id}`));
+    const expected=preview.transition;
+    return this.enqueueChecked('rules',author,{commonsTransition:expected},()=>{
+      if(this.stationHistoryV1())throw new Error('commons-transition.station-carry-forward-required');
+      const current=this.engine.previewCommonsTransition?.();
+      if(!current?.ok||JSON.stringify(current.transition)!==JSON.stringify(expected))throw new Error('commons-transition.source-moved');
+      const oldAnchors=new Set(this.engine.anchors().map(a=>a.id));
+      for(const a of current.anchors)if(!oldAnchors.has(a.id)&&this.kernel.things[a.id])throw new Error(`commons-transition.kernel-collision:${a.id}`);
+      if(this.factory.canReplayHistory?.(expected.toRulesVersion)!==true)throw new Error('commons-transition.reader-unavailable');
+      return true;
+    },()=>{
+      const result=this.db.db.prepare('UPDATE worlds SET rules_version=? WHERE id=? AND rules_version=?')
+        .run(expected.toRulesVersion,this.worldId,expected.fromRulesVersion);
+      if(result.changes!==1)throw new Error('commons-transition.header-moved');return true;
+    });
+  }
   private pendingBootstrap: { at: Record<string, string | null> } | null = null;
   /** For worlds snapshotted before the kernel existed: places from the engine, a Soul thing and deck per mind. */
   private bootstrapKernel(): KState {
@@ -641,7 +666,11 @@ export class WorldHost {
       }
       case 'rules': {
         const p = e.payload;
-        if (p?.kernelBootstrap || p?.vocabulary || p?.adoptCamp) this.kernelDirty = true;
+        if (p?.kernelBootstrap || p?.vocabulary || p?.adoptCamp || p?.commonsTransition) this.kernelDirty = true;
+        if(p?.commonsTransition)for(const m of this.minds.values()){
+          m.nextEvalTick=Math.min(m.nextEvalTick,tick+1+hash32(m.soulId)%20);
+          m.evalTrigger='world-event';m.lastFingerprint='';
+        }
         if (p?.dayConfig) { this.extra.living = { ...p.dayConfig, lastDay: -1, event: 'a new place', quiet: false }; for (const m of this.minds.values()) m.life ??= newLife(tick); }
         if(p?.runtimePolicy)this.extra.runtimePolicy=structuredClone(p.runtimePolicy);
         const day = this.living;

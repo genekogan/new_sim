@@ -20,6 +20,9 @@ import { CodecError } from '../../../mars/viewer/engine/runtime/codec.ts';
 import { constructionPlan, unsafeConstruction, type BuildPhase } from './construction.ts';
 import { captureRenderScene, commonsSceneMetadataV1Schema, type RenderSceneCaptureV1 } from '@sim/engine-contract';
 import { readNativeGathering } from './gathering-observation.ts';
+import { prepareCommonsTransition } from './commons-transition.ts';
+import { commonsTransitionV1Schema,type CommonsTransitionV1,type CommonsTransitionAdmissionV1 } from '@sim/engine-contract';
+import { decodeSnapshot } from '../../../mars/viewer/engine/runtime/snapshot.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const TPS = 20;
@@ -38,7 +41,7 @@ type Prog = {
   ops: Op[]; action?: string; settle?: 'done' | 'held'; soft?: boolean; until?: number;
   build?: { phase: BuildPhase; crew: string[]; stopping?: Diag };
 };
-export type MarsWorldConfig = { scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
+export type MarsWorldConfig = { commonsTransitionV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
 export const LITTLE_MARTIANS_WORLD: MarsWorldConfig={scene:'littlemartians',arrival:[0,18],arrivalPlace:'garden',reference:[0,16],grounds:{id:'grounds',name:'Ceramic garden'}};
 export const GREEN_FIELD_WORLD:MarsWorldConfig={scene:'greenfield',arrival:[0,0],arrivalPlace:'field',reference:[2,0],grounds:{id:'grounds',name:'Green field'}};
 export const EDEN_COMMONS_WORLD:MarsWorldConfig={scene:'eden-commons',arrival:[14,4],arrivalPlace:'commons',reference:[9,5],grounds:{id:'grounds',name:'Eden commons'}};
@@ -79,7 +82,7 @@ const bucket = (m: number): 'here' | 'close' | 'near' | 'far' => (m < 2.5 ? 'her
 export class MarsEngine implements Engine {
   readonly dt = 1 / TPS;
   readonly schema: string;
-  readonly rulesVersion: string;
+  get rulesVersion() { return nativeRulesVersion(this.m.rulesVersion,this.cfg); }
   readonly runtime: RuntimeView;
   private m: Mars; private rt: any; private cfg: MarsWorldConfig;
   private registry: Map<string, any>;
@@ -101,7 +104,7 @@ export class MarsEngine implements Engine {
 
   constructor(m: Mars, rt: any, cfg: MarsWorldConfig, saved?: { programs: Prog[]; nextProg: number; leaving: string[] }) {
     this.m = m; this.rt = rt; this.cfg = structuredClone(cfg); this.registry = rt.registry;
-    this.schema = rt.world.schema; this.rulesVersion = nativeRulesVersion(m.rulesVersion,cfg);
+    this.schema = rt.world.schema;
     if (saved) { for (const p of saved.programs) { this.programs.set(p.id, p); this.byActor.set(p.actor, p.id); } this.nextProg = saved.nextProg; this.leaving = saved.leaving; }
     this.cursor = rt.events.length;
     this.startRecorder();
@@ -460,9 +463,12 @@ export class MarsEngine implements Engine {
 
   // ------------------------------------------------------------------ what the shell reads
   anchors(): Anchor[] {
-    const w = this.rt.world, out: Anchor[] = [{ id: this.cfg.grounds.id, kind: 'region', name: this.cfg.grounds.name, point: this.cfg.arrival }];
-    for (const id of Object.keys(w.regions).sort()) { const r = w.regions[id]; if (r.kind === 'no-go') continue; out.push({ id, kind: 'place', name: r.label, in: this.cfg.grounds.id, point: centroid(r.polygon), tags: [r.kind, ...(id === this.cfg.arrivalPlace ? ['arrival'] : [])] }); }
-    for (const id of Object.keys(w.entities).sort()) { const e = w.entities[id]; if (e.kind !== 'fixture') continue; out.push({ id, kind: 'place', name: e.label ?? id, in: this.cfg.grounds.id, entity: id, tags: [e.def] }); }
+    return this.anchorsOf(this.rt.world,this.cfg);
+  }
+  private anchorsOf(w:any,cfg:MarsWorldConfig):Anchor[] {
+    const out: Anchor[] = [{ id: cfg.grounds.id, kind: 'region', name: cfg.grounds.name, point: cfg.arrival }];
+    for (const id of Object.keys(w.regions).sort()) { const r = w.regions[id]; if (r.kind === 'no-go') continue; out.push({ id, kind: 'place', name: r.label, in: cfg.grounds.id, point: centroid(r.polygon), tags: [r.kind, ...(id === cfg.arrivalPlace ? ['arrival'] : [])] }); }
+    for (const id of Object.keys(w.entities).sort()) { const e = w.entities[id]; if (e.kind !== 'fixture') continue; out.push({ id, kind: 'place', name: e.label ?? id, in: cfg.grounds.id, entity: id, tags: [e.def] }); }
     return out;
   }
   regionAt(_p: Vec3): string { return this.cfg.grounds.id; }
@@ -561,6 +567,24 @@ export class MarsEngine implements Engine {
     if (actors.length >= 2) this.m.bindCampChess(this.rt.world, actors[0], actors[1]);
     this.rt = new this.m.Runtime(this.rt.world, this.registry, this.m.servicesFor(this.m.scenes)(this.rt.world), this.m.invariants);
     this.rt.beginActionEpoch(); this.cursor = 0;
+    this.startRecorder();
+  }
+  previewCommonsTransition():CommonsTransitionAdmissionV1 {
+    if(!this.cfg.commonsTransitionV1)return {ok:false,diagnostic:{code:'commons-transition.disabled',message:'this factory has no explicit commons transition reader'}};
+    if(this.cfg.scene!=='greenfield'||this.programs.size||this.leaving.length)
+      return {ok:false,diagnostic:{code:'commons-transition.not-quiet',message:'the original Greenfield programs and departures must finish first'}};
+    const nextCfg={...this.cfg,...EDEN_COMMONS_WORLD};
+    const p=prepareCommonsTransition(this.m,this.rt,this.rulesVersion,nativeRulesVersion(this.m.rulesVersion,nextCfg));
+    return p.ok?{ok:true,transition:p.transition,anchors:this.anchorsOf(p.runtime.world,nextCfg)}:p;
+  }
+  adoptCommons(raw:CommonsTransitionV1) {
+    const expected=commonsTransitionV1Schema.parse(raw),preview=this.previewCommonsTransition();
+    if(!preview.ok)throw new Error(`${preview.diagnostic.code}: ${preview.diagnostic.message}`);
+    if(hashOf(expected)!==hashOf(preview.transition))throw new Error('commons-transition.stale-or-forged');
+    const prepared=prepareCommonsTransition(this.m,this.rt,expected.fromRulesVersion,expected.toRulesVersion);
+    if(!prepared.ok)throw new Error(`${prepared.diagnostic.code}: ${prepared.diagnostic.message}`);
+    this.finishRecorder();this.rt=prepared.runtime;this.cursor=0;
+    this.cfg={...this.cfg,...EDEN_COMMONS_WORLD};
     this.startRecorder();
   }
   restockCamp() {
@@ -718,5 +742,29 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
       if (s.quiet) engine.beginQuiet();
       return engine;
     },
+  };
+}
+
+/** Explicit reader for a logged Greenfield -> commons physical checkpoint.
+ * Genesis stays Greenfield. A newly constructed commons world is not a replay
+ * substitute; only its validated checkpoint can enter this history reader. */
+export async function marsCommonsTransitionFactory(cfg:MarsWorldConfig=GREEN_FIELD_WORLD):Promise<EngineFactory> {
+  if(cfg.scene!=='greenfield')throw new Error('commons-transition.factory-origin');
+  const old=await marsFactory({...cfg,commonsTransitionV1:true}),next=await marsFactory({...cfg,...EDEN_COMMONS_WORLD,commonsTransitionV1:true});
+  const allowed=(v:string)=>v===old.rulesVersion||v===next.rulesVersion;
+  return {rulesVersion:old.rulesVersion,canReplayHistory:allowed,canRestoreSnapshot:allowed,
+    genesis:old.genesis,
+    create(world){if(hashOf(world.base)!==hashOf(old.genesis('base').base))throw new Error('commons-transition.genesis-base');return old.create(world);},
+    restore(snapshot){
+      const s=structuredClone(snapshot) as EngineSnapshot&{cfg:MarsWorldConfig;mars:any};
+      const scene=s.cfg?.scene;
+      if(scene!=='greenfield'&&scene!=='eden-commons')throw new Error('commons-transition.snapshot-origin');
+      if(scene==='eden-commons'&&!s.cfg.commonsTransitionV1)throw new Error('commons-transition.snapshot-without-reader');
+      const expected=(scene==='greenfield'?old:next).genesis('base').base;
+      if(hashOf(decodeSnapshot(s.mars).world.base)!==hashOf(expected))throw new Error('commons-transition.snapshot-base');
+      s.cfg.commonsTransitionV1=true;
+      return (scene==='greenfield'?old:next).restore(s);
+    },
+    validateHistoryHead(engine,recorded){if(engine.rulesVersion!==recorded)throw new Error('commons-transition.history-head-differs');},
   };
 }
