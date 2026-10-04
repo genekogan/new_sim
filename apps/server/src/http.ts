@@ -26,7 +26,14 @@ export function buildApp(d: Deps) {
   const ip = (c: Context) => (c.req.header('x-forwarded-for') ?? 'local').split(',')[0].trim();
   const requireUser = async (c: Context): Promise<UserRow> => { const u = await d.auth.userFromToken(bearer(c)); if (!u) throw new ApiError(401, 'unauthorized', 'sign in first'); return u; };
   const requireAdmin = async (c: Context): Promise<UserRow> => { const u = await requireUser(c); if (u.role !== 'admin') throw new ApiError(403, 'forbidden', 'admin only'); return u; };
-  const ownSoul = (u: UserRow, id: string): SoulRow => { const s = d.db.soul(id); if (!s || s.retired_at || s.world_id !== d.host.worldId) throw new ApiError(404, 'not-found', 'no such soul'); if (s.owner !== u.id && u.role !== 'admin') throw new ApiError(403, 'forbidden', 'not your soul'); d.souls.requireControlReady(s); return s; };
+  // Authentication establishes identity across an await; it does not freeze
+  // the role/invitation used to serialize a private candidate view.
+  const privateUser=(authenticated:UserRow,requireInvitation=true):UserRow=>{
+    if(!d.souls.lifecycle)return authenticated;
+    const current=d.db.user(authenticated.id);if(!current)throw new ApiError(401,'unauthorized','sign in first');
+    if(requireInvitation)d.souls.requireInvited(current);return current;
+  };
+  const ownSoul = (authenticated: UserRow, id: string): SoulRow => { const u=privateUser(authenticated),s = d.db.soul(id); if (!s || s.retired_at || s.world_id !== d.host.worldId) throw new ApiError(404, 'not-found', 'no such soul'); if (s.owner !== u.id && u.role !== 'admin') throw new ApiError(403, 'forbidden', 'not your soul'); d.souls.requireControlReady(s); return s; };
   const agentSoul = (c: Context): SoulRow => { const s = d.souls.soulFromToken(bearer(c)); if (!s) throw new ApiError(401, 'unauthorized', 'missing or invalid soul token; pair again (see /skill.md)'); return s; };
   const controlReply=async(c:Context,guard:AcceptanceGuard|undefined,run:()=>Promise<object>)=>{
     const result=await run();if(guard)checkAcceptanceGuard(guard);return c.json(result);
@@ -50,6 +57,7 @@ export function buildApp(d: Deps) {
     app.use(path, async (c, next) => { c.header('Cache-Control', 'no-store'); await next(); });
   for(const path of ['/v1/lifecycle','/v1/lifecycle/*','/v1/me','/v1/souls','/v1/souls/*','/v1/agent/*'])
     app.use(path,async(c,next)=>{if(d.souls.lifecycle)c.header('Cache-Control','no-store');await next();});
+  app.use('/v1/brain',async(c,next)=>{if(d.souls.lifecycle)c.header('Cache-Control','no-store');await next();});
   app.use('/v1/*', bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({ ok: false, code: 'too-large', message: 'request body is larger than 64 KB' }, 413) }));
 
   // ---- public
@@ -88,7 +96,7 @@ export function buildApp(d: Deps) {
 
   // ---- signed-in users
   const mySouls = (u: UserRow) => d.db.soulsOf(u.id).filter(s=>!d.souls.lifecycle||(s.world_id===d.host.worldId&&d.souls.invited(u)&&d.souls.controlReady(s))).map((s) => ({ id: s.id, name: s.name, description: s.description, entityId: s.entity_id, hasToken: !!s.token_hash, tokenLabel: s.token_label, tokenCreatedAt: s.token_created_at, tokenLastUsed: s.token_last_used }));
-  app.get('/v1/me', async (c) => { const u = await requireUser(c),souls=mySouls(u); return c.json({ me: {...d.auth.me(u),...(d.souls.lifecycle?{souls:souls.map(s=>s.id)}:{})}, souls, maxSouls: d.cfg.maxSoulsPerUser,
+  app.get('/v1/me', async (c) => { const u = privateUser(await requireUser(c),false),souls=mySouls(u); return c.json({ me: {...d.auth.me(u),...(d.souls.lifecycle?{souls:souls.map(s=>s.id)}:{})}, souls, maxSouls: d.cfg.maxSoulsPerUser,
     ...(d.souls.lifecycle?{lifecycleRequests:d.souls.invited(u)?d.souls.lifecycleHistory(u.id):{contract:'owner-lifecycle-list/1',worldId:d.host.worldId,requests:[],nextCursor:null}}:{}) }); });
   app.get('/v1/lifecycle',async c=>{c.header('Cache-Control','no-store');const u=await requireUser(c);return c.json(d.souls.lifecycleHistory(u.id,c.req.query('cursor')??null,c.req.query('owner')??u.id));});
   app.get('/v1/lifecycle/:requestId',async c=>{c.header('Cache-Control','no-store');const u=await requireUser(c);return c.json({lifecycle:d.souls.lifecycleReceipt(u.id,c.req.param('requestId'))});});
@@ -157,13 +165,13 @@ export function buildApp(d: Deps) {
   });
   // model calls: admins see all; owners see calls about their own Souls
   app.get('/v1/brain', async (c) => {
-    const u = await requireUser(c);
-    return c.json({ calls: d.db.brainCalls(intQ(c, 'limit', 100, 1, 500), { tier: c.req.query('tier') || undefined, soulIds: u.role === 'admin' ? (c.req.query('soul') ? [c.req.query('soul')!] : null) : d.db.soulsOf(u.id).map((s) => s.id).filter((id) => !c.req.query('soul') || id === c.req.query('soul')) }) });
+    const u = privateUser(await requireUser(c));
+    return c.json({ calls: d.db.brainCalls(intQ(c, 'limit', 100, 1, 500), { tier: c.req.query('tier') || undefined, ...(d.souls.lifecycle?{worldId:d.host.worldId}:{}), soulIds: u.role === 'admin' ? (c.req.query('soul') ? [c.req.query('soul')!] : null) : (d.souls.lifecycle?mySouls(u):d.db.soulsOf(u.id)).map((s) => s.id).filter((id) => !c.req.query('soul') || id === c.req.query('soul')) }) });
   });
   app.get('/v1/prompt/:hash', async (c) => {
     c.header('Cache-Control', 'no-store');
-    const u = await requireUser(c);
-    const t = d.db.prompt(c.req.param('hash'), { worldId: d.host.worldId, userId: u.id, admin: u.role === 'admin' });
+    const u = privateUser(await requireUser(c));
+    const t = d.db.prompt(c.req.param('hash'), { worldId: d.host.worldId, userId: u.id, admin: u.role === 'admin',...(d.souls.lifecycle&&u.role!=='admin'?{soulIds:mySouls(u).map(s=>s.id)}:{}) });
     if (t === null) throw new ApiError(404, 'not-found', 'no such prompt');
     return c.text(t);
   });

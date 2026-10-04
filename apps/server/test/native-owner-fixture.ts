@@ -34,7 +34,7 @@ export function fixture(path: string, engineFactory = factory) {
       ...(data === undefined ? {} : {'content-type':'application/json'})},
     ...(data === undefined ? {} : {body:JSON.stringify(data)}),
   });
-  return { db, host, brain, souls, request, app };
+  return { db, host, brain, souls, request, app, auth };
 }
 export async function invite(f: ReturnType<typeof fixture>, owner: string) {
   const issued = await f.request('/v1/admin', { action:'invite', uses:1 }, 'admin');

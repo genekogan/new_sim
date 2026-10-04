@@ -175,15 +175,17 @@ export class Db {
    * Hash possession, response lookalikes and interned-but-unassociated text are
    * not authority. Reads recheck current ownership/role; pruning removes access.
    */
-  prompt(hash: string, access: { worldId: string; userId: string; admin: boolean }): string | null {
+  prompt(hash: string, access: { worldId: string; userId: string; admin: boolean; soulIds?:string[] }): string | null {
+    if(access.soulIds?.length===0)return null;
+    const ready=access.soulIds?`AND b.soul_id IN (${access.soulIds.map(()=>'?').join(',')})`:'';
     const owner = access.admin ? '' : `AND b.soul_id IN (
       SELECT s.id FROM souls s WHERE s.owner = ? AND s.world_id = b.world_id AND s.retired_at IS NULL
     )`;
     const row = this.db.prepare(`SELECT p.text FROM prompts p WHERE p.hash = ? AND EXISTS (
       SELECT 1 FROM brain_calls b WHERE b.world_id = ?
       AND CASE WHEN json_valid(b.body) THEN json_extract(b.body, '$.request.system[0].text.$prompt') END = p.hash
-      ${owner}
-    )`).get(hash, access.worldId, ...(access.admin ? [] : [access.userId])) as { text: string } | undefined;
+      ${owner} ${ready}
+    )`).get(hash, access.worldId, ...(access.admin ? [] : [access.userId]),...(access.soulIds??[])) as { text: string } | undefined;
     return row?.text ?? null;
   }
   saveBrainCall(worldId: string, c: Omit<BrainCall, 'id'>): number {
@@ -195,8 +197,9 @@ export class Db {
     return Number(r.lastInsertRowid);
   }
   /** Calls visible to a viewer: admins see all; owners see calls about their own Souls. */
-  brainCalls(limit: number, o: { tier?: string; soulIds?: string[] | null } = {}): BrainCall[] {
+  brainCalls(limit: number, o: { tier?: string; soulIds?: string[] | null; worldId?:string } = {}): BrainCall[] {
     const where: string[] = [], args: (string | number)[] = [];
+    if(o.worldId!==undefined){where.push('world_id = ?');args.push(o.worldId);}
     if (o.tier) { where.push('tier = ?'); args.push(o.tier); }
     if (o.soulIds) { if (!o.soulIds.length) return []; where.push(`soul_id IN (${o.soulIds.map(() => '?').join(',')})`); args.push(...o.soulIds); }
     const rows = this.db.prepare(`SELECT id, body FROM brain_calls ${where.length ? 'WHERE ' + where.join(' AND ') : ''} ORDER BY id DESC LIMIT ?`).all(...args, limit) as any[];
