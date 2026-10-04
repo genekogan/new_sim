@@ -79,7 +79,8 @@ Public selected-world routes:
 - `/v1/scenes/:hash` returns
   `{worldId,contract:'render-scene-capture/1',ref,body}` from the selected world's
   registered captures. Invalid/unknown/foreign-world hashes return the same404,
-  and all replies use no-store. It has no mutation or model operation.
+  and normal 200/404 replies use no-store. Generic exceptional 500 cache behavior
+  is not established by these fixtures. It has no mutation or model operation.
 - HTTP hot/durable takes, anonymous WS and compressed archive chunks carry the
   optional reference through their existing take body. No extra scene blob is
   duplicated in each take or socket message. Clients use the lookup explicitly.
