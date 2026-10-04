@@ -4,7 +4,8 @@
 // carries the server's view hash; the replica recomputes its own at that tick
 // and asks for a resync when they differ. Runs in browsers and in Node.
 import type { Entity, Environment, PathCommit, PoseSample, Region } from '@sim/engine-contract';
-import { samplePath, viewHashOf, viewRow, PROTO, stationLiveV1Schema, type StationLiveV1, type KernelView, type PlayView, type TalkLine, type Batch, type BrainCall, type CameraLine, type ClientMsg, type Heartbeat, type LogEvent, type Me, type NarrativeView, type PublicSoul, type ServerMsg, type ServerStats, type Snapshot, type TickerLine } from '@sim/protocol';
+import { samplePath, viewHashOf, viewRow, PROTO, stationLiveV1Schema,stationV2MessageSchema,acceptStationLiveProgressV2,stationHelloCapabilitiesV1Schema,stationLiveContractSchema,
+  type StationLiveV2,type StationAnchorVariant,type StationLiveContract,type StationLiveV1, type KernelView, type PlayView, type TalkLine, type Batch, type BrainCall, type CameraLine, type ClientMsg, type Heartbeat, type LogEvent, type Me, type NarrativeView, type PublicSoul, type ServerMsg, type ServerStats, type Snapshot, type TickerLine } from '@sim/protocol';
 
 export class Replica {
   tick = 0;            // latest tick we have data through
@@ -82,6 +83,8 @@ export type PongReceipt = TransportReceipt & { sentAtMs:number;rttMs:number;auto
 export type Handlers = {
   /** null invalidates the previous station; no playback can rely on it. */
   onStation?(view:StationLiveV1|null,receipt:TransportReceipt|null):void;
+  /** Explicitly negotiated V2 only; checkpoint receipt preserves clock session. */
+  onStationV2?(view:StationLiveV2|null,receipt:TransportReceipt|null):void;
   /** Called before onWelcome, and with null on disconnect/replacement/close. */
   onSession?(session:ConnectionSession|null):void;
   /** Only a strictly valid reply to a current, unconsumed sent probe. */
@@ -117,20 +120,27 @@ export class Connection {
   private lastExplicitProbeN=-1;
   private automaticProbeN=0;
   station:StationLiveV1|null=null;
+  stationV2:StationLiveV2|null=null;
+  private lastStationAnchorV2:StationAnchorVariant|null=null;
+  private stationOffer?:StationLiveContract[];
+  stationContract:StationLiveContract|null=null;
   /** Same monotonic domain used for actual send and receive boundaries. */
   monotonicNow:()=>number;
   url: string; getToken: () => Promise<string | null>; handlers: Handlers; make: (url: string) => WSLike; now: () => number;
 
-  constructor(url: string, getToken: () => Promise<string | null>, handlers: Handlers, make: (url: string) => WSLike, now: () => number = () => Date.now(), monotonicNow:()=>number=()=>performance.now()) {
+  constructor(url: string, getToken: () => Promise<string | null>, handlers: Handlers, make: (url: string) => WSLike, now: () => number = () => Date.now(), monotonicNow:()=>number=()=>performance.now(),stationCapabilities?:{stationContracts?:StationLiveContract[]}) {
     this.url = url; this.getToken = getToken; this.handlers = handlers; this.make = make; this.now = now;
     this.monotonicNow=monotonicNow;
+    this.stationOffer=stationHelloCapabilitiesV1Schema.parse(stationCapabilities??{}).stationContracts?.slice();
   }
 
   get session():ConnectionSession|null {return this.transport?{...this.transport}:null;}
   private clearTransport() {
-    const hadSession=this.transport!==null,hadStation=this.station!==null;
-    this.transport=null;this.station=null;this.pendingPings.clear();this.lastMonotonicAt=null;
+    const hadSession=this.transport!==null,hadStation=this.station!==null,hadV2=this.stationV2!==null;
+    this.transport=null;this.station=null;this.stationV2=null;this.lastStationAnchorV2=null;this.stationContract=null;
+    this.pendingPings.clear();this.lastMonotonicAt=null;
     if(hadStation)this.handlers.onStation?.(null,null);
+    if(hadV2)this.handlers.onStationV2?.(null,null);
     if(hadSession)this.handlers.onSession?.(null);
   }
   private monotonicSample(receivedAtMs?:number):number|null {
@@ -179,7 +189,8 @@ export class Connection {
       const token = await this.getToken().catch(() => null);
       if (!mine() || ws.readyState !== 1) return;
       // resume only from the same server process: batch numbers start again after a restart
-      const hello: ClientMsg = { t: 'hello', proto: PROTO, ...(token ? { token } : {}), ...(this.replica.ready && this.epoch ? { since: this.replica.seq, epoch: this.epoch } : {}) };
+      const hello: ClientMsg = { t: 'hello', proto: PROTO, ...(token ? { token } : {}), ...(this.replica.ready && this.epoch ? { since: this.replica.seq, epoch: this.epoch } : {}),
+        ...(this.stationOffer?{stationContracts:this.stationOffer.slice()}:{}) };
       ws.send(JSON.stringify(hello));
       clearInterval(this.pingTimer);
       this.pingTimer = setInterval(() => {
@@ -233,6 +244,10 @@ export class Connection {
     switch (m.t) {
       case 'welcome': {
         this.clearTransport();this.welcome = m; this.retry = 0; this.epoch = m.epoch ?? null;
+        const selected=m.stationContract===undefined?((this.stationOffer??['station-live/1']).includes('station-live/1')?'station-live/1':null):m.stationContract;
+        if(selected!==null&&(!stationLiveContractSchema.safeParse(selected).success||!(this.stationOffer??['station-live/1']).includes(selected)))
+          h.onError?.('station.negotiation-invalid','The selected station contract was not offered.');
+        else this.stationContract=selected;
         if(typeof m.worldId==='string'&&m.worldId&&(m.epoch===undefined||typeof m.epoch==='string'&&m.epoch.length>0)){
           this.transport={generation:++this.sessionSerial,worldId:m.worldId,epoch:m.epoch??null};
           h.onSession?.({...this.transport});
@@ -261,11 +276,31 @@ export class Connection {
       case 'takes': h.onTakes?.(m); break;
       case 'station': {
         const view=stationLiveV1Schema.safeParse(m.view),session=this.transport;
-        if(Object.keys(m).length!==2||!view.success||!session||view.data.worldId!==session.worldId){
+        if(Object.keys(m).length!==2||!view.success||!session||this.stationContract!=='station-live/1'||view.data.worldId!==session.worldId){
           this.station=null;h.onStation?.(null,null);h.onError?.('station.invalid','The public station does not match the current world session.');break;
         }
         const at=this.monotonicSample(receivedAtMs);if(at===null)break;
         this.station=structuredClone(view.data);h.onStation?.(structuredClone(view.data),{session:{...session},receivedAtMs:at});break;
+      }
+      case 'station-v2': {
+        const parsed=stationV2MessageSchema.safeParse(m),session=this.transport,w=this.welcome;
+        let view:StationLiveV2;
+        try{
+          if(!parsed.success||!session||!w||this.stationContract!=='station-live/2')throw new Error('unnegotiated or malformed station');
+          view=acceptStationLiveProgressV2(this.stationV2,parsed.data.view,
+            {worldId:session.worldId,rulesVersion:w.rulesVersion,dtSeconds:w.dt},this.lastStationAnchorV2);
+        }catch{
+          // Socket close is asynchronous. Invalidate now so queued messages
+          // cannot restore a phase or consume a probe before its close event.
+          this.stationV2=null;this.clearTransport();h.onStationV2?.(null,null);
+          h.onError?.('station-v2.invalid','The station does not match its negotiated world or recorded progression.');
+          try{this.ws?.close();}catch{/* fresh welcome required for a skipped or invalid era */}
+          break;
+        }
+        const at=this.monotonicSample(receivedAtMs);if(at===null)break;
+        this.stationV2=structuredClone(view);if(view.anchor)this.lastStationAnchorV2=structuredClone(view.anchor);
+        h.onStationV2?.(structuredClone(view),{session:{...session!},receivedAtMs:at});
+        break;
       }
       case 'pong': {
         if(Object.keys(m).length!==3||!Number.isSafeInteger(m.n)||!Number.isSafeInteger(m.serverTime)||m.serverTime<0)break;

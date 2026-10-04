@@ -19,12 +19,15 @@ import type {TakeArchive} from './take-archive.ts';
 import { checkAcceptanceGuard,type AcceptanceGuard,type WorldHost } from './world.ts';
 import {captureRenderScene} from '@sim/engine-contract';
 import type {CandidateStationV1} from './station.ts';
+import type {CandidateStationV2} from './station-v2.ts';
+import {mountStationRoutesV2} from './station-routes-v2.ts';
 import { intentTransportError, intentLookupError, type IntentControlV2, type IntentIdentityV2 } from './intent-control.ts';
 
-type Deps = { cfg: Config; db: Db; host: WorldHost; auth: Auth; hub: Hub; brain: Brain; souls: Souls; takes?: TakeArchive; station?:CandidateStationV1; intentV2?:IntentControlV2 };
+type Deps = { cfg: Config; db: Db; host: WorldHost; auth: Auth; hub: Hub; brain: Brain; souls: Souls; takes?: TakeArchive; station?:CandidateStationV1; stationV2?:CandidateStationV2; intentV2?:IntentControlV2 };
 
 export function buildApp(d: Deps) {
   if(d.station&&d.station.host!==d.host)throw new Error('station must belong to selected host');
+  if(d.stationV2&&d.stationV2.host!==d.host)throw new Error('V2 station must belong to selected host');
   if(d.intentV2&&(d.intentV2.host!==d.host||d.intentV2.brain!==d.brain||d.intentV2.souls!==d.souls))throw new Error('intent transport must belong to selected host');
   const app = new Hono();
   const bearer = (c: Context) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
@@ -69,6 +72,7 @@ export function buildApp(d: Deps) {
   app.use('/v1/*', bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({ ok: false, code: 'too-large', message: 'request body is larger than 64 KB' }, 413) }));
 
   // ---- public
+  mountStationRoutesV2(app,d.stationV2);
   app.get('/healthz', (c) => c.json({ ok: true, tick: d.host.engine.world.tick, clients: d.hub.clients.size, paused: d.host.paused, build: d.cfg.build, worldId: d.host.worldId }));
   app.get('/v1/config', (c) => c.json({ privyAppId: d.cfg.privyAppId, publicUrl: baseOf(c), worldId: d.host.worldId, worldKey: d.cfg.worldKey, worldPath: d.cfg.worldPath, authReady: d.auth.ready, devAuth: d.auth.devAuth, inviteRequired: d.cfg.inviteRequired, build: d.cfg.build }));
   app.get('/v1/world', (c) => c.json(d.souls.worldSummary()));

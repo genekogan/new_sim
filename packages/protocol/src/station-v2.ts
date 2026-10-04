@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { hashOf,nativeGatheringObservationV1Schema } from '@sim/engine-contract';
 import { stationEpochV1Schema,stationCueV1Schema,stationAnchorV1Schema,stationPinsV1Schema,
   stationEndTick,stationExpiryTick,type StationCueV1,type StationAnchorV1 } from './station-v1.ts';
-import { stationPhysicalHeadV1Schema,acceptStationPhysicalHeadV1,type StationPhysicalHeadV1 } from './station-era-v1.ts';
+import { stationPhysicalHeadV1Schema,acceptStationPhysicalHeadV1,foldStationRulesEraV1,type StationPhysicalHeadV1 } from './station-era-v1.ts';
 const tick=z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const drawnTick=z.number().finite().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const id=z.string().regex(/^[a-f0-9]{64}$/);
@@ -107,6 +107,39 @@ const liveBody=z.object({contract:z.literal('station-live/2'),...viewBody,fresh:
 export const stationLiveV2Schema=liveBody.superRefine(checkView);
 export type StationLiveV2=z.infer<typeof stationLiveV2Schema>;
 export const stationV2MessageSchema=z.object({t:z.literal('station-v2'),view:stationLiveV2Schema}).strict();
+/** First authoritative view binds the actual selected-world welcome. Later
+ * physical changes keep that socket/clock and require the exact adjacent era.
+ * A dropped era/cue requires a fresh welcome, never guessed intermediate facts. */
+export function acceptStationLiveProgressV2(previous:StationLiveV2|null,raw:unknown,
+  binding:{worldId:string;rulesVersion:string;dtSeconds:number},lastAnchor:StationAnchorVariant|null=previous?.anchor??null):StationLiveV2 {
+  const next=stationLiveV2Schema.parse(raw);
+  if(next.worldId!==binding.worldId)throw new Error('station V2 selected world differs');
+  if(!next.station){if(previous?.station)throw new Error('station V2 original epoch disappeared');return next;}
+  if(!previous?.station){
+    acceptStationPhysicalHeadV1(next.physical,next.station,binding);return next;
+  }
+  stationLiveV2Schema.parse(previous);
+  if(hashOf(previous.station)!==hashOf(next.station))throw new Error('station V2 original epoch changed');
+  const before=previous.physical!,after=next.physical!;
+  if(hashOf(before)!==hashOf(after)){
+    if(!after.era||!after.source)throw new Error('station V2 current physical head reset');
+    const state=before.revision===0?undefined:{station:previous.station,head:before,lastFactSeq:before.era!.seq};
+    const folded=foldStationRulesEraV1(state,after.era,after.source,next.station);
+    if(hashOf(folded.head)!==hashOf(after))throw new Error('station V2 adjacent physical progression differs');
+  }
+  const oldCue=previous.cue,cue=next.cue;
+  if(oldCue){
+    if(!cue)throw new Error('station V2 last recorded cue disappeared');
+    if(oldCue.cueId===cue.cueId){
+      if(hashOf(oldCue)!==hashOf(cue)||hashOf(previous.cuePhysical)!==hashOf(next.cuePhysical))throw new Error('station V2 immutable cue origin changed');
+    }else if(cue.sequence!==oldCue.sequence+1||!cue.transition||cue.transition.previousCueId!==oldCue.cueId
+      ||cue.transition.previousEndTick!==stationEndTick(oldCue)||cue.seed===oldCue.seed
+      ||hashOf(next.cuePhysical)!==hashOf(after))throw new Error('station V2 cue transition has a gap or changed predecessor');
+  }else if(cue&&cue.sequence!==1)throw new Error('station V2 initial cue sequence has a gap');
+  if(next.anchor&&lastAnchor&&hashOf(next.anchor)!==hashOf(lastAnchor))
+    acceptStationAnchorV2(lastAnchor,next.anchor,next.cue,next.physical,next.station);
+  return next;
+}
 export function stationLivePhaseV2(raw:unknown,serverNowMs:number){
   const v=stationLiveV2Schema.parse(raw);tick.parse(serverNowMs);const a=v.anchor;
   if(!v.fresh||!v.cue||!a||a.paused||a.availability!=='supported'||a.clockRate!==1||serverNowMs<a.serverTimeMs)return null;

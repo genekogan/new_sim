@@ -2,6 +2,7 @@
 import { nativeGatheringObservationV1Schema,hashOf } from '@sim/engine-contract';
 import { STATION_PINS_V1,makeStationCueV2,stationCueEraRevision,stationPhaseAtTickV2,stationEndTick,stationAnchorV2Schema,
   stationLiveV2Schema,stationHistoricalV2Schema,initialStationPhysicalHeadV1,foldStationRulesEraV1,acceptStationPhysicalHeadV1,
+  stationEraPageV1Schema,stationRulesEraFactV1Schema,stationCommonsSourceV1Schema,
   type StationLiveV2,type StationEraFoldStateV1 } from '@sim/protocol';
 import type { WorldHost } from './world.ts';
 
@@ -63,7 +64,7 @@ export class CandidateStationV2 {
     return this.view();
   }
   /** Authoritative recorded frontier, selected era and exclusive next boundary.
-   * No transport route or guessed current-rules fallback is introduced. */
+   * No guessed current-rules fallback is introduced. */
   history(scope:{worldId:string;epoch:string;rulesVersion:string},at:number,sourceCutoffSeq?:number){
     const h=this.host,old=h.stationHistoryV1(),state=h.stationHistoryV2();if(!old||!state||scope.worldId!==h.worldId||scope.epoch!==old.station.epoch)
       throw new Error('V2 station history scope differs');
@@ -88,5 +89,28 @@ export class CandidateStationV2 {
     return stationHistoricalV2Schema.parse({contract:'station-history/2',worldId:h.worldId,station:old.station,physical:selected,
       cue:entry?.cue??null,cuePhysical:entry?.physical??null,anchor,tick:at,physicalUntilTick:until,
       sourceCutoff:{seq:cutoff.seq,tick:cutoff.tick},phase:entry?stationPhaseAtTickV2(entry.cue,at):null});
+  }
+  /** At most 64 immutable public era/source pairs. Cursor is an exact era row
+   * in this selected world; page/frontier reads do not change station/clock. */
+  eraPage(scope:{worldId:string;epoch:string},afterSeq=0,limit=64,sourceCutoffSeq?:number){
+    const h=this.host,old=h.stationHistoryV1();
+    if(!old||scope.worldId!==h.worldId||scope.epoch!==old.station.epoch)throw new Error('station era page scope differs');
+    if(!Number.isSafeInteger(afterSeq)||afterSeq<0||!Number.isSafeInteger(limit)||limit<1||limit>64
+      ||sourceCutoffSeq!==undefined&&(!Number.isSafeInteger(sourceCutoffSeq)||sourceCutoffSeq<0))throw new Error('invalid station era page bounds');
+    const cutoff=sourceCutoffSeq===undefined?h.db.tailEvents(h.worldId,1)[0]:h.db.events(h.worldId,sourceCutoffSeq-1,1)[0];
+    if(!cutoff||sourceCutoffSeq!==undefined&&cutoff.seq!==sourceCutoffSeq||afterSeq>cutoff.seq)throw new Error('station era page frontier differs');
+    const epoch=h.db.db.prepare("SELECT payload FROM events WHERE world_id=? AND kind='station-epoch-v1' AND seq<=? ORDER BY seq LIMIT 1")
+      .get(h.worldId,cutoff.seq) as {payload:string}|undefined;
+    if(!epoch||hashOf(JSON.parse(epoch.payload))!==hashOf(old.station))throw new Error('station epoch is beyond the era page frontier');
+    if(afterSeq){const cursor=h.db.events(h.worldId,afterSeq-1,1)[0];if(!cursor||cursor.seq!==afterSeq||cursor.kind!=='station-rules-era-v1')throw new Error('station era page cursor is not a recorded era');}
+    const rows=h.db.db.prepare("SELECT seq,tick,payload FROM events WHERE world_id=? AND kind='station-rules-era-v1' AND seq>? AND seq<=? ORDER BY seq LIMIT ?")
+      .all(h.worldId,afterSeq,cutoff.seq,limit+1) as {seq:number;tick:number;payload:string}[];
+    const entries=rows.slice(0,limit).map(row=>{
+      const fact=stationRulesEraFactV1Schema.parse({...row,payload:JSON.parse(row.payload)}),source=h.db.events(h.worldId,fact.payload.source.seq-1,1)[0];
+      if(!source||source.kind!=='rules'||Object.keys(source.payload).length!==1)throw new Error('station era page lacks exact physical source');
+      return {fact,source:stationCommonsSourceV1Schema.parse({worldId:h.worldId,seq:source.seq,tick:source.tick,commonsTransition:source.payload.commonsTransition})};
+    });
+    return stationEraPageV1Schema.parse({contract:'station-era-page/1',worldId:h.worldId,station:old.station,afterSeq,
+      sourceCutoff:{seq:cutoff.seq,tick:cutoff.tick},nextAfterSeq:rows.length>limit?entries.at(-1)!.fact.seq:null,eras:entries});
   }
 }

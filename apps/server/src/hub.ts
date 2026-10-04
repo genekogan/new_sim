@@ -4,21 +4,24 @@
 import type { IncomingMessage, Server } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { z } from 'zod';
-import { PROTO, publicEvent, type BrainCall, type ClientMsg, type Me, type ServerMsg, type ServerStats } from '@sim/protocol';
+import { PROTO, publicEvent,stationHelloCapabilitiesV1Schema,negotiateStationContractV1,
+  type StationLiveContract,type BrainCall, type ClientMsg, type Me, type ServerMsg, type ServerStats } from '@sim/protocol';
 import type { Auth } from './auth.ts';
 import type { Brain } from './brain.ts';
 import type { Db } from './db.ts';
 import { type WorldHost } from './world.ts';
 import type { Souls } from './souls.ts';
 import type {CandidateStationV1} from './station.ts';
+import type {CandidateStationV2} from './station-v2.ts';
 
 const clientMsg = z.discriminatedUnion('t', [
-  z.object({ t: z.literal('hello'), proto: z.number(), token: z.string().max(4000).optional(), since: z.number().optional(), epoch: z.string().max(40).optional() }),
+  z.object({ t: z.literal('hello'), proto: z.number(), token: z.string().max(4000).optional(), since: z.number().optional(), epoch: z.string().max(40).optional(),
+    stationContracts:stationHelloCapabilitiesV1Schema.shape.stationContracts }),
   z.object({ t: z.literal('resync'), reason: z.string().max(200) }),
   z.object({ t: z.literal('ping'), n: z.number() }),
 ]);
 const MAX_PER_IP = 30, MAX_CLIENTS = 2000;
-type Client = { ws: WebSocket; me: Me | null; ready: boolean; alive: boolean; joinedAt: number; resyncs: number; sent: number; ip: string; msgs: number; windowStart: number; lastHello: number; lastSnapshot: number };
+type Client = { ws: WebSocket; me: Me | null; ready: boolean; alive: boolean; joinedAt: number; resyncs: number; sent: number; ip: string; msgs: number; windowStart: number; lastHello: number; lastSnapshot: number; stationContract:StationLiveContract|null };
 /** What anyone may see of the server's numbers: spend is for admins. */
 const publicStats = (st: ServerStats): ServerStats => ({ ...st, brain: { mode: st.brain.mode, callsToday: st.brain.callsToday, inflight: st.brain.inflight, jevMsAvg: st.brain.jevMsAvg } });
 const MAX_BUFFERED = 1_000_000;
@@ -35,10 +38,12 @@ export class Hub {
   host: WorldHost; auth: Auth; db: Db;
   private lifecycleSouls?:Souls;
   private station?:CandidateStationV1;
+  private stationV2?:CandidateStationV2;
 
-  constructor(server: Server, host: WorldHost, auth: Auth, db: Db,lifecycleSouls?:Souls,station?:CandidateStationV1) {
+  constructor(server: Server, host: WorldHost, auth: Auth, db: Db,lifecycleSouls?:Souls,station?:CandidateStationV1,stationV2?:CandidateStationV2) {
     this.host = host; this.auth = auth; this.db = db;
     if(station){if(station.host!==host)throw new Error('station must belong to selected Hub host');this.station=station;}
+    if(stationV2){if(stationV2.host!==host)throw new Error('V2 station must belong to selected Hub host');this.stationV2=stationV2;}
     // Internal opt-in only; production bootstrap does not supply this adapter.
     if(lifecycleSouls){
       if(!lifecycleSouls.lifecycle||lifecycleSouls.host!==host||lifecycleSouls.db!==db)throw new Error('Lifecycle WS views require the installed candidate on this host/DB');
@@ -51,7 +56,14 @@ export class Hub {
     });
     host.listeners.push({
       onApplied: e => { if (e.kind === 'rules' && e.payload?.recovery) { this.lastTakeTick=host.engine.world.tick; this.epoch=`${Date.now().toString(36)}-repair`; for (const c of this.clients) c.ws.close(1012, 'world restored; reconnect'); }
-        if(this.station&&['station-epoch-v1','station-cue-v1','station-anchor-v1'].includes(e.kind))this.broadcast({t:'station',view:this.station.view()}); },
+        if(e.kind==='station-rules-era-v1'){
+          for(const c of this.clients){if(!c.ready)continue;
+            if(c.stationContract==='station-live/1')this.welcomeClient(c);
+            this.send(c,{t:'snapshot',reason:'recorded physical checkpoint',...host.snapshotView()});
+          }
+        }
+        if(['station-epoch-v1','station-cue-v1','station-anchor-v1','station-rules-era-v1','station-cue-v2','station-anchor-v2'].includes(e.kind))
+          for(const c of this.clients)if(c.ready)this.sendStation(c); },
       afterTick: tick => {
         const chunks = host.engine.takeChunks?.(this.lastTakeTick) ?? [];
         if (!chunks.length) return;
@@ -77,7 +89,7 @@ export class Hub {
     const ip = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '').split(',')[0].trim();
     let sameIp = 0; for (const x of this.clients) if (x.ip === ip) sameIp++;
     if (this.clients.size >= MAX_CLIENTS || sameIp >= MAX_PER_IP) { ws.close(1013, 'too many connections'); return; }
-    const c: Client = { ws, me: null, ready: false, alive: true, joinedAt: Date.now(), resyncs: 0, sent: 0, ip, msgs: 0, windowStart: Date.now(), lastHello: 0, lastSnapshot: 0 };
+    const c: Client = { ws, me: null, ready: false, alive: true, joinedAt: Date.now(), resyncs: 0, sent: 0, ip, msgs: 0, windowStart: Date.now(), lastHello: 0, lastSnapshot: 0,stationContract:null };
     this.clients.add(c);
     ws.on('pong', () => (c.alive = true));
     ws.on('close', () => this.clients.delete(c));
@@ -105,8 +117,10 @@ export class Hub {
       if (m.proto !== PROTO) { this.send(c, { t: 'welcome', build: this.build, proto: PROTO, worldId: this.host.worldId, rulesVersion: this.host.engine.rulesVersion, schema: this.host.engine.schema, dt: this.host.engine.dt, clockRate: this.host.clockRate, serverTick: this.host.engine.world.tick, you: null, serverTime: Date.now(), epoch: this.epoch }); return this.send(c, { t: 'error', code: 'proto', message: `server speaks protocol ${PROTO}` }); }
       const u = await this.auth.userFromToken(m.token).catch(() => null);
       c.me = u ? this.lifecycleSouls?this.currentMe(u.id):this.auth.me(u) : null;
+      c.stationContract=negotiateStationContractV1(m.stationContracts?{stationContracts:m.stationContracts}:{},
+        [...(this.station?['station-live/1' as const]:[]),...(this.stationV2?['station-live/2' as const]:[])]);
       const e = this.host.engine;
-      this.send(c, { t: 'welcome', build: this.build, proto: PROTO, worldId: this.host.worldId, rulesVersion: e.rulesVersion, schema: e.schema, dt: e.dt, clockRate: this.host.clockRate, serverTick: e.world.tick, you: c.me, serverTime: Date.now(), epoch: this.epoch, paused: this.host.paused });
+      this.welcomeClient(c);
       // resume from the ring buffer if the client only missed a little; otherwise a full snapshot
       const ring = this.host.ring;
       const canResume = typeof m.since === 'number' && m.epoch === this.epoch && ring.length > 0 && m.since >= ring[0].seq - 1 && m.since <= this.host.currentBatchSeq;
@@ -122,9 +136,19 @@ export class Hub {
       if (c.me) this.send(c, { t: 'brain', calls: this.db.brainCalls(40, { soulIds: c.me.role === 'admin' ? null : c.me.souls }) });
       this.send(c, { t: 'stats', stats: c.me?.role === 'admin' ? this.stats() : publicStats(this.stats()) });
       this.send(c, {t: 'takes', serverTick: e.world.tick, chunks: e.takeChunks?.(e.world.tick - 40) ?? []});
-      if(this.station)this.send(c,{t:'station',view:this.station.view()});
+      this.sendStation(c);
       c.ready = true;
     }
+  }
+  private welcomeClient(c:Client){
+    const h=this.host,e=h.engine;
+    this.send(c,{t:'welcome',build:this.build,proto:PROTO,worldId:h.worldId,rulesVersion:e.rulesVersion,schema:e.schema,dt:e.dt,
+      clockRate:h.clockRate,serverTick:e.world.tick,you:c.me,serverTime:Date.now(),epoch:this.epoch,paused:h.paused,
+      ...(this.station||this.stationV2?{stationContract:c.stationContract}:{})});
+  }
+  private sendStation(c:Client){
+    if(c.stationContract==='station-live/2'&&this.stationV2)this.send(c,{t:'station-v2',view:this.stationV2.view()});
+    else if(c.stationContract==='station-live/1'&&this.station)this.send(c,{t:'station',view:this.station.view()});
   }
 
   private send(c: Client, m: ServerMsg) {

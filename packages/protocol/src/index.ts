@@ -7,9 +7,11 @@ export * from './intent-v2.ts';
 export * from './station-v1.ts';
 export * from './station-era-v1.ts';
 export * from './station-v2.ts';
+export * from './station-era-page-v1.ts';
 import { isStationFactV1, parseStationFactV1, type StationLiveV1 } from './station-v1.ts';
 import { stationRulesEraV1Schema } from './station-era-v1.ts';
-import { stationCueV2Schema,stationAnchorV2Schema } from './station-v2.ts';
+import { stationCueV2Schema,stationAnchorV2Schema,type StationLiveV2 } from './station-v2.ts';
+import type { StationLiveContract } from './station-era-v1.ts';
 import { z } from 'zod';
 import type { ChangeEvent, Entity, Environment, PathCommit, PoseSample, Region } from '@sim/engine-contract';
 import { hashOf, samplePath } from '@sim/engine-contract';
@@ -128,7 +130,7 @@ export type NarrativeView = { id: number; region: string; tick: number; summary:
 
 // ---------------------------------------------------------------- websocket
 export type ClientMsg =
-  | { t: 'hello'; proto: number; token?: string; since?: number; epoch?: string }
+  | { t: 'hello'; proto: number; token?: string; since?: number; epoch?: string; stationContracts?:StationLiveContract[] }
   | { t: 'resync'; reason: string }
   | { t: 'ping'; n: number };
 
@@ -148,8 +150,9 @@ export type TakeChunk = { fromTick: number; toTick: number; take: unknown };
 export type TakeStream = { serverTick: number; chunks: TakeChunk[] };
 
 export type ServerMsg =
+  | { t:'station-v2';view:StationLiveV2 }
   | { t:'station';view:StationLiveV1 }
-  | { t: 'welcome'; build: string; proto: number; worldId: string; rulesVersion: string; schema: string; dt: number; clockRate: number; serverTick: number; you: Me | null; serverTime: number; /** identifies this server process: batch numbers are only comparable within one */ epoch?: string; paused?: boolean }
+  | { t: 'welcome'; build: string; proto: number; worldId: string; rulesVersion: string; schema: string; dt: number; clockRate: number; serverTick: number; you: Me | null; serverTime: number; /** identifies this server process: batch numbers are only comparable within one */ epoch?: string; paused?: boolean; stationContract?:StationLiveContract|null }
   | ({ t: 'snapshot'; reason: string } & Snapshot)
   | ({ t: 'batch' } & Batch)
   | ({ t: 'heartbeat' } & Heartbeat)

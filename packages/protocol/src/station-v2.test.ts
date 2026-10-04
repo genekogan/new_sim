@@ -6,6 +6,8 @@ import { STATION_PINS_V1,stationEpochId,stationEpochV1Schema,makeStationCueV1,st
 import { initialStationPhysicalHeadV1,foldStationRulesEraV1 } from './station-era-v1.ts';
 import { makeStationCueV2,stationCueV2Schema,stationPhaseAtTickV2,stationCueEraRevision,stationAnchorV2Schema,
   acceptStationAnchorV2,stationLiveV2Schema,stationLivePhaseV2,stationHistoricalV2Schema,stationV2MessageSchema } from './station-v2.ts';
+import { acceptStationLiveProgressV2 } from './station-v2.ts';
+import { stationEraPageV1Schema } from './station-era-page-v1.ts';
 const physical=JSON.parse(readFileSync(new URL('../../../apps/server/test/fixtures/commons-transition/journey.v1.json',import.meta.url),'utf8'));
 // Native physical payload, synthetic cue/era metadata. Canonical producer proof
 // is deliberately separate from these strict-codec cases.
@@ -24,9 +26,39 @@ const anchor={contract:'station-anchor/2' as const,worldId,epoch:station.epoch,d
   physicalRulesVersion:head.rulesVersion,physicalEraRevision:1,cueId:cue.cueId,cueRulesVersion:cue.rulesVersion,cueEraRevision:0,
   sourceTick:37,serverTimeMs:10000,beat:stationPhaseAtTick(cue,37)!.beat,clockRate:1,paused:false,availability:'supported' as const};
 const live={contract:'station-live/2' as const,worldId,station,physical:head,cue,cuePhysical:origin,anchor,fresh:true};
+const prior={...live,physical:origin,anchor:null,fresh:false};
 function nextCue(){return makeStationCueV2({contract:'station-cue/2',worldId,epoch:station.epoch,rulesVersion:head.rulesVersion,eraRevision:1,
   dtSeconds:.05,pins:STATION_PINS_V1,sequence:2,pieceId:'starfield',bpm:60,seed:2,startTick:2560,cycleCount:4,energy:0,
   observation:observation(2560,head.rulesVersion),transition:{previousCueId:cue.cueId,previousEndTick:stationEndTick(cue),nextStartTick:2560,fadeInBeats:0,fadeOutBeats:0}});}
+
+test('live progression binds first welcome, exact adjacent era, immutable cue and retained anchor across pending views',()=>{
+  const binding={worldId,rulesVersion:station.rulesVersion,dtSeconds:.05};
+  assert.deepEqual(acceptStationLiveProgressV2(null,prior,binding),prior);
+  assert.throws(()=>acceptStationLiveProgressV2(null,live,binding),/physical reader/);
+  assert.deepEqual(acceptStationLiveProgressV2(null,live,{...binding,rulesVersion:head.rulesVersion}),live);
+  const pending={...live,anchor:null,fresh:false};assert.deepEqual(acceptStationLiveProgressV2(prior,pending,binding),pending);
+  assert.deepEqual(acceptStationLiveProgressV2(pending,live,binding),live);
+  assert.deepEqual(acceptStationLiveProgressV2(live,live,binding),live);
+  assert.throws(()=>acceptStationLiveProgressV2(live,prior,binding),/reset/);
+  assert.throws(()=>acceptStationLiveProgressV2(prior,live,{...binding,worldId:'foreign'}),/world/);
+  assert.throws(()=>acceptStationLiveProgressV2(live,{...live,anchor:{...anchor,revision:1}},binding,anchor),/regressed/);
+  const next=nextCue(),changed={...live,cue:next,cuePhysical:head,anchor:null,fresh:false};
+  assert.deepEqual(acceptStationLiveProgressV2(live,changed,binding),changed);
+  const {cueId,...body}=next;
+  assert.throws(()=>acceptStationLiveProgressV2(live,{...changed,cue:makeStationCueV2({...body,sequence:4})},binding),/gap/);
+  assert.throws(()=>acceptStationLiveProgressV2(live,{...live,cue:null,cuePhysical:null,anchor:null,fresh:false},binding),/disappeared/);
+  assert.equal(hashOf(live),hashOf(stationLiveV2Schema.parse(live)));
+});
+test('bounded era page rejects private, frontier, cursor, missing-source and predecessor mismatches',()=>{
+  const page={contract:'station-era-page/1',worldId,station,afterSeq:0,sourceCutoff:{seq:11,tick:37},nextAfterSeq:null,
+    eras:[{fact:head.era,source:head.source}]};
+  assert.equal(stationEraPageV1Schema.parse(page).eras.length,1);
+  assert.equal(stationEraPageV1Schema.parse({...page,afterSeq:11,eras:[]}).eras.length,0);
+  for(const bad of [{...page,owner:'PRIVATE'},{...page,worldId:'foreign'},{...page,sourceCutoff:{seq:10,tick:37}},
+    {...page,sourceCutoff:{seq:11,tick:36}},{...page,afterSeq:10},{...page,nextAfterSeq:10},
+    {...page,eras:[{fact:head.era,source:{...head.source,seq:9}}]},
+    {...page,eras:Array(65).fill(page.eras[0])}])assert.equal(stationEraPageV1Schema.safeParse(bad).success,false);
+});
 
 test('V2 current physical head retains exact V1 cue identity, observation, finite phase and distinct origin',()=>{
   const before=hashOf({station,cue,head,origin}),v=stationLiveV2Schema.parse(live);
@@ -92,7 +124,17 @@ test('second-era history checks both physical heads against the exact row fronti
   const query={contract:'station-history/2',worldId,station,physical:current,cue:c,cuePhysical:head,anchor:null,tick:100,
     physicalUntilTick:null,sourceCutoff:{seq:21,tick:200},phase:stationPhaseAtTickV2(c,100)};
   assert.equal(stationHistoricalV2Schema.safeParse(query).success,true);
+  const currentView={contract:'station-live/2' as const,worldId,station,physical:current,cue,cuePhysical:origin,anchor:null,fresh:false};
+  assert.equal(stationLiveV2Schema.safeParse(currentView).success,true);
+  const binding={worldId,rulesVersion:station.rulesVersion,dtSeconds:.05};
+  assert.throws(()=>acceptStationLiveProgressV2(prior,currentView,binding),/gap/);
+  assert.deepEqual(acceptStationLiveProgressV2({...live,anchor:null,fresh:false},currentView,binding),currentView);
   const future={...head,era:{...head.era!,seq:31,payload:{...head.era!.payload,source:{...head.era!.payload.source,seq:30}}},source:{...head.source!,seq:30}};
   assert.equal(stationHistoricalV2Schema.safeParse({...query,cuePhysical:future}).success,false);
   assert.equal(stationLiveV2Schema.safeParse({contract:'station-live/2',worldId,station,physical:current,cue:c,cuePhysical:future,anchor:null,fresh:false}).success,false);
+  const page={contract:'station-era-page/1',worldId,station,afterSeq:0,sourceCutoff:{seq:21,tick:100},nextAfterSeq:11,
+    eras:[{fact:head.era,source:head.source}]};
+  assert.equal(stationEraPageV1Schema.parse(page).nextAfterSeq,11);
+  assert.equal(stationEraPageV1Schema.parse({...page,afterSeq:11,nextAfterSeq:null,eras:[{fact:current.era,source:current.source}]}).eras.length,1);
+  assert.equal(stationEraPageV1Schema.safeParse({...page,nextAfterSeq:null,eras:[{fact:current.era,source:current.source}]}).success,false);
 });
