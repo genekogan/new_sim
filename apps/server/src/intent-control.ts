@@ -2,7 +2,7 @@
 // not construct this service or advertise the behavioral version.
 import { randomUUID } from 'node:crypto';
 import { ZodError } from 'zod';
-import { INTENT_V2, intentRequestV2Schema, intentSourceV2Schema, type IntentReceiptV2 } from '@sim/protocol';
+import { INTENT_V2, intentRequestV2Schema, intentSourceV2Schema, intentOwnerControlV2Schema, type IntentOwnerControlV2, type IntentReceiptV2 } from '@sim/protocol';
 import { hashToken } from './auth.ts';
 import type { Brain } from './brain.ts';
 import type { SoulRow } from './db.ts';
@@ -81,6 +81,14 @@ export class IntentControlV2 {
     if(scope.worldId!==this.host.worldId||row.owner!==scope.source.ownerId||scope.currentAuthority(row)!==true)
       throw new IntentRequestUnavailable();
     return true as const;
+  }
+  /** Read-only human adapter signal. Operator/agent authority does not select
+   * the genuine owner's web UI. The transport still rechecks every request. */
+  ownerControl(scope:IntentRequestScope):IntentOwnerControlV2|undefined {
+    this.guard(scope);
+    if(scope.source.kind!=='owner'||scope.source.channel!=='web'||scope.source.principalId!==scope.source.ownerId)return undefined;
+    return intentOwnerControlV2Schema.parse({worldId:this.host.worldId,soulId:scope.soulId,
+      ownerId:scope.source.ownerId,intentContract:INTENT_V2});
   }
   private version(scope:IntentRequestScope,request:ReturnType<typeof intentRequestV2Schema.parse>) {
     if(!request.edit)return;

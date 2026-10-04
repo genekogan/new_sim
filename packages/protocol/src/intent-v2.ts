@@ -20,6 +20,14 @@ export const intentRequestV2Schema = z.discriminatedUnion('op', [
 ]);
 export type IntentRequestV2 = z.infer<typeof intentRequestV2Schema>;
 
+/** Selected-Soul dashboard.control, present only for the current genuine human
+ * owner in an explicitly installed candidate. A capability snapshot is neither
+ * a credential nor interpretation/admission/physical completion evidence. */
+export const intentOwnerControlV2Schema = z.strictObject({
+  worldId: id, soulId: id, ownerId: id, intentContract: z.literal(INTENT_V2),
+});
+export type IntentOwnerControlV2 = z.infer<typeof intentOwnerControlV2Schema>;
+
 export const intentSourceV2Schema = z.strictObject({
   kind: z.enum(['owner', 'owner-agent', 'operator']), ownerId: id, principalId: id,
   channel: z.enum(['web', 'api', 'mcp']),

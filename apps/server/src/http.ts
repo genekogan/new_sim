@@ -62,6 +62,7 @@ export function buildApp(d: Deps) {
     app.use(path, async (c, next) => { c.header('Cache-Control', 'no-store'); await next(); });
   for(const path of ['/v1/souls/:id/intent-v2','/v1/souls/:id/intent-v2/*','/v1/agent/intent-v2','/v1/agent/intent-v2/*'])
     app.use(path,async(c,next)=>{c.header('Cache-Control','no-store');await next();});
+  app.use('/v1/souls/:id',async(c,next)=>{if(d.intentV2)c.header('Cache-Control','no-store');await next();});
   for(const path of ['/v1/lifecycle','/v1/lifecycle/*','/v1/me','/v1/souls','/v1/souls/*','/v1/agent/*'])
     app.use(path,async(c,next)=>{if(d.souls.lifecycle)c.header('Cache-Control','no-store');await next();});
   app.use('/v1/brain',async(c,next)=>{if(d.souls.lifecycle)c.header('Cache-Control','no-store');await next();});
@@ -184,7 +185,17 @@ export function buildApp(d: Deps) {
     return c.json({ ok: true, soul: { id: s.id, name: s.name, description: s.description, entityId: s.entity_id } });
   });
   app.delete('/v1/souls/:id', async (c) => { const u = await requireUser(c),optIn=lifecycleOptIn(c),soul=ownSoul(u,c.req.param('id'));if(d.souls.lifecycle){const op=d.souls.acceptLifecycleRetire(u.id,soul);d.hub.refreshMe(soul.owner);return lifecycleReply(c,u.id,op.requestId,optIn);}await d.souls.retire(soul); d.hub.refreshMe(u.id); return c.json({ ok: true }); });
-  app.get('/v1/souls/:id', async (c) => { const u = await requireUser(c); return c.json(d.souls.dashboard(ownSoul(u, c.req.param('id')))); });
+  app.get('/v1/souls/:id', async (c) => {
+    if(!d.intentV2){const u=await requireUser(c);return c.json(d.souls.dashboard(ownSoul(u,c.req.param('id'))));}
+    // Explicit candidate only: the same trusted expiry/current authority and
+    // body readiness used by submission select the genuine-owner human adapter.
+    c.header('Cache-Control','no-store');
+    try {
+      const service=d.intentV2,scope=service.ownerScope(await intentIdentity(c),c.req.param('id'));
+      const dashboard=d.souls.dashboard(d.db.soul(scope.soulId)!),control=service.ownerControl(scope);
+      service.guard(scope);return c.json({...dashboard,...(control?{control}:{})});
+    }catch(error){throw intentTransportError(error);}
+  });
   app.get('/v1/souls/:id/timeline', async (c) => { const u = await requireUser(c); return c.json({ events: d.souls.timeline(ownSoul(u, c.req.param('id')), intQ(c, 'limit', 80, 1, 200)) }); });
   app.get('/v1/souls/:id/deck', async (c) => { const u = await requireUser(c); return c.json(d.souls.deck(ownSoul(u, c.req.param('id')))); });
   app.get('/v1/souls/:id/talk', async (c) => { const u = await requireUser(c); return c.json({ lines: d.db.recentTalk(60, ownSoul(u, c.req.param('id')).id) }); });
