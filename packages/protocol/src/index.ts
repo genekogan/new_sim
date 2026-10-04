@@ -3,6 +3,7 @@
 export * from './mandate.ts';
 export * from './presentation.ts';
 export * from './owner-views.ts';
+export * from './intent-v2.ts';
 import { z } from 'zod';
 import type { ChangeEvent, Entity, Environment, PathCommit, PoseSample, Region } from '@sim/engine-contract';
 import { hashOf, samplePath } from '@sim/engine-contract';
