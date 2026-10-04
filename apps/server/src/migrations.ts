@@ -129,6 +129,24 @@ export const MIGRATIONS: { id: number; name: string; up(db: DatabaseSync): void 
     db.exec('CREATE INDEX lifecycle_operations_pending ON lifecycle_operations_v1(world_id,state,requested_at,request_id)');
     db.exec('CREATE INDEX lifecycle_operations_owner ON lifecycle_operations_v1(world_id,owner_id,requested_at,request_id)');
   } },
+  { id: 13, name: 'private captured intent controller observations', up(db) {
+    // Empty internal outbox. Capture is evidence, not canonical publication or
+    // authority for a new decision. No historical inference/backfill.
+    db.exec(`CREATE TABLE intent_observations_v2 (
+      world_id TEXT NOT NULL, attempt_id TEXT NOT NULL, phase TEXT NOT NULL,
+      observation_tick INTEGER NOT NULL CHECK(observation_tick>=0),
+      admission_seq INTEGER NOT NULL, admission_hash TEXT NOT NULL,
+      body TEXT NOT NULL CHECK(json_valid(body)), body_hash TEXT NOT NULL,
+      published_seq INTEGER, published_hash TEXT,
+      PRIMARY KEY(world_id,attempt_id,phase),
+      FOREIGN KEY(world_id,admission_seq) REFERENCES events(world_id,seq),
+      FOREIGN KEY(world_id,published_seq) REFERENCES events(world_id,seq),
+      CHECK(phase IN ('started','completed','blocked','interrupted')),
+      CHECK((published_seq IS NULL AND published_hash IS NULL)
+         OR (published_seq IS NOT NULL AND published_hash IS NOT NULL))
+    )`);
+    db.exec('CREATE INDEX intent_observations_pending ON intent_observations_v2(world_id,published_seq,observation_tick,admission_seq)');
+  } },
 ];
 
 export function migrate(db: DatabaseSync): number[] {

@@ -309,8 +309,13 @@ for(const phase of ['before-fact','after-fact'] as const)test(`real native worke
   const worker=new Worker(new URL('../test/fixtures/intent-controller-worker.ts',import.meta.url),{workerData:{path:f.path,phase},execArgv:[]});t.after(()=>worker.terminate());
   assert.equal(await new Promise<number>((resolve,reject)=>{worker.once('error',reject);worker.once('exit',resolve);}),24);
   const restarted=new WorldHost(f.db,native,'admission-fixture',1e9,f.host.worldId);restarted.boot();
-  const out=Object.values(restarted.intentHistoryOf('s_A').attempts)[0];assert.equal(out.phase,phase==='after-fact'?'started':'accepted');
-  assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision').length,1);assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='intent-controller-v2').length,phase==='after-fact'?1:0);
-  if(phase==='after-fact'){assert.equal(restarted.engine.world.tick,1);assert.equal(restarted.engine.programAction?.(out.activityId!)?.action.status,'executing');}
+  // Append now belongs to the publication transaction. Either exit rolls back
+  // the fact, while the earlier captured observation survives separately.
+  const out=Object.values(restarted.intentHistoryOf('s_A').attempts)[0];assert.equal(out.phase,'accepted');
+  assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision').length,1);assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='intent-controller-v2').length,0);
+  const captured=f.db.db.prepare('SELECT observation_tick,published_seq FROM intent_observations_v2').get()!;
+  assert.equal(captured.observation_tick,1);assert.equal(captured.published_seq,null);
+  restarted.tickOnce();assert.equal(Object.values(restarted.intentHistoryOf('s_A').attempts)[0].phase,'started');
+  assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='intent-controller-v2').length,1);assert.equal(restarted.engine.programAction?.(out.activityId!)?.action.status,'executing');
   assert.equal(f.db.paidCost(),0);
 });

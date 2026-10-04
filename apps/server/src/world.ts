@@ -16,6 +16,7 @@ import { arrivalPlace, baseVocabulary, codeVocabulary, foldEvent, initKernel, pi
 import { frontier, stepIndex } from './deck.ts';
 import {mandateOf,MANDATE_STATE} from './mandate.ts';
 import { emptyIntentHistoryV2, foldIntentHistoryV2, type IntentHistoryV2 } from './intent-history.ts';
+import { IntentObservations } from './intent-observations.ts';
 export { replayFromGenesis, replayKernel } from './fold.ts';
 
 
@@ -92,6 +93,7 @@ export class WorldHost {
   tickMs: number[] = [];
   private queue: Pending[] = [];
   private intentControllerFaults = new Set<string>();
+  private intentObservations: IntentObservations;
   private acc = { paths: [] as PathCommit[], changes: [] as ChangeEvent[], log: [] as LogEvent[], dirty: new Set<string>(), removed: [] as string[], plays: [] as PlayView[], fromTick: 0 };
   private batchSeq = 0;
   private timer: NodeJS.Timeout | null = null;
@@ -109,6 +111,7 @@ export class WorldHost {
   constructor(db: Db, factory: EngineFactory, seed: string, snapshotEvery: number, worldId = 'toy-1') {
     this.worldId = worldId;
     this.db = db; this.factory = factory; this.seed = seed; this.snapshotEvery = snapshotEvery;
+    this.intentObservations = new IntentObservations(db, worldId);
   }
 
   // ------------------------------------------------------------ boot
@@ -228,6 +231,7 @@ export class WorldHost {
     this.acc.paths.push(...out.paths);
     this.acc.changes.push(...out.changes);
     for (const c of out.changes) { const m = this.mindByEntity.get(c[1]); if (m) this.acc.dirty.add(m.soulId); }
+    this.reconcileIntentObservations();
     this.observeIntentActions();
     this.afterPrograms(out.programs, false);
     for (const ev of out.events) for (const l of this.listeners) l.onRuntimeEvent?.(ev);
@@ -412,7 +416,6 @@ export class WorldHost {
     for(const binding of Object.values(this.intentBindings())) {
       const p=binding.payload,history=(this.extra.intentHistoriesV2 as Record<string,IntentHistoryV2>|undefined)?.[p.soulId];
       const out=history?.attempts[p.attemptId],entry=history?.intents[p.intent.intentId];
-      if(this.intentControllerFaults.has(p.attemptId))continue;
       if(out?.phase!=='accepted' || entry?.status!=='active' || entry.revision.version!==p.intent.version)continue;
       const observed=this.engine.programAction(p.activityId);
       if(!observed || observed.programId!==p.activityId || observed.actor!==p.decision.entityId || observed.action.status!=='executing')continue;
@@ -424,7 +427,6 @@ export class WorldHost {
     if(ev.kind==='step')return;
     for(const binding of Object.values(this.intentBindings())) {
       const p=binding.payload;
-      if(this.intentControllerFaults.has(p.attemptId))continue;
       if(p.activityId!==ev.id || p.decision.entityId!==ev.actor)continue;
       const previous=(this.extra.intentHistoriesV2 as Record<string,IntentHistoryV2>|undefined)?.[p.soulId]?.attempts[p.attemptId];
       if(previous?.phase!=='accepted' && previous?.phase!=='started')continue;
@@ -432,7 +434,10 @@ export class WorldHost {
       if(ev.kind==='completed') {
         // Wait-only/no-op programs have no executing-action observation. Do not
         // manufacture a start to make their completion fit the ledger.
-        if(previous.phase==='started')this.recordIntentController({...scope,phase:'completed',observation:{...observation,programKind:'completed'}});
+        let capturedStart=previous.phase==='started';
+        try { capturedStart ||= this.intentObservations.hasCapturedStart(p.attemptId); }
+        catch { this.intentControllerNotice(p.attemptId); }
+        if(capturedStart)this.recordIntentController({...scope,phase:'completed',observation:{...observation,programKind:'completed'}});
       }else if(ev.kind==='failed')this.recordIntentController({...scope,phase:'blocked',reason:ev.code??'program failed',
         observation:{...observation,programKind:'failed',...(ev.code?{code:ev.code}:{})}});
       else this.recordIntentController({...scope,phase:'interrupted',reason:ev.code??'program cancelled',
@@ -441,16 +446,38 @@ export class WorldHost {
   }
   private recordIntentController(payload:IntentControllerPayloadV2) {
     try {
-      const e:LogEvent={seq:this.seq+1,tick:this.engine.world.tick,kind:'intent-controller-v2',author:'world:intent-controller',payload,at:Date.now()};
-      const fact=intentControllerFactV2(e);foldIntentHistoryV2(this.intentHistoryOf(payload.soulId),fact);
-      this.db.appendEvent(this.worldId,e);this.seq=e.seq;this.apply(e,false);this.acc.log.push(e);
-      for(const l of this.listeners)l.onApplied?.(e);
+      this.intentObservations.capture(payload);
+      this.reconcileIntentObservations();
     }catch {
-      // Observation persistence failure is not a physical controller fault.
-      // No physical reissue or fabricated terminal fact; recovery is a gate.
-      this.intentControllerFaults.add(payload.attemptId);
-      console.error('[world] controller history requires reconciliation');
+      this.intentControllerNotice(payload.attemptId);
     }
+  }
+  private intentControllerNotice(attemptId:string) {
+    // Persistence failure is not a physical controller fault. Report once per
+    // process; keep captured evidence, without reissuing or guessing progress.
+    if(this.intentControllerFaults.has(attemptId))return;
+    this.intentControllerFaults.add(attemptId);
+    console.error('[world] controller history requires reconciliation');
+  }
+  /** Publish at most 20 captured observations at or before current world time.
+   * Explicitly callable while paused; boot itself remains read-only for these
+   * facts. Earlier capture tick is retained in the observation, not rewritten. */
+  reconcileIntentObservations():number {
+    if(Object.keys(this.intentBindings()).length===0)return 0;
+    let pending:IntentControllerPayloadV2[];
+    try {pending=this.intentObservations.pending(this.engine.world.tick);}
+    catch {this.intentControllerNotice('journal');return 0;}
+    let published=0;
+    for(const payload of pending) {
+      try {
+        const e:LogEvent={seq:this.seq+1,tick:this.engine.world.tick,kind:'intent-controller-v2',author:'world:intent-controller',payload,at:Date.now()};
+        const fact=intentControllerFactV2(e);
+        this.intentObservations.publish(payload,e,()=>{foldIntentHistoryV2(this.intentHistoryOf(payload.soulId),fact);});
+        this.seq=e.seq;this.apply(e,false);this.acc.log.push(e);published++;
+        for(const l of this.listeners)l.onApplied?.(e);
+      }catch {this.intentControllerNotice(payload.attemptId);break;}
+    }
+    return published;
   }
 
   /** Apply a logged event: the fold moves the engine and the kernel; this adds the minds' bookkeeping. */
