@@ -4,7 +4,7 @@ import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { setImmediate } from 'node:timers/promises';
 import { marsFactory } from '@sim/engine-mars';
-import { buildMidRequest, newLife, type CompileOut, type callTool } from '@sim/brain';
+import { buildMidRequest, fakeJev, newLife, type CompileOut, type callTool } from '@sim/brain';
 import { INTENT_V2, publicEvent } from '@sim/protocol';
 import { Brain } from './brain.ts';
 import { config } from './config.ts';
@@ -127,4 +127,68 @@ test('withdrawal accepted ahead of a prepared native choice prevents its admissi
   assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision').length,0);
   assert.equal(f.host.engine.programOf('h_A'),null);
   assert.equal(f.host.intentHistoryOf('s_A').intents[revision.intentId].status,'withdrawn');
+});
+
+test('a delayed mid response cannot overwrite the fresh ordinary-purpose wake; the native sleeper then walks to its accepted target',async t=>{
+  const f=fixture(t), older=await received(f,'delayed-older','make friends if you feel like it');
+  await accept(f.host,f.publisher.publish(f.scope,older,{summary:'Welcome company.',agenda:[{card:'rest',target:null}],trigger:{kind:'none'}}));
+  f.mind.nextEvalTick=1e9;await sleep(f);
+  let release!:()=>void, called!:()=>void;
+  const gate=new Promise<void>(resolve=>release=resolve),started=new Promise<void>(resolve=>called=resolve);
+  let modelCalls=0;
+  f.brain.jev.ask=async request=>{modelCalls++;called();await gate;return fakeJev(request);};
+  f.brain.mode='live'; // Only the injected fake transport can run; no provider.
+  const delayed=f.brain.evaluate(f.mind,'timer');await started;
+  const next=await received(f,'during-mid','go to the campfire');
+  const published=await accept(f.host,f.publisher.publish(f.scope,next,{summary:'Walk to the campfire.',agenda:[{card:'go to',target:'campfire'}],trigger:{kind:'now'}}));
+  release();await delayed;f.brain.mode='fake';
+  assert.equal(modelCalls,1);assert.equal(f.db.paidCost(),0);
+  assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision' && e.author==='brain:mid').length,0,'old context admitted no choice');
+  const origin=f.host.engine.world.tick;
+  await ticks(f.host,100,()=>f.host.engine.world.entities.h_A.human!.activity==='walk');
+  const response=f.db.events(f.host.worldId).find(e=>e.kind==='decision' && e.author==='brain:reflex');
+  assert.ok(response,'new ordinary purpose produced its native choice despite the older delayed response');
+  assert.equal(response.payload.card,'go to');assert.equal(response.payload.target,'campfire');
+  assert.equal(response.tick,published.event.tick+1);
+  assert.equal(f.host.engine.world.entities.h_A.human!.activity,'walk');assert.ok(f.host.engine.world.tick-origin<=100);
+  assert.equal(Object.keys(f.host.intentHistoryOf('s_A').intents).length,2);assert.deepEqual(f.host.engine.runtime.violations,[]);
+  t.diagnostic(`delayed mid calls=${modelCalls}; publication=${published.event.tick}; decision=${response.tick}; walking=${f.host.engine.world.tick}; paid=$0`);
+});
+
+test('delayed private context preserves withdrawal, optional meaning and newer legacy NOW precedence',async t=>{
+  for(const change of ['standing','withdraw','legacy-now'] as const)await t.test(change,async child=>{
+    const f=fixture(child), original=await received(f,'old-direction','go to the campfire');
+    const published=await accept(f.host,f.publisher.publish(f.scope,original,{summary:'Walk to the campfire.',agenda:[{card:'go to',target:'campfire'}],trigger:{kind:'now'}}));
+    assert.equal(published.receipt?.phase,'understood');
+    const revision=published.receipt!.phase==='understood'?published.receipt.revision:null;assert.ok(revision);
+    f.mind.nextEvalTick=1e9;await sleep(f);
+    let release!:()=>void, called!:()=>void;
+    const gate=new Promise<void>(resolve=>release=resolve),started=new Promise<void>(resolve=>called=resolve);
+    f.brain.jev.ask=async request=>{called();await gate;return fakeJev(request);};f.brain.mode='live';
+    const delayed=f.brain.evaluate(f.mind,'timer');await started;
+    if(change==='withdraw'){
+      const r=await accept(f.host,f.publisher.receive(f.scope,{contract:INTENT_V2,requestId:'latest-withdraw',op:'withdraw',
+        edit:{intentId:revision.intentId,expectedVersion:revision.version}}));assert.ok(r.reservation.created);
+      await accept(f.host,f.publisher.publish(f.scope,r.reservation));
+    }else{
+      const r=await received(f,'latest-purpose',change==='standing'?'rest if you feel like it':'go to the campfire');
+      await accept(f.host,f.publisher.publish(f.scope,r,change==='standing'
+        ?{summary:'Rest optionally.',agenda:[{card:'rest',target:null}],trigger:{kind:'none'}}
+        :{summary:'Walk to the campfire.',agenda:[{card:'go to',target:'campfire'}],trigger:{kind:'now'}}));
+      if(change==='legacy-now')await accept(f.host,f.host.enqueue('mandate','fixture',{soulId:'s_A',op:'upsert',rule:{
+        id:'legacy-priority',words:'rest now',strict:false,understanding:'Rest here.',agenda:[{card:'rest',target:null}],
+        trigger:{kind:'now'},status:'active',report:null}}));
+    }
+    release();await delayed;f.brain.mode='fake';
+    assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision' && e.author==='brain:mid').length,0);
+    const ctx=f.brain.midContext(f.mind,f.mind.evalTrigger);
+    assert.ok(!ctx.options.some(o=>o.card==='go to' && o.servesIntent),'no old immediate or overridden private direction is reissued');
+    await ticks(f.host,20);
+    const choices=f.db.events(f.host.worldId).filter(e=>e.kind==='decision' && e.author==='brain:reflex');
+    assert.ok(!choices.some(e=>e.payload.card==='go to'));
+    if(change==='legacy-now'){assert.equal(choices[0]?.payload.card,'rest');assert.equal(choices[0]?.payload.trigger,'mandate-now');}
+    if(change==='withdraw'){assert.equal(f.host.intentHistoryOf('s_A').intents[revision.intentId].status,'withdrawn');
+      assert.equal(f.host.engine.world.entities.h_A.human!.activity,'sleep');}
+    assert.equal(f.db.paidCost(),0);assert.deepEqual(f.host.engine.runtime.violations,[]);
+  });
 });

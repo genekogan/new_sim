@@ -343,7 +343,19 @@ export class Brain {
       ? { option: opt.id, label: opt.label, card: opt.card, target: opt.cardTarget, manner: decision.manner, steps: opt.steps, mood: decision.mood, reevalSeconds: decision.reevalSeconds, probabilities: decision.probabilities, ...policy, seed }
       : { option: 'continue', mood: decision.mood, reevalSeconds: decision.reevalSeconds, ...policy };
     const callId = this.record({ tick, tier: 'mid', subject: m.name, soulId: m.soulId, model: mode === 'live' ? JEV_MODEL : 'fake', request, response, applied: { trigger, ...applied }, ms, inputTokens: tokens, outputTokens: 0, cachedTokens: 0, costUsd: cost, mode, error });
-    if (stale) { m.nextEvalTick = now + 1; m.evalTrigger = 'new-intent'; return; }
+    if (stale) {
+      m.nextEvalTick = now + 1;
+      // The later publication already installed its wake. An old response
+      // cannot turn it back into the legacy trigger and lose the fresh
+      // purpose's temporary planning view. Legacy changes retain their most
+      // recent urgent wake (including NOW); ordinary body news cannot erase
+      // an unhandled fresh purpose while the old model call was in flight.
+      if (purposeSeq !== undefined && host.intentHistoryOf(m.soulId).lastSeq !== purposeSeq && m.intentVersion === version)
+        m.evalTrigger = 'new-intent-v2';
+      else if (purposeSeq === undefined || !URGENT.has(m.evalTrigger)) m.evalTrigger = 'new-intent';
+      m.lastFingerprint = '';
+      return;
+    }
     m.wantsCompany = decision.sociable;
     if (!opt) {
       m.nextEvalTick = now + decision.reevalSeconds * TPS;
