@@ -90,3 +90,20 @@ terminal seq/tick, then compares the post-retirement receipt with that saved fac
 Only the changed walking-retirement test was rerun:1/1 PASS, including its existing
 actual walking cleanup, other actor, receipt revision, restart and inclusive replay
 checks. No runtime/codec/policy change, unchanged suite rerun or new activation claim.
+
+PM C093 identified a separate readiness compatibility defect: immutable birth
+description was used as the expected current character. Actual canonical
+`rules.character` updates the current row/Mind/kernel about together; the old
+comparison falsely denied an otherwise matching admitted identity and could
+fault a recorded birth before private completion. Two focused actual native
+tests reproduced these failures before correction (0/2 PASS). Readiness now
+compares Mind/kernel character with the current row while retaining exact
+world/owner/Soul/entity/name/body/deck/map correspondence. Immutable request
+description, private body/hash, birth event and receipt fact/revision are preserved.
+
+Only the new character surface was run after correction:2/2 PASS, with actual
+canonical updates after admission and between birth acceptance/completion,
+nine independently introduced character/identity/map mismatches denying readiness,
+restored correspondence, and matching native/kernel restart and inclusive replay.
+Server TypeScript PASS. Original41-pass evidence and saved-prior-fact1-pass
+follow-up remain separate; no unchanged suite rerun or HTTP/live activation.

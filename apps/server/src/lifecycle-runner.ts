@@ -14,15 +14,17 @@ function refers(value:unknown,id:string):boolean {
 }
 
 /** Admission readiness is correspondence, not inactivity or an old revision.
+ * Character text can change canonically; the immutable birth description is
+ * evidence of admission, not the current row/Mind/kernel character value.
  * The caller still checks current user/invitation/control authority separately. */
 export function lifecycleBodyReady(host:WorldHost,op:LifecycleOperation):boolean {
   const s=op.scope,row=host.db.soul(s.soulId),body=host.engine.world.entities[s.entityId],mind=host.minds.get(s.soulId),thing=host.kernel.things[s.soulId];
   return !!row&&row.retired_at===null&&row.world_id===host.worldId&&s.worldId===host.worldId
-    &&row.owner===s.owner&&row.entity_id===s.entityId&&row.name===op.name&&row.description===op.description
+    &&row.owner===s.owner&&row.entity_id===s.entityId&&row.name===op.name
     &&body?.kind==='human'&&body.human?.soul===s.soulId&&body.label===op.name
-    &&!!mind&&mind.entityId===s.entityId&&mind.owner===s.owner&&mind.name===op.name&&mind.description===op.description
+    &&!!mind&&mind.entityId===s.entityId&&mind.owner===s.owner&&mind.name===op.name&&mind.description===row.description
     &&host.mindByEntity.get(s.entityId)===mind&&thing?.kind==='soul'&&thing.name===op.name
-    &&thing.traits.body===s.entityId&&thing.traits.about===op.description&&!!host.kernel.decks[s.soulId];
+    &&thing.traits.body===s.entityId&&thing.traits.about===row.description&&!!host.kernel.decks[s.soulId];
 }
 export function lifecycleRemovalSettled(host:WorldHost,op:LifecycleOperation):boolean {
   const s=op.scope,row=host.db.soul(s.soulId);
