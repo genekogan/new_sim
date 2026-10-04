@@ -112,3 +112,19 @@ remain open. No model-free replay claim for unlogged idle tails is added.
 
 Broader Goal stays active; initial window ends October6 23:59 America/New_York.
 Only PM may merge/push/deploy after Gene's explicit merge-closure handover.
+
+## Malformed-envelope follow-up after the e93 milestone
+
+PM C143 reproduced that String(rpc.params.name) throws for JSON name
+{"toString":0,"valueOf":0}. One new actual paired local SDK/TCP negative test
+reproduced an escaped handler rejection: the local test server's fallback
+returned503. The adapter now checks typeof name==='string' before checking the
+agreed tool names, leaving malformed envelope validation to the existing SDK.
+Final focused **1/1**: HTTP200 carries JSON-RPC error **-32603**, not a receipt or
+success; no TypeError/credential/hash echo, no compiler/canonical/model effect,
+and a subsequent valid tools/list still responds. SDK1.31's outer Zod request
+parser maps this malformed request to InternalError before its InvalidParams
+wrapper. The first corrected test expected-32602 and failed; exact SDK source
+and observed-32603 explain the corrected expectation. No SDK/root change or
+broader pass claim. The earlier43/11 evidence remains at its stated source pin;
+those passing suites were not repeated for this one-line malformed-name fix.

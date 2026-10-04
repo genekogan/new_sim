@@ -183,3 +183,18 @@ test('candidate registration current authority also protects existing private to
   const pending=f.client.callTool({name:'soul_perceive',arguments:{}}).then(result);await started;rotate(f);release();
   const denied=await pending;assert.equal(denied.error,true);assert.equal('soul' in denied.data,false);assert.equal('code' in denied.data&&denied.data.code,'unauthorized');
 });
+
+test('malformed JSON tool name is rejected by the real transport without coercion or private diagnostic echo',async t=>{
+  const f=await local(t),before=f.db.events(worldId).length;
+  const malformed=await f.raw('tools/call',{name:{toString:0,valueOf:0},arguments:{}});
+  assert.equal(malformed.cache,'no-store');assert.equal(malformed.status,200);
+  const rpc=JSON.parse(malformed.text);assert.equal(rpc.jsonrpc,'2.0');assert.equal(rpc.id,99);
+  // SDK1.31's outer schema parser maps its Zod error to InternalError.
+  // The envelope is safely rejected; this is not an escaped handler exception.
+  assert.equal(rpc.error?.code,-32603);assert.equal(Object.hasOwn(rpc,'result'),false);
+  assert.ok(!malformed.text.includes('TypeError'));assert.ok(!malformed.text.includes(f.credential));
+  assert.ok(!malformed.text.includes(hashToken(f.credential)));
+  assert.equal(f.calls,0);assert.equal(f.db.events(worldId).length,before);assert.equal(f.db.paidCost(),0);
+  const valid=await f.raw('tools/list',{});assert.equal(valid.status,200);
+  assert.ok(JSON.parse(valid.text).result.tools.some((tool:{name:string})=>tool.name==='soul_intent_v2'));
+});

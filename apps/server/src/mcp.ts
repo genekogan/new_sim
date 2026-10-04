@@ -93,7 +93,7 @@ export async function handleMcp(req: IncomingMessage, res: ServerResponse, souls
   let body: unknown; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { res.writeHead(400).end(); return; }
   if(candidate&&body&&typeof body==='object'&&!Array.isArray(body)) {
     const rpc=body as {method?:unknown;id?:unknown;params?:{name?:unknown;arguments?:unknown}};
-    if(rpc.method==='tools/call'&&['soul_intent_v2','soul_intent_request_v2'].includes(String(rpc.params?.name))) {
+    if(rpc.method==='tools/call'&&typeof rpc.params?.name==='string'&&['soul_intent_v2','soul_intent_request_v2'].includes(rpc.params.name)) {
       const schema=rpc.params!.name==='soul_intent_v2'?intentRequestV2Schema:intentLookupInput;
       if(!schema.safeParse(rpc.params?.arguments).success) {
         // SDK validation diagnostics can echo arbitrary unknown property names.
