@@ -20,8 +20,8 @@ export async function accept<T>(host: WorldHost, promise: Promise<T>): Promise<T
   for (let i = 0; i < 50 && !done; i++) { await setImmediate(); host.drainInputs(); }
   assert.ok(done, 'request settled through the actual sequencer'); return promise;
 }
-export function fixture(path: string, engineFactory = factory) {
-  const db = new Db(path), host = new WorldHost(db, engineFactory, seed, 1e9, worldId);
+export function fixture(path: string, engineFactory = factory, options?:{durableClockV1?:boolean}) {
+  const db = new Db(path), host = new WorldHost(db, engineFactory, seed, 1e9, worldId,options);
   host.boot(); host.drainInputs();
   const cfg = { ...config, worldId, worldKey:'eden', worldPath:'/w/eden', brainMode:'fake' as const,
     budgetUsdPerDay:0, typesafeKey:undefined, anthropicKey:undefined, privyAppId:'', privyAppSecret:'', inviteRequired:true };

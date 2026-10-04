@@ -1,3 +1,4 @@
+import type { MarsEngine } from './engine.ts';
 import { humanBirthRequestSchema, type Engine, type EngineFactory, type HumanBirthProbe } from '@sim/engine-contract';
 
 /** Run the existing native placer in an exact detached checkpoint. This never
@@ -5,7 +6,8 @@ import { humanBirthRequestSchema, type Engine, type EngineFactory, type HumanBir
  * Non-resumable live work defers; invariant/codec errors remain errors. */
 export function probeNativeHumanBirth(engine:Engine,factory:EngineFactory,raw:unknown):HumanBirthProbe {
   const request=humanBirthRequestSchema.parse(raw);
-  if(!engine.rulesVersion.startsWith('sim-mars/1+')||factory.rulesVersion!==engine.rulesVersion)
+  if(!engine.rulesVersion.startsWith('sim-mars/1+')||!factory.rulesVersion.startsWith('sim-mars/1+')
+    ||(factory.rulesVersion!==engine.rulesVersion&&(factory.canRestoreSnapshot?.(engine.rulesVersion)!==true||factory.canReplayHistory?.(engine.rulesVersion)!==true)))
     throw new Error('Native birth probe requires the matching native engine factory');
   const base={schema:engine.schema,rulesVersion:engine.rulesVersion,tick:engine.world.tick,stateHash:engine.stateHash()};
   const common={contract:'detached-native-birth/1' as const,base,request};
@@ -20,7 +22,7 @@ export function probeNativeHumanBirth(engine:Engine,factory:EngineFactory,raw:un
   if(snapshot.dropped!==0||snapshot.tick!==base.tick||snapshot.stateHash!==base.stateHash)
     throw new Error('Native birth checkpoint is not exact');
   const detached=factory.restore(snapshot);
-  if(detached.stateHash()!==base.stateHash)throw new Error('Native birth checkpoint did not restore exactly');
+  if(detached.rulesVersion!==engine.rulesVersion||detached.stateHash()!==base.stateHash)throw new Error('Native birth checkpoint did not restore exactly');
   try{
     try{detached.spawnHuman(request);}
     catch(error){
@@ -30,6 +32,8 @@ export function probeNativeHumanBirth(engine:Engine,factory:EngineFactory,raw:un
     }
     const body=detached.world.entities[request.id];
     if(!body||body.kind!=='human'||body.human?.soul!==request.soul)throw new Error('Native birth probe did not create the requested body identity');
+    const issue=(detached as MarsEngine).humanBirthIssue(request.id);
+    if(issue)return {...common,outcome:'unavailable',diagnostic:issue};
     return {...common,outcome:'ready',position:[...body.pose.p]};
   }finally{
     if(engine.stateHash()!==base.stateHash||engine.world.tick!==base.tick)throw new Error('Native birth probe changed the authoritative world');

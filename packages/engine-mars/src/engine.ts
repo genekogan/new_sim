@@ -23,6 +23,10 @@ import { readNativeGathering } from './gathering-observation.ts';
 import { prepareCommonsTransition } from './commons-transition.ts';
 import { commonsTransitionV1Schema,type CommonsTransitionV1,type CommonsTransitionAdmissionV1 } from '@sim/engine-contract';
 import { decodeSnapshot } from '../../../mars/viewer/engine/runtime/snapshot.ts';
+import { dcos,dsin,hypot } from '../../../mars/viewer/engine/core/math.ts';
+import { clearanceAt } from '../../../mars/viewer/engine/spatial/grid.ts';
+import { HUMAN_RADIUS } from '../../../mars/viewer/engine/world/catalog.ts';
+import type { Spatial } from '../../../mars/viewer/engine/spatial/service.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const TPS = 20;
@@ -41,10 +45,11 @@ type Prog = {
   ops: Op[]; action?: string; settle?: 'done' | 'held'; soft?: boolean; until?: number;
   build?: { phase: BuildPhase; crew: string[]; stopping?: Diag };
 };
-export type MarsWorldConfig = { commonsTransitionV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
+export type MarsWorldConfig = { safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
 export const LITTLE_MARTIANS_WORLD: MarsWorldConfig={scene:'littlemartians',arrival:[0,18],arrivalPlace:'garden',reference:[0,16],grounds:{id:'grounds',name:'Ceramic garden'}};
 export const GREEN_FIELD_WORLD:MarsWorldConfig={scene:'greenfield',arrival:[0,0],arrivalPlace:'field',reference:[2,0],grounds:{id:'grounds',name:'Green field'}};
 export const EDEN_COMMONS_WORLD:MarsWorldConfig={scene:'eden-commons',arrival:[14,4],arrivalPlace:'commons',reference:[9,5],grounds:{id:'grounds',name:'Eden commons'}};
+export const EDEN_SAFE_COMMONS_WORLD:MarsWorldConfig={...EDEN_COMMONS_WORLD,safeArrivalV1:true};
 const PROVING_GROUND: MarsWorldConfig = { scene: 'proving-ground', arrival: [-24, -10.5], arrivalPlace: 'lawn', reference: [-24, -8], grounds: { id: 'grounds', name: 'the grounds' } };
 
 const secs = (v: unknown, d: number) => Math.round(Math.min(3600, Math.max(0.5, typeof v === 'number' ? v : d)) * TPS);
@@ -123,7 +128,7 @@ export class MarsEngine implements Engine {
     return [...BODY_VERBS, ...this.m.describeVerbs(this.registry).map((v) => ({ ...v, verb: `mars:${v.verb}`, description: `[Mars verb] ${v.description}`, scope: 'world' as const }))];
   }
   /** The world plus the adapter's own state (which program each actor is in), since both decide what happens next. */
-  stateHash(): string { return hashOf({ w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet, ...(this.cfg.safeCrewRemoval?{removalPolicy:'crew-removal/1'}:{}) }); }
+  stateHash(): string { return hashOf({ w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet, ...(this.cfg.safeCrewRemoval?{removalPolicy:'crew-removal/1'}:{}), ...(this.cfg.safeArrivalV1?{arrivalPolicy:'arrival-clearance/1'}:{}) }); }
   physicalHash(): string { return hashOf(physicalView(this.world)); }
 
   // ------------------------------------------------------------------ tick
@@ -431,11 +436,21 @@ export class MarsEngine implements Engine {
     const people = Object.values(this.ents).filter((e: any) => e.kind === 'human').map((e: any) => [e.pose.p[0], e.pose.p[2]] as [number, number]);
     let spot: [number, number] | null = null;
     search: for (let ring = 0; ring < 6; ring++) for (let k = 0; k < Math.max(1, ring * 6); k++) {
-      const ang = (k / Math.max(1, ring * 6)) * Math.PI * 2 + ring * 0.5, x = r3(ax + Math.cos(ang) * ring * 0.9), z = r3(az + Math.sin(ang) * ring * 0.9);
-      if (people.some(([px, pz]) => Math.hypot(px - x, pz - z) < 0.8)) continue;
+      const ang = (k / Math.max(1, ring * 6)) * Math.PI * 2 + ring * 0.5;
+      // Original history retains its placement math; the explicit new policy
+      // uses portable native math and checks the actual standing disc first.
+      const x = r3(ax + (this.cfg.safeArrivalV1?dcos(ang):Math.cos(ang)) * ring * 0.9),
+        z = r3(az + (this.cfg.safeArrivalV1?dsin(ang):Math.sin(ang)) * ring * 0.9);
+      if (people.some(([px, pz]) => (this.cfg.safeArrivalV1?hypot(px-x,pz-z):Math.hypot(px-x,pz-z)) < 0.8)) continue;
+      if(this.cfg.safeArrivalV1){
+        const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);
+        const grid=spatial.level(0),radius=body?.radius??HUMAN_RADIUS;
+        if(!grid||clearanceAt(grid,[x,z])<radius)continue;
+      }
       this.ents[id] = this.m.human(id, x, z, { label }); if(body)this.ents[id].body=body;
-      const ok = !this.plan('walk_to', { actor: id, x: this.cfg.reference[0], z: this.cfg.reference[1] }) || !this.plan('walk_to', { actor: id, x: ax, z: az });
-      delete this.ents[id];
+      let ok=false;
+      try{ok = !this.plan('walk_to', { actor: id, x: this.cfg.reference[0], z: this.cfg.reference[1] }) || !this.plan('walk_to', { actor: id, x: ax, z: az });}
+      finally{delete this.ents[id];}
       if (ok) { spot = [x, z]; break search; }
     }
     if (!spot) throw new Error('no free standing room at the arrival point');
@@ -444,6 +459,17 @@ export class MarsEngine implements Engine {
     this.ents[id] = e; this.m.canonicalEntityOrder(this.rt.world);
     this.out.changes.push([this.rt.tick, id, 'present', e]);
     return id;
+  }
+  /** Detached admission uses the same native standing-disc geometry as the
+   * corrected placer. Legacy replay keeps its original births, but a new
+   * admission must never label a known overlapping placement ready. */
+  humanBirthIssue(id:string):Diag|null {
+    const e=this.ents[id];if(!e?.human)throw new Error('birth body is missing');
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);
+    const grid=spatial.level(e.human.level),radius=e.body?.family==='floater'?e.body.radius:HUMAN_RADIUS;
+    if(!grid||clearanceAt(grid,[e.pose.p[0],e.pose.p[2]])<radius)
+      return {code:'birth.arrival-unavailable',message:'No safe standing room at the arrival point.'};
+    return null;
   }
   private tryRemove(id: string): boolean {
     if (!this.ents[id]) return true;
@@ -510,7 +536,7 @@ export class MarsEngine implements Engine {
     // Authored render bases are immutable for this engine instance. Supported
     // campus/clock/config boundaries change this key; actor/object motion is in
     // the take and does not cause repeated hashing of a static render base.
-    const key=JSON.stringify([this.rt.world.base.campus,this.cfg.scene,this.cfg.clock??null]);
+    const key=JSON.stringify([this.rt.world.base.campus,this.cfg.scene,this.cfg.clock??null,this.rulesVersion]);
     if(key!==this.renderBaseKey) {
       this.recorderScene=captureRenderScene(this.rulesVersion,this.renderScene());this.renderBaseKey=key;
     }
@@ -573,7 +599,7 @@ export class MarsEngine implements Engine {
     if(!this.cfg.commonsTransitionV1)return {ok:false,diagnostic:{code:'commons-transition.disabled',message:'this factory has no explicit commons transition reader'}};
     if(this.cfg.scene!=='greenfield'||this.programs.size||this.leaving.length)
       return {ok:false,diagnostic:{code:'commons-transition.not-quiet',message:'the original Greenfield programs and departures must finish first'}};
-    const nextCfg={...this.cfg,...EDEN_COMMONS_WORLD};
+    const nextCfg={...this.cfg,...EDEN_COMMONS_WORLD,...(this.cfg.commonsArrivalV1?{safeArrivalV1:true}:{})};
     const p=prepareCommonsTransition(this.m,this.rt,this.rulesVersion,nativeRulesVersion(this.m.rulesVersion,nextCfg));
     return p.ok?{ok:true,transition:p.transition,anchors:this.anchorsOf(p.runtime.world,nextCfg)}:p;
   }
@@ -584,7 +610,7 @@ export class MarsEngine implements Engine {
     const prepared=prepareCommonsTransition(this.m,this.rt,expected.fromRulesVersion,expected.toRulesVersion);
     if(!prepared.ok)throw new Error(`${prepared.diagnostic.code}: ${prepared.diagnostic.message}`);
     this.finishRecorder();this.rt=prepared.runtime;this.cursor=0;
-    this.cfg={...this.cfg,...EDEN_COMMONS_WORLD};
+    this.cfg={...this.cfg,...EDEN_COMMONS_WORLD,...(this.cfg.commonsArrivalV1?{safeArrivalV1:true}:{})};
     this.startRecorder();
   }
   restockCamp() {
@@ -691,7 +717,7 @@ export class MarsEngine implements Engine {
 }
 
 function centroid(poly: [number, number][]): [number, number] { let x = 0, z = 0; for (const p of poly) { x += p[0]; z += p[1]; } return [r3(x / poly.length), r3(z / poly.length)]; }
-function nativeRulesVersion(version:string,cfg:MarsWorldConfig){return `sim-mars/1+${version}${cfg.safeCrewRemoval?'+crew-removal/1':''}${cfg.scene==='eden-commons'?'+commons/1':''}`;}
+function nativeRulesVersion(version:string,cfg:MarsWorldConfig){return `sim-mars/1+${version}${cfg.safeCrewRemoval?'+crew-removal/1':''}${cfg.scene==='eden-commons'?'+commons/1':''}${cfg.safeArrivalV1?'+arrival-clearance/1':''}`;}
 
 /** The factory is made once the Mars engine has been loaded (an async import); after that everything is synchronous. */
 export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promise<EngineFactory> {
@@ -702,7 +728,9 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
     // A failed cross-policy checkpoint restore must not turn into replay under
     // another removal policy. An explicit, qualified transition is separate.
     canReplayHistory: version => {
-      if(cfg.scene==='eden-commons'&&version!==nativeRulesVersion(m.rulesVersion,cfg))return false;
+      if((cfg.safeArrivalV1||cfg.scene==='eden-commons')&&version!==nativeRulesVersion(m.rulesVersion,cfg))return false;
+      const arrival=version.match(/\+arrival-clearance\/[^+]+/g)??[];
+      if(cfg.safeArrivalV1?arrival.length!==1||arrival[0]!=='+arrival-clearance/1':arrival.length!==0)return false;
       const commons=version.match(/\+commons\/[^+]+/g)??[];
       if(cfg.scene==='eden-commons'?commons.length!==1||commons[0]!=='+commons/1':commons.length!==0)return false;
       const policies=version.match(/\+crew-removal\/[^+]+/g)??[];
@@ -710,7 +738,7 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
     },
     // Candidate removal changes controller behavior: restore only its exact
     // policy/version. Legacy activities31 compatibility remains unchanged.
-    canRestoreSnapshot: version => cfg.safeCrewRemoval||cfg.scene==='eden-commons'?version===nativeRulesVersion(m.rulesVersion,cfg):[m.rulesVersion,m.rulesVersion.replace('+bodies/1',''),m.rulesVersion.replace('+bodies/1','').replace('activities/31','activities/29')].some(v=>version===nativeRulesVersion(v,cfg)),
+    canRestoreSnapshot: version => cfg.safeArrivalV1||cfg.safeCrewRemoval||cfg.scene==='eden-commons'?version===nativeRulesVersion(m.rulesVersion,cfg):[m.rulesVersion,m.rulesVersion.replace('+bodies/1',''),m.rulesVersion.replace('+bodies/1','').replace('activities/31','activities/29')].some(v=>version===nativeRulesVersion(v,cfg)),
     /** The synthetic proving ground (a campfire, two benches, a lawn), emptied of its test people: Souls arrive by being born. */
     genesis(seed: string): WorldState {
       if (cfg.scene === 'littlemartians') return m.littleMartiansWorld(seed);
@@ -730,6 +758,7 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
     restore(snap: EngineSnapshot) {
       const s = structuredClone(snap) as EngineSnapshot & { mars: any; programs: Prog[]; nextProg: number; leaving: string[]; cfg: MarsWorldConfig; commonsVersion?:string; quiet?: boolean };
       if (s.format !== SNAPSHOT_FORMAT) throw new Error(`bad snapshot format ${s.format}`);
+      if(!!s.cfg?.safeArrivalV1!==!!cfg.safeArrivalV1)throw new Error('snapshot arrival policy differs from the native factory');
       if(!!s.cfg?.safeCrewRemoval!==!!cfg.safeCrewRemoval)throw new Error('snapshot removal policy differs from the native factory');
       if((s.cfg?.scene==='eden-commons'||cfg.scene==='eden-commons')&&s.cfg?.scene!==cfg.scene)throw new Error('snapshot commons layout differs from the native factory');
       if(cfg.scene==='eden-commons'&&s.commonsVersion!=='commons/1')throw new Error('snapshot commons rules differ from the native factory');
@@ -748,9 +777,11 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
 /** Explicit reader for a logged Greenfield -> commons physical checkpoint.
  * Genesis stays Greenfield. A newly constructed commons world is not a replay
  * substitute; only its validated checkpoint can enter this history reader. */
-export async function marsCommonsTransitionFactory(cfg:MarsWorldConfig=GREEN_FIELD_WORLD):Promise<EngineFactory> {
+export async function marsCommonsTransitionFactory(cfg:MarsWorldConfig=GREEN_FIELD_WORLD,options?:{safeArrivalV1?:boolean}):Promise<EngineFactory> {
   if(cfg.scene!=='greenfield')throw new Error('commons-transition.factory-origin');
-  const old=await marsFactory({...cfg,commonsTransitionV1:true}),next=await marsFactory({...cfg,...EDEN_COMMONS_WORLD,commonsTransitionV1:true});
+  const target=options?.safeArrivalV1?{commonsArrivalV1:true,safeArrivalV1:true}:{};
+  const old=await marsFactory({...cfg,commonsTransitionV1:true,...(options?.safeArrivalV1?{commonsArrivalV1:true}:{})}),
+    next=await marsFactory({...cfg,...EDEN_COMMONS_WORLD,commonsTransitionV1:true,...target});
   const allowed=(v:string)=>v===old.rulesVersion||v===next.rulesVersion;
   return {rulesVersion:old.rulesVersion,canReplayHistory:allowed,canRestoreSnapshot:allowed,
     genesis:old.genesis,
@@ -763,6 +794,7 @@ export async function marsCommonsTransitionFactory(cfg:MarsWorldConfig=GREEN_FIE
       const expected=(scene==='greenfield'?old:next).genesis('base').base;
       if(hashOf(decodeSnapshot(s.mars).world.base)!==hashOf(expected))throw new Error('commons-transition.snapshot-base');
       s.cfg.commonsTransitionV1=true;
+      if(options?.safeArrivalV1)s.cfg.commonsArrivalV1=true;
       return (scene==='greenfield'?old:next).restore(s);
     },
     validateHistoryHead(engine,recorded){if(engine.rulesVersion!==recorded)throw new Error('commons-transition.history-head-differs');},

@@ -67,7 +67,10 @@ export class LifecycleRunner {
   private recoveryAfter:{requestedAt:number;requestId:string}|undefined;
   private authority:(op:LifecycleOperation)=>boolean;
   constructor(host:WorldHost,journal:LifecycleJournal,authority:(op:LifecycleOperation)=>boolean){
-    if(host.db!==journal.db||!host.engine.rulesVersion.startsWith('sim-mars/1+')||!host.engine.rulesVersion.endsWith('+crew-removal/1'))throw new Error('Lifecycle runner needs its native host journal and qualified crew-removal policy');
+    const rules=host.engine.rulesVersion,removal=rules.match(/\+crew-removal\/[^+]+/g)??[];
+    if(host.db!==journal.db||!rules.startsWith('sim-mars/1+')||removal.length!==1||removal[0]!=='+crew-removal/1'
+      ||host.factory.canReplayHistory?.(rules)!==true||host.factory.canRestoreSnapshot?.(rules)!==true)
+      throw new Error('Lifecycle runner needs its native host journal and qualified crew-removal policy');
     this.host=host;this.journal=journal;this.authority=authority;
   }
   private current(op:LifecycleOperation){const current=this.journal.get(op.scope,op.requestId);if(!current||current.state!==op.state)throw new LifecycleDeferred('Lifecycle state changed');return current;}
