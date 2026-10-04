@@ -256,12 +256,12 @@ export class Brain {
 
   async evaluate(m: Mind, trigger: string) {
     const host = this.host, tick = host.engine.world.tick;
-    const purposeSeq = this.intentV2Choices ? host.intentHistoryOf(m.soulId).lastSeq : undefined;
+    const purposeSeq = this.intentV2Choices ? host.intentWillSeqOf(m.soulId) : undefined;
     const choiceGuard: AcceptanceGuard | undefined = purposeSeq === undefined ? undefined : () => {
       const row = this.db.soul(m.soulId);
       if (host.minds.get(m.soulId) !== m || !row || row.retired_at !== null || row.world_id !== host.worldId
         || row.owner !== m.owner || row.entity_id !== m.entityId || host.kernel.things[m.soulId]?.traits.body !== m.entityId
-        || !host.engine.world.entities[m.entityId] || host.intentHistoryOf(m.soulId).lastSeq !== purposeSeq || host.quietBarrier)
+        || !host.engine.world.entities[m.entityId] || host.intentWillSeqOf(m.soulId) !== purposeSeq || host.quietBarrier)
         throw new StaleCompilation();
       return true;
     };
@@ -339,7 +339,7 @@ export class Brain {
     this.inflight.delete(m.soulId);
     if (host.minds.get(m.soulId) !== m) return;
     const now = host.engine.world.tick;
-    const stale = m.intentVersion !== version || host.quietBarrier || purposeSeq !== undefined && host.intentHistoryOf(m.soulId).lastSeq !== purposeSeq;
+    const stale = m.intentVersion !== version || host.quietBarrier || purposeSeq !== undefined && host.intentWillSeqOf(m.soulId) !== purposeSeq;
     const opt = ctx.options.find((o) => o.id === decision.option);
     if(!stale&&host.living){const c=clockAt(now,host.living.origin,host.living.dayTicks);for(const r of mandateOf(host.kernel,m.soulId).filter(r=>r.strict&&r.status==='active'&&r.lastReportDay!==c.day)){
       const chosen=opt?{card:opt.card,target:opt.cardTarget}:m.pending?{card:m.pending.card,target:m.pending.target}:null;
@@ -357,7 +357,7 @@ export class Brain {
       // purpose's temporary planning view. Legacy changes retain their most
       // recent urgent wake (including NOW); ordinary body news cannot erase
       // an unhandled fresh purpose while the old model call was in flight.
-      if (purposeSeq !== undefined && host.intentHistoryOf(m.soulId).lastSeq !== purposeSeq && m.intentVersion === version)
+      if (purposeSeq !== undefined && host.intentWillSeqOf(m.soulId) !== purposeSeq && m.intentVersion === version)
         m.evalTrigger = 'new-intent-v2';
       else if (purposeSeq === undefined || !URGENT.has(m.evalTrigger)) m.evalTrigger = 'new-intent';
       m.lastFingerprint = '';

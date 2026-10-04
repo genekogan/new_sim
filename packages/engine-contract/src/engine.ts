@@ -52,6 +52,10 @@ export type RenderScene = {
 export type Program = { actor: string; label: string; steps: { verb: string; params: Record<string, unknown> }[] };
 /** Progress of a program, reported by the engine each tick. `step` is the index now running; -1 on the events that end a program. */
 export type ProgramEvent = { tick: number; id: string; actor: string; kind: 'step' | 'completed' | 'failed' | 'cancelled'; step: number; code?: string; message?: string };
+/** Detached observation of an actual action bound to this program. A step
+ * callback or program admission alone does not establish controller execution. */
+export type ProgramAction = { tick:number; programId:string; actor:string; step:number;
+  action:{ id:string; verb:string; status:ActionRecord['status']; phase?:string } };
 
 /** What the shell reads of an engine's runtime: never its internals. */
 export interface RuntimeView { readonly tick: number; readonly records: Map<string, ActionRecord>; readonly violations: { tick: number; code: string; message: string }[]; liveIds(): string[] }
@@ -77,6 +81,7 @@ export interface Engine {
   canPerform(program: Program): { code: string; message: string } | null;
   /** The program an actor is running, if any. */
   programOf(actor: string): string | null;
+  programAction?(programId:string): ProgramAction | null;
   /** Actual settled body-language rest, distinct from travelling toward it. */
   bodyResting?(actor:string): boolean;
   submit(verb: string, params: unknown, opts?: { id?: string; parent?: string; preempt?: boolean }): ActionRecord;

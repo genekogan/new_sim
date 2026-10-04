@@ -2,6 +2,8 @@
 
 October 4 Eastern. Parent `fad8298`, branch `core/intent-admission-outcomes`.
 Internal opt-in component; no route, capability, configuration or live activation.
+This records the exact `46eaade` component boundary. The later
+[controller component](INTENT-CONTROLLER-20261004.md) adds actual execution facts.
 
 An understood purpose now has an explicitly associated attempt when its first
 qualified immediate choice reaches `Engine.perform`. The existing public
@@ -33,7 +35,7 @@ accepts an activity or admission claim.
 
 The native sleeper trace remains publication186, decision187, walking231,
 arrival682. Its private fact records admission187. Walking and symbolic arrival
-leave the attempt `accepted` in this component: neither fabricates a controller
+leave the attempt `accepted` at this pinned component: neither fabricates a controller
 start/completion fact nor fulfils the broader purpose. Actual controller start,
 terminal observations, sustained plans and post-start withdrawal follow.
 The native `step` callback can precede failed lowering and cannot prove start.

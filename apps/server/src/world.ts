@@ -5,8 +5,8 @@ import type { Engine, EngineFactory, PathCommit, ChangeEvent, ProgramEvent, Engi
 import { kernelHash, sweep, type KState } from '@sim/kernel';
 import {
   describeIntent, publicIntent, viewHashOf, viewRow,
-  INTENT_V2, intentHistoryFactV2, intentReceivedPayloadV2Schema, intentReferenceV2Schema, intentAdmissionFactV2,
-  type IntentAdmissionPayloadV2,
+  INTENT_V2, intentHistoryFactV2, intentReceivedPayloadV2Schema, intentReferenceV2Schema, intentAdmissionFactV2, intentControllerFactV2,
+  type IntentAdmissionPayloadV2, type IntentControllerPayloadV2,
   type AgendaStep, type Batch, type BirthPayload, type DecisionPayload, type EventKind, type Heartbeat, type IntentPayload, type KernelView, type LogEvent,
   type PlayPayload, type PlayView, type PublicSoul, type ScenePayload, type Snapshot, type WireIntent,
 } from '@sim/protocol';
@@ -47,6 +47,7 @@ export function checkAcceptanceGuard(guard: AcceptanceGuard): void {
 /** Synchronous writes to this host's Db, in the event acceptance transaction. */
 export type AcceptanceJournal = (event: LogEvent) => true;
 type PurposeRef = { intentId: string; version: number };
+type ActivityBinding = { admissionSeq:number; payload:Extract<IntentAdmissionPayloadV2,{phase:'accepted'}> };
 export class StaleIntentAttempt extends Error { constructor() { super('purpose attempt became stale'); } }
 export class UnrecordedIntentAdmission extends Error {
   readonly decisionSeq: number;
@@ -89,6 +90,7 @@ export class WorldHost {
   extra: Record<string, unknown> = {};       // module state persisted with snapshots (narrator schedule etc.)
   tickMs: number[] = [];
   private queue: Pending[] = [];
+  private intentControllerFaults = new Set<string>();
   private acc = { paths: [] as PathCommit[], changes: [] as ChangeEvent[], log: [] as LogEvent[], dirty: new Set<string>(), removed: [] as string[], plays: [] as PlayView[], fromTick: 0 };
   private batchSeq = 0;
   private timer: NodeJS.Timeout | null = null;
@@ -221,6 +223,7 @@ export class WorldHost {
     this.acc.paths.push(...out.paths);
     this.acc.changes.push(...out.changes);
     for (const c of out.changes) { const m = this.mindByEntity.get(c[1]); if (m) this.acc.dirty.add(m.soulId); }
+    this.observeIntentActions();
     this.afterPrograms(out.programs, false);
     for (const ev of out.events) for (const l of this.listeners) l.onRuntimeEvent?.(ev);
     const now = this.engine.world.tick;
@@ -279,6 +282,7 @@ export class WorldHost {
   /** React to the engine's progress on depiction programs: apply a card's effects when its approach is done. */
   private afterPrograms(events: ProgramEvent[], replay: boolean) {
     for (const ev of events) {
+      if(!replay)this.observeIntentTerminal(ev);
       const m = this.mindByEntity.get(ev.actor); if (!m) continue;
       const mine = m.pending && m.pending.program === ev.id ? m.pending : null;
       const playNow = () => {
@@ -367,6 +371,60 @@ export class WorldHost {
     for (const l of this.listeners) l.onApplied?.(e);
   }
 
+  private intentBindings():Record<string,ActivityBinding> {
+    return this.extra.intentActivityBindingsV2 as Record<string,ActivityBinding> ?? {};
+  }
+  private controllerScope(binding:ActivityBinding) {
+    const p=binding.payload;
+    return {contract:INTENT_V2,worldId:this.worldId,soulId:p.soulId,intent:p.intent,attemptId:p.attemptId,
+      activityId:p.activityId,admissionSeq:binding.admissionSeq};
+  }
+  private observeIntentActions() {
+    if(!this.engine.programAction)return;
+    for(const binding of Object.values(this.intentBindings())) {
+      const p=binding.payload,history=(this.extra.intentHistoriesV2 as Record<string,IntentHistoryV2>|undefined)?.[p.soulId];
+      const out=history?.attempts[p.attemptId],entry=history?.intents[p.intent.intentId];
+      if(this.intentControllerFaults.has(p.attemptId))continue;
+      if(out?.phase!=='accepted' || entry?.status!=='active' || entry.revision.version!==p.intent.version)continue;
+      const observed=this.engine.programAction(p.activityId);
+      if(!observed || observed.programId!==p.activityId || observed.actor!==p.decision.entityId || observed.action.status!=='executing')continue;
+      this.recordIntentController({...this.controllerScope(binding),phase:'started',
+        observation:{tick:observed.tick,actor:observed.actor,action:{...observed.action,status:'executing'}}});
+    }
+  }
+  private observeIntentTerminal(ev:ProgramEvent) {
+    if(ev.kind==='step')return;
+    for(const binding of Object.values(this.intentBindings())) {
+      const p=binding.payload;
+      if(this.intentControllerFaults.has(p.attemptId))continue;
+      if(p.activityId!==ev.id || p.decision.entityId!==ev.actor)continue;
+      const previous=(this.extra.intentHistoriesV2 as Record<string,IntentHistoryV2>|undefined)?.[p.soulId]?.attempts[p.attemptId];
+      if(previous?.phase!=='accepted' && previous?.phase!=='started')continue;
+      const scope=this.controllerScope(binding),observation={tick:ev.tick,actor:ev.actor};
+      if(ev.kind==='completed') {
+        // Wait-only/no-op programs have no executing-action observation. Do not
+        // manufacture a start to make their completion fit the ledger.
+        if(previous.phase==='started')this.recordIntentController({...scope,phase:'completed',observation:{...observation,programKind:'completed'}});
+      }else if(ev.kind==='failed')this.recordIntentController({...scope,phase:'blocked',reason:ev.code??'program failed',
+        observation:{...observation,programKind:'failed',...(ev.code?{code:ev.code}:{})}});
+      else this.recordIntentController({...scope,phase:'interrupted',reason:ev.code??'program cancelled',
+        observation:{...observation,programKind:'cancelled',...(ev.code?{code:ev.code}:{})}});
+    }
+  }
+  private recordIntentController(payload:IntentControllerPayloadV2) {
+    try {
+      const e:LogEvent={seq:this.seq+1,tick:this.engine.world.tick,kind:'intent-controller-v2',author:'world:intent-controller',payload,at:Date.now()};
+      const fact=intentControllerFactV2(e);foldIntentHistoryV2(this.intentHistoryOf(payload.soulId),fact);
+      this.db.appendEvent(this.worldId,e);this.seq=e.seq;this.apply(e,false);this.acc.log.push(e);
+      for(const l of this.listeners)l.onApplied?.(e);
+    }catch {
+      // Observation persistence failure is not a physical controller fault.
+      // No physical reissue or fabricated terminal fact; recovery is a gate.
+      this.intentControllerFaults.add(payload.attemptId);
+      console.error('[world] controller history requires reconciliation');
+    }
+  }
+
   /** Apply a logged event: the fold moves the engine and the kernel; this adds the minds' bookkeeping. */
   apply(e: LogEvent, replay: boolean) {
     const tick = e.tick;
@@ -400,6 +458,25 @@ export class WorldHost {
           throw new Error('private admission lacks its canonical decision');
         const histories = (this.extra.intentHistoriesV2 ??= {}) as Record<string, IntentHistoryV2>;
         histories[fact.soulId] = foldIntentHistoryV2(this.intentHistoryOf(fact.soulId), fact);
+        if(payload.phase==='accepted') {
+          const bindings=(this.extra.intentActivityBindingsV2??={}) as Record<string,ActivityBinding>;
+          bindings[payload.attemptId]={admissionSeq:e.seq,payload:structuredClone(payload)};
+        }
+        break;
+      }
+      case 'intent-controller-v2': {
+        const fact=intentControllerFactV2(e),payload=e.payload as IntentControllerPayloadV2;
+        if(fact.worldId!==this.worldId)throw new Error('private controller fact belongs to another world');
+        const source=this.db.events(this.worldId,payload.admissionSeq-1,1)[0];
+        if(!source || source.seq!==payload.admissionSeq || source.kind!=='intent-admission-v2')throw new Error('controller fact lacks canonical admission');
+        const admitted=source.payload as IntentAdmissionPayloadV2;
+        if(admitted.phase!=='accepted' || admitted.worldId!==this.worldId || admitted.soulId!==payload.soulId
+          || admitted.activityId!==payload.activityId || admitted.attemptId!==payload.attemptId
+          || admitted.intent.intentId!==payload.intent.intentId || admitted.intent.version!==payload.intent.version
+          || admitted.decision.entityId!==payload.observation.actor)throw new Error('controller fact admission association changed');
+        const histories=(this.extra.intentHistoriesV2??={}) as Record<string,IntentHistoryV2>;
+        histories[fact.soulId]=foldIntentHistoryV2(this.intentHistoryOf(fact.soulId),fact);
+        if(payload.phase!=='started')delete this.intentBindings()[payload.attemptId];
         break;
       }
       case 'birth': {
@@ -612,6 +689,11 @@ export class WorldHost {
     const histories = this.extra.intentHistoriesV2 as Record<string, IntentHistoryV2> | undefined;
     return histories && Object.hasOwn(histories, soulId)
       ? structuredClone(histories[soulId]) : emptyIntentHistoryV2(this.worldId, soulId);
+  }
+  /** Owner-will changes, excluding observations of work already admitted. */
+  intentWillSeqOf(soulId:string):number {
+    const history=(this.extra.intentHistoriesV2 as Record<string,IntentHistoryV2>|undefined)?.[soulId];
+    return history?Object.values(history.intents).reduce((seq,entry)=>Math.max(seq,entry.statusSeq),0):0;
   }
   kernelView(): KernelView {
     const k = this.kernel; k.tick = this.engine.world.tick;

@@ -91,7 +91,7 @@ test('ordinary V2 direction wakes an actually sleeping native body; older purpos
   assert.equal(admitted.phase,'accepted');assert.equal(admitted.evidence.seq,decisions[0].seq);
   assert.equal(admitted.tick,decisions[0].tick,'admission is recorded before controller ticks or motion');
   assert.equal(published.receipt.phase,'understood');
-  assert.equal(f.host.intentHistoryOf('s_A').attempts[admitted.attemptId].phase,'accepted','walking/arrival do not manufacture start or completion facts');
+  assert.equal(f.host.intentHistoryOf('s_A').attempts[admitted.attemptId].phase,'started','executing native action establishes start; symbolic arrival does not manufacture completion');
   assert.equal(f.host.intentHistoryOf('s_A').intents[admitted.intent.intentId].status,'active','admission does not fulfil a purpose');
   assert.ok(!JSON.stringify(publicEvent(admission)).includes(admitted.intent.intentId));
   assert.equal(Object.keys(f.host.intentHistoryOf('s_A').intents).length,2);
@@ -177,6 +177,21 @@ test('a delayed mid response cannot overwrite the fresh ordinary-purpose wake; t
   assert.equal(f.host.engine.world.entities.h_A.human!.activity,'walk');assert.ok(f.host.engine.world.tick-origin<=100);
   assert.equal(Object.keys(f.host.intentHistoryOf('s_A').intents).length,2);assert.deepEqual(f.host.engine.runtime.violations,[]);
   t.diagnostic(`delayed mid calls=${modelCalls}; publication=${published.event.tick}; decision=${response.tick}; walking=${f.host.engine.world.tick}; paid=$0`);
+});
+
+test('controller start during a delayed mid call does not change owner-will generation or reissue an old immediate purpose',async t=>{
+  const f=fixture(t),request=await received(f,'progress-during-mid','go to the campfire');
+  await accept(f.host,f.publisher.publish(f.scope,request,{summary:'Walk to the fire.',agenda:[{card:'go to',target:'campfire'}],trigger:{kind:'now'}}));
+  await f.brain.evaluate(f.mind,'new-intent-v2');f.host.drainInputs();await setImmediate();
+  const will=f.host.intentWillSeqOf('s_A'),origin=f.host.intentHistoryOf('s_A').lastSeq;
+  let release!:()=>void,called!:()=>void;const gate=new Promise<void>(resolve=>release=resolve),started=new Promise<void>(resolve=>called=resolve);
+  f.brain.jev.ask=async request=>{called();await gate;return fakeJev(request);};f.brain.mode='live';
+  const delayed=f.brain.evaluate(f.mind,'timer');await started;f.host.tickOnce();
+  assert.ok(f.host.intentHistoryOf('s_A').lastSeq>origin,'actual controller start adds private history');assert.equal(f.host.intentWillSeqOf('s_A'),will);
+  release();await delayed;f.brain.mode='fake';f.host.drainInputs();await setImmediate();
+  assert.ok(f.db.events(f.host.worldId).some(e=>e.kind==='decision' && e.author==='brain:mid'),'progress did not stale otherwise valid private context');
+  assert.notEqual(f.mind.evalTrigger,'new-intent-v2');assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='intent-admission-v2').length,1);
+  assert.equal(f.db.paidCost(),0);
 });
 
 test('delayed private context preserves withdrawal, optional meaning and newer legacy NOW precedence',async t=>{

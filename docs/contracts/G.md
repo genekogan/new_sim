@@ -12,6 +12,13 @@ from controller start/completion and broader fulfilment. Decision/fact crash-gap
 reconciliation, actual lifecycle, authenticated V2 and compatible rollback remain
 activation gates. [Producer evidence](../core/INTENT-ADMISSION-20261004.md).
 
+The subsequent internal controller component records actual native executing
+action start and program completion/failure/cancellation with exact private
+admission association. Program completion does not fulfil a purpose or imply
+all held activities ended. Pure wait/no-op progress, durable observation gaps,
+safe post-admission withdrawal and wider recovery remain unqualified. No public
+API is added. [Controller evidence](../core/INTENT-CONTROLLER-20261004.md).
+
 ## Identity, routes and access
 
 Prefix HTTP/WS/MCP/skill with `/w/<key>` for the selected world. Root aliases

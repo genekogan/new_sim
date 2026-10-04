@@ -72,6 +72,27 @@ export function intentAdmissionFactV2(e: { kind: string; seq: number; tick: numb
       evidence: { seq: decision.seq, tick: decision.tick, kind: 'admission' } }) };
 }
 
+const controllerBase = { contract:z.literal(INTENT_V2),worldId:id,soulId:id,intent:intentReferenceV2Schema,
+  attemptId:id,activityId:id,admissionSeq:seq };
+const observationBase = {tick,actor:id};
+export const intentControllerPayloadV2Schema = z.discriminatedUnion('phase',[
+  z.strictObject({...controllerBase,phase:z.literal('started'),observation:z.strictObject({...observationBase,
+    action:z.strictObject({id:z.string().min(1).max(200),verb:z.string().min(1).max(100),status:z.literal('executing'),phase:z.string().max(200).optional()})})}),
+  z.strictObject({...controllerBase,phase:z.literal('completed'),observation:z.strictObject({...observationBase,programKind:z.literal('completed')})}),
+  z.strictObject({...controllerBase,phase:z.literal('blocked'),reason:z.string().min(1).max(2000),
+    observation:z.strictObject({...observationBase,programKind:z.literal('failed'),code:z.string().max(200).optional()})}),
+  z.strictObject({...controllerBase,phase:z.literal('interrupted'),reason:z.string().min(1).max(2000),
+    observation:z.strictObject({...observationBase,programKind:z.literal('cancelled'),code:z.string().max(200).optional()})}),
+]);
+export type IntentControllerPayloadV2 = z.infer<typeof intentControllerPayloadV2Schema>;
+export function intentControllerFactV2(e:{kind:string;seq:number;tick:number;payload:unknown}):Extract<IntentHistoryEventV2,{op:'outcome'}>{
+  if(e.kind!=='intent-controller-v2')throw new Error('not an accepted intent controller fact');
+  const {observation,admissionSeq,...p}=intentControllerPayloadV2Schema.parse(e.payload);
+  if(admissionSeq>=e.seq)throw new Error('controller progress requires earlier admission');
+  return {contract:INTENT_V2,worldId:p.worldId,soulId:p.soulId,seq:e.seq,tick:e.tick,op:'outcome',
+    outcome:intentOutcomeV2Schema.parse({...p,seq:e.seq,tick:e.tick,evidence:{seq:e.seq,tick:observation.tick,kind:'controller'}})};
+}
+
 export const intentHistoryEventV2Schema = z.discriminatedUnion('op', [
   z.strictObject({ ...scope, op: z.literal('upsert'), revision: intentRevisionV2Schema }),
   z.strictObject({ ...scope, op: z.literal('withdraw'), intent: intentReferenceV2Schema, requestId: id, source: intentSourceV2Schema }),

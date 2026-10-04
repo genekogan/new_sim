@@ -4,14 +4,24 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Worker } from 'node:worker_threads';
+import { createServer } from 'node:http';
+import { once } from 'node:events';
+import { setImmediate } from 'node:timers/promises';
+import WebSocket from 'ws';
 import { toyFactory } from '@sim/engine-toy';
 import { marsFactory } from '@sim/engine-mars';
 import type { Engine, EngineFactory } from '@sim/engine-contract';
-import { INTENT_V2, intentAdmissionPayloadV2Schema, intentAdmissionFactV2, publicEvent, type DecisionPayload } from '@sim/protocol';
+import { INTENT_V2, intentAdmissionPayloadV2Schema, intentAdmissionFactV2, intentControllerFactV2, intentControllerPayloadV2Schema, publicEvent, type DecisionPayload } from '@sim/protocol';
 import { Db } from './db.ts';
 import { WorldHost, StaleIntentAttempt, UnrecordedIntentAdmission } from './world.ts';
 import { IntentPublisher } from './intent-publisher.ts';
 import { IntentRequests, type IntentRequestScope } from './intent-requests.ts';
+import { Auth } from './auth.ts';
+import { Brain } from './brain.ts';
+import { config } from './config.ts';
+import { Hub } from './hub.ts';
+import { Souls } from './souls.ts';
+import { buildApp } from './http.ts';
 
 const native=await marsFactory({scene:'eden-camp',arrival:[16,-10],arrivalPlace:'bunkhouse',reference:[16,-9],grounds:{id:'grounds',name:'grounds'}});
 async function accept<T>(host:WorldHost,promise:Promise<T>){host.drainInputs();return promise;}
@@ -114,4 +124,115 @@ for(const phase of ['before-fact','after-fact'] as const)test(`real worker termi
   assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision').length,1);assert.ok(restarted.engine.programOf('h_A'));
   const attempts=Object.values(restarted.intentHistoryOf('s_A').attempts);assert.equal(attempts.length,phase==='after-fact'?1:0);
   if(attempts.length)assert.equal(attempts[0].phase,'accepted');assert.equal(f.db.paidCost(),0);
+});
+
+test('an actual executing native action establishes start and terminal program establishes completion through snapshot continuation',async t=>{
+  const f=await fixture(t),will=f.host.intentWillSeqOf('s_A');
+  await accept(f.host,f.host.enqueueIntentDecision('brain:reflex',f.decision,f.ref,()=>true));
+  const program=f.host.engine.programOf('h_A')!;assert.equal(f.host.engine.programAction?.(program),null,'admission precedes lowering/execution');
+  f.host.tickOnce();const observed=f.host.engine.programAction?.(program);assert.ok(observed);assert.equal(observed.action.status,'executing');
+  const hash=f.host.engine.stateHash(),snapshot=JSON.stringify(f.host.engine.snapshot());
+  const copy=f.host.engine.programAction!(program)!;copy.action.status='failed';copy.action.verb='mutated';copy.actor='other';
+  assert.equal(f.host.engine.programAction!(program)!.action.status,'executing');assert.equal(f.host.engine.stateHash(),hash);assert.equal(JSON.stringify(f.host.engine.snapshot()),snapshot,'observer cannot alter checkpoint data');
+  const started=f.db.events(f.host.worldId).find(e=>e.kind==='intent-controller-v2');assert.ok(started);assert.equal(started.payload.phase,'started');
+  assert.equal(started.payload.observation.action.id,observed.action.id);assert.equal(started.payload.observation.actor,'h_A');
+  assert.equal(f.host.intentWillSeqOf('s_A'),will,'actual progress is not a new human intention');
+  f.host.saveSnapshot(true);const resumed=new WorldHost(f.db,native,'admission-fixture',1e9,f.host.worldId);assert.equal(resumed.boot().from,'snapshot');
+  const attempt=intentControllerFactV2(started).outcome.attemptId;
+  for(let i=0;i<2000 && resumed.intentHistoryOf('s_A').attempts[attempt].phase!=='completed';i++)resumed.tickOnce();
+  assert.equal(resumed.intentHistoryOf('s_A').attempts[attempt].phase,'completed');assert.equal(resumed.engine.programOf('h_A'),null);
+  assert.deepEqual(resumed.extra.intentActivityBindingsV2,{},'terminal bindings leave the per-tick observation index');
+  assert.equal(resumed.intentHistoryOf('s_A').intents[f.ref.intentId].status,'active','native program completion does not fulfil a broader purpose');
+  const facts=f.db.events(f.host.worldId).filter(e=>e.kind==='intent-controller-v2');assert.deepEqual(facts.map(e=>e.payload.phase),['started','completed']);
+  for(const e of facts){assert.equal(e.payload.admissionSeq,started.payload.admissionSeq);assert.ok(!JSON.stringify(publicEvent(e)).includes(f.ref.intentId));assert.ok(!JSON.stringify(publicEvent(e)).includes(observed.action.id));}
+  resumed.saveSnapshot(true);f.db.db.prepare('DELETE FROM snapshots WHERE world_id=?').run(f.host.worldId);
+  const replayed=new WorldHost(f.db,native,'admission-fixture',1e9,f.host.worldId);assert.equal(replayed.boot().from,'genesis');
+  assert.deepEqual(replayed.intentHistoryOf('s_A'),resumed.intentHistoryOf('s_A'));assert.equal(replayed.engine.stateHash(),resumed.engine.stateHash());
+  assert.deepEqual(resumed.engine.runtime.violations,[]);assert.equal(f.db.paidCost(),0);
+  t.diagnostic(`actual native start=${started.tick}; completion=${facts[1].tick}; one start across snapshot; paid=$0`);
+});
+
+test('native step callback before refused lowering produces no false start, while wait-only completion remains explicitly unobserved',async t=>{
+  await t.test('target disappears',async child=>{
+    const f=await fixture(child);await accept(f.host,f.host.enqueueIntentDecision('brain:reflex',f.decision,f.ref,()=>true));
+    const events:any[]=[];f.host.listeners.push({onProgram:e=>events.push(e)});f.host.engine.removeEntity('campfire');f.host.tickOnce();
+    assert.ok(events.some(e=>e.kind==='step'));assert.ok(events.some(e=>e.kind==='failed'));
+    const facts=f.db.events(f.host.worldId).filter(e=>e.kind==='intent-controller-v2');assert.deepEqual(facts.map(e=>e.payload.phase),['blocked']);
+    assert.equal(intentControllerFactV2(facts[0]).outcome.evidence.kind,'controller');
+  });
+  await t.test('wait only',async child=>{
+    const f=await fixture(child),decision={...f.decision,card:undefined,steps:[{verb:'rest',params:{seconds:0.5}}]};
+    await accept(f.host,f.host.enqueueIntentDecision('brain:reflex',decision,f.ref,()=>true));const program=f.host.engine.programOf('h_A')!;
+    for(let i=0;i<15;i++){f.host.tickOnce();assert.equal(f.host.engine.programAction?.(program),null);}
+    assert.equal(f.host.engine.programOf('h_A'),null);assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='intent-controller-v2').length,0);
+    assert.equal(Object.values(f.host.intentHistoryOf('s_A').attempts)[0].phase,'accepted','no executing-action evidence, no fabricated completion');
+  });
+});
+
+test('actual cancellation after withdrawal or a newer edit preserves the old physical terminal observation',async t=>{
+  for(const change of ['withdraw','edit','before-start'] as const)await t.test(change,async child=>{
+    const f=await fixture(child);await accept(f.host,f.host.enqueueIntentDecision('brain:reflex',f.decision,f.ref,()=>true));
+    const program=f.host.engine.programOf('h_A')!;if(change!=='before-start')f.host.tickOnce();
+    const request=await accept(f.host,f.publisher.receive(f.scope,change==='edit'
+      ?{contract:INTENT_V2,requestId:'edit',op:'upsert',edit:{intentId:f.ref.intentId,expectedVersion:1},words:'PRIVATE_NEW optional rest'}
+      :{contract:INTENT_V2,requestId:'withdraw',op:'withdraw',edit:{intentId:f.ref.intentId,expectedVersion:1}}));assert.ok(request.reservation.created);
+    await accept(f.host,f.publisher.publish(f.scope,request.reservation,change==='edit'?{summary:'Rest optionally.',agenda:[{card:'rest',target:null}],trigger:{kind:'none'}}:undefined));
+    // Producer proof: withdrawal itself is not yet a physical cancellation adapter.
+    f.host.engine.stop(program);f.host.tickOnce();
+    const attempts=Object.values(f.host.intentHistoryOf('s_A').attempts);assert.equal(attempts.length,1);assert.equal(attempts[0].phase,'interrupted');assert.deepEqual(attempts[0].intent,f.ref);
+    const entry=f.host.intentHistoryOf('s_A').intents[f.ref.intentId];assert.equal(entry.status,change==='edit'?'active':'withdrawn');assert.equal(entry.revision.version,change==='edit'?2:1);
+    const facts=f.db.events(f.host.worldId).filter(e=>e.kind==='intent-controller-v2');assert.deepEqual(facts.map(e=>e.payload.phase),change==='before-start'?['interrupted']:['started','interrupted']);
+    assert.deepEqual(f.host.engine.runtime.violations,[]);
+  });
+});
+
+test('controller persistence failure reports history uncertainty without physical recovery, fabricated completion or repeated error',async t=>{
+  const f=await fixture(t);await accept(f.host,f.host.enqueueIntentDecision('brain:reflex',f.decision,f.ref,()=>true));f.host.tickOnce();
+  const append=f.db.appendEvent.bind(f.db),error=console.error,messages:string[]=[];t.after(()=>{f.db.appendEvent=append;console.error=error;});
+  console.error=(...args)=>messages.push(args.map(String).join(' '));
+  f.db.appendEvent=(world,event)=>{if(event.kind==='intent-controller-v2' && event.payload.phase==='completed')throw new Error('PRIVATE_WRITER_DETAIL');append(world,event);};
+  for(let i=0;i<2000 && f.host.engine.programOf('h_A');i++)f.host.tickOnce();for(let i=0;i<20;i++)f.host.tickOnce();
+  assert.equal(f.host.engine.programOf('h_A'),null);assert.equal(Object.values(f.host.intentHistoryOf('s_A').attempts)[0].phase,'started');
+  assert.equal(messages.length,1);assert.ok(!messages[0].includes('PRIVATE_WRITER_DETAIL'));
+  assert.ok(!f.db.events(f.host.worldId).some(e=>e.payload?.recovery));assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision').length,1);assert.equal(f.db.paidCost(),0);
+});
+
+test('controller schema requires actual executing-action or exact terminal kind, and future origins are refused',()=>{
+  const p={contract:INTENT_V2,worldId:'w',soulId:'s',intent:{intentId:'i',version:1},attemptId:'a',activityId:'p1',admissionSeq:2,phase:'started',observation:{tick:1,actor:'h',action:{id:'x',verb:'walk_to',status:'executing'}}};
+  assert.ok(intentControllerPayloadV2Schema.safeParse(p).success);
+  assert.ok(!intentControllerPayloadV2Schema.safeParse({...p,observation:{...p.observation,action:{...p.observation.action,status:'requested'}}}).success);
+  assert.ok(!intentControllerPayloadV2Schema.safeParse({...p,phase:'completed'}).success);
+  assert.throws(()=>intentControllerFactV2({kind:'intent-controller-v2',seq:3,tick:0,payload:p}),/future/);
+});
+
+test('actual native controller facts stay private through public Hono routes, anonymous WebSocket and takes',async t=>{
+  const f=await fixture(t),cfg={...config,worldId:f.host.worldId,brainMode:'fake' as const,typesafeKey:undefined,anthropicKey:undefined,budgetUsdPerDay:0,privyAppId:'',privyAppSecret:''};
+  f.host.minds.get('s_A')!.nextEvalTick=1e9;
+  const auth=new Auth(cfg,f.db);auth.devAuth=true;
+  const server=createServer((_,res)=>res.end('fixture')),hub=new Hub(server,f.host,auth,f.db);
+  const brain=new Brain(f.host,f.db,cfg,{clients:()=>0,onCall(){},onCamera(){},onTicker(){},onNarrative(){}});hub.brain=brain;
+  const souls=new Souls(f.host,f.db,brain,cfg),app=buildApp({cfg,db:f.db,host:f.host,auth,hub,brain,souls});
+  await new Promise<void>(resolve=>server.listen(4954,'127.0.0.1',resolve));
+  const ws=new WebSocket('ws://127.0.0.1:4954/ws'),messages:any[]=[];ws.on('message',data=>messages.push(JSON.parse(String(data))));
+  t.after(async()=>{ws.terminate();hub.wss.close();await new Promise<void>(resolve=>server.close(()=>resolve()));});
+  await once(ws,'open');const welcome=once(ws,'message');ws.send(JSON.stringify({t:'hello',proto:1}));await welcome;
+  await accept(f.host,f.host.enqueueIntentDecision('brain:reflex',f.decision,f.ref,()=>true));for(let i=0;i<350;i++)f.host.tickOnce();
+  for(let i=0;i<50 && !messages.some(m=>m.t==='batch' && m.log.some((e:any)=>e.kind==='intent-controller-v2'));i++)await setImmediate();
+  assert.ok(messages.some(m=>m.t==='batch' && m.log.some((e:any)=>e.kind==='intent-controller-v2')));
+  const native=f.db.events(f.host.worldId).filter(e=>e.kind==='intent-controller-v2');assert.deepEqual(native.map(e=>e.payload.phase),['started','completed']);
+  for(const path of ['/v1/log','/v1/kernel','/v1/world','/v1/debug/world','/v1/take','/v1/takes']){const response=await app.request(path);assert.equal(response.status,200);messages.push(await response.json());}
+  const text=JSON.stringify(messages);for(const marker of ['PRIVATE_WORDS','PRIVATE_MEANING','PRIVATE_PRINCIPAL',f.ref.intentId])assert.ok(!text.includes(marker),marker);
+  for(const message of messages)if(message.t==='batch')for(const e of message.log)if(e.kind==='intent-controller-v2')assert.deepEqual(Object.keys(e.payload).sort(),['op','privateUpdate','seq','soulId','tick','worldId']);
+  assert.equal(f.db.paidCost(),0);
+});
+
+for(const phase of ['before-fact','after-fact'] as const)test(`real native worker termination ${phase} of controller start replays one program and its actual evidence`,async t=>{
+  const f=await fixture(t,native,true);await accept(f.host,f.host.enqueueIntentDecision('brain:reflex',f.decision,f.ref,()=>true));
+  const worker=new Worker(new URL('../test/fixtures/intent-controller-worker.ts',import.meta.url),{workerData:{path:f.path,phase},execArgv:[]});t.after(()=>worker.terminate());
+  assert.equal(await new Promise<number>((resolve,reject)=>{worker.once('error',reject);worker.once('exit',resolve);}),24);
+  const restarted=new WorldHost(f.db,native,'admission-fixture',1e9,f.host.worldId);restarted.boot();
+  const out=Object.values(restarted.intentHistoryOf('s_A').attempts)[0];assert.equal(out.phase,phase==='after-fact'?'started':'accepted');
+  assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='decision').length,1);assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='intent-controller-v2').length,phase==='after-fact'?1:0);
+  if(phase==='after-fact'){assert.equal(restarted.engine.world.tick,1);assert.equal(restarted.engine.programAction?.(out.activityId!)?.action.status,'executing');}
+  assert.equal(f.db.paidCost(),0);
 });
