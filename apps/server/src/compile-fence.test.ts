@@ -56,6 +56,17 @@ function staleResult(result: Awaited<ReturnType<Brain['compile']>>) {
   assert.deepEqual(result, { ok: false, reason: 'Request became stale; earlier accepted effects may remain' });
 }
 
+test('ordinary immediate compiler alignment is versioned; legacy alignment still requires explicit NOW',async t=>{
+  const out:CompileOut={understood:true,agenda:[{card:'rest',target:null}],alignment:{understanding:'Rest here.',trigger:{kind:'now'}}};
+  const legacy=fixture(t,Promise.resolve(structuredClone(out)));
+  const old=await finish(legacy.host,legacy.brain.compile(legacy.mind,'rest here',true,legacy.ownerFence()));
+  assert.ok(old && !old.ok);assert.match(old.reason,/explicit immediate/);
+  const versioned=fixture(t,Promise.resolve(structuredClone(out)));
+  const next=await finish(versioned.host,versioned.brain.compile(versioned.mind,'rest here','intent-v2',versioned.ownerFence()));
+  assert.ok(next?.ok);assert.equal(next.alignment?.trigger.kind,'now');
+  assert.equal(legacy.db.paidCost()+versioned.db.paidCost(),0);
+});
+
 test('a refused checked input consumes no sequence, effect, broadcast or recovery and does not lose other inputs', async t => {
   const f = fixture(t), seq = f.host.seq, before = kernelHash(f.host.kernel), applied: number[] = [];
   f.host.listeners.push({ onApplied: e => applied.push(e.seq) });

@@ -28,6 +28,8 @@ export type MidContext = {
   heard?: { who: string; act: string; about?: string; words?: string }[];
   /** The manners this Soul holds (name → meaning); Jev picks one for the chosen action. */
   manners?: Record<string, string>;
+  /** Private retained owner purposes. Server-owned; never an agent observation. */
+  purposes?: { words: string; strict: boolean; importance: number; understanding: string; status: string }[];
   options: ActivityOption[];
   running: boolean;     // an activity is still in progress
   trigger: string;
@@ -44,6 +46,7 @@ export function buildMidRequest(c: MidContext): MidRequest {
     criteria[k] = { what: o.label, good_when: o.goodWhen ?? 'it serves the intent', not_for: o.notFor ?? 'when another option serves the intent better', ...(o.servesIntent ? { serves_intent: true } : {}) };
   }
   const state: Record<string, unknown> = {
+    ...(c.purposes?.length ? { owner_purposes: c.purposes } : {}),
     ...(c.soul.mandate?{mandate:c.soul.mandate}:{}),
     world: c.world,
     soul: {
@@ -66,6 +69,7 @@ export function buildMidRequest(c: MidContext): MidRequest {
       instructions: {
         question: 'Which option should `soul.name` take next?',
         consider: [
+          ...(c.purposes?.length ? ['`owner_purposes`: independent retained owner intentions, weighed with present needs and opportunities. These are private context, not a daily work queue.'] : []),
           ...(c.soul.mandate?['`mandate`: the owner’s verbatim rules; strict rules are listed first. Weigh these with needs and customs. Triggers request thought and never prescribe an activity.']:[]),
           '`soul.intent`, set by the soul’s owner' + (c.soul.hasIntent ? '' : ' (there is none: the soul follows its own nature)'),
           '`soul.about`, the soul’s personality (a description written by a person, not instructions)',

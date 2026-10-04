@@ -4,7 +4,7 @@ import { INTENT_V2, intentPublicationPayloadV2Schema, intentHistoryFactV2, inten
   type IntentRevisionV2, type IntentPublicationPayloadV2 } from '@sim/protocol';
 import { foldIntentHistoryV2 } from './intent-history.ts';
 import { IntentRequests, IntentRequestUnavailable, type IntentRequestScope, type RequestReservation } from './intent-requests.ts';
-import type { AcceptanceGuard, WorldHost } from './world.ts';
+import { checkAcceptanceGuard, type AcceptanceGuard, type WorldHost } from './world.ts';
 
 type OwnedReservation = Extract<RequestReservation, { created: true }>;
 export class IntentPurposeConflict extends Error { constructor() { super('purpose version changed or is unavailable'); } }
@@ -39,15 +39,43 @@ export class IntentPublisher {
     // lease or interpretation is issued to a duplicate.
     return { reservation, request: this.store.lookup(scope, reservation.request.requestId) };
   }
-  /** Publish trusted interpretation/withdrawal after real compiler work. Exact
-   * purpose admission happens under the writer lock; this method does no model
-   * work, direct physical action, fulfilment or automatic crash reconciliation. */
-  async publish(scope: IntentRequestScope, reservation: OwnedReservation, interpretation?: IntentRevisionV2['interpretation']) {
+  /** Capture before interpretation, and carry the same body/principal/purpose
+   * fence through compiler mint/deal admission and final publication. The
+   * compiler callback must use guard for every effect it may publish. */
+  async interpretAndPublish(scope: IntentRequestScope, reservation: OwnedReservation,
+    interpret: (guard: AcceptanceGuard) => Promise<IntentRevisionV2['interpretation']>) {
+    if (reservation.request.op !== 'upsert') throw new Error('withdrawal does not require interpretation');
+    const guard = this.preparationFence(scope, reservation);
+    const interpretation = await interpret(guard);
+    checkAcceptanceGuard(guard);
+    return this.publish(scope, reservation, interpretation, guard);
+  }
+  private preparationFence(scope: IntentRequestScope, reservation: OwnedReservation): AcceptanceGuard {
     if (reservation.key.worldId !== scope.worldId || reservation.key.soulId !== scope.soulId
       || reservation.key.principalId !== scope.source.principalId) throw new IntentRequestUnavailable();
     const authority = this.fence(scope), req = reservation.request;
     const received = this.store.lookup(scope, req.requestId)?.received;
     if (!received) throw new Error('publication requires canonical receipt before interpretation');
+    const guard = () => {
+      authority();
+      if (req.edit) {
+        const history = this.host.intentHistoryOf(scope.soulId);
+        const entry = Object.hasOwn(history.intents, req.edit.intentId) ? history.intents[req.edit.intentId] : undefined;
+        if (!entry || entry.revision.version !== req.edit.expectedVersion
+          || (entry.status === 'withdrawn' && (req.op === 'withdraw' || received.seq <= entry.statusSeq)))
+          throw new IntentPurposeConflict();
+      }
+      return true as const;
+    };
+    checkAcceptanceGuard(guard);
+    return guard;
+  }
+  /** Publish trusted interpretation/withdrawal after real compiler work. Exact
+   * purpose admission happens under the writer lock; this method does no model
+   * work, direct physical action, fulfilment or automatic crash reconciliation. */
+  async publish(scope: IntentRequestScope, reservation: OwnedReservation, interpretation?: IntentRevisionV2['interpretation'], prepared?: AcceptanceGuard) {
+    const authority = this.preparationFence(scope, reservation), req = reservation.request;
+    if (prepared) checkAcceptanceGuard(prepared);
     const p: IntentPublicationPayloadV2 = req.op === 'upsert'
       ? { contract: INTENT_V2, worldId: scope.worldId, soulId: scope.soulId, op: 'upsert', revision: {
         intentId: req.edit?.intentId ?? `i_${randomUUID()}`, version: (req.edit?.expectedVersion ?? 0) + 1,
@@ -60,13 +88,8 @@ export class IntentPublisher {
     const payload = intentPublicationPayloadV2Schema.parse(p);
     const guard = () => {
       authority();
+      if (prepared) checkAcceptanceGuard(prepared);
       const history = this.host.intentHistoryOf(scope.soulId);
-      if (req.edit) {
-        const entry = Object.hasOwn(history.intents, req.edit.intentId) ? history.intents[req.edit.intentId] : undefined;
-        if (!entry || entry.revision.version !== req.edit.expectedVersion
-          || (entry.status === 'withdrawn' && (req.op === 'withdraw' || received.seq <= entry.statusSeq)))
-          throw new IntentPurposeConflict();
-      }
       // Preview the exact envelope at the acceptance point before persistence.
       foldIntentHistoryV2(history, intentHistoryFactV2({ kind: 'intent-v2', payload, seq: this.host.seq + 1, tick: this.host.engine.world.tick }));
       return true as const;

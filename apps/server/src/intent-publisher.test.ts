@@ -56,6 +56,53 @@ async function receive(f: ReturnType<typeof fixture>, requestId: string, fields:
 }
 async function publish(f: ReturnType<typeof fixture>, r: Owned) { return await drive(f.host, f.publisher.publish(f.scope, r, interpretation)); }
 
+test('pre-interpretation fence rejects replacement Mind even when the current binding is valid', async t => {
+  const f = fixture(t), r = await receive(f, 'async-binding');
+  const seq = f.host.seq, original = f.host.minds.get('s_A')!;
+  await assert.rejects(f.publisher.interpretAndPublish(f.scope, r, async guard => {
+    assert.equal(guard(), true);
+    // Rehydrating a replacement at the same Soul/body must not authorize a
+    // response prepared from the old Mind. A fresh post-call fence would pass.
+    f.host.minds.set('s_A', structuredClone(original));
+    return interpretation;
+  }), IntentRequestUnavailable);
+  assert.equal(f.host.seq, seq); assert.equal(f.store.lookup(f.scope, r.request.requestId)!.receipt, null);
+});
+
+test('pre-interpretation exact-purpose fence ignores other purposes but rejects edits and withdrawal', async t => {
+  const f = fixture(t); await publish(f, await receive(f, 'original'));
+  const original = Object.values(f.host.intentHistoryOf('s_A').intents)[0].revision;
+  const unchanged = await receive(f, 'edit-with-unrelated', { edit: { intentId: original.intentId, expectedVersion: 1 } });
+  const result = await drive(f.host, f.publisher.interpretAndPublish(f.scope, unchanged, async guard => {
+    await publish(f, await receive(f, 'independent'));
+    assert.equal(guard(), true); return interpretation;
+  }));
+  assert.equal(result.receipt?.phase, 'understood');
+  const stale = await receive(f, 'slow-edit', { edit: { intentId: original.intentId, expectedVersion: 2 } });
+  await assert.rejects(drive(f.host, f.publisher.interpretAndPublish(f.scope, stale, async guard => {
+    const later = await receive(f, 'later-edit', { edit: { intentId: original.intentId, expectedVersion: 2 } });
+    await publish(f, later); assert.throws(guard, IntentPurposeConflict); return interpretation;
+  })), IntentPurposeConflict);
+  assert.equal(f.store.lookup(f.scope, 'slow-edit')!.receipt, null);
+  const withdrawn = await receive(f, 'slow-before-withdraw', { edit: { intentId: original.intentId, expectedVersion: 3 } });
+  await assert.rejects(drive(f.host, f.publisher.interpretAndPublish(f.scope, withdrawn, async () => {
+    const w = await drive(f.host, f.publisher.receive(f.scope, { contract: INTENT_V2, requestId: 'withdraw-during-interpretation',
+      op: 'withdraw', edit: { intentId: original.intentId, expectedVersion: 3 } }));
+    assert.ok(w.reservation.created); await drive(f.host, f.publisher.publish(f.scope, w.reservation)); return interpretation;
+  })), IntentPurposeConflict);
+});
+
+test('pre-interpretation authority rejection prevents final publication and queued effects', async t => {
+  const f = fixture(t), r = await receive(f, 'async-authority'); let authorized = true;
+  const scope = { ...f.scope, currentAuthority: () => authorized };
+  await assert.rejects(drive(f.host, f.publisher.interpretAndPublish(scope, r, async guard => {
+    authorized = false;
+    await assert.rejects(drive(f.host, f.host.enqueueChecked('deck', 'compiler-fixture', { soulId: 's_A', add: ['rest'] }, guard)), IntentRequestUnavailable);
+    return interpretation;
+  })), IntentRequestUnavailable);
+  assert.equal(f.host.intentHistoryOf('s_A').lastSeq, 0); assert.equal(f.store.lookup(f.scope, r.request.requestId)!.receipt, null);
+});
+
 test('received origin and understood receipt use actual canonical queue envelopes and survive file restart without models', async t => {
   const f = fixture(t, true), seq = f.host.seq;
   const pending = f.publisher.receive(f.scope, { contract: INTENT_V2, requestId: 'request-A', op: 'upsert', words });
