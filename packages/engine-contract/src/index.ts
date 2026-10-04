@@ -9,3 +9,4 @@ export * from './kinematics.ts';
 export * from './scene-proposal.ts';
 export * from './scene-capture.ts';
 export * from './terrain.ts';
+export * from './birth.ts';
