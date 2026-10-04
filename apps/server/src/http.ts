@@ -59,6 +59,12 @@ export function buildApp(d: Deps) {
     return c.json({ ok: false, code: 'internal', message: 'internal error' }, 500);
   });
   app.use('*', async (c, next) => { await next(); c.header('X-Robots-Tag', 'noindex, nofollow'); c.header('X-Frame-Options', 'DENY'); c.header('Content-Security-Policy', "frame-ancestors 'none'"); });
+  // A halted durable clock cannot serve an unacknowledged body/head or accept
+  // more control. Generic unavailable response carries no private row/error.
+  app.use('*',async(c,next)=>{
+    if(!d.host.clockAvailable)return c.json({ok:false,code:'world-unavailable',message:'World temporarily unavailable.'},503,{'Cache-Control':'no-store'});
+    await next();
+  });
   // Nothing a person or an agent sends is large: a command, an intent, a few cards.
   // Apply before parsing/auth/rate errors as well as successful secret responses.
   for (const path of ['/v1/agent/pair', '/v1/agent/pair/*', '/v1/pair/*', '/v1/souls/:id/pair'])

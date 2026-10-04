@@ -152,6 +152,13 @@ export const MIGRATIONS: { id: number; name: string; up(db: DatabaseSync): void 
     // a random generation only when an opted-in authenticated adapter uses it.
     addColumn(db, 'souls', 'token_generation', 'TEXT');
   } },
+  { id: 15, name: 'bounded private deterministic clock frontier', up(db) {
+    // Empty additive restart metadata; no historical inference or activation.
+    db.exec(`CREATE TABLE clock_frontiers_v1 (
+      world_id TEXT PRIMARY KEY REFERENCES worlds(id),
+      body TEXT NOT NULL CHECK(json_valid(body)), body_hash TEXT NOT NULL
+    )`);
+  } },
 ];
 
 export function migrate(db: DatabaseSync): number[] {

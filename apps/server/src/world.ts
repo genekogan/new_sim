@@ -4,6 +4,7 @@
 import type { Engine, EngineFactory, PathCommit, ChangeEvent, ProgramEvent, EngineSnapshot, RuntimeEvent } from '@sim/engine-contract';
 import { hashOf } from '@sim/engine-contract';
 import { kernelHash, sweep, type KState } from '@sim/kernel';
+import { ClockFrontiers,type ClockFrontierV1 } from './clock-frontier.ts';
 import {
   describeIntent, publicIntent, viewHashOf, viewRow,
   isStationFactV1,
@@ -73,6 +74,7 @@ export type HostListener = {
   onPlay?(p: PlayView, m: Mind | undefined): void;
   onKernel?(v: KernelView): void;
   afterTick?(tick: number): void;
+  onClockUnavailable?():void;
 };
 
 const TICK_MS = 50;
@@ -113,10 +115,16 @@ export class WorldHost {
   private kfCursor = 0;
   db: Db; factory: EngineFactory; seed: string; snapshotEvery: number;
   readonly worldId: string;
+  private clockFrontiers:ClockFrontiers;
+  private durableClockV1:boolean;
+  private clockFailure:unknown;
+  get clockAvailable(){return !this.clockFailure;}
+  assertClockReady():void {if(this.clockFailure)throw new Error('clock-frontier.unavailable');}
 
-  constructor(db: Db, factory: EngineFactory, seed: string, snapshotEvery: number, worldId = 'toy-1') {
+  constructor(db: Db, factory: EngineFactory, seed: string, snapshotEvery: number, worldId = 'toy-1',options?:{durableClockV1?:boolean}) {
     this.worldId = worldId;
     this.db = db; this.factory = factory; this.seed = seed; this.snapshotEvery = snapshotEvery;
+    this.clockFrontiers=new ClockFrontiers(db);this.durableClockV1=options?.durableClockV1===true;
     this.intentObservations = new IntentObservations(db, worldId);
   }
 
@@ -129,6 +137,9 @@ export class WorldHost {
       w = this.db.world(this.worldId)!;
     }
     this.clockRate = this.baseRate = w.clock_rate;
+    const clock=this.clockFrontiers.read(this.worldId);
+    if(clock&&!this.durableClockV1)throw new Error('clock-frontier.reader-required');
+    if(clock&&this.factory.canReplayHistory?.(clock.rulesVersion)===false)throw new Error('clock-frontier.rules-incompatible');
     const snap = this.db.latestSnapshot(this.worldId);
     // Snapshot rejection is not permission to reinterpret history from genesis.
     // Check both durable identities before constructing or stepping any engine.
@@ -154,13 +165,46 @@ export class WorldHost {
     }
     // fast-forward: replay events logged after the snapshot, stepping the engine to their ticks
     let later = this.db.events(this.worldId, this.seq);
+    let checkedClock=false;
+    if(clock&&this.seq>clock.throughSeq){
+      if(this.engine.world.tick<clock.tick)throw new Error('clock-frontier.snapshot-prefix-differs');
+      checkedClock=true; // A later exact durable snapshot supersedes this prefix.
+    }
+    const stepReplay=()=>{
+      const before=this.engine.runtime.violations.length;
+      const out=this.engine.step();this.advanceLives();
+      if(this.durableClockV1){
+        if(this.engine.runtime.violations.length>before)throw new Error('clock-frontier.replay-violates');
+        this.kernel.tick=this.engine.world.tick;sweep(this.kernel);
+      }
+      this.afterPrograms(out.programs,true);
+    };
+    const verifyClock=()=>{
+      if(!clock||checkedClock)return;
+      if(this.seq!==clock.throughSeq||this.engine.world.tick>clock.tick)throw new Error('clock-frontier.prefix-differs');
+      while(this.engine.world.tick<clock.tick)stepReplay();
+      this.kernel.tick=this.engine.world.tick;sweep(this.kernel);
+      if(this.engine.rulesVersion!==clock.rulesVersion||this.engine.dt!==clock.dtSeconds
+        ||this.engine.stateHash()!==clock.engineHash||kernelHash(this.kernel)!==clock.kernelHash)
+        throw new Error('clock-frontier.replay-differs');
+      checkedClock=true;
+    };
     let repaired = -1; for (let i=0;i<later.length;i++) if (later[i].kind === 'rules' && later[i].payload?.recovery) repaired=i;
-    if (repaired >= 0) { this.apply(later[repaired], true); this.seq = later[repaired].seq; later = later.slice(repaired + 1); }
+    if (repaired >= 0) {
+      const repair=later[repaired];this.apply(repair,true);this.seq=repair.seq;
+      if(clock&&repair.seq>clock.throughSeq){
+        if(this.engine.world.tick<clock.tick)throw new Error('clock-frontier.recovery-regression');
+        checkedClock=true; // Explicit logged recovery supersedes its old prefix.
+      }
+      later=later.slice(repaired+1);
+    }
     for (const e of later) {
-      while (this.engine.world.tick < e.tick) { const out = this.engine.step(); this.advanceLives(); this.afterPrograms(out.programs, true); }
+      if(clock&&!checkedClock&&e.seq>clock.throughSeq)verifyClock();
+      while (this.engine.world.tick < e.tick) stepReplay();
       this.apply(e, true);
       this.seq = e.seq;
     }
+    verifyClock();
     this.factory.validateHistoryHead?.(this.engine,this.db.world(this.worldId)!.rules_version);
     if(this.extra.stationV1)this.stationPhysicalHeadV1();
     this.acc.fromTick = this.engine.world.tick;
@@ -264,6 +308,7 @@ export class WorldHost {
   }
 
   tickOnce() {
+    this.assertClockReady();
     const t0 = performance.now();
     const tick = this.engine.world.tick;
     // 1. apply queued inputs at this tick, logging them
@@ -282,6 +327,11 @@ export class WorldHost {
     this.reconcileIntentObservations();
     this.observeIntentActions();
     this.afterPrograms(out.programs, false);
+    if(this.durableClockV1){
+      // Derived effects become durable before this elapsed body tick is sent.
+      // Listener-generated next inputs retain their ordinary queue semantics.
+      this.drainInputs();this.persistClockFrontier();
+    }
     for (const ev of out.events) for (const l of this.listeners) l.onRuntimeEvent?.(ev);
     const now = this.engine.world.tick;
     for (const l of this.listeners) l.afterTick?.(now);
@@ -295,6 +345,7 @@ export class WorldHost {
 
   /** Accept queued inputs without advancing the engine or starting new mind work. */
   drainInputs() {
+    this.assertClockReady();
     const tick = this.engine.world.tick;
     const pending = this.queue.splice(0);
     for (const p of pending) {
@@ -406,6 +457,7 @@ export class WorldHost {
   // ------------------------------------------------------------ inputs
   /** Queue an input; it is logged and applied at the next tick. Resolves with the logged event. */
   enqueue(kind: EventKind, author: string, payload: unknown): Promise<LogEvent> {
+    this.assertClockReady();
     return new Promise((resolve) => this.queue.push({ kind, author, payload, resolve }));
   }
 
@@ -414,12 +466,14 @@ export class WorldHost {
    * An optional journal writes to this Db atomically with the accepted event.
    * Queued requests remain ephemeral; this does not provide durable retries. */
   enqueueChecked(kind: EventKind, author: string, payload: unknown, guard: AcceptanceGuard, journal?: AcceptanceJournal): Promise<LogEvent> {
+    this.assertClockReady();
     return new Promise((resolve, reject) => this.queue.push({ kind, author, payload, guard, journal, resolve, reject }));
   }
 
   /** Internal opt-in choice producer. No wire operation accepts a purpose ref
    * or activity claim. The original caller fence still owns final authority. */
   enqueueIntentDecision(author: string, payload: DecisionPayload, raw: PurposeRef, guard: AcceptanceGuard): Promise<LogEvent> {
+    this.assertClockReady();
     const purpose = intentReferenceV2Schema.parse(raw), mind = this.minds.get(payload.soulId);
     if (!mind || payload.entityId !== mind.entityId || payload.continue || !payload.steps.length)
       return Promise.reject(new Error('purpose attempt requires its current body and an actual program'));
@@ -806,6 +860,7 @@ export class WorldHost {
       this.seq=originalSeq;
       const e: LogEvent={seq:++this.seq,tick:untilTick,kind:'rules',author:'world:recovery',payload:{recovery:recipe},at:Date.now()};
       this.db.appendEvent(this.worldId,e); this.resetAcc(); this.acc.log.push(e); this.ring=[];
+      if(this.durableClockV1)this.persistClockFrontier();
       for (const m of this.minds.values()) this.acc.dirty.add(m.soulId);
       for (const l of this.listeners) l.onApplied?.(e);
       this.flush(); this.heartbeat(); return;
@@ -834,6 +889,7 @@ export class WorldHost {
   nameOf(id: string): string { return this.kernel.things[id]?.name ?? this.engine.world.entities[id]?.label ?? this.engine.world.regions[id]?.label ?? id; }
   private stationGenesisV1?:string;
   stationBindingV1(){
+    this.assertClockReady();
     this.stationGenesisV1??=stationGenesisIdV1(this.worldId,this.seed,this.factory.genesis(this.seed));
     return {worldId:this.worldId,genesisId:this.stationGenesisV1,rulesVersion:this.engine.rulesVersion,dtSeconds:this.engine.dt};
   }
@@ -886,6 +942,7 @@ export class WorldHost {
     return viewHashOf(Object.keys(w.entities).filter((id) => w.entities[id].kind === 'human').map((id) => viewRow(w.entities[id], this.engine.poseSampleOf(id))));
   }
   snapshotView(): Snapshot {
+    this.assertClockReady();
     const w = this.engine.world;
     const paths: PathCommit[] = [];
     for (const id of Object.keys(w.entities)) { const p = this.engine.currentPath(id); if (p) paths.push(p); }
@@ -930,7 +987,9 @@ export class WorldHost {
   snapshotMs = { capture: 0, persist: 0 };
   /** Capture is synchronous (it must see one consistent tick); the database write is deferred past the current tick. */
   saveSnapshot(sync = true) {
+    this.assertClockReady();
     this.drainInputs();
+    if(this.durableClockV1)this.persistClockFrontier();
     if (this.engine.canSnapshot && !this.engine.canSnapshot()) {
       // A graceful close still needs a durable replay destination when the
       // controller cannot serialize. Periodic retries must not log every tick.
@@ -950,6 +1009,19 @@ export class WorldHost {
     const persist = () => { const t1 = performance.now(); this.db.saveSnapshot(this.worldId, meta); this.snapshotMs.persist = performance.now() - t1; };
     if (sync) persist(); else setImmediate(persist);
     return { tick: runtime.tick, stateHash: runtime.stateHash };
+  }
+  private persistClockFrontier():void {
+    try{
+      const frontier:ClockFrontierV1={contract:'durable-clock-frontier/1',worldId:this.worldId,
+        seedHash:hashOf(this.db.world(this.worldId)!.seed),rulesVersion:this.engine.rulesVersion,dtSeconds:this.engine.dt,
+        tick:this.engine.world.tick,throughSeq:this.seq,headEventHash:this.clockFrontiers.headHash(this.worldId,this.seq),
+        engineHash:this.engine.stateHash(),kernelHash:kernelHash(this.kernel)};
+      this.clockFrontiers.write(frontier);
+    }catch(error){
+      this.clockFailure=error;this.paused=true;this.stop();
+      for(const listener of this.listeners)try{listener.onClockUnavailable?.();}catch{/* The durable fault remains the cause. */}
+      throw error;
+    }
   }
 }
 

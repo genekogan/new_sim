@@ -55,6 +55,7 @@ export class Hub {
       this.wss.handleUpgrade(req, socket, head, (ws) => this.onConnect(ws, req));
     });
     host.listeners.push({
+      onClockUnavailable:()=>{for(const c of this.clients){c.ready=false;c.ws.close(1013,'world unavailable');}},
       onApplied: e => { if (e.kind === 'rules' && e.payload?.recovery) { this.lastTakeTick=host.engine.world.tick; this.epoch=`${Date.now().toString(36)}-repair`; for (const c of this.clients) c.ws.close(1012, 'world restored; reconnect'); }
         if(e.kind==='station-rules-era-v1'){
           for(const c of this.clients){if(!c.ready)continue;
@@ -107,6 +108,7 @@ export class Hub {
   }
 
   private async onMessage(c: Client, m: ClientMsg) {
+    if(!this.host.clockAvailable){c.ready=false;c.ws.close(1013,'world unavailable');return;}
     if (m.t === 'ping') return this.send(c, { t: 'pong', n: m.n, serverTime: Date.now() });
     // joining and resyncing each build a full view of the world: once every few seconds per socket is plenty
     const now = Date.now();
@@ -152,6 +154,7 @@ export class Hub {
   }
 
   private send(c: Client, m: ServerMsg) {
+    if(!this.host.clockAvailable){c.ready=false;c.ws.close(1013,'world unavailable');return;}
     if (c.ws.readyState !== 1) return;
     if (c.ws.bufferedAmount > MAX_BUFFERED) return; // slow client: skip; the heartbeat will make it resync
     const current=this.privateMessage(c,m);if(!current)return;
