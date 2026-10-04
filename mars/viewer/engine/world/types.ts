@@ -49,6 +49,13 @@ export type ComponentPhase =
   | 'installed'; // connected and self-supporting under the assembly rules
 
 export type HumanState = {
+  /** Opt-in shore/1 controller: metres, upright-capsule immersion length (not
+   * body-volume fraction), centre bed normal and prescribed calm buoyancy. */
+  shore?: {
+    contract: 'shore-contact/1'; terrainId: string; waterId: string;
+    mode: 'bed' | 'buoyant'; bedY: number; datumY: number;
+    depthMetres: number; submergedHeightMetres: number; normal: Vec3;
+  };
   activity: string; // 'idle' | 'walk' | 'carry' | 'support' | 'climb' | 'sit' | ...
   task?: string; // action id currently owning this actor
   grip?: { entity: string; slot: string };
