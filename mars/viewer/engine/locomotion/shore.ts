@@ -33,7 +33,7 @@ function anatomy(rt: Runtime, actor: string): Diagnostic | null {
   const e = rt.world.entities[actor];
   if (!e?.human || e.kind !== 'human') return fail('actor', `${actor} is not a human`, [actor]);
   if (e.body && e.body.family !== 'humanoid') return fail('body-family', `${actor} has no qualified shore equivalent`, [actor]);
-  if (e.human.grip || e.human.riding || e.human.on || e.human.sleepPose || e.human.hands?.left || e.human.hands?.right
+  if (e.human.grip || e.human.riding || e.human.on || e.human.boatPassenger || e.human.boatTransit || e.human.sleepPose || e.human.hands?.left || e.human.hands?.right
     || Object.values(rt.world.entities).some(item => item.support?.kind === 'in-hand' && item.support.by === actor))
     return fail('occupied-body', `${actor} must release hands, load, seat or vehicle before shore travel`, [actor]);
   if (e.human.activity.startsWith('sit') || e.human.activity.startsWith('stand-up'))
@@ -63,9 +63,9 @@ function boxHit(a: V3, b: V3, e: Entity): boolean {
   }
   return true;
 }
-function obstruction(rt: Runtime, actor: string, a: V3, b: V3): Diagnostic | null {
+function obstruction(rt: Runtime, actor: string, a: V3, b: V3, supportedIds: ReadonlySet<string> = new Set()): Diagnostic | null {
   for (const e of Object.values(rt.world.entities)) {
-    if (e.id === actor || e.kind === 'marker') continue;
+    if (e.id === actor || e.kind === 'marker' || supportedIds.has(e.id)) continue;
     if (e.human) {
       const dx=b[0]-a[0], dz=b[2]-a[2], n=dx*dx+dz*dz;
       const t=n===0?0:Math.max(0,Math.min(1,((e.pose.p[0]-a[0])*dx+(e.pose.p[2]-a[2])*dz)/n));
@@ -177,9 +177,10 @@ export const shoreSpeedInvariant:Invariant=rt=>Object.values(rt.world.entities).
   const cap=['swim','wade'].includes(h.activity)?SHORE_POLICY.travelSpeed:h.activity==='tread'?0:SPEED_CAPS[h.activity];
   return cap!==undefined&&Number.isFinite(h.speed)&&h.speed>=0&&h.speed<=cap*1.05?[]:[fail('overspeed',`${e.id} exceeds its qualified shore speed`,[e.id])];
 });
-export function shoreContactInvariant(g:ShoreGeometry):Invariant {
+export function shoreContactInvariant(g:ShoreGeometry, otherSupport?: (rt:Runtime,e:Entity)=>Diagnostic[]|null):Invariant {
   return rt=>Object.values(rt.world.entities).flatMap(e=>{
     if(!e.human)return [];
+    const delegated=otherSupport?.(rt,e);if(delegated!==undefined&&delegated!==null)return delegated;
     const issue=current(rt,g,e.id);if(issue)return [issue];
     const at=g.point([e.pose.p[0],e.pose.p[2]])!;
     if(at.depth>=SHORE_POLICY.floatingRootBelowDatum&&!['tread','swim'].includes(e.human.activity))
@@ -192,3 +193,4 @@ export function shoreContactInvariant(g:ShoreGeometry):Invariant {
     return [];
   });
 }
+export { publish as publishShoreContact, obstruction as shoreObstruction };

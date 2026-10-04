@@ -43,6 +43,9 @@ function takeHands(e: Entity): TakeHands | undefined {
 
 const FIELDS: [string, (e: Entity) => unknown][] = [
   ['shore', e => e.human?.shore], // opt-in shore/1: discrete actual support/depth
+  ['boat', e => e.boat],
+  ['boatPassenger', e => e.human?.boatPassenger],
+  ['boatTransit', e => e.human?.boatTransit],
   ['attention', e => e.human?.attention],
   ['activity', (e) => e.human?.activity],
   ['level', (e) => e.human?.level],

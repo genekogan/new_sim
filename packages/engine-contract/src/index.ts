@@ -14,3 +14,4 @@ export * from './gathering-observation.ts';
 export * from './birth.ts';
 export * from './commons.ts';
 export * from './shore.ts';
+export * from './boat.ts';

@@ -49,6 +49,9 @@ export type ComponentPhase =
   | 'installed'; // connected and self-supporting under the assembly rules
 
 export type HumanState = {
+  /** Opt-in stopped-dock boarding and finite boat passenger frame. */
+  boatPassenger?: { boatId: string; slotId: string; phase: 'boarding' | 'seated' | 'leaving'; localRoot: Vec3; relativeYaw: number };
+  boatTransit?: { from: Vec3; to: Vec3; t: number; supportId: string };
   /** Opt-in shore/1 controller: metres, upright-capsule immersion length (not
    * body-volume fraction), centre bed normal and prescribed calm buoyancy. */
   shore?: {
@@ -112,6 +115,13 @@ export type FoodPreparation = {
 export type Body = { family: 'humanoid' | 'floater'; model?: string; radius?: number; hoverHeight?: number };
 
 export type Entity = {
+  /** Native keel-base frame; authored proposal frame is .4m above it. */
+  boat?: {
+    contract: 'boat-state/1'; waterId: string; frameOffsetY: number;
+    dockId: string | null; connectorOpen: boolean;
+    phase: 'docked' | 'underway' | 'stopped'; speed: number;
+    passengers: Record<string, string>; pilotIds: string[];
+  };
   id: string;
   def: string; // AssetDef id
   kind: EntityKind;
