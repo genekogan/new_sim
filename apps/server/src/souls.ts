@@ -488,9 +488,10 @@ export class Souls {
 
   /** Recheck the approving identity and original ownership before releasing a credential. */
   private pairAuthority(soul: SoulRow | undefined, owner: string, issuer: string): soul is SoulRow {
-    const user = this.db.user(issuer);
+    const user = this.db.user(issuer),currentOwner=this.lifecycle?this.db.user(owner):undefined;
     return !!soul && !soul.retired_at && soul.world_id === this.host.worldId && soul.owner === owner
-      && !!user && this.invited(user) && (user.id === soul.owner || user.role === 'admin') && this.controlReady(soul);
+      && !!user && this.invited(user) && (user.id === soul.owner || user.role === 'admin')
+      && (!this.lifecycle||!!currentOwner&&this.invited(currentOwner)) && this.controlReady(soul);
   }
 
   soulFromToken(token: string | undefined): SoulRow | null {

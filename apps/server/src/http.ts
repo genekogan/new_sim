@@ -146,7 +146,8 @@ export function buildApp(d: Deps) {
   app.post('/v1/souls/:id/shot', async (c) => {
     const u = await requireUser(c); const s = ownSoul(u, c.req.param('id')); const m = d.host.minds.get(s.id); if (!m) throw new ApiError(409, 'not-in-world', 'not in the world');
     const lim = d.souls.limits.allow(`shot:${s.owner}`, 12, 60_000); if (!lim.ok) throw new ApiError(429, 'rate-limited', 'slow down', { retry_after: lim.retryAfter });
-    return c.json({ ok: true, shot: await d.brain.shotFor(m) });
+    const guard=d.souls.ownerControlGuard(s,u.id);if(guard)checkAcceptanceGuard(guard);
+    return controlReply(c,guard,async()=>({ok:true,shot:await d.brain.shotFor(m)}));
   });
   // approving an agent that asked to be paired
   app.get('/v1/pair/:code', async (c) => { await requireUser(c); return c.json(d.souls.pairInfo(c.req.param('code'))); });
