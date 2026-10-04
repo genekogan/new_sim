@@ -38,6 +38,15 @@ export type ChangeEvent = [number, string, string, unknown]; // [tick, entityId,
  * place Things; depiction programs refer back to them by `entity` or `point`.
  */
 export type Anchor = { id: string; kind: 'region' | 'place'; name: string; in?: string; entity?: string; point?: [number, number]; tags?: string[] };
+/** Current public scene projection. Geometry stays engine-specific; this is not
+ * a new terrain/asset manifest or a historical scene-revision guarantee. */
+export type RenderScene = {
+  scene: unknown;
+  buildings?: { file: string; p: [number, number, number]; yaw?: number }[];
+  kin?: { model: string; p: [number, number, number]; yaw?: number; radius?: number; hoverHeight?: number }[];
+  clock?: { origin: number; dayTicks: number } | null;
+  ground?: 'grass';
+};
 
 /** A depiction program for one actor: an ordered list of engine verbs. */
 export type Program = { actor: string; label: string; steps: { verb: string; params: Record<string, unknown> }[] };
@@ -75,7 +84,7 @@ export interface Engine {
   snapshot(): EngineSnapshot;
   /** Recorded rendering chunks; no browser Runtime. Optional for engines without takes. */
   takeChunks?(afterTick: number): { fromTick: number; toTick: number; take: unknown }[];
-  renderScene?(): {scene: unknown; buildings?: {file: string; p: [number, number, number]; yaw?: number}[]; kin?: {model: string; p: [number,number,number]; yaw?: number; radius?: number}[]};
+  renderScene?(): RenderScene;
   canSnapshot?(): boolean;
   configureRuntimePolicy?(policy: {sleepBlockTicks:number;quietSeatCourtesy?:boolean}): void;
   configureClock?(clock: { origin: number; dayTicks: number }): void;

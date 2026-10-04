@@ -1,6 +1,8 @@
 // Wire protocol shared by server and clients: log events, WebSocket messages,
 // REST payloads. Everything that crosses a process boundary is defined here.
 export * from './mandate.ts';
+export * from './presentation.ts';
+export * from './owner-views.ts';
 import { z } from 'zod';
 import type { ChangeEvent, Entity, Environment, PathCommit, PoseSample, Region } from '@sim/engine-contract';
 import { hashOf, samplePath } from '@sim/engine-contract';

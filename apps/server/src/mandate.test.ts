@@ -5,7 +5,7 @@ import {toyFactory} from '@sim/engine-toy';
 import {marsFactory} from '@sim/engine-mars';
 import type {EngineFactory} from '@sim/engine-contract';
 import {kernelHash,validateCard,applyAll,sweep} from '@sim/kernel';
-import {publicEvent,type MandateRule} from '@sim/protocol';
+import {publicEvent,steerReceiptSchema,ownerSoulDashboardSchema,type MandateRule} from '@sim/protocol';
 import {newLife,compileUser} from '@sim/brain';
 import {Db} from './db.ts';
 import {WorldHost,replayKernel} from './world.ts';
@@ -32,7 +32,7 @@ test('the four rule forms align once, retain owner words and do not install a da
   const wishes=['rest now','rest at 5pm every day','join every time Bill is having a party','rest if you feel like it'];
   let calls=0;const compile=f.brain.compile.bind(f.brain);f.brain.compile=async(...args)=>{calls++;return compile(...args);};
   const rules:MandateRule[]=[];
-  for(const words of wishes){const r=await accept(f.host,f.souls.steer(f.alice,{words}));assert.ok(r.ok);if(r.ok)rules.push(r.rule);}
+  for(const words of wishes){const r=await accept(f.host,f.souls.steer(f.alice,{words}));steerReceiptSchema.parse(r);assert.ok(r.ok);if(r.ok)rules.push(r.rule);}
   assert.equal(calls,4);assert.deepEqual(rules.map(r=>r.trigger.kind),['now','time','gathering','none']);assert.deepEqual(rules.map(r=>r.words),wishes);
   assert.equal((rules[1].trigger as {hour:number}).hour,17);assert.equal((rules[2].trigger as {host:string}).host,'s_Bill');
   assert.ok(!f.host.minds.get(f.alice.id)!.agenda.some(a=>a.of==='s_Bill'),'party rule did not replace the NOW agenda');
@@ -66,7 +66,7 @@ test('time and condition edges wake thought without directly choosing cards',asy
 test('rule state replays, survives restart, stays out of public views and cannot be changed by cards',async()=>{
  const f=fixture();try{
   await accept(f.host,f.souls.steer(f.alice,{words:'rest if you feel like it',strict:true}));
-  const secret='rest if you feel like it';assert.ok(JSON.stringify(f.souls.status(f.alice)).includes(secret));
+  const secret='rest if you feel like it';assert.ok(JSON.stringify(ownerSoulDashboardSchema.parse(f.souls.dashboard(f.alice))).includes(secret));
   assert.ok(!JSON.stringify(f.host.kernelView()).includes(secret));assert.ok(!JSON.stringify(f.db.events(f.host.worldId).map(publicEvent)).includes(secret));
   assert.ok(!compileUser(f.host.kernel,'s_Bill','rest',['s_Alice']).includes(secret));
   const events=f.db.events(f.host.worldId),replayed=replayKernel(f.genesis,events);replayed.tick=f.host.engine.world.tick;sweep(replayed);assert.equal(kernelHash(replayed),kernelHash(f.host.kernel));
