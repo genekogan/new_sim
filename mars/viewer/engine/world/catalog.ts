@@ -14,6 +14,7 @@ import { stockAssets } from './catalog-stock.ts';
 import { SOLAR_ASSETS, type EquipmentKind } from './catalog-solar.ts';
 import { framingAssets } from './catalog-framing.ts';
 import { ACTIVITY_ASSETS } from './catalog-activities.ts';
+import { COMMONS_ASSETS } from './catalog-commons.ts';
 
 export type GripSlot = { id: string; local: Vec3; /** Optional centered handle segment, full end-to-end local vector; midpoint drives formation. */ span?: Vec3 };
 export type Socket = { id: string; kind: 'beam-seat' | 'beam-end' | 'joist-seat' | 'deck-seat' | 'stair-top' | 'stair-bottom'; local: Vec3; face?: 'front' | 'back' };
@@ -343,6 +344,7 @@ export const CATALOG: Record<string, AssetDef> = Object.fromEntries(
     // Forklift (engine/vehicles/forklift.ts): x = 2.6 m length (forks at +x), y = 2.2 m lowered mast, z = 1.2 m width.
     { id: 'forklift', label: 'forklift (1 t)', category: 'vehicle', size: [2.6, 2.2, 1.2], massKg: 2600, color: '#e0b020', obstacle: true, dims: provisional('generic 1 t counterbalance forklift; lift 0–3.2 m, forks 1.1 m, capacity 1000 kg, disc radius 1.4 m, turn radius 2.5 m (vehicles/forklift.ts)') } satisfies AssetDef,
     ...SOCIAL_FIXTURES,
+    ...COMMONS_ASSETS,
     ...GARDEN_ASSETS,
     ...DRAWING_ASSETS,
     ...ACTIVITY_ASSETS,

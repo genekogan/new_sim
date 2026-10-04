@@ -18,7 +18,7 @@ import { hashOf, physicalView, type ActionRecord, type ActivityOption, type Anch
 import { loadMars, type Mars } from './load.ts';
 import { CodecError } from '../../../mars/viewer/engine/runtime/codec.ts';
 import { constructionPlan, unsafeConstruction, type BuildPhase } from './construction.ts';
-import { captureRenderScene, type RenderSceneCaptureV1 } from '@sim/engine-contract';
+import { captureRenderScene, commonsSceneMetadataV1Schema, type RenderSceneCaptureV1 } from '@sim/engine-contract';
 import { readNativeGathering } from './gathering-observation.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -38,9 +38,10 @@ type Prog = {
   ops: Op[]; action?: string; settle?: 'done' | 'held'; soft?: boolean; until?: number;
   build?: { phase: BuildPhase; crew: string[]; stopping?: Diag };
 };
-export type MarsWorldConfig = { scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
+export type MarsWorldConfig = { scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
 export const LITTLE_MARTIANS_WORLD: MarsWorldConfig={scene:'littlemartians',arrival:[0,18],arrivalPlace:'garden',reference:[0,16],grounds:{id:'grounds',name:'Ceramic garden'}};
 export const GREEN_FIELD_WORLD:MarsWorldConfig={scene:'greenfield',arrival:[0,0],arrivalPlace:'field',reference:[2,0],grounds:{id:'grounds',name:'Green field'}};
+export const EDEN_COMMONS_WORLD:MarsWorldConfig={scene:'eden-commons',arrival:[14,4],arrivalPlace:'commons',reference:[9,5],grounds:{id:'grounds',name:'Eden commons'}};
 const PROVING_GROUND: MarsWorldConfig = { scene: 'proving-ground', arrival: [-24, -10.5], arrivalPlace: 'lawn', reference: [-24, -8], grounds: { id: 'grounds', name: 'the grounds' } };
 
 const secs = (v: unknown, d: number) => Math.round(Math.min(3600, Math.max(0.5, typeof v === 'number' ? v : d)) * TPS);
@@ -490,7 +491,15 @@ export class MarsEngine implements Engine {
       if (near[0]) e.human.attention = [near[0].o.pose.p[0], near[0].o.pose.p[2]];
     }
   }
-  renderScene() { return {scene: structuredClone(this.m.scenes[this.rt.world.base.campus] ?? null), clock: this.cfg.clock?{origin:this.cfg.clock.origin,dayTicks:this.cfg.clock.dayTicks}:null,...(this.cfg.scene==='littlemartians'?structuredClone(this.m.littleMartiansRender):{}),ground:this.cfg.scene==='greenfield'?'grass' as const:undefined}; }
+  renderScene() {
+    const scene=structuredClone(this.m.scenes[this.rt.world.base.campus] ?? null);
+    if(this.cfg.scene==='eden-commons')scene.commons=commonsSceneMetadataV1Schema.parse({
+      version:'commons/1',source:'9b6db72fc2dcf45a762d7ce8e4db0b71d0418ea8',layout:structuredClone(this.m.commonsLayout),
+    });
+    return {scene,clock:this.cfg.clock?{origin:this.cfg.clock.origin,dayTicks:this.cfg.clock.dayTicks}:null,
+      ...(this.cfg.scene==='littlemartians'?structuredClone(this.m.littleMartiansRender):{}),
+      ground:['greenfield','eden-commons'].includes(this.cfg.scene)?'grass' as const:undefined};
+  }
   private startRecorder() {
     // Authored render bases are immutable for this engine instance. Supported
     // campus/clock/config boundaries change this key; actor/object motion is in
@@ -638,7 +647,7 @@ export class MarsEngine implements Engine {
   /** Mars's own resumable snapshot, plus which program each actor is in. Body-language steps lower only to verbs Mars can resume exactly. */
   snapshot(): EngineSnapshot {
     const mars = this.rt.snapshot();
-    return structuredClone({ format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, quiet: this.quiet });
+    return structuredClone({ format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, ...(this.cfg.scene==='eden-commons'?{commonsVersion:'commons/1'}:{}), quiet: this.quiet });
   }
   canSnapshot(): boolean {
     // A legacy formation callback is not data and must wait for a quiet point.
@@ -658,7 +667,7 @@ export class MarsEngine implements Engine {
 }
 
 function centroid(poly: [number, number][]): [number, number] { let x = 0, z = 0; for (const p of poly) { x += p[0]; z += p[1]; } return [r3(x / poly.length), r3(z / poly.length)]; }
-function nativeRulesVersion(version:string,cfg:MarsWorldConfig){return `sim-mars/1+${version}${cfg.safeCrewRemoval?'+crew-removal/1':''}`;}
+function nativeRulesVersion(version:string,cfg:MarsWorldConfig){return `sim-mars/1+${version}${cfg.safeCrewRemoval?'+crew-removal/1':''}${cfg.scene==='eden-commons'?'+commons/1':''}`;}
 
 /** The factory is made once the Mars engine has been loaded (an async import); after that everything is synchronous. */
 export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promise<EngineFactory> {
@@ -669,15 +678,19 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
     // A failed cross-policy checkpoint restore must not turn into replay under
     // another removal policy. An explicit, qualified transition is separate.
     canReplayHistory: version => {
+      if(cfg.scene==='eden-commons'&&version!==nativeRulesVersion(m.rulesVersion,cfg))return false;
+      const commons=version.match(/\+commons\/[^+]+/g)??[];
+      if(cfg.scene==='eden-commons'?commons.length!==1||commons[0]!=='+commons/1':commons.length!==0)return false;
       const policies=version.match(/\+crew-removal\/[^+]+/g)??[];
       return cfg.safeCrewRemoval?policies.length===1&&policies[0]==='+crew-removal/1':policies.length===0;
     },
     // Candidate removal changes controller behavior: restore only its exact
     // policy/version. Legacy activities31 compatibility remains unchanged.
-    canRestoreSnapshot: version => cfg.safeCrewRemoval?version===nativeRulesVersion(m.rulesVersion,cfg):[m.rulesVersion,m.rulesVersion.replace('+bodies/1',''),m.rulesVersion.replace('+bodies/1','').replace('activities/31','activities/29')].some(v=>version===nativeRulesVersion(v,cfg)),
+    canRestoreSnapshot: version => cfg.safeCrewRemoval||cfg.scene==='eden-commons'?version===nativeRulesVersion(m.rulesVersion,cfg):[m.rulesVersion,m.rulesVersion.replace('+bodies/1',''),m.rulesVersion.replace('+bodies/1','').replace('activities/31','activities/29')].some(v=>version===nativeRulesVersion(v,cfg)),
     /** The synthetic proving ground (a campfire, two benches, a lawn), emptied of its test people: Souls arrive by being born. */
     genesis(seed: string): WorldState {
       if (cfg.scene === 'littlemartians') return m.littleMartiansWorld(seed);
+      if (cfg.scene === 'eden-commons') return m.edenCommonsWorld(seed);
       if (cfg.scene === 'greenfield') return m.greenFieldWorld(seed);
       if (cfg.scene === 'eden-camp') return m.edenCampWorld(seed);
       if (cfg.scene === 'meal') { const w = m.mealWorld(); w.rng = m.seedRng(seed); return w as WorldState; }
@@ -686,15 +699,21 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
       w.rng = m.seedRng(seed);
       return w as WorldState;
     },
-    create: (world) => new MarsEngine(m, new m.Runtime(world, registry, services(world), m.invariants), cfg),
+    create: (world) => {
+      if(cfg.scene==='eden-commons'&&(world.base.campus!=='eden-commons'||world.base.staticHash!==m.edenCommonsWorld().base.staticHash))throw new Error('world commons physical base differs from the native factory');
+      return new MarsEngine(m, new m.Runtime(world, registry, services(world), m.invariants), cfg);
+    },
     restore(snap: EngineSnapshot) {
-      const s = structuredClone(snap) as EngineSnapshot & { mars: any; programs: Prog[]; nextProg: number; leaving: string[]; cfg: MarsWorldConfig; quiet?: boolean };
+      const s = structuredClone(snap) as EngineSnapshot & { mars: any; programs: Prog[]; nextProg: number; leaving: string[]; cfg: MarsWorldConfig; commonsVersion?:string; quiet?: boolean };
       if (s.format !== SNAPSHOT_FORMAT) throw new Error(`bad snapshot format ${s.format}`);
       if(!!s.cfg?.safeCrewRemoval!==!!cfg.safeCrewRemoval)throw new Error('snapshot removal policy differs from the native factory');
+      if((s.cfg?.scene==='eden-commons'||cfg.scene==='eden-commons')&&s.cfg?.scene!==cfg.scene)throw new Error('snapshot commons layout differs from the native factory');
+      if(cfg.scene==='eden-commons'&&s.commonsVersion!=='commons/1')throw new Error('snapshot commons rules differ from the native factory');
       // Spatial services are rebuilt for the same base scene; the snapshot carries the rest.
       const scene = (s.cfg ?? cfg).scene;
-      const base = scene === 'littlemartians' ? m.littleMartiansWorld() : scene === 'greenfield' ? m.greenFieldWorld() : scene === 'eden-camp' ? m.edenCampWorld() : scene === 'meal' ? m.mealWorld() : m.provingGroundWorld();
+      const base = scene === 'eden-commons' ? m.edenCommonsWorld() : scene === 'littlemartians' ? m.littleMartiansWorld() : scene === 'greenfield' ? m.greenFieldWorld() : scene === 'eden-camp' ? m.edenCampWorld() : scene === 'meal' ? m.mealWorld() : m.provingGroundWorld();
       const rt = m.Runtime.restore(s.mars, registry, services(base), m.invariants);
+      if(cfg.scene==='eden-commons'&&(rt.world.base.campus!=='eden-commons'||rt.world.base.staticHash!==base.base.staticHash))throw new Error('snapshot commons physical base differs from the native factory');
       const engine = new MarsEngine(m, rt, s.cfg ?? cfg, { programs: s.programs, nextProg: s.nextProg, leaving: s.leaving });
       if (s.quiet) engine.beginQuiet();
       return engine;
