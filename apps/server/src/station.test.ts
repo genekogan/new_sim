@@ -17,7 +17,7 @@ import {config} from './config.ts';
 import {Souls} from './souls.ts';
 import type {Brain} from './brain.ts';
 import type {Hub} from './hub.ts';
-import {acceptStationFixture,STATION_PRIVATE} from '../test/fixtures/station/generate.ts';
+import {acceptStationFixture,generateStationFixture,STATION_PRIVATE} from '../test/fixtures/station/generate.ts';
 
 test('actual candidate never defaults missing/malformed/mixed observations to ordinary and refuses private facts before append',async t=>{
   const factory=await marsFactory(),db=new Db(':memory:');t.after(()=>db.close());
@@ -57,7 +57,9 @@ test('default selected-world routes remain uninstalled; an isolated same-piece r
   assert.equal(station.history(first.station!,2561).cue,null);assert.equal(station.history(first.station!,2563).cue!.cueId,next.cue!.cueId);
 });
 test('serialized native paired fixture has strict public facts, finite history, immutable addressed takes and actual TCP/WS receipts',()=>{
-  const f=JSON.parse(readFileSync(new URL('../test/fixtures/station/native-station.v1.json',import.meta.url),'utf8'));
+  const bytes=readFileSync(new URL('../test/fixtures/station/native-station.v1.json',import.meta.url));
+  assert.equal(createHash('sha256').update(bytes).digest('hex'),'27b78076a33d961ff8cd48970bb37e359b327ebdca0819ecb9ae6bc57d80b671');
+  const f=JSON.parse(bytes.toString());
   for(const sample of f.views)stationLiveV1Schema.parse(sample.view);stationLiveV1Schema.parse(f.live);stationLiveV1Schema.parse(f.streamed);
   for(const historical of f.history)stationHistoricalV1Schema.parse(historical);
   assert.deepEqual(f.views.filter((v:any)=>['ordinary','gathering-performance','next-ordinary'].includes(v.phase)).map((v:any)=>v.view.cue.pieceId),['starfield','zoning-board','starfield']);
@@ -68,7 +70,24 @@ test('serialized native paired fixture has strict public facts, finite history, 
   decodeSceneCapturePublication(f.capture);assert.equal(JSON.stringify(f).includes(STATION_PRIVATE),false);
   for(const key of ['anonymousTcpGET','anonymousHubWS','streamedAnchor','reconnectLatestSameCue','restartRequiresFreshAnchor'])assert.equal(f.transport[key],true);
   assert.equal(f.paid,0);assert.equal(f.reconstruction.snapshot,'exact');assert.equal(f.reconstruction.genesis,'exact');
-  for(const [path,sha] of Object.entries(f.producer.authoredSourceSha256))assert.equal(createHash('sha256').update(readFileSync(new URL('../../../'+path,import.meta.url))).digest('hex'),sha);
+  // Immutable earlier recording proves its own authored input, not whichever
+  // source a later server happens to load. Keep the original bytes/hash and
+  // compare against the actual reviewed producer commit; current execution is
+  // qualified separately below instead of relabeling this historical proof.
+  for(const [path,sha] of Object.entries(f.producer.authoredSourceSha256)) {
+    const source=execFileSync('git',['show',`d0b08ff5358b78c82bf15d2c0b526b5579edee41:${path}`],{cwd:fileURLToPath(new URL('../../../',import.meta.url))});
+    assert.equal(createHash('sha256').update(source).digest('hex'),sha);
+  }
+});
+test('fresh current-source native station generation still reconstructs through SQLite, genesis and actual anonymous TCP/WS',async t=>{
+  const fresh=await generateStationFixture();
+  for(const [path,sha] of Object.entries(fresh.producer.authoredSourceSha256))
+    assert.equal(createHash('sha256').update(readFileSync(new URL('../../../'+path,import.meta.url))).digest('hex'),sha);
+  assert.equal(fresh.reconstruction.snapshot,'exact');assert.equal(fresh.reconstruction.genesis,'exact');
+  assert.equal(fresh.transport.anonymousTcpGET,true);assert.equal(fresh.transport.anonymousHubWS,true);
+  assert.equal(fresh.transport.streamedAnchor,true);assert.equal(fresh.transport.reconnectLatestSameCue,true);
+  assert.equal(fresh.paid,0);stationLiveV1Schema.parse(fresh.live);
+  t.diagnostic(`fresh native producer: ${fresh.facts.length} facts; ${fresh.views.length} views; paid=$0; original recording unchanged`);
 });
 test('new actual Core selections/retentions agree with the exact pinned inactive App policy on recorded native samples',async()=>{
   const f=JSON.parse(readFileSync(new URL('../test/fixtures/station/native-station.v1.json',import.meta.url),'utf8'));

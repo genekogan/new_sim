@@ -122,6 +122,17 @@ metadata; Brain adds a read-only opt-in flag; HTTP adds optional V2 routes. App
 paced-station fixture must pin current committed sources/dependencies rather
 than import moving worktree files. No station/default activation from this MR.
 
+Post-commit station follow-up initially returned4/5: the preserved station
+recording's provenance test compared its earlier authored HTTP hash with current
+HTTP source. (The mismatch was HTTP, not Db.) Preserve the exact27b78076 recording
+and all nine authored hashes against producerd0b08ff. The corrected check now
+explicitly qualifies that immutable historical input; a separate fresh actual
+current-source generator exercises native station/SQLite/genesis/TCP/WS again.
+This is compatibility evidence, never a rewrite of the old receipt as a new run.
+App's15 runtime input hashes remain exactly234081e; the follow-up changes only
+this document and station.test.ts. Final follow-up10/10 includes the fresh current producer, finite codec and
+history checks; final server tsc exit0. The first4/5 remains failed.
+
 Broader Goal continues into the retained-intention/privacy/physical program.
 Existing-world commons transition/rollback and terrain/water/boat/composition/
 memory work remain unfinished. Window ends October6 23:59 America/New_York;
