@@ -37,7 +37,7 @@ type Prog = {
   ops: Op[]; action?: string; settle?: 'done' | 'held'; soft?: boolean; until?: number;
   build?: { phase: BuildPhase; crew: string[]; stopping?: Diag };
 };
-export type MarsWorldConfig = { scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
+export type MarsWorldConfig = { scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
 export const LITTLE_MARTIANS_WORLD: MarsWorldConfig={scene:'littlemartians',arrival:[0,18],arrivalPlace:'garden',reference:[0,16],grounds:{id:'grounds',name:'Ceramic garden'}};
 export const GREEN_FIELD_WORLD:MarsWorldConfig={scene:'greenfield',arrival:[0,0],arrivalPlace:'field',reference:[2,0],grounds:{id:'grounds',name:'Green field'}};
 const PROVING_GROUND: MarsWorldConfig = { scene: 'proving-ground', arrival: [-24, -10.5], arrivalPlace: 'lawn', reference: [-24, -8], grounds: { id: 'grounds', name: 'the grounds' } };
@@ -99,7 +99,7 @@ export class MarsEngine implements Engine {
 
   constructor(m: Mars, rt: any, cfg: MarsWorldConfig, saved?: { programs: Prog[]; nextProg: number; leaving: string[] }) {
     this.m = m; this.rt = rt; this.cfg = structuredClone(cfg); this.registry = rt.registry;
-    this.schema = rt.world.schema; this.rulesVersion = `sim-mars/1+${m.rulesVersion}`;
+    this.schema = rt.world.schema; this.rulesVersion = nativeRulesVersion(m.rulesVersion,cfg);
     if (saved) { for (const p of saved.programs) { this.programs.set(p.id, p); this.byActor.set(p.actor, p.id); } this.nextProg = saved.nextProg; this.leaving = saved.leaving; }
     this.cursor = rt.events.length;
     this.startRecorder();
@@ -118,7 +118,7 @@ export class MarsEngine implements Engine {
     return [...BODY_VERBS, ...this.m.describeVerbs(this.registry).map((v) => ({ ...v, verb: `mars:${v.verb}`, description: `[Mars verb] ${v.description}`, scope: 'world' as const }))];
   }
   /** The world plus the adapter's own state (which program each actor is in), since both decide what happens next. */
-  stateHash(): string { return hashOf({ w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet }); }
+  stateHash(): string { return hashOf({ w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet, ...(this.cfg.safeCrewRemoval?{removalPolicy:'crew-removal/1'}:{}) }); }
   physicalHash(): string { return hashOf(physicalView(this.world)); }
 
   // ------------------------------------------------------------------ tick
@@ -441,14 +441,18 @@ export class MarsEngine implements Engine {
   }
   private tryRemove(id: string): boolean {
     if (!this.ents[id]) return true;
+    // A committed build owns its whole crew even between native actions,
+    // when no actor reservation exists. Never pull a holder out of the load.
+    if(this.cfg.safeCrewRemoval&&[...this.programs.values()].some(p=>p.build?.crew.includes(id)))return false;
     if (!this.release(id, { code: 'actor.removed', message: 'actor removed' })) return false;
     delete this.ents[id]; this.keys.delete(id); this.acts.delete(id); this.ons.delete(id);
     this.out.changes.push([this.rt.tick, id, 'present', null]);
     return true;
   }
   removeEntity(id: string) {
+    if(this.cfg.safeCrewRemoval)for(const p of this.programs.values())if(p.build?.crew.includes(id))this.stop(p.id);
     const pid = this.byActor.get(id); if (pid) this.stop(pid);
-    if (!this.tryRemove(id)) this.leaving.push(id);        // a seated person stands up first; then they go
+    if (!this.tryRemove(id)&&(!this.cfg.safeCrewRemoval||!this.leaving.includes(id))) this.leaving.push(id); // finish owned obligations first
   }
 
   // ------------------------------------------------------------------ what the shell reads
@@ -652,15 +656,17 @@ export class MarsEngine implements Engine {
 }
 
 function centroid(poly: [number, number][]): [number, number] { let x = 0, z = 0; for (const p of poly) { x += p[0]; z += p[1]; } return [r3(x / poly.length), r3(z / poly.length)]; }
+function nativeRulesVersion(version:string,cfg:MarsWorldConfig){return `sim-mars/1+${version}${cfg.safeCrewRemoval?'+crew-removal/1':''}`;}
 
 /** The factory is made once the Mars engine has been loaded (an async import); after that everything is synchronous. */
 export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promise<EngineFactory> {
   const m = await loadMars();
   const registry = m.createRegistry(), services = m.servicesFor(m.scenes);
   return {
-    rulesVersion: `sim-mars/1+${m.rulesVersion}`,
-    // activities31 only adds new verbs; existing checkpoint codecs and body physics are unchanged.
-    canRestoreSnapshot: version => [m.rulesVersion,m.rulesVersion.replace('+bodies/1',''),m.rulesVersion.replace('+bodies/1','').replace('activities/31','activities/29')].some(v=>version===`sim-mars/1+${v}`),
+    rulesVersion: nativeRulesVersion(m.rulesVersion,cfg),
+    // Candidate removal changes controller behavior: restore only its exact
+    // policy/version. Legacy activities31 compatibility remains unchanged.
+    canRestoreSnapshot: version => cfg.safeCrewRemoval?version===nativeRulesVersion(m.rulesVersion,cfg):[m.rulesVersion,m.rulesVersion.replace('+bodies/1',''),m.rulesVersion.replace('+bodies/1','').replace('activities/31','activities/29')].some(v=>version===nativeRulesVersion(v,cfg)),
     /** The synthetic proving ground (a campfire, two benches, a lawn), emptied of its test people: Souls arrive by being born. */
     genesis(seed: string): WorldState {
       if (cfg.scene === 'littlemartians') return m.littleMartiansWorld(seed);
@@ -676,6 +682,7 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
     restore(snap: EngineSnapshot) {
       const s = structuredClone(snap) as EngineSnapshot & { mars: any; programs: Prog[]; nextProg: number; leaving: string[]; cfg: MarsWorldConfig; quiet?: boolean };
       if (s.format !== SNAPSHOT_FORMAT) throw new Error(`bad snapshot format ${s.format}`);
+      if(!!s.cfg?.safeCrewRemoval!==!!cfg.safeCrewRemoval)throw new Error('snapshot removal policy differs from the native factory');
       // Spatial services are rebuilt for the same base scene; the snapshot carries the rest.
       const scene = (s.cfg ?? cfg).scene;
       const base = scene === 'littlemartians' ? m.littleMartiansWorld() : scene === 'greenfield' ? m.greenFieldWorld() : scene === 'eden-camp' ? m.edenCampWorld() : scene === 'meal' ? m.mealWorld() : m.provingGroundWorld();

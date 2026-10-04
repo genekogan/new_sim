@@ -86,6 +86,34 @@ export class LifecycleJournal {
     const ref=op.terminal!;const e=this.db.events(op.scope.worldId,ref.seq-1,1)[0];
     if(!e||e.seq!==ref.seq||e.tick!==ref.tick||hashOf(e)!==ref.hash)throw new Error('Lifecycle terminal association changed');
   }
+  /** Called ONLY by this Db's WorldHost acceptance journal after its event
+   * insert, while the same writer transaction is still open. Never appends. */
+  linkAccepted(scope:LifecycleScope,requestId:string,event:LogEvent,guard:Guard):true{
+    if(!this.db.db.isTransaction)throw new Error('Lifecycle link requires the host acceptance transaction');
+    this.guarded(guard);const op=this.required(scope,requestId),row=this.current(scope);
+    const payload=op.operation==='create'?{soulId:scope.soulId,entityId:scope.entityId,owner:scope.owner,name:op.name,description:op.description}:{soulId:scope.soulId,entityId:scope.entityId};
+    const stored=this.db.tailEvents(scope.worldId,1)[0];
+    if(op.state!=='pending'||(op.operation==='create'?row.retired_at!==null:row.retired_at===null)
+      ||event.kind!==(op.operation==='create'?'birth':'retire')||hashOf(event.payload)!==hashOf(payload)
+      ||event.author!==(op.operation==='create'&&op.native?'world':`soul:${scope.soulId}`)
+      ||!stored||stored.seq!==event.seq||hashOf(stored)!==hashOf(event))throw new Error('Lifecycle host event does not match the pending operation');
+    this.db.db.prepare("UPDATE lifecycle_operations_v1 SET state='recorded',revision=revision+1,seq=?,tick=?,event_hash=? WHERE world_id=? AND request_id=?")
+      .run(event.seq,event.tick,hashOf(event),scope.worldId,requestId);
+    return true;
+  }
+  /** Removal's generic public checkpoint is inserted by the host, then its
+   * private terminal association is linked in that same transaction. */
+  linkRemovalComplete(scope:LifecycleScope,requestId:string,event:LogEvent,physicalGuard:Guard):true{
+    if(!this.db.db.isTransaction)throw new Error('Lifecycle completion link requires the host acceptance transaction');
+    this.guarded(physicalGuard);const op=this.required(scope,requestId);this.current(scope);this.verifyFact(op);
+    const stored=this.db.tailEvents(scope.worldId,1)[0];
+    if(op.operation!=='retire'||op.state!=='recorded'||event.kind!=='rules'||event.author!=='world'
+      ||hashOf(event.payload)!==hashOf({checkpoint:'lifecycle-removal-confirmed'})||event.tick<op.fact!.tick
+      ||!stored||stored.seq!==event.seq||hashOf(stored)!==hashOf(event))throw new Error('Lifecycle host removal checkpoint does not match');
+    this.db.db.prepare("UPDATE lifecycle_operations_v1 SET state='complete',revision=revision+1,terminal_seq=?,terminal_tick=?,terminal_hash=? WHERE world_id=? AND request_id=?")
+      .run(event.seq,event.tick,hashOf(event),scope.worldId,requestId);
+    return true;
+  }
   record(scope:LifecycleScope,requestId:string,event:LogEvent,guard:Guard):LifecycleOperation{
     return this.transaction(()=>{
       this.guarded(guard);const op=this.required(scope,requestId),row=this.current(scope);
@@ -128,9 +156,11 @@ export class LifecycleJournal {
       return this.required(scope,requestId);
     });
   }
-  recover(worldId:string,limit=20):LifecycleOperation[]{
+  recover(worldId:string,limit=20,after?:{requestedAt:number;requestId:string}):LifecycleOperation[]{
     id.parse(worldId);if(!Number.isInteger(limit)||limit<1||limit>20)throw new Error('Lifecycle recovery page limit');
-    return (this.db.db.prepare("SELECT * FROM lifecycle_operations_v1 WHERE world_id=? AND state IN ('pending','recorded') ORDER BY requested_at,request_id LIMIT ?").all(worldId,limit) as Row[]).map(row=>this.checked(row));
+    if(after){lifecycleRequestIdSchema.parse(after.requestId);if(!Number.isSafeInteger(after.requestedAt)||after.requestedAt<0)throw new Error('Lifecycle recovery cursor');}
+    return (this.db.db.prepare("SELECT * FROM lifecycle_operations_v1 WHERE world_id=? AND state IN ('pending','recorded') AND (? IS NULL OR requested_at>? OR (requested_at=? AND request_id>?)) ORDER BY requested_at,request_id LIMIT ?")
+      .all(worldId,after?.requestedAt??null,after?.requestedAt??null,after?.requestedAt??null,after?.requestId??null,limit) as Row[]).map(row=>this.checked(row));
   }
   ownerPage(worldId:string,owner:string,cursor:string|null=null){
     id.parse(worldId);id.parse(owner);let after:Row|undefined;
