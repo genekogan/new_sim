@@ -2,7 +2,8 @@
 // This does not validate physics, content hashes, authority or privacy; producers
 // and consumers must prove those separately. Additive fields are preserved.
 import { z } from 'zod';
-import { renderSceneRefV1Schema,parseRenderSceneCapture,type RenderSceneCaptureV1 } from '@sim/engine-contract';
+import { renderSceneRefV1Schema } from '@sim/engine-contract/scene-capture';
+export {decodeSceneCapturePublication,type SceneCapturePublication} from './scene-capture.ts';
 
 const tick = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const finite = z.number().finite();
@@ -48,12 +49,3 @@ export const scenePublicationSchema = z.object({
   ground: z.literal('grass').optional(),
 }).passthrough();
 export type ScenePublication = z.infer<typeof scenePublicationSchema>;
-/** Historical render-base lookup. Caller verifies the selected world and
- * requested hash; this codec verifies bounded capture structure/content only. */
-export type SceneCapturePublication = RenderSceneCaptureV1 & {worldId:string};
-export function decodeSceneCapturePublication(raw:unknown):SceneCapturePublication {
-  const envelope=z.object({worldId:z.string().min(1).max(96),contract:z.literal('render-scene-capture/1'),
-    ref:renderSceneRefV1Schema,body:z.unknown()}).strict().parse(raw);
-  const {worldId,...capture}=envelope;
-  return {worldId,...parseRenderSceneCapture(capture)};
-}

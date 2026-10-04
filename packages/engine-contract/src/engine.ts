@@ -4,7 +4,8 @@ import type { ActionRecord } from './actions.ts';
 import type { RuntimeEvent } from './runtime.ts';
 import type { WorldState, Vec3 } from './world.ts';
 import type { VerbInfo } from './registry.ts';
-import type { RenderSceneCaptureV1 } from './scene-capture.ts';
+import type { RenderScene,RenderSceneCaptureV1 } from './scene-capture.ts';
+export type {RenderScene} from './scene-capture.ts';
 
 /** A feasible activity for an actor, params already bound. The brain picks by id only. */
 export type ActivityOption = {
@@ -39,16 +40,6 @@ export type ChangeEvent = [number, string, string, unknown]; // [tick, entityId,
  * place Things; depiction programs refer back to them by `entity` or `point`.
  */
 export type Anchor = { id: string; kind: 'region' | 'place'; name: string; in?: string; entity?: string; point?: [number, number]; tags?: string[] };
-/** Current public render base. Geometry stays engine-specific; optional take
- * captures identify this output, not a complete physical scene/asset manifest. */
-export type RenderScene = {
-  scene: unknown;
-  buildings?: { file: string; p: [number, number, number]; yaw?: number }[];
-  kin?: { model: string; p: [number, number, number]; yaw?: number; radius?: number; hoverHeight?: number; hover?:number }[];
-  clock?: { origin: number; dayTicks: number } | null;
-  ground?: 'grass';
-};
-
 /** A depiction program for one actor: an ordered list of engine verbs. */
 export type Program = { actor: string; label: string; steps: { verb: string; params: Record<string, unknown> }[] };
 export type ProgramAdmission = { id:string; ok:boolean; diagnostic?:{code:string;message:string} };

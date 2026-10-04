@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./scene-capture": "./src/scene-capture.ts"
   },
   "dependencies": {
     "@sim/engine-contract": "workspace:*",

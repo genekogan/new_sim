@@ -1,0 +1,37 @@
+{
+  "contract": "core-public-scene-codec-input/1",
+  "semanticsParent": "3ab5daaddf949104651f93cc15afabfa21be6d3b",
+  "entry": "@sim/protocol/scene-capture",
+  "files": [
+    {
+      "path": "packages/engine-contract/package.json",
+      "sha256": "142bfbb9ae961eb7fb66128da447e1c668a7f2f7decb56b2ca623f68f058a24e",
+      "bytes": 402
+    },
+    {
+      "path": "packages/engine-contract/src/hash.ts",
+      "sha256": "72a539ca671ddad056eca90ae94a70803d96a6622cdb31bc7e3c19a2758346b7",
+      "bytes": 3468
+    },
+    {
+      "path": "packages/engine-contract/src/scene-capture.ts",
+      "sha256": "2b529a94ba792b92ed6e10a2ee80fbaae8c139a7bd5703f32ae582e6064ac438",
+      "bytes": 2791
+    },
+    {
+      "path": "packages/protocol/package.json",
+      "sha256": "6595b99b49d5ddaee47a02f56489673e2080e2d1dbbc37b3265a310ab6c553d5",
+      "bytes": 367
+    },
+    {
+      "path": "packages/protocol/src/scene-capture.ts",
+      "sha256": "76c60ba03e5a4a7050a4c1b854ed07b3c1662266865ccf18c841000d026adbdd",
+      "bytes": 833
+    }
+  ],
+  "existingDependency": {
+    "name": "zod",
+    "version": "4.6.5"
+  },
+  "scope": "public source leaf/runtime closure for isolated World consumer; no engine/storage/kernel/index adoption or new dependency installation"
+}

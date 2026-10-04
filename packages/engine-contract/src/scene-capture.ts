@@ -1,7 +1,14 @@
 // An observation of the public render base, not a physical scene installation.
 import { z } from 'zod';
 import { hashOf } from './hash.ts';
-import type { RenderScene } from './engine.ts';
+/** Current public render base, without physical controller dependencies. */
+export type RenderScene = {
+  scene:unknown;
+  buildings?:{file:string;p:[number,number,number];yaw?:number}[];
+  kin?:{model:string;p:[number,number,number];yaw?:number;radius?:number;hoverHeight?:number;hover?:number}[];
+  clock?:{origin:number;dayTicks:number}|null;
+  ground?:'grass';
+};
 
 const finite = z.number().finite();
 const vec3 = z.tuple([finite, finite, finite]);
