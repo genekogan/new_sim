@@ -106,6 +106,29 @@ export const MIGRATIONS: { id: number; name: string; up(db: DatabaseSync): void 
       PRIMARY KEY(world_id,hash)
     )`);
   } },
+  { id: 12, name: 'private candidate lifecycle operations', up(db) {
+    // Empty additive journal only. No historical Soul backfill or route activation.
+    db.exec(`CREATE TABLE lifecycle_operations_v1 (
+      world_id TEXT NOT NULL REFERENCES worlds(id), request_id TEXT NOT NULL,
+      soul_id TEXT NOT NULL REFERENCES souls(id), owner_id TEXT NOT NULL REFERENCES users(id), entity_id TEXT NOT NULL,
+      operation TEXT NOT NULL CHECK(operation IN ('create','retire')),
+      state TEXT NOT NULL CHECK(state IN ('pending','recorded','complete','refused')),
+      body TEXT NOT NULL CHECK(json_valid(body)), body_hash TEXT NOT NULL,
+      revision INTEGER NOT NULL CHECK(revision>0), requested_at INTEGER NOT NULL,
+      seq INTEGER, tick INTEGER, event_hash TEXT,
+      terminal_seq INTEGER, terminal_tick INTEGER, terminal_hash TEXT,
+      PRIMARY KEY(world_id,request_id), UNIQUE(world_id,soul_id,operation),
+      FOREIGN KEY(world_id,seq) REFERENCES events(world_id,seq),
+      FOREIGN KEY(world_id,terminal_seq) REFERENCES events(world_id,seq),
+      CHECK((state IN ('pending','refused') AND seq IS NULL AND tick IS NULL AND event_hash IS NULL)
+         OR (state IN ('recorded','complete') AND seq IS NOT NULL AND tick IS NOT NULL AND event_hash IS NOT NULL)),
+      CHECK(state!='refused' OR operation='create'),
+      CHECK((state='complete' AND terminal_seq IS NOT NULL AND terminal_tick IS NOT NULL AND terminal_hash IS NOT NULL)
+         OR (state!='complete' AND terminal_seq IS NULL AND terminal_tick IS NULL AND terminal_hash IS NULL))
+    )`);
+    db.exec('CREATE INDEX lifecycle_operations_pending ON lifecycle_operations_v1(world_id,state,requested_at,request_id)');
+    db.exec('CREATE INDEX lifecycle_operations_owner ON lifecycle_operations_v1(world_id,owner_id,requested_at,request_id)');
+  } },
 ];
 
 export function migrate(db: DatabaseSync): number[] {

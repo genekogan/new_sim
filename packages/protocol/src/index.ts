@@ -172,6 +172,7 @@ export function viewRow(e: Entity, pose: PoseSample): [string, string, string | 
   return [e.id, e.human?.activity ?? '', e.human?.on ?? null, pose[1], pose[3]];
 }
 export { samplePath };
+export * from './lifecycle.ts';
 
 // ---------------------------------------------------------------- REST
 export const createSoulSchema = z.strictObject({
