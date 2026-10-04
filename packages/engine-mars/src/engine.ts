@@ -18,6 +18,7 @@ import { hashOf, physicalView, type ActionRecord, type ActivityOption, type Anch
 import { loadMars, type Mars } from './load.ts';
 import { CodecError } from '../../../mars/viewer/engine/runtime/codec.ts';
 import { constructionPlan, unsafeConstruction, type BuildPhase } from './construction.ts';
+import { captureRenderScene, type RenderSceneCaptureV1 } from '@sim/engine-contract';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const TPS = 20;
@@ -90,6 +91,9 @@ export class MarsEngine implements Engine {
   private leaving: string[] = [];                    // bodies to remove once nothing holds them
   private out: { paths: PathCommit[]; changes: ChangeEvent[]; programs: ProgramEvent[] } = { paths: [], changes: [], programs: [] };
   private recorder: any;
+  private recorderScene!: RenderSceneCaptureV1;
+  private renderBaseKey = '';
+  private takeScenes = new Map<string,RenderSceneCaptureV1>();
   private quiet = false;
   private chunks: { fromTick: number; toTick: number; take: unknown }[] = [];
 
@@ -98,7 +102,7 @@ export class MarsEngine implements Engine {
     this.schema = rt.world.schema; this.rulesVersion = `sim-mars/1+${m.rulesVersion}`;
     if (saved) { for (const p of saved.programs) { this.programs.set(p.id, p); this.byActor.set(p.actor, p.id); } this.nextProg = saved.nextProg; this.leaving = saved.leaving; }
     this.cursor = rt.events.length;
-    this.recorder = new m.TakeRecorder(rt, { rulesVersion: this.rulesVersion });
+    this.startRecorder();
     const self = this;
     this.runtime = {
       get tick() { return self.rt.tick as number; },
@@ -126,10 +130,8 @@ export class MarsEngine implements Engine {
     const tick: number = this.rt.tick;
     for (const p of [...this.programs.values()]) this.advance(p);
     if (tick - this.recorder.startTick >= 20) {
-      const take = this.recorder.finish();
-      this.chunks.push({ fromTick: take.startTick, toTick: tick, take });
-      if (this.chunks.length > 12) this.chunks.shift();
-      this.recorder = new this.m.TakeRecorder(this.rt, { rulesVersion: this.rulesVersion });
+      this.finishRecorder();
+      this.startRecorder();
     }
     if (this.leaving.length) this.leaving = this.leaving.filter((id) => !this.tryRemove(id));
     // What changed, for broadcast: an activity change is an event; movement is a keyframe every KEY_EVERY ticks.
@@ -482,7 +484,27 @@ export class MarsEngine implements Engine {
       if (near[0]) e.human.attention = [near[0].o.pose.p[0], near[0].o.pose.p[2]];
     }
   }
-  renderScene() { return {scene: structuredClone(this.m.scenes[this.rt.world.base.campus] ?? null), clock: this.cfg.clock ?? null,...(this.cfg.scene==='littlemartians'?structuredClone(this.m.littleMartiansRender):{}),ground:this.cfg.scene==='greenfield'?'grass':undefined}; }
+  renderScene() { return {scene: structuredClone(this.m.scenes[this.rt.world.base.campus] ?? null), clock: structuredClone(this.cfg.clock ?? null),...(this.cfg.scene==='littlemartians'?structuredClone(this.m.littleMartiansRender):{}),ground:this.cfg.scene==='greenfield'?'grass' as const:undefined}; }
+  private startRecorder() {
+    // Authored render bases are immutable for this engine instance. Supported
+    // campus/clock/config boundaries change this key; actor/object motion is in
+    // the take and does not cause repeated hashing of a static render base.
+    const key=JSON.stringify([this.rt.world.base.campus,this.cfg.scene,this.cfg.clock??null]);
+    if(key!==this.renderBaseKey) {
+      this.recorderScene=captureRenderScene(this.rulesVersion,this.renderScene());this.renderBaseKey=key;
+    }
+    this.takeScenes.set(this.recorderScene.ref.hash,this.recorderScene);
+    this.recorder=new this.m.TakeRecorder(this.rt,{rulesVersion:this.rulesVersion,renderSceneRef:structuredClone(this.recorderScene.ref)});
+    const retained=new Set([this.recorderScene.ref.hash,...this.chunks.map(c=>(c.take as {renderSceneRef:{hash:string}}).renderSceneRef.hash)]);
+    for(const hash of this.takeScenes.keys())if(!retained.has(hash))this.takeScenes.delete(hash);
+  }
+  private finishRecorder() {
+    const take=this.recorder.finish();
+    if(this.rt.tick<=take.startTick)return;
+    this.chunks.push({fromTick:take.startTick,toTick:this.rt.tick,take});
+    if(this.chunks.length>12)this.chunks.shift();
+  }
+  takeScene(hash:string) { const captured=this.takeScenes.get(hash);return captured?structuredClone(captured):undefined; }
   actorBorrowed(actor: string) {
     return !this.byActor.has(actor) && ([...this.programs.values()].some(p=>p.build?.crew.includes(actor)) || this.holders(actor).some(id => ['shared_food_break','converse','classroom_session','computer_music','campfire_circle','group_warmup'].includes(this.rt.records.get(id)?.verb)));
   }
@@ -509,9 +531,12 @@ export class MarsEngine implements Engine {
     if (this.rt.world.base.campus === 'eden-camp') return;
     if (!this.isQuiet()) throw new Error('camp.adoption-not-quiet');
     const camp = this.m.edenCampWorld();
+    for(const id of Object.keys(camp.entities))if(this.ents[id])throw new Error(`camp.entity-collision:${id}`);
+    // Seal the old public render base before replacing campus/runtime. Even a
+    // partial segment keeps its own geometry; no chunk straddles this boundary.
+    this.finishRecorder();
     // Add the camp without deleting the original bodies, fixtures, object progress or regions.
     for (const [id, e] of Object.entries(camp.entities)) {
-      if (this.ents[id]) throw new Error(`camp.entity-collision:${id}`);
       this.ents[id] = e;
     }
     for (const [id, r] of Object.entries(camp.regions)) if (!this.rt.world.regions[id]) this.rt.world.regions[id] = r;
@@ -521,7 +546,7 @@ export class MarsEngine implements Engine {
     if (actors.length >= 2) this.m.bindCampChess(this.rt.world, actors[0], actors[1]);
     this.rt = new this.m.Runtime(this.rt.world, this.registry, this.m.servicesFor(this.m.scenes)(this.rt.world), this.m.invariants);
     this.rt.beginActionEpoch(); this.cursor = 0;
-    this.recorder = new this.m.TakeRecorder(this.rt, {rulesVersion: this.rulesVersion});
+    this.startRecorder();
   }
   restockCamp() {
     if (this.rt.world.base.campus !== 'eden-camp' || !this.isQuiet()) return;
@@ -539,7 +564,12 @@ export class MarsEngine implements Engine {
     this.cfg.sleepBlockTicks = policy.sleepBlockTicks;
     this.cfg.quietSeatCourtesy = policy.quietSeatCourtesy;
   }
-  configureClock(clock: { origin: number; dayTicks: number }) { this.cfg.clock = { ...clock }; this.updateClock(); }
+  configureClock(clock: { origin: number; dayTicks: number }) {
+    if(!Number.isSafeInteger(clock.origin)||clock.origin<0||!Number.isSafeInteger(clock.dayTicks)||clock.dayTicks<=0)
+      throw new TypeError('invalid render clock');
+    if(this.cfg.clock?.origin===clock.origin&&this.cfg.clock?.dayTicks===clock.dayTicks){this.updateClock();return;}
+    this.finishRecorder();this.cfg.clock={...clock};this.updateClock();this.startRecorder();
+  }
   private updateClock() {
     const c = this.cfg.clock; if (!c) return;
     this.rt.world.env.datetime = new Date(Date.UTC(2026, 9, 3, 6) + Math.max(0, this.rt.tick - c.origin) / c.dayTicks * 86400_000).toISOString();
@@ -592,12 +622,10 @@ export class MarsEngine implements Engine {
   isQuiet() { return this.programs.size === 0 && this.m.compactionIssue(this.rt) === null; }
   compact() {
     if (!this.isQuiet()) throw new Error('compaction.not-quiet');
-    if (this.rt.tick > this.recorder.startTick) {
-      const take = this.recorder.finish(); this.chunks.push({fromTick: take.startTick, toTick: this.rt.tick, take}); this.chunks = this.chunks.slice(-12);
-    }
+    this.finishRecorder();
     this.rt = this.m.compactRuntime(this.rt, this.m.servicesFor(this.m.scenes));
     this.registry = this.rt.registry; this.cursor = 0; this.quiet = false;
-    this.recorder = new this.m.TakeRecorder(this.rt, { rulesVersion: this.rulesVersion });
+    this.startRecorder();
   }
 
   // ------------------------------------------------------------------ checkpoints

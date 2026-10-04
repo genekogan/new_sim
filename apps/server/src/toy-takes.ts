@@ -1,11 +1,18 @@
 // Observation only: Toy retains its rules, hashes and checkpoint format.
 // A separate bounded event buffer feeds the recorder; no Mars Runtime is constructed.
-import type { Engine, EngineFactory } from '@sim/engine-contract';
+import {captureRenderScene,type Engine,type EngineFactory} from '@sim/engine-contract';
 import { toyFactory } from '@sim/engine-toy';
 import { TakeRecorder, type TakeSource } from '../../../mars/viewer/engine/take/recorder.ts';
 import type { Take } from '../../../mars/viewer/engine/take/types.ts';
 
 export function recordToy(engine: Engine): Engine {
+  engine.renderScene = () => ({ scene: {
+    bounds: [-50, -50, 50, 50], levels: [{ id: 0, y: 0 }],
+    surfaces: [{ id: 'toy-ground', level: 0, y: 0, obb: { c: [0, 0], half: [50, 50], yaw: 0 } }],
+    obstacles: [], links: [],
+  } });
+  const captured=captureRenderScene(engine.rulesVersion,engine.renderScene());
+  engine.takeScene=hash=>hash===captured.ref.hash?structuredClone(captured):undefined;
   const source: TakeSource = {
     // The take codec types its original Mars schema literal. Recording reads the common
     // entity/pose shape and preserves Toy's actual schema and every original field.
@@ -13,7 +20,7 @@ export function recordToy(engine: Engine): Engine {
     get tick() { return engine.world.tick; },
     stateHash: () => engine.stateHash(), events: [], observers: [],
   };
-  let recorder = new TakeRecorder(source, { rulesVersion: engine.rulesVersion });
+  let recorder = new TakeRecorder(source, { rulesVersion: engine.rulesVersion,renderSceneRef:structuredClone(captured.ref) });
   const chunks: { fromTick: number; toTick: number; take: Take }[] = [];
   const step = engine.step.bind(engine);
   engine.step = () => {
@@ -23,16 +30,11 @@ export function recordToy(engine: Engine): Engine {
       chunks.push({ fromTick: take.startTick, toTick: source.tick, take });
       if (chunks.length > 12) chunks.shift();
       source.events.length = 0;
-      recorder = new TakeRecorder(source, { rulesVersion: engine.rulesVersion });
+      recorder = new TakeRecorder(source, { rulesVersion: engine.rulesVersion,renderSceneRef:structuredClone(captured.ref) });
     }
     return out;
   };
   engine.takeChunks = after => chunks.filter(c => c.toTick > after);
-  engine.renderScene = () => ({ scene: {
-    bounds: [-50, -50, 50, 50], levels: [{ id: 0, y: 0 }],
-    surfaces: [{ id: 'toy-ground', level: 0, y: 0, obb: { c: [0, 0], half: [50, 50], yaw: 0 } }],
-    obstacles: [], links: [],
-  } });
   return engine;
 }
 export const recordedToyFactory: EngineFactory = {

@@ -52,6 +52,9 @@ export type TakeEvent =
 
 export type Take = {
   schema: typeof TAKE_SCHEMA;
+  /** Optional public render-base content address, bound before recording.
+   * Not a physical topology/asset-availability or installation guarantee. */
+  renderSceneRef?: {contract:'render-scene-ref/1';rulesVersion:string;hash:string};
   /** Content address: hash of every other field. */
   id: string;
   planHash?: string;

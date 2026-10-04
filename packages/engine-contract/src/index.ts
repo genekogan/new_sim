@@ -7,3 +7,4 @@ export * from './registry.ts';
 export * from './engine.ts';
 export * from './kinematics.ts';
 export * from './scene-proposal.ts';
+export * from './scene-capture.ts';

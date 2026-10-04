@@ -4,6 +4,7 @@ import type { ActionRecord } from './actions.ts';
 import type { RuntimeEvent } from './runtime.ts';
 import type { WorldState, Vec3 } from './world.ts';
 import type { VerbInfo } from './registry.ts';
+import type { RenderSceneCaptureV1 } from './scene-capture.ts';
 
 /** A feasible activity for an actor, params already bound. The brain picks by id only. */
 export type ActivityOption = {
@@ -38,12 +39,12 @@ export type ChangeEvent = [number, string, string, unknown]; // [tick, entityId,
  * place Things; depiction programs refer back to them by `entity` or `point`.
  */
 export type Anchor = { id: string; kind: 'region' | 'place'; name: string; in?: string; entity?: string; point?: [number, number]; tags?: string[] };
-/** Current public scene projection. Geometry stays engine-specific; this is not
- * a new terrain/asset manifest or a historical scene-revision guarantee. */
+/** Current public render base. Geometry stays engine-specific; optional take
+ * captures identify this output, not a complete physical scene/asset manifest. */
 export type RenderScene = {
   scene: unknown;
   buildings?: { file: string; p: [number, number, number]; yaw?: number }[];
-  kin?: { model: string; p: [number, number, number]; yaw?: number; radius?: number; hoverHeight?: number }[];
+  kin?: { model: string; p: [number, number, number]; yaw?: number; radius?: number; hoverHeight?: number; hover?:number }[];
   clock?: { origin: number; dayTicks: number } | null;
   ground?: 'grass';
 };
@@ -95,6 +96,9 @@ export interface Engine {
   /** Recorded rendering chunks; no browser Runtime. Optional for engines without takes. */
   takeChunks?(afterTick: number): { fromTick: number; toTick: number; take: unknown }[];
   renderScene?(): RenderScene;
+  /** Captured public render base for an emitted take reference. Bounded hot
+   * window only; persistence owns historical retention. No topology authority. */
+  takeScene?(hash:string): RenderSceneCaptureV1 | undefined;
   canSnapshot?(): boolean;
   configureRuntimePolicy?(policy: {sleepBlockTicks:number;quietSeatCourtesy?:boolean}): void;
   configureClock?(clock: { origin: number; dayTicks: number }): void;

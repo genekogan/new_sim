@@ -3,7 +3,9 @@
 Publisher: Core. Consumer: World; App consumes agreed public viewer controls.
 Scope accepted by the three trunks/PM. This document and its structural schemas
 are the code baseline; full consumer/stream conformance is separately qualified.
-No transport, physics, history or renderer behavior is changed by these types.
+The original baseline types do not change behavior; later local producer
+checkpoints below qualify their own transport/history scope. Physics and renderer
+adoption remain separately reviewed.
 
 ## Current wire
 
@@ -64,14 +66,20 @@ speech, consent or physical completion. Camera/render sampling is pure.
 
 `Engine.renderScene()` now names its existing `RenderScene` shape, including
 optional clock and grass ground fields previously absent from the declared
-signature. Runtime output is unchanged. `scenePublicationSchema` validates the
+signature. `scenePublicationSchema` validates the
 current envelope: scene bounds and array domains or null, optional decorative
 buildings/kin, optional `{origin,dayTicks}` clock and optional grass ground.
 Geometry remains engine-specific; inner traversal/contact codecs are not frozen
 by this validator. Consumers retain defaults for omitted arrays/clock/ground.
 
-`/v1/scene` is static-on-load today. It does not promise scene revisions at a
-historic take tick. W-002 will version scene/body/action/terrain/water/support
+The baseline viewer loads `/v1/scene` once. The local additive
+[recorded render-base checkpoint](../core/RECORDED-SCENE-IDENTITY-20261004.md)
+now binds new native/Toy takes to optional `renderSceneRef`, with deduplicated
+public capture lookup at `/v1/scenes/:hash`. Current scene replies add the same
+reference shape. Old takes stay unbound; World scene switching and exact
+boundary/epoch consumers are pending. This is historical public render-base
+identity, not a complete physical scene or immutable source-asset guarantee.
+W-002 will version scene/body/action/terrain/water/support
 semantics and applied-scene transitions with concrete fixtures; no future water
 surface, dock or duck capability is advertised as shipped by this baseline.
 

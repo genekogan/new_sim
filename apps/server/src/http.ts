@@ -16,6 +16,7 @@ import { ApiError, type Souls } from './souls.ts';
 import { mountMarsStatic } from './mars-static.ts';
 import type {TakeArchive} from './take-archive.ts';
 import { type WorldHost } from './world.ts';
+import {captureRenderScene} from '@sim/engine-contract';
 
 type Deps = { cfg: Config; db: Db; host: WorldHost; auth: Auth; hub: Hub; brain: Brain; souls: Souls; takes?: TakeArchive };
 
@@ -51,7 +52,16 @@ export function buildApp(d: Deps) {
   app.get('/v1/config', (c) => c.json({ privyAppId: d.cfg.privyAppId, publicUrl: baseOf(c), worldId: d.host.worldId, worldKey: d.cfg.worldKey, worldPath: d.cfg.worldPath, authReady: d.auth.ready, devAuth: d.auth.devAuth, inviteRequired: d.cfg.inviteRequired, build: d.cfg.build }));
   app.get('/v1/world', (c) => c.json(d.souls.worldSummary()));
   app.get('/v1/debug/world', (c) => c.json(d.host.engine.world));
-  app.get('/v1/scene', c => c.json(d.host.engine.renderScene?.() ?? {scene: null}));
+  app.get('/v1/scene', c => {
+    const scene=d.host.engine.renderScene?.()??{scene:null};
+    return c.json({...scene,renderSceneRef:captureRenderScene(d.host.engine.rulesVersion,scene).ref},200,{'Cache-Control':'no-store'});
+  });
+  app.get('/v1/scenes/:hash', c => {
+    const hash=c.req.param('hash');
+    const capture=/^[a-f0-9]{64}$/.test(hash)?d.db.renderSceneCapture(d.host.worldId,hash):undefined;
+    if(!capture)return c.json({ok:false,code:'not-found',message:'No recorded render scene for this world.'},404,{'Cache-Control':'no-store'});
+    return c.json({worldId:d.host.worldId,...capture},200,{'Cache-Control':'no-store'});
+  });
   app.get('/v1/takes', async c => { const from=intQ(c,'from',0,0,Number.MAX_SAFE_INTEGER),to=intQ(c,'to',d.host.engine.world.tick,0,Number.MAX_SAFE_INTEGER),limit=intQ(c,'limit',120,1,120); const takes=d.takes?await d.takes.read(from,to,limit):d.db.takes(d.host.worldId,from,to,limit); return c.json({serverTick:d.host.engine.world.tick,...takes},200,{'Cache-Control':'no-store'}); });
   app.get('/v1/take', c => c.json({ serverTick: d.host.engine.world.tick, chunks: d.host.engine.takeChunks?.(intQ(c, 'after', -1, -1, Number.MAX_SAFE_INTEGER)) ?? [] }, 200, { 'Cache-Control': 'no-store' }));
   app.get('/v1/kernel', (c) => c.json(d.host.kernelView()));

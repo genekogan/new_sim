@@ -15,6 +15,7 @@ import { ANG_Q, INTERP_FIELDS, LIFECYCLE, POS_Q, SPEED_Q, TAKE_SCHEMA, TRACK_TOL
 import { interpSample } from './replay.ts';
 
 export type RecorderOptions = {
+  renderSceneRef?: Take['renderSceneRef'];
   planHash?: string;
   baselineCheckpoint?: string;
   rulesVersion: string;
@@ -92,8 +93,11 @@ export class TakeRecorder implements RuntimeObserver {
   private finished = false;
 
   constructor(rt: TakeSource, opts: RecorderOptions) {
+    const ref=opts.renderSceneRef;
+    if(ref && (ref.contract!=='render-scene-ref/1'||ref.rulesVersion!==opts.rulesVersion||!/^[a-f0-9]{64}$/.test(ref.hash)))
+      throw new TypeError('invalid recorder render scene reference');
     this.rt = rt;
-    this.opts = { ...opts, keyframeEvery: opts.keyframeEvery ?? 20 };
+    this.opts = { ...opts, ...(ref?{renderSceneRef:structuredClone(ref)}:{}),keyframeEvery: opts.keyframeEvery ?? 20 };
     const tol = opts.tol ?? TRACK_TOL;
     this.tol = typeof tol === 'number' ? { pos: tol, ang: tol } : { pos: tol.pos, ang: tol.ang };
     this.startTick = rt.tick;
@@ -223,6 +227,7 @@ export class TakeRecorder implements RuntimeObserver {
       baselineCheckpoint: this.opts.baselineCheckpoint,
       baselineStateHash: this.baselineStateHash,
       rulesVersion: this.opts.rulesVersion,
+      renderSceneRef: this.opts.renderSceneRef ? structuredClone(this.opts.renderSceneRef) : undefined,
       dt: DT,
       startTick: this.startTick,
       ticks: this.rt.tick - this.startTick,

@@ -44,8 +44,11 @@ export class Hub {
       afterTick: tick => {
         const chunks = host.engine.takeChunks?.(this.lastTakeTick) ?? [];
         if (!chunks.length) return;
+        for (const chunk of chunks) {
+          const ref=(chunk.take as {renderSceneRef?:{hash:string}}).renderSceneRef;
+          db.saveTake(host.worldId,chunk,ref&&!db.hasRenderSceneCapture(host.worldId,ref.hash)?host.engine.takeScene?.(ref.hash):undefined);
+        }
         this.lastTakeTick = chunks.at(-1)!.toTick;
-        for (const chunk of chunks) db.saveTake(host.worldId, chunk);
         if (chunks.length) this.broadcast({t: 'takes', serverTick: tick, chunks});
       },
       onBatch: (b) => this.broadcast({ t: 'batch', ...b, log: b.log.map(publicEvent) }),

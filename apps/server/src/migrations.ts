@@ -100,6 +100,12 @@ export const MIGRATIONS: { id: number; name: string; up(db: DatabaseSync): void 
   { id: 10, name: 'canonical candidate intent receipt origins', up(db) {
     db.exec('ALTER TABLE intent_requests_v2 ADD COLUMN received TEXT CHECK(received IS NULL OR json_valid(received))');
   } },
+  { id: 11, name: 'immutable public render scene captures', up(db) {
+    db.exec(`CREATE TABLE render_scene_captures (
+      world_id TEXT NOT NULL, hash TEXT NOT NULL, body TEXT NOT NULL CHECK(json_valid(body)),
+      PRIMARY KEY(world_id,hash)
+    )`);
+  } },
 ];
 
 export function migrate(db: DatabaseSync): number[] {

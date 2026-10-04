@@ -5,6 +5,8 @@ import { createHash } from 'node:crypto';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { migrate } from './migrations.ts';
 import type { BrainCall, LogEvent, NarrativeView, TalkLine } from '@sim/protocol';
+import {recordedTakeChunkSchema} from '@sim/protocol';
+import {stableStringify,parseRenderSceneCapture,type RenderSceneCaptureV1} from '@sim/engine-contract';
 
 export type UserRow = { id: string; email: string | null; wallet: string | null; role: 'user' | 'admin'; created_at: number; last_seen: number; invited_by: string | null };
 export type SoulRow = { id: string; world_id: string; owner: string; entity_id: string; name: string; description: string; created_at: number; retired_at: number | null; token_hash: string | null; token_created_at: number | null; native: number; token_label: string | null; token_last_used: number | null };
@@ -21,6 +23,7 @@ export class Db {
     this.migrated = migrate(this.db);
   }
   migrated: number[] = [];
+  private renderCaptureCache=new Map<string,{encoded:string;capture:RenderSceneCaptureV1}>();
 
   paidCost(now = Date.now()): number {
     return Number((this.db.prepare('SELECT COALESCE(SUM(cost),0) AS cost FROM paid_costs WHERE at >= ?').get(now - 86400_000) as { cost: number }).cost);
@@ -35,9 +38,53 @@ export class Db {
     } };
   }
 
-  saveTake(worldId: string, chunk: {fromTick: number; toTick: number; take: unknown}) {
+  saveTake(worldId: string, chunk: {fromTick: number; toTick: number; take: unknown}, scene?:RenderSceneCaptureV1) {
     const body = gzipSync(JSON.stringify(chunk.take), {level: 1});
-    this.db.prepare('INSERT OR IGNORE INTO take_chunks VALUES (?,?,?,?)').run(worldId, chunk.fromTick, chunk.toTick, body);
+    const raw=chunk.take as {renderSceneRef?:unknown}|null;
+    if(!raw || typeof raw!=='object' || !Object.hasOwn(raw,'renderSceneRef')) {
+      // Legacy takes keep their existing persistence semantics. Never infer a
+      // historical geometry reference from the currently running engine.
+      this.db.prepare('INSERT OR IGNORE INTO take_chunks VALUES (?,?,?,?)').run(worldId, chunk.fromTick, chunk.toTick, body);
+      return;
+    }
+    const ref=recordedTakeChunkSchema.parse(chunk).take.renderSceneRef!;
+    const {id:takeId,...takeBody}=chunk.take as Record<string,unknown>;
+    if(takeId!==createHash('sha256').update(stableStringify(takeBody)).digest('hex').slice(0,24))throw new Error('take content address mismatch');
+    const captured=scene?parseRenderSceneCapture(scene):undefined;
+    if(captured && (captured.ref.hash!==ref.hash||captured.ref.rulesVersion!==ref.rulesVersion))
+      throw new Error('take render scene reference mismatch');
+    this.db.exec('BEGIN IMMEDIATE');
+    try {
+      if(captured)this.db.prepare('INSERT OR IGNORE INTO render_scene_captures VALUES (?,?,?)').run(worldId,ref.hash,JSON.stringify(captured));
+      const stored=this.renderSceneCapture(worldId,ref.hash);
+      if(!stored||stored.ref.rulesVersion!==ref.rulesVersion)throw new Error('take render scene capture unavailable');
+      const existing=this.db.prepare('SELECT body FROM take_chunks WHERE world_id=? AND to_tick=?').get(worldId,chunk.toTick) as {body:Uint8Array}|undefined;
+      if(existing) {
+        const old=JSON.parse(gunzipSync(existing.body).toString()) as {renderSceneRef?:{hash:string}};
+        if(old.renderSceneRef?.hash!==ref.hash)throw new Error('stored take render scene identity conflict');
+      }
+      this.db.prepare('INSERT OR IGNORE INTO take_chunks VALUES (?,?,?,?)').run(worldId, chunk.fromTick, chunk.toTick, body);
+      this.db.exec('COMMIT');
+    } catch(error) {this.db.exec('ROLLBACK');throw error;}
+  }
+  /** Public rendering data only, scoped to the selected world and verified on
+   * read. Retained separately from take pruning and independent of live code. */
+  renderSceneCapture(worldId:string,hash:string):RenderSceneCaptureV1|undefined {
+    const row=this.db.prepare('SELECT body FROM render_scene_captures WHERE world_id=? AND hash=?').get(worldId,hash) as {body:string}|undefined;
+    if(!row)return undefined;
+    const key=JSON.stringify([worldId,hash]),cached=this.renderCaptureCache.get(key);
+    // Compare exact stored bytes on every read. A changed/corrupt row cannot use
+    // a previous verification; a bounded cache avoids hashing large immutable
+    // scenery once per one-second take. Returned values remain detached.
+    if(cached?.encoded===row.body)return structuredClone(cached.capture);
+    const capture=parseRenderSceneCapture(JSON.parse(row.body));
+    if(capture.ref.hash!==hash)throw new Error('stored render scene capture hash mismatch');
+    this.renderCaptureCache.delete(key);this.renderCaptureCache.set(key,{encoded:row.body,capture});
+    if(this.renderCaptureCache.size>16)this.renderCaptureCache.delete(this.renderCaptureCache.keys().next().value!);
+    return structuredClone(capture);
+  }
+  hasRenderSceneCapture(worldId:string,hash:string):boolean {
+    return !!this.db.prepare('SELECT 1 FROM render_scene_captures WHERE world_id=? AND hash=?').get(worldId,hash);
   }
   takes(worldId: string, from: number, to: number, limit: number) {
     const rows = this.db.prepare('SELECT from_tick, to_tick, body FROM take_chunks WHERE world_id = ? AND to_tick > ? AND from_tick < ? ORDER BY to_tick LIMIT ?').all(worldId, from, to, limit + 1) as {from_tick: number; to_tick: number; body: Uint8Array}[];

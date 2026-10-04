@@ -2,6 +2,7 @@
 // This does not validate physics, content hashes, authority or privacy; producers
 // and consumers must prove those separately. Additive fields are preserved.
 import { z } from 'zod';
+import { renderSceneRefV1Schema,parseRenderSceneCapture,type RenderSceneCaptureV1 } from '@sim/engine-contract';
 
 const tick = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const finite = z.number().finite();
@@ -17,7 +18,11 @@ export const recordedTakeSchema = z.object({
   finalState: z.object({ entities: z.record(z.string(), z.unknown()) }).passthrough(),
   entities0: z.record(z.string(), z.unknown()).optional(),
   removed: z.array(z.object({ id: z.string(), t: tick }).passthrough()).optional(),
-}).passthrough();
+  renderSceneRef: renderSceneRefV1Schema.optional(),
+}).passthrough().superRefine((take,ctx)=>{
+  if(take.renderSceneRef && take.renderSceneRef.rulesVersion!==take.rulesVersion)
+    ctx.addIssue({code:'custom',message:'take and render scene rules versions differ'});
+});
 export type RecordedTake = z.infer<typeof recordedTakeSchema>;
 
 export const recordedTakeChunkSchema = z.object({
@@ -43,3 +48,12 @@ export const scenePublicationSchema = z.object({
   ground: z.literal('grass').optional(),
 }).passthrough();
 export type ScenePublication = z.infer<typeof scenePublicationSchema>;
+/** Historical render-base lookup. Caller verifies the selected world and
+ * requested hash; this codec verifies bounded capture structure/content only. */
+export type SceneCapturePublication = RenderSceneCaptureV1 & {worldId:string};
+export function decodeSceneCapturePublication(raw:unknown):SceneCapturePublication {
+  const envelope=z.object({worldId:z.string().min(1).max(96),contract:z.literal('render-scene-capture/1'),
+    ref:renderSceneRefV1Schema,body:z.unknown()}).strict().parse(raw);
+  const {worldId,...capture}=envelope;
+  return {worldId,...parseRenderSceneCapture(capture)};
+}

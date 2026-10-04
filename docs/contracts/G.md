@@ -4,6 +4,16 @@ Publisher: Core; App owns human/agent consumers and permission policy.
 Current scopes and future G-002/G-003 proposals are accepted; executable
 conformance and breaking checkpoints remain distinct from scope signatures.
 
+Public presentation checkpoint (October 4): current `/v1/scene` adds optional
+`renderSceneRef`; `/v1/scenes/:hash` resolves an immutable captured render base
+registered with an actual take, scoped to this process's world. Unknown/invalid/
+other-world references return uniform404; responses use no-store. The strict
+`SceneCapturePublication` decoder verifies content, while consumers separately
+verify selected world/requested hash. This exposes only existing public render
+data, not private intentions or new physical capabilities. Old takes stay
+unbound. [Exact backend scope](../core/RECORDED-SCENE-IDENTITY-20261004.md);
+App/World source counterparts and history-viewer adoption remain pending.
+
 Internal admission component (October 4): the opt-in native purpose bridge now
 produces private `intent-admission-v2` facts linking an exact purpose version to
 its canonical decision and actual native program admission/refusal. This adds
