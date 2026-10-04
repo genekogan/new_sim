@@ -1,6 +1,6 @@
 // Soul operations shared by the web API, the agent API and MCP.
 import { randomBytes } from 'node:crypto';
-import { createSoulSchema, describeIntent, intentSchema, proposeCardsSchema, steerSchema, type MandateRule, type AgendaStep, type BirthPayload, type DeckPayload, type IntentPayload, type LogEvent, type WireIntent } from '@sim/protocol';
+import { createSoulSchema, describeIntent, intentSchema, proposeCardsSchema, steerSchema, type EventKind, type MandateRule, type AgendaStep, type BirthPayload, type DeckPayload, type IntentPayload, type LogEvent, type WireIntent } from '@sim/protocol';
 import {mandateOf,explicitTrigger} from './mandate.ts';
 import {clockAt} from '@sim/brain';
 import { deckView } from './deck.ts';
@@ -9,7 +9,7 @@ import type { Brain } from './brain.ts';
 import { tickerText } from './brain.ts';
 import type { Config } from './config.ts';
 import type { Db, SoulRow, UserRow } from './db.ts';
-import { energyWord, type WorldHost } from './world.ts';
+import { checkAcceptanceGuard, energyWord, type AcceptanceGuard,type AcceptanceJournal, type WorldHost } from './world.ts';
 import { LifecycleJournal, type LifecycleOperation } from './lifecycle-journal.ts';
 import { LifecycleRunner,ownedBodyCorresponds,projectLifecycle } from './lifecycle-runner.ts';
 import type { SoulLifecycle } from '@sim/protocol';
@@ -26,6 +26,10 @@ const PAIR_TTL = 15 * 60_000;
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'; // no 0/O/1/I/L
 const humanCode = () => { const b = randomBytes(8); let s = ''; for (let i = 0; i < 8; i++) s += ALPHABET[b[i] % ALPHABET.length]; return `${s.slice(0, 4)}-${s.slice(4)}`; };
 const normCode = (c: string) => c.toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^(.{4})(.{4})$/, '$1-$2');
+// The existing host journal hook holds BEGIN IMMEDIATE across the authority
+// guard and canonical append. These controls need that lock, but no private
+// operation row or new replay event of their own.
+const controlTransaction:AcceptanceJournal=()=>true;
 
 export class Souls {
   limits = new RateLimit();
@@ -83,6 +87,35 @@ export class Souls {
       &&birth.payload.name===current.name&&ownedBodyCorresponds(this.host,{worldId:this.host.worldId,soulId:soul.id,entityId:current.entity_id,owner:current.owner},current.name);
   }
   requireControlReady(soul:SoulRow){if(!this.controlReady(soul))throw new ApiError(409,'not-in-world','this Soul is not currently admitted and ready');}
+  /** A live request carries its authority to each sequenced write and final
+   * response. These predicates only read; accepted facts replay without them. */
+  ownerControlGuard(soul:SoulRow,issuer:string):AcceptanceGuard|undefined{
+    if(!this.lifecycle)return undefined;
+    return ()=>{
+      const user=this.db.user(issuer),current=this.db.soul(soul.id);
+      if(!user)throw new ApiError(401,'unauthorized','sign in first');
+      this.requireInvited(user);
+      if(!current||current.retired_at!==null||current.world_id!==this.host.worldId||current.owner!==soul.owner||current.entity_id!==soul.entity_id)throw new ApiError(404,'not-found','no such soul');
+      if(user.id!==current.owner&&user.role!=='admin')throw new ApiError(403,'forbidden','not your soul');
+      this.requireControlReady(current);return true;
+    };
+  }
+  agentControlGuard(soul:SoulRow,token:string|undefined):AcceptanceGuard|undefined{
+    if(!this.lifecycle)return undefined;
+    const capturedHash=token?hashToken(token):null;
+    return ()=>{
+      const current=capturedHash?this.db.soulByTokenHash(capturedHash):undefined,user=current?this.db.user(current.owner):undefined;
+      if(!current||current.id!==soul.id||current.owner!==soul.owner||current.entity_id!==soul.entity_id||current.world_id!==this.host.worldId||current.retired_at!==null||!user||!this.invited(user)||!this.controlReady(current))throw new ApiError(401,'unauthorized','missing or invalid soul token; pair again (see /skill.md)');
+      return true;
+    };
+  }
+  private controlGuard(soul:SoulRow,authority?:AcceptanceGuard){
+    const guard=authority??this.ownerControlGuard(soul,soul.owner);
+    if(guard)checkAcceptanceGuard(guard);return guard;
+  }
+  private enqueueControl(kind:EventKind,author:string,payload:unknown,guard?:AcceptanceGuard){
+    return guard?this.host.enqueueChecked(kind,author,payload,guard,controlTransaction):this.host.enqueue(kind,author,payload);
+  }
   private lifecycleUser(userId:string,privateRead=false){
     const user=this.db.user(userId);
     if(!user||!this.invited(user))throw new ApiError(privateRead?404:403,privateRead?'not-found':'invite-required',privateRead?'no such lifecycle':'an invite code is needed during the alpha');
@@ -92,7 +125,7 @@ export class Souls {
     const user=this.lifecycleUser(userId,true);if(!this.lifecycle)throw new ApiError(404,'not-found','no such lifecycle');
     let op:LifecycleOperation|undefined;
     // Invalid IDs use the same unknown response; invariant failures propagate.
-    if(/^lc_[0-9a-f]{32}$/.test(requestId))op=this.lifecycle.journal.operationInWorld(this.host.worldId,requestId);
+    if(/^lc_[0-9a-f]{32}$/.test(requestId))op=this.lifecycle.journal.operationForReader(this.host.worldId,requestId,user.id,user.role==='admin');
     if(!op||(op.scope.owner!==user.id&&user.role!=='admin'))throw new ApiError(404,'not-found','no such lifecycle');
     return projectLifecycle(this.host,op);
   }
@@ -185,7 +218,8 @@ export class Souls {
   }
 
   /** Set the standing intent. Resolves once the tick has accepted it (blocking mutation). */
-  async setIntent(soul: SoulRow, input: unknown, source: IntentPayload['source']): Promise<{ event: LogEvent; intent: WireIntent; text: string }> {
+  async setIntent(soul: SoulRow, input: unknown, source: IntentPayload['source'],authority?:AcceptanceGuard): Promise<{ event: LogEvent; intent: WireIntent; text: string }> {
+    const guard=this.controlGuard(soul,authority);
     const lim = this.limits.allow(`intent:${soul.owner}`, 20, 60_000);
     if (!lim.ok) throw new ApiError(429, 'rate-limited', 'too many intents; slow down', { retry_after: lim.retryAfter });
     const p = intentSchema.safeParse(input);
@@ -201,24 +235,28 @@ export class Souls {
       });
       // cards on the agenda that the Soul does not hold yet are dealt to it
       const deal = [...new Set(intent.agenda.map((a) => a.card))].filter((c) => !k.decks[soul.id]?.cards.includes(c));
-      if (deal.length) await this.host.enqueue('deck', `soul:${soul.id}`, { soulId: soul.id, add: deal, why: 'on the agenda' } satisfies DeckPayload);
+      if (deal.length) await this.enqueueControl('deck', `soul:${soul.id}`, { soulId: soul.id, add: deal, why: 'on the agenda' } satisfies DeckPayload,guard);
     } else intent.agenda = this.agendaFromGoal(intent.goal!, intent.target ?? null);
     if(this.host.living){
       const words=intent.text??intent.note??JSON.stringify(p.data);
-      const aligned=await this.brain.compile(this.host.minds.get(soul.id)!,`Perform this explicit agenda now: ${JSON.stringify(intent.agenda)}. Owner context: ${words}`,true);
+      const aligned=await this.brain.compile(this.host.minds.get(soul.id)!,`Perform this explicit agenda now: ${JSON.stringify(intent.agenda)}. Owner context: ${words}`,true,guard,guard?controlTransaction:undefined);
+      if(guard)checkAcceptanceGuard(guard);
       if(aligned&&!aligned.ok)throw new ApiError(400,'rule-not-aligned',aligned.reason);
       const rule:MandateRule={id:newId('r'),words,strict:false,understanding:aligned?.ok?aligned.alignment?.understanding??describeIntent(intent,id=>this.host.nameOf(id)):describeIntent(intent,id=>this.host.nameOf(id)),agenda:intent.agenda,trigger:{kind:'now'},status:'active',report:null};
-      await this.replaceNow(soul,rule);
-      const event=await this.host.enqueue('mandate',`soul:${soul.id}`,{soulId:soul.id,op:'upsert',rule,source});
+      await this.replaceNow(soul,rule,guard);
+      const event=await this.enqueueControl('mandate',`soul:${soul.id}`,{soulId:soul.id,op:'upsert',rule,source},guard);
+      if(guard)checkAcceptanceGuard(guard);
       return {event,intent,text:rule.understanding};
     }
-    const event = await this.host.enqueue('intent', `soul:${soul.id}`, { soulId: soul.id, intent, source } satisfies IntentPayload);
+    const event = await this.enqueueControl('intent', `soul:${soul.id}`, { soulId: soul.id, intent, source } satisfies IntentPayload,guard);
+    if(guard)checkAcceptanceGuard(guard);
     return { event, intent, text: describeIntent(intent, (id) => this.host.nameOf(id)) };
   }
 
   /** A wish in plain words. The compiler turns it into an agenda (minting cards if needed); without a compiler, the small translator picks a goal. */
-  async command(soul: SoulRow, text: string, source: IntentPayload['source'] = 'web') {
-    if(this.host.living)return this.steer(soul,{words:text},source);
+  async command(soul: SoulRow, text: string, source: IntentPayload['source'] = 'web',authority?:AcceptanceGuard) {
+    const guard=this.controlGuard(soul,authority);
+    if(this.host.living)return this.steer(soul,{words:text},source,guard);
     const lim = this.limits.allow(`cmd:${soul.owner}`, 20, 60_000);
     if (!lim.ok) throw new ApiError(429, 'rate-limited', 'too many commands; slow down', { retry_after: lim.retryAfter });
     const mind = this.host.minds.get(soul.id);
@@ -226,26 +264,32 @@ export class Souls {
     // The compiler is the expensive tier and its budget is shared, so each owner gets a fair hourly share of it;
     // past that, the small translator still understands plain goals.
     const fair = this.limits.allow(`compile:${soul.owner}`, 12, 3600_000).ok;
-    const c = fair ? await this.brain.compile(mind, text) : null;
+    const c = fair ? await this.brain.compile(mind, text,false,guard,guard?controlTransaction:undefined) : null;
+    if(guard)checkAcceptanceGuard(guard);
     if (c) {
       if (!c.ok) return { ok: false as const, reason: c.reason, via: 'compiler' };
-      const r = await this.setIntent(soul, { agenda: c.agenda, text: text.slice(0, 280) }, source);
+      const r = await this.setIntent(soul, { agenda: c.agenda, text: text.slice(0, 280) }, source,guard);
+      if(guard)checkAcceptanceGuard(guard);
       return { ok: true as const, intent: r.intent, text: r.text, tick: r.event.tick, seq: r.event.seq, via: 'compiler', confidence: 1, minted: c.minted.filter((v) => v.ok).map((v) => v.name) };
     }
     const tr = await this.brain.translate(mind, text);
+    if(guard)checkAcceptanceGuard(guard);
     if (!tr.ok) return { ok: false as const, reason: tr.reason, via: tr.via };
-    const r = await this.setIntent(soul, tr.intent, source);
+    const r = await this.setIntent(soul, tr.intent, source,guard);
+    if(guard)checkAcceptanceGuard(guard);
     return { ok: true as const, intent: r.intent, text: r.text, tick: r.event.tick, seq: r.event.seq, via: tr.via, confidence: tr.confidence, minted: [] as string[] };
   }
 
-  async steer(soul:SoulRow,input:unknown,source:IntentPayload['source']='web'){
+  async steer(soul:SoulRow,input:unknown,source:IntentPayload['source']='web',authority?:AcceptanceGuard){
+    const guard=this.controlGuard(soul,authority);
     const parsed=steerSchema.safeParse(input);if(!parsed.success)throw new ApiError(400,'invalid-rule','a rule needs words (1–2000 characters), optional strict and an existing id to edit');
     const p=parsed.data,m=this.host.minds.get(soul.id);if(!m)throw new ApiError(409,'not-in-world','this Soul is not in the world yet');
     const limit=this.limits.allow(`steer:${soul.owner}`,20,60000);if(!limit.ok)throw new ApiError(429,'rate-limited','too many rule changes; slow down');
     const existing=mandateOf(this.host.kernel,soul.id);
     if(p.id&&!existing.some(r=>r.id===p.id))throw new ApiError(404,'unknown-rule','that rule is not in this Soul’s mandate');
     if(!p.id&&existing.length>=24)throw new ApiError(409,'mandate-full','at most 24 rules per Soul; edit or remove an existing rule');
-    const compiled=await this.brain.compile(m,p.words,true);
+    const compiled=await this.brain.compile(m,p.words,true,guard,guard?controlTransaction:undefined);
+    if(guard)checkAcceptanceGuard(guard);
     if(compiled&&!compiled.ok)return {ok:false as const,reason:compiled.reason,via:'align'};
     let agenda:AgendaStep[],understanding:string,trigger:MandateRule['trigger'],minted:string[]=[];
     if(compiled?.ok){if(!compiled.alignment)throw new ApiError(400,'invalid-alignment','alignment did not return an understanding');agenda=compiled.agenda;({understanding,trigger}=compiled.alignment);minted=compiled.minted.filter(v=>v.ok).map(v=>v.name);}
@@ -257,31 +301,34 @@ export class Souls {
       const rest=action.slice(card.name.length).replace(/^(?:on|with|at|the)\s+/,'').trim(),target=rest?this.resolveThing(rest):null;
       if(card.target&&rest&&!target)return {ok:false as const,reason:`No known target named ${rest}`,via:'align'};
       agenda=[{card:card.name,target,...(trigger.kind==='gathering'&&card.target?.kind==='gathering'?{of:trigger.host}:{})}];
-      if(!this.host.kernel.decks[m.soulId]?.cards.includes(card.name))await this.host.enqueue('deck',`soul:${soul.id}`,{soulId:soul.id,add:[card.name],why:'needed for the owner rule'});
+      if(!this.host.kernel.decks[m.soulId]?.cards.includes(card.name))await this.enqueueControl('deck',`soul:${soul.id}`,{soulId:soul.id,add:[card.name],why:'needed for the owner rule'},guard);
       understanding=describeIntent({agenda},id=>this.host.nameOf(id));
     }
     const rule:MandateRule={id:p.id??newId('r'),words:p.words,strict:p.strict,understanding,agenda,trigger,status:'active',report:null};
     const living=this.host.living,c=living?clockAt(this.host.engine.world.tick,living.origin,living.dayTicks):null;
     if(c&&trigger.kind==='time'&&(c.hour+18)%24+c.minute/60>=(trigger.hour+18)%24+trigger.minute/60)rule.lastFiredDay=c.day;
-    await this.replaceNow(soul,rule);
-    const event=await this.host.enqueue('mandate',`soul:${soul.id}`,{soulId:soul.id,op:'upsert',rule,source});
+    await this.replaceNow(soul,rule,guard);
+    const event=await this.enqueueControl('mandate',`soul:${soul.id}`,{soulId:soul.id,op:'upsert',rule,source},guard);
+    if(guard)checkAcceptanceGuard(guard);
     return {ok:true as const,rule,text:understanding,tick:event.tick,seq:event.seq,via:'align',minted};
   }
-  private async replaceNow(soul:SoulRow,rule:MandateRule){
+  private async replaceNow(soul:SoulRow,rule:MandateRule,guard?:AcceptanceGuard){
     const old=this.host.minds.get(soul.id)?.activeRule;
-    if(rule.trigger.kind==='now'&&old&&old!==rule.id)await this.host.enqueue('mandate',`soul:${soul.id}`,{soulId:soul.id,ruleId:old,op:'status',patch:{status:'blocked',report:'Replaced by a newer NOW request from the owner.'}});
+    if(rule.trigger.kind==='now'&&old&&old!==rule.id)await this.enqueueControl('mandate',`soul:${soul.id}`,{soulId:soul.id,ruleId:old,op:'status',patch:{status:'blocked',report:'Replaced by a newer NOW request from the owner.'}},guard);
   }
   rules(soul:SoulRow){return mandateOf(this.host.kernel,soul.id);}
-  async removeRule(soul:SoulRow,id:string){if(!mandateOf(this.host.kernel,soul.id).some(r=>r.id===id))throw new ApiError(404,'unknown-rule','that rule is not in this Soul’s mandate');const event=await this.host.enqueue('mandate',`soul:${soul.id}`,{soulId:soul.id,op:'remove',ruleId:id});return {ok:true,tick:event.tick};}
+  async removeRule(soul:SoulRow,id:string,authority?:AcceptanceGuard){const guard=this.controlGuard(soul,authority);if(!mandateOf(this.host.kernel,soul.id).some(r=>r.id===id))throw new ApiError(404,'unknown-rule','that rule is not in this Soul’s mandate');const event=await this.enqueueControl('mandate',`soul:${soul.id}`,{soulId:soul.id,op:'remove',ruleId:id},guard);if(guard)checkAcceptanceGuard(guard);return {ok:true,tick:event.tick};}
 
   /** An owner's agent proposes cards for its Soul's deck. Validated like any other card; no model involved. */
-  async proposeCards(soul: SoulRow, input: unknown) {
+  async proposeCards(soul: SoulRow, input: unknown,authority?:AcceptanceGuard) {
+    const guard=this.controlGuard(soul,authority);
     const lim = this.limits.allow(`cards:${soul.owner}`, 12, 3600_000);
     if (!lim.ok) throw new ApiError(429, 'rate-limited', 'too many card proposals this hour', { retry_after: lim.retryAfter });
     const p = proposeCardsSchema.safeParse(input);
     if (!p.success) throw new ApiError(400, 'invalid', 'body must be { cards: [card, …], links?: {name: {summary, control?}}, kinds?: {name: {summary}} }; see /cards.md');
     const mind = this.host.minds.get(soul.id); if (!mind) throw new ApiError(409, 'not-in-world', 'this soul is not in the world yet');
-    const verdicts = await this.brain.mint(mind, p.data.cards, p.data.links, p.data.kinds, 'agent');
+    const verdicts = await this.brain.mint(mind, p.data.cards, p.data.links, p.data.kinds, 'agent',guard,guard?controlTransaction:undefined);
+    if(guard)checkAcceptanceGuard(guard);
     return { ok: verdicts.every((v) => v.ok), cards: verdicts };
   }
 
@@ -450,7 +497,7 @@ export class Souls {
     if (!token?.startsWith('sim_')) return null;
     const soul = this.db.soulByTokenHash(hashToken(token)) ?? null;
     if (soul && soul.world_id !== this.host.worldId) return null;
-    if(soul&&!this.controlReady(soul))return null;
+    if(soul&&this.lifecycle){const owner=this.db.user(soul.owner);if(!owner||!this.invited(owner)||!this.controlReady(soul))return null;}
     if (soul) { const now = Date.now(); if (now - (this.lastTouch.get(soul.id) ?? 0) > 30_000) { this.lastTouch.set(soul.id, now); this.db.touchSoulToken(soul.id); } }
     return soul;
   }

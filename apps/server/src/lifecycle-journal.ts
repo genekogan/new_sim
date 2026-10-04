@@ -54,6 +54,14 @@ export class LifecycleJournal {
     const row=this.db.db.prepare('SELECT * FROM lifecycle_operations_v1 WHERE world_id=? AND request_id=?').get(worldId,requestId) as Row|undefined;
     if(!row)return undefined;return this.get({worldId,soulId:row.soul_id,owner:row.owner_id,entityId:row.entity_id},requestId);
   }
+  /** Authorize minimal current identity metadata before loading/decoding private
+   * evidence. Corrupt foreign operations must remain indistinguishable from absent
+   * ones; authorized invariant failures still propagate from get(). */
+  operationForReader(worldId:string,requestId:string,reader:string,admin:boolean):LifecycleOperation|undefined{
+    id.parse(worldId);id.parse(reader);lifecycleRequestIdSchema.parse(requestId);
+    const row=this.db.db.prepare('SELECT o.soul_id,o.owner_id,o.entity_id FROM lifecycle_operations_v1 o JOIN souls s ON s.id=o.soul_id AND s.owner=o.owner_id AND s.world_id=o.world_id AND s.entity_id=o.entity_id WHERE o.world_id=? AND o.request_id=? AND (o.owner_id=? OR ?=1)').get(worldId,requestId,reader,admin?1:0) as Pick<Row,'soul_id'|'owner_id'|'entity_id'>|undefined;
+    return row?this.get({worldId,soulId:row.soul_id,owner:row.owner_id,entityId:row.entity_id},requestId):undefined;
+  }
   creationOfSoul(worldId:string,soulId:string):LifecycleOperation|undefined{
     id.parse(worldId);id.parse(soulId);
     const row=this.db.db.prepare("SELECT request_id FROM lifecycle_operations_v1 WHERE world_id=? AND soul_id=? AND operation='create'").get(worldId,soulId) as {request_id:string}|undefined;

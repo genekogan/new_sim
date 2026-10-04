@@ -15,7 +15,7 @@ import { agentReader } from './agent-reader.ts';
 import { ApiError, type Souls } from './souls.ts';
 import { mountMarsStatic } from './mars-static.ts';
 import type {TakeArchive} from './take-archive.ts';
-import { type WorldHost } from './world.ts';
+import { checkAcceptanceGuard,type AcceptanceGuard,type WorldHost } from './world.ts';
 import {captureRenderScene} from '@sim/engine-contract';
 
 type Deps = { cfg: Config; db: Db; host: WorldHost; auth: Auth; hub: Hub; brain: Brain; souls: Souls; takes?: TakeArchive };
@@ -28,6 +28,9 @@ export function buildApp(d: Deps) {
   const requireAdmin = async (c: Context): Promise<UserRow> => { const u = await requireUser(c); if (u.role !== 'admin') throw new ApiError(403, 'forbidden', 'admin only'); return u; };
   const ownSoul = (u: UserRow, id: string): SoulRow => { const s = d.db.soul(id); if (!s || s.retired_at || s.world_id !== d.host.worldId) throw new ApiError(404, 'not-found', 'no such soul'); if (s.owner !== u.id && u.role !== 'admin') throw new ApiError(403, 'forbidden', 'not your soul'); d.souls.requireControlReady(s); return s; };
   const agentSoul = (c: Context): SoulRow => { const s = d.souls.soulFromToken(bearer(c)); if (!s) throw new ApiError(401, 'unauthorized', 'missing or invalid soul token; pair again (see /skill.md)'); return s; };
+  const controlReply=async(c:Context,guard:AcceptanceGuard|undefined,run:()=>Promise<object>)=>{
+    const result=await run();if(guard)checkAcceptanceGuard(guard);return c.json(result);
+  };
   /** Public base URL as the caller reached us (works on any hostname pointing at the box). */
   const baseOf = (c: Context) => { const host = c.req.header('x-forwarded-host') ?? c.req.header('host'); const proto = c.req.header('x-forwarded-proto') ?? (host?.startsWith('localhost') || host?.startsWith('127.') ? 'http' : 'https'); return host ? `${proto}://${host}${d.cfg.worldPath}` : d.cfg.publicUrl; };
   /** A whole number from the query string, clamped at both ends (to SQLite, LIMIT -1 means no limit at all). */
@@ -45,7 +48,7 @@ export function buildApp(d: Deps) {
   // Apply before parsing/auth/rate errors as well as successful secret responses.
   for (const path of ['/v1/agent/pair', '/v1/agent/pair/*', '/v1/pair/*', '/v1/souls/:id/pair'])
     app.use(path, async (c, next) => { c.header('Cache-Control', 'no-store'); await next(); });
-  for(const path of ['/v1/lifecycle','/v1/lifecycle/*','/v1/me','/v1/souls','/v1/souls/:id'])
+  for(const path of ['/v1/lifecycle','/v1/lifecycle/*','/v1/me','/v1/souls','/v1/souls/*','/v1/agent/*'])
     app.use(path,async(c,next)=>{if(d.souls.lifecycle)c.header('Cache-Control','no-store');await next();});
   app.use('/v1/*', bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({ ok: false, code: 'too-large', message: 'request body is larger than 64 KB' }, 413) }));
 
@@ -123,20 +126,20 @@ export function buildApp(d: Deps) {
   app.get('/v1/souls/:id/timeline', async (c) => { const u = await requireUser(c); return c.json({ events: d.souls.timeline(ownSoul(u, c.req.param('id')), intQ(c, 'limit', 80, 1, 200)) }); });
   app.get('/v1/souls/:id/deck', async (c) => { const u = await requireUser(c); return c.json(d.souls.deck(ownSoul(u, c.req.param('id')))); });
   app.get('/v1/souls/:id/talk', async (c) => { const u = await requireUser(c); return c.json({ lines: d.db.recentTalk(60, ownSoul(u, c.req.param('id')).id) }); });
-  app.post('/v1/souls/:id/cards', async (c) => { const u = await requireUser(c); d.souls.requireInvited(u); return c.json(await d.souls.proposeCards(ownSoul(u, c.req.param('id')), await body(c))); });
+  app.post('/v1/souls/:id/cards', async (c) => { const u = await requireUser(c); d.souls.requireInvited(u);const s=ownSoul(u,c.req.param('id')),input=await body(c),guard=d.souls.ownerControlGuard(s,u.id);return controlReply(c,guard,()=>d.souls.proposeCards(s,input,guard)); });
   app.get('/v1/souls/:id/perceive', async (c) => { const u = await requireUser(c); return c.json(d.souls.perceive(ownSoul(u, c.req.param('id')))); });
   app.post('/v1/souls/:id/command', async (c) => {
     const u = await requireUser(c); d.souls.requireInvited(u); const s = ownSoul(u, c.req.param('id'));
     const p = commandSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'text is required (1–280 characters)');
-    return c.json(await d.souls.command(s, p.data.text));
+    const guard=d.souls.ownerControlGuard(s,u.id);return controlReply(c,guard,()=>d.souls.command(s,p.data.text,'web',guard));
   });
   app.get('/v1/souls/:id/mandate',async c=>{const u=await requireUser(c);return c.json({rules:d.souls.rules(ownSoul(u,c.req.param('id')))});});
-  app.post('/v1/souls/:id/mandate',async c=>{const u=await requireUser(c);d.souls.requireInvited(u);return c.json(await d.souls.steer(ownSoul(u,c.req.param('id')),await body(c)));});
-  app.delete('/v1/souls/:id/mandate/:rule',async c=>{const u=await requireUser(c);return c.json(await d.souls.removeRule(ownSoul(u,c.req.param('id')),c.req.param('rule')));});
+  app.post('/v1/souls/:id/mandate',async c=>{const u=await requireUser(c);d.souls.requireInvited(u);const s=ownSoul(u,c.req.param('id')),input=await body(c),guard=d.souls.ownerControlGuard(s,u.id);return controlReply(c,guard,()=>d.souls.steer(s,input,'web',guard));});
+  app.delete('/v1/souls/:id/mandate/:rule',async c=>{const u=await requireUser(c),s=ownSoul(u,c.req.param('id')),guard=d.souls.ownerControlGuard(s,u.id);return controlReply(c,guard,()=>d.souls.removeRule(s,c.req.param('rule'),guard));});
   app.post('/v1/souls/:id/intent', async (c) => {
     const u = await requireUser(c); d.souls.requireInvited(u); const s = ownSoul(u, c.req.param('id'));
     const p = setIntentSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { intent: { agenda: [{card, target?, of?}], note? } } or { intent: { goal, target?, note? } }; see /skill.md');
-    const r = await d.souls.setIntent(s, p.data.intent, 'web'); return c.json({ ok: true, intent: r.intent, text: r.text, tick: r.event.tick, seq: r.event.seq });
+    const guard=d.souls.ownerControlGuard(s,u.id);return controlReply(c,guard,async()=>{const r=await d.souls.setIntent(s,p.data.intent,'web',guard);return {ok:true,intent:r.intent,text:r.text,tick:r.event.tick,seq:r.event.seq};});
   });
   app.post('/v1/souls/:id/pair', async (c) => { const u = await requireUser(c); d.souls.requireInvited(u); return c.json({ ok: true, ...d.souls.pairCode(ownSoul(u, c.req.param('id')), baseOf(c), u) }); });
   app.post('/v1/souls/:id/revoke', async (c) => { const u = await requireUser(c); d.db.setSoulToken(ownSoul(u, c.req.param('id')).id, null); return c.json({ ok: true }); });
@@ -207,20 +210,20 @@ export function buildApp(d: Deps) {
   app.get('/v1/agent/perceive', (c) => c.json(d.souls.perceive(agentSoul(c))));
   app.get('/v1/agent/world', (c) => { agentSoul(c); return c.json(d.souls.worldSummary()); });
   app.get('/v1/agent/log', (c) => c.json({ events: d.souls.soulLog(agentSoul(c)) }));
-  app.get('/v1/agent/wait', async (c) => c.json(await d.souls.wait(agentSoul(c), intQ(c, 'seconds', 30, 1, 55))));
+  app.get('/v1/agent/wait', async (c) => {const s=agentSoul(c),guard=d.souls.agentControlGuard(s,bearer(c));return controlReply(c,guard,()=>d.souls.wait(s,intQ(c,'seconds',30,1,55)));});
   app.post('/v1/agent/intent', async (c) => {
     const s = agentSoul(c); const p = setIntentSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { intent: { agenda: [{card, target?, of?}], note? } } or { intent: { goal, target?, note? } }; see /skill.md');
-    const r = await d.souls.setIntent(s, p.data.intent, 'api'); return c.json({ ok: true, accepted_at_tick: r.event.tick, seq: r.event.seq, intent: r.intent, text: r.text, status: d.souls.status(s) });
+    const guard=d.souls.agentControlGuard(s,bearer(c));return controlReply(c,guard,async()=>{const r=await d.souls.setIntent(s,p.data.intent,'api',guard);return {ok:true,accepted_at_tick:r.event.tick,seq:r.event.seq,intent:r.intent,text:r.text,status:d.souls.status(s)};});
   });
   app.post('/v1/agent/command', async (c) => {
     const s = agentSoul(c); const p = commandSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'text is required (1–280 characters)');
-    return c.json(await d.souls.command(s, p.data.text, 'api'));
+    const guard=d.souls.agentControlGuard(s,bearer(c));return controlReply(c,guard,()=>d.souls.command(s,p.data.text,'api',guard));
   });
   app.get('/v1/agent/mandate',c=>c.json({rules:d.souls.rules(agentSoul(c))}));
-  app.post('/v1/agent/mandate',async c=>c.json(await d.souls.steer(agentSoul(c),await body(c),'api')));
-  app.delete('/v1/agent/mandate/:rule',async c=>c.json(await d.souls.removeRule(agentSoul(c),c.req.param('rule'))));
+  app.post('/v1/agent/mandate',async c=>{const s=agentSoul(c),input=await body(c),guard=d.souls.agentControlGuard(s,bearer(c));return controlReply(c,guard,()=>d.souls.steer(s,input,'api',guard));});
+  app.delete('/v1/agent/mandate/:rule',async c=>{const s=agentSoul(c),guard=d.souls.agentControlGuard(s,bearer(c));return controlReply(c,guard,()=>d.souls.removeRule(s,c.req.param('rule'),guard));});
   app.get('/v1/agent/deck', (c) => c.json(d.souls.deck(agentSoul(c))));
-  app.post('/v1/agent/cards', async (c) => c.json(await d.souls.proposeCards(agentSoul(c), await body(c))));
+  app.post('/v1/agent/cards', async (c) => {const s=agentSoul(c),input=await body(c),guard=d.souls.agentControlGuard(s,bearer(c));return controlReply(c,guard,()=>d.souls.proposeCards(s,input,guard));});
   app.post('/v1/agent/release', (c) => { const s = agentSoul(c); d.db.setSoulToken(s.id, null); return c.json({ ok: true }); });
 
   // ---- static web app (SPA)

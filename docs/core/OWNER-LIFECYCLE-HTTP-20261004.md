@@ -86,3 +86,12 @@ Existing guards on initial owner HTTP requests cannot prove queued authority.
 Do not install or advertise this candidate until those gates qualify. Default/live
 orphan/retired-body/unavailable-birth defects from de2c baseline are not repaired by
 selecting this isolated fixture. No main merge, push, deployment or live repair.
+
+
+Follow-up C097: metadata-first private receipt authorization, queued human/REST
+control acceptance under the SQLite writer lock, fresh REST delivery and the
+separate terminal-write/history transport cases are recorded in
+[LIFECYCLE-WRITE-AUTHORITY-20261004](LIFECYCLE-WRITE-AUTHORITY-20261004.md).
+The remaining-gates section above describes the original0b325ea pin; the follow-up
+qualifies only its explicitly executed scope. MCP/WS/public privacy/versioned
+old-world/rollback/real owner/capacity and consumer activation remain held.
