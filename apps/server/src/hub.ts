@@ -84,7 +84,9 @@ export class Hub {
       if (++c.msgs > 20) { ws.close(1008, 'too many messages'); return; }
       let raw: unknown; try { raw = JSON.parse(String(data)); } catch { return; }
       const p = clientMsg.safeParse(raw); if (!p.success) return;
-      void this.onMessage(c, p.data as ClientMsg);
+      const pending=this.onMessage(c,p.data as ClientMsg);
+      if(this.lifecycleSouls)void pending.catch(error=>this.privateViewFailed(c,error));
+      else void pending;
     });
   }
 
@@ -133,13 +135,27 @@ export class Hub {
     const me=this.auth.me(user),souls=this.lifecycleSouls;if(!souls)return me;
     return {...me,souls:souls.invited(user)?this.db.soulsOf(user.id).filter(row=>row.world_id===this.host.worldId&&souls.controlReady(row)).map(row=>row.id):[]};
   }
-  private refreshAuthority(c:Client){if(this.lifecycleSouls&&c.me)c.me=this.currentMe(c.me.userId);}
+  private privateViewFailed(c:Client,error:unknown){
+    // Preserve corrupt evidence for operator reconciliation. Neither an old Me
+    // nor a normal arrival refusal may stand in for failed authority verification.
+    c.me=null;c.ready=false;
+    console.error('[hub] private view invariant failed',error);
+    this.send(c,{t:'error',code:'private-view-unavailable',message:'Private view unavailable; reconnect after operator repair.'});
+    c.ws.close(1011,'private view unavailable');
+  }
+  private refreshAuthority(c:Client):boolean{
+    if(this.lifecycleSouls&&c.me){
+      try{c.me=this.currentMe(c.me.userId);}
+      catch(error){this.privateViewFailed(c,error);return false;}
+    }
+    return true;
+  }
   private privateMessage(c:Client,m:ServerMsg):ServerMsg|null{
     if(!this.lifecycleSouls)return m;
-    if(m.t==='welcome'){this.refreshAuthority(c);return {...m,you:c.me};}
-    if(m.t==='stats'){this.refreshAuthority(c);return c.me?.role==='admin'?m:{...m,stats:publicStats(m.stats)};}
+    if(m.t==='welcome'){if(!this.refreshAuthority(c))return null;return {...m,you:c.me};}
+    if(m.t==='stats'){if(!this.refreshAuthority(c))return null;return c.me?.role==='admin'?m:{...m,stats:publicStats(m.stats)};}
     if(m.t==='brain'){
-      this.refreshAuthority(c);if(!c.me)return null;
+      if(!this.refreshAuthority(c)||!c.me)return null;
       const calls=m.calls.filter(call=>c.me!.role==='admin'||(!!call.soulId&&c.me!.souls.includes(call.soulId)));
       return calls.length?{t:'brain',calls}:null;
     }
@@ -149,7 +165,7 @@ export class Hub {
     if(this.lifecycleSouls&&(m.t==='brain'||m.t==='stats')){
       for(const c of this.clients){
         if(!c.ready||c.ws.readyState!==1)continue;
-        this.refreshAuthority(c);if(filter&&!filter(c))continue;this.send(c,m);
+        if(!this.refreshAuthority(c)||filter&&!filter(c))continue;this.send(c,m);
       }
       return;
     }
@@ -158,7 +174,7 @@ export class Hub {
   }
   /** Model calls go to admins, and to the owner of the Soul a call is about. World-level calls (narrator, director) are admin only. */
   brainCall(call: BrainCall) { this.broadcast({ t: 'brain', calls: [call] }, (c) => !!c.me && (c.me.role === 'admin' || (!!call.soulId && c.me.souls.includes(call.soulId)))); }
-  refreshMe(userId: string) { for (const c of this.clients) if (c.me?.userId === userId) { if(this.lifecycleSouls)c.me=this.currentMe(userId);else{const u = this.db.user(userId); if (u) c.me = this.auth.me(u);} } }
+  refreshMe(userId: string) { for (const c of this.clients) if (c.me?.userId === userId) { if(this.lifecycleSouls)this.refreshAuthority(c);else{const u = this.db.user(userId); if (u) c.me = this.auth.me(u);} } }
 
   private sweep() {
     for (const c of this.clients) { if (!c.alive) { c.ws.terminate(); this.clients.delete(c); continue; } c.alive = false; try { c.ws.ping(); } catch { /* closed */ } }
