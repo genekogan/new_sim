@@ -86,9 +86,11 @@ The gaps2560–2563 and3985.222…–4000 are preserved. Three cues have distinc
 Four selected take pages contain10 actual native chunks and one captured scene;
 they are representative windows, not a continuous full4000-tick take bundle.
 
-At4000 SQLite is closed/reopened. Full host snapshot, actual host genesis boot,
-independent native/kernel inclusive genesis and the named station fact fold
-agree. A recovered station requires a fresh anchor but retains cue/epoch. Actual
+At4000 SQLite is closed/reopened. A full host snapshot is loaded; body, kernel
+and station histories match. Actual host genesis boot, independent native/kernel
+inclusive genesis and the named station fact fold match those same compared
+values. This does not assert equality of all private Mind/extra fields or SQL
+row timestamps. A recovered station requires a fresh anchor but retains cue/epoch. Actual
 TCP/Hono anonymous GET and Hub/WebSocket join, new-anchor stream and terminated
 socket rejoin agree on the recorded view. Foreign history reads return404.
 Private markers are absent from all socket messages and public output. There
