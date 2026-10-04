@@ -1,0 +1,393 @@
+{
+  "schema": "world-geometry-proposal/1",
+  "revision": "20261004-world-2",
+  "status": "proposed-for-core-validation",
+  "units": "metres",
+  "axes": {
+    "up": "+Y",
+    "ground": "XZ",
+    "yawZero": "+X"
+  },
+  "authority": "Visual design proposal only; not collision, traversability, inventory, admission or live configuration.",
+  "world": "eden-1",
+  "id": "eden-shore-dock-fixture-v1",
+  "boundsXZ": [
+    -16,
+    -12,
+    16,
+    12
+  ],
+  "terrain": {
+    "id": "eden-shore-terrain",
+    "originXZ": [
+      -16,
+      -12
+    ],
+    "spacingMetres": 1,
+    "columns": 33,
+    "rows": 25,
+    "heightMetres": [
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2],
+      [-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-0.9,-0.6,-0.3,0.0,0.13,0.26,0.39,0.52,0.65,0.78,0.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2]
+    ],
+    "interpolation": {
+      "method": "piecewise-linear triangles",
+      "cellDiagonal": "min-X/min-Z to max-X/max-Z",
+      "outsideBounds": "unsupported; no extrapolation",
+      "supportAuthority": "Core publishes deterministic height/normal and slope-qualified traversal; do not flatten into horizontal surfaces."
+    }
+  },
+  "water": {
+    "id": "eden-shore-water",
+    "datumY": 0,
+    "edgeXZ": [
+      [
+        0,
+        -12
+      ],
+      [
+        0,
+        12
+      ]
+    ],
+    "regions": [
+      {
+        "id": "eden-swimming-cove",
+        "purpose": "proposed swimming",
+        "boundsXZ": [
+          -14,
+          -10,
+          -6,
+          -2
+        ]
+      },
+      {
+        "id": "eden-wading-entry",
+        "purpose": "proposed wading/shore exit",
+        "boundsXZ": [
+          -4,
+          -2,
+          2,
+          2
+        ]
+      },
+      {
+        "id": "eden-boat-channel",
+        "purpose": "proposed boat clearance",
+        "boundsXZ": [
+          -14,
+          3,
+          -5,
+          10
+        ]
+      },
+      {
+        "id": "eden-dock-approach",
+        "purpose": "proposed docking basin; Core validates draft and approach",
+        "boundsXZ": [
+          -6,
+          6,
+          -2,
+          9
+        ]
+      }
+    ],
+    "wetDomain": {
+      "closedPolygonXZ": [
+        [
+          -16,
+          -12
+        ],
+        [
+          0,
+          -12
+        ],
+        [
+          0,
+          12
+        ],
+        [
+          -16,
+          12
+        ],
+        [
+          -16,
+          -12
+        ]
+      ],
+      "clipRule": "inside this bounded polygon AND interpolated bedY < datumY",
+      "shoreline": "depth zero is dry, including X=0; designation rectangles do not override clipping",
+      "boundaryPolicy": "wet western/northern/southern world boundary included; outside bounds unsupported"
+    },
+    "flowXZMetresPerSecond": [
+      0,
+      0
+    ],
+    "condition": "calm constant datum fixture; no implicit replenishment or weather wave physics"
+  },
+  "dock": {
+    "id": "eden-dock",
+    "centre": [
+      -3,
+      0.6,
+      5
+    ],
+    "sizeXYZ": [
+      6,
+      0.2,
+      2
+    ],
+    "proposedSupportId": "eden-dock-deck",
+    "boardingAnchors": [
+      {
+        "id": "eden-dock-boarding",
+        "p": [
+          -4,
+          0.7,
+          5.5
+        ]
+      },
+      {
+        "id": "eden-dock-shore",
+        "p": [
+          0,
+          0.7,
+          5
+        ]
+      }
+    ],
+    "shoreConnectionProposal": {
+      "kind": "raised ramp",
+      "width": 1.5,
+      "path": [
+        [
+          0,
+          0.7,
+          5
+        ],
+        [
+          4,
+          0.52,
+          5
+        ]
+      ],
+      "authority": "Core validates supports, grade and connectivity before publishing."
+    },
+    "supportTopY": 0.7
+  },
+  "boat": {
+    "id": "eden-boat-prototype",
+    "sizeXYZ": [
+      3,
+      0.8,
+      1.3
+    ],
+    "poseProposal": {
+      "p": [
+        -4,
+        0.1,
+        7
+      ],
+      "yaw": 0
+    },
+    "localPassengerAnchors": [
+      {
+        "id": "eden-boat-seat-0",
+        "p": [
+          -0.65,
+          0.4,
+          0
+        ],
+        "yaw": 3.141592653589793,
+        "kind": "seated root projected onto deck support",
+        "pelvisContactLocal": [
+          -0.65,
+          0.8,
+          0
+        ],
+        "feetContactsLocal": [
+          [
+            -1.05,
+            0.4,
+            -0.12
+          ],
+          [
+            -1.05,
+            0.4,
+            0.12
+          ]
+        ],
+        "authority": "proposed body/seat/feet coordinates; not occupied or admitted"
+      },
+      {
+        "id": "eden-boat-seat-1",
+        "p": [
+          0.65,
+          0.4,
+          0
+        ],
+        "yaw": 0,
+        "kind": "seated root projected onto deck support",
+        "pelvisContactLocal": [
+          0.65,
+          0.8,
+          0
+        ],
+        "feetContactsLocal": [
+          [
+            1.05,
+            0.4,
+            -0.12
+          ],
+          [
+            1.05,
+            0.4,
+            0.12
+          ]
+        ],
+        "authority": "proposed body/seat/feet coordinates; not occupied or admitted"
+      }
+    ],
+    "localBoardingAnchor": {
+      "id": "eden-boat-boarding",
+      "p": [
+        0,
+        0.4,
+        -0.25
+      ],
+      "kind": "standing feet/root on boat deck",
+      "landingPatchLocalXZ": [
+        -0.3,
+        -0.55,
+        0.3,
+        0.05
+      ]
+    },
+    "originMeaning": "world pose locates the boat-local frame, not the keel or seat; yaw zero +X",
+    "hullEnvelopeLocal": {
+      "minXYZ": [
+        -1.5,
+        -0.4,
+        -0.65
+      ],
+      "maxXYZ": [
+        1.5,
+        0.4,
+        0.65
+      ],
+      "meaning": "proposed tight hull box, excludes people and connector; not hydrostatic shape"
+    },
+    "deck": {
+      "topLocalY": 0.4,
+      "boundsLocalXZ": [
+        -1.5,
+        -0.65,
+        1.5,
+        0.65
+      ],
+      "visualThickness": 0.08,
+      "meaning": "standing feet/root support plane; local Y=.4 maps to world Y=.5 at proposed dock pose"
+    },
+    "waterlineLocalY": -0.1,
+    "draftMetres": 0.3,
+    "freeboardToDeckMetres": 0.5,
+    "hydrostatics": "draft/freeboard are fixture design targets only; Core validates buoyancy, displacement, stability and route clearance",
+    "occupantEnvelopeProposal": {
+      "standingRadius": 0.28,
+      "standingHeight": 1.75,
+      "seatedRootRadius": 0.28,
+      "seatedHeightAboveDeck": 1.35,
+      "authority": "baseline human design envelope only; Core validates legs/hands/other families/seat occupancy"
+    },
+    "pilotCapability": "not granted by a passenger slot; Core publishes a separate control capability"
+  },
+  "requiredValidation": [
+    "terrain normals/slopes and shoreline definition",
+    "canonical swim/wade depth and exit reach",
+    "stacked dock deck and waterbed supports",
+    "boat movement/docking/boarding clearance",
+    "passenger frame/occupancy and lifecycle",
+    "scene/body/rules revision at historical displayed tick",
+    "closed wet-domain clipping and triangle height/normal semantics",
+    "deck/hull/waterline/draft/freeboard versus occupant envelopes",
+    "supported connector landings, seat/leg clearance and occupied release"
+  ],
+  "reviewedAgainst": "7cc350842ee5f34a98ed82576f85b4a8d1c3bcdc",
+  "boardingConnectorProposal": {
+    "id": "eden-dock-gangway",
+    "kind": "supported stopped-dock ramp",
+    "width": 0.8,
+    "visualThickness": 0.08,
+    "dockLandingWorld": [
+      -4,
+      0.7,
+      5.5
+    ],
+    "dockLandingPatchXZ": [
+      -4.4,
+      5.1,
+      -3.6,
+      5.9
+    ],
+    "boatLandingLocal": [
+      0,
+      0.4,
+      -0.25
+    ],
+    "boatLandingPatchLocalXZ": [
+      -0.3,
+      -0.55,
+      0.3,
+      0.05
+    ],
+    "centrelineAtProposedDockPose": [
+      [
+        -4,
+        0.7,
+        5.5
+      ],
+      [
+        -4,
+        0.5,
+        6.75
+      ]
+    ],
+    "sweptActorEnvelope": {
+      "radius": 0.28,
+      "height": 1.75,
+      "path": "capsule sweep along supported centreline; Core also checks legs/carried loads and passenger occupancy"
+    },
+    "activation": "only after canonical boat docking/transform/version agreement and connector support publication",
+    "dependencies": [
+      "dock support",
+      "boat deck moving frame",
+      "connector attachment/support",
+      "individual passenger slot reservation"
+    ],
+    "release": "refuse retraction while occupied; retract only after safe contact release; no static ground link attached to a moving boat",
+    "authority": "Core validates supported contacts, occupancy, approach, atomic boarding/exiting and teardown; no gap jumping implied"
+  }
+}

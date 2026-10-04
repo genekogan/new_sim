@@ -1,0 +1,24 @@
+{
+  "contract": "native-boat-source-provenance/1",
+  "authoredSource": {
+    "worldCommit": "fd27a26096bc445d07483525c487f2906e6a9325",
+    "path": "worlds/eden/assets/fixtures/shore-dock-proposal.v1.json",
+    "sha256": "ad33cee15e66b56e7b1de01de573807e4091faf0cbeae1a9d1eca28f8d97f754",
+    "bytes": 12596,
+    "publishedCopy": "apps/server/test/fixtures/native-boat/source-proposal.v1.json"
+  },
+  "corePreview": {
+    "commit": "9b97f9b322b58f542fd36ec9a35a874c6b298ed1",
+    "path": "apps/server/test/fixtures/scene-placement/shore-world.v1.json",
+    "sha256": "69ac8401b8ff734f8d23acc8088d6e583d29a31d428a0a8f066cf700c85dfb3b",
+    "bytes": 12552
+  },
+  "journey": {
+    "commit": "9b97f9b322b58f542fd36ec9a35a874c6b298ed1",
+    "path": "apps/server/test/fixtures/native-boat/journey.v1.json",
+    "sha256": "d213c66af75dedb07d9a5196e505bfb86376a5e8f9105d33242d5e57985a8923",
+    "bytes": 373388
+  },
+  "difference": "Only boardingConnectorProposal.release wording differs; exact numeric fields are identical. Journey geometry.sourceProposalSha256 references authoredSource, not corePreview.",
+  "runtimeChanged": false
+}
