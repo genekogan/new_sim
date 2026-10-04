@@ -74,6 +74,20 @@ export const MIGRATIONS: { id: number; name: string; up(db: DatabaseSync): void 
       CASE WHEN json_valid(body) THEN json_extract(body, '$.request.system[0].text.$prompt') END,
       soul_id)`);
   } },
+  { id: 8, name: 'private candidate intent request reservations', up(db) {
+    // No route/capability is activated by this additive table. Pending transport
+    // work is separate from accepted canonical intention/activity facts.
+    db.exec(`CREATE TABLE intent_requests_v2 (
+      world_id TEXT NOT NULL REFERENCES worlds(id),
+      soul_id TEXT NOT NULL REFERENCES souls(id),
+      principal_id TEXT NOT NULL, request_id TEXT NOT NULL, owner_id TEXT NOT NULL,
+      body_hash TEXT NOT NULL, body TEXT NOT NULL CHECK(json_valid(body)),
+      source TEXT NOT NULL CHECK(json_valid(source)), lease TEXT NOT NULL,
+      receipt TEXT CHECK(receipt IS NULL OR json_valid(receipt)),
+      created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
+      PRIMARY KEY(world_id, soul_id, principal_id, request_id)
+    )`);
+  } },
 ];
 
 export function migrate(db: DatabaseSync): number[] {

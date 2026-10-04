@@ -1,0 +1,115 @@
+// Candidate private persistence seam. Not a route, worker or received receipt:
+// canonical reservation/admission/publication still needs the G-004 integration.
+import { randomUUID } from 'node:crypto';
+import { hashOf, stableStringify } from '@sim/engine-contract';
+import { intentRequestV2Schema, intentReceiptV2Schema, intentSourceV2Schema, intentRevisionV2Schema,
+  type IntentRequestV2, type IntentReceiptV2, type IntentRevisionV2 } from '@sim/protocol';
+import type { Db, SoulRow } from './db.ts';
+import { checkAcceptanceGuard, type AcceptanceGuard } from './world.ts';
+
+type Source = IntentRevisionV2['source'];
+export type IntentRequestScope = { worldId: string; soulId: string; source: Source; currentAuthority: (row: SoulRow) => boolean };
+type Key = { worldId: string; soulId: string; principalId: string; requestId: string };
+type Row = { owner_id: string; body_hash: string; body: string; source: string; lease: string; receipt: string | null };
+type View = { key: Key; request: IntentRequestV2; source: Source; receipt: IntentReceiptV2 | null };
+export type RequestReservation = ({ created: true; lease: string } | { created: false }) & View;
+export class IntentRequestConflict extends Error { constructor() { super('that request ID already names different words or settings'); } }
+export class IntentRequestUnavailable extends Error { constructor() { super('request unavailable'); } }
+export class IntentRequestLeaseLost extends Error { constructor() { super('request reservation no longer writable'); } }
+
+function keyArgs(k: Key) { return [k.worldId, k.soulId, k.principalId, k.requestId]; }
+function view(k: Key, row: Row): View {
+  return { key: k, request: intentRequestV2Schema.parse(JSON.parse(row.body)),
+    source: intentSourceV2Schema.parse(JSON.parse(row.source)),
+    receipt: row.receipt === null ? null : intentReceiptV2Schema.parse(JSON.parse(row.receipt)) };
+}
+export class IntentRequests {
+  readonly db: Db;
+  constructor(db: Db) { this.db = db; }
+  private transaction<T>(work: () => T): T {
+    this.db.db.exec('BEGIN IMMEDIATE');
+    try { const value = work(); this.db.db.exec('COMMIT'); return value; }
+    catch (error) { this.db.db.exec('ROLLBACK'); throw error; }
+  }
+  private row(k: Key): Row | undefined {
+    return this.db.db.prepare('SELECT owner_id, body_hash, body, source, lease, receipt FROM intent_requests_v2 WHERE world_id=? AND soul_id=? AND principal_id=? AND request_id=?')
+      .get(...keyArgs(k)) as Row | undefined;
+  }
+  private check(scope: IntentRequestScope): Source {
+    const source = intentSourceV2Schema.parse(scope.source);
+    intentRevisionV2Schema.pick({ worldId: true, soulId: true }).parse({ worldId: scope.worldId, soulId: scope.soulId });
+    const soul = this.db.soul(scope.soulId);
+    // The trusted handler binds principal/generation to its callback. This
+    // storage class cannot authenticate a claimed principal from a client.
+    if (!soul || soul.retired_at !== null || soul.world_id !== scope.worldId
+      || soul.owner !== source.ownerId || scope.currentAuthority(soul) !== true) throw new IntentRequestUnavailable();
+    return source;
+  }
+  /** Atomically choose one worker. Semantic defaults/key order hash identically.
+   * Duplicate submissions never receive its lease and never authorize rerun.
+   * Pending rows survive crashes; there is deliberately no automatic resume. */
+  reserve(scope: IntentRequestScope, raw: unknown): RequestReservation {
+    const request = intentRequestV2Schema.parse(raw), hash = hashOf(request), body = stableStringify(request);
+    return this.transaction(() => {
+      const source = this.check(scope), key = { worldId: scope.worldId, soulId: scope.soulId, principalId: source.principalId, requestId: request.requestId };
+      const old = this.row(key);
+      if (old) {
+        if (old.owner_id !== source.ownerId) throw new IntentRequestUnavailable();
+        if (old.body_hash !== hash) throw new IntentRequestConflict();
+        return { created: false, ...view(key, old) };
+      }
+      const lease = randomUUID(), now = Date.now();
+      this.db.db.prepare('INSERT INTO intent_requests_v2(world_id,soul_id,principal_id,request_id,owner_id,body_hash,body,source,lease,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+        .run(...keyArgs(key), source.ownerId, hash, body, stableStringify(source), lease, now, now);
+      return { created: true, lease, ...view(key, this.row(key)!) };
+    });
+  }
+  /** Current private lookup; unknown/inaccessible is the same null. No-store and
+   * HTTP/MCP error mapping belong to the eventual authenticated adapter. */
+  lookup(scope: IntentRequestScope, requestId: string): View | null {
+    return this.transaction(() => {
+      let source: Source;
+      try { source = this.check(scope); } catch (error) { if (error instanceof IntentRequestUnavailable) return null; throw error; }
+      const key = { worldId: scope.worldId, soulId: scope.soulId, principalId: source.principalId, requestId };
+      const row = this.row(key);
+      return row && row.owner_id === source.ownerId ? view(key, row) : null;
+    });
+  }
+  /** Trusted worker finalization, never callable with a client-supplied lease.
+   * Refusal can be recorded after authority loss as a private historical fact.
+   * Understood/withdrawn additionally require a synchronous check against REAL
+   * canonical acceptance in the SAME Db transaction, not current live auth.
+   * Later revocation affects access, not whether earlier acceptance happened. */
+  finish(reservation: Extract<RequestReservation, { created: true }>, raw: unknown, canonicalAcceptance?: AcceptanceGuard): IntentReceiptV2 {
+    const receipt = intentReceiptV2Schema.parse(raw);
+    if (receipt.phase === 'received') throw new Error('a reservation is not a canonical received receipt');
+    return this.transaction(() => {
+      const row = this.row(reservation.key);
+      if (!row || row.lease !== reservation.lease) throw new IntentRequestLeaseLost();
+      const stored = view(reservation.key, row), req = stored.request;
+      if (receipt.requestId !== req.requestId) throw new IntentRequestConflict();
+      if (receipt.phase === 'understood') {
+        const r = receipt.revision;
+        if (req.op !== 'upsert' || r.worldId !== reservation.key.worldId || r.soulId !== reservation.key.soulId
+          || stableStringify(r.source) !== stableStringify(stored.source) || r.words !== req.words
+          || r.strict !== req.strict || r.importance !== req.importance || (!req.edit && r.version !== 1)
+          || (req.edit && (r.intentId !== req.edit.intentId || r.version !== req.edit.expectedVersion + 1))) throw new IntentRequestConflict();
+      } else if (receipt.phase === 'withdrawn') {
+        if (req.op !== 'withdraw' || receipt.worldId !== reservation.key.worldId || receipt.soulId !== reservation.key.soulId
+          || receipt.intent.intentId !== req.edit.intentId || receipt.intent.version !== req.edit.expectedVersion) throw new IntentRequestConflict();
+      }
+      const encoded = stableStringify(receipt);
+      if (row.receipt !== null) {
+        if (row.receipt !== encoded) throw new IntentRequestConflict();
+        return stored.receipt!;
+      }
+      if (receipt.phase !== 'refused') {
+        if (!canonicalAcceptance) throw new Error('canonical acceptance proof is required before a terminal intent receipt');
+        checkAcceptanceGuard(canonicalAcceptance);
+      }
+      this.db.db.prepare('UPDATE intent_requests_v2 SET receipt=?,updated_at=? WHERE world_id=? AND soul_id=? AND principal_id=? AND request_id=?')
+        .run(encoded, Date.now(), ...keyArgs(reservation.key));
+      return receipt;
+    });
+  }
+}
