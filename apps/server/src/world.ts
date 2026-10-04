@@ -121,6 +121,10 @@ export class WorldHost {
     }
     this.clockRate = this.baseRate = w.clock_rate;
     const snap = this.db.latestSnapshot(this.worldId);
+    // Snapshot rejection is not permission to reinterpret history from genesis.
+    // Check both durable identities before constructing or stepping any engine.
+    for(const version of [w.rules_version,...(snap?[snap.rulesVersion]:[])])
+      if(this.factory.canReplayHistory?.(version)===false)throw new Error(`history rules are incompatible with the configured engine: ${version} -> ${this.factory.rulesVersion}`);
     let from: 'genesis' | 'snapshot' = 'genesis';
     if (snap && (snap.rulesVersion === this.factory.rulesVersion || this.factory.canRestoreSnapshot?.(snap.rulesVersion))) {
       const body = snap.body as SnapshotBody;

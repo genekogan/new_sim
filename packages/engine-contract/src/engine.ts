@@ -119,8 +119,14 @@ export interface Engine {
 
 export interface EngineFactory {
   rulesVersion: string;
-  /** Explicit, qualified additive upgrades only; unknown versions replay from genesis. */
+  /** Explicit, qualified additive checkpoint upgrades only. Rebuilding an
+   * incompatible checkpoint also requires canReplayHistory's permission. */
   canRestoreSnapshot?: (rulesVersion: string) => boolean;
+  /** Optional fail-closed boundary for history whose rules cannot be silently
+   * reinterpreted by this factory. False forbids host boot before construction
+   * or replay; absence preserves existing factories' replay behavior. This does
+   * not convert a checkpoint or qualify an upgrade/rollback. */
+  canReplayHistory?: (rulesVersion: string) => boolean;
   genesis(seed: string): WorldState;
   create(world: WorldState): Engine;
   restore(snap: EngineSnapshot): Engine;

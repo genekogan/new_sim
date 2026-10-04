@@ -664,6 +664,12 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
   const registry = m.createRegistry(), services = m.servicesFor(m.scenes);
   return {
     rulesVersion: nativeRulesVersion(m.rulesVersion,cfg),
+    // A failed cross-policy checkpoint restore must not turn into replay under
+    // another removal policy. An explicit, qualified transition is separate.
+    canReplayHistory: version => {
+      const policies=version.match(/\+crew-removal\/[^+]+/g)??[];
+      return cfg.safeCrewRemoval?policies.length===1&&policies[0]==='+crew-removal/1':policies.length===0;
+    },
     // Candidate removal changes controller behavior: restore only its exact
     // policy/version. Legacy activities31 compatibility remains unchanged.
     canRestoreSnapshot: version => cfg.safeCrewRemoval?version===nativeRulesVersion(m.rulesVersion,cfg):[m.rulesVersion,m.rulesVersion.replace('+bodies/1',''),m.rulesVersion.replace('+bodies/1','').replace('activities/31','activities/29')].some(v=>version===nativeRulesVersion(v,cfg)),
