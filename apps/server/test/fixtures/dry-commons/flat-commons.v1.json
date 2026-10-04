@@ -1,0 +1,4987 @@
+{
+  "contract": "core-flat-commons-fixture/1",
+  "worldId": "core-flat-commons-fixture",
+  "producer": {
+    "semanticsParent": "2fc2a2df65fa34525985b50a0e19f12a53d9d853",
+    "kind": "actual-native-canonical-decision",
+    "seed": "core-flat-commons-walk/1",
+    "config": {
+      "scene": "greenfield",
+      "arrival": [
+        14,
+        4
+      ],
+      "arrivalPlace": "field",
+      "reference": [
+        9,
+        5
+      ],
+      "grounds": {
+        "id": "grounds",
+        "name": "Green field"
+      },
+      "clock": {
+        "origin": 0,
+        "dayTicks": 72000
+      }
+    }
+  },
+  "scope": "flat Greenfield walking; no commons-kit installation, dance, terrain/water control or live owner admission",
+  "playback": "Canonical birth exists at tick 0 in initialSnapshot; recorder first publishes this body at tick 1. Do not backfill the take.",
+  "actor": {
+    "entityId": "h_commons",
+    "soulId": "s_commons",
+    "owner": "fake-local human association verified in SQLite"
+  },
+  "scene": {
+    "scene": {
+      "bounds": [
+        -30,
+        -30,
+        30,
+        30
+      ],
+      "levels": [
+        {
+          "id": 0,
+          "y": 0,
+          "label": "green field"
+        }
+      ],
+      "surfaces": [
+        {
+          "id": "green-field",
+          "level": 0,
+          "y": 0,
+          "obb": {
+            "c": [
+              0,
+              0
+            ],
+            "half": [
+              30,
+              30
+            ],
+            "yaw": 0
+          },
+          "label": "green field"
+        }
+      ],
+      "obstacles": [],
+      "links": []
+    },
+    "clock": {
+      "origin": 0,
+      "dayTicks": 72000
+    },
+    "ground": "grass",
+    "renderSceneRef": {
+      "contract": "render-scene-ref/1",
+      "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+      "hash": "811cea9c0116ee77446fb54fbd287552a09336e06b60d018a216f33a379f2e7b"
+    }
+  },
+  "stream": {
+    "serverTick": 200,
+    "chunks": [
+      {
+        "fromTick": 0,
+        "toTick": 20,
+        "take": {
+          "schema": "mars-take/4",
+          "baselineStateHash": "cee8451dce267751d149034f3aa8b64dcec621fafeedbba410c622feadf5eb47",
+          "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+          "renderSceneRef": {
+            "contract": "render-scene-ref/1",
+            "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+            "hash": "811cea9c0116ee77446fb54fbd287552a09336e06b60d018a216f33a379f2e7b"
+          },
+          "dt": 0.05,
+          "startTick": 0,
+          "ticks": 20,
+          "keyframeEvery": 20,
+          "tracks": {
+            "h_commons": [
+              [
+                1,
+                14000,
+                0,
+                4000,
+                0
+              ],
+              [
+                6,
+                14000,
+                0,
+                4000,
+                1000
+              ],
+              [
+                9,
+                13982,
+                0,
+                4004,
+                1600
+              ],
+              [
+                12,
+                13938,
+                0,
+                4012,
+                2200
+              ],
+              [
+                15,
+                13868,
+                0,
+                4026,
+                2800
+              ],
+              [
+                16,
+                13838,
+                0,
+                4032,
+                2944
+              ],
+              [
+                19,
+                13732,
+                0,
+                4054,
+                2944
+              ],
+              [
+                20,
+                13691,
+                0,
+                4062,
+                2944
+              ]
+            ]
+          },
+          "changes": [
+            [
+              1,
+              "h_commons",
+              "present",
+              true
+            ],
+            [
+              1,
+              "h_commons",
+              "activity",
+              "idle"
+            ],
+            [
+              1,
+              "h_commons",
+              "level",
+              0
+            ],
+            [
+              2,
+              "h_commons",
+              "task",
+              "a1"
+            ],
+            [
+              2,
+              "h_commons",
+              "speed",
+              0
+            ],
+            [
+              6,
+              "h_commons",
+              "speed",
+              0
+            ],
+            [
+              8,
+              "h_commons",
+              "activity",
+              "walk"
+            ],
+            [
+              20,
+              "h_commons",
+              "speed",
+              84
+            ]
+          ],
+          "events": [
+            {
+              "t": 1,
+              "type": "action",
+              "id": "a1",
+              "verb": "walk_to",
+              "status": "executing",
+              "from": "requested"
+            },
+            {
+              "t": 2,
+              "type": "action",
+              "id": "a1",
+              "verb": "walk_to",
+              "status": "executing",
+              "phase": "turn"
+            },
+            {
+              "t": 7,
+              "type": "action",
+              "id": "a1",
+              "verb": "walk_to",
+              "status": "executing",
+              "phase": "walk"
+            }
+          ],
+          "finalStateHash": "7a6d247a4be88bc768726c445b72db5025078580e42255055c718bcc39aa83dd",
+          "finalState": {
+            "schema": "mars-world/1",
+            "base": {
+              "campus": "greenfield",
+              "staticHash": "1bbb73f2e89cb57cdb29caf3109a87bd17d0f04a9d7a039fca6ac8213ae56a73"
+            },
+            "tick": 20,
+            "entities": {
+              "h_commons": {
+                "id": "h_commons",
+                "def": "human",
+                "kind": "human",
+                "label": "Commons walker",
+                "pose": {
+                  "p": [
+                    13.69111708715736,
+                    0,
+                    4.061776582568528
+                  ],
+                  "yaw": 2.9441970937399127
+                },
+                "provenance": {
+                  "origin": "simulation",
+                  "confidence": "hypothetical"
+                },
+                "human": {
+                  "activity": "walk",
+                  "level": 0,
+                  "soul": "s_commons",
+                  "task": "a1",
+                  "speed": 0.84
+                }
+              }
+            },
+            "regions": {
+              "field": {
+                "id": "field",
+                "label": "Green field",
+                "kind": "walkable",
+                "level": 0,
+                "polygon": [
+                  [
+                    -30,
+                    -30
+                  ],
+                  [
+                    30,
+                    -30
+                  ],
+                  [
+                    30,
+                    30
+                  ],
+                  [
+                    -30,
+                    30
+                  ]
+                ],
+                "provenance": {
+                  "origin": "design-edit",
+                  "confidence": "hypothetical"
+                }
+              }
+            },
+            "env": {
+              "datetime": "2026-10-03T06:00:24.000Z",
+              "weather": {
+                "clouds": 0,
+                "rain": 0,
+                "wind": 0,
+                "dust": 0,
+                "wet": 0
+              }
+            },
+            "inventory": "finite",
+            "rng": [
+              3580720243,
+              3589016422,
+              189943697,
+              3930112751
+            ]
+          },
+          "entities0": {
+            "h_commons": {
+              "id": "h_commons",
+              "def": "human",
+              "kind": "human",
+              "pose": {
+                "p": [
+                  14,
+                  0,
+                  4
+                ],
+                "yaw": 0
+              },
+              "human": {
+                "activity": "idle",
+                "level": 0,
+                "soul": "s_commons"
+              }
+            }
+          },
+          "removed": [],
+          "id": "beabc34df18bd85152d61491"
+        }
+      },
+      {
+        "fromTick": 20,
+        "toTick": 40,
+        "take": {
+          "schema": "mars-take/4",
+          "baselineStateHash": "7a6d247a4be88bc768726c445b72db5025078580e42255055c718bcc39aa83dd",
+          "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+          "renderSceneRef": {
+            "contract": "render-scene-ref/1",
+            "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+            "hash": "811cea9c0116ee77446fb54fbd287552a09336e06b60d018a216f33a379f2e7b"
+          },
+          "dt": 0.05,
+          "startTick": 20,
+          "ticks": 20,
+          "keyframeEvery": 20,
+          "tracks": {
+            "h_commons": [
+              [
+                0,
+                13691,
+                0,
+                4062,
+                2944
+              ],
+              [
+                3,
+                13550,
+                0,
+                4090,
+                2944
+              ],
+              [
+                6,
+                13382,
+                0,
+                4124,
+                2944
+              ],
+              [
+                11,
+                13057,
+                0,
+                4189,
+                2944
+              ],
+              [
+                20,
+                12461,
+                0,
+                4308,
+                2944
+              ]
+            ]
+          },
+          "changes": [
+            [
+              0,
+              "h_commons",
+              "present",
+              true
+            ],
+            [
+              0,
+              "h_commons",
+              "activity",
+              "walk"
+            ],
+            [
+              0,
+              "h_commons",
+              "level",
+              0
+            ],
+            [
+              0,
+              "h_commons",
+              "task",
+              "a1"
+            ],
+            [
+              0,
+              "h_commons",
+              "speed",
+              84
+            ],
+            [
+              8,
+              "h_commons",
+              "speed",
+              132
+            ],
+            [
+              9,
+              "h_commons",
+              "speed",
+              135
+            ]
+          ],
+          "events": [],
+          "finalStateHash": "26ee99b8a04e3c101d6ab415d9697d87eeb58e55b691aaa0cc45e474faa4e86d",
+          "finalState": {
+            "schema": "mars-world/1",
+            "base": {
+              "campus": "greenfield",
+              "staticHash": "1bbb73f2e89cb57cdb29caf3109a87bd17d0f04a9d7a039fca6ac8213ae56a73"
+            },
+            "tick": 40,
+            "entities": {
+              "h_commons": {
+                "id": "h_commons",
+                "def": "human",
+                "kind": "human",
+                "label": "Commons walker",
+                "pose": {
+                  "p": [
+                    12.461468919840947,
+                    0,
+                    4.307706216031811
+                  ],
+                  "yaw": 2.9441970937399127
+                },
+                "provenance": {
+                  "origin": "simulation",
+                  "confidence": "hypothetical"
+                },
+                "human": {
+                  "activity": "walk",
+                  "level": 0,
+                  "soul": "s_commons",
+                  "task": "a1",
+                  "speed": 1.35
+                }
+              }
+            },
+            "regions": {
+              "field": {
+                "id": "field",
+                "label": "Green field",
+                "kind": "walkable",
+                "level": 0,
+                "polygon": [
+                  [
+                    -30,
+                    -30
+                  ],
+                  [
+                    30,
+                    -30
+                  ],
+                  [
+                    30,
+                    30
+                  ],
+                  [
+                    -30,
+                    30
+                  ]
+                ],
+                "provenance": {
+                  "origin": "design-edit",
+                  "confidence": "hypothetical"
+                }
+              }
+            },
+            "env": {
+              "datetime": "2026-10-03T06:00:48.000Z",
+              "weather": {
+                "clouds": 0,
+                "rain": 0,
+                "wind": 0,
+                "dust": 0,
+                "wet": 0
+              }
+            },
+            "inventory": "finite",
+            "rng": [
+              3580720243,
+              3589016422,
+              189943697,
+              3930112751
+            ]
+          },
+          "entities0": {
+            "h_commons": {
+              "id": "h_commons",
+              "def": "human",
+              "kind": "human",
+              "pose": {
+                "p": [
+                  13.69111708715736,
+                  0,
+                  4.061776582568528
+                ],
+                "yaw": 2.9441970937399127
+              },
+              "human": {
+                "activity": "walk",
+                "level": 0,
+                "soul": "s_commons",
+                "task": "a1",
+                "speed": 0.84
+              }
+            }
+          },
+          "removed": [],
+          "id": "95f30cd3542bfdd84625710a"
+        }
+      },
+      {
+        "fromTick": 40,
+        "toTick": 60,
+        "take": {
+          "schema": "mars-take/4",
+          "baselineStateHash": "26ee99b8a04e3c101d6ab415d9697d87eeb58e55b691aaa0cc45e474faa4e86d",
+          "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+          "renderSceneRef": {
+            "contract": "render-scene-ref/1",
+            "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+            "hash": "811cea9c0116ee77446fb54fbd287552a09336e06b60d018a216f33a379f2e7b"
+          },
+          "dt": 0.05,
+          "startTick": 40,
+          "ticks": 20,
+          "keyframeEvery": 20,
+          "tracks": {
+            "h_commons": [
+              [
+                0,
+                12461,
+                0,
+                4308,
+                2944
+              ],
+              [
+                20,
+                11138,
+                0,
+                4572,
+                2944
+              ]
+            ]
+          },
+          "changes": [
+            [
+              0,
+              "h_commons",
+              "present",
+              true
+            ],
+            [
+              0,
+              "h_commons",
+              "activity",
+              "walk"
+            ],
+            [
+              0,
+              "h_commons",
+              "level",
+              0
+            ],
+            [
+              0,
+              "h_commons",
+              "task",
+              "a1"
+            ],
+            [
+              0,
+              "h_commons",
+              "speed",
+              135
+            ]
+          ],
+          "events": [],
+          "finalStateHash": "eb4785be8ecf7633d9306758bddec266acf108f79e27eebffa2c8e8976b72d8f",
+          "finalState": {
+            "schema": "mars-world/1",
+            "base": {
+              "campus": "greenfield",
+              "staticHash": "1bbb73f2e89cb57cdb29caf3109a87bd17d0f04a9d7a039fca6ac8213ae56a73"
+            },
+            "tick": 60,
+            "entities": {
+              "h_commons": {
+                "id": "h_commons",
+                "def": "human",
+                "kind": "human",
+                "label": "Commons walker",
+                "pose": {
+                  "p": [
+                    11.137685007658206,
+                    0,
+                    4.5724629984683585
+                  ],
+                  "yaw": 2.944197093739912
+                },
+                "provenance": {
+                  "origin": "simulation",
+                  "confidence": "hypothetical"
+                },
+                "human": {
+                  "activity": "walk",
+                  "level": 0,
+                  "soul": "s_commons",
+                  "task": "a1",
+                  "speed": 1.35
+                }
+              }
+            },
+            "regions": {
+              "field": {
+                "id": "field",
+                "label": "Green field",
+                "kind": "walkable",
+                "level": 0,
+                "polygon": [
+                  [
+                    -30,
+                    -30
+                  ],
+                  [
+                    30,
+                    -30
+                  ],
+                  [
+                    30,
+                    30
+                  ],
+                  [
+                    -30,
+                    30
+                  ]
+                ],
+                "provenance": {
+                  "origin": "design-edit",
+                  "confidence": "hypothetical"
+                }
+              }
+            },
+            "env": {
+              "datetime": "2026-10-03T06:01:12.000Z",
+              "weather": {
+                "clouds": 0,
+                "rain": 0,
+                "wind": 0,
+                "dust": 0,
+                "wet": 0
+              }
+            },
+            "inventory": "finite",
+            "rng": [
+              3580720243,
+              3589016422,
+              189943697,
+              3930112751
+            ]
+          },
+          "entities0": {
+            "h_commons": {
+              "id": "h_commons",
+              "def": "human",
+              "kind": "human",
+              "pose": {
+                "p": [
+                  12.461468919840947,
+                  0,
+                  4.307706216031811
+                ],
+                "yaw": 2.9441970937399127
+              },
+              "human": {
+                "activity": "walk",
+                "level": 0,
+                "soul": "s_commons",
+                "task": "a1",
+                "speed": 1.35
+              }
+            }
+          },
+          "removed": [],
+          "id": "47086c99aa1d1217b03eb123"
+        }
+      },
+      {
+        "fromTick": 60,
+        "toTick": 80,
+        "take": {
+          "schema": "mars-take/4",
+          "baselineStateHash": "eb4785be8ecf7633d9306758bddec266acf108f79e27eebffa2c8e8976b72d8f",
+          "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+          "renderSceneRef": {
+            "contract": "render-scene-ref/1",
+            "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+            "hash": "811cea9c0116ee77446fb54fbd287552a09336e06b60d018a216f33a379f2e7b"
+          },
+          "dt": 0.05,
+          "startTick": 60,
+          "ticks": 20,
+          "keyframeEvery": 20,
+          "tracks": {
+            "h_commons": [
+              [
+                0,
+                11138,
+                0,
+                4572,
+                2944
+              ],
+              [
+                20,
+                9814,
+                0,
+                4837,
+                2944
+              ]
+            ]
+          },
+          "changes": [
+            [
+              0,
+              "h_commons",
+              "present",
+              true
+            ],
+            [
+              0,
+              "h_commons",
+              "activity",
+              "walk"
+            ],
+            [
+              0,
+              "h_commons",
+              "level",
+              0
+            ],
+            [
+              0,
+              "h_commons",
+              "task",
+              "a1"
+            ],
+            [
+              0,
+              "h_commons",
+              "speed",
+              135
+            ]
+          ],
+          "events": [],
+          "finalStateHash": "7d59cfc61ba3275783069e5b57a18c0f6b815b14d3c028244dc9a976e6a59a92",
+          "finalState": {
+            "schema": "mars-world/1",
+            "base": {
+              "campus": "greenfield",
+              "staticHash": "1bbb73f2e89cb57cdb29caf3109a87bd17d0f04a9d7a039fca6ac8213ae56a73"
+            },
+            "tick": 80,
+            "entities": {
+              "h_commons": {
+                "id": "h_commons",
+                "def": "human",
+                "kind": "human",
+                "label": "Commons walker",
+                "pose": {
+                  "p": [
+                    9.813901095475465,
+                    0,
+                    4.837219780904907
+                  ],
+                  "yaw": 2.944197093739912
+                },
+                "provenance": {
+                  "origin": "simulation",
+                  "confidence": "hypothetical"
+                },
+                "human": {
+                  "activity": "walk",
+                  "level": 0,
+                  "soul": "s_commons",
+                  "task": "a1",
+                  "speed": 1.35
+                }
+              }
+            },
+            "regions": {
+              "field": {
+                "id": "field",
+                "label": "Green field",
+                "kind": "walkable",
+                "level": 0,
+                "polygon": [
+                  [
+                    -30,
+                    -30
+                  ],
+                  [
+                    30,
+                    -30
+                  ],
+                  [
+                    30,
+                    30
+                  ],
+                  [
+                    -30,
+                    30
+                  ]
+                ],
+                "provenance": {
+                  "origin": "design-edit",
+                  "confidence": "hypothetical"
+                }
+              }
+            },
+            "env": {
+              "datetime": "2026-10-03T06:01:36.000Z",
+              "weather": {
+                "clouds": 0,
+                "rain": 0,
+                "wind": 0,
+                "dust": 0,
+                "wet": 0
+              }
+            },
+            "inventory": "finite",
+            "rng": [
+              3580720243,
+              3589016422,
+              189943697,
+              3930112751
+            ]
+          },
+          "entities0": {
+            "h_commons": {
+              "id": "h_commons",
+              "def": "human",
+              "kind": "human",
+              "pose": {
+                "p": [
+                  11.137685007658206,
+                  0,
+                  4.5724629984683585
+                ],
+                "yaw": 2.944197093739912
+              },
+              "human": {
+                "activity": "walk",
+                "level": 0,
+                "soul": "s_commons",
+                "task": "a1",
+                "speed": 1.35
+              }
+            }
+          },
+          "removed": [],
+          "id": "e00ae59523897bc1399f4881"
+        }
+      },
+      {
+        "fromTick": 80,
+        "toTick": 100,
+        "take": {
+          "schema": "mars-take/4",
+          "baselineStateHash": "7d59cfc61ba3275783069e5b57a18c0f6b815b14d3c028244dc9a976e6a59a92",
+          "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+          "renderSceneRef": {
+            "contract": "render-scene-ref/1",
+            "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+            "hash": "811cea9c0116ee77446fb54fbd287552a09336e06b60d018a216f33a379f2e7b"
+          },
+          "dt": 0.05,
+          "startTick": 80,
+          "ticks": 20,
+          "keyframeEvery": 20,
+          "tracks": {
+            "h_commons": [
+              [
+                0,
+                9814,
+                0,
+                4837,
+                2944
+              ],
+              [
+                4,
+                9553,
+                0,
+                4889,
+                2944
+              ],
+              [
+                7,
+                9384,
+                0,
+                4923,
+                2944
+              ],
+              [
+                10,
+                9244,
+                0,
+                4951,
+                2944
+              ],
+              [
+                13,
+                9133,
+                0,
+                4973,
+                2944
+              ],
+              [
+                16,
+                9052,
+                0,
+                4990,
+                2944
+              ],
+              [
+                19,
+                9004,
+                0,
+                4999,
+                2944
+              ],
+              [
+                20,
+                9000,
+                0,
+                5000,
+                2944
+              ]
+            ]
+          },
+          "changes": [
+            [
+              0,
+              "h_commons",
+              "present",
+              true
+            ],
+            [
+              0,
+              "h_commons",
+              "activity",
+              "walk"
+            ],
+            [
+              0,
+              "h_commons",
+              "level",
+              0
+            ],
+            [
+              0,
+              "h_commons",
+              "task",
+              "a1"
+            ],
+            [
+              0,
+              "h_commons",
+              "speed",
+              135
+            ],
+            [
+              3,
+              "h_commons",
+              "speed",
+              134
+            ],
+            [
+              13,
+              "h_commons",
+              "speed",
+              69
+            ],
+            [
+              18,
+              "h_commons",
+              "speed",
+              33
+            ],
+            [
+              19,
+              "h_commons",
+              "speed",
+              25
+            ],
+            [
+              20,
+              "h_commons",
+              "activity",
+              "idle"
+            ],
+            [
+              20,
+              "h_commons",
+              "speed",
+              8
+            ]
+          ],
+          "events": [],
+          "finalStateHash": "527c4721cb00c0557269639d23e8aa1ff7d0d8069fa90017c3336c6e3bdcf0b3",
+          "finalState": {
+            "schema": "mars-world/1",
+            "base": {
+              "campus": "greenfield",
+              "staticHash": "1bbb73f2e89cb57cdb29caf3109a87bd17d0f04a9d7a039fca6ac8213ae56a73"
+            },
+            "tick": 100,
+            "entities": {
+              "h_commons": {
+                "id": "h_commons",
+                "def": "human",
+                "kind": "human",
+                "label": "Commons walker",
+                "pose": {
+                  "p": [
+                    9,
+                    0,
+                    5
+                  ],
+                  "yaw": 2.9441970937399127
+                },
+                "provenance": {
+                  "origin": "simulation",
+                  "confidence": "hypothetical"
+                },
+                "human": {
+                  "activity": "idle",
+                  "level": 0,
+                  "soul": "s_commons",
+                  "task": "a1",
+                  "speed": 0.075
+                }
+              }
+            },
+            "regions": {
+              "field": {
+                "id": "field",
+                "label": "Green field",
+                "kind": "walkable",
+                "level": 0,
+                "polygon": [
+                  [
+                    -30,
+                    -30
+                  ],
+                  [
+                    30,
+                    -30
+                  ],
+                  [
+                    30,
+                    30
+                  ],
+                  [
+                    -30,
+                    30
+                  ]
+                ],
+                "provenance": {
+                  "origin": "design-edit",
+                  "confidence": "hypothetical"
+                }
+              }
+            },
+            "env": {
+              "datetime": "2026-10-03T06:02:00.000Z",
+              "weather": {
+                "clouds": 0,
+                "rain": 0,
+                "wind": 0,
+                "dust": 0,
+                "wet": 0
+              }
+            },
+            "inventory": "finite",
+            "rng": [
+              3580720243,
+              3589016422,
+              189943697,
+              3930112751
+            ]
+          },
+          "entities0": {
+            "h_commons": {
+              "id": "h_commons",
+              "def": "human",
+              "kind": "human",
+              "pose": {
+                "p": [
+                  9.813901095475465,
+                  0,
+                  4.837219780904907
+                ],
+                "yaw": 2.944197093739912
+              },
+              "human": {
+                "activity": "walk",
+                "level": 0,
+                "soul": "s_commons",
+                "task": "a1",
+                "speed": 1.35
+              }
+            }
+          },
+          "removed": [],
+          "id": "34a406056fc421d85ffca8fd"
+        }
+      },
+      {
+        "fromTick": 100,
+        "toTick": 120,
+        "take": {
+          "schema": "mars-take/4",
+          "baselineStateHash": "527c4721cb00c0557269639d23e8aa1ff7d0d8069fa90017c3336c6e3bdcf0b3",
+          "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+          "renderSceneRef": {
+            "contract": "render-scene-ref/1",
+            "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+            "hash": "811cea9c0116ee77446fb54fbd287552a09336e06b60d018a216f33a379f2e7b"
+          },
+          "dt": 0.05,
+          "startTick": 100,
+          "ticks": 20,
+          "keyframeEvery": 20,
+          "tracks": {
+            "h_commons": [
+              [
+                0,
+                9000,
+                0,
+                5000,
+                2944
+              ]
+            ]
+          },
+          "changes": [
+            [
+              0,
+              "h_commons",
+              "present",
+              true
+            ],
+            [
+              0,
+              "h_commons",
+              "activity",
+              "idle"
+            ],
+            [
+              0,
+              "h_commons",
+              "level",
+              0
+            ],
+            [
+              0,
+              "h_commons",
+              "task",
+              "a1"
+            ],
+            [
+              0,
+              "h_commons",
+              "speed",
+              8
+            ],
+            [
+              1,
+              "h_commons",
+              "task",
+              null
+            ],
+            [
+              1,
+              "h_commons",
+              "speed",
+              null
+            ]
+          ],
+          "events": [
+            {
+              "t": 1,
+              "type": "action",
+              "id": "a1",
+              "verb": "walk_to",
+              "status": "completed",
+              "phase": "walk"
+            }
+          ],
+          "finalStateHash": "871df0cf36947627a0b1b8eec4f46d226780745f3c2d4ed3a328abcd5177b47c",
+          "finalState": {
+            "schema": "mars-world/1",
+            "base": {
+              "campus": "greenfield",
+              "staticHash": "1bbb73f2e89cb57cdb29caf3109a87bd17d0f04a9d7a039fca6ac8213ae56a73"
+            },
+            "tick": 120,
+            "entities": {
+              "h_commons": {
+                "id": "h_commons",
+                "def": "human",
+                "kind": "human",
+                "label": "Commons walker",
+                "pose": {
+                  "p": [
+                    9,
+                    0,
+                    5
+                  ],
+                  "yaw": 2.9441970937399127
+                },
+                "provenance": {
+                  "origin": "simulation",
+                  "confidence": "hypothetical"
+                },
+                "human": {
+                  "activity": "idle",
+                  "level": 0,
+                  "soul": "s_commons"
+                }
+              }
+            },
+            "regions": {
+              "field": {
+                "id": "field",
+                "label": "Green field",
+                "kind": "walkable",
+                "level": 0,
+                "polygon": [
+                  [
+                    -30,
+                    -30
+                  ],
+                  [
+                    30,
+                    -30
+                  ],
+                  [
+                    30,
+                    30
+                  ],
+                  [
+                    -30,
+                    30
+                  ]
+                ],
+                "provenance": {
+                  "origin": "design-edit",
+                  "confidence": "hypothetical"
+                }
+              }
+            },
+            "env": {
+              "datetime": "2026-10-03T06:02:24.000Z",
+              "weather": {
+                "clouds": 0,
+                "rain": 0,
+                "wind": 0,
+                "dust": 0,
+                "wet": 0
+              }
+            },
+            "inventory": "finite",
+            "rng": [
+              3580720243,
+              3589016422,
+              189943697,
+              3930112751
+            ]
+          },
+          "entities0": {
+            "h_commons": {
+              "id": "h_commons",
+              "def": "human",
+              "kind": "human",
+              "pose": {
+                "p": [
+                  9,
+                  0,
+                  5
+                ],
+                "yaw": 2.9441970937399127
+              },
+              "human": {
+                "activity": "idle",
+                "level": 0,
+                "soul": "s_commons",
+                "task": "a1",
+                "speed": 0.075
+              }
+            }
+          },
+          "removed": [],
+          "id": "a1fd0a1511f3b9bb97d041b9"
+        }
+      },
+      {
+        "fromTick": 120,
+        "toTick": 140,
+        "take": {
+          "schema": "mars-take/4",
+          "baselineStateHash": "871df0cf36947627a0b1b8eec4f46d226780745f3c2d4ed3a328abcd5177b47c",
+          "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+          "renderSceneRef": {
+            "contract": "render-scene-ref/1",
+            "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+            "hash": "811cea9c0116ee77446fb54fbd287552a09336e06b60d018a216f33a379f2e7b"
+          },
+          "dt": 0.05,
+          "startTick": 120,
+          "ticks": 20,
+          "keyframeEvery": 20,
+          "tracks": {
+            "h_commons": [
+              [
+                0,
+                9000,
+                0,
+                5000,
+                2944
+              ]
+            ]
+          },
+          "changes": [
+            [
+              0,
+              "h_commons",
+              "present",
+              true
+            ],
+            [
+              0,
+              "h_commons",
+              "activity",
+              "idle"
+            ],
+            [
+              0,
+              "h_commons",
+              "level",
+              0
+            ]
+          ],
+          "events": [],
+          "finalStateHash": "314b81ac85241e065a78e40a856da5ddeda883974f383f47eaf853d5e8d919c3",
+          "finalState": {
+            "schema": "mars-world/1",
+            "base": {
+              "campus": "greenfield",
+              "staticHash": "1bbb73f2e89cb57cdb29caf3109a87bd17d0f04a9d7a039fca6ac8213ae56a73"
+            },
+            "tick": 140,
+            "entities": {
+              "h_commons": {
+                "id": "h_commons",
+                "def": "human",
+                "kind": "human",
+                "label": "Commons walker",
+                "pose": {
+                  "p": [
+                    9,
+                    0,
+                    5
+                  ],
+                  "yaw": 2.9441970937399127
+                },
+                "provenance": {
+                  "origin": "simulation",
+                  "confidence": "hypothetical"
+                },
+                "human": {
+                  "activity": "idle",
+                  "level": 0,
+                  "soul": "s_commons"
+                }
+              }
+            },
+            "regions": {
+              "field": {
+                "id": "field",
+                "label": "Green field",
+                "kind": "walkable",
+                "level": 0,
+                "polygon": [
+                  [
+                    -30,
+                    -30
+                  ],
+                  [
+                    30,
+                    -30
+                  ],
+                  [
+                    30,
+                    30
+                  ],
+                  [
+                    -30,
+                    30
+                  ]
+                ],
+                "provenance": {
+                  "origin": "design-edit",
+                  "confidence": "hypothetical"
+                }
+              }
+            },
+            "env": {
+              "datetime": "2026-10-03T06:02:48.000Z",
+              "weather": {
+                "clouds": 0,
+                "rain": 0,
+                "wind": 0,
+                "dust": 0,
+                "wet": 0
+              }
+            },
+            "inventory": "finite",
+            "rng": [
+              3580720243,
+              3589016422,
+              189943697,
+              3930112751
+            ]
+          },
+          "entities0": {
+            "h_commons": {
+              "id": "h_commons",
+              "def": "human",
+              "kind": "human",
+              "pose": {
+                "p": [
+                  9,
+                  0,
+                  5
+                ],
+                "yaw": 2.9441970937399127
+              },
+              "human": {
+                "activity": "idle",
+                "level": 0,
+                "soul": "s_commons"
+              }
+            }
+          },
+          "removed": [],
+          "id": "d64b0ab569f005b2c537ffb7"
+        }
+      },
+      {
+        "fromTick": 140,
+        "toTick": 160,
+        "take": {
+          "schema": "mars-take/4",
+          "baselineStateHash": "314b81ac85241e065a78e40a856da5ddeda883974f383f47eaf853d5e8d919c3",
+          "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+          "renderSceneRef": {
+            "contract": "render-scene-ref/1",
+            "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+            "hash": "811cea9c0116ee77446fb54fbd287552a09336e06b60d018a216f33a379f2e7b"
+          },
+          "dt": 0.05,
+          "startTick": 140,
+          "ticks": 20,
+          "keyframeEvery": 20,
+          "tracks": {
+            "h_commons": [
+              [
+                0,
+                9000,
+                0,
+                5000,
+                2944
+              ]
+            ]
+          },
+          "changes": [
+            [
+              0,
+              "h_commons",
+              "present",
+              true
+            ],
+            [
+              0,
+              "h_commons",
+              "activity",
+              "idle"
+            ],
+            [
+              0,
+              "h_commons",
+              "level",
+              0
+            ]
+          ],
+          "events": [],
+          "finalStateHash": "d0eccc00b074e6cf8674ed9a2f40832687e1eee0cf516dcbf7e7602d2b073d97",
+          "finalState": {
+            "schema": "mars-world/1",
+            "base": {
+              "campus": "greenfield",
+              "staticHash": "1bbb73f2e89cb57cdb29caf3109a87bd17d0f04a9d7a039fca6ac8213ae56a73"
+            },
+            "tick": 160,
+            "entities": {
+              "h_commons": {
+                "id": "h_commons",
+                "def": "human",
+                "kind": "human",
+                "label": "Commons walker",
+                "pose": {
+                  "p": [
+                    9,
+                    0,
+                    5
+                  ],
+                  "yaw": 2.9441970937399127
+                },
+                "provenance": {
+                  "origin": "simulation",
+                  "confidence": "hypothetical"
+                },
+                "human": {
+                  "activity": "idle",
+                  "level": 0,
+                  "soul": "s_commons"
+                }
+              }
+            },
+            "regions": {
+              "field": {
+                "id": "field",
+                "label": "Green field",
+                "kind": "walkable",
+                "level": 0,
+                "polygon": [
+                  [
+                    -30,
+                    -30
+                  ],
+                  [
+                    30,
+                    -30
+                  ],
+                  [
+                    30,
+                    30
+                  ],
+                  [
+                    -30,
+                    30
+                  ]
+                ],
+                "provenance": {
+                  "origin": "design-edit",
+                  "confidence": "hypothetical"
+                }
+              }
+            },
+            "env": {
+              "datetime": "2026-10-03T06:03:12.000Z",
+              "weather": {
+                "clouds": 0,
+                "rain": 0,
+                "wind": 0,
+                "dust": 0,
+                "wet": 0
+              }
+            },
+            "inventory": "finite",
+            "rng": [
+              3580720243,
+              3589016422,
+              189943697,
+              3930112751
+            ]
+          },
+          "entities0": {
+            "h_commons": {
+              "id": "h_commons",
+              "def": "human",
+              "kind": "human",
+              "pose": {
+                "p": [
+                  9,
+                  0,
+                  5
+                ],
+                "yaw": 2.9441970937399127
+              },
+              "human": {
+                "activity": "idle",
+                "level": 0,
+                "soul": "s_commons"
+              }
+            }
+          },
+          "removed": [],
+          "id": "2bd7496e2d5aa9b9bc886275"
+        }
+      },
+      {
+        "fromTick": 160,
+        "toTick": 180,
+        "take": {
+          "schema": "mars-take/4",
+          "baselineStateHash": "d0eccc00b074e6cf8674ed9a2f40832687e1eee0cf516dcbf7e7602d2b073d97",
+          "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+          "renderSceneRef": {
+            "contract": "render-scene-ref/1",
+            "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+            "hash": "811cea9c0116ee77446fb54fbd287552a09336e06b60d018a216f33a379f2e7b"
+          },
+          "dt": 0.05,
+          "startTick": 160,
+          "ticks": 20,
+          "keyframeEvery": 20,
+          "tracks": {
+            "h_commons": [
+              [
+                0,
+                9000,
+                0,
+                5000,
+                2944
+              ]
+            ]
+          },
+          "changes": [
+            [
+              0,
+              "h_commons",
+              "present",
+              true
+            ],
+            [
+              0,
+              "h_commons",
+              "activity",
+              "idle"
+            ],
+            [
+              0,
+              "h_commons",
+              "level",
+              0
+            ]
+          ],
+          "events": [],
+          "finalStateHash": "96a6d8e90198db8e775310d53094edb10daaf2a4946a26c605348d5a617822d9",
+          "finalState": {
+            "schema": "mars-world/1",
+            "base": {
+              "campus": "greenfield",
+              "staticHash": "1bbb73f2e89cb57cdb29caf3109a87bd17d0f04a9d7a039fca6ac8213ae56a73"
+            },
+            "tick": 180,
+            "entities": {
+              "h_commons": {
+                "id": "h_commons",
+                "def": "human",
+                "kind": "human",
+                "label": "Commons walker",
+                "pose": {
+                  "p": [
+                    9,
+                    0,
+                    5
+                  ],
+                  "yaw": 2.9441970937399127
+                },
+                "provenance": {
+                  "origin": "simulation",
+                  "confidence": "hypothetical"
+                },
+                "human": {
+                  "activity": "idle",
+                  "level": 0,
+                  "soul": "s_commons"
+                }
+              }
+            },
+            "regions": {
+              "field": {
+                "id": "field",
+                "label": "Green field",
+                "kind": "walkable",
+                "level": 0,
+                "polygon": [
+                  [
+                    -30,
+                    -30
+                  ],
+                  [
+                    30,
+                    -30
+                  ],
+                  [
+                    30,
+                    30
+                  ],
+                  [
+                    -30,
+                    30
+                  ]
+                ],
+                "provenance": {
+                  "origin": "design-edit",
+                  "confidence": "hypothetical"
+                }
+              }
+            },
+            "env": {
+              "datetime": "2026-10-03T06:03:36.000Z",
+              "weather": {
+                "clouds": 0,
+                "rain": 0,
+                "wind": 0,
+                "dust": 0,
+                "wet": 0
+              }
+            },
+            "inventory": "finite",
+            "rng": [
+              3580720243,
+              3589016422,
+              189943697,
+              3930112751
+            ]
+          },
+          "entities0": {
+            "h_commons": {
+              "id": "h_commons",
+              "def": "human",
+              "kind": "human",
+              "pose": {
+                "p": [
+                  9,
+                  0,
+                  5
+                ],
+                "yaw": 2.9441970937399127
+              },
+              "human": {
+                "activity": "idle",
+                "level": 0,
+                "soul": "s_commons"
+              }
+            }
+          },
+          "removed": [],
+          "id": "302faef4e3a23220d094f378"
+        }
+      },
+      {
+        "fromTick": 180,
+        "toTick": 200,
+        "take": {
+          "schema": "mars-take/4",
+          "baselineStateHash": "96a6d8e90198db8e775310d53094edb10daaf2a4946a26c605348d5a617822d9",
+          "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+          "renderSceneRef": {
+            "contract": "render-scene-ref/1",
+            "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+            "hash": "811cea9c0116ee77446fb54fbd287552a09336e06b60d018a216f33a379f2e7b"
+          },
+          "dt": 0.05,
+          "startTick": 180,
+          "ticks": 20,
+          "keyframeEvery": 20,
+          "tracks": {
+            "h_commons": [
+              [
+                0,
+                9000,
+                0,
+                5000,
+                2944
+              ]
+            ]
+          },
+          "changes": [
+            [
+              0,
+              "h_commons",
+              "present",
+              true
+            ],
+            [
+              0,
+              "h_commons",
+              "activity",
+              "idle"
+            ],
+            [
+              0,
+              "h_commons",
+              "level",
+              0
+            ]
+          ],
+          "events": [],
+          "finalStateHash": "06889fe1180b0e7540b59fb3d6a1aef7dcd742b6b8ffc566e1f7435f9a187aa7",
+          "finalState": {
+            "schema": "mars-world/1",
+            "base": {
+              "campus": "greenfield",
+              "staticHash": "1bbb73f2e89cb57cdb29caf3109a87bd17d0f04a9d7a039fca6ac8213ae56a73"
+            },
+            "tick": 200,
+            "entities": {
+              "h_commons": {
+                "id": "h_commons",
+                "def": "human",
+                "kind": "human",
+                "label": "Commons walker",
+                "pose": {
+                  "p": [
+                    9,
+                    0,
+                    5
+                  ],
+                  "yaw": 2.9441970937399127
+                },
+                "provenance": {
+                  "origin": "simulation",
+                  "confidence": "hypothetical"
+                },
+                "human": {
+                  "activity": "idle",
+                  "level": 0,
+                  "soul": "s_commons"
+                }
+              }
+            },
+            "regions": {
+              "field": {
+                "id": "field",
+                "label": "Green field",
+                "kind": "walkable",
+                "level": 0,
+                "polygon": [
+                  [
+                    -30,
+                    -30
+                  ],
+                  [
+                    30,
+                    -30
+                  ],
+                  [
+                    30,
+                    30
+                  ],
+                  [
+                    -30,
+                    30
+                  ]
+                ],
+                "provenance": {
+                  "origin": "design-edit",
+                  "confidence": "hypothetical"
+                }
+              }
+            },
+            "env": {
+              "datetime": "2026-10-03T06:04:00.000Z",
+              "weather": {
+                "clouds": 0,
+                "rain": 0,
+                "wind": 0,
+                "dust": 0,
+                "wet": 0
+              }
+            },
+            "inventory": "finite",
+            "rng": [
+              3580720243,
+              3589016422,
+              189943697,
+              3930112751
+            ]
+          },
+          "entities0": {
+            "h_commons": {
+              "id": "h_commons",
+              "def": "human",
+              "kind": "human",
+              "pose": {
+                "p": [
+                  9,
+                  0,
+                  5
+                ],
+                "yaw": 2.9441970937399127
+              },
+              "human": {
+                "activity": "idle",
+                "level": 0,
+                "soul": "s_commons"
+              }
+            }
+          },
+          "removed": [],
+          "id": "1879219a01d6b7da374f80ff"
+        }
+      }
+    ],
+    "next": null
+  },
+  "captures": [
+    {
+      "worldId": "core-flat-commons-fixture",
+      "contract": "render-scene-capture/1",
+      "ref": {
+        "contract": "render-scene-ref/1",
+        "rulesVersion": "sim-mars/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1",
+        "hash": "811cea9c0116ee77446fb54fbd287552a09336e06b60d018a216f33a379f2e7b"
+      },
+      "body": {
+        "scene": {
+          "bounds": [
+            -30,
+            -30,
+            30,
+            30
+          ],
+          "levels": [
+            {
+              "id": 0,
+              "y": 0,
+              "label": "green field"
+            }
+          ],
+          "surfaces": [
+            {
+              "id": "green-field",
+              "level": 0,
+              "y": 0,
+              "obb": {
+                "c": [
+                  0,
+                  0
+                ],
+                "half": [
+                  30,
+                  30
+                ],
+                "yaw": 0
+              },
+              "label": "green field"
+            }
+          ],
+          "obstacles": [],
+          "links": []
+        },
+        "clock": {
+          "origin": 0,
+          "dayTicks": 72000
+        },
+        "ground": "grass"
+      }
+    }
+  ],
+  "initialSnapshot": {
+    "tick": 0,
+    "seq": 0,
+    "viewHash": "d6850943796017c6",
+    "entities": {
+      "h_commons": {
+        "id": "h_commons",
+        "def": "human",
+        "kind": "human",
+        "label": "Commons walker",
+        "pose": {
+          "p": [
+            14,
+            0,
+            4
+          ],
+          "yaw": 0
+        },
+        "provenance": {
+          "origin": "simulation",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0,
+          "soul": "s_commons"
+        }
+      }
+    },
+    "regions": {
+      "field": {
+        "id": "field",
+        "label": "Green field",
+        "kind": "walkable",
+        "level": 0,
+        "polygon": [
+          [
+            -30,
+            -30
+          ],
+          [
+            30,
+            -30
+          ],
+          [
+            30,
+            30
+          ],
+          [
+            -30,
+            30
+          ]
+        ],
+        "provenance": {
+          "origin": "design-edit",
+          "confidence": "hypothetical"
+        }
+      }
+    },
+    "env": {
+      "datetime": "2026-10-03T06:04:00.000Z",
+      "weather": {
+        "clouds": 0,
+        "rain": 0,
+        "wind": 0,
+        "dust": 0,
+        "wet": 0
+      }
+    },
+    "paths": [],
+    "souls": [
+      {
+        "id": "s_commons",
+        "entityId": "h_commons",
+        "name": "Commons walker",
+        "description": "Fake-local owned walker",
+        "owner": "uvwa65j",
+        "native": false,
+        "intent": null,
+        "intentText": "no particular intent; live your life",
+        "mood": "curious",
+        "energy": "energetic",
+        "doing": "standing around"
+      }
+    ]
+  },
+  "snapshot": {
+    "tick": 200,
+    "seq": 0,
+    "viewHash": "aaf3284388b226df",
+    "entities": {
+      "h_commons": {
+        "id": "h_commons",
+        "def": "human",
+        "kind": "human",
+        "label": "Commons walker",
+        "pose": {
+          "p": [
+            9,
+            0,
+            5
+          ],
+          "yaw": 2.9441970937399127
+        },
+        "provenance": {
+          "origin": "simulation",
+          "confidence": "hypothetical"
+        },
+        "human": {
+          "activity": "idle",
+          "level": 0,
+          "soul": "s_commons"
+        }
+      }
+    },
+    "regions": {
+      "field": {
+        "id": "field",
+        "label": "Green field",
+        "kind": "walkable",
+        "level": 0,
+        "polygon": [
+          [
+            -30,
+            -30
+          ],
+          [
+            30,
+            -30
+          ],
+          [
+            30,
+            30
+          ],
+          [
+            -30,
+            30
+          ]
+        ],
+        "provenance": {
+          "origin": "design-edit",
+          "confidence": "hypothetical"
+        }
+      }
+    },
+    "env": {
+      "datetime": "2026-10-03T06:04:00.000Z",
+      "weather": {
+        "clouds": 0,
+        "rain": 0,
+        "wind": 0,
+        "dust": 0,
+        "wet": 0
+      }
+    },
+    "paths": [],
+    "souls": [
+      {
+        "id": "s_commons",
+        "entityId": "h_commons",
+        "name": "Commons walker",
+        "description": "Fake-local owned walker",
+        "owner": "uvwa65j",
+        "native": false,
+        "intent": null,
+        "intentText": "no particular intent; live your life",
+        "mood": "curious",
+        "energy": "energetic",
+        "doing": "standing around"
+      }
+    ]
+  },
+  "kernel": {
+    "tick": 200,
+    "things": {
+      "grounds": {
+        "id": "grounds",
+        "kind": "region",
+        "name": "Green field",
+        "traits": {
+          "point": [
+            14,
+            4
+          ]
+        },
+        "states": {},
+        "at": null,
+        "born": 0,
+        "by": "world"
+      },
+      "field": {
+        "id": "field",
+        "kind": "place",
+        "name": "Green field",
+        "traits": {
+          "point": [
+            0,
+            0
+          ],
+          "tags": [
+            "walkable",
+            "arrival"
+          ]
+        },
+        "states": {},
+        "at": "grounds",
+        "born": 0,
+        "by": "world"
+      },
+      "s_commons": {
+        "id": "s_commons",
+        "kind": "soul",
+        "name": "Commons walker",
+        "traits": {
+          "body": "h_commons",
+          "about": "Fake-local owned walker"
+        },
+        "states": {},
+        "at": "field",
+        "born": 0,
+        "by": "world"
+      }
+    },
+    "links": {},
+    "decks": {
+      "s_commons": {
+        "cards": [
+          "go to",
+          "rest",
+          "wait",
+          "wander",
+          "greet",
+          "talk with",
+          "chat",
+          "say yes",
+          "say no",
+          "host a gathering",
+          "join",
+          "leave",
+          "end the gathering",
+          "perform",
+          "dance"
+        ],
+        "manners": [
+          "wearily",
+          "grandly",
+          "boldly"
+        ]
+      }
+    },
+    "vocab": {
+      "kinds": {
+        "soul": {
+          "summary": "an inhabitant"
+        },
+        "region": {
+          "summary": "a large area of the world"
+        },
+        "place": {
+          "summary": "somewhere one can be: a bench, the campfire, the kiosk"
+        },
+        "gathering": {
+          "summary": "people together for a while, hosted by someone"
+        }
+      },
+      "links": {
+        "said": {
+          "summary": "last spoke to (made only by saying; lapses after two minutes)"
+        },
+        "asked": {
+          "summary": "has an open question to (made only by asking; closed by an answer, or after two minutes)"
+        },
+        "knows": {
+          "summary": "has met and talked with"
+        },
+        "hosts": {
+          "summary": "is the host of",
+          "control": true
+        },
+        "attends": {
+          "summary": "is taking part in"
+        },
+        "agreed": {
+          "summary": "said yes to a request from (made only by saying yes; stands for thirty minutes)"
+        },
+        "made": {
+          "summary": "brought into being",
+          "control": true
+        },
+        "holds": {
+          "summary": "has in hand or in care",
+          "control": true
+        },
+        "dancing at": {
+          "summary": "is dancing at"
+        }
+      },
+      "cards": {
+        "go to": {
+          "name": "go to",
+          "summary": "Walk to a place and be there",
+          "good_when": "the intent names that place, or something is happening there",
+          "not_for": "no reason to move",
+          "target": {
+            "kind": "place"
+          },
+          "when": [
+            {
+              "notAt": [
+                "$actor",
+                "$target"
+              ]
+            },
+            {
+              "notState": [
+                "$actor",
+                "hosting",
+                true
+              ]
+            }
+          ],
+          "then": [
+            {
+              "move": [
+                "$actor",
+                "$target"
+              ]
+            },
+            {
+              "set": [
+                "$actor",
+                "doing",
+                "arriving"
+              ]
+            }
+          ],
+          "approach": [
+            {
+              "verb": "walk_to",
+              "params": {
+                "to": "$target",
+                "standoff": 1.2
+              }
+            }
+          ],
+          "during": [
+            {
+              "verb": "rest",
+              "params": {
+                "seconds": 15
+              }
+            }
+          ],
+          "takes": "minute",
+          "hash": "dd4ff28cb3bbecd2",
+          "by": "world",
+          "mintedAt": 0,
+          "origin": "base"
+        },
+        "rest": {
+          "name": "rest",
+          "summary": "Rest where you are for a while",
+          "good_when": "energy is low or the Soul wants quiet",
+          "not_for": "energetic and something interesting is going on",
+          "target": null,
+          "when": [],
+          "then": [
+            {
+              "set": [
+                "$actor",
+                "doing",
+                "resting"
+              ]
+            }
+          ],
+          "approach": [],
+          "during": [
+            {
+              "verb": "rest",
+              "params": {
+                "seconds": 90
+              }
+            }
+          ],
+          "takes": "minutes",
+          "hash": "34f8543513642d66",
+          "by": "world",
+          "mintedAt": 0,
+          "origin": "base"
+        },
+        "wait": {
+          "name": "wait",
+          "summary": "Stay where you are and wait",
+          "good_when": "waiting for someone to answer, or for something to begin",
+          "not_for": "nothing to wait for",
+          "target": null,
+          "when": [],
+          "then": [
+            {
+              "set": [
+                "$actor",
+                "doing",
+                "waiting"
+              ]
+            }
+          ],
+          "approach": [],
+          "during": [
+            {
+              "verb": "rest",
+              "params": {
+                "seconds": 20
+              }
+            }
+          ],
+          "takes": "seconds",
+          "hash": "b1bd6ea3f5570142",
+          "by": "world",
+          "mintedAt": 0,
+          "origin": "base"
+        },
+        "wander": {
+          "name": "wander",
+          "summary": "Drift around the area with no aim",
+          "good_when": "no intent and nothing nearby appeals",
+          "not_for": "the intent names something specific",
+          "target": null,
+          "when": [
+            {
+              "notState": [
+                "$actor",
+                "hosting",
+                true
+              ]
+            }
+          ],
+          "then": [
+            {
+              "move": [
+                "$actor",
+                "$region"
+              ]
+            },
+            {
+              "set": [
+                "$actor",
+                "doing",
+                "wandering"
+              ]
+            }
+          ],
+          "approach": [],
+          "during": [
+            {
+              "verb": "ambient_wander",
+              "params": {
+                "seconds": 60,
+                "radius": 14
+              }
+            }
+          ],
+          "takes": "minute",
+          "hash": "646c871c07435351",
+          "by": "world",
+          "mintedAt": 0,
+          "origin": "base"
+        },
+        "greet": {
+          "name": "greet",
+          "summary": "Greet someone who is here",
+          "good_when": "someone new is close",
+          "not_for": "already talking with them",
+          "target": {
+            "kind": "soul",
+            "same_place": true
+          },
+          "when": [
+            {
+              "notLinked": [
+                "said",
+                "$actor",
+                "$target"
+              ]
+            }
+          ],
+          "then": [
+            {
+              "say": [
+                "$actor",
+                "$target",
+                "greet"
+              ]
+            }
+          ],
+          "approach": [
+            {
+              "verb": "walk_to",
+              "params": {
+                "to": "$target",
+                "standoff": 1.6
+              }
+            }
+          ],
+          "during": [
+            {
+              "verb": "wave",
+              "params": {
+                "at": "$target",
+                "seconds": 2
+              }
+            }
+          ],
+          "takes": "seconds",
+          "hash": "76adb51de8d31d9d",
+          "by": "world",
+          "mintedAt": 0,
+          "origin": "base"
+        },
+        "talk with": {
+          "name": "talk with",
+          "summary": "Go to someone and have a conversation",
+          "good_when": "the Soul wants company or the intent names them",
+          "not_for": "the Soul wants to be alone",
+          "target": {
+            "kind": "soul"
+          },
+          "when": [
+            {
+              "notState": [
+                "$actor",
+                "hosting",
+                true
+              ]
+            },
+            {
+              "notLinked": [
+                "said",
+                "$actor",
+                "$target"
+              ]
+            },
+            {
+              "notLinked": [
+                "said",
+                "$target",
+                "$actor"
+              ]
+            }
+          ],
+          "then": [
+            {
+              "move": [
+                "$actor",
+                "$target.at"
+              ]
+            },
+            {
+              "say": [
+                "$actor",
+                "$target",
+                "chat"
+              ]
+            },
+            {
+              "link": [
+                "knows",
+                "$actor",
+                "$target"
+              ]
+            },
+            {
+              "set": [
+                "$actor",
+                "doing",
+                "talking with $target.name"
+              ]
+            }
+          ],
+          "approach": [
+            {
+              "verb": "walk_to",
+              "params": {
+                "to": "$target",
+                "standoff": 1.3
+              }
+            }
+          ],
+          "during": [
+            {
+              "verb": "converse",
+              "params": {
+                "with": "$target",
+                "seconds": 30
+              }
+            }
+          ],
+          "takes": "minute",
+          "hash": "b27f21bf62289d74",
+          "by": "world",
+          "mintedAt": 0,
+          "origin": "base"
+        },
+        "chat": {
+          "name": "chat",
+          "summary": "Talk with someone who is right here, without going anywhere",
+          "good_when": "someone is here and the Soul feels like talking, or is hosting and wants to welcome them",
+          "not_for": "the Soul wants quiet",
+          "target": {
+            "kind": "soul",
+            "same_place": true
+          },
+          "when": [
+            {
+              "notLinked": [
+                "said",
+                "$actor",
+                "$target"
+              ]
+            },
+            {
+              "notLinked": [
+                "said",
+                "$target",
+                "$actor"
+              ]
+            }
+          ],
+          "then": [
+            {
+              "say": [
+                "$actor",
+                "$target",
+                "chat"
+              ]
+            },
+            {
+              "link": [
+                "knows",
+                "$actor",
+                "$target"
+              ]
+            },
+            {
+              "set": [
+                "$actor",
+                "doing",
+                "talking with $target.name"
+              ]
+            }
+          ],
+          "approach": [
+            {
+              "verb": "walk_to",
+              "params": {
+                "to": "$target",
+                "standoff": 1.3
+              }
+            }
+          ],
+          "during": [
+            {
+              "verb": "converse",
+              "params": {
+                "with": "$target",
+                "seconds": 20
+              }
+            }
+          ],
+          "takes": "seconds",
+          "hash": "cdc4c927de8b4480",
+          "by": "world",
+          "mintedAt": 0,
+          "origin": "base"
+        },
+        "say yes": {
+          "name": "say yes",
+          "summary": "Agree to what someone just asked",
+          "good_when": "someone asked for something reasonable and the Soul is willing",
+          "not_for": "the request goes against the Soul’s nature",
+          "target": {
+            "kind": "soul",
+            "same_place": true
+          },
+          "when": [
+            {
+              "linked": [
+                "asked",
+                "$target",
+                "$actor"
+              ]
+            }
+          ],
+          "then": [
+            {
+              "say": [
+                "$actor",
+                "$target",
+                "agree"
+              ]
+            }
+          ],
+          "approach": [],
+          "during": [
+            {
+              "verb": "wave",
+              "params": {
+                "at": "$target",
+                "seconds": 2
+              }
+            }
+          ],
+          "takes": "seconds",
+          "hash": "abe22a34248f5fe2",
+          "by": "world",
+          "mintedAt": 0,
+          "origin": "base"
+        },
+        "say no": {
+          "name": "say no",
+          "summary": "Decline what someone just asked",
+          "good_when": "the request does not suit the Soul or the moment",
+          "not_for": "a harmless request the Soul would enjoy granting",
+          "target": {
+            "kind": "soul",
+            "same_place": true
+          },
+          "when": [
+            {
+              "linked": [
+                "asked",
+                "$target",
+                "$actor"
+              ]
+            }
+          ],
+          "then": [
+            {
+              "say": [
+                "$actor",
+                "$target",
+                "decline"
+              ]
+            }
+          ],
+          "approach": [],
+          "during": [
+            {
+              "verb": "rest",
+              "params": {
+                "seconds": 3
+              }
+            }
+          ],
+          "takes": "seconds",
+          "hash": "e626a77db51e489c",
+          "by": "world",
+          "mintedAt": 0,
+          "origin": "base"
+        },
+        "host a gathering": {
+          "name": "host a gathering",
+          "summary": "Start a gathering at this place and invite whoever comes",
+          "good_when": "the Soul likes bringing people together, or the intent is to host or throw a party",
+          "not_for": "already hosting, or wants to be alone",
+          "target": {
+            "kind": "place"
+          },
+          "when": [
+            {
+              "notState": [
+                "$actor",
+                "hosting",
+                true
+              ]
+            }
+          ],
+          "then": [
+            {
+              "move": [
+                "$actor",
+                "$target"
+              ]
+            },
+            {
+              "appear": {
+                "kind": "gathering",
+                "name": "$actor.name’s gathering",
+                "at": "$target",
+                "states": {
+                  "music": "off"
+                }
+              },
+              "linkFromActor": "hosts"
+            },
+            {
+              "link": [
+                "attends",
+                "$actor",
+                "$new"
+              ]
+            },
+            {
+              "set": [
+                "$actor",
+                "hosting",
+                true
+              ]
+            },
+            {
+              "set": [
+                "$actor",
+                "doing",
+                "hosting a gathering"
+              ]
+            }
+          ],
+          "approach": [
+            {
+              "verb": "walk_to",
+              "params": {
+                "to": "$target",
+                "standoff": 2
+              }
+            }
+          ],
+          "during": [
+            {
+              "verb": "gather",
+              "params": {
+                "at": "$target",
+                "seconds": 240
+              }
+            }
+          ],
+          "wants": [
+            "welcome guests",
+            "arrange a space"
+          ],
+          "takes": "minutes",
+          "hash": "89522dded28776c1",
+          "by": "world",
+          "mintedAt": 0,
+          "origin": "base"
+        },
+        "join": {
+          "name": "join",
+          "summary": "Go to a gathering and take part",
+          "good_when": "a gathering is on and the Soul wants company, or the intent names it",
+          "not_for": "wants to be alone",
+          "target": {
+            "kind": "gathering"
+          },
+          "when": [
+            {
+              "notLinked": [
+                "attends",
+                "$actor",
+                "$target"
+              ]
+            },
+            {
+              "notState": [
+                "$actor",
+                "hosting",
+                true
+              ]
+            }
+          ],
+          "then": [
+            {
+              "move": [
+                "$actor",
+                "$target.at"
+              ]
+            },
+            {
+              "link": [
+                "attends",
+                "$actor",
+                "$target"
+              ]
+            },
+            {
+              "set": [
+                "$actor",
+                "doing",
+                "at $target.name"
+              ]
+            }
+          ],
+          "approach": [
+            {
+              "verb": "walk_to",
+              "params": {
+                "to": "$target",
+                "standoff": 2.5
+              }
+            }
+          ],
+          "during": [
+            {
+              "verb": "gather",
+              "params": {
+                "at": "$target",
+                "seconds": 120
+              }
+            }
+          ],
+          "takes": "minutes",
+          "hash": "7df9241856cf0441",
+          "by": "world",
+          "mintedAt": 0,
+          "origin": "base"
+        },
+        "leave": {
+          "name": "leave",
+          "summary": "Leave a gathering you are part of",
+          "good_when": "tired, or it has run its course",
+          "not_for": "enjoying it",
+          "target": {
+            "kind": "gathering"
+          },
+          "when": [
+            {
+              "linked": [
+                "attends",
+                "$actor",
+                "$target"
+              ]
+            },
+            {
+              "notLinked": [
+                "hosts",
+                "$actor",
+                "$target"
+              ]
+            }
+          ],
+          "then": [
+            {
+              "unlink": [
+                "attends",
+                "$actor",
+                "$target"
+              ]
+            },
+            {
+              "set": [
+                "$actor",
+                "doing",
+                "leaving"
+              ]
+            }
+          ],
+          "approach": [],
+          "during": [
+            {
+              "verb": "stand",
+              "params": {}
+            }
+          ],
+          "takes": "seconds",
+          "hash": "9c317f7cd0b03c90",
+          "by": "world",
+          "mintedAt": 0,
+          "origin": "base"
+        },
+        "end the gathering": {
+          "name": "end the gathering",
+          "summary": "Close a gathering you host",
+          "good_when": "it has run long or everyone has drifted off",
+          "not_for": "it is lively",
+          "target": {
+            "kind": "gathering"
+          },
+          "when": [
+            {
+              "linked": [
+                "hosts",
+                "$actor",
+                "$target"
+              ]
+            }
+          ],
+          "then": [
+            {
+              "vanish": "$target"
+            },
+            {
+              "set": [
+                "$actor",
+                "hosting",
+                null
+              ]
+            },
+            {
+              "set": [
+                "$actor",
+                "doing",
+                "winding down"
+              ]
+            }
+          ],
+          "approach": [],
+          "during": [
+            {
+              "verb": "stand",
+              "params": {}
+            }
+          ],
+          "takes": "seconds",
+          "hash": "25fa565f9692f693",
+          "by": "world",
+          "mintedAt": 0,
+          "origin": "base"
+        },
+        "perform": {
+          "name": "perform",
+          "summary": "Sing, dance or tell a story for whoever is near",
+          "good_when": "others are close and the personality enjoys an audience",
+          "not_for": "nobody is near, or shy or tired",
+          "target": null,
+          "when": [],
+          "then": [
+            {
+              "set": [
+                "$actor",
+                "doing",
+                "performing"
+              ]
+            }
+          ],
+          "approach": [],
+          "during": [
+            {
+              "verb": "perform",
+              "params": {
+                "seconds": 30
+              }
+            }
+          ],
+          "wants": [
+            "sing",
+            "tell a story"
+          ],
+          "takes": "seconds",
+          "hash": "001e55e7949c4e38",
+          "by": "world",
+          "mintedAt": 0,
+          "origin": "base"
+        },
+        "dance": {
+          "name": "dance",
+          "summary": "Dance at a gathering where music is playing",
+          "good_when": "music is playing and the Soul has energy",
+          "not_for": "tired or withdrawn",
+          "target": {
+            "kind": "gathering"
+          },
+          "when": [
+            {
+              "linked": [
+                "attends",
+                "$actor",
+                "$target"
+              ]
+            },
+            {
+              "state": [
+                "$target",
+                "music",
+                "playing"
+              ]
+            }
+          ],
+          "then": [
+            {
+              "set": [
+                "$actor",
+                "doing",
+                "dancing"
+              ]
+            },
+            {
+              "link": [
+                "dancing at",
+                "$actor",
+                "$target"
+              ],
+              "forSeconds": 120
+            }
+          ],
+          "approach": [],
+          "during": [
+            {
+              "verb": "perform",
+              "params": {
+                "what": "dance",
+                "seconds": 40
+              }
+            }
+          ],
+          "wants": [
+            "dance to music"
+          ],
+          "takes": "minute",
+          "hash": "217ac5816fabb61e",
+          "by": "world",
+          "mintedAt": 0,
+          "origin": "base"
+        }
+      },
+      "manners": {
+        "warmly": {
+          "summary": "open, kind, glad to see people"
+        },
+        "shyly": {
+          "summary": "hesitant, soft-spoken, keeps a little distance"
+        },
+        "boldly": {
+          "summary": "direct, confident, takes the initiative"
+        },
+        "playfully": {
+          "summary": "teasing, light, looking for fun"
+        },
+        "calmly": {
+          "summary": "unhurried, steady, quiet"
+        },
+        "curiously": {
+          "summary": "asking questions, wanting to find out"
+        },
+        "wearily": {
+          "summary": "tired, brief, wanting rest"
+        },
+        "grandly": {
+          "summary": "theatrical, expansive, for an audience"
+        }
+      }
+    },
+    "hash": "ee26713ba69f8b6c",
+    "plays": {}
+  },
+  "positions": [
+    {
+      "tick": 0,
+      "p": [
+        14,
+        0,
+        4
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 1,
+      "p": [
+        14,
+        0,
+        4
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 2,
+      "p": [
+        14,
+        0,
+        4
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 3,
+      "p": [
+        14,
+        0,
+        4
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 4,
+      "p": [
+        14,
+        0,
+        4
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 5,
+      "p": [
+        14,
+        0,
+        4
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 6,
+      "p": [
+        14,
+        0,
+        4
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 7,
+      "p": [
+        13.997058257972927,
+        0,
+        4.000588348405414
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 8,
+      "p": [
+        13.991174773918782,
+        0,
+        4.001765045216244
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 9,
+      "p": [
+        13.982349547837563,
+        0,
+        4.003530090432488
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 10,
+      "p": [
+        13.970582579729273,
+        0,
+        4.005883484054146
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 11,
+      "p": [
+        13.955873869593908,
+        0,
+        4.0088252260812185
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 12,
+      "p": [
+        13.938223417431471,
+        0,
+        4.012355316513705
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 13,
+      "p": [
+        13.917631223241962,
+        0,
+        4.0164737553516074
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 14,
+      "p": [
+        13.89409728702538,
+        0,
+        4.021180542594924
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 15,
+      "p": [
+        13.867621608781725,
+        0,
+        4.026475678243655
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 16,
+      "p": [
+        13.838204188510998,
+        0,
+        4.032359162297801
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 17,
+      "p": [
+        13.805845026213198,
+        0,
+        4.038830994757361
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 18,
+      "p": [
+        13.770544121888324,
+        0,
+        4.0458911756223355
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 19,
+      "p": [
+        13.732301475536378,
+        0,
+        4.053539704892724
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 20,
+      "p": [
+        13.69111708715736,
+        0,
+        4.061776582568528
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 21,
+      "p": [
+        13.646990956751269,
+        0,
+        4.070601808649746
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 22,
+      "p": [
+        13.599923084318105,
+        0,
+        4.080015383136379
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 23,
+      "p": [
+        13.549913469857868,
+        0,
+        4.090017306028426
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 24,
+      "p": [
+        13.496962113370557,
+        0,
+        4.1006075773258885
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 25,
+      "p": [
+        13.441069014856176,
+        0,
+        4.111786197028765
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 26,
+      "p": [
+        13.38223417431472,
+        0,
+        4.123553165137056
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 27,
+      "p": [
+        13.320457591746193,
+        0,
+        4.135908481650762
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 28,
+      "p": [
+        13.255739267150592,
+        0,
+        4.148852146569881
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 29,
+      "p": [
+        13.189550071541454,
+        0,
+        4.1620899856917095
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 30,
+      "p": [
+        13.123360875932317,
+        0,
+        4.175327824813537
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 31,
+      "p": [
+        13.05717168032318,
+        0,
+        4.188565663935364
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 32,
+      "p": [
+        12.990982484714042,
+        0,
+        4.201803503057191
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 33,
+      "p": [
+        12.924793289104906,
+        0,
+        4.215041342179019
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 34,
+      "p": [
+        12.858604093495769,
+        0,
+        4.228279181300846
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 35,
+      "p": [
+        12.792414897886632,
+        0,
+        4.241517020422673
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 36,
+      "p": [
+        12.726225702277494,
+        0,
+        4.2547548595445015
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 37,
+      "p": [
+        12.660036506668359,
+        0,
+        4.267992698666329
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 38,
+      "p": [
+        12.593847311059221,
+        0,
+        4.281230537788156
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 39,
+      "p": [
+        12.527658115450084,
+        0,
+        4.294468376909983
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 40,
+      "p": [
+        12.461468919840947,
+        0,
+        4.307706216031811
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 41,
+      "p": [
+        12.39527972423181,
+        0,
+        4.320944055153638
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 42,
+      "p": [
+        12.329090528622672,
+        0,
+        4.334181894275465
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 43,
+      "p": [
+        12.262901333013536,
+        0,
+        4.347419733397293
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 44,
+      "p": [
+        12.196712137404399,
+        0,
+        4.36065757251912
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 45,
+      "p": [
+        12.130522941795261,
+        0,
+        4.373895411640948
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 46,
+      "p": [
+        12.064333746186124,
+        0,
+        4.387133250762775
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 47,
+      "p": [
+        11.998144550576988,
+        0,
+        4.400371089884603
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 48,
+      "p": [
+        11.931955354967851,
+        0,
+        4.41360892900643
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 49,
+      "p": [
+        11.865766159358714,
+        0,
+        4.426846768128257
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 50,
+      "p": [
+        11.799576963749576,
+        0,
+        4.440084607250085
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 51,
+      "p": [
+        11.733387768140439,
+        0,
+        4.453322446371912
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 52,
+      "p": [
+        11.667198572531301,
+        0,
+        4.466560285493739
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 53,
+      "p": [
+        11.601009376922166,
+        0,
+        4.4797981246155665
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 54,
+      "p": [
+        11.534820181313028,
+        0,
+        4.493035963737395
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 55,
+      "p": [
+        11.468630985703891,
+        0,
+        4.506273802859222
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 56,
+      "p": [
+        11.402441790094754,
+        0,
+        4.519511641981049
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 57,
+      "p": [
+        11.336252594485618,
+        0,
+        4.532749481102877
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 58,
+      "p": [
+        11.27006339887648,
+        0,
+        4.545987320224704
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 59,
+      "p": [
+        11.203874203267343,
+        0,
+        4.559225159346531
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 60,
+      "p": [
+        11.137685007658206,
+        0,
+        4.5724629984683585
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 61,
+      "p": [
+        11.071495812049069,
+        0,
+        4.585700837590186
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 62,
+      "p": [
+        11.005306616439933,
+        0,
+        4.598938676712013
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 63,
+      "p": [
+        10.939117420830796,
+        0,
+        4.612176515833841
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 64,
+      "p": [
+        10.872928225221658,
+        0,
+        4.6254143549556685
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 65,
+      "p": [
+        10.80673902961252,
+        0,
+        4.638652194077496
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 66,
+      "p": [
+        10.740549834003385,
+        0,
+        4.651890033199323
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 67,
+      "p": [
+        10.674360638394248,
+        0,
+        4.6651278723211504
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 68,
+      "p": [
+        10.60817144278511,
+        0,
+        4.678365711442978
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 69,
+      "p": [
+        10.541982247175973,
+        0,
+        4.691603550564805
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 70,
+      "p": [
+        10.475793051566836,
+        0,
+        4.704841389686632
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 71,
+      "p": [
+        10.4096038559577,
+        0,
+        4.71807922880846
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 72,
+      "p": [
+        10.343414660348563,
+        0,
+        4.731317067930288
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 73,
+      "p": [
+        10.277225464739425,
+        0,
+        4.744554907052115
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 74,
+      "p": [
+        10.211036269130288,
+        0,
+        4.757792746173942
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 75,
+      "p": [
+        10.144847073521152,
+        0,
+        4.77103058529577
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 76,
+      "p": [
+        10.078657877912015,
+        0,
+        4.784268424417597
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 77,
+      "p": [
+        10.012468682302877,
+        0,
+        4.797506263539424
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 78,
+      "p": [
+        9.94627948669374,
+        0,
+        4.810744102661252
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 79,
+      "p": [
+        9.880090291084603,
+        0,
+        4.82398194178308
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 80,
+      "p": [
+        9.813901095475465,
+        0,
+        4.837219780904907
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 81,
+      "p": [
+        9.747711899866328,
+        0,
+        4.850457620026734
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 82,
+      "p": [
+        9.681522704257192,
+        0,
+        4.863695459148562
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 83,
+      "p": [
+        9.615748839766214,
+        0,
+        4.876850232046757
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 84,
+      "p": [
+        9.553108115942138,
+        0,
+        4.889378376811573
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 85,
+      "p": [
+        9.493611044084801,
+        0,
+        4.901277791183039
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 86,
+      "p": [
+        9.437269401202528,
+        0,
+        4.912546119759495
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 87,
+      "p": [
+        9.384096479213822,
+        0,
+        4.923180704157236
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 88,
+      "p": [
+        9.334107405468924,
+        0,
+        4.933178518906216
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 89,
+      "p": [
+        9.287319562491632,
+        0,
+        4.942536087501674
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 90,
+      "p": [
+        9.243753149238959,
+        0,
+        4.951249370152208
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 91,
+      "p": [
+        9.203431950168806,
+        0,
+        4.959313609966239
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 92,
+      "p": [
+        9.166384420162494,
+        0,
+        4.966723115967501
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 93,
+      "p": [
+        9.132645269886053,
+        0,
+        4.97347094602279
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 94,
+      "p": [
+        9.102257885596813,
+        0,
+        4.9795484228806375
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 95,
+      "p": [
+        9.075278233009039,
+        0,
+        4.984944353398192
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 96,
+      "p": [
+        9.051781632626279,
+        0,
+        4.9896436734747445
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 97,
+      "p": [
+        9.03187577146969,
+        0,
+        4.993624845706062
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 98,
+      "p": [
+        9.015729773670586,
+        0,
+        4.9968540452658825
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 99,
+      "p": [
+        9.003658245444958,
+        0,
+        4.9992683509110085
+      ],
+      "activity": "walk"
+    },
+    {
+      "tick": 100,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 101,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 102,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 103,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 104,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 105,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 106,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 107,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 108,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 109,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 110,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 111,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 112,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 113,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 114,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 115,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 116,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 117,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 118,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 119,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 120,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 121,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 122,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 123,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 124,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 125,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 126,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 127,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 128,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 129,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 130,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 131,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 132,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 133,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 134,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 135,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 136,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 137,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 138,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 139,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 140,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 141,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 142,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 143,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 144,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 145,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 146,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 147,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 148,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 149,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 150,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 151,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 152,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 153,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 154,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 155,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 156,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 157,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 158,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 159,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 160,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 161,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 162,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 163,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 164,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 165,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 166,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 167,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 168,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 169,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 170,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 171,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 172,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 173,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 174,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 175,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 176,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 177,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 178,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 179,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 180,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 181,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 182,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 183,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 184,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 185,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 186,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 187,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 188,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 189,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 190,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 191,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 192,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 193,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 194,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 195,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 196,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 197,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 198,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 199,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    },
+    {
+      "tick": 200,
+      "p": [
+        9,
+        0,
+        5
+      ],
+      "activity": "idle"
+    }
+  ],
+  "reconstruction": {
+    "tick": 200,
+    "bodyHash": "900d5441c8e9ab183099a06c64911353bceb32f1fc00daa8d25260e254eda8db",
+    "kernelHash": "2814fc48e14d4766fdc2c6a1788037a445e9e52df9bb47e3dd89bd5b6da9c53e",
+    "snapshot": "exact",
+    "inclusiveGenesis": "exact",
+    "movingNativeCheckpoint": {
+      "tick": 40,
+      "stateHash": "d369d0c49e62940646e1b98001ae50141bc2f2c82b1c160d03920f169f7bd74e",
+      "throughTick": 200,
+      "continuation": "exact at every tick"
+    }
+  },
+  "faultCount": 0,
+  "violations": [],
+  "paid": 0
+}
