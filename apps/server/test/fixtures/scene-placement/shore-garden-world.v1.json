@@ -1,0 +1,661 @@
+{
+  "sourcePins": [
+    {
+      "path": "worlds/eden/assets/fixtures/shore-dock-proposal.v1.json",
+      "commit": "27879c144ef7716cd0238b5734a93d785e922950",
+      "sha256": "69ac8401b8ff734f8d23acc8088d6e583d29a31d428a0a8f066cf700c85dfb3b"
+    },
+    {
+      "path": "mars/viewer/app/engine-view/shore-preview.ts",
+      "commit": "d62f7a0aa2f05d4d8e621d4b7840464ed0d98eb0",
+      "sha256": "3b49d5fd033e3cf66226cd172add9dd559898bac415e992dc0ad4db17373ce14"
+    }
+  ],
+  "placements": [
+    {
+      "id": "shore-preview-0",
+      "kind": "canopy-tree",
+      "p": [
+        6,
+        0.78,
+        -9
+      ],
+      "size": [
+        3,
+        4.2,
+        3
+      ],
+      "seed": 81
+    },
+    {
+      "id": "shore-preview-1",
+      "kind": "canopy-tree",
+      "p": [
+        10,
+        1.3,
+        -8
+      ],
+      "size": [
+        3,
+        4.2,
+        3
+      ],
+      "seed": 82
+    },
+    {
+      "id": "shore-preview-2",
+      "kind": "canopy-tree",
+      "p": [
+        14,
+        1.82,
+        -6
+      ],
+      "size": [
+        3,
+        4.2,
+        3
+      ],
+      "seed": 83
+    },
+    {
+      "id": "shore-preview-3",
+      "kind": "canopy-tree",
+      "p": [
+        14,
+        1.82,
+        1
+      ],
+      "size": [
+        3,
+        4.2,
+        3
+      ],
+      "seed": 84
+    },
+    {
+      "id": "shore-preview-4",
+      "kind": "canopy-tree",
+      "p": [
+        13,
+        1.69,
+        8
+      ],
+      "size": [
+        3,
+        4.2,
+        3
+      ],
+      "seed": 85
+    },
+    {
+      "id": "shore-preview-5",
+      "kind": "canopy-tree",
+      "p": [
+        9,
+        1.17,
+        10
+      ],
+      "size": [
+        3,
+        4.2,
+        3
+      ],
+      "seed": 86
+    },
+    {
+      "id": "shore-preview-6",
+      "kind": "canopy-tree",
+      "p": [
+        5,
+        0.65,
+        10
+      ],
+      "size": [
+        3,
+        4.2,
+        3
+      ],
+      "seed": 87
+    },
+    {
+      "id": "shore-preview-7",
+      "kind": "conifer",
+      "p": [
+        8,
+        1.04,
+        -10
+      ],
+      "size": [
+        2.5,
+        4.4,
+        2.5
+      ],
+      "seed": 88
+    },
+    {
+      "id": "shore-preview-8",
+      "kind": "conifer",
+      "p": [
+        15,
+        1.95,
+        -2
+      ],
+      "size": [
+        2.5,
+        4.4,
+        2.5
+      ],
+      "seed": 89
+    },
+    {
+      "id": "shore-preview-9",
+      "kind": "conifer",
+      "p": [
+        15,
+        1.95,
+        6
+      ],
+      "size": [
+        2.5,
+        4.4,
+        2.5
+      ],
+      "seed": 90
+    },
+    {
+      "id": "shore-preview-10",
+      "kind": "shrub",
+      "p": [
+        5,
+        0.65,
+        -7
+      ],
+      "size": [
+        1.5,
+        0.9,
+        1.4
+      ],
+      "seed": 91
+    },
+    {
+      "id": "shore-preview-11",
+      "kind": "shrub",
+      "p": [
+        8,
+        1.04,
+        -7
+      ],
+      "size": [
+        1.5,
+        0.9,
+        1.4
+      ],
+      "seed": 92
+    },
+    {
+      "id": "shore-preview-12",
+      "kind": "shrub",
+      "p": [
+        12,
+        1.56,
+        -5
+      ],
+      "size": [
+        1.5,
+        0.9,
+        1.4
+      ],
+      "seed": 93
+    },
+    {
+      "id": "shore-preview-13",
+      "kind": "shrub",
+      "p": [
+        12,
+        1.56,
+        2
+      ],
+      "size": [
+        1.5,
+        0.9,
+        1.4
+      ],
+      "seed": 94
+    },
+    {
+      "id": "shore-preview-14",
+      "kind": "shrub",
+      "p": [
+        11,
+        1.43,
+        8
+      ],
+      "size": [
+        1.5,
+        0.9,
+        1.4
+      ],
+      "seed": 95
+    },
+    {
+      "id": "shore-preview-15",
+      "kind": "shrub",
+      "p": [
+        7,
+        0.91,
+        9
+      ],
+      "size": [
+        1.5,
+        0.9,
+        1.4
+      ],
+      "seed": 96
+    },
+    {
+      "id": "shore-preview-16",
+      "kind": "shrub",
+      "p": [
+        4,
+        0.52,
+        9
+      ],
+      "size": [
+        1.5,
+        0.9,
+        1.4
+      ],
+      "seed": 97
+    },
+    {
+      "id": "shore-preview-17",
+      "kind": "reeds",
+      "p": [
+        0.65,
+        0.08449999999999981,
+        -6
+      ],
+      "size": [
+        0.5,
+        1.15,
+        0.5
+      ],
+      "seed": 98
+    },
+    {
+      "id": "shore-preview-18",
+      "kind": "reeds",
+      "p": [
+        0.65,
+        0.08449999999999981,
+        -5.4
+      ],
+      "size": [
+        0.5,
+        1.15,
+        0.5
+      ],
+      "seed": 99
+    },
+    {
+      "id": "shore-preview-19",
+      "kind": "reeds",
+      "p": [
+        0.65,
+        0.08449999999999981,
+        -4.8
+      ],
+      "size": [
+        0.5,
+        1.15,
+        0.5
+      ],
+      "seed": 100
+    },
+    {
+      "id": "shore-preview-20",
+      "kind": "reeds",
+      "p": [
+        0.65,
+        0.08449999999999981,
+        -4.2
+      ],
+      "size": [
+        0.5,
+        1.15,
+        0.5
+      ],
+      "seed": 101
+    },
+    {
+      "id": "shore-preview-21",
+      "kind": "reeds",
+      "p": [
+        0.65,
+        0.08449999999999981,
+        -3.6
+      ],
+      "size": [
+        0.5,
+        1.15,
+        0.5
+      ],
+      "seed": 102
+    },
+    {
+      "id": "shore-preview-22",
+      "kind": "reeds",
+      "p": [
+        0.65,
+        0.08449999999999981,
+        -3
+      ],
+      "size": [
+        0.5,
+        1.15,
+        0.5
+      ],
+      "seed": 103
+    },
+    {
+      "id": "shore-preview-23",
+      "kind": "reeds",
+      "p": [
+        0.65,
+        0.08449999999999981,
+        -2.4000000000000004
+      ],
+      "size": [
+        0.5,
+        1.15,
+        0.5
+      ],
+      "seed": 104
+    },
+    {
+      "id": "shore-preview-24",
+      "kind": "grass",
+      "p": [
+        3,
+        0.39,
+        -4
+      ],
+      "size": [
+        1.4,
+        0.35,
+        1.4
+      ],
+      "seed": 105
+    },
+    {
+      "id": "shore-preview-25",
+      "kind": "grass",
+      "p": [
+        3,
+        0.39,
+        -1
+      ],
+      "size": [
+        1.4,
+        0.35,
+        1.4
+      ],
+      "seed": 106
+    },
+    {
+      "id": "shore-preview-26",
+      "kind": "grass",
+      "p": [
+        5,
+        0.65,
+        -5
+      ],
+      "size": [
+        1.4,
+        0.35,
+        1.4
+      ],
+      "seed": 107
+    },
+    {
+      "id": "shore-preview-27",
+      "kind": "grass",
+      "p": [
+        10,
+        1.3,
+        -5
+      ],
+      "size": [
+        1.4,
+        0.35,
+        1.4
+      ],
+      "seed": 108
+    },
+    {
+      "id": "shore-preview-28",
+      "kind": "grass",
+      "p": [
+        12,
+        1.56,
+        4
+      ],
+      "size": [
+        1.4,
+        0.35,
+        1.4
+      ],
+      "seed": 109
+    },
+    {
+      "id": "shore-preview-29",
+      "kind": "grass",
+      "p": [
+        10,
+        1.3,
+        7
+      ],
+      "size": [
+        1.4,
+        0.35,
+        1.4
+      ],
+      "seed": 110
+    },
+    {
+      "id": "shore-preview-30",
+      "kind": "grass",
+      "p": [
+        6,
+        0.78,
+        8
+      ],
+      "size": [
+        1.4,
+        0.35,
+        1.4
+      ],
+      "seed": 111
+    },
+    {
+      "id": "shore-preview-31",
+      "kind": "shrub",
+      "p": [
+        7,
+        1.325,
+        -2.6
+      ],
+      "size": [
+        0.5,
+        0.4,
+        0.5
+      ],
+      "seed": 112
+    },
+    {
+      "id": "shore-preview-32",
+      "kind": "shrub",
+      "p": [
+        7,
+        1.325,
+        -2.05
+      ],
+      "size": [
+        0.5,
+        0.4,
+        0.5
+      ],
+      "seed": 113
+    },
+    {
+      "id": "shore-preview-33",
+      "kind": "shrub",
+      "p": [
+        7,
+        1.325,
+        -1.5
+      ],
+      "size": [
+        0.5,
+        0.4,
+        0.5
+      ],
+      "seed": 114
+    },
+    {
+      "id": "shore-preview-34",
+      "kind": "shrub",
+      "p": [
+        7,
+        1.325,
+        -0.95
+      ],
+      "size": [
+        0.5,
+        0.4,
+        0.5
+      ],
+      "seed": 115
+    },
+    {
+      "id": "shore-preview-35",
+      "kind": "shrub",
+      "p": [
+        10.3,
+        1.7540000000000002,
+        -2.6
+      ],
+      "size": [
+        0.5,
+        0.4,
+        0.5
+      ],
+      "seed": 116
+    },
+    {
+      "id": "shore-preview-36",
+      "kind": "shrub",
+      "p": [
+        10.3,
+        1.7540000000000002,
+        -2.05
+      ],
+      "size": [
+        0.5,
+        0.4,
+        0.5
+      ],
+      "seed": 117
+    },
+    {
+      "id": "shore-preview-37",
+      "kind": "shrub",
+      "p": [
+        10.3,
+        1.7540000000000002,
+        -1.5
+      ],
+      "size": [
+        0.5,
+        0.4,
+        0.5
+      ],
+      "seed": 118
+    },
+    {
+      "id": "shore-preview-38",
+      "kind": "shrub",
+      "p": [
+        10.3,
+        1.7540000000000002,
+        -0.95
+      ],
+      "size": [
+        0.5,
+        0.4,
+        0.5
+      ],
+      "seed": 119
+    },
+    {
+      "id": "shore-preview-39",
+      "kind": "vine",
+      "p": [
+        6.2,
+        0.8059999999999999,
+        -4.8
+      ],
+      "size": [
+        0.45,
+        2,
+        0.3
+      ],
+      "seed": 120
+    },
+    {
+      "id": "shore-preview-40",
+      "kind": "vine",
+      "p": [
+        6.7,
+        0.871,
+        -4.8
+      ],
+      "size": [
+        0.45,
+        2,
+        0.3
+      ],
+      "seed": 121
+    },
+    {
+      "id": "shore-preview-41",
+      "kind": "vine",
+      "p": [
+        7.2,
+        0.9359999999999999,
+        -4.8
+      ],
+      "size": [
+        0.45,
+        2,
+        0.3
+      ],
+      "seed": 122
+    },
+    {
+      "id": "shore-preview-42",
+      "kind": "vine",
+      "p": [
+        7.7,
+        1.001,
+        -4.8
+      ],
+      "size": [
+        0.45,
+        2,
+        0.3
+      ],
+      "seed": 123
+    }
+  ]
+}

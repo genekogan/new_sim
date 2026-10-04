@@ -1,0 +1,524 @@
+{
+  "schema": "world-vegetation-preview/1",
+  "revision": "20261004-world-1",
+  "status": "asset-lookbook-only",
+  "world": "eden-1",
+  "units": "metres",
+  "authority": "Original decorative assets and flat lookbook positions only; no collision, support, ecology, canonical placement or live configuration.",
+  "boundsXZ": [
+    -12,
+    -12,
+    12,
+    12
+  ],
+  "clearCommonsXZ": [
+    -3,
+    -3,
+    3,
+    3
+  ],
+  "notes": [
+    "Preview roots all at Y=0, not the sloping shore fixture.",
+    "No imported objects or external textures.",
+    "Trees, shrubs and taller reeds/vines need approved placement and canonical obstruction/support policy before live use.",
+    "Grass blades are decorative; never a walking surface."
+  ],
+  "placements": [
+    {
+      "id": "eden-conifer-1",
+      "kind": "conifer",
+      "p": [
+        -8,
+        0,
+        -7
+      ],
+      "size": [
+        3.2,
+        4.4,
+        3.2
+      ],
+      "seed": 41,
+      "yaw": 0
+    },
+    {
+      "id": "eden-canopy-tree-2",
+      "kind": "canopy-tree",
+      "p": [
+        -5,
+        0,
+        -9
+      ],
+      "size": [
+        3.2,
+        4.800000000000001,
+        3.2
+      ],
+      "seed": 42,
+      "yaw": 0
+    },
+    {
+      "id": "eden-canopy-tree-3",
+      "kind": "canopy-tree",
+      "p": [
+        7,
+        0,
+        -8
+      ],
+      "size": [
+        3.2,
+        5.2,
+        3.2
+      ],
+      "seed": 43,
+      "yaw": 0
+    },
+    {
+      "id": "eden-conifer-4",
+      "kind": "conifer",
+      "p": [
+        9,
+        0,
+        -4
+      ],
+      "size": [
+        3.2,
+        4.4,
+        3.2
+      ],
+      "seed": 44,
+      "yaw": 0
+    },
+    {
+      "id": "eden-canopy-tree-5",
+      "kind": "canopy-tree",
+      "p": [
+        -9,
+        0,
+        3
+      ],
+      "size": [
+        3.2,
+        4.800000000000001,
+        3.2
+      ],
+      "seed": 45,
+      "yaw": 0
+    },
+    {
+      "id": "eden-canopy-tree-6",
+      "kind": "canopy-tree",
+      "p": [
+        -7,
+        0,
+        8
+      ],
+      "size": [
+        3.2,
+        5.2,
+        3.2
+      ],
+      "seed": 46,
+      "yaw": 0
+    },
+    {
+      "id": "eden-conifer-7",
+      "kind": "conifer",
+      "p": [
+        6,
+        0,
+        9
+      ],
+      "size": [
+        3.2,
+        4.4,
+        3.2
+      ],
+      "seed": 47,
+      "yaw": 0
+    },
+    {
+      "id": "eden-canopy-tree-8",
+      "kind": "canopy-tree",
+      "p": [
+        9,
+        0,
+        6
+      ],
+      "size": [
+        3.2,
+        4.800000000000001,
+        3.2
+      ],
+      "seed": 48,
+      "yaw": 0
+    },
+    {
+      "id": "eden-shrub-9",
+      "kind": "shrub",
+      "p": [
+        -7,
+        0,
+        -5
+      ],
+      "size": [
+        1.7,
+        1.0,
+        1.4
+      ],
+      "seed": 81,
+      "yaw": 0
+    },
+    {
+      "id": "eden-shrub-10",
+      "kind": "shrub",
+      "p": [
+        -5,
+        0,
+        -6
+      ],
+      "size": [
+        1.7,
+        1.0,
+        1.4
+      ],
+      "seed": 82,
+      "yaw": 0
+    },
+    {
+      "id": "eden-shrub-11",
+      "kind": "shrub",
+      "p": [
+        6,
+        0,
+        -6
+      ],
+      "size": [
+        1.7,
+        1.0,
+        1.4
+      ],
+      "seed": 83,
+      "yaw": 0
+    },
+    {
+      "id": "eden-shrub-12",
+      "kind": "shrub",
+      "p": [
+        7,
+        0,
+        -3
+      ],
+      "size": [
+        1.7,
+        1.0,
+        1.4
+      ],
+      "seed": 84,
+      "yaw": 0
+    },
+    {
+      "id": "eden-shrub-13",
+      "kind": "shrub",
+      "p": [
+        -7,
+        0,
+        4
+      ],
+      "size": [
+        1.7,
+        1.0,
+        1.4
+      ],
+      "seed": 85,
+      "yaw": 0
+    },
+    {
+      "id": "eden-shrub-14",
+      "kind": "shrub",
+      "p": [
+        -5,
+        0,
+        7
+      ],
+      "size": [
+        1.7,
+        1.0,
+        1.4
+      ],
+      "seed": 86,
+      "yaw": 0
+    },
+    {
+      "id": "eden-shrub-15",
+      "kind": "shrub",
+      "p": [
+        5,
+        0,
+        7
+      ],
+      "size": [
+        1.7,
+        1.0,
+        1.4
+      ],
+      "seed": 87,
+      "yaw": 0
+    },
+    {
+      "id": "eden-shrub-16",
+      "kind": "shrub",
+      "p": [
+        7,
+        0,
+        5
+      ],
+      "size": [
+        1.7,
+        1.0,
+        1.4
+      ],
+      "seed": 88,
+      "yaw": 0
+    },
+    {
+      "id": "eden-grass-17",
+      "kind": "grass",
+      "p": [
+        -8,
+        0,
+        -4
+      ],
+      "size": [
+        1.7,
+        0.42,
+        1.7
+      ],
+      "seed": 131,
+      "yaw": 0
+    },
+    {
+      "id": "eden-grass-18",
+      "kind": "grass",
+      "p": [
+        -4,
+        0,
+        -7
+      ],
+      "size": [
+        1.7,
+        0.42,
+        1.7
+      ],
+      "seed": 132,
+      "yaw": 0
+    },
+    {
+      "id": "eden-grass-19",
+      "kind": "grass",
+      "p": [
+        5,
+        0,
+        -5
+      ],
+      "size": [
+        1.7,
+        0.42,
+        1.7
+      ],
+      "seed": 133,
+      "yaw": 0
+    },
+    {
+      "id": "eden-grass-20",
+      "kind": "grass",
+      "p": [
+        8,
+        0,
+        -2
+      ],
+      "size": [
+        1.7,
+        0.42,
+        1.7
+      ],
+      "seed": 134,
+      "yaw": 0
+    },
+    {
+      "id": "eden-grass-21",
+      "kind": "grass",
+      "p": [
+        -8,
+        0,
+        5
+      ],
+      "size": [
+        1.7,
+        0.42,
+        1.7
+      ],
+      "seed": 135,
+      "yaw": 0
+    },
+    {
+      "id": "eden-grass-22",
+      "kind": "grass",
+      "p": [
+        -4,
+        0,
+        8
+      ],
+      "size": [
+        1.7,
+        0.42,
+        1.7
+      ],
+      "seed": 136,
+      "yaw": 0
+    },
+    {
+      "id": "eden-grass-23",
+      "kind": "grass",
+      "p": [
+        4,
+        0,
+        8
+      ],
+      "size": [
+        1.7,
+        0.42,
+        1.7
+      ],
+      "seed": 137,
+      "yaw": 0
+    },
+    {
+      "id": "eden-grass-24",
+      "kind": "grass",
+      "p": [
+        8,
+        0,
+        4
+      ],
+      "size": [
+        1.7,
+        0.42,
+        1.7
+      ],
+      "seed": 138,
+      "yaw": 0
+    },
+    {
+      "id": "eden-reeds-25",
+      "kind": "reeds",
+      "p": [
+        -10,
+        0,
+        -1.0
+      ],
+      "size": [
+        0.55,
+        1.1,
+        0.6
+      ],
+      "seed": 171,
+      "yaw": 0
+    },
+    {
+      "id": "eden-reeds-26",
+      "kind": "reeds",
+      "p": [
+        -10,
+        0,
+        -0.4
+      ],
+      "size": [
+        0.55,
+        1.1,
+        0.6
+      ],
+      "seed": 172,
+      "yaw": 0
+    },
+    {
+      "id": "eden-reeds-27",
+      "kind": "reeds",
+      "p": [
+        -10,
+        0,
+        0.19999999999999996
+      ],
+      "size": [
+        0.55,
+        1.1,
+        0.6
+      ],
+      "seed": 173,
+      "yaw": 0
+    },
+    {
+      "id": "eden-reeds-28",
+      "kind": "reeds",
+      "p": [
+        -10,
+        0,
+        0.7999999999999998
+      ],
+      "size": [
+        0.55,
+        1.1,
+        0.6
+      ],
+      "seed": 174,
+      "yaw": 0
+    },
+    {
+      "id": "eden-vine-29",
+      "kind": "vine",
+      "p": [
+        -3.0,
+        0,
+        -8
+      ],
+      "size": [
+        0.5,
+        2.2,
+        0.4
+      ],
+      "seed": 211,
+      "yaw": 0
+    },
+    {
+      "id": "eden-vine-30",
+      "kind": "vine",
+      "p": [
+        -2.4,
+        0,
+        -8
+      ],
+      "size": [
+        0.5,
+        2.2,
+        0.4
+      ],
+      "seed": 212,
+      "yaw": 0
+    },
+    {
+      "id": "eden-vine-31",
+      "kind": "vine",
+      "p": [
+        -1.8,
+        0,
+        -8
+      ],
+      "size": [
+        0.5,
+        2.2,
+        0.4
+      ],
+      "seed": 213,
+      "yaw": 0
+    }
+  ]
+}

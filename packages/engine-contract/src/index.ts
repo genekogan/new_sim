@@ -6,3 +6,4 @@ export * from './runtime.ts';
 export * from './registry.ts';
 export * from './engine.ts';
 export * from './kinematics.ts';
+export * from './scene-proposal.ts';

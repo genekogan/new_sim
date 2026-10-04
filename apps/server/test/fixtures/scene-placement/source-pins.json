@@ -1,0 +1,20 @@
+[
+  {
+    "path": "worlds/eden/assets/vegetation/commons-preview.v1.json",
+    "commit": "afa1c550dcf372b044304d45ce22713ba1102ded",
+    "sha256": "18436a40c9153f8385b46118a20537ae5a74ebfe593ee9a45c4348f2c09cfdd6",
+    "fixture": "commons-world.v1.json"
+  },
+  {
+    "path": "worlds/eden/assets/fixtures/shore-dock-proposal.v1.json",
+    "commit": "27879c144ef7716cd0238b5734a93d785e922950",
+    "sha256": "69ac8401b8ff734f8d23acc8088d6e583d29a31d428a0a8f066cf700c85dfb3b",
+    "fixture": "shore-world.v1.json"
+  },
+  {
+    "path": "mars/viewer/app/engine-view/shore-preview.ts",
+    "commit": "d62f7a0aa2f05d4d8e621d4b7840464ed0d98eb0",
+    "sha256": "3b49d5fd033e3cf66226cd172add9dd559898bac415e992dc0ad4db17373ce14",
+    "fixture": null
+  }
+]
