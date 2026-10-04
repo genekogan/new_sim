@@ -10,6 +10,7 @@ import type { Brain } from './brain.ts';
 import type { Db } from './db.ts';
 import { type WorldHost } from './world.ts';
 import type { Souls } from './souls.ts';
+import type {CandidateStationV1} from './station.ts';
 
 const clientMsg = z.discriminatedUnion('t', [
   z.object({ t: z.literal('hello'), proto: z.number(), token: z.string().max(4000).optional(), since: z.number().optional(), epoch: z.string().max(40).optional() }),
@@ -33,9 +34,11 @@ export class Hub {
   private lastTakeTick = -1;
   host: WorldHost; auth: Auth; db: Db;
   private lifecycleSouls?:Souls;
+  private station?:CandidateStationV1;
 
-  constructor(server: Server, host: WorldHost, auth: Auth, db: Db,lifecycleSouls?:Souls) {
+  constructor(server: Server, host: WorldHost, auth: Auth, db: Db,lifecycleSouls?:Souls,station?:CandidateStationV1) {
     this.host = host; this.auth = auth; this.db = db;
+    if(station){if(station.host!==host)throw new Error('station must belong to selected Hub host');this.station=station;}
     // Internal opt-in only; production bootstrap does not supply this adapter.
     if(lifecycleSouls){
       if(!lifecycleSouls.lifecycle||lifecycleSouls.host!==host||lifecycleSouls.db!==db)throw new Error('Lifecycle WS views require the installed candidate on this host/DB');
@@ -47,7 +50,8 @@ export class Hub {
       this.wss.handleUpgrade(req, socket, head, (ws) => this.onConnect(ws, req));
     });
     host.listeners.push({
-      onApplied: e => { if (e.kind === 'rules' && e.payload?.recovery) { this.lastTakeTick=host.engine.world.tick; this.epoch=`${Date.now().toString(36)}-repair`; for (const c of this.clients) c.ws.close(1012, 'world restored; reconnect'); } },
+      onApplied: e => { if (e.kind === 'rules' && e.payload?.recovery) { this.lastTakeTick=host.engine.world.tick; this.epoch=`${Date.now().toString(36)}-repair`; for (const c of this.clients) c.ws.close(1012, 'world restored; reconnect'); }
+        if(this.station&&['station-epoch-v1','station-cue-v1','station-anchor-v1'].includes(e.kind))this.broadcast({t:'station',view:this.station.view()}); },
       afterTick: tick => {
         const chunks = host.engine.takeChunks?.(this.lastTakeTick) ?? [];
         if (!chunks.length) return;
@@ -118,6 +122,7 @@ export class Hub {
       if (c.me) this.send(c, { t: 'brain', calls: this.db.brainCalls(40, { soulIds: c.me.role === 'admin' ? null : c.me.souls }) });
       this.send(c, { t: 'stats', stats: c.me?.role === 'admin' ? this.stats() : publicStats(this.stats()) });
       this.send(c, {t: 'takes', serverTick: e.world.tick, chunks: e.takeChunks?.(e.world.tick - 40) ?? []});
+      if(this.station)this.send(c,{t:'station',view:this.station.view()});
       c.ready = true;
     }
   }

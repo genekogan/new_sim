@@ -10,6 +10,7 @@ import {
 } from '@sim/kernel';
 import { intentReceivedPayloadV2Schema, intentHistoryFactV2, intentAdmissionFactV2, intentControllerFactV2, type BirthPayload, type DecisionPayload, type DeckPayload, type LogEvent, type MintPayload, type PlayPayload, type PlayView } from '@sim/protocol';
 import {foldMandate} from './mandate.ts';
+import { isStationFactV1, parseStationFactV1 } from '@sim/protocol';
 
 /**
  * The words a world began with (kinds, link kinds, manners, base cards), as written into its log.
@@ -56,6 +57,7 @@ export type FoldResult = { play?: PlayView; programId?: string; programOk?: bool
 
 /** Apply one logged event to the engine and the kernel. Deterministic; returns what happened for the host's bookkeeping. */
 export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record<string, number>): FoldResult {
+  if(isStationFactV1(e.kind))parseStationFactV1(e.kind,e.payload);
   k.tick = e.tick;
   sweep(k);
   switch (e.kind) {

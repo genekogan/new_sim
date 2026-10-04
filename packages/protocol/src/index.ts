@@ -4,6 +4,8 @@ export * from './mandate.ts';
 export * from './presentation.ts';
 export * from './owner-views.ts';
 export * from './intent-v2.ts';
+export * from './station-v1.ts';
+import { isStationFactV1, parseStationFactV1, type StationLiveV1 } from './station-v1.ts';
 import { z } from 'zod';
 import type { ChangeEvent, Entity, Environment, PathCommit, PoseSample, Region } from '@sim/engine-contract';
 import { hashOf, samplePath } from '@sim/engine-contract';
@@ -51,7 +53,7 @@ export const describeIntent = (i: WireIntent | null, nameOf: (id: string) => str
 export const publicIntent = (i: WireIntent | null): WireIntent | null => { if (!i) return null; const { note: _n, text: _t, ...rest } = i; return rest; };
 
 // ---------------------------------------------------------------- log events
-export type EventKind = 'birth' | 'intent' | 'mandate' | 'decision' | 'play' | 'mint' | 'deck' | 'scene' | 'rules' | 'admin' | 'retire' | 'intent-request-v2' | 'intent-v2' | 'intent-admission-v2' | 'intent-controller-v2';
+export type EventKind = 'birth' | 'intent' | 'mandate' | 'decision' | 'play' | 'mint' | 'deck' | 'scene' | 'rules' | 'admin' | 'retire' | 'intent-request-v2' | 'intent-v2' | 'intent-admission-v2' | 'intent-controller-v2' | 'station-epoch-v1' | 'station-cue-v1' | 'station-anchor-v1';
 export type LogEvent = { seq: number; tick: number; kind: EventKind; author: string; payload: any; at: number };
 
 export type BirthPayload = { soulId: string; entityId: string; name: string; description: string; owner: string };
@@ -75,6 +77,7 @@ export type Beat = { at_min: number; kind: 'scene' | 'group' | 'soul'; directive
 
 /** What anyone may see of a log event: an owner's own words (the intent note) are private to the owner. */
 export function publicEvent(e: LogEvent): LogEvent {
+  if(isStationFactV1(e.kind))return {...e,author:'world:station',payload:parseStationFactV1(e.kind,e.payload)};
   if (e.kind === 'intent-request-v2') {
     const p = intentReceivedPayloadV2Schema.parse(e.payload);
     return { ...e, payload: { worldId: p.worldId, soulId: p.soulId, privateUpdate: true } };
@@ -138,6 +141,7 @@ export type TakeChunk = { fromTick: number; toTick: number; take: unknown };
 export type TakeStream = { serverTick: number; chunks: TakeChunk[] };
 
 export type ServerMsg =
+  | { t:'station';view:StationLiveV1 }
   | { t: 'welcome'; build: string; proto: number; worldId: string; rulesVersion: string; schema: string; dt: number; clockRate: number; serverTick: number; you: Me | null; serverTime: number; /** identifies this server process: batch numbers are only comparable within one */ epoch?: string; paused?: boolean }
   | ({ t: 'snapshot'; reason: string } & Snapshot)
   | ({ t: 'batch' } & Batch)

@@ -5,6 +5,7 @@ import type { Engine, EngineFactory, PathCommit, ChangeEvent, ProgramEvent, Engi
 import { kernelHash, sweep, type KState } from '@sim/kernel';
 import {
   describeIntent, publicIntent, viewHashOf, viewRow,
+  isStationFactV1,
   INTENT_V2, intentHistoryFactV2, intentReceivedPayloadV2Schema, intentReferenceV2Schema, intentAdmissionFactV2, intentControllerFactV2,
   type IntentAdmissionPayloadV2, type IntentControllerPayloadV2,
   type AgendaStep, type Batch, type BirthPayload, type DecisionPayload, type EventKind, type Heartbeat, type IntentPayload, type KernelView, type LogEvent,
@@ -17,6 +18,7 @@ import { frontier, stepIndex } from './deck.ts';
 import {mandateOf,MANDATE_STATE} from './mandate.ts';
 import { emptyIntentHistoryV2, foldIntentHistoryV2, type IntentHistoryV2 } from './intent-history.ts';
 import { IntentObservations } from './intent-observations.ts';
+import { foldStationFactV1, stationGenesisIdV1, type StationHistoryV1 } from './station-history.ts';
 export { replayFromGenesis, replayKernel } from './fold.ts';
 
 
@@ -258,6 +260,10 @@ export class WorldHost {
         catch (error) { p.reject!(error); continue; }
       }
       const e: LogEvent = { seq: this.seq + 1, tick, kind: p.kind, author: p.author, payload: p.payload, at: Date.now() };
+      if(isStationFactV1(e.kind)){
+        try { foldStationFactV1(this.stationHistoryV1(),e,this.stationBindingV1()); }
+        catch(error){p.reject?.(error);continue;}
+      }
       let admission: LogEvent | undefined;
       let preview: FoldResult | undefined;
       if (p.journal) {
@@ -489,6 +495,7 @@ export class WorldHost {
     const matchedStep = pm ? stepIndex(this, pm, (e.payload as PlayPayload).card, (e.payload as PlayPayload).target) : -1;
     if (e.kind === 'rules' && e.payload?.recovery) { this.restoreRecovery(e.payload.recovery as RecoveryRecipe); this.seq = e.seq; return; }
     const r = foldEvent(this.engine, this.kernel, e, this.counts);
+    if(isStationFactV1(e.kind))this.extra.stationV1=foldStationFactV1(this.stationHistoryV1(),e,this.stationBindingV1());
     switch (e.kind) {
       case 'intent-request-v2': {
         const p = intentReceivedPayloadV2Schema.parse(e.payload);
@@ -738,6 +745,18 @@ export class WorldHost {
   }
   /** A human-readable name for a kernel thing id, an engine entity id or a region id. */
   nameOf(id: string): string { return this.kernel.things[id]?.name ?? this.engine.world.entities[id]?.label ?? this.engine.world.regions[id]?.label ?? id; }
+  private stationGenesisV1?:string;
+  stationBindingV1(){
+    this.stationGenesisV1??=stationGenesisIdV1(this.worldId,this.seed,this.factory.genesis(this.seed));
+    return {worldId:this.worldId,genesisId:this.stationGenesisV1,rulesVersion:this.engine.rulesVersion,dtSeconds:this.engine.dt};
+  }
+  stationHistoryV1():StationHistoryV1|undefined {
+    const state=this.extra.stationV1 as StationHistoryV1|undefined;
+    if(state){const binding=this.stationBindingV1();
+      if(state.station.worldId!==binding.worldId||state.station.genesisId!==binding.genesisId||state.station.rulesVersion!==binding.rulesVersion||state.station.dtSeconds!==binding.dtSeconds)
+        throw new Error('station snapshot belongs to another world or history');}
+    return state?structuredClone(state):undefined;
+  }
   /** Trusted internal projection; authorization belongs to its caller. Detached
    * copies prevent card look-ahead and consumers from mutating private truth. */
   intentHistoryOf(soulId: string): IntentHistoryV2 {

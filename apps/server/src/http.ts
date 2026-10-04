@@ -17,10 +17,12 @@ import { mountMarsStatic } from './mars-static.ts';
 import type {TakeArchive} from './take-archive.ts';
 import { checkAcceptanceGuard,type AcceptanceGuard,type WorldHost } from './world.ts';
 import {captureRenderScene} from '@sim/engine-contract';
+import type {CandidateStationV1} from './station.ts';
 
-type Deps = { cfg: Config; db: Db; host: WorldHost; auth: Auth; hub: Hub; brain: Brain; souls: Souls; takes?: TakeArchive };
+type Deps = { cfg: Config; db: Db; host: WorldHost; auth: Auth; hub: Hub; brain: Brain; souls: Souls; takes?: TakeArchive; station?:CandidateStationV1 };
 
 export function buildApp(d: Deps) {
+  if(d.station&&d.station.host!==d.host)throw new Error('station must belong to selected host');
   const app = new Hono();
   const bearer = (c: Context) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
   const ip = (c: Context) => (c.req.header('x-forwarded-for') ?? 'local').split(',')[0].trim();
@@ -68,6 +70,16 @@ export function buildApp(d: Deps) {
   app.get('/v1/scene', c => {
     const scene=d.host.engine.renderScene?.()??{scene:null};
     return c.json({...scene,renderSceneRef:captureRenderScene(d.host.engine.rulesVersion,scene).ref},200,{'Cache-Control':'no-store'});
+  });
+  app.get('/v1/station',c=>d.station?c.json(d.station.view(),200,{'Cache-Control':'no-store'}):
+    c.json({ok:false,code:'not-found'},404,{'Cache-Control':'no-store'}));
+  app.get('/v1/station/history',c=>{
+    if(!d.station)return c.json({ok:false,code:'not-found'},404,{'Cache-Control':'no-store'});
+    const q=c.req.query(),at=Number(q.tick);
+    if(Object.keys(q).some(k=>!['worldId','epoch','rulesVersion','tick'].includes(k))||q.worldId!==d.host.worldId||!q.epoch||!q.rulesVersion||q.tick===undefined||q.tick.trim()==='')
+      return c.json({ok:false,code:'not-found'},404,{'Cache-Control':'no-store'});
+    try{return c.json(d.station.history({worldId:q.worldId,epoch:q.epoch,rulesVersion:q.rulesVersion},at),200,{'Cache-Control':'no-store'});}
+    catch{return c.json({ok:false,code:'not-found'},404,{'Cache-Control':'no-store'});}
   });
   app.get('/v1/scenes/:hash', c => {
     const hash=c.req.param('hash');
