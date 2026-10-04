@@ -1,0 +1,222 @@
+{
+  "status": "analytic proposal review only; no runtime/manifest/physics/admission qualification",
+  "source": {
+    "proposalPin": "86dad3685d07f4819aacb048315f9e769e13d783",
+    "campBasePin": "621af25689d50e1fd10ff9bd236d0d5c70e20e15",
+    "engineRulesVersion": "mars-engine/1+mars-assembly/3+activities/31+bodies/1"
+  },
+  "eden": {
+    "terrainExtentXZ": [
+      -16,
+      -12,
+      16,
+      12
+    ],
+    "maxTriangleGrade": 0.30000000000000004,
+    "maxGradeDegrees": 16.699244233993625,
+    "regionDepths": [
+      {
+        "id": "eden-swimming-cove",
+        "minClampedDepthMetres": 1.5,
+        "maxDepthMetres": 1.5,
+        "containsDryBed": false
+      },
+      {
+        "id": "eden-wading-entry",
+        "minClampedDepthMetres": 0,
+        "maxDepthMetres": 1.2,
+        "containsDryBed": true
+      },
+      {
+        "id": "eden-boat-channel",
+        "minClampedDepthMetres": 1.5,
+        "maxDepthMetres": 1.5,
+        "containsDryBed": false
+      },
+      {
+        "id": "eden-dock-approach",
+        "minClampedDepthMetres": 0.6,
+        "maxDepthMetres": 1.5,
+        "containsDryBed": false
+      }
+    ],
+    "dockTopMetres": 0.7,
+    "boatBoxTopMetres": 0.5,
+    "boatBoxKeelMetres": -0.30000000000000004,
+    "boatFootprintXZ": [
+      -5.5,
+      6.35,
+      -2.5,
+      7.65
+    ],
+    "minimumBoxKeelClearanceMetres": 0.44999999999999996,
+    "dockBoatBoxGapMetres": 0.34999999999999964,
+    "dockBoardingPoint": [
+      -4,
+      0.7,
+      5.7
+    ],
+    "boatBoardingPoint": [
+      -4,
+      0.5,
+      6.35
+    ],
+    "boardingHorizontalDistanceMetres": 0.6499999999999995,
+    "boardingDeltaYMetres": -0.19999999999999996,
+    "rampGrade": -0.044999999999999984,
+    "rampAngleDegrees": -2.5765718302688296,
+    "rampGroundEndDeltaMetres": 0,
+    "seatAnchorSeparationMetres": 0.9
+  },
+  "mars": {
+    "upperFloorBoxTopMetres": 3.1,
+    "declaredStairExitY": 3,
+    "stairGrade": 0.6,
+    "upperFloorAreaMetres2": 96,
+    "poolPlanAreaMetres2": 72,
+    "existingLookoutBill": [
+      {
+        "def": "2x4-6ft",
+        "countPerExistingLookout": 5,
+        "countForTwoCopies": 10,
+        "massKgPerPiece": 3.5
+      },
+      {
+        "def": "beam-9ft",
+        "countPerExistingLookout": 4,
+        "countForTwoCopies": 8,
+        "massKgPerPiece": 19
+      },
+      {
+        "def": "plywood-4x6",
+        "countPerExistingLookout": 2,
+        "countForTwoCopies": 4,
+        "massKgPerPiece": 20
+      },
+      {
+        "def": "stair-flight-10",
+        "countPerExistingLookout": 1,
+        "countForTwoCopies": 2,
+        "massKgPerPiece": 40
+      },
+      {
+        "def": "stair-tread",
+        "countPerExistingLookout": 10,
+        "countForTwoCopies": 20,
+        "massKgPerPiece": 4
+      },
+      {
+        "def": "upright-8ft",
+        "countPerExistingLookout": 2,
+        "countForTwoCopies": 4,
+        "massKgPerPiece": 26
+      }
+    ],
+    "totalComponentsPerExistingLookout": 24,
+    "totalComponentsForTwoCopies": 48,
+    "massKgForTwoCopies": 531,
+    "repairStock": "not specified/qualified; cannot infer quantity or recovery ratio",
+    "expandedUpperFloorBill": "not the existing lookout kit; design and supporting members still required"
+  },
+  "registeredPhysicalVerbs": [
+    "ambient_wander",
+    "art_sharing",
+    "art_sharing_control",
+    "beam_walk",
+    "campfire_circle",
+    "carry",
+    "chess_move",
+    "classroom_control",
+    "classroom_session",
+    "climb_frame",
+    "communal_supper",
+    "communal_supper_control",
+    "computer_music",
+    "computer_workshop",
+    "computer_workshop_control",
+    "connect_beam",
+    "converse",
+    "dismount",
+    "display_control",
+    "drawing_work",
+    "eat",
+    "face",
+    "forklift_back",
+    "forklift_deliver",
+    "forklift_pick",
+    "forklift_present",
+    "gallery_tour",
+    "gallery_tour_control",
+    "garden_care",
+    "garden_circuit",
+    "garden_circuit_control",
+    "gather",
+    "gathering_continuation",
+    "gathering_continuation_control",
+    "grounded_dance",
+    "group_warmup",
+    "group_warmup_control",
+    "hand_up",
+    "hold_items",
+    "install_blocking",
+    "install_joist",
+    "install_panel",
+    "install_plywood",
+    "install_rafter",
+    "install_rail",
+    "install_stair_flight",
+    "install_top_plate",
+    "install_tread",
+    "library_reading",
+    "library_reading_control",
+    "living_intention",
+    "living_intention_control",
+    "mount",
+    "move_fixture",
+    "music_gathering",
+    "music_gathering_control",
+    "open_jam",
+    "open_jam_control",
+    "paint",
+    "paired_walk",
+    "paired_walk_control",
+    "place_equipment",
+    "prepare_food",
+    "purposeful_routine",
+    "purposeful_routine_control",
+    "put_item",
+    "raise_upright",
+    "read_book",
+    "reading_circle",
+    "reading_circle_control",
+    "release_support",
+    "ride_loop",
+    "ride_to",
+    "room_preparation",
+    "room_preparation_control",
+    "seed_planting",
+    "serve",
+    "setup_room",
+    "shared_food_break",
+    "sit",
+    "sleep",
+    "sleep_control",
+    "sleep_on_mat",
+    "stand",
+    "stow_items",
+    "take_item",
+    "take_slot",
+    "tidy_table",
+    "tidy_table_control",
+    "tidy_table_transfer",
+    "walk_to",
+    "warmup_participant",
+    "work_at"
+  ],
+  "assumptions": [
+    "water depth computed only where bed is below datum; closed wetted domain not supplied",
+    "boat dimensions treated as centred axis-aligned tight box for arithmetic, not a buoyancy/collision model",
+    "boarding and passenger anchors are visual points; stand/seat/foot meanings and swept envelopes not supplied",
+    "two existing lookout copies are an illustrative count, not approval for the expanded upper floor or genesis inventory"
+  ]
+}
