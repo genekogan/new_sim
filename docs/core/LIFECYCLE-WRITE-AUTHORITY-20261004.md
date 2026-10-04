@@ -100,3 +100,9 @@ and scene capacity remain unqualified. Generic Souls fallback does not establish
 MCP's captured token authority. No fullG, cohort or safe live migration claim.
 Public/private transport and versioned installation are next; do not advertise or
 install this candidate based on these tests alone.
+
+
+MCP follow-up: [LIFECYCLE-MCP-AUTHORITY-20261004](LIFECYCLE-MCP-AUTHORITY-20261004.md)
+records a separate actual transport/credential milestone. The remaining-gates
+section above is the4a621b8 source pin; subsequent MCP proof is bounded to its
+executed tool/body/result scope and does not activate the whole candidate.
