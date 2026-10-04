@@ -156,8 +156,10 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
   }
 }
 
-/** Pure replay of the log from genesis. Returns the engine and the kernel; neither calls a model. */
-export function replayFromGenesis(factory: { genesis(seed: string): unknown; create(world: any): Engine; restore?(snap: import('@sim/engine-contract').EngineSnapshot): Engine }, seed: string, events: LogEvent[], untilTick: number): { engine: Engine; kernel: KState; counts: Record<string, number> } {
+/** Pure replay of the log from genesis. The legacy default stops before inputs
+ * at untilTick. Opt-in includeHeadEvents folds those inputs without stepping
+ * beyond the tick, matching a host after drainInputs/boot at the same head. */
+export function replayFromGenesis(factory: { genesis(seed: string): unknown; create(world: any): Engine; restore?(snap: import('@sim/engine-contract').EngineSnapshot): Engine }, seed: string, events: LogEvent[], untilTick: number, options:{includeHeadEvents?:boolean}={}): { engine: Engine; kernel: KState; counts: Record<string, number> } {
   const repairs=events.filter(e=>e.tick<=untilTick && e.kind==='rules' && e.payload?.recovery), repair=repairs.at(-1);
   let engine: Engine, kernel: KState, counts: Record<string,number>, suffix=events;
   if (repair) {
@@ -174,6 +176,7 @@ export function replayFromGenesis(factory: { genesis(seed: string): unknown; cre
     while (i<suffix.length && suffix[i].tick===engine.world.tick) foldEvent(engine,kernel,suffix[i++],counts);
     engine.step();
   }
+  if(options.includeHeadEvents)while(i<suffix.length&&suffix[i].tick===untilTick)foldEvent(engine,kernel,suffix[i++],counts);
   kernel.tick=engine.world.tick; sweep(kernel);
   return {engine,kernel,counts};
 }
