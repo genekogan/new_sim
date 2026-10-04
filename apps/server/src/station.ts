@@ -19,12 +19,14 @@ export class CandidateStationV1 {
     const state=this.host.stationHistoryV1(),cue=state?.cues.at(-1)??null,last=state?.anchors.at(-1)??null;
     const anchor=last?.cueId===(cue?.cueId??null)?last:null;
     return stationLiveV1Schema.parse({contract:'station-live/1',worldId:this.host.worldId,station:state?.station??null,
-      cue,anchor,fresh:!!anchor&&anchor.revision>this.recoveredRevision&&anchor.paused===this.host.paused&&anchor.clockRate===this.host.clockRate});
+      cue,anchor,fresh:(this.host.stationPhysicalHeadV1()?.revision??0)===0&&!this.host.extra.stationV2
+        &&!!anchor&&anchor.revision>this.recoveredRevision&&anchor.paused===this.host.paused&&anchor.clockRate===this.host.clockRate});
   }
   history(scope:{worldId:string;epoch:string;rulesVersion:string},tick:number){return historicalStationV1(this.host.stationHistoryV1(),scope,tick);}
   /** Caller drains the sequencer while awaiting this; no tick or clock is forged. */
   async record():Promise<StationLiveV1> {
     const h=this.host;
+    if((h.stationPhysicalHeadV1()?.revision??0)>0||h.extra.stationV2)throw new Error('V1 station producer is unavailable after a versioned station checkpoint');
     if(!h.stationHistoryV1()){
       const binding=h.stationBindingV1(),station=stationEpochV1Schema.parse({contract:'station-epoch/1',...binding,
         epoch:stationEpochId(h.worldId,binding.genesisId),pins:STATION_PINS_V1,createdTick:h.engine.world.tick});

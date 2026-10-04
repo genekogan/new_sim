@@ -62,6 +62,7 @@ export function acceptStationCuePhysicalV2(rawCue:unknown,rawHead:unknown,rawSta
   if(!sameOrigin(station,cue)||head.revision!==stationCueEraRevision(cue)||head.revision>current.revision
     ||cue.startTick<head.effectiveTick||cue.startTick<station.createdTick
     ||head.revision===current.revision&&hashOf(head)!==hashOf(current)
+    ||head.era&&current.era&&head.revision<current.revision&&head.era.seq>=current.era.payload.source.seq
     ||head.revision<current.revision&&cue.startTick>current.effectiveTick)
     throw new Error('station cue originating physical head differs');
   return cue;
@@ -122,7 +123,7 @@ export const stationHistoricalV2Schema=z.object({contract:z.literal('station-his
   const no=()=>ctx.addIssue({code:'custom',message:'station history is outside its physical interval/cutoff or borrowed future facts'});
   if(!v.station||!v.physical||v.tick<v.physical.effectiveTick||v.tick>v.sourceCutoff.tick
     ||v.physicalUntilTick!==null&&(v.physicalUntilTick<=v.physical!.effectiveTick||v.tick>=v.physicalUntilTick)
-    ||v.physical?.era&&(v.physical.era.seq>v.sourceCutoff.seq||v.physical.era.tick>v.sourceCutoff.tick))no();
+    ||[v.physical,v.cuePhysical].some(h=>h?.era&&(h.era.seq>v.sourceCutoff.seq||h.era.tick>v.sourceCutoff.tick)))no();
   if(!v.cue){if(v.anchor||v.phase||v.cuePhysical)no();return;}
   if(v.phase===null||hashOf(v.phase)!==hashOf(stationPhaseAtTickV2(v.cue,v.tick)))no();
   if(v.anchor&&v.anchor.sourceTick>v.tick)no();

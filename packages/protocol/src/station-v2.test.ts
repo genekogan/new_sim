@@ -79,3 +79,20 @@ test('history selects exact physical interval with cutoff and no future anchor, 
   assert.equal(stationHistoricalV2Schema.safeParse(oldQuery).success,true);
   assert.equal(stationHistoricalV2Schema.safeParse({...oldQuery,tick:37,phase:stationPhaseAtTick(cue,37)}).success,false);
 });
+test('second-era history checks both physical heads against the exact row frontier and refuses reversed predecessor source order',()=>{
+  const transition={...physical.transition,tick:100,fromRulesVersion:head.rulesVersion,toRulesVersion:head.rulesVersion+'+CODEC_ONLY_SECOND'};
+  const physicalSource={worldId,seq:20,tick:100,commonsTransition:transition};
+  const state={station,head,lastFactSeq:11};
+  const current=foldStationRulesEraV1(state,{seq:21,tick:100,payload:{...head.era!.payload,revision:2,previousRevision:1,
+    fromRulesVersion:transition.fromRulesVersion,toRulesVersion:transition.toRulesVersion,effectiveTick:100,
+    source:{seq:20,tick:100,transitionHash:hashOf(transition)}}},physicalSource,station).head;
+  const c=makeStationCueV2({contract:'station-cue/2',worldId,epoch:station.epoch,rulesVersion:head.rulesVersion,eraRevision:1,
+    dtSeconds:.05,pins:STATION_PINS_V1,sequence:1,pieceId:'starfield',bpm:60,seed:2,startTick:50,cycleCount:4,energy:0,
+    observation:observation(50,head.rulesVersion),transition:null});
+  const query={contract:'station-history/2',worldId,station,physical:current,cue:c,cuePhysical:head,anchor:null,tick:100,
+    physicalUntilTick:null,sourceCutoff:{seq:21,tick:200},phase:stationPhaseAtTickV2(c,100)};
+  assert.equal(stationHistoricalV2Schema.safeParse(query).success,true);
+  const future={...head,era:{...head.era!,seq:31,payload:{...head.era!.payload,source:{...head.era!.payload.source,seq:30}}},source:{...head.source!,seq:30}};
+  assert.equal(stationHistoricalV2Schema.safeParse({...query,cuePhysical:future}).success,false);
+  assert.equal(stationLiveV2Schema.safeParse({contract:'station-live/2',worldId,station,physical:current,cue:c,cuePhysical:future,anchor:null,fresh:false}).success,false);
+});

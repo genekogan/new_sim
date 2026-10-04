@@ -8,6 +8,8 @@ export * from './station-v1.ts';
 export * from './station-era-v1.ts';
 export * from './station-v2.ts';
 import { isStationFactV1, parseStationFactV1, type StationLiveV1 } from './station-v1.ts';
+import { stationRulesEraV1Schema } from './station-era-v1.ts';
+import { stationCueV2Schema,stationAnchorV2Schema } from './station-v2.ts';
 import { z } from 'zod';
 import type { ChangeEvent, Entity, Environment, PathCommit, PoseSample, Region } from '@sim/engine-contract';
 import { hashOf, samplePath } from '@sim/engine-contract';
@@ -55,7 +57,7 @@ export const describeIntent = (i: WireIntent | null, nameOf: (id: string) => str
 export const publicIntent = (i: WireIntent | null): WireIntent | null => { if (!i) return null; const { note: _n, text: _t, ...rest } = i; return rest; };
 
 // ---------------------------------------------------------------- log events
-export type EventKind = 'birth' | 'intent' | 'mandate' | 'decision' | 'play' | 'mint' | 'deck' | 'scene' | 'rules' | 'admin' | 'retire' | 'intent-request-v2' | 'intent-v2' | 'intent-admission-v2' | 'intent-controller-v2' | 'station-epoch-v1' | 'station-cue-v1' | 'station-anchor-v1';
+export type EventKind = 'birth' | 'intent' | 'mandate' | 'decision' | 'play' | 'mint' | 'deck' | 'scene' | 'rules' | 'admin' | 'retire' | 'intent-request-v2' | 'intent-v2' | 'intent-admission-v2' | 'intent-controller-v2' | 'station-epoch-v1' | 'station-cue-v1' | 'station-anchor-v1' | 'station-rules-era-v1' | 'station-cue-v2' | 'station-anchor-v2';
 export type LogEvent = { seq: number; tick: number; kind: EventKind; author: string; payload: any; at: number };
 
 export type BirthPayload = { soulId: string; entityId: string; name: string; description: string; owner: string };
@@ -79,6 +81,9 @@ export type Beat = { at_min: number; kind: 'scene' | 'group' | 'soul'; directive
 
 /** What anyone may see of a log event: an owner's own words (the intent note) are private to the owner. */
 export function publicEvent(e: LogEvent): LogEvent {
+  if(e.kind==='station-rules-era-v1')return {...e,author:'world:station',payload:stationRulesEraV1Schema.parse(e.payload)};
+  if(e.kind==='station-cue-v2')return {...e,author:'world:station',payload:stationCueV2Schema.parse(e.payload)};
+  if(e.kind==='station-anchor-v2')return {...e,author:'world:station',payload:stationAnchorV2Schema.parse(e.payload)};
   if(isStationFactV1(e.kind))return {...e,author:'world:station',payload:parseStationFactV1(e.kind,e.payload)};
   if (e.kind === 'intent-request-v2') {
     const p = intentReceivedPayloadV2Schema.parse(e.payload);

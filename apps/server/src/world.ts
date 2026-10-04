@@ -2,10 +2,13 @@
 // snapshots, and the per-batch broadcast. The fold (doc 11):
 //   events logged with tick T are applied when world.tick == T, then the engine steps to T+1.
 import type { Engine, EngineFactory, PathCommit, ChangeEvent, ProgramEvent, EngineSnapshot, RuntimeEvent } from '@sim/engine-contract';
+import { hashOf } from '@sim/engine-contract';
 import { kernelHash, sweep, type KState } from '@sim/kernel';
 import {
   describeIntent, publicIntent, viewHashOf, viewRow,
   isStationFactV1,
+  stationCommonsSourceV1Schema,stationRulesEraV1Schema,foldStationRulesEraV1,initialStationPhysicalHeadV1,acceptStationPhysicalHeadV1,
+  type StationEraFoldStateV1,type StationPhysicalHeadV1,
   INTENT_V2, intentHistoryFactV2, intentReceivedPayloadV2Schema, intentReferenceV2Schema, intentAdmissionFactV2, intentControllerFactV2,
   type IntentAdmissionPayloadV2, type IntentControllerPayloadV2,
   type AgendaStep, type Batch, type BirthPayload, type DecisionPayload, type EventKind, type Heartbeat, type IntentPayload, type KernelView, type LogEvent,
@@ -19,6 +22,7 @@ import {mandateOf,MANDATE_STATE} from './mandate.ts';
 import { emptyIntentHistoryV2, foldIntentHistoryV2, type IntentHistoryV2 } from './intent-history.ts';
 import { IntentObservations } from './intent-observations.ts';
 import { foldStationFactV1, stationGenesisIdV1, type StationHistoryV1 } from './station-history.ts';
+import { initialStationHistoryV2,foldStationFactV2,type StationHistoryV2 } from './station-history-v2.ts';
 export { replayFromGenesis, replayKernel } from './fold.ts';
 
 
@@ -57,7 +61,7 @@ export class PersistedIntentAdmissionFault extends Error {
   readonly decisionSeq: number;
   constructor(decisionSeq:number) { super('decision and admission persisted; physical application requires reconciliation'); this.decisionSeq=decisionSeq; }
 }
-type Pending = { kind: EventKind; author: string; payload: any; resolve?: (e: LogEvent) => void; guard?: AcceptanceGuard; journal?: AcceptanceJournal; reject?: (error: unknown) => void; purpose?: PurposeRef };
+type Pending = { kind: EventKind; author: string; payload: any; resolve?: (e: LogEvent) => void; guard?: AcceptanceGuard; journal?: AcceptanceJournal; reject?: (error: unknown) => void; purpose?: PurposeRef; stationEra?:boolean };
 export type SnapshotBody = { runtime: EngineSnapshot; minds: Mind[]; seq: number; extra: Record<string, unknown>; kernel?: KState; counts?: Record<string, number> };
 export type HostListener = {
   onBatch?(b: Batch): void;
@@ -158,6 +162,7 @@ export class WorldHost {
       this.seq = e.seq;
     }
     this.factory.validateHistoryHead?.(this.engine,this.db.world(this.worldId)!.rules_version);
+    if(this.extra.stationV1)this.stationPhysicalHeadV1();
     this.acc.fromTick = this.engine.world.tick;
     this.resetAcc();
     if (snap) this.recoveryBaseline = structuredClone(snap.body as SnapshotBody);
@@ -171,28 +176,44 @@ export class WorldHost {
   /** Adopt the code's current starting vocabulary in this world (base cards, kinds, link kinds, manners), as a logged change of rules. */
   adoptVocabulary(author: string) { return this.enqueue('rules', author, { vocabulary: codeVocabulary(), why: 'adopted the current base vocabulary' } satisfies { vocabulary: Vocabulary; why: string }); }
   /** Trusted internal checkpoint only. No REST/MCP permission is introduced.
-   * Existing station eras need an explicit carry-forward contract first. */
-  adoptCommons(author:string):Promise<LogEvent> {
-    if(this.stationHistoryV1())return Promise.reject(new Error('commons-transition.station-carry-forward-required'));
+   * Carry is explicitly isolated; existing callers retain the station refusal. */
+  adoptCommons(author:string,options?:{stationEraV1?:boolean}):Promise<LogEvent> {
+    if(this.stationHistoryV1()&&!options?.stationEraV1)return Promise.reject(new Error('commons-transition.station-carry-forward-required'));
     const preview=this.engine.previewCommonsTransition?.();
     if(!preview?.ok)return Promise.reject(new Error(preview?`${preview.diagnostic.code}: ${preview.diagnostic.message}`:'commons-transition.reader-unavailable'));
     const previous=new Set(this.engine.anchors().map(a=>a.id));
     const collision=preview.anchors.find(a=>!previous.has(a.id)&&this.kernel.things[a.id]);
     if(collision)return Promise.reject(new Error(`commons-transition.kernel-collision:${collision.id}`));
     const expected=preview.transition;
-    return this.enqueueChecked('rules',author,{commonsTransition:expected},()=>{
-      if(this.stationHistoryV1())throw new Error('commons-transition.station-carry-forward-required');
+    const guard:AcceptanceGuard=()=>{
+      if(this.db.world(this.worldId)?.dt!==this.engine.dt)throw new Error('commons-transition.header-dt-moved');
+      if(this.stationHistoryV1()&&!options?.stationEraV1)throw new Error('commons-transition.station-carry-forward-required');
       const current=this.engine.previewCommonsTransition?.();
       if(!current?.ok||JSON.stringify(current.transition)!==JSON.stringify(expected))throw new Error('commons-transition.source-moved');
       const oldAnchors=new Set(this.engine.anchors().map(a=>a.id));
       for(const a of current.anchors)if(!oldAnchors.has(a.id)&&this.kernel.things[a.id])throw new Error(`commons-transition.kernel-collision:${a.id}`);
       if(this.factory.canReplayHistory?.(expected.toRulesVersion)!==true)throw new Error('commons-transition.reader-unavailable');
       return true;
-    },()=>{
+    };
+    const journal:AcceptanceJournal=()=>{
       const result=this.db.db.prepare('UPDATE worlds SET rules_version=? WHERE id=? AND rules_version=?')
         .run(expected.toRulesVersion,this.worldId,expected.fromRulesVersion);
       if(result.changes!==1)throw new Error('commons-transition.header-moved');return true;
-    });
+    };
+    return new Promise((resolve,reject)=>this.queue.push({kind:'rules',author,payload:{commonsTransition:expected},guard,journal,
+      stationEra:options?.stationEraV1===true,resolve,reject}));
+  }
+  private stationEraEvent(source:LogEvent):LogEvent|undefined {
+    const old=this.stationHistoryV1();if(!old)return undefined;
+    const physical=stationCommonsSourceV1Schema.parse({worldId:this.worldId,seq:source.seq,tick:source.tick,commonsTransition:source.payload.commonsTransition});
+    const previous=this.stationPhysicalHeadV1()!;
+    const payload=stationRulesEraV1Schema.parse({contract:'station-rules-era/1',worldId:this.worldId,epoch:old.station.epoch,
+      revision:previous.revision+1,previousRevision:previous.revision,fromRulesVersion:previous.rulesVersion,
+      toRulesVersion:physical.commonsTransition.toRulesVersion,dtSeconds:this.engine.dt,effectiveTick:source.tick,
+      source:{seq:source.seq,tick:source.tick,transitionHash:hashOf(physical.commonsTransition)}});
+    const fact={seq:source.seq+1,tick:source.tick,payload};
+    foldStationRulesEraV1(this.extra.stationEraV1 as StationEraFoldStateV1|undefined,fact,physical,old.station);
+    return {...fact,kind:'station-rules-era-v1',author:'world:station',at:source.at};
   }
   private pendingBootstrap: { at: Record<string, string | null> } | null = null;
   /** For worlds snapshotted before the kernel existed: places from the engine, a Soul thing and deck per mind. */
@@ -285,11 +306,21 @@ export class WorldHost {
         catch (error) { p.reject!(error); continue; }
       }
       const e: LogEvent = { seq: this.seq + 1, tick, kind: p.kind, author: p.author, payload: p.payload, at: Date.now() };
+      if(e.kind==='station-rules-era-v1'){
+        p.reject?.(new Error('station era must be committed with its physical checkpoint'));continue;
+      }
       if(isStationFactV1(e.kind)){
-        try { foldStationFactV1(this.stationHistoryV1(),e,this.stationBindingV1()); }
+        try {
+          if(this.extra.stationEraV1||this.extra.stationV2)throw new Error('V1 station producer is unavailable after a versioned station checkpoint');
+          foldStationFactV1(this.stationHistoryV1(),e,this.stationBindingV1()); }
+        catch(error){p.reject?.(error);continue;}
+      }
+      if(e.kind==='station-cue-v2'||e.kind==='station-anchor-v2'){
+        try{foldStationFactV2(this.stationHistoryV2()!,this.stationHistoryV1()!,e,this.stationPhysicalHeadV1()!);}
         catch(error){p.reject?.(error);continue;}
       }
       let admission: LogEvent | undefined;
+      let stationEra:LogEvent|undefined;
       let preview: FoldResult | undefined;
       if (p.journal) {
         // Accepted log fact and its private request reference either both exist
@@ -298,18 +329,20 @@ export class WorldHost {
           this.db.db.exec('BEGIN IMMEDIATE');
           try {
             checkAcceptanceGuard(p.guard!);
+            if(p.stationEra)stationEra=this.stationEraEvent(e);
             if (p.purpose) {
               preview = this.previewIntentAdmission(e);
               admission = this.intentAdmissionEvent(e, p.purpose, preview);
             }
             this.db.appendEvent(this.worldId, e);
             if (admission) this.db.appendEvent(this.worldId, admission);
+            if(stationEra)this.db.appendEvent(this.worldId,stationEra);
             if (p.journal(e) !== true) throw new TypeError('acceptance journal must synchronously return true');
             this.db.db.exec('COMMIT');
           } catch (error) { this.db.db.exec('ROLLBACK'); throw error; }
         } catch (error) { p.reject!(error); continue; }
       } else this.db.appendEvent(this.worldId, e);
-      this.seq = admission?.seq ?? e.seq;
+      this.seq = stationEra?.seq ?? admission?.seq ?? e.seq;
       let recovered = false;
       let result: FoldResult | undefined;
       try {
@@ -317,11 +350,21 @@ export class WorldHost {
         if (preview && (!result || result.programId !== preview.programId || result.programOk !== preview.programOk || result.programCode !== preview.programCode))
           throw new Error('purpose admission preview differs from live fold');
         if (admission) this.apply(admission, false);
+        if(stationEra)this.apply(stationEra,false);
       } catch (error) {
-        this.recoverFault(error, e.kind === 'decision' ? e.payload.card : undefined); recovered = true;
+        if(stationEra){
+          // A committed structural pair cannot be attributed to an unrelated
+          // card or filtered out by card-fault recovery. Restore exact history.
+          try{
+            this.minds.clear();this.mindByEntity.clear();this.seq=0;this.extra={};this.counts={};
+            this.boot();this.ring=[];recovered=true;
+          }catch(restartError){this.stop();p.reject?.(restartError);throw restartError;}
+        }else {this.recoverFault(error, e.kind === 'decision' ? e.payload.card : undefined); recovered = true;}
       }
-      if (!recovered) this.acc.log.push(e, ...(admission ? [admission] : []));
-      for (const accepted of admission ? [e, admission] : [e]) for (const l of this.listeners) l.onApplied?.(accepted);
+      const accepted=[e,...(admission?[admission]:[]),...(stationEra?[stationEra]:[])];
+      if (!recovered||stationEra) this.acc.log.push(...accepted);
+      // No listener can observe a physical event before its committed era fold.
+      for (const fact of accepted) for (const l of this.listeners) l.onApplied?.(fact);
       if (admission && recovered) { p.reject?.(new PersistedIntentAdmissionFault(e.seq)); continue; }
       p.resolve?.(e);
     }
@@ -521,6 +564,21 @@ export class WorldHost {
     if (e.kind === 'rules' && e.payload?.recovery) { this.restoreRecovery(e.payload.recovery as RecoveryRecipe); this.seq = e.seq; return; }
     const r = foldEvent(this.engine, this.kernel, e, this.counts);
     if(isStationFactV1(e.kind))this.extra.stationV1=foldStationFactV1(this.stationHistoryV1(),e,this.stationBindingV1());
+    if(e.kind==='station-rules-era-v1'){
+      const old=this.extra.stationV1 as StationHistoryV1|undefined;
+      if(!old)throw new Error('station era has no original station');
+      const source=this.db.events(this.worldId,e.payload.source.seq-1,1)[0];
+      if(!source||source.kind!=='rules'||source.seq!==e.payload.source.seq||Object.keys(source.payload).length!==1||!source.payload.commonsTransition)
+        throw new Error('station era lacks exact canonical physical source');
+      const physical=stationCommonsSourceV1Schema.parse({worldId:this.worldId,seq:source.seq,tick:source.tick,commonsTransition:source.payload.commonsTransition});
+      const folded=foldStationRulesEraV1(this.extra.stationEraV1 as StationEraFoldStateV1|undefined,
+        {seq:e.seq,tick:e.tick,payload:e.payload},physical,old.station);
+      acceptStationPhysicalHeadV1(folded.head,old.station,this.stationBindingV1());
+      this.extra.stationEraV1=folded;
+      this.extra.stationV2={...(this.extra.stationV2 as StationHistoryV2|undefined??initialStationHistoryV2(old)),lastFactSeq:e.seq};
+    }
+    if(e.kind==='station-cue-v2'||e.kind==='station-anchor-v2')
+      this.extra.stationV2=foldStationFactV2(this.stationHistoryV2()!,this.stationHistoryV1()!,e,this.stationPhysicalHeadV1()!);
     switch (e.kind) {
       case 'intent-request-v2': {
         const p = intentReceivedPayloadV2Schema.parse(e.payload);
@@ -782,9 +840,28 @@ export class WorldHost {
   stationHistoryV1():StationHistoryV1|undefined {
     const state=this.extra.stationV1 as StationHistoryV1|undefined;
     if(state){const binding=this.stationBindingV1();
-      if(state.station.worldId!==binding.worldId||state.station.genesisId!==binding.genesisId||state.station.rulesVersion!==binding.rulesVersion||state.station.dtSeconds!==binding.dtSeconds)
+      if(state.station.worldId!==binding.worldId||state.station.genesisId!==binding.genesisId||state.station.dtSeconds!==binding.dtSeconds)
         throw new Error('station snapshot belongs to another world or history');}
+    if(state)this.stationPhysicalHeadV1();
     return state?structuredClone(state):undefined;
+  }
+  stationPhysicalHeadV1():StationPhysicalHeadV1|undefined {
+    const old=this.extra.stationV1 as StationHistoryV1|undefined;if(!old)return undefined;
+    if(this.db.world(this.worldId)?.dt!==this.engine.dt)throw new Error('station world header dt differs from native history');
+    const era=this.extra.stationEraV1 as StationEraFoldStateV1|undefined;
+    if(era&&hashOf(era.station)!==hashOf(old.station))throw new Error('station era original snapshot differs');
+    const head=acceptStationPhysicalHeadV1(era?.head??initialStationPhysicalHeadV1(old.station),old.station,this.stationBindingV1());
+    if(head.era){
+      const source=this.db.events(this.worldId,head.source!.seq-1,1)[0],fact=this.db.events(this.worldId,head.era.seq-1,1)[0];
+      if(!source||source.kind!=='rules'||Object.keys(source.payload).length!==1||!fact||fact.kind!=='station-rules-era-v1'
+        ||hashOf({worldId:this.worldId,seq:source.seq,tick:source.tick,commonsTransition:source.payload.commonsTransition})!==hashOf(head.source)
+        ||hashOf({seq:fact.seq,tick:fact.tick,payload:fact.payload})!==hashOf(head.era))throw new Error('station head lacks canonical physical/era pair');
+    }
+    return head;
+  }
+  stationHistoryV2():StationHistoryV2|undefined {
+    const old=this.stationHistoryV1();if(!old)return undefined;
+    return structuredClone(this.extra.stationV2 as StationHistoryV2|undefined??initialStationHistoryV2(old));
   }
   /** Trusted internal projection; authorization belongs to its caller. Detached
    * copies prevent card look-ahead and consumers from mutating private truth. */
