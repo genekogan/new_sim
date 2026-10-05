@@ -10,3 +10,6 @@ export * from './connected-shore-engine.ts';
 export * from './connected-boat-engine.ts';
 export * from './camp-expansion.ts';
 export * from './camp-expansion-engine.ts';
+
+export * from './commons-kitchen.ts';
+export * from './commons-kitchen-engine.ts';

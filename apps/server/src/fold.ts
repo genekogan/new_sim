@@ -129,6 +129,8 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       return {};
     }
     case 'rules': {
+      if(e.payload?.commonsKitchen){if(Object.keys(e.payload).length!==1||!engine.adoptCommonsKitchenV1)throw Error('commons-kitchen.reader-required');engine.adoptCommonsKitchenV1(e.payload.commonsKitchen);
+        for(const a of engine.anchors())if(!k.things[a.id]){const r=applyAll(k,[{op:'appear',id:a.id,kind:a.kind==='region'?'region':'place',name:a.name,at:a.in??null,traits:{...(a.entity?{entity:a.entity}:{}),...(a.point?{point:a.point}:{})}}],'world');if(!r.ok)throw Error('commons-kitchen.anchor:'+r.message);}}
       if(e.payload?.commonsProvisions){if(Object.keys(e.payload).length!==1||!engine.adoptCommonsProvisionsV1)throw Error('commons-provisions.reader-required');engine.adoptCommonsProvisionsV1(e.payload.commonsProvisions);
         for(const a of engine.anchors())if(!k.things[a.id]){const r=applyAll(k,[{op:'appear',id:a.id,kind:a.kind==='region'?'region':'place',name:a.name,at:a.in??null,traits:{...(a.entity?{entity:a.entity}:{}),...(a.point?{point:a.point}:{})}}],'world');if(!r.ok)throw Error('commons-provisions.anchor:'+r.message);}}
       const crew=(e.payload as {crewRemovalTransition?:import('@sim/engine-contract').CrewRemovalTransitionV1}|null)?.crewRemovalTransition;

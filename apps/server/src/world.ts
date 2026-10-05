@@ -455,7 +455,7 @@ export class WorldHost {
         if (admission) this.apply(admission, false);
         if(stationEra)this.apply(stationEra,false);
       } catch (error) {
-        if(stationEra||e.payload?.crewRemovalTransition||e.payload?.commonsProvisions){
+        if(stationEra||e.payload?.crewRemovalTransition||e.payload?.commonsProvisions||e.payload?.commonsKitchen){
           // A committed structural pair cannot be attributed to an unrelated
           // card or filtered out by card-fault recovery. Restore exact history.
           try{
@@ -465,7 +465,7 @@ export class WorldHost {
         }else {this.recoverFault(error, e.kind === 'decision' ? e.payload.card : undefined); recovered = true;}
       }
       const accepted=[e,...(admission?[admission]:[]),...(stationEra?[stationEra]:[])];
-      if (!recovered||stationEra||e.payload?.crewRemovalTransition||e.payload?.commonsProvisions) this.acc.log.push(...accepted);
+      if (!recovered||stationEra||e.payload?.crewRemovalTransition||e.payload?.commonsProvisions||e.payload?.commonsKitchen) this.acc.log.push(...accepted);
       // No listener can observe a physical event before its committed era fold.
       for (const fact of accepted) for (const l of this.listeners) l.onApplied?.(fact);
       if (admission && recovered) { p.reject?.(new PersistedIntentAdmissionFault(e.seq)); continue; }
@@ -669,6 +669,7 @@ export class WorldHost {
     const matchedStep = pm ? stepIndex(this, pm, (e.payload as PlayPayload).card, (e.payload as PlayPayload).target) : -1;
     if (e.kind === 'rules' && e.payload?.recovery) { this.restoreRecovery(e.payload.recovery as RecoveryRecipe); this.seq = e.seq; return; }
     if(e.kind==='rules'&&e.payload?.crewRemovalTransition&&this.stationHistoryV1())throw Error('crew-removal-transition.station-carry-required');
+    if(e.kind==='rules'&&e.payload?.commonsKitchen&&this.stationHistoryV1())throw Error('commons-kitchen.station-carry-required');
     if(e.kind==='rules'&&e.payload?.commonsProvisions&&this.stationHistoryV1())throw Error('commons-provisions.station-carry-required');
     const r = foldEvent(this.engine, this.kernel, e, this.counts);
     if(isStationFactV1(e.kind))this.extra.stationV1=foldStationFactV1(this.stationHistoryV1(),e,this.stationBindingV1());
@@ -882,6 +883,14 @@ export class WorldHost {
   enableGroundFixtureGoalsV1(){return this.enqueue('rules','operator:fixture-goal-levels',{runtimePolicy:{sleepBlockTicks:1200,...this.extra.runtimePolicy as object,fixtureGroundGoalsV1:true},why:'resolve ground-supported fixture destinations prospectively; retain old navigation replay'});}
   enableHumanRestNeedsV1(){
     return this.enqueue('rules','operator:human-rest-needs',{runtimePolicy:{sleepBlockTicks:1200,...this.extra.runtimePolicy as object,humanRestNeedsV1:true},why:'recognize enacted humanoid rest prospectively; retain prior needs replay'});
+  }
+  installCommonsKitchenV1(){
+    if(this.stationHistoryV1())return Promise.reject(Error('commons-kitchen.station-carry-required'));
+    const p=this.engine.previewCommonsKitchenV1?.();if(!p?.ok)return Promise.reject(Error(p?p.diagnostic.code:'commons-kitchen.reader-required'));
+    const t=p.transition;
+    const guard:AcceptanceGuard=()=>{if(this.stationHistoryV1())throw Error('commons-kitchen.station-carry-required');const q=this.engine.previewCommonsKitchenV1?.();if(!q?.ok||hashOf(q.transition)!==hashOf(t))throw Error('commons-kitchen.source-moved');if(this.factory.canReplayHistory?.(t.toRulesVersion)!==true)throw Error('commons-kitchen.reader-required');return true;};
+    const journal:AcceptanceJournal=()=>{const r=this.db.db.prepare('UPDATE worlds SET rules_version=? WHERE id=? AND rules_version=?').run(t.toRulesVersion,this.worldId,t.fromRulesVersion);if(r.changes!==1)throw Error('commons-kitchen.header-moved');return true;};
+    return new Promise<LogEvent>((resolve,reject)=>this.queue.push({kind:'rules',author:'operator:commons-kitchen',payload:{commonsKitchen:t},guard,journal,resolve,reject}));
   }
   installCommonsProvisionsV1(){
     if(this.stationHistoryV1())return Promise.reject(Error('commons-provisions.station-carry-required'));

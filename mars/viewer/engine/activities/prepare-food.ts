@@ -33,6 +33,9 @@ export interface PrepareFoodParams {
   spoon: string;
   pot: string;
   ingredients: [string, string];
+  /** Ground-supported table/actor admission; unrelated usable level links
+   * do not invalidate this work. Legacy calls retain ground-only world scope. */
+  groundRoutePolicy?: 'supported-ground/1';
 }
 type Program = { table: string; binding: string; state: FoodPreparation };
 type Exec = Program & {
@@ -222,6 +225,7 @@ export const prepareFood: ActionDef<PrepareFoodParams, Program, Exec> = {
     spoon: id,
     pot: id,
     ingredients: z.tuple([id, id]),
+    groundRoutePolicy: z.literal('supported-ground/1').optional(),
   }),
   drivesReservedHands: (rec) =>
     [
@@ -327,7 +331,8 @@ export const prepareFood: ActionDef<PrepareFoodParams, Program, Exec> = {
       support.support?.kind !== 'ground' ||
       support.pose.p[1] !== 0 ||
       !rt.services.spatial ||
-      rt.services.spatial.base.links.some((q: { usable: boolean }) => q.usable)
+      (p.groundRoutePolicy !== 'supported-ground/1' &&
+        rt.services.spatial.base.links.some((q: { usable: boolean }) => q.usable))
     )
       return fail(
         'scope',
