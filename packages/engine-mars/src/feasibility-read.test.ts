@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {connectedCommonsShoreFactory} from './connected-shore-engine.ts';
+import {retainedCommonsShoreFactory} from './retained-shore-engine.ts';
 test('detached cancellation is shared within one pure feasibility batch, invalidated by native state, cleared on exception and absent from replay',async()=>{
- const f=await connectedCommonsShoreFactory(),e=f.create(f.genesis('feasibility-read'));e.spawnHuman({id:'h',label:'Hypothetical native feasibility actor',soul:'fixture'});assert.ok(e.perform({actor:'h',label:'long supported native movement',steps:[{verb:'walk_to',params:{to:'shore-water'}}]}).ok);e.step();
+ const f=await retainedCommonsShoreFactory(),e=f.create(f.genesis('feasibility-read')),transition=e.previewRetainedCommonsShoreV1!();assert.ok(transition.ok);if(!transition.ok)return;e.adoptRetainedCommonsShoreV1!(transition.transition);e.spawnHuman({id:'h',label:'Hypothetical native feasibility actor',soul:'fixture'});assert.ok(e.perform({actor:'h',label:'long supported native movement',steps:[{verb:'walk_to',params:{to:'shore-water'}}]}).ok);e.step();
  const native=e as any,physical=native.physical,restore=physical.restore.bind(physical);let copies=0;physical.restore=(s:any)=>{copies++;return restore(s);};
  const probe={actor:'h',label:'read only replacement',steps:[{verb:'rest',params:{seconds:2}}]},hash=e.stateHash(),single=e.canPerform(probe);copies=0;
  e.withFeasibilityRead!(()=>{for(let i=0;i<8;i++)assert.deepEqual(e.canPerform(probe),single);});assert.equal(copies,1);assert.equal(e.stateHash(),hash);assert.equal(native.feasibilityRead,undefined);
