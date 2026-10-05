@@ -22,6 +22,8 @@ export function r2Store(cfg:Config):ArchiveStore|null {
  return store;
 }
 export class TakeArchive {
+ private work=new Set<Promise<unknown>>();
+ async settled(){while(this.work.size)await Promise.allSettled([...this.work]);}
  db:Db;worldId:string;store:ArchiveStore|null;prefix:string;
  private busy=false;private timer:NodeJS.Timeout|null=null;
  private cache:{key:string;chunks:Chunk[]}|null=null;
@@ -29,6 +31,9 @@ export class TakeArchive {
  start(host:WorldHost){if(!this.store||this.timer)return;this.timer=setInterval(()=>{void this.archiveOne(host.engine.world.tick).catch(()=>console.error('[takes] archive delayed; local replay retained'));},60000);this.timer.unref();}
  stop(){if(this.timer)clearInterval(this.timer);this.timer=null;}
  async archiveOne(tick:number):Promise<boolean>{
+  const work=this.archiveOneWork(tick);this.work.add(work);try{return await work;}finally{this.work.delete(work);}
+ }
+ private async archiveOneWork(tick:number):Promise<boolean>{
   if(!this.store||this.busy)return false;this.busy=true;
   try {
    const complete=Math.floor(tick/SEGMENT)*SEGMENT;

@@ -62,6 +62,16 @@ export class Brain {
   private readonly intentV2Retries: boolean;
   get intentV2Enabled() { return this.intentV2Choices; }
   private purposeWakes = new Map<string, { intentId: string; version: number }>();
+  private quiescing=false;
+  private work=new Set<Promise<unknown>>();
+  private maintenance:ReturnType<typeof setInterval>;
+  /** Stop new thought/IO; already accepted work drains with DB/clock open. */
+  quiesce(){this.quiescing=true;clearInterval(this.maintenance);}
+  async settled(){while(this.work.size)await Promise.allSettled([...this.work]);}
+  private async track<T>(run:()=>Promise<T>):Promise<T>{
+    const work=run();this.work.add(work);try{return await work;}finally{this.work.delete(work);}
+  }
+
 
   constructor(host: WorldHost, db: Db, cfg: Config, sink: BrainSink, services?: { compilerCall?: typeof callTool; intentV2Choices?: boolean; intentV2Retries?: boolean }) {
     this.host = host; this.db = db; this.cfg = cfg; this.sink = sink;
@@ -75,7 +85,7 @@ export class Brain {
     this.jev.gate = this.paidGate;
     const t = db.brainToday(this.capSince); this.spentToday = t.cost; this.callsToday = t.calls; this.jevMsAvg = t.jevMs;
     host.listeners.push({ afterTick: (tick) => this.afterTick(tick), onApplied: (e) => this.onApplied(e), onPlay: (v) => { for (const c of v.changes) if (c.op === 'say' && host.kernel.things[c.to]?.kind === 'soul') void this.speak(c.from, c.to, c.act, typeof c.about === 'string' ? c.about : undefined, c.manner); } });
-    setInterval(() => { const t = this.db.brainToday(this.capSince); this.spentToday = t.cost; this.callsToday = t.calls; this.db.pruneBrainCalls(); }, 60_000).unref();
+    this.maintenance=setInterval(() => { const t = this.db.brainToday(this.capSince); this.spentToday = t.cost; this.callsToday = t.calls; this.db.pruneBrainCalls(); }, 60_000);this.maintenance.unref();
   }
 
   setMode(m: 'live' | 'fake') { this.mode = m; this.jev.mode = this.cfg.typesafeKey ? m : 'fake'; }
@@ -144,6 +154,7 @@ export class Brain {
 
   // ------------------------------------------------------------ per tick
   private afterTick(tick: number) {
+    if(this.quiescing)return;
     const w = this.host.engine.world;
     const day=this.host.living;
     if(day&&tick%20===0){const c=clockAt(tick,day.origin,day.dayTicks);for(const m of this.host.minds.values())for(const r of mandateOf(this.host.kernel,m.soulId)){
@@ -274,6 +285,10 @@ export class Brain {
   }
 
   async evaluate(m: Mind, trigger: string) {
+    if(this.quiescing)return;
+    return this.track(()=>this.evaluateWork(m, trigger));
+  }
+  private async evaluateWork(m: Mind, trigger: string) {
     const host = this.host, tick = host.engine.world.tick;
     const purposeSeq = this.intentV2Choices ? host.intentWillSeqOf(m.soulId) : undefined;
     const choiceGuard: AcceptanceGuard | undefined = purposeSeq === undefined ? undefined : () => {
@@ -421,6 +436,10 @@ export class Brain {
   }
 
   async reflect(m: Mind, day: number) {
+    if(this.quiescing)return;
+    return this.track(()=>this.reflectWork(m, day));
+  }
+  private async reflectWork(m: Mind, day: number) {
     if (!m.life) return;
     this.reflecting.add(m.soulId);
     let journal = reflectInCode(m.name, m.life, m.agenda.slice(m.agendaPos).map(a => a.card));
@@ -440,6 +459,10 @@ export class Brain {
 
   // ------------------------------------------------------------ web console: text → intent
   async translate(m: Mind, text: string): Promise<Translation & { via: string }> {
+    if(this.quiescing)return {ok:false,confidence:0,reason:'Direction unavailable while the server is restarting.',via:'unavailable'};
+    return this.track(()=>this.translateWork(m, text));
+  }
+  private async translateWork(m: Mind, text: string): Promise<Translation & { via: string }> {
     const eng = this.host.engine, tick = eng.world.tick;
     const s = eng.describeSurroundings(m.entityId);
     const targets: Target[] = [
@@ -475,6 +498,9 @@ export class Brain {
 
   /** Validate proposed cards and mint the valid ones into the vocabulary and this Soul's deck. No model involved. */
   async mint(m: Mind, cards: unknown[], links: Record<string, LinkKind> | undefined, kinds: Record<string, { summary: string }> | undefined, origin: MintedCard['origin'], guard?: AcceptanceGuard, journal?: AcceptanceJournal): Promise<MintVerdict[]> {
+    return this.track(()=>this.mintWork(m,cards,links,kinds,origin,guard,journal));
+  }
+  private async mintWork(m: Mind, cards: unknown[], links: Record<string, LinkKind> | undefined, kinds: Record<string, { summary: string }> | undefined, origin: MintedCard['origin'], guard?: AcceptanceGuard, journal?: AcceptanceJournal): Promise<MintVerdict[]> {
     if (journal && !guard) throw new Error('request journaling requires a current acceptance guard');
     if (guard) checkAcceptanceGuard(guard);
     const enqueue = (kind: 'deck' | 'mint', payload: unknown) => guard
@@ -519,6 +545,10 @@ export class Brain {
 
   /** A wish in plain words → an agenda of cards, minting what the vocabulary lacks. Returns null when no compiler is available. */
   async compile(m: Mind, wish: string, align: boolean | 'intent-v2'=false, guard?: AcceptanceGuard, journal?: AcceptanceJournal): Promise<{ ok: true; agenda: { card: string; target: string | null; of?: string }[]; minted: MintVerdict[]; alignment?:Alignment } | { ok: false; reason: string } | null> {
+    if(this.quiescing)return null;
+    return this.track(()=>this.compileWork(m, wish, align, guard, journal));
+  }
+  private async compileWork(m: Mind, wish: string, align: boolean | 'intent-v2'=false, guard?: AcceptanceGuard, journal?: AcceptanceJournal): Promise<{ ok: true; agenda: { card: string; target: string | null; of?: string }[]; minted: MintVerdict[]; alignment?:Alignment } | { ok: false; reason: string } | null> {
     if (journal && !guard) throw new Error('request journaling requires a current acceptance guard');
     if (this.mode === 'fake' || !this.cfg.anthropicKey) return null;
     if (this.overBudget || !this.gov.allow('user')) return { ok: false, reason: 'the thinking budget is spent for now; try again in a few minutes' };
@@ -606,6 +636,10 @@ export class Brain {
 
   /** Pick the three manners that suit a Soul's description (one cheap Jev call), and record them in its deck. */
   async attune(m: Mind) {
+    if(this.quiescing)return;
+    return this.track(()=>this.attuneWork(m));
+  }
+  private async attuneWork(m: Mind) {
     const k = this.host.kernel, tick = this.host.engine.world.tick;
     if (this.mode === 'fake' || this.overBudget || !this.gov.allow('mid')) return;
     const request = buildAttuneRequest({ name: m.name, about: m.description }, k.vocab.manners);
@@ -619,6 +653,10 @@ export class Brain {
 
   // ------------------------------------------------------------ speech: the act is state, the words are rendered here
   async speak(from: string, to: string, act: string, about: string | undefined, manner: string | undefined) {
+    if(this.quiescing)return;
+    return this.track(()=>this.speakWork(from, to, act, about, manner));
+  }
+  private async speakWork(from: string, to: string, act: string, about: string | undefined, manner: string | undefined) {
     const k = this.host.kernel, tick = this.host.engine.world.tick;
     const a = k.things[from], b = k.things[to]; if (!a || !b) return;
     const input: TalkInput = {
@@ -669,6 +707,10 @@ export class Brain {
   }
 
   async direct() {
+    if(this.quiescing)return;
+    return this.track(()=>this.directWork());
+  }
+  private async directWork() {
     const tick = this.host.engine.world.tick;
     if (this.camera && tick - this.shotSinceTick < SHOT_COMMIT_TICKS && this.tickerCandidates.length === 0) return; // commit window: no chatter
     this.directing = true;
@@ -701,6 +743,10 @@ export class Brain {
 
   /** On-demand cinematic shot for one Soul (owner view). */
   async shotFor(m: Mind) {
+    if(this.quiescing)return null;
+    return this.track(()=>this.shotForWork(m));
+  }
+  private async shotForWork(m: Mind) {
     const tick = this.host.engine.world.tick, id = m.entityId;
     const near = this.host.engine.describeSurroundings(id).nearby.find((n) => n.what === 'a soul' && (n.distance === 'here' || n.distance === 'close'));
     const cands: ShotCandidate[] = [
@@ -737,6 +783,10 @@ export class Brain {
   }
 
   async narrate(region: string, why: string) {
+    if(this.quiescing)return;
+    return this.track(()=>this.narrateWork(region, why));
+  }
+  private async narrateWork(region: string, why: string) {
     const tick = this.host.engine.world.tick, ns = this.narratorState;
     ns.nextRun[region] = tick + NARRATE_EVERY + (hash32(`${region}:${tick}`) % (TPS * 60)) - TPS * 30; // ~5 min ± 30 s, so regions drift apart
     const d = this.digest(region);
