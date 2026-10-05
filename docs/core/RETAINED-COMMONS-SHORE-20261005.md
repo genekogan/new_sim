@@ -51,3 +51,30 @@ selected installation closure, source counterparts, actual retained-world quiet
 readiness, private/public consumer checks and real-player observation remain
 required. API/clock availability must be preserved while waiting; the food
 readiness correction does not grant permission to force a shore boundary.
+
+The selected P0 closure now projects the generic physical adapter and retained
+reader onto the immutable passive-kitchen2 supplier. Unrelated camp expansion,
+crew-upgrade, boat controls and body-location methods/imports are excluded;
+existing construction/default native clearance remain from the old supplier.
+Committed source hashes and selected runtime hashes are different provenance sets
+and must be reviewed separately. The projection passes its own eight-owner
+journey/replay, prepared-food, refusal and passive-install checks. Original
+immutable ac096 runtime versus this new reader matches eight native births,
+actual provisions/kitchen facts, policy plus450deck ticks, and old snapshot hashes
+before any shore fact. A selected loopback HTTP entry test boots an existing
+synthetic kitchen2 DB and passively installs shore; no PM DB or credentials used.
+
+Local entry `shore=true` / `PREVIEW_RETAINED_SHORE=1` selects the compatible reader
+before boot and adds a passive hook. It requires kitchen/provisions, waits for
+kitchen acceptance and natural native quiet, then queues the guarded shore fact.
+HTTP/clock remain running; it never forces quiet or cancels programmes. The local
+handle `shoreInstallation.status()` distinguishes waiting/installing/installed/
+failed. Startup return is not an installation receipt. Source movement retries;
+other refusals remain visible. The hook closes and drains on shutdown.
+
+The original passive fixture compared raw JSON object order, which changes under
+canonical snapshot decode; the corrected full entity deep comparison passes.
+An initial packet-update command ran from the wrong folder and failed without
+changing runtime; it was corrected before selected checks. Selected native test
+needed the existing NativeWorld type for its shore-field assertion; no executable
+behaviour was altered. All failed receipts remain separate from passing evidence.

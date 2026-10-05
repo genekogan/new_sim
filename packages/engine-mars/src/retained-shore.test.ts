@@ -30,7 +30,7 @@ test('retained kitchen/commons becomes connected shore without replacing bodies,
   for(const p of archivedOld){assert.equal(p.capture.ref.rulesVersion,q.transition.fromRulesVersion);assert.equal(p.capture.ref.hash,(p.chunk.take as any).renderSceneRef.hash);assert.equal(p.capture.body.shore,undefined);}
   const chunks=e.takeChunks!(0);assert.ok(chunks.some(c=>(c.take as any).rulesVersion===q.transition.toRulesVersion));
   for(const c of chunks){const t=c.take as any,cap=e.takeScene!(t.renderSceneRef.hash)!;assert.ok(cap);assert.equal(cap.ref.rulesVersion,t.rulesVersion);if(t.rulesVersion===q.transition.toRulesVersion){assert.ok((cap.body.scene as any).provisions);assert.ok((cap.body.scene as any).kitchen);}}
-  walk(e,'commons');assert.equal(e.world.entities.h_A.human!.shore,undefined);const at=e.world.entities.h_A.pose.p;assert.ok(Math.hypot(at[0]-9,at[1],at[2]-5)<1e-9);
+  walk(e,'commons');assert.equal((e.world as NativeWorld).entities.h_A.human!.shore,undefined);const at=e.world.entities.h_A.pose.p;assert.ok(Math.hypot(at[0]-9,at[1],at[2]-5)<1e-9);
   const w=(e.world as NativeWorld).entities;assert.equal(w[station.pot].contents?.fraction,.5);assert.ok(w[station.pot].foodPreparation?.complete);assert.equal(w[station.beans].contents?.fraction,0);for(const other of COMMONS_KITCHENS.slice(1))assert.equal(w[other.beans].contents?.fraction,1);
   assert.equal(factory.restore(e.snapshot()).stateHash(),e.stateHash());const old=await commonsKitchenFactory();assert.equal(old.canReplayHistory?.(e.rulesVersion),false);assert.throws(()=>old.restore(e.snapshot()),/physical binding/);
   const tamper=e.snapshot() as any;tamper.cfg.walkBlockV1=false;assert.throws(()=>factory.restore(tamper),/snapshot-binding/);
