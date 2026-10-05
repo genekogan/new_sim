@@ -4,7 +4,7 @@
 // carries the server's view hash; the replica recomputes its own at that tick
 // and asks for a resync when they differ. Runs in browsers and in Node.
 import type { Entity, Environment, PathCommit, PoseSample, Region } from '@sim/engine-contract';
-import { samplePath, viewHashOf, viewRow, PROTO, stationLiveV1Schema,stationV2MessageSchema,acceptStationLiveProgressV2,stationHelloCapabilitiesV1Schema,stationLiveContractSchema,
+import { samplePath, viewHashOf, viewRow, PROTO, stationLiveV1Schema,stationV2MessageSchema,acceptStationLiveProgressV2,stationHelloCapabilitiesV1Schema,stationLiveContractSchema,meLiveDescriptorV1Schema,meLiveViewV1Schema,meLiveMessageV1Schema,
   type StationLiveV2,type StationAnchorVariant,type StationLiveContract,type StationLiveV1, type KernelView, type PlayView, type TalkLine, type Batch, type BrainCall, type CameraLine, type ClientMsg, type Heartbeat, type LogEvent, type Me, type NarrativeView, type PublicSoul, type ServerMsg, type ServerStats, type Snapshot, type TickerLine } from '@sim/protocol';
 
 export class Replica {
@@ -81,6 +81,8 @@ export type TransportReceipt = { session:ConnectionSession;receivedAtMs:number }
 export type ClockProbe = { session:ConnectionSession;n:number;sentAtMs:number;automatic:boolean };
 export type PongReceipt = TransportReceipt & { sentAtMs:number;rttMs:number;automatic:boolean };
 export type Handlers = {
+  /** Current private authority only; null scope clears old private generations. */
+  onMe?(me:Me|null,scope:PrivateMeSession|null):void;
   /** null invalidates the previous station; no playback can rely on it. */
   onStation?(view:StationLiveV1|null,receipt:TransportReceipt|null):void;
   /** Explicitly negotiated V2 only; checkpoint receipt preserves clock session. */
@@ -94,12 +96,15 @@ export type Handlers = {
   onNarrative?(v: NarrativeView): void; onStats?(s: ServerStats): void; onKernel?(v: KernelView): void; onError?(code: string, message: string): void; onPlays?(p: PlayView[]): void; onTalk?(l: TalkLine[]): void; onWelcome?(me: Me | null, w: Extract<ServerMsg, { t: 'welcome' }>): void;
 };
 type WSLike = { send(s: string): void; close(): void; readyState: number; onopen: any; onmessage: any; onclose: any; onerror: any };
+export type PrivateMeSession={generation:number;worldId:string;epoch:string;connectionId:string;userId:string|null;revision:number};
 
 /** Connection with automatic reconnect (resuming from the last batch seq) and heartbeat-driven resync. */
 export class Connection {
   replica = new Replica();
   stats: ConnStats = { state: 'connecting', resyncs: 0, reconnects: 0, heartbeats: 0, lastCheck: '-', lastHash: '', myHash: '', bytesIn: 0, msgsIn: 0, rttMs: 0, lastHeartbeatTick: 0, snapshots: 0 };
   welcome: Extract<ServerMsg, { t: 'welcome' }> | null = null;
+  me:Me|null=null;
+  private privateMeSession:PrivateMeSession|null=null;
   heartbeat: Heartbeat | null = null;
   /** Wall-clock anchor for smooth local tick estimation between batches. */
   anchor = { tick: 0, at: 0 };
@@ -135,7 +140,14 @@ export class Connection {
   }
 
   get session():ConnectionSession|null {return this.transport?{...this.transport}:null;}
+  get meSession():PrivateMeSession|null{return this.privateMeSession?{...this.privateMeSession}:null;}
+  private clearPrivateMe(){
+    const had=this.me!==null||this.privateMeSession!==null;this.me=null;this.privateMeSession=null;
+    if(this.welcome)this.welcome={...this.welcome,you:null};if(had)this.handlers.onMe?.(null,null);
+  }
+  private invalidPrivateMe(){this.clearPrivateMe();this.handlers.onError?.('me.invalid','Private authority does not match the current connection.');try{this.ws?.close();}catch{/* reconnect needs fresh authority */}}
   private clearTransport() {
+    this.clearPrivateMe();
     const hadSession=this.transport!==null,hadStation=this.station!==null,hadV2=this.stationV2!==null;
     this.transport=null;this.station=null;this.stationV2=null;this.lastStationAnchorV2=null;this.stationContract=null;
     this.pendingPings.clear();this.lastMonotonicAt=null;
@@ -252,7 +264,25 @@ export class Connection {
           this.transport={generation:++this.sessionSerial,worldId:m.worldId,epoch:m.epoch??null};
           h.onSession?.({...this.transport});
         }
-        h.onWelcome?.(m.you, m);break;
+        if(m.privateMe!==undefined){
+          const desc=meLiveDescriptorV1Schema.safeParse(m.privateMe),initial=desc.success?meLiveViewV1Schema.safeParse({...desc.data,worldId:m.worldId,epoch:m.epoch,me:m.you}):null;
+          if(!initial?.success||!this.transport){this.invalidPrivateMe();break;}
+          this.privateMeSession={generation:this.transport.generation,worldId:initial.data.worldId,epoch:initial.data.epoch,connectionId:initial.data.connectionId,userId:initial.data.userId,revision:initial.data.revision};
+          this.me=structuredClone(initial.data.me);
+        }else this.me=m.you;
+        h.onWelcome?.(this.me, m);break;
+      }
+      case 'me': {
+        const parsed=meLiveMessageV1Schema.safeParse(m),s=this.privateMeSession,t=this.transport;
+        if(!s||!t)break;
+        if(!parsed.success){this.invalidPrivateMe();break;}
+        const v=parsed.data.view;
+        if(t.generation!==s.generation||v.worldId!==s.worldId||v.epoch!==s.epoch||v.connectionId!==s.connectionId||v.userId!==s.userId)break;
+        if(v.revision<=s.revision)break;
+        if(v.revision!==s.revision+1){this.invalidPrivateMe();break;}
+        this.privateMeSession={...s,revision:v.revision};this.me=structuredClone(v.me);
+        if(this.welcome)this.welcome={...this.welcome,you:structuredClone(v.me)};
+        h.onMe?.(structuredClone(v.me),{...this.privateMeSession});break;
       }
       case 'snapshot': r.applySnapshot(m); this.stats.snapshots++; this.setAnchor(m.tick); this.pendingHb = null; this.resyncing = 0; break;
       case 'batch': {

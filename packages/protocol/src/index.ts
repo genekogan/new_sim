@@ -3,6 +3,7 @@
 export * from './mandate.ts';
 export * from './presentation.ts';
 export * from './owner-views.ts';
+export * from './me-live.ts';
 export * from './intent-v2.ts';
 export * from './intent-history-page-v1.ts';
 export * from './station-v1.ts';
@@ -13,6 +14,7 @@ import { isStationFactV1, parseStationFactV1, type StationLiveV1 } from './stati
 import { stationRulesEraV1Schema } from './station-era-v1.ts';
 import { stationCueV2Schema,stationAnchorV2Schema,type StationLiveV2 } from './station-v2.ts';
 import type { StationLiveContract } from './station-era-v1.ts';
+import type {MeLiveDescriptorV1,MeLiveViewV1} from './me-live.ts';
 import { z } from 'zod';
 import type { ChangeEvent, Entity, Environment, PathCommit, PoseSample, Region } from '@sim/engine-contract';
 import { hashOf, samplePath } from '@sim/engine-contract';
@@ -151,9 +153,10 @@ export type TakeChunk = { fromTick: number; toTick: number; take: unknown };
 export type TakeStream = { serverTick: number; chunks: TakeChunk[] };
 
 export type ServerMsg =
+  | {t:'me';view:MeLiveViewV1}
   | { t:'station-v2';view:StationLiveV2 }
   | { t:'station';view:StationLiveV1 }
-  | { t: 'welcome'; build: string; proto: number; worldId: string; rulesVersion: string; schema: string; dt: number; clockRate: number; serverTick: number; you: Me | null; serverTime: number; /** identifies this server process: batch numbers are only comparable within one */ epoch?: string; paused?: boolean; stationContract?:StationLiveContract|null }
+  | { t: 'welcome'; build: string; proto: number; worldId: string; rulesVersion: string; schema: string; dt: number; clockRate: number; serverTick: number; you: Me | null; serverTime: number; /** identifies this server process: batch numbers are only comparable within one */ epoch?: string; paused?: boolean; stationContract?:StationLiveContract|null;privateMe?:MeLiveDescriptorV1 }
   | ({ t: 'snapshot'; reason: string } & Snapshot)
   | ({ t: 'batch' } & Batch)
   | ({ t: 'heartbeat' } & Heartbeat)
