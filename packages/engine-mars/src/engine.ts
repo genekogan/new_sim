@@ -24,6 +24,7 @@ import { captureRenderScene, commonsSceneMetadataV1Schema, type RenderSceneCaptu
 import { readNativeGathering } from './gathering-observation.ts';
 import { prepareCommonsTransition } from './commons-transition.ts';
 import { commonsTransitionV1Schema,type CommonsTransitionV1,type CommonsTransitionAdmissionV1 } from '@sim/engine-contract';
+import {crewRemovalTransitionV1Schema,type CrewRemovalTransitionV1,type CrewRemovalTransitionAdmissionV1} from '@sim/engine-contract';
 import { decodeSnapshot } from '../../../mars/viewer/engine/runtime/snapshot.ts';
 import { dcos,dsin,hypot } from '../../../mars/viewer/engine/core/math.ts';
 import { clearanceAt } from '../../../mars/viewer/engine/spatial/grid.ts';
@@ -115,6 +116,7 @@ export class MarsEngine implements Engine {
   private renderBaseKey = '';
   private takeScenes = new Map<string,RenderSceneCaptureV1>();
   private quiet = false;
+  private crewRemovalTransitionReader=false;
   private chunks: { fromTick: number; toTick: number; take: unknown }[] = [];
 
   constructor(m: Mars, rt: any, cfg: MarsWorldConfig, saved?: { programs: Prog[]; nextProg: number; leaving: string[] }, physical?:MarsPhysicalBinding) {
@@ -662,6 +664,24 @@ export class MarsEngine implements Engine {
     const nextCfg={...this.cfg,...EDEN_COMMONS_WORLD,...(this.cfg.commonsArrivalV1?{safeArrivalV1:true}:{})};
     const p=prepareCommonsTransition(this.m,this.rt,this.rulesVersion,nativeRulesVersion(this.m.rulesVersion,nextCfg));
     return p.ok?{ok:true,transition:p.transition,anchors:this.anchorsOf(p.runtime.world,nextCfg)}:p;
+  }
+  /** Only the explicit dual-history factory enables this prospective reader.
+   * Installing the reader itself changes no rules, body, program or hash. */
+  enableCrewRemovalTransitionReaderV1(){this.crewRemovalTransitionReader=true;}
+  previewCrewRemovalTransitionV1():CrewRemovalTransitionAdmissionV1 {
+    const no=(code:string,message:string)=>({ok:false as const,diagnostic:{code:'crew-removal-transition.'+code,message}});
+    if(!this.crewRemovalTransitionReader)return no('reader-unavailable','an explicit legacy native dual-policy reader is required');
+    if(this.cfg.safeCrewRemoval)return no('already-adopted','crew-removal/1 is already active');
+    if(!this.isQuiet()||this.leaving.length||!this.canSnapshot())return no('not-quiet','programs, borrowed crews and departures must finish at a resumable native boundary');
+    return {ok:true,transition:crewRemovalTransitionV1Schema.parse({contract:'crew-removal-transition/1',tick:this.world.tick,
+      fromRulesVersion:this.rulesVersion,toRulesVersion:nativeRulesVersion(this.m.rulesVersion,{...this.cfg,safeCrewRemoval:true}),
+      fromStateHash:this.stateHash(),nativeWorldHash:this.rt.stateHash(),base:this.world.base})};
+  }
+  adoptCrewRemovalTransitionV1(raw:CrewRemovalTransitionV1){
+    const fact=crewRemovalTransitionV1Schema.parse(raw),preview=this.previewCrewRemovalTransitionV1();
+    if(!preview.ok)throw Error(preview.diagnostic.code+': '+preview.diagnostic.message);
+    if(hashOf(fact)!==hashOf(preview.transition))throw Error('crew-removal-transition.stale-or-forged');
+    this.finishRecorder();this.cfg={...this.cfg,safeCrewRemoval:true};this.startRecorder();
   }
   adoptCommons(raw:CommonsTransitionV1) {
     const expected=commonsTransitionV1Schema.parse(raw),preview=this.previewCommonsTransition();

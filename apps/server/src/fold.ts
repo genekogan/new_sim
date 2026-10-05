@@ -129,6 +129,12 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       return {};
     }
     case 'rules': {
+      const crew=(e.payload as {crewRemovalTransition?:import('@sim/engine-contract').CrewRemovalTransitionV1}|null)?.crewRemovalTransition;
+      if(crew){
+        if(Object.keys(e.payload).length!==1)throw Error('crew-removal-transition.mixed-payload');
+        if(!engine.adoptCrewRemovalTransitionV1)throw Error('crew-removal-transition.reader-unavailable');
+        engine.adoptCrewRemovalTransitionV1(crew);
+      }
       const transition=(e.payload as {commonsTransition?:import('@sim/engine-contract').CommonsTransitionV1}|null)?.commonsTransition;
       if(transition){
         if(!engine.adoptCommons)throw new Error('commons-transition.reader-unavailable');

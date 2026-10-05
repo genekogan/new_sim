@@ -247,6 +247,28 @@ export class WorldHost {
     return new Promise((resolve,reject)=>this.queue.push({kind:'rules',author,payload:{commonsTransition:expected},guard,journal,
       stationEra:options?.stationEraV1===true,resolve,reject}));
   }
+  /** Prospective controller policy; neither a DB-header edit nor a new world.
+   * Station binding needs its own agreed carry, so this first reader refuses it. */
+  adoptCrewRemovalPolicyV1(author:string):Promise<LogEvent>{
+    if(this.stationHistoryV1())return Promise.reject(Error('crew-removal-transition.station-carry-required'));
+    const preview=this.engine.previewCrewRemovalTransitionV1?.();
+    if(!preview?.ok)return Promise.reject(Error(preview?preview.diagnostic.code+': '+preview.diagnostic.message:'crew-removal-transition.reader-unavailable'));
+    const expected=preview.transition;
+    const guard:AcceptanceGuard=()=>{
+      if(this.stationHistoryV1())throw Error('crew-removal-transition.station-carry-required');
+      const row=this.db.world(this.worldId);
+      if(row?.dt!==this.engine.dt||row.rules_version!==expected.fromRulesVersion)throw Error('crew-removal-transition.header-moved');
+      const current=this.engine.previewCrewRemovalTransitionV1?.();
+      if(!current?.ok||hashOf(current.transition)!==hashOf(expected))throw Error('crew-removal-transition.source-moved');
+      if(this.factory.canReplayHistory?.(expected.toRulesVersion)!==true||this.factory.canRestoreSnapshot?.(expected.toRulesVersion)!==true)throw Error('crew-removal-transition.reader-unavailable');
+      return true;
+    };
+    const journal:AcceptanceJournal=()=>{
+      const r=this.db.db.prepare('UPDATE worlds SET rules_version=? WHERE id=? AND rules_version=?').run(expected.toRulesVersion,this.worldId,expected.fromRulesVersion);
+      if(r.changes!==1)throw Error('crew-removal-transition.header-moved');return true;
+    };
+    return new Promise((resolve,reject)=>this.queue.push({kind:'rules',author,payload:{crewRemovalTransition:expected},guard,journal,resolve,reject}));
+  }
   private stationEraEvent(source:LogEvent):LogEvent|undefined {
     const old=this.stationHistoryV1();if(!old)return undefined;
     const physical=stationSourceFromRulesV1(this.worldId,source);
@@ -433,7 +455,7 @@ export class WorldHost {
         if (admission) this.apply(admission, false);
         if(stationEra)this.apply(stationEra,false);
       } catch (error) {
-        if(stationEra){
+        if(stationEra||e.payload?.crewRemovalTransition){
           // A committed structural pair cannot be attributed to an unrelated
           // card or filtered out by card-fault recovery. Restore exact history.
           try{
@@ -443,7 +465,7 @@ export class WorldHost {
         }else {this.recoverFault(error, e.kind === 'decision' ? e.payload.card : undefined); recovered = true;}
       }
       const accepted=[e,...(admission?[admission]:[]),...(stationEra?[stationEra]:[])];
-      if (!recovered||stationEra) this.acc.log.push(...accepted);
+      if (!recovered||stationEra||e.payload?.crewRemovalTransition) this.acc.log.push(...accepted);
       // No listener can observe a physical event before its committed era fold.
       for (const fact of accepted) for (const l of this.listeners) l.onApplied?.(fact);
       if (admission && recovered) { p.reject?.(new PersistedIntentAdmissionFault(e.seq)); continue; }
@@ -646,6 +668,7 @@ export class WorldHost {
     const reach = pm && pm.agendaPos < pm.agenda.length ? frontier(this, pm) : -1;
     const matchedStep = pm ? stepIndex(this, pm, (e.payload as PlayPayload).card, (e.payload as PlayPayload).target) : -1;
     if (e.kind === 'rules' && e.payload?.recovery) { this.restoreRecovery(e.payload.recovery as RecoveryRecipe); this.seq = e.seq; return; }
+    if(e.kind==='rules'&&e.payload?.crewRemovalTransition&&this.stationHistoryV1())throw Error('crew-removal-transition.station-carry-required');
     const r = foldEvent(this.engine, this.kernel, e, this.counts);
     if(isStationFactV1(e.kind))this.extra.stationV1=foldStationFactV1(this.stationHistoryV1(),e,this.stationBindingV1());
     if(e.kind==='station-rules-era-v1'){

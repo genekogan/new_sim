@@ -19,3 +19,4 @@ export * from './boat.ts';
 export * from './body-location.ts';
 export * from './commons-transition.ts';
 export * from './camp-expansion.ts';
+export * from './crew-removal-transition.ts';
