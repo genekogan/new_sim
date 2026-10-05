@@ -98,6 +98,9 @@ export const serves = (host: WorldHost, m: Mind, card: string, target: string | 
 
 /** The options the mind chooses among: playable cards, physically feasible, ranked and capped. */
 export function optionsFor(host: WorldHost, m: Mind, cap = 12): CardOption[] {
+  const read=()=>readOptionsFor(host,m,cap);return host.engine.withFeasibilityRead?host.engine.withFeasibilityRead(read):read();
+}
+function readOptionsFor(host: WorldHost, m: Mind, cap = 12): CardOption[] {
   if (m.life && cap === 12) cap = 24;
   const k = host.kernel, me = m.soulId; k.tick = host.engine.world.tick;
   const fr = m.agendaPos < m.agenda.length ? m.agenda[frontier(host, m)] : undefined;

@@ -80,6 +80,8 @@ export interface Engine {
   previewAdmission?(program: Program): ProgramAdmission;
   /** Stop a running program (the actor is left idle where it is). */
   stop(programId: string): void;
+  /** Synchronous read-only feasibility batch; memoization never crosses its boundary. */
+  withFeasibilityRead?<T>(read:()=>T):T;
   /** Physical feasibility of a program's first step right now, without running it (Mars: `verb.plan`). Null = feasible. */
   canPerform(program: Program): { code: string; message: string } | null;
   /** The program an actor is running, if any. */

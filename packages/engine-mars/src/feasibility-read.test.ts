@@ -1,0 +1,13 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {connectedCommonsShoreFactory} from './connected-shore-engine.ts';
+test('detached cancellation is shared within one pure feasibility batch, invalidated by native state, cleared on exception and absent from replay',async()=>{
+ const f=await connectedCommonsShoreFactory(),e=f.create(f.genesis('feasibility-read'));e.spawnHuman({id:'h',label:'Hypothetical native feasibility actor',soul:'fixture'});assert.ok(e.perform({actor:'h',label:'long supported native movement',steps:[{verb:'walk_to',params:{to:'shore-water'}}]}).ok);e.step();
+ const native=e as any,physical=native.physical,restore=physical.restore.bind(physical);let copies=0;physical.restore=(s:any)=>{copies++;return restore(s);};
+ const probe={actor:'h',label:'read only replacement',steps:[{verb:'rest',params:{seconds:2}}]},hash=e.stateHash(),single=e.canPerform(probe);copies=0;
+ e.withFeasibilityRead!(()=>{for(let i=0;i<8;i++)assert.deepEqual(e.canPerform(probe),single);});assert.equal(copies,1);assert.equal(e.stateHash(),hash);assert.equal(native.feasibilityRead,undefined);
+ copies=0;e.withFeasibilityRead!(()=>{e.canPerform(probe);e.step();e.canPerform(probe);});assert.equal(copies,2,'canonical native tick prevents reuse');assert.equal(native.feasibilityRead,undefined);
+ copies=0;e.withFeasibilityRead!(()=>{e.canPerform(probe);native.rt.mark('fixture cache invalidation');e.canPerform(probe);});assert.equal(copies,2,'same-tick native event prevents reuse');
+ assert.throws(()=>e.withFeasibilityRead!(()=>{e.canPerform(probe);throw Error('fixture callback failed');}),/callback failed/);copies=0;e.canPerform(probe);assert.equal(copies,1,'unscoped subsequent query does not reuse failed batch');assert.equal(native.feasibilityRead,undefined);
+ const snapshot=e.snapshot();assert.equal('feasibilityRead' in snapshot,false);assert.equal(f.restore(snapshot).stateHash(),e.stateHash());
+});

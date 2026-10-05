@@ -109,6 +109,7 @@ export class MarsEngine implements Engine {
   readonly runtime: RuntimeView;
   private m: Mars; private rt: any; private cfg: MarsWorldConfig;
   private physical?:MarsPhysicalBinding;
+  private feasibilityRead?:Map<string,Diag|null>;
   private campExpansionReader?:CampExpansionReader;
   private registry: Map<string, any>;
   private programs = new Map<string, Prog>();
@@ -411,6 +412,15 @@ export class MarsEngine implements Engine {
   }
 
   // ------------------------------------------------------------------ programs
+  withFeasibilityRead<T>(read:()=>T):T {const previous=this.feasibilityRead;this.feasibilityRead=new Map();try{return read();}finally{this.feasibilityRead=previous;}}
+  private physicalReplacementIssue(action:string):Diag|null {
+    const record=this.rt.records.get(action),key=this.feasibilityRead?hashOf({action,tick:this.rt.tick,events:this.rt.events.length,native:this.rt.stateHash(),status:record?.status,phase:record?.phase,quiet:this.quiet,cfg:this.cfg}):undefined;
+    if(key&&this.feasibilityRead!.has(key))return structuredClone(this.feasibilityRead!.get(key)!);
+    let result:Diag|null=null;
+    if(!this.canSnapshot())result={code:'program.safe-stop-required',message:'Stop the current non-resumable action safely before replacing it.'};
+    else {const copy=this.physical!.restore(this.rt.snapshot());copy.cancel(action,{code:'program.replaced',message:'replaced'});if(copy.isActive(action))result={code:'program.safe-stop-required',message:'Stop the current movement and let it reach safe support before replacing it.'};}
+    if(key)this.feasibilityRead!.set(key,structuredClone(result));return result;
+  }
   canPerform(program: Program): Diag | null {
     if (!this.ents[program.actor]) return { code: 'actor.unknown', message: `no such actor ${program.actor}` };
     if ([...this.programs.values()].some(p=>p.build?.crew.includes(program.actor))) return {code:'construction.committed',message:'This builder is finishing a finite physical construction segment.'};
@@ -418,9 +428,7 @@ export class MarsEngine implements Engine {
       const old=this.programs.get(this.byActor.get(program.actor)??'');
       if(old?.stopping)return {code:'program.safe-stop-pending',message:'The previous movement is still reaching a safe supported stop.'};
       if(old?.action&&this.rt.isActive(old.action)){
-        if(!this.canSnapshot())return {code:'program.safe-stop-required',message:'Stop the current non-resumable action safely before replacing it.'};
-        const copy=this.physical.restore(this.rt.snapshot());copy.cancel(old.action,{code:'program.replaced',message:'replaced'});
-        if(copy.isActive(old.action))return {code:'program.safe-stop-required',message:'Stop the current movement and let it reach safe support before replacing it.'};
+        const issue=this.physicalReplacementIssue(old.action);if(issue)return issue;
       }
     }
     const first = program.steps[0]; if (!first) return null;
