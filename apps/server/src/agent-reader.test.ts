@@ -18,17 +18,21 @@ import { Souls } from './souls.ts';
 import { WorldHost } from './world.ts';
 import { stripWorldRequestPath } from './world-request-path.ts';
 
-const pin=JSON.parse(readFileSync(new URL('../test/fixtures/agent-reader-0b998aa.json',import.meta.url),'utf8')) as {
+const pin=JSON.parse(readFileSync(new URL('../test/fixtures/agent-reader-g207.json',import.meta.url),'utf8')) as {
   sourceCommit:string;readerSourceSha256:string;examples:{key:Config['worldKey'];base:string;text:string}[]};
 
 test('TypeScript reader producer matches independent reviewed App output byte for byte in all four worlds',()=>{
-  assert.equal(pin.sourceCommit,'0b998aa760adb48cb4ddad441521814189426d20');
-  assert.equal(pin.readerSourceSha256,'0e468aa5ce8e6cae76ea1e94d73f321ad560a33038f2bb19677e8590b7b96db0');
+  assert.equal(pin.sourceCommit,'4e05f2c85745f703cbf52eec8648a5ad23bdc356');
+  assert.equal(pin.readerSourceSha256,'2e3f9aba005041bd0ddc854567fe88f6ea03b7f862dfe4fe29034ef63079cbb3');
   for(const {key,base,text} of pin.examples){
     const cfg={publicUrl:base,worldKey:key,worldPath:`/w/${key}`};
     assert.equal(agentReader(cfg),text);assert.equal(agentReader({...cfg,publicUrl:new URL(base).origin}),text);
     assert.ok(text.split('\n').length>15);assert.ok(!text.includes('\\n'));
     assert.match(text,/After revocation, reconnecting requires fresh human approval/);
+    assert.match(text,/discover both authenticated V2 tools before using them/);
+    assert.match(text,/Retain the\nrequest reference before one write/);
+    assert.match(text,/read-only\nreference lookup, never by automatic resubmission or legacy fallback/);
+    assert.match(text,/does not assert that the connection exposes V2/);
     for(const other of pin.examples.filter(e=>e.key!==key))assert.ok(!text.includes(`/w/${other.key}`));
   }
 });
