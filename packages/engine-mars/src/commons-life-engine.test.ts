@@ -1,0 +1,15 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {hashOf} from '@sim/engine-contract';
+import {commonsLifeReaderFactory} from './commons-life-engine.ts';
+import {marsCrewRemovalTransitionFactory} from './crew-removal-engine.ts';
+import {marsFactory,EDEN_SAFE_COMMONS_WORLD} from './engine.ts';
+for(const legacy of [true,false])test('life reader keeps '+(legacy?'actual legacy':'existing commons')+' genesis through resource adoption and exact restoration',async()=>{
+ const origin=legacy?await marsCrewRemovalTransitionFactory():await marsFactory({...EDEN_SAFE_COMMONS_WORLD,safeCrewRemoval:true}),f=commonsLifeReaderFactory(origin),e=f.create(f.genesis('portable-life'));e.spawnHuman({id:'h',label:'Hypothetical original resident',soul:'fixture'});
+ const initial=e.stateHash();assert.equal(hashOf(f.genesis('portable-life')),hashOf(origin.genesis('portable-life')));assert.equal(origin.restore(e.snapshot()).stateHash(),initial);
+ if(legacy){const crew=e.previewCrewRemovalTransitionV1!();assert.ok(crew.ok);if(!crew.ok)return;e.adoptCrewRemovalTransitionV1!(crew.transition);const p=e.previewCommonsTransition!();assert.ok(p.ok);if(!p.ok)return;e.adoptCommons!(p.transition);}
+ const old=structuredClone(e.world.entities);for(const method of ['CommonsProvisions','CommonsKitchen'] as const){const p=e['preview'+method+'V1']!();assert.ok(p.ok);if(!p.ok)return;(e as any)['adopt'+method+'V1'](p.transition);}
+ const p=e.previewCommonsFoodDeliveryV1!('portable-finite-A');assert.ok(p.ok);if(!p.ok)return;e.adoptCommonsFoodDeliveryV1!(p.transition);for(const [id,v] of Object.entries(old))assert.deepEqual(e.world.entities[id],v);
+ assert.ok(f.canReplayHistory!(e.rulesVersion));assert.equal(origin.canReplayHistory!(e.rulesVersion),false);const copy=f.restore(e.snapshot());assert.equal(copy.stateHash(),e.stateHash());for(let i=0;i<25;i++){e.step();copy.step();assert.equal(copy.stateHash(),e.stateHash());}
+ const bad=e.snapshot() as any;bad.commonsProvisionsV1=false;assert.throws(()=>f.restore(bad),/snapshot-policy/);bad.commonsProvisionsV1=true;bad.stateHash='0'.repeat(64);assert.throws(()=>f.restore(bad),/snapshot-state/);
+});
