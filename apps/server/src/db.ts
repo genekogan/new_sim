@@ -99,6 +99,11 @@ export class Db {
 
   // events
   appendEvent(worldId: string, e: LogEvent) { this.db.prepare('INSERT INTO events (world_id, seq, tick, kind, author, payload, at, soul_id) VALUES (?,?,?,?,?,?,?,?)').run(worldId, e.seq, e.tick, e.kind, e.author, JSON.stringify(e.payload), e.at, (e.payload as { soulId?: string })?.soulId ?? null); }
+  /** Bounded original personal camp-card evidence bound by actual world/Soul
+   * IDs. Removing a card or changing display order does not erase its source. */
+  campPersonalCards(worldId:string,soulId:string):import('@sim/kernel').MintedCard[]{
+    return (this.db.prepare("SELECT payload FROM events WHERE world_id=? AND kind='mint' AND json_extract(payload,'$.forSoul')=? AND json_extract(payload,'$.card.by')='world' AND (json_extract(payload,'$.card.name') LIKE 'bunk sleep %' OR json_extract(payload,'$.card.name') LIKE 'eat a bowl of %' OR json_extract(payload,'$.card.name') LIKE 'finish the bowl %') ORDER BY seq LIMIT 32").all(worldId,soulId) as {payload:string}[]).map(r=>JSON.parse(r.payload).card);
+  }
   /** A Soul's own events, newest last (indexed). */
   soulEvents(worldId: string, soulId: string, limit = 100): LogEvent[] {
     return (this.db.prepare('SELECT seq, tick, kind, author, payload, at FROM events WHERE world_id = ? AND soul_id = ? ORDER BY seq DESC LIMIT ?').all(worldId, soulId, limit) as any[]).map(rowToEvent).reverse();
