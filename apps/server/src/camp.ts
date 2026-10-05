@@ -2,6 +2,7 @@
 // neither this pack nor its conditions assigns times or a sequence of daily activities.
 import { cardHash, type Card } from '@sim/kernel';
 import { hashOf } from '@sim/engine-contract';
+import {CAMP_EXPANSION_CAMPUS,CAMP_EIGHT_RESOURCES} from '@sim/engine-mars';
 import { edenCampActivities, bindCampActivity } from '../../../mars/viewer/engine/scenarios/eden-camp.ts';
 import type { WorldHost, Mind } from './world.ts';
 import {campResourceBindings,LEGACY_CAMP_RESOURCES,type CampResourceSet} from './camp-resources.ts';
@@ -11,19 +12,21 @@ export class CampCards {
   private installed = new Set<string>();
   private dirty = true;
   readonly resourceIssues=new Map<string,string>();
-  private resources:readonly CampResourceSet[];
-  constructor(host: WorldHost,resources:readonly CampResourceSet[]=LEGACY_CAMP_RESOURCES) {
+  private resources?:readonly CampResourceSet[];
+  constructor(host: WorldHost,resources?:readonly CampResourceSet[]) {
     this.host = host;
     this.resources=resources;
     host.listeners.push({onApplied: e => {
-      if (e.payload?.adoptCamp || e.kind === 'birth') this.dirty = true;
+      if (e.payload?.adoptCamp || e.payload?.campExpansion || e.kind === 'birth') this.dirty = true;
     }, afterTick: () => { if (this.dirty) { this.dirty=false; this.install(); } }});
     this.install();
   }
   install() {
-    if (this.host.engine.world.base.campus !== 'eden-camp') return;
+    const campus=this.host.engine.world.base.campus;
+    if (campus !== 'eden-camp'&&campus!==CAMP_EXPANSION_CAMPUS) return;
     const souls = [...this.host.minds.values()].sort((a,b) => a.name.localeCompare(b.name));
-    const bindings=campResourceBindings(this.host,souls,this.resources);this.resourceIssues.clear();for(const [id,why] of bindings.issues)this.resourceIssues.set(id,why);
+    const resources=this.resources??(campus===CAMP_EXPANSION_CAMPUS?CAMP_EIGHT_RESOURCES:LEGACY_CAMP_RESOURCES);
+    const bindings=campResourceBindings(this.host,souls,resources);this.resourceIssues.clear();for(const [id,why] of bindings.issues)this.resourceIssues.set(id,why);
     for (const m of souls) {
       const firstInstall=!this.installed.has(m.soulId);
       this.installed.add(m.soulId);
@@ -58,10 +61,13 @@ export class CampCards {
         during:[{verb:'build_lookout',params:{phase}}],takes:'minutes',
       });
       if(personal){
+      if(personal.sleepReturn)cards.push({name:`bunk sleep ${personal.mat.replaceAll('-',' ')} ${m.name.toLowerCase()}`,summary:'Sleep on my additional ground sleeping area.',
+        good_when:'Tired and wanting to rest; native support, free hands and a clear full sleep envelope remain required.',target:null,when:[],
+        then:[{set:['$actor','doing',`sleeping on ${personal.mat}`]}],approach:[],during:[{verb:'mars:sleep',params:{mat:personal.mat,duration:600,returnTo:personal.sleepReturn}}],takes:'long'});
       for (const [item,slot] of [[personal.bowl,personal.bowlReturn],[personal.spoon,personal.spoonReturn]]) cards.push({name:`return ${item.replace('-',' ')} ${m.name.toLowerCase()}`,summary:'Put a held utensil back on the table and free the hand.',good_when:'Tidy up after an interrupted meal. Free hands let you eat, work or sleep.',target:null,when:[],then:[{set:['$actor','doing','tidying utensils']}],approach:[],during:[{verb:'mars:put_item',params:{item,surfaceSlot:slot}}],takes:'minute'});
-      cards.push(singleMeal(m,personal,'stew-pot'));
+      cards.push(singleMeal(m,personal,personal.stewPot??'stew-pot'));
       cards.push(singleMeal(m,personal,'supper-pot'));
-      const left = singleMeal(m,personal,'stew-pot');
+      const left = singleMeal(m,personal,personal.stewPot??'stew-pot');
       cards.push({...left,name:`finish the bowl ${m.name.toLowerCase()}`,summary:'Finish food already in my bowl, then return the utensils.',good_when:'Hunger after an interrupted meal; use the food already served.',approach:[{verb:'mars:take_item',params:{item:personal.bowl,hand:'left'}},{verb:'mars:take_item',params:{item:personal.spoon,hand:'right'}}]});
       }
       cards.push(hostSupper(m, others));
@@ -78,8 +84,9 @@ export class CampCards {
 function singleMeal(m: Mind, resource:CampResourceSet, pot: string): Card {
   const bowl=resource.bowl,spoon=resource.spoon;
   const slots={bowl:resource.bowlReturn,spoon:resource.spoonReturn};
-  return {name:`eat a bowl of ${pot==='stew-pot'?'stew':'bean supper'} ${m.name.toLowerCase()}`,summary:'Take a bowl, serve stew, eat and return the utensils.',good_when:'Hunger; eat a meal alone when food is ready.',target:null,when:[],
-    approach:[{verb:'mars:take_item',params:{item:bowl,hand:'left'}},{verb:'mars:walk_to',params:{x:pot==='stew-pot'?-12.5:-16.15,z:pot==='stew-pot'?-13.4:-16.9,face:Math.PI/2}},{verb:'mars:serve',params:{pot,bowl}},{verb:'mars:take_item',params:{item:spoon,hand:'right'}}],
+  const bean=pot==='supper-pot',point=!bean&&resource.stewService?resource.stewService:bean?[-16.15,-16.9]:[-12.5,-13.4];
+  return {name:`eat a bowl of ${bean?'bean supper':'stew'} ${m.name.toLowerCase()}`,summary:'Take a bowl, serve stew, eat and return the utensils.',good_when:'Hunger; eat a meal alone when food is ready.',target:null,when:[],
+    approach:[{verb:'mars:take_item',params:{item:bowl,hand:'left'}},{verb:'mars:walk_to',params:{x:point[0],z:point[1],face:Math.PI/2}},{verb:'mars:serve',params:{pot,bowl}},{verb:'mars:take_item',params:{item:spoon,hand:'right'}}],
     then:[{set:['$actor','doing','eating a bowl of stew']}],
     during:[{verb:'mars:eat',params:{bowl,spoon,cycles:6}},{verb:'mars:put_item',params:{item:bowl,surfaceSlot:slots.bowl}},{verb:'mars:put_item',params:{item:spoon,surfaceSlot:slots.spoon}}],takes:'minutes'};
 }

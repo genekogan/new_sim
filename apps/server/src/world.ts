@@ -259,6 +259,36 @@ export class WorldHost {
     foldStationRulesEraV1(this.extra.stationEraV1 as StationEraFoldStateV1|undefined,fact,physical,old.station);
     return {...fact,kind:'station-rules-era-v1',author:'world:station',at:source.at};
   }
+  /** Trusted internal physical infrastructure edit. Existing station histories
+   * explicitly refuse until a corresponding atomic era producer is qualified. */
+  adoptCampExpansion(author:string):Promise<LogEvent>{
+    if(this.stationHistoryV1())return Promise.reject(new Error('camp-expansion.station-era-reader-required'));
+    const row=this.db.db.prepare("SELECT seq FROM events WHERE world_id=? AND kind='rules' AND json_extract(payload,'$.campExpansion.contract')='camp-ground-expansion/1' ORDER BY seq DESC LIMIT 1").get(this.worldId) as {seq:number}|undefined;
+    if(row){const old=this.db.events(this.worldId,row.seq-1,1)[0],t=old?.payload?.campExpansion;
+      if(t?.toRulesVersion===this.engine.rulesVersion&&hashOf(t.toBase)===hashOf(this.engine.world.base))return Promise.resolve(old);
+    }
+    const preview=this.engine.previewCampExpansionV1?.();
+    if(!preview?.ok)return Promise.reject(new Error(preview?preview.diagnostic.code+': '+preview.diagnostic.message:'camp-expansion.reader-unavailable'));
+    const previous=new Set(this.engine.anchors().map(a=>a.id));
+    const collision=preview.anchors.find(a=>!previous.has(a.id)&&this.kernel.things[a.id]);
+    if(collision)return Promise.reject(new Error('camp-expansion.kernel-collision:'+collision.id));
+    const expected=preview.transition;
+    const guard:AcceptanceGuard=()=>{
+      if(this.stationHistoryV1())throw new Error('camp-expansion.station-era-reader-required');
+      if(this.db.world(this.worldId)?.dt!==this.engine.dt)throw new Error('camp-expansion.header-dt');
+      const current=this.engine.previewCampExpansionV1?.();
+      if(!current?.ok||hashOf(current.transition)!==hashOf(expected))throw new Error('camp-expansion.source-moved');
+      const known=new Set(this.engine.anchors().map(a=>a.id));
+      for(const a of current.anchors)if(!known.has(a.id)&&this.kernel.things[a.id])throw new Error('camp-expansion.kernel-collision:'+a.id);
+      if(this.factory.canReplayHistory?.(expected.toRulesVersion)!==true)throw new Error('camp-expansion.reader-unavailable');
+      return true;
+    };
+    const journal:AcceptanceJournal=()=>{
+      const result=this.db.db.prepare('UPDATE worlds SET rules_version=? WHERE id=? AND rules_version=?').run(expected.toRulesVersion,this.worldId,expected.fromRulesVersion);
+      if(result.changes!==1)throw new Error('camp-expansion.header-moved');return true;
+    };
+    return new Promise((resolve,reject)=>this.queue.push({kind:'rules',author,payload:{campExpansion:expected},guard,journal,resolve,reject}));
+  }
   private pendingBootstrap: { at: Record<string, string | null> } | null = null;
   /** For worlds snapshotted before the kernel existed: places from the engine, a Soul thing and deck per mind. */
   private bootstrapKernel(): KState {
@@ -778,8 +808,8 @@ export class WorldHost {
       }
       case 'rules': {
         const p = e.payload;
-        if (p?.kernelBootstrap || p?.vocabulary || p?.adoptCamp || p?.commonsTransition) this.kernelDirty = true;
-        if(p?.commonsTransition)for(const m of this.minds.values()){
+        if (p?.kernelBootstrap || p?.vocabulary || p?.adoptCamp || p?.commonsTransition || p?.campExpansion) this.kernelDirty = true;
+        if(p?.commonsTransition||p?.campExpansion)for(const m of this.minds.values()){
           m.nextEvalTick=Math.min(m.nextEvalTick,tick+1+hash32(m.soulId)%20);
           m.evalTrigger='world-event';m.lastFingerprint='';
         }

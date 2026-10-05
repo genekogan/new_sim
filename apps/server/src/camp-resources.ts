@@ -2,7 +2,8 @@
 // Soul IDs, never the current cast-sort index. They grant no ownership/right:
 // native free-hand, support, occupancy and reservations still decide admission.
 import type {WorldHost,Mind} from './world.ts';
-export type CampResourceSet={id:string;mat:string;bowl:string;spoon:string;bowlReturn:string;spoonReturn:string};
+export type CampResourceSet={id:string;mat:string;bowl:string;spoon:string;bowlReturn:string;spoonReturn:string;
+  stewPot?:string;stewService?:[number,number];sleepReturn?:[number,number];sleepRegion?:string};
 export const LEGACY_CAMP_RESOURCES:readonly CampResourceSet[]=Object.freeze([1,2,3,4].map(n=>Object.freeze({
   id:'camp-personal-'+n,mat:'mat-'+n,bowl:'bowl-'+n,spoon:'spoon-'+n,
   bowlReturn:`dining-table#r${n<=2?0:2}c${n%2?0:4}`,spoonReturn:`dining-table#r${n<=2?0:2}c${n%2?1:5}`,
@@ -10,7 +11,7 @@ export const LEGACY_CAMP_RESOURCES:readonly CampResourceSet[]=Object.freeze([1,2
 export type CampResourceBindings={bySoul:Map<string,CampResourceSet>;issues:Map<string,string>};
 export function campResourceBindings(host:WorldHost,minds:Mind[],resources:readonly CampResourceSet[]=LEGACY_CAMP_RESOURCES):CampResourceBindings{
   const bySoul=new Map<string,CampResourceSet>(),issues=new Map<string,string>(),claimed=new Set<string>();
-  const available=resources.filter(r=>host.engine.world.regions[r.mat]&&host.engine.world.entities[r.bowl]&&host.engine.world.entities[r.spoon]);
+  const available=resources.filter(r=>host.engine.world.regions[r.mat]&&host.engine.world.entities[r.bowl]&&host.engine.world.entities[r.spoon]&&(!r.stewPot||host.engine.world.entities[r.stewPot]));
   // Historic cards remain immutable and are never repaired/reassigned. Even an
   // temporarily missing physical resource reserves its historical affinity.
   for(const m of minds){

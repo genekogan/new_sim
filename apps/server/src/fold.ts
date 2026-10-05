@@ -143,6 +143,19 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
           if(!result.ok)throw new Error(`commons-transition.anchor:${result.message}`);
         }
       }
+      const expansion=(e.payload as {campExpansion?:import('@sim/engine-contract').CampExpansionV1}|null)?.campExpansion;
+      if(expansion){
+        if(!engine.adoptCampExpansionV1)throw new Error('camp-expansion.reader-unavailable');
+        const preview=engine.previewCampExpansionV1?.();if(!preview?.ok)throw new Error('camp-expansion.preview-unavailable');
+        const previous=new Set(engine.anchors().map(a=>a.id));
+        for(const a of preview.anchors)if(!previous.has(a.id)&&k.things[a.id])throw new Error('camp-expansion.kernel-collision:'+a.id);
+        engine.adoptCampExpansionV1(expansion);
+        for(const a of engine.anchors())if(!k.things[a.id]){
+          const result=applyAll(k,[{op:'appear',id:a.id,kind:a.kind==='region'?'region':'place',name:a.name,at:a.in??null,
+            traits:{...(a.entity?{entity:a.entity}:{}),...(a.point?{point:a.point}:{}),...(a.tags?{tags:a.tags}:{})}}],'world');
+          if(!result.ok)throw new Error('camp-expansion.anchor:'+result.message);
+        }
+      }
       const rules = e.payload as { runtimePolicy?: {sleepBlockTicks:number;quietSeatCourtesy?:boolean}; dayConfig?: { origin: number; dayTicks: number }; quiet?: boolean; compact?: boolean; adoptCamp?: boolean; restockCamp?: boolean; anchors?: import('@sim/engine-contract').Anchor[]; soulId?: string; character?: string };
       if (rules?.runtimePolicy) {
         if (!engine.configureRuntimePolicy) throw Error('runtime-policy.unsupported');

@@ -5,3 +5,5 @@ export * from './water-geometry.ts';
 export * from './birth.ts';
 export * from './connected-shore-engine.ts';
 export * from './connected-boat-engine.ts';
+export * from './camp-expansion.ts';
+export * from './camp-expansion-engine.ts';

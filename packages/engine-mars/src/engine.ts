@@ -16,6 +16,8 @@
 //     instruction pulls a person out of what they were doing.
 import { hashOf, physicalView, type ActionRecord, type ActivityOption, type Anchor, type ChangeEvent, type Engine, type EngineFactory, type EngineSnapshot, type PathCommit, type PoseSample, type Program, type ProgramEvent, type RuntimeEvent, type RuntimeView, type Vec3, type VerbInfo, type WorldState } from '@sim/engine-contract';
 import { loadMars, type Mars } from './load.ts';
+import type {CampExpansionReader} from './camp-expansion.ts';
+import {campExpansionV1Schema,type CampExpansionV1,type CampExpansionAdmissionV1} from '@sim/engine-contract';
 import { CodecError } from '../../../mars/viewer/engine/runtime/codec.ts';
 import { constructionPlan, unsafeConstruction, type BuildPhase } from './construction.ts';
 import { captureRenderScene, commonsSceneMetadataV1Schema, type RenderSceneCaptureV1, type RenderScene } from '@sim/engine-contract';
@@ -97,6 +99,7 @@ export class MarsEngine implements Engine {
   readonly runtime: RuntimeView;
   private m: Mars; private rt: any; private cfg: MarsWorldConfig;
   private physical?:MarsPhysicalBinding;
+  private campExpansionReader?:CampExpansionReader;
   private registry: Map<string, any>;
   private programs = new Map<string, Prog>();
   private byActor = new Map<string, string>();
@@ -630,6 +633,7 @@ export class MarsEngine implements Engine {
     return new MarsEngine(this.m, new this.m.Runtime(w,this.registry,this.m.servicesFor(this.m.scenes)(w),this.m.invariants),cfg).anchors();
   }
   adoptCamp() {
+    if(this.physical===this.campExpansionReader&&this.campExpansionReader&&hashOf(this.rt.world.base)===hashOf(this.campExpansionReader.base))return;
     if(this.physical)throw new Error('connected.adoption-unqualified');
     if (this.rt.world.base.campus === 'eden-camp') return;
     if (!this.isQuiet()) throw new Error('camp.adoption-not-quiet');
@@ -670,13 +674,35 @@ export class MarsEngine implements Engine {
     this.startRecorder();
   }
   restockCamp() {
-    if (this.rt.world.base.campus !== 'eden-camp' || !this.isQuiet()) return;
+    const expanded=this.physical===this.campExpansionReader&&this.campExpansionReader&&hashOf(this.rt.world.base)===hashOf(this.campExpansionReader.base);
+    if ((this.rt.world.base.campus !== 'eden-camp'&&!expanded) || !this.isQuiet()) return;
     // A logged practical supply edit; no trade/economy and no object progress reset.
     const camp = this.m.edenCampWorld();
-    for (const id of ['stew-pot', 'beans-bowl', 'greens-bowl', 'water-bowl', 'seed-bowl']) {
-      const e = this.ents[id], initial = camp.entities[id];
+    for (const id of ['stew-pot', 'beans-bowl', 'greens-bowl', 'water-bowl', 'seed-bowl',...(expanded?['camp-eight-stew']:[])]) {
+      const e = this.ents[id], initial = camp.entities[id]??(expanded?this.campExpansionReader!.initialEntity(id):undefined);
       if (e?.contents && initial?.contents && !e.foodPreparation) e.contents = structuredClone(initial.contents);
     }
+  }
+  /** The explicit factory installs a reader without altering legacy state or
+   * history identity. Installation alone grants no scene change. */
+  installCampExpansionReader(reader:CampExpansionReader){this.campExpansionReader=reader;}
+  previewCampExpansionV1():CampExpansionAdmissionV1{
+    const reader=this.campExpansionReader;
+    if(!reader)return {ok:false,diagnostic:{code:'camp-expansion.disabled',message:'No explicit camp expansion reader is installed.'}};
+    if(this.cfg.scene!=='eden-camp'||this.physical||this.programs.size||this.leaving.length)
+      return {ok:false,diagnostic:{code:'camp-expansion.not-idle-camp',message:'The original camp must have finished all programs and physical departures.'}};
+    const prepared=reader.prepare(this.rt,this.rulesVersion,nativeRulesVersion(reader.rulesVersion,this.cfg));
+    if(!prepared.ok)return prepared;
+    const e=new MarsEngine(this.m,prepared.runtime,this.cfg,undefined,reader);
+    return {ok:true,transition:prepared.transition,anchors:e.anchors()};
+  }
+  adoptCampExpansionV1(raw:CampExpansionV1){
+    const expected=campExpansionV1Schema.parse(raw),preview=this.previewCampExpansionV1();
+    if(!preview.ok||hashOf(preview.transition)!==hashOf(expected))throw new Error('camp-expansion.stale-or-forged');
+    const prepared=this.campExpansionReader!.prepare(this.rt,expected.fromRulesVersion,expected.toRulesVersion);
+    if(!prepared.ok)throw new Error(prepared.diagnostic.code+': '+prepared.diagnostic.message);
+    this.finishRecorder();this.rt=prepared.runtime;this.registry=this.rt.registry;this.physical=this.campExpansionReader;
+    this.cursor=this.rt.events.length;this.renderBaseKey='';this.startRecorder();
   }
 
   configureRuntimePolicy(policy: {sleepBlockTicks:number;quietSeatCourtesy?:boolean}) {
@@ -706,7 +732,7 @@ export class MarsEngine implements Engine {
     for (const e of Object.values(this.ents) as any[]) if (e.support?.kind === 'in-hand') {
       const actor = e.support.by;
       if (this.holders(actor).length || this.rt.holder(`entity:${e.id}`).length) continue;
-      const home = initial[e.id]?.support;
+      const home = initial[e.id]?.support??(this.physical===this.campExpansionReader?this.campExpansionReader?.initialEntity(e.id)?.support:undefined);
       const slot = home?.kind === 'resting-on' && home.slot ? `${home.on}#${home.slot}` : 'ground';
       const params = {actor,item:e.id,surfaceSlot:slot};
       if (!this.plan('put_item',params)) this.rt.submit('put_item',params);

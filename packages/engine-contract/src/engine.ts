@@ -9,6 +9,7 @@ import type { NativeGatheringObservationV1 } from './gathering-observation.ts';
 import type { CommonsTransitionV1,CommonsTransitionAdmissionV1 } from './commons-transition.ts';
 import type {NativeBoatControlsV1} from './boat.ts';
 import type {BodyLocationV1} from './body-location.ts';
+import type {CampExpansionV1,CampExpansionAdmissionV1} from './camp-expansion.ts';
 export type {RenderScene} from './scene-capture.ts';
 
 /** A feasible activity for an actor, params already bound. The brain picks by id only. */
@@ -106,6 +107,8 @@ export interface Engine {
   adoptCamp?(): void;
   previewCommonsTransition?(): CommonsTransitionAdmissionV1;
   adoptCommons?(transition:CommonsTransitionV1): void;
+  previewCampExpansionV1?():CampExpansionAdmissionV1;
+  adoptCampExpansionV1?(transition:CampExpansionV1):void;
   campAnchors?(): Anchor[];
   restockCamp?(): void;
   actorBorrowed?(actor: string): boolean;

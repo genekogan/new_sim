@@ -1,0 +1,64 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {hashOf} from '@sim/engine-contract';
+import {marsFactory,type MarsWorldConfig} from './engine.ts';
+import {marsCampExpansionFactory} from './camp-expansion-engine.ts';
+import {CAMP_EXPANSION_CAMPUS} from './camp-expansion.ts';
+import {decodeSnapshot} from '../../../mars/viewer/engine/runtime/snapshot.ts';
+const cfg:MarsWorldConfig={scene:'eden-camp',safeArrivalV1:true,safeCrewRemoval:true,arrival:[-3,18],arrivalPlace:'arrival',reference:[-1,17],grounds:{id:'grounds',name:'Camp grounds'}};
+test('explicit reader preserves legacy genesis/state and adds finite stock without rewriting old entities or runtime identity',async()=>{
+  const old=await marsFactory(cfg),factory=await marsCampExpansionFactory(cfg);
+  assert.deepEqual(factory.genesis('same'),old.genesis('same'));
+  const e=factory.create(factory.genesis('same')),legacy=old.create(old.genesis('same'));assert.equal(e.stateHash(),legacy.stateHash());
+  e.spawnHuman({id:'old-resident',soul:'native-probe-only',label:'Old native fixture'});
+  const action=e.submit('face',{actor:'old-resident',target:{point:[-1,16]}});for(let i=0;i<100&&e.runtime.liveIds().includes(action.id);i++)e.step();assert.equal(e.runtime.records.get(action.id)!.status,'completed');
+  const pot=e.world.entities['stew-pot'] as any;pot.contents.fraction=.5;
+  const entities=structuredClone(e.world.entities),regions=structuredClone(e.world.regions),snapshot=e.snapshot() as any,records=structuredClone([...e.runtime.records]);assert.ok(records.length>0);
+  const p=e.previewCampExpansionV1!();assert.ok(p.ok);assert.deepEqual(e.world.entities,entities);
+  e.adoptCampExpansionV1!(p.transition);assert.equal(e.world.base.campus,CAMP_EXPANSION_CAMPUS);
+  for(const [id,value] of Object.entries(entities))assert.deepEqual(e.world.entities[id],value);
+  for(const [id,value] of Object.entries(regions))assert.deepEqual(e.world.regions[id],value);
+  const after=e.snapshot() as any;
+  assert.equal(after.mars.nextId,snapshot.mars.nextId);assert.equal(after.mars.idPrefix,snapshot.mars.idPrefix);
+  assert.deepEqual([...e.runtime.records],records);
+  assert.equal((e.world.entities['camp-eight-stew'] as any).contents.fraction,1);assert.equal((e.world.entities['stew-pot'] as any).contents.fraction,.5);
+  assert.equal(factory.restore(after).stateHash(),e.stateHash());assert.equal(factory.canReplayHistory!(e.rulesVersion),true);
+  assert.throws(()=>old.restore(after),/physical binding/);
+  e.beginQuiet!();for(let i=0;i<100&&!e.isQuiet!();i++)e.step();assert.equal(e.isQuiet!(),true);
+  (e.world.entities['camp-eight-stew'] as any).contents.fraction=0;e.restockCamp!();
+  assert.equal((e.world.entities['camp-eight-stew'] as any).contents.fraction,1);assert.equal((e.world.entities['stew-pot'] as any).contents.fraction,1,'explicit existing practical stock edit retains old policy');
+});
+test('stale or forged upgrade, occupied program, foreign base and same-ID replacement are refused without rewriting the source',async()=>{
+  const factory=await marsCampExpansionFactory(cfg),e=factory.create(factory.genesis('negative'));
+  const p=e.previewCampExpansionV1!();assert.ok(p.ok);const hash=e.stateHash();
+  assert.throws(()=>e.adoptCampExpansionV1!({...p.transition,additionsHash:'f'.repeat(64)}),/stale-or-forged/);assert.equal(e.stateHash(),hash);
+  e.step();assert.throws(()=>e.adoptCampExpansionV1!(p.transition),/stale-or-forged/);
+  e.spawnHuman({id:'actor',soul:'native-probe-only',label:'Native fixture'});e.perform({actor:'actor',label:'finite rest',steps:[{verb:'rest',params:{seconds:3}}]});
+  assert.equal(e.previewCampExpansionV1!().ok,false);for(let i=0;i<100;i++)e.step();assert.equal(e.previewCampExpansionV1!().ok,true);
+  (e.world.entities as any)['camp-eight-table']=structuredClone(e.world.entities['dining-table']);const collision=e.previewCampExpansionV1!();assert.ok(!collision.ok);assert.match(collision.diagnostic.code,/entity-collision/);
+  delete e.world.entities['camp-eight-table'];e.world.base.staticHash='f'.repeat(64);const foreign=e.previewCampExpansionV1!();assert.ok(!foreign.ok);assert.match(foreign.diagnostic.code,/foreign-base/);
+});
+test('partial historical take and captured scene retain their old addresses across the explicit physical boundary',async()=>{
+  const factory=await marsCampExpansionFactory(cfg),e=factory.create(factory.genesis('takes'));e.spawnHuman({id:'actor',soul:'native-probe-only',label:'Native fixture'});
+  for(let i=0;i<37;i++)e.step();const prior=e.takeChunks!(-1),oldCapture=e.takeScene!((prior[0].take as any).renderSceneRef.hash);
+  const p=e.previewCampExpansionV1!();assert.ok(p.ok);e.adoptCampExpansionV1!(p.transition);for(let i=0;i<25;i++)e.step();
+  const chunks=e.takeChunks!(-1);assert.deepEqual(chunks[0],prior[0]);assert.equal(chunks.some(c=>c.fromTick<37&&c.toTick>37),false);
+  assert.deepEqual(e.takeScene!((prior[0].take as any).renderSceneRef.hash),oldCapture);
+  const newer=chunks.find(c=>c.fromTick===37)!;assert.ok(newer);assert.notEqual((newer.take as any).renderSceneRef.hash,(prior[0].take as any).renderSceneRef.hash);
+  const restored=factory.restore(e.snapshot());assert.equal(restored.stateHash(),e.stateHash());
+  const graph=decodeSnapshot((e.snapshot() as any).mars);assert.equal(hashOf(graph.world.base),hashOf(p.transition.toBase));
+});
+test('original proving-ground genesis can retain its logged camp adoption before entering the explicit expansion reader',async()=>{
+  const factory=await marsCampExpansionFactory(),e=factory.create(factory.genesis('historical-bootstrap'));
+  e.beginQuiet!();for(let i=0;i<100&&!e.isQuiet!();i++)e.step();assert.equal(e.isQuiet!(),true);e.adoptCamp!();
+  const p=e.previewCampExpansionV1!();assert.ok(p.ok);e.adoptCampExpansionV1!(p.transition);
+  assert.equal(factory.restore(e.snapshot()).stateHash(),e.stateHash());assert.deepEqual(e.runtime.violations,[]);
+});
+test('quiet cleanup returns an interrupted additional utensil to its actual registered home rather than inventing ground storage',async()=>{
+  const factory=await marsCampExpansionFactory(cfg),e=factory.create(factory.genesis('home'));const p=e.previewCampExpansionV1!();assert.ok(p.ok);e.adoptCampExpansionV1!(p.transition);
+  e.spawnHuman({id:'actor',soul:'native-probe-only',label:'Native fixture'});
+  const started=e.perform({actor:'actor',label:'take registered bowl',steps:[{verb:'mars:take_item',params:{item:'bowl-5',hand:'left'}}]});assert.equal(started.ok,true);
+  for(let i=0;i<3000&&e.programOf('actor');i++)e.step();assert.equal(e.programOf('actor'),null);assert.equal((e.world.entities['bowl-5'] as any).support.kind,'in-hand');
+  e.beginQuiet!();for(let i=0;i<1000&&!e.isQuiet!();i++)e.step();assert.equal(e.isQuiet!(),true);
+  const support=(e.world.entities['bowl-5'] as any).support;assert.equal(support.kind,'resting-on');assert.equal(support.on,'camp-eight-table');assert.equal(support.slot,'r0c0');assert.deepEqual(e.runtime.violations,[]);
+});
