@@ -8,7 +8,7 @@ import {setImmediate} from 'node:timers/promises';
 import {marsFactory,EDEN_SAFE_COMMONS_WORLD} from '@sim/engine-mars';
 import {kernelHash} from '@sim/kernel';
 import {hashOf} from '@sim/engine-contract';
-import {INTENT_V2,intentReceiptV2Schema,intentHistoryPageV1Schema,publicEvent} from '@sim/protocol';
+import {INTENT_V2,intentReceiptV2Schema,intentHistoryPageV1Schema,intentAdmissionFactV2,publicEvent} from '@sim/protocol';
 import type {CompileOut,callTool} from '@sim/brain';
 import {Db} from '../../../src/db.ts';
 import {WorldHost} from '../../../src/world.ts';
@@ -21,7 +21,7 @@ import {IntentControlV2} from '../../../src/intent-control.ts';
 import type {Hub} from '../../../src/hub.ts';
 import {CandidateStationV1} from '../../../src/station.ts';
 
-export async function generateCommonsCohort(measuredTicks=3600){
+export async function generateCommonsCohort(measuredTicks=3600,retryV1=false){
   const dir=mkdtempSync(join(tmpdir(),'eden-commons-cohort-')),path=join(dir,'native.db'),db=new Db(path);
   const factory=await marsFactory({...EDEN_SAFE_COMMONS_WORLD,safeCrewRemoval:true}),seed='commons-active-24',worldId='commons-active-24';
   const host=new WorldHost(db,factory,seed,1e9,worldId,{durableClockV1:true});host.boot();host.drainInputs();
@@ -33,7 +33,7 @@ export async function generateCommonsCohort(measuredTicks=3600){
     const out:CompileOut={understood:true,agenda:[{card:'go to',target}],alignment:{understanding:'Walk to '+target+'.',trigger:{kind:'now'}}};
     return {out:out as T,ms:0,inputTokens:0,outputTokens:0,cachedTokens:0,costUsd:0,request:null,raw:{synthetic:true}};
   };
-  const brain=new Brain(host,db,cfg,{clients:()=>0,onCall(){},onCamera(){},onTicker(){},onNarrative(){},onTalk(){}},{compilerCall,intentV2Choices:true});
+  const brain=new Brain(host,db,cfg,{clients:()=>0,onCall(){},onCamera(){},onTicker(){},onNarrative(){},onTalk(){}},{compilerCall,intentV2Choices:true,intentV2Retries:retryV1});
   const compile=brain.compile.bind(brain);brain.compile=async(...args:Parameters<typeof compile>)=>{brain.mode='live';try{return await compile(...args);}finally{brain.mode='fake';}};
   const souls=new Souls(host,db,brain,cfg);souls.enableLifecycle();const auth=new Auth(cfg,db);auth.devAuth=true;
   const service=new IntentControlV2(host,brain,souls,{historyV1:true}),app=buildApp({cfg,db,host,auth,brain,souls,intentV2:service,hub:{refreshMe(){},clients:new Map()} as unknown as Hub});
@@ -65,7 +65,9 @@ export async function generateCommonsCohort(measuredTicks=3600){
       if(i%100===0)samples.push({tick:host.engine.world.tick,moving:residents.filter(r=>host.engine.world.entities[r.entityId].human?.activity==='walk').length,activePrograms:residents.filter(r=>host.engine.programOf(r.entityId)).length,violations:host.engine.runtime.violations.length,seq:host.seq});
     }
     host.drainInputs();await setImmediate();host.drainInputs();
+    const admissions=retryV1?db.events(worldId).filter(e=>e.kind==='intent-admission-v2').map(e=>intentAdmissionFactV2(e).outcome):[];
     const outcomes=residents.map(r=>({soulId:r.soulId,owner:r.owner,firstMotion:r.firstMotion??null,
+      ...(retryV1?{attempts:Object.values(host.intentHistoryOf(r.soulId).attempts).filter(a=>a.intent.intentId===r.intentId),admissions:admissions.filter(a=>a.intent.intentId===r.intentId)}:{}),
       phases:Object.values(host.intentHistoryOf(r.soulId).attempts).filter(a=>a.intent.intentId===r.intentId).map(a=>a.phase),
       interpretedTarget:host.intentHistoryOf(r.soulId).intents[r.intentId].revision.interpretation.agenda[0]?.target,
       retainedActions:Object.values(host.intentHistoryOf(r.soulId).attempts).filter(a=>a.intent.intentId===r.intentId&&'activityId' in a).map(a=>({phase:a.phase,activityId:(a as any).activityId,currentNative:host.engine.programAction?.((a as any).activityId)??null})),

@@ -16,7 +16,7 @@ import {WorldHost} from '../src/world.ts';
 
 const factory=await marsFactory({scene:'eden-camp',arrival:[16,-10],arrivalPlace:'bunkhouse',reference:[16,-9],grounds:{id:'grounds',name:'grounds'}});
 export const seed='wire-intentions',worldId='wire-eden';
-export function intentNativeFixture(t:TestContext,path=':memory:',enabled=true,historyV1=false,compilerOutput?:CompileOut) {
+export function intentNativeFixture(t:TestContext,path=':memory:',enabled=true,historyV1=false,compilerOutput?:CompileOut,retryV1=false) {
   const db=new Db(path);t.after(()=>{if(db.db.isOpen)db.close();});
   for(const id of ['dev:alice','dev:bob','dev:admin']) {
     db.upsertUser({id,role:id==='dev:admin'?'admin':'user',email:null,wallet:null});db.setInvited(id,'local');
@@ -39,7 +39,7 @@ export function intentNativeFixture(t:TestContext,path=':memory:',enabled=true,h
   const cfg={...config,worldId,worldKey:'eden',worldPath:'/w/eden',brainMode:'fake' as const,publicUrl:'http://127.0.0.1:4957',
     typesafeKey:undefined,anthropicKey:'synthetic-only',compilerModel:'synthetic-only',privyAppId:'',privyAppSecret:'',inviteRequired:true};
   const auth=new Auth(cfg,db);auth.devAuth=true;
-  const brain=new Brain(host,db,cfg,{clients:()=>0,onCall(){},onCamera(){},onTicker(){},onNarrative(){},onTalk(){}},{compilerCall,intentV2Choices:enabled});
+  const brain=new Brain(host,db,cfg,{clients:()=>0,onCall(){},onCamera(){},onTicker(){},onNarrative(){},onTalk(){}},{compilerCall,intentV2Choices:enabled,intentV2Retries:retryV1});
   // Exercise the real compiler validation/mint/journal path with the injected
   // synthetic transport. The native chooser remains the already-created fake Jev.
   const compile=brain.compile.bind(brain);

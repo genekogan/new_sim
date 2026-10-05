@@ -16,6 +16,7 @@ import { StaleCompilation } from './compile-fence.ts';
 import { Governor, SHARES, tierOf, type Tier } from './governor.ts';
 import { awaiting, belongsTo, candidatesFor, optionsFor, situationOf, matchesStep, type CardOption } from './deck.ts';
 import {mandateOf,triggerDue} from './mandate.ts';
+import {blockedDirectionForRetry} from './intent-retry.ts';
 import { SPEECH_LINKS, cardHash, validateCard, type Card, type LinkKind, type MintedCard } from '@sim/kernel';
 
 const TPS = 20;
@@ -57,13 +58,15 @@ export class Brain {
   private readonly compilerCall: typeof callTool;
   /** Isolated backend qualification switch. No environment/route activation. */
   private readonly intentV2Choices: boolean;
+  private readonly intentV2Retries: boolean;
   get intentV2Enabled() { return this.intentV2Choices; }
   private purposeWakes = new Map<string, { intentId: string; version: number }>();
 
-  constructor(host: WorldHost, db: Db, cfg: Config, sink: BrainSink, services?: { compilerCall?: typeof callTool; intentV2Choices?: boolean }) {
+  constructor(host: WorldHost, db: Db, cfg: Config, sink: BrainSink, services?: { compilerCall?: typeof callTool; intentV2Choices?: boolean; intentV2Retries?: boolean }) {
     this.host = host; this.db = db; this.cfg = cfg; this.sink = sink;
     this.compilerCall = services?.compilerCall ?? callTool;
     this.intentV2Choices = services?.intentV2Choices === true;
+    this.intentV2Retries = this.intentV2Choices && services?.intentV2Retries === true;
     this.mode = cfg.brainMode; this.gov = new Governor(cfg.budgetUsdPerDay);
     this.paidGate = (bound, model) => db.reserveCost(bound, model, this.budget);
     db.backfillSpend();
@@ -210,7 +213,8 @@ export class Brain {
     const sit = situationOf(this.host, m);
     const deck = k.decks[m.soulId];
     const rules=mandateOf(k,m.soulId).filter(r=>r.status==='active').sort((a,b)=>Number(b.strict)-Number(a.strict));
-    const retained = this.intentV2Choices ? Object.values(this.host.intentHistoryOf(m.soulId).intents)
+    const history = this.intentV2Choices ? this.host.intentHistoryOf(m.soulId) : undefined;
+    const retained = history ? Object.values(history.intents)
       .filter(e => e.status !== 'withdrawn' && e.status !== 'fulfilled' && e.revision.source.ownerId === m.owner)
       .sort((a,b) => Number(b.revision.strict)-Number(a.revision.strict) || b.revision.importance-a.revision.importance || b.revision.submitted.seq-a.revision.submitted.seq) : [];
     // First native bridge: a newly published, single-step ordinary direction.
@@ -219,11 +223,15 @@ export class Brain {
     const immediate = trigger === 'new-intent-v2' && !m.activeRule && m.agendaPos >= m.agenda.length
       ? retained.find(e => e.revision.intentId === this.purposeWakes.get(m.soulId)?.intentId && e.revision.version === this.purposeWakes.get(m.soulId)?.version
         && e.status === 'active' && e.revision.interpretation.trigger.kind === 'now' && e.revision.interpretation.agenda.length === 1) : undefined;
-    const planningMind = immediate ? { ...m, agenda: immediate.revision.interpretation.agenda, agendaPos: 0 } : m;
+    const retry = this.intentV2Retries && history && !m.activeRule && m.agendaPos >= m.agenda.length
+      && ['timer', 'activity-failed', 'activity-ended'].includes(trigger)
+      ? blockedDirectionForRetry(history, m.owner, w.tick) : undefined;
+    const acting = immediate?.revision ?? retry;
+    const planningMind = acting ? { ...m, agenda: acting.interpretation.agenda, agendaPos: 0 } : m;
     const options=optionsFor(this.host,planningMind);
     if(!m.activeRule)for(const o of options)if(rules.some(r=>r.agenda.some(s=>matchesStep(this.host,s,o.card,o.cardTarget))))o.servesIntent=true;
     return {
-      ...(immediate ? { actingPurpose:{ intentId:immediate.revision.intentId, version:immediate.revision.version } } : {}),
+      ...(acting ? { actingPurpose:{ intentId:acting.intentId, version:acting.version } } : {}),
       world: { time: timeWord(w.env.datetime), weather: weatherWord(w.env.weather), happening: this.host.living?.event ?? s.happening },
       ...(this.host.living ? { customs: this.host.living.customs } : {}),
       soul: {
@@ -302,7 +310,7 @@ export class Brain {
       // a question is never left hanging for want of budget: without a model, yes two times in three
       if (!reflex && noBudgetNow) { const yes = hash32(`${m.soulId}:${tick}:answer`) % 3 !== 0; reflex = answers.find((o) => o.card === (yes ? 'say yes' : 'say no')) ?? answers[0]; why = 'someone asked (no model budget just now)'; }
     }
-    else if (serving.length && (!m.life || trigger === 'new-intent-v2')) { ctx.options = serving; if (serving.length === 1) { reflex = serving[0]; why = 'the one thing that serves the plan'; } }
+    else if (serving.length && (!m.life || trigger === 'new-intent-v2' || !!ctx.actingPurpose)) { ctx.options = serving; if (serving.length === 1) { reflex = serving[0]; why = 'the one thing that serves the plan'; } }
     else if (awaiting(host, m.soulId).length) { reflex = ctx.options.find((o) => o.card === 'wait'); why = 'waiting for an answer'; }
     if (reflex) {
       const same = ctx.running && m.pending?.card === reflex.card && m.pending.target === reflex.cardTarget;
