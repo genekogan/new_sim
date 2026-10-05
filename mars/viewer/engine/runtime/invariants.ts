@@ -21,13 +21,13 @@ const TOL = 0.03;
  */
 export const SEATED_ACTIVITIES: ReadonlySet<string> = new Set(['sit', 'sit-down', 'stand-up', 'eat', 'serve']);
 
-export const humanStaticClearance: Invariant = (rt: Runtime) => {
+export function humanStaticClearanceWithOverlay(qualified:(rt:Runtime,e:import('../world/types.ts').Entity)=>boolean):Invariant {return (rt: Runtime) => {
   const sp = rt.services.spatial as Spatial;
   sp.sync(rt.world);
   const out: Diagnostic[] = [];
   for (const e of Object.values(rt.world.entities)) {
     // people on the rack structure (`human.on`: a frame climb or beam walkway) are checked by construction/frame.ts frameAccessOk
-    if (e.kind !== 'human' || !e.human || e.human.on || e.human.activity.startsWith('climb') || SEATED_ACTIVITIES.has(e.human.activity)) continue;
+    if (e.kind !== 'human' || !e.human || e.human.on || e.human.activity.startsWith('climb') || SEATED_ACTIVITIES.has(e.human.activity) || qualified(rt,e)) continue;
     const g = sp.level(e.human.level);
     if (!g) continue;
     const c = clearanceAt(g, [e.pose.p[0], e.pose.p[2]]);
@@ -41,7 +41,8 @@ export const humanStaticClearance: Invariant = (rt: Runtime) => {
       });
   }
   return out;
-};
+};}
+export const humanStaticClearance:Invariant=humanStaticClearanceWithOverlay(()=>false);
 
 export const humanHumanSeparation: Invariant = (rt: Runtime) => {
   const hs = Object.values(rt.world.entities).filter((e) => e.kind === 'human' && e.human);
