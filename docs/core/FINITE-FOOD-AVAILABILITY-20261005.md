@@ -6,6 +6,12 @@ mints/deals the existing meal, sleep and tidy cards without a server restart.
 Current owner/body/retirement authority is rechecked at card acceptance. Assignment
 runs outside the birth listener's acceptance stack and is drained on shutdown.
 Failures are visible and retained for the shutdown barrier. Catch-up is idempotent.
+The listener attaches before catch-up, and both share one promise chain. A pending
+ordinary birth applied during the first mint pump is assigned before startup
+returns. App identified this race in8347c3ad; the original helper demonstrably
+fails the new regression, while the corrected helper passes. Initial failure
+removes the listener. Owner/body witnesses are immutable values, not mutable
+mind comparisons.
 Retirement does not recycle a slot; the ninth lifetime birth receives no personal
 resource cards or extra stock. This is an explicit eight-slot scope, not a claim
 that a ten-person candidate has ten personal meals/mats.

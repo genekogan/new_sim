@@ -47,3 +47,20 @@ test('canonical future births receive their stable finite slots without restart;
   const head={engine:f.host.engine.stateHash(),kernel:kernelHash(f.host.kernel)};
   const reboot=new WorldHost(f.db,factory,f.host.seed,1e9,f.host.worldId,{durableClockV1:true});assert.equal(reboot.boot().from,'snapshot');assert.deepEqual({engine:reboot.engine.stateHash(),kernel:kernelHash(reboot.kernel)},head);reboot.stop();
 });
+
+test('a pending ordinary birth applied during startup catch-up is assigned before the watcher returns',async t=>{
+  const f=fixture(':memory:',factory,{durableClockV1:true});f.souls.enableLifecycle();
+  t.after(()=>{f.brain.quiesce();f.host.stop();f.db.close();});
+  await invite(f,'alice');await invite(f,'bob');
+  const alice=await accept(f.host,f.souls.create('dev:alice',{name:'Alice',description:'Synthetic startup owner'}));
+  await accept(f.host,f.host.installCommonsProvisionsV1());
+  const pendingBirth=f.souls.create('dev:bob',{name:'Bob',description:'Synthetic pending startup birth'});
+  await setImmediate();assert.equal(f.host.minds.size,1,'second birth has not applied when startup begins');
+  const follow=await followCommonsProvisionBirths(f.host,f.brain);t.after(()=>follow.close());
+  const bob=await pendingBirth;assert.equal(f.host.minds.size,2);
+  for(const row of [alice,bob])assert.ok(f.host.kernel.decks[row.id].cards.includes('eat prepared meal '+row.id.slice(2)));
+  const events=f.db.events(f.host.worldId),birth=events.find(e=>e.kind==='birth'&&e.payload.soulId===bob.id)!;
+  const firstAliceMint=events.find(e=>e.kind==='mint'&&e.payload.forSoul===alice.id&&e.payload.card.name.startsWith('eat prepared meal '))!;
+  assert.ok(birth.seq<firstAliceMint.seq,'the pending birth applied inside the initial mint pump, before the first catch-up card');
+  assert.equal(f.db.paidCost(),0);
+});

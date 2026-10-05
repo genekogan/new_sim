@@ -20,7 +20,8 @@ export async function installCommonsProvisionCards(host:WorldHost,brain:Brain,on
       {name:sleep,summary:'Sleep on my clear ground sleeping area and return to standing.',good_when:'Tired, free hands and an unoccupied supported sleep envelope; use real ground sleep.',target:null,when:[],then:[{set:['$actor','doing','sleeping on a ground mat']}],approach:[],during:[{verb:'mars:sleep',params:{mat:r.mat,duration:600,returnTo:r.sleepReturn}}],takes:'long'},
       ...[r.bowl,r.spoon].map((item):Card=>({name:`return ${item} ${suffix}`,summary:'Put my held utensil on the ground and free the hand.',good_when:'A held bowl or spoon after an interrupted meal; tidy before sleep or another task.',target:null,when:[],then:[{set:['$actor','doing','tidying utensils']}],approach:[],during:[{verb:'mars:put_item',params:{item,surfaceSlot:'ground'}}],takes:'seconds'})),
     ];
-    const guard=()=>{const current=host.db.soul(m.soulId);if(!current||current.retired_at!==null||current.owner!==m.owner||current.entity_id!==m.entityId||host.minds.get(m.soulId)!==m)throw Error('commons-provisions.owner-moved');return true as const;};
+    const owner=m.owner,entityId=m.entityId;
+    const guard=()=>{const current=host.db.soul(m.soulId);if(!current||current.retired_at!==null||current.owner!==owner||current.entity_id!==entityId||m.owner!==owner||m.entityId!==entityId||host.minds.get(m.soulId)!==m)throw Error('commons-provisions.owner-moved');return true as const;};
     const pending=brain.mint(m,cards.filter(c=>!host.kernel.decks[m.soulId].cards.includes(c.name)),undefined,undefined,'compiled',guard);
     let done=false;pending.then(()=>done=true,()=>done=true);for(let i=0;i<100&&!done;i++){host.drainInputs();await new Promise<void>(r=>setImmediate(r));}if(!done)throw Error('commons-provisions.card-mint-unsettled');const accepted=await pending;if(accepted.some(v=>!v.ok))throw Error('commons-provisions.card-mint-refused');verdicts.push(...accepted);
   }
@@ -31,13 +32,17 @@ export async function installCommonsProvisionCards(host:WorldHost,brain:Brain,on
  * the first eight canonical births retain their slots, even after retirement.
  * A ninth birth receives no invented stock. No replay-time listener runs. */
 export async function followCommonsProvisionBirths(host:WorldHost,brain:Brain){
-  await installCommonsProvisionCards(host,brain);
   let work=Promise.resolve(),failure:unknown;
-  const listener={onApplied(e:{kind:string,payload:any}){
-    if(e.kind!=='birth')return;
-    // Run outside onApplied: mint's sequencer pump must not nest acceptance.
-    work=work.then(()=>installCommonsProvisionCards(host,brain,e.payload.soulId)).then(()=>{},error=>{failure=error;console.error('commons-provisions.birth-assignment-failed');});
-  }};
+  const append=(soulId?:string)=>{
+    const pending=work.then(()=>installCommonsProvisionCards(host,brain,soulId));
+    work=pending.then(()=>{},error=>{failure=error;console.error('commons-provisions.birth-assignment-failed');});return pending;
+  };
+  const listener={onApplied(e:{kind:string,payload:any}){if(e.kind==='birth')void append(e.payload.soulId).catch(()=>{});}};
+  const close=()=>{const i=host.listeners.indexOf(listener);if(i>=0)host.listeners.splice(i,1);};
+  const settled=async()=>{let pending;do{pending=work;await pending;}while(pending!==work);if(failure)throw failure;};
+  // Subscribe before catch-up; births applied by mint's sequencer pump must
+  // join the same chain rather than fall between the query and subscription.
   host.listeners.push(listener);
-  return {async settled(){await work;if(failure)throw failure;},close(){const i=host.listeners.indexOf(listener);if(i>=0)host.listeners.splice(i,1);}};
+  try{await append();await settled();}catch(error){close();throw error;}
+  return {settled,close};
 }
