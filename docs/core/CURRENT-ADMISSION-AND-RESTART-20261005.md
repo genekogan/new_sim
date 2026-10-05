@@ -9,9 +9,11 @@ default scene, owner policy or immutable C194 input is changed here.
 The current native lifecycle path requires an authenticated currently invited
 human owner (or existing administrator authority). Its transaction reserves an
 owned Soul row and unique selected-world name before physical admission. The
-configured default is five **active Souls per account across worlds**: the query
-filters retired rows but does not filter world. Pending reservations count.
-This is an account policy, not a world capacity of five or a cohort allocation.
+configured default is five **active/pending non-retired Souls per account in the
+selected database**: the query filters retired rows but does not filter world.
+Deployed worlds use separate databases, so this query is not a universally shared
+cross-database quota. It is an account policy within that database, not a world
+capacity of five or a cohort allocation.
 
 Admission probes an exact detached checkpoint and rechecks under the canonical
 writer lock before logging birth. Non-resumable native work defers admission.
