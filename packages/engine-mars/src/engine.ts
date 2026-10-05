@@ -87,7 +87,7 @@ const inPoly = (x: number, z: number, poly: [number, number][]) => {
 const bucket = (m: number): 'here' | 'close' | 'near' | 'far' => (m < 2.5 ? 'here' : m < 9 ? 'close' : m < 28 ? 'near' : 'far');
 
 /** Fresh physical bases use an explicit native binding; legacy factories omit it. */
-export type MarsPhysicalBinding = {rulesVersion:string;renderScene:()=>RenderScene;restore:(snapshot:any)=>any;services:(world:any)=>any};
+export type MarsPhysicalBinding = {rulesVersion:string;renderScene:()=>RenderScene;restore:(snapshot:any)=>any;services:(world:any)=>any;prepareRemoval?:(runtime:any,id:string)=>boolean};
 export class MarsEngine implements Engine {
   readonly dt = 1 / TPS;
   readonly schema: string;
@@ -507,6 +507,9 @@ export class MarsEngine implements Engine {
     // A committed build owns its whole crew even between native actions,
     // when no actor reservation exists. Never pull a holder out of the load.
     if(this.cfg.safeCrewRemoval&&[...this.programs.values()].some(p=>p.build?.crew.includes(id)))return false;
+    // Fresh physical bases may own occupancy beyond actor reservations. A
+    // passenger is still supported by its boat after boarding has completed.
+    if(this.physical?.prepareRemoval&&!this.physical.prepareRemoval(this.rt,id))return false;
     if (!this.release(id, { code: 'actor.removed', message: 'actor removed' })) return false;
     delete this.ents[id]; this.keys.delete(id); this.acts.delete(id); this.ons.delete(id);
     this.out.changes.push([this.rt.tick, id, 'present', null]);
