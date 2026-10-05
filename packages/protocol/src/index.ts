@@ -188,6 +188,7 @@ export function viewRow(e: Entity, pose: PoseSample): [string, string, string | 
 }
 export { samplePath };
 export * from './lifecycle.ts';
+export * from './lifecycle-capability.ts';
 
 // ---------------------------------------------------------------- REST
 export const createSoulSchema = z.strictObject({

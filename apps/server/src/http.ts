@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { Hono, type Context } from 'hono';
 import { decodeJwt } from 'jose';
 import { serveStatic } from '@hono/node-server/serve-static';
-import { adminSchema, commandSchema, inviteSchema, pairApproveSchema, pairExchangeSchema, pairPollSchema, pairStartSchema, publicEvent, setIntentSchema } from '@sim/protocol';
+import { adminSchema, commandSchema, inviteSchema, ownerLifecycleCapabilitySchema, pairApproveSchema, pairExchangeSchema, pairPollSchema, pairStartSchema, publicEvent, setIntentSchema } from '@sim/protocol';
 import { newId, type Auth } from './auth.ts';
 import type { Brain } from './brain.ts';
 import type { Config } from './config.ts';
@@ -175,7 +175,9 @@ export function buildApp(d: Deps) {
   // ---- signed-in users
   const mySouls = (u: UserRow) => d.db.soulsOf(u.id).filter(s=>!d.souls.lifecycle||(s.world_id===d.host.worldId&&d.souls.invited(u)&&d.souls.controlReady(s))).map((s) => ({ id: s.id, name: s.name, description: s.description, entityId: s.entity_id, hasToken: !!s.token_hash, tokenLabel: s.token_label, tokenCreatedAt: s.token_created_at, tokenLastUsed: s.token_last_used }));
   app.get('/v1/me', async (c) => { const u = privateUser(await requireUser(c),false),souls=mySouls(u); return c.json({ me: {...d.auth.me(u),...(d.souls.lifecycle?{souls:souls.map(s=>s.id)}:{})}, souls, maxSouls: d.cfg.maxSoulsPerUser,
-    ...(d.souls.lifecycle?{lifecycleRequests:d.souls.invited(u)?d.souls.lifecycleHistory(u.id):{contract:'owner-lifecycle-list/1',worldId:d.host.worldId,requests:[],nextCursor:null}}:{}) }); });
+    ...(d.souls.lifecycle?{lifecycleRequests:d.souls.invited(u)?d.souls.lifecycleHistory(u.id):{contract:'owner-lifecycle-list/1',worldId:d.host.worldId,requests:[],nextCursor:null},
+      ...(d.souls.invited(u)?{lifecycleCapability:ownerLifecycleCapabilitySchema.parse({contract:'owner-lifecycle-capability/1',worldId:d.host.worldId,userId:u.id,
+        receiptContract:'soul-lifecycle/1',historyContract:'owner-lifecycle-list/1',optIn:{header:'X-Sim-Lifecycle',value:'1'}})}:{})}:{}) }); });
   app.get('/v1/lifecycle',async c=>{c.header('Cache-Control','no-store');const u=await requireUser(c);return c.json(d.souls.lifecycleHistory(u.id,c.req.query('cursor')??null,c.req.query('owner')??u.id));});
   app.get('/v1/lifecycle/:requestId',async c=>{c.header('Cache-Control','no-store');const u=await requireUser(c);return c.json({lifecycle:d.souls.lifecycleReceipt(u.id,c.req.param('requestId'))});});
   const lifecycleOptIn=(c:Context)=>{

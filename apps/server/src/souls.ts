@@ -62,8 +62,8 @@ export class Souls {
   }
 
   // ------------------------------------------------------------ lifecycle
-  /** Internal candidate installer only; main/bootstrap do not call it. Full
-   * token/queued-write/release conformance still precedes capability publication. */
+  /** Internal candidate installer only; main/bootstrap do not call it. Its
+   * private response capability does not qualify default/cohort/release use. */
   enableLifecycle(){
     if(this.lifecycle)throw new Error('Lifecycle candidate already installed');
     const journal=new LifecycleJournal(this.db),runner=new LifecycleRunner(this.host,journal,op=>{
