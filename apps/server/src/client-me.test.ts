@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomUUID} from 'node:crypto';
-import {Connection} from '@sim/client';
+import {Connection} from '../../../packages/client/src/index.ts';
 import {meLiveMessageV1Schema,type Me,type ServerMsg} from '@sim/protocol';
 class Socket{readyState=1;onopen:any;onmessage:any;onclose:any;onerror:any;sent:string[]=[];closes=0;send(s:string){this.sent.push(s);}close(){this.closes++;}message(m:unknown){this.onmessage({data:JSON.stringify(m)});}}
 const alice:Me={userId:'alice',short:'alice',email:null,wallet:null,role:'user',souls:[],invited:false};

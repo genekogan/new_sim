@@ -5,7 +5,7 @@ import {once} from 'node:events';
 import {mkdirSync,writeFileSync} from 'node:fs';
 import {setTimeout as delay} from 'node:timers/promises';
 import WebSocket from 'ws';
-import {Connection} from '@sim/client';
+import {Connection} from '../../../packages/client/src/index.ts';
 import {PROTO,meLiveMessageV1Schema,type ServerMsg} from '@sim/protocol';
 import {marsFactory,EDEN_SAFE_COMMONS_WORLD} from '@sim/engine-mars';
 import {fixture} from '../test/native-owner-fixture.ts';
