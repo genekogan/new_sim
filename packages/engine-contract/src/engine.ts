@@ -108,6 +108,8 @@ export interface Engine {
   adoptCamp?(): void;
   previewCommonsTransition?(): CommonsTransitionAdmissionV1;
   adoptCommons?(transition:CommonsTransitionV1): void;
+  previewCommonsProvisionsV1?():{ok:true;transition:{contract:'commons-provisions/1';tick:number;fromRulesVersion:string;toRulesVersion:string;fromStateHash:string;additionsHash:string;base:WorldState['base']}}|{ok:false;diagnostic:{code:string}};
+  adoptCommonsProvisionsV1?(transition:unknown):void;
   previewCrewRemovalTransitionV1?():CrewRemovalTransitionAdmissionV1;
   adoptCrewRemovalTransitionV1?(transition:CrewRemovalTransitionV1):void;
   previewCampExpansionV1?():CampExpansionAdmissionV1;

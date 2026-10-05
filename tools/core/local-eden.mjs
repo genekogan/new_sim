@@ -9,7 +9,7 @@ import {createHash} from 'node:crypto';
 import {setImmediate} from 'node:timers/promises';
 
 export async function openLocalEden({input,dataDir,worldId,port=4959,webDir,marsWebDir,build='local-c194-core/1',checkOnly=false,
-  inputManifestSHA256='4e9c18fe50ec9e8f74073f4032f20409a9e54b3fa5b1b87b54a6a4bc0ebcec12',modelCredentialFile,localBudget=3,autonomous=false,localSoulLimit=5,humanRest=false}) {
+  inputManifestSHA256='4e9c18fe50ec9e8f74073f4032f20409a9e54b3fa5b1b87b54a6a4bc0ebcec12',modelCredentialFile,localBudget=3,autonomous=false,localSoulLimit=5,humanRest=false,provisions=false,sequences=false}) {
   if(!input||!dataDir||!worldId||!Number.isInteger(port)||!(port>=4950&&port<=4959||port===4970))throw Error('explicit local input/data/world/allowed port required');
   if(!build.startsWith('local-'))throw Error('local build identity required');
   input=resolve(input);dataDir=resolve(dataDir);
@@ -51,12 +51,14 @@ export async function openLocalEden({input,dataDir,worldId,port=4959,webDir,mars
     // Refuse before boot/checkpoint writes; never relabel its old rules header.
     if(header&&!header.rules_version.includes('+crew-removal/1'))throw Error('local-bootstrap.lifecycle-policy-upgrade-unavailable: old history lacks crew-removal/1; preserve this DB and use a distinct fresh local world until a versioned policy migration exists');
     const migrated=beforeEvents.some(e=>e.kind==='rules'&&e.payload.commonsTransition);
-    const factory=header&&(!header.rules_version.includes('+commons/1')||migrated)
+    const factory=provisions?await native.commonsProvisionsFactory():header&&(!header.rules_version.includes('+commons/1')||migrated)
       ?await native.marsCommonsTransitionFactory({...native.GREEN_FIELD_WORLD,safeCrewRemoval:true},{safeArrivalV1:true})
       :await native.marsFactory({...native.EDEN_SAFE_COMMONS_WORLD,safeCrewRemoval:true});
     host=new WorldHost(db,factory,header?.seed??cfg.worldSeed,cfg.snapshotEveryTicks,worldId,{durableClockV1:true});
     const boot=host.boot();
+    if(sequences){if(!host.enableIntentSequencesV1)throw Error('selected runtime needs purpose-bound sequences');await drive(host.enableIntentSequencesV1());}
     if(humanRest){if(!host.enableHumanRestNeedsV1)throw Error('selected runtime needs versioned human rest recovery');await drive(host.enableHumanRestNeedsV1());}
+    if(provisions&&!host.engine.rulesVersion.includes('+commons-provisions/1')){if(!host.installCommonsProvisionsV1)throw Error('selected runtime needs retained commons provisions');await drive(host.installCommonsProvisionsV1());}
     if(header&&host.engine.world.base.campus!=='eden-commons') {
       // Read-only preflight first. Refusal never substitutes a new world or pose.
       const preview=host.engine.previewCommonsTransition?.();
@@ -76,6 +78,7 @@ export async function openLocalEden({input,dataDir,worldId,port=4959,webDir,mars
     if(modelCredentialFile){if(!brain.enableLocalBudgetV1||!brain.quiesce||!brain.settled)throw Error('selected live runtime needs local budget and controlled drain');brain.enableLocalBudgetV1();}
     if(autonomous){if(!brain.enableEdenAutonomyV1)throw Error('selected runtime needs explicit autonomy');await drive(brain.enableEdenAutonomyV1());}
     const souls=new Souls(host,db,brain,cfg);souls.enableLifecycle();
+    if(provisions){const {installCommonsProvisionCards}=await load('apps/server/src/commons-provisions.ts');await installCommonsProvisionCards(host,brain);}
     service=new IntentControlV2(host,brain,souls,{historyV1:true});server=createServer();
     const strip=url=>stripWorldRequestPath(url,cfg.worldPath);
     server.on('upgrade',req=>{req.url=strip(req.url);});hub=new Hub(server,host,auth,db,souls);hub.brain=brain;hub.build=cfg.build;
@@ -102,7 +105,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).hr
   try {
     const app=await openLocalEden({input,dataDir,worldId,port:Number(port),webDir,marsWebDir,build:process.env.BUILD_ID??'local-c194-core/1',checkOnly:mode==='check',
       inputManifestSHA256:process.env.PREVIEW_INPUT_MANIFEST_SHA256,modelCredentialFile:process.env.PREVIEW_MODEL_CREDENTIAL_FILE,
-      localBudget:Number(process.env.PREVIEW_BUDGET_USD_PER_DAY??3),autonomous:process.env.PREVIEW_EDEN_AUTONOMY==='1',localSoulLimit:Number(process.env.PREVIEW_SOUL_LIMIT??5),humanRest:process.env.PREVIEW_HUMAN_REST==='1'});
+      localBudget:Number(process.env.PREVIEW_BUDGET_USD_PER_DAY??3),autonomous:process.env.PREVIEW_EDEN_AUTONOMY==='1',localSoulLimit:Number(process.env.PREVIEW_SOUL_LIMIT??5),humanRest:process.env.PREVIEW_HUMAN_REST==='1',provisions:process.env.PREVIEW_COMMONS_PROVISIONS==='1',sequences:process.env.PREVIEW_INTENT_SEQUENCES==='1'});
     if(app.checkOnly)console.log(JSON.stringify(app,null,2));
     else {console.log(JSON.stringify({url:app.cfg.publicUrl,worldId:app.host.worldId,boot:app.boot,physicalBase:app.host.engine.world.base,mode:app.brain.mode,budget:app.brain.budget,autonomous:process.env.PREVIEW_EDEN_AUTONOMY==='1'}));
       for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>void app.close().then(()=>process.exit(0)).catch(()=>process.exit(1)));}

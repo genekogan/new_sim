@@ -261,8 +261,14 @@ export class Brain {
     const retry = this.intentV2Retries && history && !m.activeRule && m.agendaPos >= m.agenda.length
       && ['timer', 'activity-failed', 'activity-ended'].includes(trigger)
       ? blockedDirectionForRetry(history, m.owner, w.tick) : undefined;
-    const acting = immediate?.revision ?? retry;
-    const planningMind = acting ? { ...m, agenda: acting.interpretation.agenda, agendaPos: 0 } : m;
+
+    const latestNow=history?Object.values(history.intents).filter(e=>e.revision.source.ownerId===m.owner&&e.revision.interpretation.trigger.kind==='now').sort((a,b)=>b.revision.submitted.seq-a.revision.submitted.seq)[0]:undefined;
+    const sequence=this.host.extra.intentSequencesV1&&!m.activeRule&&m.agendaPos>=m.agenda.length&&latestNow?.status==='active'
+      &&latestNow.revision.submitted.seq>=Number(this.host.extra.intentSequencesSinceV1??0)
+      &&this.host.intentSequenceStepV1(m.soulId,{intentId:latestNow.revision.intentId,version:latestNow.revision.version})<latestNow.revision.interpretation.agenda.length?latestNow:undefined;
+    const acting = sequence?.revision ?? immediate?.revision ?? retry;
+    const sequenceIndex=sequence?this.host.intentSequenceStepV1(m.soulId,{intentId:sequence.revision.intentId,version:sequence.revision.version}):0;
+    const planningMind = acting ? { ...m, agenda: sequence?[acting.interpretation.agenda[sequenceIndex]]:acting.interpretation.agenda, agendaPos: 0 } : m;
     const options=optionsFor(this.host,planningMind);
     if(!m.activeRule)for(const o of options)if(rules.some(r=>r.agenda.some(s=>matchesStep(this.host,s,o.card,o.cardTarget))))o.servesIntent=true;
     return {

@@ -18,7 +18,7 @@ import {
 import type { Db } from './db.ts';
 import { advanceNeeds, newLife, type Life } from '@sim/brain';
 import { arrivalPlace, baseVocabulary, codeVocabulary, foldEvent, initKernel, pinnedVocabulary, soulThing, type Vocabulary, type FoldResult } from './fold.ts';
-import { frontier, stepIndex } from './deck.ts';
+import { frontier, stepIndex, belongsTo } from './deck.ts';
 import {mandateOf,MANDATE_STATE} from './mandate.ts';
 import { emptyIntentHistoryV2, foldIntentHistoryV2, type IntentHistoryV2 } from './intent-history.ts';
 import { IntentObservations } from './intent-observations.ts';
@@ -455,7 +455,7 @@ export class WorldHost {
         if (admission) this.apply(admission, false);
         if(stationEra)this.apply(stationEra,false);
       } catch (error) {
-        if(stationEra||e.payload?.crewRemovalTransition){
+        if(stationEra||e.payload?.crewRemovalTransition||e.payload?.commonsProvisions){
           // A committed structural pair cannot be attributed to an unrelated
           // card or filtered out by card-fault recovery. Restore exact history.
           try{
@@ -465,7 +465,7 @@ export class WorldHost {
         }else {this.recoverFault(error, e.kind === 'decision' ? e.payload.card : undefined); recovered = true;}
       }
       const accepted=[e,...(admission?[admission]:[]),...(stationEra?[stationEra]:[])];
-      if (!recovered||stationEra||e.payload?.crewRemovalTransition) this.acc.log.push(...accepted);
+      if (!recovered||stationEra||e.payload?.crewRemovalTransition||e.payload?.commonsProvisions) this.acc.log.push(...accepted);
       // No listener can observe a physical event before its committed era fold.
       for (const fact of accepted) for (const l of this.listeners) l.onApplied?.(fact);
       if (admission && recovered) { p.reject?.(new PersistedIntentAdmissionFault(e.seq)); continue; }
@@ -669,6 +669,7 @@ export class WorldHost {
     const matchedStep = pm ? stepIndex(this, pm, (e.payload as PlayPayload).card, (e.payload as PlayPayload).target) : -1;
     if (e.kind === 'rules' && e.payload?.recovery) { this.restoreRecovery(e.payload.recovery as RecoveryRecipe); this.seq = e.seq; return; }
     if(e.kind==='rules'&&e.payload?.crewRemovalTransition&&this.stationHistoryV1())throw Error('crew-removal-transition.station-carry-required');
+    if(e.kind==='rules'&&e.payload?.commonsProvisions&&this.stationHistoryV1())throw Error('commons-provisions.station-carry-required');
     const r = foldEvent(this.engine, this.kernel, e, this.counts);
     if(isStationFactV1(e.kind))this.extra.stationV1=foldStationFactV1(this.stationHistoryV1(),e,this.stationBindingV1());
     if(e.kind==='station-rules-era-v1'){
@@ -783,6 +784,21 @@ export class WorldHost {
         if (m) {
           const what = `${view.card}${view.targetName ? ` → ${view.targetName}` : ''}`;
           if (view.ok) {
+            if(this.extra.intentSequencesV1){
+              const latest=this.db.db.prepare("SELECT seq,payload FROM events WHERE world_id=? AND kind='decision' AND soul_id=? AND seq<? ORDER BY seq DESC LIMIT 1").get(this.worldId,m.soulId,e.seq) as {seq:number;payload:string}|undefined;
+              const choice=latest?JSON.parse(latest.payload) as DecisionPayload:undefined;
+              const binding=choice?.card===view.card&&choice.target===view.target
+                ?Object.values(this.intentBindings()).find(b=>b.payload.decision.seq===latest!.seq&&b.payload.soulId===m.soulId&&b.payload.decision.entityId===m.entityId):undefined;
+              const entry=binding?this.intentHistoryOf(m.soulId).intents[binding.payload.intent.intentId]:undefined;
+              if(binding&&entry?.status==='active'&&entry.revision.version===binding.payload.intent.version){
+                const index=this.intentSequenceStepV1(m.soulId,binding.payload.intent),step=entry.revision.interpretation.agenda[index];
+                if(step&&step.card===view.card&&(!step.target||step.target===view.target)&&(!step.of||belongsTo(this,view.target,step.of))){
+                  const progress=(this.extra.intentSequenceProgressV1??={}) as Record<string,number>;progress[JSON.stringify([m.soulId,binding.payload.intent.intentId,binding.payload.intent.version])]=index+1;
+                  m.nextEvalTick=Math.min(m.nextEvalTick,tick+1);m.evalTrigger='plan-advanced';m.lastFingerprint='';
+                }
+              }
+            }
+
             m.recent = [...m.recent.slice(-3), `${what} (done)`];
             if (m.life) { m.life.acts.push(what); if (m.life.acts.length > 100) m.life.acts.shift(); }
             const idx = matchedStep;
@@ -831,6 +847,7 @@ export class WorldHost {
       }
       case 'rules': {
         const p = e.payload;
+        if(p?.intentSequencesV1===true&&!this.extra.intentSequencesV1){this.extra.intentSequencesV1=true;this.extra.intentSequencesSinceV1=e.seq;}
         if (p?.kernelBootstrap || p?.vocabulary || p?.adoptCamp || p?.commonsTransition || p?.campExpansion) this.kernelDirty = true;
         if(p?.commonsTransition||p?.campExpansion)for(const m of this.minds.values()){
           m.nextEvalTick=Math.min(m.nextEvalTick,tick+1+hash32(m.soulId)%20);
@@ -859,8 +876,19 @@ export class WorldHost {
 
   get living(): { origin: number; dayTicks: number; customs: string[]; lastDay: number; event: string; quiet: boolean; quietDay?: number } | undefined { return this.extra.living as any; }
   get quietBarrier() { return !!this.living?.quiet; }
+  enableIntentSequencesV1(){if(this.extra.intentSequencesV1)return Promise.resolve();return this.enqueue('rules','operator:intent-sequences',{intentSequencesV1:true,worldEvent:{id:'intent-sequences-enabled',text:'Residents can follow the steps of their current directions.'},why:'enable purpose-bound card progress while preserving earlier intentions'});}
+  intentSequenceStepV1(soulId:string,intent:PurposeRef){return (this.extra.intentSequenceProgressV1 as Record<string,number>|undefined)?.[JSON.stringify([soulId,intent.intentId,intent.version])]??0;}
+
   enableHumanRestNeedsV1(){
     return this.enqueue('rules','operator:human-rest-needs',{runtimePolicy:{sleepBlockTicks:1200,...this.extra.runtimePolicy as object,humanRestNeedsV1:true},why:'recognize enacted humanoid rest prospectively; retain prior needs replay'});
+  }
+  installCommonsProvisionsV1(){
+    if(this.stationHistoryV1())return Promise.reject(Error('commons-provisions.station-carry-required'));
+    const p=this.engine.previewCommonsProvisionsV1?.();if(!p?.ok)return Promise.reject(Error(p?p.diagnostic.code:'commons-provisions.reader-required'));
+    const t=p.transition;
+    const guard:AcceptanceGuard=()=>{if(this.stationHistoryV1())throw Error('commons-provisions.station-carry-required');const q=this.engine.previewCommonsProvisionsV1?.();if(!q?.ok||hashOf(q.transition)!==hashOf(t))throw Error('commons-provisions.source-moved');if(this.factory.canReplayHistory?.(t.toRulesVersion)!==true)throw Error('commons-provisions.reader-required');return true;};
+    const journal:AcceptanceJournal=()=>{const r=this.db.db.prepare('UPDATE worlds SET rules_version=? WHERE id=? AND rules_version=?').run(t.toRulesVersion,this.worldId,t.fromRulesVersion);if(r.changes!==1)throw Error('commons-provisions.header-moved');return true;};
+    return new Promise<LogEvent>((resolve,reject)=>this.queue.push({kind:'rules',author:'operator:commons-provisions',payload:{commonsProvisions:t},guard,journal,resolve,reject}));
   }
   private advanceLives() {
     const tick = this.engine.world.tick;
