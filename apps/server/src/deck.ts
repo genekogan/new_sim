@@ -22,7 +22,13 @@ export function engineRef(host: WorldHost, id: string): string | [number, number
 export function positionOf(host: WorldHost, id: string): [number, number] | null {
   const r = engineRef(host, id); if (r === null) return null;
   if (Array.isArray(r)) return r;
-  const e = host.engine.world.entities[r]; return e ? [e.pose.p[0], e.pose.p[2]] : null;
+  const e = host.engine.world.entities[r]; if (e) return [e.pose.p[0], e.pose.p[2]];
+  // Keep the region ID for native traversal, but use the adapter's current
+  // physical anchor for distance and coordinate bindings. A symbolic `at`
+  // relationship does not establish arrival at this point.
+  if (!host.engine.world.regions[r]) return null;
+  const p = host.engine.anchors().find((a) => a.id === r)?.point;
+  return p?.length === 2 && p.every(Number.isFinite) ? [p[0], p[1]] : null;
 }
 export function distance(host: WorldHost, a: string, b: string): number {
   const pa = positionOf(host, a), pb = positionOf(host, b);
