@@ -40,7 +40,7 @@ resources. Its passive hook waits for the existing safe checkpoint, records one
 installation, catches up cards after births/new delivery, and drains on close.
 No new quiet, timetable, forced cancellation, stock/needs/pose reset or paid call.
 
-Evidence: source focused four checks pass (engine three plus server one). Eight
+Evidence: source focused four checks pass (engine three plus server one); an additional in-process passive-hook prerequisite/one-fact/restart check passes. Selected package repeats the four native/owner checks and focused types pass. Eight
 ordinary invited owners get discoverable cards; a different owner is refused;
 one actual own finite meal is eaten seated and tidied; old entities/history and
 other stock remain; SQLite snapshot and genesis replay match engine/kernel/needs.
@@ -57,3 +57,5 @@ fixture uses actual mat sleep. Missing mat caused an admission refusal; fixed
 fixture binding. Uppercase card name violated the existing lowercase grammar;
 corrected name. Empty bowl uses the existing eat.bowl-empty diagnostic, not a
 new duplicate policy. Type-only fixture union/native-world annotations corrected.
+
+Selected HTTP startup was blocked by sandbox listen EPERM at 127.0.0.1:4959 before HTTP qualification. The retained failure is not a product startup PASS. In-process sequencer/hook restart covers source behavior without network; actual HTTP startup and shutdown remain PM integration gates.
