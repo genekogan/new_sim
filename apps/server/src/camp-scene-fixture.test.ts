@@ -40,11 +40,14 @@ test('public five-file leaf dependency input executes in an isolated subprocess 
     'packages/protocol/package.json','packages/protocol/src/scene-capture.ts'];
   const input=JSON.parse(readFileSync(new URL('codec-input.v1.json',directory),'utf8'));
   assert.deepEqual(input.files.map((f:any)=>f.path),files);assert.equal(input.semanticsParent,CAMP_SCENE_PRODUCER_PIN);
+  const codecPublication='f7536a647b0ecd663554719da608babfaed14988';
   for(const f of input.files) {
-    const bytes=readFileSync(join(root,f.path));assert.equal(bytes.byteLength,f.bytes);
+    // The published five-file closure is immutable. Later additive codecs
+    // have their own inputs; do not substitute current source for this proof.
+    const bytes=execFileSync('git',['show',`${codecPublication}:${f.path}`],{cwd:root});assert.equal(bytes.byteLength,f.bytes);
     assert.equal(createHash('sha256').update(bytes).digest('hex'),f.sha256);
+    const target=join(dir,f.path);mkdirSync(join(target,'..'),{recursive:true});writeFileSync(target,bytes);
   }
-  for(const file of files){const target=join(dir,file);mkdirSync(join(target,'..'),{recursive:true});copyFileSync(join(root,file),target);}
   mkdirSync(join(dir,'node_modules/@sim'),{recursive:true});
   symlinkSync(join(dir,'packages/engine-contract'),join(dir,'node_modules/@sim/engine-contract'));
   symlinkSync(join(dir,'packages/protocol'),join(dir,'node_modules/@sim/protocol'));
