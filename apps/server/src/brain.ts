@@ -537,8 +537,12 @@ export class Brain {
         const repairs: string[] = [];
         for (const a of Array.isArray(out.agenda) ? out.agenda : []) {
           const t = a.target ? k.things[a.target] : undefined;
-          if (a.target && !t) { repairs.push(`${a.card}: unknown id ${a.target} → ${owners[0] ? `whatever is ${owners[0].name}’s` : 'any'}`); a.target = null; if (!a.of && owners[0]) a.of = owners[0].id; }
-          else if (t && owners.length && mine(t) && !owners.some((o) => belongsTo(this.host, t.id, o.id))) { repairs.push(`${a.card}: ${t.name} is not ${owners[0].name}’s → whatever is ${owners[0].name}’s`); a.target = null; a.of = owners[0].id; }
+          // A retained owner direction must never broaden a named destination
+          // to arbitrary travel. Only the established, unambiguous named-owner
+          // future-thing association can be repaired without changing scope.
+          const ownedRepair=align!=='intent-v2'||owners.length===1&&(!a.of||a.of===owners[0].id);
+          if (a.target && !t && ownedRepair) { repairs.push(`${a.card}: unknown id ${a.target} → ${owners[0] ? `whatever is ${owners[0].name}’s` : 'any'}`); a.target = null; if (!a.of && owners[0]) a.of = owners[0].id; }
+          else if (t && owners.length && mine(t) && !owners.some((o) => belongsTo(this.host, t.id, o.id)) && ownedRepair) { repairs.push(`${a.card}: ${t.name} is not ${owners[0].name}’s → whatever is ${owners[0].name}’s`); a.target = null; a.of = owners[0].id; }
         }
         if (repairs.length) attempts.push({ repaired: repairs });
         if (!Array.isArray(out.agenda) || out.agenda.length === 0) problems.push('the agenda is empty');

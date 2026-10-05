@@ -16,7 +16,7 @@ import {WorldHost} from '../src/world.ts';
 
 const factory=await marsFactory({scene:'eden-camp',arrival:[16,-10],arrivalPlace:'bunkhouse',reference:[16,-9],grounds:{id:'grounds',name:'grounds'}});
 export const seed='wire-intentions',worldId='wire-eden';
-export function intentNativeFixture(t:TestContext,path=':memory:',enabled=true,historyV1=false) {
+export function intentNativeFixture(t:TestContext,path=':memory:',enabled=true,historyV1=false,compilerOutput?:CompileOut) {
   const db=new Db(path);t.after(()=>{if(db.db.isOpen)db.close();});
   for(const id of ['dev:alice','dev:bob','dev:admin']) {
     db.upsertUser({id,role:id==='dev:admin'?'admin':'user',email:null,wallet:null});db.setInvited(id,'local');
@@ -29,10 +29,10 @@ export function intentNativeFixture(t:TestContext,path=':memory:',enabled=true,h
   const mind=host.minds.get('s_A')!;mind.life=newLife(0);mind.nextEvalTick=1e9;
   let calls=0,hold:Promise<void>|undefined;
   const compilerCall:typeof callTool=async<T>(input:Parameters<typeof callTool>[0])=>{
-    calls++;assert.match(input.system,/ordinary actionable present direction/);
+    calls++;if(!compilerOutput)assert.match(input.system,/ordinary actionable present direction/);
     const standing=JSON.stringify(input.messages).includes('make friends if you feel like it');
     if(hold)await hold;
-    const out:CompileOut={understood:true,agenda:[{card:standing?'rest':'go to',target:standing?null:'campfire'}],
+    const out:CompileOut=compilerOutput?structuredClone(compilerOutput):{understood:true,agenda:[{card:standing?'rest':'go to',target:standing?null:'campfire'}],
       alignment:{understanding:standing?'PRIVATE_STANDING_SUMMARY':'Walk to the campfire.',trigger:{kind:standing?'none':'now'}}};
     return {out:out as T,ms:0,inputTokens:0,outputTokens:0,cachedTokens:0,costUsd:0,request:null,raw:{synthetic:true}};
   };
