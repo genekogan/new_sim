@@ -18,7 +18,7 @@ import { hashOf, physicalView, type ActionRecord, type ActivityOption, type Anch
 import { loadMars, type Mars } from './load.ts';
 import { CodecError } from '../../../mars/viewer/engine/runtime/codec.ts';
 import { constructionPlan, unsafeConstruction, type BuildPhase } from './construction.ts';
-import { captureRenderScene, commonsSceneMetadataV1Schema, type RenderSceneCaptureV1 } from '@sim/engine-contract';
+import { captureRenderScene, commonsSceneMetadataV1Schema, type RenderSceneCaptureV1, type RenderScene } from '@sim/engine-contract';
 import { readNativeGathering } from './gathering-observation.ts';
 import { prepareCommonsTransition } from './commons-transition.ts';
 import { commonsTransitionV1Schema,type CommonsTransitionV1,type CommonsTransitionAdmissionV1 } from '@sim/engine-contract';
@@ -43,6 +43,7 @@ type Prog = {
   index: number; started: boolean; since: number;
   blockedSince?: number;
   walkStopping?: Diag;
+  stopping?: Diag;
   ops: Op[]; action?: string; settle?: 'done' | 'held'; soft?: boolean; until?: number;
   build?: { phase: BuildPhase; crew: string[]; stopping?: Diag };
 };
@@ -85,12 +86,15 @@ const inPoly = (x: number, z: number, poly: [number, number][]) => {
 };
 const bucket = (m: number): 'here' | 'close' | 'near' | 'far' => (m < 2.5 ? 'here' : m < 9 ? 'close' : m < 28 ? 'near' : 'far');
 
+/** Fresh physical bases use an explicit native binding; legacy factories omit it. */
+export type MarsPhysicalBinding = {rulesVersion:string;renderScene:()=>RenderScene;restore:(snapshot:any)=>any;services:(world:any)=>any};
 export class MarsEngine implements Engine {
   readonly dt = 1 / TPS;
   readonly schema: string;
-  get rulesVersion() { return nativeRulesVersion(this.m.rulesVersion,this.cfg); }
+  get rulesVersion() { return nativeRulesVersion(this.physical?.rulesVersion??this.m.rulesVersion,this.cfg); }
   readonly runtime: RuntimeView;
   private m: Mars; private rt: any; private cfg: MarsWorldConfig;
+  private physical?:MarsPhysicalBinding;
   private registry: Map<string, any>;
   private programs = new Map<string, Prog>();
   private byActor = new Map<string, string>();
@@ -108,8 +112,8 @@ export class MarsEngine implements Engine {
   private quiet = false;
   private chunks: { fromTick: number; toTick: number; take: unknown }[] = [];
 
-  constructor(m: Mars, rt: any, cfg: MarsWorldConfig, saved?: { programs: Prog[]; nextProg: number; leaving: string[] }) {
-    this.m = m; this.rt = rt; this.cfg = structuredClone(cfg); this.registry = rt.registry;
+  constructor(m: Mars, rt: any, cfg: MarsWorldConfig, saved?: { programs: Prog[]; nextProg: number; leaving: string[] }, physical?:MarsPhysicalBinding) {
+    this.m = m; this.rt = rt; this.cfg = structuredClone(cfg); this.registry = rt.registry;this.physical=physical;
     this.schema = rt.world.schema;
     if (saved) { for (const p of saved.programs) { this.programs.set(p.id, p); this.byActor.set(p.actor, p.id); } this.nextProg = saved.nextProg; this.leaving = saved.leaving; }
     this.cursor = rt.events.length;
@@ -129,7 +133,7 @@ export class MarsEngine implements Engine {
     return [...BODY_VERBS, ...this.m.describeVerbs(this.registry).map((v) => ({ ...v, verb: `mars:${v.verb}`, description: `[Mars verb] ${v.description}`, scope: 'world' as const }))];
   }
   /** The world plus the adapter's own state (which program each actor is in), since both decide what happens next. */
-  stateHash(): string { return hashOf({ w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet, ...(this.cfg.safeCrewRemoval?{removalPolicy:'crew-removal/1'}:{}), ...(this.cfg.safeArrivalV1?{arrivalPolicy:'arrival-clearance/1'}:{}), ...(this.cfg.walkBlockV1?{walkPolicy:'walk-block/1'}:{}) }); }
+  stateHash(): string { return hashOf({ w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet, ...(this.cfg.safeCrewRemoval?{removalPolicy:'crew-removal/1'}:{}), ...(this.cfg.safeArrivalV1?{arrivalPolicy:'arrival-clearance/1'}:{}), ...(this.cfg.walkBlockV1?{walkPolicy:'walk-block/1'}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion,physicalPolicy:this.cfg}:{}) }); }
   physicalHash(): string { return hashOf(physicalView(this.world)); }
 
   // ------------------------------------------------------------------ tick
@@ -189,6 +193,10 @@ export class MarsEngine implements Engine {
   /** Move a program forward as far as it can go this tick. */
   private advance(p: Prog) {
     const tick: number = this.rt.tick;
+    if(p.stopping){
+      if(p.action&&this.rt.isActive(p.action)){this.rt.cancel(p.action,p.stopping);return;}
+      return this.end(p,'cancelled',p.stopping);
+    }
     for (let guard = 0; guard < 12; guard++) {
       if (!this.ents[p.actor]) return this.end(p, 'cancelled', { code: 'actor.removed', message: 'the actor is gone' });
       if (!p.started) {
@@ -212,7 +220,7 @@ export class MarsEngine implements Engine {
           return this.end(p, 'failed', p.walkStopping);
         }
         if (rec) {
-          const walkBlocked = this.cfg.walkBlockV1 && rec.verb === 'walk_to';
+          const walkBlocked = this.cfg.walkBlockV1 && (rec.verb === 'walk_to'||this.physical&&rec.verb==='commons_shore_travel');
           const routeBlocked = /deadlock\.|walk.goal-occupied/.test(rec.diagnostic?.code ?? '');
           // Native sleep retains a failed/directed-away purpose for an explicit
           // Resume in the finite Lab. A living card must instead report blockage
@@ -291,12 +299,13 @@ export class MarsEngine implements Engine {
     let last: Diag = { code: 'route.unreachable', message: 'no reachable standing point near the target' };
     for (const turn of off === 0 ? [0] : [0, 0.6, -0.6, 1.2, -1.2, 1.9, -1.9, Math.PI]) {
       const x = r3(t[0] + Math.cos(base + turn) * off), z = r3(t[1] + Math.sin(base + turn) * off);
-      const no = this.plan('walk_to', { actor, x, z, level });
+      const no = this.plan(this.movementVerb(actor,x), { actor, x, z, level });
       if (!no) return { x, z, level };
       last = no;
     }
     return last;
   }
+  private movementVerb(actor:string,x:number){return this.physical&&(x<-29.5||this.ents[actor]?.pose.p[0]<-29.5)?'commons_shore_travel':'walk_to';}
   private free(id: string): boolean { return !!this.ents[id] && this.holders(id).length === 0 && !this.byActor.has(id) && ![...this.programs.values()].some(p=>p.build?.crew.includes(id)); }
 
   /** A raw Mars verb, with the actor filled in where the verb takes one (`actor`, or `actors` when none are given). */
@@ -317,7 +326,7 @@ export class MarsEngine implements Engine {
         const g = this.goalNear(me, a.to, typeof a.standoff === 'number' ? a.standoff : 0);
         if (g === 'here') return [];
         if ('code' in g) return g;
-        const ops: Op[] = [{ verb: 'walk_to', params: { actor: me, x: g.x, z: g.z, level:g.level }, settle: 'done' }];
+        const ops: Op[] = [{ verb: this.movementVerb(me,g.x), params: { actor: me, x: g.x, z: g.z, level:g.level }, settle: 'done' }];
         if (typeof a.to === 'string' && this.ents[a.to]) ops.push({ verb: 'face', params: { actor: me, target: { entity: a.to } }, settle: 'done', soft: true });
         return ops;
       }
@@ -342,7 +351,7 @@ export class MarsEngine implements Engine {
         // No place to take (a full bench, a spot with no layout): stand near it instead.
         const g = this.goalNear(me, a.at, 2);
         if (g !== 'here' && 'code' in g) return g;
-        return [...(g === 'here' ? [] : [{ verb: 'walk_to', params: { actor: me, x: g.x, z: g.z, level:g.level }, settle: 'done' } as Op]), { wait: n }];
+        return [...(g === 'here' ? [] : [{ verb: this.movementVerb(me,g.x), params: { actor: me, x: g.x, z: g.z, level:g.level }, settle: 'done' } as Op]), { wait: n }];
       }
       case 'sit': return [{ verb: 'sit', params: { actor: me, fixture: String(a.on ?? '') }, settle: 'held' }, { wait: secs(a.seconds, 60) }];
       case 'stand': return this.holders(me).length ? [{ verb: 'stand', params: { actor: me }, settle: 'done', soft: true }] : [];
@@ -354,7 +363,7 @@ export class MarsEngine implements Engine {
           for (let tries = 0; tries < 4; tries++) {
             const ang = this.m.nextRandom(this.rt.world.rng) * Math.PI * 2, dist = (0.3 + 0.7 * this.m.nextRandom(this.rt.world.rng)) * radius;
             const x = r3(home[0] + Math.cos(ang) * dist), z = r3(home[1] + Math.sin(ang) * dist);
-            if (leg > 0 || !this.plan('walk_to', { actor: me, x, z })) { ops.push({ verb: 'walk_to', params: { actor: me, x, z, speed: 0.9 }, settle: 'done', soft: true }); break; }
+            if (leg > 0 || !this.plan(this.movementVerb(me,x), { actor: me, x, z })) { ops.push({ verb: this.movementVerb(me,x), params: { actor: me, x, z, ...(this.movementVerb(me,x)==='walk_to'?{speed:0.9}:{}) }, settle: 'done', soft: true }); break; }
           }
           const pause = Math.round((2 + 6 * this.m.nextRandom(this.rt.world.rng)) * TPS); ops.push({ wait: pause });
           spent += pause + Math.round((radius / 0.9) * TPS * 0.6);
@@ -369,6 +378,15 @@ export class MarsEngine implements Engine {
   canPerform(program: Program): Diag | null {
     if (!this.ents[program.actor]) return { code: 'actor.unknown', message: `no such actor ${program.actor}` };
     if ([...this.programs.values()].some(p=>p.build?.crew.includes(program.actor))) return {code:'construction.committed',message:'This builder is finishing a finite physical construction segment.'};
+    if(this.physical){
+      const old=this.programs.get(this.byActor.get(program.actor)??'');
+      if(old?.stopping)return {code:'program.safe-stop-pending',message:'The previous movement is still reaching a safe supported stop.'};
+      if(old?.action&&this.rt.isActive(old.action)){
+        if(!this.canSnapshot())return {code:'program.safe-stop-required',message:'Stop the current non-resumable action safely before replacing it.'};
+        const copy=this.physical.restore(this.rt.snapshot());copy.cancel(old.action,{code:'program.replaced',message:'replaced'});
+        if(copy.isActive(old.action))return {code:'program.safe-stop-required',message:'Stop the current movement and let it reach safe support before replacing it.'};
+      }
+    }
     const first = program.steps[0]; if (!first) return null;
     if (first.verb === 'build_lookout') {
       if (program.steps.length !== 1) return {code:'construction.one-job',message:'A construction card chooses one finite job.'};
@@ -412,7 +430,7 @@ export class MarsEngine implements Engine {
   perform(program: Program) {
     const {result,build}=this.prepareAdmission(program),id=result.id;
     this.nextProg++;
-    if (!result.ok) { const old = this.byActor.get(program.actor); if (old) this.stop(old); return result; }
+    if (!result.ok) { const old = this.byActor.get(program.actor); if (old&&!this.physical) this.stop(old); return result; }
     const old = this.byActor.get(program.actor);
     if (old) { const o = this.programs.get(old)!; if (o.action && this.rt.isActive(o.action)) this.rt.cancel(o.action, { code: 'program.replaced', message: 'replaced' }); this.end(o, 'cancelled', { code: 'program.replaced', message: 'replaced by a new program' }); }
     const p: Prog = { id, actor: program.actor, label: program.label.slice(0, 200), steps: build?build.steps:program.steps, index: 0, started: false, since: this.rt.tick, ops: [], ...(build?{build:{phase:program.steps[0].params.phase as BuildPhase,crew:build.crew}}:{}) };
@@ -422,7 +440,10 @@ export class MarsEngine implements Engine {
   stop(programId: string) {
     const p = this.programs.get(programId); if (!p) return;
     if (p.build) { p.build.stopping={code:'program.stopped',message:'Construction interruption requested; finishing the committed segment safely.'}; return; }
-    if (p.action && this.rt.isActive(p.action)) this.rt.cancel(p.action, { code: 'program.stopped', message: 'stopped' });
+    if (p.action && this.rt.isActive(p.action)) {
+      this.rt.cancel(p.action, { code: 'program.stopped', message: 'stopped' });
+      if(this.physical&&this.rt.isActive(p.action)){p.stopping={code:'program.stopped',message:'Stopped after native movement reaches safe support.'};return;}
+    }
     this.end(p, 'cancelled', { code: 'program.stopped', message: 'stopped' });
   }
   programOf(actor: string) { return this.byActor.get(actor) ?? null; }
@@ -507,7 +528,10 @@ export class MarsEngine implements Engine {
     for (const id of Object.keys(w.entities).sort()) { const e = w.entities[id]; if (e.kind !== 'fixture') continue; out.push({ id, kind: 'place', name: e.label ?? id, in: cfg.grounds.id, entity: id, tags: [e.def] }); }
     return out;
   }
-  regionAt(_p: Vec3): string { return this.cfg.grounds.id; }
+  regionAt(p: Vec3): string {
+    if(this.physical)for(const id of ['shore-water','shore-bank']){const r=this.rt.world.regions[id];if(r&&inPoly(p[0],p[2],r.polygon))return id;}
+    return this.cfg.grounds.id;
+  }
   poseSampleOf(id: string): PoseSample {
     const e = this.ents[id];
     return [this.rt.tick, Math.round(e.pose.p[0] * 1000), Math.round(e.pose.p[1] * 1000), Math.round(e.pose.p[2] * 1000), Math.round(e.pose.yaw * 1000)];
@@ -534,6 +558,7 @@ export class MarsEngine implements Engine {
     }
   }
   renderScene() {
+    if(this.physical)return {...this.physical.renderScene(),clock:this.cfg.clock?{origin:this.cfg.clock.origin,dayTicks:this.cfg.clock.dayTicks}:null};
     const scene=structuredClone(this.m.scenes[this.rt.world.base.campus] ?? null);
     if(this.cfg.scene==='eden-commons')scene.commons=commonsSceneMetadataV1Schema.parse({
       version:'commons/1',source:'9b6db72fc2dcf45a762d7ce8e4db0b71d0418ea8',layout:structuredClone(this.m.commonsLayout),
@@ -585,6 +610,7 @@ export class MarsEngine implements Engine {
     return new MarsEngine(this.m, new this.m.Runtime(w,this.registry,this.m.servicesFor(this.m.scenes)(w),this.m.invariants),cfg).anchors();
   }
   adoptCamp() {
+    if(this.physical)throw new Error('connected.adoption-unqualified');
     if (this.rt.world.base.campus === 'eden-camp') return;
     if (!this.isQuiet()) throw new Error('camp.adoption-not-quiet');
     const camp = this.m.edenCampWorld();
@@ -698,7 +724,7 @@ export class MarsEngine implements Engine {
   compact() {
     if (!this.isQuiet()) throw new Error('compaction.not-quiet');
     this.finishRecorder();
-    this.rt = this.m.compactRuntime(this.rt, this.m.servicesFor(this.m.scenes));
+    this.rt = this.m.compactRuntime(this.rt, this.physical?.services??this.m.servicesFor(this.m.scenes));
     this.registry = this.rt.registry; this.cursor = 0; this.quiet = false;
     this.startRecorder();
   }
@@ -707,7 +733,7 @@ export class MarsEngine implements Engine {
   /** Mars's own resumable snapshot, plus which program each actor is in. Body-language steps lower only to verbs Mars can resume exactly. */
   snapshot(): EngineSnapshot {
     const mars = this.rt.snapshot();
-    return structuredClone({ format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, ...(this.cfg.scene==='eden-commons'?{commonsVersion:'commons/1'}:{}), quiet: this.quiet });
+    return structuredClone({ format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, ...(this.cfg.scene==='eden-commons'?{commonsVersion:'commons/1'}:{}), quiet: this.quiet, ...(this.physical?{physicalBinding:this.physical.rulesVersion}:{}) });
   }
   canSnapshot(): boolean {
     // A legacy formation callback is not data and must wait for a quiet point.
@@ -769,6 +795,7 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
     },
     restore(snap: EngineSnapshot) {
       const s = structuredClone(snap) as EngineSnapshot & { mars: any; programs: Prog[]; nextProg: number; leaving: string[]; cfg: MarsWorldConfig; commonsVersion?:string; quiet?: boolean };
+      if ('physicalBinding' in s)throw new Error('snapshot physical binding differs from the legacy factory');
       if (s.format !== SNAPSHOT_FORMAT) throw new Error(`bad snapshot format ${s.format}`);
       if(!!s.cfg?.walkBlockV1!==!!cfg.walkBlockV1)throw new Error('snapshot walk policy differs from the native factory');
       if(!!s.cfg?.safeArrivalV1!==!!cfg.safeArrivalV1)throw new Error('snapshot arrival policy differs from the native factory');

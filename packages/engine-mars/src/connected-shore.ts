@@ -59,6 +59,7 @@ export async function connectedCommonsShoreFixture(){
     create(w:WorldState):Runtime{validate(w);return new m.Runtime(w,registry,services(w),invariants);},
     restore(s:RuntimeSnapshot):Runtime{const w=decodeSnapshot(s).world;validate(w);return m.Runtime.restore(s,registry,services(w),invariants);},
     renderScene():RenderScene{const visible=structuredClone(scene);(visible as any).commons={version:'commons/1',source:'9b6db72fc2dcf45a762d7ce8e4db0b71d0418ea8',layout:structuredClone(m.commonsLayout)};return {scene:visible,ground:'grass',shore:nativeShoreSceneV1Schema.parse({contract:'native-shore-scene/1',rulesVersion,physicalBase:base,terrain,water})};},
+    servicesForWorld:services,
     human:m.human,
   };
 }
