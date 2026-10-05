@@ -24,8 +24,11 @@ export const BOAT_LAYOUT=freeze({
   connector:{from:[-4,.7,5.5] as V3,to:[-4,.5,6.75] as V3,width:.8},
   seats:{seat0:{root:[-.65,.8,0] as V3,yaw:Math.PI},seat1:{root:[.65,.8,0] as V3,yaw:0}},
 });
-const DOCK=BOAT_LAYOUT.boatDockPosition,BANK=BOAT_LAYOUT.bank,seats=BOAT_LAYOUT.seats;
 export type BoatGeometry={shore:ShoreGeometry;clearance(from:V3,to:V3):boolean};
+export type BoatPolicy = {[K in keyof typeof BOAT_POLICY]:(typeof BOAT_POLICY)[K] extends number?number:string};
+function controllersAt(B:BoatPolicy,layout:typeof BOAT_LAYOUT){
+const DOCK=layout.boatDockPosition,BANK=layout.bank,seats=layout.seats;
+
 type PathPoint={p:V3;support:string};
 type Transfer={actor:string;boat:string;slot:'seat0'|'seat1';leaving:boolean;points:PathPoint[];index:number;id:string};
 type Sailing={boat:string;actor:string;goal:V3;id:string};
@@ -37,15 +40,15 @@ const seatRoot=(v:Entity,slot:'seat0'|'seat1'):V3=>[v.pose.p[0]+seats[slot].root
 function docked(rt:Runtime):Diagnostic|null {
   const v=boat(rt),dock=rt.world.entities[B.dockId];
   if(!v?.boat||v.def!=='eden-shore-boat'||v.pose.yaw!==0||v.pose.pitch||v.pose.roll)return diag('unknown-frame','boat frame is not qualified');
-  if(!dock||dock.def!=='eden-shore-dock'||!eq(dock.pose.p,BOAT_LAYOUT.dock.position)||dock.pose.yaw!==0||dock.pose.pitch||dock.pose.roll)
+  if(!dock||dock.def!=='eden-shore-dock'||!eq(dock.pose.p,layout.dock.position)||dock.pose.yaw!==0||dock.pose.pitch||dock.pose.roll)
     return diag('dock-gone','the published dock support is unavailable',[B.dockId]);
   if(!eq(v.pose.p,DOCK)||v.boat.phase!=='docked'||v.boat.dockId!==B.dockId||!v.boat.connectorOpen||v.boat.speed!==0)
     return diag('not-docked','boarding/exiting requires the exact stopped dock and deployed connector',[v.id]);
   return null;
 }
 function path(rt:Runtime,slot:'seat0'|'seat1',leaving:boolean):PathPoint[] {
-  const p:PathPoint[]=[{p:[...BANK],support:'bank'}, {p:[...BOAT_LAYOUT.ramp.to],support:'shore-ramp'},
-    {p:[...BOAT_LAYOUT.deckEntry],support:'dock-deck'}, {p:[...BOAT_LAYOUT.connector.to],support:'dock-gangway'},
+  const p:PathPoint[]=[{p:[...BANK],support:'bank'}, {p:[...layout.ramp.to],support:'shore-ramp'},
+    {p:[...layout.deckEntry],support:'dock-deck'}, {p:[...layout.connector.to],support:'dock-gangway'},
     {p:seatRoot(boat(rt),slot),support:'boat-deck'}];
   return leaving?p.map((point,i)=>({p:point.p,support:p[Math.min(i+1,p.length-1)].support})).reverse():p;
 }
@@ -105,7 +108,7 @@ function sailingBodies(rt:Runtime):Diagnostic|null {
   return null;
 }
 
-export function boatActions(g:BoatGeometry):ActionDef[] {
+function boatActions(g:BoatGeometry):ActionDef[] {
   function transfer(leaving:boolean):ActionDef<{actor:string;slot:'seat0'|'seat1'},PathPoint[],Transfer> {
     return {
       verb:leaving?'boat_leave':'boat_board',description:leaving?'Leave a stopped, docked boat through its actual supported connector.':'Board a stopped, docked boat through the admitted ramp, deck and connector into one finite passenger seat.',
@@ -197,7 +200,7 @@ export function boatActions(g:BoatGeometry):ActionDef[] {
 }
 
 /** Return null for an ordinary shore root; otherwise certify its other support. */
-export function boatBodyContact(rt:Runtime,e:Entity):Diagnostic[]|null {
+function boatBodyContact(rt:Runtime,e:Entity):Diagnostic[]|null {
   const h=e.human;if(!h?.boatPassenger&&!h?.boatTransit)return null;
   const v=boat(rt),p=h.boatPassenger;
   if(!v?.boat||!p||p.boatId!==v.id||!Object.hasOwn(seats,p.slotId)||v.boat.passengers[p.slotId]!==e.id)
@@ -213,7 +216,7 @@ export function boatBodyContact(rt:Runtime,e:Entity):Diagnostic[]|null {
   const expected=t.from.map((x,i)=>x+(t.to[i]-x)*t.t) as V3;
   return valid&&dist(e.pose.p,expected)<1e-8?[]:[diag('unsupported-transfer',`${e.id} left its published supported connector path`)];
 }
-export function boatInvariant(g:BoatGeometry):Invariant {
+function boatInvariant(g:BoatGeometry):Invariant {
   return rt=>{
     const v=boat(rt),s=v?.boat;if(!s)return [diag('missing','the admitted boat is missing')];
     const out:Diagnostic[]=[];
@@ -230,7 +233,7 @@ export function boatInvariant(g:BoatGeometry):Invariant {
 /** The legacy flat raster clearance is unsuitable for the sloping water bed
  * and moving hull. Check actual current 3D envelopes in this isolated fixture.
  * Only the exact published transfer can use the dock/hull as support. */
-export const boatClearanceInvariant:Invariant=rt=>{
+const boatClearanceInvariant:Invariant=rt=>{
   const out:Diagnostic[]=[];
   for(const e of Object.values(rt.world.entities)) {
     if(!e.human||e.human.boatPassenger?.phase==='seated')continue;
@@ -241,3 +244,24 @@ export const boatClearanceInvariant:Invariant=rt=>{
   const v=boat(rt);if(v?.boat){const hit=routeHit(rt,v.pose.p,v.pose.p);if(hit)out.push(hit);}
   return out;
 };
+
+  return {actions:boatActions,bodyContact:boatBodyContact,invariant:boatInvariant,clearanceInvariant:boatClearanceInvariant,policy:B,layout};
+}
+const legacyControllers=controllersAt(BOAT_POLICY,BOAT_LAYOUT);
+export const boatActions=legacyControllers.actions;
+export const boatBodyContact=legacyControllers.bodyContact;
+export const boatInvariant=legacyControllers.invariant;
+export const boatClearanceInvariant=legacyControllers.clearanceInvariant;
+
+/** Only a rigid translation of the admitted layout: no new shape, yaw, force,
+ * passenger envelope, seat-derived pilot authority or hidden visual movement. */
+export function translatedBoatControllers(raw:unknown){
+  const n=z.number().finite().min(-1000).max(1000),t=z.object({x:n,y:n,z:n}).strict().parse(raw);
+  const move=(p:V3):V3=>[p[0]+t.x,p[1]+t.y,p[2]+t.z];
+  const layout=structuredClone(BOAT_LAYOUT);
+  layout.boatDockPosition=move(layout.boatDockPosition);layout.bank=move(layout.bank);
+  layout.dock.position=move(layout.dock.position);layout.dock.topY+=t.y;
+  layout.ramp.from=move(layout.ramp.from);layout.ramp.to=move(layout.ramp.to);
+  layout.deckEntry=move(layout.deckEntry);layout.connector.from=move(layout.connector.from);layout.connector.to=move(layout.connector.to);
+  return controllersAt(Object.freeze({...BOAT_POLICY,keelY:BOAT_POLICY.keelY+t.y}),freeze(layout));
+}
