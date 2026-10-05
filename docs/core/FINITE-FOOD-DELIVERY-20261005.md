@@ -53,3 +53,11 @@ rendered publication and current-state safe acceptance remain PM/World checks.
 The selected packet must exclude unrelated private-arrival migration17/DTO/wire
 changes. Social phase1 draft is preserved in an owned Git stash, not discarded;
 it will resume after this functioning-life increment.
+
+The first fresh selected-entry smoke committed delivery before its independently
+pending kitchen checkpoint; shutdown then exposed a rejected kitchen rule order.
+The failure receipt is retained. The delivery observer now waits for the existing
+requested kitchen policy before preparing its fact. This does not force kitchen
+or actors; it preserves reader/rule ordering. Corrected loopback HTTP/restart
+smoke succeeds with exactly one delivery for the same ID. Current PM kitchen2
+already exists. No old private synthetic failure DB was reset or relabelled.
