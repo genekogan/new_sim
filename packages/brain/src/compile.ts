@@ -157,7 +157,7 @@ const plain = (v: unknown, max = 200) => String(v ?? '').replace(/[<>\r\n]+/g, '
 const cardLine = (c: MintedCard) => `- "${plain(c.name, 60)}"${c.target ? ` (on a ${plain(c.target.kind, 40)})` : ''}: ${plain(c.summary, 160)}`;
 
 /** The uncached part: this Soul, its wish, what it holds, what exists. */
-export function compileUser(k: KState, soulId: string, wish: string, known: string[]): string {
+export function compileUser(k: KState, soulId: string, wish: string, known: string[], physicalWhere?:string): string {
   const soul = k.things[soulId]; const deck = k.decks[soulId]?.cards ?? [];
   const inDeck = deck.map((n) => k.vocab.cards[n]).filter(Boolean), library = Object.values(k.vocab.cards).filter((c) => !deck.includes(c.name));
   const things = known.map((id) => k.things[id]).filter(Boolean).map((t) => {
@@ -165,7 +165,8 @@ export function compileUser(k: KState, soulId: string, wish: string, known: stri
     const states=Object.fromEntries(Object.entries(t.states).filter(([key])=>key!=='privateMandate'));
     return `- ${t.id} | ${t.kind} | ${plain(t.name, 60)}${t.at ? ` | at ${plain(k.things[t.at]?.name ?? t.at, 60)}` : ''}${Object.keys(states).length ? ` | ${plain(JSON.stringify(states), 160)}` : ''}${links.length ? ` | ${plain(links.join('; '), 200)}` : ''}`;
   });
-  return `<soul>${plain(soul.name, 40)}: ${plain(soul.traits.about)} (currently at ${soul.at ? (k.things[soul.at]?.name ?? soul.at) : 'nowhere'})</soul>
+  const semanticWhere=soul.at ? (k.things[soul.at]?.name ?? soul.at) : 'nowhere';
+  return `<soul>${plain(soul.name, 40)}: ${plain(soul.traits.about)} (${physicalWhere?`physically ${plain(physicalWhere,280)}; recorded kernel place: ${plain(semanticWhere,160)}`:`currently at ${semanticWhere}`})</soul>
 
 <wish>${plain(wish, 2000)}</wish>
 

@@ -16,4 +16,5 @@ export * from './birth.ts';
 export * from './commons.ts';
 export * from './shore.ts';
 export * from './boat.ts';
+export * from './body-location.ts';
 export * from './commons-transition.ts';

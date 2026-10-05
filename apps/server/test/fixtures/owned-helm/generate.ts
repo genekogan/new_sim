@@ -5,13 +5,13 @@ import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {setImmediate} from 'node:timers/promises';
-import {connectedCommonsHelmFactory} from '@sim/engine-mars';
+import {connectedCommonsHelmFactory,connectedCommonsLocationFactory} from '@sim/engine-mars';
 import {connectedCommonsBoatFixture} from '../../../../../packages/engine-mars/src/connected-boat.ts';
 import {kernelHash} from '@sim/kernel';
-import {hashOf,nativeBoatControlsV1Schema,type ProgramEvent} from '@sim/engine-contract';
+import {hashOf,nativeBoatControlsV1Schema,bodyLocationV1Schema,describeBodyLocation,type ProgramEvent} from '@sim/engine-contract';
 import type {Mind} from '../../../src/world.ts';
 import {INTENT_V2,intentReceiptV2Schema,intentHistoryPageV1Schema,publicEvent} from '@sim/protocol';
-import type {CompileOut,callTool} from '@sim/brain';
+import {fingerprint,type CompileOut,type callTool} from '@sim/brain';
 import {Db} from '../../../src/db.ts';
 import {WorldHost} from '../../../src/world.ts';
 import {Brain} from '../../../src/brain.ts';
@@ -21,19 +21,27 @@ import {config} from '../../../src/config.ts';
 import {buildApp} from '../../../src/http.ts';
 import {IntentControlV2} from '../../../src/intent-control.ts';
 import type {Hub} from '../../../src/hub.ts';
-export async function generateOwnedHelm(){
-  const dir=mkdtempSync(join(tmpdir(),'eden-owned-helm-')),path=join(dir,'native.db'),db=new Db(path),factory=await connectedCommonsHelmFactory(),native=await connectedCommonsBoatFixture({helmV1:true});
+export async function generateOwnedHelm(options?:{bodyLocationV1?:true}){
+  const dir=mkdtempSync(join(tmpdir(),'eden-owned-helm-')),path=join(dir,'native.db'),db=new Db(path),factory=await (options?.bodyLocationV1?connectedCommonsLocationFactory():connectedCommonsHelmFactory()),native=await connectedCommonsBoatFixture({helmV1:true,...options});
   const seed='owned-voluntary-helm',worldId='owned-voluntary-helm',host=new WorldHost(db,factory,seed,1e9,worldId,{durableClockV1:true});host.boot();host.drainInputs();
   const cfg={...config,worldId,worldKey:'eden',worldPath:'/w/eden',brainMode:'fake' as const,budgetUsdPerDay:.5,
     publicUrl:'http://127.0.0.1:4958',typesafeKey:undefined,anthropicKey:'synthetic-only',compilerModel:'synthetic-only',privyAppId:'',privyAppSecret:'',inviteRequired:true};
   type Step={verb:string;params:Record<string,unknown>};
   type Direction={owner:string;requestId:string;words:string;card:string;steps:Step[]};
-  let current:Direction|undefined,compilerCalls=0,groundedCompilerCalls=0;
+  let current:Direction|undefined,compilerCalls=0,groundedCompilerCalls=0,groundedBodyCompilerCalls=0,unavailableCompilerCalls=0;
   const compilerCall:typeof callTool=async<T>(input:Parameters<typeof callTool>[0])=>{
     compilerCalls++;assert.ok(current);assert.match(input.system,/ordinary actionable present direction/);
     assert.ok(JSON.stringify(input.messages).includes(current.words),'actual submitted ordinary words reach compiler');
     const m=owned[current.owner].mind,physical=host.engine.observeBoatControls!(m.entityId);
     if(physical){groundedCompilerCalls++;assert.ok(JSON.stringify(input.messages).includes(JSON.stringify(physical).replaceAll('"','\\"')),'compiler receives current physical view');}
+    const placement=host.engine.observeBodyLocation?.(m.entityId);
+    if(options?.bodyLocationV1&&placement===null){
+      unavailableCompilerCalls++;assert.ok(JSON.stringify(input.messages).includes('physically physical location unavailable'));assert.ok(JSON.stringify(input.messages).includes('Do not infer it from the kernel place relation'));
+      assert.ok(!JSON.stringify(input.messages).includes('(currently at '));
+      return {out:{understood:false,reason:'Physical self-location is unavailable.',agenda:[]} as T,ms:0,inputTokens:0,outputTokens:0,cachedTokens:0,costUsd:0,request:null,raw:{synthetic:true,controlledUnavailableProbe:true}};
+    }
+    if(options?.bodyLocationV1){assert.ok(placement);groundedBodyCompilerCalls++;assert.ok(JSON.stringify(input.messages).includes(JSON.stringify(placement).replaceAll('"','\\"')));assert.ok(JSON.stringify(input.messages).includes('physically '+describeBodyLocation(placement)));assert.ok(JSON.stringify(input.messages).includes('recorded kernel place:'));
+      assert.ok(!JSON.stringify(input.messages).includes('(currently at '),'compiler cannot present a stale kernel relation as actual current physical placement');}
     const out:CompileOut={understood:true,agenda:[{card:current.card,target:null}],alignment:{understanding:current.words,trigger:{kind:'now'}},
       ...(!host.kernel.vocab.cards[current.card]?{new_cards:[{name:current.card,summary:'A voluntary native boat activity',target:null,when:[],then:[{set:['$actor','doing',current.card]}],approach:[],during:current.steps,takes:'minutes'}]}:{})};
     return {out:out as T,ms:0,inputTokens:0,outputTokens:0,cachedTokens:0,costUsd:0,request:null,raw:{synthetic:true}};
@@ -47,8 +55,20 @@ export async function generateOwnedHelm(){
   const owned:Record<string,{soulId:string;entityId:string;mind:Mind;token:string}>={},creators=new Map<string,string>(),accepted:{owner:string;intentId:string;card:string}[]=[],terminals:any[]=[],programEvents:ProgramEvent[]=[],cueSamples:unknown[]=[];
   host.listeners.push({onProgram:event=>programEvents.push(structuredClone(event))});
   const boat=()=>host.engine.world.entities[native.policy.boatId] as any;
+  const locationSamples:unknown[]=[],seenLocationPhases=new Set<string>();let locationFingerprintProbe:unknown;
   const quiet=()=>{for(const {mind} of Object.values(owned))mind.nextEvalTick=1e9;};
   async function tick(){quiet();host.tickOnce();await setImmediate();quiet();}
+  async function location(owner:string,stage:string){
+    if(!options?.bodyLocationV1)return;
+    const {soulId,entityId,mind,token}=owned[owner],before=hashOf(host.engine.snapshot()),kernelBefore=kernelHash(host.kernel);
+    const response=await request('/v1/souls/'+soulId+'/perceive',owner);assert.equal(response.status,200);assert.match(response.headers.get('cache-control')??'',/no-store/);const view=await response.json() as any,placement=bodyLocationV1Schema.parse(view.physical_location);
+    const agent=await app.request('/v1/agent/perceive',{headers:{authorization:'Bearer '+token}});assert.equal(agent.status,200);assert.match(agent.headers.get('cache-control')??'',/no-store/);assert.deepEqual((await agent.json() as any).physical_location,placement);
+    const status=souls.status(db.soul(soulId)!);assert.ok('physical_location' in status);assert.deepEqual(status.physical_location,placement);assert.deepEqual(placement,host.engine.observeBodyLocation!(entityId));
+    if(placement.region)assert.equal(status.position.region,placement.region.id);
+    assert.deepEqual(placement.root,host.engine.world.entities[entityId].pose.p);assert.equal(view.soul.where,describeBodyLocation(placement));assert.equal(brain.midContext(mind,'agent').soul.where,view.soul.where);
+    assert.equal(hashOf(host.engine.snapshot()),before);assert.equal(kernelHash(host.kernel),kernelBefore,'observing physical placement cannot invent a semantic move');
+    locationSamples.push({owner,stage,location:placement,where:view.soul.where,semanticAt:host.kernel.things[soulId].at});
+  }
   async function controls(owner:string){
     const {soulId,entityId,mind,token}=owned[owner],before=host.engine.stateHash();
     const response=await request('/v1/souls/'+soulId+'/perceive',owner);assert.equal(response.status,200);
@@ -81,6 +101,8 @@ export async function generateOwnedHelm(){
   async function until(owner:string,intentId:string,underway=false){
     for(let i=0;i<3500;i++){
       await tick();const attempts=Object.values(host.intentHistoryOf(owned[owner].soulId).attempts).filter(a=>a.intent.intentId===intentId),a=attempts.at(-1);
+      const phase=(host.engine.world.entities[owned[owner].entityId].human as any).boatPassenger?.phase,phaseKey=owner+':'+phase;
+      if(options?.bodyLocationV1&&phase&&!seenLocationPhases.has(phaseKey)){seenLocationPhases.add(phaseKey);await location(owner,phase);}
       if(underway&&boat().boat.phase==='underway'){assert.equal(a?.phase,'started');return a!;}
       if(a?.phase==='completed'){assert.equal(underway,false);assert.ok(programEvents.some(e=>e.id===a.activityId&&e.kind==='completed'&&e.tick===a.tick));terminals.push(a);return a;}
       if(a?.phase==='blocked'||a?.phase==='interrupted')throw Error('native activity did not complete: '+JSON.stringify(a));
@@ -105,11 +127,24 @@ export async function generateOwnedHelm(){
       const pair=await (await request('/v1/souls/'+soulId+'/pair',owner,{})).json() as any;
       const paired=await app.request('/v1/agent/pair',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({code:pair.code,agent:'Local synthetic probe'})});assert.equal(paired.status,200);const {token}=await paired.json() as any;
       owned[owner]={soulId,entityId,mind,token};quiet();
+      await location(owner,'arrival');
     }
     for(const [owner,slot,card] of [['alice','seat0','board left'],['bob','seat1','board right']]){
       const id=await submit(owner,'board-'+owner,'Walk to the dock and sit in the '+(slot==='seat0'?'left':'right')+' boat seat',card,[walkBank,nativeStep('boat_board',{slot})]);await until(owner,id);
     }
     assert.deepEqual(boat().boat.pilotIds,[]);assert.equal((await controls('alice')).take.available,true);assert.equal((await controls('bob')).take.available,true);
+    await location('alice','both-boarded');await location('bob','both-boarded');
+    if(options?.bodyLocationV1){
+      // Controlled read-only metadata probe, not a rename feature or a logged
+      // historical edit. Physics/options stay unchanged; the actual container
+      // description alone must change call relevance. Restore before any input.
+      const beforeGraph=hashOf(host.engine.snapshot()),v=boat(),label=v.label,base=brain.midContext(owned.alice.mind,'agent');
+      try{v.label='the lake boat';const changed=brain.midContext(owned.alice.mind,'agent');assert.notEqual(base.soul.where,changed.soul.where);assert.deepEqual(base.nearby,changed.nearby);assert.deepEqual(base.options.map(o=>o.id),changed.options.map(o=>o.id));assert.deepEqual(base.situation,changed.situation);
+        const {physicalWhere:_a,...legacyBase}=base,{physicalWhere:_b,...legacyChanged}=changed;
+        assert.equal(fingerprint(legacyBase),fingerprint(legacyChanged),'legacy fingerprint ignored only the changed where wording');assert.notEqual(fingerprint(base),fingerprint(changed),'tagged physical placement is meaningful context');
+        locationFingerprintProbe={physicalWordingChanged:true,legacyFingerprintSame:true,taggedFingerprintChanged:true};
+      }finally{if(label===undefined)delete v.label;else v.label=label;}assert.equal(hashOf(host.engine.snapshot()),beforeGraph);
+    }
     const take=await submit('alice','take-alice','Take the helm so we can go boating','take helm',[nativeStep('boat_take_helm')]);await until('alice',take);
     assert.deepEqual(boat().boat.pilotIds,[owned.alice.entityId]);assert.equal((await controls('alice')).release.available,true);assert.equal((await controls('bob')).take.reason!.code,'boat.helm-held');
     const beforeForeign=host.engine.stateHash(),beforeForeignGraph=hashOf(host.engine.snapshot());
@@ -118,6 +153,7 @@ export async function generateOwnedHelm(){
     const ungranted=host.engine.previewAdmission!({actor:owned.bob.entityId,label:'Hypothetical ungranted-pilot probe',steps:[nativeStep('boat_travel',{x:-56,z:8})]});assert.equal(ungranted.ok,false);assert.equal(ungranted.diagnostic!.code,'boat.pilot-not-authorized');assert.equal(host.engine.stateHash(),beforeForeign);assert.equal(hashOf(host.engine.snapshot()),beforeForeignGraph);
     const trip=await submit('alice','outward-alice','Take us out onto the quiet water','sail outward',[nativeStep('boat_travel',{x:-56,z:8})]);const started=await until('alice',trip,true);
     for(let i=0;i<40;i++)await tick();assert.ok(boat().boat.speed>0);assert.notDeepEqual(boat().pose.p,native.layout.boatDockPosition);
+    await location('alice','underway');await location('bob','underway');
     assert.equal((await controls('alice')).release.reason!.code,'boat.helm-underway');assert.equal((await controls('bob')).take.reason!.code,'boat.helm-underway');
     const movingHead=headOf(host),movingCaptures=captureTail();assert.ok(host.saveSnapshot(true));
     // Actual same-process second WAL connection plus model-free replay while
@@ -133,13 +169,33 @@ export async function generateOwnedHelm(){
     const takeover=await submit('bob','take-bob','Take the helm now it is free','take helm',[nativeStep('boat_take_helm')]);await until('bob',takeover);assert.equal((await controls('bob')).holder,owned.bob.entityId);
     const leaveBob=await submit('bob','leave-bob','Leave the boat and come back to the commons','leave right',[nativeStep('boat_leave',{slot:'seat1'}),{verb:'walk_to',params:{to:[14,4]}}]);await until('bob',leaveBob);assert.deepEqual(boat().boat.pilotIds,[]);
     const leaveAlice=await submit('alice','leave-alice','Leave the boat and return to the commons','leave left',[nativeStep('boat_leave',{slot:'seat0'}),{verb:'walk_to',params:{to:[15,4]}}]);await until('alice',leaveAlice);assert.deepEqual(boat().boat.passengers,{});
+    await location('alice','returned');await location('bob','returned');
     assert.deepEqual(host.engine.runtime.violations,[]);assert.equal(db.paidCost(),0);
     const pages:unknown[]=[];for(const [owner,v] of Object.entries(owned)){
       for(const a of accepted.filter(a=>a.owner===owner))assert.equal(host.intentHistoryOf(v.soulId).intents[a.intentId].status,'active','a completed action does not fulfil the retained purpose');
       const r=await request('/v1/souls/'+v.soulId+'/intent-v2/history',owner);assert.equal(r.status,200);assert.match(r.headers.get('cache-control')??'',/no-store/);const page=intentHistoryPageV1Schema.parse(await r.json());assert.equal(page.state,'page');pages.push(page);
       assert.equal((await request('/v1/souls/'+v.soulId+'/intent-v2/history',owner==='alice'?'bob':'alice')).status,404);
     }
+    let unavailableProbe:unknown;
+    if(options?.bodyLocationV1){
+      // Deliberate local read-only fault: a contact copied from the admitted
+      // bank is stale for a returned commons body. Never tick/drain/log world
+      // inputs while corrupted; restore the exact graph before persistence.
+      const {soulId,entityId,mind,token}=owned.alice,h=host.engine.world.entities[entityId].human as any,before=hashOf(host.engine.snapshot()),kernelBefore=kernelHash(host.kernel),seqBefore=host.seq,tickBefore=host.engine.world.tick,original=h.shore;
+      const g=native.geometry.shore,p=g.point([native.layout.bank[0],native.layout.bank[2]])!;
+      try{
+        h.shore={contract:'shore-contact/1',terrainId:g.terrainId,waterId:g.waterId,mode:'bed',bedY:p.point[1],datumY:g.datumY,depthMetres:p.depth,submergedHeightMetres:0,normal:p.normal};
+        assert.equal(host.engine.observeBodyLocation!(entityId),null);
+        const r=await request('/v1/souls/'+soulId+'/perceive','alice');assert.equal(r.status,200);const view=await r.json() as any;assert.equal(view.physical_location,null);assert.equal(view.soul.where,'physical location unavailable');
+        const ar=await app.request('/v1/agent/perceive',{headers:{authorization:'Bearer '+token}});assert.equal(ar.status,200);const av=await ar.json() as any;assert.equal(av.physical_location,null);assert.equal(av.soul.where,view.soul.where);assert.equal(brain.midContext(mind,'agent').soul.where,view.soul.where);
+        current={owner:'alice',requestId:'controlled-unavailable-probe',words:'Describe the current physical location without inventing it',card:'no action',steps:[]};
+        const result=await brain.compile(mind,current.words,'intent-v2');assert.deepEqual(result,{ok:false,reason:'Physical self-location is unavailable.'});
+        assert.equal(host.seq,seqBefore);assert.equal(host.engine.world.tick,tickBefore);assert.equal(kernelHash(host.kernel),kernelBefore);unavailableProbe={state:'unavailable',where:view.soul.where,compilerResult:result,noWorldInputsOrTicks:true};
+      }finally{current=undefined;if(original===undefined)delete h.shore;else h.shore=original;}
+      assert.equal(hashOf(host.engine.snapshot()),before);assert.equal(kernelHash(host.kernel),kernelBefore);
+    }
     const publicEvents=db.events(worldId).map(publicEvent),view=host.snapshotView();assert.ok(!JSON.stringify(publicEvents).includes('PRIVATE_HELM'));assert.ok(!JSON.stringify(view).includes('PRIVATE_HELM'));assert.ok(!JSON.stringify(view).includes('physical_boat_controls'));
+    assert.ok(!JSON.stringify(view).includes('physical_location'));assert.ok(!JSON.stringify(publicEvents).includes('physical_location'));
     for(const a of accepted)assert.ok(!JSON.stringify(publicEvents).includes(a.intentId));
     const captures=[...movingCaptures,...captureTail()];assert.ok(captures.length);assert.ok(captures.every(c=>c.capture?.body.shore?.physicalBase.staticHash===host.engine.world.base.staticHash));
     const finalHead=headOf(host);assert.ok(host.saveSnapshot(true));host.stop();db.close();
@@ -147,7 +203,7 @@ export async function generateOwnedHelm(){
       const restored=new WorldHost(finalDb,factory,seed,1e9,worldId,{durableClockV1:true});assert.equal(restored.boot().from,'snapshot');assert.deepEqual(headOf(restored),finalHead);
       finalDb.db.prepare('DELETE FROM snapshots WHERE world_id=?').run(worldId);const genesis=new WorldHost(finalDb,factory,seed,1e9,worldId,{durableClockV1:true});assert.equal(genesis.boot().from,'genesis');assert.deepEqual(headOf(genesis),finalHead);assert.equal(finalDb.paidCost(),0);restored.stop();genesis.stop();
     }finally{finalDb.close();}
-    return {contract:'core-owned-voluntary-helm-probe/1',rulesVersion:factory.rulesVersion,worldId,localHumanOwners:2,ownedSouls:2,owners:Object.fromEntries(Object.entries(owned).map(([o,v])=>[o,{soulId:v.soulId,entityId:v.entityId}])),compilerCalls,groundedCompilerCalls,accepted,terminals,started,movingHead,finalHead,cueSamples,pages,programEvents,captures,snapshotFrom,movingWALNewConnectionRead:'exact',movingGenesisReplay:'exact',finalWALConnectionReopen:'exact',finalGenesisReplay:'exact',nativeViolations:host.engine.runtime.violations,paidUsd:0,
+    return {contract:options?.bodyLocationV1?'core-owned-body-location-probe/1':'core-owned-voluntary-helm-probe/1',rulesVersion:factory.rulesVersion,worldId,localHumanOwners:2,ownedSouls:2,owners:Object.fromEntries(Object.entries(owned).map(([o,v])=>[o,{soulId:v.soulId,entityId:v.entityId}])),compilerCalls,groundedCompilerCalls,...(options?.bodyLocationV1?{groundedBodyCompilerCalls,unavailableCompilerCalls,unavailableProbe,locationFingerprintProbe,locationSamples}:{}),accepted,terminals,started,movingHead,finalHead,cueSamples,pages,programEvents,captures,snapshotFrom,movingWALNewConnectionRead:'exact',movingGenesisReplay:'exact',finalWALConnectionReopen:'exact',finalGenesisReplay:'exact',nativeViolations:host.engine.runtime.violations,paidUsd:0,
       limits:['Synthetic compiler maps each submitted ordinary direction to a native card, not model-quality proof','Two local invited dev-auth humans and explicit real needs-aware fake evaluations, not autonomous population or real Auth','Moving new-connection read keeps original writer quiescent/open; final check closes original DB before reopening; neither is OS crash/old binary rollback','Physical graph excludes only the native subscriber eventCursor which resets on restore','World combined rendering/UI/default/cohort/installed agent remain separate']};
   }finally{host.stop();if(db.db.isOpen)db.close();rmSync(dir,{recursive:true,force:true});}
 }

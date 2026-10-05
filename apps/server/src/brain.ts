@@ -1,6 +1,7 @@
 // The three-tier brain, server side. Schedules calls, records every request
 // and response for the debug shell, and turns answers into logged events.
 import type { Entity } from '@sim/engine-contract';
+import {describeBodyLocation} from '@sim/engine-contract';
 import {
   JEV_MODEL, JevClient, buildDirectorRequest, buildMidRequest, buildShotRequest, buildTranslateRequest, callNarrator, buildNarratorRequest, fallbackMid, fingerprint,
   haikuTranslate, interpretDirector, interpretMid, interpretTranslate, sanitize,
@@ -212,6 +213,8 @@ export class Brain {
     const intentText = m.intent ? describeIntent({ ...m.intent, note: undefined, text: undefined } as WireIntent, nameOf) : 'none';
     const sit = situationOf(this.host, m);
     const boatControls=eng.observeBoatControls?.(m.entityId);
+    const bodyLocation=eng.observeBodyLocation?.(m.entityId);
+    const physicalWhere=bodyLocation===undefined?undefined:bodyLocation===null?'physical location unavailable':describeBodyLocation(bodyLocation);
     const physicalSituation=boatControls?[
       `The nearby boat is ${boatControls.phase}. ${boatControls.holder===m.entityId?'You hold its helm.':boatControls.holder?'Another passenger holds its helm.':'No passenger holds its helm.'}`,
       `Taking the helm is ${boatControls.take.available?'physically available':`unavailable: ${boatControls.take.reason!.message}`}.`,
@@ -237,12 +240,13 @@ export class Brain {
     const options=optionsFor(this.host,planningMind);
     if(!m.activeRule)for(const o of options)if(rules.some(r=>r.agenda.some(s=>matchesStep(this.host,s,o.card,o.cardTarget))))o.servesIntent=true;
     return {
+      ...(physicalWhere===undefined?{}:{physicalWhere}),
       ...(acting ? { actingPurpose:{ intentId:acting.intentId, version:acting.version } } : {}),
       world: { time: timeWord(w.env.datetime), weather: weatherWord(w.env.weather), happening: this.host.living?.event ?? s.happening },
       ...(this.host.living ? { customs: this.host.living.customs } : {}),
       soul: {
         name: m.name, about: m.description, intent: intentText, ownerNote: m.intent?.text ?? m.intent?.note ?? null, hasIntent: retained.length>0||rules.length>0||!!m.intent && m.agendaPos < Math.max(1, m.agenda.length),
-        intentIsNew: m.life ? ['new-intent','new-intent-v2','plan-advanced'].includes(trigger) : URGENT.has(trigger), energy: energyWord(m.energy), where: nameOf(k.things[m.soulId]?.at ?? s.region),
+        intentIsNew: m.life ? ['new-intent','new-intent-v2','plan-advanced'].includes(trigger) : URGENT.has(trigger), energy: energyWord(m.energy), where: physicalWhere??nameOf(k.things[m.soulId]?.at ?? s.region),
         doing: eng.programOf(m.entityId) ? m.doing : ent?.human?.activity ?? 'standing around', recent: m.recent.slice(-3),
         ...(m.life ? { needs: m.life.needs, journal: m.life.journal } : {}),
         ...(rules.length?{mandate:rules.map(r=>({id:r.id,words:r.words,strict:r.strict,understanding:r.understanding}))}:{}),
@@ -524,7 +528,11 @@ export class Brain {
       ? 'This is soul-intent/2: an ordinary actionable present direction such as "go to the campfire" means {kind:"now"} without requiring the word NOW. Future, conditional, recurring, optional or negated directions must keep the matching time/gathering/none trigger; never invent immediacy for them.'
       : 'Only an explicit instruction to act now/immediately means {kind:"now"}. Otherwise use none: do not invent an immediate instruction.'} Triggers only wake the mind; the agenda describes possible objective steps, and non-now rules do not execute it automatically. The owner's words remain verbatim private context. Explain impossible or unclear rules by understood:false.\n`:'')+COMPILER_PREAMBLE + cardGrammar(verbs);
     const physical=this.host.engine.observeBoatControls?.(m.entityId);
-    const user = compileUser(k, m.soulId, wish, candidatesFor(this.host, m.soulId))+(physical?'\nCurrent local physical observation (availability is not a grant):\n'+JSON.stringify(physical):'');
+    const placement=this.host.engine.observeBodyLocation?.(m.entityId);
+    const user = compileUser(k, m.soulId, wish, candidatesFor(this.host, m.soulId),placement===undefined?undefined:placement===null?'physical location unavailable':describeBodyLocation(placement))
+      +(placement?'\nActual current self-location; the kernel place relation is separate and cannot establish physical success or permission. Native entity/container IDs below are physical references, not additional kernel Thing IDs:\n'+JSON.stringify(placement):'')
+      +(placement===null?'\nActual physical location is unavailable. Do not infer it from the kernel place relation or claim physical success/permission.':'')
+      +(physical?'\nCurrent local physical observation (availability is not a grant):\n'+JSON.stringify(physical):'');
     const messages: { role: 'user' | 'assistant'; content: string }[] = [{ role: 'user', content: user }];
     let cost = 0, ms = 0, inTok = 0, outTok = 0, cached = 0; const attempts: unknown[] = [];
     try {

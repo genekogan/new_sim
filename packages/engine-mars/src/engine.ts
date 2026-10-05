@@ -28,6 +28,7 @@ import { clearanceAt } from '../../../mars/viewer/engine/spatial/grid.ts';
 import { HUMAN_RADIUS } from '../../../mars/viewer/engine/world/catalog.ts';
 import type { Spatial } from '../../../mars/viewer/engine/spatial/service.ts';
 import type {NativeBoatControlsV1} from '@sim/engine-contract';
+import type {BodyLocationV1} from '@sim/engine-contract';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const TPS = 20;
@@ -88,7 +89,7 @@ const inPoly = (x: number, z: number, poly: [number, number][]) => {
 const bucket = (m: number): 'here' | 'close' | 'near' | 'far' => (m < 2.5 ? 'here' : m < 9 ? 'close' : m < 28 ? 'near' : 'far');
 
 /** Fresh physical bases use an explicit native binding; legacy factories omit it. */
-export type MarsPhysicalBinding = {rulesVersion:string;renderScene:()=>RenderScene;restore:(snapshot:any)=>any;services:(world:any)=>any;prepareRemoval?:(runtime:any,id:string)=>boolean;boatControls?:(runtime:any,actor:string)=>NativeBoatControlsV1|null};
+export type MarsPhysicalBinding = {rulesVersion:string;renderScene:()=>RenderScene;restore:(snapshot:any)=>any;services:(world:any)=>any;prepareRemoval?:(runtime:any,id:string)=>boolean;boatControls?:(runtime:any,actor:string)=>NativeBoatControlsV1|null;bodyLocation?:(runtime:any,actor:string)=>BodyLocationV1|null};
 export class MarsEngine implements Engine {
   readonly dt = 1 / TPS;
   readonly schema: string;
@@ -316,7 +317,7 @@ export class MarsEngine implements Engine {
     const helm=['boat_take_helm','boat_release_helm'].includes(verb);
     // The fresh owned helm binding must also prevent a passenger from naming
     // another body as pilot of an ordinary travel/board/leave program.
-    if((this.physical?.boatControls&&verb.startsWith('boat_'))||helm){
+    if(((this.physical?.boatControls||this.physical?.bodyLocation)&&verb.startsWith('boat_'))||helm){
       if(a.actor!==undefined&&a.actor!==me)return {code:helm?'boat.helm-self-only':'boat.self-only',message:'A boat activity may act only for the program\u0027s own passenger.'};
     }
     if(helm){
@@ -565,6 +566,7 @@ export class MarsEngine implements Engine {
     const place = Object.keys(this.rt.world.regions).sort().find((id) => inPoly(me[0], me[1], this.rt.world.regions[id].polygon));
     return { nearby: items.slice(0, 8).map(({ id, who, what, doing, d }) => ({ id, who, what, distance: bucket(d), doing })), region: place ?? this.cfg.grounds.id, happening: 'nothing in particular' };
   }
+  observeBodyLocation(actorId:string):BodyLocationV1|null|undefined{return this.physical?.bodyLocation?.(this.rt,actorId);}
 
   private updateAttention() {
     const people = (Object.values(this.ents) as any[]).filter(e => e.kind === 'human').sort((a,b) => a.id.localeCompare(b.id));

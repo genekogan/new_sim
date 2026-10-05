@@ -17,6 +17,9 @@ export const PACE_LEVELS = [
 export const PACE_SECONDS = [10, 45, 150];
 
 export type MidContext = {
+  /** Tagged current physical-place wording for call relevance. Legacy contexts
+   * omit it; raw coordinates/tick never make every movement a fresh call. */
+  physicalWhere?: string;
   world: { time: string; weather: string; happening: string };
   soul: { name: string; about: string; intent: string; ownerNote: string | null; hasIntent: boolean; intentIsNew: boolean; energy: string; where: string; doing: string; recent: string[]; needs?: Needs; journal?: string;mandate?:{id:string;words:string;strict:boolean;understanding:string}[] };
   customs?: string[];
@@ -163,7 +166,7 @@ export function fallbackMid(c: MidContext, seed: string): MidDecision {
 }
 
 /** Fingerprint of what the model would see; unchanged + still running ⇒ skip the call. */
-export const fingerprint = (c: MidContext) => JSON.stringify([c.soul.mandate,c.soul.intent, c.soul.energy, c.soul.doing, c.nearby, c.nudge, c.options.map((o) => o.id), c.world.happening, c.situation, c.heard]);
+export const fingerprint = (c: MidContext) => JSON.stringify([c.soul.mandate,c.soul.intent, c.soul.energy, c.soul.doing, c.nearby, c.nudge, c.options.map((o) => o.id), c.world.happening, c.situation, c.heard,...(c.physicalWhere===undefined?[]:[c.physicalWhere])]);
 
 /** Attune a Soul's manners to its description: one Noul per manner, keep the best three. */
 export function buildAttuneRequest(soul: { name: string; about: string }, manners: Record<string, { summary: string }>): JevRequest {

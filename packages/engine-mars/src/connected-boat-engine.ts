@@ -3,7 +3,7 @@ import {hashOf,type EngineFactory,type EngineSnapshot} from '@sim/engine-contrac
 import {MarsEngine,EDEN_SAFE_COMMONS_WORLD,type MarsWorldConfig,type MarsPhysicalBinding} from './engine.ts';
 import {loadMars} from './load.ts';
 import {connectedCommonsBoatFixture} from './connected-boat.ts';
-export async function connectedCommonsBoatFactory(options?:{helmV1?:true}):Promise<EngineFactory>{
+export async function connectedCommonsBoatFactory(options?:{helmV1?:true;bodyLocationV1?:true}):Promise<EngineFactory>{
   const m=await loadMars(),native=await connectedCommonsBoatFixture(options);
   const cfg:MarsWorldConfig={...EDEN_SAFE_COMMONS_WORLD,safeCrewRemoval:true,walkBlockV1:true};
   // Commit the complete native rules identity without exceeding the existing
@@ -13,6 +13,7 @@ export async function connectedCommonsBoatFactory(options?:{helmV1?:true}):Promi
   const binding:MarsPhysicalBinding={rulesVersion:bindingVersion,
     renderScene(){const scene=native.renderScene();scene.shore!.rulesVersion=rulesVersion;return scene;},restore:native.restore,services:native.servicesForWorld,
     ...(native.helmControls?{boatControls:native.helmControls}:{}),
+    ...(native.bodyLocation?{bodyLocation:native.bodyLocation}:{}),
     prepareRemoval(rt,id){
       const e=rt.world.entities[id],p=e?.human?.boatPassenger,v=rt.world.entities[native.policy.boatId];
       if(native.helmV1&&v?.boat)v.boat.pilotIds=v.boat.pilotIds.filter((actor:string)=>actor!==id);
@@ -43,3 +44,4 @@ export async function connectedCommonsBoatFactory(options?:{helmV1?:true}):Promi
   };
 }
 export const connectedCommonsHelmFactory=()=>connectedCommonsBoatFactory({helmV1:true});
+export const connectedCommonsLocationFactory=()=>connectedCommonsBoatFactory({helmV1:true,bodyLocationV1:true});
