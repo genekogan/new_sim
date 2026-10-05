@@ -1,0 +1,290 @@
+{
+  "version": "social-eden/1",
+  "units": "metres/Y-up/XZ/base-centred/native-yaw",
+  "source": {
+    "worldRevision": "9555e749",
+    "proposalSHA256": "93c0cd9583ed0baf5c397098cb71a5a75877a2e6976ca080e5ed4ccd7b069e5c",
+    "selected": "A"
+  },
+  "fixtures": [
+    {
+      "id": "social-eden-fire",
+      "def": "campfire",
+      "label": "Fire",
+      "position": [
+        24,
+        0,
+        -7
+      ],
+      "yaw": 0,
+      "regionId": "social-eden-fire-circle"
+    },
+    {
+      "id": "social-eden-fire-bench-north",
+      "def": "bench-6ft",
+      "label": "Fire Bench North",
+      "position": [
+        24,
+        0,
+        -10.2
+      ],
+      "yaw": 0,
+      "regionId": "social-eden-fire-circle"
+    },
+    {
+      "id": "social-eden-fire-bench-south",
+      "def": "bench-6ft",
+      "label": "Fire Bench South",
+      "position": [
+        24,
+        0,
+        -3.8
+      ],
+      "yaw": 3.141592653589793,
+      "regionId": "social-eden-fire-circle"
+    },
+    {
+      "id": "social-eden-dining-table",
+      "def": "table-6ft",
+      "label": "Dining Table",
+      "position": [
+        23,
+        0,
+        6
+      ],
+      "yaw": 0,
+      "regionId": "social-eden-dining"
+    },
+    {
+      "id": "social-eden-dining-chair-north-1",
+      "def": "camp-chair",
+      "label": "Dining Chair North 1",
+      "position": [
+        22.2,
+        0,
+        4.4
+      ],
+      "yaw": 0,
+      "regionId": "social-eden-dining"
+    },
+    {
+      "id": "social-eden-dining-chair-north-2",
+      "def": "camp-chair",
+      "label": "Dining Chair North 2",
+      "position": [
+        23,
+        0,
+        4.4
+      ],
+      "yaw": 0,
+      "regionId": "social-eden-dining"
+    },
+    {
+      "id": "social-eden-dining-chair-north-3",
+      "def": "camp-chair",
+      "label": "Dining Chair North 3",
+      "position": [
+        23.8,
+        0,
+        4.4
+      ],
+      "yaw": 0,
+      "regionId": "social-eden-dining"
+    },
+    {
+      "id": "social-eden-dining-chair-south-1",
+      "def": "camp-chair",
+      "label": "Dining Chair South 1",
+      "position": [
+        22.2,
+        0,
+        7.6
+      ],
+      "yaw": 3.141592653589793,
+      "regionId": "social-eden-dining"
+    },
+    {
+      "id": "social-eden-dining-chair-south-2",
+      "def": "camp-chair",
+      "label": "Dining Chair South 2",
+      "position": [
+        23,
+        0,
+        7.6
+      ],
+      "yaw": 3.141592653589793,
+      "regionId": "social-eden-dining"
+    },
+    {
+      "id": "social-eden-dining-chair-south-3",
+      "def": "camp-chair",
+      "label": "Dining Chair South 3",
+      "position": [
+        23.8,
+        0,
+        7.6
+      ],
+      "yaw": 3.141592653589793,
+      "regionId": "social-eden-dining"
+    },
+    {
+      "id": "social-eden-dining-chair-west",
+      "def": "camp-chair",
+      "label": "Dining Chair West",
+      "position": [
+        21.1,
+        0,
+        6
+      ],
+      "yaw": -1.5707963267948966,
+      "regionId": "social-eden-dining"
+    },
+    {
+      "id": "social-eden-dining-chair-east",
+      "def": "camp-chair",
+      "label": "Dining Chair East",
+      "position": [
+        24.9,
+        0,
+        6
+      ],
+      "yaw": 1.5707963267948966,
+      "regionId": "social-eden-dining"
+    }
+  ],
+  "regions": [
+    {
+      "id": "social-eden-fire-circle",
+      "label": "Campfire clearing",
+      "polygon": [
+        [
+          19.5,
+          -11.5
+        ],
+        [
+          28.5,
+          -11.5
+        ],
+        [
+          28.5,
+          -2.5
+        ],
+        [
+          19.5,
+          -2.5
+        ]
+      ],
+      "focalXZ": [
+        24,
+        -7
+      ]
+    },
+    {
+      "id": "social-eden-dining",
+      "label": "Social dining",
+      "polygon": [
+        [
+          19.0,
+          3.0
+        ],
+        [
+          27.0,
+          3.0
+        ],
+        [
+          27.0,
+          9.0
+        ],
+        [
+          19.0,
+          9.0
+        ]
+      ],
+      "focalXZ": [
+        23,
+        6
+      ]
+    }
+  ],
+  "paths": [
+    {
+      "id": "social-link-current-arrival",
+      "pointsXZ": [
+        [
+          14,
+          4
+        ],
+        [
+          17,
+          4
+        ]
+      ],
+      "width": 1.4
+    },
+    {
+      "id": "social-main-east",
+      "pointsXZ": [
+        [
+          18,
+          -13
+        ],
+        [
+          18,
+          23
+        ]
+      ],
+      "width": 2
+    },
+    {
+      "id": "social-arrival-spine",
+      "pointsXZ": [
+        [
+          17,
+          4
+        ],
+        [
+          18,
+          4
+        ]
+      ],
+      "width": 2
+    },
+    {
+      "id": "social-fire-approach",
+      "pointsXZ": [
+        [
+          18,
+          -7
+        ],
+        [
+          20,
+          -7
+        ]
+      ],
+      "width": 2,
+      "terminalRegion": "social-eden-fire-circle"
+    },
+    {
+      "id": "social-dining-approach",
+      "pointsXZ": [
+        [
+          18,
+          6
+        ],
+        [
+          20,
+          6
+        ]
+      ],
+      "width": 2,
+      "terminalRegion": "social-eden-dining"
+    }
+  ],
+  "activities": {
+    "fireRing": "campfire_circle:8 standing fire places",
+    "fireSeats": "sit/stand:6 inward bench seats",
+    "diningSeats": "sit/stand:8 chair seats",
+    "meals": "serve existing finite kitchen pot at supported service point; carry own bowl/spoon, sit/eat, return; no remote seated serving"
+  },
+  "preservation": "all old bodies/owners/items/food/preparation/regions/intentions/history/scene references unchanged"
+}

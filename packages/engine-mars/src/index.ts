@@ -16,3 +16,4 @@ export * from './commons-kitchen-engine.ts';
 export * from './retained-shore.ts';
 export * from './retained-shore-engine.ts';
 export * from './food-delivery.ts';
+export * from './social-eden.ts';

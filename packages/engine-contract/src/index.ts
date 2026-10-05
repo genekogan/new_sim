@@ -22,3 +22,4 @@ export * from './camp-expansion.ts';
 export * from './crew-removal-transition.ts';
 export * from './retained-shore.ts';
 export * from './food-delivery.ts';
+export * from './social-eden.ts';

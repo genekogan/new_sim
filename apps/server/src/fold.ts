@@ -131,6 +131,8 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
     }
     case 'rules': {
       if(e.payload?.commonsFoodDelivery){if(Object.keys(e.payload).length!==1||!engine.adoptCommonsFoodDeliveryV1)throw Error('food-delivery.reader-required');engine.adoptCommonsFoodDeliveryV1(e.payload.commonsFoodDelivery);}
+      if(e.payload?.socialEden){if(Object.keys(e.payload).length!==1||!engine.adoptSocialEdenV1)throw Error('social-eden.reader-required');engine.adoptSocialEdenV1(e.payload.socialEden);
+        for(const a of engine.anchors())if(!k.things[a.id]){const r=applyAll(k,[{op:'appear',id:a.id,kind:a.kind==='region'?'region':'place',name:a.name,at:a.in??null,traits:{...(a.entity?{entity:a.entity}:{}),...(a.point?{point:a.point}:{}),...(a.tags?{tags:a.tags}:{})},states:{socialSeat:!!a.tags?.some(t=>t==='camp-chair'||t==='bench-6ft'),socialDiningSeat:a.id.startsWith('social-eden-dining-chair-')}}],'world');if(!r.ok)throw Error('social-eden.anchor:'+r.message);}}
       if(e.payload?.retainedCommonsShore){if(Object.keys(e.payload).length!==1||!engine.adoptRetainedCommonsShoreV1)throw Error('retained-shore.reader-required');engine.adoptRetainedCommonsShoreV1(e.payload.retainedCommonsShore);
         for(const a of engine.anchors())if(!k.things[a.id]){const r=applyAll(k,[{op:'appear',id:a.id,kind:a.kind==='region'?'region':'place',name:a.name,at:a.in??null,traits:{...(a.entity?{entity:a.entity}:{}),...(a.point?{point:a.point}:{})}}],'world');if(!r.ok)throw Error('retained-shore.anchor:'+r.message);}}
       if(e.payload?.commonsKitchen){if(Object.keys(e.payload).length!==1||!engine.adoptCommonsKitchenV1)throw Error('commons-kitchen.reader-required');engine.adoptCommonsKitchenV1(e.payload.commonsKitchen);

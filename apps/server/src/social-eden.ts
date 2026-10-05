@@ -1,0 +1,20 @@
+import type {WorldHost} from './world.ts';
+import type {Brain} from './brain.ts';
+import type {Card} from '@sim/kernel';
+import {COMMONS_PERSONAL_RESOURCES,commonsFoodDeliveryItemsV1} from '@sim/engine-mars';
+/** Existing general card grammar; physical native seat/food claims remain authoritative. */
+export async function installSocialEdenCardsV1(host:WorldHost,brain:Brain){
+ if(host!==brain.host)throw Error('social-eden.card-host');if(!host.engine.rulesVersion.endsWith('+social-eden/1'))throw Error('social-eden.reader-required');
+ const births=host.db.db.prepare("SELECT payload FROM events WHERE world_id=? AND kind='birth' ORDER BY seq").all(host.worldId) as {payload:string}[];const verdicts=[];
+ for(const [index,b] of births.entries()){
+  const sid=JSON.parse(b.payload).soulId,m=host.minds.get(sid),row=host.db.soul(sid);if(!m||!row||row.retired_at!==null||row.owner!==m.owner||row.entity_id!==m.entityId)continue;
+  const seat={kind:'place'},cards:Card[]=[
+   {name:'sit at a social seat',summary:'Approach a free social chair or inward campfire bench and sit.',good_when:'Want to pause, watch nearby activity or join others; native seat admission must be free.',target:seat,when:[{state:['$target','socialSeat',true]}],then:[{move:['$actor','$target']},{set:['$actor','doing','sitting at $target.name']}],approach:[],during:[{verb:'sit',params:{on:'$target',seconds:60}}],takes:'minute'},
+   {name:'leave social seat',summary:'Stand up and release my physical seat or fire-ring place.',good_when:'Seated or warming by the fire and ready to leave.',target:null,when:[],then:[{set:['$actor','doing','leaving social seat']}],approach:[],during:[{verb:'stand',params:{}}],takes:'seconds'},
+   {name:'warm by the eden fire',summary:'Take my own available standing place facing the fire, rest, then leave.',good_when:'Want company or warmth; joins only my body, never commits another person.',target:null,when:[],then:[{set:['$actor','doing','warming by the fire']}],approach:[],during:[{verb:'mars:campfire_circle',params:{actors:['$actor'],fire:'social-eden-fire'}},{verb:'rest',params:{seconds:120}},{verb:'stand',params:{}}],takes:'minutes'},
+  ];
+  if(index<8){const personal=COMMONS_PERSONAL_RESOURCES[index],meals=[{batch:0,bowl:personal.bowl,spoon:personal.spoon},...(host.engine.commonsFoodDeliveriesV1?.()??[]).map(d=>({batch:d.batch,...commonsFoodDeliveryItemsV1(d.batch).resources[index]}))];for(const r of meals)cards.push({name:`dine with meal ${r.batch} ${sid.slice(2)}`,summary:'Carry my finite bowl and spoon to a free dining chair, eat seated, return and tidy.',good_when:'Hungry, this bowl has food and a dining chair is free; no remote table serving.',target:seat,when:[{state:['$target','socialDiningSeat',true]}],then:[{move:['$actor','$target']},{set:['$actor','doing','eating at $target.name']}],approach:[{verb:'mars:take_item',params:{item:r.bowl,hand:'left'}},{verb:'mars:take_item',params:{item:r.spoon,hand:'right'}}],during:[{verb:'sit',params:{on:'$target',seconds:1}},{verb:'mars:eat',params:{bowl:r.bowl,spoon:r.spoon}},{verb:'stand',params:{}},{verb:'walk_to',params:{to:'commons'}},{verb:'mars:put_item',params:{item:r.spoon,surfaceSlot:'ground'}},{verb:'mars:put_item',params:{item:r.bowl,surfaceSlot:'ground'}}],takes:'minutes'});}
+  const owner=m.owner,entity=m.entityId,guard=()=>{const now=host.db.soul(sid);if(!now||now.retired_at!==null||now.owner!==owner||now.entity_id!==entity||host.minds.get(sid)!==m||m.owner!==owner||m.entityId!==entity)throw Error('social-eden.owner-moved');return true as const;};
+  const pending=brain.mint(m,cards.filter(c=>!host.kernel.decks[sid].cards.includes(c.name)),undefined,undefined,'compiled',guard);let done=false;pending.then(()=>done=true,()=>done=true);for(let j=0;j<100&&!done;j++){host.drainInputs();await new Promise<void>(r=>setImmediate(r));}if(!done)throw Error('social-eden.mint-unsettled');const v=await pending;if(v.some(p=>!p.ok))throw Error('social-eden.mint-refused');verdicts.push(...v);
+ }return verdicts;
+}
