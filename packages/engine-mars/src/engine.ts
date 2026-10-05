@@ -42,10 +42,11 @@ type Prog = {
   id: string; actor: string; label: string; steps: Program['steps'];
   index: number; started: boolean; since: number;
   blockedSince?: number;
+  walkStopping?: Diag;
   ops: Op[]; action?: string; settle?: 'done' | 'held'; soft?: boolean; until?: number;
   build?: { phase: BuildPhase; crew: string[]; stopping?: Diag };
 };
-export type MarsWorldConfig = { safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
+export type MarsWorldConfig = { walkBlockV1?:boolean; safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
 export const LITTLE_MARTIANS_WORLD: MarsWorldConfig={scene:'littlemartians',arrival:[0,18],arrivalPlace:'garden',reference:[0,16],grounds:{id:'grounds',name:'Ceramic garden'}};
 export const GREEN_FIELD_WORLD:MarsWorldConfig={scene:'greenfield',arrival:[0,0],arrivalPlace:'field',reference:[2,0],grounds:{id:'grounds',name:'Green field'}};
 export const EDEN_COMMONS_WORLD:MarsWorldConfig={scene:'eden-commons',arrival:[14,4],arrivalPlace:'commons',reference:[9,5],grounds:{id:'grounds',name:'Eden commons'}};
@@ -128,7 +129,7 @@ export class MarsEngine implements Engine {
     return [...BODY_VERBS, ...this.m.describeVerbs(this.registry).map((v) => ({ ...v, verb: `mars:${v.verb}`, description: `[Mars verb] ${v.description}`, scope: 'world' as const }))];
   }
   /** The world plus the adapter's own state (which program each actor is in), since both decide what happens next. */
-  stateHash(): string { return hashOf({ w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet, ...(this.cfg.safeCrewRemoval?{removalPolicy:'crew-removal/1'}:{}), ...(this.cfg.safeArrivalV1?{arrivalPolicy:'arrival-clearance/1'}:{}) }); }
+  stateHash(): string { return hashOf({ w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet, ...(this.cfg.safeCrewRemoval?{removalPolicy:'crew-removal/1'}:{}), ...(this.cfg.safeArrivalV1?{arrivalPolicy:'arrival-clearance/1'}:{}), ...(this.cfg.walkBlockV1?{walkPolicy:'walk-block/1'}:{}) }); }
   physicalHash(): string { return hashOf(physicalView(this.world)); }
 
   // ------------------------------------------------------------------ tick
@@ -204,17 +205,26 @@ export class MarsEngine implements Engine {
       if (p.until !== undefined) { if (tick < p.until) return; p.until = undefined; }
       if (p.action) {
         const rec = this.rt.records.get(p.action);
+        // A timed-out walk can still own a between-level body. Preserve its
+        // program until native cancellation actually reaches a safe landing.
+        if (p.walkStopping) {
+          if (rec && this.rt.isActive(rec.id)) { this.rt.cancel(rec.id, p.walkStopping); return; }
+          return this.end(p, 'failed', p.walkStopping);
+        }
         if (rec) {
+          const walkBlocked = this.cfg.walkBlockV1 && rec.verb === 'walk_to';
           const routeBlocked = /deadlock\.|walk.goal-occupied/.test(rec.diagnostic?.code ?? '');
           // Native sleep retains a failed/directed-away purpose for an explicit
           // Resume in the finite Lab. A living card must instead report blockage
           // and let the Soul choose again, so it cannot hold the daily barrier.
           const sleepBlocked = this.cfg.sleepBlockTicks !== undefined && rec.verb === 'sleep' && /^sleep\./.test(rec.diagnostic?.code ?? '');
-          if (rec.status === 'blocked' && (routeBlocked || sleepBlocked)) {
+          if (rec.status === 'blocked' && (walkBlocked || routeBlocked || sleepBlocked)) {
             p.blockedSince ??= tick;
             if (tick-p.blockedSince > (sleepBlocked ? this.cfg.sleepBlockTicks! : 1200)) {
-              const why = routeBlocked ? {code:'route.blocked',message:'the route has remained blocked for a minute'} : {code:'activity.blocked',message:`sleep has remained blocked for a minute: ${rec.diagnostic?.code}`};
-              this.rt.cancel(rec.id,why); return this.end(p,'failed',why);
+              const why = walkBlocked ? {code:'route.blocked',message:`walking has remained blocked for a minute: ${rec.diagnostic?.code ?? 'action.blocked'}`} : routeBlocked ? {code:'route.blocked',message:'the route has remained blocked for a minute'} : {code:'activity.blocked',message:`sleep has remained blocked for a minute: ${rec.diagnostic?.code}`};
+              this.rt.cancel(rec.id,why);
+              if (walkBlocked && this.rt.isActive(rec.id)) { p.walkStopping = why; return; }
+              return this.end(p,'failed',why);
             }
           } else p.blockedSince = undefined;
           if (rec.status === 'failed') { if (!p.soft) return this.end(p, 'failed', { code: rec.diagnostic?.code ?? 'action.failed', message: rec.diagnostic?.message ?? 'failed' }); }
@@ -717,7 +727,7 @@ export class MarsEngine implements Engine {
 }
 
 function centroid(poly: [number, number][]): [number, number] { let x = 0, z = 0; for (const p of poly) { x += p[0]; z += p[1]; } return [r3(x / poly.length), r3(z / poly.length)]; }
-function nativeRulesVersion(version:string,cfg:MarsWorldConfig){return `sim-mars/1+${version}${cfg.safeCrewRemoval?'+crew-removal/1':''}${cfg.scene==='eden-commons'?'+commons/1':''}${cfg.safeArrivalV1?'+arrival-clearance/1':''}`;}
+function nativeRulesVersion(version:string,cfg:MarsWorldConfig){return `sim-mars/1+${version}${cfg.safeCrewRemoval?'+crew-removal/1':''}${cfg.scene==='eden-commons'?'+commons/1':''}${cfg.safeArrivalV1?'+arrival-clearance/1':''}${cfg.walkBlockV1?'+walk-block/1':''}`;}
 
 /** The factory is made once the Mars engine has been loaded (an async import); after that everything is synchronous. */
 export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promise<EngineFactory> {
@@ -728,7 +738,9 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
     // A failed cross-policy checkpoint restore must not turn into replay under
     // another removal policy. An explicit, qualified transition is separate.
     canReplayHistory: version => {
-      if((cfg.safeArrivalV1||cfg.scene==='eden-commons')&&version!==nativeRulesVersion(m.rulesVersion,cfg))return false;
+      if((cfg.walkBlockV1||cfg.safeArrivalV1||cfg.scene==='eden-commons')&&version!==nativeRulesVersion(m.rulesVersion,cfg))return false;
+      const walk=version.match(/\+walk-block\/[^+]+/g)??[];
+      if(cfg.walkBlockV1?walk.length!==1||walk[0]!=='+walk-block/1':walk.length!==0)return false;
       const arrival=version.match(/\+arrival-clearance\/[^+]+/g)??[];
       if(cfg.safeArrivalV1?arrival.length!==1||arrival[0]!=='+arrival-clearance/1':arrival.length!==0)return false;
       const commons=version.match(/\+commons\/[^+]+/g)??[];
@@ -738,7 +750,7 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
     },
     // Candidate removal changes controller behavior: restore only its exact
     // policy/version. Legacy activities31 compatibility remains unchanged.
-    canRestoreSnapshot: version => cfg.safeArrivalV1||cfg.safeCrewRemoval||cfg.scene==='eden-commons'?version===nativeRulesVersion(m.rulesVersion,cfg):[m.rulesVersion,m.rulesVersion.replace('+bodies/1',''),m.rulesVersion.replace('+bodies/1','').replace('activities/31','activities/29')].some(v=>version===nativeRulesVersion(v,cfg)),
+    canRestoreSnapshot: version => cfg.walkBlockV1||cfg.safeArrivalV1||cfg.safeCrewRemoval||cfg.scene==='eden-commons'?version===nativeRulesVersion(m.rulesVersion,cfg):[m.rulesVersion,m.rulesVersion.replace('+bodies/1',''),m.rulesVersion.replace('+bodies/1','').replace('activities/31','activities/29')].some(v=>version===nativeRulesVersion(v,cfg)),
     /** The synthetic proving ground (a campfire, two benches, a lawn), emptied of its test people: Souls arrive by being born. */
     genesis(seed: string): WorldState {
       if (cfg.scene === 'littlemartians') return m.littleMartiansWorld(seed);
@@ -758,6 +770,7 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
     restore(snap: EngineSnapshot) {
       const s = structuredClone(snap) as EngineSnapshot & { mars: any; programs: Prog[]; nextProg: number; leaving: string[]; cfg: MarsWorldConfig; commonsVersion?:string; quiet?: boolean };
       if (s.format !== SNAPSHOT_FORMAT) throw new Error(`bad snapshot format ${s.format}`);
+      if(!!s.cfg?.walkBlockV1!==!!cfg.walkBlockV1)throw new Error('snapshot walk policy differs from the native factory');
       if(!!s.cfg?.safeArrivalV1!==!!cfg.safeArrivalV1)throw new Error('snapshot arrival policy differs from the native factory');
       if(!!s.cfg?.safeCrewRemoval!==!!cfg.safeCrewRemoval)throw new Error('snapshot removal policy differs from the native factory');
       if((s.cfg?.scene==='eden-commons'||cfg.scene==='eden-commons')&&s.cfg?.scene!==cfg.scene)throw new Error('snapshot commons layout differs from the native factory');

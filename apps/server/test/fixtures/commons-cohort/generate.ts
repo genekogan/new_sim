@@ -21,10 +21,12 @@ import {IntentControlV2} from '../../../src/intent-control.ts';
 import type {Hub} from '../../../src/hub.ts';
 import {CandidateStationV1} from '../../../src/station.ts';
 
-export async function generateCommonsCohort(measuredTicks=3600,retryV1=false){
+export async function generateCommonsCohort(measuredTicks=3600,retryV1=false,diagnosticsV1=false,walkBlockV1=false){
   const dir=mkdtempSync(join(tmpdir(),'eden-commons-cohort-')),path=join(dir,'native.db'),db=new Db(path);
-  const factory=await marsFactory({...EDEN_SAFE_COMMONS_WORLD,safeCrewRemoval:true}),seed='commons-active-24',worldId='commons-active-24';
+  const factory=await marsFactory({...EDEN_SAFE_COMMONS_WORLD,safeCrewRemoval:true,walkBlockV1}),seed='commons-active-24',worldId='commons-active-24';
   const host=new WorldHost(db,factory,seed,1e9,worldId,{durableClockV1:true});host.boot();host.drainInputs();
+  const programEvents:import('@sim/engine-contract').ProgramEvent[]=[];
+  if(diagnosticsV1)host.listeners.push({onProgram:event=>programEvents.push(structuredClone(event))});
   const cfg={...config,worldId,worldKey:'eden',worldPath:'/w/eden',brainMode:'fake' as const,budgetUsdPerDay:.5,
     publicUrl:'http://127.0.0.1:4957',typesafeKey:undefined,anthropicKey:'synthetic-only',compilerModel:'synthetic-only',privyAppId:'',privyAppSecret:'',inviteRequired:true};
   let compilerCalls=0;
@@ -66,14 +68,20 @@ export async function generateCommonsCohort(measuredTicks=3600,retryV1=false){
     }
     host.drainInputs();await setImmediate();host.drainInputs();
     const admissions=retryV1?db.events(worldId).filter(e=>e.kind==='intent-admission-v2').map(e=>intentAdmissionFactV2(e).outcome):[];
+    const nativePrograms=diagnosticsV1&&host.engine.canSnapshot?.()!==false?(host.engine.snapshot() as unknown as {programs?:unknown[]}).programs:undefined;
+    const observationRows=diagnosticsV1?db.db.prepare('SELECT attempt_id,phase,observation_tick,published_seq FROM intent_observations_v2 WHERE world_id=? ORDER BY observation_tick,attempt_id,phase').all(worldId):undefined;
     const outcomes=residents.map(r=>({soulId:r.soulId,owner:r.owner,firstMotion:r.firstMotion??null,
       ...(retryV1?{attempts:Object.values(host.intentHistoryOf(r.soulId).attempts).filter(a=>a.intent.intentId===r.intentId),admissions:admissions.filter(a=>a.intent.intentId===r.intentId)}:{}),
+      ...(diagnosticsV1?{currentProgram:host.engine.programOf(r.entityId),controllerRecords:Object.values(host.intentHistoryOf(r.soulId).attempts).filter(a=>a.intent.intentId===r.intentId&&'activityId' in a).map(a=>{
+        const current=host.engine.programAction?.((a as any).activityId);return {attemptId:a.attemptId,activityId:(a as any).activityId,current,record:current?structuredClone(host.engine.runtime.records.get(current.action.id)):null};
+      })}:{}),
       phases:Object.values(host.intentHistoryOf(r.soulId).attempts).filter(a=>a.intent.intentId===r.intentId).map(a=>a.phase),
       interpretedTarget:host.intentHistoryOf(r.soulId).intents[r.intentId].revision.interpretation.agenda[0]?.target,
       retainedActions:Object.values(host.intentHistoryOf(r.soulId).attempts).filter(a=>a.intent.intentId===r.intentId&&'activityId' in a).map(a=>({phase:a.phase,activityId:(a as any).activityId,currentNative:host.engine.programAction?.((a as any).activityId)??null})),
       activity:host.engine.world.entities[r.entityId].human?.activity,at:host.kernel.things[r.soulId]?.at,
       purposeStatus:host.intentHistoryOf(r.soulId).intents[r.intentId]?.status}));
     const head={tick:host.engine.world.tick,seq:host.seq,engine:host.engine.stateHash(),kernel:kernelHash(host.kernel),station:hashOf(host.stationHistoryV1()),histories:hashOf(residents.map(r=>host.intentHistoryOf(r.soulId))),life:hashOf(residents.map(r=>host.minds.get(r.soulId)!.life))};
+    const diagnostics=diagnosticsV1?{programEvents,nativePrograms,observationRows}:undefined;
     const readerPages=[];
     for(const r of residents){let cursor:string|undefined,facts=0,pages=0,complete=false;do{
       const response=await request('/v1/souls/'+r.soulId+'/intent-v2/history'+(cursor?'?cursor='+cursor:''),r.owner);assert.equal(response.status,200);
@@ -95,7 +103,7 @@ export async function generateCommonsCohort(measuredTicks=3600,retryV1=false){
     assert.equal(hashOf(genesisBoot.stationHistoryV1()),head.station);assert.equal(genesisBoot.engine.world.tick,head.tick);
     const sorted=[...timings].sort((a,b)=>a-b);
     return {contract:'core-commons-cohort-probe/1',worldId,rulesVersion:host.engine.rulesVersion,localHumanOwners:6,residents:24,compilerCalls,measuredTicks,
-      head,outcomes,samples,readerPages,nativeViolations:host.engine.runtime.violations,snapshotSaved:snapshotSaved??null,restartFrom:restored.from,reconstruction:'exact',genesisReconstruction:'exact',
+      head,outcomes,samples,readerPages,...(diagnosticsV1?{diagnostics}:{}),nativeViolations:host.engine.runtime.violations,snapshotSaved:snapshotSaved??null,restartFrom:restored.from,reconstruction:'exact',genesisReconstruction:'exact',
       timing:{meanMs:timings.reduce((a,b)=>a+b,0)/timings.length,p95Ms:sorted[Math.floor(sorted.length*.95)],maxMs:sorted.at(-1)},paid:reopenedDb.paidCost(),
       limits:['Synthetic compiler and fake local needs-aware chooser, no real people or providers','Bounded moving ticks/WAL file in same process; no process-crash/lifetime/capacity/device/combinedviewer qualification','Source frontier bounded200rows; initial private pages may legitimately require continuation']};
     }finally{reopenedDb.close();}
