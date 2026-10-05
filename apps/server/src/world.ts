@@ -859,6 +859,9 @@ export class WorldHost {
 
   get living(): { origin: number; dayTicks: number; customs: string[]; lastDay: number; event: string; quiet: boolean; quietDay?: number } | undefined { return this.extra.living as any; }
   get quietBarrier() { return !!this.living?.quiet; }
+  enableHumanRestNeedsV1(){
+    return this.enqueue('rules','operator:human-rest-needs',{runtimePolicy:{sleepBlockTicks:1200,...this.extra.runtimePolicy as object,humanRestNeedsV1:true},why:'recognize enacted humanoid rest prospectively; retain prior needs replay'});
+  }
   private advanceLives() {
     const tick = this.engine.world.tick;
     for (const m of this.minds.values()) {
@@ -866,7 +869,8 @@ export class WorldHost {
       const e = this.engine.world.entities[m.entityId]; if (!e?.human) continue;
       const floater=(e as unknown as {body?:{family:string}}).body?.family==='floater';
       const nearby = [...this.mindByEntity.values()].some(other => { const b = this.engine.world.entities[other.entityId]; return other !== m && b && (!floater || Math.abs(e.pose.p[1]-b.pose.p[1])<2) && Math.hypot(e.pose.p[0] - b.pose.p[0], e.pose.p[2] - b.pose.p[2]) < 4; });
-      const resting=floater&&!!this.engine.bodyResting?.(m.entityId),recharging=resting&&/bask|recharge/.test(m.doing);
+      const humanRest=(this.extra.runtimePolicy as {humanRestNeedsV1?:boolean}|undefined)?.humanRestNeedsV1===true;
+      const resting=(floater||humanRest)&&!!this.engine.bodyResting?.(m.entityId),recharging=floater&&resting&&/bask|recharge/.test(m.doing);
       advanceNeeds(m.life, tick, resting?'rest':e.human.activity, nearby, recharging, floater); m.energy = m.life.needs.energy;
     }
   }

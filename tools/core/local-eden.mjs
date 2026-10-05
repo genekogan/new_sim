@@ -9,7 +9,7 @@ import {createHash} from 'node:crypto';
 import {setImmediate} from 'node:timers/promises';
 
 export async function openLocalEden({input,dataDir,worldId,port=4959,webDir,marsWebDir,build='local-c194-core/1',checkOnly=false,
-  inputManifestSHA256='4e9c18fe50ec9e8f74073f4032f20409a9e54b3fa5b1b87b54a6a4bc0ebcec12',modelCredentialFile,localBudget=3,autonomous=false}) {
+  inputManifestSHA256='4e9c18fe50ec9e8f74073f4032f20409a9e54b3fa5b1b87b54a6a4bc0ebcec12',modelCredentialFile,localBudget=3,autonomous=false,localSoulLimit=5,humanRest=false}) {
   if(!input||!dataDir||!worldId||!Number.isInteger(port)||!(port>=4950&&port<=4959||port===4970))throw Error('explicit local input/data/world/allowed port required');
   if(!build.startsWith('local-'))throw Error('local build identity required');
   input=resolve(input);dataDir=resolve(dataDir);
@@ -31,6 +31,8 @@ export async function openLocalEden({input,dataDir,worldId,port=4959,webDir,mars
     publicUrl:`http://127.0.0.1:${port}/w/eden`,engine:'mars',livingWorld:true,seedNatives:false,
     ownerId:'dev:admin',brainMode:'fake',budgetUsdPerDay:0,typesafeKey:undefined,anthropicKey:undefined,
     privyAppId:'',privyAppSecret:'',archiveTakes:false,inviteRequired:true,maxSoulsPerUser:5,build};
+  if(!Number.isInteger(localSoulLimit)||localSoulLimit<5||localSoulLimit>8)throw Error('local resident allowance must be five through eight');
+  cfg.maxSoulsPerUser=localSoulLimit;
   if(modelCredentialFile){
     if((statSync(modelCredentialFile).mode&0o077)!==0)throw Error('local model credential permissions required');
     let keys;try{keys=JSON.parse(readFileSync(modelCredentialFile,'utf8'));}catch{throw Error('local model credential file is unreadable or invalid');}
@@ -54,6 +56,7 @@ export async function openLocalEden({input,dataDir,worldId,port=4959,webDir,mars
       :await native.marsFactory({...native.EDEN_SAFE_COMMONS_WORLD,safeCrewRemoval:true});
     host=new WorldHost(db,factory,header?.seed??cfg.worldSeed,cfg.snapshotEveryTicks,worldId,{durableClockV1:true});
     const boot=host.boot();
+    if(humanRest){if(!host.enableHumanRestNeedsV1)throw Error('selected runtime needs versioned human rest recovery');await drive(host.enableHumanRestNeedsV1());}
     if(header&&host.engine.world.base.campus!=='eden-commons') {
       // Read-only preflight first. Refusal never substitutes a new world or pose.
       const preview=host.engine.previewCommonsTransition?.();
@@ -99,7 +102,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).hr
   try {
     const app=await openLocalEden({input,dataDir,worldId,port:Number(port),webDir,marsWebDir,build:process.env.BUILD_ID??'local-c194-core/1',checkOnly:mode==='check',
       inputManifestSHA256:process.env.PREVIEW_INPUT_MANIFEST_SHA256,modelCredentialFile:process.env.PREVIEW_MODEL_CREDENTIAL_FILE,
-      localBudget:Number(process.env.PREVIEW_BUDGET_USD_PER_DAY??3),autonomous:process.env.PREVIEW_EDEN_AUTONOMY==='1'});
+      localBudget:Number(process.env.PREVIEW_BUDGET_USD_PER_DAY??3),autonomous:process.env.PREVIEW_EDEN_AUTONOMY==='1',localSoulLimit:Number(process.env.PREVIEW_SOUL_LIMIT??5),humanRest:process.env.PREVIEW_HUMAN_REST==='1'});
     if(app.checkOnly)console.log(JSON.stringify(app,null,2));
     else {console.log(JSON.stringify({url:app.cfg.publicUrl,worldId:app.host.worldId,boot:app.boot,physicalBase:app.host.engine.world.base,mode:app.brain.mode,budget:app.brain.budget,autonomous:process.env.PREVIEW_EDEN_AUTONOMY==='1'}));
       for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>void app.close().then(()=>process.exit(0)).catch(()=>process.exit(1)));}
