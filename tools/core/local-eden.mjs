@@ -42,7 +42,7 @@ export async function openLocalEden({input,dataDir,worldId,port=4959,webDir,mars
   }
   const {Db}=await load('apps/server/src/db.ts'),{WorldHost}=await load('apps/server/src/world.ts');
   const native=await load('packages/engine-mars/src/index.ts'),db=new Db(join(dataDir,'sim.db'));
-  let host,server,hub,service,provisionBirths,kitchenBirths,closing=false;
+  let host,server,hub,service,provisionBirths,kitchenInstallation,closing=false;
   async function drive(p){let done=false;p.then(()=>done=true,()=>done=true);for(let i=0;i<100&&!done;i++){host.drainInputs();await setImmediate();}if(!done)throw Error('bootstrap sequencer did not settle');return p;}
   try {
     const header=db.world(worldId),beforeRows=db.liveSouls(worldId),beforeEvents=db.events(worldId);
@@ -61,7 +61,6 @@ export async function openLocalEden({input,dataDir,worldId,port=4959,webDir,mars
     if(sequences){if(!host.enableIntentSequencesV1)throw Error('selected runtime needs purpose-bound sequences');await drive(host.enableIntentSequencesV1());}
     if(humanRest){if(!host.enableHumanRestNeedsV1)throw Error('selected runtime needs versioned human rest recovery');await drive(host.enableHumanRestNeedsV1());}
     if(provisions&&!host.engine.rulesVersion.includes('+commons-provisions/1')){if(!host.installCommonsProvisionsV1)throw Error('selected runtime needs retained commons provisions');await drive(host.installCommonsProvisionsV1());}
-    if(kitchen&&!host.engine.rulesVersion.endsWith('+commons-kitchen/1'))await drive(host.installCommonsKitchenV1());
     if(header&&host.engine.world.base.campus!=='eden-commons') {
       // Read-only preflight first. Refusal never substitutes a new world or pose.
       const preview=host.engine.previewCommonsTransition?.();
@@ -82,7 +81,7 @@ export async function openLocalEden({input,dataDir,worldId,port=4959,webDir,mars
     if(autonomous){if(!brain.enableEdenAutonomyV1)throw Error('selected runtime needs explicit autonomy');await drive(brain.enableEdenAutonomyV1());}
     const souls=new Souls(host,db,brain,cfg);souls.enableLifecycle();
     if(provisions){const {followCommonsProvisionBirths}=await load('apps/server/src/commons-provisions.ts');if(!followCommonsProvisionBirths)throw Error('selected runtime needs prospective provision births');provisionBirths=await followCommonsProvisionBirths(host,brain);}
-    if(kitchen){const {followCommonsKitchenBirths}=await load('apps/server/src/commons-kitchen.ts');kitchenBirths=await followCommonsKitchenBirths(host,brain);}
+    if(kitchen){const {scheduleCommonsKitchenInstallation}=await load('apps/server/src/commons-kitchen-install.ts');kitchenInstallation=scheduleCommonsKitchenInstallation(host,brain);}
     service=new IntentControlV2(host,brain,souls,{historyV1:true});server=createServer();
     const strip=url=>stripWorldRequestPath(url,cfg.worldPath);
     server.on('upgrade',req=>{req.url=strip(req.url);});hub=new Hub(server,host,auth,db,souls);hub.brain=brain;hub.build=cfg.build;
@@ -96,9 +95,9 @@ export async function openLocalEden({input,dataDir,worldId,port=4959,webDir,mars
     await new Promise((r,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',r);});host.start();
     async function close(){if(closing)return;closing=true;brain.quiesce?.();for(const c of hub.clients)c.ws.close(1001,'local server stopping');
       const closed=new Promise(r=>server.close(r)),pump=setInterval(()=>host.drainInputs(),10);
-      try{await closed;provisionBirths?.close();kitchenBirths?.close();await Promise.all([provisionBirths?.settled(),kitchenBirths?.settled()]);await Promise.all([service.settled(),brain.settled?.()]);host.drainInputs();}finally{clearInterval(pump);}
+      try{await closed;provisionBirths?.close();await kitchenInstallation?.settled();kitchenInstallation?.close();await provisionBirths?.settled();await Promise.all([service.settled(),brain.settled?.()]);host.drainInputs();}finally{clearInterval(pump);}
       host.stop();host.saveSnapshot(true);await new Promise(r=>hub.wss.close(r));db.close();}
-    return {cfg,pins,boot,db,host,auth,brain,souls,service,hub,server,close};
+    return {cfg,pins,boot,db,host,auth,brain,souls,service,hub,server,kitchenInstallation,close};
   } catch(error){host?.stop();server?.close();db.close();throw error;}
 }
 

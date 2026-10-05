@@ -58,3 +58,21 @@ and exact native/kernel/needs snapshot and genesis replay. Fake models/$0.
 Source checks and selected-runtime checks are recorded separately. This is bounded
 local component proof, not the real eight-Soul autonomous kitchen/player/visual
 observation, sustainable food supply or release qualification.
+
+PM's actual startup attempt refused `commons-kitchen.resumable-boundary-required`
+after the running state changed beyond its earlier compatible-copy preflight.
+No kitchen fact or stock was installed. The correction selects the compatible
+reader at boot and starts the HTTP server and normal clock while a passive
+readiness observer waits. It probes at most once per20ticks, queues the existing
+guarded checkpoint at an exact safe boundary, and installs/follows cards only
+after acceptance. Source movement retries; other failures remain visible.
+There is no actor cancellation, forced quiet, new model call or stock reset.
+A pending non-resumable activity may take time to finish; readiness is not a
+claim that installation already happened. The local handle exposes actual phase.
+
+Focused proof starts an ordinary owner's actual non-resumable ground sleep,
+checks unchanged programme/hash while waiting plus usable HTTP, then advances
+the normal clock through ordinary completion and observes exactly one kitchen
+fact and card assignment. The original sleep decision is not repeated; original
+food remains unchanged. The first attempted meal fixture was unsuitable because
+native item actions are already resumable; that fixture failure is retained.
