@@ -13,7 +13,7 @@ export async function retainedCommonsShoreFactory():Promise<EngineFactory>{
   const prefix='sim-mars/1+'+reader.rulesVersion+'+crew-removal/1+commons/1+arrival-clearance/1+walk-block/1';
   const nextVersions=new Set([prefix,prefix+'+commons-provisions/1',prefix+'+commons-provisions/1+commons-kitchen/1',prefix+'+commons-provisions/1+commons-kitchen/2']);
   const install=(e:ReturnType<EngineFactory['create']>)=>{if(!(e instanceof MarsEngine))throw Error('retained-shore.native-required');e.installRetainedCommonsShoreReader(reader);return e;};
-  const physicalCfg=({clock,sleepBlockTicks,quietSeatCourtesy,fixtureGroundGoalsV1,...rest}:MarsWorldConfig)=>rest;
+  const physicalCfg=({clock,sleepBlockTicks,quietSeatCourtesy,fixtureGroundGoalsV1,nativeArrivalWitnessV1,...rest}:MarsWorldConfig)=>rest;
   return {rulesVersion:old.rulesVersion,genesis:old.genesis,create:w=>install(old.create(w)),
     canReplayHistory:v=>old.canReplayHistory?.(v)===true||nextVersions.has(v),
     canRestoreSnapshot:v=>old.canRestoreSnapshot?.(v)===true||nextVersions.has(v),

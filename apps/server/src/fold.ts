@@ -8,7 +8,7 @@ import {
   applyAll, bind, changesOf, emptyKernel, kernelHash, seedVocabulary, sweep, whyNot, BASE_MANNERS,
   type Change, type KState, type Thing,
 } from '@sim/kernel';
-import { intentReceivedPayloadV2Schema, intentHistoryFactV2, intentAdmissionFactV2, intentControllerFactV2, type BirthPayload, type DecisionPayload, type DeckPayload, type LogEvent, type MintPayload, type PlayPayload, type PlayView } from '@sim/protocol';
+import { intentReceivedPayloadV2Schema, intentHistoryFactV2, intentAdmissionFactV2, intentControllerFactV2, intentArrivalFactV1, type BirthPayload, type DecisionPayload, type DeckPayload, type LogEvent, type MintPayload, type PlayPayload, type PlayView } from '@sim/protocol';
 import {foldMandate} from './mandate.ts';
 import { isStationFactV1, parseStationFactV1 } from '@sim/protocol';
 
@@ -66,6 +66,7 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
     case 'intent-request-v2': { intentReceivedPayloadV2Schema.parse(e.payload); return {}; }
     case 'intent-v2': { intentHistoryFactV2(e); return {}; }
     case 'intent-admission-v2': { intentAdmissionFactV2(e); return {}; }
+    case 'intent-arrival-v1': {intentArrivalFactV1(e);return {};}
     case 'intent-controller-v2': { intentControllerFactV2(e); return {}; }
     case 'birth': {
       const p = e.payload as BirthPayload;

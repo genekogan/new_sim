@@ -1,3 +1,5 @@
+import {readIntentArrivalsV1} from './intent-arrivals.ts';
+import {intentArrivalQueryV1Schema,INTENT_ARRIVAL_V1} from '@sim/protocol';
 // Explicitly injected candidate transport service. Production bootstrap does
 // not construct this service or advertise the behavioral version.
 import { IntentHistoryReaderV1,IntentHistoryCursorUnavailable } from './intent-history-reader.ts';
@@ -93,7 +95,7 @@ export class IntentControlV2 {
     this.guard(scope);
     if(scope.source.kind!=='owner'||scope.source.channel!=='web'||scope.source.principalId!==scope.source.ownerId)return undefined;
     return intentOwnerControlV2Schema.parse({worldId:this.host.worldId,soulId:scope.soulId,
-      ownerId:scope.source.ownerId,intentContract:INTENT_V2,...(this.historyEnabled?{intentHistoryContract:INTENT_HISTORY_V1}:{})});
+      ownerId:scope.source.ownerId,intentContract:INTENT_V2,...(this.historyEnabled?{intentHistoryContract:INTENT_HISTORY_V1}:{}),...(this.host.extra.intentArrivalV1?{intentArrivalContract:INTENT_ARRIVAL_V1}:{})});
   }
   historyCapability(scope:IntentRequestScope){return this.historyReader?.capability(scope);}
   historyPage(scope:IntentRequestScope,query:unknown={}):IntentHistoryPageV1 {
@@ -104,6 +106,12 @@ export class IntentControlV2 {
     const parsed=intentHistoryQueryV1Schema.parse(query);
     try{return this.historyReader.page(scope,parsed);}
     catch(error){if(error instanceof ZodError)throw new Error('history source validation unavailable');throw error;}
+  }
+  arrivalsPage(scope:IntentRequestScope,query:unknown={}){
+    this.guard(scope);if(!this.host.extra.intentArrivalV1)throw new ApiError(404,'not-found','arrival evidence unavailable');
+    const allowed=this.souls.limits.allow(`intent-arrivals:${scope.worldId}:${scope.soulId}:${scope.source.principalId}`,120,60_000);if(!allowed.ok)throw new ApiError(429,'rate-limited','too many evidence reads');
+    const q=intentArrivalQueryV1Schema.parse(query);if((q.afterSeq??0)>(q.throughSeq??this.host.seq)||(q.throughSeq??this.host.seq)>this.host.seq)throw new ApiError(400,'invalid-arrival-query','invalid arrival query');
+    try{return readIntentArrivalsV1(this,scope,q.afterSeq??0,q.throughSeq??this.host.seq);}catch(error){if(error instanceof ZodError)throw new Error('arrival source validation unavailable');throw error;}
   }
   private version(scope:IntentRequestScope,request:ReturnType<typeof intentRequestV2Schema.parse>) {
     if(!request.edit)return;
@@ -187,3 +195,5 @@ export function intentHistoryReadError(error:unknown):ApiError {
   if(error instanceof ApiError&&error.status===429)return error;
   return new ApiError(503,'history-unavailable','Intention history temporarily unavailable.');
 }
+
+export function intentArrivalReadError(error:unknown):ApiError {if(error instanceof ZodError||error instanceof ApiError&&error.status===400)return new ApiError(400,'invalid-arrival-query','invalid arrival query');return intentHistoryReadError(error);}

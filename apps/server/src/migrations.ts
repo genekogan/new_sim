@@ -169,6 +169,16 @@ export const MIGRATIONS: { id: number; name: string; up(db: DatabaseSync): void 
     )`);
     db.exec('CREATE INDEX intent_history_cursors_scope ON intent_history_cursors_v1(world_id,soul_id,owner_id,principal_id,source_kind,created_at)');
   } },
+  {id:17,name:'private canonical navigation arrival references',up(db){
+    // Empty indexed read journal; no historic inference or feature activation.
+    db.exec(`CREATE TABLE intent_arrivals_v1 (
+      world_id TEXT NOT NULL, soul_id TEXT NOT NULL, owner_id TEXT NOT NULL, attempt_id TEXT NOT NULL,
+      seq INTEGER NOT NULL, event_hash TEXT NOT NULL, body_hash TEXT NOT NULL,
+      PRIMARY KEY(world_id,attempt_id), UNIQUE(world_id,seq),
+      FOREIGN KEY(world_id,seq) REFERENCES events(world_id,seq)
+    )`);
+    db.exec('CREATE INDEX intent_arrivals_owner ON intent_arrivals_v1(world_id,soul_id,owner_id,seq)');
+  }},
 ];
 
 export function migrate(db: DatabaseSync): number[] {

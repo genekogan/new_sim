@@ -77,13 +77,14 @@ const LOOK = 2.5; // m look-ahead for conflicts
 const ENC_STEP = 0.1; // m between samples of the path ahead that encounters are measured against
 const ENC_TIME = 1.0; // s: another walker's heading is the chord of its own smoothed path over this much of its walking
 
-export type WalkParams = { actor: string; x: number; z: number; level?: number; face?: number; speed?: number };
+export type WalkParams = { actor: string; x: number; z: number; level?: number; face?: number; speed?: number;arrivalEvidence?:'navigation-arrival/1' };
 
 type Seg = PathSeg;
 type Narrow = { res: string; s0: number; s1: number; entry: Vec2; dir: Vec2 };
 type Exec = {
   id: string;
   actor: string;
+  arrivalEvidence?:'navigation-arrival/1';
   goal: { level: number; p: Vec2 };
   face?: number;
   speed: number;
@@ -141,6 +142,7 @@ type Exec = {
 };
 
 export const walkSchema = z.strictObject({
+  arrivalEvidence:z.literal('navigation-arrival/1').optional(),
   actor: z.string().max(80),
   x: z.number().min(-500).max(500),
   z: z.number().min(-500).max(500),
@@ -217,7 +219,7 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
     const a = rt.world.entities[p.actor];
     a.human!.task = id;
     const ex: Exec = {
-      id, actor: p.actor, goal: { level: p.level ?? a.human!.level, p: [p.x, p.z] }, face: p.face,
+      id, actor: p.actor, ...(p.arrivalEvidence?{arrivalEvidence:p.arrivalEvidence}:{}), goal: { level: p.level ?? a.human!.level, p: [p.x, p.z] }, face: p.face,
       speed: p.speed ?? bodyProfile(a).speed, profile: bodyProfile(a), route, leg: 0, segs: [], total: 0, s: 0, v: 0,
       offset: 0, narrows: [], held: new Set(), climbT: 0, epoch: spatial(rt,p.actor).epoch, replans: 0, phase: 'walk', side: 0, stuck: 0, turning: false, plannedAround: {}, peopleReplans: 0, pushes: 0,
     };
@@ -929,7 +931,7 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     a.human!.task = undefined;
     // snapped: how far the standable arrival point lies from the requested goal (0 = exact; review H2)
     const snapped = Math.round(dist2(pointAt(ex, ex.total), ex.goal.p) * 1000) / 1000;
-    return { status: 'completed', outputs: { replans: ex.replans, length: ex.route.length, snapped, pushes: ex.pushes } };
+    return { status: 'completed', outputs: { replans: ex.replans, length: ex.route.length, snapped, pushes: ex.pushes, ...(ex.arrivalEvidence?{arrivalEndpoint:{position:[...a.pose.p],level:a.human!.level}}:{}) } };
   }
   return { status: 'running', phase };
 }

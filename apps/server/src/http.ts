@@ -21,7 +21,7 @@ import {captureRenderScene} from '@sim/engine-contract';
 import type {CandidateStationV1} from './station.ts';
 import type {CandidateStationV2} from './station-v2.ts';
 import {mountStationRoutesV2} from './station-routes-v2.ts';
-import { intentHistoryReadError,intentTransportError, intentLookupError, type IntentControlV2, type IntentIdentityV2 } from './intent-control.ts';
+import { intentArrivalReadError,intentHistoryReadError,intentTransportError, intentLookupError, type IntentControlV2, type IntentIdentityV2 } from './intent-control.ts';
 
 type Deps = { cfg: Config; db: Db; host: WorldHost; auth: Auth; hub: Hub; brain: Brain; souls: Souls; takes?: TakeArchive; station?:CandidateStationV1; stationV2?:CandidateStationV2; intentV2?:IntentControlV2 };
 
@@ -170,6 +170,15 @@ export function buildApp(d: Deps) {
     try{scope=service.agentScope(bearer(c));}catch(error){throw intentTransportError(error);}
     try{const page=service.historyPage(scope,historyQuery(c));service.guard(scope);return c.json(page);}
     catch(error){throw intentHistoryReadError(error);}
+  });
+
+  app.get('/v1/souls/:id/intent-v2/arrivals',async c=>{
+    c.header('Cache-Control','no-store');const service=intentService(),identity=await intentIdentity(c);
+    try{const scope=service.ownerScope(identity,c.req.param('id')),page=service.arrivalsPage(scope,historyQuery(c));service.guard(scope);return c.json(page);}catch(error){throw intentArrivalReadError(error);}
+  });
+  app.get('/v1/agent/intent-v2/arrivals',c=>{
+    c.header('Cache-Control','no-store');const service=intentService();let scope;try{scope=service.agentScope(bearer(c));}catch(error){throw intentTransportError(error);}
+    try{const page=service.arrivalsPage(scope,historyQuery(c));service.guard(scope);return c.json(page);}catch(error){throw intentArrivalReadError(error);}
   });
 
   // ---- signed-in users

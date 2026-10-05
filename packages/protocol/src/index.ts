@@ -1,3 +1,4 @@
+import {intentArrivalFactV1} from './intent-arrival-v1.ts';
 // Wire protocol shared by server and clients: log events, WebSocket messages,
 // REST payloads. Everything that crosses a process boundary is defined here.
 export * from './mandate.ts';
@@ -62,7 +63,7 @@ export const describeIntent = (i: WireIntent | null, nameOf: (id: string) => str
 export const publicIntent = (i: WireIntent | null): WireIntent | null => { if (!i) return null; const { note: _n, text: _t, ...rest } = i; return rest; };
 
 // ---------------------------------------------------------------- log events
-export type EventKind = 'birth' | 'intent' | 'mandate' | 'decision' | 'play' | 'mint' | 'deck' | 'scene' | 'rules' | 'admin' | 'retire' | 'intent-request-v2' | 'intent-v2' | 'intent-admission-v2' | 'intent-controller-v2' | 'station-epoch-v1' | 'station-cue-v1' | 'station-anchor-v1' | 'station-rules-era-v1' | 'station-cue-v2' | 'station-anchor-v2';
+export type EventKind = 'birth' | 'intent' | 'mandate' | 'decision' | 'play' | 'mint' | 'deck' | 'scene' | 'rules' | 'admin' | 'retire' | 'intent-request-v2' | 'intent-v2' | 'intent-admission-v2' | 'intent-controller-v2' | 'intent-arrival-v1' | 'station-epoch-v1' | 'station-cue-v1' | 'station-anchor-v1' | 'station-rules-era-v1' | 'station-cue-v2' | 'station-anchor-v2';
 export type LogEvent = { seq: number; tick: number; kind: EventKind; author: string; payload: any; at: number };
 
 export type BirthPayload = { soulId: string; entityId: string; name: string; description: string; owner: string };
@@ -96,6 +97,7 @@ export function publicEvent(e: LogEvent): LogEvent {
   }
   if (e.kind === 'intent-v2') return { ...e, payload: publicIntentHistoryEventV2(intentHistoryFactV2(e)) };
   if (e.kind === 'intent-admission-v2') return { ...e, payload: publicIntentHistoryEventV2(intentAdmissionFactV2(e)) };
+  if(e.kind==='intent-arrival-v1'){const p=intentArrivalFactV1(e);return {...e,payload:{worldId:p.worldId,soulId:p.soulId,privateUpdate:true}};}
   if (e.kind === 'intent-controller-v2') return { ...e, payload: publicIntentHistoryEventV2(intentControllerFactV2(e)) };
   if(e.kind==='mandate')return {...e,payload:{soulId:e.payload?.soulId,op:e.payload?.op,ruleId:e.payload?.ruleId??e.payload?.rule?.id,status:e.payload?.patch?.status??e.payload?.rule?.status}};
   if (e.kind === 'rules' && e.payload?.recovery) { const r=e.payload.recovery; return {...e,payload:{recovery:{excluded:r.excluded,faults:r.faults,restored:true}}}; }
@@ -225,3 +227,5 @@ export const proposeCardsSchema = z.strictObject({
   links: z.record(z.string().max(40), z.strictObject({ summary: z.string().max(120), control: z.boolean().optional() })).optional(),
   kinds: z.record(z.string().max(40), z.strictObject({ summary: z.string().max(120) })).optional(),
 });
+
+export * from './intent-arrival-v1.ts';

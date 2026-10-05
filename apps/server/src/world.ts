@@ -1,3 +1,4 @@
+import {captureIntentArrivalV1,journalIntentArrivalV1,verifyIntentArrivalV1} from './intent-arrivals.ts';
 // WorldHost: the sequencer. Owns the engine, the event log, the tick loop,
 // snapshots, and the per-batch broadcast. The fold (doc 11):
 //   events logged with tick T are applied when world.tick == T, then the engine steps to T+1.
@@ -422,6 +423,7 @@ export class WorldHost {
         try{foldStationFactV2(this.stationHistoryV2()!,this.stationHistoryV1()!,e,this.stationPhysicalHeadV1()!);}
         catch(error){p.reject?.(error);continue;}
       }
+      const arrival=this.extra.intentArrivalV1&&e.kind==='play'?captureIntentArrivalV1(this,e):undefined;
       let admission: LogEvent | undefined;
       let stationEra:LogEvent|undefined;
       let preview: FoldResult | undefined;
@@ -440,12 +442,13 @@ export class WorldHost {
             this.db.appendEvent(this.worldId, e);
             if (admission) this.db.appendEvent(this.worldId, admission);
             if(stationEra)this.db.appendEvent(this.worldId,stationEra);
+            if(arrival){this.db.appendEvent(this.worldId,arrival);journalIntentArrivalV1(this,arrival);}
             if (p.journal(e) !== true) throw new TypeError('acceptance journal must synchronously return true');
             this.db.db.exec('COMMIT');
           } catch (error) { this.db.db.exec('ROLLBACK'); throw error; }
         } catch (error) { p.reject!(error); continue; }
-      } else this.db.appendEvent(this.worldId, e);
-      this.seq = stationEra?.seq ?? admission?.seq ?? e.seq;
+      } else if(arrival){this.db.db.exec('BEGIN IMMEDIATE');try{this.db.appendEvent(this.worldId,e);this.db.appendEvent(this.worldId,arrival);journalIntentArrivalV1(this,arrival);this.db.db.exec('COMMIT');}catch(error){this.db.db.exec('ROLLBACK');this.clockFailure=error;this.paused=true;this.stop();for(const listener of this.listeners)try{listener.onClockUnavailable?.();}catch{}throw error;}}else this.db.appendEvent(this.worldId, e);
+      this.seq = arrival?.seq ?? stationEra?.seq ?? admission?.seq ?? e.seq;
       let recovered = false;
       let result: FoldResult | undefined;
       try {
@@ -454,8 +457,9 @@ export class WorldHost {
           throw new Error('purpose admission preview differs from live fold');
         if (admission) this.apply(admission, false);
         if(stationEra)this.apply(stationEra,false);
+        if(arrival)this.apply(arrival,false);
       } catch (error) {
-        if(stationEra||e.payload?.crewRemovalTransition||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore){
+        if(arrival||stationEra||e.payload?.crewRemovalTransition||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore){
           // A committed structural pair cannot be attributed to an unrelated
           // card or filtered out by card-fault recovery. Restore exact history.
           try{
@@ -464,8 +468,8 @@ export class WorldHost {
           }catch(restartError){this.stop();p.reject?.(restartError);throw restartError;}
         }else {this.recoverFault(error, e.kind === 'decision' ? e.payload.card : undefined); recovered = true;}
       }
-      const accepted=[e,...(admission?[admission]:[]),...(stationEra?[stationEra]:[])];
-      if (!recovered||stationEra||e.payload?.crewRemovalTransition||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore) this.acc.log.push(...accepted);
+      const accepted=[e,...(admission?[admission]:[]),...(stationEra?[stationEra]:[]),...(arrival?[arrival]:[])];
+      if (!recovered||arrival||stationEra||e.payload?.crewRemovalTransition||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore) this.acc.log.push(...accepted);
       // No listener can observe a physical event before its committed era fold.
       for (const fact of accepted) for (const l of this.listeners) l.onApplied?.(fact);
       if (admission && recovered) { p.reject?.(new PersistedIntentAdmissionFault(e.seq)); continue; }
@@ -719,6 +723,7 @@ export class WorldHost {
         }
         break;
       }
+      case 'intent-arrival-v1': {const p=verifyIntentArrivalV1(this,e);const arrivals=(this.extra.intentArrivalsV1??={}) as Record<string,unknown>;if(arrivals[p.attemptId])throw Error('arrival attempt already recorded');arrivals[p.attemptId]=p;break;}
       case 'intent-controller-v2': {
         const fact=intentControllerFactV2(e),payload=e.payload as IntentControllerPayloadV2;
         if(fact.worldId!==this.worldId)throw new Error('private controller fact belongs to another world');
@@ -848,6 +853,7 @@ export class WorldHost {
         break;
       }
       case 'rules': {
+        if(e.payload?.intentArrivalV1)this.extra.intentArrivalV1=true;
         const p = e.payload;
         if(p?.intentSequencesV1===true&&!this.extra.intentSequencesV1){this.extra.intentSequencesV1=true;this.extra.intentSequencesSinceV1=e.seq;}
         if (p?.kernelBootstrap || p?.vocabulary || p?.adoptCamp || p?.commonsTransition || p?.campExpansion) this.kernelDirty = true;
@@ -878,6 +884,7 @@ export class WorldHost {
 
   get living(): { origin: number; dayTicks: number; customs: string[]; lastDay: number; event: string; quiet: boolean; quietDay?: number } | undefined { return this.extra.living as any; }
   get quietBarrier() { return !!this.living?.quiet; }
+  enableIntentArrivalsV1(){if(this.extra.intentArrivalV1)return Promise.resolve();return this.enqueue('rules','operator:intent-arrival',{intentArrivalV1:true,runtimePolicy:{sleepBlockTicks:1200,...this.extra.runtimePolicy as object,nativeArrivalWitnessV1:true},why:'prospective private native navigation arrival witnesses; retain old history grammar'});}
   enableIntentSequencesV1(){if(this.extra.intentSequencesV1)return Promise.resolve();return this.enqueue('rules','operator:intent-sequences',{intentSequencesV1:true,worldEvent:{id:'intent-sequences-enabled',text:'Residents can follow the steps of their current directions.'},why:'enable purpose-bound card progress while preserving earlier intentions'});}
   intentSequenceStepV1(soulId:string,intent:PurposeRef){return (this.extra.intentSequenceProgressV1 as Record<string,number>|undefined)?.[JSON.stringify([soulId,intent.intentId,intent.version])]??0;}
 
