@@ -62,6 +62,14 @@ export class Brain {
   private readonly intentV2Retries: boolean;
   get intentV2Enabled() { return this.intentV2Choices; }
   private purposeWakes = new Map<string, { intentId: string; version: number }>();
+  private edenAutonomyV1=false;
+  /** Explicit local/operator selection; uses the existing Mars mid-brain,
+   * never a direct movement or replacement of the owner's intentions. */
+  enableEdenAutonomyV1(){
+    if(this.cfg.worldKey!=='eden')throw Error('eden-autonomy.world-differs');
+    this.edenAutonomyV1=true;
+    return this.host.enqueue('rules','operator:eden-autonomy',{worldEvent:{id:'eden-autonomy-enabled',text:'The residents may choose what to do in the world.'},why:'enable ordinary autonomous thought while retaining owner intentions and model budget'});
+  }
   private quiescing=false;
   private work=new Set<Promise<unknown>>();
   private maintenance:ReturnType<typeof setInterval>;
@@ -170,7 +178,7 @@ export class Brain {
       const due: Mind[] = [];
       for (const m of this.host.minds.values()) {
         if (this.host.quietBarrier || m.nextEvalTick > tick || this.inflight.has(m.soulId) || !w.entities[m.entityId]) continue;
-        const hasWork = this.cfg.worldKey !== 'eden' || m.agendaPos < m.agenda.length
+        const hasWork = this.cfg.worldKey !== 'eden' || this.edenAutonomyV1 || m.agendaPos < m.agenda.length
           || mandateOf(this.host.kernel,m.soulId).some(r=>r.status==='active')
           || this.intentV2Choices && Object.values(this.host.intentHistoryOf(m.soulId).intents)
             .some(e=>e.status==='active' && e.revision.source.ownerId===m.owner);
