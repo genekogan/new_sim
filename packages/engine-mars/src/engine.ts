@@ -53,7 +53,7 @@ type Prog = {
   ops: Op[]; action?: string; settle?: 'done' | 'held'; soft?: boolean; until?: number;
   build?: { phase: BuildPhase; crew: string[]; stopping?: Diag };
 };
-export type MarsWorldConfig = { walkBlockV1?:boolean; safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
+export type MarsWorldConfig = { walkBlockV1?:boolean; safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; fixtureGroundGoalsV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
 export const LITTLE_MARTIANS_WORLD: MarsWorldConfig={scene:'littlemartians',arrival:[0,18],arrivalPlace:'garden',reference:[0,16],grounds:{id:'grounds',name:'Ceramic garden'}};
 export const GREEN_FIELD_WORLD:MarsWorldConfig={scene:'greenfield',arrival:[0,0],arrivalPlace:'field',reference:[2,0],grounds:{id:'grounds',name:'Green field'}};
 export const EDEN_COMMONS_WORLD:MarsWorldConfig={scene:'eden-commons',arrival:[14,4],arrivalPlace:'commons',reference:[9,5],grounds:{id:'grounds',name:'Eden commons'}};
@@ -143,7 +143,7 @@ export class MarsEngine implements Engine {
     return [...BODY_VERBS, ...this.m.describeVerbs(this.registry).map((v) => ({ ...v, verb: `mars:${v.verb}`, description: `[Mars verb] ${v.description}`, scope: 'world' as const }))];
   }
   /** The world plus the adapter's own state (which program each actor is in), since both decide what happens next. */
-  stateHash(): string { return hashOf({ w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet, ...(this.cfg.safeCrewRemoval?{removalPolicy:'crew-removal/1'}:{}), ...(this.commonsProvisionsActive?{provisionsPolicy:'commons-provisions/1'}:{}), ...(this.cfg.safeArrivalV1?{arrivalPolicy:'arrival-clearance/1'}:{}), ...(this.cfg.walkBlockV1?{walkPolicy:'walk-block/1'}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion,physicalPolicy:this.cfg}:{}) }); }
+  stateHash(): string { return hashOf({ w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet, ...(this.cfg.safeCrewRemoval?{removalPolicy:'crew-removal/1'}:{}), ...(this.cfg.fixtureGroundGoalsV1?{fixtureGoalPolicy:'ground-fixture-levels/1'}:{}), ...(this.commonsProvisionsActive?{provisionsPolicy:'commons-provisions/1'}:{}), ...(this.cfg.safeArrivalV1?{arrivalPolicy:'arrival-clearance/1'}:{}), ...(this.cfg.walkBlockV1?{walkPolicy:'walk-block/1'}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion,physicalPolicy:this.cfg}:{}) }); }
   physicalHash(): string { return hashOf(physicalView(this.world)); }
 
   // ------------------------------------------------------------------ tick
@@ -299,7 +299,7 @@ export class MarsEngine implements Engine {
   private goalNear(actor: string, to: unknown, standoff: number): { x: number; z: number; level: number } | 'here' | Diag {
     const me = this.pos(actor)!, t = this.pointOf(to);
     if (!t) return { code: 'target.unknown', message: `nothing to walk to: ${JSON.stringify(to)}` };
-    const level = typeof to === 'string' ? (this.rt.world.regions[to]?.level ?? this.ents[to]?.human?.level ?? this.ents[actor].human.level) : this.ents[actor].human.level;
+    const level = typeof to === 'string' ? (this.rt.world.regions[to]?.level ?? this.ents[to]?.human?.level ?? (this.cfg.fixtureGroundGoalsV1&&this.ents[to]?.support?.kind==='ground'?0:this.ents[actor].human.level)) : this.ents[actor].human.level;
     const dx = me[0] - t[0], dz = me[1] - t[1], d = Math.hypot(dx, dz);
     const isBody = typeof to === 'string' && !!this.ents[to];
     const room=this.cfg.scene==='littlemartians'&&typeof to==='string'&&this.rt.world.regions[to]?.kind==='place';
@@ -743,7 +743,8 @@ export class MarsEngine implements Engine {
     this.cursor=this.rt.events.length;this.renderBaseKey='';this.startRecorder();
   }
 
-  configureRuntimePolicy(policy: {sleepBlockTicks:number;quietSeatCourtesy?:boolean}) {
+  configureRuntimePolicy(policy: {sleepBlockTicks:number;quietSeatCourtesy?:boolean;fixtureGroundGoalsV1?:boolean}) {
+    if(policy.fixtureGroundGoalsV1===true)this.cfg={...this.cfg,fixtureGroundGoalsV1:true};
     if (!Number.isInteger(policy.sleepBlockTicks) || policy.sleepBlockTicks < 20 || policy.sleepBlockTicks > 72000) throw new Error('runtime-policy.sleep-limit');
     if(policy.quietSeatCourtesy !== undefined && typeof policy.quietSeatCourtesy !== "boolean") throw new Error("runtime-policy.quiet-seat-courtesy");
     this.cfg.sleepBlockTicks = policy.sleepBlockTicks;

@@ -879,6 +879,7 @@ export class WorldHost {
   enableIntentSequencesV1(){if(this.extra.intentSequencesV1)return Promise.resolve();return this.enqueue('rules','operator:intent-sequences',{intentSequencesV1:true,worldEvent:{id:'intent-sequences-enabled',text:'Residents can follow the steps of their current directions.'},why:'enable purpose-bound card progress while preserving earlier intentions'});}
   intentSequenceStepV1(soulId:string,intent:PurposeRef){return (this.extra.intentSequenceProgressV1 as Record<string,number>|undefined)?.[JSON.stringify([soulId,intent.intentId,intent.version])]??0;}
 
+  enableGroundFixtureGoalsV1(){return this.enqueue('rules','operator:fixture-goal-levels',{runtimePolicy:{sleepBlockTicks:1200,...this.extra.runtimePolicy as object,fixtureGroundGoalsV1:true},why:'resolve ground-supported fixture destinations prospectively; retain old navigation replay'});}
   enableHumanRestNeedsV1(){
     return this.enqueue('rules','operator:human-rest-needs',{runtimePolicy:{sleepBlockTicks:1200,...this.extra.runtimePolicy as object,humanRestNeedsV1:true},why:'recognize enacted humanoid rest prospectively; retain prior needs replay'});
   }
