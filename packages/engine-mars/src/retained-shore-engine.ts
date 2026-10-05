@@ -15,7 +15,7 @@ export async function retainedCommonsShoreFactory(options?:{foodDeliveryV1?:bool
   const prefix='sim-mars/1+'+reader.rulesVersion+'+crew-removal/1+commons/1+arrival-clearance/1+walk-block/1';
   const nextVersions=new Set([prefix,prefix+'+commons-provisions/1',prefix+'+commons-provisions/1+commons-kitchen/1',prefix+'+commons-provisions/1+commons-kitchen/2']);
   const install=(e:ReturnType<EngineFactory['create']>)=>{if(!(e instanceof MarsEngine))throw Error('retained-shore.native-required');e.installRetainedCommonsShoreReader(reader);if(options?.foodDeliveryV1)e.enableCommonsFoodDeliveryReaderV1();return e;};
-  const physicalCfg=({clock,sleepBlockTicks,quietSeatCourtesy,fixtureGroundGoalsV1,nativeArrivalWitnessV1,...rest}:MarsWorldConfig)=>rest;
+  const physicalCfg=({clock,sleepBlockTicks,quietSeatCourtesy,fixtureGroundGoalsV1,nativeArrivalWitnessV1,quietLandingCourtesyV1,...rest}:MarsWorldConfig)=>rest;
   return {rulesVersion:old.rulesVersion,genesis:old.genesis,create:w=>install(old.create(w)),
     canReplayHistory:v=>{const bare=v.replace(/\+fd\/1$/,'');return (v===bare||options?.foodDeliveryV1===true)&&(old.canReplayHistory?.(bare)===true||nextVersions.has(bare));},
     canRestoreSnapshot:v=>{const bare=v.replace(/\+fd\/1$/,'');return (v===bare||options?.foodDeliveryV1===true)&&(old.canRestoreSnapshot?.(bare)===true||nextVersions.has(bare));},

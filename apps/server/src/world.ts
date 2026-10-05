@@ -885,6 +885,7 @@ export class WorldHost {
 
   get living(): { origin: number; dayTicks: number; customs: string[]; lastDay: number; event: string; quiet: boolean; quietDay?: number } | undefined { return this.extra.living as any; }
   get quietBarrier() { return !!this.living?.quiet; }
+  enableQuietLandingCourtesyV1(){return this.enqueue('rules','operator:quiet-landing-courtesy',{runtimePolicy:{sleepBlockTicks:1200,...this.extra.runtimePolicy as object,quietLandingCourtesyV1:true},why:'allow ordinary native traffic step for a free idle landing blocker while existing natural quiet drains'});}
   enableIntentArrivalsV1(){if(this.extra.intentArrivalV1)return Promise.resolve();return this.enqueue('rules','operator:intent-arrival',{intentArrivalV1:true,runtimePolicy:{sleepBlockTicks:1200,...this.extra.runtimePolicy as object,nativeArrivalWitnessV1:true},why:'prospective private native navigation arrival witnesses; retain old history grammar'});}
   enableIntentSequencesV1(){if(this.extra.intentSequencesV1)return Promise.resolve();return this.enqueue('rules','operator:intent-sequences',{intentSequencesV1:true,worldEvent:{id:'intent-sequences-enabled',text:'Residents can follow the steps of their current directions.'},why:'enable purpose-bound card progress while preserving earlier intentions'});}
   intentSequenceStepV1(soulId:string,intent:PurposeRef){return (this.extra.intentSequenceProgressV1 as Record<string,number>|undefined)?.[JSON.stringify([soulId,intent.intentId,intent.version])]??0;}
