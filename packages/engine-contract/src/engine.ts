@@ -7,6 +7,7 @@ import type { VerbInfo } from './registry.ts';
 import type { RenderScene,RenderSceneCaptureV1 } from './scene-capture.ts';
 import type { NativeGatheringObservationV1 } from './gathering-observation.ts';
 import type { CommonsTransitionV1,CommonsTransitionAdmissionV1 } from './commons-transition.ts';
+import type {NativeBoatControlsV1} from './boat.ts';
 export type {RenderScene} from './scene-capture.ts';
 
 /** A feasible activity for an actor, params already bound. The brain picks by id only. */
@@ -114,6 +115,8 @@ export interface Engine {
   enumerateActivities(actorId: string, intent: Intent | null): ActivityOption[];
   /** Word-bucketed local context for the brain: never numbers. */
   describeSurroundings(actorId: string): { nearby: { id: string; who: string; what: string; distance: 'here' | 'close' | 'near' | 'far'; doing: string }[]; region: string; happening: string };
+  /** Optional bounded local physical cue. Availability never grants control. */
+  observeBoatControls?: (actorId:string)=>NativeBoatControlsV1|null;
   /** Regions and named places/fixtures that meaning can refer to. Stable ids. */
   anchors(): Anchor[];
   /** Region id containing a point (for per-region narration). */

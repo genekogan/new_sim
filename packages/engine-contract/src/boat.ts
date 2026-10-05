@@ -2,6 +2,15 @@
 // ownership or permission derived from a seat. Pilot authority is independent.
 import { z } from 'zod';
 const id=z.string().min(1).max(96);
+const availability=z.object({available:z.boolean(),reason:z.object({code:z.string().min(1).max(96),message:z.string().min(1).max(280)}).strict().nullable()}).strict().superRefine((v,ctx)=>{
+  if(v.available!==(v.reason===null))ctx.addIssue({code:'custom',message:'Availability needs an actual refusal or no refusal'});
+});
+/** A local current physical observation, never an acquired grant or a write. */
+export const nativeBoatControlsV1Schema=z.object({contract:z.literal('native-boat-controls/1'),actorId:id,boatId:id,
+  tick:z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),physicalBase:z.object({campus:id,staticHash:z.string().regex(/^[a-f0-9]{64}$/)}).strict(),
+  phase:z.enum(['docked','underway','stopped']),holder:id.nullable(),take:availability,release:availability,
+}).strict();
+export type NativeBoatControlsV1=z.infer<typeof nativeBoatControlsV1Schema>;
 const vec=z.tuple([z.number(),z.number(),z.number()]);
 export const boatStateV1Schema=z.object({
   contract:z.literal('boat-state/1'),waterId:id,frameOffsetY:z.number(),

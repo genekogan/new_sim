@@ -343,6 +343,7 @@ export class Souls {
     const m = this.host.minds.get(soul.id), e = this.host.engine;
     if (!m || !e.world.entities[m.entityId]) throw new ApiError(409, 'not-in-world', 'this soul is not in the world');
     const c = this.brain.midContext(m, 'agent'); const s = e.describeSurroundings(m.entityId);
+    const boatControls=e.observeBoatControls?.(m.entityId);
     return {
       tick: e.world.tick, world: c.world,
       soul: { name: c.soul.name, about: c.soul.about, where: c.soul.where, energy: c.soul.energy, mood: m.mood, doing_now: c.soul.doing, recently: c.soul.recent, intent: m.intent, intent_text: c.soul.intent },
@@ -352,6 +353,7 @@ export class Souls {
       said_to_you: c.heard ?? [],
       agenda: m.agenda.map((a, i) => ({ card: a.card, target: a.target ?? null, ...(a.of ? { of: a.of } : {}), done: i < m.agendaPos })),
       could_do_now: c.options.map((o) => ({ id: o.id, card: o.card, target: o.cardTarget, what: o.label, good_when: o.goodWhen, not_for: o.notFor, ...(o.servesIntent ? { serves_current_intent: true } : {}) })),
+      ...(boatControls?{physical_boat_controls:boatControls}:{}),
     };
   }
 
@@ -360,6 +362,7 @@ export class Souls {
     if (!m || !e.world.entities[m.entityId]) return { id: soul.id, name: soul.name, description: soul.description, in_world: false };
     const ent = e.world.entities[m.entityId]; const s = e.describeSurroundings(m.entityId);
     const nameOf = (id: string) => this.host.nameOf(id);
+    const boatControls=e.observeBoatControls?.(m.entityId);
     return {
       id: soul.id, name: soul.name, description: soul.description, in_world: true, tick: e.world.tick, time: e.world.env.datetime,
       position: { x: ent.pose.p[0], z: ent.pose.p[2], region: s.region }, activity: ent.human!.activity, doing: e.programOf(m.entityId) ? m.doing : 'standing around',
@@ -370,6 +373,7 @@ export class Souls {
       storyteller_suggests: m.nudge?.text ?? null,
       next_think_in_s: Math.max(0, Math.round((m.nextEvalTick - e.world.tick) / 20)),
       available_now: this.brain.midContext(m, 'status').options.map((o) => ({ id: o.id, label: o.label })),
+      ...(boatControls?{physical_boat_controls:boatControls}:{}),
     };
   }
 

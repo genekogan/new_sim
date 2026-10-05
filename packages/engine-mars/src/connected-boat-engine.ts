@@ -3,8 +3,8 @@ import {hashOf,type EngineFactory,type EngineSnapshot} from '@sim/engine-contrac
 import {MarsEngine,EDEN_SAFE_COMMONS_WORLD,type MarsWorldConfig,type MarsPhysicalBinding} from './engine.ts';
 import {loadMars} from './load.ts';
 import {connectedCommonsBoatFixture} from './connected-boat.ts';
-export async function connectedCommonsBoatFactory():Promise<EngineFactory>{
-  const m=await loadMars(),native=await connectedCommonsBoatFixture();
+export async function connectedCommonsBoatFactory(options?:{helmV1?:true}):Promise<EngineFactory>{
+  const m=await loadMars(),native=await connectedCommonsBoatFixture(options);
   const cfg:MarsWorldConfig={...EDEN_SAFE_COMMONS_WORLD,safeCrewRemoval:true,walkBlockV1:true};
   // Commit the complete native rules identity without exceeding the existing
   // 200-character W address. No widening or truncation of the public codec.
@@ -12,8 +12,10 @@ export async function connectedCommonsBoatFactory():Promise<EngineFactory>{
   const rulesVersion='sim-mars/1+'+bindingVersion+'+crew-removal/1+commons/1+arrival-clearance/1+walk-block/1';
   const binding:MarsPhysicalBinding={rulesVersion:bindingVersion,
     renderScene(){const scene=native.renderScene();scene.shore!.rulesVersion=rulesVersion;return scene;},restore:native.restore,services:native.servicesForWorld,
+    ...(native.helmControls?{boatControls:native.helmControls}:{}),
     prepareRemoval(rt,id){
       const e=rt.world.entities[id],p=e?.human?.boatPassenger,v=rt.world.entities[native.policy.boatId];
+      if(native.helmV1&&v?.boat)v.boat.pilotIds=v.boat.pilotIds.filter((actor:string)=>actor!==id);
       if(!p&&!e?.human?.boatTransit){
         if(v?.boat&&Object.values(v.boat.passengers).includes(id))return false;
         if(v?.boat)v.boat.pilotIds=v.boat.pilotIds.filter((actor:string)=>actor!==id);return true;
@@ -40,3 +42,4 @@ export async function connectedCommonsBoatFactory():Promise<EngineFactory>{
     validateHistoryHead(e,recorded){if(e.rulesVersion!==recorded||recorded!==rulesVersion)throw new Error('connected-boat.history-head-differs');},
   };
 }
+export const connectedCommonsHelmFactory=()=>connectedCommonsBoatFactory({helmV1:true});

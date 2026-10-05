@@ -211,6 +211,12 @@ export class Brain {
     const s = eng.describeSurroundings(m.entityId);
     const intentText = m.intent ? describeIntent({ ...m.intent, note: undefined, text: undefined } as WireIntent, nameOf) : 'none';
     const sit = situationOf(this.host, m);
+    const boatControls=eng.observeBoatControls?.(m.entityId);
+    const physicalSituation=boatControls?[
+      `The nearby boat is ${boatControls.phase}. ${boatControls.holder===m.entityId?'You hold its helm.':boatControls.holder?'Another passenger holds its helm.':'No passenger holds its helm.'}`,
+      `Taking the helm is ${boatControls.take.available?'physically available':`unavailable: ${boatControls.take.reason!.message}`}.`,
+      `Releasing the helm is ${boatControls.release.available?'physically available':`unavailable: ${boatControls.release.reason!.message}`}.`,
+    ]:[];
     const deck = k.decks[m.soulId];
     const rules=mandateOf(k,m.soulId).filter(r=>r.status==='active').sort((a,b)=>Number(b.strict)-Number(a.strict));
     const history = this.intentV2Choices ? this.host.intentHistoryOf(m.soulId) : undefined;
@@ -243,7 +249,7 @@ export class Brain {
       },
       nearby: s.nearby.map((n) => ({ who: n.who, what: n.what, distance: n.distance, doing: n.doing })),
       nudge: m.nudge?.text ?? null,
-      situation: sit.situation,
+      situation: [...sit.situation,...physicalSituation],
       heard: sit.heard.map((h) => ({ who: h.who, act: h.act, ...(h.about ? { about: h.about } : {}), ...(this.lastWords.get(`${h.from}>${m.soulId}`) ? { words: this.lastWords.get(`${h.from}>${m.soulId}`)! } : {}) })),
       manners: Object.fromEntries((deck?.manners ?? []).map((n) => [n, k.vocab.manners[n]?.summary ?? n])),
       options,
@@ -517,7 +523,8 @@ export class Brain {
     const system = (align?`Align ONE new owner mandate rule in ONE call. Return alignment with a short understanding of the objective effects and one trigger. Time is the world's 24-hour clock: at 5pm every day means {kind:"time",hour:17,minute:0}. Every time Bill hosts a party means {kind:"gathering",host:Bill's known Soul id}. If you feel like it means {kind:"none"}. ${align === 'intent-v2'
       ? 'This is soul-intent/2: an ordinary actionable present direction such as "go to the campfire" means {kind:"now"} without requiring the word NOW. Future, conditional, recurring, optional or negated directions must keep the matching time/gathering/none trigger; never invent immediacy for them.'
       : 'Only an explicit instruction to act now/immediately means {kind:"now"}. Otherwise use none: do not invent an immediate instruction.'} Triggers only wake the mind; the agenda describes possible objective steps, and non-now rules do not execute it automatically. The owner's words remain verbatim private context. Explain impossible or unclear rules by understood:false.\n`:'')+COMPILER_PREAMBLE + cardGrammar(verbs);
-    const user = compileUser(k, m.soulId, wish, candidatesFor(this.host, m.soulId));
+    const physical=this.host.engine.observeBoatControls?.(m.entityId);
+    const user = compileUser(k, m.soulId, wish, candidatesFor(this.host, m.soulId))+(physical?'\nCurrent local physical observation (availability is not a grant):\n'+JSON.stringify(physical):'');
     const messages: { role: 'user' | 'assistant'; content: string }[] = [{ role: 'user', content: user }];
     let cost = 0, ms = 0, inTok = 0, outTok = 0, cached = 0; const attempts: unknown[] = [];
     try {

@@ -245,7 +245,43 @@ const boatClearanceInvariant:Invariant=rt=>{
   return out;
 };
 
-  return {actions:boatActions,bodyContact:boatBodyContact,invariant:boatInvariant,clearanceInvariant:boatClearanceInvariant,policy:B,layout};
+function helmIssue(rt:Runtime,actor:string,take:boolean,ownAction?:string):Diagnostic|null {
+  const v=boat(rt),s=v?.boat,e=rt.world.entities[actor],p=e?.human?.boatPassenger;
+  const issue=freeBody(rt,actor);if(issue)return issue;
+  if(!s||!p||p.boatId!==B.boatId||p.phase!=='seated'||boatBodyContact(rt,e)?.length!==0)
+    return diag('not-passenger','Taking or releasing the helm requires an actual seated passenger.',[actor]);
+  if(s.speed!==0||!['docked','stopped'].includes(s.phase))return diag('helm-underway','Stop the boat before changing its helm capability.',[B.boatId]);
+  if(rt.holder('boat:'+B.boatId).some(id=>id!==ownAction)||rt.holder('actor:'+actor).some(id=>id!==ownAction))
+    return diag('helm-busy','Wait until the current boat or body action finishes.',[B.boatId,actor]);
+  if(take&&s.pilotIds.length)return diag('helm-held','A passenger already holds the helm capability.',[...s.pilotIds]);
+  if(!take&&(s.pilotIds.length!==1||s.pilotIds[0]!==actor))return diag('helm-not-held','This passenger does not hold the helm capability.',[actor]);
+  return null;
+}
+function helmActions():ActionDef[] {
+  return [true,false].map((take):ActionDef<{actor:string},null,{actor:string;id:string}>=>({
+    verb:take?'boat_take_helm':'boat_release_helm',description:take?'Voluntarily take the single helm capability while actually seated, free-handed, stopped and unheld. Sitting alone never grants it.':'Release only your own helm capability while actually seated, free-handed, stopped and unheld.',
+    schema:z.object({actor:z.string().min(1).max(96)}).strict(),resumable:true,
+    reservations:(_w,p)=>[{resource:'actor:'+p.actor,mode:'exclusive'},{resource:'boat:'+B.boatId,mode:'exclusive'},{resource:'boat-helm:'+B.boatId,mode:'exclusive'}],
+    plan(rt,p){const issue=helmIssue(rt,p.actor,take);return issue?{ok:false,diagnostic:issue}:{ok:true,program:null};},
+    start(_rt,p,_plan,id){return {actor:p.actor,id};},
+    step(rt,ex){const issue=helmIssue(rt,ex.actor,take,ex.id);if(issue)return {status:'failed',diagnostic:issue};boat(rt).boat!.pilotIds=take?[ex.actor]:[];return {status:'completed',outputs:{helm:take?'acquired':'released',actor:ex.actor}};},
+    // Effects occur only at the completed native step, never speculative start.
+    cancel:()=>({ok:true}),
+  })) as ActionDef[];
+}
+const helmInvariant:Invariant=rt=>{
+  const s=boat(rt)?.boat;if(!s)return [diag('missing','The admitted boat is missing.')];
+  if(s.pilotIds.length>1)return [diag('multiple-helms','Only one passenger may hold the helm capability.')];
+  for(const actor of s.pilotIds){const e=rt.world.entities[actor];if(!e?.human||e.human.boatPassenger?.phase!=='seated'||boatBodyContact(rt,e)?.length!==0)return [diag('helm-without-passenger','The helm holder must occupy its actual seated body frame.',[actor])];}
+  return [];
+};
+function helmControls(rt:Runtime,actor:string){
+  const e=rt.world.entities[actor],v=boat(rt);if(!e?.human||!v?.boat||dist(e.pose.p,v.pose.p)>12)return null;
+  const choice=(take:boolean)=>{const issue=helmIssue(rt,actor,take);return {available:!issue,reason:issue?{code:issue.code,message:issue.message}:null};};
+  return {contract:'native-boat-controls/1' as const,actorId:actor,boatId:B.boatId,tick:rt.tick,physicalBase:{...rt.world.base},phase:v.boat.phase,
+    holder:v.boat.pilotIds.length===1?v.boat.pilotIds[0]:null,take:choice(true),release:choice(false)};
+}
+  return {actions:boatActions,bodyContact:boatBodyContact,invariant:boatInvariant,clearanceInvariant:boatClearanceInvariant,helmActions,helmInvariant,helmControls,policy:B,layout};
 }
 const legacyControllers=controllersAt(BOAT_POLICY,BOAT_LAYOUT);
 export const boatActions=legacyControllers.actions;

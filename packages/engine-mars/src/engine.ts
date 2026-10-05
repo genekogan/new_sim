@@ -27,6 +27,7 @@ import { dcos,dsin,hypot } from '../../../mars/viewer/engine/core/math.ts';
 import { clearanceAt } from '../../../mars/viewer/engine/spatial/grid.ts';
 import { HUMAN_RADIUS } from '../../../mars/viewer/engine/world/catalog.ts';
 import type { Spatial } from '../../../mars/viewer/engine/spatial/service.ts';
+import type {NativeBoatControlsV1} from '@sim/engine-contract';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const TPS = 20;
@@ -87,7 +88,7 @@ const inPoly = (x: number, z: number, poly: [number, number][]) => {
 const bucket = (m: number): 'here' | 'close' | 'near' | 'far' => (m < 2.5 ? 'here' : m < 9 ? 'close' : m < 28 ? 'near' : 'far');
 
 /** Fresh physical bases use an explicit native binding; legacy factories omit it. */
-export type MarsPhysicalBinding = {rulesVersion:string;renderScene:()=>RenderScene;restore:(snapshot:any)=>any;services:(world:any)=>any;prepareRemoval?:(runtime:any,id:string)=>boolean};
+export type MarsPhysicalBinding = {rulesVersion:string;renderScene:()=>RenderScene;restore:(snapshot:any)=>any;services:(world:any)=>any;prepareRemoval?:(runtime:any,id:string)=>boolean;boatControls?:(runtime:any,actor:string)=>NativeBoatControlsV1|null};
 export class MarsEngine implements Engine {
   readonly dt = 1 / TPS;
   readonly schema: string;
@@ -312,6 +313,15 @@ export class MarsEngine implements Engine {
   private raw(me: string, step: { verb: string; params: Record<string, unknown> }): { verb: string; params: Record<string, unknown> } | Diag {
     const verb = step.verb.slice(5), def = this.registry.get(verb), a = step.params ?? {};
     if (!def) return { code: 'action.unknown-verb', message: `no action verb "${verb}"` };
+    const helm=['boat_take_helm','boat_release_helm'].includes(verb);
+    // The fresh owned helm binding must also prevent a passenger from naming
+    // another body as pilot of an ordinary travel/board/leave program.
+    if((this.physical?.boatControls&&verb.startsWith('boat_'))||helm){
+      if(a.actor!==undefined&&a.actor!==me)return {code:helm?'boat.helm-self-only':'boat.self-only',message:'A boat activity may act only for the program\u0027s own passenger.'};
+    }
+    if(helm){
+      if(this.leaving.includes(me))return {code:'boat.helm-retiring',message:'A retiring passenger cannot acquire or release control through a new program.'};
+    }
     const shape = (this.m.describeVerbs(new Map([[verb, def]]))[0].inputSchema as { properties?: Record<string, unknown> }).properties ?? {};
     return { verb, params: { ...a, ...('actor' in shape && !('actor' in a) ? { actor: me } : {}), ...('actors' in shape && !('actors' in a) ? { actors: [me] } : {}) } };
   }
@@ -541,6 +551,11 @@ export class MarsEngine implements Engine {
   }
   currentPath(_id: string): PathCommit | undefined { return undefined; }   // movement is broadcast as keyframes, not as paths decided in advance
   enumerateActivities(): ActivityOption[] { return []; }                    // superseded by cards
+  observeBoatControls(actorId:string):NativeBoatControlsV1|null{
+    const view=this.physical?.boatControls?.(this.rt,actorId);if(!view)return null;
+    if(this.leaving.includes(actorId)){const unavailable={available:false,reason:{code:'boat.helm-retiring',message:'The retiring passenger is completing physical cleanup.'}};view.take=unavailable;view.release=structuredClone(unavailable);}
+    return view;
+  }
   describeSurroundings(actorId: string) {
     const me = this.pos(actorId) ?? [0, 0];
     const items = Object.keys(this.ents).filter((id) => id !== actorId && (this.ents[id].kind === 'human' || this.ents[id].kind === 'fixture')).map((id) => {
