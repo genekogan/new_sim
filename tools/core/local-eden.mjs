@@ -42,7 +42,7 @@ export async function openLocalEden({input,dataDir,worldId,port=4959,webDir,mars
   }
   const {Db}=await load('apps/server/src/db.ts'),{WorldHost}=await load('apps/server/src/world.ts');
   const native=await load('packages/engine-mars/src/index.ts'),db=new Db(join(dataDir,'sim.db'));
-  let host,server,hub,service,closing=false;
+  let host,server,hub,service,provisionBirths,closing=false;
   async function drive(p){let done=false;p.then(()=>done=true,()=>done=true);for(let i=0;i<100&&!done;i++){host.drainInputs();await setImmediate();}if(!done)throw Error('bootstrap sequencer did not settle');return p;}
   try {
     const header=db.world(worldId),beforeRows=db.liveSouls(worldId),beforeEvents=db.events(worldId);
@@ -79,7 +79,7 @@ export async function openLocalEden({input,dataDir,worldId,port=4959,webDir,mars
     if(modelCredentialFile){if(!brain.enableLocalBudgetV1||!brain.quiesce||!brain.settled)throw Error('selected live runtime needs local budget and controlled drain');brain.enableLocalBudgetV1();}
     if(autonomous){if(!brain.enableEdenAutonomyV1)throw Error('selected runtime needs explicit autonomy');await drive(brain.enableEdenAutonomyV1());}
     const souls=new Souls(host,db,brain,cfg);souls.enableLifecycle();
-    if(provisions){const {installCommonsProvisionCards}=await load('apps/server/src/commons-provisions.ts');await installCommonsProvisionCards(host,brain);}
+    if(provisions){const {followCommonsProvisionBirths}=await load('apps/server/src/commons-provisions.ts');if(!followCommonsProvisionBirths)throw Error('selected runtime needs prospective provision births');provisionBirths=await followCommonsProvisionBirths(host,brain);}
     service=new IntentControlV2(host,brain,souls,{historyV1:true});server=createServer();
     const strip=url=>stripWorldRequestPath(url,cfg.worldPath);
     server.on('upgrade',req=>{req.url=strip(req.url);});hub=new Hub(server,host,auth,db,souls);hub.brain=brain;hub.build=cfg.build;
@@ -93,7 +93,7 @@ export async function openLocalEden({input,dataDir,worldId,port=4959,webDir,mars
     await new Promise((r,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',r);});host.start();
     async function close(){if(closing)return;closing=true;brain.quiesce?.();for(const c of hub.clients)c.ws.close(1001,'local server stopping');
       const closed=new Promise(r=>server.close(r)),pump=setInterval(()=>host.drainInputs(),10);
-      try{await closed;await Promise.all([service.settled(),brain.settled?.()]);host.drainInputs();}finally{clearInterval(pump);}
+      try{await closed;provisionBirths?.close();await provisionBirths?.settled();await Promise.all([service.settled(),brain.settled?.()]);host.drainInputs();}finally{clearInterval(pump);}
       host.stop();host.saveSnapshot(true);await new Promise(r=>hub.wss.close(r));db.close();}
     return {cfg,pins,boot,db,host,auth,brain,souls,service,hub,server,close};
   } catch(error){host?.stop();server?.close();db.close();throw error;}

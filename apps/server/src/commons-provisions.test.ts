@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {commonsProvisionsFactory,COMMONS_PERSONAL_RESOURCES} from '@sim/engine-mars';
 import {fixture,invite,accept} from '../test/native-owner-fixture.ts';
 import {LivingWorld} from './living.ts';
-import {installCommonsProvisionCards} from './commons-provisions.ts';
+import {installCommonsProvisionCards,followCommonsProvisionBirths} from './commons-provisions.ts';
 import {setImmediate} from 'node:timers/promises';
 import {WorldHost} from './world.ts';
 import type {WorldState as NativeWorld} from '../../../mars/viewer/engine/world/types.ts';
@@ -24,4 +24,26 @@ test('eight human owners retain bodies/history and get usable personal meal/slee
   f.brain.quiesce();f.host.drainInputs();f.host.saveSnapshot(true);const head={engine:f.host.engine.stateHash(),kernel:kernelHash(f.host.kernel)},life=JSON.stringify([...f.host.minds.values()].map(m=>m.life));
   let h=new WorldHost(f.db,factory,f.host.seed,1e9,f.host.worldId,{durableClockV1:true});assert.equal(h.boot().from,'snapshot');assert.deepEqual({engine:h.engine.stateHash(),kernel:kernelHash(h.kernel)},head);assert.equal(JSON.stringify([...h.minds.values()].map(m=>m.life)),life);h.stop();
   f.db.db.prepare('DELETE FROM snapshots WHERE world_id=?').run(f.host.worldId);h=new WorldHost(f.db,factory,f.host.seed,1e9,f.host.worldId,{durableClockV1:true});assert.equal(h.boot().from,'genesis');assert.deepEqual({engine:h.engine.stateHash(),kernel:kernelHash(h.kernel)},head);assert.equal(JSON.stringify([...h.minds.values()].map(m=>m.life)),life);h.stop();assert.equal(f.db.paidCost(),0);
+});
+
+test('canonical future births receive their stable finite slots without restart; ninth birth cannot create resources',async t=>{
+  const f=fixture(':memory:',factory,{durableClockV1:true});f.souls.enableLifecycle();
+  await accept(f.host,f.host.installCommonsProvisionsV1());
+  const follow=await followCommonsProvisionBirths(f.host,f.brain);
+  t.after(()=>{follow.close();f.brain.quiesce();f.host.stop();f.db.close();});
+  const rows=[];
+  for(let i=0;i<9;i++){
+    const owner='newcomer'+i;await invite(f,owner);
+    const response=await f.app.request('/v1/souls',{method:'POST',headers:{authorization:'Bearer dev:'+owner,'content-type':'application/json','X-Sim-Lifecycle':'1'},body:JSON.stringify({name:'Newcomer '+i,description:'Synthetic future-arrival fixture'})});
+    assert.equal(response.status,202);const {lifecycle}=await response.json() as any;
+    await accept(f.host,follow.settled());const row=f.db.soul(lifecycle.soulId)!;rows.push(row);
+    assert.equal(f.host.kernel.decks[row.id].cards.includes('eat prepared meal '+row.id.slice(2)),i<8);
+    if(i<8)assert.equal((f.host.engine.world as NativeWorld).entities[COMMONS_PERSONAL_RESOURCES[i].bowl].contents?.fraction,1);
+  }
+  const facts=f.db.events(f.host.worldId),mintCount=facts.filter(e=>e.kind==='mint').length;
+  await installCommonsProvisionCards(f.host,f.brain);assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='mint').length,mintCount,'restart catch-up does not duplicate assignment');
+  assert.equal(COMMONS_PERSONAL_RESOURCES.filter(r=>(f.host.engine.world as NativeWorld).entities[r.bowl].contents?.fraction===1).length,8);assert.equal(f.db.paidCost(),0);
+  follow.close();f.brain.quiesce();f.host.drainInputs();f.host.saveSnapshot(true);
+  const head={engine:f.host.engine.stateHash(),kernel:kernelHash(f.host.kernel)};
+  const reboot=new WorldHost(f.db,factory,f.host.seed,1e9,f.host.worldId,{durableClockV1:true});assert.equal(reboot.boot().from,'snapshot');assert.deepEqual({engine:reboot.engine.stateHash(),kernel:kernelHash(reboot.kernel)},head);reboot.stop();
 });
