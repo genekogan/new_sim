@@ -7,15 +7,18 @@ export const COMMONS_KITCHENS=Object.freeze(Array.from({length:4},(_,i)=>Object.
   p:[-22+i*6,0,4] as [number,number,number],
 })));
 /** Explicit finite supported ingredients, not a refill of consumed personal bowls. */
-export function commonsKitchen(){
-  const entities:Record<string,Entity>={},provenance={origin:'design-edit' as const,confidence:'hypothetical' as const,note:'Explicit finite commons-kitchen/1: two ingredient bowls yield two servings per station'};
+export type CommonsKitchenVersion='commons-kitchen/1'|'commons-kitchen/2';
+export function commonsKitchen(version:CommonsKitchenVersion='commons-kitchen/1'){
+  if(version!=='commons-kitchen/1'&&version!=='commons-kitchen/2')throw Error('commons-kitchen.version');
+  const row=version==='commons-kitchen/2'?'r1':'r0';
+  const entities:Record<string,Entity>={},provenance={origin:'design-edit' as const,confidence:'hypothetical' as const,note:'Explicit finite '+version+': two ingredient bowls yield two servings per station'};
   for(const r of COMMONS_KITCHENS){
     entities[r.table]={id:r.table,def:'table-6ft',kind:'fixture',label:`Preparation table ${r.id}`,pose:{p:[...r.p],yaw:0},support:{kind:'ground'},provenance};
     const w={entities} as WorldState;
-    for(const [id,def,slot,food,fraction] of [[r.beans,'bowl','r0c1','beans',1],[r.greens,'bowl','r0c3','greens',1],[r.pot,'pot','r0c2','hypothetical cold shared dish',0],[r.spoon,'spoon','r0c4','',0]] as const){
+    for(const [id,def,slot,food,fraction] of [[r.beans,'bowl',row+'c1','beans',1],[r.greens,'bowl',row+'c3','greens',1],[r.pot,'pot',row+'c2','hypothetical cold shared dish',0],[r.spoon,'spoon',row+'c4','',0]] as const){
       const item=itemEntity(id,def,[0,0,0],0,{provenance,...(food?{contents:{food,fraction}}:{})}),s=surfaceSlot(w,`${r.table}#${slot}`);
       if('code' in s)throw Error('commons-kitchen.slot');placeOnSlot(item,s,0);entities[id]=item;
     }
   }
-  return {entities,hash:hashOf({contract:'commons-kitchen/1',entities})};
+  return {entities,hash:hashOf({contract:version,entities})};
 }

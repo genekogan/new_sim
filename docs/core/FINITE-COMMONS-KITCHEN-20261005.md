@@ -76,3 +76,16 @@ the normal clock through ordinary completion and observes exactly one kitchen
 fact and card assignment. The original sleep decision is not repeated; original
 food remains unchanged. The first attempted meal fixture was unsuitable because
 native item actions are already resumable; that fixture failure is retained.
+
+World W-Core073 found the original r0 pot/bowl outlines overhung the table edge.
+The new local entry selects recipe `commons-kitchen/2`: initial beans, greens,
+pot and spoon use existing inner r1 slots, and preparation returns its spoon to
+r1c4. Catalogue footprint checks pass; source-rendered outline clearance remains
+World's counterpart. No renderer pose correction is used. The original recipe1
+preset keeps its published hash, rule address, snapshot interpretation and cards.
+A recipe2 reader restores and replays actual immutable C220 recipe1 facts exactly.
+An already-installed recipe1 world is retained as recipe1; this does not silently
+move its objects or upgrade its cards. A separate future migration would be needed.
+New installations publish `scene.kitchen.version='commons-kitchen/2'` and slotRowr1.
+All quantities, IDs, table homes, native actions, owner guards and finite limits
+remain. There is still no claim of balancing, tipping or general tabletop physics.

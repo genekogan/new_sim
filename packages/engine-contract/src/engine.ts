@@ -108,7 +108,7 @@ export interface Engine {
   adoptCamp?(): void;
   previewCommonsTransition?(): CommonsTransitionAdmissionV1;
   adoptCommons?(transition:CommonsTransitionV1): void;
-  previewCommonsKitchenV1?():{ok:true;transition:{contract:'commons-kitchen/1';tick:number;fromRulesVersion:string;toRulesVersion:string;fromStateHash:string;additionsHash:string;base:WorldState['base']}}|{ok:false;diagnostic:{code:string}};
+  previewCommonsKitchenV1?():{ok:true;transition:{contract:'commons-kitchen/1'|'commons-kitchen/2';tick:number;fromRulesVersion:string;toRulesVersion:string;fromStateHash:string;additionsHash:string;base:WorldState['base']}}|{ok:false;diagnostic:{code:string}};
   adoptCommonsKitchenV1?(transition:unknown):void;
   previewCommonsProvisionsV1?():{ok:true;transition:{contract:'commons-provisions/1';tick:number;fromRulesVersion:string;toRulesVersion:string;fromStateHash:string;additionsHash:string;base:WorldState['base']}}|{ok:false;diagnostic:{code:string}};
   adoptCommonsProvisionsV1?(transition:unknown):void;

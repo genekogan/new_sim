@@ -6,7 +6,8 @@ import {COMMONS_KITCHENS,COMMONS_PERSONAL_RESOURCES} from '@sim/engine-mars';
 /** Two residents share each finite station; ownership applies to cards and
  * personal utensils, while native pot reservations/quantity govern admission. */
 export async function installCommonsKitchenCards(host:WorldHost,brain:Brain,onlySoulId?:string){
-  if(brain.host!==host||!host.engine.rulesVersion.endsWith('+commons-kitchen/1'))throw Error('commons-kitchen.card-reader-required');
+  if(brain.host!==host||! /\+commons-kitchen\/[12]$/.test(host.engine.rulesVersion))throw Error('commons-kitchen.card-reader-required');
+  const slotRow=host.engine.rulesVersion.endsWith('+commons-kitchen/2')?'r1':'r0';
   const births=host.db.db.prepare("SELECT payload FROM events WHERE world_id=? AND kind='birth' ORDER BY seq LIMIT 8").all(host.worldId) as {payload:string}[];
   const verdicts=[];
   for(const [index,event] of births.entries()){
@@ -16,7 +17,7 @@ export async function installCommonsKitchenCards(host:WorldHost,brain:Brain,only
     const cards:Card[]=[
       {name:`prepare shared dish ${suffix}`,summary:'Prepare two servings from our two finite ingredient bowls; return the preparation spoon to its table.',good_when:'Our finite ingredients or incomplete dish need preparation. Stand on ground with free hands; wait if someone is using the station.',target:null,when:[],then:[{set:['$actor','doing','preparing a shared cold dish']}],approach:[],during:[
         {verb:'mars:prepare_food',params:{pot:r.pot,spoon:r.spoon,ingredients:[r.beans,r.greens],groundRoutePolicy:'supported-ground/1'}},
-        {verb:'mars:put_item',params:{item:r.spoon,surfaceSlot:r.table+'#r0c4'}}],takes:'minute'},
+        {verb:'mars:put_item',params:{item:r.spoon,surfaceSlot:r.table+'#'+slotRow+'c4'}}],takes:'minute'},
       {name:`eat shared dish ${suffix}`,summary:'Bring my empty bowl and spoon to our table, serve one prepared portion, eat and free my hands.',good_when:'Hungry, my bowl is empty and our completed pot has a finite serving. Prepare first if unfinished; native route, quantity and hand requirements apply.',target:null,when:[],then:[{set:['$actor','doing','eating a shared dish']}],approach:[
         {verb:'mars:take_item',params:{item:personal.bowl,hand:'left'}},{verb:'mars:take_item',params:{item:personal.spoon,hand:'right'}}],during:[
         {verb:'mars:walk_to',params:{x:r.p[0]-.15,z:r.p[2]-.9,level:0}},{verb:'mars:serve',params:{pot:r.pot,bowl:personal.bowl}},{verb:'mars:eat',params:{bowl:personal.bowl,spoon:personal.spoon}},

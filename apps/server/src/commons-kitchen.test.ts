@@ -9,7 +9,7 @@ import {setImmediate} from 'node:timers/promises';
 import {WorldHost} from './world.ts';
 import {kernelHash} from '@sim/kernel';
 import type {WorldState as NativeWorld} from '../../../mars/viewer/engine/world/types.ts';
-const factory=await commonsKitchenFactory();
+const factory=await commonsKitchenFactory({version:'commons-kitchen/2'});
 test('ordinary two-owner meal/preparation/serving conserves finite shared stock and exact snapshot/genesis; checkpoint preserves old state',async t=>{
   const f=fixture(':memory:',factory,{durableClockV1:true});f.souls.enableLifecycle();t.after(()=>{f.brain.quiesce();f.host.stop();f.db.close();});
   await accept<unknown>(f.host,new LivingWorld(f.host).install(['People may prepare finite shared food, eat, rest and meet.']));for(let i=0;i<4;i++)f.host.tickOnce();f.host.drainInputs();

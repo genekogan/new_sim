@@ -8,7 +8,7 @@ import {installCommonsProvisionCards} from './commons-provisions.ts';
 import {scheduleCommonsKitchenInstallation} from './commons-kitchen-install.ts';
 import {setImmediate} from 'node:timers/promises';
 import type {WorldState as NativeWorld} from '../../../mars/viewer/engine/world/types.ts';
-const factory=await commonsKitchenFactory();
+const factory=await commonsKitchenFactory({version:'commons-kitchen/2'});
 test('API and clock stay usable while non-resumable ground sleep delays kitchen; passive safe-boundary installation preserves the original activity',async t=>{
   const f=fixture(':memory:',factory,{durableClockV1:true});f.souls.enableLifecycle();
   await accept<unknown>(f.host,new LivingWorld(f.host).install(['People can eat finite food and meet.']));for(let i=0;i<4;i++)f.host.tickOnce();f.host.drainInputs();
@@ -24,7 +24,7 @@ test('API and clock stay usable while non-resumable ground sleep delays kitchen;
   assert.deepEqual(install.status(),{phase:'waiting',reason:'commons-kitchen.resumable-boundary-required'});assert.equal(f.host.engine.stateHash(),hash);assert.equal(f.host.engine.programOf(row.entity_id),originalProgram);
   assert.equal((await f.app.request('/healthz')).status,200);
   for(let i=0;i<4500&&install.status().phase!=='installed';i++){f.host.tickOnce();if(i%5===0)await setImmediate();}
-  await accept(f.host,install.settled());assert.equal(install.status().phase,'installed');assert.ok(f.host.engine.world.tick>tick);assert.ok(f.host.engine.rulesVersion.endsWith('+commons-kitchen/1'));assert.equal(JSON.stringify(f.db.events(f.host.worldId).slice(0,JSON.parse(prefix).length)),prefix);
+  await accept(f.host,install.settled());assert.equal(install.status().phase,'installed');assert.ok(f.host.engine.world.tick>tick);assert.ok(f.host.engine.rulesVersion.endsWith('+commons-kitchen/2'));assert.equal(JSON.stringify(f.db.events(f.host.worldId).slice(0,JSON.parse(prefix).length)),prefix);
   const native=(f.host.engine.world as NativeWorld).entities;
   for(let i=0;i<4500&&f.host.engine.programOf(row.entity_id);i++){f.host.tickOnce();if(i%5===0)await setImmediate();}
   assert.equal(native[r.bowl].contents?.fraction,1);assert.ok(!native[row.entity_id].human!.grip);assert.deepEqual(f.host.engine.runtime.violations,[]);

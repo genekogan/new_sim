@@ -26,7 +26,7 @@ import { prepareCommonsTransition } from './commons-transition.ts';
 import { commonsTransitionV1Schema,type CommonsTransitionV1,type CommonsTransitionAdmissionV1 } from '@sim/engine-contract';
 import {crewRemovalTransitionV1Schema,type CrewRemovalTransitionV1,type CrewRemovalTransitionAdmissionV1} from '@sim/engine-contract';
 import {commonsProvisions,COMMONS_PERSONAL_RESOURCES} from './commons-provisions.ts';
-import {commonsKitchen,COMMONS_KITCHENS} from './commons-kitchen.ts';
+import {commonsKitchen,COMMONS_KITCHENS,type CommonsKitchenVersion} from './commons-kitchen.ts';
 import { decodeSnapshot } from '../../../mars/viewer/engine/runtime/snapshot.ts';
 import {encode} from '../../../mars/viewer/engine/runtime/codec.ts';
 import { dcos,dsin,hypot } from '../../../mars/viewer/engine/core/math.ts';
@@ -99,7 +99,7 @@ export type MarsPhysicalBinding = {rulesVersion:string;renderScene:()=>RenderSce
 export class MarsEngine implements Engine {
   readonly dt = 1 / TPS;
   readonly schema: string;
-  get rulesVersion() { return nativeRulesVersion(this.physical?.rulesVersion??this.m.rulesVersion,this.cfg)+(this.commonsProvisionsActive?'+commons-provisions/1':'')+(this.commonsKitchenActive?'+commons-kitchen/1':''); }
+  get rulesVersion() { return nativeRulesVersion(this.physical?.rulesVersion??this.m.rulesVersion,this.cfg)+(this.commonsProvisionsActive?'+commons-provisions/1':'')+(this.commonsKitchenActive?'+'+this.commonsKitchenVersion:''); }
   readonly runtime: RuntimeView;
   private m: Mars; private rt: any; private cfg: MarsWorldConfig;
   private physical?:MarsPhysicalBinding;
@@ -120,6 +120,8 @@ export class MarsEngine implements Engine {
   private takeScenes = new Map<string,RenderSceneCaptureV1>();
   private quiet = false;
   private crewRemovalTransitionReader=false;
+  private commonsKitchenReaderVersion:CommonsKitchenVersion='commons-kitchen/1';
+  private commonsKitchenVersion:CommonsKitchenVersion='commons-kitchen/1';
   private commonsKitchenReader=false;
   private commonsKitchenActive=false;
   private commonsProvisionsReader=false;
@@ -147,7 +149,7 @@ export class MarsEngine implements Engine {
     return [...BODY_VERBS, ...this.m.describeVerbs(this.registry).map((v) => ({ ...v, verb: `mars:${v.verb}`, description: `[Mars verb] ${v.description}`, scope: 'world' as const }))];
   }
   /** The world plus the adapter's own state (which program each actor is in), since both decide what happens next. */
-  stateHash(): string { return hashOf({ w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet, ...(this.cfg.safeCrewRemoval?{removalPolicy:'crew-removal/1'}:{}), ...(this.cfg.fixtureGroundGoalsV1?{fixtureGoalPolicy:'ground-fixture-levels/1'}:{}), ...(this.commonsProvisionsActive?{provisionsPolicy:'commons-provisions/1'}:{}), ...(this.commonsKitchenActive?{kitchenPolicy:'commons-kitchen/1'}:{}), ...(this.cfg.safeArrivalV1?{arrivalPolicy:'arrival-clearance/1'}:{}), ...(this.cfg.walkBlockV1?{walkPolicy:'walk-block/1'}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion,physicalPolicy:this.cfg}:{}) }); }
+  stateHash(): string { return hashOf({ w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet, ...(this.cfg.safeCrewRemoval?{removalPolicy:'crew-removal/1'}:{}), ...(this.cfg.fixtureGroundGoalsV1?{fixtureGoalPolicy:'ground-fixture-levels/1'}:{}), ...(this.commonsProvisionsActive?{provisionsPolicy:'commons-provisions/1'}:{}), ...(this.commonsKitchenActive?{kitchenPolicy:this.commonsKitchenVersion}:{}), ...(this.cfg.safeArrivalV1?{arrivalPolicy:'arrival-clearance/1'}:{}), ...(this.cfg.walkBlockV1?{walkPolicy:'walk-block/1'}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion,physicalPolicy:this.cfg}:{}) }); }
   physicalHash(): string { return hashOf(physicalView(this.world)); }
 
   // ------------------------------------------------------------------ tick
@@ -602,7 +604,7 @@ export class MarsEngine implements Engine {
     if(this.cfg.scene==='eden-commons')scene.commons=commonsSceneMetadataV1Schema.parse({
       version:'commons/1',source:'9b6db72fc2dcf45a762d7ce8e4db0b71d0418ea8',layout:structuredClone(this.m.commonsLayout),
     });
-    if(this.commonsKitchenActive)scene.kitchen={version:'commons-kitchen/1',stations:structuredClone(COMMONS_KITCHENS),ingredientBowlsPerStation:2,servingsPerStation:2,nativeGroundY:0};
+    if(this.commonsKitchenActive)scene.kitchen={version:this.commonsKitchenVersion,...(this.commonsKitchenVersion==='commons-kitchen/2'?{slotRow:'r1'}:{}),stations:structuredClone(COMMONS_KITCHENS),ingredientBowlsPerStation:2,servingsPerStation:2,nativeGroundY:0};
     if(this.commonsProvisionsActive)scene.provisions={version:'commons-provisions/1',resources:structuredClone(COMMONS_PERSONAL_RESOURCES),nativeGroundY:0};
     return {scene,clock:this.cfg.clock?{origin:this.cfg.clock.origin,dayTicks:this.cfg.clock.dayTicks}:null,
       ...(this.cfg.scene==='littlemartians'?structuredClone(this.m.littleMartiansRender):{}),
@@ -684,12 +686,12 @@ export class MarsEngine implements Engine {
   /** Only the explicit dual-history factory enables this prospective reader.
    * Installing the reader itself changes no rules, body, program or hash. */
   enableCrewRemovalTransitionReaderV1(){this.crewRemovalTransitionReader=true;}
-  enableCommonsKitchenReaderV1(active=false){this.commonsKitchenReader=true;if(active){this.finishRecorder();this.commonsKitchenActive=true;this.renderBaseKey='';this.startRecorder();}}
-  previewCommonsKitchenV1(){
+  enableCommonsKitchenReaderV1(active=false,version:CommonsKitchenVersion='commons-kitchen/1'){this.commonsKitchenReader=true;this.commonsKitchenReaderVersion=version;if(active){this.commonsKitchenVersion=version;this.finishRecorder();this.commonsKitchenActive=true;this.renderBaseKey='';this.startRecorder();}}
+  previewCommonsKitchenV1(version=this.commonsKitchenReaderVersion){
     if(!this.commonsKitchenReader||!this.commonsProvisionsActive||this.cfg.scene!=='eden-commons')return {ok:false as const,diagnostic:{code:'commons-kitchen.reader-unavailable'}};
     if(this.commonsKitchenActive)return {ok:false as const,diagnostic:{code:'commons-kitchen.already-installed'}};
     if(!this.canSnapshot())return {ok:false as const,diagnostic:{code:'commons-kitchen.resumable-boundary-required'}};
-    const additions=commonsKitchen();if(Object.keys(additions.entities).some(id=>this.ents[id]))return {ok:false as const,diagnostic:{code:'commons-kitchen.identity-collision'}};
+    const additions=commonsKitchen(version);if(Object.keys(additions.entities).some(id=>this.ents[id]))return {ok:false as const,diagnostic:{code:'commons-kitchen.identity-collision'}};
     // Validate the actual retained bodies, supports and reservations against
     // the new obstacles on a detached exact graph, never move them to fit.
     const snapshot=this.rt.snapshot(),graph=decodeSnapshot(snapshot);
@@ -697,11 +699,12 @@ export class MarsEngine implements Engine {
     const next={...snapshot,data:encode(graph),stateHash:hashOf(graph.world)};delete next.spatialEpoch;
     const detached=this.m.Runtime.restore(next,this.registry,this.m.servicesFor(this.m.scenes)(graph.world),this.m.invariants);
     if(this.m.invariants.some(inv=>inv(detached).length))return {ok:false as const,diagnostic:{code:'commons-kitchen.physical-conflict'}};
-    return {ok:true as const,transition:{contract:'commons-kitchen/1' as const,tick:this.world.tick,fromRulesVersion:this.rulesVersion,toRulesVersion:this.rulesVersion+'+commons-kitchen/1',fromStateHash:this.stateHash(),additionsHash:additions.hash,base:structuredClone(this.world.base)}};
+    return {ok:true as const,transition:{contract:version,tick:this.world.tick,fromRulesVersion:this.rulesVersion,toRulesVersion:this.rulesVersion+'+'+version,fromStateHash:this.stateHash(),additionsHash:additions.hash,base:structuredClone(this.world.base)}};
   }
   adoptCommonsKitchenV1(raw:unknown){
-    const p=this.previewCommonsKitchenV1();if(!p.ok)throw Error(p.diagnostic.code);if(hashOf(raw)!==hashOf(p.transition))throw Error('commons-kitchen.stale-or-forged');
-    this.finishRecorder();Object.assign(this.ents,structuredClone(commonsKitchen().entities));this.commonsKitchenActive=true;this.renderBaseKey='';this.startRecorder();
+    const version=(raw as {contract?:unknown})?.contract;if(version!=='commons-kitchen/1'&&version!=='commons-kitchen/2')throw Error('commons-kitchen.version');
+    const p=this.previewCommonsKitchenV1(version);if(!p.ok)throw Error(p.diagnostic.code);if(hashOf(raw)!==hashOf(p.transition))throw Error('commons-kitchen.stale-or-forged');
+    this.finishRecorder();Object.assign(this.ents,structuredClone(commonsKitchen(version).entities));this.commonsKitchenVersion=version;this.commonsKitchenActive=true;this.renderBaseKey='';this.startRecorder();
   }
   enableCommonsProvisionsReaderV1(active=false){this.commonsProvisionsReader=true;if(active){this.finishRecorder();this.commonsProvisionsActive=true;this.renderBaseKey='';this.startRecorder();}}
   previewCommonsProvisionsV1(){
@@ -849,7 +852,7 @@ export class MarsEngine implements Engine {
   /** Mars's own resumable snapshot, plus which program each actor is in. Body-language steps lower only to verbs Mars can resume exactly. */
   snapshot(): EngineSnapshot {
     const mars = this.rt.snapshot();
-    return structuredClone({ format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, ...(this.cfg.scene==='eden-commons'?{commonsVersion:'commons/1'}:{}), quiet: this.quiet, ...(this.commonsProvisionsActive?{commonsProvisionsV1:true}:{}), ...(this.commonsKitchenActive?{commonsKitchenV1:true}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion}:{}) });
+    return structuredClone({ format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, ...(this.cfg.scene==='eden-commons'?{commonsVersion:'commons/1'}:{}), quiet: this.quiet, ...(this.commonsProvisionsActive?{commonsProvisionsV1:true}:{}), ...(this.commonsKitchenActive?{commonsKitchenV1:true}:{}), ...(this.commonsKitchenActive&&this.commonsKitchenVersion==='commons-kitchen/2'?{commonsKitchenVersion:this.commonsKitchenVersion}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion}:{}) });
   }
   canSnapshot(): boolean {
     // A legacy formation callback is not data and must wait for a quiet point.

@@ -15,7 +15,7 @@ export function scheduleCommonsKitchenInstallation(host:WorldHost,brain:Brain){
     if(closed||busy||state.phase==='installed'||state.phase==='failed'||tick-lastProbe<20)return;
     lastProbe=tick;
     try{
-      const active=host.engine.rulesVersion.endsWith('+commons-kitchen/1');
+      const active=/\+commons-kitchen\/[12]$/.test(host.engine.rulesVersion);
       if(!active){
         const preview=host.engine.previewCommonsKitchenV1?.();
         if(!preview?.ok){const reason=preview?.diagnostic.code??'commons-kitchen.reader-required';if(waitable.has(reason)){state={phase:'waiting',reason};return;}throw Error(reason);}

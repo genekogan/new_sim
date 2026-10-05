@@ -52,7 +52,7 @@ export async function openLocalEden({input,dataDir,worldId,port=4959,webDir,mars
     if(header&&!header.rules_version.includes('+crew-removal/1'))throw Error('local-bootstrap.lifecycle-policy-upgrade-unavailable: old history lacks crew-removal/1; preserve this DB and use a distinct fresh local world until a versioned policy migration exists');
     const migrated=beforeEvents.some(e=>e.kind==='rules'&&e.payload.commonsTransition);
     if(kitchen&&!provisions)throw Error('local kitchen requires retained personal provisions');
-    const factory=kitchen?await native.commonsKitchenFactory():provisions?await native.commonsProvisionsFactory():header&&(!header.rules_version.includes('+commons/1')||migrated)
+    const factory=kitchen?await native.commonsKitchenFactory({version:'commons-kitchen/2'}):provisions?await native.commonsProvisionsFactory():header&&(!header.rules_version.includes('+commons/1')||migrated)
       ?await native.marsCommonsTransitionFactory({...native.GREEN_FIELD_WORLD,safeCrewRemoval:true},{safeArrivalV1:true})
       :await native.marsFactory({...native.EDEN_SAFE_COMMONS_WORLD,safeCrewRemoval:true});
     host=new WorldHost(db,factory,header?.seed??cfg.worldSeed,cfg.snapshotEveryTicks,worldId,{durableClockV1:true});
