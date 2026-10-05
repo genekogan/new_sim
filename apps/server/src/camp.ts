@@ -34,7 +34,7 @@ export class CampCards {
       const personal=bindings.bySoul.get(m.soulId);
       const cards: Card[] = [];
       for (const a of edenCampActivities()) {
-        if (a.id.startsWith('build.') || /^kitchen\.(take-|stand-at|serve|eat|return-)/.test(a.id) || ['chess_move','shared_food_break'].includes(a.verb)) continue;
+        if (a.id.startsWith('build.')&&a.id!=='build.climb-lookout' || /^kitchen\.(take-|stand-at|serve|eat|return-)/.test(a.id) || ['chess_move','shared_food_break'].includes(a.verb)) continue;
         // Each sleeper keeps an individual mat; a free mat is still an engine precondition.
         if (a.verb === 'sleep' && a.params.mat !== personal?.mat) continue;
         if (a.roles.length > souls.length) continue;

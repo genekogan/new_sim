@@ -3,6 +3,7 @@
 import { edenCampActivities, bindCampActivity, type CampActivity } from '../../../mars/viewer/engine/scenarios/eden-camp.ts';
 import { entityFrame } from '../../../mars/viewer/engine/carry/formation.ts';
 import type { WorldState } from '../../../mars/viewer/engine/world/types.ts';
+import {CAMP_EXPANSION_CAMPUS} from './camp-expansion.ts';
 export type BuildPhase = 'stage' | 'frame' | 'deck' | 'stairs';
 export type BuildPlan = { crew: string[]; steps: { verb: string; params: Record<string, unknown> }[] };
 type Refusal = { code: string; message: string };
@@ -31,7 +32,7 @@ export function unsafeConstruction(world: WorldState): boolean {
   return ['upright-a','upright-b'].some(id => world.entities[id]?.support?.kind === 'held');
 }
 export function constructionPlan(world: WorldState, actor: string, phase: unknown, free: (id:string)=>boolean): BuildPlan | Refusal {
-  if (world.base.campus !== 'eden-camp') return {code:'construction.only-camp',message:'This project belongs to the camp build site.'};
+  if (world.base.campus !== 'eden-camp'&&world.base.campus!==CAMP_EXPANSION_CAMPUS) return {code:'construction.only-camp',message:'This project belongs to the camp build site.'};
   if (!['stage','frame','deck','stairs'].includes(String(phase))) return {code:'construction.phase',message:'Choose stage, frame, deck or stairs.'};
   const all=actions.filter(a=>phaseOf(a)===phase), pending=all.filter(a=>!constructionDone(world,a));
   if (!pending.length) return {code:'construction.done',message:`The ${phase} work is already complete.`};
