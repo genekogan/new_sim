@@ -159,6 +159,16 @@ export const MIGRATIONS: { id: number; name: string; up(db: DatabaseSync): void 
       body TEXT NOT NULL CHECK(json_valid(body)), body_hash TEXT NOT NULL
     )`);
   } },
+  { id:16,name:'bounded private intention history cursors',up(db){
+    // Empty read bookkeeping only; no history inference, credential or activation.
+    db.exec(`CREATE TABLE intent_history_cursors_v1 (
+      cursor TEXT PRIMARY KEY, world_id TEXT NOT NULL REFERENCES worlds(id),
+      soul_id TEXT NOT NULL, owner_id TEXT NOT NULL, principal_id TEXT NOT NULL, source_kind TEXT NOT NULL,
+      created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL,
+      body TEXT NOT NULL CHECK(json_valid(body)), body_hash TEXT NOT NULL
+    )`);
+    db.exec('CREATE INDEX intent_history_cursors_scope ON intent_history_cursors_v1(world_id,soul_id,owner_id,principal_id,source_kind,created_at)');
+  } },
 ];
 
 export function migrate(db: DatabaseSync): number[] {

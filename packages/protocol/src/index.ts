@@ -4,6 +4,7 @@ export * from './mandate.ts';
 export * from './presentation.ts';
 export * from './owner-views.ts';
 export * from './intent-v2.ts';
+export * from './intent-history-page-v1.ts';
 export * from './station-v1.ts';
 export * from './station-era-v1.ts';
 export * from './station-v2.ts';

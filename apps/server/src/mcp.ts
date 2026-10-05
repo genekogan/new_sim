@@ -3,11 +3,11 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { z } from 'zod';
-import { GOALS, intentRequestV2Schema } from '@sim/protocol';
+import { GOALS, intentRequestV2Schema,intentHistoryQueryV1Schema } from '@sim/protocol';
 import type { SoulRow } from './db.ts';
 import { ApiError, type Souls } from './souls.ts';
 import { checkAcceptanceGuard,type AcceptanceGuard } from './world.ts';
-import { intentTransportError,intentLookupError,type IntentControlV2 } from './intent-control.ts';
+import { intentTransportError,intentLookupError,intentHistoryReadError,type IntentControlV2 } from './intent-control.ts';
 import type { IntentRequestScope } from './intent-requests.ts';
 
 const text = (v: unknown, isError = false) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v) }], isError });
@@ -30,7 +30,10 @@ function serverFor(souls: Souls, soul: SoulRow,guard?:AcceptanceGuard,candidate?
     }catch(error){if(error instanceof ApiError)return text({ok:false,code:error.code,message:error.message,...error.extra},true);throw error;}
   };
   s.registerTool('world_query', { description: 'The world: regions, places, every Soul and what it is doing. Free and instant.', inputSchema: {}, annotations: { readOnlyHint: true } }, async () => reply(()=>souls.worldSummary()));
-  s.registerTool('soul_perceive', { description: `What your Soul (${soul.name}) perceives right now: surroundings, energy, mood, nearby souls and places, and what it could do. Start here.`, inputSchema: {}, annotations: { readOnlyHint: true } }, async () => reply(()=>souls.perceive(soul)));
+  s.registerTool('soul_perceive', { description: `What your Soul (${soul.name}) perceives right now: surroundings, energy, mood, nearby souls and places, and what it could do. Start here.`, inputSchema: {}, annotations: { readOnlyHint: true } }, async () => reply(async()=>{
+    const perception=await souls.perceive(soul);
+    return candidate?.service.historyEnabled?{...perception,intentHistory:candidate.service.historyCapability(candidate.scope)}:perception;
+  }));
   s.registerTool('soul_wait', { description: 'Block until something happens to your Soul (an activity ends, a new one starts, an intent lands) or the timeout passes. Use instead of polling.', inputSchema: { seconds: z.number().int().min(1).max(55).optional() }, annotations: { readOnlyHint: true } }, async ({ seconds }) => reply(()=>souls.wait(soul,seconds??30)));
   s.registerTool('soul_command', { description: 'Say what you want your Soul to do in plain words. The world compiles the wish into a plan of cards, minting any card it needs, and returns the plan it understood. The simplest way to steer.', inputSchema: { text: z.string().min(1).max(280) } }, async ({ text: t }) => reply(()=>souls.command(soul,t,'mcp',guard)));
   s.registerTool('soul_mandate',{description:'Read your Soul’s private owner rules, understanding, triggers and done/blocked reports.',inputSchema:{},annotations:{readOnlyHint:true}},async()=>reply(()=>({rules:souls.rules(soul)})));
@@ -63,6 +66,13 @@ function serverFor(souls: Souls, soul: SoulRow,guard?:AcceptanceGuard,candidate?
       description:'Read the receipt for this scoped credential generation and requestId. Received may still be awaiting interpretation; no repeated mutation or completion is inferred. Unknown/inaccessible requests are not-found.',
       inputSchema:intentLookupInput,annotations:{readOnlyHint:true,idempotentHint:true},
     },async({requestId})=>intentReply(()=>service.lookup(scope,requestId),true));
+    if(service.historyEnabled)s.registerTool('soul_intent_history_v1',{
+      description:'Read private accepted intention revisions and actual admitted/controller outcomes through a fixed canonical frontier. Follow nextCursor; resumeCursor opens a new frontier after a complete page. A completed attempt does not fulfill its purpose. Missing source returns an explicit gap; opaque scoped cursors expire after30minutes or eviction. No interpretation or mutation fallback.',
+      inputSchema:intentHistoryQueryV1Schema,annotations:{readOnlyHint:true,idempotentHint:true},
+    },async input=>{
+      try{if(guard)checkAcceptanceGuard(guard);const page=service.historyPage(scope,input);if(guard)checkAcceptanceGuard(guard);return text(page);}
+      catch(error){const safe=intentHistoryReadError(error);return text({ok:false,code:safe.code,message:safe.message},true);}
+    });
   }
   return s;
 }
@@ -93,8 +103,8 @@ export async function handleMcp(req: IncomingMessage, res: ServerResponse, souls
   let body: unknown; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8')); } catch { res.writeHead(400).end(); return; }
   if(candidate&&body&&typeof body==='object'&&!Array.isArray(body)) {
     const rpc=body as {method?:unknown;id?:unknown;params?:{name?:unknown;arguments?:unknown}};
-    if(rpc.method==='tools/call'&&typeof rpc.params?.name==='string'&&['soul_intent_v2','soul_intent_request_v2'].includes(rpc.params.name)) {
-      const schema=rpc.params!.name==='soul_intent_v2'?intentRequestV2Schema:intentLookupInput;
+    if(rpc.method==='tools/call'&&typeof rpc.params?.name==='string'&&['soul_intent_v2','soul_intent_request_v2',...(candidate.service.historyEnabled?['soul_intent_history_v1']:[])].includes(rpc.params.name)) {
+      const schema=rpc.params!.name==='soul_intent_v2'?intentRequestV2Schema:rpc.params!.name==='soul_intent_history_v1'?intentHistoryQueryV1Schema:intentLookupInput;
       if(!schema.safeParse(rpc.params?.arguments).success) {
         // SDK validation diagnostics can echo arbitrary unknown property names.
         // Keep malformed private arguments/credential-shaped keys out of errors.

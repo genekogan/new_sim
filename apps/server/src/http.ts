@@ -21,7 +21,7 @@ import {captureRenderScene} from '@sim/engine-contract';
 import type {CandidateStationV1} from './station.ts';
 import type {CandidateStationV2} from './station-v2.ts';
 import {mountStationRoutesV2} from './station-routes-v2.ts';
-import { intentTransportError, intentLookupError, type IntentControlV2, type IntentIdentityV2 } from './intent-control.ts';
+import { intentHistoryReadError,intentTransportError, intentLookupError, type IntentControlV2, type IntentIdentityV2 } from './intent-control.ts';
 
 type Deps = { cfg: Config; db: Db; host: WorldHost; auth: Auth; hub: Hub; brain: Brain; souls: Souls; takes?: TakeArchive; station?:CandidateStationV1; stationV2?:CandidateStationV2; intentV2?:IntentControlV2 };
 
@@ -159,6 +159,19 @@ export function buildApp(d: Deps) {
     catch(error){throw intentLookupError(error);}
   });
 
+  const historyQuery=(c:Context)=>{if(Object.values(c.req.queries()).some(values=>values.length!==1))throw new ApiError(400,'invalid-history-query','invalid history query');return c.req.query();};
+  app.get('/v1/souls/:id/intent-v2/history',async c=>{
+    const service=intentService(),identity=await intentIdentity(c);
+    try{const scope=service.ownerScope(identity,c.req.param('id')),page=service.historyPage(scope,historyQuery(c));
+      service.guard(scope);return c.json(page);}catch(error){throw intentHistoryReadError(error);}
+  });
+  app.get('/v1/agent/intent-v2/history',c=>{
+    const service=intentService();let scope;
+    try{scope=service.agentScope(bearer(c));}catch(error){throw intentTransportError(error);}
+    try{const page=service.historyPage(scope,historyQuery(c));service.guard(scope);return c.json(page);}
+    catch(error){throw intentHistoryReadError(error);}
+  });
+
   // ---- signed-in users
   const mySouls = (u: UserRow) => d.db.soulsOf(u.id).filter(s=>!d.souls.lifecycle||(s.world_id===d.host.worldId&&d.souls.invited(u)&&d.souls.controlReady(s))).map((s) => ({ id: s.id, name: s.name, description: s.description, entityId: s.entity_id, hasToken: !!s.token_hash, tokenLabel: s.token_label, tokenCreatedAt: s.token_created_at, tokenLastUsed: s.token_last_used }));
   app.get('/v1/me', async (c) => { const u = privateUser(await requireUser(c),false),souls=mySouls(u); return c.json({ me: {...d.auth.me(u),...(d.souls.lifecycle?{souls:souls.map(s=>s.id)}:{})}, souls, maxSouls: d.cfg.maxSoulsPerUser,
@@ -291,7 +304,12 @@ export function buildApp(d: Deps) {
   app.get('/v1/agent/pair/poll', (c) => { limitIp(c, 'pairpoll', 60, 60_000); return c.json({ ok: true, ...d.souls.pairPoll(c.req.query('poll_token') ?? '') }, 200, { 'cache-control': 'no-store' }); });
   app.get('/v1/agent/me', (c) => { const s = agentSoul(c); return c.json({ soul: { id: s.id, name: s.name, description: s.description }, paired_as: s.token_label, since: s.token_created_at }); });
   app.get('/v1/agent/status', (c) => c.json(d.souls.status(agentSoul(c))));
-  app.get('/v1/agent/perceive', (c) => c.json(d.souls.perceive(agentSoul(c))));
+  app.get('/v1/agent/perceive',c=>{
+    if(!d.intentV2?.historyEnabled)return c.json(d.souls.perceive(agentSoul(c)));
+    c.header('Cache-Control','no-store');
+    try{const scope=d.intentV2.agentScope(bearer(c)),perception=d.souls.perceive(agentSoul(c)),intentHistory=d.intentV2.historyCapability(scope);d.intentV2.guard(scope);
+      return c.json({...perception,intentHistory});}catch(error){throw intentHistoryReadError(error);}
+  });
   app.get('/v1/agent/world', (c) => { agentSoul(c); return c.json(d.souls.worldSummary()); });
   app.get('/v1/agent/log', (c) => c.json({ events: d.souls.soulLog(agentSoul(c)) }));
   app.get('/v1/agent/wait', async (c) => {const s=agentSoul(c),guard=d.souls.agentControlGuard(s,bearer(c));return controlReply(c,guard,()=>d.souls.wait(s,intQ(c,'seconds',30,1,55)));});

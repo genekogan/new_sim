@@ -1,5 +1,7 @@
 // Explicitly injected candidate transport service. Production bootstrap does
 // not construct this service or advertise the behavioral version.
+import { IntentHistoryReaderV1,IntentHistoryCursorUnavailable } from './intent-history-reader.ts';
+import { INTENT_HISTORY_V1,intentHistoryQueryV1Schema,type IntentHistoryPageV1 } from '@sim/protocol';
 import { randomUUID } from 'node:crypto';
 import { ZodError } from 'zod';
 import { INTENT_V2, intentRequestV2Schema, intentSourceV2Schema, intentOwnerControlV2Schema, type IntentOwnerControlV2, type IntentReceiptV2 } from '@sim/protocol';
@@ -17,13 +19,16 @@ export type IntentIdentityV2 = { userId:string; expiresAt:number };
 export class IntentControlV2 {
   readonly host:WorldHost; readonly brain:Brain; readonly souls:Souls;
   readonly store:IntentRequests; readonly publisher:IntentPublisher;
+  readonly historyReader?:IntentHistoryReaderV1;
+  get historyEnabled(){return !!this.historyReader;}
   // Runtime work ownership only; durable reservations retain crash uncertainty.
   private workers = new Set<Promise<void>>();
-  constructor(host:WorldHost,brain:Brain,souls:Souls) {
+  constructor(host:WorldHost,brain:Brain,souls:Souls,options?:{historyV1?:boolean}) {
     if(brain.host!==host||souls.host!==host||brain.db!==host.db||souls.db!==host.db||!brain.intentV2Enabled)
       throw new Error('candidate intent transport requires one opted-in host/brain/database');
     this.host=host;this.brain=brain;this.souls=souls;
     this.store=new IntentRequests(host.db);this.publisher=new IntentPublisher(host,this.store);
+    if(options?.historyV1)this.historyReader=new IntentHistoryReaderV1(this);
   }
   private available(row:SoulRow|undefined):SoulRow {
     if(!row||row.world_id!==this.host.worldId||row.retired_at!==null)throw new ApiError(404,'not-found','no such soul');
@@ -88,7 +93,17 @@ export class IntentControlV2 {
     this.guard(scope);
     if(scope.source.kind!=='owner'||scope.source.channel!=='web'||scope.source.principalId!==scope.source.ownerId)return undefined;
     return intentOwnerControlV2Schema.parse({worldId:this.host.worldId,soulId:scope.soulId,
-      ownerId:scope.source.ownerId,intentContract:INTENT_V2});
+      ownerId:scope.source.ownerId,intentContract:INTENT_V2,...(this.historyEnabled?{intentHistoryContract:INTENT_HISTORY_V1}:{})});
+  }
+  historyCapability(scope:IntentRequestScope){return this.historyReader?.capability(scope);}
+  historyPage(scope:IntentRequestScope,query:unknown={}):IntentHistoryPageV1 {
+    if(!this.historyReader)throw new ApiError(404,'not-found','intention history unavailable');
+    this.guard(scope);
+    const allowed=this.souls.limits.allow(`intent-history:${scope.worldId}:${scope.soulId}:${scope.source.principalId}`,120,60_000);
+    if(!allowed.ok)throw new ApiError(429,'rate-limited','too many history reads');
+    const parsed=intentHistoryQueryV1Schema.parse(query);
+    try{return this.historyReader.page(scope,parsed);}
+    catch(error){if(error instanceof ZodError)throw new Error('history source validation unavailable');throw error;}
   }
   private version(scope:IntentRequestScope,request:ReturnType<typeof intentRequestV2Schema.parse>) {
     if(!request.edit)return;
@@ -163,4 +178,12 @@ export function intentLookupError(error:unknown):ApiError {
   if(error instanceof IntentRequestUnavailable||error instanceof ApiError&&[401,403,404,409].includes(error.status))
     return new ApiError(404,'not-found','no such request');
   return new ApiError(503,'unavailable','request lookup unavailable; keep its request ID');
+}
+
+export function intentHistoryReadError(error:unknown):ApiError {
+  if(error instanceof IntentHistoryCursorUnavailable)return new ApiError(error.expired?410:404,error.expired?'cursor-expired':'cursor-unavailable','History cursor unavailable; request a fresh history page.');
+  if(error instanceof ZodError)return new ApiError(400,'invalid-history-query','invalid history query');
+  if(error instanceof IntentRequestUnavailable||error instanceof ApiError&&[401,403,404,409].includes(error.status))return new ApiError(404,'not-found','intention history unavailable');
+  if(error instanceof ApiError&&error.status===429)return error;
+  return new ApiError(503,'history-unavailable','Intention history temporarily unavailable.');
 }

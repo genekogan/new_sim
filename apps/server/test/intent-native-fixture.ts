@@ -16,7 +16,7 @@ import {WorldHost} from '../src/world.ts';
 
 const factory=await marsFactory({scene:'eden-camp',arrival:[16,-10],arrivalPlace:'bunkhouse',reference:[16,-9],grounds:{id:'grounds',name:'grounds'}});
 export const seed='wire-intentions',worldId='wire-eden';
-export function intentNativeFixture(t:TestContext,path=':memory:',enabled=true) {
+export function intentNativeFixture(t:TestContext,path=':memory:',enabled=true,historyV1=false) {
   const db=new Db(path);t.after(()=>{if(db.db.isOpen)db.close();});
   for(const id of ['dev:alice','dev:bob','dev:admin']) {
     db.upsertUser({id,role:id==='dev:admin'?'admin':'user',email:null,wallet:null});db.setInvited(id,'local');
@@ -46,7 +46,7 @@ export function intentNativeFixture(t:TestContext,path=':memory:',enabled=true) 
   t.mock.method(brain,'compile',async(...args:Parameters<typeof brain.compile>)=>{
     brain.mode='live';try{return await compile(...args);}finally{brain.mode='fake';}
   });
-  const souls=new Souls(host,db,brain,cfg),service=enabled?new IntentControlV2(host,brain,souls):undefined;
+  const souls=new Souls(host,db,brain,cfg),service=enabled?new IntentControlV2(host,brain,souls,{historyV1}):undefined;
   const deps={cfg,db,host,auth,brain,souls,hub:{clients:new Set(),refreshMe(){}} as unknown as Hub,intentV2:service};
   const app=buildApp(deps),post=async(input:unknown,credential='dev:alice',agent=false)=>app.request(agent?'/v1/agent/intent-v2':'/v1/souls/s_A/intent-v2',{
     method:'POST',headers:{authorization:'Bearer '+credential,'content-type':'application/json'},body:JSON.stringify(input)});
