@@ -78,3 +78,15 @@ An initial packet-update command ran from the wrong folder and failed without
 changing runtime; it was corrected before selected checks. Selected native test
 needed the existing NativeWorld type for its shore-field assertion; no executable
 behaviour was altered. All failed receipts remain separate from passing evidence.
+
+Actual PM installation kept all eight mappings and6178 prior events while the
+passive hook waited. Read-only clock evidence shows a72000tick day and the next
+natural quiet opportunity at504000; at473746 this was1512.7 simulated seconds
+away. At rate1 that estimates about18:32Eastern plus native drain time, not a
+promised install time. Ongoing autonomous programmes may keep ordinary moments
+nonempty. The observer now probes each tick only while the existing living quiet
+barrier is active, resets its cadence after the existing compact event, and
+retries a source-moved compact race promptly. It emits no new quiet command and
+cancels no actors. A synthetic natural daily compact window under20ticks proves
+one existing quiet/decision and successful passive installation, retaining all
+entities. Ordinary background cadence stays one probe per20ticks.
