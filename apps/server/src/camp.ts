@@ -1,6 +1,7 @@
 // The camp's activity examples become ordinary, logged cards. They describe available acts;
 // neither this pack nor its conditions assigns times or a sequence of daily activities.
 import { cardHash, type Card } from '@sim/kernel';
+import { hashOf } from '@sim/engine-contract';
 import { edenCampActivities, bindCampActivity } from '../../../mars/viewer/engine/scenarios/eden-camp.ts';
 import type { WorldHost, Mind } from './world.ts';
 import {campResourceBindings,LEGACY_CAMP_RESOURCES,type CampResourceSet} from './camp-resources.ts';
@@ -64,6 +65,7 @@ export class CampCards {
       cards.push({...left,name:`finish the bowl ${m.name.toLowerCase()}`,summary:'Finish food already in my bowl, then return the utensils.',good_when:'Hunger after an interrupted meal; use the food already served.',approach:[{verb:'mars:take_item',params:{item:personal.bowl,hand:'left'}},{verb:'mars:take_item',params:{item:personal.spoon,hand:'right'}}]});
       }
       cards.push(hostSupper(m, others));
+      for (const other of others) cards.push(inviteToSupper(m,other));
       for (const other of others){const peer=bindings.bySoul.get(other.soulId);if(personal&&peer&&personal.id!==peer.id)cards.push(joinSupper(m,personal,other,peer));}
       for (const card of cards) {
         if (this.host.kernel.vocab.cards[card.name]) {
@@ -86,10 +88,24 @@ function utensilReturns(r:CampResourceSet) {
   return [{item:r.bowl,surfaceSlot:r.bowlReturn},{item:r.spoon,surfaceSlot:r.spoonReturn}];
 }
 function hostSupper(m: Mind, others: Mind[]): Card {
+  // Existing small-cast recipes retain their exact hashes. A larger host card
+  // creates the gathering; invitations are separately chosen bounded cards.
+  const invitations=others.length<=4?others:[];
   return {name:`host supper ${m.name.toLowerCase()}`,summary:'Invite people to share food at the kitchen table.',good_when:'Hungry or wanting company; the supper bell is an invitation, not a command.',target:null,when:[{notState:['$actor','hosting',true]}],
     approach:[{verb:'walk_to',params:{to:'dining-table',standoff:2.5}}],
-    then:[{move:['$actor','kitchen']},{appear:{kind:'gathering',name:'$actor.name’s supper',at:'kitchen',states:{meal:true}},linkFromActor:'hosts'},{link:['attends','$actor','$new']},{set:['$actor','hosting',true]},...others.map(o=>({say:['$actor',o.soulId,'invite'] as [string,string,string],about:'Would you like to share supper with me?'}))],
+    then:[{move:['$actor','kitchen']},{appear:{kind:'gathering',name:'$actor.name’s supper',at:'kitchen',states:{meal:true}},linkFromActor:'hosts'},{link:['attends','$actor','$new']},{set:['$actor','hosting',true]},...invitations.map(o=>({say:['$actor',o.soulId,'invite'] as [string,string,string],about:'Would you like to share supper with me?'}))],
     during:[{verb:'rest',params:{seconds:240}}],takes:'minutes'};
+}
+function inviteToSupper(host:Mind,guest:Mind):Card {
+  const word=(name:string)=>name.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim().slice(0,12).trim()||'soul';
+  const pair=hashOf({host:host.soulId,guest:guest.soulId}).slice(0,16);
+  return {name:`invite ${word(guest.name)} to supper ${word(host.name)} ${pair}`,
+    summary:`Invite ${guest.name} to share my supper.`,good_when:'Hosting an open supper and wanting this person to join; the guest chooses whether to attend.',
+    target:{kind:'gathering'},when:[{state:['$target','meal',true]},{linked:['hosts','$actor','$target']},
+      {state:['$actor','hosting',true]},{is:[guest.soulId,'soul']},{notLinked:['attends',guest.soulId,'$target']},
+      {notLinked:['said','$actor',guest.soulId]}],
+    then:[{say:['$actor',guest.soulId,'invite'],about:'Would you like to share supper with me?'}],
+    approach:[],during:[{verb:'rest',params:{seconds:1}}],takes:'seconds'};
 }
 function joinSupper(m: Mind, r:CampResourceSet, host: Mind, hr:CampResourceSet): Card {
   return {name:`join ${host.name.toLowerCase()} supper ${m.name.toLowerCase()}`,summary:`Join ${host.name}'s invitation and share a meal.`,good_when:'Wanting food and company; independently choose to join an open supper invitation.',target:{kind:'gathering'},derive:{host:{link:'hosts',to:'$target'}},
