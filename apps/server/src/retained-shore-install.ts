@@ -10,7 +10,7 @@ export function scheduleRetainedCommonsShoreInstallation(host:WorldHost){
     if(closed||busy||state.phase==='installed'||state.phase==='failed'||tick-lastProbe<20&&!host.quietBarrier)return;lastProbe=tick;
     try{
       if(host.engine.rulesVersion.includes('+retained-shore/1+')){state={phase:'installed'};return;}
-      if(!/\+commons-kitchen\/[12]$/.test(host.engine.rulesVersion)){state={phase:'waiting',reason:'retained-shore.kitchen-prerequisite'};return;}
+      if(!/\+commons-kitchen\/[12](?:\+|$)/.test(host.engine.rulesVersion)){state={phase:'waiting',reason:'retained-shore.kitchen-prerequisite'};return;}
       const p=host.engine.previewRetainedCommonsShoreV1?.();if(!p?.ok){const reason=p?.diagnostic.code??'retained-shore.reader-required';if(waitable.has(reason)){state={phase:'waiting',reason};return;}throw Error(reason);}
       busy=true;state={phase:'installing'};
       work=host.installRetainedCommonsShoreV1().then(()=>{if(!closed)state={phase:'installed'};}).catch(error=>{const reason=code(error);if(waitable.has(reason)){state={phase:'waiting',reason};if(reason==='retained-shore.source-moved')lastProbe=-20;}else fail(error);}).finally(()=>{busy=false;});

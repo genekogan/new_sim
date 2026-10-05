@@ -6,8 +6,8 @@ import {COMMONS_KITCHENS,COMMONS_PERSONAL_RESOURCES} from '@sim/engine-mars';
 /** Two residents share each finite station; ownership applies to cards and
  * personal utensils, while native pot reservations/quantity govern admission. */
 export async function installCommonsKitchenCards(host:WorldHost,brain:Brain,onlySoulId?:string){
-  if(brain.host!==host||! /\+commons-kitchen\/[12]$/.test(host.engine.rulesVersion))throw Error('commons-kitchen.card-reader-required');
-  const slotRow=host.engine.rulesVersion.endsWith('+commons-kitchen/2')?'r1':'r0';
+  if(brain.host!==host||! /\+commons-kitchen\/[12](?:\+|$)/.test(host.engine.rulesVersion))throw Error('commons-kitchen.card-reader-required');
+  const slotRow=/\+commons-kitchen\/2(?:\+|$)/.test(host.engine.rulesVersion)?'r1':'r0';
   const births=host.db.db.prepare("SELECT payload FROM events WHERE world_id=? AND kind='birth' ORDER BY seq LIMIT 8").all(host.worldId) as {payload:string}[];
   const verdicts=[];
   for(const [index,event] of births.entries()){

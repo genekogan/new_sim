@@ -108,6 +108,9 @@ export interface Engine {
   adoptCamp?(): void;
   previewCommonsTransition?(): CommonsTransitionAdmissionV1;
   adoptCommons?(transition:CommonsTransitionV1): void;
+  previewCommonsFoodDeliveryV1?(deliveryId:string):{ok:true;transition:import('./food-delivery.ts').CommonsFoodDeliveryV1}|{ok:false;diagnostic:{code:string}};
+  adoptCommonsFoodDeliveryV1?(delivery:import('./food-delivery.ts').CommonsFoodDeliveryV1):void;
+  commonsFoodDeliveriesV1?():import('./food-delivery.ts').CommonsFoodDeliveryV1[];
   previewRetainedCommonsShoreV1?():import('./retained-shore.ts').RetainedCommonsShoreAdmissionV1;
   adoptRetainedCommonsShoreV1?(transition:import('./retained-shore.ts').RetainedCommonsShoreV1):void;
   previewCommonsKitchenV1?():{ok:true;transition:{contract:'commons-kitchen/1'|'commons-kitchen/2';tick:number;fromRulesVersion:string;toRulesVersion:string;fromStateHash:string;additionsHash:string;base:WorldState['base']}}|{ok:false;diagnostic:{code:string}};

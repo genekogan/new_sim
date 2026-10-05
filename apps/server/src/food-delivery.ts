@@ -1,0 +1,24 @@
+import type {WorldHost} from './world.ts';
+import type {Brain} from './brain.ts';
+import type {Card} from '@sim/kernel';
+import {commonsFoodDeliveryItemsV1} from '@sim/engine-mars';
+/** Stable lifetime birth slots, no ownerless avatar or reassignment by cast sort. */
+export async function installFoodDeliveryCardsV1(host:WorldHost,brain:Brain){
+ if(host!==brain.host)throw Error('food-delivery.card-host');const births=host.db.db.prepare("SELECT payload FROM events WHERE world_id=? AND kind='birth' ORDER BY seq LIMIT 8").all(host.worldId) as {payload:string}[];const verdicts=[];
+ for(const d of host.engine.commonsFoodDeliveriesV1?.()??[]){const resources=commonsFoodDeliveryItemsV1(d.batch).resources;for(const [i,b] of births.entries()){
+  const sid=JSON.parse(b.payload).soulId,m=host.minds.get(sid),row=host.db.soul(sid);if(!m||!row||row.retired_at!==null||row.owner!==m.owner||row.entity_id!==m.entityId)continue;const r=resources[i],suffix=sid.slice(2),owner=m.owner,entity=m.entityId;
+  const cards:Card[]=[{name:`eat delivered meal ${d.batch} ${suffix}`,summary:'Eat this explicitly delivered finite prepared meal with my own spoon and free both hands.',good_when:'Hungry, food remains in this delivered bowl and my hands can use it. Existing consumed bowls/pots stay unchanged.',target:null,when:[],then:[{set:['$actor','doing','eating a delivered meal']}],approach:[],during:[{verb:'mars:take_item',params:{item:r.bowl,hand:'left'}},{verb:'mars:take_item',params:{item:r.spoon,hand:'right'}},{verb:'mars:eat',params:{bowl:r.bowl,spoon:r.spoon}},{verb:'mars:put_item',params:{item:r.spoon,surfaceSlot:'ground'}},{verb:'mars:put_item',params:{item:r.bowl,surfaceSlot:'ground'}}],takes:'minute'},
+  {name:`tidy delivered bowl ${d.batch} ${suffix}`,summary:'Put this held delivered bowl down and free my hand after an interrupted meal.',good_when:'Holding this bowl while another activity needs free hands.',target:null,when:[],then:[{set:['$actor','doing','tidying delivered bowl']}],approach:[],during:[{verb:'mars:put_item',params:{item:r.bowl,surfaceSlot:'ground'}}],takes:'seconds'}];
+  const guard=()=>{const now=host.db.soul(sid);if(!now||now.retired_at!==null||now.owner!==owner||now.entity_id!==entity||host.minds.get(sid)!==m||m.owner!==owner||m.entityId!==entity)throw Error('food-delivery.owner-moved');return true as const;};
+  const pending=brain.mint(m,cards.filter(c=>!host.kernel.decks[sid].cards.includes(c.name)),undefined,undefined,'compiled',guard);let done=false;pending.then(()=>done=true,()=>done=true);for(let j=0;j<100&&!done;j++){host.drainInputs();await new Promise<void>(r=>setImmediate(r));}if(!done)throw Error('food-delivery.mint-unsettled');const v=await pending;if(v.some(p=>!p.ok))throw Error('food-delivery.mint-refused');verdicts.push(...v);
+ }}return verdicts;
+}
+export function scheduleFiniteFoodDeliveryV1(host:WorldHost,brain:Brain,deliveryId:string){
+ let closed=false,busy=false,last=-20,failure:unknown,work=Promise.resolve();let state:{phase:'waiting'|'installing'|'installed'|'failed'|'closed';reason?:string}={phase:'waiting'};
+ const waitable=new Set(['food-delivery.resumable-boundary-required','food-delivery.physical-conflict','food-delivery.source-moved']);
+ function poll(tick=host.engine.world.tick){if(closed||busy||state.phase==='failed'||tick-last<20)return;last=tick;
+  try{const exists=host.engine.commonsFoodDeliveriesV1?.().some(d=>d.deliveryId===deliveryId);if(!exists){const p=host.engine.previewCommonsFoodDeliveryV1?.(deliveryId);if(!p?.ok){const reason=p?.diagnostic.code??'food-delivery.reader-required';if(waitable.has(reason)){state={phase:'waiting',reason};return;}throw Error(reason);}}
+   if(exists&&state.phase==='installed')return;busy=true;state={phase:'installing'};work=(async()=>{if(!exists)await host.installCommonsFoodDeliveryV1(deliveryId);await installFoodDeliveryCardsV1(host,brain);if(!closed)state={phase:'installed'};})().catch(error=>{const reason=error instanceof Error?error.message:'food-delivery.failure';if(waitable.has(reason))state={phase:'waiting',reason};else{failure=error;state={phase:'failed',reason:'food-delivery.failure'};console.error('food-delivery.failed');}}).finally(()=>{busy=false;});
+  }catch(error){failure=error;state={phase:'failed',reason:'food-delivery.failure'};console.error('food-delivery.failed');}}
+ const listener={afterTick:poll,onApplied(e:{kind:string}){if(e.kind==='birth'){last=-20;if(state.phase==='installed')state={phase:'waiting'};}}};host.listeners.push(listener);poll();return {poll,status:()=>({...state}),async settled(){await work;if(failure)throw failure;},close(){closed=true;const i=host.listeners.indexOf(listener);if(i>=0)host.listeners.splice(i,1);state={phase:'closed'};}};
+}
