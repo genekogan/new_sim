@@ -13,3 +13,5 @@ export * from './camp-expansion-engine.ts';
 
 export * from './commons-kitchen.ts';
 export * from './commons-kitchen-engine.ts';
+export * from './retained-shore.ts';
+export * from './retained-shore-engine.ts';

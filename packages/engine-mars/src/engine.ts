@@ -27,6 +27,8 @@ import { commonsTransitionV1Schema,type CommonsTransitionV1,type CommonsTransiti
 import {crewRemovalTransitionV1Schema,type CrewRemovalTransitionV1,type CrewRemovalTransitionAdmissionV1} from '@sim/engine-contract';
 import {commonsProvisions,COMMONS_PERSONAL_RESOURCES} from './commons-provisions.ts';
 import {commonsKitchen,COMMONS_KITCHENS,type CommonsKitchenVersion} from './commons-kitchen.ts';
+import type {RetainedCommonsShoreReader} from './retained-shore.ts';
+import {retainedCommonsShoreV1Schema,type RetainedCommonsShoreV1,type RetainedCommonsShoreAdmissionV1} from '@sim/engine-contract';
 import { decodeSnapshot } from '../../../mars/viewer/engine/runtime/snapshot.ts';
 import {encode} from '../../../mars/viewer/engine/runtime/codec.ts';
 import { dcos,dsin,hypot } from '../../../mars/viewer/engine/core/math.ts';
@@ -120,6 +122,7 @@ export class MarsEngine implements Engine {
   private takeScenes = new Map<string,RenderSceneCaptureV1>();
   private quiet = false;
   private crewRemovalTransitionReader=false;
+  private retainedShoreReader?:RetainedCommonsShoreReader;
   private commonsKitchenReaderVersion:CommonsKitchenVersion='commons-kitchen/1';
   private commonsKitchenVersion:CommonsKitchenVersion='commons-kitchen/1';
   private commonsKitchenReader=false;
@@ -599,7 +602,13 @@ export class MarsEngine implements Engine {
     }
   }
   renderScene() {
-    if(this.physical)return {...this.physical.renderScene(),clock:this.cfg.clock?{origin:this.cfg.clock.origin,dayTicks:this.cfg.clock.dayTicks}:null};
+    if(this.physical){
+      const visible=structuredClone(this.physical.renderScene()),scene=visible.scene as Record<string,unknown>;
+      if(this.commonsProvisionsActive)scene.provisions={version:'commons-provisions/1',resources:structuredClone(COMMONS_PERSONAL_RESOURCES),nativeGroundY:0};
+      if(this.commonsKitchenActive)scene.kitchen={version:this.commonsKitchenVersion,...(this.commonsKitchenVersion==='commons-kitchen/2'?{slotRow:'r1'}:{}),stations:structuredClone(COMMONS_KITCHENS),ingredientBowlsPerStation:2,servingsPerStation:2,nativeGroundY:0};
+      if(visible.shore)visible.shore.rulesVersion=this.rulesVersion;
+      return {...visible,clock:this.cfg.clock?{origin:this.cfg.clock.origin,dayTicks:this.cfg.clock.dayTicks}:null};
+    }
     const scene=structuredClone(this.m.scenes[this.rt.world.base.campus] ?? null);
     if(this.cfg.scene==='eden-commons')scene.commons=commonsSceneMetadataV1Schema.parse({
       version:'commons/1',source:'9b6db72fc2dcf45a762d7ce8e4db0b71d0418ea8',layout:structuredClone(this.m.commonsLayout),
@@ -686,6 +695,21 @@ export class MarsEngine implements Engine {
   /** Only the explicit dual-history factory enables this prospective reader.
    * Installing the reader itself changes no rules, body, program or hash. */
   enableCrewRemovalTransitionReaderV1(){this.crewRemovalTransitionReader=true;}
+  installRetainedCommonsShoreReader(reader:RetainedCommonsShoreReader){this.retainedShoreReader=reader;}
+  previewRetainedCommonsShoreV1():RetainedCommonsShoreAdmissionV1{
+    const reader=this.retainedShoreReader;
+    if(!reader)return {ok:false,diagnostic:{code:'retained-shore.reader-required',message:'An explicit retained-world reader is required.'}};
+    if(this.physical||this.cfg.scene!=='eden-commons'||this.programs.size||this.leaving.length||!this.isQuiet())return {ok:false,diagnostic:{code:'retained-shore.not-quiet-commons',message:'Finish programmes and departures at an exact quiet commons boundary.'}};
+    const cfg={...this.cfg,walkBlockV1:true},target=nativeRulesVersion(reader.rulesVersion,cfg)+(this.commonsProvisionsActive?'+commons-provisions/1':'')+(this.commonsKitchenActive?'+'+this.commonsKitchenVersion:'');
+    const prepared=reader.prepare(this.rt,this.rulesVersion,target,this.stateHash());return prepared.ok?{ok:true,transition:prepared.transition}:prepared;
+  }
+  adoptRetainedCommonsShoreV1(raw:RetainedCommonsShoreV1){
+    const fact=retainedCommonsShoreV1Schema.parse(raw),preview=this.previewRetainedCommonsShoreV1();if(!preview.ok)throw Error(preview.diagnostic.code);
+    if(hashOf(fact)!==hashOf(preview.transition))throw Error('retained-shore.stale-or-forged');
+    const reader=this.retainedShoreReader!,prepared=reader.prepare(this.rt,fact.fromRulesVersion,fact.toRulesVersion,fact.fromStateHash);if(!prepared.ok)throw Error(prepared.diagnostic.code);
+    this.finishRecorder();this.rt=prepared.runtime;this.registry=this.rt.registry;this.physical=reader;this.cfg={...this.cfg,walkBlockV1:true};
+    this.cursor=this.rt.events.length;this.renderBaseKey='';this.keys.clear();this.acts.clear();this.ons.clear();this.startRecorder();
+  }
   enableCommonsKitchenReaderV1(active=false,version:CommonsKitchenVersion='commons-kitchen/1'){this.commonsKitchenReader=true;this.commonsKitchenReaderVersion=version;if(active){this.commonsKitchenVersion=version;this.finishRecorder();this.commonsKitchenActive=true;this.renderBaseKey='';this.startRecorder();}}
   previewCommonsKitchenV1(version=this.commonsKitchenReaderVersion){
     if(!this.commonsKitchenReader||!this.commonsProvisionsActive||this.cfg.scene!=='eden-commons')return {ok:false as const,diagnostic:{code:'commons-kitchen.reader-unavailable'}};
