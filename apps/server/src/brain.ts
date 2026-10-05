@@ -37,7 +37,14 @@ export class Brain {
   /** The hard cap counts durable cost reservations in the rolling real 24 hours. */
   capSince = 0;
   get budget() { return this.gov.budget; }
-  set budget(b: number) { this.gov.setBudget(Number.isFinite(b) ? Math.max(0, Math.min(1, b)) : 0); }
+  private budgetLimit=1;
+  set budget(b: number) { this.gov.setBudget(Number.isFinite(b) ? Math.max(0, Math.min(this.budgetLimit, b)) : 0); }
+  /** Gene-authorized live localhost only; ordinary production stays at one. */
+  enableLocalBudgetV1(){
+    const url=new URL(this.cfg.publicUrl);
+    if(this.cfg.worldKey!=='eden'||url.protocol!=='http:'||!['127.0.0.1','localhost','[::1]'].includes(url.hostname))throw Error('local-budget.loopback-required');
+    this.budgetLimit=3;this.budget=this.cfg.budgetUsdPerDay;
+  }
   readonly paidGate: PaidGate;
   inflight = new Set<string>();
   /** The latest rendered words from one Soul to another (colour for the listener's mind). */
