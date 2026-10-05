@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import { stationEpochV1Schema } from './station-v1.ts';
-import { stationRulesEraFactV1Schema,stationCommonsSourceV1Schema,initialStationPhysicalHeadV1,acceptStationPhysicalHeadV1 } from './station-era-v1.ts';
+import { stationRulesEraFactV1Schema,stationPhysicalSourceV1Schema,initialStationPhysicalHeadV1,acceptStationPhysicalHeadV1 } from './station-era-v1.ts';
 const integer=z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const stationEraPageV1Schema=z.object({contract:z.literal('station-era-page/1'),worldId:z.string().min(1).max(128),
   station:stationEpochV1Schema,afterSeq:integer,sourceCutoff:z.object({seq:integer,tick:integer}).strict(),nextAfterSeq:integer.positive().nullable(),
-  eras:z.array(z.object({fact:stationRulesEraFactV1Schema,source:stationCommonsSourceV1Schema}).strict()).max(64),
+  eras:z.array(z.object({fact:stationRulesEraFactV1Schema,source:stationPhysicalSourceV1Schema}).strict()).max(64),
 }).strict().superRefine((v,ctx)=>{
   const no=()=>ctx.addIssue({code:'custom',message:'station era page scope, cursor, predecessor or frontier differs'});
   if(v.worldId!==v.station.worldId||v.afterSeq>v.sourceCutoff.seq||v.sourceCutoff.tick<v.station.createdTick)no();

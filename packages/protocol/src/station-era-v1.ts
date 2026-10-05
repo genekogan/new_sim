@@ -1,7 +1,7 @@
 // Candidate G006 source/head codec and fold. No journal, timer, cue selection,
 // network, model, producer installation or V1 parser relaxation.
 import { z } from 'zod';
-import { commonsTransitionV1Schema,hashOf } from '@sim/engine-contract';
+import { commonsTransitionV1Schema,campExpansionV1Schema,hashOf } from '@sim/engine-contract';
 import { stationEpochV1Schema,stationEpochId,type StationEpochV1 } from './station-v1.ts';
 const integer=z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 const digest=z.string().regex(/^[a-f0-9]{64}$/);
@@ -30,6 +30,17 @@ export const stationCommonsSourceV1Schema=z.object({
   if(s.tick!==s.commonsTransition.tick)ctx.addIssue({code:'custom',message:'physical source tick differs'});
 });
 export type StationCommonsSourceV1=z.infer<typeof stationCommonsSourceV1Schema>;
+/** Separate exact source case; the original commons parser stays unchanged. */
+export const stationCampSourceV1Schema=z.object({worldId,seq:integer.max(Number.MAX_SAFE_INTEGER-1),tick:integer,campExpansion:campExpansionV1Schema})
+  .strict().superRefine((s,ctx)=>{if(s.tick!==s.campExpansion.tick)ctx.addIssue({code:'custom',message:'camp physical source tick differs'});});
+export const stationPhysicalSourceV1Schema=z.union([stationCommonsSourceV1Schema,stationCampSourceV1Schema]);
+export type StationPhysicalSourceV1=z.infer<typeof stationPhysicalSourceV1Schema>;
+export const stationPhysicalTransitionV1=(source:StationPhysicalSourceV1)=>'commonsTransition' in source?source.commonsTransition:source.campExpansion;
+export function stationSourceFromRulesV1(worldId:string,event:{seq:number;tick:number;payload:unknown}):StationPhysicalSourceV1{
+  if(!event.payload||typeof event.payload!=='object'||Array.isArray(event.payload))throw new Error('station physical source lacks strict rules payload');
+  const keys=Object.keys(event.payload);if(keys.length!==1||!['commonsTransition','campExpansion'].includes(keys[0]))throw new Error('station physical source requires one declared transition');
+  return stationPhysicalSourceV1Schema.parse({worldId,seq:event.seq,tick:event.tick,...event.payload});
+}
 
 export const stationRulesEraV1Schema=z.object({
   contract:z.literal('station-rules-era/1'),worldId,epoch:digest,
@@ -50,13 +61,13 @@ export type StationRulesEraFactV1=z.infer<typeof stationRulesEraFactV1Schema>;
 const origin=z.object({worldId,epoch:digest,genesisId:digest,rulesVersion:rules,dtSeconds:dt,createdTick:integer}).strict();
 export const stationPhysicalHeadV1Schema=z.object({
   contract:z.literal('station-physical-head/1'),origin,rulesVersion:rules,revision:integer,effectiveTick:integer,
-  era:stationRulesEraFactV1Schema.nullable(),source:stationCommonsSourceV1Schema.nullable(),
+  era:stationRulesEraFactV1Schema.nullable(),source:stationPhysicalSourceV1Schema.nullable(),
 }).strict().superRefine((h,ctx)=>{
   const no=()=>ctx.addIssue({code:'custom',message:'physical era head/source/origin binding differs'});
   if(h.origin.epoch!==stationEpochId(h.origin.worldId,h.origin.genesisId))no();
   if(h.revision===0){if(h.era||h.source||h.rulesVersion!==h.origin.rulesVersion||h.effectiveTick!==h.origin.createdTick)no();return;}
   if(!h.era||!h.source){no();return;}
-  const e=h.era.payload,s=h.source,c=s.commonsTransition;
+  const e=h.era.payload,s=h.source,c=stationPhysicalTransitionV1(s);
   if(h.revision!==e.revision||h.rulesVersion!==e.toRulesVersion||h.effectiveTick!==e.effectiveTick||h.effectiveTick<h.origin.createdTick
     ||e.worldId!==h.origin.worldId||s.worldId!==h.origin.worldId||e.epoch!==h.origin.epoch||e.dtSeconds!==h.origin.dtSeconds
     ||e.source.seq!==s.seq||e.source.tick!==s.tick||e.source.transitionHash!==hashOf(c)
@@ -85,7 +96,7 @@ export function acceptStationPhysicalHeadV1(raw:unknown,original:unknown,binding
  * the journal; bounded history projection must use the queried tick's source. */
 export type StationEraFoldStateV1={station:StationEpochV1;head:StationPhysicalHeadV1;lastFactSeq:number};
 export function foldStationRulesEraV1(state:StationEraFoldStateV1|undefined,rawFact:unknown,rawSource:unknown,original:unknown):StationEraFoldStateV1 {
-  const station=stationEpochV1Schema.parse(original),fact=stationRulesEraFactV1Schema.parse(rawFact),source=stationCommonsSourceV1Schema.parse(rawSource);
+  const station=stationEpochV1Schema.parse(original),fact=stationRulesEraFactV1Schema.parse(rawFact),source=stationPhysicalSourceV1Schema.parse(rawSource);
   const previous=state?acceptStationPhysicalHeadV1(state.head,state.station,
     {worldId:state.station.worldId,rulesVersion:state.head.rulesVersion,dtSeconds:state.station.dtSeconds}):initialStationPhysicalHeadV1(station);
   if(state&&(hashOf(state.station)!==hashOf(station)||!Number.isSafeInteger(state.lastFactSeq)||source.seq<=state.lastFactSeq))
@@ -96,7 +107,7 @@ export function foldStationRulesEraV1(state:StationEraFoldStateV1|undefined,rawF
     throw new Error('station era previous head differs or history has a gap');
   const head=acceptStationPhysicalHeadV1({contract:'station-physical-head/1',origin:previous.origin,rulesVersion:p.toRulesVersion,
     revision:p.revision,effectiveTick:p.effectiveTick,era:fact,source},station,
-    {worldId:station.worldId,rulesVersion:source.commonsTransition.toRulesVersion,dtSeconds:station.dtSeconds});
+    {worldId:station.worldId,rulesVersion:stationPhysicalTransitionV1(source).toRulesVersion,dtSeconds:station.dtSeconds});
   return {station,head,lastFactSeq:fact.seq};
 }
 

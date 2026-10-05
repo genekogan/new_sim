@@ -8,7 +8,7 @@ import { ClockFrontiers,type ClockFrontierV1 } from './clock-frontier.ts';
 import {
   describeIntent, publicIntent, viewHashOf, viewRow,
   isStationFactV1,
-  stationCommonsSourceV1Schema,stationRulesEraV1Schema,foldStationRulesEraV1,initialStationPhysicalHeadV1,acceptStationPhysicalHeadV1,
+  stationSourceFromRulesV1,stationPhysicalTransitionV1,stationRulesEraV1Schema,foldStationRulesEraV1,initialStationPhysicalHeadV1,acceptStationPhysicalHeadV1,
   type StationEraFoldStateV1,type StationPhysicalHeadV1,
   INTENT_V2, intentHistoryFactV2, intentReceivedPayloadV2Schema, intentReferenceV2Schema, intentAdmissionFactV2, intentControllerFactV2,
   type IntentAdmissionPayloadV2, type IntentControllerPayloadV2,
@@ -249,20 +249,20 @@ export class WorldHost {
   }
   private stationEraEvent(source:LogEvent):LogEvent|undefined {
     const old=this.stationHistoryV1();if(!old)return undefined;
-    const physical=stationCommonsSourceV1Schema.parse({worldId:this.worldId,seq:source.seq,tick:source.tick,commonsTransition:source.payload.commonsTransition});
+    const physical=stationSourceFromRulesV1(this.worldId,source);
     const previous=this.stationPhysicalHeadV1()!;
     const payload=stationRulesEraV1Schema.parse({contract:'station-rules-era/1',worldId:this.worldId,epoch:old.station.epoch,
       revision:previous.revision+1,previousRevision:previous.revision,fromRulesVersion:previous.rulesVersion,
-      toRulesVersion:physical.commonsTransition.toRulesVersion,dtSeconds:this.engine.dt,effectiveTick:source.tick,
-      source:{seq:source.seq,tick:source.tick,transitionHash:hashOf(physical.commonsTransition)}});
+      toRulesVersion:stationPhysicalTransitionV1(physical).toRulesVersion,dtSeconds:this.engine.dt,effectiveTick:source.tick,
+      source:{seq:source.seq,tick:source.tick,transitionHash:hashOf(stationPhysicalTransitionV1(physical))}});
     const fact={seq:source.seq+1,tick:source.tick,payload};
     foldStationRulesEraV1(this.extra.stationEraV1 as StationEraFoldStateV1|undefined,fact,physical,old.station);
     return {...fact,kind:'station-rules-era-v1',author:'world:station',at:source.at};
   }
   /** Trusted internal physical infrastructure edit. Existing station histories
    * explicitly refuse until a corresponding atomic era producer is qualified. */
-  adoptCampExpansion(author:string):Promise<LogEvent>{
-    if(this.stationHistoryV1())return Promise.reject(new Error('camp-expansion.station-era-reader-required'));
+  adoptCampExpansion(author:string,options?:{stationEraV1?:boolean}):Promise<LogEvent>{
+    if(this.stationHistoryV1()&&!options?.stationEraV1)return Promise.reject(new Error('camp-expansion.station-era-reader-required'));
     const row=this.db.db.prepare("SELECT seq FROM events WHERE world_id=? AND kind='rules' AND json_extract(payload,'$.campExpansion.contract')='camp-ground-expansion/1' ORDER BY seq DESC LIMIT 1").get(this.worldId) as {seq:number}|undefined;
     if(row){const old=this.db.events(this.worldId,row.seq-1,1)[0],t=old?.payload?.campExpansion;
       if(t?.toRulesVersion===this.engine.rulesVersion&&hashOf(t.toBase)===hashOf(this.engine.world.base))return Promise.resolve(old);
@@ -274,7 +274,7 @@ export class WorldHost {
     if(collision)return Promise.reject(new Error('camp-expansion.kernel-collision:'+collision.id));
     const expected=preview.transition;
     const guard:AcceptanceGuard=()=>{
-      if(this.stationHistoryV1())throw new Error('camp-expansion.station-era-reader-required');
+      if(this.stationHistoryV1()&&!options?.stationEraV1)throw new Error('camp-expansion.station-era-reader-required');
       if(this.db.world(this.worldId)?.dt!==this.engine.dt)throw new Error('camp-expansion.header-dt');
       const current=this.engine.previewCampExpansionV1?.();
       if(!current?.ok||hashOf(current.transition)!==hashOf(expected))throw new Error('camp-expansion.source-moved');
@@ -287,7 +287,7 @@ export class WorldHost {
       const result=this.db.db.prepare('UPDATE worlds SET rules_version=? WHERE id=? AND rules_version=?').run(expected.toRulesVersion,this.worldId,expected.fromRulesVersion);
       if(result.changes!==1)throw new Error('camp-expansion.header-moved');return true;
     };
-    return new Promise((resolve,reject)=>this.queue.push({kind:'rules',author,payload:{campExpansion:expected},guard,journal,resolve,reject}));
+    return new Promise((resolve,reject)=>this.queue.push({kind:'rules',author,payload:{campExpansion:expected},guard,journal,stationEra:options?.stationEraV1===true,resolve,reject}));
   }
   private pendingBootstrap: { at: Record<string, string | null> } | null = null;
   /** For worlds snapshotted before the kernel existed: places from the engine, a Soul thing and deck per mind. */
@@ -652,9 +652,9 @@ export class WorldHost {
       const old=this.extra.stationV1 as StationHistoryV1|undefined;
       if(!old)throw new Error('station era has no original station');
       const source=this.db.events(this.worldId,e.payload.source.seq-1,1)[0];
-      if(!source||source.kind!=='rules'||source.seq!==e.payload.source.seq||Object.keys(source.payload).length!==1||!source.payload.commonsTransition)
+      if(!source||source.kind!=='rules'||source.seq!==e.payload.source.seq||Object.keys(source.payload).length!==1||(!source.payload.commonsTransition&&!source.payload.campExpansion))
         throw new Error('station era lacks exact canonical physical source');
-      const physical=stationCommonsSourceV1Schema.parse({worldId:this.worldId,seq:source.seq,tick:source.tick,commonsTransition:source.payload.commonsTransition});
+      const physical=stationSourceFromRulesV1(this.worldId,source);
       const folded=foldStationRulesEraV1(this.extra.stationEraV1 as StationEraFoldStateV1|undefined,
         {seq:e.seq,tick:e.tick,payload:e.payload},physical,old.station);
       acceptStationPhysicalHeadV1(folded.head,old.station,this.stationBindingV1());
@@ -940,7 +940,7 @@ export class WorldHost {
     if(head.era){
       const source=this.db.events(this.worldId,head.source!.seq-1,1)[0],fact=this.db.events(this.worldId,head.era.seq-1,1)[0];
       if(!source||source.kind!=='rules'||Object.keys(source.payload).length!==1||!fact||fact.kind!=='station-rules-era-v1'
-        ||hashOf({worldId:this.worldId,seq:source.seq,tick:source.tick,commonsTransition:source.payload.commonsTransition})!==hashOf(head.source)
+        ||hashOf(stationSourceFromRulesV1(this.worldId,source))!==hashOf(head.source)
         ||hashOf({seq:fact.seq,tick:fact.tick,payload:fact.payload})!==hashOf(head.era))throw new Error('station head lacks canonical physical/era pair');
     }
     return head;

@@ -2,7 +2,7 @@
 import { nativeGatheringObservationV1Schema,hashOf } from '@sim/engine-contract';
 import { STATION_PINS_V1,makeStationCueV2,stationCueEraRevision,stationPhaseAtTickV2,stationEndTick,stationAnchorV2Schema,
   stationLiveV2Schema,stationHistoricalV2Schema,initialStationPhysicalHeadV1,foldStationRulesEraV1,acceptStationPhysicalHeadV1,
-  stationEraPageV1Schema,stationRulesEraFactV1Schema,stationCommonsSourceV1Schema,
+  stationEraPageV1Schema,stationRulesEraFactV1Schema,stationSourceFromRulesV1,
   type StationLiveV2,type StationEraFoldStateV1 } from '@sim/protocol';
 import type { WorldHost } from './world.ts';
 
@@ -77,7 +77,7 @@ export class CandidateStationV2 {
       const source=events.find(e=>e.seq===fact.payload.source.seq);
       if(!source||source.kind!=='rules'||Object.keys(source.payload).length!==1)throw new Error('station history lacks physical source');
       eras=foldStationRulesEraV1(eras,{seq:fact.seq,tick:fact.tick,payload:fact.payload},
-        {worldId:h.worldId,seq:source.seq,tick:source.tick,commonsTransition:source.payload.commonsTransition},old.station);
+        stationSourceFromRulesV1(h.worldId,source),old.station);
       if(fact.tick<=at)selected=eras.head;else if(until===null)until=fact.tick;
     }
     acceptStationPhysicalHeadV1(selected,old.station,{worldId:scope.worldId,rulesVersion:scope.rulesVersion,dtSeconds:h.engine.dt});
@@ -108,7 +108,7 @@ export class CandidateStationV2 {
     const entries=rows.slice(0,limit).map(row=>{
       const fact=stationRulesEraFactV1Schema.parse({...row,payload:JSON.parse(row.payload)}),source=h.db.events(h.worldId,fact.payload.source.seq-1,1)[0];
       if(!source||source.kind!=='rules'||Object.keys(source.payload).length!==1)throw new Error('station era page lacks exact physical source');
-      return {fact,source:stationCommonsSourceV1Schema.parse({worldId:h.worldId,seq:source.seq,tick:source.tick,commonsTransition:source.payload.commonsTransition})};
+      return {fact,source:stationSourceFromRulesV1(h.worldId,source)};
     });
     return stationEraPageV1Schema.parse({contract:'station-era-page/1',worldId:h.worldId,station:old.station,afterSeq,
       sourceCutoff:{seq:cutoff.seq,tick:cutoff.tick},nextAfterSeq:rows.length>limit?entries.at(-1)!.fact.seq:null,eras:entries});

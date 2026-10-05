@@ -26,6 +26,7 @@ const folded=()=>foldStationRulesEraV1(undefined,fact,source,station);
 test('era/head fold binds exact published native tick37 source, preserves original epoch and retains only a detached current head',()=>{
   const before=hashOf({station,fact,source}),state=folded();assert.equal(state.head.effectiveTick,37);assert.equal(state.head.revision,1);
   assert.equal(state.station.epoch,station.epoch);assert.equal(state.station.rulesVersion,native.oldRulesVersion);assert.equal(state.head.rulesVersion,native.rulesVersion);
+  assert.ok(state.head.source&&'commonsTransition' in state.head.source);
   assert.deepEqual(state.head.source!.commonsTransition,native.transition);assert.equal(hashOf({station,fact,source}),before);
   state.head.source!.commonsTransition.fromWorldHash='0'.repeat(64);assert.equal(source.commonsTransition.fromWorldHash,native.transition.fromWorldHash);
   assert.deepEqual(Object.keys(state).sort(),['head','lastFactSeq','station']);
