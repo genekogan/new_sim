@@ -28,8 +28,8 @@ export class Db {
   paidCost(now = Date.now()): number {
     return Number((this.db.prepare('SELECT COALESCE(SUM(cost),0) AS cost FROM paid_costs WHERE at >= ?').get(now - 86400_000) as { cost: number }).cost);
   }
-  reserveCost(bound: number, model: string, budget: number, now = Date.now()) {
-    if (!Number.isFinite(bound) || bound < 0 || !Number.isFinite(budget) || this.paidCost(now) + bound > Math.min(1, budget)) throw new Error('world model budget cannot cover this request');
+  reserveCost(bound: number, model: string, budget: number, now = Date.now(), ceiling:1|3=1) {
+    if (!Number.isFinite(bound) || bound < 0 || !Number.isFinite(budget) || ![1,3].includes(ceiling) || this.paidCost(now) + bound > Math.min(ceiling, budget)) throw new Error('world model budget cannot cover this request');
     const id = Number(this.db.prepare('INSERT INTO paid_costs(at,model,cost) VALUES (?,?,?)').run(now, model, bound).lastInsertRowid);
     return { settle: (cost: number) => {
       if (!Number.isFinite(cost) || cost < 0) return;

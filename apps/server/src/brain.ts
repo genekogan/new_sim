@@ -37,7 +37,7 @@ export class Brain {
   /** The hard cap counts durable cost reservations in the rolling real 24 hours. */
   capSince = 0;
   get budget() { return this.gov.budget; }
-  private budgetLimit=1;
+  private budgetLimit:1|3=1;
   set budget(b: number) { this.gov.setBudget(Number.isFinite(b) ? Math.max(0, Math.min(this.budgetLimit, b)) : 0); }
   /** Gene-authorized live localhost only; ordinary production stays at one. */
   enableLocalBudgetV1(){
@@ -94,7 +94,7 @@ export class Brain {
     this.intentV2Choices = services?.intentV2Choices === true;
     this.intentV2Retries = this.intentV2Choices && services?.intentV2Retries === true;
     this.mode = cfg.brainMode; this.gov = new Governor(cfg.budgetUsdPerDay);
-    this.paidGate = (bound, model) => db.reserveCost(bound, model, this.budget);
+    this.paidGate = (bound, model) => db.reserveCost(bound, model, this.budget,Date.now(),this.budgetLimit);
     db.backfillSpend();
     this.jev = new JevClient(cfg.typesafeKey, this.mode);
     this.jev.gate = this.paidGate;
