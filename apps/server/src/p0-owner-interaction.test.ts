@@ -4,7 +4,11 @@
 import test,{type TestContext} from 'node:test';
 import assert from 'node:assert/strict';
 import {setImmediate} from 'node:timers/promises';
-import {retainedCommonsShoreFactory,nativeSleepSnapshotFactoryV1,COMMONS_PERSONAL_RESOURCES} from '@sim/engine-mars';
+import {retainedCommonsShoreFactory,nativeSleepSnapshotFactoryV1,COMMONS_PERSONAL_RESOURCES,edenLectureFactoryV1,edenGroundFactoryV1,commonsNewcomerResourcesFactory} from '@sim/engine-mars';
+import {readFileSync} from 'node:fs';
+import type {SoulRow} from './db.ts';
+import {installEdenSteeringModeV1} from './eden-steering-mode.ts';
+import {installOwnedEdenLectureCardV1,installOwnedEdenLectureReadinessV1} from './eden-lecture-cards.ts';
 import {humanCompilerOutputV1Schema} from '@sim/engine-contract';
 import type {WorldState as NativeWorld} from '../../../mars/viewer/engine/world/types.ts';
 import {fixture,invite,accept} from '../test/native-owner-fixture.ts';
@@ -123,4 +127,28 @@ test('G414 own-request diagnostics: strict scoped DTO with canonical attempts; f
  assert.ok([401,404].includes((await get('diag-swim')).status));assert.equal((await get('no-such','Bearer dev:alice')).status,404);
  if(process.env.P0_DIAGNOSTICS_OUT)(await import('node:fs')).writeFileSync(process.env.P0_DIAGNOSTICS_OUT,JSON.stringify({scope:{worldId:f.host.worldId,soulId:f.row.id,ownerId:'dev:alice',entityId:f.row.entity_id},understood:dto,refused:r}));
  t.diagnostic(JSON.stringify({unavailable:dto.unavailable?.map(u=>u.field),refusedCode:r.code}));
+});
+
+// Lecture fixture copied from eden-lecture-owner-control.test.ts (same factory/installs).
+async function lectureSetup(t:any,nativeContext=false){const factory=nativeSleepSnapshotFactoryV1(edenLectureFactoryV1(commonsNewcomerResourcesFactory(await edenGroundFactoryV1(await retainedCommonsShoreFactory({socialEdenV1:true,foodDeliveryV1:true}))))),f=fixture(':memory:',factory,{durableClockV1:true});f.brain.quiesce();f.souls.cfg.maxSoulsPerUser=9;f.souls.enableLifecycle();await invite(f,'operator');await invite(f,'other');const rows:SoulRow[]=[];for(let i=0;i<9;i++)rows.push(await accept(f.host,f.souls.create('dev:operator',{name:'Owned class '+i,description:'Synthetic same human owner lecture roster'})));for(const method of ['installCommonsProvisionsV1','installCommonsKitchenV1','installRetainedCommonsShoreV1'] as const)await accept<unknown>(f.host,f.host[method]());const layout=JSON.parse(readFileSync(new URL('../../../packages/engine-mars/src/fixtures/newcomer-layout.world-alternative.v2.json',import.meta.url),'utf8'));await accept(f.host,f.host.installCommonsNewcomerResourcesV1(layout.placements));await accept(f.host,f.host.installNativeSleepSnapshotV1());await accept(f.host,f.host.installEdenGroundV1());await accept(f.host,f.host.installEdenLectureV1({worldEast:'world-v2',id:'eden-classroom-1',origin:[42,-6],yaw:0,audienceSeats:20,lesson:'Learn from a world with a memory.'}));
+ const brain=new Brain(f.host,f.db,{...f.brain.cfg,budgetUsdPerDay:0},{clients:()=>0,onCall(){},onCamera(){},onTicker(){},onNarrative(){}},{intentV2Choices:true,nativeActivityContextV1:nativeContext}),service=new IntentControlV2(f.host,brain,f.souls,{closedGoalsV1:true,registeredActivitiesV1:true});await accept<unknown>(f.host,f.host.enableIntentSequencesV1());await installEdenSteeringModeV1(f.host,{closedGoalsV1:true,registeredActivitiesV1:true});const leader=f.host.minds.get(rows[0].id)!;await accept(f.host,installOwnedEdenLectureCardV1(f.host,brain,leader));t.after(()=>{brain.quiesce();f.host.stop();f.db.close();});return {...f,brain,service,leader,rows,factory};}
+test('busy lecture preparation (ready-wait and mid-walk): exact classroom and swim words are accepted and natively complete',{timeout:240000},async t=>{
+ const f=await lectureSetup(t),scopeOf=(row:SoulRow)=>f.service.ownerScope({userId:'dev:operator',expiresAt:Number.MAX_SAFE_INTEGER},row.id);
+ const attempts=(row:SoulRow,id:string)=>Object.values(f.host.intentHistoryOf(row.id).attempts).filter(a=>a.intent.intentId===id);
+ const submit=async(row:SoulRow,requestId:string,words:string)=>{await accept(f.host,f.service.submit(scopeOf(row),{contract:'soul-intent/2',op:'upsert',requestId,words}));await accept(f.host,f.service.settled());const r=f.service.lookup(scopeOf(row),requestId);await f.brain.evaluate(f.host.minds.get(row.id)!,'new-intent-v2');f.host.drainInputs();return r;};
+ const tick=async(n:number,until:()=>boolean)=>{for(let i=0;i<n&&!until();i++){f.host.tickOnce();if(i%10===0)await setImmediate();}return until();};
+ const living=new LivingWorld(f.host);await accept<unknown>(f.host,living.install(['People may choose what to do and offer voluntary readiness.']));for(let i=0;i<8;i++){f.host.tickOnce();await setImmediate();}await accept(f.host,f.brain.enableEdenAutonomyV1());
+ const prepared=await accept(f.host,installOwnedEdenLectureReadinessV1(f.host,f.brain,f.leader));assert.ok(prepared.readiness.length>=4);
+ for(const [row,phase,words] of [[f.rows[1],'ready-wait','go to the classroom'],[f.rows[2],'mid-walk','go for a swim in the pond'],[f.rows[3],'mid-walk','go to class']] as const){
+  const prep=await submit(row,'prep-'+row.id,'prepare for my Eden lecture');assert.equal(prep.phase,'understood',JSON.stringify(prep));
+  const action=()=>{const p=f.host.engine.programOf(row.entity_id);return p?f.host.engine.programAction?.(p)?.action.verb??'wait':null;};
+  assert.ok(await tick(3000,()=>phase==='ready-wait'?action()==='wait':action()==='walk_to'),phase+' reached: '+action());
+  const seen=new Set<string>(),receipt=await submit(row,'p0-'+phase+'-'+row.id,words);
+  assert.equal(receipt.phase,'understood',JSON.stringify(receipt));if(receipt.phase!=='understood')throw Error('no plan');
+  const id=receipt.revision.intentId;
+  assert.ok(await tick(8000,()=>{const a=(f.host.engine.world as NativeWorld).entities[row.entity_id].human?.activity;if(a)seen.add(a);return attempts(row,id).some(x=>x.phase==='completed');}),JSON.stringify({phase,words,summary:receipt.revision.interpretation.summary,attempts:attempts(row,id),seen:[...seen]}));
+  if(words.includes('swim'))assert.ok(seen.has('swim'),[...seen].join(','));
+  t.diagnostic(`${phase} "${words}": ${receipt.revision.interpretation.summary} | ${[...seen].join(',')}`);
+ }
+ assert.deepEqual(f.host.engine.runtime.violations,[]);assert.equal(f.db.paidCost(),0);
 });
