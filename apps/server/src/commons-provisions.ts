@@ -7,12 +7,13 @@ import {COMMONS_PERSONAL_RESOURCES} from '@sim/engine-mars';
  * reassigned by a current cast sort. Only actual owned Souls receive cards. */
 export async function installCommonsProvisionCards(host:WorldHost,brain:Brain,onlySoulId?:string){
   if(brain.host!==host)throw Error('commons-provisions.card-host-differs');
-  const births=host.db.db.prepare("SELECT payload FROM events WHERE world_id=? AND kind='birth' ORDER BY seq LIMIT 8").all(host.worldId) as {payload:string}[];
+  const resources=[...COMMONS_PERSONAL_RESOURCES,...(host.engine.commonsNewcomerResourcesV1?.()??[])];
+  const births=host.db.db.prepare("SELECT payload FROM events WHERE world_id=? AND kind='birth' ORDER BY seq LIMIT ?").all(host.worldId,resources.length) as {payload:string}[];
   const verdicts=[];
   for(const [index,event] of births.entries()){
     const birth=JSON.parse(event.payload);if(onlySoulId&&birth.soulId!==onlySoulId)continue;
     const m=host.minds.get(birth.soulId),row=host.db.soul(birth.soulId);if(!m||!row||row.retired_at!==null||row.owner!==m.owner||row.entity_id!==m.entityId)continue;
-    const r=COMMONS_PERSONAL_RESOURCES[index],suffix=m.soulId.slice(2),meal=`eat prepared meal ${suffix}`,sleep=`sleep on ground mat ${suffix}`;
+    const r=resources[index],suffix=m.soulId.slice(2),meal=`eat prepared meal ${suffix}`,sleep=`sleep on ground mat ${suffix}`;
     const cards:Card[]=[
       {name:meal,summary:'Eat my prepared meal with a spoon and free both hands afterward.',good_when:'Hungry, with food in my own bowl; native reach, food and hand requirements apply.',target:null,when:[],then:[{set:['$actor','doing','eating a prepared meal']}],approach:[],during:[
         {verb:'mars:take_item',params:{item:r.bowl,hand:'left'}},{verb:'mars:take_item',params:{item:r.spoon,hand:'right'}},{verb:'mars:eat',params:{bowl:r.bowl,spoon:r.spoon}},
@@ -29,15 +30,15 @@ export async function installCommonsProvisionCards(host:WorldHost,brain:Brain,on
 }
 
 /** Install before listening for new births. This is a bounded resource policy:
- * the first eight canonical births retain their slots, even after retirement.
- * A ninth birth receives no invented stock. No replay-time listener runs. */
+ * canonical births retain their slots, even after retirement.
+ * Later slots require an explicit recorded finite resource checkpoint. No replay-time listener runs. */
 export async function followCommonsProvisionBirths(host:WorldHost,brain:Brain){
   let work=Promise.resolve(),failure:unknown;
   const append=(soulId?:string)=>{
     const pending=work.then(()=>installCommonsProvisionCards(host,brain,soulId));
     work=pending.then(()=>{},error=>{failure=error;console.error('commons-provisions.birth-assignment-failed');});return pending;
   };
-  const listener={onApplied(e:{kind:string,payload:any}){if(e.kind==='birth')void append(e.payload.soulId).catch(()=>{});}};
+  const listener={onApplied(e:{kind:string,payload:any}){if(e.kind==='birth')void append(e.payload.soulId).catch(()=>{});else if(e.kind==='rules'&&e.payload?.commonsNewcomerResources)void append().catch(()=>{});}};
   const close=()=>{const i=host.listeners.indexOf(listener);if(i>=0)host.listeners.splice(i,1);};
   const settled=async()=>{let pending;do{pending=work;await pending;}while(pending!==work);if(failure)throw failure;};
   // Subscribe before catch-up; births applied by mint's sequencer pump must

@@ -1,3 +1,5 @@
+import {commonsNewcomerResourcesV1} from './newcomer-resources.ts';
+import {newcomerResourcesPublicV1Schema,commonsNewcomerResourcesV1Schema,type CommonsNewcomerResourcesV1,type NewcomerResourcePlacementV1} from '@sim/engine-contract';
 import {existingGreenLandmarkV1} from './green-landmark.ts';
 import {existingGreenLandmarkTransitionV1Schema,type ExistingGreenLandmarkTransitionV1} from '@sim/engine-contract';
 import {fixtureSlots} from '../../../mars/viewer/engine/social/slots.ts';
@@ -110,7 +112,7 @@ export class MarsEngine implements Engine {
   get nativeArrivalWitnessEnabledV1(){return this.cfg.nativeArrivalWitnessV1===true;}
   readonly dt = 1 / TPS;
   readonly schema: string;
-  private composedRules(base:string,change?:{provisions?:boolean;kitchen?:CommonsKitchenVersion|null;food?:boolean;social?:boolean;green?:boolean}){const provisions=change?.provisions??this.commonsProvisionsActive,kitchen=change&&'kitchen' in change?change.kitchen:(this.commonsKitchenActive?this.commonsKitchenVersion:null),food=change?.food??!!this.foodDeliveries.length,social=change?.social??this.socialEdenActive,green=change?.green??this.greenLandmarkActive;return base+(provisions?'+commons-provisions/1':'')+(kitchen?'+'+kitchen:'')+(food?'+fd/1':'')+(social?'+social-eden/1':'')+(green?'+g/1':'');}
+  private composedRules(base:string,change?:{provisions?:boolean;kitchen?:CommonsKitchenVersion|null;food?:boolean;social?:boolean;green?:boolean}){const provisions=change?.provisions??this.commonsProvisionsActive,kitchen=change&&'kitchen' in change?change.kitchen:(this.commonsKitchenActive?this.commonsKitchenVersion:null),food=change?.food??!!this.foodDeliveries.length,social=change?.social??this.socialEdenActive,green=change?.green??this.greenLandmarkActive;return base+(provisions?(this.newcomerResources.length?'+cp/2':'+commons-provisions/1'):'')+(kitchen?'+'+kitchen:'')+(food?'+fd/1':'')+(social?'+social-eden/1':'')+(green?'+g/1':'');}
   get rulesVersion(){return this.composedRules(nativeRulesVersion(this.physical?.rulesVersion??this.m.rulesVersion,this.cfg));}
   readonly runtime: RuntimeView;
   private m: Mars; private rt: any; private cfg: MarsWorldConfig;
@@ -144,6 +146,8 @@ export class MarsEngine implements Engine {
   private commonsKitchenVersion:CommonsKitchenVersion='commons-kitchen/1';
   private commonsKitchenReader=false;
   private commonsKitchenActive=false;
+  private newcomerReader=false;
+  private newcomerResources:CommonsNewcomerResourcesV1[]=[];
   private commonsProvisionsReader=false;
   private commonsProvisionsActive=false;
   private chunks: { fromTick: number; toTick: number; take: unknown }[] = [];
@@ -169,7 +173,7 @@ export class MarsEngine implements Engine {
     return [...BODY_VERBS, ...this.m.describeVerbs(this.registry).map((v) => ({ ...v, verb: `mars:${v.verb}`, description: `[Mars verb] ${v.description}`, scope: 'world' as const }))];
   }
   /** The world plus the adapter's own state (which program each actor is in), since both decide what happens next. */
-  stateHash(): string { return hashOf({ w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet, ...(this.cfg.safeCrewRemoval?{removalPolicy:'crew-removal/1'}:{}), ...(this.cfg.fixtureGroundGoalsV1?{fixtureGoalPolicy:'ground-fixture-levels/1'}:{}), ...(this.cfg.nativeArrivalWitnessV1?{arrivalWitnessPolicy:'native-navigation-arrival/1'}:{}), ...(this.cfg.quietLandingCourtesyV1?{quietLandingPolicy:'idle-landing-courtesy/1'}:{}), ...(this.commonsProvisionsActive?{provisionsPolicy:'commons-provisions/1'}:{}), ...(this.commonsKitchenActive?{kitchenPolicy:this.commonsKitchenVersion}:{}), ...(this.greenLandmarkActive?{greenLandmarkPolicy:'existing-green-landmark/1'}:{}), ...(this.socialEdenActive?{socialPolicy:'social-eden/1'}:{}), ...(this.foodDeliveries.length?{foodDeliveryPolicy:'commons-food-delivery/1',foodDeliveries:this.foodDeliveries}:{}), ...(this.cfg.safeArrivalV1?{arrivalPolicy:'arrival-clearance/1'}:{}), ...(this.cfg.walkBlockV1?{walkPolicy:'walk-block/1'}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion,physicalPolicy:this.cfg}:{}) }); }
+  stateHash(): string { return hashOf({ ...(this.newcomerResources.length?{newcomerResources:this.newcomerResources}:{}), w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet, ...(this.cfg.safeCrewRemoval?{removalPolicy:'crew-removal/1'}:{}), ...(this.cfg.fixtureGroundGoalsV1?{fixtureGoalPolicy:'ground-fixture-levels/1'}:{}), ...(this.cfg.nativeArrivalWitnessV1?{arrivalWitnessPolicy:'native-navigation-arrival/1'}:{}), ...(this.cfg.quietLandingCourtesyV1?{quietLandingPolicy:'idle-landing-courtesy/1'}:{}), ...(this.commonsProvisionsActive?{provisionsPolicy:'commons-provisions/1'}:{}), ...(this.commonsKitchenActive?{kitchenPolicy:this.commonsKitchenVersion}:{}), ...(this.greenLandmarkActive?{greenLandmarkPolicy:'existing-green-landmark/1'}:{}), ...(this.socialEdenActive?{socialPolicy:'social-eden/1'}:{}), ...(this.foodDeliveries.length?{foodDeliveryPolicy:'commons-food-delivery/1',foodDeliveries:this.foodDeliveries}:{}), ...(this.cfg.safeArrivalV1?{arrivalPolicy:'arrival-clearance/1'}:{}), ...(this.cfg.walkBlockV1?{walkPolicy:'walk-block/1'}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion,physicalPolicy:this.cfg}:{}) }); }
   physicalHash(): string { return hashOf(physicalView(this.world)); }
 
   // ------------------------------------------------------------------ tick
@@ -632,6 +636,7 @@ export class MarsEngine implements Engine {
   renderScene() {
     if(this.physical){
       const visible=structuredClone(this.physical.renderScene()),scene=visible.scene as Record<string,unknown>;
+      if(this.newcomerResources.length)scene.newcomerProvisions=newcomerResourcesPublicV1Schema.parse({contract:'commons-newcomer-resources/1',resources:this.newcomerResources.flatMap(f=>commonsNewcomerResourcesV1(f.firstSlot,f.placements).resources),nativeGroundY:0});
       if(this.commonsProvisionsActive)scene.provisions={version:'commons-provisions/1',resources:structuredClone(COMMONS_PERSONAL_RESOURCES),nativeGroundY:0};
       if(this.commonsKitchenActive)scene.kitchen={version:this.commonsKitchenVersion,...(this.commonsKitchenVersion==='commons-kitchen/2'?{slotRow:'r1'}:{}),stations:structuredClone(COMMONS_KITCHENS),ingredientBowlsPerStation:2,servingsPerStation:2,nativeGroundY:0};
       if(this.foodDeliveries.length)scene.foodDeliveries={contract:'commons-food-delivery/1',batches:this.foodDeliveries.map(d=>({deliveryId:d.deliveryId,batch:d.batch,portions:8,resources:commonsFoodDeliveryItemsV1(d.batch).resources}))};
@@ -648,6 +653,7 @@ export class MarsEngine implements Engine {
     if(this.socialEdenActive)scene.social={version:'social-eden/1',layoutHash:socialEdenV1().layoutHash,layout:socialEdenV1().layout,nativeGeometry:socialEdenV1().nativeGeometry};
       if(this.greenLandmarkActive)scene.landmarks={contract:'existing-green-landmark/1',sourceProposalHash:existingGreenLandmarkV1().sourceProposalHash,items:[{id:existingGreenLandmarkV1().id,label:'South commons tree',point:existingGreenLandmarkV1().point,visual:existingGreenLandmarkV1().source.visual,visualId:'commons-canopy-tree-16',capabilities:['walk','hang_out']}]};
     if(this.commonsKitchenActive)scene.kitchen={version:this.commonsKitchenVersion,...(this.commonsKitchenVersion==='commons-kitchen/2'?{slotRow:'r1'}:{}),stations:structuredClone(COMMONS_KITCHENS),ingredientBowlsPerStation:2,servingsPerStation:2,nativeGroundY:0};
+    if(this.newcomerResources.length)scene.newcomerProvisions=newcomerResourcesPublicV1Schema.parse({contract:'commons-newcomer-resources/1',resources:this.newcomerResources.flatMap(f=>commonsNewcomerResourcesV1(f.firstSlot,f.placements).resources),nativeGroundY:0});
     if(this.commonsProvisionsActive)scene.provisions={version:'commons-provisions/1',resources:structuredClone(COMMONS_PERSONAL_RESOURCES),nativeGroundY:0};
     return {scene,clock:this.cfg.clock?{origin:this.cfg.clock.origin,dayTicks:this.cfg.clock.dayTicks}:null,
       ...(this.cfg.scene==='littlemartians'?structuredClone(this.m.littleMartiansRender):{}),
@@ -801,6 +807,24 @@ export class MarsEngine implements Engine {
     const p=this.previewCommonsKitchenV1(version);if(!p.ok)throw Error(p.diagnostic.code);if(hashOf(raw)!==hashOf(p.transition))throw Error('commons-kitchen.stale-or-forged');
     this.finishRecorder();Object.assign(this.ents,structuredClone(commonsKitchen(version).entities));this.commonsKitchenVersion=version;this.commonsKitchenActive=true;this.renderBaseKey='';this.startRecorder();
   }
+  enableCommonsNewcomerReaderV1(recorded:CommonsNewcomerResourcesV1[]=[]){this.newcomerReader=true;let next=9;const facts=recorded.map(f=>commonsNewcomerResourcesV1Schema.parse(f));for(const f of facts){if(f.firstSlot!==next)throw Error('newcomer-resources.snapshot-sequence');next+=f.placements.length;}this.newcomerResources=structuredClone(facts);}
+  commonsNewcomerResourcesV1(){return this.newcomerResources.flatMap(f=>commonsNewcomerResourcesV1(f.firstSlot,f.placements).resources);}
+  previewCommonsNewcomerResourcesV1(placements:readonly NewcomerResourcePlacementV1[]){
+    const no=(code:string)=>({ok:false as const,diagnostic:{code:'newcomer-resources.'+code}});
+    if(!this.newcomerReader||!this.commonsProvisionsActive||this.cfg.scene!=='eden-commons')return no('reader-required');if(!this.canSnapshot())return no('resumable-boundary-required');
+    const firstSlot=9+this.newcomerResources.reduce((n,f)=>n+f.placements.length,0);let add;try{add=commonsNewcomerResourcesV1(firstSlot,placements);}catch{return no('capacity-or-layout');}
+    if(Object.keys(add.entities).some(id=>this.ents[id])||Object.keys(add.regions).some(id=>this.world.regions[id]))return no('identity-collision');
+    const allMats=[...Object.values(add.regions),...Object.values(this.world.regions).filter(r=>r.id.startsWith('commons-mat-'))];
+    for(const r of Object.values(add.regions)){const p=r.polygon;for(const other of allMats){if(other.id===r.id)continue;const q=other.polygon;if(Math.max(...p.map(v=>v[0]))>=Math.min(...q.map(v=>v[0]))&&Math.min(...p.map(v=>v[0]))<=Math.max(...q.map(v=>v[0]))&&Math.max(...p.map(v=>v[1]))>=Math.min(...q.map(v=>v[1]))&&Math.min(...p.map(v=>v[1]))<=Math.max(...q.map(v=>v[1])))return no('overlapping-rest');}}
+    const snap=this.rt.snapshot(),graph=decodeSnapshot(snap);Object.assign(graph.world.entities,structuredClone(add.entities));Object.assign(graph.world.regions,structuredClone(add.regions));const next={...snap,data:encode(graph),stateHash:hashOf(graph.world)};delete next.spatialEpoch;
+    const detached=this.physical?this.physical.restore(next):this.m.Runtime.restore(next,this.registry,this.m.servicesFor(this.m.scenes)(graph.world),this.m.invariants);if(detached.invariants.some((inv:any)=>inv(detached).length))return no('physical-conflict');
+    const spatial=detached.services.spatial as Spatial;spatial.sync(detached.world);const grid=spatial.level(0);if(!grid)return no('ground-required');
+    for(const resource of add.resources){const mat=add.regions[resource.mat],points:[number,number][]=[...mat.polygon,resource.sleepReturn,[resource.bowlHome[0],resource.bowlHome[2]],[resource.spoonHome[0],resource.spoonHome[2]]];for(let x=mat.polygon[0][0];x<=mat.polygon[1][0];x+=.25)for(let z=mat.polygon[0][1];z<=mat.polygon[2][1];z+=.25)points.push([x,z]);for(const point of points){if(clearanceAt(grid,point)<HUMAN_RADIUS+.02)return no('unsupported-envelope');}}
+    const toRulesVersion=this.rulesVersion.replace('+commons-provisions/1','+cp/2');
+    return {ok:true as const,transition:commonsNewcomerResourcesV1Schema.parse({contract:'commons-newcomer-resources/1',firstSlot,placements,tick:this.world.tick,fromRulesVersion:this.rulesVersion,toRulesVersion,fromStateHash:this.stateHash(),additionsHash:add.hash,base:this.world.base})};
+  }
+  adoptCommonsNewcomerResourcesV1(raw:CommonsNewcomerResourcesV1){const fact=commonsNewcomerResourcesV1Schema.parse(raw),p=this.previewCommonsNewcomerResourcesV1(fact.placements);if(!p.ok)throw Error(p.diagnostic.code);if(hashOf(fact)!==hashOf(p.transition))throw Error('newcomer-resources.stale-or-forged');const add=commonsNewcomerResourcesV1(fact.firstSlot,fact.placements);this.finishRecorder();Object.assign(this.ents,structuredClone(add.entities));Object.assign(this.world.regions,structuredClone(add.regions));this.newcomerResources.push(fact);this.renderBaseKey='';this.startRecorder();}
+  private newcomerBaseStateHash(){const saved=this.newcomerResources;try{this.newcomerResources=[];return this.stateHash();}finally{this.newcomerResources=saved;}}
   enableCommonsProvisionsReaderV1(active=false){this.commonsProvisionsReader=true;if(active){this.finishRecorder();this.commonsProvisionsActive=true;this.renderBaseKey='';this.startRecorder();}}
   previewCommonsProvisionsV1(){
     if(!this.commonsProvisionsReader||this.cfg.scene!=='eden-commons')return {ok:false as const,diagnostic:{code:'commons-provisions.reader-unavailable'}};
@@ -964,7 +988,7 @@ export class MarsEngine implements Engine {
   /** Mars's own resumable snapshot, plus which program each actor is in. Body-language steps lower only to verbs Mars can resume exactly. */
   snapshot(): EngineSnapshot {
     const mars = this.rt.snapshot();
-    return structuredClone({ format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, ...(this.cfg.scene==='eden-commons'?{commonsVersion:'commons/1'}:{}), quiet: this.quiet, ...(this.commonsProvisionsActive?{commonsProvisionsV1:true}:{}), ...(this.commonsKitchenActive?{commonsKitchenV1:true}:{}), ...(this.socialEdenActive?{socialEdenV1:true}:{}), ...(this.greenLandmarkActive?{greenLandmarkV1:true}:{}), ...(this.foodDeliveries.length?{foodDeliveriesV1:structuredClone(this.foodDeliveries)}:{}), ...(this.commonsKitchenActive&&this.commonsKitchenVersion==='commons-kitchen/2'?{commonsKitchenVersion:this.commonsKitchenVersion}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion}:{}) });
+    return structuredClone({ ...(this.newcomerResources.length?{commonsNewcomerResourcesV1:structuredClone(this.newcomerResources),newcomerBaseStateHash:this.newcomerBaseStateHash()}:{}), format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, ...(this.cfg.scene==='eden-commons'?{commonsVersion:'commons/1'}:{}), quiet: this.quiet, ...(this.commonsProvisionsActive?{commonsProvisionsV1:true}:{}), ...(this.commonsKitchenActive?{commonsKitchenV1:true}:{}), ...(this.socialEdenActive?{socialEdenV1:true}:{}), ...(this.greenLandmarkActive?{greenLandmarkV1:true}:{}), ...(this.foodDeliveries.length?{foodDeliveriesV1:structuredClone(this.foodDeliveries)}:{}), ...(this.commonsKitchenActive&&this.commonsKitchenVersion==='commons-kitchen/2'?{commonsKitchenVersion:this.commonsKitchenVersion}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion}:{}) });
   }
   canSnapshot(): boolean {
     // A legacy formation callback is not data and must wait for a quiet point.
@@ -1025,6 +1049,7 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
       return new MarsEngine(m, new m.Runtime(world, registry, services(world), m.invariants), cfg);
     },
     restore(snap: EngineSnapshot) {
+      if('commonsNewcomerResourcesV1' in snap)throw Error('newcomer-resources.reader-required');
       if('commonsKitchenV1' in snap)throw Error('commons-kitchen.reader-required');
       if('commonsProvisionsV1' in snap)throw Error('commons-provisions.reader-required');
       const s = structuredClone(snap) as EngineSnapshot & { mars: any; programs: Prog[]; nextProg: number; leaving: string[]; cfg: MarsWorldConfig; commonsVersion?:string; quiet?: boolean };

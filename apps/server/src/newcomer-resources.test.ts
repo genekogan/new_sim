@@ -1,0 +1,21 @@
+import {setImmediate} from 'node:timers/promises';
+import type {WorldState as NativeWorld} from '../../../mars/viewer/engine/world/types.ts';
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {commonsProvisionsFactory,commonsNewcomerResourcesFactory,COMMONS_PERSONAL_RESOURCES} from '@sim/engine-mars';
+import {kernelHash} from '@sim/kernel';
+import {fixture,invite,accept} from '../test/native-owner-fixture.ts';
+import {installCommonsProvisionCards,followCommonsProvisionBirths} from './commons-provisions.ts';
+import {WorldHost} from './world.ts';
+const factory=commonsNewcomerResourcesFactory(await commonsProvisionsFactory());
+const two=[{matCenter:[-22,28] as [number,number],mealPoint:[-22,12.5] as [number,number]},{matCenter:[-16,28] as [number,number],mealPoint:[-16,12.5] as [number,number]}];
+test('owned ninth and tenth births get their appended slots; retirement does not recycle stock; SQLite snapshot and genesis preserve the original world',async t=>{
+ const f=fixture(':memory:',factory,{durableClockV1:true});f.souls.enableLifecycle();await accept(f.host,f.host.installCommonsProvisionsV1());const follow=await followCommonsProvisionBirths(f.host,f.brain);t.after(()=>{follow.close();f.brain.quiesce();f.host.stop();f.db.close();});const rows=[];
+ for(let i=0;i<9;i++){await invite(f,'friend'+i);rows.push(await accept(f.host,f.souls.create('dev:friend'+i,{name:'Friend '+i,description:'Synthetic invited finite-resource owner'})));await accept(f.host,follow.settled());}
+ const ninth=rows[8],meal='eat prepared meal '+ninth.id.slice(2);assert.equal(f.host.kernel.decks[ninth.id].cards.includes(meal),false);const prefix=JSON.stringify(f.db.events(f.host.worldId)),bodies=JSON.stringify(rows.map(r=>f.host.engine.world.entities[r.entity_id]));const firstEight=JSON.stringify(COMMONS_PERSONAL_RESOURCES.map(r=>f.host.engine.world.entities[r.bowl]));
+ await accept(f.host,f.host.installCommonsNewcomerResourcesV1(two));await accept(f.host,follow.settled());assert.equal(JSON.stringify(rows.map(r=>f.host.engine.world.entities[r.entity_id])),bodies);assert.equal(JSON.stringify(COMMONS_PERSONAL_RESOURCES.map(r=>f.host.engine.world.entities[r.bowl])),firstEight);assert.equal(JSON.stringify(f.db.events(f.host.worldId).slice(0,JSON.parse(prefix).length)),prefix);const ninthCard=f.host.kernel.vocab.cards[meal];assert.ok(f.host.kernel.decks[ninth.id].cards.includes(meal));assert.equal(ninthCard.during![0].params!.item,'commons-bowl-9');
+ const response=await accept(f.host,f.request('/v1/souls/'+ninth.id+'/intent',{intent:{agenda:[{card:meal,target:null}],note:'Eat my own finite meal.'}},'friend8'));assert.equal(response.status,200);let consumed=false;for(let i=0;i<3500;i++){f.host.tickOnce();if(i%10===0)await setImmediate();if((f.host.engine.world as unknown as NativeWorld).entities['commons-bowl-9'].contents?.fraction===0&&!f.host.minds.get(ninth.id)!.pending){consumed=true;break;}}assert.ok(consumed,'ninth owner intent reaches and consumes its own native meal');assert.deepEqual(f.host.engine.runtime.violations,[]);
+ await accept(f.host,f.souls.retire(rows[0]));await invite(f,'friend9');const tenth=await accept(f.host,f.souls.create('dev:friend9',{name:'Friend nine',description:'Synthetic tenth lifetime owner'}));await accept(f.host,follow.settled());const tenthCard=f.host.kernel.vocab.cards['eat prepared meal '+tenth.id.slice(2)];assert.equal(tenthCard.during![0].params!.item,'commons-bowl-10');assert.equal(f.db.soul(ninth.id)!.owner,ninth.owner);assert.equal(f.db.soul(tenth.id)!.owner,tenth.owner);
+ const count=f.db.events(f.host.worldId).filter(e=>e.kind==='mint').length;await installCommonsProvisionCards(f.host,f.brain);assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='mint').length,count);follow.close();f.brain.quiesce();f.host.drainInputs();f.host.saveSnapshot(true);const head={engine:f.host.engine.stateHash(),kernel:kernelHash(f.host.kernel)};
+ for(const mode of ['snapshot','genesis']){if(mode==='genesis')f.db.db.prepare('DELETE FROM snapshots WHERE world_id=?').run(f.host.worldId);const h=new WorldHost(f.db,factory,f.host.seed,1e9,f.host.worldId,{durableClockV1:true});assert.equal(h.boot().from,mode);assert.deepEqual({engine:h.engine.stateHash(),kernel:kernelHash(h.kernel)},head);h.stop();}assert.equal(f.db.paidCost(),0);
+});

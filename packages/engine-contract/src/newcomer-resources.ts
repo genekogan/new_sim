@@ -1,0 +1,9 @@
+import {z} from 'zod';
+const point=z.tuple([z.number().finite().min(-28).max(28),z.number().finite().min(-28).max(28)]),digest=z.string().regex(/^[a-f0-9]{64}$/);
+export const newcomerResourcePlacementV1Schema=z.strictObject({matCenter:point,mealPoint:point});
+export const commonsNewcomerResourcesV1Schema=z.strictObject({contract:z.literal('commons-newcomer-resources/1'),firstSlot:z.number().int().min(9).max(30),placements:z.array(newcomerResourcePlacementV1Schema).min(1).max(22),tick:z.number().int().nonnegative(),fromRulesVersion:z.string().min(1).max(200),toRulesVersion:z.string().min(1).max(200),fromStateHash:digest,additionsHash:digest,base:z.strictObject({campus:z.string().min(1).max(100),staticHash:digest})}).refine(v=>v.firstSlot+v.placements.length-1<=30,{message:'finite lifetime capacity is thirty'});
+export type NewcomerResourcePlacementV1=z.infer<typeof newcomerResourcePlacementV1Schema>;
+export type CommonsNewcomerResourcesV1=z.infer<typeof commonsNewcomerResourcesV1Schema>;
+const vec3=z.tuple([z.number().finite(),z.literal(0),z.number().finite()]);
+export const newcomerResourcesPublicV1Schema=z.strictObject({contract:z.literal('commons-newcomer-resources/1'),nativeGroundY:z.literal(0),resources:z.array(z.strictObject({id:z.string(),slot:z.number().int().min(9).max(30),mat:z.string(),bowl:z.string(),spoon:z.string(),bowlHome:vec3,spoonHome:vec3,sleepReturn:z.tuple([z.number().finite().min(-30).max(30),z.number().finite().min(-30).max(30)])})).min(1).max(22)}).refine(v=>v.resources.every((r,i)=>r.slot===9+i&&r.id==='commons-personal-'+r.slot&&r.mat==='commons-mat-'+r.slot&&r.bowl==='commons-bowl-'+r.slot&&r.spoon==='commons-spoon-'+r.slot),{message:'public resources retain contiguous lifetime slot identities'});
+export type NewcomerResourcesPublicV1=z.infer<typeof newcomerResourcesPublicV1Schema>;

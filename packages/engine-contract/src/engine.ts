@@ -1,3 +1,4 @@
+import type {CommonsNewcomerResourcesV1,NewcomerResourcePlacementV1} from './newcomer-resources.ts';
 // The engine adapter: what the wrapper (server, brain, clients) needs from ANY
 // engine. Two implement it: the toy engine and the Mars adapter (packages/engine-mars).
 import type { ActionRecord } from './actions.ts';
@@ -121,6 +122,9 @@ export interface Engine {
   adoptRetainedCommonsShoreV1?(transition:import('./retained-shore.ts').RetainedCommonsShoreV1):void;
   previewCommonsKitchenV1?():{ok:true;transition:{contract:'commons-kitchen/1'|'commons-kitchen/2';tick:number;fromRulesVersion:string;toRulesVersion:string;fromStateHash:string;additionsHash:string;base:WorldState['base']}}|{ok:false;diagnostic:{code:string}};
   adoptCommonsKitchenV1?(transition:unknown):void;
+  previewCommonsNewcomerResourcesV1?(placements:readonly NewcomerResourcePlacementV1[]):{ok:true;transition:CommonsNewcomerResourcesV1}|{ok:false;diagnostic:{code:string}};
+  adoptCommonsNewcomerResourcesV1?(transition:CommonsNewcomerResourcesV1):void;
+  commonsNewcomerResourcesV1?():{id:string;slot:number;mat:string;bowl:string;spoon:string;bowlHome:[number,number,number];spoonHome:[number,number,number];sleepReturn:[number,number]}[];
   previewCommonsProvisionsV1?():{ok:true;transition:{contract:'commons-provisions/1';tick:number;fromRulesVersion:string;toRulesVersion:string;fromStateHash:string;additionsHash:string;base:WorldState['base']}}|{ok:false;diagnostic:{code:string}};
   adoptCommonsProvisionsV1?(transition:unknown):void;
   previewCrewRemovalTransitionV1?():CrewRemovalTransitionAdmissionV1;

@@ -19,3 +19,5 @@ export * from './food-delivery.ts';
 export * from './social-eden.ts';
 export * from './commons-life-engine.ts';
 export * from './green-landmark.ts';
+export * from './newcomer-resources.ts';
+export * from './newcomer-resources-engine.ts';

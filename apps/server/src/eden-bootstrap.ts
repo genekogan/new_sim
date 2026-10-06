@@ -70,7 +70,7 @@ export async function installEdenLifeV1(host:WorldHost,brain:Brain,options:{reta
   if(brain.host!==host||brain.cfg.worldKey!=='eden'||!host.living)throw Error('eden-life.opted-in-living-host-required');
   const drive=async<T>(p:Promise<T>)=>{let done=false;p.then(()=>done=true,()=>done=true);for(let i=0;i<100&&!done;i++){host.drainInputs();await new Promise<void>(r=>setImmediate(r));}if(!done)throw Error('eden-life.bootstrap-unsettled');return p;};
   await drive(host.enableGroundFixtureGoalsV1());await drive(host.enableHumanRestNeedsV1());await drive<unknown>(host.enableIntentSequencesV1());await drive<unknown>(host.enableIntentApproachRetentionV1());await drive(host.enableQuietLandingCourtesyV1());await drive(brain.enableEdenAutonomyV1());
-  if(!host.engine.rulesVersion.includes('+commons-provisions/1'))await drive(host.installCommonsProvisionsV1());
+  if(!host.engine.rulesVersion.includes('+commons-provisions/1')&&!host.engine.rulesVersion.includes('+cp/2'))await drive(host.installCommonsProvisionsV1());
   const {followCommonsProvisionBirths}=await import('./commons-provisions.ts'),{scheduleCommonsKitchenInstallation}=await import('./commons-kitchen-install.ts');
   const provisions=await followCommonsProvisionBirths(host,brain),kitchen=scheduleCommonsKitchenInstallation(host,brain);
   const food=options.foodDeliveryId?(await import('./food-delivery.ts')).scheduleFiniteFoodDeliveryV1(host,brain,options.foodDeliveryId):undefined;
