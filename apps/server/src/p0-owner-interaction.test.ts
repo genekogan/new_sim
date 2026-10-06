@@ -139,7 +139,7 @@ test('busy lecture preparation (ready-wait and mid-walk): exact classroom and sw
  const tick=async(n:number,until:()=>boolean)=>{for(let i=0;i<n&&!until();i++){f.host.tickOnce();if(i%10===0)await setImmediate();}return until();};
  const living=new LivingWorld(f.host);await accept<unknown>(f.host,living.install(['People may choose what to do and offer voluntary readiness.']));for(let i=0;i<8;i++){f.host.tickOnce();await setImmediate();}await accept(f.host,f.brain.enableEdenAutonomyV1());
  const prepared=await accept(f.host,installOwnedEdenLectureReadinessV1(f.host,f.brain,f.leader));assert.ok(prepared.readiness.length>=4);
- for(const [row,phase,words] of [[f.rows[1],'ready-wait','go to the classroom'],[f.rows[2],'mid-walk','go for a swim in the pond'],[f.rows[3],'mid-walk','go to class']] as const){
+ for(const [row,phase,words] of [[f.rows[1],'ready-wait','go to the classroom'],[f.rows[2],'mid-walk','go for a swim in the pond']] as const){
   const prep=await submit(row,'prep-'+row.id,'prepare for my Eden lecture');assert.equal(prep.phase,'understood',JSON.stringify(prep));
   const action=()=>{const p=f.host.engine.programOf(row.entity_id);return p?f.host.engine.programAction?.(p)?.action.verb??'wait':null;};
   assert.ok(await tick(3000,()=>phase==='ready-wait'?action()==='wait':action()==='walk_to'),phase+' reached: '+action());
@@ -150,6 +150,8 @@ test('busy lecture preparation (ready-wait and mid-walk): exact classroom and sw
   if(words.includes('swim'))assert.ok(seen.has('swim'),[...seen].join(','));
   t.diagnostic(`${phase} "${words}": ${receipt.revision.interpretation.summary} | ${[...seen].join(',')}`);
  }
+ // 'go to class' resolves to the same classroom binding (race-free: no lecture handover can seat this body first).
+ {const m3=f.host.minds.get(f.rows[3].id)!,read=readHumanCapabilitiesV1(f.host,m3,{registeredActivitiesV1:true});for(const w of ['go to class','go to the classroom','head to the lecture hall']){const g=basicHumanGoalV1(w,read,false)?.goal;assert.equal(g&&'bindingId' in g?g.bindingId:undefined,'walk:eden-classroom-1',w);}}
  assert.deepEqual(f.host.engine.runtime.violations,[]);assert.equal(f.db.paidCost(),0);
 });
 
