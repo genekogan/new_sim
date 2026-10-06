@@ -50,3 +50,17 @@ This is a small pinned operational adapter, not a new product world or whole bra
 Same9ordinarylifecycle/operator route and Core V3 compatibility receipts remain.
 No Rootservice action byCore. Sourcecopy listener4956/sockets/timers/data closed,
 privateephemeralcopyremoved,sharedbackup untouched; source1PASS/Node syntax checks.
+
+PM-R019 correction: the immutable V3 social guards used endsWith and therefore
+misread an already-installed social layer after additional policy markers. The
+narrow runtime overlay changes ONLY social-eden.ts and social-eden-install.ts to
+token-aware marker matching. Original V3 remains untouched. Exact before/after
+pins live in the overlay selection.json; CONTENT is
+712ffad08a887454bf2dc9fa3a0121d340d78fc8bbde42307bd34c405d78be53.
+
+Full current-copy flags including existing finiteFoodB, social, kitchen, shore,
+autonomous policies, burst1/ceiling3/localquota9 pass without duplicating either
+food delivery. Old owners, event prefix and paid ledger remain exact. A separate
+injected installation-settled failure test proves close reports failure only
+after the owned listener and database close. Installation handles close before
+allSettled; an installer rejection cannot skip remaining drain/cleanup.

@@ -106,8 +106,13 @@ export async function openExpandedLocalEdenV1({input,dataDir,worldId,port=4959,w
     await new Promise((r,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',r);});host.start();
     async function close(){if(closing)return;closing=true;brain.quiesce?.();for(const c of hub.clients)c.ws.close(1001,'local server stopping');
       const closed=new Promise(r=>server.close(r)),pump=setInterval(()=>host.drainInputs(),10);
-      try{await closed;provisionBirths?.close();await socialInstallation?.settled();socialInstallation?.close();await foodDelivery?.settled();foodDelivery?.close();await shoreInstallation?.settled();shoreInstallation?.close();await kitchenInstallation?.settled();kitchenInstallation?.close();await provisionBirths?.settled();await Promise.all([service.settled(),brain.settled?.()]);host.drainInputs();}finally{clearInterval(pump);}
-      host.stop();const snapshotSaved=host.engine.canSnapshot?.()===true;if(snapshotSaved)host.saveSnapshot(true);else if(!db.db.prepare('SELECT 1 FROM clock_frontiers_v1 WHERE world_id=?').get(worldId))throw Error('local-expanded-close.active-work-without-durable-frontier');await new Promise(r=>hub.wss.close(r));db.close();return {snapshotSaved,activeNativeSnapshotRefused:!snapshotSaved};}
+      const failures=[];
+      try{await closed;for(const handle of [provisionBirths,socialInstallation,foodDelivery,shoreInstallation,kitchenInstallation])handle?.close();const outcomes=await Promise.allSettled([service.settled(),brain.settled?.(),...[provisionBirths,socialInstallation,foodDelivery,shoreInstallation,kitchenInstallation].map(h=>h?.settled())]);for(const r of outcomes)if(r.status==='rejected')failures.push(r.reason);host.drainInputs();}finally{clearInterval(pump);}
+      let snapshotSaved=false;
+      try{host.stop();snapshotSaved=host.engine.canSnapshot?.()===true;if(snapshotSaved)host.saveSnapshot(true);else if(!db.db.prepare('SELECT 1 FROM clock_frontiers_v1 WHERE world_id=?').get(worldId))failures.push(Error('active-work-without-durable-frontier'));}
+      finally{await new Promise(r=>hub.wss.close(r));if(db.db.isOpen)db.close();}
+      if(failures.length)throw Error('local-expanded-close.installation-failed-resources-closed');return {snapshotSaved,activeNativeSnapshotRefused:!snapshotSaved};}
+
     return {cfg,pins,boot,db,host,auth,brain,souls,service,hub,server,kitchenInstallation,shoreInstallation,foodDelivery,socialInstallation,close};
   } catch(error){host?.stop();server?.close();db.close();throw error;}
 }
