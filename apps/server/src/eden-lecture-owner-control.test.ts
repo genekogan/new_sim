@@ -8,7 +8,7 @@ import {fixture,invite,accept} from '../test/native-owner-fixture.ts';
 import {Brain} from './brain.ts';
 import {IntentControlV2} from './intent-control.ts';
 import {installEdenSteeringModeV1} from './eden-steering-mode.ts';
-import {installOwnedEdenLectureCardV1,installOwnedEdenLectureControlsV1} from './eden-lecture-cards.ts';
+import {installOwnedEdenLectureCardV1,installOwnedEdenLectureControlsV1,installOwnedEdenLectureReadinessV1} from './eden-lecture-cards.ts';
 import {readHumanCapabilitiesV1} from './human-capabilities.ts';
 import {WorldHost} from './world.ts';
 import {localClassroomObservationV1Schema} from '@sim/engine-contract';
@@ -123,4 +123,24 @@ test('supported owned lecture remains visible with its real obstacle while parti
  await accept(f.host,f.service.submit(scope,{contract:'soul-intent/2',op:'upsert',requestId:'blocked-lecture-offer',words:'host an Eden lecture'}));await accept(f.host,f.service.settled());
  const receipt=f.service.lookup(scope,'blocked-lecture-offer');assert.equal(receipt.phase,'refused');if(receipt.phase!=='refused')throw Error('expected explicit blockage');assert.equal(receipt.outcome?.kind,'state_blocked');assert.ok(receipt.code.includes(offer.blockedCode!));
  assert.equal([...f.host.engine.runtime.records.values()].filter(r=>r.verb==='classroom_session').length,0);assert.equal(f.host.engine.stateHash(),before);assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='mint').length,mint);assert.equal(f.db.paidCost(),0);
+});
+
+test('ordinary owned readiness hands over nine living finite waits without global quiescence or borrowing unrelated programmes',{timeout:150000},async t=>{
+ const f=await setup(t);
+ const {LivingWorld}=await import('./living.ts');const living=new LivingWorld(f.host);await accept<unknown>(f.host,living.install(['People may choose what to do and offer voluntary readiness.']));for(let i=0;i<8;i++){f.host.tickOnce();await setImmediate();}assert.equal(f.host.quietBarrier,false);await accept(f.host,f.brain.enableEdenAutonomyV1());
+ const scopeOf=(row:SoulRow)=>f.service.ownerScope({userId:'dev:operator',expiresAt:Number.MAX_SAFE_INTEGER},row.id);
+ for(const [i,row] of f.rows.entries()){await accept(f.host,f.service.submit(scopeOf(row),{contract:'soul-intent/2',op:'upsert',requestId:'ordinary-rest-before-readiness-'+i,words:'rest here'}));await accept(f.host,f.service.settled());await f.brain.evaluate(f.host.minds.get(row.id)!,'new-intent-v2');f.host.drainInputs();}
+ for(let i=0;i<30;i++){f.host.tickOnce();await setImmediate();}
+ assert.ok(f.rows.filter(r=>f.host.engine.programOf(r.entity_id)).length>=8,'real foreground programmes make the live-like roster busy');
+ const original=[...readHumanCapabilitiesV1(f.host,f.leader,{registeredActivitiesV1:true}).bindings.values()].find(b=>b.label==='host an eden lecture');assert.ok(original);assert.equal(original.available,false);assert.equal(original.blockedCode,'actor.busy');
+ const prepared=await accept(f.host,installOwnedEdenLectureReadinessV1(f.host,f.brain,f.leader));assert.equal(prepared.readiness.length,9);const stillBusy=[...readHumanCapabilitiesV1(f.host,f.leader,{registeredActivitiesV1:true}).bindings.values()].find(b=>b.card.name===prepared.card);assert.equal(stillBusy?.available,false,'an unrelated finite rest does not count as offered readiness');
+ for(const [i,row] of f.rows.entries()){await accept(f.host,f.service.submit(scopeOf(row),{contract:'soul-intent/2',op:'upsert',requestId:'ordinary-readiness-'+i,words:i%2?'please get ready for the Eden lecture':'prepare for my Eden lecture'}));await accept(f.host,f.service.settled());const receipt=f.service.lookup(scopeOf(row),'ordinary-readiness-'+i);assert.equal(receipt.phase,'understood',JSON.stringify(receipt));await f.brain.evaluate(f.host.minds.get(row.id)!,'new-intent-v2');f.host.drainInputs();}
+ let offer:any;
+ for(let i=0;i<1200;i++){f.host.tickOnce();if(i%10===0)await setImmediate();if(i%20!==0)continue;offer=[...readHumanCapabilitiesV1(f.host,f.leader,{registeredActivitiesV1:true}).bindings.values()].find(b=>b.card.name===prepared.card);if(offer?.available)break;}
+ assert.equal(offer?.available,true,JSON.stringify({code:offer?.blockedCode}));
+ assert.equal(f.rows.filter(r=>f.host.engine.programOf(r.entity_id)).length,9,'host borrows only explicit ready waits, not bodies made idle by a global stop');
+ await accept(f.host,f.service.submit(scopeOf(f.rows[0]),{contract:'soul-intent/2',op:'upsert',requestId:'ordinary-ready-lecture-start',words:'please start the prepared Eden lecture'}));await accept(f.host,f.service.settled());assert.equal(f.service.lookup(scopeOf(f.rows[0]),'ordinary-ready-lecture-start').phase,'understood');await f.brain.evaluate(f.leader,'new-intent-v2');f.host.drainInputs();
+ let session:string|undefined,read:any;
+ for(let i=0;i<3000;i++){f.host.tickOnce();if(i%10===0)await setImmediate();session=[...f.host.engine.runtime.records.values()].find(r=>r.verb==='classroom_session')?.id;read=session?(f.host.engine as MarsEngine).lectureReadout(session):undefined;if(read?.phase==='presenting')break;}
+ assert.equal(read?.phase,'presenting',JSON.stringify({phase:read?.phase,reason:read?.waitingReason}));assert.equal(read.physicalParticipants.filter((p:any)=>p.occupied).length,8);assert.deepEqual(f.host.engine.runtime.violations,[]);assert.equal(f.db.paidCost(),0);
 });

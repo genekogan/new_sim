@@ -19,7 +19,7 @@ export function readHumanCapabilitiesV1(host:WorldHost,m:Mind,options?:{register
    const issue=host.engine.canPerform({actor:m.entityId,label:'registered '+goal,steps}),target=targetId?host.kernel.things[targetId]:undefined,point=targetId?engineRef(host,targetId):null;
    const pos=typeof point==='string'?w.entities[point]?.pose.p:point?[point[0],0,point[1]]:undefined;
    const name='human goal '+goal.replace('_',' ')+' '+hashOf({goal,id,steps}).slice(0,12),card:Card={name,summary:`Perform the registered ${goal.replace('_',' ')} goal using native admission.`,good_when:'This specific owner goal is requested and the registered physical binding remains available.',target:null,when:[],then:[...(target?[{move:['$actor',target.id] as [string,string]}]:[]),{set:['$actor','doing',goal==='sit'?'sitting':goal==='eat'?'eating':goal==='rest'?'resting':'following an owner goal']}],approach:steps.slice(0,approachLen),during:steps.slice(approachLen),takes:goal==='rest'?'minute':'minutes'};
-   const aliases=[label.toLowerCase(),...(targetId?[targetId.toLowerCase()]:[])];const entity=targetId?w.entities[targetId]:undefined;if(entity?.def==='campfire')aliases.push('campfire','fire');const side=label.toLowerCase().match(/\b(north|south|east|west)\b/)?.[1];if(entity?.def==='bench-6ft'&&side&&/fire/i.test(label))aliases.push(`${side} bench by the campfire`,`${side} campfire bench`,`campfire ${side} bench`,`fire bench ${side}`);
+   const aliases=[label.toLowerCase(),...(targetId?[targetId.toLowerCase()]:[]),...(targetId==='eden-classroom-1'?['classroom','eden classroom','lecture room']:[])];const entity=targetId?w.entities[targetId]:undefined;if(entity?.def==='campfire')aliases.push('campfire','fire');const side=label.toLowerCase().match(/\b(north|south|east|west)\b/)?.[1];if(entity?.def==='bench-6ft'&&side&&/fire/i.test(label))aliases.push(`${side} bench by the campfire`,`${side} campfire bench`,`campfire ${side} bench`,`fire bench ${side}`);
    bindings.set(id,{id,goal,targetId,label,aliases:[...new Set(aliases)],steps,card,available:!issue,...(issue?{blockedCode:issue.code}:{}),...(seatedWitness?{seatedWitness}:{}),distance:pos?Math.hypot(pos[0]-body.pose.p[0],pos[2]-body.pose.p[2]):0,green});
   };
   for(const a of host.engine.anchors()){
@@ -37,8 +37,8 @@ export function readHumanCapabilitiesV1(host:WorldHost,m:Mind,options?:{register
   if(options?.registeredActivitiesV1)for(const option of registeredOptionsFor(host,m,128)){
    if(!host.ownLectureRosterV1(m.soulId,option.steps))continue;
    if(option.card.startsWith('human goal '))continue;const card=host.kernel.vocab.cards[option.card];if(!card||card.hash!==option.hash||!host.kernel.decks[m.soulId].cards.includes(option.card))continue;
-   const target=option.cardTarget?host.kernel.things[option.cardTarget]:undefined,label=(option.card+(target?' '+target.name:'')).slice(0,100),id='activity:'+hashOf({card:option.card,hash:option.hash,target:option.cardTarget}).slice(0,24);
-   bindings.set(id,{id,goal:'activity',targetId:option.cardTarget??undefined,label,aliases:[...new Set([label.toLowerCase(),option.label.toLowerCase(),('perform '+label).toLowerCase()])].filter(a=>a.length<=100),steps:structuredClone(option.steps),card:structuredClone(card),available:option.available!==false,...(option.blockedCode?{blockedCode:option.blockedCode}:{}),distance:0,green:false,reuseAgenda:{card:option.card,target:option.cardTarget,hash:option.hash}});
+   const target=option.cardTarget?host.kernel.things[option.cardTarget]:undefined,ready=card.during.some(s=>s.verb==='activity_readiness_v1'),prepared=card.during.some(s=>s.verb==='mars:classroom_session'&&s.params.handoverScope==='owned-readiness/1'),label=ready?'Prepare for my Eden lecture':prepared?'Host a prepared Eden lecture':(option.card+(target?' '+target.name:'')).slice(0,100),id='activity:'+hashOf({card:option.card,hash:option.hash,target:option.cardTarget}).slice(0,24);
+   bindings.set(id,{id,goal:'activity',targetId:option.cardTarget??undefined,label,aliases:[...new Set([label.toLowerCase(),option.card.toLowerCase(),option.label.toLowerCase(),('perform '+label).toLowerCase()])].filter(a=>a.length<=100),steps:structuredClone(option.steps),card:structuredClone(card),available:option.available!==false,...(option.blockedCode?{blockedCode:option.blockedCode}:{}),distance:0,green:false,reuseAgenda:{card:option.card,target:option.cardTarget,hash:option.hash}});
   }
   const goals=([...new Set([...bindings.values()].map(b=>b.goal))]).map(id=>({id,description:`Registered ${id.replace('_',' ')} using actual native state.`,postcondition:HUMAN_GOAL_POSTCONDITIONS_V1[id],bindings:[...bindings.values()].filter(b=>b.goal===id).map(b=>({id:b.id,label:b.label,aliases:b.aliases,...(b.targetId?{targetId:b.targetId}:{}),available:b.available,...(b.blockedCode?{blockedCode:b.blockedCode}:{})}))}));
   const registryHash=hashOf({worldId:host.worldId,soulId:m.soulId,entityId:m.entityId,rules:host.engine.rulesVersion,goals,bindings:[...bindings.values()].map(b=>({id:b.id,steps:b.steps,target:b.targetId?(w.entities[b.targetId]??w.regions[b.targetId]??null):null}))});
@@ -47,14 +47,25 @@ export function readHumanCapabilitiesV1(host:WorldHost,m:Mind,options?:{register
 }
 /** Only explicitly supported basic forms bypass model naming. Unknown text is never a best-fit action. */
 export function basicHumanGoalV1(words:string,read:HumanRegistryReadV1,strict:boolean):{goal?:HumanGoalV1;adaptation?:{originalGoal:'hang_out';substituteBindingId:string;explanation:string};blocked?:HumanBindingV1}|null {
- const text=words.trim().toLowerCase().replace(/[.!]$/,'').replace(/\s+(?:now|please)$/,'');let type:HumanGoalV1['goal']|undefined,selector:(b:HumanBindingV1)=>boolean=()=>true,adaptation;
+ const text=words.trim().toLowerCase().replace(/^please\s+/,'').replace(/[.!?]$/,'').replace(/\s+(?:now|please)$/,'');let type:HumanGoalV1['goal']|undefined,selector:(b:HumanBindingV1)=>boolean=()=>true,adaptation;
  if(/^(?:go )?sit (?:down )?on (?:a|the) bench$/.test(text)){type='sit';selector=b=>/bench/i.test(b.label);}
  else if(/^(?:go )?rest(?: here)?$/.test(text))type='rest';
  else if(/^(?:go )?eat(?: (?:my |a )?(?:meal|food))?$/.test(text))type='eat';
  else {const walk=text.match(/^(?:go to|walk to) (.+)$/);if(walk){type='walk';const label=walk[1].replace(/^the /,'');selector=b=>b.aliases.includes(label);}
   else if(text==='go hang out by the garden'||text==='hang out by the garden'){type='hang_out';const exact=[...read.bindings.values()].find(b=>b.goal==='hang_out'&&/\bgarden\b/i.test(b.label));if(exact)selector=b=>b.id===exact.id;else if(!strict){selector=b=>b.green;adaptation=true;}else return null;}
  }
- if(!type){const matching=[...read.bindings.values()].filter(b=>b.goal==='activity'&&(b.aliases.includes(text)||text==='end my eden lecture'&&b.card.during[0]?.verb==='control_classroom_v1'&&b.card.during[0].params.kind==='cancel'||text==='advance my eden lecture'&&b.card.during[0]?.verb==='control_classroom_v1'&&b.card.during[0].params.kind==='advance'));return matching.length===1?(matching[0].available?{goal:{goal:'activity',bindingId:matching[0].id}}:{blocked:matching[0]}):null;}const choices=[...read.bindings.values()].filter(b=>b.goal===type&&selector(b)).sort((a,b)=>Number(b.available)-Number(a.available)||a.distance-b.distance||a.id.localeCompare(b.id));if(!choices.length)return null;const b=choices[0];if(!b.available)return {blocked:b};
+ if(!type){
+  const readyWords=/^(?:prepare|get ready|be ready) for (?:(?:my|the|a|an) )?(?:eden )?lecture$/.test(text);
+  const hostWords=/^(?:host|start) (?:(?:my|the|a|an) )?prepared (?:eden )?lecture$/.test(text);
+  const matching=[...read.bindings.values()].filter(b=>b.goal==='activity'&&(b.aliases.includes(text)
+   ||hostWords&&b.card.during.some(s=>s.verb==='mars:classroom_session'&&s.params.handoverScope==='owned-readiness/1')
+   ||readyWords&&b.card.during.some(s=>s.verb==='activity_readiness_v1')
+   ||text==='end my eden lecture'&&b.card.during[0]?.verb==='control_classroom_v1'&&b.card.during[0].params.kind==='cancel'
+   ||text==='advance my eden lecture'&&b.card.during[0]?.verb==='control_classroom_v1'&&b.card.during[0].params.kind==='advance'));
+  const available=matching.filter(b=>b.available);
+  return available.length===1?{goal:{goal:'activity',bindingId:available[0].id}}:matching.length===1?{blocked:matching[0]}:null;
+ }
+ const choices=[...read.bindings.values()].filter(b=>b.goal===type&&selector(b)).sort((a,b)=>Number(b.available)-Number(a.available)||a.distance-b.distance||a.id.localeCompare(b.id));if(!choices.length)return null;const b=choices[0];if(!b.available)return {blocked:b};
  const goal:HumanGoalV1=type==='rest'?{goal:'rest',seconds:60}:type==='sit'||type==='hang_out'?{goal:type,bindingId:b.id,seconds:60}:{goal:type,bindingId:b.id};
  return {goal,...(adaptation?{adaptation:{originalGoal:'hang_out' as const,substituteBindingId:b.id,explanation:`There is no named garden; spend time by ${b.label} instead.`}}:{})};
 }

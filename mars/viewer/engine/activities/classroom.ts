@@ -40,6 +40,8 @@ const seconds = z.number().positive().max(3600);
 const paramsSchema = z.strictObject({
   accessScope:z.literal('ground-venue/1').optional(),
   attendanceScope: z.literal('eden-audience24/1').optional(),
+  handoverScope: z.literal('owned-readiness/1').optional(),
+  readinessVenue: id.optional(),
   seatAssignments: z.record(id, id).optional(),
   host: id,
   presenters: z.array(id).min(1).max(6),

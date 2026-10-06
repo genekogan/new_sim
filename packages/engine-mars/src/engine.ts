@@ -74,6 +74,7 @@ type Prog = {
   stopping?: Diag;
   ops: Op[]; action?: string; settle?: 'done' | 'held'; soft?: boolean; until?: number;
   controlOf?:string;
+  readiedActors?:string[];
   build?: { phase: BuildPhase; crew: string[]; stopping?: Diag };
 };
 export type MarsWorldConfig = { walkBlockV1?:boolean; safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; fixtureGroundGoalsV1?:boolean; nativeArrivalWitnessV1?:boolean; quietLandingCourtesyV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
@@ -89,6 +90,7 @@ const num = { type: 'number' }, str = { type: 'string' };
 const ref = { anyOf: [str, { type: 'array', items: num, minItems: 2, maxItems: 2 }] };
 /** The body language, as the card grammar and agents see it. The actor is always implied. */
 export const BODY_VERBS: VerbInfo[] = [
+  {verb:'activity_readiness_v1',description:'My bounded voluntary standing wait for one host and venue; only a matching owned classroom may hand over this wait.',inputSchema:{type:'object',properties:{host:{type:'string'},venue:{type:'string'},activity:{const:'classroom'},seconds:{type:'number',minimum:20,maximum:300}},required:['host','venue','activity','seconds'],additionalProperties:false}},
   {verb:'control_classroom_v1',description:'Apply an owned host control to its actual classroom without replacing its body programme; accepted control is not completed cleanup.',inputSchema:{type:'object',properties:{session:{type:'string',maxLength:80},kind:{enum:['cancel','advance']}},required:['session','kind'],additionalProperties:false}},
   { verb: 'build_lookout', description: 'Choose one finite camp construction job: stage carries rack parts to the build site; frame raises/connects/releases the uprights; deck installs joists/sheets; stairs completes access. Use the exact unprefixed verb build_lookout, target:null, approach:[], and a single during step with phase. The card sets only $actor.doing; physical part progress is maintained by the engine, never invented target states or permission links. The committed crew finishes a safe segment before interruption.', inputSchema: {type:'object',properties:{phase:{type:'string',enum:['stage','frame','deck','stairs']}},required:['phase']} },
   { verb: 'walk_to', description: 'Walk to a thing or a point, stopping `standoff` metres short of it.', inputSchema: { type: 'object', properties: { to: ref, standoff: num }, required: ['to'] } },
@@ -389,6 +391,10 @@ export class MarsEngine implements Engine {
     if (step.verb === 'mars:take_item') { const it=this.ents[String(a.item)]; if (it?.support?.kind === 'in-hand' && it.support.by === me && (!a.hand || it.support.hand === a.hand)) return []; }
     if (step.verb.startsWith('mars:')) { const r = this.raw(me, step); return 'code' in r ? r : [{ ...r, settle: 'held', raw: true }]; }
     switch (step.verb) {
+      case 'activity_readiness_v1': {
+        const issue=this.readinessIssue(me,a);if(issue)return issue;
+        return [{wait:secs(a.seconds,120)}];
+      }
       case 'control_classroom_v1': return [{verb:'classroom_control',params:{session:a.session,intent:{kind:a.kind}},settle:'done',raw:true}];
       case 'walk_to': {
         const g = this.goalNear(me, a.to, typeof a.standoff === 'number' ? a.standoff : 0);
@@ -455,6 +461,7 @@ export class MarsEngine implements Engine {
   ownedClassroomControlRosterV1(actor:string,session:string){const r=this.rt.records.get(session);if(!r||r.verb!=='classroom_session'||!this.rt.isActive(session)||r.params.host!==actor)return null;const current=readClassroom(this.rt,session);if(!current)return null;return [...new Set(current.participants.map(p=>p.actor))];}
   canPerform(program: Program): Diag | null {
     if(program.steps[0]?.verb==='control_classroom_v1'){const p=program.steps[0].params;if(program.steps.length!==1||!['cancel','advance'].includes(String(p.kind))||typeof p.session!=='string'||!this.ownedClassroomControlRosterV1(program.actor,p.session))return {code:'classroom.owned-host-control-required',message:'Only the active classroom host can apply this control.'};return this.plan('classroom_control',{session:p.session,intent:{kind:p.kind}});}
+    if ([...this.programs.values()].some(p=>p.readiedActors?.includes(program.actor)&&!p.action))return {code:'activity.readiness-committed',message:'This body has committed its explicit ready wait to a starting classroom.'};
     if (!this.ents[program.actor]) return { code: 'actor.unknown', message: `no such actor ${program.actor}` };
     if ([...this.programs.values()].some(p=>p.build?.crew.includes(program.actor))) return {code:'construction.committed',message:'This builder is finishing a finite physical construction segment.'};
     if(this.physical){
@@ -465,6 +472,7 @@ export class MarsEngine implements Engine {
       }
     }
     const first = program.steps[0]; if (!first) return null;
+    for(const step of program.steps)if(step.verb==='activity_readiness_v1'){const issue=this.readinessIssue(program.actor,step.params,false);if(issue)return issue;}
     if(first.verb==='rest'&&typeof first.params.seatedAt==='string'&&!this.seatedAt(program.actor,first.params.seatedAt))return {code:'rest.native-seat-required',message:'The requested seat is no longer held by this actor.'};
     if (first.verb === 'build_lookout') {
       if (program.steps.length !== 1) return {code:'construction.one-job',message:'A construction card chooses one finite job.'};
@@ -483,7 +491,7 @@ export class MarsEngine implements Engine {
     const pots = program.steps.filter(s => ['mars:serve','mars:shared_food_break'].includes(s.verb)).map(s => s.params.pot);
     if (this.cfg.scene === 'eden-camp' && pots.length && [...this.programs.values()].some(p => p.actor !== program.actor && p.steps.some(s => ['mars:serve','mars:shared_food_break'].includes(s.verb) && pots.includes(s.params.pot)))) return {code:'food.service-in-use',message:'Someone is already using this pot and its serving space'};
     for (const step of program.steps) if (step.verb.startsWith('mars:')) {
-      const busy = this.jointIssue(step.params, program.actor); if (busy) return busy;
+      const busy = this.jointIssue(step.params, program.actor,step.verb==='mars:classroom_session'); if (busy) return busy;
       if (step.verb === 'mars:serve') {
         const pot = this.ents[String(step.params.pot)];
         if (!pot?.contents || pot.contents.fraction < 0.25 || pot.foodPreparation?.complete === false) return {code: 'food.unavailable', message: 'there is no completed serving left in the pot'};
@@ -518,9 +526,12 @@ export class MarsEngine implements Engine {
     this.nextProg++;
     if (!result.ok) { const old = this.byActor.get(program.actor); if (old&&!this.physical) this.stop(old); return result; }
     if(program.steps[0]?.verb==='control_classroom_v1'){const p:Prog={id,actor:program.actor,label:program.label.slice(0,200),steps:structuredClone(program.steps),index:0,started:false,since:this.rt.tick,ops:[],controlOf:String(program.steps[0].params.session)};this.programs.set(id,p);return result;}
+    const commitment=program.steps[0]?.verb==='mars:classroom_session'&&program.steps[0].params.handoverScope==='owned-readiness/1'?[...new Set([program.steps[0].params.host,...(program.steps[0].params.presenters as string[]??[]),...(program.steps[0].params.audience as string[]??[])].filter((id):id is string=>typeof id==='string'&&id!==program.actor))]:[];
+    const handover=program.steps[0]?.verb==='mars:classroom_session'&&program.steps[0].params.handoverScope==='owned-readiness/1'?this.classroomReadyActors(program.steps[0].params,program.actor):[];
+    for(const actor of handover){const ready=this.programs.get(this.byActor.get(actor)!);if(ready)this.end(ready,'completed',{code:'activity.readiness-handover',message:'The explicitly offered wait joined its matching owned classroom.'});}
     const old = this.byActor.get(program.actor);
     if (old) { const o = this.programs.get(old)!; if (o.action && this.rt.isActive(o.action)) this.rt.cancel(o.action, { code: 'program.replaced', message: 'replaced' }); this.end(o, 'cancelled', { code: 'program.replaced', message: 'replaced by a new program' }); }
-    const p: Prog = { id, actor: program.actor, label: program.label.slice(0, 200), steps: build?build.steps:program.steps, index: 0, started: false, since: this.rt.tick, ops: [], ...(build?{build:{phase:program.steps[0].params.phase as BuildPhase,crew:build.crew}}:{}) };
+    const p: Prog = { ...(commitment.length?{readiedActors:commitment}:{}), id, actor: program.actor, label: program.label.slice(0, 200), steps: build?build.steps:program.steps, index: 0, started: false, since: this.rt.tick, ops: [], ...(build?{build:{phase:program.steps[0].params.phase as BuildPhase,crew:build.crew}}:{}) };
     this.programs.set(id, p); this.byActor.set(p.actor, id);
     return result;
   }
@@ -704,12 +715,21 @@ export class MarsEngine implements Engine {
   }
   takeScene(hash:string) { const captured=this.takeScenes.get(hash);return captured?structuredClone(captured):undefined; }
   actorBorrowed(actor: string) {
-    return !this.byActor.has(actor) && ([...this.programs.values()].some(p=>p.build?.crew.includes(actor)) || this.holders(actor).some(id => ['shared_food_break','converse','classroom_session','computer_music','campfire_circle','group_warmup'].includes(this.rt.records.get(id)?.verb)));
+    return [...this.programs.values()].some(p=>p.readiedActors?.includes(actor)&&!p.action) || !this.byActor.has(actor) && ([...this.programs.values()].some(p=>p.build?.crew.includes(actor)) || this.holders(actor).some(id => ['shared_food_break','converse','classroom_session','computer_music','campfire_circle','group_warmup'].includes(this.rt.records.get(id)?.verb)));
   }
   private buildPlan(program: Program) {
     return constructionPlan(this.rt.world,program.actor,program.steps[0].params.phase,id=>id===program.actor?this.holders(id).length===0:this.free(id));
   }
-  private jointIssue(params: unknown, actor: string): Diag | null {
+  private readinessIssue(actor:string,params:Record<string,unknown>,requireStanding=true):Diag|null{
+    const e=this.ents[actor];if(!e?.human||params.activity!=='classroom'||typeof params.host!=='string'||!this.ents[params.host]?.human||typeof params.venue!=='string'||!this.rt.world.regions[params.venue]||typeof params.seconds!=='number'||!Number.isFinite(params.seconds)||params.seconds<20||params.seconds>300)return {code:'activity.readiness-invalid',message:'Readiness needs a current host/venue and a bounded own wait.'};
+    if(e.human.grip)return {code:'activity.readiness-load-held',message:'Finish the actual construction/carry phase before offering readiness.'};
+    if(requireStanding&&(this.holders(actor).length||e.human.on||e.human.sleepPose))return {code:'activity.readiness-standing-required',message:'Safely finish standing before declaring readiness.'};
+    if(requireStanding&&Object.values(this.ents).some((i:any)=>i.support?.kind==='in-hand'&&i.support.by===actor))return {code:'activity.readiness-hands-occupied',message:'Put down held small items through native transfer before declaring readiness.'};
+    return null;
+  }
+  private readyFor(actor:string,host:string,venue:unknown){const p=this.programs.get(this.byActor.get(actor)??''),step=p?.steps[p.index];return !!p&&p.until!==undefined&&!p.action&&!p.stopping&&step?.verb==='activity_readiness_v1'&&step.params.host===host&&step.params.venue===venue&&step.params.activity==='classroom'&&this.holders(actor).length===0&&!this.readinessIssue(actor,step.params);}
+  private classroomReadyActors(params:Record<string,unknown>,actor:string){return [...new Set([params.host,...(Array.isArray(params.presenters)?params.presenters:[]),...(Array.isArray(params.audience)?params.audience:[])].filter((a):a is string=>typeof a==='string'&&a!==actor&&this.readyFor(a,actor,params.readinessVenue)))];}
+  private jointIssue(params: unknown, actor: string,classroom=false): Diag | null {
     const ids = new Set<string>();
     const visit = (v: unknown) => {
       if (typeof v === 'string' && this.ents[v]?.kind === 'human') ids.add(v);
@@ -717,7 +737,8 @@ export class MarsEngine implements Engine {
       else if (v && typeof v === 'object') Object.values(v).forEach(visit);
     };
     visit(params);
-    for (const id of ids) if (id !== actor && !this.free(id) && !(this.programs.get(this.byActor.get(id) ?? '')?.label.startsWith('host supper ') && this.holders(id).length === 0)) return {code: 'actor.busy', message: `${id} is doing something of their own`};
+    const p=params as Record<string,unknown>;if(classroom&&p.handoverScope==='owned-readiness/1'&&p.readinessVenue!==this.lecturePlacement?.id)return {code:'activity.readiness-venue-mismatch',message:'Readiness can join only its actual installed lecture venue.'};const ready=classroom&&p.handoverScope==='owned-readiness/1'&&typeof p.readinessVenue==='string'&&this.rt.world.regions[p.readinessVenue];
+    for (const id of ids) if (id !== actor && !this.free(id) && !(ready&&this.readyFor(id,actor,p.readinessVenue)) && !(this.programs.get(this.byActor.get(id) ?? '')?.label.startsWith('host supper ') && this.holders(id).length === 0)) return {code: 'actor.busy', message: `${id} is doing something of their own`};
     return null;
   }
   campAnchors(): Anchor[] {
