@@ -292,13 +292,13 @@ export function buildApp(d: Deps) {
       case 'clock_rate': d.host.setClockRate(a.rate, who, 'admin'); break;
       case 'narrate': void d.brain.narrate(a.region, 'admin'); break;
       case 'brain_mode': d.brain.setMode(a.mode); void d.host.enqueue('admin', who, { action: 'brain_mode', mode: a.mode }); break;
-      case 'budget': d.brain.budget = Math.min(1, a.usdPerDay); void d.host.enqueue('admin', who, { action: 'budget', usdPerDay: a.usdPerDay }); break;
+      case 'budget': d.brain.budget = a.usdPerDay; void d.host.enqueue('admin', who, { action: 'budget', usdPerDay: d.brain.budget, requestedUsdPerDay:a.usdPerDay }); break;
       case 'snapshot': return c.json({ ok: true, snapshot: d.host.saveSnapshot() });
       case 'adopt_vocabulary': { const e = await d.host.adoptVocabulary(who); return c.json({ ok: true, tick: e.tick, seq: e.seq }); }
       case 'attune': { for (const m of d.host.minds.values()) void d.brain.attune(m); break; }
       case 'invite': { const code = newId('sim').replace('_', '-'); d.db.createInvite(code, a.uses, a.note ?? null, u.id); return c.json({ ok: true, code, uses: a.uses }); }
     }
-    return c.json({ ok: true, clockRate: d.host.clockRate, paused: d.host.paused, brainMode: d.brain.mode, budget: d.brain.budget });
+    return c.json({ ok: true, clockRate: d.host.clockRate, paused: d.host.paused, brainMode: d.brain.mode, budget: d.brain.budget, budgetCeiling:d.brain.thinkingBudgetCeiling });
   });
 
   // ---- agents: pairing (no auth yet) and the per-Soul API (bearer = Soul token)

@@ -39,8 +39,9 @@ export class Brain {
   capSince = 0;
   get budget() { return this.gov.budget; }
   private budgetLimit:1|3=1;
+  get thinkingBudgetCeiling(){return this.budgetLimit;}
   set budget(b: number) { this.gov.setBudget(Number.isFinite(b) ? Math.max(0, Math.min(this.budgetLimit, b)) : 0); }
-  /** Gene-authorized live localhost only; ordinary production stays at one. */
+  /** Gene-authorized localhost preview override; normal releases use the separately pinned configuration. */
   enableLocalBudgetV1(){
     const url=new URL(this.cfg.publicUrl);
     if(this.cfg.worldKey!=='eden'||url.protocol!=='http:'||!['127.0.0.1','localhost','[::1]'].includes(url.hostname))throw Error('local-budget.loopback-required');
@@ -95,7 +96,8 @@ export class Brain {
     this.compilerCall = services?.compilerCall ?? callTool;this.injectedCompiler=!!services?.compilerCall;
     this.intentV2Choices = services?.intentV2Choices === true;
     this.intentV2Retries = this.intentV2Choices && services?.intentV2Retries === true;
-    this.mode = cfg.brainMode; this.gov = new Governor(cfg.budgetUsdPerDay);
+    if(cfg.thinkingBudgetCeiling===3){if(cfg.worldKey!=='eden'||cfg.engine!=='mars'||cfg.worldId!==host.worldId||db!==host.db||!cfg.authorizedThinkingWorldId||cfg.authorizedThinkingWorldId!==cfg.worldId)throw Error('thinking-budget.explicit-Eden-world-authorization-required');this.budgetLimit=3;}
+    this.mode = cfg.brainMode; this.gov = new Governor(Number.isFinite(cfg.budgetUsdPerDay)?Math.max(0,Math.min(this.budgetLimit,cfg.budgetUsdPerDay)):0);
     this.paidGate = (bound, model) => db.reserveCost(bound, model, this.budget,Date.now(),this.budgetLimit);
     db.backfillSpend();
     this.jev = new JevClient(cfg.typesafeKey, this.mode);
@@ -160,7 +162,7 @@ export class Brain {
       byTierPerDay: Object.fromEntries((Object.keys(SHARES) as Tier[]).map((t) => [t, Math.min((actual.last1h.byTier[t]?.cost ?? 0) * 24, this.gov.perDay(t))])),
     };
     return {
-      at: now, budgetPerDay: this.budget, mode: this.mode, hardCapHit: this.overBudget, capSpent: this.db.paidCost(), capSince: this.capSince,
+      at: now, budgetPerDay: this.budget, ceilingPerDay:this.thinkingBudgetCeiling, mode: this.mode, hardCapHit: this.overBudget, capSpent: this.db.paidCost(), capSince: this.capSince,
       actual, projected, governor: this.gov.view(),
       hourly: this.db.spendHourly(24).map((r) => ({ ...r, tier: tierOf(r.tier) })),
       byModel: this.db.spendByModel(),

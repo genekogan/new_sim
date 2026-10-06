@@ -1,8 +1,9 @@
+import {worldThinkingBudgetV1} from './thinking-budget.ts';
 import { mkdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 const env = process.env;
-const budget = Number(env.BRAIN_BUDGET_USD_PER_DAY ?? 0.5);
+const thinkingBudget=worldThinkingBudgetV1(env);
 const worldKey = env.WORLD_KEY ?? 'toy';
 if (!['toy', 'mars', 'littlemartians', 'eden'].includes(worldKey)) throw new Error('invalid WORLD_KEY');
 export const config = {
@@ -25,7 +26,9 @@ export const config = {
   anthropicKey: env.ANTHROPIC_API_KEY || undefined,
   adminEmails: (env.ADMIN_EMAILS ?? '').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
   brainMode: (env.BRAIN_MODE === 'fake' ? 'fake' : 'live') as 'live' | 'fake',
-  budgetUsdPerDay: Number.isFinite(budget) ? Math.min(1, Math.max(0, budget)) : 0,
+  budgetUsdPerDay: thinkingBudget.target,
+  thinkingBudgetCeiling: thinkingBudget.ceiling,
+  authorizedThinkingWorldId: thinkingBudget.authorizedWorldId,
   narratorModel: env.NARRATOR_MODEL ?? 'claude-haiku-4-5-20251001',
   compilerModel: env.COMPILER_MODEL ?? env.NARRATOR_MODEL ?? 'claude-haiku-4-5-20251001',
   talkModel: env.TALK_MODEL ?? env.NARRATOR_MODEL ?? 'claude-haiku-4-5-20251001',
