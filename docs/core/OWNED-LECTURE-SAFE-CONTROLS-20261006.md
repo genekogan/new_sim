@@ -39,3 +39,9 @@ request whose current participant ownership changes is rejected before native
 control publication, preserving the active session/body programme and removing
 its ordinary capability binding. These source fixtures use fake minds and no
 paid calls; current Root/real-auth/active-coordinator restart remain unqualified.
+
+Receipt identity check: the completed auxiliary-control attempt has its own
+activity ID, distinct from the host's still-running physical programme. Its
+retained intention remains active while the native classroom is still in
+progress. A completed attempt is not a fulfilled purpose, nor a claim that
+all participants have departed. Both advance and cancel satisfy this check.
