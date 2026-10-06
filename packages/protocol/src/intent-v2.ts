@@ -1,6 +1,7 @@
 // G-002 candidate. Named private log handlers support isolated backend producers;
 // no route/capability activation until the agreed behavioral checkpoint.
 import { z } from 'zod';
+import {humanSteeringOutcomeV1Schema} from '@sim/engine-contract';
 import { mandateTriggerSchema } from './mandate.ts';
 
 export const INTENT_V2 = 'soul-intent/2' as const;
@@ -27,6 +28,7 @@ export const intentOwnerControlV2Schema = z.strictObject({
   worldId: id, soulId: id, ownerId: id, intentContract: z.literal(INTENT_V2),
   intentHistoryContract:z.literal('private-intent-history/1').optional(),
   intentArrivalContract:z.literal('private-intent-arrival/1').optional(),
+  humanGoalContract:z.literal('human-capabilities/1').optional(),
 });
 export type IntentOwnerControlV2 = z.infer<typeof intentOwnerControlV2Schema>;
 
@@ -36,11 +38,13 @@ export const intentSourceV2Schema = z.strictObject({
 });
 const evidence = z.strictObject({ seq, tick, kind: z.enum(['admission', 'controller', 'kernel']) });
 const agenda = z.array(z.strictObject({ card: z.string().min(2).max(60), target: z.string().max(80).nullable().optional(), of: z.string().max(80).nullable().optional() })).max(8);
-export const intentRevisionV2Schema = z.strictObject({
+const intentRevisionV2Base = z.strictObject({
   ...intentReferenceV2Schema.shape, worldId: id, soulId: id, requestId: id, source: intentSourceV2Schema,
   submitted: z.strictObject({ seq, tick }), words, strict: z.boolean(), importance: z.number().finite().min(0).max(1),
-  interpretation: z.strictObject({ summary: z.string().min(1).max(2000), agenda, trigger: mandateTriggerSchema }),
+  interpretation: z.strictObject({ summary: z.string().min(1).max(2000), agenda, trigger: mandateTriggerSchema, humanGoalPlan:humanSteeringOutcomeV1Schema.refine(v=>v.kind==='planned','goal publication requires a planned outcome').optional() }).superRefine((v,ctx)=>{if(v.humanGoalPlan?.kind==='planned'&&JSON.stringify(v.trigger)!==JSON.stringify(v.humanGoalPlan.trigger))ctx.addIssue({code:'custom',message:'goal trigger must match its interpretation'});}),
 });
+const validateGoalContext=(v:Pick<z.infer<typeof intentRevisionV2Base>,'worldId'|'soulId'|'interpretation'>,ctx:z.RefinementCtx)=>{const goal=v.interpretation.humanGoalPlan;if(goal?.kind==='planned'&&goal.bindingContext&&(goal.bindingContext.worldId!==v.worldId||goal.bindingContext.soulId!==v.soulId))ctx.addIssue({code:'custom',message:'goal context must match the original intention scope'});};
+export const intentRevisionV2Schema=intentRevisionV2Base.superRefine(validateGoalContext);
 export type IntentRevisionV2 = z.infer<typeof intentRevisionV2Schema>;
 
 const scope = { contract: z.literal(INTENT_V2), worldId: id, soulId: id, seq, tick };
@@ -120,7 +124,7 @@ export const intentReceivedPayloadV2Schema = z.strictObject({
 });
 const publicationScope = { contract: z.literal(INTENT_V2), worldId: id, soulId: id };
 export const intentPublicationPayloadV2Schema = z.discriminatedUnion('op', [
-  z.strictObject({ ...publicationScope, op: z.literal('upsert'), revision: intentRevisionV2Schema.omit({ submitted: true }) }),
+  z.strictObject({ ...publicationScope, op: z.literal('upsert'), revision: intentRevisionV2Base.omit({ submitted: true }).superRefine(validateGoalContext) }),
   z.strictObject({ ...publicationScope, op: z.literal('withdraw'), intent: intentReferenceV2Schema, requestId: id, source: intentSourceV2Schema }),
 ]);
 export type IntentPublicationPayloadV2 = z.infer<typeof intentPublicationPayloadV2Schema>;
@@ -144,7 +148,7 @@ export function publicIntentHistoryEventV2(raw: unknown) {
 export const intentReceiptV2Schema = z.discriminatedUnion('phase', [
   z.strictObject({ contract: z.literal(INTENT_V2), requestId: id, phase: z.literal('received'), worldId: id, soulId: id, seq, tick }),
   z.strictObject({ contract: z.literal(INTENT_V2), requestId: id, phase: z.literal('understood'), revision: intentRevisionV2Schema }),
-  z.strictObject({ contract: z.literal(INTENT_V2), requestId: id, phase: z.literal('refused'), code: id, reason: z.string().min(1).max(2000) }),
+  z.strictObject({ contract: z.literal(INTENT_V2), requestId: id, phase: z.literal('refused'), code: id, reason: z.string().min(1).max(2000),scope:z.strictObject({worldId:id,soulId:id,entityId:id,source:intentSourceV2Schema}).optional(),outcome:humanSteeringOutcomeV1Schema.refine(v=>v.kind!=='planned','non-publication outcome cannot claim a planned goal').optional() }),
   z.strictObject({ contract: z.literal(INTENT_V2), requestId: id, phase: z.literal('withdrawn'), worldId: id, soulId: id, intent: intentReferenceV2Schema, seq, tick }),
 ]).superRefine((receipt, ctx) => {
   if (receipt.phase === 'understood' && receipt.requestId !== receipt.revision.requestId) ctx.addIssue({ code: 'custom', message: 'receipt must name the accepted request' });

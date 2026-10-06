@@ -11,6 +11,8 @@ import {stableStringify,parseRenderSceneCapture,type RenderSceneCaptureV1} from 
 export type UserRow = { id: string; email: string | null; wallet: string | null; role: 'user' | 'admin'; created_at: number; last_seen: number; invited_by: string | null };
 export type SoulRow = { id: string; world_id: string; owner: string; entity_id: string; name: string; description: string; created_at: number; retired_at: number | null; token_hash: string | null; token_generation: string | null; token_created_at: number | null; native: number; token_label: string | null; token_last_used: number | null };
 
+export class BudgetReservationUnavailable extends Error {}
+
 export class Db {
   db: DatabaseSync;
   path: string;
@@ -29,7 +31,7 @@ export class Db {
     return Number((this.db.prepare('SELECT COALESCE(SUM(cost),0) AS cost FROM paid_costs WHERE at >= ?').get(now - 86400_000) as { cost: number }).cost);
   }
   reserveCost(bound: number, model: string, budget: number, now = Date.now(), ceiling:1|3=1) {
-    if (!Number.isFinite(bound) || bound < 0 || !Number.isFinite(budget) || ![1,3].includes(ceiling) || this.paidCost(now) + bound > Math.min(ceiling, budget)) throw new Error('world model budget cannot cover this request');
+    if (!Number.isFinite(bound) || bound < 0 || !Number.isFinite(budget) || ![1,3].includes(ceiling) || this.paidCost(now) + bound > Math.min(ceiling, budget)) throw new BudgetReservationUnavailable('world model budget cannot cover this request');
     const id = Number(this.db.prepare('INSERT INTO paid_costs(at,model,cost) VALUES (?,?,?)').run(now, model, bound).lastInsertRowid);
     return { settle: (cost: number) => {
       if (!Number.isFinite(cost) || cost < 0) return;

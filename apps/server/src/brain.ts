@@ -1,3 +1,4 @@
+import {compileHumanGoalV1,type ClosedHumanResultV1} from './human-compiler.ts';
 // The three-tier brain, server side. Schedules calls, records every request
 // and response for the debug shell, and turns answers into logged events.
 import type { Entity } from '@sim/engine-contract';
@@ -64,6 +65,7 @@ export class Brain {
   private tickerCandidates: { id: string; text: string; tick: number }[] = [];
   host: WorldHost; db: Db; cfg: Config; sink: BrainSink;
   private readonly compilerCall: typeof callTool;
+  private readonly injectedCompiler:boolean;
   /** Isolated backend qualification switch. No environment/route activation. */
   private readonly intentV2Choices: boolean;
   private readonly intentV2Retries: boolean;
@@ -90,7 +92,7 @@ export class Brain {
 
   constructor(host: WorldHost, db: Db, cfg: Config, sink: BrainSink, services?: { compilerCall?: typeof callTool; intentV2Choices?: boolean; intentV2Retries?: boolean }) {
     this.host = host; this.db = db; this.cfg = cfg; this.sink = sink;
-    this.compilerCall = services?.compilerCall ?? callTool;
+    this.compilerCall = services?.compilerCall ?? callTool;this.injectedCompiler=!!services?.compilerCall;
     this.intentV2Choices = services?.intentV2Choices === true;
     this.intentV2Retries = this.intentV2Choices && services?.intentV2Retries === true;
     this.mode = cfg.brainMode; this.gov = new Governor(cfg.budgetUsdPerDay);
@@ -563,6 +565,8 @@ export class Brain {
     }
     return verdicts;
   }
+
+  compileHumanGoalV1(m:Mind,words:string,strict:boolean,guard:AcceptanceGuard,journal:AcceptanceJournal):Promise<ClosedHumanResultV1>{if(this.quiescing)return Promise.resolve({kind:'terminal',outcome:{kind:'system_unavailable',code:'closed',explanation:'The interpreter is stopping; keep this request reference.'}});return this.track(()=>compileHumanGoalV1(this,m,words,strict,guard,journal,{call:this.compilerCall,injected:this.injectedCompiler,record:c=>this.record(c)}));}
 
   /** A wish in plain words → an agenda of cards, minting what the vocabulary lacks. Returns null when no compiler is available. */
   async compile(m: Mind, wish: string, align: boolean | 'intent-v2'=false, guard?: AcceptanceGuard, journal?: AcceptanceJournal): Promise<{ ok: true; agenda: { card: string; target: string | null; of?: string }[]; minted: MintVerdict[]; alignment?:Alignment } | { ok: false; reason: string } | null> {

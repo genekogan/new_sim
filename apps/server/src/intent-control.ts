@@ -1,3 +1,6 @@
+import {HumanGoalStateChanged} from './human-compiler.ts';
+import {readHumanCapabilitiesV1} from './human-capabilities.ts';
+import type {HumanSteeringOutcomeV1} from '@sim/engine-contract';
 import {readIntentArrivalsV1} from './intent-arrivals.ts';
 import {intentArrivalQueryV1Schema,INTENT_ARRIVAL_V1} from '@sim/protocol';
 // Explicitly injected candidate transport service. Production bootstrap does
@@ -25,10 +28,12 @@ export class IntentControlV2 {
   get historyEnabled(){return !!this.historyReader;}
   // Runtime work ownership only; durable reservations retain crash uncertainty.
   private workers = new Set<Promise<void>>();
-  constructor(host:WorldHost,brain:Brain,souls:Souls,options?:{historyV1?:boolean}) {
+  private readonly closedGoalsV1:boolean;
+  get humanGoalsEnabled(){return this.closedGoalsV1;}
+  constructor(host:WorldHost,brain:Brain,souls:Souls,options?:{historyV1?:boolean;closedGoalsV1?:boolean}) {
     if(brain.host!==host||souls.host!==host||brain.db!==host.db||souls.db!==host.db||!brain.intentV2Enabled)
       throw new Error('candidate intent transport requires one opted-in host/brain/database');
-    this.host=host;this.brain=brain;this.souls=souls;
+    this.host=host;this.brain=brain;this.souls=souls;this.closedGoalsV1=options?.closedGoalsV1===true;
     this.store=new IntentRequests(host.db);this.publisher=new IntentPublisher(host,this.store);
     if(options?.historyV1)this.historyReader=new IntentHistoryReaderV1(this);
   }
@@ -95,8 +100,9 @@ export class IntentControlV2 {
     this.guard(scope);
     if(scope.source.kind!=='owner'||scope.source.channel!=='web'||scope.source.principalId!==scope.source.ownerId)return undefined;
     return intentOwnerControlV2Schema.parse({worldId:this.host.worldId,soulId:scope.soulId,
-      ownerId:scope.source.ownerId,intentContract:INTENT_V2,...(this.historyEnabled?{intentHistoryContract:INTENT_HISTORY_V1}:{}),...(this.host.extra.intentArrivalV1?{intentArrivalContract:INTENT_ARRIVAL_V1}:{})});
+      ownerId:scope.source.ownerId,intentContract:INTENT_V2,...(this.historyEnabled?{intentHistoryContract:INTENT_HISTORY_V1}:{}),...(this.host.extra.intentArrivalV1?{intentArrivalContract:INTENT_ARRIVAL_V1}:{}),...(this.closedGoalsV1?{humanGoalContract:'human-capabilities/1'}:{})});
   }
+  humanCapabilities(scope:IntentRequestScope){if(!this.closedGoalsV1)throw new ApiError(404,'not-found','human goal registry unavailable');this.guard(scope);const allowed=this.souls.limits.allow(`human-capabilities:${scope.worldId}:${scope.soulId}:${scope.source.principalId}`,120,60_000);if(!allowed.ok)throw new ApiError(429,'rate-limited','too many capability reads');const view=readHumanCapabilitiesV1(this.host,this.host.minds.get(scope.soulId)!).view;this.guard(scope);return view;}
   historyCapability(scope:IntentRequestScope){return this.historyReader?.capability(scope);}
   historyPage(scope:IntentRequestScope,query:unknown={}):IntentHistoryPageV1 {
     if(!this.historyReader)throw new ApiError(404,'not-found','intention history unavailable');
@@ -150,20 +156,24 @@ export class IntentControlV2 {
     this.workers.add(work);void work.finally(()=>this.workers.delete(work));
   }
   private async run(scope:IntentRequestScope,reservation:Owned) {
+    const bindingEntityId=this.host.minds.get(scope.soulId)?.entityId;
+    let goalGuard:import('./world.ts').AcceptanceGuard|undefined;
     try {
       if(reservation.request.op==='withdraw')await this.publisher.publish(scope,reservation);
       else await this.publisher.interpretAndPublish(scope,reservation,async guard=>{
         checkAcceptanceGuard(guard);
         const mind=this.host.minds.get(scope.soulId)!;
+        if(this.closedGoalsV1){if(reservation.request.op!=='upsert')throw Error('closed-goals.upsert-required');const compiled=await this.brain.compileHumanGoalV1(mind,reservation.request.words,reservation.request.strict,guard,this.store.journal(reservation));checkAcceptanceGuard(guard);if(compiled.kind==='terminal')throw new HumanCompilationStopped(compiled.outcome);goalGuard=compiled.revalidate;return compiled.interpretation;}
         const result=await this.brain.compile(mind,reservation.request.op==='upsert'?reservation.request.words:'','intent-v2',guard,this.store.journal(reservation));
         checkAcceptanceGuard(guard);
         if(!result?.ok||!result.alignment)throw new InterpretationUnavailable();
         return {summary:result.alignment.understanding,agenda:result.agenda,trigger:result.alignment.trigger};
-      });
+      },()=>{goalGuard?.();return true;});
     } catch(error) {
       // This is private worker history, never physics/fulfilment or public log.
       // The trusted lease can record refusal after revocation; access still
       // requires current authority. Internal/provider errors never escape.
+      if(error instanceof HumanCompilationStopped||error instanceof HumanGoalStateChanged){const outcome=error.outcome,code=outcome.kind==='no_action'?'no-action.'+outcome.reason:outcome.kind==='state_blocked'?'state-blocked.'+outcome.code:outcome.kind==='system_unavailable'?'system-unavailable.'+outcome.code:'compilation-failure.'+outcome.code;this.store.finish(reservation,{contract:INTENT_V2,requestId:reservation.request.requestId,phase:'refused',code,reason:outcome.explanation,outcome,...(bindingEntityId?{scope:{worldId:scope.worldId,soulId:scope.soulId,entityId:bindingEntityId,source:scope.source}}:{})});return;}
       const code=error instanceof IntentPurposeConflict?'version-conflict':error instanceof InterpretationUnavailable?'not-understood':
         error instanceof ApiError||error instanceof IntentRequestUnavailable?'authority-changed':'interpretation-unavailable';
       this.store.finish(reservation,{contract:INTENT_V2,requestId:reservation.request.requestId,phase:'refused',code,
@@ -174,6 +184,7 @@ export class IntentControlV2 {
    * reinterpret crash-pending reservations. Caller still advances the host. */
   async settled() { await Promise.all([...this.workers]); }
 }
+class HumanCompilationStopped extends Error {readonly outcome:Exclude<HumanSteeringOutcomeV1,{kind:'planned'}>;constructor(outcome:Exclude<HumanSteeringOutcomeV1,{kind:'planned'}>){super('closed human compilation has a recorded non-publication outcome');this.outcome=outcome;}}
 class InterpretationUnavailable extends Error {}
 export function intentTransportError(error:unknown):ApiError {
   if(error instanceof ApiError)return error;

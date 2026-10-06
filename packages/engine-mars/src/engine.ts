@@ -1,3 +1,5 @@
+import {fixtureSlots} from '../../../mars/viewer/engine/social/slots.ts';
+import {angleDelta} from '../../../mars/viewer/engine/core/math.ts';
 import {commonsFoodDeliveryItemsV1} from './food-delivery.ts';
 import {commonsFoodDeliveryV1Schema,type CommonsFoodDeliveryV1} from '@sim/engine-contract';
 import {socialEdenV1} from './social-eden.ts';
@@ -78,7 +80,7 @@ export const BODY_VERBS: VerbInfo[] = [
   { verb: 'walk_to', description: 'Walk to a thing or a point, stopping `standoff` metres short of it.', inputSchema: { type: 'object', properties: { to: ref, standoff: num }, required: ['to'] } },
   { verb: 'sit', description: 'Go to a free seat of a fixture (a bench, a chair) and sit there for a number of seconds; stays seated afterwards.', inputSchema: { type: 'object', properties: { on: str, seconds: num }, required: ['on'] } },
   { verb: 'stand', description: 'Stand up, leaving a seat or a place in a gathering.', inputSchema: { type: 'object', properties: {} } },
-  { verb: 'rest', description: 'Stay as you are (seated if sitting) for a number of seconds.', inputSchema: { type: 'object', properties: { seconds: num } } },
+  { verb: 'rest', description: 'Stay as you are (seated if sitting) for a number of seconds.', inputSchema: { type: 'object', properties: { seconds: num, seatedAt:str } } },
   { verb: 'wave', description: 'Turn to face someone or something for a moment.', inputSchema: { type: 'object', properties: { at: str, seconds: num } } },
   { verb: 'converse', description: 'Stand in conversation with a nearby person for a number of seconds.', inputSchema: { type: 'object', properties: { with: str, seconds: num }, required: ['with'] } },
   { verb: 'gather', description: 'Take a place at a fixture (a campfire, a bench) or in a place with an audience layout, and stay for a number of seconds.', inputSchema: { type: 'object', properties: { at: str, seconds: num }, required: ['at'] } },
@@ -354,6 +356,8 @@ export class MarsEngine implements Engine {
     return { verb, params: { ...a, ...('actor' in shape && !('actor' in a) ? { actor: me } : {}), ...('actors' in shape && !('actors' in a) ? { actors: [me] } : {}) } };
   }
 
+  private seatedAt(actor:string,fixture:string){const body=this.ents[actor],entity=this.ents[fixture];if(!body?.human||body.human.activity!=='sit'||!entity)return false;return fixtureSlots(this.rt,entity).some(slot=>{const r=slot.claimedBy?this.rt.records.get(slot.claimedBy):undefined;return slot.kind==='seat'&&slot.level===body.human.level&&r?.params.actor===actor&&r.phase==='occupied'&&this.rt.isActive(r.id)&&Math.hypot(slot.p[0]-body.pose.p[0],slot.p[1]-body.pose.p[2])<=.001&&Math.abs(angleDelta(slot.yaw,body.pose.yaw))<=.03;});}
+
   /** One body-language step → the Mars actions and waits that depict it, decided when the step begins. */
   private lower(p: Prog, step: { verb: string; params: Record<string, unknown> }): Op[] | Diag {
     const me = p.actor, a = step.params ?? {};
@@ -368,7 +372,7 @@ export class MarsEngine implements Engine {
         if (typeof a.to === 'string' && this.ents[a.to]) ops.push({ verb: 'face', params: { actor: me, target: { entity: a.to } }, settle: 'done', soft: true });
         return ops;
       }
-      case 'rest': return [{ wait: secs(a.seconds, 60) }];
+      case 'rest': return typeof a.seatedAt==='string'&&!this.seatedAt(me,a.seatedAt)?{code:'rest.native-seat-required',message:'The requested seat is no longer held by this actor.'}:[{ wait: secs(a.seconds, 60) }];
       case 'perform': return [{ wait: secs(a.seconds, 30) }];
       case 'wave': return [...(typeof a.at === 'string' && this.ents[a.at] ? [{ verb: 'face', params: { actor: me, target: { entity: a.at } }, settle: 'done', soft: true } as Op] : []), { wait: secs(a.seconds, 2) }];
       case 'converse': {
@@ -433,6 +437,7 @@ export class MarsEngine implements Engine {
       }
     }
     const first = program.steps[0]; if (!first) return null;
+    if(first.verb==='rest'&&typeof first.params.seatedAt==='string'&&!this.seatedAt(program.actor,first.params.seatedAt))return {code:'rest.native-seat-required',message:'The requested seat is no longer held by this actor.'};
     if (first.verb === 'build_lookout') {
       if (program.steps.length !== 1) return {code:'construction.one-job',message:'A construction card chooses one finite job.'};
       const plan=this.buildPlan(program);

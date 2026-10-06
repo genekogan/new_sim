@@ -43,12 +43,12 @@ export class IntentPublisher {
    * fence through compiler mint/deal admission and final publication. The
    * compiler callback must use guard for every effect it may publish. */
   async interpretAndPublish(scope: IntentRequestScope, reservation: OwnedReservation,
-    interpret: (guard: AcceptanceGuard) => Promise<IntentRevisionV2['interpretation']>) {
+    interpret: (guard: AcceptanceGuard) => Promise<IntentRevisionV2['interpretation']>,extraGuard?:AcceptanceGuard) {
     if (reservation.request.op !== 'upsert') throw new Error('withdrawal does not require interpretation');
     const guard = this.preparationFence(scope, reservation);
     const interpretation = await interpret(guard);
     checkAcceptanceGuard(guard);
-    return this.publish(scope, reservation, interpretation, guard);
+    const combined=()=>{guard();extraGuard?.();return true as const;};return this.publish(scope, reservation, interpretation, combined);
   }
   private preparationFence(scope: IntentRequestScope, reservation: OwnedReservation): AcceptanceGuard {
     if (reservation.key.worldId !== scope.worldId || reservation.key.soulId !== scope.soulId

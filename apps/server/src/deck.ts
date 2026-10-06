@@ -110,7 +110,8 @@ function readOptionsFor(host: WorldHost, m: Mind, cap = 12): CardOption[] {
   // Apply runtime failure cooldown before deciding what serves the plan. If
   // its only serving option is removed later by Brain, waiting loses its
   // signal and an unrelated target can win as a spontaneous random choice.
-  const all = playable(k, me, candidatesFor(host, me)).filter(p => (faults[p.card.name] ?? 0) < 3 && (cooldown[p.card.name] ?? 0) <= k.tick
+  const registeredGoals=new Set(m.agenda.slice(m.agendaPos).map(s=>s.card));
+  const all = playable(k, me, candidatesFor(host, me)).filter(p => (!p.card.name.startsWith('human goal ')||registeredGoals.has(p.card.name)||m.pending?.card===p.card.name)&& (faults[p.card.name] ?? 0) < 3 && (cooldown[p.card.name] ?? 0) <= k.tick
     && !(m.avoid && m.avoid.untilTick > k.tick && m.avoid.id === p.id));
   // Looking one step ahead: if the plan's step cannot be played yet, any play that brings it closer serves the plan
   // (going where it happens, leaving what stands in the way). Nobody has to write those steps down.

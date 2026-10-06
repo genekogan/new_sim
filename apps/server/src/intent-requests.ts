@@ -79,7 +79,7 @@ export class IntentRequests {
   }
   private check(scope: IntentRequestScope): Source {
     const source = intentSourceV2Schema.parse(scope.source);
-    intentRevisionV2Schema.pick({ worldId: true, soulId: true }).parse({ worldId: scope.worldId, soulId: scope.soulId });
+    intentRevisionV2Schema.shape.worldId.parse(scope.worldId);intentRevisionV2Schema.shape.soulId.parse(scope.soulId);
     const soul = this.db.soul(scope.soulId);
     // The trusted handler binds principal/generation to its callback. This
     // storage class cannot authenticate a claimed principal from a client.
@@ -212,6 +212,7 @@ export class IntentRequests {
         if (req.op !== 'withdraw' || receipt.worldId !== reservation.key.worldId || receipt.soulId !== reservation.key.soulId
           || receipt.intent.intentId !== req.edit.intentId || receipt.intent.version !== req.edit.expectedVersion) throw new IntentRequestConflict();
       }
+      if(receipt.phase==='refused'&&receipt.scope&&(receipt.scope.worldId!==reservation.key.worldId||receipt.scope.soulId!==reservation.key.soulId||stableStringify(receipt.scope.source)!==stableStringify(reservation.source)))throw new IntentRequestConflict();
       const encoded = stableStringify(receipt);
       if (row.receipt !== null) {
         if (row.receipt !== encoded) throw new IntentRequestConflict();

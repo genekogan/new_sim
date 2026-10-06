@@ -159,6 +159,9 @@ export function buildApp(d: Deps) {
     catch(error){throw intentLookupError(error);}
   });
 
+  app.get('/v1/souls/:id/intent-v2/capabilities',async c=>{c.header('Cache-Control','no-store');const service=intentService(),identity=await intentIdentity(c);const scope=service.ownerScope(identity,c.req.param('id')),view=service.humanCapabilities(scope);service.guard(scope);return c.json(view);});
+  app.get('/v1/agent/intent-v2/capabilities',c=>{c.header('Cache-Control','no-store');const service=intentService(),scope=service.agentScope(bearer(c)),view=service.humanCapabilities(scope);service.guard(scope);return c.json(view);});
+
   const historyQuery=(c:Context)=>{if(Object.values(c.req.queries()).some(values=>values.length!==1))throw new ApiError(400,'invalid-history-query','invalid history query');return c.req.query();};
   app.get('/v1/souls/:id/intent-v2/history',async c=>{
     const service=intentService(),identity=await intentIdentity(c);

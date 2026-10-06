@@ -9,7 +9,7 @@ import {createHash} from 'node:crypto';
 import {setImmediate} from 'node:timers/promises';
 
 export async function openLocalEden({input,dataDir,worldId,port=4959,webDir,marsWebDir,build='local-c194-core/1',checkOnly=false,
-  inputManifestSHA256='4e9c18fe50ec9e8f74073f4032f20409a9e54b3fa5b1b87b54a6a4bc0ebcec12',modelCredentialFile,localBudget=3,autonomous=false,localSoulLimit=5,humanRest=false,provisions=false,sequences=false,floorGoals=false,kitchen=false,shore=false,foodDeliveryId,quietLandingCourtesy=false,social=false}) {
+  inputManifestSHA256='4e9c18fe50ec9e8f74073f4032f20409a9e54b3fa5b1b87b54a6a4bc0ebcec12',modelCredentialFile,localBudget=3,autonomous=false,localSoulLimit=5,humanRest=false,provisions=false,sequences=false,floorGoals=false,kitchen=false,shore=false,foodDeliveryId,quietLandingCourtesy=false,social=false,closedGoals=false}) {
   if(!input||!dataDir||!worldId||!Number.isInteger(port)||!(port>=4950&&port<=4959||port===4970))throw Error('explicit local input/data/world/allowed port required');
   if(!build.startsWith('local-'))throw Error('local build identity required');
   input=resolve(input);dataDir=resolve(dataDir);
@@ -89,7 +89,7 @@ export async function openLocalEden({input,dataDir,worldId,port=4959,webDir,mars
     if(kitchen){const {scheduleCommonsKitchenInstallation}=await load('apps/server/src/commons-kitchen-install.ts');kitchenInstallation=scheduleCommonsKitchenInstallation(host,brain);}
     if(social){if(!kitchen)throw Error('social Eden requires retained kitchen resources');const {scheduleSocialEdenInstallationV1}=await load('apps/server/src/social-eden-install.ts');socialInstallation=scheduleSocialEdenInstallationV1(host,brain);}
     if(shore){const {scheduleRetainedCommonsShoreInstallation}=await load('apps/server/src/retained-shore-install.ts');shoreInstallation=scheduleRetainedCommonsShoreInstallation(host);}
-    service=new IntentControlV2(host,brain,souls,{historyV1:true});server=createServer();
+    service=new IntentControlV2(host,brain,souls,{historyV1:true,closedGoalsV1:closedGoals});server=createServer();
     const strip=url=>stripWorldRequestPath(url,cfg.worldPath);
     server.on('upgrade',req=>{req.url=strip(req.url);});hub=new Hub(server,host,auth,db,souls);hub.brain=brain;hub.build=cfg.build;
     const app=buildApp({cfg,db,host,auth,brain,souls,hub,intentV2:service}),listener=require('@hono/node-server').getRequestListener(app.fetch);
@@ -115,7 +115,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).hr
   try {
     const app=await openLocalEden({input,dataDir,worldId,port:Number(port),webDir,marsWebDir,build:process.env.BUILD_ID??'local-c194-core/1',checkOnly:mode==='check',
       inputManifestSHA256:process.env.PREVIEW_INPUT_MANIFEST_SHA256,modelCredentialFile:process.env.PREVIEW_MODEL_CREDENTIAL_FILE,
-      localBudget:Number(process.env.PREVIEW_BUDGET_USD_PER_DAY??3),autonomous:process.env.PREVIEW_EDEN_AUTONOMY==='1',localSoulLimit:Number(process.env.PREVIEW_SOUL_LIMIT??5),humanRest:process.env.PREVIEW_HUMAN_REST==='1',provisions:process.env.PREVIEW_COMMONS_PROVISIONS==='1',sequences:process.env.PREVIEW_INTENT_SEQUENCES==='1',floorGoals:process.env.PREVIEW_FIXTURE_GOAL_LEVELS==='1',kitchen:process.env.PREVIEW_COMMONS_KITCHEN==='1',shore:process.env.PREVIEW_RETAINED_SHORE==='1',foodDeliveryId:process.env.PREVIEW_FINITE_FOOD_DELIVERY_ID,quietLandingCourtesy:process.env.PREVIEW_QUIET_LANDING_COURTESY==='1',social:process.env.PREVIEW_SOCIAL_EDEN==='1'});
+      localBudget:Number(process.env.PREVIEW_BUDGET_USD_PER_DAY??3),autonomous:process.env.PREVIEW_EDEN_AUTONOMY==='1',localSoulLimit:Number(process.env.PREVIEW_SOUL_LIMIT??5),humanRest:process.env.PREVIEW_HUMAN_REST==='1',provisions:process.env.PREVIEW_COMMONS_PROVISIONS==='1',sequences:process.env.PREVIEW_INTENT_SEQUENCES==='1',floorGoals:process.env.PREVIEW_FIXTURE_GOAL_LEVELS==='1',kitchen:process.env.PREVIEW_COMMONS_KITCHEN==='1',shore:process.env.PREVIEW_RETAINED_SHORE==='1',foodDeliveryId:process.env.PREVIEW_FINITE_FOOD_DELIVERY_ID,quietLandingCourtesy:process.env.PREVIEW_QUIET_LANDING_COURTESY==='1',social:process.env.PREVIEW_SOCIAL_EDEN==='1',closedGoals:process.env.PREVIEW_CLOSED_HUMAN_GOALS==='1'});
     if(app.checkOnly)console.log(JSON.stringify(app,null,2));
     else {console.log(JSON.stringify({url:app.cfg.publicUrl,worldId:app.host.worldId,boot:app.boot,physicalBase:app.host.engine.world.base,mode:app.brain.mode,budget:app.brain.budget,autonomous:process.env.PREVIEW_EDEN_AUTONOMY==='1'}));
       for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>void app.close().then(()=>process.exit(0)).catch(()=>process.exit(1)));}
