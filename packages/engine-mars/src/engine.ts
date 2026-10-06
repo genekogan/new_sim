@@ -72,6 +72,7 @@ type Prog = {
   walkStopping?: Diag;
   stopping?: Diag;
   ops: Op[]; action?: string; settle?: 'done' | 'held'; soft?: boolean; until?: number;
+  controlOf?:string;
   build?: { phase: BuildPhase; crew: string[]; stopping?: Diag };
 };
 export type MarsWorldConfig = { walkBlockV1?:boolean; safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; fixtureGroundGoalsV1?:boolean; nativeArrivalWitnessV1?:boolean; quietLandingCourtesyV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
@@ -87,6 +88,7 @@ const num = { type: 'number' }, str = { type: 'string' };
 const ref = { anyOf: [str, { type: 'array', items: num, minItems: 2, maxItems: 2 }] };
 /** The body language, as the card grammar and agents see it. The actor is always implied. */
 export const BODY_VERBS: VerbInfo[] = [
+  {verb:'control_classroom_v1',description:'Apply an owned host control to its actual classroom without replacing its body programme; accepted control is not completed cleanup.',inputSchema:{type:'object',properties:{session:{type:'string',maxLength:80},kind:{enum:['cancel','advance']}},required:['session','kind'],additionalProperties:false}},
   { verb: 'build_lookout', description: 'Choose one finite camp construction job: stage carries rack parts to the build site; frame raises/connects/releases the uprights; deck installs joists/sheets; stairs completes access. Use the exact unprefixed verb build_lookout, target:null, approach:[], and a single during step with phase. The card sets only $actor.doing; physical part progress is maintained by the engine, never invented target states or permission links. The committed crew finishes a safe segment before interruption.', inputSchema: {type:'object',properties:{phase:{type:'string',enum:['stage','frame','deck','stairs']}},required:['phase']} },
   { verb: 'walk_to', description: 'Walk to a thing or a point, stopping `standoff` metres short of it.', inputSchema: { type: 'object', properties: { to: ref, standoff: num }, required: ['to'] } },
   { verb: 'sit', description: 'Go to a free seat of a fixture (a bench, a chair) and sit there for a number of seconds; stays seated afterwards.', inputSchema: { type: 'object', properties: { on: str, seconds: num }, required: ['on'] } },
@@ -386,6 +388,7 @@ export class MarsEngine implements Engine {
     if (step.verb === 'mars:take_item') { const it=this.ents[String(a.item)]; if (it?.support?.kind === 'in-hand' && it.support.by === me && (!a.hand || it.support.hand === a.hand)) return []; }
     if (step.verb.startsWith('mars:')) { const r = this.raw(me, step); return 'code' in r ? r : [{ ...r, settle: 'held', raw: true }]; }
     switch (step.verb) {
+      case 'control_classroom_v1': return [{verb:'classroom_control',params:{session:a.session,intent:{kind:a.kind}},settle:'done',raw:true}];
       case 'walk_to': {
         const g = this.goalNear(me, a.to, typeof a.standoff === 'number' ? a.standoff : 0);
         if (g === 'here') return [];
@@ -448,7 +451,9 @@ export class MarsEngine implements Engine {
     else {const copy=this.physical!.restore(this.rt.snapshot());copy.cancel(action,{code:'program.replaced',message:'replaced'});if(copy.isActive(action))result={code:'program.safe-stop-required',message:'Stop the current movement and let it reach safe support before replacing it.'};}
     if(key)this.feasibilityRead!.set(key,structuredClone(result));return result;
   }
+  ownedClassroomControlRosterV1(actor:string,session:string){const r=this.rt.records.get(session);if(!r||r.verb!=='classroom_session'||!this.rt.isActive(session)||r.params.host!==actor)return null;return [r.params.host,...r.params.presenters,...r.params.audience] as string[];}
   canPerform(program: Program): Diag | null {
+    if(program.steps[0]?.verb==='control_classroom_v1'){const p=program.steps[0].params;if(program.steps.length!==1||!['cancel','advance'].includes(String(p.kind))||typeof p.session!=='string'||!this.ownedClassroomControlRosterV1(program.actor,p.session))return {code:'classroom.owned-host-control-required',message:'Only the active classroom host can apply this control.'};return this.plan('classroom_control',{session:p.session,intent:{kind:p.kind}});}
     if (!this.ents[program.actor]) return { code: 'actor.unknown', message: `no such actor ${program.actor}` };
     if ([...this.programs.values()].some(p=>p.build?.crew.includes(program.actor))) return {code:'construction.committed',message:'This builder is finishing a finite physical construction segment.'};
     if(this.physical){
@@ -511,6 +516,7 @@ export class MarsEngine implements Engine {
     const {result,build}=this.prepareAdmission(program),id=result.id;
     this.nextProg++;
     if (!result.ok) { const old = this.byActor.get(program.actor); if (old&&!this.physical) this.stop(old); return result; }
+    if(program.steps[0]?.verb==='control_classroom_v1'){const p:Prog={id,actor:program.actor,label:program.label.slice(0,200),steps:structuredClone(program.steps),index:0,started:false,since:this.rt.tick,ops:[],controlOf:String(program.steps[0].params.session)};this.programs.set(id,p);return result;}
     const old = this.byActor.get(program.actor);
     if (old) { const o = this.programs.get(old)!; if (o.action && this.rt.isActive(o.action)) this.rt.cancel(o.action, { code: 'program.replaced', message: 'replaced' }); this.end(o, 'cancelled', { code: 'program.replaced', message: 'replaced by a new program' }); }
     const p: Prog = { id, actor: program.actor, label: program.label.slice(0, 200), steps: build?build.steps:program.steps, index: 0, started: false, since: this.rt.tick, ops: [], ...(build?{build:{phase:program.steps[0].params.phase as BuildPhase,crew:build.crew}}:{}) };
