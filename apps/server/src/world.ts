@@ -905,6 +905,7 @@ export class WorldHost {
         if(p?.intentApproachRetentionV1===true)this.extra.intentApproachRetentionV1=true;
         if(p?.intentHumanSleepTransitionV1===true)this.extra.intentHumanSleepTransitionV1=true;
         if(p?.intentPurposeEvidenceV1===true)this.extra.intentPurposeEvidenceV1=true;
+        if(p?.intentPurposeRecallV1===true){if(!this.extra.intentPurposeEvidenceV1)throw Error('purpose-recall.evidence-policy-required');this.extra.intentPurposeRecallV1=true;}
         if(p?.intentSequencesV1===true&&!this.extra.intentSequencesV1){this.extra.intentSequencesV1=true;this.extra.intentSequencesSinceV1=e.seq;}
         if (p?.kernelBootstrap || p?.vocabulary || p?.adoptCamp || p?.commonsTransition || p?.campExpansion) this.kernelDirty = true;
         if(p?.commonsTransition||p?.campExpansion)for(const m of this.minds.values()){
@@ -939,6 +940,7 @@ export class WorldHost {
   enableIntentNativeSequenceCompletionV1(){if(this.extra.intentNativeSequenceCompletionV1)return Promise.resolve();return this.enqueue('rules','operator:intent-native-sequence-completion',{intentNativeSequenceCompletionV1:true,why:'prospectively advance typed owner sequence only after matching accepted native programme completion; retain failed/interrupted steps and historical semantic sequence behaviour'});}
   enableIntentHumanSleepTransitionV1(){if(this.extra.intentHumanSleepTransitionV1)return Promise.resolve();return this.enqueue('rules','operator:human-sleep-transition',{intentHumanSleepTransitionV1:true,why:'prospective owner-scoped native sleep stop; actual safe rise before fresh admission'});}
   enableIntentPurposeEvidenceV1(){if(this.extra.intentPurposeEvidenceV1)return Promise.resolve();return this.enqueue('rules','operator:purpose-evidence',{intentPurposeEvidenceV1:true,why:'private mind context keeps current owner revision origins and recorded attempt/contribution progress; no new execution priority or fulfilment'});}
+  enableIntentPurposeRecallV1(){if(this.extra.intentPurposeRecallV1)return Promise.resolve();if(!this.extra.intentPurposeEvidenceV1)return Promise.reject(Error('purpose-recall.evidence-policy-required'));return this.enqueue('rules','operator:purpose-recall',{intentPurposeRecallV1:true,why:'bound private own-purpose context; preserve strict/current commitments in full or report capacity without new choice; retain original history'});}
   pendingHumanSleepTransitionV1(soulId:string){const p=(this.extra.intentHumanSleepTransitionsV1 as Record<string,IntentSleepStopV1>|undefined)?.[soulId];return !!p&&this.engine.programOf(p.entityId)===p.programId;}
   enqueueHumanSleepStopV1(soulId:string,intent:PurposeRef,program:import('@sim/engine-contract').Program,guard:AcceptanceGuard){
     const m=this.minds.get(soulId),programId=m?previewHumanSleepStopV1(this,m,program):null;if(!m||!programId)return Promise.reject(new StaleIntentAttempt());

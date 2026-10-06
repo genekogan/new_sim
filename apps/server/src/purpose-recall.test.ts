@@ -1,0 +1,16 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import type {MidContext} from '@sim/brain';
+import {recallPurposesV1,PURPOSE_RECALL_LIMITS_V1} from './purpose-recall.ts';
+type Purpose=NonNullable<MidContext['purposes']>[number];
+const p=(i:number,strict=false):Purpose=>({words:'PRIVATE_OWNER_'+i+' '+('A retained owner purpose. '.repeat(60)),strict,importance:.5,understanding:'Consider an unfinished activity.',status:'active',source:{worldId:'w',soulId:'s_A',intentId:'i_'+i,version:1,seq:i+1,tick:i+1},trigger:{kind:'none'},contribution:{kind:'native_program_sequence',completedSteps:0,totalSteps:1,nextCard:'rest'}});
+test('100 retained purposes shrink to a bounded prompt without dropping strict/current context or mutating history',t=>{
+ const all=Array.from({length:100},(_,i)=>p(i,i<2)),before=JSON.stringify(all),rawBytes=new TextEncoder().encode(before).length,result=recallPurposesV1(all,{intentId:'i_2',version:1});assert.equal(result.recall.state,'ready');assert.ok(result.purposes.length<=12);assert.ok(result.recall.bytes<=16384);for(const i of [0,1,2])assert.ok(result.purposes.some(v=>v.source?.intentId==='i_'+i));assert.equal(result.recall.total,100);assert.equal(result.recall.omitted,100-result.purposes.length);assert.equal(result.recall.omittedSources.length,12);assert.equal(result.recall.moreOmittedSources,true);assert.equal(JSON.stringify(all),before);assert.ok(rawBytes>150000);assert.ok(result.recall.bytes<rawBytes/5);t.diagnostic(`own-purpose JSON bytes ${rawBytes} → ${result.recall.bytes}; history unchanged; full prompt/token/provider cost not measured`);
+});
+test('relevant older unfinished work can outrank recent unrelated context; selection is not a FIFO work queue',()=>{
+ const all=Array.from({length:20},(_,i)=>({...p(i),words:'Unrelated music preference '+i,understanding:'Music.'}));all[0]={...all[0],words:'Help repair the garden bench.',understanding:'The garden bench remains unfinished.'};const a=recallPurposesV1(all,undefined,'At the garden bench'),b=recallPurposesV1(all,undefined,'At the garden bench');assert.equal(a.purposes[0].source?.intentId,'i_0');assert.deepEqual(a,b);assert.equal(a.purposes[0].trigger?.kind,'none');
+});
+test('mandatory overflow is explicit, never truncated or mistaken for permission to choose with missing constraints',()=>{
+ const all=Array.from({length:13},(_,i)=>p(i,true)),before=JSON.stringify(all),r=recallPurposesV1(all);assert.equal(r.recall.state,'overflow');assert.deepEqual(r.purposes,[]);assert.equal(r.recall.reason,'mandatory_context_exceeds_limit');assert.equal(r.recall.omitted,13);assert.equal(JSON.stringify(all),before);assert.equal(PURPOSE_RECALL_LIMITS_V1.entries,12);
+ const unicode='😀'.repeat(1000),large=[1,2].map(i=>({...p(i,true),words:unicode,understanding:unicode}));assert.equal(recallPurposesV1(large).recall.state,'overflow','valid-sized UTF-16 words still exceed the UTF-8 fragment budget together');assert.throws(()=>recallPurposesV1([{...p(1),source:undefined}]));assert.throws(()=>recallPurposesV1([p(1),p(1)]));assert.throws(()=>recallPurposesV1([p(1)],{intentId:'missing',version:1}));assert.throws(()=>recallPurposesV1([p(1),{...p(2),source:{...p(2).source!,soulId:'s_B'}}]));
+});

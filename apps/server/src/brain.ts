@@ -1,6 +1,7 @@
 import {compileHumanGoalV1,type ClosedHumanResultV1} from './human-compiler.ts';
 import {previewHumanSleepStopV1} from './human-sleep-transition.ts';
 import {purposeContextEvidenceV1,indexPurposeAttemptsV1} from './purpose-context-evidence.ts';
+import {recallPurposesV1} from './purpose-recall.ts';
 // The three-tier brain, server side. Schedules calls, records every request
 // and response for the debug shell, and turns answers into logged events.
 import type { Entity } from '@sim/engine-contract';
@@ -278,6 +279,13 @@ export class Brain {
     const planningMind = acting ? { ...m, agenda: sequence?[acting.interpretation.agenda[sequenceIndex]]:acting.interpretation.agenda, agendaPos: 0 } : m;
     const options=optionsFor(this.host,planningMind);
     if(!m.activeRule)for(const o of options)if(rules.some(r=>r.agenda.some(s=>matchesStep(this.host,s,o.card,o.cardTarget))))o.servesIntent=true;
+    const allPurposes=retained.map(e => this.host.extra.intentPurposeEvidenceV1
+      ?purposeContextEvidenceV1(history!,e,m.owner,this.host.extra.intentSequencesV1&&e.revision.submitted.seq>=Number(this.host.extra.intentSequencesSinceV1??0)
+        ?{kind:this.host.extra.intentNativeSequenceCompletionV1&&e.revision.interpretation.humanGoalPlan?.kind==='planned'?'native_program_sequence':'semantic_card_sequence',completedSteps:this.host.intentSequenceStepV1(m.soulId,{intentId:e.revision.intentId,version:e.revision.version})}:undefined,purposeAttempts)
+      :({ words:e.revision.words,strict:e.revision.strict,importance:e.revision.importance,understanding:e.revision.interpretation.summary,status:e.status }));
+    const newest=allPurposes.filter(p=>'source' in p&&p.source).sort((a,b)=>('source' in b?b.source!.seq:0)-('source' in a?a.source!.seq:0))[0];
+    const pin=acting?{intentId:acting.intentId,version:acting.version}:newest&&'source' in newest?{intentId:newest.source!.intentId,version:newest.source!.version}:undefined;
+    const recall=this.host.extra.intentPurposeRecallV1?recallPurposesV1(allPurposes,pin,[physicalWhere??s.region,m.doing,...s.nearby.map(n=>n.who)].join(' ')):undefined;
     return {
       ...(physicalWhere===undefined?{}:{physicalWhere}),
       ...(acting ? { actingPurpose:{ intentId:acting.intentId, version:acting.version } } : {}),
@@ -296,10 +304,7 @@ export class Brain {
       heard: sit.heard.map((h) => ({ who: h.who, act: h.act, ...(h.about ? { about: h.about } : {}), ...(this.lastWords.get(`${h.from}>${m.soulId}`) ? { words: this.lastWords.get(`${h.from}>${m.soulId}`)! } : {}) })),
       manners: Object.fromEntries((deck?.manners ?? []).map((n) => [n, k.vocab.manners[n]?.summary ?? n])),
       options,
-      ...(retained.length ? { purposes: retained.map(e => this.host.extra.intentPurposeEvidenceV1
-        ?purposeContextEvidenceV1(history!,e,m.owner,this.host.extra.intentSequencesV1&&e.revision.submitted.seq>=Number(this.host.extra.intentSequencesSinceV1??0)
-          ?{kind:this.host.extra.intentNativeSequenceCompletionV1&&e.revision.interpretation.humanGoalPlan?.kind==='planned'?'native_program_sequence':'semantic_card_sequence',completedSteps:this.host.intentSequenceStepV1(m.soulId,{intentId:e.revision.intentId,version:e.revision.version})}:undefined,purposeAttempts)
-        :({ words: e.revision.words, strict: e.revision.strict,importance: e.revision.importance, understanding: e.revision.interpretation.summary, status: e.status })) } : {}),
+      ...(recall?{purposes:recall.purposes,purposeRecall:recall.recall}:allPurposes.length?{purposes:allPurposes}:{}),
       running: !!eng.programOf(m.entityId),
       trigger,
     };
@@ -331,6 +336,13 @@ export class Brain {
     };
     const ent = host.engine.world.entities[m.entityId];
     this.updateEnergy(m, ent, tick);
+    if(this.intentV2Choices&&(host.unfinishedHumanGoalExecutionV1(m.soulId)||host.unfinishedIntentApproachV1(m.soulId))){m.nextEvalTick=tick+TPS;m.evalTrigger='timer';m.lastFingerprint='';return;}
+    const ctx = this.midContext(m, trigger);
+    if(ctx.purposeRecall?.state==='overflow'){
+      const fp='purpose-recall-overflow:'+purposeSeq;
+      if(m.lastFingerprint!==fp)this.record({tick,tier:'mid',subject:m.name,soulId:m.soulId,model:'private-recall/1',request:{recall:ctx.purposeRecall},response:null,applied:{dropped:'private-purpose-context-overflow'},ms:0,inputTokens:0,outputTokens:0,cachedTokens:0,costUsd:0,mode:'fake',error:'Strict/current owner commitments exceed the private context limit; no new choice was made. Full history remains available.'});
+      m.lastFingerprint=fp;m.nextEvalTick=tick+TPS*20;m.evalTrigger='timer';return;
+    }
     if(this.intentV2Choices&&host.extra.intentHumanSleepTransitionV1){
       if(host.pendingHumanSleepTransitionV1(m.soulId)){m.nextEvalTick=tick+1;m.evalTrigger='new-intent-v2';return;}
       const latest=Object.values(host.intentHistoryOf(m.soulId).intents).filter(e=>e.revision.source.ownerId===m.owner&&e.revision.interpretation.trigger.kind==='now').sort((a,b)=>b.revision.submitted.seq-a.revision.submitted.seq)[0];
@@ -341,8 +353,6 @@ export class Brain {
         }}
       }
     }
-    if(this.intentV2Choices&&(host.unfinishedHumanGoalExecutionV1(m.soulId)||host.unfinishedIntentApproachV1(m.soulId))){m.nextEvalTick=tick+TPS;m.evalTrigger='timer';m.lastFingerprint='';return;}
-    const ctx = this.midContext(m, trigger);
     const purposeFor = (option: CardOption) => {
       const ref = ctx.actingPurpose;
       const entry = ref ? host.intentHistoryOf(m.soulId).intents[ref.intentId] : undefined;
