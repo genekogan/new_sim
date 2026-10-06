@@ -537,11 +537,13 @@ export class WorldHost {
    * Queued requests remain ephemeral; this does not provide durable retries. */
   enqueueChecked(kind: EventKind, author: string, payload: unknown, guard: AcceptanceGuard, journal?: AcceptanceJournal): Promise<LogEvent> {
     this.assertClockReady();
-    return new Promise((resolve, reject) => this.queue.push({ kind, author, payload, guard, journal, resolve, reject }));
+    const current:AcceptanceGuard=()=>{checkAcceptanceGuard(guard);if(kind==='decision'){const p=payload as DecisionPayload;if(!this.ownLectureRosterV1(p.soulId,p.steps))throw new StaleIntentAttempt();}return true;};
+    return new Promise((resolve, reject) => this.queue.push({ kind, author, payload, guard:current, journal, resolve, reject }));
   }
 
   /** Internal opt-in choice producer. No wire operation accepts a purpose ref
    * or activity claim. The original caller fence still owns final authority. */
+  ownLectureRosterV1(soulId:string,steps:import('@sim/engine-contract').Program['steps']){const leader=this.minds.get(soulId);if(!leader)return false;for(const step of steps){if(step.verb!=='mars:classroom_session')continue;const p=step.params as {host?:string;presenters?:string[];audience?:string[]};if(p.host!==leader.entityId||!Array.isArray(p.presenters)||!Array.isArray(p.audience))return false;const ids=[p.host,...p.presenters,...p.audience];if(new Set(ids).size!==ids.length)return false;for(const id of ids){const m=this.mindByEntity.get(id),row=m?this.db.soul(m.soulId):undefined;if(!m||!row||row.retired_at!==null||row.world_id!==this.worldId||row.owner!==leader.owner||m.owner!==leader.owner||row.entity_id!==id||this.kernel.things[m.soulId]?.traits.body!==id||!this.engine.world.entities[id])return false;}}return true;}
   enqueueIntentDecision(author: string, payload: DecisionPayload, raw: PurposeRef, guard: AcceptanceGuard): Promise<LogEvent> {
     this.assertClockReady();
     const purpose = intentReferenceV2Schema.parse(raw), mind = this.minds.get(payload.soulId);
@@ -551,6 +553,7 @@ export class WorldHost {
     const legacyVersion = mind.intentVersion;
     const current = () => {
       checkAcceptanceGuard(guard);
+      if(!this.ownLectureRosterV1(decision.soulId,decision.steps))throw new StaleIntentAttempt();
       const row = this.db.soul(decision.soulId), entry = this.intentHistoryOf(decision.soulId).intents[purpose.intentId];
       if (this.minds.get(decision.soulId) !== mind || mind.intentVersion !== legacyVersion || this.quietBarrier
         || !row || row.retired_at !== null || row.world_id !== this.worldId
