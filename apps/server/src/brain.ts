@@ -1,4 +1,5 @@
 import {compileHumanGoalV1,type ClosedHumanResultV1} from './human-compiler.ts';
+import {previewHumanSleepStopV1} from './human-sleep-transition.ts';
 // The three-tier brain, server side. Schedules calls, records every request
 // and response for the debug shell, and turns answers into logged events.
 import type { Entity } from '@sim/engine-contract';
@@ -326,6 +327,16 @@ export class Brain {
     };
     const ent = host.engine.world.entities[m.entityId];
     this.updateEnergy(m, ent, tick);
+    if(this.intentV2Choices&&host.extra.intentHumanSleepTransitionV1){
+      if(host.pendingHumanSleepTransitionV1(m.soulId)){m.nextEvalTick=tick+1;m.evalTrigger='new-intent-v2';return;}
+      const latest=Object.values(host.intentHistoryOf(m.soulId).intents).filter(e=>e.revision.source.ownerId===m.owner&&e.revision.interpretation.trigger.kind==='now').sort((a,b)=>b.revision.submitted.seq-a.revision.submitted.seq)[0];
+      if(host.extra.intentSequencesV1&&!m.activeRule&&m.agendaPos>=m.agenda.length&&latest?.status==='active'&&latest.revision.interpretation.humanGoalPlan?.kind==='planned'){
+        const ref={intentId:latest.revision.intentId,version:latest.revision.version},step=latest.revision.interpretation.agenda[host.intentSequenceStepV1(m.soulId,ref)],card=step?host.kernel.vocab.cards[step.card]:undefined;
+        if(card&&step.target===null){const program={actor:m.entityId,label:card.name,steps:[...card.approach,...card.during]};if(previewHumanSleepStopV1(host,m,program)){
+          void host.enqueueHumanSleepStopV1(m.soulId,ref,program,choiceGuard!).catch(()=>{m.nextEvalTick=host.engine.world.tick+1;m.evalTrigger='new-intent-v2';m.lastFingerprint='';});m.nextEvalTick=tick+1;m.evalTrigger='new-intent-v2';return;
+        }}
+      }
+    }
     if(this.intentV2Choices&&(host.unfinishedHumanGoalExecutionV1(m.soulId)||host.unfinishedIntentApproachV1(m.soulId))){m.nextEvalTick=tick+TPS;m.evalTrigger='timer';m.lastFingerprint='';return;}
     const ctx = this.midContext(m, trigger);
     const purposeFor = (option: CardOption) => {

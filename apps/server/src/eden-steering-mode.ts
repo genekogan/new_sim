@@ -10,7 +10,8 @@ export function edenSteeringModeV1(edenLife:boolean,env:NodeJS.ProcessEnv){
 /** A reader-only restart can keep a policy, but cannot prospectively install one. */
 export async function installEdenSteeringModeV1(host:WorldHost,mode:{closedGoalsV1:boolean;registeredActivitiesV1:boolean},retainReader=false){
  if(!mode.closedGoalsV1)return;
- if(retainReader){if(host.extra.intentExecutionRetentionV1!==true||host.extra.intentNativeSequenceCompletionV1!==true)throw Error('eden-steering.retained-execution-policy-required');return;}
+ if(retainReader){if(host.extra.intentExecutionRetentionV1!==true||host.extra.intentNativeSequenceCompletionV1!==true||host.extra.intentHumanSleepTransitionV1!==true)throw Error('eden-steering.retained-execution-policy-required');return;}
  const policy=host.enableIntentExecutionRetentionV1();host.drainInputs();await policy;
  const completion=host.enableIntentNativeSequenceCompletionV1();host.drainInputs();await completion;
+ const sleep=host.enableIntentHumanSleepTransitionV1();host.drainInputs();await sleep;
 }

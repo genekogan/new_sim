@@ -10,6 +10,7 @@ import {
 } from '@sim/kernel';
 import { intentReceivedPayloadV2Schema, intentHistoryFactV2, intentAdmissionFactV2, intentControllerFactV2, intentArrivalFactV1, type BirthPayload, type DecisionPayload, type DeckPayload, type LogEvent, type MintPayload, type PlayPayload, type PlayView } from '@sim/protocol';
 import {foldMandate} from './mandate.ts';
+import {intentSleepStopV1Schema} from '@sim/protocol';
 import { isStationFactV1, parseStationFactV1 } from '@sim/protocol';
 
 /**
@@ -61,6 +62,11 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
   k.tick = e.tick;
   sweep(k);
   switch (e.kind) {
+    case 'intent-sleep-stop-v1': {
+      const p=intentSleepStopV1Schema.parse(e.payload),action=engine.programAction?.(p.programId);
+      if(e.author!=='world:human-sleep-stop'||k.things[p.soulId]?.traits.body!==p.entityId||engine.programOf(p.entityId)!==p.programId||action?.actor!==p.entityId||action.action.verb!=='sleep')throw Error('human-sleep-transition.invalid-source');
+      engine.stop(p.programId);return {};
+    }
     // Private owner control facts have no public kernel/body effects. The host
     // folds their private history separately, including snapshot/recovery replay.
     case 'intent-request-v2': { intentReceivedPayloadV2Schema.parse(e.payload); return {}; }

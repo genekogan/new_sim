@@ -3,6 +3,8 @@ import type {NewcomerResourcePlacementV1} from '@sim/engine-contract';
 import {existingGreenLandmarkV1} from '@sim/engine-mars';
 import {socialEdenV1} from '@sim/engine-mars';
 import {captureIntentArrivalV1,journalIntentArrivalV1,verifyIntentArrivalV1} from './intent-arrivals.ts';
+import {previewHumanSleepStopV1} from './human-sleep-transition.ts';
+import {intentSleepStopV1Schema,type IntentSleepStopV1} from '@sim/protocol';
 // WorldHost: the sequencer. Owns the engine, the event log, the tick loop,
 // snapshots, and the per-batch broadcast. The fold (doc 11):
 //   events logged with tick T are applied when world.tick == T, then the engine steps to T+1.
@@ -487,6 +489,8 @@ export class WorldHost {
       const completedSequenceBinding=ev.kind==='completed'&&this.extra.intentNativeSequenceCompletionV1?Object.values(this.intentBindings()).find(b=>b.payload.activityId===ev.id&&b.payload.decision.entityId===ev.actor):undefined;
       if(!replay)this.observeIntentTerminal(ev);
       const m = this.mindByEntity.get(ev.actor); if (!m) continue;
+      const transition=(this.extra.intentHumanSleepTransitionsV1 as Record<string,IntentSleepStopV1>|undefined)?.[m.soulId];
+      if(ev.kind!=='step'&&transition?.programId===ev.id){delete (this.extra.intentHumanSleepTransitionsV1 as Record<string,IntentSleepStopV1>)[m.soulId];m.nextEvalTick=Math.min(m.nextEvalTick,ev.tick+1);m.evalTrigger='new-intent-v2';m.lastFingerprint='';}
       const mine = m.pending && m.pending.program === ev.id ? m.pending : null;
       const playNow = () => {
         if (!mine || mine.applied) return;
@@ -687,6 +691,17 @@ export class WorldHost {
   /** Apply a logged event: the fold moves the engine and the kernel; this adds the minds' bookkeeping. */
   apply(e: LogEvent, replay: boolean) {
     const tick = e.tick;
+    if(e.kind==='intent-sleep-stop-v1'){
+      const p=intentSleepStopV1Schema.parse(e.payload),history=this.intentHistoryOf(p.soulId);
+      const entry=history.intents[p.intent.intentId],m=this.minds.get(p.soulId);
+      const latest=Object.values(history.intents)
+        .filter(v=>v.revision.source.ownerId===m?.owner&&v.revision.interpretation.trigger.kind==='now')
+        .sort((a,b)=>b.revision.submitted.seq-a.revision.submitted.seq)[0];
+      if(!this.extra.intentHumanSleepTransitionV1||p.worldId!==this.worldId||!m||m.entityId!==p.entityId
+        ||entry?.status!=='active'||entry.revision.version!==p.intent.version
+        ||latest?.revision.intentId!==p.intent.intentId||latest.revision.version!==p.intent.version
+        ||entry.revision.interpretation.humanGoalPlan?.kind!=='planned')throw Error('human-sleep-transition.invalid-purpose');
+    }
     // where the actor's plan stood just before this play (a play further down the plan must not skip a step that was possible)
     const pm = e.kind === 'play' ? this.minds.get((e.payload as PlayPayload).soulId) : undefined;
     const reach = pm && pm.agendaPos < pm.agenda.length ? frontier(this, pm) : -1;
@@ -719,6 +734,11 @@ export class WorldHost {
     if(e.kind==='station-cue-v2'||e.kind==='station-anchor-v2')
       this.extra.stationV2=foldStationFactV2(this.stationHistoryV2()!,this.stationHistoryV1()!,e,this.stationPhysicalHeadV1()!);
     switch (e.kind) {
+      case 'intent-sleep-stop-v1': {
+        const p=intentSleepStopV1Schema.parse(e.payload);this.extra.intentHumanSleepTransitionsV1??={};
+        (this.extra.intentHumanSleepTransitionsV1 as Record<string,IntentSleepStopV1>)[p.soulId]=p;
+        const m=this.minds.get(p.soulId)!;m.nextEvalTick=tick+1;m.evalTrigger='new-intent-v2';m.lastFingerprint='';this.acc.dirty.add(m.soulId);break;
+      }
       case 'intent-request-v2': {
         const p = intentReceivedPayloadV2Schema.parse(e.payload);
         if (p.worldId !== this.worldId) throw new Error('private request belongs to another world');
@@ -883,6 +903,7 @@ export class WorldHost {
         if(p?.intentNativeSequenceCompletionV1===true)this.extra.intentNativeSequenceCompletionV1=true;
         if(p?.intentExecutionRetentionV1===true)this.extra.intentExecutionRetentionV1=true;
         if(p?.intentApproachRetentionV1===true)this.extra.intentApproachRetentionV1=true;
+        if(p?.intentHumanSleepTransitionV1===true)this.extra.intentHumanSleepTransitionV1=true;
         if(p?.intentSequencesV1===true&&!this.extra.intentSequencesV1){this.extra.intentSequencesV1=true;this.extra.intentSequencesSinceV1=e.seq;}
         if (p?.kernelBootstrap || p?.vocabulary || p?.adoptCamp || p?.commonsTransition || p?.campExpansion) this.kernelDirty = true;
         if(p?.commonsTransition||p?.campExpansion)for(const m of this.minds.values()){
@@ -915,6 +936,32 @@ export class WorldHost {
   enableQuietLandingCourtesyV1(){return this.enqueue('rules','operator:quiet-landing-courtesy',{runtimePolicy:{sleepBlockTicks:1200,...this.extra.runtimePolicy as object,quietLandingCourtesyV1:true},why:'allow ordinary native traffic step for a free idle landing blocker while existing natural quiet drains'});}
   enableIntentArrivalsV1(){if(this.extra.intentArrivalV1)return Promise.resolve();return this.enqueue('rules','operator:intent-arrival',{intentArrivalV1:true,runtimePolicy:{sleepBlockTicks:1200,...this.extra.runtimePolicy as object,nativeArrivalWitnessV1:true},why:'prospective private native navigation arrival witnesses; retain old history grammar'});}
   enableIntentNativeSequenceCompletionV1(){if(this.extra.intentNativeSequenceCompletionV1)return Promise.resolve();return this.enqueue('rules','operator:intent-native-sequence-completion',{intentNativeSequenceCompletionV1:true,why:'prospectively advance typed owner sequence only after matching accepted native programme completion; retain failed/interrupted steps and historical semantic sequence behaviour'});}
+  enableIntentHumanSleepTransitionV1(){if(this.extra.intentHumanSleepTransitionV1)return Promise.resolve();return this.enqueue('rules','operator:human-sleep-transition',{intentHumanSleepTransitionV1:true,why:'prospective owner-scoped native sleep stop; actual safe rise before fresh admission'});}
+  pendingHumanSleepTransitionV1(soulId:string){const p=(this.extra.intentHumanSleepTransitionsV1 as Record<string,IntentSleepStopV1>|undefined)?.[soulId];return !!p&&this.engine.programOf(p.entityId)===p.programId;}
+  enqueueHumanSleepStopV1(soulId:string,intent:PurposeRef,program:import('@sim/engine-contract').Program,guard:AcceptanceGuard){
+    const m=this.minds.get(soulId),programId=m?previewHumanSleepStopV1(this,m,program):null;if(!m||!programId)return Promise.reject(new StaleIntentAttempt());
+    const p=intentSleepStopV1Schema.parse({contract:'private-intent-sleep-stop/1',worldId:this.worldId,soulId,entityId:m.entityId,intent,programId});
+    const current:AcceptanceGuard=()=>{
+      checkAcceptanceGuard(guard);
+      const row=this.db.soul(soulId),history=this.intentHistoryOf(soulId),entry=history.intents[intent.intentId];
+      const latest=Object.values(history.intents)
+        .filter(v=>v.revision.source.ownerId===m.owner&&v.revision.interpretation.trigger.kind==='now')
+        .sort((a,b)=>b.revision.submitted.seq-a.revision.submitted.seq)[0];
+      if(this.pendingHumanSleepTransitionV1(soulId)||this.minds.get(soulId)!==m||!row
+        ||row.world_id!==this.worldId||row.retired_at!==null||row.owner!==m.owner||row.entity_id!==m.entityId
+        ||this.kernel.things[soulId]?.traits.body!==m.entityId||m.activeRule||m.agendaPos<m.agenda.length
+        ||entry?.status!=='active'||entry.revision.version!==intent.version||entry.revision.source.ownerId!==m.owner
+        ||entry.revision.interpretation.humanGoalPlan?.kind!=='planned'
+        ||latest?.revision.intentId!==intent.intentId||latest.revision.version!==intent.version
+        ||previewHumanSleepStopV1(this,m,program)!==programId)throw new StaleIntentAttempt();
+      const step=entry.revision.interpretation.agenda[this.intentSequenceStepV1(soulId,intent)];
+      const card=step?this.kernel.vocab.cards[step.card]:undefined;
+      if(!card||step.target!==null||program.label!==card.name
+        ||hashOf(program.steps)!==hashOf([...card.approach,...card.during]))throw new StaleIntentAttempt();
+      return true;
+    };
+    return this.enqueueChecked('intent-sleep-stop-v1','world:human-sleep-stop',p,current);
+  }
   enableIntentExecutionRetentionV1(){if(this.extra.intentExecutionRetentionV1)return Promise.resolve();return this.enqueue('rules','operator:intent-execution-retention',{intentExecutionRetentionV1:true,why:'prospectively retain the latest admitted owner typed goal until native programme completion or explicit authority/intent/physical interruption'});}
   enableIntentApproachRetentionV1(){if(this.extra.intentApproachRetentionV1)return Promise.resolve();return this.enqueue('rules','operator:intent-approach-retention',{intentApproachRetentionV1:true,why:'retain the latest admitted owner purpose through unfinished native locomotion/seating before autonomous redirection; preserve prior replay'});}
   enableIntentSequencesV1(){if(this.extra.intentSequencesV1)return Promise.resolve();return this.enqueue('rules','operator:intent-sequences',{intentSequencesV1:true,worldEvent:{id:'intent-sequences-enabled',text:'Residents can follow the steps of their current directions.'},why:'enable purpose-bound card progress while preserving earlier intentions'});}
