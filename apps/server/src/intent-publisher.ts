@@ -48,7 +48,7 @@ export class IntentPublisher {
     const guard = this.preparationFence(scope, reservation);
     const interpretation = await interpret(guard);
     checkAcceptanceGuard(guard);
-    const combined=()=>{guard();extraGuard?.();return true as const;};return this.publish(scope, reservation, interpretation, combined);
+    const combined=()=>{checkAcceptanceGuard(guard);if(extraGuard)checkAcceptanceGuard(extraGuard);return true as const;};return this.publish(scope, reservation, interpretation, combined);
   }
   private preparationFence(scope: IntentRequestScope, reservation: OwnedReservation): AcceptanceGuard {
     if (reservation.key.worldId !== scope.worldId || reservation.key.soulId !== scope.soulId

@@ -168,7 +168,7 @@ export class IntentControlV2 {
         checkAcceptanceGuard(guard);
         if(!result?.ok||!result.alignment)throw new InterpretationUnavailable();
         return {summary:result.alignment.understanding,agenda:result.agenda,trigger:result.alignment.trigger};
-      },()=>{goalGuard?.();return true;});
+      },()=>{if(goalGuard)checkAcceptanceGuard(goalGuard);return true;});
     } catch(error) {
       // This is private worker history, never physics/fulfilment or public log.
       // The trusted lease can record refusal after revocation; access still

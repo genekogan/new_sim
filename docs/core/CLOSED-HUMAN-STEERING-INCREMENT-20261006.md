@@ -57,7 +57,7 @@ reservations. Ordinary gates/default production1, configured budgets and rolling
 ledger bounds remain; non-loopback configuration cannot select local3. Synthetic
 reservation tests settle to zero; no real provider spend or ledger reset.
 
-Evidence:15 focused tests pass (ten native/compiler/authority cases, two budget
+Evidence:16 focused tests pass (eleven native/compiler/authority cases, two budget
 cases, three schema cases). Actual distant/nearby bench contact/facing/live claim,
 already-sat acknowledgment and intervening native stand negative; original intents
 and SQLite snapshot preserved; actual walking/rest/eating; empty food/six occupied
@@ -80,3 +80,5 @@ Next: matching App DTO/copy and selected keeper review, one PM-authorized change
 actual-world bench case with original request/controller/native seat/latency;
 complete supported-action registry/selector/replanning coverage; canonical existing
 green anchor; real-owner/agent, newcomer resources and production package gates.
+
+Additional publication guards are checked for synchronous true; false or a Promise cannot masquerade as native revalidation. Both isolated negatives pass.
