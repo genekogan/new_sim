@@ -69,6 +69,8 @@ export interface Engine {
   readonly schema: string;
   readonly runtime: RuntimeView;
   readonly world: WorldState;
+  previewEdenGroundV1?():{ok:true;transition:import('./eden-ground.ts').EdenGroundTransitionV1}|{ok:false;diagnostic:{code:string}};
+  adoptEdenGroundV1?(fact:import('./eden-ground.ts').EdenGroundTransitionV1):void;
   previewEdenLectureV1?(placement:import('./eden-lecture.ts').EdenLecturePlacementV1):{ok:true;transition:import('./eden-lecture.ts').EdenLectureTransitionV1}|{ok:false;diagnostic:{code:string}};
   adoptEdenLectureV1?(fact:import('./eden-lecture.ts').EdenLectureTransitionV1):void;
   describeVerbs(): VerbInfo[];

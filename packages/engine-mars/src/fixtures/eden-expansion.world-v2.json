@@ -1,0 +1,852 @@
+{
+  "schema": "eden-expansion-placement/1",
+  "revision": "20261006-world-v2-ground-presenter",
+  "status": "World visible assembly / proposed for Core native admission; no new canonical support inferred",
+  "worldId": "pm-preview-eden-20261005",
+  "units": "metres",
+  "axes": {
+    "up": "Y",
+    "ground": "XZ",
+    "humanYawZero": "+X",
+    "renderRotationY": "-yaw"
+  },
+  "boundsXZ": [
+    -100,
+    -65,
+    105,
+    85
+  ],
+  "preserve": [
+    "all original actor/owner/history/resource roots",
+    "original native commons and35x25shore"
+  ],
+  "nativeFirstFloorRequests": [
+    {
+      "id": "eden-east-ground",
+      "boundsXZ": [
+        30,
+        -30,
+        105,
+        85
+      ],
+      "y": 0
+    },
+    {
+      "id": "eden-north-ground",
+      "boundsXZ": [
+        -20,
+        -65,
+        30,
+        -30
+      ],
+      "y": 0
+    }
+  ],
+  "classroom": {
+    "id": "eden-classroom-1",
+    "floorId": "eden-classroom-floor",
+    "boundsXZ": [
+      34,
+      -19,
+      50,
+      2
+    ],
+    "floorY": 0,
+    "openEntrance": [
+      42,
+      0,
+      2
+    ],
+    "centralAisleXZ": [
+      40.65,
+      -12.8,
+      43.35,
+      2
+    ],
+    "stage": {
+      "id": "eden-classroom-stage-1",
+      "boundsXZ": [
+        38,
+        -16.5,
+        46,
+        -13.5
+      ],
+      "topY": 0.24,
+      "steps": [
+        {
+          "id": "eden-classroom-step-1",
+          "boundsXZ": [
+            38,
+            -13.5,
+            40,
+            -12.9
+          ],
+          "topY": 0.12
+        },
+        {
+          "id": "eden-classroom-step-2",
+          "boundsXZ": [
+            38,
+            -14.1,
+            40,
+            -13.5
+          ],
+          "topY": 0.24
+        }
+      ],
+      "status": "decorative unoccupied backdrop in first functional lecture; proper dais/steps support pending Core"
+    },
+    "lectern": {
+      "id": "eden-classroom-lectern-1",
+      "def": "speaker-lectern",
+      "p": [
+        42,
+        0,
+        -11.9
+      ],
+      "fixtureYaw": 0,
+      "presenterSlot": "presenter",
+      "presenterP": [
+        42,
+        0,
+        -12.75
+      ],
+      "presenterYaw": 1.5707963267948966,
+      "support": "ground-level0"
+    },
+    "screen": {
+      "id": "eden-classroom-screen-1",
+      "def": "standing-display",
+      "p": [
+        42,
+        0,
+        -17
+      ],
+      "fixtureYaw": 0,
+      "nativeCatalogSize": [
+        1.6,
+        1.65,
+        0.36
+      ],
+      "localProjectionPanel": {
+        "centre": [
+          42,
+          2.25,
+          -18.35
+        ],
+        "size": [
+          4.8,
+          2.7
+        ],
+        "front": "+Z",
+        "collision": false,
+        "semantics": "local lesson projection associated with native display; not native shared content"
+      }
+    },
+    "chairs": [
+      {
+        "id": "eden-classroom-seat-01",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          38,
+          0,
+          -10
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          37.725,
+          -10.275,
+          38.275,
+          -9.725
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          38,
+          0,
+          -9.1
+        ]
+      },
+      {
+        "id": "eden-classroom-seat-02",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          40,
+          0,
+          -10
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          39.725,
+          -10.275,
+          40.275,
+          -9.725
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          40,
+          0,
+          -9.1
+        ]
+      },
+      {
+        "id": "eden-classroom-seat-03",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          44,
+          0,
+          -10
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          43.725,
+          -10.275,
+          44.275,
+          -9.725
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          44,
+          0,
+          -9.1
+        ]
+      },
+      {
+        "id": "eden-classroom-seat-04",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          46,
+          0,
+          -10
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          45.725,
+          -10.275,
+          46.275,
+          -9.725
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          46,
+          0,
+          -9.1
+        ]
+      },
+      {
+        "id": "eden-classroom-seat-05",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          38,
+          0,
+          -7.8
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          37.725,
+          -8.075,
+          38.275,
+          -7.5249999999999995
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          38,
+          0,
+          -6.8999999999999995
+        ]
+      },
+      {
+        "id": "eden-classroom-seat-06",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          40,
+          0,
+          -7.8
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          39.725,
+          -8.075,
+          40.275,
+          -7.5249999999999995
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          40,
+          0,
+          -6.8999999999999995
+        ]
+      },
+      {
+        "id": "eden-classroom-seat-07",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          44,
+          0,
+          -7.8
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          43.725,
+          -8.075,
+          44.275,
+          -7.5249999999999995
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          44,
+          0,
+          -6.8999999999999995
+        ]
+      },
+      {
+        "id": "eden-classroom-seat-08",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          46,
+          0,
+          -7.8
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          45.725,
+          -8.075,
+          46.275,
+          -7.5249999999999995
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          46,
+          0,
+          -6.8999999999999995
+        ]
+      },
+      {
+        "id": "eden-classroom-seat-09",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          38,
+          0,
+          -5.6
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          37.725,
+          -5.875,
+          38.275,
+          -5.324999999999999
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          38,
+          0,
+          -4.699999999999999
+        ]
+      },
+      {
+        "id": "eden-classroom-seat-10",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          40,
+          0,
+          -5.6
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          39.725,
+          -5.875,
+          40.275,
+          -5.324999999999999
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          40,
+          0,
+          -4.699999999999999
+        ]
+      },
+      {
+        "id": "eden-classroom-seat-11",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          44,
+          0,
+          -5.6
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          43.725,
+          -5.875,
+          44.275,
+          -5.324999999999999
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          44,
+          0,
+          -4.699999999999999
+        ]
+      },
+      {
+        "id": "eden-classroom-seat-12",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          46,
+          0,
+          -5.6
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          45.725,
+          -5.875,
+          46.275,
+          -5.324999999999999
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          46,
+          0,
+          -4.699999999999999
+        ]
+      },
+      {
+        "id": "eden-classroom-seat-13",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          38,
+          0,
+          -3.4
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          37.725,
+          -3.675,
+          38.275,
+          -3.125
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          38,
+          0,
+          -2.5
+        ]
+      },
+      {
+        "id": "eden-classroom-seat-14",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          40,
+          0,
+          -3.4
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          39.725,
+          -3.675,
+          40.275,
+          -3.125
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          40,
+          0,
+          -2.5
+        ]
+      },
+      {
+        "id": "eden-classroom-seat-15",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          44,
+          0,
+          -3.4
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          43.725,
+          -3.675,
+          44.275,
+          -3.125
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          44,
+          0,
+          -2.5
+        ]
+      },
+      {
+        "id": "eden-classroom-seat-16",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          46,
+          0,
+          -3.4
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          45.725,
+          -3.675,
+          46.275,
+          -3.125
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          46,
+          0,
+          -2.5
+        ]
+      },
+      {
+        "id": "eden-classroom-seat-17",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          38,
+          0,
+          -1.2
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          37.725,
+          -1.475,
+          38.275,
+          -0.9249999999999999
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          38,
+          0,
+          -0.29999999999999993
+        ]
+      },
+      {
+        "id": "eden-classroom-seat-18",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          40,
+          0,
+          -1.2
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          39.725,
+          -1.475,
+          40.275,
+          -0.9249999999999999
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          40,
+          0,
+          -0.29999999999999993
+        ]
+      },
+      {
+        "id": "eden-classroom-seat-19",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          44,
+          0,
+          -1.2
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          43.725,
+          -1.475,
+          44.275,
+          -0.9249999999999999
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          44,
+          0,
+          -0.29999999999999993
+        ]
+      },
+      {
+        "id": "eden-classroom-seat-20",
+        "def": "camp-chair",
+        "kind": "fixture",
+        "p": [
+          46,
+          0,
+          -1.2
+        ],
+        "fixtureYaw": 3.141592653589793,
+        "seatSlot": "seat",
+        "seatedHumanYaw": -1.5707963267948966,
+        "footprintXZ": [
+          45.725,
+          -1.475,
+          46.275,
+          -0.9249999999999999
+        ],
+        "seatHeight": 0.45,
+        "approach": [
+          46,
+          0,
+          -0.29999999999999993
+        ]
+      }
+    ],
+    "demonstration": {
+      "presenterCount": 1,
+      "seatedAttendeeCount": 8,
+      "authority": "Core native actors/claims/facing/activity only; World creates no demonstration actors"
+    },
+    "presenterReturnChairProposal": {
+      "id": "eden-classroom-presenter-return-seat",
+      "def": "camp-chair",
+      "p": [
+        47,
+        0,
+        -12
+      ],
+      "fixtureYaw": 3.141592653589793,
+      "status": "proposed ground return chair; actual Core admission/aisle clearance required"
+    }
+  },
+  "routes": [
+    {
+      "id": "eden-east-spine",
+      "width": 2.4,
+      "points": [
+        [
+          18,
+          0,
+          5
+        ],
+        [
+          28,
+          0,
+          5
+        ],
+        [
+          36,
+          0,
+          4
+        ],
+        [
+          42,
+          0,
+          2
+        ]
+      ]
+    },
+    {
+      "id": "eden-residential-path",
+      "width": 2.4,
+      "points": [
+        [
+          28,
+          0,
+          5
+        ],
+        [
+          62,
+          0,
+          5
+        ],
+        [
+          62,
+          0,
+          24
+        ],
+        [
+          28,
+          0,
+          24
+        ],
+        [
+          62,
+          0,
+          24
+        ],
+        [
+          62,
+          0,
+          38
+        ],
+        [
+          28,
+          0,
+          38
+        ]
+      ],
+      "reason": "Exterior south-facing home access; originalend54,30 wasinsidehouse4. Exactdoor branches suppliedbyAssets/Core; no wall traversal."
+    },
+    {
+      "id": "eden-farm-path",
+      "width": 2.4,
+      "points": [
+        [
+          42,
+          0,
+          20
+        ],
+        [
+          48,
+          0,
+          40
+        ],
+        [
+          75,
+          0,
+          50
+        ]
+      ]
+    },
+    {
+      "id": "eden-north-path",
+      "width": 2.4,
+      "points": [
+        [
+          9,
+          0,
+          -12
+        ],
+        [
+          9,
+          0,
+          -28
+        ],
+        [
+          9,
+          0,
+          -40
+        ]
+      ]
+    }
+  ],
+  "regions": [
+    {
+      "id": "eden-housing",
+      "boundsXZ": [
+        28,
+        8,
+        62,
+        38
+      ]
+    },
+    {
+      "id": "eden-library",
+      "boundsXZ": [
+        66,
+        -13,
+        82,
+        -1
+      ]
+    },
+    {
+      "id": "eden-office",
+      "boundsXZ": [
+        84,
+        7,
+        100,
+        23
+      ]
+    },
+    {
+      "id": "eden-market",
+      "boundsXZ": [
+        63,
+        23,
+        77,
+        35
+      ]
+    },
+    {
+      "id": "eden-barn",
+      "boundsXZ": [
+        80,
+        43,
+        96,
+        59
+      ]
+    },
+    {
+      "id": "eden-gardens-farm",
+      "boundsXZ": [
+        28,
+        40,
+        78,
+        75
+      ]
+    },
+    {
+      "id": "eden-north-forest",
+      "boundsXZ": [
+        -15,
+        -60,
+        25,
+        -32
+      ]
+    },
+    {
+      "id": "eden-west-nature",
+      "boundsXZ": [
+        -100,
+        -45,
+        -62,
+        65
+      ],
+      "nativeStatus": "visual-only until new terrain/water/support admitted"
+    }
+  ]
+}

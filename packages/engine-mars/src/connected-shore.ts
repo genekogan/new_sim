@@ -13,7 +13,7 @@ import type {Diagnostic} from '../../../mars/viewer/engine/actions/types.ts';
 import type {Entity,WorldState} from '../../../mars/viewer/engine/world/types.ts';
 import type {SpatialScene} from '../../../mars/viewer/engine/spatial/types.ts';
 export const CONNECTED_SHORE_TRANSFORM=Object.freeze({x:-46,y:-2,z:0,flatShoulderColumns:2});
-export async function connectedCommonsShoreFixture(support?:{version:'connected-boat/1';bodyContact:(rt:Runtime,e:Entity)=>Diagnostic[]|null;transferSpeed:number}){
+export async function connectedCommonsShoreFixture(support?:{version:'connected-boat/1';bodyContact:(rt:Runtime,e:Entity)=>Diagnostic[]|null;transferSpeed:number},ground?:{version:'eden-expansion-ground/1';rectangles:{id:string;boundsXZ:[number,number,number,number]}[]}){
   const m=await loadMars(),source=JSON.parse(readFileSync(new URL('./fixtures/shore-bed.v1.json',import.meta.url),'utf8'));
   // Keep the reviewed shore's heights/slope/depth. Place its top at the west
   // edge of the unmodified commons ground. Two new flat columns provide a
@@ -27,8 +27,9 @@ export async function connectedCommonsShoreFixture(support?:{version:'connected-
     sweep(from,to,radius,grade){const p=bed.sweep({fromXZ:from,toXZ:to,radiusMetres:radius,maxGrade:grade});return {ok:p.geometryStatus==='clear',reason:p.reason,spans:p.centreline};},
   } satisfies ShoreGeometry);
   const commons=m.edenCommonsWorld('base') as WorldState,scene=structuredClone(m.scenes[commons.base.campus]) as SpatialScene;scene.bounds=[-62,-30,30,30];
-  const rulesVersion='native-commons-shore/1+'+(support?support.version+'+':'')+m.rulesVersion;
-  const base={campus:'eden-commons-shore/1',staticHash:hashOf({scene,terrain,water,rulesVersion,policy:SHORE_POLICY,transform:CONNECTED_SHORE_TRANSFORM,sourceHash:hashOf(source)})};
+  if(ground){for(const r of ground.rectangles){const [x0,z0,x1,z1]=r.boundsXZ;if(!(x0<x1&&z0<z1)||x0< -29.5)throw Error('eden-ground.invalid-dry-extension');scene.surfaces.push({id:r.id,level:0,y:0,obb:{c:[(x0+x1)/2,(z0+z1)/2],half:[(x1-x0)/2,(z1-z0)/2],yaw:0}});scene.bounds=[Math.min(scene.bounds[0],x0),Math.min(scene.bounds[1],z0),Math.max(scene.bounds[2],x1),Math.max(scene.bounds[3],z1)];}}
+  const rulesVersion='native-commons-shore/1+'+(ground?'eg/1+':'')+(support?support.version+'+':'')+m.rulesVersion;
+  const base={campus:ground?'eden-commons-shore-expanded/1':'eden-commons-shore/1',staticHash:hashOf({scene,terrain,water,rulesVersion,policy:SHORE_POLICY,transform:CONNECTED_SHORE_TRANSFORM,sourceHash:hashOf(source)})};
   const services=m.servicesFor({[base.campus]:scene}),registry=m.createRegistry();
   const oldWalk=registry.get('walk_to')!;
   registry.set('walk_to',{...oldWalk,plan(rt:Runtime,p:{actor:string;x:number;z:number;level?:number}){
