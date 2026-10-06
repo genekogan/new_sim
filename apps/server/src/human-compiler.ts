@@ -36,12 +36,17 @@ export async function compileHumanGoalV1(brain:Brain,m:Mind,words:string,strict:
  if(/\b(?:not|never)\s+sit\b/i.test(words)&&output.goals.some(g=>g.goal==='sit'||g.goal==='activity'&&initial.bindings.get(g.bindingId)?.steps.some(s=>s.verb==='sit')))return failure('invalid_plan','The plan contradicts the instruction not to sit.');
  if(output.trigger.kind==='gathering'&&brain.host.kernel.things[output.trigger.host]?.kind!=='soul')return failure('unknown_binding','The conditional gathering does not identify a known Soul.');
  if(/\b(?:every|when|if|tomorrow|later)\b|\bat\s+\d/i.test(words)&&output.trigger.kind==='now')return failure('invalid_plan','The plan made a conditional or future direction immediate.');
- const requested=words.trim().toLowerCase().replace(/[.!]$/,'').replace(/\s+(?:now|please)$/,'').match(/(?:go to|walk to|hang out by|hang out at|sit on)\s+(.+)$/)?.[1]?.replace(/^the /,'');
+ const clauses=words.trim().toLowerCase().split(/\s*,?\s+then\s+(?=(?:go to|walk to|hang out by|hang out at|sit on|eat|rest|greet|talk|chat)\b)/);
+ for(const [index,clause] of clauses.entries()){
+ const match=clause.replace(/[.!]$/,'').replace(/\s+(?:now|please)$/,'').match(/(go to|walk to|hang out by|hang out at|sit on)\s+(.+)$/),requested=match?.[2]?.replace(/^the /,'');
  if(requested&&!/^(?:a |an |the )?(?:supported )?bench$/.test(requested)){
-  const wanted=[...initial.bindings.values()].filter(b=>b.aliases.includes(requested));
-  if(wanted.length){if(output.goals.some(g=>'bindingId' in g&&!wanted.some(b=>b.id===g.bindingId)))return failure('invalid_plan','The plan changed the explicitly named target.');}
+  const goal=match![1]==='sit on'?'sit':match![1].startsWith('hang out')?'hang_out':'walk';
+  const wanted=[...initial.bindings.values()].filter(b=>b.goal===goal&&b.aliases.includes(requested));
+  const selected=output.goals[index];
+  if(wanted.length){if(!selected||!('bindingId' in selected)||!wanted.some(b=>b.id===selected.bindingId))return failure('invalid_plan','The plan changed the explicitly named target or its sequence step.');}
   else if(requested==='garden'&&!strict&&output.adaptation){const b=initial.bindings.get(output.adaptation.substituteBindingId);if(!b?.green)return failure('invalid_plan','The substitute is not a registered related green landmark.');}
   else return failure('invalid_plan','The requested named target is not registered; clarification is required.');
+ }
  }
  const normalized=' '+words.toLowerCase().replace(/[^\p{L}\p{N}_-]+/gu,' ')+' ',namedSouls=new Set([...initial.bindings.values()].filter(b=>b.targetId&&brain.host.kernel.things[b.targetId]?.kind==='soul'&&normalized.includes(' '+brain.host.kernel.things[b.targetId].name.toLowerCase().replace(/[^\p{L}\p{N}_-]+/gu,' ')+' ')).map(b=>b.targetId!));
  if(namedSouls.size===1&&/\b(?:greet|talk with|chat with)\b/i.test(words)&&!output.goals.some(g=>g.goal==='activity'&&(()=>{const b=initial.bindings.get(g.bindingId);return b?.targetId&&namedSouls.has(b.targetId)&&b.card.then.some(effect=>'say' in effect);})()))return failure('invalid_plan','The plan changed the named recipient or omitted the requested social speech effect.');

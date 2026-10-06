@@ -15,6 +15,18 @@ import {WorldHost} from './world.ts';
 import {kernelHash} from '@sim/kernel';
 import {publicEvent} from '@sim/protocol';
 const factory=await retainedCommonsShoreFactory({foodDeliveryV1:true});
+test('explicit named targets bind their own ordered steps instead of every later goal',async t=>{
+ let mode='valid';const socialFactory=await retainedCommonsShoreFactory({foodDeliveryV1:true,socialEdenV1:true});
+ const f=await harness(t,input=>{
+  const walk={goal:'walk',bindingId:'walk:social-eden-fire'},sit={goal:'sit',bindingId:'sit:social-eden-fire-bench-north',seconds:60};
+  const goals=mode==='reversed'?[sit,walk]:mode==='omitted'?[sit]:mode==='substituted'?[walk,{...sit,bindingId:'sit:social-eden-fire-bench-south'}]:mode==='rest-first'?[{goal:'rest',seconds:2},sit]:[walk,sit];
+  return {kind:'plan',registryHash:input.registry.registryHash,goals,explanation:'Keep each named destination in its requested step.',trigger:{kind:'now'}};
+ },socialFactory);await accept(f.host,f.host.installSocialEdenV1());
+ const words='Go to the campfire, then sit on the north bench by the campfire.';
+ const good=await f.submit(words,'ordered-targets');assert.equal(good.phase,'understood',JSON.stringify(good));
+ for(const invalid of ['reversed','omitted','substituted']){mode=invalid;const before=Object.keys(f.host.intentHistoryOf(f.row.id).intents),r=await f.submit(words,'ordered-'+invalid);assert.equal(r.phase,'refused');if(r.phase==='refused')assert.equal(r.code,'compilation-failure.invalid_plan');assert.deepEqual(Object.keys(f.host.intentHistoryOf(f.row.id).intents),before);}
+ mode='rest-first';const rested=await f.submit('Rest briefly, then sit on the north bench by the campfire.','rest-before-target');assert.equal(rested.phase,'understood',JSON.stringify(rested));assert.equal(f.db.paidCost(),0);
+});
 async function harness(t:any,model?:(input:any)=>unknown,engineFactory=factory){
  const f=fixture(':memory:',engineFactory,{durableClockV1:true});f.souls.enableLifecycle();await accept<unknown>(f.host,new LivingWorld(f.host).install(['People may follow directions and rest.']));for(let i=0;i<4;i++)f.host.tickOnce();await invite(f,'alice');await invite(f,'bob');const row=await accept(f.host,f.souls.create('dev:alice',{name:'Alice',description:'Synthetic closed steering owner'}));f.brain.quiesce();let calls=0;
  const compilerCall:typeof callTool=async<T>(o:any)=>{calls++;if(!model)throw Error('basic goal unexpectedly called a model');const input=JSON.parse(o.messages[0].content),out=model(input);return {out:out as T,ms:0,inputTokens:0,outputTokens:0,cachedTokens:0,costUsd:0,request:null,raw:{synthetic:true}};};
