@@ -24,6 +24,8 @@ export type MidContext = {
   /** Tagged current physical-place wording for call relevance. Legacy contexts
    * omit it; raw coordinates/tick never make every movement a fresh call. */
   physicalWhere?: string;
+  /** Optional bounded native physical summaries; no clock/positions/private words. */
+  nativeActivities?:string[];
   world: { time: string; weather: string; happening: string };
   soul: { name: string; about: string; intent: string; ownerNote: string | null; hasIntent: boolean; intentIsNew: boolean; energy: string; where: string; doing: string; recent: string[]; needs?: Needs; journal?: string;mandate?:{id:string;words:string;strict:boolean;understanding:string}[] };
   customs?: string[];
@@ -53,6 +55,7 @@ export type MidContext = {
 export type MidRequest = { request: JevRequest; keys: Map<string, string> };
 
 export function buildMidRequest(c: MidContext): MidRequest {
+  if(c.nativeActivities&&(c.nativeActivities.length>16||c.nativeActivities.some(s=>typeof s!=='string'||s.length>400)))throw Error('mid.native-activity-context-overflow');
   if(c.purposeRecall?.state==='overflow')throw Error('mid.private-purpose-context-overflow');
   if(c.purposeExperiences&&c.purposeExperiences.episodes.length>3)throw Error('mid.private-purpose-experiences-overflow');
   const keys = optionKeys(c.options.map((o) => ({ id: o.id, name: o.label })));
@@ -67,6 +70,7 @@ export function buildMidRequest(c: MidContext): MidRequest {
     ...(c.purposeRecall?{owner_purpose_recall:c.purposeRecall}:{}),
     ...(c.purposeExperiences?{owner_experiences:c.purposeExperiences}:{}),
     ...(c.soul.mandate?{mandate:c.soul.mandate}:{}),
+    ...(c.nativeActivities?.length?{local_native_activities:c.nativeActivities}:{}),
     world: c.world,
     soul: {
       name: c.soul.name,
@@ -98,6 +102,7 @@ export function buildMidRequest(c: MidContext): MidRequest {
           '`soul.energy` and `soul.recently`',
           ...(c.soul.needs ? ['`soul.needs`, `soul.journal` and `customs`: reasons to choose, never a timetable'] : []),
           '`nearby`',
+          ...(c.nativeActivities?.length?['`local_native_activities` reports actual current physical phases and occupied seats within a bounded distance. It does not establish line of sight, private intentions, permission to join or control another body. Choose only enumerated feasible options; control acceptance is distinct from physical cleanup.']:[]),
           ...(c.situation?.length ? ['`soul.situation`'] : []),
           ...(c.heard?.length ? ['`said_to_you`: someone is waiting for a response'] : []),
           ...(c.nudge ? ['`storyteller_suggests`, a suggestion that the intent outranks'] : []),
@@ -185,7 +190,7 @@ export function fallbackMid(c: MidContext, seed: string): MidDecision {
 }
 
 /** Fingerprint of what the model would see; unchanged + still running ⇒ skip the call. */
-export const fingerprint = (c: MidContext) => JSON.stringify([c.soul.mandate,c.soul.intent, c.soul.energy, c.soul.doing, c.nearby, c.nudge, c.options.map((o) => o.id), c.world.happening, c.situation, c.heard,...(c.physicalWhere===undefined?[]:[c.physicalWhere]),...(c.purposeExperiences===undefined?[]:[c.purposeExperiences.episodes])]);
+export const fingerprint = (c: MidContext) => JSON.stringify([c.soul.mandate,c.soul.intent, c.soul.energy, c.soul.doing, c.nearby, c.nudge, c.options.map((o) => o.id), c.world.happening, c.situation, c.heard,...(c.physicalWhere===undefined?[]:[c.physicalWhere]),...(c.nativeActivities===undefined?[]:[c.nativeActivities]),...(c.purposeExperiences===undefined?[]:[c.purposeExperiences.episodes])]);
 
 /** Attune a Soul's manners to its description: one Noul per manner, keep the best three. */
 export function buildAttuneRequest(soul: { name: string; about: string }, manners: Record<string, { summary: string }>): JevRequest {

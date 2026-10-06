@@ -1,3 +1,4 @@
+import {nativeActivityContextV1} from './native-activity-context.ts';
 import {latestPurposeDirectionV1} from './latest-purpose-direction.ts';
 import {purposeEpisodesV1,episodeJournalV1,purposeExperienceContextV1} from './purpose-episodes.ts';
 import {compileHumanGoalV1,type ClosedHumanResultV1} from './human-compiler.ts';
@@ -76,6 +77,7 @@ export class Brain {
   /** Isolated backend qualification switch. No environment/route activation. */
   private readonly intentV2Choices: boolean;
   private readonly intentV2Retries: boolean;
+  private readonly nativeActivityContext: boolean;
   get intentV2Enabled() { return this.intentV2Choices; }
   private purposeWakes = new Map<string, { intentId: string; version: number }>();
   private edenAutonomyV1=false;
@@ -97,9 +99,10 @@ export class Brain {
   }
 
 
-  constructor(host: WorldHost, db: Db, cfg: Config, sink: BrainSink, services?: { compilerCall?: typeof callTool; intentV2Choices?: boolean; intentV2Retries?: boolean }) {
+  constructor(host: WorldHost, db: Db, cfg: Config, sink: BrainSink, services?: { compilerCall?: typeof callTool; intentV2Choices?: boolean; intentV2Retries?: boolean; nativeActivityContextV1?:boolean }) {
     this.host = host; this.db = db; this.cfg = cfg; this.sink = sink;
     this.compilerCall = services?.compilerCall ?? callTool;this.injectedCompiler=!!services?.compilerCall;
+    this.nativeActivityContext = services?.nativeActivityContextV1 === true;
     this.intentV2Choices = services?.intentV2Choices === true;
     this.intentV2Retries = this.intentV2Choices && services?.intentV2Retries === true;
     if(cfg.thinkingBudgetCeiling===3){if(cfg.worldKey!=='eden'||cfg.engine!=='mars'||cfg.worldId!==host.worldId||db!==host.db||!cfg.authorizedThinkingWorldId||cfg.authorizedThinkingWorldId!==cfg.worldId)throw Error('thinking-budget.explicit-Eden-world-authorization-required');this.budgetLimit=3;}
@@ -250,6 +253,7 @@ export class Brain {
     const sit = situationOf(this.host, m);
     const boatControls=eng.observeBoatControls?.(m.entityId);
     const bodyLocation=eng.observeBodyLocation?.(m.entityId);
+    const nativeActivities=this.nativeActivityContext?nativeActivityContextV1(this.host,m):undefined;
     const physicalWhere=bodyLocation===undefined?undefined:bodyLocation===null?'physical location unavailable':describeBodyLocation(bodyLocation);
     const physicalSituation=boatControls?[
       `The nearby boat is ${boatControls.phase}. ${boatControls.holder===m.entityId?'You hold its helm.':boatControls.holder?'Another passenger holds its helm.':'No passenger holds its helm.'}`,
@@ -292,6 +296,7 @@ export class Brain {
     if(!m.activeRule)for(const o of options)if(rules.some(r=>r.agenda.some(s=>matchesStep(this.host,s,o.card,o.cardTarget))))o.servesIntent=true;
     return {
       ...(physicalWhere===undefined?{}:{physicalWhere}),
+      ...(nativeActivities===undefined?{}:{nativeActivities}),
       ...(acting ? { actingPurpose:{ intentId:acting.intentId, version:acting.version } } : {}),
       world: { time: timeWord(w.env.datetime), weather: weatherWord(w.env.weather), happening: this.host.living?.event ?? s.happening },
       ...(this.host.living ? { customs: this.host.living.customs } : {}),
