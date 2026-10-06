@@ -137,6 +137,7 @@ export class MarsEngine implements Engine {
   private leaving: string[] = [];                    // bodies to remove once nothing holds them
   private out: { paths: PathCommit[]; changes: ChangeEvent[]; programs: ProgramEvent[] } = { paths: [], changes: [], programs: [] };
   private recorder: any;
+  private readerRecordingDepth=0;
   private recorderScene!: RenderSceneCaptureV1;
   private renderBaseKey = '';
   private takeScenes = new Map<string,RenderSceneCaptureV1>();
@@ -671,7 +672,9 @@ export class MarsEngine implements Engine {
       ...(this.cfg.scene==='littlemartians'?structuredClone(this.m.littleMartiansRender):{}),
       ground:['greenfield','eden-commons'].includes(this.cfg.scene)?'grass' as const:undefined};
   }
+  readerSetupWithoutRecordingV1<T>(read:()=>T):T{this.readerRecordingDepth++;try{return read();}finally{this.readerRecordingDepth--;}}
   private startRecorder() {
+    if(this.readerRecordingDepth)return;
     // Authored render bases are immutable for this engine instance. Supported
     // campus/clock/config boundaries change this key; actor/object motion is in
     // the take and does not cause repeated hashing of a static render base.
@@ -685,6 +688,7 @@ export class MarsEngine implements Engine {
     for(const hash of this.takeScenes.keys())if(!retained.has(hash))this.takeScenes.delete(hash);
   }
   private finishRecorder() {
+    if(this.readerRecordingDepth)return;
     const take=this.recorder.finish();
     if(this.rt.tick<=take.startTick)return;
     this.chunks.push({fromTick:take.startTick,toTick:this.rt.tick,take});
