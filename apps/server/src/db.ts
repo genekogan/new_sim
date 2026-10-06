@@ -278,7 +278,11 @@ export class Db {
   updateNarrative(id: number, body: NarrativeView) { this.db.prepare('UPDATE narratives SET body = ? WHERE id = ?').run(JSON.stringify(body), id); }
 
   bytes(): number { try { return statSync(this.path).size; } catch { return 0; } }
-  async backupTo(dest: string) { await backup(this.db, dest); }
+  async backupTo(dest: string) {
+    // One complete SQLite step prevents another connection's intervening
+    // writes from repeatedly restarting an incremental100-page copy.
+    await backup(this.db, dest, {rate: 0x7fffffff});
+  }
   close() { this.db.close(); }
 }
 const rowToEvent = (r: any): LogEvent => ({ seq: r.seq, tick: r.tick, kind: r.kind, author: r.author, payload: JSON.parse(r.payload), at: r.at });
