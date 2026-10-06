@@ -484,6 +484,7 @@ export class WorldHost {
   /** React to the engine's progress on depiction programs: apply a card's effects when its approach is done. */
   private afterPrograms(events: ProgramEvent[], replay: boolean) {
     for (const ev of events) {
+      const completedSequenceBinding=ev.kind==='completed'&&this.extra.intentNativeSequenceCompletionV1?Object.values(this.intentBindings()).find(b=>b.payload.activityId===ev.id&&b.payload.decision.entityId===ev.actor):undefined;
       if(!replay)this.observeIntentTerminal(ev);
       const m = this.mindByEntity.get(ev.actor); if (!m) continue;
       const mine = m.pending && m.pending.program === ev.id ? m.pending : null;
@@ -493,6 +494,7 @@ export class WorldHost {
         // during replay the play is already in the log
         if (!replay) void this.enqueue('play', `soul:${m.soulId}`, { soulId: m.soulId, card: mine.card, hash: mine.hash, target: mine.target, ...(mine.manner ? { manner: mine.manner } : {}) } satisfies PlayPayload);
       };
+      if(ev.kind==='completed'&&this.extra.intentNativeSequenceCompletionV1&&mine){const binding=completedSequenceBinding;const entry=binding?this.intentHistoryOf(m.soulId).intents[binding.payload.intent.intentId]:undefined;if(binding&&entry?.status==='active'&&entry.revision.version===binding.payload.intent.version&&entry.revision.interpretation.humanGoalPlan?.kind==='planned'){const index=this.intentSequenceStepV1(m.soulId,binding.payload.intent),step=entry.revision.interpretation.agenda[index];if(step?.card===mine.card&&(step.target??null)===mine.target){const progress=(this.extra.intentSequenceProgressV1??={}) as Record<string,number>;progress[JSON.stringify([m.soulId,binding.payload.intent.intentId,binding.payload.intent.version])]=index+1;}}}
       if (ev.kind === 'step') { if (mine && ev.step >= mine.approachLen) playNow(); }
       else {
         if (ev.kind === 'completed') playNow();
@@ -820,7 +822,7 @@ export class WorldHost {
               const binding=choice?.card===view.card&&choice.target===view.target
                 ?Object.values(this.intentBindings()).find(b=>b.payload.decision.seq===latest!.seq&&b.payload.soulId===m.soulId&&b.payload.decision.entityId===m.entityId):undefined;
               const entry=binding?this.intentHistoryOf(m.soulId).intents[binding.payload.intent.intentId]:undefined;
-              if(binding&&entry?.status==='active'&&entry.revision.version===binding.payload.intent.version){
+              if(binding&&entry?.status==='active'&&entry.revision.version===binding.payload.intent.version&&!(this.extra.intentNativeSequenceCompletionV1&&entry.revision.interpretation.humanGoalPlan?.kind==='planned')){
                 const index=this.intentSequenceStepV1(m.soulId,binding.payload.intent),step=entry.revision.interpretation.agenda[index];
                 if(step&&step.card===view.card&&(!step.target||step.target===view.target)&&(!step.of||belongsTo(this,view.target,step.of))){
                   const progress=(this.extra.intentSequenceProgressV1??={}) as Record<string,number>;progress[JSON.stringify([m.soulId,binding.payload.intent.intentId,binding.payload.intent.version])]=index+1;
@@ -878,6 +880,7 @@ export class WorldHost {
       case 'rules': {
         if(e.payload?.intentArrivalV1)this.extra.intentArrivalV1=true;
         const p = e.payload;
+        if(p?.intentNativeSequenceCompletionV1===true)this.extra.intentNativeSequenceCompletionV1=true;
         if(p?.intentExecutionRetentionV1===true)this.extra.intentExecutionRetentionV1=true;
         if(p?.intentApproachRetentionV1===true)this.extra.intentApproachRetentionV1=true;
         if(p?.intentSequencesV1===true&&!this.extra.intentSequencesV1){this.extra.intentSequencesV1=true;this.extra.intentSequencesSinceV1=e.seq;}
@@ -911,6 +914,7 @@ export class WorldHost {
   get quietBarrier() { return !!this.living?.quiet; }
   enableQuietLandingCourtesyV1(){return this.enqueue('rules','operator:quiet-landing-courtesy',{runtimePolicy:{sleepBlockTicks:1200,...this.extra.runtimePolicy as object,quietLandingCourtesyV1:true},why:'allow ordinary native traffic step for a free idle landing blocker while existing natural quiet drains'});}
   enableIntentArrivalsV1(){if(this.extra.intentArrivalV1)return Promise.resolve();return this.enqueue('rules','operator:intent-arrival',{intentArrivalV1:true,runtimePolicy:{sleepBlockTicks:1200,...this.extra.runtimePolicy as object,nativeArrivalWitnessV1:true},why:'prospective private native navigation arrival witnesses; retain old history grammar'});}
+  enableIntentNativeSequenceCompletionV1(){if(this.extra.intentNativeSequenceCompletionV1)return Promise.resolve();return this.enqueue('rules','operator:intent-native-sequence-completion',{intentNativeSequenceCompletionV1:true,why:'prospectively advance typed owner sequence only after matching accepted native programme completion; retain failed/interrupted steps and historical semantic sequence behaviour'});}
   enableIntentExecutionRetentionV1(){if(this.extra.intentExecutionRetentionV1)return Promise.resolve();return this.enqueue('rules','operator:intent-execution-retention',{intentExecutionRetentionV1:true,why:'prospectively retain the latest admitted owner typed goal until native programme completion or explicit authority/intent/physical interruption'});}
   enableIntentApproachRetentionV1(){if(this.extra.intentApproachRetentionV1)return Promise.resolve();return this.enqueue('rules','operator:intent-approach-retention',{intentApproachRetentionV1:true,why:'retain the latest admitted owner purpose through unfinished native locomotion/seating before autonomous redirection; preserve prior replay'});}
   enableIntentSequencesV1(){if(this.extra.intentSequencesV1)return Promise.resolve();return this.enqueue('rules','operator:intent-sequences',{intentSequencesV1:true,worldEvent:{id:'intent-sequences-enabled',text:'Residents can follow the steps of their current directions.'},why:'enable purpose-bound card progress while preserving earlier intentions'});}
