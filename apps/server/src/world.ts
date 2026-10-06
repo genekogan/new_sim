@@ -594,6 +594,11 @@ export class WorldHost {
   private intentBindings():Record<string,ActivityBinding> {
     return this.extra.intentActivityBindingsV2 as Record<string,ActivityBinding> ?? {};
   }
+  unfinishedHumanGoalExecutionV1(soulId:string){
+    if(!this.extra.intentExecutionRetentionV1||this.quietBarrier)return null;const m=this.minds.get(soulId),row=this.db.soul(soulId);if(!m?.pending||m.activeRule||!row||row.world_id!==this.worldId||row.retired_at!==null||row.owner!==m.owner||row.entity_id!==m.entityId||this.kernel.things[soulId]?.traits.body!==m.entityId||!this.engine.world.entities[m.entityId]||this.engine.programOf(m.entityId)!==m.pending.program)return null;
+    const binding=Object.values(this.intentBindings()).find(b=>b.payload.soulId===soulId&&b.payload.decision.entityId===m.entityId&&b.payload.activityId===m.pending!.program);if(!binding)return null;const history=this.intentHistoryOf(soulId),entry=history.intents[binding.payload.intent.intentId];if(entry?.status!=='active'||entry.revision.version!==binding.payload.intent.version||entry.revision.source.ownerId!==m.owner||entry.revision.interpretation.trigger.kind!=='now'||entry.revision.interpretation.humanGoalPlan?.kind!=='planned')return null;
+    const latest=Object.values(history.intents).filter(e=>e.revision.source.ownerId===m.owner&&e.revision.interpretation.trigger.kind==='now').sort((a,b)=>b.revision.submitted.seq-a.revision.submitted.seq)[0];if(latest?.revision.intentId!==entry.revision.intentId||latest.revision.version!==entry.revision.version)return null;const action=this.engine.programAction?.(m.pending.program)?.action;if(action?.status==='blocked')return null;return {intent:{intentId:entry.revision.intentId,version:entry.revision.version},activityId:m.pending.program};
+  }
   unfinishedIntentApproachV1(soulId:string){
     if(!this.extra.intentApproachRetentionV1||this.quietBarrier)return null;const m=this.minds.get(soulId),row=this.db.soul(soulId);if(!m?.pending||m.activeRule||!row||row.world_id!==this.worldId||row.retired_at!==null||row.owner!==m.owner||row.entity_id!==m.entityId||this.kernel.things[soulId]?.traits.body!==m.entityId||!this.engine.world.entities[m.entityId]||this.engine.programOf(m.entityId)!==m.pending.program)return null;
     const binding=Object.values(this.intentBindings()).find(b=>b.payload.soulId===soulId&&b.payload.decision.entityId===m.entityId&&b.payload.activityId===m.pending!.program);if(!binding)return null;
@@ -873,6 +878,7 @@ export class WorldHost {
       case 'rules': {
         if(e.payload?.intentArrivalV1)this.extra.intentArrivalV1=true;
         const p = e.payload;
+        if(p?.intentExecutionRetentionV1===true)this.extra.intentExecutionRetentionV1=true;
         if(p?.intentApproachRetentionV1===true)this.extra.intentApproachRetentionV1=true;
         if(p?.intentSequencesV1===true&&!this.extra.intentSequencesV1){this.extra.intentSequencesV1=true;this.extra.intentSequencesSinceV1=e.seq;}
         if (p?.kernelBootstrap || p?.vocabulary || p?.adoptCamp || p?.commonsTransition || p?.campExpansion) this.kernelDirty = true;
@@ -905,6 +911,7 @@ export class WorldHost {
   get quietBarrier() { return !!this.living?.quiet; }
   enableQuietLandingCourtesyV1(){return this.enqueue('rules','operator:quiet-landing-courtesy',{runtimePolicy:{sleepBlockTicks:1200,...this.extra.runtimePolicy as object,quietLandingCourtesyV1:true},why:'allow ordinary native traffic step for a free idle landing blocker while existing natural quiet drains'});}
   enableIntentArrivalsV1(){if(this.extra.intentArrivalV1)return Promise.resolve();return this.enqueue('rules','operator:intent-arrival',{intentArrivalV1:true,runtimePolicy:{sleepBlockTicks:1200,...this.extra.runtimePolicy as object,nativeArrivalWitnessV1:true},why:'prospective private native navigation arrival witnesses; retain old history grammar'});}
+  enableIntentExecutionRetentionV1(){if(this.extra.intentExecutionRetentionV1)return Promise.resolve();return this.enqueue('rules','operator:intent-execution-retention',{intentExecutionRetentionV1:true,why:'prospectively retain the latest admitted owner typed goal until native programme completion or explicit authority/intent/physical interruption'});}
   enableIntentApproachRetentionV1(){if(this.extra.intentApproachRetentionV1)return Promise.resolve();return this.enqueue('rules','operator:intent-approach-retention',{intentApproachRetentionV1:true,why:'retain the latest admitted owner purpose through unfinished native locomotion/seating before autonomous redirection; preserve prior replay'});}
   enableIntentSequencesV1(){if(this.extra.intentSequencesV1)return Promise.resolve();return this.enqueue('rules','operator:intent-sequences',{intentSequencesV1:true,worldEvent:{id:'intent-sequences-enabled',text:'Residents can follow the steps of their current directions.'},why:'enable purpose-bound card progress while preserving earlier intentions'});}
   intentSequenceStepV1(soulId:string,intent:PurposeRef){return (this.extra.intentSequenceProgressV1 as Record<string,number>|undefined)?.[JSON.stringify([soulId,intent.intentId,intent.version])]??0;}

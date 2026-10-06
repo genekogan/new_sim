@@ -326,7 +326,7 @@ export class Brain {
     };
     const ent = host.engine.world.entities[m.entityId];
     this.updateEnergy(m, ent, tick);
-    if(this.intentV2Choices&&host.unfinishedIntentApproachV1(m.soulId)){m.nextEvalTick=tick+TPS;m.evalTrigger='timer';m.lastFingerprint='';return;}
+    if(this.intentV2Choices&&(host.unfinishedHumanGoalExecutionV1(m.soulId)||host.unfinishedIntentApproachV1(m.soulId))){m.nextEvalTick=tick+TPS;m.evalTrigger='timer';m.lastFingerprint='';return;}
     const ctx = this.midContext(m, trigger);
     const purposeFor = (option: CardOption) => {
       const ref = ctx.actingPurpose;

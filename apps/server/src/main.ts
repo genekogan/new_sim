@@ -1,3 +1,4 @@
+import {edenSteeringModeV1} from './eden-steering-mode.ts';
 import {TakeArchive,r2Store} from './take-archive.ts';
 import { createServer } from 'node:http';
 import { readdirSync, unlinkSync } from 'node:fs';
@@ -38,6 +39,7 @@ if (db.migrated.length) console.log(`[db] applied migrations ${db.migrated.join(
 const mars = config.engine==='mars'?await import('@sim/engine-mars'):null;
 const edenCore=edenCoreRequested(config,process.env);
 const edenLife=edenCore&&process.env.ENABLE_EDEN_LIFE==='1';
+const steeringMode=edenSteeringModeV1(edenLife,process.env);
 const newcomerResources=process.env.ENABLE_EDEN_NEWCOMER_READER==='1';
 if(newcomerResources&&!edenLife)throw Error('eden-bootstrap.newcomer-reader-requires-opted-in-Eden-life');
 const sleepSnapshot=process.env.ENABLE_NATIVE_SLEEP_SNAPSHOT_READER==='1';
@@ -80,7 +82,8 @@ const brain = new Brain(host, db, config, {
 const souls = new Souls(host, db, brain, config);
 if(edenCapabilities)souls.enableLifecycle();
 const edenLifeHandles=edenLife?await installEdenLifeV1(host,brain,{retainReader:process.env.EDEN_CORE_RETAIN_READER==='1',foodDeliveryId:process.env.EDEN_FINITE_FOOD_DELIVERY_ID}):undefined;
-const intentV2=edenCapabilities?new IntentControlV2(host,brain,souls,{historyV1:true}):undefined;
+if(steeringMode.closedGoalsV1){const policy=host.enableIntentExecutionRetentionV1();host.drainInputs();await policy;}
+const intentV2=edenCapabilities?new IntentControlV2(host,brain,souls,{historyV1:true,...steeringMode}):undefined;
 
 const server = createServer();
 const stripWorldPath = (url: string | undefined) => stripWorldRequestPath(url, config.worldPath);
