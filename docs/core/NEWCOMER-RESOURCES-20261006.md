@@ -57,3 +57,5 @@ and an optional renderScene assertion; corrected without weakening checks.
 Fake minds, zero paid provider calls. No real SSO, actual Root or renderer test,
 production activation, long-term food sustainability or full thirty-person usable
 layout claim. Slots11–30 need authored layouts and native/World qualification.
+
+Normal-reader successor: ENABLE_EDEN_NEWCOMER_READER=1 is now a source-only opt-in inside the existing ENABLE_EDEN_CORE+ENABLE_EDEN_LIFE Eden bootstrap. It selects the exact retained origin/resource/shore/social/food/landmark reader plus the newcomer wrapper. It performs no resource adoption. A cp/2 history without that explicit opt-in refuses; enabling the reader before adoption changes no old state/rules/facts. Dry and retained-shore owned SQLite snapshot/genesis keeper checks and the no-adoption case pass (three). Defaults and current Root configuration remain unchanged; matching selected packet and World/PM review are still required.

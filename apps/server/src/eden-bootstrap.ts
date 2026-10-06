@@ -1,6 +1,6 @@
 // Source-owned installer for the existing Eden control plane. Explicitly
 // selected by main; no default factory or environment/config value changes.
-import {marsFactory,marsCommonsTransitionFactory,marsCrewRemovalTransitionFactory,GREEN_FIELD_WORLD,EDEN_SAFE_COMMONS_WORLD,commonsLifeReaderFactory,retainedCommonsShoreFactory} from '@sim/engine-mars';
+import {marsFactory,marsCommonsTransitionFactory,marsCrewRemovalTransitionFactory,GREEN_FIELD_WORLD,EDEN_SAFE_COMMONS_WORLD,commonsLifeReaderFactory,retainedCommonsShoreFactory,commonsNewcomerResourcesFactory} from '@sim/engine-mars';
 import type {EngineFactory} from '@sim/engine-contract';
 import type {Db} from './db.ts';
 import type {WorldHost} from './world.ts';
@@ -10,8 +10,14 @@ import type {Brain} from './brain.ts';
 import type {IntentControlV2} from './intent-control.ts';
 
 export function edenCoreRequested(cfg:Config,env:NodeJS.ProcessEnv){return cfg.worldKey==='eden'&&cfg.engine==='mars'&&env.ENABLE_EDEN_CORE==='1';}
-export async function edenHistoryFactory(db:Db,worldId:string,options?:{lifeV1?:boolean}):Promise<EngineFactory>{
-  if(options?.lifeV1){const header=db.world(worldId);if(header?.rules_version.includes('retained-shore/1'))return retainedCommonsShoreFactory({foodDeliveryV1:header.rules_version.includes('+fd/1'),socialEdenV1:header.rules_version.includes('+social-eden/1'),greenLandmarkV1:header.rules_version.includes('+g/1')});return commonsLifeReaderFactory(await edenHistoryFactory(db,worldId));}
+export async function edenHistoryFactory(db:Db,worldId:string,options?:{lifeV1?:boolean;newcomerResourcesV1?:boolean}):Promise<EngineFactory>{
+  const header=db.world(worldId);
+  if(options?.newcomerResourcesV1&&!options.lifeV1)throw Error('eden-bootstrap.newcomer-reader-requires-life');
+  if(header?.rules_version.includes('+cp/2')&&!options?.newcomerResourcesV1)throw Error('eden-bootstrap.explicit-newcomer-reader-required');
+  if(options?.lifeV1){const origin=header?.rules_version.includes('retained-shore/1')?await retainedCommonsShoreFactory({foodDeliveryV1:header.rules_version.includes('+fd/1'),socialEdenV1:header.rules_version.includes('+social-eden/1'),greenLandmarkV1:header.rules_version.includes('+g/1')}):commonsLifeReaderFactory(await edenOriginHistoryFactory(db,worldId));return options.newcomerResourcesV1?commonsNewcomerResourcesFactory(origin):origin;}
+  return edenOriginHistoryFactory(db,worldId);
+}
+async function edenOriginHistoryFactory(db:Db,worldId:string):Promise<EngineFactory>{
   const header=db.world(worldId);
   if(!header)return marsFactory({...EDEN_SAFE_COMMONS_WORLD,safeCrewRemoval:true});
   const policy=db.db.prepare("SELECT seq FROM events WHERE world_id=? AND kind='rules' AND json_extract(payload,'$.crewRemovalTransition.contract')='crew-removal-transition/1' ORDER BY seq LIMIT 1").get(worldId);

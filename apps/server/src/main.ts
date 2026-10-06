@@ -38,7 +38,9 @@ if (db.migrated.length) console.log(`[db] applied migrations ${db.migrated.join(
 const mars = config.engine==='mars'?await import('@sim/engine-mars'):null;
 const edenCore=edenCoreRequested(config,process.env);
 const edenLife=edenCore&&process.env.ENABLE_EDEN_LIFE==='1';
-const factory=edenCore?await edenHistoryFactory(db,config.worldId,{lifeV1:edenLife}):mars?await mars.marsFactory(config.worldKey==='littlemartians'?mars.LITTLE_MARTIANS_WORLD:config.worldKey==='eden'?mars.GREEN_FIELD_WORLD:undefined):recordedToyFactory;
+const newcomerResources=process.env.ENABLE_EDEN_NEWCOMER_READER==='1';
+if(newcomerResources&&!edenLife)throw Error('eden-bootstrap.newcomer-reader-requires-opted-in-Eden-life');
+const factory=edenCore?await edenHistoryFactory(db,config.worldId,{lifeV1:edenLife,newcomerResourcesV1:newcomerResources}):mars?await mars.marsFactory(config.worldKey==='littlemartians'?mars.LITTLE_MARTIANS_WORLD:config.worldKey==='eden'?mars.GREEN_FIELD_WORLD:undefined):recordedToyFactory;
 const host = new WorldHost(db, factory, config.worldSeed, config.snapshotEveryTicks, config.worldId,edenCore?{durableClockV1:true}:undefined);
 const boot = host.boot();
 if(edenCore)await installEdenCore(host,{applyCrew:process.env.APPLY_EDEN_CREW_CHECKPOINT==='1',applyCommons:process.env.APPLY_EDEN_COMMONS_CHECKPOINT==='1',retainReader:process.env.EDEN_CORE_RETAIN_READER==='1'});
