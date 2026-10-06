@@ -878,7 +878,7 @@ export class WorldHost {
             for (const c of view.changes) if (c.op === 'say' && c.act !== 'chat' && c.act !== 'tell') { const o = this.minds.get(c.to); if (o) { o.nextEvalTick = Math.min(o.nextEvalTick, tick + 8 + (hash32(o.soulId) % 20)); o.evalTrigger = 'spoken-to'; o.lastFingerprint = ''; } }
           } else {
             m.recent = [...m.recent.slice(-3), `${what} (did not happen: ${view.reason})`];
-            m.pending = null; m.doing = 'standing around'; m.avoid = { id: view.target ? `${view.card}@${view.target}` : view.card, untilTick: tick + 1200 };
+            m.pending = null; m.doing = 'standing around'; m.avoid = { id: view.target ? `${view.card}@${view.target}` : view.card, untilTick: tick + (/^shore\.occupied-route\b/.test(String(view.reason)) ? 100 : 1200) }; // another body in the way clears quickly
             if (m.agendaPos < m.agenda.length) m.planBlockedSince ??= tick;
             m.nextEvalTick = Math.min(m.nextEvalTick, tick + 20); m.evalTrigger = 'activity-failed';
           }

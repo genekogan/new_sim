@@ -152,3 +152,21 @@ test('busy lecture preparation (ready-wait and mid-walk): exact classroom and sw
  }
  assert.deepEqual(f.host.engine.runtime.violations,[]);assert.equal(f.db.paidCost(),0);
 });
+
+test('pond is multi-occupant: a bank gathering does not block it and four Souls swim at once in spaced spots',{timeout:300000},async t=>{
+ const f=await lectureSetup(t),scopeOf=(row:SoulRow)=>f.service.ownerScope({userId:'dev:operator',expiresAt:Number.MAX_SAFE_INTEGER},row.id);
+ const body=(row:SoulRow)=>(f.host.engine.world as NativeWorld).entities[row.entity_id];
+ const tick=async(n:number,until:()=>boolean)=>{for(let i=0;i<n&&!until();i++){f.host.tickOnce();if(i%10===0)await setImmediate();}return until();};
+ const host=f.rows[1];
+ await accept(f.host,f.host.enqueue('decision','fixture:bank-gathering',{soulId:host.id,entityId:host.entity_id,option:'host a gathering@shore-bank',label:'host a gathering at the bank',steps:[{verb:'walk_to',params:{to:'shore-bank'}},{verb:'gather',params:{at:'shore-bank',seconds:600}}],reevalTicks:1e9,fallback:false,trigger:'fixture'}));
+ assert.ok(await tick(4000,()=>{const p=body(host).pose.p;return Math.hypot(p[0]+37.5,p[2])<2&&body(host).human?.activity!=='walk';}),'host stands at the bank centre: '+JSON.stringify(body(host).pose.p));
+ const swimmers=f.rows.slice(2,6),ids:string[]=[];
+ for(const row of swimmers){await accept(f.host,f.service.submit(scopeOf(row),{contract:'soul-intent/2',op:'upsert',requestId:'swim-'+row.id,words:'go for a swim'}));await accept(f.host,f.service.settled());const r=f.service.lookup(scopeOf(row),'swim-'+row.id);assert.equal(r.phase,'understood',JSON.stringify(r));if(r.phase!=='understood')throw Error('no plan');ids.push(r.revision.intentId);await f.brain.evaluate(f.host.minds.get(row.id)!,'new-intent-v2');f.host.drainInputs();}
+ const swam=new Map<string,boolean>(),done=()=>swimmers.every((row,i)=>Object.values(f.host.intentHistoryOf(row.id).attempts).some(a=>a.intent.intentId===ids[i]&&a.phase==='started'))&&swimmers.every(r=>['tread','swim'].includes(body(r).human?.activity??''));
+ let most=0;const ok=await tick(12000,()=>{for(const r of swimmers)if(body(r).human?.activity==='swim')swam.set(r.id,true);most=Math.max(most,swimmers.filter(r=>['tread','swim'].includes(body(r).human?.activity??'')).length);return done();});
+ assert.ok(ok,'max simultaneous in water='+most+' '+swimmers.map((r,i)=>body(r).human?.activity+'@'+body(r).pose.p.map(v=>v.toFixed(1)).join(',')+' '+Object.values(f.host.intentHistoryOf(r.id).attempts).filter(x=>x.intent.intentId===ids[i]).map(x=>x.phase+':'+x.tick+(('reason' in x)?':'+x.reason:'')).join('|')).join(' ;; '));
+ const ps=swimmers.map(r=>body(r).pose.p);for(let i=0;i<ps.length;i++)for(let j=i+1;j<ps.length;j++)assert.ok(Math.hypot(ps[i][0]-ps[j][0],ps[i][2]-ps[j][2])>=1,'spaced bodies');
+ assert.equal(swam.size,4,'all four actually swam');assert.ok(Math.hypot(body(host).pose.p[0]+37.5,body(host).pose.p[2])<2,'gathering host was not displaced');
+ assert.deepEqual(f.host.engine.runtime.violations,[]);assert.equal(f.db.paidCost(),0);
+ t.diagnostic('four simultaneous swimmers at '+JSON.stringify(ps.map(p=>[p[0],p[2]])));
+});
