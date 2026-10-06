@@ -1,3 +1,4 @@
+import {CodecError} from '../runtime/codec.ts';
 // Bounded ground-mat sleep. Ordinary walk owns approach/return; the physical
 // child owns the person and mat through continuous lie/wake. No rig targets.
 import { z } from 'zod';
@@ -21,6 +22,17 @@ const store = (rt: Runtime): Store => (rt.services.sleeps ??= { purposes: {}, ho
 const humanState = (e: Entity) => e.human!;
 const position = (e: Entity): Vec2 => [e.pose.p[0], e.pose.p[2]];
 const issue = (code: string, message: string, subjects: string[]): Diagnostic => ({ code: `sleep.${code}`, message, subjects });
+export const NATIVE_SLEEP_SNAPSHOT_V1='native-sleep-snapshot/1' as const;
+function snapshotPolicy(rt:Runtime){if(rt.services.nativeSleepSnapshotV1!==NATIVE_SLEEP_SNAPSHOT_V1)throw new CodecError('sleep policy','not enabled for active snapshot restoration');}
+function serializeSleep(rt:Runtime,ex:Hold|Purpose,kind:'holds'|'purposes') {snapshotPolicy(rt);const self=rt.records.get(ex.id),invalid=self?sleepSnapshotIssue(rt,ex,self,kind):true;if(invalid)throw new CodecError('sleep execution','missing original action/store/progress provenance');return ex;}
+function sleepSnapshotIssue(rt:Runtime,ex:Hold|Purpose,self:import('../actions/types.ts').ActionRecord,kind:'holds'|'purposes'):Diagnostic|null {
+  const invalid=()=>issue('snapshot-invalid','Sleep snapshot lacks the original action, actor, mat, bounded progress or shared execution-store identity',[self.id]);
+  if(rt.services.nativeSleepSnapshotV1!==NATIVE_SLEEP_SNAPSHOT_V1||!ex||typeof ex!=='object'||ex.id!==self.id||rt.services.sleeps?.[kind]?.[self.id]!==ex||!schema.safeParse(ex.p).success||JSON.stringify(ex.p)!==JSON.stringify(self.params)||!rt.world.entities[ex.p.actor]?.human||!rt.world.regions[ex.p.mat])return invalid();
+  if(ex.child){const child=rt.records.get(ex.child);if(!child||child.parent!==self.id)return invalid();}
+  if(kind==='holds'){const hold=ex as Hold;if(!['approaching','lying-down','sleeping','waking'].includes(hold.phase)||!Number.isFinite(hold.standingFraction)||hold.standingFraction<0||hold.standingFraction>1||!Number.isFinite(hold.slept)||hold.slept<0||hold.slept>hold.p.duration||typeof hold.stop!=='boolean'||!hold.mat?.anchor?.every(Number.isFinite)||!Number.isFinite(hold.mat.yaw)||!hold.mat.area)return invalid();}
+  else {const purpose=ex as Purpose;if(!['approaching','lying-down','sleeping','waking','returning','draining','paused','waiting','completed'].includes(purpose.mode)||!Number.isFinite(purpose.elapsed)||purpose.elapsed<0||purpose.elapsed>purpose.p.duration||typeof purpose.ending!=='boolean'||typeof purpose.draining!=='boolean'||!Array.isArray(purpose.owned)||new Set(purpose.owned).size!==purpose.owned.length||purpose.owned.some(id=>rt.records.get(id)?.parent!==self.id))return invalid();}
+  return null;
+}
 export const SLEEP_TRANSITION_SECONDS = 2.1;
 /** Shared physical separation margin for sleeper OBBs and ordinary circular people. */
 export const SLEEP_BODY_MARGIN = 0.05;
@@ -182,7 +194,9 @@ export const sleepHold: ActionDef<SleepParams, Mat, Hold> = {
     return { ok: true, deferred: true };
   },
   yieldTo: (_rt, self) => [self.id],
-  resumable: 'Ground sleep has runtime-local explicit interruption/return; active snapshot restoration is outside this bounded slice.',
+  serializeExec(rt,ex){return serializeSleep(rt,ex,'holds');},
+  restoreExec(rt,data){snapshotPolicy(rt);return data as Hold;},
+  validateSnapshot:(rt,ex,self)=>sleepSnapshotIssue(rt,ex,self,'holds'),
 };
 function absorb(rt: Runtime, ex: Purpose) {
   if (!ex.child) return;
@@ -229,7 +243,9 @@ export const sleep: ActionDef<SleepParams, null, Purpose> = {
     return { status: 'running', phase: 'waking' };
   },
   cancel(rt, ex) { ex.ending = true; ex.draining = true; ex.mode = 'draining'; return { ok: true, deferred: drain(rt, ex).status !== 'completed' }; },
-  resumable: 'Sleep purpose supports explicit runtime-local Pause/Resume; active snapshot restoration is outside scope.',
+  serializeExec(rt,ex){return serializeSleep(rt,ex,'purposes');},
+  restoreExec(rt,data){snapshotPolicy(rt);return data as Purpose;},
+  validateSnapshot:(rt,ex,self)=>sleepSnapshotIssue(rt,ex,self,'purposes'),
 };
 export const sleepControl: ActionDef<{ sleep: string; intent: 'pause' | 'resume' | 'end' }, null, null> = {
   verb: 'sleep_control', description: 'Pause with physical wake/cleanup, resume remaining sleep and return, or terminally end an owned purpose.',

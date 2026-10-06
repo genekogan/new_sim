@@ -114,6 +114,7 @@ function holdsLoad(rt: Runtime, id: string): string | null {
   for (const e of Object.values(rt.world.entities)) {
     if (e.reservedBy === id && (e.phase === 'carried' || e.phase === 'raising')) return `${e.id} is ${e.phase} by it`;
     if (e.human?.task === id && e.human.grip) return `${e.id} is gripping ${e.human.grip.entity} for it`;
+    if(e.human?.sleepPose&&e.human.task){const seen=new Set<string>();for(let owner:string|undefined=e.human.task;owner&&!seen.has(owner);owner=rt.records.get(owner)?.parent){if(owner===id)return `${e.id} has a prone sleep pose owned by ${e.human.task}`;seen.add(owner);}}
   }
   return null;
 }
