@@ -1,3 +1,4 @@
+import {existingGreenLandmarkV1} from '@sim/engine-mars';
 import {socialEdenV1} from '@sim/engine-mars';
 import {captureIntentArrivalV1,journalIntentArrivalV1,verifyIntentArrivalV1} from './intent-arrivals.ts';
 // WorldHost: the sequencer. Owns the engine, the event log, the tick loop,
@@ -460,7 +461,7 @@ export class WorldHost {
         if(stationEra)this.apply(stationEra,false);
         if(arrival)this.apply(arrival,false);
       } catch (error) {
-        if(arrival||stationEra||e.payload?.crewRemovalTransition||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore||e.payload?.commonsFoodDelivery||e.payload?.socialEden){
+        if(arrival||stationEra||e.payload?.crewRemovalTransition||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore||e.payload?.commonsFoodDelivery||e.payload?.socialEden||e.payload?.existingGreenLandmark){
           // A committed structural pair cannot be attributed to an unrelated
           // card or filtered out by card-fault recovery. Restore exact history.
           try{
@@ -470,7 +471,7 @@ export class WorldHost {
         }else {this.recoverFault(error, e.kind === 'decision' ? e.payload.card : undefined); recovered = true;}
       }
       const accepted=[e,...(admission?[admission]:[]),...(stationEra?[stationEra]:[]),...(arrival?[arrival]:[])];
-      if (!recovered||arrival||stationEra||e.payload?.crewRemovalTransition||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore||e.payload?.commonsFoodDelivery||e.payload?.socialEden) this.acc.log.push(...accepted);
+      if (!recovered||arrival||stationEra||e.payload?.crewRemovalTransition||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore||e.payload?.commonsFoodDelivery||e.payload?.socialEden||e.payload?.existingGreenLandmark) this.acc.log.push(...accepted);
       // No listener can observe a physical event before its committed era fold.
       for (const fact of accepted) for (const l of this.listeners) l.onApplied?.(fact);
       if (admission && recovered) { p.reject?.(new PersistedIntentAdmissionFault(e.seq)); continue; }
@@ -674,6 +675,7 @@ export class WorldHost {
     const matchedStep = pm ? stepIndex(this, pm, (e.payload as PlayPayload).card, (e.payload as PlayPayload).target) : -1;
     if (e.kind === 'rules' && e.payload?.recovery) { this.restoreRecovery(e.payload.recovery as RecoveryRecipe); this.seq = e.seq; return; }
     if(e.kind==='rules'&&e.payload?.crewRemovalTransition&&this.stationHistoryV1())throw Error('crew-removal-transition.station-carry-required');
+    if(e.kind==='rules'&&e.payload?.existingGreenLandmark&&this.stationHistoryV1())throw Error('green-landmark.station-carry-required');
     if(e.kind==='rules'&&e.payload?.socialEden&&this.stationHistoryV1())throw Error('social-eden.station-carry-required');
     if(e.kind==='rules'&&e.payload?.commonsFoodDelivery&&this.stationHistoryV1())throw Error('food-delivery.station-carry-required');
     if(e.kind==='rules'&&e.payload?.retainedCommonsShore&&this.stationHistoryV1())throw Error('retained-shore.station-carry-required');
@@ -895,6 +897,13 @@ export class WorldHost {
   enableGroundFixtureGoalsV1(){return this.enqueue('rules','operator:fixture-goal-levels',{runtimePolicy:{sleepBlockTicks:1200,...this.extra.runtimePolicy as object,fixtureGroundGoalsV1:true},why:'resolve ground-supported fixture destinations prospectively; retain old navigation replay'});}
   enableHumanRestNeedsV1(){
     return this.enqueue('rules','operator:human-rest-needs',{runtimePolicy:{sleepBlockTicks:1200,...this.extra.runtimePolicy as object,humanRestNeedsV1:true},why:'recognize enacted humanoid rest prospectively; retain prior needs replay'});
+  }
+  installExistingGreenLandmarkV1(){
+    if(this.stationHistoryV1())return Promise.reject(Error('green-landmark.station-carry-required'));
+    const p=this.engine.previewExistingGreenLandmarkV1?.();if(!p?.ok)return Promise.reject(Error(p?p.diagnostic.code:'green-landmark.reader-required'));const t=p.transition;
+    const guard:AcceptanceGuard=()=>{if(this.stationHistoryV1())throw Error('green-landmark.station-carry-required');const q=this.engine.previewExistingGreenLandmarkV1?.();if(!q?.ok||hashOf(q.transition)!==hashOf(t))throw Error('green-landmark.source-moved');for(const id of Object.keys(existingGreenLandmarkV1().regions))if(this.kernel.things[id])throw Error('green-landmark.kernel-identity-collision');if(this.factory.canReplayHistory?.(t.toRulesVersion)!==true)throw Error('green-landmark.reader-required');return true;};
+    const journal:AcceptanceJournal=()=>{const r=this.db.db.prepare('UPDATE worlds SET rules_version=? WHERE id=? AND rules_version=?').run(t.toRulesVersion,this.worldId,t.fromRulesVersion);if(r.changes!==1)throw Error('green-landmark.header-moved');return true;};
+    return new Promise<LogEvent>((resolve,reject)=>this.queue.push({kind:'rules',author:'operator:existing-green-landmark',payload:{existingGreenLandmark:t},guard,journal,resolve,reject}));
   }
   installSocialEdenV1(){
     if(this.stationHistoryV1())return Promise.reject(Error('social-eden.station-carry-required'));

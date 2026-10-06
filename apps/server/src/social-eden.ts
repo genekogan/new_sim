@@ -4,7 +4,7 @@ import type {Card} from '@sim/kernel';
 import {COMMONS_PERSONAL_RESOURCES,commonsFoodDeliveryItemsV1} from '@sim/engine-mars';
 /** Existing general card grammar; physical native seat/food claims remain authoritative. */
 export async function installSocialEdenCardsV1(host:WorldHost,brain:Brain){
- if(host!==brain.host)throw Error('social-eden.card-host');if(!host.engine.rulesVersion.endsWith('+social-eden/1'))throw Error('social-eden.reader-required');
+ if(host!==brain.host)throw Error('social-eden.card-host');if(!/\+social-eden\/1(?:\+|$)/.test(host.engine.rulesVersion))throw Error('social-eden.reader-required');
  const births=host.db.db.prepare("SELECT payload FROM events WHERE world_id=? AND kind='birth' ORDER BY seq").all(host.worldId) as {payload:string}[];const verdicts=[];
  for(const [index,b] of births.entries()){
   const sid=JSON.parse(b.payload).soulId,m=host.minds.get(sid),row=host.db.soul(sid);if(!m||!row||row.retired_at!==null||row.owner!==m.owner||row.entity_id!==m.entityId)continue;

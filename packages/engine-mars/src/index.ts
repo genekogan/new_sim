@@ -18,3 +18,4 @@ export * from './retained-shore-engine.ts';
 export * from './food-delivery.ts';
 export * from './social-eden.ts';
 export * from './commons-life-engine.ts';
+export * from './green-landmark.ts';

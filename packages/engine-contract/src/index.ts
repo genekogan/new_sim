@@ -24,3 +24,4 @@ export * from './retained-shore.ts';
 export * from './food-delivery.ts';
 export * from './social-eden.ts';
 export * from './human-goals-v1.ts';
+export * from './green-landmark-v1.ts';

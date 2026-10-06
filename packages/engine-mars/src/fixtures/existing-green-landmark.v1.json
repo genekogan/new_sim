@@ -1,0 +1,54 @@
+{
+  "proposedLandmarkId": "eden-commons-south-tree",
+  "label": "South commons tree",
+  "existingVisualId": "commons-canopy-tree-16",
+  "visual": {
+    "id": "commons-canopy-tree-16",
+    "kind": "canopy-tree",
+    "p": [
+      4.3,
+      0,
+      9.3
+    ],
+    "size": [
+      3.6,
+      5.5,
+      3.096
+    ],
+    "yaw": 4.426961621024553,
+    "seed": 119
+  },
+  "approach": {
+    "p": [
+      4.3,
+      0,
+      6.5
+    ],
+    "routeXZ": [
+      [
+        4,
+        5
+      ],
+      [
+        4.3,
+        6.5
+      ]
+    ],
+    "sourceGroundY": 0,
+    "referenceRadius": 0.28,
+    "minimumConservativeTreeEnvelopeClearance": 0.1459098584931542
+  },
+  "source": {
+    "mars/viewer/app/engine-view/content/environment/commons.ts": "78e94e4ea15b3741eb5e378ddd98e7ede31d4a6ce904816237cb08e6028b7061",
+    "mars/viewer/app/engine-view/vegetation.ts": "61c4d7e4a119126929b1dd64a2d17aad48921c4b2ed6b6f8f0a6cb46fe95f03d",
+    "apps/web/src/WorldCommons.ts": "c0c0f728a159749229e73bbe616b942bbb275f0ba792a7bef16a3ea1c3367d67",
+    "apps/web/src/WorldGeometry.ts": "e87154267dcbeceedf72124b17dae67ea78ff4723dffa5a70b988400e9dad7c9"
+  },
+  "scope": "Existing WorldGeometry authored commons plant only. No new tree/render object/canonical registry/actor move. Tree-circle route clearance source authoring evidence; Core must verify native current surfaces/obstacles/occupancy/admission and log anchor. Low decorative grass/understory not native physics certification.",
+  "contract": "existing-green-landmark-source/1",
+  "admittedActivities": [
+    "walk",
+    "hang_out"
+  ],
+  "physics": "Ground approach only; no new tree geometry/collider/climbing/harvesting capability."
+}

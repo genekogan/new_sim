@@ -113,6 +113,8 @@ export interface Engine {
   previewCommonsFoodDeliveryV1?(deliveryId:string):{ok:true;transition:import('./food-delivery.ts').CommonsFoodDeliveryV1}|{ok:false;diagnostic:{code:string}};
   adoptCommonsFoodDeliveryV1?(delivery:import('./food-delivery.ts').CommonsFoodDeliveryV1):void;
   commonsFoodDeliveriesV1?():import('./food-delivery.ts').CommonsFoodDeliveryV1[];
+  previewExistingGreenLandmarkV1?():{ok:true;transition:import('./green-landmark-v1.ts').ExistingGreenLandmarkTransitionV1}|{ok:false;diagnostic:{code:string}};
+  adoptExistingGreenLandmarkV1?(transition:import('./green-landmark-v1.ts').ExistingGreenLandmarkTransitionV1):void;
   previewSocialEdenV1?():{ok:true;transition:import('./social-eden.ts').SocialEdenTransitionV1}|{ok:false;diagnostic:{code:string}};
   adoptSocialEdenV1?(transition:import('./social-eden.ts').SocialEdenTransitionV1):void;
   previewRetainedCommonsShoreV1?():import('./retained-shore.ts').RetainedCommonsShoreAdmissionV1;
