@@ -1,0 +1,16 @@
+import type {WorldHost,Mind} from './world.ts';
+import type {IntentHistoryV2} from './intent-history.ts';
+export type PurposeEpisodeV1={intentId:string;version:number;attemptId:string;phase:string;seq:number;tick:number;origin:{seq:number;tick:number};evidence:{seq:number;tick:number;kind:string}};
+/** Only current owned accepted outcomes; journal prose does not create episodes. */
+export function purposeEpisodesV1(host:WorldHost,m:Mind,throughSeq=host.seq):PurposeEpisodeV1[]{
+ const row=host.db.soul(m.soulId);if(!row||row.owner!==m.owner||row.entity_id!==m.entityId||row.world_id!==host.worldId||row.retired_at!==null)return [];
+ const history:IntentHistoryV2=host.intentHistoryOf(m.soulId);
+ return episodesFromHistoryV1(history,m.owner,throughSeq);
+}
+export function episodesFromHistoryV1(history:IntentHistoryV2,owner:string,throughSeq:number):PurposeEpisodeV1[]{
+ return Object.values(history.attempts).filter(a=>{const r=history.intents[a.intent.intentId]?.revision;return a.seq<=throughSeq&&r?.source.ownerId===owner&&r.version===a.intent.version;}).sort((a,b)=>b.seq-a.seq).slice(0,12).map(a=>{const r=history.intents[a.intent.intentId].revision;return {intentId:a.intent.intentId,version:a.intent.version,attemptId:a.attemptId,phase:a.phase,seq:a.seq,tick:a.tick,origin:{seq:r.submitted.seq,tick:r.submitted.tick},evidence:{...a.evidence}};});
+}
+export function episodeJournalV1(episodes:PurposeEpisodeV1[]):string{
+ const count=(phase:string)=>episodes.filter(e=>e.phase===phase).length;
+ return `My recorded purpose activities currently include ${count('accepted')} admitted, ${count('started')} started, ${count('completed')} completed, ${count('blocked')} blocked and ${count('interrupted')} interrupted attempts. Admission alone does not show a physical start. Completed attempts are contributions, not declarations that my broader purposes are finished. These notes interpret my recorded experience; they do not prescribe a routine.`;
+}

@@ -1,3 +1,4 @@
+import {episodesFromHistoryV1} from './purpose-episodes.ts';
 import {commonsNewcomerResourcesV1} from '@sim/engine-mars';
 import type {NewcomerResourcePlacementV1} from '@sim/engine-contract';
 import {existingGreenLandmarkV1} from '@sim/engine-mars';
@@ -691,6 +692,10 @@ export class WorldHost {
   /** Apply a logged event: the fold moves the engine and the kernel; this adds the minds' bookkeeping. */
   apply(e: LogEvent, replay: boolean) {
     const tick = e.tick;
+    if(e.kind==='rules'&&e.payload?.reflection?.episodeMemory){
+      const p=e.payload,record=p.reflection.episodeMemory,m=this.minds.get(p.soulId);
+      if(!this.extra.intentEpisodeMemoryV1||!m||record.contract!=='private-purpose-episodes/1'||record.proseKind!=='interpretation'||!Number.isSafeInteger(record.throughSeq)||record.throughSeq<0||record.throughSeq>=e.seq||Object.keys(record).sort().join(',')!=='contract,episodes,proseKind,throughSeq'||JSON.stringify(record.episodes)!==JSON.stringify(episodesFromHistoryV1(this.intentHistoryOf(p.soulId),m.owner,record.throughSeq)))throw Error('purpose-episodes.invalid-source');
+    }
     if(e.kind==='intent-sleep-stop-v1'){
       const p=intentSleepStopV1Schema.parse(e.payload),history=this.intentHistoryOf(p.soulId);
       const entry=history.intents[p.intent.intentId],m=this.minds.get(p.soulId);
@@ -905,6 +910,7 @@ export class WorldHost {
         if(p?.intentApproachRetentionV1===true)this.extra.intentApproachRetentionV1=true;
         if(p?.intentHumanSleepTransitionV1===true)this.extra.intentHumanSleepTransitionV1=true;
         if(p?.intentRetainedChoiceV1===true)this.extra.intentRetainedChoiceV1=true;
+        if(p?.intentEpisodeMemoryV1===true)this.extra.intentEpisodeMemoryV1=true;
         if(p?.intentPurposeEvidenceV1===true)this.extra.intentPurposeEvidenceV1=true;
         if(p?.intentPurposeRecallV1===true){if(!this.extra.intentPurposeEvidenceV1)throw Error('purpose-recall.evidence-policy-required');this.extra.intentPurposeRecallV1=true;}
         if(p?.intentSequencesV1===true&&!this.extra.intentSequencesV1){this.extra.intentSequencesV1=true;this.extra.intentSequencesSinceV1=e.seq;}
@@ -923,6 +929,7 @@ export class WorldHost {
           if (p.worldEvent.day !== undefined) ((this.extra.moments ??= {}) as Record<string, number>)[p.worldEvent.id] = p.worldEvent.day;
           for (const m of this.minds.values()) { m.nextEvalTick = Math.min(m.nextEvalTick, tick + 1 + hash32(m.soulId) % 20); m.evalTrigger = 'world-event'; m.lastFingerprint = ''; }
         }
+        if(p?.reflection?.episodeMemory){if(!this.extra.intentEpisodeMemoryV1)throw Error('purpose-episodes.policy-required');const memories=(this.extra.intentEpisodeMemoriesV1??={}) as Record<string,unknown>;memories[p.soulId]=structuredClone(p.reflection.episodeMemory);}
         if (p?.reflection) { const m = this.minds.get(p.soulId); if (m?.life) { m.life.journal = String(p.reflection.journal).slice(0, 1200); m.life.reflectedDay = p.reflection.day; m.life.acts = []; this.acc.dirty.add(m.soulId); } }
         if (p?.character) { const m = this.minds.get(p.soulId); if (m) { m.description = p.character; this.kernel.things[m.soulId].traits.about = p.character; if (!replay) this.db.db.prepare('UPDATE souls SET description = ? WHERE id = ?').run(p.character, m.soulId); this.kernelDirty = true; } }
         break;
@@ -943,6 +950,7 @@ export class WorldHost {
   enableIntentPurposeEvidenceV1(){if(this.extra.intentPurposeEvidenceV1)return Promise.resolve();return this.enqueue('rules','operator:purpose-evidence',{intentPurposeEvidenceV1:true,why:'private mind context keeps current owner revision origins and recorded attempt/contribution progress; no new execution priority or fulfilment'});}
   enableIntentPurposeRecallV1(){if(this.extra.intentPurposeRecallV1)return Promise.resolve();if(!this.extra.intentPurposeEvidenceV1)return Promise.reject(Error('purpose-recall.evidence-policy-required'));return this.enqueue('rules','operator:purpose-recall',{intentPurposeRecallV1:true,why:'bound private own-purpose context; preserve strict/current commitments in full or report capacity without new choice; retain original history'});}
   enableIntentRetainedChoiceV1(){if(this.extra.intentRetainedChoiceV1)return Promise.resolve();if(!this.extra.intentPurposeRecallV1||!this.extra.intentNativeSequenceCompletionV1)return Promise.reject(Error('retained-choice.qualified-context-required'));return this.enqueue('rules','operator:retained-choice',{intentRetainedChoiceV1:true,why:'recalled owned typed unfinished steps are ordinary feasible alternatives; actual chosen contributions retain private intent provenance without FIFO priority'});}
+  enableIntentEpisodeMemoryV1(){if(this.extra.intentEpisodeMemoryV1)return Promise.resolve();return this.enqueue('rules','operator:purpose-episodes',{intentEpisodeMemoryV1:true,why:'private reflection keeps bounded canonical owned outcomes separately from interpretive prose; current owner will fences delayed reflection'});}
   pendingHumanSleepTransitionV1(soulId:string){const p=(this.extra.intentHumanSleepTransitionsV1 as Record<string,IntentSleepStopV1>|undefined)?.[soulId];return !!p&&this.engine.programOf(p.entityId)===p.programId;}
   enqueueHumanSleepStopV1(soulId:string,intent:PurposeRef,program:import('@sim/engine-contract').Program,guard:AcceptanceGuard){
     const m=this.minds.get(soulId),programId=m?previewHumanSleepStopV1(this,m,program):null;if(!m||!programId)return Promise.reject(new StaleIntentAttempt());

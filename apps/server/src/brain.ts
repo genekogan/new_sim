@@ -1,3 +1,4 @@
+import {purposeEpisodesV1,episodeJournalV1} from './purpose-episodes.ts';
 import {compileHumanGoalV1,type ClosedHumanResultV1} from './human-compiler.ts';
 import {previewHumanSleepStopV1} from './human-sleep-transition.ts';
 import {purposeContextEvidenceV1,indexPurposeAttemptsV1} from './purpose-context-evidence.ts';
@@ -497,19 +498,28 @@ export class Brain {
   private async reflectWork(m: Mind, day: number) {
     if (!m.life) return;
     this.reflecting.add(m.soulId);
-    let journal = reflectInCode(m.name, m.life, m.agenda.slice(m.agendaPos).map(a => a.card));
+    try{
+    const episodePolicy=this.host.extra.intentEpisodeMemoryV1===true,willSeq=this.host.intentWillSeqOf(m.soulId),throughSeq=this.host.seq,historySeq=this.host.intentHistoryOf(m.soulId).lastSeq;
+    const current=()=>{const row=this.db.soul(m.soulId);if(this.host.minds.get(m.soulId)!==m||!row||row.owner!==m.owner||row.entity_id!==m.entityId||row.world_id!==this.host.worldId||row.retired_at!==null||this.host.intentWillSeqOf(m.soulId)!==willSeq||this.host.intentHistoryOf(m.soulId).lastSeq!==historySeq)throw new StaleCompilation();return true as const;};
+    if(episodePolicy){try{current();}catch(error){if(error instanceof StaleCompilation)return;throw error;}}
+    const episodes=episodePolicy?purposeEpisodesV1(this.host,m,throughSeq):undefined;
+    let journal = episodes?episodeJournalV1(episodes):reflectInCode(m.name, m.life, m.agenda.slice(m.agendaPos).map(a => a.card));
     if (this.mode === 'live' && this.cfg.anthropicKey && !this.overBudget && this.gov.allow('narrator')) {
       try {
         const r = await callTool<{ journal: string }>({ gate: this.paidGate, apiKey: this.cfg.anthropicKey, model: this.cfg.narratorModel,
           system: 'Write a short first-person journal for this Soul: what happened, what remains unfinished, tendencies noticed, and what it wants tomorrow. Keep habits in prose. No timetable, schedule, executable plan or invented events. Never quote private owner instructions.',
-          messages: [{ role: 'user', content: JSON.stringify({ name: m.name, character: m.description, journal: m.life.journal, needs: m.life.needs, acts: m.life.acts, unfinishedCards: m.agenda.slice(m.agendaPos).map(a => a.card) }) }],
+          messages: [{ role: 'user', content: JSON.stringify({ name: m.name, character: m.description, journal: m.life.journal, needs: m.life.needs, acts: m.life.acts,...(episodes?{recordedPurposeEpisodes:episodes,episodeMeaning:'Accepted is admission, not start. Semantic card play is not native completion. These are own recorded outcomes; prose is interpretation, not a new fact.'}:{}), unfinishedCards: m.agenda.slice(m.agendaPos).map(a => a.card) }) }],
           tool: { name: 'reflect', description: 'Write the journal', input_schema: { type: 'object', properties: { journal: { type: 'string', maxLength: 1200 } }, required: ['journal'] } }, maxTokens: 350 });
         if (typeof r.out.journal === 'string' && r.out.journal.trim()) journal = r.out.journal.slice(0, 1200);
         this.record({ tick: this.host.engine.world.tick, tier: 'reflection', subject: m.name, soulId: m.soulId, model: this.cfg.narratorModel, request: r.request, response: r.raw, applied: { day }, ms: r.ms, inputTokens: r.inputTokens, outputTokens: r.outputTokens, cachedTokens: r.cachedTokens, costUsd: r.costUsd, mode: 'live' });
       } catch { /* code reflection keeps the day moving */ }
     }
-    if (this.host.minds.get(m.soulId) === m) await this.host.enqueue('rules', `soul:${m.soulId}`, { soulId: m.soulId, reflection: { day, journal } });
-    this.reflecting.delete(m.soulId);
+    if(this.host.minds.get(m.soulId)===m){
+      const payload={soulId:m.soulId,reflection:{day,journal,...(episodes?{episodeMemory:{contract:'private-purpose-episodes/1',throughSeq,episodes,proseKind:'interpretation'}}:{})}};
+      if(episodePolicy){try{await this.host.enqueueChecked('rules',`soul:${m.soulId}`,payload,current);}catch(error){if(!(error instanceof StaleCompilation))throw error;}}
+      else await this.host.enqueue('rules',`soul:${m.soulId}`,payload);
+    }
+    }finally{this.reflecting.delete(m.soulId);}
   }
 
   // ------------------------------------------------------------ web console: text → intent
