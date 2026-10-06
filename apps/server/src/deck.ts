@@ -5,7 +5,7 @@ import type { ActivityOption } from '@sim/engine-contract';
 import { SPEECH_LINKS, bind, enablers, linked, linksFrom, linksTo, playable, samePlace, whyNot, type KState, type MintedCard, type Thing } from '@sim/kernel';
 import type { Mind, WorldHost } from './world.ts';
 
-export type CardOption = ActivityOption & { card: string; hash: string; cardTarget: string | null; approachLen: number };
+export type CardOption = ActivityOption & { card: string; hash: string; cardTarget: string | null; approachLen: number; available?:boolean; blockedCode?:string };
 
 /** What the engine needs in order to find a kernel thing: a body, a fixture entity, or a point. */
 export function engineRef(host: WorldHost, id: string): string | [number, number] | null {
@@ -100,7 +100,12 @@ export const serves = (host: WorldHost, m: Mind, card: string, target: string | 
 export function optionsFor(host: WorldHost, m: Mind, cap = 12,ordinaryRetainedCards=new Set<string>()): CardOption[] {
   const read=()=>readOptionsFor(host,m,cap,ordinaryRetainedCards);return host.engine.withFeasibilityRead?host.engine.withFeasibilityRead(read):read();
 }
-function readOptionsFor(host: WorldHost, m: Mind, cap = 12,ordinaryRetainedCards=new Set<string>()): CardOption[] {
+/** Registry read keeps supported blocked offers; minds still receive only feasible choices. */
+export function registeredOptionsFor(host:WorldHost,m:Mind,cap=128):CardOption[]{
+ const read=()=>readOptionsFor(host,m,cap,new Set(),true);
+ return host.engine.withFeasibilityRead?host.engine.withFeasibilityRead(read):read();
+}
+function readOptionsFor(host: WorldHost, m: Mind, cap = 12,ordinaryRetainedCards=new Set<string>(),includeBlocked=false): CardOption[] {
   if (m.life && cap === 12) cap = 24;
   const k = host.kernel, me = m.soulId; k.tick = host.engine.world.tick;
   const fr = m.agendaPos < m.agenda.length ? m.agenda[frontier(host, m)] : undefined;
@@ -153,13 +158,15 @@ function readOptionsFor(host: WorldHost, m: Mind, cap = 12,ordinaryRetainedCards
     const b = bind(k, p.card, me, p.target); if (!b) continue;
     const steps = [...p.card.approach, ...p.card.during].map((s) => ({ verb: s.verb, params: resolveParams(host, s.params, b) as Record<string, unknown> }));
     // physical feasibility of the first step, asked of the engine (Mars: verb.plan)
-    if (steps.length && host.engine.canPerform({ actor: m.entityId, label: p.card.name, steps })) continue;
+    const issue=steps.length?host.engine.canPerform({actor:m.entityId,label:p.card.name,steps}):null;
+    if(issue&&!includeBlocked)continue;
     perCard.set(p.card.name, n + 1);
     const label = `${p.card.name}${t ? `: ${describeTarget(host, me, t)}` : ''}`;
     scored.push({ score, o: {
       id: p.id, template: p.card.name, label, goodWhen: p.card.good_when ?? p.card.summary, notFor: p.card.not_for, target: p.target ?? undefined,
       servesIntent: servesNow(p.card.name, p.target) || travel.has(p.id), steps, durationHint: p.card.takes,
       card: p.card.name, hash: p.card.hash, cardTarget: p.target, approachLen: p.card.approach.length,
+      ...(includeBlocked?{available:!issue,...(issue?{blockedCode:issue.code}:{})}:{}),
     } });
     if (scored.length >= cap+ordinaryRetainedCards.size) break;
   }

@@ -107,3 +107,20 @@ test('local native classroom observation reports occupied participation without 
  assert.equal(f.host.engine.runtime.liveIds().includes(session!),false);
  assert.deepEqual(f.host.engine.observeLocalClassroomV1!(f.leader.entityId)!.sessions,[],'ended history is not a current visible gathering');
 });
+
+test('supported owned lecture remains visible with its real obstacle while participant admission is blocked',async t=>{
+ const f=await setup(t),scope=f.service.ownerScope({userId:'dev:operator',expiresAt:Number.MAX_SAFE_INTEGER},f.leader.soulId);
+ const first=readHumanCapabilitiesV1(f.host,f.leader,{registeredActivitiesV1:true});
+ const card=[...first.bindings.values()].find(b=>b.label==='host an eden lecture');assert.ok(card);assert.equal(card.available,true);
+ for(const mind of f.host.minds.values())mind.nextEvalTick=f.host.engine.world.tick+1e9;
+ const held=f.host.engine.perform({actor:f.rows[8].entity_id,label:'finite native load before lecture',steps:[{verb:'mars:take_item',params:{item:'commons-bowl-1',hand:'left'}}]});
+ assert.equal(held.ok,true);
+ for(let i=0;i<2000;i++){f.host.tickOnce();if(i%10===0)await setImmediate();if((f.host.engine.world.entities['commons-bowl-1'] as any).support?.kind==='in-hand')break;}
+ assert.equal((f.host.engine.world.entities['commons-bowl-1'] as any).support?.kind,'in-hand');assert.equal((f.host.engine.world.entities['commons-bowl-1'] as any).support.by,f.rows[8].entity_id);
+ const blocked=readHumanCapabilitiesV1(f.host,f.leader,{registeredActivitiesV1:true}),offer=[...blocked.bindings.values()].find(b=>b.id===card.id);
+ assert.ok(offer,'supported activity cannot disappear merely because native admission is blocked');assert.equal(offer.available,false);assert.ok(offer.blockedCode);
+ const before=f.host.engine.stateHash(),mint=f.db.events(f.host.worldId).filter(e=>e.kind==='mint').length;
+ await accept(f.host,f.service.submit(scope,{contract:'soul-intent/2',op:'upsert',requestId:'blocked-lecture-offer',words:'host an Eden lecture'}));await accept(f.host,f.service.settled());
+ const receipt=f.service.lookup(scope,'blocked-lecture-offer');assert.equal(receipt.phase,'refused');if(receipt.phase!=='refused')throw Error('expected explicit blockage');assert.equal(receipt.outcome?.kind,'state_blocked');assert.ok(receipt.code.includes(offer.blockedCode!));
+ assert.equal([...f.host.engine.runtime.records.values()].filter(r=>r.verb==='classroom_session').length,0);assert.equal(f.host.engine.stateHash(),before);assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='mint').length,mint);assert.equal(f.db.paidCost(),0);
+});
