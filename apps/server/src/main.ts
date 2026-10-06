@@ -1,4 +1,4 @@
-import {edenSteeringModeV1} from './eden-steering-mode.ts';
+import {edenSteeringModeV1,installEdenSteeringModeV1} from './eden-steering-mode.ts';
 import {TakeArchive,r2Store} from './take-archive.ts';
 import { createServer } from 'node:http';
 import { readdirSync, unlinkSync } from 'node:fs';
@@ -82,7 +82,7 @@ const brain = new Brain(host, db, config, {
 const souls = new Souls(host, db, brain, config);
 if(edenCapabilities)souls.enableLifecycle();
 const edenLifeHandles=edenLife?await installEdenLifeV1(host,brain,{retainReader:process.env.EDEN_CORE_RETAIN_READER==='1',foodDeliveryId:process.env.EDEN_FINITE_FOOD_DELIVERY_ID}):undefined;
-if(steeringMode.closedGoalsV1){const policy=host.enableIntentExecutionRetentionV1();host.drainInputs();await policy;}
+await installEdenSteeringModeV1(host,steeringMode,process.env.EDEN_CORE_RETAIN_READER==='1');
 const intentV2=edenCapabilities?new IntentControlV2(host,brain,souls,{historyV1:true,...steeringMode}):undefined;
 
 const server = createServer();
