@@ -84,6 +84,7 @@ export type ClassroomIntent =
 export interface ClassroomParams {
   accessScope?: 'ground-venue/1';
   attendanceScope?: 'eden-audience24/1';
+  seatAssignments?: Record<string, string>;
   host: string;
   presenters: string[];
   audience: string[];

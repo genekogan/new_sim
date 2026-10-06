@@ -40,6 +40,7 @@ const seconds = z.number().positive().max(3600);
 const paramsSchema = z.strictObject({
   accessScope:z.literal('ground-venue/1').optional(),
   attendanceScope: z.literal('eden-audience24/1').optional(),
+  seatAssignments: z.record(id, id).optional(),
   host: id,
   presenters: z.array(id).min(1).max(6),
   audience: z.array(id).min(1).max(24),
@@ -633,11 +634,25 @@ export const classroomSession: ActionDef<ClassroomParams, Program, Exec> = {
           [...actors, ...p.seats],
         ),
       };
+    const assignments = p.seatAssignments ?? {};
+    const assignedSeats = new Set(Object.values(assignments));
+    if (p.seatAssignments && (
+      p.attendanceScope !== 'eden-audience24/1' ||
+      Object.keys(assignments).some(actor => !actors.includes(actor)) ||
+      assignedSeats.size !== Object.values(assignments).length ||
+      [...assignedSeats].some(seat => !free.some(slot => slot.id === seat))
+    )) return {
+      ok: false,
+      diagnostic: diagnostic('seat-assignment-invalid',
+        'Explicit Eden assignments require distinct available candidate seats for participating actors',
+        [...Object.keys(assignments), ...assignedSeats]),
+    };
     const people: Participant[] = [];
     const available = [...free];
     for (const actor of actors) {
       let last: Diagnostic | undefined;
       const index = available.findIndex((slot) => {
+        if (assignments[actor] ? slot.id !== assignments[actor] : assignedSeats.has(slot.id)) return false;
         const attempt = rt.registry
           .get('sit')!
           .plan(rt, { actor, slot: slot.id });
