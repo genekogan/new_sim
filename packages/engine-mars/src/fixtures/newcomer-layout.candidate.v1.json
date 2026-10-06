@@ -1,0 +1,226 @@
+{
+  "scope": "native candidate only; no World approval or default adoption",
+  "capacity": 30,
+  "placements": [
+    {
+      "matCenter": [
+        -22,
+        28
+      ],
+      "mealPoint": [
+        -22,
+        12.5
+      ]
+    },
+    {
+      "matCenter": [
+        -16,
+        28
+      ],
+      "mealPoint": [
+        -16,
+        12.5
+      ]
+    },
+    {
+      "matCenter": [
+        -10,
+        28
+      ],
+      "mealPoint": [
+        -10,
+        12.5
+      ]
+    },
+    {
+      "matCenter": [
+        -4,
+        28
+      ],
+      "mealPoint": [
+        -4,
+        12.5
+      ]
+    },
+    {
+      "matCenter": [
+        26,
+        -25
+      ],
+      "mealPoint": [
+        26,
+        -27.4
+      ]
+    },
+    {
+      "matCenter": [
+        19,
+        -25
+      ],
+      "mealPoint": [
+        19,
+        -27.4
+      ]
+    },
+    {
+      "matCenter": [
+        12,
+        -25
+      ],
+      "mealPoint": [
+        12,
+        -27.4
+      ]
+    },
+    {
+      "matCenter": [
+        5,
+        -25
+      ],
+      "mealPoint": [
+        5,
+        -27.4
+      ]
+    },
+    {
+      "matCenter": [
+        26,
+        -20
+      ],
+      "mealPoint": [
+        26,
+        -22.4
+      ]
+    },
+    {
+      "matCenter": [
+        19,
+        -20
+      ],
+      "mealPoint": [
+        19,
+        -22.4
+      ]
+    },
+    {
+      "matCenter": [
+        12,
+        -20
+      ],
+      "mealPoint": [
+        12,
+        -22.4
+      ]
+    },
+    {
+      "matCenter": [
+        5,
+        -20
+      ],
+      "mealPoint": [
+        5,
+        -22.4
+      ]
+    },
+    {
+      "matCenter": [
+        26,
+        -15
+      ],
+      "mealPoint": [
+        26,
+        -17.4
+      ]
+    },
+    {
+      "matCenter": [
+        19,
+        -15
+      ],
+      "mealPoint": [
+        19,
+        -17.4
+      ]
+    },
+    {
+      "matCenter": [
+        12,
+        -15
+      ],
+      "mealPoint": [
+        12,
+        -17.4
+      ]
+    },
+    {
+      "matCenter": [
+        5,
+        -15
+      ],
+      "mealPoint": [
+        5,
+        -17.4
+      ]
+    },
+    {
+      "matCenter": [
+        19,
+        -10
+      ],
+      "mealPoint": [
+        19,
+        -12.4
+      ]
+    },
+    {
+      "matCenter": [
+        12,
+        -10
+      ],
+      "mealPoint": [
+        12,
+        -12.4
+      ]
+    },
+    {
+      "matCenter": [
+        5,
+        -10
+      ],
+      "mealPoint": [
+        5,
+        -12.4
+      ]
+    },
+    {
+      "matCenter": [
+        19,
+        -5
+      ],
+      "mealPoint": [
+        19,
+        -7.4
+      ]
+    },
+    {
+      "matCenter": [
+        5,
+        -5
+      ],
+      "mealPoint": [
+        5,
+        -7.4
+      ]
+    },
+    {
+      "matCenter": [
+        26,
+        0
+      ],
+      "mealPoint": [
+        26,
+        -2.4
+      ]
+    }
+  ]
+}
