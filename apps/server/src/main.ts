@@ -18,7 +18,7 @@ import { CampCards } from './camp.ts';
 import {FloaterCards} from './floaters.ts';
 import { worldDefinition } from './world-config.ts';
 import { stripWorldRequestPath } from './world-request-path.ts';
-import {edenCoreRequested,edenHistoryFactory,installEdenCore,settleEmptyEden,drainEdenThought} from './eden-bootstrap.ts';
+import {edenCoreRequested,edenHistoryFactory,installEdenCore,settleEmptyEden,drainEdenThought,installEdenLifeV1} from './eden-bootstrap.ts';
 import {IntentControlV2} from './intent-control.ts';
 
 /** Seeded only into a world with no live Souls, so it is never empty. */
@@ -37,7 +37,8 @@ if (db.migrated.length) console.log(`[db] applied migrations ${db.migrated.join(
 // Each process owns one world and imports its engine from this release.
 const mars = config.engine==='mars'?await import('@sim/engine-mars'):null;
 const edenCore=edenCoreRequested(config,process.env);
-const factory=edenCore?await edenHistoryFactory(db,config.worldId):mars?await mars.marsFactory(config.worldKey==='littlemartians'?mars.LITTLE_MARTIANS_WORLD:config.worldKey==='eden'?mars.GREEN_FIELD_WORLD:undefined):recordedToyFactory;
+const edenLife=edenCore&&process.env.ENABLE_EDEN_LIFE==='1';
+const factory=edenCore?await edenHistoryFactory(db,config.worldId,{lifeV1:edenLife}):mars?await mars.marsFactory(config.worldKey==='littlemartians'?mars.LITTLE_MARTIANS_WORLD:config.worldKey==='eden'?mars.GREEN_FIELD_WORLD:undefined):recordedToyFactory;
 const host = new WorldHost(db, factory, config.worldSeed, config.snapshotEveryTicks, config.worldId,edenCore?{durableClockV1:true}:undefined);
 const boot = host.boot();
 if(edenCore)await installEdenCore(host,{applyCrew:process.env.APPLY_EDEN_CREW_CHECKPOINT==='1',applyCommons:process.env.APPLY_EDEN_COMMONS_CHECKPOINT==='1',retainReader:process.env.EDEN_CORE_RETAIN_READER==='1'});
@@ -74,6 +75,7 @@ const brain = new Brain(host, db, config, {
 },edenCapabilities?{intentV2Choices:true}:undefined);
 const souls = new Souls(host, db, brain, config);
 if(edenCapabilities)souls.enableLifecycle();
+const edenLifeHandles=edenLife?await installEdenLifeV1(host,brain,{retainReader:process.env.EDEN_CORE_RETAIN_READER==='1',foodDeliveryId:process.env.EDEN_FINITE_FOOD_DELIVERY_ID}):undefined;
 const intentV2=edenCapabilities?new IntentControlV2(host,brain,souls,{historyV1:true}):undefined;
 
 const server = createServer();
@@ -118,7 +120,7 @@ const shutdown = async (sig: string) => {
     for(const c of hub.clients)c.ws.close(1001,'server restarting');
     const closed=new Promise<void>(resolve=>server.close(()=>resolve()));
     await drainEdenThought(host,brain,intentV2,closed);
-    await Promise.all([brain.settled(),intentV2?.settled(),takes.settled(),...backupWork]);
+    await Promise.all([brain.settled(),intentV2?.settled(),takes.settled(),edenLifeHandles?.settled(),...backupWork]);edenLifeHandles?.close();
   }
   console.log(`[world] ${sig}: saving snapshot at tick ${host.engine.world.tick}`);
   host.stop(); takes.stop();

@@ -1,6 +1,6 @@
 // Source-owned installer for the existing Eden control plane. Explicitly
 // selected by main; no default factory or environment/config value changes.
-import {marsFactory,marsCommonsTransitionFactory,marsCrewRemovalTransitionFactory,GREEN_FIELD_WORLD,EDEN_SAFE_COMMONS_WORLD} from '@sim/engine-mars';
+import {marsFactory,marsCommonsTransitionFactory,marsCrewRemovalTransitionFactory,GREEN_FIELD_WORLD,EDEN_SAFE_COMMONS_WORLD,commonsLifeReaderFactory,retainedCommonsShoreFactory} from '@sim/engine-mars';
 import type {EngineFactory} from '@sim/engine-contract';
 import type {Db} from './db.ts';
 import type {WorldHost} from './world.ts';
@@ -10,7 +10,8 @@ import type {Brain} from './brain.ts';
 import type {IntentControlV2} from './intent-control.ts';
 
 export function edenCoreRequested(cfg:Config,env:NodeJS.ProcessEnv){return cfg.worldKey==='eden'&&cfg.engine==='mars'&&env.ENABLE_EDEN_CORE==='1';}
-export async function edenHistoryFactory(db:Db,worldId:string):Promise<EngineFactory>{
+export async function edenHistoryFactory(db:Db,worldId:string,options?:{lifeV1?:boolean}):Promise<EngineFactory>{
+  if(options?.lifeV1){const header=db.world(worldId);if(header?.rules_version.includes('retained-shore/1'))return retainedCommonsShoreFactory({foodDeliveryV1:header.rules_version.includes('+fd/1'),socialEdenV1:header.rules_version.includes('+social-eden/1'),greenLandmarkV1:header.rules_version.includes('+g/1')});return commonsLifeReaderFactory(await edenHistoryFactory(db,worldId));}
   const header=db.world(worldId);
   if(!header)return marsFactory({...EDEN_SAFE_COMMONS_WORLD,safeCrewRemoval:true});
   const policy=db.db.prepare("SELECT seq FROM events WHERE world_id=? AND kind='rules' AND json_extract(payload,'$.crewRemovalTransition.contract')='crew-removal-transition/1' ORDER BY seq LIMIT 1").get(worldId);
@@ -24,7 +25,7 @@ export async function edenHistoryFactory(db:Db,worldId:string):Promise<EngineFac
 
 export async function installEdenCore(host:WorldHost,options:{applyCrew:boolean;applyCommons:boolean;retainReader?:boolean}){
   if(options.retainReader){if(options.applyCrew||options.applyCommons)throw Error('eden-bootstrap.retain-reader-cannot-install');return [];}
-  const crew=!host.engine.rulesVersion.includes('+crew-removal/1'),commons=host.engine.world.base.campus!=='eden-commons';
+  const crew=!host.engine.rulesVersion.includes('+crew-removal/1'),commons=!['eden-commons','eden-commons-shore/1'].includes(host.engine.world.base.campus);
   if(crew&&!options.applyCrew)throw Error('eden-bootstrap.explicit-crew-checkpoint-required');
   if(commons&&!options.applyCommons)throw Error('eden-bootstrap.explicit-commons-checkpoint-required');
   if((crew||commons)&&host.stationHistoryV1())throw Error('eden-bootstrap.station-carry-required');
@@ -41,7 +42,7 @@ export async function installEdenCore(host:WorldHost,options:{applyCrew:boolean;
   const facts=[];
   if(crew){const p=host.adoptCrewRemovalPolicyV1('operator:eden-core-bootstrap');host.drainInputs();facts.push(await p);}
   if(commons){const p=host.adoptCommons('operator:eden-core-bootstrap');host.drainInputs();facts.push(await p);}
-  if(!host.engine.rulesVersion.includes('+crew-removal/1')||host.engine.world.base.campus!=='eden-commons')throw Error('eden-bootstrap.installation-incomplete');
+  if(!host.engine.rulesVersion.includes('+crew-removal/1')||!['eden-commons','eden-commons-shore/1'].includes(host.engine.world.base.campus))throw Error('eden-bootstrap.installation-incomplete');
   return facts;
 }
 
@@ -60,4 +61,18 @@ export async function drainEdenThought(host:WorldHost,brain:Brain,service:Intent
   const drain=async()=>{await acceptedRequests;await Promise.all([brain.settled(),service?.settled()]);host.drainInputs();};
   try{await Promise.race([drain(),failure]);}
   finally{clearInterval(pump);}
+}
+
+export type EdenLifeHandlesV1={settled():Promise<void>;close():void};
+/** Production-compatible opt-in composition: real Config/Auth stay in main; no dev owner or local budget override. */
+export async function installEdenLifeV1(host:WorldHost,brain:Brain,options:{retainReader?:boolean;foodDeliveryId?:string}={}):Promise<EdenLifeHandlesV1>{
+  if(options.retainReader)return {async settled(){},close(){}};
+  if(brain.host!==host||brain.cfg.worldKey!=='eden'||!host.living)throw Error('eden-life.opted-in-living-host-required');
+  const drive=async<T>(p:Promise<T>)=>{let done=false;p.then(()=>done=true,()=>done=true);for(let i=0;i<100&&!done;i++){host.drainInputs();await new Promise<void>(r=>setImmediate(r));}if(!done)throw Error('eden-life.bootstrap-unsettled');return p;};
+  await drive(host.enableGroundFixtureGoalsV1());await drive(host.enableHumanRestNeedsV1());await drive<unknown>(host.enableIntentSequencesV1());await drive<unknown>(host.enableIntentApproachRetentionV1());await drive(host.enableQuietLandingCourtesyV1());await drive(brain.enableEdenAutonomyV1());
+  if(!host.engine.rulesVersion.includes('+commons-provisions/1'))await drive(host.installCommonsProvisionsV1());
+  const {followCommonsProvisionBirths}=await import('./commons-provisions.ts'),{scheduleCommonsKitchenInstallation}=await import('./commons-kitchen-install.ts');
+  const provisions=await followCommonsProvisionBirths(host,brain),kitchen=scheduleCommonsKitchenInstallation(host,brain);
+  const food=options.foodDeliveryId?(await import('./food-delivery.ts')).scheduleFiniteFoodDeliveryV1(host,brain,options.foodDeliveryId):undefined;
+  return {async settled(){await provisions.settled();await kitchen.settled();await food?.settled();},close(){provisions.close();kitchen.close();food?.close();}};
 }
