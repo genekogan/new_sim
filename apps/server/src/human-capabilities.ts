@@ -14,12 +14,15 @@ export function readHumanCapabilitiesV1(host:WorldHost,m:Mind,options?:{register
  const read=()=>{
   const w=host.engine.world as NativeWorld,body=w.entities[m.entityId],bindings=new Map<string,HumanBindingV1>();if(!body?.human)throw Error('human-capabilities.body-unavailable');
   const verbs=new Set(host.engine.describeVerbs().map(v=>v.verb)),humanoid=!body.body||body.body.family==='humanoid';
+  // A seated body leaves its seat through the ordinary native stand step, never a forced pose.
+  const seatedNow=humanoid&&body.human.activity==='sit'&&verbs.has('stand');
   const add=(goal:HumanGoalV1['goal'],id:string,label:string,targetId:string|undefined,steps:Program['steps'],approachLen:number,green=false)=>{
    const seatedWitness=goal==='sit'?observeSeatedHumanGoalV1(host,m,{goal:'sit',bindingId:id,seconds:60}):null;if(seatedWitness){const fixture=host.kernel.things[targetId!]?.traits.entity;steps=[{verb:'rest',params:{seconds:1,seatedAt:fixture}},{verb:'rest',params:{seconds:60,seatedAt:fixture}}];approachLen=1;}
+   else if(seatedNow&&goal!=='rest'&&goal!=='eat'&&steps[0]?.verb!=='stand'){steps=[{verb:'stand',params:{}},...steps];approachLen+=1;}
    const issue=host.engine.canPerform({actor:m.entityId,label:'registered '+goal,steps}),target=targetId?host.kernel.things[targetId]:undefined,point=targetId?engineRef(host,targetId):null;
    const pos=typeof point==='string'?w.entities[point]?.pose.p:point?[point[0],0,point[1]]:undefined;
    const name='human goal '+goal.replace('_',' ')+' '+hashOf({goal,id,steps}).slice(0,12),card:Card={name,summary:`Perform the registered ${goal.replace('_',' ')} goal using native admission.`,good_when:'This specific owner goal is requested and the registered physical binding remains available.',target:null,when:[],then:[...(target?[{move:['$actor',target.id] as [string,string]}]:[]),{set:['$actor','doing',goal==='sit'?'sitting':goal==='eat'?'eating':goal==='rest'?'resting':'following an owner goal']}],approach:steps.slice(0,approachLen),during:steps.slice(approachLen),takes:goal==='rest'?'minute':'minutes'};
-   const aliases=[label.toLowerCase(),...(targetId?[targetId.toLowerCase()]:[]),...(targetId==='eden-classroom-1'?['classroom','eden classroom','lecture room']:[])];const entity=targetId?w.entities[targetId]:undefined;if(entity?.def==='campfire')aliases.push('campfire','fire');const side=label.toLowerCase().match(/\b(north|south|east|west)\b/)?.[1];if(entity?.def==='bench-6ft'&&side&&/fire/i.test(label))aliases.push(`${side} bench by the campfire`,`${side} campfire bench`,`campfire ${side} bench`,`fire bench ${side}`);
+   const aliases=[label.toLowerCase(),...(targetId?[targetId.toLowerCase()]:[]),...(targetId==='eden-classroom-1'?['classroom','eden classroom','lecture room','class','lecture','lecture hall','the lecture','school']:[])];const entity=targetId?w.entities[targetId]:undefined;if(entity?.def==='campfire')aliases.push('campfire','fire');const side=label.toLowerCase().match(/\b(north|south|east|west)\b/)?.[1];if(entity?.def==='bench-6ft'&&side&&/fire/i.test(label))aliases.push(`${side} bench by the campfire`,`${side} campfire bench`,`campfire ${side} bench`,`fire bench ${side}`);
    bindings.set(id,{id,goal,targetId,label,aliases:[...new Set(aliases)],steps,card,available:!issue,...(issue?{blockedCode:issue.code}:{}),...(seatedWitness?{seatedWitness}:{}),distance:pos?Math.hypot(pos[0]-body.pose.p[0],pos[2]-body.pose.p[2]):0,green});
   };
   for(const a of host.engine.anchors()){
@@ -34,6 +37,11 @@ export function readHumanCapabilitiesV1(host:WorldHost,m:Mind,options?:{register
    const births=host.db.db.prepare("SELECT payload FROM events WHERE world_id=? AND kind='birth' ORDER BY seq LIMIT ?").all(host.worldId,resources.length) as {payload:string}[],i=births.findIndex(b=>JSON.parse(b.payload).soulId===m.soulId);
    if(i>=0){const meals=[{batch:0,...resources[i]},...(i<COMMONS_PERSONAL_RESOURCES.length?(host.engine.commonsFoodDeliveriesV1?.()??[]).map(d=>({batch:d.batch,...commonsFoodDeliveryItemsV1(d.batch).resources[i]})):[])];for(const r of meals)if(w.entities[r.bowl]&&w.entities[r.spoon])add('eat',key('eat',r.bowl),`My meal ${r.batch}`,undefined,[{verb:'mars:take_item',params:{item:r.bowl,hand:'left'}},{verb:'mars:take_item',params:{item:r.spoon,hand:'right'}},{verb:'mars:eat',params:{bowl:r.bowl,spoon:r.spoon}},{verb:'mars:put_item',params:{item:r.spoon,surfaceSlot:'ground'}},{verb:'mars:put_item',params:{item:r.bowl,surfaceSlot:'ground'}}],2);}
   }
+  if(options?.registeredActivitiesV1&&humanoid&&host.engine.rulesVersion.includes('retained-shore/1')&&w.regions['shore-water']){
+   const id='activity:swim:shore-water',steps:Program['steps']=[...(seatedNow?[{verb:'stand',params:{}}]:[]),{verb:'walk_to',params:{to:'shore-water'}},{verb:'rest',params:{seconds:60}}],issue=host.engine.canPerform({actor:m.entityId,label:'Swim in the supported pond',steps});
+   const card:Card={name:'human goal swim supported pond '+hashOf({id,steps}).slice(0,12),summary:'Walk through the supported shore transitions into the canonical pond, swim and tread there.',good_when:'Owner asks for a swim; uses the admitted original pond rather than scenery-only water.',not_for:'Unadmitted western lake/river, a body without swimming equivalence, or unsafe current action.',target:null,when:[],then:[{set:['$actor','doing','swimming in the supported pond']}],approach:steps.slice(0,seatedNow?2:1),during:steps.slice(seatedNow?2:1),takes:'minutes'};
+   bindings.set(id,{id,goal:'activity',targetId:'shore-water',label:'Swim in the supported pond',aliases:['swim','go for a swim','swim in the pond','go for a swim in the pond','go swimming','go swimming in the pond','take a swim','have a swim','go for a dip','take a dip','swim in the water','swim at the shore'],steps,card,available:!issue,...(issue?{blockedCode:issue.code}:{}),distance:0,green:false});
+  }
   if(options?.registeredActivitiesV1)for(const option of registeredOptionsFor(host,m,128)){
    if(!host.ownLectureRosterV1(m.soulId,option.steps))continue;
    if(option.card.startsWith('human goal '))continue;const card=host.kernel.vocab.cards[option.card];if(!card||card.hash!==option.hash||!host.kernel.decks[m.soulId].cards.includes(option.card))continue;
@@ -46,12 +54,16 @@ export function readHumanCapabilitiesV1(host:WorldHost,m:Mind,options?:{register
  };return host.engine.withFeasibilityRead?host.engine.withFeasibilityRead(read):read();
 }
 /** Only explicitly supported basic forms bypass model naming. Unknown text is never a best-fit action. */
-export function basicHumanGoalV1(words:string,read:HumanRegistryReadV1,strict:boolean):{goal?:HumanGoalV1;adaptation?:{originalGoal:'hang_out';substituteBindingId:string;explanation:string};blocked?:HumanBindingV1}|null {
+export function basicHumanGoalV1(words:string,read:HumanRegistryReadV1,strict:boolean):{goal?:HumanGoalV1;adaptation?:{originalGoal:'hang_out';substituteBindingId:string;explanation:string};blocked?:HumanBindingV1;note?:string}|null {
  const text=words.trim().toLowerCase().replace(/^please\s+/,'').replace(/[.!?]$/,'').replace(/\s+(?:now|please)$/,'');let type:HumanGoalV1['goal']|undefined,selector:(b:HumanBindingV1)=>boolean=()=>true,adaptation;
+ const swim=read.bindings.get('activity:swim:shore-water'),swimWords=/\b(?:swim|swimming|a dip|bathe|bathing)\b/.test(text)&&!/\b(?:not|never|don't|dont|stop)\b/.test(text)&&!/\b(?:every|when|if|tomorrow|later|tonight|after|before|until)\b|\bat\s+\d/.test(text);
+ if(swim&&swimWords){const elsewhere=text.match(/\b(lake|river|sea|ocean|stream|creek)\b/)?.[1];if(elsewhere&&strict)return null;
+  const note=elsewhere?`The ${elsewhere} here is scenery that is not swimmable yet; swim in the supported pond instead.`:'Walk into the supported pond and swim there.';
+  return swim.available?{goal:{goal:'activity',bindingId:swim.id},note}:{blocked:swim,note};}
  if(/^(?:go )?sit (?:down )?on (?:a|the) bench$/.test(text)){type='sit';selector=b=>/bench/i.test(b.label);}
  else if(/^(?:go )?rest(?: here)?$/.test(text))type='rest';
  else if(/^(?:go )?eat(?: (?:my |a )?(?:meal|food))?$/.test(text))type='eat';
- else {const walk=text.match(/^(?:go to|walk to) (.+)$/);if(walk){type='walk';const label=walk[1].replace(/^the /,'');selector=b=>b.aliases.includes(label);}
+ else {const walk=text.match(/^(?:go|walk|head|stroll|wander|run|hurry|make your way)(?: over| back| on| down| up)? to (.+)$/);if(walk){type='walk';const label=walk[1].replace(/^the /,'');selector=b=>b.aliases.includes(label);}
   else if(text==='go hang out by the garden'||text==='hang out by the garden'){type='hang_out';const exact=[...read.bindings.values()].find(b=>b.goal==='hang_out'&&/\bgarden\b/i.test(b.label));if(exact)selector=b=>b.id===exact.id;else if(!strict){selector=b=>b.green;adaptation=true;}else return null;}
  }
  if(!type){
