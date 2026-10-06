@@ -567,7 +567,7 @@ export class Brain {
     return verdicts;
   }
 
-  compileHumanGoalV1(m:Mind,words:string,strict:boolean,guard:AcceptanceGuard,journal:AcceptanceJournal):Promise<ClosedHumanResultV1>{if(this.quiescing)return Promise.resolve({kind:'terminal',outcome:{kind:'system_unavailable',code:'closed',explanation:'The interpreter is stopping; keep this request reference.'}});return this.track(()=>compileHumanGoalV1(this,m,words,strict,guard,journal,{call:this.compilerCall,injected:this.injectedCompiler,record:c=>this.record(c)}));}
+  compileHumanGoalV1(m:Mind,words:string,strict:boolean,guard:AcceptanceGuard,journal:AcceptanceJournal,registeredActivitiesV1=false):Promise<ClosedHumanResultV1>{if(this.quiescing)return Promise.resolve({kind:'terminal',outcome:{kind:'system_unavailable',code:'closed',explanation:'The interpreter is stopping; keep this request reference.'}});return this.track(()=>compileHumanGoalV1(this,m,words,strict,guard,journal,{call:this.compilerCall,injected:this.injectedCompiler,record:c=>this.record(c),registeredActivitiesV1}));}
 
   /** A wish in plain words → an agenda of cards, minting what the vocabulary lacks. Returns null when no compiler is available. */
   async compile(m: Mind, wish: string, align: boolean | 'intent-v2'=false, guard?: AcceptanceGuard, journal?: AcceptanceJournal): Promise<{ ok: true; agenda: { card: string; target: string | null; of?: string }[]; minted: MintVerdict[]; alignment?:Alignment } | { ok: false; reason: string } | null> {

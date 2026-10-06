@@ -28,7 +28,7 @@ export const intentOwnerControlV2Schema = z.strictObject({
   worldId: id, soulId: id, ownerId: id, intentContract: z.literal(INTENT_V2),
   intentHistoryContract:z.literal('private-intent-history/1').optional(),
   intentArrivalContract:z.literal('private-intent-arrival/1').optional(),
-  humanGoalContract:z.literal('human-capabilities/1').optional(),
+  humanGoalContract:z.enum(['human-capabilities/1','human-capabilities/2']).optional(),
 });
 export type IntentOwnerControlV2 = z.infer<typeof intentOwnerControlV2Schema>;
 

@@ -28,12 +28,14 @@ export class IntentControlV2 {
   get historyEnabled(){return !!this.historyReader;}
   // Runtime work ownership only; durable reservations retain crash uncertainty.
   private workers = new Set<Promise<void>>();
+  private readonly registeredActivitiesV1:boolean;
   private readonly closedGoalsV1:boolean;
   get humanGoalsEnabled(){return this.closedGoalsV1;}
-  constructor(host:WorldHost,brain:Brain,souls:Souls,options?:{historyV1?:boolean;closedGoalsV1?:boolean}) {
+  constructor(host:WorldHost,brain:Brain,souls:Souls,options?:{historyV1?:boolean;closedGoalsV1?:boolean;registeredActivitiesV1?:boolean}) {
     if(brain.host!==host||souls.host!==host||brain.db!==host.db||souls.db!==host.db||!brain.intentV2Enabled)
       throw new Error('candidate intent transport requires one opted-in host/brain/database');
     this.host=host;this.brain=brain;this.souls=souls;this.closedGoalsV1=options?.closedGoalsV1===true;
+    this.registeredActivitiesV1=options?.registeredActivitiesV1===true;if(this.registeredActivitiesV1&&!this.closedGoalsV1)throw Error('registered activities require closed steering');
     this.store=new IntentRequests(host.db);this.publisher=new IntentPublisher(host,this.store);
     if(options?.historyV1)this.historyReader=new IntentHistoryReaderV1(this);
   }
@@ -100,9 +102,9 @@ export class IntentControlV2 {
     this.guard(scope);
     if(scope.source.kind!=='owner'||scope.source.channel!=='web'||scope.source.principalId!==scope.source.ownerId)return undefined;
     return intentOwnerControlV2Schema.parse({worldId:this.host.worldId,soulId:scope.soulId,
-      ownerId:scope.source.ownerId,intentContract:INTENT_V2,...(this.historyEnabled?{intentHistoryContract:INTENT_HISTORY_V1}:{}),...(this.host.extra.intentArrivalV1?{intentArrivalContract:INTENT_ARRIVAL_V1}:{}),...(this.closedGoalsV1?{humanGoalContract:'human-capabilities/1'}:{})});
+      ownerId:scope.source.ownerId,intentContract:INTENT_V2,...(this.historyEnabled?{intentHistoryContract:INTENT_HISTORY_V1}:{}),...(this.host.extra.intentArrivalV1?{intentArrivalContract:INTENT_ARRIVAL_V1}:{}),...(this.closedGoalsV1?{humanGoalContract:this.registeredActivitiesV1?'human-capabilities/2':'human-capabilities/1'}:{})});
   }
-  humanCapabilities(scope:IntentRequestScope){if(!this.closedGoalsV1)throw new ApiError(404,'not-found','human goal registry unavailable');this.guard(scope);const allowed=this.souls.limits.allow(`human-capabilities:${scope.worldId}:${scope.soulId}:${scope.source.principalId}`,120,60_000);if(!allowed.ok)throw new ApiError(429,'rate-limited','too many capability reads');const view=readHumanCapabilitiesV1(this.host,this.host.minds.get(scope.soulId)!).view;this.guard(scope);return view;}
+  humanCapabilities(scope:IntentRequestScope){if(!this.closedGoalsV1)throw new ApiError(404,'not-found','human goal registry unavailable');this.guard(scope);const allowed=this.souls.limits.allow(`human-capabilities:${scope.worldId}:${scope.soulId}:${scope.source.principalId}`,120,60_000);if(!allowed.ok)throw new ApiError(429,'rate-limited','too many capability reads');const view=readHumanCapabilitiesV1(this.host,this.host.minds.get(scope.soulId)!,{registeredActivitiesV1:this.registeredActivitiesV1}).view;this.guard(scope);return view;}
   historyCapability(scope:IntentRequestScope){return this.historyReader?.capability(scope);}
   historyPage(scope:IntentRequestScope,query:unknown={}):IntentHistoryPageV1 {
     if(!this.historyReader)throw new ApiError(404,'not-found','intention history unavailable');
@@ -163,7 +165,7 @@ export class IntentControlV2 {
       else await this.publisher.interpretAndPublish(scope,reservation,async guard=>{
         checkAcceptanceGuard(guard);
         const mind=this.host.minds.get(scope.soulId)!;
-        if(this.closedGoalsV1){if(reservation.request.op!=='upsert')throw Error('closed-goals.upsert-required');const compiled=await this.brain.compileHumanGoalV1(mind,reservation.request.words,reservation.request.strict,guard,this.store.journal(reservation));checkAcceptanceGuard(guard);if(compiled.kind==='terminal')throw new HumanCompilationStopped(compiled.outcome);goalGuard=compiled.revalidate;return compiled.interpretation;}
+        if(this.closedGoalsV1){if(reservation.request.op!=='upsert')throw Error('closed-goals.upsert-required');const compiled=await this.brain.compileHumanGoalV1(mind,reservation.request.words,reservation.request.strict,guard,this.store.journal(reservation),this.registeredActivitiesV1);checkAcceptanceGuard(guard);if(compiled.kind==='terminal')throw new HumanCompilationStopped(compiled.outcome);goalGuard=compiled.revalidate;return compiled.interpretation;}
         const result=await this.brain.compile(mind,reservation.request.op==='upsert'?reservation.request.words:'','intent-v2',guard,this.store.journal(reservation));
         checkAcceptanceGuard(guard);
         if(!result?.ok||!result.alignment)throw new InterpretationUnavailable();
