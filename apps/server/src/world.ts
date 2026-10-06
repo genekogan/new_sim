@@ -1,3 +1,4 @@
+import {latestPurposeDirectionV1} from './latest-purpose-direction.ts';
 import {episodesFromHistoryV1} from './purpose-episodes.ts';
 import {commonsNewcomerResourcesV1} from '@sim/engine-mars';
 import type {NewcomerResourcePlacementV1} from '@sim/engine-contract';
@@ -604,13 +605,13 @@ export class WorldHost {
   unfinishedHumanGoalExecutionV1(soulId:string){
     if(!this.extra.intentExecutionRetentionV1||this.quietBarrier)return null;const m=this.minds.get(soulId),row=this.db.soul(soulId);if(!m?.pending||m.activeRule||!row||row.world_id!==this.worldId||row.retired_at!==null||row.owner!==m.owner||row.entity_id!==m.entityId||this.kernel.things[soulId]?.traits.body!==m.entityId||!this.engine.world.entities[m.entityId]||this.engine.programOf(m.entityId)!==m.pending.program)return null;
     const binding=Object.values(this.intentBindings()).find(b=>b.payload.soulId===soulId&&b.payload.decision.entityId===m.entityId&&b.payload.activityId===m.pending!.program);if(!binding)return null;const history=this.intentHistoryOf(soulId),entry=history.intents[binding.payload.intent.intentId];if(entry?.status!=='active'||entry.revision.version!==binding.payload.intent.version||entry.revision.source.ownerId!==m.owner||entry.revision.interpretation.trigger.kind!=='now'||entry.revision.interpretation.humanGoalPlan?.kind!=='planned')return null;
-    const latest=Object.values(history.intents).filter(e=>e.revision.source.ownerId===m.owner&&e.revision.interpretation.trigger.kind==='now').sort((a,b)=>b.revision.submitted.seq-a.revision.submitted.seq)[0];if(latest?.revision.intentId!==entry.revision.intentId||latest.revision.version!==entry.revision.version){const source=this.db.events(this.worldId,binding.payload.decision.seq-1,1)[0];if(!this.extra.intentRetainedChoiceV1||source?.kind!=='decision'||source.payload.trigger!=='retained-choice/1'||source.payload.soulId!==soulId||source.payload.entityId!==m.entityId||this.intentWillSeqOf(soulId)>source.seq)return null;}const action=this.engine.programAction?.(m.pending.program)?.action;if(action?.status==='blocked')return null;return {intent:{intentId:entry.revision.intentId,version:entry.revision.version},activityId:m.pending.program};
+    const latest=latestPurposeDirectionV1(history,m.owner,this.extra.intentRetainedChoiceV1===true);if(latest?.revision.intentId!==entry.revision.intentId||latest.revision.version!==entry.revision.version){const source=this.db.events(this.worldId,binding.payload.decision.seq-1,1)[0];if(!this.extra.intentRetainedChoiceV1||source?.kind!=='decision'||source.payload.trigger!=='retained-choice/1'||source.payload.soulId!==soulId||source.payload.entityId!==m.entityId||this.intentWillSeqOf(soulId)>source.seq)return null;}const action=this.engine.programAction?.(m.pending.program)?.action;if(action?.status==='blocked')return null;return {intent:{intentId:entry.revision.intentId,version:entry.revision.version},activityId:m.pending.program};
   }
   unfinishedIntentApproachV1(soulId:string){
     if(!this.extra.intentApproachRetentionV1||this.quietBarrier)return null;const m=this.minds.get(soulId),row=this.db.soul(soulId);if(!m?.pending||m.activeRule||!row||row.world_id!==this.worldId||row.retired_at!==null||row.owner!==m.owner||row.entity_id!==m.entityId||this.kernel.things[soulId]?.traits.body!==m.entityId||!this.engine.world.entities[m.entityId]||this.engine.programOf(m.entityId)!==m.pending.program)return null;
     const binding=Object.values(this.intentBindings()).find(b=>b.payload.soulId===soulId&&b.payload.decision.entityId===m.entityId&&b.payload.activityId===m.pending!.program);if(!binding)return null;
     const history=this.intentHistoryOf(soulId),entry=history.intents[binding.payload.intent.intentId];if(entry?.status!=='active'||entry.revision.version!==binding.payload.intent.version||entry.revision.source.ownerId!==m.owner||entry.revision.interpretation.trigger.kind!=='now')return null;
-    const latest=Object.values(history.intents).filter(e=>e.revision.source.ownerId===m.owner&&e.revision.interpretation.trigger.kind==='now').sort((a,b)=>b.revision.submitted.seq-a.revision.submitted.seq)[0];if(latest?.revision.intentId!==entry.revision.intentId||latest.revision.version!==entry.revision.version)return null;
+    const latest=latestPurposeDirectionV1(history,m.owner,this.extra.intentRetainedChoiceV1===true);if(latest?.revision.intentId!==entry.revision.intentId||latest.revision.version!==entry.revision.version)return null;
     const action=this.engine.programAction?.(m.pending.program)?.action;if(action?.status==='blocked')return null;
     const incomplete=!m.pending.applied||!!action&&['walk_to','commons_shore_travel'].includes(action.verb)||!!action&&action.verb==='sit'&&action.phase!=='occupied';
     return incomplete?{intent:{intentId:entry.revision.intentId,version:entry.revision.version},activityId:m.pending.program}:null;
@@ -958,9 +959,7 @@ export class WorldHost {
     const current:AcceptanceGuard=()=>{
       checkAcceptanceGuard(guard);
       const row=this.db.soul(soulId),history=this.intentHistoryOf(soulId),entry=history.intents[intent.intentId];
-      const latest=Object.values(history.intents)
-        .filter(v=>v.revision.source.ownerId===m.owner&&v.revision.interpretation.trigger.kind==='now')
-        .sort((a,b)=>b.revision.submitted.seq-a.revision.submitted.seq)[0];
+      const latest=latestPurposeDirectionV1(history,m.owner,this.extra.intentRetainedChoiceV1===true);
       if(this.pendingHumanSleepTransitionV1(soulId)||this.minds.get(soulId)!==m||!row
         ||row.world_id!==this.worldId||row.retired_at!==null||row.owner!==m.owner||row.entity_id!==m.entityId
         ||this.kernel.things[soulId]?.traits.body!==m.entityId||m.activeRule||m.agendaPos<m.agenda.length

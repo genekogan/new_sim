@@ -1,3 +1,4 @@
+import {latestPurposeDirectionV1} from './latest-purpose-direction.ts';
 import {purposeEpisodesV1,episodeJournalV1} from './purpose-episodes.ts';
 import {compileHumanGoalV1,type ClosedHumanResultV1} from './human-compiler.ts';
 import {previewHumanSleepStopV1} from './human-sleep-transition.ts';
@@ -272,7 +273,7 @@ export class Brain {
       && ['timer', 'activity-failed', 'activity-ended'].includes(trigger)
       ? blockedDirectionForRetry(history, m.owner, w.tick) : undefined;
 
-    const latestNow=history?Object.values(history.intents).filter(e=>e.revision.source.ownerId===m.owner&&e.revision.interpretation.trigger.kind==='now').sort((a,b)=>b.revision.submitted.seq-a.revision.submitted.seq)[0]:undefined;
+    const latestNow=history?latestPurposeDirectionV1(history,m.owner,this.host.extra.intentRetainedChoiceV1===true):undefined;
     const sequence=this.host.extra.intentSequencesV1&&!m.activeRule&&m.agendaPos>=m.agenda.length&&latestNow?.status==='active'
       &&latestNow.revision.submitted.seq>=Number(this.host.extra.intentSequencesSinceV1??0)
       &&this.host.intentSequenceStepV1(m.soulId,{intentId:latestNow.revision.intentId,version:latestNow.revision.version})<latestNow.revision.interpretation.agenda.length?latestNow:undefined;
@@ -348,7 +349,7 @@ export class Brain {
     }
     if(this.intentV2Choices&&host.extra.intentHumanSleepTransitionV1){
       if(host.pendingHumanSleepTransitionV1(m.soulId)){m.nextEvalTick=tick+1;m.evalTrigger='new-intent-v2';return;}
-      const latest=Object.values(host.intentHistoryOf(m.soulId).intents).filter(e=>e.revision.source.ownerId===m.owner&&e.revision.interpretation.trigger.kind==='now').sort((a,b)=>b.revision.submitted.seq-a.revision.submitted.seq)[0];
+      const latest=latestPurposeDirectionV1(host.intentHistoryOf(m.soulId),m.owner,host.extra.intentRetainedChoiceV1===true);
       if(host.extra.intentSequencesV1&&!m.activeRule&&m.agendaPos>=m.agenda.length&&latest?.status==='active'&&latest.revision.interpretation.humanGoalPlan?.kind==='planned'){
         const ref={intentId:latest.revision.intentId,version:latest.revision.version},step=latest.revision.interpretation.agenda[host.intentSequenceStepV1(m.soulId,ref)],card=step?host.kernel.vocab.cards[step.card]:undefined;
         if(card&&step.target===null){const program={actor:m.entityId,label:card.name,steps:[...card.approach,...card.during]};if(previewHumanSleepStopV1(host,m,program)){
