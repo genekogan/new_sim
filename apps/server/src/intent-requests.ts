@@ -117,6 +117,18 @@ export class IntentRequests {
       return row && row.owner_id === source.ownerId ? this.verifiedView(key, row) : null;
     });
   }
+  /** Same authorized lookup plus the private row timestamps for own diagnostics. */
+  lookupTimedV1(scope: IntentRequestScope, requestId: string): (View & { createdAt: number; updatedAt: number }) | null {
+    return this.transaction(() => {
+      let source: Source;
+      try { source = this.check(scope); } catch (error) { if (error instanceof IntentRequestUnavailable) return null; throw error; }
+      const key = { worldId: scope.worldId, soulId: scope.soulId, principalId: source.principalId, requestId };
+      const row = this.row(key);
+      if (!row || row.owner_id !== source.ownerId) return null;
+      const times = this.db.db.prepare('SELECT created_at, updated_at FROM intent_requests_v2 WHERE world_id=? AND soul_id=? AND principal_id=? AND request_id=?').get(...keyArgs(key)) as { created_at: number; updated_at: number };
+      return { ...this.verifiedView(key, row), createdAt: times.created_at, updatedAt: times.updated_at };
+    });
+  }
   /** Private worker journal for WorldHost.enqueueChecked on THIS Db. It only
    * references the actual canonical event; it claims no physical success. */
   journal(reservation: Extract<RequestReservation, { created: true }>): AcceptanceJournal {

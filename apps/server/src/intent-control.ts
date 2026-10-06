@@ -1,3 +1,4 @@
+import {ownRequestDiagnosticsV1,type OwnRequestDiagnosticsV1} from './own-request-diagnostics.ts';
 import {setImmediate as nextEventLoopTurn} from 'node:timers/promises';
 import {HumanGoalStateChanged} from './human-compiler.ts';
 import {readHumanCapabilitiesV1} from './human-capabilities.ts';
@@ -143,6 +144,17 @@ export class IntentControlV2 {
     if(received.reservation.created)this.start(scope,received.reservation);
     // Even an immediately completed interpreter returns only recorded facts.
     return this.lookup(scope,request.requestId);
+  }
+  /** G414 strict own diagnostics through the same authorized lookup; scope re-checked after the read. */
+  diagnosticsV1(scope:IntentRequestScope,requestId:string,build?:string):OwnRequestDiagnosticsV1 {
+    this.guard(scope);
+    if(!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$/.test(requestId))throw new ApiError(404,'not-found','no such request');
+    const allowed=this.souls.limits.allow(`intent-diagnostics:${scope.worldId}:${scope.soulId}:${scope.source.principalId}`,120,60_000);if(!allowed.ok)throw new ApiError(429,'rate-limited','too many diagnostics reads');
+    const view=this.store.lookupTimedV1(scope,requestId),receipt=view?.receipt??view?.received,m=this.host.minds.get(scope.soulId);
+    if(!view||!receipt||!m||view.source.kind!=='owner')throw new ApiError(404,'not-found','no such request');
+    const dto=ownRequestDiagnosticsV1(this.host,m,{requestId,source:view.source as {kind:'owner';ownerId:string;principalId:string;channel:string},createdAt:view.createdAt,updatedAt:view.updatedAt,receipt,build,registeredActivitiesV1:this.registeredActivitiesV1});
+    this.guard(scope);if(this.host.minds.get(scope.soulId)!==m||dto.entityId!==m.entityId)throw new ApiError(404,'not-found','no such request');
+    return dto;
   }
   lookup(scope:IntentRequestScope,requestId:string):IntentReceiptV2 {
     this.guard(scope);

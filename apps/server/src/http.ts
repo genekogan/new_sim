@@ -152,6 +152,11 @@ export function buildApp(d: Deps) {
       return c.json(receipt,receipt.phase==='received'?202:200);}
     catch(error){throw intentLookupError(error);}
   });
+  app.get('/v1/souls/:id/intent-v2/requests/:requestId/diagnostics',async c=>{
+    c.header('Cache-Control','no-store');const service=intentService(),identity=await intentIdentity(c);
+    try {const scope=service.ownerScope(identity,c.req.param('id')),dto=service.diagnosticsV1(scope,c.req.param('requestId'),d.cfg.build);return c.json(dto);}
+    catch(error){if(error instanceof ApiError&&error.status===429)throw error;throw intentLookupError(error);}
+  });
   app.get('/v1/agent/intent-v2/requests/:requestId',c=>{
     const service=intentService();let scope;
     try {scope=service.agentScope(bearer(c));}catch(error){throw intentTransportError(error);}

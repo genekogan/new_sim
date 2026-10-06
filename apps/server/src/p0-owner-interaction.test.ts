@@ -14,6 +14,8 @@ import {IntentControlV2} from './intent-control.ts';
 import {installCommonsProvisionCards} from './commons-provisions.ts';
 import {basicHumanGoalV1,readHumanCapabilitiesV1} from './human-capabilities.ts';
 import {normalizeModelOutputV1} from './human-compiler.ts';
+import {buildApp} from './http.ts';
+import type {Hub} from './hub.ts';
 const factory=nativeSleepSnapshotFactoryV1(await retainedCommonsShoreFactory());
 async function setup(t:TestContext,start:'standing'|'asleep'){
  const f=fixture(':memory:',factory,{durableClockV1:true});f.souls.enableLifecycle();
@@ -104,3 +106,21 @@ test('model plan missing optional structure is normalized; no_action extras drop
  assert.equal(humanCompilerOutputV1Schema.safeParse(normalizeModelOutputV1({kind:'plan',goals:[{goal:'swim'}],explanation:'x'},hash)).success,false,'unknown goal still fails');
 });
 
+test('G414 own-request diagnostics: strict scoped DTO with canonical attempts; foreign and anonymous get nothing',async t=>{
+ const {ownRequestDiagnosticsV1Schema}=await import('./own-request-diagnostics.ts');
+ const f=await setup(t,'standing'),receipt=await f.submit('diag-swim','go for a swim in the pond');assert.equal(receipt.phase,'understood');if(receipt.phase!=='understood')throw Error('no plan');
+ await run(f,8000,()=>f.attempts(receipt.revision.intentId).some(a=>a.phase==='completed'));
+ const app=buildApp({cfg:{...f.brain.cfg,build:'p0-test-build'},db:f.db,host:f.host,auth:f.auth,brain:f.brain,souls:f.souls,intentV2:f.service,hub:{clients:new Map(),refreshMe(){}} as unknown as Hub}),path=(id:string)=>`/v1/souls/${f.row.id}/intent-v2/requests/${id}/diagnostics`,get=(id:string,auth?:string)=>app.request(path(id),auth?{headers:{authorization:auth}}:{});
+ const res=await get('diag-swim','Bearer dev:alice');assert.equal(res.status,200);assert.equal(res.headers.get('cache-control'),'no-store');const dto=ownRequestDiagnosticsV1Schema.parse(await res.json());
+ assert.equal(dto.stage,'understood');assert.equal(dto.soulId,f.row.id);assert.equal(dto.entityId,f.row.entity_id);assert.equal(dto.source.ownerId,'dev:alice');
+ assert.equal(dto.resolution?.goal,'activity');assert.equal(dto.resolution?.bindingId,'activity:swim:shore-water');assert.equal(dto.resolution?.destination,'Swim in the supported pond');
+ assert.deepEqual(['accepted','started','completed'].map(p=>dto.attempts?.some(a=>a.phase===p)),[true,true,true],JSON.stringify(dto.attempts));
+ assert.ok(dto.server.createdAt>0&&dto.server.updatedAt>=dto.server.createdAt);assert.equal(dto.server.build,'p0-test-build');
+ const text=JSON.stringify(dto);for(const secret of ['sim_','apiKey','anthropic','raw','reasoning'])assert.ok(!text.includes(secret),secret);
+ const refused=await f.submit('diag-unknown','teleport me to the moon base');assert.equal(refused.phase,'refused');
+ const r=ownRequestDiagnosticsV1Schema.parse(await (await get('diag-unknown','Bearer dev:alice')).json());assert.equal(r.stage,'refused');assert.ok(r.code);assert.ok(r.validation||r.unavailable?.some(u=>u.field==='validation'));
+ await invite(f,'bob');assert.equal((await get('diag-swim','Bearer dev:bob')).status,404);
+ assert.ok([401,404].includes((await get('diag-swim')).status));assert.equal((await get('no-such','Bearer dev:alice')).status,404);
+ if(process.env.P0_DIAGNOSTICS_OUT)(await import('node:fs')).writeFileSync(process.env.P0_DIAGNOSTICS_OUT,JSON.stringify({scope:{worldId:f.host.worldId,soulId:f.row.id,ownerId:'dev:alice',entityId:f.row.entity_id},understood:dto,refused:r}));
+ t.diagnostic(JSON.stringify({unavailable:dto.unavailable?.map(u=>u.field),refusedCode:r.code}));
+});
