@@ -347,6 +347,10 @@ export class Runtime {
   }
 
   /** Live, or a directive waiting for a pre-empted social hold to end. */
+  /** Read-only current action index; excludes retained terminal history. */
+  activeIds(): string[] {
+    return [...new Set([...this.live.keys(), ...this.waiting.keys()])].sort();
+  }
   isActive(id: string) {
     return this.live.has(id) || this.waiting.has(id);
   }

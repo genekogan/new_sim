@@ -38,6 +38,7 @@ import {campExpansionV1Schema,type CampExpansionV1,type CampExpansionAdmissionV1
 import { CodecError } from '../../../mars/viewer/engine/runtime/codec.ts';
 import { constructionPlan, unsafeConstruction, type BuildPhase } from './construction.ts';
 import { captureRenderScene, commonsSceneMetadataV1Schema, type RenderSceneCaptureV1, type RenderScene } from '@sim/engine-contract';
+import {readLocalClassroomV1} from './classroom-observation.ts';
 import { readNativeGathering } from './gathering-observation.ts';
 import { prepareCommonsTransition } from './commons-transition.ts';
 import { commonsTransitionV1Schema,type CommonsTransitionV1,type CommonsTransitionAdmissionV1 } from '@sim/engine-contract';
@@ -540,6 +541,7 @@ export class MarsEngine implements Engine {
       action:{id:r.id as string,verb:r.verb as string,status:r.status as ActionRecord['status'],...(r.phase?{phase:r.phase as string}:{})}};
   }
   bodyResting(actor:string) { const id=this.byActor.get(actor),p=id?this.programs.get(id):undefined; return !!p && p.until!==undefined && p.steps[p.index]?.verb==='rest' && !this.ents[actor]?.human?.task; }
+  observeLocalClassroomV1(observer:string){return readLocalClassroomV1(this.rt,observer,this.rulesVersion);}
   gatheringObservation() { return readNativeGathering(this.rt,this.rulesVersion,this.dt); }
   submit(verb: string, params: unknown, opts?: { id?: string; parent?: string; preempt?: boolean }): ActionRecord { return this.rt.submit(verb, params, opts) as ActionRecord; }
   cancel(id: string, reason?: Diag): ActionRecord { return this.rt.cancel(id, reason) as ActionRecord; }

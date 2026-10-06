@@ -11,6 +11,7 @@ import {installEdenSteeringModeV1} from './eden-steering-mode.ts';
 import {installOwnedEdenLectureCardV1,installOwnedEdenLectureControlsV1} from './eden-lecture-cards.ts';
 import {readHumanCapabilitiesV1} from './human-capabilities.ts';
 import {WorldHost} from './world.ts';
+import {localClassroomObservationV1Schema} from '@sim/engine-contract';
 import {kernelHash} from '@sim/kernel';
 import {MarsEngine} from '../../../packages/engine-mars/src/engine.ts';
 async function setup(t:any){const factory=nativeSleepSnapshotFactoryV1(edenLectureFactoryV1(commonsNewcomerResourcesFactory(await edenGroundFactoryV1(await retainedCommonsShoreFactory({socialEdenV1:true,foodDeliveryV1:true}))))),f=fixture(':memory:',factory,{durableClockV1:true});f.brain.quiesce();f.souls.cfg.maxSoulsPerUser=9;f.souls.enableLifecycle();await invite(f,'operator');await invite(f,'other');const rows:SoulRow[]=[];for(let i=0;i<9;i++)rows.push(await accept(f.host,f.souls.create('dev:operator',{name:'Owned class '+i,description:'Synthetic same human owner lecture roster'})));for(const method of ['installCommonsProvisionsV1','installCommonsKitchenV1','installRetainedCommonsShoreV1'] as const)await accept<unknown>(f.host,f.host[method]());const layout=JSON.parse(readFileSync(new URL('../../../packages/engine-mars/src/fixtures/newcomer-layout.world-alternative.v2.json',import.meta.url),'utf8'));await accept(f.host,f.host.installCommonsNewcomerResourcesV1(layout.placements));await accept(f.host,f.host.installNativeSleepSnapshotV1());await accept(f.host,f.host.installEdenGroundV1());await accept(f.host,f.host.installEdenLectureV1({worldEast:'world-v2',id:'eden-classroom-1',origin:[42,-6],yaw:0,audienceSeats:20,lesson:'Learn from a world with a memory.'}));
@@ -72,4 +73,35 @@ test('queued ordinary lecture control refuses changed participant ownership befo
  assert.equal(f.host.engine.runtime.liveIds().includes(session!),true);
  assert.equal([...readHumanCapabilitiesV1(f.host,f.leader,{registeredActivitiesV1:true}).bindings.values()].filter(b=>b.steps.some(s=>s.verb==='control_classroom_v1')).length,0);
  assert.equal(f.db.paidCost(),0);
+});
+
+test('local native classroom observation reports occupied participation without distant or private context',async t=>{
+ const f=await setup(t),scope=f.service.ownerScope({userId:'dev:operator',expiresAt:Number.MAX_SAFE_INTEGER},f.leader.soulId);
+ await accept(f.host,f.service.submit(scope,{contract:'soul-intent/2',op:'upsert',requestId:'local-lecture-observation',words:'host an Eden lecture'}));
+ await accept(f.host,f.service.settled());
+ let session:string|undefined;
+ for(let i=0;i<3000;i++){
+  f.host.tickOnce();if(i%10===0)await setImmediate();
+  session=[...f.host.engine.runtime.records.values()].find(r=>r.verb==='classroom_session')?.id;
+  if(session&&(f.host.engine as MarsEngine).lectureReadout(session)?.phase==='presenting')break;
+ }
+ const remote=await accept(f.host,f.souls.create('dev:other',{name:'Distant owned observer',description:'Synthetic separate human-owned body in the original commons'}));
+ const before={engine:f.host.engine.stateHash(),kernel:kernelHash(f.host.kernel),events:f.db.events(f.host.worldId).length};
+ const read=f.host.engine.observeLocalClassroomV1!(f.leader.entityId)!;
+ assert.equal(read.sessions.length,1);assert.equal(read.sessions[0].session,session);assert.equal(read.sessions[0].phase,'presenting');
+ assert.equal(read.sessions[0].participants.length,9);assert.equal(read.sessions[0].seatedAttendees,8);
+ assert.equal(read.sessions[0].presenter,f.rows[1].entity_id);
+ assert.deepEqual(f.host.engine.observeLocalClassroomV1!(remote.entity_id)!.sessions,[]);
+ assert.equal(f.host.engine.observeLocalClassroomV1!('unknown-observer'),undefined);
+ assert.deepEqual({engine:f.host.engine.stateHash(),kernel:kernelHash(f.host.kernel),events:f.db.events(f.host.worldId).length},before,'observation never mutates native or semantic truth');
+ for(const extra of [{lesson:'PRIVATE_OWNER_WORDS'},{waitingReason:'PRIVATE_DIAGNOSTIC'},{ownerId:'dev:operator'},{controls:['cancel']}])assert.equal(localClassroomObservationV1Schema.safeParse({...read,sessions:[{...read.sessions[0],...extra}]}).success,false);
+ assert.equal(localClassroomObservationV1Schema.safeParse({...read,sessions:[{...read.sessions[0],seatedAttendees:9}]}).success,false);
+ assert.equal(localClassroomObservationV1Schema.safeParse({...read,sessions:[{...read.sessions[0],floorHolder:remote.entity_id}]}).success,false);
+ assert.ok(!JSON.stringify(read).includes('Learn from a world with a memory.'));
+ assert.equal(f.db.paidCost(),0);
+ f.brain.quiesce();
+ f.host.engine.cancel(session!);
+ for(let i=0;i<3000&&f.host.engine.runtime.liveIds().includes(session!);i++){f.host.tickOnce();if(i%10===0)await setImmediate();}
+ assert.equal(f.host.engine.runtime.liveIds().includes(session!),false);
+ assert.deepEqual(f.host.engine.observeLocalClassroomV1!(f.leader.entityId)!.sessions,[],'ended history is not a current visible gathering');
 });

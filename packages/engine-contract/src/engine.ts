@@ -7,6 +7,7 @@ import type { RuntimeEvent } from './runtime.ts';
 import type { WorldState, Vec3 } from './world.ts';
 import type { VerbInfo } from './registry.ts';
 import type { RenderScene,RenderSceneCaptureV1 } from './scene-capture.ts';
+import type {LocalClassroomObservationV1} from './classroom-observation.ts';
 import type { NativeGatheringObservationV1 } from './gathering-observation.ts';
 import type { CommonsTransitionV1,CommonsTransitionAdmissionV1 } from './commons-transition.ts';
 import type {NativeBoatControlsV1} from './boat.ts';
@@ -97,6 +98,7 @@ export interface Engine {
   /** Candidate read-only public physical evidence. Native settled gather slots
    * at fixtures only; no private intent, proximity classifier or music/action admission. */
   gatheringObservation?(): NativeGatheringObservationV1;
+  observeLocalClassroomV1?(observer:string):LocalClassroomObservationV1|undefined;
   /** Actual settled body-language rest, distinct from travelling toward it. */
   bodyResting?(actor:string): boolean;
   submit(verb: string, params: unknown, opts?: { id?: string; parent?: string; preempt?: boolean }): ActionRecord;

@@ -31,3 +31,5 @@ export * from './sleep-snapshot.ts';
 export * from './eden-lecture.ts';
 
 export * from "./eden-ground.ts";
+
+export * from './classroom-observation.ts';
