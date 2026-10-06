@@ -54,11 +54,11 @@ export async function settleEmptyEden(host:WorldHost,living:LivingWorld|null,cus
 
 /** Quiesce before calling. Clock/DB remain alive, including an explicitly
  * paused clock whose sequencer still must finish already accepted writes. */
-export async function drainEdenThought(host:WorldHost,brain:Brain,service:IntentControlV2|undefined,acceptedRequests:Promise<unknown>=Promise.resolve()){
+export async function drainEdenThought(host:WorldHost,brain:Brain,service:IntentControlV2|undefined,acceptedRequests:Promise<unknown>=Promise.resolve(),additional:readonly (()=>Promise<unknown>)[]=[]){
   brain.quiesce();
   let fail!:(error:unknown)=>void;const failure=new Promise<never>((_,reject)=>fail=reject);
   const pump=setInterval(()=>{try{host.drainInputs();}catch(error){fail(error);clearInterval(pump);}},10);
-  const drain=async()=>{await acceptedRequests;await Promise.all([brain.settled(),service?.settled()]);host.drainInputs();};
+  const drain=async()=>{await acceptedRequests;await Promise.all([brain.settled(),service?.settled(),...additional.map(settle=>settle())]);await brain.settled();host.drainInputs();};
   try{await Promise.race([drain(),failure]);}
   finally{clearInterval(pump);}
 }

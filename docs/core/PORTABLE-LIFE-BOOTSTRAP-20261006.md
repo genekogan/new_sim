@@ -34,3 +34,5 @@ Still open: first8 lifetime slots do not provision newcomers9/10; production com
 selected dependency packet and compatible rollback; actual verified-human Auth/
 agent host and private acceptance; eventual20–30 usable life coverage. No main merge,
 push/deploy or Gene release handover. Core uses fake minds/zero paid provider calls.
+
+Paused shutdown repair: an isolated causal fixture reproduces a delayed direct kitchen enqueue remaining pending after the original thought pump stops. The expanded pump now encompasses life/archive/backup settlements and a final Brain drain; delayed installation plus its follow-up fact settle with the original native tick and paused state unchanged. Two focused cases pass, no actual live hang claimed.

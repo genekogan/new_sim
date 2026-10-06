@@ -119,8 +119,8 @@ const shutdown = async (sig: string) => {
     brain.quiesce();takes.stop();clearTimeout(firstBackup);clearInterval(backupTimer);
     for(const c of hub.clients)c.ws.close(1001,'server restarting');
     const closed=new Promise<void>(resolve=>server.close(()=>resolve()));
-    await drainEdenThought(host,brain,intentV2,closed);
-    await Promise.all([brain.settled(),intentV2?.settled(),takes.settled(),edenLifeHandles?.settled(),...backupWork]);edenLifeHandles?.close();
+    await drainEdenThought(host,brain,intentV2,closed,[()=>edenLifeHandles?.settled()??Promise.resolve(),()=>takes.settled(),()=>Promise.all(backupWork)]);
+    edenLifeHandles?.close();
   }
   console.log(`[world] ${sig}: saving snapshot at tick ${host.engine.world.tick}`);
   host.stop(); takes.stop();
