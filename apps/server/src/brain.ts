@@ -285,7 +285,7 @@ export class Brain {
       :({ words:e.revision.words,strict:e.revision.strict,importance:e.revision.importance,understanding:e.revision.interpretation.summary,status:e.status }));
     const newest=allPurposes.filter(p=>'source' in p&&p.source).sort((a,b)=>('source' in b?b.source!.seq:0)-('source' in a?a.source!.seq:0))[0];
     const pin=acting?{intentId:acting.intentId,version:acting.version}:newest&&'source' in newest?{intentId:newest.source!.intentId,version:newest.source!.version}:undefined;
-    const recall=this.host.extra.intentPurposeRecallV1?recallPurposesV1(allPurposes,pin,[physicalWhere??s.region,m.doing,...s.nearby.map(n=>n.who)].join(' ')):undefined;
+    const recall=this.host.extra.intentPurposeRecallV1?recallPurposesV1(allPurposes,pin,[nameOf(s.region),m.doing,...s.nearby.map(n=>n.who)].join(' ')):undefined;
     return {
       ...(physicalWhere===undefined?{}:{physicalWhere}),
       ...(acting ? { actingPurpose:{ intentId:acting.intentId, version:acting.version } } : {}),
