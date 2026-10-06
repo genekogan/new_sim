@@ -24,3 +24,5 @@ export * from './newcomer-resources-engine.ts';
 export * from './sleep-snapshot-engine.ts';
 
 export * from './eden-lecture.ts';
+
+export * from "./eden-lecture-engine.ts";

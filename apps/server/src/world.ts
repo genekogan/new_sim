@@ -1,3 +1,5 @@
+import {edenLectureV1} from '@sim/engine-mars';
+import type {EdenLecturePlacementV1} from '@sim/engine-contract';
 import {latestPurposeDirectionV1} from './latest-purpose-direction.ts';
 import {episodesFromHistoryV1} from './purpose-episodes.ts';
 import {commonsNewcomerResourcesV1} from '@sim/engine-mars';
@@ -467,7 +469,7 @@ export class WorldHost {
         if(stationEra)this.apply(stationEra,false);
         if(arrival)this.apply(arrival,false);
       } catch (error) {
-        if(arrival||stationEra||e.payload?.crewRemovalTransition||e.payload?.nativeSleepSnapshotPolicy||e.payload?.commonsNewcomerResources||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore||e.payload?.commonsFoodDelivery||e.payload?.socialEden||e.payload?.existingGreenLandmark){
+        if(arrival||stationEra||e.payload?.crewRemovalTransition||e.payload?.nativeSleepSnapshotPolicy||e.payload?.commonsNewcomerResources||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore||e.payload?.commonsFoodDelivery||e.payload?.socialEden||e.payload?.edenLecture||e.payload?.existingGreenLandmark){
           // A committed structural pair cannot be attributed to an unrelated
           // card or filtered out by card-fault recovery. Restore exact history.
           try{
@@ -477,7 +479,7 @@ export class WorldHost {
         }else {this.recoverFault(error, e.kind === 'decision' ? e.payload.card : undefined); recovered = true;}
       }
       const accepted=[e,...(admission?[admission]:[]),...(stationEra?[stationEra]:[]),...(arrival?[arrival]:[])];
-      if (!recovered||arrival||stationEra||e.payload?.crewRemovalTransition||e.payload?.nativeSleepSnapshotPolicy||e.payload?.commonsNewcomerResources||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore||e.payload?.commonsFoodDelivery||e.payload?.socialEden||e.payload?.existingGreenLandmark) this.acc.log.push(...accepted);
+      if (!recovered||arrival||stationEra||e.payload?.crewRemovalTransition||e.payload?.nativeSleepSnapshotPolicy||e.payload?.commonsNewcomerResources||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore||e.payload?.commonsFoodDelivery||e.payload?.socialEden||e.payload?.edenLecture||e.payload?.existingGreenLandmark) this.acc.log.push(...accepted);
       // No listener can observe a physical event before its committed era fold.
       for (const fact of accepted) for (const l of this.listeners) l.onApplied?.(fact);
       if (admission && recovered) { p.reject?.(new PersistedIntentAdmissionFault(e.seq)); continue; }
@@ -715,6 +717,7 @@ export class WorldHost {
     if (e.kind === 'rules' && e.payload?.recovery) { this.restoreRecovery(e.payload.recovery as RecoveryRecipe); this.seq = e.seq; return; }
     if(e.kind==='rules'&&e.payload?.crewRemovalTransition&&this.stationHistoryV1())throw Error('crew-removal-transition.station-carry-required');
     if(e.kind==='rules'&&e.payload?.existingGreenLandmark&&this.stationHistoryV1())throw Error('green-landmark.station-carry-required');
+    if(e.kind==='rules'&&e.payload?.edenLecture&&this.stationHistoryV1())throw Error('eden-lecture.station-carry-required');
     if(e.kind==='rules'&&e.payload?.socialEden&&this.stationHistoryV1())throw Error('social-eden.station-carry-required');
     if(e.kind==='rules'&&e.payload?.nativeSleepSnapshotPolicy&&this.stationHistoryV1())throw Error('sleep-snapshot.station-carry-required');
     if(e.kind==='rules'&&e.payload?.commonsNewcomerResources&&this.stationHistoryV1())throw Error('newcomer-resources.station-carry-required');
@@ -990,6 +993,13 @@ export class WorldHost {
     const guard:AcceptanceGuard=()=>{if(this.stationHistoryV1())throw Error('green-landmark.station-carry-required');const q=this.engine.previewExistingGreenLandmarkV1?.();if(!q?.ok||hashOf(q.transition)!==hashOf(t))throw Error('green-landmark.source-moved');for(const id of Object.keys(existingGreenLandmarkV1().regions))if(this.kernel.things[id])throw Error('green-landmark.kernel-identity-collision');if(this.factory.canReplayHistory?.(t.toRulesVersion)!==true)throw Error('green-landmark.reader-required');return true;};
     const journal:AcceptanceJournal=()=>{const r=this.db.db.prepare('UPDATE worlds SET rules_version=? WHERE id=? AND rules_version=?').run(t.toRulesVersion,this.worldId,t.fromRulesVersion);if(r.changes!==1)throw Error('green-landmark.header-moved');return true;};
     return new Promise<LogEvent>((resolve,reject)=>this.queue.push({kind:'rules',author:'operator:existing-green-landmark',payload:{existingGreenLandmark:t},guard,journal,resolve,reject}));
+  }
+  installEdenLectureV1(placement:EdenLecturePlacementV1){
+    if(this.stationHistoryV1())return Promise.reject(Error('eden-lecture.station-carry-required'));
+    const p=this.engine.previewEdenLectureV1?.(placement);if(!p?.ok)return Promise.reject(Error(p?p.diagnostic.code:'eden-lecture.reader-required'));const t=p.transition;
+    const guard:AcceptanceGuard=()=>{if(this.stationHistoryV1())throw Error('eden-lecture.station-carry-required');const q=this.engine.previewEdenLectureV1?.(placement);if(!q?.ok||hashOf(q.transition)!==hashOf(t))throw Error('eden-lecture.source-moved');const add=edenLectureV1(placement);for(const id of [...Object.keys(add.entities),...Object.keys(add.regions)])if(this.kernel.things[id])throw Error('eden-lecture.kernel-identity-collision');if(this.factory.canReplayHistory?.(t.toRulesVersion)!==true)throw Error('eden-lecture.reader-required');return true;};
+    const journal:AcceptanceJournal=()=>{const r=this.db.db.prepare('UPDATE worlds SET rules_version=? WHERE id=? AND rules_version=?').run(t.toRulesVersion,this.worldId,t.fromRulesVersion);if(r.changes!==1)throw Error('eden-lecture.header-moved');return true;};
+    return new Promise<LogEvent>((resolve,reject)=>this.queue.push({kind:'rules',author:'operator:eden-lecture',payload:{edenLecture:t},guard,journal,resolve,reject}));
   }
   installSocialEdenV1(){
     if(this.stationHistoryV1())return Promise.reject(Error('social-eden.station-carry-required'));

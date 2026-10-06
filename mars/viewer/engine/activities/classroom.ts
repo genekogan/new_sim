@@ -1,3 +1,4 @@
+import {planWalk} from '../locomotion/walk.ts';
 import { z } from 'zod';
 import { createTurns, stepTurns, type TurnState } from './turns.ts';
 import type {
@@ -37,6 +38,7 @@ const point = z.tuple([
 ]);
 const seconds = z.number().positive().max(3600);
 const paramsSchema = z.strictObject({
+  accessScope:z.literal('ground-venue/1').optional(),
   host: id,
   presenters: z.array(id).min(1).max(6),
   audience: z.array(id).min(1).max(12),
@@ -497,7 +499,7 @@ export const classroomSession: ActionDef<ClassroomParams, Program, Exec> = {
     const links = (rt.services.spatial as Spatial).base.links.filter(
       (link) => link.usable,
     );
-    if (links.length)
+    if (links.length&&p.accessScope!=='ground-venue/1')
       return {
         ok: false,
         diagnostic: diagnostic(
@@ -653,6 +655,7 @@ export const classroomSession: ActionDef<ClassroomParams, Program, Exec> = {
         state: 'participating',
       });
     }
+    if(p.accessScope==='ground-venue/1')for(const person of people){const body=rt.world.entities[person.actor],seat=slotById(rt,person.seat);if('code' in seat)return {ok:false,diagnostic:seat};const approach=seatApproach(rt,seat);if(!Array.isArray(approach))return {ok:false,diagnostic:approach};for(const point of [approach,p.departure[person.actor],...(p.presenters.includes(person.actor)?[station.p]:[])]){const route=planWalk(rt,body,{level:0,p:point});if(!route.ok)return {ok:false,diagnostic:route.diagnostic};if(route.route.legs.some(leg=>leg.kind!=='walk'||leg.level!==0))return {ok:false,diagnostic:diagnostic('venue-route-scope','This ground venue requires routes that stay on level zero without access links',[person.actor])};}}
     const program = { people, station };
     planned.set(p, program);
     return { ok: true, program };
