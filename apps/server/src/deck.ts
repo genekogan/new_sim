@@ -97,10 +97,10 @@ export function frontier(host: WorldHost, m: Mind): number {
 export const serves = (host: WorldHost, m: Mind, card: string, target: string | null) => m.agendaPos < m.agenda.length && matchesStep(host, m.agenda[frontier(host, m)], card, target);
 
 /** The options the mind chooses among: playable cards, physically feasible, ranked and capped. */
-export function optionsFor(host: WorldHost, m: Mind, cap = 12): CardOption[] {
-  const read=()=>readOptionsFor(host,m,cap);return host.engine.withFeasibilityRead?host.engine.withFeasibilityRead(read):read();
+export function optionsFor(host: WorldHost, m: Mind, cap = 12,ordinaryRetainedCards=new Set<string>()): CardOption[] {
+  const read=()=>readOptionsFor(host,m,cap,ordinaryRetainedCards);return host.engine.withFeasibilityRead?host.engine.withFeasibilityRead(read):read();
 }
-function readOptionsFor(host: WorldHost, m: Mind, cap = 12): CardOption[] {
+function readOptionsFor(host: WorldHost, m: Mind, cap = 12,ordinaryRetainedCards=new Set<string>()): CardOption[] {
   if (m.life && cap === 12) cap = 24;
   const k = host.kernel, me = m.soulId; k.tick = host.engine.world.tick;
   const fr = m.agendaPos < m.agenda.length ? m.agenda[frontier(host, m)] : undefined;
@@ -111,6 +111,7 @@ function readOptionsFor(host: WorldHost, m: Mind, cap = 12): CardOption[] {
   // its only serving option is removed later by Brain, waiting loses its
   // signal and an unrelated target can win as a spontaneous random choice.
   const registeredGoals=new Set(m.agenda.slice(m.agendaPos).map(s=>s.card));
+  for(const card of ordinaryRetainedCards)registeredGoals.add(card);
   const all = playable(k, me, candidatesFor(host, me)).filter(p => (!p.card.name.startsWith('human goal ')||registeredGoals.has(p.card.name)||m.pending?.card===p.card.name)&& (faults[p.card.name] ?? 0) < 3 && (cooldown[p.card.name] ?? 0) <= k.tick
     && !(m.avoid && m.avoid.untilTick > k.tick && m.avoid.id === p.id));
   // Looking one step ahead: if the plan's step cannot be played yet, any play that brings it closer serves the plan
@@ -146,6 +147,7 @@ function readOptionsFor(host: WorldHost, m: Mind, cap = 12): CardOption[] {
     return { p, t, score };
   }).sort((a, b) => b.score - a.score || (a.p.id < b.p.id ? -1 : 1));
   for (const { p, t, score } of plays) {
+    if(scored.length>=cap&&!ordinaryRetainedCards.has(p.card.name))continue;
     const n = perCard.get(p.card.name) ?? 0;
     if (n >= 3 && score < 1000) continue;                                                     // at most three targets per card
     const b = bind(k, p.card, me, p.target); if (!b) continue;
@@ -159,7 +161,7 @@ function readOptionsFor(host: WorldHost, m: Mind, cap = 12): CardOption[] {
       servesIntent: servesNow(p.card.name, p.target) || travel.has(p.id), steps, durationHint: p.card.takes,
       card: p.card.name, hash: p.card.hash, cardTarget: p.target, approachLen: p.card.approach.length,
     } });
-    if (scored.length >= cap) break;
+    if (scored.length >= cap+ordinaryRetainedCards.size) break;
   }
   // If the plan's current step cannot be played yet, waiting is what serves the plan.
   if (m.agenda[m.agendaPos] && !scored.some((x) => x.o.servesIntent)) { const w = scored.find((x) => x.o.card === 'wait'); if (w) { w.o.servesIntent = true; w.o.goodWhen = 'the plan’s next step is not possible yet: stay and wait for it'; } }

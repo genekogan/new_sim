@@ -2,6 +2,7 @@ import {compileHumanGoalV1,type ClosedHumanResultV1} from './human-compiler.ts';
 import {previewHumanSleepStopV1} from './human-sleep-transition.ts';
 import {purposeContextEvidenceV1,indexPurposeAttemptsV1} from './purpose-context-evidence.ts';
 import {recallPurposesV1} from './purpose-recall.ts';
+import {retainedPurposeChoicesV1,retainedChoiceKeyV1} from './retained-purpose-choice.ts';
 // The three-tier brain, server side. Schedules calls, records every request
 // and response for the debug shell, and turns answers into logged events.
 import type { Entity } from '@sim/engine-contract';
@@ -277,8 +278,6 @@ export class Brain {
     const acting = sequence?.revision ?? immediate?.revision ?? retry;
     const sequenceIndex=sequence?this.host.intentSequenceStepV1(m.soulId,{intentId:sequence.revision.intentId,version:sequence.revision.version}):0;
     const planningMind = acting ? { ...m, agenda: sequence?[acting.interpretation.agenda[sequenceIndex]]:acting.interpretation.agenda, agendaPos: 0 } : m;
-    const options=optionsFor(this.host,planningMind);
-    if(!m.activeRule)for(const o of options)if(rules.some(r=>r.agenda.some(s=>matchesStep(this.host,s,o.card,o.cardTarget))))o.servesIntent=true;
     const allPurposes=retained.map(e => this.host.extra.intentPurposeEvidenceV1
       ?purposeContextEvidenceV1(history!,e,m.owner,this.host.extra.intentSequencesV1&&e.revision.submitted.seq>=Number(this.host.extra.intentSequencesSinceV1??0)
         ?{kind:this.host.extra.intentNativeSequenceCompletionV1&&e.revision.interpretation.humanGoalPlan?.kind==='planned'?'native_program_sequence':'semantic_card_sequence',completedSteps:this.host.intentSequenceStepV1(m.soulId,{intentId:e.revision.intentId,version:e.revision.version})}:undefined,purposeAttempts)
@@ -286,6 +285,9 @@ export class Brain {
     const newest=allPurposes.filter(p=>'source' in p&&p.source).sort((a,b)=>('source' in b?b.source!.seq:0)-('source' in a?a.source!.seq:0))[0];
     const pin=acting?{intentId:acting.intentId,version:acting.version}:newest&&'source' in newest?{intentId:newest.source!.intentId,version:newest.source!.version}:undefined;
     const recall=this.host.extra.intentPurposeRecallV1?recallPurposesV1(allPurposes,pin,[nameOf(s.region),m.doing,...s.nearby.map(n=>n.who)].join(' ')):undefined;
+    const retainedChoices=!acting&&recall?.recall.state==='ready'?retainedPurposeChoicesV1(this.host,m,recall.purposes):new Map();
+    const options=optionsFor(this.host,planningMind,12,new Set([...retainedChoices.values()].map(v=>v.card)));
+    if(!m.activeRule)for(const o of options)if(rules.some(r=>r.agenda.some(s=>matchesStep(this.host,s,o.card,o.cardTarget))))o.servesIntent=true;
     return {
       ...(physicalWhere===undefined?{}:{physicalWhere}),
       ...(acting ? { actingPurpose:{ intentId:acting.intentId, version:acting.version } } : {}),
@@ -356,8 +358,9 @@ export class Brain {
     const purposeFor = (option: CardOption) => {
       const ref = ctx.actingPurpose;
       const entry = ref ? host.intentHistoryOf(m.soulId).intents[ref.intentId] : undefined;
-      return ref && entry?.revision.version === ref.version
-        && entry.revision.interpretation.agenda.some(step=>matchesStep(host,step,option.card,option.cardTarget)) ? ref : undefined;
+      if(ref&&entry?.revision.version===ref.version&&entry.revision.interpretation.agenda.some(step=>matchesStep(host,step,option.card,option.cardTarget)))return ref;
+      const choice=!ref&&ctx.purposeRecall?.state==='ready'?retainedPurposeChoicesV1(host,m,ctx.purposes??[]).get(retainedChoiceKeyV1(option.card,option.cardTarget)):undefined;
+      return choice?{intentId:choice.intentId,version:choice.version}:undefined;
     };
     if (m.avoid && m.avoid.untilTick > tick) ctx.options = ctx.options.filter((o) => o.id !== m.avoid!.id); else m.avoid = undefined;
     // A plan that has been impossible for ten minutes is given up, so a Soul is never stuck waiting for ever.
@@ -398,7 +401,7 @@ export class Brain {
         soulId: m.soulId, entityId: m.entityId, option: reflex.id, label: reflex.label, steps: reflex.steps, mood: m.mood,
         reevalTicks: (reflex.card === 'wait' ? 10 : durationFloor(reflex.durationHint)) * TPS, fallback: false, call: callId, trigger,
         card: reflex.card, target: reflex.cardTarget, ...(manner ? { manner } : {}), approachLen: reflex.approachLen,
-      } satisfies DecisionPayload, choiceGuard, purposeFor(reflex));
+      } satisfies DecisionPayload, choiceGuard, purposeFor(reflex),!ctx.actingPurpose);
       return;
     }
     const fp = fingerprint(ctx);
@@ -460,11 +463,12 @@ export class Brain {
       soulId: m.soulId, entityId: m.entityId, option: opt.id, label: opt.label, steps: opt.steps, mood: decision.mood,
       reevalTicks: Math.max(decision.reevalSeconds, durationFloor(opt.durationHint)) * TPS, fallback: usedFallback, call: callId, trigger,
       card: opt.card, target: opt.cardTarget, ...(decision.manner ? { manner: decision.manner } : {}), approachLen: opt.approachLen,
-    } satisfies DecisionPayload, choiceGuard, purposeFor(opt));
+    } satisfies DecisionPayload, choiceGuard, purposeFor(opt),!ctx.actingPurpose);
   }
 
-  private enqueueDecision(m: Mind, author: string, payload: DecisionPayload, guard?: AcceptanceGuard, purpose?: { intentId:string; version:number }) {
+  private enqueueDecision(m: Mind, author: string, payload: DecisionPayload, guard?: AcceptanceGuard, purpose?: { intentId:string; version:number },voluntaryRetained=false) {
     if (!guard) { void this.host.enqueue('decision', author, payload); return; }
+    if(purpose&&voluntaryRetained&&this.host.extra.intentRetainedChoiceV1)payload={...payload,trigger:'retained-choice/1'};
     const legacyVersion = m.intentVersion, willSeq = this.host.intentWillSeqOf(m.soulId);
     const queued = purpose ? this.host.enqueueIntentDecision(author,payload,purpose,guard)
       : this.host.enqueueChecked('decision', author, payload, guard);

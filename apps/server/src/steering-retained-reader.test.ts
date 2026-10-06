@@ -3,6 +3,11 @@ import assert from 'node:assert/strict';
 import {fixture} from '../test/native-owner-fixture.ts';
 import {installEdenSteeringModeV1} from './eden-steering-mode.ts';
 const registered={closedGoalsV1:true,registeredActivitiesV1:true};
+test('recall-aware keeper refuses missing voluntary-contribution policy without appending',async t=>{
+ const f=fixture(':memory:');t.after(()=>{f.brain.quiesce();f.host.stop();f.db.close();});
+ for(const promise of [f.host.enableIntentExecutionRetentionV1(),f.host.enableIntentNativeSequenceCompletionV1(),f.host.enableIntentHumanSleepTransitionV1(),f.host.enableIntentPurposeEvidenceV1()]){f.host.drainInputs();await promise;}const recall=f.host.enableIntentPurposeRecallV1();f.host.drainInputs();await recall;
+ const before=JSON.stringify(f.db.events(f.host.worldId)),hash=f.host.engine.stateHash();await assert.rejects(()=>installEdenSteeringModeV1(f.host,registered,true),/retained-execution-policy-required/);assert.equal(f.host.extra.intentRetainedChoiceV1,undefined);assert.equal(JSON.stringify(f.db.events(f.host.worldId)),before);assert.equal(f.host.engine.stateHash(),hash);
+});
 test('evidence-aware keeper cannot silently install bounded-recall choice policy',async t=>{
  const f=fixture(':memory:');t.after(()=>{f.brain.quiesce();f.host.stop();f.db.close();});
  for(const promise of [f.host.enableIntentExecutionRetentionV1(),f.host.enableIntentNativeSequenceCompletionV1(),f.host.enableIntentHumanSleepTransitionV1(),f.host.enableIntentPurposeEvidenceV1()]){f.host.drainInputs();await promise;}
