@@ -1,0 +1,57 @@
+import type {SoulRow} from './db.ts';
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {createServer} from 'node:http';
+import {once} from 'node:events';
+import {setImmediate,setTimeout as delay} from 'node:timers/promises';
+import {getRequestListener} from '@hono/node-server';
+import WebSocket from 'ws';
+import {retainedCommonsShoreFactory,nativeSleepSnapshotFactoryV1,COMMONS_PERSONAL_RESOURCES} from '@sim/engine-mars';
+import {PROTO,intentReceiptV2Schema} from '@sim/protocol';
+import type {WorldState as NativeWorld} from '../../../mars/viewer/engine/world/types.ts';
+import {fixture,invite,accept} from '../test/native-owner-fixture.ts';
+import {LivingWorld} from './living.ts';
+import {Brain} from './brain.ts';
+import {Hub} from './hub.ts';
+import {IntentControlV2} from './intent-control.ts';
+import {buildApp} from './http.ts';
+import {stripWorldRequestPath} from './world-request-path.ts';
+import {installCommonsProvisionCards} from './commons-provisions.ts';
+import {installEdenSteeringModeV1} from './eden-steering-mode.ts';
+async function until(ok:()=>boolean){const end=performance.now()+8000;while(!ok()&&performance.now()<end)await delay(10);assert.ok(ok(),'actual network condition arrives');}
+test('four ordinary owner HTTP directions measure receipt, understanding, safe native rise, walk admission and anonymous take delivery',async t=>{
+ const factory=nativeSleepSnapshotFactoryV1(await retainedCommonsShoreFactory()),f=fixture(':memory:',factory,{durableClockV1:true});f.souls.enableLifecycle();
+ await accept<unknown>(f.host,new LivingWorld(f.host).install(['Residents follow their purposes and rest.']));for(let i=0;i<4;i++)f.host.tickOnce();
+ const rows:SoulRow[]=[];for(const owner of ['alice','bob','cara','dave']){await invite(f,owner);rows.push(await accept(f.host,f.souls.create('dev:'+owner,{name:owner,description:'Synthetic first-response owner'})));}f.brain.quiesce();
+ await accept(f.host,f.host.installCommonsProvisionsV1());await accept(f.host,f.host.installRetainedCommonsShoreV1());await accept(f.host,f.host.installNativeSleepSnapshotV1());
+ const server=createServer(),timers:ReturnType<typeof setInterval>[]=[],originalInterval=setInterval;
+ t.mock.method(globalThis,'setInterval',(...args:Parameters<typeof setInterval>)=>{const timer=originalInterval(...args);timers.push(timer);return timer;});
+ server.on('upgrade',req=>{req.url=stripWorldRequestPath(req.url,f.brain.cfg.worldPath);});
+ const hub=new Hub(server,f.host,f.auth,f.db,f.souls),brain=new Brain(f.host,f.db,{...f.brain.cfg,budgetUsdPerDay:.5},{clients:()=>hub.clients.size,onCall:c=>hub.brainCall(c),onCamera(){},onTicker(){},onNarrative(){}},{intentV2Choices:true,compilerCall:async<T>(o:any)=>{
+  const input=JSON.parse(o.messages[0].content);return {out:{kind:'plan',registryHash:input.registry.registryHash,goals:[{goal:'walk',bindingId:'walk:commons-bench-west'}],explanation:'Walk to the registered west bench.',trigger:{kind:'now'}} as T,ms:0,inputTokens:0,outputTokens:0,cachedTokens:0,costUsd:0,request:null,raw:{synthetic:true}};
+ }}),service=new IntentControlV2(f.host,brain,f.souls,{historyV1:true,closedGoalsV1:true,registeredActivitiesV1:true}),app=buildApp({cfg:brain.cfg,db:f.db,host:f.host,auth:f.auth,brain,souls:f.souls,hub,intentV2:service}),listener=getRequestListener(app.fetch),clients:WebSocket[]=[];hub.brain=brain;
+ server.on('request',(req,res)=>{req.url=stripWorldRequestPath(req.url,brain.cfg.worldPath);void listener(req,res);});
+ t.after(async()=>{brain.quiesce();f.host.stop();for(const timer of timers)clearInterval(timer);for(const socket of clients)socket.terminate();for(const socket of hub.wss.clients)socket.terminate();await new Promise<void>(r=>hub.wss.close(()=>r()));if(server.listening)await new Promise<void>((r,reject)=>server.close(e=>e?reject(e):r()));f.db.close();});
+ await installCommonsProvisionCards(f.host,brain);await accept<unknown>(f.host,f.host.enableIntentSequencesV1());await installEdenSteeringModeV1(f.host,{closedGoalsV1:true,registeredActivitiesV1:true});
+ for(const [index,row] of rows.entries()){
+  const scope=service.ownerScope({userId:row.owner,expiresAt:Number.MAX_SAFE_INTEGER},row.id),old=await accept(f.host,service.publisher.receive(scope,{contract:'soul-intent/2',op:'upsert',requestId:'older-preference-'+index,words:'Remember my interest in quiet music.'}));assert.ok(old.reservation.created);await accept(f.host,service.publisher.publish(scope,old.reservation,{summary:'An optional continuing music preference.',agenda:[{card:'rest',target:null}],trigger:{kind:'none'}}));
+  f.host.minds.get(row.id)!.nextEvalTick=1e9;
+  await accept(f.host,f.host.enqueue('decision','fixture:sleep',{soulId:row.id,entityId:row.entity_id,option:'sleep',label:'sleep on own mat',steps:[{verb:'mars:sleep',params:{mat:'commons-mat-'+(index+1),duration:600,returnTo:COMMONS_PERSONAL_RESOURCES[index].sleepReturn}}],reevalTicks:1e9,fallback:false,trigger:'fixture'}));
+ }
+ const pose=(id:string)=>(f.host.engine.world as NativeWorld).entities[id].human?.sleepPose;
+ for(let i=0;i<5000&&!rows.every(r=>pose(r.entity_id)?.standingFraction===0);i++){f.host.tickOnce();if(i%10===0)await setImmediate();}assert.ok(rows.every(r=>pose(r.entity_id)?.standingFraction===0),'all four native controllers reached actual sleep');
+ type Sample={start:number;startTick:number;received?:number;understood?:number;stop?:number;stopTick?:number;rise?:number;riseTick?:number;admitted?:number;admissionTick?:number;walk?:number;walkTick?:number;publicRise?:number;publicRiseTick?:number;publicWalk?:number;publicWalkTick?:number};
+ const samples=new Map<string,Sample>(),effectiveRates=new Set<number>();
+ f.host.listeners.push({onApplied(e){const row=rows.find(r=>r.id===e.payload?.soulId),sample=row?samples.get(row.entity_id):undefined;if(!sample)return;const now=performance.now();if(e.kind==='intent-v2'&&e.payload.op==='upsert')sample.understood??=now;if(e.kind==='intent-sleep-stop-v1'){sample.stop??=now;sample.stopTick??=e.tick;}if(e.kind==='intent-admission-v2'&&e.payload.phase==='accepted'){sample.admitted??=now;sample.admissionTick??=e.tick;}},afterTick(tick){effectiveRates.add(f.host.clockRate);for(const row of rows){const sample=samples.get(row.entity_id);if(!sample)continue;const human=(f.host.engine.world as NativeWorld).entities[row.entity_id].human,now=performance.now(),fraction=human?.sleepPose?.standingFraction;if(fraction!==undefined&&fraction>0&&fraction<1){sample.rise??=now;sample.riseTick??=tick;}if(human?.activity==='walk'){sample.walk??=now;sample.walkTick??=tick;}}}});
+ await new Promise<void>((r,reject)=>{server.once('error',reject);server.listen(4958,'127.0.0.1',r);});
+ const socket=new WebSocket('ws://127.0.0.1:4958/w/eden/ws'),messages:any[]=[];clients.push(socket);socket.on('message',data=>{const message=JSON.parse(String(data));messages.push(message);if(message.t!=='takes')return;for(const chunk of message.chunks)for(const row of rows){const sample=samples.get(row.entity_id);if(!sample||chunk.toTick<=sample.startTick)continue;const human=chunk.take.finalState.entities[row.entity_id]?.human,now=performance.now(),fraction=human?.sleepPose?.standingFraction;if(fraction!==undefined&&fraction>0&&fraction<1){sample.publicRise??=now;sample.publicRiseTick??=chunk.toTick;}if(human?.activity==='walk'){sample.publicWalk??=now;sample.publicWalkTick??=chunk.toTick;}}});await once(socket,'open');socket.send(JSON.stringify({t:'hello',proto:PROTO}));await until(()=>messages.some(m=>m.t==='takes'));assert.equal(messages.find(m=>m.t==='welcome').you,null);
+ const base='http://127.0.0.1:4958/w/eden';f.host.clockRate=1;f.host.start();
+ await Promise.all(rows.map(async(row,index)=>{const sample:Sample={start:performance.now(),startTick:f.host.engine.world.tick};samples.set(row.entity_id,sample);const headers={authorization:'Bearer '+row.owner,'content-type':'application/json'},path='/v1/souls/'+row.id+'/intent-v2',response=await fetch(base+path,{method:'POST',headers,body:JSON.stringify({contract:'soul-intent/2',op:'upsert',requestId:'timed-wake-'+index,words:'PRIVATE_TIMED_OWNER_'+index+' go to commons-bench-west'})});sample.received=performance.now();assert.equal(response.status,202);await until(()=>sample.understood!==undefined);const lookup=await fetch(base+path+'/requests/timed-wake-'+index,{headers});assert.equal(lookup.status,200);const receipt=intentReceiptV2Schema.parse(await lookup.json());assert.equal(receipt.phase,'understood');if(receipt.phase==='understood')assert.match(receipt.revision.interpretation.summary,/Wake safely first/);await until(()=>sample.publicRise!==undefined&&sample.publicWalk!==undefined&&sample.walk!==undefined&&sample.admitted!==undefined);
+  assert.equal(Object.keys(f.host.intentHistoryOf(row.id).intents).length,2,'older preference remains recorded');assert.ok(Object.values(f.host.intentHistoryOf(row.id).intents).some(e=>e.revision.interpretation.trigger.kind==='none'&&e.status==='active'));
+ }));
+ const ms=(n:number,s:Sample)=>Math.round((n-s.start)*1000)/1000;
+ const report=rows.map(row=>{const s=samples.get(row.entity_id)!;for(const key of ['received','understood','stop','rise','admitted','walk','publicRise','publicWalk'] as const)assert.ok(Number.isFinite(s[key]),'all timed stages observed: '+key);assert.ok(s.stopTick!<=s.riseTick!&&s.riseTick!<=s.admissionTick!&&s.admissionTick!<=s.walkTick!,'actual safety-rise precedes new native walk admission');assert.ok(s.publicRise!-s.start<=5000,'this isolated fake-owner sample delivers first native rise within the five-second target');return {body:row.entity_id,receivedMs:ms(s.received!,s),understoodMs:ms(s.understood!,s),safeStopMs:ms(s.stop!,s),nativeRiseMs:ms(s.rise!,s),walkAdmissionMs:ms(s.admitted!,s),nativeWalkMs:ms(s.walk!,s),anonymousRiseMs:ms(s.publicRise!,s),anonymousWalkMs:ms(s.publicWalk!,s),ticks:{start:s.startTick,stop:s.stopTick,rise:s.riseTick,admitted:s.admissionTick,walk:s.walkTick,publicRise:s.publicRiseTick,publicWalk:s.publicWalkTick}};});
+ const sorted=report.map(r=>r.anonymousRiseMs).sort((a,b)=>a-b),nearest=(q:number)=>sorted[Math.max(0,Math.ceil(sorted.length*q)-1)];
+ assert.ok(!JSON.stringify(messages).includes('PRIVATE_TIMED_OWNER_'));for(const row of rows){assert.ok(!JSON.stringify(messages).includes('Remember my interest in quiet music.'));const stops=messages.filter(m=>m.t==='batch').flatMap(m=>m.log).filter((e:any)=>e.kind==='intent-sleep-stop-v1'&&e.payload.soulId===row.id);assert.equal(stops.length,1);assert.deepEqual(stops[0].payload,{worldId:f.host.worldId,soulId:row.id,privateUpdate:true});}assert.deepEqual(f.host.engine.runtime.violations,[]);assert.equal(f.db.paidCost(),0);
+ t.diagnostic(JSON.stringify({scope:'Four distinct synthetic owners, concurrent ordinary requests, requested native rate1 and local HTTP/anonymousWS; publication delivery, not renderer/device/paid-model/SSO or population SLA',samples:report,empiricalNearestRank:{n:4,firstPublicRiseP50Ms:nearest(.5),firstPublicRiseP95Ms:nearest(.95)},requestedClockRate:1,observedEffectiveRates:[...effectiveRates],providerCalls:0}));
+});
