@@ -11,8 +11,8 @@ import {commonsProvisions} from './commons-provisions.ts';
 import {commonsKitchen} from './commons-kitchen.ts';
 
 /** Old genesis and all prior provisions/kitchen facts remain authoritative. */
-export async function retainedCommonsShoreFactory(options?:{foodDeliveryV1?:boolean;socialEdenV1?:boolean;greenLandmarkV1?:boolean}):Promise<EngineFactory>{
-  const old=await commonsKitchenFactory({version:'commons-kitchen/2'}),reader=await createRetainedCommonsShoreReader(),m=await loadMars();
+export async function retainedCommonsShoreFactory(options?:{foodDeliveryV1?:boolean;socialEdenV1?:boolean;greenLandmarkV1?:boolean;origin?:EngineFactory}):Promise<EngineFactory>{
+  const old=options?.origin??await commonsKitchenFactory({version:'commons-kitchen/2'}),reader=await createRetainedCommonsShoreReader(),m=await loadMars();
   const cfg={...EDEN_SAFE_COMMONS_WORLD,safeCrewRemoval:true,walkBlockV1:true};
   const prefix='sim-mars/1+'+reader.rulesVersion+'+crew-removal/1+commons/1+arrival-clearance/1+walk-block/1';
   const nextVersions=new Set([prefix,prefix+'+commons-provisions/1',prefix+'+commons-provisions/1+commons-kitchen/1',prefix+'+commons-provisions/1+commons-kitchen/2']);

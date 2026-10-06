@@ -1,6 +1,7 @@
 // Source-owned installer for the existing Eden control plane. Explicitly
 // selected by main; no default factory or environment/config value changes.
 import {marsFactory,marsCommonsTransitionFactory,marsCrewRemovalTransitionFactory,GREEN_FIELD_WORLD,EDEN_SAFE_COMMONS_WORLD,commonsLifeReaderFactory,retainedCommonsShoreFactory,commonsNewcomerResourcesFactory,nativeSleepSnapshotFactoryV1,edenLectureFactoryV1,edenGroundFactoryV1} from '@sim/engine-mars';
+import {readFileSync} from 'node:fs';
 import type {EngineFactory} from '@sim/engine-contract';
 import type {Db} from './db.ts';
 import type {WorldHost} from './world.ts';
@@ -20,7 +21,7 @@ export async function edenHistoryFactory(db:Db,worldId:string,options?:{lifeV1?:
   if(header?.rules_version.endsWith('+ss/1')&&!options?.sleepSnapshotV1)throw Error('eden-bootstrap.explicit-sleep-snapshot-reader-required');
   if(options?.newcomerResourcesV1&&!options.lifeV1)throw Error('eden-bootstrap.newcomer-reader-requires-life');
   if(header?.rules_version.includes('+cp/2')&&!options?.newcomerResourcesV1)throw Error('eden-bootstrap.explicit-newcomer-reader-required');
-  if(options?.lifeV1){const origin=header?.rules_version.includes('retained-shore/1')?await retainedCommonsShoreFactory({foodDeliveryV1:header.rules_version.includes('+fd/1'),socialEdenV1:header.rules_version.includes('+social-eden/1'),greenLandmarkV1:header.rules_version.includes('+g/1')}):commonsLifeReaderFactory(await edenOriginHistoryFactory(db,worldId));const physical=options.groundV1?await edenGroundFactoryV1(origin):origin,resources=options.newcomerResourcesV1?commonsNewcomerResourcesFactory(physical):physical,lecture=options.lectureV1?edenLectureFactoryV1(resources):resources;return options.sleepSnapshotV1?nativeSleepSnapshotFactoryV1(lecture):lecture;}
+  if(options?.lifeV1){const origin=header?.rules_version.includes('retained-shore/1')?await retainedCommonsShoreFactory({foodDeliveryV1:header.rules_version.includes('+fd/1'),socialEdenV1:header.rules_version.includes('+social-eden/1'),greenLandmarkV1:header.rules_version.includes('+g/1')}):await retainedCommonsShoreFactory({origin:commonsLifeReaderFactory(await edenOriginHistoryFactory(db,worldId)),foodDeliveryV1:true,socialEdenV1:true});const physical=options.groundV1?await edenGroundFactoryV1(origin):origin,resources=options.newcomerResourcesV1?commonsNewcomerResourcesFactory(physical):physical,lecture=options.lectureV1?edenLectureFactoryV1(resources):resources;return options.sleepSnapshotV1?nativeSleepSnapshotFactoryV1(lecture):lecture;}
   return edenOriginHistoryFactory(db,worldId);
 }
 async function edenOriginHistoryFactory(db:Db,worldId:string):Promise<EngineFactory>{
@@ -37,7 +38,7 @@ async function edenOriginHistoryFactory(db:Db,worldId:string):Promise<EngineFact
 
 export async function installEdenCore(host:WorldHost,options:{applyCrew:boolean;applyCommons:boolean;retainReader?:boolean}){
   if(options.retainReader){if(options.applyCrew||options.applyCommons)throw Error('eden-bootstrap.retain-reader-cannot-install');return [];}
-  const crew=!host.engine.rulesVersion.includes('+crew-removal/1'),commons=!['eden-commons','eden-commons-shore/1'].includes(host.engine.world.base.campus);
+  const crew=!host.engine.rulesVersion.includes('+crew-removal/1'),commons=!['eden-commons','eden-commons-shore/1','eden-commons-shore-expanded/1'].includes(host.engine.world.base.campus);
   if(crew&&!options.applyCrew)throw Error('eden-bootstrap.explicit-crew-checkpoint-required');
   if(commons&&!options.applyCommons)throw Error('eden-bootstrap.explicit-commons-checkpoint-required');
   if((crew||commons)&&host.stationHistoryV1())throw Error('eden-bootstrap.station-carry-required');
@@ -54,7 +55,7 @@ export async function installEdenCore(host:WorldHost,options:{applyCrew:boolean;
   const facts=[];
   if(crew){const p=host.adoptCrewRemovalPolicyV1('operator:eden-core-bootstrap');host.drainInputs();facts.push(await p);}
   if(commons){const p=host.adoptCommons('operator:eden-core-bootstrap');host.drainInputs();facts.push(await p);}
-  if(!host.engine.rulesVersion.includes('+crew-removal/1')||!['eden-commons','eden-commons-shore/1'].includes(host.engine.world.base.campus))throw Error('eden-bootstrap.installation-incomplete');
+  if(!host.engine.rulesVersion.includes('+crew-removal/1')||!['eden-commons','eden-commons-shore/1','eden-commons-shore-expanded/1'].includes(host.engine.world.base.campus))throw Error('eden-bootstrap.installation-incomplete');
   return facts;
 }
 
@@ -87,4 +88,20 @@ export async function installEdenLifeV1(host:WorldHost,brain:Brain,options:{reta
   const provisions=await followCommonsProvisionBirths(host,brain),kitchen=scheduleCommonsKitchenInstallation(host,brain);
   const food=options.foodDeliveryId?(await import('./food-delivery.ts')).scheduleFiniteFoodDeliveryV1(host,brain,options.foodDeliveryId):undefined;
   return {async settled(){await provisions.settled();await kitchen.settled();await food?.settled();},close(){provisions.close();kitchen.close();food?.close();}};
+}
+
+/** Explicit first-use checkpoints for normal main.ts, preserving current world
+ * identity/history. Reader-only restarts cannot install or refill anything. */
+export async function installEdenExpansionV1(host:WorldHost,options:{retainReader?:boolean}={}){
+ if(options.retainReader){if(!host.engine.rulesVersion.includes('+cp/2')||!host.engine.rulesVersion.includes('+eg/1')||!host.engine.rulesVersion.includes('+l/1')||!host.engine.rulesVersion.endsWith('+ss/1'))throw Error('eden-expansion.retained-complete-reader-required');return [];}
+ const drive=async<T>(p:Promise<T>)=>{let done=false;p.then(()=>done=true,()=>done=true);for(let i=0;i<100&&!done;i++){host.drainInputs();await new Promise<void>(r=>setImmediate(r));}if(!done)throw Error('eden-expansion.bootstrap-unsettled');return p;};
+ const facts=[];
+ if(!host.engine.rulesVersion.includes('+commons-provisions/1')&&!host.engine.rulesVersion.includes('+cp/2'))facts.push(await drive(host.installCommonsProvisionsV1()));
+ if(!/\+commons-kitchen\/[12](?:\+|$)/.test(host.engine.rulesVersion))facts.push(await drive(host.installCommonsKitchenV1()));
+ if(!host.engine.rulesVersion.includes('retained-shore/1+'))facts.push(await drive(host.installRetainedCommonsShoreV1()));
+ if(!host.engine.rulesVersion.includes('+cp/2')){const layout=JSON.parse(readFileSync(new URL('../../../packages/engine-mars/src/fixtures/newcomer-layout.world-alternative.v2.json',import.meta.url),'utf8'));facts.push(await drive(host.installCommonsNewcomerResourcesV1(layout.placements)));}
+ if(!host.engine.rulesVersion.endsWith('+ss/1'))facts.push(await drive(host.installNativeSleepSnapshotV1()));
+ if(!host.engine.rulesVersion.includes('+eg/1'))facts.push(await drive(host.installEdenGroundV1()));
+ if(!host.engine.rulesVersion.includes('+l/1'))facts.push(await drive(host.installEdenLectureV1({worldEast:'world-v2',id:'eden-classroom-1',origin:[42,-6],yaw:0,audienceSeats:20,lesson:'Eden: observe a world, give a direction, watch what changes.'})));
+ return facts;
 }

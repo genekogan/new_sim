@@ -19,7 +19,7 @@ import { CampCards } from './camp.ts';
 import {FloaterCards} from './floaters.ts';
 import { worldDefinition } from './world-config.ts';
 import { stripWorldRequestPath } from './world-request-path.ts';
-import {edenCoreRequested,edenHistoryFactory,installEdenCore,settleEmptyEden,drainEdenThought,installEdenLifeV1} from './eden-bootstrap.ts';
+import {edenCoreRequested,edenHistoryFactory,installEdenCore,settleEmptyEden,drainEdenThought,installEdenLifeV1,installEdenExpansionV1} from './eden-bootstrap.ts';
 import {IntentControlV2} from './intent-control.ts';
 
 /** Seeded only into a world with no live Souls, so it is never empty. */
@@ -48,6 +48,8 @@ const lecture=process.env.ENABLE_EDEN_LECTURE_READER==='1';
 if(lecture&&!edenLife)throw Error('eden-bootstrap.lecture-reader-requires-opted-in-Eden-life');
 const sleepSnapshot=process.env.ENABLE_NATIVE_SLEEP_SNAPSHOT_READER==='1';
 if(sleepSnapshot&&!edenLife)throw Error('eden-bootstrap.sleep-snapshot-reader-requires-opted-in-Eden-life');
+const applyExpansion=process.env.APPLY_EDEN_EXPANSION_CHECKPOINT==='1';
+if(applyExpansion&&(!edenLife||!newcomerResources||!sleepSnapshot||!lecture||!expansionGround||process.env.EDEN_CORE_RETAIN_READER==='1'))throw Error('eden-bootstrap.expansion-requires-complete-explicit-readers-and-install-mode');
 const factory=edenCore?await edenHistoryFactory(db,config.worldId,{lifeV1:edenLife,newcomerResourcesV1:newcomerResources,sleepSnapshotV1:sleepSnapshot,lectureV1:lecture,groundV1:expansionGround}):mars?await mars.marsFactory(config.worldKey==='littlemartians'?mars.LITTLE_MARTIANS_WORLD:config.worldKey==='eden'?mars.GREEN_FIELD_WORLD:undefined):recordedToyFactory;
 const host = new WorldHost(db, factory, config.worldSeed, config.snapshotEveryTicks, config.worldId,edenCore?{durableClockV1:true}:undefined);
 const boot = host.boot();
@@ -63,7 +65,7 @@ if(edenCore)await settleEmptyEden(host,living,definition.customs);
 else if (living) { living.camp = config.worldKey === 'mars'; void living.install(definition.customs); }
 const runtimePolicy = host.extra.runtimePolicy as { sleepBlockTicks: number; quietSeatCourtesy?: boolean } | undefined;
 if (living && host.engine.configureRuntimePolicy && !runtimePolicy?.quietSeatCourtesy) {
-  void host.enqueue('rules','world',{runtimePolicy:{sleepBlockTicks:1200,quietSeatCourtesy:true},why:'enable ordinary idle-bystander courtesy at quiet seat exits prospectively; retain historical replay before this event'});
+  void host.enqueue('rules','world',{runtimePolicy:{sleepBlockTicks:1200,...host.extra.runtimePolicy as object,quietSeatCourtesy:true},why:'enable ordinary idle-bystander courtesy at quiet seat exits prospectively; retain historical replay before this event'});
 }
 const campCards = living?.camp ? new CampCards(host) : null;
 if(config.worldKey==='littlemartians')new FloaterCards(host);
@@ -85,6 +87,7 @@ const brain = new Brain(host, db, config, {
 },edenCapabilities?{intentV2Choices:true}:undefined);
 const souls = new Souls(host, db, brain, config);
 if(edenCapabilities)souls.enableLifecycle();
+if(applyExpansion)await installEdenExpansionV1(host);
 const edenLifeHandles=edenLife?await installEdenLifeV1(host,brain,{retainReader:process.env.EDEN_CORE_RETAIN_READER==='1',foodDeliveryId:process.env.EDEN_FINITE_FOOD_DELIVERY_ID}):undefined;
 await installEdenSteeringModeV1(host,steeringMode,process.env.EDEN_CORE_RETAIN_READER==='1');
 const intentV2=edenCapabilities?new IntentControlV2(host,brain,souls,{historyV1:true,...steeringMode}):undefined;
