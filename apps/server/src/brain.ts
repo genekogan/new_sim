@@ -1,5 +1,5 @@
 import {latestPurposeDirectionV1} from './latest-purpose-direction.ts';
-import {purposeEpisodesV1,episodeJournalV1} from './purpose-episodes.ts';
+import {purposeEpisodesV1,episodeJournalV1,purposeExperienceContextV1} from './purpose-episodes.ts';
 import {compileHumanGoalV1,type ClosedHumanResultV1} from './human-compiler.ts';
 import {previewHumanSleepStopV1} from './human-sleep-transition.ts';
 import {purposeContextEvidenceV1,indexPurposeAttemptsV1} from './purpose-context-evidence.ts';
@@ -309,6 +309,7 @@ export class Brain {
       manners: Object.fromEntries((deck?.manners ?? []).map((n) => [n, k.vocab.manners[n]?.summary ?? n])),
       options,
       ...(recall?{purposes:recall.purposes,purposeRecall:recall.recall}:allPurposes.length?{purposes:allPurposes}:{}),
+      ...(this.intentV2Choices&&this.host.extra.intentEpisodeMemoryV1?{purposeExperiences:purposeExperienceContextV1(this.host,m,recall?.purposes??allPurposes)}:{}),
       running: !!eng.programOf(m.entityId),
       trigger,
     };
@@ -330,11 +331,12 @@ export class Brain {
   private async evaluateWork(m: Mind, trigger: string) {
     const host = this.host, tick = host.engine.world.tick;
     const purposeSeq = this.intentV2Choices ? host.intentWillSeqOf(m.soulId) : undefined;
+    let experienceCurrent=()=>true;
     const choiceGuard: AcceptanceGuard | undefined = purposeSeq === undefined ? undefined : () => {
       const row = this.db.soul(m.soulId);
       if (host.minds.get(m.soulId) !== m || !row || row.retired_at !== null || row.world_id !== host.worldId
         || row.owner !== m.owner || row.entity_id !== m.entityId || host.kernel.things[m.soulId]?.traits.body !== m.entityId
-        || !host.engine.world.entities[m.entityId] || host.intentWillSeqOf(m.soulId) !== purposeSeq || host.quietBarrier)
+        || !host.engine.world.entities[m.entityId] || host.intentWillSeqOf(m.soulId) !== purposeSeq || host.quietBarrier || !experienceCurrent())
         throw new StaleCompilation();
       return true;
     };
@@ -342,6 +344,7 @@ export class Brain {
     this.updateEnergy(m, ent, tick);
     if(this.intentV2Choices&&(host.unfinishedHumanGoalExecutionV1(m.soulId)||host.unfinishedIntentApproachV1(m.soulId))){m.nextEvalTick=tick+TPS;m.evalTrigger='timer';m.lastFingerprint='';return;}
     const ctx = this.midContext(m, trigger);
+    if(ctx.purposeExperiences){const captured=JSON.stringify(ctx.purposeExperiences.episodes);experienceCurrent=()=>JSON.stringify(purposeExperienceContextV1(host,m,ctx.purposes??[])?.episodes)===captured;}
     if(ctx.purposeRecall?.state==='overflow'){
       const fp='purpose-recall-overflow:'+purposeSeq;
       if(m.lastFingerprint!==fp)this.record({tick,tier:'mid',subject:m.name,soulId:m.soulId,model:'private-recall/1',request:{recall:ctx.purposeRecall},response:null,applied:{dropped:'private-purpose-context-overflow'},ms:0,inputTokens:0,outputTokens:0,cachedTokens:0,costUsd:0,mode:'fake',error:'Strict/current owner commitments exceed the private context limit; no new choice was made. Full history remains available.'});
@@ -429,14 +432,14 @@ export class Brain {
     this.inflight.delete(m.soulId);
     if (host.minds.get(m.soulId) !== m) return;
     const now = host.engine.world.tick;
-    const stale = m.intentVersion !== version || host.quietBarrier || purposeSeq !== undefined && host.intentWillSeqOf(m.soulId) !== purposeSeq;
+    const stale = m.intentVersion !== version || host.quietBarrier || purposeSeq !== undefined && host.intentWillSeqOf(m.soulId) !== purposeSeq || !experienceCurrent();
     const opt = ctx.options.find((o) => o.id === decision.option);
     if(!stale&&host.living){const c=clockAt(now,host.living.origin,host.living.dayTicks);for(const r of mandateOf(host.kernel,m.soulId).filter(r=>r.strict&&r.status==='active'&&r.lastReportDay!==c.day)){
       const chosen=opt?{card:opt.card,target:opt.cardTarget}:m.pending?{card:m.pending.card,target:m.pending.target}:null;
       if(!chosen||!r.agenda.some(a=>matchesStep(host,a,chosen.card,chosen.target)))void host.enqueue('mandate','world',{soulId:m.soulId,ruleId:r.id,op:'report',patch:{lastReportDay:c.day,report:`This decision did not follow the strict rule: ${opt?.label??'continued the current activity'}. Needs, circumstances and the logged choice are available for review.`}});
     }}
     const policy = { how: decision.how, pool: decision.pool, topP: decision.topP, keepGoing: decision.keepGoing, sociable: decision.sociable, optionKeys: Object.fromEntries(keys) };
-    const applied = stale ? { dropped: 'intent changed during the call; re-evaluating' } : opt
+    const applied = stale ? { dropped: experienceCurrent()?'intent changed during the call; re-evaluating':'recorded experience changed during the call; re-evaluating' } : opt
       ? { option: opt.id, label: opt.label, card: opt.card, target: opt.cardTarget, manner: decision.manner, steps: opt.steps, mood: decision.mood, reevalSeconds: decision.reevalSeconds, probabilities: decision.probabilities, ...policy, seed }
       : { option: 'continue', mood: decision.mood, reevalSeconds: decision.reevalSeconds, ...policy };
     const callId = this.record({ tick, tier: 'mid', subject: m.name, soulId: m.soulId, model: mode === 'live' ? JEV_MODEL : 'fake', request, response, applied: { trigger, ...applied }, ms, inputTokens: tokens, outputTokens: 0, cachedTokens: 0, costUsd: cost, mode, error });
