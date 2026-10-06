@@ -27,3 +27,5 @@ export * from './human-goals-v1.ts';
 export * from './green-landmark-v1.ts';
 export * from './newcomer-resources.ts';
 export * from './sleep-snapshot.ts';
+
+export * from './eden-lecture.ts';
