@@ -30,3 +30,12 @@ actual session after it starts. They do not grant publicother-owner group access
 or turn App's localSlide buttons into shared controls. PM can expose the ordinary
 words after Source/policy/renderer review. The current V3 deployment dependency
 remains the separately pinned expanded bootstrap; no wholebranch activation.
+
+Completion/replay extension: ordinary advance and cancel both run through actual
+bounded cleanup. Engine hash, kernel hash and the host's retained intention
+history match exact snapshot and genesis restores after completion. Control
+acceptance still does not claim that cleanup already happened. A queued end
+request whose current participant ownership changes is rejected before native
+control publication, preserving the active session/body programme and removing
+its ordinary capability binding. These source fixtures use fake minds and no
+paid calls; current Root/real-auth/active-coordinator restart remain unqualified.
