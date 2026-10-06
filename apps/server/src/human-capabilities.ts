@@ -27,8 +27,11 @@ export function readHumanCapabilitiesV1(host:WorldHost,m:Mind,options?:{register
   };
   for(const a of host.engine.anchors()){
    const t=host.kernel.things[a.id];if(!t||t.by!=='world'||t.kind!=='place'||!engineRef(host,a.id))continue;
-   if(verbs.has('walk_to')){add('walk',key('walk',a.id),a.name,a.id,[{verb:'walk_to',params:{to:a.id}},{verb:'rest',params:{seconds:1}}],1);
-    add('hang_out',key('hang_out',a.id),a.name,a.id,[{verb:'walk_to',params:{to:a.id}},{verb:'rest',params:{seconds:60}}],1,/\b(?:tree|garden|forest|grove|green)\b/i.test(a.name));}
+   if(verbs.has('walk_to')){
+    // A place region takes many bodies: the engine spaces arrivals instead of one centroid lock.
+    const to=w.regions[a.id]?{to:a.id,spread:'region/1'}:{to:a.id};
+    add('walk',key('walk',a.id),a.name,a.id,[{verb:'walk_to',params:to},{verb:'rest',params:{seconds:1}}],1);
+    add('hang_out',key('hang_out',a.id),a.name,a.id,[{verb:'walk_to',params:to},{verb:'rest',params:{seconds:60}}],1,/\b(?:tree|garden|forest|grove|green)\b/i.test(a.name));}
    const entity=a.entity?w.entities[a.entity]:undefined;if(humanoid&&verbs.has('sit')&&entity&&CATALOG[entity.def]?.slots?.some(s=>s.kind==='seat'))add('sit',key('sit',a.id),a.name,a.id,[{verb:'sit',params:{on:entity.id,seconds:1}},{verb:'rest',params:{seconds:60}}],1);
   }
   if(verbs.has('rest'))add('rest','rest:self','Rest here',undefined,[{verb:'rest',params:{seconds:60}}],0);

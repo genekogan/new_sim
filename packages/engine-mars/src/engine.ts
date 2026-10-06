@@ -367,17 +367,20 @@ export class MarsEngine implements Engine {
    * retry re-chooses: a spaced spot inside the region away from other bodies and from
    * other running shore/walk targets, first with a currently plannable native route.
    * Absent the parameter, region goals keep the original single-centroid behaviour. */
-  private spreadGoalV1(actor:string,region:string):{x:number;z:number;level:number}|'here'|Diag{
+  private spreadGoalV1(actor:string,region:string,mode:unknown='pond/1'):{x:number;z:number;level:number}|'here'|Diag{
     const r=this.rt.world.regions[region],e=this.ents[actor];if(!r||!e)return {code:'target.unknown',message:`nothing to walk to: ${region}`};
     if(inPoly(e.pose.p[0],e.pose.p[2],r.polygon))return 'here';
     const level=r.level??0,xs=r.polygon.map((p:number[])=>p[0]),zs=r.polygon.map((p:number[])=>p[1]),taken:number[][]=[];
     for(const o of Object.values(this.ents) as any[])if(o.id!==actor&&o.human)taken.push([o.pose.p[0],o.pose.p[2]]);
     for(const rec of this.rt.records.values() as Iterable<any>){const q=rec.params;if(q&&q.actor!==actor&&(rec.verb==='commons_shore_travel'||rec.verb==='shore_travel'||rec.verb==='walk_to')&&typeof q.x==='number'&&typeof q.z==='number'&&this.rt.isActive(rec.id))taken.push([q.x,q.z]);}
     const spots:[number,number][]=[];
-    for(let x=Math.min(...xs)+2;x<=Math.max(...xs)-4;x+=2.5)for(let z=Math.min(...zs)+2;z<=Math.max(...zs)-2;z+=2.5){const p:[number,number]=[r3(x),r3(z)];if(inPoly(p[0],p[1],r.polygon)&&taken.every(t=>Math.hypot(t[0]-p[0],t[1]-p[1])>=1.4))spots.push(p);}
+    // pond/1: deep-side swimming grid. region/1: any place, spaced standing spots nearest its centre first.
+    const pond=mode==='pond/1',inset=pond?[2,4]:[1,1],step=pond?2.5:1.5,mid=centroid(r.polygon);
+    for(let x=Math.min(...xs)+inset[0];x<=Math.max(...xs)-inset[1];x+=step)for(let z=Math.min(...zs)+inset[0];z<=Math.max(...zs)-inset[0];z+=step){const p:[number,number]=[r3(x),r3(z)];if(inPoly(p[0],p[1],r.polygon)&&taken.every(t=>Math.hypot(t[0]-p[0],t[1]-p[1])>=(pond?1.4:1.0)))spots.push(p);}
+    if(!spots.length&&!pond&&taken.every(t=>Math.hypot(t[0]-mid[0],t[1]-mid[1])>=1.0))spots.push(mid); // a place smaller than the grid keeps its single centre
     if(!spots.length)return {code:'route.region-full',message:`no spaced free spot remains in ${region}`};
     const offset=[...actor].reduce((h,c)=>(h*31+c.charCodeAt(0))>>>0,7)%spots.length;
-    const order=[...spots.slice(offset),...spots.slice(0,offset)].map((p,i)=>({p,i,band:Math.round(Math.hypot(p[0]-e.pose.p[0],p[1]-e.pose.p[2])/8)})).sort((a,b)=>a.band-b.band||a.i-b.i);
+    const order=[...spots.slice(offset),...spots.slice(0,offset)].map((p,i)=>({p,i,band:pond?Math.round(Math.hypot(p[0]-e.pose.p[0],p[1]-e.pose.p[2])/8):Math.round(Math.hypot(p[0]-mid[0],p[1]-mid[1])/2)})).sort((a,b)=>a.band-b.band||a.i-b.i).slice(0,24);
     let last:Diag={code:'route.unreachable',message:'no reachable spaced spot'};
     for(const {p} of order){const no=this.plan(this.movementVerb(actor,p[0]),{actor,x:p[0],z:p[1],level});if(!no)return {x:p[0],z:p[1],level};last=no;}
     return last;
@@ -416,7 +419,7 @@ export class MarsEngine implements Engine {
       }
       case 'control_classroom_v1': return [{verb:'classroom_control',params:{session:a.session,intent:{kind:a.kind}},settle:'done',raw:true}];
       case 'walk_to': {
-        const g = a.spread === 'pond/1' && typeof a.to === 'string' && this.rt.world.regions[a.to] ? this.spreadGoalV1(me, a.to) : this.goalNear(me, a.to, typeof a.standoff === 'number' ? a.standoff : 0);
+        const g = (a.spread === 'pond/1' || a.spread === 'region/1') && typeof a.to === 'string' && this.rt.world.regions[a.to] ? this.spreadGoalV1(me, a.to, a.spread) : this.goalNear(me, a.to, typeof a.standoff === 'number' ? a.standoff : 0);
         if (g === 'here') return [];
         if ('code' in g) return g;
         const ops: Op[] = [{ verb: this.movementVerb(me,g.x), params: { actor: me, x: g.x, z: g.z, level:g.level, ...(this.cfg.nativeArrivalWitnessV1&&this.movementVerb(me,g.x)==='walk_to'?{arrivalEvidence:'navigation-arrival/1'}:{}) }, settle: 'done' }];
@@ -521,7 +524,7 @@ export class MarsEngine implements Engine {
     if (first.verb === 'mars:take_item') { const it=this.ents[String(first.params.item)]; if (it?.support?.kind==='in-hand' && it.support.by===program.actor && (!first.params.hand || it.support.hand===first.params.hand)) return null; }
     if (first.verb.startsWith('mars:')) { const r = this.raw(program.actor, first); return 'code' in r ? r : this.plan(r.verb, r.params); }
     if (!BODY.has(first.verb)) return { code: 'action.unknown-verb', message: `no body verb "${first.verb}"` };
-    if (first.verb === 'walk_to') { const g = first.params.spread === 'pond/1' && typeof first.params.to === 'string' && this.rt.world.regions[first.params.to] ? this.spreadGoalV1(program.actor, first.params.to) : this.goalNear(program.actor, first.params.to, typeof first.params.standoff === 'number' ? first.params.standoff : 0); return g !== 'here' && 'code' in g ? g : null; }
+    if (first.verb === 'walk_to') { const g = (first.params.spread === 'pond/1' || first.params.spread === 'region/1') && typeof first.params.to === 'string' && this.rt.world.regions[first.params.to] ? this.spreadGoalV1(program.actor, first.params.to, first.params.spread) : this.goalNear(program.actor, first.params.to, typeof first.params.standoff === 'number' ? first.params.standoff : 0); return g !== 'here' && 'code' in g ? g : null; }
     if (first.verb === 'sit') {
       const fixture = String(first.params.on ?? '');
       if (this.cfg.scene === 'eden-camp' && this.ents[fixture]?.def === 'bench-6ft') {

@@ -170,3 +170,21 @@ test('pond is multi-occupant: a bank gathering does not block it and four Souls 
  assert.deepEqual(f.host.engine.runtime.violations,[]);assert.equal(f.db.paidCost(),0);
  t.diagnostic('four simultaneous swimmers at '+JSON.stringify(ps.map(p=>[p[0],p[2]])));
 });
+
+test('a place takes many bodies: someone at the classroom centre does not lock it; four arrive spaced',{timeout:300000},async t=>{
+ const f=await lectureSetup(t),scopeOf=(row:SoulRow)=>f.service.ownerScope({userId:'dev:operator',expiresAt:Number.MAX_SAFE_INTEGER},row.id);
+ const body=(row:SoulRow)=>(f.host.engine.world as NativeWorld).entities[row.entity_id];
+ const tick=async(n:number,until:()=>boolean)=>{for(let i=0;i<n&&!until();i++){f.host.tickOnce();if(i%10===0)await setImmediate();}return until();};
+ const region=f.host.engine.world.regions['eden-classroom-1'] as {polygon:[number,number][]},mid=region.polygon.reduce((a,p)=>[a[0]+p[0]/region.polygon.length,a[1]+p[1]/region.polygon.length],[0,0]);
+ const parked=f.rows[1];
+ await accept(f.host,f.host.enqueue('decision','fixture:stand-at-centre',{soulId:parked.id,entityId:parked.entity_id,option:'stand at the centre',label:'stand at the centre',steps:[{verb:'walk_to',params:{to:'eden-classroom-1'}},{verb:'rest',params:{seconds:600}}],reevalTicks:1e9,fallback:false,trigger:'fixture'}));
+ assert.ok(await tick(4000,()=>Math.hypot(body(parked).pose.p[0]-mid[0],body(parked).pose.p[2]-mid[1])<1&&body(parked).human?.activity!=='walk'),'a body occupies the classroom centre');
+ const walkers=f.rows.slice(2,6),ids:string[]=[];
+ for(const row of walkers){await accept(f.host,f.service.submit(scopeOf(row),{contract:'soul-intent/2',op:'upsert',requestId:'class-'+row.id,words:'go to the classroom'}));await accept(f.host,f.service.settled());const r=f.service.lookup(scopeOf(row),'class-'+row.id);assert.equal(r.phase,'understood',JSON.stringify(r));if(r.phase!=='understood')throw Error('no plan');ids.push(r.revision.intentId);await f.brain.evaluate(f.host.minds.get(row.id)!,'new-intent-v2');f.host.drainInputs();}
+ const done=()=>walkers.every((row,i)=>Object.values(f.host.intentHistoryOf(row.id).attempts).some(a=>a.intent.intentId===ids[i]&&a.phase==='completed'));
+ assert.ok(await tick(12000,done),walkers.map((r,i)=>body(r).human?.activity+'@'+body(r).pose.p.map(v=>v.toFixed(1)).join(',')+' '+Object.values(f.host.intentHistoryOf(r.id).attempts).filter(x=>x.intent.intentId===ids[i]).map(x=>x.phase+':'+x.tick+(('reason' in x)?':'+x.reason:'')).join('|')).join(' ;; '));
+ const ps=[...walkers,parked].map(r=>body(r).pose.p);for(let i=0;i<ps.length;i++)for(let j=i+1;j<ps.length;j++)assert.ok(Math.hypot(ps[i][0]-ps[j][0],ps[i][2]-ps[j][2])>=.9,'spaced bodies');
+ assert.ok(Math.hypot(body(parked).pose.p[0]-mid[0],body(parked).pose.p[2]-mid[1])<1,'parked body not displaced');
+ assert.deepEqual(f.host.engine.runtime.violations,[]);assert.equal(f.db.paidCost(),0);
+ t.diagnostic('classroom arrivals at '+JSON.stringify(walkers.map(r=>[+body(r).pose.p[0].toFixed(1),+body(r).pose.p[2].toFixed(1)])));
+});
