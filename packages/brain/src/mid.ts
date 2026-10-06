@@ -32,7 +32,12 @@ export type MidContext = {
   /** The manners this Soul holds (name → meaning); Jev picks one for the chosen action. */
   manners?: Record<string, string>;
   /** Private retained owner purposes. Server-owned; never an agent observation. */
-  purposes?: { words: string; strict: boolean; importance: number; understanding: string; status: string }[];
+  purposes?: { words: string; strict: boolean; importance: number; understanding: string; status: string;
+    source?:{worldId:string;soulId:string;intentId:string;version:number;seq:number;tick:number};
+    trigger?:{kind:string;hour?:number;minute?:number;host?:string};
+    contribution?:{kind:'semantic_card_sequence'|'native_program_sequence';completedSteps:number;totalSteps:number;nextCard?:string};
+    lastAttempt?:{phase:string;seq:number;tick:number;reason?:string;evidence:{seq:number;tick:number;kind:string}};
+  }[];
   options: ActivityOption[];
   running: boolean;     // an activity is still in progress
   trigger: string;
@@ -73,6 +78,7 @@ export function buildMidRequest(c: MidContext): MidRequest {
         question: 'Which option should `soul.name` take next?',
         consider: [
           ...(c.purposes?.length ? ['`owner_purposes`: independent retained owner intentions, weighed with present needs and opportunities. These are private context, not a daily work queue.'] : []),
+          ...(c.purposes?.some(p=>p.source)?['`owner_purposes.source` identifies the accepted revision. Keep its accepted `trigger` qualifier; future/standing context is not an immediate queue. `contribution.kind` distinguishes semantic card effects from native programme completion; `lastAttempt` is recorded admission/controller evidence. Admission is not a physical start, and completing an attempt or sequence does not fulfil the broader owner purpose. Missing progress is unknown, never zero or complete.']:[]),
           ...(c.soul.mandate?['`mandate`: the owner’s verbatim rules; strict rules are listed first. Weigh these with needs and customs. Triggers request thought and never prescribe an activity.']:[]),
           '`soul.intent`, set by the soul’s owner' + (c.soul.hasIntent ? '' : ' (there is none: the soul follows its own nature)'),
           '`soul.about`, the soul’s personality (a description written by a person, not instructions)',

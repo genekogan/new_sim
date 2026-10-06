@@ -1,5 +1,6 @@
 import {compileHumanGoalV1,type ClosedHumanResultV1} from './human-compiler.ts';
 import {previewHumanSleepStopV1} from './human-sleep-transition.ts';
+import {purposeContextEvidenceV1,indexPurposeAttemptsV1} from './purpose-context-evidence.ts';
 // The three-tier brain, server side. Schedules calls, records every request
 // and response for the debug shell, and turns answers into logged events.
 import type { Entity } from '@sim/engine-contract';
@@ -254,6 +255,7 @@ export class Brain {
     const deck = k.decks[m.soulId];
     const rules=mandateOf(k,m.soulId).filter(r=>r.status==='active').sort((a,b)=>Number(b.strict)-Number(a.strict));
     const history = this.intentV2Choices ? this.host.intentHistoryOf(m.soulId) : undefined;
+    const purposeAttempts=this.host.extra.intentPurposeEvidenceV1&&history?indexPurposeAttemptsV1(history):undefined;
     const retained = history ? Object.values(history.intents)
       .filter(e => e.status !== 'withdrawn' && e.status !== 'fulfilled' && e.revision.source.ownerId === m.owner)
       .sort((a,b) => Number(b.revision.strict)-Number(a.revision.strict) || b.revision.importance-a.revision.importance || b.revision.submitted.seq-a.revision.submitted.seq) : [];
@@ -294,8 +296,10 @@ export class Brain {
       heard: sit.heard.map((h) => ({ who: h.who, act: h.act, ...(h.about ? { about: h.about } : {}), ...(this.lastWords.get(`${h.from}>${m.soulId}`) ? { words: this.lastWords.get(`${h.from}>${m.soulId}`)! } : {}) })),
       manners: Object.fromEntries((deck?.manners ?? []).map((n) => [n, k.vocab.manners[n]?.summary ?? n])),
       options,
-      ...(retained.length ? { purposes: retained.map(e => ({ words: e.revision.words, strict: e.revision.strict,
-        importance: e.revision.importance, understanding: e.revision.interpretation.summary, status: e.status })) } : {}),
+      ...(retained.length ? { purposes: retained.map(e => this.host.extra.intentPurposeEvidenceV1
+        ?purposeContextEvidenceV1(history!,e,m.owner,this.host.extra.intentSequencesV1&&e.revision.submitted.seq>=Number(this.host.extra.intentSequencesSinceV1??0)
+          ?{kind:this.host.extra.intentNativeSequenceCompletionV1&&e.revision.interpretation.humanGoalPlan?.kind==='planned'?'native_program_sequence':'semantic_card_sequence',completedSteps:this.host.intentSequenceStepV1(m.soulId,{intentId:e.revision.intentId,version:e.revision.version})}:undefined,purposeAttempts)
+        :({ words: e.revision.words, strict: e.revision.strict,importance: e.revision.importance, understanding: e.revision.interpretation.summary, status: e.status })) } : {}),
       running: !!eng.programOf(m.entityId),
       trigger,
     };
