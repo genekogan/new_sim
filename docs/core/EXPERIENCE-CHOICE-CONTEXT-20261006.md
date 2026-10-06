@@ -25,10 +25,10 @@ The writer checks again before any prepared choice commits. This uses existing
 stale-result handling and keeps the world progressing. Current owner/body/native
 correspondence is required; foreign or changed ownership yields no memory packet.
 
-Four new checks cover the actual canonical admission records, bounded private
+Five new checks cover the actual canonical admission records, bounded private
 context, synthetic delayed choice, writer-order race, public negatives and exact
 snapshot/genesis reconstruction. Together with the three existing reflection
-checks they pass seven; types pass. Generic timed-rest records in these fixtures
+checks pass seven, followed by one successful current-choice admission check; types pass. Generic timed-rest records in these fixtures
 remain admitted evidence rather than invented physical start/completion. Synthetic
 Jev transports and fake minds cost zero; no paid behavioral-quality claim follows.
 
