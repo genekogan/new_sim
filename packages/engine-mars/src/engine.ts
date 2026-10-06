@@ -451,7 +451,7 @@ export class MarsEngine implements Engine {
     else {const copy=this.physical!.restore(this.rt.snapshot());copy.cancel(action,{code:'program.replaced',message:'replaced'});if(copy.isActive(action))result={code:'program.safe-stop-required',message:'Stop the current movement and let it reach safe support before replacing it.'};}
     if(key)this.feasibilityRead!.set(key,structuredClone(result));return result;
   }
-  ownedClassroomControlRosterV1(actor:string,session:string){const r=this.rt.records.get(session);if(!r||r.verb!=='classroom_session'||!this.rt.isActive(session)||r.params.host!==actor)return null;return [r.params.host,...r.params.presenters,...r.params.audience] as string[];}
+  ownedClassroomControlRosterV1(actor:string,session:string){const r=this.rt.records.get(session);if(!r||r.verb!=='classroom_session'||!this.rt.isActive(session)||r.params.host!==actor)return null;const current=readClassroom(this.rt,session);if(!current)return null;return [...new Set(current.participants.map(p=>p.actor))];}
   canPerform(program: Program): Diag | null {
     if(program.steps[0]?.verb==='control_classroom_v1'){const p=program.steps[0].params;if(program.steps.length!==1||!['cancel','advance'].includes(String(p.kind))||typeof p.session!=='string'||!this.ownedClassroomControlRosterV1(program.actor,p.session))return {code:'classroom.owned-host-control-required',message:'Only the active classroom host can apply this control.'};return this.plan('classroom_control',{session:p.session,intent:{kind:p.kind}});}
     if (!this.ents[program.actor]) return { code: 'actor.unknown', message: `no such actor ${program.actor}` };
