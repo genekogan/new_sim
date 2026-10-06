@@ -1,4 +1,4 @@
-import {Governor} from '../../apps/server/src/governor.ts';
+import {Governor} from './pinned-human-burst-governor-46c1a0a6.ts';
 /** Exact current-local Governor methods on the existing instance. Keep levels,
  * learned estimates, denied counters and DB-backed rolling cap/holds intact. */
 export function enableCurrentHumanBurstV1(brain,amount=1){

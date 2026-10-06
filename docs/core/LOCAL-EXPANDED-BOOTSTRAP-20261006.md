@@ -64,3 +64,11 @@ food delivery. Old owners, event prefix and paid ledger remain exact. A separate
 injected installation-settled failure test proves close reports failure only
 after the owned listener and database close. Installation handles close before
 allSettled; an installer rejection cannot skip remaining drain/cleanup.
+
+Mutable import correction: human-burst-adapter now imports the exact reviewed
+46c1a0a6 Governor source from its sibling pinned-human-burst-governor-46c1a0a6.ts.
+PM integrating its owned Governor file cannot remove the adapter methods again.
+Only the already reviewed capacity/setter are attached to the existing instance;
+no production Governor replacement or budget reset. Preserve this sibling when
+copying the adapter. Current-copy fullflags test passes including depletion and
+repeated-setter no-refill, old paid/event/owner conservation and cleanup.
