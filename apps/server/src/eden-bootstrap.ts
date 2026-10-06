@@ -1,6 +1,6 @@
 // Source-owned installer for the existing Eden control plane. Explicitly
 // selected by main; no default factory or environment/config value changes.
-import {marsFactory,marsCommonsTransitionFactory,marsCrewRemovalTransitionFactory,GREEN_FIELD_WORLD,EDEN_SAFE_COMMONS_WORLD,commonsLifeReaderFactory,retainedCommonsShoreFactory,commonsNewcomerResourcesFactory} from '@sim/engine-mars';
+import {marsFactory,marsCommonsTransitionFactory,marsCrewRemovalTransitionFactory,GREEN_FIELD_WORLD,EDEN_SAFE_COMMONS_WORLD,commonsLifeReaderFactory,retainedCommonsShoreFactory,commonsNewcomerResourcesFactory,nativeSleepSnapshotFactoryV1} from '@sim/engine-mars';
 import type {EngineFactory} from '@sim/engine-contract';
 import type {Db} from './db.ts';
 import type {WorldHost} from './world.ts';
@@ -10,11 +10,13 @@ import type {Brain} from './brain.ts';
 import type {IntentControlV2} from './intent-control.ts';
 
 export function edenCoreRequested(cfg:Config,env:NodeJS.ProcessEnv){return cfg.worldKey==='eden'&&cfg.engine==='mars'&&env.ENABLE_EDEN_CORE==='1';}
-export async function edenHistoryFactory(db:Db,worldId:string,options?:{lifeV1?:boolean;newcomerResourcesV1?:boolean}):Promise<EngineFactory>{
+export async function edenHistoryFactory(db:Db,worldId:string,options?:{lifeV1?:boolean;newcomerResourcesV1?:boolean;sleepSnapshotV1?:boolean}):Promise<EngineFactory>{
   const header=db.world(worldId);
+  if(options?.sleepSnapshotV1&&!options.lifeV1)throw Error('eden-bootstrap.sleep-snapshot-reader-requires-life');
+  if(header?.rules_version.endsWith('+ss/1')&&!options?.sleepSnapshotV1)throw Error('eden-bootstrap.explicit-sleep-snapshot-reader-required');
   if(options?.newcomerResourcesV1&&!options.lifeV1)throw Error('eden-bootstrap.newcomer-reader-requires-life');
   if(header?.rules_version.includes('+cp/2')&&!options?.newcomerResourcesV1)throw Error('eden-bootstrap.explicit-newcomer-reader-required');
-  if(options?.lifeV1){const origin=header?.rules_version.includes('retained-shore/1')?await retainedCommonsShoreFactory({foodDeliveryV1:header.rules_version.includes('+fd/1'),socialEdenV1:header.rules_version.includes('+social-eden/1'),greenLandmarkV1:header.rules_version.includes('+g/1')}):commonsLifeReaderFactory(await edenOriginHistoryFactory(db,worldId));return options.newcomerResourcesV1?commonsNewcomerResourcesFactory(origin):origin;}
+  if(options?.lifeV1){const origin=header?.rules_version.includes('retained-shore/1')?await retainedCommonsShoreFactory({foodDeliveryV1:header.rules_version.includes('+fd/1'),socialEdenV1:header.rules_version.includes('+social-eden/1'),greenLandmarkV1:header.rules_version.includes('+g/1')}):commonsLifeReaderFactory(await edenOriginHistoryFactory(db,worldId));const resources=options.newcomerResourcesV1?commonsNewcomerResourcesFactory(origin):origin;return options.sleepSnapshotV1?nativeSleepSnapshotFactoryV1(resources):resources;}
   return edenOriginHistoryFactory(db,worldId);
 }
 async function edenOriginHistoryFactory(db:Db,worldId:string):Promise<EngineFactory>{

@@ -1,3 +1,4 @@
+import type {NativeSleepSnapshotPolicyV1} from './sleep-snapshot.ts';
 import type {CommonsNewcomerResourcesV1,NewcomerResourcePlacementV1} from './newcomer-resources.ts';
 // The engine adapter: what the wrapper (server, brain, clients) needs from ANY
 // engine. Two implement it: the toy engine and the Mars adapter (packages/engine-mars).
@@ -122,6 +123,8 @@ export interface Engine {
   adoptRetainedCommonsShoreV1?(transition:import('./retained-shore.ts').RetainedCommonsShoreV1):void;
   previewCommonsKitchenV1?():{ok:true;transition:{contract:'commons-kitchen/1'|'commons-kitchen/2';tick:number;fromRulesVersion:string;toRulesVersion:string;fromStateHash:string;additionsHash:string;base:WorldState['base']}}|{ok:false;diagnostic:{code:string}};
   adoptCommonsKitchenV1?(transition:unknown):void;
+  previewNativeSleepSnapshotV1?():{ok:true;transition:NativeSleepSnapshotPolicyV1}|{ok:false;diagnostic:{code:string}};
+  adoptNativeSleepSnapshotV1?(transition:NativeSleepSnapshotPolicyV1):void;
   previewCommonsNewcomerResourcesV1?(placements:readonly NewcomerResourcePlacementV1[]):{ok:true;transition:CommonsNewcomerResourcesV1}|{ok:false;diagnostic:{code:string}};
   adoptCommonsNewcomerResourcesV1?(transition:CommonsNewcomerResourcesV1):void;
   commonsNewcomerResourcesV1?():{id:string;slot:number;mat:string;bowl:string;spoon:string;bowlHome:[number,number,number];spoonHome:[number,number,number];sleepReturn:[number,number]}[];

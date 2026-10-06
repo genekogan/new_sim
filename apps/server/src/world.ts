@@ -463,7 +463,7 @@ export class WorldHost {
         if(stationEra)this.apply(stationEra,false);
         if(arrival)this.apply(arrival,false);
       } catch (error) {
-        if(arrival||stationEra||e.payload?.crewRemovalTransition||e.payload?.commonsNewcomerResources||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore||e.payload?.commonsFoodDelivery||e.payload?.socialEden||e.payload?.existingGreenLandmark){
+        if(arrival||stationEra||e.payload?.crewRemovalTransition||e.payload?.nativeSleepSnapshotPolicy||e.payload?.commonsNewcomerResources||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore||e.payload?.commonsFoodDelivery||e.payload?.socialEden||e.payload?.existingGreenLandmark){
           // A committed structural pair cannot be attributed to an unrelated
           // card or filtered out by card-fault recovery. Restore exact history.
           try{
@@ -473,7 +473,7 @@ export class WorldHost {
         }else {this.recoverFault(error, e.kind === 'decision' ? e.payload.card : undefined); recovered = true;}
       }
       const accepted=[e,...(admission?[admission]:[]),...(stationEra?[stationEra]:[]),...(arrival?[arrival]:[])];
-      if (!recovered||arrival||stationEra||e.payload?.crewRemovalTransition||e.payload?.commonsNewcomerResources||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore||e.payload?.commonsFoodDelivery||e.payload?.socialEden||e.payload?.existingGreenLandmark) this.acc.log.push(...accepted);
+      if (!recovered||arrival||stationEra||e.payload?.crewRemovalTransition||e.payload?.nativeSleepSnapshotPolicy||e.payload?.commonsNewcomerResources||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore||e.payload?.commonsFoodDelivery||e.payload?.socialEden||e.payload?.existingGreenLandmark) this.acc.log.push(...accepted);
       // No listener can observe a physical event before its committed era fold.
       for (const fact of accepted) for (const l of this.listeners) l.onApplied?.(fact);
       if (admission && recovered) { p.reject?.(new PersistedIntentAdmissionFault(e.seq)); continue; }
@@ -688,6 +688,7 @@ export class WorldHost {
     if(e.kind==='rules'&&e.payload?.crewRemovalTransition&&this.stationHistoryV1())throw Error('crew-removal-transition.station-carry-required');
     if(e.kind==='rules'&&e.payload?.existingGreenLandmark&&this.stationHistoryV1())throw Error('green-landmark.station-carry-required');
     if(e.kind==='rules'&&e.payload?.socialEden&&this.stationHistoryV1())throw Error('social-eden.station-carry-required');
+    if(e.kind==='rules'&&e.payload?.nativeSleepSnapshotPolicy&&this.stationHistoryV1())throw Error('sleep-snapshot.station-carry-required');
     if(e.kind==='rules'&&e.payload?.commonsNewcomerResources&&this.stationHistoryV1())throw Error('newcomer-resources.station-carry-required');
     if(e.kind==='rules'&&e.payload?.commonsFoodDelivery&&this.stationHistoryV1())throw Error('food-delivery.station-carry-required');
     if(e.kind==='rules'&&e.payload?.retainedCommonsShore&&this.stationHistoryV1())throw Error('retained-shore.station-carry-required');
@@ -926,6 +927,7 @@ export class WorldHost {
     const journal:AcceptanceJournal=()=>{const r=this.db.db.prepare('UPDATE worlds SET rules_version=? WHERE id=? AND rules_version=?').run(t.toRulesVersion,this.worldId,t.fromRulesVersion);if(r.changes!==1)throw Error('social-eden.header-moved');return true;};
     return new Promise<LogEvent>((resolve,reject)=>this.queue.push({kind:'rules',author:'operator:social-eden',payload:{socialEden:t},guard,journal,resolve,reject}));
   }
+  installNativeSleepSnapshotV1(){if(this.stationHistoryV1())return Promise.reject(Error('sleep-snapshot.station-carry-required'));const p=this.engine.previewNativeSleepSnapshotV1?.();if(!p?.ok)return Promise.reject(Error(p?p.diagnostic.code:'sleep-snapshot.reader-required'));const t=p.transition;const guard:AcceptanceGuard=()=>{if(this.stationHistoryV1())throw Error('sleep-snapshot.station-carry-required');const q=this.engine.previewNativeSleepSnapshotV1?.();if(!q?.ok||hashOf(q.transition)!==hashOf(t))throw Error('sleep-snapshot.source-moved');if(this.factory.canReplayHistory?.(t.toRulesVersion)!==true||this.factory.canRestoreSnapshot?.(t.toRulesVersion)!==true)throw Error('sleep-snapshot.reader-required');return true;};const journal:AcceptanceJournal=()=>{const r=this.db.db.prepare('UPDATE worlds SET rules_version=? WHERE id=? AND rules_version=?').run(t.toRulesVersion,this.worldId,t.fromRulesVersion);if(r.changes!==1)throw Error('sleep-snapshot.header-moved');return true;};return new Promise<LogEvent>((resolve,reject)=>this.queue.push({kind:'rules',author:'operator:native-sleep-snapshot',payload:{nativeSleepSnapshotPolicy:t},guard,journal,resolve,reject}));}
   installCommonsNewcomerResourcesV1(placements:readonly NewcomerResourcePlacementV1[]){
     if(this.stationHistoryV1())return Promise.reject(Error('newcomer-resources.station-carry-required'));
     const p=this.engine.previewCommonsNewcomerResourcesV1?.(placements);if(!p?.ok)return Promise.reject(Error(p?p.diagnostic.code:'newcomer-resources.reader-required'));const t=p.transition;

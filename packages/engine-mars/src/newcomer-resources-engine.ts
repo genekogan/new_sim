@@ -6,6 +6,7 @@ export function commonsNewcomerResourcesFactory(origin:EngineFactory):EngineFact
  const bare=(v:string)=>v.replace('+cp/2','+commons-provisions/1'),install=(e:Engine,records:CommonsNewcomerResourcesV1[]=[] )=>{if(!(e instanceof MarsEngine))throw Error('newcomer-resources.native-required');e.enableCommonsNewcomerReaderV1(records);return e;};
  return {rulesVersion:origin.rulesVersion,genesis:origin.genesis,create:w=>install(origin.create(w)),canReplayHistory:v=>origin.canReplayHistory?.(bare(v))===true,canRestoreSnapshot:v=>origin.canRestoreSnapshot?.(bare(v))===true,
   restore(raw:EngineSnapshot){
+   if('nativeSleepSnapshotV1' in raw)throw Error('sleep-snapshot.outer-reader-required');
    const s=structuredClone(raw) as EngineSnapshot&{commonsNewcomerResourcesV1?:CommonsNewcomerResourcesV1[];newcomerBaseStateHash?:string};const facts=(s.commonsNewcomerResourcesV1??[]).map(f=>commonsNewcomerResourcesV1Schema.parse(f));
    if(facts.length&&!/^[a-f0-9]{64}$/.test(s.newcomerBaseStateHash??''))throw Error('newcomer-resources.snapshot-base-hash');if(!facts.length&&(s.newcomerBaseStateHash!==undefined||s.commonsNewcomerResourcesV1!==undefined))throw Error('newcomer-resources.snapshot-policy');
    if(facts.length)s.stateHash=s.newcomerBaseStateHash!;delete s.commonsNewcomerResourcesV1;delete s.newcomerBaseStateHash;

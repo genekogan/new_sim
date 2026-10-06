@@ -1,3 +1,5 @@
+import {nativeSleepSnapshotPolicyV1Schema,type NativeSleepSnapshotPolicyV1} from '@sim/engine-contract';
+import {NATIVE_SLEEP_SNAPSHOT_V1} from '../../../mars/viewer/engine/activities/sleep.ts';
 import {commonsNewcomerResourcesV1} from './newcomer-resources.ts';
 import {newcomerResourcesPublicV1Schema,commonsNewcomerResourcesV1Schema,type CommonsNewcomerResourcesV1,type NewcomerResourcePlacementV1} from '@sim/engine-contract';
 import {existingGreenLandmarkV1} from './green-landmark.ts';
@@ -112,7 +114,7 @@ export class MarsEngine implements Engine {
   get nativeArrivalWitnessEnabledV1(){return this.cfg.nativeArrivalWitnessV1===true;}
   readonly dt = 1 / TPS;
   readonly schema: string;
-  private composedRules(base:string,change?:{provisions?:boolean;kitchen?:CommonsKitchenVersion|null;food?:boolean;social?:boolean;green?:boolean}){const provisions=change?.provisions??this.commonsProvisionsActive,kitchen=change&&'kitchen' in change?change.kitchen:(this.commonsKitchenActive?this.commonsKitchenVersion:null),food=change?.food??!!this.foodDeliveries.length,social=change?.social??this.socialEdenActive,green=change?.green??this.greenLandmarkActive;return base+(provisions?(this.newcomerResources.length?'+cp/2':'+commons-provisions/1'):'')+(kitchen?'+'+kitchen:'')+(food?'+fd/1':'')+(social?'+social-eden/1':'')+(green?'+g/1':'');}
+  private composedRules(base:string,change?:{provisions?:boolean;kitchen?:CommonsKitchenVersion|null;food?:boolean;social?:boolean;green?:boolean}){const provisions=change?.provisions??this.commonsProvisionsActive,kitchen=change&&'kitchen' in change?change.kitchen:(this.commonsKitchenActive?this.commonsKitchenVersion:null),food=change?.food??!!this.foodDeliveries.length,social=change?.social??this.socialEdenActive,green=change?.green??this.greenLandmarkActive;return base+(provisions?(this.newcomerResources.length?'+cp/2':'+commons-provisions/1'):'')+(kitchen?'+'+kitchen:'')+(food?'+fd/1':'')+(social?'+social-eden/1':'')+(green?'+g/1':'')+(this.sleepSnapshotActive?'+ss/1':'');}
   get rulesVersion(){return this.composedRules(nativeRulesVersion(this.physical?.rulesVersion??this.m.rulesVersion,this.cfg));}
   readonly runtime: RuntimeView;
   private m: Mars; private rt: any; private cfg: MarsWorldConfig;
@@ -146,6 +148,8 @@ export class MarsEngine implements Engine {
   private commonsKitchenVersion:CommonsKitchenVersion='commons-kitchen/1';
   private commonsKitchenReader=false;
   private commonsKitchenActive=false;
+  private sleepSnapshotReader=false;
+  private sleepSnapshotActive=false;
   private newcomerReader=false;
   private newcomerResources:CommonsNewcomerResourcesV1[]=[];
   private commonsProvisionsReader=false;
@@ -173,7 +177,7 @@ export class MarsEngine implements Engine {
     return [...BODY_VERBS, ...this.m.describeVerbs(this.registry).map((v) => ({ ...v, verb: `mars:${v.verb}`, description: `[Mars verb] ${v.description}`, scope: 'world' as const }))];
   }
   /** The world plus the adapter's own state (which program each actor is in), since both decide what happens next. */
-  stateHash(): string { return hashOf({ ...(this.newcomerResources.length?{newcomerResources:this.newcomerResources}:{}), w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet, ...(this.cfg.safeCrewRemoval?{removalPolicy:'crew-removal/1'}:{}), ...(this.cfg.fixtureGroundGoalsV1?{fixtureGoalPolicy:'ground-fixture-levels/1'}:{}), ...(this.cfg.nativeArrivalWitnessV1?{arrivalWitnessPolicy:'native-navigation-arrival/1'}:{}), ...(this.cfg.quietLandingCourtesyV1?{quietLandingPolicy:'idle-landing-courtesy/1'}:{}), ...(this.commonsProvisionsActive?{provisionsPolicy:'commons-provisions/1'}:{}), ...(this.commonsKitchenActive?{kitchenPolicy:this.commonsKitchenVersion}:{}), ...(this.greenLandmarkActive?{greenLandmarkPolicy:'existing-green-landmark/1'}:{}), ...(this.socialEdenActive?{socialPolicy:'social-eden/1'}:{}), ...(this.foodDeliveries.length?{foodDeliveryPolicy:'commons-food-delivery/1',foodDeliveries:this.foodDeliveries}:{}), ...(this.cfg.safeArrivalV1?{arrivalPolicy:'arrival-clearance/1'}:{}), ...(this.cfg.walkBlockV1?{walkPolicy:'walk-block/1'}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion,physicalPolicy:this.cfg}:{}) }); }
+  stateHash(): string { return hashOf({ ...(this.sleepSnapshotActive?{sleepSnapshotPolicy:NATIVE_SLEEP_SNAPSHOT_V1}:{}), ...(this.newcomerResources.length?{newcomerResources:this.newcomerResources}:{}), w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet, ...(this.cfg.safeCrewRemoval?{removalPolicy:'crew-removal/1'}:{}), ...(this.cfg.fixtureGroundGoalsV1?{fixtureGoalPolicy:'ground-fixture-levels/1'}:{}), ...(this.cfg.nativeArrivalWitnessV1?{arrivalWitnessPolicy:'native-navigation-arrival/1'}:{}), ...(this.cfg.quietLandingCourtesyV1?{quietLandingPolicy:'idle-landing-courtesy/1'}:{}), ...(this.commonsProvisionsActive?{provisionsPolicy:'commons-provisions/1'}:{}), ...(this.commonsKitchenActive?{kitchenPolicy:this.commonsKitchenVersion}:{}), ...(this.greenLandmarkActive?{greenLandmarkPolicy:'existing-green-landmark/1'}:{}), ...(this.socialEdenActive?{socialPolicy:'social-eden/1'}:{}), ...(this.foodDeliveries.length?{foodDeliveryPolicy:'commons-food-delivery/1',foodDeliveries:this.foodDeliveries}:{}), ...(this.cfg.safeArrivalV1?{arrivalPolicy:'arrival-clearance/1'}:{}), ...(this.cfg.walkBlockV1?{walkPolicy:'walk-block/1'}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion,physicalPolicy:this.cfg}:{}) }); }
   physicalHash(): string { return hashOf(physicalView(this.world)); }
 
   // ------------------------------------------------------------------ tick
@@ -807,6 +811,10 @@ export class MarsEngine implements Engine {
     const p=this.previewCommonsKitchenV1(version);if(!p.ok)throw Error(p.diagnostic.code);if(hashOf(raw)!==hashOf(p.transition))throw Error('commons-kitchen.stale-or-forged');
     this.finishRecorder();Object.assign(this.ents,structuredClone(commonsKitchen(version).entities));this.commonsKitchenVersion=version;this.commonsKitchenActive=true;this.renderBaseKey='';this.startRecorder();
   }
+  enableNativeSleepSnapshotReaderV1(active=false){this.sleepSnapshotReader=true;this.sleepSnapshotActive=active;if(active)this.rt.services.nativeSleepSnapshotV1=NATIVE_SLEEP_SNAPSHOT_V1;}
+  previewNativeSleepSnapshotV1(){const no=(code:string)=>({ok:false as const,diagnostic:{code:'sleep-snapshot.'+code}});if(!this.sleepSnapshotReader)return no('reader-required');if(this.sleepSnapshotActive)return no('already-installed');if(!this.canSnapshot())return no('resumable-boundary-required');if(this.rulesVersion.length+5>200)return no('header-capacity');return {ok:true as const,transition:nativeSleepSnapshotPolicyV1Schema.parse({contract:NATIVE_SLEEP_SNAPSHOT_V1,tick:this.world.tick,fromRulesVersion:this.rulesVersion,toRulesVersion:this.rulesVersion+'+ss/1',fromStateHash:this.stateHash()})};}
+  adoptNativeSleepSnapshotV1(raw:NativeSleepSnapshotPolicyV1){const fact=nativeSleepSnapshotPolicyV1Schema.parse(raw),p=this.previewNativeSleepSnapshotV1();if(!p.ok)throw Error(p.diagnostic.code);if(hashOf(fact)!==hashOf(p.transition))throw Error('sleep-snapshot.stale-or-forged');this.finishRecorder();this.enableNativeSleepSnapshotReaderV1(true);this.renderBaseKey='';this.startRecorder();}
+  private sleepSnapshotBaseStateHash(){const saved=this.sleepSnapshotActive;try{this.sleepSnapshotActive=false;return this.stateHash();}finally{this.sleepSnapshotActive=saved;}}
   enableCommonsNewcomerReaderV1(recorded:CommonsNewcomerResourcesV1[]=[]){this.newcomerReader=true;let next=9;const facts=recorded.map(f=>commonsNewcomerResourcesV1Schema.parse(f));for(const f of facts){if(f.firstSlot!==next)throw Error('newcomer-resources.snapshot-sequence');next+=f.placements.length;}this.newcomerResources=structuredClone(facts);}
   commonsNewcomerResourcesV1(){return this.newcomerResources.flatMap(f=>commonsNewcomerResourcesV1(f.firstSlot,f.placements).resources);}
   previewCommonsNewcomerResourcesV1(placements:readonly NewcomerResourcePlacementV1[]){
@@ -824,7 +832,7 @@ export class MarsEngine implements Engine {
     return {ok:true as const,transition:commonsNewcomerResourcesV1Schema.parse({contract:'commons-newcomer-resources/1',firstSlot,placements,tick:this.world.tick,fromRulesVersion:this.rulesVersion,toRulesVersion,fromStateHash:this.stateHash(),additionsHash:add.hash,base:this.world.base})};
   }
   adoptCommonsNewcomerResourcesV1(raw:CommonsNewcomerResourcesV1){const fact=commonsNewcomerResourcesV1Schema.parse(raw),p=this.previewCommonsNewcomerResourcesV1(fact.placements);if(!p.ok)throw Error(p.diagnostic.code);if(hashOf(fact)!==hashOf(p.transition))throw Error('newcomer-resources.stale-or-forged');const add=commonsNewcomerResourcesV1(fact.firstSlot,fact.placements);this.finishRecorder();Object.assign(this.ents,structuredClone(add.entities));Object.assign(this.world.regions,structuredClone(add.regions));this.newcomerResources.push(fact);this.renderBaseKey='';this.startRecorder();}
-  private newcomerBaseStateHash(){const saved=this.newcomerResources;try{this.newcomerResources=[];return this.stateHash();}finally{this.newcomerResources=saved;}}
+  private newcomerBaseStateHash(){const saved=this.newcomerResources,sleep=this.sleepSnapshotActive;try{this.newcomerResources=[];this.sleepSnapshotActive=false;return this.stateHash();}finally{this.newcomerResources=saved;this.sleepSnapshotActive=sleep;}}
   enableCommonsProvisionsReaderV1(active=false){this.commonsProvisionsReader=true;if(active){this.finishRecorder();this.commonsProvisionsActive=true;this.renderBaseKey='';this.startRecorder();}}
   previewCommonsProvisionsV1(){
     if(!this.commonsProvisionsReader||this.cfg.scene!=='eden-commons')return {ok:false as const,diagnostic:{code:'commons-provisions.reader-unavailable'}};
@@ -981,6 +989,7 @@ export class MarsEngine implements Engine {
     this.finishRecorder();
     this.rt = this.m.compactRuntime(this.rt, this.physical?.services??this.m.servicesFor(this.m.scenes));
     this.registry = this.rt.registry; this.cursor = 0; this.quiet = false;
+    if(this.sleepSnapshotActive)this.rt.services.nativeSleepSnapshotV1=NATIVE_SLEEP_SNAPSHOT_V1;
     this.startRecorder();
   }
 
@@ -988,7 +997,7 @@ export class MarsEngine implements Engine {
   /** Mars's own resumable snapshot, plus which program each actor is in. Body-language steps lower only to verbs Mars can resume exactly. */
   snapshot(): EngineSnapshot {
     const mars = this.rt.snapshot();
-    return structuredClone({ ...(this.newcomerResources.length?{commonsNewcomerResourcesV1:structuredClone(this.newcomerResources),newcomerBaseStateHash:this.newcomerBaseStateHash()}:{}), format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, ...(this.cfg.scene==='eden-commons'?{commonsVersion:'commons/1'}:{}), quiet: this.quiet, ...(this.commonsProvisionsActive?{commonsProvisionsV1:true}:{}), ...(this.commonsKitchenActive?{commonsKitchenV1:true}:{}), ...(this.socialEdenActive?{socialEdenV1:true}:{}), ...(this.greenLandmarkActive?{greenLandmarkV1:true}:{}), ...(this.foodDeliveries.length?{foodDeliveriesV1:structuredClone(this.foodDeliveries)}:{}), ...(this.commonsKitchenActive&&this.commonsKitchenVersion==='commons-kitchen/2'?{commonsKitchenVersion:this.commonsKitchenVersion}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion}:{}) });
+    return structuredClone({ ...(this.sleepSnapshotActive?{nativeSleepSnapshotV1:true,sleepSnapshotBaseStateHash:this.sleepSnapshotBaseStateHash()}:{}), ...(this.newcomerResources.length?{commonsNewcomerResourcesV1:structuredClone(this.newcomerResources),newcomerBaseStateHash:this.newcomerBaseStateHash()}:{}), format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, ...(this.cfg.scene==='eden-commons'?{commonsVersion:'commons/1'}:{}), quiet: this.quiet, ...(this.commonsProvisionsActive?{commonsProvisionsV1:true}:{}), ...(this.commonsKitchenActive?{commonsKitchenV1:true}:{}), ...(this.socialEdenActive?{socialEdenV1:true}:{}), ...(this.greenLandmarkActive?{greenLandmarkV1:true}:{}), ...(this.foodDeliveries.length?{foodDeliveriesV1:structuredClone(this.foodDeliveries)}:{}), ...(this.commonsKitchenActive&&this.commonsKitchenVersion==='commons-kitchen/2'?{commonsKitchenVersion:this.commonsKitchenVersion}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion}:{}) });
   }
   canSnapshot(): boolean {
     // A legacy formation callback is not data and must wait for a quiet point.
@@ -1049,6 +1058,7 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
       return new MarsEngine(m, new m.Runtime(world, registry, services(world), m.invariants), cfg);
     },
     restore(snap: EngineSnapshot) {
+      if('nativeSleepSnapshotV1' in snap)throw Error('sleep-snapshot.reader-required');
       if('commonsNewcomerResourcesV1' in snap)throw Error('newcomer-resources.reader-required');
       if('commonsKitchenV1' in snap)throw Error('commons-kitchen.reader-required');
       if('commonsProvisionsV1' in snap)throw Error('commons-provisions.reader-required');
