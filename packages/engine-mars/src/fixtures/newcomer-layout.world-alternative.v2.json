@@ -1,0 +1,227 @@
+{
+  "scope": "World W284 source-reviewed alternative; native/renderer/live approval are separate, no default adoption",
+  "sourceProposal": "W284 2026-10-06T05:29:01.828729Z over Environment fd1d6ac6",
+  "capacity": 30,
+  "placements": [
+    {
+      "matCenter": [
+        -22,
+        28
+      ],
+      "mealPoint": [
+        -22,
+        11.5
+      ]
+    },
+    {
+      "matCenter": [
+        -16,
+        28
+      ],
+      "mealPoint": [
+        -16,
+        11.5
+      ]
+    },
+    {
+      "matCenter": [
+        -10,
+        28
+      ],
+      "mealPoint": [
+        -10,
+        11.5
+      ]
+    },
+    {
+      "matCenter": [
+        -4,
+        28
+      ],
+      "mealPoint": [
+        -4,
+        11.5
+      ]
+    },
+    {
+      "matCenter": [
+        26,
+        -25
+      ],
+      "mealPoint": [
+        26,
+        -27.4
+      ]
+    },
+    {
+      "matCenter": [
+        19,
+        -25
+      ],
+      "mealPoint": [
+        19,
+        -27.4
+      ]
+    },
+    {
+      "matCenter": [
+        12,
+        -25
+      ],
+      "mealPoint": [
+        12,
+        -27.4
+      ]
+    },
+    {
+      "matCenter": [
+        5,
+        -25
+      ],
+      "mealPoint": [
+        5,
+        -27.4
+      ]
+    },
+    {
+      "matCenter": [
+        26,
+        -20
+      ],
+      "mealPoint": [
+        26,
+        -22.4
+      ]
+    },
+    {
+      "matCenter": [
+        19,
+        -20
+      ],
+      "mealPoint": [
+        19,
+        -22.4
+      ]
+    },
+    {
+      "matCenter": [
+        12,
+        -20
+      ],
+      "mealPoint": [
+        12,
+        -22.4
+      ]
+    },
+    {
+      "matCenter": [
+        5,
+        -20
+      ],
+      "mealPoint": [
+        5,
+        -22.4
+      ]
+    },
+    {
+      "matCenter": [
+        26,
+        -15
+      ],
+      "mealPoint": [
+        26,
+        -17.4
+      ]
+    },
+    {
+      "matCenter": [
+        19,
+        -15
+      ],
+      "mealPoint": [
+        19,
+        -17.4
+      ]
+    },
+    {
+      "matCenter": [
+        12,
+        -15
+      ],
+      "mealPoint": [
+        12,
+        -17.4
+      ]
+    },
+    {
+      "matCenter": [
+        5,
+        -15
+      ],
+      "mealPoint": [
+        5,
+        -17.4
+      ]
+    },
+    {
+      "matCenter": [
+        -28,
+        -24
+      ],
+      "mealPoint": [
+        -28,
+        -26.4
+      ]
+    },
+    {
+      "matCenter": [
+        -28,
+        -19
+      ],
+      "mealPoint": [
+        -28,
+        -21.4
+      ]
+    },
+    {
+      "matCenter": [
+        -28,
+        18
+      ],
+      "mealPoint": [
+        -28,
+        15.6
+      ]
+    },
+    {
+      "matCenter": [
+        -28,
+        23
+      ],
+      "mealPoint": [
+        -28,
+        20.6
+      ]
+    },
+    {
+      "matCenter": [
+        -28,
+        28
+      ],
+      "mealPoint": [
+        -28,
+        25.6
+      ]
+    },
+    {
+      "matCenter": [
+        26,
+        0
+      ],
+      "mealPoint": [
+        26,
+        -2.4
+      ]
+    }
+  ]
+}
