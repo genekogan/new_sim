@@ -22,6 +22,6 @@ export function commonsLifeReaderFactory(origin:EngineFactory):EngineFactory {
    if(kitchen&&!Object.keys(commonsKitchen(version).entities).every(id=>e.world.entities[id]))throw Error('commons-life.snapshot-kitchen');
    if(deliveries.some(d=>!Object.keys(commonsFoodDeliveryItemsV1(d.batch).entities).every(id=>e.world.entities[id])))throw Error('commons-life.snapshot-delivery');
    if(!allowed(e.rulesVersion)||e.stateHash()!==raw.stateHash)throw Error('commons-life.snapshot-state');return e;
-  },validateHistoryHead(e,recorded){if(e.rulesVersion!==recorded||!allowed(recorded))throw Error('commons-life.history-head');},
+  },validateHistoryHead(e,recorded){if(e instanceof MarsEngine&&e.nativeArrivalWitnessEnabledV1)throw Error('commons-life.additional-reader-required');if(e.rulesVersion!==recorded||!allowed(recorded))throw Error('commons-life.history-head');},
  };
 }

@@ -103,6 +103,7 @@ const bucket = (m: number): 'here' | 'close' | 'near' | 'far' => (m < 2.5 ? 'her
 /** Fresh physical bases use an explicit native binding; legacy factories omit it. */
 export type MarsPhysicalBinding = {rulesVersion:string;renderScene:()=>RenderScene;restore:(snapshot:any)=>any;services:(world:any)=>any;prepareRemoval?:(runtime:any,id:string)=>boolean;boatControls?:(runtime:any,actor:string)=>NativeBoatControlsV1|null;bodyLocation?:(runtime:any,actor:string)=>BodyLocationV1|null};
 export class MarsEngine implements Engine {
+  get nativeArrivalWitnessEnabledV1(){return this.cfg.nativeArrivalWitnessV1===true;}
   readonly dt = 1 / TPS;
   readonly schema: string;
   get rulesVersion() { return nativeRulesVersion(this.physical?.rulesVersion??this.m.rulesVersion,this.cfg)+(this.commonsProvisionsActive?'+commons-provisions/1':'')+(this.commonsKitchenActive?'+'+this.commonsKitchenVersion:'')+(this.foodDeliveries.length?'+fd/1':'')+(this.socialEdenActive?'+social-eden/1':''); }

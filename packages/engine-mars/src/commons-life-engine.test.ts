@@ -12,5 +12,5 @@ for(const legacy of [true,false])test('life reader keeps '+(legacy?'actual legac
  const p=e.previewCommonsFoodDeliveryV1!('portable-finite-A');assert.ok(p.ok);if(!p.ok)return;e.adoptCommonsFoodDeliveryV1!(p.transition);for(const [id,v] of Object.entries(old))assert.deepEqual(e.world.entities[id],v);
  assert.ok(f.canReplayHistory!(e.rulesVersion));assert.equal(origin.canReplayHistory!(e.rulesVersion),false);const copy=f.restore(e.snapshot());assert.equal(copy.stateHash(),e.stateHash());for(let i=0;i<25;i++){e.step();copy.step();assert.equal(copy.stateHash(),e.stateHash());}
  const privatePolicy=e.snapshot() as any;privatePolicy.cfg.nativeArrivalWitnessV1=true;assert.throws(()=>f.restore(privatePolicy),/additional-reader-required/);
- const bad=e.snapshot() as any;bad.commonsProvisionsV1=false;assert.throws(()=>f.restore(bad),/snapshot-policy/);bad.commonsProvisionsV1=true;bad.stateHash='0'.repeat(64);assert.throws(()=>f.restore(bad),/snapshot-state/);
+ const bad=e.snapshot() as any;bad.commonsProvisionsV1=false;assert.throws(()=>f.restore(bad),/snapshot-policy/);bad.commonsProvisionsV1=true;bad.stateHash='0'.repeat(64);assert.throws(()=>f.restore(bad),/snapshot-state/);e.configureRuntimePolicy?.({sleepBlockTicks:1200,nativeArrivalWitnessV1:true});assert.throws(()=>f.validateHistoryHead!(e,e.rulesVersion),/additional-reader-required/);
 });
