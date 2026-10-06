@@ -116,7 +116,7 @@ test('G414 own-request diagnostics: strict scoped DTO with canonical attempts; f
  await run(f,8000,()=>f.attempts(receipt.revision.intentId).some(a=>a.phase==='completed'));
  const app=buildApp({cfg:{...f.brain.cfg,build:'p0-test-build'},db:f.db,host:f.host,auth:f.auth,brain:f.brain,souls:f.souls,intentV2:f.service,hub:{clients:new Map(),refreshMe(){}} as unknown as Hub}),path=(id:string)=>`/v1/souls/${f.row.id}/intent-v2/requests/${id}/diagnostics`,get=(id:string,auth?:string)=>app.request(path(id),auth?{headers:{authorization:auth}}:{});
  const res=await get('diag-swim','Bearer dev:alice');assert.equal(res.status,200);assert.equal(res.headers.get('cache-control'),'no-store');const dto=ownRequestDiagnosticsV1Schema.parse(await res.json());
- assert.equal(dto.stage,'understood');assert.equal(dto.soulId,f.row.id);assert.equal(dto.entityId,f.row.entity_id);assert.equal(dto.source.ownerId,'dev:alice');
+ assert.equal(dto.stage,'understood');assert.equal(dto.words,'go for a swim in the pond');assert.equal(dto.soulId,f.row.id);assert.equal(dto.entityId,f.row.entity_id);assert.equal(dto.source.ownerId,'dev:alice');
  assert.equal(dto.resolution?.goal,'activity');assert.equal(dto.resolution?.bindingId,'activity:swim:shore-water');assert.equal(dto.resolution?.destination,'Swim in the supported pond');
  assert.deepEqual(['accepted','started','completed'].map(p=>dto.attempts?.some(a=>a.phase===p)),[true,true,true],JSON.stringify(dto.attempts));
  assert.ok(dto.server.createdAt>0&&dto.server.updatedAt>=dto.server.createdAt);assert.equal(dto.server.build,'p0-test-build');

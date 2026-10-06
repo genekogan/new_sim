@@ -152,7 +152,7 @@ export class IntentControlV2 {
     const allowed=this.souls.limits.allow(`intent-diagnostics:${scope.worldId}:${scope.soulId}:${scope.source.principalId}`,120,60_000);if(!allowed.ok)throw new ApiError(429,'rate-limited','too many diagnostics reads');
     const view=this.store.lookupTimedV1(scope,requestId),receipt=view?.receipt??view?.received,m=this.host.minds.get(scope.soulId);
     if(!view||!receipt||!m||view.source.kind!=='owner')throw new ApiError(404,'not-found','no such request');
-    const dto=ownRequestDiagnosticsV1(this.host,m,{requestId,source:view.source as {kind:'owner';ownerId:string;principalId:string;channel:string},createdAt:view.createdAt,updatedAt:view.updatedAt,receipt,build,registeredActivitiesV1:this.registeredActivitiesV1});
+    const dto=ownRequestDiagnosticsV1(this.host,m,{requestId,words:view.request.op==='upsert'?view.request.words:undefined,source:view.source as {kind:'owner';ownerId:string;principalId:string;channel:string},createdAt:view.createdAt,updatedAt:view.updatedAt,receipt,build,registeredActivitiesV1:this.registeredActivitiesV1});
     this.guard(scope);if(this.host.minds.get(scope.soulId)!==m||dto.entityId!==m.entityId)throw new ApiError(404,'not-found','no such request');
     return dto;
   }

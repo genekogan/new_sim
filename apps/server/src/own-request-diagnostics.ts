@@ -11,7 +11,7 @@ export const ownRequestDiagnosticsV1Schema=z.strictObject({
  contract:z.literal('own-request-diagnostics/1'),requestId:ref,worldId:ref,soulId:ref,entityId:ref,
  source:z.strictObject({kind:z.literal('owner'),ownerId:ref,principalId:ref,channel:ref}),
  server:z.strictObject({createdAt:int,updatedAt:int,build:ref.optional()}),
- stage:z.enum(['received','understood','refused','withdrawn']),code:ref.optional(),explanation:text(500).optional(),
+ stage:z.enum(['received','understood','refused','withdrawn']),words:text(2000).optional(),code:ref.optional(),explanation:text(500).optional(),
  validation:z.strictObject({code:ref,detail:text(500)}).optional(),
  resolution:z.strictObject({goal:z.enum(['walk','sit','rest','eat','activity','hang_out']).optional(),bindingId:ref.optional(),destination:text(200).optional(),available:z.boolean().optional(),failedCondition:ref.optional(),conditionExplanation:text(500).optional()}).optional(),
  body:z.strictObject({tick:int,activity:ref.optional(),actionId:ref.optional(),controller:ref.optional(),programme:ref.optional(),sleep:ref.optional(),busy:z.boolean().optional(),busyReason:text(300).optional(),queue:z.strictObject({position:int,length:int}).optional()}).optional(),
@@ -23,9 +23,9 @@ const asRef=(v:unknown)=>typeof v==='string'&&ref.safeParse(v).success?v:undefin
 const clip=(v:string,n:number)=>v.length>n?v.slice(0,n-1)+'…':v;
 type Source={kind:'owner';ownerId:string;principalId:string;channel:string};
 /** Caller must have authorized `scope` and re-check it after this synchronous read. */
-export function ownRequestDiagnosticsV1(host:WorldHost,m:Mind,input:{requestId:string;source:Source;createdAt:number;updatedAt:number;receipt:IntentReceiptV2;build?:string;registeredActivitiesV1?:boolean}):OwnRequestDiagnosticsV1{
+export function ownRequestDiagnosticsV1(host:WorldHost,m:Mind,input:{requestId:string;words?:string;source:Source;createdAt:number;updatedAt:number;receipt:IntentReceiptV2;build?:string;registeredActivitiesV1?:boolean}):OwnRequestDiagnosticsV1{
  const r=input.receipt,unavailable:{field:string;reason:string}[]=[],gone=(field:string,reason:string)=>unavailable.push({field,reason:clip(reason,200)});
- const out:OwnRequestDiagnosticsV1={contract:'own-request-diagnostics/1',requestId:input.requestId,worldId:host.worldId,soulId:m.soulId,entityId:m.entityId,source:{kind:'owner',ownerId:input.source.ownerId,principalId:input.source.principalId,channel:input.source.channel},server:{createdAt:input.createdAt,updatedAt:input.updatedAt,...(asRef(input.build)?{build:input.build}:{})},stage:r.phase};
+ const out:OwnRequestDiagnosticsV1={contract:'own-request-diagnostics/1',requestId:input.requestId,worldId:host.worldId,soulId:m.soulId,entityId:m.entityId,source:{kind:'owner',ownerId:input.source.ownerId,principalId:input.source.principalId,channel:input.source.channel},server:{createdAt:input.createdAt,updatedAt:input.updatedAt,...(asRef(input.build)?{build:input.build}:{})},stage:r.phase,...(input.words?{words:clip(input.words,2000)}:{})};
  if(!out.server.build)gone('build','This server did not declare a build name.');
  let goal:{goal:string;bindingId?:string}|undefined;
  if(r.phase==='refused'){
