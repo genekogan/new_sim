@@ -6,7 +6,7 @@ import type {WorldState as NativeWorld} from '../../../mars/viewer/engine/world/
 import type {Card} from '@sim/kernel';
 import {engineRef} from './deck.ts';
 import type {WorldHost,Mind} from './world.ts';
-export type HumanBindingV1={id:string;goal:HumanGoalV1['goal'];targetId?:string;label:string;steps:Program['steps'];card:Card;available:boolean;blockedCode?:string;distance:number;green:boolean;seatedWitness?:ReturnType<typeof observeSeatedHumanGoalV1>};
+export type HumanBindingV1={id:string;goal:HumanGoalV1['goal'];targetId?:string;label:string;aliases:string[];steps:Program['steps'];card:Card;available:boolean;blockedCode?:string;distance:number;green:boolean;seatedWitness?:ReturnType<typeof observeSeatedHumanGoalV1>};
 export type HumanRegistryReadV1={view:HumanCapabilityRegistryV1;bindings:Map<string,HumanBindingV1>};
 const key=(goal:string,ref:string)=>goal+':'+ref;
 /** Read-only actor-specific physical bindings. Kernel anchors alone do not invent native actions. */
@@ -19,7 +19,8 @@ export function readHumanCapabilitiesV1(host:WorldHost,m:Mind):HumanRegistryRead
    const issue=host.engine.canPerform({actor:m.entityId,label:'registered '+goal,steps}),target=targetId?host.kernel.things[targetId]:undefined,point=targetId?engineRef(host,targetId):null;
    const pos=typeof point==='string'?w.entities[point]?.pose.p:point?[point[0],0,point[1]]:undefined;
    const name='human goal '+goal.replace('_',' ')+' '+hashOf({goal,id,steps}).slice(0,12),card:Card={name,summary:`Perform the registered ${goal.replace('_',' ')} goal using native admission.`,good_when:'This specific owner goal is requested and the registered physical binding remains available.',target:null,when:[],then:[...(target?[{move:['$actor',target.id] as [string,string]}]:[]),{set:['$actor','doing',goal==='sit'?'sitting':goal==='eat'?'eating':goal==='rest'?'resting':'following an owner goal']}],approach:steps.slice(0,approachLen),during:steps.slice(approachLen),takes:goal==='rest'?'minute':'minutes'};
-   bindings.set(id,{id,goal,targetId,label,steps,card,available:!issue,...(issue?{blockedCode:issue.code}:{}),...(seatedWitness?{seatedWitness}:{}),distance:pos?Math.hypot(pos[0]-body.pose.p[0],pos[2]-body.pose.p[2]):0,green});
+   const aliases=[label.toLowerCase(),...(targetId?[targetId.toLowerCase()]:[])];const entity=targetId?w.entities[targetId]:undefined;if(entity?.def==='campfire')aliases.push('campfire','fire');const side=label.toLowerCase().match(/\b(north|south|east|west)\b/)?.[1];if(entity?.def==='bench-6ft'&&side&&/fire/i.test(label))aliases.push(`${side} bench by the campfire`,`${side} campfire bench`,`campfire ${side} bench`,`fire bench ${side}`);
+   bindings.set(id,{id,goal,targetId,label,aliases:[...new Set(aliases)],steps,card,available:!issue,...(issue?{blockedCode:issue.code}:{}),...(seatedWitness?{seatedWitness}:{}),distance:pos?Math.hypot(pos[0]-body.pose.p[0],pos[2]-body.pose.p[2]):0,green});
   };
   for(const a of host.engine.anchors()){
    const t=host.kernel.things[a.id];if(!t||t.by!=='world'||t.kind!=='place'||!engineRef(host,a.id))continue;
@@ -32,7 +33,7 @@ export function readHumanCapabilitiesV1(host:WorldHost,m:Mind):HumanRegistryRead
    const births=host.db.db.prepare("SELECT payload FROM events WHERE world_id=? AND kind='birth' ORDER BY seq LIMIT 8").all(host.worldId) as {payload:string}[],i=births.findIndex(b=>JSON.parse(b.payload).soulId===m.soulId);
    if(i>=0){const meals=[{batch:0,...COMMONS_PERSONAL_RESOURCES[i]},...(host.engine.commonsFoodDeliveriesV1?.()??[]).map(d=>({batch:d.batch,...commonsFoodDeliveryItemsV1(d.batch).resources[i]}))];for(const r of meals)if(w.entities[r.bowl]&&w.entities[r.spoon])add('eat',key('eat',r.bowl),`My meal ${r.batch}`,undefined,[{verb:'mars:take_item',params:{item:r.bowl,hand:'left'}},{verb:'mars:take_item',params:{item:r.spoon,hand:'right'}},{verb:'mars:eat',params:{bowl:r.bowl,spoon:r.spoon}},{verb:'mars:put_item',params:{item:r.spoon,surfaceSlot:'ground'}},{verb:'mars:put_item',params:{item:r.bowl,surfaceSlot:'ground'}}],2);}
   }
-  const goals=([...new Set([...bindings.values()].map(b=>b.goal))]).map(id=>({id,description:`Registered ${id.replace('_',' ')} using actual native state.`,postcondition:HUMAN_GOAL_POSTCONDITIONS_V1[id],bindings:[...bindings.values()].filter(b=>b.goal===id).map(b=>({id:b.id,label:b.label,...(b.targetId?{targetId:b.targetId}:{}),available:b.available,...(b.blockedCode?{blockedCode:b.blockedCode}:{})}))}));
+  const goals=([...new Set([...bindings.values()].map(b=>b.goal))]).map(id=>({id,description:`Registered ${id.replace('_',' ')} using actual native state.`,postcondition:HUMAN_GOAL_POSTCONDITIONS_V1[id],bindings:[...bindings.values()].filter(b=>b.goal===id).map(b=>({id:b.id,label:b.label,aliases:b.aliases,...(b.targetId?{targetId:b.targetId}:{}),available:b.available,...(b.blockedCode?{blockedCode:b.blockedCode}:{})}))}));
   const registryHash=hashOf({worldId:host.worldId,soulId:m.soulId,entityId:m.entityId,rules:host.engine.rulesVersion,goals,bindings:[...bindings.values()].map(b=>({id:b.id,steps:b.steps,target:b.targetId?(w.entities[b.targetId]??w.regions[b.targetId]??null):null}))});
   return {view:humanCapabilityRegistryV1Schema.parse({contract:'human-capabilities/1',worldId:host.worldId,soulId:m.soulId,entityId:m.entityId,tick:host.engine.world.tick,registryHash,goals}),bindings};
  };return host.engine.withFeasibilityRead?host.engine.withFeasibilityRead(read):read();
@@ -43,7 +44,7 @@ export function basicHumanGoalV1(words:string,read:HumanRegistryReadV1,strict:bo
  if(/^(?:go )?sit (?:down )?on (?:a|the) bench$/.test(text)){type='sit';selector=b=>/bench/i.test(b.label);}
  else if(/^(?:go )?rest(?: here)?$/.test(text))type='rest';
  else if(/^(?:go )?eat(?: (?:my |a )?(?:meal|food))?$/.test(text))type='eat';
- else {const walk=text.match(/^(?:go to|walk to) (.+)$/);if(walk){type='walk';const label=walk[1].replace(/^the /,'');selector=b=>b.label.toLowerCase()===label||b.targetId?.toLowerCase()===label;}
+ else {const walk=text.match(/^(?:go to|walk to) (.+)$/);if(walk){type='walk';const label=walk[1].replace(/^the /,'');selector=b=>b.aliases.includes(label);}
   else if(text==='go hang out by the garden'||text==='hang out by the garden'){type='hang_out';const exact=[...read.bindings.values()].find(b=>b.goal==='hang_out'&&/\bgarden\b/i.test(b.label));if(exact)selector=b=>b.id===exact.id;else if(!strict){selector=b=>b.green;adaptation=true;}else return null;}
  }
  if(!type)return null;const choices=[...read.bindings.values()].filter(b=>b.goal===type&&selector(b)).sort((a,b)=>Number(b.available)-Number(a.available)||a.distance-b.distance||a.id.localeCompare(b.id));if(!choices.length)return null;const b=choices[0];if(!b.available)return {blocked:b};

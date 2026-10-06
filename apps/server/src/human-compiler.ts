@@ -38,7 +38,7 @@ export async function compileHumanGoalV1(brain:Brain,m:Mind,words:string,strict:
  if(/\b(?:every|when|if|tomorrow|later)\b|\bat\s+\d/i.test(words)&&output.trigger.kind==='now')return failure('invalid_plan','The plan made a conditional or future direction immediate.');
  const requested=words.trim().toLowerCase().replace(/[.!]$/,'').replace(/\s+(?:now|please)$/,'').match(/(?:go to|walk to|hang out by|hang out at|sit on)\s+(.+)$/)?.[1]?.replace(/^the /,'');
  if(requested&&!/^(?:a |an |the )?(?:supported )?bench$/.test(requested)){
-  const wanted=[...initial.bindings.values()].filter(b=>b.label.toLowerCase()===requested||b.targetId?.toLowerCase()===requested);
+  const wanted=[...initial.bindings.values()].filter(b=>b.aliases.includes(requested));
   if(wanted.length){if(output.goals.some(g=>'bindingId' in g&&!wanted.some(b=>b.id===g.bindingId)))return failure('invalid_plan','The plan changed the explicitly named target.');}
   else if(requested==='garden'&&!strict&&output.adaptation){const b=initial.bindings.get(output.adaptation.substituteBindingId);if(!b?.green)return failure('invalid_plan','The substitute is not a registered related green landmark.');}
   else return failure('invalid_plan','The requested named target is not registered; clarification is required.');
