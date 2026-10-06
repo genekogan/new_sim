@@ -11,7 +11,7 @@ export function commonsLifeReaderFactory(origin:EngineFactory):EngineFactory {
  return {rulesVersion:origin.rulesVersion,genesis:origin.genesis,create:w=>install(origin.create(w)),canReplayHistory:allowed,canRestoreSnapshot:v=>allowed(v)&&origin.canRestoreSnapshot?.(bare(v))===true,
   restore(raw:EngineSnapshot){
    const s=structuredClone(raw) as EngineSnapshot&{commonsProvisionsV1?:boolean;commonsKitchenV1?:boolean;commonsKitchenVersion?:'commons-kitchen/1'|'commons-kitchen/2';foodDeliveriesV1?:CommonsFoodDeliveryV1[];socialEdenV1?:boolean};
-   if('physicalBinding' in s||s.socialEdenV1)throw Error('commons-life.additional-reader-required');
+   if('physicalBinding' in s||s.socialEdenV1||(s as EngineSnapshot&{cfg?:{nativeArrivalWitnessV1?:boolean}}).cfg?.nativeArrivalWitnessV1)throw Error('commons-life.additional-reader-required');
    for(const key of ['commonsProvisionsV1','commonsKitchenV1'] as const)if(s[key]!==undefined&&typeof s[key]!=='boolean')throw Error('commons-life.snapshot-policy');
    const provisions=s.commonsProvisionsV1===true,kitchen=s.commonsKitchenV1===true,version=s.commonsKitchenVersion??'commons-kitchen/1',deliveries=s.foodDeliveriesV1??[];
    if(version!=='commons-kitchen/1'&&version!=='commons-kitchen/2')throw Error('commons-life.snapshot-policy');
