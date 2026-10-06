@@ -39,9 +39,10 @@ const point = z.tuple([
 const seconds = z.number().positive().max(3600);
 const paramsSchema = z.strictObject({
   accessScope:z.literal('ground-venue/1').optional(),
+  attendanceScope: z.literal('eden-audience24/1').optional(),
   host: id,
   presenters: z.array(id).min(1).max(6),
-  audience: z.array(id).min(1).max(12),
+  audience: z.array(id).min(1).max(24),
   seats: z.array(id).min(3).max(40),
   presenterStation: id,
   departure: z.record(id, point),
@@ -187,10 +188,11 @@ function joinSeat(
       `${actor} is already participating or has a non-audience role in ${ex.id}`,
       [actor, ex.id],
     );
-  if (!previous && ex.people.filter((p) => p.role === 'audience').length >= 12)
+  const audienceCapacity = ex.params.attendanceScope === 'eden-audience24/1' ? 24 : 12;
+  if (!previous && ex.people.filter((p) => p.role === 'audience').length >= audienceCapacity)
     return diagnostic(
       'audience-full',
-      `${ex.id} already has 12 distinct audience members`,
+      `${ex.id} already has ${audienceCapacity} distinct audience members`,
       [actor, ex.id],
     );
   const person = humanOf(rt, actor);
@@ -468,6 +470,15 @@ export const classroomSession: ActionDef<ClassroomParams, Program, Exec> = {
     ];
   },
   plan(rt, p) {
+    if (p.audience.length > 12 && p.attendanceScope !== 'eden-audience24/1')
+      return {
+        ok: false,
+        diagnostic: diagnostic(
+          'legacy-audience-capacity',
+          'More than twelve audience members need the explicit Eden attendance policy',
+          p.audience,
+        ),
+      };
     const actors = [p.host, ...p.presenters, ...p.audience];
     if (new Set(actors).size !== actors.length)
       return {

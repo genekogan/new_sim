@@ -286,3 +286,40 @@ test('twelve distinct audience members cannot be bypassed with a spare seat', ()
   until(rt, () => !rt.isActive(session.id));
   clearClaims(rt);
 });
+
+test('explicit Eden attendance policy admits a thirteenth audience member through actual late seating', () => {
+  const { rt, params } = setup(12);
+  params.attendanceScope = 'eden-audience24/1';
+  params.talkSeconds = 90;
+  params.maxPhaseSeconds = 180;
+  const session = presenting(rt, params);
+  const join = rt.submit('classroom_control', {
+    session: session.id,
+    intent: { kind: 'join', actor: 'late', departure: [12, 15] },
+  });
+  assert.equal(join.status, 'executing', join.diagnostic?.message);
+  until(rt, () => readClassroom(rt, session.id)?.participants.find(p => p.actor === 'late')?.arrival === 'seated');
+  assert.equal(readClassroom(rt, session.id)!.participants.filter(p => p.role === 'audience').length, 13);
+  assert.equal(rt.world.entities.late.human!.activity, 'sit');
+  assert.equal(rt.holder('actor:late')[0], session.id);
+  rt.cancel(session.id);
+  until(rt, () => !rt.isActive(session.id));
+  clearClaims(rt);
+});
+
+test('historical classroom keeps its twelve-audience late-join limit', () => {
+  const { rt, params } = setup(12);
+  params.talkSeconds = 90;
+  const session = presenting(rt, params);
+  const pose = [...rt.world.entities.late.pose.p];
+  const join = rt.submit('classroom_control', {
+    session: session.id,
+    intent: { kind: 'join', actor: 'late', departure: [12, 15] },
+  });
+  assert.equal(join.diagnostic?.code, 'classroom.audience-full');
+  assert.deepEqual(rt.world.entities.late.pose.p, pose);
+  assert.deepEqual(rt.holder('actor:late'), []);
+  rt.cancel(session.id);
+  until(rt, () => !rt.isActive(session.id));
+  clearClaims(rt);
+});

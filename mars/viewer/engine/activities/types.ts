@@ -83,6 +83,7 @@ export type ClassroomIntent =
   | { kind: 'cancel' };
 export interface ClassroomParams {
   accessScope?: 'ground-venue/1';
+  attendanceScope?: 'eden-audience24/1';
   host: string;
   presenters: string[];
   audience: string[];
