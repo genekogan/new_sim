@@ -1,3 +1,4 @@
+import {setImmediate as nextEventLoopTurn} from 'node:timers/promises';
 import {HumanGoalStateChanged} from './human-compiler.ts';
 import {readHumanCapabilitiesV1} from './human-capabilities.ts';
 import type {HumanSteeringOutcomeV1} from '@sim/engine-contract';
@@ -151,7 +152,13 @@ export class IntentControlV2 {
     this.guard(scope);return receipt;
   }
   private start(scope:IntentRequestScope,reservation:Owned) {
-    const work=this.run(scope,reservation).catch(()=>{
+    // Keep the durable receipt outside the synchronous interpretation prefix.
+    // Track scheduled work immediately so duplicates and shutdown own one lease.
+    // Withdrawal keeps its immediate canonical publication path.
+    const started=reservation.request.op==='upsert'
+      ?nextEventLoopTurn().then(()=>this.run(scope,reservation))
+      :this.run(scope,reservation);
+    const work=started.catch(()=>{
       // Persistence failure leaves the existing recorded received receipt. No
       // fabricated terminal success, private error logging or automatic retry.
     });

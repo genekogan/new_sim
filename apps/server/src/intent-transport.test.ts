@@ -56,7 +56,8 @@ test('HTTP ordinary direction wakes native sleep, retains a standing purpose, an
   assert.equal(f.host.engine.world.entities.h_A.human!.activity,'sleep');const sleeping=f.host.engine.programOf('h_A');
   let release!:()=>void;f.hold=new Promise<void>(resolve=>release=resolve);
   const received=await receipt(await accept(f,f.post(request('ordinary'))),'received');
-  assert.equal(f.host.engine.programOf('h_A'),sleeping);assert.equal(f.calls,2);
+  assert.equal(f.host.engine.programOf('h_A'),sleeping);
+  for(let i=0;i<20&&f.calls<2;i++)await setImmediate();assert.equal(f.calls,2,'one interpreter starts asynchronously after the durable receipt');
   await receipt(await f.lookup('ordinary'),'received');release();await settled(f);
   const understood=await receipt(await f.lookup('ordinary'),'understood');assert.equal(understood.phase,'understood');
   const published=f.db.events(worldId).filter(e=>e.kind==='intent-v2').at(-1)!;
