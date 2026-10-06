@@ -13,6 +13,7 @@ import { checkAcceptanceGuard, energyWord, type AcceptanceGuard,type AcceptanceJ
 import { LifecycleJournal, type LifecycleOperation } from './lifecycle-journal.ts';
 import { LifecycleRunner,ownedBodyCorresponds,projectLifecycle } from './lifecycle-runner.ts';
 import type { SoulLifecycle } from '@sim/protocol';
+import {privatePurposeContextV1Schema} from '@sim/protocol';
 
 export class ApiError extends Error {
   status: number; code: string; extra?: Record<string, unknown>;
@@ -342,9 +343,19 @@ export class Souls {
   perceive(soul: SoulRow) {
     const m = this.host.minds.get(soul.id), e = this.host.engine;
     if (!m || !e.world.entities[m.entityId]) throw new ApiError(409, 'not-in-world', 'this soul is not in the world');
+    const privateContext=this.host.extra.intentPurposeRecallV1===true&&this.brain.intentV2Enabled;
+    const verify=()=>{
+      const current=this.db.soul(soul.id);
+      if(!current||current.retired_at!==null||current.world_id!==this.host.worldId||current.owner!==soul.owner||current.entity_id!==soul.entity_id)throw new ApiError(404,'not-found','no such soul');
+      if(this.host.minds.get(soul.id)!==m||m.owner!==current.owner||m.entityId!==current.entity_id
+        ||!ownedBodyCorresponds(this.host,{worldId:this.host.worldId,soulId:current.id,entityId:current.entity_id,owner:current.owner},current.name))throw new ApiError(409,'not-in-world','this Soul is not currently admitted and ready');
+    };
+    if(privateContext)verify();
     const c = this.brain.midContext(m, 'agent'); const s = e.describeSurroundings(m.entityId);
     const boatControls=e.observeBoatControls?.(m.entityId);
     const location=e.observeBodyLocation?.(m.entityId);
+    const purposeContext=privateContext&&c.purposeRecall?privatePurposeContextV1Schema.parse({contract:'private-purpose-context/1',visibility:'current-owner',worldId:this.host.worldId,soulId:soul.id,entityId:m.entityId,observedTick:e.world.tick,purposes:c.purposes??[],recall:c.purposeRecall}):undefined;
+    if(privateContext)verify();
     return {
       tick: e.world.tick, world: c.world,
       soul: { name: c.soul.name, about: c.soul.about, where: c.soul.where, energy: c.soul.energy, mood: m.mood, doing_now: c.soul.doing, recently: c.soul.recent, intent: m.intent, intent_text: c.soul.intent },
@@ -356,6 +367,7 @@ export class Souls {
       could_do_now: c.options.map((o) => ({ id: o.id, card: o.card, target: o.cardTarget, what: o.label, good_when: o.goodWhen, not_for: o.notFor, ...(o.servesIntent ? { serves_current_intent: true } : {}) })),
       ...(boatControls?{physical_boat_controls:boatControls}:{}),
       ...(location!==undefined?{physical_location:location}:{}),
+      ...(purposeContext?{private_purpose_context:purposeContext}:{}),
     };
   }
 

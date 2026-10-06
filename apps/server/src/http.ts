@@ -237,7 +237,7 @@ export function buildApp(d: Deps) {
   app.get('/v1/souls/:id/deck', async (c) => { const u = await requireUser(c); return c.json(d.souls.deck(ownSoul(u, c.req.param('id')))); });
   app.get('/v1/souls/:id/talk', async (c) => { const u = await requireUser(c); return c.json({ lines: d.db.recentTalk(60, ownSoul(u, c.req.param('id')).id) }); });
   app.post('/v1/souls/:id/cards', async (c) => { const u = await requireUser(c); d.souls.requireInvited(u);const s=ownSoul(u,c.req.param('id')),input=await body(c),guard=d.souls.ownerControlGuard(s,u.id);return controlReply(c,guard,()=>d.souls.proposeCards(s,input,guard)); });
-  app.get('/v1/souls/:id/perceive', async (c) => { const u = await requireUser(c); return c.json(d.souls.perceive(ownSoul(u, c.req.param('id')))); });
+  app.get('/v1/souls/:id/perceive', async (c) => { const u = await requireUser(c),soul=ownSoul(u,c.req.param('id'));if(!d.host.extra.intentPurposeRecallV1)return c.json(d.souls.perceive(soul));c.header('Cache-Control','no-store');const guard=d.souls.ownerControlGuard(soul,u.id);if(guard)checkAcceptanceGuard(guard);const result=d.souls.perceive(soul);if(guard)checkAcceptanceGuard(guard);return c.json(result); });
   app.post('/v1/souls/:id/command', async (c) => {
     const u = await requireUser(c); d.souls.requireInvited(u); const s = ownSoul(u, c.req.param('id'));
     const p = commandSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'text is required (1–280 characters)');
@@ -319,7 +319,7 @@ export function buildApp(d: Deps) {
   app.get('/v1/agent/me', (c) => { const s = agentSoul(c); return c.json({ soul: { id: s.id, name: s.name, description: s.description }, paired_as: s.token_label, since: s.token_created_at }); });
   app.get('/v1/agent/status', (c) => c.json(d.souls.status(agentSoul(c))));
   app.get('/v1/agent/perceive',c=>{
-    if(!d.intentV2?.historyEnabled)return c.json(d.souls.perceive(agentSoul(c)));
+    if(!d.intentV2?.historyEnabled){const soul=agentSoul(c);if(!d.host.extra.intentPurposeRecallV1)return c.json(d.souls.perceive(soul));c.header('Cache-Control','no-store');const guard=d.souls.agentControlGuard(soul,bearer(c));if(guard)checkAcceptanceGuard(guard);const result=d.souls.perceive(soul);if(guard)checkAcceptanceGuard(guard);return c.json(result);}
     c.header('Cache-Control','no-store');
     try{const scope=d.intentV2.agentScope(bearer(c)),perception=d.souls.perceive(agentSoul(c)),intentHistory=d.intentV2.historyCapability(scope);d.intentV2.guard(scope);
       return c.json({...perception,intentHistory});}catch(error){throw intentHistoryReadError(error);}

@@ -1,3 +1,4 @@
+export * from './purpose-context-v1.ts';
 import {intentArrivalFactV1} from './intent-arrival-v1.ts';
 import {intentSleepStopV1Schema} from './intent-sleep-stop-v1.ts';
 export * from './intent-sleep-stop-v1.ts';
