@@ -101,6 +101,7 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
     if(host.enableStairMakeWayV1)await drive(host.enableStairMakeWayV1());
     if(host.enableReflexTimeoutV1)await drive(host.enableReflexTimeoutV1());
     if(host.enableContinuousDayV1)await drive(host.enableContinuousDayV1());
+    if(host.enableEdgeMotionV1)await drive(host.enableEdgeMotionV1());
     const {EdgeLedger}=await load('apps/server/src/edge/ledger/ledger.ts');
     const edge=new EdgeLedger(host,db,placeData?JSON.parse(readFileSync(resolve(placeData),'utf8')):undefined,{ambient});
     const app=buildApp({cfg,db,host,auth,brain,souls,hub,intentV2:service,edge}),listener=require('@hono/node-server').getRequestListener(app.fetch);

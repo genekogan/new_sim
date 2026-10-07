@@ -76,13 +76,16 @@ type Prog = {
   quietHeldSince?: number;
   spreadWaits?: number;
   walkStopping?: Diag;
+  walkResume?: true;
+  trafficSince?: number;
+  trafficTries?: number;
   stopping?: Diag;
   ops: Op[]; action?: string; settle?: 'done' | 'held'; soft?: boolean; until?: number;
   controlOf?:string;
   readiedActors?:string[];
   build?: { phase: BuildPhase; crew: string[]; stopping?: Diag; reverse?: true };
 };
-export type MarsWorldConfig = { disassemblyV1?:boolean; spreadV2?:boolean; yieldTimeoutV1?:boolean; quietStallReleaseV1?:boolean; stairMakeWayV1?:boolean; reflexTimeoutV1?:boolean; walkBlockV1?:boolean; safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; fixtureGroundGoalsV1?:boolean; nativeArrivalWitnessV1?:boolean; quietLandingCourtesyV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
+export type MarsWorldConfig = { edgeMotionV1?:boolean; disassemblyV1?:boolean; spreadV2?:boolean; yieldTimeoutV1?:boolean; quietStallReleaseV1?:boolean; stairMakeWayV1?:boolean; reflexTimeoutV1?:boolean; walkBlockV1?:boolean; safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; fixtureGroundGoalsV1?:boolean; nativeArrivalWitnessV1?:boolean; quietLandingCourtesyV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
 export const LITTLE_MARTIANS_WORLD: MarsWorldConfig={scene:'littlemartians',arrival:[0,18],arrivalPlace:'garden',reference:[0,16],grounds:{id:'grounds',name:'Ceramic garden'}};
 export const GREEN_FIELD_WORLD:MarsWorldConfig={scene:'greenfield',arrival:[0,0],arrivalPlace:'field',reference:[2,0],grounds:{id:'grounds',name:'Green field'}};
 export const EDEN_COMMONS_WORLD:MarsWorldConfig={scene:'eden-commons',arrival:[14,4],arrivalPlace:'commons',reference:[9,5],grounds:{id:'grounds',name:'Eden commons'}};
@@ -284,6 +287,7 @@ export class MarsEngine implements Engine {
         // program until native cancellation actually reaches a safe landing.
         if (p.walkStopping) {
           if (rec && this.rt.isActive(rec.id)) { this.rt.cancel(rec.id, p.walkStopping); return; }
+          if (p.walkResume) { const why = p.walkStopping; p.walkStopping = undefined; p.walkResume = undefined; return this.trafficStepBack(p, why); }
           return this.end(p, 'failed', p.walkStopping);
         }
         if (rec) {
@@ -297,6 +301,23 @@ export class MarsEngine implements Engine {
           // people (status running, never 'blocked') would hold the quiet barrier forever.
           // Release it through native cancellation like the blocked-walk timeout.
           // yieldTimeoutV1 (edge reflex floor): the same release outside quiet after 60 s, so a yield never holds a receipt forever.
+          // edgeMotionV1: a walk held in a people jam (traffic.yield / traffic.person: a gridlock of walkers that the
+          // runtime does not report as deadlock.*, e.g. four Souls each yielding at a deck's single-file step) steps
+          // back after 10 s plus a per-actor stagger, waits 1-3 s and re-tries the same step (at most 6 times), so
+          // one walker goes first and the rest follow instead of all freezing for ever.
+          if (this.cfg.edgeMotionV1 === true) {
+            const held = this.trafficHeld(p.actor);
+            if (held) {
+              p.trafficSince ??= tick;
+              // An obstacle (someone else's walk waits for me to move out of the way) steps aside first, after 5 s.
+              if (tick - p.trafficSince > (this.trafficWaiters(p.actor).length ? 100 : 200 + this.stagger(p.actor) * 40)) {
+                const why = {code:'route.blocked',message:'stepped back from a crowd to let others pass first'};
+                this.rt.cancel(rec.id, why);
+                if (this.rt.isActive(rec.id)) { p.walkStopping = why; p.walkResume = true; return; }
+                return this.trafficStepBack(p, why);
+              }
+            } else p.trafficSince = undefined;
+          }
           const yieldLimit = this.quiet && this.cfg.quietStallReleaseV1 === true ? 600 : this.cfg.yieldTimeoutV1 === true ? 1200 : 0;
           const quietHeld = yieldLimit > 0 && ['walk_to','sit','take_slot','commons_shore_travel'].includes(rec.verb) && rec.status !== 'blocked' && this.rt.isActive(rec.id) && this.ents[p.actor]?.human?.activity === 'wait';
           if (quietHeld) {
@@ -437,6 +458,46 @@ export class MarsEngine implements Engine {
     if (!['pond/1','region/1','pond-lap/1'].includes(spread) || (p.spreadWaits = (p.spreadWaits ?? 0) + 1) > 60) return false;
     p.index--; p.ops = [{ wait: 20 }]; return true;
   }
+  /** edgeMotionV1 stroll: every leg is a checked native walk (at least 1.5 m, on the body's own level or the ground
+   * around a raised place), so a stroll always visibly moves; when nothing nearby is walkable it refuses honestly. */
+  private strollV1(me: string, home: [number, number], total: number, radius: number): Op[] | Diag {
+    const ops: Op[] = [], level = this.ents[me]?.human?.level ?? 0; let spent = 0, legs = 0;
+    for (let leg = 0; leg < 6 && spent < total; leg++) {
+      for (let tries = 0; tries < 6; tries++) {
+        const ang = this.m.nextRandom(this.rt.world.rng) * Math.PI * 2, dist = Math.max(1.5, (0.3 + 0.7 * this.m.nextRandom(this.rt.world.rng)) * radius);
+        const x = r3(home[0] + Math.cos(ang) * dist), z = r3(home[1] + Math.sin(ang) * dist), verb = this.movementVerb(me, x);
+        const at = [level, 0].find(l => !this.plan(verb, { actor: me, x, z, level: l }));
+        if (at === undefined) continue;
+        ops.push({ verb, params: { actor: me, x, z, level: at, ...(verb === 'walk_to' ? { speed: 0.9 } : {}) }, settle: 'done', soft: true }); legs++; break;
+      }
+      const pause = Math.round((2 + 6 * this.m.nextRandom(this.rt.world.rng)) * TPS); ops.push({ wait: pause });
+      spent += pause + Math.round((radius / 0.9) * TPS * 0.6);
+    }
+    return legs ? ops : { code: 'route.region-full', message: 'there is no free ground to stroll on nearby' };
+  }
+  /** edgeMotionV1: the actor's own walk (its current task) is held by other people in traffic. */
+  private trafficHeld(actor: string): boolean {
+    const t = this.ents[actor]?.human?.task, r = t ? this.rt.records.get(t) : undefined;
+    return !!r && r.status === 'blocked' && (r.verb === 'walk_to' || r.verb === 'commons_shore_travel') && /^traffic\./.test(r.diagnostic?.code ?? '');
+  }
+  /** Positions of other walkers held in traffic waiting for this actor to move out of their way. */
+  private trafficWaiters(actor: string): [number, number][] {
+    const out: [number, number][] = [];
+    for (const o of Object.values(this.ents) as any[]) {
+      const t = o.human?.task, r = t ? this.rt.records.get(t) : undefined;
+      if (o.id !== actor && r?.status === 'blocked' && r.diagnostic?.code === 'traffic.person' && r.diagnostic.subjects?.[1] === actor) out.push([o.pose.p[0], o.pose.p[2]]);
+    }
+    return out;
+  }
+  private stagger(actor: string) { return [...actor].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7) % 5; }
+  /** Re-try the current step after a short staggered pause (the body stands, so others can pass or ask it to make way). */
+  private trafficStepBack(p: Prog, why: Diag) {
+    p.action = undefined; p.settle = undefined; p.soft = undefined; p.trafficSince = undefined; p.blockedSince = undefined; p.quietHeldSince = undefined;
+    const waiters = this.trafficWaiters(p.actor);
+    if (waiters.length) this.m.makeWay(this.rt, p.actor, waiters[0]);           // step out of their way (native courtesy walk)
+    if ((p.trafficTries = (p.trafficTries ?? 0) + 1) > 6) return this.end(p, 'failed', why);
+    p.index--; p.ops = [{ wait: (waiters.length ? 80 : 20) + this.stagger(p.actor) * 10 }];
+  }
   private movementVerb(actor:string,x:number){return this.physical&&(x<-29.5||this.ents[actor]?.pose.p[0]<-29.5)?'commons_shore_travel':'walk_to';}
   private free(id: string): boolean { return !!this.ents[id] && this.holders(id).length === 0 && !this.byActor.has(id) && ![...this.programs.values()].some(p=>p.build?.crew.includes(id)); }
 
@@ -507,6 +568,7 @@ export class MarsEngine implements Engine {
         // Mars's own ambient_wander is not resumable from a snapshot, so strolling is built from walks and pauses, which are.
         const total = secs(a.seconds, 60), radius = Math.min(40, Math.max(2, typeof a.radius === 'number' ? a.radius : 12));
         const home = this.pos(me)!, ops: Op[] = []; let spent = 0;
+        if (this.cfg.edgeMotionV1 === true) return this.strollV1(me, home, total, radius);
         for (let leg = 0; leg < 6 && spent < total; leg++) {
           for (let tries = 0; tries < 4; tries++) {
             const ang = this.m.nextRandom(this.rt.world.rng) * Math.PI * 2, dist = (0.3 + 0.7 * this.m.nextRandom(this.rt.world.rng)) * radius;
@@ -1067,6 +1129,7 @@ export class MarsEngine implements Engine {
   configureRuntimePolicy(policy: {sleepBlockTicks:number;quietSeatCourtesy?:boolean;fixtureGroundGoalsV1?:boolean;nativeArrivalWitnessV1?:boolean;quietLandingCourtesyV1?:boolean;quietStallReleaseV1?:boolean;stairMakeWayV1?:boolean;yieldTimeoutV1?:boolean;spreadV2?:boolean}) {
     if(policy.stairMakeWayV1===true)this.cfg={...this.cfg,stairMakeWayV1:true};
     if((policy as {reflexTimeoutV1?:boolean}).reflexTimeoutV1===true)this.cfg={...this.cfg,reflexTimeoutV1:true};
+    if((policy as {edgeMotionV1?:boolean}).edgeMotionV1===true)this.cfg={...this.cfg,edgeMotionV1:true};
     if(policy.spreadV2===true)this.cfg={...this.cfg,spreadV2:true};
     if(policy.yieldTimeoutV1===true)this.cfg={...this.cfg,yieldTimeoutV1:true};
     if(policy.quietStallReleaseV1===true)this.cfg={...this.cfg,quietStallReleaseV1:true};
