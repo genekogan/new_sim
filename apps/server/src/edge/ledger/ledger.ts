@@ -28,7 +28,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** Server start (ms): metrics count world model calls only from here, not copied history. */
   readonly startedAt = Date.now();
   private capCache = new Map<string, {tick: number; value: {caps: EdgeCapability[]; plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>}}>();
-  comms?: {streams: {headCursor(soulId: string): string}; fading: {status(soulId: string): unknown}; objects: {visibleTo(soul: EdgeSoul): unknown[]}; close(): void};
+  comms?: {streams: {headCursor(soulId: string): string}; fading: {status(soulId: string): unknown}; objects: {visibleTo(soul: EdgeSoul): unknown[]; create(i: {id: string; kind: string; name: string; description?: string; placeId: string; params?: Record<string, unknown>}): {id: string}; all(): {id: string; kind: string; placeId: string; state: unknown}[]}; close(): void};
   attachComms(c: NonNullable<EdgeLedger['comms']>) {
     this.comms = c;
     // C9 body effects (fading itself only runs when Comms' fading flag is on — Gene has not approved it).
@@ -78,10 +78,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private view(r: Row): EdgeReceipt {return {id: r.receipt_id, soulId: r.soul_id, capability: r.capability, phase: r.phase, acceptedTick: r.accepted_tick, startedTick: r.started_tick, endedTick: r.ended_tick, code: r.code, reason: r.reason, programId: r.program_id};}
   receipt(soulId: string, id: string): EdgeReceipt | null {const r = this.rows('receipt_id=? AND soul_id=?', id, soulId)[0]; return r ? this.view(r) : null;}
   openReceipts(soulId: string): EdgeReceipt[] {return this.rows("soul_id=? AND phase IN ('waiting','started') ORDER BY accepted_tick", soulId).map(r => this.view(r));}
-  private insert(soul: EdgeSoul, capability: string, phase: EdgeReceipt['phase'], clientRef?: string): EdgeReceipt {
+  private insert(soul: EdgeSoul, capability: string, phase: EdgeReceipt['phase'], clientRef?: string, keepActivity = false): EdgeReceipt {
     const id = 'r_' + randomUUID(), tick = this.host.engine.world.tick;
-    for (const old of this.openReceipts(soul.soulId)) this.update(old.id, {phase: 'replaced', reason: 'A newer action from this Soul replaced it.'});
-    this.pending.delete(soul.soulId);
+    if (!keepActivity) {for (const old of this.openReceipts(soul.soulId)) this.update(old.id, {phase: 'replaced', reason: 'A newer action from this Soul replaced it.'}); this.pending.delete(soul.soulId);}
     this.db.db.prepare('INSERT INTO edge_receipts_v1 (world_id,receipt_id,soul_id,capability,phase,accepted_tick,client_ref,created_at) VALUES (?,?,?,?,?,?,?,?)').run(this.host.worldId, id, soul.soulId, capability, phase, tick, clientRef ?? null, Date.now());
     const r = this.receipt(soul.soulId, id)!; this.emit(r); return r;
   }
@@ -147,6 +146,13 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const id = 'go-near:' + o.soulId, steps: Program['steps'] = [{verb: 'walk_to', params: {to: o.entityId, standoff: 1.3}}];
       caps.push({id, verb: 'go-near', label: `Go near ${o.name}`, target: {id: o.soulId, kind: 'soul'}, available: true});   // route checked at act time
       plans.set(id, {label: `Go near ${o.name}`, steps});
+    }
+    // Lasting marks (objects the Soul authors where it stands): a note/sign/offering, or a shared project.
+    if (this.comms) {
+      const makeParams = {form: {type: 'string', enum: ['note', 'sign', 'offering'], optional: true}, title: {type: 'string', maxLength: 60}, text: {type: 'string', maxLength: 500}};
+      caps.push({id: 'make:mark', verb: 'make', label: 'Leave a note, sign or offering here (lasting; others can read and respond)', available: true, params: makeParams});
+      caps.push({id: 'make:project', verb: 'make', label: 'Start a shared project here (others can contribute steps)', available: true, params: {title: {type: 'string', maxLength: 60}, text: {type: 'string', maxLength: 500}}});
+      plans.set('make:mark', {label: 'Make a mark', steps: [], make: 'mark'} as never); plans.set('make:project', {label: 'Start a project', steps: [], make: 'project'} as never);
     }
     // Social and expressive native verbs: visible, deterministic, shared by many Souls at once.
     const secondsOf = (def: number, max: number) => ({seconds: {type: 'integer', min: 5, max, default: def}});
@@ -221,6 +227,19 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (params.seconds !== undefined) {
       if (!plan.seconds || !Number.isInteger(params.seconds) || (params.seconds as number) < 1 || (params.seconds as number) > 600) return refuse('capability.params', 'seconds must be an integer 1..600 for this capability.');
       for (const s of steps) if (s.verb === 'rest' || s.verb === 'ambient_wander' || s.verb === 'gather') s.params.seconds = params.seconds;
+    }
+    const make = (plan as {make?: 'mark' | 'project'}).make;
+    if (make && this.comms) {
+      const title = typeof params.title === 'string' ? params.title.trim() : '', text = typeof params.text === 'string' ? params.text.trim() : '';
+      if (!title || title.length > 60 || text.length > 500 || (make === 'mark' && !text)) return refuse('capability.params', 'give a title (<=60) and text (<=500)');
+      const mine = this.comms.objects.all().filter(o => (o.kind === 'mark' || o.kind === 'project') && ((o.state as {author?: {soulId: string}; creator?: {soulId: string}; removed?: boolean}).author?.soulId === soul.soulId || (o.state as {creator?: {soulId: string}}).creator?.soulId === soul.soulId) && !(o.state as {removed?: boolean}).removed);
+      if (mine.length >= 5) return refuse('make.limit', 'you already have 5 lasting marks or projects; take one down first');
+      const placeId = this.placePathOf(soul.soulId).find(p => p.kind !== 'occupier')?.id ?? 'world';
+      if (this.comms.objects.all().filter(o => o.kind === 'mark' && o.placeId === placeId && !(o.state as {removed?: boolean}).removed).length >= 20) return refuse('place.marks-full', 'this place already holds 20 marks; try somewhere else');
+      const b = this.body(soul.entityId), id = `${make}-${randomUUID().slice(0, 8)}`;
+      const r = this.insert(soul, capability, 'completed', clientRef, true);   // making a mark does not interrupt the body
+      this.comms.objects.create({id, kind: make, name: title, placeId, params: {form: params.form, title, text, author: soul.soulId, at: b ? [b.pose.p[0], b.pose.p[2]] : null}});
+      return {accepted: true, receipt: {...this.receipt(soul.soulId, r.id)!, object: id} as EdgeReceipt};
     }
     if (plan.stop) {
       const program = this.host.engine.programOf(soul.entityId);

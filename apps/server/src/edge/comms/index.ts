@@ -9,6 +9,7 @@ import {Conversations} from './converse.ts';
 import {chessKind} from './objects/chess.ts';
 import {Objects} from './objects/framework.ts';
 import {presentationKind} from './objects/presentation.ts';
+import {markKind, projectKind} from './objects/marks.ts';
 import type {CommsCore, SpectatorEdgeMessage} from './core.ts';
 import {Presence} from './presence.ts';
 import {say} from './speech.ts';
@@ -75,6 +76,8 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   const objects = new Objects(core);
   objects.register(chessKind);
   objects.register(presentationKind);
+  objects.register(markKind);
+  objects.register(projectKind);
   deps.ledger.addCapabilityProvider(soul => objects.capabilities(soul));
   const steward = new Steward(core, options.stewardToken);
   const fading = new Fading(core, steward, options.fading === true);

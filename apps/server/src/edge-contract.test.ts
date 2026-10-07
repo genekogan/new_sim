@@ -103,3 +103,20 @@ test('map is public and never lists occupants',async t=>{
  const f=await setup(t),res=await f.app.request('/v1/edge/map');assert.equal(res.status,200);const j=await res.json() as any;
  assert.equal(j.contract,EDGE_CONTRACT);assert.ok(j.places.length>=1);assert.ok(!JSON.stringify(j).includes(f.rows[0].id),'no Soul ids in the map');
 });
+
+test('lasting marks: make a sign while walking (not interrupted), others read and respond; shared project; per-Soul limit',async t=>{
+ const f=await setup(t);
+ const walk=(await f.call(0,'GET','/v1/edge/capabilities')).json.capabilities.find((c:any)=>c.verb==='walk'&&c.available);
+ const w=(await f.call(0,'POST','/v1/edge/act',{capability:walk.id})).json;assert.equal(w.accepted,true);
+ const m=(await f.call(0,'POST','/v1/edge/act',{capability:'make:mark',params:{form:'sign',title:'Ground Found',text:'A blessing on the arm of this bench.'}})).json;
+ assert.equal(m.accepted,true,JSON.stringify(m));assert.match(m.receipt.object,/^mark-/);
+ assert.ok(['waiting','started','completed'].includes((await f.receipt(0,w.receipt.id)).phase),'walk not replaced by making a mark');
+ const id=m.receipt.object,seen=(await f.call(1,'GET','/v1/edge/objects/'+id)).json;assert.equal(seen.object.state.title,'Ground Found',JSON.stringify(seen));assert.equal(seen.object.state.form,'sign');
+ const resp=(await f.call(1,'POST','/v1/edge/objects/'+id+'/act',{action:'respond',params:{text:'Lovely.'}})).json;assert.equal(resp.accepted,true,JSON.stringify(resp));
+ const p=(await f.call(0,'POST','/v1/edge/act',{capability:'make:project',params:{title:'The bench',text:'A garden bench together'}})).json;assert.equal(p.accepted,true);
+ const c1=(await f.call(1,'POST','/v1/edge/objects/'+p.receipt.object+'/act',{action:'contribute',params:{text:'I carve the arm',effort:5}})).json;assert.equal(c1.accepted,true,JSON.stringify(c1));
+ const proj=(await f.call(0,'GET','/v1/edge/objects/'+p.receipt.object)).json.object.state;assert.equal(proj.progress,5);assert.equal(proj.contributors.length,1);
+ for(let i=0;i<3;i++)assert.equal((await f.call(0,'POST','/v1/edge/act',{capability:'make:mark',params:{title:'n'+i,text:'t'}})).json.accepted,true);
+ const sixth=(await f.call(0,'POST','/v1/edge/act',{capability:'make:mark',params:{title:'n9',text:'t'}})).json;assert.deepEqual([sixth.accepted,sixth.code],[false,'make.limit']);
+ const bad=(await f.call(0,'POST','/v1/edge/act',{capability:'make:project',params:{}})).json;assert.equal(bad.code,'capability.params');
+});
