@@ -31,8 +31,10 @@ export class Steward {
     if (!timingSafeEqual(digestOf(given), digestOf(this.token))) throw new EdgeError(401, 'unauthorized', 'steward token required');
   }
 
+  private seq = 0;
   enqueue(kind: WorkKind | string, body: Record<string, unknown>, dedupe?: string): string | null {
-    const id = newId('wk');
+    // Sortable within one millisecond: created_at, then this per-process sequence.
+    const id = `${newId('wk')}`.replace(/^wk_/, `wk_${(++this.seq).toString(36).padStart(6, '0')}_`);
     const r = this.core.db.prepare('INSERT OR IGNORE INTO edge_comms_work (world_id, id, kind, state, dedupe, created_at, body) VALUES (?,?,?,?,?,?,?)')
       .run(this.core.worldId, id, kind, 'open', dedupe ?? null, this.core.now(), JSON.stringify(body));
     return Number(r.changes) > 0 ? id : null;

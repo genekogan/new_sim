@@ -92,13 +92,18 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   deps.ledger.onPlaceChange(e => presence.onPlaceChange(e));
   try { presence.prime(); } catch { /* ledger not ready: paths are learned on first change */ }
 
+  // EdgeError → its status; any other fault → 503 `unavailable` (same mapping as Ledger's routes).
+  const failure = (c: Context, error: unknown) => {
+    if (error instanceof EdgeError) return c.json(edgeBody({error: {code: error.code, message: error.message}}), error.status as ContentfulStatusCode);
+    if (process.env.EDGE_DEBUG) console.error('edge comms fault', error);
+    return c.json(edgeBody({error: {code: 'unavailable', message: 'the world could not answer; retry'}}), 503);
+  };
   const route = (fn: (c: Context, soul: EdgeSoul) => object | Promise<object>) => async (c: Context) => {
     try {
       const soul = deps.soul(c);
       return c.json(edgeBody(await fn(c, soul)));
     } catch (error) {
-      if (error instanceof EdgeError) return c.json(edgeBody({error: {code: error.code, message: error.message}}), error.status as ContentfulStatusCode);
-      throw error;
+      return failure(c, error);
     }
   };
   const json = async (c: Context): Promise<Record<string, unknown>> => {
@@ -135,10 +140,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   // Steward session endpoints (not Soul-authenticated).
   const stewardRoute = (fn: (c: Context) => object | Promise<object>) => async (c: Context) => {
     try { steward.authorize(c.req.header('authorization')); return c.json(edgeBody(await fn(c))); }
-    catch (error) {
-      if (error instanceof EdgeError) return c.json(edgeBody({error: {code: error.code, message: error.message}}), error.status as ContentfulStatusCode);
-      throw error;
-    }
+    catch (error) { return failure(c, error); }
   };
   const by = (body: Record<string, unknown>) => typeof body.by === 'string' && body.by.length <= 100 ? body.by : 'steward';
   app.get('/v1/edge/steward/work', stewardRoute(c => { steward.schedule(); return {clock: steward.clock(), work: steward.list(c.req.query('done') === '1')}; }));
