@@ -10,7 +10,7 @@ export type HumanBindingV1={id:string;goal:HumanGoalV1['goal'];targetId?:string;
 export type HumanRegistryReadV1={view:HumanCapabilityRegistryV1;bindings:Map<string,HumanBindingV1>};
 const key=(goal:string,ref:string)=>goal+':'+ref;
 /** Read-only actor-specific physical bindings. Kernel anchors alone do not invent native actions. */
-export function readHumanCapabilitiesV1(host:WorldHost,m:Mind,options?:{registeredActivitiesV1?:boolean}):HumanRegistryReadV1 {
+export function readHumanCapabilitiesV1(host:WorldHost,m:Mind,options?:{registeredActivitiesV1?:boolean;deferRouteChecks?:boolean;skipRegisteredCards?:boolean}):HumanRegistryReadV1 {
  const read=()=>{
   const w=host.engine.world as NativeWorld,body=w.entities[m.entityId],bindings=new Map<string,HumanBindingV1>();if(!body?.human)throw Error('human-capabilities.body-unavailable');
   const verbs=new Set(host.engine.describeVerbs().map(v=>v.verb)),humanoid=!body.body||body.body.family==='humanoid';
@@ -19,7 +19,8 @@ export function readHumanCapabilitiesV1(host:WorldHost,m:Mind,options?:{register
   const add=(goal:HumanGoalV1['goal'],id:string,label:string,targetId:string|undefined,steps:Program['steps'],approachLen:number,green=false)=>{
    const seatedWitness=goal==='sit'?observeSeatedHumanGoalV1(host,m,{goal:'sit',bindingId:id,seconds:60}):null;if(seatedWitness){const fixture=host.kernel.things[targetId!]?.traits.entity;steps=[{verb:'rest',params:{seconds:1,seatedAt:fixture}},{verb:'rest',params:{seconds:60,seatedAt:fixture}}];approachLen=1;}
    else if(seatedNow&&goal!=='rest'&&goal!=='eat'&&steps[0]?.verb!=='stand'){steps=[{verb:'stand',params:{}},...steps];approachLen+=1;}
-   const issue=host.engine.canPerform({actor:m.entityId,label:'registered '+goal,steps}),target=targetId?host.kernel.things[targetId]:undefined,point=targetId?engineRef(host,targetId):null;
+   // deferRouteChecks (edge capability listing): walk/hang-out route planning runs once at act time instead of per listing.
+   const issue=options?.deferRouteChecks&&(goal==='walk'||goal==='hang_out')?null:options?.deferRouteChecks&&goal==='sit'&&!seatedWitness?seatOccupancyIssue(host,targetId?host.kernel.things[targetId]?.traits.entity:undefined,m.entityId):host.engine.canPerform({actor:m.entityId,label:'registered '+goal,steps}),target=targetId?host.kernel.things[targetId]:undefined,point=targetId?engineRef(host,targetId):null;
    const pos=typeof point==='string'?w.entities[point]?.pose.p:point?[point[0],0,point[1]]:undefined;
    const name='human goal '+goal.replace('_',' ')+' '+hashOf({goal,id,steps}).slice(0,12),card:Card={name,summary:`Perform the registered ${goal.replace('_',' ')} goal using native admission.`,good_when:'This specific owner goal is requested and the registered physical binding remains available.',target:null,when:[],then:[...(target?[{move:['$actor',target.id] as [string,string]}]:[]),{set:['$actor','doing',goal==='sit'?'sitting':goal==='eat'?'eating':goal==='rest'?'resting':'following an owner goal']}],approach:steps.slice(0,approachLen),during:steps.slice(approachLen),takes:goal==='rest'?'minute':'minutes'};
    const aliases=[label.toLowerCase(),...(targetId?[targetId.toLowerCase()]:[]),...(targetId==='eden-classroom-1'?['classroom','eden classroom','lecture room','class','lecture','lecture hall','the lecture','school']:[])];const entity=targetId?w.entities[targetId]:undefined;if(entity?.def==='campfire')aliases.push('campfire','fire');const side=label.toLowerCase().match(/\b(north|south|east|west)\b/)?.[1];if(entity?.def==='bench-6ft'&&side&&/fire/i.test(label))aliases.push(`${side} bench by the campfire`,`${side} campfire bench`,`campfire ${side} bench`,`fire bench ${side}`);
@@ -49,7 +50,7 @@ export function readHumanCapabilitiesV1(host:WorldHost,m:Mind,options?:{register
    const card:Card={name:'human goal swim supported pond '+hashOf({id,steps}).slice(0,12),summary:'Walk through the supported shore transitions into the canonical pond, swim and tread there.',good_when:'Owner asks for a swim; uses the admitted original pond rather than scenery-only water.',not_for:'Unadmitted western lake/river, a body without swimming equivalence, or unsafe current action.',target:null,when:[],then:[{set:['$actor','doing','swimming in the supported pond']}],approach:steps.slice(0,seatedNow?2:1),during:steps.slice(seatedNow?2:1),takes:'minutes'};
    bindings.set(id,{id,goal:'activity',targetId:'shore-water',label:'Swim in the supported pond',aliases:['swim','go for a swim','swim in the pond','go for a swim in the pond','go swimming','go swimming in the pond','take a swim','have a swim','go for a dip','take a dip','swim in the water','swim at the shore'],steps,card,available:!issue,...(issue?{blockedCode:issue.code}:{}),distance:0,green:false});
   }
-  if(options?.registeredActivitiesV1)for(const option of registeredOptionsFor(host,m,128)){
+  if(options?.registeredActivitiesV1&&!options.skipRegisteredCards)for(const option of registeredOptionsFor(host,m,128)){
    if(!host.ownLectureRosterV1(m.soulId,option.steps))continue;
    if(option.card.startsWith('human goal '))continue;const card=host.kernel.vocab.cards[option.card];if(!card||card.hash!==option.hash||!host.kernel.decks[m.soulId].cards.includes(option.card))continue;
    const target=option.cardTarget?host.kernel.things[option.cardTarget]:undefined,ready=card.during.some(s=>s.verb==='activity_readiness_v1'),prepared=card.during.some(s=>s.verb==='mars:classroom_session'&&s.params.handoverScope==='owned-readiness/1'),label=ready?'Prepare for my Eden lecture':prepared?'Host a prepared Eden lecture':(option.card+(target?' '+target.name:'')).slice(0,100),id='activity:'+hashOf({card:option.card,hash:option.hash,target:option.cardTarget}).slice(0,24);
@@ -101,4 +102,13 @@ export function observeSeatedHumanGoalV1(host:WorldHost,m:Mind,goal:HumanGoalV1)
    if(Math.hypot(p[0]-body.pose.p[0],p[1]-body.pose.p[2])<=.001&&Math.abs(angleDelta(yaw,body.pose.yaw))<=.03)return {contract:'native-seated-postcondition/1' as const,tick:host.engine.world.tick,actor:m.entityId,fixtureId:fixture.id,slotId:id,nativeActionId:record.id,position:[...body.pose.p],yaw:body.pose.yaw};
   }
  }return null;
+}
+
+/** Cheap listing-time seat check: every seat slot of the fixture is held by another live sit. Route checked at act. */
+function seatOccupancyIssue(host:WorldHost,fixtureId:unknown,actor:string):{code:string;message:string}|null{
+ if(typeof fixtureId!=='string')return null;const w=host.engine.world as NativeWorld,fixture=w.entities[fixtureId];if(!fixture)return null;
+ const seats=(CATALOG[fixture.def]?.slots??[]).filter(s=>s.kind==='seat').map(s=>fixtureId+'#'+s.id);if(!seats.length)return null;
+ const live=new Set(host.engine.runtime.liveIds()),held=new Set<string>();
+ for(const r of host.engine.runtime.records.values()){const p=r.params as Record<string,unknown>;if(live.has(r.id)&&r.verb==='sit'&&p.actor!==actor&&typeof p.slot==='string')held.add(p.slot);}
+ return seats.every(s=>held.has(s))?{code:'slot.none-free',message:'every seat here is taken'}:null;
 }

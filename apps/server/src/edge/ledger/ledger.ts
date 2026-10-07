@@ -25,6 +25,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private providers: ((s: EdgeSoul) => EdgeCapability[])[] = [];
   private pending = new Map<string, Pending>();           // soulId → waiting act
   private lastPlace = new Map<string, string | null>();
+  private capCache = new Map<string, {tick: number; value: {caps: EdgeCapability[]; plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>}}>();
   comms?: {streams: {headCursor(soulId: string): string}; fading: {status(soulId: string): unknown}; objects: {visibleTo(soul: EdgeSoul): unknown[]}; close(): void};
   attachComms(c: NonNullable<EdgeLedger['comms']>) {this.comms = c;}
   readonly host: WorldHost; readonly db: Db;
@@ -110,7 +111,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
 
   // ---------------------------------------------------------------- capabilities
   private binds(soul: EdgeSoul): {caps: EdgeCapability[]; plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>} {
-    const m = this.mind(soul), read = readHumanCapabilitiesV1(this.host, m, {registeredActivitiesV1: true});
+    const tick = this.host.engine.world.tick, hit = this.capCache.get(soul.soulId);
+    if (hit && hit.tick === tick) return hit.value;
+    const m = this.mind(soul), read = readHumanCapabilitiesV1(this.host, m, {registeredActivitiesV1: true, deferRouteChecks: true, skipRegisteredCards: true});
     const caps: EdgeCapability[] = [], plans = new Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>();
     const secondsParam = {seconds: {type: 'integer', min: 1, max: 600, default: 60}};
     for (const b of read.bindings.values()) {
@@ -123,12 +126,11 @@ export class EdgeLedger implements EdgeLedgerHooks {
     plans.set('stand:here', {label: 'Stand up', steps: [], stop: true});
     for (const o of this.perceivedBodies(soul.soulId, NEAR_RADIUS)) {
       const id = 'go-near:' + o.soulId, steps: Program['steps'] = [{verb: 'walk_to', params: {to: o.entityId, standoff: 1.3}}];
-      const issue = this.host.engine.canPerform({actor: soul.entityId, label: 'go near', steps});
-      caps.push({id, verb: 'go-near', label: `Go near ${o.name}`, target: {id: o.soulId, kind: 'soul'}, available: !issue || WAIT_CODES.has(issue.code), ...(issue && !WAIT_CODES.has(issue.code) ? {blocked: {code: issue.code, reason: humanBlockedExplanationV1(issue.code, o.name)}} : {})});
+      caps.push({id, verb: 'go-near', label: `Go near ${o.name}`, target: {id: o.soulId, kind: 'soul'}, available: true});   // route checked at act time
       plans.set(id, {label: `Go near ${o.name}`, steps});
     }
     for (const p of this.providers) try {caps.push(...p(soul));} catch {/* a provider fault hides only its own entries */}
-    return {caps, plans};
+    const value = {caps, plans}; this.capCache.set(soul.soulId, {tick, value}); return value;
   }
   capabilities(soul: EdgeSoul): EdgeCapability[] {return this.binds(soul).caps;}
   addCapabilityProvider(p: (soul: EdgeSoul) => EdgeCapability[]) {this.providers.push(p);}
