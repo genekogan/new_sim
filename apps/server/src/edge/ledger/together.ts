@@ -569,6 +569,15 @@ export class Together {
       return near.find(o => o.soulId === w) ?? near.find(o => o.name.toLowerCase() === w) ?? near.find(o => tokens(o.name).length && tokens(o.name).every(x => tokens(w).includes(x))) ?? near.find(o => tokens(w).some(x => x.length > 2 && tokens(o.name).includes(x))) ?? null;
     };
     const capFor = (verb: string, o: NearbyBody) => caps.find(c => c.id === `${verb}:${o.soulId}`);
+    /** A Soul named but not in sight (inside a building, or far): say where they are and offer the walk there. */
+    const notHere = (verb: string, name: string) => {
+      const w = name.trim().toLowerCase().replace(/^(?:to|with|at|the)\s+/, ''), m = [...this.p.host.minds.values()].find(x => x.soulId !== soul.soulId && (x.name.toLowerCase() === w || (tokens(x.name).length > 0 && tokens(x.name).every(t => tokens(w).includes(t)))));
+      if (!m || this.p.faded(m.soulId)) return {code: 'capability.unknown', reason: `Nobody called "${name}" is near you.`, did_you_mean: caps.filter(c => c.verb === verb).slice(0, 5).map(c => ({id: c.id, label: c.label}))};
+      const place = this.p.innermostPlace(m.soulId), pname = place ? this.p.places.byId.get(place)?.name ?? place : null, here = this.posOf(soul.soulId), there = this.posOf(m.soulId);
+      const d = here && there ? Math.round(Math.hypot(here[0] - there[0], here[1] - there[1])) : null;
+      const walk = caps.filter(c => c.verb === 'walk' && c.target && place && (c.target.id === place || this.p.places.byId.get(place)?.parent === c.target.id))[0];
+      return {code: 'soul.not-in-sight', reason: `${m.name} is not in sight from here${pname ? ` (in ${pname}` + (d !== null ? `, ${d} m away)` : ')') : ''}; go to them first, then ${verb}.`, did_you_mean: walk ? [{id: walk.id, label: walk.label}] : []};
+    };
     const tooFar = (verb: string, o: NearbyBody) => {const g = caps.find(c => c.id === 'go-near:' + o.soulId); return {code: 'gesture.too-far', reason: `${o.name} is ${o.distance} m away; ${verb} needs you within ${GESTURE_RADIUS} m. Go near them first.`, did_you_mean: g ? [{id: g.id, label: g.label}] : []};};
     // invitations to me
     const mine = this.invitesFor(soul.soulId);
@@ -584,7 +593,7 @@ export class Together {
       const m = re.exec(t); if (!m) continue;
       const name = (m[1] ?? m[2] ?? '').trim();
       const o = name ? who(name) : near.filter(x => x.distance <= GESTURE_RADIUS).length === 1 ? near[0] : null;
-      if (!o) return {code: 'capability.unknown', reason: name ? `Nobody called "${name}" is near you.` : `Say who: "${verb} <name>".`, did_you_mean: caps.filter(c => c.verb === verb).slice(0, 5).map(c => ({id: c.id, label: c.label}))};
+      if (!o) return name ? notHere(verb, name) : {code: 'capability.unknown', reason: `Say who: "${verb} <name>".`, did_you_mean: caps.filter(c => c.verb === verb).slice(0, 5).map(c => ({id: c.id, label: c.label}))};
       const back = this.reciprocal(soul.soulId, o.soulId, verb); if (back) return {capability: 'accept:' + back.id, note: `${o.name} already offered ${verb}; accepting`};
       const c = capFor(verb, o); if (!c) return tooFar(verb, o);
       return {capability: c.id, note: `${raw} is ${c.id}`};
@@ -597,8 +606,8 @@ export class Together {
     }
     // follow / walk with
     const fol = /^(?:follow|walk\s+with|go\s+with|accompany|tag\s+along\s+with|come\s+with)\s+(.+)$/.exec(t);
-    if (fol) {
-      const o = who(fol[1]); if (!o) return null;
+    if (fol && !/^(?:me|us)$/.test(fol[1].trim())) {
+      const o = who(fol[1]); if (!o) return /^(?:him|her|them|they|she|he)$/.test(fol[1].trim()) ? null : notHere('follow', fol[1]);
       const back = this.invitesFor(soul.soulId).find(i => i.host.soulId === o.soulId); if (back) return {capability: 'accept:' + back.id, note: `joining ${o.name}'s ${back.what}`};
       const c = capFor('follow', o); if (!c) return {code: 'follow.unavailable', reason: `${o.name} is too far away to walk with (${o.distance} m).`, did_you_mean: []};
       return {capability: c.id, note: `${raw} is ${c.id}`};
@@ -608,7 +617,7 @@ export class Together {
     const give = /^(?:give|hand|pass|offer)\s+(.+?)\s+(?:the\s+|my\s+|this\s+|a\s+|an\s+)?(?:book|flower|flowers|cup|tea|coffee|food|snack|letter|tool|frisbee|it|this|that|thing)$/.exec(t) ?? /^(?:give|hand|pass|offer)\s+(?:the\s+|my\s+|this\s+|a\s+|an\s+)?(?:\w+\s+)?(?:to)\s+(.+)$/.exec(t) ?? /^(?:give|hand|pass)\s+(?:it|this|that)\s+to\s+(.+)$/.exec(t);
     if (give) {
       if (!held) return {code: 'hands.empty', reason: 'You are not holding anything to give; pick something up first.', did_you_mean: caps.filter(c => c.verb === 'pick-up').slice(0, 5).map(c => ({id: c.id, label: c.label}))};
-      const o = who(give[1]); if (!o) return {code: 'capability.unknown', reason: `Nobody called "${give[1]}" is near you.`, did_you_mean: caps.filter(c => c.verb === 'give').slice(0, 5).map(c => ({id: c.id, label: c.label}))};
+      const o = who(give[1]); if (!o) return notHere('give', give[1]);
       const c = capFor('give', o); if (!c) return tooFar('give', o);
       return {capability: c.id, note: `${raw} is ${c.id} (${held.name})`};
     }
