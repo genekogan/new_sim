@@ -1,4 +1,5 @@
-// Core-Comms routes under /v1/edge: wait (event stream), say, subscribe, converse, objects.
+// Core-Comms routes under /v1/edge: wait (event stream), say, subscribe, converse, objects,
+// digest, and the steward work queue under /v1/edge/steward/*.
 // Mounted by Ledger's edge/routes.ts via registerEdgeComms(app, deps).
 import type {Context, Hono} from 'hono';
 import type {ContentfulStatusCode} from 'hono/utils/http-status';
@@ -11,6 +12,7 @@ import {presentationKind} from './objects/presentation.ts';
 import type {CommsCore, SpectatorEdgeMessage} from './core.ts';
 import {Presence} from './presence.ts';
 import {say} from './speech.ts';
+import {Steward} from './steward.ts';
 import {ensureCommsSchema} from './store.ts';
 import {EventStreams, parseCursor} from './stream.ts';
 import {Webhooks, type Fetch} from './webhook.ts';
@@ -25,6 +27,8 @@ export type CommsOptions = {
   sweepMs?: number;
   /** Webhook transport; defaults to global fetch. `null` disables delivery. */
   fetch?: Fetch | null;
+  /** Bearer token the steward session presents on /v1/edge/steward/*; unset = 503. */
+  stewardToken?: string;
 };
 
 export type CommsRuntime = {
@@ -34,6 +38,8 @@ export type CommsRuntime = {
   webhooks: Webhooks;
   /** Object framework: `objects.create({...})` seeds instances; kinds via `objects.register`. */
   objects: Objects;
+  /** Steward work queue: `enqueue`, `narrate`, `requestRender`, `latestDigest`. */
+  steward: Steward;
   /** Narration/world text to one Soul, some Souls, or every live Soul. */
   publishWorld(text: string, to?: string[]): void;
   /** Spectator `edge` messages (§7) for the hub to broadcast. */
@@ -65,6 +71,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   objects.register(chessKind);
   objects.register(presentationKind);
   deps.ledger.addCapabilityProvider(soul => objects.capabilities(soul));
+  const steward = new Steward(core, options.stewardToken);
   const presence = new Presence({ledger: deps.ledger, liveSoulIds: core.liveSoulIds, nameOf: core.nameOf, deliver: (s, k, t, b) => { streams.deliver(s, k, t, b); }});
 
   // Ledger feeds: receipt phases to their own Soul (deduplicated durably, so replays
@@ -116,17 +123,43 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   app.get('/v1/edge/objects', route((_c, soul) => ({objects: objects.visibleTo(soul)})));
   app.get('/v1/edge/objects/:id', route((c, soul) => objects.get(c.req.param('id') ?? '', soul)));
   app.post('/v1/edge/objects/:id/act', route(async (c, soul) => objects.act(c.req.param('id') ?? '', soul, await json(c))));
+  app.get('/v1/edge/digest', route(() => ({digest: steward.latestDigest()})));
+
+  // Steward session endpoints (not Soul-authenticated).
+  const stewardRoute = (fn: (c: Context) => object | Promise<object>) => async (c: Context) => {
+    try { steward.authorize(c.req.header('authorization')); return c.json(edgeBody(await fn(c))); }
+    catch (error) {
+      if (error instanceof EdgeError) return c.json(edgeBody({error: {code: error.code, message: error.message}}), error.status as ContentfulStatusCode);
+      throw error;
+    }
+  };
+  const by = (body: Record<string, unknown>) => typeof body.by === 'string' && body.by.length <= 100 ? body.by : 'steward';
+  app.get('/v1/edge/steward/work', stewardRoute(c => { steward.schedule(); return {clock: steward.clock(), work: steward.list(c.req.query('done') === '1')}; }));
+  app.post('/v1/edge/steward/work/:id/claim', stewardRoute(async c => ({work: steward.claim(c.req.param('id') ?? '', by(await json(c)))})));
+  app.post('/v1/edge/steward/work/:id/release', stewardRoute(c => steward.release(c.req.param('id') ?? '')));
+  app.post('/v1/edge/steward/work/:id/complete', stewardRoute(async c => {
+    const body = await json(c);
+    const result = body.result;
+    if (!result || typeof result !== 'object' || Array.isArray(result)) throw new EdgeError(400, 'invalid', 'result must be an object');
+    return {work: steward.complete(c.req.param('id') ?? '', result as Record<string, unknown>)};
+  }));
+  app.get('/v1/edge/steward/log', stewardRoute(c => {
+    const since = Number(c.req.query('since') ?? 0);
+    if (!Number.isFinite(since) || since < 0) throw new EdgeError(400, 'invalid', 'since must be ms since epoch');
+    return steward.log(since);
+  }));
 
   const sweep = () => {
     try { conversations.sweep(); } catch { /* retried next period */ }
     try { objects.sweep(); } catch { /* retried next period */ }
+    try { steward.schedule(); } catch { /* retried next period */ }
   };
   const timer = (options.sweepMs ?? 30_000) > 0 ? setInterval(sweep, options.sweepMs ?? 30_000) : null;
   timer?.unref?.();
   for (const r of db.prepare('SELECT soul_id FROM edge_comms_subscriptions WHERE world_id = ?').all(worldId) as {soul_id: string}[]) void webhooks.push(r.soul_id);
 
   return {
-    core, streams, conversations, webhooks, objects,
+    core, streams, conversations, webhooks, objects, steward,
     publishWorld(text, to) {
       const tick = core.tick();
       for (const id of to ?? core.liveSoulIds()) streams.deliver(id, 'world', tick, {text});
