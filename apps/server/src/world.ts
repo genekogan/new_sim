@@ -1007,6 +1007,15 @@ export class WorldHost {
     if(!admit.length)return Promise.resolve({admitted:[] as string[],refused});
     return this.enqueue('rules','operator:place-regions',{placeRegionsV1:admit,why:'W1 places on admitted native ground become destination regions (walk, hang-out, gather) so Souls can spread beyond the commons; prospective, earlier history replays unchanged'}).then(()=>({admitted:admit.map(r=>r.id),refused}));
   }
+  /** nav/1: extra walking ground and solid footprints (buildings, water) as one logged prospective rules fact; a spec equal
+   *  to the installed one is a no-op. Resolves {installed:false} without logging when nothing would change. */
+  installNavV1(spec:{version:'nav/1';ground:{id:string;boundsXZ:[number,number,number,number]}[];solids:{id:string;label?:string;c:[number,number];half:[number,number];yaw:number;height?:number}[]}){
+    const engine=this.engine as unknown as {previewNavV1?:(s:unknown)=>{code:string;message:string}|null;navFromSpecV1:(s:unknown)=>unknown;world:{navV1?:unknown}};
+    if(!engine.previewNavV1)return Promise.reject(Error('nav.reader-required'));
+    const issue=engine.previewNavV1(spec);if(issue)return Promise.reject(Error(`${issue.code}: ${issue.message}`));
+    if(hashOf(engine.world.navV1??null)===hashOf(engine.navFromSpecV1(spec)))return Promise.resolve({installed:false});
+    return this.enqueue('rules','operator:nav',{navV1:structuredClone(spec),why:'nav/1: buildings and water are solid to walking (doors closed until interiors are admitted) and admitted ground widens to the park; prospective, earlier history replays unchanged'}).then(()=>({installed:true}));
+  }
   /** carrier/1: install a ride (e.g. a hot-air balloon) at its home as a logged prospective rules fact; idempotent by id. */
   installCarrierV1(spec:{id:string;def:string;label?:string;at:[number,number];yaw?:number;route:string;waitSeconds?:number}){
     const engine=this.engine as unknown as {previewCarrierV1?:(s:unknown)=>{code:string;message:string}|null;world:{entities:Record<string,{carrier?:unknown}>}};

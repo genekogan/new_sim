@@ -19,6 +19,8 @@ const TOL = 0.03;
  * seat's approach point and the seat during the 0.6 s sit-down / stand-up transitions. `eat` / `serve`
  * (engine/items) are overlays a seated person runs without leaving the seat (they never move the body).
  */
+/** activities/1 overlays (social/pose.ts) that may sit on a held seat; eat/drink only with a pose prop (native items keep their own rule). */
+const POSE_OVERLAY_SET: ReadonlySet<string> = new Set(['read', 'browse', 'write', 'play-piano', 'play-music', 'paint', 'cook', 'play-game', 'craft', 'post-letter', 'wave']);
 export const SEATED_ACTIVITIES: ReadonlySet<string> = new Set(['sit', 'sit-down', 'stand-up', 'eat', 'serve']);
 
 export function humanStaticClearanceWithOverlay(qualified:(rt:Runtime,e:import('../world/types.ts').Entity)=>boolean):Invariant {return (rt: Runtime) => {
@@ -27,7 +29,8 @@ export function humanStaticClearanceWithOverlay(qualified:(rt:Runtime,e:import('
   const out: Diagnostic[] = [];
   for (const e of Object.values(rt.world.entities)) {
     // people on the rack structure (`human.on`: a frame climb or beam walkway) are checked by construction/frame.ts frameAccessOk
-    if (e.kind !== 'human' || !e.human || e.human.on || e.human.carrier || e.human.activity.startsWith('climb') || SEATED_ACTIVITIES.has(e.human.activity) || qualified(rt,e)) continue;
+    // activities/1 overlays on a seat (read, play-piano…) keep the seated exemption (baseActivity 'sit'; social/pose.ts)
+    if (e.kind !== 'human' || !e.human || e.human.on || e.human.carrier || e.human.activity.startsWith('climb') || SEATED_ACTIVITIES.has(e.human.activity) || (e.human.baseActivity === 'sit' && (POSE_OVERLAY_SET.has(e.human.activity) || (!!e.human.prop && (e.human.activity === 'eat' || e.human.activity === 'drink')))) || qualified(rt,e)) continue;
     const g = sp.level(e.human.level);
     if (!g) continue;
     const c = clearanceAt(g, [e.pose.p[0], e.pose.p[2]]);

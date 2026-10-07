@@ -96,6 +96,10 @@ export type HumanState = {
   proneYaw?: number;
   /** Ground-mat sleep only: semantic progress, independent of renderer rig coordinates. */
   sleepPose?: { mat: string; standingFraction: number };
+  /** activities/1 (social/pose.ts, ACTIVITIES-v1): a small object in the hands while a pose activity runs (book, brush…). */
+  prop?: string;
+  /** activities/1: seat top (m above the feet) while seated at a scenery spot with no native seat fixture (piano bench, armchair). */
+  seatHeight?: number;
 };
 
 /** Persistent committed quantities for one bounded cold preparation batch. */
@@ -197,6 +201,8 @@ export type WorldState = {
   regions: Record<string, Region>;
   /** Fork-local static obstacle overrides; null removes a source obstacle. Source base stays immutable. */
   obstacleEdits?: Record<string, Obstacle | null>;
+  /** nav/1: extra walking ground and solid footprints over the source scene (spatial/edits.ts); absent before its rules fact. */
+  navV1?: import('../spatial/edits.ts').NavV1;
   env: Environment;
   inventory: 'finite' | 'unlimited';
   rng: RngState;
@@ -217,6 +223,7 @@ export function physicalView(w: WorldState) {
   return {
     base: w.base,
     ...(w.obstacleEdits ? { obstacleEdits: w.obstacleEdits } : {}),
+    ...(w.navV1 ? { navV1: w.navV1 } : {}),
     entities,
     regions: Object.values(w.regions).map((r) => {
       const layout = (r as { layout?: unknown }).layout;

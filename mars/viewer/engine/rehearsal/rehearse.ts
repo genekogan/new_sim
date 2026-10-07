@@ -6,6 +6,7 @@
 import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import { hashOf, stableStringify } from '../core/hash.ts';
 import { HistoryError, type Checkpoint, type WorldHistory } from '../history/store.ts';
+import { worldBaseId } from '../spatial/edits.ts';
 import { Runtime, type Invariant, type RuntimeServices, type Violation } from '../runtime/runtime.ts';
 import { SequenceRunner, type SequenceResult, type SequenceStatus, type StepReport } from '../sequence/runner.ts';
 import type { BoundPlan } from '../sequence/types.ts';
@@ -82,7 +83,7 @@ export type ExecuteResult =
 export function runServices(world: WorldState, cfg: EngineConfig): RuntimeServices {
   const services = cfg.services(world);
   const sp = services.spatial as { base?: unknown; baseId?: string } | undefined;
-  const expectedBase = world.obstacleEdits ? hashOf({ source: world.base.staticHash, obstacleEdits: world.obstacleEdits }) : world.base.staticHash;
+  const expectedBase = worldBaseId(world.base.staticHash, world);
   if (sp && sp.base !== undefined && (sp.baseId ?? hashOf(sp.base)) !== expectedBase)
     throw new HistoryError(
       'services.base-mismatch',

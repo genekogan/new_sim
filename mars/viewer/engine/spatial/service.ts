@@ -11,6 +11,7 @@ import { findRoute, prepareCorridor, type Place, type RouteOpts, type RouteResul
 import type { AgentProfile, Link, Obstacle, SpatialScene, Surface } from './types.ts';
 import type { Profiler } from '../runtime/profile.ts';
 import { sleepEnvelope, SLEEP_BODY_MARGIN } from '../activities/sleep.ts';
+import { sceneForWorld, worldBaseId } from './edits.ts';
 
 /** Phases in which a component physically occupies space as a static obstacle. */
 const STATIC_PHASES = new Set(['stored', 'reserved', 'staged', 'placed', 'installed', 'raising']);
@@ -139,14 +140,38 @@ export class Spatial {
   /** Rasters of the base obstacles (they lead every synced scene's obstacle list). */
   private raster: StaticRaster;
 
-  constructor(base: SpatialScene, opts: { cell?: number; contributors?: Contributor[]; baseId?: string; planner?: 'exact' | 'corridor'; incremental?: boolean } = {}) {
+  /** The unedited source scene and its id (servicesFor), so a world edit (nav/1) can re-base this service in place. */
+  source?: { scene: SpatialScene; id: string };
+
+  constructor(base: SpatialScene, opts: { cell?: number; contributors?: Contributor[]; baseId?: string; planner?: 'exact' | 'corridor'; incremental?: boolean; source?: { scene: SpatialScene; id: string } } = {}) {
     this.base = base;
+    this.source = opts.source;
     this.baseId = opts.baseId ?? hashOf(base);
     this.cell = opts.cell ?? 0.1;
     this.contributors = opts.contributors ?? [];
     this.planner = opts.planner ?? 'exact';
     this.incremental = opts.incremental ?? true;
     this.raster = new StaticRaster(base.obstacles, base.bounds, this.cell);
+  }
+
+  /**
+   * Re-base on the world's own static edits (nav/1 ground and solids) after a logged rules fact changed them: the
+   * static raster is rebuilt once here, and the next sync rebuilds the grids and advances the navigation epoch, so
+   * walkers replan. Returns false when nothing changed (or no source is known).
+   */
+  refreshForWorld(world: WorldState): boolean {
+    if (!this.source) return false;
+    const id = worldBaseId(this.source.id, world);
+    if (id === this.baseId) return false;
+    this.base = sceneForWorld(this.source.scene, world);
+    this.baseId = id;
+    this.raster = new StaticRaster(this.base.obstacles, this.base.bounds, this.cell);
+    this.scene = undefined as unknown as SpatialScene;
+    this.snaps = [];
+    this.aroundCache.clear();
+    this.narrowCache.clear();
+    this.sync(world);
+    return true;
   }
 
   /** Rebuild derived scene/grids iff navigation-relevant world content changed. */

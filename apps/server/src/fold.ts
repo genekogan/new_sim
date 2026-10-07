@@ -199,6 +199,9 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
           if(!result.ok)throw new Error('camp-expansion.anchor:'+result.message);
         }
       }
+      // nav/1: extra flat walking ground and solid building/water footprints join the static walk scene (prospective; idempotent).
+      const nav=(e.payload as {navV1?:unknown}|null)?.navV1;
+      if(nav){const install=(engine as unknown as {installNavV1?:(s:unknown)=>unknown}).installNavV1;if(!install)throw Error('nav.reader-required');install.call(engine,nav);}
       // placeRegionsV1: W1 places on admitted native ground become destination regions, with their kernel places (walk offers).
       const regionsV1=(e.payload as {placeRegionsV1?:unknown}|null)?.placeRegionsV1;
       if(regionsV1){const install=(engine as unknown as {installPlaceRegionsV1?:(l:unknown)=>string[]}).installPlaceRegionsV1;if(!install)throw Error('place-regions.reader-required');

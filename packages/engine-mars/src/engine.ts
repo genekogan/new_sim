@@ -130,6 +130,8 @@ const bucket = (m: number): 'here' | 'close' | 'near' | 'far' => (m < 2.5 ? 'her
 
 /** Fresh physical bases use an explicit native binding; legacy factories omit it. */
 export type MarsPhysicalBinding = {rulesVersion:string;renderScene:()=>RenderScene;restore:(snapshot:any)=>any;services:(world:any)=>any;prepareRemoval?:(runtime:any,id:string)=>boolean;boatControls?:(runtime:any,actor:string)=>NativeBoatControlsV1|null;bodyLocation?:(runtime:any,actor:string)=>BodyLocationV1|null};
+/** nav/1 install spec (Core derives it from place data): flat ground rectangles and solid oriented boxes. */
+export type NavSpecV1={version:'nav/1';ground:{id:string;boundsXZ:[number,number,number,number]}[];solids:{id:string;label?:string;c:[number,number];half:[number,number];yaw:number;height?:number}[]};
 export class MarsEngine implements Engine {
   get nativeArrivalWitnessEnabledV1(){return this.cfg.nativeArrivalWitnessV1===true;}
   readonly dt = 1 / TPS;
@@ -1149,6 +1151,68 @@ export class MarsEngine implements Engine {
     for(const r of list??[]){if(this.previewPlaceRegionV1(r))continue;this.rt.world.regions[r.id]={id:r.id,label:r.label,kind:'place',level:0,polygon:r.polygon.map(v=>[v[0],v[1]] as [number,number]),provenance:{origin:'design-edit',confidence:'hypothetical',note:'W1 place admitted as a native destination (placeRegionsV1)'}};added.push(r.id);}
     if(added.length){const sorted:Record<string,any>={};for(const id of Object.keys(this.rt.world.regions).sort())sorted[id]=this.rt.world.regions[id];this.rt.world.regions=sorted;}
     return added;
+  }
+  /** nav/1: why this ground/solids spec cannot be installed (pure), or null. Ground rectangles are flat level-0 floor
+   *  (never west of the connected shore's dry gate, x < -29.5); solids are oriented boxes (centre, half-extents, yaw). */
+  previewNavV1(spec:NavSpecV1):Diag|null{
+    if(!spec||spec.version!=='nav/1'||!Array.isArray(spec.ground)||!Array.isArray(spec.solids))return {code:'nav.bad-spec',message:'{version:"nav/1",ground:[],solids:[]} required'};
+    if(spec.ground.length>16||spec.solids.length>1024)return {code:'nav.too-many',message:'at most 16 ground rectangles and 1024 solids'};
+    const ids=new Set<string>(),okId=(id:unknown)=>typeof id==='string'&&/^[a-z0-9][a-z0-9._#-]{0,119}$/.test(id)&&!ids.has(id)&&!!ids.add(id);
+    for(const g of spec.ground){const b=g?.boundsXZ;if(!okId(g?.id)||!Array.isArray(b)||b.length!==4||!b.every(Number.isFinite)||!(b[0]<b[2]&&b[1]<b[3]))return {code:'nav.bad-ground',message:`ground ${g?.id}: id and boundsXZ [x0,z0,x1,z1] required`};
+      if(b[0]< -29.5)return {code:'nav.ground-west-of-shore-gate',message:`ground ${g.id} reaches west of x=-29.5, the connected shore's dry gate`};
+      if(Math.abs(b[0])>2000||Math.abs(b[1])>2000||Math.abs(b[2])>2000||Math.abs(b[3])>2000)return {code:'nav.bad-ground',message:`ground ${g.id} out of range`};}
+    for(const o of spec.solids){if(!okId(o?.id)||!Array.isArray(o.c)||o.c.length!==2||!o.c.every(Number.isFinite)||!Array.isArray(o.half)||o.half.length!==2||!o.half.every(h=>Number.isFinite(h)&&h>0&&h<200)||!Number.isFinite(o.yaw))return {code:'nav.bad-solid',message:`solid ${o?.id}: id, c [x,z], half [hx,hz] (>0) and yaw required`};}
+    return null;
+  }
+  /** nav/1 (logged rules fact `navV1`): extra flat walking ground and solid footprints become part of this world's static
+   *  scene (world.navV1; every Spatial built for the world agrees), the walk planner re-bases once (precomputed raster) and
+   *  routes around the solids. Idempotent for the same spec. Idle bodies standing inside a new solid step out to the nearest
+   *  clear spot; busy ones are named in `trapped` (their programme ends on its own when it cannot route). */
+  installNavV1(spec:NavSpecV1):{installed:boolean;relocated:string[];trapped:string[]}{
+    if(this.previewNavV1(spec))return {installed:false,relocated:[],trapped:[]};
+    const nav=this.navFromSpecV1(spec);
+    if(hashOf(this.rt.world.navV1??null)===hashOf(nav))return {installed:false,relocated:[],trapped:[]};
+    this.rt.world.navV1=nav;
+    const spatial=this.rt.services.spatial as Spatial;
+    if(!spatial.refreshForWorld(this.rt.world))throw Error('nav.spatial-not-rebasable');
+    const grid=spatial.level(0),relocated:string[]=[],trapped:string[]=[];
+    for(const id of Object.keys(this.ents).sort()){
+      const e=this.ents[id];if(e.kind!=='human'||!e.human||(e.human.level??0)!==0||e.human.shore||e.human.carrier||e.human.sleepPose||e.human.on||!grid)continue;
+      if(clearanceAt(grid,[e.pose.p[0],e.pose.p[2]])>=HUMAN_RADIUS)continue;
+      const to=this.nearestStandableV1([e.pose.p[0],e.pose.p[2]],id);
+      if(to&&this.relocateHumanV1(id,to))relocated.push(id);else trapped.push(id);
+    }
+    return {installed:true,relocated,trapped};
+  }
+  /** nav/1: the world.navV1 value a valid spec installs (pure; prefixed ids so they never collide with source obstacles). */
+  navFromSpecV1(spec:NavSpecV1){
+    return {version:'nav/1' as const,
+      ground:spec.ground.map(g=>{const [x0,z0,x1,z1]=g.boundsXZ;return {id:'nav-ground:'+g.id,level:0,y:0,obb:{c:[(x0+x1)/2,(z0+z1)/2] as [number,number],half:[(x1-x0)/2,(z1-z0)/2] as [number,number],yaw:0}};}),
+      solids:spec.solids.map(o=>({id:'nav-solid:'+o.id,obb:{c:[o.c[0],o.c[1]] as [number,number],half:[o.half[0],o.half[1]] as [number,number],yaw:o.yaw},y0:-.5,y1:Number.isFinite(o.height)&&o.height!>0?o.height!:4,kind:'solid' as const,...(o.label?{label:String(o.label).slice(0,100)}:{})}))};
+  }
+  /** Nearest clear level-0 standing spot (0.5 m rings, up to 40 m) away from other people; read-only. */
+  /** nav/1 read: the walk planner's current raster bounds [x0,z0,x1,z1] (where ground can exist at all). */
+  groundBoundsV1():[number,number,number,number]{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);return [...spatial.scene.bounds] as [number,number,number,number];}
+  /** nav/1 read: clearance (m) of level-0 standing ground at a point (0 off ground or inside a solid). */
+  clearanceAtV1(x:number,z:number,level=0):number{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const g=spatial.level(level);return g?clearanceAt(g,[x,z]):0;}
+  nearestStandableV1(at:[number,number],except?:string,minClear=HUMAN_RADIUS+.15,maxRing=80):[number,number]|null{
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.level(0);if(!grid)return null;
+    const people=Object.values(this.ents).filter((o:any)=>o.kind==='human'&&o.id!==except).map((o:any)=>[o.pose.p[0],o.pose.p[2]] as [number,number]);
+    for(let ring=0;ring<=maxRing;ring++){const n=Math.max(1,ring*8);for(let k=0;k<n;k++){
+      const ang=(k/n)*Math.PI*2,x=r3(at[0]+dcos(ang)*ring*.5),z=r3(at[1]+dsin(ang)*ring*.5);
+      if(clearanceAt(grid,[x,z])<minClear||people.some(([px,pz])=>hypot(px-x,pz-z)<.8))continue;return [x,z];}}
+    return null;
+  }
+  /** nav/1 read: up to `n` clear standing points spread over a polygon (2 m lattice, farthest-point order from its centre), for strolls. */
+  clearSpotsV1(polygon:[number,number][],n:number):[number,number][]{
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.level(0);if(!grid||!Array.isArray(polygon)||polygon.length<3)return [];
+    const xs=polygon.map(v=>v[0]),zs=polygon.map(v=>v[1]),cand:[number,number][]=[];
+    for(let x=Math.ceil(Math.min(...xs))+1;x<Math.max(...xs);x+=2)for(let z=Math.ceil(Math.min(...zs))+1;z<Math.max(...zs);z+=2)if(inPoly(x,z,polygon)&&clearanceAt(grid,[x,z])>=HUMAN_RADIUS+.4)cand.push([x,z]);
+    if(!cand.length)return [];
+    const cx=xs.reduce((a,b)=>a+b,0)/xs.length,cz=zs.reduce((a,b)=>a+b,0)/zs.length;
+    const out:[number,number][]=[cand.reduce((b,p)=>hypot(p[0]-cx,p[1]-cz)<hypot(b[0]-cx,b[1]-cz)?p:b)];
+    while(out.length<Math.min(n,cand.length)){let best=cand[0],bd=-1;for(const p of cand){const d=Math.min(...out.map(q=>hypot(p[0]-q[0],p[1]-q[1])));if(d>bd){bd=d;best=p;}}if(bd<=0)break;out.push(best);}
+    return out;
   }
   /** carrier/1: the carrier this body is boarding, seated in or leaving, if any. */
   carrierOf(actor:string):{id:string;slot:string;riderPhase:string;phase:string;label:string}|null{
