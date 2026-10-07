@@ -1,6 +1,6 @@
 // Edge server entry (EDGE-CONTRACT-v1). Owners' agents drive Souls; the world runs no Soul mind.
 // Usage: node tools/core/edge-server.mjs <descriptor.json> [check]
-// Descriptor: {input, dataDir, worldId, port, build, webDir?, marsWebDir?, placeData?, inputManifestSHA256?, localSoulLimit?, flags?{...}}
+// Descriptor: {input, dataDir, worldId, port, build, webDir?, marsWebDir?, placeData?, inputManifestSHA256?, localSoulLimit?, flags?{...}, nav?{ground?:[{id,boundsXZ}]}, activitySpots?}
 import {createServer} from 'node:http';
 import {createRequire} from 'node:module';
 import {resolve,join} from 'node:path';
@@ -10,7 +10,7 @@ import {createHash} from 'node:crypto';
 import {setImmediate} from 'node:timers/promises';
 
 export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,marsWebDir,build='local-edge/1',checkOnly=false,placeData,seedObjects,inviteRequired=false,skillFile,cliFile,ambient=true,
-  inputManifestSHA256,modelCredentialFile=undefined,localBudget=0,autonomous=false,localSoulLimit=5,humanRest=false,provisions=false,sequences=false,floorGoals=false,kitchen=false,shore=false,foodDeliveryId,quietLandingCourtesy=false,social=false,closedGoals=false,approachRetention=false,activateExpansion=false,humanDirectionBurstUsd=1,quiesceThought=false,nativePlaces=[]}) {
+  inputManifestSHA256,modelCredentialFile=undefined,localBudget=0,autonomous=false,localSoulLimit=5,humanRest=false,provisions=false,sequences=false,floorGoals=false,kitchen=false,shore=false,foodDeliveryId,quietLandingCourtesy=false,social=false,closedGoals=false,approachRetention=false,activateExpansion=false,humanDirectionBurstUsd=1,quiesceThought=false,nativePlaces=[],nav=null,activitySpots}) {
   if(!input||!dataDir||!worldId||!Number.isInteger(port)||!(port>=4950&&port<=4959||port===4970))throw Error('explicit local input/data/world/allowed port required');
   if(!build.startsWith('local-'))throw Error('local build identity required');
   input=resolve(input);dataDir=resolve(dataDir);
@@ -102,6 +102,15 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
     if(host.enableReflexTimeoutV1)await drive(host.enableReflexTimeoutV1());
     if(host.enableContinuousDayV1)await drive(host.enableContinuousDayV1());
     if(host.enableEdgeMotionV1)await drive(host.enableEdgeMotionV1());
+    // nav/1: enclosed buildings, water and World's scenery solids become solid to walking; admitted interiors get walls with doors;
+    // descriptor nav.ground widens walkable ground (e.g. south to the park). One logged rules fact; a no-op when unchanged.
+    const spotsRaw=activitySpots?JSON.parse(readFileSync(resolve(activitySpots),'utf8')):undefined;
+    if(nav){if(!placeData)throw Error('nav needs placeData');if(!host.installNavV1)throw Error('selected runtime has no nav/1');
+      const {navSpecFromPlaces}=await load('apps/server/src/edge/ledger/nav.ts'),{loadSpots}=await load('apps/server/src/edge/ledger/activities.ts');
+      const data=JSON.parse(readFileSync(resolve(placeData),'utf8')),spots=loadSpots(spotsRaw).data;
+      const native=new Set([...Object.entries(host.engine.world.regions).filter(([,r])=>!String(r.provenance?.note??'').includes('placeRegionsV1')).map(([id])=>id),...data.places.filter(p=>(p.occupiers??[]).length).map(p=>p.id)]);
+      const spec=navSpecFromPlaces(data,{native,ground:Array.isArray(nav.ground)?nav.ground:[],area:[host.engine.groundBoundsV1()],extraSolids:spots.solids,rings:spots.rings,interiors:spots.interiors});
+      const out=await drive(host.installNavV1(spec));console.error('[edge] nav/1:',JSON.stringify({installed:out.installed,ground:spec.ground.length,solids:spec.solids.length}));}
     // placeRegionsV1: named W1 places (from placeData) on admitted native ground become destination regions (one logged rules fact; idempotent).
     if(nativePlaces.length){if(!placeData)throw Error('nativePlaces needs placeData');if(!host.installPlaceRegionsV1)throw Error('selected runtime has no placeRegionsV1');
       const byId=new Map(JSON.parse(readFileSync(resolve(placeData),'utf8')).places.map(p=>[p.id,p]));
@@ -110,7 +119,7 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
     // carrier/1: a seeded ride object with `carrier` installs its native carrier first (logged rules fact, idempotent by id).
     for(const o of seedObjects??[])if(o.kind==='ride'&&o.carrier&&!host.engine.world.entities[o.params?.carrier]?.carrier){if(!host.installCarrierV1)throw Error('selected runtime has no carrier/1');await drive(host.installCarrierV1({id:o.params.carrier,label:o.name,...o.carrier}));}
     const {EdgeLedger}=await load('apps/server/src/edge/ledger/ledger.ts');
-    const edge=new EdgeLedger(host,db,placeData?JSON.parse(readFileSync(resolve(placeData),'utf8')):undefined,{ambient});
+    const edge=new EdgeLedger(host,db,placeData?JSON.parse(readFileSync(resolve(placeData),'utf8')):undefined,{ambient,spots:spotsRaw});if(edge.spotsRefused?.length)console.error('[edge] activity spots refused:',edge.spotsRefused.join(', '));
     const app=buildApp({cfg,db,host,auth,brain,souls,hub,intentV2:service,edge}),listener=require('@hono/node-server').getRequestListener(app.fetch);
     // Seed declared objects (idempotent by id). presentation params may give startsInMinutes.
     for(const o of seedObjects??[]){const params={...(o.params??{})};if(typeof params.startsInMinutes==='number'){params.startsAtTick=host.engine.world.tick+Math.round(params.startsInMinutes*60*20);delete params.startsInMinutes;}const {carrier:_c,...object}=o;edge.comms?.objects.create({...object,params});}
@@ -143,7 +152,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).hr
     if(!descriptorPath)throw Error('usage: node tools/core/edge-server.mjs <descriptor.json> [check]');
     const d=JSON.parse(readFileSync(resolve(descriptorPath),'utf8')),flags=d.flags??{};
     const app=await openEdgeServerV1({input:d.input,dataDir:d.dataDir,worldId:d.worldId,port:Number(d.port),webDir:d.webDir,marsWebDir:d.marsWebDir,build:d.build??'local-edge/1',checkOnly:mode==='check',placeData:d.placeData,seedObjects:d.objects,inviteRequired:d.inviteRequired===true,skillFile:d.skillFile,cliFile:d.cliFile,inputManifestSHA256:d.inputManifestSHA256,
-      localSoulLimit:Number(d.localSoulLimit??9),humanRest:flags.humanRest??true,provisions:flags.provisions??true,sequences:flags.sequences??true,floorGoals:flags.floorGoals??true,kitchen:flags.kitchen??true,shore:flags.shore??true,foodDeliveryId:flags.foodDeliveryId,quietLandingCourtesy:flags.quietLandingCourtesy??true,social:flags.social??true,approachRetention:flags.approachRetention??true,closedGoals:flags.closedGoals??true,activateExpansion:flags.activateExpansion??true,nativePlaces:Array.isArray(d.nativePlaces)?d.nativePlaces:[]});
+      localSoulLimit:Number(d.localSoulLimit??9),humanRest:flags.humanRest??true,provisions:flags.provisions??true,sequences:flags.sequences??true,floorGoals:flags.floorGoals??true,kitchen:flags.kitchen??true,shore:flags.shore??true,foodDeliveryId:flags.foodDeliveryId,quietLandingCourtesy:flags.quietLandingCourtesy??true,social:flags.social??true,approachRetention:flags.approachRetention??true,closedGoals:flags.closedGoals??true,activateExpansion:flags.activateExpansion??true,nativePlaces:Array.isArray(d.nativePlaces)?d.nativePlaces:[],nav:d.nav??null,activitySpots:d.activitySpots});
     if(app.checkOnly)console.log(JSON.stringify(app,null,2));
     else {console.log(JSON.stringify({url:app.cfg.publicUrl,worldId:app.host.worldId,boot:app.boot,mindDriver:app.cfg.mindDriver,edge:'/v1/edge',places:app.edge.places.byId.size,build:app.cfg.build}));
       for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>void app.close().then(()=>process.exit(0)).catch(()=>process.exit(1)));}
