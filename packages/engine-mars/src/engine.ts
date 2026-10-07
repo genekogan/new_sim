@@ -298,6 +298,7 @@ export class MarsEngine implements Engine {
               const why = {code:'route.blocked',message:this.quiet?'quiet checkpoint: this walk stayed held waiting on other people for 30 seconds':'this walk stayed held waiting on other people for a minute'};
               this.rt.cancel(rec.id, why);
               if (this.rt.isActive(rec.id)) { p.walkStopping = why; return; }
+              if (this.spreadRetry(p, 'route.occupied')) { p.action = undefined; p.settle = undefined; p.soft = undefined; p.quietHeldSince = undefined; return; }
               return this.end(p, 'failed', why);
             }
           } else p.quietHeldSince = undefined;
@@ -307,9 +308,11 @@ export class MarsEngine implements Engine {
               const why = walkBlocked ? {code:'route.blocked',message:`walking has remained blocked for a minute: ${rec.diagnostic?.code ?? 'action.blocked'}`} : routeBlocked ? {code:'route.blocked',message:'the route has remained blocked for a minute'} : {code:'activity.blocked',message:`sleep has remained blocked for a minute: ${rec.diagnostic?.code}`};
               this.rt.cancel(rec.id,why);
               if (walkBlocked && this.rt.isActive(rec.id)) { p.walkStopping = why; return; }
+              if (walkBlocked && this.spreadRetry(p, 'route.occupied')) { p.action = undefined; p.settle = undefined; p.soft = undefined; p.blockedSince = undefined; return; }
               return this.end(p,'failed',why);
             }
           } else p.blockedSince = undefined;
+          if (rec.status === 'failed' && this.spreadRetry(p, rec.diagnostic?.code)) { p.action = undefined; p.settle = undefined; p.soft = undefined; continue; }
           if (rec.status === 'failed') { if (!p.soft) return this.end(p, 'failed', { code: rec.diagnostic?.code ?? 'action.failed', message: rec.diagnostic?.message ?? 'failed' }); }
           else if (rec.status === 'cancelled') { if (!p.soft) return this.end(p, 'failed', { code: rec.diagnostic?.code ?? 'action.interrupted', message: rec.diagnostic?.message ?? 'interrupted' }); }
           else if (rec.status !== 'completed' && !(p.settle === 'held' && SETTLED.has(rec.phase))) return; // still under way
@@ -345,6 +348,7 @@ export class MarsEngine implements Engine {
         }
       }
       const rec = this.rt.submit(op.verb, op.params);
+      if (rec.status === 'failed' && !op.soft && this.spreadRetry(p, rec.diagnostic?.code)) continue;
       if (rec.status === 'failed') { if (op.soft) continue; return this.end(p, 'failed', { code: rec.diagnostic?.code ?? 'action.failed', message: rec.diagnostic?.message ?? 'refused' }); }
       p.action = rec.id; p.settle = op.settle; p.soft = op.soft;
     }
@@ -409,6 +413,14 @@ export class MarsEngine implements Engine {
     let last:Diag={code:'route.unreachable',message:'no reachable spaced spot'};
     for(const {p} of order){const no=this.plan(this.movementVerb(actor,p[0]),{actor,x:p[0],z:p[1],level});if(!no)return {x:p[0],z:p[1],level};last=no;}
     return last;
+  }
+  /** Edge reflex floor (yieldTimeoutV1): a shared-space spread step whose movement failed only because another body
+   * was in the way waits 1 s and re-chooses its spot (at most a minute) instead of failing the programme. */
+  private spreadRetry(p: Prog, code: string | undefined): boolean {
+    if (this.cfg.yieldTimeoutV1 !== true || !code || !/occupied/.test(code)) return false;
+    const spread = String(p.steps[p.index]?.params?.spread ?? '');
+    if (!['pond/1','region/1','pond-lap/1'].includes(spread) || (p.spreadWaits = (p.spreadWaits ?? 0) + 1) > 60) return false;
+    p.index--; p.ops = [{ wait: 20 }]; return true;
   }
   private movementVerb(actor:string,x:number){return this.physical&&(x<-29.5||this.ents[actor]?.pose.p[0]<-29.5)?'commons_shore_travel':'walk_to';}
   private free(id: string): boolean { return !!this.ents[id] && this.holders(id).length === 0 && !this.byActor.has(id) && ![...this.programs.values()].some(p=>p.build?.crew.includes(id)); }
