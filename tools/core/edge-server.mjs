@@ -88,6 +88,7 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
     const strip=url=>stripWorldRequestPath(url,cfg.worldPath);
     server.on('upgrade',req=>{req.url=strip(req.url);});hub=new Hub(server,host,auth,db,souls);hub.brain=brain;hub.build=cfg.build;
     if(host.enableQuietStallReleaseV1)await drive(host.enableQuietStallReleaseV1());
+    if(host.enableYieldTimeoutV1)await drive(host.enableYieldTimeoutV1());
     const {EdgeLedger}=await load('apps/server/src/edge/ledger/ledger.ts');
     const edge=new EdgeLedger(host,db,placeData?JSON.parse(readFileSync(resolve(placeData),'utf8')):undefined);
     const app=buildApp({cfg,db,host,auth,brain,souls,hub,intentV2:service,edge}),listener=require('@hono/node-server').getRequestListener(app.fetch);

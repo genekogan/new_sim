@@ -102,7 +102,7 @@ hub.brain = brain; hub.build = config.build;
 const takes=new TakeArchive(db,host.worldId,config.archiveTakes?r2Store(config):null,`${config.r2.prefix}/takes`); if(host.engine.takeChunks)takes.start(host);
 // Edge worlds mount EDGE-CONTRACT-v1; PLACE_DATA names a PLACE-DATA-v1 file (else places derive from native regions).
 const edge = config.mindDriver === 'edge' ? new EdgeLedger(host, db, process.env.PLACE_DATA ? JSON.parse(readFileSync(process.env.PLACE_DATA, 'utf8')) : undefined) : undefined;
-if (edge && host.enableQuietStallReleaseV1) void host.enableQuietStallReleaseV1();
+if (edge && host.enableQuietStallReleaseV1) void host.enableQuietStallReleaseV1().then(async () => { await host.enableYieldTimeoutV1?.(); });
 const app = buildApp({ cfg: config, db, host, auth, hub, brain, souls, takes, intentV2, edge });
 const listener = getRequestListener(app.fetch);
 server.on('request', (req, res) => {

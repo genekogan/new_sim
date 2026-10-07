@@ -79,7 +79,7 @@ type Prog = {
   readiedActors?:string[];
   build?: { phase: BuildPhase; crew: string[]; stopping?: Diag };
 };
-export type MarsWorldConfig = { quietStallReleaseV1?:boolean; walkBlockV1?:boolean; safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; fixtureGroundGoalsV1?:boolean; nativeArrivalWitnessV1?:boolean; quietLandingCourtesyV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
+export type MarsWorldConfig = { yieldTimeoutV1?:boolean; quietStallReleaseV1?:boolean; walkBlockV1?:boolean; safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; fixtureGroundGoalsV1?:boolean; nativeArrivalWitnessV1?:boolean; quietLandingCourtesyV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
 export const LITTLE_MARTIANS_WORLD: MarsWorldConfig={scene:'littlemartians',arrival:[0,18],arrivalPlace:'garden',reference:[0,16],grounds:{id:'grounds',name:'Ceramic garden'}};
 export const GREEN_FIELD_WORLD:MarsWorldConfig={scene:'greenfield',arrival:[0,0],arrivalPlace:'field',reference:[2,0],grounds:{id:'grounds',name:'Green field'}};
 export const EDEN_COMMONS_WORLD:MarsWorldConfig={scene:'eden-commons',arrival:[14,4],arrivalPlace:'commons',reference:[9,5],grounds:{id:'grounds',name:'Eden commons'}};
@@ -289,11 +289,13 @@ export class MarsEngine implements Engine {
           // Opt-in quiet drain: a walk/seat approach whose body stays held waiting on other
           // people (status running, never 'blocked') would hold the quiet barrier forever.
           // Release it through native cancellation like the blocked-walk timeout.
-          const quietHeld = this.quiet && this.cfg.quietStallReleaseV1 === true && ['walk_to','sit','take_slot','commons_shore_travel'].includes(rec.verb) && rec.status !== 'blocked' && this.rt.isActive(rec.id) && this.ents[p.actor]?.human?.activity === 'wait';
+          // yieldTimeoutV1 (edge reflex floor): the same release outside quiet after 60 s, so a yield never holds a receipt forever.
+          const yieldLimit = this.quiet && this.cfg.quietStallReleaseV1 === true ? 600 : this.cfg.yieldTimeoutV1 === true ? 1200 : 0;
+          const quietHeld = yieldLimit > 0 && ['walk_to','sit','take_slot','commons_shore_travel'].includes(rec.verb) && rec.status !== 'blocked' && this.rt.isActive(rec.id) && this.ents[p.actor]?.human?.activity === 'wait';
           if (quietHeld) {
             p.quietHeldSince ??= tick;
-            if (tick - p.quietHeldSince > 600) {
-              const why = {code:'route.blocked',message:'quiet checkpoint: this walk stayed held waiting on other people for 30 seconds'};
+            if (tick - p.quietHeldSince > yieldLimit) {
+              const why = {code:'route.blocked',message:this.quiet?'quiet checkpoint: this walk stayed held waiting on other people for 30 seconds':'this walk stayed held waiting on other people for a minute'};
               this.rt.cancel(rec.id, why);
               if (this.rt.isActive(rec.id)) { p.walkStopping = why; return; }
               return this.end(p, 'failed', why);
@@ -1007,7 +1009,8 @@ export class MarsEngine implements Engine {
     this.cursor=this.rt.events.length;this.renderBaseKey='';this.startRecorder();
   }
 
-  configureRuntimePolicy(policy: {sleepBlockTicks:number;quietSeatCourtesy?:boolean;fixtureGroundGoalsV1?:boolean;nativeArrivalWitnessV1?:boolean;quietLandingCourtesyV1?:boolean;quietStallReleaseV1?:boolean}) {
+  configureRuntimePolicy(policy: {sleepBlockTicks:number;quietSeatCourtesy?:boolean;fixtureGroundGoalsV1?:boolean;nativeArrivalWitnessV1?:boolean;quietLandingCourtesyV1?:boolean;quietStallReleaseV1?:boolean;yieldTimeoutV1?:boolean}) {
+    if(policy.yieldTimeoutV1===true)this.cfg={...this.cfg,yieldTimeoutV1:true};
     if(policy.quietStallReleaseV1===true)this.cfg={...this.cfg,quietStallReleaseV1:true};
     if(policy.quietLandingCourtesyV1===true)this.cfg={...this.cfg,quietLandingCourtesyV1:true};
     if(policy.nativeArrivalWitnessV1===true)this.cfg={...this.cfg,nativeArrivalWitnessV1:true};
