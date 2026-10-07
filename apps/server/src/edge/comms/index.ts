@@ -15,6 +15,7 @@ import {rideKind} from './objects/ride.ts';
 import type {CommsCore, SpectatorEdgeMessage} from './core.ts';
 import {Presence} from './presence.ts';
 import {say} from './speech.ts';
+import {dialogueReplay} from './dialogue-replay.ts';
 import {Steward} from './steward.ts';
 import {Fading} from './fading.ts';
 import {ensureCommsSchema} from './store.ts';
@@ -54,7 +55,8 @@ export type CommsRuntime = {
   publishWorld(text: string, to?: string[]): void;
   /** Spectator `edge` messages (§7) for the hub to broadcast. */
   onSpectator(listener: (m: SpectatorEdgeMessage) => void): void;
-  /** Standing spectator state a newly joined viewer needs (the fade roster); also re-broadcast each sweep. */
+  /** Standing spectator state a newly joined viewer needs: the fade roster (also re-broadcast each sweep), then the
+   *  recent dialogue (`speech` / `conversation.turn`, marked `replay: true`; see dialogue-replay.ts). */
   spectatorJoin(): SpectatorEdgeMessage[];
   sweep(): void;
   close(): void;
@@ -212,7 +214,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
       core.spectate({kind: 'world', tick, text});
     },
     onSpectator(l) { spectators.push(l); },
-    spectatorJoin: roster,
+    spectatorJoin: () => { let replay: SpectatorEdgeMessage[] = []; try { replay = dialogueReplay(core); } catch { /* history is optional */ } return [...roster(), ...replay]; },
     sweep,
     close() { if (timer) clearInterval(timer); webhooks.close(); streams.wakeAll(); },
   };

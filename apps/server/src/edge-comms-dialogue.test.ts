@@ -57,12 +57,43 @@ test('faded Souls cannot be invited or hear; a pending invite to one expires at 
     assert.deepEqual(alice.map(e => [e.conversation, e.change ?? e.reason, e.reason ?? null]), [[cv, 'invite-expired', 'soul.faded'], [cv, 'invite-expired', 'invite-expired']]);
     const said = (await f.post('Alice', '/v1/edge/say', {text: 'Hello?'})).body;
     assert.equal(said.said.heardBy, 0, 'faded neighbours do not hear');
-    const join = f.runtime.spectatorJoin();
+    const join = f.runtime.spectatorJoin().filter(m => !m.replay);
     assert.deepEqual(join.map(m => [m.type, m.kind]), [['edge', 'fade.roster']]);
     assert.deepEqual((join[0].souls as any[]).map(s => [s.soulId, s.colour]).sort(), [['s_bob', 'gone'], ['s_cleo', 'gone']]);
     assert.ok(seen.some(m => m.kind === 'fade.roster' && (m.souls as any[]).length === 2), 'roster re-broadcast each sweep');
     await f.post('Bob', '/v1/edge/say', {text: 'I am back.'});  // any accepted act reclaims
     assert.equal(f.runtime.fading.status(f.id('Bob'))!.colour, 'green');
     assert.equal((await f.post('Alice', '/v1/edge/converse', {op: 'start', with: [f.id('Bob')]})).body.accepted, true);
+  } finally { f.destroy(); }
+});
+
+test('a newly joined viewer gets the recent dialogue from the durable tables as replay, bounded, newest kept', async () => {
+  const {f} = pair({fading: true});
+  try {
+    assert.deepEqual(f.runtime.spectatorJoin().filter(m => m.replay), [], 'empty before anyone speaks');
+    await f.post('Alice', '/v1/edge/say', {text: 'Morning, all.'});
+    f.clock.now += 1000;
+    const cv = (await f.post('Alice', '/v1/edge/converse', {op: 'start', with: [f.id('Bob')], text: 'A word?'})).body.conversation.id;
+    await f.post('Bob', '/v1/edge/converse', {op: 'accept', conversation: cv});
+    f.clock.now += 1000;
+    await f.post('Bob', '/v1/edge/converse', {op: 'say', conversation: cv, text: 'Of course.'});
+    f.runtime.publishWorld('Rain is coming.');                 // world narration is not dialogue
+    const join = f.runtime.spectatorJoin();
+    assert.equal(join[0].kind, 'fade.roster', 'standing roster first');
+    const replay = join.filter(m => m.replay) as any[];
+    assert.deepEqual(replay.map(m => m.kind), ['speech', 'conversation.turn', 'conversation.turn']);
+    assert.ok(replay.every(m => m.type === 'edge' && typeof m.at === 'number' && typeof m.tick === 'number' && m.untrusted === true));
+    assert.deepEqual([replay[0].from, replay[0].text, replay[0].channel.kind, replay[0].heardBy], [{soulId: f.id('Alice'), name: 'Alice'}, 'Morning, all.', 'earshot', [f.id('Bob'), f.id('Cleo')]]);
+    assert.deepEqual(replay.slice(1).map(m => [m.conversation, m.turn.seq, m.turn.from.name, m.turn.text]), [[cv, 1, 'Alice', 'A word?'], [cv, 2, 'Bob', 'Of course.']]);
+    assert.deepEqual([replay[2].state, replay[2].members.map((m: any) => m.name)], ['open', ['Alice', 'Bob']]);
+    // Live and replayed shapes agree, so a viewer folds both the same way.
+    const live: any[] = []; f.runtime.onSpectator(m => live.push(m));
+    await f.post('Alice', '/v1/edge/converse', {op: 'say', conversation: cv, text: 'Thanks.'});
+    const lastReplay = (f.runtime.spectatorJoin().at(-1) as any);
+    assert.deepEqual(lastReplay.turn, live.find(m => m.kind === 'conversation.turn').turn);
+    for (let i = 0; i < 130; i++) { f.clock.now += 10; await f.post('Cleo', '/v1/edge/say', {text: `line ${i}`}); }
+    const bounded = f.runtime.spectatorJoin().filter(m => m.replay);
+    assert.equal(bounded.length, 120);
+    assert.equal(bounded.at(-1)!.text, 'line 129', 'newest kept');
   } finally { f.destroy(); }
 });
