@@ -21,7 +21,7 @@ test('fading (flag on): removed after 60 min idle, hidden from others; next act 
  const first=await accept(f.host,ledger.act(ana,{capability:'rest:here',params:{seconds:600}}));assert.equal(first.accepted,true);
  for(let i=0;i<20;i++)f.host.tickOnce();
  now+=61*60_000;comms.sweep();for(let i=0;i<10;i++){f.host.tickOnce();f.host.drainInputs();}
- assert.ok(ledger.faded.has(ana.soulId),'faded');assert.equal(f.host.engine.programOf(ana.entityId),null,'body stopped');
+ assert.ok(ledger.faded.has(ana.soulId),'faded');{const r=ledger.receipt(ana.soulId,(first as any).receipt.id)!;assert.deepEqual([r.phase,r.code],['failed','soul.faded'],'fading ends the open act failed, not replaced');}assert.equal(f.host.engine.programOf(ana.entityId),null,'body stopped');
  assert.ok(!ledger.perceivedBodies(rows[1].id,500).some(b=>b.soulId===ana.soulId),'hidden from others');
  assert.equal((ledger.observe(ana,new Set()) as any).self.state,'faded');
  const back=await accept(f.host,ledger.act(ana,{capability:'rest:here',params:{seconds:5}}));assert.equal(back.accepted,true,JSON.stringify(back));

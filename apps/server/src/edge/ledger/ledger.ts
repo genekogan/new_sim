@@ -34,7 +34,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
     // C9 body effects (fading itself only runs when Comms' fading flag is on — Gene has not approved it).
     (c as unknown as {fading?: {onFade?(l: (e: {soulId: string; change: string}) => void): void}}).fading?.onFade?.(e => {
       const m = this.host.minds.get(e.soulId); if (!m) return;
-      if (e.change === 'removed') {this.faded.add(e.soulId); if (this.host.engine.programOf(m.entityId)) void this.host.enqueue('edge-stop', `edge:${e.soulId}`, {soulId: e.soulId, entityId: m.entityId, why: 'faded'});}
+      if (e.change === 'removed') {
+        this.faded.add(e.soulId); this.pending.delete(e.soulId);
+        // Not replaced by the Soul's own act: its open receipts end failed, so agents can tell why.
+        for (const r of this.openReceipts(e.soulId)) this.update(r.id, {phase: 'failed', code: 'soul.faded', reason: 'This Soul faded out after an hour without an accepted action; act again to come back.'});
+        if (this.host.engine.programOf(m.entityId)) void this.host.enqueue('edge-stop', `edge:${e.soulId}`, {soulId: e.soulId, entityId: m.entityId, why: 'faded'});
+      }
     });
   }
   /** Souls faded out (removed at 60 min idle); their next act lands them at a starting place. */
@@ -109,7 +114,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (ev.kind === 'step') return;
     const r = this.rows("program_id=? AND phase IN ('waiting','started')", ev.id)[0]; if (!r) return;
     if (ev.kind === 'completed') this.update(r.receipt_id, {phase: 'completed'});
-    else if (ev.kind === 'cancelled' && (ev.code === 'program.replaced' || ev.code === 'program.stopped')) this.update(r.receipt_id, {phase: 'replaced', code: ev.code, reason: 'Stopped or replaced before it finished.'});
+    // 'replaced' means only "a newer act from this Soul superseded it", and that is recorded at act time (insert),
+    // before the old programme is cancelled. A receipt still open here was ended by something else: report it failed.
+    else if (ev.kind === 'cancelled' && (ev.code === 'program.replaced' || ev.code === 'program.stopped')) this.update(r.receipt_id, {phase: 'failed', code: 'action.interrupted', reason: 'Something else in the world interrupted this before it finished; choose again.'});
     else this.update(r.receipt_id, {phase: 'failed', code: ev.code ?? 'action.failed', reason: ev.message ?? humanBlockedExplanationV1(ev.code, 'That action')});
   }
   private afterTick(tick: number) {
@@ -225,6 +232,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
     return {window: {ms: windowMs, since}, actsPerActiveSoulPerHour: active ? Math.round(accepted / active / (windowMs / 3600_000) * 10) / 10 : null,
       acts: {accepted, refused, refusalRate: accepted + refused ? Math.round(refused / (accepted + refused) * 1000) / 1000 : null},
       receiptsByPhase: Object.fromEntries(q('SELECT phase k, COUNT(*) n FROM edge_receipts_v1 WHERE world_id=? AND created_at>=? GROUP BY phase', since).map(r => [r.k, r.n])),
+      // Finished receipts: completed vs failed (by code) vs replaced by the Soul's own newer act (lasting marks count as completed).
+      receiptFailuresByCode: Object.fromEntries(q("SELECT code k, COUNT(*) n FROM edge_receipts_v1 WHERE world_id=? AND created_at>=? AND phase='failed' GROUP BY code ORDER BY n DESC", since).map(r => [r.k, r.n])),
+      completedShareOfFinished: (() => {const r = q("SELECT SUM(phase='completed') c, SUM(phase IN ('completed','failed','replaced')) n FROM edge_receipts_v1 WHERE world_id=? AND created_at>=?", since)[0]; return Number(r?.n) ? Math.round(Number(r.c) / Number(r.n) * 1000) / 1000 : null;})(),
       refusalsByCode: Object.fromEntries(q('SELECT verb||\' \'||code k, COUNT(*) n FROM edge_refusals_v1 WHERE world_id=? AND at>=? GROUP BY verb, code ORDER BY n DESC', since).map(r => [r.k, r.n])),
       activeSouls: count('SELECT COUNT(DISTINCT soul_id) n FROM edge_receipts_v1 WHERE world_id=? AND created_at>=?', since),
       speech: has('edge_comms_speech') ? count('SELECT COUNT(*) n FROM edge_comms_speech WHERE world_id=? AND at>=?', since) : null,
