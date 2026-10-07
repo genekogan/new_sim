@@ -74,6 +74,7 @@ type Prog = {
   index: number; started: boolean; since: number;
   blockedSince?: number;
   quietHeldSince?: number;
+  stairHeldSince?: number;
   spreadWaits?: number;
   walkStopping?: Diag;
   stopping?: Diag;
@@ -82,7 +83,7 @@ type Prog = {
   readiedActors?:string[];
   build?: { phase: BuildPhase; crew: string[]; stopping?: Diag; reverse?: true };
 };
-export type MarsWorldConfig = { disassemblyV1?:boolean; spreadV2?:boolean; yieldTimeoutV1?:boolean; quietStallReleaseV1?:boolean; walkBlockV1?:boolean; safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; fixtureGroundGoalsV1?:boolean; nativeArrivalWitnessV1?:boolean; quietLandingCourtesyV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
+export type MarsWorldConfig = { disassemblyV1?:boolean; spreadV2?:boolean; yieldTimeoutV1?:boolean; quietStallReleaseV1?:boolean; stairMakeWayV1?:boolean; walkBlockV1?:boolean; safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; fixtureGroundGoalsV1?:boolean; nativeArrivalWitnessV1?:boolean; quietLandingCourtesyV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
 export const LITTLE_MARTIANS_WORLD: MarsWorldConfig={scene:'littlemartians',arrival:[0,18],arrivalPlace:'garden',reference:[0,16],grounds:{id:'grounds',name:'Ceramic garden'}};
 export const GREEN_FIELD_WORLD:MarsWorldConfig={scene:'greenfield',arrival:[0,0],arrivalPlace:'field',reference:[2,0],grounds:{id:'grounds',name:'Green field'}};
 export const EDEN_COMMONS_WORLD:MarsWorldConfig={scene:'eden-commons',arrival:[14,4],arrivalPlace:'commons',reference:[9,5],grounds:{id:'grounds',name:'Eden commons'}};
@@ -278,6 +279,16 @@ export class MarsEngine implements Engine {
       if (p.until !== undefined) { if (tick < p.until) return; p.until = undefined; }
       if (p.action) {
         const rec = this.rt.records.get(p.action);
+        // stairMakeWayV1: a climber held on a flight by an idle person (no task of their own) at the landing
+        // asks them to step aside through native make-way (spec §17, as floor walks already do), every 10 s.
+        // Without it an idle body at a stair head holds the climber, and so the quiet barrier, forever.
+        if (this.cfg.stairMakeWayV1 === true && rec && this.ents[p.actor]?.human?.activity === 'climb-wait' && rec.status === 'blocked') {
+          p.stairHeldSince ??= tick;
+          if (tick - p.stairHeldSince >= 200 && (tick - p.stairHeldSince) % 200 === 0) {
+            const me = this.ents[p.actor]!;
+            for (const s of rec.diagnostic?.subjects ?? []) if (s !== p.actor && this.stairYieldable(s)) this.m.makeWay(this.rt, s, [me.pose.p[0], me.pose.p[2]]);
+          }
+        } else p.stairHeldSince = undefined;
         // A timed-out walk can still own a between-level body. Preserve its
         // program until native cancellation actually reaches a safe landing.
         if (p.walkStopping) {
@@ -1062,7 +1073,8 @@ export class MarsEngine implements Engine {
     this.cursor=this.rt.events.length;this.renderBaseKey='';this.startRecorder();
   }
 
-  configureRuntimePolicy(policy: {sleepBlockTicks:number;quietSeatCourtesy?:boolean;fixtureGroundGoalsV1?:boolean;nativeArrivalWitnessV1?:boolean;quietLandingCourtesyV1?:boolean;quietStallReleaseV1?:boolean;yieldTimeoutV1?:boolean;spreadV2?:boolean}) {
+  configureRuntimePolicy(policy: {sleepBlockTicks:number;quietSeatCourtesy?:boolean;fixtureGroundGoalsV1?:boolean;nativeArrivalWitnessV1?:boolean;quietLandingCourtesyV1?:boolean;quietStallReleaseV1?:boolean;stairMakeWayV1?:boolean;yieldTimeoutV1?:boolean;spreadV2?:boolean}) {
+    if(policy.stairMakeWayV1===true)this.cfg={...this.cfg,stairMakeWayV1:true};
     if(policy.spreadV2===true)this.cfg={...this.cfg,spreadV2:true};
     if(policy.yieldTimeoutV1===true)this.cfg={...this.cfg,yieldTimeoutV1:true};
     if(policy.quietStallReleaseV1===true)this.cfg={...this.cfg,quietStallReleaseV1:true};
@@ -1108,6 +1120,8 @@ export class MarsEngine implements Engine {
       }
     }
   }
+  /** A free idle bystander: no programme, task, grip, seat, ride, sleep pose, borrow or hold (as quiet landing courtesy). */
+  private stairYieldable(id:string){const o=this.ents[id] as any;return !!o?.human&&!o.human.task&&!o.human.grip&&!o.human.on&&!o.human.riding&&!o.human.sleepPose&&!o.human.boatPassenger&&!o.human.boatTransit&&!this.byActor.has(id)&&!this.actorBorrowed(id)&&!this.holders(id).length&&['idle','wait'].includes(o.human.activity);}
   private clearQuietWalkLandings(){
     for(const live of this.rt.live.values()){
       const ex=live.exec,leg=ex?.route?.legs?.[ex.leg];
