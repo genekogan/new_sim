@@ -60,6 +60,9 @@ const FIELDS: [string, (e: Entity) => unknown][] = [
   // mars-take/2 (BODY_MODEL.md "take fields"): what a replay needs to pose people exactly as the engine did
   ['hands', takeHands], // human.hands, integer mm (hand-up, items, eating, paint)
   ['baseActivity', (e) => e.human?.baseActivity], // the activity an overlay (eat) is layered on: 'sit' = seated
+  ['prop', (e) => e.human?.prop], // activities/1: the small object in the hands (book, cup, flower…; ACTIVITIES-v1)
+  ['seatHeight', (e) => e.human?.seatHeight], // activities/1: seat top (m) at a scenery seat with no native fixture
+  ['partner', (e) => e.human?.partner], // together/1: the other body of a paired gesture (hug, handshake, high-five, give/take, dance together)
   ['on', (e) => e.human?.on], // the rack link (beam:… / climb:…) someone stands on
   ['speed', (e) => (e.human?.speed === undefined ? undefined : q(e.human.speed, SPEED_Q))], // integer cm/s (walk_to)
   ['sleepPose', (e) => e.human?.sleepPose], // additive semantic lie/wake state; renderer owns rig coordinates

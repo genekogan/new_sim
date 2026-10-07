@@ -100,6 +100,12 @@ export type HumanState = {
   prop?: string;
   /** activities/1: seat top (m above the feet) while seated at a scenery spot with no native seat fixture (piano bench, armchair). */
   seatHeight?: number;
+  /** together/1 (social/pose.ts): the small item carried in the hand between activities (book, flower, cup…); shown as `prop`. */
+  holding?: string;
+  /** together/1: the body this one is doing a paired gesture with (hug, handshake, high-five, give/take, dance together). */
+  partner?: string;
+  /** together/1: a grouped pose — waiting for partners or running in sync until the shared end tick. */
+  together?: { group: string; phase: 'waiting' | 'active'; until?: number; mobile: boolean };
 };
 
 /** Persistent committed quantities for one bounded cold preparation batch. */

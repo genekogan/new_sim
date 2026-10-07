@@ -7,6 +7,9 @@
 //                  'occupied' once seated); cancelled → steps out when the carrier is on the ground
 //                  (deferred until it lands). When the carrier lands every rider steps out by itself.
 //   carrier_depart {actor, carrier}         a seated rider asks to leave now instead of waiting.
+//   together/1 (core-next4): carrier_ride {holdSeats, holdSeconds} keeps that many places for invited companions
+//   and does not lift off until they are seated (or the hold runs out); a companion boards with {reserved: true}.
+//   Strangers cannot take a kept place. carrier_depart ends the hold.
 //
 // Phases: parked → boarding (first rider claims a seat; departs after `waitTicks`, sooner when full)
 // → aloft (route from its first key at elapsed 0; holds above the landing spot until it is clear)
@@ -34,6 +37,8 @@ export type CarrierState = {
   waitTicks: number; departAtTick: number | null; phaseTick: number; flights: number; holding: boolean;
   /** The one body using the boarding step right now (boarding or stepping out), so transfers never cross. */
   doorBy: string | null;
+  /** together/1: places kept for invited companions (`seats`), how many of them have boarded, until when. Absent otherwise. */
+  hold?: { by: string; seats: number; filled: number; untilTick: number };
 };
 export type CarriedBody = { id: string; slot: string; phase: 'boarding' | 'seated' | 'leaving' };
 
@@ -144,10 +149,15 @@ function boardingPath(e: Entity, from: Vec3, seat: Vec3, d: CarrierDef): Vec3[] 
   if (l[0] * out < Math.abs(d.door[0]) - 0.05) { if (Math.abs(l[1]) < hz) pts.push([l[0], side * hz]); pts.push([d.door[0], side * hz]); }
   return [...pts.map(q => at(e, q)), doorPoint(e)!, seat];
 }
-const ride: ActionDef<{ actor: string; carrier: string; slot?: string }, { slot: string }, RideExec> = {
+/** together/1: places kept for companions who have not boarded yet. */
+const keptSeats = (c: CarrierState) => c.hold ? Math.max(0, c.hold.seats - c.hold.filled) : 0;
+const HOLD_MAX_SECONDS = 180;
+type RideParams = { actor: string; carrier: string; slot?: string; holdSeats?: number; holdSeconds?: number; reserved?: boolean };
+const ride: ActionDef<RideParams, { slot: string }, RideExec> = {
   verb: 'carrier_ride',
   description: 'Step into a free seat of a parked or boarding carrier (a balloon basket) from its door and stay seated while it carries you; step out only when it is on the ground.',
-  schema: z.object({ actor: z.string().min(1), carrier: z.string().min(1), slot: z.string().min(1).max(40).optional() }).strict(),
+  schema: z.object({ actor: z.string().min(1), carrier: z.string().min(1), slot: z.string().min(1).max(40).optional(),
+    holdSeats: z.number().int().min(1).max(8).optional(), holdSeconds: z.number().min(5).max(HOLD_MAX_SECONDS).optional(), reserved: z.boolean().optional() }).strict(),
   resumable: true,
   reservations: (w: WorldState, p) => {
     const e = w.entities[p.carrier], slot = p.slot ?? (e ? seatFor(e, p.actor) : null) ?? 'none';
@@ -162,6 +172,9 @@ const ride: ActionDef<{ actor: string; carrier: string; slot?: string }, { slot:
     if (c.phase === 'landed') return { ok: false, diagnostic: diag('landing', `${e.label ?? e.id} has just landed; wait for its riders to step out`, [e.id]) };
     const slot = p.slot && !c.seats[p.slot] && d.seats.some(s => s.id === p.slot) ? p.slot : seatFor(e, p.actor);
     if (!slot || c.seats[slot]) return { ok: false, diagnostic: diag('full', `${e.label ?? e.id} is full`, [e.id]) };
+    const free = Object.values(c.seats).filter(v => !v).length;
+    if (!(p.reserved && keptSeats(c) > 0) && free - keptSeats(c) < 1) return { ok: false, diagnostic: diag('reserved', `the last place in ${e.label ?? e.id} is kept for someone who was invited`, [e.id]) };
+    if (p.holdSeats && p.holdSeats > free - keptSeats(c) - 1) return { ok: false, diagnostic: diag('full', `${e.label ?? e.id} has no room for ${p.holdSeats} more`, [e.id]) };
     const a = rt.world.entities[p.actor];
     if (hypot(a.pose.p[0] - e.pose.p[0], a.pose.p[2] - e.pose.p[2]) > BOARD_REACH || Math.abs(a.pose.p[1] - c.home[1]) > 0.05 || (a.human!.level ?? 0) !== 0)
       return { ok: false, diagnostic: diag('not-at-door', `${p.actor} must stand beside ${e.label ?? e.id} first`, [p.actor]) };
@@ -171,6 +184,8 @@ const ride: ActionDef<{ actor: string; carrier: string; slot?: string }, { slot:
     const e = rt.world.entities[p.carrier], c = state(e)!, a = rt.world.entities[p.actor], h = a.human!;
     c.seats[prog.slot] = p.actor;
     if (c.phase === 'parked') { c.phase = 'boarding'; c.phaseTick = rt.tick; c.departAtTick = rt.tick + c.waitTicks; }
+    if (p.reserved && c.hold && c.hold.filled < c.hold.seats) c.hold.filled++;
+    if (p.holdSeats && !c.hold) c.hold = { by: p.actor, seats: p.holdSeats, filled: 0, untilTick: rt.tick + Math.round((p.holdSeconds ?? 120) * TPS) };
     (h as { carrier?: CarriedBody }).carrier = { id: e.id, slot: prog.slot, phase: 'boarding' };
     h.task = id; h.activity = 'board'; delete h.speed;
     return { actor: p.actor, carrier: p.carrier, slot: prog.slot, phase: 'boarding', leg: 0, stopping: false, waited: 0, id, path: boardingPath(e, a.pose.p, seatPose(e, prog.slot)!.p, carrierDef(e)!) };
@@ -234,7 +249,7 @@ const depart: ActionDef<{ actor: string; carrier: string }, null, DepartExec> = 
     if (c.phase !== 'boarding') return { ok: false, diagnostic: diag('not-boarding', `${e.label ?? e.id} is not waiting to leave`) };
     return { ok: true, program: null };
   },
-  start(rt, p, _prog, id) { const c = state(rt.world.entities[p.carrier])!; c.departAtTick = Math.min(c.departAtTick ?? rt.tick, rt.tick); return { carrier: p.carrier, id }; },
+  start(rt, p, _prog, id) { const c = state(rt.world.entities[p.carrier])!; c.departAtTick = Math.min(c.departAtTick ?? rt.tick, rt.tick); delete c.hold; return { carrier: p.carrier, id }; },
   step() { return { status: 'completed', outputs: { departing: true } }; },
   cancel() { return { ok: true }; },
 };
@@ -254,7 +269,15 @@ export function stepCarriers(rt: Runtime): void {
     const riders = Object.values(c.seats).filter((a): a is string => !!a);
     const tick = rt.tick;
     if (c.phase === 'boarding') {
-      if (!riders.length) { c.phase = 'parked'; c.departAtTick = null; c.phaseTick = tick; continue; }
+      if (!riders.length) { c.phase = 'parked'; c.departAtTick = null; c.phaseTick = tick; delete c.hold; continue; }
+      if (c.hold) {
+        // together/1: wait for invited companions (all seated), or until the hold runs out / its host is no longer aboard
+        const companionsIn = c.hold.filled >= c.hold.seats && riders.every(a => carried(rt.world.entities[a])?.phase === 'seated');
+        if (companionsIn || tick >= c.hold.untilTick || !riders.includes(c.hold.by)) {
+          if (companionsIn) c.departAtTick = tick + 3 * TPS;   // everyone is in: a moment to settle, then up
+          delete c.hold;
+        } else continue;
+      }
       if (riders.length === d.seats.length) c.departAtTick = Math.min(c.departAtTick ?? tick, tick + 5 * TPS);
       const allSeated = riders.every(a => carried(rt.world.entities[a])?.phase === 'seated');
       if (allSeated && c.departAtTick !== null && tick >= c.departAtTick) {

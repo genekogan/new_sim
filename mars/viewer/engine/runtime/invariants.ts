@@ -20,7 +20,8 @@ const TOL = 0.03;
  * (engine/items) are overlays a seated person runs without leaving the seat (they never move the body).
  */
 /** activities/1 overlays (social/pose.ts) that may sit on a held seat; eat/drink only with a pose prop (native items keep their own rule). */
-const POSE_OVERLAY_SET: ReadonlySet<string> = new Set(['read', 'browse', 'write', 'play-piano', 'play-music', 'paint', 'cook', 'play-game', 'craft', 'post-letter', 'wave']);
+const POSE_OVERLAY_SET: ReadonlySet<string> = new Set(['read', 'browse', 'write', 'play-piano', 'play-music', 'paint', 'cook', 'play-game', 'craft', 'post-letter', 'wave',
+  'bow', 'clap', 'nod', 'shake-head', 'point', 'cheer', 'give', 'take', 'pick-up', 'put-down']);
 export const SEATED_ACTIVITIES: ReadonlySet<string> = new Set(['sit', 'sit-down', 'stand-up', 'eat', 'serve']);
 
 export function humanStaticClearanceWithOverlay(qualified:(rt:Runtime,e:import('../world/types.ts').Entity)=>boolean):Invariant {return (rt: Runtime) => {
