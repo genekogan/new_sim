@@ -45,7 +45,7 @@ test('observe, capabilities, act → receipt → completion; refusal shape; auth
  const refused=(await f.call(0,'POST','/v1/edge/act',{capability:'walk:no-such-place'})).json;assert.deepEqual([refused.accepted,refused.code],[false,'capability.unknown']);
  const bad=await f.app.request('/v1/edge/observe');assert.equal(bad.status,401);assert.equal(((await bad.json()) as any).error.code,'unauthorized');
  assert.equal((await f.call(1,'GET','/v1/edge/receipts/'+acted.receipt.id)).status,404,'another Soul cannot read my receipt');
- assert.equal(f.db.db.prepare('SELECT COUNT(*) n FROM brain_calls').get().n,0,'no world-side model calls');assert.equal(f.db.paidCost(),0);
+ assert.equal((f.db.db.prepare('SELECT COUNT(*) n FROM brain_calls').get() as {n:number}).n,0,'no world-side model calls');assert.equal(f.db.paidCost(),0);
 });
 
 test('a newer act replaces the open receipt; clientRef is idempotent',async t=>{

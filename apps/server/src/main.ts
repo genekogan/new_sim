@@ -21,6 +21,8 @@ import { worldDefinition } from './world-config.ts';
 import { stripWorldRequestPath } from './world-request-path.ts';
 import {edenCoreRequested,edenHistoryFactory,installEdenCore,settleEmptyEden,drainEdenThought,installEdenLifeV1,installEdenExpansionV1} from './eden-bootstrap.ts';
 import {IntentControlV2} from './intent-control.ts';
+import {EdgeLedger} from './edge/ledger/ledger.ts';
+import {readFileSync} from 'node:fs';
 
 /** Seeded only into a world with no live Souls, so it is never empty. */
 const NATIVES: { name: string; description: string }[] = [
@@ -98,7 +100,10 @@ server.on('upgrade', req => { req.url = stripWorldPath(req.url); });
 hub = new Hub(server, host, auth, db,edenCore?souls:undefined);
 hub.brain = brain; hub.build = config.build;
 const takes=new TakeArchive(db,host.worldId,config.archiveTakes?r2Store(config):null,`${config.r2.prefix}/takes`); if(host.engine.takeChunks)takes.start(host);
-const app = buildApp({ cfg: config, db, host, auth, hub, brain, souls, takes,intentV2 });
+// Edge worlds mount EDGE-CONTRACT-v1; PLACE_DATA names a PLACE-DATA-v1 file (else places derive from native regions).
+const edge = config.mindDriver === 'edge' ? new EdgeLedger(host, db, process.env.PLACE_DATA ? JSON.parse(readFileSync(process.env.PLACE_DATA, 'utf8')) : undefined) : undefined;
+if (edge && host.enableQuietStallReleaseV1) void host.enableQuietStallReleaseV1();
+const app = buildApp({ cfg: config, db, host, auth, hub, brain, souls, takes, intentV2, edge });
 const listener = getRequestListener(app.fetch);
 server.on('request', (req, res) => {
   if(edenCore&&closing){res.writeHead(503,{'Cache-Control':'no-store'}).end('Server restarting.');return;}
