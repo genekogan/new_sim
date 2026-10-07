@@ -149,8 +149,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
     }
     // Lasting marks (objects the Soul authors where it stands): a note/sign/offering, or a shared project.
     if (this.comms) {
-      const makeParams = {form: {type: 'string', enum: ['note', 'sign', 'offering'], optional: true}, title: {type: 'string', maxLength: 60}, text: {type: 'string', maxLength: 500}};
-      caps.push({id: 'make:mark', verb: 'make', label: 'Leave a note, sign or offering here (lasting; others can read and respond)', available: true, params: makeParams});
+      const makeParams = {form: {type: 'string', enum: ['note', 'sign', 'offering', 'proposal'], optional: true}, title: {type: 'string', maxLength: 60}, text: {type: 'string', maxLength: 500}};
+      caps.push({id: 'make:mark', verb: 'make', label: 'Leave a note, sign, offering or proposal here (lasting; others can read and respond; the steward may calendar proposals)', available: true, params: makeParams});
       caps.push({id: 'make:project', verb: 'make', label: 'Start a shared project here (others can contribute steps)', available: true, params: {title: {type: 'string', maxLength: 60}, text: {type: 'string', maxLength: 500}}});
       plans.set('make:mark', {label: 'Make a mark', steps: [], make: 'mark'} as never); plans.set('make:project', {label: 'Start a project', steps: [], make: 'project'} as never);
     }

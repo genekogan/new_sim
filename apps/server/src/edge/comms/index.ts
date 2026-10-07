@@ -10,6 +10,7 @@ import {chessKind} from './objects/chess.ts';
 import {Objects} from './objects/framework.ts';
 import {presentationKind} from './objects/presentation.ts';
 import {markKind, projectKind} from './objects/marks.ts';
+import {calendarKind} from './objects/calendar.ts';
 import type {CommsCore, SpectatorEdgeMessage} from './core.ts';
 import {Presence} from './presence.ts';
 import {say} from './speech.ts';
@@ -78,6 +79,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   objects.register(presentationKind);
   objects.register(markKind);
   objects.register(projectKind);
+  objects.register(calendarKind);
   deps.ledger.addCapabilityProvider(soul => objects.capabilities(soul));
   const steward = new Steward(core, options.stewardToken);
   const fading = new Fading(core, steward, options.fading === true);
@@ -138,6 +140,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   app.get('/v1/edge/objects', route((_c, soul) => ({objects: objects.visibleTo(soul)})));
   app.get('/v1/edge/objects/:id', route((c, soul) => objects.get(c.req.param('id') ?? '', soul)));
   app.post('/v1/edge/objects/:id/act', route(async (c, soul) => { const body = await json(c), out = objects.act(c.req.param('id') ?? '', soul, body); if (out.accepted) fading.touch(soul.soulId); else deps.ledger.recordRefusal?.(soul.soulId, 'object', `object:${c.req.param('id') ?? ''}:${String(body.action ?? '')}`, String((out as {code?: unknown}).code ?? 'refused')); return out; }));
+  app.get('/v1/edge/calendar', c => c.json(edgeBody({tick: core.tick(), items: objects.all().filter(o => o.kind === 'calendar-item' && (o.state as {phase: string}).phase !== 'over').map(o => ({id: o.id, ...(o.state as object)}))})));
   app.get('/v1/edge/digest', route(() => ({digest: steward.latestDigest()})));
 
   // Steward session endpoints (not Soul-authenticated).
@@ -146,6 +149,17 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
     catch (error) { return failure(c, error); }
   };
   const by = (body: Record<string, unknown>) => typeof body.by === 'string' && body.by.length <= 100 ? body.by : 'steward';
+  // Steward calendar: post an open gathering (often one a Soul proposed). Public listing for everyone.
+  app.post('/v1/edge/steward/calendar', stewardRoute(async c => {
+    const b = await json(c), title = String(b.title ?? '').trim(), placeId = String(b.placeId ?? '');
+    const minutes = Number(b.startsInMinutes), duration = Number(b.durationMinutes ?? 60);
+    if (!title || title.length > 80 || !/^[a-z0-9][a-z0-9._-]{0,99}$/.test(placeId) || !Number.isFinite(minutes) || minutes < 0 || minutes > 7 * 24 * 60 || !Number.isFinite(duration) || duration < 5 || duration > 600) throw new EdgeError(400, 'invalid', 'body: {title<=80, placeId, startsInMinutes 0..10080, durationMinutes? 5..600, description?, proposedBy?}');
+    const tick = core.tick(), id = 'cal-' + Math.random().toString(36).slice(2, 10);
+    const placeName = (deps.ledger as unknown as {places?: {byId: Map<string, {name: string}>}}).places?.byId.get(placeId)?.name ?? placeId;
+    const o = objects.create({id, kind: 'calendar-item', name: title, placeId, params: {title, description: b.description, placeId, placeName, proposedBy: b.proposedBy, startsAtTick: tick + Math.round(minutes * 60 * 20), durationTicks: Math.round(duration * 60 * 20)}});
+    {const text = `New on the calendar: "${title}" at ${placeName} in ${Math.round(minutes)} minutes.`, t = core.tick(); for (const sid of core.liveSoulIds()) streams.deliver(sid, 'world', t, {text}); core.spectate({kind: 'world', tick: t, text});}
+    return {calendarItem: {id: o.id, title, placeId, startsAtTick: (o.state as {startsAtTick: number}).startsAtTick}};
+  }));
   app.get('/v1/edge/steward/work', stewardRoute(c => { steward.schedule(); return {clock: steward.clock(), work: steward.list(c.req.query('done') === '1')}; }));
   app.post('/v1/edge/steward/work/:id/claim', stewardRoute(async c => ({work: steward.claim(c.req.param('id') ?? '', by(await json(c)))})));
   app.post('/v1/edge/steward/work/:id/release', stewardRoute(c => steward.release(c.req.param('id') ?? '')));
