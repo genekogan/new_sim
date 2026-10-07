@@ -99,7 +99,7 @@ export const poseV1: ActionDef<Params, true, Exec> = {
     const a = rt.world.entities[ex.p.actor], h = a?.human;
     if (!h) return { status: 'failed', diagnostic: issue('not-human', 'the body is gone', [ex.p.actor]) };
     if (ex.phase && nudged(rt, ex.p.actor)) { ex.at = [...a.pose.p]; return { status: 'running', phase: 'settling' }; }
-    if (ex.phase && ex.phase === 'waiting' && a.pose.p.some((n, i) => Math.abs(n - ex.at[i]) > 1e-6)) ex.at = [...a.pose.p];   // nudged aside while waiting: wait from there
+    if (ex.phase) ex.at = [...a.pose.p];   // a grouped pose carries on from wherever a courtesy step left the body
     if (a.pose.p.some((n, i) => Math.abs(n - ex.at[i]) > 1e-6)) { restore(rt, ex); return { status: 'failed', diagnostic: issue('moved', 'The body moved; the activity ended.', [ex.p.actor]) }; }
     if (ex.phase) return together(rt, ex, a, h, dt);
     if (ex.yaw !== null && !held(rt, ex.p.actor)) a.pose.yaw = ex.yaw;  // a body on a native seat keeps the seat's facing
@@ -151,14 +151,14 @@ function together(rt: Runtime, ex: Exec, a: NonNullable<Runtime['world']['entiti
     else {
       h.partner = partner.id; faceTo(partner.pose.p);
       const d = hypot(partner.pose.p[0] - a.pose.p[0], partner.pose.p[2] - a.pose.p[2]), left = d - ex.p.gap;
-      if (left > 0.03 && ex.mobile) {
-        // step in: share the distance with a mobile partner; stay on clear ground
-        const share = partner.human!.together?.mobile ? 2 : 1, move = Math.min(STEP_IN_SPEED * dt, left / share), ux = (partner.pose.p[0] - a.pose.p[0]) / d, uz = (partner.pose.p[2] - a.pose.p[2]) / d;
+      if (Math.abs(left) > 0.03 && ex.mobile && !ex.close) {
+        // step in (or back, when already closer than the gesture needs): share the distance with a mobile partner; stay on clear ground
+        const share = partner.human!.together?.mobile ? 2 : 1, move = Math.sign(left) * Math.min(STEP_IN_SPEED * dt, Math.abs(left) / share), ux = (partner.pose.p[0] - a.pose.p[0]) / d, uz = (partner.pose.p[2] - a.pose.p[2]) / d;
         const nx = a.pose.p[0] + ux * move, nz = a.pose.p[2] + uz * move, sp = rt.services.spatial as Spatial | undefined, g = sp?.level(h.level);
         // never closer to a wall or bench than the body already is (people may stand near furniture)
         const clear = (x: number, z: number) => g ? clearanceAt(g, [x, z]) : Infinity, next = clear(nx, nz);
         if (next >= HUMAN_RADIUS - 0.02 || next >= clear(a.pose.p[0], a.pose.p[2])) {
-          a.pose.p = [nx, a.pose.p[1], nz]; ex.at = [...a.pose.p]; h.activity = 'walk'; h.speed = Math.round(move / dt * 1000) / 1000;
+          a.pose.p = [nx, a.pose.p[1], nz]; ex.at = [...a.pose.p]; h.activity = 'walk'; h.speed = Math.round(Math.abs(move) / dt * 1000) / 1000;
           return tick >= ex.until! ? finish(rt, ex) : { status: 'running' as const, phase: 'stepping-in' };
         }
       }

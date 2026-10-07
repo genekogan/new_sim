@@ -82,6 +82,12 @@ test('together: hug (accept), high-five (decline), handshake (lapses), hug back 
   await w.run([{soulId: a.soulId, id: h2.receipt.id}, {soulId: b.soulId, id: back.receipt.id}], 3000);
   assert.equal(w.phase(a, h2).phase, 'completed'); assert.equal(w.phase(b, back).phase, 'completed');
 
+  // 4b. a handshake right after a hug: they step back to arm's length (0.85 m)
+  const sh = await w.act(b, 'handshake:' + a.soulId); assert.equal(sh.accepted, true, JSON.stringify(sh)); for (let i = 0; i < 10; i++) w.f.host.tickOnce();
+  const shy = await w.act(a, 'accept'); assert.equal(shy.accepted, true, JSON.stringify(shy)); let shook = 0;
+  await w.run([{soulId: b.soulId, id: sh.receipt.id}, {soulId: a.soulId, id: shy.receipt.id}], 2000, () => {if (w.body(a).human.activity === 'handshake' && w.body(b).human.activity === 'handshake') shook = w.gap(a, b);});
+  assert.ok(Math.abs(shook - 0.85) < 0.08, 'handshake at arm\'s length: ' + shook);
+
   // 5. dance together: paired, facing, one shared end tick
   const dn = await w.act(a, 'dance with ' + b.name, {seconds: 8}); assert.equal(dn.resolved?.to, 'dance-with:' + b.soulId);
   for (let i = 0; i < 10; i++) w.f.host.tickOnce();
@@ -99,7 +105,8 @@ test('together: hug (accept), high-five (decline), handshake (lapses), hug back 
   await w.run([{soulId: a.soulId, id: jj.receipt.id}, {soulId: b.soulId, id: jb.receipt.id}, {soulId: c.soulId, id: jc.receipt.id}], 4000, tick => {for (const s of [a, b, c]) {if (w.body(s).human.activity === 'jumping-jacks') {started[s.soulId] ??= tick; ended[s.soulId] = tick;}}});
   t.diagnostic(JSON.stringify({started, ended}));
   for (const [s, r] of [[a, jj], [b, jb], [c, jc]] as const) assert.equal(w.phase(s, r).phase, 'completed', s.name + JSON.stringify(w.phase(s, r)));
-  const ends = Object.values(ended); assert.equal(ends.length, 3, 'all three did jumping jacks'); assert.ok(Math.max(...ends) - Math.min(...ends) <= 2, 'they stop together');
+  assert.equal(Object.keys(started).length, 3, 'all three did jumping jacks');
+  const ends = [w.phase(a, jj), w.phase(b, jb), w.phase(c, jc)].map(r => r.endedTick!); assert.ok(Math.max(...ends) - Math.min(...ends) <= 2, 'they stop together ' + ends);
 
   // 7. walking together: a invites c along on a walk; c accepts and walks with a until a arrives
   const go = await w.act(a, 'walk:commons-kitchen', {with: [c.name]}); assert.equal(go.accepted, true);
