@@ -38,6 +38,8 @@ export class Auth {
   async userFromToken(token: string | undefined | null): Promise<UserRow | null> {
     if (!token) return null;
     if (this.devAuth && token.startsWith('dev:')) {
+      // Public exposure (EDGE_PUBLIC=1): only self-generated agent identities; never admin or chosen names.
+      if (process.env.EDGE_PUBLIC === '1' && !/^dev:agent-[0-9a-f]{24}$/.test(token)) return null;
       const id = `dev:${token.slice(4, 40)}`;
       if (!this.db.user(id)) this.db.upsertUser({ id, email: `${token.slice(4)}@dev.local`, wallet: null, role: token === 'dev:admin' ? 'admin' : 'user' });
       return this.db.user(id)!;
