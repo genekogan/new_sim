@@ -11,7 +11,7 @@ export class LivingWorld {
     this.host = host;
     host.listeners.push({ onApplied: e => {
       if (e.kind !== 'rules') return;
-      if (e.payload?.quiet || e.payload?.compact) this.queued = false;
+      if (e.payload?.quiet || e.payload?.compact || e.payload?.quietEnded || e.payload?.dayTurn) this.queued = false;
       if (e.payload?.compact) this.capture = true;
     }, afterTick: tick => this.afterTick(tick) });
   }
@@ -23,7 +23,15 @@ export class LivingWorld {
     const h = this.host, living = h.living; if (!living) return;
     if (this.capture) { this.capture = false; h.saveSnapshot(true); }
     const c = clockAt(tick, living.origin, living.dayTicks);
-    if (living.quiet) {
+    if (h.extra.continuousDayV1) {
+      // Gene: no nightly quiet hours. Nothing pauses or holds anyone; the day turns as a plain event.
+      if (!this.queued && living.quiet) { this.queued = true; void h.enqueue('rules', 'world', { quietEnded: true, day: c.day, why: 'continuous day: a legacy quiet ends at once, without compaction' }); return; }
+      if (!this.queued && !living.quiet && c.day > living.lastDay) {
+        this.queued = true;
+        void h.enqueue('rules', 'world', { dayTurn: true, day: c.day, worldEvent: { id: 'first-light', text: 'First light. A new day begins.' }, why: 'continuous day: the day turns without pausing anyone' });
+        return;
+      }
+    } else if (living.quiet) {
       if (!this.queued && h.engine.isQuiet?.()) {
         this.queued = true;
         const firstLight = c.day > living.lastDay;
@@ -33,7 +41,7 @@ export class LivingWorld {
       }
       return;
     }
-    if (!this.queued && (c.day > living.lastDay || (tick - h.lastSnapshotTick > 12000 && h.engine.canSnapshot && !h.engine.canSnapshot()))) {
+    if (!h.extra.continuousDayV1 && !this.queued && (c.day > living.lastDay || (tick - h.lastSnapshotTick > 12000 && h.engine.canSnapshot && !h.engine.canSnapshot()))) {
       this.queued = true;
       void h.enqueue('rules', 'world', { quiet: true, day: c.day, why: c.day > living.lastDay ? 'renew the engine before first light' : 'overdue quiet checkpoint' });
       return;

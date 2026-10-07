@@ -39,3 +39,16 @@ test('stairMakeWayV1 full landing (live crowd): no one can step aside, so the st
  const off=await run(false),on=await run(true);
  assert.equal(off.quiet,false,'control stuck');assert.equal(on.quiet,true,'quiet completes');assert.notEqual(on.act,'climb-wait');assert.deepEqual(on.deck,[1,1],'deck occupants never dropped');assert.deepEqual(on.violations,[]);
 });
+test('reflexTimeoutV1: outside quiet, a climb stalled at a full stair head is natively cancelled and the body gets free (control: programme ends but the body stays held forever)',async()=>{
+ const run=async(policy:boolean)=>{const e=factory.create(factory.genesis('reflex-timeout'));
+  for(const [id,x,z] of [['b2',10.04,-1.2],['b3',8.69,-1.71]] as [string,number,number][]){e.spawnHuman({id,label:'Synthetic idle deck occupant',soul:'fixture'});assert.ok(e.perform({actor:id,label:'deck arrival',steps:[{verb:'mars:walk_to',params:{x,z,level:1}}]}).ok);for(let i=0;i<900&&e.programOf(id);i++)e.step();}
+  e.spawnHuman({id:'mover',label:'Synthetic stair climber',soul:'fixture'});if(policy)e.configureRuntimePolicy!({sleepBlockTicks:1200,stairMakeWayV1:true,reflexTimeoutV1:true} as any);
+  const p=e.perform({actor:'mover',label:'deck journey',steps:[{verb:'mars:walk_to',params:{x:9.16,z:-1.4,level:1}}]});assert.ok(p.ok);
+  const copy=factory.restore(e.snapshot());let ended:string|null=null;
+  for(let i=0;i<3600&&!ended;i++){const out=e.step();copy.step();assert.equal(copy.stateHash(),e.stateHash());if(!e.programOf('mover'))ended='ended';}
+  for(let i=0;i<2400&&e.world.entities.mover.human!.activity==='climb-wait';i++){e.step();copy.step();}
+  return {ended,act:e.world.entities.mover.human!.activity,live:e.runtime.liveIds().length,violations:e.runtime.violations};};
+ const off=await run(false),on=await run(true);
+ assert.equal(off.act,'climb-wait','control: the body stays held on the flight with an orphaned live walk');assert.equal(off.live,1);
+ assert.equal(on.ended,'ended');assert.notEqual(on.act,'climb-wait');assert.equal(on.live,0,'nothing left holding the body');assert.deepEqual(on.violations,[]);
+});

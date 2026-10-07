@@ -328,7 +328,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const c = day ? clockAt(tick, day.origin, day.dayTicks) : null;
     const out: Record<string, unknown> = {
       tick, at: Date.now(),
-      world: {id: this.host.worldId, quiet: this.host.quietBarrier, ...(c ? {time: {day: c.day, phase: Math.round(c.phase * 1000) / 1000, label: timeLabel(c.phase), clock: `${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')}`}} : {})},
+      world: {id: this.host.worldId, ...(this.host.extra.continuousDayV1 ? {} : {quiet: this.host.quietBarrier}), ...(c ? {time: {day: c.day, phase: Math.round(c.phase * 1000) / 1000, label: timeLabel(c.phase), clock: `${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')}`}} : {})},
       self: {soulId: soul.soulId, name: soul.name, entityId: soul.entityId, placePath: this.placePathOf(soul.soulId), position: b ? b.pose.p.map(v => Math.round(v * 100) / 100) : null, facing: b ? Math.round(b.pose.yaw * 100) / 100 : null,
         state: this.faded.has(soul.soulId) ? 'faded' : stateOf(this.host, m.entityId), activity: String(b?.human?.activity ?? 'idle'), reflex: action && action.actor === m.entityId ? {verb: action.action.verb, phase: action.action.phase ?? action.action.status} : null,
         receipts: this.openReceipts(soul.soulId), fade: this.comms?.fading.status(soul.soulId) ?? null},

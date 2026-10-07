@@ -82,7 +82,7 @@ type Prog = {
   readiedActors?:string[];
   build?: { phase: BuildPhase; crew: string[]; stopping?: Diag; reverse?: true };
 };
-export type MarsWorldConfig = { disassemblyV1?:boolean; spreadV2?:boolean; yieldTimeoutV1?:boolean; quietStallReleaseV1?:boolean; stairMakeWayV1?:boolean; walkBlockV1?:boolean; safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; fixtureGroundGoalsV1?:boolean; nativeArrivalWitnessV1?:boolean; quietLandingCourtesyV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
+export type MarsWorldConfig = { disassemblyV1?:boolean; spreadV2?:boolean; yieldTimeoutV1?:boolean; quietStallReleaseV1?:boolean; stairMakeWayV1?:boolean; reflexTimeoutV1?:boolean; walkBlockV1?:boolean; safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; fixtureGroundGoalsV1?:boolean; nativeArrivalWitnessV1?:boolean; quietLandingCourtesyV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
 export const LITTLE_MARTIANS_WORLD: MarsWorldConfig={scene:'littlemartians',arrival:[0,18],arrivalPlace:'garden',reference:[0,16],grounds:{id:'grounds',name:'Ceramic garden'}};
 export const GREEN_FIELD_WORLD:MarsWorldConfig={scene:'greenfield',arrival:[0,0],arrivalPlace:'field',reference:[2,0],grounds:{id:'grounds',name:'Green field'}};
 export const EDEN_COMMONS_WORLD:MarsWorldConfig={scene:'eden-commons',arrival:[14,4],arrivalPlace:'commons',reference:[9,5],grounds:{id:'grounds',name:'Eden commons'}};
@@ -208,6 +208,7 @@ export class MarsEngine implements Engine {
     if (this.rt.tick % 10 === 0) this.updateAttention();
     if (this.quiet) this.advanceQuiet();
     if (this.cfg.stairMakeWayV1 === true && this.rt.tick % 200 === 0) this.clearStairHeads();
+    if (this.cfg.reflexTimeoutV1 === true && this.rt.tick % 200 === 100) this.timeoutStalledReflexes();
     const tick: number = this.rt.tick;
     for (const p of [...this.programs.values()]) this.advance(p);
     if (tick - this.recorder.startTick >= 20) {
@@ -1065,6 +1066,7 @@ export class MarsEngine implements Engine {
 
   configureRuntimePolicy(policy: {sleepBlockTicks:number;quietSeatCourtesy?:boolean;fixtureGroundGoalsV1?:boolean;nativeArrivalWitnessV1?:boolean;quietLandingCourtesyV1?:boolean;quietStallReleaseV1?:boolean;stairMakeWayV1?:boolean;yieldTimeoutV1?:boolean;spreadV2?:boolean}) {
     if(policy.stairMakeWayV1===true)this.cfg={...this.cfg,stairMakeWayV1:true};
+    if((policy as {reflexTimeoutV1?:boolean}).reflexTimeoutV1===true)this.cfg={...this.cfg,reflexTimeoutV1:true};
     if(policy.spreadV2===true)this.cfg={...this.cfg,spreadV2:true};
     if(policy.yieldTimeoutV1===true)this.cfg={...this.cfg,yieldTimeoutV1:true};
     if(policy.quietStallReleaseV1===true)this.cfg={...this.cfg,quietStallReleaseV1:true};
@@ -1088,6 +1090,21 @@ export class MarsEngine implements Engine {
     if (this.rt.tick % 10 === 0) this.out.changes.push([this.rt.tick, '$env', 'datetime', this.rt.world.env.datetime]);
   }
   beginQuiet() { this.quiet = true; }
+  /** continuousDayV1: a legacy quiet ends without compaction; programmes and actions carry on untouched. */
+  endQuiet() { this.quiet = false; }
+  /** reflexTimeoutV1: every 10 s, any live action the runtime has reported stalled (deadlock.stalled / deadlock.cycle:
+   *  a walk, seat, stair, swim, courtesy step or yield making no progress while waiting on others) for 60 s or more is
+   *  natively cancelled, in every state. Its programme then ends as failed and the Soul re-chooses; a climber steps off
+   *  at a landing (stairMakeWayV1 retreats it when that landing is full). Stateless: tick and runtime records only. */
+  private timeoutStalledReflexes() {
+    const tick = this.rt.tick;
+    for (const live of [...this.rt.live.values()] as any[]) {
+      const rec = live.rec, d = rec.diagnostic;
+      if (live.cancelling || !d || (d.code !== 'deadlock.stalled' && d.code !== 'deadlock.cycle') || !Number.isFinite(d.details?.sinceTick) || tick - d.details.sinceTick < 1200) continue;
+      let root = rec; while (root.parent && this.rt.records.get(root.parent)) root = this.rt.records.get(root.parent);
+      if (this.rt.isActive(root.id)) this.rt.cancel(root.id, {code: 'reflex.timeout', message: 'this stayed held waiting on other people for a minute'});
+    }
+  }
   private advanceQuiet() {
     if(this.cfg.quietLandingCourtesyV1)this.clearQuietWalkLandings();
     if (this.cfg.quietSeatCourtesy) this.clearQuietSeatExits();

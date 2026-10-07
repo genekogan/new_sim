@@ -206,6 +206,7 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       }
       if (rules?.dayConfig) engine.configureClock?.(rules.dayConfig);
       if (rules?.quiet) engine.beginQuiet?.();
+      if ((rules as {quietEnded?: boolean})?.quietEnded) (engine as {endQuiet?(): void}).endQuiet?.();
       if (rules?.adoptCamp) {
         engine.adoptCamp?.();
         for (const a of rules.anchors ?? []) if (!k.things[a.id]) {
