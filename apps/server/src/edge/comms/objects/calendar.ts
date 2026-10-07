@@ -3,7 +3,7 @@
 import type {ObjectKind, SoulRef} from './types.ts';
 
 export type CalendarState = {title: string; description: string; placeId: string; placeName: string; startsAtTick: number; endsAtTick: number;
-  proposedBy: string | null; interested: SoulRef[]; phase: 'upcoming' | 'happening' | 'over'; reminded: boolean};
+  proposedBy: string; interested: SoulRef[]; phase: 'upcoming' | 'happening' | 'over'; reminded: boolean};
 const clip = (v: unknown, n: number) => String(v ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 
 export const calendarKind: ObjectKind<CalendarState> = {
@@ -18,7 +18,7 @@ export const calendarKind: ObjectKind<CalendarState> = {
     const startsAtTick = Number(p.startsAtTick), duration = Number(p.durationTicks ?? 3000);
     if (!Number.isInteger(startsAtTick) || !Number.isInteger(duration) || duration < 1) throw new Error('calendar item needs integer startsAtTick and durationTicks');
     return {title: clip(p.title, 80) || 'A gathering', description: clip(p.description, 500), placeId: String(p.placeId ?? ''), placeName: clip(p.placeName, 100),
-      startsAtTick, endsAtTick: startsAtTick + duration, proposedBy: p.proposedBy ? clip(p.proposedBy, 100) : null, interested: [], phase: 'upcoming', reminded: false};
+      startsAtTick, endsAtTick: startsAtTick + duration, proposedBy: p.proposedBy ? clip(p.proposedBy, 100) : '', interested: [], phase: 'upcoming', reminded: false};
   },
   rolesOf: (s, id) => s.interested.some(x => x.soulId === id) ? ['interested'] : [],
   actions: {

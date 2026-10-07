@@ -100,7 +100,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   // EdgeError → its status; any other fault → 503 `unavailable` (same mapping as Ledger's routes).
   const failure = (c: Context, error: unknown) => {
     if (error instanceof EdgeError) return c.json(edgeBody({error: {code: error.code, message: error.message}}), error.status as ContentfulStatusCode);
-    if (process.env.EDGE_DEBUG) console.error('edge comms fault', error);
+    console.error('[edge] comms fault', c.req.method, c.req.path, error instanceof Error ? (error.stack ?? error.message).split('\n').slice(0, 4).join(' | ') : String(error));
     return c.json(edgeBody({error: {code: 'unavailable', message: 'the world could not answer; retry'}}), 503);
   };
   const route = (fn: (c: Context, soul: EdgeSoul) => object | Promise<object>) => async (c: Context) => {

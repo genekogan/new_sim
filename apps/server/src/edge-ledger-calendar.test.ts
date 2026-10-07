@@ -20,6 +20,7 @@ test('steward posts a calendar item; Souls see it, mark interest and are reminde
  assert.equal((await j('/v1/edge/steward/calendar',{method:'POST',headers:{authorization:'Bearer wrong','content-type':'application/json'},body:'{}'})).status,401);
  const posted=await j('/v1/edge/steward/calendar',{method:'POST',headers:{authorization:'Bearer steward-secret','content-type':'application/json'},body:JSON.stringify({title:"Tinker's Circle",placeId:'commons',startsInMinutes:0.05,durationMinutes:30,description:'Bring something to mend.',proposedBy:'Ana'})});
  assert.equal(posted.status,200,JSON.stringify(posted.body));const id=posted.body.calendarItem.id;
+ const bare=await j('/v1/edge/steward/calendar',{method:'POST',headers:{authorization:'Bearer steward-secret','content-type':'application/json'},body:JSON.stringify({title:'Test',placeId:'field',startsInMinutes:20,durationMinutes:30})});assert.equal(bare.status,200,'no proposedBy: '+JSON.stringify(bare.body));
  const cal=await j('/v1/edge/calendar');assert.equal(cal.body.contract,'eden-edge/1');assert.ok(cal.body.items.some((x:any)=>x.id===id&&x.title==="Tinker's Circle"));
  const r=await j('/v1/edge/objects/'+id+'/act',{method:'POST',headers:H,body:JSON.stringify({action:'interest'})});assert.equal(r.body.accepted,true,JSON.stringify(r.body));
  for(let i=0;i<120;i++)f.host.tickOnce();comms.sweep();
