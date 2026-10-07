@@ -71,3 +71,19 @@ export class PlaceIndex {
   }
   ref(p: Place): PlaceRef {return {id: p.id, name: p.name, kind: p.kind};}
 }
+
+export type Happening = {placeId: string; place: string; id: string; label: string; now: boolean; startsInMinutes: number; endsInMinutes: number; distance: number | null};
+/** What is on now, or next within `horizon` world minutes, from place schedules (daily `M H * * *` slots on the
+ *  world clock; other cron forms are skipped in v1). Nearest-first among those on now, then soonest. A reason to go somewhere. */
+export function happenings(places: Iterable<Place>, minuteOfDay: number, from: V2 | null, limit = 4, horizon = 120): Happening[] {
+  const out: Happening[] = [];
+  for (const p of places) for (const s of p.schedule ?? []) {
+    const m = /^(\d{1,2}) (\d{1,2}) \* \* \*$/.exec(s.cron.trim()); if (!m) continue;
+    const start = Number(m[2]) * 60 + Number(m[1]), dur = s.durationMinutes ?? 60;
+    const since = (minuteOfDay - start + 1440) % 1440, now = since < dur, until = now ? 0 : (start - minuteOfDay + 1440) % 1440;
+    if (!now && until > horizon) continue;
+    const [cx, cz] = centroid(p.polygon);
+    out.push({placeId: p.id, place: p.name, id: s.id, label: s.label ?? s.id, now, startsInMinutes: until, endsInMinutes: now ? dur - since : until + dur, distance: from ? Math.round(Math.hypot(cx - from[0], cz - from[1])) : null});
+  }
+  return out.sort((a, b) => Number(b.now) - Number(a.now) || (a.now ? (a.distance ?? 0) - (b.distance ?? 0) : a.startsInMinutes - b.startsInMinutes)).slice(0, limit);
+}
