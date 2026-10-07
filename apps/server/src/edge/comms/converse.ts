@@ -1,6 +1,8 @@
 // `converse` — private, membership-based conversations (EDGE-CONTRACT-v1 §6, vision §6).
 // Only members receive turns. A member silent for the inactivity timeout drops; pending
-// invitations and join requests expire after the same timeout. A conversation closes
+// invitations and join requests expire after the (shorter) invite timeout, and the members
+// hear `invite-expired`. Faded (absent) Souls cannot be invited; a pending invitation to a
+// Soul that fades expires at the next sweep. A conversation closes
 // when no member remains, or one member remains with no pending invitation.
 // State lives in SQLite so conversations and turns survive restart.
 import type {EdgeSoul} from '../contract.ts';
@@ -22,8 +24,8 @@ export type ConverseResult = {accepted: true; [k: string]: unknown} | {accepted:
 const refuse = (code: string, reason: string, conversation?: string): ConverseResult => ({accepted: false, code, reason, ...(conversation ? {conversation} : {})});
 
 export class Conversations {
-  private core: CommsCore; private timeoutMs: number;
-  constructor(core: CommsCore, timeoutMs: number) { this.core = core; this.timeoutMs = timeoutMs; }
+  private core: CommsCore; private timeoutMs: number; private inviteTimeoutMs: number;
+  constructor(core: CommsCore, timeoutMs: number, inviteTimeoutMs = timeoutMs) { this.core = core; this.timeoutMs = timeoutMs; this.inviteTimeoutMs = Math.min(inviteTimeoutMs, timeoutMs); }
 
   private load(id: string): Body | undefined {
     const row = this.core.db.prepare('SELECT body FROM edge_comms_conversations WHERE world_id = ? AND id = ?').get(this.core.worldId, id) as {body: string} | undefined;
@@ -49,8 +51,10 @@ export class Conversations {
     const tick = this.core.tick();
     for (const id of new Set(to)) this.core.streams.deliver(id, kind, tick, body);
   }
-  private memberEvent(b: Body, to: string[], who: Ref, change: string) {
-    this.emit(to, 'conversation.member', {conversation: b.id, soul: soulRef(who), change, members: this.refs(b.members), untrusted: true});
+  private memberEvent(b: Body, to: string[], who: Ref, change: string, extra: Record<string, unknown> = {}) {
+    this.emit(to, 'conversation.member', {conversation: b.id, soul: soulRef(who), change, members: this.refs(b.members), ...extra, untrusted: true});
+    // Spectators see every membership change (doc 26 §10), so the viewer keeps its tethers honest.
+    this.core.spectate({kind: 'conversation.member', tick: this.core.tick(), conversation: b.id, soul: soulRef(who), change, untrusted: true});
   }
   /** Closes when the membership rule says so; notifies everyone still attached. */
   private settle(b: Body, reason: string) {
@@ -98,6 +102,8 @@ export class Conversations {
     if (invitees.includes(soul.soulId)) return refuse('conversation.self', 'You cannot invite yourself.');
     const unknown = invitees.find(id => !this.core.isLive(id));
     if (unknown) return refuse('soul.unknown', `No Soul ${unknown} in this world.`);
+    const faded = invitees.filter(id => this.core.isFaded?.(id));
+    if (faded.length) return refuse('soul.faded', `${faded.map(id => this.core.nameOf(id)).join(', ')} faded from the world (no one has acted for them in an hour) and cannot hear you; they return when their agent acts again.`);
     const near = new Set(this.core.deps.ledger.perceivedBodies(soul.soulId, INVITE_RADIUS).filter(b => b.distance <= INVITE_RADIUS).map(b => b.soulId));
     const far = invitees.filter(id => !near.has(id));
     if (far.length) return refuse('conversation.out-of-range', `${far.map(id => this.core.nameOf(id)).join(', ')} must be within ${INVITE_RADIUS} m to be invited.`);
@@ -127,7 +133,6 @@ export class Conversations {
     b.members.push({...who, joinedAt: now, lastAt: now, fromTurn: b.turns});
     b.asks = b.asks.filter(m => m.soulId !== who.soulId);
     this.memberEvent(b, this.ids(b.members), who, 'joined');
-    this.core.spectate({kind: 'conversation.member', tick: this.core.tick(), conversation: b.id, soul: who, change: 'joined', untrusted: true});
   }
   private decline(b: Body, soul: EdgeSoul): ConverseResult {
     if (!b.invited.some(m => m.soulId === soul.soulId)) return refuse('conversation.not-invited', 'There is no invitation to decline.', b.id);
@@ -192,24 +197,30 @@ export class Conversations {
 
   /** Drops silent members and expired requests; closes conversations by the rule. */
   sweep(): number {
-    const now = this.core.now(), cutoff = now - this.timeoutMs;
+    const now = this.core.now(), cutoff = now - this.timeoutMs, inviteCutoff = now - this.inviteTimeoutMs;
+    const gone = (id: string) => this.core.isFaded?.(id) === true;
     let changed = 0;
     const rows = this.core.db.prepare("SELECT id FROM edge_comms_conversations WHERE world_id = ? AND state = 'open' AND updated_at <= ?").all(this.core.worldId, now) as {id: string}[];
     for (const {id} of rows) tx(this.core.db, () => {
       const b = this.load(id);
       if (!b || b.state !== 'open') return;
-      const dropped = b.members.filter(m => m.lastAt <= cutoff);
-      const expired = b.invited.filter(m => m.at <= cutoff), lapsed = b.asks.filter(m => m.at <= cutoff);
+      const dropped = b.members.filter(m => m.lastAt <= cutoff || gone(m.soulId));
+      const isExpired = (m: Pending) => m.at <= inviteCutoff || gone(m.soulId);
+      const expired = b.invited.filter(isExpired), lapsed = b.asks.filter(isExpired);
       if (!dropped.length && !expired.length && !lapsed.length) return;
-      b.invited = b.invited.filter(m => m.at > cutoff);
-      b.asks = b.asks.filter(m => m.at > cutoff);
-      for (const m of expired) this.emit([m.soulId], 'conversation.closed', {conversation: b.id, reason: 'invite-expired'});
+      b.invited = b.invited.filter(m => !isExpired(m));
+      b.asks = b.asks.filter(m => !isExpired(m));
+      for (const m of expired) {
+        this.emit([m.soulId], 'conversation.closed', {conversation: b.id, reason: 'invite-expired'});
+        // The inviter (and any other member) hears plainly that nobody answered, and why if known.
+        this.memberEvent(b, this.ids(b.members), m, 'invite-expired', {reason: gone(m.soulId) ? 'soul.faded' : 'no-answer'});
+      }
       for (const m of lapsed) this.emit([m.soulId], 'conversation.closed', {conversation: b.id, reason: 'request-expired'});
       for (const m of dropped) {
         b.members = b.members.filter(x => x.soulId !== m.soulId);
         this.memberEvent(b, [...this.ids(b.members), m.soulId], m, 'dropped');
       }
-      this.settle(b, dropped.length ? 'inactive' : 'one-member');
+      this.settle(b, dropped.length ? 'inactive' : expired.length ? 'invite-expired' : 'one-member');
       this.save(b); changed++;
     });
     return changed;

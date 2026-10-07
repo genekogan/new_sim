@@ -27,6 +27,8 @@ export type CommsOptions = {
   retainMs?: number;
   /** Conversation member inactivity / invitation expiry (Gene §13: 10 min). */
   conversationTimeoutMs?: number;
+  /** An unanswered invitation expires (and the inviter hears so) after this long. Default 2 min. */
+  inviteTimeoutMs?: number;
   /** Background sweep period; 0 disables the timer (tests call runtime.sweep()). */
   sweepMs?: number;
   /** Webhook transport; defaults to global fetch. `null` disables delivery. */
@@ -52,6 +54,8 @@ export type CommsRuntime = {
   publishWorld(text: string, to?: string[]): void;
   /** Spectator `edge` messages (§7) for the hub to broadcast. */
   onSpectator(listener: (m: SpectatorEdgeMessage) => void): void;
+  /** Standing spectator state a newly joined viewer needs (the fade roster); also re-broadcast each sweep. */
+  spectatorJoin(): SpectatorEdgeMessage[];
   sweep(): void;
   close(): void;
 };
@@ -73,7 +77,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
     isLive: id => { const s = deps.db.soul(id); return !!s && s.world_id === worldId && s.retired_at === null; },
     spectate: m => { if (!spectators.length) return; const msg = {type: 'edge', at: now(), ...m} as SpectatorEdgeMessage; for (const l of spectators) { try { l(msg); } catch { /* never break comms */ } } },
   };
-  const conversations = new Conversations(core, options.conversationTimeoutMs ?? 10 * 60_000);
+  const conversations = new Conversations(core, options.conversationTimeoutMs ?? 10 * 60_000, options.inviteTimeoutMs ?? 2 * 60_000);
   const webhooks = new Webhooks(core, options.fetch === null ? undefined : options.fetch ?? (globalThis.fetch as unknown as Fetch));
   const objects = new Objects(core);
   objects.register(chessKind);
@@ -85,6 +89,8 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   deps.ledger.addCapabilityProvider(soul => objects.capabilities(soul));
   const steward = new Steward(core, options.stewardToken);
   const fading = new Fading(core, steward, options.fading === true);
+  core.isFaded = id => fading.status(id)?.colour === 'gone';
+  const roster = (): SpectatorEdgeMessage[] => fading.enabled ? [{type: 'edge', kind: 'fade.roster', tick: core.tick(), at: now(), souls: fading.roster()}] : [];
   const presence = new Presence({ledger: deps.ledger, liveSoulIds: core.liveSoulIds, nameOf: core.nameOf, deliver: (s, k, t, b) => { streams.deliver(s, k, t, b); }});
 
   // Ledger feeds: receipt phases to their own Soul (deduplicated durably, so replays
@@ -191,6 +197,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
     try { objects.sweep(); } catch { /* retried next period */ }
     try { steward.schedule(); } catch { /* retried next period */ }
     try { fading.sweep(); } catch { /* retried next period */ }
+    try { for (const m of roster()) core.spectate(m); } catch { /* retried next period */ }
     try { streams.pruneAll(); } catch { /* retried next period */ }
   };
   const timer = (options.sweepMs ?? 30_000) > 0 ? setInterval(sweep, options.sweepMs ?? 30_000) : null;
@@ -205,6 +212,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
       core.spectate({kind: 'world', tick, text});
     },
     onSpectator(l) { spectators.push(l); },
+    spectatorJoin: roster,
     sweep,
     close() { if (timer) clearInterval(timer); webhooks.close(); streams.wakeAll(); },
   };

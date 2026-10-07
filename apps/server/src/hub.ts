@@ -145,6 +145,7 @@ export class Hub {
       if (c.me) this.send(c, { t: 'brain', calls: this.db.brainCalls(40, { soulIds: c.me.role === 'admin' ? null : c.me.souls }) });
       this.send(c, { t: 'stats', stats: c.me?.role === 'admin' ? this.stats() : publicStats(this.stats()) });
       this.send(c, {t: 'takes', serverTick: e.world.tick, chunks: e.takeChunks?.(e.world.tick - 40) ?? []});
+      for (const extra of this.joinMessages) { try { for (const x of extra()) this.send(c, x as ServerMsg); } catch { /* optional standing state */ } }
       this.sendStation(c);
       c.ready = c.ws.readyState===1&&c.helloGeneration===generation;
     }
@@ -220,6 +221,8 @@ export class Hub {
     }
     return m;
   }
+  /** Standing public state a viewer needs on join (e.g. the edge fade roster); public messages only. */
+  readonly joinMessages: (() => unknown[])[] = [];
   broadcast(m: ServerMsg, filter?: (c: Client) => boolean) {
     if(m.t==='me')throw new Error('Private Me must be published directly to its bound connection');
     if(this.lifecycleSouls&&(m.t==='brain'||m.t==='stats')){

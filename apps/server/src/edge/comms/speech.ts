@@ -18,15 +18,15 @@ export function say(core: CommsCore, soul: EdgeSoul, input: {text?: unknown}, ad
   let channel: Channel, base: BaseChannel, hearers: string[];
   if (enclosure) {
     channel = base = {kind: 'enclosure', placeId: enclosure};
-    hearers = core.liveSoulIds().filter(id => id !== soul.soulId && safeEnclosure(core, id) === enclosure);
+    hearers = core.liveSoulIds().filter(id => id !== soul.soulId && !core.isFaded?.(id) && safeEnclosure(core, id) === enclosure);
   } else {
     channel = base = {kind: 'earshot', placeId: ledger.placePathOf(soul.soulId)[0]?.id ?? null, radius: EARSHOT_RADIUS};
-    hearers = [...new Set(ledger.perceivedBodies(soul.soulId, EARSHOT_RADIUS).map(b => b.soulId))].filter(id => id !== soul.soulId && core.isLive(id));
+    hearers = [...new Set(ledger.perceivedBodies(soul.soulId, EARSHOT_RADIUS).map(b => b.soulId))].filter(id => id !== soul.soulId && core.isLive(id) && !core.isFaded?.(id));
   }
   const audiences = addressees?.(soul.soulId) ?? [];
   if (audiences.length) {
     channel = {kind: 'audience', object: audiences[0]!.objectId, base};
-    hearers = [...new Set([...hearers, ...audiences.flatMap(a => a.souls)])].filter(h => h !== soul.soulId && core.isLive(h));
+    hearers = [...new Set([...hearers, ...audiences.flatMap(a => a.souls)])].filter(h => h !== soul.soulId && core.isLive(h) && !core.isFaded?.(h));
   }
   const id = newId('sp'), tick = core.tick(), at = core.now();
   core.db.prepare('INSERT INTO edge_comms_speech (world_id, id, soul_id, tick, at, channel, text, heard_by) VALUES (?,?,?,?,?,?,?,?)')

@@ -24,6 +24,9 @@ test('fading (flag on): removed after 60 min idle, hidden from others; next act 
  assert.ok(ledger.faded.has(ana.soulId),'faded');{const r=ledger.receipt(ana.soulId,(first as any).receipt.id)!;assert.deepEqual([r.phase,r.code],['failed','soul.faded'],'fading ends the open act failed, not replaced');}assert.equal(f.host.engine.programOf(ana.entityId),null,'body stopped');
  assert.ok(!ledger.perceivedBodies(rows[1].id,500).some(b=>b.soulId===ana.soulId),'hidden from others');
  assert.equal((ledger.observe(ana,new Set()) as any).self.state,'faded');
+ // DLG1: `faded` is memory; a restarted Ledger re-learns the durable roster, so the absent Soul stays hidden and is not animated.
+ {const n=f.host.listeners.length,l2=new EdgeLedger(f.host,f.db),c2=registerEdgeComms(new Hono(),{host:f.host,db:f.db,souls:f.souls,soul:edgeSoulResolver(f.host,f.souls,()=>undefined),ledger:l2},{fading:true,now:()=>now,sweepMs:0});l2.attachComms(c2 as any);
+  try{assert.ok(l2.faded.has(ana.soulId),'re-learned after restart');assert.ok(!l2.perceivedBodies(rows[1].id,500).some(b=>b.soulId===ana.soulId),'still hidden after restart');}finally{c2.close();f.host.listeners.splice(n);}}
  const back=await accept(f.host,ledger.act(ana,{capability:'rest:here',params:{seconds:5}}));assert.equal(back.accepted,true,JSON.stringify(back));
  assert.ok(!ledger.faded.has(ana.soulId));assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='edge-relocate').length,1);
  const p=(f.host.engine.world as NativeWorld).entities[ana.entityId].pose.p;t.diagnostic('landed at '+JSON.stringify(p));

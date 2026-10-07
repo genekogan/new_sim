@@ -62,6 +62,18 @@ export class Fading {
     });
   }
 
+  /** Souls currently faded out (colour `gone`). Durable, so a restarted Ledger re-learns who is absent. */
+  gone(): string[] {
+    if (!this.enabled) return [];
+    const live = new Set(this.core.liveSoulIds());
+    return (this.core.db.prepare("SELECT soul_id FROM edge_comms_activity WHERE world_id = ? AND colour = 'gone'").all(this.core.worldId) as {soul_id: string}[]).map(r => r.soul_id).filter(id => live.has(id));
+  }
+  /** Spectator roster: every live Soul that is not green (yellow/red warn rings, gone hidden). Empty when off. */
+  roster(): {soulId: string; colour: FadeColour; idleSeconds: number}[] {
+    if (!this.enabled) return [];
+    return this.core.liveSoulIds().flatMap(soulId => { const s = this.status(soulId); return s && s.colour !== 'green' ? [{soulId, ...s}] : []; });
+  }
+
   status(soulId: string): {colour: FadeColour; idleSeconds: number} | null {
     if (!this.enabled) return null;
     const r = this.row(soulId);

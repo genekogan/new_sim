@@ -35,15 +35,26 @@ export class EdgeLedger implements EdgeLedgerHooks {
   attachComms(c: NonNullable<EdgeLedger['comms']>) {
     this.comms = c;
     // C9 body effects (fading itself only runs when Comms' fading flag is on — Gene has not approved it).
-    (c as unknown as {fading?: {onFade?(l: (e: {soulId: string; change: string}) => void): void}}).fading?.onFade?.(e => {
-      const m = this.host.minds.get(e.soulId); if (!m) return;
-      if (e.change === 'removed') {
-        this.faded.add(e.soulId); this.pending.delete(e.soulId);
-        // Not replaced by the Soul's own act: its open receipts end failed, so agents can tell why.
-        for (const r of this.openReceipts(e.soulId)) this.update(r.id, {phase: 'failed', code: 'soul.faded', reason: 'This Soul faded out after an hour without an accepted action; act again to come back.'});
-        if (this.host.engine.programOf(m.entityId)) void this.host.enqueue('edge-stop', `edge:${e.soulId}`, {soulId: e.soulId, entityId: m.entityId, why: 'faded'});
+    const fading = (c as unknown as {fading?: {onFade?(l: (e: {soulId: string; change: string}) => void): void; gone?(): string[]}}).fading;
+    const fadeOut = (soulId: string) => {
+      const m = this.host.minds.get(soulId); if (!m) return;
+      this.faded.add(soulId); this.pending.delete(soulId);
+      // Not replaced by the Soul's own act: its open receipts end failed, so agents can tell why.
+      for (const r of this.openReceipts(soulId)) this.update(r.id, {phase: 'failed', code: 'soul.faded', reason: 'This Soul faded out after an hour without an accepted action; act again to come back.'});
+      try { if (this.host.engine.programOf(m.entityId)) void this.host.enqueue('edge-stop', `edge:${soulId}`, {soulId, entityId: m.entityId, why: 'faded'}).catch(() => {/* best effort */}); } catch { /* clock not ready: ambient skips faded Souls anyway */ }
+    };
+    fading?.onFade?.(e => {
+      if (e.change === 'removed') fadeOut(e.soulId);
+      // Reclaimed by speech/converse/object acts (not through act()): land at a starting place like act() does.
+      else if (e.change === 'reclaimed' && this.faded.delete(e.soulId)) {
+        const m = this.host.minds.get(e.soulId);
+        try { if (m) void this.host.enqueue('edge-relocate', `edge:${e.soulId}`, {soulId: e.soulId, entityId: m.entityId, to: this.startingPoint(e.soulId), why: 'reclaimed after fading'}).catch(() => {/* best effort */}); } catch { /* clock not ready */ }
+        this.capCache.delete(e.soulId);
       }
     });
+    // `faded` is memory: after a restart re-learn the durable fade roster, or absent Souls look alive
+    // (listed in here.souls, animated by ambient life, invitable) until they act again.
+    try { for (const soulId of fading?.gone?.() ?? []) fadeOut(soulId); } catch { /* fading table not ready: learned on next change */ }
   }
   /** Souls faded out (removed at 60 min idle); their next act lands them at a starting place. */
   readonly faded = new Set<string>();
@@ -534,6 +545,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const program = this.host.engine.programOf(m.entityId), action = program ? this.host.engine.programAction?.(program) : null;
     const c = day ? clockAt(tick, day.origin, day.dayTicks) : null;
     const spread = this.spread(soul, b ? [b.pose.p[0], b.pose.p[2]] : null, c ? c.hour * 60 + c.minute : null);
+    // A neighbour idle 30+ min (yellow/red) may have no agent behind it: say so, so nobody waits on silence.
+    const awayOf = (id: string) => {const f = this.comms?.fading.status(id) as {colour: string; idleSeconds: number} | null | undefined; return f && (f.colour === 'yellow' || f.colour === 'red') ? {away: {idleMinutes: Math.floor(f.idleSeconds / 60), note: 'idle a long while; may not answer'}} : {};};
     const out: Record<string, unknown> = {
       tick, at: Date.now(),
       world: {id: this.host.worldId, ...(this.host.extra.continuousDayV1 ? {} : {quiet: this.host.quietBarrier}), ...(c ? {time: {day: c.day, phase: Math.round(c.phase * 1000) / 1000, label: timeLabel(c.phase), clock: `${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')}`}} : {})},
@@ -543,7 +556,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       self: {soulId: soul.soulId, name: soul.name, entityId: soul.entityId, placePath: this.placePathOf(soul.soulId), position: b ? b.pose.p.map(v => Math.round(v * 100) / 100) : null, facing: b ? Math.round(b.pose.yaw * 100) / 100 : null,
         state: this.faded.has(soul.soulId) ? 'faded' : stateOf(this.host, m.entityId), activity: String(b?.human?.activity ?? 'idle'), reflex: action && action.actor === m.entityId ? {verb: action.action.verb, phase: action.action.phase ?? action.action.status} : null,
         receipts: this.openReceipts(soul.soulId), fade: this.comms?.fading.status(soul.soulId) ?? null},
-      here: {souls: this.perceivedBodies(soul.soulId, NEAR_RADIUS).map(o => ({soulId: o.soulId, name: o.name, state: o.state, activity: o.activity, distance: o.distance, placeId: o.placeId})), objects: this.comms?.objects.visibleTo(soul) ?? [], untrusted: true},
+      here: {souls: this.perceivedBodies(soul.soulId, NEAR_RADIUS).map(o => ({soulId: o.soulId, name: o.name, state: o.state, activity: o.activity, distance: o.distance, placeId: o.placeId, ...awayOf(o.soulId)})), objects: this.comms?.objects.visibleTo(soul) ?? [], untrusted: true},
       ...(this.comms ? {streamCursor: this.comms.streams.headCursor(soul.soulId)} : {}),
     };
     if (include.has('capabilities')) out.capabilities = this.capabilities(soul);
