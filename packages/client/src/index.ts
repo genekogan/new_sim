@@ -80,7 +80,10 @@ export type ConnectionSession = { generation:number;worldId:string;epoch:string|
 export type TransportReceipt = { session:ConnectionSession;receivedAtMs:number };
 export type ClockProbe = { session:ConnectionSession;n:number;sentAtMs:number;automatic:boolean };
 export type PongReceipt = TransportReceipt & { sentAtMs:number;rttMs:number;automatic:boolean };
+export type EdgeSpectatorMessage = {type:'edge';kind:string;tick:number;at:number}&Record<string,unknown>;
 export type Handlers = {
+  /** EDGE-CONTRACT-v1 §7 spectator messages (speech, conversations, objects, fading) — viewer only. */
+  onEdge?(m: EdgeSpectatorMessage): void;
   /** Current private authority only; null scope clears old private generations. */
   onMe?(me:Me|null,scope:PrivateMeSession|null):void;
   /** null invalidates the previous station; no playback can rely on it. */
@@ -216,6 +219,7 @@ export class Connection {
     ws.onmessage = (ev: { data: unknown }) => {
       if (!mine()) return;const receivedAtMs=this.monotonicNow(); const s = String(ev.data); this.stats.bytesIn += s.length; this.stats.msgsIn++; this.lastMessageAt = this.now();
       let m:ServerMsg;try{m=JSON.parse(s) as ServerMsg;}catch{this.handlers.onError?.('message.invalid','The server message is not valid JSON.');return;}
+      if(m&&typeof m==='object'&&(m as {type?:unknown}).type==='edge'){this.handlers.onEdge?.(m as unknown as EdgeSpectatorMessage);return;}
       if(!m||typeof m!=='object'||typeof m.t!=='string')return;
       this.onMessage(m,receivedAtMs);
     };
