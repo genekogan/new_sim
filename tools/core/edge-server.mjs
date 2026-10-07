@@ -5,7 +5,7 @@ import {createServer} from 'node:http';
 import {createRequire} from 'node:module';
 import {resolve,join} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {readFileSync,mkdirSync,statSync} from 'node:fs';
+import {readFileSync,mkdirSync,statSync,writeFileSync,unlinkSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {setImmediate} from 'node:timers/promises';
 
@@ -14,6 +14,14 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
   if(!input||!dataDir||!worldId||!Number.isInteger(port)||!(port>=4950&&port<=4959||port===4970))throw Error('explicit local input/data/world/allowed port required');
   if(!build.startsWith('local-'))throw Error('local build identity required');
   input=resolve(input);dataDir=resolve(dataDir);
+  // Single writer per data dir: a second server on the same DB would fork the durable clock.
+  const lockPath=join(dataDir,'edge-server.lock');mkdirSync(dataDir,{recursive:true});
+  if(!checkOnly){
+    try{const held=JSON.parse(readFileSync(lockPath,'utf8'));let alive=false;try{process.kill(held.pid,0);alive=held.pid!==process.pid;}catch{alive=false;}
+      if(alive)throw Error(`another edge server (pid ${held.pid}) is still running on this data dir; wait for it to exit`);}catch(error){if(error instanceof Error&&error.message.startsWith('another edge server'))throw error;}
+    writeFileSync(lockPath,JSON.stringify({pid:process.pid,startedAt:new Date().toISOString()}));
+  }
+  const releaseLock=()=>{try{if(JSON.parse(readFileSync(lockPath,'utf8')).pid===process.pid)unlinkSync(lockPath);}catch{/* already gone */}};
   const manifest=inputManifestSHA256?JSON.parse(readFileSync(join(input,'../CONTENT-MANIFEST.json'),'utf8')):null;
   if(inputManifestSHA256&&(!/^[a-f0-9]{64}$/.test(inputManifestSHA256)||createHash('sha256').update(readFileSync(join(input,'../CONTENT-MANIFEST.json'))).digest('hex')!==inputManifestSHA256))throw Error('not the explicitly selected runtime content manifest');
   const sources=['db','world','auth','brain','souls','http','hub','intent-control','mcp','living','config','world-request-path'];
@@ -101,17 +109,20 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
       void listener(req,res);
     });
     await new Promise((r,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',r);});host.start();
-    async function close(){if(closing)return;closing=true;brain.quiesce?.();edge.comms?.close();for(const c of hub.clients)c.ws.close(1001,'local server stopping');
-      const closed=new Promise(r=>server.close(r)),pump=setInterval(()=>host.drainInputs(),10);
+    async function close(){if(closing)return;closing=true;brain.quiesce?.();
+      // Stop the world clock FIRST: once the port is released another process may start on this data dir,
+      // so this process must not advance or persist the clock frontier afterwards (two-writer frontier fault).
+      host.stop();edge.comms?.close();for(const c of hub.clients)c.ws.close(1001,'local server stopping');
+      const closed=new Promise(r=>server.close(r));server.closeAllConnections?.();const pump=setInterval(()=>host.drainInputs(),10);
       const failures=[];
       try{await closed;for(const handle of [provisionBirths,socialInstallation,foodDelivery,shoreInstallation,kitchenInstallation])handle?.close();const outcomes=await Promise.allSettled([service.settled(),brain.settled?.(),...[provisionBirths,socialInstallation,foodDelivery,shoreInstallation,kitchenInstallation].map(h=>h?.settled())]);for(const r of outcomes)if(r.status==='rejected')failures.push(r.reason);host.drainInputs();}finally{clearInterval(pump);}
       let snapshotSaved=false;
       try{host.stop();snapshotSaved=host.engine.canSnapshot?.()===true;if(snapshotSaved)host.saveSnapshot(true);else if(!db.db.prepare('SELECT 1 FROM clock_frontiers_v1 WHERE world_id=?').get(worldId))failures.push(Error('active-work-without-durable-frontier'));}
-      finally{await new Promise(r=>hub.wss.close(r));if(db.db.isOpen)db.close();}
+      finally{clearInterval(pump);await new Promise(r=>hub.wss.close(r));if(db.db.isOpen)db.close();releaseLock();}
       if(failures.length)throw Error('local-expanded-close.installation-failed-resources-closed');return {snapshotSaved,activeNativeSnapshotRefused:!snapshotSaved};}
 
     return {cfg,pins,boot,db,host,auth,brain,souls,service,hub,server,edge,kitchenInstallation,shoreInstallation,foodDelivery,socialInstallation,close};
-  } catch(error){host?.stop();server?.close();db.close();throw error;}
+  } catch(error){host?.stop();server?.close();db.close();releaseLock();throw error;}
 }
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){

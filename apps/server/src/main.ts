@@ -134,6 +134,9 @@ server.listen(config.port, config.host, () => console.log(`[http] listening on h
 let closing = false;
 const shutdown = async (sig: string) => {
   if (closing) return; closing = true;
+  // Edge worlds have no thought to drain: freeze the clock before the port is released so no successor
+  // process can boot while this one still advances the durable clock frontier.
+  if (config.mindDriver === 'edge') { host.stop(); edge?.comms?.close(); }
   if(edenCore){
     brain.quiesce();takes.stop();clearTimeout(firstBackup);clearInterval(backupTimer);
     for(const c of hub.clients)c.ws.close(1001,'server restarting');
