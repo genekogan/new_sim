@@ -83,3 +83,11 @@ test('stand:here stops the current activity; go-near lists perceived Souls',asyn
  const caps=(await f.call(0,'GET','/v1/edge/capabilities')).json.capabilities as any[];
  const near=caps.filter(c=>c.verb==='go-near');const bodies=f.ledger.perceivedBodies(f.rows[0].id,20);assert.equal(near.length,bodies.length);
 });
+
+test('G430 public Soul read: no auth, own data only, no owner/token fields',async t=>{
+ const f=await setup(t);await f.call(0,'POST','/v1/edge/act',{capability:'rest:here',params:{seconds:5}});
+ const res=await f.app.request('/v1/edge/public/souls/'+f.rows[0].id);assert.equal(res.status,200);const j=await res.json() as any;
+ assert.equal(j.contract,EDGE_CONTRACT);assert.equal(j.soul.soulId,f.rows[0].id);assert.ok(j.soul.untrusted);assert.ok(Array.isArray(j.receipts)&&j.receipts.length>=1);assert.ok(j.lastAcceptedAt>0);
+ const text=JSON.stringify(j);for(const k of ['owner','token','dev:alice','programId'])assert.ok(!text.includes(k),k);
+ assert.equal((await f.app.request('/v1/edge/public/souls/s_nobody')).status,404);
+});
