@@ -1,10 +1,13 @@
-// Core-Comms routes under /v1/edge: wait (event stream), say, subscribe, converse.
+// Core-Comms routes under /v1/edge: wait (event stream), say, subscribe, converse, objects.
 // Mounted by Ledger's edge/routes.ts via registerEdgeComms(app, deps).
 import type {Context, Hono} from 'hono';
 import type {ContentfulStatusCode} from 'hono/utils/http-status';
 import type {EdgeDeps, EdgeReceipt, EdgeSoul} from '../contract.ts';
 import {EdgeError, edgeBody} from '../contract.ts';
 import {Conversations} from './converse.ts';
+import {chessKind} from './objects/chess.ts';
+import {Objects} from './objects/framework.ts';
+import {presentationKind} from './objects/presentation.ts';
 import type {CommsCore, SpectatorEdgeMessage} from './core.ts';
 import {Presence} from './presence.ts';
 import {say} from './speech.ts';
@@ -29,6 +32,8 @@ export type CommsRuntime = {
   streams: EventStreams;
   conversations: Conversations;
   webhooks: Webhooks;
+  /** Object framework: `objects.create({...})` seeds instances; kinds via `objects.register`. */
+  objects: Objects;
   /** Narration/world text to one Soul, some Souls, or every live Soul. */
   publishWorld(text: string, to?: string[]): void;
   /** Spectator `edge` messages (§7) for the hub to broadcast. */
@@ -56,6 +61,10 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   };
   const conversations = new Conversations(core, options.conversationTimeoutMs ?? 10 * 60_000);
   const webhooks = new Webhooks(core, options.fetch === null ? undefined : options.fetch ?? (globalThis.fetch as unknown as Fetch));
+  const objects = new Objects(core);
+  objects.register(chessKind);
+  objects.register(presentationKind);
+  deps.ledger.addCapabilityProvider(soul => objects.capabilities(soul));
   const presence = new Presence({ledger: deps.ledger, liveSoulIds: core.liveSoulIds, nameOf: core.nameOf, deliver: (s, k, t, b) => { streams.deliver(s, k, t, b); }});
 
   // Ledger feeds: receipt phases to their own Soul (deduplicated durably, so replays
@@ -93,7 +102,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
     if (!Number.isFinite(seconds) || seconds < 1 || seconds > 55) throw new EdgeError(400, 'invalid', 'timeout must be 1..55 seconds');
     return streams.wait(soul.soulId, after, seconds * 1000, c.req.raw.signal);
   }));
-  app.post('/v1/edge/say', route(async (c, soul) => say(core, soul, await json(c))));
+  app.post('/v1/edge/say', route(async (c, soul) => say(core, soul, await json(c), id => objects.addressees(id))));
   app.post('/v1/edge/subscribe', route(async (c, soul) => webhooks.subscribe(soul, await json(c))));
   app.delete('/v1/edge/subscribe', route((_c, soul) => webhooks.unsubscribe(soul)));
   app.post('/v1/edge/converse', route(async (c, soul) => conversations.handle(soul, await json(c))));
@@ -104,13 +113,20 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
     return conversations.turns(soul, c.req.param('id') ?? '', after);
   }));
 
-  const sweep = () => { try { conversations.sweep(); } catch { /* retried next period */ } };
+  app.get('/v1/edge/objects', route((_c, soul) => ({objects: objects.visibleTo(soul)})));
+  app.get('/v1/edge/objects/:id', route((c, soul) => objects.get(c.req.param('id') ?? '', soul)));
+  app.post('/v1/edge/objects/:id/act', route(async (c, soul) => objects.act(c.req.param('id') ?? '', soul, await json(c))));
+
+  const sweep = () => {
+    try { conversations.sweep(); } catch { /* retried next period */ }
+    try { objects.sweep(); } catch { /* retried next period */ }
+  };
   const timer = (options.sweepMs ?? 30_000) > 0 ? setInterval(sweep, options.sweepMs ?? 30_000) : null;
   timer?.unref?.();
   for (const r of db.prepare('SELECT soul_id FROM edge_comms_subscriptions WHERE world_id = ?').all(worldId) as {soul_id: string}[]) void webhooks.push(r.soul_id);
 
   return {
-    core, streams, conversations, webhooks,
+    core, streams, conversations, webhooks, objects,
     publishWorld(text, to) {
       const tick = core.tick();
       for (const id of to ?? core.liveSoulIds()) streams.deliver(id, 'world', tick, {text});
@@ -121,3 +137,6 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
     close() { if (timer) clearInterval(timer); webhooks.close(); streams.wakeAll(); },
   };
 }
+
+/** EDGE-CONTRACT-v1 §8 export: object actions as capabilities for a Soul. */
+export function edgeObjectCapabilities(runtime: CommsRuntime, soul: EdgeSoul) { return runtime.objects.capabilities(soul); }
