@@ -74,7 +74,6 @@ type Prog = {
   index: number; started: boolean; since: number;
   blockedSince?: number;
   quietHeldSince?: number;
-  stairHeldSince?: number;
   spreadWaits?: number;
   walkStopping?: Diag;
   stopping?: Diag;
@@ -208,6 +207,7 @@ export class MarsEngine implements Engine {
     this.updateClock();
     if (this.rt.tick % 10 === 0) this.updateAttention();
     if (this.quiet) this.advanceQuiet();
+    if (this.cfg.stairMakeWayV1 === true && this.rt.tick % 200 === 0) this.clearStairHeads();
     const tick: number = this.rt.tick;
     for (const p of [...this.programs.values()]) this.advance(p);
     if (tick - this.recorder.startTick >= 20) {
@@ -279,16 +279,6 @@ export class MarsEngine implements Engine {
       if (p.until !== undefined) { if (tick < p.until) return; p.until = undefined; }
       if (p.action) {
         const rec = this.rt.records.get(p.action);
-        // stairMakeWayV1: a climber held on a flight by an idle person (no task of their own) at the landing
-        // asks them to step aside through native make-way (spec §17, as floor walks already do), every 10 s.
-        // Without it an idle body at a stair head holds the climber, and so the quiet barrier, forever.
-        if (this.cfg.stairMakeWayV1 === true && rec && this.ents[p.actor]?.human?.activity === 'climb-wait' && rec.status === 'blocked') {
-          p.stairHeldSince ??= tick;
-          if (tick - p.stairHeldSince >= 200 && (tick - p.stairHeldSince) % 200 === 0) {
-            const me = this.ents[p.actor]!;
-            for (const s of rec.diagnostic?.subjects ?? []) if (s !== p.actor && this.stairYieldable(s)) this.m.makeWay(this.rt, s, [me.pose.p[0], me.pose.p[2]]);
-          }
-        } else p.stairHeldSince = undefined;
         // A timed-out walk can still own a between-level body. Preserve its
         // program until native cancellation actually reaches a safe landing.
         if (p.walkStopping) {
@@ -1118,6 +1108,30 @@ export class MarsEngine implements Engine {
         const a = this.ents[actor], yaw = a.pose.yaw + Math.PI/2;
         this.rt.submit('face',{actor,target:{point:[a.pose.p[0]+Math.cos(yaw)*2,a.pose.p[2]+Math.sin(yaw)*2]}});
       }
+    }
+  }
+  /** stairMakeWayV1: every 10 s, a climber the runtime itself reports stalled on a flight (climb-wait,
+   *  deadlock.stalled; whether still climbing, stopping or cancelling to a landing) asks the free idle
+   *  bystanders named in that wait to step aside through native make-way (spec §17, as floor walks already
+   *  do). Without it an idle body at a stair head holds the climber, and so the quiet barrier, forever
+   *  (live 4970, 2026-10-07). Stateless: driven by tick and runtime records only, so snapshots agree. */
+  private clearStairHeads() {
+    for (const live of [...this.rt.live.values()] as any[]) {
+      const rec = live.rec, me = this.ents[rec.params?.actor];
+      if (rec.verb !== 'walk_to' || rec.status !== 'blocked' || rec.diagnostic?.code !== 'deadlock.stalled' || me?.human?.activity !== 'climb-wait') continue;
+      let room = false;
+      for (const s of rec.diagnostic?.subjects ?? []) {
+        if (s === me.id || !this.ents[s]?.human) continue;
+        if (this.ents[s]!.human!.task) { room = true; continue; }   // already moving (e.g. an earlier courtesy step)
+        if (!this.stairYieldable(s)) continue;
+        this.m.makeWay(this.rt, s, [me.pose.p[0], me.pose.p[2]]);
+        if (this.rt.records.has(`${s}:make-way:${this.rt.tick}`)) room = true;
+      }
+      // No one at a full landing can step aside: a climber already cancelling to that exit landing
+      // retreats along the same flight to its entry landing instead (native cancel traversal, which
+      // itself waits for a supported clear landing). Floaters keep their exit rule.
+      const ex = live.exec;
+      if (!room && ex?.cancelTo === 'exit' && me.body?.family !== 'floater') ex.cancelTo = 'entry';
     }
   }
   /** A free idle bystander: no programme, task, grip, seat, ride, sleep pose, borrow or hold (as quiet landing courtesy). */
