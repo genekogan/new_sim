@@ -97,7 +97,7 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
     server.on('request',(req,res)=>{
       if(closing){res.writeHead(503,{'Cache-Control':'no-store'}).end('Local server is draining.');return;}
       req.url=strip(req.url);
-      if(req.url?.startsWith('/mcp')){void handleMcp(req,res,souls,service).catch(()=>{if(!res.headersSent)res.writeHead(503).end();});return;}
+      if(req.url?.startsWith('/mcp')){void handleMcp(req,res,souls,service,(method,path,token,body)=>Promise.resolve(app.request(path,{method,headers:{authorization:'Bearer '+token,'content-type':'application/json'},...(body!==undefined?{body:JSON.stringify(body)}:{})})).then(r=>r.json())).catch(()=>{if(!res.headersSent)res.writeHead(503).end();});return;}
       void listener(req,res);
     });
     await new Promise((r,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',r);});host.start();

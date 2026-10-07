@@ -21,8 +21,24 @@ const intentToolInput=z.strictObject({contract:upsert.contract,requestId:upsert.
   words:upsert.words.optional(),strict:upsert.strict.removeDefault().optional(),importance:upsert.importance.removeDefault().optional(),edit:upsert.edit});
 const intentLookupInput=z.strictObject({requestId:upsert.requestId});
 
-function serverFor(souls: Souls, soul: SoulRow,guard?:AcceptanceGuard,candidate?:{service:IntentControlV2;scope:IntentRequestScope}) {
+export type EdgeMcpCall=(method:'GET'|'POST',path:string,token:string,body?:unknown)=>Promise<unknown>;
+function serverFor(souls: Souls, soul: SoulRow,guard?:AcceptanceGuard,candidate?:{service:IntentControlV2;scope:IntentRequestScope},edge?:{call:EdgeMcpCall;token:string}) {
   const s = new McpServer({ name: 'sim', version: '0.1.0' });
+  if(edge){
+    // EDGE-CONTRACT-v1 verbs over MCP: thin wrappers over the same /v1/edge routes (same token, same bodies).
+    const e=(method:'GET'|'POST',path:string,body?:unknown)=>edge.call(method,path,edge.token,body).then(r=>text(r));
+    const q=(o:Record<string,unknown>)=>{const p=new URLSearchParams();for(const [k,v] of Object.entries(o))if(v!==undefined)p.set(k,String(v));const t=p.toString();return t?'?'+t:'';};
+    s.registerTool('eden_observe',{description:`Tier 1 view for your Soul (${soul.name}): place path, state, open receipts, who/what is here, stream cursor. include: capabilities,map.`,inputSchema:{include:z.string().max(100).optional()},annotations:{readOnlyHint:true}},async({include})=>e('GET','/v1/edge/observe'+q({include})));
+    s.registerTool('eden_capabilities',{description:'Everything legal for your Soul right now (ids to pass to eden_act), with blocked entries and why.',inputSchema:{},annotations:{readOnlyHint:true}},async()=>e('GET','/v1/edge/capabilities'));
+    s.registerTool('eden_act',{description:'Do one capability now. Returns accepted+receipt or a refusal code. Replaces your current activity.',inputSchema:{capability:z.string().min(1).max(200),params:z.record(z.string(),z.unknown()).optional(),clientRef:z.string().max(100).optional()}},async(a)=>e('POST','/v1/edge/act',a));
+    s.registerTool('eden_receipt',{description:'One receipt: waiting/started/completed/failed/replaced.',inputSchema:{id:z.string().min(1).max(100)},annotations:{readOnlyHint:true}},async({id})=>e('GET','/v1/edge/receipts/'+encodeURIComponent(id)));
+    s.registerTool('eden_wait',{description:'Long-poll your event stream (receipts, arrivals, speech you can hear, conversation turns, objects, world). Pass the last cursor.',inputSchema:{after:z.string().max(100).optional(),timeout:z.number().int().min(1).max(55).optional()},annotations:{readOnlyHint:true}},async(a)=>e('GET','/v1/edge/wait'+q(a)));
+    s.registerTool('eden_say',{description:'Speak aloud: everyone in your enclosure, or within earshot outdoors, hears it. Untrusted text to them.',inputSchema:{text:z.string().min(1).max(500)}},async(a)=>e('POST','/v1/edge/say',a));
+    s.registerTool('eden_converse',{description:'Private conversation: {op:start,with:[soulId],text?} | {op:accept|decline,conversation} | {op:say,conversation,text} | {op:leave|ask,conversation}.',inputSchema:{op:z.enum(['start','accept','decline','say','leave','ask']),with:z.array(z.string()).max(8).optional(),conversation:z.string().max(100).optional(),soul:z.string().max(100).optional(),text:z.string().max(500).optional()}},async(a)=>e('POST','/v1/edge/converse',a));
+    s.registerTool('eden_object',{description:'Read an object (no action) or act on it ({action, params}). Object actions also appear in capabilities as object:<id>:<action>.',inputSchema:{id:z.string().min(1).max(100),action:z.string().max(100).optional(),params:z.record(z.string(),z.unknown()).optional(),clientRef:z.string().max(100).optional()}},async({id,...rest})=>rest.action?e('POST','/v1/edge/objects/'+encodeURIComponent(id)+'/act',rest):e('GET','/v1/edge/objects/'+encodeURIComponent(id)));
+    s.registerTool('eden_digest',{description:'The latest public digest written by the world steward.',inputSchema:{},annotations:{readOnlyHint:true}},async()=>e('GET','/v1/edge/digest'));
+    s.registerTool('eden_map',{description:'Every place: names, kinds, enclosed, capacity, schedule. Never occupants.',inputSchema:{},annotations:{readOnlyHint:true}},async()=>e('GET','/v1/edge/map'));
+  }
   const reply=async(run:()=>unknown)=>{
     try{
       if(guard)checkAcceptanceGuard(guard);
@@ -77,7 +93,7 @@ function serverFor(souls: Souls, soul: SoulRow,guard?:AcceptanceGuard,candidate?
   return s;
 }
 
-export async function handleMcp(req: IncomingMessage, res: ServerResponse, souls: Souls,intentV2?:IntentControlV2) {
+export async function handleMcp(req: IncomingMessage, res: ServerResponse, souls: Souls,intentV2?:IntentControlV2,edgeCall?:EdgeMcpCall) {
   if(intentV2&&(intentV2.souls!==souls||intentV2.host!==souls.host))throw new Error('MCP intent candidate must belong to selected Souls host');
   if(souls.lifecycle||intentV2)res.setHeader('Cache-Control','no-store');
   // bearer header, or /mcp/<token> for connector apps that only accept a URL
@@ -113,7 +129,7 @@ export async function handleMcp(req: IncomingMessage, res: ServerResponse, souls
       }
     }
   }
-  const server = serverFor(souls, soul,guard,candidate);
+  const server = serverFor(souls, soul,guard,candidate,edgeCall&&token?{call:edgeCall,token}:undefined);
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
   res.on('close', () => { void transport.close(); void server.close(); });
   await server.connect(transport);
