@@ -1130,6 +1130,26 @@ export class MarsEngine implements Engine {
     this.cursor=this.rt.events.length;this.renderBaseKey='';this.startRecorder();
   }
 
+  /** placeRegionsV1: why a W1 place cannot become a native destination region here (pure), or null. It must be new, level 0,
+   *  and lie on admitted native ground with at least three clear 1 m standing spots inside it. */
+  previewPlaceRegionV1(r:{id:string;label:string;polygon:[number,number][]}):Diag|null{
+    if(!/^[a-z0-9][a-z0-9._-]{0,99}$/.test(String(r?.id)))return {code:'region.bad-id',message:'a place-style id is required'};
+    if(this.rt.world.regions[r.id]||this.ents[r.id])return {code:'region.exists',message:`${r.id} already names a region or entity`};
+    if(typeof r.label!=='string'||!r.label||r.label.length>100)return {code:'region.bad-label',message:'label 1..100 characters'};
+    if(!Array.isArray(r.polygon)||r.polygon.length<3||r.polygon.length>64||!r.polygon.every(v=>Array.isArray(v)&&v.length===2&&v.every(Number.isFinite)))return {code:'region.bad-polygon',message:'3..64 [x,z] points'};
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.level(0);if(!grid)return {code:'region.no-ground',message:'no level-0 ground'};
+    const xs=r.polygon.map(v=>v[0]),zs=r.polygon.map(v=>v[1]);let clear=0;
+    for(let x=Math.ceil(Math.min(...xs))+.5;x<Math.max(...xs);x+=1)for(let z=Math.ceil(Math.min(...zs))+.5;z<Math.max(...zs);z+=1)if(inPoly(x,z,r.polygon)&&clearanceAt(grid,[x,z])>=HUMAN_RADIUS+.07)clear++;
+    return clear>=3?null:{code:'region.unsupported',message:`${r.id} has ${clear} clear standing spots on admitted native ground (needs 3)`};
+  }
+  /** placeRegionsV1 (logged rules fact `placeRegionsV1`): W1 places become native destination regions (walk/hang-out/gather offers);
+   *  idempotent by id; a place that is not admissible is skipped. Returns the ids added. */
+  installPlaceRegionsV1(list:{id:string;label:string;polygon:[number,number][]}[]):string[]{
+    const added:string[]=[];
+    for(const r of list??[]){if(this.previewPlaceRegionV1(r))continue;this.rt.world.regions[r.id]={id:r.id,label:r.label,kind:'place',level:0,polygon:r.polygon.map(v=>[v[0],v[1]] as [number,number]),provenance:{origin:'design-edit',confidence:'hypothetical',note:'W1 place admitted as a native destination (placeRegionsV1)'}};added.push(r.id);}
+    if(added.length){const sorted:Record<string,any>={};for(const id of Object.keys(this.rt.world.regions).sort())sorted[id]=this.rt.world.regions[id];this.rt.world.regions=sorted;}
+    return added;
+  }
   /** carrier/1: the carrier this body is boarding, seated in or leaving, if any. */
   carrierOf(actor:string):{id:string;slot:string;riderPhase:string;phase:string;label:string}|null{
     const b=this.ents[actor]?.human?.carrier,e=b?this.ents[b.id]:undefined;if(!b||!e?.carrier)return null;

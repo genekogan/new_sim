@@ -199,6 +199,11 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
           if(!result.ok)throw new Error('camp-expansion.anchor:'+result.message);
         }
       }
+      // placeRegionsV1: W1 places on admitted native ground become destination regions, with their kernel places (walk offers).
+      const regionsV1=(e.payload as {placeRegionsV1?:unknown}|null)?.placeRegionsV1;
+      if(regionsV1){const install=(engine as unknown as {installPlaceRegionsV1?:(l:unknown)=>string[]}).installPlaceRegionsV1;if(!install)throw Error('place-regions.reader-required');
+        const added=new Set(install.call(engine,regionsV1));
+        for(const a of engine.anchors())if(added.has(a.id)&&!k.things[a.id]){const r=applyAll(k,[{op:'appear',id:a.id,kind:'place',name:a.name,at:a.in??null,traits:{...(a.point?{point:a.point}:{}),...(a.tags?{tags:a.tags}:{})}}],'world');if(!r.ok)throw Error('place-regions.anchor:'+r.message);}}
       // carrier/1: a ride (balloon) installed at its home; prospective, idempotent by id; refused installs are no-ops.
       const carrier=(e.payload as {carrierV1?:unknown}|null)?.carrierV1;
       if(carrier){const install=(engine as unknown as {installCarrierV1?:(s:unknown)=>boolean}).installCarrierV1;if(!install)throw Error('carrier.reader-required');install.call(engine,carrier);}

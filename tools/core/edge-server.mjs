@@ -10,7 +10,7 @@ import {createHash} from 'node:crypto';
 import {setImmediate} from 'node:timers/promises';
 
 export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,marsWebDir,build='local-edge/1',checkOnly=false,placeData,seedObjects,inviteRequired=false,skillFile,cliFile,ambient=true,
-  inputManifestSHA256,modelCredentialFile=undefined,localBudget=0,autonomous=false,localSoulLimit=5,humanRest=false,provisions=false,sequences=false,floorGoals=false,kitchen=false,shore=false,foodDeliveryId,quietLandingCourtesy=false,social=false,closedGoals=false,approachRetention=false,activateExpansion=false,humanDirectionBurstUsd=1,quiesceThought=false}) {
+  inputManifestSHA256,modelCredentialFile=undefined,localBudget=0,autonomous=false,localSoulLimit=5,humanRest=false,provisions=false,sequences=false,floorGoals=false,kitchen=false,shore=false,foodDeliveryId,quietLandingCourtesy=false,social=false,closedGoals=false,approachRetention=false,activateExpansion=false,humanDirectionBurstUsd=1,quiesceThought=false,nativePlaces=[]}) {
   if(!input||!dataDir||!worldId||!Number.isInteger(port)||!(port>=4950&&port<=4959||port===4970))throw Error('explicit local input/data/world/allowed port required');
   if(!build.startsWith('local-'))throw Error('local build identity required');
   input=resolve(input);dataDir=resolve(dataDir);
@@ -102,6 +102,11 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
     if(host.enableReflexTimeoutV1)await drive(host.enableReflexTimeoutV1());
     if(host.enableContinuousDayV1)await drive(host.enableContinuousDayV1());
     if(host.enableEdgeMotionV1)await drive(host.enableEdgeMotionV1());
+    // placeRegionsV1: named W1 places (from placeData) on admitted native ground become destination regions (one logged rules fact; idempotent).
+    if(nativePlaces.length){if(!placeData)throw Error('nativePlaces needs placeData');if(!host.installPlaceRegionsV1)throw Error('selected runtime has no placeRegionsV1');
+      const byId=new Map(JSON.parse(readFileSync(resolve(placeData),'utf8')).places.map(p=>[p.id,p]));
+      const out=await drive(host.installPlaceRegionsV1(nativePlaces.filter(id=>byId.has(id)).map(id=>({id,label:byId.get(id).name,polygon:byId.get(id).polygon}))));
+      if(out.admitted.length||out.refused.length)console.error('[edge] native places:',JSON.stringify({admitted:out.admitted,refused:out.refused.map(r=>r.id+' '+r.code),unknown:nativePlaces.filter(id=>!byId.has(id))}));}
     // carrier/1: a seeded ride object with `carrier` installs its native carrier first (logged rules fact, idempotent by id).
     for(const o of seedObjects??[])if(o.kind==='ride'&&o.carrier&&!host.engine.world.entities[o.params?.carrier]?.carrier){if(!host.installCarrierV1)throw Error('selected runtime has no carrier/1');await drive(host.installCarrierV1({id:o.params.carrier,label:o.name,...o.carrier}));}
     const {EdgeLedger}=await load('apps/server/src/edge/ledger/ledger.ts');
@@ -138,7 +143,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).hr
     if(!descriptorPath)throw Error('usage: node tools/core/edge-server.mjs <descriptor.json> [check]');
     const d=JSON.parse(readFileSync(resolve(descriptorPath),'utf8')),flags=d.flags??{};
     const app=await openEdgeServerV1({input:d.input,dataDir:d.dataDir,worldId:d.worldId,port:Number(d.port),webDir:d.webDir,marsWebDir:d.marsWebDir,build:d.build??'local-edge/1',checkOnly:mode==='check',placeData:d.placeData,seedObjects:d.objects,inviteRequired:d.inviteRequired===true,skillFile:d.skillFile,cliFile:d.cliFile,inputManifestSHA256:d.inputManifestSHA256,
-      localSoulLimit:Number(d.localSoulLimit??9),humanRest:flags.humanRest??true,provisions:flags.provisions??true,sequences:flags.sequences??true,floorGoals:flags.floorGoals??true,kitchen:flags.kitchen??true,shore:flags.shore??true,foodDeliveryId:flags.foodDeliveryId,quietLandingCourtesy:flags.quietLandingCourtesy??true,social:flags.social??true,approachRetention:flags.approachRetention??true,closedGoals:flags.closedGoals??true,activateExpansion:flags.activateExpansion??true});
+      localSoulLimit:Number(d.localSoulLimit??9),humanRest:flags.humanRest??true,provisions:flags.provisions??true,sequences:flags.sequences??true,floorGoals:flags.floorGoals??true,kitchen:flags.kitchen??true,shore:flags.shore??true,foodDeliveryId:flags.foodDeliveryId,quietLandingCourtesy:flags.quietLandingCourtesy??true,social:flags.social??true,approachRetention:flags.approachRetention??true,closedGoals:flags.closedGoals??true,activateExpansion:flags.activateExpansion??true,nativePlaces:Array.isArray(d.nativePlaces)?d.nativePlaces:[]});
     if(app.checkOnly)console.log(JSON.stringify(app,null,2));
     else {console.log(JSON.stringify({url:app.cfg.publicUrl,worldId:app.host.worldId,boot:app.boot,mindDriver:app.cfg.mindDriver,edge:'/v1/edge',places:app.edge.places.byId.size,build:app.cfg.build}));
       for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>void app.close().then(()=>process.exit(0)).catch(()=>process.exit(1)));}

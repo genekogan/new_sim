@@ -997,6 +997,16 @@ export class WorldHost {
   enableSpreadV2(){if((this.extra.runtimePolicy as {spreadV2?:boolean}|undefined)?.spreadV2)return Promise.resolve();return this.enqueue('rules','operator:spread-v2',{runtimePolicy:{sleepBlockTicks:1200,...this.extra.runtimePolicy as object,spreadV2:true},why:'shared places take arrivals by real area: proportional inset, 1 m spots, centre kept, arrivals stand just outside a full place instead of being refused; retain historical replay before this event'});}
   enableContinuousDayV1(){if(this.extra.continuousDayV1)return Promise.resolve();return this.enqueue('rules','operator:continuous-day',{continuousDayV1:true,why:'Gene: no nightly quiet hours. The day turns as a plain event; no quiet renewal, overdue-checkpoint pause or held intent; snapshots carry in-flight work. A quiet already under way ends at once without compaction. Retain historical quiet/compact replay before this event'});}
   enableReflexTimeoutV1(){if((this.extra.runtimePolicy as {reflexTimeoutV1?:boolean}|undefined)?.reflexTimeoutV1)return Promise.resolve();return this.enqueue('rules','operator:reflex-timeout',{runtimePolicy:{sleepBlockTicks:1200,...this.extra.runtimePolicy as object,reflexTimeoutV1:true},why:'every reflex the runtime reports stalled on other people for 60 s (walk, seat, stair, swim, courtesy step, yield) is natively cancelled in every state, so no single body can hold another or the world; retain historical replay before this event'});}
+  /** placeRegionsV1: admit W1 places (id, label, polygon) as native destination regions in one logged prospective rules fact.
+   *  Only new, admissible places are written; returns what was admitted and why the rest were not. */
+  installPlaceRegionsV1(list:{id:string;label:string;polygon:[number,number][]}[]){
+    const engine=this.engine as unknown as {previewPlaceRegionV1?:(r:unknown)=>{code:string;message:string}|null;world:{regions:Record<string,unknown>}};
+    if(!engine.previewPlaceRegionV1)return Promise.reject(Error('place-regions.reader-required'));
+    const admit:typeof list=[],refused:{id:string;code:string;message:string}[]=[];
+    for(const r of list){if(engine.world.regions[r.id])continue;const issue=engine.previewPlaceRegionV1(r);if(issue)refused.push({id:r.id,...issue});else admit.push({id:r.id,label:r.label,polygon:r.polygon});}
+    if(!admit.length)return Promise.resolve({admitted:[] as string[],refused});
+    return this.enqueue('rules','operator:place-regions',{placeRegionsV1:admit,why:'W1 places on admitted native ground become destination regions (walk, hang-out, gather) so Souls can spread beyond the commons; prospective, earlier history replays unchanged'}).then(()=>({admitted:admit.map(r=>r.id),refused}));
+  }
   /** carrier/1: install a ride (e.g. a hot-air balloon) at its home as a logged prospective rules fact; idempotent by id. */
   installCarrierV1(spec:{id:string;def:string;label?:string;at:[number,number];yaw?:number;route:string;waitSeconds?:number}){
     const engine=this.engine as unknown as {previewCarrierV1?:(s:unknown)=>{code:string;message:string}|null;world:{entities:Record<string,{carrier?:unknown}>}};
