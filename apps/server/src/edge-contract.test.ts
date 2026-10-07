@@ -135,3 +135,22 @@ test('PM-R057 vocabulary over HTTP: natural names resolve (resolved), unknown ge
  assert.equal((await f.call(1,'GET','/v1/edge/objects/talk-1')).json.object.mine.ticket,true);
  const again=(await f.call(1,'POST','/v1/edge/act',{capability:'object:talk-1:reserve'})).json;assert.equal(again.accepted,false,JSON.stringify(again));
 });
+
+test('PM-R055 observe.elsewhere: a few other places with the walk there, why (quiet / marks / on now), counts only',async t=>{
+ const f=await setup(t),o=(await f.call(0,'GET','/v1/edge/observe')).json,caps=(await f.call(0,'GET','/v1/edge/capabilities')).json.capabilities as any[];
+ assert.ok(Array.isArray(o.happening)&&Array.isArray(o.elsewhere)&&o.elsewhere.length>=1&&o.elsewhere.length<=4,JSON.stringify(o.elsewhere));
+ const mine=new Set(o.self.placePath.map((p:any)=>p.id));
+ for(const e of o.elsewhere){assert.ok(caps.some(c=>c.id===e.capability),e.capability);assert.ok(!mine.has(e.placeId),'not where I already am');assert.ok(Array.isArray(e.why));assert.equal(typeof e.souls,'number');}
+ assert.ok(!JSON.stringify(o.elsewhere).includes(f.rows[1].id),'no Soul identities');
+ // Bob walks somewhere and leaves a mark there; Alice's elsewhere counts it (counts only, never the text).
+ const target=o.elsewhere[0],walk=(await f.call(1,'POST','/v1/edge/act',{capability:target.capability})).json;assert.equal(walk.accepted,true);
+ for(let i=0;i<60&&(await f.receipt(1,walk.receipt.id)).phase!=='completed';i++)await f.run(100,()=>false);
+ const mk=(await f.call(1,'POST','/v1/edge/act',{capability:'make:mark',params:{title:'Come by',text:'secret words'}})).json;assert.equal(mk.accepted,true,JSON.stringify(mk));
+ const placeId=f.ledger.comms!.objects.all().find(x=>x.id===mk.receipt.object)!.placeId;
+ const away=(await f.call(1,'GET','/v1/edge/capabilities')).json.capabilities.filter((c:any)=>c.verb==='walk'&&c.available&&c.target?.kind==='place'&&c.target.id!==placeId).pop();
+ const left=(await f.call(1,'POST','/v1/edge/act',{capability:away.id})).json;for(let i=0;i<60&&(await f.receipt(1,left.receipt.id)).phase!=='completed';i++)await f.run(100,()=>false);
+ const again=(await f.call(0,'GET','/v1/edge/observe')).json,e=again.elsewhere.find((x:any)=>x.placeId===placeId);t.diagnostic(JSON.stringify(again.elsewhere));
+ assert.ok(e&&e.why.some((w:string)=>/lasting mark/.test(w))&&e.souls===0,'the quiet place with a fresh mark is suggested: '+JSON.stringify(again.elsewhere));
+ assert.ok(!again.elsewhere.some((x:any)=>/(^|-)mat-\d+$/.test(x.placeId)),'no personal sleeping mats');
+ assert.ok(!JSON.stringify(again.elsewhere).includes('secret words'),'mark text never listed elsewhere');
+});

@@ -17,7 +17,7 @@ const WAIT_CODES = new Set(['program.safe-stop-required', 'program.safe-stop-pen
 const WAIT_LIMIT_TICKS = 20 * 60;   // a waiting receipt that cannot start within a minute fails
 const NEAR_RADIUS = 20;
 const OPEN: EdgeReceipt['phase'][] = ['waiting', 'started'];
-type Row = {receipt_id: string; soul_id: string; capability: string; phase: EdgeReceipt['phase']; accepted_tick: number; started_tick: number | null; ended_tick: number | null; code: string | null; reason: string | null; program_id: string | null; client_ref: string | null};
+type Row = {receipt_id: string; soul_id: string; capability: string; phase: EdgeReceipt['phase']; accepted_tick: number; started_tick: number | null; ended_tick: number | null; code: string | null; reason: string | null; program_id: string | null; client_ref: string | null; plan?: string | null};
 type Pending = {receipt: string; soul: EdgeSoul; steps: Program['steps']; label: string; deadline: number; capability: string};
 
 export class EdgeLedger implements EdgeLedgerHooks {
@@ -65,11 +65,16 @@ export class EdgeLedger implements EdgeLedgerHooks {
       CREATE INDEX IF NOT EXISTS edge_receipts_v1_soul ON edge_receipts_v1 (world_id, soul_id, phase);
       CREATE TABLE IF NOT EXISTS edge_refusals_v1 (world_id TEXT NOT NULL, at INTEGER NOT NULL, tick INTEGER NOT NULL, soul_id TEXT NOT NULL, verb TEXT NOT NULL, capability TEXT NOT NULL, code TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS edge_refusals_v1_at ON edge_refusals_v1 (world_id, at);`);
+    // PM-R055: a waiting act's plan is kept with its receipt so a restart re-arms it instead of losing it.
+    if (!(db.db.prepare('PRAGMA table_info(edge_receipts_v1)').all() as {name: string}[]).some(c => c.name === 'plan')) db.db.exec('ALTER TABLE edge_receipts_v1 ADD COLUMN plan TEXT');
     this.places = new PlaceIndex(this.loadPlaces(placeData));
-    // Receipts left open by a previous process cannot be followed honestly.
+    // Open receipts from a previous process: a started one whose programme the snapshot carries is still followed;
+    // a waiting one with its plan is re-armed (fresh one-minute wait); anything else cannot be followed honestly.
     for (const r of this.rows("phase IN ('waiting','started')")) {
       const m = host.minds.get(r.soul_id);
       if (r.phase === 'started' && r.program_id && m && host.engine.programOf(m.entityId) === r.program_id) continue;
+      const plan = r.phase === 'waiting' && r.plan ? JSON.parse(r.plan) as {label: string; steps: Program['steps']} : null;
+      if (plan && m && !this.pending.has(r.soul_id)) {this.pending.set(r.soul_id, {receipt: r.receipt_id, soul: {soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner}, steps: plan.steps, label: plan.label, deadline: host.engine.world.tick + WAIT_LIMIT_TICKS, capability: r.capability}); continue;}
       this.update(r.receipt_id, {phase: 'failed', code: 'receipt.lost-on-restart', reason: 'The server restarted before this action could be followed to its end.'});
     }
     host.listeners.push({
@@ -128,7 +133,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       if (this.host.quietBarrier) continue;
       const issue = this.host.engine.canPerform({actor: p.soul.entityId, label: p.label, steps: p.steps});
       if (issue && WAIT_CODES.has(issue.code)) continue;
-      this.pending.delete(soulId);
+      this.pending.delete(soulId); this.db.db.prepare('UPDATE edge_receipts_v1 SET plan=NULL WHERE world_id=? AND receipt_id=?').run(this.host.worldId, p.receipt);
       if (issue) {this.update(p.receipt, {phase: 'failed', code: issue.code, reason: humanBlockedExplanationV1(issue.code, p.label)}); continue;}
       void this.decide(p.soul, p.receipt, p.capability, p.label, p.steps).catch(() => this.update(p.receipt, {phase: 'failed', code: 'ledger.unavailable', reason: 'The world could not record this action.'}));
     }
@@ -159,6 +164,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
   /** @internal ambient helper: the capability plans near this Soul (cached per tick). */
   ambientPlans(soul: EdgeSoul) {return this.binds(soul);}
+  private arm(p: Pending) {
+    this.pending.set(p.soul.soulId, p);
+    this.db.db.prepare('UPDATE edge_receipts_v1 SET plan=? WHERE world_id=? AND receipt_id=?').run(JSON.stringify({label: p.label, steps: p.steps}), this.host.worldId, p.receipt);
+  }
   private decide(soul: EdgeSoul, receipt: string, capability: string, label: string, steps: Program['steps']) {
     return this.host.enqueue('decision', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, option: capability, label, steps, reevalTicks: 1e9, fallback: false, trigger: `edge-act:${receipt}`});
   }
@@ -311,7 +320,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (this.host.quietBarrier) {
       // Quiet renewal is brief and always ends (stall release): accept and start at first light, receipt 'waiting'.
       const r = this.insert(soul, capability, 'waiting', clientRef);
-      this.pending.set(soul.soulId, {receipt: r.id, soul, steps, label: plan.label, deadline: this.host.engine.world.tick + WAIT_LIMIT_TICKS, capability});
+      this.arm({receipt: r.id, soul, steps, label: plan.label, deadline: this.host.engine.world.tick + WAIT_LIMIT_TICKS, capability});
       return {accepted: true, receipt: this.receipt(soul.soulId, r.id)!, ...resolved};
     }
     if (!cap.available && cap.blocked && !WAIT_CODES.has(cap.blocked.code)) return {...refuse(cap.blocked.code, cap.blocked.reason), ...resolved};
@@ -320,7 +329,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (issue) {
       // Asleep or mid-step: stop safely first, then start (receipt `waiting`).
       const r = this.insert(soul, capability, 'waiting', clientRef);
-      this.pending.set(soul.soulId, {receipt: r.id, soul, steps, label: plan.label, deadline: this.host.engine.world.tick + WAIT_LIMIT_TICKS, capability});
+      this.arm({receipt: r.id, soul, steps, label: plan.label, deadline: this.host.engine.world.tick + WAIT_LIMIT_TICKS, capability});
       if (issue.code === 'program.safe-stop-required') await this.host.enqueue('edge-stop', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, receipt: r.id});
       return {accepted: true, receipt: this.receipt(soul.soulId, r.id)!, ...resolved};
     }
@@ -396,19 +405,49 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
   map() {return [...this.places.byId.values()].map(p => ({id: p.id, name: p.name, kind: p.kind, enclosed: p.enclosed, capacity: p.capacity, parent: p.parent, center: centroid(p.polygon).map(v => Math.round(v * 10) / 10), starting: p.starting, ...(p.description ? {description: p.description} : {}), schedule: (p.schedule ?? []).map(s => ({id: s.id, cron: s.cron, durationMinutes: s.durationMinutes ?? null, ticketed: !!s.ticketed, label: s.label ?? null}))}));}
 
+  /** PM-R055: happening (with walk capability) and a few inviting places elsewhere. Counts only, never identities;
+   *  project titles are listed objects (untrusted), marks are counted. Deterministic for a given world state. */
+  private spread(soul: EdgeSoul, me: [number, number] | null, minuteOfDay: number | null) {
+    const caps = this.capabilities(soul), walk = new Map(caps.filter(c => c.verb === 'walk' && c.available && c.target?.kind === 'place').map(c => [c.target!.id, c]));
+    const happening = (minuteOfDay === null ? [] : happenings(this.places.byId.values(), minuteOfDay, me)).map(h => ({...h, ...(walk.has(h.placeId) ? {capability: walk.get(h.placeId)!.id} : {})}));
+    const here = new Set(this.placePathOf(soul.soulId).map(p => p.id)), souls = new Map<string, number>();
+    for (const m of this.host.minds.values()) {
+      if (m.soulId === soul.soulId || this.faded.has(m.soulId)) continue; const ob = this.body(m.entityId); if (!ob) continue;
+      for (const p of this.places.containing(ob.pose.p[0], ob.pose.p[2], ob.human?.level ?? 0)) souls.set(p.id, (souls.get(p.id) ?? 0) + 1);
+    }
+    const marks = new Map<string, number>(), projects = new Map<string, string[]>();
+    for (const o of this.comms?.objects.all() ?? []) {
+      const st = o.state as {removed?: boolean; status?: string; title?: string};
+      if (o.kind === 'mark' && !st.removed) marks.set(o.placeId, (marks.get(o.placeId) ?? 0) + 1);
+      if (o.kind === 'project' && st.status !== 'done' && st.title) projects.set(o.placeId, [...(projects.get(o.placeId) ?? []), st.title]);
+    }
+    const on = new Map(happening.map(h => [h.placeId, h]));
+    const elsewhere = [...walk.entries()].flatMap(([id, cap]) => {
+      const p = this.places.byId.get(id); if (!p || here.has(id) || p.parent === null || p.kind === 'sleeping-mat' || /(^|-)mat-\d+$/.test(id)) return [];   // personal sleeping spots are not invitations
+      const [cx, cz] = centroid(p.polygon), d = me ? Math.hypot(cx - me[0], cz - me[1]) : 0; if (d > 150) return [];
+      const n = souls.get(id) ?? 0, mk = marks.get(id) ?? 0, pj = projects.get(id) ?? [], h = on.get(id);
+      const why = [...(h ? [h.now ? `${h.label} is on now` : `${h.label} in ${h.startsInMinutes} min`] : []), ...(n === 0 ? ['quiet: nobody there'] : []), ...(mk ? [`${mk} lasting mark${mk > 1 ? 's' : ''}`] : []), ...(pj.length ? [`${pj.length} open project${pj.length > 1 ? 's' : ''}`] : [])];
+      const score = (h ? (h.now ? 6 : 2) : 0) + (n === 0 ? 3 : n === 1 ? 1 : -n) + Math.min(3, mk + pj.length) - d / 30;
+      return [{score, item: {placeId: id, place: p.name, kind: p.kind, distance: Math.round(d), souls: n, why, capability: cap.id, ...(pj.length ? {projects: pj.slice(0, 2), untrusted: true} : {})}}];
+    }).sort((a, b) => b.score - a.score || a.item.placeId.localeCompare(b.item.placeId)).slice(0, 4).map(x => x.item);
+    return {happening, elsewhere};
+  }
+
   observe(soul: EdgeSoul, include: Set<string>) {
     const m = this.mind(soul), b = this.body(m.entityId), tick = this.host.engine.world.tick, day = this.host.living;
     const program = this.host.engine.programOf(m.entityId), action = program ? this.host.engine.programAction?.(program) : null;
     const c = day ? clockAt(tick, day.origin, day.dayTicks) : null;
+    const spread = this.spread(soul, b ? [b.pose.p[0], b.pose.p[2]] : null, c ? c.hour * 60 + c.minute : null);
     const out: Record<string, unknown> = {
       tick, at: Date.now(),
       world: {id: this.host.worldId, ...(this.host.extra.continuousDayV1 ? {} : {quiet: this.host.quietBarrier}), ...(c ? {time: {day: c.day, phase: Math.round(c.phase * 1000) / 1000, label: timeLabel(c.phase), clock: `${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')}`}} : {})},
+      // PM-R055 spread: reasons to go somewhere else, first. Scheduled place activities on now or soon (with the walk
+      // that gets there), then a few other places nearby: quiet ones, ones with lasting marks/projects or something on.
+      happening: spread.happening, elsewhere: spread.elsewhere,
       self: {soulId: soul.soulId, name: soul.name, entityId: soul.entityId, placePath: this.placePathOf(soul.soulId), position: b ? b.pose.p.map(v => Math.round(v * 100) / 100) : null, facing: b ? Math.round(b.pose.yaw * 100) / 100 : null,
         state: this.faded.has(soul.soulId) ? 'faded' : stateOf(this.host, m.entityId), activity: String(b?.human?.activity ?? 'idle'), reflex: action && action.actor === m.entityId ? {verb: action.action.verb, phase: action.action.phase ?? action.action.status} : null,
         receipts: this.openReceipts(soul.soulId), fade: this.comms?.fading.status(soul.soulId) ?? null},
       here: {souls: this.perceivedBodies(soul.soulId, NEAR_RADIUS).map(o => ({soulId: o.soulId, name: o.name, state: o.state, activity: o.activity, distance: o.distance, placeId: o.placeId})), objects: this.comms?.objects.visibleTo(soul) ?? [], untrusted: true},
-      // Scheduled place activities on now or soon (World's place data): a concrete reason to go somewhere.
-      ...(c ? {happening: happenings(this.places.byId.values(), c.hour * 60 + c.minute, b ? [b.pose.p[0], b.pose.p[2]] : null)} : {}),
       ...(this.comms ? {streamCursor: this.comms.streams.headCursor(soul.soulId)} : {}),
     };
     if (include.has('capabilities')) out.capabilities = this.capabilities(soul);
