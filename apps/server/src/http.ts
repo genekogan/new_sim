@@ -33,7 +33,7 @@ export function buildApp(d: Deps) {
   if(d.intentV2&&(d.intentV2.host!==d.host||d.intentV2.brain!==d.brain||d.intentV2.souls!==d.souls))throw new Error('intent transport must belong to selected host');
   const app = new Hono();
   const bearer = (c: Context) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
-  if (d.edge) { if (d.edge.host !== d.host) throw new Error('edge ledger must belong to selected host'); mountEdgeRoutes(app, { host: d.host, db: d.db, souls: d.souls, build: d.cfg.build, soul: edgeSoulResolver(d.host, d.souls, bearer), ledger: d.edge }); }
+  if (d.edge) { if (d.edge.host !== d.host) throw new Error('edge ledger must belong to selected host'); const comms = mountEdgeRoutes(app, { host: d.host, db: d.db, souls: d.souls, build: d.cfg.build, soul: edgeSoulResolver(d.host, d.souls, bearer), ledger: d.edge }); comms.onSpectator(m => d.hub?.broadcast?.(m as never)); }
   const ip = (c: Context) => (c.req.header('x-forwarded-for') ?? 'local').split(',')[0].trim();
   const requireUser = async (c: Context): Promise<UserRow> => { const u = await d.auth.userFromToken(bearer(c)); if (!u) throw new ApiError(401, 'unauthorized', 'sign in first'); return u; };
   const requireAdmin = async (c: Context): Promise<UserRow> => { const u = await requireUser(c); if (u.role !== 'admin') throw new ApiError(403, 'forbidden', 'admin only'); return u; };

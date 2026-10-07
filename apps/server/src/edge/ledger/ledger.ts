@@ -25,6 +25,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private providers: ((s: EdgeSoul) => EdgeCapability[])[] = [];
   private pending = new Map<string, Pending>();           // soulId → waiting act
   private lastPlace = new Map<string, string | null>();
+  comms?: {streams: {headCursor(soulId: string): string}; fading: {status(soulId: string): unknown}; objects: {visibleTo(soul: EdgeSoul): unknown[]}; close(): void};
+  attachComms(c: NonNullable<EdgeLedger['comms']>) {this.comms = c;}
   readonly host: WorldHost; readonly db: Db;
   constructor(host: WorldHost, db: Db, placeData?: unknown) {
     this.host = host; this.db = db;
@@ -214,8 +216,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
       world: {id: this.host.worldId, quiet: this.host.quietBarrier, ...(c ? {time: {day: c.day, phase: Math.round(c.phase * 1000) / 1000, label: timeLabel(c.phase), clock: `${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')}`}} : {})},
       self: {soulId: soul.soulId, name: soul.name, entityId: soul.entityId, placePath: this.placePathOf(soul.soulId), position: b ? b.pose.p.map(v => Math.round(v * 100) / 100) : null, facing: b ? Math.round(b.pose.yaw * 100) / 100 : null,
         state: stateOf(this.host, m.entityId), activity: String(b?.human?.activity ?? 'idle'), reflex: action && action.actor === m.entityId ? {verb: action.action.verb, phase: action.action.phase ?? action.action.status} : null,
-        receipts: this.openReceipts(soul.soulId), fade: null},
-      here: {souls: this.perceivedBodies(soul.soulId, NEAR_RADIUS).map(o => ({soulId: o.soulId, name: o.name, state: o.state, activity: o.activity, distance: o.distance, placeId: o.placeId})), objects: [], untrusted: true},
+        receipts: this.openReceipts(soul.soulId), fade: this.comms?.fading.status(soul.soulId) ?? null},
+      here: {souls: this.perceivedBodies(soul.soulId, NEAR_RADIUS).map(o => ({soulId: o.soulId, name: o.name, state: o.state, activity: o.activity, distance: o.distance, placeId: o.placeId})), objects: this.comms?.objects.visibleTo(soul) ?? [], untrusted: true},
+      ...(this.comms ? {streamCursor: this.comms.streams.headCursor(soul.soulId)} : {}),
     };
     if (include.has('capabilities')) out.capabilities = this.capabilities(soul);
     if (include.has('map')) out.map = {places: this.map()};
