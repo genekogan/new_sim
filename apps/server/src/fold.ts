@@ -87,6 +87,13 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       const r = engine.perform({ actor: p.entityId, label: p.label, steps: p.steps });
       return { programId: r.id, programOk: r.ok, programCode: r.diagnostic?.code };
     }
+    case 'edge-relocate': {
+      // Edge reclaim after fading: land an idle body at a starting place (no-op if the engine refuses).
+      const p = e.payload as { entityId?: string; to?: [number, number] };
+      const relocate = (engine as unknown as { relocateHumanV1?: (id: string, to: [number, number]) => boolean }).relocateHumanV1;
+      if (p.entityId && Array.isArray(p.to) && relocate) relocate.call(engine, p.entityId, p.to);
+      return {};
+    }
     case 'edge-stop': {
       // Edge worlds: a Soul's own agent asked its body to stop safely (rise from sleep,
       // finish the current step); the engine's ordinary stop owns the safe landing.

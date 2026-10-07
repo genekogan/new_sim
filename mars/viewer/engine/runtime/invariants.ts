@@ -88,6 +88,9 @@ export const MAX_HUMAN_STEP_PER_TICK = 0.15;
 /** Poses at the end of the previous tick, per runtime (only compared across consecutive ticks of the same world object). */
 const lastPoses = new WeakMap<Runtime, { tick: number; world: WorldState; poses: Map<string, { p: Vec3; yaw: number; ext: number }> }>();
 
+/** A deliberate logged relocation (edge reclaim) is not a teleport fault: forget that body's previous pose. */
+export function acknowledgeRelocation(rt: Runtime, id: string): void { lastPoses.get(rt)?.poses.delete(id); }
+
 /**
  * No person or carried component moves more than MAX_STEP_PER_TICK in one tick (review C1): catches
  * every teleport class (formation flips, snaps, lerps with a wrong origin). For carried components the

@@ -27,7 +27,21 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private lastPlace = new Map<string, string | null>();
   private capCache = new Map<string, {tick: number; value: {caps: EdgeCapability[]; plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>}}>();
   comms?: {streams: {headCursor(soulId: string): string}; fading: {status(soulId: string): unknown}; objects: {visibleTo(soul: EdgeSoul): unknown[]}; close(): void};
-  attachComms(c: NonNullable<EdgeLedger['comms']>) {this.comms = c;}
+  attachComms(c: NonNullable<EdgeLedger['comms']>) {
+    this.comms = c;
+    // C9 body effects (fading itself only runs when Comms' fading flag is on — Gene has not approved it).
+    (c as unknown as {fading?: {onFade?(l: (e: {soulId: string; change: string}) => void): void}}).fading?.onFade?.(e => {
+      const m = this.host.minds.get(e.soulId); if (!m) return;
+      if (e.change === 'removed') {this.faded.add(e.soulId); if (this.host.engine.programOf(m.entityId)) void this.host.enqueue('edge-stop', `edge:${e.soulId}`, {soulId: e.soulId, entityId: m.entityId, why: 'faded'});}
+    });
+  }
+  /** Souls faded out (removed at 60 min idle); their next act lands them at a starting place. */
+  readonly faded = new Set<string>();
+  private startingPoint(soulId: string): [number, number] {
+    const starts = [...this.places.byId.values()].filter(p => p.starting && p.parent !== null);
+    const pick = starts.length ? starts[[...soulId].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7) % starts.length] : [...this.places.byId.values()][0];
+    return centroid(pick.polygon);
+  }
   readonly host: WorldHost; readonly db: Db;
   constructor(host: WorldHost, db: Db, placeData?: unknown) {
     this.host = host; this.db = db;
@@ -166,6 +180,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const clientRef = typeof input.clientRef === 'string' && input.clientRef.length <= 100 ? input.clientRef : undefined;
     if (clientRef) {const old = this.rows('soul_id=? AND client_ref=?', soul.soulId, clientRef)[0]; if (old) return {accepted: true, receipt: this.view(old)};}
     const refuse = (code: string, reason: string, extra?: {retry_after?: number}) => {this.recordRefusal(soul.soulId, 'act', capability, code); return {accepted: false as const, code, reason, capability, ...extra};};
+    if (this.faded.has(soul.soulId)) {
+      // Reclaim: fall onto feet at a starting place, identity and history intact (C9).
+      this.faded.delete(soul.soulId);
+      await this.host.enqueue('edge-relocate', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, to: this.startingPoint(soul.soulId), why: 'reclaimed after fading'});
+      this.capCache.delete(soul.soulId);
+    }
     const {caps, plans} = this.binds(soul), cap = caps.find(c => c.id === capability), plan = plans.get(capability);
     if (!cap || !plan) return refuse('capability.unknown', 'That capability is not offered to this Soul right now; read capabilities again.');
     const params = (input.params && typeof input.params === 'object' ? input.params : {}) as Record<string, unknown>;
@@ -226,7 +246,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const me = this.host.minds.get(soulId), mb = me ? this.body(me.entityId) : undefined; if (!me || !mb) return [];
     const myEnc = this.enclosureOf(soulId), out: NearbyBody[] = [];
     for (const o of this.host.minds.values()) {
-      if (o.soulId === soulId) continue; const ob = this.body(o.entityId); if (!ob) continue;
+      if (o.soulId === soulId || this.faded.has(o.soulId)) continue; const ob = this.body(o.entityId); if (!ob) continue;
       const d = Math.hypot(ob.pose.p[0] - mb.pose.p[0], ob.pose.p[2] - mb.pose.p[2]); if (d > radius) continue;
       if (this.enclosureOf(o.soulId) !== myEnc) continue;      // enclosure rule: same enclosure, or both outdoors
       out.push({soulId: o.soulId, entityId: o.entityId, name: o.name, distance: Math.round(d * 10) / 10, placeId: this.innermostPlace(o) ?? '', state: stateOf(this.host, o.entityId), activity: String(ob.human?.activity ?? 'idle')});
@@ -260,7 +280,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       tick, at: Date.now(),
       world: {id: this.host.worldId, quiet: this.host.quietBarrier, ...(c ? {time: {day: c.day, phase: Math.round(c.phase * 1000) / 1000, label: timeLabel(c.phase), clock: `${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')}`}} : {})},
       self: {soulId: soul.soulId, name: soul.name, entityId: soul.entityId, placePath: this.placePathOf(soul.soulId), position: b ? b.pose.p.map(v => Math.round(v * 100) / 100) : null, facing: b ? Math.round(b.pose.yaw * 100) / 100 : null,
-        state: stateOf(this.host, m.entityId), activity: String(b?.human?.activity ?? 'idle'), reflex: action && action.actor === m.entityId ? {verb: action.action.verb, phase: action.action.phase ?? action.action.status} : null,
+        state: this.faded.has(soul.soulId) ? 'faded' : stateOf(this.host, m.entityId), activity: String(b?.human?.activity ?? 'idle'), reflex: action && action.actor === m.entityId ? {verb: action.action.verb, phase: action.action.phase ?? action.action.status} : null,
         receipts: this.openReceipts(soul.soulId), fade: this.comms?.fading.status(soul.soulId) ?? null},
       here: {souls: this.perceivedBodies(soul.soulId, NEAR_RADIUS).map(o => ({soulId: o.soulId, name: o.name, state: o.state, activity: o.activity, distance: o.distance, placeId: o.placeId})), objects: this.comms?.objects.visibleTo(soul) ?? [], untrusted: true},
       ...(this.comms ? {streamCursor: this.comms.streams.headCursor(soul.soulId)} : {}),

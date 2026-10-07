@@ -51,6 +51,7 @@ import { decodeSnapshot } from '../../../mars/viewer/engine/runtime/snapshot.ts'
 import {encode} from '../../../mars/viewer/engine/runtime/codec.ts';
 import { dcos,dsin,hypot } from '../../../mars/viewer/engine/core/math.ts';
 import { clearanceAt } from '../../../mars/viewer/engine/spatial/grid.ts';
+import { acknowledgeRelocation } from '../../../mars/viewer/engine/runtime/invariants.ts';
 import { HUMAN_RADIUS } from '../../../mars/viewer/engine/world/catalog.ts';
 import type { Spatial } from '../../../mars/viewer/engine/spatial/service.ts';
 import type {NativeBoatControlsV1} from '@sim/engine-contract';
@@ -623,6 +624,21 @@ export class MarsEngine implements Engine {
 
   // ------------------------------------------------------------------ bodies
   /** Mars has no way to add a person to a running world; the adapter does what its world editor does, then restores canonical order. */
+  /** Edge reclaim (logged 'edge-relocate'): an idle, unheld body lands on its feet at the nearest free
+   * standing spot near `to` (same ring search as arrival). Refuses busy/held/sleeping bodies. */
+  relocateHumanV1(id: string, to: [number, number]): boolean {
+    const e = this.ents[id];
+    if (!e?.human || this.byActor.has(id) || this.holders(id).length || e.human.sleepPose || e.human.on || e.human.riding) return false;
+    const people = Object.values(this.ents).filter((o: any) => o.kind === 'human' && o.id !== id).map((o: any) => [o.pose.p[0], o.pose.p[2]] as [number, number]);
+    const spatial = this.rt.services.spatial as Spatial; spatial.sync(this.rt.world); const grid = spatial.level(0);
+    for (let ring = 0; ring < 8; ring++) for (let k = 0; k < Math.max(1, ring * 6); k++) {
+      const ang = (k / Math.max(1, ring * 6)) * Math.PI * 2 + ring * 0.5, x = r3(to[0] + dcos(ang) * ring * 0.9), z = r3(to[1] + dsin(ang) * ring * 0.9);
+      if (people.some(([px, pz]) => hypot(px - x, pz - z) < 0.8)) continue;
+      if (!grid || clearanceAt(grid, [x, z]) < HUMAN_RADIUS) continue;
+      e.pose.p = [x, 0, z]; e.human.level = 0; e.human.activity = 'idle'; e.human.speed = 0; delete e.human.shore; acknowledgeRelocation(this.rt, id); return true;
+    }
+    return false;
+  }
   spawnHuman({ id, label, soul }: { id: string; label: string; soul: string }): string {
     if (this.ents[id]) return id;
     const [ax, az] = this.cfg.arrival;

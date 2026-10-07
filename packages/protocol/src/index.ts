@@ -66,7 +66,7 @@ export const describeIntent = (i: WireIntent | null, nameOf: (id: string) => str
 export const publicIntent = (i: WireIntent | null): WireIntent | null => { if (!i) return null; const { note: _n, text: _t, ...rest } = i; return rest; };
 
 // ---------------------------------------------------------------- log events
-export type EventKind = 'birth' | 'intent' | 'mandate' | 'decision' | 'edge-stop' | 'play' | 'mint' | 'deck' | 'scene' | 'rules' | 'admin' | 'retire' | 'intent-request-v2' | 'intent-v2' | 'intent-admission-v2' | 'intent-controller-v2' | 'intent-arrival-v1' | 'intent-sleep-stop-v1' | 'station-epoch-v1' | 'station-cue-v1' | 'station-anchor-v1' | 'station-rules-era-v1' | 'station-cue-v2' | 'station-anchor-v2';
+export type EventKind = 'birth' | 'intent' | 'mandate' | 'decision' | 'edge-stop' | 'edge-relocate' | 'play' | 'mint' | 'deck' | 'scene' | 'rules' | 'admin' | 'retire' | 'intent-request-v2' | 'intent-v2' | 'intent-admission-v2' | 'intent-controller-v2' | 'intent-arrival-v1' | 'intent-sleep-stop-v1' | 'station-epoch-v1' | 'station-cue-v1' | 'station-anchor-v1' | 'station-rules-era-v1' | 'station-cue-v2' | 'station-anchor-v2';
 export type LogEvent = { seq: number; tick: number; kind: EventKind; author: string; payload: any; at: number };
 
 export type BirthPayload = { soulId: string; entityId: string; name: string; description: string; owner: string };
