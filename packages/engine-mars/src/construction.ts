@@ -7,10 +7,11 @@ import {CAMP_EXPANSION_CAMPUS} from './camp-expansion.ts';
 export type BuildPhase = 'stage' | 'frame' | 'deck' | 'stairs';
 export type BuildPlan = { crew: string[]; steps: { verb: string; params: Record<string, unknown> }[] };
 type Refusal = { code: string; message: string };
-const actions = edenCampActivities().filter(a => a.id.startsWith('build.') && a.id !== 'build.climb-lookout');
+export const BUILD_ACTIONS: readonly CampActivity[] = edenCampActivities().filter(a => a.id.startsWith('build.') && a.id !== 'build.climb-lookout');
+const actions = BUILD_ACTIONS;
 const byId = new Map(actions.map(a => [a.id, a]));
-const itemOf = (a: CampActivity) => String(a.params.item ?? a.params.beam ?? a.params.joist ?? a.params.sheet ?? a.params.tread ?? a.params.stair ?? '');
-function phaseOf(a: CampActivity): BuildPhase {
+export const itemOf = (a: CampActivity) => String(a.params.item ?? a.params.beam ?? a.params.joist ?? a.params.sheet ?? a.params.tread ?? a.params.stair ?? '');
+export function phaseOf(a: CampActivity): BuildPhase {
   if (['raise_upright','connect_beam','release_support'].includes(a.verb)) return 'frame';
   if (['install_stair_flight','install_tread'].includes(a.verb)) return 'stairs';
   return /joist|sheet/.test(itemOf(a)) ? 'deck' : 'stage';

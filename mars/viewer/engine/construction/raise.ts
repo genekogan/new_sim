@@ -437,3 +437,9 @@ export const raiseUpright: ActionDef<P, null, Exec> = {
     return { ok: true };
   },
 };
+
+// The same raise geometry, read by the reverse verb (disassembly.ts lower_upright).
+// Exported only; nothing above changes behaviour.
+export type RaiseGeo = Geo;
+export type RaiseRole = Role;
+export { RAISE_RATE, STEP_PITCH, geoOf as raiseGeo, reachR as raiseReach, lifterAt as raiseLifterAt, faceCol as raiseFaceCol, standBlocked as raiseStandBlocked, choreoBlocked as raiseChoreoBlocked, transitionPitch as raiseTransitionPitch };
