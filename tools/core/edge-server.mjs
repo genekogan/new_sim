@@ -110,7 +110,9 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
       const data=JSON.parse(readFileSync(resolve(placeData),'utf8')),spots=loadSpots(spotsRaw).data;
       const native=new Set([...Object.entries(host.engine.world.regions).filter(([,r])=>!String(r.provenance?.note??'').includes('placeRegionsV1')).map(([id])=>id),...data.places.filter(p=>(p.occupiers??[]).length).map(p=>p.id)]);
       const spec=navSpecFromPlaces(data,{native,ground:Array.isArray(nav.ground)?nav.ground:[],area:[host.engine.groundBoundsV1()],extraSolids:spots.solids,rings:spots.rings,interiors:spots.interiors});
-      const out=await drive(host.installNavV1(spec));console.error('[edge] nav/1:',JSON.stringify({installed:out.installed,ground:spec.ground.length,solids:spec.solids.length}));}
+      // A refused spec is reported and the world boots without it (never a half-installed nav).
+      try{const out=await drive(host.installNavV1(spec));console.error('[edge] nav/1:',JSON.stringify({installed:out.installed,ground:spec.ground.length,solids:spec.solids.length}));}
+      catch(error){console.error('[edge] nav/1 refused:',error instanceof Error?error.message:String(error));}}
     // placeRegionsV1: named W1 places (from placeData) on admitted native ground become destination regions (one logged rules fact; idempotent).
     if(nativePlaces.length){if(!placeData)throw Error('nativePlaces needs placeData');if(!host.installPlaceRegionsV1)throw Error('selected runtime has no placeRegionsV1');
       const byId=new Map(JSON.parse(readFileSync(resolve(placeData),'utf8')).places.map(p=>[p.id,p]));
