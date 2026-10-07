@@ -40,7 +40,8 @@ export class ClockFrontiers {
       this.validatePrefix(v);
       if(this.db.lastSeq(v.worldId)!==v.throughSeq||this.db.world(v.worldId)!.rules_version!==v.rulesVersion)
         throw new Error('clock-frontier.writer-moved');
-      const old=this.read(v.worldId);
+      let old:ClockFrontierV1|undefined;
+      try{old=this.read(v.worldId);}catch(error){if(error instanceof Error&&error.message==='clock-frontier.future-prefix')throw new Error('clock-frontier.future-prefix: another process advanced this world\'s durable clock after this process booted (two writers on one data dir). Stop every server on it, back up the DB, delete only the clock_frontiers_v1 row, start one server.');throw error;}
       if(old&&(old.tick>v.tick||old.throughSeq>v.throughSeq))throw new Error('clock-frontier.regression');
       if(old&&old.tick===v.tick&&old.throughSeq===v.throughSeq&&hashOf(old)!==hashOf(v))throw new Error('clock-frontier.changed-same-head');
       if(!old||hashOf(old)!==hashOf(v))this.db.db.prepare(`INSERT INTO clock_frontiers_v1(world_id,body,body_hash) VALUES(?,?,?)

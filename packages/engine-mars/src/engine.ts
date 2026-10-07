@@ -79,7 +79,7 @@ type Prog = {
   readiedActors?:string[];
   build?: { phase: BuildPhase; crew: string[]; stopping?: Diag };
 };
-export type MarsWorldConfig = { yieldTimeoutV1?:boolean; quietStallReleaseV1?:boolean; walkBlockV1?:boolean; safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; fixtureGroundGoalsV1?:boolean; nativeArrivalWitnessV1?:boolean; quietLandingCourtesyV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
+export type MarsWorldConfig = { spreadV2?:boolean; yieldTimeoutV1?:boolean; quietStallReleaseV1?:boolean; walkBlockV1?:boolean; safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; fixtureGroundGoalsV1?:boolean; nativeArrivalWitnessV1?:boolean; quietLandingCourtesyV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
 export const LITTLE_MARTIANS_WORLD: MarsWorldConfig={scene:'littlemartians',arrival:[0,18],arrivalPlace:'garden',reference:[0,16],grounds:{id:'grounds',name:'Ceramic garden'}};
 export const GREEN_FIELD_WORLD:MarsWorldConfig={scene:'greenfield',arrival:[0,0],arrivalPlace:'field',reference:[2,0],grounds:{id:'grounds',name:'Green field'}};
 export const EDEN_COMMONS_WORLD:MarsWorldConfig={scene:'eden-commons',arrival:[14,4],arrivalPlace:'commons',reference:[9,5],grounds:{id:'grounds',name:'Eden commons'}};
@@ -404,9 +404,14 @@ export class MarsEngine implements Engine {
     for(const rec of this.rt.records.values() as Iterable<any>){const q=rec.params;if(q&&q.actor!==actor&&(rec.verb==='commons_shore_travel'||rec.verb==='shore_travel'||rec.verb==='walk_to')&&typeof q.x==='number'&&typeof q.z==='number'&&this.rt.isActive(rec.id))taken.push([q.x,q.z]);}
     const spots:[number,number][]=[];
     // pond/1: deep-side swimming grid. region/1: any place, spaced standing spots nearest its centre first.
-    const pond=mode==='pond/1'||lap,inset=pond?[2,4]:[1,1],step=pond?2.5:1.5,mid=centroid(r.polygon);
+    // spreadV2 (prospective policy): thin/small places (the 10 x 1.4 m commons strip, mats) keep real interior spots.
+    const v2=this.cfg.spreadV2===true&&!(mode==='pond/1'||lap),ex=Math.max(...xs)-Math.min(...xs),ez=Math.max(...zs)-Math.min(...zs);
+    const pond=mode==='pond/1'||lap,inset=pond?[2,4]:v2?[Math.min(.6,ex/4,ez/4),Math.min(.6,ex/4,ez/4)]:[1,1],step=pond?2.5:v2?1.0:1.5,mid=centroid(r.polygon);
     for(let x=Math.min(...xs)+inset[0];x<=Math.max(...xs)-inset[1];x+=step)for(let z=Math.min(...zs)+inset[0];z<=Math.max(...zs)-inset[0];z+=step){const p:[number,number]=[r3(x),r3(z)];if(inPoly(p[0],p[1],r.polygon)&&taken.every(t=>Math.hypot(t[0]-p[0],t[1]-p[1])>=(pond?1.4:1.0))&&(!lap||Math.hypot(p[0]-e.pose.p[0],p[1]-e.pose.p[2])>=4))spots.push(p);}
     if(!spots.length&&!pond&&taken.every(t=>Math.hypot(t[0]-mid[0],t[1]-mid[1])>=1.0))spots.push(mid); // a place smaller than the grid keeps its single centre
+    if(v2&&!spots.length){ // inside full: stand just outside it, nearest first (arriving at a busy place is not a refusal)
+      const reach=Math.max(ex,ez)/2;for(const rr of [reach+.8,reach+1.6,reach+2.4])for(let k=0;k<12;k++){const a=k/12*Math.PI*2,p:[number,number]=[r3(mid[0]+Math.cos(a)*rr),r3(mid[1]+Math.sin(a)*rr)];if(taken.every(t=>Math.hypot(t[0]-p[0],t[1]-p[1])>=1.0))spots.push(p);}
+    }
     if(!spots.length)return {code:'route.region-full',message:`no spaced free spot remains in ${region}`};
     const offset=[...actor].reduce((h,c)=>(h*31+c.charCodeAt(0))>>>0,7)%spots.length;
     const order=[...spots.slice(offset),...spots.slice(0,offset)].map((p,i)=>({p,i,band:lap?Math.round(Math.abs(Math.hypot(p[0]-e.pose.p[0],p[1]-e.pose.p[2])-6)/2):pond?Math.round(Math.hypot(p[0]-e.pose.p[0],p[1]-e.pose.p[2])/8):Math.round(Math.hypot(p[0]-mid[0],p[1]-mid[1])/2)})).sort((a,b)=>a.band-b.band||a.i-b.i).slice(0,24);
@@ -1021,7 +1026,8 @@ export class MarsEngine implements Engine {
     this.cursor=this.rt.events.length;this.renderBaseKey='';this.startRecorder();
   }
 
-  configureRuntimePolicy(policy: {sleepBlockTicks:number;quietSeatCourtesy?:boolean;fixtureGroundGoalsV1?:boolean;nativeArrivalWitnessV1?:boolean;quietLandingCourtesyV1?:boolean;quietStallReleaseV1?:boolean;yieldTimeoutV1?:boolean}) {
+  configureRuntimePolicy(policy: {sleepBlockTicks:number;quietSeatCourtesy?:boolean;fixtureGroundGoalsV1?:boolean;nativeArrivalWitnessV1?:boolean;quietLandingCourtesyV1?:boolean;quietStallReleaseV1?:boolean;yieldTimeoutV1?:boolean;spreadV2?:boolean}) {
+    if(policy.spreadV2===true)this.cfg={...this.cfg,spreadV2:true};
     if(policy.yieldTimeoutV1===true)this.cfg={...this.cfg,yieldTimeoutV1:true};
     if(policy.quietStallReleaseV1===true)this.cfg={...this.cfg,quietStallReleaseV1:true};
     if(policy.quietLandingCourtesyV1===true)this.cfg={...this.cfg,quietLandingCourtesyV1:true};

@@ -93,6 +93,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
   private afterTick(tick: number) {
     for (const [soulId, p] of this.pending) {
+      if (this.host.quietBarrier) {p.deadline = Math.max(p.deadline, tick + WAIT_LIMIT_TICKS); continue;}   // the wait clock pauses during renewal
       if (tick > p.deadline) {this.pending.delete(soulId); this.update(p.receipt, {phase: 'failed', code: 'state.safe-stop-timeout', reason: 'The body could not reach a safe stop within a minute.'}); continue;}
       if (this.host.quietBarrier) continue;
       const issue = this.host.engine.canPerform({actor: p.soul.entityId, label: p.label, steps: p.steps});
@@ -165,7 +166,6 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const clientRef = typeof input.clientRef === 'string' && input.clientRef.length <= 100 ? input.clientRef : undefined;
     if (clientRef) {const old = this.rows('soul_id=? AND client_ref=?', soul.soulId, clientRef)[0]; if (old) return {accepted: true, receipt: this.view(old)};}
     const refuse = (code: string, reason: string, extra?: {retry_after?: number}) => {this.recordRefusal(soul.soulId, 'act', capability, code); return {accepted: false as const, code, reason, capability, ...extra};};
-    if (this.host.quietBarrier) return refuse('world.quiet', 'The world is briefly quiet while it renews; try again shortly.', {retry_after: 30});
     const {caps, plans} = this.binds(soul), cap = caps.find(c => c.id === capability), plan = plans.get(capability);
     if (!cap || !plan) return refuse('capability.unknown', 'That capability is not offered to this Soul right now; read capabilities again.');
     const params = (input.params && typeof input.params === 'object' ? input.params : {}) as Record<string, unknown>;
@@ -179,6 +179,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const r = this.insert(soul, capability, program ? 'started' : 'completed', clientRef);
       if (program) await this.host.enqueue('edge-stop', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, receipt: r.id});
       if (program) this.update(r.id, {phase: 'completed'});
+      return {accepted: true, receipt: this.receipt(soul.soulId, r.id)!};
+    }
+    if (this.host.quietBarrier) {
+      // Quiet renewal is brief and always ends (stall release): accept and start at first light, receipt 'waiting'.
+      const r = this.insert(soul, capability, 'waiting', clientRef);
+      this.pending.set(soul.soulId, {receipt: r.id, soul, steps, label: plan.label, deadline: this.host.engine.world.tick + WAIT_LIMIT_TICKS, capability});
       return {accepted: true, receipt: this.receipt(soul.soulId, r.id)!};
     }
     if (!cap.available && cap.blocked && !WAIT_CODES.has(cap.blocked.code)) return refuse(cap.blocked.code, cap.blocked.reason);
