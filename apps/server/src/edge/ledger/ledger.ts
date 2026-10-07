@@ -48,8 +48,11 @@ export class EdgeLedger implements EdgeLedgerHooks {
     return centroid(pick.polygon);
   }
   readonly host: WorldHost; readonly db: Db;
-  constructor(host: WorldHost, db: Db, placeData?: unknown) {
-    this.host = host; this.db = db;
+  /** Ambient life reflex (Gene: Souls visibly alive between agent decisions); the edge server turns it on. */
+  readonly ambient: boolean;
+  private idleSince = new Map<string, number>();
+  constructor(host: WorldHost, db: Db, placeData?: unknown, options: {ambient?: boolean} = {}) {
+    this.host = host; this.db = db; this.ambient = options.ambient === true;
     db.db.exec(`CREATE TABLE IF NOT EXISTS edge_receipts_v1 (world_id TEXT NOT NULL, receipt_id TEXT NOT NULL, soul_id TEXT NOT NULL, capability TEXT NOT NULL, phase TEXT NOT NULL,
       accepted_tick INTEGER NOT NULL, started_tick INTEGER, ended_tick INTEGER, code TEXT, reason TEXT, program_id TEXT, client_ref TEXT, created_at INTEGER NOT NULL, PRIMARY KEY (world_id, receipt_id));
       CREATE INDEX IF NOT EXISTS edge_receipts_v1_soul ON edge_receipts_v1 (world_id, soul_id, phase);
@@ -120,12 +123,33 @@ export class EdgeLedger implements EdgeLedgerHooks {
       if (issue) {this.update(p.receipt, {phase: 'failed', code: issue.code, reason: humanBlockedExplanationV1(issue.code, p.label)}); continue;}
       void this.decide(p.soul, p.receipt, p.capability, p.label, p.steps).catch(() => this.update(p.receipt, {phase: 'failed', code: 'ledger.unavailable', reason: 'The world could not record this action.'}));
     }
+    if (this.ambient && tick % 20 === 0) this.ambientLife(tick);
     if (tick % 10 === 0) for (const m of this.host.minds.values()) {
       const to = this.innermostPlace(m), from = this.lastPlace.has(m.soulId) ? this.lastPlace.get(m.soulId)! : to;
       this.lastPlace.set(m.soulId, to);
       if (from !== to) for (const l of this.placeListeners) try {l({soulId: m.soulId, from, to, tick});} catch {/* ignore */}
     }
   }
+  /** Ambient life reflex: a Soul with nothing running for 20 s (no programme, no open or waiting receipt, awake,
+   *  not faded) gets one small native thing to do near where it is: warm by a fire within 15 m, sit on a free seat
+   *  within 10 m, turn towards someone within 6 m, or a short stroll. Chosen deterministically (Soul id + tick),
+   *  logged as an ordinary decision (trigger edge-ambient) so replay is exact; no receipt, not an accepted action
+   *  for fading or metrics. Any agent act simply replaces it. Never model calls. */
+  private ambientLife(tick: number) {
+    for (const m of this.host.minds.values()) {
+      const busy = this.faded.has(m.soulId) || this.pending.has(m.soulId) || !!this.host.engine.programOf(m.entityId) || this.openReceipts(m.soulId).length > 0;
+      const b = this.body(m.entityId), state = stateOf(this.host, m.entityId);
+      if (busy || !b || state === 'sleeping' || state === 'absent' || state === 'swimming') {this.idleSince.set(m.soulId, tick); continue;}
+      const since = this.idleSince.get(m.soulId); if (since === undefined) {this.idleSince.set(m.soulId, tick); continue;}
+      if (tick - since < 400) continue;
+      this.idleSince.set(m.soulId, tick);
+      const soul: EdgeSoul = {soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner}, pick = ambientChoice(this, soul, b, tick);
+      if (!pick) continue;
+      void this.host.enqueue('decision', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, option: pick.id, label: pick.label, steps: pick.steps, reevalTicks: 1e9, fallback: false, trigger: 'edge-ambient'}).catch(() => {/* best effort */});
+    }
+  }
+  /** @internal ambient helper: the capability plans near this Soul (cached per tick). */
+  ambientPlans(soul: EdgeSoul) {return this.binds(soul);}
   private decide(soul: EdgeSoul, receipt: string, capability: string, label: string, steps: Program['steps']) {
     return this.host.enqueue('decision', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, option: capability, label, steps, reevalTicks: 1e9, fallback: false, trigger: `edge-act:${receipt}`});
   }
@@ -342,6 +366,26 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (include.has('eyes')) out.eyes = {status: 'unavailable'};
     return out;
   }
+}
+
+const mix = (s: string, n: number) => {let h = 2166136261 ^ n; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return (h >>> 0);};
+function ambientChoice(ledger: EdgeLedger, soul: EdgeSoul, me: {pose: {p: number[]}}, tick: number): {id: string; label: string; steps: Program['steps']} | null {
+  const {caps, plans} = ledger.ambientPlans(soul), world = ledger.host.engine.world as NativeWorld;
+  const dist = (id: string | undefined) => {const e = id ? world.entities[id] : undefined; return e ? Math.hypot(e.pose.p[0] - me.pose.p[0], e.pose.p[2] - me.pose.p[2]) : Infinity;};
+  const near = (c: EdgeCapability, r: number) => c.available && dist(c.target?.kind === 'soul' ? ledger.host.minds.get(c.target.id)?.entityId : c.target?.id) <= r;
+  const options: {id: string; label: string; steps: Program['steps']; weight: number}[] = [];
+  const add = (c: EdgeCapability | undefined, weight: number, adjust?: (s: Program['steps']) => void) => {
+    const p = c && plans.get(c.id); if (!c || !p) return; const steps = structuredClone(p.steps); adjust?.(steps); options.push({id: c.id, label: p.label, steps, weight});
+  };
+  const seconds = (n: number) => (s: Program['steps']) => {for (const x of s) if ('seconds' in (x.params ?? {})) x.params.seconds = n;};
+  add(caps.find(c => c.verb === 'warm-by-fire' && near(c, 15)), 3, seconds(90));
+  add(caps.find(c => c.verb === 'sit' && near(c, 10)), 3, seconds(60));
+  for (const c of caps.filter(c => c.verb === 'face' && near(c, 6)).slice(0, 2)) add(c, 2);
+  add(caps.find(c => c.id === 'wander:here'), 3, s => {for (const x of s) if (x.verb === 'ambient_wander') {x.params.seconds = 25; x.params.radius = 4;}});
+  if (!options.length) return null;
+  let r = mix(soul.soulId, tick) % options.reduce((a, o) => a + o.weight, 0);
+  for (const o of options) {if (r < o.weight) return o; r -= o.weight;}
+  return options[0];
 }
 
 export function edgeIdOf(b: HumanBindingV1): {id: string; verb: string} {

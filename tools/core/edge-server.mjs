@@ -9,7 +9,7 @@ import {readFileSync,mkdirSync,statSync,writeFileSync,unlinkSync} from 'node:fs'
 import {createHash} from 'node:crypto';
 import {setImmediate} from 'node:timers/promises';
 
-export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,marsWebDir,build='local-edge/1',checkOnly=false,placeData,seedObjects,inviteRequired=false,skillFile,cliFile,
+export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,marsWebDir,build='local-edge/1',checkOnly=false,placeData,seedObjects,inviteRequired=false,skillFile,cliFile,ambient=true,
   inputManifestSHA256,modelCredentialFile=undefined,localBudget=0,autonomous=false,localSoulLimit=5,humanRest=false,provisions=false,sequences=false,floorGoals=false,kitchen=false,shore=false,foodDeliveryId,quietLandingCourtesy=false,social=false,closedGoals=false,approachRetention=false,activateExpansion=false,humanDirectionBurstUsd=1,quiesceThought=false}) {
   if(!input||!dataDir||!worldId||!Number.isInteger(port)||!(port>=4950&&port<=4959||port===4970))throw Error('explicit local input/data/world/allowed port required');
   if(!build.startsWith('local-'))throw Error('local build identity required');
@@ -102,7 +102,7 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
     if(host.enableReflexTimeoutV1)await drive(host.enableReflexTimeoutV1());
     if(host.enableContinuousDayV1)await drive(host.enableContinuousDayV1());
     const {EdgeLedger}=await load('apps/server/src/edge/ledger/ledger.ts');
-    const edge=new EdgeLedger(host,db,placeData?JSON.parse(readFileSync(resolve(placeData),'utf8')):undefined);
+    const edge=new EdgeLedger(host,db,placeData?JSON.parse(readFileSync(resolve(placeData),'utf8')):undefined,{ambient});
     const app=buildApp({cfg,db,host,auth,brain,souls,hub,intentV2:service,edge}),listener=require('@hono/node-server').getRequestListener(app.fetch);
     // Seed declared objects (idempotent by id). presentation params may give startsInMinutes.
     for(const o of seedObjects??[]){const params={...(o.params??{})};if(typeof params.startsInMinutes==='number'){params.startsAtTick=host.engine.world.tick+Math.round(params.startsInMinutes*60*20);delete params.startsInMinutes;}edge.comms?.objects.create({...o,params});}
