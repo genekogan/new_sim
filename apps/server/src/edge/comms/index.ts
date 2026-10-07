@@ -13,6 +13,7 @@ import type {CommsCore, SpectatorEdgeMessage} from './core.ts';
 import {Presence} from './presence.ts';
 import {say} from './speech.ts';
 import {Steward} from './steward.ts';
+import {Fading} from './fading.ts';
 import {ensureCommsSchema} from './store.ts';
 import {EventStreams, parseCursor} from './stream.ts';
 import {Webhooks, type Fetch} from './webhook.ts';
@@ -29,6 +30,8 @@ export type CommsOptions = {
   fetch?: Fetch | null;
   /** Bearer token the steward session presents on /v1/edge/steward/*; unset = 503. */
   stewardToken?: string;
+  /** C9 fading rule. Ships OFF; only Gene turns it on. */
+  fading?: boolean;
 };
 
 export type CommsRuntime = {
@@ -40,6 +43,8 @@ export type CommsRuntime = {
   objects: Objects;
   /** Steward work queue: `enqueue`, `narrate`, `requestRender`, `latestDigest`. */
   steward: Steward;
+  /** C9 fading (flag-off by default): `status(soulId)` for observe.self.fade, `onFade` for body effects. */
+  fading: Fading;
   /** Narration/world text to one Soul, some Souls, or every live Soul. */
   publishWorld(text: string, to?: string[]): void;
   /** Spectator `edge` messages (§7) for the hub to broadcast. */
@@ -72,6 +77,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   objects.register(presentationKind);
   deps.ledger.addCapabilityProvider(soul => objects.capabilities(soul));
   const steward = new Steward(core, options.stewardToken);
+  const fading = new Fading(core, steward, options.fading === true);
   const presence = new Presence({ledger: deps.ledger, liveSoulIds: core.liveSoulIds, nameOf: core.nameOf, deliver: (s, k, t, b) => { streams.deliver(s, k, t, b); }});
 
   // Ledger feeds: receipt phases to their own Soul (deduplicated durably, so replays
@@ -79,6 +85,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   deps.ledger.onReceipt((r: EdgeReceipt) => {
     const fresh = Number(db.prepare('INSERT OR IGNORE INTO edge_comms_receipts_seen (world_id, receipt_id, phase) VALUES (?,?,?)').run(worldId, r.id, r.phase).changes) > 0;
     if (!fresh) return;
+    if (r.phase === 'started' || r.phase === 'waiting') fading.touch(r.soulId);
     const tick = r.endedTick ?? r.startedTick ?? r.acceptedTick;
     streams.deliver(r.soulId, 'receipt', tick, {receipt: {id: r.id, capability: r.capability, phase: r.phase, acceptedTick: r.acceptedTick, startedTick: r.startedTick, endedTick: r.endedTick, code: r.code, reason: r.reason}});
   });
@@ -109,10 +116,10 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
     if (!Number.isFinite(seconds) || seconds < 1 || seconds > 55) throw new EdgeError(400, 'invalid', 'timeout must be 1..55 seconds');
     return streams.wait(soul.soulId, after, seconds * 1000, c.req.raw.signal);
   }));
-  app.post('/v1/edge/say', route(async (c, soul) => say(core, soul, await json(c), id => objects.addressees(id))));
+  app.post('/v1/edge/say', route(async (c, soul) => { const out = say(core, soul, await json(c), id => objects.addressees(id)); fading.touch(soul.soulId); return out; }));
   app.post('/v1/edge/subscribe', route(async (c, soul) => webhooks.subscribe(soul, await json(c))));
   app.delete('/v1/edge/subscribe', route((_c, soul) => webhooks.unsubscribe(soul)));
-  app.post('/v1/edge/converse', route(async (c, soul) => conversations.handle(soul, await json(c))));
+  app.post('/v1/edge/converse', route(async (c, soul) => { const out = conversations.handle(soul, await json(c)); if (out.accepted) fading.touch(soul.soulId); return out; }));
   app.get('/v1/edge/conversations', route((_c, soul) => conversations.list(soul)));
   app.get('/v1/edge/conversations/:id/turns', route((c, soul) => {
     const after = Number(c.req.query('after') ?? 0);
@@ -122,7 +129,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
 
   app.get('/v1/edge/objects', route((_c, soul) => ({objects: objects.visibleTo(soul)})));
   app.get('/v1/edge/objects/:id', route((c, soul) => objects.get(c.req.param('id') ?? '', soul)));
-  app.post('/v1/edge/objects/:id/act', route(async (c, soul) => objects.act(c.req.param('id') ?? '', soul, await json(c))));
+  app.post('/v1/edge/objects/:id/act', route(async (c, soul) => { const out = objects.act(c.req.param('id') ?? '', soul, await json(c)); if (out.accepted) fading.touch(soul.soulId); return out; }));
   app.get('/v1/edge/digest', route(() => ({digest: steward.latestDigest()})));
 
   // Steward session endpoints (not Soul-authenticated).
@@ -153,13 +160,15 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
     try { conversations.sweep(); } catch { /* retried next period */ }
     try { objects.sweep(); } catch { /* retried next period */ }
     try { steward.schedule(); } catch { /* retried next period */ }
+    try { fading.sweep(); } catch { /* retried next period */ }
+    try { streams.pruneAll(); } catch { /* retried next period */ }
   };
   const timer = (options.sweepMs ?? 30_000) > 0 ? setInterval(sweep, options.sweepMs ?? 30_000) : null;
   timer?.unref?.();
   for (const r of db.prepare('SELECT soul_id FROM edge_comms_subscriptions WHERE world_id = ?').all(worldId) as {soul_id: string}[]) void webhooks.push(r.soul_id);
 
   return {
-    core, streams, conversations, webhooks, objects, steward,
+    core, streams, conversations, webhooks, objects, steward, fading,
     publishWorld(text, to) {
       const tick = core.tick();
       for (const id of to ?? core.liveSoulIds()) streams.deliver(id, 'world', tick, {text});
