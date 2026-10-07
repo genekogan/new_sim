@@ -146,6 +146,31 @@ export class EdgeLedger implements EdgeLedgerHooks {
       caps.push({id, verb: 'go-near', label: `Go near ${o.name}`, target: {id: o.soulId, kind: 'soul'}, available: true});   // route checked at act time
       plans.set(id, {label: `Go near ${o.name}`, steps});
     }
+    // Social and expressive native verbs: visible, deterministic, shared by many Souls at once.
+    const secondsOf = (def: number, max: number) => ({seconds: {type: 'integer', min: 5, max, default: def}});
+    caps.push({id: 'wander:here', verb: 'wander', label: 'Stroll around nearby', available: true, params: secondsOf(60, 300)});
+    plans.set('wander:here', {label: 'Stroll around nearby', steps: [{verb: 'ambient_wander', params: {seconds: 60, radius: 8}}], seconds: true});
+    for (const o of this.perceivedBodies(soul.soulId, NEAR_RADIUS)) {
+      caps.push({id: 'wave:' + o.soulId, verb: 'wave', label: `Wave to ${o.name}`, target: {id: o.soulId, kind: 'soul'}, available: true});
+      plans.set('wave:' + o.soulId, {label: `Wave to ${o.name}`, steps: [{verb: 'walk_to', params: {to: o.entityId, standoff: 1.6}}, {verb: 'wave', params: {at: o.entityId, seconds: 3}}]});
+      caps.push({id: 'face:' + o.soulId, verb: 'face', label: `Turn towards ${o.name}`, target: {id: o.soulId, kind: 'soul'}, available: true});
+      plans.set('face:' + o.soulId, {label: `Turn towards ${o.name}`, steps: [{verb: 'wave', params: {at: o.entityId, seconds: 1}}]});
+    }
+    const me = this.body(soul.entityId), w = this.host.engine.world as NativeWorld;
+    if (me) {
+      for (const e of Object.values(w.entities)) {
+        if (e.def !== 'campfire' || Math.hypot(e.pose.p[0] - me.pose.p[0], e.pose.p[2] - me.pose.p[2]) > 60) continue;
+        const id = 'warm-by-fire:' + e.id, label = 'Warm up by the fire with whoever is there';
+        caps.push({id, verb: 'warm-by-fire', label, target: {id: e.id, kind: 'object'}, available: true, params: secondsOf(120, 600)});
+        plans.set(id, {label, steps: [{verb: 'mars:campfire_circle', params: {actors: [soul.entityId], fire: e.id}}, {verb: 'rest', params: {seconds: 120}}], seconds: true});
+      }
+      for (const [rid, r] of Object.entries(w.regions ?? {}) as [string, {polygon: [number, number][]}][]) {
+        const [cx, cz] = centroid(r.polygon); if (Math.hypot(cx - me.pose.p[0], cz - me.pose.p[2]) > 60 || !this.places.byId.has(rid)) continue;
+        const id = 'gather:' + rid, label = `Gather with others at ${this.places.byId.get(rid)!.name}`;
+        caps.push({id, verb: 'gather', label, target: {id: rid, kind: 'place'}, available: true, params: secondsOf(120, 600)});
+        plans.set(id, {label, steps: [{verb: 'gather', params: {at: rid, seconds: 120}}], seconds: true});
+      }
+    }
     for (const p of this.providers) try {caps.push(...p(soul));} catch {/* a provider fault hides only its own entries */}
     const value = {caps, plans}; this.capCache.set(soul.soulId, {tick, value}); return value;
   }
@@ -192,7 +217,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     let steps = structuredClone(plan.steps);
     if (params.seconds !== undefined) {
       if (!plan.seconds || !Number.isInteger(params.seconds) || (params.seconds as number) < 1 || (params.seconds as number) > 600) return refuse('capability.params', 'seconds must be an integer 1..600 for this capability.');
-      for (const s of steps) if (s.verb === 'rest') s.params.seconds = params.seconds;
+      for (const s of steps) if (s.verb === 'rest' || s.verb === 'ambient_wander' || s.verb === 'gather') s.params.seconds = params.seconds;
     }
     if (plan.stop) {
       const program = this.host.engine.programOf(soul.entityId);
