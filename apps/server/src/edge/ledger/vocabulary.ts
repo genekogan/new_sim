@@ -35,7 +35,10 @@ const VERBS: Record<string, string> = {go: 'walk', goto: 'walk', 'go-to': 'walk'
   'warm': 'warm-by-fire', 'warm-up': 'warm-by-fire', fire: 'warm-by-fire',
   'sit-ups': 'situps', situp: 'situps', 'sit-up': 'situps', 'push-ups': 'pushups', pushup: 'pushups', 'push-up': 'pushups', 'press-ups': 'pushups', 'star-jumps': 'jumping-jacks', 'jumping-jack': 'jumping-jacks', 'do-yoga': 'yoga', boogie: 'dance', hop: 'jump',
   'lie-down': 'lie', 'lay-down': 'lie', 'have-a-nap': 'nap', 'take-a-nap': 'nap', snooze: 'nap', doze: 'nap', sleep: 'nap',
-  'stand-up': 'stand', 'get-up': 'stand', rise: 'stand', stop: 'stand', greet: 'wave', 'wave-to': 'wave', 'say-hi': 'wave', 'turn-to': 'face', 'look-at': 'face'};
+  'stand-up': 'stand', 'get-up': 'stand', rise: 'stand', stop: 'stand', greet: 'wave', 'wave-to': 'wave', 'say-hi': 'wave', 'turn-to': 'face', 'look-at': 'face',
+  // together/1 (core-next4)
+  'walk-with': 'follow', 'go-with': 'follow', accompany: 'follow', 'hi-five': 'high-five', highfive: 'high-five', 'high-5': 'high-five', 'shake-hands': 'handshake', 'shake-hands-with': 'handshake',
+  embrace: 'hug', applaud: 'clap', 'pick-up': 'pick-up', grab: 'pick-up', drop: 'put-down', 'put-down': 'put-down', 'set-down': 'put-down', 'hand-to': 'give', 'dance-with': 'dance-with'};
 /** Everyday words for places, tried only when the word itself names nothing (walk:lake → the pond, walk:forest → the woodland). */
 const SYNONYMS: Record<string, string[]> = {
   woods: ['woodland', 'wood', 'forest', 'grove'], wood: ['woodland', 'woods', 'forest'], forest: ['woodland', 'woods', 'grove'], trees: ['woodland', 'grove', 'orchard'], grove: ['woodland', 'orchard'],
@@ -90,7 +93,7 @@ export const RIDE_WORDS = /\b(?:ride|rides|balloon|fly|flight|flying|go up|up in
 /** Things bodies cannot do yet: refused honestly (never resolved to something else). */
 export const NOT_YET: [RegExp, string, string[]][] = [
   [/\b(?:run|runs|running|jog|jogging|sprint|sprinting|race|hurry)\b/i, 'Bodies cannot run yet (walking only); walk or stroll instead.', ['stroll', 'wander', 'walk']],
-  [/\b(?:hug|hugs|hugging|handshake|shake hands|high[- ]five|kiss|cuddle)\b/i, 'Touching another body (hugs, handshakes, high fives) is not possible yet; wave, face them or start a conversation.', ['wave', 'face', 'go-near']],
+  [/\b(?:kiss|kisses|kissing|snog)\b/i, 'Kissing is not a gesture here; hug, shake hands, high-five, bow or wave instead (hugs and handshakes ask the other Soul first).', ['hug', 'handshake', 'high-five', 'wave']],
   [/\b(?:climb|jump over|vault|cartwheel|somersault|backflip)\b/i, 'Climbing and acrobatics are not possible yet.', ['jump', 'stretch', 'dance']],
 ];
 

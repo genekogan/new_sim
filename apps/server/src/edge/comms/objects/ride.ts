@@ -6,31 +6,34 @@
 // `converse` works as anywhere else.
 import type {ActionCtx, CarrierView, ObjectEvent, ObjectKind, SoulRef, TimeCtx} from './types.ts';
 
-export type RideState = {carrier: string; capacity: number; phase: string; riders: SoulRef[]; seatsFree: number; departsInSeconds: number | null; holding: boolean; flights: number; routeSeconds: number; door: [number, number] | null};
+export type RideState = {carrier: string; capacity: number; phase: string; riders: SoulRef[]; seatsFree: number; departsInSeconds: number | null; holding: boolean; flights: number; routeSeconds: number; door: [number, number] | null;
+  /** together/1: invited companions the basket keeps a place for and waits for (absent on older objects). */
+  keptFor?: SoulRef[]};
 
 const view = (ctx: TimeCtx | ActionCtx, id: string): CarrierView | null => ctx.carrier?.(id) ?? null;
 function from(state: RideState, v: CarrierView | null): RideState {
   if (!v) return {...state, phase: 'closed', riders: [], seatsFree: 0, departsInSeconds: null};
   return {carrier: state.carrier, capacity: v.capacity, phase: v.phase, holding: v.holding, flights: v.flights, seatsFree: v.seatsFree, routeSeconds: v.route.seconds,
-    door: v.door as [number, number] | null, departsInSeconds: v.departsInSeconds,
+    door: v.door as [number, number] | null, departsInSeconds: v.departsInSeconds, keptFor: (v as {hold?: {for: SoulRef[]}}).hold?.for ?? [],
     riders: v.riders.filter(r => r.soulId && r.phase !== 'leaving').map(r => ({soulId: r.soulId!, name: r.name ?? 'someone'}))};
 }
 const minutes = (s: number) => s >= 90 ? `about ${Math.round(s / 60)} minutes` : `${Math.round(s)} seconds`;
 
 export const rideKind: ObjectKind<RideState> = {
   kind: 'ride',
-  description: 'A ride for a few people (here a hot-air balloon). `join` walks you up to it and you climb in by its boarding step into a free place in the basket; it lifts off by itself a little after the first rider is in (sooner when full, or at once when a rider says `start`), flies its route and lands where it started, and then everyone steps out by themselves. Speech in the basket is heard only by the riders; `converse` works as usual. You cannot leave while it is in the air.',
+  description: 'A ride for a few people (here a hot-air balloon). `join` walks you up to it and you climb in by its boarding step into a free place in the basket; it lifts off by itself a little after the first rider is in (sooner when full, or at once when a rider says `start`), flies its route and lands where it started, and then everyone steps out by themselves. Speech in the basket is heard only by the riders; `converse` works as usual. You cannot leave while it is in the air. To ride with someone, invite them: act join with params {"with": ["<soulId or name>"]} (or say "go for a balloon ride with <name>"): the basket keeps their place and waits for them to climb in (up to 90 s).',
   listed: true,
   roles: [{id: 'rider', relations: [{name: 'shares', to: 'rider'}]}],
   schema: {
     carrier: {type: 'string', visibility: 'public'}, capacity: {type: 'integer', visibility: 'public'}, phase: {type: 'string', visibility: 'public'},
     riders: {type: 'soul[]', visibility: 'public'}, seatsFree: {type: 'integer', visibility: 'public'}, departsInSeconds: {type: 'json', visibility: 'public'},
     holding: {type: 'boolean', visibility: 'public'}, flights: {type: 'integer', visibility: 'public'}, routeSeconds: {type: 'integer', visibility: 'public'}, door: {type: 'json', visibility: 'public'},
+    keptFor: {type: 'json', visibility: 'public', description: 'invited companions the basket keeps a place for and waits for'},
   },
   initial(params, ctx) {
     const carrier = String(params.carrier ?? '');
     if (!/^[a-z0-9][a-z0-9._-]{0,99}$/.test(carrier)) throw new Error('ride needs params.carrier (a native carrier entity id)');
-    return from({carrier, capacity: 0, phase: 'closed', riders: [], seatsFree: 0, departsInSeconds: null, holding: false, flights: 0, routeSeconds: 0, door: null}, view(ctx, carrier));
+    return from({carrier, capacity: 0, phase: 'closed', riders: [], seatsFree: 0, departsInSeconds: null, holding: false, flights: 0, routeSeconds: 0, door: null, keptFor: []}, view(ctx, carrier));
   },
   rolesOf: (s, soulId) => s.riders.some(r => r.soulId === soulId) ? ['rider'] : [],
   personal: (s, soulId) => ({riding: s.riders.some(r => r.soulId === soulId)}),
@@ -43,7 +46,8 @@ export const rideKind: ObjectKind<RideState> = {
       if (next.phase === 'landed' || (state.phase === 'aloft' && next.phase === 'parked')) events.push({to: was, text: 'The balloon has landed where it started; you step out onto the grass.'});
     }
     if (next.phase === 'boarding' && next.riders.length > state.riders.length) for (const r of next.riders.filter(r => !state.riders.some(o => o.soulId === r.soulId)))
-      events.push({to: to.filter(id => id !== r.soulId), text: `${r.name} climbs into the basket with you.`, untrusted: true}, {to: [r.soulId], text: `You are in the basket. It lifts off in about ${next.departsInSeconds ?? 0} seconds, or now if a rider says start.`});
+      events.push({to: to.filter(id => id !== r.soulId), text: `${r.name} climbs into the basket with you.`, untrusted: true}, {to: [r.soulId], text: (next.keptFor ?? []).length
+        ? `You are in the basket. It waits for ${(next.keptFor ?? []).map(k => k.name).join(', ')} before lifting off (or start now).` : `You are in the basket. It lifts off in about ${next.departsInSeconds ?? 0} seconds, or now if a rider says start.`, untrusted: true});
     if (!state.holding && next.holding && to.length) events.push({to, text: 'The balloon hovers above its landing spot until the ground below is clear.'});
     return {state: next, events};
   },
@@ -54,7 +58,7 @@ export const rideKind: ObjectKind<RideState> = {
         : s.phase === 'aloft' ? {code: 'ride.departed', reason: 'It is in the air; it lands where it started.'}
         : s.phase === 'landed' ? {code: 'ride.landing', reason: 'It has just landed; its riders are stepping out.'}
         : s.phase === 'closed' ? {code: 'ride.closed', reason: 'This ride is not running.'}
-        : s.seatsFree < 1 ? {code: 'ride.full', reason: 'Every place in the basket is taken.'} : null,
+        : s.seatsFree < 1 && !(s.keptFor ?? []).some(r => r.soulId === ctx.soul.soulId) ? {code: 'ride.full', reason: (s.keptFor ?? []).length ? `The last place is kept for ${(s.keptFor ?? []).map(r => r.name).join(', ')}.` : 'Every place in the basket is taken.'} : null,
       validate(s, _p, ctx) { return rideKind.actions.join.available!(s, ctx); },
       apply(s, _p, _ctx) {
         return {state: s, result: {boarding: s.carrier}, bodies: [{label: 'Board the balloon', steps: [

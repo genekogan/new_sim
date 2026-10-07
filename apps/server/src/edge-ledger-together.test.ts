@@ -1,0 +1,173 @@
+// together/1 (core-next4; Gene: gestures are "absolutely. critical even"; Souls do things together):
+// paired gestures with light consent (accept / decline / ignore), doing it back accepts, dance together and group
+// activities in sync, follow / walk with, conversations survive all of it; carry / give / put down / pick up / eat.
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {Hono} from 'hono';
+import {kernelHash} from '@sim/kernel';
+import {edenNavWorld, factory} from '../test/eden-nav-fixture.ts';
+import {WorldHost} from './world.ts';
+import {mountEdgeRoutes, edgeSoulResolver} from './edge/routes.ts';
+
+async function world(n: number) {
+  const w = await edenNavWorld(n), app = new Hono(), bearer = (c: any) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
+  const comms = mountEdgeRoutes(app, {host: w.f.host, db: w.f.db, souls: w.f.souls, soul: edgeSoulResolver(w.f.host, w.f.souls, bearer), ledger: w.ledger});
+  const body = (s: {entityId: string}) => (w.engine.world.entities as any)[s.entityId];
+  const act = async (s: typeof w.souls[number], capability: string, params?: object, ok = true) => {const out: any = await w.act(s, capability, params); if (ok) assert.equal(out.accepted, true, capability + ' ' + JSON.stringify(out)); return out;};
+  const phase = (s: {soulId: string}, out: any) => w.ledger.receipt(s.soulId, out.receipt.id)!;
+  const events = (s: {soulId: string}, kind: string) => (w.f.db.db.prepare('SELECT body FROM edge_comms_stream WHERE soul_id=? AND kind=? ORDER BY seq').all(s.soulId, kind) as {body: string}[]).map(r => JSON.parse(r.body));
+  const gap = (a: {entityId: string}, b: {entityId: string}) => Math.hypot(body(a).pose.p[0] - body(b).pose.p[0], body(a).pose.p[2] - body(b).pose.p[2]);
+  /** A fresh replay of the log from genesis reaches the same world (paired poses, holds and releases are native and logged). */
+  const replayExact = async () => {
+    w.f.host.drainInputs(); w.f.host.saveSnapshot(true); const head = {engine: w.f.host.engine.stateHash(), kernel: kernelHash(w.f.host.kernel)};
+    w.f.db.db.prepare('DELETE FROM snapshots WHERE world_id=?').run(w.f.host.worldId);
+    const h = new WorldHost(w.f.db, await factory(), w.f.host.seed, 1e9, w.f.host.worldId, {durableClockV1: true}); assert.equal(h.boot().from, 'genesis');
+    assert.deepEqual({engine: h.engine.stateHash(), kernel: kernelHash(h.kernel)}, head, 'replay exact'); h.stop();
+  };
+  return {...w, comms, body, act, phase, events, gap, replayExact};
+}
+
+test('together: hug (accept), high-five (decline), handshake (lapses), hug back = accept, dance together, group jumping jacks, follow; conversation survives', {timeout: 900000}, async t => {
+  const w = await world(3); t.after(() => {w.comms.close(); w.f.host.stop(); w.f.db.close();});
+  const [a, b, c] = w.souls;
+  // everyone to the fire circle, near each other
+  const walks = await Promise.all(w.souls.map(s => w.act(s, 'walk:social-eden-fire-circle'))) as any[];
+  await w.run(walks.map((o, i) => ({soulId: w.souls[i].soulId, id: o.receipt.id})), 8000);
+  if (w.gap(a, b) > 6) {const g = await w.act(b, 'go-near:' + a.soulId); await w.run([{soulId: b.soulId, id: g.receipt.id}], 3000);}
+  if (w.gap(a, c) > 8) {const g = await w.act(c, 'go-near:' + a.soulId); await w.run([{soulId: c.soulId, id: g.receipt.id}], 3000);}
+  // a and b are talking
+  const cv: any = w.comms.conversations.handle(a, {op: 'start', with: [b.soulId], text: 'hello'}); assert.equal(cv.accepted, true, JSON.stringify(cv));
+  assert.equal((w.comms.conversations.handle(b, {op: 'accept', conversation: cv.conversation.id}) as any).accepted, true);
+  // discoverable: gestures listed, also in doHere
+  const caps = w.ledger.capabilities(a);
+  for (const id of ['hug:' + b.soulId, 'high-five:' + b.soulId, 'handshake:' + b.soulId, 'dance-with:' + b.soulId, 'follow:' + b.soulId, 'bow:here', 'clap:here', 'point:here']) assert.ok(caps.some(x => x.id === id), 'offers ' + id);
+  assert.ok((w.ledger.observe(a, new Set()) as any).doHere.some((d: any) => d.id === 'hug:' + b.soulId), 'doHere lists a hug');
+
+  // 1. hug: asked in plain words; b hears the invitation, accepts; both hug, facing, close, in sync
+  const hug = await w.act(a, 'hug ' + b.name); assert.equal(hug.resolved?.to, 'hug:' + b.soulId);
+  for (let i = 0; i < 40; i++) w.f.host.tickOnce();
+  const inv = w.events(b, 'invite').at(-1); assert.equal(inv?.invite?.what, 'hug', JSON.stringify(inv));
+  const obsB: any = w.ledger.observe(b, new Set()); assert.equal(obsB.invites?.[0]?.id, inv.invite.id); assert.ok(obsB.doHere[0].id.startsWith('accept:'), 'accept leads doHere');
+  const yes = await w.act(b, 'accept'); assert.equal(yes.resolved?.to, 'accept:' + inv.invite.id);
+  const first: Record<string, number> = {}, last: Record<string, number> = {}; let closest = 99, partnered = false;
+  await w.run([{soulId: a.soulId, id: hug.receipt.id}, {soulId: b.soulId, id: yes.receipt.id}], 3000, tick => {
+    for (const s of [a, b]) if (w.body(s).human.activity === 'hug') {first[s.soulId] ??= tick; last[s.soulId] = tick; partnered ||= w.body(s).human.partner === (s === a ? b : a).entityId;}
+    if (w.body(a).human.activity === 'hug' && w.body(b).human.activity === 'hug') closest = Math.min(closest, w.gap(a, b));
+  });
+  assert.equal(w.phase(a, hug).phase, 'completed', JSON.stringify(w.phase(a, hug))); assert.equal(w.phase(b, yes).phase, 'completed');
+  assert.ok(first[a.soulId] && first[b.soulId], 'both hugged'); assert.ok(Math.abs(first[a.soulId] - first[b.soulId]) <= 2 && Math.abs(last[a.soulId] - last[b.soulId]) <= 2, `in sync ${JSON.stringify({first, last})}`);
+  assert.ok(partnered, 'partner published'); assert.ok(closest < 0.62 && closest >= 0.48, 'arms-length hug distance ' + closest);
+  assert.ok(w.events(a, 'invite.accepted').length >= 1, 'a hears the acceptance');
+
+  // solo gestures: bow to someone (turns to face them), clap
+  const bow = await w.act(c, 'bow to ' + a.name); assert.equal(bow.resolved?.to, 'bow:here');
+  let bowed = false, facing = 9; await w.run([{soulId: c.soulId, id: bow.receipt.id}], 600, () => {if (w.body(c).human.activity === 'bow') {bowed = true; const d = [w.body(a).pose.p[0] - w.body(c).pose.p[0], w.body(a).pose.p[2] - w.body(c).pose.p[2]]; facing = Math.abs(Math.atan2(Math.sin(Math.atan2(d[1], d[0]) - w.body(c).pose.yaw), Math.cos(Math.atan2(d[1], d[0]) - w.body(c).pose.yaw)));}});
+  assert.ok(bowed, 'bowed'); assert.ok(facing < 0.1, 'facing them ' + facing); assert.equal(w.phase(c, bow).phase, 'completed');
+  const clap = await w.act(c, 'applaud'); assert.equal(clap.resolved?.to, 'clap:here'); await w.run([{soulId: c.soulId, id: clap.receipt.id}], 600); assert.equal(w.phase(c, clap).phase, 'completed');
+
+  // 2. high-five declined: a's act fails invite.declined
+  const hf = await w.act(a, 'high-five:' + b.soulId); for (let i = 0; i < 20; i++) w.f.host.tickOnce();
+  const no = await w.act(b, 'no thanks'); assert.match(no.resolved?.to ?? '', /^decline:/);
+  await w.run([{soulId: a.soulId, id: hf.receipt.id}], 400);
+  assert.equal(w.phase(a, hf).phase, 'failed'); assert.equal(w.phase(a, hf).code, 'invite.declined');
+
+  // 3. handshake ignored: it lapses after 30 s
+  const hs = await w.act(a, 'shake hands with ' + b.name); assert.equal(hs.resolved?.to, 'handshake:' + b.soulId);
+  await w.run([{soulId: a.soulId, id: hs.receipt.id}], 900);
+  assert.equal(w.phase(a, hs).phase, 'failed'); assert.equal(w.phase(a, hs).code, 'invite.expired'); assert.ok(w.events(b, 'invite.expired').length, 'b hears it lapsed');
+
+  // 4. doing it back is accepting: a offers a hug, b "hugs a" → accept
+  const h2 = await w.act(a, 'hug:' + b.soulId); for (let i = 0; i < 10; i++) w.f.host.tickOnce();
+  const back = await w.act(b, 'hug:' + a.soulId); assert.match(back.resolved?.to ?? '', /^accept:/, JSON.stringify(back));
+  await w.run([{soulId: a.soulId, id: h2.receipt.id}, {soulId: b.soulId, id: back.receipt.id}], 3000);
+  assert.equal(w.phase(a, h2).phase, 'completed'); assert.equal(w.phase(b, back).phase, 'completed');
+
+  // 5. dance together: paired, facing, one shared end tick
+  const dn = await w.act(a, 'dance with ' + b.name, {seconds: 8}); assert.equal(dn.resolved?.to, 'dance-with:' + b.soulId);
+  for (let i = 0; i < 10; i++) w.f.host.tickOnce();
+  const dy = await w.act(b, 'yes');
+  let both = 0, untils = new Set<number>();
+  await w.run([{soulId: a.soulId, id: dn.receipt.id}, {soulId: b.soulId, id: dy.receipt.id}], 3000, () => {if (w.body(a).human.activity === 'dance' && w.body(b).human.activity === 'dance') {both++; untils.add(w.body(a).human.together.until); untils.add(w.body(b).human.together.until);}});
+  assert.ok(both > 100, 'danced together ' + both); assert.equal(untils.size, 1, 'one shared end tick');
+  assert.equal(w.phase(a, dn).phase, 'completed'); assert.equal(w.phase(b, dy).phase, 'completed');
+
+  // 6. group start: jumping jacks with b and c; all three in sync
+  const jj = await w.act(a, `jumping jacks with ${b.name} and ${c.name}`, {seconds: 6}); assert.equal(jj.resolved?.to, 'jumping-jacks:here', JSON.stringify(jj));
+  for (let i = 0; i < 10; i++) w.f.host.tickOnce();
+  const [jb, jc] = [await w.act(b, 'accept'), await w.act(c, 'accept')];
+  const started: Record<string, number> = {}, ended: Record<string, number> = {};
+  await w.run([{soulId: a.soulId, id: jj.receipt.id}, {soulId: b.soulId, id: jb.receipt.id}, {soulId: c.soulId, id: jc.receipt.id}], 4000, tick => {for (const s of [a, b, c]) {if (w.body(s).human.activity === 'jumping-jacks') {started[s.soulId] ??= tick; ended[s.soulId] = tick;}}});
+  t.diagnostic(JSON.stringify({started, ended}));
+  for (const [s, r] of [[a, jj], [b, jb], [c, jc]] as const) assert.equal(w.phase(s, r).phase, 'completed', s.name + JSON.stringify(w.phase(s, r)));
+  const ends = Object.values(ended); assert.equal(ends.length, 3, 'all three did jumping jacks'); assert.ok(Math.max(...ends) - Math.min(...ends) <= 2, 'they stop together');
+
+  // 7. walking together: a invites c along on a walk; c accepts and walks with a until a arrives
+  const go = await w.act(a, 'walk:commons-kitchen', {with: [c.name]}); assert.equal(go.accepted, true);
+  for (let i = 0; i < 10; i++) w.f.host.tickOnce();
+  const along = await w.act(c, 'accept');
+  assert.equal((w.ledger.observe(c, new Set()) as any).self.following?.soulId, a.soulId);
+  await w.run([{soulId: a.soulId, id: go.receipt.id}, {soulId: c.soulId, id: along.receipt.id}], 8000);
+  assert.equal(w.phase(a, go).phase, 'completed'); assert.equal(w.phase(c, along).phase, 'completed', JSON.stringify(w.phase(c, along)));
+  assert.ok(w.gap(a, c) < 5, 'c walked with a: ' + w.gap(a, c).toFixed(1));
+  // follow: c walks with a (no invitation needed; a is told and can ask c to stop)
+  const fo = await w.act(c, 'walk with ' + a.name); assert.equal(fo.resolved?.to, 'follow:' + a.soulId);
+  assert.ok(w.events(a, 'follow').length, 'a hears c is walking with them');
+  const home = await w.act(a, 'walk:social-eden-fire-circle');
+  await w.run([{soulId: a.soulId, id: home.receipt.id}], 6000);
+  for (let i = 0; i < 300; i++) {w.f.host.tickOnce(); if (i % 20 === 0) {await new Promise(r => setImmediate(r)); w.f.host.drainInputs();}}
+  assert.ok(w.gap(a, c) < 4.5, 'c kept up with a: ' + w.gap(a, c).toFixed(1)); assert.equal(w.phase(c, fo).phase, 'started');
+  assert.equal((w.ledger.observe(c, new Set()) as any).self.following?.soulId, a.soulId);
+  const stop = await w.act(a, 'ask-to-stop:' + c.soulId); assert.equal(stop.receipt.phase, 'completed');
+  for (let i = 0; i < 40; i++) w.f.host.tickOnce();
+  assert.equal(w.phase(c, fo).phase, 'failed'); assert.equal(w.phase(c, fo).code, 'follow.asked-to-stop');
+
+  // conversations survive gestures, dancing, following
+  assert.equal((w.comms.conversations.list(a) as any).conversations.find((x: any) => x.id === cv.conversation.id)?.state, 'open', 'still talking');
+  // unsupported touch stays honest; far partners get the walk there
+  const kiss: any = await w.act(a, 'kiss ' + b.name, undefined, false); assert.equal(kiss.accepted, false);
+  assert.deepEqual(w.f.host.engine.runtime.violations, []); assert.equal(w.f.db.paidCost(), 0);
+  await w.replayExact();
+});
+
+test('together: pick up, carry, give (accepted), put down, pick up again, eat; hands hold one thing', {timeout: 900000}, async t => {
+  const w = await world(2); t.after(() => {w.comms.close(); w.f.host.stop(); w.f.db.close();});
+  const [a, b] = w.souls;
+  const walks = await Promise.all(w.souls.map(s => w.act(s, 'walk:eden-library-1'))) as any[];
+  await w.run(walks.map((o, i) => ({soulId: w.souls[i].soulId, id: o.receipt.id})), 8000);
+  // a takes a book from a shelf
+  const pk = await w.act(a, 'pick up a book'); assert.equal(pk.resolved?.to, 'pick-up:book', JSON.stringify(pk));
+  await w.run([{soulId: a.soulId, id: pk.receipt.id}], 4000); assert.equal(w.phase(a, pk).phase, 'completed', JSON.stringify(w.phase(a, pk)));
+  assert.equal((w.ledger.observe(a, new Set()) as any).self.holding?.kind, 'book'); assert.equal(w.body(a).human.holding, 'book'); assert.equal(w.body(a).human.prop, 'book', 'carried visibly');
+  const full: any = await w.act(a, 'pick up a book', undefined, false); assert.equal(full.code, 'hands.full');
+  // carried through a walk
+  const wk = await w.act(a, 'wander:here', {seconds: 5}); await w.run([{soulId: a.soulId, id: wk.receipt.id}], 2000); assert.equal(w.body(a).human.prop, 'book', 'still in hand after a stroll');
+  if (w.gap(a, b) > 6) {const g = await w.act(b, 'go-near:' + a.soulId); await w.run([{soulId: b.soulId, id: g.receipt.id}], 3000);}
+  // a gives it to b ("give her the book" → the only one near)
+  const gv = await w.act(a, `give ${b.name} the book`); assert.equal(gv.resolved?.to, 'give:' + b.soulId, JSON.stringify(gv));
+  for (let i = 0; i < 20; i++) w.f.host.tickOnce();
+  const tk = await w.act(b, 'accept'); let both = false;
+  await w.run([{soulId: a.soulId, id: gv.receipt.id}, {soulId: b.soulId, id: tk.receipt.id}], 3000, () => {both ||= w.body(a).human.activity === 'give' && w.body(b).human.activity === 'take';});
+  assert.ok(both, 'hand-over seen'); assert.equal(w.phase(a, gv).phase, 'completed'); assert.equal(w.phase(b, tk).phase, 'completed');
+  assert.equal((w.ledger.observe(b, new Set()) as any).self.holding?.kind, 'book'); assert.equal((w.ledger.observe(a, new Set()) as any).self.holding, null);
+  assert.equal(w.body(b).human.prop, 'book'); assert.equal(w.body(a).human.prop, undefined);
+  // b puts it down away from the shelves: it lies there; a sees it and picks it up
+  const away = await w.act(b, 'walk:commons-kitchen'); await w.run([{soulId: b.soulId, id: away.receipt.id}], 8000);
+  const pd = await w.act(b, 'put it down'); assert.equal(pd.resolved?.to, 'put-down:here');
+  await w.run([{soulId: b.soulId, id: pd.receipt.id}], 400);
+  const lying = w.ledger.together.placed(); assert.equal(lying.length, 1); assert.equal(lying[0].kind, 'book'); assert.equal(w.body(b).human.prop, undefined);
+  const back = await w.act(a, 'walk:commons-kitchen'); await w.run([{soulId: a.soulId, id: back.receipt.id}], 8000);
+  const items = (w.ledger.observe(a, new Set()) as any).here.items; assert.equal(items[0]?.id, lying[0].id);
+  const again = await w.act(a, 'pick up the book'); assert.equal(again.resolved?.to, 'pick-up:' + lying[0].id);
+  await w.run([{soulId: a.soulId, id: again.receipt.id}], 2000); assert.equal(w.phase(a, again).phase, 'completed');
+  assert.equal(w.ledger.together.placed().length, 0); assert.equal(w.ledger.together.heldBy(a.soulId)?.id, lying[0].id);
+  // b gets something to eat at the kitchen and eats it
+  const fd = await w.act(b, 'get something to eat'); assert.equal(fd.resolved?.to, 'pick-up:food', JSON.stringify(fd));
+  await w.run([{soulId: b.soulId, id: fd.receipt.id}], 3000); assert.equal(w.phase(b, fd).phase, 'completed');
+  const eat = await w.act(b, 'eat it', {seconds: 5}); assert.equal(eat.resolved?.to, 'eat:held');
+  let ate = false; await w.run([{soulId: b.soulId, id: eat.receipt.id}], 400, () => {ate ||= w.body(b).human.activity === 'eat' && w.body(b).human.prop === 'food';});
+  assert.ok(ate, 'eating with food in hand'); assert.equal(w.ledger.together.heldBy(b.soulId), null); assert.equal(w.body(b).human.prop, undefined);
+  // public items endpoint shape
+  assert.deepEqual(w.ledger.together.publicItems(), []);
+  assert.deepEqual(w.f.host.engine.runtime.violations, []);
+  await w.replayExact();
+});

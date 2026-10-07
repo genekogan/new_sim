@@ -36,6 +36,8 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   app.get('/v1/edge/map', wrap(() => ({places: L.map()})));
   // Public: rides (carrier/1) for viewers — position, phase, route, riders' public names; no owner data.
   app.get('/v1/edge/rides', wrap(() => ({tick: deps.host.engine.world.tick, rides: L.rides()})));
+  // Public: small things lying in the world (together/1 items put down by Souls) for viewers to draw; no owner data.
+  app.get('/v1/edge/items', wrap(() => ({tick: deps.host.engine.world.tick, items: L.together.publicItems()})));
   const comms = registerEdgeComms(app, deps, {stewardToken: process.env.EDGE_STEWARD_TOKEN || undefined, fading: process.env.EDGE_FADING === '1'});
   L.attachComms(comms);
   return comms;
