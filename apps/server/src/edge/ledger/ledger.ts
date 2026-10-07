@@ -40,7 +40,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** Souls faded out (removed at 60 min idle); their next act lands them at a starting place. */
   readonly faded = new Set<string>();
   private startingPoint(soulId: string): [number, number] {
-    const starts = [...this.places.byId.values()].filter(p => p.starting && p.parent !== null);
+    // Only starting places on admitted native ground (an engine region of the same id); W1 scenery (e.g. region-*) is never a landing spot.
+    const ground = (this.host.engine.world as {regions?: Record<string, unknown>}).regions ?? {};
+    const all = [...this.places.byId.values()].filter(p => p.starting && p.parent !== null), native = all.filter(p => p.id in ground);
+    const starts = native.length ? native : all;
     const pick = starts.length ? starts[[...soulId].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7) % starts.length] : [...this.places.byId.values()][0];
     return centroid(pick.polygon);
   }
