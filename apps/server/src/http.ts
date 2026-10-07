@@ -1,5 +1,5 @@
 import { bodyLimit } from 'hono/body-limit';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { Hono, type Context } from 'hono';
 import { decodeJwt } from 'jose';
@@ -364,10 +364,13 @@ export function buildApp(d: Deps) {
   app.get('/buildings', c => c.html(`<main style="max-width:1100px;margin:auto;font:18px system-ui;padding:24px"><a href="/">Sim worlds</a><h1>Ceramic Tower and Minaret Temple</h1><p>First procedural versions, rebuilt after Vanessa Rosa's ceramics. Open rooms and shafts are sized for floating heads.</p><img style="width:100%" src="/world-assets/littlemartians/buildings/previews/both.jpg" alt="Ceramic Tower and Minaret Temple"/><h2>Inside the rooms</h2><img style="width:48%" src="/world-assets/littlemartians/buildings/previews/ceramic-tower-inside-L1.jpg" alt="Tower second room"/><img style="width:48%" src="/world-assets/littlemartians/buildings/previews/minaret-temple-inside-L1.jpg" alt="Temple domed room"/></main>`));
   if (existsSync(d.cfg.marsWebDir)) mountMarsStatic(app, d.cfg.marsWebDir);
   if (existsSync(d.cfg.webDir)) {
-    const index = readFileSync(join(d.cfg.webDir, 'index.html'), 'utf8');
+    // Re-read when the file changes so a frontend install needs no server restart (stat per request is cheap).
+    const indexPath = join(d.cfg.webDir, 'index.html');
+    let index = readFileSync(indexPath, 'utf8'), indexMtime = statSync(indexPath).mtimeMs;
+    const currentIndex = () => { try { const m = statSync(indexPath).mtimeMs; if (m !== indexMtime) { index = readFileSync(indexPath, 'utf8'); indexMtime = m; } } catch { /* keep the last good index */ } return index; };
     app.use('/assets/*', async (c, next) => { await next(); if (c.res.ok) c.header('Cache-Control', 'public, max-age=31536000, immutable'); });
     app.use('/assets/*', serveStatic({ root: d.cfg.webDir }));
-    app.get('*', (c) => (c.req.path.startsWith('/v1/') || c.req.path.startsWith('/mcp') ? c.json({ ok: false, code: 'not-found', message: 'no such route' }, 404) : c.html(index, 200, { 'Cache-Control': 'no-cache' })));
+    app.get('*', (c) => (c.req.path.startsWith('/v1/') || c.req.path.startsWith('/mcp') ? c.json({ ok: false, code: 'not-found', message: 'no such route' }, 404) : c.html(currentIndex(), 200, { 'Cache-Control': 'no-cache' })));
   } else app.get('/', (c) => c.text('Sim server is running. The web app has not been built (pnpm build).'));
   return app;
 }
