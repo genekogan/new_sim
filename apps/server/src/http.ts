@@ -12,6 +12,7 @@ import type { Db, SoulRow, UserRow } from './db.ts';
 import type { Hub } from './hub.ts';
 import { cardGrammar } from '@sim/brain';
 import { skillMd } from './skill.ts';
+import { edgeSkillStub } from './edge/skill-stub.ts';
 import { agentReader } from './agent-reader.ts';
 import { ApiError, type Souls } from './souls.ts';
 import { mountMarsStatic } from './mars-static.ts';
@@ -114,7 +115,13 @@ export function buildApp(d: Deps) {
   app.get('/cards.md', (c) => c.text(cardGrammar(d.host.engine.describeVerbs().filter((v) => v.verb !== 'do_activity')), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'public, max-age=60' }));
   app.get('/v1/debug/verbs', (c) => c.json({ rulesVersion: d.host.engine.rulesVersion, dt: d.host.engine.dt, verbs: d.host.engine.describeVerbs() }));
   app.get('/v1/log', (c) => c.json({ events: d.db.events(d.host.worldId, intQ(c, 'after', 0, 0, Number.MAX_SAFE_INTEGER), intQ(c, 'limit', 200, 1, 1000)).map(publicEvent) }));
-  const skill = (c: Context) => c.text(skillMd(baseOf(c)), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'public, max-age=60' });
+  // App owns the skill text (EDGE_SKILL_FILE / descriptor skillFile, read per request so edits apply live).
+  // The legacy approval-pairing skill applies only to central-mind worlds.
+  const skillText = (base: string) => {
+    if (d.cfg.skillFile) { try { return readFileSync(d.cfg.skillFile, 'utf8').replaceAll('{{BASE}}', base); } catch { /* fall through to built-in */ } }
+    return d.cfg.mindDriver === 'edge' ? edgeSkillStub(base) : skillMd(base);
+  };
+  const skill = (c: Context) => c.text(skillText(baseOf(c)), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'public, max-age=60' });
   app.get('/skill.md', skill);
   app.get('/v1/skill.md', skill);
   // Selected-world text producer, before the SPA fallback. Origin/prefix come

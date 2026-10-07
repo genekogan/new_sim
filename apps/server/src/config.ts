@@ -10,6 +10,8 @@ export const config = {
   archiveTakes: env.ARCHIVE_TAKES === '1',
   r2: {account:env.R2_ACCOUNT_ID,bucket:env.R2_BUCKET,endpoint:env.R2_ENDPOINT,access:env.R2_ACCESS_KEY_ID,secret:env.R2_SECRET_ACCESS_KEY,prefix:env.R2_PREFIX??'sim'},
   worldKey,
+  /** Markdown served at /skill.md (App's agent skill). Unset: edge worlds get a built-in edge stub; central worlds the legacy skill. */
+  skillFile: env.EDGE_SKILL_FILE || undefined as string | undefined,
   /** Who chooses Souls' actions: 'edge' (owners' own agents; the world runs no Soul mind) or 'central' (legacy brain, kept for a future NPC driver). */
   // Default 'edge'. Under node --test (NODE_TEST_CONTEXT) legacy suites keep 'central'; edge tests opt in explicitly.
   mindDriver: ((env.MIND_DRIVER ?? (env.NODE_TEST_CONTEXT ? 'central' : 'edge')) === 'central' ? 'central' : 'edge') as 'edge' | 'central',

@@ -124,7 +124,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   app.post('/v1/edge/say', route(async (c, soul) => { const out = say(core, soul, await json(c), id => objects.addressees(id)); fading.touch(soul.soulId); return out; }));
   app.post('/v1/edge/subscribe', route(async (c, soul) => webhooks.subscribe(soul, await json(c))));
   app.delete('/v1/edge/subscribe', route((_c, soul) => webhooks.unsubscribe(soul)));
-  app.post('/v1/edge/converse', route(async (c, soul) => { const out = conversations.handle(soul, await json(c)); if (out.accepted) fading.touch(soul.soulId); return out; }));
+  app.post('/v1/edge/converse', route(async (c, soul) => { const out = conversations.handle(soul, await json(c)); if (out.accepted) fading.touch(soul.soulId); else deps.ledger.recordRefusal?.(soul.soulId, 'converse', String((out as {op?: unknown}).op ?? 'converse'), String((out as {code?: unknown}).code ?? 'refused')); return out; }));
   app.get('/v1/edge/conversations', route((_c, soul) => conversations.list(soul)));
   app.get('/v1/edge/conversations/:id/turns', route((c, soul) => {
     const after = Number(c.req.query('after') ?? 0);
@@ -134,7 +134,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
 
   app.get('/v1/edge/objects', route((_c, soul) => ({objects: objects.visibleTo(soul)})));
   app.get('/v1/edge/objects/:id', route((c, soul) => objects.get(c.req.param('id') ?? '', soul)));
-  app.post('/v1/edge/objects/:id/act', route(async (c, soul) => { const out = objects.act(c.req.param('id') ?? '', soul, await json(c)); if (out.accepted) fading.touch(soul.soulId); return out; }));
+  app.post('/v1/edge/objects/:id/act', route(async (c, soul) => { const body = await json(c), out = objects.act(c.req.param('id') ?? '', soul, body); if (out.accepted) fading.touch(soul.soulId); else deps.ledger.recordRefusal?.(soul.soulId, 'object', `object:${c.req.param('id') ?? ''}:${String(body.action ?? '')}`, String((out as {code?: unknown}).code ?? 'refused')); return out; }));
   app.get('/v1/edge/digest', route(() => ({digest: steward.latestDigest()})));
 
   // Steward session endpoints (not Soul-authenticated).

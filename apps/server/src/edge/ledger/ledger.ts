@@ -33,7 +33,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
     this.host = host; this.db = db;
     db.db.exec(`CREATE TABLE IF NOT EXISTS edge_receipts_v1 (world_id TEXT NOT NULL, receipt_id TEXT NOT NULL, soul_id TEXT NOT NULL, capability TEXT NOT NULL, phase TEXT NOT NULL,
       accepted_tick INTEGER NOT NULL, started_tick INTEGER, ended_tick INTEGER, code TEXT, reason TEXT, program_id TEXT, client_ref TEXT, created_at INTEGER NOT NULL, PRIMARY KEY (world_id, receipt_id));
-      CREATE INDEX IF NOT EXISTS edge_receipts_v1_soul ON edge_receipts_v1 (world_id, soul_id, phase);`);
+      CREATE INDEX IF NOT EXISTS edge_receipts_v1_soul ON edge_receipts_v1 (world_id, soul_id, phase);
+      CREATE TABLE IF NOT EXISTS edge_refusals_v1 (world_id TEXT NOT NULL, at INTEGER NOT NULL, tick INTEGER NOT NULL, soul_id TEXT NOT NULL, verb TEXT NOT NULL, capability TEXT NOT NULL, code TEXT NOT NULL);
+      CREATE INDEX IF NOT EXISTS edge_refusals_v1_at ON edge_refusals_v1 (world_id, at);`);
     this.places = new PlaceIndex(this.loadPlaces(placeData));
     // Receipts left open by a previous process cannot be followed honestly.
     for (const r of this.rows("phase IN ('waiting','started')")) {
@@ -135,13 +137,34 @@ export class EdgeLedger implements EdgeLedgerHooks {
   capabilities(soul: EdgeSoul): EdgeCapability[] {return this.binds(soul).caps;}
   addCapabilityProvider(p: (soul: EdgeSoul) => EdgeCapability[]) {this.providers.push(p);}
 
+  recordRefusal(soulId: string, verb: string, capability: string, code: string) {
+    try {this.db.db.prepare('INSERT INTO edge_refusals_v1 (world_id,at,tick,soul_id,verb,capability,code) VALUES (?,?,?,?,?,?,?)').run(this.host.worldId, Date.now(), this.host.engine.world.tick, soulId, verb.slice(0, 40), capability.slice(0, 200), code.slice(0, 100));} catch {/* measurement never breaks acting */}
+  }
+  /** Counts only (no agent text): acts, receipts by phase, refusals by code, active Souls, speech/conversations when Comms is present. */
+  metrics(windowMs = 3600_000) {
+    const w = this.host.worldId, since = Date.now() - windowMs, q = (sql: string, ...a: (string | number)[]) => this.db.db.prepare(sql).all(w, ...a) as Record<string, number | string>[];
+    const has = (t: string) => !!this.db.db.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(t);
+    const count = (sql: string, ...a: (string | number)[]) => Number((this.db.db.prepare(sql).get(w, ...a) as {n: number}).n);
+    const accepted = count('SELECT COUNT(*) n FROM edge_receipts_v1 WHERE world_id=? AND created_at>=?', since), refused = count('SELECT COUNT(*) n FROM edge_refusals_v1 WHERE world_id=? AND at>=?', since);
+    const active = count('SELECT COUNT(DISTINCT soul_id) n FROM edge_receipts_v1 WHERE world_id=? AND created_at>=?', since);
+    return {window: {ms: windowMs, since}, actsPerActiveSoulPerHour: active ? Math.round(accepted / active / (windowMs / 3600_000) * 10) / 10 : null,
+      acts: {accepted, refused, refusalRate: accepted + refused ? Math.round(refused / (accepted + refused) * 1000) / 1000 : null},
+      receiptsByPhase: Object.fromEntries(q('SELECT phase k, COUNT(*) n FROM edge_receipts_v1 WHERE world_id=? AND created_at>=? GROUP BY phase', since).map(r => [r.k, r.n])),
+      refusalsByCode: Object.fromEntries(q('SELECT verb||\' \'||code k, COUNT(*) n FROM edge_refusals_v1 WHERE world_id=? AND at>=? GROUP BY verb, code ORDER BY n DESC', since).map(r => [r.k, r.n])),
+      activeSouls: count('SELECT COUNT(DISTINCT soul_id) n FROM edge_receipts_v1 WHERE world_id=? AND created_at>=?', since),
+      speech: has('edge_comms_speech') ? count('SELECT COUNT(*) n FROM edge_comms_speech WHERE world_id=? AND at>=?', since) : null,
+      conversationTurns: has('edge_comms_turns') ? count('SELECT COUNT(*) n FROM edge_comms_turns WHERE world_id=? AND at>=?', since) : null,
+      worldModelCalls: count('SELECT COUNT(*) n FROM brain_calls WHERE world_id=? AND at>=?', since),
+      tick: this.host.engine.world.tick};
+  }
+
   // ---------------------------------------------------------------- act
   async act(soul: EdgeSoul, input: {capability?: unknown; params?: unknown; clientRef?: unknown}): Promise<{accepted: true; receipt: EdgeReceipt} | {accepted: false; code: string; reason: string; capability: string; retry_after?: number}> {
     const capability = typeof input.capability === 'string' ? input.capability : '';
     if (!capability || capability.length > 200) throw new EdgeError(400, 'invalid', 'body must be {capability, params?, clientRef?}');
     const clientRef = typeof input.clientRef === 'string' && input.clientRef.length <= 100 ? input.clientRef : undefined;
     if (clientRef) {const old = this.rows('soul_id=? AND client_ref=?', soul.soulId, clientRef)[0]; if (old) return {accepted: true, receipt: this.view(old)};}
-    const refuse = (code: string, reason: string, extra?: {retry_after?: number}) => ({accepted: false as const, code, reason, capability, ...extra});
+    const refuse = (code: string, reason: string, extra?: {retry_after?: number}) => {this.recordRefusal(soul.soulId, 'act', capability, code); return {accepted: false as const, code, reason, capability, ...extra};};
     if (this.host.quietBarrier) return refuse('world.quiet', 'The world is briefly quiet while it renews; try again shortly.', {retry_after: 30});
     const {caps, plans} = this.binds(soul), cap = caps.find(c => c.id === capability), plan = plans.get(capability);
     if (!cap || !plan) return refuse('capability.unknown', 'That capability is not offered to this Soul right now; read capabilities again.');

@@ -91,3 +91,10 @@ test('G430 public Soul read: no auth, own data only, no owner/token fields',asyn
  const text=JSON.stringify(j);for(const k of ['owner','token','dev:alice','programId'])assert.ok(!text.includes(k),k);
  assert.equal((await f.app.request('/v1/edge/public/souls/s_nobody')).status,404);
 });
+
+test('refusals are logged for measurement; /v1/edge/metrics counts accepted, refused and codes (no text)',async t=>{
+ const f=await setup(t);await f.call(0,'POST','/v1/edge/act',{capability:'rest:here',params:{seconds:5}});await f.call(0,'POST','/v1/edge/act',{capability:'walk:nowhere'});
+ const m=(await f.call(0,'GET','/v1/edge/metrics?minutes=60')).json;
+ assert.equal(m.acts.accepted,1);assert.equal(m.acts.refused,1);assert.equal(m.refusalsByCode['act capability.unknown'],1);assert.equal(m.activeSouls,1);assert.equal(m.worldModelCalls,0);
+ const rows=f.db.db.prepare('SELECT soul_id,verb,capability,code FROM edge_refusals_v1').all() as any[];assert.deepEqual(rows.map(r=>[r.soul_id,r.verb,r.capability,r.code]),[[f.rows[0].id,'act','walk:nowhere','capability.unknown']]);
+});
