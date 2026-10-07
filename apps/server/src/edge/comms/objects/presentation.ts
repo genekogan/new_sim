@@ -23,7 +23,7 @@ function recount(s: PresentationState) { s.ticketsLeft = Math.max(0, s.capacity 
 
 export const presentationKind: ObjectKind<PresentationState> = {
   kind: 'presentation',
-  description: 'A ticketed presentation. Reserve a seat from anywhere; doors open shortly before the start; enter in person. If full, you join the standby queue; unclaimed seats go to standby in order at curtain.',
+  description: 'A ticketed presentation. Reserve a seat from anywhere; doors open shortly before the start; enter in person. If full, you join the standby queue; unclaimed seats go to standby in order at curtain. After you enter, walk in and sit on any free seat in this place yourself (its sit:… capabilities); the presenter\'s speech and published materials reach the audience wherever they sit.',
   listed: true,
   roles: [{id: 'presenter', relations: [{name: 'addresses', to: 'audience'}]}, {id: 'ticket-holder'}, {id: 'standby'}, {id: 'audience'}],
   schema: {
