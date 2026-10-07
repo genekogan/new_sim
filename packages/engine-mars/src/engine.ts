@@ -37,6 +37,8 @@ import type {CampExpansionReader} from './camp-expansion.ts';
 import {campExpansionV1Schema,type CampExpansionV1,type CampExpansionAdmissionV1} from '@sim/engine-contract';
 import { CodecError } from '../../../mars/viewer/engine/runtime/codec.ts';
 import { constructionPlan, unsafeConstruction, type BuildPhase } from './construction.ts';
+import { disassemblyPlan, DISASSEMBLY_POLICY } from './disassembly.ts';
+import { disassemblyRegistry } from '../../../mars/viewer/engine/construction/disassembly.ts';
 import { captureRenderScene, commonsSceneMetadataV1Schema, type RenderSceneCaptureV1, type RenderScene } from '@sim/engine-contract';
 import {readLocalClassroomV1} from './classroom-observation.ts';
 import { readNativeGathering } from './gathering-observation.ts';
@@ -77,9 +79,9 @@ type Prog = {
   ops: Op[]; action?: string; settle?: 'done' | 'held'; soft?: boolean; until?: number;
   controlOf?:string;
   readiedActors?:string[];
-  build?: { phase: BuildPhase; crew: string[]; stopping?: Diag };
+  build?: { phase: BuildPhase; crew: string[]; stopping?: Diag; reverse?: true };
 };
-export type MarsWorldConfig = { quietStallReleaseV1?:boolean; walkBlockV1?:boolean; safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; fixtureGroundGoalsV1?:boolean; nativeArrivalWitnessV1?:boolean; quietLandingCourtesyV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
+export type MarsWorldConfig = { quietStallReleaseV1?:boolean; walkBlockV1?:boolean; safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; fixtureGroundGoalsV1?:boolean; nativeArrivalWitnessV1?:boolean; quietLandingCourtesyV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; disassemblyV1?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
 export const LITTLE_MARTIANS_WORLD: MarsWorldConfig={scene:'littlemartians',arrival:[0,18],arrivalPlace:'garden',reference:[0,16],grounds:{id:'grounds',name:'Ceramic garden'}};
 export const GREEN_FIELD_WORLD:MarsWorldConfig={scene:'greenfield',arrival:[0,0],arrivalPlace:'field',reference:[2,0],grounds:{id:'grounds',name:'Green field'}};
 export const EDEN_COMMONS_WORLD:MarsWorldConfig={scene:'eden-commons',arrival:[14,4],arrivalPlace:'commons',reference:[9,5],grounds:{id:'grounds',name:'Eden commons'}};
@@ -106,6 +108,8 @@ export const BODY_VERBS: VerbInfo[] = [
   { verb: 'ambient_wander', description: 'Stroll between nearby points, pausing, for a number of seconds within a radius in metres.', inputSchema: { type: 'object', properties: { seconds: num, radius: num } } },
 ];
 const BODY = new Set(BODY_VERBS.map((v) => v.verb));
+/** Offered only by an engine whose rules include disassembly/1 (never by the legacy body language). */
+export const UNBUILD_VERB: VerbInfo = { verb: 'unbuild_lookout', description: 'Choose one finite camp disassembly job, the build in reverse: stairs takes the treads and flight down; deck lifts the sheets and joists off and carries them back to their piles; frame holds the uprights, takes the beams out and lowers the uprights; stage carries the rack parts back to the rack pile. Phases come down latest first (stairs, deck, frame, stage). Use the exact unprefixed verb unbuild_lookout, target:null, approach:[], and a single during step with phase. Refused while anyone is on the lookout. The committed crew finishes a safe segment before interruption.', inputSchema: {type:'object',properties:{phase:{type:'string',enum:['stairs','deck','frame','stage']}},required:['phase']} };
 const NEEDS_BODY = new Set(['walk_to', 'sit', 'gather', 'converse', 'ambient_wander']);
 /** Mars's meal scenario as a world: the same proving ground, furnished and with its cast of four already there. */
 export const MEAL_WORLD: MarsWorldConfig = { scene: 'meal', arrival: [-6, -12], arrivalPlace: 'lawn', reference: [-6, -10.5], grounds: { id: 'grounds', name: 'the grounds' } };
@@ -190,10 +194,10 @@ export class MarsEngine implements Engine {
   get world(): WorldState { return this.rt.world as WorldState; }
   private get ents(): Record<string, any> { return this.rt.world.entities; }
   describeVerbs(): VerbInfo[] {
-    return [...BODY_VERBS, ...this.m.describeVerbs(this.registry).map((v) => ({ ...v, verb: `mars:${v.verb}`, description: `[Mars verb] ${v.description}`, scope: 'world' as const }))];
+    return [...BODY_VERBS, ...(this.cfg.disassemblyV1?[UNBUILD_VERB]:[]), ...this.m.describeVerbs(this.registry).map((v) => ({ ...v, verb: `mars:${v.verb}`, description: `[Mars verb] ${v.description}`, scope: 'world' as const }))];
   }
   /** The world plus the adapter's own state (which program each actor is in), since both decide what happens next. */
-  stateHash(): string { return hashOf({ ...(this.lecturePlacement?{lecturePolicy:this.lecturePlacement}:{}), ...(this.sleepSnapshotActive?{sleepSnapshotPolicy:NATIVE_SLEEP_SNAPSHOT_V1}:{}), ...(this.newcomerResources.length?{newcomerResources:this.newcomerResources}:{}), w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet, ...(this.cfg.safeCrewRemoval?{removalPolicy:'crew-removal/1'}:{}), ...(this.cfg.fixtureGroundGoalsV1?{fixtureGoalPolicy:'ground-fixture-levels/1'}:{}), ...(this.cfg.nativeArrivalWitnessV1?{arrivalWitnessPolicy:'native-navigation-arrival/1'}:{}), ...(this.cfg.quietLandingCourtesyV1?{quietLandingPolicy:'idle-landing-courtesy/1'}:{}), ...(this.commonsProvisionsActive?{provisionsPolicy:'commons-provisions/1'}:{}), ...(this.commonsKitchenActive?{kitchenPolicy:this.commonsKitchenVersion}:{}), ...(this.greenLandmarkActive?{greenLandmarkPolicy:'existing-green-landmark/1'}:{}), ...(this.socialEdenActive?{socialPolicy:'social-eden/1'}:{}), ...(this.foodDeliveries.length?{foodDeliveryPolicy:'commons-food-delivery/1',foodDeliveries:this.foodDeliveries}:{}), ...(this.cfg.safeArrivalV1?{arrivalPolicy:'arrival-clearance/1'}:{}), ...(this.cfg.walkBlockV1?{walkPolicy:'walk-block/1'}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion,physicalPolicy:this.cfg}:{}) }); }
+  stateHash(): string { return hashOf({ ...(this.lecturePlacement?{lecturePolicy:this.lecturePlacement}:{}), ...(this.sleepSnapshotActive?{sleepSnapshotPolicy:NATIVE_SLEEP_SNAPSHOT_V1}:{}), ...(this.newcomerResources.length?{newcomerResources:this.newcomerResources}:{}), w: this.rt.stateHash(), p: [...this.programs.values()], l: this.leaving, clock: this.cfg.clock ?? null, quiet: this.quiet, ...(this.cfg.safeCrewRemoval?{removalPolicy:'crew-removal/1'}:{}), ...(this.cfg.disassemblyV1?{disassemblyPolicy:DISASSEMBLY_POLICY}:{}), ...(this.cfg.fixtureGroundGoalsV1?{fixtureGoalPolicy:'ground-fixture-levels/1'}:{}), ...(this.cfg.nativeArrivalWitnessV1?{arrivalWitnessPolicy:'native-navigation-arrival/1'}:{}), ...(this.cfg.quietLandingCourtesyV1?{quietLandingPolicy:'idle-landing-courtesy/1'}:{}), ...(this.commonsProvisionsActive?{provisionsPolicy:'commons-provisions/1'}:{}), ...(this.commonsKitchenActive?{kitchenPolicy:this.commonsKitchenVersion}:{}), ...(this.greenLandmarkActive?{greenLandmarkPolicy:'existing-green-landmark/1'}:{}), ...(this.socialEdenActive?{socialPolicy:'social-eden/1'}:{}), ...(this.foodDeliveries.length?{foodDeliveryPolicy:'commons-food-delivery/1',foodDeliveries:this.foodDeliveries}:{}), ...(this.cfg.safeArrivalV1?{arrivalPolicy:'arrival-clearance/1'}:{}), ...(this.cfg.walkBlockV1?{walkPolicy:'walk-block/1'}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion,physicalPolicy:this.cfg}:{}) }); }
   physicalHash(): string { return hashOf(physicalView(this.world)); }
 
   // ------------------------------------------------------------------ tick
@@ -519,6 +523,14 @@ export class MarsEngine implements Engine {
     const first = program.steps[0]; if (!first) return null;
     for(const step of program.steps)if(step.verb==='activity_readiness_v1'){const issue=this.readinessIssue(program.actor,step.params,false);if(issue)return issue;}
     if(first.verb==='rest'&&typeof first.params.seatedAt==='string'&&!this.seatedAt(program.actor,first.params.seatedAt))return {code:'rest.native-seat-required',message:'The requested seat is no longer held by this actor.'};
+    if (this.cfg.disassemblyV1 && (first.verb === 'build_lookout' || first.verb === 'unbuild_lookout') && [...this.programs.values()].some(p=>p.build)) return {code:'construction.site-busy',message:'Another crew is building or taking down the lookout; one finite job at a time.'};
+    if (first.verb === 'unbuild_lookout' && this.cfg.disassemblyV1) {
+      if (program.steps.length !== 1) return {code:'disassembly.one-job',message:'A disassembly card chooses one finite job.'};
+      const plan=this.unbuildPlan(program);
+      if ('code' in plan) return plan;
+      const raw=this.raw(program.actor,plan.steps[0]);
+      return 'code' in raw?raw:this.plan(raw.verb,raw.params);
+    }
     if (first.verb === 'build_lookout') {
       if (program.steps.length !== 1) return {code:'construction.one-job',message:'A construction card chooses one finite job.'};
       const plan=this.buildPlan(program);
@@ -561,13 +573,14 @@ export class MarsEngine implements Engine {
     const no = this.canPerform(program);
     const id = `p${this.nextProg}`;
     if (no) return {result:{id,ok:false,diagnostic:no},build:null};
-    const build=program.steps[0]?.verb==='build_lookout'?this.buildPlan(program):null;
-    if (build && 'code' in build) return {result:{id,ok:false,diagnostic:build},build:null};
-    return {result:{id,ok:true},build};
+    const reverse=program.steps[0]?.verb==='unbuild_lookout'&&this.cfg.disassemblyV1===true;
+    const build=program.steps[0]?.verb==='build_lookout'?this.buildPlan(program):reverse?this.unbuildPlan(program):null;
+    if (build && 'code' in build) return {result:{id,ok:false,diagnostic:build},build:null,reverse};
+    return {result:{id,ok:true},build,reverse};
   }
   previewAdmission(program:Program) { return structuredClone(this.prepareAdmission(program).result); }
   perform(program: Program) {
-    const {result,build}=this.prepareAdmission(program),id=result.id;
+    const {result,build,reverse}=this.prepareAdmission(program),id=result.id;
     this.nextProg++;
     if (!result.ok) { const old = this.byActor.get(program.actor); if (old&&!this.physical) this.stop(old); return result; }
     if(program.steps[0]?.verb==='control_classroom_v1'){const p:Prog={id,actor:program.actor,label:program.label.slice(0,200),steps:structuredClone(program.steps),index:0,started:false,since:this.rt.tick,ops:[],controlOf:String(program.steps[0].params.session)};this.programs.set(id,p);return result;}
@@ -576,7 +589,7 @@ export class MarsEngine implements Engine {
     for(const actor of handover){const ready=this.programs.get(this.byActor.get(actor)!);if(ready)this.end(ready,'completed',{code:'activity.readiness-handover',message:'The explicitly offered wait joined its matching owned classroom.'});}
     const old = this.byActor.get(program.actor);
     if (old) { const o = this.programs.get(old)!; if (o.action && this.rt.isActive(o.action)) this.rt.cancel(o.action, { code: 'program.replaced', message: 'replaced' }); this.end(o, 'cancelled', { code: 'program.replaced', message: 'replaced by a new program' }); }
-    const p: Prog = { ...(commitment.length?{readiedActors:commitment}:{}), id, actor: program.actor, label: program.label.slice(0, 200), steps: build?build.steps:program.steps, index: 0, started: false, since: this.rt.tick, ops: [], ...(build?{build:{phase:program.steps[0].params.phase as BuildPhase,crew:build.crew}}:{}) };
+    const p: Prog = { ...(commitment.length?{readiedActors:commitment}:{}), id, actor: program.actor, label: program.label.slice(0, 200), steps: build?build.steps:program.steps, index: 0, started: false, since: this.rt.tick, ops: [], ...(build?{build:{phase:program.steps[0].params.phase as BuildPhase,crew:build.crew,...(reverse?{reverse:true as const}:{})}}:{}) };
     this.programs.set(id, p); this.byActor.set(p.actor, id);
     return result;
   }
@@ -764,6 +777,10 @@ export class MarsEngine implements Engine {
   }
   private buildPlan(program: Program) {
     return constructionPlan(this.rt.world,program.actor,program.steps[0].params.phase,id=>id===program.actor?this.holders(id).length===0:this.free(id));
+  }
+  private unbuildPlan(program: Program) {
+    const walks=[...this.rt.records.values()].filter((r:any)=>r.verb==='walk_to'&&this.rt.isActive(r.id)&&typeof r.params?.x==='number').map((r:any)=>({actor:String(r.params.actor),x:r.params.x,z:r.params.z,level:r.params.level??0}));
+    return disassemblyPlan(this.rt.world,program.actor,program.steps[0].params.phase,id=>id===program.actor?this.holders(id).length===0:this.free(id),walks);
   }
   private readinessIssue(actor:string,params:Record<string,unknown>,requireStanding=true):Diag|null{
     const e=this.ents[actor];if(!e?.human||params.activity!=='classroom'||typeof params.host!=='string'||!this.ents[params.host]?.human||typeof params.venue!=='string'||!this.rt.world.regions[params.venue]||typeof params.seconds!=='number'||!Number.isFinite(params.seconds)||params.seconds<20||params.seconds>300)return {code:'activity.readiness-invalid',message:'Readiness needs a current host/venue and a bounded own wait.'};
@@ -1121,18 +1138,20 @@ export class MarsEngine implements Engine {
 }
 
 function centroid(poly: [number, number][]): [number, number] { let x = 0, z = 0; for (const p of poly) { x += p[0]; z += p[1]; } return [r3(x / poly.length), r3(z / poly.length)]; }
-function nativeRulesVersion(version:string,cfg:MarsWorldConfig){return `sim-mars/1+${version}${cfg.safeCrewRemoval?'+crew-removal/1':''}${cfg.scene==='eden-commons'?'+commons/1':''}${cfg.safeArrivalV1?'+arrival-clearance/1':''}${cfg.walkBlockV1?'+walk-block/1':''}`;}
+function nativeRulesVersion(version:string,cfg:MarsWorldConfig){return `sim-mars/1+${version}${cfg.safeCrewRemoval?'+crew-removal/1':''}${cfg.scene==='eden-commons'?'+commons/1':''}${cfg.safeArrivalV1?'+arrival-clearance/1':''}${cfg.walkBlockV1?'+walk-block/1':''}${cfg.disassemblyV1?'+'+DISASSEMBLY_POLICY:''}`;}
 
 /** The factory is made once the Mars engine has been loaded (an async import); after that everything is synchronous. */
 export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promise<EngineFactory> {
   const m = await loadMars();
-  const registry = m.createRegistry(), services = m.servicesFor(m.scenes);
+  // disassembly/1 adds its reverse verbs to this engine's registry only; the default registry is unchanged.
+  const registry = cfg.disassemblyV1 ? disassemblyRegistry(m.createRegistry) : m.createRegistry(), services = m.servicesFor(m.scenes);
   return {
     rulesVersion: nativeRulesVersion(m.rulesVersion,cfg),
     // A failed cross-policy checkpoint restore must not turn into replay under
     // another removal policy. An explicit, qualified transition is separate.
     canReplayHistory: version => {
-      if((cfg.walkBlockV1||cfg.safeArrivalV1||cfg.scene==='eden-commons')&&version!==nativeRulesVersion(m.rulesVersion,cfg))return false;
+      if((cfg.walkBlockV1||cfg.safeArrivalV1||cfg.scene==='eden-commons'||cfg.disassemblyV1)&&version!==nativeRulesVersion(m.rulesVersion,cfg))return false;
+      if(!cfg.disassemblyV1&&/\+disassembly\//.test(version))return false;
       const walk=version.match(/\+walk-block\/[^+]+/g)??[];
       if(cfg.walkBlockV1?walk.length!==1||walk[0]!=='+walk-block/1':walk.length!==0)return false;
       const arrival=version.match(/\+arrival-clearance\/[^+]+/g)??[];
@@ -1144,7 +1163,7 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
     },
     // Candidate removal changes controller behavior: restore only its exact
     // policy/version. Legacy activities31 compatibility remains unchanged.
-    canRestoreSnapshot: version => cfg.walkBlockV1||cfg.safeArrivalV1||cfg.safeCrewRemoval||cfg.scene==='eden-commons'?version===nativeRulesVersion(m.rulesVersion,cfg):[m.rulesVersion,m.rulesVersion.replace('+bodies/1',''),m.rulesVersion.replace('+bodies/1','').replace('activities/31','activities/29')].some(v=>version===nativeRulesVersion(v,cfg)),
+    canRestoreSnapshot: version => cfg.walkBlockV1||cfg.safeArrivalV1||cfg.safeCrewRemoval||cfg.disassemblyV1||cfg.scene==='eden-commons'?version===nativeRulesVersion(m.rulesVersion,cfg):[m.rulesVersion,m.rulesVersion.replace('+bodies/1',''),m.rulesVersion.replace('+bodies/1','').replace('activities/31','activities/29')].some(v=>version===nativeRulesVersion(v,cfg)),
     /** The synthetic proving ground (a campfire, two benches, a lawn), emptied of its test people: Souls arrive by being born. */
     genesis(seed: string): WorldState {
       if (cfg.scene === 'littlemartians') return m.littleMartiansWorld(seed);
@@ -1172,6 +1191,7 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
       if(!!s.cfg?.walkBlockV1!==!!cfg.walkBlockV1)throw new Error('snapshot walk policy differs from the native factory');
       if(!!s.cfg?.safeArrivalV1!==!!cfg.safeArrivalV1)throw new Error('snapshot arrival policy differs from the native factory');
       if(!!s.cfg?.safeCrewRemoval!==!!cfg.safeCrewRemoval)throw new Error('snapshot removal policy differs from the native factory');
+      if(!!s.cfg?.disassemblyV1!==!!cfg.disassemblyV1)throw new Error('snapshot disassembly policy differs from the native factory');
       if((s.cfg?.scene==='eden-commons'||cfg.scene==='eden-commons')&&s.cfg?.scene!==cfg.scene)throw new Error('snapshot commons layout differs from the native factory');
       if(cfg.scene==='eden-commons'&&s.commonsVersion!=='commons/1')throw new Error('snapshot commons rules differ from the native factory');
       // Spatial services are rebuilt for the same base scene; the snapshot carries the rest.

@@ -3,11 +3,12 @@ import {decodeSnapshot} from '../../../mars/viewer/engine/runtime/snapshot.ts';
 import {loadMars} from './load.ts';
 import {marsFactory,MarsEngine,type MarsWorldConfig} from './engine.ts';
 import {createCampExpansion} from './camp-expansion.ts';
+import {disassemblyRegistry} from '../../../mars/viewer/engine/construction/disassembly.ts';
 
 /** Historical genesis stays unchanged. Only a validated, logged transition
  * can make the additional native ground infrastructure part of that history. */
 export async function marsCampExpansionFactory(cfg?:MarsWorldConfig):Promise<EngineFactory>{
-  const old=await marsFactory(cfg),m=await loadMars(),native=createCampExpansion(m);
+  const old=await marsFactory(cfg),m=await loadMars(),native=createCampExpansion(m,cfg?.disassemblyV1?()=>disassemblyRegistry(m.createRegistry):undefined);
   const origin=old.create(old.genesis('policy')) as MarsEngine;
   const initial=(origin.snapshot() as EngineSnapshot&{cfg:MarsWorldConfig}).cfg;
   if(!['proving-ground','eden-camp'].includes(initial.scene))throw new Error('camp-expansion.factory-origin');

@@ -19,7 +19,7 @@ export type Mars = {
   nonResumableReason: (def: any) => string | null;
   canonicalEntityOrder: (w: any) => any;
   rulesVersion: string;
-  createRegistry: () => Map<string, any>;
+  createRegistry: (extra?: any[]) => Map<string, any>;
   servicesFor: (scenes: Record<string, any>) => (world: any) => Record<string, any>;
   invariants: any[];
   describeVerbs: (registry: Map<string, any>) => { verb: string; description: string; inputSchema: Record<string, unknown> }[];

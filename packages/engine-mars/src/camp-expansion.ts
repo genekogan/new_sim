@@ -20,7 +20,8 @@ const provenance={origin:'design-edit' as const,confidence:'hypothetical' as con
 function region(id:string,label:string,x0:number,z0:number,x1:number,z1:number,kind:Region['kind']='work-area'):Region{
   return {id,label,kind,level:0,polygon:[[x0,z0],[x1,z0],[x1,z1],[x0,z1]],provenance:{...provenance}};
 }
-export function createCampExpansion(m:Mars){
+/** `registry`: the reader's action registry (default: the engine's default registry; disassembly/1 passes its own). */
+export function createCampExpansion(m:Mars,registry:()=>Map<string,any>=()=>m.createRegistry()){
   const old=m.edenCampWorld('base') as WorldState,scene=structuredClone(m.scenes[old.base.campus]) as SpatialScene;
   scene.bounds=[-44,-36,44,36];scene.surfaces[0].obb.half=[44,36];
   const entities:Record<string,Entity>={'camp-eight-table':{id:'camp-eight-table',def:'table-6ft',kind:'fixture',label:'Additional finite meal service',pose:{p:[-10,0,26],yaw:0},support:{kind:'ground'},provenance:{...provenance}}};
@@ -38,7 +39,7 @@ export function createCampExpansion(m:Mars){
   const additionsHash=hashOf({entities,regions}),base={campus:CAMP_EXPANSION_CAMPUS,staticHash:hashOf({scene,additionsHash,contract:'camp-ground-expansion/1'})};
   const services=m.servicesFor({...m.scenes,[base.campus]:scene});
   const validate=(w:WorldState)=>{if(hashOf(w.base)!==hashOf(base))throw new Error('camp-expansion.restore-base');};
-  const restore=(s:RuntimeSnapshot):Runtime=>{validate(decodeSnapshot(s).world);return m.Runtime.restore(s,m.createRegistry(),services(decodeSnapshot(s).world),m.invariants);};
+  const restore=(s:RuntimeSnapshot):Runtime=>{validate(decodeSnapshot(s).world);return m.Runtime.restore(s,registry(),services(decodeSnapshot(s).world),m.invariants);};
   function prepare(rt:Runtime,fromRulesVersion:string,toRulesVersion:string):{ok:true;transition:CampExpansionV1;runtime:Runtime}|{ok:false;diagnostic:{code:string;message:string}}{
     const no=(code:string,message:string)=>({ok:false as const,diagnostic:{code:'camp-expansion.'+code,message}});
     if(hashOf(rt.world.base)!==hashOf(old.base))return no('foreign-base','Only the exact historical native camp base can enter this ground upgrade.');
