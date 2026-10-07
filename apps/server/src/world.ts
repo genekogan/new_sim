@@ -81,6 +81,8 @@ export type HostListener = {
   onApplied?(e: LogEvent): void;
   onRuntimeEvent?(e: RuntimeEvent): void;
   onProgram?(e: ProgramEvent, m: Mind): void;
+  /** A logged decision was folded: its native programme admission result (live only). */
+  onDecision?(e: LogEvent, r: { programId?: string; programOk?: boolean; programCode?: string }): void;
   /** A card's effects were applied (or refused). Not called during replay. */
   onPlay?(p: PlayView, m: Mind | undefined): void;
   onKernel?(v: KernelView): void;
@@ -730,6 +732,7 @@ export class WorldHost {
     if(e.kind==='rules'&&e.payload?.commonsKitchen&&this.stationHistoryV1())throw Error('commons-kitchen.station-carry-required');
     if(e.kind==='rules'&&e.payload?.commonsProvisions&&this.stationHistoryV1())throw Error('commons-provisions.station-carry-required');
     const r = foldEvent(this.engine, this.kernel, e, this.counts);
+    if (e.kind === 'decision' && !replay) for (const l of this.listeners) l.onDecision?.(e, r);
     if(isStationFactV1(e.kind))this.extra.stationV1=foldStationFactV1(this.stationHistoryV1(),e,this.stationBindingV1());
     if(e.kind==='station-rules-era-v1'){
       const old=this.extra.stationV1 as StationHistoryV1|undefined;

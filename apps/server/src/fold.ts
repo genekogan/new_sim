@@ -87,6 +87,14 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       const r = engine.perform({ actor: p.entityId, label: p.label, steps: p.steps });
       return { programId: r.id, programOk: r.ok, programCode: r.diagnostic?.code };
     }
+    case 'edge-stop': {
+      // Edge worlds: a Soul's own agent asked its body to stop safely (rise from sleep,
+      // finish the current step); the engine's ordinary stop owns the safe landing.
+      const p = e.payload as { entityId?: string };
+      const id = p.entityId ? engine.programOf(p.entityId) : null;
+      if (id) engine.stop(id);
+      return {};
+    }
     case 'play': {
       const p = e.payload as PlayPayload;
       const soul = k.things[p.soulId], card = k.vocab.cards[p.card], target = p.target ? k.things[p.target] : null;

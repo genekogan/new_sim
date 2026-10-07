@@ -182,6 +182,8 @@ export class Brain {
 
   // ------------------------------------------------------------ per tick
   private afterTick(tick: number) {
+    // Edge worlds: owners' agents choose; the world runs no Soul decisions, talk, reflection or director (zero world-side model spend).
+    if (this.cfg.mindDriver === 'edge') return;
     if(this.quiescing)return;
     const w = this.host.engine.world;
     const day=this.host.living;

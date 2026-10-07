@@ -28,5 +28,5 @@ export interface EdgeLedgerHooks {
 }
 export type EdgeCapability = {id: string; verb: string; label: string; available: boolean; target?: {id: string; kind: string}; blocked?: {code: string; reason: string}; params?: Record<string, unknown>; object?: string; action?: string};
 export type EdgeDeps = {host: WorldHost; db: Db; souls: Souls; build?: string; soul(c: Context): EdgeSoul; ledger: EdgeLedgerHooks};
-export class EdgeError extends Error {constructor(readonly status: number, readonly code: string, message: string) {super(message);}}
+export class EdgeError extends Error {readonly status: number; readonly code: string; constructor(status: number, code: string, message: string) {super(message); this.status = status; this.code = code;}}
 export const edgeBody = <T extends object>(body: T) => ({contract: EDGE_CONTRACT, ...body});
