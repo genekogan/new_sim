@@ -414,14 +414,17 @@ export class MarsEngine implements Engine {
     const pond=mode==='pond/1'||lap,inset=pond?[2,4]:v2?[Math.min(.6,ex/4,ez/4),Math.min(.6,ex/4,ez/4)]:[1,1],step=pond?2.5:v2?1.0:1.5,mid=centroid(r.polygon);
     for(let x=Math.min(...xs)+inset[0];x<=Math.max(...xs)-inset[1];x+=step)for(let z=Math.min(...zs)+inset[0];z<=Math.max(...zs)-inset[0];z+=step){const p:[number,number]=[r3(x),r3(z)];if(inPoly(p[0],p[1],r.polygon)&&taken.every(t=>Math.hypot(t[0]-p[0],t[1]-p[1])>=(pond?1.4:1.0))&&(!lap||Math.hypot(p[0]-e.pose.p[0],p[1]-e.pose.p[2])>=4))spots.push(p);}
     if(!spots.length&&!pond&&taken.every(t=>Math.hypot(t[0]-mid[0],t[1]-mid[1])>=1.0))spots.push(mid); // a place smaller than the grid keeps its single centre
-    if(v2&&!spots.length){ // inside full: stand just outside it, nearest first (arriving at a busy place is not a refusal)
-      const reach=Math.max(ex,ez)/2;for(const rr of [reach+.8,reach+1.6,reach+2.4])for(let k=0;k<12;k++){const a=k/12*Math.PI*2,p:[number,number]=[r3(mid[0]+Math.cos(a)*rr),r3(mid[1]+Math.sin(a)*rr)];if(taken.every(t=>Math.hypot(t[0]-p[0],t[1]-p[1])>=1.0))spots.push(p);}
-    }
-    if(!spots.length)return {code:'route.region-full',message:`no spaced free spot remains in ${region}`};
+    // spreadV2: when the inside is full (or unreachable) stand just outside it, nearest first, on the ground
+    // around a raised place (never mid-air beside a deck). Arriving at a busy place is not a refusal.
+    const ring:[number,number][]=[];
+    if(v2){const reach=Math.max(ex,ez)/2;for(const rr of [reach+.8,reach+1.6,reach+2.4])for(let k=0;k<12;k++){const a=k/12*Math.PI*2,p:[number,number]=[r3(mid[0]+Math.cos(a)*rr),r3(mid[1]+Math.sin(a)*rr)];if(!inPoly(p[0],p[1],r.polygon)&&taken.every(t=>Math.hypot(t[0]-p[0],t[1]-p[1])>=1.0))ring.push(p);}}
+    if(!spots.length&&!ring.length)return {code:'route.region-full',message:`no spaced free spot remains in ${region}`};
     const offset=[...actor].reduce((h,c)=>(h*31+c.charCodeAt(0))>>>0,7)%spots.length;
     const order=[...spots.slice(offset),...spots.slice(0,offset)].map((p,i)=>({p,i,band:lap?Math.round(Math.abs(Math.hypot(p[0]-e.pose.p[0],p[1]-e.pose.p[2])-6)/2):pond?Math.round(Math.hypot(p[0]-e.pose.p[0],p[1]-e.pose.p[2])/8):Math.round(Math.hypot(p[0]-mid[0],p[1]-mid[1])/2)})).sort((a,b)=>a.band-b.band||a.i-b.i).slice(0,24);
     let last:Diag={code:'route.unreachable',message:'no reachable spaced spot'};
     for(const {p} of order){const no=this.plan(this.movementVerb(actor,p[0]),{actor,x:p[0],z:p[1],level});if(!no)return {x:p[0],z:p[1],level};last=no;}
+    if(v2&&ring.length){const ground=0;for(const p of ring.sort((a,b)=>Math.hypot(a[0]-e.pose.p[0],a[1]-e.pose.p[2])-Math.hypot(b[0]-e.pose.p[0],b[1]-e.pose.p[2])).slice(0,24)){const no=this.plan(this.movementVerb(actor,p[0]),{actor,x:p[0],z:p[1],level:ground});if(!no)return {x:p[0],z:p[1],level:ground};}
+      return {code:'route.region-full',message:`${region} is full and nobody can stand beside it right now`};}
     return last;
   }
   /** Edge reflex floor (yieldTimeoutV1): a shared-space spread step whose movement failed only because another body

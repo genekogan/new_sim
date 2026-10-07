@@ -25,6 +25,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private providers: ((s: EdgeSoul) => EdgeCapability[])[] = [];
   private pending = new Map<string, Pending>();           // soulId → waiting act
   private lastPlace = new Map<string, string | null>();
+  /** Server start (ms): metrics count world model calls only from here, not copied history. */
+  readonly startedAt = Date.now();
   private capCache = new Map<string, {tick: number; value: {caps: EdgeCapability[]; plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>}}>();
   comms?: {streams: {headCursor(soulId: string): string}; fading: {status(soulId: string): unknown}; objects: {visibleTo(soul: EdgeSoul): unknown[]}; close(): void};
   attachComms(c: NonNullable<EdgeLedger['comms']>) {
@@ -194,7 +196,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
       activeSouls: count('SELECT COUNT(DISTINCT soul_id) n FROM edge_receipts_v1 WHERE world_id=? AND created_at>=?', since),
       speech: has('edge_comms_speech') ? count('SELECT COUNT(*) n FROM edge_comms_speech WHERE world_id=? AND at>=?', since) : null,
       conversationTurns: has('edge_comms_turns') ? count('SELECT COUNT(*) n FROM edge_comms_turns WHERE world_id=? AND at>=?', since) : null,
-      worldModelCalls: count('SELECT COUNT(*) n FROM brain_calls WHERE world_id=? AND at>=?', since),
+      worldModelCalls: count('SELECT COUNT(*) n FROM brain_calls WHERE world_id=? AND at>=?', Math.max(since, this.startedAt)),
+      worldModelCallsCountedSince: Math.max(since, this.startedAt),
       tick: this.host.engine.world.tick};
   }
 
