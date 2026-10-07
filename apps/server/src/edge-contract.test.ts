@@ -98,3 +98,8 @@ test('refusals are logged for measurement; /v1/edge/metrics counts accepted, ref
  assert.equal(m.acts.accepted,1);assert.equal(m.acts.refused,1);assert.equal(m.refusalsByCode['act capability.unknown'],1);assert.equal(m.activeSouls,1);assert.equal(m.worldModelCalls,0);
  const rows=f.db.db.prepare('SELECT soul_id,verb,capability,code FROM edge_refusals_v1').all() as any[];assert.deepEqual(rows.map(r=>[r.soul_id,r.verb,r.capability,r.code]),[[f.rows[0].id,'act','walk:nowhere','capability.unknown']]);
 });
+
+test('map is public and never lists occupants',async t=>{
+ const f=await setup(t),res=await f.app.request('/v1/edge/map');assert.equal(res.status,200);const j=await res.json() as any;
+ assert.equal(j.contract,EDGE_CONTRACT);assert.ok(j.places.length>=1);assert.ok(!JSON.stringify(j).includes(f.rows[0].id),'no Soul ids in the map');
+});
