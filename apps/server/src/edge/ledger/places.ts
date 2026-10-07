@@ -6,7 +6,9 @@ import type {PlaceRef} from '../contract.ts';
 
 type V2 = [number, number];
 export type Occupier = {id: string; fixture: string; slot: string; kind: string};
-export type Place = {id: string; name: string; kind: string; parent: string | null; polygon: V2[]; level: number; enclosed: boolean; capacity: number | null; starting: boolean; description?: string; occupiers?: Occupier[]; schedule?: {id: string; cron: string; durationMinutes?: number; ticketed?: boolean; label?: string}[]; roles?: {id: string; relations?: {name: string; to: string}[]}[]};
+export type Place = {id: string; name: string; kind: string; parent: string | null; polygon: V2[]; level: number; enclosed: boolean; capacity: number | null; starting: boolean; description?: string; occupiers?: Occupier[]; schedule?: {id: string; cron: string; durationMinutes?: number; ticketed?: boolean; label?: string}[]; roles?: {id: string; relations?: {name: string; to: string}[]}[];
+  /** carrier/1: a place that moves with a native carrier entity (a balloon basket). Membership is by carriage, never geometry; `polygon` is in the entity's own frame. */
+  carrier?: {entity: string; frame?: 'local'}};
 export type PlaceData = {contract: 'place-data/1'; world: string; places: Place[]};
 const REF = /^[a-z0-9][a-z0-9._-]{0,99}$/;
 
@@ -37,11 +39,17 @@ export function validatePlaceData(raw: unknown, world?: NativeWorld): string[] {
     const seen = new Set<string>(); let q: Place | undefined = p;
     while (q && q.parent !== null) {if (seen.has(q.id)) {errs.push(`${p.id}: parent cycle`); break;} seen.add(q.id); q = ids.get(q.parent);}
     const parent = p.parent ? ids.get(p.parent) : undefined;
-    if (parent && Array.isArray(p.polygon) && Array.isArray(parent.polygon)) {const [cx, cz] = centroid(p.polygon); if (!inPoly(cx, cz, parent.polygon)) errs.push(`${p.id}: centroid outside parent ${parent.id}`);}
+    if (p.carrier !== undefined) {
+      if (!p.carrier || typeof p.carrier.entity !== 'string' || (p.carrier.frame !== undefined && p.carrier.frame !== 'local')) errs.push(`${p.id}: carrier must be {entity, frame?: 'local'}`);
+      else if (world) {const e = world.entities[p.carrier.entity], seats = e ? CATALOG[e.def]?.capabilities?.carrier?.seats : undefined;
+        if (!e || !seats) errs.push(`${p.id}: carrier ${p.carrier.entity} is not a native carrier in this world`);
+        else for (const o of p.occupiers ?? []) if (o.fixture !== p.carrier.entity || !seats.some(s => s.id === o.slot)) errs.push(`${p.id}: occupier ${o.id} must name a seat of ${p.carrier.entity}`);}
+    }
+    if (p.carrier === undefined && parent && Array.isArray(p.polygon) && Array.isArray(parent.polygon)) {const [cx, cz] = centroid(p.polygon); if (!inPoly(cx, cz, parent.polygon)) errs.push(`${p.id}: centroid outside parent ${parent.id}`);}
     if (p.capacity && (p.occupiers?.length ?? 0) > p.capacity) errs.push(`${p.id}: capacity below its occupier count`);
     for (const o of p.occupiers ?? []) {
       if (!REF.test(o.id) || ids.has(o.id)) errs.push(`${p.id}: occupier id ${o.id}`);
-      if (world) {const e = world.entities[o.fixture]; if (!e) errs.push(`${p.id}: occupier ${o.id} fixture ${o.fixture} not in world`); else if (!(CATALOG[e.def]?.slots ?? []).some(s => s.id === o.slot && s.kind === 'seat')) errs.push(`${p.id}: occupier ${o.id} slot ${o.slot} not a seat slot of ${o.fixture} (${e.def})`);}
+      if (world && p.carrier === undefined) {const e = world.entities[o.fixture]; if (!e) errs.push(`${p.id}: occupier ${o.id} fixture ${o.fixture} not in world`); else if (!(CATALOG[e.def]?.slots ?? []).some(s => s.id === o.slot && s.kind === 'seat')) errs.push(`${p.id}: occupier ${o.id} slot ${o.slot} not a seat slot of ${o.fixture} (${e.def})`);}
     }
   }
   if (!d.places.some(p => p.starting)) errs.push('at least one starting place required');
@@ -61,13 +69,16 @@ export class PlaceIndex {
   readonly byId = new Map<string, Place>();
   readonly occupierOf = new Map<string, {occ: Occupier; place: Place}>();
   readonly data: PlaceData;
+  /** carrier/1: carrier entity id → its place (declared in the data, or derived by the ledger). */
+  readonly carrierPlaces = new Map<string, Place>();
   constructor(data: PlaceData) {
     this.data = data;
-    for (const p of data.places) {this.byId.set(p.id, p); for (const o of p.occupiers ?? []) this.occupierOf.set(o.fixture + '#' + o.slot, {occ: o, place: p});}
+    for (const p of data.places) this.add(p);
   }
-  /** Places containing the point, innermost (smallest) first; occupier (if seated) prepended by caller. */
+  add(p: Place) {this.byId.set(p.id, p); for (const o of p.occupiers ?? []) this.occupierOf.set(o.fixture + '#' + o.slot, {occ: o, place: p}); if (p.carrier) this.carrierPlaces.set(p.carrier.entity, p);}
+  /** Places containing the point, innermost (smallest) first; occupier (if seated) prepended by caller. Carrier places never contain by geometry. */
   containing(x: number, z: number, level = 0): Place[] {
-    return [...this.byId.values()].filter(p => (p.level ?? 0) === level && inPoly(x, z, p.polygon) || p.parent === null).sort((a, b) => (a.parent === null ? 1 : 0) - (b.parent === null ? 1 : 0) || area(a.polygon) - area(b.polygon));
+    return [...this.byId.values()].filter(p => !p.carrier && ((p.level ?? 0) === level && inPoly(x, z, p.polygon) || p.parent === null)).sort((a, b) => (a.parent === null ? 1 : 0) - (b.parent === null ? 1 : 0) || area(a.polygon) - area(b.polygon));
   }
   ref(p: Place): PlaceRef {return {id: p.id, name: p.name, kind: p.kind};}
 }

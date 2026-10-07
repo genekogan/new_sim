@@ -27,7 +27,7 @@ export function humanStaticClearanceWithOverlay(qualified:(rt:Runtime,e:import('
   const out: Diagnostic[] = [];
   for (const e of Object.values(rt.world.entities)) {
     // people on the rack structure (`human.on`: a frame climb or beam walkway) are checked by construction/frame.ts frameAccessOk
-    if (e.kind !== 'human' || !e.human || e.human.on || e.human.activity.startsWith('climb') || SEATED_ACTIVITIES.has(e.human.activity) || qualified(rt,e)) continue;
+    if (e.kind !== 'human' || !e.human || e.human.on || e.human.carrier || e.human.activity.startsWith('climb') || SEATED_ACTIVITIES.has(e.human.activity) || qualified(rt,e)) continue;
     const g = sp.level(e.human.level);
     if (!g) continue;
     const c = clearanceAt(g, [e.pose.p[0], e.pose.p[2]]);
@@ -111,7 +111,7 @@ export const maxStepPerTick: Invariant = (rt: Runtime) => {
     if (!q) continue;
     const lin = hypot(cur.p[0] - q.p[0], cur.p[1] - q.p[1], cur.p[2] - q.p[2]);
     const d = lin + Math.abs(angleDelta(q.yaw, cur.yaw)) * ext;
-    const max = human && !e.human!.riding ? MAX_HUMAN_STEP_PER_TICK : MAX_STEP_PER_TICK;
+    const max = human && !e.human!.riding && !e.human!.carrier ? MAX_HUMAN_STEP_PER_TICK : MAX_STEP_PER_TICK;   // a carried body (vehicles/carrier.ts) moves with its carrier
     if (d > max)
       out.push({
         code: 'motion.teleport',

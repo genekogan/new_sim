@@ -5,12 +5,12 @@ import type {EdgeCapability, EdgeSoul} from '../../contract.ts';
 import {EdgeError} from '../../contract.ts';
 import type {CommsCore} from '../core.ts';
 import {tx} from '../store.ts';
-import type {ActionCtx, FieldSpec, ObjectEvent, ObjectKind, ObjectRecord, ParamSpec, Refusal, TimeCtx} from './types.ts';
+import type {ActionCtx, BodyRequest, CarrierView, FieldSpec, ObjectEvent, ObjectKind, ObjectRecord, ParamSpec, Refusal, TimeCtx} from './types.ts';
 
 const OBJECT_ID = /^[a-z0-9][a-z0-9._-]{0,99}$/;
 const ACTION = /^[a-z][a-z0-9_-]{0,39}$/;
 
-export type ObjectActResult = {accepted: true; object: {id: string; version: number}; action: string; result?: Record<string, unknown>}
+export type ObjectActResult = {accepted: true; object: {id: string; version: number}; action: string; result?: Record<string, unknown>; bodies?: BodyRequest[]}
   | {accepted: false; code: string; reason: string; object: string; action: string};
 
 export class Objects {
@@ -25,7 +25,8 @@ export class Objects {
   }
   kindOf(kind: string) { return this.kinds.get(kind); }
 
-  private timeCtx(): TimeCtx { return {tick: this.core.tick(), now: this.core.now(), nameOf: this.core.nameOf}; }
+  private carrierRead = (id: string): CarrierView | null => { try { return (this.core.deps.ledger.carrierView?.(id) ?? null) as CarrierView | null; } catch { return null; } };
+  private timeCtx(): TimeCtx { return {tick: this.core.tick(), now: this.core.now(), nameOf: this.core.nameOf, carrier: this.carrierRead}; }
   private row(id: string): ObjectRecord | undefined {
     const r = this.core.db.prepare('SELECT body FROM edge_comms_objects WHERE world_id = ? AND id = ?').get(this.core.worldId, id) as {body: string} | undefined;
     return r ? JSON.parse(r.body) as ObjectRecord : undefined;
@@ -63,7 +64,7 @@ export class Objects {
     try { return this.core.deps.ledger.placePathOf(soulId).some(p => p.id === placeId); } catch { return false; }
   }
   private ctx(o: ObjectRecord, kind: ObjectKind, soul: EdgeSoul): ActionCtx {
-    return {soul, roles: kind.rolesOf(o.state, soul.soulId), tick: this.core.tick(), now: this.core.now(), nameOf: this.core.nameOf, inPlace: this.inPlace(soul.soulId, o.placeId)};
+    return {soul, roles: kind.rolesOf(o.state, soul.soulId), tick: this.core.tick(), now: this.core.now(), nameOf: this.core.nameOf, inPlace: this.inPlace(soul.soulId, o.placeId), carrier: this.carrierRead};
   }
   /** Apply time-driven transitions and persist them (with their events). */
   private advanced(o: ObjectRecord): ObjectRecord {
@@ -166,7 +167,7 @@ export class Objects {
     const next = {...o, state: outcome.state, version: o.version + 1};
     this.save(next); this.log(next, soul.soulId, action, params);
     this.emit(next, outcome.events ?? []);
-    return {accepted: true, object: {id: o.id, version: next.version}, action, ...(outcome.result ? {result: outcome.result} : {})};
+    return {accepted: true, object: {id: o.id, version: next.version}, action, ...(outcome.result ? {result: outcome.result} : {}), ...(outcome.bodies?.length ? {bodies: outcome.bodies} : {})};
   }
 
   /** Object actions as capabilities (`object:<id>:<action>`), merged by Ledger. */

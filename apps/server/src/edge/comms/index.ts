@@ -11,6 +11,7 @@ import {Objects} from './objects/framework.ts';
 import {presentationKind} from './objects/presentation.ts';
 import {markKind, projectKind} from './objects/marks.ts';
 import {calendarKind} from './objects/calendar.ts';
+import {rideKind} from './objects/ride.ts';
 import type {CommsCore, SpectatorEdgeMessage} from './core.ts';
 import {Presence} from './presence.ts';
 import {say} from './speech.ts';
@@ -80,6 +81,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   objects.register(markKind);
   objects.register(projectKind);
   objects.register(calendarKind);
+  objects.register(rideKind);
   deps.ledger.addCapabilityProvider(soul => objects.capabilities(soul));
   const steward = new Steward(core, options.stewardToken);
   const fading = new Fading(core, steward, options.fading === true);
@@ -139,7 +141,16 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
 
   app.get('/v1/edge/objects', route((_c, soul) => ({objects: objects.visibleTo(soul)})));
   app.get('/v1/edge/objects/:id', route((c, soul) => objects.get(c.req.param('id') ?? '', soul)));
-  app.post('/v1/edge/objects/:id/act', route(async (c, soul) => { const body = await json(c), out = objects.act(c.req.param('id') ?? '', soul, body); if (out.accepted) fading.touch(soul.soulId); else deps.ledger.recordRefusal?.(soul.soulId, 'object', `object:${c.req.param('id') ?? ''}:${String(body.action ?? '')}`, String((out as {code?: unknown}).code ?? 'refused')); return out; }));
+  app.post('/v1/edge/objects/:id/act', route(async (c, soul) => {
+    const body = await json(c), id = c.req.param('id') ?? '', cap = `object:${id}:${String(body.action ?? '')}`, out = objects.act(id, soul, body);
+    if (!out.accepted) { deps.ledger.recordRefusal?.(soul.soulId, 'object', cap, String((out as {code?: unknown}).code ?? 'refused')); return out; }
+    fading.touch(soul.soulId);
+    // A body-moving action (a ride's join/leave/start) gets a normal receipt from the Ledger, or its genuine refusal.
+    const {bodies, ...rest} = out;
+    if (!bodies?.length || !deps.ledger.performBodies) return rest;
+    const b = await deps.ledger.performBodies(soul, cap, bodies[0]!.label, bodies[0]!.steps as never, typeof body.clientRef === 'string' ? `obj:${body.clientRef}` : undefined);
+    return b.accepted ? {...rest, receipt: b.receipt} : {accepted: false, code: b.code, reason: b.reason, object: id, action: out.action};
+  }));
   app.get('/v1/edge/calendar', c => c.json(edgeBody({tick: core.tick(), items: objects.all().filter(o => o.kind === 'calendar-item' && (o.state as {phase: string}).phase !== 'over').map(o => ({id: o.id, ...(o.state as object)}))})));
   app.get('/v1/edge/digest', route(() => ({digest: steward.latestDigest()})));
 

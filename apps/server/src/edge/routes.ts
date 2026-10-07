@@ -34,6 +34,8 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   app.get('/v1/edge/metrics', wrap(c => {const m = Number(c.req.query('minutes') ?? 60); return L.metrics(Number.isFinite(m) && m >= 1 && m <= 10080 ? m * 60_000 : 3600_000);}));
   // Public: map knowledge (names, kinds, enclosure, capacity, public schedule) never lists occupants (§5).
   app.get('/v1/edge/map', wrap(() => ({places: L.map()})));
+  // Public: rides (carrier/1) for viewers — position, phase, route, riders' public names; no owner data.
+  app.get('/v1/edge/rides', wrap(() => ({tick: deps.host.engine.world.tick, rides: L.rides()})));
   const comms = registerEdgeComms(app, deps, {stewardToken: process.env.EDGE_STEWARD_TOKEN || undefined, fading: process.env.EDGE_FADING === '1'});
   L.attachComms(comms);
   return comms;

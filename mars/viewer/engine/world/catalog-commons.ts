@@ -14,5 +14,13 @@ export const COMMONS_ASSETS: AssetDef[] = [
   // Multi-part static colliders/support live in the pinned scene; a whole
   // pavilion box would close the aisle. These identity entities add no box.
   { id: 'eden-commons-pavilion', label: 'Commons pavilion', category: 'fixture', size: [6, 2.9, 4], massKg: 0, dims },
+  // carrier/1 (vehicles/carrier.ts): a hot-air balloon basket (World eden-rides/1, worlds/eden/rides/balloon-ride.v1.json). The box is
+  // the basket (1.5 long x 1.1 high x 1.2 wide; local +x forward), a static walking obstacle while parked; the envelope is depiction
+  // only. Two standing places at the rim, a two-step mounting block behind (local -x); riders leave by the block to their own exit spot.
+  { id: 'hot-air-balloon', label: 'Hot-air balloon', category: 'fixture', size: [1.5, 1.1, 1.2], massKg: 0, obstacle: true,
+    capabilities: { carrier: { door: [-1.25, 0], floorY: 0, transferSpeed: 0.6, landingClear: 1.7, seats: [
+      { id: 'rider-a', local: [0.12, -0.3], yaw: 0.35, exit: [-2.0, -0.9] },
+      { id: 'rider-b', local: [0.12, 0.3], yaw: -0.35, exit: [-2.0, 0.9] }] } },
+    dims: { confidence: 'hypothetical', note: 'World eden-rides/1 (WN9): basket 1.5 x 1.2 x 1.1 m, mount at -1.25 m' } },
   { id: 'eden-commons-platform', label: 'Commons presentation platform', category: 'fixture', size: [3, .24, 2], massKg: 0, dims },
 ];

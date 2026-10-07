@@ -91,7 +91,7 @@ export type AssetDef = {
     /** Upright ground fixture transport; handling geometry is defined only here. */
     /** Chess token semantics are independent of its appearance. */
     gameToken?: { game: 'chess'; color: Color; kind: Kind };
-    boardGame?: 'chess'; readable?: { pages: number; maxSeatDistance: number }; fixtureCarry?: { handling: Handling; upright: true }; display?: { accepts: 'text'; maxChars: number }; presenterStation?: true; workstation?: { seatPoint: Vec2; seatTolerance: number; facingYaw: number; facingTolerance: number } };
+    boardGame?: 'chess'; carrier?: import('../vehicles/carrier.ts').CarrierDef; readable?: { pages: number; maxSeatDistance: number }; fixtureCarry?: { handling: Handling; upright: true }; display?: { accepts: 'text'; maxChars: number }; presenterStation?: true; workstation?: { seatPoint: Vec2; seatTolerance: number; facingYaw: number; facingTolerance: number } };
   dims: { confidence: Confidence; note: string };
 };
 

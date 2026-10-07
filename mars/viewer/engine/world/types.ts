@@ -52,6 +52,8 @@ export type HumanState = {
   /** Opt-in stopped-dock boarding and finite boat passenger frame. */
   boatPassenger?: { boatId: string; slotId: string; phase: 'boarding' | 'seated' | 'leaving'; localRoot: Vec3; relativeYaw: number };
   boatTransit?: { from: Vec3; to: Vec3; t: number; supportId: string };
+  /** carrier/1 (vehicles/carrier.ts): this body is boarding, seated in or leaving a carrier's seat; the carrier supports it. */
+  carrier?: { id: string; slot: string; phase: 'boarding' | 'seated' | 'leaving' };
   /** Opt-in shore/1 controller: metres, upright-capsule immersion length (not
    * body-volume fraction), centre bed normal and prescribed calm buoyancy. */
   shore?: {
@@ -115,6 +117,8 @@ export type FoodPreparation = {
 export type Body = { family: 'humanoid' | 'floater'; model?: string; radius?: number; hoverHeight?: number };
 
 export type Entity = {
+  /** carrier/1 (vehicles/carrier.ts): a ride with seats that carries its riders along a deterministic route. */
+  carrier?: import('../vehicles/carrier.ts').CarrierState;
   /** Native keel-base frame; authored proposal frame is .4m above it. */
   boat?: {
     contract: 'boat-state/1'; waterId: string; frameOffsetY: number;

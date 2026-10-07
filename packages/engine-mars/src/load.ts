@@ -40,12 +40,16 @@ export type Mars = {
   human: (id: string, x: number, z: number, opts?: Record<string, unknown>) => any;
   seedRng: (seed: string) => [number, number, number, number];
   nextRandom: (st: [number, number, number, number]) => number;
+  /** carrier/1: advance every carrier one tick (before the runtime steps), and the carrier entity factory. */
+  stepCarriers: (rt: any) => void;
+  carrierEntity: (spec: any, tick: number) => any;
 };
 
 export async function loadMars(): Promise<Mars> {
   if (!marsAvailable()) throw new Error(`Mars engine not found at ${marsDir()} (vendored engine required)`);
   const at = (f: string) => import(pathToFileURL(join(marsDir(), f)).href);
   const [rt, reg, seeds, fac, rng, meal, recorder, snapshot, compact, camp, hashes, lm, field, bodies, walk, commons] = await Promise.all([at('runtime/runtime.ts'), at('api/registry.ts'), at('api/seeds.ts'), at('world/factory.ts'), at('core/rng.ts'), at('scenarios/meal.ts'), at('take/recorder.ts'), at('runtime/snapshot.ts'), at('runtime/compact.ts'), at('scenarios/eden-camp.ts'), at('core/hash.ts'), at('scenarios/littlemartians.ts'), at('scenarios/greenfield.ts'),at('bodies/policy.ts'),at('locomotion/walk.ts'),at('scenarios/eden-commons.ts')]);
+  const carrier = await at('vehicles/carrier.ts');
   // The server uses the identical UTF-8 SHA-256 digest in native code. The
   // browser/Worker engine retains its portable default and the same addresses.
   hashes.setSha256Provider((text: string) => createHash('sha256').update(text, 'utf8').digest('hex'));
@@ -54,8 +58,8 @@ export async function loadMars(): Promise<Mars> {
   campScene.bounds = [-30,-30,30,30]; campScene.surfaces[0].obb.half = [30,30];
   const campWorld = (seed?: string) => { const w = camp.edenCampWorld(seed); w.base.staticHash = hashes.hashOf(campScene); return w; };
   return {
-    Runtime: rt.Runtime, makeWay:walk.makeWay, admitFloaters:bodies.admitFloaters, compactRuntime: compact.compactRuntime, compactionIssue: compact.compactionIssue, TakeRecorder: recorder.TakeRecorder, nonResumableReason: snapshot.nonResumableReason, canonicalEntityOrder: rt.canonicalEntityOrder, rulesVersion: reg.ENGINE_RULES_VERSION, createRegistry: reg.createRegistry, servicesFor: reg.servicesFor,
+    Runtime: rt.Runtime, makeWay:walk.makeWay, admitFloaters:bodies.admitFloaters, compactRuntime: compact.compactRuntime, compactionIssue: compact.compactionIssue, TakeRecorder: recorder.TakeRecorder, nonResumableReason: snapshot.nonResumableReason, canonicalEntityOrder: rt.canonicalEntityOrder, rulesVersion: reg.ENGINE_RULES_VERSION, createRegistry: (extra: any[] = []) => reg.createRegistry([...carrier.CARRIER_ACTIONS, ...extra]), stepCarriers: carrier.stepCarriers, carrierEntity: carrier.carrierEntity, servicesFor: reg.servicesFor,
     littleMartiansWorld: lm.littleMartiansWorld, greenFieldWorld:field.greenFieldWorld,edenCommonsWorld:commons.edenCommonsWorld,commonsLayout:commons.COMMONS_LAYOUT,littleMartiansRender:lm.LITTLE_MARTIANS_RENDER,
-    invariants: reg.ENGINE_INVARIANTS, describeVerbs: reg.describeVerbs, scenes: {...seeds.ENGINE_SCENES, [camp.EDEN_CAMP_CAMPUS]: campScene,littlemartians:lm.LITTLE_MARTIANS_SCENE,greenfield:field.GREEN_FIELD_SCENE,'eden-commons':commons.EDEN_COMMONS_SCENE}, edenCampWorld: campWorld, campActivities: camp.edenCampActivities, bindCampActivity: camp.bindCampActivity, bindCampChess: camp.bindCampChess, provingGroundWorld: seeds.provingGroundWorld, human: fac.human, seedRng: rng.seedRng, nextRandom: rng.nextRandom, mealWorld: meal.mealWorld, mealSteps: meal.mealSteps,
+    invariants: [...reg.ENGINE_INVARIANTS, carrier.carrierInvariant], describeVerbs: reg.describeVerbs, scenes: {...seeds.ENGINE_SCENES, [camp.EDEN_CAMP_CAMPUS]: campScene,littlemartians:lm.LITTLE_MARTIANS_SCENE,greenfield:field.GREEN_FIELD_SCENE,'eden-commons':commons.EDEN_COMMONS_SCENE}, edenCampWorld: campWorld, campActivities: camp.edenCampActivities, bindCampActivity: camp.bindCampActivity, bindCampChess: camp.bindCampChess, provingGroundWorld: seeds.provingGroundWorld, human: fac.human, seedRng: rng.seedRng, nextRandom: rng.nextRandom, mealWorld: meal.mealWorld, mealSteps: meal.mealSteps,
   };
 }

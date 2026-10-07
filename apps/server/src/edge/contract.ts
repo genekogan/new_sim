@@ -27,6 +27,10 @@ export interface EdgeLedgerHooks {
   addCapabilityProvider(p: (soul: EdgeSoul) => EdgeCapability[]): void;
   /** Persist a refusal for measurement (no text from agents). */
   recordRefusal?(soulId: string, verb: string, capability: string, code: string): void;
+  /** carrier/1: a native ride's public state, for ride objects (null when there is no such carrier). */
+  carrierView?(entityId: string): unknown;
+  /** OBJECT-CONTRACT §7: perform an object action's body steps as a logged decision with a normal receipt. */
+  performBodies?(soul: EdgeSoul, capability: string, label: string, steps: {verb: string; params: Record<string, unknown>}[], clientRef?: string): Promise<{accepted: true; receipt: EdgeReceipt} | {accepted: false; code: string; reason: string}>;
 }
 export type EdgeCapability = {id: string; verb: string; label: string; available: boolean; target?: {id: string; kind: string}; blocked?: {code: string; reason: string}; params?: Record<string, unknown>; object?: string; action?: string};
 export type EdgeDeps = {host: WorldHost; db: Db; souls: Souls; build?: string; soul(c: Context): EdgeSoul; ledger: EdgeLedgerHooks};

@@ -102,11 +102,13 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
     if(host.enableReflexTimeoutV1)await drive(host.enableReflexTimeoutV1());
     if(host.enableContinuousDayV1)await drive(host.enableContinuousDayV1());
     if(host.enableEdgeMotionV1)await drive(host.enableEdgeMotionV1());
+    // carrier/1: a seeded ride object with `carrier` installs its native carrier first (logged rules fact, idempotent by id).
+    for(const o of seedObjects??[])if(o.kind==='ride'&&o.carrier&&!host.engine.world.entities[o.params?.carrier]?.carrier){if(!host.installCarrierV1)throw Error('selected runtime has no carrier/1');await drive(host.installCarrierV1({id:o.params.carrier,label:o.name,...o.carrier}));}
     const {EdgeLedger}=await load('apps/server/src/edge/ledger/ledger.ts');
     const edge=new EdgeLedger(host,db,placeData?JSON.parse(readFileSync(resolve(placeData),'utf8')):undefined,{ambient});
     const app=buildApp({cfg,db,host,auth,brain,souls,hub,intentV2:service,edge}),listener=require('@hono/node-server').getRequestListener(app.fetch);
     // Seed declared objects (idempotent by id). presentation params may give startsInMinutes.
-    for(const o of seedObjects??[]){const params={...(o.params??{})};if(typeof params.startsInMinutes==='number'){params.startsAtTick=host.engine.world.tick+Math.round(params.startsInMinutes*60*20);delete params.startsInMinutes;}edge.comms?.objects.create({...o,params});}
+    for(const o of seedObjects??[]){const params={...(o.params??{})};if(typeof params.startsInMinutes==='number'){params.startsAtTick=host.engine.world.tick+Math.round(params.startsInMinutes*60*20);delete params.startsInMinutes;}const {carrier:_c,...object}=o;edge.comms?.objects.create({...object,params});}
     server.on('request',(req,res)=>{
       if(closing){res.writeHead(503,{'Cache-Control':'no-store'}).end('Local server is draining.');return;}
       req.url=strip(req.url);

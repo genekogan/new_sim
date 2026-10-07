@@ -17,9 +17,13 @@ export type ParamSpec =
 
 export type Refusal = {code: string; reason: string};
 export type ObjectEvent = {to: string[]; kind?: 'object' | 'schedule'; text: string; data?: Record<string, unknown>; untrusted?: boolean};
-export type ActionCtx = {soul: EdgeSoul; roles: string[]; tick: number; now: number; nameOf(soulId: string): string; inPlace: boolean};
-export type TimeCtx = {tick: number; now: number; nameOf(soulId: string): string};
-export type ActionOutcome<S> = {state: S; result?: Record<string, unknown>; events?: ObjectEvent[]};
+/** carrier/1: the native ride an object may read (rides only; Ledger supplies it). */
+export type CarrierView = NonNullable<ReturnType<import('../../ledger/ledger.ts').EdgeLedger['carrierView']>>;
+export type ActionCtx = {soul: EdgeSoul; roles: string[]; tick: number; now: number; nameOf(soulId: string): string; inPlace: boolean; carrier?(entityId: string): CarrierView | null};
+export type TimeCtx = {tick: number; now: number; nameOf(soulId: string): string; carrier?(entityId: string): CarrierView | null};
+/** Body steps for the acting Soul (OBJECT-CONTRACT §7): the Ledger performs them as a logged decision with a normal receipt. */
+export type BodyRequest = {label: string; steps: {verb: string; params: Record<string, unknown>}[]};
+export type ActionOutcome<S> = {state: S; result?: Record<string, unknown>; events?: ObjectEvent[]; bodies?: BodyRequest[]};
 
 export type ActionDef<S> = {
   label: string;

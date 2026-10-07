@@ -54,7 +54,7 @@ import {encode} from '../../../mars/viewer/engine/runtime/codec.ts';
 import { dcos,dsin,hypot } from '../../../mars/viewer/engine/core/math.ts';
 import { clearanceAt } from '../../../mars/viewer/engine/spatial/grid.ts';
 import { acknowledgeRelocation } from '../../../mars/viewer/engine/runtime/invariants.ts';
-import { HUMAN_RADIUS } from '../../../mars/viewer/engine/world/catalog.ts';
+import { CATALOG, HUMAN_RADIUS } from '../../../mars/viewer/engine/world/catalog.ts';
 import type { Spatial } from '../../../mars/viewer/engine/spatial/service.ts';
 import type {NativeBoatControlsV1} from '@sim/engine-contract';
 import type {BodyLocationV1} from '@sim/engine-contract';
@@ -206,6 +206,7 @@ export class MarsEngine implements Engine {
 
   // ------------------------------------------------------------------ tick
   step() {
+    this.m.stepCarriers(this.rt);   // carrier/1: rides move their seated riders first (no carriers: no effect)
     this.rt.step();
     this.updateClock();
     if (this.rt.tick % 10 === 0) this.updateAttention();
@@ -608,6 +609,9 @@ export class MarsEngine implements Engine {
       }
     }
     const first = program.steps[0]; if (!first) return null;
+    const aboard=this.carrierOf(program.actor);
+    if(aboard&&aboard.phase==='aloft'&&!program.steps.every(s=>['rest','wave','perform','mars:carrier_depart'].includes(s.verb)))
+      return {code:'carrier.aloft',message:`You are riding in ${aboard.label} above the ground; it lands by itself and you step out then.`};
     for(const step of program.steps)if(step.verb==='activity_readiness_v1'){const issue=this.readinessIssue(program.actor,step.params,false);if(issue)return issue;}
     if(first.verb==='rest'&&typeof first.params.seatedAt==='string'&&!this.seatedAt(program.actor,first.params.seatedAt))return {code:'rest.native-seat-required',message:'The requested seat is no longer held by this actor.'};
     if (this.cfg.disassemblyV1 && (first.verb === 'build_lookout' || first.verb === 'unbuild_lookout') && [...this.programs.values()].some(p=>p.build)) return {code:'construction.site-busy',message:'Another crew is building or taking down the lookout; one finite job at a time.'};
@@ -1126,6 +1130,35 @@ export class MarsEngine implements Engine {
     this.cursor=this.rt.events.length;this.renderBaseKey='';this.startRecorder();
   }
 
+  /** carrier/1: the carrier this body is boarding, seated in or leaving, if any. */
+  carrierOf(actor:string):{id:string;slot:string;riderPhase:string;phase:string;label:string}|null{
+    const b=this.ents[actor]?.human?.carrier,e=b?this.ents[b.id]:undefined;if(!b||!e?.carrier)return null;
+    return {id:e.id,slot:b.slot,riderPhase:b.phase,phase:e.carrier.phase,label:e.label??e.id};
+  }
+  /** carrier/1: every carrier entity's public state (riders by entity id). */
+  carriers(){return Object.values(this.ents).filter((e:any)=>e.carrier).map((e:any)=>({id:e.id as string,def:e.def as string,label:(e.label??e.id) as string,pose:structuredClone(e.pose),state:structuredClone(e.carrier)}));}
+  /** carrier/1 install preview (pure): a known carrier def and route, a fresh id, home on clear level-0 ground away from bodies. */
+  previewCarrierV1(spec:{id:string;def:string;label?:string;at:[number,number];yaw?:number;route:string;waitSeconds?:number}):Diag|null{
+    if(!/^[a-z0-9][a-z0-9._-]{0,99}$/.test(String(spec?.id)))return {code:'carrier.bad-id',message:'carrier id must be a place-style id'};
+    if(this.ents[spec.id])return this.ents[spec.id].carrier?null:{code:'carrier.id-taken',message:`${spec.id} already names another entity`};
+    if(!Array.isArray(spec.at)||!spec.at.every(Number.isFinite))return {code:'carrier.bad-home',message:'at must be [x,z]'};
+    const e=this.m.carrierEntity(spec,this.rt.tick);if('code' in e)return e;
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.level(0);
+    const need=Math.hypot(0.75,0.6)+0.3;
+    if(!grid||clearanceAt(grid,spec.at)<need)return {code:'carrier.home-blocked',message:'the carrier home is not clear level-0 ground'};
+    for(const o of Object.values(this.ents) as any[])if(o.human&&Math.hypot(o.pose.p[0]-spec.at[0],o.pose.p[2]-spec.at[1])<2.5)return {code:'carrier.home-occupied',message:`${o.id} stands where the carrier would be`};
+    const dp=e.pose,c=dcos(dp.yaw),sn=dsin(dp.yaw);
+    const cd=CATALOG[spec.def]?.capabilities?.carrier!;for(const local of [cd.door,...cd.seats.map(x=>x.exit)]){const x=dp.p[0]+local[0]*c-local[1]*sn,z=dp.p[2]+local[0]*sn+local[1]*c;if(clearanceAt(grid,[x,z])<HUMAN_RADIUS+.3)return {code:'carrier.door-blocked',message:'the boarding step or exit spots are not clear ground'};}
+    return null;
+  }
+  /** carrier/1 (logged rules fact `carrierV1`): add the carrier at its home, idempotent by id. */
+  installCarrierV1(spec:{id:string;def:string;label?:string;at:[number,number];yaw?:number;route:string;waitSeconds?:number}):boolean{
+    if(this.ents[spec.id]?.carrier)return true;
+    if(this.previewCarrierV1(spec))return false;
+    const e=this.m.carrierEntity(spec,this.rt.tick);if('code' in e)return false;
+    this.ents[e.id]=e;this.m.canonicalEntityOrder(this.rt.world);this.out.changes.push([this.rt.tick,e.id,'present',e]);
+    return true;
+  }
   configureRuntimePolicy(policy: {sleepBlockTicks:number;quietSeatCourtesy?:boolean;fixtureGroundGoalsV1?:boolean;nativeArrivalWitnessV1?:boolean;quietLandingCourtesyV1?:boolean;quietStallReleaseV1?:boolean;stairMakeWayV1?:boolean;yieldTimeoutV1?:boolean;spreadV2?:boolean}) {
     if(policy.stairMakeWayV1===true)this.cfg={...this.cfg,stairMakeWayV1:true};
     if((policy as {reflexTimeoutV1?:boolean}).reflexTimeoutV1===true)this.cfg={...this.cfg,reflexTimeoutV1:true};

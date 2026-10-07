@@ -179,7 +179,7 @@ export const shoreSpeedInvariant:Invariant=rt=>Object.values(rt.world.entities).
 });
 export function shoreContactInvariant(g:ShoreGeometry, otherSupport?: (rt:Runtime,e:Entity)=>Diagnostic[]|null):Invariant {
   return rt=>Object.values(rt.world.entities).flatMap(e=>{
-    if(!e.human)return [];
+    if(!e.human||e.human.carrier)return [];   // carrier/1: a carried body's support is its carrier (vehicles/carrier.ts)
     const delegated=otherSupport?.(rt,e);if(delegated!==undefined&&delegated!==null)return delegated;
     const issue=current(rt,g,e.id);if(issue)return [issue];
     const at=g.point([e.pose.p[0],e.pose.p[2]])!;
