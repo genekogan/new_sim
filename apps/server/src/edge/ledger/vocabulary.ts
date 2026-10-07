@@ -11,7 +11,9 @@ export type VocabTarget = {
   /** Target position [x, z], when known. */
   at: [number, number] | null;
 };
-export type VocabPlace = {id: string; name: string; center: [number, number]};
+export type VocabPlace = {id: string; name: string; center: [number, number];
+  /** Optional richer facts (live ledger): parent id, kind, description words and whether a walk reaches it natively. */
+  parent?: string | null; kind?: string; description?: string; walkable?: boolean};
 export type VocabContext = {
   caps: EdgeCapability[];
   target(cap: EdgeCapability): VocabTarget;
@@ -25,11 +27,26 @@ export type VocabResult =
   | {kind: 'alias'; cap: EdgeCapability; note: string}
   | {kind: 'unknown'; reason: string; didYouMean: {id: string; label: string}[]};
 
-const STOP = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'at', 'by', 'on', 'into', 'near', 'with', 'my', 'some']);
-const VERBS: Record<string, string> = {go: 'walk', goto: 'walk', 'go-to': 'walk', 'walk-to': 'walk', visit: 'walk', move: 'walk', head: 'walk', travel: 'walk',
+const STOP = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'at', 'by', 'on', 'into', 'near', 'with', 'my', 'some', 'through', 'thru', 'around', 'across', 'over', 'back', 'please', 'little', 'bit', 'for', 'while', 'and', 'then', 'there']);
+const VERBS: Record<string, string> = {go: 'walk', goto: 'walk', 'go-to': 'walk', 'walk-to': 'walk', visit: 'walk', move: 'walk', head: 'walk', travel: 'walk', 'come-back': 'walk', return: 'walk', 'go-back': 'walk', 'head-back': 'walk', 'walk-back': 'walk', 'go-over': 'walk',
   hangout: 'hang-out', 'hang-around': 'hang-out', linger: 'hang-out', 'go-near': 'go-near', approach: 'go-near', join: 'go-near',
-  'sit-on': 'sit', 'sit-at': 'sit', 'sit-down': 'sit', relax: 'rest', stroll: 'wander', 'warm': 'warm-by-fire', 'warm-up': 'warm-by-fire', fire: 'warm-by-fire',
-  'stand-up': 'stand', stop: 'stand', greet: 'wave', 'turn-to': 'face', 'look-at': 'face'};
+  'sit-on': 'sit', 'sit-at': 'sit', 'sit-down': 'sit', 'take-a-seat': 'sit', 'have-a-seat': 'sit', 'take-seat': 'sit', 'be-seated': 'sit', seat: 'sit', relax: 'rest',
+  stroll: 'stroll', 'take-a-walk': 'stroll', 'take-a-stroll': 'stroll', 'go-for-a-walk': 'stroll', 'go-for-a-stroll': 'stroll', 'walk-through': 'stroll', 'stroll-through': 'stroll', wander: 'stroll', ramble: 'stroll', meander: 'stroll', explore: 'stroll',
+  'warm': 'warm-by-fire', 'warm-up': 'warm-by-fire', fire: 'warm-by-fire',
+  'sit-ups': 'situps', situp: 'situps', 'sit-up': 'situps', 'push-ups': 'pushups', pushup: 'pushups', 'push-up': 'pushups', 'press-ups': 'pushups', 'star-jumps': 'jumping-jacks', 'jumping-jack': 'jumping-jacks', 'do-yoga': 'yoga', boogie: 'dance', hop: 'jump',
+  'lie-down': 'lie', 'lay-down': 'lie', 'have-a-nap': 'nap', 'take-a-nap': 'nap', snooze: 'nap', doze: 'nap', sleep: 'nap',
+  'stand-up': 'stand', 'get-up': 'stand', rise: 'stand', stop: 'stand', greet: 'wave', 'wave-to': 'wave', 'say-hi': 'wave', 'turn-to': 'face', 'look-at': 'face'};
+/** Everyday words for places, tried only when the word itself names nothing (walk:lake → the pond, walk:forest → the woodland). */
+const SYNONYMS: Record<string, string[]> = {
+  woods: ['woodland', 'wood', 'forest', 'grove'], wood: ['woodland', 'woods', 'forest'], forest: ['woodland', 'woods', 'grove'], trees: ['woodland', 'grove', 'orchard'], grove: ['woodland', 'orchard'],
+  campfire: ['fire'], bonfire: ['fire', 'campfire'], fireplace: ['fire'], fire: ['campfire'], firepit: ['fire'], 'fire-pit': ['fire'],
+  lake: ['pond'], pool: ['pond'], water: ['pond'], swim: ['pond'],
+  meadow: ['lawn', 'field', 'green', 'commons'], field: ['commons', 'lawn', 'green'], lawn: ['commons', 'green'], green: ['lawn', 'commons'], grass: ['lawn', 'commons', 'green'],
+  square: ['plaza', 'quad', 'green', 'commons'], plaza: ['square'], centre: ['commons'], center: ['commons'], middle: ['commons'],
+  market: ['kiosks', 'market'], shops: ['kiosks', 'market'], shop: ['kiosks', 'market'], stalls: ['kiosks'],
+  stage: ['deck', 'bandstand'], gazebo: ['bandstand', 'pavilion'], bandstand: ['gazebo'], garden: ['gardens'], gardens: ['garden'],
+  dinner: ['dining'], food: ['dining', 'kitchen'], eat: ['dining', 'kitchen'], cafe: ['tea', 'café'], tea: ['café'], playground: ['playground'],
+};
 /** Within this many metres of a named place, its nearest admitted walk target stands in for it. */
 export const NEAREST_PLACE_LIMIT = 60;
 
@@ -40,37 +57,114 @@ const bigrams = (s: string) => {const x = s.replace(/\s+/g, ''), out: string[] =
 function dice(a: string, b: string) {const A = bigrams(a), B = bigrams(b); if (!A.length || !B.length) return 0; const m = new Map<string, number>(); for (const g of A) m.set(g, (m.get(g) ?? 0) + 1); let hit = 0; for (const g of B) {const n = m.get(g) ?? 0; if (n) {hit++; m.set(g, n - 1);}} return 2 * hit / (A.length + B.length);}
 const dist = (a: [number, number] | null, b: [number, number] | null) => a && b ? Math.hypot(a[0] - b[0], a[1] - b[1]) : Infinity;
 
+/** Whole-sentence intents (activities/1): "find somewhere to read a book" → read, "lie down on the grass" → lie. The first
+ *  matching rule whose verb is offered wins; its words are removed from the target text. */
+const INTENTS: [RegExp, string][] = [
+  [/\b(?:post|send|mail)\b.*\b(?:letter|card|postcard)\b|\bpost (?:a |the )?letter\b|\bmailbox\b/, 'post-letter'],
+  [/\bjumping[- ]?jacks?\b|\bstar[- ]?jumps?\b/, 'jumping-jacks'], [/\bpush[- ]?ups?\b|\bpress[- ]?ups?\b/, 'pushups'], [/\bsit[- ]?ups?\b|\bcrunches\b/, 'situps'],
+  [/\byoga\b/, 'yoga'], [/\bstretch(?:es|ing)?\b/, 'stretch'], [/\bdanc(?:e|es|ing)\b|\bboogie\b/, 'dance'], [/\bjump(?:s|ing)?\b|\bhop\b/, 'jump'],
+  [/\b(?:read|reading|reads)\b/, 'read'], [/\b(?:write|writing)\b/, 'write'],
+  [/\bpiano\b/, 'play-piano'], [/\b(?:paint|painting|easel)\b/, 'paint'], [/\b(?:cook|cooking|bake|baking)\b/, 'cook'],
+  [/\b(?:music|guitar|instrument|sing|singing)\b/, 'play-music'], [/\b(?:craft|crafts|carve|carving|woodwork|pottery|weave|weaving|whittle)\b/, 'craft'],
+  [/\b(?:game|games|cards|board game|play a game)\b/, 'play-game'],
+  [/\b(?:eat|eating|meal|lunch|dinner|breakfast|snack)\b/, 'eat'], [/\b(?:drink|coffee|tea)\b/, 'drink'],
+  [/\b(?:nap|snooze|doze|sleep|sleeping|siesta|rest my eyes)\b/, 'nap'], [/\b(?:lie|lay|lying|laying)\b/, 'lie'],
+  [/\bsit\b.*\b(?:ground|grass|floor|lawn|sand)\b/, 'sit-ground'], [/\b(?:sit|seat|seated)\b/, 'sit'],
+  [/\b(?:stroll|wander|ramble|meander|explore|take a walk|go for a walk|walk (?:around|through|about))\b/, 'stroll'],
+  [/\b(?:stand up|get up|stand)\b/, 'stand'], [/\b(?:swim|dip|bathe)\b/, 'swim'], [/\b(?:warm up|warm)\b/, 'warm-by-fire'],
+  [/\b(?:go|walk|head|come|return|visit|travel)\b/, 'walk'],
+];
+/** Words that only carry the intent, never the target ("find somewhere quiet to read a book" names no place). */
+const FILLER = new Set(['find', 'somewhere', 'someplace', 'place', 'spot', 'quiet', 'nice', 'good', 'cozy', 'cosy', 'comfy', 'book', 'books', 'novel', 'down', 'up', 'read', 'reading',
+  'nap', 'snooze', 'doze', 'sleep', 'sleeping', 'siesta', 'lie', 'lay', 'lying', 'laying', 'sit', 'seat', 'seated', 'piano', 'play', 'paint', 'painting', 'easel', 'cook', 'cooking', 'bake',
+  'music', 'guitar', 'instrument', 'craft', 'crafts', 'game', 'games', 'cards', 'eat', 'meal', 'lunch', 'dinner', 'breakfast', 'snack', 'drink', 'coffee', 'tea', 'post', 'send', 'mail',
+  'letter', 'card', 'write', 'writing', 'stroll', 'wander', 'walk', 'go', 'take', 'have', 'let', 'lets', 'me', 'i', 'want', 'like', 'would', 'could', 'can', 'you', 'we', 'he', 'she', 'they',
+  'him', 'her', 'them', 'just', 'now', 'something', 'thing', 'do', 'get', 'grab', 'head', 'come', 'return', 'visit', 'travel', 'around', 'about', 'quick', 'short', 'long', 'while']);
+
+/** "go for a X", "take a X", "have a X": X decides the verb (a swim is a swim, a balloon ride is the ride, never a stroll). */
+const GO_FOR = /^(?:let'?s\s+|i\s+want\s+to\s+|please\s+)?(?:go|going|take|have|do|try)\s+(?:for\s+|on\s+|in\s+)?(?:a|an|some|the)\s+(.+)$/i;
+const GO_FOR_X: [RegExp, string][] = [[/^(?:sit[- ]?ups?|crunches)\b/, 'situps'], [/^(?:push[- ]?ups?|press[- ]?ups?)\b/, 'pushups'], [/^(?:jumping[- ]?jacks?|star[- ]?jumps?)\b/, 'jumping-jacks'], [/^yoga\b/, 'yoga'], [/^(?:swim|dip|bathe|paddle)\b/, 'swim'], [/^(?:walk|stroll|wander|ramble|wee walk|little walk|short walk|long walk)\b/, 'stroll'], [/^(?:nap|snooze|doze|sleep|siesta|lie[- ]down)\b/, 'nap'],
+  [/^(?:seat|sit)\b/, 'sit'], [/^(?:dance|boogie)\b/, 'dance'], [/^(?:stretch)\b/, 'stretch'], [/^(?:read|book)\b/, 'read'], [/^(?:look|wander around)\b/, 'stroll'], [/^(?:rest|break|breather)\b/, 'rest'], [/^(?:drink|coffee|tea|cuppa)\b/, 'drink'], [/^(?:meal|bite|snack|lunch|dinner|breakfast)\b/, 'eat']];
+/** Rides: the balloon (and any later carrier) is an object you join. */
+export const RIDE_WORDS = /\b(?:ride|rides|balloon|fly|flight|flying|go up|up in the air|hot[- ]air)\b/i;
+/** Things bodies cannot do yet: refused honestly (never resolved to something else). */
+export const NOT_YET: [RegExp, string, string[]][] = [
+  [/\b(?:run|runs|running|jog|jogging|sprint|sprinting|race|hurry)\b/i, 'Bodies cannot run yet (walking only); walk or stroll instead.', ['stroll', 'wander', 'walk']],
+  [/\b(?:hug|hugs|hugging|handshake|shake hands|high[- ]five|kiss|cuddle)\b/i, 'Touching another body (hugs, handshakes, high fives) is not possible yet; wave, face them or start a conversation.', ['wave', 'face', 'go-near']],
+  [/\b(?:climb|jump over|vault|cartwheel|somersault|backflip)\b/i, 'Climbing and acrobatics are not possible yet.', ['jump', 'stretch', 'dance']],
+];
+
 /** Split "verb:target" (or free text such as "hang out at the deck") into a canonical verb and the target words. */
 export function parseCapability(input: string, verbs: Set<string>): {verb: string; rest: string} {
   const raw = input.trim(), i = raw.indexOf(':');
   const canon = (v: string) => {const k = v.toLowerCase().trim().replace(/[\s_]+/g, '-'); return verbs.has(k) ? k : VERBS[k] ?? k;};
   if (i >= 0) return {verb: canon(raw.slice(0, i)), rest: raw.slice(i + 1)};
+  const gf = GO_FOR.exec(raw);
+  if (gf) {const x = gf[1].toLowerCase().trim(); for (const [re, v] of GO_FOR_X) if (re.test(x)) {if (verbs.has(v) || v === 'stroll') return {verb: v, rest: x.replace(re, ' ').trim()}; break;}}
   const words = raw.split(/\s+/);
-  for (let n = Math.min(3, words.length); n >= 1; n--) {const v = canon(words.slice(0, n).join('-')); if (verbs.has(v)) return {verb: v, rest: words.slice(n).join(' ')};}
+  for (let n = Math.min(4, words.length); n >= 1; n--) {
+    const v = canon(words.slice(0, n).join('-')), rest = words.slice(n).join(' ');
+    if (!verbs.has(v)) continue;
+    // "sit on the grass" is sitting on the ground, not on a seat called grass.
+    if (v === 'sit' && verbs.has('sit-ground') && /\b(?:ground|grass|floor|lawn|sand)\b/i.test(rest)) return {verb: 'sit-ground', rest: ''};
+    return {verb: v, rest};
+  }
+  // A whole sentence: the first offered intent, its words removed from the target text.
+  const text = raw.toLowerCase();
+  for (const [re, verb] of INTENTS) if (verbs.has(verb) && re.test(text)) return {verb, rest: text.replace(re, ' ').split(/[^a-z0-9.-]+/).filter(w => w && !FILLER.has(w) && !STOP.has(w)).join(' ')};
   return {verb: canon(words[0] ?? ''), rest: words.slice(1).join(' ')};
 }
 
+/** Verbs whose target is a place (natural place names and the places map apply). */
+const PLACE_VERBS = new Set(['walk', 'hang-out', 'gather', 'stroll', 'read']);
+
 export function resolveCapability(input: string, ctx: VocabContext): VocabResult {
   const exact = ctx.caps.find(c => c.id === input); if (exact) return {kind: 'exact', cap: exact};
-  const verbs = new Set(ctx.caps.map(c => c.verb)), {verb, rest} = parseCapability(input, verbs);
+  const text = input.toLowerCase(), colon = text.indexOf(':'), head = colon >= 0 ? text.slice(0, colon) : '';
+  // Unsupported motions are refused honestly, with the nearest real things to do.
+  if (colon < 0 || !ctx.caps.some(c => c.verb === head)) for (const [re, reason, prefer] of NOT_YET) if (re.test(colon < 0 ? text : head)) return {kind: 'unknown', reason, didYouMean: suggest(input, prefer[0], '', ctx, ctx.caps.filter(c => prefer.includes(c.verb) && c.available).slice(0, 5))};
+  // Rides: "ride the balloon", "go for a balloon ride", "fly" → joining the ride object.
+  if ((colon < 0 || ['ride', 'fly', 'balloon'].includes(head)) && RIDE_WORDS.test(text) && !/\b(?:bike|bicycle|horse|boat)\b/.test(text)) {
+    const rides = ctx.caps.filter(c => c.verb === 'object' && c.action === 'join' && /ride|balloon|carrier/i.test(c.id + ' ' + c.label));
+    const named = rides.filter(c => tokens(text).some(w => w.length > 3 && !['ride', 'rides'].includes(w) && tokens(c.id + ' ' + c.label).includes(w)));
+    const pick = (named.length ? named : rides).sort((a, b) => Number(b.available) - Number(a.available) || a.id.localeCompare(b.id))[0];
+    if (pick) return {kind: 'alias', cap: pick, note: `${input} is ${pick.id} (${pick.label}).`};
+  }
+  const verbs = new Set(ctx.caps.map(c => c.verb)); let {verb, rest} = parseCapability(input, verbs);
+  // "stroll" with nothing named is a stroll right here.
+  if (verb === 'stroll' && !tokens(rest).length && !ctx.caps.some(c => c.id === 'stroll:here')) {const w = ctx.caps.find(c => c.id === 'wander:here'); if (w) return {kind: 'alias', cap: w, note: `${input} is ${w.id}.`};}
+  if (verb === 'stroll' && !verbs.has('stroll') && verbs.has('wander')) verb = 'wander';
   const pool = ctx.caps.filter(c => c.verb === verb);
   const info = new Map(pool.map(c => {const t = ctx.target(c), own = [c.target?.id ?? '', c.id.slice(c.id.indexOf(':') + 1), c.label, ...t.names].filter(Boolean); return [c.id, {t, own, ownTokens: own.flatMap(tokens)}];}));
   const unknown = (reason: string, prefer: EdgeCapability[] = []) => ({kind: 'unknown' as const, reason, didYouMean: suggest(input, verb, rest, ctx, prefer)});
+  const dme = (c: EdgeCapability) => dist(info.get(c.id)?.t.at ?? null, ctx.me);
+  const placeOf = (c: EdgeCapability) => ctx.places.find(p => p.id === c.target?.id);
+  // Several fit: the free ones; a place that contains the others (the park, not its gazebo); then the nearest.
   const one = (cs: EdgeCapability[], note: (c: EdgeCapability) => string): VocabResult | null => {
-    const live = cs.length > 1 ? cs.filter(c => c.available) : cs;           // several seats, only one free: that one
-    if (live.length === 1) return {kind: 'alias', cap: live[0], note: note(live[0])};
-    if (cs.length > 1) return unknown(`"${input}" could mean several things you can do; pick one of did_you_mean.`, cs);
-    return null;
+    if (!cs.length) return null;
+    const live = cs.filter(c => c.available), list = live.length ? live : cs;
+    if (list.length === 1) return {kind: 'alias', cap: list[0], note: note(list[0])};
+    const outer = list.filter(c => {const p = placeOf(c); return !!p && list.every(o => o === c || isAncestor(ctx, p.id, o.target?.id));});
+    if (outer.length === 1) return {kind: 'alias', cap: outer[0], note: note(outer[0]) + ` (it contains ${list.length - 1} more specific match${list.length > 2 ? 'es' : ''})`};
+    const ranked = [...list].sort((a, b) => dme(a) - dme(b) || a.id.localeCompare(b.id));
+    return {kind: 'alias', cap: ranked[0], note: note(ranked[0]) + ` (the nearest of ${list.length}; also ${ranked.slice(1, 4).map(c => c.id).join(', ')})`};
   };
   if (pool.length) {
-    const q = tokens(rest), qs = q.join(' '), byOwn = (want: string) => pool.filter(c => info.get(c.id)!.own.some(n => norm(n) === want));
+    const q = tokens(rest).filter(t => !FILLER.has(t) || !PLACE_VERBS.has(verb) ? true : false), qs = q.join(' '), byOwn = (want: string) => pool.filter(c => info.get(c.id)!.own.some(n => norm(n) === want));
+    const here = pool.find(c => c.id === `${verb}:here`);
     // 0. Verbs with a single non-targeted (or "here") capability: rest:anything, swim:pond, wander:around.
     if (pool.length === 1 && (!pool[0].target || pool[0].id.endsWith(':here') || !q.length || pool[0].verb === 'swim')) return {kind: 'alias', cap: pool[0], note: `${input} is ${pool[0].id}.`};
+    // Nothing named, or "here"/"down"/"nearby": the verb's own :here capability (sit down → sit:here).
+    if (here && (!q.length || ['here', 'nearby', 'near', 'anywhere', 'somewhere', 'down', 'now', 'nearest'].includes(qs))) return {kind: 'alias', cap: here, note: `${input} is ${here.id} (${here.label}).`};
     if (!q.length) return unknown(`Say which: "${verb}:<target>".`, pool);
-    // "here": the nearest free one within reach (sit:here, hang-out:here).
-    if (qs === 'here') {
-      const near = pool.filter(c => c.available && dist(info.get(c.id)!.t.at, ctx.me) <= 6).sort((a, b) => dist(info.get(a.id)!.t.at, ctx.me) - dist(info.get(b.id)!.t.at, ctx.me) || a.id.localeCompare(b.id));
-      return near.length ? {kind: 'alias', cap: near[0], note: `${input} is the nearest free one, ${near[0].id} (${near[0].label}).`} : unknown(`Nothing free to ${verb} within a few metres of you; the nearest are in did_you_mean.`, pool.filter(c => c.available).sort((a, b) => dist(info.get(a.id)!.t.at, ctx.me) - dist(info.get(b.id)!.t.at, ctx.me)).slice(0, 5));
+    // "here" without a :here capability: the nearest free one within reach (30 m for seats).
+    if (qs === 'here' || qs === 'nearby' || qs === 'nearest') {
+      const reach = verb === 'sit' ? 30 : 6;
+      const near = pool.filter(c => c.available && dme(c) <= reach).sort((a, b) => dme(a) - dme(b) || a.id.localeCompare(b.id));
+      if (near.length) return {kind: 'alias', cap: near[0], note: `${input} is the nearest free one, ${near[0].id} (${near[0].label}).`};
+      const rest_ = ctx.caps.find(c => c.id === 'rest:here');
+      if (verb === 'sit' && rest_) return {kind: 'alias', cap: rest_, note: `No free seat within ${reach} m; resting where you stand instead (${rest_.id}).`};
+      return unknown(`Nothing free to ${verb} within a few metres of you; the nearest are in did_you_mean.`, pool.filter(c => c.available).sort((a, b) => dme(a) - dme(b)).slice(0, 5));
     }
     const passes = [q, q.filter(t => !ctx.root.includes(t))].filter((p, i, all) => p.length && (i === 0 || p.length !== all[0].length));
     for (const words of passes) {
@@ -82,21 +176,46 @@ export function resolveCapability(input: string, ctx: VocabContext): VocabResult
       // 3. Every word appears in the target's own names (walk:pond → the pond).
       const r3 = one(pool.filter(c => words.every(w => tokenHit(w, info.get(c.id)!.ownTokens))), c => `${input} is ${c.id} (${c.label}).`); if (r3) return r3;
     }
-    // 4. A known place with no capability of this verb: its nearest admitted target (walk:eden-library-1).
-    if (['walk', 'hang-out', 'gather'].includes(verb)) for (const words of passes) {
-      const s = words.join(' ');
-      let places = ctx.places.filter(p => norm(p.id) === s || norm(p.name) === s);
-      if (!places.length) places = ctx.places.filter(p => words.every(w => tokenHit(w, [...tokens(p.id), ...tokens(p.name)])));
-      if (places.length !== 1) continue;
-      // Prefer whole places (a classroom, the shore) over fixtures (a seat) as the stand-in.
+    // 3b. Places by name/description words and everyday synonyms (the park, the woods, the lake, the campfire).
+    if (PLACE_VERBS.has(verb)) for (const words of passes) {
+      const found = placeMatch(words, ctx.places);
+      if (!found.length) continue;
+      const capOf = new Map(pool.filter(c => c.target).map(c => [c.target!.id, c]));
+      const reach = found.filter(p => capOf.has(p.id));
+      if (reach.length) {const r = one(reach.map(p => capOf.get(p.id)!), c => `${input} is ${c.id} (${c.label}).`); if (r) return r;}
+      // A place with no capability of this verb: a reachable place inside it, else the nearest reachable place (≤60 m).
+      const place = found[0], inner = pool.filter(c => c.available && c.target && isAncestor(ctx, place.id, c.target.id));
+      if (inner.length) {const r = one(inner, c => `${place.name} itself is not a ${verb} target; ${c.id} (${c.label}) is in it.`); if (r) return r;}
       const reachable = pool.filter(c => c.available && info.get(c.id)!.t.at), wholes = reachable.filter(c => c.target?.kind === 'place');
-      const place = places[0], ranked = (wholes.length ? wholes : reachable).map(c => ({c, d: dist(info.get(c.id)!.t.at, place.center)})).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id));
+      const ranked = (wholes.length ? wholes : reachable).map(c => ({c, d: dist(info.get(c.id)!.t.at, place.center)})).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id));
       if (!ranked.length) break;
       if (ranked[0].d > NEAREST_PLACE_LIMIT) return unknown(`${place.name} is not walkable ground yet (the nearest place you can ${verb} to is ${Math.round(ranked[0].d)} m from it).`, ranked.slice(0, 3).map(r => r.c));
       return {kind: 'alias', cap: ranked[0].c, note: `${place.name} is not walkable ground yet; ${ranked[0].c.id} (${ranked[0].c.label}) is the nearest place you can ${verb} to, ${Math.round(ranked[0].d)} m from it.`};
     }
   }
-  return unknown(pool.length ? `Nothing offered matches "${input}"; read capabilities again.` : `No "${verb}" capability is offered to this Soul right now; read capabilities again.`);
+  if (!pool.length) return unknown(`No "${verb}" capability is offered to this Soul right now. Things you can do: ${ctx.caps.filter(c => c.id.endsWith(':here')).map(c => c.id).slice(0, 12).join(', ')} (and walk:<place>, stroll:<place>, read:<place>); read capabilities again.`, ctx.caps.filter(c => c.id.endsWith(':here')));
+  return unknown(`Nothing offered matches "${input}"; read capabilities again.`);
+}
+
+function isAncestor(ctx: VocabContext, ancestor: string, id: string | undefined): boolean {
+  const byId = new Map(ctx.places.map(p => [p.id, p]));
+  for (let p = id ? byId.get(id) : undefined, n = 0; p && n < 20; p = p.parent ? byId.get(p.parent) : undefined, n++) if (p.parent === ancestor) return true;
+  return false;
+}
+/** Places named by these words: own name/id first, then everyday synonyms, then description words; the most
+ *  obvious first (by name over description, walkable, outermost, larger). */
+export function placeMatch(words: string[], places: VocabPlace[]): VocabPlace[] {
+  if (!words.length) return [];
+  const nameT = (p: VocabPlace) => [...tokens(p.name), ...tokens(p.id)], descT = (p: VocabPlace) => tokens(p.description ?? '');
+  const hit = (w: string, set: string[]) => tokenHit(w, set) || (SYNONYMS[w] ?? []).some(s => tokenHit(s, set));
+  const tiers = [
+    places.filter(p => words.every(w => tokenHit(w, nameT(p)))),
+    places.filter(p => words.every(w => hit(w, nameT(p)))),
+    places.filter(p => words.every(w => hit(w, [...nameT(p), ...descT(p)]))),
+  ];
+  const found = tiers.find(t => t.length) ?? [];
+  const depth = (p: VocabPlace) => {let n = 0; for (let q: VocabPlace | undefined = p; q?.parent; q = places.find(x => x.id === q!.parent)) n++; return n;};
+  return [...found].sort((a, b) => Number(!!b.walkable) - Number(!!a.walkable) || Number(a.kind === 'water') - Number(b.kind === 'water') || depth(a) - depth(b) || a.id.localeCompare(b.id));
 }
 
 /** The closest offered capabilities: same verb first, then word overlap, string likeness, availability, distance. */

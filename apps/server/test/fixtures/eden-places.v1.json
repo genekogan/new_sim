@@ -1,0 +1,7205 @@
+{
+ "contract": "place-data/1",
+ "world": "eden",
+ "places": [
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "eden",
+   "name": "Eden",
+   "kind": "world",
+   "parent": null,
+   "polygon": [
+    [
+     -900,
+     -900
+    ],
+    [
+     900,
+     -900
+    ],
+    [
+     900,
+     900
+    ],
+    [
+     -900,
+     900
+    ]
+   ],
+   "description": "Eden is a growing settlement between hills and the sea. At its heart: a lived-in commons with a campfire and shared kitchen in the west, a calm pond with a sloping bank beyond it, and an expanding east side of homes, a library, an office, a market hall, a barn, gardens, a classroom and newer quarters with a geodesic dome, an amphitheatre and an artists' row. Paths connect everything; lamps light the residential streets at night."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": true,
+   "id": "field",
+   "name": "Commons ground",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     -30,
+     -30
+    ],
+    [
+     30,
+     -30
+    ],
+    [
+     30,
+     30
+    ],
+    [
+     -30,
+     30
+    ]
+   ],
+   "description": "The open commons ground at Eden's heart (walk:field). Around its edges: the fire circle and the long dining table to the east, the pond bank to the west, the classroom beyond the east path, rows of sleeping mats north and south. The middle by the little stage is usually crowded — pick an edge.",
+   "schedule": [
+    {
+     "id": "sleep-mats",
+     "cron": "30 23 * * *",
+     "durationMinutes": 390,
+     "ticketed": false,
+     "label": "Night: sleep on a free mat (walk:commons-mat-N)"
+    }
+   ]
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "commons",
+   "name": "Commons gathering lawn",
+   "kind": "outdoor",
+   "parent": "field",
+   "polygon": [
+    [
+     4,
+     4.3
+    ],
+    [
+     14,
+     4.3
+    ],
+    [
+     14,
+     5.7
+    ],
+    [
+     4,
+     5.7
+    ]
+   ],
+   "description": "A strip of lawn with two benches facing the little stage — usually the most crowded spot in Eden. Good for: a short sit while someone speaks. Then move on: the fire circle (walk:social-eden-fire-circle), the dining table (walk:social-eden-dining) and the pond bank (walk:shore-bank) all have room.",
+   "occupiers": [
+    {
+     "id": "commons-bench-commons-bench-west-seat0",
+     "fixture": "commons-bench-west",
+     "slot": "seat0",
+     "kind": "seat"
+    },
+    {
+     "id": "commons-bench-commons-bench-west-seat1",
+     "fixture": "commons-bench-west",
+     "slot": "seat1",
+     "kind": "seat"
+    },
+    {
+     "id": "commons-bench-commons-bench-west-seat2",
+     "fixture": "commons-bench-west",
+     "slot": "seat2",
+     "kind": "seat"
+    },
+    {
+     "id": "commons-bench-commons-bench-east-seat0",
+     "fixture": "commons-bench-east",
+     "slot": "seat0",
+     "kind": "seat"
+    },
+    {
+     "id": "commons-bench-commons-bench-east-seat1",
+     "fixture": "commons-bench-east",
+     "slot": "seat1",
+     "kind": "seat"
+    },
+    {
+     "id": "commons-bench-commons-bench-east-seat2",
+     "fixture": "commons-bench-east",
+     "slot": "seat2",
+     "kind": "seat"
+    }
+   ]
+  },
+  {
+   "level": 1,
+   "enclosed": false,
+   "capacity": 2,
+   "starting": false,
+   "id": "commons-deck",
+   "name": "Presentation deck",
+   "kind": "stage",
+   "parent": "field",
+   "polygon": [
+    [
+     7.5,
+     -2.8
+    ],
+    [
+     10.5,
+     -2.8
+    ],
+    [
+     10.5,
+     -0.8
+    ],
+    [
+     7.5,
+     -0.8
+    ]
+   ],
+   "description": "A small raised stage for ONE speaker at a time — step up to address the lawn (an announcement, a story, a song), then step down so others can. If someone is already on it, listen from the lawn or go elsewhere. Not a place to hang out.",
+   "roles": [
+    {
+     "id": "speaker",
+     "relations": [
+      {
+       "name": "addresses",
+       "to": "listeners"
+      }
+     ]
+    },
+    {
+     "id": "listeners"
+    }
+   ],
+   "schedule": [
+    {
+     "id": "open-mic",
+     "cron": "0 17 * * *",
+     "durationMinutes": 45,
+     "ticketed": false,
+     "label": "Open mic: one speaker at a time"
+    }
+   ]
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 12,
+   "starting": false,
+   "id": "commons-pavilion",
+   "name": "Commons pavilion",
+   "kind": "pavilion",
+   "parent": "field",
+   "polygon": [
+    [
+     6,
+     -7
+    ],
+    [
+     12,
+     -7
+    ],
+    [
+     12,
+     -3
+    ],
+    [
+     6,
+     -3
+    ]
+   ],
+   "description": "An open-sided timber pavilion with a long table: shade, shelter from rain, and the best spot on the commons to work, write, plan or play a quiet game with someone. Voices carry out the open sides. (On the commons, but no walk goes here yet — nearby reachable spots: the kitchen tables, fire circle, dining table, pond bank, pond, classroom.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 16,
+   "starting": false,
+   "id": "commons-kitchen",
+   "name": "Shared kitchen tables",
+   "kind": "outdoor",
+   "parent": "field",
+   "polygon": [
+    [
+     -25,
+     2.5
+    ],
+    [
+     -1,
+     2.5
+    ],
+    [
+     -1,
+     5.5
+    ],
+    [
+     -25,
+     5.5
+    ]
+   ],
+   "description": "Four long tables where food is prepared. Good for: cooking together, helping out, chatting while you work. Busiest just before meals. Walk: walk:commons-kitchen.",
+   "schedule": [
+    {
+     "id": "cook-breakfast",
+     "cron": "30 7 * * *",
+     "durationMinutes": 45,
+     "ticketed": false,
+     "label": "Breakfast prep"
+    },
+    {
+     "id": "cook-lunch",
+     "cron": "0 12 * * *",
+     "durationMinutes": 45,
+     "ticketed": false,
+     "label": "Lunch prep"
+    },
+    {
+     "id": "cook-dinner",
+     "cron": "30 18 * * *",
+     "durationMinutes": 45,
+     "ticketed": false,
+     "label": "Dinner prep"
+    }
+   ]
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 14,
+   "starting": false,
+   "id": "social-eden-fire-circle",
+   "name": "Campfire clearing",
+   "kind": "outdoor",
+   "parent": "field",
+   "polygon": [
+    [
+     19.5,
+     -11.5
+    ],
+    [
+     28.5,
+     -11.5
+    ],
+    [
+     28.5,
+     -2.5
+    ],
+    [
+     19.5,
+     -2.5
+    ]
+   ],
+   "description": "A ring of benches around Eden's campfire, with a chess table set up beside it. Good for: a game of chess (object chess-campfire), long talks, stories, warming your hands. Glowing at night, calm by day. Walk: walk:social-eden-fire-circle, then warm-by-fire or sit on a bench.",
+   "occupiers": [
+    {
+     "id": "fire-bench-social-eden-fire-bench-north-seat0",
+     "fixture": "social-eden-fire-bench-north",
+     "slot": "seat0",
+     "kind": "seat"
+    },
+    {
+     "id": "fire-bench-social-eden-fire-bench-north-seat1",
+     "fixture": "social-eden-fire-bench-north",
+     "slot": "seat1",
+     "kind": "seat"
+    },
+    {
+     "id": "fire-bench-social-eden-fire-bench-north-seat2",
+     "fixture": "social-eden-fire-bench-north",
+     "slot": "seat2",
+     "kind": "seat"
+    },
+    {
+     "id": "fire-bench-social-eden-fire-bench-south-seat0",
+     "fixture": "social-eden-fire-bench-south",
+     "slot": "seat0",
+     "kind": "seat"
+    },
+    {
+     "id": "fire-bench-social-eden-fire-bench-south-seat1",
+     "fixture": "social-eden-fire-bench-south",
+     "slot": "seat1",
+     "kind": "seat"
+    },
+    {
+     "id": "fire-bench-social-eden-fire-bench-south-seat2",
+     "fixture": "social-eden-fire-bench-south",
+     "slot": "seat2",
+     "kind": "seat"
+    }
+   ],
+   "schedule": [
+    {
+     "id": "dawn-tea",
+     "cron": "0 6 * * *",
+     "durationMinutes": 60,
+     "ticketed": false,
+     "label": "Dawn embers and first tea"
+    },
+    {
+     "id": "fireside-chess",
+     "cron": "30 13 * * *",
+     "durationMinutes": 90,
+     "ticketed": false,
+     "label": "Chess and slow talk by the fire"
+    },
+    {
+     "id": "evening-fire",
+     "cron": "30 20 * * *",
+     "durationMinutes": 120,
+     "ticketed": false,
+     "label": "Evening fire and stories"
+    },
+    {
+     "id": "late-embers",
+     "cron": "30 22 * * *",
+     "durationMinutes": 60,
+     "ticketed": false,
+     "label": "Late embers: quiet stories before sleep"
+    }
+   ]
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 12,
+   "starting": false,
+   "id": "social-eden-dining",
+   "name": "Social dining",
+   "kind": "outdoor",
+   "parent": "field",
+   "polygon": [
+    [
+     19,
+     3
+    ],
+    [
+     27,
+     3
+    ],
+    [
+     27,
+     9
+    ],
+    [
+     19,
+     9
+    ]
+   ],
+   "description": "A long outdoor table for eight with camp chairs, bowls and spoons already laid. Good for: sharing a meal, tea and cards between meals, catching up with several people at once. Walk: walk:social-eden-dining, then sit on any free chair.",
+   "occupiers": [
+    {
+     "id": "dining-social-eden-dining-chair-north-1",
+     "fixture": "social-eden-dining-chair-north-1",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "dining-social-eden-dining-chair-north-2",
+     "fixture": "social-eden-dining-chair-north-2",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "dining-social-eden-dining-chair-north-3",
+     "fixture": "social-eden-dining-chair-north-3",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "dining-social-eden-dining-chair-south-1",
+     "fixture": "social-eden-dining-chair-south-1",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "dining-social-eden-dining-chair-south-2",
+     "fixture": "social-eden-dining-chair-south-2",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "dining-social-eden-dining-chair-south-3",
+     "fixture": "social-eden-dining-chair-south-3",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "dining-social-eden-dining-chair-east",
+     "fixture": "social-eden-dining-chair-east",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "dining-social-eden-dining-chair-west",
+     "fixture": "social-eden-dining-chair-west",
+     "slot": "seat",
+     "kind": "seat"
+    }
+   ],
+   "schedule": [
+    {
+     "id": "breakfast",
+     "cron": "0 8 * * *",
+     "durationMinutes": 60,
+     "ticketed": false,
+     "label": "Shared breakfast"
+    },
+    {
+     "id": "lunch",
+     "cron": "45 12 * * *",
+     "durationMinutes": 60,
+     "ticketed": false,
+     "label": "Shared lunch"
+    },
+    {
+     "id": "table-tea",
+     "cron": "0 16 * * *",
+     "durationMinutes": 45,
+     "ticketed": false,
+     "label": "Tea, cake and cards at the long table"
+    },
+    {
+     "id": "dinner",
+     "cron": "15 19 * * *",
+     "durationMinutes": 75,
+     "ticketed": false,
+     "label": "Shared dinner"
+    }
+   ]
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-1",
+   "name": "Sleeping mat 1",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     -23.6,
+     13.3
+    ],
+    [
+     -20.4,
+     13.3
+    ],
+    [
+     -20.4,
+     14.7
+    ],
+    [
+     -23.6,
+     14.7
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-2",
+   "name": "Sleeping mat 2",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     -17.6,
+     13.3
+    ],
+    [
+     -14.4,
+     13.3
+    ],
+    [
+     -14.4,
+     14.7
+    ],
+    [
+     -17.6,
+     14.7
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-3",
+   "name": "Sleeping mat 3",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     -11.6,
+     13.3
+    ],
+    [
+     -8.4,
+     13.3
+    ],
+    [
+     -8.4,
+     14.7
+    ],
+    [
+     -11.6,
+     14.7
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-4",
+   "name": "Sleeping mat 4",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     -5.6,
+     13.3
+    ],
+    [
+     -2.4,
+     13.3
+    ],
+    [
+     -2.4,
+     14.7
+    ],
+    [
+     -5.6,
+     14.7
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-5",
+   "name": "Sleeping mat 5",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     -23.6,
+     20.3
+    ],
+    [
+     -20.4,
+     20.3
+    ],
+    [
+     -20.4,
+     21.7
+    ],
+    [
+     -23.6,
+     21.7
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-6",
+   "name": "Sleeping mat 6",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     -17.6,
+     20.3
+    ],
+    [
+     -14.4,
+     20.3
+    ],
+    [
+     -14.4,
+     21.7
+    ],
+    [
+     -17.6,
+     21.7
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-7",
+   "name": "Sleeping mat 7",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     -11.6,
+     20.3
+    ],
+    [
+     -8.4,
+     20.3
+    ],
+    [
+     -8.4,
+     21.7
+    ],
+    [
+     -11.6,
+     21.7
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-8",
+   "name": "Sleeping mat 8",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     -5.6,
+     20.3
+    ],
+    [
+     -2.4,
+     20.3
+    ],
+    [
+     -2.4,
+     21.7
+    ],
+    [
+     -5.6,
+     21.7
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-9",
+   "name": "Sleeping mat 9",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     -23.6,
+     27.3
+    ],
+    [
+     -20.4,
+     27.3
+    ],
+    [
+     -20.4,
+     28.7
+    ],
+    [
+     -23.6,
+     28.7
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-10",
+   "name": "Sleeping mat 10",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     -17.6,
+     27.3
+    ],
+    [
+     -14.4,
+     27.3
+    ],
+    [
+     -14.4,
+     28.7
+    ],
+    [
+     -17.6,
+     28.7
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-11",
+   "name": "Sleeping mat 11",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     -11.6,
+     27.3
+    ],
+    [
+     -8.4,
+     27.3
+    ],
+    [
+     -8.4,
+     28.7
+    ],
+    [
+     -11.6,
+     28.7
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-12",
+   "name": "Sleeping mat 12",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     -5.6,
+     27.3
+    ],
+    [
+     -2.4,
+     27.3
+    ],
+    [
+     -2.4,
+     28.7
+    ],
+    [
+     -5.6,
+     28.7
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-13",
+   "name": "Sleeping mat 13",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     24.4,
+     -25.7
+    ],
+    [
+     27.6,
+     -25.7
+    ],
+    [
+     27.6,
+     -24.3
+    ],
+    [
+     24.4,
+     -24.3
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-14",
+   "name": "Sleeping mat 14",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     17.4,
+     -25.7
+    ],
+    [
+     20.6,
+     -25.7
+    ],
+    [
+     20.6,
+     -24.3
+    ],
+    [
+     17.4,
+     -24.3
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-15",
+   "name": "Sleeping mat 15",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     10.4,
+     -25.7
+    ],
+    [
+     13.6,
+     -25.7
+    ],
+    [
+     13.6,
+     -24.3
+    ],
+    [
+     10.4,
+     -24.3
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-16",
+   "name": "Sleeping mat 16",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     3.4,
+     -25.7
+    ],
+    [
+     6.6,
+     -25.7
+    ],
+    [
+     6.6,
+     -24.3
+    ],
+    [
+     3.4,
+     -24.3
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-17",
+   "name": "Sleeping mat 17",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     24.4,
+     -20.7
+    ],
+    [
+     27.6,
+     -20.7
+    ],
+    [
+     27.6,
+     -19.3
+    ],
+    [
+     24.4,
+     -19.3
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-18",
+   "name": "Sleeping mat 18",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     17.4,
+     -20.7
+    ],
+    [
+     20.6,
+     -20.7
+    ],
+    [
+     20.6,
+     -19.3
+    ],
+    [
+     17.4,
+     -19.3
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-19",
+   "name": "Sleeping mat 19",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     10.4,
+     -20.7
+    ],
+    [
+     13.6,
+     -20.7
+    ],
+    [
+     13.6,
+     -19.3
+    ],
+    [
+     10.4,
+     -19.3
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-20",
+   "name": "Sleeping mat 20",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     3.4,
+     -20.7
+    ],
+    [
+     6.6,
+     -20.7
+    ],
+    [
+     6.6,
+     -19.3
+    ],
+    [
+     3.4,
+     -19.3
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-21",
+   "name": "Sleeping mat 21",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     24.4,
+     -15.7
+    ],
+    [
+     27.6,
+     -15.7
+    ],
+    [
+     27.6,
+     -14.3
+    ],
+    [
+     24.4,
+     -14.3
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-22",
+   "name": "Sleeping mat 22",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     17.4,
+     -15.7
+    ],
+    [
+     20.6,
+     -15.7
+    ],
+    [
+     20.6,
+     -14.3
+    ],
+    [
+     17.4,
+     -14.3
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-23",
+   "name": "Sleeping mat 23",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     10.4,
+     -15.7
+    ],
+    [
+     13.6,
+     -15.7
+    ],
+    [
+     13.6,
+     -14.3
+    ],
+    [
+     10.4,
+     -14.3
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-24",
+   "name": "Sleeping mat 24",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     3.4,
+     -15.7
+    ],
+    [
+     6.6,
+     -15.7
+    ],
+    [
+     6.6,
+     -14.3
+    ],
+    [
+     3.4,
+     -14.3
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-25",
+   "name": "Sleeping mat 25",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     -29.6,
+     -24.7
+    ],
+    [
+     -26.4,
+     -24.7
+    ],
+    [
+     -26.4,
+     -23.3
+    ],
+    [
+     -29.6,
+     -23.3
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-26",
+   "name": "Sleeping mat 26",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     -29.6,
+     -19.7
+    ],
+    [
+     -26.4,
+     -19.7
+    ],
+    [
+     -26.4,
+     -18.3
+    ],
+    [
+     -29.6,
+     -18.3
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-27",
+   "name": "Sleeping mat 27",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     -29.6,
+     17.3
+    ],
+    [
+     -26.4,
+     17.3
+    ],
+    [
+     -26.4,
+     18.7
+    ],
+    [
+     -29.6,
+     18.7
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-28",
+   "name": "Sleeping mat 28",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     -29.6,
+     22.3
+    ],
+    [
+     -26.4,
+     22.3
+    ],
+    [
+     -26.4,
+     23.7
+    ],
+    [
+     -29.6,
+     23.7
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-29",
+   "name": "Sleeping mat 29",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     -29.6,
+     27.3
+    ],
+    [
+     -26.4,
+     27.3
+    ],
+    [
+     -26.4,
+     28.7
+    ],
+    [
+     -29.6,
+     28.7
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 1,
+   "starting": false,
+   "id": "commons-mat-30",
+   "name": "Sleeping mat 30",
+   "kind": "sleeping-mat",
+   "parent": "field",
+   "polygon": [
+    [
+     24.4,
+     -0.7
+    ],
+    [
+     27.6,
+     -0.7
+    ],
+    [
+     27.6,
+     0.7
+    ],
+    [
+     24.4,
+     0.7
+    ]
+   ],
+   "description": "A personal sleeping mat at the edge of the commons, one sleeper at a time. Good for: a nap, a night's sleep, lying down away from the crowd for a while."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": true,
+   "id": "shore-bank",
+   "name": "Connected sloping bank",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     -46,
+     -11
+    ],
+    [
+     -29,
+     -11
+    ],
+    [
+     -29,
+     11
+    ],
+    [
+     -46,
+     11
+    ]
+   ],
+   "description": "A grassy slope down to the pond, the quietest edge of Eden: reeds, flat stones for skipping, a long view across the water. Good for: a one-to-one talk away from the crowd, sketching, watching swimmers, thinking. Walk: walk:shore-bank.",
+   "schedule": [
+    {
+     "id": "stargazing",
+     "cron": "0 1 * * *",
+     "durationMinutes": 120,
+     "ticketed": false,
+     "label": "Stargazing by the pond"
+    },
+    {
+     "id": "bank-sketching",
+     "cron": "30 9 * * *",
+     "durationMinutes": 90,
+     "ticketed": false,
+     "label": "Sketching and stone-skipping on the bank"
+    },
+    {
+     "id": "sunset-bank",
+     "cron": "15 18 * * *",
+     "durationMinutes": 60,
+     "ticketed": false,
+     "label": "Watching the sunset over the pond"
+    }
+   ]
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 12,
+   "starting": false,
+   "id": "shore-water",
+   "name": "The pond (connected calm water)",
+   "kind": "water",
+   "parent": "eden",
+   "polygon": [
+    [
+     -61,
+     -11
+    ],
+    [
+     -46,
+     -11
+    ],
+    [
+     -46,
+     11
+    ],
+    [
+     -61,
+     11
+    ]
+   ],
+   "description": "Clear, calm pond water west of the commons: shallow by the bank, deep enough to swim and float further out. Good for: a swim, floating on your back, a race with a friend. Walk: walk:shore-water (several can swim at once).",
+   "schedule": [
+    {
+     "id": "morning-swim",
+     "cron": "0 7 * * *",
+     "durationMinutes": 45,
+     "ticketed": false,
+     "label": "Morning swim"
+    },
+    {
+     "id": "afternoon-swim",
+     "cron": "0 15 * * *",
+     "durationMinutes": 60,
+     "ticketed": false,
+     "label": "Afternoon swim and floating"
+    }
+   ]
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": true,
+   "id": "eden-east",
+   "name": "Eden east",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     30,
+     -30
+    ],
+    [
+     105,
+     -30
+    ],
+    [
+     105,
+     85
+    ],
+    [
+     30,
+     85
+    ]
+   ],
+   "description": "The newer east side across the path from the commons: a residential street, a library, an office, a market hall, a barn, gardens, a classroom and newer quarters with a geodesic dome, an amphitheatre, a bandstand, a tea house and an artists' row. Roomier than the commons — a good place to wander, explore and find your own corner. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 24,
+   "starting": false,
+   "id": "eden-classroom-1",
+   "name": "Eden east classroom",
+   "kind": "venue",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     34,
+     -19
+    ],
+    [
+     50,
+     -19
+    ],
+    [
+     50,
+     2
+    ],
+    [
+     34,
+     2
+    ]
+   ],
+   "description": "A walled classroom east of the commons: twenty seats facing a lectern and a screen. Good for: teaching a skill, a talk, a quiet study hour — speech inside stays inside, so it is also the one room you can walk into for a private group. Walk: walk:eden-classroom-1.",
+   "occupiers": [
+    {
+     "id": "classroom-eden-classroom-seat-01",
+     "fixture": "eden-classroom-seat-01",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-eden-classroom-seat-02",
+     "fixture": "eden-classroom-seat-02",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-eden-classroom-seat-03",
+     "fixture": "eden-classroom-seat-03",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-eden-classroom-seat-04",
+     "fixture": "eden-classroom-seat-04",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-eden-classroom-seat-05",
+     "fixture": "eden-classroom-seat-05",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-eden-classroom-seat-06",
+     "fixture": "eden-classroom-seat-06",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-eden-classroom-seat-07",
+     "fixture": "eden-classroom-seat-07",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-eden-classroom-seat-08",
+     "fixture": "eden-classroom-seat-08",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-eden-classroom-seat-09",
+     "fixture": "eden-classroom-seat-09",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-eden-classroom-seat-10",
+     "fixture": "eden-classroom-seat-10",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-eden-classroom-seat-11",
+     "fixture": "eden-classroom-seat-11",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-eden-classroom-seat-12",
+     "fixture": "eden-classroom-seat-12",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-eden-classroom-seat-13",
+     "fixture": "eden-classroom-seat-13",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-eden-classroom-seat-14",
+     "fixture": "eden-classroom-seat-14",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-eden-classroom-seat-15",
+     "fixture": "eden-classroom-seat-15",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-eden-classroom-seat-16",
+     "fixture": "eden-classroom-seat-16",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-eden-classroom-seat-17",
+     "fixture": "eden-classroom-seat-17",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-eden-classroom-seat-18",
+     "fixture": "eden-classroom-seat-18",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-eden-classroom-seat-19",
+     "fixture": "eden-classroom-seat-19",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-eden-classroom-seat-20",
+     "fixture": "eden-classroom-seat-20",
+     "slot": "seat",
+     "kind": "seat"
+    },
+    {
+     "id": "classroom-presenter-return-seat",
+     "fixture": "eden-classroom-presenter-return-seat",
+     "slot": "seat",
+     "kind": "seat"
+    }
+   ],
+   "roles": [
+    {
+     "id": "presenter",
+     "relations": [
+      {
+       "name": "addresses",
+       "to": "audience"
+      }
+     ]
+    },
+    {
+     "id": "audience"
+    }
+   ],
+   "schedule": [
+    {
+     "id": "skill-share",
+     "cron": "30 10 * * *",
+     "durationMinutes": 60,
+     "ticketed": false,
+     "label": "Morning skill share: teach what you know"
+    },
+    {
+     "id": "study-hour",
+     "cron": "30 14 * * *",
+     "durationMinutes": 60,
+     "ticketed": false,
+     "label": "Quiet study hour"
+    }
+   ]
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "eden-housing",
+   "name": "Residential street",
+   "kind": "outdoor",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     28,
+     8
+    ],
+    [
+     62,
+     8
+    ],
+    [
+     62,
+     38
+    ],
+    [
+     28,
+     38
+    ]
+   ],
+   "description": "A lamp-lit street of four homes — a brick courtyard house, a two-storey balcony house and two larger courtyard houses — with yards, planters and benches. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 16,
+   "starting": false,
+   "id": "eden-house-1",
+   "name": "Brick courtyard house",
+   "kind": "building",
+   "parent": "eden-housing",
+   "polygon": [
+    [
+     30.5,
+     12
+    ],
+    [
+     37.5,
+     12
+    ],
+    [
+     37.5,
+     18
+    ],
+    [
+     30.5,
+     18
+    ]
+   ],
+   "description": "A compact brick house built around a small open courtyard, with glazed windows to the street and a door straight onto it. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 4,
+   "starting": false,
+   "id": "eden-house-1-courtyard",
+   "name": "House 1 courtyard",
+   "kind": "garden",
+   "parent": "eden-house-1",
+   "polygon": [
+    [
+     32.5,
+     13.5
+    ],
+    [
+     35.5,
+     13.5
+    ],
+    [
+     35.5,
+     16.5
+    ],
+    [
+     32.5,
+     16.5
+    ]
+   ],
+   "description": "A small open-sky courtyard inside the brick house. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 39,
+   "starting": false,
+   "id": "eden-house-2",
+   "name": "Balcony house",
+   "kind": "building",
+   "parent": "eden-housing",
+   "polygon": [
+    [
+     48,
+     5.52
+    ],
+    [
+     56,
+     5.52
+    ],
+    [
+     56,
+     18
+    ],
+    [
+     48,
+     18
+    ]
+   ],
+   "description": "A two-storey house with a long balcony and an outside stair; glazed windows face the street. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 47,
+   "starting": false,
+   "id": "eden-house-3",
+   "name": "Warm timber courtyard house",
+   "kind": "building",
+   "parent": "eden-housing",
+   "polygon": [
+    [
+     28,
+     25
+    ],
+    [
+     39.96,
+     25
+    ],
+    [
+     39.96,
+     35
+    ],
+    [
+     28,
+     35
+    ]
+   ],
+   "description": "Warm timber courtyard house: a two-storey home wrapped around an open-sky courtyard, with an upper room and a balcony; framed windows on its outer walls. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 6,
+   "starting": false,
+   "id": "eden-house-3-courtyard",
+   "name": "Warm timber courtyard house courtyard",
+   "kind": "garden",
+   "parent": "eden-house-3",
+   "polygon": [
+    [
+     32,
+     28
+    ],
+    [
+     36,
+     28
+    ],
+    [
+     36,
+     32
+    ],
+    [
+     32,
+     32
+    ]
+   ],
+   "description": "An open-sky courtyard at the centre of the house. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 1,
+   "enclosed": true,
+   "capacity": 12,
+   "starting": false,
+   "id": "eden-house-3-upper-room",
+   "name": "Warm timber courtyard house upper room",
+   "kind": "room",
+   "parent": "eden-house-3",
+   "polygon": [
+    [
+     28,
+     25
+    ],
+    [
+     38.4,
+     25
+    ],
+    [
+     38.4,
+     28
+    ],
+    [
+     28,
+     28
+    ]
+   ],
+   "description": "The upper-floor room along the north side, reached by the stair. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 47,
+   "starting": false,
+   "id": "eden-house-4",
+   "name": "Pale stone courtyard house",
+   "kind": "building",
+   "parent": "eden-housing",
+   "polygon": [
+    [
+     48,
+     25
+    ],
+    [
+     59.96,
+     25
+    ],
+    [
+     59.96,
+     35
+    ],
+    [
+     48,
+     35
+    ]
+   ],
+   "description": "Pale stone courtyard house: a two-storey home wrapped around an open-sky courtyard, with an upper room and a balcony; framed windows on its outer walls. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 6,
+   "starting": false,
+   "id": "eden-house-4-courtyard",
+   "name": "Pale stone courtyard house courtyard",
+   "kind": "garden",
+   "parent": "eden-house-4",
+   "polygon": [
+    [
+     52,
+     28
+    ],
+    [
+     56,
+     28
+    ],
+    [
+     56,
+     32
+    ],
+    [
+     52,
+     32
+    ]
+   ],
+   "description": "An open-sky courtyard at the centre of the house. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 1,
+   "enclosed": true,
+   "capacity": 12,
+   "starting": false,
+   "id": "eden-house-4-upper-room",
+   "name": "Pale stone courtyard house upper room",
+   "kind": "room",
+   "parent": "eden-house-4",
+   "polygon": [
+    [
+     48,
+     25
+    ],
+    [
+     58.4,
+     25
+    ],
+    [
+     58.4,
+     28
+    ],
+    [
+     48,
+     28
+    ]
+   ],
+   "description": "The upper-floor room along the north side, reached by the stair. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 32,
+   "starting": false,
+   "id": "eden-library-1",
+   "name": "Library",
+   "kind": "building",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     68.8,
+     -11.2
+    ],
+    [
+     79.2,
+     -11.2
+    ],
+    [
+     79.2,
+     -2.8
+    ],
+    [
+     68.8,
+     -2.8
+    ]
+   ],
+   "description": "A quiet library: shelves, reading chairs and tall windows, with a garden fountain outside. Good for: reading, studying, whispered conversation. Speech inside stays inside. (Seen from the commons — not reachable on foot yet.)",
+   "schedule": [
+    {
+     "id": "reading-hour",
+     "cron": "0 14 * * *",
+     "durationMinutes": 60,
+     "ticketed": false,
+     "label": "Quiet reading hour"
+    }
+   ]
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 114,
+   "starting": false,
+   "id": "eden-office-1",
+   "name": "Office building",
+   "kind": "building",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     86,
+     11
+    ],
+    [
+     98,
+     11
+    ],
+    [
+     98,
+     19
+    ],
+    [
+     86,
+     19
+    ]
+   ],
+   "description": "A three-storey office with open floors at ground, first and second level, connected by stairs. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 38,
+   "starting": false,
+   "id": "eden-office-1-floor-0",
+   "name": "Office ground floor",
+   "kind": "room",
+   "parent": "eden-office-1",
+   "polygon": [
+    [
+     86,
+     11
+    ],
+    [
+     98,
+     11
+    ],
+    [
+     98,
+     19
+    ],
+    [
+     86,
+     19
+    ]
+   ],
+   "description": "The office's ground floor: desks and open workspace. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 1,
+   "enclosed": true,
+   "capacity": 38,
+   "starting": false,
+   "id": "eden-office-1-floor-1",
+   "name": "Office first floor",
+   "kind": "room",
+   "parent": "eden-office-1",
+   "polygon": [
+    [
+     86,
+     11
+    ],
+    [
+     98,
+     11
+    ],
+    [
+     98,
+     19
+    ],
+    [
+     86,
+     19
+    ]
+   ],
+   "description": "The office's first floor: desks and open workspace. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 2,
+   "enclosed": true,
+   "capacity": 38,
+   "starting": false,
+   "id": "eden-office-1-floor-2",
+   "name": "Office second floor",
+   "kind": "room",
+   "parent": "eden-office-1",
+   "polygon": [
+    [
+     86,
+     11
+    ],
+    [
+     98,
+     11
+    ],
+    [
+     98,
+     19
+    ],
+    [
+     86,
+     19
+    ]
+   ],
+   "description": "The office's second floor: desks and open workspace. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 8,
+   "starting": false,
+   "id": "eden-market-1",
+   "name": "Market hall",
+   "kind": "pavilion",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     67,
+     27
+    ],
+    [
+     73,
+     27
+    ],
+    [
+     73,
+     31
+    ],
+    [
+     67,
+     31
+    ]
+   ],
+   "description": "A small open market hall with tables and crates. Good for: trading, browsing, bumping into people. Walk: walk:eden-market-1."
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 38,
+   "starting": false,
+   "id": "eden-barn-1",
+   "name": "Barn",
+   "kind": "building",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     81.8,
+     46.8
+    ],
+    [
+     94.2,
+     46.8
+    ],
+    [
+     94.2,
+     55.2
+    ],
+    [
+     81.8,
+     55.2
+    ]
+   ],
+   "description": "A big timber barn beside the farm, with carts parked outside. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "eden-gardens",
+   "name": "Gardens and cultivated plots",
+   "kind": "garden",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     28,
+     40
+    ],
+    [
+     78,
+     40
+    ],
+    [
+     78,
+     75
+    ],
+    [
+     28,
+     75
+    ]
+   ],
+   "description": "Rows of cultivated plots, orchards and garden paths south of the homes. Good for: gardening, a walk between the beds, a quiet talk while working. Walk: walk:eden-gardens."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": true,
+   "id": "eden-dome-quarter",
+   "name": "Dome quarter",
+   "kind": "outdoor",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     94.5,
+     31.5
+    ],
+    [
+     104.6,
+     31.5
+    ],
+    [
+     104.6,
+     54.5
+    ],
+    [
+     94.5,
+     54.5
+    ]
+   ],
+   "description": "An east-edge quarter: an open geodesic dome over a painted mosaic floor and, just south, an arched pergola courtyard under bunting. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 20,
+   "starting": false,
+   "id": "eden-dome",
+   "name": "Geodesic dome",
+   "kind": "pavilion",
+   "parent": "eden-dome-quarter",
+   "polygon": [
+    [
+     94.6,
+     31.9
+    ],
+    [
+     103.8,
+     31.9
+    ],
+    [
+     103.8,
+     41.1
+    ],
+    [
+     94.6,
+     41.1
+    ]
+   ],
+   "description": "An open geodesic dome over a colourful mosaic floor at the far east edge. Good for: meeting a group away from the commons, stretching, dancing, a circle conversation. Open: voices carry. Walk: walk:eden-dome.",
+   "schedule": [
+    {
+     "id": "dome-morning",
+     "cron": "0 9 * * *",
+     "durationMinutes": 45,
+     "ticketed": false,
+     "label": "Morning circle in the dome"
+    }
+   ]
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 24,
+   "starting": false,
+   "id": "eden-pergola-court",
+   "name": "Pergola court",
+   "kind": "pavilion",
+   "parent": "eden-dome-quarter",
+   "polygon": [
+    [
+     95.5,
+     42.75
+    ],
+    [
+     103.5,
+     42.75
+    ],
+    [
+     103.5,
+     53.75
+    ],
+    [
+     95.5,
+     53.75
+    ]
+   ],
+   "description": "A paved courtyard under a pergola hung with bunting, beside the dome. Good for: crafts, a pop-up market, a long table conversation. Warmly lit at night. Walk: walk:eden-pergola-court.",
+   "schedule": [
+    {
+     "id": "court-crafts",
+     "cron": "0 11 * * *",
+     "durationMinutes": 90,
+     "ticketed": false,
+     "label": "Crafts and swaps in the court"
+    }
+   ]
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 8,
+   "starting": false,
+   "id": "eden-hex-pavilion",
+   "name": "Hexagonal pavilion",
+   "kind": "pavilion",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     98.9,
+     6.4
+    ],
+    [
+     104.1,
+     6.4
+    ],
+    [
+     104.1,
+     11.6
+    ],
+    [
+     98.9,
+     11.6
+    ]
+   ],
+   "description": "A small six-post pavilion with a painted roof; a sheltered spot for two or three to talk. Walk: walk:eden-hex-pavilion."
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 30,
+   "starting": false,
+   "id": "eden-amphitheatre",
+   "name": "Amphitheatre",
+   "kind": "venue",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     71.6,
+     77.9
+    ],
+    [
+     80.4,
+     77.9
+    ],
+    [
+     80.4,
+     84.9
+    ],
+    [
+     71.6,
+     84.9
+    ]
+   ],
+   "description": "Three curved stone steps facing a round painted stage at the south edge. Good for: performances, readings, an audience of up to thirty. On the stage, you address everyone on the steps. Walk: walk:eden-amphitheatre.",
+   "roles": [
+    {
+     "id": "performer",
+     "relations": [
+      {
+       "name": "addresses",
+       "to": "audience"
+      }
+     ]
+    },
+    {
+     "id": "audience"
+    }
+   ],
+   "schedule": [
+    {
+     "id": "sunset-show",
+     "cron": "0 18 * * *",
+     "durationMinutes": 60,
+     "ticketed": false,
+     "label": "Sunset performance"
+    }
+   ]
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 4,
+   "starting": false,
+   "id": "eden-observatory",
+   "name": "Observatory",
+   "kind": "building",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     34.5,
+     80
+    ],
+    [
+     38.5,
+     80
+    ],
+    [
+     38.5,
+     84
+    ],
+    [
+     34.5,
+     84
+    ]
+   ],
+   "description": "A small plaster tower with a copper dome, its door open: inside, a brass telescope on a tripod under the dome, a desk with a star chart and a lamp, a globe and a shelf of books. Good for: stargazing on clear nights, a quiet talk about the sky, reading. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 12,
+   "starting": false,
+   "id": "eden-stone-garden",
+   "name": "Stone garden gate",
+   "kind": "garden",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     53.2,
+     -13.8
+    ],
+    [
+     60.8,
+     -13.8
+    ],
+    [
+     60.8,
+     -6.2
+    ],
+    [
+     53.2,
+     -6.2
+    ]
+   ],
+   "description": "A ring of standing stones around an arched gate between the classroom and the library. Good for: a pause, a private word, meeting someone at a landmark everyone knows. Walk: walk:eden-stone-garden."
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 3,
+   "starting": false,
+   "id": "eden-windmill",
+   "name": "Windmill",
+   "kind": "building",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     85.9,
+     25.65
+    ],
+    [
+     90.1,
+     25.65
+    ],
+    [
+     90.1,
+     29.85
+    ],
+    [
+     85.9,
+     29.85
+    ]
+   ],
+   "description": "A whitewashed tower windmill whose sails turn with the wind, door open: inside, a pair of millstones under a wooden hopper, sacks of flour, a barrel and a ladder up toward the cap. Good for: grinding grain, watching the gears, a cool quiet corner. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 8,
+   "starting": false,
+   "id": "eden-greenhouse",
+   "name": "Greenhouse",
+   "kind": "building",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     63.8,
+     32.5
+    ],
+    [
+     74.2,
+     32.5
+    ],
+    [
+     74.2,
+     37.5
+    ],
+    [
+     63.8,
+     37.5
+    ]
+   ],
+   "description": "A warm glass greenhouse with planted benches. Good for: tending seedlings, a humid quiet corner on a cold or rainy day. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 12,
+   "starting": false,
+   "id": "eden-bandstand",
+   "name": "Bandstand",
+   "kind": "pavilion",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     35.5,
+     -29
+    ],
+    [
+     41.5,
+     -29
+    ],
+    [
+     41.5,
+     -23
+    ],
+    [
+     35.5,
+     -23
+    ]
+   ],
+   "description": "An octagonal bandstand with a teal roof south of the classroom. Good for: music, announcements, small open-air gatherings. Walk: walk:eden-bandstand.",
+   "roles": [
+    {
+     "id": "performer",
+     "relations": [
+      {
+       "name": "addresses",
+       "to": "audience"
+      }
+     ]
+    },
+    {
+     "id": "audience"
+    }
+   ],
+   "schedule": [
+    {
+     "id": "bandstand-music",
+     "cron": "30 17 * * *",
+     "durationMinutes": 45,
+     "ticketed": false,
+     "label": "Music at the bandstand"
+    }
+   ]
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 10,
+   "starting": false,
+   "id": "eden-market-kiosks",
+   "name": "Market kiosks",
+   "kind": "outdoor",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     53.6,
+     -28.2
+    ],
+    [
+     61.4,
+     -28.2
+    ],
+    [
+     61.4,
+     -24.8
+    ],
+    [
+     53.6,
+     -24.8
+    ]
+   ],
+   "description": "Three striped market stalls in a row. Good for: setting out things to share, a quick chat over a counter. Walk: walk:eden-market-kiosks."
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 4,
+   "starting": false,
+   "id": "eden-a-frame",
+   "name": "A-frame cabin",
+   "kind": "building",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     74,
+     -28.5
+    ],
+    [
+     79,
+     -28.5
+    ],
+    [
+     79,
+     -22.5
+    ],
+    [
+     74,
+     -22.5
+    ]
+   ],
+   "description": "A steep-roofed A-frame cabin with a round gable window, door open: inside, a bed under the rafters, a wood stove, an armchair, a little table for one by the door and a shelf of books. Good for: reading, writing, a quiet night away from the commons. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 8,
+   "starting": false,
+   "id": "eden-yurt",
+   "name": "Yurt",
+   "kind": "building",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     64.5,
+     -21.5
+    ],
+    [
+     70.5,
+     -21.5
+    ],
+    [
+     70.5,
+     -15.5
+    ],
+    [
+     64.5,
+     -15.5
+    ]
+   ],
+   "description": "A round felt yurt with a purple roof, its painted door standing open: inside, a wood stove under the crown ring, a bed, a low table with cups and a candle, floor cushions on a round rug, a chest and a shelf of books. Good for: a warm, private chat, tea by the stove, a nap. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 3,
+   "starting": false,
+   "id": "eden-tower-house",
+   "name": "Tower house",
+   "kind": "building",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     67.3,
+     18.3
+    ],
+    [
+     70.7,
+     18.3
+    ],
+    [
+     70.7,
+     21.7
+    ],
+    [
+     67.3,
+     21.7
+    ]
+   ],
+   "description": "A narrow three-storey tower house with a red roof, its door open: a little kitchen with a stove and a table for two on the ground floor, steep stairs up to a reading room with a bookshelf and an armchair, and a bedroom under the roof with a desk by the window. Good for: tea for two, reading, a private talk away from the commons. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 8,
+   "starting": false,
+   "id": "eden-tea-house",
+   "name": "Tea house",
+   "kind": "pavilion",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     89.7,
+     1.7
+    ],
+    [
+     95.3,
+     1.7
+    ],
+    [
+     95.3,
+     7.3
+    ],
+    [
+     89.7,
+     7.3
+    ]
+   ],
+   "description": "An octagonal open tea house among the artists' buildings. Good for: tea and a slow two- or three-person chat, a break from the crowd. Walk: walk:eden-tea-house.",
+   "schedule": [
+    {
+     "id": "afternoon-tea",
+     "cron": "30 15 * * *",
+     "durationMinutes": 45,
+     "ticketed": false,
+     "label": "Afternoon tea"
+    }
+   ]
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": true,
+   "id": "eden-north-woods",
+   "name": "Northern woodland",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     -20,
+     -65
+    ],
+    [
+     30,
+     -65
+    ],
+    [
+     30,
+     -30
+    ],
+    [
+     -20,
+     -30
+    ]
+   ],
+   "description": "Shaded woods north of the commons with a path up to a lookout. Good for: walking alone or with a friend, thinking, a change of scene. Quiet at all hours. Walk: walk:eden-north-woods.",
+   "schedule": [
+    {
+     "id": "woods-walk",
+     "cron": "0 16 * * *",
+     "durationMinutes": 60,
+     "ticketed": false,
+     "label": "Afternoon walk in the woods"
+    }
+   ]
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-canal-quarter",
+   "name": "Canal quarter",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     106,
+     -42
+    ],
+    [
+     172,
+     -42
+    ],
+    [
+     172,
+     58
+    ],
+    [
+     106,
+     58
+    ]
+   ],
+   "description": "A narrow canal runs north–south between stone quays lined with tall, brightly painted row houses with stepped and pointed gables. Lamps, benches and young trees line both quays; small boats are moored along the walls, and two low arched bridges carry the cross streets over the water. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-canal-quarter.canal",
+   "name": "The canal",
+   "kind": "water",
+   "parent": "region-canal-quarter",
+   "polygon": [
+    [
+     133.2,
+     -35
+    ],
+    [
+     139.8,
+     -35
+    ],
+    [
+     139.8,
+     55
+    ],
+    [
+     133.2,
+     55
+    ]
+   ],
+   "description": "Green-blue water between stone quay walls, too deep to wade; moored rowing and cabin boats bob along both sides. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-canal-quarter.bridge-south",
+   "name": "South canal bridge",
+   "kind": "bridge",
+   "parent": "region-canal-quarter",
+   "polygon": [
+    [
+     131,
+     0.3
+    ],
+    [
+     142,
+     0.3
+    ],
+    [
+     142,
+     3.7
+    ],
+    [
+     131,
+     3.7
+    ]
+   ],
+   "description": "A low stone arch over the canal — a natural place to stop, lean on the parapet and watch the boats. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-canal-quarter.bridge-north",
+   "name": "North canal bridge",
+   "kind": "bridge",
+   "parent": "region-canal-quarter",
+   "polygon": [
+    [
+     131,
+     27.3
+    ],
+    [
+     142,
+     27.3
+    ],
+    [
+     142,
+     30.7
+    ],
+    [
+     131,
+     30.7
+    ]
+   ],
+   "description": "The northern arched bridge, with a view down the whole length of the canal to the old town. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-canal-quarter.west-quay",
+   "name": "West quay",
+   "kind": "street",
+   "parent": "region-canal-quarter",
+   "polygon": [
+    [
+     126.2,
+     -33
+    ],
+    [
+     131.8,
+     -33
+    ],
+    [
+     131.8,
+     57
+    ],
+    [
+     126.2,
+     57
+    ]
+   ],
+   "description": "A wide paved quay with benches facing the water, lamps and bicycles leaned against the house fronts. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-canal-quarter.east-quay",
+   "name": "East quay",
+   "kind": "street",
+   "parent": "region-canal-quarter",
+   "polygon": [
+    [
+     141.2,
+     -33
+    ],
+    [
+     146.8,
+     -33
+    ],
+    [
+     146.8,
+     57
+    ],
+    [
+     141.2,
+     57
+    ]
+   ],
+   "description": "The sunnier quay: benches, bollards and café-style clutter along the water. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-canal-quarter.west-row",
+   "name": "West canal houses",
+   "kind": "residential-row",
+   "parent": "region-canal-quarter",
+   "polygon": [
+    [
+     116.3,
+     -30
+    ],
+    [
+     125.5,
+     -30
+    ],
+    [
+     125.5,
+     53
+    ],
+    [
+     116.3,
+     53
+    ]
+   ],
+   "description": "Three-to-five-storey canal houses, each a private home with its front door on the quay, flower boxes and here and there a balcony or roof garden. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-canal-quarter.east-row",
+   "name": "East canal houses",
+   "kind": "residential-row",
+   "parent": "region-canal-quarter",
+   "polygon": [
+    [
+     147.5,
+     -30
+    ],
+    [
+     157.5,
+     -30
+    ],
+    [
+     157.5,
+     53
+    ],
+    [
+     147.5,
+     53
+    ]
+   ],
+   "description": "A matching row of tall, narrow homes facing west over the water. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-canal-quarter.allotments",
+   "name": "Canal allotments",
+   "kind": "garden",
+   "parent": "region-canal-quarter",
+   "polygon": [
+    [
+     111.6,
+     -36
+    ],
+    [
+     115.7,
+     -36
+    ],
+    [
+     115.7,
+     56
+    ],
+    [
+     111.6,
+     56
+    ]
+   ],
+   "description": "Fenced vegetable beds behind the west row, tended by the canal-house residents. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": true,
+   "id": "region-old-town",
+   "name": "Old town plaza and market street",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     106,
+     58
+    ],
+    [
+     172,
+     58
+    ],
+    [
+     172,
+     112
+    ],
+    [
+     106,
+     112
+    ]
+   ],
+   "description": "A cobbled plaza with a stone fountain, framed by two long arcades, a domed hall and a bell tower. South of it a market street of striped stalls faces a row of shops with awnings and painted signs. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-old-town.plaza",
+   "name": "Old town plaza",
+   "kind": "square",
+   "parent": "region-old-town",
+   "polygon": [
+    [
+     119,
+     62
+    ],
+    [
+     159,
+     62
+    ],
+    [
+     159,
+     84
+    ],
+    [
+     119,
+     84
+    ]
+   ],
+   "description": "Cobbles, a tiered fountain, benches, tree tubs and café tables under umbrellas — the place to meet and be seen. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-old-town.north-arcade",
+   "name": "North arcade",
+   "kind": "arcade",
+   "parent": "region-old-town",
+   "polygon": [
+    [
+     120,
+     55.3
+    ],
+    [
+     158,
+     55.3
+    ],
+    [
+     158,
+     60.8
+    ],
+    [
+     120,
+     60.8
+    ]
+   ],
+   "description": "A shaded colonnade along the plaza with doors and shop windows behind the columns; dry in the rain. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-old-town.south-arcade",
+   "name": "South arcade",
+   "kind": "arcade",
+   "parent": "region-old-town",
+   "polygon": [
+    [
+     120,
+     85.2
+    ],
+    [
+     158,
+     85.2
+    ],
+    [
+     158,
+     90.7
+    ],
+    [
+     120,
+     90.7
+    ]
+   ],
+   "description": "The southern colonnade, opening onto the plaza on one side and the market street on the other. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 57,
+   "starting": false,
+   "id": "region-old-town.domed-hall",
+   "name": "Domed hall",
+   "kind": "venue",
+   "parent": "region-old-town",
+   "polygon": [
+    [
+     159.5,
+     67.5
+    ],
+    [
+     172.5,
+     67.5
+    ],
+    [
+     172.5,
+     78.5
+    ],
+    [
+     159.5,
+     78.5
+    ]
+   ],
+   "description": "A white hall with a green copper dome and a columned portico facing the plaza — for concerts, assemblies and lectures. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 6,
+   "starting": false,
+   "id": "region-old-town.bell-tower",
+   "name": "Bell tower",
+   "kind": "building",
+   "parent": "region-old-town",
+   "polygon": [
+    [
+     111.8,
+     70.8
+    ],
+    [
+     116.2,
+     70.8
+    ],
+    [
+     116.2,
+     75.2
+    ],
+    [
+     111.8,
+     75.2
+    ]
+   ],
+   "description": "A slender ochre tower with a slate spire at the west end of the plaza. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-old-town.market-street",
+   "name": "Market street",
+   "kind": "street",
+   "parent": "region-old-town",
+   "polygon": [
+    [
+     111.6,
+     91
+    ],
+    [
+     170,
+     91
+    ],
+    [
+     170,
+     100
+    ],
+    [
+     111.6,
+     100
+    ]
+   ],
+   "description": "Thirteen striped market stalls piled with produce and crafts; vendors call out and shoppers browse. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 186,
+   "starting": false,
+   "id": "region-old-town.shops",
+   "name": "Market-street shops",
+   "kind": "building",
+   "parent": "region-old-town",
+   "polygon": [
+    [
+     110,
+     101.5
+    ],
+    [
+     168,
+     101.5
+    ],
+    [
+     168,
+     109.5
+    ],
+    [
+     110,
+     109.5
+    ]
+   ],
+   "description": "A row of two- and three-storey shops with awnings, flower boxes and colourful signs. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-hillside-village",
+   "name": "Hillside village",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     166,
+     -72
+    ],
+    [
+     262,
+     -72
+    ],
+    [
+     262,
+     26
+    ],
+    [
+     166,
+     26
+    ]
+   ],
+   "description": "Whitewashed and ochre houses on level lots climb the eastern hill along a winding lane with cypresses, low stone walls and lamps. Each house has a garden behind — fruit trees, laundry lines, a bench by the door. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-hillside-village.lookout-temple",
+   "name": "Lookout temple",
+   "kind": "pavilion",
+   "parent": "region-hillside-village",
+   "polygon": [
+    [
+     217.6,
+     -30.4
+    ],
+    [
+     234.4,
+     -30.4
+    ],
+    [
+     234.4,
+     -13.6
+    ],
+    [
+     217.6,
+     -13.6
+    ]
+   ],
+   "description": "A round colonnaded temple on a walled terrace at the summit, with benches facing outward — the best view of all Eden, the canal town and the sea. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-hillside-village.vegetable-terraces",
+   "name": "Hillside vegetable terraces",
+   "kind": "garden",
+   "parent": "region-hillside-village",
+   "polygon": [
+    [
+     192,
+     -66
+    ],
+    [
+     236,
+     -66
+    ],
+    [
+     236,
+     -60
+    ],
+    [
+     192,
+     -60
+    ]
+   ],
+   "description": "Small terraced beds on the hill’s southern shoulder. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-east-suburb",
+   "name": "East suburb",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     172,
+     28
+    ],
+    [
+     250,
+     28
+    ],
+    [
+     250,
+     118
+    ],
+    [
+     172,
+     118
+    ]
+   ],
+   "description": "Leafy streets of detached houses with lawns, picket fences, garages and mailboxes; behind them pools, trampolines, swing sets and sheds. Street trees and lamps line the sidewalks. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-south-avenue",
+   "name": "South avenue",
+   "kind": "street",
+   "parent": "eden",
+   "polygon": [
+    [
+     -96,
+     88
+    ],
+    [
+     106.5,
+     88
+    ],
+    [
+     106.5,
+     93
+    ],
+    [
+     -96,
+     93
+    ]
+   ],
+   "description": "A broad tree-lined avenue running along the south of Eden, joining the park, sports ground, farm and the canal town. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": true,
+   "id": "region-park",
+   "name": "Park with pond",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     -42,
+     95
+    ],
+    [
+     32,
+     95
+    ],
+    [
+     32,
+     134
+    ],
+    [
+     -42,
+     134
+    ]
+   ],
+   "description": "A green park round an oval pond with reeds, a ring path and benches; a white gazebo stands on the lawn, flower beds glow, and there is an ice-cream kiosk by the avenue. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-park.pond",
+   "name": "Park pond",
+   "kind": "water",
+   "parent": "region-park",
+   "polygon": [
+    [
+     -19,
+     103.5
+    ],
+    [
+     7,
+     103.5
+    ],
+    [
+     7,
+     120.5
+    ],
+    [
+     -19,
+     120.5
+    ]
+   ],
+   "description": "A shallow oval pond edged with stone, reeds and a small wooden jetty. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-park.gazebo",
+   "name": "Park gazebo",
+   "kind": "pavilion",
+   "parent": "region-park",
+   "polygon": [
+    [
+     -31.6,
+     106.4
+    ],
+    [
+     -24.4,
+     106.4
+    ],
+    [
+     -24.4,
+     113.6
+    ],
+    [
+     -31.6,
+     113.6
+    ]
+   ],
+   "description": "An octagonal white gazebo with a green roof — shelter from rain, or a tiny bandstand. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-park.playground",
+   "name": "Playground",
+   "kind": "playground",
+   "parent": "region-park",
+   "polygon": [
+    [
+     11,
+     97
+    ],
+    [
+     27,
+     97
+    ],
+    [
+     27,
+     109
+    ],
+    [
+     11,
+     109
+    ]
+   ],
+   "description": "A fenced sandpit playground with swings, a slide, a climbing frame and a see-saw. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-sports-ground",
+   "name": "Sports ground",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     33,
+     86
+    ],
+    [
+     106,
+     86
+    ],
+    [
+     106,
+     134
+    ],
+    [
+     33,
+     134
+    ]
+   ],
+   "description": "A football pitch with crisp white lines, goals and a covered grandstand, two tennis courts and a clubhouse with a veranda. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-sports-ground.pitch",
+   "name": "Football pitch",
+   "kind": "field",
+   "parent": "region-sports-ground",
+   "polygon": [
+    [
+     36,
+     95
+    ],
+    [
+     92,
+     95
+    ],
+    [
+     92,
+     129
+    ],
+    [
+     36,
+     129
+    ]
+   ],
+   "description": "A striped grass pitch, 56 by 34 metres, with full markings and goals. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-sports-ground.tennis-courts",
+   "name": "Tennis courts",
+   "kind": "field",
+   "parent": "region-sports-ground",
+   "polygon": [
+    [
+     91,
+     92
+    ],
+    [
+     103,
+     92
+    ],
+    [
+     103,
+     126
+    ],
+    [
+     91,
+     126
+    ]
+   ],
+   "description": "Two fenced hard courts, one blue and one clay-red. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 24,
+   "starting": false,
+   "id": "region-sports-ground.clubhouse",
+   "name": "Clubhouse",
+   "kind": "building",
+   "parent": "region-sports-ground",
+   "polygon": [
+    [
+     33.5,
+     123
+    ],
+    [
+     39.5,
+     123
+    ],
+    [
+     39.5,
+     133
+    ],
+    [
+     33.5,
+     133
+    ]
+   ],
+   "description": "A small white clubhouse with a green roof and a veranda over the pitch. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-farm-hamlet",
+   "name": "Farm hamlet",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     -104,
+     92
+    ],
+    [
+     -44,
+     92
+    ],
+    [
+     -44,
+     136
+    ],
+    [
+     -104,
+     136
+    ]
+   ],
+   "description": "Crop fields in green and gold rows divided by hedges, a red barn, a farmhouse with a veranda, three silos, hay bales, a tractor and a white windmill. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-farm-hamlet.fields",
+   "name": "Crop fields",
+   "kind": "garden",
+   "parent": "region-farm-hamlet",
+   "polygon": [
+    [
+     -102,
+     94
+    ],
+    [
+     -62,
+     94
+    ],
+    [
+     -62,
+     112
+    ],
+    [
+     -102,
+     112
+    ]
+   ],
+   "description": "Rows of vegetables and grain, tended by hand. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 43,
+   "starting": false,
+   "id": "region-farm-hamlet.barn",
+   "name": "Red barn",
+   "kind": "building",
+   "parent": "region-farm-hamlet",
+   "polygon": [
+    [
+     -76,
+     119.5
+    ],
+    [
+     -64,
+     119.5
+    ],
+    [
+     -64,
+     128.5
+    ],
+    [
+     -76,
+     128.5
+    ]
+   ],
+   "description": "A big red timber barn with wide doors, smelling of hay. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 45,
+   "starting": false,
+   "id": "region-farm-hamlet.farmhouse",
+   "name": "Farmhouse",
+   "kind": "building",
+   "parent": "region-farm-hamlet",
+   "polygon": [
+    [
+     -57.5,
+     123
+    ],
+    [
+     -50.5,
+     123
+    ],
+    [
+     -50.5,
+     131
+    ],
+    [
+     -57.5,
+     131
+    ]
+   ],
+   "description": "A two-storey farmhouse with shutters, flower boxes and a porch. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 7,
+   "starting": false,
+   "id": "region-farm-hamlet.windmill",
+   "name": "Windmill",
+   "kind": "building",
+   "parent": "region-farm-hamlet",
+   "polygon": [
+    [
+     -96.4,
+     101.6
+    ],
+    [
+     -91.6,
+     101.6
+    ],
+    [
+     -91.6,
+     106.4
+    ],
+    [
+     -96.4,
+     106.4
+    ]
+   ],
+   "description": "A white tower windmill with four sails, facing the town. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": true,
+   "id": "region-harbour",
+   "name": "Harbour, boardwalk and beach",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     -104,
+     127
+    ],
+    [
+     130,
+     127
+    ],
+    [
+     130,
+     192
+    ],
+    [
+     -104,
+     192
+    ]
+   ],
+   "description": "A long timber boardwalk runs along the sea with benches and lamps; two piers reach out to moored boats, a striped lighthouse stands on the breakwater, and to the west a sandy beach with bathing huts and umbrellas. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-harbour.boardwalk",
+   "name": "Boardwalk",
+   "kind": "boardwalk",
+   "parent": "region-harbour",
+   "polygon": [
+    [
+     -40,
+     136.5
+    ],
+    [
+     100,
+     136.5
+    ],
+    [
+     100,
+     141.5
+    ],
+    [
+     -40,
+     141.5
+    ]
+   ],
+   "description": "Sun-bleached planks above the waterline; benches face the sea. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-harbour.west-pier",
+   "name": "West pier",
+   "kind": "pier",
+   "parent": "region-harbour",
+   "polygon": [
+    [
+     8.4,
+     141.5
+    ],
+    [
+     11.6,
+     141.5
+    ],
+    [
+     11.6,
+     167.5
+    ],
+    [
+     8.4,
+     167.5
+    ]
+   ],
+   "description": "A timber pier with boats moored on both sides. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-harbour.east-pier",
+   "name": "East pier",
+   "kind": "pier",
+   "parent": "region-harbour",
+   "polygon": [
+    [
+     60.4,
+     141.5
+    ],
+    [
+     63.6,
+     141.5
+    ],
+    [
+     63.6,
+     175.5
+    ],
+    [
+     60.4,
+     175.5
+    ]
+   ],
+   "description": "The longer pier, reaching into deeper water. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 5,
+   "starting": false,
+   "id": "region-harbour.lighthouse",
+   "name": "Lighthouse",
+   "kind": "building",
+   "parent": "region-harbour",
+   "polygon": [
+    [
+     93.9,
+     185.9
+    ],
+    [
+     98.1,
+     185.9
+    ],
+    [
+     98.1,
+     190.1
+    ],
+    [
+     93.9,
+     190.1
+    ]
+   ],
+   "description": "A red-and-white striped lighthouse at the end of the breakwater. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 34,
+   "starting": false,
+   "id": "region-harbour.fish-market",
+   "name": "Fish market",
+   "kind": "building",
+   "parent": "region-harbour",
+   "polygon": [
+    [
+     41,
+     128
+    ],
+    [
+     55,
+     128
+    ],
+    [
+     55,
+     134
+    ],
+    [
+     41,
+     134
+    ]
+   ],
+   "description": "A blue timber shed where the day’s catch is sold. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-harbour.beach",
+   "name": "Beach",
+   "kind": "beach",
+   "parent": "region-harbour",
+   "polygon": [
+    [
+     -100,
+     134
+    ],
+    [
+     -44,
+     134
+    ],
+    [
+     -44,
+     146
+    ],
+    [
+     -100,
+     146
+    ]
+   ],
+   "description": "Pale sand, colourful bathing huts, umbrellas and towels at the water’s edge. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-seaside-resort",
+   "name": "Seaside resort",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     106,
+     112
+    ],
+    [
+     206,
+     112
+    ],
+    [
+     206,
+     192
+    ],
+    [
+     106,
+     192
+    ]
+   ],
+   "description": "Pastel hotels with balconies line a seafront promenade; a ferris wheel and a carousel turn on the beach, a café terrace spreads umbrellas, and sailboats crowd the marina. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 1120,
+   "starting": false,
+   "id": "region-seaside-resort.hotels",
+   "name": "Seafront hotels",
+   "kind": "building",
+   "parent": "region-seaside-resort",
+   "polygon": [
+    [
+     114,
+     116
+    ],
+    [
+     170,
+     116
+    ],
+    [
+     170,
+     126
+    ],
+    [
+     114,
+     126
+    ]
+   ],
+   "description": "Four- to six-storey hotels with balconies on every floor and rooftop gardens. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-seaside-resort.ferris-wheel",
+   "name": "Ferris wheel",
+   "kind": "attraction",
+   "parent": "region-seaside-resort",
+   "polygon": [
+    [
+     178,
+     120
+    ],
+    [
+     190,
+     120
+    ],
+    [
+     190,
+     128
+    ],
+    [
+     178,
+     128
+    ]
+   ],
+   "description": "A big white wheel with sixteen coloured gondolas over the beach. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-seaside-resort.carousel",
+   "name": "Carousel",
+   "kind": "attraction",
+   "parent": "region-seaside-resort",
+   "polygon": [
+    [
+     158,
+     121
+    ],
+    [
+     170,
+     121
+    ],
+    [
+     170,
+     133
+    ],
+    [
+     158,
+     133
+    ]
+   ],
+   "description": "A painted carousel of horses under a red-and-white striped roof. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-seaside-resort.marina",
+   "name": "Marina",
+   "kind": "water",
+   "parent": "region-seaside-resort",
+   "polygon": [
+    [
+     117,
+     138
+    ],
+    [
+     155,
+     138
+    ],
+    [
+     155,
+     167
+    ],
+    [
+     117,
+     167
+    ]
+   ],
+   "description": "Three pontoons of sailboats with bright sails. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-north-avenue",
+   "name": "North avenue",
+   "kind": "street",
+   "parent": "eden",
+   "polygon": [
+    [
+     -100,
+     -72
+    ],
+    [
+     109,
+     -72
+    ],
+    [
+     109,
+     -67
+    ],
+    [
+     -100,
+     -67
+    ]
+   ],
+   "description": "A tree-lined avenue along the north of Eden linking the artists’ village, the campus, the vineyard and the canal town. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-vineyard",
+   "name": "Vineyard and orchard terraces",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     20,
+     -160
+    ],
+    [
+     112,
+     -160
+    ],
+    [
+     112,
+     -72
+    ],
+    [
+     20,
+     -72
+    ]
+   ],
+   "description": "Terraces climb north in steps held by low stone walls: vine rows to the west, fruit trees to the east, and a cypress lane leading up to an ochre villa with a tower and a wine cellar. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-vineyard.vines",
+   "name": "Vine terraces",
+   "kind": "garden",
+   "parent": "region-vineyard",
+   "polygon": [
+    [
+     24,
+     -150
+    ],
+    [
+     68,
+     -150
+    ],
+    [
+     68,
+     -73
+    ],
+    [
+     24,
+     -73
+    ]
+   ],
+   "description": "Long rows of vines on posts, one terrace above the next. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-vineyard.orchard",
+   "name": "Orchard terraces",
+   "kind": "garden",
+   "parent": "region-vineyard",
+   "polygon": [
+    [
+     72,
+     -150
+    ],
+    [
+     108,
+     -150
+    ],
+    [
+     108,
+     -73
+    ],
+    [
+     72,
+     -73
+    ]
+   ],
+   "description": "Fruit trees in rows, some heavy with fruit. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 128,
+   "starting": false,
+   "id": "region-vineyard.villa",
+   "name": "Hill villa",
+   "kind": "building",
+   "parent": "region-vineyard",
+   "polygon": [
+    [
+     63,
+     -157
+    ],
+    [
+     79,
+     -157
+    ],
+    [
+     79,
+     -147
+    ],
+    [
+     63,
+     -147
+    ]
+   ],
+   "description": "A two-storey ochre villa with green shutters and a veranda overlooking the terraces. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 7,
+   "starting": false,
+   "id": "region-vineyard.villa-tower",
+   "name": "Villa tower",
+   "kind": "building",
+   "parent": "region-vineyard",
+   "polygon": [
+    [
+     80.2,
+     -152.4
+    ],
+    [
+     85,
+     -152.4
+    ],
+    [
+     85,
+     -147.6
+    ],
+    [
+     80.2,
+     -147.6
+    ]
+   ],
+   "description": "A round tower beside the villa with a view over the vineyard. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 25,
+   "starting": false,
+   "id": "region-vineyard.wine-cellar",
+   "name": "Wine cellar",
+   "kind": "building",
+   "parent": "region-vineyard",
+   "polygon": [
+    [
+     54.5,
+     -153.5
+    ],
+    [
+     61.5,
+     -153.5
+    ],
+    [
+     61.5,
+     -144.5
+    ],
+    [
+     54.5,
+     -144.5
+    ]
+   ],
+   "description": "A stone cellar with barrels stacked outside. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-campus",
+   "name": "Campus and library annex",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     -44,
+     -128
+    ],
+    [
+     18,
+     -128
+    ],
+    [
+     18,
+     -72
+    ],
+    [
+     -44,
+     -72
+    ]
+   ],
+   "description": "A green quad with crossing paths and a fountain, a domed library annex behind a columned portico, two arcaded lecture halls, a clock tower and a gate onto the avenue. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-campus.quad",
+   "name": "Campus quad",
+   "kind": "square",
+   "parent": "region-campus",
+   "polygon": [
+    [
+     -29,
+     -109
+    ],
+    [
+     5,
+     -109
+    ],
+    [
+     5,
+     -85
+    ],
+    [
+     -29,
+     -85
+    ]
+   ],
+   "description": "A lawn crossed by paths, benches under trees, students’ bikes at the rack. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 106,
+   "starting": false,
+   "id": "region-campus.library-annex",
+   "name": "Library annex",
+   "kind": "building",
+   "parent": "region-campus",
+   "polygon": [
+    [
+     -24,
+     -126.5
+    ],
+    [
+     0,
+     -126.5
+    ],
+    [
+     0,
+     -115.5
+    ],
+    [
+     -24,
+     -115.5
+    ]
+   ],
+   "description": "A tall reading hall under a grey dome, with long windows and a portico of five columns. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 192,
+   "starting": false,
+   "id": "region-campus.east-hall",
+   "name": "East lecture hall",
+   "kind": "building",
+   "parent": "region-campus",
+   "polygon": [
+    [
+     8,
+     -109
+    ],
+    [
+     18,
+     -109
+    ],
+    [
+     18,
+     -85
+    ],
+    [
+     8,
+     -85
+    ]
+   ],
+   "description": "Brick lecture rooms behind an arcade facing the quad. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 192,
+   "starting": false,
+   "id": "region-campus.west-hall",
+   "name": "West lecture hall",
+   "kind": "building",
+   "parent": "region-campus",
+   "polygon": [
+    [
+     -42,
+     -109
+    ],
+    [
+     -32,
+     -109
+    ],
+    [
+     -32,
+     -85
+    ],
+    [
+     -42,
+     -85
+    ]
+   ],
+   "description": "The twin lecture hall across the quad. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 5,
+   "starting": false,
+   "id": "region-campus.clock-tower",
+   "name": "Clock tower",
+   "kind": "building",
+   "parent": "region-campus",
+   "polygon": [
+    [
+     -3,
+     -80
+    ],
+    [
+     1,
+     -80
+    ],
+    [
+     1,
+     -76
+    ],
+    [
+     -3,
+     -76
+    ]
+   ],
+   "description": "A brick tower with a clock face by the south gate. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": true,
+   "id": "region-artists-village",
+   "name": "Artists’ village",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     -104,
+     -136
+    ],
+    [
+     -46,
+     -136
+    ],
+    [
+     -46,
+     -72
+    ],
+    [
+     -104,
+     -72
+    ]
+   ],
+   "description": "Colourful studios and A-frames ring a village green with a towering sculpture of painted spheres under strings of lights; easels stand by the doors, craft stalls and picnic tables invite lingering, and a long mural wall runs along the avenue. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-artists-village.green",
+   "name": "Village green",
+   "kind": "square",
+   "parent": "region-artists-village",
+   "polygon": [
+    [
+     -83,
+     -107
+    ],
+    [
+     -65,
+     -107
+    ],
+    [
+     -65,
+     -89
+    ],
+    [
+     -83,
+     -89
+    ]
+   ],
+   "description": "A round green with picnic tables, string lights and the painted-sphere sculpture. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 96,
+   "starting": false,
+   "id": "region-artists-village.warehouse-studio",
+   "name": "Warehouse studio",
+   "kind": "building",
+   "parent": "region-artists-village",
+   "polygon": [
+    [
+     -102,
+     -124
+    ],
+    [
+     -82,
+     -124
+    ],
+    [
+     -82,
+     -112
+    ],
+    [
+     -102,
+     -112
+    ]
+   ],
+   "description": "A brick warehouse with a sawtooth roof of north lights — a shared studio and gallery. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-artists-village.mural-wall",
+   "name": "Mural wall",
+   "kind": "landmark",
+   "parent": "region-artists-village",
+   "polygon": [
+    [
+     -102,
+     -73.2
+    ],
+    [
+     -50,
+     -73.2
+    ],
+    [
+     -50,
+     -72.4
+    ],
+    [
+     -102,
+     -72.4
+    ]
+   ],
+   "description": "A long wall painted in blocks of colour, always half-finished. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-west-lake",
+   "name": "West lake shore",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     -204,
+     -74
+    ],
+    [
+     -102,
+     -74
+    ],
+    [
+     -102,
+     60
+    ],
+    [
+     -204,
+     60
+    ]
+   ],
+   "description": "A wide calm lake ringed by a shore path, reeds and boathouses on stilts; cabins and A-frames sit among the pines on the north shore beside a lakeside inn with a deck. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-west-lake.lake",
+   "name": "West lake",
+   "kind": "water",
+   "parent": "region-west-lake",
+   "polygon": [
+    [
+     -194,
+     -42
+    ],
+    [
+     -102,
+     -42
+    ],
+    [
+     -102,
+     46
+    ],
+    [
+     -194,
+     46
+    ]
+   ],
+   "description": "Deep calm water with a swimming platform and diving board far out. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 115,
+   "starting": false,
+   "id": "region-west-lake.inn",
+   "name": "Lake inn",
+   "kind": "building",
+   "parent": "region-west-lake",
+   "polygon": [
+    [
+     -148,
+     -56.5
+    ],
+    [
+     -132,
+     -56.5
+    ],
+    [
+     -132,
+     -47.5
+    ],
+    [
+     -148,
+     -47.5
+    ]
+   ],
+   "description": "A two-storey timber inn with a waterside deck of umbrella tables. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-campsite",
+   "name": "Forest campsite",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     -176,
+     -136
+    ],
+    [
+     -106,
+     -136
+    ],
+    [
+     -106,
+     -74
+    ],
+    [
+     -176,
+     -74
+    ]
+   ],
+   "description": "Tents in a pine clearing around a stone fire circle with log benches; log cabins and a two-storey lodge with a stone chimney stand at the edges. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-campsite.fire-circle",
+   "name": "Fire circle",
+   "kind": "square",
+   "parent": "region-campsite",
+   "polygon": [
+    [
+     -145,
+     -105
+    ],
+    [
+     -135,
+     -105
+    ],
+    [
+     -135,
+     -95
+    ],
+    [
+     -145,
+     -95
+    ]
+   ],
+   "description": "A ring of stones and log benches — for stories and songs after dark. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 134,
+   "starting": false,
+   "id": "region-campsite.lodge",
+   "name": "Lodge",
+   "kind": "building",
+   "parent": "region-campsite",
+   "polygon": [
+    [
+     -129,
+     -88
+    ],
+    [
+     -115,
+     -88
+    ],
+    [
+     -115,
+     -76
+    ],
+    [
+     -129,
+     -76
+    ]
+   ],
+   "description": "A timber lodge with a balcony, veranda and a big stone chimney. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-railway-station",
+   "name": "Railway station",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     114,
+     -60
+    ],
+    [
+     170,
+     -60
+    ],
+    [
+     170,
+     -36
+    ],
+    [
+     114,
+     -36
+    ]
+   ],
+   "description": "A brick station with a long canopied platform, a red train standing ready, and the line running east to a tunnel in the hills. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-railway-station.platform",
+   "name": "Platform",
+   "kind": "platform",
+   "parent": "region-railway-station",
+   "polygon": [
+    [
+     122,
+     -47.4
+    ],
+    [
+     162,
+     -47.4
+    ],
+    [
+     162,
+     -43.8
+    ],
+    [
+     122,
+     -43.8
+    ]
+   ],
+   "description": "A raised platform with benches, lamps and a yellow safety line. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 86,
+   "starting": false,
+   "id": "region-railway-station.station-building",
+   "name": "Station building",
+   "kind": "building",
+   "parent": "region-railway-station",
+   "polygon": [
+    [
+     133,
+     -43.5
+    ],
+    [
+     151,
+     -43.5
+    ],
+    [
+     151,
+     -37.5
+    ],
+    [
+     133,
+     -37.5
+    ]
+   ],
+   "description": "The two-storey brick station hall with a clock above the platform. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 160,
+   "starting": false,
+   "id": "region-railway-station.train",
+   "name": "Parked train",
+   "kind": "vehicle",
+   "parent": "region-railway-station",
+   "polygon": [
+    [
+     116,
+     -50.4
+    ],
+    [
+     170,
+     -50.4
+    ],
+    [
+     170,
+     -47.6
+    ],
+    [
+     116,
+     -47.6
+    ]
+   ],
+   "description": "A green locomotive and four red carriages waiting at the platform. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-makers-yard",
+   "name": "Makers’ yard",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     114,
+     -124
+    ],
+    [
+     176,
+     -124
+    ],
+    [
+     176,
+     -62
+    ],
+    [
+     114,
+     -62
+    ]
+   ],
+   "description": "Workshop sheds with big doors, a stack of shipping containers, a water tower on legs, greenhouses and raised beds — where things get built and grown. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 47,
+   "starting": false,
+   "id": "region-makers-yard.workshop-1",
+   "name": "Workshop one",
+   "kind": "building",
+   "parent": "region-makers-yard",
+   "polygon": [
+    [
+     115.5,
+     -78.5
+    ],
+    [
+     128.5,
+     -78.5
+    ],
+    [
+     128.5,
+     -69.5
+    ],
+    [
+     115.5,
+     -69.5
+    ]
+   ],
+   "description": "A tall timber workshop with a roller door. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 47,
+   "starting": false,
+   "id": "region-makers-yard.workshop-2",
+   "name": "Workshop two",
+   "kind": "building",
+   "parent": "region-makers-yard",
+   "polygon": [
+    [
+     131.5,
+     -78.5
+    ],
+    [
+     144.5,
+     -78.5
+    ],
+    [
+     144.5,
+     -69.5
+    ],
+    [
+     131.5,
+     -69.5
+    ]
+   ],
+   "description": "The middle workshop. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 47,
+   "starting": false,
+   "id": "region-makers-yard.workshop-3",
+   "name": "Workshop three",
+   "kind": "building",
+   "parent": "region-makers-yard",
+   "polygon": [
+    [
+     147.5,
+     -78.5
+    ],
+    [
+     160.5,
+     -78.5
+    ],
+    [
+     160.5,
+     -69.5
+    ],
+    [
+     147.5,
+     -69.5
+    ]
+   ],
+   "description": "The end workshop, next to the containers. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 140,
+   "starting": false,
+   "id": "region-makers-yard.greenhouses",
+   "name": "Greenhouses",
+   "kind": "building",
+   "parent": "region-makers-yard",
+   "polygon": [
+    [
+     144.5,
+     -105
+    ],
+    [
+     169.5,
+     -105
+    ],
+    [
+     169.5,
+     -91
+    ],
+    [
+     144.5,
+     -91
+    ]
+   ],
+   "description": "Three glasshouses full of seedlings and vegetables. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-abbey",
+   "name": "Abbey on the knoll",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     -200,
+     56
+    ],
+    [
+     -140,
+     56
+    ],
+    [
+     -140,
+     140
+    ],
+    [
+     -200,
+     140
+    ]
+   ],
+   "description": "A stone church with a bell tower on a gentle knoll, a cloister round a quiet court, a walled kitchen garden and a field of lavender below. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 174,
+   "starting": false,
+   "id": "region-abbey.church",
+   "name": "Abbey church",
+   "kind": "venue",
+   "parent": "region-abbey",
+   "polygon": [
+    [
+     -176,
+     93
+    ],
+    [
+     -145,
+     93
+    ],
+    [
+     -145,
+     107
+    ],
+    [
+     -176,
+     107
+    ]
+   ],
+   "description": "A tall stone nave with aisles, an apse and a bell tower facing east toward Eden. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 80,
+   "starting": false,
+   "id": "region-abbey.cloister",
+   "name": "Cloister",
+   "kind": "building",
+   "parent": "region-abbey",
+   "polygon": [
+    [
+     -171,
+     109.5
+    ],
+    [
+     -153,
+     109.5
+    ],
+    [
+     -153,
+     125.5
+    ],
+    [
+     -171,
+     125.5
+    ]
+   ],
+   "description": "Two storeys of rooms round an arcaded court with a fountain and a cypress. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-abbey.kitchen-garden",
+   "name": "Kitchen garden",
+   "kind": "garden",
+   "parent": "region-abbey",
+   "polygon": [
+    [
+     -180,
+     82
+    ],
+    [
+     -156,
+     82
+    ],
+    [
+     -156,
+     92
+    ],
+    [
+     -180,
+     92
+    ]
+   ],
+   "description": "A walled garden of vegetable beds. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-abbey.lavender",
+   "name": "Lavender field",
+   "kind": "garden",
+   "parent": "region-abbey",
+   "polygon": [
+    [
+     -197,
+     57
+    ],
+    [
+     -166,
+     57
+    ],
+    [
+     -166,
+     97
+    ],
+    [
+     -197,
+     97
+    ]
+   ],
+   "description": "Rows of purple lavender humming with bees. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-courtyard-quarter",
+   "name": "Courtyard-house quarter",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     -150,
+     52
+    ],
+    [
+     -104,
+     52
+    ],
+    [
+     -104,
+     88
+    ],
+    [
+     -150,
+     88
+    ]
+   ],
+   "description": "Four Mediterranean courtyard houses along a lamp-lit lane, each a ring of rooms round an open court with a fountain and a fruit tree. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 50,
+   "starting": false,
+   "id": "region-courtyard-quarter.house-1",
+   "name": "Courtyard house one",
+   "kind": "building",
+   "parent": "region-courtyard-quarter",
+   "polygon": [
+    [
+     -124,
+     53.5
+    ],
+    [
+     -108,
+     53.5
+    ],
+    [
+     -108,
+     66.5
+    ],
+    [
+     -124,
+     66.5
+    ]
+   ],
+   "description": "An ochre courtyard house; its gate opens onto the lane. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 45,
+   "starting": false,
+   "id": "region-courtyard-quarter.house-2",
+   "name": "Courtyard house two",
+   "kind": "building",
+   "parent": "region-courtyard-quarter",
+   "polygon": [
+    [
+     -143,
+     53.5
+    ],
+    [
+     -129,
+     53.5
+    ],
+    [
+     -129,
+     66.5
+    ],
+    [
+     -143,
+     66.5
+    ]
+   ],
+   "description": "A smaller courtyard house with an arcade round its court. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 50,
+   "starting": false,
+   "id": "region-courtyard-quarter.house-3",
+   "name": "Courtyard house three",
+   "kind": "building",
+   "parent": "region-courtyard-quarter",
+   "polygon": [
+    [
+     -124,
+     73.5
+    ],
+    [
+     -108,
+     73.5
+    ],
+    [
+     -108,
+     86.5
+    ],
+    [
+     -124,
+     86.5
+    ]
+   ],
+   "description": "A two-storey courtyard house facing the lane. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 55,
+   "starting": false,
+   "id": "region-courtyard-quarter.house-4",
+   "name": "Courtyard house four",
+   "kind": "building",
+   "parent": "region-courtyard-quarter",
+   "polygon": [
+    [
+     -147,
+     73.5
+    ],
+    [
+     -129,
+     73.5
+    ],
+    [
+     -129,
+     86.5
+    ],
+    [
+     -147,
+     86.5
+    ]
+   ],
+   "description": "The largest courtyard house, beside the path to the abbey. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-botanic-garden",
+   "name": "Botanic garden",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     -104,
+     -170
+    ],
+    [
+     -40,
+     -170
+    ],
+    [
+     -40,
+     -136
+    ],
+    [
+     -104,
+     -136
+    ]
+   ],
+   "description": "A Japanese garden beyond a red torii: a koi pond crossed by an arched red bridge, a five-storey pagoda, a tea house with a veranda, a raked-gravel court with three rocks, maples and cherry trees — and a Victorian palm house of glass. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-botanic-garden.koi-pond",
+   "name": "Koi pond",
+   "kind": "water",
+   "parent": "region-botanic-garden",
+   "polygon": [
+    [
+     -80,
+     -158
+    ],
+    [
+     -60,
+     -158
+    ],
+    [
+     -60,
+     -146
+    ],
+    [
+     -80,
+     -146
+    ]
+   ],
+   "description": "Still water with orange and white koi, stepping stones and reeds. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-botanic-garden.red-bridge",
+   "name": "Red bridge",
+   "kind": "bridge",
+   "parent": "region-botanic-garden",
+   "polygon": [
+    [
+     -79,
+     -153
+    ],
+    [
+     -67,
+     -153
+    ],
+    [
+     -67,
+     -151
+    ],
+    [
+     -79,
+     -151
+    ]
+   ],
+   "description": "A lacquered red arched footbridge over the koi pond. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 8,
+   "starting": false,
+   "id": "region-botanic-garden.pagoda",
+   "name": "Pagoda",
+   "kind": "building",
+   "parent": "region-botanic-garden",
+   "polygon": [
+    [
+     -90.5,
+     -160.5
+    ],
+    [
+     -85.5,
+     -160.5
+    ],
+    [
+     -85.5,
+     -155.5
+    ],
+    [
+     -90.5,
+     -155.5
+    ]
+   ],
+   "description": "A five-storey cream and red pagoda with dark flared roofs and a golden finial. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 19,
+   "starting": false,
+   "id": "region-botanic-garden.tea-house",
+   "name": "Tea house",
+   "kind": "building",
+   "parent": "region-botanic-garden",
+   "polygon": [
+    [
+     -59,
+     -157
+    ],
+    [
+     -53,
+     -157
+    ],
+    [
+     -53,
+     -149
+    ],
+    [
+     -59,
+     -149
+    ]
+   ],
+   "description": "A low timber tea house with a veranda over the pond and a stone lantern by the step. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-botanic-garden.zen-court",
+   "name": "Raked-gravel court",
+   "kind": "garden",
+   "parent": "region-botanic-garden",
+   "polygon": [
+    [
+     -55,
+     -165.5
+    ],
+    [
+     -45,
+     -165.5
+    ],
+    [
+     -45,
+     -158.5
+    ],
+    [
+     -55,
+     -158.5
+    ]
+   ],
+   "description": "White gravel raked in lines around three dark rocks, behind a bamboo screen. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 58,
+   "starting": false,
+   "id": "region-botanic-garden.palm-house",
+   "name": "Palm house",
+   "kind": "building",
+   "parent": "region-botanic-garden",
+   "polygon": [
+    [
+     -102,
+     -149.5
+    ],
+    [
+     -86,
+     -149.5
+    ],
+    [
+     -86,
+     -140.5
+    ],
+    [
+     -102,
+     -140.5
+    ]
+   ],
+   "description": "A glass barrel-vaulted glasshouse with a small dome, warm and humid, full of palms. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-observatory",
+   "name": "Observatory",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     78,
+     -200
+    ],
+    [
+     106,
+     -200
+    ],
+    [
+     106,
+     -176
+    ],
+    [
+     78,
+     -176
+    ]
+   ],
+   "description": "A white domed observatory on the plateau above the vineyard, with a small study house and a beacon mast — the night sky feels very close here. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 32,
+   "starting": false,
+   "id": "region-observatory.dome",
+   "name": "Observatory dome",
+   "kind": "building",
+   "parent": "region-observatory",
+   "polygon": [
+    [
+     87.5,
+     -192.5
+    ],
+    [
+     96.5,
+     -192.5
+    ],
+    [
+     96.5,
+     -183.5
+    ],
+    [
+     87.5,
+     -183.5
+    ]
+   ],
+   "description": "A round white building under a silver dome with an open slit. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-west-river",
+   "name": "West river",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     -272,
+     -236
+    ],
+    [
+     -206,
+     -236
+    ],
+    [
+     -206,
+     192
+    ],
+    [
+     -272,
+     192
+    ]
+   ],
+   "description": "A clear river winds down from the north-western hills between reeds, boulders and alders, past an old stone watermill with a turning wheel and under a humpbacked stone bridge, to a fishing hamlet of stilt houses at its mouth. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-west-river.river",
+   "name": "The river",
+   "kind": "water",
+   "parent": "region-west-river",
+   "polygon": [
+    [
+     -250,
+     -200
+    ],
+    [
+     -224,
+     -200
+    ],
+    [
+     -224,
+     180
+    ],
+    [
+     -250,
+     180
+    ]
+   ],
+   "description": "A shallow, quick river about seven metres wide — good for paddling and fishing, too strong for swimming far. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 50,
+   "starting": false,
+   "id": "region-west-river.watermill",
+   "name": "Watermill",
+   "kind": "building",
+   "parent": "region-west-river",
+   "polygon": [
+    [
+     -229.5,
+     -111.5
+    ],
+    [
+     -222.5,
+     -111.5
+    ],
+    [
+     -222.5,
+     -102.5
+    ],
+    [
+     -229.5,
+     -102.5
+    ]
+   ],
+   "description": "A two-storey stone mill with a big timber wheel on the bank. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-west-river.stone-bridge",
+   "name": "Stone bridge",
+   "kind": "bridge",
+   "parent": "region-west-river",
+   "polygon": [
+    [
+     -248,
+     -61
+    ],
+    [
+     -229,
+     -61
+    ],
+    [
+     -229,
+     -55
+    ],
+    [
+     -248,
+     -55
+    ]
+   ],
+   "description": "A humpbacked bridge carrying the west country road over the river. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-west-river.fishing-hamlet",
+   "name": "Fishing hamlet",
+   "kind": "outdoor",
+   "parent": "region-west-river",
+   "polygon": [
+    [
+     -224,
+     114
+    ],
+    [
+     -204,
+     114
+    ],
+    [
+     -204,
+     148
+    ],
+    [
+     -224,
+     148
+    ]
+   ],
+   "description": "Five bright stilt houses with decks over the sand, drying nets, rowing boats pulled up on the beach and a small blue-roofed chapel. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-cliff-village",
+   "name": "Whitewashed cliff village",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     252,
+     84
+    ],
+    [
+     306,
+     84
+    ],
+    [
+     306,
+     140
+    ],
+    [
+     252,
+     140
+    ]
+   ],
+   "description": "White cube houses with blue doors, shutters and the odd blue dome step down a sunny slope to a small harbour; bougainvillea spills over terrace walls, two round windmills turn above, and a blue-domed chapel rings its bell. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 22,
+   "starting": false,
+   "id": "region-cliff-village.chapel",
+   "name": "Blue-domed chapel",
+   "kind": "venue",
+   "parent": "region-cliff-village",
+   "polygon": [
+    [
+     276,
+     99.5
+    ],
+    [
+     282,
+     99.5
+    ],
+    [
+     282,
+     108.5
+    ],
+    [
+     276,
+     108.5
+    ]
+   ],
+   "description": "A tiny white chapel with a blue dome on a drum and a bell gable over the door. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-cliff-village.harbour-quay",
+   "name": "Cliff harbour quay",
+   "kind": "street",
+   "parent": "region-cliff-village",
+   "polygon": [
+    [
+     262,
+     127
+    ],
+    [
+     300,
+     127
+    ],
+    [
+     300,
+     133.5
+    ],
+    [
+     262,
+     133.5
+    ]
+   ],
+   "description": "A sunny quay with café tables under umbrellas, fishing boats tied up below. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 6,
+   "starting": false,
+   "id": "region-cliff-village.windmill-east",
+   "name": "East windmill",
+   "kind": "building",
+   "parent": "region-cliff-village",
+   "polygon": [
+    [
+     293.8,
+     89.8
+    ],
+    [
+     298.2,
+     89.8
+    ],
+    [
+     298.2,
+     94.2
+    ],
+    [
+     293.8,
+     94.2
+    ]
+   ],
+   "description": "A round white windmill with a thatched cap and six cloth sails. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 6,
+   "starting": false,
+   "id": "region-cliff-village.windmill-west",
+   "name": "West windmill",
+   "kind": "building",
+   "parent": "region-cliff-village",
+   "polygon": [
+    [
+     259.8,
+     87.8
+    ],
+    [
+     264.2,
+     87.8
+    ],
+    [
+     264.2,
+     92.2
+    ],
+    [
+     259.8,
+     92.2
+    ]
+   ],
+   "description": "Its twin at the western end of the village. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-east-crossroads",
+   "name": "East crossroads",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     264,
+     -36
+    ],
+    [
+     302,
+     -36
+    ],
+    [
+     302,
+     16
+    ],
+    [
+     264,
+     16
+    ]
+   ],
+   "description": "Where the east country road meets a lane among the hills: a red-and-white petrol station with two pumps, a stone pub with a hanging sign and a beer garden, a bus shelter, a big yellow billboard, cottages and telegraph poles. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 14,
+   "starting": false,
+   "id": "region-east-crossroads.petrol-station",
+   "name": "Petrol station shop",
+   "kind": "building",
+   "parent": "region-east-crossroads",
+   "polygon": [
+    [
+     270.5,
+     -13.5
+    ],
+    [
+     277.5,
+     -13.5
+    ],
+    [
+     277.5,
+     -8.5
+    ],
+    [
+     270.5,
+     -8.5
+    ]
+   ],
+   "description": "A small white shop with a red roof edge beside the pumps. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 77,
+   "starting": false,
+   "id": "region-east-crossroads.pub",
+   "name": "The pub",
+   "kind": "building",
+   "parent": "region-east-crossroads",
+   "polygon": [
+    [
+     288,
+     -20
+    ],
+    [
+     296,
+     -20
+    ],
+    [
+     296,
+     -8
+    ],
+    [
+     288,
+     -8
+    ]
+   ],
+   "description": "A two-storey stone pub with green shutters, flower boxes and a beer garden of umbrella tables behind. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-east-crossroads.beer-garden",
+   "name": "Beer garden",
+   "kind": "garden",
+   "parent": "region-east-crossroads",
+   "polygon": [
+    [
+     289,
+     -29
+    ],
+    [
+     296,
+     -29
+    ],
+    [
+     296,
+     -22
+    ],
+    [
+     289,
+     -22
+    ]
+   ],
+   "description": "Four picnic tables under green and white umbrellas. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-golf-course",
+   "name": "Golf course",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     178,
+     -186
+    ],
+    [
+     260,
+     -186
+    ],
+    [
+     260,
+     -110
+    ],
+    [
+     178,
+     -110
+    ]
+   ],
+   "description": "Five rolling fairways with striped mowing, sand bunkers, flags on the greens and a small water hazard, among pines in the north-eastern meadows; a white clubhouse with a green roof and a row of golf carts by the car park. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 34,
+   "starting": false,
+   "id": "region-golf-course.clubhouse",
+   "name": "Golf clubhouse",
+   "kind": "building",
+   "parent": "region-golf-course",
+   "polygon": [
+    [
+     182.5,
+     -120
+    ],
+    [
+     189.5,
+     -120
+    ],
+    [
+     189.5,
+     -108
+    ],
+    [
+     182.5,
+     -108
+    ]
+   ],
+   "description": "A white clubhouse with a green hip roof, a veranda and an awning over the terrace. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-golf-course.water-hazard",
+   "name": "Water hazard",
+   "kind": "water",
+   "parent": "region-golf-course",
+   "polygon": [
+    [
+     215,
+     -143
+    ],
+    [
+     229,
+     -143
+    ],
+    [
+     229,
+     -135
+    ],
+    [
+     215,
+     -135
+    ]
+   ],
+   "description": "A small pond in the middle of the course — where golf balls go to rest. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-festival-meadow",
+   "name": "Festival meadow",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     251,
+     24
+    ],
+    [
+     302,
+     24
+    ],
+    [
+     302,
+     82
+    ],
+    [
+     251,
+     82
+    ]
+   ],
+   "description": "A sloping meadow east of the suburb given over to the fair: a red-and-white striped big top, a yellow helter-skelter, an arc of striped food and game stalls, a little stage, bunting on poles, and two hot-air balloons straining at their tethers. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 150,
+   "starting": false,
+   "id": "region-festival-meadow.big-top",
+   "name": "Big top",
+   "kind": "venue",
+   "parent": "region-festival-meadow",
+   "polygon": [
+    [
+     266,
+     41
+    ],
+    [
+     288,
+     41
+    ],
+    [
+     288,
+     63
+    ],
+    [
+     266,
+     63
+    ]
+   ],
+   "description": "A striped circus tent with a flag on its peak; inside, a sawdust ring and benches. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-festival-meadow.helter-skelter",
+   "name": "Helter-skelter",
+   "kind": "attraction",
+   "parent": "region-festival-meadow",
+   "polygon": [
+    [
+     258,
+     38
+    ],
+    [
+     262,
+     38
+    ],
+    [
+     262,
+     42
+    ],
+    [
+     258,
+     42
+    ]
+   ],
+   "description": "A yellow tower with a red-and-white spiral slide. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-festival-meadow.stage",
+   "name": "Fair stage",
+   "kind": "venue",
+   "parent": "region-festival-meadow",
+   "polygon": [
+    [
+     290,
+     34
+    ],
+    [
+     298,
+     34
+    ],
+    [
+     298,
+     42
+    ],
+    [
+     290,
+     42
+    ]
+   ],
+   "description": "A small timber stage with a blue backdrop and striped pelmet. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-alpine",
+   "name": "Alpine chalets and cable car",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     -60,
+     -330
+    ],
+    [
+     40,
+     -330
+    ],
+    [
+     40,
+     -176
+    ],
+    [
+     -60,
+     -176
+    ]
+   ],
+   "description": "North of the campus the land climbs into the mountains: wooden chalets with balconies and stacked firewood sit among pines, and a red and a yellow gondola ride the cable car up to a chalet restaurant with a sun terrace near the snowline. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 17,
+   "starting": false,
+   "id": "region-alpine.valley-station",
+   "name": "Cable car valley station",
+   "kind": "building",
+   "parent": "region-alpine",
+   "polygon": [
+    [
+     -7.5,
+     -199
+    ],
+    [
+     -0.5,
+     -199
+    ],
+    [
+     -0.5,
+     -193
+    ],
+    [
+     -7.5,
+     -193
+    ]
+   ],
+   "description": "A timber station at the foot of the cable car. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 77,
+   "starting": false,
+   "id": "region-alpine.mountain-restaurant",
+   "name": "Mountain restaurant",
+   "kind": "building",
+   "parent": "region-alpine",
+   "polygon": [
+    [
+     0,
+     -306
+    ],
+    [
+     12,
+     -306
+    ],
+    [
+     12,
+     -298
+    ],
+    [
+     0,
+     -298
+    ]
+   ],
+   "description": "A two-storey chalet restaurant with flower boxes, a balcony and a sun terrace with umbrellas. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 22,
+   "starting": false,
+   "id": "region-alpine.mountain-station",
+   "name": "Cable car mountain station",
+   "kind": "building",
+   "parent": "region-alpine",
+   "polygon": [
+    [
+     2,
+     -315.5
+    ],
+    [
+     10,
+     -315.5
+    ],
+    [
+     10,
+     -308.5
+    ],
+    [
+     2,
+     -308.5
+    ]
+   ],
+   "description": "The top station, looking back over all of Eden to the sea. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-castle-ruin",
+   "name": "Castle ruin",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     -181,
+     -201
+    ],
+    [
+     -149,
+     -201
+    ],
+    [
+     -149,
+     -169
+    ],
+    [
+     -181,
+     -169
+    ]
+   ],
+   "description": "A broken curtain wall, crumbling round towers and a tall keep on a crag in the north-western hills, among pines. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-southern-sea",
+   "name": "Southern sea",
+   "kind": "water",
+   "parent": "eden",
+   "polygon": [
+    [
+     -430,
+     192
+    ],
+    [
+     430,
+     192
+    ],
+    [
+     430,
+     430
+    ],
+    [
+     -430,
+     430
+    ]
+   ],
+   "description": "Open sea to the south as far as the eye can see. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-eastern-hills",
+   "name": "Eastern hills",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     304,
+     -160
+    ],
+    [
+     430,
+     -160
+    ],
+    [
+     430,
+     80
+    ],
+    [
+     304,
+     80
+    ]
+   ],
+   "description": "Rolling wooded hills with farmsteads, country roads and wind turbines on the ridges. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": null,
+   "starting": false,
+   "id": "region-northern-mountains",
+   "name": "Northern mountains",
+   "kind": "outdoor",
+   "parent": "eden",
+   "polygon": [
+    [
+     -430,
+     -400
+    ],
+    [
+     430,
+     -400
+    ],
+    [
+     430,
+     -331
+    ],
+    [
+     -430,
+     -331
+    ]
+   ],
+   "description": "Forested slopes rising to bare, pale peaks. (Seen from Eden — scenery for now, not walkable yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 17,
+   "starting": false,
+   "id": "int-cafe",
+   "name": "Corner café",
+   "kind": "shop",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     98.7,
+     21.2
+    ],
+    [
+     104.3,
+     21.2
+    ],
+    [
+     104.3,
+     28.8
+    ],
+    [
+     98.7,
+     28.8
+    ]
+   ],
+   "description": "A small corner café with a green counter: an espresso machine, cakes under glass, bread, a chalkboard menu, two window tables, counter stools and a teal sofa nook by a bookshelf. Order coffee, share cake, sit and talk or read for an hour. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 12,
+   "starting": false,
+   "id": "int-music-room",
+   "name": "Music room",
+   "kind": "room",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     98.8,
+     55.7
+    ],
+    [
+     103.39999999999999,
+     55.7
+    ],
+    [
+     103.39999999999999,
+     62.3
+    ],
+    [
+     98.8,
+     62.3
+    ]
+   ],
+   "description": "A plum-trimmed music room: an upright piano, a drum kit, two guitars on stands, three music stands with chairs on a round rug, sheet music shelves and sound panels. Play, rehearse together, teach a song or sit and listen. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 7,
+   "starting": false,
+   "id": "int-games-room",
+   "name": "Games room",
+   "kind": "room",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     84.2,
+     -21.3
+    ],
+    [
+     88.8,
+     -21.3
+    ],
+    [
+     88.8,
+     -17.7
+    ],
+    [
+     84.2,
+     -17.7
+    ]
+   ],
+   "description": "A cosy games room: a chess table set for a game, a green card table for four, a shelf of board games, a dartboard and an armchair under warm pendants. Play chess or cards, challenge someone, or watch a game. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 7,
+   "starting": false,
+   "id": "int-bakery",
+   "name": "Bakery",
+   "kind": "shop",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     75.7,
+     -17.8
+    ],
+    [
+     79.3,
+     -17.8
+    ],
+    [
+     79.3,
+     -13.2
+    ],
+    [
+     75.7,
+     -13.2
+    ]
+   ],
+   "description": "A warm bakery with a domed brick oven glowing at the back, shelves of loaves, a counter with bread baskets and a cake stand, a flour-dusted kneading table and sacks of flour. Bake bread at dawn, buy or share a loaf. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 8,
+   "starting": false,
+   "id": "int-chapel",
+   "name": "Chapel",
+   "kind": "chapel",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     84,
+     80
+    ],
+    [
+     89,
+     80
+    ],
+    [
+     89,
+     84
+    ],
+    [
+     84,
+     84
+    ]
+   ],
+   "description": "A small white chapel with a bell-cote: three rows of walnut pews either side of a rust runner, an altar with a cloth, candles and flowers, brass candle stands and a lectern, tall side windows. Sit in silence, light a candle, hold a wedding, a memorial or a quiet reading. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 8,
+   "starting": false,
+   "id": "int-clinic",
+   "name": "Clinic",
+   "kind": "clinic",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     62.5,
+     -11
+    ],
+    [
+     66.5,
+     -11
+    ],
+    [
+     66.5,
+     -6
+    ],
+    [
+     62.5,
+     -6
+    ]
+   ],
+   "description": "A bright little clinic with a green cross by the door: a reception desk, three waiting chairs, an examination cot behind a folding screen, a cabinet of bottles, a basin and a clock. Ask for help, rest when unwell, or keep someone company while they wait. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 8,
+   "starting": false,
+   "id": "int-bathhouse",
+   "name": "Bathhouse and laundry",
+   "kind": "bathhouse",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     81.5,
+     -13
+    ],
+    [
+     85.5,
+     -13
+    ],
+    [
+     85.5,
+     -8
+    ],
+    [
+     81.5,
+     -8
+    ]
+   ],
+   "description": "A cool blue-green bathhouse and laundry: two deep tubs behind a screen, washbasins with a mirror, shelves of folded towels, a laundry tub and basket, and a washing line outside. Bathe, wash clothes, hang them out and chat while they dry. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 6,
+   "starting": false,
+   "id": "int-potting-shed",
+   "name": "Potting shed",
+   "kind": "workshop",
+   "parent": "eden-east",
+   "polygon": [
+    [
+     42,
+     80.5
+    ],
+    [
+     46,
+     80.5
+    ],
+    [
+     46,
+     84.5
+    ],
+    [
+     42,
+     84.5
+    ]
+   ],
+   "description": "A green timber potting shed by the observatory: a long bench of terracotta pots and seedlings, shelves of pots and herbs, sacks of compost, a watering can and wide windows. Pot up seedlings, take cuttings, plan the gardens. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 9,
+   "starting": false,
+   "id": "int-library-stacks",
+   "name": "Library stacks",
+   "kind": "room",
+   "parent": "eden-library-1",
+   "polygon": [
+    [
+     69.2,
+     -10.8
+    ],
+    [
+     78.8,
+     -10.8
+    ],
+    [
+     78.8,
+     -8.4
+    ],
+    [
+     69.2,
+     -8.4
+    ]
+   ],
+   "description": "Floor-to-ceiling walnut bookshelves under the tall north windows, with two writing desks and green-shaded lamps. Browse the shelves, take a book down, or write quietly at a desk. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 13,
+   "starting": false,
+   "id": "int-library-reading-tables",
+   "name": "Library reading tables",
+   "kind": "room",
+   "parent": "eden-library-1",
+   "polygon": [
+    [
+     69.2,
+     -8.4
+    ],
+    [
+     78.8,
+     -8.4
+    ],
+    [
+     78.8,
+     -4.9
+    ],
+    [
+     69.2,
+     -4.9
+    ]
+   ],
+   "description": "Two long reading tables on warm rugs under brass pendants, with benches for six. Read, study together in low voices, or spread out maps and papers. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 3,
+   "starting": false,
+   "id": "int-library-reading-corner",
+   "name": "Library reading corner",
+   "kind": "room",
+   "parent": "eden-library-1",
+   "polygon": [
+    [
+     75.6,
+     -4.9
+    ],
+    [
+     78.8,
+     -4.9
+    ],
+    [
+     78.8,
+     -3.2
+    ],
+    [
+     75.6,
+     -3.2
+    ]
+   ],
+   "description": "Two deep armchairs facing each other across a small lamp table — the cosiest seats in the library, for a long book or a quiet one-to-one talk. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 14,
+   "starting": false,
+   "id": "int-barn-woodshop",
+   "name": "Barn woodshop",
+   "kind": "workshop",
+   "parent": "eden-barn-1",
+   "polygon": [
+    [
+     82.16,
+     47.16
+    ],
+    [
+     86.6,
+     47.16
+    ],
+    [
+     86.6,
+     54.84
+    ],
+    [
+     82.16,
+     54.84
+    ]
+   ],
+   "description": "A sturdy workbench with a vice under a pegboard of saws, chisels and mallets; sawhorses and a stack of seasoned planks. Measure, saw, plane and build furniture or repair tools. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 9,
+   "starting": false,
+   "id": "int-barn-craft-floor",
+   "name": "Barn craft table",
+   "kind": "workshop",
+   "parent": "eden-barn-1",
+   "polygon": [
+    [
+     86.6,
+     47.16
+    ],
+    [
+     89.6,
+     47.16
+    ],
+    [
+     89.6,
+     54.84
+    ],
+    [
+     86.6,
+     54.84
+    ]
+   ],
+   "description": "A long pine table on a rug in the middle of the barn under hanging lanterns, with stools for six — for shared making, mending, sketching and teaching a craft. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 13,
+   "starting": false,
+   "id": "int-barn-crafts-and-stores",
+   "name": "Barn pottery, loom and stores",
+   "kind": "workshop",
+   "parent": "eden-barn-1",
+   "polygon": [
+    [
+     89.6,
+     47.16
+    ],
+    [
+     93.84,
+     47.16
+    ],
+    [
+     93.84,
+     54.84
+    ],
+    [
+     89.6,
+     54.84
+    ]
+   ],
+   "description": "A pottery wheel beside shelves of drying pots, a floor loom with a half-woven rug, and the barn’s stores: hay bales, grain sacks and barrels. Throw a pot, weave a few rows, or fetch supplies. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 4,
+   "starting": false,
+   "id": "int-house-1-kitchen",
+   "name": "House 1 kitchen wing",
+   "kind": "room",
+   "parent": "eden-house-1",
+   "polygon": [
+    [
+     35.64,
+     12.14
+    ],
+    [
+     37.36,
+     12.14
+    ],
+    [
+     37.36,
+     17.86
+    ],
+    [
+     35.64,
+     17.86
+    ]
+   ],
+   "description": "The east wing of the courtyard house: a sink and stove along the wall and a small table for two by the window. Cook, make tea, eat breakfast looking into the courtyard. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 4,
+   "starting": false,
+   "id": "int-house-1-bedroom",
+   "name": "House 1 bedroom wing",
+   "kind": "bedroom",
+   "parent": "eden-house-1",
+   "polygon": [
+    [
+     30.64,
+     12.14
+    ],
+    [
+     32.36,
+     12.14
+    ],
+    [
+     32.36,
+     17.86
+    ],
+    [
+     30.64,
+     17.86
+    ]
+   ],
+   "description": "The west wing with the bed, a lamp-lit nightstand, a wardrobe and a woven rug. Sleep, dress, read in bed. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 4,
+   "starting": false,
+   "id": "int-house-2-living",
+   "name": "House 2 living corner",
+   "kind": "room",
+   "parent": "eden-house-2",
+   "polygon": [
+    [
+     52.8,
+     12.14
+    ],
+    [
+     55.86,
+     12.14
+    ],
+    [
+     55.86,
+     15.6
+    ],
+    [
+     52.8,
+     15.6
+    ]
+   ],
+   "description": "A kitchenette with sink and stove, an ochre armchair on a navy rug by the east window — the home’s sitting and cooking corner; a round table for two stands by the bed. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 10,
+   "starting": false,
+   "id": "int-house-3-kitchen",
+   "name": "House 3 kitchen and dining room",
+   "kind": "kitchen",
+   "parent": "eden-house-3",
+   "polygon": [
+    [
+     28.2,
+     25.2
+    ],
+    [
+     38.2,
+     25.2
+    ],
+    [
+     38.2,
+     27.8
+    ],
+    [
+     28.2,
+     27.8
+    ]
+   ],
+   "description": "The north range of the warm timber courtyard house: a fitted kitchen with fridge, sink and stove, a sideboard under a painting, and a dining table set for six under a pendant lamp. Cook a meal, set the table, invite neighbours to dinner. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 10,
+   "starting": false,
+   "id": "int-house-3-living",
+   "name": "House 3 living room",
+   "kind": "room",
+   "parent": "eden-house-3",
+   "polygon": [
+    [
+     28.2,
+     32.2
+    ],
+    [
+     38.2,
+     32.2
+    ],
+    [
+     38.2,
+     34.8
+    ],
+    [
+     28.2,
+     34.8
+    ]
+   ],
+   "description": "The south range by the front door: a sofa, armchair and low table on a rug with a reading lamp, bookshelves — and an upright piano with a music stand. Talk, read, play or listen to music. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 6,
+   "starting": false,
+   "id": "int-house-3-bedroom",
+   "name": "House 3 bedroom",
+   "kind": "bedroom",
+   "parent": "eden-house-3",
+   "polygon": [
+    [
+     28.2,
+     28
+    ],
+    [
+     31.8,
+     28
+    ],
+    [
+     31.8,
+     32
+    ],
+    [
+     28.2,
+     32
+    ]
+   ],
+   "description": "A quiet bedroom off the courtyard: bed, nightstand lamp, wardrobe, a writing desk with stocked shelves and a rug. Sleep, dress, write letters. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 10,
+   "starting": false,
+   "id": "int-house-4-kitchen",
+   "name": "House 4 kitchen and dining room",
+   "kind": "kitchen",
+   "parent": "eden-house-4",
+   "polygon": [
+    [
+     48.2,
+     25.2
+    ],
+    [
+     58.2,
+     25.2
+    ],
+    [
+     58.2,
+     27.8
+    ],
+    [
+     48.2,
+     27.8
+    ]
+   ],
+   "description": "The north range of the pale stone courtyard house: a fitted kitchen with fridge, sink and stove, a sideboard under a painting, and a dining table set for six under a pendant lamp. Cook a meal, set the table, invite neighbours to dinner. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 10,
+   "starting": false,
+   "id": "int-house-4-living",
+   "name": "House 4 living room",
+   "kind": "room",
+   "parent": "eden-house-4",
+   "polygon": [
+    [
+     48.2,
+     32.2
+    ],
+    [
+     58.2,
+     32.2
+    ],
+    [
+     58.2,
+     34.8
+    ],
+    [
+     48.2,
+     34.8
+    ]
+   ],
+   "description": "The south range by the front door: a sofa, armchair and low table on a rug with a reading lamp, bookshelves, a plan chest and an easel by the window. Talk, read, paint or draw. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": true,
+   "capacity": 6,
+   "starting": false,
+   "id": "int-house-4-bedroom",
+   "name": "House 4 bedroom",
+   "kind": "bedroom",
+   "parent": "eden-house-4",
+   "polygon": [
+    [
+     48.2,
+     28
+    ],
+    [
+     51.8,
+     28
+    ],
+    [
+     51.8,
+     32
+    ],
+    [
+     48.2,
+     32
+    ]
+   ],
+   "description": "A quiet bedroom off the courtyard: bed, nightstand lamp, wardrobe, a writing desk with stocked shelves and a rug. Sleep, dress, write letters. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 14,
+   "starting": false,
+   "id": "int-office-post-room",
+   "name": "Post room and reception",
+   "kind": "room",
+   "parent": "eden-office-1-floor-0",
+   "polygon": [
+    [
+     86.2,
+     11.2
+    ],
+    [
+     97.8,
+     11.2
+    ],
+    [
+     97.8,
+     14.2
+    ],
+    [
+     86.2,
+     14.2
+    ]
+   ],
+   "description": "Low pigeonholes under the north windows hold letters for every resident, with parcels stacked beside them and a notice board on the east wall. Post or collect mail, leave a note, or ask at the desks. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 0,
+   "enclosed": false,
+   "capacity": 4,
+   "starting": false,
+   "id": "int-office-lounge",
+   "name": "Office lounge",
+   "kind": "room",
+   "parent": "eden-office-1-floor-0",
+   "polygon": [
+    [
+     94.8,
+     15.8
+    ],
+    [
+     97.8,
+     15.8
+    ],
+    [
+     97.8,
+     18.8
+    ],
+    [
+     94.8,
+     18.8
+    ]
+   ],
+   "description": "A teal sofa and coffee table by the window, cups left out — a place to wait, have a quick chat or take a break from the desks. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 1,
+   "enclosed": false,
+   "capacity": 11,
+   "starting": false,
+   "id": "int-office-studio",
+   "name": "Artists’ studio",
+   "kind": "studio",
+   "parent": "eden-office-1-floor-1",
+   "polygon": [
+    [
+     89.6,
+     11.2
+    ],
+    [
+     97.8,
+     11.2
+    ],
+    [
+     97.8,
+     14.6
+    ],
+    [
+     89.6,
+     14.6
+    ]
+   ],
+   "description": "Four easels with canvases in progress catch the north light; a sitter’s stool, a paint trolley and a plan chest of paper and prints. Paint, draw, pose for a portrait or critique each other’s work. (Seen from the commons — not reachable on foot yet.)"
+  },
+  {
+   "level": 2,
+   "enclosed": false,
+   "capacity": 4,
+   "starting": false,
+   "id": "int-office-upper-lounge",
+   "name": "Upper lounge",
+   "kind": "room",
+   "parent": "eden-office-1-floor-2",
+   "polygon": [
+    [
+     93.6,
+     16.6
+    ],
+    [
+     97.8,
+     16.6
+    ],
+    [
+     97.8,
+     18.8
+    ],
+    [
+     93.6,
+     18.8
+    ]
+   ],
+   "description": "A rust sofa and an ochre armchair in the corner of the top floor — for waiting before a meeting or continuing one more comfortably. (Seen from the commons — not reachable on foot yet.)"
+  }
+ ]
+}

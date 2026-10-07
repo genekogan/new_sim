@@ -52,10 +52,48 @@ test('vocabulary: a known place without a target stands in its nearest whole pla
  assert.equal(to('walk:library'), 'walk:eden-classroom-1', 'Library (exact name) beats Library annex');
  const far = resolveCapability('walk:region-park.pond', ctx());assert.equal(far.kind, 'unknown');assert.match((far as any).reason, /not walkable ground yet/);
 });
-test('vocabulary: ambiguous or unknown names are refused with did_you_mean (closest offered first)', () => {
- const shore = to('walk:shore') as {unknown: string[]};assert.deepEqual(shore.unknown.slice(0, 2).sort(), ['walk:shore-bank', 'walk:shore-water']);
+test('vocabulary: several matches prefer the obvious one (nearest, with the others named); unknown names get did_you_mean', () => {
+ const shore = resolveCapability('walk:shore', ctx());assert.equal(shore.kind, 'alias');assert.equal((shore as any).cap.id, 'walk:shore-bank', 'the nearer of the two');assert.match((shore as any).note, /walk:shore-water/);
  const dining = to('walk:dining-common') as {unknown: string[]};assert.equal(dining.unknown[0], 'walk:social-eden-dining');
- const bogus = to('dance:moon') as {unknown: string[]};assert.equal(bogus.unknown.length, 5);
- const sit = resolveCapability('sit:here', ctx([-40, 40]));assert.equal(sit.kind, 'unknown');assert.match((sit as any).reason, /Nothing free to sit within a few metres/);
+ const bogus = resolveCapability('dance:moon', ctx());assert.equal(bogus.kind, 'unknown');assert.match((bogus as any).reason, /No "dance" capability/);assert.ok((bogus as any).didYouMean.some((d: any) => d.id === 'rest:here'), 'real things to do');
+ const sit = resolveCapability('sit:here', ctx([-40, 40]));assert.equal(sit.kind, 'alias');assert.equal((sit as any).cap.id, 'rest:here');assert.match((sit as any).note, /No free seat within 30 m/);
  assert.deepEqual(parseCapability('hang out at the deck', new Set(['hang-out'])), {verb: 'hang-out', rest: 'at the deck'});
+});
+test('vocabulary: everyday sentences become activities (activities/1) and places resolve by name, synonym and description', () => {
+ const verbs = new Set(['walk', 'read', 'lie', 'nap', 'sit', 'sit-ground', 'stroll', 'play-piano', 'stand', 'warm-by-fire']);
+ assert.equal(parseCapability('find somewhere to read a book', verbs).verb, 'read');assert.equal(parseCapability('find somewhere to read a book', verbs).rest, '');
+ assert.equal(parseCapability('read a book in the library', verbs).verb, 'read');
+ assert.equal(parseCapability('lie down', verbs).verb, 'lie');assert.equal(parseCapability('take a nap on the grass', verbs).verb, 'nap');
+ assert.equal(parseCapability('sit down', verbs).verb, 'sit');assert.equal(parseCapability('take a seat', verbs).verb, 'sit');assert.equal(parseCapability('sit on the grass', verbs).verb, 'sit-ground');
+ assert.equal(parseCapability('take a walk through the park', verbs).verb, 'stroll');assert.equal(parseCapability('come back to the fire', verbs).verb, 'walk');
+ assert.equal(parseCapability('play the piano', verbs).verb, 'play-piano');
+ const here = (id: string, verb: string): EdgeCapability => ({id, verb, label: id, available: true});
+ const park = {id: 'region-park', name: 'Park with pond', center: [-5, 114] as [number, number], parent: 'eden', kind: 'outdoor', walkable: true, description: 'A green park round an oval pond with reeds, a ring path and benches; a white gazebo'};
+ const gazebo = {id: 'region-park.gazebo', name: 'Park gazebo', center: [-28, 110] as [number, number], parent: 'region-park', kind: 'pavilion', walkable: true};
+ const woods = {id: 'eden-north-woods', name: 'Northern woodland', center: [5, -47] as [number, number], parent: 'eden', kind: 'outdoor', walkable: true};
+ const fire = {id: 'social-eden-fire-circle', name: 'Campfire clearing', center: [24, -7] as [number, number], parent: 'field', kind: 'outdoor', walkable: true};
+ const ps = [...places, park, gazebo, woods, fire];
+ const cs: EdgeCapability[] = [...caps, ...[park, gazebo, woods].map(p => P('walk', p.id, p.name)), {id: 'stroll:region-park', verb: 'stroll', label: 'Stroll through Park with pond', available: true, target: {id: 'region-park', kind: 'place'}},
+  here('sit:here', 'sit'), here('lie:here', 'lie'), here('nap:here', 'nap'), here('read:here', 'read'), {id: 'read:eden-library-1', verb: 'read', label: 'Read a book in Library', available: true, target: {id: 'eden-library-1', kind: 'place'}}, here('wander:here', 'wander')];
+ const c2: VocabContext = {...ctx(), caps: cs, places: ps, target: c => {const p = ps.find(x => x.id === c.target?.id); return p ? {names: [p.name], around: [], at: p.center} : ctx().target(c);}};
+ const go = (s: string) => {const r = resolveCapability(s, c2); return r.kind === 'unknown' ? 'unknown: ' + r.reason : r.cap.id;};
+ assert.equal(go('sit down'), 'sit:here');assert.equal(go('take a seat'), 'sit:here');assert.equal(go('lie down'), 'lie:here');assert.equal(go('take a nap'), 'nap:here');
+ assert.equal(go('find somewhere to read a book'), 'read:here');assert.equal(go('read a book in the library'), 'read:eden-library-1');
+ assert.equal(go('walk:park'), 'walk:region-park', 'the park, not its gazebo');assert.equal(go('go to the park'), 'walk:region-park');
+ assert.equal(go('take a walk through the park'), 'stroll:region-park');assert.equal(go('stroll'), 'wander:here');
+ assert.equal(go('walk to the woods'), 'walk:eden-north-woods', 'synonym woods → woodland');assert.equal(go('walk:forest'), 'walk:eden-north-woods');
+ assert.equal(go('come back to the fire'), 'walk:social-eden-fire-circle');assert.equal(go('walk:campfire'), 'walk:social-eden-fire-circle');
+ assert.equal(go('walk:gazebo'), 'walk:region-park.gazebo');
+});
+test('vocabulary (audit P0a): "go for a X" resolves X; rides join the balloon; unsupported motions are refused honestly', () => {
+ const join: EdgeCapability = {id: 'object:ride-eden-balloon:join', verb: 'object', label: 'Take a ride: walk to the boarding step and climb into the basket (Red balloon)', available: true, object: 'ride-eden-balloon', action: 'join'};
+ const here = (id: string, verb: string): EdgeCapability => ({id, verb, label: id, available: true});
+ const cs = [...caps, join, here('wander:here', 'wander'), here('dance:here', 'dance'), here('situps:here', 'situps'), here('pushups:here', 'pushups'), here('jumping-jacks:here', 'jumping-jacks'), here('nap:here', 'nap'), here('wave:s_moss', 'wave')];
+ const c3: VocabContext = {...ctx(), caps: cs};
+ const go = (s: string) => {const r = resolveCapability(s, c3); return r.kind === 'unknown' ? 'unknown' : r.cap.id;};
+ assert.equal(go('go for a swim'), 'swim:shore-water');assert.equal(go('go for a walk'), 'wander:here');assert.equal(go('take a nap'), 'nap:here');
+ assert.equal(go('go for a balloon ride'), join.id);assert.equal(go('ride the balloon'), join.id);assert.equal(go('fly in the balloon'), join.id);assert.equal(go('take a ride'), join.id);
+ for (const s of ['go for a run', 'run to the deck', 'jog around', 'give Moss a hug', 'go for a jog']) {const r = resolveCapability(s, c3);assert.equal(r.kind, 'unknown', s);}
+ assert.match((resolveCapability('go for a run', c3) as any).reason, /cannot run yet/);
+ assert.equal(go('do some sit-ups'), 'situps:here');assert.equal(go('do push ups'), 'pushups:here');assert.equal(go('jumping jacks'), 'jumping-jacks:here');assert.equal(go('dance'), 'dance:here');
 });
