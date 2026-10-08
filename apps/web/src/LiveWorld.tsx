@@ -145,6 +145,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   const follow = cameraMode === 'follow';
   const [thing, setThing] = useState<string | null>(null);
   const [mode, setMode] = useState<'live' | 'past'>('live');
+  const [, refreshPlayback] = useState(0);
   const [draft, setDraft] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [placeCard,setPlaceCard]=useState<HoverTarget|null>(null);
@@ -611,7 +612,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         alive.add(soul.id);
         const drawnBody=recordedBody(rec?.body,at.entities[soul.entityId]?.state??{});
         const lift = drawnBody?.family === 'floater' ? (() => { const b = floaterBody(drawnBody); return b.hoverHeight + b.radius + 0.15; })() : 2.05;
-        if(refresh&&!past.current&&!eyes)portraits.capture(soul.id,JSON.stringify([drawnBody,soul.entityId]),people?.bodyObject(soul.entityId)??floaters.object(soul.entityId)??standIns.getObjectByName(soul.entityId)??null,drawnBody?.family==='floater',now);
+        if(refresh&&!eyes)portraits.capture(soul.id,JSON.stringify([drawnBody,soul.entityId]),people?.bodyObject(soul.entityId)??floaters.object(soul.entityId)??standIns.getObjectByName(soul.entityId)??null,drawnBody?.family==='floater',now);
         const l = labelFor(soul);
         l.obj.position.set(pos[0], pos[1] + lift, pos[2]);
         l.obj.visible = true;
@@ -859,9 +860,10 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // An explicit seek chooses a recorded moment even inside the live buffer.
     // The separate live command resumes the delayed live view.
     const tick = Math.floor(Math.max(at - HOUR_SECONDS / dts, Math.min(at, wanted), 0));
+    // A newer buffered seek also supersedes an older network request.
+    seeking.current?.abort(); seeking.current = null;
     const cur = past.current;
-    if (cur && cur.chunks[0].fromTick <= tick && tick <= cur.chunks.at(-1)!.toTick) { cur.tick = tick; setDraft(null); setNote(null); return; }
-    seeking.current?.abort();
+    if (cur && cur.chunks[0].fromTick <= tick && tick <= cur.chunks.at(-1)!.toTick) { cur.tick = tick; setLoading(false); setDraft(null); setNote(null); refreshPlayback(n=>n+1); return; }
     const ctl = new AbortController();
     seeking.current = ctl;
     setLoading(true); setNote(null);
@@ -885,10 +887,10 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     if (commitTimer.current) clearTimeout(commitTimer.current);
     commitTimer.current = setTimeout(() => commit(v), 600); // keyboard and slow drags; a release commits at once
   };
-  const togglePlay = () => { if (past.current) { past.current.playing = !past.current.playing; setNote(null); setMode('past'); } };
+  const togglePlay = () => { if (past.current) { past.current.playing = !past.current.playing; setNote(null); setMode('past'); refreshPlayback(n=>n+1); } };
   playbackCommands.current = { seek, live: goLive, setPlaying: (playing) => {
     if (!past.current) return false;
-    past.current.playing = playing; setNote(null); setMode('past'); return true;
+    past.current.playing = playing; setNote(null); setMode('past'); refreshPlayback(n=>n+1); return true;
   } };
   useEffect(() => {
     const handle = createWorldViewerHandle(() => ({
