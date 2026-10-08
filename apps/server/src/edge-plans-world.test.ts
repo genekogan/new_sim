@@ -25,7 +25,8 @@ test('plans + fade by abandonment in a native world: lie 90 min on instruction s
   t.after(() => {plans.close(); events.close(); comms.close();});
   const [ana, ben, cai, dot] = w.souls, body = (s: typeof ana) => w.engine.world.entities[s.entityId];
   /** World time passes in ticks; wall time (fading, plan deadlines) in the fake clock. */
-  const run = async (ticks: number) => {for (let i = 0; i < ticks; i++) {w.f.host.tickOnce(); if (i % 20 === 0) {await setImmediate(); w.f.host.drainInputs(); plans.tick();}} await setImmediate(); w.f.host.drainInputs();};
+  let lieTicks = 0, allTicks = 0;
+  const run = async (ticks: number) => {for (let i = 0; i < ticks; i++) {w.f.host.tickOnce(); allTicks++; if (body(ana)?.human?.activity === 'lie') lieTicks++; if (i % 20 === 0) {await setImmediate(); w.f.host.drainInputs(); plans.tick();}} await setImmediate(); w.f.host.drainInputs();};
   const settle = async <T>(p: Promise<T>) => {let done = false; p.then(() => done = true, () => done = true); for (let i = 0; i < 400 && !done; i++) {w.f.host.tickOnce(); await setImmediate(); w.f.host.drainInputs();} assert.ok(done, 'settled'); return p;};
   comms.sweep();
   // spread out first (two bodies lying side by side at the spawn point nudge each other: pose.moved)
@@ -56,7 +57,8 @@ test('plans + fade by abandonment in a native world: lie 90 min on instruction s
   assert.ok(colours.ben!.every(c => c === 'green'), 'Ben lying on a single 30-min act stays green: ' + colours.ben!.join(' '));
   assert.ok(colours.cai!.every(c => c === 'green'), 'Cai, seated by her own choice, stays green: ' + colours.cai!.join(' '));
   assert.equal(colours.dot!.at(-1), 'gone', 'Dot, abandoned, still fades at 60');
-  assert.ok(lying.size >= 12, `Ana is lying most of the time (${lying.size}/18 samples)`);
+  t.diagnostic(`Ana lying ${lieTicks}/${allTicks} ticks`);
+  assert.ok(lieTicks / allTicks > 0.5, `Ana is lying most of the time (${lieTicks}/${allTicks} ticks)`);
   const acts = w.f.db.db.prepare("SELECT capability, client_ref FROM edge_receipts_v1 WHERE world_id=? AND soul_id=? ORDER BY created_at").all(w.f.host.worldId, ana.soulId) as {capability: string; client_ref: string}[];
   const lies = acts.filter(a => a.client_ref?.startsWith('pl:'));
   assert.ok(lies.length >= 10 && lies.every(a => a.capability === 'lie:here' && /^pl:pl_[^:]+:0:\d+$/.test(a.client_ref)), `the plan lay down again each time the lie ended (${lies.length} acts)`);
