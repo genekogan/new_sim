@@ -12,3 +12,10 @@ test('pinned map sidecars retain seven native room identities and preserve admis
 test('sidecars reject unknown/changed aliases, outside geometry and role injection',()=>{
  for(const change of [(d:any)=>d.nativeAliases.aliases[0].nativeRegion='invented',(d:any)=>d.nativeAliases.aliases.push(d.nativeAliases.aliases[0]),(d:any)=>d.placeData.places.find((p:any)=>p.id==='tower-l0').level=0,(d:any)=>d.placeData.places[1].polygon[0]=[999,999],(d:any)=>d.activityData.solids[0].half=[-1,2],(d:any)=>d.activityData.interiors[0].doors[0]=[999,999,999,998],(d:any)=>d.placeData.places[0].roles=[{id:'admin'}]]){const d=structuredClone(raw);change(d);assert.throws(()=>validateAuthoredLmSidecars(host,d),/authored-lm.invalid/);}
 });
+test('ring containment checks the other corners of a slanted root',()=>{
+ const d={placeData:{contract:'place-data/1',world:'littlemartians',places:[{id:'root',name:'Root',kind:'outdoor',parent:null,polygon:[[-2,0],[0,-2],[2,0],[0,2]],level:0,enclosed:false,capacity:null,starting:true}]},activityData:{contract:'activity-spots/1',world:'littlemartians',spots:[],solids:[],interiors:[],rings:[{id:'protruding-ring',c:[-.5,.5],r:1}]},nativeAliases:{schema:'native-place-aliases/1',aliases:[]}};
+ // The original two corners (-1.5,-.5),(.5,1.5) lie on the root boundary;
+ // (-1.5,1.5) and the corresponding circle arc protrude outside it.
+ assert.throws(()=>validateAuthoredLmSidecars(host,d),/ring outside root/);
+ d.activityData.rings[0].r=.4;assert.equal(validateAuthoredLmSidecars(host,d).activities.rings.length,1);
+});

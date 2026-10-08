@@ -24,7 +24,7 @@ export function validateAuthoredLmSidecars(host:WorldHost,raw:{placeData:unknown
  if(loadSpots(activities).refused.length)fail('refused activity geometry');
  for(const s of [...(activities.spots??[]),...(activities.shelves??[])]){const poly=s.place?byId.get(s.place)?.polygon:root.polygon;if(!poly||!finitePt(s.at)||!contains(poly,s.at)||(s.faceTo&&!finitePt(s.faceTo)))fail('spot outside place');}
  for(const s of activities.solids??[]){if(!finitePt(s.half)||s.half.some((x:number)=>x<=0)||!Number.isFinite(s.height)||s.height<=0)fail('solid bounds');for(const x of [-s.half[0],s.half[0]])for(const z of [-s.half[1],s.half[1]])if(!contains(root.polygon,[s.c[0]+x*Math.cos(s.yaw)-z*Math.sin(s.yaw),s.c[1]+x*Math.sin(s.yaw)+z*Math.cos(s.yaw)]))fail('solid outside root');}
- for(const g of activities.rings??[])for(const p of [[g.c[0]-g.r,g.c[1]-g.r],[g.c[0]+g.r,g.c[1]+g.r]] as V2[])if(!contains(root.polygon,p))fail('ring outside root');
+ for(const g of activities.rings??[])for(const x of [-g.r,g.r])for(const z of [-g.r,g.r])if(!contains(root.polygon,[g.c[0]+x,g.c[1]+z]))fail('ring outside root');
  for(const i of activities.interiors??[]){const place=byId.get(i.place);if(!place||!Number.isFinite(i.wall)||i.wall<=0||(i.furniture??[]).length)fail('interior');for(const d of i.doors)if(!contains(place!.polygon,[d[0],d[1]])||!contains(place!.polygon,[d[2],d[3]]))fail('door outside place');}
  const aliases=raw.nativeAliases as any;
  if(aliases?.schema!=='native-place-aliases/1'||!keys(aliases,['schema','aliases'])||!Array.isArray(aliases.aliases))fail('alias schema');
