@@ -170,7 +170,7 @@ export class Intents {
   private go(P: Perception, s: Record<string, unknown>, verb: string): Resolution {
     const asked = str(s.place) ?? str(s.target); if (!asked) return no('capability.params', `${verb} needs a place: {"verb":"go","target":{"place":"<id or name>"}}.`);
     const {caps} = this.L.coreA.binds(P.soul), via = s.via !== undefined ? {via: s.via} : {}, withP = s.with !== undefined ? {with: s.with} : {};
-    const walkTo = (c: EdgeCapability) => {const p = this.L.places.byId.get(c.target!.id); return {ok: true as const, kind: 'capability' as const, capability: c.id, ...(Object.keys({...via, ...withP}).length ? {params: {...via, ...withP}} : {}), chosen: {place: c.target!.id, name: p?.name ?? c.label, ...(p ? this.eta(P, centroid(p.polygon)) : {})}};};
+    const walkTo = (c: EdgeCapability) => {const p = this.L.places.byId.get(c.target!.id); return {ok: true as const, kind: 'capability' as const, capability: c.id, ...(Object.keys({...via, ...withP}).length ? {params: {...via, ...withP}} : {}), chosen: {...(c.target!.kind==='place'?{place:c.target!.id}:{target:c.target!.id,kind:c.target!.kind}), name: p?.name ?? c.label, ...(p ? this.eta(P, centroid(p.polygon)) : {})}};};
     const exact = caps.find(c => c.id === `walk:${asked}`); if (exact) {if (!exact.available && exact.blocked) return no(exact.blocked.code, exact.blocked.reason); return walkTo(exact);}
     const place = this.L.places.byId.get(asked);
     if (place) {
@@ -181,7 +181,7 @@ export class Intents {
     }
     const r = this.L.coreA.resolveText(P.soul, `walk:${asked}`, caps);
     if (r.kind === 'unknown') return no((r as {code?: string}).code ?? 'capability.unknown', r.reason, r.didYouMean);
-    if (r.cap.verb !== 'walk' || r.cap.target?.kind !== 'place') return no('capability.unknown', `"${asked}" is not a place you can walk to.`);
+    if (r.cap.verb !== 'walk' || !r.cap.target || !['place','object'].includes(r.cap.target.kind)) return no('capability.unknown', `"${asked}" is not a destination you can walk to.`);
     const out = walkTo(r.cap); return {...out, chosen: {...out.chosen, resolved: r.kind === 'alias' ? r.note : undefined}};
   }
 
@@ -223,6 +223,8 @@ export class Intents {
 
   private follow(P: Perception, s: Record<string, unknown>): Resolution {
     const asked = str(s.target); if (!asked) return no('capability.params', 'follow needs a Soul.');
+    if(s.place!==undefined)return this.go(P,{place:s.place,with:[asked],...(s.via!==undefined?{via:s.via}:{})},'go');
+    if(s.via!==undefined)return no('follow.destination','Follow cannot promise a destination or route; use go to the named place with a companion invitation.');
     const t = P.locate(asked, {things: false, places: false}); if (!t) return no('soul.not-in-sight', `${asked} is not in sight from here.`);
     const sec = this.seconds(s, 3600); if ('ok' in sec) return sec;
     return {ok: true, kind: 'capability', capability: `follow:${t.id}`, ...(sec.seconds !== undefined ? {params: {seconds: sec.seconds}} : {}), chosen: {target: t.id, name: t.name, distFromYou: t.distance}};
@@ -320,6 +322,7 @@ export class Intents {
   /** POST /v1/edge/resolve: what act would do, without doing anything. */
   dryRun(soul: EdgeSoul, input: IntentInput & {capability?: unknown}): Record<string, unknown> {
     if (typeof input.capability === 'string' && input.verb === undefined) {
+      const walk=walkWithDestinationWords(input.capability,[...this.L.host.minds.values()].map(m=>m.name));if(walk)return this.dryRun(soul,{...walk,...(input.params?{params:input.params}:{})});
       const {caps} = this.L.coreA.binds(soul), asked = input.capability.trim();
       const bodyIssue=asked.startsWith('object:')?null:this.L.bodyVerbProblem(soul,asked.split(/[:\s]/)[0]!);if(bodyIssue)return {ok:false,...bodyIssue};
       if (!asked || asked.length > 200) return {ok: false, code: 'capability.params', reason: 'capability must be 1..200 characters.'};
@@ -363,4 +366,13 @@ export function attentionWords(text: string): IntentInput | null {
   if (verb === 'look' || verb === 'glance') return {verb: 'look', target: rest};
   if (/^(?:around|back|behind)$/i.test(rest)) return {verb: 'turn', target: rest};
   return {verb: 'turn', target: rest};
+}
+
+/** An explicit companion AND destination becomes a destination walk with a consent invitation. */
+export function walkWithDestinationWords(text:string,knownNames:readonly string[]=[]):IntentInput|null {
+ if(text.includes(':'))return null;
+ const whole=/^\s*(?:please\s+)?(?:walk|go)\s+with\s+(.+?)\s*$/i.exec(text)?.[1].replace(/[.!?]+$/,'').trim().toLowerCase();
+ if(whole&&knownNames.some(name=>name.trim().toLowerCase()===whole))return null;
+ const match=/^\s*(?:please\s+)?(?:walk|go)\s+with\s+(.+?)\s+to\s+(.+?)\s*[.!?]?\s*$/i.exec(text);
+ return match?{verb:'go',target:{place:match[2].replace(/[.!?]+$/,'').trim()},with:[match[1].trim()]}:null;
 }

@@ -18,7 +18,7 @@ const area = (p: [number, number][]) => Math.abs(p.reduce((s, [x, z], i) => {con
 import {resolveCapability, tokens, placeMatch, type VocabContext} from './vocabulary.ts';
 import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, type SpotsData} from './activities.ts';
 import {Together, PAIRED, type TogetherPlan} from './together.ts';
-import {Intents, attentionWords, type IntentInput} from '../intents/intents.ts';
+import {Intents,walkWithDestinationWords, attentionWords, type IntentInput} from '../intents/intents.ts';
 import {strictCheck} from '../intents/strict.ts';
 import {bodyEnd} from '../perception/here.ts';
 
@@ -162,6 +162,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const id = 'r_' + randomUUID(), tick = this.host.engine.world.tick;
     if (!keepActivity) {for (const old of this.openReceipts(soul.soulId)) this.update(old.id, {phase: 'replaced', reason: 'A newer action from this Soul replaced it.'}); this.pending.delete(soul.soulId);}
     this.db.db.prepare('INSERT INTO edge_receipts_v1 (world_id,receipt_id,soul_id,capability,phase,accepted_tick,client_ref,created_at) VALUES (?,?,?,?,?,?,?,?)').run(this.host.worldId, id, soul.soulId, capability, phase, tick, clientRef ?? null, Date.now());
+    if(capability.startsWith('warm-by-fire:'))this.setDetail(id,{warmTargetV1:capability.slice('warm-by-fire:'.length)});
     if(phase==='completed'&&capability==='stand:here')this.ownerControlGrace(soul.soulId);
     if (keepActivity || !OPEN.includes(phase)) this.setDetail(id, {...detail, ...(keepActivity ? {channel: this.nextChannel ?? 'none'} : {}), ...(!OPEN.includes(phase) ? {endedAt: bodyEnd(this, soul.soulId)} : {})});
     const r = this.receipt(soul.soulId, id)!; this.emit(r); return r;
@@ -199,6 +200,11 @@ export class EdgeLedger implements EdgeLedgerHooks {
       // together/1: a follow walks on leg after leg under the same receipt until it is stopped or its target is gone
       const m = this.host.minds.get(r.soul_id);
       if (m && this.together.continueFollow(r.receipt_id, {soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner})) return;
+      const warmTarget=r.detail?(JSON.parse(r.detail) as {warmTargetV1?:string}).warmTargetV1:undefined;
+      if(warmTarget){const body=m?this.body(m.entityId):undefined,fire=this.body(warmTarget),live=new Set(this.host.engine.runtime.liveIds());
+        const occupied=!!m&&[...this.host.engine.runtime.records.values()].some(record=>{const p=record.params as {actor?:string;slot?:string};return live.has(record.id)&&record.verb==='take_slot'&&record.phase==='occupied'&&p.actor===m.entityId&&typeof p.slot==='string'&&p.slot.startsWith(warmTarget+'#');});
+        if(!body?.human||!fire||body.human.shore?.mode==='buoyant'||!occupied||Math.hypot(body.pose.p[0]-fire.pose.p[0],body.pose.p[2]-fire.pose.p[2])>2){this.update(r.receipt_id,{phase:'failed',code:'activity.not-reached',reason:'No place at the named fire was reached; this did not warm your body.'});return;}
+      }
       this.update(r.receipt_id, {phase: 'completed'});
     }
     // 'replaced' means only "a newer act from this Soul superseded it", and that is recorded at act time (insert),
@@ -342,7 +348,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
         if (e.def !== 'campfire' || Math.hypot(e.pose.p[0] - me.pose.p[0], e.pose.p[2] - me.pose.p[2]) > 150) continue;
         const id = 'warm-by-fire:' + e.id, label = 'Warm up by the fire with whoever is there';
         caps.push({id, verb: 'warm-by-fire', label, target: {id: e.id, kind: 'object'}, available: true, params: secondsOf(120, 600)});
-        plans.set(id, {label, steps: [{verb: 'mars:campfire_circle', params: {actors: [soul.entityId], fire: e.id}}, {verb: 'rest', params: {seconds: 120}}], seconds: true});
+        plans.set(id, {label, steps: [{verb:'walk_to',params:{to:e.id,standoff:2}},{verb: 'mars:campfire_circle', params: {actors: [soul.entityId], fire: e.id}}, {verb: 'rest', params: {seconds: 120}}], seconds: true});
       }
       for (const [rid, r] of Object.entries(w.regions ?? {}) as [string, {polygon: [number, number][]}][]) {
         const [cx, cz] = centroid(r.polygon); if (Math.hypot(cx - me.pose.p[0], cz - me.pose.p[2]) > 60 || !this.places.byId.has(rid)) continue;
@@ -430,6 +436,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
   async act(soul: EdgeSoul, input: {capability?: unknown; params?: unknown; clientRef?: unknown; verb?: unknown; target?: unknown}): Promise<{accepted: true; receipt: EdgeReceipt; resolved?: Resolved; result?: unknown} | {accepted: false; code: string; reason: string; capability: string; retry_after?: number; did_you_mean?: {id: string; label: string}[]; resolved?: Resolved}> {
     // intents/1 (Core-A): {verb, target} is resolved now and acted on as the concrete choice it reports
     if (input.capability === undefined && input.verb !== undefined) {const out = await this.intents.act(soul, input as IntentInput); if (out.accepted) this.capCache.clear(); return out;}
+    if(typeof input.capability==='string'){const walk=walkWithDestinationWords(input.capability,[...this.host.minds.values()].map(m=>m.name));if(walk){const out=await this.intents.act(soul,{...walk,...(input.params?{params:input.params}:{}),clientRef:input.clientRef});if(out.accepted){this.capCache.clear();return {...out,resolved:{from:input.capability,to:out.receipt.capability,note:'Walk to the named destination; companions receive an invitation and choose whether to join.'}};}return out;}}
     const out = await this.actOnce(soul, input);
     if (out.accepted) this.capCache.clear();     // invitations, items and follows change what others can do this tick
     return out;

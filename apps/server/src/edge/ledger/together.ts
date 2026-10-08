@@ -642,6 +642,7 @@ export class Together {
     // follow / walk with
     const fol = /^(?:follow|walk\s+with|go\s+with|accompany|tag\s+along\s+with|come\s+with)\s+(.+)$/.exec(t);
     if (fol && !/^(?:me|us)$/.test(fol[1].trim())) {
+      if(/\s+to\s+\S/.test(fol[1])&&!near.some(o=>o.name.toLowerCase()===fol[1].trim()))return {code:'follow.destination',reason:'Following only tracks the named Soul. To reach a place, walk with them to that place and invite them.',did_you_mean:[]};
       const o = who(fol[1]); if (!o) return /^(?:him|her|them|they|she|he)$/.test(fol[1].trim()) ? null : notHere('follow', fol[1]);
       const back = this.invitesFor(soul.soulId).find(i => i.host.soulId === o.soulId); if (back) return {capability: 'accept:' + back.id, note: `joining ${o.name}'s ${back.what}`};
       const c = capFor('follow', o); if (!c) return {code: 'follow.unavailable', reason: `${o.name} is too far away to walk with (${o.distance} m).`, did_you_mean: []};
