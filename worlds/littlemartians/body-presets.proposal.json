@@ -1,0 +1,386 @@
+{
+  "schema": "lm-body-presets/proposal-1",
+  "corePin": "fa79ef0343fe144282dd6484e81e8ca108cea27b",
+  "schemaSha256": "8d9bd34e04b8f66a3344ea4205e17c00632db3370203b93151c36804fbe39902",
+  "status": "Validated PM integration proposal, not installed registry or assigned bodies.",
+  "presets": [
+    {
+      "id": "verdelis",
+      "name": "Verdelis",
+      "defaultWorldRole": "floater",
+      "eligibleAsSoulBody": true,
+      "body": {
+        "family": "floater",
+        "type": "ceramic",
+        "model": "verdelis",
+        "modelUrl": "/world-assets/littlemartians/characters/verdelis.glb",
+        "avatar": {
+          "kind": "body",
+          "modelUrl": "/world-assets/littlemartians/characters/verdelis.glb",
+          "bodyType": "ceramic"
+        },
+        "radius": 0.35,
+        "hoverHeight": 1.45
+      },
+      "originalFile": "verdelis.glb",
+      "bodyFile": "verdelis.glb",
+      "sourceSha256": "881d7f5c6096cf25bd3422e82f017ab2192f729acbce3d2bc980776c816b0daa",
+      "archiveId": "verdelis--characters",
+      "rights": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none \u2014 no paid APIs or services were used to produce these files"
+      }
+    },
+    {
+      "id": "kalama",
+      "name": "Kalama",
+      "defaultWorldRole": "floater",
+      "eligibleAsSoulBody": true,
+      "body": {
+        "family": "floater",
+        "type": "ceramic",
+        "model": "kalama",
+        "modelUrl": "/world-assets/littlemartians/characters/kalama.glb",
+        "avatar": {
+          "kind": "body",
+          "modelUrl": "/world-assets/littlemartians/characters/kalama.glb",
+          "bodyType": "ceramic"
+        },
+        "radius": 0.35,
+        "hoverHeight": 1.45
+      },
+      "originalFile": "kalama.glb",
+      "bodyFile": "kalama.glb",
+      "sourceSha256": "753f3163a6929fdf31598b34df557d04548fa28319e5cdbfd36755bf07938e73",
+      "archiveId": "kalama--characters",
+      "rights": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none \u2014 no paid APIs or services were used to produce these files"
+      }
+    },
+    {
+      "id": "kweku",
+      "name": "Kweku",
+      "defaultWorldRole": "floater",
+      "eligibleAsSoulBody": true,
+      "body": {
+        "family": "floater",
+        "type": "ceramic",
+        "model": "kweku",
+        "modelUrl": "/world-assets/littlemartians/characters/kweku.glb",
+        "avatar": {
+          "kind": "body",
+          "modelUrl": "/world-assets/littlemartians/characters/kweku.glb",
+          "bodyType": "ceramic"
+        },
+        "radius": 0.35,
+        "hoverHeight": 1.45
+      },
+      "originalFile": "kweku.glb",
+      "bodyFile": "kweku.glb",
+      "sourceSha256": "9216edfb03807cd95f1cfa5f046ecbf217e395fb207d8d72884ed8532aae36c5",
+      "archiveId": "kweku--characters",
+      "rights": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none \u2014 no paid APIs or services were used to produce these files"
+      }
+    },
+    {
+      "id": "mycos",
+      "name": "Mycos",
+      "defaultWorldRole": "floater",
+      "eligibleAsSoulBody": true,
+      "body": {
+        "family": "floater",
+        "type": "ceramic",
+        "model": "mycos",
+        "modelUrl": "/world-assets/littlemartians/characters/mycos.glb",
+        "avatar": {
+          "kind": "body",
+          "modelUrl": "/world-assets/littlemartians/characters/mycos.glb",
+          "bodyType": "ceramic"
+        },
+        "radius": 0.35,
+        "hoverHeight": 1.45
+      },
+      "originalFile": "mycos.glb",
+      "bodyFile": "mycos.glb",
+      "sourceSha256": "411eac1f3b7a71830c80305bfe787976c0864f782e433232c73170b59bad08bf",
+      "archiveId": "mycos--characters",
+      "rights": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none \u2014 no paid APIs or services were used to produce these files"
+      }
+    },
+    {
+      "id": "ada",
+      "name": "Ada",
+      "defaultWorldRole": "floater",
+      "eligibleAsSoulBody": true,
+      "body": {
+        "family": "floater",
+        "type": "ceramic",
+        "model": "ada",
+        "modelUrl": "/world-assets/littlemartians/characters/ada.glb",
+        "avatar": {
+          "kind": "body",
+          "modelUrl": "/world-assets/littlemartians/characters/ada.glb",
+          "bodyType": "ceramic"
+        },
+        "radius": 0.35,
+        "hoverHeight": 1.45
+      },
+      "originalFile": "ada.glb",
+      "bodyFile": "ada.glb",
+      "sourceSha256": "d072646e5562ea694fb749d85b43eda419822311679537d49a74df02a20ff02c",
+      "archiveId": "ada--characters",
+      "rights": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none \u2014 no paid APIs or services were used to produce these files"
+      }
+    },
+    {
+      "id": "shuijing",
+      "name": "Shuijing",
+      "defaultWorldRole": "floater",
+      "eligibleAsSoulBody": true,
+      "body": {
+        "family": "floater",
+        "type": "ceramic",
+        "model": "shuijing",
+        "modelUrl": "/world-assets/littlemartians/characters/shuijing.glb",
+        "avatar": {
+          "kind": "body",
+          "modelUrl": "/world-assets/littlemartians/characters/shuijing.glb",
+          "bodyType": "ceramic"
+        },
+        "radius": 0.35,
+        "hoverHeight": 1.45
+      },
+      "originalFile": "shuijing.glb",
+      "bodyFile": "shuijing.glb",
+      "sourceSha256": "b1cb50299458e144eef76098bd54ff38fb1e8c910df020efd65ce753e51e754c",
+      "archiveId": "shuijing--characters",
+      "rights": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none \u2014 no paid APIs or services were used to produce these files"
+      }
+    },
+    {
+      "id": "nyx",
+      "name": "Nyx",
+      "defaultWorldRole": "floater",
+      "eligibleAsSoulBody": true,
+      "body": {
+        "family": "floater",
+        "type": "ceramic",
+        "model": "nyx",
+        "modelUrl": "/world-assets/littlemartians/characters/nyx.glb",
+        "avatar": {
+          "kind": "body",
+          "modelUrl": "/world-assets/littlemartians/characters/nyx.glb",
+          "bodyType": "ceramic"
+        },
+        "radius": 0.35,
+        "hoverHeight": 1.45
+      },
+      "originalFile": "nyx.glb",
+      "bodyFile": "nyx.glb",
+      "sourceSha256": "ab9dbab637ffb11b9f1ab40feb1767ac561948e8651310e18a0bd5431db7e8eb",
+      "archiveId": "nyx--characters",
+      "rights": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none \u2014 no paid APIs or services were used to produce these files"
+      }
+    },
+    {
+      "id": "green-patterns-blue",
+      "name": "Green Patterns Blue",
+      "defaultWorldRole": "kin",
+      "eligibleAsSoulBody": true,
+      "body": {
+        "family": "floater",
+        "type": "ceramic",
+        "model": "green-patterns-blue",
+        "modelUrl": "/world-assets/littlemartians/characters/green-patterns-blue.glb",
+        "avatar": {
+          "kind": "body",
+          "modelUrl": "/world-assets/littlemartians/characters/green-patterns-blue.glb",
+          "bodyType": "ceramic"
+        },
+        "radius": 0.35,
+        "hoverHeight": 1.45
+      },
+      "originalFile": "kin/green-patterns-blue.glb",
+      "bodyFile": "green-patterns-blue.glb",
+      "sourceSha256": "261e30cbfba0e9ad13288b0cf3b657d1e15b1ebf829558e6f7a64d9f88f69fdb",
+      "archiveId": "green-patterns-blue--ceramic-heads",
+      "rights": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none \u2014 no paid APIs or services were used to produce these files"
+      }
+    },
+    {
+      "id": "chebel",
+      "name": "Chebel",
+      "defaultWorldRole": "kin",
+      "eligibleAsSoulBody": true,
+      "body": {
+        "family": "floater",
+        "type": "ceramic",
+        "model": "chebel",
+        "modelUrl": "/world-assets/littlemartians/characters/chebel.glb",
+        "avatar": {
+          "kind": "body",
+          "modelUrl": "/world-assets/littlemartians/characters/chebel.glb",
+          "bodyType": "ceramic"
+        },
+        "radius": 0.35,
+        "hoverHeight": 1.45
+      },
+      "originalFile": "kin/chebel.glb",
+      "bodyFile": "chebel.glb",
+      "sourceSha256": "eef400e7d641bf7208b469ca882a837a2a4196db386fdeb760db8d90b76c003a",
+      "archiveId": "chebel--ceramic-heads",
+      "rights": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none \u2014 no paid APIs or services were used to produce these files"
+      }
+    },
+    {
+      "id": "colors-lemuet",
+      "name": "Colors (Lemuet)",
+      "defaultWorldRole": "kin",
+      "eligibleAsSoulBody": true,
+      "body": {
+        "family": "floater",
+        "type": "ceramic",
+        "model": "colors-lemuet",
+        "modelUrl": "/world-assets/littlemartians/characters/colors-lemuet.glb",
+        "avatar": {
+          "kind": "body",
+          "modelUrl": "/world-assets/littlemartians/characters/colors-lemuet.glb",
+          "bodyType": "ceramic"
+        },
+        "radius": 0.35,
+        "hoverHeight": 1.45
+      },
+      "originalFile": "kin/colors-lemuet.glb",
+      "bodyFile": "colors-lemuet.glb",
+      "sourceSha256": "0be443c2a719a71d8e8b88fb19bf2ed27ef9e1d557bf586caeea3126350aee8b",
+      "archiveId": "colors-lemuet--ceramic-heads",
+      "rights": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none \u2014 no paid APIs or services were used to produce these files"
+      }
+    },
+    {
+      "id": "crystal-freeman",
+      "name": "Crystal (Freeman)",
+      "defaultWorldRole": "kin",
+      "eligibleAsSoulBody": true,
+      "body": {
+        "family": "floater",
+        "type": "ceramic",
+        "model": "crystal-freeman",
+        "modelUrl": "/world-assets/littlemartians/characters/crystal-freeman.glb",
+        "avatar": {
+          "kind": "body",
+          "modelUrl": "/world-assets/littlemartians/characters/crystal-freeman.glb",
+          "bodyType": "ceramic"
+        },
+        "radius": 0.35,
+        "hoverHeight": 1.45
+      },
+      "originalFile": "kin/crystal-freeman.glb",
+      "bodyFile": "crystal-freeman.glb",
+      "sourceSha256": "e15118c599c3f9006fba71e4178543bc9389b3031d194f2c297db80fe603fcae",
+      "archiveId": "crystal-freeman--ceramic-heads",
+      "rights": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none \u2014 no paid APIs or services were used to produce these files"
+      }
+    },
+    {
+      "id": "dark-blue",
+      "name": "Dark Blue",
+      "defaultWorldRole": "kin",
+      "eligibleAsSoulBody": true,
+      "body": {
+        "family": "floater",
+        "type": "ceramic",
+        "model": "dark-blue",
+        "modelUrl": "/world-assets/littlemartians/characters/dark-blue.glb",
+        "avatar": {
+          "kind": "body",
+          "modelUrl": "/world-assets/littlemartians/characters/dark-blue.glb",
+          "bodyType": "ceramic"
+        },
+        "radius": 0.35,
+        "hoverHeight": 1.45
+      },
+      "originalFile": "kin/dark-blue.glb",
+      "bodyFile": "dark-blue.glb",
+      "sourceSha256": "5e3ad5159e06d18a70d405a9f1fcede4623f5f392761043e0b7838ea0c47ebc9",
+      "archiveId": "dark-blue--ceramic-heads",
+      "rights": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none \u2014 no paid APIs or services were used to produce these files"
+      }
+    },
+    {
+      "id": "green-brains-out",
+      "name": "Green, Brains Out",
+      "defaultWorldRole": "kin",
+      "eligibleAsSoulBody": true,
+      "body": {
+        "family": "floater",
+        "type": "ceramic",
+        "model": "green-brains-out",
+        "modelUrl": "/world-assets/littlemartians/characters/green-brains-out.glb",
+        "avatar": {
+          "kind": "body",
+          "modelUrl": "/world-assets/littlemartians/characters/green-brains-out.glb",
+          "bodyType": "ceramic"
+        },
+        "radius": 0.35,
+        "hoverHeight": 1.45
+      },
+      "originalFile": "kin/green-brains-out.glb",
+      "bodyFile": "green-brains-out.glb",
+      "sourceSha256": "c19e95da37e2faa91ec7ef9dbfecce12ba9f3a58ea3f6bcd8ab3b90f76a98bbb",
+      "archiveId": "green-brains-out--ceramic-heads",
+      "rights": {
+        "owner": "Vanessa Rosa (Little Martians)",
+        "status": "no open license recorded \u2014 the archive manifest has license: null for every character and ceramic-head scan",
+        "terms": "Polycam scans of Vanessa Rosa's hand-pressed ceramic sculptures. Included in this private repository on Gene Kogan's explicit authorization for the eden4 Little Martians world; not for redistribution outside this project without the artist's permission.",
+        "cost": "none \u2014 no paid APIs or services were used to produce these files"
+      }
+    }
+  ],
+  "scope": "Trusted shipped legacy assets; upload validator bypass is not proposed for new/untrusted files. Preserve existing cast/scenery placement roles independently of Soul-body eligibility."
+}

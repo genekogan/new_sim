@@ -1,0 +1,8836 @@
+{
+ "contract": "activity-spots/1",
+ "world": "eden",
+ "note": "World (WA1) activity spots. Library, interiors, solids and rings: Core-next3 survey kept verbatim. World adds street-prop spots (easels, post boxes, benches, log benches, picnic tables) computed from eden-street-props/placements.ts (front = local +Z) and the house-3 piano. Positions world metres; faceTo a point the body turns to; seatHeight = seat top above the native ground. WN3-0 (World-next3): solids for hedges, stone garden, lookout, pergola/hex-pavilion/market posts, playground and garden props, craft furniture, rocks, vehicles and goals; rings: bandstand gap 90 deg and tea-house gap 180 deg (gap angle = atan2(dz,dx) deg, 45 deg wide, with a step); platforms[] = walkable raised decks (top = deck height above ground, optional step/ramp); greenhouse interior with a west door on the centre aisle. World-owned CN5 data: frisbee lawn clearance; picnic tabletop footprints; library computer; harbour decks; district obstacle survey. Visible pier/mural gaps must be integrated alongside corresponding nav before release.",
+ "interiors": [
+  {
+   "place": "eden-greenhouse",
+   "doors": [
+    [
+     64,
+     34.45,
+     64,
+     35.55
+    ]
+   ],
+   "wall": 0.15,
+   "furniture": [
+    {
+     "id": "greenhouse-bench-north",
+     "label": "Planting bench",
+     "c": [
+      69,
+      33.9
+     ],
+     "half": [
+      4.3,
+      0.45
+     ],
+     "yaw": 0,
+     "height": 1.2
+    },
+    {
+     "id": "greenhouse-bench-south",
+     "label": "Planting bench",
+     "c": [
+      69,
+      36.1
+     ],
+     "half": [
+      4.3,
+      0.45
+     ],
+     "yaw": 0,
+     "height": 1.2
+    }
+   ],
+   "walls": [],
+   "shell": [
+    64,
+    32.7,
+    74,
+    37.3
+   ]
+  },
+  {
+   "place": "eden-house-1",
+   "doors": [
+    [
+     33.4,
+     12,
+     34.6,
+     12
+    ]
+   ],
+   "wall": 0.14,
+   "furniture": [
+    {
+     "id": "eden-house-1-f1",
+     "label": "Wardrobe",
+     "c": [
+      30.95,
+      17.2
+     ],
+     "half": [
+      0.31,
+      0.58
+     ],
+     "yaw": 0,
+     "height": 2.05
+    },
+    {
+     "id": "eden-house-1-f2",
+     "label": "Nightstand",
+     "c": [
+      30.92,
+      13.33
+     ],
+     "half": [
+      0.23,
+      0.21
+     ],
+     "yaw": 0,
+     "height": 0.79
+    },
+    {
+     "id": "eden-house-1-f3",
+     "label": "Eden house 1 drawn bed",
+     "c": [
+      31.5,
+      13.67
+     ],
+     "half": [
+      0.52,
+      0.04
+     ],
+     "yaw": 0,
+     "height": 1.07
+    },
+    {
+     "id": "eden-house-1-f4",
+     "label": "Eden house 1 drawn desk cabinet",
+     "c": [
+      32.75,
+      17.48
+     ],
+     "half": [
+      0.45,
+      0.3
+     ],
+     "yaw": 0,
+     "height": 1.5
+    },
+    {
+     "id": "eden-house-1-f5",
+     "label": "Courtyard plants",
+     "c": [
+      32.86,
+      13.85
+     ],
+     "half": [
+      0.28,
+      0.27
+     ],
+     "yaw": 0,
+     "height": 0.95
+    },
+    {
+     "id": "eden-house-1-f6",
+     "label": "Courtyard plants",
+     "c": [
+      35.16,
+      13.85
+     ],
+     "half": [
+      0.28,
+      0.27
+     ],
+     "yaw": 0,
+     "height": 0.95
+    },
+    {
+     "id": "eden-house-1-f7",
+     "label": "Courtyard plants",
+     "c": [
+      35.19,
+      16.18
+     ],
+     "half": [
+      0.28,
+      0.27
+     ],
+     "yaw": 0,
+     "height": 0.95
+    },
+    {
+     "id": "eden-house-1-f8",
+     "label": "Table",
+     "c": [
+      36.3,
+      15.0
+     ],
+     "half": [
+      0.35,
+      0.83
+     ],
+     "yaw": 0,
+     "height": 0.92
+    },
+    {
+     "id": "eden-house-1-f9",
+     "label": "Kitchen",
+     "c": [
+      37.03,
+      13.05
+     ],
+     "half": [
+      0.33,
+      0.62
+     ],
+     "yaw": 0,
+     "height": 1.1
+    },
+    {
+     "id": "eden-house-1-f10",
+     "label": "Kitchen",
+     "c": [
+      37.05,
+      16.75
+     ],
+     "half": [
+      0.31,
+      0.4
+     ],
+     "yaw": 0,
+     "height": 1.05
+    }
+   ],
+   "walls": [
+    [
+     32.5,
+     13.43,
+     33.4,
+     13.43
+    ],
+    [
+     34.6,
+     13.43,
+     35.5,
+     13.43
+    ],
+    [
+     35.57,
+     13.5,
+     35.57,
+     14.4
+    ],
+    [
+     35.57,
+     14.4,
+     35.57,
+     15.6
+    ],
+    [
+     35.57,
+     15.6,
+     35.57,
+     16.5
+    ],
+    [
+     32.43,
+     13.5,
+     32.43,
+     15.3
+    ],
+    [
+     32.5,
+     16.57,
+     33.4,
+     16.57
+    ],
+    [
+     34.6,
+     16.57,
+     35.5,
+     16.57
+    ],
+    [
+     30.98,
+     13.67,
+     32.02,
+     13.67
+    ],
+    [
+     33.18,
+     17.18,
+     33.18,
+     17.78
+    ],
+    [
+     32.32,
+     17.18,
+     32.32,
+     17.78
+    ]
+   ]
+  },
+  {
+   "place": "eden-house-2",
+   "doors": [
+    [
+     51.4,
+     12,
+     52.6,
+     12
+    ]
+   ],
+   "wall": 0.14,
+   "furniture": [
+    {
+     "id": "eden-house-2-f1",
+     "label": "Wardrobe",
+     "c": [
+      48.45,
+      17.2
+     ],
+     "half": [
+      0.31,
+      0.58
+     ],
+     "yaw": 0,
+     "height": 2.05
+    },
+    {
+     "id": "eden-house-2-f2",
+     "label": "Nightstand",
+     "c": [
+      48.95,
+      13.36
+     ],
+     "half": [
+      0.23,
+      0.21
+     ],
+     "yaw": 0,
+     "height": 0.79
+    },
+    {
+     "id": "eden-house-2-f3",
+     "label": "Bed",
+     "c": [
+      50.0,
+      12.97
+     ],
+     "half": [
+      0.52,
+      0.04
+     ],
+     "yaw": 0,
+     "height": 1.07
+    },
+    {
+     "id": "eden-house-2-f4",
+     "label": "Dining",
+     "c": [
+      51.6,
+      14.6
+     ],
+     "half": [
+      0.86,
+      0.42
+     ],
+     "yaw": 0,
+     "height": 0.92
+    },
+    {
+     "id": "eden-house-2-f5",
+     "label": "Desk cabinet",
+     "c": [
+      54.15,
+      16.4
+     ],
+     "half": [
+      0.45,
+      0.3
+     ],
+     "yaw": 0,
+     "height": 1.5
+    },
+    {
+     "id": "eden-house-2-f6",
+     "label": "Armchair",
+     "c": [
+      54.3,
+      13.49
+     ],
+     "half": [
+      0.39,
+      0.38
+     ],
+     "yaw": 0,
+     "height": 0.92
+    },
+    {
+     "id": "eden-house-2-f7",
+     "label": "Plant",
+     "c": [
+      55.44,
+      17.45
+     ],
+     "half": [
+      0.36,
+      0.37
+     ],
+     "yaw": 0,
+     "height": 1.65
+    },
+    {
+     "id": "eden-house-2-f8",
+     "label": "Kitchenette",
+     "c": [
+      55.53,
+      13.24
+     ],
+     "half": [
+      0.33,
+      1.01
+     ],
+     "yaw": 0,
+     "height": 1.1
+    }
+   ],
+   "walls": [
+    [
+     49.48,
+     12.97,
+     50.52,
+     12.97
+    ],
+    [
+     53.72,
+     16.1,
+     53.72,
+     16.7
+    ],
+    [
+     54.58,
+     16.1,
+     54.58,
+     16.7
+    ],
+    [
+     53.74,
+     16.12,
+     54.56,
+     16.12
+    ]
+   ],
+   "shell": [
+    48,
+    12,
+    56,
+    18
+   ]
+  },
+  {
+   "place": "eden-house-3",
+   "doors": [
+    [
+     33.1,
+     35,
+     34.9,
+     35
+    ]
+   ],
+   "wall": 0.2,
+   "furniture": [
+    {
+     "id": "eden-house-3-f1",
+     "label": "Sofa",
+     "c": [
+      28.63,
+      33.5
+     ],
+     "half": [
+      0.43,
+      0.95
+     ],
+     "yaw": 0,
+     "height": 0.88
+    },
+    {
+     "id": "eden-house-3-f2",
+     "label": "Kitchen",
+     "c": [
+      30.21,
+      25.54
+     ],
+     "half": [
+      1.96,
+      0.34
+     ],
+     "yaw": 0,
+     "height": 1.8
+    },
+    {
+     "id": "eden-house-3-f3",
+     "label": "Bedroom nightstand",
+     "c": [
+      28.75,
+      28.76
+     ],
+     "half": [
+      0.23,
+      0.21
+     ],
+     "yaw": 0,
+     "height": 0.79
+    },
+    {
+     "id": "eden-house-3-f4",
+     "label": "Bed",
+     "c": [
+      30.0,
+      28.47
+     ],
+     "half": [
+      0.52,
+      0.04
+     ],
+     "yaw": 0,
+     "height": 1.05
+    },
+    {
+     "id": "eden-house-3-f5",
+     "label": "Desk cabinet",
+     "c": [
+      30.65,
+      31.2
+     ],
+     "half": [
+      0.45,
+      0.3
+     ],
+     "yaw": 0,
+     "height": 1.5
+    },
+    {
+     "id": "eden-house-3-f6",
+     "label": "Armchair",
+     "c": [
+      31.36,
+      33.5
+     ],
+     "half": [
+      0.38,
+      0.39
+     ],
+     "yaw": 0,
+     "height": 0.92
+    },
+    {
+     "id": "eden-house-3-f7",
+     "label": "Bedroom wardrobe",
+     "c": [
+      31.49,
+      28.9
+     ],
+     "half": [
+      0.31,
+      0.58
+     ],
+     "yaw": 0,
+     "height": 2.05
+    },
+    {
+     "id": "eden-house-3-f8",
+     "label": "Living lamp",
+     "c": [
+      31.45,
+      32.55
+     ],
+     "half": [
+      0.17,
+      0.18
+     ],
+     "yaw": 0,
+     "height": 1.48
+    },
+    {
+     "id": "eden-house-3-f9",
+     "label": "South plant",
+     "c": [
+      32.09,
+      34.4
+     ],
+     "half": [
+      0.36,
+      0.37
+     ],
+     "yaw": 0,
+     "height": 1.65
+    },
+    {
+     "id": "eden-house-3-f10",
+     "label": "Sideboard",
+     "c": [
+      33.9,
+      25.44
+     ],
+     "half": [
+      0.8,
+      0.24
+     ],
+     "yaw": 0,
+     "height": 2.35
+    },
+    {
+     "id": "eden-house-3-f11",
+     "label": "Dining",
+     "c": [
+      36.7,
+      26.4
+     ],
+     "half": [
+      1.16,
+      0.83
+     ],
+     "yaw": 0,
+     "height": 1.06
+    },
+    {
+     "id": "eden-house-3-f12",
+     "label": "Music stand",
+     "c": [
+      35.85,
+      33.7
+     ],
+     "half": [
+      0.23,
+      0.2
+     ],
+     "yaw": 0,
+     "height": 1.3
+    },
+    {
+     "id": "eden-house-3-f13",
+     "label": "South shelves",
+     "c": [
+      37.0,
+      34.63
+     ],
+     "half": [
+      1.15,
+      0.16
+     ],
+     "yaw": 0,
+     "height": 2.0
+    }
+   ],
+   "walls": [
+    [
+     28,
+     32.1,
+     33.1,
+     32.1
+    ],
+    [
+     34.9,
+     32.1,
+     38.4,
+     32.1
+    ],
+    [
+     31.9,
+     28,
+     31.9,
+     29.5
+    ],
+    [
+     31.9,
+     30.5,
+     31.9,
+     32
+    ],
+    [
+     36.1,
+     28,
+     36.1,
+     29.5
+    ],
+    [
+     36.1,
+     30.5,
+     36.1,
+     32
+    ],
+    [
+     28,
+     27.9,
+     33.1,
+     27.9
+    ],
+    [
+     34.9,
+     27.9,
+     38.4,
+     27.9
+    ],
+    [
+     29.48,
+     28.47,
+     30.52,
+     28.47
+    ],
+    [
+     30.22,
+     30.9,
+     30.22,
+     31.5
+    ],
+    [
+     31.08,
+     30.9,
+     31.08,
+     31.5
+    ],
+    [
+     30.24,
+     30.92,
+     31.06,
+     30.92
+    ]
+   ],
+   "shell": [
+    28,
+    25,
+    38.4,
+    35
+   ]
+  },
+  {
+   "place": "eden-house-4",
+   "doors": [
+    [
+     53.1,
+     35,
+     54.9,
+     35
+    ]
+   ],
+   "wall": 0.2,
+   "furniture": [
+    {
+     "id": "eden-house-4-f1",
+     "label": "Sofa",
+     "c": [
+      48.63,
+      33.5
+     ],
+     "half": [
+      0.43,
+      0.95
+     ],
+     "yaw": 0,
+     "height": 0.88
+    },
+    {
+     "id": "eden-house-4-f2",
+     "label": "Kitchen",
+     "c": [
+      50.21,
+      25.54
+     ],
+     "half": [
+      1.96,
+      0.34
+     ],
+     "yaw": 0,
+     "height": 1.8
+    },
+    {
+     "id": "eden-house-4-f3",
+     "label": "Bedroom nightstand",
+     "c": [
+      48.75,
+      28.76
+     ],
+     "half": [
+      0.23,
+      0.21
+     ],
+     "yaw": 0,
+     "height": 0.79
+    },
+    {
+     "id": "eden-house-4-f4",
+     "label": "Bed",
+     "c": [
+      50.0,
+      28.47
+     ],
+     "half": [
+      0.52,
+      0.04
+     ],
+     "yaw": 0,
+     "height": 1.05
+    },
+    {
+     "id": "eden-house-4-f5",
+     "label": "Desk cabinet",
+     "c": [
+      50.65,
+      31.2
+     ],
+     "half": [
+      0.45,
+      0.3
+     ],
+     "yaw": 0,
+     "height": 1.5
+    },
+    {
+     "id": "eden-house-4-f6",
+     "label": "Armchair",
+     "c": [
+      51.36,
+      33.5
+     ],
+     "half": [
+      0.37,
+      0.39
+     ],
+     "yaw": 0,
+     "height": 0.92
+    },
+    {
+     "id": "eden-house-4-f7",
+     "label": "Bedroom wardrobe",
+     "c": [
+      51.49,
+      28.9
+     ],
+     "half": [
+      0.31,
+      0.58
+     ],
+     "yaw": 0,
+     "height": 2.05
+    },
+    {
+     "id": "eden-house-4-f8",
+     "label": "Living lamp",
+     "c": [
+      51.45,
+      32.55
+     ],
+     "half": [
+      0.17,
+      0.18
+     ],
+     "yaw": 0,
+     "height": 1.48
+    },
+    {
+     "id": "eden-house-4-f9",
+     "label": "South plant",
+     "c": [
+      52.09,
+      34.4
+     ],
+     "half": [
+      0.36,
+      0.37
+     ],
+     "yaw": 0,
+     "height": 1.65
+    },
+    {
+     "id": "eden-house-4-f10",
+     "label": "Sideboard",
+     "c": [
+      53.9,
+      25.44
+     ],
+     "half": [
+      0.8,
+      0.24
+     ],
+     "yaw": 0,
+     "height": 2.35
+    },
+    {
+     "id": "eden-house-4-f11",
+     "label": "Dining",
+     "c": [
+      56.7,
+      26.4
+     ],
+     "half": [
+      1.16,
+      0.83
+     ],
+     "yaw": 0,
+     "height": 1.06
+    },
+    {
+     "id": "eden-house-4-f12",
+     "label": "South shelves",
+     "c": [
+      57.0,
+      34.63
+     ],
+     "half": [
+      1.15,
+      0.16
+     ],
+     "yaw": 0,
+     "height": 2.0
+    },
+    {
+     "id": "eden-house-4-f13",
+     "label": "Plan chest",
+     "c": [
+      56.9,
+      32.89
+     ],
+     "half": [
+      0.8,
+      0.67
+     ],
+     "yaw": 0,
+     "height": 1.73
+    }
+   ],
+   "walls": [
+    [
+     48,
+     32.1,
+     53.1,
+     32.1
+    ],
+    [
+     54.9,
+     32.1,
+     58.4,
+     32.1
+    ],
+    [
+     51.9,
+     28,
+     51.9,
+     29.5
+    ],
+    [
+     51.9,
+     30.5,
+     51.9,
+     32
+    ],
+    [
+     56.1,
+     28,
+     56.1,
+     29.5
+    ],
+    [
+     56.1,
+     30.5,
+     56.1,
+     32
+    ],
+    [
+     48,
+     27.9,
+     53.1,
+     27.9
+    ],
+    [
+     54.9,
+     27.9,
+     58.4,
+     27.9
+    ],
+    [
+     49.48,
+     28.47,
+     50.52,
+     28.47
+    ],
+    [
+     50.22,
+     30.9,
+     50.22,
+     31.5
+    ],
+    [
+     51.08,
+     30.9,
+     51.08,
+     31.5
+    ],
+    [
+     50.24,
+     30.92,
+     51.06,
+     30.92
+    ]
+   ],
+   "shell": [
+    48,
+    25,
+    58.4,
+    35
+   ]
+  },
+  {
+   "place": "eden-library-1",
+   "doors": [
+    [
+     73.1,
+     -2.8,
+     74.9,
+     -2.8
+    ]
+   ],
+   "wall": 0.2,
+   "furniture": [
+    {
+     "id": "eden-library-1-f1",
+     "label": "West shelves",
+     "c": [
+      69.37,
+      -6.9
+     ],
+     "half": [
+      0.16,
+      0.67
+     ],
+     "yaw": 0,
+     "height": 2.3
+    },
+    {
+     "id": "eden-library-1-f2",
+     "label": "West shelves",
+     "c": [
+      69.37,
+      -5.2
+     ],
+     "half": [
+      0.16,
+      0.9
+     ],
+     "yaw": 0,
+     "height": 0.74
+    },
+    {
+     "id": "eden-library-1-f3",
+     "label": "North shelves",
+     "c": [
+      70.3,
+      -10.63
+     ],
+     "half": [
+      1.0,
+      0.16
+     ],
+     "yaw": 0,
+     "height": 2.3
+    },
+    {
+     "id": "eden-library-1-f4",
+     "label": "Floor lamp",
+     "c": [
+      69.6,
+      -3.6
+     ],
+     "half": [
+      0.17,
+      0.18
+     ],
+     "yaw": 0,
+     "height": 1.48
+    },
+    {
+     "id": "eden-library-1-f5",
+     "label": "Globe",
+     "c": [
+      70.5,
+      -3.8
+     ],
+     "half": [
+      0.24,
+      0.24
+     ],
+     "yaw": 0,
+     "height": 1.19
+    },
+    {
+     "id": "eden-library-1-f6",
+     "label": "Plant",
+     "c": [
+      71.59,
+      -3.6
+     ],
+     "half": [
+      0.36,
+      0.37
+     ],
+     "yaw": 0,
+     "height": 1.65
+    },
+    {
+     "id": "eden-library-1-f7",
+     "label": "Under-window shelves",
+     "c": [
+      74.0,
+      -10.63
+     ],
+     "half": [
+      2.35,
+      0.16
+     ],
+     "yaw": 0,
+     "height": 0.74
+    },
+    {
+     "id": "eden-library-1-f8",
+     "label": "Desk cabinet",
+     "c": [
+      72.15,
+      -9.0
+     ],
+     "half": [
+      0.45,
+      0.3
+     ],
+     "yaw": 0,
+     "height": 1.5
+    },
+    {
+     "id": "eden-library-1-f9",
+     "label": "North shelves",
+     "c": [
+      77.7,
+      -10.63
+     ],
+     "half": [
+      1.0,
+      0.16
+     ],
+     "yaw": 0,
+     "height": 2.3
+    },
+    {
+     "id": "eden-library-1-f10",
+     "label": "Desk cabinet",
+     "c": [
+      77.15,
+      -9.0
+     ],
+     "half": [
+      0.45,
+      0.3
+     ],
+     "yaw": 0,
+     "height": 1.5
+    },
+    {
+     "id": "eden-library-1-f11",
+     "label": "Reading corner",
+     "c": [
+      77.1,
+      -3.7
+     ],
+     "half": [
+      0.23,
+      0.24
+     ],
+     "yaw": 0,
+     "height": 0.84
+    },
+    {
+     "id": "eden-library-1-f12",
+     "label": "East shelves",
+     "c": [
+      78.63,
+      -8.8
+     ],
+     "half": [
+      0.16,
+      0.9
+     ],
+     "yaw": 0,
+     "height": 0.74
+    },
+    {
+     "id": "eden-library-1-f13",
+     "label": "East shelves",
+     "c": [
+      78.63,
+      -7.0
+     ],
+     "half": [
+      0.16,
+      0.75
+     ],
+     "yaw": 0,
+     "height": 2.3
+    },
+    {
+     "id": "eden-library-1-f14",
+     "label": "East shelves",
+     "c": [
+      78.63,
+      -5.2
+     ],
+     "half": [
+      0.16,
+      0.9
+     ],
+     "yaw": 0,
+     "height": 0.74
+    }
+   ],
+   "walls": [
+    [
+     71.72,
+     -9.3,
+     71.72,
+     -8.7
+    ],
+    [
+     72.58,
+     -9.3,
+     72.58,
+     -8.7
+    ],
+    [
+     71.74,
+     -9.28,
+     72.56,
+     -9.28
+    ],
+    [
+     76.72,
+     -9.3,
+     76.72,
+     -8.7
+    ],
+    [
+     77.58,
+     -9.3,
+     77.58,
+     -8.7
+    ],
+    [
+     76.74,
+     -9.28,
+     77.56,
+     -9.28
+    ]
+   ]
+  },
+  {
+   "place": "eden-office-1",
+   "doors": [
+    [
+     91,
+     19,
+     93,
+     19
+    ]
+   ],
+   "wall": 0.2,
+   "furniture": [
+    {
+     "id": "eden-office-1-f1",
+     "label": "Post pigeonholes",
+     "c": [
+      92.0,
+      11.38
+     ],
+     "half": [
+      1.6,
+      0.18
+     ],
+     "yaw": 0,
+     "height": 0.72
+    },
+    {
+     "id": "eden-office-1-f2",
+     "label": "Desk cabinet",
+     "c": [
+      92.65,
+      15.1
+     ],
+     "half": [
+      0.45,
+      0.3
+     ],
+     "yaw": 0,
+     "height": 1.5
+    },
+    {
+     "id": "eden-office-1-f3",
+     "label": "Parcels",
+     "c": [
+      94.99,
+      11.54
+     ],
+     "half": [
+      0.22,
+      0.16
+     ],
+     "yaw": 0,
+     "height": 0.83
+    },
+    {
+     "id": "eden-office-1-f4",
+     "label": "Lounge",
+     "c": [
+      96.2,
+      17.6
+     ],
+     "half": [
+      0.95,
+      0.43
+     ],
+     "yaw": 0,
+     "height": 0.88
+    },
+    {
+     "id": "eden-office-1-f5",
+     "label": "Desk cabinet",
+     "c": [
+      95.75,
+      15.1
+     ],
+     "half": [
+      0.45,
+      0.3
+     ],
+     "yaw": 0,
+     "height": 1.5
+    },
+    {
+     "id": "eden-office-1-f6",
+     "label": "Parcels",
+     "c": [
+      95.61,
+      11.6
+     ],
+     "half": [
+      0.25,
+      0.19
+     ],
+     "yaw": 0,
+     "height": 0.98
+    },
+    {
+     "id": "eden-office-1-f7",
+     "label": "Lounge",
+     "c": [
+      96.2,
+      16.4
+     ],
+     "half": [
+      0.5,
+      0.27
+     ],
+     "yaw": 0,
+     "height": 0.5
+    },
+    {
+     "id": "eden-office-1-f8",
+     "label": "Plants",
+     "c": [
+      97.39,
+      11.6
+     ],
+     "half": [
+      0.36,
+      0.37
+     ],
+     "yaw": 0,
+     "height": 1.65
+    },
+    {
+     "id": "eden-office-1-f9",
+     "label": "Plants",
+     "c": [
+      97.41,
+      18.4
+     ],
+     "half": [
+      0.34,
+      0.33
+     ],
+     "yaw": 0,
+     "height": 1.17
+    }
+   ],
+   "walls": [
+    [
+     92.22,
+     14.8,
+     92.22,
+     15.4
+    ],
+    [
+     93.08,
+     14.8,
+     93.08,
+     15.4
+    ],
+    [
+     92.24,
+     14.82,
+     93.06,
+     14.82
+    ],
+    [
+     95.32,
+     14.8,
+     95.32,
+     15.4
+    ],
+    [
+     96.18,
+     14.8,
+     96.18,
+     15.4
+    ],
+    [
+     95.34,
+     14.82,
+     96.16,
+     14.82
+    ]
+   ]
+  },
+  {
+   "place": "eden-barn-1",
+   "doors": [
+    [
+     86.8,
+     55.2,
+     89.2,
+     55.2
+    ]
+   ],
+   "wall": 0.16,
+   "furniture": [
+    {
+     "id": "eden-barn-1-f1",
+     "label": "Workbench",
+     "c": [
+      82.59,
+      49.6
+     ],
+     "half": [
+      0.42,
+      1.1
+     ],
+     "yaw": 0,
+     "height": 1.1
+    },
+    {
+     "id": "eden-barn-1-f2",
+     "label": "Lumber",
+     "c": [
+      84.4,
+      47.64
+     ],
+     "half": [
+      1.3,
+      0.29
+     ],
+     "yaw": 0,
+     "height": 0.61
+    },
+    {
+     "id": "eden-barn-1-f3",
+     "label": "Sawhorses",
+     "c": [
+      85.22,
+      49.2
+     ],
+     "half": [
+      0.52,
+      0.21
+     ],
+     "yaw": 0,
+     "height": 0.79
+    },
+    {
+     "id": "eden-barn-1-f4",
+     "label": "Sawhorses",
+     "c": [
+      85.22,
+      50.6
+     ],
+     "half": [
+      0.52,
+      0.21
+     ],
+     "yaw": 0,
+     "height": 0.79
+    },
+    {
+     "id": "eden-barn-1-f5",
+     "label": "Craft table",
+     "c": [
+      88.0,
+      50.2
+     ],
+     "half": [
+      1.2,
+      0.89
+     ],
+     "yaw": 0,
+     "height": 0.9
+    },
+    {
+     "id": "eden-barn-1-f6",
+     "label": "Pottery",
+     "c": [
+      90.06,
+      52.04
+     ],
+     "half": [
+      0.47,
+      0.55
+     ],
+     "yaw": 0,
+     "height": 0.71
+    },
+    {
+     "id": "eden-barn-1-f7",
+     "label": "Hay",
+     "c": [
+      91.75,
+      47.9
+     ],
+     "half": [
+      1.7,
+      0.66
+     ],
+     "yaw": 0,
+     "height": 0.91
+    },
+    {
+     "id": "eden-barn-1-f8",
+     "label": "Pottery",
+     "c": [
+      91.2,
+      53.6
+     ],
+     "half": [
+      0.7,
+      0.2
+     ],
+     "yaw": 0,
+     "height": 1.4
+    },
+    {
+     "id": "eden-barn-1-f9",
+     "label": "Barrels",
+     "c": [
+      92.6,
+      53.3
+     ],
+     "half": [
+      0.29,
+      0.3
+     ],
+     "yaw": 0,
+     "height": 0.85
+    },
+    {
+     "id": "eden-barn-1-f10",
+     "label": "Sacks",
+     "c": [
+      93.15,
+      49.67
+     ],
+     "half": [
+      0.49,
+      0.48
+     ],
+     "yaw": 0,
+     "height": 0.65
+    },
+    {
+     "id": "eden-barn-1-f11",
+     "label": "Loom",
+     "c": [
+      93.29,
+      51.6
+     ],
+     "half": [
+      0.55,
+      0.74
+     ],
+     "yaw": 0,
+     "height": 1.6
+    },
+    {
+     "id": "eden-barn-1-f12",
+     "label": "Barrels",
+     "c": [
+      93.3,
+      53.1
+     ],
+     "half": [
+      0.29,
+      0.3
+     ],
+     "yaw": 0,
+     "height": 0.85
+    },
+    {
+     "id": "eden-barn-1-f13",
+     "label": "Barrels",
+     "c": [
+      93.3,
+      53.85
+     ],
+     "half": [
+      0.29,
+      0.3
+     ],
+     "yaw": 0,
+     "height": 0.85
+    }
+   ],
+   "walls": []
+  },
+  {
+   "place": "int-cafe",
+   "doors": [
+    [
+     98.7,
+     24.4,
+     98.7,
+     25.6
+    ]
+   ],
+   "wall": 0.1,
+   "furniture": [
+    {
+     "id": "int-cafe-f1",
+     "label": "Cafe plants",
+     "c": [
+      99.15,
+      21.66
+     ],
+     "half": [
+      0.33,
+      0.34
+     ],
+     "yaw": 0,
+     "height": 1.17
+    },
+    {
+     "id": "int-cafe-f2",
+     "label": "Cafe plants",
+     "c": [
+      99.2,
+      28.29
+     ],
+     "half": [
+      0.37,
+      0.36
+     ],
+     "yaw": 0,
+     "height": 1.65
+    },
+    {
+     "id": "int-cafe-f3",
+     "label": "Cafe tables",
+     "c": [
+      100.15,
+      27.5
+     ],
+     "half": [
+      0.4,
+      0.83
+     ],
+     "yaw": 0,
+     "height": 0.92
+    },
+    {
+     "id": "int-cafe-f4",
+     "label": "Cafe tables",
+     "c": [
+      100.2,
+      22.3
+     ],
+     "half": [
+      0.4,
+      0.83
+     ],
+     "yaw": 0,
+     "height": 0.92
+    },
+    {
+     "id": "int-cafe-f5",
+     "label": "Cafe sofa nook",
+     "c": [
+      103.05,
+      28.37
+     ],
+     "half": [
+      0.9,
+      0.43
+     ],
+     "yaw": 0,
+     "height": 0.88
+    },
+    {
+     "id": "int-cafe-f6",
+     "label": "Cafe stools",
+     "c": [
+      102.35,
+      22.4
+     ],
+     "half": [
+      0.17,
+      0.16
+     ],
+     "yaw": 0,
+     "height": 0.7
+    },
+    {
+     "id": "int-cafe-f7",
+     "label": "Cafe stools",
+     "c": [
+      102.35,
+      23.2
+     ],
+     "half": [
+      0.17,
+      0.16
+     ],
+     "yaw": 0,
+     "height": 0.7
+    },
+    {
+     "id": "int-cafe-f8",
+     "label": "Cafe sofa nook",
+     "c": [
+      103.05,
+      27.55
+     ],
+     "half": [
+      0.45,
+      0.25
+     ],
+     "yaw": 0,
+     "height": 0.53
+    },
+    {
+     "id": "int-cafe-f9",
+     "label": "Cafe counter",
+     "c": [
+      103.08,
+      24.0
+     ],
+     "half": [
+      0.34,
+      2.02
+     ],
+     "yaw": 0,
+     "height": 1.6
+    },
+    {
+     "id": "int-cafe-f10",
+     "label": "Cafe back shelves",
+     "c": [
+      104.12,
+      22.6
+     ],
+     "half": [
+      0.17,
+      1.1
+     ],
+     "yaw": 0,
+     "height": 1.9
+    },
+    {
+     "id": "int-cafe-f11",
+     "label": "Cafe sofa nook",
+     "c": [
+      104.13,
+      27.2
+     ],
+     "half": [
+      0.15,
+      0.45
+     ],
+     "yaw": 0,
+     "height": 1.6
+    }
+   ],
+   "walls": []
+  },
+  {
+   "place": "int-music-room",
+   "doors": [
+    [
+     98.8,
+     58.4,
+     98.8,
+     59.6
+    ]
+   ],
+   "wall": 0.1,
+   "furniture": [
+    {
+     "id": "int-music-room-f1",
+     "label": "Music plant",
+     "c": [
+      99.1,
+      56.01
+     ],
+     "half": [
+      0.3,
+      0.31
+     ],
+     "yaw": 0,
+     "height": 1.06
+    },
+    {
+     "id": "int-music-room-f2",
+     "label": "Music stands and chairs",
+     "c": [
+      100.3,
+      59.0
+     ],
+     "half": [
+      0.21,
+      0.22
+     ],
+     "yaw": 0,
+     "height": 0.92
+    },
+    {
+     "id": "int-music-room-f3",
+     "label": "Music stands and chairs",
+     "c": [
+      100.5,
+      57.8
+     ],
+     "half": [
+      0.29,
+      0.29
+     ],
+     "yaw": 0,
+     "height": 0.92
+    },
+    {
+     "id": "int-music-room-f4",
+     "label": "Music stands and chairs",
+     "c": [
+      100.5,
+      60.2
+     ],
+     "half": [
+      0.29,
+      0.29
+     ],
+     "yaw": 0,
+     "height": 0.92
+    },
+    {
+     "id": "int-music-room-f5",
+     "label": "Music shelf",
+     "c": [
+      101.1,
+      55.87
+     ],
+     "half": [
+      0.65,
+      0.16
+     ],
+     "yaw": 0,
+     "height": 1.2
+    },
+    {
+     "id": "int-music-room-f6",
+     "label": "Music guitars",
+     "c": [
+      100.8,
+      62.05
+     ],
+     "half": [
+      0.17,
+      0.15
+     ],
+     "yaw": 0,
+     "height": 1.05
+    },
+    {
+     "id": "int-music-room-f7",
+     "label": "Music stands and chairs",
+     "c": [
+      101.0,
+      59.0
+     ],
+     "half": [
+      0.15,
+      0.24
+     ],
+     "yaw": 0,
+     "height": 1.3
+    },
+    {
+     "id": "int-music-room-f8",
+     "label": "Music stands and chairs",
+     "c": [
+      101.25,
+      57.8
+     ],
+     "half": [
+      0.17,
+      0.24
+     ],
+     "yaw": 0,
+     "height": 1.3
+    },
+    {
+     "id": "int-music-room-f9",
+     "label": "Music stands and chairs",
+     "c": [
+      101.25,
+      60.2
+     ],
+     "half": [
+      0.17,
+      0.24
+     ],
+     "yaw": 0,
+     "height": 1.3
+    },
+    {
+     "id": "int-music-room-f10",
+     "label": "Music guitars",
+     "c": [
+      101.5,
+      62.05
+     ],
+     "half": [
+      0.17,
+      0.15
+     ],
+     "yaw": 0,
+     "height": 1.05
+    },
+    {
+     "id": "int-music-room-f11",
+     "label": "Music drums",
+     "c": [
+      102.24,
+      61.3
+     ],
+     "half": [
+      0.53,
+      0.78
+     ],
+     "yaw": 0,
+     "height": 1.11
+    },
+    {
+     "id": "int-music-room-f12",
+     "label": "Music piano",
+     "c": [
+      102.8,
+      57.4
+     ],
+     "half": [
+      0.59,
+      0.75
+     ],
+     "yaw": 0,
+     "height": 1.27
+    }
+   ],
+   "walls": []
+  },
+  {
+   "place": "int-games-room",
+   "doors": [
+    [
+     86.35,
+     -17.7,
+     87.45,
+     -17.7
+    ]
+   ],
+   "wall": 0.1,
+   "furniture": [
+    {
+     "id": "int-games-room-f1",
+     "label": "Games armchair",
+     "c": [
+      84.75,
+      -18.35
+     ],
+     "half": [
+      0.54,
+      0.53
+     ],
+     "yaw": 0,
+     "height": 0.92
+    },
+    {
+     "id": "int-games-room-f2",
+     "label": "Games chess",
+     "c": [
+      85.05,
+      -20.25
+     ],
+     "half": [
+      0.35,
+      0.79
+     ],
+     "yaw": 0,
+     "height": 0.92
+    },
+    {
+     "id": "int-games-room-f3",
+     "label": "Games shelf",
+     "c": [
+      86.55,
+      -21.13
+     ],
+     "half": [
+      0.55,
+      0.16
+     ],
+     "yaw": 0,
+     "height": 1.4
+    },
+    {
+     "id": "int-games-room-f4",
+     "label": "Games card table",
+     "c": [
+      87.65,
+      -19.95
+     ],
+     "half": [
+      0.83,
+      0.83
+     ],
+     "yaw": 0,
+     "height": 0.92
+    }
+   ],
+   "walls": []
+  },
+  {
+   "place": "int-bakery",
+   "doors": [
+    [
+     79.3,
+     -16.05,
+     79.3,
+     -14.95
+    ]
+   ],
+   "wall": 0.1,
+   "furniture": [
+    {
+     "id": "int-bakery-f1",
+     "label": "Bakery bread shelves",
+     "c": [
+      75.9,
+      -16.74
+     ],
+     "half": [
+      0.2,
+      0.96
+     ],
+     "yaw": 0,
+     "height": 1.8
+    },
+    {
+     "id": "int-bakery-f2",
+     "label": "Bakery oven",
+     "c": [
+      76.31,
+      -14.1
+     ],
+     "half": [
+      0.56,
+      0.8
+     ],
+     "yaw": 0,
+     "height": 2.7
+    },
+    {
+     "id": "int-bakery-f3",
+     "label": "Bakery counter",
+     "c": [
+      77.77,
+      -16.8
+     ],
+     "half": [
+      0.31,
+      0.87
+     ],
+     "yaw": 0,
+     "height": 1.24
+    },
+    {
+     "id": "int-bakery-f4",
+     "label": "Bakery kneading table",
+     "c": [
+      78.15,
+      -13.6
+     ],
+     "half": [
+      0.6,
+      0.35
+     ],
+     "yaw": 0,
+     "height": 0.96
+    },
+    {
+     "id": "int-bakery-f5",
+     "label": "Bakery sacks",
+     "c": [
+      78.97,
+      -14.35
+     ],
+     "half": [
+      0.23,
+      0.44
+     ],
+     "yaw": 0,
+     "height": 0.65
+    }
+   ],
+   "walls": []
+  },
+  {
+   "place": "int-chapel",
+   "doors": [
+    [
+     84,
+     81.4,
+     84,
+     82.6
+    ]
+   ],
+   "wall": 0.1,
+   "furniture": [
+    {
+     "id": "int-chapel-f1",
+     "label": "Chapel flowers",
+     "c": [
+      84.4,
+      80.46
+     ],
+     "half": [
+      0.27,
+      0.28
+     ],
+     "yaw": 0,
+     "height": 0.95
+    },
+    {
+     "id": "int-chapel-f2",
+     "label": "Chapel flowers",
+     "c": [
+      84.4,
+      83.56
+     ],
+     "half": [
+      0.27,
+      0.28
+     ],
+     "yaw": 0,
+     "height": 0.95
+    },
+    {
+     "id": "int-chapel-f3",
+     "label": "Chapel pews",
+     "c": [
+      85.4,
+      80.95
+     ],
+     "half": [
+      0.22,
+      0.65
+     ],
+     "yaw": 0,
+     "height": 0.95
+    },
+    {
+     "id": "int-chapel-f4",
+     "label": "Chapel pews",
+     "c": [
+      85.4,
+      83.05
+     ],
+     "half": [
+      0.22,
+      0.65
+     ],
+     "yaw": 0,
+     "height": 0.95
+    },
+    {
+     "id": "int-chapel-f5",
+     "label": "Chapel pews",
+     "c": [
+      86.2,
+      80.95
+     ],
+     "half": [
+      0.22,
+      0.65
+     ],
+     "yaw": 0,
+     "height": 0.95
+    },
+    {
+     "id": "int-chapel-f6",
+     "label": "Chapel pews",
+     "c": [
+      86.2,
+      83.05
+     ],
+     "half": [
+      0.22,
+      0.65
+     ],
+     "yaw": 0,
+     "height": 0.95
+    },
+    {
+     "id": "int-chapel-f7",
+     "label": "Chapel pews",
+     "c": [
+      87.1,
+      80.95
+     ],
+     "half": [
+      0.22,
+      0.65
+     ],
+     "yaw": 0,
+     "height": 0.95
+    },
+    {
+     "id": "int-chapel-f8",
+     "label": "Chapel pews",
+     "c": [
+      87.1,
+      83.05
+     ],
+     "half": [
+      0.22,
+      0.65
+     ],
+     "yaw": 0,
+     "height": 0.95
+    },
+    {
+     "id": "int-chapel-f9",
+     "label": "Chapel lectern",
+     "c": [
+      88.09,
+      80.7
+     ],
+     "half": [
+      0.42,
+      0.41
+     ],
+     "yaw": 0,
+     "height": 1.18
+    },
+    {
+     "id": "int-chapel-f10",
+     "label": "Chapel candle stands",
+     "c": [
+      88.35,
+      83.55
+     ],
+     "half": [
+      0.16,
+      0.16
+     ],
+     "yaw": 0,
+     "height": 1.13
+    },
+    {
+     "id": "int-chapel-f11",
+     "label": "Chapel altar",
+     "c": [
+      88.55,
+      82.0
+     ],
+     "half": [
+      0.28,
+      0.68
+     ],
+     "yaw": 0,
+     "height": 1.63
+    }
+   ],
+   "walls": []
+  },
+  {
+   "place": "int-clinic",
+   "doors": [
+    [
+     63.35,
+     -6,
+     64.45,
+     -6
+    ]
+   ],
+   "wall": 0.1,
+   "furniture": [
+    {
+     "id": "int-clinic-f1",
+     "label": "Clinic plant",
+     "c": [
+      62.86,
+      -6.3
+     ],
+     "half": [
+      0.28,
+      0.27
+     ],
+     "yaw": 0,
+     "height": 0.95
+    },
+    {
+     "id": "int-clinic-f2",
+     "label": "Clinic waiting chairs",
+     "c": [
+      62.8,
+      -8.2
+     ],
+     "half": [
+      0.21,
+      0.22
+     ],
+     "yaw": 0,
+     "height": 0.92
+    },
+    {
+     "id": "int-clinic-f3",
+     "label": "Clinic waiting chairs",
+     "c": [
+      62.8,
+      -7.55
+     ],
+     "half": [
+      0.21,
+      0.22
+     ],
+     "yaw": 0,
+     "height": 0.92
+    },
+    {
+     "id": "int-clinic-f4",
+     "label": "Clinic waiting chairs",
+     "c": [
+      62.8,
+      -6.9
+     ],
+     "half": [
+      0.21,
+      0.22
+     ],
+     "yaw": 0,
+     "height": 0.92
+    },
+    {
+     "id": "int-clinic-f5",
+     "label": "Clinic cot",
+     "c": [
+      63.35,
+      -9.95
+     ],
+     "half": [
+      0.4,
+      0.97
+     ],
+     "yaw": 0,
+     "height": 0.77
+    },
+    {
+     "id": "int-clinic-f6",
+     "label": "Clinic screen",
+     "c": [
+      64.66,
+      -10.1
+     ],
+     "half": [
+      0.12,
+      0.73
+     ],
+     "yaw": 0,
+     "height": 1.7
+    },
+    {
+     "id": "int-clinic-f7",
+     "label": "Clinic desk",
+     "c": [
+      65.65,
+      -7.35
+     ],
+     "half": [
+      0.55,
+      0.28
+     ],
+     "yaw": 0,
+     "height": 0.85
+    },
+    {
+     "id": "int-clinic-f8",
+     "label": "Clinic cabinet",
+     "c": [
+      65.75,
+      -10.75
+     ],
+     "half": [
+      0.6,
+      0.22
+     ],
+     "yaw": 0,
+     "height": 1.14
+    },
+    {
+     "id": "int-clinic-f9",
+     "label": "Clinic desk chair",
+     "c": [
+      65.65,
+      -8.05
+     ],
+     "half": [
+      0.22,
+      0.21
+     ],
+     "yaw": 0,
+     "height": 0.92
+    },
+    {
+     "id": "int-clinic-f10",
+     "label": "Clinic basin",
+     "c": [
+      66.25,
+      -9.7
+     ],
+     "half": [
+      0.21,
+      0.28
+     ],
+     "yaw": 0,
+     "height": 1.04
+    }
+   ],
+   "walls": []
+  },
+  {
+   "place": "int-bathhouse",
+   "doors": [
+    [
+     82.95,
+     -8,
+     84.05,
+     -8
+    ]
+   ],
+   "wall": 0.1,
+   "furniture": [
+    {
+     "id": "int-bathhouse-f1",
+     "label": "Bath towels",
+     "c": [
+      81.67,
+      -10.19
+     ],
+     "half": [
+      0.17,
+      0.61
+     ],
+     "yaw": 0,
+     "height": 1.5
+    },
+    {
+     "id": "int-bathhouse-f2",
+     "label": "Laundry tub",
+     "c": [
+      82.1,
+      -8.75
+     ],
+     "half": [
+      0.29,
+      0.3
+     ],
+     "yaw": 0,
+     "height": 0.62
+    },
+    {
+     "id": "int-bathhouse-f3",
+     "label": "Bath tubs",
+     "c": [
+      82.25,
+      -12.05
+     ],
+     "half": [
+      0.38,
+      0.8
+     ],
+     "yaw": 0,
+     "height": 0.78
+    },
+    {
+     "id": "int-bathhouse-f4",
+     "label": "Bath bench",
+     "c": [
+      83.7,
+      -10.15
+     ],
+     "half": [
+      0.55,
+      0.17
+     ],
+     "yaw": 0,
+     "height": 0.47
+    },
+    {
+     "id": "int-bathhouse-f5",
+     "label": "Bath screen",
+     "c": [
+      83.61,
+      -12.25
+     ],
+     "half": [
+      0.12,
+      0.73
+     ],
+     "yaw": 0,
+     "height": 1.7
+    },
+    {
+     "id": "int-bathhouse-f6",
+     "label": "Bath plant",
+     "c": [
+      84.88,
+      -8.51
+     ],
+     "half": [
+      0.56,
+      0.4
+     ],
+     "yaw": 0,
+     "height": 1.65
+    },
+    {
+     "id": "int-bathhouse-f7",
+     "label": "Bath tubs",
+     "c": [
+      84.75,
+      -12.05
+     ],
+     "half": [
+      0.38,
+      0.8
+     ],
+     "yaw": 0,
+     "height": 0.78
+    },
+    {
+     "id": "int-bathhouse-f8",
+     "label": "Bath basins",
+     "c": [
+      85.29,
+      -10.4
+     ],
+     "half": [
+      0.21,
+      0.28
+     ],
+     "yaw": 0,
+     "height": 1.04
+    },
+    {
+     "id": "int-bathhouse-f9",
+     "label": "Bath basins",
+     "c": [
+      85.29,
+      -9.6
+     ],
+     "half": [
+      0.21,
+      0.28
+     ],
+     "yaw": 0,
+     "height": 1.04
+    }
+   ],
+   "walls": []
+  },
+  {
+   "place": "int-potting-shed",
+   "doors": [
+    [
+     42.85,
+     80.5,
+     43.95,
+     80.5
+    ]
+   ],
+   "wall": 0.1,
+   "furniture": [
+    {
+     "id": "int-potting-shed-f1",
+     "label": "Potting sacks",
+     "c": [
+      42.4,
+      82.4
+     ],
+     "half": [
+      0.24,
+      0.2
+     ],
+     "yaw": 0,
+     "height": 0.65
+    },
+    {
+     "id": "int-potting-shed-f2",
+     "label": "Potting sacks",
+     "c": [
+      42.4,
+      83.0
+     ],
+     "half": [
+      0.24,
+      0.2
+     ],
+     "yaw": 0,
+     "height": 0.65
+    },
+    {
+     "id": "int-potting-shed-f3",
+     "label": "Potting bench",
+     "c": [
+      44.0,
+      84.06
+     ],
+     "half": [
+      1.2,
+      0.37
+     ],
+     "yaw": 0,
+     "height": 1.54
+    },
+    {
+     "id": "int-potting-shed-f4",
+     "label": "Potting stool",
+     "c": [
+      43.8,
+      83.25
+     ],
+     "half": [
+      0.16,
+      0.17
+     ],
+     "yaw": 0,
+     "height": 0.62
+    },
+    {
+     "id": "int-potting-shed-f5",
+     "label": "Potting tall plant",
+     "c": [
+      45.51,
+      81.0
+     ],
+     "half": [
+      0.36,
+      0.37
+     ],
+     "yaw": 0,
+     "height": 1.65
+    },
+    {
+     "id": "int-potting-shed-f6",
+     "label": "Potting shelves",
+     "c": [
+      45.79,
+      82.2
+     ],
+     "half": [
+      0.17,
+      0.7
+     ],
+     "yaw": 0,
+     "height": 1.6
+    }
+   ],
+   "walls": []
+  },
+  {
+   "place": "eden-yurt",
+   "doors": [
+    [
+     65.3,
+     -15.5,
+     66.3,
+     -15.5
+    ]
+   ],
+   "wall": 0.2,
+   "furniture": [
+    {
+     "id": "eden-yurt-f1",
+     "label": "Bed",
+     "c": [
+      65.9,
+      -19.35
+     ],
+     "half": [
+      1.12,
+      1.03
+     ],
+     "yaw": 0,
+     "height": 1.0
+    },
+    {
+     "id": "eden-yurt-f2",
+     "label": "Stove",
+     "c": [
+      67.95,
+      -18.8
+     ],
+     "half": [
+      0.35,
+      0.36
+     ],
+     "yaw": 0,
+     "height": 3.64
+    },
+    {
+     "id": "eden-yurt-f3",
+     "label": "Plant",
+     "c": [
+      67.96,
+      -16.06
+     ],
+     "half": [
+      0.27,
+      0.27
+     ],
+     "yaw": 0,
+     "height": 0.95
+    },
+    {
+     "id": "eden-yurt-f4",
+     "label": "Low table",
+     "c": [
+      68.22,
+      -17.34
+     ],
+     "half": [
+      0.42,
+      0.42
+     ],
+     "yaw": 0,
+     "height": 0.52
+    },
+    {
+     "id": "eden-yurt-f5",
+     "label": "Shelf",
+     "c": [
+      68.36,
+      -20.82
+     ],
+     "half": [
+      0.52,
+      0.31
+     ],
+     "yaw": 0,
+     "height": 0.9
+    },
+    {
+     "id": "eden-yurt-f6",
+     "label": "Lantern",
+     "c": [
+      68.86,
+      -18.9
+     ],
+     "half": [
+      0.17,
+      0.18
+     ],
+     "yaw": 0,
+     "height": 1.48
+    },
+    {
+     "id": "eden-yurt-f7",
+     "label": "Chest",
+     "c": [
+      69.68,
+      -19.74
+     ],
+     "half": [
+      0.45,
+      0.51
+     ],
+     "yaw": 0,
+     "height": 0.5
+    }
+   ],
+   "walls": []
+  },
+  {
+   "place": "eden-a-frame",
+   "doors": [
+    [
+     76.7,
+     -22.5,
+     77.7,
+     -22.5
+    ]
+   ],
+   "wall": 0.2,
+   "furniture": [
+    {
+     "id": "eden-a-frame-f1",
+     "label": "Shelf",
+     "c": [
+      74.84,
+      -25.18
+     ],
+     "half": [
+      0.32,
+      0.52
+     ],
+     "yaw": 0,
+     "height": 0.89
+    },
+    {
+     "id": "eden-a-frame-f2",
+     "label": "Bed",
+     "c": [
+      75.82,
+      -27.11
+     ],
+     "half": [
+      1.03,
+      1.19
+     ],
+     "yaw": 0,
+     "height": 1.09
+    },
+    {
+     "id": "eden-a-frame-f3",
+     "label": "Table",
+     "c": [
+      75.84,
+      -24.23
+     ],
+     "half": [
+      0.49,
+      0.65
+     ],
+     "yaw": 0,
+     "height": 1.02
+    },
+    {
+     "id": "eden-a-frame-f4",
+     "label": "Armchair",
+     "c": [
+      77.87,
+      -24.72
+     ],
+     "half": [
+      0.5,
+      0.51
+     ],
+     "yaw": 0,
+     "height": 1.02
+    },
+    {
+     "id": "eden-a-frame-f5",
+     "label": "Stove",
+     "c": [
+      77.7,
+      -26.12
+     ],
+     "half": [
+      0.29,
+      0.29
+     ],
+     "yaw": 0,
+     "height": 0.69
+    }
+   ],
+   "walls": []
+  },
+  {
+   "place": "eden-observatory",
+   "doors": [
+    [
+     36.0,
+     80,
+     37.0,
+     80
+    ]
+   ],
+   "wall": 0.2,
+   "furniture": [
+    {
+     "id": "eden-observatory-f1",
+     "label": "Globe",
+     "c": [
+      35.25,
+      82.35
+     ],
+     "half": [
+      0.24,
+      0.24
+     ],
+     "yaw": 0,
+     "height": 1.19
+    },
+    {
+     "id": "eden-observatory-f2",
+     "label": "Desk",
+     "c": [
+      36.5,
+      83.42
+     ],
+     "half": [
+      0.5,
+      0.24
+     ],
+     "yaw": 0,
+     "height": 1.04
+    },
+    {
+     "id": "eden-observatory-f3",
+     "label": "Chair",
+     "c": [
+      36.5,
+      82.9
+     ],
+     "half": [
+      0.22,
+      0.21
+     ],
+     "yaw": 0,
+     "height": 0.92
+    },
+    {
+     "id": "eden-observatory-f4",
+     "label": "Telescope",
+     "c": [
+      36.57,
+      81.85
+     ],
+     "half": [
+      0.24,
+      0.5
+     ],
+     "yaw": 0,
+     "height": 1.71
+    },
+    {
+     "id": "eden-observatory-f5",
+     "label": "Shelf",
+     "c": [
+      37.7,
+      81.45
+     ],
+     "half": [
+      0.3,
+      0.42
+     ],
+     "yaw": 0,
+     "height": 1.6
+    }
+   ],
+   "walls": []
+  },
+  {
+   "place": "eden-windmill",
+   "doors": [
+    [
+     85.9,
+     28.5,
+     85.9,
+     29.5
+    ]
+   ],
+   "wall": 0.2,
+   "furniture": [
+    {
+     "id": "eden-windmill-f1",
+     "label": "Sacks",
+     "c": [
+      86.76,
+      27.15
+     ],
+     "half": [
+      0.22,
+      0.22
+     ],
+     "yaw": 0,
+     "height": 0.65
+    },
+    {
+     "id": "eden-windmill-f2",
+     "label": "Millstones",
+     "c": [
+      88.32,
+      27.43
+     ],
+     "half": [
+      0.79,
+      0.79
+     ],
+     "yaw": 0,
+     "height": 1.3
+    },
+    {
+     "id": "eden-windmill-f3",
+     "label": "Ladder",
+     "c": [
+      88.18,
+      26.34
+     ],
+     "half": [
+      0.28,
+      0.24
+     ],
+     "yaw": 0,
+     "height": 2.56
+    },
+    {
+     "id": "eden-windmill-f4",
+     "label": "Sacks",
+     "c": [
+      88.32,
+      28.92
+     ],
+     "half": [
+      0.22,
+      0.22
+     ],
+     "yaw": 0,
+     "height": 0.65
+    },
+    {
+     "id": "eden-windmill-f5",
+     "label": "Barrel",
+     "c": [
+      89.56,
+      27.26
+     ],
+     "half": [
+      0.28,
+      0.28
+     ],
+     "yaw": 0,
+     "height": 0.7
+    }
+   ],
+   "walls": []
+  },
+  {
+   "place": "eden-tower-house",
+   "doors": [
+    [
+     70.7,
+     19.85,
+     70.7,
+     20.75
+    ]
+   ],
+   "wall": 0.2,
+   "furniture": [
+    {
+     "id": "eden-tower-house-f1",
+     "label": "Stove",
+     "c": [
+      67.75,
+      18.95
+     ],
+     "half": [
+      0.31,
+      0.4
+     ],
+     "yaw": 0,
+     "height": 1.05
+    },
+    {
+     "id": "eden-tower-house-f2",
+     "label": "Sink",
+     "c": [
+      67.78,
+      20.05
+     ],
+     "half": [
+      0.33,
+      0.47
+     ],
+     "yaw": 0,
+     "height": 1.1
+    },
+    {
+     "id": "eden-tower-house-f3",
+     "label": "Stairs ground",
+     "c": [
+      68.75,
+      21.2
+     ],
+     "half": [
+      1.27,
+      0.32
+     ],
+     "yaw": 0,
+     "height": 2.77
+    },
+    {
+     "id": "eden-tower-house-f4",
+     "label": "Table",
+     "c": [
+      69.45,
+      19.3
+     ],
+     "half": [
+      0.35,
+      0.34
+     ],
+     "yaw": 0,
+     "height": 0.84
+    },
+    {
+     "id": "eden-tower-house-f5",
+     "label": "Chair east",
+     "c": [
+      69.45,
+      18.68
+     ],
+     "half": [
+      0.22,
+      0.21
+     ],
+     "yaw": 0,
+     "height": 0.92
+    },
+    {
+     "id": "eden-tower-house-f6",
+     "label": "Chair west",
+     "c": [
+      69.45,
+      19.92
+     ],
+     "half": [
+      0.22,
+      0.21
+     ],
+     "yaw": 0,
+     "height": 0.92
+    }
+   ],
+   "walls": []
+  }
+ ],
+ "shelves": [
+  {
+   "id": "lib-shelf-north-west",
+   "place": "int-library-stacks",
+   "at": [
+    70.3,
+    -10
+   ],
+   "faceTo": [
+    70.3,
+    -11
+   ]
+  },
+  {
+   "id": "lib-shelf-north-east",
+   "place": "int-library-stacks",
+   "at": [
+    77.7,
+    -10
+   ],
+   "faceTo": [
+    77.7,
+    -11
+   ]
+  },
+  {
+   "id": "lib-shelf-east",
+   "place": "int-library-stacks",
+   "at": [
+    77.9,
+    -7
+   ],
+   "faceTo": [
+    79,
+    -7
+   ]
+  },
+  {
+   "id": "lib-shelf-west",
+   "place": "int-library-stacks",
+   "at": [
+    70.1,
+    -6
+   ],
+   "faceTo": [
+    69,
+    -6
+   ]
+  }
+ ],
+ "spots": [
+  {
+   "id": "lib-armchair-sage",
+   "place": "int-library-reading-corner",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    76.25,
+    -3.85
+   ],
+   "faceTo": [
+    76.25,
+    -6
+   ],
+   "seatHeight": 0.62,
+   "label": "Sage armchair in the library reading corner"
+  },
+  {
+   "id": "lib-armchair-rose",
+   "place": "int-library-reading-corner",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    77.95,
+    -3.85
+   ],
+   "faceTo": [
+    77.95,
+    -6
+   ],
+   "seatHeight": 0.62,
+   "label": "Rose armchair in the library reading corner"
+  },
+  {
+   "id": "lib-table-1-north",
+   "place": "int-library-reading-tables",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    71.5,
+    -7.45
+   ],
+   "faceTo": [
+    71.5,
+    -6.6
+   ],
+   "seatHeight": 0.4,
+   "label": "Reading table, west"
+  },
+  {
+   "id": "lib-table-1-south",
+   "place": "int-library-reading-tables",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    71.5,
+    -5.75
+   ],
+   "faceTo": [
+    71.5,
+    -6.6
+   ],
+   "seatHeight": 0.4,
+   "label": "Reading table, west (south side)"
+  },
+  {
+   "id": "lib-table-2-north",
+   "place": "int-library-reading-tables",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    76.5,
+    -7.45
+   ],
+   "faceTo": [
+    76.5,
+    -6.6
+   ],
+   "seatHeight": 0.4,
+   "label": "Reading table, east"
+  },
+  {
+   "id": "lib-table-2-south",
+   "place": "int-library-reading-tables",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    76.5,
+    -5.75
+   ],
+   "faceTo": [
+    76.5,
+    -6.6
+   ],
+   "seatHeight": 0.4,
+   "label": "Reading table, east (south side)"
+  },
+  {
+   "id": "lib-desk-1",
+   "place": "int-library-stacks",
+   "activity": "write",
+   "base": "sit",
+   "at": [
+    71.5,
+    -8.3
+   ],
+   "faceTo": [
+    71.5,
+    -9
+   ],
+   "seatHeight": 0.56,
+   "label": "Library writing desk, west"
+  },
+  {
+   "id": "lib-desk-2",
+   "place": "int-library-stacks",
+   "activity": "write",
+   "base": "sit",
+   "at": [
+    76.5,
+    -8.3
+   ],
+   "faceTo": [
+    76.5,
+    -9
+   ],
+   "seatHeight": 0.56,
+   "label": "Library writing desk, east",
+   "also": [
+    "use-computer"
+   ]
+  },
+  {
+   "id": "easel-1",
+   "place": "eden-east",
+   "activity": "paint",
+   "base": "idle",
+   "at": [
+    63.25,
+    -13.42
+   ],
+   "faceTo": [
+    62.77,
+    -14.12
+   ],
+   "label": "Painter's easel 1"
+  },
+  {
+   "id": "easel-2",
+   "place": "eden-east",
+   "activity": "paint",
+   "base": "idle",
+   "at": [
+    60.84,
+    -19.81
+   ],
+   "faceTo": [
+    61.6,
+    -20.2
+   ],
+   "label": "Painter's easel 2"
+  },
+  {
+   "id": "easel-3",
+   "place": "eden-east",
+   "activity": "paint",
+   "base": "idle",
+   "at": [
+    81.67,
+    -20.27
+   ],
+   "faceTo": [
+    81,
+    -20.8
+   ],
+   "label": "Painter's easel 3"
+  },
+  {
+   "id": "mailbox-1",
+   "place": "eden-east",
+   "activity": "post-letter",
+   "base": "idle",
+   "at": [
+    32.75,
+    6.35
+   ],
+   "faceTo": [
+    32.75,
+    6.95
+   ],
+   "label": "Post box 1"
+  },
+  {
+   "id": "mailbox-2",
+   "place": "eden-house-2",
+   "activity": "post-letter",
+   "base": "idle",
+   "at": [
+    48.9,
+    6.35
+   ],
+   "faceTo": [
+    48.9,
+    6.95
+   ],
+   "label": "Post box 2"
+  },
+  {
+   "id": "mailbox-3",
+   "place": "eden-housing",
+   "activity": "post-letter",
+   "base": "idle",
+   "at": [
+    37.4,
+    36.9
+   ],
+   "faceTo": [
+    37.4,
+    36.3
+   ],
+   "label": "Post box 3"
+  },
+  {
+   "id": "mailbox-4",
+   "place": "eden-housing",
+   "activity": "post-letter",
+   "base": "idle",
+   "at": [
+    57.4,
+    36.9
+   ],
+   "faceTo": [
+    57.4,
+    36.3
+   ],
+   "label": "Post box 4"
+  },
+  {
+   "id": "mailbox-5",
+   "place": "eden-east",
+   "activity": "post-letter",
+   "base": "idle",
+   "at": [
+    84.98,
+    34.81
+   ],
+   "faceTo": [
+    84.98,
+    34.21
+   ],
+   "label": "Post box 5"
+  },
+  {
+   "id": "mailbox-6",
+   "place": "eden-east",
+   "activity": "post-letter",
+   "base": "idle",
+   "at": [
+    64,
+    -12.2
+   ],
+   "faceTo": [
+    64,
+    -12.8
+   ],
+   "label": "Post box 6"
+  },
+  {
+   "id": "mailbox-7",
+   "place": "eden-east",
+   "activity": "post-letter",
+   "base": "idle",
+   "at": [
+    80.73,
+    -23.25
+   ],
+   "faceTo": [
+    80.5,
+    -23.8
+   ],
+   "label": "Post box 7"
+  },
+  {
+   "id": "mailbox-8",
+   "place": "eden-east",
+   "activity": "post-letter",
+   "base": "idle",
+   "at": [
+    73.2,
+    22.6
+   ],
+   "faceTo": [
+    72.6,
+    22.6
+   ],
+   "label": "Post box 8"
+  },
+  {
+   "id": "bench-1",
+   "place": "eden-east",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    40.2,
+    7.3
+   ],
+   "faceTo": [
+    40.2,
+    5.35
+   ],
+   "seatHeight": 0.46,
+   "label": "Bench 1"
+  },
+  {
+   "id": "bench-2",
+   "place": "eden-east",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    56.72,
+    2.28
+   ],
+   "faceTo": [
+    56.72,
+    4.23
+   ],
+   "seatHeight": 0.46,
+   "label": "Bench 2"
+  },
+  {
+   "id": "bench-3",
+   "place": "eden-east",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    78.9,
+    2.38
+   ],
+   "faceTo": [
+    78.9,
+    0.43
+   ],
+   "seatHeight": 0.46,
+   "label": "Bench 3"
+  },
+  {
+   "id": "bench-4",
+   "place": "eden-east",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    81.6,
+    0
+   ],
+   "faceTo": [
+    79.65,
+    0
+   ],
+   "seatHeight": 0.46,
+   "label": "Bench 4"
+  },
+  {
+   "id": "bench-5",
+   "place": "eden-east",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    87,
+    9.55
+   ],
+   "faceTo": [
+    87,
+    7.6
+   ],
+   "seatHeight": 0.46,
+   "label": "Bench 5"
+  },
+  {
+   "id": "bench-6",
+   "place": "eden-east",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    40.4,
+    -20.79
+   ],
+   "faceTo": [
+    39.74,
+    -22.62
+   ],
+   "seatHeight": 0.46,
+   "label": "Bench 6"
+  },
+  {
+   "id": "bench-7",
+   "place": "eden-east",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    36.6,
+    -20.79
+   ],
+   "faceTo": [
+    37.27,
+    -22.62
+   ],
+   "seatHeight": 0.46,
+   "label": "Bench 7"
+  },
+  {
+   "id": "bench-8",
+   "place": "eden-east",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    43.76,
+    -24.25
+   ],
+   "faceTo": [
+    41.91,
+    -24.86
+   ],
+   "seatHeight": 0.46,
+   "label": "Bench 8"
+  },
+  {
+   "id": "bench-9",
+   "place": "eden-east",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    33.24,
+    -24.25
+   ],
+   "faceTo": [
+    35.09,
+    -24.86
+   ],
+   "seatHeight": 0.46,
+   "label": "Bench 9"
+  },
+  {
+   "id": "bench-10",
+   "place": "eden-gardens",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    57,
+    51.35
+   ],
+   "faceTo": [
+    57,
+    49.4
+   ],
+   "seatHeight": 0.46,
+   "label": "Bench 10"
+  },
+  {
+   "id": "bench-11",
+   "place": "eden-gardens",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    60.77,
+    50.22
+   ],
+   "faceTo": [
+    59.31,
+    48.93
+   ],
+   "seatHeight": 0.46,
+   "label": "Bench 11"
+  },
+  {
+   "id": "bench-12",
+   "place": "eden-gardens",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    54.82,
+    49.8
+   ],
+   "faceTo": [
+    56.22,
+    48.44
+   ],
+   "seatHeight": 0.46,
+   "label": "Bench 12"
+  },
+  {
+   "id": "bench-13",
+   "place": "eden-east",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    39.64,
+    79.03
+   ],
+   "faceTo": [
+    41.17,
+    80.24
+   ],
+   "seatHeight": 0.46,
+   "label": "Bench 13"
+  },
+  {
+   "id": "bench-14",
+   "place": "eden-east",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    50.8,
+    -8
+   ],
+   "faceTo": [
+    52.75,
+    -8
+   ],
+   "seatHeight": 0.46,
+   "label": "Bench 14"
+  },
+  {
+   "id": "bench-15",
+   "place": "eden-east",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    50.8,
+    -3.5
+   ],
+   "faceTo": [
+    52.75,
+    -3.5
+   ],
+   "seatHeight": 0.46,
+   "label": "Bench 15"
+  },
+  {
+   "id": "log-bench-1",
+   "place": "eden-north-woods",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    18.2,
+    -34.91
+   ],
+   "faceTo": [
+    16.25,
+    -34.91
+   ],
+   "seatHeight": 0.4,
+   "label": "Log bench in the woodland 1"
+  },
+  {
+   "id": "log-bench-2",
+   "place": "eden-north-woods",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    14.9,
+    -38.18
+   ],
+   "faceTo": [
+    14.9,
+    -36.23
+   ],
+   "seatHeight": 0.4,
+   "label": "Log bench in the woodland 2"
+  },
+  {
+   "id": "log-bench-3",
+   "place": "eden-north-woods",
+   "activity": "read",
+   "base": "sit",
+   "at": [
+    11.99,
+    -34.06
+   ],
+   "faceTo": [
+    13.85,
+    -34.64
+   ],
+   "seatHeight": 0.4,
+   "label": "Log bench in the woodland 3"
+  },
+  {
+   "id": "picnic-1-south-w",
+   "place": "eden-east",
+   "activity": "eat",
+   "base": "sit",
+   "at": [
+    54.55,
+    -21.78
+   ],
+   "faceTo": [
+    54.55,
+    -22.4
+   ],
+   "seatHeight": 0.46,
+   "label": "Picnic table 1"
+  },
+  {
+   "id": "picnic-1-south-e",
+   "place": "eden-east",
+   "activity": "eat",
+   "base": "sit",
+   "at": [
+    55.45,
+    -21.78
+   ],
+   "faceTo": [
+    55.45,
+    -22.4
+   ],
+   "seatHeight": 0.46,
+   "label": "Picnic table 1"
+  },
+  {
+   "id": "picnic-1-north-w",
+   "place": "eden-east",
+   "activity": "eat",
+   "base": "sit",
+   "at": [
+    54.55,
+    -23.02
+   ],
+   "faceTo": [
+    54.55,
+    -22.4
+   ],
+   "seatHeight": 0.46,
+   "label": "Picnic table 1"
+  },
+  {
+   "id": "picnic-1-north-e",
+   "place": "eden-east",
+   "activity": "eat",
+   "base": "sit",
+   "at": [
+    55.45,
+    -23.02
+   ],
+   "faceTo": [
+    55.45,
+    -22.4
+   ],
+   "seatHeight": 0.46,
+   "label": "Picnic table 1"
+  },
+  {
+   "id": "picnic-2-south-w",
+   "place": "eden-east",
+   "activity": "eat",
+   "base": "sit",
+   "at": [
+    59.13,
+    -21.63
+   ],
+   "faceTo": [
+    59.05,
+    -22.25
+   ],
+   "seatHeight": 0.46,
+   "label": "Picnic table 2"
+  },
+  {
+   "id": "picnic-2-south-e",
+   "place": "eden-east",
+   "activity": "eat",
+   "base": "sit",
+   "at": [
+    60.02,
+    -21.74
+   ],
+   "faceTo": [
+    59.95,
+    -22.35
+   ],
+   "seatHeight": 0.46,
+   "label": "Picnic table 2"
+  },
+  {
+   "id": "picnic-2-north-w",
+   "place": "eden-east",
+   "activity": "eat",
+   "base": "sit",
+   "at": [
+    58.98,
+    -22.86
+   ],
+   "faceTo": [
+    59.05,
+    -22.25
+   ],
+   "seatHeight": 0.46,
+   "label": "Picnic table 2"
+  },
+  {
+   "id": "picnic-2-north-e",
+   "place": "eden-east",
+   "activity": "eat",
+   "base": "sit",
+   "at": [
+    59.87,
+    -22.97
+   ],
+   "faceTo": [
+    59.95,
+    -22.35
+   ],
+   "seatHeight": 0.46,
+   "label": "Picnic table 2"
+  },
+  {
+   "id": "picnic-3-south-w",
+   "place": "eden-east",
+   "activity": "eat",
+   "base": "sit",
+   "at": [
+    84.35,
+    77.93
+   ],
+   "faceTo": [
+    84.17,
+    77.33
+   ],
+   "seatHeight": 0.46,
+   "label": "Picnic table 3"
+  },
+  {
+   "id": "picnic-3-south-e",
+   "place": "eden-east",
+   "activity": "eat",
+   "base": "sit",
+   "at": [
+    85.21,
+    77.66
+   ],
+   "faceTo": [
+    85.03,
+    77.07
+   ],
+   "seatHeight": 0.46,
+   "label": "Picnic table 3"
+  },
+  {
+   "id": "picnic-3-north-w",
+   "place": "eden-east",
+   "activity": "eat",
+   "base": "sit",
+   "at": [
+    83.99,
+    76.74
+   ],
+   "faceTo": [
+    84.17,
+    77.33
+   ],
+   "seatHeight": 0.46,
+   "label": "Picnic table 3"
+  },
+  {
+   "id": "picnic-3-north-e",
+   "place": "eden-east",
+   "activity": "eat",
+   "base": "sit",
+   "at": [
+    84.85,
+    76.47
+   ],
+   "faceTo": [
+    85.03,
+    77.07
+   ],
+   "seatHeight": 0.46,
+   "label": "Picnic table 3"
+  },
+  {
+   "id": "house3-piano",
+   "place": "eden-house-3",
+   "activity": "play-piano",
+   "base": "sit",
+   "at": [
+    36.9,
+    33.2
+   ],
+   "faceTo": [
+    36.9,
+    32.2
+   ],
+   "seatHeight": 0.58,
+   "label": "Piano in house 3"
+  },
+  {
+   "id": "stage-drums",
+   "place": "eden-performance-stage",
+   "activity": "play-music",
+   "base": "sit",
+   "at": [
+    92,
+    -31.65
+   ],
+   "faceTo": [
+    92,
+    -29
+   ],
+   "seatHeight": 0.88,
+   "label": "Drum kit on the performance stage",
+   "instrument": "drums",
+   "platform": "performance-stage-deck"
+  },
+  {
+   "id": "stage-keys",
+   "place": "eden-performance-stage",
+   "activity": "play-music",
+   "base": "idle",
+   "at": [
+    93.85,
+    -31.55
+   ],
+   "faceTo": [
+    93.6,
+    -29
+   ],
+   "label": "Keyboard on the performance stage",
+   "instrument": "keyboard",
+   "platform": "performance-stage-deck"
+  },
+  {
+   "id": "stage-guitar",
+   "place": "eden-performance-stage",
+   "activity": "play-music",
+   "base": "idle",
+   "at": [
+    90.2,
+    -29.6
+   ],
+   "faceTo": [
+    90.2,
+    -27
+   ],
+   "label": "Guitar on the performance stage",
+   "instrument": "guitar",
+   "platform": "performance-stage-deck"
+  },
+  {
+   "id": "stage-bass",
+   "place": "eden-performance-stage",
+   "activity": "play-music",
+   "base": "idle",
+   "at": [
+    94.3,
+    -29.4
+   ],
+   "faceTo": [
+    94.3,
+    -27
+   ],
+   "label": "Bass guitar on the performance stage",
+   "instrument": "bass",
+   "platform": "performance-stage-deck"
+  },
+  {
+   "id": "stage-mic-1",
+   "place": "eden-performance-stage",
+   "activity": "sing",
+   "base": "idle",
+   "at": [
+    92,
+    -29.05
+   ],
+   "faceTo": [
+    92,
+    -26
+   ],
+   "label": "Lead microphone on the performance stage",
+   "platform": "performance-stage-deck"
+  },
+  {
+   "id": "stage-mic-2",
+   "place": "eden-performance-stage",
+   "activity": "sing",
+   "base": "idle",
+   "at": [
+    90.6,
+    -29.2
+   ],
+   "faceTo": [
+    90.6,
+    -26
+   ],
+   "label": "Second microphone on the performance stage",
+   "platform": "performance-stage-deck"
+  },
+  {
+   "id": "amph-mic",
+   "place": "eden-amphitheatre",
+   "activity": "sing",
+   "base": "idle",
+   "at": [
+    76,
+    80.35
+   ],
+   "faceTo": [
+    76,
+    83
+   ],
+   "label": "Microphone on the amphitheatre stage"
+  },
+  {
+   "id": "amph-guitar",
+   "place": "eden-amphitheatre",
+   "activity": "play-music",
+   "base": "sit",
+   "at": [
+    76.75,
+    80.25
+   ],
+   "faceTo": [
+    76.4,
+    83
+   ],
+   "seatHeight": 0.37,
+   "label": "Stool and guitar on the amphitheatre stage",
+   "instrument": "guitar"
+  },
+  {
+   "id": "amph-seat-2-1",
+   "place": "eden-amphitheatre",
+   "activity": "listen",
+   "base": "sit",
+   "at": [
+    77.1,
+    83.07
+   ],
+   "faceTo": [
+    76,
+    80.6
+   ],
+   "seatHeight": 0.32,
+   "label": "Amphitheatre step 2, seat 1"
+  },
+  {
+   "id": "amph-seat-2-2",
+   "place": "eden-amphitheatre",
+   "activity": "listen",
+   "base": "sit",
+   "at": [
+    76.56,
+    83.24
+   ],
+   "faceTo": [
+    76,
+    80.6
+   ],
+   "seatHeight": 0.32,
+   "label": "Amphitheatre step 2, seat 2"
+  },
+  {
+   "id": "amph-seat-2-3",
+   "place": "eden-amphitheatre",
+   "activity": "listen",
+   "base": "sit",
+   "at": [
+    76.0,
+    83.3
+   ],
+   "faceTo": [
+    76,
+    80.6
+   ],
+   "seatHeight": 0.32,
+   "label": "Amphitheatre step 2, seat 3"
+  },
+  {
+   "id": "amph-seat-2-4",
+   "place": "eden-amphitheatre",
+   "activity": "listen",
+   "base": "sit",
+   "at": [
+    75.44,
+    83.24
+   ],
+   "faceTo": [
+    76,
+    80.6
+   ],
+   "seatHeight": 0.32,
+   "label": "Amphitheatre step 2, seat 4"
+  },
+  {
+   "id": "amph-seat-2-5",
+   "place": "eden-amphitheatre",
+   "activity": "listen",
+   "base": "sit",
+   "at": [
+    74.9,
+    83.07
+   ],
+   "faceTo": [
+    76,
+    80.6
+   ],
+   "seatHeight": 0.32,
+   "label": "Amphitheatre step 2, seat 5"
+  },
+  {
+   "id": "amph-seat-3-1",
+   "place": "eden-amphitheatre",
+   "activity": "listen",
+   "base": "sit",
+   "at": [
+    77.35,
+    83.5
+   ],
+   "faceTo": [
+    76,
+    80.6
+   ],
+   "seatHeight": 0.48,
+   "label": "Amphitheatre step 3, seat 1"
+  },
+  {
+   "id": "amph-seat-3-2",
+   "place": "eden-amphitheatre",
+   "activity": "listen",
+   "base": "sit",
+   "at": [
+    76.83,
+    83.69
+   ],
+   "faceTo": [
+    76,
+    80.6
+   ],
+   "seatHeight": 0.48,
+   "label": "Amphitheatre step 3, seat 2"
+  },
+  {
+   "id": "amph-seat-3-3",
+   "place": "eden-amphitheatre",
+   "activity": "listen",
+   "base": "sit",
+   "at": [
+    76.28,
+    83.79
+   ],
+   "faceTo": [
+    76,
+    80.6
+   ],
+   "seatHeight": 0.48,
+   "label": "Amphitheatre step 3, seat 3"
+  },
+  {
+   "id": "amph-seat-3-4",
+   "place": "eden-amphitheatre",
+   "activity": "listen",
+   "base": "sit",
+   "at": [
+    75.72,
+    83.79
+   ],
+   "faceTo": [
+    76,
+    80.6
+   ],
+   "seatHeight": 0.48,
+   "label": "Amphitheatre step 3, seat 4"
+  },
+  {
+   "id": "amph-seat-3-5",
+   "place": "eden-amphitheatre",
+   "activity": "listen",
+   "base": "sit",
+   "at": [
+    75.17,
+    83.69
+   ],
+   "faceTo": [
+    76,
+    80.6
+   ],
+   "seatHeight": 0.48,
+   "label": "Amphitheatre step 3, seat 5"
+  },
+  {
+   "id": "amph-seat-3-6",
+   "place": "eden-amphitheatre",
+   "activity": "listen",
+   "base": "sit",
+   "at": [
+    74.65,
+    83.5
+   ],
+   "faceTo": [
+    76,
+    80.6
+   ],
+   "seatHeight": 0.48,
+   "label": "Amphitheatre step 3, seat 6"
+  },
+  {
+   "id": "band-chair-1",
+   "place": "eden-bandstand",
+   "activity": "play-music",
+   "base": "sit",
+   "at": [
+    37.3,
+    -26.2
+   ],
+   "faceTo": [
+    37.94,
+    -25.44
+   ],
+   "seatHeight": 0.81,
+   "label": "Bandstand quartet chair 1 (violin)",
+   "instrument": "violin",
+   "platform": "bandstand-deck"
+  },
+  {
+   "id": "band-chair-2",
+   "place": "eden-bandstand",
+   "activity": "play-music",
+   "base": "sit",
+   "at": [
+    38.05,
+    -26.75
+   ],
+   "faceTo": [
+    38.3,
+    -25.78
+   ],
+   "seatHeight": 0.81,
+   "label": "Bandstand quartet chair 2 (violin)",
+   "instrument": "violin",
+   "platform": "bandstand-deck"
+  },
+  {
+   "id": "band-chair-3",
+   "place": "eden-bandstand",
+   "activity": "play-music",
+   "base": "sit",
+   "at": [
+    38.95,
+    -26.75
+   ],
+   "faceTo": [
+    38.7,
+    -25.78
+   ],
+   "seatHeight": 0.81,
+   "label": "Bandstand quartet chair 3 (viola)",
+   "instrument": "viola",
+   "platform": "bandstand-deck"
+  },
+  {
+   "id": "band-chair-4",
+   "place": "eden-bandstand",
+   "activity": "play-music",
+   "base": "sit",
+   "at": [
+    39.7,
+    -26.2
+   ],
+   "faceTo": [
+    39.06,
+    -25.44
+   ],
+   "seatHeight": 0.81,
+   "label": "Bandstand quartet chair 4 (cello)",
+   "instrument": "cello",
+   "platform": "bandstand-deck"
+  },
+  {
+   "id": "pc-office-1",
+   "place": "eden-office-1",
+   "activity": "use-computer",
+   "base": "sit",
+   "at": [
+    91.15,
+    15.95
+   ],
+   "faceTo": [
+    91.15,
+    15.1
+   ],
+   "seatHeight": 0.57,
+   "label": "Office workstation 1 (ground floor)"
+  },
+  {
+   "id": "pc-office-2",
+   "place": "eden-office-1",
+   "activity": "use-computer",
+   "base": "sit",
+   "at": [
+    94.25,
+    15.95
+   ],
+   "faceTo": [
+    94.25,
+    15.1
+   ],
+   "seatHeight": 0.57,
+   "label": "Office workstation 2 (ground floor)"
+  },
+  {
+   "id": "pc-house-3",
+   "place": "int-house-3-bedroom",
+   "activity": "use-computer",
+   "base": "sit",
+   "at": [
+    29.15,
+    30.6
+   ],
+   "faceTo": [
+    29.15,
+    31.2
+   ],
+   "seatHeight": 0.57,
+   "label": "Laptop at the house 3 bedroom desk"
+  },
+  {
+   "id": "pc-house-4",
+   "place": "int-house-4-bedroom",
+   "activity": "use-computer",
+   "base": "sit",
+   "at": [
+    49.15,
+    30.6
+   ],
+   "faceTo": [
+    49.15,
+    31.2
+   ],
+   "seatHeight": 0.57,
+   "label": "Laptop at the house 4 bedroom desk"
+  },
+  {
+   "id": "sport-volleyball-1",
+   "place": "region-park",
+   "activity": "play-volleyball",
+   "base": "idle",
+   "at": [
+    13.5,
+    114
+   ],
+   "faceTo": [
+    15.5,
+    114
+   ],
+   "label": "Beach volleyball court, west side"
+  },
+  {
+   "id": "sport-volleyball-2",
+   "place": "region-park",
+   "activity": "play-volleyball",
+   "base": "idle",
+   "at": [
+    13.5,
+    118
+   ],
+   "faceTo": [
+    15.5,
+    118
+   ],
+   "label": "Beach volleyball court, west side"
+  },
+  {
+   "id": "sport-volleyball-3",
+   "place": "region-park",
+   "activity": "play-volleyball",
+   "base": "idle",
+   "at": [
+    22.5,
+    114
+   ],
+   "faceTo": [
+    20.5,
+    114
+   ],
+   "label": "Beach volleyball court, east side"
+  },
+  {
+   "id": "sport-volleyball-4",
+   "place": "region-park",
+   "activity": "play-volleyball",
+   "base": "idle",
+   "at": [
+    22.5,
+    118
+   ],
+   "faceTo": [
+    20.5,
+    118
+   ],
+   "label": "Beach volleyball court, east side"
+  },
+  {
+   "id": "sport-petanque-1",
+   "place": "region-park",
+   "activity": "play-petanque",
+   "base": "idle",
+   "at": [
+    1.4,
+    122.9
+   ],
+   "faceTo": [
+    1.4,
+    125.5
+   ],
+   "label": "Petanque court, throwing end"
+  },
+  {
+   "id": "sport-petanque-2",
+   "place": "region-park",
+   "activity": "play-petanque",
+   "base": "idle",
+   "at": [
+    2.6,
+    122.9
+   ],
+   "faceTo": [
+    2.6,
+    125.5
+   ],
+   "label": "Petanque court, throwing end"
+  },
+  {
+   "id": "sport-frisbee-1",
+   "place": "region-park",
+   "activity": "play-frisbee",
+   "base": "idle",
+   "at": [
+    5.5,
+    116.5
+   ],
+   "faceTo": [
+    5.5,
+    119.5
+   ],
+   "label": "Frisbee lawn, north end"
+  },
+  {
+   "id": "sport-frisbee-2",
+   "place": "region-park",
+   "activity": "play-frisbee",
+   "base": "idle",
+   "at": [
+    5.5,
+    127
+   ],
+   "faceTo": [
+    5.5,
+    125
+   ],
+   "label": "Frisbee lawn, south end"
+  },
+  {
+   "id": "gym-pull-ups-1",
+   "place": "eden-south-lawn",
+   "activity": "pull-ups",
+   "base": "idle",
+   "at": [
+    -14.15,
+    86.4
+   ],
+   "faceTo": [
+    -15.4,
+    86.4
+   ],
+   "label": "Outdoor gym: low pull-up bar"
+  },
+  {
+   "id": "gym-pull-ups-2",
+   "place": "eden-south-lawn",
+   "activity": "pull-ups",
+   "base": "idle",
+   "at": [
+    -14.15,
+    85.0
+   ],
+   "faceTo": [
+    -15.4,
+    85.0
+   ],
+   "label": "Outdoor gym: middle pull-up bar"
+  },
+  {
+   "id": "gym-pull-ups-3",
+   "place": "eden-south-lawn",
+   "activity": "pull-ups",
+   "base": "idle",
+   "at": [
+    -14.15,
+    83.6
+   ],
+   "faceTo": [
+    -15.4,
+    83.6
+   ],
+   "label": "Outdoor gym: high pull-up bar"
+  },
+  {
+   "id": "gym-dips",
+   "place": "eden-south-lawn",
+   "activity": "dips",
+   "base": "idle",
+   "at": [
+    -12.4,
+    85.0
+   ],
+   "faceTo": [
+    -10.4,
+    85.0
+   ],
+   "label": "Outdoor gym: dip bars"
+  },
+  {
+   "id": "gym-situps-1",
+   "place": "eden-south-lawn",
+   "activity": "situps",
+   "base": "lie",
+   "at": [
+    -9.6,
+    85.0
+   ],
+   "faceTo": [
+    -10.8,
+    85.0
+   ],
+   "seatHeight": 0.46,
+   "label": "Outdoor gym: flat bench 1"
+  },
+  {
+   "id": "gym-situps-2",
+   "place": "eden-south-lawn",
+   "activity": "situps",
+   "base": "lie",
+   "at": [
+    -7.8,
+    85.0
+   ],
+   "faceTo": [
+    -9,
+    85.0
+   ],
+   "seatHeight": 0.46,
+   "label": "Outdoor gym: flat bench 2"
+  },
+  {
+   "id": "gym-bench-press",
+   "place": "eden-south-lawn",
+   "activity": "bench-press",
+   "base": "lie",
+   "at": [
+    -4.75,
+    85.0
+   ],
+   "faceTo": [
+    -6,
+    85.0
+   ],
+   "seatHeight": 0.49,
+   "label": "Outdoor gym: bench press"
+  },
+  {
+   "id": "gym-weights",
+   "place": "eden-south-lawn",
+   "activity": "lift-weights",
+   "base": "idle",
+   "at": [
+    -2.75,
+    85.0
+   ],
+   "faceTo": [
+    -1.8,
+    85.0
+   ],
+   "label": "Outdoor gym: dumbbells"
+  },
+  {
+   "id": "gym-yoga",
+   "place": "eden-south-lawn",
+   "activity": "yoga",
+   "base": "idle",
+   "at": [
+    0.3,
+    85.6
+   ],
+   "faceTo": [
+    2,
+    85.6
+   ],
+   "label": "Outdoor gym: exercise mat (yoga)"
+  },
+  {
+   "id": "gym-pushups",
+   "place": "eden-south-lawn",
+   "activity": "pushups",
+   "base": "lie",
+   "at": [
+    0.3,
+    84.35
+   ],
+   "faceTo": [
+    2,
+    84.35
+   ],
+   "label": "Outdoor gym: exercise mat (push-ups)"
+  }
+ ],
+ "solids": [
+  {
+   "id": "rural-cottage",
+   "label": "Rural cottage",
+   "c": [
+    -12,
+    46
+   ],
+   "half": [
+    3.5,
+    3
+   ],
+   "yaw": 0
+  },
+  {
+   "id": "verandah-house",
+   "label": "Verandah house",
+   "c": [
+    12,
+    46
+   ],
+   "half": [
+    3.5,
+    3
+   ],
+   "yaw": 0
+  },
+  {
+   "id": "courtyard-sculpture",
+   "label": "Courtyard sculpture",
+   "c": [
+    3,
+    57
+   ],
+   "half": [
+    0.4,
+    0.4
+   ],
+   "yaw": 0,
+   "height": 1.8
+  },
+  {
+   "id": "courtyard-monument",
+   "label": "Courtyard monument",
+   "c": [
+    -3,
+    57
+   ],
+   "half": [
+    0.8,
+    0.8
+   ],
+   "yaw": 0,
+   "height": 1.7
+  },
+  {
+   "id": "courtyard-arch-west",
+   "label": "Courtyard arch",
+   "c": [
+    -1.3,
+    62.4
+   ],
+   "half": [
+    0.2,
+    0.2
+   ],
+   "yaw": 0,
+   "height": 3.1
+  },
+  {
+   "id": "courtyard-arch-east",
+   "label": "Courtyard arch",
+   "c": [
+    1.3,
+    62.4
+   ],
+   "half": [
+    0.2,
+    0.2
+   ],
+   "yaw": 0,
+   "height": 3.1
+  },
+  {
+   "id": "farmhouse",
+   "label": "Farmhouse",
+   "c": [
+    90,
+    38.5
+   ],
+   "half": [
+    3.5,
+    3
+   ],
+   "yaw": 0
+  },
+  {
+   "id": "garden-greenhouse",
+   "label": "Garden greenhouse",
+   "c": [
+    69,
+    69.5
+   ],
+   "half": [
+    3,
+    2
+   ],
+   "yaw": 0
+  },
+  {
+   "id": "garden-monument",
+   "label": "Garden monument",
+   "c": [
+    70,
+    65
+   ],
+   "half": [
+    1.5,
+    0.75
+   ],
+   "yaw": 0
+  },
+  {
+   "id": "mural-wall",
+   "label": "Mural wall",
+   "c": [
+    73.5,
+    4.55
+   ],
+   "half": [
+    2.8,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "water-tower",
+   "label": "Water tower",
+   "c": [
+    102,
+    -27
+   ],
+   "half": [
+    1.2,
+    1.2
+   ],
+   "yaw": 0,
+   "height": 9
+  },
+  {
+   "id": "library-fountain",
+   "label": "Library fountain",
+   "c": [
+    79,
+    0
+   ],
+   "half": [
+    1.25,
+    1.25
+   ],
+   "yaw": 0,
+   "height": 1.8
+  },
+  {
+   "id": "sports-grandstand",
+   "label": "Sports grandstand",
+   "c": [
+    64.25,
+    87.15
+   ],
+   "half": [
+    15.25,
+    2.25
+   ],
+   "yaw": 0,
+   "height": 5.2
+  },
+  {
+   "id": "ice-cream-kiosk",
+   "label": "Ice-cream kiosk",
+   "c": [
+    -6,
+    95.5
+   ],
+   "half": [
+    1.3,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.45
+  },
+  {
+   "id": "playground-fence-south",
+   "label": "Playground fence",
+   "c": [
+    19,
+    97
+   ],
+   "half": [
+    8,
+    0.08
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "playground-fence-east",
+   "label": "Playground fence",
+   "c": [
+    27,
+    103
+   ],
+   "half": [
+    0.08,
+    6
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "playground-fence-north",
+   "label": "Playground fence",
+   "c": [
+    19,
+    109
+   ],
+   "half": [
+    8,
+    0.08
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "playground-fence-west",
+   "label": "Playground fence",
+   "c": [
+    11,
+    105
+   ],
+   "half": [
+    0.08,
+    4
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "picket-fence-house-1-west",
+   "label": "Picket fence",
+   "c": [
+    31.925,
+    7.55
+   ],
+   "half": [
+    1.025,
+    0.06
+   ],
+   "yaw": 0,
+   "height": 1
+  },
+  {
+   "id": "picket-fence-house-1-east",
+   "label": "Picket fence",
+   "c": [
+    35.775,
+    7.55
+   ],
+   "half": [
+    1.825,
+    0.06
+   ],
+   "yaw": 0,
+   "height": 1
+  },
+  {
+   "id": "garden-rail-fence",
+   "label": "Rail fence",
+   "c": [
+    68.3,
+    51
+   ],
+   "half": [
+    3.7,
+    0.06
+   ],
+   "yaw": 0,
+   "height": 1
+  },
+  {
+   "id": "garden-low-wall",
+   "label": "Low garden wall",
+   "c": [
+    92,
+    63.5
+   ],
+   "half": [
+    2,
+    0.15
+   ],
+   "yaw": 0,
+   "height": 0.8
+  },
+  {
+   "id": "market-kiosk-counters",
+   "label": "Market kiosks",
+   "c": [
+    57.5,
+    -26.4
+   ],
+   "half": [
+    4,
+    0.8
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "playground-swings",
+   "label": "Swing frame",
+   "c": [
+    14,
+    100
+   ],
+   "half": [
+    1.7,
+    0.7
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "playground-slide",
+   "label": "Slide tower",
+   "c": [
+    20,
+    99.5
+   ],
+   "half": [
+    0.7,
+    0.7
+   ],
+   "yaw": 0,
+   "height": 3.5
+  },
+  {
+   "id": "playground-climbing-frame",
+   "label": "Climbing frame",
+   "c": [
+    24,
+    105
+   ],
+   "half": [
+    1.5,
+    1
+   ],
+   "yaw": 0.3,
+   "height": 2
+  },
+  {
+   "id": "hedge-house-2-west",
+   "label": "Clipped hedge",
+   "c": [
+    49.6,
+    7.65
+   ],
+   "half": [
+    1.3,
+    0.3
+   ],
+   "yaw": 0,
+   "height": 0.95
+  },
+  {
+   "id": "hedge-house-2-east",
+   "label": "Clipped hedge",
+   "c": [
+    55.7,
+    7.65
+   ],
+   "half": [
+    1.0,
+    0.3
+   ],
+   "yaw": 0,
+   "height": 0.95
+  },
+  {
+   "id": "garden-clipped-hedge",
+   "label": "Clipped hedge",
+   "c": [
+    46.0,
+    46.0
+   ],
+   "half": [
+    3.0,
+    0.55
+   ],
+   "yaw": 0,
+   "height": 1.2
+  },
+  {
+   "id": "standing-stone-1",
+   "label": "Standing stone",
+   "c": [
+    60.245,
+    -8.995
+   ],
+   "half": [
+    0.325,
+    0.425
+   ],
+   "yaw": 0,
+   "height": 1.31
+  },
+  {
+   "id": "standing-stone-2",
+   "label": "Standing stone",
+   "c": [
+    58.24,
+    -6.835
+   ],
+   "half": [
+    0.41,
+    0.335
+   ],
+   "yaw": 0,
+   "height": 1.74
+  },
+  {
+   "id": "standing-stone-3",
+   "label": "Standing stone",
+   "c": [
+    55.295,
+    -7.06
+   ],
+   "half": [
+    0.455,
+    0.39
+   ],
+   "yaw": 0,
+   "height": 2.19
+  },
+  {
+   "id": "standing-stone-4",
+   "label": "Standing stone",
+   "c": [
+    53.64,
+    -9.5
+   ],
+   "half": [
+    0.28,
+    0.41
+   ],
+   "yaw": 0,
+   "height": 1.53
+  },
+  {
+   "id": "standing-stone-5",
+   "label": "Standing stone",
+   "c": [
+    54.51,
+    -12.315
+   ],
+   "half": [
+    0.4,
+    0.405
+   ],
+   "yaw": 0,
+   "height": 1.96
+  },
+  {
+   "id": "standing-stone-6",
+   "label": "Standing stone",
+   "c": [
+    57.26,
+    -13.39
+   ],
+   "half": [
+    0.39,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 1.31
+  },
+  {
+   "id": "standing-stone-7",
+   "label": "Standing stone",
+   "c": [
+    59.81,
+    -11.915
+   ],
+   "half": [
+    0.4,
+    0.445
+   ],
+   "yaw": 0,
+   "height": 1.75
+  },
+  {
+   "id": "stone-garden-gate-pier-west",
+   "label": "Gate pier",
+   "c": [
+    55.7,
+    -10.0
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "stone-garden-gate-pier-east",
+   "label": "Gate pier",
+   "c": [
+    58.3,
+    -10.0
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "lookout-post-1",
+   "label": "Lookout shelter post",
+   "c": [
+    0.75,
+    -61.25
+   ],
+   "half": [
+    0.1,
+    0.1
+   ],
+   "yaw": 0,
+   "height": 2.9
+  },
+  {
+   "id": "lookout-post-2",
+   "label": "Lookout shelter post",
+   "c": [
+    6.25,
+    -61.25
+   ],
+   "half": [
+    0.1,
+    0.1
+   ],
+   "yaw": 0,
+   "height": 2.9
+  },
+  {
+   "id": "lookout-post-3",
+   "label": "Lookout shelter post",
+   "c": [
+    0.75,
+    -57.75
+   ],
+   "half": [
+    0.1,
+    0.1
+   ],
+   "yaw": 0,
+   "height": 2.9
+  },
+  {
+   "id": "lookout-post-4",
+   "label": "Lookout shelter post",
+   "c": [
+    6.25,
+    -57.75
+   ],
+   "half": [
+    0.1,
+    0.1
+   ],
+   "yaw": 0,
+   "height": 2.9
+  },
+  {
+   "id": "lookout-table",
+   "label": "Lookout table",
+   "c": [
+    3.5,
+    -60.5
+   ],
+   "half": [
+    0.7,
+    0.4
+   ],
+   "yaw": 0,
+   "height": 0.99
+  },
+  {
+   "id": "lookout-bench-west",
+   "label": "Lookout bench",
+   "c": [
+    1.765,
+    -59.4
+   ],
+   "half": [
+    0.235,
+    0.79
+   ],
+   "yaw": 0,
+   "height": 1.14
+  },
+  {
+   "id": "lookout-bench-east",
+   "label": "Lookout bench",
+   "c": [
+    5.22,
+    -59.4
+   ],
+   "half": [
+    0.25,
+    0.79
+   ],
+   "yaw": 0,
+   "height": 1.14
+  },
+  {
+   "id": "pergola-court-post-1",
+   "label": "Pergola post",
+   "c": [
+    95.5,
+    42.75
+   ],
+   "half": [
+    0.13,
+    0.13
+   ],
+   "yaw": 0,
+   "height": 2.8
+  },
+  {
+   "id": "pergola-court-post-2",
+   "label": "Pergola post",
+   "c": [
+    103.5,
+    42.75
+   ],
+   "half": [
+    0.13,
+    0.13
+   ],
+   "yaw": 0,
+   "height": 2.8
+  },
+  {
+   "id": "pergola-court-post-3",
+   "label": "Pergola post",
+   "c": [
+    95.5,
+    45.5
+   ],
+   "half": [
+    0.13,
+    0.13
+   ],
+   "yaw": 0,
+   "height": 2.8
+  },
+  {
+   "id": "pergola-court-post-4",
+   "label": "Pergola post",
+   "c": [
+    103.5,
+    45.5
+   ],
+   "half": [
+    0.13,
+    0.13
+   ],
+   "yaw": 0,
+   "height": 2.8
+  },
+  {
+   "id": "pergola-court-post-5",
+   "label": "Pergola post",
+   "c": [
+    95.5,
+    48.25
+   ],
+   "half": [
+    0.13,
+    0.13
+   ],
+   "yaw": 0,
+   "height": 2.8
+  },
+  {
+   "id": "pergola-court-post-6",
+   "label": "Pergola post",
+   "c": [
+    103.5,
+    48.25
+   ],
+   "half": [
+    0.13,
+    0.13
+   ],
+   "yaw": 0,
+   "height": 2.8
+  },
+  {
+   "id": "pergola-court-post-7",
+   "label": "Pergola post",
+   "c": [
+    95.5,
+    51
+   ],
+   "half": [
+    0.13,
+    0.13
+   ],
+   "yaw": 0,
+   "height": 2.8
+  },
+  {
+   "id": "pergola-court-post-8",
+   "label": "Pergola post",
+   "c": [
+    103.5,
+    51
+   ],
+   "half": [
+    0.13,
+    0.13
+   ],
+   "yaw": 0,
+   "height": 2.8
+  },
+  {
+   "id": "pergola-court-post-9",
+   "label": "Pergola post",
+   "c": [
+    95.5,
+    53.75
+   ],
+   "half": [
+    0.13,
+    0.13
+   ],
+   "yaw": 0,
+   "height": 2.8
+  },
+  {
+   "id": "pergola-court-post-10",
+   "label": "Pergola post",
+   "c": [
+    103.5,
+    53.75
+   ],
+   "half": [
+    0.13,
+    0.13
+   ],
+   "yaw": 0,
+   "height": 2.8
+  },
+  {
+   "id": "pergola-court-post-11",
+   "label": "Pergola post",
+   "c": [
+    99.5,
+    42.75
+   ],
+   "half": [
+    0.13,
+    0.13
+   ],
+   "yaw": 0,
+   "height": 2.8
+  },
+  {
+   "id": "pergola-court-post-12",
+   "label": "Pergola post",
+   "c": [
+    99.5,
+    53.75
+   ],
+   "half": [
+    0.13,
+    0.13
+   ],
+   "yaw": 0,
+   "height": 2.8
+  },
+  {
+   "id": "hex-pavilion-post-1",
+   "label": "Pavilion post",
+   "c": [
+    104.1,
+    9
+   ],
+   "half": [
+    0.13,
+    0.13
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "hex-pavilion-post-2",
+   "label": "Pavilion post",
+   "c": [
+    102.8,
+    11.25
+   ],
+   "half": [
+    0.13,
+    0.13
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "hex-pavilion-post-3",
+   "label": "Pavilion post",
+   "c": [
+    100.2,
+    11.25
+   ],
+   "half": [
+    0.13,
+    0.13
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "hex-pavilion-post-4",
+   "label": "Pavilion post",
+   "c": [
+    98.9,
+    9
+   ],
+   "half": [
+    0.13,
+    0.13
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "hex-pavilion-post-5",
+   "label": "Pavilion post",
+   "c": [
+    100.2,
+    6.75
+   ],
+   "half": [
+    0.13,
+    0.13
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "hex-pavilion-post-6",
+   "label": "Pavilion post",
+   "c": [
+    102.8,
+    6.75
+   ],
+   "half": [
+    0.13,
+    0.13
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "covered-market-post-1",
+   "label": "Market post",
+   "c": [
+    67.15,
+    27.15
+   ],
+   "half": [
+    0.08,
+    0.08
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "covered-market-post-2",
+   "label": "Market post",
+   "c": [
+    67.15,
+    30.85
+   ],
+   "half": [
+    0.08,
+    0.08
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "covered-market-post-3",
+   "label": "Market post",
+   "c": [
+    72.85,
+    27.15
+   ],
+   "half": [
+    0.08,
+    0.08
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "covered-market-post-4",
+   "label": "Market post",
+   "c": [
+    72.85,
+    30.85
+   ],
+   "half": [
+    0.08,
+    0.08
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "covered-market-table-west",
+   "label": "Market table",
+   "c": [
+    68.25,
+    29.9
+   ],
+   "half": [
+    0.6,
+    0.6
+   ],
+   "yaw": 0,
+   "height": 0.75
+  },
+  {
+   "id": "covered-market-table-east",
+   "label": "Market table",
+   "c": [
+    71.75,
+    29.9
+   ],
+   "half": [
+    0.6,
+    0.6
+   ],
+   "yaw": 0,
+   "height": 0.75
+  },
+  {
+   "id": "garden-sandbox",
+   "label": "Sandbox",
+   "c": [
+    52.4,
+    67.4
+   ],
+   "half": [
+    0.9,
+    0.9
+   ],
+   "yaw": -0.3,
+   "height": 0.22
+  },
+  {
+   "id": "garden-swing-set",
+   "label": "Swing set",
+   "c": [
+    55.1,
+    66
+   ],
+   "half": [
+    1.4,
+    0.75
+   ],
+   "yaw": -0.3,
+   "height": 2.3
+  },
+  {
+   "id": "playground-see-saw",
+   "label": "See-saw",
+   "c": [
+    15,
+    106
+   ],
+   "half": [
+    1.6,
+    0.2
+   ],
+   "yaw": 0,
+   "height": 0.8
+  },
+  {
+   "id": "park-drinking-fountain",
+   "label": "Drinking fountain",
+   "c": [
+    4,
+    94.5
+   ],
+   "half": [
+    0.3,
+    0.3
+   ],
+   "yaw": 0,
+   "height": 0.95
+  },
+  {
+   "id": "picnic-table-1",
+   "label": "Picnic table",
+   "c": [
+    55.0,
+    -22.4
+   ],
+   "half": [
+    0.92,
+    0.4
+   ],
+   "yaw": 0,
+   "height": 0.76
+  },
+  {
+   "id": "picnic-table-2",
+   "label": "Picnic table",
+   "c": [
+    59.5,
+    -22.3
+   ],
+   "half": [
+    0.92,
+    0.4
+   ],
+   "yaw": -0.12,
+   "height": 0.76
+  },
+  {
+   "id": "picnic-table-3",
+   "label": "Picnic table",
+   "c": [
+    84.6,
+    77.2
+   ],
+   "half": [
+    0.92,
+    0.4
+   ],
+   "yaw": -0.3,
+   "height": 0.76
+  },
+  {
+   "id": "beehive-1",
+   "label": "Beehive",
+   "c": [
+    64.5,
+    57.6
+   ],
+   "half": [
+    0.27,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.84
+  },
+  {
+   "id": "beehive-2",
+   "label": "Beehive",
+   "c": [
+    65.4,
+    57.7
+   ],
+   "half": [
+    0.27,
+    0.25
+   ],
+   "yaw": -0.1,
+   "height": 0.84
+  },
+  {
+   "id": "beehive-3",
+   "label": "Beehive",
+   "c": [
+    66.3,
+    57.6
+   ],
+   "half": [
+    0.27,
+    0.25
+   ],
+   "yaw": 0.08,
+   "height": 0.84
+  },
+  {
+   "id": "hay-bale-1",
+   "label": "Hay bale",
+   "c": [
+    93.42,
+    58.56
+   ],
+   "half": [
+    0.5,
+    0.55
+   ],
+   "yaw": -0.2,
+   "height": 1.1
+  },
+  {
+   "id": "hay-bale-2",
+   "label": "Hay bale",
+   "c": [
+    94.74,
+    58.6
+   ],
+   "half": [
+    0.5,
+    0.55
+   ],
+   "yaw": 0.3,
+   "height": 1.1
+  },
+  {
+   "id": "hay-bale-3",
+   "label": "Hay bale",
+   "c": [
+    94.0,
+    59.95
+   ],
+   "half": [
+    0.5,
+    0.55
+   ],
+   "yaw": -1.4,
+   "height": 1.1
+  },
+  {
+   "id": "farm-trough",
+   "label": "Water trough",
+   "c": [
+    80.9,
+    50.5
+   ],
+   "half": [
+    0.8,
+    0.36
+   ],
+   "yaw": -1.5708,
+   "height": 0.5
+  },
+  {
+   "id": "bird-bath-1",
+   "label": "Bird bath",
+   "c": [
+    31.5,
+    19.3
+   ],
+   "half": [
+    0.32,
+    0.32
+   ],
+   "yaw": 0,
+   "height": 0.82
+  },
+  {
+   "id": "bird-bath-2",
+   "label": "Bird bath",
+   "c": [
+    73.5,
+    63.5
+   ],
+   "half": [
+    0.32,
+    0.32
+   ],
+   "yaw": 0,
+   "height": 0.82
+  },
+  {
+   "id": "bird-bath-3",
+   "label": "Bird bath",
+   "c": [
+    44.3,
+    33.2
+   ],
+   "half": [
+    0.32,
+    0.32
+   ],
+   "yaw": 0,
+   "height": 0.82
+  },
+  {
+   "id": "garden-low-wall-west-end",
+   "label": "Low garden wall",
+   "c": [
+    89.5,
+    63.5
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.65
+  },
+  {
+   "id": "garden-low-wall-east-end",
+   "label": "Low garden wall",
+   "c": [
+    94.45,
+    63.59
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.65
+  },
+  {
+   "id": "craft-west-table",
+   "label": "Craft table",
+   "c": [
+    88.0,
+    -11.0
+   ],
+   "half": [
+    0.7,
+    0.4
+   ],
+   "yaw": 0,
+   "height": 0.75
+  },
+  {
+   "id": "craft-west-bench",
+   "label": "Craft bench",
+   "c": [
+    88.0,
+    -9.0
+   ],
+   "half": [
+    1.0,
+    0.33
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "craft-west-workbench",
+   "label": "Workbench",
+   "c": [
+    87.15,
+    -15.0
+   ],
+   "half": [
+    0.7,
+    0.35
+   ],
+   "yaw": 0,
+   "height": 0.75
+  },
+  {
+   "id": "craft-west-shelves",
+   "label": "Craft shelves",
+   "c": [
+    88.65,
+    -15.0
+   ],
+   "half": [
+    0.45,
+    0.3
+   ],
+   "yaw": 0,
+   "height": 1.5
+  },
+  {
+   "id": "craft-east-table",
+   "label": "Craft table",
+   "c": [
+    96.0,
+    -11.0
+   ],
+   "half": [
+    0.7,
+    0.4
+   ],
+   "yaw": 0,
+   "height": 0.75
+  },
+  {
+   "id": "craft-east-bench",
+   "label": "Craft bench",
+   "c": [
+    96.0,
+    -9.0
+   ],
+   "half": [
+    1.0,
+    0.33
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "craft-east-workbench",
+   "label": "Workbench",
+   "c": [
+    95.15,
+    -15.0
+   ],
+   "half": [
+    0.7,
+    0.35
+   ],
+   "yaw": 0,
+   "height": 0.75
+  },
+  {
+   "id": "craft-east-shelves",
+   "label": "Craft shelves",
+   "c": [
+    96.65,
+    -15.0
+   ],
+   "half": [
+    0.45,
+    0.3
+   ],
+   "yaw": 0,
+   "height": 1.5
+  },
+  {
+   "id": "craft-couch",
+   "label": "Craft-room couch",
+   "c": [
+    92.0,
+    -16.0
+   ],
+   "half": [
+    1.1,
+    0.45
+   ],
+   "yaw": 0,
+   "height": 0.81
+  },
+  {
+   "id": "stone-cluster-1",
+   "label": "Stone cluster",
+   "c": [
+    47.98,
+    42.98
+   ],
+   "half": [
+    1.4,
+    1.23
+   ],
+   "yaw": 0,
+   "height": 0.6
+  },
+  {
+   "id": "stone-cluster-2",
+   "label": "Stone cluster",
+   "c": [
+    57.97,
+    74.0
+   ],
+   "half": [
+    0.82,
+    1.51
+   ],
+   "yaw": 0,
+   "height": 0.6
+  },
+  {
+   "id": "stone-cluster-3",
+   "label": "Stone cluster",
+   "c": [
+    -12.03,
+    63.0
+   ],
+   "half": [
+    0.69,
+    1.5
+   ],
+   "yaw": 0,
+   "height": 0.6
+  },
+  {
+   "id": "stone-cluster-4",
+   "label": "Stone cluster",
+   "c": [
+    8.025,
+    71.015
+   ],
+   "half": [
+    1.325,
+    1.325
+   ],
+   "yaw": 0,
+   "height": 0.6
+  },
+  {
+   "id": "stone-cluster-5",
+   "label": "Stone cluster",
+   "c": [
+    16.985,
+    58.975
+   ],
+   "half": [
+    1.495,
+    0.985
+   ],
+   "yaw": 0,
+   "height": 0.6
+  },
+  {
+   "id": "lookout-long-stones-west",
+   "label": "Long stones",
+   "c": [
+    -3.005,
+    -60.03
+   ],
+   "half": [
+    1.445,
+    0.42
+   ],
+   "yaw": 0,
+   "height": 0.6
+  },
+  {
+   "id": "lookout-long-stones-east",
+   "label": "Long stones",
+   "c": [
+    10.995,
+    -60.03
+   ],
+   "half": [
+    1.445,
+    0.42
+   ],
+   "yaw": 0,
+   "height": 0.6
+  },
+  {
+   "id": "basalt-ridge",
+   "label": "Basalt rock ridge",
+   "c": [
+    95.0,
+    79.0
+   ],
+   "half": [
+    4.0,
+    4.0
+   ],
+   "yaw": 0,
+   "height": 2.3
+  },
+  {
+   "id": "rock-arch-west-leg",
+   "label": "Rock arch",
+   "c": [
+    98.6,
+    68.0
+   ],
+   "half": [
+    0.6,
+    0.6
+   ],
+   "yaw": 0,
+   "height": 4
+  },
+  {
+   "id": "rock-arch-east-leg",
+   "label": "Rock arch",
+   "c": [
+    101.4,
+    68.0
+   ],
+   "half": [
+    0.6,
+    0.6
+   ],
+   "yaw": 0,
+   "height": 4
+  },
+  {
+   "id": "courtyard-bench-west",
+   "label": "Courtyard bench",
+   "c": [
+    -1.85,
+    59.0
+   ],
+   "half": [
+    0.3,
+    0.9
+   ],
+   "yaw": 0,
+   "height": 1.05
+  },
+  {
+   "id": "courtyard-bench-east",
+   "label": "Courtyard bench",
+   "c": [
+    1.85,
+    59.0
+   ],
+   "half": [
+    0.3,
+    0.9
+   ],
+   "yaw": 0,
+   "height": 1.05
+  },
+  {
+   "id": "parked-car-country",
+   "label": "Parked car",
+   "c": [
+    83.0,
+    37.0
+   ],
+   "half": [
+    1.7,
+    0.66
+   ],
+   "yaw": 0,
+   "height": 1.56
+  },
+  {
+   "id": "parked-car-office",
+   "label": "Parked car",
+   "c": [
+    96.0,
+    28.0
+   ],
+   "half": [
+    0.66,
+    1.7
+   ],
+   "yaw": 0,
+   "height": 1.56
+  },
+  {
+   "id": "parked-wagon",
+   "label": "Parked rail wagon",
+   "c": [
+    96.0,
+    64.0
+   ],
+   "half": [
+    1.0,
+    3.0
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "handcart-market",
+   "label": "Handcart",
+   "c": [
+    61.0,
+    28.0
+   ],
+   "half": [
+    0.7,
+    0.35
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "handcart-barn-1",
+   "label": "Handcart",
+   "c": [
+    85,
+    61
+   ],
+   "half": [
+    0.75,
+    0.4
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "handcart-barn-2",
+   "label": "Handcart",
+   "c": [
+    88,
+    61
+   ],
+   "half": [
+    0.75,
+    0.4
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "bus-stop-shelter",
+   "label": "Bus stop shelter",
+   "c": [
+    31.8,
+    1.3
+   ],
+   "half": [
+    1.55,
+    0.65
+   ],
+   "yaw": 0,
+   "height": 2.5
+  },
+  {
+   "id": "phone-box",
+   "label": "Telephone box",
+   "c": [
+    33.5,
+    -0.4
+   ],
+   "half": [
+    0.48,
+    0.48
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "football-goal-west",
+   "label": "Football goal",
+   "c": [
+    35.15,
+    112
+   ],
+   "half": [
+    0.8,
+    3.72
+   ],
+   "yaw": 0,
+   "height": 2.44
+  },
+  {
+   "id": "football-goal-east",
+   "label": "Football goal",
+   "c": [
+    92.85,
+    112
+   ],
+   "half": [
+    0.8,
+    3.72
+   ],
+   "yaw": 0,
+   "height": 2.44
+  },
+  {
+   "id": "festival-lantern-pole-1",
+   "label": "Lantern pole",
+   "c": [
+    48.5,
+    -29.8
+   ],
+   "half": [
+    0.16,
+    0.16
+   ],
+   "yaw": 0,
+   "height": 3.45
+  },
+  {
+   "id": "festival-lantern-pole-2",
+   "label": "Lantern pole",
+   "c": [
+    48.5,
+    -22.2
+   ],
+   "half": [
+    0.16,
+    0.16
+   ],
+   "yaw": 0,
+   "height": 3.45
+  },
+  {
+   "id": "eden-house-2-outside-1",
+   "label": "Outside stair",
+   "c": [
+    53.8,
+    7.9
+   ],
+   "half": [
+    0.6,
+    2.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "eden-house-3-outside-1",
+   "label": "Outside stair",
+   "c": [
+    38.55,
+    26.75
+   ],
+   "half": [
+    0.07,
+    0.07
+   ],
+   "yaw": 0,
+   "height": 2.88
+  },
+  {
+   "id": "eden-house-3-outside-2",
+   "label": "Outside stair",
+   "c": [
+    39.2,
+    30.8
+   ],
+   "half": [
+    0.6,
+    2.8
+   ],
+   "yaw": 0,
+   "height": 3
+  },
+  {
+   "id": "eden-house-3-outside-3",
+   "label": "Outside stair",
+   "c": [
+    39.65,
+    26.75
+   ],
+   "half": [
+    0.07,
+    0.07
+   ],
+   "yaw": 0,
+   "height": 2.88
+  },
+  {
+   "id": "eden-house-3-outside-4",
+   "label": "Outside stair",
+   "c": [
+    39.9,
+    33.8
+   ],
+   "half": [
+    0.05,
+    0.05
+   ],
+   "yaw": 0,
+   "height": 1.1
+  },
+  {
+   "id": "eden-house-4-outside-1",
+   "label": "Outside stair",
+   "c": [
+    58.55,
+    26.75
+   ],
+   "half": [
+    0.07,
+    0.07
+   ],
+   "yaw": 0,
+   "height": 2.88
+  },
+  {
+   "id": "eden-house-4-outside-2",
+   "label": "Outside stair",
+   "c": [
+    59.2,
+    30.8
+   ],
+   "half": [
+    0.6,
+    2.8
+   ],
+   "yaw": 0,
+   "height": 3
+  },
+  {
+   "id": "eden-house-4-outside-3",
+   "label": "Outside stair",
+   "c": [
+    59.65,
+    26.75
+   ],
+   "half": [
+    0.07,
+    0.07
+   ],
+   "yaw": 0,
+   "height": 2.88
+  },
+  {
+   "id": "eden-house-4-outside-4",
+   "label": "Outside stair",
+   "c": [
+    59.9,
+    33.8
+   ],
+   "half": [
+    0.05,
+    0.05
+   ],
+   "yaw": 0,
+   "height": 1.1
+  },
+  {
+   "id": "sport-volleyball-post-north",
+   "label": "Volleyball post",
+   "c": [
+    18,
+    111.6
+   ],
+   "half": [
+    0.08,
+    0.08
+   ],
+   "yaw": 0,
+   "height": 2.5
+  },
+  {
+   "id": "sport-volleyball-post-south",
+   "label": "Volleyball post",
+   "c": [
+    18,
+    120.4
+   ],
+   "half": [
+    0.08,
+    0.08
+   ],
+   "yaw": 0,
+   "height": 2.5
+  },
+  {
+   "id": "sport-volleyball-net",
+   "label": "Volleyball net",
+   "c": [
+    18,
+    116
+   ],
+   "half": [
+    0.03,
+    4.4
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "gym-bench-press-rack",
+   "label": "Bench press",
+   "c": [
+    -4.45,
+    85.0
+   ],
+   "half": [
+    0.15,
+    0.6
+   ],
+   "yaw": 0,
+   "height": 1.2
+  },
+  {
+   "id": "gym-weights-rack",
+   "label": "Dumbbell rack",
+   "c": [
+    -2,
+    85.0
+   ],
+   "half": [
+    0.2,
+    0.8
+   ],
+   "yaw": 0,
+   "height": 0.8
+  },
+  {
+   "id": "gym-dip-bars",
+   "label": "Dip bars",
+   "c": [
+    -10.9,
+    85.0
+   ],
+   "half": [
+    0.55,
+    0.35
+   ],
+   "yaw": 0,
+   "height": 1.2
+  },
+  {
+   "id": "sport-petanque-bench",
+   "label": "Bench",
+   "c": [
+    4.6,
+    128
+   ],
+   "half": [
+    0.2,
+    0.8
+   ],
+   "yaw": 0,
+   "height": 0.5
+  },
+  {
+   "id": "district-building-35",
+   "label": "District building (tower)",
+   "c": [
+    114,
+    73
+   ],
+   "half": [
+    2.2,
+    2.2
+   ],
+   "yaw": 0,
+   "height": 6
+  },
+  {
+   "id": "district-building-36",
+   "label": "District building (house)",
+   "c": [
+    113.727,
+    105.5
+   ],
+   "half": [
+    3.577,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-37",
+   "label": "District building (house)",
+   "c": [
+    120.488,
+    105.5
+   ],
+   "half": [
+    2.885,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-38",
+   "label": "District building (house)",
+   "c": [
+    126.091,
+    105.5
+   ],
+   "half": [
+    2.418,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-39",
+   "label": "District building (house)",
+   "c": [
+    131.663,
+    105.5
+   ],
+   "half": [
+    2.854,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-40",
+   "label": "District building (house)",
+   "c": [
+    138.66,
+    105.5
+   ],
+   "half": [
+    3.843,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-41",
+   "label": "District building (house)",
+   "c": [
+    145.385,
+    105.5
+   ],
+   "half": [
+    2.582,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-42",
+   "label": "District building (house)",
+   "c": [
+    150.963,
+    105.5
+   ],
+   "half": [
+    2.696,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-43",
+   "label": "District building (house)",
+   "c": [
+    156.955,
+    105.5
+   ],
+   "half": [
+    2.996,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-44",
+   "label": "District building (house)",
+   "c": [
+    163.474,
+    105.5
+   ],
+   "half": [
+    3.222,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-45",
+   "label": "District building (house)",
+   "c": [
+    169.354,
+    105.5
+   ],
+   "half": [
+    2.358,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-62",
+   "label": "District building (house)",
+   "c": [
+    36.5,
+    128
+   ],
+   "half": [
+    5,
+    3
+   ],
+   "yaw": -1.571,
+   "height": 6
+  },
+  {
+   "id": "district-building-66",
+   "label": "District building (house)",
+   "c": [
+    48,
+    131
+   ],
+   "half": [
+    7,
+    3
+   ],
+   "yaw": 0,
+   "height": 6
+  },
+  {
+   "id": "district-building-70",
+   "label": "District building (house)",
+   "c": [
+    -37,
+    -97
+   ],
+   "half": [
+    12,
+    5
+   ],
+   "yaw": -1.571,
+   "height": 6
+  },
+  {
+   "id": "district-building-75",
+   "label": "District building (aframe)",
+   "c": [
+    -53.419,
+    -93.828
+   ],
+   "half": [
+    3,
+    3.5
+   ],
+   "yaw": 1.771,
+   "height": 6
+  },
+  {
+   "id": "district-building-76",
+   "label": "District building (house)",
+   "c": [
+    -60.915,
+    -81.575
+   ],
+   "half": [
+    3.5,
+    3.25
+   ],
+   "yaw": 2.469,
+   "height": 6
+  },
+  {
+   "id": "district-building-77",
+   "label": "District building (house)",
+   "c": [
+    -74.535,
+    -77.007
+   ],
+   "half": [
+    3.5,
+    3.25
+   ],
+   "yaw": -3.116,
+   "height": 6
+  },
+  {
+   "id": "district-building-78",
+   "label": "District building (aframe)",
+   "c": [
+    -87.904,
+    -82.262
+   ],
+   "half": [
+    3,
+    3.5
+   ],
+   "yaw": -2.418,
+   "height": 6
+  },
+  {
+   "id": "district-building-79",
+   "label": "District building (house)",
+   "c": [
+    -94.767,
+    -94.881
+   ],
+   "half": [
+    3.5,
+    3.25
+   ],
+   "yaw": -1.72,
+   "height": 6
+  },
+  {
+   "id": "district-building-80",
+   "label": "District building (house)",
+   "c": [
+    -91.913,
+    -108.96
+   ],
+   "half": [
+    3.5,
+    3.25
+   ],
+   "yaw": -1.022,
+   "height": 6
+  },
+  {
+   "id": "district-building-81",
+   "label": "District building (aframe)",
+   "c": [
+    -80.678,
+    -117.91
+   ],
+   "half": [
+    3,
+    3.5
+   ],
+   "yaw": -0.324,
+   "height": 6
+  },
+  {
+   "id": "district-building-82",
+   "label": "District building (house)",
+   "c": [
+    -66.317,
+    -117.544
+   ],
+   "half": [
+    3.5,
+    3.25
+   ],
+   "yaw": 0.375,
+   "height": 6
+  },
+  {
+   "id": "district-building-83",
+   "label": "District building (house)",
+   "c": [
+    -55.552,
+    -108.033
+   ],
+   "half": [
+    3.5,
+    3.25
+   ],
+   "yaw": 1.073,
+   "height": 6
+  },
+  {
+   "id": "district-building-113",
+   "label": "District building (house)",
+   "c": [
+    174.349,
+    86
+   ],
+   "half": [
+    1.7,
+    3
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "arts-mural-wall",
+   "label": "Mural wall along the avenue",
+   "c": [
+    -89.7,
+    -72.8
+   ],
+   "half": [
+    12.299999999999997,
+    0.2
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "arts-mural-wall-east",
+   "label": "Mural wall along the avenue",
+   "c": [
+    -62.3,
+    -72.8
+   ],
+   "half": [
+    12.299999999999997,
+    0.2
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "arts-sculpture",
+   "label": "Village green sculpture",
+   "c": [
+    -74,
+    -98
+   ],
+   "half": [
+    1.6,
+    1.6
+   ],
+   "yaw": 0,
+   "height": 4
+  },
+  {
+   "id": "arts-craft-stall-1",
+   "label": "Craft market stall",
+   "c": [
+    -80,
+    -85.5
+   ],
+   "half": [
+    1.5,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "arts-craft-stall-2",
+   "label": "Craft market stall",
+   "c": [
+    -76,
+    -85.5
+   ],
+   "half": [
+    1.5,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "arts-craft-stall-3",
+   "label": "Craft market stall",
+   "c": [
+    -72,
+    -85.5
+   ],
+   "half": [
+    1.5,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "arts-craft-stall-4",
+   "label": "Craft market stall",
+   "c": [
+    -68,
+    -85.5
+   ],
+   "half": [
+    1.5,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "arts-picnic-table-1",
+   "label": "Picnic table",
+   "c": [
+    -78,
+    -103.5
+   ],
+   "half": [
+    0.9,
+    0.8
+   ],
+   "yaw": 0,
+   "height": 0.8
+  },
+  {
+   "id": "arts-picnic-table-2",
+   "label": "Picnic table",
+   "c": [
+    -74,
+    -103.5
+   ],
+   "half": [
+    0.9,
+    0.8
+   ],
+   "yaw": 0,
+   "height": 0.8
+  },
+  {
+   "id": "arts-picnic-table-3",
+   "label": "Picnic table",
+   "c": [
+    -70,
+    -103.5
+   ],
+   "half": [
+    0.9,
+    0.8
+   ],
+   "yaw": 0,
+   "height": 0.8
+  },
+  {
+   "id": "harbour-beach-hut-1",
+   "label": "Bathing hut",
+   "c": [
+    -98,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-2",
+   "label": "Bathing hut",
+   "c": [
+    -93.8,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-3",
+   "label": "Bathing hut",
+   "c": [
+    -89.6,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-4",
+   "label": "Bathing hut",
+   "c": [
+    -85.4,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-5",
+   "label": "Bathing hut",
+   "c": [
+    -81.2,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-6",
+   "label": "Bathing hut",
+   "c": [
+    -77,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-7",
+   "label": "Bathing hut",
+   "c": [
+    -72.8,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-8",
+   "label": "Bathing hut",
+   "c": [
+    -68.6,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-9",
+   "label": "Bathing hut",
+   "c": [
+    -64.4,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-10",
+   "label": "Bathing hut",
+   "c": [
+    -60.2,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-11",
+   "label": "Bathing hut",
+   "c": [
+    -56,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-12",
+   "label": "Bathing hut",
+   "c": [
+    -51.8,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-13",
+   "label": "Bathing hut",
+   "c": [
+    -47.6,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-kiosk-1",
+   "label": "Seafront kiosk",
+   "c": [
+    -30,
+    133.2
+   ],
+   "half": [
+    1.5,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "harbour-kiosk-2",
+   "label": "Seafront kiosk",
+   "c": [
+    44,
+    133.2
+   ],
+   "half": [
+    1.5,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "harbour-kiosk-3",
+   "label": "Seafront kiosk",
+   "c": [
+    84,
+    133.2
+   ],
+   "half": [
+    1.5,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "harbour-boardwalk-bench-1",
+   "label": "Boardwalk bench",
+   "c": [
+    -36,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-2",
+   "label": "Boardwalk bench",
+   "c": [
+    -24,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-3",
+   "label": "Boardwalk bench",
+   "c": [
+    -12,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-4",
+   "label": "Boardwalk bench",
+   "c": [
+    0,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-5",
+   "label": "Boardwalk bench",
+   "c": [
+    12,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-6",
+   "label": "Boardwalk bench",
+   "c": [
+    24,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-7",
+   "label": "Boardwalk bench",
+   "c": [
+    36,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-8",
+   "label": "Boardwalk bench",
+   "c": [
+    48,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-9",
+   "label": "Boardwalk bench",
+   "c": [
+    60,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-10",
+   "label": "Boardwalk bench",
+   "c": [
+    72,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-11",
+   "label": "Boardwalk bench",
+   "c": [
+    84,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-12",
+   "label": "Boardwalk bench",
+   "c": [
+    96,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-north-arcade-column-0",
+   "label": "North arcade column",
+   "c": [
+    120,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-0",
+   "label": "South arcade column",
+   "c": [
+    120,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-1",
+   "label": "North arcade column",
+   "c": [
+    123.455,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-1",
+   "label": "South arcade column",
+   "c": [
+    123.455,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-2",
+   "label": "North arcade column",
+   "c": [
+    126.909,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-2",
+   "label": "South arcade column",
+   "c": [
+    126.909,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-3",
+   "label": "North arcade column",
+   "c": [
+    130.364,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-3",
+   "label": "South arcade column",
+   "c": [
+    130.364,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-4",
+   "label": "North arcade column",
+   "c": [
+    133.818,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-4",
+   "label": "South arcade column",
+   "c": [
+    133.818,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-5",
+   "label": "North arcade column",
+   "c": [
+    137.273,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-5",
+   "label": "South arcade column",
+   "c": [
+    137.273,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-6",
+   "label": "North arcade column",
+   "c": [
+    140.727,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-6",
+   "label": "South arcade column",
+   "c": [
+    140.727,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-7",
+   "label": "North arcade column",
+   "c": [
+    144.182,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-7",
+   "label": "South arcade column",
+   "c": [
+    144.182,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-8",
+   "label": "North arcade column",
+   "c": [
+    147.636,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-8",
+   "label": "South arcade column",
+   "c": [
+    147.636,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-9",
+   "label": "North arcade column",
+   "c": [
+    151.091,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-9",
+   "label": "South arcade column",
+   "c": [
+    151.091,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-10",
+   "label": "North arcade column",
+   "c": [
+    154.545,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-10",
+   "label": "South arcade column",
+   "c": [
+    154.545,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-11",
+   "label": "North arcade column",
+   "c": [
+    158,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-11",
+   "label": "South arcade column",
+   "c": [
+    158,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade",
+   "label": "South arcade building",
+   "c": [
+    139,
+    89.5
+   ],
+   "half": [
+    19,
+    1.2
+   ],
+   "yaw": 0,
+   "height": 7.2
+  },
+  {
+   "id": "oldtown-fountain-a",
+   "label": "Plaza fountain",
+   "c": [
+    139,
+    73
+   ],
+   "half": [
+    2.96,
+    2.96
+   ],
+   "yaw": 0,
+   "height": 0.6
+  },
+  {
+   "id": "oldtown-fountain-b",
+   "label": "Plaza fountain",
+   "c": [
+    139,
+    73
+   ],
+   "half": [
+    2.96,
+    2.96
+   ],
+   "yaw": 0.785,
+   "height": 0.6
+  },
+  {
+   "id": "oldtown-planter-125-66",
+   "label": "Tree planter",
+   "c": [
+    125,
+    66
+   ],
+   "half": [
+    1.05,
+    1.05
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-planter-125-80",
+   "label": "Tree planter",
+   "c": [
+    125,
+    80
+   ],
+   "half": [
+    1.05,
+    1.05
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-planter-153-66",
+   "label": "Tree planter",
+   "c": [
+    153,
+    66
+   ],
+   "half": [
+    1.05,
+    1.05
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-planter-153-80",
+   "label": "Tree planter",
+   "c": [
+    153,
+    80
+   ],
+   "half": [
+    1.05,
+    1.05
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-bench-133-68",
+   "label": "Plaza bench",
+   "c": [
+    133,
+    68
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-bench-145-68",
+   "label": "Plaza bench",
+   "c": [
+    145,
+    68
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-bench-133-78",
+   "label": "Plaza bench",
+   "c": [
+    133,
+    78
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-bench-145-78",
+   "label": "Plaza bench",
+   "c": [
+    145,
+    78
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-market-stall-1",
+   "label": "Market street stall",
+   "c": [
+    114,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-2",
+   "label": "Market street stall",
+   "c": [
+    118.4,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-3",
+   "label": "Market street stall",
+   "c": [
+    122.8,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-4",
+   "label": "Market street stall",
+   "c": [
+    127.2,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-5",
+   "label": "Market street stall",
+   "c": [
+    131.6,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-6",
+   "label": "Market street stall",
+   "c": [
+    136,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-7",
+   "label": "Market street stall",
+   "c": [
+    140.4,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-8",
+   "label": "Market street stall",
+   "c": [
+    144.8,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-9",
+   "label": "Market street stall",
+   "c": [
+    149.2,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-10",
+   "label": "Market street stall",
+   "c": [
+    153.6,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-11",
+   "label": "Market street stall",
+   "c": [
+    158,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-12",
+   "label": "Market street stall",
+   "c": [
+    162.4,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-domed-hall",
+   "label": "Domed hall (plinth and walls)",
+   "c": [
+    166,
+    73
+   ],
+   "half": [
+    7.5,
+    6.5
+   ],
+   "yaw": 0,
+   "height": 8
+  },
+  {
+   "id": "oldtown-domed-hall-front",
+   "label": "Domed hall front wall",
+   "c": [
+    158.4,
+    73
+   ],
+   "half": [
+    0.25,
+    6
+   ],
+   "yaw": 0,
+   "height": 7.4
+  },
+  {
+   "id": "oldtown-domed-hall-column-68.5",
+   "label": "Domed hall portico column",
+   "c": [
+    157.3,
+    68.5
+   ],
+   "half": [
+    0.38,
+    0.38
+   ],
+   "yaw": 0,
+   "height": 6.6
+  },
+  {
+   "id": "oldtown-domed-hall-column-71.5",
+   "label": "Domed hall portico column",
+   "c": [
+    157.3,
+    71.5
+   ],
+   "half": [
+    0.38,
+    0.38
+   ],
+   "yaw": 0,
+   "height": 6.6
+  },
+  {
+   "id": "oldtown-domed-hall-column-74.5",
+   "label": "Domed hall portico column",
+   "c": [
+    157.3,
+    74.5
+   ],
+   "half": [
+    0.38,
+    0.38
+   ],
+   "yaw": 0,
+   "height": 6.6
+  },
+  {
+   "id": "oldtown-domed-hall-column-77.5",
+   "label": "Domed hall portico column",
+   "c": [
+    157.3,
+    77.5
+   ],
+   "half": [
+    0.38,
+    0.38
+   ],
+   "yaw": 0,
+   "height": 6.6
+  },
+  {
+   "id": "oldtown-cafe-table-1-65",
+   "label": "Cafe table and chairs",
+   "c": [
+    128,
+    65
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-1-81",
+   "label": "Cafe table and chairs",
+   "c": [
+    128,
+    81
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-2-65",
+   "label": "Cafe table and chairs",
+   "c": [
+    132.4,
+    65
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-2-81",
+   "label": "Cafe table and chairs",
+   "c": [
+    132.4,
+    81
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-3-65",
+   "label": "Cafe table and chairs",
+   "c": [
+    136.8,
+    65
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-3-81",
+   "label": "Cafe table and chairs",
+   "c": [
+    136.8,
+    81
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-4-65",
+   "label": "Cafe table and chairs",
+   "c": [
+    141.2,
+    65
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-4-81",
+   "label": "Cafe table and chairs",
+   "c": [
+    141.2,
+    81
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-5-65",
+   "label": "Cafe table and chairs",
+   "c": [
+    145.6,
+    65
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-5-81",
+   "label": "Cafe table and chairs",
+   "c": [
+    145.6,
+    81
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-6-65",
+   "label": "Cafe table and chairs",
+   "c": [
+    150,
+    65
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-6-81",
+   "label": "Cafe table and chairs",
+   "c": [
+    150,
+    81
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-flower-planter-122-62.6",
+   "label": "Flower planter",
+   "c": [
+    122,
+    62.6
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-122-83.4",
+   "label": "Flower planter",
+   "c": [
+    122,
+    83.4
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-128-62.6",
+   "label": "Flower planter",
+   "c": [
+    128,
+    62.6
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-128-83.4",
+   "label": "Flower planter",
+   "c": [
+    128,
+    83.4
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-134-62.6",
+   "label": "Flower planter",
+   "c": [
+    134,
+    62.6
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-134-83.4",
+   "label": "Flower planter",
+   "c": [
+    134,
+    83.4
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-140-62.6",
+   "label": "Flower planter",
+   "c": [
+    140,
+    62.6
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-140-83.4",
+   "label": "Flower planter",
+   "c": [
+    140,
+    83.4
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-146-62.6",
+   "label": "Flower planter",
+   "c": [
+    146,
+    62.6
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-146-83.4",
+   "label": "Flower planter",
+   "c": [
+    146,
+    83.4
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-152-62.6",
+   "label": "Flower planter",
+   "c": [
+    152,
+    62.6
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-152-83.4",
+   "label": "Flower planter",
+   "c": [
+    152,
+    83.4
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "harbour-boardwalk-sea-rail-1",
+   "label": "Boardwalk sea railing with pier entrances",
+   "c": [
+    -15.8,
+    141.4
+   ],
+   "half": [
+    24.2,
+    0.04
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-sea-rail-2",
+   "label": "Boardwalk sea railing with pier entrances",
+   "c": [
+    36.0,
+    141.4
+   ],
+   "half": [
+    24.4,
+    0.04
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-sea-rail-3",
+   "label": "Boardwalk sea railing with pier entrances",
+   "c": [
+    81.8,
+    141.4
+   ],
+   "half": [
+    18.2,
+    0.04
+   ],
+   "yaw": 0,
+   "height": 0.9
+  }
+ ],
+ "rings": [
+  {
+   "id": "park-gazebo",
+   "label": "Park gazebo",
+   "c": [
+    -28,
+    110
+   ],
+   "r": 3.25,
+   "segments": 8,
+   "gaps": [
+    112.5
+   ],
+   "gapDegrees": 20,
+   "height": 1.1
+  },
+  {
+   "id": "bandstand-rail",
+   "label": "Bandstand",
+   "c": [
+    38.5,
+    -26
+   ],
+   "r": 3,
+   "segments": 8,
+   "height": 1.25,
+   "gaps": [
+    90
+   ],
+   "gapDegrees": 45
+  },
+  {
+   "id": "tea-house-rail",
+   "label": "Tea house",
+   "c": [
+    92.5,
+    4.5
+   ],
+   "r": 2.8,
+   "segments": 8,
+   "height": 1.05,
+   "gaps": [
+    180
+   ],
+   "gapDegrees": 45
+  },
+  {
+   "id": "geodesic-dome",
+   "label": "Geodesic dome",
+   "c": [
+    99.2,
+    36.5
+   ],
+   "r": 4.5,
+   "segments": 24,
+   "gaps": [
+    0,
+    120,
+    240
+   ],
+   "gapDegrees": 9,
+   "height": 4.7
+  }
+ ],
+ "platforms": [
+  {
+   "id": "bandstand-deck",
+   "label": "Bandstand deck",
+   "c": [
+    38.5,
+    -26
+   ],
+   "r": 3,
+   "segments": 8,
+   "top": 0.35,
+   "step": {
+    "c": [
+     38.5,
+     -23.03
+    ],
+    "half": [
+     0.85,
+     0.275
+    ],
+    "top": 0.18
+   }
+  },
+  {
+   "id": "tea-house-deck",
+   "label": "Tea house deck",
+   "c": [
+    92.5,
+    4.5
+   ],
+   "r": 2.8,
+   "segments": 8,
+   "top": 0.3,
+   "step": {
+    "c": [
+     89.83,
+     4.5
+    ],
+    "half": [
+     0.25,
+     0.75
+    ],
+    "top": 0.15
+   }
+  },
+  {
+   "id": "lookout-deck",
+   "label": "North-woods lookout deck",
+   "c": [
+    3.5,
+    -59.5
+   ],
+   "half": [
+    3,
+    2
+   ],
+   "yaw": 0,
+   "top": 0.24
+  },
+  {
+   "id": "greenhouse-floor",
+   "label": "Greenhouse floor",
+   "c": [
+    69,
+    35
+   ],
+   "half": [
+    5,
+    2.3
+   ],
+   "yaw": 0,
+   "top": 0.45,
+   "step": {
+    "c": [
+     63.75,
+     35
+    ],
+    "half": [
+     0.25,
+     0.7
+    ],
+    "top": 0.22
+   }
+  },
+  {
+   "id": "performance-stage-deck",
+   "label": "Performance stage",
+   "c": [
+    92,
+    -30
+   ],
+   "half": [
+    3,
+    2
+   ],
+   "yaw": 0,
+   "top": 0.6,
+   "ramp": {
+    "c": [
+     92,
+     -26.2
+    ],
+    "half": [
+     0.9,
+     1.8
+    ],
+    "from": 0,
+    "to": 0.6,
+    "dir": [
+     0,
+     -1
+    ]
+   }
+  },
+  {
+   "id": "harbour-boardwalk-deck",
+   "label": "Harbour boardwalk",
+   "c": [
+    30,
+    139
+   ],
+   "half": [
+    70,
+    2.5
+   ],
+   "yaw": 0,
+   "top": 0.55
+  },
+  {
+   "id": "harbour-west-pier-deck",
+   "label": "West pier",
+   "c": [
+    10,
+    154.5
+   ],
+   "half": [
+    1.6,
+    13
+   ],
+   "yaw": 0,
+   "top": 0.55
+  },
+  {
+   "id": "harbour-east-pier-deck",
+   "label": "East pier",
+   "c": [
+    62,
+    158.5
+   ],
+   "half": [
+    1.6,
+    17
+   ],
+   "yaw": 0,
+   "top": 0.55
+  }
+ ]
+}
