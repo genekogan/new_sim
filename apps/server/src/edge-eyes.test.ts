@@ -4,6 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Hono} from 'hono';
+import {accept} from '../test/native-owner-fixture.ts';
 import {edenNavWorld} from '../test/eden-nav-fixture.ts';
 import {edgeSoulResolver} from './edge/routes.ts';
 import {mountEdgeEyes} from './edge/eyes/routes.ts';
@@ -71,7 +72,7 @@ class FakeRenderer implements EyesRenderer {
 }
 
 test('eyes route: privacy, cache, per-Soul and global limits, 503 caption fallback, gaze refusals', {timeout: 600000}, async t => {
-  const w = await edenNavWorld(4, {nav: false}); t.after(() => w.f.host.stop());
+  const w = await edenNavWorld(4, {nav: false}); t.after(() => {w.f.host.stop();w.f.db.close();});
   const tokens = new Map<string, string>(); w.souls.forEach((s, i) => tokens.set('tok' + i, s.soulId));
   const resolver = edgeSoulResolver(w.f.host, w.f.souls, () => undefined);
   const soulOf = (c: any) => {const id = tokens.get(c.req.header('authorization')?.replace(/^Bearer\s+/i, '') ?? ''); const s = w.souls.find(x => x.soulId === id); if (!s) return resolver(c); return s;};
@@ -83,7 +84,7 @@ test('eyes route: privacy, cache, per-Soul and global limits, 503 caption fallba
   const place = (i: number, x: number, z: number, yaw: number) => {const e = (w.engine.world.entities as any)[w.souls[i].entityId]; e.pose.p = [x, 0, z]; e.pose.yaw = yaw; if (e.human) e.human.activity = 'idle';};
   // A faces south toward house 1; B stands behind it; C is in front; D is inside the library (another building)
   place(0, 34, 4, Math.PI / 2); place(1, 34, 24, -Math.PI / 2); place(2, 31, 8, -Math.PI / 2); place(3, 74, -7, 0);
-  const get = async (a: Hono, i: number, q = '') => {const r = await a.request('/v1/edge/view' + q, {headers: {authorization: 'Bearer tok' + i}}); return {status: r.status, body: await r.json() as any};};
+  const get = async (a: Hono, i: number, q = '') => {const r = await accept(w.f.host, Promise.resolve(a.request('/v1/edge/view' + q, {headers: {authorization: 'Bearer tok' + i}}))); return {status: r.status, body: await r.json() as any};};
 
   const first = await get(app, 0);
   assert.equal(first.status, 200, JSON.stringify(first.body));
@@ -108,6 +109,10 @@ test('eyes route: privacy, cache, per-Soul and global limits, 503 caption fallba
   assert.equal(left.status, 429); assert.equal(left.body.error.code, 'eyes.rate-limited'); assert.ok(left.body.retry_after > 0 && left.body.alt.includes('head turned left'), JSON.stringify(left.body));
   clock += 31_000;
   const left2 = await get(app, 0, '?gaze=left'); assert.equal(left2.status, 200, JSON.stringify(left2.body)); assert.equal(left2.body.gaze.mode, 'left');
+  const held = await get(app,0,'?alt=only');
+  assert.ok(Math.abs(held.body.gaze.yaw-left2.body.gaze.yaw)<0.001,'no-gaze view follows logged Core-A look');
+  const attentionRows=w.f.db.db.prepare("SELECT capability,detail FROM edge_receipts_v1 WHERE soul_id=? AND capability='look:left'").all(w.souls[0].soulId) as {capability:string;detail:string}[];
+  assert.ok(attentionRows.length>=1 && attentionRows.every(r=>JSON.parse(r.detail).channel==='attention'),'explicit view gaze has a quiet independent attention receipt');
   // looking at C by id turns the head toward C; looking at B (behind the house) or D (inside elsewhere) is refused
   clock += 31_000;
   const atC = await get(app, 0, '?gaze=' + w.souls[2].soulId); assert.equal(atC.status, 200); assert.equal(atC.body.gaze.mode, 'target');

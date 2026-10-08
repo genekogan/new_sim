@@ -1,6 +1,5 @@
 // Eyes (M3): server state → the Soul's eye pose, gaze and visible set (sight.ts), for one Soul at the current tick.
-// Reads only public ledger hooks and the native world; never changes world state (the gaze turns the rendered head
-// only; an attention-channel event can be added once EVENTS-v1 §8 lands).
+// Plans read the native world and the current Core-A gaze; an explicit gaze request is logged by the route through the independent attention channel.
 import {CATALOG} from '../../../../../mars/viewer/engine/world/catalog.ts';
 import type {WorldState as NativeWorld} from '../../../../../mars/viewer/engine/world/types.ts';
 import {EdgeError, type EdgeSoul} from '../contract.ts';
@@ -87,7 +86,16 @@ export function planView(ledger: EdgeLedger, soul: EdgeSoul, request: ViewReques
     return {soulId, entityId, name, p: [b.pose.p[0], b.pose.p[1], b.pose.p[2]], yaw: b.pose.yaw, level: Number(b.human?.level ?? 0), enclosure: ledger.enclosureOf(soulId), state: stateOf(host, entityId), activity: String(b.human?.activity ?? 'idle')};
   };
   const me = bodyOf(soul.soulId, m.entityId, m.name)!;
-  const gaze = request.mode === 'map' ? {mode: 'forward', yaw: me.yaw} : resolveGaze(ledger, soul, me, request.gaze);
+  const current = body.human?.gaze;
+  const attention = request.gaze === undefined && current && (current.until === undefined || current.until > world.tick) ? current : null;
+  const point = attention?.target ? world.entities[attention.target]?.pose.p : null;
+  const at = point ? [point[0], point[2]] : attention?.at;
+  const activeYaw = at ? Math.atan2(at[1] - me.p[2], at[0] - me.p[0]) : me.yaw;
+  const angle = wrap(activeYaw - me.yaw);
+  const direction = Math.abs(angle) > Math.PI * 3/4 ? 'behind' : Math.abs(angle) < Math.PI/4 ? 'forward' : angle < 0 ? 'left' : 'right';
+  const gaze = request.mode === 'map' ? {mode:'forward',yaw:me.yaw} : attention && at
+    ? {mode:attention.target ? 'target' : direction,yaw:activeYaw, ...(attention.target ? {target:world.entities[attention.target]?.label ?? attention.target} : {}), aim:[at[0], point ? point[1] + 1.3 : me.p[1] + 1.5, at[1]] as [number,number,number]}
+    : resolveGaze(ledger, soul, me, request.gaze);
   const hfovDeg = request.mode === 'map' ? 360 : Math.max(50, Math.min(120, Number.isFinite(request.fov) ? request.fov! : 90));
   const pose = eyePose(body as never, me.state, gaze.yaw, Math.min(hfovDeg, 179), request.w, request.h);
   if (request.mode === 'map') pose.hfov = Math.PI * 2;

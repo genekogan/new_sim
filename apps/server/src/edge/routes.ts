@@ -51,7 +51,7 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   // Public: small things lying in the world (together/1 items put down by Souls) for viewers to draw; no owner data.
   app.get('/v1/edge/items', wrap(() => ({tick: deps.host.engine.world.tick, items: L.together.publicItems()})));
   // Eyes (M3): GET /v1/edge/view first-person sight + alt caption; render worker only when EDGE_EYES=<viewer url>.
-  mountEdgeEyes(app, deps);
+  const eyes = mountEdgeEyes(app, deps);
   const comms = registerEdgeComms(app, deps, {stewardToken: process.env.EDGE_STEWARD_TOKEN || undefined, fading: process.env.EDGE_FADING === '1'});
   L.attachComms(comms);
   // EVENTS-v1 (tranche agent-minds M1/M2/M4): push stream (SSE + WS), digest, world.notice, server-side plans, schema.
@@ -61,5 +61,5 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   plans = registerEdgePlans(app, deps, comms, events, L);
   mountSchema(app);
   const close = comms.close;
-  return Object.assign(comms, {events, plans, close() { plans?.close(); events.close(); close(); }});
+  return Object.assign(comms, {events, plans, close() { plans?.close(); events.close(); eyes.close(); close(); }});
 }

@@ -62,9 +62,18 @@ export function mountEdgeEyes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}, 
     c.header('Cache-Control', 'no-store');
     try {
       const s = deps.soul(c), q = parseViewQuery(k => c.req.query(k));
-      const plan = planView(deps.ledger, s, q), base = summary(plan);
-      if (q.altOnly) {limit(s, 'view-alt', 60); return c.json(edgeBody({...base, url: null, image: 'not requested (alt=only)'}));}
-      limit(s, 'view', 60); sweep();
+      limit(s, q.altOnly ? 'view-alt' : 'view', 60);
+      let plan = planView(deps.ledger, s, q);
+      if (q.mode === 'eyes' && q.gaze !== undefined) {
+        // Gaze is an owner's explicit attention request. The body keeps walking/sitting; subsequent no-gaze frames
+        // observe the same logged head target that here reports. Invalid visibility/query already refused above.
+        const p = plan.render.pose, at: [number,number] = [p.p[0] + 6 * Math.cos(p.yaw), p.p[2] + 6 * Math.sin(p.yaw)];
+        await deps.ledger.intents.attend(s, `look:${q.gaze || 'ahead'}`, {at,until:deps.host.engine.world.tick+200,kind:'look'}, undefined, {direction:q.gaze || 'ahead',seconds:10});
+        plan = planView(deps.ledger,s,q);
+      }
+      const base = summary(plan);
+      if (q.altOnly) { return c.json(edgeBody({...base, url: null, image: 'not requested (alt=only)'}));}
+      sweep();
       const key = keyOf(s, plan), hit = frames.get(key), t = now();
       if (hit && images.has(hit.img)) return c.json(edgeBody({...base, tick: hit.tick, alt: hit.alt, seen: hit.seen, url: `/v1/edge/view/img/${hit.img}.jpg`, expiresAt: new Date(hit.expires).toISOString(), cached: true, render: {ms: hit.ms, frameTick: hit.frameTick}}));
       const st = renderer.status();
