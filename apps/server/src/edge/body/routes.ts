@@ -6,8 +6,9 @@ import {admitBodyGLB,BodyAdmissionError,BODY_LIMITS} from './admission.ts';
 import {FLOATER_MODELS} from '../../../../../mars/viewer/engine/bodies/models.ts';
 import {addSchemaPart} from '../events/schema.ts';
 
-export const BODY_PRESETS=[{id:'humanoid',name:'Humanoid',body:null},...FLOATER_MODELS.filter(m=>m.group==='floater').map(m=>{
-  const modelUrl=`/world-assets/littlemartians/characters/${m.file}`;
+export const BODY_PRESETS=[{id:'humanoid',name:'Humanoid',body:null},...FLOATER_MODELS.map(m=>{
+  // Trusted flat aliases retain the same shipped bytes; placement roles stay in the world catalog.
+  const modelUrl=`/world-assets/littlemartians/characters/${m.file.replace(/^kin\//,'')}`;
   return {id:m.id,name:m.name,body:{family:'floater',type:'ceramic',model:m.id,modelUrl,avatar:{kind:'body',modelUrl,bodyType:'ceramic'},radius:.35,hoverHeight:1.45} as Entity['body']};
 })];
 const ASSET=/^body_[a-f0-9]{64}$/;
