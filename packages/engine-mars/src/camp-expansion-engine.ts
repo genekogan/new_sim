@@ -26,7 +26,7 @@ export async function marsCampExpansionFactory(cfg?:MarsWorldConfig):Promise<Eng
       const s=structuredClone(raw) as EngineSnapshot&{physicalBinding?:string;mars:any;cfg:MarsWorldConfig;programs:any[];nextProg:number;leaving:string[];quiet?:boolean};
       if(s.format!=='sim-mars-snapshot/1'||s.physicalBinding!==rulesVersion||hashOf(physicalCfg(s.cfg))!==hashOf(physicalCfg(camp)))throw new Error('camp-expansion.snapshot-binding');
       if(hashOf(decodeSnapshot(s.mars).world.base)!==hashOf(native.base))throw new Error('camp-expansion.snapshot-base');
-      const engine=install(new MarsEngine(m,native.restore(s.mars),s.cfg,{programs:s.programs,nextProg:s.nextProg,leaving:s.leaving},reader));
+      const engine=install(new MarsEngine(m,native.restore(s.mars),s.cfg,{programs:s.programs,nextProg:s.nextProg,leaving:s.leaving,renderPlatformsV1:(s as any).renderPlatformsV1},reader));
       if(s.quiet)engine.beginQuiet();
       if(engine.stateHash()!==s.stateHash||engine.world.tick!==s.tick)throw new Error('camp-expansion.snapshot-state');
       return engine;

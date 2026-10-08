@@ -63,6 +63,7 @@ import type {NativeBoatControlsV1} from '@sim/engine-contract';
 import type {BodyLocationV1} from '@sim/engine-contract';
 import {bodyProblem} from '../../../mars/viewer/engine/bodies/body.ts';
 import type {Body} from '../../../mars/viewer/engine/world/types.ts';
+import {renderPlatformsV1Schema,type RenderPlatformsV1} from '@sim/engine-contract';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const TPS = 20;
@@ -186,11 +187,13 @@ export class MarsEngine implements Engine {
   private commonsProvisionsReader=false;
   private commonsProvisionsActive=false;
   private chunks: { fromTick: number; toTick: number; take: unknown }[] = [];
+  private renderPlatformMetadata?:RenderPlatformsV1;
 
-  constructor(m: Mars, rt: any, cfg: MarsWorldConfig, saved?: { programs: Prog[]; nextProg: number; leaving: string[] }, physical?:MarsPhysicalBinding) {
+  constructor(m: Mars, rt: any, cfg: MarsWorldConfig, saved?: { programs: Prog[]; nextProg: number; leaving: string[];renderPlatformsV1?:RenderPlatformsV1 }, physical?:MarsPhysicalBinding) {
     this.m = m; this.rt = rt; this.cfg = structuredClone(cfg); this.registry = rt.registry;this.physical=physical;
     this.schema = rt.world.schema;
     if (saved) { for (const p of saved.programs) { this.programs.set(p.id, p); this.byActor.set(p.actor, p.id); } this.nextProg = saved.nextProg; this.leaving = saved.leaving; }
+    if(saved?.renderPlatformsV1)this.renderPlatformMetadata=renderPlatformsV1Schema.parse(saved.renderPlatformsV1);
     this.cursor = rt.events.length;
     this.startRecorder();
     const self = this;
@@ -213,6 +216,9 @@ export class MarsEngine implements Engine {
 
   // ------------------------------------------------------------------ tick
   step() {
+    // Reader wrappers finish restoring public policies after construction.
+    // Discard only their empty initial recorder before the first new frame.
+    if(!this.readerRecordingDepth&&this.renderBaseKey!==this.renderContextKeyV1()){this.finishRecorder();this.startRecorder();}
     this.m.stepCarriers(this.rt);   // carrier/1: rides move their seated riders first (no carriers: no effect)
     this.rt.step();
     this.updateClock();
@@ -925,6 +931,7 @@ export class MarsEngine implements Engine {
       if(this.socialEdenActive)scene.social={version:'social-eden/1',layoutHash:socialEdenV1().layoutHash,layout:socialEdenV1().layout,nativeGeometry:socialEdenV1().nativeGeometry};
       if(this.greenLandmarkActive)scene.landmarks={contract:'existing-green-landmark/1',sourceProposalHash:existingGreenLandmarkV1().sourceProposalHash,items:[{id:existingGreenLandmarkV1().id,label:'South commons tree',point:existingGreenLandmarkV1().point,visual:existingGreenLandmarkV1().source.visual,visualId:'commons-canopy-tree-16',capabilities:['walk','hang_out']}]};
       if(visible.shore)visible.shore.rulesVersion=this.rulesVersion;
+      this.projectRenderPlatformsV1(scene);
       return {...visible,clock:this.cfg.clock?{origin:this.cfg.clock.origin,dayTicks:this.cfg.clock.dayTicks}:null};
     }
     const scene=structuredClone(this.m.scenes[this.rt.world.base.campus] ?? null);
@@ -937,17 +944,22 @@ export class MarsEngine implements Engine {
     if(this.commonsKitchenActive)scene.kitchen={version:this.commonsKitchenVersion,...(this.commonsKitchenVersion==='commons-kitchen/2'?{slotRow:'r1'}:{}),stations:structuredClone(COMMONS_KITCHENS),ingredientBowlsPerStation:2,servingsPerStation:2,nativeGroundY:0};
     if(this.newcomerResources.length)scene.newcomerProvisions=newcomerResourcesPublicV1Schema.parse({contract:'commons-newcomer-resources/1',resources:this.newcomerResources.flatMap(f=>commonsNewcomerResourcesV1(f.firstSlot,f.placements).resources),nativeGroundY:0});
     if(this.commonsProvisionsActive)scene.provisions={version:'commons-provisions/1',resources:structuredClone(COMMONS_PERSONAL_RESOURCES),nativeGroundY:0};
+    this.projectRenderPlatformsV1(scene);
     return {scene,clock:this.cfg.clock?{origin:this.cfg.clock.origin,dayTicks:this.cfg.clock.dayTicks}:null,
       ...(this.cfg.scene==='littlemartians'?structuredClone(this.m.littleMartiansRender):{}),
       ground:['greenfield','eden-commons'].includes(this.cfg.scene)?'grass' as const:undefined};
   }
   readerSetupWithoutRecordingV1<T>(read:()=>T):T{this.readerRecordingDepth++;try{return read();}finally{this.readerRecordingDepth--;}}
+  renderPlatformsV1(){return this.renderPlatformMetadata?structuredClone(this.renderPlatformMetadata):undefined;}
+  configureRenderPlatformsV1(raw:RenderPlatformsV1){const metadata=renderPlatformsV1Schema.parse(raw);if(metadata.navHash!==hashOf((this.world as any).navV1??null)||metadata.baseStaticHash!==this.world.base.staticHash)throw Error('render-platforms.source-differs');if(hashOf(metadata)===hashOf(this.renderPlatformMetadata??null))return;this.finishRecorder();this.renderPlatformMetadata=structuredClone(metadata);this.renderBaseKey='';this.startRecorder();}
+  private projectRenderPlatformsV1(scene:Record<string,unknown>|null){const m=this.renderPlatformMetadata;if(!scene||!m)return;if(m.navHash!==hashOf((this.world as any).navV1??null)||m.baseStaticHash!==this.world.base.staticHash){scene.platforms=[];return;}const {platforms,...provenance}=m;scene.platforms=structuredClone(platforms);scene.platformProvenance=structuredClone(provenance);}
+  private renderContextKeyV1(){return JSON.stringify([this.rt.world.base.campus,this.cfg.scene,this.cfg.clock??null,this.rulesVersion]);}
   private startRecorder() {
     if(this.readerRecordingDepth)return;
     // Authored render bases are immutable for this engine instance. Supported
     // campus/clock/config boundaries change this key; actor/object motion is in
     // the take and does not cause repeated hashing of a static render base.
-    const key=JSON.stringify([this.rt.world.base.campus,this.cfg.scene,this.cfg.clock??null,this.rulesVersion]);
+    const key=this.renderContextKeyV1();
     if(key!==this.renderBaseKey) {
       this.recorderScene=captureRenderScene(this.rulesVersion,this.renderScene());this.renderBaseKey=key;
     }
@@ -1258,6 +1270,7 @@ export class MarsEngine implements Engine {
     if(this.previewNavV1(spec))return {installed:false,relocated:[],trapped:[]};
     const nav=this.navFromSpecV1(spec);
     if(hashOf(this.rt.world.navV1??null)===hashOf(nav))return {installed:false,relocated:[],trapped:[]};
+    if(this.renderPlatformMetadata)this.finishRecorder();
     this.rt.world.navV1=nav;
     const spatial=this.rt.services.spatial as Spatial;
     if(!spatial.refreshForWorld(this.rt.world))throw Error('nav.spatial-not-rebasable');
@@ -1268,6 +1281,7 @@ export class MarsEngine implements Engine {
       const to=this.nearestStandableV1([e.pose.p[0],e.pose.p[2]],id);
       if(to&&this.relocateHumanV1(id,to))relocated.push(id);else trapped.push(id);
     }
+    if(this.renderPlatformMetadata){this.renderBaseKey='';this.startRecorder();}
     return {installed:true,relocated,trapped};
   }
   /** nav/1: the world.navV1 value a valid spec installs (pure; prefixed ids so they never collide with source obstacles). */
@@ -1475,7 +1489,7 @@ export class MarsEngine implements Engine {
   /** Mars's own resumable snapshot, plus which program each actor is in. Body-language steps lower only to verbs Mars can resume exactly. */
   snapshot(): EngineSnapshot {
     const mars = this.rt.snapshot();
-    return structuredClone({ ...(this.lecturePlacement?{edenLectureV1:this.lecturePlacement,lectureBaseStateHash:this.lectureBaseStateHash()}:{}), ...(this.sleepSnapshotActive?{nativeSleepSnapshotV1:true,sleepSnapshotBaseStateHash:this.sleepSnapshotBaseStateHash()}:{}), ...(this.newcomerResources.length?{commonsNewcomerResourcesV1:structuredClone(this.newcomerResources),newcomerBaseStateHash:this.newcomerBaseStateHash()}:{}), format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, ...(this.cfg.scene==='eden-commons'?{commonsVersion:'commons/1'}:{}), quiet: this.quiet, ...(this.commonsProvisionsActive?{commonsProvisionsV1:true}:{}), ...(this.commonsKitchenActive?{commonsKitchenV1:true}:{}), ...(this.socialEdenActive?{socialEdenV1:true}:{}), ...(this.greenLandmarkActive?{greenLandmarkV1:true}:{}), ...(this.foodDeliveries.length?{foodDeliveriesV1:structuredClone(this.foodDeliveries)}:{}), ...(this.commonsKitchenActive&&this.commonsKitchenVersion==='commons-kitchen/2'?{commonsKitchenVersion:this.commonsKitchenVersion}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion}:{}) });
+    return structuredClone({ ...(this.lecturePlacement?{edenLectureV1:this.lecturePlacement,lectureBaseStateHash:this.lectureBaseStateHash()}:{}), ...(this.sleepSnapshotActive?{nativeSleepSnapshotV1:true,sleepSnapshotBaseStateHash:this.sleepSnapshotBaseStateHash()}:{}), ...(this.newcomerResources.length?{commonsNewcomerResourcesV1:structuredClone(this.newcomerResources),newcomerBaseStateHash:this.newcomerBaseStateHash()}:{}), ...(this.renderPlatformMetadata?{renderPlatformsV1:structuredClone(this.renderPlatformMetadata)}:{}), format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, ...(this.cfg.scene==='eden-commons'?{commonsVersion:'commons/1'}:{}), quiet: this.quiet, ...(this.commonsProvisionsActive?{commonsProvisionsV1:true}:{}), ...(this.commonsKitchenActive?{commonsKitchenV1:true}:{}), ...(this.socialEdenActive?{socialEdenV1:true}:{}), ...(this.greenLandmarkActive?{greenLandmarkV1:true}:{}), ...(this.foodDeliveries.length?{foodDeliveriesV1:structuredClone(this.foodDeliveries)}:{}), ...(this.commonsKitchenActive&&this.commonsKitchenVersion==='commons-kitchen/2'?{commonsKitchenVersion:this.commonsKitchenVersion}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion}:{}) });
   }
   canSnapshot(): boolean {
     // A legacy formation callback is not data and must wait for a quiet point.
@@ -1543,7 +1557,7 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
       if('commonsNewcomerResourcesV1' in snap)throw Error('newcomer-resources.reader-required');
       if('commonsKitchenV1' in snap)throw Error('commons-kitchen.reader-required');
       if('commonsProvisionsV1' in snap)throw Error('commons-provisions.reader-required');
-      const s = structuredClone(snap) as EngineSnapshot & { mars: any; programs: Prog[]; nextProg: number; leaving: string[]; cfg: MarsWorldConfig; commonsVersion?:string; quiet?: boolean };
+      const s = structuredClone(snap) as EngineSnapshot & { mars: any; programs: Prog[]; nextProg: number; leaving: string[]; cfg: MarsWorldConfig; commonsVersion?:string; quiet?: boolean;renderPlatformsV1?:RenderPlatformsV1 };
       if ('physicalBinding' in s)throw new Error('snapshot physical binding differs from the legacy factory');
       if (s.format !== SNAPSHOT_FORMAT) throw new Error(`bad snapshot format ${s.format}`);
       if(!!s.cfg?.walkBlockV1!==!!cfg.walkBlockV1)throw new Error('snapshot walk policy differs from the native factory');
@@ -1557,7 +1571,7 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
       const base = scene === 'eden-commons' ? m.edenCommonsWorld() : scene === 'littlemartians' ? m.littleMartiansWorld() : scene === 'greenfield' ? m.greenFieldWorld() : scene === 'eden-camp' ? m.edenCampWorld() : scene === 'meal' ? m.mealWorld() : m.provingGroundWorld();
       const rt = m.Runtime.restore(s.mars, registry, services(base), m.invariants);
       if(cfg.scene==='eden-commons'&&(rt.world.base.campus!=='eden-commons'||rt.world.base.staticHash!==base.base.staticHash))throw new Error('snapshot commons physical base differs from the native factory');
-      const engine = new MarsEngine(m, rt, s.cfg ?? cfg, { programs: s.programs, nextProg: s.nextProg, leaving: s.leaving });
+      const engine = new MarsEngine(m, rt, s.cfg ?? cfg, { programs: s.programs, nextProg: s.nextProg, leaving: s.leaving,renderPlatformsV1:s.renderPlatformsV1 });
       if (s.quiet) engine.beginQuiet();
       return engine;
     },

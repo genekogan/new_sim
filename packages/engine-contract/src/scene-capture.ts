@@ -2,6 +2,7 @@
 import { z } from 'zod';
 import { hashOf } from './hash.ts';
 import { nativeShoreSceneV1Schema,type NativeShoreSceneV1 } from './shore-scene.ts';
+import {renderPlatformsV1Schema} from './render-platforms-v1.ts';
 /** Current public render base, without physical controller dependencies. */
 export type RenderScene = {
   scene:unknown;
@@ -41,6 +42,8 @@ export function captureRenderScene(rules:string, scene:RenderScene):RenderSceneC
   const json=JSON.stringify(scene);
   if (new TextEncoder().encode(json).length>1024*1024) throw new RangeError('render scene capture exceeds 1 MiB');
   const body=bodySchema.parse(JSON.parse(json)) as RenderScene;
+  const publicScene=body.scene as Record<string,unknown>|null;
+  if(publicScene&&typeof publicScene==='object'&&!Array.isArray(publicScene)&&publicScene.platformProvenance!==undefined){const p=publicScene.platformProvenance;if(!p||typeof p!=='object'||Array.isArray(p))throw TypeError('captured platform provenance is required');renderPlatformsV1Schema.parse({...p,platforms:publicScene.platforms});}
   if(body.shore&&body.shore.rulesVersion!==rules)throw new TypeError('captured shore and render rules versions differ');
   return {contract:'render-scene-capture/1',ref:{contract:'render-scene-ref/1',rulesVersion:rules,
     hash:hashOf({contract:'render-scene-capture/1',rulesVersion:rules,body})},body};

@@ -21,7 +21,7 @@ export async function nativeCampDrinkFactory():Promise<EngineFactory>{
     create(w){validate(w);return new MarsEngine(m,new m.Runtime(w,registry,services(w),invariants),cfg,undefined,binding);},
     restore(raw){const s=structuredClone(raw) as EngineSnapshot&{physicalBinding?:string;mars:any;cfg:MarsWorldConfig;programs:any[];nextProg:number;leaving:string[];quiet?:boolean};
       const {clock,sleepBlockTicks,quietSeatCourtesy,...policy}=s.cfg??{};if(s.format!=='sim-mars-snapshot/1'||s.physicalBinding!==version||hashOf(policy)!==hashOf(cfg))throw new Error('drink.snapshot-policy');
-      const e=new MarsEngine(m,restore(s.mars),s.cfg,{programs:s.programs,nextProg:s.nextProg,leaving:s.leaving},binding);if(s.quiet)e.beginQuiet();if(e.stateHash()!==s.stateHash)throw new Error('drink.snapshot-state');return e;},
+      const e=new MarsEngine(m,restore(s.mars),s.cfg,{programs:s.programs,nextProg:s.nextProg,leaving:s.leaving,renderPlatformsV1:(s as any).renderPlatformsV1},binding);if(s.quiet)e.beginQuiet();if(e.stateHash()!==s.stateHash)throw new Error('drink.snapshot-state');return e;},
     validateHistoryHead(e,recorded){if(recorded!==rulesVersion||e.rulesVersion!==recorded)throw new Error('drink.history-head');},
   };
 }

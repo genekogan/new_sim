@@ -32,7 +32,7 @@ export async function retainedCommonsShoreFactory(options?:{foodDeliveryV1?:bool
       if(s.format!=='sim-mars-snapshot/1'||s.physicalBinding!==reader.rulesVersion||s.commonsVersion!=='commons/1'||hashOf(physicalCfg(s.cfg))!==hashOf(cfg))throw Error('retained-shore.snapshot-binding');
       if(s.commonsKitchenV1&&!s.commonsProvisionsV1)throw Error('retained-shore.snapshot-resource-policy');
       if(!s.commonsKitchenV1&&s.commonsKitchenVersion!==undefined)throw Error('retained-shore.snapshot-resource-policy');
-      const e=install(new MarsEngine(m,reader.restore(s.mars),s.cfg,{programs:s.programs,nextProg:s.nextProg,leaving:s.leaving},reader));
+      const e=install(new MarsEngine(m,reader.restore(s.mars),s.cfg,{programs:s.programs,nextProg:s.nextProg,leaving:s.leaving,renderPlatformsV1:(s as any).renderPlatformsV1},reader));
       e.enableCommonsProvisionsReaderV1(s.commonsProvisionsV1===true);e.enableCommonsKitchenReaderV1(s.commonsKitchenV1===true,s.commonsKitchenVersion??'commons-kitchen/1');
       if(s.commonsProvisionsV1){const p=commonsProvisions();if(!Object.keys(p.entities).every(id=>e.world.entities[id])||!Object.keys(p.regions).every(id=>e.world.regions[id]))throw Error('retained-shore.snapshot-resource-policy');}
       if(s.commonsKitchenV1&&!Object.keys(commonsKitchen(s.commonsKitchenVersion??'commons-kitchen/1').entities).every(id=>e.world.entities[id]))throw Error('retained-shore.snapshot-resource-policy');

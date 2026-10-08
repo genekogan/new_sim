@@ -1,0 +1,10 @@
+import {z} from 'zod';
+const coordinate=z.number().finite().min(-10000).max(10000),v2=z.tuple([coordinate,coordinate]);
+const half=z.tuple([z.number().finite().positive().max(100),z.number().finite().positive().max(100)]);
+const height=z.number().finite().min(0).lt(3),digest=z.string().regex(/^[a-f0-9]{64}$/);
+export const renderPlatformV1Schema=z.strictObject({id:z.string().min(1).max(120),label:z.string().max(160).optional(),c:v2,half:half.optional(),yaw:z.number().finite().optional(),r:z.number().finite().gt(.3).lt(50).optional(),segments:z.number().int().min(3).max(64).optional(),top:height.refine(v=>v>0),step:z.strictObject({c:v2,half,top:height.optional()}).optional(),ramp:z.strictObject({c:v2,half,from:height.optional(),to:height.optional(),dir:v2.refine(v=>Math.sqrt(v[0]*v[0]+v[1]*v[1])>1e-6).optional()}).optional()}).refine(p=>(p.half===undefined)!==(p.r===undefined));
+export const renderPlatformRowsV1Schema=z.array(renderPlatformV1Schema).max(128).refine(rows=>new Set(rows.map(r=>r.id)).size===rows.length);
+export const renderPlatformsDeclarationV1Schema=z.strictObject({contract:z.literal('render-platforms/1'),navHash:digest,baseStaticHash:digest,platforms:renderPlatformRowsV1Schema});
+export const renderPlatformsV1Schema=renderPlatformsDeclarationV1Schema.extend({acceptedAtTick:z.number().int().nonnegative()});
+export type RenderPlatformsV1=z.infer<typeof renderPlatformsV1Schema>;
+export type RenderPlatformV1=z.infer<typeof renderPlatformV1Schema>;

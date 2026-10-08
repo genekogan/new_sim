@@ -8,6 +8,7 @@ export * from './engine.ts';
 export * from './kinematics.ts';
 export * from './scene-proposal.ts';
 export * from './scene-capture.ts';
+export * from './render-platforms-v1.ts';
 export * from './shore-scene.ts';
 export * from './terrain.ts';
 export * from './water-geometry.ts';

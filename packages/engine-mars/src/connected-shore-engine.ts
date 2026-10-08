@@ -18,7 +18,7 @@ export async function connectedCommonsShoreFactory():Promise<EngineFactory>{
       if(s.format!=='sim-mars-snapshot/1'||s.physicalBinding!==binding.rulesVersion||s.commonsVersion!=='commons/1')throw new Error('connected.snapshot-binding-differs');
       const {clock,sleepBlockTicks,quietSeatCourtesy,...physicalCfg}=s.cfg??{};
       if(hashOf(physicalCfg)!==hashOf(cfg))throw new Error('connected.snapshot-policy-differs');
-      const e=new MarsEngine(m,native.restore(s.mars),s.cfg,{programs:s.programs,nextProg:s.nextProg,leaving:s.leaving},binding);
+      const e=new MarsEngine(m,native.restore(s.mars),s.cfg,{programs:s.programs,nextProg:s.nextProg,leaving:s.leaving,renderPlatformsV1:(s as any).renderPlatformsV1},binding);
       if(s.quiet)e.beginQuiet();
       if(e.stateHash()!==s.stateHash||e.world.tick!==s.tick)throw new Error('connected.snapshot-state-differs');
       return e;

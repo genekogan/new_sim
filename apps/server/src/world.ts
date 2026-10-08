@@ -1,4 +1,5 @@
 import {edenLectureV1} from '@sim/engine-mars';
+import {renderPlatformRowsV1Schema,type RenderPlatformV1} from '@sim/engine-contract';
 import type {EdenLecturePlacementV1} from '@sim/engine-contract';
 import {latestPurposeDirectionV1} from './latest-purpose-direction.ts';
 import {episodesFromHistoryV1} from './purpose-episodes.ts';
@@ -1013,12 +1014,23 @@ export class WorldHost {
   }
   /** nav/1: extra walking ground and solid footprints (buildings, water) as one logged prospective rules fact; a spec equal
    *  to the installed one is a no-op. Resolves {installed:false} without logging when nothing would change. */
-  installNavV1(spec:{version:'nav/1';ground:{id:string;boundsXZ:[number,number,number,number]}[];solids:{id:string;label?:string;c:[number,number];half:[number,number];yaw:number;height?:number}[]}){
+  installNavV1(spec:{version:'nav/1';ground:{id:string;boundsXZ:[number,number,number,number]}[];solids:{id:string;label?:string;c:[number,number];half:[number,number];yaw:number;height?:number}[];platforms?:RenderPlatformV1[]}){
     const engine=this.engine as unknown as {previewNavV1?:(s:unknown)=>{code:string;message:string}|null;navFromSpecV1:(s:unknown)=>unknown;world:{navV1?:unknown}};
     if(!engine.previewNavV1)return Promise.reject(Error('nav.reader-required'));
     const issue=engine.previewNavV1(spec);if(issue)return Promise.reject(Error(`${issue.code}: ${issue.message}`));
-    if(hashOf(engine.world.navV1??null)===hashOf(engine.navFromSpecV1(spec)))return Promise.resolve({installed:false});
-    return this.enqueue('rules','operator:nav',{navV1:structuredClone(spec),why:'nav/1: buildings and water are solid to walking (doors closed until interiors are admitted) and admitted ground widens to the park; prospective, earlier history replays unchanged'}).then(()=>({installed:true}));
+    const platforms=spec.platforms===undefined?undefined:renderPlatformRowsV1Schema.parse(spec.platforms);
+    const installProjection=()=>platforms===undefined?Promise.resolve():this.installRenderPlatformsV1(platforms).then(()=>undefined);
+    if(hashOf(engine.world.navV1??null)===hashOf(engine.navFromSpecV1(spec)))return installProjection().then(()=>({installed:false}));
+    const {platforms:_renderOnly,...geometry}=spec;
+    return this.enqueue('rules','operator:nav',{navV1:structuredClone(geometry),why:'nav/1: buildings and water are solid to walking (doors closed until interiors are admitted) and admitted ground widens to the park; prospective, earlier history replays unchanged'}).then(async()=>{await installProjection();return {installed:true};});
+  }
+  /** Prospective presentation only: bind new capture metadata to the accepted nav/base at this tick. */
+  installRenderPlatformsV1(raw:RenderPlatformV1[]){
+    if(!this.engine.configureRenderPlatformsV1)return Promise.reject(Error('render-platforms.reader-required'));
+    const platforms=renderPlatformRowsV1Schema.parse(raw).sort((a,b)=>a.id<b.id?-1:a.id>b.id?1:0),navHash=hashOf((this.engine.world as any).navV1??null),baseStaticHash=this.engine.world.base.staticHash;
+    const old=this.engine.renderPlatformsV1?.();if(old&&old.navHash===navHash&&old.baseStaticHash===baseStaticHash&&hashOf(old.platforms)===hashOf(platforms))return Promise.resolve({installed:false});
+    const guard:AcceptanceGuard=()=>{if(hashOf((this.engine.world as any).navV1??null)!==navHash||this.engine.world.base.staticHash!==baseStaticHash)throw Error('render-platforms.source-moved');return true;};
+    return this.enqueueChecked('rules','operator:render-platforms',{renderPlatformsV1:{contract:'render-platforms/1',navHash,baseStaticHash,platforms}},guard).then(()=>({installed:true}));
   }
   /** carrier/1: install a ride (e.g. a hot-air balloon) at its home as a logged prospective rules fact; idempotent by id. */
   setCarrierRouteV1(spec:{id:string;route:string}){

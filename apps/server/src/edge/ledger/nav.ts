@@ -6,7 +6,7 @@ import type {PlaceData, Place} from './places.ts';
 type V2 = [number, number];
 export type Solid = {id: string; label?: string; c: V2; half: V2; yaw: number; height?: number};
 export type GroundRect = {id: string; boundsXZ: [number, number, number, number]};
-export type NavSpec = {version: 'nav/1'; ground: GroundRect[]; solids: Solid[]};
+export type NavSpec = {version: 'nav/1'; ground: GroundRect[]; solids: Solid[];platforms?:Platform[]};
 /** activity-spots/1 `interiors[]`: an enclosed building made enterable through its doors. */
 export type Interior = {place: string; doors: [number, number, number, number][]; wall?: number; furniture?: Solid[];
   /** Interior wall runs [x0,z0,x1,z1] inside the building; any door segment lying on a run is a gap in it. */
@@ -166,5 +166,5 @@ export function navSpecFromPlaces(data: PlaceData, opts: {native: Set<string>; g
   for (const s of [...extra, ...(opts.rings ?? []).flatMap(ringWalls), ...platforms.flatMap(platformEdges)]) if (inArea([[s.c[0] - s.half[0], s.c[1] - s.half[1]], [s.c[0] + s.half[0], s.c[1] + s.half[1]]])) solids.push(s);
   // one solid per id (the first wins): a provisional survey never collides with World's own ids
   const seen = new Set<string>();
-  return {version: 'nav/1', ground: opts.ground, solids: solids.filter(s => !seen.has(s.id) && !!seen.add(s.id))};
+  return {version: 'nav/1', ground: opts.ground, solids: solids.filter(s => !seen.has(s.id) && !!seen.add(s.id)),...(platforms.length?{platforms:structuredClone(platforms)}:{})};
 }

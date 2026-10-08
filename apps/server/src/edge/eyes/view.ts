@@ -5,6 +5,7 @@ import type {WorldState as NativeWorld} from '../../../../../mars/viewer/engine/
 import {EdgeError, type EdgeSoul} from '../contract.ts';
 import {stateOf, type EdgeLedger} from '../ledger/ledger.ts';
 import {centroid} from '../ledger/places.ts';
+import {visualFloorOffset} from './platforms.ts';
 import {buildOccluders, computeSight, lightOf, wrap, compassOf, doingOf, type EyePose, type Occluders, type Sight, type SightBody, type SightFixture, type V2} from './sight.ts';
 
 export type ViewMode = 'eyes' | 'map';
@@ -41,8 +42,8 @@ function enclosureAt(ledger: EdgeLedger, x: number, z: number, level = 0): strin
   const v = ledger.places.containing(x, z, level).find(p => p.enclosed)?.id ?? null; if (m.size > 20000) m.clear(); m.set(key, v); return v;
 }
 
-export function eyePose(body: {pose: {p: number[]; yaw: number}; body?:{family:string;hoverHeight?:number}; human?: {activity?: unknown; shore?: {datumY?: number}}}, state: string, yaw: number, hfovDeg: number, w: number, h: number): EyePose {
-  const [x, y, z] = body.pose.p, act = String(body.human?.activity ?? '');
+export function eyePose(body: {pose: {p: number[]; yaw: number}; body?:{family:string;hoverHeight?:number}; human?: {activity?: unknown; shore?: {datumY?: number}}}, state: string, yaw: number, hfovDeg: number, w: number, h: number,floorOffset=0): EyePose {
+  const [x, recordedY, z] = body.pose.p,y=recordedY+floorOffset, act = String(body.human?.activity ?? '');
   const datum = body.human?.shore?.datumY;
   const eyeY = body.body?.family==='floater'?y+(body.body.hoverHeight??1.45):(state === 'swimming' || act === 'swim' || act === 'tread') && Number.isFinite(datum) ? datum! + 0.25
     : state === 'seated' ? y + 1.15 : state === 'lying' || state === 'sleeping' ? y + 0.35 : y + 1.62;
@@ -61,7 +62,7 @@ export function resolveGaze(ledger: EdgeLedger, soul: EdgeSoul, me: SightBody, g
   if (!/^[A-Za-z0-9][A-Za-z0-9._:#-]{0,120}$/.test(g)) throw new EdgeError(400, 'invalid', 'gaze must be forward, left, right, behind, a Soul id or a thing id');
   const at = (p: V2, name: string, y = 0.9) => ({mode: 'target', yaw: Math.atan2(p[1] - me.p[2], p[0] - me.p[0]), target: name, aim: [p[0], y, p[1]] as [number, number, number]});
   const near = ledger.perceivedBodies(soul.soulId, 60).find(o => o.soulId === g || o.entityId === g);
-  if (near) {const b = (ledger.host.engine.world as NativeWorld).entities[near.entityId]; if (b) return at([b.pose.p[0], b.pose.p[2]], near.name, b.pose.p[1] + 1.3);}
+  if (near) {const b = (ledger.host.engine.world as NativeWorld).entities[near.entityId]; if (b) return at([b.pose.p[0], b.pose.p[2]], near.name, b.pose.p[1]+visualFloorOffset(ledger,b as never)+(b.body?.family==='floater'?(b.body.hoverHeight??1.45):1.3));}
   if (ledger.host.minds.get(g)) throw new EdgeError(404, 'gaze.not-visible', 'That Soul is not near you (or is inside somewhere else), so you cannot turn to look at it.');
   const e = (ledger.host.engine.world as NativeWorld).entities[g];
   if (e && e.kind !== 'human') {
@@ -83,21 +84,22 @@ export function planView(ledger: EdgeLedger, soul: EdgeSoul, request: ViewReques
   if (ledger.faded.has(soul.soulId)) throw new EdgeError(409, 'soul.faded', 'This Soul has faded out; act again to come back, then look.');
   const bodyOf = (soulId: string, entityId: string, name: string): SightBody | null => {
     const b = world.entities[entityId]; if (!b) return null;
-    return {soulId, entityId, name, p: [b.pose.p[0], b.pose.p[1], b.pose.p[2]], yaw: b.pose.yaw, level: Number(b.human?.level ?? 0), enclosure: ledger.enclosureOf(soulId), state: stateOf(host, entityId), activity: String(b.human?.activity ?? 'idle')};
+    return {soulId, entityId, name, p: [b.pose.p[0], b.pose.p[1]+visualFloorOffset(ledger,b as never), b.pose.p[2]], yaw: b.pose.yaw, level: Number(b.human?.level ?? 0), enclosure: ledger.enclosureOf(soulId), state: stateOf(host, entityId), activity: String(b.human?.activity ?? 'idle')};
   };
   const me = bodyOf(soul.soulId, m.entityId, m.name)!;
   const current = body.human?.gaze;
   const attention = request.gaze === undefined && current && (current.until === undefined || current.until > world.tick) ? current : null;
-  const point = attention?.target ? world.entities[attention.target]?.pose.p : null;
+  const targetBody=attention?.target?world.entities[attention.target]:undefined;
+  const point = targetBody?[targetBody.pose.p[0],targetBody.pose.p[1]+visualFloorOffset(ledger,targetBody as never),targetBody.pose.p[2]]:null;
   const at = point ? [point[0], point[2]] : attention?.at;
   const activeYaw = at ? Math.atan2(at[1] - me.p[2], at[0] - me.p[0]) : me.yaw;
   const angle = wrap(activeYaw - me.yaw);
   const direction = Math.abs(angle) > Math.PI * 3/4 ? 'behind' : Math.abs(angle) < Math.PI/4 ? 'forward' : angle < 0 ? 'left' : 'right';
   const gaze = request.mode === 'map' ? {mode:'forward',yaw:me.yaw} : attention && at
-    ? {mode:attention.target ? 'target' : direction,yaw:activeYaw, ...(attention.target ? {target:world.entities[attention.target]?.label ?? attention.target} : {}), aim:[at[0], point ? point[1] + 1.3 : me.p[1] + 1.5, at[1]] as [number,number,number]}
+    ? {mode:attention.target ? 'target' : direction,yaw:activeYaw, ...(attention.target ? {target:world.entities[attention.target]?.label ?? attention.target} : {}), aim:[at[0], point ? point[1]+(targetBody?.body?.family==='floater'?(targetBody.body.hoverHeight??1.45):1.3) : me.p[1] + 1.5, at[1]] as [number,number,number]}
     : resolveGaze(ledger, soul, me, request.gaze);
   const hfovDeg = request.mode === 'map' ? 360 : Math.max(50, Math.min(120, Number.isFinite(request.fov) ? request.fov! : 90));
-  const pose = eyePose(body as never, me.state, gaze.yaw, Math.min(hfovDeg, 179), request.w, request.h);
+  const pose = eyePose(body as never, me.state, gaze.yaw, Math.min(hfovDeg, 179), request.w, request.h,visualFloorOffset(ledger,body as never));
   if (request.mode === 'map') pose.hfov = Math.PI * 2;
   // looking at something: tilt the eyes toward it (a fire at your feet, a face across the table), within a natural range
   const aim = (gaze as {aim?: [number, number, number]}).aim;

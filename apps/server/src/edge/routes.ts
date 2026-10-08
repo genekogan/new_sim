@@ -11,6 +11,7 @@ import {registerEdgePlans} from './plans/index.ts';
 import type {Plans} from './plans/plans.ts';
 import {mountEdgeEyes} from './eyes/routes.ts';
 import {mountBodyRoutes} from './body/routes.ts';
+import {livePlatforms} from './eyes/platforms.ts';
 import type {WorldHost} from '../world.ts';
 import type {Souls} from '../souls.ts';
 
@@ -48,6 +49,7 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   app.get('/v1/edge/metrics', wrap(c => {const m = Number(c.req.query('minutes') ?? 60); return L.metrics(Number.isFinite(m) && m >= 1 && m <= 10080 ? m * 60_000 : 3600_000);}));
   // Public: map knowledge (names, kinds, enclosure, capacity, public schedule) never lists occupants (§5).
   app.get('/v1/edge/map', wrap(() => ({places: L.map()})));
+  app.get('/v1/edge/platforms',wrap(()=>({worldId:deps.host.worldId,tick:deps.host.engine.world.tick,...livePlatforms(L)})));
   // Public: rides (carrier/1) for viewers — position, phase, route, riders' public names; no owner data.
   app.get('/v1/edge/rides', wrap(() => ({tick: deps.host.engine.world.tick, rides: L.rides()})));
   // Public: small things lying in the world (together/1 items put down by Souls) for viewers to draw; no owner data.
