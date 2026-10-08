@@ -1197,8 +1197,9 @@ export class MarsEngine implements Engine {
       ground:spec.ground.map(g=>{const [x0,z0,x1,z1]=g.boundsXZ;return {id:'nav-ground:'+g.id,level:0,y:0,obb:{c:[(x0+x1)/2,(z0+z1)/2] as [number,number],half:[(x1-x0)/2,(z1-z0)/2] as [number,number],yaw:0}};}),
       solids:spec.solids.map(o=>({id:'nav-solid:'+o.id,obb:{c:[o.c[0],o.c[1]] as [number,number],half:[o.half[0],o.half[1]] as [number,number],yaw:o.yaw},y0:-.5,y1:Number.isFinite(o.height)&&o.height!>0?o.height!:4,kind:'solid' as const,...(o.label?{label:String(o.label).slice(0,100)}:{})}))};
   }
-  /** Nearest clear level-0 standing spot (0.5 m rings, up to 40 m) away from other people; read-only. */
-  /** nav/1 read: the walk planner's current raster bounds [x0,z0,x1,z1] (where ground can exist at all). */
+  /** Bootstrap nav must use immutable source bounds, not the raster widened by its own previous installation. */
+  nativeGroundBoundsV1():[number,number,number,number]{const spatial=this.rt.services.spatial as Spatial;const bounds=spatial.source?.scene.bounds;if(!bounds)throw Error('nav.source-ground-unavailable');return [...bounds] as [number,number,number,number];}
+  /** nav/1 read: current raster bounds, widened by installed navigation overlays. */
   groundBoundsV1():[number,number,number,number]{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);return [...spatial.scene.bounds] as [number,number,number,number];}
   /** nav/1 read: clearance (m) of level-0 standing ground at a point (0 off ground or inside a solid). */
   clearanceAtV1(x:number,z:number,level=0):number{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const g=spatial.level(level);return g?clearanceAt(g,[x,z]):0;}
