@@ -1,21 +1,13 @@
 import * as THREE from 'three';
 import type { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import type { WorldCameraMode } from './WorldBroadcast.ts';
-import { editableEvent } from './WorldNavigation.ts';
+import { editableEvent,manualCameraKeys,manualCameraStep,rotateWorldView } from './WorldNavigation.ts';
 import { cameraGround } from './WorldCameraGround.ts';
 
-/** VF2 (Gene): one "your camera", RTS / Google-Earth style, on top of the orbit controls.
- *
- * Mouse (OrbitControls, configured in createWorldOrbitControls): drag orbits around the pivot, right-drag or two
- * fingers pan along the ground, scroll zooms toward the point under the cursor. This module adds:
- * - keys: WASD/arrows pan the pivot across the ground (radius and angle kept), Q/E rotate around it,
- *   R/F or PageUp/PageDown raise/lower the view, Shift speeds everything up; holding the right mouse button
- *   while pressing WASD flies along the view instead (editor style);
- * - the pivot rule: after keys, zoom or a drag, the pivot is re-anchored to the drawn ground under the screen
- *   centre, so orbiting is always around what you look at;
- * - double-click flies to the Soul/object/ground under the pointer and makes it the pivot;
- * - a subtle pivot marker while you move.
- * Any key movement takes over from Broadcast or Follow (`takeOver`). Presentation only. */
+/** One manual camera: default drag orbits, RMB looks in place, WASD moves horizontally,
+ * arrows rotate the head, Q/E (or F/R) lower/raise, Shift boosts and Alt gives precision.
+ * Deliberate movement takes over from Follow/Broadcast at the same eye and gaze.
+ * Orbit gestures in Follow keep the tracked Soul centred. Presentation only. */
 export type RtsOptions = {
   controls: () => OrbitControls;
   mode: () => WorldCameraMode;
@@ -29,8 +21,6 @@ export type RtsOptions = {
   /** Subject centre and enclosing world-space radius, never a requested camera distance. */
   focusAt?:(x:number,y:number)=>{center:THREE.Vector3;radius:number}|null;
 };
-const PAN_KEYS: Record<string, [number, number]> = { KeyW: [1, 0], ArrowUp: [1, 0], KeyS: [-1, 0], ArrowDown: [-1, 0], KeyA: [0, -1], ArrowLeft: [0, -1], KeyD: [0, 1], ArrowRight: [0, 1] };
-const OTHER_KEYS = new Set(['KeyQ', 'KeyE', 'KeyR', 'KeyF', 'PageUp', 'PageDown', 'ShiftLeft', 'ShiftRight']);
 const FLY_SECONDS = .8, MARKER_SECONDS = .9, REANCHOR_IDLE = .25;
 
 /** Where the view ray from `camera` through the screen centre meets the drawn ground (or y = 0). */
@@ -55,6 +45,9 @@ export class WorldRtsCamera {
   readonly marker = new THREE.Group();
   private keys = new Set<string>();
   private rightHeld = false;
+  private rightPointer:number|null=null;
+  private lookPoint:{x:number;y:number}|null=null;
+  private manualInput=false;
   private dragging = false;
   private markerAge = Infinity;
   private idle = Infinity;
@@ -84,36 +77,48 @@ export class WorldRtsCamera {
     // VF6: also when a panel has focus (the Soul card focuses its name; Follow is a button on it), so pressing W
     // while following breaks out. Letter keys only there: arrows/PageUp/PageDown keep scrolling a focused panel.
     const panelFocus = () => { const a = doc.activeElement; return !!a && a !== canvas && a !== doc.body && !(a.tagName === 'BUTTON' && !a.closest('.human-panel,.dialogue-dock')); };
-    const ours = (e: KeyboardEvent) => !editableEvent(e) && !e.altKey && !e.ctrlKey && !e.metaKey && !doc.querySelector('[aria-modal="true"]')
+    const ours = (e: KeyboardEvent) => !editableEvent(e) && !e.ctrlKey && !e.metaKey && !doc.querySelector('[aria-modal="true"]')
       && (doc.activeElement === canvas || doc.activeElement === doc.body || doc.activeElement === null
-        || (!doc.activeElement.closest('[role=dialog],[role=radiogroup],[role=listbox],[role=menu],[role=slider]') && (!panelFocus() || /^Key[WASDQERF]$|^Shift/.test(e.code))));
+        || (!doc.activeElement.closest('[role=dialog],[role=radiogroup],[role=listbox],[role=menu],[role=slider]') && (!panelFocus() || /^Key[WASDQERF]$|^(Shift|Alt)/.test(e.code))));
     if (win) {
       listen(win, 'keydown', (e: KeyboardEvent) => {
-        if (!ours(e) || !(e.code in PAN_KEYS || OTHER_KEYS.has(e.code)) || this.enabledNow() === false) return;
-        e.preventDefault(); this.keys.add(e.code);
+        if(e.key==='Escape'&&!editableEvent(e)){this.clearInput();return;}
+        if (!ours(e) || !manualCameraKeys.has(e.code) || this.enabledNow() === false) return;
+        e.preventDefault(); this.keys.add(e.code);this.flight=null;
       });
       listen(win, 'keyup', (e: KeyboardEvent) => { this.keys.delete(e.code); });
-      listen(win, 'blur', () => { this.keys.clear(); this.rightHeld = false; });
+      listen(win, 'blur', () => this.clearInput());
     }
-    listen(canvas, 'pointerdown', (e: PointerEvent) => { if (e.button === 2) { this.rightHeld = true; this.crane = { x: e.clientX, y: e.clientY }; } this.flight = null; });
-    // VF6: in Follow, right-drag up/down cranes the camera (raises/lowers it, still looking at the Soul).
-    listen(canvas, 'pointermove', (e: PointerEvent) => {
-      if (!this.crane || !this.rightHeld || !this.following || this.enabledNow() === false) { this.crane = null; return; }
-      const dy = e.clientY - this.crane.y; this.crane = { x: e.clientX, y: e.clientY };
-      if (dy) this.craneBy(dy);
-    });
-    listen(doc, 'pointerup', (e: PointerEvent) => { if (e.button === 2) { this.crane = null; if (this.rightHeld && this.flew) { this.flew = false; this.idle = 0; this.moved = true; } this.rightHeld = false; } });
+    listen(canvas,'blur',()=>this.clearInput());
+    listen(doc,'visibilitychange',()=>{if(doc.hidden)this.clearInput();});
+    listen(canvas,'pointerdown',(e:PointerEvent)=>{
+      this.flight=null;if(e.button!==2||this.enabledNow()===false)return;
+      this.rightHeld=true;this.rightPointer=e.pointerId;this.lookPoint={x:e.clientX,y:e.clientY};
+      canvas.focus({preventScroll:true});canvas.setPointerCapture?.(e.pointerId);
+      e.preventDefault();e.stopImmediatePropagation();
+    },{capture:true});
+    listen(canvas,'pointermove',(e:PointerEvent)=>{
+      if(!this.rightHeld||!this.lookPoint||this.enabledNow()===false)return;
+      const dx=e.clientX-this.lookPoint.x,dy=e.clientY-this.lookPoint.y;this.lookPoint={x:e.clientX,y:e.clientY};
+      if(dx||dy){const c=this.startManualInput();rotateWorldView(this.camera,c.target,dx*.004,-dy*.004);this.markerAge=0;}
+      e.preventDefault();e.stopImmediatePropagation();
+    },{capture:true});
+    const endLook=(e:PointerEvent)=>{if(e.pointerId===this.rightPointer){this.releaseLook();this.manualInput=false;}};
+    listen(doc,'pointerup',endLook);listen(canvas,'pointercancel',endLook);
+    listen(canvas,'lostpointercapture',endLook);
     listen(canvas, 'contextmenu', (e: Event) => e.preventDefault());
     listen(canvas, 'wheel', () => { this.markerAge = 0; this.idle = 0; this.moved = true; }, { passive: true });
     listen(canvas, 'dblclick', (e: MouseEvent) => this.flyToPointer(e));
   }
-  private flew = false;
-  private crane: { x: number; y: number } | null = null;
-  /** Follow: raise (drag down) or lower (drag up) the camera around the Soul by `dy` pixels; keeps the distance. */
-  craneBy(dy: number) {
-    const c = this.bind(), offset = this.camera.position.clone().sub(c.target), s = new THREE.Spherical().setFromVector3(offset);
-    s.phi = Math.max(.12, Math.min(c.maxPolarAngle, s.phi - dy * .006));
-    this.camera.position.copy(c.target).add(new THREE.Vector3().setFromSpherical(s)); this.camera.lookAt(c.target);
+  private releaseLook(){
+    const id=this.rightPointer;this.rightHeld=false;this.rightPointer=null;this.lookPoint=null;
+    if(id!==null&&this.canvas.hasPointerCapture?.(id))this.canvas.releasePointerCapture(id);
+  }
+  private clearInput(){this.keys.clear();this.releaseLook();this.manualInput=false;this.flight=null;}
+  /** Discard an old orbit gesture/damping once, before direct eye-relative controls. */
+  private startManualInput(){
+    if(!this.manualInput){this.o.takeOver();this.manualInput=true;this.dragging=false;this.moved=false;this.flight=null;}
+    return this.bind();
   }
   private enabledNow() { return this.o.enabled ? this.o.enabled() : true; }
   /** Keep the controls' start/end hooks on the current controls object (it is recreated on input release). */
@@ -159,7 +164,7 @@ export class WorldRtsCamera {
   /** Per frame, before controls.update(). Returns true when it moved the camera. */
   update(seconds: number): boolean {
     const dt = Number.isFinite(seconds) ? Math.max(0, Math.min(.1, seconds)) : 0;
-    const c = this.bind(), mode = this.o.mode(), target = c.target;
+    const mode=this.o.mode();let c=this.bind(),target=c.target;
     let changed = false;
     if (this.flight) {
       const f = this.flight; f.t = Math.min(1, f.t + dt / FLY_SECONDS); const k = f.t * f.t * (3 - 2 * f.t);
@@ -167,40 +172,17 @@ export class WorldRtsCamera {
       this.markerAge = 0; changed = true;
       if (f.t >= 1) this.flight = null;
     }
-    const held = (code: string) => this.keys.has(code);
-    let fwd = 0, side = 0;
-    for (const [code, [f, s]] of Object.entries(PAN_KEYS)) if (held(code)) { fwd += f; side += s; }
-    const turn = (held('KeyE') ? 1 : 0) - (held('KeyQ') ? 1 : 0);
-    const lift = (held('KeyR') || held('PageUp') ? 1 : 0) - (held('KeyF') || held('PageDown') ? 1 : 0);
-    if ((fwd || side || turn || lift) && this.enabledNow() !== false) {
-      if (mode !== 'manual') this.o.takeOver(); // Broadcast or Follow hands over to your camera
-      this.flight = null;
-      const boost = held('ShiftLeft') || held('ShiftRight') ? 3 : 1;
-      const offset = this.camera.position.clone().sub(target), radius = Math.max(2, offset.length());
-      const speed = Math.max(6, radius * .9) * boost * dt;
-      if (fwd || side) {
-        const n = Math.hypot(fwd, side);
-        if (this.rightHeld) { // editor-style fly along the view
-          const dir = this.camera.getWorldDirection(new THREE.Vector3()), right = new THREE.Vector3().crossVectors(dir, this.camera.up).normalize();
-          const move = dir.multiplyScalar(fwd / n * speed).addScaledVector(right, side / n * speed);
-          this.camera.position.add(move); target.add(move); this.flew = true;
-        } else {
-          const forward = this.camera.getWorldDirection(new THREE.Vector3()); forward.y = 0;
-          if (forward.lengthSq() < 1e-8) forward.set(0, 0, -1); else forward.normalize();
-          const right = new THREE.Vector3().crossVectors(forward, new THREE.Vector3(0, 1, 0));
-          const move = forward.multiplyScalar(fwd / n * speed).addScaledVector(right, side / n * speed);
-          this.camera.position.add(move); target.add(move);
-        }
-      }
-      if (turn || lift) {
-        const s = new THREE.Spherical().setFromVector3(offset);
-        s.theta -= turn * 1.3 * boost * dt;
-        s.phi = Math.max(.12, Math.min(c.maxPolarAngle, s.phi - lift * .9 * boost * dt));
-        this.camera.position.copy(target).add(new THREE.Vector3().setFromSpherical(s));
-        this.camera.lookAt(target);
-      }
-      this.markerAge = 0; this.idle = 0; this.moved = !this.rightHeld || !(fwd || side); changed = true;
-    } else this.idle += dt;
+    const movement=manualCameraStep(this.keys,dt);
+    if(Object.values(movement).some(Boolean)&&this.enabledNow()!==false){
+      c=this.startManualInput();target=c.target;const pivot=target;
+      const forward=this.camera.getWorldDirection(new THREE.Vector3());forward.y=0;
+      if(forward.lengthSq()<1e-8)forward.set(0,0,-1);else forward.normalize();
+      const right=new THREE.Vector3().crossVectors(forward,new THREE.Vector3(0,1,0));
+      const delta=forward.multiplyScalar(movement.forward??0).addScaledVector(right,movement.right??0);delta.y=movement.up??0;
+      this.camera.position.add(delta);pivot.add(delta);
+      rotateWorldView(this.camera,pivot,movement.yaw??0,movement.pitch??0);
+      this.markerAge=0;this.idle=0;this.moved=false;changed=true;
+    }else{this.idle+=dt;if(!this.rightHeld)this.manualInput=false;}
     // The pivot rule: shortly after any movement, re-anchor the pivot to the ground under the screen centre.
     if (this.moved && !this.dragging && !this.flight && !this.rightHeld && this.idle >= REANCHOR_IDLE && mode === 'manual') {
       this.moved = false; this.reanchor();
@@ -223,7 +205,9 @@ export class WorldRtsCamera {
     if (!p || p.distanceTo(this.camera.position) < 1) return false;
     c.target.copy(p); return true;
   }
+  release(){this.clearInput();this.flight=null;}
   dispose() {
+    this.clearInput();
     for (const [t, name, cb, opt] of this.listeners) t.removeEventListener(name, cb, opt);
     this.listeners = [];
     this.boundControls?.removeEventListener('start', this.onStart); this.boundControls?.removeEventListener('end', this.onEnd); this.boundControls?.removeEventListener('change', this.onChange);

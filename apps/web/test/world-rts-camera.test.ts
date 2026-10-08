@@ -32,3 +32,45 @@ test('Follow orbit never paints a manual pivot at the Soul torso; manual orbit r
   assert.equal(rts.marker.visible,true,'manual camera still marks its chosen pivot');
   assert.equal(rts.marker.position.y,1.04);rts.dispose();
 });
+
+function manualRig(radius=30,mode:'follow'|'manual'='manual'){
+ const win=new EventTarget(),doc=Object.assign(new EventTarget(),{defaultView:win,activeElement:null as unknown,hidden:false,querySelector:()=>null});
+ const canvas=Object.assign(new EventTarget(),{ownerDocument:doc,focus(){doc.activeElement=canvas;},setPointerCapture(){},hasPointerCapture(){return false;}}) as unknown as HTMLCanvasElement;
+ const camera=new THREE.PerspectiveCamera(45,16/9,.1,2000);camera.position.set(0,3,0);
+ const controls=Object.assign(new THREE.EventDispatcher(),{target:new THREE.Vector3(0,3,-radius),maxPolarAngle:Math.PI}) as unknown as OrbitControls;camera.lookAt(controls.target);canvas.focus();
+ let takeovers=0;const rts=new WorldRtsCamera(canvas,camera,{controls:()=>controls,mode:()=>mode,takeOver:()=>{mode='manual';takeovers++;},scene:()=>new THREE.Scene(),pickRoots:()=>[]});
+ const fire=(type:string,fields:Record<string,unknown>={},surface:EventTarget=win)=>{const event=new Event(type,{cancelable:true});Object.assign(event,{code:'',key:'',pointerId:1,button:2,clientX:0,clientY:0,...fields});surface.dispatchEvent(event);return event;};
+ const hold=(codes:string[])=>{codes.forEach(code=>fire('keydown',{code}));for(let i=0;i<60;i++)rts.update(1/60);codes.forEach(code=>fire('keyup',{code}));};
+ return {camera,controls,rts,win,doc,canvas,fire,hold,takeovers:()=>takeovers,mode:()=>mode};
+}
+for(const radius of [30,300])for(const [keys,speed]of [[['KeyW'],3],[['KeyW','ShiftLeft'],9],[['KeyW','AltLeft'],.6],[['KeyW','KeyD','KeyE'],3]] as const){
+ test(`manual speed at ${radius}m radius is bounded ${speed}m/s for ${keys.join('+')}`,()=>{
+  const f=manualRig(radius),p=f.camera.position.clone();try{f.hold([...keys]);assert.ok(Math.abs(f.camera.position.distanceTo(p)-speed)<1e-8);assert.equal(f.takeovers(),1);}finally{f.rts.dispose();}
+ });
+}
+test('Follow keyboard handover preserves eye/gaze before horizontal translation; arrows only turn the head',()=>{
+ const f=manualRig(30,'follow'),before=f.camera.position.clone(),direction=f.camera.getWorldDirection(new THREE.Vector3());try{
+  f.fire('keydown',{code:'KeyW'});f.rts.update(.1);assert.equal(f.mode(),'manual');assert.equal(f.takeovers(),1);
+  assert.ok(f.camera.position.distanceTo(before.clone().addScaledVector(direction,.3))<1e-9);
+  assert.ok(f.camera.getWorldDirection(new THREE.Vector3()).distanceTo(direction)<1e-9);f.fire('keyup',{code:'KeyW'});
+  const p=f.camera.position.clone();f.hold(['ArrowRight','ArrowUp']);assert.ok(f.camera.position.distanceTo(p)<1e-9);assert.ok(f.camera.getWorldDirection(new THREE.Vector3()).x>.3);
+ }finally{f.rts.dispose();}
+});
+test('right mouse looks in place, mouse and keys combine, and blur clears all retained input',()=>{
+ const f=manualRig(30,'follow'),before=f.camera.position.clone();try{
+  assert.equal(f.fire('pointerdown',{},f.canvas).defaultPrevented,true);assert.equal(f.mode(),'follow','a right click alone does not change the camera');
+  assert.equal(f.fire('pointermove',{clientX:40,clientY:-20},f.canvas).defaultPrevented,true);
+  assert.equal(f.mode(),'manual');assert.ok(f.camera.position.distanceTo(before)<1e-9);assert.ok(f.camera.getWorldDirection(new THREE.Vector3()).x>.1);
+  f.fire('keydown',{code:'KeyW'});f.rts.update(.1);assert.ok(Math.abs(f.camera.position.distanceTo(before)-.3)<1e-8);
+  f.win.dispatchEvent(new Event('blur'));const p=f.camera.position.clone(),q=f.camera.quaternion.clone();f.rts.update(.1);
+  f.fire('pointermove',{clientX:100,clientY:100},f.canvas);assert.ok(f.camera.position.distanceTo(p)<1e-9);assert.ok(f.camera.quaternion.angleTo(q)<1e-7);
+ }finally{f.rts.dispose();}
+});
+
+test('Escape and explicit release stop a pending glide and held movement at the current pose',()=>{
+ const f=manualRig();try{
+  f.rts.flyTo(new THREE.Vector3(30,0,-30));f.rts.update(.1);const p=f.camera.position.clone();
+  f.fire('keydown',{key:'Escape',code:'Escape'});f.rts.update(.1);assert.ok(f.camera.position.distanceTo(p)<1e-9);
+  f.fire('keydown',{code:'KeyW'});f.rts.update(.1);const moved=f.camera.position.clone();f.rts.release();f.rts.update(.1);assert.ok(f.camera.position.distanceTo(moved)<1e-9);
+ }finally{f.rts.dispose();}
+});

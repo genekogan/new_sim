@@ -30,18 +30,19 @@ test('arrow left/right turn the view in place; right turns clockwise seen from a
   hold('ArrowLeft');hold('ArrowLeft');assert.ok(dir(camera).x<-.3);
 });
 
-test('arrow up/down change elevation only; W still moves forward horizontally', () => {
-  const {camera,hold}=rig(),d0=dir(camera);
-  hold('ArrowUp');assert.ok(camera.position.y>1.5+2,'climbs');assert.ok(Math.abs(camera.position.x)<1e-9&&Math.abs(camera.position.z)<1e-9);
-  assert.ok(dir(camera).distanceTo(d0)<1e-9,'view direction unchanged');
-  const y=camera.position.y;hold('ArrowDown');assert.ok(camera.position.y<y-2);
-  const z=camera.position.z;hold('KeyW');assert.ok(camera.position.z<z-2,'W forward');
+test('arrows pitch the head in place; horizontal W movement keeps its height',()=>{
+  const {camera,hold}=rig(),p0=camera.position.clone();
+  hold('ArrowUp');assert.ok(dir(camera).y>.3);assert.ok(camera.position.distanceTo(p0)<1e-9);
+  hold('ArrowDown');assert.ok(Math.abs(dir(camera).y)<1e-8);
+  hold('ArrowUp');const y=camera.position.y,z=camera.position.z;hold('KeyW');
+  assert.equal(camera.position.y,y);assert.ok(camera.position.z<z-1);
 });
 
-test('Q/E tilt the view down/up without moving; tilt is clamped short of vertical', () => {
-  const {camera,hold}=rig(),p0=camera.position.clone();
-  hold('KeyQ');assert.ok(dir(camera).y<-.3,'Q tilts down');assert.ok(camera.position.distanceTo(p0)<1e-9);
-  hold('KeyE',3);assert.ok(dir(camera).y>.9&&dir(camera).y<.999,'E tilts up, clamped');
+test('Q/E raise/lower without tilting; arrow pitch is clamped short of vertical',()=>{
+  const {camera,hold}=rig(),d0=dir(camera),y=camera.position.y;
+  hold('KeyQ');assert.ok(camera.position.y<y-1);assert.ok(dir(camera).distanceTo(d0)<1e-9);
+  hold('KeyE');assert.ok(Math.abs(camera.position.y-y)<1e-8);
+  hold('ArrowUp',3);assert.ok(dir(camera).y>.9&&dir(camera).y<.999);
 });
 
 test('button deltas (yaw/pitch) apply through move()', () => {

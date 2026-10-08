@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PerspectiveCamera, Vector3 } from 'three';
 import { WorldNavigation, createWorldOrbitControls, type NavigationContext } from '../src/WorldNavigation.ts';
+import { WorldRtsCamera } from '../src/WorldRtsCamera.ts';
 
 class Surface extends EventTarget {
   tagName='CANVAS'; isContentEditable=false; tabIndex=-1;
@@ -34,14 +35,14 @@ function fixture(){
 }
 const close=(a:number,b:number)=>assert.ok(Math.abs(a-b)<1e-8,`${a} != ${b}`);
 
-test('WASD and arrow-up/down move an explicitly focused scene at frame-independent speed; no keys outside scene ownership',()=>{
+test('WASD and Q/E move an explicitly focused scene at frame-independent speed; no keys outside scene ownership',()=>{
   const distance=(fps:number)=>{
     const f=fixture();try{
       const noFocus=f.event('keydown',{code:'KeyW'});assert.equal(noFocus.defaultPrevented,false);f.nav.update(1/fps);close(f.camera.position.z,10);
       f.canvas.focus();assert.equal(f.event('keydown',{code:'KeyW'}).defaultPrevented,true);
       for(let i=0;i<fps;i++)f.nav.update(1/fps);
-      close(f.camera.position.z,4);close(f.target.z,-6);
-      f.event('keyup',{code:'KeyW'});f.event('keydown',{code:'ArrowUp'});f.nav.update(.1);close(f.camera.position.y,3.6);
+      close(f.camera.position.z,7);close(f.target.z,-3);
+      f.event('keyup',{code:'KeyW'});f.event('keydown',{code:'KeyE'});f.nav.update(.1);close(f.camera.position.y,3.3);
       return f.camera.position.z;
     }finally{f.nav.dispose();}
   };
@@ -130,6 +131,25 @@ test('actual OrbitControls release discards a held drag and damping while preser
     close(f.camera.position.distanceTo(new Vector3().fromArray(position)),0);close(controls.target.distanceTo(new Vector3().fromArray(target)),0);
     f.context.mode='follow';nav.sync();assert.equal(controls.enablePan,false);assert.equal(controls.enabled,true);
     f.context.mode='manual';f.context.navigation='free';nav.sync();assert.equal(controls.enabled,false);
-    f.canvas.focus();f.event('keydown',{code:'KeyW'});nav.update(.1);assert.ok(f.camera.position.distanceTo(new Vector3().fromArray(position))>.5);
+    f.canvas.focus();f.event('keydown',{code:'KeyW'});nav.update(.1);assert.ok(f.camera.position.distanceTo(new Vector3().fromArray(position))>.2);
   }finally{disposed=true;nav.dispose();controls.dispose();}
+});
+
+
+test('actual OrbitControls accepts head tilt and a Follow handover without applying old drag/damping',()=>{
+ const f=fixture();f.nav.dispose();Object.assign(f.doc,{querySelector:()=>null});f.context.mode='follow';f.context.navigation='orbit';
+ let controls=createWorldOrbitControls(f.camera,f.canvas as never,f.target,f.context);
+ const rts=new WorldRtsCamera(f.canvas as never,f.camera,{controls:()=>controls,mode:()=>f.context.mode,
+  takeOver:()=>{const target=controls.target.clone();f.context.mode='manual';controls.dispose();controls=createWorldOrbitControls(f.camera,f.canvas as never,target,f.context);},scene:()=>null as never,pickRoots:()=>[]});
+ const key=(type:string,code:string)=>{const e=new Event(type,{cancelable:true});Object.assign(e,{code,key:code});f.window.dispatchEvent(e);};
+ try{
+  f.canvas.focus();const p=f.camera.position.clone(),direction=f.camera.getWorldDirection(new Vector3());
+  key('keydown','KeyW');rts.update(.1);controls.update();key('keyup','KeyW');
+  const horizontal=direction.clone();horizontal.y=0;horizontal.normalize();
+  assert.ok(f.camera.position.distanceTo(p.clone().addScaledVector(horizontal,.3))<1e-8);
+  assert.ok(f.camera.getWorldDirection(new Vector3()).distanceTo(direction)<1e-8);assert.equal(controls.mouseButtons.RIGHT,null);
+  const eye=f.camera.position.clone();key('keydown','ArrowUp');for(let i=0;i<20;i++){rts.update(.05);controls.update();}key('keyup','ArrowUp');
+  assert.ok(f.camera.position.distanceTo(eye)<1e-8,'head pitch stays at the eye even after actual OrbitControls update');assert.ok(f.camera.getWorldDirection(new Vector3()).y>.5);
+  key('keydown','KeyW');f.canvas.blur();rts.update(.1);assert.ok(f.camera.position.distanceTo(eye)<1e-8,'blur releases global RTS movement');
+ }finally{rts.dispose();controls.dispose();}
 });

@@ -5,8 +5,27 @@ export type ManualNavigation = 'orbit' | 'free';
 /** Metres for forward/right/up; radians for yaw (+ turns right) and pitch (+ tilts up). */
 export type CameraMove = { forward?: number; right?: number; up?: number; yaw?: number; pitch?: number };
 export type NavigationContext = { mode: WorldCameraMode; navigation: ManualNavigation; lifecycle: string };
-// Drone keys: W/S forward/back, A/D strafe, Left/Right turn, Up/Down climb/descend, Q/E tilt down/up.
-const movementKeys = new Set(['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','ShiftLeft','ShiftRight']);
+// Shared controls in either manual camera: horizontal walking, independent head rotation and elevation.
+export const manualCameraKeys = new Set(['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','KeyR','KeyF','PageUp','PageDown','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','ShiftLeft','ShiftRight','AltLeft','AltRight']);
+export function manualCameraStep(keys:ReadonlySet<string>,seconds:number):CameraMove {
+  const held=(code:string)=>Number(keys.has(code)),dt=Number.isFinite(seconds)?Math.min(.1,Math.max(0,seconds)):0;
+  const precision=held('AltLeft')||held('AltRight'),boost=held('ShiftLeft')||held('ShiftRight');
+  const speed=3*(precision?.2:boost?3:1),angular=precision?.35:1;
+  const forward=held('KeyW')-held('KeyS'),right=held('KeyD')-held('KeyA');
+  const up=Number(!!(held('KeyE')||held('KeyR')||held('PageUp')))-Number(!!(held('KeyQ')||held('KeyF')||held('PageDown')));
+  const n=Math.hypot(forward,right,up)||1;
+  return {forward:forward/n*speed*dt,right:right/n*speed*dt,up:up/n*speed*dt,
+    yaw:(held('ArrowRight')-held('ArrowLeft'))*1.2*angular*dt,pitch:(held('ArrowUp')-held('ArrowDown'))*.9*angular*dt};
+}
+/** Turn the view at its current eye position, keeping a level horizon and a finite orbit target. */
+export function rotateWorldView(camera:PerspectiveCamera,target:Vector3,yawDelta:number,pitchDelta:number){
+  if(!yawDelta&&!pitchDelta)return;
+  const distance=Math.min(320,Math.max(2,camera.position.distanceTo(target))),direction=camera.getWorldDirection(new Vector3());
+  const yaw=Math.atan2(direction.x,-direction.z)+yawDelta;
+  const pitch=Math.max(-Math.PI*.47,Math.min(Math.PI*.47,Math.asin(Math.max(-1,Math.min(1,direction.y)))+pitchDelta));
+  direction.set(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch));
+  target.copy(camera.position).addScaledVector(direction,distance);camera.up.set(0,1,0);camera.lookAt(target);
+}
 export function editableEvent(event: KeyboardEvent): boolean {
   if(event.isComposing || event.keyCode===229) return true;
   return event.composedPath().some(target => {
@@ -20,11 +39,12 @@ export function editableEvent(event: KeyboardEvent): boolean {
 export function createWorldOrbitControls(camera: PerspectiveCamera,canvas: HTMLCanvasElement,target: Vector3 | undefined,context:NavigationContext): OrbitControls {
   const position=camera.position.clone(),rotation=camera.quaternion.clone();
   const controls=new OrbitControls(camera,canvas);
-  controls.enableDamping=true;controls.maxPolarAngle=Math.PI*.48;controls.minDistance=2;controls.maxDistance=320;
+  controls.enableDamping=true;controls.maxPolarAngle=context.mode==='follow'?Math.PI*.48:Math.PI*.99;controls.minDistance=2;controls.maxDistance=320;
   controls.enabled=!(context.mode==='manual'&&context.navigation==='free');controls.enablePan=context.mode!=='follow';
   // VF2 (Gene): your camera pans along the ground and zooms toward the point under the cursor; Follow keeps its Soul centred.
+  controls.mouseButtons.RIGHT=null; // RMB is owned by look-in-place, never OrbitControls pan.
   controls.screenSpacePanning=false;controls.zoomToCursor=context.mode==='manual';
-  // VF6: in Follow, drag orbits the Soul and scroll zooms toward it between 2.4 m and 40 m (right-drag cranes; WorldRtsCamera).
+  // Follow keeps left-drag orbit and 2.4–40m zoom; RMB deliberately takes over to look in place.
   if(context.mode==='follow'){controls.minDistance=2.4;controls.maxDistance=40;}
   if(target){controls.target.copy(target);camera.position.copy(position);camera.quaternion.copy(rotation);}
   return controls;
@@ -61,7 +81,7 @@ export class WorldNavigation {
     listen(canvas,'keydown',(event:KeyboardEvent)=>{
       if(this.composing || editableEvent(event))return;
       if(event.key==='Escape'){this.release();return;}
-      if(!this.free() || event.altKey || event.ctrlKey || event.metaKey || !movementKeys.has(event.code))return;
+      if(!this.free() || event.ctrlKey || event.metaKey || !manualCameraKeys.has(event.code))return;
       event.preventDefault();this.keys.add(event.code);
     });
     listen(canvas,'keyup',(event:KeyboardEvent)=>{this.keys.delete(event.code);});
@@ -93,7 +113,7 @@ export class WorldNavigation {
   get inputOwned(){return this.owned;}
   private setOwned(value:boolean){if(this.owned===value)return;this.owned=value;this.onOwnership(value);}
   private free(){const c=this.context();return !this.disposed&&this.owned&&c.mode==='manual'&&c.navigation==='free';}
-  sync(){const c=this.context(),key=`${c.mode}:${c.navigation}:${c.lifecycle}`;if(this.previousLifecycle&&key!==this.previousLifecycle)this.release();this.previousLifecycle=key;}
+  sync(preserveFocus=false){const c=this.context(),key=`${c.mode}:${c.navigation}:${c.lifecycle}`,changed=!!this.previousLifecycle&&key!==this.previousLifecycle;if(changed)this.release(!preserveFocus);this.previousLifecycle=key;return changed;}
   release(blur=true){
     if(this.releasing)return;this.releasing=true;
     this.keys.clear();this.setOwned(false);
@@ -105,12 +125,7 @@ export class WorldNavigation {
   }
   update(seconds:number){
     this.sync();if(!this.free()||!Number.isFinite(seconds))return;
-    const dt=Math.min(.1,Math.max(0,seconds)),boost=this.keys.has('ShiftLeft')||this.keys.has('ShiftRight')?3:1;
-    const held=(code:string)=>Number(this.keys.has(code));
-    const axis={forward:held('KeyW')-held('KeyS'),right:held('KeyD')-held('KeyA'),up:held('ArrowUp')-held('ArrowDown')};
-    const n=Math.hypot(axis.forward,axis.right,axis.up)||1;
-    this.move({forward:axis.forward/n*6*boost*dt,right:axis.right/n*6*boost*dt,up:axis.up/n*6*boost*dt,
-      yaw:(held('ArrowRight')-held('ArrowLeft'))*1.4*dt,pitch:(held('KeyE')-held('KeyQ'))*1*dt});
+    this.move(manualCameraStep(this.keys,seconds));
   }
   /** Bounded metre displacement for touch buttons; never acquires keyboard focus. */
   move(delta:CameraMove):boolean {
@@ -125,15 +140,10 @@ export class WorldNavigation {
     if(turn(delta.yaw)||turn(delta.pitch))this.rotate(turn(delta.yaw),turn(delta.pitch));
     return true;
   }
-  private look(dx:number,dy:number){this.rotate(-dx*.004,-dy*.004);}
+  private look(dx:number,dy:number){this.rotate(dx*.004,-dy*.004);}
   /** Turn the view in place: yaw + turns right, pitch + tilts up. */
   private rotate(yawDelta:number,pitchDelta:number){
-    const target=this.target(),distance=Math.max(2,this.camera.position.distanceTo(target));
-    const direction=this.camera.getWorldDirection(new Vector3());
-    const yaw=Math.atan2(direction.x,-direction.z)+yawDelta;
-    const pitch=Math.max(-Math.PI*.47,Math.min(Math.PI*.47,Math.asin(Math.max(-1,Math.min(1,direction.y)))+pitchDelta));
-    direction.set(Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch));
-    target.copy(this.camera.position).addScaledVector(direction,distance);this.camera.up.set(0,1,0);this.camera.lookAt(target);
+    rotateWorldView(this.camera,this.target(),yawDelta,pitchDelta);
   }
   dispose(){if(this.disposed)return;this.release();this.disposed=true;for(const [surface,name,callback,options] of this.listeners)surface.removeEventListener(name,callback,options);this.listeners=[];}
 }

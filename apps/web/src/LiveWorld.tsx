@@ -229,7 +229,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       const target=controls.target.clone();controls.dispose();controls=newControls(target);
     },owned=>{if(latestViewerState.current)emitState({...latestViewerState.current,inputOwned:owned});});
     const orbitPivot=new WorldOrbitPivot();scene.add(orbitPivot.group);
-    const rts=new WorldRtsCamera(renderer.domElement,camera,{controls:()=>controls,mode:()=>context.current.cameraMode,takeOver:()=>{context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');},scene:()=>scene,pickRoots:()=>[floaters.root,kin.view.root,standIns,...(people?.pickingRoots()??[]),...visualObstructionRoots()],focusAt:(x,y)=>{const target=hover.pick(x,y);if(target){inspectHover(target);return {center:target.point,radius:target.radius};}return null;},enabled:()=>!(context.current.cameraMode==='manual'&&context.current.manualNavigation==='free')});scene.add(rts.marker);  // VF2: your camera (keys, pivot, double-click)
+    const rts=new WorldRtsCamera(renderer.domElement,camera,{controls:()=>controls,mode:()=>context.current.cameraMode,takeOver:()=>{context.current.manualNavigation='orbit';context.current.cameraMode='manual';context.current.follow=false;if(!navigation?.sync(true))navigation?.release(false);context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');},scene:()=>scene,pickRoots:()=>[floaters.root,kin.view.root,standIns,...(people?.pickingRoots()??[]),...visualObstructionRoots()],focusAt:(x,y)=>{const target=hover.pick(x,y);if(target){inspectHover(target);return {center:target.point,radius:target.radius};}return null;},enabled:()=>!(context.current.cameraMode==='manual'&&context.current.manualNavigation==='free')});scene.add(rts.marker);  // VF2: your camera (keys, pivot, double-click)
     const speechLayer=new SpectatorSpeechLayer();scene.add(speechLayer.group);let speeches:SpectatorSpeech[]=[];const speechHead=new THREE.Vector3();
     // W3 fading visuals: Core C9 state when it ships; meanwhile a ?fade= preview override.
     // W2/W5 preview: ?snapshots=1 exposes on-demand low-res JPEG eyes/overhead/map frames (steward queue C10 will call these).
@@ -285,7 +285,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         if(!shot)return false;groupSelection.clear();members.forEach(m=>groupSelection.add(m.id));context.current.onSelect(members[0].id);controls.target.copy(shot.target);camera.position.copy(shot.position);camera.lookAt(shot.target);controls.update();return true;
       },
       framePlace: place => {const view=worldPlaceView(place);if(!view)return false;if(!expansion||past.current||!view)return false;navigation?.release();context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');camera.position.fromArray(view.p);controls.target.fromArray(view.target);controls.update();return true;},
-      releaseInput: () => navigation?.release(),
+      releaseInput: () => {rts.release();navigation?.release();},
       move: delta => navigation?.move(delta) ?? false,
       inputOwned: () => navigation?.inputOwned ?? false,
       reset: () => {
@@ -683,9 +683,9 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       orbitPivot.update(step,camera,controls.target);
       atmosphereSeconds+=step;try{atmosphere.update({seconds:atmosphereSeconds,dt:step,daylight:light.daylight,camera,eden:!!expansion&&!past.current,reducedMotion:!!reducedMotionQuery?.matches,clock:shown.current?.datetime??null});}catch{}
       if(controls.enabled)controls.update();
-      if(following&&focus){renderer.domElement.dataset.cameraShot='follow:'+(soulId?s.conn.replica.souls.get(soulId)?.entityId??'':thingId??'');const offset=followView.resolve(controls.target,camera.position.clone().sub(controls.target),visualObstructionRoots(),step);camera.position.copy(controls.target).add(offset);camera.lookAt(controls.target);}
+      if(context.current.cameraMode==='follow'&&focus){renderer.domElement.dataset.cameraShot='follow:'+(soulId?s.conn.replica.souls.get(soulId)?.entityId??'':thingId??'');const offset=followView.resolve(controls.target,camera.position.clone().sub(controls.target),visualObstructionRoots(),step);camera.position.copy(controls.target).add(offset);camera.lookAt(controls.target);}
       const area = visibleViewport(host.clientWidth, host.clientHeight, context.current.viewportInsets);
-      if (viewing === 'broadcast') {
+      if (context.current.cameraMode === 'broadcast') {
         const shot = broadcast.sample(at.entities, records, base, at.tick, dt, area?.aspect ?? camera.aspect, now / 1000, step,visualObstructionRoots());
         if (shot?.pose) {
           camera.position.fromArray(shot.pose.position);
@@ -940,8 +940,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         <button aria-pressed={cameraMode==='manual'&&manualNavigation==='free'} onClick={()=>{controlsApi.current?.releaseInput();setManualNavigation('free');setCameraMode('manual');}}>Free camera</button>
         <button onClick={()=>controlsApi.current?.reset()}>Reset camera</button>
         <button onClick={()=>controlsApi.current?.releaseInput()}>Release camera controls</button>
+        {cameraMode==='manual'&&<span className="dim">WASD moves horizontally · arrows look left/right/up/down · Q/E down/up (F/R also) · Shift faster · Alt precision. Drag to orbit; right-drag to look in place. Free camera also supports touch look. Escape releases.</span>}
         {cameraMode==='manual'&&manualNavigation==='free' && <>
-          <span className="dim">Focus the scene: W/S forward/back, A/D sideways, ←/→ turn, ↑/↓ up/down, Q/E tilt down/up, Shift faster; drag right mouse or one finger to look. Escape releases.</span>
           {([['Forward',{forward:.5}],['Back',{forward:-.5}],['Left',{right:-.5}],['Right',{right:.5}],['Up',{up:.5}],['Down',{up:-.5}]] as [string,CameraMove][]).map(([label,delta])=><button key={label} onClick={()=>controlsApi.current?.move(delta)}>{label}</button>)}
         </>}
       </div>}
