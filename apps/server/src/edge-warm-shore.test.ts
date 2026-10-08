@@ -34,3 +34,11 @@ test('destination parsing preserves an exact Soul name containing to and explici
  assert.equal(walkWithDestinationWords('walk:harbour'),null);
  assert.deepEqual(walkWithDestinationWords('walk with Arlo to the fire',['Arlo']),{verb:'go',target:{place:'the fire'},with:['Arlo']});
 });
+
+test('absent private fire proof version retains legacy receipt behavior without changing native accepted execution',async t=>{
+ const {w,a}=await swimming(t);const old=await accept(w.f.host,w.ledger.performBodies(a,'warm-by-fire:social-eden-fire','synthetic old persisted receipt',[{verb:'mars:campfire_circle',params:{actors:[a.entityId],fire:'social-eden-fire'}},{verb:'rest',params:{seconds:1}}]));assert.ok(old.accepted);if(!old.accepted)throw Error('fixture not admitted');
+ // Simulate only an existing persisted receipt from before the private outcome policy.
+ // Accepted native input/history is untouched; the old raw aggregate behavior remains exact.
+ w.f.db.db.prepare("UPDATE edge_receipts_v1 SET detail=json_remove(detail,'$.warmTargetV1') WHERE world_id=? AND receipt_id=?").run(w.f.host.worldId,old.receipt.id);
+ await w.run([{soulId:a.soulId,id:old.receipt.id}],2000);const end=w.ledger.receipt(a.soulId,old.receipt.id)!;assert.equal(end.phase,'completed');assert.equal((end.endedAt as {posture:string}).posture,'swimming');assert.deepEqual(w.engine.runtime.violations,[]);
+});
