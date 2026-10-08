@@ -28,3 +28,4 @@ export * from './eden-lecture.ts';
 export * from "./eden-lecture-engine.ts";
 
 export * from "./eden-ground-engine.ts";
+export * from './mars-2026-map.ts';
