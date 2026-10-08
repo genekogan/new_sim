@@ -8,7 +8,7 @@ import type {Vec3} from '../core/math.ts';
 import {bodyFrame,carryHand,mouthPoint,SEAT_DROP,lerp3,smooth,type Hand} from './body.ts';
 import {followHand,heldBy,isItem} from './model.ts';
 import {slotsOf,slotById} from '../social/slots.ts';
-import {angleDelta} from '../core/math.ts';
+import {angleDelta,hypot} from '../core/math.ts';
 export const DRINK_POLICY=Object.freeze({contract:'drink/1',raiseSeconds:.8,sipSeconds:.4,lowerSeconds:.8,fractionPerSip:.125});
 type Params={actor:string;container:string;sips:number};
 type Exec={id:string;p:Params;hand:Hand;at:Vec3;level:number;base:string;phase:'raise'|'sip'|'lower';t:number;done:number;stopping:boolean;from:Vec3};
@@ -19,7 +19,7 @@ function actualSeat(rt:Runtime,actor:Entity):boolean{
     const record=rt.records.get(id);if(!record||!['sit','take_slot'].includes(record.verb)||record.phase!=='occupied')continue;
     const p=record.params as {fixture?:string;slot?:string};const slots=p.slot?[slotById(rt,p.slot)]:p.fixture?slotsOf(rt,p.fixture):[];if(!Array.isArray(slots))continue;
     if(slots.some(slot=>!('code' in slot)&&slot.kind==='seat'&&slot.claimedBy===id&&slot.level===actor.human!.level
-      &&Math.hypot(actor.pose.p[0]-slot.p[0],actor.pose.p[2]-slot.p[1])<1e-6&&Math.abs(angleDelta(actor.pose.yaw,slot.yaw))<1e-6))return true;
+      &&hypot(actor.pose.p[0]-slot.p[0],actor.pose.p[2]-slot.p[1])<1e-6&&Math.abs(angleDelta(actor.pose.yaw,slot.yaw))<1e-6))return true;
   }return false;
 }
 /** Only the registered optional invariant may recognize this overlay, and only

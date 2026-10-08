@@ -1,5 +1,6 @@
 // Static design edits are checkpoint data, never mutations of the shared campus.
 import { hashOf } from '../core/hash.ts';
+import {dcos,dsin} from '../core/math.ts';
 import type { WorldState } from '../world/types.ts';
 import type { Obstacle, SpatialScene, Surface } from './types.ts';
 
@@ -30,7 +31,7 @@ export function sceneForWorld(base: SpatialScene, world: WorldState): SpatialSce
   // Ground widens the raster; solids join the static obstacles (rasterised once per base, StaticRaster).
   let [x0, z0, x1, z1] = scene.bounds;
   for (const s of nav.ground) {
-    const hx = Math.abs(s.obb.half[0] * Math.cos(s.obb.yaw)) + Math.abs(s.obb.half[1] * Math.sin(s.obb.yaw)), hz = Math.abs(s.obb.half[0] * Math.sin(s.obb.yaw)) + Math.abs(s.obb.half[1] * Math.cos(s.obb.yaw));
+    const hx = Math.abs(s.obb.half[0] * dcos(s.obb.yaw)) + Math.abs(s.obb.half[1] * dsin(s.obb.yaw)), hz = Math.abs(s.obb.half[0] * dsin(s.obb.yaw)) + Math.abs(s.obb.half[1] * dcos(s.obb.yaw));
     x0 = Math.min(x0, s.obb.c[0] - hx); z0 = Math.min(z0, s.obb.c[1] - hz); x1 = Math.max(x1, s.obb.c[0] + hx); z1 = Math.max(z1, s.obb.c[1] + hz);
   }
   return { ...scene, bounds: [Math.floor(x0), Math.floor(z0), Math.ceil(x1), Math.ceil(z1)], surfaces: [...scene.surfaces, ...nav.ground], obstacles: [...scene.obstacles, ...nav.solids] };

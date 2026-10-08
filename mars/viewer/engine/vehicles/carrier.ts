@@ -296,7 +296,7 @@ export function stepCarriers(rt: Runtime): void {
     if (c.holding) continue;
     c.elapsed++;
     // yaw follows travel high up (World: "yaw follows travel") and turns back to the home yaw low down, so it parks as it left; ≤ 0.5 rad/s.
-    const dx = next[0] - e.pose.p[0], dz = next[2] - e.pose.p[2], want = next[1] - c.home[1] > 10 && Math.hypot(dx, dz) > 0.02 / TPS ? heading([dx, dz]) : c.yaw;
+    const dx = next[0] - e.pose.p[0], dz = next[2] - e.pose.p[2], want = next[1] - c.home[1] > 10 && hypot(dx, dz) > 0.02 / TPS ? heading([dx, dz]) : c.yaw;
     const turn = angleDelta(e.pose.yaw, want); e.pose.yaw = wrapAngle(e.pose.yaw + Math.max(-0.5 / TPS, Math.min(0.5 / TPS, turn)));
     e.pose.p = next;
     for (const a of riders) { const b = rt.world.entities[a], s = seatPose(e, carried(b)!.slot); if (b && s) { b.pose.p = s.p; b.pose.yaw = s.yaw; } }
