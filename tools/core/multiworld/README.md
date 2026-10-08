@@ -45,3 +45,9 @@ python3 tools/core/multiworld/verify-eden-data.py /absolute/activity-spots.v1.js
 ```
 
 Run final public-CLI natural-language acceptance against the composed private server after PM's browser checkpoint; this internal data qualifier does not substitute for that acceptance probe.
+
+`public-cli-acceptance.mjs` is a separate prepared acceptance fixture, not a claimed passing proof. It registers two synthetic owners through the public CLI, asks ten ordinary requests (picnic, library, computer, mailbox, unsupported fishing, campfire and consent-based hug/handshake/dance/balloon), checks actual terminal receipts, and records a three-minute limit per request honestly. Use a private server configured for scripted execution and zero model spend. Credential files remain inside its private actor/peer folders; never print or stage those folders. The summary is written incrementally and exits nonzero for any required refusal, failure or limit.
+
+```sh
+node tools/core/multiworld/public-cli-acceptance.mjs /absolute/composed-source/tools/edge-skill/eden-agent.mjs http://127.0.0.1:4956 /absolute/owned-proof-directory
+```
