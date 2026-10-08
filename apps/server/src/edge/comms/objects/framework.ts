@@ -153,7 +153,10 @@ export class Objects {
     const raw = OBJECT_ID.test(id) ? this.row(id) : undefined;
     const kind = raw && this.kinds.get(raw.kind);
     if (!raw || !kind || !this.visible(raw, soul.soulId, kind)) throw new EdgeError(404, 'not-found', 'no such object here');
-    const bodyIssue=bodyCapabilityProblem(this.core.deps.host.engine.world.entities[soul.entityId],{id:`object:${id}:${action}`,verb:'object',action,label:action,available:true});
+    const actor=this.core.deps.host.engine.world.entities?.[soul.entityId];
+    if(!actor?.human||actor.kind!=='human')return refuse({code:'body.unavailable',reason:'Your body is unavailable; this object action cannot be accepted.'});
+    if(actor.body&&!['humanoid','floater'].includes(actor.body.family))return refuse({code:'body.unsupported',reason:'This body family is unsupported; this object action cannot be accepted.'});
+    const bodyIssue=bodyCapabilityProblem(actor,{id:`object:${id}:${action}`,verb:'object',action,label:action,available:true});
     if(bodyIssue)return refuse(bodyIssue);
     const o = this.advanced(raw);
     const a = kind.actions[action];

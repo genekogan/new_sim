@@ -1,6 +1,6 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';
 import {admitBodyGLB,BODY_LIMITS} from './edge/body/admission.ts';
-import {RIGID_MANIFEST,packGLB,rigidGLB} from './edge/body/testing.ts';
+import {RIGID_MANIFEST,packGLB,rigidGLB,canonicalHumanoidGLB} from './edge/body/testing.ts';
 import {deflateSync} from 'node:zlib';
 const code=(f:()=>unknown,c:string)=>assert.throws(f,(e:any)=>e.code===c);
 function png(w:number,h:number){const chunk=(name:string,data:Buffer)=>{const b=Buffer.alloc(data.length+12);b.writeUInt32BE(data.length);b.write(name,4,4,'ascii');data.copy(b,8);let crc=0xffffffff;for(const byte of b.subarray(4,-4)){crc^=byte;for(let k=0;k<8;k++)crc=(crc>>>1)^((crc&1)?0xedb88320:0);}b.writeUInt32BE((crc^0xffffffff)>>>0,b.length-4);return b;};const head=Buffer.alloc(13);head.writeUInt32BE(w);head.writeUInt32BE(h,4);head[8]=8;head[9]=6;return Buffer.concat([Buffer.from('89504e470d0a1a0a','hex'),chunk('IHDR',head),chunk('IDAT',deflateSync(Buffer.alloc(h*(w*4+1)))),chunk('IEND',Buffer.alloc(0))]);}
@@ -33,7 +33,7 @@ test('BODY admission: content addressed rigid GLB; malformed/external/extensions
  const huge=Buffer.alloc(300003*12),j={asset:{version:'2.0'},buffers:[{byteLength:huge.length}],bufferViews:[{buffer:0,byteLength:huge.length}],accessors:[{bufferView:0,componentType:5126,count:300003,type:'VEC3'}],meshes:[{primitives:[{attributes:{POSITION:0}}]}]};code(()=>admitBodyGLB(packGLB(j,huge),RIGID_MANIFEST),'body.too-complex');
 });
 test('BODY admission: actual canonical Quaternius humanoid admits; missing bone/hierarchy/skin/clip refuse',()=>{
- const b=readFileSync(new URL('../../../mars/viewer/public/modular/environment/animated-casual.glb',import.meta.url)),m={type:'humanoid',license:'CC0',rightsConfirmed:true,rig:'quaternius/1'};
+ const b=canonicalHumanoidGLB(),m={type:'humanoid',license:'CC0',rightsConfirmed:true,rig:'quaternius/1'};
  const a=admitBodyGLB(b,m);assert.equal(a.rig,'quaternius/1');assert.ok(a.triangles>100);assert.ok(a.triangles<BODY_LIMITS.triangles);
  const n=b.readUInt32LE(12),j=JSON.parse(b.toString('utf8',20,20+n)),bin=b.subarray(28+n);const altered=(fn:(j:any)=>void)=>{const clone=structuredClone(j);fn(clone);return packGLB(clone,bin);};
  code(()=>admitBodyGLB(b,{...m,rig:'arbitrary/1'}),'body.rig');

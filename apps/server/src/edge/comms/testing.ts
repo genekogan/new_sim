@@ -5,6 +5,7 @@ import {mkdtempSync, rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {Hono} from 'hono';
+import type {Entity} from '@sim/engine-contract';
 import {Db} from '../../db.ts';
 import type {WorldHost} from '../../world.ts';
 import type {Souls} from '../../souls.ts';
@@ -61,13 +62,15 @@ export function commsFixture(names: string[], options: CommsOptions = {}, existi
   const db = existing?.db ?? new Db(join(dir, 'world.db'));
   const worldId = 'edge-comms-test';
   const clock = existing?.clock ?? {now: 1_800_000_000_000};
-  const host = {worldId, engine: {world: {tick: 100}}} as unknown as WorldHost;
+  const entities:Record<string,Entity>={};
+  const host = {worldId, engine: {world: {tick: 100,entities}}} as unknown as WorldHost;
   const ledger = new FakeLedger();
   const souls = new Map<string, EdgeSoul>();
   names.forEach((name, i) => {
     const soulId = `s_${name.toLowerCase()}`;
     if (!db.soul(soulId)) db.db.prepare('INSERT INTO souls (id, world_id, owner, entity_id, name, description, created_at) VALUES (?,?,?,?,?,?,?)').run(soulId, worldId, `dev:${name}`, `h_${soulId}`, name, '', i);
     souls.set(soulId, {soulId, entityId: `h_${soulId}`, name, owner: `dev:${name}`});
+    entities[`h_${soulId}`]={id:`h_${soulId}`,def:'human',kind:'human',label:name,pose:{p:[i*100,0,0],yaw:0},provenance:{origin:'test-fixture',confidence:'hypothetical'},human:{activity:'idle',level:0,soul:soulId}};
     ledger.bodies.set(soulId, {x: i * 100, z: 0, path: [COMMONS], enclosure: null});
   });
   const deps: EdgeDeps = {host, db, souls: {} as Souls, ledger, soul(c) {
@@ -84,7 +87,7 @@ export function commsFixture(names: string[], options: CommsOptions = {}, existi
     const res = await app.request(path, {method, headers: {authorization: `Bearer ${id(name)}`, ...(body === undefined ? {} : {'content-type': 'application/json'})}, ...(body === undefined ? {} : {body: JSON.stringify(body)})});
     return {status: res.status, body: await res.json() as any};
   };
-  const at = (name: string, x: number, z: number, path: PlaceRef[] = [COMMONS], enclosure: string | null = null, yaw = 0) => ledger.move(id(name), {x, z, path, enclosure, yaw}, (host as any).engine.world.tick);
+  const at = (name: string, x: number, z: number, path: PlaceRef[] = [COMMONS], enclosure: string | null = null, yaw = 0) => {entities[`h_${id(name)}`].pose={p:[x,0,z],yaw};ledger.move(id(name), {x, z, path, enclosure, yaw}, host.engine.world.tick);};
   const close = () => { runtime.close(); };
   const destroy = () => { runtime.close(); db.db.close(); rmSync(dir, {recursive: true, force: true}); };
   return {dir, db, host, ledger, app, runtime, clock, deps, id, req, at, close, destroy,

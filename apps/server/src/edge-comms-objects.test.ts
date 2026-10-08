@@ -184,3 +184,17 @@ test('object state and log survive a restart', async () => {
     assert.deepEqual(log.map(r => r.action), ['create', 'sit', 'sit']);
   } finally { again.destroy(); }
 });
+
+test('objects refuse unavailable or unknown actor bodies before state or log mutation',async()=>{
+ const f=chessWorld();try{
+  const entityId='h_'+f.id('Alice'),entities=f.host.engine.world.entities,original=entities[entityId];
+  const before=(await f.get('Alice','/v1/edge/objects/chess-1')).body.object,logCount=()=>f.db.db.prepare('SELECT COUNT(*) n FROM edge_comms_object_log WHERE world_id=? AND object_id=?').get(f.host.worldId,'chess-1'),beforeLog=logCount();
+  for(const invalid of [undefined,{...original,kind:'fixture',human:undefined},{...original,body:{family:'unknown'}}]){
+   if(invalid===undefined)delete entities[entityId];else entities[entityId]=invalid as typeof original;
+   const out=await f.post('Alice','/v1/edge/objects/chess-1/act',{action:'sit',params:{color:'white'}});
+   assert.equal(out.status,200);assert.equal(out.body.accepted,false);assert.match(out.body.code,/^body[.](unavailable|unsupported)$/);
+   assert.deepEqual((await f.get('Alice','/v1/edge/objects/chess-1')).body.object,before);assert.deepEqual(logCount(),beforeLog);
+  }
+  entities[entityId]=original;assert.equal((await f.post('Alice','/v1/edge/objects/chess-1/act',{action:'sit',params:{color:'white'}})).body.accepted,true);
+ }finally{f.destroy();}
+});

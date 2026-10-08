@@ -1,7 +1,7 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {mkdtempSync,rmSync,readFileSync} from 'node:fs';import {join} from 'node:path';import {tmpdir} from 'node:os';
+import {mkdtempSync,rmSync} from 'node:fs';import {join} from 'node:path';import {tmpdir} from 'node:os';
 import {fixture,invite,accept,factory} from '../test/native-owner-fixture.ts';import {EdgeLedger} from './edge/ledger/ledger.ts';import {mountEdgeRoutes,edgeSoulResolver} from './edge/routes.ts';import {Hono} from 'hono';
-import {rigidGLB,RIGID_MANIFEST} from './edge/body/testing.ts';import {WorldHost} from './world.ts';import {Db} from './db.ts';
+import {rigidGLB,RIGID_MANIFEST,canonicalHumanoidGLB} from './edge/body/testing.ts';import {WorldHost} from './world.ts';import {Db} from './db.ts';
 async function setup(t:any){const dir=mkdtempSync(join(tmpdir(),'body-api-')),path=join(dir,'sim.db'),f=fixture(path,factory,{durableClockV1:true});f.brain.quiesce();
  t.after(()=>{f.host.stop();if(f.db.db.isOpen)f.db.close();rmSync(dir,{recursive:true,force:true});});const ss:any[]=[];
  for(const owner of ['a','b']){await invite(f,owner);const row=await accept(f.host,f.souls.create('dev:'+owner,{name:'Body '+owner,description:'scripted body test'}));const p=f.souls.pairCode(row,'http://127.0.0.1:4958'),token=f.souls.pairExchange(p.code,'scripted').token;ss.push({row,token,soul:{soulId:row.id,entityId:row.entity_id,name:row.name,owner:row.owner}});}
@@ -16,7 +16,7 @@ test('BODY owner API: admission, ownership, rights and honest rigid offers/refus
  const response=await w.upload(a);assert.equal(response.status,200);const asset=(await response.json()).asset;assert.match(asset.assetId,/^body_[a-f0-9]{64}$/);
  assert.match(asset.modelUrl,/^\/w\/eden\/v1\/edge\/body\/assets\//);const publicAsset=await w.app.request(asset.modelUrl.replace(/^\/w\/eden/,''));assert.equal(publicAsset.status,200);assert.equal(publicAsset.headers.get('content-type'),'model/gltf-binary');assert.deepEqual(Buffer.from(await publicAsset.arrayBuffer()),rigidGLB());
  assert.equal((await w.req(b,'body',{assetId:asset.assetId},'PUT')).status,403);assert.equal(w.f.host.engine.world.entities[b.row.entity_id].body,undefined);
- const human=await w.upload(b,readFileSync(new URL('../../../mars/viewer/public/modular/environment/animated-casual.glb',import.meta.url)),{type:'humanoid',license:'CC0',rightsConfirmed:true,rig:'quaternius/1'});assert.equal(human.status,200,await human.clone().text());const humanAsset=(await human.json()).asset;
+ const human=await w.upload(b,canonicalHumanoidGLB(),{type:'humanoid',license:'CC0',rightsConfirmed:true,rig:'quaternius/1'});assert.equal(human.status,200,await human.clone().text());const humanAsset=(await human.json()).asset;
  const humanAssigned=await accept(w.f.host,w.req(b,'body',{assetId:humanAsset.assetId},'PUT'));assert.equal(humanAssigned.status,200,await humanAssigned.clone().text());assert.equal(w.f.host.engine.world.entities[b.row.entity_id].body?.family,'humanoid');
  const assigned=await accept(w.f.host,w.req(a,'body',{assetId:asset.assetId},'PUT'));assert.equal(assigned.status,200,await assigned.clone().text());assert.equal((await assigned.json()).body.type,'ceramic');
  const caps=w.ledger.capabilities(a.soul);assert.ok(caps.some(c=>c.verb==='hover'));assert.ok(caps.some(c=>c.verb==='settle'));assert.ok(!caps.some(c=>['sit','swim','hug','wave','pick-up','play-piano'].includes(c.verb)));
