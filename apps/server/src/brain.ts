@@ -252,7 +252,7 @@ export class Brain {
   }
 
   // ------------------------------------------------------------ tier 2: mid-brain
-  midContext(m: Mind, trigger: string): Omit<MidContext, 'options'> & { options: CardOption[]; actingPurpose?: { intentId:string; version:number } } {
+  midContext(m: Mind, trigger: string, deferUnusedOptions=false): Omit<MidContext, 'options'> & { options: CardOption[]; actingPurpose?: { intentId:string; version:number } } {
     const eng = this.host.engine, w = eng.world, ent = w.entities[m.entityId], k = this.host.kernel;
     const nameOf = (id: string) => this.host.nameOf(id);
     const s = eng.describeSurroundings(m.entityId);
@@ -299,7 +299,7 @@ export class Brain {
     const pin=acting?{intentId:acting.intentId,version:acting.version}:newest&&'source' in newest?{intentId:newest.source!.intentId,version:newest.source!.version}:undefined;
     const recall=this.host.extra.intentPurposeRecallV1?recallPurposesV1(allPurposes,pin,[nameOf(s.region),m.doing,...s.nearby.map(n=>n.who)].join(' ')):undefined;
     const retainedChoices=!acting&&recall?.recall.state==='ready'?retainedPurposeChoicesV1(this.host,m,recall.purposes):new Map();
-    const options=optionsFor(this.host,planningMind,12,new Set([...retainedChoices.values()].map(v=>v.card)));
+    const options=deferUnusedOptions?[]:optionsFor(this.host,planningMind,12,new Set([...retainedChoices.values()].map(v=>v.card)));
     if(!m.activeRule)for(const o of options)if(rules.some(r=>r.agenda.some(s=>matchesStep(this.host,s,o.card,o.cardTarget))))o.servesIntent=true;
     return {
       ...(physicalWhere===undefined?{}:{physicalWhere}),
@@ -355,8 +355,10 @@ export class Brain {
     const ent = host.engine.world.entities[m.entityId];
     this.updateEnergy(m, ent, tick);
     if(this.intentV2Choices&&(host.unfinishedHumanGoalExecutionV1(m.soulId)||host.unfinishedIntentApproachV1(m.soulId))){m.nextEvalTick=tick+TPS;m.evalTrigger='timer';m.lastFingerprint='';return;}
-    const ctx = this.midContext(m, trigger);
-    if(this.nativeProgramAllowed)ctx.options=ctx.options.filter(o=>this.nativeProgramAllowed!(m,o.steps));
+    // Safe-wake and pending-rise returns make no choice. Read private context first,
+    // then build the full option registry if neither native safety branch returns.
+    const deferOptions=this.intentV2Choices&&host.extra.intentHumanSleepTransitionV1===true;
+    let ctx = this.midContext(m, trigger,deferOptions);
     if(ctx.purposeExperiences){const captured=JSON.stringify(ctx.purposeExperiences.episodes);experienceCurrent=()=>JSON.stringify(purposeExperienceContextV1(host,m,ctx.purposes??[])?.episodes)===captured;}
     if(ctx.purposeRecall?.state==='overflow'){
       const fp='purpose-recall-overflow:'+purposeSeq;
@@ -373,6 +375,8 @@ export class Brain {
         }}
       }
     }
+    if(deferOptions)ctx=this.midContext(m,trigger);
+    if(this.nativeProgramAllowed)ctx.options=ctx.options.filter(o=>this.nativeProgramAllowed!(m,o.steps));
     const purposeFor = (option: CardOption) => {
       const ref = ctx.actingPurpose;
       const entry = ref ? host.intentHistoryOf(m.soulId).intents[ref.intentId] : undefined;
