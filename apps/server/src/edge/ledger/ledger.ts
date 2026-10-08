@@ -865,7 +865,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
       // together/1: answers first, then what to do with what I hold, then things to do with the nearest Soul
       for (const c of caps) if (c.verb === 'accept') take(c);
       if (social.holding) for (const c of caps) if (c.id === 'put-down:here' || c.id === 'eat:held' || c.id === 'drink:held' || c.verb === 'give') take(c);
-      const nearest = this.perceivedBodies(soul.soulId, 8)[0];
+      const nearby = this.perceivedBodies(soul.soulId, 8);
+      // Prefer an ongoing conversation partner when proposing consent gestures; another bystander may be nearer.
+      const partners = new Set(this.coreA.conversations().filter(c => c.members.includes(soul.soulId)).flatMap(c => c.members));
+      const nearest = nearby.find(o => partners.has(o.soulId)) ?? nearby[0];
       if (nearest) for (const v of ['hug', 'high-five', 'dance-with', 'follow']) take(caps.find(c => c.id === `${v}:${nearest.soulId}`));
       for (const id of ['sit:here', 'read:here', 'lie:here', 'nap:here', 'sit-ground:here', 'wander:here']) take(caps.find(c => c.id === id));
       for (const verb of ['warm-by-fire', 'stroll', 'play-piano', 'paint', 'play-music', 'sing', 'listen', 'use-computer', 'play-frisbee', 'play-petanque', 'play-volleyball', 'lift-weights', 'bench-press', 'pull-ups',
