@@ -1,3 +1,4 @@
+import {withStaticGridReadCache} from '../../../mars/viewer/engine/spatial/grid.ts';
 import {edenGroundTransitionV1Schema,type EdenGroundTransitionV1} from '@sim/engine-contract';
 import type {EdenGroundReaderV1} from './eden-ground.ts';
 import {readClassroom} from '../../../mars/viewer/engine/activities/classroom.ts';
@@ -603,7 +604,7 @@ export class MarsEngine implements Engine {
   }
 
   // ------------------------------------------------------------------ programs
-  withFeasibilityRead<T>(read:()=>T):T {const previous=this.feasibilityRead;this.feasibilityRead=previous??new Map();try{return read();}finally{this.feasibilityRead=previous;}}
+  withFeasibilityRead<T>(read:()=>T):T {const previous=this.feasibilityRead;this.feasibilityRead=previous??new Map();try{return withStaticGridReadCache(read);}finally{this.feasibilityRead=previous;}}
   private physicalReplacementIssue(action:string):Diag|null {
     const record=this.rt.records.get(action),key=this.feasibilityRead?hashOf({action,tick:this.rt.tick,events:this.rt.events.length,native:this.rt.stateHash(),status:record?.status,phase:record?.phase,quiet:this.quiet,cfg:this.cfg}):undefined;
     if(key&&this.feasibilityRead!.has(key))return structuredClone(this.feasibilityRead!.get(key)!);

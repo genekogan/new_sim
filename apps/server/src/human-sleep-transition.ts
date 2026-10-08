@@ -1,3 +1,4 @@
+import {withStaticGridReadCache} from '../../../mars/viewer/engine/spatial/grid.ts';
 import type {Program,Engine} from '@sim/engine-contract';
 import type {WorldHost,Mind} from './world.ts';
 import type {WorldState as NativeWorld} from '../../../mars/viewer/engine/world/types.ts';
@@ -25,7 +26,7 @@ export function withHumanSleepStopReadV1<T>(host:WorldHost,m:Mind,read:(preview:
   try{const projected=copy.stateHash(),issue=copy.canPerform(program);if(copy.stateHash()!==projected){copy=undefined;return null;}return issue?null:id;}catch{copy=undefined;return null;}
  };
  const scopes=activeReads.get(host)??new Map<Mind,SleepStopPreview>();activeReads.set(host,scopes);scopes.set(m,preview);
- try{return synchronousResult(read(preview));}
+ try{return withStaticGridReadCache(()=>synchronousResult(read(preview)));}
  finally{scopes.delete(m);if(scopes.size===0)activeReads.delete(host);open=false;copy=undefined;if(before!==undefined&&source.stateHash()!==before)throw Error('human-sleep-transition.preview-mutated-source');}
 }
 /** Detached native projection, never an admission or a change to the live body.

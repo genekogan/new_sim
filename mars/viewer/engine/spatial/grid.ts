@@ -2,6 +2,7 @@
 // Deterministic, allocation-light and pure TS so it runs in the Durable
 // Object as well as the browser. Rebuilt (or patched) when construction
 // changes the scene.
+import { hashOf } from '../core/hash.ts';
 import { obbCorners, obbOverlap, pointInObb, type OBB2, type Vec2, hypot } from '../core/math.ts';
 import type { Level, Obstacle, SpatialScene, Surface } from './types.ts';
 
@@ -43,18 +44,21 @@ export class BlockerMap extends Map<number, string> {
   private index: Map<string, number>;
   private count: number;
 
-  constructor(n: number, from?: BlockerMap) {
+  constructor(n: number, from?: BlockerMap, independent = false) {
     super();
     // copies share the id table: it only grows, and indices already written never change
     this.cells = from ? from.cells.slice() : new Int32Array(n).fill(-1);
-    this.ids = from ? from.ids : [];
-    this.index = from ? from.index : new Map();
+    this.ids = from ? independent ? from.ids.slice() : from.ids : [];
+    this.index = from ? independent ? new Map(from.index) : from.index : new Map();
     this.count = from ? from.count : 0;
   }
 
   copy(): BlockerMap {
     return new BlockerMap(this.cells.length, this);
   }
+
+  /** A derived-geometry template must not share even its append-only dictionary with a runtime. */
+  detachedCopy(): BlockerMap { return new BlockerMap(this.cells.length, this, true); }
 
   override get size(): number {
     return this.count;
@@ -177,6 +181,60 @@ export function buildGrids(scene: SpatialScene, cell = 0.1, prefix?: StaticRaste
   const pre = prefix?.fits(scene, cell) ? prefix : undefined;
   for (const lv of scene.levels) levels.set(lv.id, buildLevel(scene, lv, cell, lat, pre, keepColumns));
   return { cell, levels };
+}
+
+// Only immutable raster/EDT products are retained, never a Spatial, world, route,
+// body, reservation or permission. Every caller receives independent storage.
+const STATIC_GRID_CACHE_LIMIT = 64 * 1024 * 1024;
+const staticGridReads = new Map<string, { grids: GridSet; bytes: number }>();
+let staticGridReadDepth = 0, staticGridReadBytes = 0, staticGridReadHits = 0, staticGridReadMisses = 0;
+/** Internal numeric-only diagnostics; no world or geometry references escape. */
+export function staticGridReadCacheMetrics() { return { entries: staticGridReads.size, estimatedBytes: staticGridReadBytes, hits: staticGridReadHits, misses: staticGridReadMisses, maxBytes: STATIC_GRID_CACHE_LIMIT, maxEntries: 8 }; }
+/** Opt-in for the synchronous portion of a detached geometry read. */
+export function withStaticGridReadCache<T>(read: () => T): T {
+  staticGridReadDepth++;
+  try { return read(); } finally { staticGridReadDepth--; }
+}
+function detachedGrids(grids: GridSet): GridSet {
+  const levels = new Map<number, LevelGrid>();
+  for (const [id, g] of grids.levels) {
+    const blockers = g.blockers instanceof BlockerMap ? g.blockers.detachedCopy() : new Map(g.blockers);
+    const copy = { ...g, free: g.free.slice(), clearance: g.clearance.slice(), blockers };
+    const cols = COLUMNS.get(g); if (cols) COLUMNS.set(copy, cols.slice());
+    levels.set(id, copy);
+  }
+  return { cell: grids.cell, levels };
+}
+function gridStorageBytes(grids: GridSet): number {
+  let bytes = 0;
+  for (const g of grids.levels.values()) {
+    bytes += g.free.byteLength + g.clearance.byteLength + g.free.length * 4 + (COLUMNS.get(g)?.byteLength ?? 0);
+    const ids = new Set(g.blockers.values()); for (const id of ids) bytes += 80 + id.length * 2;
+  }
+  return bytes;
+}
+/** Spatial.sync's complete assembled static geometry only. Dynamic people/around
+ * grids are deliberately excluded; profiles and permissions are checked later.
+ * Exact ordered geometry includes nav edits, contributor output and height bands. */
+export function buildStaticGrids(scene: SpatialScene, cell = 0.1, prefix?: StaticRaster, keepColumns = false): GridSet {
+  if (!staticGridReadDepth) return buildGrids(scene, cell, prefix, keepColumns);
+  const key = hashOf({ format: 'static-grid-read/1', scene, cell, keepColumns, step: STEP, bodyHeight: BODY_HEIGHT });
+  const cached = staticGridReads.get(key);
+  if (cached) {
+    staticGridReadHits++;
+    staticGridReads.delete(key); staticGridReads.set(key, cached);
+    return detachedGrids(cached.grids);
+  }
+  staticGridReadMisses++;
+  const grids = buildGrids(scene, cell, prefix, keepColumns), bytes = gridStorageBytes(grids);
+  if (bytes <= STATIC_GRID_CACHE_LIMIT / 2) {
+    while (staticGridReads.size >= 8 || staticGridReadBytes + bytes > STATIC_GRID_CACHE_LIMIT) {
+      const oldest = staticGridReads.keys().next().value!;
+      staticGridReadBytes -= staticGridReads.get(oldest)!.bytes; staticGridReads.delete(oldest);
+    }
+    staticGridReads.set(key, { grids: detachedGrids(grids), bytes }); staticGridReadBytes += bytes;
+  }
+  return grids;
 }
 
 type Lattice = ReturnType<typeof latticeOf>;
