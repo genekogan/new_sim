@@ -735,10 +735,12 @@ export class MarsEngine implements Engine {
   cancel(id: string, reason?: Diag): ActionRecord { return this.rt.cancel(id, reason) as ActionRecord; }
 
   // ------------------------------------------------------------------ bodies
-  /** BODY-v1: rigid bodies never run limb/ride/building programs, including raw structured steps. */
+  /** BODY-v1 owner assignments never run limb/ride/building programs. Legacy native
+   * descriptors keep the original named floater policy when replaying accepted history. */
   bodyProgramProblemV1(program:Program):Diag|null {
-    if(this.ents[program.actor]?.body?.family!=='floater')return null;
-    for(const s of program.steps)if(!['walk_to','ambient_wander','face','wave','rest','gather','stand'].includes(s.verb))return {code:'body.unsupported',message:'Rigid ceramic/floater bodies cannot do that limb activity; try glide, hover, settle or turn.'};
+    const body=this.ents[program.actor]?.body;
+    if(body?.family!=='floater'||body.type===undefined&&body.modelUrl===undefined)return null;
+    for(const s of program.steps)if(!['walk_to','ambient_wander','face','wave','rest','gather','stand','converse'].includes(s.verb))return {code:'body.unsupported',message:'Rigid ceramic/floater bodies cannot do that limb activity; try glide, hover, settle or turn.'};
     return null;
   }
   /** BODY-v1: never interrupt holders, commitments or unsafe postures to swap a body. */
