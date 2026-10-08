@@ -6,10 +6,11 @@ import {renderPlatformsV1Schema} from './render-platforms-v1.ts';
 /** Current public render base, without physical controller dependencies. */
 export type RenderScene = {
   scene:unknown;
-  buildings?:{file:string;p:[number,number,number];yaw?:number}[];
+  buildings?:{file:string;p:[number,number,number];yaw?:number;scale?:number|[number,number,number]}[];
   kin?:{model:string;p:[number,number,number];yaw?:number;radius?:number;hoverHeight?:number;hover?:number}[];
   clock?:{origin:number;dayTicks:number}|null;
   ground?:'grass';
+  assetRoot?:string;
   shore?:NativeShoreSceneV1;
 };
 
@@ -23,10 +24,11 @@ export const renderSceneRefV1Schema = z.object({
 export type RenderSceneRefV1 = z.infer<typeof renderSceneRefV1Schema>;
 const bodySchema = z.object({
   scene: z.unknown(),
-  buildings: z.array(z.object({file:z.string(),p:vec3,yaw:finite.optional()}).strict()).optional(),
+  buildings: z.array(z.object({file:z.string(),p:vec3,yaw:finite.optional(),scale:z.union([finite.positive().max(100),z.tuple([finite.positive().max(100),finite.positive().max(100),finite.positive().max(100)])]).optional()}).strict()).optional(),
   kin: z.array(z.object({model:z.string(),p:vec3,yaw:finite.optional(),radius:finite.positive().optional(),hoverHeight:finite.optional(),hover:finite.optional()}).strict()).optional(),
   clock: z.object({origin:z.number().int().nonnegative(),dayTicks:z.number().int().positive()}).strict().nullable().optional(),
   ground: z.literal('grass').optional(),
+  assetRoot:z.string().regex(/^\/world-assets\/[a-z0-9][a-z0-9_-]{0,63}$/).optional(),
   shore:nativeShoreSceneV1Schema.optional(),
 }).strict();
 export type RenderSceneCaptureV1 = {
