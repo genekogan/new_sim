@@ -5,13 +5,17 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # The complete application check includes timed server journeys and the
+    # native Mars engine. Local qualification takes about 32 minutes.
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      - run: pnpm typecheck
-      - run: pnpm -r test
+      # Use the repository's release check, including the native Mars suite.
+      # Legacy Mars deployment tests require published media prepared separately
+      # by its asset/release gate; they are not the application test entry point.
+      - run: pnpm check
       - run: pnpm --filter @sim/web build
