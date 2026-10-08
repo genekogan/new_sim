@@ -10,7 +10,7 @@ import {randomUUID,randomBytes} from 'node:crypto';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
-export const SKILL_VERSION='1.8.2';
+export const SKILL_VERSION='1.8.3';
 export const CONTRACT='eden-edge/1';
 const STATE='.eden-agent.json';
 const EDGE={observe:'/v1/edge/observe',capabilities:'/v1/edge/capabilities',act:'/v1/edge/act',receipt:id=>`/v1/edge/receipts/${encodeURIComponent(id)}`,
@@ -239,15 +239,14 @@ export async function act(first,...rest){
   if(d.accepted){accepted();if(d.channel!=='attention'&&d.channel!=='none')save({lastReceipt:d.receipt?.id,lastActAt:now()});return {accepted:true,receipt:d.receipt,chosen:d.chosen,channel:d.channel,...(d.resolved?{resolved:d.resolved}:{}),next:d.channel==='attention'?'carry on (your body act is untouched)':'wait'};}
   return hinted({accepted:false,code:d.code,reason:d.reason,...(d.did_you_mean?{did_you_mean:d.did_you_mean}:{}),next:'here, then choose something else'});
  }
- let capability=first,params={},rewritten=null;
- if(rest.length===1&&rest[0].trim().startsWith('{'))params=JSON.parse(rest[0]);
- else if(rest.length||!/^[a-z-]+:/.test(first)){ // words → capability by label
-  const words=[first,...rest].join(' ').toLowerCase().replace(/^(?:please\s+)?(?:go|walk|head)\s+to\s+(?:the\s+)?/,'');
-  const all=(await capabilities()).canDo.available;const hit=all.find(c=>c.label?.toLowerCase()===words); // exact label only; anything else is resolved by the world (it knows the nearest seat, the park, etc.)
-  if(m==='legacy'&&!hit){const text=[first,...rest].join(' ');return legacyAct(soul,text);}
-  // 1.5.0: no label match → send the words as they are; the world resolves plain language (sit down, read a book,
-  // take a walk through the park…) and answers with `resolved` or `did_you_mean`.
-  capability=hit?hit.id:[first,...rest].join(' ');
+ let capability=first,params={},rewritten=null,wordsRest=[...rest];
+ // A trailing params object does not bypass the same word/label normalization as a plain act.
+ if(wordsRest.length&&wordsRest.at(-1).trim().startsWith('{')){params=JSON.parse(wordsRest.pop());if(!params||typeof params!=='object'||Array.isArray(params))throw new Error('act params must be a JSON object');}
+ if(wordsRest.length||!/^[a-z-]+:/.test(first)){
+  const asked=[first,...wordsRest].join(' '),words=asked.toLowerCase().replace(/^(?:please\s+)?(?:go|walk|head)\s+to\s+(?:the\s+)?/,'');
+  const all=(await capabilities()).canDo.available,hit=all.find(c=>c.label?.toLowerCase()===words);
+  if(m==='legacy'&&!hit)return legacyAct(soul,asked);
+  capability=hit?hit.id:asked;
   if(!hit&&m==='edge'){const w=rewrite(capability);if(w){capability=w.words;params={...(w.params??{}),...params};rewritten=w;}}
  }
  if(m==='legacy'){const label=(await capabilities()).canDo.available.find(c=>c.id===capability)?.label;const verb=capability.split(':')[0];
@@ -282,6 +281,7 @@ export function rewrite(text){
   return {from:text,words:rewrite(parts[0])?.words??parts[0],then:parts.slice(1).join(', then ')};
  }
  if((m=ITEM.exec(t)))return {from:text,words:`pick up ${m[1]==='the'?'a':m[1]} ${m[2]}`};
+ if(/^(?:give|do|make)\s+(?:a\s+)?(?:little\s+)?bow$/.test(t))return {from:text,words:'bow'};
  if((m=EXERCISE.exec(t)))return {from:text,words:`do jumping jacks${m[1]??''}`};
  return null;
 }
