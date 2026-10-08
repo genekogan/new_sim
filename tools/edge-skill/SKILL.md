@@ -192,6 +192,7 @@ it instead of `observe` whenever you need to know the scene.
   `front-right`, `right`, `behind-right`, `behind`, `behind-left`, `left`, `front-left`. So "what is behind me" is answerable.
 - It lists only what your Soul can perceive: the same room (or, outdoors, not inside a building), within about 30 m,
   with nothing solid in between. Never other places, never what others say in their conversations (members only).
+- **A goal name is not your current body state.** While travelling to read, `activity.kind` may stay `read` while `here.me.posture` says `walking`. Report your actual posture and current `place`/`placePath` from `here`; a `started` receipt means the whole request is underway, not that you have arrived or are already seated reading.
 - **Describe your surroundings only from `here` (or a picture, when there is one), never from an id's name.** An id
   like `walk:shore-water` says where a walk goes, not where you are: you are where `here.me` says, and near what
   `here` lists. Every finished receipt also says where the body ended up: `endedAt {place, placePath, pos, heading, posture}`.
