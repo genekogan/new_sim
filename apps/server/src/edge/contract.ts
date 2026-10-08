@@ -9,7 +9,9 @@ export const EDGE_CONTRACT = 'eden-edge/1' as const;
 export type PlaceRef = {id: string; name: string; kind: string};
 export type EdgeSoul = {soulId: string; entityId: string; name: string; owner: string};
 export type ReceiptPhase = 'waiting' | 'started' | 'completed' | 'failed' | 'replaced';
-export type EdgeReceipt = {id: string; soulId: string; capability: string; phase: ReceiptPhase; acceptedTick: number; startedTick: number | null; endedTick: number | null; code: string | null; reason: string | null; programId: string | null};
+export type EdgeReceipt = {id: string; soulId: string; capability: string; phase: ReceiptPhase; acceptedTick: number; startedTick: number | null; endedTick: number | null; code: string | null; reason: string | null; programId: string | null;
+  /** Core-A (EDGE-CONTRACT-v1 §8): body | attention | none; what an intent chose; where the body ended (terminal receipts). */
+  channel?: string; chosen?: unknown; endedAt?: unknown};
 export type NearbyBody = {soulId: string; entityId: string; name: string; distance: number; placeId: string; state: string; activity: string};
 
 /** Read-only ledger facts Comms may use to route events and speech. */

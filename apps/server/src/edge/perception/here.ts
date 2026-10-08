@@ -1,0 +1,222 @@
+// perception/1 — `GET /v1/edge/here` (EDGE-CONTRACT-v1 §8.1): a compact first-person frame of what one Soul can
+// perceive from where it stands. Strictly local: Souls and things in the same enclosed place (or, outdoors, not
+// inside one) within sight radius and with a clear sightline (nav/1 solids); never other places, never conversation
+// content, never owner data. Read-only; deterministic for a given world state. No model calls.
+import {clockAt} from '@sim/brain';
+import type {WorldState as NativeWorld} from '../../../../../mars/viewer/engine/world/types.ts';
+import type {EdgeLedger} from '../ledger/ledger.ts';
+import {stateOf} from '../ledger/ledger.ts';
+import type {EdgeSoul, PlaceRef} from '../contract.ts';
+import {centroid} from '../ledger/places.ts';
+import {EARSHOT_RADIUS} from '../comms/speech.ts';
+import {CATALOG} from '../../../../../mars/viewer/engine/world/catalog.ts';
+import {bearingOf, clearSight, compassOf, compassPoint, dist2, durationWord, facingPoint, headingOfYaw, round1, walkSeconds, type Solid} from './geometry.ts';
+
+type V2 = [number, number];
+/** Sight radius (m): beyond this nothing is listed, indoors or out. */
+export const SIGHT_RADIUS = 30;
+/** Things (seats, spots, fires, items) are listed within this many metres. */
+export const OBJECT_RADIUS = 15;
+const LIMITS = {near: 6, objects: 6, seats: 3, exits: 5, conversations: 3};
+
+export type Located = {kind: 'soul' | 'seat' | 'fire' | 'spot' | 'object' | 'item' | 'fixture' | 'place'; id: string; name: string; at: V2; entityId?: string; free?: boolean; capability?: string; distance: number};
+
+/** One read of the world for one Soul (built per request). */
+export class Perception {
+  readonly L: EdgeLedger; readonly soul: EdgeSoul; readonly w: NativeWorld; readonly tick: number;
+  readonly pos: V2 | null; readonly heading: number; readonly enclosure: string | null; private solidsCache?: readonly Solid[];
+  constructor(ledger: EdgeLedger, soul: EdgeSoul) {
+    this.L = ledger; this.soul = soul; this.w = ledger.host.engine.world as NativeWorld; this.tick = ledger.host.engine.world.tick;
+    const b = this.w.entities[soul.entityId];
+    this.pos = b ? [b.pose.p[0], b.pose.p[2]] : null; this.heading = b ? headingOfYaw(b.pose.yaw) : 0;
+    this.enclosure = ledger.enclosureOf(soul.soulId);
+  }
+  /** nav/1 solids as installed in the world ({id, obb:{c, half, yaw}, y0, y1}); height = top above the ground. */
+  solids(): readonly Solid[] {
+    return this.solidsCache ??= (((this.w as {navV1?: {solids?: unknown[]}}).navV1?.solids ?? []) as {id: string; label?: string; obb?: {c: V2; half: V2; yaw: number}; c?: V2; half?: V2; yaw?: number; y1?: number; height?: number}[])
+      .flatMap(x => {const o = x.obb ?? (x.c && x.half ? {c: x.c, half: x.half, yaw: x.yaw ?? 0} : null); return o ? [{id: x.id, ...(x.label ? {label: x.label} : {}), c: o.c, half: o.half, yaw: o.yaw, height: x.y1 ?? x.height}] : [];});
+  }
+  /** Sightline from me to a point (enclosure is checked by the caller). */
+  sees(at: V2): boolean {return !!this.pos && clearSight(this.pos, at, this.solids()).clear;}
+  /** Is a point in my enclosure (or, when I am outdoors, not inside any enclosed place)? */
+  sameEnclosure(at: V2, level = 0): boolean {
+    const enc = this.L.places.containing(at[0], at[1], level).find(p => p.enclosed)?.id ?? null;
+    return enc === this.enclosure;
+  }
+  bearing(at: V2) {return this.pos ? bearingOf(this.heading, this.pos, at) : 'ahead';}
+  dist(at: V2) {return this.pos ? round1(dist2(this.pos, at)) : Infinity;}
+
+  /** Other Souls I can perceive: enclosure rule + sight radius + sightline. */
+  souls(radius = SIGHT_RADIUS) {
+    return this.L.perceivedBodies(this.soul.soulId, radius).flatMap(o => {
+      const b = this.w.entities[o.entityId]; if (!b) return [];
+      const at: V2 = [b.pose.p[0], b.pose.p[2]];
+      return this.sees(at) ? [{...o, at, body: b}] : [];
+    });
+  }
+  /** Seats (native sit capabilities) with position and whether they are free. */
+  /** How many places of each seat fixture are held by someone else's live sit action or claimed by another Soul's open
+   *  act (walking there); a seat is free while that is below its seat slots (a 6 ft bench has 3). */
+  private takenSeats(): Map<string, number> {
+    const out = new Map<string, number>(), rt = this.L.host.engine.runtime, live = new Set(rt.liveIds()), add = (id: string) => out.set(id, (out.get(id) ?? 0) + 1);
+    for (const r of rt.records.values()) {const p = r.params as {actor?: string; fixture?: unknown; on?: unknown}; if (live.has(r.id) && r.verb === 'sit' && p.actor !== this.soul.entityId) {const v = typeof p.fixture === 'string' ? p.fixture : typeof p.on === 'string' ? p.on : null; if (v) add(v);}}
+    for (const m of this.L.host.minds.values()) if (m.soulId !== this.soul.soulId) for (const r of this.L.openReceipts(m.soulId)) if (r.capability.startsWith('sit:')) add(r.capability.slice(4));
+    return out;
+  }
+  private seatSlots(entity: string): number {const def = this.w.entities[entity]?.def; return Math.max(1, (CATALOG[def as string]?.slots ?? []).filter(x => x.kind === 'seat').length);}
+  seats(radius = OBJECT_RADIUS): Located[] {
+    const out: Located[] = [], {caps} = this.L.coreA.binds(this.soul), taken = this.takenSeats();
+    for (const c of caps) {
+      if (c.verb !== 'sit' || !c.target || c.id === 'sit:here') continue;
+      const ent = (this.L.host.kernel.things[c.target.id]?.traits.entity as string | undefined) ?? c.target.id, e = this.w.entities[ent]; if (!e) continue;
+      const at: V2 = [e.pose.p[0], e.pose.p[2]], d = this.dist(at); if (d > radius) continue;
+      out.push({kind: 'seat', id: c.target.id, name: c.label, at, entityId: ent, free: c.available && (taken.get(c.target.id) ?? taken.get(ent) ?? 0) < this.seatSlots(ent), capability: c.id, distance: d});
+    }
+    return out.sort((a, b) => a.distance - b.distance || a.id.localeCompare(b.id));
+  }
+  /** Everything nearby with a position: seats, fires, activity spots, lasting objects, items lying around. */
+  things(radius = OBJECT_RADIUS): Located[] {
+    const out: Located[] = [...this.seats(radius)];
+    for (const e of Object.values(this.w.entities)) {
+      if (e.def !== 'campfire') continue; const at: V2 = [e.pose.p[0], e.pose.p[2]], d = this.dist(at);
+      if (d <= Math.max(radius, SIGHT_RADIUS)) out.push({kind: 'fire', id: e.id, name: e.label ?? 'campfire', at, entityId: e.id, distance: d});
+    }
+    for (const s of this.L.spots.spots) {
+      const d = this.dist(s.at); if (d > radius) continue;
+      out.push({kind: 'spot', id: s.id, name: s.label ?? s.activity, at: s.at, distance: d, capability: `${s.activity}:${s.id}`});
+    }
+    for (const o of this.L.comms?.objects.all() ?? []) {
+      const st = o.state as {at?: V2; removed?: boolean}; if (st?.removed) continue;
+      const at = Array.isArray(st?.at) ? st.at : this.w.entities[o.id] ? [this.w.entities[o.id].pose.p[0], this.w.entities[o.id].pose.p[2]] as V2 : null;
+      const place = this.L.places.byId.get(o.placeId), here = new Set(this.L.placePathOf(this.soul.soulId).map(p => p.id));
+      const point = at ?? (place && here.has(o.placeId) ? centroid(place.polygon) : null); if (!point) continue;
+      const d = this.dist(point); if (d > radius && !(here.has(o.placeId) && !at)) continue;
+      out.push({kind: 'object', id: o.id, name: (o as {name?: string}).name ?? o.kind, at: point, distance: d});
+    }
+    for (const i of this.L.together.publicItems()) {
+      if (i.state !== 'placed' || !Array.isArray(i.at)) continue; const at = i.at as V2, d = this.dist(at);
+      if (d <= radius) out.push({kind: 'item', id: i.id, name: i.name, at, distance: d});
+    }
+    return out.filter(t => this.sameEnclosure(t.at) && this.sees(t.at)).sort((a, b) => a.distance - b.distance || a.id.localeCompare(b.id));
+  }
+  /** A thing, Soul or place named by id or plain words, as this Soul can perceive it (places: anywhere). */
+  locate(ref: string, opts: {places?: boolean; souls?: boolean; things?: boolean} = {}): Located | null {
+    const q = ref.trim(), lq = q.toLowerCase(); if (!q) return null;
+    const words = lq.split(/[^a-z0-9]+/).filter(w => w && !['the', 'a', 'an', 'at', 'to', 'by', 'on', 'my'].includes(w));
+    const named = (name: string) => {const n = name.toLowerCase(); return n === lq || (words.length > 0 && words.every(w => n.split(/[^a-z0-9]+/).includes(w)));};
+    if (opts.souls !== false) {
+      const seen = this.souls(60);
+      const s = seen.find(o => o.soulId === q) ?? seen.find(o => named(o.name));
+      if (s) return {kind: 'soul', id: s.soulId, name: s.name, at: s.at, entityId: s.entityId, distance: s.distance};
+    }
+    if (opts.things !== false) {
+      const all = this.things(60), ALIAS: Record<string, string[]> = {fire: ['fire', 'campfire', 'bonfire', 'firepit'], seat: ['seat', 'chair', 'bench'], item: ['item']};
+      const def = (x: Located) => x.entityId ? String(this.w.entities[x.entityId]?.def ?? '') : '';
+      const kindWords = (x: Located) => [...(ALIAS[x.kind] ?? [x.kind]), ...def(x).split('-'), ...(x.capability?.split(':')[0].split('-') ?? [])];
+      // the id, then the exact name, then what kind of thing it is ("the fire", "a bench"), then words of its name
+      const t = all.find(x => x.id === q) ?? all.find(x => x.name.toLowerCase() === lq) ?? all.find(x => words.length > 0 && words.every(w => kindWords(x).includes(w))) ?? all.find(x => named(x.name));
+      if (t) return t;
+      const e = this.w.entities[q];
+      if (e && e.kind !== 'human') {const at: V2 = [e.pose.p[0], e.pose.p[2]]; if (this.dist(at) <= 60 && this.sameEnclosure(at) && this.sees(at)) return {kind: 'fixture', id: e.id, name: e.label ?? e.def ?? e.id, at, entityId: e.id, distance: this.dist(at)};}
+    }
+    if (opts.places !== false) {
+      const p = this.L.places.byId.get(q) ?? [...this.L.places.byId.values()].find(x => x.parent !== null && named(x.name));
+      if (p) {const at = p.carrier ? (() => {const e = this.w.entities[p.carrier!.entity]; return e ? [e.pose.p[0], e.pose.p[2]] as V2 : centroid(p.polygon);})() : centroid(p.polygon); return {kind: 'place', id: p.id, name: p.name, at, distance: this.dist(at)};}
+    }
+    return null;
+  }
+  /** The seat (fixture id, as in sit:<id>) this body holds, from the engine's live sit action. */
+  seat(): string | null {
+    const rt = this.L.host.engine.runtime, live = new Set(rt.liveIds());
+    for (const r of rt.records.values()) {const p = r.params as {actor?: string; fixture?: unknown; slot?: unknown; on?: unknown}; if (live.has(r.id) && r.verb === 'sit' && p.actor === this.soul.entityId) return typeof p.fixture === 'string' ? p.fixture : typeof p.on === 'string' ? p.on : typeof p.slot === 'string' ? p.slot : null;}
+    return null;
+  }
+  /** Where the Soul is and how it is (also used for receipts' endedAt). */
+  me() {
+    const m = this.L.host.minds.get(this.soul.soulId), b = this.w.entities[this.soul.entityId];
+    const path: PlaceRef[] = this.L.placePathOf(this.soul.soulId), seat = path[0]?.kind === 'occupier' ? path[0].id : this.seat(), places = path.filter(p => p.kind !== 'occupier');
+    const posture = this.L.faded.has(this.soul.soulId) ? 'faded' : m ? stateOf(this.L.host, m.entityId) : 'absent';
+    return {place: places[0]?.id ?? null, placePath: places.map(p => p.name), pos: this.pos ? [round1(this.pos[0]), round1(this.pos[1])] as V2 : null, heading: this.heading, posture, ...(seat ? {seat} : {}), body: b};
+  }
+}
+
+/** endedAt for a terminal receipt: where the body is and how (EDGE-CONTRACT-v1 §8.4). */
+export function bodyEnd(ledger: EdgeLedger, soulId: string): {place: string | null; placePath: string[]; pos: V2 | null; heading: number | null; posture: string; seat?: string} | null {
+  const m = ledger.host.minds.get(soulId); if (!m) return null;
+  try {
+    const me = new Perception(ledger, {soulId, entityId: m.entityId, name: m.name, owner: m.owner}).me();
+    const {body, ...rest} = me; return {...rest, heading: body ? rest.heading : null};
+  } catch {return null;}
+}
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+function lightOf(hour: number, minute: number) {const t = hour * 60 + minute; return t < 330 ? 'night' : t < 420 ? 'dawn' : t < 1110 ? 'day' : t < 1200 ? 'dusk' : 'night';}
+function skyOf(w: {clouds?: number; rain?: number; wind?: number} | undefined) {
+  if (!w) return null;
+  const sky = (w.rain ?? 0) > 0.3 ? 'rain' : (w.clouds ?? 0) > 0.6 ? 'overcast' : (w.clouds ?? 0) > 0.25 ? 'some cloud' : 'clear';
+  const wind = (w.wind ?? 0) > 0.6 ? 'windy' : (w.wind ?? 0) > 0.3 ? 'breezy' : (w.wind ?? 0) > 0.1 ? 'light' : 'calm';
+  return {sky, wind};
+}
+const POSE_WORDS: Record<string, string> = {walk: 'walking', wait: 'waiting', sit: 'seated', idle: 'standing', swim: 'swimming', tread: 'swimming', wade: 'wading', lie: 'lying down', nap: 'napping', read: 'reading', browse: 'at a shelf', write: 'writing', dance: 'dancing',
+  'play-piano': 'playing the piano', 'play-music': 'playing music', paint: 'painting', cook: 'cooking', eat: 'eating', drink: 'drinking', 'sit-ground': 'sitting on the ground', wave: 'waving', hug: 'hugging', yoga: 'doing yoga', stretch: 'stretching',
+  'jumping-jacks': 'doing jumping jacks', pushups: 'doing push-ups', situps: 'doing sit-ups', jump: 'jumping', ride: 'riding', board: 'boarding', alight: 'stepping out'};
+const doingWord = (state: string, activity: string) => POSE_WORDS[activity] ?? (state === 'busy' ? activity.replace(/[-_]/g, ' ') : state);
+
+/** The `here` frame (EDGE-CONTRACT-v1 §8.1). Target ≤ ~600 tokens. */
+export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul) {
+  const P = new Perception(ledger, soul), tick = P.tick, me = P.me(), b = me.body, host = ledger.host;
+  const day = host.living, c = day ? clockAt(tick, day.origin, day.dayTicks) : null;
+  const weather = skyOf((P.w as {env?: {weather?: {clouds: number; rain: number; wind: number}}}).env?.weather);
+  // my current body act and how long its timed step has left
+  const open = ledger.openReceipts(soul.soulId).filter(r => (r as {channel?: string}).channel !== 'attention');
+  const program = host.engine.programOf(soul.entityId), action = program ? host.engine.programAction?.(program) : null;
+  let endsIn: string | undefined;
+  if (action) {
+    const rec = host.engine.runtime.records.get(action.action.id) as {params?: {seconds?: unknown}; history?: {tick: number; status: string}[]; requestedTick?: number} | undefined;
+    const secs = typeof rec?.params?.seconds === 'number' ? rec.params.seconds : null, started = rec?.history?.find(h => h.status === 'running')?.tick ?? rec?.requestedTick;
+    if (secs !== null && started !== undefined) endsIn = durationWord(Math.max(0, secs - (tick - started) / 20));
+  }
+  const activityKind = open[0]?.capability.split(':')[0] ?? String(b?.human?.activity ?? 'idle');
+  const fade = ledger.comms?.fading.status(soul.soulId) as {colour?: string} | null | undefined;
+  const gaze = b?.human?.gaze as {kind: string; target?: string; at?: V2} | undefined;
+  const nameOfEntity = (id: string) => host.mindByEntity?.get(id)?.name ?? (P.w.entities[id]?.label as string | undefined) ?? id;
+  const holding = (() => {try {return ledger.together.observe(soul).holding as {name?: string} | null;} catch {return null;}})();
+  // conversations: who is talking with whom (members only; never what is said)
+  const talks = ledger.coreA.conversations();
+  const seen = P.souls(SIGHT_RADIUS), seenIds = new Set(seen.map(s => s.soulId));
+  const earshot = (d: number) => P.enclosure !== null || d <= EARSHOT_RADIUS;
+  const near = seen.slice(0, LIMITS.near).map(o => {
+    const ob = o.body, facing = ob.human?.attention ? compassOf(ob.human.attention[0] - o.at[0], ob.human.attention[1] - o.at[1]) : headingOfYaw(ob.pose.yaw);
+    const with_ = talks.filter(t => t.members.includes(o.soulId)).flatMap(t => t.members).filter(id => id !== o.soulId);
+    const partners = [...new Set(with_)].map(id => id === soul.soulId ? 'you' : seenIds.has(id) ? host.minds.get(id)?.name ?? 'someone' : 'someone');
+    return {id: o.soulId, name: o.name, dist: o.distance, bearing: P.bearing(o.at), doing: doingWord(o.state, o.activity) + (partners.length ? ` · talking with ${partners.slice(0, 3).join(', ')}` : ''),
+      earshot: earshot(o.distance), facingMe: !!P.pos && facingPoint(o.at, facing, P.pos)};
+  });
+  // things: a few of each kind, nearest first (≤ 3 seats, ≤ 2 of any other kind); the rest are counted in `more`
+  const all = P.things(), kindOf = (t: Located) => t.kind === 'spot' ? (t.capability?.split(':')[0] ?? 'spot') : t.kind === 'object' ? (ledger.comms?.objects.all().find(o => o.id === t.id)?.kind ?? 'object') : t.kind;
+  const taken = new Map<string, number>(), picked: Located[] = [], more: Record<string, number> = {};
+  for (const t of all) {const k = kindOf(t), n = taken.get(k) ?? 0; if (n < (k === 'seat' ? LIMITS.seats : 2) && picked.length < LIMITS.objects) {picked.push(t); taken.set(k, n + 1);} else more[k] = (more[k] ?? 0) + 1;}
+  const objects = picked.map(t => ({
+    id: t.id, kind: kindOf(t),
+    ...(t.kind === 'seat' || t.kind === 'object' || t.kind === 'spot' || t.kind === 'item' ? {name: t.name} : {}),
+    ...(t.kind === 'seat' ? {free: !!t.free} : {}), ...(t.kind === 'object' ? {readable: true} : {}),
+    dist: t.distance, bearing: P.bearing(t.at)}));
+  const conversations = talks.filter(t => t.members.some(id => id === soul.soulId || (seenIds.has(id) && earshot(seen.find(s => s.soulId === id)!.distance))))
+    .slice(0, LIMITS.conversations).map(t => {const mine = t.members.includes(soul.soulId), heard = t.members.filter(id => id === soul.soulId || seenIds.has(id));
+      return {...(mine ? {id: t.id} : {}), members: heard.map(id => id === soul.soulId ? 'you' : host.minds.get(id)?.name ?? 'someone'), ...(t.members.length > heard.length ? {others: t.members.length - heard.length} : {}), public: false};});
+  // exits: walks to nearby places (not the ones I am in), nearest first
+  const inside = new Set(ledger.placePathOf(soul.soulId).map(p => p.id));
+  const exits = P.pos ? ledger.capabilities(soul).filter(c => c.verb === 'walk' && c.available && c.target?.kind === 'place' && !inside.has(c.target.id) && !/(^|-)mat-\d+$/.test(c.target.id))
+    .map(c => {const p = ledger.places.byId.get(c.target!.id), at = p ? centroid(p.polygon) : null; return at ? {c, p: p!, at, d: dist2(P.pos!, at)} : null;})
+    .filter((x): x is NonNullable<typeof x> => !!x && x.d <= 150).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id)).slice(0, LIMITS.exits)
+    .map(x => ({to: x.p.id, name: x.p.name, dir: compassPoint(compassOf(x.at[0] - P.pos![0], x.at[1] - P.pos![1])), walk: x.c.id, eta: '~' + durationWord(walkSeconds(x.d * 1.25))})) : [];
+  return {
+    tick, ...(c ? {clock: `${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')}`, day: WEEKDAYS[new Date(c.datetime).getUTCDay()], light: lightOf(c.hour, c.minute)} : {}),
+    ...(weather ? {weather} : {}),
+    me: {place: me.place, placePath: me.placePath, pos: me.pos, heading: me.heading, facing: compassPoint(me.heading), posture: me.posture, ...(me.seat ? {seat: me.seat} : {}),
+      activity: {kind: activityKind, ...(endsIn ? {endsIn} : {})},
+      ...(gaze ? {gaze: {kind: gaze.kind, ...(gaze.target ? {at: nameOfEntity(gaze.target)} : gaze.at && P.pos ? {bearing: P.bearing(gaze.at)} : {})}} : {}),
+      ...(holding?.name ? {holding: holding.name} : {}), ...(fade?.colour ? {fade: fade.colour} : {})},
+    near, objects, ...(Object.keys(more).length ? {more} : {}), conversations_in_earshot: conversations, exits, untrusted: true,
+  };
+}

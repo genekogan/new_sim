@@ -15,13 +15,16 @@ const area = (p: [number, number][]) => Math.abs(p.reduce((s, [x, z], i) => {con
 import {resolveCapability, tokens, placeMatch, type VocabContext} from './vocabulary.ts';
 import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, type SpotsData} from './activities.ts';
 import {Together, PAIRED, type TogetherPlan} from './together.ts';
+import {Intents, attentionWords, type IntentInput} from '../intents/intents.ts';
+import {strictCheck} from '../intents/strict.ts';
+import {bodyEnd} from '../perception/here.ts';
 
 type Resolved = {from: string; to: string; note: string};
 const WAIT_CODES = new Set(['program.safe-stop-required', 'program.safe-stop-pending']);
 const WAIT_LIMIT_TICKS = 20 * 60;   // a waiting receipt that cannot start within a minute fails
 const NEAR_RADIUS = 20, GO_NEAR_RADIUS = 60;
 const OPEN: EdgeReceipt['phase'][] = ['waiting', 'started'];
-type Row = {receipt_id: string; soul_id: string; capability: string; phase: EdgeReceipt['phase']; accepted_tick: number; started_tick: number | null; ended_tick: number | null; code: string | null; reason: string | null; program_id: string | null; client_ref: string | null; plan?: string | null};
+type Row = {receipt_id: string; soul_id: string; capability: string; phase: EdgeReceipt['phase']; accepted_tick: number; started_tick: number | null; ended_tick: number | null; code: string | null; reason: string | null; program_id: string | null; client_ref: string | null; plan?: string | null; detail?: string | null};
 type Pending = {receipt: string; soul: EdgeSoul; steps: Program['steps']; label: string; deadline: number; capability: string};
 
 export class EdgeLedger implements EdgeLedgerHooks {
@@ -37,6 +40,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
   comms?: {streams: {headCursor(soulId: string): string}; fading: {status(soulId: string): unknown; touch?(soulId: string): void}; objects: {act?(id: string, soul: EdgeSoul, input: Record<string, unknown>): unknown; visibleTo(soul: EdgeSoul): unknown[]; create(i: {id: string; kind: string; name: string; description?: string; placeId: string; params?: Record<string, unknown>}): {id: string}; all(): {id: string; kind: string; placeId: string; state: unknown}[]}; close(): void};
   attachComms(c: NonNullable<EdgeLedger['comms']>) {
     this.comms = c;
+    // intents/1 auto-face: conversation members turn their heads to whoever speaks (default on)
+    try {(c as unknown as {onSpectator?(l: (m: {kind: string; conversation?: string; turn?: {from?: {soulId: string}}}) => void): void}).onSpectator?.(m => {
+      if (m.kind !== 'conversation.turn' || !m.conversation || !m.turn?.from) return;
+      const members = this.coreA.conversations().find(x => x.id === m.conversation)?.members ?? [];
+      try {this.intents.onTurn(m.conversation, m.turn.from.soulId, members);} catch {/* attention is best effort */}
+    });} catch {/* no spectator hook: auto-face off */}
     // C9 body effects (fading itself only runs when Comms' fading flag is on — Gene has not approved it).
     const fading = (c as unknown as {fading?: {onFade?(l: (e: {soulId: string; change: string}) => void): void; gone?(): string[]}}).fading;
     const fadeOut = (soulId: string) => {
@@ -90,6 +99,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
       CREATE INDEX IF NOT EXISTS edge_refusals_v1_at ON edge_refusals_v1 (world_id, at);`);
     // PM-R055: a waiting act's plan is kept with its receipt so a restart re-arms it instead of losing it.
     if (!(db.db.prepare('PRAGMA table_info(edge_receipts_v1)').all() as {name: string}[]).some(c => c.name === 'plan')) db.db.exec('ALTER TABLE edge_receipts_v1 ADD COLUMN plan TEXT');
+    // intents/1 + strict/1 (Core-A): receipt detail {channel, chosen, endedAt} (JSON)
+    if (!(db.db.prepare('PRAGMA table_info(edge_receipts_v1)').all() as {name: string}[]).some(c => c.name === 'detail')) db.db.exec('ALTER TABLE edge_receipts_v1 ADD COLUMN detail TEXT');
+    this.intents = new Intents(this);
     this.places = new PlaceIndex(this.loadPlaces(placeData));
     this.syncCarrierPlaces();
     // together/1: gestures, invitations, follows and items (core-next4)
@@ -132,13 +144,14 @@ export class EdgeLedger implements EdgeLedgerHooks {
 
   // ---------------------------------------------------------------- receipts
   private rows(where: string, ...args: (string | number | null)[]): Row[] {return this.db.db.prepare(`SELECT * FROM edge_receipts_v1 WHERE world_id=? AND ${where}`).all(this.host.worldId, ...args) as Row[];}
-  private view(r: Row): EdgeReceipt {return {id: r.receipt_id, soulId: r.soul_id, capability: r.capability, phase: r.phase, acceptedTick: r.accepted_tick, startedTick: r.started_tick, endedTick: r.ended_tick, code: r.code, reason: r.reason, programId: r.program_id};}
+  private view(r: Row): EdgeReceipt {return {id: r.receipt_id, soulId: r.soul_id, capability: r.capability, phase: r.phase, acceptedTick: r.accepted_tick, startedTick: r.started_tick, endedTick: r.ended_tick, code: r.code, reason: r.reason, programId: r.program_id, ...detailOf(r)};}
   receipt(soulId: string, id: string): EdgeReceipt | null {const r = this.rows('receipt_id=? AND soul_id=?', id, soulId)[0]; return r ? this.view(r) : null;}
   openReceipts(soulId: string): EdgeReceipt[] {return this.rows("soul_id=? AND phase IN ('waiting','started') ORDER BY accepted_tick", soulId).map(r => this.view(r));}
   private insert(soul: EdgeSoul, capability: string, phase: EdgeReceipt['phase'], clientRef?: string, keepActivity = false): EdgeReceipt {
     const id = 'r_' + randomUUID(), tick = this.host.engine.world.tick;
     if (!keepActivity) {for (const old of this.openReceipts(soul.soulId)) this.update(old.id, {phase: 'replaced', reason: 'A newer action from this Soul replaced it.'}); this.pending.delete(soul.soulId);}
     this.db.db.prepare('INSERT INTO edge_receipts_v1 (world_id,receipt_id,soul_id,capability,phase,accepted_tick,client_ref,created_at) VALUES (?,?,?,?,?,?,?,?)').run(this.host.worldId, id, soul.soulId, capability, phase, tick, clientRef ?? null, Date.now());
+    if (keepActivity || !OPEN.includes(phase)) this.setDetail(id, {...(keepActivity ? {channel: this.nextChannel ?? 'none'} : {}), ...(!OPEN.includes(phase) ? {endedAt: bodyEnd(this, soul.soulId)} : {})});
     const r = this.receipt(soul.soulId, id)!; this.emit(r); return r;
   }
   private update(id: string, patch: Partial<Pick<Row, 'phase' | 'code' | 'reason' | 'program_id' | 'started_tick'>>) {
@@ -148,6 +161,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (patch.phase === 'started' && next.started_tick === null) next.started_tick = tick;
     if (patch.phase && !OPEN.includes(patch.phase)) next.ended_tick = tick;
     this.db.db.prepare('UPDATE edge_receipts_v1 SET phase=?,code=?,reason=?,program_id=?,started_tick=?,ended_tick=? WHERE world_id=? AND receipt_id=?').run(next.phase, next.code, next.reason, next.program_id, next.started_tick, next.ended_tick, this.host.worldId, id);
+    if (patch.phase && !OPEN.includes(patch.phase)) next.detail = this.setDetail(id, {endedAt: bodyEnd(this, cur.soul_id)});   // strict/1: where the body ended up
     if (patch.phase && patch.phase !== cur.phase) this.emit(this.view(next));
   }
   private emit(r: EdgeReceipt) {for (const l of this.receiptListeners) try {l(r);} catch {/* listener faults never break the ledger */}}
@@ -386,7 +400,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
   }
 
   // ---------------------------------------------------------------- act
-  async act(soul: EdgeSoul, input: {capability?: unknown; params?: unknown; clientRef?: unknown}): Promise<{accepted: true; receipt: EdgeReceipt; resolved?: Resolved; result?: unknown} | {accepted: false; code: string; reason: string; capability: string; retry_after?: number; did_you_mean?: {id: string; label: string}[]; resolved?: Resolved}> {
+  async act(soul: EdgeSoul, input: {capability?: unknown; params?: unknown; clientRef?: unknown; verb?: unknown; target?: unknown}): Promise<{accepted: true; receipt: EdgeReceipt; resolved?: Resolved; result?: unknown} | {accepted: false; code: string; reason: string; capability: string; retry_after?: number; did_you_mean?: {id: string; label: string}[]; resolved?: Resolved}> {
+    // intents/1 (Core-A): {verb, target} is resolved now and acted on as the concrete choice it reports
+    if (input.capability === undefined && input.verb !== undefined) {const out = await this.intents.act(soul, input as IntentInput); if (out.accepted) this.capCache.clear(); return out;}
     const out = await this.actOnce(soul, input);
     if (out.accepted) this.capCache.clear();     // invitations, items and follows change what others can do this tick
     return out;
@@ -406,6 +422,11 @@ export class EdgeLedger implements EdgeLedgerHooks {
     }
     const {caps, plans} = this.binds(soul);
     let params = (input.params && typeof input.params === 'object' && !Array.isArray(input.params) ? {...input.params as Record<string, unknown>} : {}) as Record<string, unknown>;
+    // intents/1: plain words for the attention channel ("look at the fire", "turn to Bill") and face:<soul> never touch the body
+    if (!caps.some(c => c.id === asked)) {const plain = attentionWords(asked); if (plain) return this.intents.act(soul, {...plain, ...(clientRef ? {clientRef} : {})});}
+    if (asked.startsWith('face:') && caps.some(c => c.id === asked && c.target?.kind === 'soul')) return this.intents.act(soul, {verb: 'turn', face: caps.find(c => c.id === asked)!.target!.id, ...(clientRef ? {clientRef} : {})});
+    // strict/1: an id-shaped target that names nothing in this world is refused, never swapped for something else
+    {const strict = strictCheck(this, soul, asked, caps); if (strict) return {...refuse(strict.code, strict.reason), did_you_mean: strict.did_you_mean};}
     // together/1: social phrasing first (accept/decline, "hug Tamsin", "give her the book", "dance with Roger", "invite X to …")
     let social: {note: string} | null = null, text = asked;
     if (!caps.some(c => c.id === asked)) {
@@ -858,6 +879,63 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (include.has('eyes')) out.eyes = {status: 'unavailable'};
     return out;
   }
+
+  // ---------------------------------------------------------------- Core-A hooks (perception/1, intents/1, strict/1)
+  /** intents/1: affordance intents, dry runs and the attention channel. */
+  readonly intents!: Intents;
+  private nextChannel: string | null = null;
+  /** Merge into a receipt's detail {channel, chosen, endedAt}; returns the stored JSON. */
+  private setDetail(id: string, patch: Record<string, unknown>): string | null {
+    const row = this.db.db.prepare('SELECT detail FROM edge_receipts_v1 WHERE world_id=? AND receipt_id=?').get(this.host.worldId, id) as {detail: string | null} | undefined; if (!row) return null;
+    const next = JSON.stringify({...(row.detail ? JSON.parse(row.detail) : {}), ...patch});
+    this.db.db.prepare('UPDATE edge_receipts_v1 SET detail=? WHERE world_id=? AND receipt_id=?').run(next, this.host.worldId, id);
+    return next;
+  }
+  /** @internal for edge/perception and edge/intents (Core-A modules): read access and two narrow write paths. */
+  get coreA() {
+    const self = this;
+    return {
+      binds: (s: EdgeSoul) => self.binds(s),
+      body: (entityId: string) => self.body(entityId),
+      resolveText: (s: EdgeSoul, text: string, caps: EdgeCapability[]) => caps.some(c => c.id === text) ? {kind: 'exact' as const, cap: caps.find(c => c.id === text)!} : resolveCapability(text, self.vocabulary(s, caps)),
+      isAncestor: (ancestor: string, id: string) => {for (let p = self.places.byId.get(id), n = 0; p?.parent && n < 20; p = self.places.byId.get(p.parent), n++) if (p.parent === ancestor) return true; return false;},
+      targetPoint: (s: EdgeSoul, c: EdgeCapability) => self.vocabulary(s, [c]).target(c).at,
+      detail: (id: string): Record<string, unknown> | null => {const r = self.rows('receipt_id=?', id)[0]; try {return r?.detail ? JSON.parse(r.detail) : null;} catch {return null;}},
+      byClientRef: (soulId: string, ref: string) => {const r = self.rows('soul_id=? AND client_ref=?', soulId, ref)[0]; return r ? self.view(r) : null;},
+      setDetail: (id: string, patch: Record<string, unknown>) => {const r = self.rows('receipt_id=?', id)[0]; if (!r) return null; self.setDetail(id, patch); return self.view(self.rows('receipt_id=?', id)[0]);},
+      /** A completed receipt that never touches the body's act (attention, settings). */
+      insertDone: (s: EdgeSoul, capability: string, clientRef: string | undefined, detail: Record<string, unknown>) => {
+        self.nextChannel = String(detail.channel ?? 'none');
+        try {const r = self.insert(s, capability, 'completed', clientRef, true); self.setDetail(r.id, detail); return self.receipt(s.soulId, r.id)!;} finally {self.nextChannel = null;}
+      },
+      /** Body steps chosen by an intent, launched exactly like an offered capability (receipt waiting → started → …). */
+      launchPlan: async (s: EdgeSoul, capability: string, label: string, steps: Program['steps'], clientRef?: string) => {
+        if (steps.length > 80) return {accepted: false as const, code: 'capability.params', reason: 'that plan is too long; act in shorter legs.', capability};
+        if (self.aboard(s.entityId)?.phase === 'aloft') return {accepted: false as const, code: 'ride.aboard', reason: 'You are aloft; it lands by itself and you step out then.', capability};
+        const refuse = (code: string, reason: string) => {self.recordRefusal(s.soulId, 'intent', capability, code); return {accepted: false as const, code, reason, capability};};
+        const out = await self.launch(s, capability, label, steps, clientRef, {}, refuse); if (out.accepted) self.capCache.clear(); return out;
+      },
+      /** A faded Soul's next act lands it at a starting place first (C9), as act() does. */
+      reclaim: async (s: EdgeSoul) => {
+        if (!self.faded.has(s.soulId)) return;
+        self.faded.delete(s.soulId);
+        await self.host.enqueue('edge-relocate', `edge:${s.soulId}`, {soulId: s.soulId, entityId: s.entityId, to: self.startingPoint(s.soulId), why: 'reclaimed after fading'});
+        self.capCache.delete(s.soulId);
+      },
+      /** Open conversations (ids and member Soul ids only; never turns). */
+      conversations: (): {id: string; members: string[]}[] => {
+        try {return (self.db.db.prepare("SELECT id, body FROM edge_comms_conversations WHERE world_id=? AND state='open' ORDER BY id").all(self.host.worldId) as {id: string; body: string}[]).map(r => ({id: r.id, members: ((JSON.parse(r.body) as {members?: {soulId: string}[]}).members ?? []).map(m => m.soulId)}));}
+        catch {return [];}
+      },
+    };
+  }
+}
+
+/** Receipt detail (Core-A): channel (body | attention | none), chosen (what an intent picked), endedAt (terminal). */
+function detailOf(r: Row): {channel?: string; chosen?: unknown; endedAt?: unknown} {
+  if (!r.detail) return {};
+  try {const d = JSON.parse(r.detail) as {channel?: string; chosen?: unknown; endedAt?: unknown}; return {...(d.channel ? {channel: d.channel} : {}), ...(d.chosen ? {chosen: d.chosen} : {}), ...(d.endedAt ? {endedAt: d.endedAt} : {})};}
+  catch {return {};}
 }
 
 const mix = (s: string, n: number) => {let h = 2166136261 ^ n; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619); return (h >>> 0);};
