@@ -1,5 +1,43 @@
 # Status
 
+## October 8 local release checkpoint
+
+Qualified runtime code `65048616` is on main and the existing local Cloudflare
+preview. Production domains and remote server units were not promoted.
+The preview preserves its original world, owners, Souls and accepted history.
+The complete closed backup, exact latest/suffix reader checks and two ordinary
+startup checks are retained in `<team>/pm-integration/release-checkpoint-20261008/`.
+
+This checkpoint includes CLI 1.8.3, native/API/body/viewer integration, local
+three-world restoration, truthful action outcomes and destination consent, and
+bounded manual camera movement with distinct head/elevation controls and smooth
+Follow handover. WASD stays level; arrows turn/tilt; Q/E lower/raise; right-drag
+looks in place; Shift boosts and Alt gives precision movement.
+
+The final application check passed 877 server and 190 adapter tests plus 1555
+native Mars tests (six existing skips and eleven existing TODOs). Focused Chrome
+camera/public-preview and real public CLI smoke checks passed. Two independent
+real clients demonstrated precise reading, honest reports/refusals/clarification,
+and a completed consented handshake. First failures and scripted versus model
+evidence remain separate. Twenty-four real decisions used 812747 input tokens
+(683520 cached) and 4899 output tokens; median decision latency was 5.9 seconds.
+Model identity, subscription USD and internal provider retries remain unknown.
+
+One follow-up real-client question arrived during active seated reading: the
+same original receipt completed and the client reported it truthfully. Dynamic
+replanning failed because the client omitted the documented override flag; its
+final refusal report was honest. Both first-attempt outcomes are retained.
+
+The exhaustive integration evaluation, native protected-action guarantees,
+dynamic replanning, SSE fault/handoff/sustained coverage, native Soul-provider behavior and the full
+Mars browser release gate remain unqualified. Wider terrain/boundary changes,
+visual polish and the full performance audit are retained for follow-up.
+Blocked balloon exits recover when the bystander clears them; automatic egress
+handling is not claimed fixed. Eyes produced qualified daylight frames and rate/
+closure evidence, with pixel identity/solid-wall privacy ambiguity recorded.
+
+The historical production review below describes a separate deployed baseline.
+
 Reviewed **2026-10-03** against canonical `<repo>`, production receipts and
 qualification artifacts. Production is [sim.eden.art](https://sim.eden.art);
 staging is [the isolated staging site](https://<staging-host>).
