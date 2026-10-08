@@ -12,12 +12,12 @@ import {WorldHost} from './world.ts';
 import {IntentControlV2} from './intent-control.ts';
 import {installCommonsProvisionCards} from './commons-provisions.ts';
 const factory=nativeSleepSnapshotFactoryV1(await retainedCommonsShoreFactory());
-async function setup(t:TestContext,codec=true,policy=true){
+async function setup(t:TestContext,codec=true,policy=true,nativeProgramAllowed?:NonNullable<ConstructorParameters<typeof Brain>[4]>['nativeProgramAllowed']){
  const f=fixture(':memory:',factory,{durableClockV1:true});f.souls.enableLifecycle();
  await accept<unknown>(f.host,new LivingWorld(f.host).install(['Residents follow directions and rest.']));for(let i=0;i<4;i++)f.host.tickOnce();
  await invite(f,'alice');const row=await accept(f.host,f.souls.create('dev:alice',{name:'Alice',description:'Synthetic sleeping owner'}));
  await accept(f.host,f.host.installCommonsProvisionsV1());await accept(f.host,f.host.installRetainedCommonsShoreV1());if(codec)await accept(f.host,f.host.installNativeSleepSnapshotV1());f.brain.quiesce();
- const brain=new Brain(f.host,f.db,{...f.brain.cfg,budgetUsdPerDay:0},{clients:()=>0,onCall(){},onCamera(){},onTicker(){},onNarrative(){}},{intentV2Choices:true});
+ const brain=new Brain(f.host,f.db,{...f.brain.cfg,budgetUsdPerDay:0},{clients:()=>0,onCall(){},onCamera(){},onTicker(){},onNarrative(){}},{intentV2Choices:true,nativeProgramAllowed});
  t.after(()=>{brain.quiesce();f.host.stop();f.db.close();});await installCommonsProvisionCards(f.host,brain);
  await accept<unknown>(f.host,f.host.enableIntentSequencesV1());await accept<unknown>(f.host,f.host.enableIntentExecutionRetentionV1());await accept<unknown>(f.host,f.host.enableIntentNativeSequenceCompletionV1());if(policy)await accept<unknown>(f.host,f.host.enableIntentHumanSleepTransitionV1());
  await accept(f.host,f.host.enqueue('decision','fixture:sleep',{soulId:row.id,entityId:row.entity_id,option:'sleep',label:'sleep on own mat',steps:[{verb:'mars:sleep',params:{mat:'commons-mat-1',duration:600,returnTo:COMMONS_PERSONAL_RESOURCES[0].sleepReturn}}],reevalTicks:1e9,fallback:false,trigger:'fixture'}));
@@ -93,4 +93,14 @@ test('a refused native sleep-stop preview immediately restores the full registry
  t.mock.method(f.host.engine,'canPerform',(...args:Parameters<typeof f.host.engine.canPerform>)=>{checks++;return canPerform(...args);});
  t.mock.method(f.brain,'midContext',(...args:Parameters<Brain['midContext']>)=>{const before=checks,ctx=original(...args);calls.push({deferred:args[2]===true,options:ctx.options,checks:checks-before});return ctx;});
  await f.brain.evaluate(m,'new-intent-v2');f.host.drainInputs();assert.equal(calls[0]?.deferred,true);assert.deepEqual(calls[0]?.options,[]);assert.equal(calls[1]?.deferred,false);assert.deepEqual(calls[1].options,expected);assert.ok(calls[1].checks>0,'the fallback actually runs native feasibility checks even when the sleeping body cannot use any option');assert.equal(f.db.events(f.host.worldId).filter(e=>e.kind==='intent-sleep-stop-v1').length,0);assert.equal(f.pose()?.standingFraction,0);assert.equal(f.db.paidCost(),0);assert.deepEqual(f.host.engine.runtime.violations,[]);
+});
+
+test('deferred safe-wake fallback reconstructs options before native participant admission and cannot choose a denied programme',async t=>{
+ let checks=0;const f=await setup(t,true,true,()=>{checks++;return false;}),receipt=await f.submit();assert.equal(receipt.phase,'understood');const m=f.host.minds.get(f.row.id)!;
+ await f.brain.evaluate(m,'new-intent-v2');f.host.drainInputs();assert.equal(f.host.pendingHumanSleepTransitionV1(m.soulId),true);assert.equal(checks,0,'a native safe-wake return makes no candidate choice');
+ for(let i=0;i<120&&f.host.pendingHumanSleepTransitionV1(m.soulId);i++){m.nextEvalTick=1e9;f.host.tickOnce();}
+ assert.equal(f.host.pendingHumanSleepTransitionV1(m.soulId),false);const original=f.brain.midContext.bind(f.brain),expected=original(m,'new-intent-v2').options;assert.ok(expected.length>0,'the now-standing actor has actual available native choices');
+ const reads:boolean[]=[];t.mock.method(f.brain,'midContext',(...args:Parameters<Brain['midContext']>)=>{reads.push(args[2]===true);return original(...args);});
+ const head=f.host.engine.stateHash(),events=f.db.events(f.host.worldId).length,calls=f.db.brainCalls(100).length;
+ await f.brain.evaluate(m,'new-intent-v2');f.host.drainInputs();assert.deepEqual(reads,[true,false]);assert.equal(checks,expected.length,'every reconstructed candidate passes through native participant admission');assert.equal(f.host.engine.stateHash(),head);assert.equal(f.db.events(f.host.worldId).length,events);assert.equal(f.db.brainCalls(100).length,calls,'denied options never reach reflex/model choice');assert.equal(f.db.paidCost(),0);assert.deepEqual(f.host.engine.runtime.violations,[]);
 });
