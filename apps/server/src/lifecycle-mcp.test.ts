@@ -13,7 +13,8 @@ async function local(t:TestContext,candidate=true){
   if(candidate){const op=f.souls.acceptLifecycleCreate('dev:alice',input);f.host.drainInputs();await delay(0);soul=f.db.soul(op.scope.soulId)!;}
   else{const created=f.souls.create('dev:alice',input);f.host.drainInputs();soul=await created;}
   const token=f.souls.pairExchange(f.souls.pairCode(soul,'http://127.0.0.1:4957',f.db.user('dev:alice')!).code,'local').token;
-  const server=createServer((req,res)=>{void handleMcp(req,res,f.souls).catch(()=>{res.writeHead(500).end();});});
+  // Each fixture closes its transport; keep pooled fetch sockets out of the next fixture.
+  const server=createServer((req,res)=>{res.setHeader('Connection','close');void handleMcp(req,res,f.souls).catch(()=>{res.writeHead(500).end();});});
   await new Promise<void>((resolve,reject)=>{server.once('error',reject);server.listen(4957,'127.0.0.1',resolve);});
   t.after(async()=>{await new Promise<void>((resolve,reject)=>{server.close(error=>error?reject(error):resolve());server.closeAllConnections();});f.db.close();});
   const call=async(name:string,args:unknown={})=>{

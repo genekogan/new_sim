@@ -97,18 +97,19 @@ export async function generateStationFixture(){
     const auth=new Auth(cfg,db),brain={mode:'fake',callsToday:0,spentToday:0,budget:0,inflight:new Map(),jevMsAvg:0,camera:null,ticker:[],narratives:new Map(),midContext:()=>({options:[]})} as unknown as Brain;
     const souls=new Souls(restored,db,brain,cfg);server=createServer();hub=new Hub(server,restored,auth,db,undefined,restarted);hub.brain=brain;
     const app=buildApp({cfg,db,host:restored,auth,brain,souls,hub,station:restarted});server.on('request',getRequestListener(app.fetch));
-    await new Promise<void>(resolve=>server!.listen(4953,'127.0.0.1',resolve));
+    await new Promise<void>(resolve=>server!.listen(0,'127.0.0.1',resolve));
     const messages:any[]=[];
-    async function joinClient(){const ws=new WebSocket('ws://127.0.0.1:4953/ws'),own:any[]=[];sockets.push(ws);ws.on('message',data=>{const m=JSON.parse(String(data));messages.push(m);own.push(m);});
+    const address=server!.address();assert.ok(address&&typeof address!=='string');const origin='http://127.0.0.1:'+address.port;
+    async function joinClient(){const ws=new WebSocket(origin.replace('http:','ws:')+'/ws'),own:any[]=[];sockets.push(ws);ws.on('message',data=>{const m=JSON.parse(String(data));messages.push(m);own.push(m);});
       await once(ws,'open');ws.send(JSON.stringify({t:'hello',proto:1}));
       for(let n=0;n<100&&!own.some(m=>m.t==='station');n++)await setImmediate();assert.ok(own.some(m=>m.t==='station'));return {ws,messages:own};}
     const firstClient=await joinClient();
-    async function get(path:string){const response=await fetch('http://127.0.0.1:4953'+path);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');return response.json();}
+    async function get(path:string){const response=await fetch(origin+path);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');return response.json();}
     const publicLive=await get('/v1/station');assert.deepEqual(publicLive,restarted.view());
     const scope=restart.station!,query=(at:number,world=worldId)=>`/v1/station/history?worldId=${world}&epoch=${scope.epoch}&rulesVersion=${encodeURIComponent(scope.rulesVersion)}&tick=${at}`;
     const history=[];for(const at of [0,640,2559,2560,2562,2563,3303,stationEndTick(beforeSnapshot.cues[1])-1e-7,stationEndTick(beforeSnapshot.cues[1]),3999,4000])history.push(await get(query(at)));
-    assert.equal((await fetch('http://127.0.0.1:4953'+query(100,'foreign'))).status,404);
-    assert.equal((await fetch('http://127.0.0.1:4953/v1/station/history?worldId='+worldId+'&epoch=bad&rulesVersion=bad&tick=0')).status,404);
+    assert.equal((await fetch(origin+query(100,'foreign'))).status,404);
+    assert.equal((await fetch(origin+'/v1/station/history?worldId='+worldId+'&epoch=bad&rulesVersion=bad&tick=0')).status,404);
     const pairedTakes=[];for(const [from,to] of [[0,20],[2500,2620],[3280,3320],[3980,4000]])pairedTakes.push(await get(`/v1/takes?from=${from}&to=${to}&limit=120`));
     const captureHash=(pairedTakes[0] as any).chunks[0].take.renderSceneRef.hash,capture=await get('/v1/scenes/'+captureHash);
     const snapshot=restored.snapshotView();
