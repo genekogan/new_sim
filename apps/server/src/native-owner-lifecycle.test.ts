@@ -78,15 +78,16 @@ test('actual local socket loss after accepted birth recovers identity by owner r
     return response;
   }));
   t.after(()=>new Promise<void>((resolve,reject)=>{server.close(error=>error?reject(error):resolve());server.closeAllConnections();}));
-  await new Promise<void>((resolve,reject)=>{server.once('error',reject);server.listen(4956,'127.0.0.1',resolve);});
+  await new Promise<void>((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});
+  const address=server.address();assert.ok(address&&typeof address!=='string');const origin='http://127.0.0.1:'+address.port;
   const headers={authorization:'Bearer dev:alice','content-type':'application/json'};
-  const lost=fetch('http://127.0.0.1:4956/v1/souls',{method:'POST',headers,body:JSON.stringify({name:'Socket Alice',description:'local'})});
+  const lost=fetch(origin+'/v1/souls',{method:'POST',headers,body:JSON.stringify({name:'Socket Alice',description:'local'})});
   let failure:unknown;await accept(f.host,lost.catch(error=>{failure=error;}));
   assert.ok(failure instanceof TypeError);assert.equal(dropped,true);
-  const refreshed=await fetch('http://127.0.0.1:4956/v1/me',{headers});assert.equal(refreshed.status,200);
+  const refreshed=await fetch(origin+'/v1/me',{headers});assert.equal(refreshed.status,200);
   const me=await refreshed.json() as {souls:{id:string;entityId:string}[]};assert.equal(me.souls.length,1);
   assert.deepEqual(bodyIds(f.host),[me.souls[0].entityId]);assert.equal(f.host.kernel.things[me.souls[0].id].traits.body,me.souls[0].entityId);
-  const retry=await fetch('http://127.0.0.1:4956/v1/souls',{method:'POST',headers,body:JSON.stringify({name:'Socket Alice',description:'local'})});
+  const retry=await fetch(origin+'/v1/souls',{method:'POST',headers,body:JSON.stringify({name:'Socket Alice',description:'local'})});
   assert.equal(retry.status,409);assert.equal(f.db.events(worldId).filter(e=>e.kind==='birth').length,1);
 });
 
