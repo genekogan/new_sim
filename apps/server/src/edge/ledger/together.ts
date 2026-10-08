@@ -611,7 +611,7 @@ export class Together {
       const walk = caps.filter(c => c.verb === 'walk' && c.target && place && (c.target.id === place || this.p.places.byId.get(place)?.parent === c.target.id))[0];
       return {code: 'soul.not-in-sight', reason: `${m.name} is not in sight from here${pname ? ` (in ${pname}` + (d !== null ? `, ${d} m away)` : ')') : ''}; go to them first, then ${verb}.`, did_you_mean: walk ? [{id: walk.id, label: walk.label}] : []};
     };
-    const tooFar = (verb: string, o: NearbyBody) => {const g = caps.find(c => c.id === 'go-near:' + o.soulId); return {code: 'gesture.too-far', reason: `${o.name} is ${o.distance} m away; ${verb} needs you within ${GESTURE_RADIUS} m. Go near them first.`, did_you_mean: g ? [{id: g.id, label: g.label}] : []};};
+    const tooFar = (verb: string, o: NearbyBody) => {const g = caps.find(c => c.id === 'go-near:' + o.soulId); return {code: 'gesture.too-far', reason: `${o.name} is ${o.distance} m away; ${verb} needs you within ${GESTURE_RADIUS} m. Go near them first (go-near:${o.soulId}), then ask again.`, did_you_mean: [{id: 'go-near:' + o.soulId, label: g?.label ?? `Go near ${o.name}`}]};};
     // invitations to me
     const mine = this.invitesFor(soul.soulId);
     if (/^(?:accept|yes|sure|ok|okay|i accept|accept (?:the |their |his |her )?(?:invitation|invite|offer)|join (?:in|them|him|her)|with pleasure|gladly)$/.test(t) && mine.length) {const i = mine.at(-1)!; return {capability: 'accept:' + i.id, note: `accepting ${i.host.name}'s invitation (${i.what})`};}

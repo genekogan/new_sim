@@ -1021,6 +1021,9 @@ export class WorldHost {
     return this.enqueue('rules','operator:nav',{navV1:structuredClone(spec),why:'nav/1: buildings and water are solid to walking (doors closed until interiors are admitted) and admitted ground widens to the park; prospective, earlier history replays unchanged'}).then(()=>({installed:true}));
   }
   /** carrier/1: install a ride (e.g. a hot-air balloon) at its home as a logged prospective rules fact; idempotent by id. */
+  setCarrierRouteV1(spec:{id:string;route:string}){
+    return this.enqueue('rules','operator:carrier-route',{carrierRouteV1:structuredClone(spec),why:'a ride flies another named route from its next flight (only while parked and empty); prospective, earlier history replays unchanged'});
+  }
   installCarrierV1(spec:{id:string;def:string;label?:string;at:[number,number];yaw?:number;route:string;waitSeconds?:number}){
     const engine=this.engine as unknown as {previewCarrierV1?:(s:unknown)=>{code:string;message:string}|null;world:{entities:Record<string,{carrier?:unknown}>}};
     if(!engine.previewCarrierV1)return Promise.reject(Error('carrier.reader-required'));

@@ -124,3 +124,21 @@ test('cn5 games: pétanque (two, then a third joins and one leaves), frisbee pai
   assert.deepEqual(w.f.host.engine.runtime.violations, []);
   await w.replayExact();
 });
+
+test('cn5 acceptance: a picnic seat inside its table box is used from just behind it; a gesture far off offers go-near; the brisk balloon loop', {timeout: 900000}, async t => {
+  const {carrierEntity, setCarrierRoute} = await import('../../../mars/viewer/engine/vehicles/carrier.ts');
+  const e: any = carrierEntity({id: 'b1', def: 'hot-air-balloon', at: [-20, -9], yaw: Math.PI, route: 'eden-commons-loop'}, 0);
+  assert.equal(setCarrierRoute({entities: {b1: e}}, 'b1', 'eden-commons-loop-brisk'), true);
+  assert.equal(e.carrier.route.id, 'eden-commons-loop-brisk'); assert.equal(e.carrier.route.keys.at(-1).t, 672, '11.2 min');
+  e.carrier.phase = 'aloft'; assert.equal(setCarrierRoute({entities: {b1: e}}, 'b1', 'eden-commons-loop'), false, 'never mid-flight');
+  const w = await world(2); t.after(() => {w.f.host.stop(); w.f.db.close();});
+  const [a, b] = w.souls;
+  const eat = await w.act(a, 'eat:picnic-1-south-w', {seconds: 5}); let sat: any = null;
+  const r = await w.done(a, eat, 20 * 60 * 5, () => {const h = w.body(a).human; if (h.activity === 'eat') sat ??= {base: h.baseActivity, at: [w.body(a).pose.p[0], w.body(a).pose.p[2]]};});
+  t.diagnostic('picnic ' + JSON.stringify({r: r.phase, code: r.code, sat}));
+  assert.equal(r.phase, 'completed', JSON.stringify(r)); assert.equal(sat?.base, 'sit'); assert.ok(Math.hypot(sat.at[0] - 54.55, sat.at[1] + 21.78) < 1, 'at the picnic table');
+  // b is far off (tens of metres): a hug offers go-near first
+  const hug: any = await import('../test/native-owner-fixture.ts').then(m => m.accept(w.f.host, w.ledger.act(b, {capability: 'hug ' + a.name})));
+  if (!hug.accepted) {assert.match(hug.code, /gesture.too-far|soul.not-in-sight/); assert.ok(hug.did_you_mean?.length, JSON.stringify(hug));}
+  assert.deepEqual(w.f.host.engine.runtime.violations, []);
+});

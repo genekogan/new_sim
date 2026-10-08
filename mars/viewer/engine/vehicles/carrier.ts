@@ -57,6 +57,10 @@ export const CARRIER_ROUTES: Record<string, CarrierRoute> = {
   'eden-commons-loop': { id: 'eden-commons-loop', keys: [
     [0, -20, 0, -9], [40, -28, 25, -6], [120, -55, 55, 0], [240, -150, 75, 5], [360, -260, 85, 80], [480, -480, 95, 150], [600, -300, 90, 230],
     [720, 60, 80, 215], [840, 160, 70, 140], [960, 70, 50, 40], [1060, 0, 25, -8], [1120, -20, 0, -9]].map(([t, x, y, z]) => ({ t, p: [x, y, z] as Vec3 })) },
+  // CN5 (acceptance: a flight lasted ~19 min with no way down): the same World path flown at 0.6x the time, 11.2 min (top speed stays under 6 m/s).
+  'eden-commons-loop-brisk': { id: 'eden-commons-loop-brisk', keys: [
+    [0, -20, 0, -9], [40, -28, 25, -6], [120, -55, 55, 0], [240, -150, 75, 5], [360, -260, 85, 80], [480, -480, 95, 150], [600, -300, 90, 230],
+    [720, 60, 80, 215], [840, 160, 70, 140], [960, 70, 50, 40], [1060, 0, 25, -8], [1120, -20, 0, -9]].map(([t, x, y, z]) => ({ t: Math.round(t * 0.6 * 10) / 10, p: [x, y, z] as Vec3 })) },
   // A short hop over the commons (tests, demos): up, a small loop, down. Relative routes are moved to the home.
   'commons-hop': { id: 'commons-hop', keys: [
     { t: 0, p: [0, 0, 0] }, { t: 15, p: [-4, 8, 4] }, { t: 35, p: [6, 14, 8] }, { t: 55, p: [8, 10, -4] }, { t: 80, p: [0, 0, 0] }] },
@@ -317,3 +321,13 @@ export const carrierInvariant: Invariant = (rt: Runtime) => {
   }
   return out;
 };
+
+/** CN5 (logged rules fact `carrierRouteV1`): a parked carrier with nobody aboard flies a different named route from its next
+ *  flight (e.g. the brisk eden loop); refused (no change) while boarding, aloft or landed, or for a route not ending at home. */
+export function setCarrierRoute(world: { entities: Record<string, Entity> }, id: string, routeId: string): boolean {
+  const e = world.entities[id], c = state(e); if (!e || !c || c.phase !== 'parked' || Object.values(c.seats).some(Boolean)) return false;
+  const route = routeAt(routeId, c.home); if (!route) return false;
+  const a = route.keys[0].p, b = route.keys[route.keys.length - 1].p;
+  if (hypot(a[0] - c.home[0], a[1] - c.home[1], a[2] - c.home[2]) > 1e-6 || hypot(b[0] - c.home[0], b[1] - c.home[1], b[2] - c.home[2]) > 1e-6) return false;
+  c.route = route; c.elapsed = 0; return true;
+}

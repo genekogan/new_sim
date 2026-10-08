@@ -122,6 +122,10 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
       const out=await drive(host.installPlaceRegionsV1(nativePlaces.filter(id=>byId.has(id)).map(id=>({id,label:byId.get(id).name,polygon:byId.get(id).polygon}))));
       if(out.admitted.length||out.refused.length)console.error('[edge] native places:',JSON.stringify({admitted:out.admitted,refused:out.refused.map(r=>r.id+' '+r.code),unknown:nativePlaces.filter(id=>!byId.has(id))}));}
     // carrier/1: a seeded ride object with `carrier` installs its native carrier first (logged rules fact, idempotent by id).
+    // CN5: a ride whose descriptor route changed flies the new one from its next flight (logged; only while parked and empty)
+    for(const o of seedObjects??[])if(o.kind==='ride'&&o.carrier?.route&&host.engine.world.entities[o.params?.carrier]?.carrier&&host.engine.carrierRouteV1?.(o.params.carrier)!==o.carrier.route&&host.setCarrierRouteV1){
+      const c=host.engine.world.entities[o.params.carrier].carrier;if(c.phase==='parked'&&!Object.values(c.seats).some(Boolean)){await drive(host.setCarrierRouteV1({id:o.params.carrier,route:o.carrier.route}));console.error('[edge] ride route:',o.params.carrier,'→',host.engine.carrierRouteV1(o.params.carrier));}
+      else console.error('[edge] ride route change waits for the ride to be parked and empty (next boot):',o.params.carrier);}
     for(const o of seedObjects??[])if(o.kind==='ride'&&o.carrier&&!host.engine.world.entities[o.params?.carrier]?.carrier){if(!host.installCarrierV1)throw Error('selected runtime has no carrier/1');await drive(host.installCarrierV1({id:o.params.carrier,label:o.name,...o.carrier}));}
     const {EdgeLedger}=await load('apps/server/src/edge/ledger/ledger.ts');
     const edge=new EdgeLedger(host,db,placeData?JSON.parse(readFileSync(resolve(placeData),'utf8')):undefined,{ambient,spots:spotsRaw});if(edge.spotsRefused?.length)console.error('[edge] activity spots refused:',edge.spotsRefused.join(', '));

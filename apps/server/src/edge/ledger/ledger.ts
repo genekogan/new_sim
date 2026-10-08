@@ -19,7 +19,7 @@ import {Together, PAIRED, type TogetherPlan} from './together.ts';
 type Resolved = {from: string; to: string; note: string};
 const WAIT_CODES = new Set(['program.safe-stop-required', 'program.safe-stop-pending']);
 const WAIT_LIMIT_TICKS = 20 * 60;   // a waiting receipt that cannot start within a minute fails
-const NEAR_RADIUS = 20;
+const NEAR_RADIUS = 20, GO_NEAR_RADIUS = 60;
 const OPEN: EdgeReceipt['phase'][] = ['waiting', 'started'];
 type Row = {receipt_id: string; soul_id: string; capability: string; phase: EdgeReceipt['phase']; accepted_tick: number; started_tick: number | null; ended_tick: number | null; code: string | null; reason: string | null; program_id: string | null; client_ref: string | null; plan?: string | null};
 type Pending = {receipt: string; soul: EdgeSoul; steps: Program['steps']; label: string; deadline: number; capability: string};
@@ -243,7 +243,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (!engine.clearanceAtV1 || !engine.nearestStandableV1 || !(this.host.engine.world as {navV1?: unknown}).navV1) return;
     for (const m of this.host.minds.values()) {
       const b = this.body(m.entityId), h = b?.human; if (!b || !h || (h.level ?? 0) !== 0 || h.shore || h.carrier || h.sleepPose || h.activity === 'sit' || h.baseActivity === 'sit' || this.host.engine.programOf(m.entityId)) continue;
-      if ((this.unstuckAt.get(m.soulId) ?? -1e9) > tick - 1200 || engine.clearanceAtV1(b.pose.p[0], b.pose.p[2]) >= 0.2) continue;
+      // CN5: below the walk planner's body radius a body cannot start a walk (route.start-blocked), so it steps out
+      if ((this.unstuckAt.get(m.soulId) ?? -1e9) > tick - 1200 || engine.clearanceAtV1(b.pose.p[0], b.pose.p[2]) >= 0.27) continue;
       const to = engine.nearestStandableV1([b.pose.p[0], b.pose.p[2]], m.entityId); if (!to) continue;
       this.unstuckAt.set(m.soulId, tick);
       try {void this.host.enqueue('edge-relocate', `edge:${m.soulId}`, {soulId: m.soulId, entityId: m.entityId, to, why: 'stepped out of a solid footprint'}).catch(() => {/* best effort */});} catch {/* clock not ready */}
@@ -274,7 +275,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
     }
     caps.push({id: 'stand:here', verb: 'stand', label: 'Stand up / stop what I am doing', available: true});
     plans.set('stand:here', {label: 'Stand up', steps: [], stop: true});
-    for (const o of this.perceivedBodies(soul.soulId, NEAR_RADIUS)) {
+    // CN5 (acceptance): go near anyone in sight within 60 m (a gesture to someone farther off offers this first)
+    for (const o of this.perceivedBodies(soul.soulId, GO_NEAR_RADIUS)) {
       const id = 'go-near:' + o.soulId, steps: Program['steps'] = [{verb: 'walk_to', params: {to: o.entityId, standoff: 1.3}}];
       caps.push({id, verb: 'go-near', label: `Go near ${o.name}`, target: {id: o.soulId, kind: 'soul'}, available: true});   // route checked at act time
       plans.set(id, {label: `Go near ${o.name}`, steps});
@@ -288,6 +290,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
     }
     // Social and expressive native verbs: visible, deterministic, shared by many Souls at once.
     const secondsOf = (def: number, max: number) => ({seconds: {type: 'integer', min: 5, max, default: def}});
+    // CN5 (acceptance): a solo wave, with nobody in particular near (or facing someone/something: {"to": …})
+    caps.push({id: 'wave:here', verb: 'wave', label: 'Wave (to nobody in particular, or {"to": a name} to face someone)', available: true, params: {to: {type: 'string', optional: true, description: 'a Soul, place or thing to face'}}});
+    plans.set('wave:here', {label: 'Wave', steps: [{verb: 'mars:pose_v1', params: {activity: 'wave', seconds: 3}}]});
     caps.push({id: 'wander:here', verb: 'wander', label: 'Stroll around nearby', available: true, params: secondsOf(60, 300)});
     plans.set('wander:here', {label: 'Stroll around nearby', steps: [{verb: 'ambient_wander', params: {seconds: 60, radius: 8}}], seconds: true});
     for (const o of this.perceivedBodies(soul.soulId, NEAR_RADIUS)) {
@@ -301,7 +306,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const me = this.body(soul.entityId), w = this.host.engine.world as NativeWorld;
     if (me) {
       for (const e of Object.values(w.entities)) {
-        if (e.def !== 'campfire' || Math.hypot(e.pose.p[0] - me.pose.p[0], e.pose.p[2] - me.pose.p[2]) > 60) continue;
+        // CN5 (acceptance): 150 m, so the fire is offered from the pond and the shore too
+        if (e.def !== 'campfire' || Math.hypot(e.pose.p[0] - me.pose.p[0], e.pose.p[2] - me.pose.p[2]) > 150) continue;
         const id = 'warm-by-fire:' + e.id, label = 'Warm up by the fire with whoever is there';
         caps.push({id, verb: 'warm-by-fire', label, target: {id: e.id, kind: 'object'}, available: true, params: secondsOf(120, 600)});
         plans.set(id, {label, steps: [{verb: 'mars:campfire_circle', params: {actors: [soul.entityId], fire: e.id}}, {verb: 'rest', params: {seconds: 120}}], seconds: true});
@@ -328,7 +334,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const act = activityCapabilities(this.spots, this.activityWorld(soul, me, caps, plans));
       // Activities lead the list (agents and the CLI read the first entries first).
       for (const c of [...act.caps].reverse()) {const i = caps.findIndex(x => x.id === c.id); if (i >= 0) caps.splice(i, 1); caps.unshift(c); plans.set(c.id, act.plans.get(c.id)!);}
-    } catch {/* activities never hide the rest */}
+    } catch (e) {if (this.activityErrors++ < 20) console.error('[edge] activity capabilities', soul.soulId, e instanceof Error ? e.stack?.split('\n').slice(0, 3).join(' | ') : e);/* activities never hide the rest */}
     // together/1: gestures, follows, items; invitations to me lead the list
     if (me) try {
       this.together.capabilities(soul, caps, plans as Map<string, TogetherPlan>);
@@ -341,6 +347,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const value = {caps, plans}; this.capCache.set(soul.soulId, {tick, value}); return value;
   }
   capabilities(soul: EdgeSoul): EdgeCapability[] {return this.binds(soul).caps;}
+  private activityErrors = 0;
   private strollSpots = new Map<string, {key: string; spots: [number, number][]}>();
   /** Up to 5 clear stops spread over a place (cached until the static scene changes), visited from the nearest as a loop. */
   private strollRoute(placeId: string, polygon: [number, number][], from: [number, number]): [number, number][] {
@@ -411,6 +418,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const v = caps.some(c => c.id === text) ? {kind: 'exact' as const, cap: caps.find(c => c.id === text)!} : resolveCapability(text, this.vocabulary(soul, caps));
     if (v.kind === 'unknown') return {...refuse(v.code ?? 'capability.unknown', v.reason), did_you_mean: v.didYouMean};
     let cap = v.cap; capability = cap.id;
+    if (v.kind === 'alias' && v.params) params = {...v.params, ...params};   // CN5: "A, then B" walks become via legs
     const note = [social?.note, v.kind === 'alias' ? v.note : null].filter(Boolean).join('; ');
     // together/1: doing a paired gesture back to someone who offered it is accepting their invitation
     if (cap.target?.kind === 'soul' && cap.verb in PAIRED) {const back = this.together.reciprocal(soul.soulId, cap.target.id, cap.verb), acc = back ? caps.find(c => c.id === 'accept:' + back.id) : undefined; if (acc) {cap = acc; capability = acc.id;}}
@@ -450,6 +458,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (!plan) return refuse('capability.unknown', 'That capability is not offered to this Soul right now; read capabilities again.');
     let steps = structuredClone(plan.steps);
     if (steps.length > 40) return refuse('capability.params', 'that plan is too long; act in shorter legs.');
+    // CN5 (acceptance): a capability that takes no seconds (a swim) ignores them instead of refusing
+    if (params.seconds !== undefined && !plan.seconds) delete params.seconds;
     if (params.seconds !== undefined) {
       const posed = steps.some(s => s.verb === 'mars:pose_v1'), max = posed ? ACTIVITY_SECONDS_MAX : 600;
       if (!plan.seconds || !Number.isInteger(params.seconds) || (params.seconds as number) < 1 || (params.seconds as number) > max) return refuse('capability.params', `seconds must be an integer 1..${max} for this capability.`);
@@ -517,7 +527,13 @@ export class EdgeLedger implements EdgeLedgerHooks {
       return {accepted: true, receipt: this.receipt(soul.soulId, r.id)!, ...resolved};
     }
     if (!cap.available && cap.blocked && !WAIT_CODES.has(cap.blocked.code) && !this.host.quietBarrier) return {...refuse(cap.blocked.code, cap.blocked.reason), ...resolved};
-    return this.launch(soul, capability, plan.label, steps, clientRef, resolved, refuse, prep.commit);
+    return this.launch(soul, capability, plan.label, this.standIfSeated(soul, steps), clientRef, resolved, refuse, prep.commit);
+  }
+  /** CN5 (acceptance: reservation.conflict on the Soul's own seat): a seated body that is going somewhere or doing
+   *  something with its whole body gets up first; overlays done on the seat (read, eat, wave…) keep it. */
+  private standIfSeated(soul: EdgeSoul, steps: Program['steps']): Program['steps'] {
+    const first = steps[0]?.verb; if (!first || ['stand', 'mars:pose_v1', 'wave', 'face', 'rest'].includes(first) || !this.seatOf(soul.entityId)) return steps;
+    return [{verb: 'stand', params: {}}, ...steps];
   }
   /** Start a body plan as the Soul's act: queued through a quiet renewal or a safe stop, else decided now. */
   private async launch(soul: EdgeSoul, capability: string, label: string, steps: Program['steps'], clientRef: string | undefined, resolved: {resolved?: Resolved}, refuse: (code: string, reason: string) => {accepted: false; code: string; reason: string; capability: string}, commit?: (receipt: string) => void) {
@@ -527,7 +543,17 @@ export class EdgeLedger implements EdgeLedgerHooks {
       this.arm({receipt: r.id, soul, steps, label, deadline: this.host.engine.world.tick + WAIT_LIMIT_TICKS, capability});
       return {accepted: true as const, receipt: this.receipt(soul.soulId, r.id)!, ...resolved};
     }
-    const issue = this.host.engine.canPerform({actor: soul.entityId, label, steps});
+    let issue = this.host.engine.canPerform({actor: soul.entityId, label, steps});
+    // CN5 (acceptance: stuck at the pond bank / after a landing): a body standing where no walk can start steps to the
+    // nearest clear spot within 4 m first (a logged edge-relocate), then starts
+    if (issue?.code === 'route.start-blocked') {
+      const engine = this.host.engine as unknown as {nearestStandableV1?: (at: [number, number], except?: string, min?: number, rings?: number) => [number, number] | null}, b = this.body(soul.entityId);
+      const to = b && engine.nearestStandableV1 ? engine.nearestStandableV1([b.pose.p[0], b.pose.p[2]], soul.entityId, 0.33, 8) : null;
+      if (to && b && Math.hypot(to[0] - b.pose.p[0], to[1] - b.pose.p[2]) <= 4) {
+        await this.host.enqueue('edge-relocate', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, to, why: 'stepped clear to start'});
+        issue = this.host.engine.canPerform({actor: soul.entityId, label, steps});
+      }
+    }
     if (issue && !WAIT_CODES.has(issue.code)) return {...refuse(issue.code, issue.code.startsWith('carrier.') ? issue.message : humanBlockedExplanationV1(issue.code, label)), ...resolved};
     if (issue) {
       // Asleep or mid-step: stop safely first, then start (receipt `waiting`).

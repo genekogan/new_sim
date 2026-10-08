@@ -12,6 +12,7 @@ import {existingGreenLandmarkTransitionV1Schema,type ExistingGreenLandmarkTransi
 import {fixtureSlots} from '../../../mars/viewer/engine/social/slots.ts';
 import {angleDelta} from '../../../mars/viewer/engine/core/math.ts';
 import {inShoreDomain} from '../../../mars/viewer/engine/locomotion/connected-shore.ts';
+import {setCarrierRoute} from '../../../mars/viewer/engine/vehicles/carrier.ts';
 import {commonsFoodDeliveryItemsV1} from './food-delivery.ts';
 import {commonsFoodDeliveryV1Schema,type CommonsFoodDeliveryV1} from '@sim/engine-contract';
 import {socialEdenV1} from './social-eden.ts';
@@ -1241,6 +1242,10 @@ export class MarsEngine implements Engine {
     const cd=CATALOG[spec.def]?.capabilities?.carrier!;for(const local of [cd.door,...cd.seats.map(x=>x.exit)]){const x=dp.p[0]+local[0]*c-local[1]*sn,z=dp.p[2]+local[0]*sn+local[1]*c;if(clearanceAt(grid,[x,z])<HUMAN_RADIUS+.3)return {code:'carrier.door-blocked',message:'the boarding step or exit spots are not clear ground'};}
     return null;
   }
+  /** CN5 (logged rules fact `carrierRouteV1`): a parked, empty carrier flies another named route from its next flight. */
+  setCarrierRouteV1(spec:{id:string;route:string}):boolean{return setCarrierRoute(this.rt.world as any,spec.id,spec.route);}
+  /** CN5: the route id a carrier flies (null if no such carrier). */
+  carrierRouteV1(id:string):string|null{return (this.ents[id] as any)?.carrier?.route?.id??null;}
   /** carrier/1 (logged rules fact `carrierV1`): add the carrier at its home, idempotent by id. */
   installCarrierV1(spec:{id:string;def:string;label?:string;at:[number,number];yaw?:number;route:string;waitSeconds?:number}):boolean{
     if(this.ents[spec.id]?.carrier)return true;

@@ -208,6 +208,8 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
         const added=new Set(install.call(engine,regionsV1));
         for(const a of engine.anchors())if(added.has(a.id)&&!k.things[a.id]){const r=applyAll(k,[{op:'appear',id:a.id,kind:'place',name:a.name,at:a.in??null,traits:{...(a.point?{point:a.point}:{}),...(a.tags?{tags:a.tags}:{})}}],'world');if(!r.ok)throw Error('place-regions.anchor:'+r.message);}}
       // carrier/1: a ride (balloon) installed at its home; prospective, idempotent by id; refused installs are no-ops.
+      const carrierRoute=(e.payload as {carrierRouteV1?:{id:string;route:string}}|null)?.carrierRouteV1;
+      if(carrierRoute){const set=(engine as unknown as {setCarrierRouteV1?:(s:unknown)=>boolean}).setCarrierRouteV1;if(!set)throw Error('carrier.reader-required');set.call(engine,carrierRoute);}
       const carrier=(e.payload as {carrierV1?:unknown}|null)?.carrierV1;
       if(carrier){const install=(engine as unknown as {installCarrierV1?:(s:unknown)=>boolean}).installCarrierV1;if(!install)throw Error('carrier.reader-required');install.call(engine,carrier);}
       const rules = e.payload as { runtimePolicy?: {sleepBlockTicks:number;quietSeatCourtesy?:boolean}; dayConfig?: { origin: number; dayTicks: number }; quiet?: boolean; compact?: boolean; adoptCamp?: boolean; restockCamp?: boolean; anchors?: import('@sim/engine-contract').Anchor[]; soulId?: string; character?: string };

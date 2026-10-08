@@ -35,6 +35,10 @@ export const GAME_MAX_PLAYERS = 6;
 const LYING_SPOT = new Set(['lie', 'nap', 'situps', 'pushups', 'bench-press', 'yoga']);
 const INSTRUMENTS = new Set<string>(POSE_INSTRUMENTS);
 const REF = /^[a-z0-9][a-z0-9._-]{0,99}$/;
+/** Clear ground a body needs to stand or sit at a spot (m): the walk planner's body radius. */
+const STAND_CLEAR = 0.28;
+/** Spots within this distance are offered (CN5: 200 m, so the piano is still offered from the pond and the shore). */
+export const SPOT_REACH = 200;
 const pt = (v: unknown): v is V2 => Array.isArray(v) && v.length === 2 && v.every(Number.isFinite);
 
 /** Validate an activity-spots/1 file; bad entries are dropped and reported (never faked). */
@@ -84,10 +88,24 @@ export const ACTIVITY_SECONDS_MAX = 1800;
 export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: EdgeCapability[]; plans: Map<string, Plan>} {
   const caps: EdgeCapability[] = [], plans = new Map<string, Plan>();
   const add = (cap: EdgeCapability, plan: Plan) => {caps.push(cap); plans.set(cap.id, plan);};
-  const live = data.spots.filter(s => w.enterable(s.place));
+  // CN5 (acceptance): a spot World placed inside an obstacle (the picnic seats inside their table's box) is used from the
+  // first clear point straight back from what it faces (≤ 0.9 m); one with no clear point near it is not offered
+  const standAt = new Map<string, V2 | null>(), clearAt = (s: Spot): V2 | null => {
+    if (!standAt.has(s.id)) {
+      let at: V2 | null = s.at;
+      // only a spot inside an obstacle (no clearance at all) moves; seats and benches close to furniture are as World placed them
+      if (!(s.activity in GAME_ACTIVITIES) && w.clearance(s.at[0], s.at[1]) < 0.05 && w.clearance(w.me[0], w.me[1]) > 0) {
+        const f = s.faceTo ?? s.at, L = Math.hypot(s.at[0] - f[0], s.at[1] - f[1]), back: V2 = L > 1e-6 ? [(s.at[0] - f[0]) / L, (s.at[1] - f[1]) / L] : [0, 0];
+        at = null; for (let t = 0.1; t <= 0.9 + 1e-9 && L > 1e-6; t += 0.1) {const p: V2 = [Math.round((s.at[0] + back[0] * t) * 100) / 100, Math.round((s.at[1] + back[1] * t) * 100) / 100]; if (w.clearance(p[0], p[1]) >= STAND_CLEAR) {at = p; break;}}
+      }
+      standAt.set(s.id, at);
+    }
+    return standAt.get(s.id)!;
+  };
+  const live = data.spots.filter(s => w.enterable(s.place) && !!clearAt(s));
   const spotSteps = (s: Spot, seconds?: number, activity = s.activity): Program['steps'] => {
     const def = SPOT_ACTIVITIES[activity], lying = s.base === 'lie', act = lying && !LYING_SPOT.has(activity) ? 'lie' : activity, prop = s.prop ?? def.prop;
-    return [...standFirst(w), walk(s.at), pose(act, seconds ?? def.seconds, {...(prop && !lying ? {prop} : {}), ...(s.base === 'sit' ? {base: 'sit', ...(s.seatHeight ? {seatHeight: s.seatHeight, seatTogether: true} : {})} : {}),
+    return [...standFirst(w), walk(clearAt(s) ?? s.at), pose(act, seconds ?? def.seconds, {...(prop && !lying ? {prop} : {}), ...(s.base === 'sit' ? {base: 'sit', ...(s.seatHeight ? {seatHeight: s.seatHeight, seatTogether: true} : {})} : {}),
       // CN5: lying on furniture (a gym bench) at its top; the instrument played at a music spot
       ...(lying && s.seatHeight ? {seatHeight: s.seatHeight, seatTogether: true} : {}), ...(s.instrument && (act === 'play-music' || act === 'play-piano') ? {instrument: s.instrument} : {}), ...(s.faceTo ? {face: s.faceTo} : {})})];
   };
@@ -137,7 +155,7 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
   const labelOf = (s: Spot, activity: string) => {const def = SPOT_ACTIVITIES[activity], inst = s.instrument && activity === 'play-music' ? `Play the ${s.instrument}` : def.label; return `${inst}${s.label ? ` (${s.label})` : ''}`;};
   for (const s of live) {
     if (s.base === 'lie' && !LYING_SPOT.has(s.activity)) continue;
-    if ((s.base === 'lie' && (s.activity === 'lie' || s.activity === 'nap')) || s.activity in GAME_ACTIVITIES || w.taken(s.at, s.id) || d2(s.at, w.me) > 120) continue;
+    if ((s.base === 'lie' && (s.activity === 'lie' || s.activity === 'nap')) || s.activity in GAME_ACTIVITIES || w.taken(s.at, s.id) || d2(s.at, w.me) > SPOT_REACH) continue;
     for (const activity of [s.activity, ...(s.also ?? [])]) {
       const def = SPOT_ACTIVITIES[activity], id = `${activity}:${s.id}`; if (plans.has(id)) continue;
       add({id, verb: activity, label: labelOf(s, activity), available: true, target: {id: s.id, kind: 'spot'}, params: secondsParam(def.seconds)}, {label: def.label, steps: activity === 'read' ? readAt(s) : spotSteps(s, undefined, activity), seconds: true});
@@ -149,7 +167,7 @@ export function activityCapabilities(data: SpotsData, w: ActivityWorld): {caps: 
     // a new player goes to the end/side with fewer players (a frisbee pair at the two ends, volleyball across the net)
     const used = (side: number) => court.slots.filter(x => x.side === side && w.taken(x.at, x.id)).length, sides = [...new Set(court.slots.map(x => x.side))], least = Math.min(...sides.map(used));
     for (const slot of court.slots) {
-      if (w.taken(slot.at, slot.id) || d2(slot.at, w.me) > 120 || used(slot.side) > least) continue;
+      if (w.taken(slot.at, slot.id) || d2(slot.at, w.me) > SPOT_REACH || used(slot.side) > least) continue;
       const def = SPOT_ACTIVITIES[court.activity], id = `${court.activity}:${slot.id}`; if (plans.has(id)) continue;
       add({id, verb: court.activity, label: `${def.label} (${slot.label}${playing ? `; ${playing} playing, join them` : '; a partner joins by taking another place here'})`, available: !full,
         ...(full ? {blocked: {code: 'game.full', reason: `${GAME_MAX_PLAYERS} are already playing.`}} : {}), target: {id: slot.id, kind: 'spot'}, params: secondsParam(def.seconds)},

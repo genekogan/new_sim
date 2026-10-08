@@ -24,7 +24,7 @@ export type VocabContext = {
 };
 export type VocabResult =
   | {kind: 'exact'; cap: EdgeCapability}
-  | {kind: 'alias'; cap: EdgeCapability; note: string}
+  | {kind: 'alias'; cap: EdgeCapability; note: string; params?: Record<string, unknown>}
   | {kind: 'unknown'; reason: string; didYouMean: {id: string; label: string}[];
     /** Refusal code when it is not capability.unknown (place.unreachable: a named place exists but cannot be reached). */
     code?: string};
@@ -105,7 +105,13 @@ export const NOT_YET: [RegExp, string, string[]][] = [
   [/\b(?:run|runs|running|jog|jogging|sprint|sprinting|race|hurry)\b/i, 'Bodies cannot run yet (walking only); walk or stroll instead.', ['stroll', 'wander', 'walk']],
   [/\b(?:kiss|kisses|kissing|snog)\b/i, 'Kissing is not a gesture here; hug, shake hands, high-five, bow or wave instead (hugs and handshakes ask the other Soul first).', ['hug', 'handshake', 'high-five', 'wave']],
   [/\b(?:climb|jump over|vault|cartwheel|somersault|backflip)\b/i, 'Climbing and acrobatics are not possible yet.', ['jump', 'stretch', 'dance']],
+  // CN5 (acceptance: "go fishing" walked to the playground): things nobody can do here yet are refused, never swapped
+  [/\b(?:fishing|go fish|to fish|catch (?:a |some )?fish|rowing|row (?:a |the )?boat|boating|sailing|canoeing|kayaking|paddle (?:a |the )?boat)\b/i, 'Fishing and boats are not possible yet.', ['swim', 'stroll', 'sit']],
+  [/\b(?:swinging|on the swings?|go on (?:a |the )?swing|feed(?:ing)? (?:the )?(?:ducks|birds|fish)|skateboard\w*|cycling|ride (?:a |my |the )?(?:bike|bicycle))\b/i, 'That is not possible here yet.', ['stroll', 'sit', 'dance']],
 ];
+/** CN5: "go <doing>" names an activity, not a place: these mean something here; any other is refused (never a walk). */
+const GO_ING: Record<string, string> = {swimming: 'swim', walking: 'stroll', strolling: 'stroll', hiking: 'stroll', exploring: 'stroll', wandering: 'stroll', rambling: 'stroll', sightseeing: 'stroll',
+  dancing: 'dance', reading: 'read', painting: 'paint', napping: 'nap', sitting: 'sit', exercising: 'stretch', stretching: 'stretch', singing: 'sing', shopping: 'walk market'};
 
 /** Split "verb:target" (or free text such as "hang out at the deck") into a canonical verb and the target words. */
 export function parseCapability(input: string, verbs: Set<string>): {verb: string; rest: string} {
@@ -133,7 +139,28 @@ const PLACE_VERBS = new Set(['walk', 'hang-out', 'gather', 'stroll', 'read']);
 
 export function resolveCapability(input: string, ctx: VocabContext): VocabResult {
   const exact = ctx.caps.find(c => c.id === input); if (exact) return {kind: 'exact', cap: exact};
+  // CN5 (acceptance): "A, then B" is two things. Walks and strolls chain (the earlier ones become `via` legs of the last);
+  // anything else does the first and says to act again for the rest (never a mix-up of the two).
+  const clauses = input.includes(':') ? [input] : input.split(/\s*(?:,|;)?\s+(?:and\s+)?then\s+|\s*;\s*|\s*,\s*and\s+then\s+/i).map(x => x.trim()).filter(Boolean);
+  if (clauses.length > 1) {
+    const parts = clauses.map(c => resolveCapability(c, ctx)), moves = ['walk', 'stroll'];
+    if (parts[0].kind === 'unknown') return parts[0];
+    if (parts.every(r => r.kind !== 'unknown' && moves.includes(r.cap.verb) && r.cap.target)) {
+      const last = parts.at(-1) as Exclude<VocabResult, {kind: 'unknown'}>, via = parts.slice(0, -1).map(r => (r as Exclude<VocabResult, {kind: 'unknown'}>).cap.id);
+      if (via.length <= 4) return {kind: 'alias', cap: last.cap, params: {via}, note: `${input} is ${via.join(', then ')}, then ${last.cap.id} (one act: via ${via.join(', ')}).`};
+    }
+    const first = parts[0] as Exclude<VocabResult, {kind: 'unknown'}>;
+    return {kind: 'alias', cap: first.cap, note: `${'note' in first ? first.note : `${clauses[0]} is ${first.cap.id}.`} Doing the first part now; act again for "${clauses.slice(1).join(', then ')}" when its receipt completes.`};
+  }
   const text = input.toLowerCase(), colon = text.indexOf(':'), head = colon >= 0 ? text.slice(0, colon) : '';
+  // CN5: "go fishing", "go swimming": the doing word decides; an unknown one is refused, never taken as a place
+  const going = colon < 0 ? /^(?:let'?s\s+|i\s+want\s+to\s+)?(?:go|going|went)\s+([a-z]+ing)\b(.*)$/.exec(text) : null;
+  if (going && !NOT_YET.some(([re]) => re.test(text))) {
+    const [verb, ...more] = (GO_ING[going[1]] ?? '').split(' ');
+    if (!verb) return {kind: 'unknown', reason: `"${going[1]}" is not something bodies can do here yet; nothing else was chosen in its place.`, didYouMean: suggest(input, 'stroll', '', ctx, ctx.caps.filter(c => c.id.endsWith(':here') && c.available).slice(0, 5))};
+    const sub = resolveCapability(`${verb} ${[...more, going[2].trim()].join(' ')}`.trim(), ctx);
+    return sub.kind === 'unknown' || sub.cap.verb === verb || (verb === 'stroll' && sub.cap.verb === 'wander') ? sub : {kind: 'unknown', reason: `Nothing to ${verb} is offered here right now; nothing else was chosen in its place.`, didYouMean: suggest(input, verb, '', ctx)};
+  }
   // Unsupported motions are refused honestly, with the nearest real things to do.
   if (colon < 0 || !ctx.caps.some(c => c.verb === head)) for (const [re, reason, prefer] of NOT_YET) if (re.test(colon < 0 ? text : head)) return {kind: 'unknown', reason, didYouMean: suggest(input, prefer[0], '', ctx, ctx.caps.filter(c => prefer.includes(c.verb) && c.available).slice(0, 5))};
   // Rides: "ride the balloon", "go for a balloon ride", "fly" → joining the ride object.

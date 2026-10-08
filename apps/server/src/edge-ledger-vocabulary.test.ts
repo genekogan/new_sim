@@ -118,3 +118,20 @@ test('vocabulary (CN5): computers, stage music, singing, the audience, the gym a
  assert.equal(go('play petanque'), 'play-petanque:sport-petanque-1');assert.equal(go('play boules'), 'play-petanque:sport-petanque-1');assert.equal(go('throw a frisbee'), 'play-frisbee:sport-frisbee-1');
  assert.equal(go('play beach volleyball'), 'play-volleyball:sport-volleyball-3');assert.equal(go('go for a swim'), 'swim:shore-water', 'a swim is still a swim');
 });
+test('vocabulary (CN5 acceptance): verbs never swap either — "go fishing" refused, "go swimming" swims, "A, then B" walks chain, a solo wave', () => {
+ const here = (id: string, verb: string): EdgeCapability => ({id, verb, label: id, available: true});
+ const park = {id: 'region-park', name: 'Park with pond', center: [-5, 114] as [number, number], parent: 'eden', kind: 'outdoor', walkable: true};
+ const ps = [...places, park, {id: 'region-park.playground', name: 'Playground', center: [19, 103] as [number, number], parent: 'region-park', kind: 'playground', walkable: true}];
+ const cs: EdgeCapability[] = [...caps, P('walk', 'region-park', 'Park with pond'), P('walk', 'region-park.playground', 'Playground'), {id: 'stroll:region-park', verb: 'stroll', label: 'Stroll through Park with pond', available: true, target: {id: 'region-park', kind: 'place'}},
+  here('wave:here', 'wave'), here('wander:here', 'wander'), here('sit:here', 'sit'), here('dance:here', 'dance'), {id: 'wave:s_moss', verb: 'wave', label: 'Wave to Moss', available: true, target: {id: 's_moss', kind: 'soul'}}];
+ const c6: VocabContext = {...ctx(), caps: cs, places: ps, target: c => {const p = ps.find(x => x.id === c.target?.id); return p ? {names: [p.name], around: [], at: p.center} : ctx().target(c);}};
+ const r = (s: string) => resolveCapability(s, c6);
+ for (const s of ['go fishing', "let's go fishing at the pond", 'row a boat', 'go on the swings', 'feed the ducks', 'go bowling']) assert.equal(r(s).kind, 'unknown', s);
+ assert.match((r('go bowling') as any).reason, /not something bodies can do here yet/);
+ assert.equal((r('go swimming') as any).cap.id, 'swim:shore-water');
+ const two = r('take a walk through the park, then come back to the fire') as any;
+ assert.equal(two.kind, 'alias'); assert.equal(two.cap.id, 'walk:social-eden-fire-circle'); assert.deepEqual(two.params, {via: ['stroll:region-park']});
+ const mixed = r('sit down then dance') as any; assert.equal(mixed.kind, 'alias'); assert.match(mixed.note, /act again for "dance"/);
+ assert.equal((r('wave') as any).cap.id, 'wave:here', 'a solo wave'); assert.equal((r('wave to Moss') as any).cap.id, 'wave:s_moss');
+ assert.equal((r('walk to the fish market') as any).kind, 'unknown', 'a place word with fish is a place, refused as unknown place, not "fishing"');
+});
