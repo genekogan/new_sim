@@ -20,6 +20,14 @@ export type EyesOptions = {
 type Frame = {key: string; img: string; tick: number; alt: string; heading: unknown; gaze: unknown; seen: unknown; at: number; expires: number; ms: number; frameTick: number | null};
 const num = (v: string | undefined, d: number) => {const n = Number(v); return v !== undefined && v !== '' && Number.isFinite(n) ? n : d;};
 const envNum = (k: string, d: number) => num(process.env[k], d);
+/** A inherited manager-wide viewer URL must never draw a different world's scene. */
+export function eyesViewerProblem(viewerUrl:string,cfg:{worldPath:string;publicUrl:string}):string|null{
+  try{const viewer=new URL(viewerUrl),selected=new URL(cfg.publicUrl),path=cfg.worldPath.replace(/\/$/,'');
+    if(!['http:','https:'].includes(viewer.protocol)||viewer.username||viewer.password||viewer.hash)return 'invalid Eyes viewer URL';
+    if(viewer.origin!==selected.origin||viewer.pathname.replace(/\/$/,'')!==path)return 'Eyes viewer URL does not match the selected world';
+    return null;
+  }catch{return 'invalid Eyes viewer URL';}
+}
 
 export function parseViewQuery(q: (k: string) => string | undefined): ViewRequest & {altOnly: boolean} {
   const mode = q('mode') === 'map' ? 'map' : 'eyes', small = q('size') === 'small';
@@ -32,7 +40,9 @@ export function parseViewQuery(q: (k: string) => string | undefined): ViewReques
 
 export function mountEdgeEyes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}, options: EyesOptions = {}) {
   const now = options.now ?? Date.now;
-  const renderer: EyesRenderer = options.renderer ?? (process.env.EDGE_EYES ? new EyesWorker({viewerUrl: process.env.EDGE_EYES, timeoutMs: envNum('EDGE_EYES_TIMEOUT_SECONDS', 90) * 1000}) : NO_RENDERER);
+  const viewerUrl=process.env.EDGE_EYES,problem=viewerUrl?eyesViewerProblem(viewerUrl,deps.souls.cfg):null;
+  const refused:EyesRenderer={status:()=>({...NO_RENDERER.status(),detail:problem}),render:()=>Promise.reject(new EyesUnavailable(problem!)),close(){}};
+  const renderer: EyesRenderer = options.renderer ?? (problem?refused:viewerUrl ? new EyesWorker({viewerUrl, timeoutMs: envNum('EDGE_EYES_TIMEOUT_SECONDS', 90) * 1000}) : NO_RENDERER);
   const soulMs = (options.soulSeconds ?? envNum('EDGE_EYES_SOUL_SECONDS', 30)) * 1000, globalPerMinute = options.globalPerMinute ?? envNum('EDGE_EYES_GLOBAL_PER_MINUTE', 12);
   const bucketTicks = Math.max(1, Math.round((options.bucketSeconds ?? envNum('EDGE_EYES_BUCKET_SECONDS', 10)) * TPS));
   const urlMs = (options.urlSeconds ?? envNum('EDGE_EYES_URL_SECONDS', 600)) * 1000, quality = options.quality ?? envNum('EDGE_EYES_QUALITY', 0.7);
