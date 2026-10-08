@@ -40,6 +40,8 @@ export type TakeHands = { left?: [number, number, number]; right?: [number, numb
  * Additive sleepPose carries {mat, standingFraction}: exact semantic lie/wake state,
  * without rig coordinates. It is absent in older takes and remains discrete per tick.
  * A null value = the field was cleared.
+ * attention/1 (still mars-take/4, additive): gaze {kind: look|turn|auto|face, target?: entity id, at?: [x, z], until?: tick},
+ * a Soul's own head direction; `attention` carries the point the head turns to.
  */
 export type ChangeEvent = [number, string, string, unknown];
 
