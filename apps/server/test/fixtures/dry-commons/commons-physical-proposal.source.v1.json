@@ -1,0 +1,1484 @@
+{
+  "contract": "world-commons-physical-proposal/1",
+  "status": "uninstalled-proposal",
+  "sourceCommit": "9b6db72fc2dcf45a762d7ce8e4db0b71d0418ea8",
+  "units": "metres",
+  "origin": "local-base-centre",
+  "yawConvention": "rotation.y=-yaw",
+  "ground": "flat explicit captured y0 only; not sloped shore support",
+  "corridors": [
+    {
+      "from": [
+        14,
+        4
+      ],
+      "to": [
+        9,
+        5
+      ],
+      "fullWidth": 1.4
+    },
+    {
+      "from": [
+        9,
+        5
+      ],
+      "to": [
+        4,
+        5
+      ],
+      "fullWidth": 1.4
+    }
+  ],
+  "placements": [
+    {
+      "id": "commons-pavilion",
+      "kind": "pavilion",
+      "p": [
+        9,
+        0,
+        -5
+      ],
+      "yaw": 0,
+      "inspection": {
+        "kind": "pavilion",
+        "origin": "local base centre",
+        "units": "metres",
+        "footprint": [
+          6,
+          4
+        ],
+        "parts": [
+          {
+            "name": "post-foot-0",
+            "material": "stone",
+            "centre": [
+              -2.75,
+              0.08,
+              -1.75
+            ],
+            "size": [
+              0.38,
+              0.16,
+              0.38
+            ]
+          },
+          {
+            "name": "post-0",
+            "material": "timber",
+            "centre": [
+              -2.75,
+              1.3,
+              -1.75
+            ],
+            "size": [
+              0.18,
+              2.6,
+              0.18
+            ]
+          },
+          {
+            "name": "post-collar-0",
+            "material": "mutedmetal",
+            "centre": [
+              -2.75,
+              0.24,
+              -1.75
+            ],
+            "size": [
+              0.2,
+              0.06,
+              0.2
+            ]
+          },
+          {
+            "name": "post-foot-1",
+            "material": "stone",
+            "centre": [
+              2.75,
+              0.08,
+              -1.75
+            ],
+            "size": [
+              0.38,
+              0.16,
+              0.38
+            ]
+          },
+          {
+            "name": "post-1",
+            "material": "timber",
+            "centre": [
+              2.75,
+              1.3,
+              -1.75
+            ],
+            "size": [
+              0.18,
+              2.6,
+              0.18
+            ]
+          },
+          {
+            "name": "post-collar-1",
+            "material": "mutedmetal",
+            "centre": [
+              2.75,
+              0.24,
+              -1.75
+            ],
+            "size": [
+              0.2,
+              0.06,
+              0.2
+            ]
+          },
+          {
+            "name": "post-foot-2",
+            "material": "stone",
+            "centre": [
+              -2.75,
+              0.08,
+              1.75
+            ],
+            "size": [
+              0.38,
+              0.16,
+              0.38
+            ]
+          },
+          {
+            "name": "post-2",
+            "material": "timber",
+            "centre": [
+              -2.75,
+              1.3,
+              1.75
+            ],
+            "size": [
+              0.18,
+              2.6,
+              0.18
+            ]
+          },
+          {
+            "name": "post-collar-2",
+            "material": "mutedmetal",
+            "centre": [
+              -2.75,
+              0.24,
+              1.75
+            ],
+            "size": [
+              0.2,
+              0.06,
+              0.2
+            ]
+          },
+          {
+            "name": "post-foot-3",
+            "material": "stone",
+            "centre": [
+              2.75,
+              0.08,
+              1.75
+            ],
+            "size": [
+              0.38,
+              0.16,
+              0.38
+            ]
+          },
+          {
+            "name": "post-3",
+            "material": "timber",
+            "centre": [
+              2.75,
+              1.3,
+              1.75
+            ],
+            "size": [
+              0.18,
+              2.6,
+              0.18
+            ]
+          },
+          {
+            "name": "post-collar-3",
+            "material": "mutedmetal",
+            "centre": [
+              2.75,
+              0.24,
+              1.75
+            ],
+            "size": [
+              0.2,
+              0.06,
+              0.2
+            ]
+          },
+          {
+            "name": "eave-beam--1.75",
+            "material": "bark",
+            "centre": [
+              0,
+              2.57,
+              -1.75
+            ],
+            "size": [
+              5.8,
+              0.22,
+              0.18
+            ]
+          },
+          {
+            "name": "eave-beam-1.75",
+            "material": "bark",
+            "centre": [
+              0,
+              2.57,
+              1.75
+            ],
+            "size": [
+              5.8,
+              0.22,
+              0.18
+            ]
+          },
+          {
+            "name": "cross-beam--2.75",
+            "material": "timber",
+            "centre": [
+              -2.75,
+              2.57,
+              0
+            ],
+            "size": [
+              0.18,
+              0.22,
+              3.7
+            ]
+          },
+          {
+            "name": "cross-beam-2.75",
+            "material": "timber",
+            "centre": [
+              2.75,
+              2.57,
+              0
+            ],
+            "size": [
+              0.18,
+              0.22,
+              3.7
+            ]
+          },
+          {
+            "name": "shaded-ceiling",
+            "material": "plaster",
+            "centre": [
+              0,
+              2.735,
+              0
+            ],
+            "size": [
+              6,
+              0.13,
+              4
+            ]
+          },
+          {
+            "name": "roof-rib-0",
+            "material": "timber",
+            "centre": [
+              -2.7,
+              2.82,
+              0
+            ],
+            "size": [
+              0.065,
+              0.04,
+              4
+            ]
+          },
+          {
+            "name": "roof-rib-1",
+            "material": "timber",
+            "centre": [
+              -1.8000000000000003,
+              2.82,
+              0
+            ],
+            "size": [
+              0.065,
+              0.04,
+              4
+            ]
+          },
+          {
+            "name": "roof-rib-2",
+            "material": "timber",
+            "centre": [
+              -0.9000000000000001,
+              2.82,
+              0
+            ],
+            "size": [
+              0.065,
+              0.04,
+              4
+            ]
+          },
+          {
+            "name": "roof-rib-3",
+            "material": "timber",
+            "centre": [
+              0,
+              2.82,
+              0
+            ],
+            "size": [
+              0.065,
+              0.04,
+              4
+            ]
+          },
+          {
+            "name": "roof-rib-4",
+            "material": "timber",
+            "centre": [
+              0.8999999999999999,
+              2.82,
+              0
+            ],
+            "size": [
+              0.065,
+              0.04,
+              4
+            ]
+          },
+          {
+            "name": "roof-rib-5",
+            "material": "timber",
+            "centre": [
+              1.7999999999999998,
+              2.82,
+              0
+            ],
+            "size": [
+              0.065,
+              0.04,
+              4
+            ]
+          },
+          {
+            "name": "roof-rib-6",
+            "material": "timber",
+            "centre": [
+              2.7,
+              2.82,
+              0
+            ],
+            "size": [
+              0.065,
+              0.04,
+              4
+            ]
+          },
+          {
+            "name": "roof-cap",
+            "material": "bark",
+            "centre": [
+              0,
+              2.87,
+              -0.7
+            ],
+            "size": [
+              6,
+              0.06,
+              0.28
+            ]
+          }
+        ],
+        "bounds": {
+          "min": [
+            -3,
+            0,
+            -2
+          ],
+          "max": [
+            3,
+            2.9,
+            2
+          ]
+        },
+        "clearances": [
+          {
+            "name": "central-open-aisle",
+            "min": [
+              -1,
+              0,
+              -2
+            ],
+            "max": [
+              1,
+              2.46,
+              2
+            ]
+          }
+        ],
+        "proposedSurfaces": [
+          {
+            "name": "rigid-post-bases-not-terrain-fitted",
+            "centre": [
+              0,
+              0,
+              0
+            ],
+            "size": [
+              6,
+              4
+            ],
+            "normal": [
+              0,
+              1,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "commons-platform",
+      "kind": "presentation-platform",
+      "p": [
+        9,
+        0,
+        -1.8
+      ],
+      "yaw": 0,
+      "inspection": {
+        "kind": "presentation-platform",
+        "origin": "local base centre",
+        "units": "metres",
+        "footprint": [
+          3,
+          2
+        ],
+        "parts": [
+          {
+            "name": "low-stone-plinth",
+            "material": "stone",
+            "centre": [
+              0,
+              0.085,
+              0
+            ],
+            "size": [
+              3,
+              0.17,
+              2
+            ]
+          },
+          {
+            "name": "deck-board-0",
+            "material": "timber",
+            "centre": [
+              0,
+              0.205,
+              -0.9
+            ],
+            "size": [
+              3,
+              0.07,
+              0.19
+            ]
+          },
+          {
+            "name": "deck-board-1",
+            "material": "timber",
+            "centre": [
+              0,
+              0.205,
+              -0.7
+            ],
+            "size": [
+              3,
+              0.07,
+              0.19
+            ]
+          },
+          {
+            "name": "deck-board-2",
+            "material": "timber",
+            "centre": [
+              0,
+              0.205,
+              -0.5
+            ],
+            "size": [
+              3,
+              0.07,
+              0.19
+            ]
+          },
+          {
+            "name": "deck-board-3",
+            "material": "timber",
+            "centre": [
+              0,
+              0.205,
+              -0.29999999999999993
+            ],
+            "size": [
+              3,
+              0.07,
+              0.19
+            ]
+          },
+          {
+            "name": "deck-board-4",
+            "material": "timber",
+            "centre": [
+              0,
+              0.205,
+              -0.09999999999999998
+            ],
+            "size": [
+              3,
+              0.07,
+              0.19
+            ]
+          },
+          {
+            "name": "deck-board-5",
+            "material": "timber",
+            "centre": [
+              0,
+              0.205,
+              0.09999999999999998
+            ],
+            "size": [
+              3,
+              0.07,
+              0.19
+            ]
+          },
+          {
+            "name": "deck-board-6",
+            "material": "timber",
+            "centre": [
+              0,
+              0.205,
+              0.30000000000000016
+            ],
+            "size": [
+              3,
+              0.07,
+              0.19
+            ]
+          },
+          {
+            "name": "deck-board-7",
+            "material": "timber",
+            "centre": [
+              0,
+              0.205,
+              0.5000000000000001
+            ],
+            "size": [
+              3,
+              0.07,
+              0.19
+            ]
+          },
+          {
+            "name": "deck-board-8",
+            "material": "timber",
+            "centre": [
+              0,
+              0.205,
+              0.7000000000000001
+            ],
+            "size": [
+              3,
+              0.07,
+              0.19
+            ]
+          },
+          {
+            "name": "deck-board-9",
+            "material": "timber",
+            "centre": [
+              0,
+              0.205,
+              0.9
+            ],
+            "size": [
+              3,
+              0.07,
+              0.19
+            ]
+          },
+          {
+            "name": "front-edge-band",
+            "material": "bark",
+            "centre": [
+              0,
+              0.16,
+              0.975
+            ],
+            "size": [
+              3,
+              0.06,
+              0.05
+            ]
+          }
+        ],
+        "bounds": {
+          "min": [
+            -1.5,
+            0,
+            -1
+          ],
+          "max": [
+            1.5,
+            0.24,
+            1
+          ]
+        },
+        "clearances": [
+          {
+            "name": "open-above-deck",
+            "min": [
+              -1.5,
+              0.24,
+              -1
+            ],
+            "max": [
+              1.5,
+              2.24,
+              1
+            ]
+          }
+        ],
+        "proposedSurfaces": [
+          {
+            "name": "presentation-deck",
+            "centre": [
+              0,
+              0.24,
+              0
+            ],
+            "size": [
+              3,
+              2
+            ],
+            "normal": [
+              0,
+              1,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "commons-bench-west",
+      "kind": "bench",
+      "p": [
+        6,
+        0,
+        3
+      ],
+      "yaw": 3.141592653589793,
+      "inspection": {
+        "kind": "bench",
+        "origin": "local base centre",
+        "units": "metres",
+        "footprint": [
+          2,
+          0.65
+        ],
+        "parts": [
+          {
+            "name": "leg-frame--0.72",
+            "material": "bark",
+            "centre": [
+              -0.72,
+              0.2,
+              0
+            ],
+            "size": [
+              0.13,
+              0.4,
+              0.58
+            ]
+          },
+          {
+            "name": "back-upright--0.72",
+            "material": "timber",
+            "centre": [
+              -0.72,
+              0.59,
+              -0.275
+            ],
+            "size": [
+              0.08,
+              0.62,
+              0.08
+            ]
+          },
+          {
+            "name": "leg-frame-0.72",
+            "material": "bark",
+            "centre": [
+              0.72,
+              0.2,
+              0
+            ],
+            "size": [
+              0.13,
+              0.4,
+              0.58
+            ]
+          },
+          {
+            "name": "back-upright-0.72",
+            "material": "timber",
+            "centre": [
+              0.72,
+              0.59,
+              -0.275
+            ],
+            "size": [
+              0.08,
+              0.62,
+              0.08
+            ]
+          },
+          {
+            "name": "under-seat-stretcher",
+            "material": "bark",
+            "centre": [
+              0,
+              0.23,
+              0
+            ],
+            "size": [
+              1.55,
+              0.1,
+              0.1
+            ]
+          },
+          {
+            "name": "seat-slat-0",
+            "material": "timber",
+            "centre": [
+              0,
+              0.42,
+              -0.22
+            ],
+            "size": [
+              2,
+              0.06,
+              0.1
+            ]
+          },
+          {
+            "name": "seat-slat-1",
+            "material": "timber",
+            "centre": [
+              0,
+              0.42,
+              -0.11
+            ],
+            "size": [
+              2,
+              0.06,
+              0.1
+            ]
+          },
+          {
+            "name": "seat-slat-2",
+            "material": "timber",
+            "centre": [
+              0,
+              0.42,
+              0
+            ],
+            "size": [
+              2,
+              0.06,
+              0.1
+            ]
+          },
+          {
+            "name": "seat-slat-3",
+            "material": "timber",
+            "centre": [
+              0,
+              0.42,
+              0.11000000000000001
+            ],
+            "size": [
+              2,
+              0.06,
+              0.1
+            ]
+          },
+          {
+            "name": "seat-slat-4",
+            "material": "timber",
+            "centre": [
+              0,
+              0.42,
+              0.22
+            ],
+            "size": [
+              2,
+              0.06,
+              0.1
+            ]
+          },
+          {
+            "name": "back-slat-0",
+            "material": "timber",
+            "centre": [
+              0,
+              0.61,
+              -0.275
+            ],
+            "size": [
+              2,
+              0.09,
+              0.1
+            ]
+          },
+          {
+            "name": "back-slat-1",
+            "material": "timber",
+            "centre": [
+              0,
+              0.73,
+              -0.275
+            ],
+            "size": [
+              2,
+              0.09,
+              0.1
+            ]
+          },
+          {
+            "name": "back-slat-2",
+            "material": "timber",
+            "centre": [
+              0,
+              0.85,
+              -0.275
+            ],
+            "size": [
+              2,
+              0.09,
+              0.1
+            ]
+          },
+          {
+            "name": "seat-end-cap--0.95",
+            "material": "bark",
+            "centre": [
+              -0.95,
+              0.41,
+              0.3
+            ],
+            "size": [
+              0.1,
+              0.08,
+              0.05
+            ]
+          },
+          {
+            "name": "seat-end-cap-0.95",
+            "material": "bark",
+            "centre": [
+              0.95,
+              0.41,
+              0.3
+            ],
+            "size": [
+              0.1,
+              0.08,
+              0.05
+            ]
+          }
+        ],
+        "bounds": {
+          "min": [
+            -1,
+            0,
+            -0.325
+          ],
+          "max": [
+            1,
+            0.8999999999999999,
+            0.325
+          ]
+        },
+        "clearances": [
+          {
+            "name": "front-approach-proposal",
+            "min": [
+              -1,
+              0,
+              0.325
+            ],
+            "max": [
+              1,
+              1.75,
+              1.125
+            ]
+          }
+        ],
+        "proposedSurfaces": [
+          {
+            "name": "slatted-seat",
+            "centre": [
+              0,
+              0.45,
+              0
+            ],
+            "size": [
+              2,
+              0.54
+            ],
+            "normal": [
+              0,
+              1,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "commons-bench-east",
+      "kind": "bench",
+      "p": [
+        12,
+        0,
+        3
+      ],
+      "yaw": 3.141592653589793,
+      "inspection": {
+        "kind": "bench",
+        "origin": "local base centre",
+        "units": "metres",
+        "footprint": [
+          2,
+          0.65
+        ],
+        "parts": [
+          {
+            "name": "leg-frame--0.72",
+            "material": "bark",
+            "centre": [
+              -0.72,
+              0.2,
+              0
+            ],
+            "size": [
+              0.13,
+              0.4,
+              0.58
+            ]
+          },
+          {
+            "name": "back-upright--0.72",
+            "material": "timber",
+            "centre": [
+              -0.72,
+              0.59,
+              -0.275
+            ],
+            "size": [
+              0.08,
+              0.62,
+              0.08
+            ]
+          },
+          {
+            "name": "leg-frame-0.72",
+            "material": "bark",
+            "centre": [
+              0.72,
+              0.2,
+              0
+            ],
+            "size": [
+              0.13,
+              0.4,
+              0.58
+            ]
+          },
+          {
+            "name": "back-upright-0.72",
+            "material": "timber",
+            "centre": [
+              0.72,
+              0.59,
+              -0.275
+            ],
+            "size": [
+              0.08,
+              0.62,
+              0.08
+            ]
+          },
+          {
+            "name": "under-seat-stretcher",
+            "material": "bark",
+            "centre": [
+              0,
+              0.23,
+              0
+            ],
+            "size": [
+              1.55,
+              0.1,
+              0.1
+            ]
+          },
+          {
+            "name": "seat-slat-0",
+            "material": "timber",
+            "centre": [
+              0,
+              0.42,
+              -0.22
+            ],
+            "size": [
+              2,
+              0.06,
+              0.1
+            ]
+          },
+          {
+            "name": "seat-slat-1",
+            "material": "timber",
+            "centre": [
+              0,
+              0.42,
+              -0.11
+            ],
+            "size": [
+              2,
+              0.06,
+              0.1
+            ]
+          },
+          {
+            "name": "seat-slat-2",
+            "material": "timber",
+            "centre": [
+              0,
+              0.42,
+              0
+            ],
+            "size": [
+              2,
+              0.06,
+              0.1
+            ]
+          },
+          {
+            "name": "seat-slat-3",
+            "material": "timber",
+            "centre": [
+              0,
+              0.42,
+              0.11000000000000001
+            ],
+            "size": [
+              2,
+              0.06,
+              0.1
+            ]
+          },
+          {
+            "name": "seat-slat-4",
+            "material": "timber",
+            "centre": [
+              0,
+              0.42,
+              0.22
+            ],
+            "size": [
+              2,
+              0.06,
+              0.1
+            ]
+          },
+          {
+            "name": "back-slat-0",
+            "material": "timber",
+            "centre": [
+              0,
+              0.61,
+              -0.275
+            ],
+            "size": [
+              2,
+              0.09,
+              0.1
+            ]
+          },
+          {
+            "name": "back-slat-1",
+            "material": "timber",
+            "centre": [
+              0,
+              0.73,
+              -0.275
+            ],
+            "size": [
+              2,
+              0.09,
+              0.1
+            ]
+          },
+          {
+            "name": "back-slat-2",
+            "material": "timber",
+            "centre": [
+              0,
+              0.85,
+              -0.275
+            ],
+            "size": [
+              2,
+              0.09,
+              0.1
+            ]
+          },
+          {
+            "name": "seat-end-cap--0.95",
+            "material": "bark",
+            "centre": [
+              -0.95,
+              0.41,
+              0.3
+            ],
+            "size": [
+              0.1,
+              0.08,
+              0.05
+            ]
+          },
+          {
+            "name": "seat-end-cap-0.95",
+            "material": "bark",
+            "centre": [
+              0.95,
+              0.41,
+              0.3
+            ],
+            "size": [
+              0.1,
+              0.08,
+              0.05
+            ]
+          }
+        ],
+        "bounds": {
+          "min": [
+            -1,
+            0,
+            -0.325
+          ],
+          "max": [
+            1,
+            0.8999999999999999,
+            0.325
+          ]
+        },
+        "clearances": [
+          {
+            "name": "front-approach-proposal",
+            "min": [
+              -1,
+              0,
+              0.325
+            ],
+            "max": [
+              1,
+              1.75,
+              1.125
+            ]
+          }
+        ],
+        "proposedSurfaces": [
+          {
+            "name": "slatted-seat",
+            "centre": [
+              0,
+              0.45,
+              0
+            ],
+            "size": [
+              2,
+              0.54
+            ],
+            "normal": [
+              0,
+              1,
+              0
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "commons-table",
+      "kind": "table",
+      "p": [
+        12,
+        0,
+        -5
+      ],
+      "yaw": 0,
+      "inspection": {
+        "kind": "table",
+        "origin": "local base centre",
+        "units": "metres",
+        "footprint": [
+          1.4,
+          0.8
+        ],
+        "parts": [
+          {
+            "name": "leg--0.51--0.25",
+            "material": "bark",
+            "centre": [
+              -0.51,
+              0.34,
+              -0.25
+            ],
+            "size": [
+              0.09,
+              0.68,
+              0.09
+            ]
+          },
+          {
+            "name": "leg--0.51-0.25",
+            "material": "bark",
+            "centre": [
+              -0.51,
+              0.34,
+              0.25
+            ],
+            "size": [
+              0.09,
+              0.68,
+              0.09
+            ]
+          },
+          {
+            "name": "leg-0.51--0.25",
+            "material": "bark",
+            "centre": [
+              0.51,
+              0.34,
+              -0.25
+            ],
+            "size": [
+              0.09,
+              0.68,
+              0.09
+            ]
+          },
+          {
+            "name": "leg-0.51-0.25",
+            "material": "bark",
+            "centre": [
+              0.51,
+              0.34,
+              0.25
+            ],
+            "size": [
+              0.09,
+              0.68,
+              0.09
+            ]
+          },
+          {
+            "name": "lower-stretcher",
+            "material": "timber",
+            "centre": [
+              0,
+              0.22,
+              0
+            ],
+            "size": [
+              1.1,
+              0.08,
+              0.09
+            ]
+          },
+          {
+            "name": "apron--0.25",
+            "material": "bark",
+            "centre": [
+              0,
+              0.635,
+              -0.25
+            ],
+            "size": [
+              1.18,
+              0.1,
+              0.06
+            ]
+          },
+          {
+            "name": "apron-0.25",
+            "material": "bark",
+            "centre": [
+              0,
+              0.635,
+              0.25
+            ],
+            "size": [
+              1.18,
+              0.1,
+              0.06
+            ]
+          },
+          {
+            "name": "top-board-0",
+            "material": "timber",
+            "centre": [
+              0,
+              0.72,
+              -0.3
+            ],
+            "size": [
+              1.4,
+              0.06,
+              0.19
+            ]
+          },
+          {
+            "name": "top-board-1",
+            "material": "timber",
+            "centre": [
+              0,
+              0.72,
+              -0.09999999999999998
+            ],
+            "size": [
+              1.4,
+              0.06,
+              0.19
+            ]
+          },
+          {
+            "name": "top-board-2",
+            "material": "timber",
+            "centre": [
+              0,
+              0.72,
+              0.10000000000000003
+            ],
+            "size": [
+              1.4,
+              0.06,
+              0.19
+            ]
+          },
+          {
+            "name": "top-board-3",
+            "material": "timber",
+            "centre": [
+              0,
+              0.72,
+              0.3000000000000001
+            ],
+            "size": [
+              1.4,
+              0.06,
+              0.19
+            ]
+          },
+          {
+            "name": "top-end-inlay",
+            "material": "mutedmetal",
+            "centre": [
+              0.66,
+              0.7485,
+              0
+            ],
+            "size": [
+              0.025,
+              0.003,
+              0.8
+            ]
+          }
+        ],
+        "bounds": {
+          "min": [
+            -0.7,
+            0,
+            -0.4
+          ],
+          "max": [
+            0.7,
+            0.75,
+            0.4
+          ]
+        },
+        "clearances": [
+          {
+            "name": "under-table-knee-proposal",
+            "min": [
+              -0.46,
+              0.28,
+              -0.22
+            ],
+            "max": [
+              0.46,
+              0.58,
+              0.22
+            ]
+          }
+        ],
+        "proposedSurfaces": [
+          {
+            "name": "tabletop",
+            "centre": [
+              0,
+              0.75,
+              0
+            ],
+            "size": [
+              1.4,
+              0.8
+            ],
+            "normal": [
+              0,
+              1,
+              0
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "limitations": [
+    "per-part boxes describe render geometry, not canonical colliders",
+    "pavilion roof footprint cannot be treated as ground-level solid obstacle",
+    "proposed surfaces are not installed support or body slots",
+    "bench facing rotates local +Z front by negative yaw",
+    "table protrudes beyond pavilion east footprint by .7m",
+    "Core owns installed colliders/support/nav/slots/rules/history compatibility"
+  ]
+}

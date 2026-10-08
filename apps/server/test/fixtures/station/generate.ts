@@ -25,6 +25,7 @@ import {Hub} from '../../../src/hub.ts';
 import {Souls} from '../../../src/souls.ts';
 import {buildApp} from '../../../src/http.ts';
 import {config} from '../../../src/config.ts';
+import {waitForSocketCondition} from '../../socket-condition.ts';
 
 export const STATION_FIXTURE_WORLD='core-native-station-fixture';
 export const STATION_PRIVATE='PRIVATE_STATION_FIXTURE';
@@ -102,7 +103,7 @@ export async function generateStationFixture(){
     const address=server!.address();assert.ok(address&&typeof address!=='string');const origin='http://127.0.0.1:'+address.port;
     async function joinClient(){const ws=new WebSocket(origin.replace('http:','ws:')+'/ws'),own:any[]=[];sockets.push(ws);ws.on('message',data=>{const m=JSON.parse(String(data));messages.push(m);own.push(m);});
       await once(ws,'open');ws.send(JSON.stringify({t:'hello',proto:1}));
-      for(let n=0;n<100&&!own.some(m=>m.t==='station');n++)await setImmediate();assert.ok(own.some(m=>m.t==='station'));return {ws,messages:own};}
+      await waitForSocketCondition(ws,()=>own.some(m=>m.t==='station'),'initial station');assert.ok(own.some(m=>m.t==='station'));return {ws,messages:own};}
     const firstClient=await joinClient();
     async function get(path:string){const response=await fetch(origin+path);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');return response.json();}
     const publicLive=await get('/v1/station');assert.deepEqual(publicLive,restarted.view());
@@ -114,7 +115,7 @@ export async function generateStationFixture(){
     const captureHash=(pairedTakes[0] as any).chunks[0].take.renderSceneRef.hash,capture=await get('/v1/scenes/'+captureHash);
     const snapshot=restored.snapshotView();
     const streamed=await acceptStationFixture(restored,restarted.record());
-    for(let n=0;n<100&&!messages.some(m=>m.t==='station'&&m.view.anchor?.revision===streamed.anchor!.revision);n++)await setImmediate();
+    await waitForSocketCondition(firstClient.ws,()=>firstClient.messages.some(m=>m.t==='station'&&m.view.anchor?.revision===streamed.anchor!.revision),'streamed station revision');
     assert.deepEqual(messages.find(m=>m.t==='station'&&m.view.anchor?.revision===streamed.anchor!.revision).view,streamed);
     const closed=once(firstClient.ws,'close');firstClient.ws.terminate();await closed;
     const rejoined=await joinClient();assert.deepEqual(rejoined.messages.find(m=>m.t==='station').view,streamed);
@@ -124,7 +125,7 @@ export async function generateStationFixture(){
     assert.deepEqual(finalGenesis.stationHistoryV1(),finalHistory);assert.equal(finalGenesis.engine.stateHash(),bodyHash);assert.equal(kernelHash(finalGenesis.kernel),kh);
     const publicOutput={views,restart,live:publicLive,streamed,history,pairedTakes,capture,snapshot,facts};
     assert.ok(!JSON.stringify({publicOutput,messages}).includes(STATION_PRIVATE));assert.equal(db.paidCost(),0);
-    for(let n=0;n<50&&!messages.some(m=>m.t==='station');n++)await setImmediate();
+    await waitForSocketCondition(rejoined.ws,()=>rejoined.messages.some(m=>m.t==='station'),'reconnected station');
     assert.deepEqual(messages.find(m=>m.t==='station').view,publicLive);
     const authored=['packages/protocol/src/station-v1.ts','packages/protocol/src/index.ts','apps/server/src/station.ts','apps/server/src/station-history.ts',
       'apps/server/src/world.ts','apps/server/src/fold.ts','apps/server/src/http.ts','apps/server/src/hub.ts','apps/server/test/fixtures/station/generate.ts'];

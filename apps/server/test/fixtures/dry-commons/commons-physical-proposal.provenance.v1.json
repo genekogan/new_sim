@@ -1,0 +1,8 @@
+{
+  "contract": "public-fixture-source/1",
+  "originalSource": "team/reviews/world-commons-physical-proposal-20261004.json",
+  "worldSourceCommit": "9b6db72fc2dcf45a762d7ce8e4db0b71d0418ea8",
+  "bytes": 29776,
+  "sha256": "8a20d529865951d4d5cb140bd78de8a753b8eacde2f5e76464fdee48b896343a",
+  "scope": "Exact original accepted public physical proposal; portable input for unchanged installed-commons recording, not current geometry substitution."
+}

@@ -23,6 +23,7 @@ import { IntentPublisher, IntentPurposeConflict } from './intent-publisher.ts';
 import { IntentRequests, IntentRequestUnavailable, type RequestReservation, type IntentRequestScope } from './intent-requests.ts';
 import { Souls } from './souls.ts';
 import { WorldHost, replayKernel } from './world.ts';
+import { waitForSocketCondition } from '../test/socket-condition.ts';
 
 const words = 'PRIVATE_OWNER_WORDS drink tea later';
 const interpretation = { summary: 'PRIVATE_INTERPRETATION rest here', agenda: [{ card: 'rest', target: null }], trigger: { kind: 'none' as const } };
@@ -237,13 +238,14 @@ test('named public HTTP/real WS handlers and takes exclude private publication; 
   ws.on('message', data => messages.push(JSON.parse(String(data))));
   t.after(async () => { ws.terminate(); hub.wss.close(); await new Promise<void>(resolve => server.close(() => resolve())); });
   await once(ws, 'open'); ws.send(JSON.stringify({ t: 'hello', proto: 1 }));
+  await waitForSocketCondition(ws, () => messages.some(m => m.t === 'welcome'), 'welcome before publication');
   const result = await publish(f, await receive(f, 'PRIVATE_REQUEST'));
   assert.equal(result.receipt?.phase,'understood');
   const revision=result.receipt?.phase==='understood'?result.receipt.revision:null;assert.ok(revision);
   const decision=f.host.enqueueIntentDecision('brain:reflex',{soulId:'s_A',entityId:'h_A',option:'rest',label:'rest',steps:[{verb:'rest',params:{seconds:1}}],reevalTicks:1200,fallback:false,trigger:'new-intent-v2'},
     {intentId:revision.intentId,version:revision.version},()=>true);f.host.drainInputs();await decision;
   for (let i = 0; i < 65; i++) f.host.tickOnce();
-  for (let i = 0; i < 50 && !messages.some(m => m.t === 'batch' && m.log.some((e: any) => e.kind === 'intent-v2')); i++) await setImmediate();
+  await waitForSocketCondition(ws, () => messages.some(m => m.t === 'batch' && m.log.some((e: any) => e.kind === 'intent-v2')), 'named public publication');
   assert.ok(messages.some(m => m.t === 'batch' && m.log.some((e: any) => e.kind === 'intent-v2')), 'real socket sees named public publication');
   assert.ok(messages.some(m => m.t === 'batch' && m.log.some((e: any) => e.kind === 'intent-admission-v2')), 'real socket sees named redacted admission');
   for (const path of ['/v1/log', '/v1/kernel', '/v1/world', '/v1/debug/world', '/v1/takes', '/v1/take']) {

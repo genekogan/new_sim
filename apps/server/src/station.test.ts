@@ -91,7 +91,7 @@ test('fresh current-source native station generation still reconstructs through 
 });
 test('new actual Core selections/retentions agree with the exact pinned inactive App policy on recorded native samples',async()=>{
   const f=JSON.parse(readFileSync(new URL('../test/fixtures/station/native-station.v1.json',import.meta.url),'utf8'));
-  const source=execFileSync('git',['show','ce2813609500d2b0944706cba4e47e6c7b83fda9:tools/score/station-policy.mjs'],{cwd:fileURLToPath(new URL('../../../',import.meta.url)),encoding:'utf8'});
+  const source=readFileSync(new URL('../test/fixtures/station/station-policy.source.v1.mjs',import.meta.url),'utf8');
   assert.equal(createHash('sha256').update(source).digest('hex'),'3f5e3fb89cd53287847035095765acda0f3f90b4d822c945c27e54b5d3ba7137');
   const {selectStation}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
   let previous:any=null;

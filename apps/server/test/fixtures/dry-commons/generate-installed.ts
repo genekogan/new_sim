@@ -89,10 +89,11 @@ export async function generateInstalledCommons(){
   const captures=[];for(const hash of refs)captures.push(await anonymous(`/v1/scenes/${hash}`));
   const publication={scene,stream,captures,initialSnapshot,snapshot:genesis.snapshotView(),kernel:genesis.kernelView()};
   assert.equal(JSON.stringify(publication).includes(PRIVATE),false);assert.equal(db.paidCost(),0);
-  const proposalFile=new URL('../../../../../../../team/reviews/world-commons-physical-proposal-20261004.json',import.meta.url);
+  const proposalFile=new URL('./commons-physical-proposal.source.v1.json',import.meta.url);
   // Team source is coordination input; hash the exact accepted packet without
   // baking a workstation path into the public fixture.
   const proposalHash=createHash('sha256').update(readFileSync(proposalFile)).digest('hex');
+  assert.equal(proposalHash,'8a20d529865951d4d5cb140bd78de8a753b8eacde2f5e76464fdee48b896343a','exact original public physical proposal');
   return JSON.parse(JSON.stringify({contract:'core-installed-commons-fixture/1',worldId:INSTALLED_COMMONS_WORLD,
    producer:{semanticsParent:'13d87b2c5736ad23f71bc09755fcd94428887138',seed,config:INSTALLED_COMMONS_CFG,worldSource:'9b6db72fc2dcf45a762d7ce8e4db0b71d0418ea8',physicalProposalHash:proposalHash},
    scope:'Canonical isolated dry commons/1 installation; no existing-world migration, default/live rollout, natural-language compiler, generic slope/climb/water/boat or dance grant',

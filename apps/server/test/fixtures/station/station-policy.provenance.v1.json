@@ -1,0 +1,8 @@
+{
+  "contract": "public-fixture-source/1",
+  "sourceCommit": "ce2813609500d2b0944706cba4e47e6c7b83fda9",
+  "sourcePath": "tools/score/station-policy.mjs",
+  "bytes": 2318,
+  "sha256": "3f5e3fb89cd53287847035095765acda0f3f90b4d822c945c27e54b5d3ba7137",
+  "scope": "Exact pinned inactive App policy from original branch; no current-policy substitution. Makes original hash comparison portable."
+}
