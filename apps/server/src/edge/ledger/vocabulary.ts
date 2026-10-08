@@ -171,6 +171,10 @@ export function resolveCapability(input: string, ctx: VocabContext): VocabResult
     if (pick) return {kind: 'alias', cap: pick, note: `${input} is ${pick.id} (${pick.label}).`};
   }
   const verbs = new Set(ctx.caps.map(c => c.verb)); let {verb, rest} = parseCapability(input, verbs);
+  // A real fire is a qualifier of the existing fire request, not a new seat name.
+  // Keep explicit/named IDs intact and require an offered actual fire before dropping it.
+  const realFire = colon < 0 && ['sit', 'warm-by-fire'].includes(verb) ? /^(?:by|near|beside)\s+(?:a|the)\s+real\s+(fire|campfire)[.!]?$/i.exec(rest) : null;
+  if (realFire && ctx.caps.some(c => c.verb === 'warm-by-fire' && c.target?.kind === 'object')) rest = 'fire';
   // "stroll" with nothing named is a stroll right here.
   if (verb === 'stroll' && !tokens(rest).length && !ctx.caps.some(c => c.id === 'stroll:here')) {const w = ctx.caps.find(c => c.id === 'wander:here'); if (w) return {kind: 'alias', cap: w, note: `${input} is ${w.id}.`};}
   if (verb === 'stroll' && !verbs.has('stroll') && verbs.has('wander')) verb = 'wander';

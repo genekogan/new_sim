@@ -135,3 +135,19 @@ test('vocabulary (CN5 acceptance): verbs never swap either — "go fishing" refu
  assert.equal((r('wave') as any).cap.id, 'wave:here', 'a solo wave'); assert.equal((r('wave to Moss') as any).cap.id, 'wave:s_moss');
  assert.equal((r('walk to the fish market') as any).kind, 'unknown', 'a place word with fish is a place, refused as unknown place, not "fishing"');
 });
+
+
+test('real-fire qualifier keeps sit as an offered fire seat, warm as the actual fire, and refuses missing/named alternatives',()=>{
+ const seat:EdgeCapability={id:'sit:fire-bench',verb:'sit',label:'Fire Bench South',target:{id:'fire-bench',kind:'object'},available:true};
+ const fire:EdgeCapability={id:'warm-by-fire:actual-fire',verb:'warm-by-fire',label:'Warm by the fire',target:{id:'actual-fire',kind:'object'},available:true};
+ const ordinary:EdgeCapability={id:'sit:plain-bench',verb:'sit',label:'Nearer ordinary bench',target:{id:'plain-bench',kind:'object'},available:true};
+ const c:VocabContext={caps:[seat,fire,ordinary],places:[],root:['eden'],me:[0,0],target:cap=>({names:[cap.label],around:[],at:cap===ordinary?[1,0]:[12,0]})};
+ for(const verb of ['sit','warm'])for(const prep of ['by','near','beside'])for(const article of ['a','the'])for(const noun of ['fire','campfire']){
+  const words=`${verb} ${prep} ${article} real ${noun}`,r=resolveCapability(words,c);assert.notEqual(r.kind,'unknown',words);if(r.kind==='unknown')throw Error(words);
+  assert.equal(r.cap.id,verb==='sit'?seat.id:fire.id,words);assert.equal(r.cap.verb,verb==='sit'?'sit':'warm-by-fire','never turn sitting into warming');
+ }
+ const missing={...c,caps:[seat,ordinary]};assert.equal(resolveCapability('sit by a real fire',missing).kind,'unknown','a fire seat label does not invent a missing actual fire');
+ for(const words of ['sit by a real fire on the moon','sit by a real fountain','sit:real fire','warm-by-fire:real fire'])assert.equal(resolveCapability(words,c).kind,'unknown',words);
+ const named:EdgeCapability={...seat,id:'sit:real-fire-bench',label:'Real Fire Bench',target:{id:'real-fire-bench',kind:'object'}};
+ const explicit=resolveCapability(named.id,{...c,caps:[...c.caps,named]});assert.equal(explicit.kind,'exact');assert.equal(explicit.cap.id,named.id,'explicit named ID untouched');
+});
