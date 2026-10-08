@@ -1,9 +1,13 @@
 import type {Program,Engine} from '@sim/engine-contract';
 import type {WorldHost,Mind} from './world.ts';
 import type {WorldState as NativeWorld} from '../../../mars/viewer/engine/world/types.ts';
+type SleepStopPreview=(program:Program)=>string|null;
+const activeReads=new WeakMap<WorldHost,Map<Mind,SleepStopPreview>>();
+function synchronousResult<T>(result:T):T{if(result&&typeof(result as {then?:unknown}).then==='function')throw Error('human-sleep-transition.synchronous-read-required');return result;}
 /** One synchronous read can share the detached rise, never a live admission.
  * The probe expires on return and never survives a tick/writer boundary. */
 export function withHumanSleepStopReadV1<T>(host:WorldHost,m:Mind,read:(preview:(program:Program)=>string|null)=>T):T{
+ const nested=activeReads.get(host)?.get(m);if(nested)return synchronousResult(read(nested));
  let open=true,attempted=false,copy:Engine|undefined,before:string|undefined,id:string|null=null;
  const source=host.engine,factory=host.factory,restore=factory.restore;
  const preview=(program:Program):string|null=>{
@@ -20,8 +24,9 @@ export function withHumanSleepStopReadV1<T>(host:WorldHost,m:Mind,read:(preview:
   if(!copy||current!==id)return null;
   try{const projected=copy.stateHash(),issue=copy.canPerform(program);if(copy.stateHash()!==projected){copy=undefined;return null;}return issue?null:id;}catch{copy=undefined;return null;}
  };
- try{const result=read(preview);if(result&&typeof(result as {then?:unknown}).then==='function')throw Error('human-sleep-transition.synchronous-read-required');return result;}
- finally{open=false;copy=undefined;if(before!==undefined&&source.stateHash()!==before)throw Error('human-sleep-transition.preview-mutated-source');}
+ const scopes=activeReads.get(host)??new Map<Mind,SleepStopPreview>();activeReads.set(host,scopes);scopes.set(m,preview);
+ try{return synchronousResult(read(preview));}
+ finally{scopes.delete(m);if(scopes.size===0)activeReads.delete(host);open=false;copy=undefined;if(before!==undefined&&source.stateHash()!==before)throw Error('human-sleep-transition.preview-mutated-source');}
 }
 /** Detached native projection, never an admission or a change to the live body.
  * Only the existing resumable sleep codec can qualify this narrow transition. */

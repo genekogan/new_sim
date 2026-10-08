@@ -2,7 +2,7 @@ import {nativeActivityContextV1} from './native-activity-context.ts';
 import {latestPurposeDirectionV1} from './latest-purpose-direction.ts';
 import {purposeEpisodesV1,episodeJournalV1,purposeExperienceContextV1} from './purpose-episodes.ts';
 import {compileHumanGoalV1,type ClosedHumanResultV1} from './human-compiler.ts';
-import {previewHumanSleepStopV1} from './human-sleep-transition.ts';
+import {withHumanSleepStopReadV1} from './human-sleep-transition.ts';
 import {purposeContextEvidenceV1,indexPurposeAttemptsV1} from './purpose-context-evidence.ts';
 import {recallPurposesV1} from './purpose-recall.ts';
 import {retainedPurposeChoicesV1,retainedChoiceKeyV1} from './retained-purpose-choice.ts';
@@ -370,9 +370,10 @@ export class Brain {
       const latest=latestPurposeDirectionV1(host.intentHistoryOf(m.soulId),m.owner,host.extra.intentRetainedChoiceV1===true);
       if(host.extra.intentSequencesV1&&!m.activeRule&&m.agendaPos>=m.agenda.length&&latest?.status==='active'&&latest.revision.interpretation.humanGoalPlan?.kind==='planned'){
         const ref={intentId:latest.revision.intentId,version:latest.revision.version},step=latest.revision.interpretation.agenda[host.intentSequenceStepV1(m.soulId,ref)],card=step?host.kernel.vocab.cards[step.card]:undefined;
-        if(card&&step.target===null){const program={actor:m.entityId,label:card.name,steps:[...card.approach,...card.during]};if(previewHumanSleepStopV1(host,m,program)){
-          void host.enqueueHumanSleepStopV1(m.soulId,ref,program,choiceGuard!).catch(()=>{m.nextEvalTick=host.engine.world.tick+1;m.evalTrigger='new-intent-v2';m.lastFingerprint='';});m.nextEvalTick=tick+1;m.evalTrigger='new-intent-v2';return;
-        }}
+        if(card&&step.target===null){const program={actor:m.entityId,label:card.name,steps:[...card.approach,...card.during]};if(withHumanSleepStopReadV1(host,m,preview=>{
+          if(!preview(program))return false;
+          void host.enqueueHumanSleepStopV1(m.soulId,ref,program,choiceGuard!).catch(()=>{m.nextEvalTick=host.engine.world.tick+1;m.evalTrigger='new-intent-v2';m.lastFingerprint='';});return true;
+        })){m.nextEvalTick=tick+1;m.evalTrigger='new-intent-v2';return;}}
       }
     }
     if(deferOptions)ctx=this.midContext(m,trigger);
