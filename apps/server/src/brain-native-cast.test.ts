@@ -33,6 +33,11 @@ test('native cast predicate suppresses every Soul route and fences queued work',
   const reflectionsBefore=db.events(host.worldId).filter(e=>e.kind==='rules'&&e.payload?.reflection).length;
   const reflection=brain.reflect(native,2);skipped.add('native');host.drainInputs();await reflection;
   assert.equal(db.events(host.worldId).filter(e=>e.kind==='rules'&&e.payload?.reflection).length,reflectionsBefore);
+  // A speaker removed after generation began must not be resurrected by the
+  // async word-commit route. Default callers retain their legacy behavior.
+  const talkBefore=db.recentTalk(100).length;host.minds.delete('native');
+  await (brain as unknown as {speakWork:(from:string,to:string,act:string,about?:string,manner?:string)=>Promise<void>}).speakWork('native','paired','greet');
+  assert.equal(db.recentTalk(100).length,talkBefore);host.minds.set('native',native);
   assert.equal(db.paidCost(),0);
  }finally{brain.quiesce();host.stop();await brain.settled();db.close();}
 });

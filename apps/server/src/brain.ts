@@ -752,7 +752,7 @@ export class Brain {
   // ------------------------------------------------------------ speech: the act is state, the words are rendered here
   async speak(from: string, to: string, act: string, about: string | undefined, manner: string | undefined) {
     const speaker=this.host.minds.get(from);
-    if(this.quiescing||(speaker&&this.skipMind?.(speaker)))return;
+    if(this.quiescing||(this.skipMind&&(!speaker||this.skipMind(speaker))))return;
     return this.track(()=>this.speakWork(from, to, act, about, manner));
   }
   private async speakWork(from: string, to: string, act: string, about: string | undefined, manner: string | undefined) {
@@ -780,7 +780,7 @@ export class Brain {
       }
     }
     if (!lines.length) lines = plainLine(input);
-    const out: TalkLine[] = lines.filter(l=>{const m=this.host.minds.get(l.who==='speaker'?from:to);return !m||!this.skipMind?.(m);}).map((l) => {
+    const out: TalkLine[] = lines.filter(l=>{const m=this.host.minds.get(l.who==='speaker'?from:to);return this.skipMind?!!m&&!this.skipMind(m):true;}).map((l) => {
       const speaker = l.who === 'speaker';
       const line = { tick, at: Date.now(), from: speaker ? from : to, to: speaker ? to : from, fromName: speaker ? a.name : b.name, toName: speaker ? b.name : a.name, act, ...(manner && speaker ? { manner } : {}), text: l.text, place: a.at };
       return { ...line, id: this.db.saveTalk(this.host.worldId, line) };
