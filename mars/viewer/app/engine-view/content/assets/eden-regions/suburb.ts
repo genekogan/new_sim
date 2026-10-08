@@ -44,7 +44,7 @@ export function buildSuburb(b:Builder,t:Terrain,trees:Trees){const r=rng(6101);
  // street trees and lamps along the sidewalks
  for(const [[ax,az],[bx,bz]] of SUBURB_STREETS){const L=Math.hypot(bx-ax,bz-az),ux=(bx-ax)/L,uz=(bz-az)/L;for(let s=5;s<L;s+=11)for(const side of [1,-1]){const x=ax+ux*s-uz*5.4*side,z=az+uz*s+ux*5.4*side;
    if(((s/11)|0)%2)trees.add(x,0,z,.9,'round',pick(r,['#6f9a4e','#7fa84f','#5f8a46']),r()*6);else{b.push(x,0,z,0);lampPost(b,4,'#3a3f42');b.pop();}}}
- 
+
  t.ribbon(b,[[160,54],[172,54]],3,'#9d9584','path',.05);t.ribbon(b,[[172,34],[160,26],[160,-8]],3,'#9d9584','path',.05);
  void fence;void STONE;
 }
