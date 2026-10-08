@@ -72,8 +72,11 @@ export function mountBodyRoutes(app:Hono,deps:EdgeDeps&{ledger:EdgeLedger}){
       const row=record(raw.assetId,s.owner);if(!row)throw new EdgeError(404,'body.asset-not-found','No admitted body asset');const asset=JSON.parse(row.descriptor);
       const type=asset.type,modelUrl=asset.modelUrl;body={family:type==='humanoid'?'humanoid':'floater',type,model:asset.assetId,modelUrl,avatar:{kind:'body',modelUrl,bodyType:type},...(type==='humanoid'?{}:{radius:.35,hoverHeight:1.45})};
     }else throw new EdgeError(400,'body.assignment','Choose a preset or admitted assetId');
-    const guard=():true=>{const row=deps.db.soul(s.soulId),mind=deps.host.minds.get(s.soulId);
+    const authority=():true=>{const row=deps.db.soul(s.soulId),mind=deps.host.minds.get(s.soulId);
       if(!row||row.retired_at!==null||row.owner!==source.owner||row.world_id!==world||row.entity_id!==s.entityId||row.token_hash!==source.token_hash||!mind||mind.owner!==row.owner||mind.entityId!==row.entity_id)throw new EdgeError(401,'unauthorized','Soul authority changed before body assignment');
+      return true;};
+    authority();deps.ledger.ownerControlGrace(s.soulId);
+    const guard=():true=>{authority();
       if(deps.host.quietBarrier||!deps.ledger.bodyAssignmentReady(s))throw new EdgeError(409,'body.safe-standing-required','Finish the current commitment before changing bodies');
       if(!deps.host.engine.bodyAssignmentProblemV1)throw new EdgeError(503,'body.unavailable','This engine cannot assign bodies');
       const issue=deps.host.engine.bodyAssignmentProblemV1(s.entityId,body);if(issue)throw new EdgeError(409,issue,'Finish safely standing with free hands and clear space before changing bodies');return true;

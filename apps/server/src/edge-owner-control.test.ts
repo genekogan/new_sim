@@ -1,0 +1,12 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {Hono} from 'hono';
+import {fixture,invite,accept} from '../test/native-owner-fixture.ts';import {EdgeLedger} from './edge/ledger/ledger.ts';import {mountBodyRoutes} from './edge/body/routes.ts';import {edgeSoulResolver} from './edge/routes.ts';
+test('default ambient respects completed owner stop/body swap grace, refuses queued ambient, survives ledger restart, then resumes',async t=>{
+ const f=fixture(':memory:');f.brain.quiesce();t.after(()=>{f.host.stop();f.db.close();});await invite(f,'owner');const row=await accept(f.host,f.souls.create('dev:owner',{name:'Grace',description:'scripted owner control fixture'})),soul={soulId:row.id,entityId:row.entity_id,name:row.name,owner:row.owner};let now=1000;
+ const L=new EdgeLedger(f.host,f.db,undefined,{ambient:true,now:()=>now});(L as any).ambientLife(0);(L as any).ambientLife(400);
+ const stop=await accept(f.host,L.act(soul,{capability:'stand:here'}));assert.equal(stop.accepted,true);assert.equal((stop as any).receipt.phase,'completed');await new Promise(r=>setImmediate(r));f.host.drainInputs();
+ const ambient=()=>f.db.events(f.host.worldId).filter(e=>e.kind==='decision'&&e.payload.trigger==='edge-ambient');assert.equal(ambient().length,0,'queued proposal cannot race the owner stop');assert.equal(f.host.engine.programOf(row.entity_id),null);
+ const pairing=f.souls.pairCode(row,'http://127.0.0.1:4958'),token=f.souls.pairExchange(pairing.code,'scripted').token,app=new Hono();mountBodyRoutes(app,{host:f.host,db:f.db,souls:f.souls,ledger:L,soul:edgeSoulResolver(f.host,f.souls,c=>c.req.header('authorization')?.replace(/^Bearer /,''))});
+ const changed=await accept(f.host,Promise.resolve(app.request('/v1/edge/body',{method:'PUT',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({preset:'verdelis'})})));assert.equal(changed.status,200,await changed.clone().text());assert.equal(f.host.engine.world.entities[row.entity_id].body?.model,'verdelis');
+ const restored=new EdgeLedger(f.host,f.db,undefined,{ambient:true,now:()=>now});(restored as any).ambientLife(600);f.host.drainInputs();assert.equal(ambient().length,0,'durable short control window survives ledger reconstruction');
+ now=11001;(restored as any).ambientLife(1000);await new Promise(r=>setImmediate(r));f.host.drainInputs();assert.ok(ambient().length>0,'ordinary idle life resumes after the finite control window');assert.ok(f.host.engine.programOf(row.entity_id));assert.equal(f.db.paidCost(),0);
+});
