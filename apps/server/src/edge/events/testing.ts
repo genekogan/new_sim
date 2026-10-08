@@ -32,7 +32,10 @@ export class FakeActor {
     this.db?.db.exec('CREATE TABLE IF NOT EXISTS edge_receipts_v1 (world_id TEXT NOT NULL, receipt_id TEXT NOT NULL, soul_id TEXT NOT NULL, capability TEXT NOT NULL, phase TEXT NOT NULL, accepted_tick INTEGER NOT NULL, started_tick INTEGER, ended_tick INTEGER, code TEXT, reason TEXT, program_id TEXT, client_ref TEXT, created_at INTEGER NOT NULL, PRIMARY KEY (world_id, receipt_id))');
   }
   async act(soul: EdgeSoul, input: Record<string, unknown>) {
-    const err = this.throwFor(input); if (err) throw err;
+    const err = this.throwFor(input);
+    // The attempt log includes requests rejected by a thrown HTTP-style error,
+    // so the plans tests can detect a retry or a plain-word fallback too.
+    if (err) { this.acts.push({soulId: soul.soulId, input}); throw err; }
     const ref = typeof input.clientRef === 'string' ? input.clientRef : undefined;
     if (ref) { const old = [...this.receipts.values()].find(r => r.clientRef === ref && r.soulId === soul.soulId); if (old) return {accepted: true, receipt: {...old}}; }
     const no = this.refuse(input);
