@@ -84,3 +84,28 @@ test('plans + fade by abandonment in a native world: lie 90 min on instruction s
   }
   assert.deepEqual(w.f.host.engine.runtime.violations, []);
 });
+
+test('Core-A/B composition: plan resolves a structured seat intent when it starts and attention reports its actual choice', {timeout: 120000}, async t => {
+  const w = await edenNavWorld(1); t.after(() => {w.f.host.stop();w.f.db.close();});
+  let now = 1_900_000_000_000;
+  const app = new Hono(), deps = {host:w.f.host,db:w.f.db,souls:w.f.souls,soul:edgeSoulResolver(w.f.host,w.f.souls,()=>undefined),ledger:w.ledger};
+  const comms = registerEdgeComms(app,deps,{fading:true,now:()=>now,sweepMs:0});w.ledger.attachComms(comms as never);
+  const events = registerEdgeEvents(app,deps,comms,{placeName:id=>w.ledger.places.byId.get(id)?.name??null});
+  const plans = registerEdgePlans(app,deps,comms,events,w.ledger,{tickMs:0});t.after(()=>{plans.close();events.close();comms.close();});
+  const soul=w.souls[0]!;
+  const settle=async<T>(p:Promise<T>)=>{let done=false;p.finally(()=>{done=true;});for(let i=0;i<400&&!done;i++){w.f.host.tickOnce();await setImmediate();w.f.host.drainInputs();}assert.ok(done);return p;};
+  const walk=await settle(w.ledger.act(soul,{verb:'go',target:{place:'social-eden-fire-circle'}})) as any;
+  assert.equal(walk.accepted,true,JSON.stringify(walk));await w.run([{soulId:soul.soulId,id:walk.receipt.id}],6000);
+  const made=await settle(plans.create(soul,{steps:[{for:'1s'},{do:{verb:'sit',target:{nearest:'seat',free:true}},params:{seconds:5}},{do:{verb:'look',target:'left'},params:{seconds:2}}]}));
+  assert.equal(made.plan.steps[1]!.status,'pending');assert.equal(made.plan.steps[1]!.capability,undefined,'seat is not preselected at plan creation');
+  now+=1001;plans.tick();
+  for(let i=0;i<3000&&plans.current(soul).plan;i++){w.f.host.tickOnce();if(i%20===0){await setImmediate();w.f.host.drainInputs();plans.tick();}}
+  const final=plans.get(soul,made.plan.id).plan;
+  assert.equal(final.state,'done',JSON.stringify(final));assert.match(final.steps[1]!.capability!,/^sit:/);assert.equal(final.steps[2]!.capability,'look:left');
+  const env=(await comms.streams.read(soul.soulId,0,1000)).events.map(e=>events.envelope(soul.soulId,e));
+  const attention=env.find(e=>(e.data?.receipt as any)?.capability==='look:left');
+  assert.equal(attention?.salience,0);assert.equal((attention?.data?.receipt as any)?.chosen.direction,'left');
+  assert.equal((attention?.data?.receipt as any)?.chosen.seconds,2,'intent params reach resolver');
+  const arrival=env.find(e=>e.kind==='arrive');assert.equal(arrival?.text,'You arrived at Campfire clearing.');
+  assert.deepEqual(w.engine.runtime.violations,[]);
+});

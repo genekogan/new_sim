@@ -75,15 +75,16 @@ export function registerEdgeEvents(app: Hono, deps: EdgeDeps, comms: CommsRuntim
     const aboutId: string | undefined = b.from?.soulId ?? b.soul?.soulId ?? b.turn?.from?.soulId ?? b.invite?.from?.soulId;
     if (body.where === undefined) {
       const where: Record<string, unknown> = {};
+      if (kind === 'arrive' && Array.isArray(b.placePath) && b.placePath[0]) where.place = b.placePath[0];
       if (typeof b.placeId === 'string') { where.placeId = b.placeId; const n = placeName(b.placeId); if (n) where.place = n; }
       if (aboutId && aboutId !== soulId) {
         if (!where.place) { const p = placeOf(aboutId); if (p) { where.placeId = p.id; where.place = p.name; } }
         const me = ledger.poseOf?.(soulId), them = ledger.poseOf?.(aboutId);
         if (me && them) { const dx = them.x - me.x, dz = them.z - me.z; where.dist = Math.round(Math.hypot(dx, dz) * 10) / 10; where.bearing = relativeBearing(me.yaw, dx, dz); }
-      } else if (!where.place && (kind === 'receipt' || kind.startsWith('plan.') || kind === 'fade')) { const p = placeOf(soulId); if (p) { where.placeId = p.id; where.place = p.name; } }
+      } else if (!where.place && (kind === 'receipt' || kind === 'arrive' || kind.startsWith('plan.') || kind === 'fade')) { const p = placeOf(soulId); if (p) { where.placeId = p.id; where.place = p.name; } }
       if (Object.keys(where).length) extra.where = where;
     }
-    if (kind === 'receipt' && typeof b.receipt?.id === 'string' && b.plan === undefined) { const plan = receiptPlan(b.receipt.id); if (plan) extra.plan = plan; }
+    if ((kind === 'receipt' || kind === 'arrive') && typeof b.receipt?.id === 'string' && b.plan === undefined) { const plan = receiptPlan(b.receipt.id); if (plan) extra.plan = plan; }
     return extra;
   };
   const envelope = (soulId: string, e: StreamEvent) => toEnvelope(e, viewer(soulId));

@@ -53,10 +53,6 @@ export function parseDuration(v: unknown, field: string): number {
 
 const newPlanId = () => 'pl_' + randomBytes(9).toString('base64url');
 const labelOf = (s: StepSpec) => s.label ? oneLine(s.label, 80) : s.say !== undefined ? `say "${oneLine(s.say, 60)}"` : typeof s.do === 'string' ? oneLine(s.do, 80) : s.do ? oneLine((s.do.capability as string | undefined) ?? `${s.do.verb ?? 'do'} ${typeof s.do.target === 'string' ? s.do.target : JSON.stringify(s.do.target ?? '')}`, 80) : s.until ? `wait until ${s.until.event}` : 'wait';
-const plainOf = (d: Record<string, unknown>) => {
-  const t = d.target, tw = typeof t === 'string' ? t : t && typeof t === 'object' ? Object.entries(t as Record<string, unknown>).map(([k, v]) => k === 'nearest' ? `the nearest ${v}` : k === 'near' ? `near ${v}` : k === 'in' ? `in ${v}` : k === 'place' ? `${v}` : k === 'row' ? `${v} row` : k === 'free' ? '' : `${v}`).filter(Boolean).join(' ') : '';
-  return `${String(d.verb ?? '')} ${tw}`.trim();
-};
 
 export function validateSteps(raw: unknown): StepSpec[] {
   if (!Array.isArray(raw) || !raw.length || raw.length > PLAN_MAX_STEPS) throw new EdgeError(400, 'invalid', `steps must be a list of 1..${PLAN_MAX_STEPS} steps`);
@@ -241,7 +237,6 @@ export class Plans {
       }
       const base: Record<string, unknown> = typeof s.do === 'string' ? {capability: s.do} : {...(s.do as Record<string, unknown>)};
       if (reissue && s.state.capability) { base.capability = s.state.capability; delete base.verb; delete base.target; }
-      else if (s.state.plain && typeof s.do === 'object') { base.capability = plainOf(s.do); delete base.verb; delete base.target; }
       const params: Record<string, unknown> = {...((base.params as Record<string, unknown> | undefined) ?? {}), ...(s.params ?? {})};
       let autoSeconds = false;
       if (s.state.deadline && params.seconds === undefined && !s.state.noSeconds) {
@@ -253,7 +248,6 @@ export class Plans {
       let out: Record<string, unknown>;
       try { out = await this.actor.act(soul, input); }
       catch (e) {
-        if (e instanceof EdgeError && e.status === 400 && typeof s.do === 'object' && s.do.verb && !s.state.plain) { s.state.plain = true; this.busy.delete(p.id); return this.issue(p, reissue); }
         if (e instanceof EdgeError && e.status < 500 && e.status !== 429) { this.busy.delete(p.id); return this.stepFailed(p, e.code, e.message); }
         s.state.transient++; s.state.status = 'starting'; s.state.retryAt = this.core.now() + TRANSIENT_RETRY_MS; this.save(p);
         if (s.state.transient > TRANSIENT_MAX) { this.busy.delete(p.id); return this.stepFailed(p, 'plan.unavailable', 'The world could not take this step after repeated tries.'); }

@@ -29,6 +29,7 @@ export const EVENT_KINDS: Record<string, {salience: 0 | 1 | 2 | 3; what: string}
   'follow.start': {salience: 2, what: 'someone started walking with me'},
   'follow.stop': {salience: 1, what: 'someone stopped walking with me'},
   'approach': {salience: 2, what: 'someone came within 3 m of me'},
+  'arrive': {salience: 2, what: 'my body arrived at the destination its receipt reports'},
   'arrive.here': {salience: 1, what: 'a Soul arrived in the place I am in'},
   'leave.here': {salience: 1, what: 'a Soul left the place I am in'},
   'world.join': {salience: 1, what: 'a Soul I have met came back into the world'},
@@ -121,12 +122,14 @@ export function classify(e: StreamEvent, me: Viewer): {kind: string; salience: 0
     case 'follow': return k('follow.start');
     case 'follow.stop': return k('follow.stop');
     case 'approach': return k('approach');
+    case 'arrive': return k('arrive', d.plan ? 1 : 2);
     case 'arrival': return k('arrive.here');
     case 'departure': return k('leave.here');
     case 'world.join': case 'world.leave': case 'light.changed': case 'weather.changed': return k(e.kind);
     case 'world.notice': return k('world.notice', d.level === 'outage' || d.level === 'restart' ? 3 : Number(d.salience) === 3 ? 3 : 2);
     case 'receipt': {
       const r = d.receipt ?? {}, plan = !!d.plan;
+      if (r.channel === 'attention' || r.channel === 'none') return k('receipt.terminal', 0);
       if (r.phase === 'waiting') return k('receipt.waiting');
       if (r.phase === 'started') return k('receipt.started', plan ? 0 : 1);
       if (r.phase === 'replaced') return k('receipt.terminal', plan ? 0 : 1);
@@ -185,6 +188,7 @@ export function toEnvelope(e: StreamEvent, me: Viewer): Envelope {
     case 'conversation.member': text = `${about?.name ?? 'Someone'} ${d.change ?? 'changed'} [${d.conversation}]`; break;
     case 'conversation.closed': text = `Conversation ${d.conversation} closed (${d.reason ?? 'ended'})`; break;
     case 'invite': text = `${oneLine(d.invite?.label ?? `${who} invites you`, 120)} → accept:${d.invite?.id} / decline:${d.invite?.id} (${d.invite?.expiresInSeconds ?? '?'} s)`; break;
+    case 'arrive': text = `You arrived at ${d.placePath?.[0] ?? d.endedAt?.placePath?.[0] ?? where?.place ?? d.placeId ?? 'your destination'}.`; break;
     case 'arrival': text = `${who} arrived${where?.place ? ' at ' + where.place : ''}`; break;
     case 'departure': text = `${about?.name ?? 'Someone'} left${where?.place ? ' ' + where.place : ''}`; break;
     case 'receipt': {

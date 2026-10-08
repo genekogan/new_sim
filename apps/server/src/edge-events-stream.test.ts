@@ -35,6 +35,12 @@ test('envelope: kinds, salience, about, where (distance and bearing relative to 
     assert.deepEqual([r('completed').kind, r('completed').salience], ['receipt.terminal', 3]);
     assert.deepEqual([r('replaced').salience, r('completed', null, true).salience, r('started').salience, r('waiting').salience], [1, 1, 1, 0]);
     assert.deepEqual([r('failed', 'route.blocked').kind, r('failed', 'route.blocked').salience], ['blocked', 3]);
+    const attention = toEnvelope({id:'c_a', kind:'receipt', tick:1, at:1, receipt:{phase:'completed', capability:'look:left', channel:'attention', chosen:{direction:'left'}}}, {soulId:'s',name:'S'});
+    assert.equal(attention.salience, 0); assert.deepEqual((attention.data!.receipt as any).chosen, {direction:'left'});
+    const arrive = toEnvelope({id:'c_b',kind:'arrive',tick:1,at:1,placePath:['Garden','Eden'],plan:{id:'pl_x',step:0},endedAt:{posture:'standing'}}, {soulId:'s',name:'S'});
+    assert.equal(arrive.kind, 'arrive'); assert.equal(arrive.salience, 1); assert.equal(arrive.text, 'You arrived at Garden.');
+    const blocked = toEnvelope({id:'c_c',kind:'receipt',tick:1,at:1,receipt:{phase:'failed',code:'seat.taken',alternatives:[{capability:'sit:seat-2'}]}}, {soulId:'s',name:'S'});
+    assert.equal(blocked.kind, 'blocked'); assert.deepEqual((blocked.data!.receipt as any).alternatives,[{capability:'sit:seat-2'}]);
     // media from shared slides
     assert.deepEqual(mediaOf('Slide 2 ![the pond at dawn](https://example.org/pond.jpg) and https://example.org/b.png'), [{type: 'image', url: 'https://example.org/pond.jpg', alt: 'the pond at dawn'}, {type: 'image', url: 'https://example.org/b.png', alt: 'picture'}]);
   } finally { f.destroy(); }

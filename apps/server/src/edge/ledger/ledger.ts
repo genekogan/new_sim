@@ -147,11 +147,11 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private view(r: Row): EdgeReceipt {return {id: r.receipt_id, soulId: r.soul_id, capability: r.capability, phase: r.phase, acceptedTick: r.accepted_tick, startedTick: r.started_tick, endedTick: r.ended_tick, code: r.code, reason: r.reason, programId: r.program_id, ...detailOf(r)};}
   receipt(soulId: string, id: string): EdgeReceipt | null {const r = this.rows('receipt_id=? AND soul_id=?', id, soulId)[0]; return r ? this.view(r) : null;}
   openReceipts(soulId: string): EdgeReceipt[] {return this.rows("soul_id=? AND phase IN ('waiting','started') ORDER BY accepted_tick", soulId).map(r => this.view(r));}
-  private insert(soul: EdgeSoul, capability: string, phase: EdgeReceipt['phase'], clientRef?: string, keepActivity = false): EdgeReceipt {
+  private insert(soul: EdgeSoul, capability: string, phase: EdgeReceipt['phase'], clientRef?: string, keepActivity = false, detail: Record<string, unknown> = {}): EdgeReceipt {
     const id = 'r_' + randomUUID(), tick = this.host.engine.world.tick;
     if (!keepActivity) {for (const old of this.openReceipts(soul.soulId)) this.update(old.id, {phase: 'replaced', reason: 'A newer action from this Soul replaced it.'}); this.pending.delete(soul.soulId);}
     this.db.db.prepare('INSERT INTO edge_receipts_v1 (world_id,receipt_id,soul_id,capability,phase,accepted_tick,client_ref,created_at) VALUES (?,?,?,?,?,?,?,?)').run(this.host.worldId, id, soul.soulId, capability, phase, tick, clientRef ?? null, Date.now());
-    if (keepActivity || !OPEN.includes(phase)) this.setDetail(id, {...(keepActivity ? {channel: this.nextChannel ?? 'none'} : {}), ...(!OPEN.includes(phase) ? {endedAt: bodyEnd(this, soul.soulId)} : {})});
+    if (keepActivity || !OPEN.includes(phase)) this.setDetail(id, {...detail, ...(keepActivity ? {channel: this.nextChannel ?? 'none'} : {}), ...(!OPEN.includes(phase) ? {endedAt: bodyEnd(this, soul.soulId)} : {})});
     const r = this.receipt(soul.soulId, id)!; this.emit(r); return r;
   }
   private update(id: string, patch: Partial<Pick<Row, 'phase' | 'code' | 'reason' | 'program_id' | 'started_tick'>>) {
@@ -933,7 +933,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       /** A completed receipt that never touches the body's act (attention, settings). */
       insertDone: (s: EdgeSoul, capability: string, clientRef: string | undefined, detail: Record<string, unknown>) => {
         self.nextChannel = String(detail.channel ?? 'none');
-        try {const r = self.insert(s, capability, 'completed', clientRef, true); self.setDetail(r.id, detail); return self.receipt(s.soulId, r.id)!;} finally {self.nextChannel = null;}
+        try {const r = self.insert(s, capability, 'completed', clientRef, true, detail); return self.receipt(s.soulId, r.id)!;} finally {self.nextChannel = null;}
       },
       /** Body steps chosen by an intent, launched exactly like an offered capability (receipt waiting → started → …). */
       launchPlan: async (s: EdgeSoul, capability: string, label: string, steps: Program['steps'], clientRef?: string) => {

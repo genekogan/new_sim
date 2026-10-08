@@ -1,6 +1,6 @@
 // Server-side plans (EVENTS-v1 §plans) against a fake actor: for / until / act-ends steps, offline execution, PATCH
 // insert / replace / skip / resume / cancel, onRefusal policies, restart persistence without double acts, an own act
-// pausing the plan, intents falling back to plain words, keeping a posture up, determinism, and fade by abandonment.
+// pausing the plan, honest intent refusals, keeping a posture up, determinism, and fade by abandonment.
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {EdgeError} from './edge/contract.ts';
@@ -143,14 +143,17 @@ test('the Soul\'s own direct act pauses the plan; say does not; holding a postur
   } finally { f.destroy(); }
 });
 
-test('intents the Ledger does not take yet fall back to plain words; seconds the capability refuses are dropped', async () => {
+test('invalid intents refuse honestly without a plain-word substitute; seconds the capability refuses are dropped', async () => {
   const f = eventsFixture(['Roger']);
   try {
     f.actor.throwFor = i => i.verb ? new EdgeError(400, 'invalid', 'body must be {capability, params?, clientRef?}') : null;
     f.actor.refuse = i => i.capability === 'swim:shore-water' && (i.params as any)?.seconds !== undefined ? {code: 'capability.params', reason: 'seconds must be an integer 1..600 for this capability.'} : null;
     const p = (await f.post('Roger', '/v1/edge/plan', {steps: [{do: {verb: 'sit', target: {nearest: 'seat', near: 'Bill', free: true}}}, {do: 'swim:shore-water', for: '20m'}]})).body.plan;
-    assert.equal(f.actor.last()!.input.capability, 'sit the nearest seat near Bill');
-    f.actor.set(f.actor.last()!.receipt!.id, 'completed'); await flush(); await flush();
+    assert.equal(p.state, 'paused');
+    assert.equal(p.steps[0].code, 'invalid');
+    assert.equal(f.actor.acts.length, 1, 'structured intent is attempted exactly once');
+    assert.deepEqual(f.actor.acts[0]!.input.target, {nearest: 'seat', near: 'Bill', free: true});
+    await f.patch('Roger', `/v1/edge/plan/${p.id}`, {op: 'skip'}); await flush();
     const swims = f.actor.acts.filter(a => a.input.capability === 'swim:shore-water').map(a => (a.input.params as any)?.seconds);
     assert.deepEqual(swims, [1200, 600, undefined], 'tries the time, then the max, then without');
     assert.equal((await f.get('Roger', `/v1/edge/plan/${p.id}`)).body.plan.steps[1].status, 'running');

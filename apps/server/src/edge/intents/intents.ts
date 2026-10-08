@@ -39,7 +39,9 @@ const str = (v: unknown) => typeof v === 'string' && v.trim() ? v.trim() : null;
 /** {verb, target:{…}} or {verb, target:"id", distance, heading…}: one flat spec. */
 export function specOf(input: IntentInput): Record<string, unknown> {
   const t = input.target, base: Record<string, unknown> = t && typeof t === 'object' && !Array.isArray(t) ? {...t as Record<string, unknown>} : t !== undefined ? {target: t} : {};
+  const params = input.params && typeof input.params === 'object' && !Array.isArray(input.params) ? input.params as Record<string, unknown> : {};
   for (const k of SPEC_KEYS) if (input[k] !== undefined && base[k] === undefined) base[k] = input[k];
+  for (const k of SPEC_KEYS) if (params[k] !== undefined && base[k] === undefined) base[k] = params[k];
   return base;
 }
 
