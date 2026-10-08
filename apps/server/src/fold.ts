@@ -11,6 +11,7 @@ import {
 import { intentReceivedPayloadV2Schema, intentHistoryFactV2, intentAdmissionFactV2, intentControllerFactV2, intentArrivalFactV1, type BirthPayload, type DecisionPayload, type DeckPayload, type LogEvent, type MintPayload, type PlayPayload, type PlayView } from '@sim/protocol';
 import {foldMandate} from './mandate.ts';
 import {intentSleepStopV1Schema} from '@sim/protocol';
+import {bodyAssignmentV1Schema} from '@sim/protocol';
 import { isStationFactV1, parseStationFactV1 } from '@sim/protocol';
 
 /**
@@ -92,6 +93,11 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       const p = e.payload as { entityId?: string; to?: [number, number] };
       const relocate = (engine as unknown as { relocateHumanV1?: (id: string, to: [number, number]) => boolean }).relocateHumanV1;
       if (p.entityId && Array.isArray(p.to) && relocate) relocate.call(engine, p.entityId, p.to);
+      return {};
+    }
+    case 'body-assignment-v1': {
+      const p=bodyAssignmentV1Schema.parse(e.payload);
+      if(e.author!=='world:body'||k.things[p.soulId]?.traits.body!==p.entityId||!engine.assignBodyV1||!engine.assignBodyV1(p.entityId,p.body))throw Error('body.assignment-invalid');
       return {};
     }
     case 'edge-attention': {

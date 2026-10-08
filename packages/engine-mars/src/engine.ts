@@ -60,6 +60,8 @@ import { CATALOG, HUMAN_RADIUS } from '../../../mars/viewer/engine/world/catalog
 import type { Spatial } from '../../../mars/viewer/engine/spatial/service.ts';
 import type {NativeBoatControlsV1} from '@sim/engine-contract';
 import type {BodyLocationV1} from '@sim/engine-contract';
+import {bodyProblem} from '../../../mars/viewer/engine/bodies/body.ts';
+import type {Body} from '../../../mars/viewer/engine/world/types.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const TPS = 20;
@@ -622,6 +624,7 @@ export class MarsEngine implements Engine {
     return [...ids].sort();
   }
   canPerform(program: Program): Diag | null {
+    const bodyIssue=this.bodyProgramProblemV1(program); if(bodyIssue)return bodyIssue;
     if(program.steps[0]?.verb==='control_classroom_v1'){const p=program.steps[0].params;if(program.steps.length!==1||!['cancel','advance'].includes(String(p.kind))||typeof p.session!=='string'||!this.ownedClassroomControlRosterV1(program.actor,p.session))return {code:'classroom.owned-host-control-required',message:'Only the active classroom host can apply this control.'};return this.plan('classroom_control',{session:p.session,intent:{kind:p.kind}});}
     if ([...this.programs.values()].some(p=>p.readiedActors?.includes(program.actor)&&!p.action))return {code:'activity.readiness-committed',message:'This body has committed its explicit ready wait to a starting classroom.'};
     if (!this.ents[program.actor]) return { code: 'actor.unknown', message: `no such actor ${program.actor}` };
@@ -698,7 +701,7 @@ export class MarsEngine implements Engine {
   perform(program: Program) {
     const {result,build,reverse}=this.prepareAdmission(program),id=result.id;
     this.nextProg++;
-    if (!result.ok) { const old = this.byActor.get(program.actor); if (old&&!this.physical) this.stop(old); return result; }
+    if (!result.ok) { const old = this.byActor.get(program.actor); if (old&&!this.physical&&result.diagnostic?.code!=='body.unsupported') this.stop(old); return result; }
     if(program.steps[0]?.verb==='control_classroom_v1'){const p:Prog={id,actor:program.actor,label:program.label.slice(0,200),steps:structuredClone(program.steps),index:0,started:false,since:this.rt.tick,ops:[],controlOf:String(program.steps[0].params.session)};this.programs.set(id,p);return result;}
     const commitment=program.steps[0]?.verb==='mars:classroom_session'&&program.steps[0].params.handoverScope==='owned-readiness/1'?[...new Set([program.steps[0].params.host,...(program.steps[0].params.presenters as string[]??[]),...(program.steps[0].params.audience as string[]??[])].filter((id):id is string=>typeof id==='string'&&id!==program.actor))]:[];
     const handover=program.steps[0]?.verb==='mars:classroom_session'&&program.steps[0].params.handoverScope==='owned-readiness/1'?this.classroomReadyActors(program.steps[0].params,program.actor):[];
@@ -732,6 +735,29 @@ export class MarsEngine implements Engine {
   cancel(id: string, reason?: Diag): ActionRecord { return this.rt.cancel(id, reason) as ActionRecord; }
 
   // ------------------------------------------------------------------ bodies
+  /** BODY-v1: rigid bodies never run limb/ride/building programs, including raw structured steps. */
+  bodyProgramProblemV1(program:Program):Diag|null {
+    if(this.ents[program.actor]?.body?.family!=='floater')return null;
+    for(const s of program.steps)if(!['walk_to','ambient_wander','face','wave','rest','gather','stand'].includes(s.verb))return {code:'body.unsupported',message:'Rigid ceramic/floater bodies cannot do that limb activity; try glide, hover, settle or turn.'};
+    return null;
+  }
+  /** BODY-v1: never interrupt holders, commitments or unsafe postures to swap a body. */
+  bodyAssignmentProblemV1(id:string,body:Body|null):string|null {
+    const problem=bodyProblem(body??undefined);if(problem)return problem;
+    const e=this.ents[id],h=e?.human;if(!h)return 'body.not-found';
+    if(!this.free(id)||this.actorBorrowed(id)||h.task||h.grip||h.on||h.riding||h.carrier||h.boatPassenger||h.boatTransit||h.sleepPose||h.shore||h.together||h.partner||h.holding||h.prop||h.baseActivity==='sit'||!['idle','wait'].includes(h.activity))return 'body.safe-standing-required';
+    if(Object.values(this.ents).some((o:any)=>o.support?.kind==='in-hand'&&o.support.by===id))return 'body.safe-standing-required';
+    const radius=body?.family==='floater'?(body.radius??.35):HUMAN_RADIUS;
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.level(h.level);
+    if(!grid||clearanceAt(grid,[e.pose.p[0],e.pose.p[2]])<radius)return 'body.no-clearance';
+    if(Object.values(this.ents).some((o:any)=>o.id!==id&&o.kind==='human'&&o.human?.level===h.level&&hypot(o.pose.p[0]-e.pose.p[0],o.pose.p[2]-e.pose.p[2])<radius+(o.body?.family==='floater'?(o.body.radius??.35):HUMAN_RADIUS)))return 'body.no-clearance';
+    return null;
+  }
+  assignBodyV1(id:string,body:Body|null):boolean {
+    if(this.bodyAssignmentProblemV1(id,body))return false;
+    if(body)this.ents[id].body=structuredClone(body);else delete this.ents[id].body;
+    this.out.changes.push([this.rt.tick,id,'body',body]);return true;
+  }
   /** Mars has no way to add a person to a running world; the adapter does what its world editor does, then restores canonical order. */
   /** Edge reclaim (logged 'edge-relocate'): an idle, unheld body lands on its feet at the nearest free
    * standing spot near `to` (same ring search as arrival). Refuses busy/held/sleeping bodies. */

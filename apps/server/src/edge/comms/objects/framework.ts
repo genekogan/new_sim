@@ -3,6 +3,7 @@
 // framework never knows chess or presentations.
 import type {EdgeCapability, EdgeSoul} from '../../contract.ts';
 import {EdgeError} from '../../contract.ts';
+import {bodyCapabilityProblem} from '../../body/actions.ts';
 import type {CommsCore} from '../core.ts';
 import {tx} from '../store.ts';
 import type {ActionCtx, BodyRequest, CarrierView, FieldSpec, ObjectEvent, ObjectKind, ObjectRecord, ParamSpec, Refusal, TimeCtx} from './types.ts';
@@ -152,6 +153,8 @@ export class Objects {
     const raw = OBJECT_ID.test(id) ? this.row(id) : undefined;
     const kind = raw && this.kinds.get(raw.kind);
     if (!raw || !kind || !this.visible(raw, soul.soulId, kind)) throw new EdgeError(404, 'not-found', 'no such object here');
+    const bodyIssue=bodyCapabilityProblem(this.core.deps.host.engine.world.entities[soul.entityId],{id:`object:${id}:${action}`,verb:'object',action,label:action,available:true});
+    if(bodyIssue)return refuse(bodyIssue);
     const o = this.advanced(raw);
     const a = kind.actions[action];
     if (!a) return refuse({code: 'object.action-unknown', reason: `${o.name} has no action ${action}.`});

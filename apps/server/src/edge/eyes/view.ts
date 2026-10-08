@@ -41,10 +41,10 @@ function enclosureAt(ledger: EdgeLedger, x: number, z: number, level = 0): strin
   const v = ledger.places.containing(x, z, level).find(p => p.enclosed)?.id ?? null; if (m.size > 20000) m.clear(); m.set(key, v); return v;
 }
 
-function eyePose(body: {pose: {p: number[]; yaw: number}; human?: {activity?: unknown; shore?: {datumY?: number}}}, state: string, yaw: number, hfovDeg: number, w: number, h: number): EyePose {
+export function eyePose(body: {pose: {p: number[]; yaw: number}; body?:{family:string;hoverHeight?:number}; human?: {activity?: unknown; shore?: {datumY?: number}}}, state: string, yaw: number, hfovDeg: number, w: number, h: number): EyePose {
   const [x, y, z] = body.pose.p, act = String(body.human?.activity ?? '');
   const datum = body.human?.shore?.datumY;
-  const eyeY = (state === 'swimming' || act === 'swim' || act === 'tread') && Number.isFinite(datum) ? datum! + 0.25
+  const eyeY = body.body?.family==='floater'?y+(body.body.hoverHeight??1.45):(state === 'swimming' || act === 'swim' || act === 'tread') && Number.isFinite(datum) ? datum! + 0.25
     : state === 'seated' ? y + 1.15 : state === 'lying' || state === 'sleeping' ? y + 0.35 : y + 1.62;
   const hfov = hfovDeg * Math.PI / 180, vfov = 2 * Math.atan(Math.tan(hfov / 2) * h / w);
   return {p: [x, Math.round(eyeY * 1000) / 1000, z], yaw, pitch: PITCH, hfov, vfov};

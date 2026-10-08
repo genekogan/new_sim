@@ -10,6 +10,7 @@ import {mountSchema} from './events/schema.ts';
 import {registerEdgePlans} from './plans/index.ts';
 import type {Plans} from './plans/plans.ts';
 import {mountEdgeEyes} from './eyes/routes.ts';
+import {mountBodyRoutes} from './body/routes.ts';
 import type {WorldHost} from '../world.ts';
 import type {Souls} from '../souls.ts';
 
@@ -23,6 +24,7 @@ export function edgeSoulResolver(host: WorldHost, souls: Souls, bearer: (c: Cont
 }
 export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}) {
   const L = deps.ledger;
+  mountBodyRoutes(app,deps);
   // EVENTS-v1: idempotency keys guard act/say/converse/plan writes; it must be mounted before those routes.
   mountIdempotency(app, deps);
   const wrap = (fn: (c: Context) => unknown | Promise<unknown>) => async (c: Context) => {

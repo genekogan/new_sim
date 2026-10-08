@@ -131,7 +131,8 @@ export type FoodPreparation = {
  * worlds, takes and hashes without the field are unchanged. A 'floater' is a static scanned head that
  * hovers at `hoverHeight` above its ground pose with radius `radius`; `model` names its GLB.
  */
-export type Body = { family: 'humanoid' | 'floater'; model?: string; radius?: number; hoverHeight?: number };
+export type Body = { family: 'humanoid' | 'floater'; type?: 'humanoid' | 'ceramic' | 'floater'; model?: string; modelUrl?: string;
+  avatar?: {kind:'body'; modelUrl:string; bodyType:'humanoid'|'ceramic'|'floater'}; radius?: number; hoverHeight?: number };
 
 export type Entity = {
   /** carrier/1 (vehicles/carrier.ts): a ride with seats that carries its riders along a deterministic route. */

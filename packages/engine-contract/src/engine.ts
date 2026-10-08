@@ -146,6 +146,8 @@ export interface Engine {
   actorBorrowed?(actor: string): boolean;
   /** Optional native-cast custody reader; null means participant scope is unqualified. */
   nativeProgramParticipantsV1?(program:Program):readonly string[]|null;
+  bodyAssignmentProblemV1?(actor:string,body:import('./world.ts').Entity['body']|null):string|null;
+  assignBodyV1?(actor:string,body:import('./world.ts').Entity['body']|null):boolean;
   /** Spawn a human entity for a Soul at the arrival point; returns the entity id. */
   spawnHuman(args: { id: string; label: string; soul: string }): string;
   removeEntity(id: string): void;

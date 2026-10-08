@@ -1,0 +1,18 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+import {createServer} from 'node:http';import {once} from 'node:events';import {getRequestListener} from '@hono/node-server';import {Hono} from 'hono';
+import {mkdtempSync,writeFileSync,rmSync,statSync} from 'node:fs';import {join} from 'node:path';import {tmpdir} from 'node:os';import {execFile} from 'node:child_process';import {promisify} from 'node:util';import {fileURLToPath} from 'node:url';
+import {fixture,invite,accept} from '../test/native-owner-fixture.ts';import {EdgeLedger} from './edge/ledger/ledger.ts';import {mountEdgeRoutes,edgeSoulResolver} from './edge/routes.ts';import {rigidGLB} from './edge/body/testing.ts';
+
+test('CLI1.8.1 BODY authenticates privately, uploads GLB, selects body and reads the derived avatar seam',async()=>{
+ const f=fixture(':memory:'),dir=mkdtempSync(join(tmpdir(),'body-cli-'));f.brain.quiesce();let server:ReturnType<typeof createServer>|undefined,pump:NodeJS.Timeout|undefined,closed=false;
+ try{
+  await invite(f,'cli');const row=await accept(f.host,f.souls.create('dev:cli',{name:'Body CLI',description:'local scripted CLI fixture'})),pair=f.souls.pairCode(row,'http://127.0.0.1:4958'),credential=f.souls.pairExchange(pair.code,'scripted-cli');
+  const app=new Hono(),ledger=new EdgeLedger(f.host,f.db,undefined,{ambient:false});mountEdgeRoutes(app,{host:f.host,db:f.db,souls:f.souls,ledger,soul:edgeSoulResolver(f.host,f.souls,c=>c.req.header('authorization')?.replace(/^Bearer /,''))});
+  const listener=getRequestListener(app.fetch);server=createServer((req,res)=>{req.url=req.url?.replace(/^\/w\/eden(?=\/)/,'');void listener(req,res);});server.listen(4958,'127.0.0.1');await once(server,'listening');pump=setInterval(()=>f.host.drainInputs(),10);
+  const state=join(dir,'.eden-agent.json');writeFileSync(state,JSON.stringify({world:'http://127.0.0.1:4958/w/eden',token:credential.token}),{mode:0o600});assert.equal(statSync(state).mode&0o777,0o600);writeFileSync(join(dir,'fixture.glb'),rigidGLB());
+  const cli=fileURLToPath(new URL('../../../tools/edge-skill/eden-agent.mjs',import.meta.url));
+  const run=async(...args:string[])=>{const {stdout}=await promisify(execFile)(process.execPath,[cli,'body',...args],{cwd:dir,timeout:30000,maxBuffer:256*1024});assert.ok(!stdout.includes(credential.token));return JSON.parse(stdout);};
+  const presets=await run('presets');assert.equal(presets.length,8);const uploaded=await run('upload','fixture.glb','--type','ceramic','--license','owned','--rights-confirmed');assert.match(uploaded.assetId,/^body_[a-f0-9]{64}$/);
+  const assigned=await run('set',uploaded.assetId);assert.equal(assigned.body.type,'ceramic');const current=await run();assert.equal(current.body.modelUrl,uploaded.modelUrl);assert.equal(current.body.avatar.modelUrl,uploaded.modelUrl);assert.equal(f.db.paidCost(),0);
+ }finally{if(pump)clearInterval(pump);if(server){server.closeAllConnections();await new Promise<void>(resolve=>server!.close(()=>{closed=true;resolve();}));}f.host.stop();f.db.close();assert.ok(closed||!server,'owned fixture listener closed before private identity deletion');rmSync(dir,{recursive:true,force:true});}
+});

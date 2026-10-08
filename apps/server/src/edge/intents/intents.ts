@@ -75,11 +75,12 @@ export class Intents {
   // ------------------------------------------------------------------ resolution (pure: no side effects)
   resolve(soul: EdgeSoul, input: IntentInput): Resolution {
     const verb = str(input.verb)?.toLowerCase(); if (!verb) return no('capability.params', 'verb must be a word such as sit, go, swim, approach, turn or look.');
+    const bodyIssue=this.L.bodyVerbProblem(soul,verb);if(bodyIssue)return no(bodyIssue.code,bodyIssue.reason);
     const s = specOf(input), P = new Perception(this.L, soul);
     if (!P.pos) return no('not-found', 'This Soul has no body in the world.');
     switch (verb) {
       case 'sit': return this.sit(P, s);
-      case 'go': case 'walk': return this.go(P, s, verb);
+      case 'go': case 'walk': case 'glide': return this.go(P, s, verb);
       case 'swim': return this.swim(P, s);
       case 'approach': return this.approach(P, s);
       case 'follow': case 'walk-with': return this.follow(P, s);
@@ -320,6 +321,7 @@ export class Intents {
   dryRun(soul: EdgeSoul, input: IntentInput & {capability?: unknown}): Record<string, unknown> {
     if (typeof input.capability === 'string' && input.verb === undefined) {
       const {caps} = this.L.coreA.binds(soul), asked = input.capability.trim();
+      const bodyIssue=asked.startsWith('object:')?null:this.L.bodyVerbProblem(soul,asked.split(/[:\s]/)[0]!);if(bodyIssue)return {ok:false,...bodyIssue};
       if (!asked || asked.length > 200) return {ok: false, code: 'capability.params', reason: 'capability must be 1..200 characters.'};
       const plain = attentionWords(asked); if (plain) return this.dryRun(soul, plain);
       const strict = strictCheck(this.L, soul, asked, caps); if (strict) return {ok: false, ...strict};

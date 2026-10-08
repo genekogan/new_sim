@@ -37,13 +37,17 @@ export function bodyProblem(body: unknown): string | null {
   if (body === undefined) return null;
   if (!body || typeof body !== 'object' || Array.isArray(body)) return 'body.not-object';
   const b = body as Record<string, unknown>;
-  for (const k of Object.keys(b)) if (!['family', 'model', 'radius', 'hoverHeight'].includes(k)) return `body.unknown-field:${k}`;
+  for (const k of Object.keys(b)) if (!['family', 'type', 'model', 'modelUrl', 'avatar', 'radius', 'hoverHeight'].includes(k)) return `body.unknown-field:${k}`;
   if (b.family !== 'humanoid' && b.family !== 'floater') return 'body.family';
-  if (b.model !== undefined && (typeof b.model !== 'string' || !/^[a-z0-9-]{1,64}$/.test(b.model))) return 'body.model';
+  if (b.type !== undefined && !(b.family==='humanoid' ? b.type==='humanoid' : b.type==='ceramic'||b.type==='floater')) return 'body.type';
+  if (b.model !== undefined && (typeof b.model !== 'string' || !/^(?:[a-z0-9-]{1,64}|body_[a-f0-9]{64})$/.test(b.model))) return 'body.model';
+  const safeUrl=(v:unknown)=>typeof v==='string' && /^\/(?:w\/[a-z0-9-]+\/)?(?:v1\/edge\/body\/assets\/body_[a-f0-9]{64}\.glb|world-assets\/littlemartians\/characters\/[a-z0-9-]+\.glb)$/.test(v);
+  if (b.modelUrl!==undefined && !safeUrl(b.modelUrl)) return 'body.model-url';
+  if(b.avatar!==undefined){const a=b.avatar as Record<string,unknown>;if(!a||typeof a!=='object'||Object.keys(a).some(k=>!['kind','modelUrl','bodyType'].includes(k))||a.kind!=='body'||!safeUrl(a.modelUrl)||a.modelUrl!==b.modelUrl||a.bodyType!==(b.type??b.family))return 'body.avatar';}
   const inRange = (v: unknown, [lo, hi]: readonly [number, number]) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
   if (b.radius !== undefined && !inRange(b.radius, FLOATER_RADIUS_RANGE)) return 'body.radius';
   if (b.hoverHeight !== undefined && !inRange(b.hoverHeight, FLOATER_HOVER_RANGE)) return 'body.hover-height';
-  if (b.family === 'humanoid' && (b.model !== undefined || b.radius !== undefined || b.hoverHeight !== undefined)) return 'body.humanoid-fields';
+  if (b.family === 'humanoid' && (b.radius !== undefined || b.hoverHeight !== undefined || (b.model!==undefined && !b.modelUrl))) return 'body.humanoid-fields';
   return null;
 }
 
@@ -55,7 +59,7 @@ export function withBody<T extends Entity>(e: T, body: Body): T {
   const problem = bodyProblem(body);
   if (problem) throw new Error(`${e.id}: ${problem}`);
   const copy = structuredClone(e);
-  if (body.family === 'humanoid') delete copy.body;
+  if (body.family === 'humanoid' && !body.modelUrl) delete copy.body;
   else copy.body = { ...body };
   return copy;
 }

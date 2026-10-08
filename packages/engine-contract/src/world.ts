@@ -32,6 +32,8 @@ export type Entity = {
   pose: Pose;
   provenance: Provenance;
   human?: HumanState;
+  body?: {family:'humanoid'|'floater';type?:'humanoid'|'ceramic'|'floater';model?:string;modelUrl?:string;
+    avatar?:{kind:'body';modelUrl:string;bodyType:'humanoid'|'ceramic'|'floater'};radius?:number;hoverHeight?:number};
   reservedBy?: string;
   /** Fixture capacity for seats/gathering (toy extension). */
   seats?: number;

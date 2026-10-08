@@ -37,7 +37,8 @@ export class Replica {
         continue;
       }
       const e = this.entities[id]; if (!e?.human) continue;
-      if (field === 'activity') e.human.activity = value as string;
+      if (field === 'body') {if(value===null)delete e.body;else e.body=structuredClone(value as Entity['body']);}
+      else if (field === 'activity') e.human.activity = value as string;
       else if (field === 'on') { if (value === null) delete e.human.on; else e.human.on = value as string; }
       else if (field === 'task') { if (value === null) delete e.human.task; else e.human.task = value as string; }
     }

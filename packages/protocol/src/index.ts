@@ -1,4 +1,5 @@
 export * from './purpose-context-v1.ts';
+export * from './body-v1.ts';
 import {intentArrivalFactV1} from './intent-arrival-v1.ts';
 import {intentSleepStopV1Schema} from './intent-sleep-stop-v1.ts';
 export * from './intent-sleep-stop-v1.ts';
@@ -66,7 +67,7 @@ export const describeIntent = (i: WireIntent | null, nameOf: (id: string) => str
 export const publicIntent = (i: WireIntent | null): WireIntent | null => { if (!i) return null; const { note: _n, text: _t, ...rest } = i; return rest; };
 
 // ---------------------------------------------------------------- log events
-export type EventKind = 'birth' | 'intent' | 'mandate' | 'decision' | 'edge-stop' | 'edge-relocate' | 'edge-attention' | 'play' | 'mint' | 'deck' | 'scene' | 'rules' | 'admin' | 'retire' | 'intent-request-v2' | 'intent-v2' | 'intent-admission-v2' | 'intent-controller-v2' | 'intent-arrival-v1' | 'intent-sleep-stop-v1' | 'station-epoch-v1' | 'station-cue-v1' | 'station-anchor-v1' | 'station-rules-era-v1' | 'station-cue-v2' | 'station-anchor-v2';
+export type EventKind = 'birth' | 'intent' | 'mandate' | 'decision' | 'edge-stop' | 'edge-relocate' | 'edge-attention' | 'body-assignment-v1' | 'play' | 'mint' | 'deck' | 'scene' | 'rules' | 'admin' | 'retire' | 'intent-request-v2' | 'intent-v2' | 'intent-admission-v2' | 'intent-controller-v2' | 'intent-arrival-v1' | 'intent-sleep-stop-v1' | 'station-epoch-v1' | 'station-cue-v1' | 'station-anchor-v1' | 'station-rules-era-v1' | 'station-cue-v2' | 'station-anchor-v2';
 export type LogEvent = { seq: number; tick: number; kind: EventKind; author: string; payload: any; at: number };
 
 export type BirthPayload = { soulId: string; entityId: string; name: string; description: string; owner: string };
@@ -90,6 +91,7 @@ export type Beat = { at_min: number; kind: 'scene' | 'group' | 'soul'; directive
 
 /** What anyone may see of a log event: an owner's own words (the intent note) are private to the owner. */
 export function publicEvent(e: LogEvent): LogEvent {
+  if(e.kind==='body-assignment-v1')return {...e,author:'world:body',payload:{contract:e.payload.contract,worldId:e.payload.worldId,soulId:e.payload.soulId,entityId:e.payload.entityId,body:e.payload.body}};
   if(e.kind==='intent-sleep-stop-v1'){const p=intentSleepStopV1Schema.parse(e.payload);return {...e,payload:{worldId:p.worldId,soulId:p.soulId,privateUpdate:true}};}
   if(e.kind==='station-rules-era-v1')return {...e,author:'world:station',payload:stationRulesEraV1Schema.parse(e.payload)};
   if(e.kind==='station-cue-v2')return {...e,author:'world:station',payload:stationCueV2Schema.parse(e.payload)};

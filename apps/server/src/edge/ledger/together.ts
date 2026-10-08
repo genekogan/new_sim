@@ -13,6 +13,7 @@
 //   place, cleared after a while), eat or drink consumables. Items live in this ledger's table; the body only carries
 //   the visible prop (human.holding), changed when a pose completes, so both agree.
 import {randomUUID} from 'node:crypto';
+import {isRigidBody} from '../body/actions.ts';
 import type {Program} from '@sim/engine-contract';
 import type {WorldState as NativeWorld} from '../../../../../mars/viewer/engine/world/types.ts';
 import type {WorldHost} from '../../world.ts';
@@ -299,6 +300,7 @@ export class Together {
     if (tag?.kind === 'paired' || tag?.kind === 'give') {
       const g = this.mindOf(tag.guest), gb = g ? this.p.body(g.entityId) : undefined, me = this.p.body(soul.entityId);
       if (!g || !gb || !me || this.p.faded(tag.guest)) return {code: 'gesture.partner-unavailable', reason: 'They are not here any more.'};
+      if(isRigidBody(me)||isRigidBody(gb))return {code:'body.unsupported',reason:'Paired limb gestures and hand transfers require humanoid bodies; try looking or talking instead.'};
       if (Math.hypot(gb.pose.p[0] - me.pose.p[0], gb.pose.p[2] - me.pose.p[2]) > GESTURE_RADIUS + 2) return {code: 'gesture.too-far', reason: `${g.name} is too far away; go near them first.`};
       if (tag.kind === 'give' && this.heldBy(tag.guest)) return {code: 'hands.full', reason: `${g.name}'s hands are full.`};
       const held = tag.kind === 'give' ? this.heldBy(soul.soulId) : null;

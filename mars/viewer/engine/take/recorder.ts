@@ -42,6 +42,7 @@ function takeHands(e: Entity): TakeHands | undefined {
 }
 
 const FIELDS: [string, (e: Entity) => unknown][] = [
+  ['body', e => e.body], // BODY-v1: discrete admitted model/family swaps, never interpolated
   ['shore', e => e.human?.shore], // opt-in shore/1: discrete actual support/depth
   ['boat', e => e.boat],
   ['boatPassenger', e => e.human?.boatPassenger],
