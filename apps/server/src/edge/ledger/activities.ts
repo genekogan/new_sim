@@ -5,6 +5,7 @@ import type {Program} from '@sim/engine-contract';
 import type {EdgeCapability} from '../contract.ts';
 import type {Interior, Platform, Ring, Solid} from './nav.ts';
 import {POSE_INSTRUMENTS} from '../../../../../mars/viewer/engine/social/pose.ts';
+import {validInteriorShellBounds} from './nav.ts';
 
 type V2 = [number, number];
 export type Spot = {id: string; place?: string; activity: string; base: 'sit' | 'idle' | 'lie'; at: V2; faceTo?: V2; seatHeight?: number; prop?: string; label?: string;
@@ -48,7 +49,7 @@ export function loadSpots(raw: unknown): {data: SpotsData; refused: string[]} {
   const spots = (d.spots ?? []).filter(s => {const good = ok(s?.id) && pt(s.at) && s.activity in SPOT_ACTIVITIES && ['sit', 'idle', 'lie'].includes(s.base) && (s.faceTo === undefined || pt(s.faceTo))
     && (s.instrument === undefined || INSTRUMENTS.has(s.instrument)) && (s.also === undefined || (Array.isArray(s.also) && s.also.every(a => a in SPOT_ACTIVITIES && !(a in GAME_ACTIVITIES)))); if (!good) refused.push('spot ' + String(s?.id)); return good;});
   const shelves = (d.shelves ?? []).filter(s => {const good = ok(s?.id) && pt(s.at); if (!good) refused.push('shelf ' + String(s?.id)); return good;});
-  const interiors = (d.interiors ?? []).filter(i => {const good = typeof i?.place === 'string' && Array.isArray(i.doors) && i.doors.length > 0 && i.doors.every(x => Array.isArray(x) && x.length === 4 && x.every(Number.isFinite)); if (!good) refused.push('interior ' + String(i?.place)); return good;});
+  const interiors = (d.interiors ?? []).filter(i => {const good = typeof i?.place === 'string' && Array.isArray(i.doors) && i.doors.length > 0 && i.doors.every(x => Array.isArray(x) && x.length === 4 && x.every(Number.isFinite)) && (i.shell===undefined||validInteriorShellBounds(i.shell)); if (!good) refused.push('interior ' + String(i?.place)); return good;});
   const solids = (d.solids ?? []).filter(s => {const good = ok(s?.id) && pt(s.c) && pt(s.half) && Number.isFinite(s.yaw); if (!good) refused.push('solid ' + String(s?.id)); return good;});
   const rings = (d.rings ?? []).filter(g => {const good = ok(g?.id) && pt(g.c) && Number.isFinite(g.r) && g.r > 0.3 && g.r < 50 && (g.gaps === undefined || (Array.isArray(g.gaps) && g.gaps.every(Number.isFinite))); if (!good) refused.push('ring ' + String(g?.id)); return good;});
   // CN5: walkable raised decks (OBSTACLES-v1 platforms[]): a box {c, half, yaw} or a round deck {c, r}, top height, optional step/ramp

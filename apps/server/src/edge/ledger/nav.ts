@@ -2,6 +2,7 @@
 // for walking; World's activity-spots file adds scenery solids that have no place and turns admitted interiors into
 // wall shells with door gaps plus furniture boxes. Pure and deterministic; the engine validates and installs it.
 import type {PlaceData, Place} from './places.ts';
+import {inPoly} from './places.ts';
 
 type V2 = [number, number];
 export type Solid = {id: string; label?: string; c: V2; half: V2; yaw: number; height?: number};
@@ -10,7 +11,28 @@ export type NavSpec = {version: 'nav/1'; ground: GroundRect[]; solids: Solid[];p
 /** activity-spots/1 `interiors[]`: an enclosed building made enterable through its doors. */
 export type Interior = {place: string; doors: [number, number, number, number][]; wall?: number; furniture?: Solid[];
   /** Interior wall runs [x0,z0,x1,z1] inside the building; any door segment lying on a run is a gap in it. */
-  walls?: [number, number, number, number][]};
+  walls?: [number, number, number, number][];
+  /** Actual ground room bounds; an enclosing place may also cover exterior stairs/balconies. */
+  shell?: [number,number,number,number]};
+
+export function validInteriorShellBounds(value:unknown):value is [number,number,number,number]{
+ return Array.isArray(value)&&value.length===4&&value.every(Number.isFinite)&&value[0]<value[2]&&value[1]<value[3];
+}
+/** Read-only actual enclosure footprint. Invalid explicit bounds remain a
+ * conservative refusal; absent bounds preserve the old authored polygon. */
+export function interiorShellPolygon(place:Pick<Place,'polygon'>,interior:Pick<Interior,'shell'>):V2[]|null{
+ if(interior.shell===undefined)return place.polygon;
+ if(!validInteriorShellBounds(interior.shell))return null;
+ const [x0,z0,x1,z1]=interior.shell,poly=place.polygon,eps=1e-8;
+ const rect:V2[]=[[x0,z0],[x1,z0],[x1,z1],[x0,z1]];
+ const onEdge=(p:V2,a:V2,b:V2)=>{const dx=b[0]-a[0],dz=b[1]-a[1],px=p[0]-a[0],pz=p[1]-a[1],dot=px*dx+pz*dz;if(dx*dx+dz*dz<=eps*eps)return px*px+pz*pz<=eps*eps;return Math.abs(px*dz-pz*dx)<=eps&&dot>=-eps&&dot<=dx*dx+dz*dz+eps;};
+ if(poly.length<3||poly.some(p=>!Array.isArray(p)||p.length!==2||!p.every(Number.isFinite))||rect.some(p=>!inPoly(p[0],p[1],poly)&&!poly.some((a,i)=>onEdge(p,a,poly[(i+1)%poly.length]))))return null;
+ // A concave parent can contain every corner yet cut through the rectangle.
+ // Refuse any parent boundary segment entering its open interior.
+ const cutsInterior=(a:V2,b:V2)=>{let lo=0,hi=1;for(const [axis,min,max]of [[0,x0+eps,x1-eps],[1,z0+eps,z1-eps]]){const d=b[axis]-a[axis];if(Math.abs(d)<=eps){if(a[axis]<=min||a[axis]>=max)return false;continue;}const t0=(min-a[axis])/d,t1=(max-a[axis])/d;lo=Math.max(lo,Math.min(t0,t1));hi=Math.min(hi,Math.max(t0,t1));if(hi<=lo)return false;}return hi>lo;};
+ if(poly.some((a,i)=>cutsInterior(a,poly[(i+1)%poly.length])))return null;
+ return rect;
+}
 
 const r3 = (n: number) => Math.round(n * 1000) / 1000;
 const bbox = (poly: V2[]) => {const xs = poly.map(v => v[0]), zs = poly.map(v => v[1]); return [Math.min(...xs), Math.min(...zs), Math.max(...xs), Math.max(...zs)] as [number, number, number, number];};
@@ -158,7 +180,7 @@ export function navSpecFromPlaces(data: PlaceData, opts: {native: Set<string>; g
     if (p.kind === 'water') {solids.push(...ovalStrips(p.id, p.polygon, p.name)); continue;}
     if (!p.enclosed || enclosedAncestor(p)) continue;
     const inside = interiors.get(p.id);
-    if (inside) {solids.push(...shellWalls(p.id, p.polygon, inside.doors, inside.wall ?? 0.3, p.name), ...runWalls(p.id, inside.walls ?? [], inside.doors, 0.15, p.name), ...(inside.furniture ?? []).map(f => ({...f, id: `${p.id}#f-${f.id}`})));}
+    if (inside) {const shell=interiorShellPolygon(p,inside);if(!shell){solids.push(polygonBox(p.id,p.polygon,p.name));continue;}solids.push(...shellWalls(p.id, shell, inside.doors, inside.wall ?? 0.3, p.name), ...runWalls(p.id, inside.walls ?? [], inside.doors, 0.15, p.name), ...(inside.furniture ?? []).map(f => ({...f, id: `${p.id}#f-${f.id}`})));}
     else solids.push(polygonBox(p.id, p.polygon, p.name));
   }
   // CN5: a platform's deck is a floor (a scenery solid covering it is not kept); box decks with a step/ramp get edge walls
