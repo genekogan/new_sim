@@ -233,7 +233,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private ambientLife(tick: number) {
     const talking = this.conversationPartners();
     for (const m of this.host.minds.values()) {
-      const busy = this.faded.has(m.soulId) || this.pending.has(m.soulId) || !!this.aboard(m.entityId) || !!this.host.engine.programOf(m.entityId) || this.openReceipts(m.soulId).length > 0 || this.together.awaiting(m.soulId);
+      const row=this.db.soul(m.soulId);
+      if(!row||row.retired_at!==null||row.owner!==m.owner||row.entity_id!==m.entityId||row.world_id!==this.host.worldId)continue;
+      const busy = this.faded.has(m.soulId) || this.pending.has(m.soulId) || !!this.aboard(m.entityId) || !!this.host.engine.programOf(m.entityId) || !!this.host.engine.actorBorrowed?.(m.entityId) || this.openReceipts(m.soulId).length > 0 || this.together.awaiting(m.soulId);
       const b = this.body(m.entityId), state = stateOf(this.host, m.entityId);
       if (busy || !b || state === 'sleeping' || state === 'absent' || state === 'swimming') {this.idleSince.set(m.soulId, tick); continue;}
       const since = this.idleSince.get(m.soulId); if (since === undefined) {this.idleSince.set(m.soulId, tick); continue;}
@@ -247,7 +249,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const pick = near ? {id: 'face:' + near.x.soulId, label: `Turn towards ${near.x.name}`, steps: [{verb: 'wave', params: {at: near.x.entityId, seconds: 1}}] as Program['steps']} : ambientChoice(this, soul, b, tick);
       if (!pick) continue;
       this.ambientAt.set(soul.soulId, Date.now());
-      void this.host.enqueue('decision', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, option: pick.id, label: pick.label, steps: pick.steps, reevalTicks: 1e9, fallback: false, trigger: 'edge-ambient'}).catch(() => {/* best effort */});
+      const guard=():true=>{const current=this.db.soul(soul.soulId);
+        if(!current||current.retired_at!==null||current.owner!==soul.owner||current.entity_id!==soul.entityId||current.world_id!==this.host.worldId||this.host.engine.programOf(soul.entityId)||this.host.engine.actorBorrowed?.(soul.entityId)||this.pending.has(soul.soulId)||this.openReceipts(soul.soulId).length||this.together.awaiting(soul.soulId)||this.faded.has(soul.soulId))throw Error('edge.ambient-stale');return true;};
+      void this.host.enqueueChecked('decision', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, option: pick.id, label: pick.label, steps: pick.steps, reevalTicks: 1e9, fallback: false, trigger: 'edge-ambient'},guard).catch(() => {/* best effort */});
     }
   }
   private unstuckAt = new Map<string, number>();
