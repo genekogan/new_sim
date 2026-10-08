@@ -1,3 +1,4 @@
+import {SHORE_POLICY} from '../../../mars/viewer/engine/locomotion/shore.ts';
 // P0 October 6: exact saved Alice failures. "go to the classroom" was refused
 // while she slept during quiet renewal; "go for a swim in the pond" had no
 // registered swim binding and the model plan failed schema. Fake minds, $0.
@@ -8,7 +9,7 @@ import {retainedCommonsShoreFactory,nativeSleepSnapshotFactoryV1,COMMONS_PERSONA
 import {readFileSync} from 'node:fs';
 import type {SoulRow} from './db.ts';
 import {installEdenSteeringModeV1} from './eden-steering-mode.ts';
-import {humanCompilerOutputV1Schema} from '@sim/engine-contract';
+import {humanCompilerOutputV1Schema,type ActionRecord} from '@sim/engine-contract';
 import type {WorldState as NativeWorld} from '../../../mars/viewer/engine/world/types.ts';
 import {fixture,invite,accept} from '../test/native-owner-fixture.ts';
 import {LivingWorld} from './living.ts';
@@ -143,11 +144,25 @@ test('pond is multi-occupant: a bank gathering does not block it and four Souls 
  assert.ok(await tick(4000,()=>{const p=body(host).pose.p;return Math.hypot(p[0]+37.5,p[2])<2&&body(host).human?.activity!=='walk';}),'host stands at the bank centre: '+JSON.stringify(body(host).pose.p));
  const swimmers=f.rows.slice(2,6),ids:string[]=[];
  for(const row of swimmers){await accept(f.host,f.service.submit(scopeOf(row),{contract:'soul-intent/2',op:'upsert',requestId:'swim-'+row.id,words:'go for a swim'}));await accept(f.host,f.service.settled());const r=f.service.lookup(scopeOf(row),'swim-'+row.id);assert.equal(r.phase,'understood',JSON.stringify(r));if(r.phase!=='understood')throw Error('no plan');ids.push(r.revision.intentId);await f.brain.evaluate(f.host.minds.get(row.id)!,'new-intent-v2');f.host.drainInputs();}
- const swam=new Map<string,boolean>();
- let most=0,ps:number[][]=[];const completed=()=>swimmers.every((row,i)=>Object.values(f.host.intentHistoryOf(row.id).attempts).some(x=>x.intent.intentId===ids[i]&&x.phase==='completed'));const ok=await tick(14000,()=>{for(const r of swimmers)if(body(r).human?.activity==='swim')swam.set(r.id,true);const inWater=swimmers.filter(r=>['tread','swim'].includes(body(r).human?.activity??''));if(inWater.length>most){most=inWater.length;ps=inWater.map(r=>[...body(r).pose.p]);}return most>=3&&completed();});
+ const swam=new Map<string,boolean>(),checkedGoals=new Set<string>();let goalAdmissions=0,minimumGoalSpacing=Infinity;
+ const pond=f.host.engine.world.regions['shore-water'].polygon,insidePond=(x:number,z:number)=>{let inside=false;for(let i=0,j=pond.length-1;i<pond.length;j=i++){const a=pond[i],b=pond[j];if((a[1]>z)!==(b[1]>z)&&x<(b[0]-a[0])*(z-a[1])/(b[1]-a[1])+a[0])inside=!inside;}return inside;};
+ const moveGoal=(record:ActionRecord)=>{if(record.parent||!['commons_shore_travel','shore_travel','walk_to'].includes(record.verb)||!record.params||typeof record.params!=='object'||Array.isArray(record.params))return null;const p=record.params as Record<string,unknown>;return typeof p.actor==='string'&&typeof p.x==='number'&&typeof p.z==='number'?{actor:p.actor,x:p.x,z:p.z}:null;};
+ const checkAdmittedGoals=()=>{const live=new Set(f.host.engine.runtime.liveIds());for(const record of f.host.engine.runtime.records.values()){
+  if(checkedGoals.has(record.id)||!live.has(record.id))continue;const goal=moveGoal(record),row=goal?swimmers.find(row=>row.entity_id===goal.actor):undefined;if(!goal||!row||!insidePond(goal.x,goal.z))continue;
+  const pending=f.host.minds.get(row.id)?.pending,action=pending?f.host.engine.programAction?.(pending.program):null,card=pending?f.host.kernel.vocab.cards[pending.card]:undefined,step=action&&card?[...card.approach,...card.during][action.step]:undefined;
+  if(action?.action.id!==record.id||!['pond/1','pond-lap/1'].includes(String(step?.params?.spread)))continue;checkedGoals.add(record.id);goalAdmissions++;
+
+  const distances=Object.values(f.host.engine.world.entities).filter(e=>e.human&&e.id!==goal.actor).map(e=>Math.hypot(goal.x-e.pose.p[0],goal.z-e.pose.p[2]));
+  for(const other of f.host.engine.runtime.records.values()){if(!live.has(other.id))continue;const target=moveGoal(other);if(target&&target.actor!==goal.actor)distances.push(Math.hypot(goal.x-target.x,goal.z-target.z));}
+  const spacing=Math.min(...distances);minimumGoalSpacing=Math.min(minimumGoalSpacing,spacing);assert.ok(spacing>=1.4-1e-9,'new pond destination is spaced from other bodies and admitted goals '+JSON.stringify({tick:f.host.engine.world.tick,goal,spacing}));
+ }};
+ let most=0,ps:number[][]=[],peakTick=0,peakActivities:string[]=[],minimumConcurrent=Infinity,minimumTreading=Infinity;const completed=()=>swimmers.every((row,i)=>Object.values(f.host.intentHistoryOf(row.id).attempts).some(x=>x.intent.intentId===ids[i]&&x.phase==='completed'));const ok=await tick(14000,()=>{checkAdmittedGoals();for(const r of swimmers)if(body(r).human?.activity==='swim')swam.set(r.id,true);const inWater=swimmers.filter(r=>['tread','swim'].includes(body(r).human?.activity??''));for(let i=0;i<inWater.length;i++)for(let j=i+1;j<inWater.length;j++){const a=body(inWater[i]),b=body(inWater[j]),distance=Math.hypot(a.pose.p[0]-b.pose.p[0],a.pose.p[2]-b.pose.p[2]);minimumConcurrent=Math.min(minimumConcurrent,distance);if(a.human?.activity==='tread'&&b.human?.activity==='tread')minimumTreading=Math.min(minimumTreading,distance);}if(inWater.length>most){most=inWater.length;ps=inWater.map(r=>[...body(r).pose.p]);peakTick=f.host.engine.world.tick;peakActivities=inWater.map(r=>body(r).human!.activity);}return most>=3&&completed();});
  assert.ok(ok,'max simultaneous in water='+most+' '+swimmers.map((r,i)=>body(r).human?.activity+'@'+body(r).pose.p.map(v=>v.toFixed(1)).join(',')+' '+Object.values(f.host.intentHistoryOf(r.id).attempts).filter(x=>x.intent.intentId===ids[i]).map(x=>x.phase+':'+x.tick+(('reason' in x)?':'+x.reason:'')).join('|')).join(' ;; '));
- for(let i=0;i<ps.length;i++)for(let j=i+1;j<ps.length;j++)assert.ok(Math.hypot(ps[i][0]-ps[j][0],ps[i][2]-ps[j][2])>=1,'spaced bodies');
- assert.equal(swam.size,4,'all four actually swam');t.diagnostic('peak simultaneous swimmers '+most);assert.ok(Math.hypot(body(host).pose.p[0]+37.5,body(host).pose.p[2])<2,'gathering host was not displaced');
+ t.diagnostic(JSON.stringify({peakTick,peakActivities,peakPositions:ps,minimumConcurrent,minimumTreading,goalAdmissions,minimumGoalSpacing}));
+ // Spread endpoints are 1.4m apart, but swimming/turning/obstruction stops use the native swept-capsule bound.
+ // Check every concurrent-water tick, rather than one arbitrary first-peak position during transit.
+ const physicalSeparation=2*SHORE_POLICY.radius+.02;assert.ok(Number.isFinite(minimumConcurrent)&&minimumConcurrent>=physicalSeparation-1e-9,'native swimmer capsules never overlap '+JSON.stringify({minimumConcurrent,physicalSeparation,peakTick,peakActivities,positions:ps}));
+ assert.ok(goalAdmissions>=4,'each swimmer has a separately admitted spaced pond destination');assert.equal(swam.size,4,'all four actually swam');t.diagnostic('peak simultaneous swimmers '+most);assert.ok(Math.hypot(body(host).pose.p[0]+37.5,body(host).pose.p[2])<2,'gathering host was not displaced');
  assert.deepEqual(f.host.engine.runtime.violations,[]);assert.equal(f.db.paidCost(),0);
  t.diagnostic('four simultaneous swimmers at '+JSON.stringify(ps.map(p=>[p[0],p[2]])));
 });
