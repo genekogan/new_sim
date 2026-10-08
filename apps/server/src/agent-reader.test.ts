@@ -1,6 +1,7 @@
 import { test, type TestContext } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
+import type {AddressInfo} from 'node:net';
 import { once } from 'node:events';
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -69,9 +70,10 @@ async function fixture(t:TestContext,key:Config['worldKey']){
     req.url=stripWorldRequestPath(req.url,cfg.worldPath);void listener(req,res);
   });
   t.after(async()=>{server.closeAllConnections();await new Promise<void>(resolve=>server.close(()=>resolve()));db.close();rmSync(dir,{recursive:true,force:true});});
-  server.listen(4953,'127.0.0.1');await once(server,'listening');
-  const url='http://127.0.0.1:4953';
-  // Successive independent worlds reuse one owned port, not one HTTP session.
+  server.listen(0,'127.0.0.1');await once(server,'listening');
+  const url=`http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  cfg.publicUrl=url+`/w/${key}`;
+  // Each independent world uses its own allocated port and HTTP session.
   // Do not let the client's pool carry a closed socket into the next fixture.
   const request=(path:string,init:RequestInit={})=>fetch(url+path,{...init,
     headers:{connection:'close',...init.headers}});
