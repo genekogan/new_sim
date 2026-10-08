@@ -2,6 +2,8 @@
 // and the read-only hooks Core-Comms routes events and speech with. No model calls.
 import {randomUUID} from 'node:crypto';
 import {bodyCapabilityProblem,bodyVerbProblem,isRigidBody} from '../body/actions.ts';
+import {interiorShellPolygon} from './nav.ts';
+import {inPoly} from './places.ts';
 import type {Program} from '@sim/engine-contract';
 import {clockAt} from '@sim/brain';
 import type {WorldState as NativeWorld} from '../../../../../mars/viewer/engine/world/types.ts';
@@ -11,7 +13,7 @@ import {readHumanCapabilitiesV1, type HumanBindingV1} from '../../human-capabili
 import {humanBlockedExplanationV1} from '../../human-wait-condition.ts';
 import {EdgeError, type EdgeCapability, type EdgeLedgerHooks, type EdgeReceipt, type EdgeSoul, type NearbyBody, type PlaceRef} from '../contract.ts';
 import {CATALOG} from '../../../../../mars/viewer/engine/world/catalog.ts';
-import {PlaceIndex, centroid, derivePlaceData, happenings, validatePlaceData, type PlaceData} from './places.ts';
+import {PlaceIndex, centroid, derivePlaceData, happenings, validatePlaceData, type PlaceData,type Place} from './places.ts';
 const area = (p: [number, number][]) => Math.abs(p.reduce((s, [x, z], i) => {const [x2, z2] = p[(i + 1) % p.length]; return s + x * z2 - x2 * z;}, 0)) / 2;
 import {resolveCapability, tokens, placeMatch, type VocabContext} from './vocabulary.ts';
 import {activityCapabilities, loadSpots, ACTIVITY_SECONDS_MAX, type SpotsData} from './activities.ts';
@@ -803,8 +805,12 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const m = this.host.minds.get(soulId), b = m ? this.body(m.entityId) : undefined; if (!b) return null;
     const ride = this.aboard(m!.entityId), basket = ride ? this.places.carrierPlaces.get(ride.id) : undefined;
     if (basket?.enclosed) return basket.id;
-    return this.places.containing(b.pose.p[0], b.pose.p[2], b.human?.level ?? 0).find(p => p.enclosed)?.id ?? null;
+    return this.enclosureAtPoint(b.pose.p[0],b.pose.p[2],b.human?.level??0);
   }
+  /** Logical property polygons can include balconies; privacy follows the validated actual room shell. */
+  enclosureAtPoint(x:number,z:number,level=0):string|null{return this.places.containing(x,z,level).find(p=>p.enclosed&&inPoly(x,z,this.enclosurePolygon(p)))?.id??null;}
+  private enclosurePolygon(p:Place){const interior=this.spots.interiors.find(i=>i.place===p.id);return interior?interiorShellPolygon(p,interior)??p.polygon:p.polygon;}
+  enclosurePlaces(){return [...this.places.byId.values()].map(p=>p.enclosed?{...p,polygon:this.enclosurePolygon(p)}:p);}
   perceivedBodies(soulId: string, radius: number): NearbyBody[] {
     const me = this.host.minds.get(soulId), mb = me ? this.body(me.entityId) : undefined; if (!me || !mb) return [];
     const myEnc = this.enclosureOf(soulId), out: NearbyBody[] = [];

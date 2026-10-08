@@ -40,7 +40,7 @@ export class Perception {
   sees(at: V2): boolean {return !!this.pos && clearSight(this.pos, at, this.solids()).clear;}
   /** Is a point in my enclosure (or, when I am outdoors, not inside any enclosed place)? */
   sameEnclosure(at: V2, level = 0): boolean {
-    const enc = this.L.places.containing(at[0], at[1], level).find(p => p.enclosed)?.id ?? null;
+    const enc = this.L.enclosureAtPoint(at[0],at[1],level);
     return enc === this.enclosure;
   }
   bearing(at: V2) {return this.pos ? bearingOf(this.heading, this.pos, at) : 'ahead';}

@@ -4,7 +4,7 @@ import {CATALOG} from '../../../../../mars/viewer/engine/world/catalog.ts';
 import type {WorldState as NativeWorld} from '../../../../../mars/viewer/engine/world/types.ts';
 import {EdgeError, type EdgeSoul} from '../contract.ts';
 import {stateOf, type EdgeLedger} from '../ledger/ledger.ts';
-import {centroid} from '../ledger/places.ts';
+import {centroid,inPoly} from '../ledger/places.ts';
 import {visualFloorOffset} from './platforms.ts';
 import {buildOccluders, computeSight, lightOf, wrap, compassOf, doingOf, type EyePose, type Occluders, type Sight, type SightBody, type SightFixture, type V2} from './sight.ts';
 
@@ -34,12 +34,12 @@ export function plainName(label: string): string {
 const occCache = new WeakMap<EdgeLedger, Occluders>();
 const encCache = new WeakMap<EdgeLedger, Map<string, string | null>>();
 function occludersOf(ledger: EdgeLedger): Occluders {
-  let o = occCache.get(ledger); if (!o) {o = buildOccluders(ledger.places.byId.values(), ledger.spots); occCache.set(ledger, o);} return o;
+  let o = occCache.get(ledger); if (!o) {o = buildOccluders(ledger.enclosurePlaces(), ledger.spots); occCache.set(ledger, o);} return o;
 }
 function enclosureAt(ledger: EdgeLedger, x: number, z: number, level = 0): string | null {
   let m = encCache.get(ledger); if (!m) {m = new Map(); encCache.set(ledger, m);}
   const key = `${Math.round(x * 10)},${Math.round(z * 10)},${level}`; if (m.has(key)) return m.get(key)!;
-  const v = ledger.places.containing(x, z, level).find(p => p.enclosed)?.id ?? null; if (m.size > 20000) m.clear(); m.set(key, v); return v;
+  const v = ledger.enclosureAtPoint(x,z,level); if (m.size > 20000) m.clear(); m.set(key, v); return v;
 }
 
 export function eyePose(body: {pose: {p: number[]; yaw: number}; body?:{family:string;hoverHeight?:number}; human?: {activity?: unknown; shore?: {datumY?: number}}}, state: string, yaw: number, hfovDeg: number, w: number, h: number,floorOffset=0): EyePose {
@@ -116,10 +116,11 @@ export function planView(ledger: EdgeLedger, soul: EdgeSoul, request: ViewReques
   }
   const spots: SightFixture[] = ledger.spots.spots.filter(s => s.label).map(s => ({id: s.id, name: plainName(s.label!), p: [s.at[0], 0, s.at[1]], enclosure: enclosureAt(ledger, s.at[0], s.at[1])}));
   const path = ledger.placePathOf(soul.soulId).filter(p => p.kind !== 'occupier'), enc = me.enclosure ? ledger.places.byId.get(me.enclosure) : undefined;
-  const containing = new Set(ledger.places.containing(me.p[0], me.p[2], me.level).map(p => p.id));
+  const privacyPlaces=new Map(ledger.enclosurePlaces().map(p=>[p.id,p]));
+  const containing = new Set(ledger.places.containing(me.p[0], me.p[2], me.level).filter(p=>!p.enclosed||inPoly(me.p[0],me.p[2],privacyPlaces.get(p.id)!.polygon)).map(p => p.id));
   const light = lightOf(world.env?.datetime ?? null, world.env?.weather, me.enclosure !== null);
   const sight = computeSight({me, pose, gaze: {mode: gaze.mode, yaw: gaze.yaw, ...(gaze.target ? {target: gaze.target} : {})}, light, place: path[0]?.name ?? null, enclosureName: enc?.name ?? null, others, fixtures, spots,
-    places: [...ledger.places.byId.values()], containing, occluders: occludersOf(ledger)});
+    places: ledger.enclosurePlaces(), containing, occluders: occludersOf(ledger)});
   if (request.mode === 'map') sight.alt = mapCaption(sight, me);
   return {sight, tick: host.engine.world.tick, me, request,
     render: {mode: request.mode, w: request.w, h: request.h, pose, self: me.entityId, show: sight.souls.map(s => s.entityId), ...(request.mode === 'map' ? {span: MAP_SPAN} : {})}};

@@ -1,0 +1,13 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {Hono} from 'hono';
+import {edenNavWorld} from '../test/eden-nav-fixture.ts';import {mountEdgeRoutes,edgeSoulResolver} from './edge/routes.ts';import {planView} from './edge/eyes/view.ts';import {buildOccluders} from './edge/eyes/sight.ts';
+test('actual House2 shell keeps balcony outdoor sight/earshot, private room isolated, and its real door navigable',async t=>{
+ const w=await edenNavWorld(3,{cn5:true});t.after(()=>{w.f.host.stop();w.f.db.close();});const [inside,balcony,visitor]=w.souls;
+ const place=w.ledger.places.byId.get('eden-house-2')!,shell=w.spots.interiors.find(i=>i.place===place.id)!.shell!;assert.deepEqual(shell,[48,12,56,18]);const rect=[[48,12],[56,12],[56,18],[48,18]] as [number,number][];
+ const room=w.engine.clearSpotsV1(rect,1)[0];assert.ok(room);for(const [soul,p]of [[inside,room],[balcony,[50,8]],[visitor,[52,8]]] as const)assert.equal(w.engine.relocateHumanV1(soul.entityId,p),true);
+ assert.equal(w.ledger.enclosureOf(inside.soulId),'eden-house-2');assert.equal(w.ledger.enclosureOf(balcony.soulId),null);assert.equal(w.ledger.enclosureOf(visitor.soulId),null);assert.deepEqual(w.ledger.perceivedBodies(inside.soulId,30),[]);assert.equal(w.ledger.perceivedBodies(balcony.soulId,30).some(p=>p.soulId===visitor.soulId),true);
+ const view=planView(w.ledger,balcony,{w:640,h:400,mode:'eyes',gaze:'forward',fov:120});assert.equal(view.sight.where.inside,false);assert.equal(view.sight.souls.some(s=>s.soulId===inside.soulId),false);
+ const occ=buildOccluders(w.ledger.enclosurePlaces(),w.ledger.spots);assert.deepEqual(occ.buildings.find(b=>b.id===place.id)!.poly,rect);
+ const credentials=w.souls.map(s=>{const row=w.f.db.soul(s.soulId)!,pair=w.f.souls.pairCode(row,'http://127.0.0.1:4958');return w.f.souls.pairExchange(pair.code,'scripted').token;}),app=new Hono();mountEdgeRoutes(app,{host:w.f.host,db:w.f.db,souls:w.f.souls,ledger:w.ledger,soul:edgeSoulResolver(w.f.host,w.f.souls,c=>c.req.header('authorization')?.replace(/^Bearer /,''))});
+ const say=async(i:number)=>{const r=await app.request('/v1/edge/say',{method:'POST',headers:{authorization:'Bearer '+credentials[i],'content-type':'application/json'},body:JSON.stringify({text:'Scripted shell privacy fixture.'})});assert.equal(r.status,200,await r.clone().text());return(await r.json()).said;};assert.equal((await say(0)).heardBy,0);assert.equal((await say(1)).heardBy,1);
+ assert.ok(w.engine.clearanceAtV1(52,12)>.28,'actual declared door gap admits ordinary movement');assert.ok(w.engine.clearanceAtV1(48.9,6.35)>.28,'authentic mailbox approach stays outside the actual room');assert.deepEqual(w.engine.runtime.violations,[]);assert.equal(w.f.db.paidCost(),0);
+});
