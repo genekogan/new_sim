@@ -1,0 +1,33 @@
+{
+  "schema": "native-place-aliases/1",
+  "aliases": [
+    {
+      "place": "tower-l0",
+      "nativeRegion": "tower-L0"
+    },
+    {
+      "place": "tower-l1",
+      "nativeRegion": "tower-L1"
+    },
+    {
+      "place": "tower-l2",
+      "nativeRegion": "tower-L2"
+    },
+    {
+      "place": "tower-l3",
+      "nativeRegion": "tower-L3"
+    },
+    {
+      "place": "temple-l0",
+      "nativeRegion": "temple-L0"
+    },
+    {
+      "place": "temple-l1",
+      "nativeRegion": "temple-L1"
+    },
+    {
+      "place": "temple-l2",
+      "nativeRegion": "temple-L2"
+    }
+  ]
+}

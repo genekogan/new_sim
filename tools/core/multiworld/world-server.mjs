@@ -7,8 +7,9 @@ import {resolve,join} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {readFileSync,mkdirSync,writeFileSync,unlinkSync} from 'node:fs';
 import {setImmediate} from 'node:timers/promises';
+import {readAuthoredSidecars} from './authored-sidecars.mjs';
 
-export async function openWorldServer({input,dataDir,worldKey,worldId,port,build='local-multiworld/1',webDir,marsWebDir,publicOrigin,ownerId='dev:admin',seedCast=true,nativeCast=true,runtimePolicies=true,installLiving=true,cards=true,skillFile,cliFile,checkOnly=false,worldVariant='legacy',sceneSha256,nativeCastIds,experiencesFile,experiencesSha256}){
+export async function openWorldServer({input,dataDir,worldKey,worldId,port,build='local-multiworld/1',webDir,marsWebDir,publicOrigin,ownerId='dev:admin',seedCast=true,nativeCast=true,runtimePolicies=true,installLiving=true,cards=true,skillFile,cliFile,checkOnly=false,worldVariant='legacy',sceneSha256,nativeCastIds,experiencesFile,experiencesSha256,placeData,placeDataSha256,activityData,activityDataSha256,nativeAliases,nativeAliasesSha256}){
  if(!['mars','littlemartians'].includes(worldKey)||!input||!dataDir||!worldId||!Number.isInteger(port)||port<4963||port>4969)throw Error('explicit local Mars/LM input/data/world and port4963..4969 required');
  if(!build.startsWith('local-')||!ownerId)throw Error('local build and explicit cast owner required');
  input=resolve(input);dataDir=resolve(dataDir);
@@ -25,6 +26,7 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
   const bytes=readFileSync(resolve(experiencesFile));if(createHash('sha256').update(bytes).digest('hex')!==experiencesSha256)throw Error('authored experiences source hash differs');
   experiencesData=JSON.parse(bytes.toString('utf8'));
  }
+ const authoredData=readAuthoredSidecars({input,worldKey,worldVariant,worldId,placeData,placeDataSha256,activityData,activityDataSha256,nativeAliases,nativeAliasesSha256});
  mkdirSync(dataDir,{recursive:true});
  const lockPath=join(dataDir,'edge-server.lock');
  const releaseLock=()=>{try{if(JSON.parse(readFileSync(lockPath,'utf8')).pid===process.pid)unlinkSync(lockPath);}catch{/* already released */}};
@@ -55,6 +57,7 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
   const factory=await native.marsFactory(selected);
   host=new WorldHost(db,factory,db.world(worldId)?.seed??cfg.worldSeed,cfg.snapshotEveryTicks,worldId,{durableClockV1:true});const boot=host.boot();
   if(worldKey==='littlemartians'&&host.engine.world.base.staticHash!==factory.genesis(host.seed).base.staticHash)throw Error('LM persisted physical base differs from selected map; preserve the old reader and database');
+  const authored=authoredData?(await load('apps/server/src/worlds/authored-lm-edge.ts')).validateAuthoredLmSidecars(host,authoredData):undefined;
   if(checkOnly){const result={checkOnly:true,boot,worldKey,worldId,tick:host.engine.world.tick,head:host.seq,stateHash:host.engine.stateHash(),rulesVersion:host.engine.rulesVersion};host.stop();db.close();releaseLock();return result;}
   if(skillFile){
    // The shared CLI stays identical. Only selected-world prose is adapted.
@@ -112,11 +115,12 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
   if(cards){if(worldKey==='mars'){const {CampCards}=await load('apps/server/src/camp.ts');new CampCards(host);}else{const {FloaterCards}=await load('apps/server/src/floaters.ts');new FloaterCards(host);}host.drainInputs();await setImmediate();}
   // Fake native needs already animate the cast. A second ambient decision
   // driver could commandeer a crew member borrowed by a construction program.
-  edge=new EdgeLedger(host,db,undefined,{ambient:false});
+  edge=new EdgeLedger(host,db,authored?.places,{ambient:false,...(authored?{spots:authored.activities}:{})});
   const {marsEdgeProfile}=await load('apps/server/src/worlds/mars-edge.ts'),{floaterEdgeProfile}=await load('apps/server/src/worlds/floater-edge.ts');
   const profile=worldKey==='mars'?marsEdgeProfile(host):null,rigid=floaterEdgeProfile(host);
   const experienceProfile=experiencesData?(await load('apps/server/src/worlds/experiences-edge.ts')).lmExperienceEdgeProfile(host,experiencesData):undefined;
-  edge.worldProfile=(soul,caps,plans)=>{profile?.(soul,caps,plans);rigid(soul,caps,plans);experienceProfile?.(soul,caps,plans);};
+  const aliasesProfile=authored?(await load('apps/server/src/worlds/authored-lm-edge.ts')).authoredLmAliasProfile(host,authored.aliases):undefined;
+  edge.worldProfile=(soul,caps,plans)=>{profile?.(soul,caps,plans);aliasesProfile?.(soul,caps,plans);experienceProfile?.(soul,caps,plans);rigid(soul,caps,plans);};
   server=createServer();const strip=url=>stripWorldRequestPath(url,cfg.worldPath);server.on('upgrade',req=>{req.url=strip(req.url);});
   hub=new Hub(server,host,auth,db);hub.brain=brain;hub.build=build;
   const previousFading=process.env.EDGE_FADING;delete process.env.EDGE_FADING;

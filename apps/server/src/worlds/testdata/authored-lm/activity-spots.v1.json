@@ -1,0 +1,583 @@
+{
+  "contract": "activity-spots/1",
+  "world": "littlemartians",
+  "spots": [],
+  "solids": [
+    {
+      "id": "madmaraca-unqualified-scan-envelope",
+      "label": "Madmaraca Ceramic Library (conservative exterior envelope)",
+      "c": [
+        -45.0,
+        -20.0
+      ],
+      "half": [
+        10.552705432751722,
+        11.338116037574252
+      ],
+      "yaw": 0,
+      "height": 26.0
+    },
+    {
+      "id": "minarete-scan-envelope-west",
+      "label": "Minarete Temple (measured passage; remaining envelope conservative)",
+      "c": [
+        37.88318802114871,
+        -20.0
+      ],
+      "half": [
+        3.1168119788512847,
+        6.335945287715209
+      ],
+      "yaw": 0,
+      "height": 32.0
+    },
+    {
+      "id": "minarete-scan-envelope-east",
+      "label": "Minarete Temple (measured passage; remaining envelope conservative)",
+      "c": [
+        46.11681197885129,
+        -20.0
+      ],
+      "half": [
+        3.1168119788512847,
+        6.335945287715209
+      ],
+      "yaw": 0,
+      "height": 32.0
+    },
+    {
+      "id": "celadon-tower-scan-envelope-west",
+      "label": "Celadon Beacon (measured passage; remaining envelope conservative)",
+      "c": [
+        -3.9222675114084447,
+        -37.0
+      ],
+      "half": [
+        2.9222675114084447,
+        6.427716981968011
+      ],
+      "yaw": 0,
+      "height": 30.0
+    },
+    {
+      "id": "celadon-tower-scan-envelope-east",
+      "label": "Celadon Beacon (measured passage; remaining envelope conservative)",
+      "c": [
+        3.9222675114084447,
+        -37.0
+      ],
+      "half": [
+        2.9222675114084447,
+        6.427716981968011
+      ],
+      "yaw": 0,
+      "height": 30.0
+    },
+    {
+      "id": "grotto-wall-0",
+      "label": "Reconstructed basalt gallery wall",
+      "c": [
+        27.0,
+        48.0
+      ],
+      "half": [
+        1.0,
+        10.0
+      ],
+      "yaw": 0,
+      "height": 8
+    },
+    {
+      "id": "grotto-wall-1",
+      "label": "Reconstructed basalt gallery wall",
+      "c": [
+        63.0,
+        48.0
+      ],
+      "half": [
+        1.0,
+        10.0
+      ],
+      "yaw": 0,
+      "height": 8
+    },
+    {
+      "id": "grotto-wall-2",
+      "label": "Reconstructed basalt gallery wall",
+      "c": [
+        45.0,
+        57.0
+      ],
+      "half": [
+        19.0,
+        1.0
+      ],
+      "yaw": 0,
+      "height": 8
+    },
+    {
+      "id": "grotto-wall-3",
+      "label": "Reconstructed basalt gallery wall",
+      "c": [
+        33.0,
+        39.0
+      ],
+      "half": [
+        7.0,
+        1.0
+      ],
+      "yaw": 0,
+      "height": 8
+    },
+    {
+      "id": "grotto-wall-4",
+      "label": "Reconstructed basalt gallery wall",
+      "c": [
+        57.0,
+        39.0
+      ],
+      "half": [
+        7.0,
+        1.0
+      ],
+      "yaw": 0,
+      "height": 8
+    },
+    {
+      "id": "grotto-pool-0",
+      "label": "Decorative pool; no admitted swimming or water-supported walking",
+      "c": [
+        34.5,
+        47.0
+      ],
+      "half": [
+        3.5,
+        4.0
+      ],
+      "yaw": 0,
+      "height": 0.3
+    },
+    {
+      "id": "grotto-pool-1",
+      "label": "Decorative pool; no admitted swimming or water-supported walking",
+      "c": [
+        55.5,
+        47.0
+      ],
+      "half": [
+        3.5,
+        4.0
+      ],
+      "yaw": 0,
+      "height": 0.3
+    },
+    {
+      "id": "glazed-plant--1-0",
+      "label": "Glazed garden plant",
+      "c": [
+        -30,
+        37
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant--1-1",
+      "label": "Glazed garden plant",
+      "c": [
+        -34,
+        37
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant--1-2",
+      "label": "Glazed garden plant",
+      "c": [
+        -38,
+        37
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant--1-3",
+      "label": "Glazed garden plant",
+      "c": [
+        -42,
+        37
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant--1-4",
+      "label": "Glazed garden plant",
+      "c": [
+        -46,
+        37
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant--1-5",
+      "label": "Glazed garden plant",
+      "c": [
+        -50,
+        37
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant--1-6",
+      "label": "Glazed garden plant",
+      "c": [
+        -54,
+        37
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant--1-7",
+      "label": "Glazed garden plant",
+      "c": [
+        -30,
+        53
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant--1-8",
+      "label": "Glazed garden plant",
+      "c": [
+        -34,
+        53
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant--1-9",
+      "label": "Glazed garden plant",
+      "c": [
+        -38,
+        53
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant--1-10",
+      "label": "Glazed garden plant",
+      "c": [
+        -42,
+        53
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant--1-11",
+      "label": "Glazed garden plant",
+      "c": [
+        -46,
+        53
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant--1-12",
+      "label": "Glazed garden plant",
+      "c": [
+        -50,
+        53
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant--1-13",
+      "label": "Glazed garden plant",
+      "c": [
+        -54,
+        53
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant-1-0",
+      "label": "Glazed garden plant",
+      "c": [
+        30,
+        37
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant-1-1",
+      "label": "Glazed garden plant",
+      "c": [
+        34,
+        37
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant-1-2",
+      "label": "Glazed garden plant",
+      "c": [
+        38,
+        37
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant-1-3",
+      "label": "Glazed garden plant",
+      "c": [
+        42,
+        37
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant-1-4",
+      "label": "Glazed garden plant",
+      "c": [
+        46,
+        37
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant-1-5",
+      "label": "Glazed garden plant",
+      "c": [
+        50,
+        37
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant-1-6",
+      "label": "Glazed garden plant",
+      "c": [
+        54,
+        37
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant-1-7",
+      "label": "Glazed garden plant",
+      "c": [
+        30,
+        53
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant-1-8",
+      "label": "Glazed garden plant",
+      "c": [
+        34,
+        53
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant-1-9",
+      "label": "Glazed garden plant",
+      "c": [
+        38,
+        53
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "glazed-plant-1-13",
+      "label": "Glazed garden plant",
+      "c": [
+        54,
+        53
+      ],
+      "half": [
+        0.9,
+        0.9
+      ],
+      "yaw": 0,
+      "height": 3.9
+    },
+    {
+      "id": "gallery-panel-forest",
+      "label": "Gallery artwork panel",
+      "c": [
+        -44,
+        59
+      ],
+      "half": [
+        3,
+        0.1
+      ],
+      "yaw": 0,
+      "height": 5
+    },
+    {
+      "id": "gallery-panel-pattern",
+      "label": "Gallery artwork panel",
+      "c": [
+        44,
+        55.6
+      ],
+      "half": [
+        3,
+        0.1
+      ],
+      "yaw": 0,
+      "height": 5
+    },
+    {
+      "id": "gallery-panel-archways",
+      "label": "Gallery artwork panel",
+      "c": [
+        58,
+        30
+      ],
+      "half": [
+        3,
+        0.1
+      ],
+      "yaw": 0,
+      "height": 5
+    }
+  ],
+  "interiors": [
+    {
+      "place": "grotto-court",
+      "doors": [
+        [
+          40,
+          39,
+          50,
+          39
+        ]
+      ],
+      "wall": 2,
+      "furniture": []
+    }
+  ],
+  "rings": []
+}
