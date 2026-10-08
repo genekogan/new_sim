@@ -33,6 +33,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private receiptListeners: ((r: EdgeReceipt) => void)[] = [];
   private placeListeners: ((e: {soulId: string; from: string | null; to: string | null; tick: number}) => void)[] = [];
   private providers: ((s: EdgeSoul) => EdgeCapability[])[] = [];
+  /** MW: a world profile (worlds/*: Mars camp work, floater bodies) adds planned capabilities and drops ones its bodies cannot do. */
+  worldProfile?: (soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>) => void;
   private pending = new Map<string, Pending>();           // soulId → waiting act
   private lastPlace = new Map<string, string | null>();
   /** Server start (ms): metrics count world model calls only from here, not copied history. */
@@ -363,6 +365,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     // carrier/1: a rider in the air can talk and use objects, but its body stays in the basket until it lands.
     const ride = this.aboard(soul.entityId);
     if (ride) for (const c of caps) if (c.verb === 'make' || (ride.phase === 'aloft' && !['rest:here', 'stand:here'].includes(c.id) && !['accept', 'decline', 'ask-to-stop'].includes(c.verb))) {c.available = false; c.blocked = {code: 'ride.aboard', reason: ride.phase === 'aloft' ? `You are aloft in ${ride.label}; it lands by itself and you step out then.` : `You are in ${ride.label}; leave it first.`};}
+    if (this.worldProfile) try {this.worldProfile(soul, caps, plans);} catch (e) {console.error('[edge] world profile', e instanceof Error ? e.message : e);}
     for (const p of this.providers) try {caps.push(...p(soul));} catch {/* a provider fault hides only its own entries */}
     if(isRigidBody(me)){
       for(let i=caps.length-1;i>=0;i--)if(bodyCapabilityProblem(me,caps[i]!,plans.get(caps[i]!.id)?.steps)){plans.delete(caps[i]!.id);caps.splice(i,1);}
