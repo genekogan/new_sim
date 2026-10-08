@@ -251,6 +251,7 @@ export function replayFromGenesis(factory: { genesis(seed: string): unknown; cre
     if (!factory.restore) throw new Error('recovery requires a checkpoint factory');
     engine=factory.restore(structuredClone(recipe.baseline.runtime)); kernel=structuredClone(recipe.baseline.kernel!); counts={...recipe.baseline.counts};
     for (const m of recipe.baseline.minds) if (m.pending && recipe.excluded.includes(m.pending.card)) engine.stop(m.pending.program);
+    for (const actor of recipe.edge?.stopActors ?? []) { const program=engine.programOf(actor); if (program) engine.stop(program); }
     for (const e of recipe.events) { while (engine.world.tick<e.tick) engine.step(); foldEvent(engine,kernel,e,counts); }
     while (engine.world.tick<recipe.untilTick) engine.step();
     suffix=events.filter(e=>e.seq>repair.seq);

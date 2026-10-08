@@ -111,7 +111,10 @@ export class EdgeLedger implements EdgeLedgerHooks {
       if (plan && m && !this.pending.has(r.soul_id)) {this.pending.set(r.soul_id, {receipt: r.receipt_id, soul: {soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner}, steps: plan.steps, label: plan.label, deadline: host.engine.world.tick + WAIT_LIMIT_TICKS, capability: r.capability}); continue;}
       this.update(r.receipt_id, {phase: 'failed', code: 'receipt.lost-on-restart', reason: 'The server restarted before this action could be followed to its end.'});
     }
+    // Hotfix: in an edge world an engine fault is recovered by attributing it to edge programmes (never a process exit)
+    host.recoveryForEdge = true;
     host.listeners.push({
+      onApplied: e => this.onRecovery(e),
       onDecision: (e, r) => this.onDecision(e, r),
       onProgram: ev => this.onProgram(ev),
       afterTick: tick => this.afterTick(tick),
@@ -150,6 +153,15 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const p = e.payload as {trigger?: string}, m = /^edge-act:(r_[0-9a-f-]+)$/.exec(p.trigger ?? ''); if (!m) return;
     if (r.programOk && r.programId) this.update(m[1], {phase: 'started', program_id: r.programId});
     else this.update(m[1], {phase: 'failed', code: r.programCode ?? 'program.refused', reason: humanBlockedExplanationV1(r.programCode, 'That action')});
+  }
+  /** Hotfix: a recovered engine fault ends the open receipts of the Souls whose programmes were set aside. */
+  private onRecovery(e: {kind: string; payload: unknown}) {
+    const edge = (e.payload as {recovery?: {edge?: {souls: string[]}}} | null)?.recovery?.edge; if (e.kind !== 'rules' || !edge) return;
+    for (const soulId of edge.souls) {
+      this.pending.delete(soulId);
+      for (const r of this.openReceipts(soulId)) this.update(r.id, {phase: 'failed', code: 'engine.fault-recovered', reason: 'That would have pushed bodies into each other, so the world set it aside and carried on; choose again.'});
+    }
+    this.capCache.clear();
   }
   private onProgram(ev: {id: string; kind: string; code?: string; message?: string}) {
     if (ev.kind === 'step') return;

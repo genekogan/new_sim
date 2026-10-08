@@ -57,7 +57,10 @@ export type Mind = {
   /** The card whose depiction is running and whose effects have not applied yet. */
   pending: { program: string; card: string; hash: string; target: string | null; option?: string; manner?: string; approachLen: number; applied: boolean } | null;
 };
-export type RecoveryRecipe = { baseline: SnapshotBody; events: LogEvent[]; untilTick: number; faults: Record<string,number>; excluded: string[]; reason: string };
+export type RecoveryRecipe = { baseline: SnapshotBody; events: LogEvent[]; untilTick: number; faults: Record<string,number>; excluded: string[]; reason: string;
+  /** Hotfix (edge worlds, no mind card to blame): the bodies whose programmes are stopped at the baseline, the edge decision
+   *  events left out of the replay, and the edge Souls whose open receipts end `engine.fault-recovered`. */
+  edge?: { stopActors: string[]; excludedSeqs: number[]; souls: string[] } };
 /** A synchronous, read-only acceptance check. Throw to refuse before logging. */
 export type AcceptanceGuard = () => true;
 export function checkAcceptanceGuard(guard: AcceptanceGuard): void {
@@ -478,7 +481,7 @@ export class WorldHost {
             this.minds.clear();this.mindByEntity.clear();this.seq=0;this.extra={};this.counts={};
             this.boot();this.ring=[];recovered=true;
           }catch(restartError){this.stop();p.reject?.(restartError);throw restartError;}
-        }else {this.recoverFault(error, e.kind === 'decision' ? e.payload.card : undefined); recovered = true;}
+        }else {this.recoverFault(error, e.kind === 'decision' ? e.payload.card : undefined, e.kind === 'decision' && !e.payload?.card ? {seq: e.seq, entityId: e.payload?.entityId} : undefined); recovered = true;}
       }
       const accepted=[e,...(admission?[admission]:[]),...(stationEra?[stationEra]:[]),...(arrival?[arrival]:[])];
       if (!recovered||arrival||stationEra||e.payload?.crewRemovalTransition||e.payload?.nativeSleepSnapshotPolicy||e.payload?.commonsNewcomerResources||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore||e.payload?.commonsFoodDelivery||e.payload?.socialEden||e.payload?.edenLecture||e.payload?.edenGround||e.payload?.existingGreenLandmark) this.acc.log.push(...accepted);
@@ -1120,6 +1123,7 @@ export class WorldHost {
     const historicViolations=this.engine.runtime.violations.length;
     // The baseline may contain a resumable program whose later tick proved faulty.
     for (const m of this.minds.values()) if (m.pending && recipe.excluded.includes(m.pending.card)) { this.engine.stop(m.pending.program); m.pending=null; }
+    for (const actor of recipe.edge?.stopActors ?? []) { const program=this.engine.programOf(actor); if (program) this.engine.stop(program); }
     for (const e of recipe.events) {
       while (this.engine.world.tick < e.tick) { const out=this.engine.step(); this.advanceLives(); this.afterPrograms(out.programs,true); }
       this.apply(e,true); this.seq=e.seq;
@@ -1131,20 +1135,28 @@ export class WorldHost {
     for (const m of this.minds.values()) { m.nextEvalTick=this.engine.world.tick+1; m.evalTrigger='activity-failed'; m.lastFingerprint=''; if (m.pending && recipe.excluded.includes(m.pending.card)) m.pending=null; }
     this.kernel.tick=this.engine.world.tick; sweep(this.kernel); this.kernelDirty=true;
   }
-  private recoverFault(error: unknown, cardHint?: string) {
-    const baseline=this.recoveryBaseline; if (!baseline) throw new Error(`No resumable recovery baseline: ${String(error)}`);
+  private recoverFault(error: unknown, cardHint?: string, edgeHint?: {seq: number; entityId?: string}) {
+    const baseline=this.recoveryBaseline;
+    if (!baseline) { if (this.edgeRecovery()) return this.haltOnFault(error, 'no resumable recovery baseline'); throw new Error(`No resumable recovery baseline: ${String(error)}`); }
     const untilTick=this.engine.world.tick, originalSeq=this.seq, all=this.db.events(this.worldId,baseline.seq);
     const pending=[...this.minds.values()].filter(m=>m.pending).map(m=>m.pending!.card);
     const latest=[...all].reverse().find(e=>e.kind==='decision' && pending.includes(e.payload.card));
     const excluded=cardHint ? [cardHint] : latest?.payload.card ? [latest.payload.card as string] : [...new Set(pending)];
-    if (!excluded.length) throw new Error(`Engine fault has no attributable card: ${String(error)}`);
+    // Hotfix (edge worlds): a fault no mind card explains is put down to the edge programmes of the bodies it names (a
+    // collision's two people), widening once to every edge decision since the baseline; never a process exit.
+    const plans = excluded.length ? [{excluded, edge: undefined as RecoveryRecipe['edge']}, {excluded, edge: undefined as RecoveryRecipe['edge']}]
+      : this.edgeRecovery() ? this.edgePlans(error, all, edgeHint).map(edge => ({excluded: [] as string[], edge})) : [];
+    if (!plans.length) throw new Error(`Engine fault has no attributable card: ${String(error)}`);
     const faults={...this.extra.cardFaults as Record<string,number>};
-    for (let attempt=0;attempt<2;attempt++) {
-      for (const card of excluded) faults[card]=(faults[card]??0)+1;
-      const events=all.filter(e=>!(['decision','play'].includes(e.kind) && excluded.includes(e.payload?.card)));
-      const recipe: RecoveryRecipe={baseline:structuredClone(baseline),events,untilTick,faults:{...faults},excluded:[...excluded],reason:String(error).slice(0,800)};
+    for (let attempt=0;attempt<plans.length;attempt++) {
+      const plan=plans[attempt];
+      if (plan.edge === undefined && attempt>0) for (const card of pending) if (!excluded.includes(card)) excluded.push(card);
+      for (const card of plan.excluded) faults[card]=(faults[card]??0)+1;
+      const skip=new Set(plan.edge?.excludedSeqs ?? []);
+      const events=all.filter(e=>!(['decision','play'].includes(e.kind) && plan.excluded.includes(e.payload?.card)) && !skip.has(e.seq));
+      const recipe: RecoveryRecipe={baseline:structuredClone(baseline),events,untilTick,faults:{...faults},excluded:[...plan.excluded],reason:String(error).slice(0,800),...(plan.edge?{edge:plan.edge}:{})};
       try { this.restoreRecovery(recipe); }
-      catch (replayError) { if (attempt===1) throw replayError; for (const card of pending) if (!excluded.includes(card)) excluded.push(card); continue; }
+      catch (replayError) { if (attempt===plans.length-1) { if (this.edgeRecovery()) return this.haltOnFault(replayError, 'recovery replay still faults'); throw replayError; } continue; }
       this.seq=originalSeq;
       const e: LogEvent={seq:++this.seq,tick:untilTick,kind:'rules',author:'world:recovery',payload:{recovery:recipe},at:Date.now()};
       this.db.appendEvent(this.worldId,e); this.resetAcc(); this.acc.log.push(e); this.ring=[];
@@ -1154,6 +1166,36 @@ export class WorldHost {
       this.flush(); this.heartbeat(); return;
     }
   }
+  /** Edge worlds (mindDriver edge): Souls act through edge decisions, not mind cards. */
+  private edgeRecovery(): boolean { return this.recoveryForEdge; }
+  /** Set by the edge server: faults are recovered by edge attribution (never a process exit). */
+  recoveryForEdge = false;
+  /** Edge fault attribution, narrowest first: the faulting bodies' running edge programmes and their decisions since the
+   *  baseline; then every edge decision since the baseline (all running programmes stopped). */
+  private edgePlans(error: unknown, all: LogEvent[], hint?: {seq: number; entityId?: string}): NonNullable<RecoveryRecipe['edge']>[] {
+    let subjects: string[] = [];
+    try { const v = JSON.parse(String(error instanceof Error ? error.message : error).replace(/^Error:\s*/, '')) as {subjects?: string[]}[]; subjects = [...new Set(v.flatMap(d => d.subjects ?? []))]; } catch { /* not a violation list */ }
+    if (hint?.entityId) subjects = [...new Set([hint.entityId, ...subjects])];
+    const humans = Object.values(this.engine.world.entities).filter(e => e.kind === 'human').map(e => e.id).sort();
+    const named = subjects.filter(id => humans.includes(id)), running = (ids: string[]) => ids.filter(id => !!this.engine.programOf(id));
+    const edgeDecision = (e: LogEvent) => e.kind === 'decision' && typeof e.payload?.trigger === 'string' && /^edge-/.test(e.payload.trigger) && !e.payload?.card;
+    const soulOf = (id: string) => this.mindByEntity.get(id)?.soulId;
+    const plan = (actors: string[], all_: boolean) => {
+      const seqs = all.filter(e => edgeDecision(e) && (all_ || actors.includes(e.payload.entityId))).map(e => e.seq), stop = [...new Set(actors)].sort();
+      if (hint && !seqs.includes(hint.seq)) seqs.push(hint.seq);
+      const souls = [...new Set([...stop, ...all.filter(e => seqs.includes(e.seq)).map(e => e.payload.entityId as string)].map(soulOf).filter((x): x is string => !!x))].sort();
+      return {stopActors: stop, excludedSeqs: seqs.sort((a, b) => a - b), souls};
+    };
+    const out = [plan(running(named.length ? named : humans), false), plan(named.length ? named : humans, false), plan(running(humans), true)];
+    return out.filter((p, i) => p.stopActors.length + p.excludedSeqs.length > 0 && out.findIndex(q => JSON.stringify(q) === JSON.stringify(p)) === i);
+  }
+  /** Last resort for edge worlds: keep the process up, the world paused and the fault reported (never a crash loop). */
+  private haltOnFault(error: unknown, why: string) {
+    console.error(`[world] engine fault could not be recovered (${why}); the world is paused, the process stays up:`, String(error).slice(0, 800));
+    this.paused = true; this.engineFault = String(error).slice(0, 800);
+  }
+  /** The fault that paused this world (edge worlds), if any. */
+  engineFault: string | null = null;
 
   setClockRate(rate: number, author: string, why: string) {
     this.clockRate = this.baseRate = rate; this.db.setClockRate(this.worldId, rate);

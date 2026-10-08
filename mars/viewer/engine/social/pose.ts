@@ -36,7 +36,10 @@ const OVERLAY = new Set<string>(POSE_OVERLAYS), POSTURE = new Set<string>([...PO
 export const LIE_CLEARANCE = 0.9;
 
 type Params = { actor: string; activity: string; seconds: number; prop?: string; base?: 'sit' | 'idle'; seatHeight?: number; face?: Vec2;
-  group?: string; waitSeconds?: number; alone?: 'start' | 'fail'; gap?: number; need?: number; hold?: string; release?: boolean };
+  group?: string; waitSeconds?: number; alone?: 'start' | 'fail'; gap?: number; need?: number; hold?: string; release?: boolean;
+  /** hotfix: stepping in or back for a paired gesture never brings this body closer to anyone else than it already is
+   *  (once within arm's reach of them); prospective, set by edge plans, so earlier logs replay unchanged. */
+  clear?: boolean };
 type Exec = { id: string; p: Params; base: string; at: number[]; t: number; yaw: number | null;
   /** together/1: 'waiting' for partners, then 'active' until the shared end tick. */
   phase?: 'waiting' | 'active'; waited?: number; until?: number; mobile?: boolean; close?: boolean };
@@ -86,7 +89,7 @@ export const poseV1: ActionDef<Params, true, Exec> = {
   description: 'activities/1: take a generic activity pose where you are (read, browse, write, play-piano, play-music, paint, eat, drink, cook, play-game, craft, post-letter, wave over a seat or standing; sit-ground, lie, nap, pushups, situps, yoga on open ground; dance, jump, stretch, jumping-jacks standing) for a number of seconds, optionally holding a prop and facing a point, then return to the base posture.',
   schema: z.object({ actor: z.string().min(1).max(80), activity: z.enum(POSE_ACTIVITIES as [string, ...string[]]), seconds: z.number().min(0.5).max(3600), prop: z.enum(POSE_PROPS).optional(), base: z.enum(['sit', 'idle']).optional(), seatHeight: z.number().min(0.2).max(1.2).optional(), face: z.tuple([z.number(), z.number()]).optional(),
     group: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/).optional(), waitSeconds: z.number().min(0).max(180).optional(), alone: z.enum(['start', 'fail']).optional(),
-    gap: z.number().min(0.5).max(2.5).optional(), need: z.number().int().min(1).max(8).optional(), hold: z.enum(POSE_PROPS).optional(), release: z.boolean().optional() }).strict(),
+    gap: z.number().min(0.5).max(2.5).optional(), need: z.number().int().min(1).max(8).optional(), hold: z.enum(POSE_PROPS).optional(), release: z.boolean().optional(), clear: z.boolean().optional() }).strict(),
   reservations: (_w, p) => [{ resource: 'hand:' + p.actor + ':left', mode: 'exclusive' }, { resource: 'hand:' + p.actor + ':right', mode: 'exclusive' }, { resource: 'pose:' + p.actor, mode: 'exclusive' }],
   plan(rt, p) { const d = admission(rt, p); return d ? { ok: false, diagnostic: d } : { ok: true, program: true }; },
   start(rt, p, _plan, id) {
@@ -157,7 +160,12 @@ function together(rt: Runtime, ex: Exec, a: NonNullable<Runtime['world']['entiti
         const nx = a.pose.p[0] + ux * move, nz = a.pose.p[2] + uz * move, sp = rt.services.spatial as Spatial | undefined, g = sp?.level(h.level);
         // never closer to a wall or bench than the body already is (people may stand near furniture)
         const clear = (x: number, z: number) => g ? clearanceAt(g, [x, z]) : Infinity, next = clear(nx, nz);
-        if (next >= HUMAN_RADIUS - 0.02 || next >= clear(a.pose.p[0], a.pose.p[2])) {
+        // hotfix (`clear`): nor into a bystander — never nearer than two bodies plus a hand's width to anyone but the partner,
+        // unless already that near and not getting nearer
+        const people = ex.p.clear ? Object.values(rt.world.entities).filter((o) => o.id !== a.id && o.id !== partner.id && o.kind === 'human' && (o.human?.level ?? 0) === (h.level ?? 0)) : [];
+        const nearest = (x: number, z: number) => people.reduce((m, o) => Math.min(m, hypot(o.pose.p[0] - x, o.pose.p[2] - z)), Infinity), apart = 2 * HUMAN_RADIUS + 0.04;
+        const roomy = !people.length || nearest(nx, nz) >= apart || nearest(nx, nz) >= nearest(a.pose.p[0], a.pose.p[2]);
+        if (roomy && (next >= HUMAN_RADIUS - 0.02 || next >= clear(a.pose.p[0], a.pose.p[2]))) {
           a.pose.p = [nx, a.pose.p[1], nz]; ex.at = [...a.pose.p]; h.activity = 'walk'; h.speed = Math.round(Math.abs(move) / dt * 1000) / 1000;
           return tick >= ex.until! ? finish(rt, ex) : { status: 'running' as const, phase: 'stepping-in' };
         }

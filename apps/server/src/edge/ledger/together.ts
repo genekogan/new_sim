@@ -134,20 +134,27 @@ export class Together {
   }
   /** Where to stand to meet someone face to face: within 1.1 m of them with a clear line between (nearest to `from`),
    *  so a hug or a hand-over never reaches across a fire, a bench or a wall. Null when they are already in reach. */
-  meetSteps(me: string, other: string, standoff = 1.1): Steps {
+  meetSteps(me: string, other: string, standoff = 1.1, gap = 0.8): Steps | null {
     const mb = this.p.body(me), ob = this.p.body(other); if (!mb || !ob) return [{verb: 'walk_to', params: {to: other, standoff}}];
     const from: V2 = [mb.pose.p[0], mb.pose.p[2]], at: V2 = [ob.pose.p[0], ob.pose.p[2]], d = Math.hypot(at[0] - from[0], at[1] - from[1]);
-    if (d <= standoff + 0.8 && this.lineClear(from, at)) return [{verb: 'wave', params: {at: other, seconds: 0.2}}];
     const e = this.p.host.engine as unknown as {clearanceAtV1?: (x: number, z: number) => number};
     const people = Object.values(this.w.entities).filter(x => x.kind === 'human' && x.id !== me && x.id !== other).map(x => [x.pose.p[0], x.pose.p[2]] as V2);
+    // hotfix: where both will stand for the gesture (`gap` apart, meeting between) and the way there stay clear of bystanders
+    const roomFor = (p: V2) => {
+      const L = Math.hypot(at[0] - p[0], at[1] - p[1]) || 1, u: V2 = [(at[0] - p[0]) / L, (at[1] - p[1]) / L], m: V2 = [(p[0] + at[0]) / 2, (p[1] + at[1]) / 2];
+      const marks: V2[] = [[m[0] - u[0] * gap / 2, m[1] - u[1] * gap / 2], [m[0] + u[0] * gap / 2, m[1] + u[1] * gap / 2]];
+      for (let i = 0; i <= 4; i++) marks.push([p[0] + (marks[0][0] - p[0]) * i / 4, p[1] + (marks[0][1] - p[1]) * i / 4], [at[0] + (marks[1][0] - at[0]) * i / 4, at[1] + (marks[1][1] - at[1]) * i / 4]);
+      return marks.every(q => people.every(o => Math.hypot(o[0] - q[0], o[1] - q[1]) >= 0.62));
+    };
+    if (d <= standoff + 0.8 && this.lineClear(from, at) && roomFor(from)) return [{verb: 'wave', params: {at: other, seconds: 0.2}}];
     const spots: {p: V2; d: number}[] = [];
     for (let k = 0; k < 16; k++) {
       const ang = k * Math.PI / 8, p: V2 = [r2(at[0] + Math.cos(ang) * standoff), r2(at[1] + Math.sin(ang) * standoff)];
-      if ((e.clearanceAtV1?.(p[0], p[1]) ?? 1) < 0.34 || people.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < 0.8) || !this.lineClear(p, at)) continue;
+      if ((e.clearanceAtV1?.(p[0], p[1]) ?? 1) < 0.34 || people.some(q => Math.hypot(q[0] - p[0], q[1] - p[1]) < 0.8) || !this.lineClear(p, at) || !roomFor(p)) continue;
       spots.push({p, d: Math.hypot(p[0] - from[0], p[1] - from[1])});
     }
     spots.sort((a, b) => a.d - b.d || a.p[0] - b.p[0] || a.p[1] - b.p[1]);
-    return spots.length ? [{verb: 'walk_to', params: {to: spots[0].p, standoff: 0}}, {verb: 'wave', params: {at: other, seconds: 0.2}}] : [{verb: 'walk_to', params: {to: other, standoff}}];
+    return spots.length ? [{verb: 'walk_to', params: {to: spots[0].p, standoff: 0}}, {verb: 'wave', params: {at: other, seconds: 0.2}}] : null;
   }
   private asleep(entityId: string) {const h = this.p.body(entityId)?.human; return !h || !!h.sleepPose || h.activity === 'nap';}
 
@@ -220,12 +227,12 @@ export class Together {
         for (const g of Object.keys(PAIRED) as Paired[]) {
           const def = PAIRED[g], blocked = busy ? {code: 'gesture.partner-unavailable', reason: `${o.name} is ${busy}.`} : aloft ? {code: 'ride.aboard', reason: 'Not while riding.'} : null;
           add({id: `${g}:${o.soulId}`, verb: g, label: def.label(o.name), target: {id: o.soulId, kind: 'soul'}, available: !blocked, ...(blocked ? {blocked} : {}), ...(g === 'dance-with' ? {params: {seconds: {type: 'integer', min: 5, max: 600, default: 60}}} : {})},
-            {label: def.label(o.name).replace(/ \(.*\)$/, ''), seconds: g === 'dance-with', steps: [...this.standFirst(soul.entityId), {verb: 'walk_to', params: {to: o.entityId, standoff: 1.1}}, pose(def.activity, def.seconds, {gap: def.gap, waitSeconds: 45, alone: 'fail'})], together: {kind: 'paired', what: g, guest: o.soulId}});
+            {label: def.label(o.name).replace(/ \(.*\)$/, ''), seconds: g === 'dance-with', steps: [...this.standFirst(soul.entityId), {verb: 'walk_to', params: {to: o.entityId, standoff: 1.1}}, pose(def.activity, def.seconds, {gap: def.gap, waitSeconds: 45, alone: 'fail', clear: true})], together: {kind: 'paired', what: g, guest: o.soulId}});
         }
         if (held) {
           const blocked = busy ? {code: 'gesture.partner-unavailable', reason: `${o.name} is ${busy}.`} : this.heldBy(o.soulId) ? {code: 'hands.full', reason: `${o.name}'s hands are full.`} : null;
           add({id: 'give:' + o.soulId, verb: 'give', label: `Give ${o.name} ${held.name} you are holding (they accept or decline)`, target: {id: o.soulId, kind: 'soul'}, available: !blocked, ...(blocked ? {blocked} : {})},
-            {label: `Give ${o.name} ${held.name}`, steps: [...this.standFirst(soul.entityId), {verb: 'walk_to', params: {to: o.entityId, standoff: 1.1}}, pose('give', 2.5, {prop: held.kind, gap: 0.8, waitSeconds: 45, alone: 'fail', release: true})], together: {kind: 'give', guest: o.soulId, item: held.id}});
+            {label: `Give ${o.name} ${held.name}`, steps: [...this.standFirst(soul.entityId), {verb: 'walk_to', params: {to: o.entityId, standoff: 1.1}}, pose('give', 2.5, {prop: held.kind, gap: 0.8, waitSeconds: 45, alone: 'fail', release: true, clear: true})], together: {kind: 'give', guest: o.soulId, item: held.id}});
         }
       }
       if (mine?.target !== o.soulId) add({id: 'follow:' + o.soulId, verb: 'follow', label: `Walk with ${o.name}: follow them wherever they go until you do something else`, target: {id: o.soulId, kind: 'soul'}, available: !busy && !aloft, ...(busy || aloft ? {blocked: {code: 'follow.unavailable', reason: busy ? `${o.name} is ${busy}.` : 'Not while riding.'}} : {}), params: {seconds: {type: 'integer', min: 10, max: 3600, default: 600}}},
@@ -297,7 +304,9 @@ export class Together {
       const id = 'inv_' + randomUUID().slice(0, 12), def = tag.kind === 'paired' ? PAIRED[tag.what] : null;
       const seconds = tag.kind === 'paired' && tag.what === 'dance-with' && Number.isInteger(params.seconds) ? params.seconds as number : def?.seconds ?? 2.5;
       // walk to a spot facing them with nothing between (never across a fire or a bench)
-      const out = structuredClone(steps).flatMap(s => s.verb === 'walk_to' && s.params.to === g.entityId ? this.meetSteps(soul.entityId, g.entityId) : [s]);
+      const meet = this.meetSteps(soul.entityId, g.entityId, 1.1, def?.gap ?? 0.8);
+      if (!meet) return {code: 'gesture.no-room', reason: `There is no clear spot beside ${g.name} right now (someone else is standing too close); try again in a moment or somewhere roomier.`};
+      const out = structuredClone(steps).flatMap(s => s.verb === 'walk_to' && s.params.to === g.entityId ? meet : [s]);
       for (const s of out) if (s.verb === 'mars:pose_v1') {s.params.group = id; s.params.seconds = seconds;}
       return {steps: out, commit: receipt => {
         const inv: Invite = {id, what: tag.kind === 'paired' ? tag.what : 'give', kind: tag.kind, host: {soulId: soul.soulId, name: soul.name}, guests: [{soulId: g.soulId, name: g.name}], capability: cap.id,
@@ -397,8 +406,10 @@ export class Together {
       if (inv.kind === 'give' && this.heldBy(soul.soulId)) return {code: 'hands.full', reason: `Your hands are full; put down ${this.heldBy(soul.soulId)!.name} first.`};
       if (this.asleep(soul.entityId)) return {code: 'state.asleep', reason: 'Wake up first.'};
       const seatedTake = inv.kind === 'give' && this.seated(soul.entityId);
-      const steps: Steps = [...(seatedTake ? [] : [...this.standFirst(soul.entityId), ...this.meetSteps(soul.entityId, host.entityId)]),
-        pose(inv.activity!, inv.seconds!, {group: inv.id, gap: inv.gap, waitSeconds: 30, alone: 'fail', ...(inv.kind === 'give' ? {prop: inv.item!.kind, hold: inv.item!.kind} : {})})];
+      const meet = seatedTake ? [] : this.meetSteps(soul.entityId, host.entityId, 1.1, inv.gap ?? 0.8);
+      if (!meet) return {code: 'gesture.no-room', reason: `There is no clear spot beside ${inv.host.name} right now (someone else is standing too close); try again in a moment.`};
+      const steps: Steps = [...(seatedTake ? [] : [...this.standFirst(soul.entityId), ...meet]),
+        pose(inv.activity!, inv.seconds!, {group: inv.id, gap: inv.gap, waitSeconds: 30, alone: 'fail', clear: true, ...(inv.kind === 'give' ? {prop: inv.item!.kind, hold: inv.item!.kind} : {})})];
       return {label: inv.kind === 'give' ? `Take ${inv.item!.name} from ${inv.host.name}` : `${inv.what} with ${inv.host.name}`, steps, capability: 'accept:' + inv.id, commit: receipt => {
         commit(receipt); if (inv.kind === 'give') this.saveOp(receipt, {soulId: soul.soulId, op: 'take', item: inv.item!.id, invite: inv.id});
       }};
