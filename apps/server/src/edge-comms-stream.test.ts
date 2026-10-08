@@ -4,8 +4,30 @@ import {test} from 'node:test';
 import {EDGE_CONTRACT} from './edge/contract.ts';
 import {COMMONS, commsFixture, place} from './edge/comms/testing.ts';
 import {signature} from './edge/comms/webhook.ts';
+import {EventStreams} from './edge/comms/stream.ts';
 
 const HOUSE = place('house-1', 'building');
+
+test('aborted event waits release historical Soul keys without removing another active waiter', async () => {
+  const f = commsFixture(['Alice']);
+  const streams = new EventStreams(f.db.db, 'edge-comms-test', {retainEvents: 1000, retainMs: 86400_000, now: Date.now});
+  const retained = (streams as unknown as {waiters: Map<string, Set<() => void>>}).waiters;
+  const active = new AbortController(), cancelled = new AbortController();
+  const first = streams.waitForEvent('s_alice', 15_000, active.signal);
+  const second = streams.waitForEvent('s_alice', 15_000, cancelled.signal);
+  try {
+    cancelled.abort(); await second;
+    assert.equal(retained.get('s_alice')?.size, 1, 'the other wait remains active');
+    for (let i = 0; i < 64; i++) {
+      const signal = new AbortController();
+      const wait = streams.waitForEvent(`historical-soul-${i}`, 15_000, signal.signal);
+      signal.abort(); await wait;
+    }
+    assert.deepEqual([...retained.keys()], ['s_alice'], 'completed waits release their empty Soul entries');
+    active.abort(); await first;
+    assert.equal(retained.size, 0, 'the final active wait releases its entry');
+  } finally { active.abort(); cancelled.abort(); await Promise.all([first, second]); streams.wakeAll(); f.destroy(); }
+});
 
 test('every response carries the contract; bad tokens are 401 with the error shape', async () => {
   const f = commsFixture(['Alice']);

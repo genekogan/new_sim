@@ -84,7 +84,12 @@ export class EventStreams {
     return new Promise(resolve => {
       let set = this.waiters.get(soulId);
       if (!set) { set = new Set(); this.waiters.set(soulId, set); }
-      const done = () => { clearTimeout(timer); signal?.removeEventListener('abort', done); this.waiters.get(soulId)?.delete(done); resolve(); };
+      const owned = set;
+      const done = () => {
+        clearTimeout(timer); signal?.removeEventListener('abort', done); owned.delete(done);
+        if (!owned.size && this.waiters.get(soulId) === owned) this.waiters.delete(soulId);
+        resolve();
+      };
       const timer = setTimeout(done, timeoutMs);
       signal?.addEventListener('abort', done, {once: true});
       set.add(done);

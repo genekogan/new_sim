@@ -96,7 +96,10 @@ export function registerEdgeEvents(app: Hono, deps: EdgeDeps, comms: CommsRuntim
     set.add(conn);
     while (set.size > MAX_STREAMS_PER_SOUL) { const oldest = [...set].sort((a, b) => a.since - b.since)[0]!; set.delete(oldest); oldest.close(`more than ${MAX_STREAMS_PER_SOUL} event streams for this Soul; the oldest closes`); }
   };
-  const release = (conn: Conn) => { conns.get(conn.soulId)?.delete(conn); };
+  const release = (conn: Conn) => {
+    const set = conns.get(conn.soulId);
+    if (set) { set.delete(conn); if (!set.size) conns.delete(conn.soulId); }
+  };
 
   const failure = (c: Context, error: unknown) => {
     if (error instanceof EdgeError) return c.json(edgeBody({error: {code: error.code, message: error.message}}), error.status as ContentfulStatusCode);
@@ -133,6 +136,9 @@ export function registerEdgeEvents(app: Hono, deps: EdgeDeps, comms: CommsRuntim
       }
       if (page.events.length >= 200) continue;
       const before = streams.head(soulId);
+      // Delivery may append while an awaited send drains. Read that backlog
+      // before waiting for future growth; its wake-up has already happened.
+      if (before > pos) continue;
       await streams.waitForEvent(soulId, heartbeatMs, signal);
       if (signal.aborted) return;
       if (streams.head(soulId) === before) { if (pos > sent) { await out.cursor(cursorOf(pos)); sent = pos; } else await out.idle(); }

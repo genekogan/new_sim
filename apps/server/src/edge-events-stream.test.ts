@@ -6,8 +6,56 @@ import {WebSocket} from 'ws';
 import {eventsFixture, readSSE} from './edge/events/testing.ts';
 import {relativeBearing, toEnvelope, mediaOf} from './edge/events/envelope.ts';
 import {EDGE_CONTRACT} from './edge/contract.ts';
+import {HEARTBEAT_MS} from './edge/events/index.ts';
 
 const MIN = 60_000;
+
+test('mounted SSE drains speech appended while an earlier send is backpressured', async () => {
+  const f = eventsFixture(['Roger', 'Bill'], {events: {heartbeatMs: HEARTBEAT_MS}});
+  const ac = new AbortController();
+  let reader: ReadableStreamDefaultReader<Uint8Array> | null = null;
+  let deadline: ReturnType<typeof setTimeout> | null = null;
+  try {
+    f.at('Roger', 0, 0); f.at('Bill', 1, 0);
+    const since = f.runtime.streams.headCursor(f.id('Roger'));
+    await f.post('Bill', '/v1/edge/say', {text: 'first buffered speech'});
+    let pageRead!: () => void;
+    const reading = new Promise<void>(resolve => { pageRead = resolve; });
+    const read = f.runtime.streams.read.bind(f.runtime.streams);
+    f.runtime.streams.read = (id, after, limit) => {
+      const page = read(id, after, limit);
+      if (id === f.id('Roger') && page.events.some(e => e.text === 'first buffered speech')) pageRead();
+      return page;
+    };
+    const response = await f.app.request(`/v1/edge/events?cursor=${since}&pad=0`, {headers: {authorization: `Bearer ${f.id('Roger')}`}, signal: ac.signal});
+    assert.equal(response.status, 200);
+    reader = response.body!.getReader();
+    await reading;
+    await new Promise<void>(resolve => setImmediate(resolve));
+    // The unread hello occupies Hono's response buffer. The first speech send
+    // cannot drain until this reader resumes; append through the mounted API.
+    await f.post('Bill', '/v1/edge/say', {text: 'second arrived during send'});
+    const speech: {id: string; text: string}[] = [], decoder = new TextDecoder();
+    let buffered = '';
+    const drain = (async () => {
+      while (speech.length < 2) {
+        const chunk = await reader!.read();
+        assert.equal(chunk.done, false, 'the stream remains open through both speeches');
+        buffered += decoder.decode(chunk.value, {stream: true});
+        let end: number;
+        while ((end = buffered.indexOf('\n\n')) >= 0) {
+          const block = buffered.slice(0, end); buffered = buffered.slice(end + 2);
+          if (!/^event: speech\./m.test(block)) continue;
+          const data = JSON.parse(block.split('\n').filter(line => line.startsWith('data: ')).map(line => line.slice(6)).join('\n'));
+          speech.push({id: data.id, text: data.data.text});
+        }
+      }
+    })();
+    await Promise.race([drain, new Promise<never>((_, reject) => { deadline = setTimeout(() => reject(Error('stored speech waited for the 15-second heartbeat instead of draining immediately')), 3000); })]);
+    assert.deepEqual(speech.map(e => e.text), ['first buffered speech', 'second arrived during send']);
+    assert.equal(new Set(speech.map(e => e.id)).size, 2, 'each cursor arrives once');
+  } finally { if (deadline) clearTimeout(deadline); ac.abort(); await reader?.cancel().catch(() => {}); f.destroy(); }
+});
 
 test('envelope: kinds, salience, about, where (distance and bearing relative to my heading), one-line text', async () => {
   const f = eventsFixture(['Roger', 'Bill', 'Carol']);
