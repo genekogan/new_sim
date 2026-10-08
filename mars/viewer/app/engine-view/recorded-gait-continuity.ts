@@ -16,7 +16,7 @@ export class RecordedGaitContinuity {
   const index=chunks.indexOf(target);if(index<0)return{};
   let lo=index,hi=index;while(lo>0&&adjacent(chunks[lo-1],chunks[lo]))lo--;while(hi+1<chunks.length&&adjacent(chunks[hi],chunks[hi+1]))hi++;
   let anchor=lo;for(let i=lo;i<=hi;i++)if(this.cache.has(key(chunks[i].take))){anchor=i;break;}
-  const offsets:Offsets[]=[];offsets[anchor]={...(this.cache.get(key(chunks[anchor].take))??{})};
+  const offsets:Offsets[]=[];offsets[anchor]={...this.cache.get(key(chunks[anchor].take))};
   for(let i=anchor-1;i>=lo;i--){const a=chunks[i].take,b=chunks[i+1].take,total=walkTotals(a),out:Offsets={};for(const id of Object.keys(total))out[id]=carries(a,b,id)?(offsets[i+1][id]??0)-total[id]:this.cache.get(key(a))?.[id]??0;offsets[i]=out;}
   for(let i=anchor+1;i<=hi;i++){const a=chunks[i-1].take,b=chunks[i].take,total=walkTotals(a),out:Offsets={};for(const id of Object.keys(walkTotals(b)))out[id]=carries(a,b,id)?(offsets[i-1][id]??0)+(total[id]??0):0;offsets[i]=out;}
   for(let i=lo;i<=hi;i++){const k=key(chunks[i].take);this.cache.delete(k);this.cache.set(k,{...offsets[i]});}

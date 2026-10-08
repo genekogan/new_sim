@@ -26,7 +26,7 @@ const barn:RoomDraw={id:'eden-barn-1',draw(b){const y=.1;
  b.label='barn workbench';b.at(82.16+.42,y,49.6,W,()=>F.workbench(b,2.2,.8,3));b.label='barn tool wall';b.at(82.16,y,49.6,W,()=>F.toolWall(b,2.4,1.15,.95,5));
  b.label='barn sawhorses';b.at(85.2,y,49.2,0,()=>F.sawhorse(b));b.at(85.2,y,50.6,0,()=>F.sawhorse(b));
  b.label='barn lumber';for(let i=0;i<6;i++)b.box(84.4,y+i*.07,47.5+(i%2)*.02,2.6,.06,.22+(i%3)*.04,i%2?C.pine:C.ash);for(let i=0;i<4;i++)b.box(84.4,y+.42+i*.05,47.85,2.2,.045,.15,C.oak);
- b.label='barn hay';for(let i=0;i<4;i++)for(let j=0;j<2;j++)b.at(90.6+i*.0+(j?1.2:0),y+((i/2|0)?.45:0),47.5+(i%2)*.55,0,()=>F.hayBale(b,1.1));
+ b.label='barn hay';for(let i=0;i<4;i++)for(let j=0;j<2;j++)b.at(90.6+(j?1.2:0),y+((i/2|0)?.45:0),47.5+(i%2)*.55,0,()=>F.hayBale(b,1.1));
  b.at(92.9,y,47.75,0,()=>F.hayBale(b,1.1));b.at(92.9,y,48.3,0,()=>F.hayBale(b,1.1));b.at(92.9,y+.45,48,0,()=>F.hayBale(b,1.1));
  b.label='barn sacks';for(const [x,z] of[[93.4,49.4],[93.35,49.95],[92.9,49.65]])b.at(x,y,z,0,()=>F.sack(b));
  b.label='barn barrels';for(const [x,z] of[[93.3,53.1],[92.6,53.3],[93.3,53.85]])b.at(x,y,z,0,()=>F.barrel(b,.3,.85));

@@ -64,5 +64,5 @@ export class NativeBoatViews {
    Math.abs(Math.atan2(Math.sin(e.yaw-b.yaw-q.relativeYaw),Math.cos(e.yaw-b.yaw-q.relativeYaw)))>angBound)return;
   return this.seatHeights[q.slotId];
  }
- dispose(){if(this.closed)return;this.closed=true;const errors:unknown[]=[],attempt=(f:()=>void)=>{try{f();}catch(error){errors.push(error);}};attempt(()=>this.group.removeFromParent());attempt(()=>this.boat.dispose());attempt(()=>this.supports.dispose());for(const child of [...this.group.children])attempt(()=>this.group.remove(child));if(errors.length)throw new AggregateError(errors,'Native boat owner cleanup failed');}
+ dispose(){if(this.closed)return;this.closed=true;const errors:unknown[]=[],attempt=(f:()=>void)=>{try{f();}catch(error){errors.push(error);}};attempt(()=>this.group.removeFromParent());attempt(()=>this.boat.dispose());attempt(()=>this.supports.dispose());for(const child of this.group.children.slice())attempt(()=>this.group.remove(child));if(errors.length)throw new AggregateError(errors,'Native boat owner cleanup failed');}
 }

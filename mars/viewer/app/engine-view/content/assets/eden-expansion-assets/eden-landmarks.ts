@@ -22,7 +22,7 @@ export function createEdenLandmarks(ground:Ground){
  const shade=(mesh:THREE.Mesh)=>{mesh.castShadow=true;mesh.receiveShadow=true;return mesh;};
  try{
   const stone=mat(new THREE.MeshStandardMaterial({color:'#b9ad97',roughness:.95})),darkStone=mat(new THREE.MeshStandardMaterial({color:'#8d8273',roughness:1}));
-  const plaster=mat(new THREE.MeshStandardMaterial({color:'#efe6d2',roughness:.9})),copper=mat(new THREE.MeshStandardMaterial({color:'#6e9c8c',roughness:.5,metalness:.35}));
+  const _plaster=mat(new THREE.MeshStandardMaterial({color:'#efe6d2',roughness:.9})),copper=mat(new THREE.MeshStandardMaterial({color:'#6e9c8c',roughness:.5,metalness:.35}));
   const paint=mat(new THREE.MeshStandardMaterial({vertexColors:true,roughness:.8}));
   // 1. Amphitheatre: three curved stone steps facing a painted stage disc to the north.
   const a=EDEN_LANDMARKS_PLAN.amphitheatre,amph=new THREE.Group();amph.name='amphitheatre';amph.position.fromArray(a.stage);group.add(amph);

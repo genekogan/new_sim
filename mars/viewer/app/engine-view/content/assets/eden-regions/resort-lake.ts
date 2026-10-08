@@ -10,7 +10,7 @@ const sail=(b:Builder,len:number,c:string)=>{b.cyl('metal',0,0,0,.06,len*1.3,5,'
 export function buildResort(b:Builder,t:Terrain,trees:Trees){const r=rng(3101);
  // promenade along the shore (continues the boardwalk eastwards on land), palms/lamps
  t.ribbon(b,[[109,112],[109,128],[118,134],[206,134]],5,'#cfc2a0','path',.05,2);
- for(let x=122;x<204;x+=8){b.push(x,0,131.4,0);lampPost(b,3.6,'#2f4f5f');b.pop();trees.add(x+4,0,131.6,1,'poplar','#5f8a46',0);if((x/8|0)%2)b.push(x+2,0,136.4,Math.PI),bench(b,'#efe9dc'),b.pop();}
+ for(let x=122;x<204;x+=8){b.push(x,0,131.4,0);lampPost(b,3.6,'#2f4f5f');b.pop();trees.add(x+4,0,131.6,1,'poplar','#5f8a46',0);if((x/8|0)%2){b.push(x+2,0,136.4,Math.PI);bench(b,'#efe9dc');b.pop();}}
  // seafront hotels: tall white/pastel blocks with balconies on every floor
  let x=114;while(x<170){const w=10+r()*5,floors=4+Math.floor(r()*3),c=pick(r,['#f3eee2','#efe4cf','#f0d9a8','#cfe3e8','#f3d3c8','#e8f0d8']);
   b.push(x+w/2,0,121,0);house(b,{w,d:10,floors,fh:3.1,wallC:c,roof:'flat',roofGarden:r()<.5,trim:pick(r,['#2f6f8f','#3d5a80','#c45a4a','#5a8a6a']),door:true,awning:pick(r,['#2f6f8f','#e05a3a','#f0c040'])},r);
@@ -79,7 +79,7 @@ export function buildCampsite(b:Builder,t:Terrain,trees:Trees){const r=rng(3401)
  b.push(-122,0,-82,Math.PI*.85);house(b,{w:14,d:9,floors:2,wall:'timber',wallC:'#8a5a36',roof:'gable',roofH:4.5,roofC:'#3f4a3a',veranda:true,balcony:true,chimney:true,trim:'#efe4cf'},r);b.pop();
  // picnic tables + firewood stack
  for(let i=0;i<4;i++){const x=cx-6+i*4,z=cz+20;b.box('timber',x,.72,z,1.8,.06,.8,'#8a5a36');for(const s of [-1,1])b.box('timber',x,.42,z+s*.65,1.8,.05,.28,'#8a5a36');}
- for(let k=0;k<12;k++)b.push(-150,0,-90,0),b.pushRot('x',Math.PI/2),b.cyl('bark',-1+(k%4)*.5,-.8,-.3-Math.floor(k/4)*.45,.22,1.6,6,'#7a5a3a'),b.pop(),b.pop();
+ for(let k=0;k<12;k++){b.push(-150,0,-90,0);b.pushRot('x',Math.PI/2);b.cyl('bark',-1+(k%4)*.5,-.8,-.3-Math.floor(k/4)*.45,.22,1.6,6,'#7a5a3a');b.pop();b.pop();}
  for(let i=0;i<70;i++){const x=-176+r()*70,z=-136+r()*60;if(Math.hypot(x-cx,z-cz)<20||Math.hypot(x+122,z+82)<10)continue;trees.add(x,G(x,z),z,1+r()*.6,r()<.75?'conifer':'round',pick(r,['#3f6a3c','#4a7a44','#365e38','#5f8a46']),r()*6);}
  t.ribbon(b,[[-100,-69.5],[-122,-76],[cx,cz+8]],2.4,'#b6a582','path',.06);
 }

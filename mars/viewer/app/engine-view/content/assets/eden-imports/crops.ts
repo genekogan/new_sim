@@ -10,9 +10,7 @@ const DEFAULT_CROPS = ['carrot', 'lettuce', 'tomato', 'corn', 'pumpkin', 'beet',
 const SPACING: Record<string, number> = { carrot: .45, lettuce: .75, beet: .45, wheat: .32, tomato: .8, corn: .7, pumpkin: 1.4, watermelon: 1.4, berries: 1.0, flowers: .5 };
 const HARDY = new Set(['lettuce', 'beet', 'carrot']);
 /** Eden beds (world metres). The eden-gardens cultivated plots are 6 × 2.6 m soil boxes 0.12 m high (landscape.mjs). */
-export const BEDS: readonly Bed[] = [
-  ...[44, 48].flatMap((z) => [37, 45, 64, 72].map((x): Bed => ({ id: `garden-${x}-${z}`, c: [x, z], size: [5.6, 2.2], top: 0.12 }))),
-];
+export const BEDS: readonly Bed[] = Array.from([44, 48].flatMap((z) => [37, 45, 64, 72].map((x): Bed => ({ id: `garden-${x}-${z}`, c: [x, z], size: [5.6, 2.2], top: 0.12 }))));
 export const WORLD_DAY_MS = 3600_000; // Eden: one world day per real hour
 const CYCLE_DAYS = 4;
 /** Growth stage of a bed at time `ms` (UTC): its crop and stage 0 (bare soil) … 4 (ripe), 5 (harvested). */

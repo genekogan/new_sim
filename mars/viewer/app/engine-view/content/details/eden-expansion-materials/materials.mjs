@@ -62,7 +62,7 @@ export function createEdenFinish(input){
    s.vertexShader='varying vec2 vEdenFinishUV;varying float vEdenEnd;\n'+vertex.replace('#include <begin_vertex>',`#include <begin_vertex>\nvec3 edenP=position*vec3(${scale.map(v=>v.toFixed(8)).join(',')});\nvEdenFinishUV=${coordinates}/${pixels.tile.toFixed(8)};vEdenEnd=${end};`);
    const signal=spec.recipe==='timber'?'texture2D(map,vEdenFinishUV).r':'.67*texture2D(map,vEdenFinishUV).r+.33*texture2D(map,mat2(.7986,-.6018,.6018,.7986)*vEdenFinishUV/1.71+vec2(.31,.73)).r';
    s.fragmentShader='varying vec2 vEdenFinishUV;varying float vEdenEnd;uniform float edenMean;uniform float edenGain;\n'+fragment.replace('#include <map_fragment>',`#ifdef USE_MAP\ndiffuseColor.rgb*=mix(1.0+(${signal}-edenMean)*edenGain,1.0,vEdenEnd);\n#endif`).replace('#include <roughnessmap_fragment>','float roughnessFactor=roughness;\n#ifdef USE_ROUGHNESSMAP\nroughnessFactor*=mix(texture2D(roughnessMap,vEdenFinishUV).g,1.0,vEdenEnd);\n#endif');Object.assign(s.uniforms,uniforms);
-  };material.customProgramCacheKey=()=>`eden-expansion-finish/1:${role}:${axis}:${scale.join(',')}:256:13`;expectedHooks.compile=material.onBeforeCompile;expectedHooks.key=material.customProgramCacheKey;
+  };material.customProgramCacheKey=()=>`eden-expansion-finish/1:${role}:${axis}:${scale.join(',')}:256:13`;expectedHooks.compile=Object.getOwnPropertyDescriptor(material,'onBeforeCompile')?.value;expectedHooks.key=Object.getOwnPropertyDescriptor(material,'customProgramCacheKey')?.value;
   return Object.freeze({quality:'RichPrepared',owned:true,owner:input.owner,role,material,state,dispose});
  }catch{dispose();return fallback('Optional preparation fault; owned cleanup attempted');}
 }

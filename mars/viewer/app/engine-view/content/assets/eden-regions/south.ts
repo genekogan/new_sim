@@ -42,7 +42,7 @@ export function buildPark(b:Builder,t:Terrain,trees:Trees){const r=rng(1201),G=(
   trees.add(x,G(x,z),z,.9+r()*.6,pick(r,['round','round','poplar','conifer'] as const),pick(r,['#6f9a4e','#5f8a46','#7fa84f','#4f7a3c','#8aa850']),r()*6);}
  // playground (x 10..28, z 96..110): sandpit, swings, slide, climbing frame, see-saw, fence
  b.box('soil',19,0,103,16,.06,12,'#d8c79a');fence(b,[[11,97],[27,97],[27,109],[11,109],[11,101]],.9,'#e05a3a',G);
- {b.push(14,0,100,0);for(const x of [-1.6,1.6])for(const z of [-.7,.7])b.box('metal',x,0,z*0+z,.08,2.3,.08,'#3d5a80');b.box('metal',0,2.3,0,3.4,.1,.1,'#3d5a80');for(const x of [-.7,.7]){b.box('metal',x,.9,0,.02,1.4,.02,'#999');b.box('timber',x,.5,0,.5,.06,.25,'#e0b04a');}b.pop();}
+ {b.push(14,0,100,0);for(const x of [-1.6,1.6])for(const z of [-.7,.7])b.box('metal',x,0,z,.08,2.3,.08,'#3d5a80');b.box('metal',0,2.3,0,3.4,.1,.1,'#3d5a80');for(const x of [-.7,.7]){b.box('metal',x,.9,0,.02,1.4,.02,'#999');b.box('timber',x,.5,0,.5,.06,.25,'#e0b04a');}b.pop();}
  {b.push(20,0,99.5,0);b.box('metal',0,0,0,1.4,1.8,1.4,'#c45a4a');b.box('timber',0,1.8,0,1.6,.1,1.6,'#e0b04a');b.quad('metal',[-.4,1.85,.8],[.4,1.85,.8],[.4,.1,3.6],[-.4,.1,3.6],'#e8c84a');b.box('metal',0,1.9,0,1.6,.8,.06,'#3d5a80');b.cone('roof',0,2.6,0,1.1,.9,4,'#c45a4a');b.pop();}
  {b.push(24,0,105,.3);for(let i=0;i<4;i++)for(let j=0;j<3;j++){b.box('metal',-1.5+i,0,-1+j,.06,2,.06,'#3a7a5a');}for(let y=.6;y<2.1;y+=.7){b.box('metal',0,y,-1,3,.05,.05,'#3a7a5a');b.box('metal',0,y,1,3,.05,.05,'#3a7a5a');}b.pop();}
  {b.push(15,0,106,0);b.box('metal',0,0,0,.3,.45,.3,'#555');b.push(0,.5,0,0);b.pushRot('z',.18);b.box('timber',0,0,0,3.2,.08,.3,'#e05a3a');b.pop();b.pop();b.pop();}

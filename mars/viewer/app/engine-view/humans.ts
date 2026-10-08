@@ -296,7 +296,7 @@ export class HumanViews {
     this.templates = ts;
   }
   /** Optional presentation readiness, never a simulation/action barrier. */
-  async appearancesSettled(){await Promise.all([...this.views.values()].map(v=>v.appearance?.ready));}
+  async appearancesSettled(){await Promise.all([...this.views.values()].flatMap(v=>v.appearance?[v.appearance.ready]:[]));}
   appearanceStatus(){return [...this.views].map(([id,v])=>({id,...(v.appearance?.snapshot()??{state:'simple',presetId:null,template:v.rig.template.name,ownedMaterials:0})}));}
   private syncAppearance(v:View,key:string|undefined){
     if(!this.humanPresets||v.appearance&&v.appearanceSoulKey===key)return;

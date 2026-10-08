@@ -17,7 +17,7 @@ export function contactShadowQuads(){
  return out;
 }
 export function createEdenContactShadows(ground:(x:number,z:number)=>number|null):{mesh:THREE.Mesh;dispose():void}|null{
- if(typeof document==='undefined'||typeof document.createElement!=='function')return null;
+ if(typeof document==='undefined'||typeof Reflect.get(document,'createElement')!=='function')return null;
  const canvas=document.createElement('canvas');canvas.width=canvas.height=64;const g=canvas.getContext('2d');if(!g)return null;
  const grad=g.createRadialGradient(32,32,2,32,32,32);grad.addColorStop(0,'rgba(0,0,0,0.55)');grad.addColorStop(.55,'rgba(0,0,0,0.28)');grad.addColorStop(1,'rgba(0,0,0,0)');g.fillStyle=grad;g.fillRect(0,0,64,64);
  const pos:number[]=[],uv:number[]=[],nor:number[]=[];

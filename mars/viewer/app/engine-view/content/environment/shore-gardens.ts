@@ -38,7 +38,7 @@ export function createShoreGardens(design:ShoreDesign):ContentView{
   const inspection=shoreGardenInspection(design),soil:number[]=[],timber:number[]=[];
   // Complete all required terrain samples before allocation. A visible level rim
   // caps varying wall heights; no ground flattening or concealed support claim.
-  for(const b of inspection.beds){const [x,z]=b.centreXZ,[w,d]=b.sizeXZ;
+  for(const b of inspection.beds){const [x,z]=b.centreXZ,[_w,_d]=b.sizeXZ;
     for(let j=0;j<4;j++)for(let i=0;i<6;i++){const a=b.bottomSamples[j*7+i],bb=b.bottomSamples[j*7+i+1],c=b.bottomSamples[(j+1)*7+i],dd=b.bottomSamples[(j+1)*7+i+1];quad(soil,a,bb,dd,c);}
     const inner=b.footprintXZ.map(([sx,sz])=>[sx+(sx<x?.055:-.055),b.soilY,sz+(sz<z?.055:-.055)]);quad(soil,inner[0],inner[3],inner[2],inner[1]);
     for(let edge=0;edge<4;edge++){const a=b.footprintXZ[edge],bb=b.footprintXZ[(edge+1)%4];

@@ -22,7 +22,7 @@ export function createEdenVillageFeatures(ground:Ground){
  const dispose=()=>{if(closed)return;closed=true;group.removeFromParent();for(const g of geos)g.dispose();for(const m of mats)m.dispose();group.clear();};
  const solid=(g:THREE.BufferGeometry,m:THREE.Material,name:string,at:V,parent:THREE.Object3D)=>{const mesh=new THREE.Mesh(g,m);mesh.name=name;mesh.position.fromArray(at);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;};
  try{
-  const whitewash=mat(new THREE.MeshStandardMaterial({color:'#efe8da',roughness:.92})),timber=mat(new THREE.MeshStandardMaterial({color:'#7f5532',roughness:.85}));
+  const _whitewash=mat(new THREE.MeshStandardMaterial({color:'#efe8da',roughness:.92})),timber=mat(new THREE.MeshStandardMaterial({color:'#7f5532',roughness:.85}));
   const shingle=mat(new THREE.MeshStandardMaterial({color:'#5d4a3f',roughness:.9})),sail=mat(new THREE.MeshStandardMaterial({color:'#f3eedf',roughness:.95,side:THREE.DoubleSide}));
   const iron=mat(new THREE.MeshStandardMaterial({color:'#3f4a46',roughness:.5,metalness:.6})),stone=mat(new THREE.MeshStandardMaterial({color:'#b9ad97',roughness:.95}));
   const glass=mat(new THREE.MeshStandardMaterial({color:'#cfe8e2',roughness:.08,metalness:0,transparent:true,opacity:.28,depthWrite:false,side:THREE.DoubleSide}));

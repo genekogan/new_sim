@@ -199,8 +199,7 @@ export const KINDS:Record<string,Kind>={
  stump:{name:'tree stumps',material:'wood',shadow:false,clutter:false,parts:()=>[cyl(.26,.32,.42,'#6e5236',0,.21,0,8),cyl(.24,.24,.02,'#c9a77a',0,.43,0,8),cyl(.2,.2,.021,'#a8845a',0,.432,0,8),box(.12,.1,.3,'#6e5236',.28,.05,.1,[0,.5,0])]},
  fallenLog:{name:'fallen logs',material:'wood',shadow:false,clutter:false,parts:()=>[
   cyl(.24,.28,3.0,'#7a5a3c',0,.26,0,8,[0,0,Math.PI/2]),cyl(.2,.2,.02,'#c9a77a',1.51,.26,0,8,[0,0,Math.PI/2]),box(.5,.06,.06,'#7a5a3c',.4,.5,.12,[.3,.6,.5]),ball(.12,'#5f7a3a',-.6,.48,0,[1.6,.5,1.2]),ball(.1,'#6d8a40',.3,.47,-.08,[1.4,.5,1])]},
- mushrooms:{name:'mushroom clusters',material:'foliage',shadow:false,clutter:true,parts:()=>[
-  ...[[0,0,.1],[.12,.08,.07],[-.1,.1,.06],[.05,-.14,.08],[-.18,-.06,.05]].flatMap(([x,z,h])=>[cyl(.02,.025,h,'#efe6d2',x,h/2,z,5),{g:new THREE.SphereGeometry(h*.7,6,3,0,Math.PI*2,0,Math.PI/2),c:h>.07?'#c0392b':'#d9b38a',at:[x,h,z] as [number,number,number]}])]},
+ mushrooms:{name:'mushroom clusters',material:'foliage',shadow:false,clutter:true,parts:()=>Array.from([[0,0,.1],[.12,.08,.07],[-.1,.1,.06],[.05,-.14,.08],[-.18,-.06,.05]].flatMap(([x,z,h])=>[cyl(.02,.025,h,'#efe6d2',x,h/2,z,5),{g:new THREE.SphereGeometry(h*.7,6,3,0,Math.PI*2,0,Math.PI/2),c:h>.07?'#c0392b':'#d9b38a',at:[x,h,z] as [number,number,number]}]))},
 
  // WP6: street-name signs (lettering lives in signs.ts) ------------------------------------
  streetSign:{name:'street name signs',material:'metal',shadow:true,clutter:true,parts:()=>[
@@ -220,8 +219,7 @@ export const KINDS:Record<string,Kind>={
 
  // WP8: stall goods ------------------------------------------------------------------------
  produceDisplay:{name:'produce trays on stalls',material:'wood',shadow:false,clutter:true,parts:()=>[
-  ...[-.6,0,.6].flatMap((x,i)=>[box(.56,.08,.46,'#a47a4c',x,.04,0),box(.5,.02,.4,'#7d5a3a',x,.05,0)]),
+  ...[-.6,0,.6].flatMap((x,_i)=>[box(.56,.08,.46,'#a47a4c',x,.04,0),box(.5,.02,.4,'#7d5a3a',x,.05,0)]),
   ...[['#c43b2e','#d24a3a'],['#e8b83a','#f1c84b'],['#5f9142','#7fae4a']].flatMap(([a,b],i)=>Array.from({length:4},(_,k)=>ball(.07,k%2?a:b,-.6+i*.6-.1+(k%2)*.2,.12,-.1+Math.floor(k/2)*.2)))]},
- flowerBuckets:{name:'flower buckets',material:'metal',shadow:false,clutter:true,parts:()=>[
-  ...[-.6,-.2,.2,.6].flatMap((x,i)=>[cyl(.13,.1,.24,'#8c9a9e',x,.12,0,6),...[0,1].map(k=>ball(.07,['#d9567a','#f1c84b','#e9eef0','#9a6fd0'][(i+k)%4],x-.04+k*.08,.35+k*.04,(k-.5)*.06)),ball(.1,'#4f7f3a',x,.27,0,[1,.6,1])])]},
+ flowerBuckets:{name:'flower buckets',material:'metal',shadow:false,clutter:true,parts:()=>Array.from([-.6,-.2,.2,.6].flatMap((x,i)=>[cyl(.13,.1,.24,'#8c9a9e',x,.12,0,6),...[0,1].map(k=>ball(.07,['#d9567a','#f1c84b','#e9eef0','#9a6fd0'][(i+k)%4],x-.04+k*.08,.35+k*.04,(k-.5)*.06)),ball(.1,'#4f7f3a',x,.27,0,[1,.6,1])]))},
 };

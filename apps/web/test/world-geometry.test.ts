@@ -47,7 +47,7 @@ test('parseSceneInfo keeps valid parts and drops the rest', () => {
   assert.deepEqual(ok.scene?.links, []);
   assert.equal(ok.buildings.length, 1);
   assert.equal(ok.kin.length, 1);
-  assert.deepEqual(parseSceneInfo(null), { scene: null, buildings: [], kin: [], clock: null, ground: undefined });
+  assert.deepEqual(parseSceneInfo(null), { scene: null, buildings: [], kin: [], clock: null, ground: undefined, assetRoot: undefined, backdrop: undefined, commons: undefined });
   assert.equal(parseSceneInfo({ scene: { bounds: [1, 2] } }).scene, null);
 });
 

@@ -29,7 +29,7 @@ export function createCapturedShoreEnvironment(terrain:NativeShoreTerrainInput,w
   // owner contains its own single water surface, including cosmetic .003 lift.
   const group=new THREE.Group();group.name='Captured native shoreline environment';
   const owners:{dispose():void}[]=[];let green:ReturnType<typeof createNativeShoreLandscape>|undefined,calm:ReturnType<typeof createCapturedWaterSurface>|undefined,closed=false;
-  const release=()=>{const errors:unknown[]=[];try{group.removeFromParent();}catch(e){errors.push(e);}for(const owner of owners){try{owner.dispose();}catch(e){errors.push(e);}}for(const child of [...group.children]){try{group.remove(child);}catch(e){errors.push(e);}}return errors;};
+  const release=()=>{const errors:unknown[]=[];try{group.removeFromParent();}catch(e){errors.push(e);}for(const owner of owners){try{owner.dispose();}catch(e){errors.push(e);}}for(const child of group.children.slice()){try{group.remove(child);}catch(e){errors.push(e);}}return errors;};
   try{
     const copied={...ground,diagonal:'min-min/max-max'};
     if(proposal){green=createNativeShoreLandscape(copied,proposal);owners.push(green);group.add(green.group);}

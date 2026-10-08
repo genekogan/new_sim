@@ -46,7 +46,7 @@ export class Builder{
   for(let i=0;i<P.count;i++){this.v.fromBufferAttribute(P,i).applyMatrix4(this.l);b.p.push(this.v.x,this.v.y,this.v.z);
    mn[0]=Math.min(mn[0],this.v.x);mn[1]=Math.min(mn[1],this.v.y);mn[2]=Math.min(mn[2],this.v.z);mx[0]=Math.max(mx[0],this.v.x);mx[1]=Math.max(mx[1],this.v.y);mx[2]=Math.max(mx[2],this.v.z);
    this.v.fromBufferAttribute(N,i).applyMatrix3(this.nm).normalize();b.n.push(this.v.x,this.v.y,this.v.z);b.c.push(tmpC.r,tmpC.g,tmpC.b);}
-  this.boxes.push({min:mn as any,max:mx as any,label:this.label,layer});
+  this.boxes.push({min:mn as [number,number,number],max:mx as [number,number,number],label:this.label,layer});
  }
  /** Axis box by its bottom-centre (x, y = bottom, z) and size. */
  box(x:number,y:number,z:number,w:number,h:number,d:number,col:Col,layer:Layer='furn',yaw=0){this.add(prim('box',()=>new THREE.BoxGeometry(1,1,1)),x,y+h/2,z,w,h,d,col,layer,0,yaw,0);return this;}

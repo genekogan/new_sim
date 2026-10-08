@@ -49,7 +49,7 @@ function frameOf(r:FacadeBuilding['rect'],edge:FacadeSide['edge']):Frame{
 const pt=(f:Frame,a:number,y:number,d:number):V3=>f.edge==='n'||f.edge==='s'?[a,y,f.line+f.out.z*d]:[f.line+f.out.x*d,y,a];
 /** Windows the house kit adds on solid walls (houses 3/4) join the plan's openings. */
 function extraWindows(b:FacadeBuilding,f:Frame):FacadeOpening[]{
- if(!/^eden-house-/.test(b.id))return[];const out:FacadeOpening[]=[];
+ if(!b.id.startsWith('eden-house-'))return[];const out:FacadeOpening[]=[];
  for(const w of houseWindowPlacements()){if(w.kind!=='facade')continue;const [x,y,z]=w.at;
   const along=f.edge==='n'||f.edge==='s'?x:z,across=f.edge==='n'||f.edge==='s'?z:x;
   if(Math.abs(across-f.line)>.4||along<f.lo-.1||along>f.hi+.1)continue;

@@ -26,7 +26,7 @@ export function createNativeShoreSupports(layout:NativeBoatLayoutV1):NativeShore
   attempt(()=>group.removeFromParent());
   // Resource and removed listeners may throw; each owned release and residual membership still gets its attempt.
   for(const g of geometries)attempt(()=>g.dispose());for(const m of materials)attempt(()=>m.dispose());
-  for(const child of [...group.children])attempt(()=>group.remove(child));
+  for(const child of group.children.slice())attempt(()=>group.remove(child));
   geometries.length=materials.length=0;
   if(failures.length)throw new AggregateError(failures,'Native shore support cleanup failed');
  }};

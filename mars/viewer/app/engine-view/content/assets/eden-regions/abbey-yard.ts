@@ -52,7 +52,7 @@ export function buildAbbey(b:Builder,t:Terrain,trees:Trees){const r=rng(5101),G=
  // lavender field below the knoll (purple rows)
  for(let i=0;i<14;i++){const x=-196+i*2.2;for(let z=58;z<96;z+=1.6){const yy=G(x,z);b.box('flower',x,yy,z,1.1,.55,.9,i%3?'#8a6ab0':'#9a7ac0');}}
 }
-export function buildCourtyards(b:Builder,t:Terrain,trees:Trees){const r=rng(5201);
+export function buildCourtyards(b:Builder,t:Terrain,trees:Trees){const _r=rng(5201);
  const cols=['#efe4cf','#e6c86e','#e9b07a','#d49a8c','#f0d9a8','#c96f4a','#efe9dc'];let i=0;
  for(const [x,z,W,D,yaw] of [[-116,60,16,13,0],[-136,60,14,13,0],[-116,80,16,13,Math.PI],[-138,80,18,13,Math.PI]] as [number,number,number,number,number][]){const rr=rng(5300+i++*17);
   b.push(x,0,z,yaw);courtyardHouse(b,W,D,4,1+(rr()<.5?1:0),pick(rr,cols),pick(rr,['#a8553a','#b86a45','#c27a52']),rr,{add:(lx,_,lz)=>trees.add(x+lz*Math.sin(yaw)+lx*Math.cos(yaw),0,z+lz*Math.cos(yaw)-lx*Math.sin(yaw),.6,'fruit','#7d9a4a',0)},rr()<.6);b.pop();}
@@ -65,7 +65,7 @@ export function buildMakersYard(b:Builder,t:Terrain,trees:Trees){const r=rng(540
  // workshops: three long sheds with roller doors
  for(let i=0;i<3;i++){const x=122+i*16;b.push(x,0,-74,Math.PI);house(b,{w:13,d:9,floors:1,fh:5,wall:'timber',wallC:pick(r,['#5f6b73','#8a5a36','#3f5a6a','#7a2f2a']),roof:'gable',roofH:2.2,roofC:'#5a5f66',noWindows:true,door:false,barnDoor:true,trim:'#e8e2d2'},r);b.pop();}
  // stacked shipping containers
- for(let k=0;k<9;k++){const x=166+Math.floor(k/3)*0,z=-70-(k%3)*2.7,lv=Math.floor(k/3);b.push(x+lv*0,lv*2.6,z,0);b.box('metal',0,0,0,6,2.6,2.5,pick(r,['#c43a2a','#2f6f8f','#e0b04a','#3a7a5a','#8a8a8a','#d06a2a']));for(let q=-2.7;q<=2.7;q+=.45)b.box('metal',q,.05,1.26,.08,2.5,.02,'#4a4a4a');b.pop();}
+ for(let k=0;k<9;k++){const x=166,z=-70-(k%3)*2.7,lv=Math.floor(k/3);b.push(x,lv*2.6,z,0);b.box('metal',0,0,0,6,2.6,2.5,pick(r,['#c43a2a','#2f6f8f','#e0b04a','#3a7a5a','#8a8a8a','#d06a2a']));for(let q=-2.7;q<=2.7;q+=.45)b.box('metal',q,.05,1.26,.08,2.5,.02,'#4a4a4a');b.pop();}
  // water tower on legs
  {const x=130,z=-96;for(const [dx,dz] of [[-2,-2],[2,-2],[-2,2],[2,2]] as [number,number][])b.box('metal',x+dx,0,z+dz,.25,12,.25,'#6a6f72');b.cyl('metal',x,12,z,3.2,4.5,12,'#a8b0b0');b.cone('roof',x,16.5,z,3.4,1.6,12,'#5a5f66');b.box('dressing',x,14,z+3.25,2.2,.6,.05,'#2f4f5f');}
  // market-garden greenhouses (light panes, see-through dressing) and raised beds
@@ -73,7 +73,7 @@ export function buildMakersYard(b:Builder,t:Terrain,trees:Trees){const r=rng(540
   for(let j=0;j<4;j++)b.box('foliage',x-2.4+j*1.6,.4,z,.8,.6+r()*.4,12,pick(r,['#5f8a46','#7fae4a','#6f9a4e']));}
  for(let i=0;i<8;i++){b.box('timber',120+i*4.5,0,-114,3,.5,8,'#8a5a36');b.box('foliage',120+i*4.5,.5,-114,2.6,.4,7.4,pick(r,['#5f8a46','#7fae4a','#9ab04a']));}
  // yard surface, a forklift-ish cart, pallets, bench; access lane from the station
- b.box('soil',146,0,-84,60,.04,22,'#9a9488');for(let k=0;k<10;k++)b.box('timber',150+(k%5)*1.4,0+Math.floor(k/5)*.15,-86+Math.floor(k/5)*0,1.2,.14,1.2,'#b08a5f');
+ b.box('soil',146,0,-84,60,.04,22,'#9a9488');for(let k=0;k<10;k++)b.box('timber',150+(k%5)*1.4,0+Math.floor(k/5)*.15,-86,1.2,.14,1.2,'#b08a5f');
  {b.push(152,0,-80,.5);b.box('metal',0,.3,0,1.4,1,2.2,'#e0b04a');b.box('metal',0,1.3,-.3,1.2,1.2,.08,'#2a2a2a');b.box('metal',0,0,1.3,1,.1,1,'#555');b.pop();}
  b.push(140,0,-90,0);bench(b,'#5f6b73');b.pop();
  t.ribbon(b,[[132,-58],[134,-66],[146,-84]],3,'#9d9584','path',.07);

@@ -54,7 +54,7 @@ export function createShoreBoat(boat:ShoreDesign['boat']):ContentView{
   attempt(()=>group.removeFromParent());
   // Snapshot only factory-owned resources; throwing listeners cannot prevent the remaining release attempts.
   for(const m of instances)attempt(()=>m.dispose());for(const g of geometries)attempt(()=>g.dispose());for(const m of materials.values())attempt(()=>m.dispose());
-  for(const member of members)attempt(()=>member.removeFromParent());for(const child of [...group.children])attempt(()=>group.remove(child));
+  for(const member of members)attempt(()=>member.removeFromParent());for(const child of group.children.slice())attempt(()=>group.remove(child));
   instances.length=members.length=0;geometries.clear();materials.clear();
   if(failures.length)throw new AggregateError(failures,'Shore boat cleanup failed');
  }};

@@ -55,7 +55,7 @@ export function buildCanalQuarter(b:Builder,t:Terrain,trees:Trees){
  quayClutter(b,r);
  for(const x of [120.5,152.5])for(const [a,c] of [[-30,0],[4,27],[31,53]] as [number,number][])fence(b,[[x,a],[x,c]],1.0,'#e8e2d2',G);
  // ---- quay furniture: lamps, benches, trees, bollards
- for(let z=-28;z<=52;z+=7.5){if(Math.abs(z-2)<3||Math.abs(z-29)<3)continue;for(const [x,yaw] of [[131.3,-Math.PI/2],[141.7,Math.PI/2]] as [number,number][]){b.push(x,0,z,0);lampPost(b);b.pop();}
+ for(let z=-28;z<=52;z+=7.5){if(Math.abs(z-2)<3||Math.abs(z-29)<3)continue;for(const [x,_yaw] of [[131.3,-Math.PI/2],[141.7,Math.PI/2]] as [number,number][]){b.push(x,0,z,0);lampPost(b);b.pop();}
   trees.add(127.3,0,z+3.7,.85,'round',pick(r,['#6f9a4e','#5f8a46','#7fa84f']),r()*6);trees.add(145.7,0,z+3.7,.85,'round',pick(r,['#6f9a4e','#5f8a46','#7fa84f']),r()*6);
   b.push(130.8,0,z+2,Math.PI/2);bench(b);b.pop();b.push(142.2,0,z+2,-Math.PI/2);bench(b);b.pop();
   for(const x of [132.4,140.6])b.cyl('metal',x,0,z-2,.12,.6,6,'#2f3436');}

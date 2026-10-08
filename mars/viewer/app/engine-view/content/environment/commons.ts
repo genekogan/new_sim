@@ -104,7 +104,7 @@ export function createEdenCommonsEnvironment(sample: GroundSample): ContentView 
   let closed=false;
   return {group,dispose(){if(closed)return;closed=true;const errors:unknown[]=[];
     for(const release of [()=>group.removeFromParent(),()=>vegetation.dispose(),()=>resources.dispose(),()=>blossoms.dispose()]){try{release();}catch(error){errors.push(error);}}
-    for(const child of [...group.children]){try{group.remove(child);}catch(error){errors.push(error);}}
+    for(const child of group.children.slice()){try{group.remove(child);}catch(error){errors.push(error);}}
     if(errors.length)throw new AggregateError(errors,'Commons disposal failed',{cause:errors[0]});
   }};
 }

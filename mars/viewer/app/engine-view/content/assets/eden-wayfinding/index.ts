@@ -66,7 +66,7 @@ export function wayfindingParts(ground:Ground):{parts:Part[];quads:Quad[];finger
 }
 const CW=512,CH=64,COLS=2;
 function lettering(quads:Quad[]){
- if(typeof document==='undefined'||typeof document.createElement!=='function'||!quads.length)return null;
+ if(typeof document==='undefined'||typeof Reflect.get(document,'createElement')!=='function'||!quads.length)return null;
  const keyOf=(l:Label)=>l.text+'\u0000'+l.fg+'\u0000'+(l.w/l.h).toFixed(2)+'\u0000'+(l.align??'center');
  const keys=[...new Set(quads.map(q=>keyOf(q.label)))],rows=Math.ceil(keys.length/COLS),canvas=document.createElement('canvas');
  canvas.width=CW*COLS;canvas.height=THREE.MathUtils.ceilPowerOfTwo(rows*CH);const g=canvas.getContext('2d');if(!g)return null;

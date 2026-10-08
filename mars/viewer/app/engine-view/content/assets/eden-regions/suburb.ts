@@ -1,5 +1,5 @@
 import {Builder,rng,pick,PLASTER,ROOFS,TIMBER,STONE} from './kit.ts';
-import {house,lampPost,bench,fence,tower,lowWall} from './buildings.ts';
+import {house,lampPost,bench as _bench,fence,tower,lowWall} from './buildings.ts';
 import type {Terrain} from './terrain.ts';
 import type {Trees} from './trees.ts';
 /** A leafy suburb east of the old town (x 174..244, z 30..110): two loops with

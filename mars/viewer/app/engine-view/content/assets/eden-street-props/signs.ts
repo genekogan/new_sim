@@ -48,7 +48,7 @@ export function signQuads():Quad[]{
 }
 const CW=256,CH=96,COLS=4;
 export function createEdenStreetSigns():{mesh:THREE.Mesh;texture:THREE.Texture;dispose():void}|null{
- if(typeof document==='undefined'||typeof document.createElement!=='function')return null;
+ if(typeof document==='undefined'||typeof Reflect.get(document,'createElement')!=='function')return null;
  const quads=signQuads();if(!quads.length)return null;
  const keys=[...new Set(quads.map(q=>q.label.text+'\u0000'+q.label.fg+'\u0000'+(q.label.w/q.label.h).toFixed(2)))];
  const rows=Math.ceil(keys.length/COLS),H=THREE.MathUtils.ceilPowerOfTwo(rows*CH),canvas=document.createElement('canvas');canvas.width=CW*COLS;canvas.height=H;

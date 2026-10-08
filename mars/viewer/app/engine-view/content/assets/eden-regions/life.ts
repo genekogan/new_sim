@@ -23,7 +23,7 @@ export function buildLife(b:Builder,t:Terrain){const r=rng(8101);
  const cols=['#c43a2a','#2f4f5f','#e8e2d2','#3a3a3a','#5a8a6a','#d9a441','#7a8a9a','#3d5a80'];
  for(const [[ax,az],[bx,bz]] of SUBURB_STREETS){const L=Math.hypot(bx-ax,bz-az),ux=(bx-ax)/L,uz=(bz-az)/L;for(let s=12;s<L-8;s+=17+r()*10){if(r()<.35)continue;const side=r()<.5?-1:1,x=ax+ux*s-uz*2.1*side,z=az+uz*s+ux*2.1*side;
    b.push(x,0,z,Math.atan2(ux*side,uz*side));car(b,pick(r,cols));b.pop();}}
- for(let i=0;i<5;i++){b.push(118+i*3,0,-36.5,Math.PI/2*0);car(b,pick(r,cols));b.pop();}
+ for(let i=0;i<5;i++){b.push(118+i*3,0,-36.5,0);car(b,pick(r,cols));b.pop();}
  b.push(168.5,0,97.5,0);car(b,'#e8e2d2',true);b.pop();
  // sailboats and a ferry out on the sea
  for(let i=0;i<9;i++){const x=-80+r()*260,z=200+r()*120;b.push(x,WATER.bay-.1,z,r()*6.28);boat(b,6+r()*3,pick(r,['#f3f3ee','#2f4f5f','#7a2f2a']),r,false);b.cyl('metal',0,.5,0,.06,6,5,'#e8e8e8',false);b.tri('cloth',[.1,1.5,0],[.1,6.3,0],[3.2,1.6,0],pick(r,['#f3f3ee','#e05a3a','#3d8ab0','#f0c040']));b.pop();}

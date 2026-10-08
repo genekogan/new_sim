@@ -48,7 +48,7 @@ function liveHook() {
   };
 }
 
-test('live Lab camera applies a safe pose on every display frame, including repeated engine ticks', () => {
+void test('live Lab camera applies a safe pose on every display frame, including repeated engine ticks', () => {
   const run = liveHook();
   try {
     for (let i = 0; i < 61; i++) run.frame(i * 1000 / 60);
@@ -59,7 +59,7 @@ test('live Lab camera applies a safe pose on every display frame, including repe
   assert.equal(run.pending(), 0);
 });
 
-test('unchanged paused Lab view stays still; explicit release refreshes without advancing the world', () => {
+void test('unchanged paused Lab view stays still; explicit release refreshes without advancing the world', () => {
   const run = liveHook();
   try {
     run.pause();

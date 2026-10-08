@@ -1,3 +1,4 @@
+const hasControlCharacter=value=>{for(let i=0;i<value.length;i++){const code=value.charCodeAt(i);if(code<=31||code===127)return true;}return false;};
 import audit from './audit.json' with {type:'json'};
 const freeze=o=>{for(const v of Object.values(o))if(v&&typeof v==='object')freeze(v);return Object.freeze(o);};
 export const PRESET_VERSION='human-presets/1';
@@ -23,14 +24,14 @@ function recipe([id,label,template,colors]) {
 export const HUMAN_PRESETS=Object.freeze(palettes.map(recipe));
 function keyHash(key){let h=2166136261;for(const b of new TextEncoder().encode(key)){h^=b;h=Math.imul(h,16777619)>>>0;}return h;}
 export function presetForSoul(stableSoulId,version=PRESET_VERSION){
- if(version!==PRESET_VERSION||typeof stableSoulId!=='string'||stableSoulId.length<1||stableSoulId.length>128||/[\u0000-\u001f\u007f]/u.test(stableSoulId))return Object.freeze({quality:'Simple',bindingGranted:false,reason:'Explicit stable Soul key and supported preset version required'});
+ if(version!==PRESET_VERSION||typeof stableSoulId!=='string'||stableSoulId.length<1||stableSoulId.length>128||hasControlCharacter(stableSoulId))return Object.freeze({quality:'Simple',bindingGranted:false,reason:'Explicit stable Soul key and supported preset version required'});
  return HUMAN_PRESETS[keyHash(stableSoulId)%HUMAN_PRESETS.length];
 }
 /** Metadata association only. No material/mesh/rig access or mutable input writes. */
 export function presetForAsset(stableSoulId,version,assetSHA256){const p=presetForSoul(stableSoulId,version);return p.quality==='InertPreset'&&p.sourceAssetSHA256===assetSHA256?p:Object.freeze({quality:'Simple',bindingGranted:false,reason:'Actual original selected GLB hash must match; renderer-owned hooks/maps/rig guards still required'});}
 /** Optional palette selection preserves the actual existing template/rig identity. */
 export function compatiblePresetForSoul(stableSoulKey,existingTemplateName,version,actualSourceGLBSHA){
- if(version!==PRESET_VERSION||typeof stableSoulKey!=='string'||stableSoulKey.length<1||stableSoulKey.length>128||/[\u0000-\u001f\u007f]/u.test(stableSoulKey)||(existingTemplateName!=='casual'&&existingTemplateName!=='punk'&&existingTemplateName!=='woman')||typeof actualSourceGLBSHA!=='string')return Object.freeze({quality:'Simple',bindingGranted:false,reason:'Explicit stable Soul key, existing template and supported version/hash required'});
+ if(version!==PRESET_VERSION||typeof stableSoulKey!=='string'||stableSoulKey.length<1||stableSoulKey.length>128||hasControlCharacter(stableSoulKey)||(existingTemplateName!=='casual'&&existingTemplateName!=='punk'&&existingTemplateName!=='woman')||typeof actualSourceGLBSHA!=='string')return Object.freeze({quality:'Simple',bindingGranted:false,reason:'Explicit stable Soul key, existing template and supported version/hash required'});
  if(actualSourceGLBSHA!==HUMAN_ASSETS[existingTemplateName].sha256)return Object.freeze({quality:'Simple',bindingGranted:false,reason:'Actual existing original template GLB hash must match'});
  const offset=existingTemplateName==='casual'?0:existingTemplateName==='punk'?2:4;
  return HUMAN_PRESETS[offset+keyHash(stableSoulKey)%2];
@@ -56,7 +57,7 @@ export const SOCIAL_PUBLIC_ASSIGNMENTS=freeze([
 ].map(([actorId,stableSoulKey,template,presetId])=>({actorId,stableSoulKey,template,presetId,version:SOCIAL_PRESET_VERSION,sourceAssetSHA256:HUMAN_ASSETS[template].sha256})));
 /** Exact audited public cohort mapping, not a template writer or global rehash. */
 export function socialPresetForSoul(stableSoulKey,existingTemplateName,version,actualSourceGLBSHA){
- if(version!==SOCIAL_PRESET_VERSION||typeof stableSoulKey!=='string'||stableSoulKey.length<1||stableSoulKey.length>128||/[\u0000-\u001f\u007f]/u.test(stableSoulKey)||(existingTemplateName!=='casual'&&existingTemplateName!=='punk'&&existingTemplateName!=='woman')||typeof actualSourceGLBSHA!=='string')return Object.freeze({quality:'Simple',bindingGranted:false,reason:'Explicit social source version/stable key/template/hash required'});
+ if(version!==SOCIAL_PRESET_VERSION||typeof stableSoulKey!=='string'||stableSoulKey.length<1||stableSoulKey.length>128||hasControlCharacter(stableSoulKey)||(existingTemplateName!=='casual'&&existingTemplateName!=='punk'&&existingTemplateName!=='woman')||typeof actualSourceGLBSHA!=='string')return Object.freeze({quality:'Simple',bindingGranted:false,reason:'Explicit social source version/stable key/template/hash required'});
  const row=SOCIAL_PUBLIC_ASSIGNMENTS.find(p=>p.stableSoulKey===stableSoulKey);
  if(!row||row.template!==existingTemplateName||row.sourceAssetSHA256!==actualSourceGLBSHA)return Object.freeze({quality:'Simple',bindingGranted:false,reason:'Unknown or drifted audited public Soul/template/source remains Simple'});
  return SOCIAL_HUMAN_PRESETS.find(p=>p.id===row.presetId)??Object.freeze({quality:'Simple',bindingGranted:false,reason:'Missing audited palette remains Simple'});

@@ -12,7 +12,7 @@ import {createOrchardProposal} from '../orchard-proposal/orchard.mjs';
 import {createAridLandmark} from '../arid-landmark-proposal/landmarks.mjs';
 import {createVolcanicLandscapeKit} from '../volcanic-landscape-kit.ts';
 import {createMountainRidge} from '../mountain-ridge-proposal/ridge.mjs';
-import {edenExpansionLayout,expansionHeight,inNative,inside,waterBedReserved,reserved} from './layout.mjs';
+import {edenExpansionLayout,expansionHeight,inNative,inside as _inside,waterBedReserved,reserved} from './layout.mjs';
 import {createExpansionBankEnrichment} from './bank-enrichment.mjs';
 import {joinExpansionWater} from './water-join.mjs';
 import {createWetlandPlant} from '../wetland-plant-family/wetland.mjs';

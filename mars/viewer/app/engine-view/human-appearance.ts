@@ -19,7 +19,7 @@ export async function collectTemplateAppearance(gltf:GLTF,template:string,source
   const mesh=gltf.parser.associations.get(object) as {meshes?:number;primitives?:number}|undefined,material=gltf.parser.associations.get(object.material);
   let ancestor:THREE.Object3D|null=object,node:number|undefined;
   while(ancestor){const n=gltf.parser.associations.get(ancestor)?.nodes;if(Number.isInteger(n)){node=n;break;}ancestor=ancestor.parent;}
-  const expected=asset.primitives.find((p:any)=>p.nodeIndex===node&&p.mesh===mesh?.meshes&&p.primitive===mesh?.primitives&&p.material===material?.materials);
+  const expected=asset.primitives.find(p=>p.nodeIndex===node&&p.mesh===mesh?.meshes&&p.primitive===mesh?.primitives&&p.material===material?.materials);
   if(!expected){failed=true;return;}
   const key=expected.node+':'+expected.mesh+':'+expected.primitive;
   if(seen.has(key)){failed=true;return;}seen.add(key);
@@ -85,4 +85,4 @@ export class HumanActorAppearance{
 }
 export function humanAppearanceQuarantineCount(){return quarantinedAppearances.size;}
 /** Only a caller that has resolved foreign references should request recovery. */
-export function recoverHumanAppearances(){for(const owner of [...quarantinedAppearances])owner.retire();return quarantinedAppearances.size;}
+export function recoverHumanAppearances(){for(const owner of Array.from(quarantinedAppearances))owner.retire();return quarantinedAppearances.size;}
