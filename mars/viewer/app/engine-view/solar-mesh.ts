@@ -49,6 +49,9 @@ export function solarPanelMesh(id: string, length: number, thickness: number, wi
     grid.setMatrixAt(i++, matrix.compose(position, quaternion, scale));
   }
   grid.instanceMatrix.needsUpdate = true;
+  // The cell grid lies 1.75 mm over the laminate: pull it forward in depth so it never z-fights (speckle) at range.
+  const gm = grid.material as THREE.MeshStandardMaterial;
+  gm.polygonOffset = true; gm.polygonOffsetFactor = -2; gm.polygonOffsetUnits = -4;
   group.add(grid);
   const junction = piece(kit, `solar-junction:${id}`, [0.16, 0.035, 0.11], '#242b32');
   junction.position.set(0, -0.014, 0);

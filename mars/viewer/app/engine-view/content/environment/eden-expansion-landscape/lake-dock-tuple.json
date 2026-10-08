@@ -1,0 +1,89 @@
+{
+  "version": "eden-expansion-lake-dock/1",
+  "worldPlacementStatus": "visual proposal ONLY; no native dock/boat/approach admitted",
+  "preserveOriginalNativeShore": true,
+  "waterDatumY": -2,
+  "shorewardEnd": [
+    -98,
+    -1.7878570872910566,
+    1
+  ],
+  "waterwardEnd": [
+    -90,
+    -2,
+    1
+  ],
+  "dockWorldAxis": [
+    1,
+    0,
+    0
+  ],
+  "yawIfLocalPositiveXWaterward": 0,
+  "yawIfLocalPositiveZWaterward": -1.5707963267948966,
+  "proposedDockFootprintXZ": [
+    -98,
+    0.2,
+    -90,
+    1.8
+  ],
+  "bankApproachFootprintXZ": [
+    -99,
+    0,
+    -97,
+    18
+  ],
+  "pathConnection": [
+    [
+      -90,
+      24
+    ],
+    [
+      -98,
+      18
+    ],
+    [
+      -98,
+      1
+    ]
+  ],
+  "bankSamples": [
+    {
+      "x": -98,
+      "z": 0.2,
+      "actualFloat32BankY": -1.7852354024581705
+    },
+    {
+      "x": -98,
+      "z": 1,
+      "actualFloat32BankY": -1.7878570872910566
+    },
+    {
+      "x": -98,
+      "z": 1.8,
+      "actualFloat32BankY": -1.7852354071302894
+    },
+    {
+      "x": -97,
+      "z": 0.2,
+      "actualFloat32BankY": -1.8222792561727317
+    },
+    {
+      "x": -97,
+      "z": 1.8,
+      "actualFloat32BankY": -1.8222792069997589
+    },
+    {
+      "x": -95,
+      "z": 1,
+      "actualFloat32BankY": -2
+    }
+  ],
+  "proposedWatercraftSurfacePoint": [
+    -90,
+    -2,
+    3
+  ],
+  "boatRootKeelY": null,
+  "source": "actual NEW calmlake clipped Float32 triangle positions, current owned expansion",
+  "currentF5NativeDockMetadata": null
+}

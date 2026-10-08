@@ -14,6 +14,7 @@
 // Until a model has loaded (or when a body names no known model) a glazed sphere of the same radius
 // stands in, so placement and selection work from the first frame.
 import * as THREE from 'three';
+import {admittedBodyUrl} from './recorded-body.ts';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { floaterBody, floaterModel, floaterPose, idPhase, type FloaterBody } from '../../engine/bodies/index.ts';
@@ -87,13 +88,15 @@ export class FloaterView {
 
   /** Start drawing entity `id` as a floater. Re-adding with a different body rebuilds it. */
   add(id: string, body: Body): void {
-    const fb = floaterBody(body);
+    const modelUrl=admittedBodyUrl((body as {modelUrl?:string}).modelUrl);
+    const fb = {...floaterBody(body),...(modelUrl?{modelUrl}: {})};
     const prev = this.floaters.get(id);
     if (prev && JSON.stringify(prev.body) === JSON.stringify(fb)) return;
     if (prev) this.remove(id);
     const holder = new THREE.Group();
     holder.name = `floater:${id}`;
     holder.userData.entity = id;
+    holder.userData.bodyModel='stand-in';
     holder.visible = false; // until its first update
     const tilt = new THREE.Group();
     const turn = new THREE.Group();
@@ -109,21 +112,22 @@ export class FloaterView {
     this.floaters.set(id, f);
     this.root.add(holder);
     const m = floaterModel(fb.model);
-    if (!m) return; // unknown or absent model: the stand-in stays
-    const p = this.template(m.file).then(
+    if (!m&&!modelUrl) return; // unknown or absent model: the stand-in stays
+    const p = this.template(modelUrl??m!.file).then(
       (tpl) => {
         if (this.disposed || this.floaters.get(id) !== f) return;
         const model = normalized(tpl.clone(true), 2 * fb.radius);
         model.traverse((o) => (o.userData.entity = id));
         orient.add(model);
         f.model = model;
+        holder.userData.bodyModel=fb.model??'uploaded';
         if (f.stand) {
           tilt.remove(f.stand);
           f.stand.geometry.dispose();
           f.stand = null;
         }
       },
-      (err) => console.warn(`floater ${id}: model ${m.file} failed to load; keeping the stand-in`, err),
+      (err) => console.warn(`floater ${id}: model ${modelUrl??m?.file} failed to load; keeping the stand-in`, err),
     );
     this.pending.add(p);
     void p.finally(() => this.pending.delete(p));
@@ -202,7 +206,7 @@ export class FloaterView {
   private template(file: string): Promise<THREE.Object3D> {
     let t = this.templates.get(file);
     if (!t) {
-      t = this.loader.loadAsync(this.base + file).then((g) => g.scene);
+      t = this.loader.loadAsync(file.startsWith('/')?file:this.base+file).then((g) => g.scene);
       this.templates.set(file, t);
     }
     return t;

@@ -1,0 +1,21 @@
+{
+  "groups": 3,
+  "oldWaterTriangles": 177,
+  "newWaterTriangles": 50,
+  "beforeWaterOverlap": {
+    "count": 14,
+    "sum": 0.000005198722788701815
+  },
+  "afterWaterOverlap": {
+    "count": 0,
+    "sum": 0
+  },
+  "beforeArea": 612.1775969670666,
+  "afterArea": 612.177601707429,
+  "unionAreaDelta": 0.0000047403623284481,
+  "beforeInternalBedWaterLevelEdges": 9,
+  "afterInternalBedWaterLevelEdges": 0,
+  "waterDatumDisplacements": 0,
+  "originalCanonicalPhysicsChanges": 0,
+  "scope": "NEWowned union conforming topology and internal bed-edge removal; suppliedimage sourcecorrespondence, not newpixels"
+}

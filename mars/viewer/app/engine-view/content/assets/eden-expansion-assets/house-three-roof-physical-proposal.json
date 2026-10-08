@@ -1,0 +1,2471 @@
+{
+  "version": "eden-house-three-roof-route/1",
+  "houseId": "eden-house-3",
+  "root": [
+    34,
+    0,
+    30
+  ],
+  "yaw": 0,
+  "status": "Release-required physical REQUEST; no admitted support/navigation/seats/actors",
+  "levelRequests": [
+    {
+      "id": "eden-house-3-ground",
+      "topY": 0,
+      "nativeLevel": null
+    },
+    {
+      "id": "eden-house-3-upper-roof",
+      "topY": 3,
+      "nativeLevel": null,
+      "meaning": "Core chooses actual level ID; upperfloor/balcony/lowerroofs SAMEheight"
+    }
+  ],
+  "supports": [
+    {
+      "id": "eden-house-3:ground-floor:north",
+      "sourcePart": "ground-floor:north",
+      "centre": [
+        33.2,
+        0.05,
+        26.5
+      ],
+      "size": [
+        10.4,
+        0.1,
+        3
+      ],
+      "topY": 0.1,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:ground-floor:south",
+      "sourcePart": "ground-floor:south",
+      "centre": [
+        33.2,
+        0.05,
+        33.5
+      ],
+      "size": [
+        10.4,
+        0.1,
+        3
+      ],
+      "topY": 0.1,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:ground-floor:west",
+      "sourcePart": "ground-floor:west",
+      "centre": [
+        30,
+        0.05,
+        30
+      ],
+      "size": [
+        4,
+        0.1,
+        4
+      ],
+      "topY": 0.1,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:ground-floor:east",
+      "sourcePart": "ground-floor:east",
+      "centre": [
+        37.2,
+        0.05,
+        30
+      ],
+      "size": [
+        2.4,
+        0.1,
+        4
+      ],
+      "topY": 0.1,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:upper-room-floor",
+      "sourcePart": "upper-room-floor",
+      "centre": [
+        33.2,
+        2.94,
+        26.5
+      ],
+      "size": [
+        10.4,
+        0.12,
+        3
+      ],
+      "topY": 3,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:upper-room-roof",
+      "sourcePart": "upper-room-roof",
+      "centre": [
+        33.2,
+        5.7,
+        26.5
+      ],
+      "size": [
+        10.4,
+        0.2,
+        3
+      ],
+      "topY": 5.8,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:west-ground-roof",
+      "sourcePart": "west-ground-roof",
+      "centre": [
+        30,
+        2.9,
+        31.5
+      ],
+      "size": [
+        4,
+        0.2,
+        7
+      ],
+      "topY": 3,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:east-ground-roof",
+      "sourcePart": "east-ground-roof",
+      "centre": [
+        37.2,
+        2.9,
+        31.5
+      ],
+      "size": [
+        2.4,
+        0.2,
+        7
+      ],
+      "topY": 3,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:south-ground-roof",
+      "sourcePart": "south-ground-roof",
+      "centre": [
+        34,
+        2.9,
+        33.5
+      ],
+      "size": [
+        4,
+        0.2,
+        3
+      ],
+      "topY": 3,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:balcony-floor",
+      "sourcePart": "balcony-floor",
+      "centre": [
+        39.1,
+        2.94,
+        27.3
+      ],
+      "size": [
+        1.4,
+        0.12,
+        1.4
+      ],
+      "topY": 3,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:exterior-step:0",
+      "sourcePart": "exterior-step:0",
+      "centre": [
+        39.2,
+        0.1,
+        33.8
+      ],
+      "size": [
+        1.2,
+        0.2,
+        0.4
+      ],
+      "topY": 0.2,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:exterior-step:1",
+      "sourcePart": "exterior-step:1",
+      "centre": [
+        39.2,
+        0.2,
+        33.4
+      ],
+      "size": [
+        1.2,
+        0.4,
+        0.4
+      ],
+      "topY": 0.4,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:exterior-step:2",
+      "sourcePart": "exterior-step:2",
+      "centre": [
+        39.2,
+        0.30000000000000004,
+        33
+      ],
+      "size": [
+        1.2,
+        0.6000000000000001,
+        0.4
+      ],
+      "topY": 0.6000000000000001,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:exterior-step:3",
+      "sourcePart": "exterior-step:3",
+      "centre": [
+        39.2,
+        0.4,
+        32.6
+      ],
+      "size": [
+        1.2,
+        0.8,
+        0.4
+      ],
+      "topY": 0.8,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:exterior-step:4",
+      "sourcePart": "exterior-step:4",
+      "centre": [
+        39.2,
+        0.5,
+        32.2
+      ],
+      "size": [
+        1.2,
+        1,
+        0.4
+      ],
+      "topY": 1,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:exterior-step:5",
+      "sourcePart": "exterior-step:5",
+      "centre": [
+        39.2,
+        0.6000000000000001,
+        31.8
+      ],
+      "size": [
+        1.2,
+        1.2000000000000002,
+        0.4
+      ],
+      "topY": 1.2000000000000002,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:exterior-step:6",
+      "sourcePart": "exterior-step:6",
+      "centre": [
+        39.2,
+        0.7000000000000001,
+        31.4
+      ],
+      "size": [
+        1.2,
+        1.4000000000000001,
+        0.4
+      ],
+      "topY": 1.4000000000000001,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:exterior-step:7",
+      "sourcePart": "exterior-step:7",
+      "centre": [
+        39.2,
+        0.8,
+        31
+      ],
+      "size": [
+        1.2,
+        1.6,
+        0.4
+      ],
+      "topY": 1.6,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:exterior-step:8",
+      "sourcePart": "exterior-step:8",
+      "centre": [
+        39.2,
+        0.9,
+        30.6
+      ],
+      "size": [
+        1.2,
+        1.8,
+        0.4
+      ],
+      "topY": 1.8,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:exterior-step:9",
+      "sourcePart": "exterior-step:9",
+      "centre": [
+        39.2,
+        1,
+        30.2
+      ],
+      "size": [
+        1.2,
+        2,
+        0.4
+      ],
+      "topY": 2,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:exterior-step:10",
+      "sourcePart": "exterior-step:10",
+      "centre": [
+        39.2,
+        1.1,
+        29.8
+      ],
+      "size": [
+        1.2,
+        2.2,
+        0.4
+      ],
+      "topY": 2.2,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:exterior-step:11",
+      "sourcePart": "exterior-step:11",
+      "centre": [
+        39.2,
+        1.2000000000000002,
+        29.4
+      ],
+      "size": [
+        1.2,
+        2.4000000000000004,
+        0.4
+      ],
+      "topY": 2.4000000000000004,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:exterior-step:12",
+      "sourcePart": "exterior-step:12",
+      "centre": [
+        39.2,
+        1.3,
+        29
+      ],
+      "size": [
+        1.2,
+        2.6,
+        0.4
+      ],
+      "topY": 2.6,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:exterior-step:13",
+      "sourcePart": "exterior-step:13",
+      "centre": [
+        39.2,
+        1.4000000000000001,
+        28.6
+      ],
+      "size": [
+        1.2,
+        2.8000000000000003,
+        0.4
+      ],
+      "topY": 2.8000000000000003,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    },
+    {
+      "id": "eden-house-3:exterior-step:14",
+      "sourcePart": "exterior-step:14",
+      "centre": [
+        39.2,
+        1.5,
+        28.2
+      ],
+      "size": [
+        1.2,
+        3,
+        0.4
+      ],
+      "topY": 3,
+      "yaw": 0,
+      "status": "request exact rendered solidpart/top support; roofundersides remain original"
+    }
+  ],
+  "wallOBBs": [
+    {
+      "id": "eden-house-3:west-outer-wall",
+      "centre": [
+        28.1,
+        1.45,
+        30
+      ],
+      "size": [
+        0.2,
+        2.7,
+        10
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:north-outer-wall",
+      "centre": [
+        33.2,
+        2.85,
+        25.1
+      ],
+      "size": [
+        10.4,
+        5.5,
+        0.2
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:north-west-upper-wall",
+      "centre": [
+        28.1,
+        4.3,
+        26.5
+      ],
+      "size": [
+        0.2,
+        2.6,
+        3
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:south-entry-pier:2.1:-1",
+      "centre": [
+        30.55,
+        1.45,
+        32.1
+      ],
+      "size": [
+        5.1,
+        2.7,
+        0.2
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:south-entry-pier:2.1:1",
+      "centre": [
+        36.65,
+        1.45,
+        32.1
+      ],
+      "size": [
+        3.5000000000000004,
+        2.7,
+        0.2
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:south-entry-header:2.1",
+      "centre": [
+        34,
+        2.65,
+        32.1
+      ],
+      "size": [
+        1.8,
+        0.3,
+        0.2
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:entry-trim:2.1:-1",
+      "centre": [
+        33.06,
+        1.3,
+        32.185
+      ],
+      "size": [
+        0.08,
+        2.4,
+        0.03
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:entry-trim:2.1:1",
+      "centre": [
+        34.94,
+        1.3,
+        32.185
+      ],
+      "size": [
+        0.08,
+        2.4,
+        0.03
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:south-entry-pier:4.9:-1",
+      "centre": [
+        30.55,
+        1.45,
+        34.9
+      ],
+      "size": [
+        5.1,
+        2.7,
+        0.2
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:south-entry-pier:4.9:1",
+      "centre": [
+        36.65,
+        1.45,
+        34.9
+      ],
+      "size": [
+        3.5000000000000004,
+        2.7,
+        0.2
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:south-entry-header:4.9",
+      "centre": [
+        34,
+        2.65,
+        34.9
+      ],
+      "size": [
+        1.8,
+        0.3,
+        0.2
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:entry-trim:4.9:-1",
+      "centre": [
+        33.06,
+        1.3,
+        34.985
+      ],
+      "size": [
+        0.08,
+        2.4,
+        0.03
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:entry-trim:4.9:1",
+      "centre": [
+        34.94,
+        1.3,
+        34.985
+      ],
+      "size": [
+        0.08,
+        2.4,
+        0.03
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:courtyard-west-wall",
+      "centre": [
+        31.9,
+        1.45,
+        30
+      ],
+      "size": [
+        0.2,
+        2.7,
+        4
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:courtyard-east-wall",
+      "centre": [
+        36.1,
+        1.45,
+        30
+      ],
+      "size": [
+        0.2,
+        2.7,
+        4
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:east-outer-ground-wall",
+      "centre": [
+        38.3,
+        1.45,
+        31.5
+      ],
+      "size": [
+        0.2,
+        2.7,
+        7
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:north-ground-opening-pier:-1",
+      "centre": [
+        30.55,
+        1.45,
+        27.9
+      ],
+      "size": [
+        5.1,
+        2.7,
+        0.2
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:north-ground-opening-pier:1",
+      "centre": [
+        36.65,
+        1.45,
+        27.9
+      ],
+      "size": [
+        3.5000000000000004,
+        2.7,
+        0.2
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:north-ground-opening-head",
+      "centre": [
+        34,
+        2.65,
+        27.9
+      ],
+      "size": [
+        1.8,
+        0.3,
+        0.2
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:upper-east-door-pier:-4.2",
+      "centre": [
+        38.3,
+        4.3,
+        25.8
+      ],
+      "size": [
+        0.2,
+        2.6,
+        1.6
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:upper-east-door-pier:-2.1",
+      "centre": [
+        38.3,
+        4.3,
+        27.9
+      ],
+      "size": [
+        0.2,
+        2.6,
+        0.2
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:upper-door-header",
+      "centre": [
+        38.3,
+        5.5,
+        27.2
+      ],
+      "size": [
+        0.2,
+        0.2,
+        1.2
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:balcony-support:4.55",
+      "centre": [
+        38.55,
+        1.44,
+        26.75
+      ],
+      "size": [
+        0.14,
+        2.88,
+        0.14
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:balcony-support:5.65",
+      "centre": [
+        39.65,
+        1.44,
+        26.75
+      ],
+      "size": [
+        0.14,
+        2.88,
+        0.14
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:balcony-edge-post:-3.4",
+      "centre": [
+        39.9,
+        3.55,
+        26.6
+      ],
+      "size": [
+        0.12,
+        1.1,
+        0.12
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:balcony-edge-post:-2",
+      "centre": [
+        39.9,
+        3.55,
+        28
+      ],
+      "size": [
+        0.12,
+        1.1,
+        0.12
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:balcony-east-rail",
+      "centre": [
+        39.9,
+        4.05,
+        27.3
+      ],
+      "size": [
+        0.1,
+        0.1,
+        1.5
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:balcony-north-rail",
+      "centre": [
+        39.15,
+        4.05,
+        26.55
+      ],
+      "size": [
+        1.6,
+        0.1,
+        0.1
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:balcony-north-inner-post",
+      "centre": [
+        38.45,
+        3.55,
+        26.55
+      ],
+      "size": [
+        0.1,
+        1.1,
+        0.1
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:stair-outer-post:0",
+      "centre": [
+        39.9,
+        0.65,
+        33.8
+      ],
+      "size": [
+        0.1,
+        0.9,
+        0.1
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:stair-outer-post:3",
+      "centre": [
+        39.9,
+        1.25,
+        32.6
+      ],
+      "size": [
+        0.1,
+        0.9,
+        0.1
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:stair-outer-post:6",
+      "centre": [
+        39.9,
+        1.85,
+        31.4
+      ],
+      "size": [
+        0.1,
+        0.9,
+        0.1
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:stair-outer-post:9",
+      "centre": [
+        39.9,
+        2.45,
+        30.2
+      ],
+      "size": [
+        0.1,
+        0.9,
+        0.1
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:stair-outer-post:12",
+      "centre": [
+        39.9,
+        3.0500000000000003,
+        29
+      ],
+      "size": [
+        0.1,
+        0.9,
+        0.1
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:stair-sloping-outer-rail",
+      "centre": [
+        39.9,
+        2.5,
+        31
+      ],
+      "size": [
+        0.1,
+        0.1,
+        6.708203932499369
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0.4636476090008061,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-route-door-west-pier",
+      "centre": [
+        32.3,
+        4.3,
+        27.9
+      ],
+      "size": [
+        8.6,
+        2.6,
+        0.2
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-route-door-east-pier",
+      "centre": [
+        38.1,
+        4.3,
+        27.9
+      ],
+      "size": [
+        0.6,
+        2.6,
+        0.2
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-route-door-head",
+      "centre": [
+        37.2,
+        5.5,
+        27.9
+      ],
+      "size": [
+        1.2,
+        0.2,
+        0.2
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:front:post:0",
+      "centre": [
+        28.04,
+        3.55,
+        34.96
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:front:post:1",
+      "centre": [
+        29.759999999999998,
+        3.55,
+        34.96
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:front:post:2",
+      "centre": [
+        31.48,
+        3.55,
+        34.96
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:front:post:3",
+      "centre": [
+        33.2,
+        3.55,
+        34.96
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:front:post:4",
+      "centre": [
+        34.92,
+        3.55,
+        34.96
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:front:post:5",
+      "centre": [
+        36.64,
+        3.55,
+        34.96
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:front:post:6",
+      "centre": [
+        38.36,
+        3.55,
+        34.96
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:front:rail:3.55",
+      "centre": [
+        33.2,
+        3.55,
+        34.96
+      ],
+      "size": [
+        10.32,
+        0.08,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:front:rail:4.05",
+      "centre": [
+        33.2,
+        4.05,
+        34.96
+      ],
+      "size": [
+        10.32,
+        0.08,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:east:post:0",
+      "centre": [
+        38.36,
+        3.55,
+        28.04
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:east:post:1",
+      "centre": [
+        38.36,
+        3.55,
+        29.77
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:east:post:2",
+      "centre": [
+        38.36,
+        3.55,
+        31.5
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:east:post:3",
+      "centre": [
+        38.36,
+        3.55,
+        33.23
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:east:post:4",
+      "centre": [
+        38.36,
+        3.55,
+        34.96
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:east:rail:3.55",
+      "centre": [
+        38.36,
+        3.55,
+        31.5
+      ],
+      "size": [
+        0.08,
+        0.08,
+        6.92
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:east:rail:4.05",
+      "centre": [
+        38.36,
+        4.05,
+        31.5
+      ],
+      "size": [
+        0.08,
+        0.08,
+        6.92
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:west:post:0",
+      "centre": [
+        28.04,
+        3.55,
+        28.04
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:west:post:1",
+      "centre": [
+        28.04,
+        3.55,
+        29.77
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:west:post:2",
+      "centre": [
+        28.04,
+        3.55,
+        31.5
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:west:post:3",
+      "centre": [
+        28.04,
+        3.55,
+        33.23
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:west:post:4",
+      "centre": [
+        28.04,
+        3.55,
+        34.96
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:west:rail:3.55",
+      "centre": [
+        28.04,
+        3.55,
+        31.5
+      ],
+      "size": [
+        0.08,
+        0.08,
+        6.92
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:west:rail:4.05",
+      "centre": [
+        28.04,
+        4.05,
+        31.5
+      ],
+      "size": [
+        0.08,
+        0.08,
+        6.92
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:court-west:post:0",
+      "centre": [
+        31.96,
+        3.55,
+        28.04
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:court-west:post:1",
+      "centre": [
+        31.96,
+        3.55,
+        29.373333333333335
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:court-west:post:2",
+      "centre": [
+        31.96,
+        3.55,
+        30.706666666666667
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:court-west:post:3",
+      "centre": [
+        31.96,
+        3.55,
+        32.04
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:court-west:rail:3.55",
+      "centre": [
+        31.96,
+        3.55,
+        30.04
+      ],
+      "size": [
+        0.08,
+        0.08,
+        4
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:court-west:rail:4.05",
+      "centre": [
+        31.96,
+        4.05,
+        30.04
+      ],
+      "size": [
+        0.08,
+        0.08,
+        4
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:court-east:post:0",
+      "centre": [
+        36.04,
+        3.55,
+        28.04
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:court-east:post:1",
+      "centre": [
+        36.04,
+        3.55,
+        29.373333333333335
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:court-east:post:2",
+      "centre": [
+        36.04,
+        3.55,
+        30.706666666666667
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:court-east:post:3",
+      "centre": [
+        36.04,
+        3.55,
+        32.04
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:court-east:rail:3.55",
+      "centre": [
+        36.04,
+        3.55,
+        30.04
+      ],
+      "size": [
+        0.08,
+        0.08,
+        4
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:court-east:rail:4.05",
+      "centre": [
+        36.04,
+        4.05,
+        30.04
+      ],
+      "size": [
+        0.08,
+        0.08,
+        4
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:court-front:post:0",
+      "centre": [
+        31.96,
+        3.55,
+        32.04
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:court-front:post:1",
+      "centre": [
+        33.32,
+        3.55,
+        32.04
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:court-front:post:2",
+      "centre": [
+        34.68,
+        3.55,
+        32.04
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:court-front:post:3",
+      "centre": [
+        36.04,
+        3.55,
+        32.04
+      ],
+      "size": [
+        0.08,
+        1.1,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:court-front:rail:3.55",
+      "centre": [
+        34,
+        3.55,
+        32.04
+      ],
+      "size": [
+        4.08,
+        0.08,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-3:roof-guard:court-front:rail:4.05",
+      "centre": [
+        34,
+        4.05,
+        32.04
+      ],
+      "size": [
+        4.08,
+        0.08,
+        0.08
+      ],
+      "yaw": 0,
+      "rotationXYZ": [
+        0,
+        0,
+        0
+      ]
+    }
+  ],
+  "steps": [
+    {
+      "index": 0,
+      "boundsXZ": [
+        38.6,
+        33.6,
+        39.8,
+        34
+      ],
+      "topY": 0.2,
+      "rise": 0.2,
+      "tread": 0.4,
+      "status": "proposed",
+      "id": "eden-house-3:exterior-step:0",
+      "root": [
+        39.2,
+        0.1,
+        33.8
+      ],
+      "surfaceCentre": [
+        39.2,
+        0.2,
+        33.8
+      ]
+    },
+    {
+      "index": 1,
+      "boundsXZ": [
+        38.6,
+        33.2,
+        39.8,
+        33.6
+      ],
+      "topY": 0.4,
+      "rise": 0.2,
+      "tread": 0.4,
+      "status": "proposed",
+      "id": "eden-house-3:exterior-step:1",
+      "root": [
+        39.2,
+        0.2,
+        33.4
+      ],
+      "surfaceCentre": [
+        39.2,
+        0.4,
+        33.4
+      ]
+    },
+    {
+      "index": 2,
+      "boundsXZ": [
+        38.6,
+        32.8,
+        39.8,
+        33.2
+      ],
+      "topY": 0.6000000000000001,
+      "rise": 0.2,
+      "tread": 0.4,
+      "status": "proposed",
+      "id": "eden-house-3:exterior-step:2",
+      "root": [
+        39.2,
+        0.30000000000000004,
+        33
+      ],
+      "surfaceCentre": [
+        39.2,
+        0.6000000000000001,
+        33
+      ]
+    },
+    {
+      "index": 3,
+      "boundsXZ": [
+        38.6,
+        32.4,
+        39.8,
+        32.8
+      ],
+      "topY": 0.8,
+      "rise": 0.2,
+      "tread": 0.4,
+      "status": "proposed",
+      "id": "eden-house-3:exterior-step:3",
+      "root": [
+        39.2,
+        0.4,
+        32.6
+      ],
+      "surfaceCentre": [
+        39.2,
+        0.8,
+        32.599999999999994
+      ]
+    },
+    {
+      "index": 4,
+      "boundsXZ": [
+        38.6,
+        32,
+        39.8,
+        32.4
+      ],
+      "topY": 1,
+      "rise": 0.2,
+      "tread": 0.4,
+      "status": "proposed",
+      "id": "eden-house-3:exterior-step:4",
+      "root": [
+        39.2,
+        0.5,
+        32.2
+      ],
+      "surfaceCentre": [
+        39.2,
+        1,
+        32.199999999999996
+      ]
+    },
+    {
+      "index": 5,
+      "boundsXZ": [
+        38.6,
+        31.6,
+        39.8,
+        32
+      ],
+      "topY": 1.2000000000000002,
+      "rise": 0.2,
+      "tread": 0.4,
+      "status": "proposed",
+      "id": "eden-house-3:exterior-step:5",
+      "root": [
+        39.2,
+        0.6000000000000001,
+        31.8
+      ],
+      "surfaceCentre": [
+        39.2,
+        1.2000000000000002,
+        31.799999999999997
+      ]
+    },
+    {
+      "index": 6,
+      "boundsXZ": [
+        38.6,
+        31.2,
+        39.8,
+        31.6
+      ],
+      "topY": 1.4000000000000001,
+      "rise": 0.2,
+      "tread": 0.4,
+      "status": "proposed",
+      "id": "eden-house-3:exterior-step:6",
+      "root": [
+        39.2,
+        0.7000000000000001,
+        31.4
+      ],
+      "surfaceCentre": [
+        39.2,
+        1.4000000000000001,
+        31.4
+      ]
+    },
+    {
+      "index": 7,
+      "boundsXZ": [
+        38.6,
+        30.8,
+        39.8,
+        31.2
+      ],
+      "topY": 1.6,
+      "rise": 0.2,
+      "tread": 0.4,
+      "status": "proposed",
+      "id": "eden-house-3:exterior-step:7",
+      "root": [
+        39.2,
+        0.8,
+        31
+      ],
+      "surfaceCentre": [
+        39.2,
+        1.6,
+        30.999999999999996
+      ]
+    },
+    {
+      "index": 8,
+      "boundsXZ": [
+        38.6,
+        30.4,
+        39.8,
+        30.8
+      ],
+      "topY": 1.8,
+      "rise": 0.2,
+      "tread": 0.4,
+      "status": "proposed",
+      "id": "eden-house-3:exterior-step:8",
+      "root": [
+        39.2,
+        0.9,
+        30.6
+      ],
+      "surfaceCentre": [
+        39.2,
+        1.8,
+        30.599999999999998
+      ]
+    },
+    {
+      "index": 9,
+      "boundsXZ": [
+        38.6,
+        30,
+        39.8,
+        30.4
+      ],
+      "topY": 2,
+      "rise": 0.2,
+      "tread": 0.4,
+      "status": "proposed",
+      "id": "eden-house-3:exterior-step:9",
+      "root": [
+        39.2,
+        1,
+        30.2
+      ],
+      "surfaceCentre": [
+        39.2,
+        2,
+        30.199999999999996
+      ]
+    },
+    {
+      "index": 10,
+      "boundsXZ": [
+        38.6,
+        29.6,
+        39.8,
+        30
+      ],
+      "topY": 2.2,
+      "rise": 0.2,
+      "tread": 0.4,
+      "status": "proposed",
+      "id": "eden-house-3:exterior-step:10",
+      "root": [
+        39.2,
+        1.1,
+        29.8
+      ],
+      "surfaceCentre": [
+        39.2,
+        2.2,
+        29.799999999999997
+      ]
+    },
+    {
+      "index": 11,
+      "boundsXZ": [
+        38.6,
+        29.2,
+        39.8,
+        29.6
+      ],
+      "topY": 2.4000000000000004,
+      "rise": 0.2,
+      "tread": 0.4,
+      "status": "proposed",
+      "id": "eden-house-3:exterior-step:11",
+      "root": [
+        39.2,
+        1.2000000000000002,
+        29.4
+      ],
+      "surfaceCentre": [
+        39.2,
+        2.4000000000000004,
+        29.4
+      ]
+    },
+    {
+      "index": 12,
+      "boundsXZ": [
+        38.6,
+        28.8,
+        39.8,
+        29.2
+      ],
+      "topY": 2.6,
+      "rise": 0.2,
+      "tread": 0.4,
+      "status": "proposed",
+      "id": "eden-house-3:exterior-step:12",
+      "root": [
+        39.2,
+        1.3,
+        29
+      ],
+      "surfaceCentre": [
+        39.2,
+        2.6,
+        28.999999999999996
+      ]
+    },
+    {
+      "index": 13,
+      "boundsXZ": [
+        38.6,
+        28.4,
+        39.8,
+        28.8
+      ],
+      "topY": 2.8000000000000003,
+      "rise": 0.2,
+      "tread": 0.4,
+      "status": "proposed",
+      "id": "eden-house-3:exterior-step:13",
+      "root": [
+        39.2,
+        1.4000000000000001,
+        28.6
+      ],
+      "surfaceCentre": [
+        39.2,
+        2.8000000000000003,
+        28.599999999999998
+      ]
+    },
+    {
+      "index": 14,
+      "boundsXZ": [
+        38.6,
+        28,
+        39.8,
+        28.4
+      ],
+      "topY": 3,
+      "rise": 0.2,
+      "tread": 0.4,
+      "status": "proposed",
+      "id": "eden-house-3:exterior-step:14",
+      "root": [
+        39.2,
+        1.5,
+        28.2
+      ],
+      "surfaceCentre": [
+        39.2,
+        3,
+        28.199999999999996
+      ]
+    }
+  ],
+  "originalLanding": {
+    "id": "eden-house-3:balcony-floor",
+    "rectangleXZ": [
+      38.4,
+      26.6,
+      39.8,
+      28
+    ],
+    "topY": 3
+  },
+  "openings": [
+    {
+      "id": "eden-house-3:original-upper-door",
+      "boundsMin": [
+        38.2,
+        3,
+        26.6
+      ],
+      "boundsMax": [
+        38.4,
+        5.4,
+        27.8
+      ],
+      "width": 1.2
+    },
+    {
+      "id": "eden-house-3:upper-to-east-lower-roof",
+      "boundsMin": [
+        36.6,
+        3,
+        27.8
+      ],
+      "boundsMax": [
+        37.8,
+        5.4,
+        28
+      ],
+      "width": 1.2
+    }
+  ],
+  "route": {
+    "radius": 0.28,
+    "height": 1.75,
+    "groundApproach": [
+      39.2,
+      0,
+      34.8
+    ],
+    "stairRise": 0.2,
+    "stairTread": 0.4,
+    "upperWaypoints": [
+      [
+        39.2,
+        3,
+        28.2
+      ],
+      [
+        39.2,
+        3,
+        27.2
+      ],
+      [
+        37.2,
+        3,
+        27.2
+      ],
+      [
+        37.2,
+        3,
+        33.1
+      ],
+      [
+        35.6,
+        3,
+        33.8
+      ],
+      [
+        35.6,
+        3,
+        34.63
+      ]
+    ],
+    "meaning": "Original stairs→original balcony→existingupperdoor→NEWsouthdoor→eastlowerroof→frontlowerroof; no landingover topstairs"
+  },
+  "table": {
+    "id": "eden-house-3-roof-table-1",
+    "defProposal": "eden-commons-table",
+    "root": [
+      34,
+      3,
+      33.1
+    ],
+    "yaw": 0,
+    "drawnSize": [
+      1.4,
+      0.75,
+      0.8
+    ],
+    "tableTop": 3.75,
+    "status": "exact existing rendered commons table preserved; Core must confirm existingdef/support; NEVER table-6ftalias"
+  },
+  "seats": [
+    {
+      "id": "eden-house-3-roof-chair-1",
+      "def": "camp-chair",
+      "catalogSize": [
+        0.55,
+        0.85,
+        0.55
+      ],
+      "root": [
+        33.55,
+        3,
+        34
+      ],
+      "yaw": 3.141592653589793,
+      "slotId": "seat",
+      "humanYaw": -1.5707963267948966,
+      "visualSeatTop": 3.44,
+      "approach": [
+        33.55,
+        3,
+        34.63
+      ],
+      "supportRequestId": "eden-house-3:south-ground-roof",
+      "status": "genuine native definition proposal; not spawned/claimed"
+    },
+    {
+      "id": "eden-house-3-roof-chair-2",
+      "def": "camp-chair",
+      "catalogSize": [
+        0.55,
+        0.85,
+        0.55
+      ],
+      "root": [
+        34.45,
+        3,
+        34
+      ],
+      "yaw": 3.141592653589793,
+      "slotId": "seat",
+      "humanYaw": -1.5707963267948966,
+      "visualSeatTop": 3.44,
+      "approach": [
+        34.45,
+        3,
+        34.63
+      ],
+      "supportRequestId": "eden-house-3:south-ground-roof",
+      "status": "genuine native definition proposal; not spawned/claimed"
+    }
+  ],
+  "retiredFurniture": "Original decorativehouse3southterracebench only; table unchanged. Other3patios/default/history remainoriginal",
+  "limits": "Core exactstep/support/levels/link/approach/seatedbody/grip/contact/load/guard validation required; no fake poses or screenshot-derived physical authority"
+}

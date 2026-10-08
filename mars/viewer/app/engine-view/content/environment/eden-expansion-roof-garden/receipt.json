@@ -1,0 +1,15 @@
+{
+  "groups": 4,
+  "beds": 14,
+  "grassPlants": 56,
+  "floweringHerbs": 7,
+  "calls": 5,
+  "triangles": 10948,
+  "maxPlantHeight": 0.21250008225440986,
+  "wholeTransformedVerticesChecked": 32844,
+  "soilFootprintEscapes": 0,
+  "groundGuesses": 0,
+  "textures": 0,
+  "rendered": false,
+  "scope": "ONLYnew renderer-owned bed datums/ornamental flora; no native grown/access/load/food"
+}

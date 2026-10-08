@@ -1,0 +1,999 @@
+{
+  "version": "eden-house-one-access-variant/1",
+  "houseId": "eden-house-1",
+  "root": [
+    34,
+    0,
+    15
+  ],
+  "yaw": 0,
+  "status": "optional owned visual replacement/Core physical delta REQUEST only",
+  "floors": [
+    {
+      "id": "eden-house-1:side-room-floor:-2.5:top",
+      "sourcePart": "side-room-floor:-2.5",
+      "topY": 0.12,
+      "rectangleXZ": [
+        30.5,
+        13.5,
+        32.5,
+        16.5
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-1:side-room-floor:2.5:top",
+      "sourcePart": "side-room-floor:2.5",
+      "topY": 0.12,
+      "rectangleXZ": [
+        35.5,
+        13.5,
+        37.5,
+        16.5
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-1:end-room-floor:-2.25:top",
+      "sourcePart": "end-room-floor:-2.25",
+      "topY": 0.12,
+      "rectangleXZ": [
+        30.5,
+        12,
+        37.5,
+        13.5
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-1:end-room-floor:2.25:top",
+      "sourcePart": "end-room-floor:2.25",
+      "topY": 0.12,
+      "rectangleXZ": [
+        30.5,
+        16.5,
+        37.5,
+        18
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "id": "eden-house-1:courtyard-patio:top",
+      "sourcePart": "courtyard-patio",
+      "topY": 0.08,
+      "rectangleXZ": [
+        32.5,
+        13.5,
+        35.5,
+        16.5
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
+    }
+  ],
+  "walls": [
+    {
+      "id": "eden-house-1:front-facade:0:0",
+      "sourcePart": "front-facade:0:0",
+      "centre": [
+        30.75,
+        1.37,
+        12.07
+      ],
+      "size": [
+        0.5,
+        2.5,
+        0.14
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:front-facade:1:0",
+      "sourcePart": "front-facade:1:0",
+      "centre": [
+        31.6,
+        0.52,
+        12.07
+      ],
+      "size": [
+        1.2000000000000002,
+        0.8,
+        0.14
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:front-facade:1:1",
+      "sourcePart": "front-facade:1:1",
+      "centre": [
+        31.6,
+        2.3200000000000003,
+        12.07
+      ],
+      "size": [
+        1.2000000000000002,
+        0.6000000000000001,
+        0.14
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:front-facade:2:0",
+      "sourcePart": "front-facade:2:0",
+      "centre": [
+        32.8,
+        1.37,
+        12.07
+      ],
+      "size": [
+        1.1999999999999997,
+        2.5,
+        0.14
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:front-facade:3:1",
+      "sourcePart": "front-facade:3:1",
+      "centre": [
+        34,
+        2.47,
+        12.07
+      ],
+      "size": [
+        1.2,
+        0.2999999999999998,
+        0.14
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:front-facade:4:0",
+      "sourcePart": "front-facade:4:0",
+      "centre": [
+        35.2,
+        1.37,
+        12.07
+      ],
+      "size": [
+        1.1999999999999997,
+        2.5,
+        0.14
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:front-facade:5:0",
+      "sourcePart": "front-facade:5:0",
+      "centre": [
+        36.4,
+        0.52,
+        12.07
+      ],
+      "size": [
+        1.2000000000000002,
+        0.8,
+        0.14
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:front-facade:5:1",
+      "sourcePart": "front-facade:5:1",
+      "centre": [
+        36.4,
+        2.3200000000000003,
+        12.07
+      ],
+      "size": [
+        1.2000000000000002,
+        0.6000000000000001,
+        0.14
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:front-facade:6:0",
+      "sourcePart": "front-facade:6:0",
+      "centre": [
+        37.25,
+        1.37,
+        12.07
+      ],
+      "size": [
+        0.5,
+        2.5,
+        0.14
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:rear-facade:0:0",
+      "sourcePart": "rear-facade:0:0",
+      "centre": [
+        31.95,
+        1.37,
+        17.93
+      ],
+      "size": [
+        2.9,
+        2.5,
+        0.14
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:rear-facade:1:0",
+      "sourcePart": "rear-facade:1:0",
+      "centre": [
+        34,
+        0.52,
+        17.93
+      ],
+      "size": [
+        1.2,
+        0.8,
+        0.14
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:rear-facade:1:1",
+      "sourcePart": "rear-facade:1:1",
+      "centre": [
+        34,
+        2.3200000000000003,
+        17.93
+      ],
+      "size": [
+        1.2,
+        0.6000000000000001,
+        0.14
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:rear-facade:2:0",
+      "sourcePart": "rear-facade:2:0",
+      "centre": [
+        36.05,
+        1.37,
+        17.93
+      ],
+      "size": [
+        2.9,
+        2.5,
+        0.14
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:side-facade:-3.43:0:0",
+      "sourcePart": "side-facade:-3.43:0:0",
+      "centre": [
+        30.57,
+        1.37,
+        13.27
+      ],
+      "size": [
+        0.14,
+        2.5,
+        2.26
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:side-facade:-3.43:1:0",
+      "sourcePart": "side-facade:-3.43:1:0",
+      "centre": [
+        30.57,
+        0.52,
+        15
+      ],
+      "size": [
+        0.14,
+        0.8,
+        1.2
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:side-facade:-3.43:1:1",
+      "sourcePart": "side-facade:-3.43:1:1",
+      "centre": [
+        30.57,
+        2.3200000000000003,
+        15
+      ],
+      "size": [
+        0.14,
+        0.6000000000000001,
+        1.2
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:side-facade:-3.43:2:0",
+      "sourcePart": "side-facade:-3.43:2:0",
+      "centre": [
+        30.57,
+        1.37,
+        16.73
+      ],
+      "size": [
+        0.14,
+        2.5,
+        2.26
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:side-facade:3.43:0:0",
+      "sourcePart": "side-facade:3.43:0:0",
+      "centre": [
+        37.43,
+        1.37,
+        13.27
+      ],
+      "size": [
+        0.14,
+        2.5,
+        2.26
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:side-facade:3.43:1:0",
+      "sourcePart": "side-facade:3.43:1:0",
+      "centre": [
+        37.43,
+        0.52,
+        15
+      ],
+      "size": [
+        0.14,
+        0.8,
+        1.2
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:side-facade:3.43:1:1",
+      "sourcePart": "side-facade:3.43:1:1",
+      "centre": [
+        37.43,
+        2.3200000000000003,
+        15
+      ],
+      "size": [
+        0.14,
+        0.6000000000000001,
+        1.2
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:side-facade:3.43:2:0",
+      "sourcePart": "side-facade:3.43:2:0",
+      "centre": [
+        37.43,
+        1.37,
+        16.73
+      ],
+      "size": [
+        0.14,
+        2.5,
+        2.26
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:court-front-wall:0:0",
+      "sourcePart": "court-front-wall:0:0",
+      "centre": [
+        32.95,
+        1.37,
+        13.43
+      ],
+      "size": [
+        0.9,
+        2.5,
+        0.14
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:court-front-wall:1:1",
+      "sourcePart": "court-front-wall:1:1",
+      "centre": [
+        34,
+        2.47,
+        13.43
+      ],
+      "size": [
+        1.2,
+        0.2999999999999998,
+        0.14
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:court-front-wall:2:0",
+      "sourcePart": "court-front-wall:2:0",
+      "centre": [
+        35.05,
+        1.37,
+        13.43
+      ],
+      "size": [
+        0.9,
+        2.5,
+        0.14
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:court-side-wall:1.57:0:0",
+      "sourcePart": "court-side-wall:1.57:0:0",
+      "centre": [
+        35.57,
+        1.37,
+        13.95
+      ],
+      "size": [
+        0.14,
+        2.5,
+        0.9
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:court-side-wall:1.57:1:0",
+      "sourcePart": "court-side-wall:1.57:1:0",
+      "centre": [
+        35.57,
+        0.52,
+        15
+      ],
+      "size": [
+        0.14,
+        0.8,
+        1.2
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:court-side-wall:1.57:1:1",
+      "sourcePart": "court-side-wall:1.57:1:1",
+      "centre": [
+        35.57,
+        2.3200000000000003,
+        15
+      ],
+      "size": [
+        0.14,
+        0.6000000000000001,
+        1.2
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:court-side-wall:1.57:2:0",
+      "sourcePart": "court-side-wall:1.57:2:0",
+      "centre": [
+        35.57,
+        1.37,
+        16.05
+      ],
+      "size": [
+        0.14,
+        2.5,
+        0.9
+      ],
+      "yaw": 0,
+      "meaning": "exact opaque wallpiece OBB; openings omitted rather than solid whole-wall approximation"
+    },
+    {
+      "id": "eden-house-1:courtyard-west-door-pier",
+      "sourcePart": "courtyard-west-door-pier",
+      "centre": [
+        32.43,
+        1.37,
+        14.4
+      ],
+      "size": [
+        0.14,
+        2.5,
+        1.8
+      ],
+      "yaw": 0,
+      "meaning": "replacement opaque pier/head; real opening below"
+    },
+    {
+      "id": "eden-house-1:courtyard-west-door-head",
+      "sourcePart": "courtyard-west-door-head",
+      "centre": [
+        32.43,
+        2.47,
+        15.9
+      ],
+      "size": [
+        0.14,
+        0.3,
+        1.2
+      ],
+      "yaw": 0,
+      "meaning": "replacement opaque pier/head; real opening below"
+    },
+    {
+      "id": "eden-house-1:courtyard-rear-door-left",
+      "sourcePart": "courtyard-rear-door-left",
+      "centre": [
+        32.95,
+        1.37,
+        16.57
+      ],
+      "size": [
+        0.9,
+        2.5,
+        0.14
+      ],
+      "yaw": 0,
+      "meaning": "replacement opaque pier/head; real opening below"
+    },
+    {
+      "id": "eden-house-1:courtyard-rear-door-right",
+      "sourcePart": "courtyard-rear-door-right",
+      "centre": [
+        35.05,
+        1.37,
+        16.57
+      ],
+      "size": [
+        0.9,
+        2.5,
+        0.14
+      ],
+      "yaw": 0,
+      "meaning": "replacement opaque pier/head; real opening below"
+    },
+    {
+      "id": "eden-house-1:courtyard-rear-door-head",
+      "sourcePart": "courtyard-rear-door-head",
+      "centre": [
+        34,
+        2.47,
+        16.57
+      ],
+      "size": [
+        1.2,
+        0.3,
+        0.14
+      ],
+      "yaw": 0,
+      "meaning": "replacement opaque pier/head; real opening below"
+    }
+  ],
+  "openings": [
+    {
+      "id": "street-door",
+      "min": [
+        33.4,
+        0.12,
+        11.96
+      ],
+      "max": [
+        34.6,
+        2.3200000000000003,
+        12.18
+      ],
+      "type": "door"
+    },
+    {
+      "id": "front-window-west",
+      "min": [
+        31,
+        0.92,
+        11.96
+      ],
+      "max": [
+        32.2,
+        2.02,
+        12.18
+      ],
+      "type": "window"
+    },
+    {
+      "id": "front-window-east",
+      "min": [
+        35.8,
+        0.92,
+        11.96
+      ],
+      "max": [
+        37,
+        2.02,
+        12.18
+      ],
+      "type": "window"
+    },
+    {
+      "id": "rear-window",
+      "min": [
+        33.4,
+        0.92,
+        17.82
+      ],
+      "max": [
+        34.6,
+        2.02,
+        18.04
+      ],
+      "type": "window"
+    },
+    {
+      "id": "side-window:-3.43",
+      "min": [
+        30.46,
+        0.92,
+        14.4
+      ],
+      "max": [
+        30.68,
+        2.02,
+        15.6
+      ],
+      "type": "window"
+    },
+    {
+      "id": "side-window:3.43",
+      "min": [
+        37.32,
+        0.92,
+        14.4
+      ],
+      "max": [
+        37.54,
+        2.02,
+        15.6
+      ],
+      "type": "window"
+    },
+    {
+      "id": "courtyard-door",
+      "min": [
+        33.4,
+        0.12,
+        13.32
+      ],
+      "max": [
+        34.6,
+        2.3200000000000003,
+        13.54
+      ],
+      "type": "door"
+    },
+    {
+      "id": "court-window:1.57",
+      "min": [
+        35.46,
+        0.92,
+        14.4
+      ],
+      "max": [
+        35.68,
+        2.02,
+        15.6
+      ],
+      "type": "window"
+    },
+    {
+      "id": "courtyard-west-door",
+      "min": [
+        32.32,
+        0.12,
+        15.3
+      ],
+      "max": [
+        32.54,
+        2.32,
+        16.5
+      ],
+      "type": "door"
+    },
+    {
+      "id": "courtyard-rear-door",
+      "min": [
+        33.4,
+        0.12,
+        16.46
+      ],
+      "max": [
+        34.6,
+        2.32,
+        16.68
+      ],
+      "type": "door"
+    }
+  ],
+  "furniture": [
+    {
+      "id": "eden-house-1-drawn-bed",
+      "kind": "bed",
+      "root": [
+        31.5,
+        0.12,
+        14.7
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          30.975,
+          0.12,
+          13.629999999999999
+        ],
+        "max": [
+          32.025,
+          1.2200000000000002,
+          15.75
+        ]
+      },
+      "nativeEquivalent": null
+    },
+    {
+      "id": "eden-house-1-drawn-desk-cabinet",
+      "kind": "desk-cabinet",
+      "root": [
+        33.4,
+        0.12,
+        17.48
+      ],
+      "yaw": 3.141592653589793,
+      "bounds": {
+        "min": [
+          32.3,
+          0.12,
+          17.13
+        ],
+        "max": [
+          34.949999999999996,
+          1.62,
+          17.830000000000002
+        ]
+      },
+      "nativeEquivalent": null
+    },
+    {
+      "id": "eden-house-1-drawn-low-table",
+      "kind": "low-table",
+      "root": [
+        34,
+        0.08,
+        15
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          33.4,
+          0.08,
+          14.625
+        ],
+        "max": [
+          34.6,
+          0.43000000000000005,
+          15.375
+        ]
+      },
+      "nativeEquivalent": null
+    }
+  ],
+  "entryCorridor": {
+    "rectangleXZ": [
+      33.4,
+      12,
+      34.6,
+      13.5
+    ],
+    "floorTop": 0.12,
+    "doorWidth": 1.2,
+    "standingCentreX": [
+      33.68,
+      34.32
+    ],
+    "height": 1.75,
+    "thresholds": "outside0→floor.12; frontfloor.12→courtyardpatio.08 need explicit native floor/link admission"
+  },
+  "eligibleSeatProposal": {
+    "id": "eden-house-1-front-chair",
+    "def": "camp-chair",
+    "catalogSize": [
+      0.55,
+      0.85,
+      0.55
+    ],
+    "root": [
+      36.2,
+      0.12,
+      12.75
+    ],
+    "fixtureYaw": 0,
+    "slotId": "seat",
+    "humanYaw": 1.5707963267948966,
+    "visualSeatTop": 0.56,
+    "physicalFloorRequestId": "eden-house-1:end-room-floor:-2.25:top",
+    "support": "Core must select and admit actual .12floor support; no invented support schema",
+    "status": "genuine existing definition/source-compatible geometry proposal, NOT spawned or usable until admitted"
+  },
+  "restGap": {
+    "drawnBed": "Original bed 1.05×2.1, mattressworldY.67/pillow.77; no native bed/sleep-mat def equivalent in frozen catalog",
+    "westRoom": "Original had indirect floor-strip corner connections. This variant adds direct courtyarddoor; bedmoves30cmsouth tocreate .73m northfoot gap.",
+    "rearRoom": "Original had indirect corner connections. Directcourtyarddoor plus reversed desk/root33.4,.12,17.48 creates workfront indoordooraperture.",
+    "groundRest": "No nativebed/sleepmat equivalence or invented restregion; bed itself remains visual-only."
+  },
+  "thresholds": [
+    {
+      "id": "eden-house-1:west-door-threshold",
+      "centre": [
+        32.43,
+        0.1,
+        15.9
+      ],
+      "size": [
+        0.22,
+        0.04,
+        1.2
+      ],
+      "topY": 0.12,
+      "fromFloorY": 0.08,
+      "toFloorY": 0.12,
+      "status": "actual4cmstep geometry; Core support/step-link required, not smoothramp"
+    },
+    {
+      "id": "eden-house-1:rear-door-threshold",
+      "centre": [
+        34,
+        0.1,
+        16.57
+      ],
+      "size": [
+        1.2,
+        0.04,
+        0.22
+      ],
+      "topY": 0.12,
+      "fromFloorY": 0.08,
+      "toFloorY": 0.12,
+      "status": "actual4cmstep geometry; Core support/step-link required, not smoothramp"
+    }
+  ],
+  "proposedClearRoutes": {
+    "radius": 0.28,
+    "height": 1.75,
+    "westBedFootXZ": [
+      [
+        34,
+        12.7
+      ],
+      [
+        34,
+        13.82
+      ],
+      [
+        32.95,
+        13.82
+      ],
+      [
+        32.95,
+        16.15
+      ],
+      [
+        31.5,
+        16.15
+      ]
+    ],
+    "rearDeskApproachXZ": [
+      [
+        32.95,
+        16.15
+      ],
+      [
+        34.25,
+        16.15
+      ],
+      [
+        34.25,
+        16.8
+      ]
+    ],
+    "meaning": "swept geometric standing envelope only; actual .12/.08 datum and4cmstep links/supports pending"
+  },
+  "sourcePartsUnchanged": [
+    "side-room-floor:-2.5",
+    "side-room-roof:-2.5",
+    "side-room-floor:2.5",
+    "side-room-roof:2.5",
+    "end-room-floor:-2.25",
+    "end-room-roof:-2.25",
+    "end-room-floor:2.25",
+    "end-room-roof:2.25",
+    "courtyard-patio",
+    "front-facade:0:0",
+    "front-facade:1:0",
+    "front-facade:1:1",
+    "front-facade:2:0",
+    "front-facade:3:1",
+    "front-facade:4:0",
+    "front-facade:5:0",
+    "front-facade:5:1",
+    "front-facade:6:0",
+    "rear-facade:0:0",
+    "rear-facade:1:0",
+    "rear-facade:1:1",
+    "rear-facade:2:0",
+    "side-facade:-3.43:0:0",
+    "side-facade:-3.43:1:0",
+    "side-facade:-3.43:1:1",
+    "side-facade:-3.43:2:0",
+    "side-facade:3.43:0:0",
+    "side-facade:3.43:1:0",
+    "side-facade:3.43:1:1",
+    "side-facade:3.43:2:0",
+    "court-front-wall:0:0",
+    "court-front-wall:1:1",
+    "court-front-wall:2:0",
+    "court-side-wall:1.57:0:0",
+    "court-side-wall:1.57:1:0",
+    "court-side-wall:1.57:1:1",
+    "court-side-wall:1.57:2:0",
+    "street-timber-jamb:-0.69",
+    "street-timber-jamb:0.69",
+    "street-timber-lintel"
+  ],
+  "replacementRule": "Replace ONLY original house1 visual+threefurnishings, preserving IDs; never overlay both assemblies. Existing physicalproposal remains immutable. Caller/Root performs atomic selection."
+}

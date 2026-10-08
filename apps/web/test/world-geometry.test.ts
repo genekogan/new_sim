@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import * as THREE from 'three';
 import { agoText, buildingUrl, chunkAt, clockText, mergeWindow, MAX_PAST_CHUNKS, parseSceneInfo, placeOf, plainWords, rewindWindow, shiftIso, validChunks, WorldGeometry, type Chunk } from '../src/WorldGeometry.ts';
 
-const take = (startTick: number, ticks = 20) => ({ schema: 'mars-take/4', id: `t${startTick}`, startTick, ticks, dt: 0.05, tracks: {}, changes: [], events: [], finalState: { entities: {} } });
+const take = (startTick: number, ticks = 20) => ({ schema: 'mars-take/4', id: `t${startTick}`, baselineStateHash: 'fixture-start', finalStateHash: 'fixture-end', rulesVersion: 'fixture/1', keyframeEvery: 20, startTick, ticks, dt: 0.05, tracks: {}, changes: [], events: [], finalState: { entities: {} } });
 const chunk = (from: number): Chunk => ({ fromTick: from, toTick: from + 20, take: take(from) as unknown as Chunk['take'] });
 
 test('validChunks drops malformed chunks, dedupes and sorts', () => {
@@ -47,7 +47,7 @@ test('parseSceneInfo keeps valid parts and drops the rest', () => {
   assert.deepEqual(ok.scene?.links, []);
   assert.equal(ok.buildings.length, 1);
   assert.equal(ok.kin.length, 1);
-  assert.deepEqual(parseSceneInfo(null), { scene: null, buildings: [], kin: [] });
+  assert.deepEqual(parseSceneInfo(null), { scene: null, buildings: [], kin: [], clock: null, ground: undefined });
   assert.equal(parseSceneInfo({ scene: { bounds: [1, 2] } }).scene, null);
 });
 

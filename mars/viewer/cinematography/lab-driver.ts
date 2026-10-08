@@ -110,7 +110,7 @@ export function attachLabCamera(
   const loop = (wall: number) => {
     if (disposed) return;
     raf = viewWindow.requestAnimationFrame(loop);
-    if (wall - lastWall < 90) return;
+    const movementDt = Number.isFinite(lastWall) ? (wall - lastWall) / 1000 : 0;
     lastWall = wall;
     const started = performance.now(),
       state = hook.state();
@@ -146,8 +146,10 @@ export function attachLabCamera(
       canvas && canvas.width > 0 && canvas.height > 0
         ? canvas.width / canvas.height
         : NaN;
+    const refreshShot = state.tick !== lastTick || geometryChanged || controlDirty || aspect !== lastAspect;
     if (
       state.tick === lastTick &&
+      state.paused &&
       !manualActive &&
       !geometryChanged &&
       !controlDirty &&
@@ -223,7 +225,9 @@ export function attachLabCamera(
           hook.camera(lastManual.position, lastManual.target, lastManual.fov);
       }
     }
-    const result = director.update(o),
+    const result = refreshShot || manualActive
+      ? director.update(o, runChanged ? 0 : movementDt)
+      : director.track(o, movementDt),
       request = director.request();
     if (request)
       advisory?.ask(request, wall, (reply, req) => director.accept(reply, req));

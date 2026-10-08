@@ -1,0 +1,20 @@
+[
+  {
+    "path": "mars/viewer/app/engine-view/content/environment/alpine-grove-proposal/alpine.mjs",
+    "sha256": "ba8c86627686c1798d8d1e35c8b5035408ca349fe7d4e2bd7d322fd03e105aea",
+    "git": "07b0889871066eba55a0835d98238031a5276300",
+    "equalsGit": true
+  },
+  {
+    "path": "mars/viewer/app/engine-view/content/environment/riverbank-stone-proposal/stones.mjs",
+    "sha256": "dfadabe22057e6ab16d839d232a8a6a0af8752bd02087d4fd5e6f7e8b3b7495c",
+    "git": "07b0889871066eba55a0835d98238031a5276300",
+    "equalsGit": true
+  },
+  {
+    "path": "mars/viewer/app/engine-view/content/environment/cloud-family-proposal/clouds.mjs",
+    "sha256": "2feb7e1601a22b090d6c8fda6cac484c48221b14dc0c93db8794d89e91dbdc35",
+    "git": "07b0889871066eba55a0835d98238031a5276300",
+    "equalsGit": true
+  }
+]

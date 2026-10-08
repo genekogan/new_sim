@@ -20,14 +20,28 @@ export function sleepHeadPitch(pr: ProneState): number {
   const k = Math.max(0, Math.min(1, pr.r));
   return 0.2 * (1 - k * k * (3 - 2 * k)) * pr.w;
 }
+/** A resting cheek, rather than a face pressed into the floor. Rise restores the head. */
+export function sleepRestWeight(pr: ProneState): number {
+  const k = Math.max(0, Math.min(1, pr.r));
+  return (1 - k * k * (3 - 2 * k)) * pr.w;
+}
+/** Small authored clearance for the original measured rigs, in world metres.
+ * Seven actual sleepers need <=5.14mm punk /7.94mm casual for a 2mm margin.
+ * The actual woman sleep/wake sample is already clear. Unknown rigs retain
+ * their existing pose; no per-frame skin scan or native root lift is needed. */
+export function sleepHeadRestLift(pr:ProneState,template:string):number{
+  const lift=template==='punk'?.006:template==='casual'?.008:0,rest=sleepRestWeight(pr);
+  return Number.isFinite(rest)?lift*Math.max(0,Math.min(1,rest)):0;
+}
 /** Renderer-only free palm contacts on the ground, smoothly raised with the
  * shoulders during waking. These are not grips or authoritative hand leases.
  * Existing armTo + flatHand handle the current rigs; fingers remain approximate. */
 export function sleepHands(d: Dims, pr: ProneState): Target[] {
   const sh = proneFrame(d, pr.r, pr.bend, LIP).spine[3];
+  const rest = sleepRestWeight(pr);
   return [-1, 1].map(side => ({
-    f: sh.f + 0.22 * d.armLen,
-    lat: side * (d.shHalf + 0.24 * d.armLen),
+    f: sh.f + (0.22 - 0.96 * rest) * d.armLen,
+    lat: side * (d.shHalf + (0.24 - 0.12 * rest) * d.armLen),
     up: Math.max(0.04, sh.up - 0.65 * d.armLen),
   }));
 }

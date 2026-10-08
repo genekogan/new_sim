@@ -13,16 +13,22 @@ import { tableObject } from './items.ts';
 import { chessBoardObject } from './chess.ts';
 import { workstationObject, type WorkstationVisual, type WorkstationAppearanceOptions } from './workstation.ts';
 import { rendererColor } from './palette.ts';
+import { createCommonsPrefab, type PrefabKind } from './content/assets/commons-prefabs.ts';
+import {createCommonsContrast,COMMONS_FACTORY_SHA256} from './content/assets/commons-contrast/contrast.mjs';
+const COMMONS_APPEARANCE:Readonly<Record<string,PrefabKind>>=Object.freeze({
+  'eden-commons-pavilion':'pavilion','eden-commons-platform':'presentation-platform',
+  'eden-commons-bench':'bench','eden-commons-table':'table',
+});
 import { seedbedObject, type SeedbedVisual } from './seedbed.ts';
 
 /** A bundle / stack's pieces (rebuilt when `contents.count` changes). */
-type Stack = { group: THREE.Group; count: number };
+type Stack = { group: THREE.Group; count: number | null };
 type Screen = { geometry: THREE.PlaneGeometry; canvas: HTMLCanvasElement; texture: THREE.CanvasTexture; material: THREE.MeshBasicMaterial; key: string };
 type Pose = { p: [number, number, number]; yaw: number; pitch: number; roll: number };
 const poseOf = (e: Entity): Pose => ({ p: [...e.pose.p], yaw: e.pose.yaw, pitch: e.pose.pitch ?? 0, roll: e.pose.roll ?? 0 });
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const lerpAngle = (a: number, b: number, t: number) => a + (((b - a + Math.PI * 3) % (Math.PI * 2)) - Math.PI) * t;
-type View = { obj: THREE.Object3D; key: string; prev: Pose; cur: Pose; fire?: Fire; stack?: Stack; screen?: Screen; workstation?: WorkstationVisual; seedbed?: SeedbedVisual; ownedGeometries?: THREE.BufferGeometry[] };
+type View = { obj: THREE.Object3D; key: string; prev: Pose; cur: Pose; fire?: Fire; stack?: Stack; screen?: Screen; workstation?: WorkstationVisual; seedbed?: SeedbedVisual; ownedGeometries?: THREE.BufferGeometry[]; appearanceDispose?:()=>void; appearanceSync?:(fixture:Entity)=>void };
 
 /** Dunnage under a bundle (catalog-stock.ts: 0.1 m runners). */
 const DUNNAGE = 0.1;
@@ -31,9 +37,15 @@ const STRAP = '#1d1f22';
 export function bundleCount(e: Entity): number | null {
   const b = BUNDLES[e.def];
   if (!b) return null;
-  const c = e.contents as { count?: number; fraction?: number } | undefined;
-  if (typeof c?.count === 'number') return c.count;
-  return Math.round((c?.fraction ?? 1) * b.capacity);
+  const c = e.contents as { count?: unknown; fraction?: unknown } | undefined;
+  // Refuse malformed public quantities before any per-piece allocation. Never
+  // clamp an invalid count into invented full/empty canonical stock.
+  if (c && Object.prototype.hasOwnProperty.call(c, 'count'))
+    return typeof c.count === 'number' && Number.isInteger(c.count) && c.count >= 0 && c.count <= b.capacity ? c.count : null;
+  if (c && Object.prototype.hasOwnProperty.call(c, 'fraction'))
+    return typeof c.fraction === 'number' && Number.isFinite(c.fraction) && c.fraction >= 0 && c.fraction <= 1 ? Math.round(c.fraction * b.capacity) : null;
+  return b.capacity; // legacy recording without contents: existing full depiction
+
 }
 
 /** Top of the camp chair's fabric seat (m), as built by `chair()`. */
@@ -41,6 +53,7 @@ const CHAIR_SEAT = 0.44;
 /** Height of the sitting surface of a seat fixture as drawn here (humans.ts lowers sitters onto it). */
 export function seatHeight(def: string): number | undefined {
   if (def === 'camp-chair') return CHAIR_SEAT;
+  if (def === 'eden-commons-bench') return .45; // exact reviewed slatted top
   if (def === 'bench-6ft') return CATALOG[def]?.size[1]; // plank top = box height
   return undefined;
 }
@@ -54,7 +67,7 @@ export class FixtureViews {
   private readonly mats = new Map<string, THREE.Material>();
   private readonly unit = this.keep(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0));
 
-  constructor() {
+  constructor(private readonly commonsContrast=false) {
     this.group.name = 'engine fixtures';
   }
 
@@ -205,10 +218,16 @@ export class FixtureViews {
   }
 
   private fillStack(e: Entity, st: Stack, sx: number, sy: number, sz: number) {
-    const b = BUNDLES[e.def], n = Math.max(0, bundleCount(e) ?? 0);
+    const b = BUNDLES[e.def], n = bundleCount(e);
     if (!b || n === st.count) return;
     st.count = n;
     st.group.clear();
+    if (n === null) {
+      const marker = this.box('#b38a48', 0, 0, 0, sx, sy, sz);
+      marker.material = this.mat('stock quantity unavailable', () => new THREE.MeshBasicMaterial({ color: '#b38a48', wireframe: true }));
+      marker.name = 'stock quantity unavailable'; marker.castShadow = marker.receiveShadow = false;
+      st.group.add(marker); return;
+    }
     const piece = CATALOG[b.piece];
     // The aggregate is stock of this same component: use its existing renderer
     // palette so extraction does not appear to substitute a different material.
@@ -279,7 +298,14 @@ export class FixtureViews {
     const color = d?.color ?? '#b08a5a';
     const v: Partial<View> = { key: e.def, prev: poseOf(e), cur: poseOf(e) };
     let obj: THREE.Object3D;
-    if (e.def === 'bench') obj = this.bench(2.4, 0.45, 0.65, color);
+    const commons=Object.hasOwn(COMMONS_APPEARANCE,e.def)?COMMONS_APPEARANCE[e.def]:undefined;
+    if (commons) {
+      const styled=this.commonsContrast?createCommonsContrast(e,{factorySHA256:COMMONS_FACTORY_SHA256,createOriginal:createCommonsPrefab}):null;
+      const view=styled??createCommonsPrefab(commons);obj=view.group;v.appearanceDispose=()=>view.dispose();
+      if(styled)v.appearanceSync=fixture=>{styled.syncNativeFixture(fixture);};
+    }
+    else if (e.def === 'hot-air-balloon') obj = new THREE.Group(); // carrier/1 balloon: the basket, envelope and launch kit are drawn by World (apps/web WorldBalloonRide) at this entity's pose
+    else if (e.def === 'bench') obj = this.bench(2.4, 0.45, 0.65, color);
     else if (e.def === 'kiosk') {
       const kiosk = new THREE.Group();
       kiosk.add(this.box('#b08a5a', 0, 0, 0, 2.4, 1.0, 1.6));
@@ -319,7 +345,7 @@ export class FixtureViews {
       v.ownedGeometries = [];
       obj.traverse(o => { if (o instanceof THREE.Mesh) v.ownedGeometries!.push(o.geometry); });
     }
-    else if (BUNDLES[e.def]) obj = this.stack(e, sx, sy, sz, v);
+    else if (Object.hasOwn(BUNDLES,e.def)) obj = this.stack(e, sx, sy, sz, v);
     else if (e.def === 'cutting-station') obj = this.cutting(sx, sy, sz, color, v);
     else obj = this.box(color, 0, 0, 0, sx, sy, sz);
     obj.name = e.id;
@@ -344,7 +370,7 @@ export class FixtureViews {
   }
 
   clear() {
-    for (const v of this.views.values()) { v.fire?.dispose(); v.workstation?.dispose(); v.screen?.geometry.dispose(); v.screen?.texture.dispose(); v.screen?.material.dispose(); v.ownedGeometries?.forEach(g => g.dispose()); }
+    for (const v of this.views.values()) { v.appearanceDispose?.(); v.fire?.dispose(); v.workstation?.dispose(); v.screen?.geometry.dispose(); v.screen?.texture.dispose(); v.screen?.material.dispose(); v.ownedGeometries?.forEach(g => g.dispose()); }
     this.group.clear();
     this.views.clear();
   }
@@ -357,7 +383,7 @@ export class FixtureViews {
       if (!v || v.key !== e.def) {
         if (v) {
           this.group.remove(v.obj);
-          v.fire?.dispose(); v.workstation?.dispose();
+          v.appearanceDispose?.(); v.fire?.dispose(); v.workstation?.dispose();
           v.screen?.geometry.dispose(); v.screen?.texture.dispose(); v.screen?.material.dispose(); v.ownedGeometries?.forEach(g => g.dispose());
         }
         v = this.build(e);
@@ -368,6 +394,7 @@ export class FixtureViews {
       v.cur = poseOf(e);
       v.obj.position.set(...v.cur.p);
       v.obj.rotation.set(v.cur.pitch, -v.cur.yaw, v.cur.roll, 'YXZ');
+      v.appearanceSync?.(e);
       if (v.stack) {
         const [sx, sy, sz] = CATALOG[e.def].size;
         this.fillStack(e, v.stack, sx, sy, sz);
@@ -377,9 +404,9 @@ export class FixtureViews {
       v.seedbed?.update(e);
     }
     for (const [id, v] of this.views)
-      if (!world.entities[id]) {
+      if (world.entities[id]?.kind !== 'fixture') {
         this.group.remove(v.obj);
-        v.fire?.dispose(); v.workstation?.dispose();
+        v.appearanceDispose?.(); v.fire?.dispose(); v.workstation?.dispose();
         v.screen?.geometry.dispose(); v.screen?.texture.dispose(); v.screen?.material.dispose(); v.ownedGeometries?.forEach(g => g.dispose());
         this.views.delete(id);
       }

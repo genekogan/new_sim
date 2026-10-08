@@ -1,72 +1,106 @@
+import {SoulArrival} from './SoulArrival.tsx';
+import {LifecycleStatus,readLifecycle,type LifecycleRead} from './LifecycleStatus.tsx';
+import {authIdentity} from './auth-projection.ts';
+import {InviteAccess} from './InviteAccess.tsx';
 // The signed-in home: invite → create a Soul → steer it here or from your own
 // agent → watch its dashboard. One column of cards, in the order a newcomer needs them.
+import {isConnectionRefusal} from './connection-response.ts';
+import {AgentConnection} from './AgentConnection.tsx';
 import { DeckPanel, HeardPanel, SentencesPanel } from './Grammar.tsx';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { GOALS, type BrainCall, type MandateRule } from '@sim/protocol';
 import type { AuthCtx } from './Shell.tsx';
 import type { Api, Sim } from './useSim.ts';
 import { Call } from './BrainPanels.tsx';
+import { steerReceipt, type SteerReceipt } from './steer-receipt.ts';
 
 type MySoul = { id: string; name: string; description: string; entityId: string; hasToken: boolean; tokenLabel: string | null; tokenCreatedAt: number | null; tokenLastUsed: number | null };
 type Dash = { status: any; agent: { attached: boolean; label: string | null; since: number | null; last_used: number | null }; spend: { calls: number; cost: number }; created_at: number };
 type TL = { seq: number; tick: number; at: number; kind: string; text: string; why: string | null; mood: string | null; fallback: boolean; call: number | null };
 const ago = (ms: number | null) => { if (!ms) return 'never'; const s = Math.max(0, (Date.now() - ms) / 1000); return s < 60 ? `${Math.round(s)} s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} h ago` : `${Math.round(s / 86400)} d ago`; };
 
-export function SoulHome({ sim, auth, api, selected, onSelect, pairCode, clearPair, base }: { sim: Sim; auth: AuthCtx; api: Api; selected: string | null; onSelect(id: string | null): void; pairCode: string | null; clearPair(): void; base: string }) {
+type HomeProps = { sim: Sim; auth: AuthCtx; api: Api; selected: string | null; onSelect(id: string | null): void; pairCode: string | null; clearPair(): void; base: string; allowCreate?: boolean; active?: boolean; worldId?: string; arrivalEnabled?:boolean; onArrivalReady?(id:string):void };
+export function SoulHome(props: HomeProps) {
+  // Session changes replace all private child state, even while the panel is hidden.
+  const identity = props.auth.debug.privyUserId ?? props.auth.label ?? props.sim.me?.userId ?? 'public';
+  return <SoulAccount key={JSON.stringify([props.sim.privateAuthorityGeneration??0,props.base,props.worldId,props.auth.authed,identity])} {...props} />;
+}
+function SoulAccount({ sim, auth, api, selected, onSelect, pairCode, clearPair, base, allowCreate = true, active = true, worldId,arrivalEnabled=false,onArrivalReady }: HomeProps) {
   const [souls, setSouls] = useState<MySoul[] | null>(null);
   const [me, setMe] = useState<any>(null);
   const [maxSouls, setMaxSouls] = useState(5);
+  const [lifecycle,setLifecycle]=useState<LifecycleRead>({kind:'absent'});
+  const lifecycleSeen=useRef(false);
   const [creating, setCreating] = useState(false);
-  const refresh = async () => { const r = await api('/v1/me'); if (r.status === 200) { setSouls(r.data.souls); setMe(r.data.me); setMaxSouls(r.data.maxSouls); } };
-  useEffect(() => { if (auth.authed) void refresh(); else { setSouls(null); setMe(null); } }, [auth.authed]); // eslint-disable-line react-hooks/exhaustive-deps
+  const [arrivalGeneration,setArrivalGeneration]=useState(0);
+  const [arrivalOutstanding,setArrivalOutstanding]=useState(false);
+  const [fresh, setFresh] = useState(false), [error, setError] = useState('');
+  const generation = useRef(0);
+  const refresh = useCallback(async () => {
+    if (!auth.authed || !active) return;
+    const request = ++generation.current;
+    setFresh(false); setError('');
+    const r = await api('/v1/me');
+    if (request !== generation.current) return;
+    if (r.status === 200 && r.data?.me && r.data.me.userId===authIdentity(auth) && Array.isArray(r.data.souls)) {
+      const next=readLifecycle(r.data.lifecycleRequests,worldId);
+      if(next.kind!=='absent')lifecycleSeen.current=true;
+      setLifecycle(next.kind==='absent'&&lifecycleSeen.current?{kind:'unavailable'}:next);
+      setSouls(r.data.souls); setMe(r.data.me); setMaxSouls(r.data.maxSouls); setFresh(true);return r.data.souls as MySoul[];
+    } else {
+      setSouls(null); setMe(null); setCreating(false);setLifecycle({kind:'unavailable'});
+      setError('Account details are unavailable. We’ll check again shortly.');return null;
+    }
+  }, [api, auth.authed, active,authIdentity(auth),worldId]);
+  const authority = JSON.stringify([sim.me?.userId, sim.me?.role, sim.me?.invited, sim.me?.souls]);
+  useLayoutEffect(() => {
+    if (auth.authed && active) void refresh();
+    return () => { generation.current++; };
+  }, [refresh, authority, active, auth.authed]);
   // a failed first load (the server restarting, a token not ready yet) is retried rather than left at "loading…"
-  useEffect(() => { if (!auth.authed || souls) return; const t = setInterval(() => void refresh(), 4000); return () => clearInterval(t); }, [auth.authed, souls]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!auth.authed || !active || fresh) return; const t = setInterval(() => void refresh(), 4000); return () => clearInterval(t); }, [auth.authed, active, fresh, refresh]);
   const mine = souls?.find((s) => s.id === selected) ?? null;
   useEffect(() => { if (souls?.length && !mine) onSelect(souls[0].id); }, [souls]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!auth.authed) return (
     <section className="wide">
       <h2>Your Soul</h2>
-      <p>Right now you are a spectator. Sign in to create a <b>Soul</b>: an inhabitant of this world that is yours. It lives here all the time, makes its own small decisions, and takes direction from you, either from this page or from your own AI assistant.</p>
+      <p>Sign in to manage your <b>Soul</b>: an inhabitant that keeps living here and takes direction from you. You can keep watching without an account.</p>
       <button className="primary" onClick={auth.login} disabled={!auth.ready}>sign in</button>
     </section>
   );
-  if (!souls || !me) return <section className="wide"><h2>Your Soul</h2><p className="dim">loading…</p></section>;
+  const arrivalIdentity=authIdentity(auth),stagedArrival=arrivalEnabled&&!!worldId&&!!arrivalIdentity;
+  const permission = JSON.stringify([me?.userId, me?.role, me?.invited, souls?.map(s => s.id)]);
 
   return (
     <>
-      {pairCode && <PairApprove api={api} code={pairCode} souls={souls} done={() => { clearPair(); void refresh(); }} />}
-      {!me.invited ? <Invite api={api} done={refresh} />
+      {stagedArrival&&<SoulArrival key={arrivalGeneration} base={base} worldId={worldId!} identity={arrivalIdentity!} api={api} onPendingChange={setArrivalOutstanding} active={active&&fresh&&!!me?.invited&&(souls?.length===0||creating||arrivalOutstanding)} onReady={async id=>{const current=await refresh();if(current?.some(s=>s.id===id)){setCreating(false);setArrivalOutstanding(false);setArrivalGeneration(n=>n+1);(onArrivalReady??onSelect)(id);}}}/>}
+      {!fresh && <section className="wide"><h2>Your Soul</h2><p role="status" className="dim">{error || 'Checking current account…'}</p></section>}
+      {souls && me && <div className="account-current" hidden={!fresh} key={permission}>
+      {fresh&&me.invited&&<LifecycleStatus initial={lifecycle} worldId={worldId} api={api} refresh={refresh}/> }
+      {pairCode && <PairApprove key={pairCode} api={api} code={pairCode} souls={souls} allowCreate={allowCreate||stagedArrival} done={() => { clearPair(); void refresh(); }} />}
+      {!me.invited ? <InviteAccess api={api} refresh={refresh} accountCheck={me} />
+        : souls.length === 0 && !allowCreate&&!stagedArrival ? <section className="wide"><h2>Your Soul</h2><p>You do not have a Soul in this world yet. Arrival is not open in this view yet. You can keep watching the world.</p></section>
+        : stagedArrival&&(souls.length===0||creating||arrivalOutstanding)?null
         : souls.length === 0 || creating ? <Create api={api} first={souls.length === 0} cancel={souls.length ? () => setCreating(false) : undefined} done={async (id) => { setCreating(false); await refresh(); onSelect(id); }} />
         : mine ? <>
           <section className="wide">
             <div className="row" style={{ margin: 0 }}>
               <h2 style={{ margin: 0 }}>Your Souls</h2>
               {souls.map((s) => <button key={s.id} className={s.id === mine.id ? 'primary' : ''} onClick={() => onSelect(s.id)}>{s.name}</button>)}
-              {souls.length < maxSouls && <button onClick={() => setCreating(true)}>+ new Soul</button>}
+              {(allowCreate||stagedArrival) && souls.length < maxSouls && <button onClick={() => setCreating(true)}>+ new Soul</button>}
               <span className="dim" style={{ marginLeft: 'auto' }}>{me.email}</span>
             </div>
           </section>
-          <Dashboard key={mine.id} sim={sim} api={api} soul={mine} isAdmin={me.role === 'admin'} base={base} refresh={refresh} onGone={() => { onSelect(null); void refresh(); }} />
+          <Dashboard key={mine.id} sim={sim} api={api} soul={mine} isAdmin={me.role === 'admin'} base={base} refresh={refresh} active={active && fresh} onGone={() => { onSelect(null); void refresh(); }} />
           <section><h2>Account</h2>
             <div className="kv"><span>signed in as</span><span>{me.email ?? auth.label}</span><span>role</span><span>{me.role}</span><span>public owner id</span><span>{me.short}</span></div>
             <details style={{ marginTop: 6 }}><summary className="dim">sign-in details (the wallet is created for later and unused for now)</summary>
               <pre className="json">{JSON.stringify({ userId: auth.debug.privyUserId ?? me.userId, embeddedWallet: auth.debug.wallet ?? null, walletSeenByServer: me.wallet ?? null, linkedAccounts: auth.debug.linked }, null, 2)}</pre></details>
           </section>
         </> : null}
+      </div>}
     </>
-  );
-}
-
-function Invite({ api, done }: { api: Api; done(): void }) {
-  const [code, setCode] = useState(''); const [msg, setMsg] = useState('');
-  return (
-    <section className="wide">
-      <h2>Step 1 of 3 — invite code</h2>
-      <p>Sim is in a small alpha. Enter the invite code you were given to create a Soul. You can keep watching without one.</p>
-      <div className="row"><input placeholder="invite code" value={code} onChange={(e) => setCode(e.target.value)} style={{ maxWidth: 260 }} />
-        <button className="primary" disabled={code.trim().length < 3} onClick={async () => { const r = await api('/v1/invite', { code }); if (r.status === 200) done(); else setMsg(r.data.message ?? 'failed'); }}>continue</button><span className="warn">{msg}</span></div>
-    </section>
   );
 }
 
@@ -90,52 +124,73 @@ function Create({ api, first, done, cancel }: { api: Api; first: boolean; done(i
   );
 }
 
-function PairApprove({ api, code, souls, done }: { api: Api; code: string; souls: MySoul[]; done(): void }) {
-  const [info, setInfo] = useState<any>(null); const [err, setErr] = useState(''); const [soulId, setSoulId] = useState(''); const [ok, setOk] = useState(false);
+function PairApprove({ api, code, souls, allowCreate, done }: { api: Api; code: string; souls: MySoul[]; allowCreate: boolean; done(): void }) {
+  const [info, setInfo] = useState<any>(null); const [err, setErr] = useState(''); const [soulId, setSoulId] = useState(''); const [ok, setOk] = useState(false); const [approving,setApproving]=useState(false); const approvingRef=useRef(false);
   useEffect(() => { void api(`/v1/pair/${encodeURIComponent(code)}`).then((r) => (r.status === 200 ? setInfo(r.data) : setErr(r.data.message ?? 'invalid'))); }, [code]); // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <section className="wide" style={{ borderColor: 'var(--accent)' }}>
       <h2>An agent is asking to steer one of your Souls</h2>
-      {err ? <p className="warn">{err} <button onClick={done}>dismiss</button></p> : !info ? <p className="dim">checking…</p> : ok ? <p className="ok">Approved. Your agent can carry on. <button onClick={done}>close</button></p> : souls.length === 0 ? <p>Create a Soul first (below), then come back to this link.</p> : <>
+      {err ? <p className="warn">{err} <button onClick={done}>dismiss</button></p> : !info ? <p className="dim">checking…</p> : ok ? <p className="ok">Approval accepted. Your assistant must finish connecting; check its response. <button onClick={done}>close</button></p> : souls.length === 0 ? <p>{allowCreate ? 'Create a Soul first (below), then come back to this link.' : 'You need a usable Soul in this world before approving an agent. Admission is still being prepared.'}</p> : <>
         <p>An agent calling itself “{String(info.agent ?? 'unnamed').slice(0, 60)}” is asking for permission to see through and steer one of your Souls. <b>Approve only if you started this yourself, just now, with your own assistant</b>, and it showed you the code <b>{String(info.code ?? '')}</b>. Anyone can send a link like this one; the name above is whatever they chose to type.</p>
         <div className="row"><span>Soul:</span><select value={soulId} onChange={(e) => setSoulId(e.target.value)}><option value="">choose…</option>{souls.map((s) => <option key={s.id} value={s.id}>{s.name}{s.hasToken ? ' (has an agent now; it will be disconnected)' : ''}</option>)}</select>
-          <button className="primary" disabled={!soulId} onClick={async () => { const r = await api('/v1/pair/approve', { code, soulId }); if (r.status === 200) setOk(true); else setErr(r.data.message ?? 'failed'); }}>approve</button><button onClick={done}>not now</button></div>
+          <button className="primary" disabled={!soulId||approving} onClick={async () => { if(approvingRef.current)return;approvingRef.current=true;setApproving(true);try{const r = await api('/v1/pair/approve', { code, soulId }); if (r.status === 200&&r.data?.ok===true) setOk(true); else setErr(isConnectionRefusal(r.status) ? 'Approval refused. Check that this request and Soul are still yours.' : 'Approval response unconfirmed. Check your assistant and current connection before trying again.');}finally{approvingRef.current=false;setApproving(false);} }}>approve</button><button onClick={done}>not now</button></div>
         <p className="dim">This replaces any agent already attached to that Soul. You can revoke it at any time.</p></>}
     </section>
   );
 }
 
-function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone }: { sim: Sim; api: Api; soul: MySoul; isAdmin: boolean; base: string; refresh(): void; onGone(): void }) {
+function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone, active }: { sim: Sim; api: Api; soul: MySoul; isAdmin: boolean; base: string; refresh(): void; onGone(): void; active: boolean }) {
   const [d, setD] = useState<Dash | null>(null); const [tl, setTl] = useState<TL[]>([]);
-  const [text, setText] = useState(''); const [busy, setBusy] = useState(false); const [replies, setReplies] = useState<{ text: string; reply: string; ok: boolean }[]>([]);
+  const [text, setText] = useState(''); const [busy, setBusy] = useState(false); const sending = useRef(false);
+  const [replies, setReplies] = useState<{ text: string; reply: string; ok: boolean; receipt?: SteerReceipt }[]>([]);
   const [strict,setStrict]=useState(false),[editingRule,setEditingRule]=useState<string|null>(null);
   const [goal, setGoal] = useState<string>('wander'); const [target, setTarget] = useState(''); const [note, setNote] = useState('');
-  const [pair, setPair] = useState<{ prompt: string; code: string } | null>(null); const [copied, setCopied] = useState(false); const [pairAt, setPairAt] = useState(0);
   const [shot, setShot] = useState<any>(null); const [openCall, setOpenCall] = useState<BrainCall | null>(null);
-  useEffect(() => {
+  const [unavailable, setUnavailable] = useState(false);
+  const [checking, setChecking] = useState(true);
+  // A same-account refresh hides the card; retain its receipt in this Soul's lifetime.
+  const [connectionMessage,setConnectionMessage]=useState('');
+  useLayoutEffect(() => {
+    if (!active) return;
+    setChecking(true);
     let live = true;
     let latest = 0;
-    const load = async () => { const mine = ++latest; const [a, b] = await Promise.all([api(`/v1/souls/${soul.id}`), api(`/v1/souls/${soul.id}/timeline?limit=60`)]); if (!live || mine !== latest) return; if (a.status === 200) setD(a.data); if (b.status === 200) setTl(b.data.events); };
+    const load = async () => {
+      const mine = ++latest;
+      const [a, b] = await Promise.all([api(`/v1/souls/${soul.id}`), api(`/v1/souls/${soul.id}/timeline?limit=60`)]);
+      if (!live || mine !== latest) return;
+      if (a.status === 200 && a.data?.status && b.status === 200 && Array.isArray(b.data?.events)) {
+        setD(a.data); setTl(b.data.events); setUnavailable(false);
+      } else {
+        setD(null); setTl([]); setReplies([]); setShot(null); setOpenCall(null); setConnectionMessage(''); setUnavailable(true);
+      }
+      setChecking(false);
+    };
     void load(); const t = setInterval(load, 3000); return () => { live = false; clearInterval(t); };
-  }, [soul.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [soul.id, api, active]);
   const s = d?.status;
-  // once an agent attaches, the code has been used: stop showing it
-  useEffect(() => { if (d?.agent.attached && d.agent.since && pair && d.agent.since > pairAt) setPair(null); }, [d?.agent.since]); // eslint-disable-line react-hooks/exhaustive-deps
   const send = async () => {
-    if (!text.trim()) return; const t = text; setText(''); setBusy(true);
-    const r = s?.needs?await api(`/v1/souls/${soul.id}/mandate`,{words:t,strict,...(editingRule?{id:editingRule}:{})}):await api(`/v1/souls/${soul.id}/command`, { text: t }); setBusy(false);
-    if(r.status===200&&r.data.ok){setEditingRule(null);setStrict(false);}
-    if (r.status !== 200) setText((cur) => cur || t);
-    const reply = r.status !== 200 ? (r.data.message ?? 'failed') : r.data.ok ? `${s?.needs?'understood':'the plan'}: ${r.data.text}${r.data.minted?.length ? ` · new card${r.data.minted.length > 1 ? 's' : ''} made for this: ${r.data.minted.join(', ')}` : ''}` : `could not: ${r.data.reason}`;
-    setReplies((h) => [...h, { text: t, reply, ok: r.status === 200 && r.data.ok }].slice(-6));
+    if (sending.current || !text.trim()) return;
+    const t = text; setText(''); sending.current = true; setBusy(true);
+    const endpoint = s?.needs ? 'mandate' : 'command';
+    try {
+      const r = await api(`/v1/souls/${soul.id}/${endpoint}`, endpoint === 'mandate'
+        ? { words: t, strict, ...(editingRule ? { id: editingRule } : {}) } : { text: t });
+      const receipt = steerReceipt(r.status, r.data, endpoint);
+      if (receipt.kind === 'accepted') { setEditingRule(null); setStrict(false); }
+      if (receipt.kind === 'refused') setText((cur) => cur || t);
+      setReplies((h) => [...h, { text: t, reply: receipt.detail, ok: receipt.kind === 'accepted', receipt }].slice(-6));
+    } finally { sending.current = false; setBusy(false); }
   };
   const setIntent = async () => {
     const r = await api(`/v1/souls/${soul.id}/intent`, { intent: { goal, target: target || null, ...(note.trim() ? { note: note.trim() } : {}) } });
-    setReplies((h) => [...h, { text: `${goal} ${target}`.trim(), reply: r.status === 200 ? `set: ${r.data.text}` : r.data.message, ok: r.status === 200 }].slice(-6));
+    const receipt = steerReceipt(r.status, r.data, 'intent');
+    setReplies((h) => [...h, { text: `${goal} ${target}`.trim(), reply: receipt.detail, ok: receipt.kind === 'accepted', receipt }].slice(-6));
   };
   const rep = sim.conn.replica;
   const targets = [...Object.values(rep.entities).filter((e) => e.id !== soul.entityId && e.id !== 'gate').map((e) => ({ id: e.id, label: e.label ?? e.id })), ...Object.values(rep.regions).map((x) => ({ id: x.id, label: x.label }))];
   const calls = sim.brain.filter((c) => c.soulId === soul.id).slice(-8).reverse();
+  if (checking || unavailable) return <section className="wide"><h2>{soul.name}</h2><p role="status">{checking ? 'Checking current Soul details…' : 'Private Soul details are unavailable. We’ll check again shortly.'}</p></section>;
   return (
     <>
       <section>
@@ -166,7 +221,13 @@ function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone }: { sim: Si
             <select value={target} onChange={(e) => setTarget(e.target.value)}><option value="">(no target)</option>{targets.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}</select></div>
           <div className="row"><input placeholder="optional note: how, why, in what spirit (only you and the Soul see it)" value={note} maxLength={160} onChange={(e) => setNote(e.target.value)} /><button onClick={() => void setIntent()}>set</button></div>
         </details>}
-        {replies.slice().reverse().map((h, i) => <div key={i}><span className="dim">you:</span> {h.text} <span className={h.ok ? 'ok' : 'warn'}>→ {h.reply}</span></div>)}
+        <div aria-live="polite" aria-relevant="additions">
+          {replies.slice().reverse().map((h, i) => <div key={i}>
+            <span className="dim">you:</span> {h.text}
+            <p className={h.ok ? 'ok' : 'warn'}>{h.receipt && <b>{h.receipt.title}: </b>}{h.reply}</p>
+            {h.receipt?.kind === 'accepted' && <p className="dim">This confirms your direction was saved. Completion has not been confirmed.</p>}
+          </div>)}
+        </div>
         <p className="note">{s?.needs?`Your rules inform ${soul.name}’s decisions alongside character, needs and journal. The Soul tells you what it understood, and can report a rule blocked. An explicit NOW request runs first; other rules leave room for judgement.`:<>Direction is not remote control. Your words become a plan: a few cards for {soul.name} to play in order. If the world has no card for what you ask, one is made. {soul.name} decides how and when, answers when spoken to, and cannot act for anyone else: to get something from another Soul, it asks.</>}</p>
       </section>
 
@@ -174,18 +235,7 @@ function Dashboard({ sim, api, soul, isAdmin, base, refresh, onGone }: { sim: Si
       <SentencesPanel sim={sim} soulId={soul.id} limit={14} />
       <HeardPanel sim={sim} soulId={soul.id} />
 
-      <section className="wide">
-        <h2>Or let your own AI assistant steer {soul.name}</h2>
-        {d?.agent.attached
-          ? <p><span className="ok">●</span> <b>{d.agent.label ?? 'An agent'}</b> is attached · paired {ago(d.agent.since)} · last active {ago(d.agent.last_used)} <button onClick={async () => { await api(`/v1/souls/${soul.id}/revoke`, {}); setPair(null); refresh(); }}>disconnect it</button></p>
-          : <p className="dim">No agent attached.</p>}
-        <p>Paste this one line into Claude, ChatGPT, Codex or any agent that can make web requests:</p>
-        {pair ? <>
-          <pre className="json" style={{ fontSize: 13 }}>{pair.prompt}</pre>
-          <div className="row"><button className="primary" onClick={() => { void navigator.clipboard?.writeText(pair.prompt).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500); }, () => {}); }}>{copied ? 'copied' : 'copy'}</button><span className="dim">The code works once and expires in 15 minutes. Pairing replaces any agent already attached.</span></div>
-        </> : <div className="row"><button className="primary" onClick={async () => { const r = await api(`/v1/souls/${soul.id}/pair`, {}); if (r.status === 200) { setPair(r.data); setPairAt(Date.now()); } }}>{d?.agent.attached ? 'make a new one-line prompt (replaces the attached agent)' : 'show my one-line prompt'}</button></div>}
-        <p className="note">What happens: your assistant reads <a href="/skill.md" target="_blank" rel="noreferrer">{base.replace(/^https?:\/\//, '')}/skill.md</a>, trades the code for a key that works for this one Soul, and saves the instructions as a small skill. From then on you can just tell it things like “have {soul.name} go find someone to talk to” or “what has {soul.name} been up to?”. It sees what {soul.name} perceives, and it sets the same kind of direction you set above.</p>
-      </section>
+      <AgentConnection api={api} soulId={soul.id} name={soul.name} base={base} connection={d?.agent??null} refresh={refresh} notice={{message:connectionMessage,setMessage:setConnectionMessage}} />
 
       <section className="wide">
         <h2>{soul.name}’s story so far</h2>

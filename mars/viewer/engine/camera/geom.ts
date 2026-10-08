@@ -35,6 +35,7 @@ export type Mask = 'collide' | 'occlude';
  * Read-only query structure over a scene's obstacles. A uniform x/z grid is
  * used as broadphase; each solid is listed in every cell its AABB touches.
  */
+const EMPTY_CELL: number[] = [];
 export class CameraWorld {
   solids: Solid[];
   cell: number;
@@ -62,10 +63,16 @@ export class CameraWorld {
     this.minX = x0; this.minZ = z0;
     this.nx = Math.max(1, Math.ceil((x1 - x0) / cell));
     this.nz = Math.max(1, Math.ceil((z1 - z0) / cell));
-    this.cells = Array.from({ length: this.nx * this.nz }, () => [] as number[]);
+    // Empty cells share one array (most of a large scene grid is empty);
+    // cell lists are read-only to callers either way.
+    this.cells = new Array<number[]>(this.nx * this.nz).fill(EMPTY_CELL);
     this.solids.forEach((q, i) => {
       const [ia, ja, ib, jb] = this.range(q.minX, q.minZ, q.maxX, q.maxZ);
-      for (let j = ja; j <= jb; j++) for (let k = ia; k <= ib; k++) this.cells[j * this.nx + k].push(i);
+      for (let j = ja; j <= jb; j++) for (let k = ia; k <= ib; k++) {
+        const c = j * this.nx + k;
+        if (this.cells[c] === EMPTY_CELL) this.cells[c] = [];
+        this.cells[c].push(i);
+      }
     });
     this.stamp = new Uint32Array(this.solids.length);
   }

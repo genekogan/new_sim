@@ -4,8 +4,9 @@
 import * as THREE from 'three';
 import { clone } from 'three/addons/utils/SkeletonUtils.js';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
-import { ThreeResources, loadGltf } from '../../lib/three-resources';
+import { ThreeResources, loadGltf } from '../../lib/three-resources.ts';
 import { BODY_MODEL } from './rig.ts';
+import {collectTemplateAppearance,transferActorAppearance,type TemplateAppearance,type ActorAppearance} from './human-appearance.ts';
 
 export const PEOPLE = ['casual', 'punk', 'woman'] as const;
 export const PERSON_HEIGHT = 1.75;
@@ -19,6 +20,11 @@ export type Template = {
   forward: number;
   /** Arm fit (fitArms): length factor applied to UpperArm / LowerArm, left then right, and the arm length before it. */
   arms: { k: number; before: number }[];
+  /** Optional original-byte/loader provenance; never changes the model choice. */
+  appearance?:TemplateAppearance;
+  /** Ground speed (m/s) of the library locomotion clips at timeScale 1 (clip-library.ts), when present. */
+  jogSpeed?: number;
+  sprintSpeed?: number;
 };
 
 export type Rig = {
@@ -27,17 +33,50 @@ export type Rig = {
   mixer: THREE.AnimationMixer;
   idle: THREE.AnimationAction;
   walk: THREE.AnimationAction;
+  /** Optional extra clips (present in the clips-1 GLBs): played only while an activity asks for them. */
+  extra: Partial<Record<ExtraClip, THREE.AnimationAction>>;
   template: Template;
+  appearance?:ActorAppearance;
+  /** Library clip actions (clip-library.ts), created on first use: only clips someone plays cost anything. */
+  lib: Map<string, THREE.AnimationAction | null>;
 };
+/** The rig's action for a library clip, or null when its GLB has no such clip. */
+export function libAction(rig: Rig, name: string): THREE.AnimationAction | null {
+  let a = rig.lib.get(name);
+  if (a === undefined) {
+    const c = THREE.AnimationClip.findByName(rig.template.gltf.animations, name);
+    a = c ? rig.mixer.clipAction(c) : null;
+    rig.lib.set(name, a);
+  }
+  return a;
+}
+export type ExtraClip='wave'|'run'|'interact'|'idleNeutral';
+const EXTRA_CLIPS:Record<ExtraClip,string>={wave:'Wave',run:'Run',interact:'Interact',idleNeutral:'Idle_Neutral'};
 
-export async function loadTemplates(signal: AbortSignal, resources: ThreeResources): Promise<Template[]> {
+/** The served character GLB (cache tag bumped whenever the GLBs change). Exactly one pinned URL expression: the
+ *  PM build maps it to its own model directory. */
+const characterUrl = (name: string) => `/modular/environment/animated-${name}.glb?v=ual-1`;
+/** Directory the character GLBs are served from; other imported models (eden-imports) are served beside them. */
+export const MODEL_DIR = characterUrl('').replace(/animated-\.glb.*$/, '');
+
+export async function loadTemplates(signal: AbortSignal, resources: ThreeResources,options?:{appearances?:boolean}): Promise<Template[]> {
   return Promise.all(
     PEOPLE.map(async (name) => {
-      const gltf = await loadGltf(`/modular/environment/animated-${name}.glb?v=mirror-baked-2`, signal, resources);
-      const arms = fitArms(gltf);
-      return { name, gltf, arms, ...measureWalk(gltf) };
+      let appearance:TemplateAppearance|undefined;
+      const gltf = await loadGltf(characterUrl(name), signal, resources,options?.appearances?async(bytes,gltf)=>{
+        const digest=await globalThis.crypto.subtle.digest('SHA-256',bytes);
+        const sha=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
+        if(!signal.aborted)appearance=await collectTemplateAppearance(gltf,name,sha);
+      }:undefined);
+      return templateFromGltf(name,gltf,appearance);
     }),
   );
+}
+
+/** Validated owner GLBs use the same canonical rig fitting and locomotion measurements. */
+export function templateFromGltf(name:string,gltf:GLTF,appearance?:TemplateAppearance):Template{
+ const arms=fitArms(gltf),jog=measureWalk(gltf,'Jog_Fwd_Loop'),sprint=measureWalk(gltf,'Sprint_Loop');
+ return {name,gltf,arms,...measureWalk(gltf),...(appearance?{appearance}:{}),...(jog.found?{jogSpeed:jog.walkSpeed}:{}),...(sprint.found?{sprintSpeed:sprint.walkSpeed}:{})};
 }
 
 function clip(gltf: GLTF, name: string) {
@@ -52,14 +91,18 @@ function clip(gltf: GLTF, name: string) {
  * top) would make the punk rig's body 7 % smaller than the others (its hair spikes count as height):
  * fitted by shoulders, the crowns are at ≈ 1.75 (woman), 1.77 (casual) and 1.88 m (punk, hair tips).
  */
-function fit(gltf: GLTF) {
+function fit(gltf: GLTF,appearance?:TemplateAppearance) {
   const model = clone(gltf.scene);
+  const actorAppearance=transferActorAppearance(gltf.scene,model,appearance);
   const mixer = new THREE.AnimationMixer(model);
   const idle = mixer.clipAction(clip(gltf, 'Idle'));
   const walk = mixer.clipAction(clip(gltf, 'Walk'));
+  const extra:Partial<Record<ExtraClip,THREE.AnimationAction>>={};
+  for(const [k,name] of Object.entries(EXTRA_CLIPS) as [ExtraClip,string][]){const c=THREE.AnimationClip.findByName(gltf.animations,name);if(c)extra[k]=mixer.clipAction(c);}
   idle.play();
   mixer.update(0.01);
   const b = new THREE.Box3().setFromObject(model);
+  if(b.isEmpty()||![...b.min.toArray(),...b.max.toArray()].every(Number.isFinite)||b.max.y-b.min.y<1e-5)throw Error('Body model has no finite standing height');
   let scale = PERSON_HEIGHT / (b.max.y - b.min.y);
   const place = () => {
     model.scale.setScalar(scale);
@@ -69,10 +112,12 @@ function fit(gltf: GLTF) {
   place();
   const sh = ['UpperArmL', 'UpperArmR'].map((n) => model.getObjectByName(n)?.getWorldPosition(new THREE.Vector3()).y);
   if (sh[0] !== undefined && sh[1] !== undefined) {
-    scale *= BODY_MODEL.shoulderHeight / ((sh[0] + sh[1]) / 2);
+    const shoulder=(sh[0]+sh[1])/2;
+    if(!Number.isFinite(shoulder)||shoulder<1e-5)throw Error('Body shoulders must stand above its feet');
+    scale *= BODY_MODEL.shoulderHeight / shoulder;
     place();
   }
-  return { model, mixer, idle, walk, scale };
+  return { model, mixer, idle, walk, extra, scale,...(actorAppearance?{appearance:actorAppearance}:{}) };
 }
 
 /**
@@ -97,7 +142,9 @@ function fitArms(gltf: GLTF) {
     const [s, e, wr, m] = [`UpperArm${side}`, `LowerArm${side}`, `Wrist${side}`, `Middle2${side}`].map(w);
     if (!s || !e || !wr || !m) continue;
     const a = s.distanceTo(e), fw = wr.clone().sub(e), h = m.clone().sub(wr).multiplyScalar(0.5);
+    if(![a,fw.length(),h.length()].every(v=>Number.isFinite(v)&&v>1e-5))throw Error('Body arm chain is collapsed');
     const len = (k: number) => k * a + fw.clone().multiplyScalar(k).add(h).length();
+    if(len(.5)>BODY_MODEL.armLength||len(3)<BODY_MODEL.armLength)throw Error('Body arm proportions cannot fit the canonical reach');
     let lo = 0.5, hi = 3;
     for (let i = 0; i < 60; i++) {
       const mid = (lo + hi) / 2;
@@ -148,8 +195,11 @@ function fitArms(gltf: GLTF) {
  * (the stance foot) and measure how fast it slides backwards relative to the
  * body. That velocity is the ground speed at which feet would not slide.
  */
-function measureWalk(gltf: GLTF): { walkSpeed: number; forward: number } {
-  const { model, mixer, idle, walk } = fit(gltf);
+function measureWalk(gltf: GLTF, name = 'Walk'): { walkSpeed: number; forward: number; found?: boolean } {
+  const { model, mixer, idle, walk: base } = fit(gltf);
+  const c = name === 'Walk' ? base.getClip() : THREE.AnimationClip.findByName(gltf.animations, name);
+  if (!c) { mixer.stopAllAction(); return { walkSpeed: 1, forward: 1 }; }
+  const walk = name === 'Walk' ? base : mixer.clipAction(c);
   idle.stop();
   walk.play();
   const feet = ['FootL', 'FootR'].map((n) => model.getObjectByName(n));
@@ -173,11 +223,11 @@ function measureWalk(gltf: GLTF): { walkSpeed: number; forward: number } {
   const speed = Math.abs(med);
   mixer.stopAllAction();
   // Stance foot moves opposite to facing.
-  return speed > 0.2 ? { walkSpeed: speed, forward: med < 0 ? 1 : -1 } : { walkSpeed: 1, forward: 1 };
+  return speed > 0.2 ? { walkSpeed: speed, forward: med < 0 ? 1 : -1, found: true } : { walkSpeed: 1, forward: 1 };
 }
 
 export function createRig(t: Template): Rig {
-  const { model, mixer, idle, walk } = fit(t.gltf);
+  const { model, mixer, idle, walk, extra,appearance } = fit(t.gltf,t.appearance);
   model.traverse((o) => {
     if (o instanceof THREE.Mesh) {
       o.castShadow = true;
@@ -190,9 +240,11 @@ export function createRig(t: Template): Rig {
   inner.rotation.y = t.forward > 0 ? Math.PI / 2 : -Math.PI / 2;
   inner.add(model);
   const holder = new THREE.Group();
+  holder.userData.avatarIdleClip=idle.getClip().toJSON();
+  holder.userData.bodyModel=t.name;
   holder.add(inner);
   idle.play();
   walk.play();
   walk.setEffectiveWeight(0);
-  return { holder, model, mixer, idle, walk, template: t };
+  return { holder, model, mixer, idle, walk, extra, template: t, lib: new Map(),...(appearance?{appearance}:{}) };
 }

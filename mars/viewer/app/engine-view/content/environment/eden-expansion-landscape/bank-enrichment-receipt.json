@@ -1,0 +1,24 @@
+{
+  "groups": 4,
+  "candidates": 213,
+  "accepted": 119,
+  "types": {
+    "grass": 39,
+    "fern": 31,
+    "stone": 20,
+    "wetland": 29
+  },
+  "calls": 7,
+  "triangles": 53208,
+  "actualVerticesChecked": 159624,
+  "wetHits": 0,
+  "nativeHits": 0,
+  "reserveHits": 0,
+  "minBaseRelativeY": -3.6285688898018975e-8,
+  "maxBaseRelativeY": 6.040163924581066e-8,
+  "minActualFloat32BaseRelativeY": -2.8704865595585716e-7,
+  "maxActualFloat32BaseRelativeY": 3.4896588085864266e-7,
+  "rendered": false,
+  "sourceGeometryClones": 0,
+  "scope": "NEW actual visible bank triangles/planar bases only; no native ecology/watering/support/food"
+}

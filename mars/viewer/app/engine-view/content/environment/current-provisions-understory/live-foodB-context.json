@@ -1,0 +1,1089 @@
+{
+  "worldId": "pm-preview-eden-20261005",
+  "ref": {
+    "contract": "render-scene-ref/1",
+    "rulesVersion": "sim-mars/1+retained-shore/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1+crew-removal/1+commons/1+arrival-clearance/1+walk-block/1+commons-provisions/1+commons-kitchen/2+fd/1+social-eden/1",
+    "hash": "f5edf997d6c0c345f7e28b3d4a8cc60743a2e566b338b66cbaea5e14a8a34921"
+  },
+  "provisions": {
+    "version": "commons-provisions/1",
+    "resources": [
+      {
+        "id": "commons-personal-1",
+        "mat": "commons-mat-1",
+        "bowl": "commons-bowl-1",
+        "spoon": "commons-spoon-1",
+        "bowlHome": [
+          -22,
+          0,
+          8
+        ],
+        "spoonHome": [
+          -21.5,
+          0,
+          8
+        ],
+        "sleepReturn": [
+          -22,
+          12.5
+        ]
+      },
+      {
+        "id": "commons-personal-2",
+        "mat": "commons-mat-2",
+        "bowl": "commons-bowl-2",
+        "spoon": "commons-spoon-2",
+        "bowlHome": [
+          -16,
+          0,
+          8
+        ],
+        "spoonHome": [
+          -15.5,
+          0,
+          8
+        ],
+        "sleepReturn": [
+          -16,
+          12.5
+        ]
+      },
+      {
+        "id": "commons-personal-3",
+        "mat": "commons-mat-3",
+        "bowl": "commons-bowl-3",
+        "spoon": "commons-spoon-3",
+        "bowlHome": [
+          -10,
+          0,
+          8
+        ],
+        "spoonHome": [
+          -9.5,
+          0,
+          8
+        ],
+        "sleepReturn": [
+          -10,
+          12.5
+        ]
+      },
+      {
+        "id": "commons-personal-4",
+        "mat": "commons-mat-4",
+        "bowl": "commons-bowl-4",
+        "spoon": "commons-spoon-4",
+        "bowlHome": [
+          -4,
+          0,
+          8
+        ],
+        "spoonHome": [
+          -3.5,
+          0,
+          8
+        ],
+        "sleepReturn": [
+          -4,
+          12.5
+        ]
+      },
+      {
+        "id": "commons-personal-5",
+        "mat": "commons-mat-5",
+        "bowl": "commons-bowl-5",
+        "spoon": "commons-spoon-5",
+        "bowlHome": [
+          -22,
+          0,
+          11
+        ],
+        "spoonHome": [
+          -21.5,
+          0,
+          11
+        ],
+        "sleepReturn": [
+          -22,
+          19.5
+        ]
+      },
+      {
+        "id": "commons-personal-6",
+        "mat": "commons-mat-6",
+        "bowl": "commons-bowl-6",
+        "spoon": "commons-spoon-6",
+        "bowlHome": [
+          -16,
+          0,
+          11
+        ],
+        "spoonHome": [
+          -15.5,
+          0,
+          11
+        ],
+        "sleepReturn": [
+          -16,
+          19.5
+        ]
+      },
+      {
+        "id": "commons-personal-7",
+        "mat": "commons-mat-7",
+        "bowl": "commons-bowl-7",
+        "spoon": "commons-spoon-7",
+        "bowlHome": [
+          -10,
+          0,
+          11
+        ],
+        "spoonHome": [
+          -9.5,
+          0,
+          11
+        ],
+        "sleepReturn": [
+          -10,
+          19.5
+        ]
+      },
+      {
+        "id": "commons-personal-8",
+        "mat": "commons-mat-8",
+        "bowl": "commons-bowl-8",
+        "spoon": "commons-spoon-8",
+        "bowlHome": [
+          -4,
+          0,
+          11
+        ],
+        "spoonHome": [
+          -3.5,
+          0,
+          11
+        ],
+        "sleepReturn": [
+          -4,
+          19.5
+        ]
+      }
+    ],
+    "nativeGroundY": 0
+  },
+  "kitchen": {
+    "version": "commons-kitchen/2",
+    "slotRow": "r1",
+    "stations": [
+      {
+        "id": "commons-kitchen-1",
+        "table": "commons-kitchen-table-1",
+        "pot": "commons-kitchen-pot-1",
+        "beans": "commons-kitchen-beans-1",
+        "greens": "commons-kitchen-greens-1",
+        "spoon": "commons-kitchen-spoon-1",
+        "p": [
+          -22,
+          0,
+          4
+        ]
+      },
+      {
+        "id": "commons-kitchen-2",
+        "table": "commons-kitchen-table-2",
+        "pot": "commons-kitchen-pot-2",
+        "beans": "commons-kitchen-beans-2",
+        "greens": "commons-kitchen-greens-2",
+        "spoon": "commons-kitchen-spoon-2",
+        "p": [
+          -16,
+          0,
+          4
+        ]
+      },
+      {
+        "id": "commons-kitchen-3",
+        "table": "commons-kitchen-table-3",
+        "pot": "commons-kitchen-pot-3",
+        "beans": "commons-kitchen-beans-3",
+        "greens": "commons-kitchen-greens-3",
+        "spoon": "commons-kitchen-spoon-3",
+        "p": [
+          -10,
+          0,
+          4
+        ]
+      },
+      {
+        "id": "commons-kitchen-4",
+        "table": "commons-kitchen-table-4",
+        "pot": "commons-kitchen-pot-4",
+        "beans": "commons-kitchen-beans-4",
+        "greens": "commons-kitchen-greens-4",
+        "spoon": "commons-kitchen-spoon-4",
+        "p": [
+          -4,
+          0,
+          4
+        ]
+      }
+    ],
+    "ingredientBowlsPerStation": 2,
+    "servingsPerStation": 2,
+    "nativeGroundY": 0
+  },
+  "foodDeliveries": {
+    "contract": "commons-food-delivery/1",
+    "batches": [
+      {
+        "deliveryId": "finite-eden-20261005-A",
+        "batch": 1,
+        "portions": 8,
+        "resources": [
+          {
+            "index": 0,
+            "bowl": "commons-food-1-bowl-1",
+            "spoon": "commons-spoon-1",
+            "home": [
+              -21,
+              0,
+              8
+            ]
+          },
+          {
+            "index": 1,
+            "bowl": "commons-food-1-bowl-2",
+            "spoon": "commons-spoon-2",
+            "home": [
+              -15,
+              0,
+              8
+            ]
+          },
+          {
+            "index": 2,
+            "bowl": "commons-food-1-bowl-3",
+            "spoon": "commons-spoon-3",
+            "home": [
+              -9,
+              0,
+              8
+            ]
+          },
+          {
+            "index": 3,
+            "bowl": "commons-food-1-bowl-4",
+            "spoon": "commons-spoon-4",
+            "home": [
+              -3,
+              0,
+              8
+            ]
+          },
+          {
+            "index": 4,
+            "bowl": "commons-food-1-bowl-5",
+            "spoon": "commons-spoon-5",
+            "home": [
+              -21,
+              0,
+              11
+            ]
+          },
+          {
+            "index": 5,
+            "bowl": "commons-food-1-bowl-6",
+            "spoon": "commons-spoon-6",
+            "home": [
+              -15,
+              0,
+              11
+            ]
+          },
+          {
+            "index": 6,
+            "bowl": "commons-food-1-bowl-7",
+            "spoon": "commons-spoon-7",
+            "home": [
+              -9,
+              0,
+              11
+            ]
+          },
+          {
+            "index": 7,
+            "bowl": "commons-food-1-bowl-8",
+            "spoon": "commons-spoon-8",
+            "home": [
+              -3,
+              0,
+              11
+            ]
+          }
+        ]
+      },
+      {
+        "deliveryId": "finite-eden-20261006-B",
+        "batch": 2,
+        "portions": 8,
+        "resources": [
+          {
+            "index": 0,
+            "bowl": "commons-food-2-bowl-1",
+            "spoon": "commons-spoon-1",
+            "home": [
+              -20.7,
+              0,
+              8
+            ]
+          },
+          {
+            "index": 1,
+            "bowl": "commons-food-2-bowl-2",
+            "spoon": "commons-spoon-2",
+            "home": [
+              -14.7,
+              0,
+              8
+            ]
+          },
+          {
+            "index": 2,
+            "bowl": "commons-food-2-bowl-3",
+            "spoon": "commons-spoon-3",
+            "home": [
+              -8.7,
+              0,
+              8
+            ]
+          },
+          {
+            "index": 3,
+            "bowl": "commons-food-2-bowl-4",
+            "spoon": "commons-spoon-4",
+            "home": [
+              -2.7,
+              0,
+              8
+            ]
+          },
+          {
+            "index": 4,
+            "bowl": "commons-food-2-bowl-5",
+            "spoon": "commons-spoon-5",
+            "home": [
+              -20.7,
+              0,
+              11
+            ]
+          },
+          {
+            "index": 5,
+            "bowl": "commons-food-2-bowl-6",
+            "spoon": "commons-spoon-6",
+            "home": [
+              -14.7,
+              0,
+              11
+            ]
+          },
+          {
+            "index": 6,
+            "bowl": "commons-food-2-bowl-7",
+            "spoon": "commons-spoon-7",
+            "home": [
+              -8.7,
+              0,
+              11
+            ]
+          },
+          {
+            "index": 7,
+            "bowl": "commons-food-2-bowl-8",
+            "spoon": "commons-spoon-8",
+            "home": [
+              -2.7,
+              0,
+              11
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "social": {
+    "version": "social-eden/1",
+    "layoutHash": "9358d4aee77853ffadc158107ff55d9563b17f43bda7519d44f5da63a75783b1",
+    "layout": {
+      "version": "social-eden/1",
+      "units": "metres/Y-up/XZ/base-centred/native-yaw",
+      "source": {
+        "worldRevision": "9555e749",
+        "proposalSHA256": "93c0cd9583ed0baf5c397098cb71a5a75877a2e6976ca080e5ed4ccd7b069e5c",
+        "selected": "A"
+      },
+      "fixtures": [
+        {
+          "id": "social-eden-fire",
+          "def": "campfire",
+          "label": "Fire",
+          "position": [
+            24,
+            0,
+            -7
+          ],
+          "yaw": 0,
+          "regionId": "social-eden-fire-circle"
+        },
+        {
+          "id": "social-eden-fire-bench-north",
+          "def": "bench-6ft",
+          "label": "Fire Bench North",
+          "position": [
+            24,
+            0,
+            -10.2
+          ],
+          "yaw": 0,
+          "regionId": "social-eden-fire-circle"
+        },
+        {
+          "id": "social-eden-fire-bench-south",
+          "def": "bench-6ft",
+          "label": "Fire Bench South",
+          "position": [
+            24,
+            0,
+            -3.8
+          ],
+          "yaw": 3.141592653589793,
+          "regionId": "social-eden-fire-circle"
+        },
+        {
+          "id": "social-eden-dining-table",
+          "def": "table-6ft",
+          "label": "Dining Table",
+          "position": [
+            23,
+            0,
+            6
+          ],
+          "yaw": 0,
+          "regionId": "social-eden-dining"
+        },
+        {
+          "id": "social-eden-dining-chair-north-1",
+          "def": "camp-chair",
+          "label": "Dining Chair North 1",
+          "position": [
+            22.2,
+            0,
+            4.4
+          ],
+          "yaw": 0,
+          "regionId": "social-eden-dining"
+        },
+        {
+          "id": "social-eden-dining-chair-north-2",
+          "def": "camp-chair",
+          "label": "Dining Chair North 2",
+          "position": [
+            23,
+            0,
+            4.4
+          ],
+          "yaw": 0,
+          "regionId": "social-eden-dining"
+        },
+        {
+          "id": "social-eden-dining-chair-north-3",
+          "def": "camp-chair",
+          "label": "Dining Chair North 3",
+          "position": [
+            23.8,
+            0,
+            4.4
+          ],
+          "yaw": 0,
+          "regionId": "social-eden-dining"
+        },
+        {
+          "id": "social-eden-dining-chair-south-1",
+          "def": "camp-chair",
+          "label": "Dining Chair South 1",
+          "position": [
+            22.2,
+            0,
+            7.6
+          ],
+          "yaw": 3.141592653589793,
+          "regionId": "social-eden-dining"
+        },
+        {
+          "id": "social-eden-dining-chair-south-2",
+          "def": "camp-chair",
+          "label": "Dining Chair South 2",
+          "position": [
+            23,
+            0,
+            7.6
+          ],
+          "yaw": 3.141592653589793,
+          "regionId": "social-eden-dining"
+        },
+        {
+          "id": "social-eden-dining-chair-south-3",
+          "def": "camp-chair",
+          "label": "Dining Chair South 3",
+          "position": [
+            23.8,
+            0,
+            7.6
+          ],
+          "yaw": 3.141592653589793,
+          "regionId": "social-eden-dining"
+        },
+        {
+          "id": "social-eden-dining-chair-west",
+          "def": "camp-chair",
+          "label": "Dining Chair West",
+          "position": [
+            21.1,
+            0,
+            6
+          ],
+          "yaw": -1.5707963267948966,
+          "regionId": "social-eden-dining"
+        },
+        {
+          "id": "social-eden-dining-chair-east",
+          "def": "camp-chair",
+          "label": "Dining Chair East",
+          "position": [
+            24.9,
+            0,
+            6
+          ],
+          "yaw": 1.5707963267948966,
+          "regionId": "social-eden-dining"
+        }
+      ],
+      "regions": [
+        {
+          "id": "social-eden-fire-circle",
+          "label": "Campfire clearing",
+          "polygon": [
+            [
+              19.5,
+              -11.5
+            ],
+            [
+              28.5,
+              -11.5
+            ],
+            [
+              28.5,
+              -2.5
+            ],
+            [
+              19.5,
+              -2.5
+            ]
+          ],
+          "focalXZ": [
+            24,
+            -7
+          ]
+        },
+        {
+          "id": "social-eden-dining",
+          "label": "Social dining",
+          "polygon": [
+            [
+              19,
+              3
+            ],
+            [
+              27,
+              3
+            ],
+            [
+              27,
+              9
+            ],
+            [
+              19,
+              9
+            ]
+          ],
+          "focalXZ": [
+            23,
+            6
+          ]
+        }
+      ],
+      "paths": [
+        {
+          "id": "social-link-current-arrival",
+          "pointsXZ": [
+            [
+              14,
+              4
+            ],
+            [
+              17,
+              4
+            ]
+          ],
+          "width": 1.4
+        },
+        {
+          "id": "social-main-east",
+          "pointsXZ": [
+            [
+              18,
+              -13
+            ],
+            [
+              18,
+              23
+            ]
+          ],
+          "width": 2
+        },
+        {
+          "id": "social-arrival-spine",
+          "pointsXZ": [
+            [
+              17,
+              4
+            ],
+            [
+              18,
+              4
+            ]
+          ],
+          "width": 2
+        },
+        {
+          "id": "social-fire-approach",
+          "pointsXZ": [
+            [
+              18,
+              -7
+            ],
+            [
+              20,
+              -7
+            ]
+          ],
+          "width": 2,
+          "terminalRegion": "social-eden-fire-circle"
+        },
+        {
+          "id": "social-dining-approach",
+          "pointsXZ": [
+            [
+              18,
+              6
+            ],
+            [
+              20,
+              6
+            ]
+          ],
+          "width": 2,
+          "terminalRegion": "social-eden-dining"
+        }
+      ],
+      "activities": {
+        "fireRing": "campfire_circle:8 standing fire places",
+        "fireSeats": "sit/stand:6 inward bench seats",
+        "diningSeats": "sit/stand:8 chair seats",
+        "meals": "serve existing finite kitchen pot at supported service point; carry own bowl/spoon, sit/eat, return; no remote seated serving"
+      },
+      "preservation": "all old bodies/owners/items/food/preparation/regions/intentions/history/scene references unchanged"
+    },
+    "nativeGeometry": [
+      {
+        "id": "social-eden-fire",
+        "def": "campfire",
+        "size": [
+          1,
+          0.35,
+          1
+        ],
+        "support": {
+          "kind": "ground",
+          "level": 0,
+          "y": 0
+        },
+        "seats": [],
+        "approachPolicy": "native-front-or-back/current-clearance",
+        "exitPolicy": "native-stand/current-reservations"
+      },
+      {
+        "id": "social-eden-fire-bench-north",
+        "def": "bench-6ft",
+        "size": [
+          1.8288000000000002,
+          0.45,
+          0.4
+        ],
+        "support": {
+          "kind": "ground",
+          "level": 0,
+          "y": 0
+        },
+        "seats": [
+          {
+            "id": "social-eden-fire-bench-north#seat0",
+            "owner": "social-eden-fire-bench-north",
+            "positionXZ": [
+              23.3904,
+              -10.2
+            ],
+            "yaw": 1.5707963267948966,
+            "level": 0,
+            "claim": "slot:social-eden-fire-bench-north#seat0"
+          },
+          {
+            "id": "social-eden-fire-bench-north#seat1",
+            "owner": "social-eden-fire-bench-north",
+            "positionXZ": [
+              24,
+              -10.2
+            ],
+            "yaw": 1.5707963267948966,
+            "level": 0,
+            "claim": "slot:social-eden-fire-bench-north#seat1"
+          },
+          {
+            "id": "social-eden-fire-bench-north#seat2",
+            "owner": "social-eden-fire-bench-north",
+            "positionXZ": [
+              24.6096,
+              -10.2
+            ],
+            "yaw": 1.5707963267948966,
+            "level": 0,
+            "claim": "slot:social-eden-fire-bench-north#seat2"
+          }
+        ],
+        "approachPolicy": "native-front-or-back/current-clearance",
+        "exitPolicy": "native-stand/current-reservations"
+      },
+      {
+        "id": "social-eden-fire-bench-south",
+        "def": "bench-6ft",
+        "size": [
+          1.8288000000000002,
+          0.45,
+          0.4
+        ],
+        "support": {
+          "kind": "ground",
+          "level": 0,
+          "y": 0
+        },
+        "seats": [
+          {
+            "id": "social-eden-fire-bench-south#seat0",
+            "owner": "social-eden-fire-bench-south",
+            "positionXZ": [
+              24.6096,
+              -3.8
+            ],
+            "yaw": -1.5707963267948966,
+            "level": 0,
+            "claim": "slot:social-eden-fire-bench-south#seat0"
+          },
+          {
+            "id": "social-eden-fire-bench-south#seat1",
+            "owner": "social-eden-fire-bench-south",
+            "positionXZ": [
+              24,
+              -3.8
+            ],
+            "yaw": -1.5707963267948966,
+            "level": 0,
+            "claim": "slot:social-eden-fire-bench-south#seat1"
+          },
+          {
+            "id": "social-eden-fire-bench-south#seat2",
+            "owner": "social-eden-fire-bench-south",
+            "positionXZ": [
+              23.3904,
+              -3.8
+            ],
+            "yaw": -1.5707963267948966,
+            "level": 0,
+            "claim": "slot:social-eden-fire-bench-south#seat2"
+          }
+        ],
+        "approachPolicy": "native-front-or-back/current-clearance",
+        "exitPolicy": "native-stand/current-reservations"
+      },
+      {
+        "id": "social-eden-dining-table",
+        "def": "table-6ft",
+        "size": [
+          1.8288000000000002,
+          0.75,
+          0.75
+        ],
+        "support": {
+          "kind": "ground",
+          "level": 0,
+          "y": 0
+        },
+        "seats": [],
+        "approachPolicy": "native-front-or-back/current-clearance",
+        "exitPolicy": "native-stand/current-reservations"
+      },
+      {
+        "id": "social-eden-dining-chair-north-1",
+        "def": "camp-chair",
+        "size": [
+          0.55,
+          0.85,
+          0.55
+        ],
+        "support": {
+          "kind": "ground",
+          "level": 0,
+          "y": 0
+        },
+        "seats": [
+          {
+            "id": "social-eden-dining-chair-north-1#seat",
+            "owner": "social-eden-dining-chair-north-1",
+            "positionXZ": [
+              22.2,
+              4.4
+            ],
+            "yaw": 1.5707963267948966,
+            "level": 0,
+            "claim": "slot:social-eden-dining-chair-north-1#seat"
+          }
+        ],
+        "approachPolicy": "native-front-or-back/current-clearance",
+        "exitPolicy": "native-stand/current-reservations"
+      },
+      {
+        "id": "social-eden-dining-chair-north-2",
+        "def": "camp-chair",
+        "size": [
+          0.55,
+          0.85,
+          0.55
+        ],
+        "support": {
+          "kind": "ground",
+          "level": 0,
+          "y": 0
+        },
+        "seats": [
+          {
+            "id": "social-eden-dining-chair-north-2#seat",
+            "owner": "social-eden-dining-chair-north-2",
+            "positionXZ": [
+              23,
+              4.4
+            ],
+            "yaw": 1.5707963267948966,
+            "level": 0,
+            "claim": "slot:social-eden-dining-chair-north-2#seat"
+          }
+        ],
+        "approachPolicy": "native-front-or-back/current-clearance",
+        "exitPolicy": "native-stand/current-reservations"
+      },
+      {
+        "id": "social-eden-dining-chair-north-3",
+        "def": "camp-chair",
+        "size": [
+          0.55,
+          0.85,
+          0.55
+        ],
+        "support": {
+          "kind": "ground",
+          "level": 0,
+          "y": 0
+        },
+        "seats": [
+          {
+            "id": "social-eden-dining-chair-north-3#seat",
+            "owner": "social-eden-dining-chair-north-3",
+            "positionXZ": [
+              23.8,
+              4.4
+            ],
+            "yaw": 1.5707963267948966,
+            "level": 0,
+            "claim": "slot:social-eden-dining-chair-north-3#seat"
+          }
+        ],
+        "approachPolicy": "native-front-or-back/current-clearance",
+        "exitPolicy": "native-stand/current-reservations"
+      },
+      {
+        "id": "social-eden-dining-chair-south-1",
+        "def": "camp-chair",
+        "size": [
+          0.55,
+          0.85,
+          0.55
+        ],
+        "support": {
+          "kind": "ground",
+          "level": 0,
+          "y": 0
+        },
+        "seats": [
+          {
+            "id": "social-eden-dining-chair-south-1#seat",
+            "owner": "social-eden-dining-chair-south-1",
+            "positionXZ": [
+              22.2,
+              7.6
+            ],
+            "yaw": -1.5707963267948966,
+            "level": 0,
+            "claim": "slot:social-eden-dining-chair-south-1#seat"
+          }
+        ],
+        "approachPolicy": "native-front-or-back/current-clearance",
+        "exitPolicy": "native-stand/current-reservations"
+      },
+      {
+        "id": "social-eden-dining-chair-south-2",
+        "def": "camp-chair",
+        "size": [
+          0.55,
+          0.85,
+          0.55
+        ],
+        "support": {
+          "kind": "ground",
+          "level": 0,
+          "y": 0
+        },
+        "seats": [
+          {
+            "id": "social-eden-dining-chair-south-2#seat",
+            "owner": "social-eden-dining-chair-south-2",
+            "positionXZ": [
+              23,
+              7.6
+            ],
+            "yaw": -1.5707963267948966,
+            "level": 0,
+            "claim": "slot:social-eden-dining-chair-south-2#seat"
+          }
+        ],
+        "approachPolicy": "native-front-or-back/current-clearance",
+        "exitPolicy": "native-stand/current-reservations"
+      },
+      {
+        "id": "social-eden-dining-chair-south-3",
+        "def": "camp-chair",
+        "size": [
+          0.55,
+          0.85,
+          0.55
+        ],
+        "support": {
+          "kind": "ground",
+          "level": 0,
+          "y": 0
+        },
+        "seats": [
+          {
+            "id": "social-eden-dining-chair-south-3#seat",
+            "owner": "social-eden-dining-chair-south-3",
+            "positionXZ": [
+              23.8,
+              7.6
+            ],
+            "yaw": -1.5707963267948966,
+            "level": 0,
+            "claim": "slot:social-eden-dining-chair-south-3#seat"
+          }
+        ],
+        "approachPolicy": "native-front-or-back/current-clearance",
+        "exitPolicy": "native-stand/current-reservations"
+      },
+      {
+        "id": "social-eden-dining-chair-west",
+        "def": "camp-chair",
+        "size": [
+          0.55,
+          0.85,
+          0.55
+        ],
+        "support": {
+          "kind": "ground",
+          "level": 0,
+          "y": 0
+        },
+        "seats": [
+          {
+            "id": "social-eden-dining-chair-west#seat",
+            "owner": "social-eden-dining-chair-west",
+            "positionXZ": [
+              21.1,
+              6
+            ],
+            "yaw": 0,
+            "level": 0,
+            "claim": "slot:social-eden-dining-chair-west#seat"
+          }
+        ],
+        "approachPolicy": "native-front-or-back/current-clearance",
+        "exitPolicy": "native-stand/current-reservations"
+      },
+      {
+        "id": "social-eden-dining-chair-east",
+        "def": "camp-chair",
+        "size": [
+          0.55,
+          0.85,
+          0.55
+        ],
+        "support": {
+          "kind": "ground",
+          "level": 0,
+          "y": 0
+        },
+        "seats": [
+          {
+            "id": "social-eden-dining-chair-east#seat",
+            "owner": "social-eden-dining-chair-east",
+            "positionXZ": [
+              24.9,
+              6
+            ],
+            "yaw": -3.141592653589793,
+            "level": 0,
+            "claim": "slot:social-eden-dining-chair-east#seat"
+          }
+        ],
+        "approachPolicy": "native-front-or-back/current-clearance",
+        "exitPolicy": "native-stand/current-reservations"
+      }
+    ]
+  },
+  "sceneHash": "fb9116a3d8f05b27d4f5358625859176a33f7543d8087bb7b27b209ef6f5a7ba",
+  "shoreHash": "38366c1eac5d1041e117ece543cb594d0319520f9a116abf5a911e7d1e8bbd41",
+  "clock": {
+    "origin": 0,
+    "dayTicks": 72000
+  },
+  "ground": "grass",
+  "base": {
+    "campus": "eden-commons-shore/1",
+    "staticHash": "c1d5707a5a821ae6788461105b83289f8f943dba657b4e31ca62cf3c3244fa37"
+  }
+}

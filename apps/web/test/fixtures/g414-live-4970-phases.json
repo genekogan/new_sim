@@ -1,0 +1,174 @@
+{
+ "source": "read-only GET on 4970 build local-p0a3-core03f0-20261006, 2026-10-06",
+ "completed": {
+  "contract": "own-request-diagnostics/1",
+  "requestId": "84f87524-10b3-4f49-956f-9110db3412b4",
+  "worldId": "pm-preview-eden-20261005",
+  "soulId": "s_4158faee14",
+  "entityId": "h_4158faee14",
+  "source": {
+   "kind": "owner",
+   "ownerId": "dev:admin",
+   "principalId": "dev:admin",
+   "channel": "web"
+  },
+  "server": {
+   "createdAt": 1791319831441,
+   "updatedAt": 1791319836125,
+   "build": "local-p0a3-core03f0-20261006"
+  },
+  "stage": "understood",
+  "explanation": "Walk to Eden east classroom.",
+  "resolution": {
+   "goal": "walk",
+   "bindingId": "walk:eden-classroom-1",
+   "destination": "Eden east classroom",
+   "available": true
+  },
+  "body": {
+   "tick": 2206419,
+   "activity": "wait",
+   "actionId": "a2094818-502",
+   "controller": "sit",
+   "programme": "p9420",
+   "sleep": "awake",
+   "busy": true,
+   "busyReason": "Eden is quietly renewing before first light; new actions start after renewal."
+  },
+  "attempts": [
+   {
+    "attemptId": "a_18431",
+    "phase": "accepted",
+    "seq": 18432,
+    "tick": 2059332
+   },
+   {
+    "attemptId": "a_18431",
+    "phase": "started",
+    "seq": 18433,
+    "tick": 2059333
+   },
+   {
+    "attemptId": "a_18431",
+    "phase": "completed",
+    "seq": 18437,
+    "tick": 2059580
+   }
+  ],
+  "unavailable": [
+   {
+    "field": "validation",
+    "reason": "No technical validation step failed for this request."
+   },
+   {
+    "field": "conditionExplanation",
+    "reason": "The destination is currently available."
+   },
+   {
+    "field": "queue",
+    "reason": "Owner directions are not queued; the latest active direction is followed."
+   },
+   {
+    "field": "blocked",
+    "reason": "No canonical blocked fact exists yet for this direction."
+   },
+   {
+    "field": "interrupted",
+    "reason": "No canonical interrupted fact exists yet for this direction."
+   }
+  ]
+ },
+ "interruptedThenCompleted": {
+  "contract": "own-request-diagnostics/1",
+  "requestId": "12a2dad7-eac1-4614-ac36-cdd6f60a1ac3",
+  "worldId": "pm-preview-eden-20261005",
+  "soulId": "s_4158faee14",
+  "entityId": "h_4158faee14",
+  "source": {
+   "kind": "owner",
+   "ownerId": "dev:admin",
+   "principalId": "dev:admin",
+   "channel": "web"
+  },
+  "server": {
+   "createdAt": 1791320101032,
+   "updatedAt": 1791320107123,
+   "build": "local-p0a3-core03f0-20261006"
+  },
+  "stage": "understood",
+  "explanation": "Walk to Eden east classroom.",
+  "resolution": {
+   "goal": "walk",
+   "bindingId": "walk:eden-classroom-1",
+   "destination": "Eden east classroom",
+   "available": true
+  },
+  "body": {
+   "tick": 2206442,
+   "activity": "wait",
+   "actionId": "a2094818-502",
+   "controller": "sit",
+   "programme": "p9420",
+   "sleep": "awake",
+   "busy": true,
+   "busyReason": "Eden is quietly renewing before first light; new actions start after renewal."
+  },
+  "attempts": [
+   {
+    "attemptId": "a_18551",
+    "phase": "accepted",
+    "seq": 18552,
+    "tick": 2064655
+   },
+   {
+    "attemptId": "a_18551",
+    "phase": "started",
+    "seq": 18553,
+    "tick": 2064656
+   },
+   {
+    "attemptId": "a_18551",
+    "phase": "interrupted",
+    "seq": 18567,
+    "tick": 2064964,
+    "reason": "program.replaced"
+   },
+   {
+    "attemptId": "a_19992",
+    "phase": "accepted",
+    "seq": 19993,
+    "tick": 2145342
+   },
+   {
+    "attemptId": "a_19992",
+    "phase": "started",
+    "seq": 19994,
+    "tick": 2145343
+   },
+   {
+    "attemptId": "a_19992",
+    "phase": "completed",
+    "seq": 19998,
+    "tick": 2145611
+   }
+  ],
+  "unavailable": [
+   {
+    "field": "validation",
+    "reason": "No technical validation step failed for this request."
+   },
+   {
+    "field": "conditionExplanation",
+    "reason": "The destination is currently available."
+   },
+   {
+    "field": "queue",
+    "reason": "Owner directions are not queued; the latest active direction is followed."
+   },
+   {
+    "field": "blocked",
+    "reason": "No canonical blocked fact exists yet for this direction."
+   }
+  ]
+ }
+}

@@ -1,0 +1,1064 @@
+{
+  "version": "eden-library-ground-physical-proposal/1",
+  "id": "eden-library-1",
+  "root": [
+    74,
+    0,
+    -7
+  ],
+  "yaw": 0,
+  "status": "Core physical request/optional source depiction; no admitted library/reading/book authority",
+  "floor": {
+    "id": "eden-library-1:proposed-floor:top",
+    "rectangleXZ": [
+      69,
+      -11,
+      79,
+      -3
+    ],
+    "topY": 0.1,
+    "sourcePart": "proposed-floor"
+  },
+  "door": {
+    "id": "eden-library-1:south-entry",
+    "rectangleXZ": [
+      73.1,
+      -3.2,
+      74.9,
+      -2.95
+    ],
+    "clearWidth": 1.8,
+    "y": [
+      0.1,
+      2.5
+    ],
+    "humanRadius": 0.28,
+    "clearCentreX": [
+      73.38,
+      74.62
+    ],
+    "status": "actual open geometry; outside0→floor.1 needs Core threshold/floorlink"
+  },
+  "walls": [
+    {
+      "id": "eden-library-1:south-entry-side:-1",
+      "sourcePart": "south-entry-side:-1",
+      "centre": [
+        71.05,
+        1.65,
+        -3.1
+      ],
+      "size": [
+        4.1,
+        3.1,
+        0.2
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          69,
+          0.09999999999999987,
+          -3.2
+        ],
+        "max": [
+          73.1,
+          3.2,
+          -3
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:south-stone-base:-1",
+      "sourcePart": "south-stone-base:-1",
+      "centre": [
+        71.05,
+        0.175,
+        -3.04
+      ],
+      "size": [
+        4.1,
+        0.15,
+        0.1
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          69,
+          0.09999999999999999,
+          -3.09
+        ],
+        "max": [
+          73.1,
+          0.25,
+          -2.99
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:north-window-pier:-1",
+      "sourcePart": "north-window-pier:-1",
+      "centre": [
+        70.25,
+        1.65,
+        -10.9
+      ],
+      "size": [
+        2.5,
+        3.1,
+        0.2
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          69,
+          0.09999999999999987,
+          -11
+        ],
+        "max": [
+          71.5,
+          3.2,
+          -10.8
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:entry-jamb:-1",
+      "sourcePart": "entry-jamb:-1",
+      "centre": [
+        73.06,
+        1.3,
+        -2.9850000000000003
+      ],
+      "size": [
+        0.08,
+        2.4,
+        0.07
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          73.02,
+          0.10000000000000009,
+          -3.0200000000000005
+        ],
+        "max": [
+          73.1,
+          2.5,
+          -2.95
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:south-entry-side:1",
+      "sourcePart": "south-entry-side:1",
+      "centre": [
+        76.95,
+        1.65,
+        -3.1
+      ],
+      "size": [
+        4.1,
+        3.1,
+        0.2
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          74.9,
+          0.09999999999999987,
+          -3.2
+        ],
+        "max": [
+          79,
+          3.2,
+          -3
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:south-stone-base:1",
+      "sourcePart": "south-stone-base:1",
+      "centre": [
+        76.95,
+        0.175,
+        -3.04
+      ],
+      "size": [
+        4.1,
+        0.15,
+        0.1
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          74.9,
+          0.09999999999999999,
+          -3.09
+        ],
+        "max": [
+          79,
+          0.25,
+          -2.99
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:north-window-pier:1",
+      "sourcePart": "north-window-pier:1",
+      "centre": [
+        77.75,
+        1.65,
+        -10.9
+      ],
+      "size": [
+        2.5,
+        3.1,
+        0.2
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          76.5,
+          0.09999999999999987,
+          -11
+        ],
+        "max": [
+          79,
+          3.2,
+          -10.8
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:entry-jamb:1",
+      "sourcePart": "entry-jamb:1",
+      "centre": [
+        74.94,
+        1.3,
+        -2.9850000000000003
+      ],
+      "size": [
+        0.08,
+        2.4,
+        0.07
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          74.9,
+          0.10000000000000009,
+          -3.0200000000000005
+        ],
+        "max": [
+          74.98,
+          2.5,
+          -2.95
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:entry-header",
+      "sourcePart": "entry-header",
+      "centre": [
+        74,
+        2.85,
+        -3.1
+      ],
+      "size": [
+        1.8,
+        0.7,
+        0.2
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          73.1,
+          2.5,
+          -3.2
+        ],
+        "max": [
+          74.9,
+          3.2,
+          -3
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:entry-head-trim",
+      "sourcePart": "entry-head-trim",
+      "centre": [
+        74,
+        2.54,
+        -2.9850000000000003
+      ],
+      "size": [
+        1.96,
+        0.08,
+        0.07
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          73.02,
+          2.5,
+          -3.0200000000000005
+        ],
+        "max": [
+          74.98,
+          2.58,
+          -2.95
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:north-window-sill-wall",
+      "sourcePart": "north-window-sill-wall",
+      "centre": [
+        74,
+        0.5,
+        -10.9
+      ],
+      "size": [
+        5,
+        0.8,
+        0.2
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          71.5,
+          0.09999999999999998,
+          -11
+        ],
+        "max": [
+          76.5,
+          0.9,
+          -10.8
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:north-window-head-wall",
+      "sourcePart": "north-window-head-wall",
+      "centre": [
+        74,
+        2.95,
+        -10.9
+      ],
+      "size": [
+        5,
+        0.5,
+        0.2
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          71.5,
+          2.7,
+          -11
+        ],
+        "max": [
+          76.5,
+          3.2,
+          -10.8
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:north-stone-base",
+      "sourcePart": "north-stone-base",
+      "centre": [
+        74,
+        0.175,
+        -10.96
+      ],
+      "size": [
+        10,
+        0.15,
+        0.1
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          69,
+          0.09999999999999999,
+          -11.01
+        ],
+        "max": [
+          79,
+          0.25,
+          -10.91
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:side-sill-wall:-1",
+      "sourcePart": "side-sill-wall:-1",
+      "centre": [
+        69.1,
+        0.5,
+        -7
+      ],
+      "size": [
+        0.2,
+        0.8,
+        8
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          69,
+          0.09999999999999998,
+          -11
+        ],
+        "max": [
+          69.2,
+          0.9,
+          -3
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:side-head-wall:-1",
+      "sourcePart": "side-head-wall:-1",
+      "centre": [
+        69.1,
+        2.95,
+        -7
+      ],
+      "size": [
+        0.2,
+        0.5,
+        8
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          69,
+          2.7,
+          -11
+        ],
+        "max": [
+          69.2,
+          3.2,
+          -3
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:side-window-pier:-1:-3.4",
+      "sourcePart": "side-window-pier:-1:-3.4",
+      "centre": [
+        69.1,
+        1.65,
+        -10.4
+      ],
+      "size": [
+        0.2,
+        3.1,
+        1.2
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          69,
+          0.09999999999999987,
+          -11
+        ],
+        "max": [
+          69.2,
+          3.2,
+          -9.8
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:side-window-pier:-1:0",
+      "sourcePart": "side-window-pier:-1:0",
+      "centre": [
+        69.1,
+        1.65,
+        -7
+      ],
+      "size": [
+        0.2,
+        3.1,
+        1.6
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          69,
+          0.09999999999999987,
+          -7.8
+        ],
+        "max": [
+          69.2,
+          3.2,
+          -6.2
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:side-window-pier:-1:3.4",
+      "sourcePart": "side-window-pier:-1:3.4",
+      "centre": [
+        69.1,
+        1.65,
+        -3.6
+      ],
+      "size": [
+        0.2,
+        3.1,
+        1.2
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          69,
+          0.09999999999999987,
+          -4.2
+        ],
+        "max": [
+          69.2,
+          3.2,
+          -3
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:side-stone-base:-1",
+      "sourcePart": "side-stone-base:-1",
+      "centre": [
+        69.04,
+        0.175,
+        -7
+      ],
+      "size": [
+        0.1,
+        0.15,
+        8
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          68.99,
+          0.09999999999999999,
+          -11
+        ],
+        "max": [
+          69.09,
+          0.25,
+          -3
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:side-sill-wall:1",
+      "sourcePart": "side-sill-wall:1",
+      "centre": [
+        78.9,
+        0.5,
+        -7
+      ],
+      "size": [
+        0.2,
+        0.8,
+        8
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          78.8,
+          0.09999999999999998,
+          -11
+        ],
+        "max": [
+          79,
+          0.9,
+          -3
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:side-head-wall:1",
+      "sourcePart": "side-head-wall:1",
+      "centre": [
+        78.9,
+        2.95,
+        -7
+      ],
+      "size": [
+        0.2,
+        0.5,
+        8
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          78.8,
+          2.7,
+          -11
+        ],
+        "max": [
+          79,
+          3.2,
+          -3
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:side-window-pier:1:-3.4",
+      "sourcePart": "side-window-pier:1:-3.4",
+      "centre": [
+        78.9,
+        1.65,
+        -10.4
+      ],
+      "size": [
+        0.2,
+        3.1,
+        1.2
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          78.8,
+          0.09999999999999987,
+          -11
+        ],
+        "max": [
+          79,
+          3.2,
+          -9.8
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:side-window-pier:1:0",
+      "sourcePart": "side-window-pier:1:0",
+      "centre": [
+        78.9,
+        1.65,
+        -7
+      ],
+      "size": [
+        0.2,
+        3.1,
+        1.6
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          78.8,
+          0.09999999999999987,
+          -7.8
+        ],
+        "max": [
+          79,
+          3.2,
+          -6.2
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:side-window-pier:1:3.4",
+      "sourcePart": "side-window-pier:1:3.4",
+      "centre": [
+        78.9,
+        1.65,
+        -3.6
+      ],
+      "size": [
+        0.2,
+        3.1,
+        1.2
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          78.8,
+          0.09999999999999987,
+          -4.2
+        ],
+        "max": [
+          79,
+          3.2,
+          -3
+        ]
+      }
+    },
+    {
+      "id": "eden-library-1:side-stone-base:1",
+      "sourcePart": "side-stone-base:1",
+      "centre": [
+        78.96,
+        0.175,
+        -7
+      ],
+      "size": [
+        0.1,
+        0.15,
+        8
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          78.91,
+          0.09999999999999999,
+          -11
+        ],
+        "max": [
+          79.01,
+          0.25,
+          -3
+        ]
+      }
+    }
+  ],
+  "windows": [
+    {
+      "side": "north/-Z",
+      "x": [
+        71.5,
+        76.5
+      ],
+      "y": [
+        0.9,
+        2.7
+      ],
+      "z": [
+        -11,
+        -10.8
+      ],
+      "frame": "world-metres"
+    },
+    {
+      "side": "west/-X",
+      "x": [
+        69,
+        69.2
+      ],
+      "y": [
+        0.9,
+        2.7
+      ],
+      "z": [
+        -9.8,
+        -7.8
+      ],
+      "frame": "world-metres"
+    },
+    {
+      "side": "west/-X",
+      "x": [
+        69,
+        69.2
+      ],
+      "y": [
+        0.9,
+        2.7
+      ],
+      "z": [
+        -6.2,
+        -4.2
+      ],
+      "frame": "world-metres"
+    },
+    {
+      "side": "east/+X",
+      "x": [
+        78.8,
+        79
+      ],
+      "y": [
+        0.9,
+        2.7
+      ],
+      "z": [
+        -9.8,
+        -7.8
+      ],
+      "frame": "world-metres"
+    },
+    {
+      "side": "east/+X",
+      "x": [
+        78.8,
+        79
+      ],
+      "y": [
+        0.9,
+        2.7
+      ],
+      "z": [
+        -6.2,
+        -4.2
+      ],
+      "frame": "world-metres"
+    }
+  ],
+  "roof": {
+    "topY": 3.5,
+    "undersideY": 3.2
+  },
+  "niche": [
+    {
+      "id": "eden-library-1:geometric-desk-height-niche",
+      "bounds": {
+        "min": [
+          69.2,
+          0.6599999999999999,
+          -10
+        ],
+        "max": [
+          69.8,
+          0.75,
+          -7.6
+        ]
+      },
+      "status": "decorative niche/support parts only"
+    },
+    {
+      "id": "eden-library-1:niche-support:-2.7",
+      "bounds": {
+        "min": [
+          69.44,
+          0.09999999999999998,
+          -9.76
+        ],
+        "max": [
+          69.56,
+          0.66,
+          -9.64
+        ]
+      },
+      "status": "decorative niche/support parts only"
+    },
+    {
+      "id": "eden-library-1:niche-support:-0.9",
+      "bounds": {
+        "min": [
+          69.44,
+          0.09999999999999998,
+          -7.96
+        ],
+        "max": [
+          69.56,
+          0.66,
+          -7.84
+        ]
+      },
+      "status": "decorative niche/support parts only"
+    }
+  ],
+  "furniture": [
+    {
+      "kind": "desk-cabinet",
+      "root": [
+        71.5,
+        0.1,
+        -9
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          69.95,
+          0.1,
+          -9.35
+        ],
+        "max": [
+          72.6,
+          1.6,
+          -8.65
+        ]
+      },
+      "nativeEquivalent": null,
+      "status": "actual decorative source parts; NOT native bench/table/storage bindings"
+    },
+    {
+      "kind": "bench",
+      "root": [
+        71.5,
+        0.1,
+        -5.5
+      ],
+      "yaw": 3.141592653589793,
+      "bounds": {
+        "min": [
+          70.5,
+          0.1,
+          -5.825
+        ],
+        "max": [
+          72.5,
+          0.9999999999999999,
+          -5.175
+        ]
+      },
+      "nativeEquivalent": null,
+      "status": "actual decorative source parts; NOT native bench/table/storage bindings"
+    },
+    {
+      "kind": "low-table",
+      "root": [
+        71.5,
+        0.1,
+        -6.6
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          70.9,
+          0.1,
+          -6.975
+        ],
+        "max": [
+          72.1,
+          0.45000000000000007,
+          -6.225
+        ]
+      },
+      "nativeEquivalent": null,
+      "status": "actual decorative source parts; NOT native bench/table/storage bindings"
+    },
+    {
+      "kind": "desk-cabinet",
+      "root": [
+        76.5,
+        0.1,
+        -9
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          74.95,
+          0.1,
+          -9.35
+        ],
+        "max": [
+          77.6,
+          1.6,
+          -8.65
+        ]
+      },
+      "nativeEquivalent": null,
+      "status": "actual decorative source parts; NOT native bench/table/storage bindings"
+    },
+    {
+      "kind": "bench",
+      "root": [
+        76.5,
+        0.1,
+        -5.5
+      ],
+      "yaw": 3.141592653589793,
+      "bounds": {
+        "min": [
+          75.5,
+          0.1,
+          -5.825
+        ],
+        "max": [
+          77.5,
+          0.9999999999999999,
+          -5.175
+        ]
+      },
+      "nativeEquivalent": null,
+      "status": "actual decorative source parts; NOT native bench/table/storage bindings"
+    },
+    {
+      "kind": "low-table",
+      "root": [
+        76.5,
+        0.1,
+        -6.6
+      ],
+      "yaw": 0,
+      "bounds": {
+        "min": [
+          75.9,
+          0.1,
+          -6.975
+        ],
+        "max": [
+          77.1,
+          0.45000000000000007,
+          -6.225
+        ]
+      },
+      "nativeEquivalent": null,
+      "status": "actual decorative source parts; NOT native bench/table/storage bindings"
+    }
+  ],
+  "chair": {
+    "id": "eden-library-interior-chair-1",
+    "def": "camp-chair",
+    "catalogSize": [
+      0.55,
+      0.85,
+      0.55
+    ],
+    "root": [
+      75.4,
+      0.1,
+      -7.6
+    ],
+    "yaw": 0,
+    "slotId": "seat",
+    "humanYaw": 1.5707963267948966,
+    "visualSeatTop": 0.54,
+    "visualBoundsConservative": {
+      "min": [
+        75.12,
+        0.1,
+        -7.92
+      ],
+      "max": [
+        75.68,
+        0.97,
+        -7.28
+      ]
+    },
+    "physicalFloorRequestId": "eden-library-1:proposed-floor:top",
+    "status": "existing source-native catalog definition only; no actual entity/admission yet"
+  },
+  "approachDeparture": {
+    "standingPoint": [
+      75.4,
+      0.1,
+      -6.98
+    ],
+    "routeXZ": [
+      [
+        74,
+        -3.4
+      ],
+      [
+        74,
+        -6.98
+      ],
+      [
+        75.4,
+        -6.98
+      ]
+    ],
+    "radius": 0.28,
+    "height": 1.75,
+    "outsideLinkRequest": [
+      [
+        74,
+        0,
+        -2.3
+      ],
+      [
+        74,
+        0.1,
+        -3.4
+      ]
+    ],
+    "seatLink": "Core existing campchair approach/sit/leave with exact .1floor; no invented states/claims"
+  },
+  "forecourt": "Existing native2chair/table request is separate/unchanged; no stocks/books/food/controller updates"
+}

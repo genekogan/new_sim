@@ -1,0 +1,51 @@
+{
+  "sourceRevision": "3b806f2084d5dcefcf9a2282828765657bd74220",
+  "inputArchiveSha256": "285363c429310e688ac0fb812c4053a1a1429d17d1f6d5187b849e0753ca7a0a",
+  "status": "bounded composition input; audio not qualified",
+  "transformation": "Seven source blobs concatenated inside explicit Tone/private Sim closure; five root expressions replaced with scope. Comments and remaining source preserved.",
+  "files": [
+    {
+      "path": "site/engine/theory.js",
+      "inputSha256": "06799a78479a5ad660ecc46e44519f4387d482fbc669652fe2fa83df12166610",
+      "namespaceReplacements": 1,
+      "transformedSha256": "5cad27c9cd65bb6e9a54f6679782ba9c4aeb92c607b3330e1edea3c0308c5b7e"
+    },
+    {
+      "path": "site/engine/compose.js",
+      "inputSha256": "5ac04c4ec7dbf1bec99bff85d34e4fa834ee36a610948156c84c87fbf48db8ee",
+      "namespaceReplacements": 1,
+      "transformedSha256": "32b5fca7b2c2be54eae172e737a885fae7139e8a2212e5a9ae0080ddae91de30"
+    },
+    {
+      "path": "site/engine/instruments.js",
+      "inputSha256": "4ba58973d79f0cbf8ad0adf1699e69c4acc4d03bca5afa2735325b78795427bd",
+      "namespaceReplacements": 1,
+      "transformedSha256": "f66b3ee73466e2966f988630cad75537e8951598bf035109fb28c9fc79604445"
+    },
+    {
+      "path": "site/engine/more-instruments.js",
+      "inputSha256": "414845748105d0faff7ff02ff5e7ac8155f5646fb28659e69481ed54ff09a20c",
+      "namespaceReplacements": 1,
+      "transformedSha256": "1dd2aaef1e17c41cbcdae8463d95d7f52580087b65eb54a7158416692904e572"
+    },
+    {
+      "path": "site/engine/conductor.js",
+      "inputSha256": "1d1a6eac5be029dae0f21598b38a138f4eeb07dd696b511431d5b7ec79384032",
+      "namespaceReplacements": 1,
+      "transformedSha256": "6c4983ea7f152e5b49727124ba05703db454e0f4a52a77de6c28b43c0d64b927"
+    },
+    {
+      "path": "site/pieces/starfield.js",
+      "inputSha256": "5ee4f5665ab2f84f9a27f5a109ffe763d00ee1692036ecd798e839e177cad0e4",
+      "namespaceReplacements": 0,
+      "transformedSha256": "5ee4f5665ab2f84f9a27f5a109ffe763d00ee1692036ecd798e839e177cad0e4"
+    },
+    {
+      "path": "site/pieces/zoning-board.js",
+      "inputSha256": "08c962581d39ec1770b1967c107a58f1c3407c2d020b5e9eb37777800bc238ea",
+      "namespaceReplacements": 0,
+      "transformedSha256": "08c962581d39ec1770b1967c107a58f1c3407c2d020b5e9eb37777800bc238ea"
+    }
+  ],
+  "outputSha256": "9adfa1407777457d0cae5d4138bb39d2b83ece1ac952ec5f27def8a2affd33f0"
+}

@@ -1,0 +1,191 @@
+{
+  "southernSources": [
+    {
+      "id": "cottage",
+      "root": [
+        -12,
+        0,
+        46
+      ],
+      "bounds": [
+        -17,
+        41,
+        -7,
+        51
+      ],
+      "entry": [
+        -12,
+        43
+      ]
+    },
+    {
+      "id": "timber-verandah",
+      "root": [
+        12,
+        0,
+        46
+      ],
+      "bounds": [
+        7,
+        38,
+        17,
+        51
+      ],
+      "entry": [
+        12,
+        39
+      ]
+    },
+    {
+      "id": "monument-courtyard",
+      "root": [
+        0,
+        0,
+        59
+      ],
+      "bounds": [
+        -6,
+        53,
+        6,
+        65
+      ]
+    }
+  ],
+  "entranceLamps": [
+    {
+      "id": "compact-entrance-lantern-0",
+      "footprint": [
+        34.85,
+        2.85,
+        35.15,
+        3.15
+      ],
+      "root": [
+        35,
+        0,
+        3
+      ],
+      "height": 1.6
+    },
+    {
+      "id": "compact-entrance-lantern-1",
+      "footprint": [
+        48.85,
+        2.85,
+        49.15,
+        3.15
+      ],
+      "root": [
+        49,
+        0,
+        3
+      ],
+      "height": 1.6
+    },
+    {
+      "id": "compact-entrance-lantern-2",
+      "footprint": [
+        70.85,
+        -0.85,
+        71.15,
+        -0.5499999999999999
+      ],
+      "root": [
+        71,
+        0,
+        -0.7
+      ],
+      "height": 1.6
+    },
+    {
+      "id": "compact-entrance-lantern-3",
+      "footprint": [
+        76.85,
+        -0.85,
+        77.15,
+        -0.5499999999999999
+      ],
+      "root": [
+        77,
+        0,
+        -0.7
+      ],
+      "height": 1.6
+    },
+    {
+      "id": "compact-entrance-lantern-4",
+      "footprint": [
+        32.550000000000004,
+        10.65,
+        32.85,
+        10.950000000000001
+      ],
+      "root": [
+        32.7,
+        0,
+        10.8
+      ],
+      "height": 1.6
+    },
+    {
+      "id": "compact-entrance-lantern-5",
+      "footprint": [
+        35.15,
+        10.65,
+        35.449999999999996,
+        10.950000000000001
+      ],
+      "root": [
+        35.3,
+        0,
+        10.8
+      ],
+      "height": 1.6
+    },
+    {
+      "id": "compact-entrance-lantern-6",
+      "footprint": [
+        -2.15,
+        52.550000000000004,
+        -1.85,
+        52.85
+      ],
+      "root": [
+        -2,
+        0,
+        52.7
+      ],
+      "height": 1.6
+    },
+    {
+      "id": "compact-entrance-lantern-7",
+      "footprint": [
+        1.85,
+        52.550000000000004,
+        2.15,
+        52.85
+      ],
+      "root": [
+        2,
+        0,
+        52.7
+      ],
+      "height": 1.6
+    }
+  ],
+  "librarySculpture": {
+    "root": [
+      79,
+      0,
+      0
+    ],
+    "footprint": [
+      77.75,
+      -1.25,
+      80.25,
+      1.25
+    ]
+  },
+  "lightResourcesAllocated": 0,
+  "scope": "actual appearance triangle datums/reservations only; no native housing/access/light/fluid/support"
+}

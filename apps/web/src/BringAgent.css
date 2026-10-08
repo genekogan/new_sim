@@ -1,0 +1,13 @@
+.bring-agent-open{padding:10px 18px;border-radius:999px;border:1px solid var(--line);background:var(--fg);color:var(--bg);font:600 14px/1.2 system-ui,sans-serif;box-shadow:0 6px 24px #0005;cursor:pointer}
+.bring-agent-open:hover{background:var(--accent);color:#fff}
+.bring-agent-scrim{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:16px;background:#0008}
+.bring-agent{position:relative;box-sizing:border-box;width:min(560px,100%);max-height:calc(100vh - 32px);overflow:auto;padding:24px;border-radius:16px;border:1px solid var(--line);background:var(--panel);color:var(--fg);font:15px/1.45 system-ui,sans-serif;box-shadow:0 12px 48px #0006}
+.bring-agent h2{margin:0 28px 10px 0;font:700 22px/1.2 system-ui,sans-serif;letter-spacing:0;text-transform:none;color:var(--fg)}
+.bring-agent p{margin:0 0 14px}
+.bring-agent textarea{box-sizing:border-box;width:100%;font:12.5px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;padding:10px;resize:vertical}
+.bring-agent-row{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin:12px 0 14px}
+.bring-agent-row .primary{padding:8px 16px;border-radius:8px;border:0;background:var(--accent);color:#fff;font:600 14px system-ui,sans-serif;cursor:pointer}
+.bring-agent-row span{color:var(--dim);font-size:13px}
+.bring-agent-fine{color:var(--dim);font-size:13px;overflow-wrap:anywhere}
+.bring-agent-close{position:absolute;top:12px;right:12px;width:32px;height:32px;padding:0;border:0;background:transparent;color:var(--dim);font-size:22px;cursor:pointer}
+@media (max-width:600px){.bring-agent{padding:18px}.bring-agent h2{font-size:19px}}

@@ -1,0 +1,338 @@
+{
+  "worldId": "pm-preview-eden-20261005",
+  "ref": {
+    "contract": "render-scene-ref/1",
+    "rulesVersion": "sim-mars/1+retained-shore/1+mars-engine/1+mars-assembly/3+activities/31+bodies/1+crew-removal/1+commons/1+arrival-clearance/1+walk-block/1+commons-provisions/1+commons-kitchen/2+fd/1",
+    "hash": "e66484dbafd9c45caf64c616de34e55202f534e644f9e2302c61ad2fb5ce78f7"
+  },
+  "provisions": {
+    "version": "commons-provisions/1",
+    "resources": [
+      {
+        "id": "commons-personal-1",
+        "mat": "commons-mat-1",
+        "bowl": "commons-bowl-1",
+        "spoon": "commons-spoon-1",
+        "bowlHome": [
+          -22,
+          0,
+          8
+        ],
+        "spoonHome": [
+          -21.5,
+          0,
+          8
+        ],
+        "sleepReturn": [
+          -22,
+          12.5
+        ]
+      },
+      {
+        "id": "commons-personal-2",
+        "mat": "commons-mat-2",
+        "bowl": "commons-bowl-2",
+        "spoon": "commons-spoon-2",
+        "bowlHome": [
+          -16,
+          0,
+          8
+        ],
+        "spoonHome": [
+          -15.5,
+          0,
+          8
+        ],
+        "sleepReturn": [
+          -16,
+          12.5
+        ]
+      },
+      {
+        "id": "commons-personal-3",
+        "mat": "commons-mat-3",
+        "bowl": "commons-bowl-3",
+        "spoon": "commons-spoon-3",
+        "bowlHome": [
+          -10,
+          0,
+          8
+        ],
+        "spoonHome": [
+          -9.5,
+          0,
+          8
+        ],
+        "sleepReturn": [
+          -10,
+          12.5
+        ]
+      },
+      {
+        "id": "commons-personal-4",
+        "mat": "commons-mat-4",
+        "bowl": "commons-bowl-4",
+        "spoon": "commons-spoon-4",
+        "bowlHome": [
+          -4,
+          0,
+          8
+        ],
+        "spoonHome": [
+          -3.5,
+          0,
+          8
+        ],
+        "sleepReturn": [
+          -4,
+          12.5
+        ]
+      },
+      {
+        "id": "commons-personal-5",
+        "mat": "commons-mat-5",
+        "bowl": "commons-bowl-5",
+        "spoon": "commons-spoon-5",
+        "bowlHome": [
+          -22,
+          0,
+          11
+        ],
+        "spoonHome": [
+          -21.5,
+          0,
+          11
+        ],
+        "sleepReturn": [
+          -22,
+          19.5
+        ]
+      },
+      {
+        "id": "commons-personal-6",
+        "mat": "commons-mat-6",
+        "bowl": "commons-bowl-6",
+        "spoon": "commons-spoon-6",
+        "bowlHome": [
+          -16,
+          0,
+          11
+        ],
+        "spoonHome": [
+          -15.5,
+          0,
+          11
+        ],
+        "sleepReturn": [
+          -16,
+          19.5
+        ]
+      },
+      {
+        "id": "commons-personal-7",
+        "mat": "commons-mat-7",
+        "bowl": "commons-bowl-7",
+        "spoon": "commons-spoon-7",
+        "bowlHome": [
+          -10,
+          0,
+          11
+        ],
+        "spoonHome": [
+          -9.5,
+          0,
+          11
+        ],
+        "sleepReturn": [
+          -10,
+          19.5
+        ]
+      },
+      {
+        "id": "commons-personal-8",
+        "mat": "commons-mat-8",
+        "bowl": "commons-bowl-8",
+        "spoon": "commons-spoon-8",
+        "bowlHome": [
+          -4,
+          0,
+          11
+        ],
+        "spoonHome": [
+          -3.5,
+          0,
+          11
+        ],
+        "sleepReturn": [
+          -4,
+          19.5
+        ]
+      }
+    ],
+    "nativeGroundY": 0
+  },
+  "kitchen": {
+    "version": "commons-kitchen/2",
+    "slotRow": "r1",
+    "stations": [
+      {
+        "id": "commons-kitchen-1",
+        "table": "commons-kitchen-table-1",
+        "pot": "commons-kitchen-pot-1",
+        "beans": "commons-kitchen-beans-1",
+        "greens": "commons-kitchen-greens-1",
+        "spoon": "commons-kitchen-spoon-1",
+        "p": [
+          -22,
+          0,
+          4
+        ]
+      },
+      {
+        "id": "commons-kitchen-2",
+        "table": "commons-kitchen-table-2",
+        "pot": "commons-kitchen-pot-2",
+        "beans": "commons-kitchen-beans-2",
+        "greens": "commons-kitchen-greens-2",
+        "spoon": "commons-kitchen-spoon-2",
+        "p": [
+          -16,
+          0,
+          4
+        ]
+      },
+      {
+        "id": "commons-kitchen-3",
+        "table": "commons-kitchen-table-3",
+        "pot": "commons-kitchen-pot-3",
+        "beans": "commons-kitchen-beans-3",
+        "greens": "commons-kitchen-greens-3",
+        "spoon": "commons-kitchen-spoon-3",
+        "p": [
+          -10,
+          0,
+          4
+        ]
+      },
+      {
+        "id": "commons-kitchen-4",
+        "table": "commons-kitchen-table-4",
+        "pot": "commons-kitchen-pot-4",
+        "beans": "commons-kitchen-beans-4",
+        "greens": "commons-kitchen-greens-4",
+        "spoon": "commons-kitchen-spoon-4",
+        "p": [
+          -4,
+          0,
+          4
+        ]
+      }
+    ],
+    "ingredientBowlsPerStation": 2,
+    "servingsPerStation": 2,
+    "nativeGroundY": 0
+  },
+  "foodDeliveries": {
+    "contract": "commons-food-delivery/1",
+    "batches": [
+      {
+        "deliveryId": "finite-eden-20261005-A",
+        "batch": 1,
+        "portions": 8,
+        "resources": [
+          {
+            "index": 0,
+            "bowl": "commons-food-1-bowl-1",
+            "spoon": "commons-spoon-1",
+            "home": [
+              -21,
+              0,
+              8
+            ]
+          },
+          {
+            "index": 1,
+            "bowl": "commons-food-1-bowl-2",
+            "spoon": "commons-spoon-2",
+            "home": [
+              -15,
+              0,
+              8
+            ]
+          },
+          {
+            "index": 2,
+            "bowl": "commons-food-1-bowl-3",
+            "spoon": "commons-spoon-3",
+            "home": [
+              -9,
+              0,
+              8
+            ]
+          },
+          {
+            "index": 3,
+            "bowl": "commons-food-1-bowl-4",
+            "spoon": "commons-spoon-4",
+            "home": [
+              -3,
+              0,
+              8
+            ]
+          },
+          {
+            "index": 4,
+            "bowl": "commons-food-1-bowl-5",
+            "spoon": "commons-spoon-5",
+            "home": [
+              -21,
+              0,
+              11
+            ]
+          },
+          {
+            "index": 5,
+            "bowl": "commons-food-1-bowl-6",
+            "spoon": "commons-spoon-6",
+            "home": [
+              -15,
+              0,
+              11
+            ]
+          },
+          {
+            "index": 6,
+            "bowl": "commons-food-1-bowl-7",
+            "spoon": "commons-spoon-7",
+            "home": [
+              -9,
+              0,
+              11
+            ]
+          },
+          {
+            "index": 7,
+            "bowl": "commons-food-1-bowl-8",
+            "spoon": "commons-spoon-8",
+            "home": [
+              -3,
+              0,
+              11
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "sceneHash": "fb9116a3d8f05b27d4f5358625859176a33f7543d8087bb7b27b209ef6f5a7ba",
+  "shoreHash": "bcc62c49261431f26eaa863eab1c4c55d18c9e201c1adc753cf2921bb454b9d9",
+  "clock": {
+    "origin": 0,
+    "dayTicks": 72000
+  },
+  "ground": "grass",
+  "base": {
+    "campus": "eden-commons-shore/1",
+    "staticHash": "c1d5707a5a821ae6788461105b83289f8f943dba657b4e31ca62cf3c3244fa37"
+  }
+}

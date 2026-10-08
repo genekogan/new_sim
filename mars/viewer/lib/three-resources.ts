@@ -78,6 +78,7 @@ export async function loadGltf(
   url: string,
   signal: AbortSignal,
   resources: ThreeResources,
+  observeSource?: (bytes: ArrayBuffer, gltf: GLTF) => void | Promise<void>,
 ): Promise<GLTF> {
   const response = await fetch(url, { signal });
   if (!response.ok) throw Error(`Model unavailable (${response.status})`);
@@ -87,6 +88,8 @@ export async function loadGltf(
     .setMeshoptDecoder(MeshoptDecoder)
     .parseAsync(bytes, new URL('.', new URL(url, location.href)).href);
   resources.object(gltf.scene);
+  // Optional presentation provenance must never prevent the base model load.
+  if(observeSource)try{await observeSource(bytes,gltf);}catch{}
   signal.throwIfAborted();
   return gltf;
 }

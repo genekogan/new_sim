@@ -3,6 +3,10 @@
 // Everything is random access in take time, so scrubbing, pausing, the speed
 // and whether the engine camera is on can never change what is shown at a
 // given t (spec §18: the take plays identically with any camera).
+import {recordedBody,admittedBodyUrl} from './recorded-body.ts';
+import {recordedGame} from './recorded-games.ts';
+import {projectPlatformFrame} from './recorded-platforms.ts';
+import type {PlatformFloor} from '../../lib/platform-floor.ts';
 import * as THREE from 'three';
 import { hashOf } from '../../engine/core/hash.ts';
 import { ANG_Q, POS_Q, type CameraTrack, type PoseSample, type Take } from '../../engine/take/types.ts';
@@ -14,13 +18,20 @@ import type { Entity, WorldState } from '../../engine/world/types.ts';
 import type { SpatialScene } from '../../engine/spatial/types.ts';
 import { def } from '../../engine/world/catalog.ts';
 import { progressiveContributor } from '../../engine/construction/contributor.ts';
+import {waterTransitions,type WaterTransition} from './water-transition.ts';
 import { isPlywood } from '../../engine/construction/deck.ts';
 import { ComponentViews } from './components.ts';
+import {recordedSleepPose} from './recorded-sleep-pose.ts';
 import { FixtureViews } from './fixtures.ts';
 import { HumanViews, type Hands, type SampledHuman } from './humans.ts';
 import { takeLog, type LogLine, type TakeStep } from './take-log.ts';
 import type { Template } from './people.ts';
 import { walkCum } from './take-walk.ts';
+import type { DepictionBeat } from './station-depiction.ts';
+import {shoreDepiction} from './recorded-shore.ts';
+import {NativeBoatViews} from './native-boat.ts';
+import type {NativeBoatLayoutV1} from '../../../../packages/engine-contract/src/boat.ts';
+import type {ShoreDesign} from './shore-preview.ts';
 
 export { takeLog, type LogLine, type TakeStep } from './take-log.ts';
 export type TakeManifestEntry = {
@@ -141,12 +152,18 @@ const EMPTY_SCENE: SpatialScene = { bounds: [0, 0, 0, 0], levels: [], surfaces: 
  * construction contributor over the frame's components (installed flights with all treads).
  */
 export class TakePeople {
+  private platformFloors:readonly PlatformFloor[]=[];
+  private platformBaseY=0;
+  setPlatformFloors(platforms:readonly PlatformFloor[],baseY=0){this.platformFloors=platforms;this.platformBaseY=baseY;}
   readonly group = new THREE.Group();
   take: Take;
   private comps = new ComponentViews();
-  private fixtures = new FixtureViews();
-  private humans = new HumanViews();
+  private fixtures:FixtureViews;
+  private humans:HumanViews;
   private walks = new Map<string, Walk>();
+  /** Per person: the ticks at which `activity` / `baseActivity` changed in this take, and the values (library clip
+   *  crossfades and one-shots need how long the current activity has run and what came before). */
+  private acts = new Map<string, { t: number[]; v: string[]; bt: number[]; bv: (string | null)[] }>();
   private base: SpatialScene;
   private stairKey = '';
   /** Metres each walker had already walked before this take began (a chapter set: Σ over the earlier chapters). */
@@ -154,22 +171,42 @@ export class TakePeople {
   /** Per person at the last show(): metres walked (offset included) and the Walk weight. */
   private lastGait = new Map<string, { dist: number; walk: number }>();
   private templates: Template[] = [];
+  private fixtureDrawReplacement:THREE.Group|null=null;
+  private excludedFixtureObjects=new Map<THREE.Object3D,boolean>();
+  private waterTransition:(id:string,seconds:number)=>WaterTransition=()=>({weight:1,from:null,origins:[]});
+  private waterHistoryKey='';
+  private nativeBoat?:NativeBoatViews;
   frame: TakeFrame | null = null;
   /** Wall ms of the last show()'s `sampleTake` (the rest of show() is posing the three.js views). */
   sampleMs = 0;
+  appearancesSettled(){return this.humans.appearancesSettled();}
+  appearanceStatus(){return this.humans.appearanceStatus();}
 
-  constructor(take: Take, opts: { scene?: SpatialScene } = {}) {
+  constructor(take: Take, opts: { scene?: SpatialScene; commonsContrast?:boolean; humanPresets?:boolean; nativeBoat?:{layout:NativeBoatLayoutV1;proposal:ShoreDesign['boat']} } = {}) {
     this.take = take;
+    this.humans=new HumanViews(opts.humanPresets??false);
+    this.fixtures=new FixtureViews(opts.commonsContrast??false);
     this.base = opts.scene ?? EMPTY_SCENE;
     this.group.add(this.comps.group, this.fixtures.group, this.humans.group);
+    if(opts.nativeBoat){this.nativeBoat=new NativeBoatViews(opts.nativeBoat.layout,opts.nativeBoat.proposal);this.group.add(this.nativeBoat.group);}
     this.indexWalks();
     this.humans.setStairs(this.base.links);
   }
 
   private indexWalks() {
     this.walks.clear();
+    this.acts.clear();
+    for (const [tick, id, field, value] of this.take.changes) {
+      if (field !== 'activity' && field !== 'baseActivity') continue;
+      let a = this.acts.get(id);
+      if (!a) this.acts.set(id, (a = { t: [], v: [], bt: [], bv: [] }));
+      if (field === 'activity') { if (typeof value === 'string' && a.v[a.v.length - 1] !== value) { a.t.push(tick); a.v.push(value); } }
+      else { a.bt.push(tick); a.bv.push(typeof value === 'string' ? value : null); }
+    }
+    this.waterTransition=waterTransitions(this.take);
+    this.waterHistoryKey='';
     for (const [id, s] of Object.entries(this.take.tracks)) {
-      if (recordOf(this.take, id)?.kind !== 'human' || recordOf(this.take,id)?.body?.family === 'floater') continue;
+      if (recordOf(this.take,id)?.kind!=='human')continue;
       this.walks.set(id, { ticks: s.map((x) => x[0]), cum: walkCum(s), track: s });
     }
   }
@@ -188,6 +225,15 @@ export class TakePeople {
     this.frame = null;
   }
 
+  /** Optional retained exact recording history; gaps/foreign physics never fill a transition. */
+  setWaterHistory(takes:readonly Take[]){
+    const key=this.take.id+'|'+takes.map(t=>t.id).join('|');if(key===this.waterHistoryKey)return;
+    this.waterTransition=waterTransitions(this.take,takes);this.waterHistoryKey=key;
+  }
+
+  setBodyTemplates(templates:ReadonlyMap<string,Template>){this.humans.setBodyTemplates(templates);}
+  bodyObject(id:string){return this.humans.bodyObject(id);}
+
   setTemplates(ts: Template[]) {
     this.templates = ts;
     this.humans.setTemplates(ts);
@@ -205,9 +251,21 @@ export class TakePeople {
       const tpl = this.templates.find((x) => x.name === bones[id]?.template);
       const dur = tpl ? THREE.AnimationClip.findByName(tpl.gltf.animations, 'Walk')?.duration : undefined;
       const stride = tpl && dur ? tpl.walkSpeed * dur : null;
-      out[id] = { dist: g.dist, walk: g.walk, stride, phase: stride ? ((g.dist / tpl!.walkSpeed) % dur!) / dur! : null };
+      out[id] = { dist: g.dist, walk: g.walk, stride, phase: stride ? (((g.dist / tpl!.walkSpeed) % dur! + dur!) % dur!) / dur! : null };
     }
     return out;
+  }
+
+  /** How long `id`'s current activity has run at `tick` and what it did before (absent when it began before the take). */
+  private activityHistory(id: string, tick: number): Pick<SampledHuman, 'activityAge' | 'prevActivity' | 'prevBaseActivity'> {
+    const a = this.acts.get(id);
+    if (!a) return {};
+    let k = -1;
+    for (let i = a.t.length - 1; i >= 0; i--) if (a.t[i] <= tick) { k = i; break; }
+    if (k < 1) return {};
+    let b: string | null = null;
+    for (let i = a.bt.length - 1; i >= 0; i--) if (a.bt[i] < a.t[k]) { b = a.bv[i]; break; }
+    return { activityAge: (tick - a.t[k]) * this.take.dt, prevActivity: a.v[k - 1], ...(b ? { prevBaseActivity: b } : {}) };
   }
 
   /** Metres walked by `id` up to `tick` along its recorded track (horizontal). */
@@ -239,9 +297,11 @@ export class TakePeople {
    * Pose everything at take time t (seconds). `clock`: the time the views animate on (idle loops, fire flicker); a
    * chapter set passes its set time so it runs on across a chapter boundary. Poses depend only on t.
    */
-  show(t: number, clock = t) {
+  show(t: number, clock = t,stationBeat:DepictionBeat|null=null) {
     const s0 = performance.now();
-    const frame = (this.frame = sampleTake(this.take, t));
+    const nativeFrame=sampleTake(this.take,t);
+    const boatAppearance=this.nativeBoat?.show(nativeFrame);
+    const frame=(this.frame=projectPlatformFrame(nativeFrame,{...this.take.entities0,...this.take.finalState.entities},this.platformFloors,this.platformBaseY));
     this.sampleMs = performance.now() - s0;
     const comps: Record<string, Entity> = {};
     const fixtures: Record<string, Entity> = {};
@@ -251,18 +311,21 @@ export class TakePeople {
     for (const [id, e] of Object.entries(frame.entities)) {
       const src = recordOf(this.take, id) as Entity | undefined; // pose / phase / contents below come from the frame
       if (!src) continue;
-      const st = e.state as { grip?: { entity?: string; slot?: string }; support?: Entity['support']; connections?: Entity['connections']; contents?: Entity['contents']; hands?: Hands; baseActivity?: string; on?: string; proneYaw?: number; phaseK?: number; sleepPose?: NonNullable<Entity['human']>['sleepPose'] };
+      const st = e.state as { grip?: { entity?: string; slot?: string }; support?: Entity['support']; connections?: Entity['connections']; contents?: Entity['contents']; hands?: Hands; baseActivity?: string; prop?: string; seatHeight?: number; on?: string; proneYaw?: number; phaseK?: number; sleepPose?: NonNullable<Entity['human']>['sleepPose'] };
       if (src.kind === 'component') {
         // discrete state as of t (the final state's phase / support would put every item in its last place)
         comps[id] = { ...src, pose: { p: e.p, yaw: e.yaw, pitch: e.pitch, roll: e.roll }, ...(e.phase ? { phase: e.phase as Entity['phase'] } : {}), ...('support' in st ? { support: st.support ?? undefined } : {}), ...('connections' in st ? { connections: st.connections ?? undefined } : {}), ...Object.fromEntries(['contents', 'gardenCare', 'planting', 'foodPreparation'].map(field => [field, e.state[field] ?? undefined])) };
         continue;
       }
       if (src.kind === 'fixture') {
+        // Replace the unknown fixture cube only while its recorded counterpart is valid.
+        if(boatAppearance?.dockDepicted&&this.nativeBoat?.group.getObjectByName(id))continue;
         // piles / bundles, the cutting station, benches, campfires: pose + contents as of t (a pile shrinks)
         fixtures[id] = { ...src, pose: { p: e.p, yaw: e.yaw, pitch: e.pitch, roll: e.roll }, ...Object.fromEntries(['contents', 'gardenCare', 'planting', 'foodPreparation'].map(field => [field, e.state[field] ?? undefined])) };
         continue;
       }
-      if (src.kind !== 'human' || src.body?.family === 'floater') continue;
+      const body=recordedBody(src.body,e.state);
+      if (src.kind !== 'human' || body?.family === 'floater') continue;
       const w = this.walks.get(id);
       const dist = (w ? this.walked(w, frame.tick) : 0) + (this.walkOffsets[id] ?? 0);
       const speed = w ? (this.walked(w, frame.tick + span) - this.walked(w, frame.tick - span)) / (2 * span * dt) : 0;
@@ -273,19 +336,28 @@ export class TakePeople {
       // prone receiver (mars-take/4, W32): the lying heading in integer mrad and the phase progress in integer % → rad, 0–1
       const proneYaw = typeof st.proneYaw === 'number' ? st.proneYaw / ANG_Q : undefined;
       const phaseK = typeof st.phaseK === 'number' ? st.phaseK / 100 : undefined;
-      people.push({ id, p: e.p, yaw: e.yaw, walk, walkDist: dist, activity: e.activity, grip: g?.entity, gripSlot: g?.slot, hands: e.hands, baseActivity: st.baseActivity ?? undefined, on: st.on ?? undefined, ...(proneYaw !== undefined ? { proneYaw } : {}), ...(phaseK !== undefined ? { phaseK } : {}), ...(st.sleepPose ? { sleepPose: structuredClone(st.sleepPose) } : {}) });
+      const shore=shoreDepiction(e);
+      // a scenery seat (armchair, piano bench) carries its seat top in the body state (ACTIVITIES-v1 human.seatHeight)
+      const seatHeight=this.nativeBoat?.seatHeightFor(frame,id)??(typeof st.seatHeight==='number'&&Number.isFinite(st.seatHeight)?st.seatHeight:undefined);
+      const publicSoulKey=(src.human as {soul?:unknown}|undefined)?.soul;
+      const game=recordedGame(e.state.game);
+      people.push({ ...(body?.modelUrl?{bodyModel:admittedBodyUrl(body.modelUrl)??body.modelUrl}:{}),...(typeof publicSoulKey==='string'?{publicSoulKey}:{}), ...(seatHeight!==undefined?{seatHeight}:{}), ...(shore.status==='recorded'?{shore:shore.contact}:{}), shoreTime:(this.take.startTick+t/this.take.dt)*this.take.dt,waterTransition:this.waterTransition(id,t), id, p: e.p, yaw: e.yaw, walk, walkDist: dist, activity: e.activity, grip: g?.entity, gripSlot: g?.slot, hands: e.hands, baseActivity: st.baseActivity ?? undefined, ...this.activityHistory(id, frame.tick), ...(typeof (st as {partner?: unknown}).partner==='string'?{partner:(st as {partner:string}).partner}:{}), ...(typeof st.prop==='string'?{prop:st.prop}:{}), ...(typeof e.state.instrument==='string'?{instrument:e.state.instrument}:{}),...(game?{game,gameTick:this.take.startTick+frame.tick,gameDt:this.take.dt}:{}),...(Number.isFinite(speed)?{speed:Math.abs(speed)}:{}), on: st.on ?? undefined, ...(proneYaw !== undefined ? { proneYaw } : {}), ...(phaseK !== undefined ? { phaseK } : {}), ...(st.sleepPose ? { sleepPose: recordedSleepPose(this.take,id,frame.tick,st.sleepPose) } : {}) });
     }
     this.stairs(comps);
     this.comps.onTick({ entities: comps });
     this.comps.render(1);
     this.fixtures.onTick({ entities: fixtures });
     this.fixtures.render(clock);
+    this.humans.setStationBeat(stationBeat);
     this.humans.setFrame(people, clock, { ...comps, ...fixtures }); // seats / fires come from the fixtures
     this.humans.setAttention(Object.fromEntries(Object.entries(frame.entities).filter(([,e]) => Array.isArray(e.state.attention)).map(([id,e]) => [id, e.state.attention as [number,number]])));
     this.humans.render(1, (id, from, out) => this.comps.nearestPoint(id, from, out));
     this.comps.attachHeld(this.humans);
     return frame;
   }
+
+  /** Bodies (entity ids) speaking now in the viewer: they talk with their hands (library talking clips). */
+  setSpeaking(ids: ReadonlySet<string>) { this.humans.setSpeaking(ids); }
 
   /** Pose readout (lab hook / tests): as HumanViews.bones for the last show(). */
   bones(id?: string) {
@@ -306,6 +378,18 @@ export class TakePeople {
   humanCount() {
     return this.humans.group.children.length;
   }
+  /** Caller owns replacement resources. Retain ALL native records for bodies and seats. */
+  setFixtureDrawReplacement(group:THREE.Group|null,ids:readonly string[]=[]){
+    if(this.fixtureDrawReplacement!==group){this.fixtureDrawReplacement?.removeFromParent();this.fixtureDrawReplacement=group;if(group)this.group.add(group);}
+    for(const [object,visible]of this.excludedFixtureObjects)object.visible=visible;
+    this.excludedFixtureObjects.clear();
+    if(group)for(const id of ids){const object=this.fixtures.group.getObjectByName(id);if(object&&!this.excludedFixtureObjects.has(object)){this.excludedFixtureObjects.set(object,object.visible);object.visible=false;}}
+  }
+  /** Original identity-bearing geometry remains the sole picking source. */
+  pickingRoots():readonly THREE.Object3D[]{return [this.comps.group,this.fixtures.group,this.humans.group,...(this.nativeBoat?[this.nativeBoat.group]:[])];}
+
+  /** Render-only camera blockers; selected human bodies are deliberately excluded. */
+  obstructionRoots():readonly THREE.Object3D[]{return [this.comps.group,this.fixtures.group,...(this.fixtureDrawReplacement?[this.fixtureDrawReplacement]:[]),...(this.nativeBoat?[this.nativeBoat.group]:[])];}
   /** Components and fixtures drawn. */
   componentCount() {
     return this.comps.group.children.length + this.fixtures.group.children.length;
@@ -316,10 +400,12 @@ export class TakePeople {
   }
 
   dispose() {
-    this.humans.clear();
-    this.comps.dispose();
-    this.fixtures.dispose();
-    this.group.removeFromParent();
+    const errors:unknown[]=[],attempt=(release:()=>void)=>{try{release();}catch(error){errors.push(error);}};
+    // A nested native owner can report callback errors after cleanup; still release its siblings.
+    attempt(()=>this.setFixtureDrawReplacement(null));
+    attempt(()=>this.nativeBoat?.dispose());attempt(()=>this.humans.clear());
+    attempt(()=>this.comps.dispose());attempt(()=>this.fixtures.dispose());attempt(()=>this.group.removeFromParent());
+    if(errors.length)throw new AggregateError(errors,'Take people cleanup failed');
   }
 }
 

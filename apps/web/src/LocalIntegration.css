@@ -1,0 +1,4 @@
+.local-integration, .local-connection-help { font-size: .8rem; min-width: 0; max-width: 100%; }
+.local-integration > summary, .local-connection-help > summary { cursor: pointer; }
+.world-hud > .local-integration[open], .world-hud > .local-connection-help[open] { flex-basis: 100%; max-height: 28vh; overflow: auto; }
+.local-integration p, .local-integration li, .local-connection-help p, .local-connection-help li { overflow-wrap: anywhere; }

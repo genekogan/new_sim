@@ -1,0 +1,18 @@
+[
+  {
+    "path": "mars/viewer/app/engine-view/vegetation.ts",
+    "sha256": "61c4d7e4a119126929b1dd64a2d17aad48921c4b2ed6b6f8f0a6cb46fe95f03d",
+    "role": "original reused family"
+  },
+  {
+    "path": "mars/viewer/app/engine-view/content/environment/forest-understory.ts",
+    "sha256": "57ec484c4b14ee18296ae5edd2ca12b93eada094f61b399458dd4e24bbc3bb1d",
+    "role": "original reused family"
+  },
+  {
+    "path": "mars/viewer/app/engine-view/content/assets/eden-expansion-assets/roof-planters.ts",
+    "sha256": "befb2b580b48d830e475d81ab709052bcb321b01ecf6b35302c4ba1b72fa55b3",
+    "git": "272f82fc",
+    "role": "frozen Assets exact roof bed datums/IDs"
+  }
+]

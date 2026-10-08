@@ -1,0 +1,37 @@
+// Exact connected native geometry appearance; native admission remains Core-owned.
+import * as THREE from 'three';
+import {inspectNativeShoreTerrain,type NativeShoreTerrainInput} from './native-shore-terrain.ts';
+import {inspectCapturedBankDressing,createCapturedBankDressing} from './captured-bank-dressing.ts';
+import {inspectCapturedWaterSurface,createCapturedWaterSurface,type CapturedWaterInput} from './captured-water-surface.ts';
+import {createEdenReadableWater} from './eden-water-readability/water.mjs';
+import {buildEdenShoreVertexColours} from './eden-shore-ground-colour/vertex-colours.mjs';
+const ORIGINAL_ROW=[-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.5,-1.2,-.9,-.6,-.3,0,.13,.26,.39,.52,.65,.78,.91,1.04,1.17,1.3,1.43,1.56,1.69,1.82,1.95,2] as const;
+function data(input:unknown,keys:readonly string[]):Record<string,unknown>{
+ if(!input||typeof input!=='object'||Object.getPrototypeOf(input)!==Object.prototype&&Object.getPrototypeOf(input)!==null)throw Error('Connected shore requires plain own data');
+ const own=Reflect.ownKeys(input);if(own.length!==keys.length||own.some(k=>typeof k!=='string'||!keys.includes(k)))throw Error('Unsupported connected shore keys');const copy:Record<string,unknown>={};for(const key of keys){const d=Object.getOwnPropertyDescriptor(input,key);if(!d||!Object.hasOwn(d,'value'))throw Error('Connected shore refuses accessors');copy[key]=d.value;}return copy;
+}
+function dense(input:unknown,n:number):unknown[]{
+ if(!Array.isArray(input)||Object.getPrototypeOf(input)!==Array.prototype)throw Error('Connected shore requires dense arrays');const keys=Reflect.ownKeys(input);if(keys.length!==n+1||keys.some(k=>typeof k!=='string'||k!=='length'&&(!/^(0|[1-9][0-9]*)$/.test(k)||Number(k)>=n)))throw Error('Unsupported connected shore array keys');const length=Object.getOwnPropertyDescriptor(input,'length');if(length?.value!==n)throw Error('Connected shore array dimensions differ');return Array.from({length:n},(_,i)=>{const d=Object.getOwnPropertyDescriptor(input,String(i));if(!d||!Object.hasOwn(d,'value'))throw Error('Connected shore array requires own values');return d.value;});
+}
+/** Exact frozen f870 profile certificate; actual terrain is copied, never generated. */
+export function inspectConnectedNativeShore(input:NativeShoreTerrainInput,waterInput:CapturedWaterInput){
+ const t=data(input,['id','originXZ','spacingMetres','columns','rows','diagonal','heightMetres']);if(t.id!=='commons-shore-terrain/1'||t.spacingMetres!==1||t.columns!==35||t.rows!==25||t.diagonal!=='min-min/max-max')throw Error('Unsupported connected shore profile');const origin=dense(t.originXZ,2);if(origin[0]!==-62||origin[1]!==-12)throw Error('Unsupported connected shore origin');const expected=[...ORIGINAL_ROW.map(y=>y-2),0,0];const heights=dense(t.heightMetres,25).map(row=>dense(row,35).map((h,i)=>{if(typeof h!=='number'||!Number.isFinite(h)||h!==expected[i])throw Error('Unsupported connected shore heights');return h;}));
+ const w=data(waterInput,['id','datumY','wetBoundsXZ']);if(w.id!=='commons-shore-water/1'||w.datumY!==-2)throw Error('Unsupported connected water datum/id');const bounds=dense(w.wetBoundsXZ,4);if(bounds.some((v,i)=>v!==[-62,-12,-46,12][i]))throw Error('Unsupported connected water bounds');
+ const terrain:NativeShoreTerrainInput={id:'commons-shore-terrain/1',originXZ:[-62,-12],spacingMetres:1,columns:35,rows:25,diagonal:'min-min/max-max',heightMetres:heights};const water:CapturedWaterInput={id:'commons-shore-water/1',datumY:-2,wetBoundsXZ:bounds as number[]};
+ // Strict subtraction certificate precedes exact inverse-profile decoding. A naive
+ // +2 would round .13 differently and be refused by the unchanged old owner.
+ const isolatedTerrain:NativeShoreTerrainInput={id:'eden-shore-terrain',originXZ:[-16,-12],spacingMetres:1,columns:33,rows:25,diagonal:'min-min/max-max',heightMetres:heights.map(row=>row.slice(0,33).map((_,i)=>ORIGINAL_ROW[i]))},isolatedWater:CapturedWaterInput={id:'eden-shore-water',datumY:0,wetBoundsXZ:[-16,-12,0,12]};
+ inspectNativeShoreTerrain(isolatedTerrain);const bank=inspectCapturedBankDressing(isolatedTerrain);inspectCapturedWaterSurface(isolatedTerrain,isolatedWater);
+ const translatedEnvelopes=bank.envelopes.map(e=>({...e,root:[e.root[0]-46,e.root[1]-2,e.root[2]] as [number,number,number]}));if(translatedEnvelopes.some(e=>e.root[0]+e.radius>=-30))throw Error('Connected foliage crosses native flat shoulder/commons');
+ return{terrain,water,isolatedTerrain,isolatedWater,transform:[-46,-2,0] as const,translatedEnvelopes,omittedPlants:[] as string[],gate:[-29,0,0] as const,appearance:'exact supplied connected terrain/water plus bounded transformed bank; no support admission'};
+}
+// The accepted connected Eden profile uses reviewed water/shore contrast.
+// Explicit false keeps each Simple recipe; water refusal returns its original owner.
+export function createConnectedNativeShore(terrain:NativeShoreTerrainInput,water:CapturedWaterInput,waterReadability=true,terrainReadability=true):{group:THREE.Group;setViewTime(seconds:number):void;dispose():void}{
+ const s=inspectConnectedNativeShore(terrain,water),colourRecipe=buildEdenShoreVertexColours(s.terrain,s.water,terrainReadability),group=new THREE.Group(),geometry=new THREE.BufferGeometry();group.name='Exact connected native shore appearance';let material:THREE.MeshStandardMaterial|undefined,bank:ReturnType<typeof createCapturedBankDressing>|undefined,wet:ReturnType<typeof createCapturedWaterSurface>|undefined;
+ const release=()=>{const errors:unknown[]=[];for(const action of[()=>group.removeFromParent(),()=>geometry.dispose(),()=>material?.dispose(),()=>bank?.dispose(),()=>wet?.dispose(),()=>group.clear()])try{action();}catch(error){errors.push(error);}return errors;};
+ try{const positions:number[]=[],colours:number[]=[],indices:number[]=[];for(let z=0;z<25;z++)for(let x=0;x<35;x++){const y=s.terrain.heightMetres[z][x];positions.push(-62+x,y,-12+z);const color=new THREE.Color('#b4ae7f').lerp(new THREE.Color('#91ad70'),THREE.MathUtils.clamp((y+2)/.8,0,1));colours.push(color.r,color.g,color.b);}for(let z=0;z<24;z++)for(let x=0;x<34;x++){const a=z*35+x,b=a+1,c=a+35,d=c+1;indices.push(a,d,b,a,c,d);}geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));geometry.setAttribute('color',new THREE.Float32BufferAttribute(colourRecipe?.colours??colours,3));geometry.setIndex(indices);geometry.computeVertexNormals();material=new THREE.MeshStandardMaterial({vertexColors:true,roughness:1});const mesh=new THREE.Mesh(geometry,material);mesh.name=s.terrain.id;mesh.receiveShadow=true;group.add(mesh);
+ bank=createCapturedBankDressing(s.isolatedTerrain);bank.group.position.set(...s.transform);group.add(bank.group);wet=createEdenReadableWater(s.isolatedTerrain,s.isolatedWater,waterReadability)??createCapturedWaterSurface(s.isolatedTerrain,s.isolatedWater);wet.group.position.set(...s.transform);wet.group.children[0].name=s.water.id;group.add(wet.group);
+ }catch(error){const errors=release();if(errors.length)throw new AggregateError([error,...errors],'Connected shore rollback failed',{cause:error});throw error;}
+ let closed=false;return{group,setViewTime(seconds:number){if(closed)throw Error('Connected shore disposed');wet!.setViewTime(seconds);},dispose(){if(closed)return;closed=true;const errors=release();if(errors.length)throw new AggregateError(errors,'Connected shore disposal failed',{cause:errors[0]});}};
+}

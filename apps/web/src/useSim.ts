@@ -1,27 +1,52 @@
+import {createApiRequest} from './api-request.ts';
+import {matchingMe} from './auth-projection.ts';
+import {acceptPrivateAuthority,acceptLivePrivateAuthority,retirePrivateAuthority} from './private-authority.ts';
 import { apiPath, worldPath } from './world-path.ts';
 import { useEffect, useRef, useState } from 'react';
 import { Connection } from '@sim/client';
-import type { BrainCall, CameraLine, KernelView, LogEvent, Me, NarrativeView, PlayView, ServerStats, TalkLine, TickerLine } from '@sim/protocol';
+import {createStationConnection,type StationConnection} from './score/station-connection.mjs';
+import * as stationCodec from '@sim/protocol';
+import type { StationLiveContract, BrainCall, CameraLine, KernelView, LogEvent, Me, NarrativeView, PlayView, ServerStats, TalkLine, TickerLine } from '@sim/protocol';
 
 declare const __BUILD__: string;
 
 export type Sim = {
   takes: { serverTick: number; chunks: {fromTick: number; toTick: number; take: unknown}[]; receivedAt: number };
-  conn: Connection; me: Me | null; log: LogEvent[]; brain: BrainCall[]; camera: CameraLine | null; ticker: TickerLine[];
+  privateAuthorityGeneration?:number;conn: Connection; station:StationConnection|null;me: Me | null; log: LogEvent[]; brain: BrainCall[]; camera: CameraLine | null; ticker: TickerLine[];
   narratives: Record<string, NarrativeView>; stats: ServerStats | null; bytesPerSec: number;
   /** The meaning layer: things, links, vocabulary, decks (public). */
   kernel: KernelView | null; plays: PlayView[]; talk: TalkLine[];
+  /** Edge spectator feed (speech, conversation.*, fade, steward.*) from the viewer socket; newest last, max 300. */
+  edge: EdgeMsg[];
 };
+/** One `{type:'edge', …}` viewer message (EDGE-CONTRACT-v1 §7). Open shape: renderers read only what they know. */
+export type EdgeMsg = { type: 'edge'; kind?: string; [k: string]: unknown };
 
 /** One connection for the page. Re-renders about 5 times a second while the world runs. */
-export function useSim(getToken: () => Promise<string | null>, authed: boolean): Sim {
+export function useSim(getToken: () => Promise<string | null>, authed: boolean,identity:string|null=null,worldId?:string,stationCapabilities?:{stationContracts?:StationLiveContract[]}): Sim {
   const tokenRef = useRef(getToken); tokenRef.current = getToken;
+  const identityRef=useRef(identity);identityRef.current=identity;
+  const authedRef=useRef(authed);authedRef.current=authed;
+  const session=JSON.stringify([authed,identity]);const sessionRef=useRef(session);
   const [, force] = useState(0);
-  const s = useRef<Omit<Sim, 'conn'> & { conn: Connection | null; lastBytes: number; lastAt: number; takeEpoch?: string }>({ takes: {serverTick: 0, chunks: [], receivedAt: 0}, conn: null, me: null, log: [], brain: [], camera: null, ticker: [], narratives: {}, stats: null, bytesPerSec: 0, kernel: null, plays: [], talk: [], lastBytes: 0, lastAt: Date.now() });
+  const s = useRef<Omit<Sim, 'conn'> & { conn: Connection | null; lastBytes: number; lastAt: number; takeEpoch?: string }>({ takes: {serverTick: 0, chunks: [], receivedAt: 0}, conn: null,station:null, privateAuthorityGeneration:0,me: null, log: [], brain: [], camera: null, ticker: [], narratives: {}, stats: null, bytesPerSec: 0, kernel: null, plays: [], talk: [], edge: [], lastBytes: 0, lastAt: Date.now() });
+  if(sessionRef.current!==session){sessionRef.current=session;retirePrivateAuthority(s.current);}
   if (!s.current.conn) {
     const st = s.current;
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     st.conn = new Connection(`${proto}://${location.host}${worldPath}/ws`, () => tokenRef.current(), {
+      onSession: session => {
+        retirePrivateAuthority(st);
+        if(session&&!st.station)st.station=createStationConnection({worldId:worldId??session.worldId,codec:stationCodec});
+        st.station?.onSession(session);
+      },
+      onMe: (me,scope)=>{
+        acceptLivePrivateAuthority(st,authedRef.current,identityRef.current,me,scope,st.conn!,worldId);
+        force(n=>n+1);
+      },
+      onStation: (view,receipt)=>st.station?.onStation(view,receipt),
+      onStationV2: (view,receipt)=>st.station?.onStationV2(view,receipt),
+      onPong: (pong,receipt)=>st.station?.onPong(pong,receipt),
       onTakes: stream => {
         const old = stream.serverTick < st.takes.serverTick ? [] : st.takes.chunks;
         const merged = new Map(old.map(c => [c.toTick, c]));
@@ -29,22 +54,25 @@ export function useSim(getToken: () => Promise<string | null>, authed: boolean):
         st.takes = {serverTick: stream.serverTick, chunks: [...merged.values()].sort((a,b) => a.toTick-b.toTick).slice(-12), receivedAt: performance.now()};
       },
       onWelcome: (me, w) => {
+        st.station?.onWelcome(w);
         if (w.epoch !== st.takeEpoch) st.takes.chunks = [];
         st.takeEpoch = w.epoch;
-        st.me = me;
+        acceptPrivateAuthority(st,authedRef.current,identityRef.current,me);
         // after a deploy, a page still running the old bundle reloads itself (once)
         if (w.build && w.build !== 'dev' && __BUILD__ !== 'dev' && w.build !== __BUILD__ && sessionStorage.getItem('sim.reloaded') !== w.build) { sessionStorage.setItem('sim.reloaded', w.build); location.reload(); }
       },
       onLog: (ev) => { const seen = new Set(st.log.map((e) => e.seq)); st.log = [...st.log, ...ev.filter((e) => !seen.has(e.seq))].slice(-400); },
-      onBrain: (calls) => { const seen = new Set(st.brain.map((c) => c.id)); st.brain = [...st.brain, ...calls.filter((c) => !seen.has(c.id))].slice(-300); },
+      onBrain: (calls) => { const current=matchingMe(authedRef.current,identityRef.current,st.me);if(!current)return;const own=new Set(current.souls);const seen = new Set(st.brain.map((c) => c.id)); st.brain = [...st.brain, ...calls.filter((c) => !seen.has(c.id)&&(current.role==='admin'||(typeof c.soulId==='string'&&own.has(c.soulId))))].slice(-300); },
       onCamera: (l) => { st.camera = l; },
       onTicker: (l) => { const seen = new Set(st.ticker.map((x) => `${x.tick}:${x.text}`)); st.ticker = [...st.ticker, ...l.filter((x) => !seen.has(`${x.tick}:${x.text}`))].slice(-40); },
       onNarrative: (v) => { st.narratives = { ...st.narratives, [v.region]: v }; },
-      onStats: (x) => { st.stats = x; },
+      onStats: (x) => { const admin=matchingMe(authedRef.current,identityRef.current,st.me)?.role==='admin';st.stats=admin?x:{...x,brain:{mode:x.brain.mode,callsToday:x.brain.callsToday,inflight:x.brain.inflight,jevMsAvg:x.brain.jevMsAvg}}; },
       onKernel: (v) => { st.kernel = v; },
       onPlays: (p) => { const seen = new Set(st.plays.map((x) => x.seq)); st.plays = [...st.plays, ...p.filter((x) => !seen.has(x.seq))].slice(-300); },
       onTalk: (l) => { const seen = new Set(st.talk.map((x) => x.id)); st.talk = [...st.talk, ...l.filter((x) => !seen.has(x.id))].slice(-300); },
-    }, (u) => new WebSocket(u) as never);
+      // Spread so this compiles before and after the client declares onEdge; re-render comes from the 200 ms tick.
+      ...({ onEdge: (m: EdgeMsg) => { st.edge = [...st.edge, m].slice(-300); } } as { onEdge(m: EdgeMsg): void }),
+    }, (u) => new WebSocket(u) as never,undefined,undefined,stationCapabilities);
   }
   useEffect(() => {
     const st = s.current; st.conn!.connect();
@@ -53,27 +81,22 @@ export function useSim(getToken: () => Promise<string | null>, authed: boolean):
     void get('/v1/kernel').then((v) => { if (v && !st.kernel) st.kernel = v; });
     void get('/v1/plays?limit=200').then((v) => { if (v?.plays) { const seen = new Set(st.plays.map((x) => x.seq)); st.plays = [...(v.plays as PlayView[]).filter((x) => !seen.has(x.seq)), ...st.plays].slice(-300); } });
     void get('/v1/talk?limit=120').then((v) => { if (v?.lines) { const seen = new Set(st.talk.map((x) => x.id)); st.talk = [...(v.lines as TalkLine[]).filter((x) => !seen.has(x.id)).sort((a, b) => a.id - b.id), ...st.talk].slice(-300); } });
+    let lastProbeAt=-Infinity;
     const t = setInterval(() => {
       const now = Date.now(), b = st.conn!.stats.bytesIn;
       if (now - st.lastAt >= 2000) { st.bytesPerSec = ((b - st.lastBytes) * 1000) / (now - st.lastAt); st.lastBytes = b; st.lastAt = now; }
+      const monotonicAt=performance.now();if(monotonicAt-lastProbeAt>=1000){lastProbeAt=monotonicAt;st.station?.probe(st.conn!);}
       force((n) => n + 1);
     }, 200);
-    return () => { clearInterval(t); st.conn!.close(); };
+    return () => { clearInterval(t); st.conn!.close();st.station?.dispose(); };
   }, []);
   // signing in or out: reconnect so the server re-reads who we are
   const first = useRef(true);
-  useEffect(() => { if (first.current) { first.current = false; return; } s.current.conn!.rehello(); }, [authed]);
+  useEffect(() => { if (first.current) { first.current = false; return; } const st=s.current;retirePrivateAuthority(st);st.conn!.rehello(); }, [authed,identity]);
   return s.current as Sim;
 }
 
-export function makeApi(getToken: () => Promise<string | null>) {
-  return async function api<T = any>(path: string, body?: unknown, method?: string): Promise<{ status: number; data: T }> {
-    try {
-      const token = await getToken();
-      const r = await fetch(apiPath(path), { method: method ?? (body !== undefined ? 'POST' : 'GET'), headers: { ...(token ? { authorization: `Bearer ${token}` } : {}), 'content-type': 'application/json' }, body: body !== undefined ? JSON.stringify(body) : undefined });
-      const text = await r.text(); let data: any; try { data = JSON.parse(text); } catch { data = r.ok ? text : { message: `the server answered ${r.status}` }; }
-      return { status: r.status, data };
-    } catch { return { status: 0, data: { message: 'could not reach the server; try again' } as any }; }
-  };
+export function makeApi(getToken: () => Promise<string | null>,session?:()=>number) {
+  return createApiRequest(getToken,{path:apiPath,session});
 }
 export type Api = ReturnType<typeof makeApi>;

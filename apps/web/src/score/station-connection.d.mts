@@ -1,0 +1,7 @@
+import type {Connection,ConnectionSession,ClockProbe,PongReceipt,TransportReceipt} from '@sim/client';
+import type {StationLiveV1,StationLiveV2,StationLiveContract,ServerMsg} from '@sim/protocol';
+export type StationClockEstimate={serverNowMs:number;earliestServerTimeMs:number;latestServerTimeMs:number;uncertaintyMs:number;rttMs:number;ageMs:number;transportEpoch:string};
+export type StationConnectionState={session:ConnectionSession|null;view:StationLiveV1|StationLiveV2|null;clock:StationClockEstimate|null;error:string|null};
+export type StationConnectionEvent={kind:'welcome'|'session'|'station'|'clock'|'unavailable';state:StationConnectionState};
+export type StationConnection={snapshot():StationConnectionState;contract():StationLiveContract|null;physicalBinding():{worldId:string;rulesVersion:string;dtSeconds:number}|null;onWelcome(w:Extract<ServerMsg,{t:'welcome'}>):void;onStationV2(view:StationLiveV2|null,receipt:TransportReceipt|null):void;estimate():StationClockEstimate|null;onSession(session:ConnectionSession|null):void;onStation(view:StationLiveV1|StationLiveV2|null,receipt:TransportReceipt|null):void;onPong(pong:Extract<ServerMsg,{t:'pong'}>,receipt:PongReceipt):void;probe(connection:Connection):ClockProbe|null;subscribe(listener:(event:StationConnectionEvent)=>void):()=>void;dispose():void};
+export function createStationConnection(options:{worldId:string;codec?:unknown;now?:()=>number;onChange?:(event:StationConnectionEvent)=>void}):StationConnection;

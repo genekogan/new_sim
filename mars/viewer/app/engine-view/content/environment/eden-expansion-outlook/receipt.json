@@ -1,0 +1,40 @@
+{
+  "groups": 5,
+  "costs": {
+    "calls": 13,
+    "triangles": 2310,
+    "oneSunCalls": 21,
+    "oneSunTriangles": 3612,
+    "textures": 0
+  },
+  "actualGroundBounds": {
+    "min": [
+      -4.454064607620239,
+      0,
+      -60.451588183641434
+    ],
+    "max": [
+      12.441423892974854,
+      3.9999998807907104,
+      -49.28619606843891
+    ]
+  },
+  "actualSkyBounds": {
+    "min": [
+      -26.35030426649348,
+      28,
+      -32.39976519666593
+    ],
+    "max": [
+      35.71905926620125,
+      35.080000042915344,
+      26.588486960740273
+    ]
+  },
+  "actualVerticesChecked": 6735,
+  "lookoutPlatformInteriorVertexHits": 0,
+  "skyMinimumY": 28,
+  "clockOrWeatherChanges": 0,
+  "rendered": false,
+  "scope": "optional visual alpine woodland/ornamental sky; no native support/weather/clock changes"
+}

@@ -1,0 +1,2049 @@
+{
+  "status": "READ_ONLY_LITERAL_GLB_METADATA",
+  "sourceGLBs": {
+    "casual": {
+      "path": "<worktrees>/world/mars/viewer/public/modular/environment/animated-casual.glb",
+      "sha256": "67adf57862cff4cfa02fac223b87e7f66e178ad1b94bd4cd77167b9efb583590",
+      "bytes": 1857308,
+      "jsonSHA256": "7dd1a6e6fc2a15ee39d9f125db762fa7652355581faabe940c7f36f9384ad27b",
+      "binarySHA256": "c891ea2f3e242150ce1de91e1bda49f2ebc97f6e094ae36d4309dd5a51e4d603",
+      "materials": [
+        {
+          "doubleSided": true,
+          "name": "Skin",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.6172067523002625,
+              0.4178851246833801,
+              0.23839758336544037,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "LightBrown",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.3049873113632202,
+              0.2788942754268646,
+              0.22696588933467865,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "Red_Dark",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.20507875084877014,
+              0.020288560539484024,
+              0.03433981165289879,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "White",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.45752230286598206,
+              0.45752230286598206,
+              0.45752230286598206,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "Skin_Darker",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.486887663602829,
+              0.3306396007537842,
+              0.18961724638938904,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "Eyebrows",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.048171836882829666,
+              0.03433981165289879,
+              0.022173885256052017,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "Hair",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.06680474430322647,
+              0.027386492118239403,
+              0.00902561191469431,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "Eye",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.03106195665895939,
+              0.018161438405513763,
+              0.01130784023553133,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "LightBlue",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.033104777336120605,
+              0.04970657452940941,
+              0.06301002949476242,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        }
+      ],
+      "primitives": [
+        {
+          "node": "Casual2_Body",
+          "nodeIndex": 62,
+          "skin": 0,
+          "mesh": 0,
+          "meshName": "Cube.010",
+          "primitive": 0,
+          "material": 0,
+          "materialName": "Skin",
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2,
+            "JOINTS_0": 3,
+            "WEIGHTS_0": 4
+          },
+          "index": 5,
+          "positionCount": 4156,
+          "vertexColors": []
+        },
+        {
+          "node": "Casual2_Body",
+          "nodeIndex": 62,
+          "skin": 0,
+          "mesh": 0,
+          "meshName": "Cube.010",
+          "primitive": 1,
+          "material": 1,
+          "materialName": "LightBrown",
+          "attributes": {
+            "POSITION": 6,
+            "NORMAL": 7,
+            "TEXCOORD_0": 8,
+            "JOINTS_0": 9,
+            "WEIGHTS_0": 10
+          },
+          "index": 11,
+          "positionCount": 1490,
+          "vertexColors": []
+        },
+        {
+          "node": "Casual2_Feet",
+          "nodeIndex": 63,
+          "skin": 0,
+          "mesh": 1,
+          "meshName": "Cube.003",
+          "primitive": 0,
+          "material": 2,
+          "materialName": "Red_Dark",
+          "attributes": {
+            "POSITION": 13,
+            "NORMAL": 14,
+            "TEXCOORD_0": 15,
+            "JOINTS_0": 16,
+            "WEIGHTS_0": 17
+          },
+          "index": 18,
+          "positionCount": 640,
+          "vertexColors": []
+        },
+        {
+          "node": "Casual2_Feet",
+          "nodeIndex": 63,
+          "skin": 0,
+          "mesh": 1,
+          "meshName": "Cube.003",
+          "primitive": 1,
+          "material": 3,
+          "materialName": "White",
+          "attributes": {
+            "POSITION": 19,
+            "NORMAL": 20,
+            "TEXCOORD_0": 21,
+            "JOINTS_0": 22,
+            "WEIGHTS_0": 23
+          },
+          "index": 24,
+          "positionCount": 464,
+          "vertexColors": []
+        },
+        {
+          "node": "Casual2_Head",
+          "nodeIndex": 64,
+          "skin": 0,
+          "mesh": 2,
+          "meshName": "Cube.015",
+          "primitive": 0,
+          "material": 0,
+          "materialName": "Skin",
+          "attributes": {
+            "POSITION": 25,
+            "NORMAL": 26,
+            "TEXCOORD_0": 27,
+            "JOINTS_0": 28,
+            "WEIGHTS_0": 29
+          },
+          "index": 30,
+          "positionCount": 798,
+          "vertexColors": []
+        },
+        {
+          "node": "Casual2_Head",
+          "nodeIndex": 64,
+          "skin": 0,
+          "mesh": 2,
+          "meshName": "Cube.015",
+          "primitive": 1,
+          "material": 4,
+          "materialName": "Skin_Darker",
+          "attributes": {
+            "POSITION": 31,
+            "NORMAL": 32,
+            "TEXCOORD_0": 33,
+            "JOINTS_0": 34,
+            "WEIGHTS_0": 35
+          },
+          "index": 36,
+          "positionCount": 88,
+          "vertexColors": []
+        },
+        {
+          "node": "Casual2_Head",
+          "nodeIndex": 64,
+          "skin": 0,
+          "mesh": 2,
+          "meshName": "Cube.015",
+          "primitive": 2,
+          "material": 5,
+          "materialName": "Eyebrows",
+          "attributes": {
+            "POSITION": 37,
+            "NORMAL": 38,
+            "TEXCOORD_0": 39,
+            "JOINTS_0": 40,
+            "WEIGHTS_0": 41
+          },
+          "index": 42,
+          "positionCount": 48,
+          "vertexColors": []
+        },
+        {
+          "node": "Casual2_Head",
+          "nodeIndex": 64,
+          "skin": 0,
+          "mesh": 2,
+          "meshName": "Cube.015",
+          "primitive": 3,
+          "material": 6,
+          "materialName": "Hair",
+          "attributes": {
+            "POSITION": 43,
+            "NORMAL": 44,
+            "TEXCOORD_0": 45,
+            "JOINTS_0": 46,
+            "WEIGHTS_0": 47
+          },
+          "index": 48,
+          "positionCount": 2436,
+          "vertexColors": []
+        },
+        {
+          "node": "Casual2_Head",
+          "nodeIndex": 64,
+          "skin": 0,
+          "mesh": 2,
+          "meshName": "Cube.015",
+          "primitive": 4,
+          "material": 7,
+          "materialName": "Eye",
+          "attributes": {
+            "POSITION": 49,
+            "NORMAL": 50,
+            "TEXCOORD_0": 51,
+            "JOINTS_0": 52,
+            "WEIGHTS_0": 53
+          },
+          "index": 54,
+          "positionCount": 48,
+          "vertexColors": []
+        },
+        {
+          "node": "Casual2_Legs",
+          "nodeIndex": 65,
+          "skin": 0,
+          "mesh": 3,
+          "meshName": "Cube.019",
+          "primitive": 0,
+          "material": 8,
+          "materialName": "LightBlue",
+          "attributes": {
+            "POSITION": 55,
+            "NORMAL": 56,
+            "TEXCOORD_0": 57,
+            "COLOR_0": 58,
+            "COLOR_1": 59,
+            "JOINTS_0": 60,
+            "WEIGHTS_0": 61
+          },
+          "index": 62,
+          "positionCount": 1488,
+          "vertexColors": [
+            "COLOR_0",
+            "COLOR_1"
+          ]
+        }
+      ],
+      "skins": [
+        {
+          "name": "CharacterArmature",
+          "joints": [
+            "Root",
+            "Body",
+            "Hips",
+            "Abdomen",
+            "Torso",
+            "Chest",
+            "Neck",
+            "Head",
+            "Shoulder.L",
+            "UpperArm.L",
+            "LowerArm.L",
+            "Wrist.L",
+            "Index1.L",
+            "Index2.L",
+            "Index3.L",
+            "Index4.L",
+            "Middle1.L",
+            "Middle2.L",
+            "Middle3.L",
+            "Middle4.L",
+            "Ring1.L",
+            "Ring2.L",
+            "Ring3.L",
+            "Ring4.L",
+            "Pinky1.L",
+            "Pinky2.L",
+            "Pinky3.L",
+            "Pinky4.L",
+            "Thumb1.L",
+            "Thumb2.L",
+            "Thumb3.L",
+            "Shoulder.R",
+            "UpperArm.R",
+            "LowerArm.R",
+            "Wrist.R",
+            "Index1.R",
+            "Index2.R",
+            "Index3.R",
+            "Index4.R",
+            "Middle1.R",
+            "Middle2.R",
+            "Middle3.R",
+            "Middle4.R",
+            "Ring1.R",
+            "Ring2.R",
+            "Ring3.R",
+            "Ring4.R",
+            "Pinky1.R",
+            "Pinky2.R",
+            "Pinky3.R",
+            "Pinky4.R",
+            "Thumb1.R",
+            "Thumb2.R",
+            "Thumb3.R",
+            "UpperLeg.L",
+            "LowerLeg.L",
+            "UpperLeg.R",
+            "LowerLeg.R",
+            "Foot.L",
+            "PT.L",
+            "Foot.R",
+            "PT.R"
+          ],
+          "inverseBindMatrices": 12
+        }
+      ],
+      "animations": [
+        {
+          "name": "Idle",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Walk",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Wave",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Run",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Idle_Neutral",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Interact",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "HitRecieve",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Death",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Sitting_Enter",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Sitting_Idle_Loop",
+          "channels": 47,
+          "samplers": 47
+        },
+        {
+          "name": "Sitting_Idle02_Loop",
+          "channels": 47,
+          "samplers": 47
+        },
+        {
+          "name": "Sitting_Talking_Loop",
+          "channels": 47,
+          "samplers": 47
+        },
+        {
+          "name": "Sitting_Nodding_Loop",
+          "channels": 47,
+          "samplers": 47
+        },
+        {
+          "name": "Sitting_Exit",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Driving_Loop",
+          "channels": 51,
+          "samplers": 51
+        },
+        {
+          "name": "GroundSit_Enter",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "GroundSit_Idle_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "GroundSit_Exit",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Swim_Fwd_Loop",
+          "channels": 48,
+          "samplers": 48
+        },
+        {
+          "name": "Swim_Idle_Loop",
+          "channels": 49,
+          "samplers": 49
+        },
+        {
+          "name": "Idle_Talking_Loop",
+          "channels": 48,
+          "samplers": 48
+        },
+        {
+          "name": "Idle_LookAround_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Idle_Tired_Loop",
+          "channels": 50,
+          "samplers": 50
+        },
+        {
+          "name": "Celebration",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Dance_Loop",
+          "channels": 50,
+          "samplers": 50
+        },
+        {
+          "name": "Jump_Start",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Jump_Loop",
+          "channels": 50,
+          "samplers": 50
+        },
+        {
+          "name": "Jump_Land",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Jog_Fwd_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Sprint_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Crouch_Idle_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Drink",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "PickUp_Table",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "PickUp_Kneeling",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Counter_Give",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Push_Loop",
+          "channels": 36,
+          "samplers": 36
+        },
+        {
+          "name": "Fixing_Kneeling",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "LayToIdle",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Idle_TalkingPhone_Loop",
+          "channels": 48,
+          "samplers": 48
+        },
+        {
+          "name": "Idle_FoldArms_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Yes",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Idle_No_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Idle_Rail_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Walk_Carry_Loop",
+          "channels": 50,
+          "samplers": 50
+        },
+        {
+          "name": "Consume",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Farm_PlantSeed",
+          "channels": 51,
+          "samplers": 51
+        },
+        {
+          "name": "Farm_Watering",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Farm_Harvest",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "TreeChopping_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Chest_Open",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "OverhandThrow",
+          "channels": 52,
+          "samplers": 52
+        }
+      ],
+      "images": 0,
+      "textures": 0,
+      "extensionsUsed": []
+    },
+    "punk": {
+      "path": "<worktrees>/world/mars/viewer/public/modular/environment/animated-punk.glb",
+      "sha256": "0ed3ebd87144d372b84c0524a2f843c3eb4391573eeb420e29f8cb80ab1a7f0b",
+      "bytes": 1807856,
+      "jsonSHA256": "731c15a9f6b7f7f1e46c6d45c804610140287f7034d02d4ca3af6a66c7674834",
+      "binarySHA256": "e639b6544179984294cfe400528e6939454399757fbb522fa9c3cbdd81f42280",
+      "materials": [
+        {
+          "doubleSided": true,
+          "name": "Skin",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.6172067523002625,
+              0.4178851246833801,
+              0.23839758336544037,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "White",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.45752230286598206,
+              0.45752230286598206,
+              0.45752230286598206,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "Black",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.017641952261328697,
+              0.017641952261328697,
+              0.017641952261328697,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "Eye",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.03106195665895939,
+              0.018161438405513763,
+              0.01130784023553133,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "Eyebrows",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.048171836882829666,
+              0.03433981165289879,
+              0.022173885256052017,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "Red_Dark",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.20507875084877014,
+              0.020288560539484024,
+              0.03433981165289879,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "Red",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.20189833641052246,
+              0.0048876297660171986,
+              0.01379700843244791,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "Earrings",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.42869052290916443,
+              0.24228115379810333,
+              0.0666259378194809,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "LightBlue",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.033104777336120605,
+              0.04970657452940941,
+              0.06301002949476242,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        }
+      ],
+      "primitives": [
+        {
+          "node": "Punk_Body",
+          "nodeIndex": 62,
+          "skin": 0,
+          "mesh": 0,
+          "meshName": "Cube.001",
+          "primitive": 0,
+          "material": 0,
+          "materialName": "Skin",
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2,
+            "JOINTS_0": 3,
+            "WEIGHTS_0": 4
+          },
+          "index": 5,
+          "positionCount": 4492,
+          "vertexColors": []
+        },
+        {
+          "node": "Punk_Body",
+          "nodeIndex": 62,
+          "skin": 0,
+          "mesh": 0,
+          "meshName": "Cube.001",
+          "primitive": 1,
+          "material": 1,
+          "materialName": "White",
+          "attributes": {
+            "POSITION": 6,
+            "NORMAL": 7,
+            "TEXCOORD_0": 8,
+            "JOINTS_0": 9,
+            "WEIGHTS_0": 10
+          },
+          "index": 11,
+          "positionCount": 508,
+          "vertexColors": []
+        },
+        {
+          "node": "Punk_Body",
+          "nodeIndex": 62,
+          "skin": 0,
+          "mesh": 0,
+          "meshName": "Cube.001",
+          "primitive": 2,
+          "material": 2,
+          "materialName": "Black",
+          "attributes": {
+            "POSITION": 12,
+            "NORMAL": 13,
+            "TEXCOORD_0": 14,
+            "JOINTS_0": 15,
+            "WEIGHTS_0": 16
+          },
+          "index": 17,
+          "positionCount": 954,
+          "vertexColors": []
+        },
+        {
+          "node": "Punk_Feet",
+          "nodeIndex": 63,
+          "skin": 0,
+          "mesh": 1,
+          "meshName": "Cube.208",
+          "primitive": 0,
+          "material": 0,
+          "materialName": "Skin",
+          "attributes": {
+            "POSITION": 19,
+            "NORMAL": 20,
+            "TEXCOORD_0": 21,
+            "JOINTS_0": 22,
+            "WEIGHTS_0": 23
+          },
+          "index": 24,
+          "positionCount": 288,
+          "vertexColors": []
+        },
+        {
+          "node": "Punk_Feet",
+          "nodeIndex": 63,
+          "skin": 0,
+          "mesh": 1,
+          "meshName": "Cube.208",
+          "primitive": 1,
+          "material": 2,
+          "materialName": "Black",
+          "attributes": {
+            "POSITION": 25,
+            "NORMAL": 26,
+            "TEXCOORD_0": 27,
+            "JOINTS_0": 28,
+            "WEIGHTS_0": 29
+          },
+          "index": 30,
+          "positionCount": 816,
+          "vertexColors": []
+        },
+        {
+          "node": "Punk_Head",
+          "nodeIndex": 64,
+          "skin": 0,
+          "mesh": 2,
+          "meshName": "Cube.026",
+          "primitive": 0,
+          "material": 0,
+          "materialName": "Skin",
+          "attributes": {
+            "POSITION": 31,
+            "NORMAL": 32,
+            "TEXCOORD_0": 33,
+            "JOINTS_0": 34,
+            "WEIGHTS_0": 35
+          },
+          "index": 36,
+          "positionCount": 606,
+          "vertexColors": []
+        },
+        {
+          "node": "Punk_Head",
+          "nodeIndex": 64,
+          "skin": 0,
+          "mesh": 2,
+          "meshName": "Cube.026",
+          "primitive": 1,
+          "material": 3,
+          "materialName": "Eye",
+          "attributes": {
+            "POSITION": 37,
+            "NORMAL": 38,
+            "TEXCOORD_0": 39,
+            "JOINTS_0": 40,
+            "WEIGHTS_0": 41
+          },
+          "index": 42,
+          "positionCount": 48,
+          "vertexColors": []
+        },
+        {
+          "node": "Punk_Head",
+          "nodeIndex": 64,
+          "skin": 0,
+          "mesh": 2,
+          "meshName": "Cube.026",
+          "primitive": 2,
+          "material": 4,
+          "materialName": "Eyebrows",
+          "attributes": {
+            "POSITION": 43,
+            "NORMAL": 44,
+            "TEXCOORD_0": 45,
+            "JOINTS_0": 46,
+            "WEIGHTS_0": 47
+          },
+          "index": 48,
+          "positionCount": 48,
+          "vertexColors": []
+        },
+        {
+          "node": "Punk_Head",
+          "nodeIndex": 64,
+          "skin": 0,
+          "mesh": 2,
+          "meshName": "Cube.026",
+          "primitive": 3,
+          "material": 5,
+          "materialName": "Red_Dark",
+          "attributes": {
+            "POSITION": 49,
+            "NORMAL": 50,
+            "TEXCOORD_0": 51,
+            "JOINTS_0": 52,
+            "WEIGHTS_0": 53
+          },
+          "index": 54,
+          "positionCount": 280,
+          "vertexColors": []
+        },
+        {
+          "node": "Punk_Head",
+          "nodeIndex": 64,
+          "skin": 0,
+          "mesh": 2,
+          "meshName": "Cube.026",
+          "primitive": 4,
+          "material": 6,
+          "materialName": "Red",
+          "attributes": {
+            "POSITION": 55,
+            "NORMAL": 56,
+            "TEXCOORD_0": 57,
+            "JOINTS_0": 58,
+            "WEIGHTS_0": 59
+          },
+          "index": 60,
+          "positionCount": 1204,
+          "vertexColors": []
+        },
+        {
+          "node": "Punk_Head",
+          "nodeIndex": 64,
+          "skin": 0,
+          "mesh": 2,
+          "meshName": "Cube.026",
+          "primitive": 5,
+          "material": 7,
+          "materialName": "Earrings",
+          "attributes": {
+            "POSITION": 61,
+            "NORMAL": 62,
+            "TEXCOORD_0": 63,
+            "JOINTS_0": 64,
+            "WEIGHTS_0": 65
+          },
+          "index": 66,
+          "positionCount": 320,
+          "vertexColors": []
+        },
+        {
+          "node": "Punk_Legs",
+          "nodeIndex": 65,
+          "skin": 0,
+          "mesh": 3,
+          "meshName": "Cube.009",
+          "primitive": 0,
+          "material": 0,
+          "materialName": "Skin",
+          "attributes": {
+            "POSITION": 67,
+            "NORMAL": 68,
+            "TEXCOORD_0": 69,
+            "JOINTS_0": 70,
+            "WEIGHTS_0": 71
+          },
+          "index": 72,
+          "positionCount": 48,
+          "vertexColors": []
+        },
+        {
+          "node": "Punk_Legs",
+          "nodeIndex": 65,
+          "skin": 0,
+          "mesh": 3,
+          "meshName": "Cube.009",
+          "primitive": 1,
+          "material": 8,
+          "materialName": "LightBlue",
+          "attributes": {
+            "POSITION": 73,
+            "NORMAL": 74,
+            "TEXCOORD_0": 75,
+            "JOINTS_0": 76,
+            "WEIGHTS_0": 77
+          },
+          "index": 78,
+          "positionCount": 1398,
+          "vertexColors": []
+        }
+      ],
+      "skins": [
+        {
+          "name": "CharacterArmature",
+          "joints": [
+            "Root",
+            "Body",
+            "Hips",
+            "Abdomen",
+            "Torso",
+            "Chest",
+            "Neck",
+            "Head",
+            "Shoulder.L",
+            "UpperArm.L",
+            "LowerArm.L",
+            "Wrist.L",
+            "Index1.L",
+            "Index2.L",
+            "Index3.L",
+            "Index4.L",
+            "Middle1.L",
+            "Middle2.L",
+            "Middle3.L",
+            "Middle4.L",
+            "Ring1.L",
+            "Ring2.L",
+            "Ring3.L",
+            "Ring4.L",
+            "Pinky1.L",
+            "Pinky2.L",
+            "Pinky3.L",
+            "Pinky4.L",
+            "Thumb1.L",
+            "Thumb2.L",
+            "Thumb3.L",
+            "Shoulder.R",
+            "UpperArm.R",
+            "LowerArm.R",
+            "Wrist.R",
+            "Index1.R",
+            "Index2.R",
+            "Index3.R",
+            "Index4.R",
+            "Middle1.R",
+            "Middle2.R",
+            "Middle3.R",
+            "Middle4.R",
+            "Ring1.R",
+            "Ring2.R",
+            "Ring3.R",
+            "Ring4.R",
+            "Pinky1.R",
+            "Pinky2.R",
+            "Pinky3.R",
+            "Pinky4.R",
+            "Thumb1.R",
+            "Thumb2.R",
+            "Thumb3.R",
+            "UpperLeg.L",
+            "LowerLeg.L",
+            "UpperLeg.R",
+            "LowerLeg.R",
+            "Foot.L",
+            "PT.L",
+            "Foot.R",
+            "PT.R"
+          ],
+          "inverseBindMatrices": 18
+        }
+      ],
+      "animations": [
+        {
+          "name": "Idle",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Walk",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Wave",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Run",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Idle_Neutral",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Interact",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "HitRecieve",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Death",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Sitting_Enter",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Sitting_Idle_Loop",
+          "channels": 47,
+          "samplers": 47
+        },
+        {
+          "name": "Sitting_Idle02_Loop",
+          "channels": 47,
+          "samplers": 47
+        },
+        {
+          "name": "Sitting_Talking_Loop",
+          "channels": 47,
+          "samplers": 47
+        },
+        {
+          "name": "Sitting_Nodding_Loop",
+          "channels": 47,
+          "samplers": 47
+        },
+        {
+          "name": "Sitting_Exit",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Driving_Loop",
+          "channels": 51,
+          "samplers": 51
+        },
+        {
+          "name": "GroundSit_Enter",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "GroundSit_Idle_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "GroundSit_Exit",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Swim_Fwd_Loop",
+          "channels": 48,
+          "samplers": 48
+        },
+        {
+          "name": "Swim_Idle_Loop",
+          "channels": 49,
+          "samplers": 49
+        },
+        {
+          "name": "Idle_Talking_Loop",
+          "channels": 48,
+          "samplers": 48
+        },
+        {
+          "name": "Idle_LookAround_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Idle_Tired_Loop",
+          "channels": 50,
+          "samplers": 50
+        },
+        {
+          "name": "Celebration",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Dance_Loop",
+          "channels": 50,
+          "samplers": 50
+        },
+        {
+          "name": "Jump_Start",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Jump_Loop",
+          "channels": 50,
+          "samplers": 50
+        },
+        {
+          "name": "Jump_Land",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Jog_Fwd_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Sprint_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Crouch_Idle_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Drink",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "PickUp_Table",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "PickUp_Kneeling",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Counter_Give",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Push_Loop",
+          "channels": 36,
+          "samplers": 36
+        },
+        {
+          "name": "Fixing_Kneeling",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "LayToIdle",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Idle_TalkingPhone_Loop",
+          "channels": 48,
+          "samplers": 48
+        },
+        {
+          "name": "Idle_FoldArms_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Yes",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Idle_No_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Idle_Rail_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Walk_Carry_Loop",
+          "channels": 50,
+          "samplers": 50
+        },
+        {
+          "name": "Consume",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Farm_PlantSeed",
+          "channels": 51,
+          "samplers": 51
+        },
+        {
+          "name": "Farm_Watering",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Farm_Harvest",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "TreeChopping_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Chest_Open",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "OverhandThrow",
+          "channels": 52,
+          "samplers": 52
+        }
+      ],
+      "images": 0,
+      "textures": 0,
+      "extensionsUsed": []
+    },
+    "woman": {
+      "path": "<worktrees>/world/mars/viewer/public/modular/environment/animated-woman.glb",
+      "sha256": "679d905e85b5becd8a822a60c4741a67bbd6382b2198fd51b361de42a8532a63",
+      "bytes": 1917076,
+      "jsonSHA256": "4ed6f8e3bf96381981df5fa4b97ec5ef2bce015adb420137446c8abe4f784a37",
+      "binarySHA256": "49928ca078c7b8cd3b40658499fbff57b9e201959ff80dbfb8f9a101f2c9fa73",
+      "materials": [
+        {
+          "doubleSided": true,
+          "name": "Skin",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.6172067523002625,
+              0.4178851246833801,
+              0.23839758336544037,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "White",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.45752230286598206,
+              0.45752230286598206,
+              0.45752230286598206,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "Grey",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.04970657452940941,
+              0.04970657452940941,
+              0.04970657452940941,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "Hair_Brown",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.048171836882829666,
+              0.03433981165289879,
+              0.022173885256052017,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "Brown",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.03106195665895939,
+              0.018161438405513763,
+              0.01130784023553133,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "Hair_Blond",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.25979405641555786,
+              0.17865963280200958,
+              0.0627506673336029,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        },
+        {
+          "doubleSided": true,
+          "name": "Orange",
+          "pbrMetallicRoughness": {
+            "baseColorFactor": [
+              0.3423798084259033,
+              0.1214110255241394,
+              0.039835505187511444,
+              1
+            ],
+            "metallicFactor": 0,
+            "roughnessFactor": 0.5
+          }
+        }
+      ],
+      "primitives": [
+        {
+          "node": "Casual_Body",
+          "nodeIndex": 62,
+          "skin": 0,
+          "mesh": 0,
+          "meshName": "Cube.037",
+          "primitive": 0,
+          "material": 0,
+          "materialName": "Skin",
+          "attributes": {
+            "POSITION": 0,
+            "NORMAL": 1,
+            "TEXCOORD_0": 2,
+            "JOINTS_0": 3,
+            "WEIGHTS_0": 4
+          },
+          "index": 5,
+          "positionCount": 4362,
+          "vertexColors": []
+        },
+        {
+          "node": "Casual_Body",
+          "nodeIndex": 62,
+          "skin": 0,
+          "mesh": 0,
+          "meshName": "Cube.037",
+          "primitive": 1,
+          "material": 1,
+          "materialName": "White",
+          "attributes": {
+            "POSITION": 6,
+            "NORMAL": 7,
+            "TEXCOORD_0": 8,
+            "JOINTS_0": 9,
+            "WEIGHTS_0": 10
+          },
+          "index": 11,
+          "positionCount": 976,
+          "vertexColors": []
+        },
+        {
+          "node": "Casual_Feet",
+          "nodeIndex": 63,
+          "skin": 0,
+          "mesh": 1,
+          "meshName": "Cube.070",
+          "primitive": 0,
+          "material": 0,
+          "materialName": "Skin",
+          "attributes": {
+            "POSITION": 13,
+            "NORMAL": 14,
+            "TEXCOORD_0": 15,
+            "JOINTS_0": 16,
+            "WEIGHTS_0": 17
+          },
+          "index": 18,
+          "positionCount": 222,
+          "vertexColors": []
+        },
+        {
+          "node": "Casual_Feet",
+          "nodeIndex": 63,
+          "skin": 0,
+          "mesh": 1,
+          "meshName": "Cube.070",
+          "primitive": 1,
+          "material": 2,
+          "materialName": "Grey",
+          "attributes": {
+            "POSITION": 19,
+            "NORMAL": 20,
+            "TEXCOORD_0": 21,
+            "JOINTS_0": 22,
+            "WEIGHTS_0": 23
+          },
+          "index": 24,
+          "positionCount": 860,
+          "vertexColors": []
+        },
+        {
+          "node": "Casual_Head",
+          "nodeIndex": 64,
+          "skin": 0,
+          "mesh": 2,
+          "meshName": "Cube.001",
+          "primitive": 0,
+          "material": 0,
+          "materialName": "Skin",
+          "attributes": {
+            "POSITION": 25,
+            "NORMAL": 26,
+            "TEXCOORD_0": 27,
+            "JOINTS_0": 28,
+            "WEIGHTS_0": 29
+          },
+          "index": 30,
+          "positionCount": 674,
+          "vertexColors": []
+        },
+        {
+          "node": "Casual_Head",
+          "nodeIndex": 64,
+          "skin": 0,
+          "mesh": 2,
+          "meshName": "Cube.001",
+          "primitive": 1,
+          "material": 3,
+          "materialName": "Hair_Brown",
+          "attributes": {
+            "POSITION": 31,
+            "NORMAL": 32,
+            "TEXCOORD_0": 33,
+            "JOINTS_0": 34,
+            "WEIGHTS_0": 35
+          },
+          "index": 36,
+          "positionCount": 80,
+          "vertexColors": []
+        },
+        {
+          "node": "Casual_Head",
+          "nodeIndex": 64,
+          "skin": 0,
+          "mesh": 2,
+          "meshName": "Cube.001",
+          "primitive": 2,
+          "material": 4,
+          "materialName": "Brown",
+          "attributes": {
+            "POSITION": 37,
+            "NORMAL": 38,
+            "TEXCOORD_0": 39,
+            "JOINTS_0": 40,
+            "WEIGHTS_0": 41
+          },
+          "index": 42,
+          "positionCount": 48,
+          "vertexColors": []
+        },
+        {
+          "node": "Casual_Head",
+          "nodeIndex": 64,
+          "skin": 0,
+          "mesh": 2,
+          "meshName": "Cube.001",
+          "primitive": 3,
+          "material": 5,
+          "materialName": "Hair_Blond",
+          "attributes": {
+            "POSITION": 43,
+            "NORMAL": 44,
+            "TEXCOORD_0": 45,
+            "JOINTS_0": 46,
+            "WEIGHTS_0": 47
+          },
+          "index": 48,
+          "positionCount": 4320,
+          "vertexColors": []
+        },
+        {
+          "node": "Casual_Legs",
+          "nodeIndex": 65,
+          "skin": 0,
+          "mesh": 3,
+          "meshName": "Cube.038",
+          "primitive": 0,
+          "material": 6,
+          "materialName": "Orange",
+          "attributes": {
+            "POSITION": 49,
+            "NORMAL": 50,
+            "TEXCOORD_0": 51,
+            "JOINTS_0": 52,
+            "WEIGHTS_0": 53
+          },
+          "index": 54,
+          "positionCount": 1426,
+          "vertexColors": []
+        }
+      ],
+      "skins": [
+        {
+          "name": "CharacterArmature",
+          "joints": [
+            "Root",
+            "Body",
+            "Hips",
+            "Abdomen",
+            "Torso",
+            "Chest",
+            "Neck",
+            "Head",
+            "Shoulder.L",
+            "UpperArm.L",
+            "LowerArm.L",
+            "Wrist.L",
+            "Index1.L",
+            "Index2.L",
+            "Index3.L",
+            "Index4.L",
+            "Middle1.L",
+            "Middle2.L",
+            "Middle3.L",
+            "Middle4.L",
+            "Ring1.L",
+            "Ring2.L",
+            "Ring3.L",
+            "Ring4.L",
+            "Pinky1.L",
+            "Pinky2.L",
+            "Pinky3.L",
+            "Pinky4.L",
+            "Thumb1.L",
+            "Thumb2.L",
+            "Thumb3.L",
+            "Shoulder.R",
+            "UpperArm.R",
+            "LowerArm.R",
+            "Wrist.R",
+            "Index1.R",
+            "Index2.R",
+            "Index3.R",
+            "Index4.R",
+            "Middle1.R",
+            "Middle2.R",
+            "Middle3.R",
+            "Middle4.R",
+            "Ring1.R",
+            "Ring2.R",
+            "Ring3.R",
+            "Ring4.R",
+            "Pinky1.R",
+            "Pinky2.R",
+            "Pinky3.R",
+            "Pinky4.R",
+            "Thumb1.R",
+            "Thumb2.R",
+            "Thumb3.R",
+            "UpperLeg.L",
+            "LowerLeg.L",
+            "UpperLeg.R",
+            "LowerLeg.R",
+            "Foot.L",
+            "PT.L",
+            "Foot.R",
+            "PT.R"
+          ],
+          "inverseBindMatrices": 12
+        }
+      ],
+      "animations": [
+        {
+          "name": "Idle",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Walk",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Wave",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Run",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Idle_Neutral",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Interact",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "HitRecieve",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Death",
+          "channels": 186,
+          "samplers": 186
+        },
+        {
+          "name": "Sitting_Enter",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Sitting_Idle_Loop",
+          "channels": 47,
+          "samplers": 47
+        },
+        {
+          "name": "Sitting_Idle02_Loop",
+          "channels": 47,
+          "samplers": 47
+        },
+        {
+          "name": "Sitting_Talking_Loop",
+          "channels": 47,
+          "samplers": 47
+        },
+        {
+          "name": "Sitting_Nodding_Loop",
+          "channels": 47,
+          "samplers": 47
+        },
+        {
+          "name": "Sitting_Exit",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Driving_Loop",
+          "channels": 51,
+          "samplers": 51
+        },
+        {
+          "name": "GroundSit_Enter",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "GroundSit_Idle_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "GroundSit_Exit",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Swim_Fwd_Loop",
+          "channels": 48,
+          "samplers": 48
+        },
+        {
+          "name": "Swim_Idle_Loop",
+          "channels": 49,
+          "samplers": 49
+        },
+        {
+          "name": "Idle_Talking_Loop",
+          "channels": 48,
+          "samplers": 48
+        },
+        {
+          "name": "Idle_LookAround_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Idle_Tired_Loop",
+          "channels": 50,
+          "samplers": 50
+        },
+        {
+          "name": "Celebration",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Dance_Loop",
+          "channels": 50,
+          "samplers": 50
+        },
+        {
+          "name": "Jump_Start",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Jump_Loop",
+          "channels": 50,
+          "samplers": 50
+        },
+        {
+          "name": "Jump_Land",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Jog_Fwd_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Sprint_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Crouch_Idle_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Drink",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "PickUp_Table",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "PickUp_Kneeling",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Counter_Give",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Push_Loop",
+          "channels": 36,
+          "samplers": 36
+        },
+        {
+          "name": "Fixing_Kneeling",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "LayToIdle",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Idle_TalkingPhone_Loop",
+          "channels": 48,
+          "samplers": 48
+        },
+        {
+          "name": "Idle_FoldArms_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Yes",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Idle_No_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Idle_Rail_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Walk_Carry_Loop",
+          "channels": 50,
+          "samplers": 50
+        },
+        {
+          "name": "Consume",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Farm_PlantSeed",
+          "channels": 51,
+          "samplers": 51
+        },
+        {
+          "name": "Farm_Watering",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Farm_Harvest",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "TreeChopping_Loop",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "Chest_Open",
+          "channels": 52,
+          "samplers": 52
+        },
+        {
+          "name": "OverhandThrow",
+          "channels": 52,
+          "samplers": 52
+        }
+      ],
+      "images": 0,
+      "textures": 0,
+      "extensionsUsed": []
+    }
+  },
+  "visualOrRigLoaderQualified": false,
+  "referencePins": {
+    "<worktrees>/world/mars/viewer/app/engine-view/people.ts": {
+      "sha256": "597dc3b4c80968f761a2c61c1a821c3e5d130f8f251ac7a256ce4875c8aa66d2",
+      "bytes": 8663
+    },
+    "<worktrees>/world/mars/viewer/app/engine-view/rig.ts": {
+      "sha256": "ec570584b695e3fa2d5efaf3e4022bedf3b3c2e5dc17f40b4c5b179d9868b980",
+      "bytes": 14714
+    },
+    "<worktrees>/world/mars/viewer/lib/three-resources.ts": {
+      "sha256": "5e9678206cd6d53aabd4ff98446d3fc74e4d2c7f0ec80a23a7d8705eb9700b52",
+      "bytes": 3530
+    },
+    "<worktrees>/world/.e2e/runs/world-rest-water-feet-2026-10-05T13-27-45.908Z/after-sleep-4.png": {
+      "sha256": "8faac55d3476c5a1fa06e6b092342962310b4a657091c9690273c67584a92217",
+      "bytes": 50179
+    },
+    "<team>/world-lanes/SOCIAL-details-20261005.md": {
+      "sha256": "583efa007f279ec2693f5c7480f17829c9179cefd732a889c4cee7d736f14c86",
+      "bytes": 3453
+    }
+  },
+  "appearanceAPI": "none in actual people.ts; World later owns optional cloned-material seam and persistent Soul mapping",
+  "sourceOnly": true,
+  "nativeRigChanges": false
+}

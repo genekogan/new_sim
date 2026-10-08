@@ -1,0 +1,11 @@
+{
+  "groups": 4,
+  "disjointRefused": true,
+  "nonclosedRefused": true,
+  "holeBoundaryRefused": true,
+  "currentWaterAndBedOutputExact": true,
+  "vertices": 52,
+  "triangles": 50,
+  "requestV1V2Unmodified": true,
+  "scope": "new topology admission guards and affected output parity only; no graphics/native admission"
+}
