@@ -76,7 +76,12 @@ export function buildArtists(b:Builder,t:Terrain,trees:Trees){const r=rng(2301),
  b.push(-92,0,-118,0);b.box('stone',0,-.6,0,20,1,12,'#a59d8e');b.box('stone',0,.4,0,19,5,11,'#9a4a36');for(let k=0;k<4;k++){const x=-9.5+k*4.75;b.quad('roof',[x,5.4,-5.5],[x+4.75,5.4,-5.5],[x+4.75,5.4,5.5],[x,5.4,5.5],'#3f4448');b.quad('roof',[x,5.4,5.5],[x+4.75,5.4,5.5],[x+4.75,7.4,5.5],[x,7.4,5.5],'#3f4448');
   b.quad('roof',[x,5.4,-5.5],[x,7.4,-5.5],[x+4.75,7.4,-5.5],[x+4.75,5.4,-5.5],'#3f4448');b.quad('glass',[x+.1,5.4,-5.6],[x+.1,7.3,-5.6],[x+4.65,7.3,-5.6],[x+4.65,5.4,-5.6],'#9ab8c8');b.quad('roof',[x,7.4,-5.5],[x+4.75,7.4,-5.5],[x+4.75,7.4,5.5],[x,7.4,5.5],'#3f4448');}
   b.panel('timber',0,2.4,5.53,4,4,'#2f6f6f');for(const x of [-7,-4,4,7])b.panel('glass',x,2.8,5.53,2,2.4,'#2d3c46');b.pop();
- {const x0=-102,x1=-50,z=-72.8;const n=13;for(let i=0;i<n;i++){const xa=x0+i*(x1-x0)/n;b.box('stone',xa+(x1-x0)/n/2,0,z,(x1-x0)/n,2.6,.4,pick(r,['#e05a3a','#3d8ab0','#f0c040','#5aa070','#e88aa0','#7a4a8a','#f3eee2']));b.box('dressing',xa+(x1-x0)/n/2,.6+r()*1.2,z+.21,(x1-x0)/n*.6,.4+r()*.6,.02,pick(r,['#2f2f2f','#f3eee2','#c43a2a','#3d5a80']));}}
+ {const x0=-102,x1=-50,z=-72.8,n=13;for(let i=0;i<n;i++){
+  const xa=x0+i*(x1-x0)/n,xb=xa+(x1-x0)/n;
+  // Preserve seeded paint choices while opening the existing village path.
+  const wall=pick(r,['#e05a3a','#3d8ab0','#f0c040','#5aa070','#e88aa0','#7a4a8a','#f3eee2']),dy=.6+r()*1.2,dh=.4+r()*.6,paint=pick(r,['#2f2f2f','#f3eee2','#c43a2a','#3d5a80']);
+  for(const [a,c] of [[xa,Math.min(xb,-77.4)],[Math.max(xa,-74.6),xb]])if(c>a){b.box('stone',(a+c)/2,0,z,c-a,2.6,.4,wall);b.box('dressing',(a+c)/2,dy,z+.21,(c-a)*.6,dh,.02,paint);}
+ }}
  // string lights across the green (posts + see-through bulbs line)
  for(let i=0;i<6;i++){const a=i/6*Math.PI*2,x=gx+Math.cos(a)*9.5,z=gz+Math.sin(a)*9.5;b.cyl('timber',x,0,z,.08,4,5,'#6e4a30',false);const a2=(i+1)/6*Math.PI*2,x2=gx+Math.cos(a2)*9.5,z2=gz+Math.sin(a2)*9.5;for(let k=1;k<10;k++){const u=k/10,sag=Math.sin(u*Math.PI)*.6;b.box('dressing',x+(x2-x)*u,3.9-sag,z+(z2-z)*u,.12,.12,.12,pick(r,['#f8e08a','#f3a6c0','#9ad0f0']));}}
  // a little outdoor market of crafts + picnic tables

@@ -1,0 +1,105 @@
+{
+  "contract": "pm-descriptor-data-pair/1",
+  "files": [
+    {
+      "path": "worlds/eden/activity-spots.v1.json",
+      "sha256": "c25914c09b878a2440638e0ef688094d5691e16361cb84201e5234a678494946"
+    },
+    {
+      "path": "mars/viewer/app/engine-view/content/assets/eden-regions/north.ts",
+      "sha256": "58916a07e1a61c1e6b28d68f1baeed47a3d007b163550a3ac87709e588d8df10"
+    },
+    {
+      "path": "mars/viewer/app/engine-view/content/assets/eden-regions/south.ts",
+      "sha256": "d4271dc2a841f8fc5775def49ce614bd8579e7df2ee0b9a0545b3bddc7ad637d"
+    }
+  ],
+  "descriptorSource": {
+    "path": "<team>/pm-integration/trials/cn5-stable-codex/edge-descriptor.json",
+    "sha256": "ad8dfc22544cd66f717fcffe027e8205072a0634037b47b31cf3315bd8f6916f"
+  },
+  "descriptorOperation": {
+    "op": "delete",
+    "path": "nav.extraSolids"
+  },
+  "requiredConsumerPins": [
+    "bad615c6 validated interior shell",
+    "eeb0307c Core shell privacy",
+    "4f46f7fc runtime policy boot idempotence"
+  ],
+  "districtSurvey": {
+    "source": "<worktrees>/pm-core-next/tools/core/eden-district-solids.v1.json",
+    "sha256": "9d3738a0444d9c8f2ce9cbce13520ce06ddd9e2140d8e36290c8983d4056942b",
+    "count": 138,
+    "preservedExactRecords": 137,
+    "intentionalSplit": "arts-mural-wall original ID west half plus new east half around visible village path"
+  },
+  "platforms": [
+    {
+      "id": "bandstand-deck",
+      "top": 0.35
+    },
+    {
+      "id": "tea-house-deck",
+      "top": 0.3
+    },
+    {
+      "id": "lookout-deck",
+      "top": 0.24
+    },
+    {
+      "id": "greenhouse-floor",
+      "top": 0.45
+    },
+    {
+      "id": "performance-stage-deck",
+      "top": 0.6
+    },
+    {
+      "id": "harbour-boardwalk-deck",
+      "top": 0.55
+    },
+    {
+      "id": "harbour-west-pier-deck",
+      "top": 0.55
+    },
+    {
+      "id": "harbour-east-pier-deck",
+      "top": 0.55
+    }
+  ],
+  "qualification": {
+    "physicalRoutes": {
+      "inputHead": "b96d095d",
+      "log": "<team>/scratch/world-runtime/eden-data-copy-b96-sealed.log",
+      "completedBeforeRestartFailure": [
+        "walk:eden-library-1",
+        "use-computer:lib-desk-2",
+        "post-letter:mailbox-2",
+        "eat:picnic-1-south-w",
+        "eat:picnic-1-north-w",
+        "walk:region-harbour.west-pier",
+        "walk:region-harbour.east-pier",
+        "walk:region-artists-village.green"
+      ],
+      "limitation": "Whole old gate was red on three duplicate boot policy rules; successful action receipts were asserted in memory but not separately persisted. Failure log retained. Final restart-only gate uses unchanged physical source plus policy correction."
+    },
+    "exactRestart": {
+      "inputHead": "ae6c34ae",
+      "proof": "<team>/proofs/multiworld-20261008/eden-data-restart-ae6.json",
+      "proofSha256": "a27827f91304135c58d6e90f29dfe686ad14cda2ca1f77acace0ea1ae2d8cbd0",
+      "tick": 4420305,
+      "head": 31205,
+      "stateHash": "c09a6a4a7c6be39894b4ee0590ef907a6f436e8f29471f2e531694753cfd5536",
+      "newRecoveries": 0,
+      "preservedRecovery": {
+        "seq": 7542,
+        "tick": 619784
+      },
+      "violations": 0,
+      "newPaidSpend": 0
+    },
+    "visual": "Pending PM browser validation of paired north/south gaps, harbour deck lift and mailbox ground room on final composed source."
+  },
+  "sourceDataPolicy": "readOnly:true VACUUM INTO disposable copy; shared baseline and production data untouched"
+}

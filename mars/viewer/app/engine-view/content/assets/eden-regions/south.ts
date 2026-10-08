@@ -92,8 +92,8 @@ export function buildFarm(b:Builder,t:Terrain,trees:Trees){const r=rng(1401),G=(
 export function buildHarbour(b:Builder,t:Terrain,trees:Trees){const r=rng(1501),G=(x:number,z:number)=>t.height(x,z);
  // boardwalk deck along the shore (z 137..141) on posts, from x -40 to 100
  const z0=136.5,z1=141.5,y=.55;b.box('timber',30,y-.18,(z0+z1)/2,140,.18,z1-z0,'#a0764e');for(let x=-40;x<=100;x+=1)b.box('timber',x,y-.17,(z0+z1)/2,.04,.012,z1-z0,'#7a5a3a');
- for(let x=-40;x<=100;x+=4)for(const z of [z0+.2,z1-.2])b.box('timber',x,-2,z,.22,2.4,.22,'#5b4030');b.box('timber',30,y,z1-.1,140,.9,.08,'#e8e2d2');
- for(let x=-38;x<=100;x+=2.5)b.box('timber',x,y,z1-.1,.08,.9,.08,'#e8e2d2');
+ for(let x=-40;x<=100;x+=4)for(const z of [z0+.2,z1-.2])b.box('timber',x,-2,z,.22,2.4,.22,'#5b4030');for(const [a,z] of [[-40,8.4],[11.6,60.4],[63.6,100]])b.box('timber',(a+z)/2,y,z1-.1,z-a,.9,.08,'#e8e2d2');
+ for(let x=-38;x<=100;x+=2.5)if(!((x>=8.4&&x<=11.6)||(x>=60.4&&x<=63.6)))b.box('timber',x,y,z1-.1,.08,.9,.08,'#e8e2d2');
  for(let x=-36;x<100;x+=12){b.push(x,y,z0+.8,Math.PI);bench(b,'#7a5a3a');b.pop();b.push(x+6,y,z1-.5,0);lampPost(b,3.4,'#2f4f5f');b.pop();}
  // two piers out over the water with moored boats; a lighthouse on a breakwater
  for(const [px,len] of [[10,26],[62,34]] as [number,number][]){b.box('timber',px,y-.18,z1+len/2,3.2,.18,len,'#a0764e');for(let z=z1;z<z1+len;z+=4)for(const x of [-1.4,1.4])b.box('timber',px+x,-3,z,.25,3.6,.25,'#5b4030');

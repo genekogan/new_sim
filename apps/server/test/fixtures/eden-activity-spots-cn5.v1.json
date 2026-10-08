@@ -1,7 +1,7 @@
 {
  "contract": "activity-spots/1",
  "world": "eden",
- "note": "World (WA1) activity spots. Library, interiors, solids and rings: Core-next3 survey kept verbatim. World adds street-prop spots (easels, post boxes, benches, log benches, picnic tables) computed from eden-street-props/placements.ts (front = local +Z) and the house-3 piano. Positions world metres; faceTo a point the body turns to; seatHeight = seat top above the native ground. WN3-0 (World-next3): solids for hedges, stone garden, lookout, pergola/hex-pavilion/market posts, playground and garden props, craft furniture, rocks, vehicles and goals; rings: bandstand gap 90 deg and tea-house gap 180 deg (gap angle = atan2(dz,dx) deg, 45 deg wide, with a step); platforms[] = walkable raised decks (top = deck height above ground, optional step/ramp); greenhouse interior with a west door on the centre aisle.",
+ "note": "World (WA1) activity spots. Library, interiors, solids and rings: Core-next3 survey kept verbatim. World adds street-prop spots (easels, post boxes, benches, log benches, picnic tables) computed from eden-street-props/placements.ts (front = local +Z) and the house-3 piano. Positions world metres; faceTo a point the body turns to; seatHeight = seat top above the native ground. WN3-0 (World-next3): solids for hedges, stone garden, lookout, pergola/hex-pavilion/market posts, playground and garden props, craft furniture, rocks, vehicles and goals; rings: bandstand gap 90 deg and tea-house gap 180 deg (gap angle = atan2(dz,dx) deg, 45 deg wide, with a step); platforms[] = walkable raised decks (top = deck height above ground, optional step/ramp); greenhouse interior with a west door on the centre aisle. World-owned CN5 data: frisbee lawn clearance; picnic tabletop footprints; library computer; harbour decks; district obstacle survey. Visible pier/mural gaps must be integrated alongside corresponding nav before release.",
  "interiors": [
   {
    "place": "eden-greenhouse",
@@ -3324,7 +3324,10 @@
     -9
    ],
    "seatHeight": 0.56,
-   "label": "Library writing desk, east"
+   "label": "Library writing desk, east",
+   "also": [
+    "use-computer"
+   ]
   },
   {
    "id": "easel-1",
@@ -4529,11 +4532,11 @@
    "base": "idle",
    "at": [
     5.5,
-    113.5
+    116.5
    ],
    "faceTo": [
     5.5,
-    115.5
+    119.5
    ],
    "label": "Frisbee lawn, north end"
   },
@@ -4869,20 +4872,6 @@
    ],
    "yaw": 0,
    "height": 1.8
-  },
-  {
-   "id": "performance-stage",
-   "label": "Performance stage",
-   "c": [
-    92,
-    -30
-   ],
-   "half": [
-    3,
-    2
-   ],
-   "yaw": 0,
-   "height": 1
   },
   {
    "id": "sports-grandstand",
@@ -5747,7 +5736,7 @@
    ],
    "half": [
     0.92,
-    0.78
+    0.4
    ],
    "yaw": 0,
    "height": 0.76
@@ -5761,7 +5750,7 @@
    ],
    "half": [
     0.92,
-    0.78
+    0.4
    ],
    "yaw": -0.12,
    "height": 0.76
@@ -5775,7 +5764,7 @@
    ],
    "half": [
     0.92,
-    0.78
+    0.4
    ],
    "yaw": -0.3,
    "height": 0.76
@@ -6633,6 +6622,1994 @@
    ],
    "yaw": 0,
    "height": 0.5
+  },
+  {
+   "id": "district-building-35",
+   "label": "District building (tower)",
+   "c": [
+    114,
+    73
+   ],
+   "half": [
+    2.2,
+    2.2
+   ],
+   "yaw": 0,
+   "height": 6
+  },
+  {
+   "id": "district-building-36",
+   "label": "District building (house)",
+   "c": [
+    113.727,
+    105.5
+   ],
+   "half": [
+    3.577,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-37",
+   "label": "District building (house)",
+   "c": [
+    120.488,
+    105.5
+   ],
+   "half": [
+    2.885,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-38",
+   "label": "District building (house)",
+   "c": [
+    126.091,
+    105.5
+   ],
+   "half": [
+    2.418,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-39",
+   "label": "District building (house)",
+   "c": [
+    131.663,
+    105.5
+   ],
+   "half": [
+    2.854,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-40",
+   "label": "District building (house)",
+   "c": [
+    138.66,
+    105.5
+   ],
+   "half": [
+    3.843,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-41",
+   "label": "District building (house)",
+   "c": [
+    145.385,
+    105.5
+   ],
+   "half": [
+    2.582,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-42",
+   "label": "District building (house)",
+   "c": [
+    150.963,
+    105.5
+   ],
+   "half": [
+    2.696,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-43",
+   "label": "District building (house)",
+   "c": [
+    156.955,
+    105.5
+   ],
+   "half": [
+    2.996,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-44",
+   "label": "District building (house)",
+   "c": [
+    163.474,
+    105.5
+   ],
+   "half": [
+    3.222,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-45",
+   "label": "District building (house)",
+   "c": [
+    169.354,
+    105.5
+   ],
+   "half": [
+    2.358,
+    4
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "district-building-62",
+   "label": "District building (house)",
+   "c": [
+    36.5,
+    128
+   ],
+   "half": [
+    5,
+    3
+   ],
+   "yaw": -1.571,
+   "height": 6
+  },
+  {
+   "id": "district-building-66",
+   "label": "District building (house)",
+   "c": [
+    48,
+    131
+   ],
+   "half": [
+    7,
+    3
+   ],
+   "yaw": 0,
+   "height": 6
+  },
+  {
+   "id": "district-building-70",
+   "label": "District building (house)",
+   "c": [
+    -37,
+    -97
+   ],
+   "half": [
+    12,
+    5
+   ],
+   "yaw": -1.571,
+   "height": 6
+  },
+  {
+   "id": "district-building-75",
+   "label": "District building (aframe)",
+   "c": [
+    -53.419,
+    -93.828
+   ],
+   "half": [
+    3,
+    3.5
+   ],
+   "yaw": 1.771,
+   "height": 6
+  },
+  {
+   "id": "district-building-76",
+   "label": "District building (house)",
+   "c": [
+    -60.915,
+    -81.575
+   ],
+   "half": [
+    3.5,
+    3.25
+   ],
+   "yaw": 2.469,
+   "height": 6
+  },
+  {
+   "id": "district-building-77",
+   "label": "District building (house)",
+   "c": [
+    -74.535,
+    -77.007
+   ],
+   "half": [
+    3.5,
+    3.25
+   ],
+   "yaw": -3.116,
+   "height": 6
+  },
+  {
+   "id": "district-building-78",
+   "label": "District building (aframe)",
+   "c": [
+    -87.904,
+    -82.262
+   ],
+   "half": [
+    3,
+    3.5
+   ],
+   "yaw": -2.418,
+   "height": 6
+  },
+  {
+   "id": "district-building-79",
+   "label": "District building (house)",
+   "c": [
+    -94.767,
+    -94.881
+   ],
+   "half": [
+    3.5,
+    3.25
+   ],
+   "yaw": -1.72,
+   "height": 6
+  },
+  {
+   "id": "district-building-80",
+   "label": "District building (house)",
+   "c": [
+    -91.913,
+    -108.96
+   ],
+   "half": [
+    3.5,
+    3.25
+   ],
+   "yaw": -1.022,
+   "height": 6
+  },
+  {
+   "id": "district-building-81",
+   "label": "District building (aframe)",
+   "c": [
+    -80.678,
+    -117.91
+   ],
+   "half": [
+    3,
+    3.5
+   ],
+   "yaw": -0.324,
+   "height": 6
+  },
+  {
+   "id": "district-building-82",
+   "label": "District building (house)",
+   "c": [
+    -66.317,
+    -117.544
+   ],
+   "half": [
+    3.5,
+    3.25
+   ],
+   "yaw": 0.375,
+   "height": 6
+  },
+  {
+   "id": "district-building-83",
+   "label": "District building (house)",
+   "c": [
+    -55.552,
+    -108.033
+   ],
+   "half": [
+    3.5,
+    3.25
+   ],
+   "yaw": 1.073,
+   "height": 6
+  },
+  {
+   "id": "district-building-113",
+   "label": "District building (house)",
+   "c": [
+    174.349,
+    86
+   ],
+   "half": [
+    1.7,
+    3
+   ],
+   "yaw": 3.142,
+   "height": 6
+  },
+  {
+   "id": "arts-mural-wall",
+   "label": "Mural wall along the avenue",
+   "c": [
+    -89.7,
+    -72.8
+   ],
+   "half": [
+    12.299999999999997,
+    0.2
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "arts-mural-wall-east",
+   "label": "Mural wall along the avenue",
+   "c": [
+    -62.3,
+    -72.8
+   ],
+   "half": [
+    12.299999999999997,
+    0.2
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "arts-sculpture",
+   "label": "Village green sculpture",
+   "c": [
+    -74,
+    -98
+   ],
+   "half": [
+    1.6,
+    1.6
+   ],
+   "yaw": 0,
+   "height": 4
+  },
+  {
+   "id": "arts-craft-stall-1",
+   "label": "Craft market stall",
+   "c": [
+    -80,
+    -85.5
+   ],
+   "half": [
+    1.5,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "arts-craft-stall-2",
+   "label": "Craft market stall",
+   "c": [
+    -76,
+    -85.5
+   ],
+   "half": [
+    1.5,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "arts-craft-stall-3",
+   "label": "Craft market stall",
+   "c": [
+    -72,
+    -85.5
+   ],
+   "half": [
+    1.5,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "arts-craft-stall-4",
+   "label": "Craft market stall",
+   "c": [
+    -68,
+    -85.5
+   ],
+   "half": [
+    1.5,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "arts-picnic-table-1",
+   "label": "Picnic table",
+   "c": [
+    -78,
+    -103.5
+   ],
+   "half": [
+    0.9,
+    0.8
+   ],
+   "yaw": 0,
+   "height": 0.8
+  },
+  {
+   "id": "arts-picnic-table-2",
+   "label": "Picnic table",
+   "c": [
+    -74,
+    -103.5
+   ],
+   "half": [
+    0.9,
+    0.8
+   ],
+   "yaw": 0,
+   "height": 0.8
+  },
+  {
+   "id": "arts-picnic-table-3",
+   "label": "Picnic table",
+   "c": [
+    -70,
+    -103.5
+   ],
+   "half": [
+    0.9,
+    0.8
+   ],
+   "yaw": 0,
+   "height": 0.8
+  },
+  {
+   "id": "harbour-beach-hut-1",
+   "label": "Bathing hut",
+   "c": [
+    -98,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-2",
+   "label": "Bathing hut",
+   "c": [
+    -93.8,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-3",
+   "label": "Bathing hut",
+   "c": [
+    -89.6,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-4",
+   "label": "Bathing hut",
+   "c": [
+    -85.4,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-5",
+   "label": "Bathing hut",
+   "c": [
+    -81.2,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-6",
+   "label": "Bathing hut",
+   "c": [
+    -77,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-7",
+   "label": "Bathing hut",
+   "c": [
+    -72.8,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-8",
+   "label": "Bathing hut",
+   "c": [
+    -68.6,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-9",
+   "label": "Bathing hut",
+   "c": [
+    -64.4,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-10",
+   "label": "Bathing hut",
+   "c": [
+    -60.2,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-11",
+   "label": "Bathing hut",
+   "c": [
+    -56,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-12",
+   "label": "Bathing hut",
+   "c": [
+    -51.8,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-beach-hut-13",
+   "label": "Bathing hut",
+   "c": [
+    -47.6,
+    134.5
+   ],
+   "half": [
+    1.2,
+    1.1
+   ],
+   "yaw": 0,
+   "height": 2.6
+  },
+  {
+   "id": "harbour-kiosk-1",
+   "label": "Seafront kiosk",
+   "c": [
+    -30,
+    133.2
+   ],
+   "half": [
+    1.5,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "harbour-kiosk-2",
+   "label": "Seafront kiosk",
+   "c": [
+    44,
+    133.2
+   ],
+   "half": [
+    1.5,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "harbour-kiosk-3",
+   "label": "Seafront kiosk",
+   "c": [
+    84,
+    133.2
+   ],
+   "half": [
+    1.5,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "harbour-boardwalk-bench-1",
+   "label": "Boardwalk bench",
+   "c": [
+    -36,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-2",
+   "label": "Boardwalk bench",
+   "c": [
+    -24,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-3",
+   "label": "Boardwalk bench",
+   "c": [
+    -12,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-4",
+   "label": "Boardwalk bench",
+   "c": [
+    0,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-5",
+   "label": "Boardwalk bench",
+   "c": [
+    12,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-6",
+   "label": "Boardwalk bench",
+   "c": [
+    24,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-7",
+   "label": "Boardwalk bench",
+   "c": [
+    36,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-8",
+   "label": "Boardwalk bench",
+   "c": [
+    48,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-9",
+   "label": "Boardwalk bench",
+   "c": [
+    60,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-10",
+   "label": "Boardwalk bench",
+   "c": [
+    72,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-11",
+   "label": "Boardwalk bench",
+   "c": [
+    84,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-bench-12",
+   "label": "Boardwalk bench",
+   "c": [
+    96,
+    137.3
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-north-arcade-column-0",
+   "label": "North arcade column",
+   "c": [
+    120,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-0",
+   "label": "South arcade column",
+   "c": [
+    120,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-1",
+   "label": "North arcade column",
+   "c": [
+    123.455,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-1",
+   "label": "South arcade column",
+   "c": [
+    123.455,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-2",
+   "label": "North arcade column",
+   "c": [
+    126.909,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-2",
+   "label": "South arcade column",
+   "c": [
+    126.909,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-3",
+   "label": "North arcade column",
+   "c": [
+    130.364,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-3",
+   "label": "South arcade column",
+   "c": [
+    130.364,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-4",
+   "label": "North arcade column",
+   "c": [
+    133.818,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-4",
+   "label": "South arcade column",
+   "c": [
+    133.818,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-5",
+   "label": "North arcade column",
+   "c": [
+    137.273,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-5",
+   "label": "South arcade column",
+   "c": [
+    137.273,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-6",
+   "label": "North arcade column",
+   "c": [
+    140.727,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-6",
+   "label": "South arcade column",
+   "c": [
+    140.727,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-7",
+   "label": "North arcade column",
+   "c": [
+    144.182,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-7",
+   "label": "South arcade column",
+   "c": [
+    144.182,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-8",
+   "label": "North arcade column",
+   "c": [
+    147.636,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-8",
+   "label": "South arcade column",
+   "c": [
+    147.636,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-9",
+   "label": "North arcade column",
+   "c": [
+    151.091,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-9",
+   "label": "South arcade column",
+   "c": [
+    151.091,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-10",
+   "label": "North arcade column",
+   "c": [
+    154.545,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-10",
+   "label": "South arcade column",
+   "c": [
+    154.545,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-north-arcade-column-11",
+   "label": "North arcade column",
+   "c": [
+    158,
+    60.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade-column-11",
+   "label": "South arcade column",
+   "c": [
+    158,
+    85.5
+   ],
+   "half": [
+    0.28,
+    0.28
+   ],
+   "yaw": 0,
+   "height": 3.4
+  },
+  {
+   "id": "oldtown-south-arcade",
+   "label": "South arcade building",
+   "c": [
+    139,
+    89.5
+   ],
+   "half": [
+    19,
+    1.2
+   ],
+   "yaw": 0,
+   "height": 7.2
+  },
+  {
+   "id": "oldtown-fountain-a",
+   "label": "Plaza fountain",
+   "c": [
+    139,
+    73
+   ],
+   "half": [
+    2.96,
+    2.96
+   ],
+   "yaw": 0,
+   "height": 0.6
+  },
+  {
+   "id": "oldtown-fountain-b",
+   "label": "Plaza fountain",
+   "c": [
+    139,
+    73
+   ],
+   "half": [
+    2.96,
+    2.96
+   ],
+   "yaw": 0.785,
+   "height": 0.6
+  },
+  {
+   "id": "oldtown-planter-125-66",
+   "label": "Tree planter",
+   "c": [
+    125,
+    66
+   ],
+   "half": [
+    1.05,
+    1.05
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-planter-125-80",
+   "label": "Tree planter",
+   "c": [
+    125,
+    80
+   ],
+   "half": [
+    1.05,
+    1.05
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-planter-153-66",
+   "label": "Tree planter",
+   "c": [
+    153,
+    66
+   ],
+   "half": [
+    1.05,
+    1.05
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-planter-153-80",
+   "label": "Tree planter",
+   "c": [
+    153,
+    80
+   ],
+   "half": [
+    1.05,
+    1.05
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-bench-133-68",
+   "label": "Plaza bench",
+   "c": [
+    133,
+    68
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-bench-145-68",
+   "label": "Plaza bench",
+   "c": [
+    145,
+    68
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-bench-133-78",
+   "label": "Plaza bench",
+   "c": [
+    133,
+    78
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-bench-145-78",
+   "label": "Plaza bench",
+   "c": [
+    145,
+    78
+   ],
+   "half": [
+    0.8,
+    0.22
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-market-stall-1",
+   "label": "Market street stall",
+   "c": [
+    114,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-2",
+   "label": "Market street stall",
+   "c": [
+    118.4,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-3",
+   "label": "Market street stall",
+   "c": [
+    122.8,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-4",
+   "label": "Market street stall",
+   "c": [
+    127.2,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-5",
+   "label": "Market street stall",
+   "c": [
+    131.6,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-6",
+   "label": "Market street stall",
+   "c": [
+    136,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-7",
+   "label": "Market street stall",
+   "c": [
+    140.4,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-8",
+   "label": "Market street stall",
+   "c": [
+    144.8,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-9",
+   "label": "Market street stall",
+   "c": [
+    149.2,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-10",
+   "label": "Market street stall",
+   "c": [
+    153.6,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-11",
+   "label": "Market street stall",
+   "c": [
+    158,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-market-stall-12",
+   "label": "Market street stall",
+   "c": [
+    162.4,
+    93.6
+   ],
+   "half": [
+    1.7,
+    1
+   ],
+   "yaw": 0,
+   "height": 2.4
+  },
+  {
+   "id": "oldtown-domed-hall",
+   "label": "Domed hall (plinth and walls)",
+   "c": [
+    166,
+    73
+   ],
+   "half": [
+    7.5,
+    6.5
+   ],
+   "yaw": 0,
+   "height": 8
+  },
+  {
+   "id": "oldtown-domed-hall-front",
+   "label": "Domed hall front wall",
+   "c": [
+    158.4,
+    73
+   ],
+   "half": [
+    0.25,
+    6
+   ],
+   "yaw": 0,
+   "height": 7.4
+  },
+  {
+   "id": "oldtown-domed-hall-column-68.5",
+   "label": "Domed hall portico column",
+   "c": [
+    157.3,
+    68.5
+   ],
+   "half": [
+    0.38,
+    0.38
+   ],
+   "yaw": 0,
+   "height": 6.6
+  },
+  {
+   "id": "oldtown-domed-hall-column-71.5",
+   "label": "Domed hall portico column",
+   "c": [
+    157.3,
+    71.5
+   ],
+   "half": [
+    0.38,
+    0.38
+   ],
+   "yaw": 0,
+   "height": 6.6
+  },
+  {
+   "id": "oldtown-domed-hall-column-74.5",
+   "label": "Domed hall portico column",
+   "c": [
+    157.3,
+    74.5
+   ],
+   "half": [
+    0.38,
+    0.38
+   ],
+   "yaw": 0,
+   "height": 6.6
+  },
+  {
+   "id": "oldtown-domed-hall-column-77.5",
+   "label": "Domed hall portico column",
+   "c": [
+    157.3,
+    77.5
+   ],
+   "half": [
+    0.38,
+    0.38
+   ],
+   "yaw": 0,
+   "height": 6.6
+  },
+  {
+   "id": "oldtown-cafe-table-1-65",
+   "label": "Cafe table and chairs",
+   "c": [
+    128,
+    65
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-1-81",
+   "label": "Cafe table and chairs",
+   "c": [
+    128,
+    81
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-2-65",
+   "label": "Cafe table and chairs",
+   "c": [
+    132.4,
+    65
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-2-81",
+   "label": "Cafe table and chairs",
+   "c": [
+    132.4,
+    81
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-3-65",
+   "label": "Cafe table and chairs",
+   "c": [
+    136.8,
+    65
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-3-81",
+   "label": "Cafe table and chairs",
+   "c": [
+    136.8,
+    81
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-4-65",
+   "label": "Cafe table and chairs",
+   "c": [
+    141.2,
+    65
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-4-81",
+   "label": "Cafe table and chairs",
+   "c": [
+    141.2,
+    81
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-5-65",
+   "label": "Cafe table and chairs",
+   "c": [
+    145.6,
+    65
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-5-81",
+   "label": "Cafe table and chairs",
+   "c": [
+    145.6,
+    81
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-6-65",
+   "label": "Cafe table and chairs",
+   "c": [
+    150,
+    65
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-cafe-table-6-81",
+   "label": "Cafe table and chairs",
+   "c": [
+    150,
+    81
+   ],
+   "half": [
+    0.95,
+    0.95
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "oldtown-flower-planter-122-62.6",
+   "label": "Flower planter",
+   "c": [
+    122,
+    62.6
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-122-83.4",
+   "label": "Flower planter",
+   "c": [
+    122,
+    83.4
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-128-62.6",
+   "label": "Flower planter",
+   "c": [
+    128,
+    62.6
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-128-83.4",
+   "label": "Flower planter",
+   "c": [
+    128,
+    83.4
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-134-62.6",
+   "label": "Flower planter",
+   "c": [
+    134,
+    62.6
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-134-83.4",
+   "label": "Flower planter",
+   "c": [
+    134,
+    83.4
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-140-62.6",
+   "label": "Flower planter",
+   "c": [
+    140,
+    62.6
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-140-83.4",
+   "label": "Flower planter",
+   "c": [
+    140,
+    83.4
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-146-62.6",
+   "label": "Flower planter",
+   "c": [
+    146,
+    62.6
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-146-83.4",
+   "label": "Flower planter",
+   "c": [
+    146,
+    83.4
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-152-62.6",
+   "label": "Flower planter",
+   "c": [
+    152,
+    62.6
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "oldtown-flower-planter-152-83.4",
+   "label": "Flower planter",
+   "c": [
+    152,
+    83.4
+   ],
+   "half": [
+    0.5,
+    0.25
+   ],
+   "yaw": 0,
+   "height": 0.7
+  },
+  {
+   "id": "harbour-boardwalk-sea-rail-1",
+   "label": "Boardwalk sea railing with pier entrances",
+   "c": [
+    -15.8,
+    141.4
+   ],
+   "half": [
+    24.2,
+    0.04
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-sea-rail-2",
+   "label": "Boardwalk sea railing with pier entrances",
+   "c": [
+    36.0,
+    141.4
+   ],
+   "half": [
+    24.4,
+    0.04
+   ],
+   "yaw": 0,
+   "height": 0.9
+  },
+  {
+   "id": "harbour-boardwalk-sea-rail-3",
+   "label": "Boardwalk sea railing with pier entrances",
+   "c": [
+    81.8,
+    141.4
+   ],
+   "half": [
+    18.2,
+    0.04
+   ],
+   "yaw": 0,
+   "height": 0.9
   }
  ],
  "rings": [
@@ -6812,6 +8789,48 @@
      -1
     ]
    }
+  },
+  {
+   "id": "harbour-boardwalk-deck",
+   "label": "Harbour boardwalk",
+   "c": [
+    30,
+    139
+   ],
+   "half": [
+    70,
+    2.5
+   ],
+   "yaw": 0,
+   "top": 0.55
+  },
+  {
+   "id": "harbour-west-pier-deck",
+   "label": "West pier",
+   "c": [
+    10,
+    154.5
+   ],
+   "half": [
+    1.6,
+    13
+   ],
+   "yaw": 0,
+   "top": 0.55
+  },
+  {
+   "id": "harbour-east-pier-deck",
+   "label": "East pier",
+   "c": [
+    62,
+    158.5
+   ],
+   "half": [
+    1.6,
+    17
+   ],
+   "yaw": 0,
+   "top": 0.55
   }
  ]
 }
