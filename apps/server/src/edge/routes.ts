@@ -9,6 +9,7 @@ import {mountIdempotency} from './events/idempotency.ts';
 import {mountSchema} from './events/schema.ts';
 import {registerEdgePlans} from './plans/index.ts';
 import type {Plans} from './plans/plans.ts';
+import {mountEdgeEyes} from './eyes/routes.ts';
 import type {WorldHost} from '../world.ts';
 import type {Souls} from '../souls.ts';
 
@@ -49,6 +50,8 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   app.get('/v1/edge/rides', wrap(() => ({tick: deps.host.engine.world.tick, rides: L.rides()})));
   // Public: small things lying in the world (together/1 items put down by Souls) for viewers to draw; no owner data.
   app.get('/v1/edge/items', wrap(() => ({tick: deps.host.engine.world.tick, items: L.together.publicItems()})));
+  // Eyes (M3): GET /v1/edge/view first-person sight + alt caption; render worker only when EDGE_EYES=<viewer url>.
+  mountEdgeEyes(app, deps);
   const comms = registerEdgeComms(app, deps, {stewardToken: process.env.EDGE_STEWARD_TOKEN || undefined, fading: process.env.EDGE_FADING === '1'});
   L.attachComms(comms);
   // EVENTS-v1 (tranche agent-minds M1/M2/M4): push stream (SSE + WS), digest, world.notice, server-side plans, schema.
