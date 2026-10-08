@@ -11,6 +11,7 @@ import {existingGreenLandmarkV1} from './green-landmark.ts';
 import {existingGreenLandmarkTransitionV1Schema,type ExistingGreenLandmarkTransitionV1} from '@sim/engine-contract';
 import {fixtureSlots} from '../../../mars/viewer/engine/social/slots.ts';
 import {angleDelta} from '../../../mars/viewer/engine/core/math.ts';
+import {inShoreDomain} from '../../../mars/viewer/engine/locomotion/connected-shore.ts';
 import {commonsFoodDeliveryItemsV1} from './food-delivery.ts';
 import {commonsFoodDeliveryV1Schema,type CommonsFoodDeliveryV1} from '@sim/engine-contract';
 import {socialEdenV1} from './social-eden.ts';
@@ -85,7 +86,7 @@ type Prog = {
   readiedActors?:string[];
   build?: { phase: BuildPhase; crew: string[]; stopping?: Diag; reverse?: true };
 };
-export type MarsWorldConfig = { edgeMotionV1?:boolean; disassemblyV1?:boolean; spreadV2?:boolean; yieldTimeoutV1?:boolean; quietStallReleaseV1?:boolean; stairMakeWayV1?:boolean; reflexTimeoutV1?:boolean; walkBlockV1?:boolean; safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; fixtureGroundGoalsV1?:boolean; nativeArrivalWitnessV1?:boolean; quietLandingCourtesyV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
+export type MarsWorldConfig = { edgeMotionV1?:boolean; spreadClearV1?:boolean; disassemblyV1?:boolean; spreadV2?:boolean; yieldTimeoutV1?:boolean; quietStallReleaseV1?:boolean; stairMakeWayV1?:boolean; reflexTimeoutV1?:boolean; walkBlockV1?:boolean; safeArrivalV1?:boolean; commonsArrivalV1?:boolean; commonsTransitionV1?:boolean; fixtureGroundGoalsV1?:boolean; nativeArrivalWitnessV1?:boolean; quietLandingCourtesyV1?:boolean; scene: 'proving-ground' | 'meal' | 'eden-camp' | 'littlemartians' | 'greenfield' | 'eden-commons'; clock?: { origin: number; dayTicks: number }; sleepBlockTicks?:number; quietSeatCourtesy?:boolean; safeCrewRemoval?:boolean; arrival: [number, number]; arrivalPlace: string; reference: [number, number]; grounds: { id: string; name: string } };
 export const LITTLE_MARTIANS_WORLD: MarsWorldConfig={scene:'littlemartians',arrival:[0,18],arrivalPlace:'garden',reference:[0,16],grounds:{id:'grounds',name:'Ceramic garden'}};
 export const GREEN_FIELD_WORLD:MarsWorldConfig={scene:'greenfield',arrival:[0,0],arrivalPlace:'field',reference:[2,0],grounds:{id:'grounds',name:'Green field'}};
 export const EDEN_COMMONS_WORLD:MarsWorldConfig={scene:'eden-commons',arrival:[14,4],arrivalPlace:'commons',reference:[9,5],grounds:{id:'grounds',name:'Eden commons'}};
@@ -416,7 +417,7 @@ export class MarsEngine implements Engine {
     let last: Diag = { code: 'route.unreachable', message: 'no reachable standing point near the target' };
     for (const turn of off === 0 ? [0] : [0, 0.6, -0.6, 1.2, -1.2, 1.9, -1.9, Math.PI]) {
       const x = r3(t[0] + Math.cos(base + turn) * off), z = r3(t[1] + Math.sin(base + turn) * off);
-      const no = this.plan(this.movementVerb(actor,x), { actor, x, z, level });
+      const no = this.plan(this.movementVerb(actor,x,z), { actor, x, z, level });
       if (!no) return { x, z, level };
       last = no;
     }
@@ -438,7 +439,10 @@ export class MarsEngine implements Engine {
     // spreadV2 (prospective policy): thin/small places (the 10 x 1.4 m commons strip, mats) keep real interior spots.
     const v2=this.cfg.spreadV2===true&&!(mode==='pond/1'||lap),ex=Math.max(...xs)-Math.min(...xs),ez=Math.max(...zs)-Math.min(...zs);
     const pond=mode==='pond/1'||lap,inset=pond?[2,4]:v2?[Math.min(.6,ex/4,ez/4),Math.min(.6,ex/4,ez/4)]:[1,1],step=pond?2.5:v2?1.0:1.5,mid=centroid(r.polygon);
-    for(let x=Math.min(...xs)+inset[0];x<=Math.max(...xs)-inset[1];x+=step)for(let z=Math.min(...zs)+inset[0];z<=Math.max(...zs)-inset[0];z+=step){const p:[number,number]=[r3(x),r3(z)];if(inPoly(p[0],p[1],r.polygon)&&taken.every(t=>Math.hypot(t[0]-p[0],t[1]-p[1])>=(pond?1.4:1.0))&&(!lap||Math.hypot(p[0]-e.pose.p[0],p[1]-e.pose.p[2])>=4))spots.push(p);}
+    // spreadClearV1 (CN5, prospective policy): only spots on clear standing ground are candidates, so a place whose middle
+    // is a fountain or a pond still takes arrivals inside it rather than beside it.
+    const clearGrid=this.cfg.spreadClearV1===true&&!pond?(()=>{const sp=this.rt.services.spatial as Spatial;sp.sync(this.rt.world);return sp.level(level)??null;})():null;
+    for(let x=Math.min(...xs)+inset[0];x<=Math.max(...xs)-inset[1];x+=step)for(let z=Math.min(...zs)+inset[0];z<=Math.max(...zs)-inset[0];z+=step){const p:[number,number]=[r3(x),r3(z)];if(inPoly(p[0],p[1],r.polygon)&&(!clearGrid||clearanceAt(clearGrid,p)>=HUMAN_RADIUS+.07)&&taken.every(t=>Math.hypot(t[0]-p[0],t[1]-p[1])>=(pond?1.4:1.0))&&(!lap||Math.hypot(p[0]-e.pose.p[0],p[1]-e.pose.p[2])>=4))spots.push(p);}
     if(!spots.length&&!pond&&taken.every(t=>Math.hypot(t[0]-mid[0],t[1]-mid[1])>=1.0))spots.push(mid); // a place smaller than the grid keeps its single centre
     // spreadV2: when the inside is full (or unreachable) stand just outside it, nearest first, on the ground
     // around a raised place (never mid-air beside a deck). Arriving at a busy place is not a refusal.
@@ -448,8 +452,8 @@ export class MarsEngine implements Engine {
     const offset=[...actor].reduce((h,c)=>(h*31+c.charCodeAt(0))>>>0,7)%spots.length;
     const order=[...spots.slice(offset),...spots.slice(0,offset)].map((p,i)=>({p,i,band:lap?Math.round(Math.abs(Math.hypot(p[0]-e.pose.p[0],p[1]-e.pose.p[2])-6)/2):pond?Math.round(Math.hypot(p[0]-e.pose.p[0],p[1]-e.pose.p[2])/8):Math.round(Math.hypot(p[0]-mid[0],p[1]-mid[1])/2)})).sort((a,b)=>a.band-b.band||a.i-b.i).slice(0,24);
     let last:Diag={code:'route.unreachable',message:'no reachable spaced spot'};
-    for(const {p} of order){const no=this.plan(this.movementVerb(actor,p[0]),{actor,x:p[0],z:p[1],level});if(!no)return {x:p[0],z:p[1],level};last=no;}
-    if(v2&&ring.length){const ground=0;for(const p of ring.sort((a,b)=>Math.hypot(a[0]-e.pose.p[0],a[1]-e.pose.p[2])-Math.hypot(b[0]-e.pose.p[0],b[1]-e.pose.p[2])).slice(0,24)){const no=this.plan(this.movementVerb(actor,p[0]),{actor,x:p[0],z:p[1],level:ground});if(!no)return {x:p[0],z:p[1],level:ground};}
+    for(const {p} of order){const no=this.plan(this.movementVerb(actor,p[0],p[1]),{actor,x:p[0],z:p[1],level});if(!no)return {x:p[0],z:p[1],level};last=no;}
+    if(v2&&ring.length){const ground=0;for(const p of ring.sort((a,b)=>Math.hypot(a[0]-e.pose.p[0],a[1]-e.pose.p[2])-Math.hypot(b[0]-e.pose.p[0],b[1]-e.pose.p[2])).slice(0,24)){const no=this.plan(this.movementVerb(actor,p[0],p[1]),{actor,x:p[0],z:p[1],level:ground});if(!no)return {x:p[0],z:p[1],level:ground};}
       return {code:'route.region-full',message:`${region} is full and nobody can stand beside it right now`};}
     return last;
   }
@@ -468,7 +472,7 @@ export class MarsEngine implements Engine {
     for (let leg = 0; leg < 6 && spent < total; leg++) {
       for (let tries = 0; tries < 6; tries++) {
         const ang = this.m.nextRandom(this.rt.world.rng) * Math.PI * 2, dist = Math.max(1.5, (0.3 + 0.7 * this.m.nextRandom(this.rt.world.rng)) * radius);
-        const x = r3(home[0] + Math.cos(ang) * dist), z = r3(home[1] + Math.sin(ang) * dist), verb = this.movementVerb(me, x);
+        const x = r3(home[0] + Math.cos(ang) * dist), z = r3(home[1] + Math.sin(ang) * dist), verb = this.movementVerb(me, x, z);
         const at = [level, 0].find(l => !this.plan(verb, { actor: me, x, z, level: l }));
         if (at === undefined) continue;
         ops.push({ verb, params: { actor: me, x, z, level: at, ...(verb === 'walk_to' ? { speed: 0.9 } : {}) }, settle: 'done', soft: true }); legs++; break;
@@ -501,7 +505,7 @@ export class MarsEngine implements Engine {
     if ((p.trafficTries = (p.trafficTries ?? 0) + 1) > 6) return this.end(p, 'failed', why);
     p.index--; p.ops = [{ wait: (waiters.length ? 80 : 20) + this.stagger(p.actor) * 10 }];
   }
-  private movementVerb(actor:string,x:number){return this.physical&&(x<-29.5||this.ents[actor]?.pose.p[0]<-29.5)?'commons_shore_travel':'walk_to';}
+  private movementVerb(actor:string,x:number,z:number){const a=this.ents[actor];return this.physical&&(inShoreDomain(this.rt.world,x,z)||!!a&&inShoreDomain(this.rt.world,a.pose.p[0],a.pose.p[2]))?'commons_shore_travel':'walk_to';}
   private free(id: string): boolean { return !!this.ents[id] && this.holders(id).length === 0 && !this.byActor.has(id) && ![...this.programs.values()].some(p=>p.build?.crew.includes(id)); }
 
   /** A raw Mars verb, with the actor filled in where the verb takes one (`actor`, or `actors` when none are given). */
@@ -538,7 +542,7 @@ export class MarsEngine implements Engine {
         const g = (a.spread === 'pond/1' || a.spread === 'region/1' || a.spread === 'pond-lap/1') && typeof a.to === 'string' && this.rt.world.regions[a.to] ? this.spreadGoalV1(me, a.to, a.spread) : this.goalNear(me, a.to, typeof a.standoff === 'number' ? a.standoff : 0);
         if (g === 'here') return [];
         if ('code' in g) return g;
-        const ops: Op[] = [{ verb: this.movementVerb(me,g.x), params: { actor: me, x: g.x, z: g.z, level:g.level, ...(this.cfg.nativeArrivalWitnessV1&&this.movementVerb(me,g.x)==='walk_to'?{arrivalEvidence:'navigation-arrival/1'}:{}) }, settle: 'done', ...(a.spread === 'pond-lap/1' ? { soft: true } : {}) }];
+        const ops: Op[] = [{ verb: this.movementVerb(me,g.x,g.z), params: { actor: me, x: g.x, z: g.z, level:g.level, ...(this.cfg.nativeArrivalWitnessV1&&this.movementVerb(me,g.x,g.z)==='walk_to'?{arrivalEvidence:'navigation-arrival/1'}:{}) }, settle: 'done', ...(a.spread === 'pond-lap/1' ? { soft: true } : {}) }];
         if (typeof a.to === 'string' && this.ents[a.to]) ops.push({ verb: 'face', params: { actor: me, target: { entity: a.to } }, settle: 'done', soft: true });
         return ops;
       }
@@ -563,7 +567,7 @@ export class MarsEngine implements Engine {
         // No place to take (a full bench, a spot with no layout): stand near it instead.
         const g = this.goalNear(me, a.at, 2);
         if (g !== 'here' && 'code' in g) return g;
-        return [...(g === 'here' ? [] : [{ verb: this.movementVerb(me,g.x), params: { actor: me, x: g.x, z: g.z, level:g.level, ...(this.cfg.nativeArrivalWitnessV1&&this.movementVerb(me,g.x)==='walk_to'?{arrivalEvidence:'navigation-arrival/1'}:{}) }, settle: 'done' } as Op]), { wait: n }];
+        return [...(g === 'here' ? [] : [{ verb: this.movementVerb(me,g.x,g.z), params: { actor: me, x: g.x, z: g.z, level:g.level, ...(this.cfg.nativeArrivalWitnessV1&&this.movementVerb(me,g.x,g.z)==='walk_to'?{arrivalEvidence:'navigation-arrival/1'}:{}) }, settle: 'done' } as Op]), { wait: n }];
       }
       case 'sit': return [{ verb: 'sit', params: { actor: me, fixture: String(a.on ?? '') }, settle: 'held' }, { wait: secs(a.seconds, 60) }];
       case 'stand': return this.holders(me).length ? [{ verb: 'stand', params: { actor: me }, settle: 'done', soft: true }] : [];
@@ -576,7 +580,7 @@ export class MarsEngine implements Engine {
           for (let tries = 0; tries < 4; tries++) {
             const ang = this.m.nextRandom(this.rt.world.rng) * Math.PI * 2, dist = (0.3 + 0.7 * this.m.nextRandom(this.rt.world.rng)) * radius;
             const x = r3(home[0] + Math.cos(ang) * dist), z = r3(home[1] + Math.sin(ang) * dist);
-            if (leg > 0 || !this.plan(this.movementVerb(me,x), { actor: me, x, z })) { ops.push({ verb: this.movementVerb(me,x), params: { actor: me, x, z, ...(this.movementVerb(me,x)==='walk_to'?{speed:0.9}:{}) }, settle: 'done', soft: true }); break; }
+            if (leg > 0 || !this.plan(this.movementVerb(me,x,z), { actor: me, x, z })) { ops.push({ verb: this.movementVerb(me,x,z), params: { actor: me, x, z, ...(this.movementVerb(me,x,z)==='walk_to'?{speed:0.9}:{}) }, settle: 'done', soft: true }); break; }
           }
           const pause = Math.round((2 + 6 * this.m.nextRandom(this.rt.world.rng)) * TPS); ops.push({ wait: pause });
           spent += pause + Math.round((radius / 0.9) * TPS * 0.6);
@@ -1153,13 +1157,15 @@ export class MarsEngine implements Engine {
     return added;
   }
   /** nav/1: why this ground/solids spec cannot be installed (pure), or null. Ground rectangles are flat level-0 floor
-   *  (never west of the connected shore's dry gate, x < -29.5); solids are oriented boxes (centre, half-extents, yaw). */
+   *  (never over the connected shore west of its dry gate); solids are oriented boxes (centre, half-extents, yaw). */
   previewNavV1(spec:NavSpecV1):Diag|null{
     if(!spec||spec.version!=='nav/1'||!Array.isArray(spec.ground)||!Array.isArray(spec.solids))return {code:'nav.bad-spec',message:'{version:"nav/1",ground:[],solids:[]} required'};
     if(spec.ground.length>16||spec.solids.length>1024)return {code:'nav.too-many',message:'at most 16 ground rectangles and 1024 solids'};
     const ids=new Set<string>(),okId=(id:unknown)=>typeof id==='string'&&/^[a-z0-9][a-z0-9._#-]{0,119}$/.test(id)&&!ids.has(id)&&!!ids.add(id);
     for(const g of spec.ground){const b=g?.boundsXZ;if(!okId(g?.id)||!Array.isArray(b)||b.length!==4||!b.every(Number.isFinite)||!(b[0]<b[2]&&b[1]<b[3]))return {code:'nav.bad-ground',message:`ground ${g?.id}: id and boundsXZ [x0,z0,x1,z1] required`};
-      if(b[0]< -29.5)return {code:'nav.ground-west-of-shore-gate',message:`ground ${g.id} reaches west of x=-29.5, the connected shore's dry gate`};
+      // CN5: ground may lie west of the shore's dry gate (x < -29.5: the artists' village, the beach) but never over the
+      // connected shore itself (its slope and water, x -62..-29.5, z -12..12, with a metre's margin): there the shore controller rules.
+      if(b[0]< -29.5&&b[1]<13&&b[3]> -13&&b[2]> -63)return {code:'nav.ground-west-of-shore-gate',message:`ground ${g.id} overlaps the connected shore west of its dry gate (x -63..-29.5, z -13..13)`};
       if(Math.abs(b[0])>2000||Math.abs(b[1])>2000||Math.abs(b[2])>2000||Math.abs(b[3])>2000)return {code:'nav.bad-ground',message:`ground ${g.id} out of range`};}
     for(const o of spec.solids){if(!okId(o?.id)||!Array.isArray(o.c)||o.c.length!==2||!o.c.every(Number.isFinite)||!Array.isArray(o.half)||o.half.length!==2||!o.half.every(h=>Number.isFinite(h)&&h>0&&h<200)||!Number.isFinite(o.yaw))return {code:'nav.bad-solid',message:`solid ${o?.id}: id, c [x,z], half [hx,hz] (>0) and yaw required`};}
     return null;
@@ -1248,6 +1254,7 @@ export class MarsEngine implements Engine {
     if((policy as {reflexTimeoutV1?:boolean}).reflexTimeoutV1===true)this.cfg={...this.cfg,reflexTimeoutV1:true};
     if((policy as {edgeMotionV1?:boolean}).edgeMotionV1===true)this.cfg={...this.cfg,edgeMotionV1:true};
     if(policy.spreadV2===true)this.cfg={...this.cfg,spreadV2:true};
+    if((policy as {spreadClearV1?:boolean}).spreadClearV1===true)this.cfg={...this.cfg,spreadClearV1:true};
     if(policy.yieldTimeoutV1===true)this.cfg={...this.cfg,yieldTimeoutV1:true};
     if(policy.quietStallReleaseV1===true)this.cfg={...this.cfg,quietStallReleaseV1:true};
     if(policy.quietLandingCourtesyV1===true)this.cfg={...this.cfg,quietLandingCourtesyV1:true};

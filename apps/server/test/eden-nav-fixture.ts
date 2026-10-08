@@ -9,9 +9,14 @@ import {EdgeLedger} from '../src/edge/ledger/ledger.ts';
 import {navSpecFromPlaces, type NavSpec, type Solid} from '../src/edge/ledger/nav.ts';
 import {loadSpots} from '../src/edge/ledger/activities.ts';
 import type {PlaceData} from '../src/edge/ledger/places.ts';
+import {CN5_DISTRICT_GROUND, CN5_DISTRICT_PLACES} from '../src/edge/ledger/districts.ts';
 
 export const EDEN_PLACES = JSON.parse(readFileSync(new URL('./fixtures/eden-places.v1.json', import.meta.url), 'utf8')) as PlaceData;
 export const EDEN_SPOTS = JSON.parse(readFileSync(new URL('../../../tools/core/eden-activity-spots.v1.json', import.meta.url), 'utf8'));
+/** CN5: World's live places and activity spots (2026-10-07 snapshot), Core's provisional district solids. */
+export const CN5_PLACES = JSON.parse(readFileSync(new URL('./fixtures/eden-places-cn5.v1.json', import.meta.url), 'utf8')) as PlaceData;
+export const CN5_SPOTS = JSON.parse(readFileSync(new URL('./fixtures/eden-activity-spots-cn5.v1.json', import.meta.url), 'utf8'));
+export const CN5_DISTRICT_SOLIDS = JSON.parse(readFileSync(new URL('../../../tools/core/eden-district-solids.v1.json', import.meta.url), 'utf8'));
 /** The descriptor's nav.ground for the preview: the lawn south of the commons and the park (never west of the shore gate). */
 export const SOUTH_GROUND = [{id: 'eden-south-lawn', boundsXZ: [-29.5, 30, 30, 85] as [number, number, number, number]}, {id: 'eden-south-park', boundsXZ: [-29.5, 85, 33, 136] as [number, number, number, number]}];
 export const NATIVE_PLACES = ['commons-kitchen', 'eden-stone-garden', 'eden-bandstand', 'eden-market-kiosks', 'eden-north-woods', 'eden-gardens', 'eden-market-1', 'eden-tea-house', 'eden-dome', 'eden-pergola-court', 'eden-amphitheatre', 'eden-hex-pavilion',
@@ -26,7 +31,10 @@ export function inSolid(x: number, z: number, s: Solid, shrink = 0): boolean {
   return Math.abs(lx) < s.half[0] - shrink && Math.abs(lz) < s.half[1] - shrink;
 }
 
-export async function edenNavWorld(souls: number, opts: {nav?: boolean} = {}) {
+export async function edenNavWorld(souls: number, opts: {nav?: boolean; cn5?: boolean} = {}) {
+  const PLACES = opts.cn5 ? CN5_PLACES : EDEN_PLACES, SPOTS = opts.cn5 ? CN5_SPOTS : EDEN_SPOTS;
+  const GROUND = opts.cn5 ? [...SOUTH_GROUND, ...CN5_DISTRICT_GROUND] : SOUTH_GROUND;
+  const NATIVE = opts.cn5 ? [...NATIVE_PLACES, 'eden-south-lawn', ...CN5_DISTRICT_PLACES] : NATIVE_PLACES;
   const fac = await factory(), f = fixture(':memory:', fac, {durableClockV1: true});
   f.souls.enableLifecycle(); f.brain.quiesce();
   await accept<unknown>(f.host, new LivingWorld(f.host).install(['Owners drive their Souls.'])); for (let i = 0; i < 4; i++) f.host.tickOnce();
@@ -34,19 +42,19 @@ export async function edenNavWorld(souls: number, opts: {nav?: boolean} = {}) {
   const layout = JSON.parse(readFileSync(new URL('../../../packages/engine-mars/src/fixtures/newcomer-layout.world-alternative.v2.json', import.meta.url), 'utf8'));
   await accept(f.host, f.host.installCommonsNewcomerResourcesV1(layout.placements)); await accept(f.host, f.host.installNativeSleepSnapshotV1());
   await accept(f.host, f.host.installEdenGroundV1()); await accept(f.host, f.host.installEdenLectureV1(placement)); await accept(f.host, f.host.installSocialEdenV1());
-  for (const p of [f.host.enableYieldTimeoutV1(), f.host.enableSpreadV2(), f.host.enableContinuousDayV1(), f.host.enableReflexTimeoutV1(), f.host.enableEdgeMotionV1()]) await accept<unknown>(f.host, p);
+  for (const p of [f.host.enableYieldTimeoutV1(), f.host.enableSpreadV2(), f.host.enableContinuousDayV1(), f.host.enableReflexTimeoutV1(), f.host.enableEdgeMotionV1(), ...(opts.cn5 ? [f.host.enableSpreadClearV1()] : [])]) await accept<unknown>(f.host, p);
   const rows: any[] = [];
   for (let i = 0; i < souls; i++) {await invite(f, 'nav' + i); rows.push(await accept(f.host, f.souls.create('dev:nav' + i, {name: 'Nav ' + i, description: 'walker'})));}
   let spec: NavSpec | null = null;
-  const spots = loadSpots(EDEN_SPOTS).data, engine = f.host.engine as any;
+  const spots = loadSpots(SPOTS).data, engine = f.host.engine as any, extra = opts.cn5 ? loadSpots(CN5_DISTRICT_SOLIDS).data.solids : [];
   if (opts.nav !== false) {
-    const native = new Set([...Object.entries(engine.world.regions as Record<string, any>).filter(([, r]) => !String(r.provenance?.note ?? '').includes('placeRegionsV1')).map(([id]) => id), ...EDEN_PLACES.places.filter(p => (p.occupiers ?? []).length).map(p => p.id)]);
-    spec = navSpecFromPlaces(EDEN_PLACES, {native, ground: SOUTH_GROUND, area: [engine.groundBoundsV1()], extraSolids: spots.solids, rings: spots.rings, interiors: spots.interiors});
+    const native = new Set([...Object.entries(engine.world.regions as Record<string, any>).filter(([, r]) => !String(r.provenance?.note ?? '').includes('placeRegionsV1')).map(([id]) => id), ...PLACES.places.filter(p => (p.occupiers ?? []).length).map(p => p.id)]);
+    spec = navSpecFromPlaces(PLACES, {native, ground: GROUND, area: [engine.groundBoundsV1()], extraSolids: [...spots.solids, ...extra], rings: spots.rings, interiors: spots.interiors, platforms: spots.platforms});
     await accept(f.host, f.host.installNavV1(spec));
   }
-  const byId = new Map(EDEN_PLACES.places.map(p => [p.id, p]));
-  const admitted = await accept(f.host, f.host.installPlaceRegionsV1(NATIVE_PLACES.filter(id => byId.has(id)).map(id => ({id, label: byId.get(id)!.name, polygon: byId.get(id)!.polygon}))));
-  const ledger = new EdgeLedger(f.host, f.db, EDEN_PLACES, {spots: EDEN_SPOTS});
+  const byId = new Map(PLACES.places.map(p => [p.id, p]));
+  const admitted = await accept(f.host, f.host.installPlaceRegionsV1(NATIVE.filter(id => byId.has(id)).map(id => ({id, label: byId.get(id)!.name, polygon: byId.get(id)!.polygon}))));
+  const ledger = new EdgeLedger(f.host, f.db, PLACES, {spots: SPOTS});
   const souls_ = rows.map(r => ({soulId: r.id, entityId: r.entity_id, name: r.name, owner: r.owner}));
   return {f, fac, ledger, spec, spots, admitted, souls: souls_, engine,
     /** ledger.act through the real sequencer (it awaits the logged decision). */

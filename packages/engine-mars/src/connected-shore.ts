@@ -4,7 +4,7 @@ import {hashOf,nativeShoreSceneV1Schema,type RenderScene} from '@sim/engine-cont
 import {loadMars} from './load.ts';
 import {createTerrainGeometryProbe} from './terrain.ts';
 import {createWaterGeometryProbe} from './water-geometry.ts';
-import {connectedShoreAction} from '../../../mars/viewer/engine/locomotion/connected-shore.ts';
+import {connectedShoreAction,inShoreDomain} from '../../../mars/viewer/engine/locomotion/connected-shore.ts';
 import {shoreActions,shoreContactInvariant,shoreSpeedInvariant,SHORE_POLICY,type ShoreGeometry} from '../../../mars/viewer/engine/locomotion/shore.ts';
 import {humanStaticClearance,speedWithinCap} from '../../../mars/viewer/engine/runtime/invariants.ts';
 import {decodeSnapshot,type RuntimeSnapshot} from '../../../mars/viewer/engine/runtime/snapshot.ts';
@@ -34,7 +34,7 @@ export async function connectedCommonsShoreFixture(support?:{version:'connected-
   const oldWalk=registry.get('walk_to')!;
   registry.set('walk_to',{...oldWalk,plan(rt:Runtime,p:{actor:string;x:number;z:number;level?:number}){
     const e=rt.world.entities[p.actor];
-    if(p.x<-29.5||e&&e.pose.p[0]<-29.5||e?.human?.shore&&Math.abs(e.pose.p[1])>.001)return {ok:false,diagnostic:{code:'connected.use-shore-controller',message:'Use the installed shore controller through the dry gate; flat-grid walking cannot enter the sloped or wet domain',subjects:[p.actor]}};
+    if(inShoreDomain(rt.world,p.x,p.z)||e&&inShoreDomain(rt.world,e.pose.p[0],e.pose.p[2])||e?.human?.shore&&Math.abs(e.pose.p[1])>.001)return {ok:false,diagnostic:{code:'connected.use-shore-controller',message:'Use the installed shore controller through the dry gate; flat-grid walking cannot enter the sloped or wet domain',subjects:[p.actor]}};
     return oldWalk.plan(rt,p);
   },start(rt:Runtime,...args:unknown[]){const actor=(args[0] as {actor:string}).actor;delete rt.world.entities[actor].human!.shore;return oldWalk.start(rt,...args);}});
   // Native commons actions have no qualified wet/slope equivalent. Validate
@@ -45,7 +45,7 @@ export async function connectedCommonsShoreFixture(support?:{version:'connected-
     for(const claim of def.reservations(rt.world,p)){
       if(!claim.resource.startsWith('actor:'))continue;
       const id=claim.resource.slice(6),e=rt.world.entities[id];
-      if(e?.human&&(e.pose.p[0]<-29.5||e.human.shore&&(e.human.shore.depthMetres>0||Math.abs(e.pose.p[1])>.001)))
+      if(e?.human&&(inShoreDomain(rt.world,e.pose.p[0],e.pose.p[2])||e.human.shore&&(e.human.shore.depthMetres>0||Math.abs(e.pose.p[1])>.001)))
         return {ok:false,diagnostic:{code:'connected.unqualified-shore-action',message:verb+' has no qualified slope/water equivalent for '+id+'; return through the dry gate first',subjects:[id]}};
     }
     return planned;
@@ -54,7 +54,7 @@ export async function connectedCommonsShoreFixture(support?:{version:'connected-
   const certified=(rt:Runtime,id:string)=>{const e=rt.world.entities[id];if(e&&support?.bodyContact(rt,e)?.length===0)return true;const s=e?.human?.shore,p=e?geometry.point([e.pose.p[0],e.pose.p[2]]):null;return !!s&&!!p&&s.terrainId===terrain.id&&Math.abs(e.pose.p[1]-(p.depth>1.2?water.datumY-1.2:p.point[1]))<.001;};
   const invariants=[...m.invariants.filter(i=>i!==speedWithinCap&&i!==humanStaticClearance),(rt:Runtime)=>shoreSpeedInvariant(rt).filter(d=>!support||!d.subjects?.every(id=>{const e=rt.world.entities[id];return !!e?.human?.boatTransit&&support.bodyContact(rt,e)?.length===0&&Number.isFinite(e.human.speed)&&e.human.speed!>=0&&e.human.speed!<=support.transferSpeed*1.05;})),
     (rt:Runtime)=>humanStaticClearance(rt).filter(d=>!d.subjects?.every(id=>certified(rt,id))),
-    shoreContactInvariant(geometry,(rt,e)=>support?.bodyContact(rt,e)??(e.pose.p[0]>=-29.5&&!e.human?.shore?[]:null))];
+    shoreContactInvariant(geometry,(rt,e)=>support?.bodyContact(rt,e)??(!inShoreDomain(rt.world,e.pose.p[0],e.pose.p[2])&&!e.human?.shore?[]:null))];
   const validate=(w:WorldState)=>{if(w.base.campus!==base.campus||w.base.staticHash!==base.staticHash||w.obstacleEdits)throw new Error('connected shore physical base differs; no old-world reinterpretation');};
   return {rulesVersion,geometry,terrain:structuredClone(terrain),water:structuredClone(water),scene:structuredClone(scene),sourceHash:hashOf(source),
     genesis(seed='connected'):WorldState{const w=m.edenCommonsWorld(seed) as WorldState;w.base={...base};w.regions['shore-bank']={id:'shore-bank',label:'Connected sloping bank',kind:'place',level:0,polygon:[[-46,-11],[-29,-11],[-29,11],[-46,11]],provenance:{origin:'design-edit',confidence:'hypothetical'}};w.regions['shore-water']={id:'shore-water',label:'Connected calm water',kind:'place',level:0,polygon:[[-61,-11],[-46,-11],[-46,11],[-61,11]],provenance:{origin:'design-edit',confidence:'hypothetical'}};return w;},

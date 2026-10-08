@@ -67,7 +67,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const all = [...this.places.byId.values()].filter(p => p.starting && p.parent !== null), native = all.filter(p => p.id in ground);
     const starts = native.length ? native : all;
     const pick = starts.length ? starts[[...soulId].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7) % starts.length] : [...this.places.byId.values()][0];
-    return centroid(pick.polygon);
+    // CN5: on clear ground near its centre (a park's centre is its pond, a harbour's is the sea); the centre if none is known
+    const clear = (this.host.engine as unknown as {clearSpotsV1?: (p: [number, number][], n: number) => [number, number][]}).clearSpotsV1?.(pick.polygon, 1)?.[0];
+    return clear ?? centroid(pick.polygon);
   }
   readonly host: WorldHost; readonly db: Db;
   /** together/1 (core-next4): gestures between Souls, invitations, follows, carried items. */
@@ -407,7 +409,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     // PM-R057: exact ids first; an unambiguous natural name is accepted and reported back as `resolved`;
     // anything else is refused with the closest offered capabilities.
     const v = caps.some(c => c.id === text) ? {kind: 'exact' as const, cap: caps.find(c => c.id === text)!} : resolveCapability(text, this.vocabulary(soul, caps));
-    if (v.kind === 'unknown') return {...refuse('capability.unknown', v.reason), did_you_mean: v.didYouMean};
+    if (v.kind === 'unknown') return {...refuse(v.code ?? 'capability.unknown', v.reason), did_you_mean: v.didYouMean};
     let cap = v.cap; capability = cap.id;
     const note = [social?.note, v.kind === 'alias' ? v.note : null].filter(Boolean).join('; ');
     // together/1: doing a paired gesture back to someone who offered it is accepting their invitation
@@ -671,9 +673,17 @@ export class EdgeLedger implements EdgeLedgerHooks {
       },
       placeName: (id: string | undefined) => id ? this.places.byId.get(id)?.name ?? null : null,
       ancestors: (id: string) => {const out: string[] = []; for (let p = this.places.byId.get(id); p?.parent; p = this.places.byId.get(p.parent)) {const q = this.places.byId.get(p.parent); if (q?.enclosed) out.push(q.id);} return out;},
+      groupSize: (group: string) => Object.values(w.entities).filter(e => e.kind === 'human' && e.human?.together?.group === group).length,
     };
   }
 
+  /** CN5: a choreographed game this body is playing, in names (who is playing, whose turn, ends won at pétanque). */
+  private gameView(b: ReturnType<EdgeLedger['body']> | undefined): {game?: unknown} {
+    const g = b?.human?.game; if (!g) return {};
+    const name = (id: string | null | undefined) => id ? this.host.mindByEntity?.get(id)?.name ?? [...this.host.minds.values()].find(m => m.entityId === id)?.name ?? id : null;
+    return {game: {kind: g.kind, players: g.players.map(name), ...(g.waiting ? {waiting: 'for someone to join'} : {turn: g.turn, throwing: name(g.from), to: g.to ? name(g.to) : null}),
+      ...(g.kind === 'petanque' ? {end: g.end ?? 0, lastEndWonBy: name(g.lastWinner), boulesThisEnd: g.boules?.length ?? 0} : {}), myWins: g.wins ?? 0, untrusted: true}};
+  }
   /** What each capability answers to, for PM-R057 natural names (built only when an id is not exact). */
   private vocabulary(soul: EdgeSoul, caps: EdgeCapability[]): VocabContext {
     const w = this.host.engine.world as NativeWorld, me = this.body(soul.entityId), all = [...this.places.byId.values()], root = all.find(p => p.parent === null);
@@ -683,7 +693,11 @@ export class EdgeLedger implements EdgeLedgerHooks {
       places: all.filter(p => p.parent !== null).map(p => ({id: p.id, name: p.name, center: centroid(p.polygon), parent: p.parent, kind: p.kind, description: p.description, walkable: !!(w.regions as Record<string, unknown>)[p.id]})),
       target: c => {
         const t = c.target; if (!t) return {names: [], around: [], at: null};
-        if (t.kind === 'spot') {const sp = this.spots.spots.find(x => x.id === t.id), pl = sp?.place ? this.places.byId.get(sp.place) : undefined; return {names: sp?.label ? [sp.label] : [], around: pl ? [pl.id, pl.name] : [], at: sp ? sp.at : null};}
+        if (t.kind === 'spot') {
+          // CN5: a game's extra place `<spot>.pN` answers to its spot; a spot answers to its instrument too
+          const sp = this.spots.spots.find(x => x.id === t.id) ?? this.spots.spots.find(x => x.id === t.id.replace(/\.p\d+$/, '')), pl = sp?.place ? this.places.byId.get(sp.place) : undefined;
+          return {names: [...(sp?.label ? [sp.label] : []), ...(sp?.instrument ? [sp.instrument] : [])], around: pl ? [pl.id, pl.name] : [], at: sp ? sp.at : null};
+        }
         if (t.kind === 'soul') {const m = this.host.minds.get(t.id), e = m ? this.body(m.entityId) : undefined; return {names: m ? [m.name] : [], around: [], at: e ? [e.pose.p[0], e.pose.p[2]] : null};}
         const place = this.places.byId.get(t.id); if (place) return {names: [place.name], around: [], at: centroid(place.polygon)};
         const e = w.entities[t.id]; if (e) return {names: [], around: around(e.pose.p[0], e.pose.p[2]), at: [e.pose.p[0], e.pose.p[2]]};
@@ -791,7 +805,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       self: {soulId: soul.soulId, name: soul.name, entityId: soul.entityId, placePath: this.placePathOf(soul.soulId), position: b ? b.pose.p.map(v => Math.round(v * 100) / 100) : null, facing: b ? Math.round(b.pose.yaw * 100) / 100 : null,
         state: this.faded.has(soul.soulId) ? 'faded' : stateOf(this.host, m.entityId), activity: String(b?.human?.activity ?? 'idle'), reflex: action && action.actor === m.entityId ? {verb: action.action.verb, phase: action.action.phase ?? action.action.status} : null,
         receipts: this.openReceipts(soul.soulId), fade: this.comms?.fading.status(soul.soulId) ?? null,
-        holding: social.holding, following: social.following, followedBy: social.followedBy},
+        holding: social.holding, following: social.following, followedBy: social.followedBy, ...this.gameView(b)},
       // together/1: invitations to me (accept:<id> / decline:<id>) and my own open ones
       ...(social.invites.length ? {invites: social.invites} : {}), ...(social.invited.length ? {invited: social.invited} : {}),
       here: {souls: this.perceivedBodies(soul.soulId, NEAR_RADIUS).map(o => ({soulId: o.soulId, name: o.name, state: o.state, activity: o.activity, distance: o.distance, placeId: o.placeId, ...awayOf(o.soulId)})), objects: this.comms?.objects.visibleTo(soul) ?? [], items: social.items, untrusted: true},
@@ -807,7 +821,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
       const nearest = this.perceivedBodies(soul.soulId, 8)[0];
       if (nearest) for (const v of ['hug', 'high-five', 'dance-with', 'follow']) take(caps.find(c => c.id === `${v}:${nearest.soulId}`));
       for (const id of ['sit:here', 'read:here', 'lie:here', 'nap:here', 'sit-ground:here', 'wander:here']) take(caps.find(c => c.id === id));
-      for (const verb of ['warm-by-fire', 'stroll', 'play-piano', 'paint', 'play-music', 'write', 'cook', 'eat', 'drink', 'play-game', 'craft', 'post-letter', 'gather', 'swim']) take(caps.find(c => c.verb === verb));
+      for (const verb of ['warm-by-fire', 'stroll', 'play-piano', 'paint', 'play-music', 'sing', 'listen', 'use-computer', 'play-frisbee', 'play-petanque', 'play-volleyball', 'lift-weights', 'bench-press', 'pull-ups',
+        'write', 'cook', 'eat', 'drink', 'play-game', 'craft', 'post-letter', 'gather', 'swim']) take(caps.find(c => c.verb === verb));
       for (const c of caps) if (c.verb === 'object') take(c);
       for (const c of caps) if (c.verb === 'pick-up') take(c);
       out.doHere = pick.map(c => ({id: c.id, label: c.label}));

@@ -106,6 +106,10 @@ export type HumanState = {
   partner?: string;
   /** together/1: a grouped pose — waiting for partners or running in sync until the shared end tick. */
   together?: { group: string; phase: 'waiting' | 'active'; until?: number; mobile: boolean };
+  /** CN5 (social/pose.ts): the instrument a play-music body plays. */
+  instrument?: string;
+  /** CN5 (social/pose.ts): a choreographed game's public turn state (who throws to whom and when). */
+  game?: import('../social/pose.ts').GameState;
 };
 
 /** Persistent committed quantities for one bounded cold preparation batch. */

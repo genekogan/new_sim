@@ -32,7 +32,8 @@ export type TakeHands = { left?: [number, number, number]; right?: [number, numb
  * on, speed (cm/s), contents; since W32 (still mars-take/4, additive: absent unless a prone receiver lies down) proneYaw
  * (integer mrad, the lying body's world heading) and phaseK (integer %, progress within the prone hand-up phase).
  * Since core-next4 (still mars-take/4, additive: absent unless set) prop (activities/1: book, cup, flower…), seatHeight (m)
- * and partner (together/1: the other body of a paired gesture).
+ * and partner (together/1: the other body of a paired gesture). Since core-next5 (still additive): together (group, phase,
+ * until), instrument (play-music) and game (choreographed games: turn, thrower, catcher, throw/land ticks, petanque jack/boules).
  * Additive sleepPose carries {mat, standingFraction}: exact semantic lie/wake state,
  * without rig coordinates. It is absent in older takes and remains discrete per tick.
  * A null value = the field was cleared.

@@ -98,6 +98,7 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
     if(host.enableQuietStallReleaseV1)await drive(host.enableQuietStallReleaseV1());
     if(host.enableYieldTimeoutV1)await drive(host.enableYieldTimeoutV1());
     if(host.enableSpreadV2)await drive(host.enableSpreadV2());
+    if(host.enableSpreadClearV1)await drive(host.enableSpreadClearV1());
     if(host.enableStairMakeWayV1)await drive(host.enableStairMakeWayV1());
     if(host.enableReflexTimeoutV1)await drive(host.enableReflexTimeoutV1());
     if(host.enableContinuousDayV1)await drive(host.enableContinuousDayV1());
@@ -109,7 +110,9 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
       const {navSpecFromPlaces}=await load('apps/server/src/edge/ledger/nav.ts'),{loadSpots}=await load('apps/server/src/edge/ledger/activities.ts');
       const data=JSON.parse(readFileSync(resolve(placeData),'utf8')),spots=loadSpots(spotsRaw).data;
       const native=new Set([...Object.entries(host.engine.world.regions).filter(([,r])=>!String(r.provenance?.note??'').includes('placeRegionsV1')).map(([id])=>id),...data.places.filter(p=>(p.occupiers??[]).length).map(p=>p.id)]);
-      const spec=navSpecFromPlaces(data,{native,ground:Array.isArray(nav.ground)?nav.ground:[],area:[host.engine.groundBoundsV1()],extraSolids:spots.solids,rings:spots.rings,interiors:spots.interiors});
+      // CN5: nav.extraSolids = activity-spots/1 files whose solids join World's (Core's provisional district survey); platforms keep decks walkable
+      const extra=(Array.isArray(nav.extraSolids)?nav.extraSolids:[]).flatMap(path=>{const out=loadSpots(JSON.parse(readFileSync(resolve(path),'utf8')));if(out.refused.length)console.error('[edge] nav extra solids refused:',path,out.refused.join(', '));return out.data.solids;});
+      const spec=navSpecFromPlaces(data,{native,ground:Array.isArray(nav.ground)?nav.ground:[],area:[host.engine.groundBoundsV1()],extraSolids:[...spots.solids,...extra],rings:spots.rings,interiors:spots.interiors,platforms:spots.platforms});
       // A refused spec is reported and the world boots without it (never a half-installed nav).
       try{const out=await drive(host.installNavV1(spec));console.error('[edge] nav/1:',JSON.stringify({installed:out.installed,ground:spec.ground.length,solids:spec.solids.length}));}
       catch(error){console.error('[edge] nav/1 refused:',error instanceof Error?error.message:String(error));}}

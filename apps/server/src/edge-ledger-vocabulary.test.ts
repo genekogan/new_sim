@@ -47,9 +47,10 @@ test('vocabulary: exact ids win; natural names resolve when unambiguous', () => 
  assert.equal(to('sit:commons'), 'sit:commons-bench-east', 'two benches there, only one free');
  assert.equal(to('sit:here', [11, 6]), 'sit:commons-bench-east', 'nearest free seat within reach');
 });
-test('vocabulary: a known place without a target stands in its nearest whole place within 60 m', () => {
- const lib = resolveCapability('walk:eden-library-1', ctx());assert.equal(lib.kind, 'alias');assert.equal((lib as any).cap.id, 'walk:eden-classroom-1', 'a place, not the nearer seat fixture');assert.match((lib as any).note, /Library is not walkable ground yet/);
- assert.equal(to('walk:library'), 'walk:eden-classroom-1', 'Library (exact name) beats Library annex');
+test('vocabulary (CN5): a known place that cannot be reached is refused honestly (place.unreachable), never swapped for another place', () => {
+ const lib = resolveCapability('walk:eden-library-1', ctx());assert.equal(lib.kind, 'unknown');assert.equal((lib as any).code, 'place.unreachable');assert.match((lib as any).reason, /Library is not walkable ground yet/);
+ assert.equal((lib as any).didYouMean[0].id, 'walk:eden-classroom-1', 'the nearest whole place you can walk to, offered (not chosen)');
+ const named = resolveCapability('walk:library', ctx());assert.equal(named.kind, 'unknown');assert.match((named as any).reason, /Library is not walkable/, 'Library (exact name) beats Library annex');
  const far = resolveCapability('walk:region-park.pond', ctx());assert.equal(far.kind, 'unknown');assert.match((far as any).reason, /not walkable ground yet/);
 });
 test('vocabulary: several matches prefer the obvious one (nearest, with the others named); unknown names get did_you_mean', () => {
@@ -96,4 +97,24 @@ test('vocabulary (audit P0a): "go for a X" resolves X; rides join the balloon; u
  for (const s of ['go for a run', 'run to the deck', 'jog around', 'give Moss a hug', 'go for a jog']) {const r = resolveCapability(s, c3);assert.equal(r.kind, 'unknown', s);}
  assert.match((resolveCapability('go for a run', c3) as any).reason, /cannot run yet/);
  assert.equal(go('do some sit-ups'), 'situps:here');assert.equal(go('do push ups'), 'pushups:here');assert.equal(go('jumping jacks'), 'jumping-jacks:here');assert.equal(go('dance'), 'dance:here');
+});
+test('vocabulary (CN5): computers, stage music, singing, the audience, the gym and park games in plain words; nothing named → the nearest free spot', () => {
+ const S = (verb: string, id: string, label: string, at: [number, number], extra: string[] = []): EdgeCapability & {at: [number, number]; names: string[]} => ({id: `${verb}:${id}`, verb, label, available: true, target: {id, kind: 'spot'}, at, names: [label, ...extra]});
+ const spots = [S('use-computer', 'pc-house-3', 'Use the computer (Laptop at the house 3 bedroom desk)', [29, 30]), S('use-computer', 'pc-office-1', 'Use the computer (Office workstation 1)', [91, 16]),
+  S('play-music', 'stage-drums', 'Play the drums (Drum kit on the performance stage)', [92, -31], ['drums']), S('play-music', 'band-chair-4', 'Play the cello (Bandstand quartet chair 4 (cello))', [39, -26], ['cello']),
+  S('play-music', 'amph-guitar', 'Play the guitar (Stool and guitar on the amphitheatre stage)', [76, 80], ['guitar']), S('sing', 'amph-mic', 'Sing at the microphone (Microphone on the amphitheatre stage)', [76, 80]),
+  S('sing', 'stage-mic-1', 'Sing at the microphone (Lead microphone on the performance stage)', [92, -29]), S('listen', 'amph-seat-2-1', 'Sit in the audience and listen (Amphitheatre step 2, seat 1)', [77, 83]),
+  S('bench-press', 'gym-bench-press', 'Do a bench press (Outdoor gym: bench press)', [30, 110]), S('lift-weights', 'gym-weights', 'Lift weights (dumbbell curls) (Outdoor gym: dumbbells)', [30, 112]),
+  S('pull-ups', 'gym-pull-ups-1', 'Do pull-ups (Outdoor gym: low pull-up bar)', [29, 100]), S('dips', 'gym-dips', 'Do dips on the bars (Outdoor gym: dip bars)', [30, 102]),
+  S('play-petanque', 'sport-petanque-1', 'Play pétanque (Petanque court, throwing end)', [1, 123]), S('play-frisbee', 'sport-frisbee-1', 'Throw a frisbee (Frisbee lawn, north end)', [5, 113]),
+  S('play-volleyball', 'sport-volleyball-3', 'Play beach volleyball (Beach volleyball court, east side)', [22, 114])];
+ const around = new Map([['amph-mic', ['eden-amphitheatre', 'Amphitheatre']], ['stage-mic-1', ['eden-performance-stage', 'Performance stage']], ['amph-guitar', ['eden-amphitheatre', 'Amphitheatre']]]);
+ const c5: VocabContext = {...ctx([10, 5]), caps: [...caps, ...spots], target: c => {const s = spots.find(x => x.id === c.id); return s ? {names: s.names, around: around.get(c.target!.id) ?? [], at: s.at} : ctx().target(c);}};
+ const go = (s: string) => {const r = resolveCapability(s, c5); return r.kind === 'unknown' ? 'unknown: ' + r.reason : r.cap.id;};
+ assert.equal(go('use a computer'), 'use-computer:pc-house-3', 'the nearest free computer');assert.equal(go('check my email on a computer in the office'), 'use-computer:pc-office-1');
+ assert.equal(go('play the drums'), 'play-music:stage-drums');assert.equal(go('play the cello'), 'play-music:band-chair-4');assert.equal(go('play guitar'), 'play-music:amph-guitar');
+ assert.equal(go('sing at the amphitheatre'), 'sing:amph-mic');assert.equal(go('sing on the performance stage'), 'sing:stage-mic-1');assert.equal(go('listen to the concert'), 'listen:amph-seat-2-1');
+ assert.equal(go('do a bench press'), 'bench-press:gym-bench-press');assert.equal(go('lift weights'), 'lift-weights:gym-weights');assert.equal(go('do some pull-ups'), 'pull-ups:gym-pull-ups-1');assert.equal(go('dips'), 'dips:gym-dips');
+ assert.equal(go('play petanque'), 'play-petanque:sport-petanque-1');assert.equal(go('play boules'), 'play-petanque:sport-petanque-1');assert.equal(go('throw a frisbee'), 'play-frisbee:sport-frisbee-1');
+ assert.equal(go('play beach volleyball'), 'play-volleyball:sport-volleyball-3');assert.equal(go('go for a swim'), 'swim:shore-water', 'a swim is still a swim');
 });

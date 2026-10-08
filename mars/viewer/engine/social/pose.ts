@@ -10,7 +10,7 @@
 import { z } from 'zod';
 import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
-import { heading, hypot, type Vec2 } from '../core/math.ts';
+import { dcos, dsin, heading, hypot, type Vec2 } from '../core/math.ts';
 import { HUMAN_RADIUS } from '../world/catalog.ts';
 import type { Spatial } from '../spatial/service.ts';
 import { clearanceAt } from '../spatial/grid.ts';
@@ -18,20 +18,40 @@ import { clearanceAt } from '../spatial/grid.ts';
 /** Overlay activities (upper body; drawn on top of baseActivity). */
 export const POSE_OVERLAYS = ['read', 'browse', 'write', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'post-letter', 'wave',
   // gestures (core-next4): solo, and the hand-over pair give/take; pick-up/put-down an item
-  'bow', 'clap', 'nod', 'shake-head', 'point', 'cheer', 'give', 'take', 'pick-up', 'put-down'] as const;
+  'bow', 'clap', 'nod', 'shake-head', 'point', 'cheer', 'give', 'take', 'pick-up', 'put-down',
+  // CN5: at a desk computer, at a microphone, in an audience, with dumbbells
+  'use-computer', 'sing', 'listen', 'lift-weights'] as const;
 /** Whole-body postures on open ground (the body point stays; the viewer lays the body out along pose.yaw). */
-export const POSE_POSTURES = ['sit-ground', 'lie', 'nap', 'pushups', 'situps', 'yoga'] as const;
+export const POSE_POSTURES = ['sit-ground', 'lie', 'nap', 'pushups', 'situps', 'yoga',
+  // CN5: lying on a gym bench (seatHeight = the bench top)
+  'bench-press'] as const;
 /** Standing whole-body exercise/expression poses (cyclic; the viewer animates them from the tick). */
 export const POSE_MOVES = ['dance', 'jump', 'stretch', 'jumping-jacks',
   // paired touch gestures (core-next4): both bodies face each other at `gap` and share one start and end
-  'hug', 'high-five', 'handshake'] as const;
+  'hug', 'high-five', 'handshake',
+  // CN5: outdoor gym bars; choreographed games (grouped: the world keeps the turns, see `game`)
+  'pull-ups', 'dips', 'play-frisbee', 'play-petanque', 'play-volleyball'] as const;
 export const POSE_ACTIVITIES: readonly string[] = [...POSE_OVERLAYS, ...POSE_POSTURES, ...POSE_MOVES];
-export const POSE_PROPS = ['book', 'brush', 'pen', 'letter', 'cup', 'plate', 'tool', 'cards', 'flower', 'food', 'frisbee'] as const;
+export const POSE_PROPS = ['book', 'brush', 'pen', 'letter', 'cup', 'plate', 'tool', 'cards', 'flower', 'food', 'frisbee', 'dumbbell', 'boule'] as const;
+/** CN5: the instrument a `play-music` body plays (World draws it at the spot; the body state names it). */
+export const POSE_INSTRUMENTS = ['drums', 'keyboard', 'guitar', 'bass', 'violin', 'viola', 'cello', 'piano', 'flute', 'ukulele'] as const;
+/** CN5 choreographed games: no physics. The world keeps whose turn it is (a pure function of the tick and the players in
+ *  the group, sorted), so every body and the viewer agree: turn k lasts `period` s, the throw leaves at `windup` and
+ *  arrives `flight` s later. frisbee: thrower → next player (a held frisbee's owner starts); volleyball: the rally
+ *  alternates over the net; petanque: each throws in turn towards the jack, two boules each per end, the nearest wins it. */
+export const GAMES = { frisbee: { period: 3.2, windup: 0.7, flight: 1.5 }, volleyball: { period: 2.6, windup: 0.4, flight: 1.4 }, petanque: { period: 7, windup: 1.6, flight: 1.4 } } as const;
+export type GameKind = keyof typeof GAMES;
+/** Public game state on each player's body (human.game); the viewer draws the disc/ball/boules from it. */
+export type GameState = { kind: GameKind; group: string; players: string[]; waiting?: boolean; since?: number; turn?: number; from?: string; to?: string | null; throwTick?: number; landTick?: number;
+  /** petanque: the jack, where this turn's boule lands, this end's landed boules, the last end's winner, and this body's ends won. */
+  jack?: [number, number]; at?: [number, number]; boules?: { by: string; at: [number, number] }[]; end?: number; lastWinner?: string | null; wins?: number };
 /** together/1: speed of the short step-in to the paired distance (m/s). */
 const STEP_IN_SPEED = 0.6;
 /** together/1: partners further apart than this never pair (m). */
 const PAIR_REACH = 4;
-const OVERLAY = new Set<string>(POSE_OVERLAYS), POSTURE = new Set<string>([...POSE_POSTURES, ...POSE_MOVES]), LYING = new Set(['lie', 'nap', 'pushups', 'situps', 'yoga']);
+const OVERLAY = new Set<string>(POSE_OVERLAYS), POSTURE = new Set<string>([...POSE_POSTURES, ...POSE_MOVES]), LYING = new Set(['lie', 'nap', 'pushups', 'situps', 'yoga', 'bench-press']);
+/** CN5: players of a game are found within this distance (a frisbee lawn's ends are 14 m apart). */
+const GAME_REACH = 30;
 /** Open ground a lying body needs around its point (m). */
 export const LIE_CLEARANCE = 0.9;
 
@@ -39,10 +59,16 @@ type Params = { actor: string; activity: string; seconds: number; prop?: string;
   group?: string; waitSeconds?: number; alone?: 'start' | 'fail'; gap?: number; need?: number; hold?: string; release?: boolean;
   /** hotfix: stepping in or back for a paired gesture never brings this body closer to anyone else than it already is
    *  (once within arm's reach of them); prospective, set by edge plans, so earlier logs replay unchanged. */
-  clear?: boolean };
+  clear?: boolean;
+  /** CN5: the instrument played (play-music) and a choreographed game (grouped). */
+  instrument?: string; game?: { kind: GameKind; jack?: Vec2; net?: [number, number, number, number] };
+  /** CN5: keep the scenery seat height when the pose is done together (grouped). */
+  seatTogether?: boolean };
 type Exec = { id: string; p: Params; base: string; at: number[]; t: number; yaw: number | null;
   /** together/1: 'waiting' for partners, then 'active' until the shared end tick. */
-  phase?: 'waiting' | 'active'; waited?: number; until?: number; mobile?: boolean; close?: boolean };
+  phase?: 'waiting' | 'active'; waited?: number; until?: number; mobile?: boolean; close?: boolean;
+  /** CN5 games: ticks with nobody to play with, the last petanque end seen and the ends this body won. */
+  lonely?: number; end?: number; wins?: number; since?: number };
 /** together/1 public body state while a grouped pose runs (the viewer may draw open arms while waiting). */
 export type TogetherState = { group: string; phase: 'waiting' | 'active'; until?: number; mobile: boolean };
 const issue = (code: string, message: string, subjects: string[]): Diagnostic => ({ code: 'pose.' + code, message, subjects });
@@ -59,7 +85,9 @@ function admission(rt: Runtime, p: Params): Diagnostic | null {
     const sp = rt.services.spatial as Spatial | undefined, g = sp?.level(h.level);
     // together/1: a standing gesture done with someone (hug, dance together…) needs only the ground the body already stands on
     const standingTogether = !!p.group && !LYING.has(p.activity);
-    if (sp && g && !standingTogether) { sp.sync(rt.world); if (clearanceAt(sp.level(h.level)!, [a.pose.p[0], a.pose.p[2]]) < (LYING.has(p.activity) ? LIE_CLEARANCE : HUMAN_RADIUS + 0.1)) return issue('no-room', 'There is not enough open ground here to lie down; step onto open grass first.', [p.actor]); }
+    // CN5: lying on furniture (a gym bench: seatHeight) needs the bench, not open ground
+    const onFurniture = LYING.has(p.activity) && p.seatHeight !== undefined;
+    if (sp && g && !standingTogether && !onFurniture) { sp.sync(rt.world); if (clearanceAt(sp.level(h.level)!, [a.pose.p[0], a.pose.p[2]]) < (LYING.has(p.activity) ? LIE_CLEARANCE : HUMAN_RADIUS + 0.1)) return issue('no-room', 'There is not enough open ground here to lie down; step onto open grass first.', [p.actor]); }
   }
   return null;
 }
@@ -70,15 +98,15 @@ const nudged = (rt: Runtime, actor: string) => rt.holder('actor:' + actor).some(
 const restore = (rt: Runtime, ex: Exec) => {
   const h = rt.world.entities[ex.p.actor]?.human; if (!h) return;
   if (h.activity === ex.p.activity || (ex.phase && h.activity === 'walk')) h.activity = ex.base === 'sit' && !held(rt, ex.p.actor) ? 'idle' : ex.base;
-  delete h.baseActivity; delete h.seatHeight; delete h.partner; delete h.together; if (ex.phase) delete h.speed;
+  delete h.baseActivity; delete h.seatHeight; delete h.partner; delete h.together; delete h.instrument; delete h.game; if (ex.phase) delete h.speed;
   // together/1: a carried item stays in the hand between activities
   if (h.holding) h.prop = h.holding; else delete h.prop;
 };
 /** together/1: the other bodies posing with this group (sorted by id: deterministic), nearest first for the paired one. */
 const partnersOf = (rt: Runtime, ex: Exec) => {
   const me = rt.world.entities[ex.p.actor];
-  return Object.values(rt.world.entities).filter((e) => e.id !== ex.p.actor && e.kind === 'human' && e.human?.together?.group === ex.p.group && (e.human.level ?? 0) === (me.human!.level ?? 0)
-    && hypot(e.pose.p[0] - me.pose.p[0], e.pose.p[2] - me.pose.p[2]) <= PAIR_REACH * (ex.p.gap ? 1 : 3))
+  return Object.values(rt.world.entities).filter((e) => e.id !== ex.p.actor && e.kind === 'human' && e.human?.together?.group === ex.p.group && (e.human?.level ?? 0) === (me.human!.level ?? 0)
+    && hypot(e.pose.p[0] - me.pose.p[0], e.pose.p[2] - me.pose.p[2]) <= (ex.p.game ? GAME_REACH : PAIR_REACH * (ex.p.gap ? 1 : 3)))
     .sort((a, b) => hypot(a.pose.p[0] - me.pose.p[0], a.pose.p[2] - me.pose.p[2]) - hypot(b.pose.p[0] - me.pose.p[0], b.pose.p[2] - me.pose.p[2]) || (a.id < b.id ? -1 : 1));
 };
 /** A native seat (sit / take_slot) this actor still holds. */
@@ -86,10 +114,13 @@ const held = (rt: Runtime, actor: string) => rt.holder('actor:' + actor).some((i
 
 export const poseV1: ActionDef<Params, true, Exec> = {
   verb: 'pose_v1',
-  description: 'activities/1: take a generic activity pose where you are (read, browse, write, play-piano, play-music, paint, eat, drink, cook, play-game, craft, post-letter, wave over a seat or standing; sit-ground, lie, nap, pushups, situps, yoga on open ground; dance, jump, stretch, jumping-jacks standing) for a number of seconds, optionally holding a prop and facing a point, then return to the base posture.',
+  description: 'activities/1: take a generic activity pose where you are (read, browse, write, play-piano, play-music, paint, eat, drink, cook, play-game, craft, post-letter, wave, use-computer, sing, listen, lift-weights over a seat or standing; sit-ground, lie, nap, pushups, situps, yoga on open ground, bench-press on a bench; dance, jump, stretch, jumping-jacks, pull-ups, dips standing; play-frisbee, play-petanque, play-volleyball as choreographed group games) for a number of seconds, optionally holding a prop and facing a point, then return to the base posture.',
   schema: z.object({ actor: z.string().min(1).max(80), activity: z.enum(POSE_ACTIVITIES as [string, ...string[]]), seconds: z.number().min(0.5).max(3600), prop: z.enum(POSE_PROPS).optional(), base: z.enum(['sit', 'idle']).optional(), seatHeight: z.number().min(0.2).max(1.2).optional(), face: z.tuple([z.number(), z.number()]).optional(),
     group: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/).optional(), waitSeconds: z.number().min(0).max(180).optional(), alone: z.enum(['start', 'fail']).optional(),
-    gap: z.number().min(0.5).max(2.5).optional(), need: z.number().int().min(1).max(8).optional(), hold: z.enum(POSE_PROPS).optional(), release: z.boolean().optional(), clear: z.boolean().optional() }).strict(),
+    gap: z.number().min(0.5).max(2.5).optional(), need: z.number().int().min(1).max(8).optional(), hold: z.enum(POSE_PROPS).optional(), release: z.boolean().optional(), clear: z.boolean().optional(),
+    instrument: z.enum(POSE_INSTRUMENTS).optional(), seatTogether: z.boolean().optional(),
+    game: z.object({ kind: z.enum(Object.keys(GAMES) as [GameKind, ...GameKind[]]), jack: z.tuple([z.number(), z.number()]).optional(), net: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional() }).strict().optional() }).strict()
+    .refine((p) => !p.game || (!!p.group && p.activity === 'play-' + p.game.kind), { message: 'a game needs a group and its own play-<game> activity' }),
   reservations: (_w, p) => [{ resource: 'hand:' + p.actor + ':left', mode: 'exclusive' }, { resource: 'hand:' + p.actor + ':right', mode: 'exclusive' }, { resource: 'pose:' + p.actor, mode: 'exclusive' }],
   plan(rt, p) { const d = admission(rt, p); return d ? { ok: false, diagnostic: d } : { ok: true, program: true }; },
   start(rt, p, _plan, id) {
@@ -109,7 +140,8 @@ export const poseV1: ActionDef<Params, true, Exec> = {
     h.activity = ex.p.activity;
     if (OVERLAY.has(ex.p.activity)) h.baseActivity = ex.base; else delete h.baseActivity;
     if (ex.p.prop) h.prop = ex.p.prop; else if (h.holding) h.prop = h.holding; else delete h.prop;
-    if (ex.base === 'sit' && ex.p.seatHeight !== undefined && !held(rt, ex.p.actor)) h.seatHeight = ex.p.seatHeight; else delete h.seatHeight;
+    if ((ex.base === 'sit' || LYING.has(ex.p.activity)) && ex.p.seatHeight !== undefined && !held(rt, ex.p.actor)) h.seatHeight = ex.p.seatHeight; else delete h.seatHeight;
+    if (ex.p.instrument) h.instrument = ex.p.instrument;
     ex.t += dt;
     if (ex.t + 1e-9 < ex.p.seconds) return { status: 'running', phase: 'posing' };
     return finish(rt, ex);
@@ -148,6 +180,7 @@ function together(rt: Runtime, ex: Exec, a: NonNullable<Runtime['world']['entiti
     }
   }
   h.together = { group: ex.p.group!, phase: 'active', until: ex.until, mobile: !!ex.mobile };
+  if (ex.p.game) return playGame(rt, ex, a, h, others, dt);
   if (ex.p.gap) {
     // a paired gesture ends when its partner has gone (no hugging the air)
     if (!partner) { if (ex.close) return finish(rt, ex); }
@@ -178,6 +211,68 @@ function together(rt: Runtime, ex: Exec, a: NonNullable<Runtime['world']['entiti
   h.activity = ex.p.activity;
   if (OVERLAY.has(ex.p.activity)) h.baseActivity = ex.base; else delete h.baseActivity;
   if (ex.p.prop) h.prop = ex.p.prop; else if (h.holding) h.prop = h.holding; else delete h.prop;
+  // CN5: done together at a scenery seat or bench, or at an instrument: the same seat height and instrument as alone
+  // (prospective: only poses that ask for it with `seatTogether`, so earlier grouped poses replay unchanged)
+  if (ex.p.seatTogether && (ex.base === 'sit' || LYING.has(ex.p.activity)) && ex.p.seatHeight !== undefined && !held(rt, ex.p.actor)) h.seatHeight = ex.p.seatHeight;
+  if (ex.p.instrument) h.instrument = ex.p.instrument;
   if (tick >= ex.until!) return finish(rt, ex);
   return { status: 'running' as const, phase: 'together' };
+}
+
+/** CN5: a choreographed game turn for this body (state is a pure function of the tick and the active players). */
+function playGame(rt: Runtime, ex: Exec, a: NonNullable<Runtime['world']['entities'][string]>, h: NonNullable<NonNullable<Runtime['world']['entities'][string]>['human']>, others: NonNullable<Runtime['world']['entities'][string]>[], dt: number) {
+  const g = ex.p.game!, spec = GAMES[g.kind], tick = rt.tick, ticks = (s: number) => Math.max(1, Math.round(s / dt));
+  if (ex.yaw !== null && !held(rt, ex.p.actor)) a.pose.yaw = ex.yaw;
+  h.activity = ex.p.activity; delete h.baseActivity;
+  const playing = [a, ...others.filter((o) => o.human!.together?.phase === 'active' && o.human!.together.group === ex.p.group)];
+  const roster = playing.map((e) => e.id).sort();
+  let players = roster;   // the throwing order (roster below is what the body state lists)
+  if (g.kind === 'frisbee') { const owner = players.find((id) => rt.world.entities[id].human?.holding === 'frisbee'); if (owner) players = [owner, ...players.filter((id) => id !== owner)]; }
+  if (g.kind === 'volleyball' && g.net) {
+    // the rally alternates over the net: one side, the other, … (each side in id order, cycling the shorter side)
+    const [x0, z0, x1, z1] = g.net, side = (id: string) => { const p = rt.world.entities[id].pose.p; return (x1 - x0) * (p[2] - z0) - (z1 - z0) * (p[0] - x0) < 0 ? 0 : 1; };
+    const sides = [players.filter((id) => side(id) === 0), players.filter((id) => side(id) === 1)];
+    players = sides[0].length && sides[1].length ? Array.from({ length: 2 * Math.max(sides[0].length, sides[1].length) }, (_, i) => sides[i % 2][Math.floor(i / 2) % sides[i % 2].length]) : [];
+  }
+  const done = () => tick >= ex.until! ? finish(rt, ex) : { status: 'running' as const, phase: 'together' };
+  if (new Set(players).size < 2) {
+    // nobody (left) to play with: wait up to 30 s for someone to join, then the game ends
+    h.game = { kind: g.kind, group: ex.p.group!, players: roster, waiting: true, ...(g.jack ? { jack: g.jack } : {}), ...(ex.wins ? { wins: ex.wins } : {}) };
+    if (h.holding) h.prop = h.holding; else delete h.prop;
+    if ((ex.lonely = (ex.lonely ?? 0) + 1) > ticks(30)) return finish(rt, ex);
+    return done();
+  }
+  ex.lonely = 0;
+  // turns count from the game's start: the earliest start any player shows (a joiner takes the running game's)
+  const since = Math.min(ex.since ?? tick, ...playing.map((o) => o.human!.game?.since ?? Infinity)); ex.since = since;
+  const P = ticks(spec.period), k = Math.floor((tick - since) / P), n = players.length, from = players[k % n], throwTick = since + k * P + ticks(spec.windup), landTick = throwTick + ticks(spec.flight);
+  const state: GameState = { kind: g.kind, group: ex.p.group!, players: roster, since, turn: k, from, throwTick, landTick };
+  delete h.prop;
+  if (g.kind === 'petanque' && g.jack) {
+    // two boules each per end; each end's jack lies a little differently; the nearest boule wins the end
+    const L = 2 * n, end = Math.floor(k / L), seed = ex.p.group!;
+    const jack = (e: number): Vec2 => [r3(g.jack![0] + (unit(seed + ':jx:' + e) - 0.5) * 1.2), r3(g.jack![1] + (unit(seed + ':jz:' + e) - 0.5) * 1.6)];
+    const land = (turn: number): Vec2 => { const j = jack(Math.floor(turn / L)), ang = unit(seed + ':a:' + turn) * Math.PI * 2, u = unit(seed + ':r:' + turn), rad = 0.12 + 1.7 * u * Math.sqrt(u); return [r3(j[0] + dcos(ang) * rad), r3(j[1] + dsin(ang) * rad)]; };
+    const boulesOf = (e: number, upTo: number) => { const out: { by: string; at: Vec2 }[] = []; for (let t = e * L; t <= Math.min(upTo, (e + 1) * L - 1); t++) out.push({ by: players[t % n], at: land(t) }); return out; };
+    const winner = (e: number) => { const j = jack(e); let best: { by: string; d: number } | null = null; for (const b of boulesOf(e, (e + 1) * L - 1)) { const d = hypot(b.at[0] - j[0], b.at[1] - j[1]); if (!best || d < best.d) best = { by: b.by, d }; } return best?.by ?? null; };
+    if (ex.end !== undefined && end > ex.end && winner(end - 1) === ex.p.actor) ex.wins = (ex.wins ?? 0) + 1;
+    ex.end = end;
+    Object.assign(state, { to: null, jack: jack(end), at: land(k), end, boules: boulesOf(end, tick >= landTick ? k : k - 1), lastWinner: end > 0 ? winner(end - 1) : null });
+    if (from === ex.p.actor && tick < throwTick) h.prop = 'boule';
+  } else {
+    const to = players[(k + 1) % n];
+    state.to = to;
+    // the frisbee is in the thrower's hand until it flies, then in the catcher's
+    if (g.kind === 'frisbee' && ((tick < throwTick && from === ex.p.actor) || (tick >= landTick && to === ex.p.actor))) h.prop = 'frisbee';
+  }
+  if (ex.wins) state.wins = ex.wins;
+  h.game = state;
+  return done();
+}
+const r3 = (n: number) => Math.round(n * 1000) / 1000;
+/** Deterministic unit value in [0,1) from a string (FNV-1a). */
+function unit(s: string): number {
+  let x = 2166136261; for (let i = 0; i < s.length; i++) x = Math.imul(x ^ s.charCodeAt(i), 16777619);
+  x ^= x >>> 16; x = Math.imul(x, 0x85ebca6b); x ^= x >>> 13; x = Math.imul(x, 0xc2b2ae35); x ^= x >>> 16;   // murmur3 finaliser: every bit counts
+  return (x >>> 0) / 4294967296;
 }

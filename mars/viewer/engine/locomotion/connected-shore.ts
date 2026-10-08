@@ -2,11 +2,20 @@
 import {z} from 'zod';
 import type {ActionDef,Diagnostic} from '../actions/types.ts';
 import type {Runtime} from '../runtime/runtime.ts';
+import type {WorldState} from '../world/types.ts';
 import {shoreObstruction,SHORE_POLICY,type ShoreGeometry} from './shore.ts';
 type Params={actor:string;x:number;z:number;level?:number};
 type Op={verb:'walk_to'|'shore_travel';params:Params};
 type Exec={id:string;actor:string;ops:Op[];index:number;child?:string;stopping?:boolean};
 export const COMMONS_SHORE_GATE=[-29,0] as const;
+/** The connected shore's slope/water domain lies west of the dry gate (x < -29.5). CN5: level-0 nav/1 ground admitted west of
+ *  the gate (districts such as the artists' village and the beach; never over the shore itself, see previewNavV1) is ordinary
+ *  flat ground, not shore. Without such ground (every earlier world) this is exactly x < -29.5. */
+export function inShoreDomain(world:Pick<WorldState,'navV1'>,x:number,z:number):boolean{
+  if(!(x< -29.5))return false;
+  for(const g of world.navV1?.ground??[])if(g.level===0&&g.obb.c[0]-g.obb.half[0]< -29.5&&Math.abs(x-g.obb.c[0])<=g.obb.half[0]+1e-9&&Math.abs(z-g.obb.c[1])<=g.obb.half[1]+1e-9)return false;
+  return true;
+}
 const no=(code:string,message:string,actor:string):Diagnostic=>({code:'connected.'+code,message,subjects:[actor]});
 export function connectedShoreAction(g:ShoreGeometry):ActionDef<Params,Op[],Exec>{
   return {
@@ -17,7 +26,7 @@ export function connectedShoreAction(g:ShoreGeometry):ActionDef<Params,Op[],Exec
       const a=rt.world.entities[p.actor];
       if(!a?.human||a.kind!=='human'||a.body&&a.body.family!=='humanoid')return {ok:false,diagnostic:no('body-family','Only qualified upright humans can use the commons/shore connection',p.actor)};
       if(a.human.grip||a.human.on||a.human.riding||a.human.boatPassenger||a.human.boatTransit||a.human.sleepPose||a.human.hands?.left||a.human.hands?.right||Object.values(rt.world.entities).some(e=>e.support?.kind==='in-hand'&&e.support.by===p.actor))return {ok:false,diagnostic:no('occupied-body','Stand safely with free hands before taking the shore route',p.actor)};
-      const shoreFrom=a.pose.p[0]<-29.5,shoreTo=p.x<-29.5;
+      const shoreFrom=inShoreDomain(rt.world,a.pose.p[0],a.pose.p[2]),shoreTo=inShoreDomain(rt.world,p.x,p.z);
       if(shoreTo&&(p.level??0)!==0)return {ok:false,diagnostic:no('shore-level','Shore travel uses its certified terrain/buoyant support, not a raised commons level',p.actor)};
       const gate={actor:p.actor,x:COMMONS_SHORE_GATE[0],z:COMMONS_SHORE_GATE[1],level:0};
       const ops:Op[]=shoreFrom===shoreTo?[{verb:shoreTo?'shore_travel':'walk_to',params:p}]:shoreTo?

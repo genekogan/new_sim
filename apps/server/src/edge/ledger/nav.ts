@@ -84,6 +84,48 @@ export function ringWalls(g: Ring): Solid[] {
   return out;
 }
 
+/** activity-spots/1 `platforms[]` (OBSTACLES-v1, CN5): a walkable raised deck (bandstand, stage, boardwalk): a box {c, half, yaw}
+ *  or a round deck {c, r}, its `top` above the ground, and an optional `step` or `ramp` up to it. Walking stays level 0 (the
+ *  viewer lifts bodies standing on a deck); Core keeps a deck walkable (never one of the scenery solids) and, for a box deck
+ *  with a step or ramp, walls its edges except where the step/ramp meets it, so bodies go up the way World built. */
+export type Platform = {id: string; label?: string; c: V2; half?: V2; yaw?: number; r?: number; segments?: number; top: number;
+  step?: {c: V2; half: V2; top?: number}; ramp?: {c: V2; half: V2; from?: number; to?: number; dir?: V2}};
+
+const local = (p: V2, c: V2, yaw: number): V2 => {const dx = p[0] - c[0], dz = p[1] - c[1], cs = Math.cos(yaw), sn = Math.sin(yaw); return [dx * cs + dz * sn, -dx * sn + dz * cs];};
+/** A solid that is the deck of a platform itself (inside it within 5 cm and covering at least 80 % of it): decks are floors,
+ *  not obstacles. Things standing on a deck (a table, posts) stay solid. */
+export function isDeck(s: Solid, q: Platform): boolean {
+  const deckArea = q.r !== undefined ? Math.PI * q.r * q.r : q.half ? 4 * q.half[0] * q.half[1] : Infinity;
+  if (4 * s.half[0] * s.half[1] < 0.8 * deckArea) return false;
+  const cs = Math.cos(s.yaw), sn = Math.sin(s.yaw), corners: V2[] = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => [s.c[0] + a * s.half[0] * cs - b * s.half[1] * sn, s.c[1] + a * s.half[0] * sn + b * s.half[1] * cs]);
+  if (q.r !== undefined) return corners.every(v => Math.hypot(v[0] - q.c[0], v[1] - q.c[1]) <= q.r! + 0.05);
+  return !!q.half && corners.every(v => {const l = local(v, q.c, q.yaw ?? 0); return Math.abs(l[0]) <= q.half![0] + 0.05 && Math.abs(l[1]) <= q.half![1] + 0.05;});
+}
+/** Edge walls of a box deck reached by a step or ramp: a gap where it meets the deck, and rails along a ramp's sides. */
+export function platformEdges(q: Platform): Solid[] {
+  const access = q.ramp ?? q.step; if (!q.half || !access) return [];
+  const yaw = q.yaw ?? 0, cs = Math.cos(yaw), sn = Math.sin(yaw), th = 0.1, h = Math.round((q.top + 0.6) * 100) / 100, out: Solid[] = [];
+  const w = (id: string, lc: V2, half: V2) => out.push({id: `${q.id}#${id}`, ...(q.label ? {label: q.label} : {}), c: [r3(q.c[0] + lc[0] * cs - lc[1] * sn), r3(q.c[1] + lc[0] * sn + lc[1] * cs)], half: [r3(half[0]), r3(half[1])], yaw: r3(yaw), height: h});
+  const [hx, hz] = q.half, a = local(access.c, q.c, yaw);
+  // the access box's extent in the deck frame (it is axis-aligned in the world; turn its corners)
+  const ax = [-1, 1].flatMap(i => [-1, 1].map(j => local([access.c[0] + i * access.half[0], access.c[1] + j * access.half[1]], q.c, yaw)));
+  const lo = (k: 0 | 1) => Math.min(...ax.map(v => v[k])) - 0.05, hi = (k: 0 | 1) => Math.max(...ax.map(v => v[k])) + 0.05;
+  // which edge it meets: the side its centre lies beyond the most
+  const side = Math.abs(a[0]) / hx > Math.abs(a[1]) / hz ? (a[0] > 0 ? 'E' : 'W') : (a[1] > 0 ? 'N' : 'S');
+  for (const e of ['N', 'S', 'E', 'W'] as const) {
+    const along = e === 'N' || e === 'S' ? 0 : 1, len = along === 0 ? hx : hz, at = (e === 'N' || e === 'E' ? 1 : -1) * ((along === 0 ? hz : hx) + th / 2);   // just outside the deck: its whole top stays standable
+    const runs: [number, number][] = e === side ? [[-len, Math.max(-len, lo(along))], [Math.min(len, hi(along)), len]] : [[-len, len]];
+    runs.forEach(([s0, s1], k) => {if (s1 - s0 < 0.05) return; const m = (s0 + s1) / 2; w(`edge-${e.toLowerCase()}${k}`, along === 0 ? [m, at] : [at, m], along === 0 ? [(s1 - s0) / 2, th / 2] : [th / 2, (s1 - s0) / 2]);});
+  }
+  if (q.ramp) {
+    // rails along the ramp's long sides (from the deck edge out to its foot)
+    const long = (q.ramp.dir ? Math.abs(q.ramp.dir[0]) > Math.abs(q.ramp.dir[1]) : q.ramp.half[0] > q.ramp.half[1]) ? 0 : 1, rc = q.ramp.c, rh = q.ramp.half;
+    for (const sgn of [-1, 1]) out.push({id: `${q.id}#ramp-rail-${sgn > 0 ? 'b' : 'a'}`, ...(q.label ? {label: q.label} : {}),
+      c: long === 1 ? [r3(rc[0] + sgn * (rh[0] + th / 2)), r3(rc[1])] : [r3(rc[0]), r3(rc[1] + sgn * (rh[1] + th / 2))], half: long === 1 ? [th / 2, r3(rh[1])] : [r3(rh[0]), th / 2], yaw: 0, height: h});
+  }
+  return out;
+}
+
 /** Interior wall runs with door gaps (a door segment within 0.3 m of the run's line opens it). */
 export function runWalls(id: string, runs: [number, number, number, number][], doors: [number, number, number, number][], wall = 0.15, label?: string): Solid[] {
   const out: Solid[] = [];
@@ -106,7 +148,7 @@ export function runWalls(id: string, runs: [number, number, number, number][], d
 
 /** The nav/1 spec for a place file. `native` = ids already native regions (their own geometry, never solid here);
  *  `area` = rectangles where solids matter (native ground plus new ground); others are skipped to keep the raster small. */
-export function navSpecFromPlaces(data: PlaceData, opts: {native: Set<string>; ground: GroundRect[]; area: [number, number, number, number][]; extraSolids?: Solid[]; rings?: Ring[]; interiors?: Interior[]}): NavSpec {
+export function navSpecFromPlaces(data: PlaceData, opts: {native: Set<string>; ground: GroundRect[]; area: [number, number, number, number][]; extraSolids?: Solid[]; rings?: Ring[]; interiors?: Interior[]; platforms?: Platform[]}): NavSpec {
   const byId = new Map(data.places.map(p => [p.id, p])), interiors = new Map((opts.interiors ?? []).map(i => [i.place, i]));
   const enclosedAncestor = (p: Place) => {for (let q = p.parent ? byId.get(p.parent) : undefined; q; q = q.parent ? byId.get(q.parent) : undefined) if (q.enclosed && (q.level ?? 0) === 0 && !q.carrier) return true; return false;};
   const area = [...opts.area, ...opts.ground.map(g => g.boundsXZ)], inArea = (poly: V2[]) => {const b = bbox(poly); return area.some(a => hits(b, a));};
@@ -119,6 +161,10 @@ export function navSpecFromPlaces(data: PlaceData, opts: {native: Set<string>; g
     if (inside) {solids.push(...shellWalls(p.id, p.polygon, inside.doors, inside.wall ?? 0.3, p.name), ...runWalls(p.id, inside.walls ?? [], inside.doors, 0.15, p.name), ...(inside.furniture ?? []).map(f => ({...f, id: `${p.id}#f-${f.id}`})));}
     else solids.push(polygonBox(p.id, p.polygon, p.name));
   }
-  for (const s of [...(opts.extraSolids ?? []), ...(opts.rings ?? []).flatMap(ringWalls)]) if (inArea([[s.c[0] - s.half[0], s.c[1] - s.half[1]], [s.c[0] + s.half[0], s.c[1] + s.half[1]]])) solids.push(s);
-  return {version: 'nav/1', ground: opts.ground, solids};
+  // CN5: a platform's deck is a floor (a scenery solid covering it is not kept); box decks with a step/ramp get edge walls
+  const platforms = opts.platforms ?? [], extra = (opts.extraSolids ?? []).filter(s => !platforms.some(q => isDeck(s, q)));
+  for (const s of [...extra, ...(opts.rings ?? []).flatMap(ringWalls), ...platforms.flatMap(platformEdges)]) if (inArea([[s.c[0] - s.half[0], s.c[1] - s.half[1]], [s.c[0] + s.half[0], s.c[1] + s.half[1]]])) solids.push(s);
+  // one solid per id (the first wins): a provisional survey never collides with World's own ids
+  const seen = new Set<string>();
+  return {version: 'nav/1', ground: opts.ground, solids: solids.filter(s => !seen.has(s.id) && !!seen.add(s.id))};
 }

@@ -68,7 +68,9 @@ export const ITEM_LIMITS = {perPlace: 12, placedWorld: 150, pickReach: 120, cons
 const INVITE_RADIUS = 60, GESTURE_RADIUS = 8, FOLLOW_RADIUS = 20, FOLLOW_LOST = 45;
 /** Activity verbs an invitation may carry (params.with). */
 const INVITABLE = new Set(['walk', 'stroll', 'wander', 'hang-out', 'gather', 'warm-by-fire', 'sit', 'sit-ground', 'lie', 'nap', 'read', 'write', 'swim', 'rest',
-  'dance', 'jump', 'stretch', 'jumping-jacks', 'yoga', 'pushups', 'situps', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'object']);
+  'dance', 'jump', 'stretch', 'jumping-jacks', 'yoga', 'pushups', 'situps', 'play-piano', 'play-music', 'paint', 'eat', 'drink', 'cook', 'play-game', 'craft', 'object',
+  // CN5
+  'use-computer', 'sing', 'listen', 'lift-weights', 'bench-press', 'pull-ups', 'dips', 'play-frisbee', 'play-petanque', 'play-volleyball']);
 
 export type Invite = {id: string; what: string; host: {soulId: string; name: string}; guests: {soulId: string; name: string}[]; capability: string; label: string;
   kind: 'paired' | 'give' | 'activity' | 'ride'; activity?: string; seconds?: number; gap?: number; prop?: string; base?: string;
@@ -356,7 +358,8 @@ export class Together {
       if (!INVITABLE.has(cap.verb) || (cap.verb === 'object' && cap.action !== 'join')) return {code: 'capability.params', reason: `with (inviting others) works with activities, walks and rides, not ${cap.verb}.`};
       const w = this.withSouls(soul, params.with); if (!w.ok) return {code: w.code, reason: w.reason};
       const id = 'inv_' + randomUUID().slice(0, 12), out = structuredClone(steps), last = [...out].reverse().find(s => s.verb === 'mars:pose_v1');
-      if (last) {last.params.group = id; last.params.waitSeconds = 20; last.params.alone = 'start'; last.params.need = 1;}
+      // CN5: a game keeps its court's group (the guest takes a free place at the same court)
+      if (last && !last.params.game) {last.params.group = id; last.params.waitSeconds = 20; last.params.alone = 'start'; last.params.need = 1;}
       const ride = cap.verb === 'object' ? out.find(s => s.verb === 'mars:carrier_ride') : undefined;
       if (ride) {ride.params.holdSeats = w.souls.length; ride.params.holdSeconds = 90;}
       const what = ride ? 'ride' : cap.verb, label = ride ? `invites you on ${cap.label.replace(/^.*\(/, '').replace(/\)$/, '') || 'the ride'}` : `invites you to join: ${cap.label}`;
@@ -420,6 +423,25 @@ export class Together {
     if (['walk', 'stroll', 'wander', 'hang-out'].includes(verb)) return {label: `Walk with ${inv.host.name}`, steps: this.followSteps(soul.entityId, host.entityId), capability: 'accept:' + inv.id, commit: receipt => {
       commit(receipt); this.saveFollow({receipt, soulId: soul.soulId, target: inv.host.soulId, untilTick: this.tick + 3600 * 20, withHost: inv.hostReceipt ?? undefined});
     }};
+    // CN5: a game: my own free place at the same court (same verb, same group)
+    if (verb.startsWith('play-') && ['play-frisbee', 'play-petanque', 'play-volleyball'].includes(verb)) {
+      const group = (id: string) => (ownPlans.get(id)?.steps ?? []).find(s => s.verb === 'mars:pose_v1')?.params.group;
+      const hostGroup = hb.human?.together?.group ?? (ownPlans.has(hostCap) ? group(hostCap) : undefined) ?? `game-${verb.slice(5)}-`;
+      const to = (id: string) => {const t = (ownPlans.get(id)?.steps ?? []).find(s => s.verb === 'walk_to')?.params.to as [number, number] | undefined; return t ? Math.hypot(t[0] - hb.pose.p[0], t[1] - hb.pose.p[2]) : Infinity;};
+      const mine = ownCaps.filter(c => c.verb === verb && c.available && ownPlans.has(c.id) && String(group(c.id) ?? '').startsWith(String(hostGroup))).map(c => ({c, d: to(c.id)})).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id))[0];
+      if (!mine) return {code: 'game.full', reason: 'There is no free place left at that game.'};
+      return {label: ownPlans.get(mine.c.id)!.label, steps: ownPlans.get(mine.c.id)!.steps, capability: 'accept:' + inv.id, commit};
+    }
+    // CN5: a spot activity (listen in the audience, play in the band, use a computer): my nearest free spot of it by the host
+    if (!ownCaps.some(c => c.id === hostCap && c.available)) {
+      const to = (id: string) => {const t = (ownPlans.get(id)?.steps ?? []).find(s => s.verb === 'walk_to')?.params.to; return Array.isArray(t) ? Math.hypot(Number(t[0]) - hb.pose.p[0], Number(t[1]) - hb.pose.p[2]) : Infinity;};
+      const near = ownCaps.filter(c => c.verb === verb && c.available && c.target?.kind === 'spot' && ownPlans.has(c.id)).map(c => ({c, d: to(c.id)})).filter(x => x.d <= 12).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id))[0];
+      if (near) {
+        const steps = structuredClone(ownPlans.get(near.c.id)!.steps), last = [...steps].reverse().find(s => s.verb === 'mars:pose_v1');
+        if (last) {last.params.group = inv.id; last.params.waitSeconds = 20; last.params.alone = 'start';}
+        return {label: ownPlans.get(near.c.id)!.label, steps, capability: 'accept:' + inv.id, commit};
+      }
+    }
     if (!hostCap.endsWith(':here') && ownPlans.has(hostCap) && ownCaps.find(c => c.id === hostCap)?.available) {
       const own = ownPlans.get(hostCap)!, steps = structuredClone(own.steps), last = [...steps].reverse().find(s => s.verb === 'mars:pose_v1');
       if (last) {last.params.group = inv.id; last.params.waitSeconds = 20; last.params.alone = 'start';}

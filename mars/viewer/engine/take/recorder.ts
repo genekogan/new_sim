@@ -63,6 +63,9 @@ const FIELDS: [string, (e: Entity) => unknown][] = [
   ['prop', (e) => e.human?.prop], // activities/1: the small object in the hands (book, cup, flower…; ACTIVITIES-v1)
   ['seatHeight', (e) => e.human?.seatHeight], // activities/1: seat top (m) at a scenery seat with no native fixture
   ['partner', (e) => e.human?.partner], // together/1: the other body of a paired gesture (hug, handshake, high-five, give/take, dance together)
+  ['together', (e) => e.human?.together], // together/1: a grouped pose's shared group and end tick (animate cyclic poses in step)
+  ['instrument', (e) => e.human?.instrument], // CN5: the instrument a play-music body plays (drums, guitar, violin…)
+  ['game', (e) => e.human?.game], // CN5: a choreographed game's turn (who throws to whom, when; petanque jack and boules)
   ['on', (e) => e.human?.on], // the rack link (beam:… / climb:…) someone stands on
   ['speed', (e) => (e.human?.speed === undefined ? undefined : q(e.human.speed, SPEED_Q))], // integer cm/s (walk_to)
   ['sleepPose', (e) => e.human?.sleepPose], // additive semantic lie/wake state; renderer owns rig coordinates
