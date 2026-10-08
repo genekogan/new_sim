@@ -81,7 +81,7 @@ else {
   };
   before(async () => {
     proc = spawn(process.execPath, [new URL('./main.ts', import.meta.url).pathname], {
-      env: { PATH: process.env.PATH, HOME: process.env.HOME, ...(process.env.MARS_ENGINE_DIR ? { MARS_ENGINE_DIR: process.env.MARS_ENGINE_DIR } : {}), ENGINE: 'mars', PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR: mkdtempSync(join(tmpdir(), 'sim-mars-')), BRAIN_MODE: 'fake', DEV_AUTH: '1', PUBLIC_URL: BASE, WEB_DIR: '/nonexistent' },
+      env: { PATH: process.env.PATH, HOME: process.env.HOME, ...(process.env.MARS_ENGINE_DIR ? { MARS_ENGINE_DIR: process.env.MARS_ENGINE_DIR } : {}), ENGINE: 'mars', MIND_DRIVER: 'central', PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR: mkdtempSync(join(tmpdir(), 'sim-mars-')), BRAIN_MODE: 'fake', DEV_AUTH: '1', PUBLIC_URL: BASE, WEB_DIR: '/nonexistent' },
       stdio: ['ignore', 'inherit', 'inherit'],
     });
     for (let i = 0; i < 50; i++) { try { if ((await fetch(`${BASE}/healthz`)).ok) return; } catch { /* not up yet */ } await sleep(200); }
