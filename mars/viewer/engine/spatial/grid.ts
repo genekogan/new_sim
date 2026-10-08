@@ -60,6 +60,13 @@ export class BlockerMap extends Map<number, string> {
   /** A derived-geometry template must not share even its append-only dictionary with a runtime. */
   detachedCopy(): BlockerMap { return new BlockerMap(this.cells.length, this, true); }
 
+  /** Estimated retained cells + every append-only dictionary/index entry, including unused ids. */
+  retainedStorageBytes(): number {
+    let bytes = this.cells.byteLength + this.ids.length * 8 + this.index.size * 72;
+    for (const id of this.ids) bytes += id.length * 2;
+    return bytes;
+  }
+
   override get size(): number {
     return this.count;
   }
@@ -208,8 +215,9 @@ function detachedGrids(grids: GridSet): GridSet {
 function gridStorageBytes(grids: GridSet): number {
   let bytes = 0;
   for (const g of grids.levels.values()) {
-    bytes += g.free.byteLength + g.clearance.byteLength + g.free.length * 4 + (COLUMNS.get(g)?.byteLength ?? 0);
-    const ids = new Set(g.blockers.values()); for (const id of ids) bytes += 80 + id.length * 2;
+    bytes += g.free.byteLength + g.clearance.byteLength + (COLUMNS.get(g)?.byteLength ?? 0);
+    if (g.blockers instanceof BlockerMap) bytes += g.blockers.retainedStorageBytes();
+    else for (const id of g.blockers.values()) bytes += 80 + id.length * 2;
   }
   return bytes;
 }

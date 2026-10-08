@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {buildGrids,buildStaticGrids,withStaticGridReadCache,updateGrids,gridsWithObstacles,type GridSet} from '../spatial/grid.ts';
+import {buildGrids,buildStaticGrids,withStaticGridReadCache,updateGrids,gridsWithObstacles,StaticRaster,BlockerMap,type GridSet} from '../spatial/grid.ts';
 import {findRoute} from '../spatial/path.ts';
 import {HUMAN_PROFILE,type SpatialScene} from '../spatial/types.ts';
 const scene=():SpatialScene=>({bounds:[-3,-3,3,3],levels:[{id:0,y:0,label:'ground'}],surfaces:[{id:'ground',level:0,y:0,obb:{c:[0,0],half:[3,3],yaw:0}}],obstacles:[{id:'wall',y0:0,y1:2,obb:{c:[0,0],half:[.12,1],yaw:0}}],links:[]});
@@ -20,4 +20,15 @@ test('fresh dynamic blocker grids never mutate the cached static product and sco
  const s=scene(),staticGrids=withStaticGridReadCache(()=>buildStaticGrids(s,.1,undefined,true)),person={id:'moving-person',y0:0,y1:1.8,obb:{c:[-1,0] as [number,number],half:[.3,.3] as [number,number],yaw:0}};
  same(gridsWithObstacles(staticGrids,[person]),buildGrids({...s,obstacles:[...s.obstacles,person]}));person.obb.c[0]=1;same(gridsWithObstacles(staticGrids,[person]),buildGrids({...s,obstacles:[...s.obstacles,person]}));same(withStaticGridReadCache(()=>buildStaticGrids(s,.1,undefined,true)),buildGrids(s,.1,undefined,true));
  assert.throws(()=>withStaticGridReadCache(()=>{buildStaticGrids(s);throw Error('read failed');}),/read failed/);const later=withStaticGridReadCache(()=>Promise.resolve().then(()=>buildStaticGrids(s)));same(await later,buildGrids(s));
+});
+
+test('legitimate StaticRaster prefix changes no free bits, blocker ids or incremental EDT columns with cache on or off',()=>{
+ const s=scene();s.obstacles[0].id='prefix-equivalence';const prefix=new StaticRaster(s.obstacles,s.bounds,.1);assert.equal(prefix.fits(s,.1),true);const plain=buildGrids(s,.1,undefined,true);same(buildGrids(s,.1,prefix,true),plain);
+ const prefixed=withStaticGridReadCache(()=>buildStaticGrids(s,.1,prefix,true)),unprefixed=withStaticGridReadCache(()=>buildStaticGrids(s,.1,undefined,true));same(prefixed,plain);same(unprefixed,plain);
+ const edited={...s,obstacles:[...s.obstacles,{id:'prefix-extra',y0:0,y1:2,obb:{c:[1,0] as [number,number],half:[.1,1] as [number,number],yaw:0}}]};
+ for(const grids of [prefixed,unprefixed]){const patch=updateGrids(grids,s,edited,.1,prefix);assert.ok(patch);same(patch,buildGrids(edited,.1,undefined,true));}
+});
+test('retained-byte accounting includes cleared append-only dictionary entries and their independently cloned index',()=>{
+ const m=new BlockerMap(4);m.set(0,'retired-blocker-with-long-name');const stored=m.retainedStorageBytes();assert.ok(stored>4*4);m.clear();assert.equal(m.size,0);assert.deepEqual([...m.values()],[]);assert.equal(m.retainedStorageBytes(),stored,'unused ids/index remain allocated after clearing cells');
+ const clone=m.detachedCopy();assert.equal(clone.retainedStorageBytes(),stored);clone.set(1,'new-independent-id');assert.ok(clone.retainedStorageBytes()>stored);assert.equal(m.retainedStorageBytes(),stored,'cloned dictionary growth is isolated');
 });
