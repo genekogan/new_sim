@@ -11,6 +11,8 @@ export type SubjectPose = {
   height?: number; // default 1.75
   /** Readability points in world space (head, torso, hands, load ends, receiving socket…). */
   points?: Vec3[];
+  /** Camera-only full visual envelope for sizing shots. Visibility still uses points. */
+  framingPoints?: Vec3[];
   /** Relative importance in group scoring (default 1). */
   weight?: number;
   /** 'human' subjects are soft occluders (capsule) for everyone else's readability. */
@@ -191,7 +193,7 @@ function evaluateRaw(spec: ShotSpec, sampler: Sampler, t: number, frameAspect: n
       // framing radius: every point of the shot's subjects (a lying frame's corners, a crew member at the edge)
       const all = sampler(t);
       let r = 0;
-      for (const id of shotSubjects(spec)) for (const q of all[id] ? subjectPoints(all[id]) : []) r = Math.max(r, hypot(q[0] - target[0], q[1] - target[1], q[2] - target[2]));
+      for (const id of shotSubjects(spec)) for (const q of all[id] ? (all[id].framingPoints?.length ? all[id].framingPoints! : subjectPoints(all[id])) : []) r = Math.max(r, hypot(q[0] - target[0], q[1] - target[1], q[2] - target[2]));
       const d0 = hypot(off[0], off[1], off[2]);
       if (r > 0 && d0 > 1e-9) {
         const d = fitDistance(r + (spec.padding ?? 0.5), fov, spec.aspect ?? frameAspect, sb);
@@ -205,7 +207,7 @@ function evaluateRaw(spec: ShotSpec, sampler: Sampler, t: number, frameAspect: n
       for (const id of spec.subjects) {
         const s = all[id];
         if (!s) throw new Error(`camera: subject '${id}' not present at t=${t.toFixed(2)}`);
-        pts.push(...subjectPoints(s));
+        pts.push(...(s.framingPoints?.length ? s.framingPoints : subjectPoints(s)));
       }
       const lo: Vec3 = [Infinity, Infinity, Infinity], hi: Vec3 = [-Infinity, -Infinity, -Infinity];
       for (const p of pts) for (let j = 0; j < 3; j++) { lo[j] = Math.min(lo[j], p[j]); hi[j] = Math.max(hi[j], p[j]); }
