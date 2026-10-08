@@ -14,7 +14,7 @@ export const FACE_DOWN: ReadonlySet<string> = new Set(['pushups']);
 export const CYCLES: ReadonlySet<string> = new Set(['dance', 'jumping-jacks', 'jump', 'stretch', 'yoga', 'pull-ups', 'dips', 'lift-weights', 'play-volleyball', 'play-frisbee', 'play-petanque']);
 /** Seat height used for sitting on the ground (pelvis on the grass). */
 export const GROUND_SEAT = 0.04;
-export const PROPS = ['book', 'brush', 'pen', 'letter', 'cup', 'plate', 'tool', 'cards', 'flower', 'food', 'frisbee', 'boule', 'dumbbell'] as const;
+export const PROPS = ['book', 'brush', 'pen', 'letter', 'cup', 'plate', 'tool', 'cards', 'flower', 'food', 'frisbee', 'boule', 'dumbbell', 'guitar', 'bass', 'violin', 'viola', 'cello', 'flute', 'drumsticks'] as const;
 export type PropKind = (typeof PROPS)[number];
 const DEFAULT_PROP: Record<string, PropKind> = { read: 'book', browse: 'book', write: 'pen', paint: 'brush', eat: 'plate', drink: 'cup', cook: 'tool', 'play-game': 'cards', craft: 'tool', 'post-letter': 'letter' };
 
@@ -25,8 +25,12 @@ export function activityBase(activity: string, base?: string): string {
   return activity;
 }
 /** The prop in the hands: the engine's `human.prop` when it names a known prop, else the activity's default. */
-export function propFor(activity: string, prop?: string): PropKind | null {
+export function propFor(activity: string, prop?: string, instrument?:string): PropKind | null {
   if (prop && (PROPS as readonly string[]).includes(prop)) return prop as PropKind;
+  if(activity==='play-music'){
+    if(instrument==='drums')return 'drumsticks';
+    if(['guitar','bass','violin','viola','cello','flute'].includes(instrument??''))return instrument as PropKind;
+  }
   return DEFAULT_PROP[activity] ?? null;
 }
 /** Extra inputs of a frame: seconds since the activity began (one-shot gestures; undefined = cycle on take time) and
@@ -209,14 +213,44 @@ export function makeProp(kind: PropKind): THREE.Group {
     case 'frisbee': g.add(part(k.cyl, M.frisbee, 0.12, 0.018, 0.12, 0.09, 0, 0)); g.add(part(k.cyl, M.frisbee2, 0.08, 0.02, 0.08, 0.09, 0.002, 0)); break;
     case 'boule': g.add(part(k.sphere,M.metal,.045,.045,.045)); break;
     case 'dumbbell': g.add(part(k.cyl,M.metal,.015,.22,.015,0,0,0,Math.PI/2));for(const side of [-1,1])g.add(part(k.cyl,M.metal,.06,.045,.06,side*.1,0,0,Math.PI/2));break;
+    case 'guitar': case 'bass': {
+      g.add(part(k.sphere,M.wood,.055,.2,.16,0,-.035));
+      g.add(part(k.sphere,M.wood,.05,.13,.12,0,.17));
+      const neck=kind==='bass'?.58:.43;
+      g.add(part(k.box,M.cover,.028,neck,.05,0,.24+neck/2));
+      g.add(part(k.box,M.wood,.035,.11,.075,0,.3+neck));
+      g.add(part(k.box,M.metal,.006,.62,.012,.058,.24));
+      g.add(part(k.sphere,M.cover,.008,.045,.045,.058,.03));break;
+    }
+    case 'violin': case 'viola': case 'cello': {
+      const scale=kind==='cello'?2.2:kind==='viola'?1.15:1;
+      g.add(part(k.sphere,M.wood,.035*scale,.13*scale,.085*scale,0,-.04*scale));
+      g.add(part(k.sphere,M.wood,.03*scale,.09*scale,.07*scale,0,.12*scale));
+      g.add(part(k.box,M.cover,.025,.28*scale,.03,0,.24*scale));
+      g.add(part(k.sphere,M.wood,.024,.04,.025,0,.4*scale));
+      g.add(part(k.cyl,M.wood,.005,.55*scale,.005,.055,0,0,Math.PI/2));
+      if(kind==='cello')g.add(part(k.cyl,M.metal,.005,.18,.005,0,-.47));break;
+    }
+    case 'flute': g.add(part(k.cyl,M.metal,.012,.58,.012,0,0,0,Math.PI/2));for(let i=0;i<7;i++)g.add(part(k.sphere,M.cover,.014,.005,.014,i*.055-.16,.012));break;
+    case 'drumsticks': for(const side of ['left','right']){const stick=part(k.cyl,M.wood,.006,.3,.006);stick.name=side+' stick';g.add(stick);}break;
   }
   return g;
 }
 const _m = new THREE.Matrix4(), _a = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0), _rgt = new THREE.Vector3();
 /** Put a prop at the hands: two-handed props (book, cards) between the palms, a plate in the left, others in the right. */
 export function placeProp(obj: THREE.Object3D, kind: PropKind, left: THREE.Vector3 | null, right: THREE.Vector3 | null, fwd: THREE.Vector3) {
+  if(kind==='drumsticks'){
+    obj.matrixAutoUpdate=false;obj.matrix.identity();obj.matrixWorldNeedsUpdate=true;
+    for(const [i,at]of[left,right].entries()){const stick=obj.children[i];stick.visible=!!at;if(at){stick.position.copy(at).addScaledVector(fwd,.12);stick.quaternion.setFromUnitVectors(_up,_a.copy(fwd).addScaledVector(_up,-.15).normalize());stick.updateMatrix();}}
+    obj.visible=!!left||!!right;return;
+  }
   const two = kind === 'book' || kind === 'cards', at = two && left && right ? _a.copy(left).add(right).multiplyScalar(0.5) : kind === 'plate' ? (left ?? right) : (right ?? left);
   if (!at) { obj.visible = false; return; }
+  if(['guitar','bass','violin','viola','cello'].includes(kind)&&left&&right){
+    const neck=new THREE.Vector3().subVectors(left,right).normalize();
+    const face=fwd.clone().addScaledVector(neck,-fwd.dot(neck)).normalize();
+    if(neck.lengthSq()>.9&&face.lengthSq()>.9){_rgt.crossVectors(face,neck).normalize();_m.makeBasis(face,neck,_rgt).setPosition(right);obj.matrixAutoUpdate=false;obj.matrix.copy(_m);obj.matrixWorldNeedsUpdate=true;obj.visible=true;return;}
+  }
   _rgt.crossVectors(fwd, _up).normalize();
   _m.makeBasis(fwd, _up, _rgt).setPosition(at);
   if (two) _m.setPosition(at.x + fwd.x * 0.03, at.y + 0.05, at.z + fwd.z * 0.03);
