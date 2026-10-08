@@ -1,3 +1,4 @@
+import {HUMAN_PROFILE} from '../../../mars/viewer/engine/spatial/types.ts';
 import {SHORE_POLICY} from '../../../mars/viewer/engine/locomotion/shore.ts';
 // P0 October 6: exact saved Alice failures. "go to the classroom" was refused
 // while she slept during quiet renewal; "go for a swim in the pond" had no
@@ -177,9 +178,29 @@ test('a place takes many bodies: someone at the classroom centre does not lock i
  assert.ok(await tick(4000,()=>Math.hypot(body(parked).pose.p[0]-mid[0],body(parked).pose.p[2]-mid[1])<1&&body(parked).human?.activity!=='walk'),'a body occupies the classroom centre');
  const walkers=f.rows.slice(2,6),ids:string[]=[];
  for(const row of walkers){await accept(f.host,f.service.submit(scopeOf(row),{contract:'soul-intent/2',op:'upsert',requestId:'class-'+row.id,words:'go to the classroom'}));await accept(f.host,f.service.settled());const r=f.service.lookup(scopeOf(row),'class-'+row.id);assert.equal(r.phase,'understood',JSON.stringify(r));if(r.phase!=='understood')throw Error('no plan');ids.push(r.revision.intentId);await f.brain.evaluate(f.host.minds.get(row.id)!,'new-intent-v2');f.host.drainInputs();}
- const done=()=>walkers.every((row,i)=>Object.values(f.host.intentHistoryOf(row.id).attempts).some(a=>a.intent.intentId===ids[i]&&a.phase==='completed'));
+ // This owner-arrival fixture stops unrelated fake autonomous choices after all four decisions are accepted.
+ // Already accepted native programmes and their truthful intent completion still run on WorldHost ticks.
+ f.brain.quiesce();
+ const checkedGoals=new Set<string>();let minimumGoalSpacing=Infinity,minimumPhysicalSpacing=Infinity;
+ const sample=()=>{
+  const entities=[...walkers,parked].map(body);
+  for(let i=0;i<entities.length;i++)for(let j=i+1;j<entities.length;j++)minimumPhysicalSpacing=Math.min(minimumPhysicalSpacing,Math.hypot(entities[i].pose.p[0]-entities[j].pose.p[0],entities[i].pose.p[2]-entities[j].pose.p[2]));
+  const active=new Set(f.host.engine.runtime.liveIds());
+  for(const record of f.host.engine.runtime.records.values()){
+   if(checkedGoals.has(record.id)||record.parent||record.verb!=='walk_to'||!active.has(record.id)||!record.params||typeof record.params!=='object'||Array.isArray(record.params))continue;
+   const q=record.params as Record<string,unknown>,row=walkers.find(r=>r.entity_id===q.actor);if(!row||typeof q.x!=='number'||typeof q.z!=='number')continue;
+   const pending=f.host.minds.get(row.id)?.pending,action=pending?f.host.engine.programAction?.(pending.program):null,card=pending?f.host.kernel.vocab.cards[pending.card]:undefined,step=action&&card?[...card.approach,...card.during][action.step]:undefined;
+   if(action?.action.id!==record.id||step?.params?.spread!=='region/1')continue;
+   const x=q.x,z=q.z,distances=Object.values(f.host.engine.world.entities).filter(e=>e.human&&e.id!==q.actor).map(e=>Math.hypot(x-e.pose.p[0],z-e.pose.p[2]));
+   for(const other of f.host.engine.runtime.records.values())if(other.id!==record.id&&active.has(other.id)&&!other.parent&&other.verb==='walk_to'&&other.params&&typeof other.params==='object'&&!Array.isArray(other.params)){const p=other.params as Record<string,unknown>;if(p.actor!==q.actor&&typeof p.x==='number'&&typeof p.z==='number')distances.push(Math.hypot(x-p.x,z-p.z));}
+   const spacing=Math.min(...distances);minimumGoalSpacing=Math.min(minimumGoalSpacing,spacing);checkedGoals.add(record.id);assert.ok(spacing>=1-1e-9,'each admitted classroom destination is spaced from other bodies and pending goals '+JSON.stringify({tick:f.host.engine.world.tick,actor:q.actor,x,z,spacing}));
+  }
+ };
+ const done=()=>{sample();return walkers.every((row,i)=>Object.values(f.host.intentHistoryOf(row.id).attempts).some(a=>a.intent.intentId===ids[i]&&a.phase==='completed'));};
  assert.ok(await tick(12000,done),walkers.map((r,i)=>body(r).human?.activity+'@'+body(r).pose.p.map(v=>v.toFixed(1)).join(',')+' '+Object.values(f.host.intentHistoryOf(r.id).attempts).filter(x=>x.intent.intentId===ids[i]).map(x=>x.phase+':'+x.tick+(('reason' in x)?':'+x.reason:'')).join('|')).join(' ;; '));
- const ps=[...walkers,parked].map(r=>body(r).pose.p);for(let i=0;i<ps.length;i++)for(let j=i+1;j<ps.length;j++)assert.ok(Math.hypot(ps[i][0]-ps[j][0],ps[i][2]-ps[j][2])>=.9,'spaced bodies');
+ assert.ok(checkedGoals.size>=4,'all four have separately admitted classroom destinations');assert.ok(minimumPhysicalSpacing>=2*HUMAN_PROFILE.radius-1e-9,'native human capsules stay separate on every transit tick '+JSON.stringify({minimumPhysicalSpacing}));
+ t.diagnostic(JSON.stringify({goalAdmissions:checkedGoals.size,minimumGoalSpacing,minimumPhysicalSpacing}));
+ const ps=[...walkers,parked].map(r=>body(r).pose.p);t.diagnostic(JSON.stringify({tick:f.host.engine.world.tick,positions:ps,activities:[...walkers,parked].map(r=>body(r).human?.activity)}));for(let i=0;i<ps.length;i++)for(let j=i+1;j<ps.length;j++)assert.ok(Math.hypot(ps[i][0]-ps[j][0],ps[i][2]-ps[j][2])>=.9,'spaced bodies '+JSON.stringify({i,j,distance:Math.hypot(ps[i][0]-ps[j][0],ps[i][2]-ps[j][2]),positions:ps}));
  assert.ok(Math.hypot(body(parked).pose.p[0]-mid[0],body(parked).pose.p[2]-mid[1])<1,'parked body not displaced');
  assert.deepEqual(f.host.engine.runtime.violations,[]);assert.equal(f.db.paidCost(),0);
  t.diagnostic('classroom arrivals at '+JSON.stringify(walkers.map(r=>[+body(r).pose.p[0].toFixed(1),+body(r).pose.p[2].toFixed(1)])));
