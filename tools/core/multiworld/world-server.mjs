@@ -8,7 +8,7 @@ import {pathToFileURL} from 'node:url';
 import {readFileSync,mkdirSync,writeFileSync,unlinkSync} from 'node:fs';
 import {setImmediate} from 'node:timers/promises';
 
-export async function openWorldServer({input,dataDir,worldKey,worldId,port,build='local-multiworld/1',webDir,marsWebDir,publicOrigin,ownerId='dev:admin',seedCast=true,nativeCast=true,runtimePolicies=true,installLiving=true,cards=true,skillFile,cliFile,checkOnly=false,worldVariant='legacy',sceneSha256,nativeCastIds}){
+export async function openWorldServer({input,dataDir,worldKey,worldId,port,build='local-multiworld/1',webDir,marsWebDir,publicOrigin,ownerId='dev:admin',seedCast=true,nativeCast=true,runtimePolicies=true,installLiving=true,cards=true,skillFile,cliFile,checkOnly=false,worldVariant='legacy',sceneSha256,nativeCastIds,experiencesFile,experiencesSha256}){
  if(!['mars','littlemartians'].includes(worldKey)||!input||!dataDir||!worldId||!Number.isInteger(port)||port<4963||port>4969)throw Error('explicit local Mars/LM input/data/world and port4963..4969 required');
  if(!build.startsWith('local-')||!ownerId)throw Error('local build and explicit cast owner required');
  input=resolve(input);dataDir=resolve(dataDir);
@@ -18,6 +18,12 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
   if(worldVariant==='legacy'){if(actual!==legacy)throw Error('LM legacy scene differs; an authored map requires its own explicit world identity and scene hash');}
   else if(worldVariant==='authored'){if(worldId==='littlemartians-1'||sceneSha256!==actual)throw Error('LM authored map requires a separate worldId and exact sceneSha256');}
   else throw Error('unknown Little Martians worldVariant');
+ }
+ let experiencesData;
+ if(experiencesFile){
+  if(worldKey!=='littlemartians'||worldVariant!=='authored'||resolve(experiencesFile)!==join(input,'worlds/littlemartians/experiences.json'))throw Error('experiences require the explicit authored world source file');
+  const bytes=readFileSync(resolve(experiencesFile));if(createHash('sha256').update(bytes).digest('hex')!==experiencesSha256)throw Error('authored experiences source hash differs');
+  experiencesData=JSON.parse(bytes.toString('utf8'));
  }
  mkdirSync(dataDir,{recursive:true});
  const lockPath=join(dataDir,'edge-server.lock');
@@ -109,7 +115,8 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
   edge=new EdgeLedger(host,db,undefined,{ambient:false});
   const {marsEdgeProfile}=await load('apps/server/src/worlds/mars-edge.ts'),{floaterEdgeProfile}=await load('apps/server/src/worlds/floater-edge.ts');
   const profile=worldKey==='mars'?marsEdgeProfile(host):null,rigid=floaterEdgeProfile(host);
-  edge.worldProfile=(soul,caps,plans)=>{profile?.(soul,caps,plans);rigid(soul,caps,plans);};
+  const experienceProfile=experiencesData?(await load('apps/server/src/worlds/experiences-edge.ts')).lmExperienceEdgeProfile(host,experiencesData):undefined;
+  edge.worldProfile=(soul,caps,plans)=>{profile?.(soul,caps,plans);rigid(soul,caps,plans);experienceProfile?.(soul,caps,plans);};
   server=createServer();const strip=url=>stripWorldRequestPath(url,cfg.worldPath);server.on('upgrade',req=>{req.url=strip(req.url);});
   hub=new Hub(server,host,auth,db);hub.brain=brain;hub.build=build;
   const previousFading=process.env.EDGE_FADING;delete process.env.EDGE_FADING;

@@ -1,0 +1,229 @@
+{
+  "sourceCommit": "7f9368b8",
+  "experiencesSha256": "e6b4f72c36d23ddad5577c475d5b536ea1db4222c8ec64bafb4971fc37645e83",
+  "experiences": {
+    "schema": "lm-native-experiences/1",
+    "world": "littlemartians",
+    "experiences": [
+      {
+        "id": "lm-gallery-observe",
+        "place": "madmaraca-court",
+        "at": [
+          -35,
+          8
+        ],
+        "label": "Observe the Madmaraca glazes",
+        "steps": [
+          {
+            "verb": "walk_to",
+            "params": {
+              "to": [
+                -35,
+                8
+              ]
+            }
+          },
+          {
+            "verb": "rest",
+            "params": {
+              "seconds": 120
+            }
+          }
+        ]
+      },
+      {
+        "id": "lm-temple-observe",
+        "place": "minarete-court",
+        "at": [
+          32,
+          8
+        ],
+        "label": "Observe the Minarete Temple",
+        "steps": [
+          {
+            "verb": "walk_to",
+            "params": {
+              "to": [
+                32,
+                8
+              ]
+            }
+          },
+          {
+            "verb": "rest",
+            "params": {
+              "seconds": 120
+            }
+          }
+        ]
+      },
+      {
+        "id": "lm-garden-rest",
+        "place": "eden-garden",
+        "at": [
+          -32,
+          44
+        ],
+        "label": "Rest in Verdelis's garden",
+        "steps": [
+          {
+            "verb": "walk_to",
+            "params": {
+              "to": [
+                -32,
+                44
+              ]
+            }
+          },
+          {
+            "verb": "rest",
+            "params": {
+              "seconds": 120
+            }
+          }
+        ]
+      },
+      {
+        "id": "lm-grotto-observe",
+        "place": "grotto-court",
+        "at": [
+          45,
+          48
+        ],
+        "label": "Observe the painted grotto from its dry causeway",
+        "steps": [
+          {
+            "verb": "walk_to",
+            "params": {
+              "to": [
+                45,
+                48
+              ]
+            }
+          },
+          {
+            "verb": "rest",
+            "params": {
+              "seconds": 120
+            }
+          }
+        ]
+      }
+    ],
+    "integration": "Native programs valid on current engine; explicit edge provider installation remains pending shared launcher. No invented activity pose."
+  },
+  "regions": {
+    "madmaraca-court": {
+      "id": "madmaraca-court",
+      "label": "Madmaraca Gallery Court",
+      "kind": "walkable",
+      "level": 0,
+      "polygon": [
+        [
+          -64,
+          3
+        ],
+        [
+          -28,
+          3
+        ],
+        [
+          -28,
+          26
+        ],
+        [
+          -64,
+          26
+        ]
+      ],
+      "provenance": {
+        "origin": "design-edit",
+        "confidence": "hypothetical"
+      }
+    },
+    "minarete-court": {
+      "id": "minarete-court",
+      "label": "Minarete Sky Court",
+      "kind": "walkable",
+      "level": 0,
+      "polygon": [
+        [
+          28,
+          3
+        ],
+        [
+          64,
+          3
+        ],
+        [
+          64,
+          26
+        ],
+        [
+          28,
+          26
+        ]
+      ],
+      "provenance": {
+        "origin": "design-edit",
+        "confidence": "hypothetical"
+      }
+    },
+    "eden-garden": {
+      "id": "eden-garden",
+      "label": "Verdelis's Eden Garden",
+      "kind": "walkable",
+      "level": 0,
+      "polygon": [
+        [
+          -65,
+          36
+        ],
+        [
+          -25,
+          36
+        ],
+        [
+          -25,
+          58
+        ],
+        [
+          -65,
+          58
+        ]
+      ],
+      "provenance": {
+        "origin": "design-edit",
+        "confidence": "hypothetical"
+      }
+    },
+    "grotto-court": {
+      "id": "grotto-court",
+      "label": "Grotto of Painted Worlds",
+      "kind": "walkable",
+      "level": 0,
+      "polygon": [
+        [
+          25,
+          36
+        ],
+        [
+          65,
+          36
+        ],
+        [
+          65,
+          58
+        ],
+        [
+          25,
+          58
+        ]
+      ],
+      "provenance": {
+        "origin": "design-edit",
+        "confidence": "hypothetical"
+      }
+    }
+  }
+}
