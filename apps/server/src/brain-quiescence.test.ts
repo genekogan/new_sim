@@ -24,7 +24,11 @@ test('quiescence suppresses new thought but drains accepted compiler, nested min
   t.after(()=>brain.quiesce());brain.mode='live'; // Only injected compiler; Jev stays fake, no provider.
   const service=new IntentControlV2(f.host,brain,f.souls,{historyV1:true});
   const scope=service.ownerScope({userId:row.owner,expiresAt:Number.MAX_SAFE_INTEGER},row.id);
-  const received=await accept(f.host,service.submit(scope,{contract:'soul-intent/2',requestId:'shutdown-held-original',op:'upsert',words:'Wait quietly.'}));assert.equal(received.phase,'received');assert.equal(calls,1);
+  const received=await accept(f.host,service.submit(scope,{contract:'soul-intent/2',requestId:'shutdown-held-original',op:'upsert',words:'Wait quietly.'}));assert.equal(received.phase,'received');
+  // Upserts publish their durable received receipt before scheduling interpretation
+  // on the next event-loop turn. This test shuts down an already-entered compiler.
+  for(let i=0;i<100&&calls===0;i++)await delay(1);
+  assert.equal(calls,1,'the accepted injected compiler has entered before shutdown');
   brain.quiesce();let drained=false;const drain=Promise.all([brain.settled(),service.settled()]).then(()=>drained=true);
   await setImmediate();assert.equal(drained,false);assert.equal(await brain.compile(f.host.minds.get(row.id)!,'another direction'),null);
   await brain.evaluate(f.host.minds.get(row.id)!,'timer');await brain.direct();assert.equal(calls,1);
