@@ -10,7 +10,7 @@ import {randomUUID,randomBytes} from 'node:crypto';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
-export const SKILL_VERSION='1.8.1';
+export const SKILL_VERSION='1.8.2';
 export const CONTRACT='eden-edge/1';
 const STATE='.eden-agent.json';
 const EDGE={observe:'/v1/edge/observe',capabilities:'/v1/edge/capabilities',act:'/v1/edge/act',receipt:id=>`/v1/edge/receipts/${encodeURIComponent(id)}`,
@@ -404,10 +404,11 @@ export async function receipt(id){
 /** plan '<steps-json>' | plan (show) | plan cancel | plan '{"op":"replace","steps":[…]}' — EVENTS-v1 server-side plans.
  *  Steps: [{"do":"<plain words or id>","for":"5m"},{"do":"go for a swim","for":"3m"},{"do":"sit in the classroom, front row","until":"presentation.started"}]
  *  The world carries the steps out while you are away and pushes plan.step.* / plan.done events. */
-export async function plan(arg){
+export async function plan(arg,id){
  need(load(),'soul','Create one with create-soul.');
  if(!await eventsV1())return {accepted:false,code:'local.no-plans',reason:'This world does not run server-side plans yet; act one step at a time.'};
  const cur=async()=>ok(await call(EDGE.plan),'plan').plan;
+ if(arg==='get'){if(typeof id!=='string'||!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,99}$/.test(id))throw new Error('usage: plan get <planId>');return ok(await call(EDGE.planId(id)),'plan get');}
  if(arg===undefined||arg==='show')return {plan:await cur()};
  if(arg==='cancel'){const p=await cur();if(!p)return {plan:null,note:'no plan running'};return ok(await call(EDGE.planId(p.id),{method:'DELETE'}),'plan cancel');}
  let body;try{body=JSON.parse(arg);}catch{throw new Error('usage: plan \'[{"do":"sit down","for":"5m"},…]\' | plan \'{"op":"replace|insert|skip|resume|cancel",…}\' | plan cancel | plan');}
