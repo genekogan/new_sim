@@ -104,3 +104,10 @@ test('ordinary north-bench-by-campfire and campfire aliases retain the same cano
  const north=await f.submit('Please sit on the north bench by the campfire now.','natural-north-bench');assert.equal(north.phase,'understood');if(north.phase==='understood'){const p=north.revision.interpretation.humanGoalPlan;if(p?.kind==='planned'){assert.equal((p.goals[0] as any).bindingId,'sit:social-eden-fire-bench-north');assert.equal(p.adaptation,undefined);}}
  intent='walk';const fire=await f.submit('go to the campfire','natural-campfire');assert.equal(fire.phase,'understood');if(fire.phase==='understood'){const p=fire.revision.interpretation.humanGoalPlan;if(p?.kind==='planned')assert.equal((p.goals[0] as any).bindingId,'walk:social-eden-fire');}
 });
+
+
+test('selected native target removal before acceptance still refuses after unrelated route checks are deferred',async t=>{
+ const f=await harness(t,input=>({kind:'plan',registryHash:input.registry.registryHash,goals:[{goal:'walk',bindingId:'walk:commons-bench-west'}],explanation:'Walk to the selected west bench.',trigger:{kind:'now'}}));
+ const original=f.brain.compileHumanGoalV1.bind(f.brain);t.mock.method(f.brain,'compileHumanGoalV1',async(...args:Parameters<Brain['compileHumanGoalV1']>)=>{const result=await original(...args);if(result.kind==='planned')f.host.engine.removeEntity('commons-bench-west');return result;});
+ const receipt=await f.submit('PRIVATE_SELECTED_ROUTE go to commons-bench-west','route-removed-at-acceptance');assert.equal(receipt.phase,'refused');if(receipt.phase==='refused')assert.equal(receipt.outcome?.kind,'state_blocked');assert.equal(Object.keys(f.host.intentHistoryOf(f.row.id).intents).length,0);assert.equal(f.db.paidCost(),0);
+});
