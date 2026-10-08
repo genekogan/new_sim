@@ -207,7 +207,7 @@ export class WorldRtsCamera {
     }
     this.markerAge += dt;
     const fade = this.dragging ? 1 : Math.max(0, 1 - this.markerAge / MARKER_SECONDS);
-    this.material.opacity = .85 * fade; this.marker.visible = fade > 0 && mode !== 'broadcast';
+    this.material.opacity = .85 * fade; this.marker.visible = fade > 0 && mode === 'manual';
     if (this.marker.visible) {
       const scale = Math.max(.5, this.camera.position.distanceTo(target) * .035);
       this.marker.position.copy(target).add(new THREE.Vector3(0, .04, 0)); this.marker.scale.setScalar(scale);
