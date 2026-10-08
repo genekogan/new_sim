@@ -55,6 +55,8 @@ export type Environment = {
 };
 
 export type WorldState = {
+  /** Explicit prospective office guard prisms; absent on all earlier worlds. */
+  officeStairGuardsV1?:import('./office-stair-guards-v1.ts').OfficeStairGuardsV1;
   schema: string;
   base: BaseRef;
   tick: number;

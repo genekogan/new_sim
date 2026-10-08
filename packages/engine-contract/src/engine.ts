@@ -150,6 +150,8 @@ export interface Engine {
   assignBodyV1?(actor:string,body:import('./world.ts').Entity['body']|null):boolean;
   configureRenderPlatformsV1?(metadata:import('./render-platforms-v1.ts').RenderPlatformsV1):void;
   renderPlatformsV1?():import('./render-platforms-v1.ts').RenderPlatformsV1|undefined;
+  configureOfficeStairGuardsV1?(metadata:import('./office-stair-guards-v1.ts').OfficeStairGuardsV1):void;
+  officeStairGuardsV1?():import('./office-stair-guards-v1.ts').OfficeStairGuardsV1|undefined;
   /** Spawn a human entity for a Soul at the arrival point; returns the entity id. */
   spawnHuman(args: { id: string; label: string; soul: string }): string;
   removeEntity(id: string): void;

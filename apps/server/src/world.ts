@@ -1,5 +1,6 @@
 import {edenLectureV1} from '@sim/engine-mars';
 import {renderPlatformRowsV1Schema,type RenderPlatformV1} from '@sim/engine-contract';
+import {officeStairGuardsDeclarationV1Schema,type OfficeStairGuardsDeclarationV1} from '@sim/engine-contract';
 import type {EdenLecturePlacementV1} from '@sim/engine-contract';
 import {latestPurposeDirectionV1} from './latest-purpose-direction.ts';
 import {episodesFromHistoryV1} from './purpose-episodes.ts';
@@ -1031,6 +1032,14 @@ export class WorldHost {
     const old=this.engine.renderPlatformsV1?.();if(old&&old.navHash===navHash&&old.baseStaticHash===baseStaticHash&&hashOf(old.platforms)===hashOf(platforms))return Promise.resolve({installed:false});
     const guard:AcceptanceGuard=()=>{if(hashOf((this.engine.world as any).navV1??null)!==navHash||this.engine.world.base.staticHash!==baseStaticHash)throw Error('render-platforms.source-moved');return true;};
     return this.enqueueChecked('rules','operator:render-platforms',{renderPlatformsV1:{contract:'render-platforms/1',navHash,baseStaticHash,platforms}},guard).then(()=>({installed:true}));
+  }
+  /** Explicit prospective height bands only; does not activate office floors or stairs. */
+  installOfficeStairGuardsV1(raw:OfficeStairGuardsDeclarationV1){
+    if(!this.engine.configureOfficeStairGuardsV1)return Promise.reject(Error('office-guards.reader-required'));
+    const declaration=officeStairGuardsDeclarationV1Schema.parse(raw),existing=this.engine.officeStairGuardsV1?.();
+    if(existing)return Promise.resolve({installed:false});
+    const guard:AcceptanceGuard=()=>{if(this.engine.officeStairGuardsV1?.())throw Error('office-guards.already-installed');return true;};
+    return this.enqueueChecked('rules','operator:office-stair-guards',{officeStairGuardsV1:declaration},guard).then(()=>({installed:true}));
   }
   /** carrier/1: install a ride (e.g. a hot-air balloon) at its home as a logged prospective rules fact; idempotent by id. */
   setCarrierRouteV1(spec:{id:string;route:string}){

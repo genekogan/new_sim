@@ -13,6 +13,7 @@ import {foldMandate} from './mandate.ts';
 import {intentSleepStopV1Schema} from '@sim/protocol';
 import {bodyAssignmentV1Schema} from '@sim/protocol';
 import {renderPlatformsDeclarationV1Schema} from '@sim/engine-contract';
+import {officeStairGuardsDeclarationV1Schema} from '@sim/engine-contract';
 import { isStationFactV1, parseStationFactV1 } from '@sim/protocol';
 
 /**
@@ -218,6 +219,7 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       const nav=(e.payload as {navV1?:unknown}|null)?.navV1;
       if(nav){const install=(engine as unknown as {installNavV1?:(s:unknown)=>unknown}).installNavV1;if(!install)throw Error('nav.reader-required');install.call(engine,nav);}
       if(e.payload?.renderPlatformsV1){if(e.author!=='operator:render-platforms'||!engine.configureRenderPlatformsV1)throw Error('render-platforms.reader-required');engine.configureRenderPlatformsV1({...renderPlatformsDeclarationV1Schema.parse(e.payload.renderPlatformsV1),acceptedAtTick:e.tick});}
+      if(e.payload?.officeStairGuardsV1){if(e.author!=='operator:office-stair-guards'||!engine.configureOfficeStairGuardsV1)throw Error('office-guards.reader-required');engine.configureOfficeStairGuardsV1({...officeStairGuardsDeclarationV1Schema.parse(e.payload.officeStairGuardsV1),acceptedAtTick:e.tick});}
       // placeRegionsV1: W1 places on admitted native ground become destination regions, with their kernel places (walk offers).
       const regionsV1=(e.payload as {placeRegionsV1?:unknown}|null)?.placeRegionsV1;
       if(regionsV1){const install=(engine as unknown as {installPlaceRegionsV1?:(l:unknown)=>string[]}).installPlaceRegionsV1;if(!install)throw Error('place-regions.reader-required');
