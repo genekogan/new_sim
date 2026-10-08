@@ -300,7 +300,9 @@ function worldBounds(node:THREE.Object3D){const box=new THREE.Box3(),v=new THREE
  node.traverse(o=>{const mesh=o as THREE.Mesh;if(!mesh.isMesh)return;const p=mesh.geometry.attributes.position;if(!p)return;const inst=(mesh as THREE.InstancedMesh).isInstancedMesh?(mesh as THREE.InstancedMesh):null;
   for(let k=0;k<(inst?inst.count:1);k++){if(inst){inst.getMatrixAt(k,m);world.multiplyMatrices(mesh.matrixWorld,m);}else world.copy(mesh.matrixWorld);for(let i=0;i<p.count;i++)box.expandByPoint(v.fromBufferAttribute(p,i).applyMatrix4(world));}});
  return box;}
-function buildingOf(mesh:THREE.Object3D,root:THREE.Object3D){const chain:THREE.Object3D[]=[];let p=mesh.parent;while(p&&p!==root){chain.unshift(p);p=p.parent;}
+function buildingOf(mesh:THREE.Object3D,root:THREE.Object3D){
+ if(mesh.userData.skipBuildingIdentity===true||root.userData.skipBuildingIdentity===true)return null;
+ const chain:THREE.Object3D[]=[];let p=mesh.parent;while(p&&p!==root){if(p.userData.skipBuildingIdentity===true)return null;chain.unshift(p);p=p.parent;}
  const at=chain.findIndex(a=>/^[a-z]/.test(a.name));if(at<0||!BUILDING.test(chain[at].name))return null;
  if(chain.slice(at).some(a=>NOT_BUILDING.test(a.name))||NOT_BUILDING.test(mesh.name))return null;return chain[at];}
 function roleFor(cls:RealismClass|null,m:THREE.MeshStandardMaterial,mesh:THREE.Object3D,key:string,timberWalls:boolean):1|2|3|4|null{

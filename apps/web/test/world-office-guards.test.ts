@@ -5,6 +5,8 @@ import {officeStairGuardBoxes,officeGuardSweepFraction} from '../../../mars/view
 import {constrainOfficeGuardCamera,officeGuardsFromPublication} from '../src/WorldOfficeGuards.ts';
 import {createOfficeStairGuardAssembly} from '../../../mars/viewer/app/engine-view/content/assets/office-building-proposal/stair-guards.ts';
 import {createEdenPublicQuarter} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/public-quarter.ts';
+import {applyWorldRealism,buildingPaletteOf,disposeBuildingIdentity} from '../src/WorldEdenRealism.ts';
+import {createEdenNeighborhood} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/neighborhood.ts';
 
 const guards=officeStairGuardBoxes();
 test('only an exact guard fact captured by the depicted tick supplies drawing and collision bands',()=>{
@@ -29,6 +31,24 @@ test('default old office assembly is unchanged; the captured guard owner alone a
   assert.deepEqual(old.group.getObjectByName('eden-office-1')!.userData,next.group.getObjectByName('eden-office-1')!.userData);
   assert.equal(next.group.children.length,old.group.children.length+1);
  }finally{old.dispose();next.dispose();}
+});
+
+test('adding guards before the original office leaves its assigned palette and actual finish unchanged',()=>{
+ const finish=(withGuards:boolean)=>{
+  disposeBuildingIdentity();const root=new THREE.Group(),neighborhood=createEdenNeighborhood(()=>0,{houseOne:'direct-courtyard',houseThree:'lower-roof-route'})!,owner=createEdenPublicQuarter(()=>0,withGuards?guards:[])!;
+  root.add(neighborhood.group,owner.group); // Actual production neighbour and public-quarter ordering.
+  try{
+   applyWorldRealism(root,{buildings:true});
+   const office=owner.group.getObjectByName('eden-office-1')!,mesh=office.children[0] as THREE.Mesh;
+   const material=mesh.material as THREE.MeshStandardMaterial;
+   const shader={vertexShader:THREE.ShaderLib.standard.vertexShader,fragmentShader:THREE.ShaderLib.standard.fragmentShader,uniforms:{}} as THREE.WebGLProgramParametersWithUniforms;
+   material.onBeforeCompile(shader,{} as THREE.WebGLRenderer);
+   return {palette:buildingPaletteOf('eden-office-1'),style:shader.uniforms.edenStyle.value.toArray(),paint:shader.uniforms.edenPaint.value.toArray(),trim:shader.uniforms.edenTrim.value.toArray(),guardPalette:buildingPaletteOf('eden-office-1:stair-guards')};
+  }finally{disposeBuildingIdentity();owner.dispose();neighborhood.dispose();}
+ };
+ const original=finish(false),guarded=finish(true);assert.notEqual(original.palette,null);
+ assert.deepEqual(guarded,original,'guards must not consume a neighbouring building finish before the office');
+ assert.equal(guarded.guardPalette,null,'a rail assembly is not a second building');
 });
 test('upper office guards block a fast camera crossing on three sides while preserving the gaze',()=>{
  for(const floor of[3.1,6.1])for(const[from,to]of[

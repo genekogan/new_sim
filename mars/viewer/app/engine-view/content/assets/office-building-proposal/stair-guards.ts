@@ -33,7 +33,7 @@ export function createOfficeStairGuardAssembly(guards:readonly OfficeGuardBox[])
  const expected=officeStairGuardBoxes();
  if(guards.length!==expected.length||guards.some((g,i)=>g.id!==expected[i].id||g.buildingId!==expected[i].buildingId||g.floorY!==expected[i].floorY||g.min.some((v,j)=>v!==expected[i].min[j])||g.max.some((v,j)=>v!==expected[i].max[j])))throw new TypeError('Exact captured office guard bands required');
  const group=new THREE.Group(),parts=officeStairAssemblyParts(guards),geometry=new THREE.BoxGeometry(1,1,1),material=new THREE.MeshStandardMaterial({color:'#65716b',roughness:.7});
- group.name='eden-office-1:stair-guards';group.userData.officeStairGuards=structuredClone(guards);
+ group.name='eden-office-1:stair-guards';group.userData.skipBuildingIdentity=true;group.userData.officeStairGuards=structuredClone(guards);
  const mesh=new THREE.InstancedMesh(geometry,material,parts.length),matrix=new THREE.Matrix4(),q=new THREE.Quaternion(),axis=new THREE.Vector3(1,0,0),position=new THREE.Vector3(),scale=new THREE.Vector3();
  mesh.name='office guard rails, stringers and suspended landing supports';mesh.userData.parts=structuredClone(parts);
  parts.forEach((p,i)=>{q.setFromAxisAngle(axis,p.rotationX??0);matrix.compose(position.fromArray(p.p),q,scale.fromArray(p.size));mesh.setMatrixAt(i,matrix);});
