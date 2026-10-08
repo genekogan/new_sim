@@ -84,7 +84,7 @@ test('re-planning mid-run: PATCH replace turns around; insert, skip, cancel; one
     assert.ok((await kinds(f, 'Roger')).includes('plan.done:replaced'));
     assert.equal((await f.envelopes('Roger')).find(e => e.kind === 'plan.done' && e.data?.status === 'replaced')!.salience, 1);
     // validation
-    for (const bad of [{steps: []}, {steps: [{for: 'soon'}]}, {steps: [{do: 'x', say: 'y'}]}, {steps: [{do: 'x', until: {event: 'NOT VALID'}}]}, {steps: [{do: 'x'}], onRefusal: 'shrug'}, {steps: Array(21).fill({do: 'x'})}])
+    for (const bad of [{steps: []}, {steps: [{for: 'soon'}]}, {steps: [{do: 'x', say: 'y'}]}, {steps: [{do: 'x', until: {event: 'NOT VALID'}}]}, {steps: [{do: 'x', until: 'walk-done'}]}, {steps: [{do: 'x'}], onRefusal: 'shrug'}, {steps: Array(21).fill({do: 'x'})}])
       assert.equal((await f.post('Roger', '/v1/edge/plan', bad)).status, 400, JSON.stringify(bad));
   } finally { f.destroy(); }
 });

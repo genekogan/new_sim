@@ -65,11 +65,13 @@ test('plans + fade by abandonment in a native world: lie 90 min on instruction s
   // the plan's events: started once (with what it chose), its receipts tagged and quiet, `where` on them
   const env = (await comms.streams.read(ana.soulId, 0, 1000)).events.map(e => events.envelope(ana.soulId, e));
   assert.equal(env.filter(e => e.kind === 'plan.step.started').length, 1);
-  assert.ok(env.filter(e => e.raw === 'receipt').every(e => e.salience <= 1 && (e.data?.plan as any)?.step === 0), 'plan-driven receipts are tagged and quiet');
+  const planReceipts = env.filter(e => e.raw === 'receipt' && (e.data?.receipt as any)?.capability === 'lie:here');
+  assert.ok(planReceipts.length >= 10 && planReceipts.every(e => e.salience <= 1 && (e.data?.plan as any)?.step === 0), 'plan-driven receipts are tagged and quiet');
+  assert.equal(env.find(e => e.raw === 'receipt' && (e.data?.receipt as any)?.capability === 'walk:eden-gardens' && (e.data?.receipt as any)?.phase === 'completed')?.salience, 3, 'her own walk is not');
   assert.ok(env.find(e => e.raw === 'receipt')!.where?.place, 'receipts say where');
   now += 1 * MIN; plans.tick(); await run(40);
   assert.equal(plans.current(ana).plan, null, 'done after 90 min');
-  assert.equal(env.concat((await comms.streams.read(ana.soulId, 0, 1000)).events.map(e => events.envelope(ana.soulId, e))).filter(e => e.kind === 'plan.done').length, 1);
+  assert.equal((await comms.streams.read(ana.soulId, 0, 1000)).events.map(e => events.envelope(ana.soulId, e)).filter(e => e.kind === 'plan.done').length, 1);
   // replay: plan acts are ordinary logged decisions; snapshot and genesis both rebuild the same state
   await run(40); w.f.host.saveSnapshot(true);
   const head = {engine: w.f.host.engine.stateHash(), kernel: kernelHash(w.f.host.kernel)};

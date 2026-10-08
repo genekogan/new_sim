@@ -6,7 +6,7 @@
 import {randomBytes} from 'node:crypto';
 import {EdgeError, type EdgeReceipt, type EdgeSoul} from '../contract.ts';
 import type {EventStreams, StreamEvent} from '../comms/stream.ts';
-import {kindMatches, oneLine, type Envelope} from '../events/envelope.ts';
+import {EVENT_KINDS, kindMatches, oneLine, type Envelope} from '../events/envelope.ts';
 
 export type OnRefusal = 'pause-and-notify' | 'skip' | 'cancel';
 export const ON_REFUSAL: OnRefusal[] = ['pause-and-notify', 'skip', 'cancel'];
@@ -17,6 +17,10 @@ const TRANSIENT_RETRY_MS = 5000, TRANSIENT_MAX = 12, REISSUE_MAX = 60, REISSUE_G
 /** Verbs whose posture or activity a `for` step keeps up by acting again when the body's own activity ends early. */
 const REHOLD = new Set(['sit', 'sit-ground', 'lie', 'nap', 'read', 'rest', 'warm-by-fire', 'gather', 'swim', 'dance', 'jump', 'stretch', 'jumping-jacks', 'yoga', 'pushups', 'situps', 'play-piano', 'paint', 'play-music', 'write', 'play-game', 'craft', 'cook', 'wander', 'hang-out']);
 
+/** The `wait` (raw) kinds an `until` may also name. */
+const RAW_KINDS = ['receipt', 'arrival', 'departure', 'speech', 'conversation.invite', 'conversation.turn', 'conversation.member', 'conversation.closed', 'object', 'schedule', 'fade', 'world', 'invite', 'invite.accepted', 'invite.declined', 'invite.expired', 'invite.closed', 'follow', 'follow.stop', 'approach', 'world.notice', 'world.join', 'world.leave', 'light.changed'];
+/** An `until` step with no `within` gives up waiting after this long (and moves on). */
+export const UNTIL_DEFAULT_MS = 3 * 3600_000;
 export type Until = {event: string; about?: string; object?: string; place?: string; text?: string; within?: string | number};
 export type StepSpec = {do?: string | Record<string, unknown>; say?: string; params?: Record<string, unknown>; for?: string | number; until?: Until; onRefusal?: OnRefusal; label?: string};
 type StepState = {status: 'pending' | 'starting' | 'running' | 'done' | 'failed' | 'skipped'; attempt: number; startedAt?: number; endedAt?: number; deadline?: number; untilBy?: number;
@@ -73,6 +77,9 @@ export function validateSteps(raw: unknown): StepSpec[] {
       const u = typeof x.until === 'string' ? {event: x.until} : x.until as Record<string, unknown>;
       const ev = u && typeof u === 'object' ? (u.event ?? u.kind) : undefined;
       if (typeof ev !== 'string' || !/^[a-z*][a-z0-9.*-]{0,60}$/.test(ev)) throw new EdgeError(400, 'invalid', `step ${i}: until must be an event kind (e.g. "presentation.started") or {event, about?, object?, place?, text?, within?}`);
+      // a kind that never happens would hold the step for hours: refuse names the stream does not have
+      const known = [...Object.keys(EVENT_KINDS), ...RAW_KINDS];
+      if (!known.some(k => kindMatches(ev, k))) throw new EdgeError(400, 'invalid', `step ${i}: until "${ev}" is not an event kind; use one of ${['presentation.started', 'schedule.starting', 'speech.to-me', 'conversation.turn', 'approach', 'arrive.here', 'invite', 'receipt.terminal'].join(', ')} … (GET /v1/edge/schema lists all)`);
       const until: Until = {event: ev};
       for (const k of ['about', 'object', 'place', 'text'] as const) if (u[k] !== undefined) { if (typeof u[k] !== 'string' || (u[k] as string).length > 120) throw new EdgeError(400, 'invalid', `step ${i}: until.${k} must be a string`); until[k] = u[k] as string; }
       if (u.within !== undefined) { const ms = parseDuration(u.within, `step ${i}: until.within`); if (ms > 12 * 3600_000) throw new EdgeError(400, 'invalid', `step ${i}: until.within is at most 12 h`); until.within = u.within as string | number; }
@@ -210,7 +217,7 @@ export class Plans {
     const now = this.core.now();
     s.state = {...s.state, status: 'starting', startedAt: now, attempt: s.state.attempt + 1};
     if (s.for !== undefined) s.state.deadline = now + parseDuration(s.for, 'for');
-    if (s.until?.within !== undefined) s.state.untilBy = now + parseDuration(s.until.within, 'within');
+    if (s.until) s.state.untilBy = now + (s.until.within !== undefined ? parseDuration(s.until.within, 'within') : UNTIL_DEFAULT_MS);
     this.save(p);
     if (s.do === undefined) this.emit(p, 'plan.step.started', `Step ${p.current + 1}/${p.steps.length}: ${labelOf(s)}${s.for !== undefined ? ` for ${s.for}` : ''}${s.until ? ` until ${s.until.event}` : ''}.`);
     if (s.do === undefined && s.say === undefined) { s.state.status = 'running'; this.save(p); return; }
