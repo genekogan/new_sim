@@ -9,6 +9,7 @@
 // and its rules version carries `+mars-2026-map/1`, so an old camp history is never replayed
 // on the map (or the reverse). The source scene file is pinned by content hash.
 import {readFileSync} from 'node:fs';
+import {createHash} from 'node:crypto';
 import {hashOf} from '@sim/engine-contract';
 import type {Mars} from './load.ts';
 import type {Obstacle, SpatialScene} from '../../../mars/viewer/engine/spatial/types.ts';
@@ -16,7 +17,9 @@ import type {Region, WorldState} from '../../../mars/viewer/engine/world/types.t
 import type {CampusSceneFile} from '../../../mars/viewer/engine/campus/types.ts';
 
 export const MARS_2026_MAP = 'mars-2026-map/1';
-/** The exact generated campus file this map was qualified on (campus-2026.json contentHash). */
+/** Exact tracked JSON bytes, independent of its self-declared contentHash. */
+export const MARS_2026_SOURCE_SHA256 = '92b8f7d6b39a2bb92300042aac7d7ba917dca1754070127d44aa8f01f41a2a1c';
+/** The exporter's declared content hash, checked in addition to exact bytes. */
 export const MARS_2026_SOURCE_HASH = '256ac4954e7e2f00eef5146165933bb6bab52ef53305d35ac918cd5f542de25a';
 /** world = campus + OFFSET (x, z); the campus ground (y −0.16) is lifted to the camp ground (y 0). */
 export const MARS_2026_OFFSET: readonly [number, number] = Object.freeze([40, -30]) as readonly [number, number];
@@ -56,8 +59,10 @@ function campusRegions(f: CampusSceneFile): Region[] {
     .filter(r => r.polygon.some(([x, z]) => x > bx0 && x < bx1 && z > bz0 && z < bz1));
 }
 
-export function readMars2026Source(): CampusSceneFile {
-  const f = JSON.parse(readFileSync(sourceUrl, 'utf8')) as CampusSceneFile;
+export function readMars2026Source(bytes: Uint8Array = readFileSync(sourceUrl)): CampusSceneFile {
+  const sha256=createHash('sha256').update(bytes).digest('hex');
+  if(sha256!==MARS_2026_SOURCE_SHA256)throw new Error('mars-2026-map.source-bytes-changed: an exact new source requires a new map version');
+  const f = JSON.parse(Buffer.from(bytes).toString('utf8')) as CampusSceneFile;
   if (f.contentHash !== MARS_2026_SOURCE_HASH) throw new Error(`mars-2026-map.source-changed: campus-2026.json ${f.contentHash.slice(0, 12)} is not the pinned ${MARS_2026_SOURCE_HASH.slice(0, 12)}; a new map version is required`);
   return f;
 }
