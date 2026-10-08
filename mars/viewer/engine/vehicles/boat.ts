@@ -292,7 +292,7 @@ export const boatClearanceInvariant=legacyControllers.clearanceInvariant;
 /** Only a rigid translation of the admitted layout: no new shape, yaw, force,
  * passenger envelope, seat-derived pilot authority or hidden visual movement. */
 export function translatedBoatControllers(raw:unknown){
-  const n=z.number().finite().min(-1000).max(1000),t=z.object({x:n,y:n,z:n}).strict().parse(raw);
+  const n=z.number().min(-1000).max(1000),t=z.object({x:n,y:n,z:n}).strict().parse(raw);
   const move=(p:V3):V3=>[p[0]+t.x,p[1]+t.y,p[2]+t.z];
   const layout=structuredClone(BOAT_LAYOUT);
   layout.boatDockPosition=move(layout.boatDockPosition);layout.bank=move(layout.bank);

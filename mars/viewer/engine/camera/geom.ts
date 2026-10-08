@@ -65,7 +65,7 @@ export class CameraWorld {
     this.nz = Math.max(1, Math.ceil((z1 - z0) / cell));
     // Empty cells share one array (most of a large scene grid is empty);
     // cell lists are read-only to callers either way.
-    this.cells = new Array<number[]>(this.nx * this.nz).fill(EMPTY_CELL);
+    this.cells = Array.from({length:this.nx*this.nz},()=>EMPTY_CELL);
     this.solids.forEach((q, i) => {
       const [ia, ja, ib, jb] = this.range(q.minX, q.minZ, q.maxX, q.maxZ);
       for (let j = ja; j <= jb; j++) for (let k = ia; k <= ib; k++) {

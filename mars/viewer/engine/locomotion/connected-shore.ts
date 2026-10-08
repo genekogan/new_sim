@@ -1,7 +1,6 @@
 // One retained native action, with the existing controllers owning every move.
 import {z} from 'zod';
 import type {ActionDef,Diagnostic} from '../actions/types.ts';
-import type {Runtime} from '../runtime/runtime.ts';
 import type {WorldState} from '../world/types.ts';
 import {shoreObstruction,SHORE_POLICY,type ShoreGeometry} from './shore.ts';
 type Params={actor:string;x:number;z:number;level?:number};
@@ -20,7 +19,7 @@ const no=(code:string,message:string,actor:string):Diagnostic=>({code:'connected
 export function connectedShoreAction(g:ShoreGeometry):ActionDef<Params,Op[],Exec>{
   return {
     verb:'commons_shore_travel',description:'Travel between installed commons and calm shore through the supported dry gate. Native walk handles commons; native shore travel handles slope, wading and swimming. Human on foot, free hands, direct shore routes only; no boarding or transport teleport.',
-    schema:z.object({actor:z.string().min(1).max(80),x:z.number().finite().min(-10000).max(10000),z:z.number().finite().min(-10000).max(10000),level:z.number().int().min(0).max(100).optional()}).strict(),resumable:true,
+    schema:z.object({actor:z.string().min(1).max(80),x:z.number().min(-10000).max(10000),z:z.number().min(-10000).max(10000),level:z.number().int().min(0).max(100).optional()}).strict(),resumable:true,
     reservations:(_w,p)=>[{resource:'actor:'+p.actor,mode:'exclusive'}],
     plan(rt,p){
       const a=rt.world.entities[p.actor];
