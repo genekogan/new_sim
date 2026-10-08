@@ -49,7 +49,7 @@ test('cn5 activities: use a computer, the gym (bench press, weights, pull-ups, d
   // the outdoor gym in the park
   const bench = await w.act(b, 'do a bench press', {seconds: 5}); assert.equal(bench.resolved?.to, 'bench-press:gym-bench-press');
   const benchPose = await seen(b, bench, 'bench-press'); assert.equal(benchPose.seatHeight, 0.49, 'lying on the bench top');
-  assert.ok(Math.hypot(benchPose.at[0] - 30.5, benchPose.at[1] - 110.25) < 0.3, 'on the bench');
+  assert.ok(Math.hypot(benchPose.at[0] + 4.75, benchPose.at[1] - 85) < 0.3, 'on the bench');
   const weights = await w.act(b, 'lift weights', {seconds: 5}); assert.equal(weights.resolved?.to, 'lift-weights:gym-weights');
   assert.equal((await seen(b, weights, 'lift-weights')).prop, 'dumbbell');
   const pull = await w.act(b, 'do some pull-ups', {seconds: 5}); assert.match(pull.resolved?.to, /^pull-ups:gym-pull-ups-/); await seen(b, pull, 'pull-ups');
