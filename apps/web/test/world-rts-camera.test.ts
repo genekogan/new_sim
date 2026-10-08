@@ -74,3 +74,26 @@ test('Escape and explicit release stop a pending glide and held movement at the 
   f.fire('keydown',{code:'KeyW'});f.rts.update(.1);const moved=f.camera.position.clone();f.rts.release();f.rts.update(.1);assert.ok(f.camera.position.distanceTo(moved)<1e-9);
  }finally{f.rts.dispose();}
 });
+
+test('the ordinary Follow button keeps immediate arrow head control without moving the eye',()=>{
+ const f=manualRig(30,'follow'),p=f.camera.position.clone(),q=f.camera.quaternion.clone();try{
+  f.doc.activeElement={tagName:'BUTTON',closest:(selector:string)=>selector.includes('.human-panel')?{}:null};
+  assert.equal(f.fire('keydown',{code:'ArrowUp'}).defaultPrevented,true);f.rts.update(.1);
+  assert.equal(f.mode(),'manual');assert.equal(f.takeovers(),1);
+  assert.ok(f.camera.position.distanceTo(p)<1e-9);assert.ok(f.camera.quaternion.angleTo(q)>.05);
+ }finally{f.rts.dispose();}
+});
+
+test('camera arrows leave editors, widget buttons, modal dialogs and focused panel scrolling alone',()=>{
+ for(const role of ['dialog','radiogroup','listbox','menu','slider','textbox','input','panel','modal']){
+  const f=manualRig(30,'follow'),p=f.camera.position.clone(),q=f.camera.quaternion.clone();try{
+   const active={tagName:role==='input'?'INPUT':role==='panel'?'H2':'BUTTON',getAttribute:(name:string)=>name==='role'&&role==='textbox'?'textbox':null,
+    closest:(selector:string)=>selector.includes(`[role=${role}]`)?{}:null};
+   f.doc.activeElement=active;
+   if(role==='modal')f.doc.querySelector=()=>({}) as never;
+   assert.equal(f.fire('keydown',{code:'ArrowUp',composedPath:()=>[active]}).defaultPrevented,false,role);f.rts.update(.1);
+   assert.equal(f.mode(),'follow',role);assert.equal(f.takeovers(),0,role);
+   assert.ok(f.camera.position.distanceTo(p)<1e-9,role);assert.ok(f.camera.quaternion.angleTo(q)<1e-7,role);
+  }finally{f.rts.dispose();}
+ }
+});

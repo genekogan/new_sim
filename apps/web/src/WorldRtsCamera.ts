@@ -75,8 +75,9 @@ export class WorldRtsCamera {
     const listen = (t: EventTarget, name: string, cb: (e: any) => void, opt?: AddEventListenerOptions) => { t.addEventListener(name, cb, opt); this.listeners.push([t, name, cb, opt]); };
     // Keys work when the scene has focus, or when nothing else does (a fresh page: just press W).
     // VF6: also when a panel has focus (the Soul card focuses its name; Follow is a button on it), so pressing W
-    // while following breaks out. Letter keys only there: arrows/PageUp/PageDown keep scrolling a focused panel.
-    const panelFocus = () => { const a = doc.activeElement; return !!a && a !== canvas && a !== doc.body && !(a.tagName === 'BUTTON' && !a.closest('.human-panel,.dialogue-dock')); };
+    // while following breaks out. Ordinary buttons also allow head controls immediately after Follow.
+    // Arrows/PageUp/PageDown keep scrolling a focused panel; interactive widgets retain their keys below.
+    const panelFocus = () => { const a = doc.activeElement; return !!a && a !== canvas && a !== doc.body && a.tagName !== 'BUTTON'; };
     const ours = (e: KeyboardEvent) => !editableEvent(e) && !e.ctrlKey && !e.metaKey && !doc.querySelector('[aria-modal="true"]')
       && (doc.activeElement === canvas || doc.activeElement === doc.body || doc.activeElement === null
         || (!doc.activeElement.closest('[role=dialog],[role=radiogroup],[role=listbox],[role=menu],[role=slider]') && (!panelFocus() || /^Key[WASDQERF]$|^(Shift|Alt)/.test(e.code))));
