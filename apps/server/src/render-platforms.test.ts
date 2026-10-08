@@ -1,3 +1,4 @@
+import {Hono} from 'hono';
 import test from 'node:test';import assert from 'node:assert/strict';
 import {captureRenderScene,parseRenderSceneCapture,hashOf} from '@sim/engine-contract';import {kernelHash} from '@sim/kernel';
 import {fixture,accept,factory} from '../test/native-owner-fixture.ts';import {WorldHost} from './world.ts';import {EdgeLedger} from './edge/ledger/ledger.ts';
@@ -24,7 +25,7 @@ test('declared stage/ramp floor aligns human and floater Eyes; native recorded e
  assert.equal(visualFloorOffset(L,body),.6);assert.deepEqual(eyePose(body,'standing',0,90,640,400,visualFloorOffset(L,body)).p,[92,2.22,-30]);assert.deepEqual(eyePose({...body,body:{family:'floater',hoverHeight:1.45}},'standing',0,90,640,400,.6).p,[92,2.05,-30]);
  assert.equal(visualFloorOffset(L,{...body,pose:{p:[92,0,-26.2],yaw:0}}),.3);for(const human of [{level:1},{level:0,carrier:'x'},{level:0,on:'beam'},{level:0,grip:'held'},{level:0,boatPassenger:{boat:'x'}},{level:0,shore:{datumY:0}}])assert.equal(visualFloorOffset(L,{...body,human}),0);
  assert.equal(visualFloorOffset(L,{...body,pose:{p:[92,.6,-30],yaw:0}}),0);assert.equal(livePlatforms(L).source,'accepted-render-fact');assert.equal(f.host.engine.world.entities.h?.pose.p[1],undefined);
- mountEdgeRoutes(f.app,{host:f.host,db:f.db,souls:f.souls,ledger:L,soul:edgeSoulResolver(f.host,f.souls,()=>undefined)});const response=await f.app.request('/v1/edge/platforms');assert.equal(response.status,200);const published=await response.json();assert.equal(published.worldId,f.host.worldId);assert.equal(published.source,'accepted-render-fact');assert.equal(published.provenance.navHash,hashOf(null));
+ const edgeApp=new Hono(),comms=mountEdgeRoutes(edgeApp,{host:f.host,db:f.db,souls:f.souls,ledger:L,soul:edgeSoulResolver(f.host,f.souls,()=>undefined)});t.after(()=>comms.close());const response=await edgeApp.request('/v1/edge/platforms');assert.equal(response.status,200);const published=await response.json();assert.equal(published.worldId,f.host.worldId);assert.equal(published.source,'accepted-render-fact');assert.equal(published.provenance.navHash,hashOf(null));
  const scene=await(await f.app.request('/v1/scene')).json();assert.deepEqual(scene.scene.platforms,published.platforms);
 });
 test('render-only platform installation accompanies nav once and remains separate from physical geometry',async t=>{
