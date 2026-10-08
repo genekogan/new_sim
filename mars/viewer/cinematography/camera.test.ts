@@ -327,10 +327,24 @@ void test('operator stillness pins a valid pose through moving semantic subjects
   d.update(observation());
   const pose = structuredClone(d.pose!);
   d.takeover({ movement: 'still', expires: 10 });
-  const next = observation(1);
-  next.subjects.a.p[0] += 1;
-  d.update(next);
-  assert.deepEqual(d.pose, pose);
+  for(const [i,shift]of[.2,.4,.8,1].entries()){
+    const next = observation(i+1);
+    next.subjects.a.p[0] += shift;
+    d.update(next);
+    assert.deepEqual(d.pose, pose,'stillness is exact across repeated semantic updates');
+    d.track(next,.05);
+    assert.deepEqual(d.pose, pose,'frame tracking also preserves the exact pose');
+  }
+});
+void test('an unchanged camera pose still obeys placement and rendered visibility guards',()=>{
+  const o=observation(),pose={position:[0,2,-6] as [number,number,number],target:[0,1,0] as [number,number,number],fov:45};
+  const same=execute(o,pose,structuredClone(pose),false,.1,[]);
+  assert.deepEqual(same.pose,pose,'equal-value cloned desired pose is exact');
+  const hidden=execute(o,pose,pose,false,.1,['a'],()=>0);
+  assert.equal(hidden.pose,undefined);assert.match(hidden.reason,/placement-invalid/);
+  o.scene.obstacles=[{id:'new obstruction',obb:{c:[0,-6],half:[.4,.4],yaw:0},y0:0,y1:4}];
+  const blocked=execute(o,pose,pose,false,.1,[]);
+  assert.equal(blocked.pose,undefined);assert.match(blocked.reason,/placement-invalid/);
 });
 void test('Jev reserves costs before overlapping calls and accounts unknown outcomes offline', async () => {
   const original = globalThis.fetch;

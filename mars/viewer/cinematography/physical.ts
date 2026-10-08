@@ -118,7 +118,10 @@ export function execute(
   const direction=a.map((v,i)=>v*c+side[i]*sin+axis[i]*axial*(1-c));
   const lookLength=oldLength+(goalLength-oldLength)*response;
   const fovDelta = Math.max(-dt*5,Math.min(dt*5,desired.fov-previous.fov));
-  const pose:CameraPose = {
+  const stationary=previous.fov===desired.fov&&previous.position.every((v,i)=>v===desired.position[i])&&previous.target.every((v,i)=>v===desired.target[i]);
+  // Identical rays must retain their exact target: normalization/acos can invent
+  // a tiny pan. The ordinary safety and visibility checks below still apply.
+  const pose:CameraPose = stationary ? {position:[...previous.position],target:[...previous.target],fov:previous.fov} : {
     position,
     target:dt<=0?[...previous.target]:position.map((v,i)=>v+direction[i]*lookLength) as [number,number,number],
     fov:previous.fov+fovDelta,

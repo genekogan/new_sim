@@ -67,7 +67,9 @@ export class FixtureViews {
   private readonly mats = new Map<string, THREE.Material>();
   private readonly unit = this.keep(new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0));
 
-  constructor(private readonly commonsContrast=false) {
+  private readonly commonsContrast:boolean;
+  constructor(commonsContrast=false) {
+    this.commonsContrast=commonsContrast;
     this.group.name = 'engine fixtures';
   }
 
