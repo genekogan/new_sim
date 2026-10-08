@@ -1,8 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {marsFactory} from './engine.ts';
+import {MarsEngine,marsFactory} from './engine.ts';
 import {CAMP_ARRIVALS} from '../../../mars/viewer/engine/scenarios/eden-camp.ts';
 test('native participant custody: exact construction crew/raw peers, unknown refusal and pure repeated reads',async()=>{
- const f=await marsFactory({scene:'eden-camp',arrival:CAMP_ARRIVALS[0].p,arrivalPlace:'yard',reference:CAMP_ARRIVALS[1].p,grounds:{id:'grounds',name:'Camp'}}),e=f.create(f.genesis('native-custody'));
+ const f=await marsFactory({scene:'eden-camp',arrival:CAMP_ARRIVALS[0].p,arrivalPlace:'yard',reference:CAMP_ARRIVALS[1].p,grounds:{id:'grounds',name:'Camp'}}),e=f.create(f.genesis('native-custody'));assert.ok(e instanceof MarsEngine);
  for(const [i,name]of ['A','B','C','D'].entries())e.spawnHuman({id:'h'+i,label:name,soul:'s'+i});
  const program={actor:'h0',label:'stage',steps:[{verb:'build_lookout',params:{phase:'stage'}}]},hash=e.stateHash();
  assert.deepEqual(e.nativeProgramParticipantsV1(program),['h0']);assert.deepEqual(e.nativeProgramParticipantsV1(program),['h0']);assert.equal(e.stateHash(),hash);

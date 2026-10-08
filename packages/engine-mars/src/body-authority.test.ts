@@ -1,8 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';
-import {marsFactory,GREEN_FIELD_WORLD} from './engine.ts';
+import {MarsEngine,marsFactory,GREEN_FIELD_WORLD} from './engine.ts';
 import {sampleTake} from '../../../mars/viewer/engine/take/replay.ts';
 test('BODY native authority: safe swap changes replica/take, exact snapshot; unsafe programs refuse without mutation',async()=>{
- const f=await marsFactory(GREEN_FIELD_WORLD),e=f.create(f.genesis('body-authority'));e.spawnHuman({id:'h',label:'Human',soul:'s'});
+ const f=await marsFactory(GREEN_FIELD_WORLD),e=f.create(f.genesis('body-authority'));assert.ok(e instanceof MarsEngine);e.spawnHuman({id:'h',label:'Human',soul:'s'});
  const body={family:'floater' as const,type:'ceramic' as const,model:'verdelis',modelUrl:'/world-assets/littlemartians/characters/verdelis.glb',radius:.35,hoverHeight:1.45};
  assert.equal(e.bodyAssignmentProblemV1('h',body),null);assert.equal(e.assignBodyV1('h',body),true);let changed=false;
  for(let i=0;i<25;i++){const out=e.step();changed ||= out.changes.some(c=>c[1]==='h'&&c[2]==='body');}

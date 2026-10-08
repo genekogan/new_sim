@@ -1,3 +1,4 @@
+import {nativeEntity} from './native-test-state.ts';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {retainedCommonsShoreFactory} from './retained-shore-engine.ts';
@@ -19,7 +20,7 @@ test('additive social checkpoint preserves old worlds; carried finite food is ac
  const delivery=e.previewCommonsFoodDeliveryV1!('social-finite-A');assert.ok(delivery.ok);if(!delivery.ok)return;e.adoptCommonsFoodDeliveryV1!(delivery.transition);assert.equal(e.rulesVersion,delivery.transition.toRulesVersion);assert.ok(e.rulesVersion.length<=200);assert.ok(f.canReplayHistory!(e.rulesVersion));
  const r=commonsFoodDeliveryItemsV1(1).resources[0],chair='social-eden-dining-chair-west';
  const phases=finish(e,'h_A',[{verb:'mars:take_item',params:{item:r.bowl,hand:'left'}},{verb:'mars:take_item',params:{item:r.spoon,hand:'right'}},{verb:'sit',params:{on:chair,seconds:1}},{verb:'mars:eat',params:{bowl:r.bowl,spoon:r.spoon}},{verb:'stand',params:{}},{verb:'walk_to',params:{to:'commons'}},{verb:'mars:put_item',params:{item:r.spoon,surfaceSlot:'ground'}},{verb:'mars:put_item',params:{item:r.bowl,surfaceSlot:'ground'}}]);
- assert.ok(phases.has('sit'));assert.equal(e.world.entities[r.bowl].contents?.fraction,0);assert.equal(e.world.entities[COMMONS_PERSONAL_RESOURCES[0].bowl].contents?.fraction,1);
+ assert.ok(phases.has('sit'));assert.equal(nativeEntity(e,r.bowl).contents?.fraction,0);assert.equal(nativeEntity(e,COMMONS_PERSONAL_RESOURCES[0].bowl).contents?.fraction,1);
  const copy=f.restore(e.snapshot());assert.equal(copy.stateHash(),e.stateHash());for(let i=0;i<30;i++){e.step();copy.step();assert.equal(copy.stateHash(),e.stateHash());}
  const empty=e.canPerform({actor:'h_A',label:'empty social meal',steps:[{verb:'sit',params:{on:chair,seconds:1}},{verb:'mars:eat',params:{bowl:r.bowl,spoon:r.spoon}}]});assert.equal(empty?.code,'eat.bowl-empty');
  assert.equal((e.renderScene!().scene as any).social.layoutHash,socialEdenV1().layoutHash);assert.equal((e.renderScene!().scene as any).foodDeliveries.batches.length,1);
