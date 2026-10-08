@@ -51,19 +51,22 @@ export class Intents {
   private explicitUntil = new Map<string, number>();
   constructor(ledger: EdgeLedger) {this.L = ledger; ledger.onReceipt(r => {try {this.onTerminal(r);} catch {/* events are best effort */}});}
 
-  /** EVENTS-v1 (Core-A kinds): `arrive` when a body act that goes somewhere completes; `blocked` when one fails on a
-   *  route or a taken seat, with alternatives from a fresh dry run of the same intent. */
+  /** EVENTS-v1 §3b (Core-A): raw `arrive` when a body act that goes somewhere completes; on a route/seat failure the
+   *  receipt gains `alternatives` (a fresh dry run of the same intent) for Core-B's derived `blocked`. */
   private onTerminal(r: EdgeReceipt) {
     if (r.phase !== 'completed' && r.phase !== 'failed') return;
     const verb = r.capability.split(':')[0], deliver = (kind: string, body: Record<string, unknown>) => (this.L.comms as unknown as {streams?: {deliver?(s: string, k: string, t: number, b: object): void}} | undefined)?.streams?.deliver?.(r.soulId, kind, this.L.host.engine.world.tick, body);
     if (!['walk', 'stroll', 'hang-out', 'approach', 'go-near', 'sit', 'swim', 'gather', 'warm-by-fire'].includes(verb) || (r.channel && r.channel !== 'body')) return;
     const end = r.endedAt as {place?: string | null; placePath?: string[]} | undefined;
     if (r.phase === 'completed' && ['walk', 'stroll', 'hang-out', 'approach', 'go-near'].includes(verb)) {deliver('arrive', {receipt: {id: r.id, capability: r.capability, phase: r.phase}, placeId: end?.place ?? null, placePath: end?.placePath ?? [], ...(r.chosen ? {chosen: r.chosen} : {}), endedAt: r.endedAt ?? null}); return;}
-    if (r.phase === 'failed' && r.code && /^(?:route\.|slot\.|seat\.|walk\.goal|reservation\.)/.test(r.code)) {
+    if (r.phase === 'failed' && r.code && /^(?:route\.|slot\.|seat\.|walk\.goal|reservation\.|pose\.occupied|pose\.no-room)/.test(r.code)) {
+      // blocked: Core-B's envelope derives `blocked` from this receipt; Core-A adds `alternatives` = a fresh dry run of the
+      // same intent, on the receipt itself (this listener runs before Comms delivers the receipt event)
       const m = this.L.host.minds.get(r.soulId), intent = (this.L.coreA.detail(r.id) as {intent?: IntentInput} | null)?.intent;
-      let alternatives: unknown = undefined;
-      if (m && intent) {const d = this.dryRun({soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner}, intent); if (d.ok) alternatives = [d.would];}
-      deliver('blocked', {receipt: {id: r.id, capability: r.capability, phase: r.phase, code: r.code}, code: r.code, reason: r.reason, ...(alternatives ? {alternatives} : {}), endedAt: r.endedAt ?? null});
+      if (!m || !intent) return;
+      const d = this.dryRun({soulId: m.soulId, entityId: m.entityId, name: m.name, owner: m.owner}, intent);
+      if (!d.ok) return;
+      const alternatives = [d.would]; this.L.coreA.setDetail(r.id, {alternatives}); Object.assign(r, {alternatives});
     }
   }
 
