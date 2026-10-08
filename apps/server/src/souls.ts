@@ -39,7 +39,9 @@ export class Souls {
   private lastTouch = new Map<string, number>();
   host: WorldHost; db: Db; brain: Brain; cfg: Config;
   lifecycle?:LifecycleRunner;
-  constructor(host: WorldHost, db: Db, brain: Brain, cfg: Config) {
+  readonly services?:{controlReady?:(soul:SoulRow)=>boolean};
+  constructor(host: WorldHost, db: Db, brain: Brain, cfg: Config, services?:{controlReady?:(soul:SoulRow)=>boolean}) {
+    this.services = services;
     this.host = host; this.db = db; this.brain = brain; this.cfg = cfg;
     host.listeners.push({
       onApplied: (e) => { const id = (e.payload as { soulId?: string })?.soulId; if (id) this.wake(id, e.kind === 'decision' ? `started: ${(e.payload as { label: string }).label}` : e.kind === 'intent' ? 'a new intent was accepted' : e.kind); },
@@ -75,6 +77,7 @@ export class Souls {
     return runner;
   }
   controlReady(soul:SoulRow):boolean{
+    if(this.services?.controlReady && !this.services.controlReady(soul))return false;
     if(!this.lifecycle)return true;
     const current=this.db.soul(soul.id);
     if(!current||current.owner!==soul.owner||current.world_id!==this.host.worldId||current.entity_id!==soul.entity_id||current.retired_at!==null)return false;

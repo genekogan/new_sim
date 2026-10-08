@@ -144,6 +144,8 @@ export interface Engine {
   campAnchors?(): Anchor[];
   restockCamp?(): void;
   actorBorrowed?(actor: string): boolean;
+  /** Optional native-cast custody reader; null means participant scope is unqualified. */
+  nativeProgramParticipantsV1?(program:Program):readonly string[]|null;
   /** Spawn a human entity for a Soul at the arrival point; returns the entity id. */
   spawnHuman(args: { id: string; label: string; soul: string }): string;
   removeEntity(id: string): void;

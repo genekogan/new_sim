@@ -603,6 +603,24 @@ export class MarsEngine implements Engine {
     if(key)this.feasibilityRead!.set(key,structuredClone(result));return result;
   }
   ownedClassroomControlRosterV1(actor:string,session:string){const r=this.rt.records.get(session);if(!r||r.verb!=='classroom_session'||!this.rt.isActive(session)||r.params.host!==actor)return null;const current=readClassroom(this.rt,session);if(!current)return null;return [...new Set(current.participants.map(p=>p.actor))];}
+  /** Optional native-cast custody reader. It shares the exact construction and raw-verb participant
+   * binding used at admission; unknown steps refuse qualification rather than assume actor-only.
+   * Does not know owners/tokens, mutate bodies, or change ordinary owner-directed engine semantics. */
+  nativeProgramParticipantsV1(program:Program):readonly string[]|null {
+    if(!this.ents[program.actor]?.human)return null;
+    const ids=new Set<string>([program.actor]);
+    const visit=(v:unknown):void=>{if(typeof v==='string'&&this.ents[v]?.kind==='human')ids.add(v);else if(Array.isArray(v))v.forEach(visit);else if(v&&typeof v==='object')Object.values(v).forEach(visit);};
+    for(const s of program.steps){
+      if(s.verb==='build_lookout'||s.verb==='unbuild_lookout'){
+        if(program.steps.length!==1||s.verb==='unbuild_lookout'&&!this.cfg.disassemblyV1)return null;
+        const p=s.verb==='build_lookout'?this.buildPlan(program):this.unbuildPlan(program);if('code' in p)return null;p.crew.forEach(id=>ids.add(id));
+      }else if(s.verb.startsWith('mars:')){const p=this.raw(program.actor,s);if('code' in p)return null;visit(p.params);}
+      else if(s.verb==='converse'){visit(s.params.with);}
+      else if(s.verb==='control_classroom_v1'){const roster=this.ownedClassroomControlRosterV1(program.actor,String(s.params.session));if(!roster)return null;roster.forEach(id=>ids.add(id));}
+      else if(!['walk_to','sit','stand','wave','face','gather','rest','perform','ambient_wander','activity_readiness_v1'].includes(s.verb))return null;
+    }
+    return [...ids].sort();
+  }
   canPerform(program: Program): Diag | null {
     if(program.steps[0]?.verb==='control_classroom_v1'){const p=program.steps[0].params;if(program.steps.length!==1||!['cancel','advance'].includes(String(p.kind))||typeof p.session!=='string'||!this.ownedClassroomControlRosterV1(program.actor,p.session))return {code:'classroom.owned-host-control-required',message:'Only the active classroom host can apply this control.'};return this.plan('classroom_control',{session:p.session,intent:{kind:p.kind}});}
     if ([...this.programs.values()].some(p=>p.readiedActors?.includes(program.actor)&&!p.action))return {code:'activity.readiness-committed',message:'This body has committed its explicit ready wait to a starting classroom.'};
