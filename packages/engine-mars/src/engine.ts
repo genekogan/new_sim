@@ -730,6 +730,36 @@ export class MarsEngine implements Engine {
     }
     return false;
   }
+  /** attention/1 (logged 'edge-attention'): set or clear a body's gaze (head target: a body/fixture id or a point, until a tick),
+   * and with `yaw` also turn a free standing body (no program, nothing holding it, awake, not seated/riding). Never cancels
+   * or blocks anything the body is doing. Returns what turned. */
+  attendHumanV1(id: string, gaze: { target?: string; at?: [number, number]; until?: number; kind?: string } | null, yaw?: number): 'body' | 'head' | 'none' {
+    const e = this.ents[id]; if (!e?.human) return 'none';
+    if (gaze === null) { delete e.human.gaze; delete e.human.attention; return 'none'; }
+    const g: any = { kind: gaze.kind ?? 'look' }; if (typeof gaze.target === 'string' && this.ents[gaze.target]) g.target = gaze.target; else if (Array.isArray(gaze.at)) g.at = [r3(gaze.at[0]), r3(gaze.at[1])];
+    if (Number.isInteger(gaze.until)) g.until = gaze.until;
+    let turned: 'body' | 'head' = 'head';
+    const free = !this.byActor.has(id) && !this.holders(id).length && !e.human.sleepPose && !e.human.on && !e.human.riding && !e.human.carrier && !e.human.together && (e.human.activity === 'idle' || e.human.activity === 'wait');
+    if (typeof yaw === 'number' && Number.isFinite(yaw) && free) { e.pose.yaw = r3(yaw); turned = 'body'; }
+    if (g.target || g.at) { e.human.gaze = g; this.gazeAt(e); } else delete e.human.gaze;
+    return turned;
+  }
+  private gazeAt(e: any): boolean {
+    const g = e.human.gaze; if (!g) return false;
+    if (g.until !== undefined && this.rt.tick >= g.until) { delete e.human.gaze; return false; }
+    const t = g.target ? this.ents[g.target] : null, at = t ? [t.pose.p[0], t.pose.p[2]] : g.at;
+    if (!at) { delete e.human.gaze; return false; }
+    e.human.attention = [at[0], at[1]]; return true;
+  }
+  /** attention/1 + intents: the planned walking route length (m) from a body to a point, without moving it (read-only planning). */
+  routeEstimateV1(actor: string, to: [number, number], level?: number): { ok: true; metres: number } | { ok: false; code: string; message: string } {
+    const def = this.registry.get('walk_to'), a = this.ents[actor];
+    if (!def || !a?.human) return { ok: false, code: 'actor.unknown', message: 'no such body' };
+    const parsed = def.schema.safeParse({ actor, x: to[0], z: to[1], ...(level !== undefined ? { level } : {}) });
+    if (!parsed.success) return { ok: false, code: 'action.invalid-params', message: 'bad point' };
+    const r = def.plan(this.rt, parsed.data);
+    return r.ok ? { ok: true, metres: Math.round((r.program?.length ?? 0) * 10) / 10 } : { ok: false, code: r.diagnostic.code, message: r.diagnostic.message };
+  }
   spawnHuman({ id, label, soul }: { id: string; label: string; soul: string }): string {
     if (this.ents[id]) return id;
     const [ax, az] = this.cfg.arrival;
@@ -830,6 +860,8 @@ export class MarsEngine implements Engine {
   private updateAttention() {
     const people = (Object.values(this.ents) as any[]).filter(e => e.kind === 'human').sort((a,b) => a.id.localeCompare(b.id));
     for (const e of people) {
+      // attention/1 (logged 'edge-attention'): a Soul's own look/turn/auto-face holds its head until it expires
+      if (e.human.gaze && this.gazeAt(e)) continue;
       delete e.human.attention;
       if (!/talk|converse|listen|watch|warm/.test(e.human.activity)) continue;
       const near = people.filter(o => o !== e).map(o => ({o, d: Math.hypot(o.pose.p[0]-e.pose.p[0], o.pose.p[2]-e.pose.p[2])})).filter(x => x.d < 7).sort((a,b) => a.d-b.d);

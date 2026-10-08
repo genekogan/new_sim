@@ -84,6 +84,9 @@ export type HumanState = {
   speed?: number;
   /** Server-computed head attention target, recorded rather than decided by a viewer. */
   attention?: [number, number];
+  /** attention/1 (logged 'edge-attention'): the Soul's own gaze — a body/fixture to track or a point — until a tick; it wins
+   *  over the activity-derived `attention` while it lasts. Never moves or interrupts the body. */
+  gaze?: { kind: string; target?: string; at?: [number, number]; until?: number };
   /**
    * Prone receiver only (construction/handup.ts, HANDUP.md "Prone receiver"): progress 0–1 within the current hand-up
    * phase (lie-down, then each receiver phase), every tick from lie-down to the release; absent otherwise.

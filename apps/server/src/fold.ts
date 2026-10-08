@@ -94,6 +94,14 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       if (p.entityId && Array.isArray(p.to) && relocate) relocate.call(engine, p.entityId, p.to);
       return {};
     }
+    case 'edge-attention': {
+      // attention/1: a Soul's own look / turn / face (or auto-face in a conversation). Head only, or a free standing body
+      // turns; never stops, replaces or blocks the body's program (independent attention channel).
+      const p = e.payload as { entityId?: string; gaze?: { target?: string; at?: [number, number]; until?: number; kind?: string } | null; yaw?: number };
+      const attend = (engine as unknown as { attendHumanV1?: (id: string, g: unknown, yaw?: number) => string }).attendHumanV1;
+      if (p.entityId && attend && p.gaze !== undefined) attend.call(engine, p.entityId, p.gaze, typeof p.yaw === 'number' ? p.yaw : undefined);
+      return {};
+    }
     case 'edge-stop': {
       // Edge worlds: a Soul's own agent asked its body to stop safely (rise from sleep,
       // finish the current step); the engine's ordinary stop owns the safe landing.
