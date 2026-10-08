@@ -19,6 +19,8 @@ export function parseCursor(raw: string | undefined | null): number | null | und
 export class EventStreams {
   private waiters = new Map<string, Set<() => void>>();
   private listeners: ((soulId: string, e: StreamEvent) => void)[] = [];
+  /** EVENTS-v1: delivery-time facts merged into a stored event (`where`, `clock`, `plan`); faults never block delivery. */
+  enrich: ((soulId: string, kind: string, body: Record<string, unknown>) => Record<string, unknown> | undefined) | null = null;
   private db: Sql; private worldId: string; private opts: StreamOptions;
   constructor(db: Sql, worldId: string, opts: StreamOptions) { this.db = db; this.worldId = worldId; this.opts = opts; }
 
@@ -29,6 +31,8 @@ export class EventStreams {
     return row ?? {head: 0, floor: 0};
   }
   head(soulId: string): number { return this.headRow(soulId).head; }
+  /** Oldest retained position (a cursor below it reads as a gap). */
+  floor(soulId: string): number { return this.headRow(soulId).floor; }
   headCursor(soulId: string): string { return cursorOf(this.head(soulId)); }
 
   /** Append one event to a Soul's stream; returns the stored event. */
@@ -37,7 +41,9 @@ export class EventStreams {
     const event = tx(this.db, () => {
       const {head, floor} = this.headRow(soulId);
       const seq = head + 1;
-      const stored = {...body};
+      let extra: Record<string, unknown> | undefined;
+      try { extra = this.enrich?.(soulId, kind, body); } catch { extra = undefined; }
+      const stored = {...(extra ?? {}), ...body};
       delete stored.id; delete stored.kind; delete stored.tick; delete stored.at;
       this.db.prepare('INSERT INTO edge_comms_stream (world_id, soul_id, seq, tick, at, kind, body) VALUES (?,?,?,?,?,?,?)').run(this.worldId, soulId, seq, tick, at, kind, JSON.stringify(stored));
       this.db.prepare('INSERT INTO edge_comms_heads (world_id, soul_id, head, floor) VALUES (?,?,?,?) ON CONFLICT (world_id, soul_id) DO UPDATE SET head = excluded.head').run(this.worldId, soulId, seq, floor);

@@ -11,7 +11,7 @@ import type {Souls} from '../../souls.ts';
 import {EdgeError, type EdgeCapability, type EdgeDeps, type EdgeLedgerHooks, type EdgeReceipt, type EdgeSoul, type NearbyBody, type PlaceRef} from '../contract.ts';
 import {registerEdgeComms, type CommsOptions, type CommsRuntime} from './index.ts';
 
-export type FakeBody = {x: number; z: number; path: PlaceRef[]; enclosure: string | null};
+export type FakeBody = {x: number; z: number; path: PlaceRef[]; enclosure: string | null; yaw?: number};
 export const place = (id: string, kind = 'outdoor'): PlaceRef => ({id, name: id, kind});
 export const COMMONS = place('eden-commons');
 
@@ -33,6 +33,10 @@ export class FakeLedger implements EdgeLedgerHooks {
     }
     return out;
   }
+  /** EVENTS-v1 hooks: body pose (yaw defaults to 0 = facing +x) and a test-set posture hold per Soul. */
+  holds = new Map<string, string>();
+  poseOf(soulId: string) { const b = this.bodies.get(soulId); return b ? {x: b.x, z: b.z, yaw: b.yaw ?? 0} : null; }
+  postureHold(soulId: string) { return this.holds.get(soulId) ?? null; }
   onReceipt(l: (r: EdgeReceipt) => void) { this.receiptListeners.push(l); }
   onPlaceChange(l: (e: {soulId: string; from: string | null; to: string | null; tick: number}) => void) { this.placeListeners.push(l); }
   addCapabilityProvider(p: (soul: EdgeSoul) => EdgeCapability[]) { this.providers.push(p); }
@@ -52,7 +56,7 @@ export class FakeLedger implements EdgeLedgerHooks {
 
 export type CommsFixture = ReturnType<typeof commsFixture>;
 
-export function commsFixture(names: string[], options: CommsOptions = {}, existing?: {dir: string; db: Db; clock: {now: number}}) {
+export function commsFixture(names: string[], options: CommsOptions = {}, existing?: {dir: string; db: Db; clock: {now: number}}, before?: (app: Hono, deps: EdgeDeps, clock: {now: number}) => void) {
   const dir = existing?.dir ?? mkdtempSync(join(tmpdir(), 'edge-comms-'));
   const db = existing?.db ?? new Db(join(dir, 'world.db'));
   const worldId = 'edge-comms-test';
@@ -73,13 +77,14 @@ export function commsFixture(names: string[], options: CommsOptions = {}, existi
     return s;
   }};
   const app = new Hono();
+  before?.(app, deps, clock);
   const runtime: CommsRuntime = registerEdgeComms(app, deps, {now: () => clock.now, sweepMs: 0, fetch: null, ...options});
   const id = (name: string) => `s_${name.toLowerCase()}`;
   const req = async (name: string, method: string, path: string, body?: unknown) => {
     const res = await app.request(path, {method, headers: {authorization: `Bearer ${id(name)}`, ...(body === undefined ? {} : {'content-type': 'application/json'})}, ...(body === undefined ? {} : {body: JSON.stringify(body)})});
     return {status: res.status, body: await res.json() as any};
   };
-  const at = (name: string, x: number, z: number, path: PlaceRef[] = [COMMONS], enclosure: string | null = null) => ledger.move(id(name), {x, z, path, enclosure}, (host as any).engine.world.tick);
+  const at = (name: string, x: number, z: number, path: PlaceRef[] = [COMMONS], enclosure: string | null = null, yaw = 0) => ledger.move(id(name), {x, z, path, enclosure, yaw}, (host as any).engine.world.tick);
   const close = () => { runtime.close(); };
   const destroy = () => { runtime.close(); db.db.close(); rmSync(dir, {recursive: true, force: true}); };
   return {dir, db, host, ledger, app, runtime, clock, deps, id, req, at, close, destroy,

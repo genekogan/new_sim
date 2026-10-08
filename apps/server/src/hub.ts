@@ -30,6 +30,8 @@ const MAX_BUFFERED = 1_000_000;
 
 export class Hub {
   wss: WebSocketServer;
+  /** Other WebSocket endpoints on this server (EVENTS-v1 /v1/edge/events/ws); each returns true when it took the upgrade. */
+  upgradeHandlers: ((req: import('node:http').IncomingMessage, socket: import('node:stream').Duplex, head: Buffer) => boolean)[] = [];
   clients = new Set<Client>();
   brain!: Brain;
   startedAt = Date.now();
@@ -53,7 +55,7 @@ export class Hub {
     }
     this.wss = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024, perMessageDeflate: {threshold: 1024, clientNoContextTakeover: true, serverNoContextTakeover: true, concurrencyLimit: 4} });
     server.on('upgrade', (req, socket, head) => {
-      if (!req.url?.startsWith('/ws')) { socket.destroy(); return; }
+      if (!req.url?.startsWith('/ws')) { for (const h of this.upgradeHandlers) { try { if (h(req, socket, head)) return; } catch { /* a handler fault falls through */ } } socket.destroy(); return; }
       this.wss.handleUpgrade(req, socket, head, (ws) => this.onConnect(ws, req));
     });
     host.listeners.push({

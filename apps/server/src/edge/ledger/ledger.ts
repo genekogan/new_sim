@@ -24,7 +24,7 @@ const WAIT_CODES = new Set(['program.safe-stop-required', 'program.safe-stop-pen
 const WAIT_LIMIT_TICKS = 20 * 60;   // a waiting receipt that cannot start within a minute fails
 const NEAR_RADIUS = 20, GO_NEAR_RADIUS = 60;
 const OPEN: EdgeReceipt['phase'][] = ['waiting', 'started'];
-type Row = {receipt_id: string; soul_id: string; capability: string; phase: EdgeReceipt['phase']; accepted_tick: number; started_tick: number | null; ended_tick: number | null; code: string | null; reason: string | null; program_id: string | null; client_ref: string | null; plan?: string | null; detail?: string | null};
+type Row = {created_at: number; receipt_id: string; soul_id: string; capability: string; phase: EdgeReceipt['phase']; accepted_tick: number; started_tick: number | null; ended_tick: number | null; code: string | null; reason: string | null; program_id: string | null; client_ref: string | null; plan?: string | null; detail?: string | null};
 type Pending = {receipt: string; soul: EdgeSoul; steps: Program['steps']; label: string; deadline: number; capability: string};
 
 export class EdgeLedger implements EdgeLedgerHooks {
@@ -246,6 +246,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
       if (partners.length && !near) continue;                      // partner further away: stay put rather than wander off
       const pick = near ? {id: 'face:' + near.x.soulId, label: `Turn towards ${near.x.name}`, steps: [{verb: 'wave', params: {at: near.x.entityId, seconds: 1}}] as Program['steps']} : ambientChoice(this, soul, b, tick);
       if (!pick) continue;
+      this.ambientAt.set(soul.soulId, Date.now());
       void this.host.enqueue('decision', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, option: pick.id, label: pick.label, steps: pick.steps, reevalTicks: 1e9, fallback: false, trigger: 'edge-ambient'}).catch(() => {/* best effort */});
     }
   }
@@ -788,6 +789,29 @@ export class EdgeLedger implements EdgeLedgerHooks {
     }
     return out.sort((a, b) => a.distance - b.distance);
   }
+  /** EVENTS-v1: position and heading of a Soul's body (null when it has none or faded). */
+  poseOf(soulId: string): {x: number; z: number; yaw: number} | null {
+    const m = this.host.minds.get(soulId), b = m && !this.faded.has(soulId) ? this.body(m.entityId) : undefined;
+    return b ? {x: b.pose.p[0], z: b.pose.p[2], yaw: b.pose.yaw} : null;
+  }
+  /** EVENTS-v1 fade-by-abandonment: an activity in progress (open receipt with its programme running), a ride, or a resting
+   *  posture (seated, lying, sleeping, swimming) the Soul's own latest act chose and ambient life has not changed since. */
+  postureHold(soulId: string): string | null {
+    const m = this.host.minds.get(soulId); if (!m || this.faded.has(soulId) || !this.body(m.entityId)) return null;
+    const program = this.host.engine.programOf(m.entityId), open = this.openReceipts(soulId);
+    const running = open.find(r => r.phase === 'started' && r.programId && r.programId === program);
+    if (running) return 'activity ' + running.capability;
+    if (open.some(r => r.phase === 'waiting')) return 'starting ' + open[0]!.capability;
+    if (this.aboard(m.entityId)) return 'riding';
+    const state = stateOf(this.host, m.entityId);
+    if (!['seated', 'lying', 'sleeping', 'swimming'].includes(state)) return null;
+    // the latest act that moved the body (lasting marks, object moves and answers leave the body as it was)
+    const last = this.rows('soul_id=? ORDER BY created_at DESC LIMIT 8', soulId).find(r => {const v = r.capability.split(':')[0]!; return !['make', 'decline', 'ask-to-stop'].includes(v) && !(v === 'object' && r.program_id === null);});
+    if (!last || last.phase === 'failed' || (this.ambientAt.get(soulId) ?? 0) > last.created_at) return null;
+    return POSTURE_VERBS.has(last.capability.split(':')[0]!) ? state : null;
+  }
+  /** Last ambient-life decision per Soul (ms): a posture ambient life chose is not the Soul's own choice. */
+  private ambientAt = new Map<string, number>();
   onReceipt(l: (r: EdgeReceipt) => void) {this.receiptListeners.push(l);}
   onPlaceChange(l: (e: {soulId: string; from: string | null; to: string | null; tick: number}) => void) {this.placeListeners.push(l);}
 
@@ -980,4 +1004,6 @@ export function stateOf(host: WorldHost, entityId: string): string {
   if (a === 'idle') return host.engine.programOf(entityId) ? 'busy' : 'standing';
   return 'busy';
 }
-function timeLabel(phase: number) {return phase < .2 ? 'morning' : phase < .45 ? 'day' : phase < .55 ? 'evening' : phase < .75 ? 'dusk' : 'night';}
+/** Verbs whose resting posture is a chosen activity (fade-by-abandonment holds the Soul while the body keeps it). */
+const POSTURE_VERBS = new Set(['sit', 'sit-ground', 'lie', 'nap', 'read', 'rest', 'warm-by-fire', 'gather', 'swim', 'accept', 'object', 'paint', 'play-piano', 'play-music', 'write', 'play-game', 'craft', 'eat', 'drink', 'cook', 'dance-with']);
+export function timeLabel(phase: number) {return phase < .2 ? 'morning' : phase < .45 ? 'day' : phase < .55 ? 'evening' : phase < .75 ? 'dusk' : 'night';}

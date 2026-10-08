@@ -31,7 +31,7 @@ export function say(core: CommsCore, soul: EdgeSoul, input: {text?: unknown}, ad
   const id = newId('sp'), tick = core.tick(), at = core.now();
   core.db.prepare('INSERT INTO edge_comms_speech (world_id, id, soul_id, tick, at, channel, text, heard_by) VALUES (?,?,?,?,?,?,?,?)')
     .run(core.worldId, id, soul.soulId, tick, at, JSON.stringify(channel), text, JSON.stringify(hearers));
-  for (const h of hearers) core.streams.deliver(h, 'speech', tick, {saidId: id, from: soulRef(soul), channel, text, untrusted: true});
+  for (const h of hearers) core.streams.deliver(h, 'speech', tick, {saidId: id, from: soulRef(soul), channel, text, heardBy: hearers.length, untrusted: true});
   core.spectate({kind: 'speech', tick, id, from: soulRef(soul), channel, text, heardBy: hearers, untrusted: true});
   return {said: {id, tick, channel, heardBy: hearers.length}};
 }

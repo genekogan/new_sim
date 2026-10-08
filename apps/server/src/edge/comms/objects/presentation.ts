@@ -67,6 +67,8 @@ export const presentationKind: ObjectKind<PresentationState> = {
       const promoted = s.standby.slice(0, free);
       s.tickets = [...s.audience, ...promoted];
       s.standby = s.standby.slice(promoted.length);
+      // EVENTS-v1 presentation.started: everyone already inside (and the presenter) hears that it began.
+      {const inside = [...ids(s.audience), ...(s.presenter ? [s.presenter.soulId] : [])]; if (inside.length) events.push({to: inside, kind: 'schedule', text: `"${s.title}" has begun${s.presenter ? ` (${s.presenter.name} presenting)` : ''}.`, data: {phase: 'started', ...(s.presenter ? {from: s.presenter} : {})}, untrusted: true});}
       if (forfeited.length) events.push({to: ids(forfeited), kind: 'schedule', text: `"${s.title}" has begun; your unclaimed seat was released to standby.`, data: {phase: 'running'}, untrusted: true});
       if (promoted.length) events.push({to: ids(promoted), kind: 'schedule', text: `A standby seat for "${s.title}" is yours. Enter now.`, data: {phase: 'running', ticket: true}, untrusted: true});
       if (s.standby.length) events.push({to: ids(s.standby), kind: 'schedule', text: `No seat came free for "${s.title}".`, data: {phase: 'running', ticket: false}, untrusted: true});

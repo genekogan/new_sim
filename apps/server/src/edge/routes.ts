@@ -4,6 +4,11 @@ import {EDGE_CONTRACT, EdgeError, edgeBody, type EdgeDeps, type EdgeSoul} from '
 import type {EdgeLedger} from './ledger/ledger.ts';
 import {registerEdgeComms} from './comms/index.ts';
 import {hereFrame} from './perception/here.ts';
+import {registerEdgeEvents} from './events/index.ts';
+import {mountIdempotency} from './events/idempotency.ts';
+import {mountSchema} from './events/schema.ts';
+import {registerEdgePlans} from './plans/index.ts';
+import type {Plans} from './plans/plans.ts';
 import type {WorldHost} from '../world.ts';
 import type {Souls} from '../souls.ts';
 
@@ -17,6 +22,8 @@ export function edgeSoulResolver(host: WorldHost, souls: Souls, bearer: (c: Cont
 }
 export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}) {
   const L = deps.ledger;
+  // EVENTS-v1: idempotency keys guard act/say/converse/plan writes; it must be mounted before those routes.
+  mountIdempotency(app, deps);
   const wrap = (fn: (c: Context) => unknown | Promise<unknown>) => async (c: Context) => {
     c.header('Cache-Control', 'no-store');
     try {return c.json(edgeBody(await fn(c) as object));}
@@ -44,5 +51,12 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   app.get('/v1/edge/items', wrap(() => ({tick: deps.host.engine.world.tick, items: L.together.publicItems()})));
   const comms = registerEdgeComms(app, deps, {stewardToken: process.env.EDGE_STEWARD_TOKEN || undefined, fading: process.env.EDGE_FADING === '1'});
   L.attachComms(comms);
-  return comms;
+  // EVENTS-v1 (tranche agent-minds M1/M2/M4): push stream (SSE + WS), digest, world.notice, server-side plans, schema.
+  let plans: Plans | null = null;
+  const events = registerEdgeEvents(app, deps, comms, {placeName: id => L.places.byId.get(id)?.name ?? null, planSummary: id => plans?.summary(id) ?? null,
+    bootNotice: process.env.EDGE_BOOT_NOTICE === '1' ? `The world server restarted${deps.build ? ` (${deps.build})` : ''}. Plans and open acts carried on; read the digest if you missed anything.` : null});
+  plans = registerEdgePlans(app, deps, comms, events, L);
+  mountSchema(app);
+  const close = comms.close;
+  return Object.assign(comms, {events, plans, close() { plans?.close(); events.close(); close(); }});
 }
