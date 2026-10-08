@@ -17,7 +17,7 @@ import {
   type CompileOut, type SpokenLine, type TalkInput, type PaidGate, clockAt, reflectInCode,
   type DirectorContext, type MidContext, type RegionDigest, type ShotCandidate, type Target, type Translation, type ChoiceA,
 } from '@sim/brain';
-import { GOALS, describeIntent, publicIntent, mandateTriggerSchema, type Alignment, type Beat, type BrainCall, type CameraLine, type DecisionPayload, type LogEvent, type NarrativeView, type ScenePayload, type TalkLine, type TickerLine, type WireIntent } from '@sim/protocol';
+import { GOALS, describeIntent, publicIntent, mandateTriggerSchema, type Alignment, type Beat, type BrainCall, type CameraLine, type DecisionPayload, type EventKind, type LogEvent, type NarrativeView, type ScenePayload, type TalkLine, type TickerLine, type WireIntent } from '@sim/protocol';
 import type { Config } from './config.ts';
 import type { Db } from './db.ts';
 import { checkAcceptanceGuard, energyWord, hash32, IntentAdmissionDeferred, StaleIntentAttempt, PersistedIntentAdmissionFault, type AcceptanceGuard, type AcceptanceJournal, type Mind, type WorldHost } from './world.ts';
@@ -74,6 +74,9 @@ export class Brain {
   host: WorldHost; db: Db; cfg: Config; sink: BrainSink;
   private readonly compilerCall: typeof callTool;
   private readonly injectedCompiler:boolean;
+  /** Optional native-cast boundary. Rechecked before durable decisions so pairing takes effect immediately. */
+  private readonly skipMind?: (mind: Mind) => boolean;
+  private readonly nativeProgramAllowed?: (mind: Mind, steps: DecisionPayload['steps']) => boolean;
   /** Isolated backend qualification switch. No environment/route activation. */
   private readonly intentV2Choices: boolean;
   private readonly intentV2Retries: boolean;
@@ -99,8 +102,10 @@ export class Brain {
   }
 
 
-  constructor(host: WorldHost, db: Db, cfg: Config, sink: BrainSink, services?: { compilerCall?: typeof callTool; intentV2Choices?: boolean; intentV2Retries?: boolean; nativeActivityContextV1?:boolean }) {
+  constructor(host: WorldHost, db: Db, cfg: Config, sink: BrainSink, services?: { compilerCall?: typeof callTool; intentV2Choices?: boolean; intentV2Retries?: boolean; nativeActivityContextV1?:boolean; skipMind?: (mind: Mind) => boolean; nativeProgramAllowed?: (mind: Mind, steps: DecisionPayload['steps']) => boolean }) {
     this.host = host; this.db = db; this.cfg = cfg; this.sink = sink;
+    this.skipMind = services?.skipMind;
+    this.nativeProgramAllowed = services?.nativeProgramAllowed;
     this.compilerCall = services?.compilerCall ?? callTool;this.injectedCompiler=!!services?.compilerCall;
     this.nativeActivityContext = services?.nativeActivityContextV1 === true;
     this.intentV2Choices = services?.intentV2Choices === true;
@@ -187,19 +192,19 @@ export class Brain {
     if(this.quiescing)return;
     const w = this.host.engine.world;
     const day=this.host.living;
-    if(day&&tick%20===0){const c=clockAt(tick,day.origin,day.dayTicks);for(const m of this.host.minds.values())for(const r of mandateOf(this.host.kernel,m.soulId)){
+    if(day&&tick%20===0){const c=clockAt(tick,day.origin,day.dayTicks);for(const m of this.host.minds.values())for(const r of this.skipMind?.(m)?[]:mandateOf(this.host.kernel,m.soulId)){
       if(this.ruleUpdates.has(r.id))continue;
       const matched=r.trigger.kind==='gathering'?Object.values(this.host.kernel.links).some(l=>l.kind==='hosts'&&l.from===(r.trigger as {host:string}).host&&this.host.kernel.things[l.to]?.kind==='gathering'):false;
       if(triggerDue(r,this.host.kernel,c.day,c.hour+c.minute/60)){
-        this.ruleUpdates.add(r.id);void this.host.enqueue('mandate','world',{soulId:m.soulId,ruleId:r.id,op:'wake',patch:{lastFiredDay:c.day,...(r.trigger.kind==='gathering'?{conditionMatched:true}:{})}}).finally(()=>this.ruleUpdates.delete(r.id));
-      }else if(r.trigger.kind==='gathering'&&r.conditionMatched&&!matched){this.ruleUpdates.add(r.id);void this.host.enqueue('mandate','world',{soulId:m.soulId,ruleId:r.id,op:'condition',patch:{conditionMatched:false}}).finally(()=>this.ruleUpdates.delete(r.id));}
+        this.ruleUpdates.add(r.id);void this.enqueueNative(m,'mandate','world',{soulId:m.soulId,ruleId:r.id,op:'wake',patch:{lastFiredDay:c.day,...(r.trigger.kind==='gathering'?{conditionMatched:true}:{})}}).finally(()=>this.ruleUpdates.delete(r.id));
+      }else if(r.trigger.kind==='gathering'&&r.conditionMatched&&!matched){this.ruleUpdates.add(r.id);void this.enqueueNative(m,'mandate','world',{soulId:m.soulId,ruleId:r.id,op:'condition',patch:{conditionMatched:false}}).finally(()=>this.ruleUpdates.delete(r.id));}
     }}
     // Tier 2: mid-brain, per Soul, when due. Fair order: owner intents first, then whoever has waited longest,
     // so a fixed iteration order can never let a few Souls take the whole mid-brain share.
     if (this.inflight.size < MAX_INFLIGHT) {
       const due: Mind[] = [];
       for (const m of this.host.minds.values()) {
-        if (this.host.quietBarrier || m.nextEvalTick > tick || this.inflight.has(m.soulId) || !w.entities[m.entityId]) continue;
+        if (this.skipMind?.(m) || this.host.quietBarrier || m.nextEvalTick > tick || this.inflight.has(m.soulId) || !w.entities[m.entityId]) continue;
         const hasWork = this.cfg.worldKey !== 'eden' || this.edenAutonomyV1 || m.agendaPos < m.agenda.length
           || mandateOf(this.host.kernel,m.soulId).some(r=>r.status==='active')
           || this.intentV2Choices && Object.values(this.host.intentHistoryOf(m.soulId).intents)
@@ -212,7 +217,7 @@ export class Brain {
       }
     }
     // expire nudges
-    if (tick % TPS === 0) for (const m of this.host.minds.values()) if (m.nudge && m.nudge.untilTick < tick) m.nudge = null;
+    if (tick % TPS === 0) for (const m of this.host.minds.values()) if (!this.skipMind?.(m) && m.nudge && m.nudge.untilTick < tick) m.nudge = null;
     // Tier 3 beats firing
     while (this.pendingBeats.length && this.pendingBeats[0].fireTick <= tick) {
       const b = this.pendingBeats.shift()!;
@@ -332,7 +337,7 @@ export class Brain {
   }
 
   async evaluate(m: Mind, trigger: string) {
-    if(this.quiescing)return;
+    if(this.quiescing||this.skipMind?.(m))return;
     return this.track(()=>this.evaluateWork(m, trigger));
   }
   private async evaluateWork(m: Mind, trigger: string) {
@@ -351,6 +356,7 @@ export class Brain {
     this.updateEnergy(m, ent, tick);
     if(this.intentV2Choices&&(host.unfinishedHumanGoalExecutionV1(m.soulId)||host.unfinishedIntentApproachV1(m.soulId))){m.nextEvalTick=tick+TPS;m.evalTrigger='timer';m.lastFingerprint='';return;}
     const ctx = this.midContext(m, trigger);
+    if(this.nativeProgramAllowed)ctx.options=ctx.options.filter(o=>this.nativeProgramAllowed!(m,o.steps));
     if(ctx.purposeExperiences){const captured=JSON.stringify(ctx.purposeExperiences.episodes);experienceCurrent=()=>JSON.stringify(purposeExperienceContextV1(host,m,ctx.purposes??[])?.episodes)===captured;}
     if(ctx.purposeRecall?.state==='overflow'){
       const fp='purpose-recall-overflow:'+purposeSeq;
@@ -379,7 +385,7 @@ export class Brain {
     if (m.agendaPos < m.agenda.length) {
       if (!ctx.options.some((o) => o.servesIntent && o.card !== 'wait') && m.planBlockedSince === undefined) m.planBlockedSince = tick;
       if (m.planBlockedSince !== undefined && tick - m.planBlockedSince > TPS * 600) {
-        if(m.activeRule){void host.enqueue('mandate','world',{soulId:m.soulId,ruleId:m.activeRule,op:'status',patch:{status:'blocked',report:`The next card, ${m.agenda[m.agendaPos].card}, stayed impossible for ten minutes.`}});m.nextEvalTick=tick+20;return;}
+        if(m.activeRule){void this.enqueueNative(m,'mandate','world',{soulId:m.soulId,ruleId:m.activeRule,op:'status',patch:{status:'blocked',report:`The next card, ${m.agenda[m.agendaPos].card}, stayed impossible for ten minutes.`}});m.nextEvalTick=tick+20;return;}
         m.recent = [...m.recent.slice(-3), `gave up on the plan at "${m.agenda[m.agendaPos].card}" (not possible for a long while)`]; m.agendaPos = m.agenda.length; m.planBlockedSince = undefined; host.markDirty(m.soulId);
       }
     }
@@ -393,7 +399,7 @@ export class Brain {
     const serving = ctx.options.filter((o) => o.servesIntent && o.card !== 'wait');
     let reflex: CardOption | undefined, why = '';
     if(m.activeRule){
-      if(m.agendaPos>=m.agenda.length){void host.enqueue('mandate','world',{soulId:m.soulId,op:'status',ruleId:m.activeRule,patch:{status:'done',report:'The cards played and their objective changes are logged.'}});m.nextEvalTick=tick+20;return;}
+      if(m.agendaPos>=m.agenda.length){void this.enqueueNative(m,'mandate','world',{soulId:m.soulId,op:'status',ruleId:m.activeRule,patch:{status:'done',report:'The cards played and their objective changes are logged.'}});m.nextEvalTick=tick+20;return;}
       reflex=serving.sort((a,b)=>a.id.localeCompare(b.id))[0];why='the owner explicitly asked for this now';
       if(!reflex){m.nextEvalTick=tick+20;return;}
     }else if (answers.length) {
@@ -437,13 +443,13 @@ export class Brain {
       }
     } catch (e) { decision = fallbackMid(ctx, seed); usedFallback = true; error = String((e as Error).message ?? e); }
     this.inflight.delete(m.soulId);
-    if (host.minds.get(m.soulId) !== m) return;
+    if (host.minds.get(m.soulId) !== m || this.skipMind?.(m)) return;
     const now = host.engine.world.tick;
     const stale = m.intentVersion !== version || host.quietBarrier || purposeSeq !== undefined && host.intentWillSeqOf(m.soulId) !== purposeSeq || !experienceCurrent();
     const opt = ctx.options.find((o) => o.id === decision.option);
     if(!stale&&host.living){const c=clockAt(now,host.living.origin,host.living.dayTicks);for(const r of mandateOf(host.kernel,m.soulId).filter(r=>r.strict&&r.status==='active'&&r.lastReportDay!==c.day)){
       const chosen=opt?{card:opt.card,target:opt.cardTarget}:m.pending?{card:m.pending.card,target:m.pending.target}:null;
-      if(!chosen||!r.agenda.some(a=>matchesStep(host,a,chosen.card,chosen.target)))void host.enqueue('mandate','world',{soulId:m.soulId,ruleId:r.id,op:'report',patch:{lastReportDay:c.day,report:`This decision did not follow the strict rule: ${opt?.label??'continued the current activity'}. Needs, circumstances and the logged choice are available for review.`}});
+      if(!chosen||!r.agenda.some(a=>matchesStep(host,a,chosen.card,chosen.target)))void this.enqueueNative(m,'mandate','world',{soulId:m.soulId,ruleId:r.id,op:'report',patch:{lastReportDay:c.day,report:`This decision did not follow the strict rule: ${opt?.label??'continued the current activity'}. Needs, circumstances and the logged choice are available for review.`}});
     }}
     const policy = { how: decision.how, pool: decision.pool, topP: decision.topP, keepGoing: decision.keepGoing, sociable: decision.sociable, optionKeys: Object.fromEntries(keys) };
     const applied = stale ? { dropped: experienceCurrent()?'intent changed during the call; re-evaluating':'recorded experience changed during the call; re-evaluating' } : opt
@@ -478,7 +484,16 @@ export class Brain {
     } satisfies DecisionPayload, choiceGuard, purposeFor(opt),!ctx.actingPurpose);
   }
 
+  private enqueueNative(m: Mind, kind: EventKind, author: string, payload: unknown) {
+    if(!this.skipMind)return this.host.enqueue(kind,author,payload);
+    if(this.skipMind(m))return Promise.resolve(undefined);
+    return this.host.enqueueChecked(kind,author,payload,()=>{if(this.skipMind?.(m))throw new StaleCompilation();return true;}).catch(error=>{if(!(error instanceof StaleCompilation))throw error;return undefined;});
+  }
+
   private enqueueDecision(m: Mind, author: string, payload: DecisionPayload, guard?: AcceptanceGuard, purpose?: { intentId:string; version:number },voluntaryRetained=false) {
+    if (this.skipMind?.(m) || this.nativeProgramAllowed && !this.nativeProgramAllowed(m,payload.steps)) return;
+    const priorGuard=guard;
+    if(this.skipMind||this.nativeProgramAllowed)guard=()=>{if(this.skipMind?.(m)||this.nativeProgramAllowed&&!this.nativeProgramAllowed(m,payload.steps))throw new StaleCompilation();return priorGuard?priorGuard():true;};
     if (!guard) { void this.host.enqueue('decision', author, payload); return; }
     if(purpose&&voluntaryRetained&&this.host.extra.intentRetainedChoiceV1)payload={...payload,trigger:'retained-choice/1'};
     const legacyVersion = m.intentVersion, willSeq = this.host.intentWillSeqOf(m.soulId);
@@ -490,7 +505,7 @@ export class Brain {
         return; // The pair is already durable; never issue duplicate work.
       }
       if (error instanceof IntentAdmissionDeferred) {
-        if (this.host.minds.get(m.soulId) === m && m.intentVersion === legacyVersion && this.host.intentWillSeqOf(m.soulId) === willSeq) {
+        if (!this.skipMind?.(m) && this.host.minds.get(m.soulId) === m && m.intentVersion === legacyVersion && this.host.intentWillSeqOf(m.soulId) === willSeq) {
           m.nextEvalTick = Math.min(m.nextEvalTick, this.host.engine.world.tick + 40);
           m.evalTrigger = 'new-intent-v2';
           m.lastFingerprint = '';
@@ -498,12 +513,12 @@ export class Brain {
         return; // Checkpoint eligibility is temporary; no durable or body effect.
       }
       if (!(error instanceof StaleCompilation) && !(error instanceof StaleIntentAttempt)) console.error('[brain] checked decision persistence failed');
-      if (this.host.minds.get(m.soulId) === m) { m.nextEvalTick = this.host.engine.world.tick + 1; m.evalTrigger = 'new-intent-v2'; m.lastFingerprint = ''; }
+      if (!this.skipMind?.(m) && this.host.minds.get(m.soulId) === m) { m.nextEvalTick = this.host.engine.world.tick + 1; m.evalTrigger = 'new-intent-v2'; m.lastFingerprint = ''; }
     });
   }
 
   async reflect(m: Mind, day: number) {
-    if(this.quiescing)return;
+    if(this.quiescing||this.skipMind?.(m))return;
     return this.track(()=>this.reflectWork(m, day));
   }
   private async reflectWork(m: Mind, day: number) {
@@ -511,7 +526,7 @@ export class Brain {
     this.reflecting.add(m.soulId);
     try{
     const episodePolicy=this.host.extra.intentEpisodeMemoryV1===true,willSeq=this.host.intentWillSeqOf(m.soulId),throughSeq=this.host.seq,historySeq=this.host.intentHistoryOf(m.soulId).lastSeq;
-    const current=()=>{const row=this.db.soul(m.soulId);if(this.host.minds.get(m.soulId)!==m||!row||row.owner!==m.owner||row.entity_id!==m.entityId||row.world_id!==this.host.worldId||row.retired_at!==null||this.host.intentWillSeqOf(m.soulId)!==willSeq||this.host.intentHistoryOf(m.soulId).lastSeq!==historySeq)throw new StaleCompilation();return true as const;};
+    const current=()=>{const row=this.db.soul(m.soulId);if(this.skipMind?.(m)||this.host.minds.get(m.soulId)!==m||!row||row.owner!==m.owner||row.entity_id!==m.entityId||row.world_id!==this.host.worldId||row.retired_at!==null||this.host.intentWillSeqOf(m.soulId)!==willSeq||this.host.intentHistoryOf(m.soulId).lastSeq!==historySeq)throw new StaleCompilation();return true as const;};
     if(episodePolicy){try{current();}catch(error){if(error instanceof StaleCompilation)return;throw error;}}
     const episodes=episodePolicy?purposeEpisodesV1(this.host,m,throughSeq):undefined;
     let journal = episodes?episodeJournalV1(episodes):reflectInCode(m.name, m.life, m.agenda.slice(m.agendaPos).map(a => a.card));
@@ -525,9 +540,10 @@ export class Brain {
         this.record({ tick: this.host.engine.world.tick, tier: 'reflection', subject: m.name, soulId: m.soulId, model: this.cfg.narratorModel, request: r.request, response: r.raw, applied: { day }, ms: r.ms, inputTokens: r.inputTokens, outputTokens: r.outputTokens, cachedTokens: r.cachedTokens, costUsd: r.costUsd, mode: 'live' });
       } catch { /* code reflection keeps the day moving */ }
     }
-    if(this.host.minds.get(m.soulId)===m){
+    if(this.host.minds.get(m.soulId)===m&&!this.skipMind?.(m)){
       const payload={soulId:m.soulId,reflection:{day,journal,...(episodes?{episodeMemory:{contract:'private-purpose-episodes/1',throughSeq,episodes,proseKind:'interpretation'}}:{})}};
       if(episodePolicy){try{await this.host.enqueueChecked('rules',`soul:${m.soulId}`,payload,current);}catch(error){if(!(error instanceof StaleCompilation))throw error;}}
+      else if(this.skipMind)await this.enqueueNative(m,'rules',`soul:${m.soulId}`,payload);
       else await this.host.enqueue('rules',`soul:${m.soulId}`,payload);
     }
     }finally{this.reflecting.delete(m.soulId);}
@@ -714,7 +730,7 @@ export class Brain {
 
   /** Pick the three manners that suit a Soul's description (one cheap Jev call), and record them in its deck. */
   async attune(m: Mind) {
-    if(this.quiescing)return;
+    if(this.quiescing||this.skipMind?.(m))return;
     return this.track(()=>this.attuneWork(m));
   }
   private async attuneWork(m: Mind) {
@@ -725,13 +741,18 @@ export class Brain {
       const r = await this.jev.ask(request);
       const manners = interpretAttune(r.response);
       this.record({ tick, tier: 'attune', subject: m.name, soulId: m.soulId, model: r.mode === 'live' ? JEV_MODEL : 'fake', request, response: r.response, applied: { manners }, ms: r.ms, inputTokens: r.response.usage.input_tokens, outputTokens: 0, cachedTokens: 0, costUsd: r.costUsd, mode: r.mode });
-      if (this.host.minds.has(m.soulId)) void this.host.enqueue('deck', 'brain:attune', { soulId: m.soulId, manners, why: 'manners attuned to the description' });
+      if (this.host.minds.has(m.soulId)&&!this.skipMind?.(m)) {
+        const payload={ soulId: m.soulId, manners, why: 'manners attuned to the description' };
+        if(this.skipMind)void this.host.enqueueChecked('deck','brain:attune',payload,()=>{if(this.skipMind?.(m))throw new StaleCompilation();return true;}).catch(()=>{/* pairing revoked native control */});
+        else void this.host.enqueue('deck','brain:attune',payload);
+      }
     } catch { /* the default manners stay */ }
   }
 
   // ------------------------------------------------------------ speech: the act is state, the words are rendered here
   async speak(from: string, to: string, act: string, about: string | undefined, manner: string | undefined) {
-    if(this.quiescing)return;
+    const speaker=this.host.minds.get(from);
+    if(this.quiescing||(speaker&&this.skipMind?.(speaker)))return;
     return this.track(()=>this.speakWork(from, to, act, about, manner));
   }
   private async speakWork(from: string, to: string, act: string, about: string | undefined, manner: string | undefined) {
@@ -759,7 +780,7 @@ export class Brain {
       }
     }
     if (!lines.length) lines = plainLine(input);
-    const out: TalkLine[] = lines.map((l) => {
+    const out: TalkLine[] = lines.filter(l=>{const m=this.host.minds.get(l.who==='speaker'?from:to);return !m||!this.skipMind?.(m);}).map((l) => {
       const speaker = l.who === 'speaker';
       const line = { tick, at: Date.now(), from: speaker ? from : to, to: speaker ? to : from, fromName: speaker ? a.name : b.name, toName: speaker ? b.name : a.name, act, ...(manner && speaker ? { manner } : {}), text: l.text, place: a.at };
       return { ...line, id: this.db.saveTalk(this.host.worldId, line) };
@@ -846,7 +867,7 @@ export class Brain {
   regions(): string[] { return this.host.engine.anchors().filter((a) => a.kind === 'region').map((a) => a.id); }
   digest(region: string): RegionDigest {
     const eng = this.host.engine, w = eng.world;
-    const here = [...this.host.minds.values()].filter((m) => w.entities[m.entityId] && eng.regionAt(w.entities[m.entityId].pose.p) === region);
+    const here = [...this.host.minds.values()].filter((m) => !this.skipMind?.(m) && w.entities[m.entityId] && eng.regionAt(w.entities[m.entityId].pose.p) === region);
     const nameOf = (id: string) => this.host.nameOf(id);
     const places = Object.values(w.entities).filter((e) => e.kind === 'fixture' && e.id !== 'gate' && eng.regionAt(e.pose.p) === region)
       .map((e) => { const n = Object.values(w.entities).filter((x) => x.human?.on === e.id).length; return { id: e.id, name: e.label ?? e.id, state: n ? `${n} souls here` : 'empty' }; });
