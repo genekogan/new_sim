@@ -1,21 +1,73 @@
+# Complete application checks on isolated runners; preserve every acceptance target.
 name: ci
 on:
   push: { branches: [main] }
   pull_request:
 jobs:
-  check:
+  qualify:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
-    # The complete application check includes timed server journeys and the
-    # native Mars engine. Local qualification takes about 32 minutes.
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: types-web, kind: types-web }
+          - { name: packages, kind: packages }
+          - { name: native, kind: native }
+          - { name: latency, kind: latency }
+          - { name: server-0, kind: server, shard: 0 }
+          - { name: server-1, kind: server, shard: 1 }
     steps:
       - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: pnpm }
       - run: pnpm install --frozen-lockfile
-      # Use the repository's release check, including the native Mars suite.
-      # Legacy Mars deployment tests require published media prepared separately
-      # by its asset/release gate; they are not the application test entry point.
-      - run: pnpm check
-      - run: pnpm --filter @sim/web build
+      - name: Run complete assigned checks
+        env:
+          CHECK_KIND: ${{ matrix.kind }}
+          SERVER_SHARD: ${{ matrix.shard }}
+        shell: bash
+        run: |
+          case "$CHECK_KIND" in
+            types-web)
+              pnpm typecheck
+              pnpm --filter @sim/web build
+              ;;
+            packages)
+              pnpm -r --filter '!mars-campus-viewer' --filter '!@sim/server' test
+              ;;
+            native)
+              pnpm test:mars
+              ;;
+            latency)
+              pnpm --filter @sim/server exec node --test --test-concurrency=1 src/owner-response-milestones.test.ts
+              ;;
+            server)
+              node --input-type=module <<'NODE'
+          import { readdirSync } from 'node:fs';
+          import { spawnSync } from 'node:child_process';
+          const all = readdirSync('apps/server/src').filter(f => f.endsWith('.test.ts')).sort();
+          const latency = 'owner-response-milestones.test.ts';
+          if (!all.includes(latency)) throw Error('Expected latency test is missing');
+          const pool = all.filter(f => f !== latency), shard = Number(process.env.SERVER_SHARD);
+          if (![0, 1].includes(shard)) throw Error('Invalid server shard');
+          const files = pool.filter((_, i) => i % 2 === shard).map(f => `src/${f}`);
+          if (!files.length) throw Error('Empty server shard');
+          console.log(JSON.stringify({ shard, totalServerFiles: all.length, files }));
+          const result = spawnSync('pnpm', ['--filter', '@sim/server', 'exec', process.execPath, '--test', '--test-concurrency=1', ...files], { stdio: 'inherit' });
+          if (result.error) throw result.error;
+          process.exit(result.status ?? 1);
+          NODE
+              ;;
+            *) exit 1 ;;
+          esac
+  # Retain a single stable required-check name and fail unless every lane passed.
+  check:
+    runs-on: ubuntu-latest
+    needs: qualify
+    if: always()
+    steps:
+      - run: test '${{ needs.qualify.result }}' = success
