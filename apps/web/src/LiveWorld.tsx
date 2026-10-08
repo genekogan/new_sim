@@ -1,3 +1,4 @@
+import {constrainOfficeGuardCamera,officeGuardsFromPublication} from './WorldOfficeGuards.ts';
 import {recordedBody,admittedBodyUrl} from '../../../mars/viewer/app/engine-view/recorded-body.ts';
 import {WorldBodyModels} from './WorldBodyModels.ts';
 import {conversationFrame} from './WorldConversationFrame.ts';
@@ -462,7 +463,9 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
 
     const pacer = new FramePacer();
     const eyes=WorldEyes.fromSearch(location.search,{renderer,camera,scene,body:id=>people?.bodyObject(id)??floaters.object(id)??standIns.getObjectByName(id)??null,souls:()=>[...context.current.sim.conn.replica.souls.values()].map(x=>x.entityId),overlays:()=>[speechLayer.group,ring,orbitPivot.group,fading.group,hover.marker],tick:()=>shown.current.tick,ready:()=>sceneSettled&&drawnTick.current!==null});
+    const officeGuardFrom=new THREE.Vector3();
     const animate = () => {
+      officeGuardFrom.copy(camera.position);
       if (abort.signal.aborted) return;
       frame = pacer.next(animate);
       if(eyes&&!eyes.wake(performance.now()))return;  // VF1b: a slow frame leaves room for socket messages
@@ -559,7 +562,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           geometry?.setViewTime(depictedTick*take.dt);
           const expansionWanted=edenExpansionCapture(!!context.current.edenExpansion,s.conn.welcome?.worldId,expansionSceneInfo,publication,!!past.current);
           if(!expansionWanted&&expansion)clearExpansion();
-          if(expansionWanted&&!expansion&&!expansionFailed)try{expansion=createWorldEdenExpansion();scene.add(expansion.group);try{houseWindows=createEdenHouseWindows();if(houseWindows)expansion.group.add(houseWindows.group);}catch{houseWindows=null;}expansion.replaceCosmeticBackdrop(geometry.group);light.fit([-100,-65,105,85]);}catch{expansionFailed=true;problem('Some new Eden scenery could not be shown.');}
+          if(expansionWanted&&!expansion&&!expansionFailed)try{expansion=createWorldEdenExpansion(officeGuardsFromPublication(publication,depictedTick));scene.add(expansion.group);try{houseWindows=createEdenHouseWindows();if(houseWindows)expansion.group.add(houseWindows.group);}catch{houseWindows=null;}expansion.replaceCosmeticBackdrop(geometry.group);light.fit([-100,-65,105,85]);}catch{expansionFailed=true;problem('Some new Eden scenery could not be shown.');}
           expansion?.sync(sampled.entities,!!past.current,depictedTick*take.dt);
           expansion?.setLocalPresentation(context.current.localClassroomPresentation,s.conn.welcome?.worldId??'',Object.hasOwn(sampled.entities,'eden-classroom-screen-1')&&records['eden-classroom-screen-1']?.kind==='fixture'&&records['eden-classroom-screen-1']?.def==='standing-display',!!past.current);
           floaters.update(sampled.entities, take.startTick + sampled.tick, take.dt); // absolute tick: the bob is replay-stable
@@ -696,6 +699,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         }
       }
       if(cameraGround.apply(camera,scene)>0&&!(viewing==='manual'&&context.current.manualNavigation==='free'))camera.lookAt(controls.target);  // never underground (Gene)
+      if(context.current.cameraMode==='manual'&&expansion?.group.visible)constrainOfficeGuardCamera(camera,controls.target,officeGuardFrom,expansion.officeGuards);
       composeVisibleViewport(camera, host.clientWidth, host.clientHeight, context.current.viewportInsets, logicalFov);
       if(fadeOverride.size&&!past.current){const states=new Map<string,FadingState>(),now=performance.now();
         for(const soul of s.conn.replica.souls.values()){const v=fadeOverride.get(soul.name.toLowerCase());if(!v)continue;if(!fadeSince.has(soul.id))fadeSince.set(soul.id,now);
