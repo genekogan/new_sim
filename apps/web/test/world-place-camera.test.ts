@@ -8,6 +8,10 @@ import {WorldOrbitPivot} from '../src/WorldOrbitPivot.ts';
 import {WorldPlacePreviews} from '../src/WorldPlacePreviews.ts';
 import {WORLD_PLACE_VIEWS,worldPlaceView} from '../src/WorldPlaces.ts';
 import {WALL_FRAME_MANIFEST} from '../src/WorldWallFrames.ts';
+import {WorldAuthoredBoundaries} from '../src/WorldAuthoredBoundaries.ts';
+import {constrainOfficeGuardCamera} from '../src/WorldOfficeGuards.ts';
+import {officeStairGuardBoxes} from '../../../mars/viewer/lib/office-stair-guards.ts';
+import {authoredBoundaryDeclarationV1} from '../../../packages/engine-contract/src/authored-boundaries-v1.ts';
 import {createEdenPublicQuarter} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/public-quarter.ts';
 import {createEdenInteriors,interiorBoxes} from '../../../mars/viewer/app/engine-view/content/assets/eden-interiors/index.ts';
 
@@ -24,6 +28,15 @@ void test('Explore replaces pending RTS flight and orbit glide, retaining its en
   }
  }finally{rts.dispose();pivot.dispose();}
  const fresh=new WorldPlaceCamera();let calls=0;fresh.initial(()=>calls++);fresh.initial(()=>calls++);assert.equal(calls,1,'initial real scenery is still framed exactly once');
+});
+
+void test('the next rendered frame sweeps from the selected legal endpoint while manual wall crossing stays blocked',()=>{
+ const camera=new THREE.PerspectiveCamera(),target=new THREE.Vector3(),framing=new WorldPlaceCamera(),view=worldPlaceView('int-office-studio')!,oldEye=new THREE.Vector3(100,4.7,18.5);
+ camera.position.copy(oldEye);const boundaries=new WorldAuthoredBoundaries();boundaries.bind({body:{scene:{authoredBoundaries:{...authoredBoundaryDeclarationV1('fixture-wall',[{id:'wall-between-views',buildingId:'fixture',kind:'wall',c:[99,3,18.5],half:[.1,3,5],yaw:0}]),acceptedAtTick:1}}}});
+ framing.place(camera,()=>({target,update(){}}),view,()=>{},()=>{});
+ const frameStart=camera.position.clone(); // LiveWorld records this before any movement/update on every RAF.
+ assert.equal(boundaries.constrain(camera,target,frameStart,1),false);assert.equal(constrainOfficeGuardCamera(camera,target,frameStart,officeStairGuardBoxes()),false);assert.deepEqual(camera.position.toArray(),view.p);
+ assert.equal(boundaries.constrain(camera,target,oldEye,1),true,'the same wall still blocks an actual manual sweep from the old eye');
 });
 
 void test('gallery preset sees both actual frame corners unobstructed by the authored library furniture',()=>{
