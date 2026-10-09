@@ -65,6 +65,12 @@ export class Builder{
   const p=new THREE.Vector3(cx,y0+sy/2,cz).applyMatrix4(this.m),b:AuthoredBoundaryBox={id:buildingId+':'+partId,buildingId,kind,c:p.toArray() as [number,number,number],half:[sx*scaleX/2,sy*scaleY/2,sz*scaleZ/2],yaw:Math.atan2(e[2],e[0])};
   if(!validAuthoredBoundary(b))throw Error('authored-boundary.invalid-prism');this.boundaries.push(b);
  }
+ /** Future authored prisms have one draw/collision definition. Solid is the
+  * default; decorative opt-out is explicit and retained in the source pin.
+  * Legacy box() stays geometry-only until its author selects this contract. */
+ authoredBox(k:MatKey,cx:number,y0:number,cz:number,sx:number,sy:number,sz:number,color:Col,buildingId:string,partId:string,kind:'wall'|'guard'='wall',collision:'solid'|'decorative'='solid'){
+  this.box(k,cx,y0,cz,sx,sy,sz,color);this.boundary(kind,cx,y0,cz,sx,sy,sz,buildingId,partId);this.boundaries[this.boundaries.length-1].collision=collision;
+ }
  /** Push a rotation about local x or z (tilted parts: see-saws, wheels, hay bales). */
  pushRot(axis:'x'|'z',angle:number){return this.pushM(axis==='x'?new THREE.Matrix4().makeRotationX(angle):new THREE.Matrix4().makeRotationZ(angle));}
  b(k:MatKey){let b=this.buf.get(k);if(!b)this.buf.set(k,b={p:[],n:[],c:[]});return b;}

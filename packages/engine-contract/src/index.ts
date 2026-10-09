@@ -1,4 +1,5 @@
 export * from './hash.ts';
+export * from './authored-boundaries-v1.ts';
 export * from './rng.ts';
 export * from './world.ts';
 export * from './actions.ts';

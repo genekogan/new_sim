@@ -152,6 +152,9 @@ export interface Engine {
   renderPlatformsV1?():import('./render-platforms-v1.ts').RenderPlatformsV1|undefined;
   configureOfficeStairGuardsV1?(metadata:import('./office-stair-guards-v1.ts').OfficeStairGuardsV1):void;
   officeStairGuardsV1?():import('./office-stair-guards-v1.ts').OfficeStairGuardsV1|undefined;
+  previewAuthoredBoundariesV1?(metadata:import('./authored-boundaries-v1.ts').AuthoredBoundariesDeclarationV1):{code:string;message:string}|null;
+  configureAuthoredBoundariesV1?(metadata:import('./authored-boundaries-v1.ts').AuthoredBoundariesV1):void;
+  authoredBoundariesV1?():import('./authored-boundaries-v1.ts').AuthoredBoundariesV1|undefined;
   /** Spawn a human entity for a Soul at the arrival point; returns the entity id. */
   spawnHuman(args: { id: string; label: string; soul: string }): string;
   removeEntity(id: string): void;
