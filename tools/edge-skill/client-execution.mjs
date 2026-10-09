@@ -35,7 +35,7 @@ export function boundedRememberChoice(value){if(!value||typeof value!=='object')
 
 const identityText=value=>String(value??'').normalize('NFKC').replace(/\s+/gu,' ').trim().toLocaleLowerCase('en-US');
 export const literalSoulReference=(text,reference)=>{const id=typeof reference==='string'&&/^s_[A-Za-z0-9_-]+$/.test(reference);const source=id?String(text??'').normalize('NFKC').replace(/\s+/gu,' ').trim():identityText(text),needle=id?reference:identityText(reference);if(!needle)return false;let offset=-1;while((offset=source.indexOf(needle,offset+1))>=0){if(!/[\p{L}\p{N}_-]/u.test(source[offset-1]??'')&&!/[\p{L}\p{N}_-]/u.test(source[offset+needle.length]??''))return true;}return false;};
-const GENERIC_IDENTITY_BASES=new Set(['anyone','anyone nearby','someone nearby','somebody nearby','people nearby','everyone nearby','everyone','any nearby person']);
+const GENERIC_IDENTITY_BASES=new Set(['anyone','anyone nearby','someone','someone nearby','somebody','somebody nearby','people nearby','everyone nearby','everyone','any nearby person']);
 /** Validate supplied references, not arbitrary prose semantics. A generic choice
  * needs an explicit supported selector actually present in the trusted request.
  * Neither a model judgment nor a similar first name supplies owner authority. */
