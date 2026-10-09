@@ -56,6 +56,7 @@ import { WorldSceneHistory } from './WorldSceneHistory.ts';
 import { apiPath } from './world-path.ts';
 import {WorldEdgeItems} from './WorldEdgeItems.ts';
 import { WorldNavigation, createWorldOrbitControls, type ManualNavigation, type CameraMove } from './WorldNavigation.ts';
+import {WorldPlaceCamera} from './WorldPlaceCamera.ts';
 import { composeVisibleViewport, visibleViewport, type ViewportInsets } from './WorldViewport.ts';
 import { placeWorldLabels, type LabelBox, type LabelOffset } from './WorldLabels.ts';
 import {projectSpeechAnchors,type SpeechAnchorPoint} from './WorldSpeechAnchors.ts';
@@ -272,16 +273,16 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     let geometry = new WorldGeometry(null);
     scene.add(geometry.group);
     const groupSelection=new Set<string>();
-    let framed = false, followed: string | null = null;
+    const framing=new WorldPlaceCamera();let followed: string | null = null;
     const overview = (b: readonly [number, number, number, number]) => {
       const [x0, z0, x1, z1] = b, span = Math.max(10, x1 - x0, z1 - z0);
       controls.target.set((x0 + x1) / 2, 0, (z0 + z1) / 2);
       camera.position.set(controls.target.x + span * 0.1, span * 0.6, controls.target.z + span * 0.75);
       controls.update();
-      framed = true;
+      framing.framed = true;
     };
     overview(geometry.bounds);
-    framed = false; // the placeholder ground does not count: frame again once the real layout (or the people) arrive
+    framing.framed = false; // the placeholder ground does not count: frame again once the real layout (or the people) arrive
     controlsApi.current = {
       overview: () => { navigation?.release(); overview(expansion&&!past.current?[-100,-65,105,85]:geometry.bounds); },
       framePoint:(point,radius)=>{context.current.setCameraMode('manual');context.current.setManualNavigation('orbit');rts.frameSubject(point,radius);},
@@ -292,7 +293,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         const shot=conversationFrame(members,camera,visualObstructionRoots(),(x,z)=>cameraGround.heightAt(scene,x,z)??0);
         if(!shot)return false;groupSelection.clear();members.forEach(m=>groupSelection.add(m.id));context.current.onSelect(members[0].id);controls.target.copy(shot.target);camera.position.copy(shot.position);camera.lookAt(shot.target);controls.update();return true;
       },
-      framePlace: place => {const view=worldPlaceView(place);if(!view)return false;if(!expansion||past.current||!view)return false;navigation?.release();context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');camera.position.fromArray(view.p);controls.target.fromArray(view.target);controls.update();return true;},
+      framePlace: place => {const view=worldPlaceView(place);if(!view||!expansion||past.current)return false;framing.place(camera,()=>controls,view,()=>{context.current.manualNavigation='orbit';context.current.cameraMode='manual';context.current.follow=false;context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');},()=>{rts.release();orbitPivot.cancel();navigation?.release();});return true;},
       releaseInput: () => {rts.release();navigation?.release();},
       move: delta => navigation?.move(delta) ?? false,
       inputOwned: () => navigation?.inputOwned ?? false,
@@ -387,7 +388,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       // Cosmetic paths require the verified full public capture and exact Core
       // social layout. Unknown/legacy scenes retain their original appearance.
       if((verifiedPublication as {body?:{scene?:{social?:{version?:unknown}}}}|undefined)?.body?.scene?.social?.version==='social-eden/1')try{socialPaths=createNativeSocialPaths(verifiedPublication,true);if(socialPaths)scene.add(socialPaths.group);}catch{}
-      if(base)overview(geometry.bounds);
+      if(base)framing.initial(()=>overview(geometry.bounds));
       kin.place(info.kin);sceneSettled=true;
       const owner=geometry;
       if(info.backdrop)void owner.addBackdrop(info.backdrop,loader).then(ok=>{if(!ok&&!abort.signal.aborted&&owner===geometry)problem('The campus model could not be shown; its plain navigation walls remain visible.');});
@@ -555,7 +556,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
             records = { ...(take.entities0 as Record<string, Entity> | undefined), ...take.finalState.entities };
             applied = chunk;
             geometry.markRegions(take.finalState.regions);
-            if (!framed) { // no layout: frame whatever the world has in it
+            if (!framing.framed) { // no layout: frame whatever the world has in it
               const box = new THREE.Box3();
               for (const e of Object.values(take.finalState.entities)) box.expandByPoint(new THREE.Vector3(...e.pose.p));
               if (!box.isEmpty()) overview([box.min.x - 4, box.min.z - 4, box.max.x + 4, box.max.z + 4]);

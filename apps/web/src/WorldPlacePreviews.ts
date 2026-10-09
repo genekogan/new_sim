@@ -1,6 +1,14 @@
 import {GRADE_A} from './atmosphere/grade.ts';
 import * as THREE from 'three';
 import {worldPlaceView,type WorldPlaceId} from './WorldPlaces.ts';
+/** Fit the selected geometry in camera space, including its depth, rather than using a tour distance. */
+export function fitPlacePreviewCamera(box:THREE.Box3,direction:THREE.Vector3,aspect=160/112){
+ const aim=box.getCenter(new THREE.Vector3()),camera=new THREE.PerspectiveCamera(38,aspect,.01,10000),view=direction.clone().normalize();
+ if(view.lengthSq()<.5)view.set(1,.6,1).normalize();
+ camera.position.copy(aim).add(view);camera.lookAt(aim);const inverse=camera.quaternion.clone().invert(),vertical=Math.tan(camera.fov*Math.PI/360),horizontal=vertical*aspect;let distance=.1;
+ for(const x of[box.min.x,box.max.x])for(const y of[box.min.y,box.max.y])for(const z of[box.min.z,box.max.z]){const p=new THREE.Vector3(x,y,z).sub(aim).applyQuaternion(inverse);distance=Math.max(distance,p.z+Math.abs(p.x)/(horizontal*.88),p.z+Math.abs(p.y)/(vertical*.88));}
+ camera.position.copy(aim).addScaledVector(view,distance);camera.lookAt(aim);camera.updateMatrixWorld(true);return camera;
+}
 /** Transparent thumbnails of the actual authored mesh data, using the world's existing renderer.
  * Work runs only for visible Explore cards, caches at most24 images and never loads a second model. */
 export class WorldPlacePreviews{
@@ -23,16 +31,15 @@ export class WorldPlacePreviews{
     if(object instanceof THREE.InstancedMesh){const selected:number[]=[];for(let i=0;i<object.count;i++){object.getMatrixAt(i,matrix);matrix.premultiply(object.matrixWorld);point.setFromMatrixPosition(matrix);if(Math.hypot(point.x-center.x,point.z-center.z)<=radius)selected.push(i);}if(!selected.length)return;const mesh=new THREE.InstancedMesh(geometry,material(object.material),selected.length),color=new THREE.Color();instances.push(mesh);selected.forEach((source,i)=>{object.getMatrixAt(source,matrix);matrix.premultiply(object.matrixWorld);mesh.setMatrixAt(i,matrix);if(object.instanceColor){object.getColorAt(source,color);mesh.setColorAt(i,color);}});mesh.instanceMatrix.needsUpdate=true;if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;scene.add(mesh);return;}
     const indices=geometry.index,vertices:number[]=[],normals:number[]=[],colors:number[]=[],uvs:number[]=[],normal=geometry.getAttribute('normal'),color=geometry.getAttribute('color'),uv=geometry.getAttribute('uv'),count=indices?.count??position.count;
     for(let i=0;i<count;i+=3){const ia=indices?indices.getX(i):i,ib=indices?indices.getX(i+1):i+1,ic=indices?indices.getX(i+2):i+2;
-     a.fromBufferAttribute(position,ia).applyMatrix4(object.matrixWorld);b.fromBufferAttribute(position,ib).applyMatrix4(object.matrixWorld);c.fromBufferAttribute(position,ic).applyMatrix4(object.matrixWorld);point.copy(a).add(b).add(c).multiplyScalar(1/3);
-     if(Math.hypot(point.x-center.x,point.z-center.z)>radius)continue;
+     a.fromBufferAttribute(position,ia).applyMatrix4(object.matrixWorld);b.fromBufferAttribute(position,ib).applyMatrix4(object.matrixWorld);c.fromBufferAttribute(position,ic).applyMatrix4(object.matrixWorld);
+     if(Math.hypot(a.x-center.x,a.z-center.z)>radius||Math.hypot(b.x-center.x,b.z-center.z)>radius||Math.hypot(c.x-center.x,c.z-center.z)>radius)continue;
      for(const j of[ia,ib,ic]){vertices.push(position.getX(j),position.getY(j),position.getZ(j));if(normal)normals.push(normal.getX(j),normal.getY(j),normal.getZ(j));if(color)colors.push(color.getX(j),color.getY(j),color.getZ(j));if(uv)uvs.push(uv.getX(j),uv.getY(j));}triangles++;if(triangles>24000)break;
     }
     if(!vertices.length)return;const sliced=new THREE.BufferGeometry();geometries.push(sliced);sliced.setAttribute('position',new THREE.Float32BufferAttribute(vertices,3));if(normals.length)sliced.setAttribute('normal',new THREE.Float32BufferAttribute(normals,3));else sliced.computeVertexNormals();if(colors.length)sliced.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));if(uvs.length)sliced.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));const mesh=new THREE.Mesh(sliced,material(object.material));mesh.matrixAutoUpdate=false;mesh.matrix.copy(object.matrixWorld);scene.add(mesh);
    });}
    if(!scene.children.length)return null;
-   const box=new THREE.Box3().setFromObject(scene),size=box.getSize(new THREE.Vector3()),aim=box.getCenter(new THREE.Vector3());
-   const camera=new THREE.PerspectiveCamera(38,160/112,.05,1000),direction=new THREE.Vector3().fromArray(view.p).sub(center).normalize(),distance=Math.max(size.y,size.x/camera.aspect,size.z/camera.aspect)/(2*Math.tan(camera.fov*Math.PI/360))*1.35;
-   camera.position.copy(aim).addScaledVector(direction,Math.max(2,distance));camera.lookAt(aim);scene.add(new THREE.HemisphereLight(0xffffff,0x5a635b,2.5));const light=new THREE.DirectionalLight(0xffffff,2);light.position.copy(camera.position).add(new THREE.Vector3(0,5,0));scene.add(light);
+   const box=new THREE.Box3().setFromObject(scene),direction=new THREE.Vector3().fromArray(view.p).sub(center),camera=fitPlacePreviewCamera(box,direction);
+   scene.add(new THREE.HemisphereLight(0xffffff,0x5a635b,2.5));const light=new THREE.DirectionalLight(0xffffff,2);light.position.copy(camera.position).add(new THREE.Vector3(0,5,0));scene.add(light);
    const renderer=this.renderer,previous=renderer.getRenderTarget(),viewport=renderer.getViewport(new THREE.Vector4()),scissor=renderer.getScissor(new THREE.Vector4()),scissorTest=renderer.getScissorTest(),clear=renderer.getClearColor(new THREE.Color()),alpha=renderer.getClearAlpha(),autoClear=renderer.autoClear,gradeStrength=GRADE_A.x;
    const pixels=new Uint8Array(160*112*4);
    try{GRADE_A.x=0;renderer.setRenderTarget(target);renderer.setScissorTest(false);renderer.setClearColor(0,0);renderer.autoClear=true;renderer.render(scene,camera);renderer.readRenderTargetPixels(target,0,0,160,112,pixels);}

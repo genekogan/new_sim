@@ -2,8 +2,8 @@ import * as THREE from 'three';
 export type WallFrame={id:string;buildingId:string;p:readonly[number,number,number];yaw:number;width:number;height:number;media:{kind:'image'|'video';url:string}};
 /** Stable authored placement/assignment, not an inventory, upload or owner-control API. */
 export const WALL_FRAME_MANIFEST:readonly WallFrame[]=Object.freeze([
- {id:'eden-library-colour-study',buildingId:'eden-library-1',p:[78.775,1.6,-7],yaw:-Math.PI/2,width:1.1,height:1.4,media:{kind:'image',url:new URL('./media/gallery-study.svg',import.meta.url).href}},
- {id:'eden-library-colour-loop',buildingId:'eden-library-1',p:[77.6,1.6,-10.775],yaw:0,width:1.55,height:.97,media:{kind:'video',url:new URL('./media/gallery-loop.mp4',import.meta.url).href}},
+ {id:'eden-library-colour-study',buildingId:'eden-library-1',p:[70.6,2.42,-3.225],yaw:Math.PI,width:.95,height:1.2,media:{kind:'image',url:new URL('./media/gallery-study.svg',import.meta.url).href}},
+ {id:'eden-library-colour-loop',buildingId:'eden-library-1',p:[77.2,2.45,-3.225],yaw:Math.PI,width:1.55,height:.97,media:{kind:'video',url:new URL('./media/gallery-loop.mp4',import.meta.url).href}},
 ]);
 export function validWallFrames(rows:readonly WallFrame[]){
  const ids=new Set<string>();return rows.length<=16&&rows.every(f=>{if(ids.has(f.id))return false;ids.add(f.id);return /^[a-z0-9-]{1,80}$/.test(f.id)&&typeof f.buildingId==='string'&&f.p.length===3&&f.p.every(Number.isFinite)&&Number.isFinite(f.yaw)&&Number.isFinite(f.width)&&f.width>.1&&f.width<=4&&Number.isFinite(f.height)&&f.height>.1&&f.height<=4&&(f.media.kind==='image'||f.media.kind==='video')&&typeof f.media.url==='string'&&!/[\r\n]/.test(f.media.url)&&(/^(?:https?:\/\/|\/)/.test(f.media.url)||f.media.kind==='image'&&/^data:image\/(?:svg\+xml|png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(f.media.url)&&f.media.url.length<=512000||typeof document==='undefined'&&f.media.url.startsWith('file:'));});
