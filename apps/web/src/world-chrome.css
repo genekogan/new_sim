@@ -142,6 +142,7 @@
 .my-souls-away .soul-avatar{filter:grayscale(1);opacity:.5}
 
 /* Shared glass treatment with Explore; retain readable theme foreground. */
-.human-world:not(.has-advanced) .human-panel{background:color-mix(in srgb,var(--panel) 78%,transparent);-webkit-backdrop-filter:blur(22px) saturate(1.2);backdrop-filter:blur(22px) saturate(1.2);border-color:color-mix(in srgb,var(--fg) 17%,transparent)}
+.human-world:not(.has-advanced) .account-panel section{background:transparent}
+.human-world:not(.has-advanced) .human-panel{background:color-mix(in srgb,var(--panel) 68%,transparent);-webkit-backdrop-filter:blur(22px) saturate(1.2);backdrop-filter:blur(22px) saturate(1.2);border-color:color-mix(in srgb,var(--fg) 17%,transparent)}
 
 .world-hover-tooltip,.world-place-card{background:color-mix(in srgb,var(--panel) 80%,transparent);-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);color:var(--fg);line-height:1.4}.world-hover-tooltip{max-width:240px;font-weight:500}.world-place-card{padding:14px;max-width:280px}.world-place-card p{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;color:color-mix(in srgb,var(--fg) 90%,var(--dim))}
