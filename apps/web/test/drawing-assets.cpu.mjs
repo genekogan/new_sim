@@ -1,0 +1,22 @@
+// Actual shipped GLB frame evidence; no renderer/browser/network/native world.
+import assert from 'node:assert/strict';import {readFileSync} from 'node:fs';import {createHash} from 'node:crypto';import * as THREE from 'three';import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
+import {animalFacingYaw,agentAt} from '../../../mars/viewer/app/engine-view/content/assets/eden-imports/animals.ts';
+import {HERDS} from '../../../mars/viewer/app/engine-view/content/assets/eden-imports/animal-plan.ts';
+import {authoredBoundaryDeclarationV1} from '../../../packages/engine-contract/src/authored-boundaries-v1.ts';
+import {createEdenRegions} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/index.ts';
+import {parseSceneInfo} from '../src/WorldGeometry.ts';import {publishedGroundSampler} from '../src/WorldPublishedGround.ts';import {expansionHeight} from '../../../mars/viewer/app/engine-view/content/environment/eden-expansion-landscape/layout.mjs';
+const bytes=readFileSync(new URL('../../../mars/viewer/public/modular/environment/eden-animals.glb',import.meta.url));
+const gltf=await new Promise((ok,no)=>new GLTFLoader().parse(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'',ok,no));gltf.scene.updateMatrixWorld(true);
+const animalReport=[];
+for(const [model,suffix] of [['dog',''],['cat','_1']]){const src=gltf.scene.getObjectByName(model),front=src.getObjectByName('IKFrontRight'+suffix).getWorldPosition(new THREE.Vector3()).add(src.getObjectByName('IKFrontLeft'+suffix).getWorldPosition(new THREE.Vector3())).multiplyScalar(.5),back=src.getObjectByName('IKBackRight'+suffix).getWorldPosition(new THREE.Vector3()).add(src.getObjectByName('IKBackLeft'+suffix).getWorldPosition(new THREE.Vector3())).multiplyScalar(.5),original=front.sub(back).setY(0).normalize();assert.ok(original.x>.99&&Math.abs(original.z)<.06,'actual original source model faces +X');
+ const h=HERDS.find(h=>h.model===model);let count=0;
+ for(let t=1000;t<3000;t+=.4){const [x,z,yaw,moving]=agentAt(h,h.id+'-0',t),next=agentAt(h,h.id+'-0',t+.001);if(!moving||!next[3])continue;const travel=new THREE.Vector3(next[0]-x,0,next[1]-z).normalize(),facing=original.clone().applyAxisAngle(new THREE.Vector3(0,1,0),animalFacingYaw(model,yaw));assert.ok(facing.dot(travel)>.99,'actual front faces displacement, never sideways');count++;}
+ assert.ok(count>200);animalReport.push({model,actualForward:original.toArray(),movingSamples:count});
+}
+assert.equal(animalFacingYaw('pug',.4),.4,'unrelated +Z pack model unchanged');
+const proofDir='<team>/scratch/viewer-app/graphics-followup-20261009/';
+const info=parseSceneInfo(JSON.parse(readFileSync(proofDir+'public-scene-650.json','utf8'))),native=publishedGroundSampler(info),ground=(x,z)=>native(x,z)??(x>=-30&&x<=30&&z>=-30&&z<=30?0:expansionHeight(x,z));
+const owner=createEdenRegions(ground);assert.ok(owner);const original=JSON.parse(readFileSync(proofDir+'regions-boundaries.json','utf8'));const declaration=authoredBoundaryDeclarationV1(original.sourceRevision,owner.authoredBoundaries);assert.equal(createHash('sha256').update(JSON.stringify(declaration.boxes)).digest('hex'),createHash('sha256').update(JSON.stringify(original.boxes)).digest('hex'),'all 822 canonical boundary prisms identical, including explicit solid policy');
+const landing=owner.group.userData.edenBalloonLanding;assert.deepEqual(landing,[295,2,62]);for(const dx of [-1,0,1])for(const dz of [-1,0,1])assert.ok(Math.abs(owner.sampleVisualGround(295+dx,62+dz)-landing[1])<1e-5,'actual drawn triangles support full basket footprint');
+let draws=0,parts=new Set();owner.group.traverse(o=>{if(o.isMesh&&o.name.includes('configured decorative motion')){draws++;const p=o.geometry.attributes.decorationPart;for(let i=0;i<p.count;i++)parts.add(p.getW(i));}});assert.ok(draws<=5&&draws>0);assert.deepEqual([...parts].sort(),[1,2,3,4]);
+console.log(JSON.stringify({animalGlbSha256:createHash('sha256').update(bytes).digest('hex'),animalReport,unchangedBoundaryBoxes:owner.authoredBoundaries.length,motionDraws:draws,landing,regionStats:owner.stats}));owner.dispose();console.log('PASS actual model facing, original 822 boundary equality, drawn ground landing support, bounded motion batching');

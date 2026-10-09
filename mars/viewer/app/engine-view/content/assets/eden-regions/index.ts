@@ -1,3 +1,4 @@
+import {DecorativeMotion} from '../decorative-motion.ts';
 import * as THREE from 'three';
 import {validAuthoredBoundary,type AuthoredBoundaryBox} from '../../../../../lib/authored-boundaries.ts';
 import type {Ground} from '../eden-expansion-assets/venue.ts';
@@ -80,8 +81,9 @@ export function createEdenRegions(ground:Ground):{group:THREE.Group;dispose():vo
  FOOTPRINTS.length=0;CHIMNEYS.length=0;LIGHTS.length=0;
  const edge=(x:number,z:number)=>{const y=ground(Math.min(Math.max(x,INNER[0]+.01),INNER[2]-.01),Math.min(Math.max(z,INNER[1]+.01),INNER[3]-.01));return typeof y==='number'&&Number.isFinite(y)?y:0;};
  const group=new THREE.Group();group.name='Eden Regions — districts beyond the edge (scenery only)';group.userData.nativeSupport='none: visual scenery, Core admission pending';
+ const motion=new DecorativeMotion(),motionMaterials:THREE.Material[]=[];
  const mats=new Materials(),geos:THREE.BufferGeometry[]=[];let tris=0,closed=false;
- const dispose=()=>{if(closed)return;closed=true;group.removeFromParent();for(const g of geos)g.dispose();mats.dispose();group.clear();};
+ const dispose=()=>{if(closed)return;closed=true;group.removeFromParent();for(const g of geos)g.dispose();mats.dispose();for(const m of motionMaterials)m.dispose();group.clear();};
  try{
   const t=new Terrain(edge),trees=new Trees();// far forests + every district's distant trees
   const farB=new Builder('legacy'),winB=new Builder('legacy'),isFar=(x:number,z:number)=>outside(x,z)>FAR_CLEAR+6;
@@ -105,7 +107,7 @@ export function createEdenRegions(ground:Ground):{group:THREE.Group;dispose():vo
   district('Vineyard and orchard terraces with hill villa (scenery only)',(b,tr)=>buildVineyard(b,t,tr));
   district('Campus quad and library annex (scenery only)',(b,tr)=>buildCampus(b,t,tr));
   district('Artists village (scenery only)',(b,tr)=>buildArtists(b,t,tr));
-  district('Seaside resort, ferris wheel and marina (scenery only)',(b,tr)=>buildResort(b,t,tr));
+  district('Seaside resort, ferris wheel and marina (scenery only)',(b,tr)=>buildResort(b,t,tr,motion.sink));
   district('West lake shore hamlet and boathouses (scenery only)',(b,tr)=>buildLakeShore(b,t,tr));
   district('Forest campsite and lodge (scenery only)',(b,tr)=>buildCampsite(b,t,tr));
   district('Railway, station and parked train (scenery only)',(b,tr)=>buildRailway(b,t,tr));
@@ -118,7 +120,7 @@ export function createEdenRegions(ground:Ground):{group:THREE.Group;dispose():vo
   district('Castle ruin on the north-west crag (scenery only)',(b,tr)=>buildCastle(b,t,tr));
   district('Botanic garden: Japanese garden, pagoda, tea house, palm house (scenery only)',(b,tr)=>buildBotanic(b,t,tr));
   district('Observatory above the vineyard (scenery only)',(b,tr)=>buildObservatory(b,t,tr));
-  district('Bunting, laundry, parked cars and boats at sea (scenery only)',b=>buildLife(b,t));
+  district('Bunting, laundry, parked cars and boats at sea (scenery only)',b=>buildLife(b,t,motion.sink));
   district('West river, watermill, stone bridge and fishing hamlet (scenery only)',(b,tr)=>buildRiver(b,t,tr));
   district('Whitewashed cliff village, chapel, windmills and harbour (scenery only)',(b,tr)=>buildCliffVillage(b,t,tr));
   district('East crossroads: petrol station, pub, bus stop (scenery only)',(b,tr)=>buildCrossroads(b,t,tr));
@@ -133,6 +135,7 @@ export function createEdenRegions(ground:Ground):{group:THREE.Group;dispose():vo
   const fg=new THREE.Group();fg.name='Regions distant district parts (scenery only; never in camera rays)';group.add(fg);tris+=farB.emit(fg,mats,'Regions distant districts',geos,{allClear:true,glassSink:winB});
   {const W=winB.b('glass');if(W.p.length){const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(W.p,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(W.n,3));g.setAttribute('color',new THREE.Float32BufferAttribute(W.c,3));g.computeBoundingBox();g.computeBoundingSphere();geos.push(g);
    const m=new THREE.Mesh(g,mats.windows());m.name='Regions window glass and lamp heads (night-lit)';m.userData.cameraTransparent=true;m.matrixAutoUpdate=false;fg.add(m);tris+=W.p.length/9;}}
+  tris+=motion.emit(group,mats,geos,motionMaterials);
   const tg=new THREE.Group();tg.name='Regions trees and far forests (scenery only)';group.add(tg);
   tris+=trees.emit(tg,mats,geos,true);
   // Terrain and open water last (largest meshes).
@@ -159,6 +162,10 @@ export function createEdenRegions(ground:Ground):{group:THREE.Group;dispose():vo
   group.userData.edenSmokeSources=[...CHIMNEYS].sort((a,b)=>outside(a[0],a[2])-outside(b[0],b[2])).slice(0,16).map(([x,y,z])=>[x,y,z,1]);
   // Night light anchors (lamp posts, lanterns, fires, windowed houses): the viewer paints them into its night light map.
   group.userData.edenLightSources=LIGHTS.map(l=>[...l]);
+  // Clear festival meadow patch: outside the big top/stage, tethered balloons,
+  // stall arc and 23 m light ring. Read the drawn triangles, not terrain guesses.
+  {const x=295,z=62,samples=[[-1,-1],[1,-1],[-1,1],[1,1],[0,0]].map(([dx,dz])=>t.sampleRenderedGround(x+dx,z+dz));
+   if(samples.every((y):y is number=>typeof y==='number'&&Number.isFinite(y))&&Math.max(...samples as number[])-Math.min(...samples as number[])<.03)group.userData.edenBalloonLanding=[x,Math.max(...samples as number[]),z];}
   group.updateMatrixWorld(true);
   let draws=0;group.traverse(o=>{if((o as THREE.Mesh).isMesh)draws++;});
   group.userData.stats={draws,triangles:tris};

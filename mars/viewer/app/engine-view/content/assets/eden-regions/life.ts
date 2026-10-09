@@ -1,3 +1,4 @@
+import {drawDecoration,type DecorationSink} from '../decorative-motion.ts';
 import {Builder,rng,pick} from './kit.ts';
 import {boat} from './buildings.ts';
 import {WATER,type Terrain} from './terrain.ts';
@@ -13,7 +14,7 @@ export function car(b:Builder,c:string,van=false){const L=van?5:4.2,W=1.8;b.box(
  else{b.box('metal',0,1.05,-.2,W-.2,.6,L*.5,c);b.box('glass',0,1.1,L*.25-.18,W-.3,.45,.04,'#2d3c46');b.box('glass',0,1.1,-L*.25-.22,W-.3,.45,.04,'#2d3c46');}
  for(const x of [-W/2,W/2])for(const z of [-L*.32,L*.32]){b.push(x,.32,z,0);b.pushRot('z',Math.PI/2);b.cyl('dressing',0,-.12,0,.32,.24,8,'#1e1e1e');b.pop();b.pop();}
  b.box('dressing',0,.55,L/2+.01,W*.8,.12,.02,'#f3e3a8');}
-export function buildLife(b:Builder,t:Terrain){const r=rng(8101);
+export function buildLife(b:Builder,t:Terrain,motion?:DecorationSink){const r=rng(8101);
  // bunting zig-zagging over the market street and across the plaza
  for(let x=113;x<166;x+=9)bunting(b,r,x,93.6,3.6,x+4.5,100.6,4.2);
  for(let x=122;x<158;x+=12)bunting(b,r,x,61,5.2,x+6,85,5.2,1.4);
@@ -26,7 +27,7 @@ export function buildLife(b:Builder,t:Terrain){const r=rng(8101);
  for(let i=0;i<5;i++){b.push(118+i*3,0,-36.5,0);car(b,pick(r,cols));b.pop();}
  b.push(168.5,0,97.5,0);car(b,'#e8e2d2',true);b.pop();
  // sailboats and a ferry out on the sea
- for(let i=0;i<9;i++){const x=-80+r()*260,z=200+r()*120;b.push(x,WATER.bay-.1,z,r()*6.28);boat(b,6+r()*3,pick(r,['#f3f3ee','#2f4f5f','#7a2f2a']),r,false);b.cyl('metal',0,.5,0,.06,6,5,'#e8e8e8',false);b.tri('cloth',[.1,1.5,0],[.1,6.3,0],[3.2,1.6,0],pick(r,['#f3f3ee','#e05a3a','#3d8ab0','#f0c040']));b.pop();}
- {b.push(40,WATER.bay,260,.3);b.box('metal',0,-.5,0,6,1.6,22,'#f3f3ee');b.box('metal',0,1.1,-2,5,2.2,12,'#e8e2d2');b.box('glass',0,1.6,-2,5.05,.6,11,'#2d3c46');b.box('metal',0,3.3,-4,1.2,1.5,1.2,'#c43a2a');b.pop();}
+ for(let i=0;i<9;i++){const x=-80+r()*260,z=200+r()*120;b.push(x,WATER.bay-.1,z,r()*6.28);drawDecoration(b,motion,{kind:'boat',pivot:[x,WATER.bay-.1,z],phase:i*2.3},b=>{boat(b,6+r()*3,pick(r,['#f3f3ee','#2f4f5f','#7a2f2a']),r,false);b.cyl('metal',0,.5,0,.06,6,5,'#e8e8e8',false);b.tri('cloth',[.1,1.5,0],[.1,6.3,0],[3.2,1.6,0],pick(r,['#f3f3ee','#e05a3a','#3d8ab0','#f0c040']));});b.pop();}
+ {b.push(40,WATER.bay,260,.3);drawDecoration(b,motion,{kind:'boat',pivot:[40,WATER.bay,260],phase:4},b=>{b.box('metal',0,-.5,0,6,1.6,22,'#f3f3ee');b.box('metal',0,1.1,-2,5,2.2,12,'#e8e2d2');b.box('glass',0,1.6,-2,5.05,.6,11,'#2d3c46');b.box('metal',0,3.3,-4,1.2,1.5,1.2,'#c43a2a');});b.pop();}
  void t;
 }

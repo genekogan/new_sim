@@ -1,3 +1,4 @@
+import {DECORATIVE_MOTION,nextFerrisAngle} from '../../../mars/viewer/app/engine-view/content/assets/decorative-motion.ts';
 import {twilightColour} from './atmosphere/twilight.ts';
 import * as THREE from 'three';
 import {WIND,WindPatches} from './atmosphere/wind.ts';
@@ -55,7 +56,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
  const background=new TintedColor(()=>(scene.background as THREE.Color|null)?.isColor?scene.background as THREE.Color:null);
  const cWarm=new THREE.Color(),cSky=new THREE.Color(),cGrey=new THREE.Color(),cFog=new THREE.Color(),cTmp=new THREE.Color(),sunDir=new THREE.Vector3();
  let driftX=0,driftZ=0;
- const wind=new WindPatches(),motion=new MotionPatches();let sailAngle=0;
+ const wind=new WindPatches(),motion=new MotionPatches();let sailAngle=0,ferrisAngle=0;
  const own=(o:THREE.Object3D)=>o===root;
  const state:WeatherState={cloud:0,rain:0,wind:0,fog:0,mist:0,wet:0},target:WeatherState={...state};
  let clockAt=0,clockNow=0,active=false,closed=false,initialised=false,expansionSeen=-1,scans=0,nextScan=0,kind:WeatherKind|null=null,lastFound={flowers:0,meadow:0,roofs:0,water:0,harbour:false};
@@ -84,6 +85,9 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   if(f.hemi&&!lights.hemi){const hemi=f.hemi;lights.hemi=new ScaledNumber(()=>hemi.intensity,v=>{hemi.intensity=v;});}
   if(f.flowers.length)fauna.setFlowers(f.flowers);if(f.water.length)fauna.setWater(f.water);if(f.harbour)fauna.setGulls(f.harbour.x,f.harbour.z);if(f.roofs.length)fauna.setPerches(f.roofs);if(f.meadow.length)fireflies.setSites(f.meadow);if(f.lamps.length)fireflies.setLamps(f.lamps);smoke.setSources(f.smoke);
   lastFound={flowers:f.flowers.length,meadow:f.meadow.length,roofs:f.roofs.length,water:f.water.length,harbour:!!f.harbour};
+  let landing:readonly number[]|null=null;
+  scene.traverse(o=>{const p=o.userData?.edenBalloonLanding;if(!landing&&Array.isArray(p)&&p.length===3&&p.every(Number.isFinite)){o.updateWorldMatrix(true,false);const w=new THREE.Vector3(...p as [number,number,number]).applyMatrix4(o.matrixWorld);landing=w.toArray();}});
+  balloons.setLanding(landing);
   collectLights();
   scans++;const since=seconds-expansionSeen;nextScan=expansionSeen+(scans<SCAN_AT.length?SCAN_AT[scans]:since+RESCAN_EVERY);
  }
@@ -217,7 +221,8 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    {const h=hourOf(ms),dawn=smooth(4.5,6.5,h)*(1-smooth(8.5,10.5,h));fogBanks.update(still?0:t,Math.min(1,state.fog*1.1+state.mist*.6+dawn*.45*(1-state.wind)*(1-state.rain)),WIND.value.z,WIND.value.w,state.wind,fog.color);}
    // the sea: swell and surf (livelier in wind; still for reduced motion)
    SURF.value.x=still?0:t;SURF.value.y=1;SURF.value.z=state.wind;
-   if(!still)balloons.update(t);
+   ferrisAngle=nextFerrisAngle(ferrisAngle,frame.dt,frame.daylight===null||hourOf(ms)>=7&&hourOf(ms)<19,still);
+   if(!still){DECORATIVE_MOTION.value.set(seconds,ferrisAngle);balloons.update(t);}
    fireflies.update(t,still?0:Math.max(0,1-day*3)*(1-state.rain)*(1-state.wind*.7),fireflies.uniforms.uFly.value.z);
    smoke.update(t,still?0:1-state.rain*.5,smoke.uniforms.uSmoke.value.z,day,WIND.value.z,WIND.value.w,state.wind);
    // Autumn leaves blow through in wind (a few drift down on any breezy day).

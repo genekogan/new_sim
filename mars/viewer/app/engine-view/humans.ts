@@ -1035,7 +1035,7 @@ export class HumanViews {
   private libraryBody(v: View, lib: LibPlan, curW: number, prevW: number, yaw: number): boolean {
     const h = v.rig.holder, t = v.rig.template;
     if (!v.spine || v.legs.length < 2) return false;
-    let seatW = 0, seatShift = 0;
+    let seatW = 0, seatShift = 0, seatX = 0, seatZ = 0;
     for (const [one, wgt] of [[lib.cur, curW], [lib.prev, prevW]] as [LibOne | null, number][]) {
       if (!one || wgt <= 1e-4) continue;
       const body = one.pick.body;
@@ -1043,7 +1043,17 @@ export class HumanViews {
         const d = one.act.getClip().duration, k = one.clip === 'Sitting_Enter' ? smooth(one.time / d) : one.clip === 'Sitting_Exit' ? 1 - smooth(one.time / d) : 1;
         const rest = clipProbe(t, body === 'seat' ? 'Sitting_Idle_Loop' : 'GroundSit_Idle_Loop', 0);
         const seat = body === 'ground-seat' ? GROUND_SEAT : v.seat;
-        if (rest) { seatShift += wgt * k * (seat + PELVIS - rest.hip.y); seatW += wgt; }
+        if (rest) {
+          seatShift += wgt * k * (seat + PELVIS - rest.hip.y); seatW += wgt;
+          // The clip sits its pelvis behind its standing origin. The native seat
+          // point owns the pelvis, not that old origin: otherwise the shins pass
+          // through the plank's front. Translate the fitted seated layout,
+          // including foot goals, rather than stretching legs or moving a seat.
+          if (body === 'seat') {
+            seatX -= wgt * k * (rest.hip.x * Math.cos(yaw) - rest.hip.z * Math.sin(yaw));
+            seatZ -= wgt * k * (rest.hip.x * Math.sin(yaw) + rest.hip.z * Math.cos(yaw));
+          }
+        }
       } else if (body === 'lie' && one === lib.cur) {
         const p0 = clipProbe(t, 'LayToIdle', 0);
         if (!p0) continue;
@@ -1083,11 +1093,12 @@ export class HumanViews {
     h.updateMatrixWorld(true);
     // feet first (Root children: they stay where the clip put them), then the pelvis onto the seat, then the legs to the feet
     const feet = v.legs.map((l) => ({ p: l.foot.getWorldPosition(V()), q: l.foot.getWorldQuaternion(new THREE.Quaternion()) }));
-    place(v.spine.body, v.spine.body.getWorldPosition(V()).addScaledVector(UP, seatShift));
+    const seatOffset = V().set(seatX, seatShift, seatZ);
+    place(v.spine.body, v.spine.body.getWorldPosition(V()).add(seatOffset));
     h.updateMatrixWorld(true);
     const floorY = h.position.y + (v.dims?.ankleH ?? 0.08);
     v.legs.forEach((l, i) => {
-      const goal = feet[i].p.clone();
+      const goal = feet[i].p.clone(); goal.x += seatX; goal.z += seatZ;
       goal.y = Math.max(goal.y, floorY);
       legTo(l, v.ankle[i], goal, V().copy(_fwd).addScaledVector(UP, 0.35), 0.995, feet[i].q);
     });
