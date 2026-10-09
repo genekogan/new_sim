@@ -56,6 +56,7 @@ test('mounted owner rename/photo is atomic; identities/birth/physical pose, read
  assert.equal(f.host.publicSoul(f.host.minds.get(a.id)!).name,'Avery Current');assert.equal(f.souls.controlReady(f.db.soul(a.id)!),true);assert.equal(projectLifecycle(f.host,operation).ready,true);
  assert.deepEqual(f.souls.lifecycle!.journal.creationOfSoul(f.host.worldId,a.id),originalOperation);assert.deepEqual(f.db.events(f.host.worldId).find(e=>e.seq===originalBirth.seq),originalBirth);
  assert.equal((await (await f.request('/v1/me')).json() as any).souls[0].name,'Avery Current');
+ const ownHere=hereFrame(ledger,{...actor(a.id),name:'Avery Original'});assert.equal(ownHere.me.soulId,a.id);assert.equal(ownHere.me.name,'Avery Current');assert.equal(ownHere.me.profileRevision,1);
  const actualHere=hereFrame(ledger,actor(b.id));assert.equal(actualHere.near.find(n=>n.id===a.id)?.name,'Avery Current');
  const bootApp=new Hono();mountBootRoutes(bootApp,{host:f.host,db:f.db,souls:f.souls,build:'test',soul:()=>actor(a.id),ledger},[]);const boot:any=await (await bootApp.request('/v1/edge/boot')).json();assert.equal(boot.me.name,'Avery Current');
  const directory=terminalSnapshot(ledger,actor(b.id),'use-computer').sections.find(s=>s.section==='directory')!;assert.equal((directory.rows.find((r:any)=>r.soulId===a.id) as any).name,'Avery Current');
