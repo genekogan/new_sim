@@ -25,7 +25,19 @@ test('private native arrival follows own canonical play before resting-tail inte
   await accept<unknown>(f.host,f.host.enableIntentSequencesV1());await accept<unknown>(f.host,f.host.enableIntentArrivalsV1());const service=new IntentControlV2(f.host,brain,f.souls,{historyV1:true}),scope=service.ownerScope({userId:row.owner,expiresAt:Number.MAX_SAFE_INTEGER},row.id);
   const server=createServer((_,response)=>response.end('synthetic-arrival')),hub=new Hub(server,f.host,f.auth,f.db,f.souls);hub.brain=brain;
   await new Promise<void>((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});const address=server.address();assert.ok(address&&typeof address!=='string');const ws=new WebSocket('ws://127.0.0.1:'+address.port+'/ws'),messages:any[]=[];ws.on('message',raw=>messages.push(JSON.parse(String(raw))));
-  t.after(async()=>{ws.terminate();hub.wss.close();await new Promise<void>(resolve=>server.close(()=>resolve()));});await once(ws,'open');const welcome=once(ws,'message');ws.send(JSON.stringify({t:'hello',proto:1}));await welcome;
+  t.after(async()=>{ws.terminate();hub.wss.close();await new Promise<void>(resolve=>server.close(()=>resolve()));});await once(ws,'open');
+  // Subscribe before hello/ticks/events: scheduler turns do not prove wire delivery.
+  const arrivalBatch=new Promise<void>((resolve,reject)=>{
+    let settled=false;
+    const cleanup=()=>{clearTimeout(deadline);ws.off('message',onMessage);ws.off('error',onError);ws.off('close',onClose);};
+    const finish=(error?:Error)=>{if(settled)return;settled=true;cleanup();if(error)reject(error);else resolve();};
+    const onMessage=(data:WebSocket.RawData)=>{try{const m=JSON.parse(String(data));if(m.t==='batch'&&Array.isArray(m.log)&&m.log.some((e:any)=>e.kind==='intent-arrival-v1'))finish();}catch{finish(new Error('anonymous WebSocket delivered invalid JSON'));}};
+    const onError=(error:Error)=>finish(error),onClose=()=>finish(new Error('anonymous WebSocket closed before native arrival batch'));
+    const deadline=setTimeout(()=>finish(new Error('anonymous WebSocket native arrival batch was not delivered within 2000 ms')),2000);
+    ws.on('message',onMessage);ws.on('error',onError);ws.on('close',onClose);t.after(cleanup);
+  });
+  void arrivalBatch.catch(()=>{});
+  const welcome=once(ws,'message',{signal:AbortSignal.timeout(2000)});ws.send(JSON.stringify({t:'hello',proto:1}));await welcome;
   brain.mode='live';await accept(f.host,service.submit(scope,{contract:'soul-intent/2',requestId:'arrival-original',op:'upsert',words:'PRIVATE_ARRIVAL_WORDS Go to east and then west.'}));await accept(f.host,service.settled());brain.mode='fake';
   const receipt=service.lookup(scope,'arrival-original');assert.equal(receipt.phase,'understood');if(receipt.phase!=='understood')return;const ref={intentId:receipt.revision.intentId,version:receipt.revision.version};
   for(let i=0;i<1800&&readIntentArrivalsV1(service,scope).arrivals.length<2;i++){f.host.tickOnce();if(i%10===0)await setImmediate();}f.host.drainInputs();
@@ -41,7 +53,7 @@ test('private native arrival follows own canonical play before resting-tail inte
   const token='sim_SYNTHETIC_ARRIVAL_TOKEN';f.db.setSoulToken(row.id,hashToken(token),'synthetic');const agentScope=service.agentScope(token);
   const agent=await request('/v1/agent/intent-v2/arrivals',token);assert.equal(agent.status,200);assert.deepEqual(intentArrivalPageV1Schema.parse(await agent.json()).arrivals,page.arrivals);
   f.db.setSoulToken(row.id,hashToken('sim_SYNTHETIC_REPLACED_ARRIVAL'),'synthetic');assert.throws(()=>readIntentArrivalsV1(service,agentScope));assert.equal((await request('/v1/agent/intent-v2/arrivals',token)).status,401);
-  for(let i=0;i<20;i++)f.host.tickOnce();for(let i=0;i<40&&!messages.some(m=>m.t==='batch'&&m.log?.some((e:any)=>e.kind==='intent-arrival-v1'));i++)await setImmediate();
+  for(let i=0;i<20;i++)f.host.tickOnce();await arrivalBatch;
   assert.ok(messages.some(m=>m.t==='batch'&&m.log?.some((e:any)=>e.kind==='intent-arrival-v1')));for(const m of messages)if(m.t==='batch')for(const e of m.log??[])if(e.kind==='intent-arrival-v1')assert.deepEqual(Object.keys(e.payload).sort(),['privateUpdate','soulId','worldId']);
   const publicViews=[];for(const path of ['/v1/log','/v1/kernel','/v1/world','/v1/debug/world','/v1/take','/v1/takes']){const reply=await app.request(path);assert.equal(reply.status,200);publicViews.push(await reply.json());}
   const publicText=JSON.stringify([...messages,...publicViews]);assert.ok(!publicText.includes('PRIVATE_ARRIVAL_WORDS'));assert.ok(!publicText.includes(ref.intentId));
