@@ -41,13 +41,14 @@ export function createEdenGroundCover(ground: (x: number, z: number) => number |
   }
   // distance culling from the camera (the hook runs on an always-drawn empty mesh)
   const hookGeo = new THREE.BufferGeometry(); hookGeo.setAttribute('position', new THREE.Float32BufferAttribute(new Float32Array(9), 3)); hookGeo.setDrawRange(0, 0);
-  const hook = new THREE.Mesh(hookGeo, new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false })); hook.frustumCulled = false; group.add(hook);
+  const hookMat = new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false });
+  const hook = new THREE.Mesh(hookGeo, hookMat); hook.frustumCulled = false; group.add(hook);
   const cam = new THREE.Vector3(), c = new THREE.Vector3();
   hook.onBeforeRender = (_r, _s, camera) => { camera.getWorldPosition(cam); for (const m of cells.values()) { const b = m.geometry.boundingSphere; if (!b) continue; c.copy(b.center); m.visible = c.distanceTo(cam) - b.radius < DRAW_M; } };
   const timer = setInterval(() => { if (!closed) build(); }, 60_000);
   loadPack(file).then((g) => { if (closed) return; gltf = g; build(); }).catch((e) => console.warn('Eden ground cover unavailable', e));
   return {
     group, stats: () => ({ groundCoverCells: cells.size, groundCoverTriangles: triangles }),
-    dispose() { if (closed) return; closed = true; clearInterval(timer); group.removeFromParent(); for (const m of cells.values()) m.geometry.dispose(); for (const g of geos.values()) g?.dispose(); hookGeo.dispose(); mat.dispose(); },
+    dispose() { if (closed) return; closed = true; clearInterval(timer); group.removeFromParent(); for (const m of cells.values()) m.geometry.dispose(); for (const g of geos.values()) g?.dispose(); hookGeo.dispose(); hookMat.dispose(); mat.dispose(); },
   };
 }

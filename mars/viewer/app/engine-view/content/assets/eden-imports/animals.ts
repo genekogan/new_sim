@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {clone} from 'three/addons/utils/SkeletonUtils.js';
+import {disposeSkeletons} from '../../../../../lib/three-resources.ts';
 import type {GLTF} from 'three/addons/loaders/GLTFLoader.js';
 import {hash01,loadPack,decorationGround} from './assets.ts';
 import {HERDS,FLOCKS,AVOID,type Herd,type Rect} from './animal-plan.ts';
@@ -97,5 +98,5 @@ export function createEdenAnimals(ground:(x:number,z:number)=>number|null,assets
  }).catch(e=>console.warn('Eden animals unavailable',e));
  return {group,
   stats:()=>({animals:agents.length,birds:flyers.length,visible:[...agents,...flyers].filter(a=>a.root.visible).length}),
-  dispose(){if(closed)return;closed=true;group.removeFromParent();for(const a of agents){a.mixer.stopAllAction();a.mixer.uncacheRoot(a.model);}for(const f of flyers){f.mixer.stopAllAction();f.mixer.uncacheRoot(f.model);}hookGeo.dispose();hookMat.dispose();group.clear();}};
+  dispose(){if(closed)return;closed=true;group.removeFromParent();for(const a of agents){a.mixer.stopAllAction();a.mixer.uncacheRoot(a.model);disposeSkeletons(a.model);}for(const f of flyers){f.mixer.stopAllAction();f.mixer.uncacheRoot(f.model);disposeSkeletons(f.model);}hookGeo.dispose();hookMat.dispose();group.clear();}};
 }
