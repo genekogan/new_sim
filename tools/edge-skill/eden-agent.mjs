@@ -8,6 +8,7 @@ import {spawn} from 'node:child_process';
 import {randomUUID,randomBytes} from 'node:crypto';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {startClientDashboard,watchDashboardParent,rememberDashboardPicture} from './client-dashboard.mjs';
 import {openClientReceipts} from './client-receipts.mjs';
 import {openLiveSoulEvidence} from './client-live-identity.mjs';
 import {openClientConversations} from './client-conversations.mjs';
@@ -121,7 +122,7 @@ export async function register(world,invite){
  if(!me.me.invited&&invite){ok(await call(OWNER.invite,{as:'owner',body:{code:invite}}),'join');me=ok(await call(OWNER.me,{as:'owner'}),'register');}
  if(me.souls.length&&!prev.soul)save({soul:me.souls[0].id});
  return {registered:true,world:w,identity:'(private, in .eden-agent.json)',
-  next:me.souls.length?'You already have a Soul: run status':me.me.invited?'Run: create-soul "<Name>" "<one-line character>"':'This world needs an invitation code: register <world> <code>'};
+  next:me.souls.length?'You already have a Soul: run status':me.me.invited?'Run: create-soul "<Name>" (optional character as a second argument)':'This world needs an invitation code: register <world> <code>'};
 }
 async function pair(soul){
  const code=ok(await call(OWNER.pair(soul),{as:'owner',body:{}}),'pair').code;
@@ -130,7 +131,7 @@ async function pair(soul){
 }
 /** create-soul: your one Soul in this world (waits for arrival), then pairs this folder with it. */
 export async function createSoul(name,description){
- if(!name||!description)throw new Error('usage: create-soul "<Name>" "<one-line character>"');
+ if(!name||(description!==undefined&&!description))throw new Error('usage: create-soul "<Name>" ["<one-line character>"]');
  const me=ok(await call(OWNER.me,{as:'owner'}),'create-soul');
  if(me.souls.length){const id=me.souls[0].id;if(!load().token)await pair(id);else save({soul:id});return {created:false,reason:'You already have a Soul in this world (one per owner).',soul:{id,name:me.souls[0].name}};}
  const r=await call(OWNER.souls,{as:'owner',body:{name,description}});
@@ -548,14 +549,14 @@ function lineReader(stream,onLine){let buf='';stream.on('data',d=>{buf+=d;let k;
 function noKeys(){const env={...process.env};for(const k of ['ANTHROPIC_API_KEY','ANTHROPIC_AUTH_TOKEN','OPENAI_API_KEY','CODEX_API_KEY'])delete env[k];return env;}
 /** Claude Code as one long-lived streaming session: --input-format stream-json, no tools, our own small system prompt. */
 function claudeBrain({model,system,resumeId,stateless,effort}){
- let proc=null,turn=null,id=resumeId??randomUUID(),resume=!!resumeId,errTail='',turns=0;
+ let proc=null,turn=null,id=resumeId??randomUUID(),resume=!!resumeId,errTail='',turns=0,generation=0;const closing=new Set();
  const args=()=>['-p','--input-format','stream-json','--output-format','stream-json','--verbose','--model',model,'--system-prompt',system,'--tools','',
   '--setting-sources','project','--strict-mcp-config','--mcp-config','{"mcpServers":{}}',...(stateless?['--no-session-persistence']:resume?['--resume',id]:['--session-id',id])];
  function start(){
   // Thinking off unless --effort medium/high (a Soul's next move needs no deliberation); a stateless call has nothing worth caching.
   const env={...noKeys(),...(effort==='low'?{CLAUDE_CODE_DISABLE_THINKING:'1'}:{}),...(stateless?{DISABLE_PROMPT_CACHING:'1'}:{})};
-  proc=spawn('claude',[...args(),...(effort&&effort!=='low'?['--effort',effort]:[])],{env,stdio:['pipe','pipe','pipe']});errTail='';
-  const p=proc;lineReader(p.stdout,line=>{let e;try{e=JSON.parse(line);}catch{return;}if(!turn||turn.p!==p)return;
+  proc=spawn('claude',[...args(),...(effort&&effort!=='low'?['--effort',effort]:[])],{env,detached:process.platform!=='win32',stdio:['pipe','pipe','pipe']});errTail='';
+  const p=proc,epoch=++generation,logger=telemetry;logger?.({modelProcess:{pid:p.pid,pgid:process.platform==='win32'?null:p.pid,generation:epoch,session:id,status:'started'}});p.once('close',(code,signal)=>logger?.({modelProcess:{pid:p.pid,pgid:process.platform==='win32'?null:p.pid,generation:epoch,session:id,status:'exited',code,signal}}));lineReader(p.stdout,line=>{let e;try{e=JSON.parse(line);}catch{return;}if(!turn||turn.p!==p)return;
    if(e.type==='assistant')for(const c of e.message?.content??[])if(c.type==='text')turn.text+=c.text;
    if(e.type==='result'){const u=e.usage??{},cc=u.cache_creation??{};
     const t=turn;turn=null;t.resolve({text:t.text||e.result||'',usage:{in:u.input_tokens??null,read:u.cache_read_input_tokens??null,write:u.cache_creation_input_tokens??null,
@@ -566,7 +567,7 @@ function claudeBrain({model,system,resumeId,stateless,effort}){
  return {engine:'claude',get id(){return id;},get isNew(){return stateless||(!resume&&turns===0);},
   ask(text){if(!proc)start();turns++;return new Promise((resolve,reject)=>{turn={text:'',resolve,reject,p:proc};
    proc.stdin.write(JSON.stringify({type:'user',message:{role:'user',content:text}})+'\n');}).finally(()=>{if(stateless)this.close();});},
-  close(){const p=proc;proc=null;if(p){try{p.stdin.end();}catch{}setTimeout(()=>{try{p.kill('SIGTERM');}catch{}},1500);}if(stateless){id=randomUUID();turns=0;}},
+  close(){const p=proc;proc=null;if(p){const kill=signal=>{if(p.exitCode===null&&p.signalCode===null)try{process.platform==='win32'?p.kill(signal):process.kill(-p.pid,signal);}catch(e){if(e.code!=='ESRCH')throw e;}};let term,hard;const wait=new Promise(resolve=>{const done=()=>{clearTimeout(term);clearTimeout(hard);resolve();};p.once('close',done);p.once('error',done);try{p.stdin.end();}catch{}term=setTimeout(()=>kill('SIGTERM'),500);hard=setTimeout(()=>kill('SIGKILL'),1500);});closing.add(wait);wait.finally(()=>closing.delete(wait));}if(stateless){id=randomUUID();turns=0;}return Promise.all([...closing]);},
   fresh(){this.close();id=randomUUID();resume=false;turns=0;}};
 }
 function codexBrain(options){const loggers=new Map();return codexExecBrain({...options,env:noKeys(),onProcess:event=>{if(event.status==='started')loggers.set(event.generation,telemetry);const logger=loggers.get(event.generation)??telemetry;logger?.({modelProcess:event});if(event.status==='exited'||event.status==='spawn-error')loggers.delete(event.generation);}});}
@@ -582,6 +583,7 @@ function makeBrain(engine,opts){return engine==='codex'?codexBrain(opts):engine=
 
 // ---------------------------------------------------------------- the loop
 export async function live(...argv){
+ const parent=process.env.EDEN_DASHBOARD_PARENT_PID;const unwatchParent=parent?watchDashboardParent(Number(parent),()=>process.kill(process.pid,'SIGTERM')):()=>{};
  const o=liveOptions(argv),s=load();need(s,'soul','Create your Soul first (create-soul), then run live.');
  if(await mode(true)!=='edge')throw new Error('live needs a world that serves eden-edge/1.');
  if(existsSync(LIVE.stop))throw new Error(`Remove the ${LIVE.stop} file first.`);
@@ -610,7 +612,7 @@ export async function live(...argv){
  let receiptReads=null,bodyQueue=null,perception=null,clientMemory=null,cadences=null,lastClockRefresh=0,lastHere=null,lastLean=null,queuePollAt=0,queueNotice=null,modelBudgetUnknown=false;let streamHealth={state:'connecting',lastFrameAt:null,lastEventAt:null};
  /** Sleep until the next wake could be due, or at once when an event or owner request arrives. */
  const snooze=ms=>new Promise(r=>{const t=setTimeout(()=>{nudge=null;r();},ms);nudge=()=>{clearTimeout(t);nudge=null;r();};});
- let stopping=false;const stop=()=>{if(stopping)process.exit(0);stopping=true;console.log('stopping…');pollAbort?.abort();streamAbort.abort();nudge?.();receiptReads?.close();bodyQueue?.close();brain.close();setTimeout(()=>process.exit(0),3000).unref();}; // state is saved after every decision
+ let stopping=false;const stop=()=>{if(stopping)process.exit(0);stopping=true;console.log('stopping…');pollAbort?.abort();streamAbort.abort();nudge?.();receiptReads?.close();bodyQueue?.close();brain.close();routine?.close();setTimeout(()=>process.exit(0),3000).unref();}; // state is saved after every decision
  process.on('SIGINT',stop);process.on('SIGTERM',stop);
  let cohortTimer=null;const armDeadline=()=>{if(!Number.isFinite(runDeadline))return;cohortTimer=setTimeout(()=>{if(Date.now()>=runDeadline)stop();else armDeadline();},Math.min(2147483647,Math.max(1,runDeadline-Date.now())));};armDeadline();
  process.on('uncaughtException',e=>{try{appendFileSync(LIVE.log,JSON.stringify({t:now(),error:'uncaught: '+clip(e?.message??e,300)+' @'+String(e?.stack??'').split('\n')[1]?.trim()})+'\n');}catch{}});process.on('unhandledRejection',e=>{try{appendFileSync(LIVE.log,JSON.stringify({t:now(),error:'unhandled: '+clip(e?.message??e,300)})+'\n');}catch{}});
@@ -896,7 +898,7 @@ export async function live(...argv){
    if(reason==='fade'&&load().lastAcceptedAt===before)await keepAlive('model chose no action near fading');
   }catch(e){logLive({error:clip(e.message,300)});console.log('live error: '+clip(e.message,200));await sleep(10_000);}
  }
- clearTimeout(cohortTimer);streamAbort.abort();receiptReads.close();bodyQueue.close();telemetry=null;brain.close();saveS();clearInterval(watcher);unlock();logLive({stop:true});console.log('live: stopped.');return {stopped:true,cost:costLine(readCostLog(),o)};
+ clearTimeout(cohortTimer);streamAbort.abort();receiptReads.close();bodyQueue.close();await brain.close();await routine?.close();telemetry=null;saveS();clearInterval(watcher);unwatchParent();unlock();logLive({stop:true});console.log('live: stopped.');return {stopped:true,cost:costLine(readCostLog(),o)};
 }
 /** The last complete top-level JSON object in a model reply (models sometimes draft one, then answer again). */
 function lastJSON(t){const objs=[];let depth=0,start=-1,str=false,esc=false;
@@ -978,7 +980,7 @@ export async function view(...args){
   sees:(d.seen?.souls??[]).map(x=>`${x.name} · ${Math.round(x.distance)}m ${x.side}${x.facingYou?' · facing you':''}`),untrusted:true};
  if(d.url){
   const img=await fetch(s.world+d.url,{signal:AbortSignal.timeout(30_000)}).catch(e=>({ok:false,status:0,e}));
-  if(img.ok){const file=resolve(out??(map?'map.jpg':'view.jpg')),buf=Buffer.from(await img.arrayBuffer());writeFileSync(file,buf);res.saved=file;res.bytes=buf.length;res.cached=!!d.cached;if(d.render?.ms!=null)res.renderMs=d.render.ms;}
+  if(img.ok){const file=resolve(out??(map?'map.jpg':'view.jpg')),buf=Buffer.from(await img.arrayBuffer());writeFileSync(file,buf);rememberDashboardPicture(file);res.saved=file;res.bytes=buf.length;res.cached=!!d.cached;if(d.render?.ms!=null)res.renderMs=d.render.ms;}
   else res.picture=`could not download the picture (HTTP ${img.status}); the caption still holds`;
  } else if(!altOnly) res.picture=d.error?`${d.error.code}: ${d.error.message}${d.retry_after?` (retry in ${d.retry_after}s)`:''}`:'none';
  return res;
@@ -1006,7 +1008,12 @@ export async function body(cmd,...args){
  const response=await fetch(world+'/v1/edge/body/uploads',{method:'POST',headers:{authorization:'Bearer '+token},body:form,signal:AbortSignal.timeout(90000)});
  const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error((data.error?.code??'body.unavailable')+': '+(data.error?.message??'Body upload refused'));return data.asset;
 }
-const commands={body,live,tell,report,view,cost,plan,events,attend,register,status,'create-soul':createSoul,here,observe,capabilities,map,digest,calendar,whatson,explore,act,resolve:resolveAct,say,converse,object,mark,project,wait,receipt,accept,decline,version:async()=>({skillVersion:SKILL_VERSION,contract:CONTRACT,apiContract:API_CONTRACT})};
+export async function dashboard(...args){
+ let port=0;const liveArgs=[];for(let i=0;i<args.length;i++){if(args[i]==='--port'){port=Number(args[++i]);if(!Number.isSafeInteger(port)||port<0||port>65535)throw Error('dashboard port must be 0..65535');}else liveArgs.push(args[i]);}
+ liveOptions(liveArgs);const service=await startClientDashboard({cli:resolve(process.argv[1]),liveArgs,port});console.log('Local Soul dashboard: '+service.origin+' (mind starts automatically; pause/stop preserves world activity)');
+ await new Promise(resolve=>{let closing=false;const close=async()=>{if(closing)return;closing=true;await service.close();resolve();};process.once('SIGINT',close);process.once('SIGTERM',close);});return {dashboard:'closed'};
+}
+const commands={body,live,dashboard,tell,report,view,cost,plan,events,attend,register,status,'create-soul':createSoul,here,observe,capabilities,map,digest,calendar,whatson,explore,act,resolve:resolveAct,say,converse,object,mark,project,wait,receipt,accept,decline,version:async()=>({skillVersion:SKILL_VERSION,contract:CONTRACT,apiContract:API_CONTRACT})};
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  const [cmd,...args]=process.argv.slice(2);
  if(!commands[cmd]){console.log(`eden-agent ${SKILL_VERSION} (${CONTRACT})\nusage: node eden-agent.mjs <${Object.keys(commands).join('|')}> [args]\n  while live runs: tell "<your human's request>" --wait · report (what the Soul sees/does) · view --out view.jpg (a picture of what it sees) · full guide: SKILL.md`);process.exit(cmd?2:0);}
