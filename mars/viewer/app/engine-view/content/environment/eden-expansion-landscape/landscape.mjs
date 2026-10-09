@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {indexGroundQuads} from './quad-ground.ts';
 import {VegetationViews} from '../../../vegetation.ts';
 import {createForestUnderstory} from '../forest-understory.ts';
 import {createBirchFamily} from '../birch-family-proposal/birch.mjs';
@@ -23,8 +24,9 @@ export function createEdenExpansionLandscape(enabled=false){
  const layout=edenExpansionLayout(),planting=edenExpansionPlanting(),group=new THREE.Group(),owners=[],resources=[],instances=[],waterOwners=[];
  group.name='Connected Eden: woodland, neighborhood gardens, country and lake';
  group.userData.environmentScope=layout.scope;
+ let groundLookup=null;
  const own=o=>{owners.push(o);return o;};
- const release=()=>{const errors=[];for(const fn of[()=>group.removeFromParent(),...instances.map(i=>()=>i.dispose()),...owners.map(o=>()=>o.dispose()),...resources.map(r=>()=>r.dispose()),()=>group.clear()])try{fn();}catch(e){errors.push(e);}return errors;};
+ const release=()=>{const errors=[];for(const fn of[()=>group.removeFromParent(),()=>{groundLookup?.dispose();groundLookup=null;},...instances.map(i=>()=>i.dispose()),...owners.map(o=>()=>o.dispose()),...resources.map(r=>()=>r.dispose()),()=>group.clear()])try{fn();}catch(e){errors.push(e);}return errors;};
  function mesh(name,positions,colors,indices,material){
   const g=new THREE.BufferGeometry();resources.push(g);g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));if(colors)g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));if(indices)g.setIndex(indices);g.computeVertexNormals();const m=new THREE.Mesh(g,material);m.name=name;m.receiveShadow=true;group.add(m);return m;
  }
@@ -44,10 +46,10 @@ export function createEdenExpansionLandscape(enabled=false){
    for(const [a,b] of [[x0,z0],[x1,z0],[x1,z1],[x0,z1]]){const y=expansionHeight(a,b)??expansionHeight(x,z)??0;pos.push(a,y,b);const c=new THREE.Color('#8a9b6e').lerp(new THREE.Color('#b6ae89'),Math.min(1,Math.max(0,-y/2)));col.push(c.r,c.g,c.b);}idx.push(first,first+2,first+1,first,first+3,first+2);
   }
   const ground=mesh('NEW expansion cosmetic ground; original native rectangles omitted',pos,col,idx,simpleMaterial({vertexColors:true,roughness:1}));
+  groundLookup=indexGroundQuads(ground.geometry.attributes.position.array);
   function sampleVisualGround(x,z){
    if(!Number.isFinite(x)||!Number.isFinite(z)||inNative(x,z))return null;
-   const a=ground.geometry.attributes.position.array;
-   for(let i=0;i<a.length;i+=12){const x0=a[i],x1=a[i+3],z0=a[i+2],z1=a[i+8];if(x<x0||x>x1||z<z0||z>z1)continue;const u=(x-x0)/(x1-x0),v=(z-z0)/(z1-z0),A=a[i+1],B=a[i+4],C=a[i+7],D=a[i+10];return v<=u?A+(B-A)*u+(C-B)*v:A+(C-D)*u+(D-A)*v;}return null;
+   return groundLookup?.heightAt(x,z)??null;
   }
   // Fit new authored roots to the ACTUAL Float32 ground triangles, not the analytic sketch.
   for(const p of [...planting.plants,...Object.values(planting.special).flat()]){const y=sampleVisualGround(p.p[0],p.p[2]);if(y===null)throw Error('New expansion plant lacks supplied cosmetic triangle');p.p[1]=y;}
