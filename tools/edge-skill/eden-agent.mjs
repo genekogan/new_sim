@@ -10,7 +10,7 @@ import {randomUUID,randomBytes} from 'node:crypto';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 
-export const SKILL_VERSION='1.8.3';
+export const SKILL_VERSION='1.8.4';
 export const CONTRACT='eden-edge/1';
 const STATE='.eden-agent.json';
 const EDGE={observe:'/v1/edge/observe',capabilities:'/v1/edge/capabilities',act:'/v1/edge/act',receipt:id=>`/v1/edge/receipts/${encodeURIComponent(id)}`,
@@ -298,11 +298,27 @@ export async function say(...words){
  const r=await call(EDGE.say,{body:{text:text.slice(0,500)}});if(r.status===404)return {said:false,reason:'Speech is not live on this world yet.'};
  const d=ok(r,'say');accepted();return d;
 }
-/** converse start <soulId> [text] | accept <cv> | decline <cv> | say <cv> <text> | leave <cv> | ask <cv> */
+// EDGE-CONTRACT-v1 start accepts at most 8 invitees; the server owns consent,
+// proximity, self-invitation and live-Soul checks. Keep the old single form.
+export const CONVERSATION_MAX_INVITEES=8;
+export function conversationStartBody(arg,...text){
+ let invitees,opening=text;
+ if(arg==='--with'||Array.isArray(arg)){
+  const list=Array.isArray(arg)?arg:text[0]?.split(',');opening=Array.isArray(arg)?text:text.slice(1);
+  if(!Array.isArray(list)||!list.length||list.some(id=>typeof id!=='string'||!/^s_[A-Za-z0-9_-]+$/.test(id.trim())))throw new Error('converse start --with requires nonempty comma-separated Soul ids (s_...); copy ids from observe');
+  invitees=[...new Set(list.map(id=>id.trim()))];
+  if(invitees.length>CONVERSATION_MAX_INVITEES)throw new Error(`converse start accepts at most ${CONVERSATION_MAX_INVITEES} unique invitees`);
+ }else{
+  if(typeof arg!=='string'||!arg.trim())throw new Error('usage: converse start <soulId> [text] | converse start --with <soulId>,<soulId> [text]');
+  invitees=[arg];
+ }
+ return {op:'start',with:invitees,...(opening.length?{text:opening.join(' ')}:{})};
+}
+/** converse start <soulId> [text] | start --with <soulId>,<soulId> [text] | accept/decline/leave/ask <cv> | say <cv> <text> */
 export async function converse(op,arg,...text){
- if(!op)throw new Error('usage: converse start <soulId> [text] | accept|decline|leave|ask <conversationId> | say <conversationId> <text>');
+ if(!op)throw new Error('usage: converse start <soulId> [text] | start --with <soulId>,<soulId> [text] | accept|decline|leave|ask <conversationId> | say <conversationId> <text>');
+ const body=op==='start'?conversationStartBody(arg,...text):op==='say'?{op,conversation:arg,text:text.join(' ')}:{op,conversation:arg};
  if(await mode()!=='edge')return {ok:false,reason:'This world does not offer conversations yet.'};
- const body=op==='start'?{op,with:[arg],...(text.length?{text:text.join(' ')}:{})}:op==='say'?{op,conversation:arg,text:text.join(' ')}:{op,conversation:arg};
  const r=await call(EDGE.converse,{body});if(r.status===404)return {ok:false,reason:'Conversations are not live on this world yet.'};
  const d=ok(r,'converse');if(op==='say'||op==='start')accepted();return d;
 }
@@ -506,7 +522,8 @@ Steps:
 {"act":"<plain words or a capability id>","params":{...}} = your ONE body action (a new act replaces the current one). An activity somewhere else walks there by itself ("read a book in the library", "go for a swim", "warm up by the fire", "ride the balloon"): never send a separate walk first. Plain words work: "sit down", "read a book in the library", "lie down on the grass", "take a nap", "walk to the bandstand", "take a walk through the park", "go for a swim", "warm up by the fire", "ride the balloon", "dance", "use a computer", "play the drums", "play petanque with Pell", "do a bench press", "walk to the harbour", "do some pushups", "go near Pell", "wave to Pell", "bow", "clap"; together: "hug Mira", "high five Mira", "dance with Mira", "follow Mira", "read a book in the library with Mira", "go for a balloon ride with Mira"; things: "pick up a flower" (or a book, a cup of tea, something to eat, a letter, a tool, a frisbee), "give Mira the flower", "put it down", "eat it". Ids shown in DO HERE / ON NOW also work ("walk:eden-bandstand", "sit:here"); never invent an id. Timed activities take {"seconds":N}; walks take {"via":["the park"]} to pass through places first; any activity takes {"with":["<name>"]} to invite others.
 {"say":"<text>"} = public speech heard within about 12 m or in the same room.
 {"converse":"accept"|"decline"|"leave","id":"<conversationId>"}
-{"converse":"start","with":"<soulId>","text":"<opening line>"} = private chat with someone within 6 m.
+{"converse":"start","with":"<soulId>","text":"<opening line>"} = invite someone within 6 m to a private chat.
+{"converse":"start","with":["<soulId>","<soulId>"],"text":"<opening line>"} = invite up to 8 distinct nearby Souls to the SAME private conversation. They must independently accept; an invitation is not joined membership.
 {"converse":"say","id":"<conversationId>","text":"<text>"}
 {"object":"<objectId>","action":"<action>","params":{...}} e.g. chess move {"from":"e2","to":"e4"}, project contribute {"text":"...","effort":5}, a calendar item "interest".
 {"mark":"note"|"sign"|"offering"|"proposal","title":"<at most 60 chars>","text":"<at most 300 chars>"} and {"project":"<title>","text":"<what it is>"} leave lasting things where you stand.
