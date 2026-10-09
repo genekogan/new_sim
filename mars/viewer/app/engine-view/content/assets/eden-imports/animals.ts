@@ -72,7 +72,7 @@ export function createEdenAnimals(ground:(x:number,z:number)=>number|null,assets
    if(f.act&&d<ANIMATE_M*1.5){const dur=f.act.getClip().duration;f.act.time=((t+f.ph)%dur+dur)%dur;f.mixer.update(0);}
   }
  }
- const prep=(src:THREE.Object3D)=>{const o=clone(src);o.traverse(m=>{const mesh=m as THREE.Mesh;if(mesh.isMesh){mesh.castShadow=true;mesh.receiveShadow=false;mesh.frustumCulled=true;
+ const prep=(src:THREE.Object3D)=>{const o=clone(src);o.position.set(0,0,0);o.traverse(m=>{const mesh=m as THREE.Mesh;if(mesh.isMesh){mesh.castShadow=true;mesh.receiveShadow=false;mesh.frustumCulled=true;
   const mat=mesh.material as THREE.MeshStandardMaterial;if(mat&&!mat.userData.edenImports){mat.vertexColors=true;mat.roughness=.85;mat.metalness=0;mat.userData.edenImports=true;mat.needsUpdate=true;}}});return o;};
  const clipOf=(gltf:GLTF,model:string,name:string|undefined)=>name?THREE.AnimationClip.findByName(gltf.animations,`${model}|${name}`):null;
  assetsLoader('eden-animals.glb').then(gltf=>{
