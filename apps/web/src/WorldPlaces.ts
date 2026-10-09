@@ -3,6 +3,7 @@ import {INTERIOR_EXPLORE} from '../../../mars/viewer/app/engine-view/content/ass
 /** Local renderer tour addresses. They identify scenery views, never native
  * entities, controller destinations, attendance, or recorded world facts. */
 export const WORLD_PLACE_VIEWS={
+ gallery:{label:'Library wall gallery',p:[76.5,1.7,-5.1],target:[77.6,1.6,-8.9]},
  roofseating:{label:'Front roof table',p:[43,8.5,40],target:[34,3.5,31.4]},
  libraryroom:{label:'Library reading interior',p:[74,1.65,-3.55],target:[74.6,.7,-7.1]},
  homecourtyard:{label:'Courtyard home interior',p:[34.7,2.1,14.1],target:[33.3,.9,16.6]},

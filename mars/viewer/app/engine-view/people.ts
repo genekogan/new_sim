@@ -59,16 +59,20 @@ const characterUrl = (name: string) => `/modular/environment/animated-${name}.gl
 /** Directory the character GLBs are served from; other imported models (eden-imports) are served beside them. */
 export const MODEL_DIR = characterUrl('').replace(/animated-\.glb.*$/, '');
 
-export async function loadTemplates(signal: AbortSignal, resources: ThreeResources,options?:{appearances?:boolean}): Promise<Template[]> {
+export async function loadTemplates(signal: AbortSignal, resources: ThreeResources,options?:{appearances?:boolean;onAsset?:(name:string,phase:'start'|'loaded'|'failed')=>void}): Promise<Template[]> {
   return Promise.all(
     PEOPLE.map(async (name) => {
+      const report=(phase:'start'|'loaded'|'failed')=>{try{options?.onAsset?.(name,phase);}catch{/* Optional download reporting cannot prevent a model load. */}};
+      report('start');
+      try{
       let appearance:TemplateAppearance|undefined;
       const gltf = await loadGltf(characterUrl(name), signal, resources,options?.appearances?async(bytes,gltf)=>{
         const digest=await globalThis.crypto.subtle.digest('SHA-256',bytes);
         const sha=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
         if(!signal.aborted)appearance=await collectTemplateAppearance(gltf,name,sha);
       }:undefined);
-      return templateFromGltf(name,gltf,appearance);
+      const template=templateFromGltf(name,gltf,appearance);report('loaded');return template;
+      }catch(error){report('failed');throw error;}
     }),
   );
 }

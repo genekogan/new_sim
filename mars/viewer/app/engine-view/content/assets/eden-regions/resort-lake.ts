@@ -13,8 +13,9 @@ export function buildResort(b:Builder,t:Terrain,trees:Trees){const r=rng(3101);
  for(let x=122;x<204;x+=8){b.push(x,0,131.4,0);lampPost(b,3.6,'#2f4f5f');b.pop();trees.add(x+4,0,131.6,1,'poplar','#5f8a46',0);if((x/8|0)%2){b.push(x+2,0,136.4,Math.PI);bench(b,'#efe9dc');b.pop();}}
  // seafront hotels: tall white/pastel blocks with balconies on every floor
  let x=114;while(x<170){const w=10+r()*5,floors=4+Math.floor(r()*3),c=pick(r,['#f3eee2','#efe4cf','#f0d9a8','#cfe3e8','#f3d3c8','#e8f0d8']);
-  b.push(x+w/2,0,121,0);house(b,{w,d:10,floors,fh:3.1,wallC:c,roof:'flat',roofGarden:r()<.5,trim:pick(r,['#2f6f8f','#3d5a80','#c45a4a','#5a8a6a']),door:true,awning:pick(r,['#2f6f8f','#e05a3a','#f0c040'])},r);
-  for(let f=1;f<floors;f++)for(let i=0;i<Math.floor(w/3.3);i++){const bx=-w/2+1.7+i*3.3;b.box('stone',bx,f*3.1-.1,5.6,2.6,.12,1.2,'#f3f3ee');b.box('metal',bx,f*3.1,6.15,2.6,.9,.05,'#dfe8ea');b.box('dressing',bx,f*3.1+.95,6.15,2.6,.05,.08,'#f3f3ee');}
+  const balconyLayout=Array.from({length:floors-1},(_,f)=>Array.from({length:Math.floor(w/3.3)},(_,i)=>({x:-w/2+1.7+i*3.3,floorY:(f+1)*3.1+.02,width:2.6,depth:1.2,index:(f+1)+':'+i}))).flat();
+  b.push(x+w/2,0,121,0);house(b,{balconyLayout,w,d:10,floors,fh:3.1,wallC:c,roof:'flat',roofGarden:r()<.5,trim:pick(r,['#2f6f8f','#3d5a80','#c45a4a','#5a8a6a']),door:true,awning:pick(r,['#2f6f8f','#e05a3a','#f0c040'])},r);
+
   b.pop();x+=w+3;}
  // ferris wheel on the beach (axle 16 m), carousel, a striped beach café
  {const cx=184,cz=124,R=13,hub=16;b.push(cx,0,cz,0);

@@ -11,3 +11,5 @@
 .bring-agent-fine{color:var(--dim);font-size:13px;overflow-wrap:anywhere}
 .bring-agent-close{position:absolute;top:12px;right:12px;width:32px;height:32px;padding:0;border:0;background:transparent;color:var(--dim);font-size:22px;cursor:pointer}
 @media (max-width:600px){.bring-agent{padding:18px}.bring-agent h2{font-size:19px}}
+
+.bring-agent-open{display:inline-flex;align-items:center;justify-content:center;gap:7px}.bring-agent-open svg{width:18px;height:18px;flex:none}

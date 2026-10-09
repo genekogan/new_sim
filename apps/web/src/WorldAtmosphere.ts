@@ -1,3 +1,4 @@
+import {twilightColour} from './atmosphere/twilight.ts';
 import * as THREE from 'three';
 import {WIND,WindPatches} from './atmosphere/wind.ts';
 import {Fauna} from './atmosphere/fauna.ts';
@@ -142,7 +143,10 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    // warm band on the sun's side at dawn/dusk, into a rosy-violet afterglow in the blue hour; less under cloud
    const dusk=(b.warmth*smooth(-.2,.6,day)*.55+b.blueHour*.35)*(1-.75*state.cloud)*(1-state.fog);
    if(lights.sunLight)cWarm.copy(lights.sunLight.color).lerp(cTmp.setRGB(1,.55,.38),.5).lerp(cTmp.setRGB(.62,.42,.62),b.blueHour*.7);else cWarm.setRGB(1,.6,.4);
-   u.uDusk.value.set(cWarm.r,cWarm.g,cWarm.b,dusk);
+   const glow=twilightColour(b.sunElevation,state.cloud,Math.floor(clockNow/86400000));
+   cWarm.lerp(cTmp.setRGB(...glow.rgb),glow.strength*.6);
+   u.uDusk.value.set(cWarm.r,cWarm.g,cWarm.b,dusk+glow.strength*.12*(1-state.fog));
+   u.uCloudLit.value.lerp(cTmp.setRGB(...glow.rgb).multiplyScalar(.95),glow.strength*.28*(1-state.fog));
    sky.uniforms.uBow.value.y*=1-.5*b.illumination*moonUp;
    setGrade(day,b.warmth,b.blueHour,state.cloud);
   }else{u.uSun.value.w=0;u.uMoon.value.w=0;u.uDusk.value.w=0;u.uMoonLight.value.set(0,0,1,0);setGrade(day,0,0,state.cloud);}
@@ -165,7 +169,8 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   sky.mesh.visible=skyWanted&&!ortho;if(!ortho){sky.mesh.position.copy(camAt);sky.mesh.updateMatrix();sky.mesh.updateMatrixWorld(true);}
  }
  let skyWanted=false;
- const previousBeforeRender=scene.onBeforeRender;
+ // Capture the callback value; disposal restores this exact function, and invocation below supplies its Scene receiver.
+ const previousBeforeRender=Reflect.get(scene,'onBeforeRender') as THREE.Object3D['onBeforeRender'];
  const beforeRender:THREE.Object3D['onBeforeRender']=function(this:THREE.Object3D,renderer,s,camera,geometry,material,group){
   previousBeforeRender.call(this,renderer,s,camera,geometry,material,group);if(active&&!closed)forCamera(camera);};
  scene.onBeforeRender=beforeRender;

@@ -2,16 +2,19 @@ import * as THREE from 'three';
 import {Builder,type MatKey,type Col,pick,PLASTER,ROOFS,TIMBER,STONE,TRIM} from './kit.ts';
 /** Building archetypes in a LOCAL frame: origin = footprint centre at floor level,
  * front facade faces local +z. Callers b.push(x,y,z,yaw) first. */
+export type BalconyLayout={x:number;floorY:number;width:number;depth:number;index:string};
 export type RoofKind='gable'|'hip'|'flat'|'shed'|'cross'|'stepped'|'none';
 export type HouseSpec={w:number;d:number;floors:number;fh?:number;wall?:MatKey;wallC?:Col;roof?:RoofKind;roofC?:Col;roofH?:number;trim?:Col;
- chimney?:boolean;balcony?:boolean;veranda?:boolean;shutters?:boolean;flowerbox?:boolean;dormer?:boolean;plinth?:number;roofGarden?:boolean;sideDoor?:boolean;noWindows?:boolean;barnDoor?:boolean;flatC?:Col;door?:boolean;awning?:Col;band?:boolean};
+ chimney?:boolean;balcony?:boolean;veranda?:boolean;shutters?:boolean;flowerbox?:boolean;dormer?:boolean;plinth?:number;roofGarden?:boolean;sideDoor?:boolean;noWindows?:boolean;barnDoor?:boolean;flatC?:Col;door?:boolean;awning?:Col;band?:boolean;balconyLayout?:readonly BalconyLayout[]};
 const GLASS='#2d3c46',GLASS2='#3b4a52',DOOR=['#5b3a29','#2f4f5f','#7a2f2a','#355e3b','#3d3a35','#8a6a3a'];
 /** Window grid on one facade (local plane z=zf facing +z when face=1; use push for other facades). */
-function windows(b:Builder,w:number,y0:number,floors:number,fh:number,zf:number,trim:Col,o:{shutters?:boolean;box?:boolean;skipDoor?:boolean;r:()=>number}){
+function windows(b:Builder,w:number,y0:number,floors:number,fh:number,zf:number,trim:Col,o:{shutters?:boolean;box?:boolean;skipDoor?:boolean;openings?:readonly BalconyLayout[];r:()=>number}){
  const n=Math.max(1,Math.floor((w-.6)/2.1)),gap=w/n;
  for(let f=0;f<floors;f++)for(let i=0;i<n;i++){const x=-w/2+gap*(i+.5),y=y0+f*fh+fh*.55;if(f===0&&o.skipDoor&&Math.abs(x)<gap*.6)continue;
   const tall=f>0&&o.r()<.25;const wh=tall?1.6:1.15,ww=.85;
-  b.panel('glass',x,y+(tall?-.2:0),zf+.03,ww,wh,o.r()<.5?GLASS:GLASS2);
+  const glass=o.r()<.5?GLASS:GLASS2;
+  if(o.openings?.some(v=>Math.abs(x-v.x)<(ww+1.2)/2&&y+wh/2>v.floorY&&y-wh/2<v.floorY+2.3))continue;
+  b.panel('glass',x,y+(tall?-.2:0),zf+.03,ww,wh,glass);
   b.box('stone',x,y-wh/2-.08+(tall?-.2:0),zf+.06,ww+.2,.08,.14,trim);
   if(o.shutters){b.panel('timber',x-ww/2-.24,y,zf+.05,.4,wh+.05,trim);b.panel('timber',x+ww/2+.24,y,zf+.05,.4,wh+.05,trim);}
   if(o.box&&f===0)b.box('flower',x,y-wh/2-.02,zf+.18,ww,.18,.22,pick(o.r,['#d0485a','#e8a33c','#c45ab0','#f0e04a','#e86a4a']));}
@@ -31,10 +34,22 @@ export function house(b:Builder,s:HouseSpec,r:()=>number){footprint(b,s.w,s.d,'h
  const fh=s.fh??2.9,H=s.floors*fh,wall=s.wall??'plaster',wc=s.wallC??pick(r,PLASTER),rc=s.roofC??pick(r,ROOFS),trim=s.trim??pick(r,TRIM),pl=s.plinth??1.6,roof=s.roof??'gable';
  // Plinth reaches below the pad so sloping ground never shows a gap.
  b.box('stone',0,-pl,0,s.w+.25,pl+.35,s.d+.25,pick(r,STONE));
- b.box(wall,0,.35,0,s.w,H-.35,s.d,wc);
+ const balconies=s.balconyLayout??(s.balcony&&s.floors>1?[{x:0,floorY:fh+.04,width:Math.min(s.w-.8,3.2),depth:1.2,index:'first-floor'}]:[]);
+ const buildingId='region-house:'+b.m.elements.slice(12,15).map(v=>v.toFixed(3)).join(':');
+ const wallBox=(x:number,y:number,z:number,w:number,h:number,d:number,id:string)=>{b.box(wall,x,y,z,w,h,d,wc);b.boundary('wall',x,y,z,w,h,d,buildingId,id);};
+ if(balconies.length){
+  // Actual hollow shell and rectangular cuts, rather than a doorway painted on a solid building volume.
+  const thickness=.18;
+  wallBox(0,.35,-s.d/2+thickness/2,s.w,H-.35,thickness,'back');
+  for(const floorY of new Set(balconies.map(v=>v.floorY)))b.box('stone',0,floorY-.12,0,s.w-2*thickness,.12,s.d-2*thickness,trim,true); // Rendered floor, no native support registration.
+  for(const side of[-1,1])wallBox(side*(s.w/2-thickness/2),.35,0,thickness,H-.35,s.d-2*thickness,'side:'+side);
+  const xs=[...new Set([-s.w/2,s.w/2,...balconies.flatMap(v=>[v.x-.6,v.x+.6])])].sort((a,c)=>a-c);
+  const ys=[...new Set([.35,H,...balconies.flatMap(v=>[v.floorY,v.floorY+2.3])])].filter(y=>y>=.35&&y<=H).sort((a,c)=>a-c);
+  for(let ix=0;ix<xs.length-1;ix++)for(let iy=0;iy<ys.length-1;iy++){const x=(xs[ix]+xs[ix+1])/2,y=(ys[iy]+ys[iy+1])/2;if(balconies.some(v=>Math.abs(x-v.x)<.6&&y>v.floorY&&y<v.floorY+2.3))continue;wallBox(x,ys[iy],s.d/2-thickness/2,xs[ix+1]-xs[ix],ys[iy+1]-ys[iy],thickness,'front:'+ix+':'+iy);}
+ }else b.authoredBox(wall,0,.35,0,s.w,H-.35,s.d,wc,buildingId,'body');
  if(s.band)for(let f=1;f<s.floors;f++)b.box('stone',0,f*fh-.05,0,s.w+.1,.14,s.d+.1,trim);
  // Facades: front and back, then the sides.
- if(!s.noWindows){lightAt(b,'window',0,0,0,Math.min(1.6,Math.max(.6,(s.w+s.d)/14)));windows(b,s.w,0,s.floors,fh,s.d/2,trim,{shutters:s.shutters,box:s.flowerbox,skipDoor:s.door!==false,r});
+ if(!s.noWindows){lightAt(b,'window',0,0,0,Math.min(1.6,Math.max(.6,(s.w+s.d)/14)));windows(b,s.w,0,s.floors,fh,s.d/2,trim,{shutters:s.shutters,box:s.flowerbox,skipDoor:s.door!==false,openings:balconies,r});
  b.push(0,0,0,Math.PI);windows(b,s.w,0,s.floors,fh,s.d/2,trim,{r});b.pop();
  for(const side of [1,-1]){b.push(0,0,0,side*Math.PI/2);windows(b,s.d,0,s.floors,fh,s.w/2,trim,{shutters:s.shutters,r});b.pop();}}
  if(s.barnDoor){const dw=Math.min(s.w*.4,4.2),dh=Math.min(H*.6,4);b.panel('timber',0,.35+dh/2,s.d/2+.04,dw,dh,'#5b2a20');b.box('timber',0,.35+dh/2,s.d/2+.07,dw*1.05,.16,.06,trim);
@@ -55,11 +70,21 @@ export function house(b:Builder,s:HouseSpec,r:()=>number){footprint(b,s.w,s.d,'h
    b.box('metal',0,H+.35,s.d/2-.15,s.w,.9,.05,'#3e4446');b.box('cloth',s.w/4,H+2.2,0,2.4,.05,2.4,pick(r,['#d8c3a0','#c45a4a','#e0d07a']));b.box('metal',s.w/4,H+.6,0,.06,1.6,.06,'#444');}}
  if(s.chimney){const cx=s.w*(r()-.5)*.6,cz=-s.d*.18;b.box('stone',cx,H+rh*.4,cz,.6,rh*.7+.6,.6,pick(r,['#8a4a36','#a59d8e','#7a6a5a']));const v=new THREE.Vector3(cx,H+rh*1.1+.65,cz).applyMatrix4(b.m);CHIMNEYS.push([v.x,v.y,v.z]);}
  if(s.dormer&&roof==='gable'&&s.w>=s.d){b.push(0,H+rh*.18,s.d*.2,0);b.box(wall,0,0,0,1.4,1.2,1.2,wc);b.panel('glass',0,.6,.62,.8,.8,GLASS);b.gable('roof',0,1.2,0,1.4,1.3,.6,rc,wall,wc,.15);b.pop();}
- if(s.balcony&&s.floors>1){const y=fh;b.box('stone',0,y-.1,s.d/2+.6,Math.min(s.w-.8,3.2),.14,1.2,trim);for(let i=0;i<=8;i++)b.box('metal',-Math.min(s.w-.8,3.2)/2+i*Math.min(s.w-.8,3.2)/8,y,s.d/2+1.15,.04,.95,.04,'#2f3436');b.box('metal',0,y+.95,s.d/2+1.15,Math.min(s.w-.8,3.2),.05,.06,'#2f3436');
-  b.box('foliage',-Math.min(s.w-.8,3.2)/2+.3,y+.04,s.d/2+.9,.4,.4,.4,'#5f8a46');}
+ for(const balcony of balconies)buildBalcony(b,balcony,s.d/2,trim,buildingId);
  if(s.veranda){const vd=2.2;b.box('timber',0,-.1,s.d/2+vd/2,s.w+.4,.3,vd,pick(r,TIMBER));for(const x of [-s.w/2,-s.w/6,s.w/6,s.w/2])b.box('timber',x,.2,s.d/2+vd-.15,.16,2.5,.16,trim);
   b.shed('roof',0,2.6,s.d/2+vd/2,s.w+.4,vd,.45,rc,.15);b.box('timber',0,.2,s.d/2+vd-.15,s.w,.08,.06,trim);b.box('timber',0,.95,s.d/2+vd-.15,s.w,.06,.06,trim);}
  return H+rh;
+}
+/** Visible solid guard panels match the same three exact height bands; facade/entry stays open. */
+export function buildBalcony(b:Builder,v:BalconyLayout,facadeZ:number,trim:Col,buildingId:string){
+ const thickness=.08,height=1.05,y=v.floorY,outer=facadeZ+v.depth;
+ b.box('stone',v.x,y-.12,facadeZ+v.depth/2,v.width,.12,v.depth,trim,true);
+ const guard=(x:number,z:number,w:number,d:number,id:string)=>{b.box('metal',x,y,z,w,height,d,'#d3d9d5');b.box('dressing',x,y+height,z,w,.055,d+.02,trim);b.boundary('guard',x,y,z,w,height,d,buildingId,'balcony:'+v.index+':'+id);};
+ guard(v.x,outer-thickness/2,v.width,thickness,'front');
+ for(const side of[-1,1])guard(v.x+side*(v.width/2-thickness/2),facadeZ+v.depth/2,thickness,v.depth,'side:'+side);
+ // Door jamb/head only. No sill or rail crosses the 1.2×2.3m access opening.
+ for(const side of[-1,1])b.box('stone',v.x+side*.64,y,facadeZ+.025,.08,2.3,.08,trim);
+ b.box('stone',v.x,y+2.3,facadeZ+.025,1.36,.08,.08,trim);
 }
 /** A-frame cabin: steep roof to the ground, glazed gable. */
 export function aframe(b:Builder,w:number,d:number,h:number,r:()=>number){footprint(b,w,d,'aframe');const rc=pick(r,['#5d4a3f','#3f4448','#6f3a2a','#4f5d4b']),wc=pick(r,['#d9a85e','#c96f4a','#9db8c9','#e8d8b8','#8fb3a8']);

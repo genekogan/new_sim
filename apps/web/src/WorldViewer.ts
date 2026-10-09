@@ -1,3 +1,4 @@
+import type {AssetDownloadProgress} from './AssetDownloads.ts';
 import type {WorldPlaceId} from './WorldPlaces.ts';
 import type { WorldCameraMode } from './WorldBroadcast.ts';
 export type { ViewportInsets } from './WorldViewport.ts';
@@ -14,6 +15,7 @@ export interface WorldViewerHandle {
   frameSouls?(ids:readonly string[]):boolean;
   /** Local current-world scenery tour; no simulation command or selection. */
   framePlace?(place:WorldPlaceId): boolean;
+  placePreview?(place:WorldPlaceId):Promise<string|null>;
   focusSelected(): boolean;
   selectSoul(id: string | null): boolean;
   selectEntity(id: string | null): boolean;
@@ -34,6 +36,8 @@ export interface WorldViewerState {
   selection: { soulId: string | null; entityId: string | null; soulIds?:readonly string[] };
   playback: 'live' | 'playing' | 'paused';
   loading: boolean;
+  assetDownloads?:AssetDownloadProgress;
+  room?:{id:string;name:string;soulIds:readonly string[]}|null;
   unavailableReason: string | null;
   /** All movement keys/pointers are scoped to the viewport, never document keys. */
   inputScope: 'viewport-pointer';
@@ -57,6 +61,7 @@ export interface WorldViewerPort {
   frameSouls?(ids:readonly string[]):boolean;
   /** Local current-world scenery tour; no simulation command or selection. */
   framePlace?(place:WorldPlaceId): boolean;
+  placePreview?(place:WorldPlaceId):Promise<string|null>;
   focusSelected(): boolean;
   hasSoul(id: string): boolean;
   hasEntity(id: string): boolean;
@@ -75,6 +80,7 @@ export function createWorldViewerHandle(current: () => WorldViewerPort): WorldVi
     frameAll: () => current().frameAll(),
     frameSouls: ids => current().frameSouls?.(ids) ?? false,
     framePlace: place => current().framePlace?.(place) ?? false,
+    placePreview: place => current().placePreview?.(place) ?? Promise.resolve(null),
     focusSelected: () => current().focusSelected(),
     selectSoul: id => { const p = current(); if (id !== null && !p.hasSoul(id)) return false; p.select(id, null); return true; },
     selectEntity: id => { const p = current(); if (id !== null && !p.hasEntity(id)) return false; p.select(null, id); return true; },
@@ -91,6 +97,8 @@ export function viewerPresentation(input: {
   drawnTick: number | null; history: boolean; playing: boolean;
   cameraMode: WorldCameraMode; soulId: string | null; entityId: string | null;
   loading: boolean; unavailableReason: string | null;
+  assetDownloads?:AssetDownloadProgress;
+  room?:{id:string;name:string;soulIds:readonly string[]}|null;
   manualNavigation?: ManualNavigation; inputOwned?: boolean; soulIds?:readonly string[];
   speechAnchors?: readonly WorldSpeechAnchor[];
 }): WorldViewerState {
@@ -100,6 +108,8 @@ export function viewerPresentation(input: {
     selection: { ...(input.soulIds?.length?{soulIds:[...input.soulIds]}:{}),soulId: input.soulId, entityId: !input.soulId && input.entityId?.startsWith('kin:') ? null : input.entityId },
     playback: input.history ? input.playing ? 'playing' : 'paused' : 'live',
     loading: input.loading, unavailableReason: input.unavailableReason,
+    ...(input.assetDownloads?{assetDownloads:{...input.assetDownloads}}:{}),
+    ...(input.room!==undefined?{room:input.room}:{}),
     inputScope: 'viewport-pointer',
     ...(input.manualNavigation ? {manualNavigation:input.manualNavigation} : {}),
     ...(input.inputOwned!==undefined ? {inputOwned:input.inputOwned} : {}),

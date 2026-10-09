@@ -43,8 +43,10 @@ export class WorldHover{
   const point=new THREE.Vector3();for(const p of place.polygon)point.add(new THREE.Vector3(p[0],ground.y,p[1]));point.multiplyScalar(1/place.polygon.length);
   return {kind:'place',id:place.id,name:place.name,detail:place.schedule?.map(s=>s.label).join(' · '),point,radius:Math.max(8,...place.polygon.map(p=>Math.hypot(p[0]-point.x,p[1]-point.z)))};
  }
- private show(t:HoverTarget,x:number,y:number){this.target=t;this.marker.visible=true;this.marker.position.copy(t.markerPoint??t.point);this.marker.position.y+=.05;this.marker.scale.setScalar(t.kind==='place'?Math.min(7,t.radius*.25):1);this.tooltip.textContent=t.name+(t.detail?' · '+t.detail:'');const r=this.canvas.getBoundingClientRect();this.tooltip.style.left=Math.max(8,Math.min(r.width-180,x-r.left+12))+'px';this.tooltip.style.top=Math.max(8,y-r.top-40)+'px';this.tooltip.hidden=false;this.canvas.style.cursor='pointer';}
+ private show(t:HoverTarget,x:number,y:number){this.target=t;this.marker.visible=true;this.marker.position.copy(t.markerPoint??t.point);this.marker.position.y+=.05;this.marker.scale.setScalar(t.kind==='place'?Math.min(7,t.radius*.25):1);this.tooltip.textContent=hoverTooltipText(t.name,t.detail);this.tooltip.title=t.name+(t.detail?' · '+t.detail:'');const r=this.canvas.getBoundingClientRect();this.tooltip.style.left=Math.max(8,Math.min(r.width-180,x-r.left+12))+'px';this.tooltip.style.top=Math.max(8,y-r.top-40)+'px';this.tooltip.hidden=false;this.canvas.style.cursor='pointer';}
  update(now:number){if(this.held||!this.pointer||now-this.last<34)return;this.last=now;const t=this.pick(this.pointer.x,this.pointer.y);if(t)this.show(t,this.pointer.x,this.pointer.y);else this.clear();}
  clear(){this.target=null;this.marker.visible=false;this.tooltip.hidden=true;this.canvas.style.cursor='';if(this.timer)clearTimeout(this.timer);this.timer=null;}
  dispose(){this.clear();for(const [t,n,f] of this.listeners)t.removeEventListener(n,f);this.tooltip.remove();this.marker.removeFromParent();this.marker.geometry.dispose();(this.marker.material as THREE.Material).dispose();}
 }
+
+export function hoverTooltipText(name:string,detail?:string){const short=(text:string,max:number)=>text.length>max?text.slice(0,max-1).trimEnd()+'…':text;return short(name,54)+(detail?' · '+short(detail,76):'');}

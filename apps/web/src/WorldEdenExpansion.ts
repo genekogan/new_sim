@@ -1,3 +1,4 @@
+import {createWorldWallFrames} from './WorldWallFrames.ts';
 import {publishedGroundSampler} from './WorldPublishedGround.ts';
 import type {SceneInfo} from './WorldGeometry.ts';
 import type {AuthoredBoundaryBox} from '../../../mars/viewer/lib/authored-boundaries.ts';
@@ -44,6 +45,7 @@ import {currentClassroomPresentation,type LocalClassroomPresentation} from './Wo
 export function createWorldEdenExpansion(officeGuards:readonly OfficeGuardBox[]=[],groundPublication?:Pick<SceneInfo,'scene'|'shore'>){
  const group=new THREE.Group(),owners:{group:THREE.Group;dispose():void}[]=[],hidden:THREE.Object3D[]=[];
  group.name='Eden — connected growing world';
+ const wallFrames=createWorldWallFrames();owners.push(wallFrames);group.add(wallFrames.group);
  let visualGround:(x:number,z:number)=>number|null=expansionHeight;
  const nativeGround=publishedGroundSampler(groundPublication);let regionalGround:((x:number,z:number)=>number|null)|null=null;
  const proposedGround=(x:number,z:number)=>nativeGround(x,z)??(x>=-30&&x<=30&&z>=-30&&z<=30?0:visualGround(x,z)??regionalGround?.(x,z)??null);
@@ -100,7 +102,7 @@ export function createWorldEdenExpansion(officeGuards:readonly OfficeGuardBox[]=
  const fixtures=academicVenuePlan()!.fixtures;
  const loader=new THREE.TextureLoader(),staticPreviewImage=classroomSlide(0).imageUrl;
  function clearSlide(){generation++;slideKey='';venue!.setProjection(null);for(const texture of textures)texture.dispose();textures.clear();}
- return {group,officeGuards,authoredBoundaries,venue:venue!,sampleVisualGround:(x:number,z:number)=>closed?null:proposedGround(x,z),places:[{id:'commons',label:'Inhabited commons',p:[9,5]},{id:'classroom',label:'Classroom · 20 seats',p:[42,-8]},{id:'homes',label:'Furnished neighborhood',p:[44,23]},{id:'forest',label:'Northern woodland',p:[7,-44]},{id:'gardens',label:'Gardens and cultivated plots',p:[52,50]},{id:'dome-quarter',label:'Dome quarter',p:[99.2,36.5]},{id:'amphitheatre',label:'Amphitheatre and observatory',p:[76,82]},{id:'library',label:'Library, office and market',p:[74,5]},{id:'lake',label:'Lake, river and wetlands',p:[-81,1]}],
+ return {group,officeGuards,wallFrames,authoredBoundaries,venue:venue!,sampleVisualGround:(x:number,z:number)=>closed?null:proposedGround(x,z),places:[{id:'commons',label:'Inhabited commons',p:[9,5]},{id:'classroom',label:'Classroom · 20 seats',p:[42,-8]},{id:'homes',label:'Furnished neighborhood',p:[44,23]},{id:'forest',label:'Northern woodland',p:[7,-44]},{id:'gardens',label:'Gardens and cultivated plots',p:[52,50]},{id:'dome-quarter',label:'Dome quarter',p:[99.2,36.5]},{id:'amphitheatre',label:'Amphitheatre and observatory',p:[76,82]},{id:'library',label:'Library, office and market',p:[74,5]},{id:'lake',label:'Lake, river and wetlands',p:[-81,1]}],
   replaceCosmeticBackdrop(base:THREE.Group){backdrop=base;realismAt=-Infinity;refreshRealism();prewarm(base);base.traverse(o=>{if(o.name==='outside-ground'&&o.visible){hidden.push(o);o.visible=false;}});},
   sync(nativeEntities:Record<string,unknown>,history=false,seconds=0){if(closed)return;setRealismTime(seconds);stepSurfaceKit(3);if(!warm&&performance.now()-bornAt>4000)warm=true;lastNative=nativeEntities;group.visible=!history&&warm;for(const o of hidden)o.visible=history;if(history){clearSlide();return;}extraPlaces?.sync(nativeEntities,seconds);const missing=fixtures.filter(f=>!Object.hasOwn(nativeEntities,f.id));scenery.onTick({entities:Object.fromEntries(missing.map(f=>[f.id,f]))} as any);scenery.render(0,1);refreshRealism();},
   setSurfaceQuality(quality:'Simple'|'Rich'){if(closed)return false;if(!surfaceStudy&&quality==='Simple')return true;if(!surfaceStudy&&surfaceGroup)try{const own=surfaceGroup;releaseWorldRealism(own.children.flatMap(o=>o instanceof THREE.Mesh&&!(o instanceof THREE.InstancedMesh)&&(o.name.startsWith('NEW expansion cosmetic ground')||o.name.startsWith('Connected countryside and forest path')||o.name.startsWith('Cultivated garden plot'))?[o.material as THREE.Material]:[]));surfaceStudy=createWorldEdenSurfaceStudy(own);}catch{return false;}return surfaceStudy?.setQuality(quality)??false;},

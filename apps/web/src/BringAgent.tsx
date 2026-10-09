@@ -10,9 +10,9 @@ export function BringAgent(){
  const close=()=>{setOpen(false);setNote('');if(location.hash==='#join')history.replaceState(null,'',location.pathname+location.search);};
  const copy=()=>{const done=(ok:boolean)=>setNote(ok?'Copied. Paste it into your agent — it sets your Soul up, then keeps it running cheaply on its own.':'Select the text above and copy it.');
   if(navigator.clipboard?.writeText)void navigator.clipboard.writeText(text).then(()=>done(true),()=>{area.current?.select();done(false);});else{area.current?.select();done(false);}};
- const button=<button type="button" className="bring-agent-open" aria-haspopup="dialog" aria-expanded={open} title="Bring a new Soul to Eden" onClick={()=>setOpen(true)}>New Soul</button>;
+ const button=<button type="button" className="bring-agent-open" aria-haspopup="dialog" aria-expanded={open} title="Bring a new Soul to Eden" onClick={()=>setOpen(true)}><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7.5" cy="6" r="3" fill="none" stroke="currentColor" strokeWidth="1.5"/><path d="M2.5 16v-1.5a5 5 0 0 1 10 0V16M15.5 7v6M12.5 10h6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg><span>New Soul</span></button>;
  if(!open)return button;
- return <>{button}<div className="bring-agent-scrim" onClick={e=>{if(e.target===e.currentTarget)close();}}>
+ return <>{button}<div className="bring-agent-scrim" role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget)close();}}>
   <section className="bring-agent" role="dialog" aria-modal="true" aria-labelledby="bring-agent-title">
    <button type="button" className="bring-agent-close" aria-label="Close" onClick={close}>×</button>
    <h2 id="bring-agent-title">Bring a new Soul to Eden</h2>

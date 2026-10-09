@@ -18,7 +18,7 @@ if(uEdenGradeA.x>0.0){
  edenC=mix(vec3(edenL),edenC,1.0+uEdenGradeA.z);
  float edenSh=1.0-smoothstep(.0,.5,edenL),edenHi=smoothstep(.45,1.0,edenL);
  edenC+=uEdenGradeB.rgb*edenSh;
- edenC*=mix(vec3(1.0),vec3(1.0+.07*uEdenGradeA.w,1.0+.015*uEdenGradeA.w,1.0-.09*uEdenGradeA.w),edenHi);
+ edenC*=mix(vec3(1.0),vec3(1.0+.11*uEdenGradeA.w,1.0+.022*uEdenGradeA.w,1.0-.11*uEdenGradeA.w),edenHi);
  float edenNd=uEdenGradeB.w*(1.0-smoothstep(.12,.55,edenL))*(1.0-smoothstep(.05,.25,edenC.r-edenC.b));
  edenC=mix(edenC,vec3(edenL)*vec3(.82,.93,1.18),edenNd);
  gl_FragColor.rgb=mix(gl_FragColor.rgb,edenC,uEdenGradeA.x);
@@ -34,7 +34,7 @@ export function setGrade(day:number,warmth:number,blueHour:number,cloud:number){
  GRADE_A.w=golden*clear*1.0+.15*day*clear;
  // shadow tint: teal at golden hour, blue at blue hour/night (small additive amounts)
  GRADE_B.x=-.012*golden-.006*blueHour-.004*night;
- GRADE_B.y=.004*golden+.0*blueHour;
+ GRADE_B.y=.004*golden;
  GRADE_B.z=.01*golden+.022*blueHour+.012*night;
  GRADE_B.w=.55*night;
 }

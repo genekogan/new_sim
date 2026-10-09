@@ -102,6 +102,8 @@ void main(){
   vec3 cc=mix(uCloudLit,uCloudShade,thick*.75);
   cc*=mix(.86,1.1,mix(.5,shade,uCloud.w));
   cc+=uCloudLit*sunSide*.25*uCloud.w;
+  // Low sun colours the exposed cloud edges, fading continuously with solar elevation/weather.
+  cc+=uDusk.rgb*uDusk.w*pow(max(dot(normalize(d.xz+1e-5),normalize(uSun.xz+1e-5)),0.0),2.0)*(1.0-thick*.65)*.55;
   // Moonlight silvers thin cloud near the moon at night.
   cc+=vec3(.55,.6,.72)*uMoonLight.x*uMoonLight.y*uMoon.w*pow(max(dot(d,uMoon.xyz),0.0),10.0)*(1.0-thick)*.35;
   col=mix(col,cc,c*(.55+.45*cover));
