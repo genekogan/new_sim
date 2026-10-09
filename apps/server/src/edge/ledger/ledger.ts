@@ -724,6 +724,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
       authority();const issue=this.host.engine.canPerform({actor:soul.entityId,label,steps});
       if(issue&&!WAIT_CODES.has(issue.code))return refuse(issue.code,issue.code.startsWith('carrier.')?issue.message:humanBlockedExplanationV1(issue.code,label));
       if(this.host.quietBarrier||issue){
+        // Accepted waiting is a durable intent/reservation, not physical completion.
+        // A later start can fail or be replaced; that terminal receipt is authoritative.
+        // Ride apply() adds no member: riders/custody are projected from native state.
         tx(this.db.db,()=>{authority();const fresh=this.host.engine.canPerform({actor:soul.entityId,label,steps});if(fresh&&!WAIT_CODES.has(fresh.code))throw new EdgeError(409,fresh.code,fresh.code.startsWith('carrier.')?fresh.message:humanBlockedExplanationV1(fresh.code,label));const detail=admission.commit(id)??{};this.insert(soul,capability,'waiting',clientRef,false,detail,{},id);afterCommit(this.db.db,()=>this.arm({receipt:id,soul,steps,label,deadline:this.host.engine.world.tick+WAIT_LIMIT_TICKS,capability}));},{immediate:true});
         if(issue?.code==='program.safe-stop-required')await this.host.enqueue('edge-stop',`edge:${soul.soulId}`,{soulId:soul.soulId,entityId:soul.entityId,receipt:id});
       }else{

@@ -68,3 +68,34 @@ test('accepted body output forces atomic admission even if a future definition o
  q.f.host.apply=(event,replay,defer)=>{const result=apply(event,replay,defer);if(event.kind==='decision'&&!replay){folded=true;throw Error('after real future-definition body fold');}return result;};
  const out=await q.call({capability:'object:future-ride:join',clientRef:'future-marker'});assert.equal(out.accepted,false);assert.equal(out.code,'object.admission-failed');assert.equal(folded,true);assert.deepEqual(q.snapshot(),before);assert.deepEqual(q.f.db.db.prepare('SELECT version,body FROM edge_comms_objects WHERE id=?').get('future-ride'),object);
 });
+
+test('committed native decision resolves despite throwing advisory listeners',{timeout:60000},async t=>{
+ const q=await setup(t);let laterDecision=0,laterApplied=0;
+ q.f.host.listeners.push({onDecision(){throw Error('injected advisory decision fault');},onApplied(){throw Error('injected advisory applied fault');}});
+ q.f.host.listeners.push({onDecision(){laterDecision++;},onApplied(){laterApplied++;}});
+ const out=await q.call({action:'join',clientRef:'advisory-fault'},true);assert.equal(out.accepted,true);assert.equal(out.receipt?.phase,'started');assert.equal(laterDecision,1);assert.equal(laterApplied,1);
+});
+
+test('real native safe-stop wait is accepted intent, not boarding; late start failure retains truthful failed receipt',{timeout:60000},async t=>{
+ const q=await setup(t),actor=q.rows[0].entity_id;
+ await accept<unknown>(q.f.host,q.f.host.installCommonsProvisionsV1());await accept<unknown>(q.f.host,q.f.host.installRetainedCommonsShoreV1());
+ // Reuse the existing connected-shore unsafe between-level fixture geometry:
+ // a real occupied native landing, not a mocked canPerform/refusal flag.
+ const {loadMars}=await import('../../../packages/engine-mars/src/load.ts'),{regionSlots}=await import('../../../mars/viewer/engine/social/slots.ts'),m=await loadMars();
+ const native=q.f.host.engine as unknown as {rt:InstanceType<typeof m.Runtime>},w=native.rt.world;
+ const region={id:'hold',label:'Hypothetical landing hold',provenance:{origin:'test-fixture' as const,confidence:'hypothetical' as const},kind:'place' as const,level:1,polygon:[[8.9,-2.71],[9.1,-2.71],[9.1,-.7],[8.9,-.7]] as [number,number][],layout:{focus:[9,1] as [number,number],kind:'stand' as const}};w.regions.hold=region;
+ const slot=regionSlots(native.rt,region).find(s=>Math.abs(s.p[1]+1.7)<1e-8)!;assert.ok(slot);w.entities.blocker=m.human('blocker',slot.p[0],slot.p[1],{level:1,y:.24,yaw:slot.yaw});assert.notEqual(q.f.host.engine.submit!('take_slot',{actor:'blocker',slot:slot.id}).status,'failed');
+ await accept(q.f.host,q.f.host.enqueue('edge-relocate','synthetic:fixture-position',{soulId:q.rows[0].id,entityId:actor,to:[9,.8],why:'hypothetical blocked-landing native fixture'}));
+ await accept(q.f.host,q.f.host.enqueue('decision','synthetic:climb',{soulId:q.rows[0].id,entityId:actor,option:'climb-fixture',label:'Real native climb before ride',steps:[{verb:'mars:commons_shore_travel',params:{x:9,z:-1.8,level:1}}],reevalTicks:1e9,fallback:false,trigger:'synthetic-climb'}));
+ for(let i=0;i<250;i++)q.f.host.tickOnce();assert.equal(w.entities[actor].human?.activity,'climb-wait');
+ const board=[{verb:'stand',params:{}},{verb:'walk_to',params:{to:'eden-balloon',standoff:2.2}},{verb:'mars:carrier_ride',params:{carrier:'eden-balloon'}}],issue=q.f.host.engine.canPerform({actor,label:'Board',steps:board});
+ assert.match(issue?.code??'',/^program.safe-stop/,'actual blocked native climb requires safe-stop');
+ const before=q.comms.objects.all().find(o=>o.id==='ride-test')!,out=await q.call({action:'join',clientRef:'wait-failure'},true);assert.equal(out.accepted,true,JSON.stringify(out));assert.equal(out.receipt?.phase,'waiting');let receipt=out.receipt!.id;
+ const waiting=q.ledger.receipt(q.rows[0].id,receipt)!;assert.equal(waiting.programId,null);assert.equal(waiting.startedTick,null);assert.equal(waiting.outcome,undefined);assert.deepEqual(q.comms.objects.all().find(o=>o.id==='ride-test')!.state,before.state,'ride bookkeeping adds no physical member');assert.equal(q.ledger.aboard(actor),null);
+ const cancelledReceipt=receipt,stop=await q.call({capability:'stand:here',clientRef:'replace-waiting-ride'});assert.equal(stop.accepted,true);assert.equal(q.ledger.receipt(q.rows[0].id,cancelledReceipt)!.phase,'replaced');assert.equal(q.ledger.aboard(actor),null);
+ const retried=await q.call({action:'join',clientRef:'new-wait-failure'},true);assert.equal(retried.accepted,true);assert.equal(retried.receipt?.phase,'waiting');receipt=retried.receipt!.id;
+ await accept(q.f.host,q.f.host.enqueue('decision','synthetic:clear-landing',{entityId:'blocker',option:'clear-fixture',label:'Clear hypothetical landing',steps:[{verb:'walk_to',params:{to:[9.9,-1.7]}}],reevalTicks:1e9,fallback:false,trigger:'synthetic-clear'}));
+ const enqueue=q.f.host.enqueue.bind(q.f.host);let failedStart=false;q.f.host.enqueue=(kind,author,payload)=>{if(kind==='decision'&&(payload as {trigger?:string}).trigger===`edge-act:${receipt}`){failedStart=true;return Promise.reject(Error('injected failure of later queued native start'));}return enqueue(kind,author,payload);};
+ for(let i=0;i<2000&&q.ledger.receipt(q.rows[0].id,receipt)?.phase==='waiting';i++){q.f.host.tickOnce();if(i%20===0)await setImmediate();}
+ const final=q.ledger.receipt(q.rows[0].id,receipt)!;assert.equal(failedStart,true);assert.equal(final.phase,'failed');assert.equal(final.code,'ledger.unavailable');assert.equal(final.startedTick,null);assert.equal(q.ledger.aboard(actor),null);assert.deepEqual((q.comms.objects.all().find(o=>o.id==='ride-test')!.state as {riders:unknown[]}).riders,[]);assert.deepEqual(q.f.host.engine.runtime.violations,[]);console.log('WAIT_TRUTH',JSON.stringify({accepted:out.receipt,final:final.phase,code:final.code,physicalRiders:0,actionVersionRetained:true}));
+});

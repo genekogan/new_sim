@@ -463,7 +463,8 @@ export class WorldHost {
         }catch(error){if(baseline)this.restoreBody(baseline);this.acc=acc;this.kernelDirty=kernelDirty;p.reject!(error);continue;}
         this.seq=e.seq;this.acc.log.push(e);
         notify();for(const notice of decisionNotices)notice();
-        for(const l of this.listeners)l.onApplied?.(e);p.resolve?.(e);continue;
+        for(const l of this.listeners)try{l.onApplied?.(e);}catch{/* advisory faults cannot strand a committed object request */}
+        p.resolve?.(e);continue;
       }
       if (p.journal) {
         // Accepted log fact and its private request reference either both exist
@@ -765,7 +766,7 @@ export class WorldHost {
     if(e.kind==='rules'&&e.payload?.commonsKitchen&&this.stationHistoryV1())throw Error('commons-kitchen.station-carry-required');
     if(e.kind==='rules'&&e.payload?.commonsProvisions&&this.stationHistoryV1())throw Error('commons-provisions.station-carry-required');
     const r = foldEvent(this.engine, this.kernel, e, this.counts);
-    if(e.kind==='decision'&&!replay){const notify=()=>{for(const l of this.listeners)l.onDecision?.(e,r);};if(deferDecisionNotice)deferDecisionNotice(notify);else notify();}
+    if(e.kind==='decision'&&!replay){const notify=()=>{for(const l of this.listeners)l.onDecision?.(e,r);};if(deferDecisionNotice)deferDecisionNotice(()=>{for(const l of this.listeners)try{l.onDecision?.(e,r);}catch{/* committed advisory faults cannot skip later observers */}});else notify();}
     if(isStationFactV1(e.kind))this.extra.stationV1=foldStationFactV1(this.stationHistoryV1(),e,this.stationBindingV1());
     if(e.kind==='station-rules-era-v1'){
       const old=this.extra.stationV1 as StationHistoryV1|undefined;
