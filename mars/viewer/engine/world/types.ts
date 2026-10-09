@@ -219,6 +219,7 @@ export type WorldState = {
   navV1?: import('../spatial/edits.ts').NavV1;
   /** Prospective elevated guard prisms; absent before their explicit rules fact. No office floor/traversal grant. */
   officeStairGuardsV1?: import('../../../../packages/engine-contract/src/office-stair-guards-v1.ts').OfficeStairGuardsV1;
+  authoredBoundariesV1?: import('../../../../packages/engine-contract/src/authored-boundaries-v1.ts').AuthoredBoundariesV1;
   env: Environment;
   inventory: 'finite' | 'unlimited';
   rng: RngState;
@@ -241,6 +242,7 @@ export function physicalView(w: WorldState) {
     ...(w.obstacleEdits ? { obstacleEdits: w.obstacleEdits } : {}),
     ...(w.navV1 ? { navV1: w.navV1 } : {}),
     ...(w.officeStairGuardsV1 ? { officeStairGuardsV1:w.officeStairGuardsV1 } : {}),
+    ...(w.authoredBoundariesV1 ? { authoredBoundariesV1:w.authoredBoundariesV1 } : {}),
     entities,
     regions: Object.values(w.regions).map((r) => {
       const layout = (r as { layout?: unknown }).layout;

@@ -66,6 +66,7 @@ import {bodyProblem} from '../../../mars/viewer/engine/bodies/body.ts';
 import type {Body} from '../../../mars/viewer/engine/world/types.ts';
 import {renderPlatformsV1Schema,type RenderPlatformsV1} from '@sim/engine-contract';
 import {officeStairGuardsV1Schema,type OfficeStairGuardsV1} from '@sim/engine-contract';
+import {authoredBoundariesV1Schema,authoredBoundariesDeclarationV1Schema,type AuthoredBoundariesV1,type AuthoredBoundariesDeclarationV1} from '@sim/engine-contract';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 const TPS = 20;
@@ -935,6 +936,7 @@ export class MarsEngine implements Engine {
       if(visible.shore)visible.shore.rulesVersion=this.rulesVersion;
       this.projectRenderPlatformsV1(scene);
       if(this.world.officeStairGuardsV1)scene.officeStairGuards=structuredClone(this.world.officeStairGuardsV1);
+      if(this.world.authoredBoundariesV1)scene.authoredBoundaries=structuredClone(this.world.authoredBoundariesV1);
       return {...visible,clock:this.cfg.clock?{origin:this.cfg.clock.origin,dayTicks:this.cfg.clock.dayTicks}:null};
     }
     const scene=structuredClone(this.m.scenes[this.rt.world.base.campus] ?? null);
@@ -949,11 +951,33 @@ export class MarsEngine implements Engine {
     if(this.commonsProvisionsActive)scene.provisions={version:'commons-provisions/1',resources:structuredClone(COMMONS_PERSONAL_RESOURCES),nativeGroundY:0};
     this.projectRenderPlatformsV1(scene);
     if(this.world.officeStairGuardsV1)scene.officeStairGuards=structuredClone(this.world.officeStairGuardsV1);
+      if(this.world.authoredBoundariesV1)scene.authoredBoundaries=structuredClone(this.world.authoredBoundariesV1);
     return {scene,clock:this.cfg.clock?{origin:this.cfg.clock.origin,dayTicks:this.cfg.clock.dayTicks}:null,
       ...(this.cfg.scene==='littlemartians'?structuredClone(this.m.littleMartiansRender):{}),
       ground:['greenfield','eden-commons'].includes(this.cfg.scene)?'grass' as const:undefined};
   }
   officeStairGuardsV1(){return this.world.officeStairGuardsV1?structuredClone(this.world.officeStairGuardsV1):undefined;}
+  authoredBoundariesV1(){return this.world.authoredBoundariesV1?structuredClone(this.world.authoredBoundariesV1):undefined;}
+  /** Conservative current-body refusal before any acceptance. Existing support
+   * stays authoritative; a source prism is never lowered to a visual floor. */
+  previewAuthoredBoundariesV1(raw:AuthoredBoundariesDeclarationV1){
+    const declaration=authoredBoundariesDeclarationV1Schema.parse(raw);
+    const spatial=this.rt.services.spatial as Spatial;if(!spatial.source)return {code:'authored-boundaries.spatial-not-rebasable',message:'The current native scene cannot admit new boundary bands.'};
+    for(const e of Object.values(this.ents)){if(!e.human)continue;const radius=e.body?.radius??HUMAN_RADIUS,floater=e.body?.family==='floater',height=floater?radius*2:1.8,feet=e.pose.p[1]-(floater?radius:0);
+      for(const b of declaration.boxes){if(b.collision!=='solid'||b.c[1]+b.half[1]<=feet+1e-10||b.c[1]-b.half[1]>=feet+height-1e-10)continue;
+        const dx=e.pose.p[0]-b.c[0],dz=e.pose.p[2]-b.c[2],cs=dcos(b.yaw),sn=dsin(b.yaw),x=Math.max(Math.abs(dx*cs+dz*sn)-b.half[0],0),z=Math.max(Math.abs(-dx*sn+dz*cs)-b.half[2],0);
+        if(x*x+z*z<radius*radius-1e-10)return {code:'authored-boundaries.body-intersection',message:`Boundary ${b.id} would intersect current body ${e.id}; no movement or installation was accepted.`};
+      }
+    }return null;
+  }
+  configureAuthoredBoundariesV1(raw:AuthoredBoundariesV1){
+    const fact=authoredBoundariesV1Schema.parse(raw);if(hashOf(fact)===hashOf(this.world.authoredBoundariesV1??null))return;
+    const {acceptedAtTick:_,...declaration}=fact,issue=this.previewAuthoredBoundariesV1(declaration);if(issue)throw Error(issue.code);
+    const spatial=this.rt.services.spatial as Spatial;
+    this.finishRecorder();this.world.authoredBoundariesV1=structuredClone(fact);
+    if(!spatial.refreshForWorld(this.rt.world))throw Error('authored-boundaries.spatial-not-rebasable');
+    spatial.sync(this.rt.world);this.renderBaseKey='';this.startRecorder();
+  }
   configureOfficeStairGuardsV1(raw:OfficeStairGuardsV1){
     const fact=officeStairGuardsV1Schema.parse(raw);
     if(hashOf(fact)===hashOf(this.world.officeStairGuardsV1??null))return;

@@ -1,3 +1,4 @@
+import {authoredBoundariesDeclarationV1Schema,type AuthoredBoundariesDeclarationV1} from '@sim/engine-contract';
 import {edenLectureV1} from '@sim/engine-mars';
 import {renderPlatformRowsV1Schema,type RenderPlatformV1} from '@sim/engine-contract';
 import {officeStairGuardsDeclarationV1Schema,type OfficeStairGuardsDeclarationV1} from '@sim/engine-contract';
@@ -1032,6 +1033,15 @@ export class WorldHost {
     const old=this.engine.renderPlatformsV1?.();if(old&&old.navHash===navHash&&old.baseStaticHash===baseStaticHash&&hashOf(old.platforms)===hashOf(platforms))return Promise.resolve({installed:false});
     const guard:AcceptanceGuard=()=>{if(hashOf((this.engine.world as any).navV1??null)!==navHash||this.engine.world.base.staticHash!==baseStaticHash)throw Error('render-platforms.source-moved');return true;};
     return this.enqueueChecked('rules','operator:render-platforms',{renderPlatformsV1:{contract:'render-platforms/1',navHash,baseStaticHash,platforms}},guard).then(()=>({installed:true}));
+  }
+  /** Source-pinned authored bands, explicit prospective installation only.
+   * Default-solid metadata adds neither support nor an advertised destination. */
+  installAuthoredBoundariesV1(raw:AuthoredBoundariesDeclarationV1){
+    if(!this.engine.configureAuthoredBoundariesV1||!this.engine.previewAuthoredBoundariesV1)return Promise.reject(Error('authored-boundaries.reader-required'));
+    const declaration=authoredBoundariesDeclarationV1Schema.parse(raw),old=this.engine.authoredBoundariesV1?.();
+    if(old?.sourceHash===declaration.sourceHash)return Promise.resolve({installed:false});
+    const guard:AcceptanceGuard=()=>{const issue=this.engine.previewAuthoredBoundariesV1!(declaration);if(issue)throw Error(issue.code+': '+issue.message);return true;};
+    guard();return this.enqueueChecked('rules','operator:authored-boundaries',{authoredBoundariesV1:declaration},guard).then(()=>({installed:true}));
   }
   /** Explicit prospective height bands only; does not activate office floors or stairs. */
   installOfficeStairGuardsV1(raw:OfficeStairGuardsDeclarationV1){

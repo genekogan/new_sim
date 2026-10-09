@@ -1,3 +1,4 @@
+import {authoredBoundariesDeclarationV1Schema} from '@sim/engine-contract';
 // The fold: applying one logged event to the world. The world has two parts:
 //   the KERNEL (meaning: things, links, vocabulary, decks), which replays from
 //   the log alone, and the ENGINE (depiction: bodies, motion), which replays the
@@ -219,6 +220,7 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       const nav=(e.payload as {navV1?:unknown}|null)?.navV1;
       if(nav){const install=(engine as unknown as {installNavV1?:(s:unknown)=>unknown}).installNavV1;if(!install)throw Error('nav.reader-required');install.call(engine,nav);}
       if(e.payload?.renderPlatformsV1){if(e.author!=='operator:render-platforms'||!engine.configureRenderPlatformsV1)throw Error('render-platforms.reader-required');engine.configureRenderPlatformsV1({...renderPlatformsDeclarationV1Schema.parse(e.payload.renderPlatformsV1),acceptedAtTick:e.tick});}
+      if(e.payload?.authoredBoundariesV1){if(e.author!=='operator:authored-boundaries'||!engine.configureAuthoredBoundariesV1)throw Error('authored-boundaries.reader-required');engine.configureAuthoredBoundariesV1({...authoredBoundariesDeclarationV1Schema.parse(e.payload.authoredBoundariesV1),acceptedAtTick:e.tick});}
       if(e.payload?.officeStairGuardsV1){if(e.author!=='operator:office-stair-guards'||!engine.configureOfficeStairGuardsV1)throw Error('office-guards.reader-required');engine.configureOfficeStairGuardsV1({...officeStairGuardsDeclarationV1Schema.parse(e.payload.officeStairGuardsV1),acceptedAtTick:e.tick});}
       // placeRegionsV1: W1 places on admitted native ground become destination regions, with their kernel places (walk offers).
       const regionsV1=(e.payload as {placeRegionsV1?:unknown}|null)?.placeRegionsV1;
