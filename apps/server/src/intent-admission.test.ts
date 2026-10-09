@@ -6,7 +6,6 @@ import { join } from 'node:path';
 import { Worker } from 'node:worker_threads';
 import { createServer } from 'node:http';
 import { once } from 'node:events';
-import { setImmediate } from 'node:timers/promises';
 import WebSocket from 'ws';
 import { toyFactory } from '@sim/engine-toy';
 import { marsFactory } from '@sim/engine-mars';
@@ -294,8 +293,18 @@ test('actual native controller facts stay private through public Hono routes, an
   const ws=new WebSocket('ws://127.0.0.1:4954/ws'),messages:any[]=[];ws.on('message',data=>messages.push(JSON.parse(String(data))));
   t.after(async()=>{ws.terminate();hub.wss.close();await new Promise<void>(resolve=>server.close(()=>resolve()));});
   await once(ws,'open');const welcome=once(ws,'message');ws.send(JSON.stringify({t:'hello',proto:1}));await welcome;
+  // Subscribe before admission/ticks: scheduler turns do not prove socket delivery.
+  const controllerBatch=new Promise<void>((resolve,reject)=>{
+    let settled=false;
+    const cleanup=()=>{clearTimeout(deadline);ws.off('message',onMessage);ws.off('error',onError);ws.off('close',onClose);};
+    const finish=(error?:Error)=>{if(settled)return;settled=true;cleanup();if(error)reject(error);else resolve();};
+    const onMessage=(data:WebSocket.RawData)=>{try{const m=JSON.parse(String(data));if(m.t==='batch'&&Array.isArray(m.log)&&m.log.some((e:any)=>e.kind==='intent-controller-v2'))finish();}catch{finish(new Error('anonymous WebSocket delivered invalid JSON'));}};
+    const onError=(error:Error)=>finish(error),onClose=()=>finish(new Error('anonymous WebSocket closed before the controller batch'));
+    const deadline=setTimeout(()=>finish(new Error('anonymous WebSocket controller batch was not delivered within 2000 ms')),2000);
+    ws.on('message',onMessage);ws.on('error',onError);ws.on('close',onClose);t.after(cleanup);
+  });
   await accept(f.host,f.host.enqueueIntentDecision('brain:reflex',f.decision,f.ref,()=>true));for(let i=0;i<350;i++)f.host.tickOnce();
-  for(let i=0;i<50 && !messages.some(m=>m.t==='batch' && m.log.some((e:any)=>e.kind==='intent-controller-v2'));i++)await setImmediate();
+  await controllerBatch;
   assert.ok(messages.some(m=>m.t==='batch' && m.log.some((e:any)=>e.kind==='intent-controller-v2')));
   const native=f.db.events(f.host.worldId).filter(e=>e.kind==='intent-controller-v2');assert.deepEqual(native.map(e=>e.payload.phase),['started','completed']);
   for(const path of ['/v1/log','/v1/kernel','/v1/world','/v1/debug/world','/v1/take','/v1/takes']){const response=await app.request(path);assert.equal(response.status,200);messages.push(await response.json());}
