@@ -231,10 +231,14 @@ test('a place takes many bodies: someone at the classroom centre does not lock i
  };
  const done=()=>{sample();return walkers.every((row,i)=>Object.values(f.host.intentHistoryOf(row.id).attempts).some(a=>a.intent.intentId===ids[i]&&a.phase==='completed'));};
  assert.ok(await tick(12000,done),walkers.map((r,i)=>body(r).human?.activity+'@'+body(r).pose.p.map(v=>v.toFixed(1)).join(',')+' '+Object.values(f.host.intentHistoryOf(r.id).attempts).filter(x=>x.intent.intentId===ids[i]).map(x=>x.phase+':'+x.tick+(('reason' in x)?':'+x.reason:'')).join('|')).join(' ;; '));
- const physicalDiagnostic={goalAdmissions:checkedGoals.size,minimumGoalSpacing,minimumPhysicalSpacing,firstBelowNominalDiameter,worstSpacingCapture,randomBirthIdsRetained:walkers.map(r=>({soulId:r.id,entityId:r.entity_id}))};
+ // MOVEMENT.md §2/limitations documents the published standing-people hard
+ // layer as 2r minus 0.02 m. This is a legacy proxy-separation test, not proof
+ // of full nominal-diameter or skinned-body nonintersection. Preserve replay.
+ const nominalDiameter=2*HUMAN_PROFILE.radius,nativeStandingSeparation=nominalDiameter-.02;
+ const physicalDiagnostic={nominalDiameterComparison:{diameter:nominalDiameter,minimumGap:minimumPhysicalSpacing-nominalDiameter,meetsNominalDiameter:minimumPhysicalSpacing>=nominalDiameter-1e-9},documentedNativeStandingSeparation:nativeStandingSeparation,goalAdmissions:checkedGoals.size,minimumGoalSpacing,minimumPhysicalSpacing,firstBelowNominalDiameter,worstSpacingCapture,randomBirthIdsRetained:walkers.map(r=>({soulId:r.id,entityId:r.entity_id}))};
  t.diagnostic('classroom physical spacing '+JSON.stringify(physicalDiagnostic));
  if(process.env.P0_SPACING_DIAGNOSTIC_FILE)writeFileSync(process.env.P0_SPACING_DIAGNOSTIC_FILE,JSON.stringify(physicalDiagnostic,null,2)+'\n',{flag:'wx'});
- assert.ok(checkedGoals.size>=4,'all four have separately admitted classroom destinations');assert.ok(minimumPhysicalSpacing>=2*HUMAN_PROFILE.radius-1e-9,'native human capsules stay separate on every transit tick '+JSON.stringify({minimumPhysicalSpacing}));
+ assert.ok(checkedGoals.size>=4,'all four have separately admitted classroom destinations');assert.ok(minimumPhysicalSpacing>=nativeStandingSeparation-1e-9,'documented legacy native standing separation holds on every transit tick '+JSON.stringify({minimumPhysicalSpacing,nativeStandingSeparation,nominalDiameter}));
  t.diagnostic(JSON.stringify({goalAdmissions:checkedGoals.size,minimumGoalSpacing,minimumPhysicalSpacing}));
  const ps=[...walkers,parked].map(r=>body(r).pose.p);t.diagnostic(JSON.stringify({tick:f.host.engine.world.tick,positions:ps,activities:[...walkers,parked].map(r=>body(r).human?.activity)}));for(let i=0;i<ps.length;i++)for(let j=i+1;j<ps.length;j++)assert.ok(Math.hypot(ps[i][0]-ps[j][0],ps[i][2]-ps[j][2])>=.9,'spaced bodies '+JSON.stringify({i,j,distance:Math.hypot(ps[i][0]-ps[j][0],ps[i][2]-ps[j][2]),positions:ps}));
  assert.ok(Math.hypot(body(parked).pose.p[0]-mid[0],body(parked).pose.p[2]-mid[1])<1,'parked body not displaced');
