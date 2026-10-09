@@ -42,9 +42,9 @@ export const REGION_PLACES:readonly RegionPlace[]=Object.freeze([
   ['gazebo','Park gazebo','pavilion',[-31.6,106.4,-24.4,113.6],false,null,'An octagonal white gazebo with a green roof — shelter from rain, or a tiny bandstand.'],
   ['playground','Playground','playground',[11,97,27,109],false,null,'A fenced sandpit playground with swings, a slide, a climbing frame and a see-saw.'],
  ],{starting:true}),
- ...district('sports-ground','Sports ground',[33,86,106,134],'A football pitch with crisp white lines, goals and a covered grandstand, two tennis courts and a clubhouse with a veranda.',[
-  ['pitch','Football pitch','field',[36,95,92,129],false,null,'A striped grass pitch, 56 by 34 metres, with full markings and goals.'],
-  ['tennis-courts','Tennis courts','field',[91,92,103,126],false,null,'Two fenced hard courts, one blue and one clay-red.'],
+ ...district('sports-ground','Sports ground',[19.5,86,106,134],'A football pitch with crisp white lines, goals and a covered grandstand, two tennis courts and a clubhouse with a veranda.',[
+  ['pitch','Football pitch','field',[36,97,86,127],false,null,'A striped grass pitch, 50 by 30 metres, with full markings and goals.'],
+  ['tennis-courts','Tennis courts','field',[93.5,89,105.5,128],false,null,'Two fenced hard courts, one blue and one clay-red.'],
   ['clubhouse','Clubhouse','building',[19.5,112,25.5,122],true,cap(19.5,112,25.5,122),'A small white clubhouse with a green roof and a veranda over the pitch.'],
  ]),
  ...district('farm-hamlet','Farm hamlet',[-104,92,-44,136],'Crop fields in green and gold rows divided by hedges, a red barn, a farmhouse with a veranda, three silos, hay bales, a tractor and a white windmill.',[

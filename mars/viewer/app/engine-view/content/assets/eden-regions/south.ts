@@ -7,6 +7,14 @@ import {SPORTS_LAYOUT} from './sports-layout.ts';
  * ground, farm hamlet with silos, beach + boardwalk harbour on the sea. */
 export const PARK_BOUNDS=[-42,86,32,134] as const,SPORTS_BOUNDS=[33,86,106,134] as const,FARM_BOUNDS=[-104,86,-44,136] as const,HARBOUR_BOUNDS=[-104,134,130,190] as const;
 const POND={x:-6,z:112,rx:13,rz:8.5};
+/** The two relocated sheds only: include roof overhang, the rotated clubhouse
+ * veranda and the fish-market front step. Reserve the canopy, not just its trunk. */
+function clearsRelocatedBuildings(x:number,z:number,scale:number){
+ const c=SPORTS_LAYOUT.clubhouse,f=SPORTS_LAYOUT.fishMarket;
+ for(const [x0,z0,x1,z1]of[[c.x-3.15,c.z-5.35,c.x+5.35,c.z+5.35],[f.x-7.15,f.z-3.15,f.x+7.15,f.z+3.8]])
+  if(Math.hypot(Math.max(x0-x,0,x-x1),Math.max(z0-z,0,z-z1))<=1.5*scale)return false;
+ return true;
+}
 export const SOUTH_AVENUE:[number,number][]=[[-96,90.5],[106.5,90.5]];
 export function southPads(t:Terrain){
  t.pad(-100,86,106,137,0,6);
@@ -40,7 +48,10 @@ export function buildPark(b:Builder,t:Terrain,trees:Trees){const r=rng(1201),G=(
  // flower beds and specimen trees
  for(const [x,z,c] of [[-18,96,'#d0485a'],[8,96,'#e8a33c'],[-30,124,'#c45ab0'],[16,126,'#f0e04a']] as [number,number,string][]){b.cyl('soil',x,0,z,2.4,.25,10,'#5a4632');for(let k=0;k<14;k++){const a=r()*6.28,d=r()*2.1;b.box('flower',x+Math.cos(a)*d,.25,z+Math.sin(a)*d,.25,.25,.25,k%3?c:'#efe9dc');}}
  for(let i=0;i<34;i++){const x=-40+r()*70,z=88+r()*44;if(pondDepth(x,z)<0||((x-POND.x)/(POND.rx+6))**2+((z-POND.z)/(POND.rz+6))**2<1||Math.hypot(x+28,z-110)<6||(x>8&&x<30&&z>94&&z<112))continue;
-  trees.add(x,G(x,z),z,.9+r()*.6,pick(r,['round','round','poplar','conifer'] as const),pick(r,['#6f9a4e','#5f8a46','#7fa84f','#4f7a3c','#8aa850']),r()*6);}
+  // Consume the original draws even when clearing a new building, keeping all
+  // later park trees, playground and kiosk decoration at their seeded positions.
+  const scale=.9+r()*.6,kind=pick(r,['round','round','poplar','conifer'] as const),color=pick(r,['#6f9a4e','#5f8a46','#7fa84f','#4f7a3c','#8aa850']),yaw=r()*6;
+  if(clearsRelocatedBuildings(x,z,scale))trees.add(x,G(x,z),z,scale,kind,color,yaw);}
  // playground (x 10..28, z 96..110): sandpit, swings, slide, climbing frame, see-saw, fence
  b.box('soil',19,0,103,16,.06,12,'#d8c79a');fence(b,[[11,97],[27,97],[27,109],[11,109],[11,101]],.9,'#e05a3a',G);
  {b.push(14,0,100,0);for(const x of [-1.6,1.6])for(const z of [-.7,.7])b.box('metal',x,0,z,.08,2.3,.08,'#3d5a80');b.box('metal',0,2.3,0,3.4,.1,.1,'#3d5a80');for(const x of [-.7,.7]){b.box('metal',x,.9,0,.02,1.4,.02,'#999');b.box('timber',x,.5,0,.5,.06,.25,'#e0b04a');}b.pop();}
@@ -123,7 +134,7 @@ export function buildHarbour(b:Builder,t:Terrain,trees:Trees){const r=rng(1501),
  // seafront kiosks and a fish market shed
  for(const [x,c] of [[-30,'#3d8ab0'],[44,'#e05a3a'],[84,'#f0c040']] as [number,string][]){b.push(x,0,133.2,Math.PI);stall(b,3,c,'#ffffff',r,true);b.pop();}
  b.push(SPORTS_LAYOUT.fishMarket.x,0,SPORTS_LAYOUT.fishMarket.z,0);house(b,{w:14,d:6,floors:1,fh:4,wall:'timber',wallC:'#5f7f8f',roof:'gable',roofC:'#3f4448',door:true},r);b.pop();
- for(let x=-36;x<100;x+=9)trees.add(x+4.5,0,132.2,.8,'poplar','#5f8a46',0);
+ for(let x=-36;x<100;x+=9)if(clearsRelocatedBuildings(x+4.5,132.2,.8))trees.add(x+4.5,0,132.2,.8,'poplar','#5f8a46',0);
  for(const x of [-36,31])t.ribbon(b,[[x,93],[x,136.4]],2.4,'#c2b79c','path',.05);
  void TIMBER;
 }

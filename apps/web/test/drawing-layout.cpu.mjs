@@ -5,7 +5,9 @@ import {createEdenOutlookAtmosphere} from '../../../mars/viewer/app/engine-view/
 import {Builder} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/kit.ts';
 import {Terrain} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/terrain.ts';
 import {Trees} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/trees.ts';
-import {buildSports,buildHarbour,southPads} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/south.ts';
+import {buildSports,buildHarbour,buildPark,southPads} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/south.ts';
+import {house} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/buildings.ts';
+import {rng} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/kit.ts';
 import {FOOTPRINTS} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/buildings.ts';
 import {REGION_PLACES} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/places.ts';
 import {buildResort,resortPads} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/resort-lake.ts';
@@ -53,6 +55,34 @@ test('moved clubhouse and fish-market map polygons match their actual transforme
   const bodyBounds=[body.x0,body.z0,body.x1,body.z1];
   for(let i=0;i<4;i++)assert.ok(Math.abs(mapBounds[i]-bodyBounds[i])<1e-6,`${id} map bound ${i} matches the drawn shell`);
   assert.equal(place.capacity,Math.round((body.x1-body.x0)*(body.z1-body.z0)/2.5));
+ }
+});
+
+test('sports catalogue encloses the moved clubhouse and fits actual pitch markings and court pads',()=>{
+ const b=new Builder('legacy'),t=new Terrain(()=>0);southPads(t);buildSports(b,t,new Trees());
+ const bounds=(points)=>[Math.min(...points.map(v=>v[0])),Math.min(...points.map(v=>v[1])),Math.max(...points.map(v=>v[0])),Math.max(...points.map(v=>v[1]))];
+ const placeBounds=(id)=>bounds(REGION_PLACES.find(v=>v.id===id).polygon);
+ const atHeight=(key,y,xMin=-Infinity)=>{const p=b.buf.get(key).p,out=[];for(let i=0;i<p.length;i+=3)if(Math.abs(p[i+1]-y)<1e-6&&p[i]>xMin)out.push([p[i],p[i+2]]);return bounds(out);};
+ const markings=atHeight('dressing',.046),pitch=placeBounds('region-sports-ground.pitch');
+ for(let i=0;i<4;i++)assert.ok(Math.abs(markings[i]-pitch[i]-(i<2?-.06:.06))<1e-6,'pitch label fits actual outside white line centers');
+ assert.deepEqual(placeBounds('region-sports-ground.tennis-courts'),atHeight('soil',.04,90),'two actual 12 by 18 metre court surfaces');
+ const parent=placeBounds('region-sports-ground');
+ for(const id of['clubhouse','pitch','tennis-courts']){const child=placeBounds('region-sports-ground.'+id);assert.ok(child[0]>=parent[0]&&child[1]>=parent[1]&&child[2]<=parent[2]&&child[3]<=parent[3]);}
+});
+
+test('existing park and harbour trees clear the actual relocated shells and clubhouse veranda',()=>{
+ const boxes=[];
+ for(const [x,z,yaw,spec]of[[22.5,117,Math.PI/2,{w:10,d:6,floors:1,roof:'gable',veranda:true}],[20.5,132,0,{w:14,d:6,floors:1,fh:4,wall:'timber',roof:'gable',door:true}]]){
+  const b=new Builder('legacy');b.push(x,0,z,yaw);house(b,spec,rng(1));b.pop();
+  const box=new THREE.Box3();for(const soup of b.buf.values())for(let i=0;i<soup.p.length;i+=3)box.expandByPoint(new THREE.Vector3(...soup.p.slice(i,i+3)));boxes.push(box);
+ }
+ for(const build of[buildPark,buildHarbour]){
+  const b=new Builder('legacy'),t=new Terrain(()=>0),trees=new Trees();southPads(t);build(b,t,trees);
+  for(const tree of trees.list)for(const box of boxes){const dx=Math.max(box.min.x-tree.x,0,tree.x-box.max.x),dz=Math.max(box.min.z-tree.z,0,tree.z-box.max.z);
+   const radius=(tree.k==='conifer'?1.5:tree.k==='poplar'?.9:1.25)*tree.s;
+   assert.ok(Math.hypot(dx,dz)>radius,`tree ${tree.x},${tree.z} canopy clears drawn building/veranda`);
+  }
+  if(build===buildHarbour)assert.deepEqual(trees.list.map(v=>v.x),[-31.5,-22.5,-13.5,-4.5,4.5,31.5,40.5,49.5,58.5,67.5,76.5,85.5,94.5,103.5],'only the two overlapping fixed-row trees are removed');
  }
 });
 
