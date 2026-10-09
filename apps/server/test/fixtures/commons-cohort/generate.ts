@@ -20,6 +20,7 @@ import {buildApp} from '../../../src/http.ts';
 import {IntentControlV2} from '../../../src/intent-control.ts';
 import type {Hub} from '../../../src/hub.ts';
 import {CandidateStationV1} from '../../../src/station.ts';
+import {drainEdenThought} from '../../../src/eden-bootstrap.ts';
 
 export async function generateCommonsCohort(measuredTicks=3600,retryV1=false,diagnosticsV1=false,walkBlockV1=false){
   const dir=mkdtempSync(join(tmpdir(),'eden-commons-cohort-')),path=join(dir,'native.db'),db=new Db(path);
@@ -66,7 +67,7 @@ export async function generateCommonsCohort(measuredTicks=3600,retryV1=false,dia
       for(const r of residents)if(r.firstMotion===undefined&&hashOf(host.engine.world.entities[r.entityId].pose.p)!==hashOf(r.birth))r.firstMotion=host.engine.world.tick;
       if(i%100===0)samples.push({tick:host.engine.world.tick,moving:residents.filter(r=>host.engine.world.entities[r.entityId].human?.activity==='walk').length,activePrograms:residents.filter(r=>host.engine.programOf(r.entityId)).length,violations:host.engine.runtime.violations.length,seq:host.seq});
     }
-    host.drainInputs();await setImmediate();host.drainInputs();
+    brain.quiesce();host.stop();await drainEdenThought(host,brain,service);
     const admissions=retryV1?db.events(worldId).filter(e=>e.kind==='intent-admission-v2').map(e=>intentAdmissionFactV2(e).outcome):[];
     const nativePrograms=diagnosticsV1&&host.engine.canSnapshot?.()!==false?(host.engine.snapshot() as unknown as {programs?:unknown[]}).programs:undefined;
     const observationRows=diagnosticsV1?db.db.prepare('SELECT attempt_id,phase,observation_tick,published_seq FROM intent_observations_v2 WHERE world_id=? ORDER BY observation_tick,attempt_id,phase').all(worldId):undefined;
@@ -107,5 +108,5 @@ export async function generateCommonsCohort(measuredTicks=3600,retryV1=false,dia
       timing:{meanMs:timings.reduce((a,b)=>a+b,0)/timings.length,p95Ms:sorted[Math.floor(sorted.length*.95)],maxMs:sorted.at(-1)},paid:reopenedDb.paidCost(),
       limits:['Synthetic compiler and fake local needs-aware chooser, no real people or providers','Bounded moving ticks/WAL file in same process; no process-crash/lifetime/capacity/device/combinedviewer qualification','Source frontier bounded200rows; initial private pages may legitimately require continuation']};
     }finally{reopenedDb.close();}
-  }finally{host.stop();if(db.db.isOpen)db.close();rmSync(dir,{recursive:true,force:true});}
+  }finally{brain.quiesce();host.stop();if(db.db.isOpen){await drainEdenThought(host,brain,service);db.close();}rmSync(dir,{recursive:true,force:true});}
 }
