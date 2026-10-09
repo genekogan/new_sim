@@ -5,7 +5,9 @@ import {createEdenOutlookAtmosphere} from '../../../mars/viewer/app/engine-view/
 import {Builder} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/kit.ts';
 import {Terrain} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/terrain.ts';
 import {Trees} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/trees.ts';
-import {buildSports,southPads} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/south.ts';
+import {buildSports,buildHarbour,southPads} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/south.ts';
+import {FOOTPRINTS} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/buildings.ts';
+import {REGION_PLACES} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/places.ts';
 import {buildResort,resortPads} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/resort-lake.ts';
 import {furnishBalconyRooms} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/buildings.ts';
 import {authoredBoundarySweepFraction} from '../../../mars/viewer/lib/authored-boundaries.ts';
@@ -36,6 +38,22 @@ test('actual sports fences separate courts from goal run-off and keep a human-si
  assert.equal(authoredBoundarySweepFraction(guards,[99.5,1.65,108.7],[99.5,1.65,105],.28,1.65,.1),1,'front gate admits the same capsule');
  const lines=b.buf.get('dressing').p;assert.ok(lines.some((v,i)=>i%3===1&&Math.abs(v-.051)<1e-5),'court lines stand above the .04m pad');
  assert.ok(lines.some((v,i)=>i%3===1&&Math.abs(v-2.43)<1e-5),'goal grid includes a roof, not an opaque sloping cloth');
+});
+
+test('moved clubhouse and fish-market map polygons match their actual transformed house footprints',()=>{
+ const before=FOOTPRINTS.length,b=new Builder('legacy'),t=new Terrain(()=>0);southPads(t);
+ buildSports(b,t,new Trees());buildHarbour(b,t,new Trees());
+ const drawn=FOOTPRINTS.slice(before);
+ for(const [id,center]of[['region-sports-ground.clubhouse',[22.5,117]],['region-harbour.fish-market',[20.5,132]]]){
+  const body=drawn.find(v=>Math.abs((v.x0+v.x1)/2-center[0])<1e-6&&Math.abs((v.z0+v.z1)/2-center[1])<1e-6);
+  assert.ok(body,'actual transformed building exists');
+  const place=REGION_PLACES.find(v=>v.id===id);assert.ok(place);
+  const xs=place.polygon.map(v=>v[0]),zs=place.polygon.map(v=>v[1]);
+  const mapBounds=[Math.min(...xs),Math.min(...zs),Math.max(...xs),Math.max(...zs)];
+  const bodyBounds=[body.x0,body.z0,body.x1,body.z1];
+  for(let i=0;i<4;i++)assert.ok(Math.abs(mapBounds[i]-bodyBounds[i])<1e-6,`${id} map bound ${i} matches the drawn shell`);
+  assert.equal(place.capacity,Math.round((body.x1-body.x0)*(body.z1-body.z0)/2.5));
+ }
 });
 
 test('pictured resort hotel IDs retain actual shells; decorative room geometry leaves the entry lane and walls clear',()=>{
