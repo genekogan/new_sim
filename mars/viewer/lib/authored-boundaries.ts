@@ -11,8 +11,13 @@ export function authoredBoundarySweepFraction(boxes:readonly AuthoredBoundaryBox
   const local=(p:readonly number[])=>{const x=p[0]-b.c[0],z=p[2]-b.c[2];return[x*cs+z*sn,p[1]-b.c[1],-x*sn+z*cs];},a=local(from),z=local(to);
   const lo=[-b.half[0]-radius,-b.half[1]-above,-b.half[2]-radius],hi=[b.half[0]+radius,b.half[1]+below,b.half[2]+radius];
   let enter=0,leave=1,hit=true;const inside=a.every((v,i)=>v>lo[i]&&v<hi[i]);
-  if(inside){let nearest=Infinity,axis=0,sign=0;for(let i=0;i<3;i++)for(const direction of[-1,1]){const distance=direction<0?a[i]-lo[i]:hi[i]-a[i];if(distance<nearest){nearest=distance;axis=i;sign=direction;}}if((z[axis]-a[axis])*sign>0)continue;fraction=0;continue;}
-  for(let i=0;i<3;i++){const d=z[i]-a[i];if(Math.abs(d)<1e-12){if(a[i]<lo[i]||a[i]>hi[i]){hit=false;break;}continue;}const p=(lo[i]-a[i])/d,q=(hi[i]-a[i])/d;enter=Math.max(enter,Math.min(p,q));leave=Math.min(leave,Math.max(p,q));if(enter>leave){hit=false;break;}}
+  if(inside){let nearest=Infinity,axis=0,sign=0;for(let i=0;i<3;i++)for(const direction of[-1,1]){const distance=direction<0?a[i]-lo[i]:hi[i]-a[i];if(distance<nearest){nearest=distance;axis=i;sign=direction;}}
+   // Inspect the first exit of the entire movement ray, not merely the sign
+   // of one component: a tiny drift toward +X cannot permit a -Z escape.
+   let firstExit=Infinity,exitAxis=-1,exitSign=0;for(let i=0;i<3;i++){const d=z[i]-a[i];if(Math.abs(d)<1e-12)continue;const direction=d>0?1:-1,t=((direction>0?hi[i]:lo[i])-a[i])/d;if(t<firstExit){firstExit=t;exitAxis=i;exitSign=direction;}}
+   if(exitAxis===axis&&exitSign===sign)continue;fraction=0;continue;
+  }
+  for(let i=0;i<3;i++){const d=z[i]-a[i];if(Math.abs(d)<1e-12){if(a[i]<=lo[i]+1e-10||a[i]>=hi[i]-1e-10){hit=false;break;}continue;}const p=(lo[i]-a[i])/d,q=(hi[i]-a[i])/d;enter=Math.max(enter,Math.min(p,q));leave=Math.min(leave,Math.max(p,q));if(enter>=leave){hit=false;break;}}
   if(hit&&enter>=0&&enter<=1)fraction=Math.min(fraction,Math.max(0,enter-1e-7));
  }return fraction;
 }
