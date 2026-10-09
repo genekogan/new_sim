@@ -4,13 +4,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {Hono} from 'hono';
+import {writeFileSync} from 'node:fs';
 import {kernelHash} from '@sim/kernel';
 import {edenNavWorld, factory} from '../test/eden-nav-fixture.ts';
 import {WorldHost} from './world.ts';
 import {mountEdgeRoutes, edgeSoulResolver} from './edge/routes.ts';
 
 async function world(n: number) {
-  const w = await edenNavWorld(n), app = new Hono(), bearer = (c: any) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
+  const ids=process.env.TOGETHER_DIAGNOSTIC_IDS?.split(',');const w = await edenNavWorld(n,{...(ids?{diagnosticSoulIds:ids}:{})}), app = new Hono(), bearer = (c: any) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
   const comms = mountEdgeRoutes(app, {host: w.f.host, db: w.f.db, souls: w.f.souls, soul: edgeSoulResolver(w.f.host, w.f.souls, bearer), ledger: w.ledger});
   const body = (s: {entityId: string}) => (w.engine.world.entities as any)[s.entityId];
   const act = async (s: typeof w.souls[number], capability: string, params?: object, ok = true) => {const out: any = await w.act(s, capability, params); if (ok) assert.equal(out.accepted, true, capability + ' ' + JSON.stringify(out)); return out;};
@@ -98,11 +99,19 @@ test('together: hug (accept), high-five (decline), handshake (lapses), hug back 
   assert.equal(w.phase(a, dn).phase, 'completed'); assert.equal(w.phase(b, dy).phase, 'completed');
 
   // 6. group start: jumping jacks with b and c; all three in sync
+  const groupBeginTick=w.f.host.engine.world.tick,intervals:unknown[]=[],lastDiagnostic=new Map<string,string>();
+  const capture=()=>{const rt=w.f.host.engine.runtime;for(const actor of[a,b,c]){const h=w.body(actor).human,holders=(w.f.host.engine as unknown as {rt:{holder(resource:string):string[]}}).rt.holder('actor:'+actor.entityId),row={tick:rt.tick,soulId:actor.soulId,entityId:actor.entityId,pose:structuredClone(w.body(actor).pose),activity:h.activity,together:structuredClone(h.together??null),holders:[...holders],program:w.f.host.engine.programOf(actor.entityId)};const key=JSON.stringify({...row,tick:0,pose:undefined});if(lastDiagnostic.get(actor.soulId)!==key){intervals.push(row);lastDiagnostic.set(actor.soulId,key);}}};
+  capture();
   const jj = await w.act(a, `jumping jacks with ${b.name} and ${c.name}`, {seconds: 6}); assert.equal(jj.resolved?.to, 'jumping-jacks:here', JSON.stringify(jj));
   for (let i = 0; i < 10; i++) w.f.host.tickOnce();
   const [jb, jc] = [await w.act(b, 'accept'), await w.act(c, 'accept')];
   const started: Record<string, number> = {}, ended: Record<string, number> = {};
-  await w.run([{soulId: a.soulId, id: jj.receipt.id}, {soulId: b.soulId, id: jb.receipt.id}, {soulId: c.soulId, id: jc.receipt.id}], 4000, tick => {for (const s of [a, b, c]) {if (w.body(s).human.activity === 'jumping-jacks') {started[s.soulId] ??= tick; ended[s.soulId] = tick;}}});
+  await w.run([{soulId: a.soulId, id: jj.receipt.id}, {soulId: b.soulId, id: jb.receipt.id}, {soulId: c.soulId, id: jc.receipt.id}], 4000, tick => {capture();for (const s of [a, b, c]) {if (w.body(s).human.activity === 'jumping-jacks') {started[s.soulId] ??= tick; ended[s.soulId] = tick;}}});
+  capture();
+  const records=[...w.f.host.engine.runtime.records.values()].filter(r=>{const p=r.params as {actor?:string};return [a,b,c].some(s=>s.entityId===p?.actor)&&((r.verb==='pose_v1'&&r.history.some(h=>h.tick>=groupBeginTick))||r.id.includes(':make-way:'));}).map(r=>({id:r.id,verb:r.verb,parent:r.parent,status:r.status,params:r.params,history:r.history,diagnostic:r.diagnostic,outputs:r.outputs}));
+  const packet={groupBeginTick,ids:w.souls,started,ended,intervals,records,receiptPhases:[w.phase(a,jj),w.phase(b,jb),w.phase(c,jc)],paidUsd:w.f.db.paidCost(),originalHosted:{started:[1682,1683,1783],lastActivity:[1753,1801,1801],receiptEnds:[1802,1818,1802]}};
+  t.diagnostic('group diagnostic '+JSON.stringify(packet));
+  if(process.env.TOGETHER_DIAGNOSTIC_FILE)writeFileSync(process.env.TOGETHER_DIAGNOSTIC_FILE,JSON.stringify(packet,null,2)+'\n',{flag:'wx'});
   t.diagnostic(JSON.stringify({started, ended}));
   for (const [s, r] of [[a, jj], [b, jb], [c, jc]] as const) assert.equal(w.phase(s, r).phase, 'completed', s.name + JSON.stringify(w.phase(s, r)));
   assert.equal(Object.keys(started).length, 3, 'all three did jumping jacks');

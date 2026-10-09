@@ -31,7 +31,7 @@ export function inSolid(x: number, z: number, s: Solid, shrink = 0): boolean {
   return Math.abs(lx) < s.half[0] - shrink && Math.abs(lz) < s.half[1] - shrink;
 }
 
-export async function edenNavWorld(souls: number, opts: {nav?: boolean; cn5?: boolean} = {}) {
+export async function edenNavWorld(souls: number, opts: {nav?: boolean; cn5?: boolean; diagnosticSoulIds?: readonly string[]} = {}) {
   const PLACES = opts.cn5 ? CN5_PLACES : EDEN_PLACES, SPOTS = opts.cn5 ? CN5_SPOTS : EDEN_SPOTS;
   const GROUND = opts.cn5 ? [...SOUTH_GROUND, ...CN5_DISTRICT_GROUND] : SOUTH_GROUND;
   const NATIVE = opts.cn5 ? [...NATIVE_PLACES, 'eden-south-lawn', ...CN5_DISTRICT_PLACES] : NATIVE_PLACES;
@@ -44,7 +44,17 @@ export async function edenNavWorld(souls: number, opts: {nav?: boolean; cn5?: bo
   await accept(f.host, f.host.installEdenGroundV1()); await accept(f.host, f.host.installEdenLectureV1(placement)); await accept(f.host, f.host.installSocialEdenV1());
   for (const p of [f.host.enableYieldTimeoutV1(), f.host.enableSpreadV2(), f.host.enableContinuousDayV1(), f.host.enableReflexTimeoutV1(), f.host.enableEdgeMotionV1(), ...(opts.cn5 ? [f.host.enableSpreadClearV1()] : [])]) await accept<unknown>(f.host, p);
   const rows: any[] = [];
-  for (let i = 0; i < souls; i++) {await invite(f, 'nav' + i); rows.push(await accept(f.host, f.souls.create('dev:nav' + i, {name: 'Nav ' + i, description: 'walker'})));}
+  if(opts.diagnosticSoulIds){if(opts.diagnosticSoulIds.length!==souls||new Set(opts.diagnosticSoulIds).size!==souls||opts.diagnosticSoulIds.some(id=>!/^s_[0-9a-f]{10}$/.test(id)))throw Error('exact logged diagnostic IDs required');}
+  for (let i = 0; i < souls; i++) {
+    await invite(f, 'nav' + i);
+    if(!opts.diagnosticSoulIds){rows.push(await accept(f.host, f.souls.create('dev:nav' + i, {name: 'Nav ' + i, description: 'walker'})));continue;}
+    // Diagnostic ONLY: original hosted birth identities through the existing
+    // lifecycle journal/native admission seam, never pose SQL or teleportation.
+    const soulId=opts.diagnosticSoulIds[i],entityId='h_'+soulId.slice(2),runner=f.souls.lifecycle!,requestId='lc_'+String(i+1).padStart(32,'0');
+    runner.journal.acceptCreate({worldId:f.host.worldId,soulId,entityId,owner:'dev:nav'+i},requestId,{name:'Nav '+i,description:'walker',native:false},()=>true);runner.pump();
+    for(let j=0;j<50&&!f.souls.controlReady(f.db.soul(soulId)!);j++){await setImmediate();f.host.drainInputs();runner.pump();}
+    const row=f.db.soul(soulId)!;if(!f.souls.controlReady(row)||runner.faults.size)throw Error('logged diagnostic birth did not admit');rows.push(row);
+  }
   let spec: NavSpec | null = null;
   const spots = loadSpots(SPOTS).data, engine = f.host.engine as any, extra = opts.cn5 ? loadSpots(CN5_DISTRICT_SOLIDS).data.solids : [];
   if (opts.nav !== false) {
