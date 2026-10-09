@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {validAuthoredBoundary,type AuthoredBoundaryBox} from '../../../../../lib/authored-boundaries.ts';
 import {EDEN_ROOM_GLSL} from '../eden-window-interiors.ts';
 /** Regions panes (merged facades, no pane coordinates): rooms on a 3.2 m × 2.9 m world grid behind each facade
  * plane; lit-tone panes (vertex colour) light up when their room's threshold is under the evening's lit fraction;
@@ -50,11 +51,20 @@ const col=(c:Col)=>c instanceof THREE.Color?c:new THREE.Color(c);
 export const SEE_THROUGH:readonly MatKey[]=['glass','path','flower','cloth','metal','soil','water','foliage'];
 /** Per-material triangle soup with a transform stack. */
 export class Builder{
+ readonly boundaries:AuthoredBoundaryBox[]=[];
  readonly buf=new Map<MatKey,{p:number[];n:number[];c:number[]}>();
  m=new THREE.Matrix4();private stack:THREE.Matrix4[]=[];
  push(x:number,y:number,z:number,yaw=0,s=1){this.stack.push(this.m.clone());const t=new THREE.Matrix4().compose(new THREE.Vector3(x,y,z),new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),yaw),new THREE.Vector3(s,s,s));this.m.multiply(t);return this;}
  pushM(t:THREE.Matrix4){this.stack.push(this.m.clone());this.m.multiply(t);return this;}
  pop(){this.m=this.stack.pop()!;return this;}
+ /** Capture the exact authored prism beside its draw. Never infer a collider
+  * from a mesh name, foundation, floor or a merged district bounding box. */
+ boundary(kind:'wall'|'guard',cx:number,y0:number,cz:number,sx:number,sy:number,sz:number,buildingId:string,partId:string):void{
+  const e=this.m.elements,scaleX=Math.hypot(e[0],e[2]),scaleY=Math.abs(e[5]),scaleZ=Math.hypot(e[8],e[10]);
+  if(Math.max(Math.abs(e[1]),Math.abs(e[4]),Math.abs(e[6]),Math.abs(e[9]))>1e-8||e[5]<=0||Math.abs(e[0]*e[8]+e[2]*e[10])>1e-8)throw Error('authored-boundary.requires-upright-orthogonal-frame');
+  const p=new THREE.Vector3(cx,y0+sy/2,cz).applyMatrix4(this.m),b:AuthoredBoundaryBox={id:buildingId+':'+partId,buildingId,kind,c:p.toArray() as [number,number,number],half:[sx*scaleX/2,sy*scaleY/2,sz*scaleZ/2],yaw:Math.atan2(e[2],e[0])};
+  if(!validAuthoredBoundary(b))throw Error('authored-boundary.invalid-prism');this.boundaries.push(b);
+ }
  /** Push a rotation about local x or z (tilted parts: see-saws, wheels, hay bales). */
  pushRot(axis:'x'|'z',angle:number){return this.pushM(axis==='x'?new THREE.Matrix4().makeRotationX(angle):new THREE.Matrix4().makeRotationZ(angle));}
  b(k:MatKey){let b=this.buf.get(k);if(!b)this.buf.set(k,b={p:[],n:[],c:[]});return b;}
@@ -88,9 +98,10 @@ export class Builder{
  disc(k:MatKey,cx:number,y:number,cz:number,r:number,seg:number,color:Col){for(let i=0;i<seg;i++){const a=i/seg*Math.PI*2,b=(i+1)/seg*Math.PI*2;this.tri(k,[cx,y,cz],[cx+Math.cos(b)*r,y,cz+Math.sin(b)*r],[cx+Math.cos(a)*r,y,cz+Math.sin(a)*r],color);}}
  /** Moves every triangle to the builder chosen by its centroid (glass to the windows sink, far parts to the
   * distant sink, the rest to its sector) so many small districts share a few draws and ray objects. */
- drain(route:(cx:number,cz:number,k:MatKey)=>Builder){for(const [k,B] of this.buf){for(let t=0;t<B.p.length;t+=9){const T=route((B.p[t]+B.p[t+3]+B.p[t+6])/3,(B.p[t+2]+B.p[t+5]+B.p[t+8])/3,k).b(k);for(let i=t;i<t+9;i++){T.p.push(B.p[i]);T.n.push(B.n[i]);T.c.push(B.c[i]);}}}this.buf.clear();}
+  drain(route:(cx:number,cz:number,k:MatKey)=>Builder){for(const [k,B] of this.buf){for(let t=0;t<B.p.length;t+=9){const T=route((B.p[t]+B.p[t+3]+B.p[t+6])/3,(B.p[t+2]+B.p[t+5]+B.p[t+8])/3,k).b(k);for(let i=t;i<t+9;i++){T.p.push(B.p[i]);T.n.push(B.n[i]);T.c.push(B.c[i]);}}}this.buf.clear();for(const b of this.boundaries)route(b.c[0],b.c[2],b.kind==='guard'?'metal':'stone').boundaries.push(b);this.boundaries.length=0;}
  /** Emits one mesh per material into group; returns triangle count. */
  emit(group:THREE.Group,mats:Materials,name:string,geos:THREE.BufferGeometry[],opts:{transparent?:MatKey[];splitX?:number;far?:(x:number,z:number)=>boolean;farSink?:Builder;allClear?:boolean;glassSink?:Builder}={}){let tris=0;
+  group.userData.edenAuthoredBoundaries=[...(group.userData.edenAuthoredBoundaries??[]),...this.boundaries.map(b=>({...b,c:[...b.c],half:[...b.half]}))];
   // All window glass (and lamp heads) goes to one shared night-lit draw.
   if(opts.glassSink){const B=this.buf.get('glass');if(B){const G=opts.glassSink.b('glass');for(let i=0;i<B.p.length;i++){G.p.push(B.p[i]);G.n.push(B.n[i]);G.c.push(B.c[i]);}this.buf.delete('glass');}}
   // Far triangles (that can never stand between a Broadcast camera and a subject) move to a shared sink that is
@@ -105,7 +116,7 @@ export class Builder{
   for(const [k,B] of this.buf){if(opts.splitX===undefined||k==='dressing'||k==='water'){parts.push([k,B,'']);continue;}const A={p:[] as number[],n:[] as number[],c:[] as number[]},C={p:[] as number[],n:[] as number[],c:[] as number[]};
    for(let t=0;t<B.p.length;t+=9){const T=(B.p[t]+B.p[t+3]+B.p[t+6])/3<opts.splitX?A:C;for(let i=t;i<t+9;i++){T.p.push(B.p[i]);T.n.push(B.n[i]);T.c.push(B.c[i]);}}parts.push([k,A,' west'],[k,C,' east']);}
   for(const [k,B,suffix] of parts){if(!B.p.length)continue;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(B.p,3));g.setAttribute('normal',new THREE.Float32BufferAttribute(B.n,3));g.setAttribute('color',new THREE.Float32BufferAttribute(B.c,3));g.computeBoundingBox();g.computeBoundingSphere();geos.push(g);
-   const mesh=new THREE.Mesh(g,mats.get(k));mesh.name=name+' / '+mats.get(k).name.replace('Regions ','')+suffix;mesh.receiveShadow=k!=='glass'&&k!=='water';mesh.castShadow=false;
+   const mesh=new THREE.Mesh(g,mats.get(k));mesh.name=name+' / '+mats.get(k).name.replace('Regions ','')+suffix;mesh.receiveShadow=k!=='glass'&&k!=='water';mesh.castShadow=false;mesh.userData.edenWindRooted=false;
    if(opts.allClear||k==='dressing'||(opts.transparent??SEE_THROUGH).includes(k))mesh.userData.cameraTransparent=true;
    mesh.matrixAutoUpdate=false;group.add(mesh);tris+=B.p.length/9;}
   this.buf.clear();return tris;}

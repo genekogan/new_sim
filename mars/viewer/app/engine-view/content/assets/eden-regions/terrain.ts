@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {groundTriangleSampler} from '../../../../../lib/ground-triangles.ts';
 import {Builder,type Materials} from './kit.ts';
 /** Visual terrain OUTSIDE the current expansion rectangle [-100,105]x[-65,85].
  * Scenery only: no native support, collision or route. At the rectangle edge it
@@ -71,6 +72,9 @@ function relief(x:number,z:number){
  return h;
 }
 export class Terrain{
+ private drawn:ReturnType<typeof groundTriangleSampler>|null=null;
+ /** Actual Float32 triangle height after build, not the analytic relief sketch. */
+ sampleRenderedGround(x:number,z:number){return this.drawn?.heightAt(x,z)??null;}
  pads:Pad[]=[];
  // Spatial index of pads (24 m cells) and polyline bounding boxes: built lazily, dropped when pads change.
  private grid:Map<number,number[]>|null=null;private gridN=0;private boxes=new WeakMap<object,number[]>();
@@ -127,7 +131,7 @@ export class Terrain{
   for(let j=1;j<nz;j++)for(let i=1;i<nx;i++){const cx=(xs[i-1]+xs[i])/2,cz=(zs[j-1]+zs[j])/2;if(cx>INNER[0]&&cx<INNER[2]&&cz>INNER[1]&&cz<INNER[3])continue;
    const a=v(i-1,j-1),b=v(i,j-1),cc=v(i,j),dd=v(i-1,j);idx.push(a,cc,b,a,dd,cc);}
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));g.setIndex(idx);g.computeVertexNormals();g.computeBoundingBox();g.computeBoundingSphere();geos.push(g);
-  const m=mats.get('ground');const mesh=new THREE.Mesh(g,m);mesh.name='Regions cosmetic ground terrain (scenery only; no native support)';mesh.receiveShadow=true;mesh.matrixAutoUpdate=false;group.add(mesh);
+  const m=mats.get('ground');const mesh=new THREE.Mesh(g,m);mesh.name='Regions cosmetic ground terrain (scenery only; no native support)';mesh.receiveShadow=true;mesh.matrixAutoUpdate=false;group.add(mesh);this.drawn=groundTriangleSampler(mesh);
   // The terrain never stands between a Broadcast camera and a subject (it has a hole over the inhabited
   // rectangle and stays flat near it), so it is kept out of camera rays. A one-triangle opaque anchor below
   // the promenade shares its material, so the realism pass still finishes the (shared) ground material.

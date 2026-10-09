@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {validAuthoredBoundary,type AuthoredBoundaryBox} from '../../../../../lib/authored-boundaries.ts';
 import type {Ground} from '../eden-expansion-assets/venue.ts';
 import {Builder,Materials,rng,pick} from './kit.ts';
 import {SEABED,Terrain,outside,fbm,WATER,INNER} from './terrain.ts';
@@ -74,7 +75,7 @@ export const REGION_EXPLORE:readonly {id:string;label:string;camera:[number,numb
 ]);
 export const FAR_CLEAR=35;
 const inDistrict=(x:number,z:number,m=0)=>REGION_DISTRICTS.some(d=>x>d.bounds[0]-m&&x<d.bounds[2]+m&&z>d.bounds[1]-m&&z<d.bounds[3]+m);
-export function createEdenRegions(ground:Ground):{group:THREE.Group;dispose():void;stats:{draws:number;triangles:number}}|null{
+export function createEdenRegions(ground:Ground):{group:THREE.Group;dispose():void;stats:{draws:number;triangles:number};sampleVisualGround:Ground;authoredBoundaries:AuthoredBoundaryBox[]}|null{
  if(typeof ground!=='function')return null;
  FOOTPRINTS.length=0;CHIMNEYS.length=0;LIGHTS.length=0;
  const edge=(x:number,z:number)=>{const y=ground(Math.min(Math.max(x,INNER[0]+.01),INNER[2]-.01),Math.min(Math.max(z,INNER[1]+.01),INNER[3]-.01));return typeof y==='number'&&Number.isFinite(y)?y:0;};
@@ -161,6 +162,7 @@ export function createEdenRegions(ground:Ground):{group:THREE.Group;dispose():vo
   group.updateMatrixWorld(true);
   let draws=0;group.traverse(o=>{if((o as THREE.Mesh).isMesh)draws++;});
   group.userData.stats={draws,triangles:tris};
-  return {group,dispose,stats:{draws,triangles:tris}};
+  const authoredBoundaries:AuthoredBoundaryBox[]=[],seen=new Set<string>();group.traverse(o=>{for(const b of o.userData.edenAuthoredBoundaries??[]){if(!validAuthoredBoundary(b)||seen.has(b.id))throw Error('regions.invalid-authored-boundary');seen.add(b.id);authoredBoundaries.push({...b,c:[...b.c],half:[...b.half]});}});authoredBoundaries.sort((a,b)=>a.id.localeCompare(b.id));group.userData.edenAuthoredBoundaries=authoredBoundaries;
+  return {group,dispose,stats:{draws,triangles:tris},sampleVisualGround:(x,z)=>closed?null:t.sampleRenderedGround(x,z),authoredBoundaries};
  }catch(e){dispose();throw e;}
 }
