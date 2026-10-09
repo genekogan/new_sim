@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import {clone} from 'three/addons/utils/SkeletonUtils.js';
 import type {GLTF} from 'three/addons/loaders/GLTFLoader.js';
-import {hash01,loadPack} from './assets.ts';
+import {hash01,loadPack,decorationGround} from './assets.ts';
 import {HERDS,FLOCKS,AVOID,type Herd,type Rect} from './animal-plan.ts';
 /** Animals of Eden (scenery only, never engine actors): farm animals in the farm hamlet's pastures, dogs and cats about
  * town and the gardens, deer and foxes at the woodland edges, birds wheeling over the meadows. Each animal wanders a
@@ -10,8 +10,8 @@ import {HERDS,FLOCKS,AVOID,type Herd,type Rect} from './animal-plan.ts';
  * Rendering: one skinned clone per animal (one draw each: colours baked into vertex colours), drawn within DRAW_M of the
  * camera, animated within ANIMATE_M (farther ones hold their pose), all updated from one per-frame hook. */
 const DRAW_M=140,ANIMATE_M=70,ROAM_SEGMENTS=6;
-type Agent={id:string;herd:Herd;root:THREE.Object3D;mixer:THREE.AnimationMixer;acts:Record<string,THREE.AnimationAction|undefined>;cur:string;speed:number};
-type Flyer={root:THREE.Object3D;mixer:THREE.AnimationMixer;act?:THREE.AnimationAction;c:[number,number];r:number;h:number;w:number;ph:number;y?:number};
+type Agent={id:string;herd:Herd;root:THREE.Object3D;model:THREE.Object3D;mixer:THREE.AnimationMixer;acts:Record<string,THREE.AnimationAction|undefined>;cur:string;speed:number};
+type Flyer={root:THREE.Object3D;model:THREE.Object3D;mixer:THREE.AnimationMixer;act?:THREE.AnimationAction;c:[number,number];r:number;h:number;w:number;ph:number;y?:number};
 const inRect=(r:Rect,x:number,z:number)=>x>=r[0]&&x<=r[2]&&z>=r[1]&&z<=r[3];
 const blocked=(x:number,z:number,zone:readonly Rect[])=>!zone.some(r=>inRect(r,x,z))||AVOID.some(r=>inRect(r,x,z));
 /** A seeded point of the herd's zone (rejection sampled, also off the avoid rects), and whether the straight walk there is clear. */
@@ -41,10 +41,10 @@ export function agentAt(h:Herd,id:string,t:number):[number,number,number,boolean
  if(f<walkT&&dist>1e-3){const v=f/walkT;return [a[0]+dx*v,a[1]+dz*v,heading,true];}
  return [b[0],b[1],heading+(f-walkT)*0.02*(hash01(id,k+3)-.5),false];
 }
-export function createEdenAnimals(ground:(x:number,z:number)=>number|null){
+export function createEdenAnimals(ground:(x:number,z:number)=>number|null,assetsLoader:typeof loadPack=loadPack){
  const group=new THREE.Group();group.name='Eden animals (scenery only)';
  const agents:Agent[]=[],flyers:Flyer[]=[];let closed=false,ready=false;
- const gy=(x:number,z:number)=>{const y=ground(x,z);return y!==null&&Number.isFinite(y)?y:0;};
+
  const cam=new THREE.Vector3();
  // per-frame hook: an empty, never-culled mesh (no triangles are drawn)
  const hookGeo=new THREE.BufferGeometry();hookGeo.setAttribute('position',new THREE.Float32BufferAttribute([0,0,0,0,0,0,0,0,0],3));hookGeo.setDrawRange(0,0);
@@ -55,8 +55,8 @@ export function createEdenAnimals(ground:(x:number,z:number)=>number|null){
  function update(t:number,_dt:number){
   for(const a of agents){
    const [x,z,yaw,moving]=agentAt(a.herd,a.id,t),d=Math.hypot(x-cam.x,z-cam.z);
-   a.root.visible=d<DRAW_M;if(!a.root.visible)continue;
-   a.root.position.set(x,gy(x,z),z);a.root.rotation.y=yaw;
+   const y=decorationGround(ground,x,z);a.root.visible=d<DRAW_M&&y!==null;if(!a.root.visible)continue;
+   a.root.position.set(x,y!,z);a.root.rotation.y=yaw;
    if(d>ANIMATE_M&&a.cur)continue;
    // standing still without an idle clip: the walk clip held at its first frame
    let want=moving?'walk':(a.herd.clips.eat&&a.acts.eat&&hash01(a.id,Math.floor(t/23))<.55?'eat':'idle');const hold=want==='idle'&&!a.acts.idle;if(hold)want='walk';
@@ -66,34 +66,36 @@ export function createEdenAnimals(ground:(x:number,z:number)=>number|null){
   }
   for(const f of flyers){
    const ang=f.ph+t*f.w,x=f.c[0]+Math.cos(ang)*f.r,z=f.c[1]+Math.sin(ang)*f.r,d=Math.hypot(x-cam.x,z-cam.z);
-   f.root.visible=d<(f.y!==undefined?60:DRAW_M);if(!f.root.visible)continue;
+   const y=f.y??decorationGround(ground,x,z);f.root.visible=d<(f.y!==undefined?60:DRAW_M)&&y!==null;if(!f.root.visible)continue;
    if(f.y!==undefined){f.root.position.set(x,f.y+Math.sin(t*.9+f.ph)*.04,z);f.root.rotation.y=-ang+(f.w>0?0:Math.PI);}
-   else{f.root.position.set(x,gy(f.c[0],f.c[1])+f.h+Math.sin(t*.7+f.ph)*1.2,z);f.root.rotation.y=-ang+(f.w>0?0:Math.PI);f.root.rotation.z=(f.w>0?-1:1)*.25;}
+   else{f.root.position.set(x,y!+f.h+Math.sin(t*.7+f.ph)*1.2,z);f.root.rotation.y=-ang+(f.w>0?0:Math.PI);f.root.rotation.z=(f.w>0?-1:1)*.25;}
    if(f.act&&d<ANIMATE_M*1.5){const dur=f.act.getClip().duration;f.act.time=((t+f.ph)%dur+dur)%dur;f.mixer.update(0);}
   }
  }
  const prep=(src:THREE.Object3D)=>{const o=clone(src);o.traverse(m=>{const mesh=m as THREE.Mesh;if(mesh.isMesh){mesh.castShadow=true;mesh.receiveShadow=false;mesh.frustumCulled=true;
   const mat=mesh.material as THREE.MeshStandardMaterial;if(mat&&!mat.userData.edenImports){mat.vertexColors=true;mat.roughness=.85;mat.metalness=0;mat.userData.edenImports=true;mat.needsUpdate=true;}}});return o;};
  const clipOf=(gltf:GLTF,model:string,name:string|undefined)=>name?THREE.AnimationClip.findByName(gltf.animations,`${model}|${name}`):null;
- loadPack('eden-animals.glb').then(gltf=>{
+ assetsLoader('eden-animals.glb').then(gltf=>{
   if(closed)return;
   for(const h of HERDS){
    const src=gltf.scene.getObjectByName(h.model);if(!src)continue;
    for(let i=0;i<h.count;i++){
-    const id=`${h.id}-${i}`,root=prep(src);root.name='animal '+id;root.position.set(0,0,0);root.scale.multiplyScalar(h.scale??1);
-    const mixer=new THREE.AnimationMixer(root),acts:Agent['acts']={};
+    const id=`${h.id}-${i}`,model=prep(src),root=new THREE.Group();root.name='animal '+id;root.add(model);root.scale.multiplyScalar(h.scale??1);
+    // Clips own only the model's local pose. The support/placement parent is
+    // outside the mixer, so animated root tracks cannot reset terrain height.
+    const mixer=new THREE.AnimationMixer(model),acts:Agent['acts']={};
     for(const k of ['idle','walk','eat'] as const){const c=clipOf(gltf,h.model,h.clips[k]);if(c){const a=mixer.clipAction(c);a.play();a.setEffectiveWeight(0);acts[k]=a;}}
-    agents.push({id,herd:h,root,mixer,acts,cur:'',speed:h.clipRate??1});group.add(root);
+    agents.push({id,herd:h,root,model,mixer,acts,cur:'',speed:h.clipRate??1});group.add(root);
    }
   }
   for(const fl of FLOCKS){
    const src=gltf.scene.getObjectByName(fl.model);if(!src)continue;
-   for(let i=0;i<fl.count;i++){const root=prep(src);root.scale.multiplyScalar(fl.scale??1);const mixer=new THREE.AnimationMixer(root),c=clipOf(gltf,fl.model,fl.clip);const act=c?mixer.clipAction(c):undefined;act?.play();
-    const ph=hash01(fl.id,i)*Math.PI*2;flyers.push({root,mixer,act,c:[fl.centre[0]+(hash01(fl.id,i+50)-.5)*6,fl.centre[1]+(hash01(fl.id,i+90)-.5)*6],r:fl.radius*(0.75+0.5*hash01(fl.id,i+7)),h:fl.height+hash01(fl.id,i+3)*4,w:(i%2?1:-1)*fl.speed/fl.radius,ph,...(fl.y!==undefined?{y:fl.y}:{})});group.add(root);}
+   for(let i=0;i<fl.count;i++){const model=prep(src),root=new THREE.Group();root.add(model);root.scale.multiplyScalar(fl.scale??1);const mixer=new THREE.AnimationMixer(model),c=clipOf(gltf,fl.model,fl.clip);const act=c?mixer.clipAction(c):undefined;act?.play();
+    const ph=hash01(fl.id,i)*Math.PI*2;flyers.push({root,model,mixer,act,c:[fl.centre[0]+(hash01(fl.id,i+50)-.5)*6,fl.centre[1]+(hash01(fl.id,i+90)-.5)*6],r:fl.radius*(0.75+0.5*hash01(fl.id,i+7)),h:fl.height+hash01(fl.id,i+3)*4,w:(i%2?1:-1)*fl.speed/fl.radius,ph,...(fl.y!==undefined?{y:fl.y}:{})});group.add(root);}
   }
   ready=true;
  }).catch(e=>console.warn('Eden animals unavailable',e));
  return {group,
   stats:()=>({animals:agents.length,birds:flyers.length,visible:[...agents,...flyers].filter(a=>a.root.visible).length}),
-  dispose(){if(closed)return;closed=true;group.removeFromParent();for(const a of agents){a.mixer.stopAllAction();a.mixer.uncacheRoot(a.root);}for(const f of flyers){f.mixer.stopAllAction();}hookGeo.dispose();hookMat.dispose();group.clear();}};
+  dispose(){if(closed)return;closed=true;group.removeFromParent();for(const a of agents){a.mixer.stopAllAction();a.mixer.uncacheRoot(a.model);}for(const f of flyers){f.mixer.stopAllAction();f.mixer.uncacheRoot(f.model);}hookGeo.dispose();hookMat.dispose();group.clear();}};
 }

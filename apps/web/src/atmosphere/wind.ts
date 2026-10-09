@@ -39,7 +39,7 @@ export function windModeOf(path:string):WindMode|null{
 }
 /** Shared by every patched material: x time (s, wrapped), y strength, zw unit direction (xz). */
 export const WIND={value:{x:0,y:0,z:1,w:0}};
-const KEY='eden-atmos-wind-v1';
+const KEY='eden-atmos-wind-v2';
 const HEAD=/* glsl */`
 uniform vec4 uEdenWind;
 uniform vec4 uEdenWindP;
@@ -68,7 +68,9 @@ vEdenGust=0.0;
   vec3 edenV=vec3(edenD.x,0.0,edenD.y)*edenSw*edenB;
   edenV.xz+=vec2(-edenD.y,edenD.x)*edenB*edenS*.3*sin(edenT*2.2+edenPh*1.3);
   vec3 edenWp=(edenWM*vec4(transformed,1.0)).xyz;
-  edenV+=uEdenWindP.z*edenS*(.6+edenG)*vec3(sin(edenT*7.0+edenWp.x*3.1+edenWp.y*2.0),.5*sin(edenT*8.3+edenWp.z*2.7),cos(edenT*6.4+edenWp.z*3.3+edenWp.y*1.7))*min(edenHL+edenHO*.1,1.0);
+  // Flutter starts at the actual local piece root. Absolute terrain elevation
+  // cannot move a blade's pinned base (including a root on a hill).
+  edenV+=uEdenWindP.z*edenS*(.6+edenG)*vec3(sin(edenT*7.0+edenWp.x*3.1+edenWp.y*2.0),.5*sin(edenT*8.3+edenWp.z*2.7),cos(edenT*6.4+edenWp.z*3.3+edenWp.y*1.7))*min(edenHL,1.0);
   // world offset → local: column projections (exact for rotation×scale, close enough with mild shear)
   transformed+=vec3(dot(edenWM[0].xyz,edenV)/dot(edenWM[0].xyz,edenWM[0].xyz),dot(edenWM[1].xyz,edenV)/dot(edenWM[1].xyz,edenWM[1].xyz),dot(edenWM[2].xyz,edenV)/dot(edenWM[2].xyz,edenWM[2].xyz));
  }
@@ -126,7 +128,10 @@ export class WindPatches{
    if(skip?.(o))return;
    const mesh=o as THREE.Mesh;
    if(mesh.isMesh&&!(o as THREE.SkinnedMesh).isSkinnedMesh){
-    const path=(o.parent?.name??'')+' > '+o.name,mode=windModeOf(path);
+    const path=(o.parent?.name??'')+' > '+o.name,candidate=windModeOf(path);
+    // Merged world-space plants have many distinct roots baked into their
+    // vertices. A single origin/base uniform cannot represent those anchors.
+    const mode=o.userData.edenWindRooted===false&&candidate&&['grass','crown','trunk'].includes(candidate)?null:candidate;
     for(const m of ([] as THREE.Material[]).concat(mesh.material)){
      if(this.patched.has(m)||this.rejected.has(m))continue;
      let u=users.get(m);if(!u){u={modes:new Set(),minY:Infinity,indexed:false,box:new THREE.Box3(),pieces:false};users.set(m,u);}
@@ -163,7 +168,7 @@ export class WindPatches{
    shader.vertexShader=HEAD+(plant?'varying float vEdenGust;\n':'')+shader.vertexShader.replace('#include <begin_vertex>','#include <begin_vertex>\n'+(mode==='bunting'?BUNTING:CLOTH.has(mode)?cloth(mode):BODY));
    if(plant)shader.fragmentShader='varying float vEdenGust;\n'+shader.fragmentShader.replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb*=1.0+vEdenGust*'+(mode==='grass'?'.32':mode==='crown'?'.12':'0.0')+';');
   };
-  material.customProgramCacheKey=function(){return previousKey.call(this)+'|'+KEY+':'+(mode==='bunting'||CLOTH.has(mode)?mode:'v');};
+  material.customProgramCacheKey=function(){return previousKey.call(this)+'|'+KEY+':'+mode;};
   material.needsUpdate=true;
   this.patched.set(material,{material,onBeforeCompile:previous,key:previousKey,mode});
  }

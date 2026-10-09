@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {hash01,loadPack,modelGeometry,PackSoup} from './assets.ts';
+import {hash01,loadPack,modelGeometry,PackSoup,decorationGround} from './assets.ts';
 import {FIXTURES} from './interior-plan.ts';
 /** Food and table settings and house fixtures (Quaternius Ultimate Food + House Interior, Kenney Food
  * Kit; CC0). Decorative only: these are not engine items (Souls' own food, cups and plates stay the engine's and are
@@ -22,13 +22,13 @@ export function createEdenProps(ground: (x: number, z: number) => number | null,
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .6, metalness: 0 }); mat.name = 'Eden table props';
   const mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat); mesh.name = 'table settings and produce'; mesh.castShadow = true; mesh.receiveShadow = true; group.add(mesh);
   let closed = false, triangles = 0;
-  const gy = (x: number, z: number) => { const y = ground(x, z); return y !== null && Number.isFinite(y) ? y : 0; };
   loadPack('eden-food.glb').then((gltf) => {
     if (closed) return;
     const soup = new PackSoup(), geos = new Map<string, THREE.BufferGeometry | null>();
     const geo = (n: string) => { if (!geos.has(n)) geos.set(n, modelGeometry(gltf, n)); return geos.get(n)!; };
     for (const s of settings) {
-      const yaw = s.yaw ?? 0, c = Math.cos(yaw), sn = Math.sin(yaw), base = gy(s.at[0], s.at[1]) + s.y;
+      const y=decorationGround(ground,s.at[0],s.at[1]);if(y===null)continue;
+      const yaw = s.yaw ?? 0, c = Math.cos(yaw), sn = Math.sin(yaw), base = y+s.y;
       // stacked items (a croissant on its plate) rest on what is already there at that spot
       const tops = new Map<string, number>();
       for (const [model, dx, dz, ry] of s.items) {

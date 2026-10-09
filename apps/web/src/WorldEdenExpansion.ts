@@ -1,3 +1,6 @@
+import {publishedGroundSampler} from './WorldPublishedGround.ts';
+import type {SceneInfo} from './WorldGeometry.ts';
+import type {AuthoredBoundaryBox} from '../../../mars/viewer/lib/authored-boundaries.ts';
 import type {OfficeGuardBox} from '../../../mars/viewer/lib/office-stair-guards.ts';
 import {createWorldEdenSurfaceStudy} from './WorldEdenSurfaceStudy.ts';
 import {createWorldEdenPlaces} from './WorldEdenPlaces.ts';
@@ -38,11 +41,13 @@ import {setDepthFitGround} from '../../../mars/viewer/lib/depth-fit.ts';
 import {currentClassroomPresentation,type LocalClassroomPresentation} from './WorldClassroomPresentation.ts';
 /** One connected visual assembly. New places never manufacture native actors,
  * support, claims or participation. Existing published fixture draws win. */
-export function createWorldEdenExpansion(officeGuards:readonly OfficeGuardBox[]=[]){
+export function createWorldEdenExpansion(officeGuards:readonly OfficeGuardBox[]=[],groundPublication?:Pick<SceneInfo,'scene'|'shore'>){
  const group=new THREE.Group(),owners:{group:THREE.Group;dispose():void}[]=[],hidden:THREE.Object3D[]=[];
  group.name='Eden — connected growing world';
  let visualGround:(x:number,z:number)=>number|null=expansionHeight;
- const proposedGround=(x:number,z:number)=>x>=-30&&x<=30&&z>=-30&&z<=30?0:visualGround(x,z);
+ const nativeGround=publishedGroundSampler(groundPublication);let regionalGround:((x:number,z:number)=>number|null)|null=null;
+ const proposedGround=(x:number,z:number)=>nativeGround(x,z)??(x>=-30&&x<=30&&z>=-30&&z<=30?0:visualGround(x,z)??regionalGround?.(x,z)??null);
+ let authoredBoundaries:AuthoredBoundaryBox[]=[];
  let wind:ReturnType<typeof createWorldEdenWind>|null=null,windWanted=false;
  let surfaceStudy:ReturnType<typeof createWorldEdenSurfaceStudy>|null=null;
  let surfaceGroup:THREE.Group|null=null;
@@ -64,9 +69,10 @@ export function createWorldEdenExpansion(officeGuards:readonly OfficeGuardBox[]=
   const streetDetails=createEdenStreetDetails(proposedGround);if(streetDetails){owners.push(streetDetails);group.add(streetDetails.group);}
   const artistRow=createEdenArtistRow(proposedGround);if(artistRow){owners.push(artistRow);group.add(artistRow.group);}
   // Edge lanes (each owns its module): new regions, street props, interiors, commons wayfinding.
-  for(const make of [createEdenRegions,createEdenStreetProps,createEdenInteriors,createEdenWayfinding,createEdenFacades,createEdenEventKit,createEdenComputers,createEdenSportsKit,createEdenDistricts,createEdenImports]){try{const lane=make(proposedGround);if(lane){owners.push(lane);group.add(lane.group);}}catch(error){console.warn('Eden lane scenery unavailable',error);}}
+  const regions=createEdenRegions(proposedGround);if(regions){owners.push(regions);group.add(regions.group);regionalGround=regions.sampleVisualGround;authoredBoundaries=regions.authoredBoundaries;}
+  for(const make of [createEdenStreetProps,createEdenInteriors,createEdenWayfinding,createEdenFacades,createEdenEventKit,createEdenComputers,createEdenSportsKit,createEdenDistricts,createEdenImports]){try{const lane=make(proposedGround);if(lane){owners.push(lane);group.add(lane.group);}}catch(error){console.warn('Eden lane scenery unavailable',error);}}
   // Ground details: near-camera grass tufts and wildflowers, worn path edges, field stones, fallen leaves.
-  try{const details=createWorldGroundDetails();owners.push(details);group.add(details.group);}catch(error){console.warn('Eden ground details unavailable',error);}
+  try{const details=createWorldGroundDetails(proposedGround,(x,z)=>{const water=groundPublication?.shore?.metadata.water;if(!water)return false;const b=water.wetBoundsXZ,y=nativeGround(x,z);return x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3]&&y!==null&&y<water.datumY;});owners.push(details);group.add(details.group);}catch(error){console.warn('Eden ground details unavailable',error);}
   const bankY=landscape.sampleVisualGround(-81,-22);if(bankY!==null){const bridge=createEdenRiverCrossing({deckTopY:bankY+.35,bankSample:landscape.sampleVisualGround});if(bridge){owners.push(bridge);group.add(bridge.group);}}
   const buildings=[...neighborhood.plan.map(b=>({id:b.id,group:neighborhood.buildingOwners.find(o=>o.id===b.id)?.group as THREE.Group,root:b.root,parts:b.sourceInspection.parts})),...publicQuarter.plan.map(b=>({id:b.id,group:publicQuarter.group.getObjectByName(b.id) as THREE.Group,root:b.root,parts:b.originalInspection.parts}))];
   if(buildings.some(b=>!b.group))throw Error('Selected building owner unavailable');
@@ -94,7 +100,7 @@ export function createWorldEdenExpansion(officeGuards:readonly OfficeGuardBox[]=
  const fixtures=academicVenuePlan()!.fixtures;
  const loader=new THREE.TextureLoader(),staticPreviewImage=classroomSlide(0).imageUrl;
  function clearSlide(){generation++;slideKey='';venue!.setProjection(null);for(const texture of textures)texture.dispose();textures.clear();}
- return {group,officeGuards,venue:venue!,sampleVisualGround:(x:number,z:number)=>closed?null:visualGround(x,z),places:[{id:'commons',label:'Inhabited commons',p:[9,5]},{id:'classroom',label:'Classroom · 20 seats',p:[42,-8]},{id:'homes',label:'Furnished neighborhood',p:[44,23]},{id:'forest',label:'Northern woodland',p:[7,-44]},{id:'gardens',label:'Gardens and cultivated plots',p:[52,50]},{id:'dome-quarter',label:'Dome quarter',p:[99.2,36.5]},{id:'amphitheatre',label:'Amphitheatre and observatory',p:[76,82]},{id:'library',label:'Library, office and market',p:[74,5]},{id:'lake',label:'Lake, river and wetlands',p:[-81,1]}],
+ return {group,officeGuards,authoredBoundaries,venue:venue!,sampleVisualGround:(x:number,z:number)=>closed?null:proposedGround(x,z),places:[{id:'commons',label:'Inhabited commons',p:[9,5]},{id:'classroom',label:'Classroom · 20 seats',p:[42,-8]},{id:'homes',label:'Furnished neighborhood',p:[44,23]},{id:'forest',label:'Northern woodland',p:[7,-44]},{id:'gardens',label:'Gardens and cultivated plots',p:[52,50]},{id:'dome-quarter',label:'Dome quarter',p:[99.2,36.5]},{id:'amphitheatre',label:'Amphitheatre and observatory',p:[76,82]},{id:'library',label:'Library, office and market',p:[74,5]},{id:'lake',label:'Lake, river and wetlands',p:[-81,1]}],
   replaceCosmeticBackdrop(base:THREE.Group){backdrop=base;realismAt=-Infinity;refreshRealism();prewarm(base);base.traverse(o=>{if(o.name==='outside-ground'&&o.visible){hidden.push(o);o.visible=false;}});},
   sync(nativeEntities:Record<string,unknown>,history=false,seconds=0){if(closed)return;setRealismTime(seconds);stepSurfaceKit(3);if(!warm&&performance.now()-bornAt>4000)warm=true;lastNative=nativeEntities;group.visible=!history&&warm;for(const o of hidden)o.visible=history;if(history){clearSlide();return;}extraPlaces?.sync(nativeEntities,seconds);const missing=fixtures.filter(f=>!Object.hasOwn(nativeEntities,f.id));scenery.onTick({entities:Object.fromEntries(missing.map(f=>[f.id,f]))} as any);scenery.render(0,1);refreshRealism();},
   setSurfaceQuality(quality:'Simple'|'Rich'){if(closed)return false;if(!surfaceStudy&&quality==='Simple')return true;if(!surfaceStudy&&surfaceGroup)try{const own=surfaceGroup;releaseWorldRealism(own.children.flatMap(o=>o instanceof THREE.Mesh&&!(o instanceof THREE.InstancedMesh)&&(o.name.startsWith('NEW expansion cosmetic ground')||o.name.startsWith('Connected countryside and forest path')||o.name.startsWith('Cultivated garden plot'))?[o.material as THREE.Material]:[]));surfaceStudy=createWorldEdenSurfaceStudy(own);}catch{return false;}return surfaceStudy?.setQuality(quality)??false;},

@@ -6,6 +6,11 @@ import {MODEL_DIR} from '../../../people.ts';
  * on the ground at real size, with its colours baked into vertex colours (one material). Served beside the character
  * GLBs (MODEL_DIR). Bump IMPORTS_TAG whenever a pack GLB changes. */
 export const IMPORTS_TAG='imports-1';
+/** No invented Y0 when a decorative root has no selected drawn surface. Explicit
+ * authored water/platform heights remain absolute; absent support is omitted. */
+export function decorationGround(ground:(x:number,z:number)=>number|null,x:number,z:number,absolute?:number){
+ const y=absolute??ground(x,z);return y!==null&&Number.isFinite(y)?y:null;
+}
 const cache=new Map<string,Promise<GLTF>>();
 export function loadPack(file:string):Promise<GLTF>{
  let p=cache.get(file);

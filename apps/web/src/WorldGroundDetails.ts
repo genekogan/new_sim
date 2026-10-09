@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {edenExpansionLayout,inWater,expansionHeight} from '../../../mars/viewer/app/engine-view/content/environment/eden-expansion-landscape/layout.mjs';
+import {edenExpansionLayout,inWater} from '../../../mars/viewer/app/engine-view/content/environment/eden-expansion-landscape/layout.mjs';
 import {edenExpansionPlanting} from '../../../mars/viewer/app/engine-view/content/environment/eden-expansion-landscape/planting.mjs';
 import {EDEN_VIEWER_PLACES} from './WorldEdenPlaceData.ts';
 import {SPORTS_PLAN} from '../../../mars/viewer/app/engine-view/content/assets/eden-sports-kit/index.ts';
@@ -14,9 +14,9 @@ import {SPORTS_PLAN} from '../../../mars/viewer/app/engine-view/content/assets/e
  * atmosphere finds them by name). */
 const B=[-100,-65,105,85] as const,CELL=.5,W=Math.round((B[2]-B[0])/CELL),H=Math.round((B[3]-B[1])/CELL);
 /** 0 = no detail, 1 = grass, 2 = path edge (worn), 3 = path. */
-export function groundMask(){
+export function groundMask(exclude:(x:number,z:number)=>boolean=()=>false){
  const m=new Uint8Array(W*H);const L=edenExpansionLayout();
- for(let j=0;j<H;j++)for(let i=0;i<W;i++){const x=B[0]+(i+.5)*CELL,z=B[1]+(j+.5)*CELL;m[j*W+i]=inWater(x,z)?0:1;}
+ for(let j=0;j<H;j++)for(let i=0;i<W;i++){const x=B[0]+(i+.5)*CELL,z=B[1]+(j+.5)*CELL;m[j*W+i]=inWater(x,z)||exclude(x,z)?0:1;}
  const stampRect=(x0:number,z0:number,x1:number,z1:number,v:number)=>{for(let j=Math.max(0,Math.floor((z0-B[1])/CELL));j<=Math.min(H-1,Math.floor((z1-B[1])/CELL));j++)for(let i=Math.max(0,Math.floor((x0-B[0])/CELL));i<=Math.min(W-1,Math.floor((x1-B[0])/CELL));i++)m[j*W+i]=v;};
  const stampPath=(pts:readonly (readonly [number,number])[],width:number)=>{const half=width/2,edge=half+.75;
   for(let k=1;k<pts.length;k++){const [ax,az]=pts[k-1],[bx,bz]=pts[k],dx=bx-ax,dz=bz-az,l2=dx*dx+dz*dz||1;
@@ -37,7 +37,7 @@ export function groundMask(){
 }
 const maskAt=(m:Uint8Array,x:number,z:number)=>{const i=Math.floor((x-B[0])/CELL),j=Math.floor((z-B[1])/CELL);return i<0||j<0||i>=W||j>=H?0:m[j*W+i];};
 const hash=(i:number,j:number,s:number)=>{let h=(Math.imul(i,374761393)+Math.imul(j,668265263)+Math.imul(s,1442695041))|0;h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967296;};
-const groundY=(x:number,z:number)=>x>=-30&&x<=30&&z>=-30&&z<=30?0:(expansionHeight(x,z)??0);
+type Ground=(x:number,z:number)=>number|null;
 function tuftGeometry(){
  // five blades, each one triangle, leaning out from the root; darker at the base
  const p:number[]=[],c:number[]=[],base=new THREE.Color('#5a8a3a'),tip=new THREE.Color('#a9c96b');
@@ -62,8 +62,9 @@ class Meadow{
  readonly tufts:THREE.InstancedMesh;readonly blooms:THREE.InstancedMesh;
  private cx=Infinity;private cz=Infinity;private readonly m=new THREE.Matrix4();private readonly q=new THREE.Quaternion();private readonly s=new THREE.Vector3();private readonly v=new THREE.Vector3();private readonly col=new THREE.Color();
  private readonly mask:Uint8Array;readonly radius:number;
- constructor(mask:Uint8Array,radius=26,maxTufts=12000,maxBlooms=700){
-  this.mask=mask;this.radius=radius;
+ private readonly ground:Ground;
+ constructor(mask:Uint8Array,ground:Ground,radius=26,maxTufts=12000,maxBlooms=700){
+  this.mask=mask;this.radius=radius;this.ground=ground;
   const grass=new THREE.MeshStandardMaterial({vertexColors:true,roughness:1,side:THREE.DoubleSide});grass.name='meadow grass tufts';
   const flower=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.9,side:THREE.DoubleSide});flower.name='meadow wildflower blooms';
   this.tufts=new THREE.InstancedMesh(tuftGeometry(),grass,maxTufts);this.tufts.name='meadow grass tufts (near camera)';
@@ -76,7 +77,7 @@ class Meadow{
   if(!(camera as THREE.PerspectiveCamera).isPerspectiveCamera)return;
   camera.getWorldPosition(this.v);
   // From high up the tufts would be sub-pixel: skip them entirely.
-  if(this.v.y>26){if(this.tufts.count){this.tufts.count=0;this.blooms.count=0;this.cx=Infinity;}return;}
+  if(this.v.y>(this.ground(this.v.x,this.v.z)??0)+26){if(this.tufts.count){this.tufts.count=0;this.blooms.count=0;this.cx=Infinity;}return;}
   if(Math.hypot(this.v.x-this.cx,this.v.z-this.cz)<2.5)return;
   this.cx=this.v.x;this.cz=this.v.z;this.deal();
  }
@@ -86,11 +87,12 @@ class Meadow{
   for(let j=j0;j<=j1;j++)for(let i=i0;i<=i1;i++){
    const h1=hash(i,j,1),h2=hash(i,j,2),x=(i+h1)*C,z=(j+h2)*C,d=Math.hypot(x-this.cx,z-this.cz);if(d>R)continue;
    const k=maskAt(this.mask,x,z);if(k!==1&&!(k===2&&h1<.35))continue;
-   const fade=1-THREE.MathUtils.smoothstep(d,R*.55,R),y=groundY(x,z);
+   const fade=1-THREE.MathUtils.smoothstep(d,R*.55,R);
    const count=d<12?(h2<.4?3:2):(h2<.35?2:1);
    for(let c=0;c<count&&n<nt;c++){const ox=c?(hash(i,j,3+c*7)-.5)*.45:0,oz=c?(hash(i,j,4+c*7)-.5)*.45:0,sc=(.75+.6*hash(i,j,5+c))*(.25+.75*fade)*(k===2?.7:1);
+    const y=this.ground(x+ox,z+oz);if(y===null||!Number.isFinite(y)||maskAt(this.mask,x+ox,z+oz)===0)continue;
     this.q.setFromAxisAngle(up,hash(i,j,7+c)*6.283);this.m.compose(this.v.set(x+ox,y,z+oz),this.q,this.s.set(sc,sc*(.8+.5*hash(i,j,9)),sc));this.tufts.setMatrixAt(n++,this.m);}
-   if(k===1&&hash(i,j,11)<.07&&b<nb){const sc=(.8+.5*hash(i,j,12))*(.3+.7*fade);this.q.setFromAxisAngle(up,hash(i,j,13)*6.283);
+   if(k===1&&hash(i,j,11)<.07&&b<nb){const y=this.ground(x+.25,z-.2);if(y===null||!Number.isFinite(y)||maskAt(this.mask,x+.25,z-.2)===0)continue;const sc=(.8+.5*hash(i,j,12))*(.3+.7*fade);this.q.setFromAxisAngle(up,hash(i,j,13)*6.283);
     this.m.compose(this.v.set(x+.25,y,z-.2),this.q,this.s.set(sc,sc,sc));this.blooms.setMatrixAt(b,this.m);
     this.col.set(FLOWER[Math.floor(hash(i,j,14)*FLOWER.length)]);this.blooms.setColorAt(b,this.col);b++;}}
   this.tufts.count=n;this.blooms.count=b;this.tufts.instanceMatrix.needsUpdate=true;this.blooms.instanceMatrix.needsUpdate=true;if(this.blooms.instanceColor)this.blooms.instanceColor.needsUpdate=true;
@@ -99,18 +101,20 @@ class Meadow{
  dispose(){for(const x of [this.tufts,this.blooms]){x.removeFromParent();x.geometry.dispose();(x.material as THREE.Material).dispose();x.dispose();}}
 }
 /** Static details: worn path edges, pebbles, field stones, fallen leaves (merged; vertex colours). */
-function staticDetails(mask:Uint8Array){
+function staticDetails(mask:Uint8Array,ground:Ground){
  const p:number[]=[],c:number[]=[],col=new THREE.Color();let rocks=0,leaves=0,worn=0;
  const flat=(x:number,z:number,r:number,sides:number,rot:number,color:string,y:number,stretch=1)=>{col.set(color);
+  const base=ground(x,z);if(base===null)return;const lift=y-base;
   for(let k=0;k<sides;k++){const a0=rot+k/sides*6.283,a1=rot+(k+1)/sides*6.283,j0=.75+.25*Math.sin(a0*3+r*7),j1=.75+.25*Math.sin(a1*3+r*7);
-   p.push(x,y,z,x+Math.cos(a1)*r*j1*stretch,y,z+Math.sin(a1)*r*j1,x+Math.cos(a0)*r*j0*stretch,y,z+Math.sin(a0)*r*j0);for(let i=0;i<3;i++)c.push(col.r,col.g,col.b);}};
- const rock=(x:number,z:number,r:number,seed:number)=>{const g=new THREE.IcosahedronGeometry(r,0),a=g.attributes.position,y=groundY(x,z);
+   const ax=x+Math.cos(a1)*r*j1*stretch,az=z+Math.sin(a1)*r*j1,bx=x+Math.cos(a0)*r*j0*stretch,bz=z+Math.sin(a0)*r*j0,ay=ground(ax,az),by=ground(bx,bz);if(ay===null||by===null)continue;
+   p.push(x,y,z,ax,ay+lift,az,bx,by+lift,bz);for(let i=0;i<3;i++)c.push(col.r,col.g,col.b);}};
+ const rock=(x:number,z:number,r:number,seed:number)=>{const y=ground(x,z);if(y===null)return;const g=new THREE.IcosahedronGeometry(r,0),a=g.attributes.position;
   const tint=.55+.15*seed;col.setRGB(tint,tint*.97,tint*.9);
   for(let i=0;i<a.count;i++){const vx=a.getX(i)*(1+.3*Math.sin(seed*9)),vy=Math.max(a.getY(i)*.55,-.02),vz=a.getZ(i)*(1+.3*Math.cos(seed*7));p.push(x+vx,y+vy+r*.15,z+vz);
    const shade=a.getY(i)>0?1:.8;c.push(col.r*shade,col.g*shade,col.b*shade);}g.dispose();rocks++;};
  // worn edges: trodden soil patches and pebbles at the path borders
  for(let j=0;j<H;j++)for(let i=0;i<W;i++){if(mask[j*W+i]!==2)continue;const h=hash(i,j,21);if(h>.3)continue;
-  const x=B[0]+(i+hash(i,j,22))*CELL,z=B[1]+(j+hash(i,j,23))*CELL,y=groundY(x,z)+.009;
+  const x=B[0]+(i+hash(i,j,22))*CELL,z=B[1]+(j+hash(i,j,23))*CELL,base=ground(x,z);if(base===null)continue;const y=base+.009;
   flat(x,z,.14+.16*hash(i,j,24),6,h*20,h<.12?'#a99d7c':'#93a065',y,1.3);worn++;
   if(hash(i,j,25)<.3){col.set('#b1a998');const r=.04+.04*hash(i,j,26);flat(x+.2,z-.1,r,5,h*9,'#a59d8e',y+.012);}}
  // field stones in the grass, sparse
@@ -120,13 +124,13 @@ function staticDetails(mask:Uint8Array){
  const LEAF=['#c98b3a','#b5652e','#d9b24a','#8a6a3a','#a8452c'];
  let t=0;for(const tree of edenExpansionPlanting().plants){if(!/tree|orchard|birch|flowering/.test(tree.kind))continue;const [tx,,tz]=tree.p;t++;
   for(let k=0;k<26;k++){const a=hash(t,k,41)*6.283,d=Math.sqrt(hash(t,k,42))*2.6,x=tx+Math.cos(a)*d,z=tz+Math.sin(a)*d;if(maskAt(mask,x,z)===3||maskAt(mask,x,z)===0&&x>B[0]&&x<B[2]&&z>B[1]&&z<B[3])continue;
-   flat(x,z,.06+.04*hash(t,k,43),4,hash(t,k,44)*6,LEAF[Math.floor(hash(t,k,45)*LEAF.length)],groundY(x,z)+.012+.001*(k%4),1.6);leaves++;}}
+   const y=ground(x,z);if(y===null)continue;flat(x,z,.06+.04*hash(t,k,43),4,hash(t,k,44)*6,LEAF[Math.floor(hash(t,k,45)*LEAF.length)],y+.012+.001*(k%4),1.6);leaves++;}}
  const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(p,3));g.setAttribute('color',new THREE.Float32BufferAttribute(c,3));g.computeVertexNormals();
  // flat decals light like the ground (up normals); rocks keep their facets
  g.computeBoundingSphere();return {geometry:g,stats:{rocks,leaves,worn,triangles:p.length/9}};
 }
-export function createWorldGroundDetails(){
- const mask=groundMask(),meadow=new Meadow(mask),st=staticDetails(mask);
+export function createWorldGroundDetails(ground:Ground,exclude:(x:number,z:number)=>boolean=()=>false){
+ const mask=groundMask(exclude),meadow=new Meadow(mask,ground),st=staticDetails(mask,ground);
  const material=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.95,side:THREE.DoubleSide,polygonOffset:true,polygonOffsetFactor:-1,polygonOffsetUnits:-1});material.name='trodden soil, pebbles, field stones and fallen leaves';
  const stat=new THREE.Mesh(st.geometry,material);stat.name='ground litter: worn path edges, stones, fallen leaves (static)';stat.receiveShadow=true;stat.userData.cameraTransparent=true;stat.raycast=()=>{};
  const group=new THREE.Group();group.name='Eden near-field meadow details (scenery only)';group.add(stat,meadow.tufts,meadow.blooms);

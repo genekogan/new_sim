@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {loadPack,modelGeometry,PackSoup} from './assets.ts';
+import {loadPack,modelGeometry,PackSoup,decorationGround} from './assets.ts';
 /** Boats moored on Eden's waters and bicycles parked by houses, the café and the harbour (static scenery; CC0: Kenney
  * Watercraft + Nature canoe, Quaternius Ships + Public Transport). Ids and poses are the starting `parked` poses of the
  * carriers proposal (team/CONTRACTS/proposals/IMPORTS-boats-bikes-carriers.md). One merged mesh, one draw. Boats sit on
@@ -37,12 +37,11 @@ export function createEdenBoatsBikes(ground: (x: number, z: number) => number | 
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .7, metalness: .05 }); mat.name = 'Eden boats and bikes';
   const mesh = new THREE.Mesh(new THREE.BufferGeometry(), mat); mesh.name = 'boats and bikes'; mesh.castShadow = true; mesh.receiveShadow = true; group.add(mesh);
   let closed = false, triangles = 0;
-  const gy = (x: number, z: number) => { const y = ground(x, z); return y !== null && Number.isFinite(y) ? y : 0; };
   loadPack('eden-boats-bikes.glb').then((gltf) => {
     if (closed) return;
     const soup = new PackSoup(), geos = new Map<string, THREE.BufferGeometry | null>();
     const geo = (n: string) => { if (!geos.has(n)) geos.set(n, modelGeometry(gltf, n)); return geos.get(n)!; };
-    for (const p of [...boats, ...bikes]) { const g = geo(p.model); if (!g) continue; soup.add(g, [p.at[0], p.y ?? gy(p.at[0], p.at[1]), p.at[1]], p.yaw, 1, undefined, p.tilt ?? 0, p.roll ?? 0); }
+    for (const p of [...boats, ...bikes]) { const g = geo(p.model),y=decorationGround(ground,p.at[0],p.at[1],p.y);if(!g||y===null)continue;soup.add(g,[p.at[0],y,p.at[1]],p.yaw,1,undefined,p.tilt??0,p.roll??0); }
     for (const g of geos.values()) g?.dispose();
     mesh.geometry.dispose(); mesh.geometry = soup.geometry(); triangles = soup.triangles;
   }).catch((e) => console.warn('Eden boats and bikes unavailable', e));

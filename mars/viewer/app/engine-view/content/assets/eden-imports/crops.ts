@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {hash01,loadPack,modelGeometry,PackSoup} from './assets.ts';
+import {hash01,loadPack,modelGeometry,PackSoup,decorationGround} from './assets.ts';
 /** Crops growing in Eden's garden beds (Quaternius Ultimate Crops, CC0; scenery only, no food or stock truth). Each bed
  * grows one crop at a time through its four growth stages, is harvested and replanted with another crop; the cycle runs
  * on the Eden clock (one world day per real hour, UTC), so every viewer sees the same stage. Winter beds rest (only
@@ -34,7 +34,6 @@ export function createEdenCrops(ground: (x: number, z: number) => number | null,
   let gltf: Awaited<ReturnType<typeof loadPack>> | null = null, key = '', closed = false, triangles = 0;
   const geos = new Map<string, THREE.BufferGeometry | null>();
   const geo = (name: string) => { if (!gltf) return null; if (!geos.has(name)) geos.set(name, modelGeometry(gltf, name)); return geos.get(name)!; };
-  const gy = (x: number, z: number) => { const y = ground(x, z); return y !== null && Number.isFinite(y) ? y : 0; };
   function rebuild(ms: number) {
     if (!gltf) return;
     const st = beds.map((b) => bedStage(b, ms)), k = st.map((s) => s.crop + s.stage).join('|');
@@ -49,7 +48,8 @@ export function createEdenCrops(ground: (x: number, z: number) => number | null,
         const id = `${b.id}:${ix}:${iz}`, jx = (hash01(id, 3) - .5) * sp * .25, jz = (hash01(id, 4) - .5) * sp * .25;
         const lx = (ix + .5) * b.size[0] / nx - b.size[0] / 2 + jx, lz = (iz + .5) * b.size[1] / nz - b.size[1] / 2 + jz;
         const x = b.c[0] + lx * c + lz * s, z = b.c[1] - lx * s + lz * c;
-        soup.add(g, [x, gy(x, z) + (b.top ?? 0), z], hash01(id, 5) * Math.PI * 2, .85 + .3 * hash01(id, 6));
+        const y=decorationGround(ground,x,z);if(y===null)continue;
+        soup.add(g, [x,y+(b.top??0),z],hash01(id,5)*Math.PI*2,.85+.3*hash01(id,6));
       }
     });
     mesh.geometry.dispose(); mesh.geometry = soup.empty ? new THREE.BufferGeometry() : soup.geometry(); triangles = soup.triangles;

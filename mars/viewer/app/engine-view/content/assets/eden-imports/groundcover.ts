@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import {hash01,loadPack,modelGeometry,PackSoup} from './assets.ts';
+import {hash01,loadPack,modelGeometry,PackSoup,decorationGround} from './assets.ts';
 /** Ground cover and tree variety (Quaternius Ultimate Nature + Kenney Nature Kit, CC0): flower drifts in the gardens,
  * the park and the meadows, ferns and mushrooms at the woodland floor, lily pads on still water, and groves of birch,
  * willow and broadleaf at the lake and river edges that turn to their autumn colours in the Eden autumn (one world day
@@ -13,7 +13,6 @@ export function createEdenGroundCover(ground: (x: number, z: number) => number |
   const group = new THREE.Group(); group.name = 'Eden ground cover and trees (scenery only)';
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: .9, metalness: 0 }); mat.name = 'Eden ground cover';
   const cells = new Map<string, THREE.Mesh>(); let closed = false, triangles = 0, season = '';
-  const gy = (x: number, z: number) => { const y = ground(x, z); return y !== null && Number.isFinite(y) ? y : 0; };
   let gltf: Awaited<ReturnType<typeof loadPack>> | null = null;
   const geos = new Map<string, THREE.BufferGeometry | null>();
   const geo = (n: string) => { if (!gltf) return null; if (!geos.has(n)) geos.set(n, modelGeometry(gltf, n)); return geos.get(n)!; };
@@ -31,7 +30,8 @@ export function createEdenGroundCover(ground: (x: number, z: number) => number |
         const g = geo(models[Math.floor(hash01(id, 3) * models.length)]); if (!g) continue;
         const [s0, s1] = p.scale ?? [.8, 1.2], k = `${Math.floor(x / CELL)}:${Math.floor(z / CELL)}`;
         let soup = soups.get(k); if (!soup) soups.set(k, (soup = new PackSoup()));
-        soup.add(g, [x, p.y ?? gy(x, z) - .02, z], hash01(id, 4) * Math.PI * 2, s0 + (s1 - s0) * hash01(id, 5));
+        const y=decorationGround(ground,x,z,p.y);if(y===null)continue;
+        soup.add(g, [x,p.y===undefined?y-.02:y,z], hash01(id, 4) * Math.PI * 2, s0 + (s1 - s0) * hash01(id, 5));
       }
     }
     for (const [k, soup] of soups) {
