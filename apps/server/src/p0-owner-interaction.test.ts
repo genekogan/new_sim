@@ -7,7 +7,7 @@ import test,{type TestContext} from 'node:test';
 import assert from 'node:assert/strict';
 import {setImmediate} from 'node:timers/promises';
 import {retainedCommonsShoreFactory,nativeSleepSnapshotFactoryV1,COMMONS_PERSONAL_RESOURCES,edenLectureFactoryV1,edenGroundFactoryV1,commonsNewcomerResourcesFactory} from '@sim/engine-mars';
-import {readFileSync} from 'node:fs';
+import {readFileSync,writeFileSync} from 'node:fs';
 import type {SoulRow} from './db.ts';
 import {installEdenSteeringModeV1} from './eden-steering-mode.ts';
 import {humanCompilerOutputV1Schema,type ActionRecord} from '@sim/engine-contract';
@@ -201,9 +201,23 @@ test('a place takes many bodies: someone at the classroom centre does not lock i
  // Already accepted native programmes and their truthful intent completion still run on WorldHost ticks.
  f.brain.quiesce();
  const checkedGoals=new Set<string>();let minimumGoalSpacing=Infinity,minimumPhysicalSpacing=Infinity;
+ let firstBelowNominalDiameter:unknown=null,worstSpacingCapture:unknown=null;
+ const captureSpacing=(a:SoulRow,b:SoulRow,distance:number)=>{
+  const active=new Set(f.host.engine.runtime.liveIds()),pair=[a,b].map(row=>{
+   const e=body(row),pending=f.host.minds.get(row.id)?.pending,card=pending?f.host.kernel.vocab.cards[pending.card]:undefined;
+   return {soulId:row.id,entityId:row.entity_id,name:row.name,pose:structuredClone(e.pose),bodyFamily:e.body?.family??'human',human:{level:e.human?.level,activity:e.human?.activity,speed:e.human?.speed,task:e.human?.task},program:f.host.engine.programOf(row.entity_id),
+    acceptedWalkPlan:card?structuredClone([...card.approach,...card.during]):null,
+    activeWalkRecords:[...f.host.engine.runtime.records.values()].filter(r=>active.has(r.id)&&r.params&&typeof r.params==='object'&&!Array.isArray(r.params)&&(r.params as {actor?:unknown}).actor===row.entity_id).map(r=>({id:r.id,parent:r.parent,verb:r.verb,status:r.status,params:structuredClone(r.params)}))};
+  });
+  return {tick:f.host.engine.world.tick,distance,nominalProfileDiameter:2*HUMAN_PROFILE.radius,existingNativeIntrusionBound:2*HUMAN_PROFILE.radius-.02,pair};
+ };
  const sample=()=>{
   const entities=[...walkers,parked].map(body);
-  for(let i=0;i<entities.length;i++)for(let j=i+1;j<entities.length;j++)minimumPhysicalSpacing=Math.min(minimumPhysicalSpacing,Math.hypot(entities[i].pose.p[0]-entities[j].pose.p[0],entities[i].pose.p[2]-entities[j].pose.p[2]));
+  for(let i=0;i<entities.length;i++)for(let j=i+1;j<entities.length;j++){
+   const distance=Math.hypot(entities[i].pose.p[0]-entities[j].pose.p[0],entities[i].pose.p[2]-entities[j].pose.p[2]);
+   if(distance<minimumPhysicalSpacing){minimumPhysicalSpacing=distance;worstSpacingCapture=captureSpacing([...walkers,parked][i],[...walkers,parked][j],distance);}
+   if(firstBelowNominalDiameter===null&&distance<2*HUMAN_PROFILE.radius-1e-9)firstBelowNominalDiameter=captureSpacing([...walkers,parked][i],[...walkers,parked][j],distance);
+  }
   const active=new Set(f.host.engine.runtime.liveIds());
   for(const record of f.host.engine.runtime.records.values()){
    if(checkedGoals.has(record.id)||record.parent||record.verb!=='walk_to'||!active.has(record.id)||!record.params||typeof record.params!=='object'||Array.isArray(record.params))continue;
@@ -217,6 +231,9 @@ test('a place takes many bodies: someone at the classroom centre does not lock i
  };
  const done=()=>{sample();return walkers.every((row,i)=>Object.values(f.host.intentHistoryOf(row.id).attempts).some(a=>a.intent.intentId===ids[i]&&a.phase==='completed'));};
  assert.ok(await tick(12000,done),walkers.map((r,i)=>body(r).human?.activity+'@'+body(r).pose.p.map(v=>v.toFixed(1)).join(',')+' '+Object.values(f.host.intentHistoryOf(r.id).attempts).filter(x=>x.intent.intentId===ids[i]).map(x=>x.phase+':'+x.tick+(('reason' in x)?':'+x.reason:'')).join('|')).join(' ;; '));
+ const physicalDiagnostic={goalAdmissions:checkedGoals.size,minimumGoalSpacing,minimumPhysicalSpacing,firstBelowNominalDiameter,worstSpacingCapture,randomBirthIdsRetained:walkers.map(r=>({soulId:r.id,entityId:r.entity_id}))};
+ t.diagnostic('classroom physical spacing '+JSON.stringify(physicalDiagnostic));
+ if(process.env.P0_SPACING_DIAGNOSTIC_FILE)writeFileSync(process.env.P0_SPACING_DIAGNOSTIC_FILE,JSON.stringify(physicalDiagnostic,null,2)+'\n',{flag:'wx'});
  assert.ok(checkedGoals.size>=4,'all four have separately admitted classroom destinations');assert.ok(minimumPhysicalSpacing>=2*HUMAN_PROFILE.radius-1e-9,'native human capsules stay separate on every transit tick '+JSON.stringify({minimumPhysicalSpacing}));
  t.diagnostic(JSON.stringify({goalAdmissions:checkedGoals.size,minimumGoalSpacing,minimumPhysicalSpacing}));
  const ps=[...walkers,parked].map(r=>body(r).pose.p);t.diagnostic(JSON.stringify({tick:f.host.engine.world.tick,positions:ps,activities:[...walkers,parked].map(r=>body(r).human?.activity)}));for(let i=0;i<ps.length;i++)for(let j=i+1;j<ps.length;j++)assert.ok(Math.hypot(ps[i][0]-ps[j][0],ps[i][2]-ps[j][2])>=.9,'spaced bodies '+JSON.stringify({i,j,distance:Math.hypot(ps[i][0]-ps[j][0],ps[i][2]-ps[j][2]),positions:ps}));
