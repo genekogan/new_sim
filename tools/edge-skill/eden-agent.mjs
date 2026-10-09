@@ -21,6 +21,7 @@ import {openClientQueue,replySteps} from './client-queue.mjs';
 import {readClientStream} from './client-stream.mjs';
 import {openClientPerception} from './client-perception.mjs';
 import {recordedVisitParent} from './client-place-arrivals.mjs';
+import {queuePollDeadlineMs} from './client-poll-cadence.mjs';
 import {codexExecBrain} from './client-codex-brain.mjs';
 import {openClientLiving} from './client-living.mjs';
 import {completedOwnerResult} from './client-owner-result.mjs';
@@ -668,7 +669,7 @@ export async function live(...argv){
   const frame=fresh.frame;return {clock:frame.clock,time:frame.day,me:{name:persona.name,where:(frame.me?.placePath??[]).join(' < '),state:frame.me?.posture,activity:frame.me?.activity?.kind,holding:frame.me?.holding,fade:frame.me?.fade,openReceipts:busy&&lastReceipt?[{id:lastReceipt,capability:busy,phase:'started'}]:[]},here:{souls:(frame.near??[]).map(x=>({...x,soulId:x.id,distance:x.dist,state:x.doing})),objects:frame.objects??[]},doHere:frame.doHere??[],canDo:summarise(fresh.capabilities??[]),exits:frame.exits??[]};
  };
  const queueContext=()=>({placeId:lastHere?.me?.place??null,nearCount:lastHere?.near?.length??0,worldMinutes:lastLean?.clock?.absoluteWorldMinutes??initialBoot.clock?.absoluteWorldMinutes,busy:busy&&lastReceipt?{id:lastReceipt,capability:busy}:null});
- receiptReads=openClientReceipts({scope:s.world+'|'+s.soul,soulId:s.soul,read:receipt});
+ receiptReads=openClientReceipts({scope:s.world+'|'+s.soul,soulId:s.soul,read:receipt,onChange:rec=>{logLive({canonicalReceiptUpdate:{id:rec.id,phase:rec.phase}});queuePollAt=0;pollAbort?.abort();nudge?.();}});
  bodyQueue=openClientQueue(process.cwd(),{scope:s.world+'|'+s.soul,adapter:{
   async runPublic(step){receiptReads.invalidateNonterminal();const result=await runStep(step);if(result.readOnly===true){result.followupRequested=result.again===true;result.again=false;}else if(result.accepted!==true)result.again=true;rememberResult({operation:step.converse?'converse:'+step.converse:step.act??(step.say?'say':'public-step'),...result});logLive({publicVerdict:{operation:step.converse??step.act??'public',accepted:result.accepted??null,code:result.code??null,reason:result.reason??null}});if(result?.receipt?.id)receiptReads.track(result.receipt.id);return result;},
   async send(body){receiptReads.invalidateNonterminal();logLive({actSubmit:{queueId:bodyQueue.snapshot().id,clientRef:body.clientRef,capability:body.capability,source:bodyQueue.snapshot().source}});const response=await call(EDGE.act,{body});const verdict=response.data;logLive({actVerdict:{clientRef:body.clientRef,accepted:typeof verdict?.accepted==='boolean'?verdict.accepted:null,receiptId:verdict?.receipt?.id??null,code:verdict?.code??null}});rememberResult({operation:body.capability,accepted:typeof verdict?.accepted==='boolean'?verdict.accepted:null,code:verdict?.code??null,reason:verdict?.reason??null,receiptId:verdict?.receipt?.id??null,queueRetained:true,line:verdict?.accepted?`Actual receipt ${verdict.receipt?.id??'unconfirmed'} ${verdict.receipt?.phase??'unknown'}; future queue steps are not yet accepted`:`Actual admission ${verdict?.code??'unknown'}: ${verdict?.reason??'transport outcome unknown'}`});if(response.status===0||response.status>=500)throw Error('uncertain action transport');if(verdict?.accepted){if(verdict.receipt?.id)receiptReads.track(verdict.receipt.id);accepted();lastReceipt=verdict.receipt?.id;busy=verdict.receipt?.capability??body.capability;save({lastReceipt,lastActAt:now()});if(ownerActive)ownerActive.receipt=lastReceipt;}return verdict;},
@@ -725,7 +726,9 @@ export async function live(...argv){
   const heard=pending.find(e=>e.kind==='speech');if(heard)due=Math.min(due,Math.max(4000-(t-heard._rx),45_000-since));
   if(pending.some(e=>e.kind==='receipt'&&e.receipt?.id===lastReceipt&&TERMINAL.has(e.receipt?.phase)))due=Math.min(due,15_000-since);
   if(!busy&&!planBusy)due=Math.min(due,idleGap*(quiet()?2.5:1)-since);
-  if(bodyQueue?.snapshot().steps.some(s=>['pending','dispatching','running','waiting','stopping','waiting-condition'].includes(s.status)))due=Math.min(due,2000);
+  due=Math.min(due,queuePollDeadlineMs(bodyQueue?.snapshot().steps));
+  if(queuePollAt===0&&bodyQueue?.snapshot().steps.some(s=>!['completed','cancelled','skipped','superseded'].includes(s.status)))due=0;
+  if(pending.some(e=>['queue.refusal','plan.step.failed','plan.paused','digest'].includes(e.kind)))due=0;
   return Math.max(1,Math.min(20,Math.ceil(due/1000)));
  }
  function compactState(ob){
@@ -894,7 +897,7 @@ export async function live(...argv){
     if(r.status===200){const d=r.data;if(d.gap)cursor=d.cursor;else{cursor=d.cursor??cursor;for(const e of d.events??[]){e._rx=Date.now();if(track(e)!==false)pending.push(e);}}save({cursor});if(typeof d.cursor==='string'&&Array.isArray(d.events))timeoutRecoveryPending=false;}
     else if(!sig.aborted){await sleep(r.status===429?(r.data?.retry_after??30)*1000:5000);}
     ownerPoll();}
-   if(Date.now()-queuePollAt>=2000){queuePollAt=Date.now();if(bodyQueue.snapshot().steps.find(s=>!['completed','cancelled','skipped','superseded'].includes(s.status))?.until)await leanObservation();await bodyQueue.pump(queueContext(),held);const qs=bodyQueue.snapshot();if(qs.steps.length&&qs.steps.every(s=>['completed','skipped'].includes(s.status))&&qs.source==='owner'){const old=readJSONL(LIVE.replies).filter(r=>r.id===qs.id).at(-1);if(old&&!old.queueComplete){let observed=null;try{await leanObservation();observed=lastHere;}catch{}const final=completedOwnerResult(old,qs,{here:observed,at:now()});appendFileSync(LIVE.replies,JSON.stringify(final)+'\n');logLive({queueComplete:{id:qs.id}});}}}
+   if(queuePollAt===0||Date.now()-queuePollAt>=8000){queuePollAt=Date.now();if(bodyQueue.snapshot().steps.find(s=>!['completed','cancelled','skipped','superseded'].includes(s.status))?.until)await leanObservation();await bodyQueue.pump(queueContext(),held);const qs=bodyQueue.snapshot();if(qs.steps.length&&qs.steps.every(s=>['completed','skipped'].includes(s.status))&&qs.source==='owner'){const old=readJSONL(LIVE.replies).filter(r=>r.id===qs.id).at(-1);if(old&&!old.queueComplete){let observed=null;try{await leanObservation();observed=lastHere;}catch{}const final=completedOwnerResult(old,qs,{here:observed,at:now()});appendFileSync(LIVE.replies,JSON.stringify(final)+'\n');logLive({queueComplete:{id:qs.id}});}}}
    S.health={cadence:cadences.status(),stream:streamHealth,nextWakeAt:new Date(Date.now()+pollSeconds()*1000).toISOString(),reason:queueNotice??(busy?'receipt reconciliation':'idle/check'),effectiveOptions:o,optionSources:o.optionSources,queueLength:bodyQueue.snapshot().steps.filter(s=>s.status!=='completed').length,coverage:perception.coverage(),modelBudgetUnknown};saveS();
    if(pending.length>60)pending=pending.filter(e=>e.kind!=='arrival'&&e.kind!=='departure').slice(-60);
    if(ownerQueue.length){await think('owner');continue;} // the owner's requests are always answered, whatever the budget (they are counted)
