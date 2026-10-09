@@ -1,5 +1,6 @@
-// Bounded optional three-uniform recipe on the original exact water owner, no new shader/topology.
+// Bounded optional recipe on the original exact water owner, no new geometry/topology.
 import * as THREE from 'three';
+import {EDEN_WATER_DAYLIGHT} from './daylight.ts';
 import {inspectCapturedWaterSurface,createCapturedWaterSurface} from '../captured-water-surface.ts';
 // Submerged bodies must read as underwater (Gene, Oct 6): .68 front alpha showed whole
 // legs of treading swimmers. Absorption proxy now hides most of what lies below the datum.
@@ -15,6 +16,7 @@ export function createEdenReadableWater(terrain,water,enabled=false){
  const inspection=inspectEdenWaterReadability(terrain,water,true);if(!inspection)return null;
  const owner=createCapturedWaterSurface(terrain,water);
  try{const mesh=owner.group.children[0],material=mesh?.material;if(!mesh?.isMesh||!material?.isShaderMaterial||!material.uniforms.uBaseColor?.value?.isColor||!material.uniforms.uBaseAlpha||!material.uniforms.uGrazingAlpha)throw Error('Unknown original water target');
+ material.uniforms.uDaylight=EDEN_WATER_DAYLIGHT;
  material.uniforms.uBaseColor.value.set(EDEN_WATER_READABILITY.baseColor);material.uniforms.uBaseAlpha.value=EDEN_WATER_READABILITY.frontAlpha;material.uniforms.uGrazingAlpha.value=EDEN_WATER_READABILITY.grazingAlpha;
  mesh.userData.cameraTransparent=true;return{...owner,inspection};
  }catch(cause){try{owner.dispose();}catch(cleanup){throw new AggregateError([cause,cleanup],'Readable water returned-owner rollback failed',{cause});}return null;}

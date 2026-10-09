@@ -1,4 +1,5 @@
 import {DECORATIVE_MOTION,nextFerrisAngle} from '../../../mars/viewer/app/engine-view/content/assets/decorative-motion.ts';
+import {EDEN_WATER_DAYLIGHT} from '../../../mars/viewer/app/engine-view/content/environment/eden-water-readability/daylight.ts';
 import {twilightColour} from './atmosphere/twilight.ts';
 import * as THREE from 'three';
 import {WIND,WindPatches} from './atmosphere/wind.ts';
@@ -201,6 +202,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    // Rooms behind lit windows switch on and off with the hour of the world clock.
    setWindowLife(frame.daylight===null?null:hourOf(ms),frame.reducedMotion?0:seconds);
    const day=frame.daylight===null?1:Math.max(0,Math.min(1,frame.daylight)),still=frame.reducedMotion;
+   EDEN_WATER_DAYLIGHT.value=day;
    applyWeather(frame,day);
    if(!active){active=true;if(!root.parent)scene.add(root);root.visible=true;}
    const t=seconds%7200;

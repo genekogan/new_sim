@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import {parsePlatformFloors,type PlatformFloor} from '../../../mars/viewer/lib/platform-floor.ts';
 import {parseWorldShore,type WorldShore} from './WorldShore.ts';
 import {createConnectedNativeShore} from '../../../mars/viewer/app/engine-view/content/environment/connected-native-shore.ts';
+import {shoreBankEdgePositions} from './WorldShoreBankEdges.ts';
 import {groundOutsideTerrain,type GroundRectangle} from './WorldGround.ts';
 import {createCapturedShoreEnvironment,type CapturedShoreView} from '../../../mars/viewer/app/engine-view/content/environment/captured-shore.ts';
 import { commonsSceneMetadataV1Schema, type CommonsSceneMetadataV1 } from '@sim/engine-contract';
@@ -21,6 +22,7 @@ import type { Link, Obstacle, SpatialScene } from '../../../mars/viewer/engine/s
 import type { KinPlacement } from '../../../mars/viewer/app/engine-view/floaters.ts';
 import type { Take } from '../../../mars/viewer/engine/take/types.ts';
 import { solarPosition } from '../../../mars/viewer/engine/env/sun.ts';
+import {createEdenDaylight} from './atmosphere/visual-transitions.ts';
 import { daylightFactors } from '../../../mars/viewer/engine/env/daylight.ts';
 import { fitNearPlane } from '../../../mars/viewer/lib/depth-fit.ts';
 import { isMarsCamp, MarsDesert } from './WorldMarsDesert.ts';
@@ -185,6 +187,7 @@ export class WorldGeometry {
   readonly group = new THREE.Group();
   private readonly materials = {
     outside: new THREE.MeshStandardMaterial({ color: '#b39b78', roughness: 1 }),
+    bank: new THREE.MeshStandardMaterial({color:'#b39b78',roughness:1,side:THREE.DoubleSide,forceSinglePass:true}),
     floor: new THREE.MeshStandardMaterial({ color: '#c6b08b', roughness: 1 }),
     deck: new THREE.MeshStandardMaterial({ color: '#a8835a', roughness: 0.9 }),
     wall: new THREE.MeshStandardMaterial({ color: '#e3d6bd', roughness: 0.9 }),
@@ -233,6 +236,12 @@ export class WorldGeometry {
     // lower native floor. Body roots and authoritative surfaces stay untouched.
     const backdropY=(scene?.levels.find(level=>level.id===0)?.y??0)-.02;
     groundPlanes([x0-80,z0-80,x1+80,z1+80],backdropY,this.materials.outside,'outside-ground');
+    if(shore?.profile==='connected-commons-shore/1'){
+      const edge=new THREE.BufferGeometry();edge.setAttribute('position',new THREE.Float32BufferAttribute(shoreBankEdgePositions(shore.metadata.terrain,backdropY),3));edge.computeVertexNormals();
+      const banks=new THREE.Mesh(edge,this.materials.bank);banks.name='Captured shore north/south visual bank edge closure (no support)';banks.userData.cameraTransparent=true;
+      // Both banks must be readable from water and land without a duplicated mesh.
+      this.group.add(banks);
+    }
     if (!scene) return;
     this.commons=authoredCommons(scene,commons);
     if(this.commons){
@@ -375,13 +384,14 @@ export class Daylight {
   private key = '';
   private commonsReadability=false;
   private nightLighting=false;
+  private readonly edenDaylight=createEdenDaylight();
   private daylightFactor:number|null=null;
   /** 0 at night .. 1 in full day; null before the first clock. */
   get daylight(){return this.daylightFactor;}
   /** With lamp/window light pools active, night drops to dim moonlight away from lights. */
   setNightLighting(enabled:boolean){
     if(this.nightLighting===enabled)return;
-    this.nightLighting=enabled;this.observerFill();
+    this.nightLighting=enabled;this.key='';this.observerFill();
   }
   /** Presentation fill only: astronomical sun/time and physical light truth stay unchanged. */
   setCommonsReadability(enabled:boolean){
@@ -455,7 +465,8 @@ export class Daylight {
     }
     let pos;
     try { pos = solarPosition(datetime); } catch { return; }
-    const f = daylightFactors(pos.elevationDeg);
+    const original = daylightFactors(pos.elevationDeg);
+    const f=this.nightLighting?this.edenDaylight(datetime,original):original;
     this.daylightFactor=f.daylight;
     const dir = new THREE.Vector3(...pos.direction);
     if (dir.y < 0.05) dir.y = 0.05; // below the horizon: keep the shadow camera sane; intensity goes to ~0 anyway
@@ -464,7 +475,7 @@ export class Daylight {
     this.sun.color.copy(SUN_WHITE).lerp(SUN_WARM, f.warmth * 0.7);
     // night stays readable: a moonlit fill rather than black
     this.observerFill();
-    this.hemi.color.set(f.daylight > 0.5 ? 0xffffff : 0x9fb3d9);
+    this.hemi.color.set(0x9fb3d9).lerp(SUN_WHITE,f.daylight);
 
     (this.scene.background as THREE.Color).copy(NIGHT_SKY).lerp(DUSK_SKY, Math.max(f.warmth * f.daylight, f.blueHour * 0.4)).lerp(DAY_SKY, f.daylight * (1 - f.warmth * 0.6));
     this.elevation = pos.elevationDeg;
