@@ -1,5 +1,38 @@
 # Status
 
+## October 9 consolidated local preview release
+
+Runtime source `d6dc340b` is on main and the existing Cloudflare preview; PR1 is
+merged. Seven hosted CI lanes passed (run37889663728). The one full local check
+passed on fd967516; final changes were test/skill-only, with exact runtime/web
+inheritance recorded. Native totals:1,563 passes, six skips, eleven TODOs.
+
+This release consolidates grass/root and animal grounding, shared authored
+boundaries, balcony openings/rails, stairwell guards/supports, fountain water,
+gradual dawn/sunset lighting, translucent overlays, Explore asset previews,
+loading indicators, wall-mounted image/looping-video frames and manual camera
+handover. Representative Chrome journeys passed. A hosted follow-up remains:
+empty rooms hide Explore's global Soul roster/search. Presence ordering is not
+qualified. Upper office/regional Soul floors and a whole-map visual grounding
+survey are also not qualified.
+
+The sole local writer is PID58429 on4970, using frozen runtime input
+`<worktrees>/pm-followup-20261008`. Current closed history latest/nonempty-suffix
+readers and two ordinary boots passed. Original32,015-event prefix,28 Soul
+identities, existing recovery and paid ledger were preserved; exactly two new
+boundary rules were installed idempotently. Resumed receipts legitimately
+completed afterward. No older database was restored. Production was not changed.
+Receipts: `<team>/pm-integration/graphics-consolidated-20261009/RELEASE-D6DC340B.json`.
+
+Meaningful real-agent protected reading, truthful reporting, clarification,
+handshake and explicit dynamic replan passed. Independent three-Soul dialogue
+showed consent, five content turns and natural closure; the longer six-turn
+criterion remains unmet. Model billing and resolved identity remain unknown.
+Client W1–W7 is now implementing boot/resolution, watchdog, client queue/memory,
+factual outcomes/content and cadence; skill1.9/edge1.1 and real S1–S5 acceptance
+must precede its release. S3 has not started. Mars adoption follows, capped at
+12 hours of new work, retaining actual Mimos/bowl/couch/conversation/Follow.
+
 ## October 8 local release checkpoint
 
 Qualified runtime code `65048616` is on main and the existing local Cloudflare

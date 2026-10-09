@@ -1,32 +1,33 @@
 # Runbook — Sim on eden2
 
-## October 8 local preview checkpoint
+## October 9 local preview checkpoint
 
-The local preview is separate from the remote units below. Runtime code is pinned
-in `<worktrees>/pm-release-20261008` at `65048616`, served by Node 22.20.0 on
-127.0.0.1:4970 through the existing quick tunnel. Preserve its data and credentials
-in `<team>/previews/20261007-edge/`; never restore older data for a code rollback.
+The local preview is separate from the remote units below. Runtime is pinned at
+`d6dc340b` in `<worktrees>/pm-followup-20261008`, Node22.20 on127.0.0.1:4970,
+writer PID58429. Keep this source checkout immutable while it is runtime input.
+The existing quick tunnel and world `pm-preview-eden-20261005` retain the same data
+and credential paths under `<team>/previews/20261007-edge/`.
 
-For this preview's web build explicitly set
-`VITE_EDEN_EXPERIENCE_WORLD_IDS=pm-preview-eden-20261005`. Localhost alone bypasses
-that public-world view allowlist, so always smoke the actual tunnel after rebuilding.
-Use the exact web manifest under `team/pm-integration/release-assets-20261008/`.
+Selected web: `team/pm-integration/graphics-consolidated-20261009/final-d6dc-web/web`.
+Selected static: the same receipt directory's
+`private-1694-qa-stage/mars-static-composed-1694`. Bind the reviewed descriptor;
+do not substitute a campus-only asset root or omit the six Eden model packs.
+For rebuilt web set `VITE_EDEN_EXPERIENCE_WORLD_IDS=pm-preview-eden-20261005`,
+and test the actual public tunnel because localhost bypasses that allowlist.
+Served skill substitutes request origin; compare after only that exact substitution.
 
-Stop with the prepared `STOP-STRICT.py`, independently confirm PID/listener/data
-handle closure, and retain a complete verified closed backup before promotion.
-The APFS helper validates all bytes and history; immutable SQLite reads apply only
-to its sealed checkpointed clone without a WAL, never an active database.
-Run exact latest plus a nonempty accepted-decision suffix and two ordinary trial
-boots before selecting the candidate. Keep known recovery facts; append no new
-recovery merely to force compatibility. Receipts are under
-`team/pm-integration/release-checkpoint-20261008/`.
+Root owns cutover. Tell Gene before new push/live deployment. Use existing
+`STOP-STRICT.py`; independently verify actual PID, listener and all data handles
+closed. Preserve a sealed whole-data copy; run latest plus genuinely nonempty
+accepted-decision suffix on separate disposable copies. Qualify ordinary boots
+and exact second-boot idempotence before descriptor promotion. The finite helper
+must refuse sealed retention paths. Never restore older data for code rollback.
+New accepted boundary facts require a qualified reader, not an assumed old build.
 
-Dispatch `START.sh` into a new detached process session with owned log files;
-plain background launch can end with its tool session. Verify liveness after the
-launcher exits, one writer, clock advance, served skill/CLI/web bytes and public
-registration/action smoke. Leave stewardship files in place without printing them.
-Root holds promotion authority; production/DNS/Cloudflare account changes require
-separate explicit authorization.
+Start detached with owned logs, verify actual Node survives launcher exit, sole
+writer, advancing clock, served web/GLB/skill/CLI pins and hosted viewer. Never
+print credentials. Receipt `RELEASE-D6DC340B.json` links completed compatibility,
+history preservation, asset and browser checks and explicit coverage gaps.
 
 Reviewed 2026-10-03 against scoped deployment/rollback scripts and merge receipts.
 Canonical checkout: `<repo>`. Host: `ssh root@eden2` (<eden2-ip>).
