@@ -10,10 +10,18 @@ import {createHash} from 'node:crypto';
 import {setImmediate} from 'node:timers/promises';
 
 export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,marsWebDir,build='local-edge/1',checkOnly=false,placeData,seedObjects,inviteRequired=false,skillFile,cliFile,ambient=true,
-  officeStairGuards=false,inputManifestSHA256,modelCredentialFile=undefined,localBudget=0,autonomous=false,localSoulLimit=5,humanRest=false,provisions=false,sequences=false,floorGoals=false,kitchen=false,shore=false,foodDeliveryId,quietLandingCourtesy=false,social=false,closedGoals=false,approachRetention=false,activateExpansion=false,humanDirectionBurstUsd=1,quiesceThought=false,nativePlaces=[],nav=null,activitySpots}) {
+  officeStairGuards=false,authoredBoundariesFile=undefined,authoredBoundariesSHA256=undefined,inputManifestSHA256,modelCredentialFile=undefined,localBudget=0,autonomous=false,localSoulLimit=5,humanRest=false,provisions=false,sequences=false,floorGoals=false,kitchen=false,shore=false,foodDeliveryId,quietLandingCourtesy=false,social=false,closedGoals=false,approachRetention=false,activateExpansion=false,humanDirectionBurstUsd=1,quiesceThought=false,nativePlaces=[],nav=null,activitySpots}) {
   if(!input||!dataDir||!worldId||!Number.isInteger(port)||!(port>=4950&&port<=4959||port===4970))throw Error('explicit local input/data/world/allowed port required');
   if(!build.startsWith('local-'))throw Error('local build identity required');
   input=resolve(input);dataDir=resolve(dataDir);
+  let authoredBoundaryDeclaration;
+  if(authoredBoundariesFile!==undefined||authoredBoundariesSHA256!==undefined){
+    if(typeof authoredBoundariesFile!=='string'||!authoredBoundariesFile||typeof authoredBoundariesSHA256!=='string'||!/^[a-f0-9]{64}$/.test(authoredBoundariesSHA256))throw Error('authored boundaries require explicit source file and exact SHA256 pin');
+    const bytes=readFileSync(resolve(authoredBoundariesFile));if(bytes.length>4*1024*1024||createHash('sha256').update(bytes).digest('hex')!==authoredBoundariesSHA256)throw Error('authored boundary source file differs from the selected pin');
+    const {authoredBoundariesDeclarationV1Schema}=await import(pathToFileURL(join(input,'packages/engine-contract/src/authored-boundaries-v1.ts')).href);
+    authoredBoundaryDeclaration=authoredBoundariesDeclarationV1Schema.parse(JSON.parse(bytes.toString('utf8')));
+  }
+
   // Single writer per data dir: a second server on the same DB would fork the durable clock.
   const lockPath=join(dataDir,'edge-server.lock');mkdirSync(dataDir,{recursive:true});
   if(!checkOnly){
@@ -62,6 +70,7 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
     const factory=await edenHistoryFactory(db,worldId,{lifeV1:true,newcomerResourcesV1:true,sleepSnapshotV1:true,groundV1:true,lectureV1:true});
     host=new WorldHost(db,factory,header?.seed??cfg.worldSeed,cfg.snapshotEveryTicks,worldId,{durableClockV1:true});
     const boot=host.boot();
+    if(authoredBoundaryDeclaration){if(!host.engine.previewAuthoredBoundariesV1)throw Error('selected runtime lacks authored boundary preview');const issue=host.engine.previewAuthoredBoundariesV1(authoredBoundaryDeclaration);if(issue)throw Error(issue.code+': '+issue.message);}
     if(approachRetention){if(!host.enableIntentApproachRetentionV1)throw Error('selected runtime needs native approach retention');await drive(host.enableIntentApproachRetentionV1());}
     if(quietLandingCourtesy){if(!host.enableQuietLandingCourtesyV1)throw Error('selected runtime needs prospective quiet landing courtesy');await drive(host.enableQuietLandingCourtesyV1());}
     if(floorGoals){if(!host.enableGroundFixtureGoalsV1)throw Error('selected runtime needs ground fixture goal levels');await drive(host.enableGroundFixtureGoalsV1());}
@@ -130,6 +139,7 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
     const {EdgeLedger}=await load('apps/server/src/edge/ledger/ledger.ts');
     // Explicit prospective office guard policy only; never grants upper floors/stairs or installs by default.
     if(officeStairGuards===true){const {officeStairGuardBoxes,OFFICE_STAIR_GUARD_VERSION}=await load('mars/viewer/lib/office-stair-guards.ts');await drive(host.installOfficeStairGuardsV1({version:OFFICE_STAIR_GUARD_VERSION,guards:officeStairGuardBoxes()}));}
+    if(authoredBoundaryDeclaration){if(!host.installAuthoredBoundariesV1)throw Error('selected runtime lacks authored boundary reader');const out=await drive(host.installAuthoredBoundariesV1(authoredBoundaryDeclaration));console.error('[edge] authored-boundaries:',JSON.stringify({...out,sourceHash:authoredBoundaryDeclaration.sourceHash,boxes:authoredBoundaryDeclaration.boxes.length}));}
     const edge=new EdgeLedger(host,db,placeData?JSON.parse(readFileSync(resolve(placeData),'utf8')):undefined,{ambient,spots:spotsRaw});if(edge.spotsRefused?.length)console.error('[edge] activity spots refused:',edge.spotsRefused.join(', '));
     const app=buildApp({cfg,db,host,auth,brain,souls,hub,intentV2:service,edge}),listener=require('@hono/node-server').getRequestListener(app.fetch);
     // Seed declared objects (idempotent by id). presentation params may give startsInMinutes.
@@ -163,7 +173,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).hr
     if(!descriptorPath)throw Error('usage: node tools/core/edge-server.mjs <descriptor.json> [check]');
     const d=JSON.parse(readFileSync(resolve(descriptorPath),'utf8')),flags=d.flags??{};
     const app=await openEdgeServerV1({input:d.input,dataDir:d.dataDir,worldId:d.worldId,port:Number(d.port),webDir:d.webDir,marsWebDir:d.marsWebDir,build:d.build??'local-edge/1',checkOnly:mode==='check',placeData:d.placeData,seedObjects:d.objects,inviteRequired:d.inviteRequired===true,skillFile:d.skillFile,cliFile:d.cliFile,inputManifestSHA256:d.inputManifestSHA256,
-      officeStairGuards:flags.officeStairGuards??false,ambient:d.ambient!==false,localSoulLimit:Number(d.localSoulLimit??9),humanRest:flags.humanRest??true,provisions:flags.provisions??true,sequences:flags.sequences??true,floorGoals:flags.floorGoals??true,kitchen:flags.kitchen??true,shore:flags.shore??true,foodDeliveryId:flags.foodDeliveryId,quietLandingCourtesy:flags.quietLandingCourtesy??true,social:flags.social??true,approachRetention:flags.approachRetention??true,closedGoals:flags.closedGoals??true,activateExpansion:flags.activateExpansion??true,nativePlaces:Array.isArray(d.nativePlaces)?d.nativePlaces:[],nav:d.nav??null,activitySpots:d.activitySpots});
+      authoredBoundariesFile:d.authoredBoundariesFile,authoredBoundariesSHA256:d.authoredBoundariesSHA256,officeStairGuards:flags.officeStairGuards??false,ambient:d.ambient!==false,localSoulLimit:Number(d.localSoulLimit??9),humanRest:flags.humanRest??true,provisions:flags.provisions??true,sequences:flags.sequences??true,floorGoals:flags.floorGoals??true,kitchen:flags.kitchen??true,shore:flags.shore??true,foodDeliveryId:flags.foodDeliveryId,quietLandingCourtesy:flags.quietLandingCourtesy??true,social:flags.social??true,approachRetention:flags.approachRetention??true,closedGoals:flags.closedGoals??true,activateExpansion:flags.activateExpansion??true,nativePlaces:Array.isArray(d.nativePlaces)?d.nativePlaces:[],nav:d.nav??null,activitySpots:d.activitySpots});
     if(app.checkOnly)console.log(JSON.stringify(app,null,2));
     else {console.log(JSON.stringify({url:app.cfg.publicUrl,worldId:app.host.worldId,boot:app.boot,mindDriver:app.cfg.mindDriver,edge:'/v1/edge',places:app.edge.places.byId.size,build:app.cfg.build}));
       for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>void app.close().then(()=>process.exit(0)).catch(()=>process.exit(1)));}
