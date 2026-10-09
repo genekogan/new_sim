@@ -4,7 +4,7 @@
 // carries the server's view hash; the replica recomputes its own at that tick
 // and asks for a resync when they differ. Runs in browsers and in Node.
 import type { Entity, Environment, PathCommit, PoseSample, Region } from '@sim/engine-contract';
-import { samplePath, viewHashOf, viewRow, PROTO, stationLiveV1Schema,stationV2MessageSchema,acceptStationLiveProgressV2,stationHelloCapabilitiesV1Schema,stationLiveContractSchema,meLiveDescriptorV1Schema,meLiveViewV1Schema,meLiveMessageV1Schema,
+import { samplePath, viewHashOf, viewRow, PROTO,TAKE_BOUNDARY_WIRE_V1,hydrateTakeBoundaryWireV1, stationLiveV1Schema,stationV2MessageSchema,acceptStationLiveProgressV2,stationHelloCapabilitiesV1Schema,stationLiveContractSchema,meLiveDescriptorV1Schema,meLiveViewV1Schema,meLiveMessageV1Schema,
   type StationLiveV2,type StationAnchorVariant,type StationLiveContract,type StationLiveV1, type KernelView, type PlayView, type TalkLine, type Batch, type BrainCall, type CameraLine, type ClientMsg, type Heartbeat, type LogEvent, type Me, type NarrativeView, type PublicSoul, type ServerMsg, type ServerStats, type Snapshot, type TickerLine } from '@sim/protocol';
 
 export class Replica {
@@ -135,11 +135,13 @@ export class Connection {
   stationContract:StationLiveContract|null=null;
   /** Same monotonic domain used for actual send and receive boundaries. */
   monotonicNow:()=>number;
+  readonly takeBoundaryTransport:boolean;
   url: string; getToken: () => Promise<string | null>; handlers: Handlers; make: (url: string) => WSLike; now: () => number;
 
-  constructor(url: string, getToken: () => Promise<string | null>, handlers: Handlers, make: (url: string) => WSLike, now: () => number = () => Date.now(), monotonicNow:()=>number=()=>performance.now(),stationCapabilities?:{stationContracts?:StationLiveContract[]}) {
+  constructor(url: string, getToken: () => Promise<string | null>, handlers: Handlers, make: (url: string) => WSLike, now: () => number = () => Date.now(), monotonicNow:()=>number=()=>performance.now(),stationCapabilities?:{stationContracts?:StationLiveContract[]},takeBoundaryTransport=false) {
     this.url = url; this.getToken = getToken; this.handlers = handlers; this.make = make; this.now = now;
     this.monotonicNow=monotonicNow;
+    this.takeBoundaryTransport=takeBoundaryTransport;
     this.stationOffer=stationHelloCapabilitiesV1Schema.parse(stationCapabilities??{}).stationContracts?.slice();
   }
 
@@ -206,7 +208,7 @@ export class Connection {
       if (!mine() || ws.readyState !== 1) return;
       // resume only from the same server process: batch numbers start again after a restart
       const hello: ClientMsg = { t: 'hello', proto: PROTO, ...(token ? { token } : {}), ...(this.replica.ready && this.epoch ? { since: this.replica.seq, epoch: this.epoch } : {}),
-        ...(this.stationOffer?{stationContracts:this.stationOffer.slice()}:{}) };
+        ...(this.stationOffer?{stationContracts:this.stationOffer.slice()}:{}),...(this.takeBoundaryTransport?{takeTransport:TAKE_BOUNDARY_WIRE_V1}:{}) };
       ws.send(JSON.stringify(hello));
       clearInterval(this.pingTimer);
       this.pingTimer = setInterval(() => {
@@ -222,6 +224,12 @@ export class Connection {
       let m:ServerMsg;try{m=JSON.parse(s) as ServerMsg;}catch{this.handlers.onError?.('message.invalid','The server message is not valid JSON.');return;}
       if(m&&typeof m==='object'&&(m as {type?:unknown}).type==='edge'){this.handlers.onEdge?.(m as unknown as EdgeSpectatorMessage);return;}
       if(!m||typeof m!=='object'||typeof m.t!=='string')return;
+      try{
+        if((m as {t:string}).t==='take-boundary-wire'){
+          if(!this.takeBoundaryTransport||this.welcome?.takeTransport!==TAKE_BOUNDARY_WIRE_V1)throw new Error('unnegotiated take transport');
+          m=hydrateTakeBoundaryWireV1(m) as ServerMsg;
+        }
+      }catch{this.handlers.onError?.('takes.transport-invalid','The take transport cannot be restored exactly.');try{ws.close();}catch{/* closing */}return;}
       this.onMessage(m,receivedAtMs);
     };
     ws.onclose = () => {

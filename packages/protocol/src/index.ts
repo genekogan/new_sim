@@ -140,8 +140,9 @@ export type TickerLine = { tick: number; text: string };
 export type NarrativeView = { id: number; region: string; tick: number; summary: string; beats: (Beat & { fired: boolean; fireTick: number })[]; nextRunTick: number };
 
 // ---------------------------------------------------------------- websocket
+export * from './take-boundary-wire.ts';
 export type ClientMsg =
-  | { t: 'hello'; proto: number; token?: string; since?: number; epoch?: string; stationContracts?:StationLiveContract[] }
+  | { t: 'hello'; proto: number; token?: string; since?: number; epoch?: string; stationContracts?:StationLiveContract[];takeTransport?:'take-boundary-facts/1' }
   | { t: 'resync'; reason: string }
   | { t: 'ping'; n: number };
 
@@ -164,7 +165,7 @@ export type ServerMsg =
   | {t:'me';view:MeLiveViewV1}
   | { t:'station-v2';view:StationLiveV2 }
   | { t:'station';view:StationLiveV1 }
-  | { t: 'welcome'; build: string; proto: number; worldId: string; rulesVersion: string; schema: string; dt: number; clockRate: number; serverTick: number; you: Me | null; serverTime: number; /** identifies this server process: batch numbers are only comparable within one */ epoch?: string; paused?: boolean; stationContract?:StationLiveContract|null;privateMe?:MeLiveDescriptorV1 }
+  | { t: 'welcome'; build: string; proto: number; worldId: string; rulesVersion: string; schema: string; dt: number; clockRate: number; serverTick: number; you: Me | null; serverTime: number; /** identifies this server process: batch numbers are only comparable within one */ epoch?: string; paused?: boolean; stationContract?:StationLiveContract|null;privateMe?:MeLiveDescriptorV1;takeTransport?:'take-boundary-facts/1' }
   | ({ t: 'snapshot'; reason: string } & Snapshot)
   | ({ t: 'batch' } & Batch)
   | ({ t: 'heartbeat' } & Heartbeat)

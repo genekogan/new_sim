@@ -5,7 +5,7 @@ import type { IncomingMessage, Server } from 'node:http';
 import { WebSocketServer, type WebSocket } from 'ws';
 import { z } from 'zod';
 import {randomUUID} from 'node:crypto';
-import { PROTO, publicEvent,stationHelloCapabilitiesV1Schema,negotiateStationContractV1,meLiveDescriptorV1Schema,meLiveViewV1Schema,
+import { PROTO, publicEvent,TAKE_BOUNDARY_WIRE_V1,stringifyTakeBoundaryWireV1,stationHelloCapabilitiesV1Schema,negotiateStationContractV1,meLiveDescriptorV1Schema,meLiveViewV1Schema,
   type StationLiveContract,type BrainCall, type ClientMsg, type Me, type ServerMsg, type ServerStats } from '@sim/protocol';
 import type { Auth } from './auth.ts';
 import type { Brain } from './brain.ts';
@@ -17,13 +17,13 @@ import type {CandidateStationV2} from './station-v2.ts';
 
 const clientMsg = z.discriminatedUnion('t', [
   z.object({ t: z.literal('hello'), proto: z.number(), token: z.string().max(4000).optional(), since: z.number().optional(), epoch: z.string().max(40).optional(),
-    stationContracts:stationHelloCapabilitiesV1Schema.shape.stationContracts }),
+    stationContracts:stationHelloCapabilitiesV1Schema.shape.stationContracts,takeTransport:z.literal(TAKE_BOUNDARY_WIRE_V1).optional() }),
   z.object({ t: z.literal('resync'), reason: z.string().max(200) }),
   z.object({ t: z.literal('ping'), n: z.number() }),
 ]);
 const MAX_PER_IP = 30, MAX_CLIENTS = 2000;
 type Client = { ws: WebSocket; me: Me | null; ready: boolean; alive: boolean; joinedAt: number; resyncs: number; sent: number; ip: string; msgs: number; windowStart: number; lastHello: number; lastSnapshot: number; stationContract:StationLiveContract|null;
-  authUserId?:string|null;helloGeneration?:number;meScope?:{contract:'me-live/1';connectionId:string;userId:string|null;revision:number;worldId:string;epoch:string};publishedMe?:string };
+  authUserId?:string|null;helloGeneration?:number;meScope?:{contract:'me-live/1';connectionId:string;userId:string|null;revision:number;worldId:string;epoch:string};publishedMe?:string;takeTransport?:typeof TAKE_BOUNDARY_WIRE_V1 };
 /** What anyone may see of the server's numbers: spend is for admins. */
 const publicStats = (st: ServerStats): ServerStats => ({ ...st, brain: { mode: st.brain.mode, callsToday: st.brain.callsToday, inflight: st.brain.inflight, jevMsAvg: st.brain.jevMsAvg } });
 const MAX_BUFFERED = 1_000_000;
@@ -122,12 +122,13 @@ export class Hub {
     if (m.t === 'resync') { c.resyncs++; return this.send(c, { t: 'snapshot', reason: `resync: ${String(m.reason).slice(0, 80)}`, ...this.host.snapshotView() }); }
     if (m.t === 'hello') {
       const generation=(c.helloGeneration??0)+1;c.helloGeneration=generation;
-      c.ready=false;c.me=null;c.authUserId=null;c.meScope=undefined;c.publishedMe=undefined;
+      c.ready=false;c.me=null;c.authUserId=null;c.meScope=undefined;c.publishedMe=undefined;c.takeTransport=undefined;
       if (m.proto !== PROTO) { this.send(c, { t: 'welcome', build: this.build, proto: PROTO, worldId: this.host.worldId, rulesVersion: this.host.engine.rulesVersion, schema: this.host.engine.schema, dt: this.host.engine.dt, clockRate: this.host.clockRate, serverTick: this.host.engine.world.tick, you: null, serverTime: Date.now(), epoch: this.epoch }); return this.send(c, { t: 'error', code: 'proto', message: `server speaks protocol ${PROTO}` }); }
       const u = await this.auth.userFromToken(m.token).catch(() => null);
       if(!this.clients.has(c)||c.helloGeneration!==generation||c.ws.readyState!==1||!this.host.clockAvailable)return;
       c.authUserId=u&&(!this.lifecycleSouls||this.db.user(u.id))?u.id:null;
       c.me = u ? this.lifecycleSouls?this.currentMe(u.id):this.auth.me(u) : null;
+      c.takeTransport=m.takeTransport===TAKE_BOUNDARY_WIRE_V1?TAKE_BOUNDARY_WIRE_V1:undefined;
       c.stationContract=negotiateStationContractV1(m.stationContracts?{stationContracts:m.stationContracts}:{},
         [...(this.station?['station-live/1' as const]:[]),...(this.stationV2?['station-live/2' as const]:[])]);
       const e = this.host.engine;
@@ -159,7 +160,7 @@ export class Hub {
     const sent=this.send(c,{t:'welcome',build:this.build,proto:PROTO,worldId:h.worldId,rulesVersion:e.rulesVersion,schema:e.schema,dt:e.dt,
       clockRate:h.clockRate,serverTick:e.world.tick,you:c.me,serverTime:Date.now(),epoch:this.epoch,paused:h.paused,
       ...(this.lifecycleSouls?{privateMe:{contract:'me-live/1' as const,connectionId:c.meScope!.connectionId,userId:c.meScope!.userId,revision:1 as const}}:{}),
-      ...(this.station||this.stationV2?{stationContract:c.stationContract}:{})});
+      ...(this.station||this.stationV2?{stationContract:c.stationContract}:{}),...(c.takeTransport?{takeTransport:c.takeTransport}:{})});
     if(sent)c.publishedMe=JSON.stringify(c.me);return sent;
   }
   private sendStation(c:Client){
@@ -167,12 +168,22 @@ export class Hub {
     else if(c.stationContract==='station-live/1'&&this.station)this.send(c,{t:'station',view:this.station.view()});
   }
 
-  private send(c: Client, m: ServerMsg) {
+  private send(c: Client, m: ServerMsg, takeStrings?:Map<ServerMsg,{raw?:string;wire?:string}>) {
     if(!this.host.clockAvailable){c.ready=false;c.ws.close(1013,'world unavailable');return;}
     if (c.ws.readyState !== 1) return false;
     if (c.ws.bufferedAmount > MAX_BUFFERED){if(m.t==='me'||m.t==='welcome'&&m.privateMe){c.ready=false;c.ws.close(1013,'private view backpressure');}return false;}
     const current=this.privateMessage(c,m);if(!current)return false;
-    const s = JSON.stringify(current); c.sent += s.length; c.ws.send(s);return true;
+    // All existing public/private recipient projection runs before packing.
+    let s:string;
+    try{
+      const mode=current.t==='takes'&&c.takeTransport?'wire':'raw',cached=takeStrings?.get(current)??{};
+      s=cached[mode]??(mode==='wire'?stringifyTakeBoundaryWireV1(current):JSON.stringify(current));
+      if(takeStrings){cached[mode]=s;takeStrings.set(current,cached);}
+    }catch{
+      // A broken fact must not become a different raw message or stop the host.
+      c.ready=false;c.ws.send(JSON.stringify({t:'error',code:'takes.transport-invalid',message:'The take transport cannot be encoded exactly.'}));c.ws.close(1011,'invalid take transport');return false;
+    }
+    c.sent += s.length; c.ws.send(s);return true;
   }
   /** No new private lifecycle fields are added to WS. Me retains its existing
    * shape but only usable identities; canonical public bodies/takes stay intact. */
@@ -227,6 +238,13 @@ export class Hub {
   readonly joinMessages: (() => unknown[])[] = [];
   broadcast(m: ServerMsg, filter?: (c: Client) => boolean) {
     if(m.t==='me')throw new Error('Private Me must be published directly to its bound connection');
+    if(m.t==='takes'){
+      // Cache only serialized strings for this broadcast, after each recipient's
+      // public/private projection. No mutable fact survives across messages.
+      const strings=new Map<ServerMsg,{raw?:string;wire?:string}>();
+      for(const c of this.clients){if(!c.ready||c.ws.readyState!==1||filter&&!filter(c))continue;this.send(c,m,strings);}
+      return;
+    }
     if(this.lifecycleSouls&&(m.t==='brain'||m.t==='stats')){
       for(const c of this.clients){
         if(!c.ready||c.ws.readyState!==1)continue;
