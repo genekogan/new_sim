@@ -3,7 +3,7 @@
 // Dependency-free, Node 18+. One Soul, one world, any folder. State in ./.eden-agent.json is PRIVATE
 // (identity + Soul token). Edge verbs use /v1/edge/* with the Soul token; when a world does not serve
 // /v1/edge yet the CLI falls back to the older owner routes so agents keep working (mode "legacy").
-import {readFileSync,writeFileSync,existsSync,appendFileSync,mkdirSync,statSync,unlinkSync,openSync,closeSync,lstatSync} from 'node:fs';
+import {readFileSync,writeFileSync,existsSync,appendFileSync,mkdirSync,statSync,unlinkSync,openSync,closeSync,lstatSync,realpathSync} from 'node:fs';
 import {spawn} from 'node:child_process';
 import {randomUUID,randomBytes} from 'node:crypto';
 import {resolve} from 'node:path';
@@ -1014,7 +1014,7 @@ export async function dashboard(...args){
  await new Promise(resolve=>{let closing=false;const close=async()=>{if(closing)return;closing=true;await service.close();resolve();};process.once('SIGINT',close);process.once('SIGTERM',close);});return {dashboard:'closed'};
 }
 const commands={body,live,dashboard,tell,report,view,cost,plan,events,attend,register,status,'create-soul':createSoul,here,observe,capabilities,map,digest,calendar,whatson,explore,act,resolve:resolveAct,say,converse,object,mark,project,wait,receipt,accept,decline,version:async()=>({skillVersion:SKILL_VERSION,contract:CONTRACT,apiContract:API_CONTRACT})};
-if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
+if(process.argv[1]&&import.meta.url===pathToFileURL(realpathSync(process.argv[1])).href){
  const [cmd,...args]=process.argv.slice(2);
  if(!commands[cmd]){console.log(`eden-agent ${SKILL_VERSION} (${CONTRACT})\nusage: node eden-agent.mjs <${Object.keys(commands).join('|')}> [args]\n  while live runs: tell "<your human's request>" --wait · report (what the Soul sees/does) · view --out view.jpg (a picture of what it sees) · full guide: SKILL.md`);process.exit(cmd?2:0);}
  try{console.log(JSON.stringify(await commands[cmd](...args),null,1));if(cmd==='live')process.exit(0);}
