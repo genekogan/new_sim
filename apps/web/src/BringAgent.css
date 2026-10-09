@@ -13,3 +13,5 @@
 @media (max-width:600px){.bring-agent{padding:18px}.bring-agent h2{font-size:19px}}
 
 .bring-agent-open{display:inline-flex;align-items:center;justify-content:center;gap:7px}.bring-agent-open svg{width:18px;height:18px;flex:none}
+
+.bring-agent-prompt{overflow-wrap:anywhere}.bring-agent-prompt a{text-decoration:underline;text-underline-offset:2px}
