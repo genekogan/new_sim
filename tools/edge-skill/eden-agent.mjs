@@ -598,7 +598,7 @@ export async function live(...argv){
  // a 1 s mtime check (portable: fs.watch fails inside some sandboxes) cuts the long-poll short when a request arrives
  let reqMtime=mtime(LIVE.requests);watcher=setInterval(()=>{const t=mtime(LIVE.requests);if(t!==reqMtime){reqMtime=t;pollAbort?.abort();nudge?.();}},1000);watcher.unref?.();
  const S=readJSON(LIVE.state,{});S.history??=[];S.convs??={};S.publicResults??=[];S.projectionProblems??=[];S.identitySelections??=[];S.options={...o.explicit};
- let ownProfile=me0?.profile??{soulId:s.soul,name:me0?.name??s.soul,revision:null,source:'startup-owner-sample; current-name refresh unavailable on legacy'};let pendingOwnProfile=null;
+ let ownProfile={soulId:s.soul,name:me0?.profile?.name??me0?.name??s.soul,revision:Number.isSafeInteger(me0?.profile?.revision)?me0.profile.revision:null,source:me0?.profile?'startup-canonical-owner-profile':'startup-owner-sample; current-name refresh unavailable on legacy'};let pendingOwnProfile=null;
  const saveS=()=>writeFileSync(LIVE.state,JSON.stringify(S,null,1)+'\n');
  const me=ok(await call(OWNER.me,{as:'owner'}),'live').souls?.find(x=>x.id===s.soul)??{};
  const persona={soulId:s.soul,name:me.name??s.soul,character:readText(LIVE.persona,600)||me.description||''};
