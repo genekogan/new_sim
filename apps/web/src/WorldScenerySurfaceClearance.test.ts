@@ -5,6 +5,8 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {createCourtyardHouseProposal,inspectCourtyardHouseProposal} from '../../../mars/viewer/app/engine-view/content/assets/courtyard-house-proposal/house.ts';
 import {createHouseThreeRoofAccess} from '../../../mars/viewer/app/engine-view/content/assets/eden-expansion-assets/house-three-roof-access.ts';
+import {buildFacades} from '../../../mars/viewer/app/engine-view/content/assets/eden-facades/index.ts';
+import {FACADE_PLAN} from '../../../mars/viewer/app/engine-view/content/assets/eden-facades/plan.ts';
 import {FIXTURES} from '../../../mars/viewer/app/engine-view/content/assets/eden-imports/interior-plan.ts';
 import {modelGeometry,PackSoup} from '../../../mars/viewer/app/engine-view/content/assets/eden-imports/assets.ts';
 type Part={name:string;p:number[];size:number[]};
@@ -27,8 +29,23 @@ function auditDoor(root:THREE.Group){
   assert.equal(ray.intersectObject(root,true).length,0,'actual door passage remains clear from both sides');
  }
 }
+function auditFacadeBase(root:THREE.Group,id:string){
+ const plan=FACADE_PLAN.find(b=>b.id===id);assert.ok(plan);const facade=buildFacades([plan]),p=facade.geometry.getAttribute('position');
+ try{for(const side of[-1,1]){
+  const wall=drawnPart(root,'south-entry-pier:4.9:'+side),trim=drawnPart(root,'entry-trim:4.9:'+side),plane=side>0?trim.min.x:trim.max.x;
+  let sharedArea=0;
+  for(let i=0;i<p.count;i+=3){
+   if(![0,1,2].every(k=>Math.abs(p.getX(i+k)-plane)<1e-5))continue;
+   const y0=Math.min(p.getY(i),p.getY(i+1),p.getY(i+2)),y1=Math.max(p.getY(i),p.getY(i+1),p.getY(i+2)),z0=Math.min(p.getZ(i),p.getZ(i+1),p.getZ(i+2)),z1=Math.max(p.getZ(i),p.getZ(i+1),p.getZ(i+2));
+   if(y1>.441)continue;
+   for(const surface of[wall,trim])sharedArea+=Math.max(0,Math.min(y1,surface.max.y)-Math.max(y0,surface.min.y))*Math.max(0,Math.min(z1,surface.max.z)-Math.max(z0,surface.min.z));
+  }
+  assert.ok(sharedArea<1e-6,'actual facade base does not share positive-area opening-side planes with wall or casing');
+ }
+ }finally{facade.geometry.dispose();}
+}
 await test('both courtyard variants and selected House3 render raised front trim without shared opening-side planes',()=>{
- for(const variant of['warm-timber','stone-pale'] as const){const owner=createCourtyardHouseProposal(variant);try{auditDoor(owner.group);const spec=inspectCourtyardHouseProposal(variant);assert.equal(spec.floor.topY,.1);assert.deepEqual(spec.entry.x,[-.9,.9]);assert.deepEqual(spec.entry.outerZ,[4.8,5]);assert.equal(spec.bounds.max[2],5.03);}finally{owner.dispose();}}
+ for(const variant of['warm-timber','stone-pale'] as const){const owner=createCourtyardHouseProposal(variant);try{auditDoor(owner.group);const spec=inspectCourtyardHouseProposal(variant);assert.equal(spec.floor.topY,.1);assert.deepEqual(spec.entry.x,[-.9,.9]);assert.deepEqual(spec.entry.outerZ,[4.8,5]);assert.equal(spec.bounds.max[2],5.03);owner.group.position.set(variant==='warm-timber'?34:54,0,30);auditFacadeBase(owner.group,variant==='warm-timber'?'eden-house-3':'eden-house-4');}finally{owner.dispose();}}
  const house3=createHouseThreeRoofAccess(()=>true);assert.ok(house3);try{auditDoor(house3.group);}finally{house3.dispose();}
 });
 await test('actual imported round rug flat faces clear both installed house floors after production packing',async()=>{

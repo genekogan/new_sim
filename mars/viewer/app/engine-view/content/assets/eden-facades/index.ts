@@ -65,7 +65,8 @@ export function buildFacades(plan:readonly FacadeBuilding[]=FACADE_PLAN){
    const windows=[...side.windows,...extraWindows(b,f).filter(w=>!side.windows.some(o=>Math.abs(o.at-w.at)<.3&&Math.abs(o.y0-w.y0)<.4))];
    const doors=side.doors;
    // plinth (stone band) except across doorways
-   const cuts=doors.map(d=>[d.at-d.w/2,d.at+d.w/2]).sort((a,c)=>a[0]-c[0]);let a0=f.lo-.07;
+   // Leave a 1 cm decorative reveal: band end faces must not coincide with doorway jambs/casing.
+   const cuts=doors.map(d=>[d.at-d.w/2-.01,d.at+d.w/2+.01]).sort((a,c)=>a[0]-c[0]);let a0=f.lo-.07;
    for(const [c0,c1] of [...cuts,[f.hi+.07,f.hi+.07]]){if(c0-a0>.05)s.box(pt(f,(a0+c0)/2,.22,.035),(c0-a0)/2,.22,.05,f.ax,f.out,P.base);a0=c1;}
    // cornice at the wall top (projecting, wrapping the corners), and a string course between storeys
    s.box(pt(f,(f.lo+f.hi)/2,top-.11,.07),len/2+.16,.11,.1,f.ax,f.out,P.trim);
