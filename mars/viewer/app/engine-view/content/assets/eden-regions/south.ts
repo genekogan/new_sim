@@ -2,6 +2,7 @@ import {Builder,rng,pick,PLASTER,ROOFS,TIMBER} from './kit.ts';
 import {house,lampPost,bench,boat,gazebo,silo,fence,tower,stall,lightAt} from './buildings.ts';
 import {WATER,type Terrain} from './terrain.ts';
 import type {Trees} from './trees.ts';
+import {SPORTS_LAYOUT} from './sports-layout.ts';
 /** South of the expansion (z 85..175): park with pond, playground and sports
  * ground, farm hamlet with silos, beach + boardwalk harbour on the sea. */
 export const PARK_BOUNDS=[-42,86,32,134] as const,SPORTS_BOUNDS=[33,86,106,134] as const,FARM_BOUNDS=[-104,86,-44,136] as const,HARBOUR_BOUNDS=[-104,134,130,190] as const;
@@ -51,22 +52,36 @@ export function buildPark(b:Builder,t:Terrain,trees:Trees){const r=rng(1201),G=(
  b.push(-6,0,95.5,Math.PI);stall(b,2.6,'#f3a6c0','#ffffff',r,false);b.pop();b.cyl('stone',4,0,94.5,.3,.95,6,'#b9b0a0');
 }
 export function buildSports(b:Builder,t:Terrain,trees:Trees){const r=rng(1301),G=(x:number,z:number)=>t.height(x,z);
- // football pitch 56×34 centred (64,112) with white lines; goals; grandstand on the north side
- const cx=64,cz=112,L=56,W=34;b.box('soil',cx,0,cz,L+8,.03,W+6,'#6f9a4a');
+ // Scaled football pitch, with clear goal run-off before the courts and western sidewalk.
+ const {x:cx,z:cz,length:L,width:W}=SPORTS_LAYOUT.pitch;b.box('soil',cx,0,cz,L+8,.03,W+6,'#6f9a4a');
  for(let i=0;i<8;i++)b.box('soil',cx-L/2+L/16+i*L/8,.031,cz,L/16,.004,W,'#7aa654');
  const line=(x0:number,z0:number,x1:number,z1:number)=>b.box('dressing',(x0+x1)/2,.036,(z0+z1)/2,Math.abs(x1-x0)+.12,.01,Math.abs(z1-z0)+.12,'#f3f3ee');
  line(cx-L/2,cz-W/2,cx+L/2,cz-W/2);line(cx-L/2,cz+W/2,cx+L/2,cz+W/2);line(cx-L/2,cz-W/2,cx-L/2,cz+W/2);line(cx+L/2,cz-W/2,cx+L/2,cz+W/2);line(cx,cz-W/2,cx,cz+W/2);
  for(const s of [-1,1]){line(cx+s*L/2,cz-8,cx+s*(L/2-9),cz-8);line(cx+s*L/2,cz+8,cx+s*(L/2-9),cz+8);line(cx+s*(L/2-9),cz-8,cx+s*(L/2-9),cz+8);
-  b.push(cx+s*(L/2+.05),0,cz,s>0?-Math.PI/2:Math.PI/2);b.box('metal',-3.66,0,0,.12,2.44,.12,'#f3f3ee');b.box('metal',3.66,0,0,.12,2.44,.12,'#f3f3ee');b.box('metal',0,2.38,0,7.44,.12,.12,'#f3f3ee');b.quad('cloth',[-3.66,2.4,0],[3.66,2.4,0],[3.66,0,-1.6],[-3.66,0,-1.6],'#e8e8e8');b.pop();}
+  b.push(cx+s*(L/2+.05),0,cz,s>0?-Math.PI/2:Math.PI/2);b.box('metal',-3.66,0,0,.12,2.44,.12,'#f3f3ee');b.box('metal',3.66,0,0,.12,2.44,.12,'#f3f3ee');b.box('metal',0,2.38,0,7.44,.12,.12,'#f3f3ee');
+  // Actual open grid across the back, both sides and roof; the goal mouth stays open.
+  for(let x=-3.66;x<=3.67;x+=.305){b.box('dressing',x,0,-1.6,.014,2.44,.014,'#e8e8e8');b.box('dressing',x,2.43,-.8,.014,.014,1.6,'#e8e8e8');}
+  for(let y=.244;y<2.45;y+=.244){b.box('dressing',0,y,-1.6,7.32,.014,.014,'#e8e8e8');for(const x of[-3.66,3.66])b.box('dressing',x,y,-.8,.014,.014,1.6,'#e8e8e8');}
+  for(let z=-1.6;z<.01;z+=.32){for(const x of[-3.66,3.66])b.box('dressing',x,0,z,.014,2.44,.014,'#e8e8e8');b.box('dressing',0,2.43,z,7.32,.014,.014,'#e8e8e8');}b.pop();}
  {const N=24;for(let i=0;i<=N;i++){const a=i/N*Math.PI*2;line(cx+Math.cos(a)*4.5,cz+Math.sin(a)*4.5,cx+Math.cos(a)*4.5+.1,cz+Math.sin(a)*4.5+.1);}}
  // grandstand
  b.push(cx,0,cz-W/2-6.5,0);for(let k=0;k<5;k++)b.box('timber',0,k*.45,-k*.8,30,.45,.8,k%2?'#8a5a36':'#a0764e');for(let k=0;k<5;k++)b.box('dressing',0,k*.45+.45,-k*.8+.1,29,.05,.3,pick(r,['#3d5a80','#c45a4a']));
   for(const x of [-15,-5,5,15])b.box('metal',x,0,-3.1,.15,4.6,.15,'#5a6268');b.shed('roof',0,4.6,-1.1,31,4,.6,'#3f4448');b.pop();
- // tennis courts and a basketball half-court east of the pitch
- for(const [x,z,c] of [[97,100,'#4a7aa0'],[97,118,'#b8603e']] as [number,number,string][]){b.box('soil',x,0,z,12,.04,16,c);line(x-5,z-11.5+3.6,x+5,z-11.5+3.6);line(x-5,z+11.5-3.6,x+5,z+11.5-3.6);line(x-5,z-8,x-5,z+8);line(x+5,z-8,x+5,z+8);line(x,z-4.4,x,z+4.4);
-  b.box('metal',x,0,z,11,1,.04,'#2f3436');for(const xx of [-6.5,6.5])b.box('metal',x+xx,0,z,.06,3,16,'#3a5a4a');}
+ // Two complete scaled tennis courts; singles/doubles sidelines and all four service boxes.
+ SPORTS_LAYOUT.courts.forEach(({x,z},i)=>{b.box('soil',x,0,z,12,.04,18,i?'#b8603e':'#4a7aa0');
+  const courtLine=(xa:number,za:number,xb:number,zb:number)=>b.box('dressing',(xa+xb)/2,.051,(za+zb)/2,Math.abs(xb-xa)+.07,.008,Math.abs(zb-za)+.07,'#f3f3ee');
+  for(const zz of[-8,8])courtLine(x-5,z+zz,x+5,z+zz);
+  for(const xx of[-5,-3.7,3.7,5])courtLine(x+xx,z-8,x+xx,z+8);
+  for(const zz of[-4.4,4.4])courtLine(x-3.7,z+zz,x+3.7,z+zz);courtLine(x,z-4.4,x,z+4.4);
+  for(const zz of[-8,8])courtLine(x,z+zz,x,z+zz+(zz>0?-.18:.18));
+  for(let xx=-5.5;xx<=5.51;xx+=.25)b.box('dressing',x+xx,0,z,.016,1,.016,'#d3d6d1');for(let y=.2;y<=1.01;y+=.2)b.box('dressing',x,y,z,11,.014,.014,'#d3d6d1');
+  const fence=(px:number,pz:number,sx:number,sz:number,part:string)=>{b.box('metal',px,0,pz,sx,3,sz,'#3a5a4a');b.boundary('guard',px,0,pz,sx,3,sz,'region-sports-court:'+i,part);};
+  for(const xx of[-6.5,6.5])fence(x+xx,z,.06,19,'side:'+xx);fence(x,z-9.5,13,.06,'rear');
+  // Front gate remains 1.4 m wide, outside the playing baseline.
+  for(const s of[-1,1])fence(x+s*3.6,z+9.5,5.8,.06,'front:'+s);
+ });
  // clubhouse with a veranda
- b.push(36.5,0,128,Math.PI/2);house(b,{w:10,d:6,floors:1,roof:'gable',veranda:true,wallC:'#efe9dc',roofC:'#3f6a3c',trim:'#3a5a4a'},r);b.pop();
+ b.push(SPORTS_LAYOUT.clubhouse.x,0,SPORTS_LAYOUT.clubhouse.z,Math.PI/2);house(b,{w:10,d:6,floors:1,roof:'gable',veranda:true,wallC:'#efe9dc',roofC:'#3f6a3c',trim:'#3a5a4a'},r);b.pop();
  for(let x=38;x<92;x+=8){trees.add(x,0,133.5,.9,'poplar','#6f9a4e',0);}
  for(const [x,z] of [[34,95],[94,95],[34,129],[92,131]] as [number,number][]){b.push(x,0,z,0);lampPost(b,6,'#5a6268');b.pop();}
  t.ribbon(b,[[59,88],[59,94.5]],2.2,'#b6b09b','path',.05);
@@ -107,7 +122,7 @@ export function buildHarbour(b:Builder,t:Terrain,trees:Trees){const r=rng(1501),
  for(let i=0;i<14;i++){const x=-96+r()*52,z=139+r()*5,yy=G(x,z);if(yy<WATER.bay+.1)continue;b.cyl('metal',x,yy,z,.03,2,4,'#ddd',false);b.cone('cloth',x,yy+1.8,z,1.1,.45,8,pick(r,['#e05a3a','#3d8ab0','#f0c040','#efe9dc','#5aa070']));b.box('cloth',x+1,yy+.02,z+.4,.8,.02,1.8,pick(r,['#e05a3a','#3d8ab0','#f0c040','#ffffff']));}
  // seafront kiosks and a fish market shed
  for(const [x,c] of [[-30,'#3d8ab0'],[44,'#e05a3a'],[84,'#f0c040']] as [number,string][]){b.push(x,0,133.2,Math.PI);stall(b,3,c,'#ffffff',r,true);b.pop();}
- b.push(48,0,131,0);house(b,{w:14,d:6,floors:1,fh:4,wall:'timber',wallC:'#5f7f8f',roof:'gable',roofC:'#3f4448',door:true},r);b.pop();
+ b.push(SPORTS_LAYOUT.fishMarket.x,0,SPORTS_LAYOUT.fishMarket.z,0);house(b,{w:14,d:6,floors:1,fh:4,wall:'timber',wallC:'#5f7f8f',roof:'gable',roofC:'#3f4448',door:true},r);b.pop();
  for(let x=-36;x<100;x+=9)trees.add(x+4.5,0,132.2,.8,'poplar','#5f8a46',0);
  for(const x of [-36,31])t.ribbon(b,[[x,93],[x,136.4]],2.4,'#c2b79c','path',.05);
  void TIMBER;

@@ -5,7 +5,7 @@ import {Builder,type MatKey,type Col,pick,PLASTER,ROOFS,TIMBER,STONE,TRIM} from 
 export type BalconyLayout={x:number;floorY:number;width:number;depth:number;index:string};
 export type RoofKind='gable'|'hip'|'flat'|'shed'|'cross'|'stepped'|'none';
 export type HouseSpec={w:number;d:number;floors:number;fh?:number;wall?:MatKey;wallC?:Col;roof?:RoofKind;roofC?:Col;roofH?:number;trim?:Col;
- chimney?:boolean;balcony?:boolean;veranda?:boolean;shutters?:boolean;flowerbox?:boolean;dormer?:boolean;plinth?:number;roofGarden?:boolean;sideDoor?:boolean;noWindows?:boolean;barnDoor?:boolean;flatC?:Col;door?:boolean;awning?:Col;band?:boolean;balconyLayout?:readonly BalconyLayout[]};
+ chimney?:boolean;balcony?:boolean;veranda?:boolean;shutters?:boolean;flowerbox?:boolean;dormer?:boolean;plinth?:number;roofGarden?:boolean;sideDoor?:boolean;noWindows?:boolean;barnDoor?:boolean;flatC?:Col;door?:boolean;awning?:Col;band?:boolean;balconyLayout?:readonly BalconyLayout[];furnishBalconies?:boolean};
 const GLASS='#2d3c46',GLASS2='#3b4a52',DOOR=['#5b3a29','#2f4f5f','#7a2f2a','#355e3b','#3d3a35','#8a6a3a'];
 /** Window grid on one facade (local plane z=zf facing +z when face=1; use push for other facades). */
 function windows(b:Builder,w:number,y0:number,floors:number,fh:number,zf:number,trim:Col,o:{shutters?:boolean;box?:boolean;skipDoor?:boolean;openings?:readonly BalconyLayout[];r:()=>number}){
@@ -71,9 +71,28 @@ export function house(b:Builder,s:HouseSpec,r:()=>number){footprint(b,s.w,s.d,'h
  if(s.chimney){const cx=s.w*(r()-.5)*.6,cz=-s.d*.18;b.box('stone',cx,H+rh*.4,cz,.6,rh*.7+.6,.6,pick(r,['#8a4a36','#a59d8e','#7a6a5a']));const v=new THREE.Vector3(cx,H+rh*1.1+.65,cz).applyMatrix4(b.m);CHIMNEYS.push([v.x,v.y,v.z]);}
  if(s.dormer&&roof==='gable'&&s.w>=s.d){b.push(0,H+rh*.18,s.d*.2,0);b.box(wall,0,0,0,1.4,1.2,1.2,wc);b.panel('glass',0,.6,.62,.8,.8,GLASS);b.gable('roof',0,1.2,0,1.4,1.3,.6,rc,wall,wc,.15);b.pop();}
  for(const balcony of balconies)buildBalcony(b,balcony,s.d/2,trim,buildingId);
+ if(s.furnishBalconies&&balconies.length)furnishBalconyRooms(b,balconies,s.d,trim);
  if(s.veranda){const vd=2.2;b.box('timber',0,-.1,s.d/2+vd/2,s.w+.4,.3,vd,pick(r,TIMBER));for(const x of [-s.w/2,-s.w/6,s.w/6,s.w/2])b.box('timber',x,.2,s.d/2+vd-.15,.16,2.5,.16,trim);
   b.shed('roof',0,2.6,s.d/2+vd/2,s.w+.4,vd,.45,rc,.15);b.box('timber',0,.2,s.d/2+vd-.15,s.w,.08,.06,trim);b.box('timber',0,.95,s.d/2+vd-.15,s.w,.06,.06,trim);}
  return H+rh;
+}
+/** Pictured seaside hotel rooms. Decorative contents leave the full door-to-rear centre lane clear.
+ * No native floor, seat or furniture action is registered; existing walls and guards are unchanged. */
+export function furnishBalconyRooms(b:Builder,rooms:readonly BalconyLayout[],depth:number,trim:Col){
+ const d=new Builder('decorative');d.m.copy(b.m);
+ for(const room of rooms){const x=room.x,y=room.floorY;
+  // A narrow single bed beside the centre lane, with its head toward the rear wall.
+  d.box('timber',x-.95,y+.12,-depth/2+1.7,.70,.16,2.05,'#8a6545');
+  for(const dx of[-.29,.29])for(const dz of[-.84,.84])d.box('timber',x-.95+dx,y,-depth/2+1.7+dz,.07,.15,.07,trim);
+  d.box('cloth',x-.95,y+.28,-depth/2+1.7,.68,.18,2,'#efe9dc');d.box('cloth',x-.95,y+.46,-depth/2+1.08,.6,.09,.36,'#f3eee2');
+  d.box('timber',x-.95,y+.12,-depth/2+.63,.74,.62,.06,trim);
+  // Writing desk and inward-facing chair on the opposite side.
+  d.box('timber',x+1.05,y+.72,-depth/2+2.1,.64,.06,.6,'#c6a57b');
+  for(const dx of[-.25,.25])for(const dz of[-.23,.23])d.box('timber',x+1.05+dx,y,-depth/2+2.1+dz,.06,.72,.06,trim);
+  d.box('dressing',x+1.05,y+.785,-depth/2+2.1,.29,.015,.2,'#f3eee2');
+  d.push(x+1.05,y,-depth/2+3.0,Math.PI);d.box('timber',0,.42,0,.44,.06,.42,trim);d.box('timber',0,.48,-.19,.44,.42,.06,trim);for(const xx of[-.16,.16])for(const zz of[-.16,.16])d.box('timber',xx,0,zz,.06,.42,.06,trim);d.pop();
+ }
+ d.drain(()=>b);
 }
 /** Visible solid guard panels match the same three exact height bands; facade/entry stays open. */
 export function buildBalcony(b:Builder,v:BalconyLayout,facadeZ:number,trim:Col,buildingId:string){
