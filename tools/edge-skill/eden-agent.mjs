@@ -9,6 +9,7 @@ import {randomUUID,randomBytes} from 'node:crypto';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {writeAtomicJSON} from './client-json-file.mjs';
+import {delegatedOwnerPath,approvalPublic,acceptDelegation} from './client-account.mjs';
 import {openLocalOperationFeedback,rememberSelector,REMEMBER_FORMAT_HINT} from './client-operation-feedback.mjs';
 import {clientProfile} from './client-profile.mjs';
 import {startClientDashboard,watchDashboardParent,rememberDashboardPicture} from './client-dashboard.mjs';
@@ -89,10 +90,11 @@ function need(s,k,hint){if(!s[k])throw new Error(`No ${k} yet. ${hint}`);return 
 /** as: 'owner' (identity bearer) | 'soul' (Soul token) | 'none' */
 async function call(path,{body,method,as='soul',timeoutMs=90_000,signal,extraHeaders={}}={}){
  assertLiveDispatch(IN_LIVE,leaseHeld,method??(body?'POST':'GET'));
- const s=load(),url=need(s,'world','Run: node eden-agent.mjs register <world-url>')+path,headers={'content-type':'application/json',...extraHeaders};
- // TODO(G1): real worlds will not accept a self-made owner identity; it is only used to own and pair the Soul.
- if(as==='owner'&&s.identity)headers.authorization=`Bearer dev:${s.identity}`;
+ const s=load(),headers={'content-type':'application/json',...extraHeaders};
+ if(as==='owner'&&s.accountAuth){path=delegatedOwnerPath(path,need(s,'soul','Complete an account approval first.'));if(s.token)headers.authorization=`Bearer ${s.token}`;}
+ else if(as==='owner'&&s.identity)headers.authorization=`Bearer dev:${s.identity}`;
  if(as==='soul'&&s.token)headers.authorization=`Bearer ${s.token}`;
+ const url=need(s,'world','Run: node eden-agent.mjs register <world-url>')+path;
  let r;try{r=await fetch(url,{method:method??(body?'POST':'GET'),headers,body:body?JSON.stringify(body):undefined,signal:signal&&AbortSignal.any?AbortSignal.any([signal,AbortSignal.timeout(timeoutMs)]):AbortSignal.timeout(timeoutMs)});}
  catch(e){return {status:0,data:{error:{code:signal?.aborted?'aborted':'unreachable',message:String(e.message)}}};}
  const text=await r.text();let data;try{data=JSON.parse(text);}catch{data={raw:text.slice(0,200)};}
@@ -123,12 +125,15 @@ export async function register(world,invite){
  const prev=load();if(!world&&!prev.world)throw new Error('usage: register <world-url> [invitation-code]');
  const w=(world??prev.world).replace(/\/skill\.md$/,'').replace(/\/+$/,'');
  if(!/^https?:\/\/.+\/w\/[a-z0-9-]+$/.test(w))throw new Error('world must look like http://host:port/w/<world>');
- save({world:w,identity:prev.identity??('agent-'+randomBytes(12).toString('hex')),skillVersion:SKILL_VERSION});
+ if(prev.world&&prev.world!==w&&(prev.soul||prev.pendingApproval))throw Error('This folder already belongs to a different world. Use a fresh folder; no identity, grant or approval is retargeted.');
+ save({world:w,skillVersion:SKILL_VERSION});
  const cfg=ok(await call(OWNER.config,{as:'none'}),'config');
+ if(cfg.accountAuthRequired){if(!cfg.accountApproval||!cfg.authReady)throw Error('Account approval is unavailable; no self-made account is substituted.');save({accountAuth:true,worldId:cfg.worldId});return {registered:true,world:w,next:'Run: create-soul "<Name>" ["<optional character>"]. Your human signs in and approves its link; provider credentials never enter this folder.'};}
+ save({accountAuth:false,identity:prev.identity??('agent-'+randomBytes(12).toString('hex'))});
  if(!cfg.devAuth)throw new Error('This world does not accept self-made identities yet. Tell your owner.');
  let me=ok(await call(OWNER.me,{as:'owner'}),'register');
  if(!me.me.invited&&invite){ok(await call(OWNER.invite,{as:'owner',body:{code:invite}}),'join');me=ok(await call(OWNER.me,{as:'owner'}),'register');}
- if(me.souls.length&&!prev.soul)save({soul:me.souls[0].id});
+ if(me.souls.length===1&&!prev.soul)save({soul:me.souls[0].id});
  return {registered:true,world:w,identity:'(private, in .eden-agent.json)',
   next:me.souls.length?'You already have a Soul: run status':me.me.invited?'Run: create-soul "<Name>" (optional character as a second argument)':'This world needs an invitation code: register <world> <code>'};
 }
@@ -139,15 +144,36 @@ async function pair(soul){
 }
 /** create-soul: your one Soul in this world (waits for arrival), then pairs this folder with it. */
 export async function createSoul(name,description){
+ if(liveRunning())throw Error('Stop this folder’s mind before changing its selected Soul, or use a fresh agent folder.');
  if(!name||(description!==undefined&&!description))throw new Error('usage: create-soul "<Name>" ["<one-line character>"]');
+ if(load().accountAuth)return startApproval({name,description});
  const me=ok(await call(OWNER.me,{as:'owner'}),'create-soul');
- if(me.souls.length){const id=me.souls[0].id;if(!load().token)await pair(id);else save({soul:id});return {created:false,reason:'You already have a Soul in this world (one per owner).',soul:{id,name:me.souls[0].name}};}
+ const existing=me.souls.filter(s=>s.name===name);if(existing.length===1){const id=existing[0].id;if(load().soul!==id||!load().token)await pair(id);return {created:false,reason:'This exact named Soul already belongs to this owner.',soul:{id,name}};}
  const r=await call(OWNER.souls,{as:'owner',body:{name,description}});
  if(r.status===409)return {created:false,code:r.data?.code??'name-taken',reason:'That name is taken in this world. Choose a different name and run create-soul again.'};
  const d=ok(r,'create-soul');
  const id=d.soul?.id??d.lifecycle?.soulId;if(!id)return {created:false,detail:d};
  await pair(id);accepted();folderGuide(d.soul?.name??name);return {created:true,soul:{id,name:d.soul?.name??name},paired:true,wrote:'AGENTS.md + CLAUDE.md (so a later agent session here knows how to relay your requests)'};
 }
+async function startApproval({name,description,soulId}){
+ const s=load();if(!s.accountAuth)throw Error('This world does not advertise account approvals.');
+ let pending=s.pendingApproval;if(pending&&(pending.world!==s.world||pending.input.name!==name||pending.input.description!==description||pending.input.soulId!==soulId))throw Error('A different approval is pending. Check it with approval status or cancel it before creating another.');
+ if(!pending){pending={world:s.world,worldId:s.worldId,input:{name,...(description===undefined?{}:{description}),...(soulId?{soulId}:{}),agentLabel:'eden-agent '+SKILL_VERSION,idempotencyKey:randomUUID(),pollSecret:randomBytes(32).toString('base64url')}};save({pendingApproval:pending});}
+ const data=ok(await call('/v1/agent/approval/start',{as:'none',body:pending.input}),'approval start');if(data.approval.worldId!==pending.worldId)throw Error('Approval world differs from registration.');pending.approvalId=data.approval.id;save({pendingApproval:pending});return approvalPublic(data,s.world);
+}
+export async function approval(action='status'){
+ if(liveRunning())throw Error('Stop this folder’s mind before selecting a newly approved Soul, or use a fresh folder.');
+ if(!['status','wait','cancel'].includes(action))throw Error('usage: approval [status|wait|cancel]');const s=load(),pending=need(s,'pendingApproval','Run create-soul or pair-soul first.');if(pending.world!==s.world||pending.worldId!==s.worldId)throw Error('Approval belongs to another world.');if(!pending.approvalId)return startApproval(pending.input);
+ const body={approvalId:pending.approvalId,pollSecret:pending.input.pollSecret},deadline=Date.now()+15*60000;
+ for(;;){const data=ok(await call('/v1/agent/approval/'+(action==='cancel'?'cancel':'poll'),{as:'none',body}),'approval '+action),dto=data.approval??data;
+  if(action==='cancel'){save({pendingApproval:undefined});return approvalPublic(dto,s.world);}
+  const delegate=acceptDelegation(data,pending,s.world);if(delegate){const grants={...(load().delegations??{}),[delegate.soul]:{world:delegate.world,token:delegate.token}};save({...delegate,delegations:grants,pendingApproval:undefined,mode:undefined});accepted();folderGuide(dto.name);return {approvalId:dto.id,status:'ready',soul:{id:delegate.soul,name:dto.name},paired:true,next:'Run status. Manual control and dashboard/live now use this Soul grant; signing out of the browser does not stop it.'};}
+  if(action!=='wait'||['refused','cancelled','expired'].includes(dto.status)||Date.now()>=deadline)return approvalPublic(dto,s.world);
+  await sleep(3000);
+ }
+}
+export async function pairSoul(id,name){if(liveRunning())throw Error('Stop this folder’s mind before changing its selected Soul.');if(!/^s_[A-Za-z0-9_-]+$/.test(id??''))throw Error('usage: pair-soul <immutable Soul ID> "<current name>"');if(load().accountAuth){if(!name)throw Error('Include the current Soul name for the approval preview.');return startApproval({name,soulId:id});}const me=ok(await call(OWNER.me,{as:'owner'}),'pair-soul');if(!me.souls.some(s=>s.id===id))throw Error('That Soul is not owned by this identity.');await pair(id);return {paired:true,soulId:id};}
+export async function selectSoul(id){if(liveRunning())throw Error('Stop this folder’s mind before changing its selected Soul.');const s=load();if(s.accountAuth){const grant=s.delegations?.[id];if(!grant||grant.world!==s.world)throw Error('No delegated grant for that exact Soul and world. Run pair-soul to request approval.');save({soul:id,token:grant.token,mode:undefined});ok(await call('/v1/agent/me'),'select-soul');return {selected:id};}return pairSoul(id);}
 /** 1.7.1: a short guide for any later agent session opened in this folder (Claude Code reads CLAUDE.md, Codex AGENTS.md). Never overwrites. */
 function folderGuide(name){
  const text=`# This folder is my Eden Soul "${name}"
@@ -1030,7 +1056,7 @@ export async function dashboard(...args){
  liveOptions(liveArgs);const service=await startClientDashboard({cli:resolve(process.argv[1]),liveArgs,port});console.log('Local Soul dashboard: '+service.origin+' (mind starts automatically; pause/stop preserves world activity)');
  await new Promise(resolve=>{let closing=false;const close=async()=>{if(closing)return;closing=true;await service.close();resolve();};process.once('SIGINT',close);process.once('SIGTERM',close);});return {dashboard:'closed'};
 }
-const commands={body,live,dashboard,profile,tell,report,view,cost,plan,events,attend,register,status,'create-soul':createSoul,here,observe,capabilities,map,digest,calendar,whatson,explore,act,resolve:resolveAct,say,converse,object,mark,project,wait,receipt,accept,decline,version:async()=>({skillVersion:SKILL_VERSION,contract:CONTRACT,apiContract:API_CONTRACT})};
+const commands={body,live,dashboard,profile,tell,report,view,cost,plan,events,attend,register,status,approval,'pair-soul':pairSoul,'select-soul':selectSoul,'create-soul':createSoul,here,observe,capabilities,map,digest,calendar,whatson,explore,act,resolve:resolveAct,say,converse,object,mark,project,wait,receipt,accept,decline,version:async()=>({skillVersion:SKILL_VERSION,contract:CONTRACT,apiContract:API_CONTRACT})};
 if(process.argv[1]&&import.meta.url===pathToFileURL(realpathSync(process.argv[1])).href){
  const [cmd,...args]=process.argv.slice(2);
  if(!commands[cmd]){console.log(`eden-agent ${SKILL_VERSION} (${CONTRACT})\nusage: node eden-agent.mjs <${Object.keys(commands).join('|')}> [args]\n  while live runs: tell "<your human's request>" --wait · report (what the Soul sees/does) · view --out view.jpg (a picture of what it sees) · full guide: SKILL.md`);process.exit(cmd?2:0);}

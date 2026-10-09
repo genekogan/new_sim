@@ -180,6 +180,9 @@ export class AccountStore {
     });
   }
   start(input: StartApprovalInput): ApprovalDTO & { pollSecret?: string } { return this.begin(input, null); }
+  /** An agent may propose repairing a public Soul ID. This conveys no control;
+   * approve() requires the verified account's exact existing membership. */
+  startRepairRequest(soulId:string,input:StartApprovalInput){text(soulId,'Soul');return this.begin(input,soulId);}
   startRepair(identity: AccountIdentity, soulId: string, input: StartApprovalInput): ApprovalDTO & { pollSecret?: string } {
     return this.db.tx(() => { this.owned(identity, soulId); return this.begin(input, soulId); });
   }
@@ -295,4 +298,6 @@ export class AccountStore {
       this.db.db.prepare('UPDATE account_soul_memberships_v1 SET current_grant_id=NULL WHERE world_id=? AND soul_id=? AND account_id=?').run(this.worldId, soulId, identity.id);
     });
   }
+  releaseGrant(token:string){return this.db.tx(()=>{const grant=this.resolveGrant(token);if(!grant)fail('forbidden','Delegated grant unavailable');this.db.db.prepare('UPDATE account_agent_grants_v1 SET revoked_at=? WHERE world_id=? AND id=? AND revoked_at IS NULL').run(this.time(),this.worldId,grant.id);this.db.db.prepare('UPDATE account_soul_memberships_v1 SET current_grant_id=NULL WHERE world_id=? AND soul_id=? AND current_grant_id=?').run(this.worldId,grant.soulId,grant.id);});}
+  agentStatus(soulId:string){const row=this.db.db.prepare("SELECT a.agent_label,g.created_at FROM account_agent_grants_v1 g JOIN account_soul_memberships_v1 m ON m.world_id=g.world_id AND m.soul_id=g.soul_id AND m.current_grant_id=g.id JOIN account_approvals_v1 a ON a.id=g.approval_id AND a.world_id=g.world_id AND a.status='ready' WHERE g.world_id=? AND g.soul_id=? AND g.revoked_at IS NULL AND g.token_hash IS NOT NULL").get(this.worldId,soulId) as {agent_label:string;created_at:number}|undefined;return row?{attached:true,label:row.agent_label,since:row.created_at,last_used:null}:null;}
 }

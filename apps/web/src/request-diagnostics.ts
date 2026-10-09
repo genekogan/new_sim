@@ -2,7 +2,7 @@ import type {IntentReceiptV2,IntentRequestV2} from '@sim/protocol';
 import type {IntentResponse} from './intent-response.ts';
 import {intentFeedback} from './intent-feedback.ts';
 export type DiagnosticContext={worldId:string;soulId:string;entityId?:string;backendBuild?:string;sentAt?:string;observedAt?:string;responseStatus?:number;body?:{activity?:string;actionId?:string;seatedOn?:string;tick?:number}};
-export type DiagnosticScope={worldId:string;soulId:string;ownerId:string;entityId?:string;requestId:string};
+export type DiagnosticScope={worldId:string;soulId:string;ownerId:string;principalId?:string;entityId?:string;requestId:string};
 const unavailable='Unavailable — not supplied in this request evidence.';
 export function redactDiagnosticText(value:string):string{
  return value.replace(/-----BEGIN [^-]*PRIVATE KEY-----[\s\S]*?-----END [^-]*PRIVATE KEY-----/g,'[redacted private key]')
@@ -68,7 +68,7 @@ export function ownRequestDiagnostics(status:number,body:unknown,scope:Diagnosti
  if(!dtoShape(body))return {kind:'unavailable',reason:'The server diagnostics failed validation and were not shown.'};
  const d=body as unknown as OwnRequestDiagnostics;
  if(d.requestId!==scope.requestId||d.worldId!==scope.worldId||d.soulId!==scope.soulId||(scope.entityId!==undefined&&d.entityId!==scope.entityId)
-  ||d.source.ownerId!==scope.ownerId||d.source.principalId!==scope.ownerId)return {kind:'unavailable',reason:'The server diagnostics did not match this request, Soul or owner and were not shown.'};
+  ||d.source.ownerId!==scope.ownerId||d.source.principalId!==(scope.principalId??scope.ownerId))return {kind:'unavailable',reason:'The server diagnostics did not match this request, Soul or owner and were not shown.'};
  return {kind:'available',dto:d};
 }
 export function ownRequestDiagnosticsPath(soulId:string,requestId:string){return `/v1/souls/${encodeURIComponent(soulId)}/intent-v2/requests/${encodeURIComponent(requestId)}/diagnostics`;}

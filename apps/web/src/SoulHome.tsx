@@ -60,7 +60,7 @@ function SoulAccount({ sim, auth, api, selected, onSelect, pairCode, clearPair, 
   // a failed first load (the server restarting, a token not ready yet) is retried rather than left at "loading…"
   useEffect(() => { if (!auth.authed || !active || fresh) return; const t = setInterval(() => void refresh(), 4000); return () => clearInterval(t); }, [auth.authed, active, fresh, refresh]);
   const mine = souls?.find((s) => s.id === selected) ?? null;
-  useEffect(() => { if (souls?.length && !mine) onSelect(souls[0].id); }, [souls]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Multiple account Souls require an explicit choice; never silently retarget a client.
 
   if (!auth.authed) return (
     <section className="wide">
@@ -95,10 +95,9 @@ function SoulAccount({ sim, auth, api, selected, onSelect, pairCode, clearPair, 
           <Dashboard key={mine.id} sim={sim} api={api} soul={mine} isAdmin={me.role === 'admin'} base={base} refresh={refresh} active={active && fresh} onGone={() => { onSelect(null); void refresh(); }} />
           <section><h2>Account</h2>
             <div className="kv"><span>signed in as</span><span>{me.email ?? auth.label}</span><span>role</span><span>{me.role}</span><span>public owner id</span><span>{me.short}</span></div>
-            <details style={{ marginTop: 6 }}><summary className="dim">sign-in details (the wallet is created for later and unused for now)</summary>
-              <pre className="json">{JSON.stringify({ userId: auth.debug.privyUserId ?? me.userId, embeddedWallet: auth.debug.wallet ?? null, walletSeenByServer: me.wallet ?? null, linkedAccounts: auth.debug.linked }, null, 2)}</pre></details>
+
           </section>
-        </> : null}
+        </> : <section><h2>Your Souls</h2><p>Choose which Soul to inspect.</p>{souls.map(s=><button key={s.id} onClick={()=>onSelect(s.id)}>{s.name}</button>)}</section>}
       </div>}
     </>
   );

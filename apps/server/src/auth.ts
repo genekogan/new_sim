@@ -8,9 +8,13 @@ import type { Config } from './config.ts';
 import type { Db, UserRow } from './db.ts';
 import { ownerShort } from './world.ts';
 
+export type VerifiedAccountIdentity={id:string;issuer:string;subject:string;verifiedEmail?:string;emailVerifiedAt?:number;verifiedAt:number;expiresAt:number};
+
 export class Auth {
   private key: CryptoKey | null = null;
   private profileAt = new Map<string, number>();
+  private verified=new WeakMap<UserRow,VerifiedAccountIdentity>();
+  private profileProof=new Map<string,{email:string|null;at:number}>();
   ready = false;
   devAuth: boolean;
   cfg: Config; db: Db;
@@ -37,6 +41,12 @@ export class Auth {
   /** Verify a Privy access token and return the user (creating the row on first sight). */
   async userFromToken(token: string | undefined | null): Promise<UserRow | null> {
     if (!token) return null;
+    if(token.startsWith('dev:')&&this.cfg.accountAuthRequired){
+      // Existing high-entropy agent-local legacy credentials retain their own
+      // startup projection. They are not verified human account identities.
+      if(!/^dev:agent-[0-9a-f]{24}$/.test(token))return null;
+      const row=this.db.user(token);return row&&this.db.soulsOf(row.id).some(s=>s.world_id===this.cfg.worldId&&s.token_hash)?row:null;
+    }
     if (this.devAuth && token.startsWith('dev:')) {
       // Public exposure (EDGE_PUBLIC=1): only self-generated agent identities; never admin or chosen names.
       if (process.env.EDGE_PUBLIC === '1' && !/^dev:agent-[0-9a-f]{24}$/.test(token)) return null;
@@ -45,17 +55,18 @@ export class Auth {
       return this.db.user(id)!;
     }
     if (!this.key) return null;
-    let did: string;
+    let did: string,expiresAt:number;
     try {
       const { payload } = await jwtVerify(token, this.key, { issuer: 'privy.io', audience: this.cfg.privyAppId });
-      did = String(payload.sub);
+      if(typeof payload.sub!=='string'||!/^did:privy:[a-zA-Z0-9_-]{1,100}$/.test(payload.sub)||typeof payload.exp!=='number'||!Number.isFinite(payload.exp))return null;
+      did=payload.sub;expiresAt=payload.exp*1000;
     } catch { return null; }
     let u = this.db.user(did);
     // (re)fetch the profile on first sight, or hourly, so a wallet created later shows up on the debug page
     const fetched = this.profileAt.get(did) ?? 0;
     if (!u || Date.now() - fetched > 3600_000) {
-      this.profileAt.set(did, Date.now());
       const prof = await this.fetchProfile(did).catch(() => null);
+      if(prof){this.profileAt.set(did,Date.now());this.profileProof.set(did,{email:prof.email,at:Date.now()});}
       const email = prof?.email ?? u?.email ?? null;
       const role = email && this.cfg.adminEmails.includes(email.toLowerCase()) ? 'admin' : 'user';
       this.db.upsertUser({ id: did, email, wallet: prof?.wallet ?? u?.wallet ?? null, role });
@@ -65,8 +76,13 @@ export class Auth {
       const role = u.email && this.cfg.adminEmails.includes(u.email.toLowerCase()) ? 'admin' : 'user';
       if (role !== u.role) { this.db.upsertUser({ id: did, email: u.email, wallet: u.wallet, role }); u = this.db.user(did)!; } else this.db.touchUser(did);
     }
+    const proof=this.profileProof.get(did);this.verified.set(u!,{id:did,issuer:'privy.io/'+this.cfg.privyAppId,subject:did,expiresAt:expiresAt!,verifiedAt:Date.now(),...(proof?.email?{verifiedEmail:proof.email.toLowerCase(),emailVerifiedAt:proof.at}: {})});
     return u;
   }
+
+  /** Only validated provider JWTs establish account authority. Caller emails,
+   * public Soul IDs and legacy dev identities never satisfy this predicate. */
+  async accountFromToken(token:string|undefined|null){const user=await this.userFromToken(token),identity=user?this.verified.get(user):undefined;return user&&identity&&identity.expiresAt>Date.now()?{user,identity}:null;}
 
   private async fetchProfile(did: string): Promise<{ email: string | null; wallet: string | null }> {
     const res = await fetch(`https://auth.privy.io/api/v1/users/${encodeURIComponent(did)}`, { headers: { Authorization: this.basic(), 'privy-app-id': this.cfg.privyAppId } });
@@ -82,7 +98,7 @@ export class Auth {
   }
 
   me(u: UserRow): Me {
-    return { userId: u.id, short: ownerShort(u.id), email: u.email, wallet: u.wallet, role: u.role, souls: this.db.soulsOf(u.id).map((s) => s.id), invited: !this.cfg.inviteRequired || u.role === 'admin' || !!u.invited_by };
+    return { userId: u.id, short: ownerShort(u.id), email: u.email, wallet: this.cfg.accountAuthRequired?null:u.wallet, role: u.role, souls: this.db.soulsOf(u.id).map((s) => s.id), invited: !this.cfg.inviteRequired || u.role === 'admin' || !!u.invited_by };
   }
 }
 

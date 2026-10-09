@@ -12,7 +12,7 @@ import './styles.css';
 declare const __SIM_ARRIVAL_ENABLED__: boolean;
 const arrivalEnabled=typeof __SIM_ARRIVAL_ENABLED__!=='undefined'&&__SIM_ARRIVAL_ENABLED__===true;
 
-type Cfg = { privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean;worldKey?:string };
+type Cfg = { privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean;worldKey?:string;accountAuthRequired?:boolean };
 
 function WithPrivy({ cfg }: { cfg: Cfg }) {
   const p = usePrivy();
@@ -21,7 +21,7 @@ function WithPrivy({ cfg }: { cfg: Cfg }) {
     ready: p.ready, authed: p.ready && p.authenticated, label: email ?? p.user?.id ?? null,
     login: () => p.login(), logout: () => p.logout(),
     getToken: async () => (p.ready && p.authenticated ? await p.getAccessToken() : null),
-    debug: { privyUserId: p.user?.id ?? null, wallet: p.user?.wallet ?? null, linked: p.user?.linkedAccounts?.map((a) => ({ type: a.type, ...(('address' in a) ? { address: (a as { address: string }).address } : {}) })) ?? [] },
+    debug: { privyUserId:p.user?.id??null,wallet:null,linked:[] },
   };
   return <Shell cfg={cfg} auth={auth} arrivalEnabled={arrivalEnabled} />;
 }
@@ -44,11 +44,11 @@ function WorldRoot() {
   useEffect(() => { let tries = 0; const go = () => { fetch(apiPath('/v1/config')).then(r=>readWorldBootstrap(r,worldKey)).then(raw=>setCfg(raw as Cfg)).catch((e) => { if (!(e instanceof WorldBootstrapError)&&++tries < 20) setTimeout(go, 3000); else setErr(String(e)); }); }; go(); }, []);
   if (err) return <pre>cannot reach the server: {err}</pre>;
   if (!cfg) return <pre>connecting…</pre>;
-  const useDev = cfg.devAuth && new URLSearchParams(location.search).has('dev');
-  if (useDev || (!cfg.privyAppId && cfg.devAuth)) return <WithDev cfg={cfg} />;
+  const useDev = !cfg.accountAuthRequired&&cfg.devAuth && new URLSearchParams(location.search).has('dev');
+  if (useDev || (!cfg.accountAuthRequired&&!cfg.privyAppId && cfg.devAuth)) return <WithDev cfg={cfg} />;
   if (!cfg.privyAppId) return <Shell cfg={cfg} auth={{ ready: true, authed: false, label: null, login: () => alert('Sign-in is not configured on this server.'), logout: () => {}, getToken: async () => null, debug: { privyUserId: null, wallet: null, linked: [] } }} arrivalEnabled={arrivalEnabled} />;
   return (
-    <PrivyProvider appId={cfg.privyAppId} config={{ embeddedWallets: { ethereum: { createOnLogin: 'users-without-wallets' }, showWalletUIs: false }, appearance: { theme: 'dark' } }}>
+    <PrivyProvider appId={cfg.privyAppId} config={{ loginMethods:['google','email'],embeddedWallets: { ethereum: { createOnLogin: 'off' }, showWalletUIs: false }, appearance: { theme: 'dark' } }}>
       <WithPrivy cfg={cfg} />
     </PrivyProvider>
   );

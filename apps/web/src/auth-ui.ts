@@ -1,9 +1,5 @@
-/** Edge onboarding: Souls are run by their owners' agents, so human sign-in (dev/Privy) is hidden by default.
- * The code stays; add `?auth=1` to the URL (or localStorage `sim.authUi`='1') to show it again. */
-export const AUTH_UI:boolean=(()=>{
- try{return typeof location!=='undefined'&&(new URLSearchParams(location.search).get('auth')==='1'||localStorage.getItem('sim.authUi')==='1');}
- catch{return false;}
-})();
+/** Sign-in is part of the shared world chrome; public viewing remains unsigned. */
+export const AUTH_UI=true;
 
 /** Raw-world bootstrap prompt; full runtime instructions live in the installed skill. */
 export function agentOnboarding(worldUrl:string,worldName?:string){

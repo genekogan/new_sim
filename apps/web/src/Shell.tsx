@@ -23,6 +23,8 @@ import {approvedMe,authIdentity} from './auth-projection.ts';
 import { useViewerInsets, ViewerFrame } from './ViewerFrame.tsx';
 import {connectionLost} from './viewer-arrival.ts';
 import {BringAgent} from './BringAgent.tsx';
+import {AccountApproval} from './AccountApproval.tsx';
+import {approvalFromHash} from './account-approval.ts';
 import {worldClockAt,worldTimeText} from './world-clock.ts';
 import type { WorldViewerHandle, WorldViewerState } from './WorldViewer.ts';
 import { worldKey } from './world-path.ts';
@@ -63,8 +65,11 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   useEffect(()=>()=>{apiGeneration.current++;},[]);
   const [tab, setTab] = useState<Tab>(() => hashTab().tab);
   const [pairCode, setPairCode] = useState<string | null>(() => hashTab().pair);
+  const [approvalId,setApprovalId]=useState(()=>approvalFromHash(location.hash));
+  const [approvalFollow,setApprovalFollow]=useState<string|null>(null);
   const [selected, setSelected] = useState<string | null>(()=>hashTab().soul??null); // public selection only
-  useEffect(() => { if (!pairCode){if(tab==='watch'&&!selected&&location.hash==='#advanced')return;const next=tab==='watch'&&selected?soulFragment(selected):tab;if(location.hash!=='#'+next)location.hash=next;} }, [tab, pairCode,selected]);
+  useEffect(() => { if (!pairCode&&!approvalId){if(location.hash==='#join'||tab==='watch'&&!selected&&location.hash==='#advanced')return;const next=tab==='watch'&&selected?soulFragment(selected):tab;if(location.hash!=='#'+next)location.hash=next;} }, [tab, pairCode,selected,approvalId]);
+  useEffect(()=>{const changed=()=>setApprovalId(approvalFromHash(location.hash));addEventListener('hashchange',changed);return()=>removeEventListener('hashchange',changed);},[]);
   useEffect(() => { const f = () => { if(location.hash==='#advanced'){setAdvanced(true);setPanelOpen(false);setTab('watch');return;} const h = hashTab(); setTab(h.tab); if (!['watch', 'my soul'].includes(h.tab)) setAdvanced(true); else if(h.soul){setAdvanced(false);setPanelOpen(true);setNavigationOpen(false);} if(h.tab==='watch')setSelected(h.soul??null); if (h.pair) setPairCode(h.pair); else if(h.tab==='watch')setPairCode(null); }; addEventListener('hashchange', f); return () => removeEventListener('hashchange', f); }, []);
   const [lessonIndex,setLessonIndex]=useState(0);
   const [lessonOpen,setLessonOpen]=useState(false);
@@ -83,6 +88,8 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   const [viewerState, setViewerState] = useState<WorldViewerState | null>(null);
   const receiveHandle = useCallback((handle: WorldViewerHandle | null) => setViewerHandle(handle), []);
   const receiveState = useCallback((state: WorldViewerState) => setViewerState(state), []);
+  useEffect(()=>{if(!approvalFollow||!auth.authed)return;const attempt=()=>{if(viewerHandle?.selectSoul(approvalFollow)){viewerHandle.setCameraMode('follow');setApprovalFollow(null);}};attempt();const timer=setInterval(attempt,500);return()=>clearInterval(timer);},[approvalFollow,viewerHandle,auth.authed]);
+  useEffect(()=>{setApprovalFollow(null);},[cfg.worldId,authIdentity(auth)]);
   const placePreview=useCallback((place:EdenTourPlace)=>viewerHandle?.placePreview?.(place)??Promise.resolve(null),[viewerHandle]);
   const openNavigation = useCallback(() => setPanelOpen(false), []);
   const viewportInsets = useViewerInsets(frame, !advanced && panelOpen, `${advanced}:${navigationOpen}:${tab}:${selected}`);
@@ -104,7 +111,8 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   const show = (...t: Tab[]) => tab === 'everything' || t.includes(tab);
   const r = sim.conn.replica, st = sim.conn.stats;
   const pins=useMySouls();
-  const pinnedIds=[...new Set([...pins.ids,...(currentMe?.souls??[])])];
+  // Local favourites never establish ownership. Navbar comes only from server Me.
+  const ownedIds=currentMe?.souls??[];
   const mine = new Set(currentMe?.souls ?? []);
   const inspect = (id: string | null) => { setSelected(id); if (id) revealPanel(); };
   const edenExpansion=edenExperienceEnabled(location.hostname,worldPath,cfg.worldId,sim.conn.welcome?.worldId,qualifiedEdenWorlds);
@@ -113,6 +121,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   const openAccount = () => { setAdvanced(false); setPairCode(null); setTab('my soul'); revealPanel(); };
   return (
     <div ref={frame} className={`human-world ${advanced ? 'has-advanced' : ''}`}>
+      {approvalId&&<AccountApproval key={JSON.stringify([cfg.worldId,authIdentity(auth),approvalId])} id={approvalId} worldId={cfg.worldId} worldUrl={location.origin+worldPath} worldName={worldKey==='littlemartians'?'Little Martians':worldKey[0].toUpperCase()+worldKey.slice(1)} auth={auth} api={api} onClose={()=>{setApprovalId(null);history.replaceState(null,'',location.pathname+location.search+'#watch');}} onReady={id=>{setSelected(id);setApprovalFollow(id);setAdvanced(false);setTab('watch');setPanelOpen(true);setApprovalId(null);}}/>}
       <div className="world-scene"><LiveWorld sim={sim} selected={selected} onSelect={inspect} embedded {...{edenExpansion,localClassroomPresentation,publishSpeechAnchors:!advanced,humanPresets:humanPresetsEnabled&&edenExpansion}} hideControls={!advanced} hideSoulInfo={!advanced} viewportInsets={viewportInsets} onViewerHandle={receiveHandle} onViewerState={receiveState} /></div>
       <WorldSpeechOverlay root={frame} sim={sim} state={viewerState} active={!advanced} handle={viewerHandle}/>
       {!advanced && <ViewerFrame handle={viewerHandle} state={viewerState} dt={sim.conn.welcome?.dt ?? 0.05} navigationOpen={navigationOpen} onNavigationChange={setNavigationOpen} onNavigationOpen={openNavigation} worldTime={worldTimeText(worldClockAt((sim as Sim&{takes?:{chunks?:unknown[]}|null}).takes?.chunks,viewerState?.shownTick))} connected={!connectionLost(sim.conn)} connecting={!sim.conn.welcome} worldName={worldKey === 'littlemartians' ? 'Little Martians' : worldKey[0].toUpperCase() + worldKey.slice(1)} followName={viewerState?.cameraMode === 'follow' ? r.souls.get(viewerState.selection.soulId ?? '')?.name ?? null : null} slots={{ status: statusSlot, camera: cameraSlot }} />}
@@ -127,13 +136,13 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
         {!advanced&&<div className="hud-camera-row"><div className="hud-camera-slot" ref={setCameraSlot}/><button className="hud-camera" aria-label="Camera controls" aria-expanded={navigationOpen} title="Camera controls" onClick={()=>setNavigationOpen(o=>!o)}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6.5h3l1.4-2h5.2l1.4 2h3v9.5H3z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><circle cx="10" cy="11" r="3" fill="none" stroke="currentColor" strokeWidth="1.5"/></svg></button></div>}
         <LocalIntegrationNotice source={cfg.localIntegrationMetadataPath}/>{AUTH_UI&&<LocalConnectionHelp devAuth={cfg.devAuth}/>}
         <div className="hud-actions">
-          {!advanced&&<MySouls ids={pinnedIds} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} select={id=>{inspect(id);if(viewerHandle?.selectSoul(id))viewerHandle.setCameraMode('follow');}}/>}
-          {AUTH_UI&&<button disabled={auth.authed&&!currentMe} onClick={() => { const id = currentMe?.souls[0]; if (id) { inspect(id); setTab('watch'); setAdvanced(false); } else openAccount(); }}>Your Soul</button>}
+          {!advanced&&<MySouls ids={ownedIds} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} select={inspect}/>}
+          {AUTH_UI&&auth.authed&&<button onClick={openAccount}>Account</button>}
           {advanced&&<a className="world-back" href="#watch" onClick={e => { e.preventDefault(); setAdvanced(false); setPairCode(null); setTab('watch'); history.replaceState(null, '', '#watch'); }}>← Back to the world</a>}
           {!AUTH_UI ? null : !auth.ready ? <span className="dim">Signing in…</span> : auth.authed
             ? <button onClick={() => void auth.logout()}>Sign out</button>
             : <button className="primary" onClick={auth.login}>Sign in</button>}
-          {!advanced&&worldKey==='eden'&&<BringAgent/>}
+          {!advanced&&<BringAgent auth={auth}/>}
         </div>
       </header>
       <aside id="soul-panel" tabIndex={-1} className="human-panel" hidden={advanced || !panelOpen || tab === 'my soul'} aria-label="Selected Soul">

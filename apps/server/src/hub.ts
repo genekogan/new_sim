@@ -190,7 +190,7 @@ export class Hub {
   private currentMe(userId:string):Me|null{
     const user=this.db.user(userId);if(!user)return null;
     const me=this.auth.me(user),souls=this.lifecycleSouls;if(!souls)return me;
-    return {...me,souls:souls.invited(user)?this.db.soulsOf(user.id).filter(row=>row.world_id===this.host.worldId&&souls.controlReady(row)).map(row=>row.id):[]};
+    return {...me,souls:souls.invited(user)?souls.ownedRows(user.id).filter(row=>row.world_id===this.host.worldId&&souls.controlReady(row)).map(row=>row.id):[]};
   }
   private privateViewFailed(c:Client,error:unknown){
     // Preserve corrupt evidence for operator reconciliation. Neither an old Me
