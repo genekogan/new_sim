@@ -1,3 +1,4 @@
+import {bodyProfile} from '../../../mars/viewer/engine/bodies/navigation.ts';
 import {withStaticGridReadCache} from '../../../mars/viewer/engine/spatial/grid.ts';
 import {edenGroundTransitionV1Schema,type EdenGroundTransitionV1} from '@sim/engine-contract';
 import type {EdenGroundReaderV1} from './eden-ground.ts';
@@ -963,10 +964,10 @@ export class MarsEngine implements Engine {
   previewAuthoredBoundariesV1(raw:AuthoredBoundariesDeclarationV1){
     const declaration=authoredBoundariesDeclarationV1Schema.parse(raw);
     const spatial=this.rt.services.spatial as Spatial;if(!spatial.source)return {code:'authored-boundaries.spatial-not-rebasable',message:'The current native scene cannot admit new boundary bands.'};
-    for(const e of Object.values(this.ents)){if(!e.human)continue;const radius=e.body?.radius??HUMAN_RADIUS,floater=e.body?.family==='floater',height=floater?radius*2:1.8,feet=e.pose.p[1]-(floater?radius:0);
+    for(const e of Object.values(this.ents)){if(!e.human)continue;const profile=bodyProfile(e),radius=profile.radius,height=profile.height,feet=e.pose.p[1];
       for(const b of declaration.boxes){if(b.collision!=='solid'||b.c[1]+b.half[1]<=feet+1e-10||b.c[1]-b.half[1]>=feet+height-1e-10)continue;
         const dx=e.pose.p[0]-b.c[0],dz=e.pose.p[2]-b.c[2],cs=dcos(b.yaw),sn=dsin(b.yaw),x=Math.max(Math.abs(dx*cs+dz*sn)-b.half[0],0),z=Math.max(Math.abs(-dx*sn+dz*cs)-b.half[2],0);
-        if(x*x+z*z<radius*radius-1e-10)return {code:'authored-boundaries.body-intersection',message:`Boundary ${b.id} would intersect current body ${e.id}; no movement or installation was accepted.`};
+        if(x*x+z*z<radius*radius-1e-10)return {code:'authored-boundaries.body-intersection',message:`Boundary ${b.id} would intersect current occupied ${profile.id} movement envelope of ${e.id}; no movement or installation was accepted.`};
       }
     }return null;
   }
