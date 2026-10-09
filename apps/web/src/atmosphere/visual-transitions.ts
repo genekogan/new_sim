@@ -28,3 +28,15 @@ export function leafSpell(seconds:number,wind:number){
  const a=hash(i),b=hash(i+1),spell=a+(b-a)*t;
  return .18+.82*clamp(.25*wind+.75*spell);
 }
+
+/** Strong decorative wind now comes in smooth seeded spells instead of staying
+ * continuously at gale strength. Light/moderate breezes are exactly preserved;
+ * the caller retains its original weather state for facts, rain and physics. */
+export function visualWindStrength(seconds:number,wind:number){
+ if(wind<=.75)return wind;
+ const x=seconds/37,i=Math.floor(x),t=smooth(x-i);
+ const hash=(n:number)=>{let h=Math.imul(n+83,374761393);h=Math.imul(h^(h>>>13),1274126177);return((h^(h>>>16))>>>0)/4294967296;};
+ const noise=hash(i)+(hash(i+1)-hash(i))*t,strong=smooth((noise-.28)/.6);
+ const weight=smooth((wind-.75)/.2),spell=.75+(wind-.75)*strong;
+ return wind+(spell-wind)*weight;
+}

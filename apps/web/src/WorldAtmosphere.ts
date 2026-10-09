@@ -1,5 +1,6 @@
 import {DECORATIVE_MOTION,nextFerrisAngle} from '../../../mars/viewer/app/engine-view/content/assets/decorative-motion.ts';
 import {EDEN_WATER_DAYLIGHT} from '../../../mars/viewer/app/engine-view/content/environment/eden-water-readability/daylight.ts';
+import {visualWindStrength} from './atmosphere/visual-transitions.ts';
 import {twilightColour} from './atmosphere/twilight.ts';
 import * as THREE from 'three';
 import {WIND,WindPatches} from './atmosphere/wind.ts';
@@ -206,8 +207,9 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    applyWeather(frame,day);
    if(!active){active=true;if(!root.parent)scene.add(root);root.visible=true;}
    const t=seconds%7200;
-   // Wind: calm breeze .28 .. gale 1 (the shader adds travelling gusts).
-   WIND.value.x=t;WIND.value.y=still?0:.15+state.wind*.95;
+   // Less frequent strong decorative spells; reported weather and native facts stay unchanged.
+   const visualWind=visualWindStrength(seconds,state.wind);
+   WIND.value.x=t;WIND.value.y=still?0:.15+visualWind*.95;
    // Windmill sails turn with the wind (angle integrated, so speed changes never jump); fountain ripples.
    if(!still)sailAngle=(sailAngle+Math.min(frame.dt,.25)*(.18+state.wind*1.1))%(Math.PI*2);ROTOR.value.w=sailAngle;
    // The static ornamental sky clouds drift slowly to and fro downwind and grey under overcast.
@@ -228,14 +230,14 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    fireflies.update(t,still?0:Math.max(0,1-day*3)*(1-state.rain)*(1-state.wind*.7),fireflies.uniforms.uFly.value.z);
    smoke.update(t,still?0:1-state.rain*.5,smoke.uniforms.uSmoke.value.z,day,WIND.value.z,WIND.value.w,state.wind);
    // Autumn leaves blow through in wind (a few drift down on any breezy day).
-   const leaves=still?0:Math.max(0,Math.min(1,(state.wind-.3)/.5))*(1-state.rain*.7)*(.15+.85*Math.min(1,day*2));
+   const leaves=still?0:Math.max(0,Math.min(1,(visualWind-.3)/.5))*(1-state.rain*.7)*(.15+.85*Math.min(1,day*2));
    // Rain comes in heavier and lighter spells (smooth, tens of seconds) rather than at a constant rate.
    const spell=.72+.18*Math.sin(seconds*.037+1.3)+.1*Math.sin(seconds*.11+.4);
    // Sunlit pollen/seed motes drift near the camera on fair, breezy-but-not-windy days.
    const motes=still?0:smooth(.45,.8,day)*(1-smooth(.35,.7,state.cloud))*(1-smooth(.6,.9,state.wind))*(1-state.rain)*(1-state.fog);
    // ... and in a real wind the same particles become fine dust skimming low over the ground (desert setting); dry ground only.
    const dust=still?0:smooth(.65,.95,state.wind)*(1-smooth(.15,.4,state.wet));
-   rain.update2(t,still?0:state.rain*spell,leaves,day,frame.camera,WIND.value.z,WIND.value.w,state.wind,Math.max(motes,dust),dust>motes?1:0);rainWanted=rain.lines.visible;
+   rain.update2(seconds,still?0:state.rain*spell,leaves,day,frame.camera,WIND.value.z,WIND.value.w,visualWind,Math.max(motes,dust),dust>motes?1:0);rainWanted=rain.lines.visible;
   },
   inspect(){return {active,kind,state:{...state},rotor:motion.rotorFound,fountainWater:motion.waterFound,skyClouds:motion.skyClouds,windMaterials:wind.count,windModes:wind.modes(),smokeSources:smoke.sourceCount,flowers:lastFound.flowers,meadow:lastFound.meadow,roofs:lastFound.roofs,water:lastFound.water,harbour:lastFound.harbour,scans,drawCalls:root.children.filter(o=>o.visible).length};},
   dispose(){if(closed)return;closed=true;if(review&&(globalThis as Record<string,unknown>).edenAtmosphere===api)delete (globalThis as Record<string,unknown>).edenAtmosphere;deactivate();wind.dispose();motion.dispose();fauna.dispose();balloons.dispose();fireflies.dispose();smoke.dispose();sky.dispose();rain.dispose();halos.dispose();lighthouse.dispose();fogBanks.dispose();root.removeFromParent();if(ownsFog&&scene.fog===fog)scene.fog=null;if(scene.onBeforeRender===beforeRender)scene.onBeforeRender=previousBeforeRender;},

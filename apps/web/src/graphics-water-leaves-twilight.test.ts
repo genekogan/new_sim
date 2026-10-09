@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import {createEdenDaylight,visualDaylight,leafSpell,TWILIGHT_WORLD_HOURS} from './atmosphere/visual-transitions.ts';
+import {createEdenDaylight,visualDaylight,leafSpell,visualWindStrength,TWILIGHT_WORLD_HOURS} from './atmosphere/visual-transitions.ts';
 import {sunTimes,parseLocalDateTime} from '../../../mars/viewer/engine/env/sun.ts';
 import {Rain,LEAVES} from './atmosphere/rain.ts';
 import {createConnectedNativeShore} from '../../../mars/viewer/app/engine-view/content/environment/connected-native-shore.ts';
@@ -49,4 +49,13 @@ void test('actual Daylight Eden opt-in resets same-clock cache and smooth hemi t
  const before=hemi.color.clone();const t=parseLocalDateTime(stamp);const sec=(t.hour*3600+t.minute*60+t.second)+.01;
  d.update(stamp.slice(0,11)+`${Math.floor(sec/3600).toString().padStart(2,'0')}:${Math.floor(sec/60)%60<10?'0':''}${Math.floor(sec/60)%60}:${(sec%60).toFixed(2).padStart(5,'0')}`);
  assert.ok(Math.hypot(before.r-hemi.color.r,before.g-hemi.color.g,before.b-hemi.color.b)<.0001);d.setNightLighting(false);d.update(stamp);assert.equal(d.daylight,daylightFactors(solarPosition(stamp).elevationDeg).daylight);d.dispose();
+});
+
+void test('strong visual wind has lower seeded duty cycle while light/moderate breezes are exact',()=>{
+ const samples=Array.from({length:7200},(_,t)=>visualWindStrength(t,1));
+ const heavy=samples.filter(x=>x>=.9).length/samples.length;
+ assert.ok(heavy>.05&&heavy<.65,`strong visual duty ${heavy} versus original constant gale 1`);
+ assert.ok(Math.max(...samples)>.98);assert.ok(Math.min(...samples)<=.750001);
+ for(const wind of [0,.15,.3,.55,.7,.75])for(const t of [0,1,37,71,1000,7199])assert.equal(visualWindStrength(t,wind),wind);
+ for(let t=0;t<7200;t+=7){assert.equal(visualWindStrength(t,1),samples[t]);assert.ok(Math.abs(visualWindStrength(t+1e-5,1)-visualWindStrength(t-1e-5,1))<1e-5);}
 });
