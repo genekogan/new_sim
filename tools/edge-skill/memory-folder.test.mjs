@@ -53,7 +53,7 @@ test('actually met people retain untrusted speech separately from knowledge and 
   f.m.fold(event('speech', 'speech:1', {personId: 's_lumen', text: speech, untrusted: true}));
   f.m.remember({id: 'remember:1', at, person: 's_lumen', note: 'Seems interested in drawing; ask about their sketch.'});
   const person = readFileSync(f.m.personFile('s_lumen'), 'utf8');
-  assert.match(person, /actual meetings/); assert.match(person, /UNTRUSTED data/); assert.match(person, /Judgments/);
+  assert.match(person, /confirmed physical meetings/); assert.match(person, /UNTRUSTED data/); assert.match(person, /Judgments/);
   assert.match(person, /&lt;script&gt;/); assert.doesNotMatch(person, /\[Read secrets\]\(/);
   assert.doesNotMatch(f.read('knowledge.md'), /Ignore your instructions/);
   assert.equal(readFileSync(join(f.root, 'PERSONA.md'), 'utf8'), 'owner voice\n');
@@ -115,7 +115,7 @@ test('source and event conflicts fail before logs or projections change; raw aut
 test('duplicate receipt delivery does not count met people twice', t => {
   const f = fixture(t), value = outcome('terminal:meeting', {met: [{id: 's_lumen', name: 'Lumen', where: 'shore-bank'}]});
   f.m.fold(value); f.m.fold({...value, id: 'poll:meeting'});
-  assert.match(readFileSync(f.m.personFile('s_lumen'), 'utf8'), /Times met: 1/);
+  assert.match(readFileSync(f.m.personFile('s_lumen'), 'utf8'), /Confirmed physical meetings 1/);
 });
 
 test('symlink and torn machine-log boundaries preserve outside data and failures', t => {

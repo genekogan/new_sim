@@ -26,8 +26,9 @@ including fields valid for a different event type. Each record is bounded to
 | `gazetteer` | `places: [{id,name,goodFor: string[]}]` | Public place rows; updates retain historic visits. This is not navigation admission. |
 | `arrival` | `placeId` | An actual observed arrival, with a stable occurrence ID. Increments visits once. |
 | `act.accepted` | `receiptId, act` | Accepted work only. Does not count a visit or a success. |
-| `meet` | `person: {id,name}, placeId` | An actual encounter. Merely appearing in a directory is not a meeting. |
-| `speech` | `personId,text,untrusted:true` | Quoted last words from an already met person. Never promoted to knowledge. |
+| `meet` | `person: {id,name}, placeId` | A confirmed physical meeting from qualified normalized world evidence; receipt `met` is physical. Directory entries and received speech are not physical meetings. |
+| `communication` | `person:{id,name},channel,recipientPlace`, private channel also `conversationId` | Received private/public speech. Recipient place is its last observed location; the other person’s location/co-location is unknown. |
+| `speech` | `personId,text,untrusted:true` | Quoted last words from an observed communication contact or physically met person. Never promoted to knowledge. |
 | `outcome` | `receiptId,act,phase,summary,learned,produced,met,untrusted`, optional `placeId` | A normalized terminal receipt; arrays are required, empty where appropriate. |
 | `refusal` | `act,code` | Evidence that an attempt was refused. |
 | `lesson` | `attempt,fix,refusalId,successId` | Links the matching refusal to an actually completed fix. Acceptance alone is insufficient. |
@@ -111,3 +112,5 @@ actual visit counts and knowledge survive a module restart, while a mind’s
 ability to answer from the retrieved Markdown remains a later integration gate.
 
 Focused verification: `node --test tools/edge-skill/memory-folder.test.mjs`.
+
+Private conversation membership/turns preserve peer context and communication counts, never physical co-location. Canonical `receipt.met` and separately qualified `meet` facts retain physical counts. Legacy `encounter:<64hex>` meet rows from the old received-speech adapter are labelled communication-derived/unqualified in projections; machine JSONL and judgment records are unchanged. Same-event replay preserves stored first-observation time/place and immutable quote; conflicting text still refuses. Older binaries that lack the additive communication event type are not forward-qualified readers after new records; retain the current reader rather than rewriting history.

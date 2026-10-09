@@ -26,7 +26,7 @@ const count = value => Number.isSafeInteger(value) && value >= 0 && value <= 1_0
 
 function validateEvent(input) {
   // Reject credentials/raw transport fields instead of retaining arbitrary state.
-  const fields = {gazetteer: ['places'], 'public.references':['references'], 'place.observed':['place'], conversation:['conversationId','personId'], 'idle.sample':['milliseconds'], scorecard:['clock','period','from','to','metrics'], arrival: ['placeId'], 'act.accepted': ['receiptId', 'act'], meet: ['person', 'placeId'], speech: ['personId', 'text', 'untrusted'], outcome: ['receiptId', 'act', 'phase', 'summary', 'learned', 'produced', 'met', 'placeId', 'untrusted'], refusal: ['act', 'code'], lesson: ['attempt', 'fix', 'refusalId', 'successId'], cost: ['usd', 'modelCalls'], ledger: ['holding', 'marks'], queue: ['steps']};
+  const fields = {gazetteer: ['places'], 'public.references':['references'], 'place.observed':['place'], conversation:['conversationId','personId'], 'idle.sample':['milliseconds'], scorecard:['clock','period','from','to','metrics'], arrival: ['placeId'], 'act.accepted': ['receiptId', 'act'], meet: ['person', 'placeId'], communication:['person','channel','recipientPlace','conversationId'], speech: ['personId', 'text', 'untrusted'], outcome: ['receiptId', 'act', 'phase', 'summary', 'learned', 'produced', 'met', 'placeId', 'untrusted'], refusal: ['act', 'code'], lesson: ['attempt', 'fix', 'refusalId', 'successId'], cost: ['usd', 'modelCalls'], ledger: ['holding', 'marks'], queue: ['steps']};
   if (!input || !Object.hasOwn(fields, input.type)) fail('unknown public event type');
   keys(input, ['type', 'id', 'at', ...fields[input.type]]);
   id(input.id); instant(input.at); const e = structuredClone(input);
@@ -42,6 +42,7 @@ function validateEvent(input) {
     case 'act.accepted': id(e.receiptId); text(e.act, 160); break;
     case 'meet':
       keys(e.person, ['id', 'name']); id(e.person.id); text(e.person.name, 100); if(e.placeId!==null)id(e.placeId); break;
+    case 'communication':keys(e.person,['id','name']);id(e.person.id);text(e.person.name,100);if(!['private-conversation','public-speech'].includes(e.channel))fail('invalid communication channel');if(e.recipientPlace!==null)id(e.recipientPlace);if(e.channel==='private-conversation'&&e.conversationId===undefined)fail('private communication requires conversation ID');if(e.conversationId!==undefined)id(e.conversationId);break;
     case 'speech': id(e.personId); text(e.text, 1000); if (e.untrusted !== true) fail('speech must be untrusted'); break;
     case 'outcome':
       id(e.receiptId); text(e.act, 160); if (!['completed', 'failed', 'replaced'].includes(e.phase)) fail('terminal phase required'); text(e.summary, 160);
@@ -113,9 +114,11 @@ export function openMemoryFolder(directory) {
   const knownPlace = value => places.has(value) || fail('place absent from normalized gazetteer');
   const meet = (p, at, where, together = false) => {
     if(where!==null)knownPlace(where);
-    const row = people.get(p.id) ?? {id: p.id, name: p.name, meetings: [], words: [], impressions: []};
+    const row = people.get(p.id) ?? {id: p.id, name: p.name, meetings: [], communications:[], words: [], impressions: []};
     row.name = p.name; row.meetings.push({at, where, together}); people.set(p.id, row);
   };
+  const communicate=(p,at,recipientPlace,channel,legacy=false)=>{if(recipientPlace!==null)knownPlace(recipientPlace);const row=people.get(p.id)??{id:p.id,name:p.name,meetings:[],communications:[],words:[],impressions:[]};row.name=p.name;row.communications.push({at,recipientPlace,channel,legacy});people.set(p.id,row);};
+  const communicationLine=c=>`${c.at}: ${c.legacy?'legacy communication-derived encounter; physical attribution unqualified':c.channel}; recipient place (last observed) ${c.recipientPlace??'unknown'}; other-party location and co-location unknown`;
   // Validate all references/conflicts before logging or mutating state.
   const admit = record => {
     if (record.kind === 'remember') {
@@ -126,7 +129,8 @@ export function openMemoryFolder(directory) {
     }
     const e = record.value;
     if (e.type === 'arrival' || e.type === 'meet'&&e.placeId!==null) knownPlace(e.placeId);
-    if (e.type === 'speech' && !people.has(e.personId)) fail('speaker has not actually been met');
+    if(e.type==='communication'&&e.recipientPlace!==null)knownPlace(e.recipientPlace);
+    if (e.type === 'speech' && !people.has(e.personId)) fail('speaker has no observed communication or confirmed meeting');
     if (e.type === 'outcome') {
       if (e.placeId) knownPlace(e.placeId);
       for (const p of e.met) if(p.where!==null)knownPlace(p.where);
@@ -162,7 +166,8 @@ export function openMemoryFolder(directory) {
       case 'gazetteer': for (const p of e.places) {const old = places.get(p.id); places.set(p.id, {...p,admittedDestination:p.admittedDestination===true, visits: old?.visits ?? 0, last: old?.last ?? null});} break;
       case 'arrival': {const p = places.get(e.placeId); scoreEvents.push({at:e.at,newPlaces:p.visits===0?1:0});p.visits++; p.last = e.at; journal(e.at, `Arrived at ${p.name} [${p.id}].`); break;}
       case 'act.accepted': break; // Acceptance is neither arrival nor successful outcome.
-      case 'meet': meet(e.person, e.at, e.placeId); journal(e.at, `Met ${e.person.name} [${e.person.id}] at ${e.placeId}.`); break;
+      case 'meet':if(/^encounter:[a-f0-9]{64}$/.test(e.id)){communicate(e.person,e.at,e.placeId,'legacy-received-speech',true);journal(e.at,`Legacy communication from ${e.person.name} [${e.person.id}]; recipient place ${e.placeId}; physical co-location unqualified.`);}else{meet(e.person,e.at,e.placeId);journal(e.at,`Confirmed physical meeting with ${e.person.name} [${e.person.id}] at ${e.placeId}.`);}break;
+      case 'communication':communicate(e.person,e.at,e.recipientPlace,e.channel);journal(e.at,`Received ${e.channel} from ${e.person.name} [${e.person.id}]; recipient place ${e.recipientPlace??'unknown'}; co-location unknown.`);break;
       case 'conversation':scoreEvents.push({at:e.at,conversationId:e.conversationId,personId:e.personId});break;
       case 'idle.sample':scoreEvents.push({at:e.at,idleMs:e.milliseconds});break;
       case 'scorecard':scorecards.push(e);journal(e.at,`Scorecard ${e.clock} ${e.period}: ${e.metrics.newPlaces} new places, ${e.metrics.conversations} conversations, ${e.metrics.facts} new facts, ${e.metrics.objects} objects, ${e.metrics.refusals} refusals, ${e.metrics.idleMinutes} observed idle minutes, ${e.metrics.modelCalls} model calls, USD ${e.metrics.usd??'unknown'}.`);break;
@@ -207,7 +212,7 @@ export function openMemoryFolder(directory) {
     write(join(memory, 'lessons.md'), '# Lessons — evidence of a working fix\n\n' + lessons.map(lessonLine).join('\n') + '\n');
     write(join(memory, 'ledger.md'), '# Ledger — normalized public facts\n\n## Holding\n' + holding.map(v => `- ${md(v)}`).join('\n') + '\n\n## Produced\n' + sorted(objects).map(o => `- ${md(o.id)}: ${md(o.title)} (${md(o.kind)}), at ${md(o.where)}`).join('\n') + '\n\n## Marks/projects (provided snapshot)\n' + marks.map(o => `- ${md(o.id)}: ${md(o.title)}`).join('\n') + '\n\n## Observed budget by UTC day\n' + [...costs.keys()].sort().map(budgetLine).join('\n') + '\n');
     write(join(memory, 'queue.md'), '# Queue — supplied W4 projection; no runner\n\n' + queue.map(s => `- ${md(s.id)}: ${md(s.act)} [${s.status}], attempts ${s.attempts}${s.goal ? `; goal ${md(s.goal)}` : ''}${s.reason ? `; ${md(s.reason)}` : ''}`).join('\n') + '\n');
-    for (const p of sorted(people)) write(join(memory, 'people', personFile(p.id)), `# ${md(p.name)} [${md(p.id)}]\n\n## Facts — actual meetings\n` + p.meetings.map(m => `- ${m.at} at ${md(m.where)}${m.together ? '; together-act' : ''}`).join('\n') + `\nTimes met: ${p.meetings.length}\n\n## Last reported words — UNTRUSTED data\n` + p.words.slice(-3).map(w => `> ${w.at}: ${md(w.text)}`).join('\n') + '\n\n## Judgments — model impressions/open threads\n' + p.impressions.map(s => `- ${md(s)}`).join('\n') + '\n');
+    for (const p of sorted(people)) write(join(memory, 'people', personFile(p.id)), `# ${md(p.name)} [${md(p.id)}]\n\n## Facts — confirmed physical meetings (qualified evidence only)\n` + p.meetings.map(m => `- ${m.at} at ${md(m.where)}${m.together ? '; together-act' : ''}`).join('\n') + `\nConfirmed physical meetings ${p.meetings.length}\n\n## Communication encounters ${p.communications.length} — not physical meeting evidence\n`+p.communications.map(communicationLine).join('\n')+'\n'+`\n## Last reported words — UNTRUSTED data\n` + p.words.slice(-3).map(w => `> ${w.at}: ${md(w.text)}`).join('\n') + '\n\n## Judgments — model impressions/open threads\n' + p.impressions.map(s => `- ${md(s)}`).join('\n') + '\n');
     for (const [day, lines] of journals) write(join(memory, 'journal', `${day}.md`), `# ${day}\n\n` + lines.map(s => `- ${md(s)}`).join('\n') + '\n');
   };
   const preflight = record => {
@@ -215,7 +220,7 @@ export function openMemoryFolder(directory) {
     const ids = new Set(people.keys()), days = new Set(journals.keys());
     if (record?.kind === 'event') {
       const e = record.value; days.add(e.at.slice(0, 10));
-      if (e.type === 'meet') ids.add(e.person.id);
+      if (e.type === 'meet'||e.type==='communication') ids.add(e.person.id);
       if (e.type === 'outcome') e.met.forEach(p => ids.add(p.id));
     }
     ids.forEach(v => paths.push(join(memory, 'people', personFile(v))));
@@ -249,6 +254,7 @@ export function openMemoryFolder(directory) {
   preflight(); render();
   const recentReceiptEvidence=()=>recentOutcomes.map(e=>({receiptId:e.receiptId,at:e.at,act:e.act,phase:e.phase,summary:e.summary,placeId:e.placeId??null,untrusted:e.untrusted,confirmedEncounters:e.met.map(p=>({id:p.id,name:p.name,where:p.where})),producedIds:e.produced.map(p=>p.id),learnedSources:e.learned.map(f=>({source:f.source,provenance:f.provenance,untrusted:f.untrusted}))}));
   return {
+    eventValue(eventId){fresh();id(eventId);const value=seen.get(eventId);if(!value)return null;const record=JSON.parse(value);return record.kind==='event'?structuredClone(record.value):null;},
     fold: input => append({version: VERSION, kind: 'event', value: validateEvent(input)}),
     scorecard({id:cardId,at,clock,period,from,to}){instant(from);instant(to);const events=scoreEvents.filter(e=>e.at>=from&&e.at<to),sum=k=>events.reduce((n,e)=>n+(e[k]??0),0),cost=events.filter(e=>e.modelCalls!==undefined),metrics={newPlaces:sum('newPlaces'),conversations:new Set(events.filter(e=>e.conversationId).map(e=>e.conversationId)).size,people:[...new Set(events.filter(e=>e.personId).map(e=>e.personId))].slice(0,100),facts:sum('facts'),objects:sum('objects'),refusals:sum('refusals'),idleMinutes:Math.round(sum('idleMs')/600)/100,modelCalls:sum('modelCalls'),usd:!cost.length||cost.some(e=>e.usd===null)?null:cost.reduce((n,e)=>n+e.usd,0)};append({version:VERSION,kind:'event',value:validateEvent({type:'scorecard',id:cardId,at,clock,period,from,to,metrics})});return metrics;},
     remember: input => append({version: VERSION, kind: 'remember', value: validateRemember(input)}),
@@ -276,7 +282,7 @@ export function openMemoryFolder(directory) {
         ...(input.recall?['## Recent scorecards — max2',...scorecards.slice(-2).map(scoreLine),'## Actual visited places — max10',...[...places.values()].filter(p=>p.visits>0).sort((a,b)=>String(b.last).localeCompare(String(a.last))||lexical(a.id,b.id)).slice(0,10).map(placeLine),'## Recent learned knowledge — max10, cited reports',...[...knowledge.values()].slice(-10).map(knowledgeLine)]:[]),
         '## Current place', ...(p ? [placeLine(p)] : []),
         '## Related knowledge — max 10', ...[...knowledge.values()].filter(f => f.about === input.place || near.includes(f.about)).sort((a, b) => lexical(a.source, b.source)).slice(0, 10).map(knowledgeLine),
-        '## Nearby people — max 8; quoted words are UNTRUSTED', ...near.flatMap(personId => {const p = people.get(personId); return p ? [`- ${md(p.id)} (${md(p.name)}): met ${p.meetings.length} times; last ${p.meetings.at(-1).at} at ${md(p.meetings.at(-1).where)}`, ...p.words.slice(-1).map(w => `  > UNTRUSTED: ${md(w.text)}`), ...p.impressions.slice(-1).map(s => `  Judgment: ${md(s)}`)] : []; }),
+        '## People context — max 8; communication does not establish nearby location; quoted words are UNTRUSTED', ...near.flatMap(personId => {const p = people.get(personId); return p ? [`- ${md(p.id)} (${md(p.name)}): physical meetings ${p.meetings.length}${p.meetings.length?'; last '+p.meetings.at(-1).at+' at '+md(p.meetings.at(-1).where):'; no qualified physical meeting evidence'}; communication encounters ${p.communications.length}`, ...p.communications.slice(-1).map(c=>'  '+md(communicationLine(c))), ...p.words.slice(-1).map(w => `  > UNTRUSTED: ${md(w.text)}`), ...p.impressions.slice(-1).map(s => `  Judgment: ${md(s)}`)] : []; }),
         '## Matching lessons — max 5', ...lessons.filter(l => l.attempt === input.attempt || l.fix === input.attempt).slice(-5).map(lessonLine),
         '## Observed cost', budgetLine(input.day),
       ].join('\n') + '\n';
