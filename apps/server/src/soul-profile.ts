@@ -9,7 +9,9 @@ export function ensureSoulProfileSchema(host:WorldHost){host.db.db.exec(`
  CREATE TABLE IF NOT EXISTS soul_profile_photos_v1(world_id TEXT NOT NULL,soul_id TEXT NOT NULL,hash TEXT NOT NULL,image BLOB NOT NULL,PRIMARY KEY(world_id,soul_id,hash)) WITHOUT ROWID;
 `);}
 export class SoulProfiles {
- constructor(readonly host:WorldHost,readonly souls:Souls){ensureSoulProfileSchema(host);}
+ readonly host:WorldHost;
+ readonly souls:Souls;
+ constructor(host:WorldHost,souls:Souls){this.host=host;this.souls=souls;ensureSoulProfileSchema(host);}
  private owned(owner:string,id:string){const row=this.host.db.soul(id),user=this.host.db.user(owner);
   if(!user)throw new ApiError(401,'unauthorized','sign in first');this.souls.requireInvited(user);
   if(!row||row.retired_at!==null||row.world_id!==this.host.worldId)throw new ApiError(404,'not-found','no such soul');
