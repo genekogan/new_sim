@@ -5,7 +5,6 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {createServer} from 'node:http';
 import {once} from 'node:events';
-import {setImmediate} from 'node:timers/promises';
 import {Worker} from 'node:worker_threads';
 import {WebSocket} from 'ws';
 import {captureRenderScene,hashOf} from '@sim/engine-contract';
@@ -122,10 +121,22 @@ test('real Hub/anonymous socket and Hono scene routes expose scoped immutable pu
   await new Promise<void>(resolve=>server.listen(4955,'127.0.0.1',resolve));
   const ws=new WebSocket('ws://127.0.0.1:4955/ws'),messages:any[]=[];ws.on('message',b=>messages.push(JSON.parse(String(b))));
   t.after(async()=>{ws.terminate();hub.wss.close();await new Promise<void>(resolve=>server.close(()=>resolve()));});
-  await once(ws,'open');const welcome=once(ws,'message');ws.send(JSON.stringify({t:'hello',proto:1}));await welcome;
+  await once(ws,'open');
+  // Subscribe before hello/ticks: scheduler turns do not prove socket delivery.
+  const takesMessage=new Promise<any>((resolve,reject)=>{
+    let settled=false;
+    const cleanup=()=>{clearTimeout(deadline);ws.off('message',onMessage);ws.off('error',onError);ws.off('close',onClose);};
+    const finish=(error?:Error,message?:any)=>{if(settled)return;settled=true;cleanup();if(error)reject(error);else resolve(message);};
+    const onMessage=(data:WebSocket.RawData)=>{try{const m=JSON.parse(String(data));if(m.t==='takes'&&Array.isArray(m.chunks)&&m.chunks.length)finish(undefined,m);}catch{finish(new Error('anonymous WebSocket delivered invalid JSON'));}};
+    const onError=(error:Error)=>finish(error),onClose=()=>finish(new Error('anonymous WebSocket closed before takes delivery'));
+    const deadline=setTimeout(()=>finish(new Error('anonymous WebSocket takes were not delivered within 2000 ms')),2000);
+    ws.on('message',onMessage);ws.on('error',onError);ws.on('close',onClose);t.after(cleanup);
+  });
+  // Keep a pending readiness rejection handled while the welcome is awaited.
+  void takesMessage.catch(()=>{});
+  const welcome=once(ws,'message',{signal:AbortSignal.timeout(2000)});ws.send(JSON.stringify({t:'hello',proto:1}));await welcome;
   while(host.engine.world.tick<25)host.tickOnce();
-  for(let i=0;i<50&&!messages.some(m=>m.t==='takes'&&m.chunks.length);i++)await setImmediate();
-  const chunk=messages.find(m=>m.t==='takes'&&m.chunks.length).chunks[0],ref=recordedTakeChunkSchema.parse(chunk).take.renderSceneRef!;
+  const chunk=(await takesMessage).chunks[0],ref=recordedTakeChunkSchema.parse(chunk).take.renderSceneRef!;
   const response=await app.request(`/v1/scenes/${ref.hash}`);assert.equal(response.status,200);assert.equal(response.headers.get('cache-control'),'no-store');
   const capture:any=await response.json();assert.equal(capture.worldId,host.worldId);assert.deepEqual(capture.ref,ref);
   assert.deepEqual(decodeSceneCapturePublication(capture),capture);

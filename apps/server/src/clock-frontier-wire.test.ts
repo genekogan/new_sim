@@ -38,9 +38,20 @@ test('actual native TCP/Hono/anonymous Hub exposes only committed clocks and clo
   await new Promise<void>(resolve=>server.listen(4958,'127.0.0.1',resolve));
   const ws=new WebSocket('ws://127.0.0.1:4958/ws');sockets.push(ws);const messages:any[]=[];
   ws.on('message',b=>messages.push(JSON.parse(String(b))));await once(ws,'open');
-  const greeting=once(ws,'message');ws.send(JSON.stringify({t:'hello',proto:1}));await greeting;
+  // Subscribe before hello/ticks: scheduler turns do not prove socket delivery.
+  const takesMessage=new Promise<void>((resolve,reject)=>{
+    let settled=false;
+    const cleanup=()=>{clearTimeout(deadline);ws.off('message',onMessage);ws.off('error',onError);ws.off('close',onClose);};
+    const finish=(error?:Error)=>{if(settled)return;settled=true;cleanup();if(error)reject(error);else resolve();};
+    const onMessage=(data:WebSocket.RawData)=>{try{const m=JSON.parse(String(data));if(m.t==='takes')finish();}catch{finish(new Error('anonymous WebSocket delivered invalid JSON'));}};
+    const onError=(error:Error)=>finish(error),onClose=()=>finish(new Error('anonymous WebSocket closed before committed takes delivery'));
+    const deadline=setTimeout(()=>finish(new Error('anonymous WebSocket committed takes were not delivered within 2000 ms')),2000);
+    ws.on('message',onMessage);ws.on('error',onError);ws.on('close',onClose);t.after(cleanup);
+  });
+  void takesMessage.catch(()=>{});
+  const greeting=once(ws,'message',{signal:AbortSignal.timeout(2000)});ws.send(JSON.stringify({t:'hello',proto:1}));await greeting;
   while(host.engine.world.tick<20)host.tickOnce();
-  for(let i=0;i<50&&!messages.some(m=>m.t==='takes');i++)await setImmediate();
+  await takesMessage;
   const takes=messages.filter(m=>m.t==='takes');assert.ok(takes.length);assert.ok(takes.every(m=>m.serverTick<=new ClockFrontiers(db).read(host.worldId)!.tick));
   const response=await fetch('http://127.0.0.1:4958/healthz');assert.equal(response.status,200);assert.equal((await response.json() as any).tick,20);
   const row=new ClockFrontiers(db).read(host.worldId)!;
