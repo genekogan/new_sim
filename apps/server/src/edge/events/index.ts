@@ -155,7 +155,7 @@ export function registerEdgeEvents(app: Hono, deps: EdgeDeps, comms: CommsRuntim
     } catch (error) { return failure(c, error); }
     const filter = parseFilter(q), raw = q('format') === 'raw', pad = q('pad') !== '0';
     c.header('Cache-Control', 'no-cache, no-transform'); c.header('X-Accel-Buffering', 'no');
-    return streamSSE(c, async stream => {
+    const response = streamSSE(c, async stream => {
       const ac = new AbortController();
       stream.onAbort(() => ac.abort());
       c.req.raw.signal?.addEventListener('abort', () => ac.abort(), {once: true});
@@ -174,6 +174,10 @@ export function registerEdgeEvents(app: Hono, deps: EdgeDeps, comms: CommsRuntim
       } catch { /* the client went away */ }
       finally { release(conn); }
     });
+    // Hono's streamSSE assigns Cache-Control: no-cache after c.header above.
+    // Preserve the transport directive on the actual outgoing response.
+    response.headers.set('Cache-Control', 'no-cache, no-transform');
+    return response;
   });
 
   // ---- WebSocket: /v1/edge/events/ws (auth: Authorization header, or a first message {"type":"auth","token"} within 5 s)

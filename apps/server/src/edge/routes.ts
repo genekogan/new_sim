@@ -6,7 +6,11 @@ import {registerEdgeComms} from './comms/index.ts';
 import {hereFrame} from './perception/here.ts';
 import {registerEdgeEvents} from './events/index.ts';
 import {mountIdempotency} from './events/idempotency.ts';
-import {mountSchema} from './events/schema.ts';
+import {mountSchema,EDGE_ACT_VERBS} from './events/schema.ts';
+import {mountBootRoutes} from './boot/routes.ts';
+import {INTENT_VERBS} from './intents/intents.ts';
+import {mountOutcomeRoutes} from './outcomes/routes.ts';
+import {mountPersonalReminders} from './reminders/routes.ts';
 import {registerEdgePlans} from './plans/index.ts';
 import type {Plans} from './plans/plans.ts';
 import {mountEdgeEyes} from './eyes/routes.ts';
@@ -25,6 +29,8 @@ export function edgeSoulResolver(host: WorldHost, souls: Souls, bearer: (c: Cont
 }
 export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}) {
   const L = deps.ledger;
+  mountBootRoutes(app,deps,[...EDGE_ACT_VERBS,...INTENT_VERBS]);
+  mountOutcomeRoutes(app,deps);
   mountBodyRoutes(app,deps);
   // EVENTS-v1: idempotency keys guard act/say/converse/plan writes; it must be mounted before those routes.
   mountIdempotency(app, deps);
@@ -42,7 +48,7 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   app.get('/v1/edge/capabilities', wrap(c => {const s = deps.soul(c); limit(s, 'capabilities', 240); return {tick: deps.host.engine.world.tick, capabilities: L.capabilities(s)};}));
   app.post('/v1/edge/act', wrap(async c => {const s = deps.soul(c); limit(s, 'act', 60); const body = await c.req.json().catch(() => { throw new EdgeError(400, 'invalid', 'body must be JSON {capability, params?, clientRef?} or {verb, target, …}'); }); return L.act(s, body ?? {});}));
   // perception/1 + intents/1 (Core-A, EDGE-CONTRACT-v1 §8): a compact first-person frame, and the dry run of act.
-  app.get('/v1/edge/here', wrap(c => {const s = deps.soul(c); limit(s, 'here', 240); return {tick: deps.host.engine.world.tick, here: hereFrame(L, s)};}));
+  app.get('/v1/edge/here', wrap(c => {const s = deps.soul(c); limit(s, 'here', 240); const modern=(c.req.query('include')??'').split(',').includes('doHere');return {tick: deps.host.engine.world.tick, here: hereFrame(L, s,{doHere:modern}),...(modern?{apiContract:'eden-edge/1.1'}:{})};}));
   app.post('/v1/edge/resolve', wrap(async c => {const s = deps.soul(c); limit(s, 'resolve', 120); const body = await c.req.json().catch(() => { throw new EdgeError(400, 'invalid', 'body must be JSON {verb, target} or {capability}'); }); if (!body || typeof body !== 'object' || (body.verb === undefined && body.capability === undefined)) throw new EdgeError(400, 'invalid', 'body must be JSON {verb, target} or {capability}'); return {tick: deps.host.engine.world.tick, resolve: L.intents.dryRun(s, body)};}));
   app.get('/v1/edge/receipts/:id', wrap(c => {const s = deps.soul(c); const r = L.receipt(s.soulId, c.req.param('id') ?? ''); if (!r) throw new EdgeError(404, 'not-found', 'no such receipt for this Soul'); return {receipt: r};}));
   app.get('/v1/edge/public/souls/:soulId', wrap(c => L.publicSoul(c.req.param('soulId') ?? '')));
@@ -63,7 +69,8 @@ export function mountEdgeRoutes(app: Hono, deps: EdgeDeps & {ledger: EdgeLedger}
   const events = registerEdgeEvents(app, deps, comms, {placeName: id => L.places.byId.get(id)?.name ?? null, planSummary: id => plans?.summary(id) ?? null,
     bootNotice: process.env.EDGE_BOOT_NOTICE === '1' ? `The world server restarted${deps.build ? ` (${deps.build})` : ''}. Plans and open acts carried on; read the digest if you missed anything.` : null});
   plans = registerEdgePlans(app, deps, comms, events, L);
+  const reminders=mountPersonalReminders(app,deps,comms);
   mountSchema(app);
   const close = comms.close;
-  return Object.assign(comms, {events, plans, close() { plans?.close(); events.close(); eyes.close(); close(); }});
+  return Object.assign(comms, {events, plans, close() { reminders.close(); plans?.close(); events.close(); eyes.close(); close(); }});
 }

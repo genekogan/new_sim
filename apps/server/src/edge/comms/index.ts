@@ -18,7 +18,7 @@ import {say} from './speech.ts';
 import {dialogueReplay} from './dialogue-replay.ts';
 import {Steward} from './steward.ts';
 import {Fading} from './fading.ts';
-import {ensureCommsSchema} from './store.ts';
+import {ensureCommsSchema,tx} from './store.ts';
 import {EventStreams, parseCursor} from './stream.ts';
 import {Webhooks, type Fetch} from './webhook.ts';
 
@@ -97,13 +97,13 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
 
   // Ledger feeds: receipt phases to their own Soul (deduplicated durably, so replays
   // after boot do not repeat), place changes to the Souls who share the place.
-  deps.ledger.onReceipt((r: EdgeReceipt) => {
+  deps.ledger.onReceipt((r: EdgeReceipt) => tx(db,()=>{
     const fresh = Number(db.prepare('INSERT OR IGNORE INTO edge_comms_receipts_seen (world_id, receipt_id, phase) VALUES (?,?,?)').run(worldId, r.id, r.phase).changes) > 0;
     if (!fresh) return;
     if (r.phase === 'started' || r.phase === 'waiting') fading.touch(r.soulId);
     const tick = r.endedTick ?? r.startedTick ?? r.acceptedTick;
-    streams.deliver(r.soulId, 'receipt', tick, {receipt: {id: r.id, capability: r.capability, phase: r.phase, acceptedTick: r.acceptedTick, startedTick: r.startedTick, endedTick: r.endedTick, code: r.code, reason: r.reason, ...(r.channel ? {channel: r.channel} : {}), ...(r.chosen ? {chosen: r.chosen} : {}), ...(r.endedAt ? {endedAt: r.endedAt} : {}), ...((r as {alternatives?: unknown}).alternatives ? {alternatives: (r as {alternatives?: unknown}).alternatives} : {})}});   // Core-A: strict/1 endedAt, intents/1 chosen + alternatives
-  });
+    streams.deliver(r.soulId, 'receipt', tick, {receipt: {id: r.id, capability: r.capability, phase: r.phase, acceptedTick: r.acceptedTick, startedTick: r.startedTick, endedTick: r.endedTick, code: r.code, reason: r.reason, ...(r.channel ? {channel: r.channel} : {}), ...(r.chosen ? {chosen: r.chosen} : {}), ...(r.endedAt ? {endedAt: r.endedAt} : {}), ...(r.outcome?{outcome:r.outcome}:{}), ...((r as {alternatives?: unknown}).alternatives ? {alternatives: (r as {alternatives?: unknown}).alternatives} : {})}});   // Core-A: strict/1 endedAt, intents/1 chosen + alternatives
+  }));
   deps.ledger.onPlaceChange(e => presence.onPlaceChange(e));
   try { presence.prime(); } catch { /* ledger not ready: paths are learned on first change */ }
 

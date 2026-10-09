@@ -236,3 +236,4 @@ export const proposeCardsSchema = z.strictObject({
 });
 
 export * from './intent-arrival-v1.ts';
+export {EDGE_OUTCOME_CONTRACT,edgeLearnedV1Schema,edgeProducedV1Schema,edgeOutcomeV1Schema,type EdgeOutcomeV1} from './edge-outcome-v1.ts';

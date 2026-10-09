@@ -28,10 +28,32 @@ CREATE TABLE IF NOT EXISTS edge_comms_digests (world_id TEXT NOT NULL, written_a
 export function ensureCommsSchema(db: Sql): void { db.exec(SCHEMA); }
 
 let savepoints = 0;
-/** Atomic block that also nests safely inside a caller's transaction. */
+type CommitFrame={callbacks:(()=>void)[];untrackedParent:boolean};
+type CommitContext={frames:CommitFrame[];ready:(()=>void)[];draining:boolean};
+const contexts=new WeakMap<Sql,CommitContext>();
+function context(db:Sql){let c=contexts.get(db);if(!c){c={frames:[],ready:[],draining:false};contexts.set(db,c);}return c;}
+function notifyCommitted(c:CommitContext,callbacks:(()=>void)[]){
+ c.ready.push(...callbacks);if(c.draining)return;
+ c.draining=true;
+ try{while(c.ready.length){const callback=c.ready.shift()!;try{callback();}catch{/* committed observer faults cannot undo data or skip later observers */}}}
+ finally{c.draining=false;}
+}
+/** Advisory notifications run synchronously after the outer tracked commit.
+ * Nested success merges in order; rollback discards the matching callbacks.
+ * Raw untracked SQL transactions cannot safely publish and refuse before an
+ * inner savepoint releases. Callers that publish must use tx for the outer scope. */
+export function afterCommit(db:Sql,callback:()=>void){
+ const c=context(db),frame=c.frames.at(-1);
+ if(frame){if(c.frames[0].untrackedParent)throw Error('edge-comms.untracked-outer-transaction');frame.callbacks.push(callback);}
+ else{if(db.isTransaction)throw Error('edge-comms.untracked-outer-transaction');notifyCommitted(c,[callback]);}
+}
+/** Atomic block that nests safely; publishing additionally tracks commit scope. */
 export function tx<T>(db: Sql, fn: () => T): T {
-  const name = `edge_comms_${++savepoints}`;
-  db.exec(`SAVEPOINT ${name}`);
-  try { const out = fn(); db.exec(`RELEASE ${name}`); return out; }
-  catch (error) { db.exec(`ROLLBACK TO ${name}`); db.exec(`RELEASE ${name}`); throw error; }
+ const c=context(db),name=`edge_comms_${++savepoints}`,frame:CommitFrame={callbacks:[],untrackedParent:c.frames.length?c.frames[0].untrackedParent:db.isTransaction};
+ db.exec(`SAVEPOINT ${name}`);c.frames.push(frame);let out:T;
+ try{out=fn();db.exec(`RELEASE ${name}`);}
+ catch(error){try{db.exec(`ROLLBACK TO ${name}`);}finally{try{db.exec(`RELEASE ${name}`);}finally{c.frames.pop();}}throw error;}
+ c.frames.pop();const parent=c.frames.at(-1);
+ if(parent)parent.callbacks.push(...frame.callbacks);else notifyCommitted(c,frame.callbacks);
+ return out;
 }

@@ -8,6 +8,10 @@ export function explorePresence(messages:readonly{kind?:string;souls?:unknown;so
 export function orderedExploreSouls(souls:ReadonlyMap<string,PublicSoul>,presence:ReadonlyMap<string,ExplorePresence>,query=''){
  const q=query.trim().toLocaleLowerCase(),rank=(id:string)=>({active:0,fading:1,unknown:2,departed:3}[presence.get(id)??'unknown']);return [...souls.values()].filter(s=>!q||`${s.name} ${s.description}`.toLocaleLowerCase().includes(q)).sort((a,b)=>rank(a.id)-rank(b.id)||a.name.localeCompare(b.name)||a.id.localeCompare(b.id));
 }
+/** Camera-room context annotates a world search; an empty room never erases known Souls. */
+export function exploreSoulRoster(souls:ReadonlyMap<string,PublicSoul>,presence:ReadonlyMap<string,ExplorePresence>,query='',room?:{soulIds:readonly string[]}|null){
+ const inRoom=new Set((room?.soulIds??[]).filter(id=>souls.has(id)));return{souls:orderedExploreSouls(souls,presence,query),inRoom};
+}
 type Place={id:string;name:string;kind:string;polygon:readonly(readonly number[])[];level:number};
 function contains(poly:Place['polygon'],x:number,z:number){let inside=false;for(let i=0,j=poly.length-1;i<poly.length;j=i++){const a=poly[i],b=poly[j];if((a[1]>z)!==(b[1]>z)&&x<(b[0]-a[0])*(z-a[1])/(b[1]-a[1])+a[0])inside=!inside;}return inside;}
 export function exploreRoom(camera:readonly number[],places:readonly Place[],souls:ReadonlyMap<string,{entityId:string}>,entities:Readonly<Record<string,{p:readonly number[]}>>){

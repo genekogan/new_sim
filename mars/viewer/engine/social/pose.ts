@@ -56,7 +56,7 @@ const GAME_REACH = 30;
 export const LIE_CLEARANCE = 0.9;
 
 type Params = { actor: string; activity: string; seconds: number; prop?: string; base?: 'sit' | 'idle'; seatHeight?: number; face?: Vec2;
-  group?: string; waitSeconds?: number; alone?: 'start' | 'fail'; gap?: number; need?: number; hold?: string; release?: boolean;
+  group?: string; pairedPolicy?: 'ready-v1'; waitSeconds?: number; alone?: 'start' | 'fail'; gap?: number; need?: number; hold?: string; release?: boolean;
   /** hotfix: stepping in or back for a paired gesture never brings this body closer to anyone else than it already is
    *  (once within arm's reach of them); prospective, set by edge plans, so earlier logs replay unchanged. */
   clear?: boolean;
@@ -66,11 +66,11 @@ type Params = { actor: string; activity: string; seconds: number; prop?: string;
   seatTogether?: boolean };
 type Exec = { id: string; p: Params; base: string; at: number[]; t: number; yaw: number | null;
   /** together/1: 'waiting' for partners, then 'active' until the shared end tick. */
-  phase?: 'waiting' | 'active'; waited?: number; until?: number; mobile?: boolean; close?: boolean;
+  phase?: 'waiting' | 'active'; readyAt?: number; waited?: number; until?: number; mobile?: boolean; close?: boolean;
   /** CN5 games: ticks with nobody to play with, the last petanque end seen and the ends this body won. */
   lonely?: number; end?: number; wins?: number; since?: number };
 /** together/1 public body state while a grouped pose runs (the viewer may draw open arms while waiting). */
-export type TogetherState = { group: string; phase: 'waiting' | 'active'; until?: number; mobile: boolean };
+export type TogetherState = { group: string; phase: 'waiting' | 'active'; until?: number; mobile: boolean; pairedPolicy?: 'ready-v1'; readyAt?: number };
 const issue = (code: string, message: string, subjects: string[]): Diagnostic => ({ code: 'pose.' + code, message, subjects });
 
 function admission(rt: Runtime, p: Params): Diagnostic | null {
@@ -102,6 +102,8 @@ const restore = (rt: Runtime, ex: Exec) => {
   // together/1: a carried item stays in the hand between activities
   if (h.holding) h.prop = h.holding; else delete h.prop;
 };
+/** Versioned cleanup releases the gesture without erasing an actual courtesy walk. */
+const restorePaired=(rt:Runtime,ex:Exec)=>{const h=rt.world.entities[ex.p.actor]?.human,moving=!!h&&nudged(rt,ex.p.actor),activity=h?.activity,speed=h?.speed;restore(rt,ex);if(h&&moving){h.activity=activity!;if(speed!==undefined)h.speed=speed;}};
 /** together/1: the other bodies posing with this group (sorted by id: deterministic), nearest first for the paired one. */
 const partnersOf = (rt: Runtime, ex: Exec) => {
   const me = rt.world.entities[ex.p.actor];
@@ -116,10 +118,11 @@ export const poseV1: ActionDef<Params, true, Exec> = {
   verb: 'pose_v1',
   description: 'activities/1: take a generic activity pose where you are (read, browse, write, play-piano, play-music, paint, eat, drink, cook, play-game, craft, post-letter, wave, use-computer, sing, listen, lift-weights over a seat or standing; sit-ground, lie, nap, pushups, situps, yoga on open ground, bench-press on a bench; dance, jump, stretch, jumping-jacks, pull-ups, dips standing; play-frisbee, play-petanque, play-volleyball as choreographed group games) for a number of seconds, optionally holding a prop and facing a point, then return to the base posture.',
   schema: z.object({ actor: z.string().min(1).max(80), activity: z.enum(POSE_ACTIVITIES as [string, ...string[]]), seconds: z.number().min(0.5).max(3600), prop: z.enum(POSE_PROPS).optional(), base: z.enum(['sit', 'idle']).optional(), seatHeight: z.number().min(0.2).max(1.2).optional(), face: z.tuple([z.number(), z.number()]).optional(),
-    group: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/).optional(), waitSeconds: z.number().min(0).max(180).optional(), alone: z.enum(['start', 'fail']).optional(),
+    group: z.string().regex(/^[A-Za-z0-9_-]{1,80}$/).optional(), pairedPolicy: z.literal('ready-v1').optional(), waitSeconds: z.number().min(0).max(180).optional(), alone: z.enum(['start', 'fail']).optional(),
     gap: z.number().min(0.5).max(2.5).optional(), need: z.number().int().min(1).max(8).optional(), hold: z.enum(POSE_PROPS).optional(), release: z.boolean().optional(), clear: z.boolean().optional(),
     instrument: z.enum(POSE_INSTRUMENTS).optional(), seatTogether: z.boolean().optional(),
     game: z.object({ kind: z.enum(Object.keys(GAMES) as [GameKind, ...GameKind[]]), jack: z.tuple([z.number(), z.number()]).optional(), net: z.tuple([z.number(), z.number(), z.number(), z.number()]).optional() }).strict().optional() }).strict()
+    .refine(p => !p.pairedPolicy || (!!p.group && p.gap !== undefined && ['hug','high-five','handshake','dance'].includes(p.activity) && !p.game && !p.hold && !p.release), {message:'ready-v1 requires a paired limb gesture with group and gap'})
     .refine((p) => !p.game || (!!p.group && p.activity === 'play-' + p.game.kind), { message: 'a game needs a group and its own play-<game> activity' }),
   reservations: (_w, p) => [{ resource: 'hand:' + p.actor + ':left', mode: 'exclusive' }, { resource: 'hand:' + p.actor + ':right', mode: 'exclusive' }, { resource: 'pose:' + p.actor, mode: 'exclusive' }],
   plan(rt, p) { const d = admission(rt, p); return d ? { ok: false, diagnostic: d } : { ok: true, program: true }; },
@@ -132,7 +135,9 @@ export const poseV1: ActionDef<Params, true, Exec> = {
   step(rt, ex, dt) {
     const a = rt.world.entities[ex.p.actor], h = a?.human;
     if (!h) return { status: 'failed', diagnostic: issue('not-human', 'the body is gone', [ex.p.actor]) };
-    if (ex.phase && nudged(rt, ex.p.actor)) { ex.at = [...a.pose.p]; return { status: 'running', phase: 'settling' }; }
+    if (ex.phase && nudged(rt, ex.p.actor)) {
+      if(ex.p.pairedPolicy){if(ex.phase==='active')ex.phase='waiting';delete ex.readyAt;h.together={group:ex.p.group!,phase:ex.phase,mobile:!!ex.mobile,pairedPolicy:ex.p.pairedPolicy,...(ex.until===undefined?{}:{until:ex.until})};if(ex.phase==='waiting'&&ex.until===undefined&&(ex.waited=(ex.waited??0)+1)>Math.round((ex.p.waitSeconds??30)/dt)){restorePaired(rt,ex);return {status:'failed',diagnostic:issue('pair-not-ready','The paired gesture could not settle in time.',[ex.p.actor])};}}
+      ex.at = [...a.pose.p]; return { status: 'running', phase: 'settling' }; }
     if (ex.phase) ex.at = [...a.pose.p];   // a grouped pose carries on from wherever a courtesy step left the body
     if (a.pose.p.some((n, i) => Math.abs(n - ex.at[i]) > 1e-6)) { restore(rt, ex); return { status: 'failed', diagnostic: issue('moved', 'The body moved; the activity ended.', [ex.p.actor]) }; }
     if (ex.phase) return together(rt, ex, a, h, dt);
@@ -146,7 +151,7 @@ export const poseV1: ActionDef<Params, true, Exec> = {
     if (ex.t + 1e-9 < ex.p.seconds) return { status: 'running', phase: 'posing' };
     return finish(rt, ex);
   },
-  cancel(rt, ex) { restore(rt, ex); return { ok: true }; },
+  cancel(rt, ex) { if(ex.p.pairedPolicy)restorePaired(rt,ex);else restore(rt, ex); return { ok: true }; },
   resumable: true,
 };
 
@@ -161,6 +166,7 @@ function finish(rt: Runtime, ex: Exec) {
 
 /** together/1: wait for the group, start together, step in to `gap` facing the partner, end at the shared tick. */
 function together(rt: Runtime, ex: Exec, a: NonNullable<Runtime['world']['entities'][string]>, h: NonNullable<typeof a.human>, dt: number) {
+  if(ex.p.pairedPolicy)return pairedReadyV1(rt,ex,a,h,dt);
   const tick = rt.tick, ticks = (s: number) => Math.round(s / dt);
   const others = partnersOf(rt, ex), partner = others[0];
   const faceTo = (q: number[]) => { if (!held(rt, ex.p.actor) && hypot(q[0] - a.pose.p[0], q[2] - a.pose.p[2]) > 0.05) a.pose.yaw = heading([q[0] - a.pose.p[0], q[2] - a.pose.p[2]]); };
@@ -217,6 +223,47 @@ function together(rt: Runtime, ex: Exec, a: NonNullable<Runtime['world']['entiti
   if (ex.p.instrument) h.instrument = ex.p.instrument;
   if (tick >= ex.until!) return finish(rt, ex);
   return { status: 'running' as const, phase: 'together' };
+}
+
+/** Prospective paired-ready/1: contact/settling precedes the shared expression window.
+ * No-policy executions continue through together/1 unchanged, including snapshot restores. */
+function pairedReadyV1(rt:Runtime,ex:Exec,a:NonNullable<Runtime['world']['entities'][string]>,h:NonNullable<typeof a.human>,dt:number){
+ const tick=rt.tick,partner=partnersOf(rt,ex)[0],ticks=(s:number)=>Math.round(s/dt);
+ const publish=()=>{h.together={group:ex.p.group!,phase:ex.phase!,mobile:!!ex.mobile,pairedPolicy:'ready-v1',...(ex.until===undefined?{}:{until:ex.until}),...(ex.readyAt===undefined?{}:{readyAt:ex.readyAt})};};
+ const fail=(code:string,message:string)=>{restorePaired(rt,ex);return {status:'failed' as const,diagnostic:issue(code,message,[ex.p.actor,...(partner?[partner.id]:[])])};};
+ if(ex.phase==='active'&&partner&&(nudged(rt,partner.id)||partner.human!.together?.readyAt===undefined||Math.abs(hypot(partner.pose.p[0]-a.pose.p[0],partner.pose.p[2]-a.pose.p[2])-ex.p.gap!)>.03)){ex.phase='waiting';delete ex.readyAt;}
+ if(ex.phase==='waiting'){
+  if(ex.until!==undefined&&tick>=ex.until)return finish(rt,ex);
+  if(ex.until===undefined&&(ex.waited=(ex.waited??0)+1)>ticks(ex.p.waitSeconds??30))return fail('pair-not-ready','Both partners could not meet and settle in time.');
+  if(!partner){delete ex.readyAt;publish();h.activity=ex.base;return {status:'running' as const,phase:'waiting-for-partner'};}
+  if(partner.human!.together?.pairedPolicy!=='ready-v1')return fail('pair-policy-mismatch','Partners must use the same explicit paired policy.');
+  const d=hypot(partner.pose.p[0]-a.pose.p[0],partner.pose.p[2]-a.pose.p[2]),left=d-ex.p.gap!;
+  if(d<1e-9)return fail('pair-overlap','Partners cannot step in from overlapping body centres.');
+  if(nudged(rt,partner.id)){delete ex.readyAt;publish();h.activity=ex.base;return {status:'running' as const,phase:'waiting-for-settling'};}
+  if(Math.abs(left)>.03){
+   delete ex.readyAt;const share=partner.human!.together?.mobile?2:1,move=Math.sign(left)*Math.min(STEP_IN_SPEED*dt,Math.abs(left)/share),ux=(partner.pose.p[0]-a.pose.p[0])/d,uz=(partner.pose.p[2]-a.pose.p[2])/d;
+   const nx=a.pose.p[0]+ux*move,nz=a.pose.p[2]+uz*move,sp=rt.services.spatial as Spatial|undefined,g=sp?.level(h.level),clear=(x:number,z:number)=>g?clearanceAt(g,[x,z]):Infinity,next=clear(nx,nz);
+   const people=ex.p.clear?Object.values(rt.world.entities).filter(o=>o.id!==a.id&&o.id!==partner.id&&o.kind==='human'&&(o.human?.level??0)===(h.level??0)):[];
+   const nearest=(x:number,z:number)=>people.reduce((m,o)=>Math.min(m,hypot(o.pose.p[0]-x,o.pose.p[2]-z)),Infinity),apart=2*HUMAN_RADIUS+.04;
+   const roomy=!people.length||nearest(nx,nz)>=apart||nearest(nx,nz)>=nearest(a.pose.p[0],a.pose.p[2]);
+   if(roomy&&(next>=HUMAN_RADIUS-.02||next>=clear(a.pose.p[0],a.pose.p[2]))){a.pose.p=[nx,a.pose.p[1],nz];ex.at=[...a.pose.p];h.activity='walk';h.speed=Math.round(Math.abs(move)/dt*1000)/1000;publish();return {status:'running' as const,phase:'stepping-in'};}
+   publish();h.activity=ex.base;delete h.speed;return {status:'running' as const,phase:'waiting-for-clearance'};
+  }
+  ex.readyAt??=tick;publish();h.activity=ex.base;delete h.speed;
+  const peer=partner.human!.together!;
+  // Both bodies must already have been ready before this tick. An actor ordered
+  // first cannot start while the later actor still needs to move or settle.
+  if(ex.readyAt>=tick||peer.readyAt===undefined||peer.readyAt>=tick)return {status:'running' as const,phase:'waiting-for-readiness'};
+  ex.phase='active';ex.until??=peer.until??tick+ticks(ex.p.seconds);ex.close=true;
+ }
+ publish();
+ if(!partner)return finish(rt,ex);
+ if(nudged(rt,partner.id)){h.activity=ex.base;return tick>=ex.until!?finish(rt,ex):{status:'running' as const,phase:'settling-with-partner'};}
+ if(!held(rt,ex.p.actor)&&hypot(partner.pose.p[0]-a.pose.p[0],partner.pose.p[2]-a.pose.p[2])>.05)a.pose.yaw=heading([partner.pose.p[0]-a.pose.p[0],partner.pose.p[2]-a.pose.p[2]]);
+ h.partner=partner.id;h.activity=ex.p.activity;delete h.speed;
+ if(ex.p.prop)h.prop=ex.p.prop;else if(h.holding)h.prop=h.holding;
+ if(tick>=ex.until!)return finish(rt,ex);
+ return {status:'running' as const,phase:'together'};
 }
 
 /** CN5: a choreographed game turn for this body (state is a pure function of the tick and the active players). */

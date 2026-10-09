@@ -1,0 +1,133 @@
+import {existsSync,lstatSync,mkdirSync,openSync,closeSync,readFileSync,writeFileSync,renameSync,unlinkSync} from 'node:fs';
+import {join,resolve} from 'node:path';
+import {randomUUID,createHash} from 'node:crypto';
+
+const TERMINAL=new Set(['completed','failed','replaced']);
+const fail=message=>{throw Error('client queue: '+message);};
+const stable=value=>typeof value==='string'&&/^[A-Za-z0-9][A-Za-z0-9:._@-]{0,159}$/.test(value)?value:fail('invalid stable ID');
+const safeText=(value,max=300)=>typeof value==='string'&&value.trim()&&value.length<=max?value.trim():fail('invalid text');
+const plain=value=>value&&typeof value==='object'&&!Array.isArray(value);
+export function durationSeconds(value){
+ if(typeof value==='number'&&Number.isFinite(value)&&value>0&&value<=86400)return value;
+ const m=/^(\d+(?:\.\d+)?)(s|m|h)$/.exec(String(value));if(!m)fail('duration must be positive seconds or Ns/Nm/Nh');
+ return durationSeconds(Number(m[1])*({s:1,m:60,h:3600}[m[2]]));
+}
+/** Local reply compatibility only: never turns "plan" into a server capability. */
+export function replySteps(reply,depth=0){
+ if(depth>4)fail('nested plan limit');
+ if(!plain(reply))fail('reply must be an object');
+ let value=reply.do;
+ if(Array.isArray(reply.plan))value=reply.plan;
+ if(plain(reply.plan)&&Array.isArray(reply.plan.steps))value=reply.plan.steps;
+ if(reply.act==='plan'){value=reply.steps??reply.params?.steps;if(!Array.isArray(value))fail('plan needs steps array');}
+ if(value===undefined&&reply.act)value=[reply];
+ if(value===undefined)return [];
+ if(!Array.isArray(value)||value.length>24)fail('reply must contain at most24 steps');
+ value=value.flatMap(step=>plain(step)&&(step.act==='plan'||step.plan!==undefined)?replySteps(step.act==='plan'?{act:'plan',steps:step.steps??step.params?.steps}:{plan:step.plan},depth+1):[step]);
+ if(value.length>24)fail('too many expanded steps');
+ return value.map(step=>{
+  if(!plain(step))fail('step must be an object');
+  const act=step.act??step.do;if(act===undefined){if(JSON.stringify(step).length>4096)fail('public step too large');return structuredClone(step);}
+  safeText(act);if(act==='plan')fail('plan needs a local steps array');
+  const params=step.params??{};if(!plain(params)||JSON.stringify(params).length>4096)fail('invalid bounded params');
+  const out={act,params:structuredClone(params)};for(const k of ['targetSoul','identityBasis'])if(step[k]!==undefined){if(JSON.stringify(step[k]).length>1024)fail('identity reference too large');out[k]=structuredClone(step[k]);}const nestedProtection=Object.hasOwn(params,'protected');if(step.protected!==undefined&&typeof step.protected!=='boolean'||nestedProtection&&typeof params.protected!=='boolean')fail('invalid client protection');if(step.protected!==undefined&&nestedProtection&&step.protected!==params.protected)fail('conflicting client protection');const protection=step.protected??(nestedProtection?params.protected:undefined);delete out.params.protected;if(protection!==undefined)out.protected=protection;if(step.fixes!==undefined)out.fixes=stable(step.fixes);
+  if(step.for!==undefined){out.for=durationSeconds(step.for);out.params.seconds=out.for;}
+  if(step.if!==undefined){if(!plain(step.if)||Object.keys(step.if).some(k=>!['place','nobodyNear'].includes(k)))fail('unknown guard');if(step.if.place!==undefined)stable(step.if.place);if(step.if.nobodyNear!==undefined&&step.if.nobodyNear!==true)fail('invalid near guard');out.if=structuredClone(step.if);}
+  if(step.until!==undefined&&step.for!==undefined)fail('until hold and fixed for duration are distinct; omit for');
+  if(step.until!==undefined){const u=typeof step.until==='string'?{event:step.until}:step.until;if(!plain(u)||Object.keys(u).some(k=>!['event','worldTime','worldMinutes'].includes(k))||Number(u.event!==undefined)+Number(u.worldTime!==undefined)+Number(u.worldMinutes!==undefined)!==1)fail('unknown until condition');if(u.event!==undefined)safeText(u.event,100);if(u.worldMinutes!==undefined&&(!Number.isFinite(u.worldMinutes)||u.worldMinutes<0))fail('invalid absolute world minute');if(u.worldTime!==undefined&&!/^([01]\d|2[0-3]):[0-5]\d$/.test(u.worldTime))fail('invalid world time');out.until=structuredClone(u);}
+  return out;
+ });
+}
+
+/** One local writer, one body request. Dispatch intent is saved BEFORE transport;
+ * uncertain replies retry only the SAME clientRef/body, relying on edge1 idempotency.
+ * No model, server planner, body force, timetable, identity or credential access. */
+export function openClientQueue(directory,{adapter,scope=null,now=Date.now,onWake=()=>{},onReceipt=()=>{},onChange=()=>{}}={}){
+ const root=resolve(directory),stateFile=join(root,'.client-queue.json'),lockFile=join(root,'.client-queue.lock');
+ const safe=path=>{try{const s=lstatSync(path);if(s.isSymbolicLink()||s.nlink>1)fail('linked file refused');}catch(e){if(e.code!=='ENOENT')throw e;}return path;};
+ if(lstatSync(root).isSymbolicLink())fail('linked root refused');
+ const nonce=randomUUID();let closed=false,pumping=null;
+ const read=path=>JSON.parse(readFileSync(safe(path),'utf8'));
+ if(existsSync(lockFile)){
+  const old=read(lockFile);if(!Number.isSafeInteger(old.pid)||old.pid<1)fail('invalid lease');
+  let alive=true;try{process.kill(old.pid,0);}catch(e){if(e.code==='ESRCH')alive=false;else throw e;}
+  if(alive)fail('another writer owns the queue lease');unlinkSync(lockFile);
+ }
+ const fd=openSync(safe(lockFile),'wx',0o600);writeFileSync(fd,JSON.stringify({version:1,pid:process.pid,nonce}));closeSync(fd);
+ let state=existsSync(stateFile)?read(stateFile):{version:1,id:null,source:null,steps:[],at:0,notice:null};
+ if(state.version!==1||!Array.isArray(state.steps)||state.steps.length>24||(state.scope&&state.scope!==scope)){unlinkSync(lockFile);fail('unsupported state');}
+ state.scope??=scope;
+ const lease=()=>{if(closed||read(lockFile).nonce!==nonce)fail('writer lease lost');};
+ const snapshot=()=>structuredClone(state);
+ const save=()=>{lease();safe(stateFile);const tmp=safe(stateFile+'.tmp');writeFileSync(tmp,JSON.stringify(state)+'\n',{mode:0o600});renameSync(tmp,stateFile);onChange(snapshot());};
+ const notify=(reason,step)=>{state.notice={reason,step:step?.id,at:now()};save();onWake(reason,snapshot());};
+ const current=()=>state.steps.find(s=>!['completed','cancelled','skipped','superseded'].includes(s.status));
+ const condition=(step,context)=>{const u=step.until;if(!u)return true;if(u.event)return state.events?.some(e=>e.kind===u.event&&e.sequence>(step.untilAfterSequence??0));return Number.isFinite(context.worldMinutes)&&Number.isFinite(step.untilWorldMinutes)&&context.worldMinutes>=step.untilWorldMinutes;};
+ const reference=(step,part)=>'queue-'+createHash('sha256').update(JSON.stringify([state.id,step.id,part,step.act,step.params])).digest('hex');
+ async function send(step,body,part){
+  const ref=reference(step,part);if(part==='stop')step.stopRequested=true;else step.clientRef=ref;step.status=part==='stop'?'stopping':'dispatching';step.attempts=(step.attempts??0)+1;save();
+  let result;try{result=await adapter.send({...body,clientRef:ref});}catch{state.notice={reason:'transport-uncertain',step:step.id,at:now()};save();return null;}
+  lease();if(!result?.accepted||!result.receipt?.id){step.status='failed';step.code=result?.code??'transport.invalid-response';step.reason=result?.reason??'No accepted receipt';notify('refusal',step);return null;}
+  return result.receipt;
+ }
+ async function drive(context={},paused=false){
+  lease();
+  for(const previous of state.previous??[]){if(previous.folded)continue;const r=await adapter.readReceipt(previous.receiptId).catch(()=>null);if(r&&TERMINAL.has(r.phase)){await onReceipt(r,previous);previous.folded=true;save();}}
+  let step=current();if(!step||['failed','interrupted','blocked'].includes(step.status))return snapshot();
+  if(step.receiptId){
+   const receipt=await adapter.readReceipt(step.receiptId).catch(()=>null);lease();if(!receipt||receipt.id!==step.receiptId)return snapshot();step.receipt=receipt;step.lastReconciledAt=now();
+   const reached=condition(step,context);if(step.stopRequested&&!step.stopReceiptId&&TERMINAL.has(receipt.phase)){const stop=await send(step,{capability:'stand:here',params:{}},'stop');if(!stop)return snapshot();step.stopReceiptId=stop.id;save();}
+   if(!TERMINAL.has(receipt.phase)){
+    if(step.until&&reached&&!paused){
+     if(!step.stopReceiptId){const stop=await send(step,{capability:'stand:here',params:{}},'stop');if(!stop)return snapshot();step.stopReceiptId=stop.id;save();}
+     const stop=await adapter.readReceipt(step.stopReceiptId).catch(()=>null);if(stop&&TERMINAL.has(stop.phase)){if(stop.phase!=='completed'){step.status='failed';notify('stop-refused',step);return snapshot();}await onReceipt(stop,step);}
+     step.status='stopping';save();return snapshot();
+    }
+    step.status=receipt.phase==='waiting'?'waiting':'running';save();return snapshot();
+   }
+   if(!step.terminalFolded){await onReceipt(receipt,step);step.terminalFolded=true;save();}
+   if(receipt.phase!=='completed'&&!(step.stopReceiptId&&receipt.phase==='replaced')){step.status=receipt.phase==='replaced'?'interrupted':'failed';notify(step.status,step);return snapshot();}
+   if(step.stopReceiptId){const stop=await adapter.readReceipt(step.stopReceiptId).catch(()=>null);if(!stop||!TERMINAL.has(stop.phase))return snapshot();if(stop.phase!=='completed'){step.status='failed';notify('stop-refused',step);return snapshot();}}
+   if(step.until&&!reached){
+    // A genuine bounded native completion earns its effects; renewal is a new
+    // qualified substep, never a fake claim that an already-ended body is held.
+    step.renewal=(step.renewal??0)+1;step.receiptId=null;step.terminalFolded=false;step.status='pending';save();
+   }else{step.status='completed';save();}
+   context=adapter.context?await adapter.context():{...context,busy:null,placeId:receipt.endedAt?.place??context.placeId};step=current();if(!step)return snapshot();
+  }
+  if(paused)return snapshot();
+  if(step.publicStep){
+   if(step.status==='dispatching'){step.status='blocked';notify('public-step-outcome-uncertain',step);return snapshot();}
+   step.status='dispatching';save();
+   let result;try{result=await adapter.runPublic(step.publicStep);}catch(error){step.status='blocked';step.reason=String(error.message).slice(0,300);notify('public-step-outcome-uncertain',step);return snapshot();}
+   lease();step.result=result;if(result?.receipt?.id){step.receiptId=result.receipt.id;step.receipt=result.receipt;step.status='running';save();return snapshot();}step.status=result?.again?'failed':'completed';save();if(result?.again){notify('public-step-refusal',step);return snapshot();}return drive(context,paused);
+  }
+  if(context.busy&&context.busy.id!==step.receiptId&&context.busy.id!==state.replaceReceiptId){step.status='blocked';notify('protected-action',step);return snapshot();}
+  if(step.if?.place&&step.if.place!==context.placeId){step.status='blocked';notify('guard-place',step);return snapshot();}
+  if(step.if?.nobodyNear&&(context.nearCount??0)>0){step.status='blocked';notify('guard-near',step);return snapshot();}
+  if(step.until){
+   if(step.until.worldMinutes!==undefined){step.untilWorldMinutes=step.until.worldMinutes;if(Number.isFinite(context.worldMinutes)&&context.worldMinutes>=step.untilWorldMinutes){step.status='skipped';step.reason='World deadline elapsed before activity start';save();return drive(context,paused);}}
+   if(!step.holdProfile){const qualified=await adapter.holdProfile?.(step,context);if(!qualified||!Number.isFinite(qualified.seconds)||qualified.seconds<=0||qualified.seconds>600){step.status='blocked';notify('until-hold-unqualified',step);return snapshot();}step.holdProfile=qualified;step.untilAfterSequence=state.eventSequence??0;}
+   if(step.until.worldTime&&!Number.isFinite(step.untilWorldMinutes)){if(!Number.isFinite(context.worldMinutes)){step.status='blocked';notify('clock-unavailable',step);return snapshot();}const minute=Number(step.until.worldTime.slice(0,2))*60+Number(step.until.worldTime.slice(3));step.untilWorldMinutes=Math.floor(context.worldMinutes/1440)*1440+minute;if(step.untilWorldMinutes<context.worldMinutes)step.untilWorldMinutes+=1440;}
+  }
+  const body={capability:step.act,params:step.until?{...step.params,seconds:step.holdProfile.seconds}:step.params??{}};
+  const result=await send(step,body,'hold-'+(step.renewal??0));if(!result)return snapshot();step.receiptId=result.id;step.receipt=result;step.status=result.phase==='waiting'?'waiting':'running';state.notice=null;state.replaceReceiptId=null;save();return snapshot();
+ }
+
+ return {
+  snapshot,
+  enqueue(steps,{id=randomUUID(),source='mind',replace=false,force=false}={}){
+   lease();stable(id);stable(source);const normalized=replySteps({do:steps});if(normalized.some(s=>!s.act&&(s.for||s.until||s.if)))fail('public steps cannot carry body conditions');
+   if(state.id===id)return snapshot();
+   const active=current();if(active&&!replace)fail('queue already has pending work');
+   if(['dispatching','stopping'].includes(active?.status)&&replace)fail('transport outcome uncertain; reconcile before replacement');
+   if(active?.protected&&replace&&!force)fail('local protected step requires explicit owner force/attended takeover');
+   const previous=[...(state.previous??[])];if(active?.receiptId)previous.push({...active,status:'superseded'});
+   state={version:1,scope,id,source,at:now(),notice:null,events:[],eventSequence:0,previous:previous.slice(-50),replaceReceiptId:active?.receiptId??null,steps:normalized.map((s,i)=>({...s,...(!s.act?{publicStep:structuredClone(s.publicStep??s),act:s.say?'say':s.converse?'converse':s.publicStep?.act??'public-step'}:{}),id:`step-${i}-${randomUUID()}`,status:'pending',attempts:0}))};save();return snapshot();
+  },
+  event(event){lease();if(typeof event?.kind==='string'){state.eventSequence=(state.eventSequence??0)+1;state.events=[...(state.events??[]),{kind:event.kind,sequence:state.eventSequence}].slice(-100);save();}},
+  pump(context={},paused=false){if(!pumping)pumping=drive(context,paused).finally(()=>{pumping=null;});return pumping;},
+  resume(){lease();const s=current();if(s&&s.status==='blocked'&&state.notice?.reason!=='public-step-outcome-uncertain'){s.status='pending';state.notice=null;save();}return snapshot();},
+  close(){if(closed)return;try{if(read(lockFile).nonce===nonce)unlinkSync(lockFile);}catch(e){if(e.code!=='ENOENT')throw e;}finally{closed=true;}},
+ };
+}

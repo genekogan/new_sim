@@ -35,10 +35,10 @@ export function validateAuthoredLmSidecars(host:WorldHost,raw:{placeData:unknown
  }
  return {places,activities,aliases:structuredClone(aliases.aliases) as Alias[]};
 }
-export function authoredLmAliasProfile(host:WorldHost,aliases:Alias[]){return(soul:EdgeSoul,caps:EdgeCapability[],plans:WorldPlans)=>{
+export function authoredLmAliasProfile(host:WorldHost,aliases:Alias[]){return Object.assign((soul:EdgeSoul,caps:EdgeCapability[],plans:WorldPlans)=>{
  for(const alias of aliases){
   for(let i=caps.length-1;i>=0;i--)if(caps[i].target?.kind==='place'&&(caps[i].target!.id===alias.nativeRegion||caps[i].id==='walk:'+alias.place)){plans.delete(caps[i].id);caps.splice(i,1);}
   const region=host.engine.world.regions[alias.nativeRegion],id='walk:'+alias.place,label=((host.engine.world.entities[soul.entityId] as {body?:{family?:string}}|undefined)?.body?.family==='floater'?'Glide':'Walk')+' to '+region.label,steps=[{verb:'walk_to',params:{to:alias.nativeRegion}}];
   const issue=host.engine.canPerform({actor:soul.entityId,label,steps});caps.push({id,verb:'walk',label,target:{id:alias.place,kind:'place'},available:!issue,...(issue?{blocked:{code:issue.code,reason:issue.message}}:{})});plans.set(id,{label,steps});
  }
-};}
+},{nativePlaceAliases:structuredClone(aliases)});}

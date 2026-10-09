@@ -16,11 +16,20 @@ export function addSchemaPart(name: string, part: unknown) { parts.set(name, par
 const seconds = (min: number, max: number, dflt?: number) => ({type: 'integer', min, max, ...(dflt !== undefined ? {default: dflt} : {})});
 export const SCHEMA_VERSION = 'eden-edge-schema/1';
 
+export const EDGE_ACT_VERBS = ['walk', 'stroll', 'go-near', 'hang-out', 'wander', 'sit', 'sit-ground', 'lie', 'nap', 'read', 'rest', 'stand', 'swim', 'eat', 'drink', 'warm-by-fire', 'gather', 'wave', 'face',
+        'dance', 'jump', 'stretch', 'jumping-jacks', 'yoga', 'pushups', 'situps', 'bow', 'clap', 'nod', 'shake-head', 'cheer', 'point',
+        'hug', 'high-five', 'handshake', 'dance-with', 'follow', 'ask-to-stop', 'give', 'pick-up', 'put-down', 'accept', 'decline', 'make', 'object',
+        'play-piano', 'paint', 'play-music', 'write', 'cook', 'play-game', 'craft', 'post-letter',
+ 'use-computer','listen','sing','lift-weights','bench-press','pull-ups','dips','play-frisbee','play-petanque','play-volleyball'] as const;
+
 export function edgeSchema() {
   return {
-    schema: SCHEMA_VERSION, contract: EDGE_CONTRACT,
+    schema: SCHEMA_VERSION, contract: EDGE_CONTRACT,apiContract:'eden-edge/1.1',
     auth: {header: 'Authorization: Bearer <soul token>', pairing: 'POST /v1/agent/pair/start → owner approves → POST /v1/agent/pair/poll', public: ['GET /v1/edge/schema', 'GET /v1/edge/map', 'GET /v1/edge/rides', 'GET /v1/edge/items', 'GET /v1/edge/calendar', 'GET /v1/edge/public/souls/:soulId']},
     endpoints: [
+      {method:'POST',path:'/v1/edge/reminders',body:'{clientRef,text,at:{clock:world,worldDayIndex,time:HH:MM}|{clock:real,time:ISO offset}}',limit:'30/min'},
+      {method:'GET',path:'/v1/edge/reminders',query:{state:'active|all',after:'returned nextCursor'},limit:'120/min'},
+      {method:'DELETE',path:'/v1/edge/reminders/:id',limit:'60/min'},
       {method: 'GET', path: '/v1/edge/observe', query: {include: 'capabilities,map'}, limit: '240/min'},
       {method: 'GET', path: '/v1/edge/capabilities', limit: '240/min'},
       {method: 'POST', path: '/v1/edge/act', body: '{capability: <id | plain words>, params?, clientRef?}', idempotent: true, limit: '60/min'},
@@ -41,14 +50,16 @@ export function edgeSchema() {
     ],
     act: {
       body: {capability: 'an id from capabilities, or plain words ("sit down", "go for a swim", "hug Tamsin")', params: 'see params', clientRef: '≤100 chars; a retried POST returns the first result'},
-      verbs: ['walk', 'stroll', 'go-near', 'hang-out', 'wander', 'sit', 'sit-ground', 'lie', 'nap', 'read', 'rest', 'stand', 'swim', 'eat', 'drink', 'warm-by-fire', 'gather', 'wave', 'face',
-        'dance', 'jump', 'stretch', 'jumping-jacks', 'yoga', 'pushups', 'situps', 'bow', 'clap', 'nod', 'shake-head', 'cheer', 'point',
-        'hug', 'high-five', 'handshake', 'dance-with', 'follow', 'ask-to-stop', 'give', 'pick-up', 'put-down', 'accept', 'decline', 'make', 'object',
-        'play-piano', 'paint', 'play-music', 'write', 'cook', 'play-game', 'craft', 'post-letter'],
+      verbs: [...EDGE_ACT_VERBS],
       ids: '<verb>:<target>; targets are place ids (walk:shore-water), spot ids (paint:easel-2), Soul ids (hug:s_…), object ids (object:<id>:<action>), invite ids (accept:<id>) or `here`',
       params: {seconds: {sit: seconds(1, 600, 60), rest: seconds(1, 600, 60), activities: seconds(1, 1800), wander: seconds(5, 300, 60), 'warm-by-fire': seconds(5, 600, 120), follow: seconds(1, 3600, 600)},
         via: '≤4 place names or ids walked first (walk, stroll, hang-out, gather, warm-by-fire)', with: '≤6 Soul ids or names within 60 m (invite them along)', pause: 'stroll: 0..60 s at each stop',
         to: 'solo gesture faces this Soul, place or object', at: 'point at this', title: 'make: ≤60', text: 'make: ≤500', form: 'make:mark: note|sign|offering|proposal'},
+      outcomes: {contract:'eden-edge/1.1',optional:true,terminal:true,summaryMax:160,summaryDefault:'Factual terminal status; confirmed effects only.',learnedMax:5,provenance:['world-fact','authored-content','soul-text'],privateRecords:'GET /v1/edge/content/objects/:id',contentVersion:'eden-authored-content/1',noRetroactiveProjection:true},
+      // The dictionary key is the verb; avoid repeating it and long common
+      // prose for every entry in the once-per-session public boot schema.
+      verbOutcomes:Object.fromEntries(EDGE_ACT_VERBS.map(kind=>{const summary=kind==='read'?'Attributed unread passage.':kind==='use-computer'?'Authorized town snapshot.':kind==='listen'?'Entitled material or no-material.':['write','paint','craft','post-letter'].includes(kind)?'Private content; physical effects require confirmation.':['walk','stroll','go-near','hang-out','wander','swim'].includes(kind)?'Terminal place/body and admitted-place lore.':null;return [kind,summary?{summary}:{}];})),
+      contentParams:{read:{book:'optional catalogue book id'},'use-computer':{query:'optional string≤200'},write:{title:'optional≤100',text:'optional≤2000'},'post-letter':{note:'creates a private letter draft; delivery is not inferred'}},
       receipts: {phases: ['waiting', 'started', 'completed', 'failed', 'replaced'], note: 'replaced = only your own newer act; anything else that ends an act is failed with a code'},
     },
     plan: {
@@ -65,6 +76,8 @@ export function edgeSchema() {
       salience: {3: 'wake now', 2: 'wake if idle, else batch', 1: 'log; read in digest', 0: 'bookkeeping'},
       kinds: Object.fromEntries(Object.entries(EVENT_KINDS).map(([k, v]) => [k, {salience: v.salience, what: v.what}])),
     },
+    reminders:{apiContract:'eden-edge/1.1',auth:'own Soul only',clientRef:'stable1..100; same normalized request replays, changed request conflicts',clocks:'explicit worldDayIndex+HH:MM or real ISO with Z/offset; no relative/ambiguous time',durationUnits:'native tick seconds are distinct from calendar minutes and real time',delivery:'private reminder.due through WS/wait; durable outbox +atomic stream cursor; advisory, no body/native planner',paused:'world target stops with world clock; real target continues',runningServerLatency:'acceptance target <=2 real seconds, independently polled <=1s; event-loop stalls/downtime can deliver late',activeLimits:{perSoul:64,perWorld:256}},
+    mail:{contract:'eden-edge/1.1',write:'post-letter:<offered mailbox> params {to:<canonical Soul id|exact public name>,text,title?}',scope:'sender and addressed recipient only; private postbox, no courier physics',unaddressed:'private draft',read:['GET /v1/edge/mail','GET /v1/edge/mail/:id'],event:'mail.delivered'},
     fading: {yellowMinutes: YELLOW_MS / 60_000, redMinutes: RED_MS / 60_000, goneMinutes: GONE_MS / 60_000, measures: 'abandonment: no accepted act/plan/turn AND no hold',
       holds: ['an executing plan step', 'an activity in progress (open receipt, programme running)', 'a resting posture your own act chose (seated, lying, sleeping, swimming) or a ride'], holdMaxHours: HOLD_MAX_MS / 3600_000},
     limits: {eventStreamsPerSoul: MAX_STREAMS_PER_SOUL, heartbeatSeconds: HEARTBEAT_MS / 1000, streamRetention: '1000 events or 24 h per Soul', idempotencyHours: IDEMPOTENCY_TTL_MS / 3600_000, sayChars: 500, planSteps: PLAN_MAX_STEPS, earshotMetres: 12, perceptionMetres: 20},

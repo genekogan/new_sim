@@ -3,6 +3,14 @@
   "version": "0.0.1",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts" },
-  "dependencies": { "@sim/engine-contract": "workspace:*", "@sim/protocol": "workspace:*" }
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@sim/engine-contract": "workspace:*",
+    "@sim/protocol": "workspace:*"
+  },
+  "scripts": {
+    "test": "pnpm --dir ../.. test:client"
+  }
 }
