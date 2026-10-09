@@ -58,3 +58,16 @@ test('ordinary floater glide respects accepted profile bands; wholly higher/lowe
   if(scenario==='blocking')assert.equal(entered,false,'warm ordinary glide cannot cross an accepted band intersecting its movement profile');else assert.equal(entered,true,'profile-clear band does not become a ground column');assert.ok(maxStep<=.061);assert.equal(body().pose.p[1],start[1]);assert.deepEqual(e.runtime.violations,[]);assert.equal(f.db.paidCost(),0);
  });
 });
+test('static source identity memo retains exact hashes across configure/restore and all earlier rebase sources',async t=>{
+ const {worldBaseId}=await import('../../../mars/viewer/engine/spatial/edits.ts');const f=fixture(':memory:',factory,{durableClockV1:true});f.brain.quiesce();t.after(()=>{f.host.stop();f.db.close();});const e=f.host.engine,old=e.snapshot(),absent=worldBaseId('memo-source',e.world as any);
+ await accept(f.host,f.host.installAuthoredBoundariesV1(declaration));const fact=(e.world as any).authoredBoundariesV1,beforeBytes=JSON.stringify(e.world),beforeHash=e.stateHash(),snapshot=e.snapshot();
+ assert.ok(Object.isFrozen(fact)&&Object.isFrozen(fact.boxes)&&Object.isFrozen(fact.boxes[0])&&Object.isFrozen(fact.boxes[0].c)&&Object.isFrozen(fact.boxes[0].half));
+ assert.equal(worldBaseId('memo-source',e.world as any),hashOf({source:'memo-source',authoredBoundariesV1:fact}));for(let i=0;i<30;i++)assert.equal(worldBaseId('memo-source',e.world as any),hashOf({source:'memo-source',authoredBoundariesV1:fact}));assert.equal(e.stateHash(),beforeHash);assert.equal(JSON.stringify(e.world),beforeBytes);
+ assert.throws(()=>{fact.boxes[0].c[0]+=1;},TypeError);const publicCopy=e.authoredBoundariesV1!()!;publicCopy.boxes[0].c[0]+=1;assert.equal(e.stateHash(),beforeHash,'public capture/getter copies cannot mutate accepted fact');
+ const restored=factory.restore(snapshot);assert.equal(restored.stateHash(),beforeHash);assert.ok(Object.isFrozen((restored.world as any).authoredBoundariesV1.boxes[0].half));assert.equal(worldBaseId('memo-source',restored.world as any),worldBaseId('memo-source',e.world as any));assert.equal(worldBaseId('memo-source',factory.restore(old).world as any),absent);
+ // Mutating older sources is still detected even when the authored fact stays
+ // the same immutable reference; memo is keyed by the complete preceding id.
+ const w=structuredClone(e.world) as any;const a=worldBaseId('memo-source',w);w.obstacleEdits={};const b=worldBaseId('memo-source',w);assert.notEqual(a,b);w.navV1={version:'nav/1',ground:[],solids:[]};const c=worldBaseId('memo-source',w);assert.notEqual(b,c);w.navV1.solids.push({id:'later-nav',obb:{c:[50,50],half:[1,1],yaw:0},y0:0,y1:2});const d=worldBaseId('memo-source',w);assert.notEqual(c,d);
+ const {officeStairGuardBoxes}=await import('../../../mars/viewer/lib/office-stair-guards.ts');w.officeStairGuardsV1={version:'office-stair-guards/1',acceptedAtTick:0,guards:officeStairGuardBoxes()};assert.notEqual(worldBaseId('memo-source',w),d);assert.notEqual(worldBaseId('other-source',w),worldBaseId('memo-source',w));
+ const successor=authoredBoundaryDeclarationV1('next-source/1',declaration.boxes);w.authoredBoundariesV1={...successor,acceptedAtTick:0};assert.notEqual(worldBaseId('memo-source',w),worldBaseId('memo-source',e.world as any));
+});

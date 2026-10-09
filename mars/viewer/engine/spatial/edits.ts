@@ -2,7 +2,7 @@
 import { hashOf } from '../core/hash.ts';
 import {dcos,dsin} from '../core/math.ts';
 import {officeStairGuardsV1Schema} from '../../../../packages/engine-contract/src/office-stair-guards-v1.ts';
-import {authoredBoundariesV1Schema} from '../../../../packages/engine-contract/src/authored-boundaries-v1.ts';
+import {authoredBoundariesV1Schema,type AuthoredBoundariesV1} from '../../../../packages/engine-contract/src/authored-boundaries-v1.ts';
 import type { WorldState } from '../world/types.ts';
 import type { Obstacle, SpatialScene, Surface } from './types.ts';
 
@@ -11,6 +11,16 @@ import type { Obstacle, SpatialScene, Surface } from './types.ts';
  * the source scene. World-state data, so every Spatial built for this world (live, restored, rehearsal) agrees.
  */
 export type NavV1 = { version: 'nav/1'; ground: Surface[]; solids: Obstacle[] };
+const immutableAuthoredFacts=new WeakSet<object>();
+const authoredIdentities=new WeakMap<object,{source:string;identity:string}>();
+/** Validation/freeze changes only JS ownership descriptors, never canonical
+ * bytes. Restore and configure both establish the same static fact contract. */
+export function immutableAuthoredBoundaryFact<T extends AuthoredBoundariesV1>(fact:T):T{
+ if(immutableAuthoredFacts.has(fact))return fact;
+ authoredBoundariesV1Schema.parse(fact);
+ for(const box of fact.boxes){Object.freeze(box.c);Object.freeze(box.half);Object.freeze(box);}
+ Object.freeze(fact.boxes);Object.freeze(fact);immutableAuthoredFacts.add(fact);return fact;
+}
 
 export function sceneForWorld(base: SpatialScene, world: WorldState): SpatialScene {
   const edits = world.obstacleEdits;
@@ -44,7 +54,10 @@ export function worldBaseId(sourceId: string, world: WorldState): string {
   const edited = world.obstacleEdits ? hashOf({ source: sourceId, obstacleEdits: world.obstacleEdits }) : sourceId;
   const base=world.navV1 ? hashOf({ source: edited, navV1: world.navV1 }) : edited;
   const guarded=world.officeStairGuardsV1 ? hashOf({source:base,officeStairGuardsV1:world.officeStairGuardsV1}) : base;
-  return world.authoredBoundariesV1?hashOf({source:guarded,authoredBoundariesV1:world.authoredBoundariesV1}):guarded;
+  if(!world.authoredBoundariesV1)return guarded;
+  const fact=immutableAuthoredBoundaryFact(world.authoredBoundariesV1),memo=authoredIdentities.get(fact);
+  if(memo?.source===guarded)return memo.identity;
+  const identity=hashOf({source:guarded,authoredBoundariesV1:fact});authoredIdentities.set(fact,{source:guarded,identity});return identity;
 }
 
 /** Same height bands as the capture/camera. Registration never adds a surface,

@@ -1,4 +1,5 @@
 import {bodyProfile} from '../../../mars/viewer/engine/bodies/navigation.ts';
+import {immutableAuthoredBoundaryFact} from '../../../mars/viewer/engine/spatial/edits.ts';
 import {withStaticGridReadCache} from '../../../mars/viewer/engine/spatial/grid.ts';
 import {edenGroundTransitionV1Schema,type EdenGroundTransitionV1} from '@sim/engine-contract';
 import type {EdenGroundReaderV1} from './eden-ground.ts';
@@ -195,6 +196,7 @@ export class MarsEngine implements Engine {
 
   constructor(m: Mars, rt: any, cfg: MarsWorldConfig, saved?: { programs: Prog[]; nextProg: number; leaving: string[];renderPlatformsV1?:RenderPlatformsV1 }, physical?:MarsPhysicalBinding) {
     this.m = m; this.rt = rt; this.cfg = structuredClone(cfg); this.registry = rt.registry;this.physical=physical;
+    if(rt.world.authoredBoundariesV1)immutableAuthoredBoundaryFact(rt.world.authoredBoundariesV1);
     this.schema = rt.world.schema;
     if (saved) { for (const p of saved.programs) { this.programs.set(p.id, p); this.byActor.set(p.actor, p.id); } this.nextProg = saved.nextProg; this.leaving = saved.leaving; }
     if(saved?.renderPlatformsV1)this.renderPlatformMetadata=renderPlatformsV1Schema.parse(saved.renderPlatformsV1);
@@ -975,7 +977,7 @@ export class MarsEngine implements Engine {
     const fact=authoredBoundariesV1Schema.parse(raw);if(hashOf(fact)===hashOf(this.world.authoredBoundariesV1??null))return;
     const {acceptedAtTick:_,...declaration}=fact,issue=this.previewAuthoredBoundariesV1(declaration);if(issue)throw Error(issue.code);
     const spatial=this.rt.services.spatial as Spatial;
-    this.finishRecorder();this.world.authoredBoundariesV1=structuredClone(fact);
+    this.finishRecorder();this.world.authoredBoundariesV1=immutableAuthoredBoundaryFact(structuredClone(fact));
     if(!spatial.refreshForWorld(this.rt.world))throw Error('authored-boundaries.spatial-not-rebasable');
     spatial.sync(this.rt.world);this.renderBaseKey='';this.startRecorder();
   }
