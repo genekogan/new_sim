@@ -14,3 +14,10 @@ test('feet tangent to a doorway lower band are clear; actual penetration and inw
  assert.ok(authoredBoundarySweepFraction([wall],[0,floor+1.65-.001,-1],[0,floor+1.65-.001,1],.08,1.65,.1)<1,'one millimetre actual penetration still collides');
  assert.equal(authoredBoundarySweepFraction([box],[1,0,0],[0,0,0],0),0,'contact followed by inward motion blocks at the face');
 });
+test('renderer may declare Float32 floor contact precision without changing native default or actual penetration',()=>{
+ const floor=3.12,drawn=Math.fround(floor),wall:AuthoredBoundaryBox={...box,c:[0,floor-.5,0],half:[2,.5,.09]},from=[0,drawn+1.65,-1],to=[0,drawn+1.65,1];
+ assert.ok(floor-drawn>1e-10&&floor-drawn<1e-6);
+ assert.equal(authoredBoundarySweepFraction([wall],from,to,.08,1.65,.1,1e-6),1,'Float32 surface contact is clear at explicitly selected renderer precision');
+ assert.ok(authoredBoundarySweepFraction([wall],from,to,.08,1.65,.1)<1,'native/default double-precision seam remains unchanged');
+ assert.ok(authoredBoundarySweepFraction([wall],[0,floor+1.65-.001,-1],[0,floor+1.65-.001,1],.08,1.65,.1,1e-6)<1,'real1mm penetration stays blocked');
+});
