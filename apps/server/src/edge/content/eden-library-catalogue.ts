@@ -9,7 +9,7 @@ export const EDEN_CONTENT_PROVENANCE = {
   author: 'Eden world editorial collection',
   sourceRevision: '619bc87e405530c6ff0a65c241a6efa04ff841f7',
   placeDataPath: 'worlds/eden/places.v1.json',
-  placeDataSHA256: '65fc61d8b8ad8067729b1fb6e94fb2796fc60850465bcc195e82e52d30bd7d2f',
+  placeDataSHA256: '2ec44c187ac041d734e0b039754087ec5e199af0eb067a640e9eacb7bda6d78b',
   note: 'Original Eden fiction anchored to public place names and scenery. No archival excerpts, private history, harvest schedule, inventory, or economic promises.',
 } as const;
 

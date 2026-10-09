@@ -34,10 +34,11 @@ test('actual sports fences separate courts from goal run-off and keep a human-si
  const b=new Builder('legacy'),t=new Terrain(()=>0);southPads(t);buildSports(b,t,new Trees());
  const guards=b.boundaries.filter(v=>v.buildingId.startsWith('region-sports-court:'));
  assert.equal(guards.length,10);
+ assert.ok(Math.min(...guards.map(v=>v.c[2]-v.half[2]))>93,'court fences and pads clear the South Avenue ribbon ending at z93');
  const west=guards.find(v=>v.id==='region-sports-court:0:side:-6.5');assert.equal(west.c[0],93);
  assert.ok(west.c[0]-west.half[0]-(86.05+1.6)>5,'more than five metres between the goal back and court fence');
- assert.ok(authoredBoundarySweepFraction(guards,[99.5,1.65,98],[109,1.65,98],.28,1.65,.1)<1,'closed side blocks a human capsule');
- assert.equal(authoredBoundarySweepFraction(guards,[99.5,1.65,108.7],[99.5,1.65,105],.28,1.65,.1),1,'front gate admits the same capsule');
+ assert.ok(authoredBoundarySweepFraction(guards,[99.5,1.65,103],[109,1.65,103],.28,1.65,.1)<1,'closed side blocks a human capsule');
+ assert.equal(authoredBoundarySweepFraction(guards,[99.5,1.65,113.7],[99.5,1.65,110],.28,1.65,.1),1,'front gate admits the same capsule');
  const lines=b.buf.get('dressing').p;assert.ok(lines.some((v,i)=>i%3===1&&Math.abs(v-.051)<1e-5),'court lines stand above the .04m pad');
  assert.ok(lines.some((v,i)=>i%3===1&&Math.abs(v-2.43)<1e-5),'goal grid includes a roof, not an opaque sloping cloth');
 });

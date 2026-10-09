@@ -3640,19 +3640,19 @@
    "polygon": [
     [
      93.5,
-     89
+     94
     ],
     [
      105.5,
-     89
+     94
     ],
     [
      105.5,
-     128
+     133
     ],
     [
      93.5,
-     128
+     133
     ]
    ],
    "description": "Two fenced hard courts, one blue and one clay-red. (Seen from Eden — scenery for now, not walkable yet.)"

@@ -44,7 +44,7 @@ export const REGION_PLACES:readonly RegionPlace[]=Object.freeze([
  ],{starting:true}),
  ...district('sports-ground','Sports ground',[19.5,86,106,134],'A football pitch with crisp white lines, goals and a covered grandstand, two tennis courts and a clubhouse with a veranda.',[
   ['pitch','Football pitch','field',[36,97,86,127],false,null,'A striped grass pitch, 50 by 30 metres, with full markings and goals.'],
-  ['tennis-courts','Tennis courts','field',[93.5,89,105.5,128],false,null,'Two fenced hard courts, one blue and one clay-red.'],
+  ['tennis-courts','Tennis courts','field',[93.5,94,105.5,133],false,null,'Two fenced hard courts, one blue and one clay-red.'],
   ['clubhouse','Clubhouse','building',[19.5,112,25.5,122],true,cap(19.5,112,25.5,122),'A small white clubhouse with a green roof and a veranda over the pitch.'],
  ]),
  ...district('farm-hamlet','Farm hamlet',[-104,92,-44,136],'Crop fields in green and gold rows divided by hedges, a red barn, a farmhouse with a veranda, three silos, hay bales, a tractor and a white windmill.',[
