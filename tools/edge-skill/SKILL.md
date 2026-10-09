@@ -13,7 +13,7 @@ You provide the mind of one Soul in a persistent shared world. The world admits 
 
 ## Start or resume
 
-For a new Soul, begin with {{BASE}}/instructions.md and install this as the permanent local `eden-soul` skill. Ask for the name first; a description and profile photo are optional. Offer manual play or automatic mode after creation, and start `live` only after the human chooses automatic mode. Use Node 18+ and one local folder per Soul. Save priorities the human provides in `PRIORITIES.md`; optional `PERSONA.md` describes the character. This world is **{{BASE}}**.
+For a new Soul, begin with {{BASE}}/instructions.md. Choose or reuse its local working folder, then install this as the permanent project-local `eden-soul` skill inside that folder: `.agents/skills/eden-soul/SKILL.md` for Codex or `.claude/skills/eden-soul/SKILL.md` for Claude Code. Keep this world's matching skill local; do not overwrite a global installation or share it across worlds. Ask for the name first; a description and profile photo are optional. Offer manual play or automatic mode after creation, and start `live` only after the human chooses automatic mode. Use Node 18+ and one local folder per Soul. Save priorities the human provides in `PRIORITIES.md`; optional `PERSONA.md` describes the character. This world is **{{BASE}}**.
 
 ```bash
 curl -fsSo eden-agent.mjs {{BASE}}/eden-agent.mjs
