@@ -84,14 +84,14 @@ export function createEdenRegions(ground:Ground):{group:THREE.Group;dispose():vo
  const dispose=()=>{if(closed)return;closed=true;group.removeFromParent();for(const g of geos)g.dispose();mats.dispose();group.clear();};
  try{
   const t=new Terrain(edge),trees=new Trees();// far forests + every district's distant trees
-  const farB=new Builder(),winB=new Builder(),isFar=(x:number,z:number)=>outside(x,z)>FAR_CLEAR+6;
+  const farB=new Builder('legacy'),winB=new Builder('legacy'),isFar=(x:number,z:number)=>outside(x,z)>FAR_CLEAR+6;
   canalPads(t);countryPads(t);hillPads(t);southPads(t);northPads(t);resortPads(t);abbeyPads(t);suburbPads(t);botanicPads(t);riverPads(t);cliffPads(t);crossPads(t);golfPads(t);fairPads(t);alpinePads(t);
   // Districts are authored separately but drawn per SECTOR (north/south/east/west of the inhabited rectangle):
   // a few shared draws and ray objects instead of a dozen per district. Distant parts and window glass go to
   // their own shared sinks.
-  const sectors={southWest:new Builder(),northWest:new Builder(),north:new Builder(),south:new Builder(),east:new Builder(),eastEdge:new Builder(),eastEdgeSouth:new Builder(),eastEdgeNorth:new Builder(),west:new Builder()},sectorTrees={southWest:new Trees(),northWest:new Trees(),north:new Trees(),south:new Trees(),east:new Trees(),eastEdge:new Trees(),eastEdgeSouth:new Trees(),eastEdgeNorth:new Trees(),west:new Trees()};
+  const sectors={southWest:new Builder('legacy'),northWest:new Builder('legacy'),north:new Builder('legacy'),south:new Builder('legacy'),east:new Builder('legacy'),eastEdge:new Builder('legacy'),eastEdgeSouth:new Builder('legacy'),eastEdgeNorth:new Builder('legacy'),west:new Builder('legacy')},sectorTrees={southWest:new Trees(),northWest:new Trees(),north:new Trees(),south:new Trees(),east:new Trees(),eastEdge:new Trees(),eastEdgeSouth:new Trees(),eastEdgeNorth:new Trees(),west:new Trees()};
   const sectorOf=(x:number,z:number):keyof typeof sectors=>z<INNER[1]?(x<0?'northWest':'north'):z>INNER[3]?(x<0?'southWest':'south'):x>INNER[2]?(x<136.5?(z<10?'eastEdgeNorth':z<60?'eastEdge':'eastEdgeSouth'):'east'):'west';
-  const district=(name:string,fn:(b:Builder,tr:Trees)=>void)=>{const b=new Builder(),tr=new Trees();fn(b,tr);b.drain((x,z,k)=>k==='glass'?winB:isFar(x,z)?farB:sectors[sectorOf(x,z)]);
+  const district=(name:string,fn:(b:Builder,tr:Trees)=>void)=>{const b=new Builder('legacy'),tr=new Trees();fn(b,tr);b.drain((x,z,k)=>k==='glass'?winB:isFar(x,z)?farB:sectors[sectorOf(x,z)]);
    for(const tt of tr.list)(isFar(tt.x,tt.z)?trees:sectorTrees[sectorOf(tt.x,tt.z)]).list.push(tt);void name;};
   district('Canal quarter (scenery only)',(b,tr)=>buildCanalQuarter(b,t,tr));
   district('Old town plaza and market street (scenery only)',(b,tr)=>buildOldTown(b,t,tr));
@@ -138,7 +138,7 @@ export function createEdenRegions(ground:Ground):{group:THREE.Group;dispose():vo
   // Terrain and open water last (largest meshes).
   const land=new THREE.Group();land.name='Regions terrain and open water (scenery only)';group.add(land);
   tris+=t.build(land,mats,geos);
-  const wb=new Builder();
+  const wb=new Builder('legacy');
   // Open sea to the horizon (the camera sees ~2 km); beyond the districts it reaches into the coves of the outer coast.
   wb.quad('water',[-300,WATER.bay,138],[300,WATER.bay,138],[300,WATER.bay,4000],[-300,WATER.bay,4000],'#4d7f93');
   // Deep seabed under the open sea beyond the terrain (the translucent sea never shows a terrain edge).

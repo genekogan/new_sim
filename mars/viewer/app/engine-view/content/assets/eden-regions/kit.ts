@@ -51,6 +51,9 @@ const col=(c:Col)=>c instanceof THREE.Color?c:new THREE.Color(c);
 export const SEE_THROUGH:readonly MatKey[]=['glass','path','flower','cloth','metal','soil','water','foliage'];
 /** Per-material triangle soup with a transform stack. */
 export class Builder{
+ readonly authoring:'authored'|'legacy'|'decorative';
+ private drawingAuthored=false;
+ constructor(authoring:'authored'|'legacy'|'decorative'='authored'){this.authoring=authoring;}
  readonly boundaries:AuthoredBoundaryBox[]=[];
  readonly buf=new Map<MatKey,{p:number[];n:number[];c:number[]}>();
  m=new THREE.Matrix4();private stack:THREE.Matrix4[]=[];
@@ -69,12 +72,13 @@ export class Builder{
   * default; decorative opt-out is explicit and retained in the source pin.
   * Legacy box() stays geometry-only until its author selects this contract. */
  authoredBox(k:MatKey,cx:number,y0:number,cz:number,sx:number,sy:number,sz:number,color:Col,buildingId:string,partId:string,kind:'wall'|'guard'='wall',collision:'solid'|'decorative'='solid'){
-  this.box(k,cx,y0,cz,sx,sy,sz,color);this.boundary(kind,cx,y0,cz,sx,sy,sz,buildingId,partId);this.boundaries[this.boundaries.length-1].collision=collision;
+  this.boundary(kind,cx,y0,cz,sx,sy,sz,buildingId,partId);this.boundaries[this.boundaries.length-1].collision=collision;
+  this.drawingAuthored=true;try{this.box(k,cx,y0,cz,sx,sy,sz,color);}finally{this.drawingAuthored=false;}
  }
  /** Push a rotation about local x or z (tilted parts: see-saws, wheels, hay bales). */
  pushRot(axis:'x'|'z',angle:number){return this.pushM(axis==='x'?new THREE.Matrix4().makeRotationX(angle):new THREE.Matrix4().makeRotationZ(angle));}
  b(k:MatKey){let b=this.buf.get(k);if(!b)this.buf.set(k,b={p:[],n:[],c:[]});return b;}
- tri(k:MatKey,a:number[],b:number[],c:number[],color:Col){const B=this.b(k),C=col(color);_a.fromArray(a).applyMatrix4(this.m);_b.fromArray(b).applyMatrix4(this.m);_c.fromArray(c).applyMatrix4(this.m);
+ tri(k:MatKey,a:number[],b:number[],c:number[],color:Col){if(this.authoring==='authored'&&!this.drawingAuthored)throw Error('authored-geometry.requires-authoredBox-or-explicit-legacy/decorative');const B=this.b(k),C=col(color);_a.fromArray(a).applyMatrix4(this.m);_b.fromArray(b).applyMatrix4(this.m);_c.fromArray(c).applyMatrix4(this.m);
   _e1.subVectors(_b,_a);_e2.subVectors(_c,_a);_n.crossVectors(_e1,_e2);if(_n.lengthSq()<1e-14)return;_n.normalize();
   B.p.push(_a.x,_a.y,_a.z,_b.x,_b.y,_b.z,_c.x,_c.y,_c.z);for(let i=0;i<3;i++){B.n.push(_n.x,_n.y,_n.z);B.c.push(C.r,C.g,C.b);}}
  quad(k:MatKey,a:number[],b:number[],c:number[],d:number[],color:Col){this.tri(k,a,b,c,color);this.tri(k,a,c,d,color);}
@@ -108,6 +112,7 @@ export class Builder{
  /** Emits one mesh per material into group; returns triangle count. */
  emit(group:THREE.Group,mats:Materials,name:string,geos:THREE.BufferGeometry[],opts:{transparent?:MatKey[];splitX?:number;far?:(x:number,z:number)=>boolean;farSink?:Builder;allClear?:boolean;glassSink?:Builder}={}){let tris=0;
   group.userData.edenAuthoredBoundaries=[...(group.userData.edenAuthoredBoundaries??[]),...this.boundaries.map(b=>({...b,c:[...b.c],half:[...b.half]}))];
+  group.userData.edenGeometryAuthoring=this.authoring;
   // All window glass (and lamp heads) goes to one shared night-lit draw.
   if(opts.glassSink){const B=this.buf.get('glass');if(B){const G=opts.glassSink.b('glass');for(let i=0;i<B.p.length;i++){G.p.push(B.p[i]);G.n.push(B.n[i]);G.c.push(B.c[i]);}this.buf.delete('glass');}}
   // Far triangles (that can never stand between a Broadcast camera and a subject) move to a shared sink that is
