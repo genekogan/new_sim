@@ -72,7 +72,7 @@ export function useSim(getToken: () => Promise<string | null>, authed: boolean,i
       onTalk: (l) => { const seen = new Set(st.talk.map((x) => x.id)); st.talk = [...st.talk, ...l.filter((x) => !seen.has(x.id))].slice(-300); },
       // Spread so this compiles before and after the client declares onEdge; re-render comes from the 200 ms tick.
       ...({ onEdge: (m: EdgeMsg) => { st.edge = [...st.edge, m].slice(-300); } } as { onEdge(m: EdgeMsg): void }),
-    }, (u) => new WebSocket(u) as never,undefined,undefined,stationCapabilities);
+    }, (u) => new WebSocket(u) as never,undefined,undefined,stationCapabilities,true);
   }
   useEffect(() => {
     const st = s.current; st.conn!.connect();

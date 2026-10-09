@@ -1,3 +1,4 @@
+import {historyTakePath,historyTakePage} from './WorldTakeTransport.ts';
 import {WorldAuthoredBoundaries} from './WorldAuthoredBoundaries.ts';
 import {exploreRoom} from './explore-data.ts';
 import {RendererDiagnostics} from './RendererDiagnostics.ts';
@@ -105,10 +106,10 @@ type Label = { obj: CSS2DObject; name: HTMLElement; line: HTMLElement; card: HTM
 async function fetchChunks(from: number, to: number, limit: number, signal: AbortSignal): Promise<Chunk[]> {
   let out: Chunk[] = [], cursor = from;
   for (let page = 0; page < 4 && out.length < limit; page++) {
-    const res = await fetch(apiPath(`/v1/takes?from=${Math.floor(cursor)}&to=${Math.ceil(to)}&limit=${Math.min(MAX_PAST_CHUNKS, limit - out.length)}`), { signal });
+    const res = await fetch(apiPath(historyTakePath(cursor,to,limit-out.length)), { signal });
     if (!res.ok) throw Error(`the server answered ${res.status}`);
-    const body = (await res.json()) as { chunks?: unknown; next?: unknown };
-    out = validChunks([...out, ...validChunks(body.chunks)]).slice(0, limit);
+    const body = historyTakePage(await res.json());
+    out = validChunks([...out, ...body.chunks]).slice(0, limit);
     const next = typeof body.next === 'number' ? body.next : null;
     if (next === null || next <= cursor || (out.at(-1)?.toTick ?? -Infinity) >= to) break;
     cursor = next;
