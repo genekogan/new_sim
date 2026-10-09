@@ -1,6 +1,7 @@
 /* Shared readable glass, over the actual world canvas. Native dialogs own focus and Escape. */
 .frosted-modal,.human-world .human-panel{background:color-mix(in srgb,var(--panel) 68%,transparent);-webkit-backdrop-filter:blur(22px) saturate(1.2);backdrop-filter:blur(22px) saturate(1.2);color:var(--fg);border:1px solid color-mix(in srgb,var(--fg) 17%,transparent);box-shadow:0 20px 70px #0005}
 .explore-modal{width:min(680px,calc(100vw - 32px));max-height:min(720px,calc(100dvh - 48px));box-sizing:border-box;padding:20px;border-radius:20px;overflow:hidden;font:14px/1.45 system-ui,sans-serif}
+.explore-modal section{background:transparent;border:0;border-radius:0;padding:10px 0;min-width:0}
 .explore-modal::backdrop{background:#10151445}
 .explore-heading{position:static;background:transparent;border:0;padding:0;display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px}
 .explore-heading h2{margin:0;font:650 23px/1.2 system-ui,sans-serif;color:var(--fg);text-transform:none;letter-spacing:-.025em}

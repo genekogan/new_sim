@@ -51,13 +51,16 @@ void test('gallery preset sees both actual frame corners unobstructed by the aut
 });
 
 void test('actual library and office preview meshes fill the transparent thumbnail without cropping',async()=>{
- const quarter=createEdenPublicQuarter(()=>0)!,interiors=createEdenInteriors(()=>0)!;let rendered=0;const captures:{points:THREE.Vector3[]}[]=[];
+ const quarter=createEdenPublicQuarter(()=>0)!,interiors=createEdenInteriors(()=>0)!;let rendered=0;const captures:{points:THREE.Vector3[];box:THREE.Box3}[]=[];
+ const unit=new THREE.BoxGeometry(.7,1,.1),material=new THREE.MeshBasicMaterial(),plaque=new THREE.Mesh(unit,material);plaque.matrixAutoUpdate=false;plaque.matrix.makeTranslation(0,2,3.7);plaque.matrixWorldNeedsUpdate=true;quarter.group.getObjectByName('eden-library-1')!.add(plaque);
+ const outlierGeometry=new THREE.BoxGeometry(3,100,3),outlier=new THREE.Mesh(outlierGeometry,material);outlier.position.set(74,50,-7);quarter.group.add(outlier);
+ const hidden=new THREE.Group(),hiddenMesh=new THREE.Mesh(unit,material);hidden.visible=false;hiddenMesh.position.set(0,800,0);hidden.add(hiddenMesh);quarter.group.getObjectByName('eden-library-1')!.add(hidden);
  const renderer={autoClear:false,getRenderTarget:()=>null,setRenderTarget(){},getViewport:(v:THREE.Vector4)=>v,setViewport(){},getScissor:(v:THREE.Vector4)=>v,setScissor(){},getScissorTest:()=>false,setScissorTest(){},getClearColor:(v:THREE.Color)=>v,getClearAlpha:()=>1,setClearColor(){},render(scene:THREE.Scene,camera:THREE.Camera){
   rendered++;camera.updateMatrixWorld(true);const box=new THREE.Box3().setFromObject(scene),points:THREE.Vector3[]=[];
   for(const x of [box.min.x,box.max.x])for(const y of [box.min.y,box.max.y])for(const z of [box.min.z,box.max.z])points.push(new THREE.Vector3(x,y,z).project(camera));
-  captures.push({points});
+  captures.push({points,box:box.clone()});
   throw Error('geometry-only projection capture');
  }};
  const previews=new WorldPlacePreviews(renderer as unknown as THREE.WebGLRenderer,()=>[quarter.group,interiors.group]);
- try{for(const id of ['gallery','library','int-office-studio'] as const)await previews.capture(id);assert.equal(rendered,3);for(const {points} of captures){assert.ok(points.every(p=>Math.abs(p.x)<=.881&&Math.abs(p.y)<=.881&&p.z>-1&&p.z<1),JSON.stringify(points.map(p=>p.toArray())));const width=Math.max(...points.map(p=>p.x))-Math.min(...points.map(p=>p.x)),height=Math.max(...points.map(p=>p.y))-Math.min(...points.map(p=>p.y));assert.ok(Math.max(width,height)>=1.4,JSON.stringify({width,height,points:points.map(p=>p.toArray())}));}}finally{previews.dispose();interiors.dispose();quarter.dispose();}
+ try{for(const id of ['gallery','library','int-office-studio'] as const)await previews.capture(id);assert.equal(rendered,3);for(const {points,box} of captures){assert.ok(box.min.x>68&&box.max.x<100&&box.max.y<10,'selected actual building has no origin ghost, high background, or hidden-child outlier');assert.ok(points.every(p=>Math.abs(p.x)<=.881&&Math.abs(p.y)<=.881&&p.z>-1&&p.z<1),JSON.stringify(points.map(p=>p.toArray())));const width=Math.max(...points.map(p=>p.x))-Math.min(...points.map(p=>p.x)),height=Math.max(...points.map(p=>p.y))-Math.min(...points.map(p=>p.y));assert.ok(Math.max(width,height)>=1.4,JSON.stringify({width,height,points:points.map(p=>p.toArray())}));}}finally{previews.dispose();interiors.dispose();quarter.dispose();unit.dispose();outlierGeometry.dispose();material.dispose();}
 });
