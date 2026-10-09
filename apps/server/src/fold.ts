@@ -1,3 +1,4 @@
+import {soulProfileFactV1Schema} from '@sim/protocol';
 import {authoredBoundariesDeclarationV1Schema} from '@sim/engine-contract';
 // The fold: applying one logged event to the world. The world has two parts:
 //   the KERNEL (meaning: things, links, vocabulary, decks), which replays from
@@ -246,6 +247,14 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
           const result = applyAll(k,[{op:'appear',id:a.id,kind:a.kind === 'region'?'region':'place',name:a.name,at:a.in??null,traits:{...(a.entity?{entity:a.entity}:{}),...(a.point?{point:a.point}:{}),...(a.tags?{tags:a.tags}:{})}}],'world');
           if (!result.ok) throw new Error(`camp.anchor:${result.message}`);
         }
+      }
+      if (e.payload?.soulProfileV1) {
+        const profile=soulProfileFactV1Schema.parse(e.payload.soulProfileV1),thing=k.things[profile.soulId],body=engine.world.entities[profile.entityId];
+        if(thing?.kind!=='soul'||thing.traits.body!==profile.entityId||thing.name!==profile.fromName
+          ||Number(thing.traits.soulProfileRevisionV1??0)!==profile.fromRevision||body?.human?.soul!==profile.soulId||body.label!==profile.fromName)
+          throw Error('soul-profile.correspondence');
+        thing.name=profile.name;thing.traits.about=profile.description;thing.traits.soulProfileRevisionV1=profile.revision;
+        body.label=profile.name;
       }
       if (rules?.character && rules.soulId && k.things[rules.soulId]) k.things[rules.soulId].traits.about = rules.character;
       if (rules?.restockCamp) engine.restockCamp?.();

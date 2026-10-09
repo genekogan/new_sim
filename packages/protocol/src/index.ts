@@ -1,3 +1,5 @@
+import {soulNameSchema,DEFAULT_SOUL_DESCRIPTION} from './soul-profile-v1.ts';
+export * from './soul-profile-v1.ts';
 export * from './purpose-context-v1.ts';
 export * from './body-v1.ts';
 import {intentArrivalFactV1} from './intent-arrival-v1.ts';
@@ -106,6 +108,7 @@ export function publicEvent(e: LogEvent): LogEvent {
   if(e.kind==='intent-arrival-v1'){const p=intentArrivalFactV1(e);return {...e,payload:{worldId:p.worldId,soulId:p.soulId,privateUpdate:true}};}
   if (e.kind === 'intent-controller-v2') return { ...e, payload: publicIntentHistoryEventV2(intentControllerFactV2(e)) };
   if(e.kind==='mandate')return {...e,payload:{soulId:e.payload?.soulId,op:e.payload?.op,ruleId:e.payload?.ruleId??e.payload?.rule?.id,status:e.payload?.patch?.status??e.payload?.rule?.status}};
+  if(e.kind==='rules'&&e.payload?.soulProfileV1){const p=e.payload.soulProfileV1;return {...e,payload:{soulProfileV1:{...p,owner:p.owner==='system'?'system':'someone'}}};}
   if (e.kind === 'rules' && e.payload?.recovery) { const r=e.payload.recovery; return {...e,payload:{recovery:{excluded:r.excluded,faults:r.faults,restored:true}}}; }
   if (e.kind === 'rules' && e.payload?.reflection) return { ...e, payload: { soulId: e.payload.soulId, reflection: { day: e.payload.reflection.day, written: true } } };
   if (e.kind === 'intent' && (e.payload?.intent?.note || e.payload?.intent?.text)) return { ...e, payload: { ...e.payload, intent: publicIntent(e.payload.intent) } };
@@ -119,6 +122,8 @@ export function publicEvent(e: LogEvent): LogEvent {
 // ---------------------------------------------------------------- public views
 export type PublicSoul = {
   id: string; entityId: string; name: string; description: string; owner: string; // owner is an opaque short id
+  nameAmbiguous?: true;
+  profilePhoto?: {hash:string;url:string;mime:'image/png';width:number;height:number;bytes:number};
   intent: WireIntent | null; intentText: string; mood: string; energy: string; doing: string; native: boolean;
 };
 export type BrainCall = {
@@ -204,8 +209,8 @@ export * from './lifecycle-capability.ts';
 
 // ---------------------------------------------------------------- REST
 export const createSoulSchema = z.strictObject({
-  name: z.string().trim().min(2).max(32).regex(/^[\p{L}\p{N} _'-]+$/u, 'letters, numbers, spaces, apostrophes and hyphens only'),
-  description: z.string().trim().min(3).max(1200),
+  name: soulNameSchema,
+  description: z.string().trim().min(3).max(1200).default(DEFAULT_SOUL_DESCRIPTION),
 });
 export const commandSchema = z.strictObject({ text: z.string().trim().min(1).max(280) });
 export const setIntentSchema = z.object({ intent: intentSchema });

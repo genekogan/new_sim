@@ -18,7 +18,7 @@ function refers(value:unknown,id:string):boolean {
  * evidence of admission, not the current row/Mind/kernel character value.
  * The caller still checks current user/invitation/control authority separately. */
 export function lifecycleBodyReady(host:WorldHost,op:LifecycleOperation):boolean {
-  return ownedBodyCorresponds(host,op.scope,op.name);
+  return ownedBodyCorresponds(host,op.scope,host.currentProfileName(op.scope.soulId,op.name));
 }
 /** Shared correspondence for an admitted operation or a verified legacy birth.
  * A legacy identity does not need a fabricated lifecycle operation. */

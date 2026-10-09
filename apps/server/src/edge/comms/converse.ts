@@ -36,12 +36,13 @@ export class Conversations {
       .run(this.core.worldId, b.id, b.state, b.createdAt, this.core.now(), JSON.stringify(b));
   }
   private ids = (list: Ref[]) => list.map(m => m.soulId);
-  private refs = (list: Ref[]) => list.map(m => ({soulId: m.soulId, name: m.name}));
+  private currentRef=(m:Ref)=>({soulId:m.soulId,name:this.core.nameOf(m.soulId),...this.core.nameMetadata?.(m.soulId)});
+  private refs = (list: Ref[],current=true) => list.map(m => current?this.currentRef(m):{soulId:m.soulId,name:m.name});
 
   /** What a given Soul may see of a conversation. */
   view(b: Body, viewer: string) {
     const member = b.members.some(m => m.soulId === viewer);
-    return {id: b.id, state: b.state, members: this.refs(b.members), invited: this.refs(b.invited),
+    return {id: b.id, state: b.state, members: this.refs(b.members,b.state==='open'), invited: this.refs(b.invited,b.state==='open'),
       ...(member ? {asks: this.refs(b.asks)} : {}), turns: member ? b.turns : undefined,
       role: member ? 'member' : b.invited.some(m => m.soulId === viewer) ? 'invited' : b.asks.some(m => m.soulId === viewer) ? 'asked' : 'none',
       ...(b.closedReason ? {closedReason: b.closedReason} : {}), untrusted: true};
@@ -52,9 +53,9 @@ export class Conversations {
     for (const id of new Set(to)) this.core.streams.deliver(id, kind, tick, body);
   }
   private memberEvent(b: Body, to: string[], who: Ref, change: string, extra: Record<string, unknown> = {}) {
-    this.emit(to, 'conversation.member', {conversation: b.id, soul: soulRef(who), change, members: this.refs(b.members), ...extra, untrusted: true});
+    this.emit(to, 'conversation.member', {conversation: b.id, soul: this.currentRef(who), change, members: this.refs(b.members), ...extra, untrusted: true});
     // Spectators see every membership change (doc 26 §10), so the viewer keeps its tethers honest.
-    this.core.spectate({kind: 'conversation.member', tick: this.core.tick(), conversation: b.id, soul: soulRef(who), change, untrusted: true});
+    this.core.spectate({kind: 'conversation.member', tick: this.core.tick(), conversation: b.id, soul: this.currentRef(who), change, untrusted: true});
   }
   /** Closes when the membership rule says so; notifies everyone still attached. */
   private settle(b: Body, reason: string) {
@@ -114,8 +115,8 @@ export class Conversations {
     return tx(this.core.db, () => {
       if (text) this.addTurn(b, soul, text, false);
       this.save(b);
-      this.emit(invitees, 'conversation.invite', {conversation: b.id, from: soulRef(soul), members: this.refs(b.members), ...(text ? {text} : {}), untrusted: true});
-      this.core.spectate({kind: 'conversation.start', tick, conversation: b.id, from: soulRef(soul), invited: this.refs(b.invited), untrusted: true});
+      this.emit(invitees, 'conversation.invite', {conversation: b.id, from: this.currentRef(soul), members: this.refs(b.members), ...(text ? {text} : {}), untrusted: true});
+      this.core.spectate({kind: 'conversation.start', tick, conversation: b.id, from: this.currentRef(soul), invited: this.refs(b.invited), untrusted: true});
       return {accepted: true, conversation: this.view(b, soul.soulId)};
     });
   }
@@ -169,7 +170,9 @@ export class Conversations {
     this.core.db.prepare('INSERT INTO edge_comms_turns (world_id, conversation_id, seq, soul_id, tick, at, text) VALUES (?,?,?,?,?,?,?)').run(this.core.worldId, b.id, seq, soul.soulId, tick, at, text);
     const me = b.members.find(m => m.soulId === soul.soulId);
     if (me) me.lastAt = at;
-    const turn = {seq, tick, at, from: soulRef(soul), text};
+    const name=this.core.nameOf(soul.soulId);
+    this.core.db.prepare('INSERT INTO edge_comms_turn_names_v1(world_id,conversation_id,seq,name) VALUES(?,?,?,?)').run(this.core.worldId,b.id,seq,name);
+    const turn = {seq, tick, at, from: {...this.currentRef(soul),name}, text};
     if (deliver) this.emit(this.ids(b.members).filter(id => id !== soul.soulId), 'conversation.turn', {conversation: b.id, turn, untrusted: true});
     this.core.spectate({kind: 'conversation.turn', tick, conversation: b.id, turn, untrusted: true});
     return {seq, tick, at};
@@ -245,6 +248,6 @@ export class Conversations {
     if (!b || !me) throw new EdgeError(404, 'not-found', 'no such conversation for you');
     const from = Math.max(after, me.fromTurn);
     const rows = this.core.db.prepare('SELECT seq, soul_id, tick, at, text FROM edge_comms_turns WHERE world_id = ? AND conversation_id = ? AND seq > ? ORDER BY seq LIMIT ?').all(this.core.worldId, id, from, limit) as {seq: number; soul_id: string; tick: number; at: number; text: string}[];
-    return {conversation: this.view(b, soul.soulId), turns: rows.map(r => ({seq: r.seq, tick: r.tick, at: r.at, from: {soulId: r.soul_id, name: this.core.nameOf(r.soul_id)}, text: r.text})), untrusted: true};
+    return {conversation: this.view(b, soul.soulId), turns: rows.map(r => {const historical=this.core.db.prepare('SELECT name FROM edge_comms_turn_names_v1 WHERE world_id=? AND conversation_id=? AND seq=?').get(this.core.worldId,id,r.seq) as {name:string}|undefined;return {seq:r.seq,tick:r.tick,at:r.at,from:{soulId:r.soul_id,name:historical?.name??this.core.nameOf(r.soul_id),currentName:this.core.nameOf(r.soul_id),nameSource:historical?'at-turn':'current-projection'},text:r.text};}), untrusted:true};
   }
 }

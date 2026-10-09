@@ -12,6 +12,8 @@ export const config = {
   worldKey,
   /** Markdown served at /skill.md (App's agent skill). Unset: edge worlds get a built-in edge stub; central worlds the legacy skill. */
   skillFile: env.EDGE_SKILL_FILE || undefined as string | undefined,
+  /** Source-owned onboarding Markdown, served with the selected world's base and display name. */
+  instructionsFile: (env.EDGE_INSTRUCTIONS_FILE || resolve(new URL('../../../tools/edge-skill/INSTRUCTIONS.md',import.meta.url).pathname)) as string | undefined,
   /** App's agent CLI served at /eden-agent.mjs (read per request). Unset: 404. */
   cliFile: env.EDGE_CLI_FILE || undefined as string | undefined,
   /** Who chooses Souls' actions: 'edge' (owners' own agents; the world runs no Soul mind) or 'central' (legacy brain, kept for a future NPC driver). */

@@ -16,6 +16,7 @@ export type CommsCore = {
   now(): number;
   tick(): number;
   nameOf(soulId: string): string;
+  nameMetadata?(soulId:string):{nameAmbiguous?:true};
   liveSoulIds(): string[];
   isLive(soulId: string): boolean;
   /** Faded out (C9 `gone`): absent from the world until its agent acts again. */
