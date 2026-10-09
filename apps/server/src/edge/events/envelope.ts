@@ -43,6 +43,7 @@ export const EVENT_KINDS: Record<string, {salience: 0 | 1 | 2 | 3; what: string}
   'plan.step.failed': {salience: 3, what: 'a step of my plan was refused or failed (the plan pauses, skips or cancels per onRefusal)'},
   'plan.paused': {salience: 3, what: 'my plan paused (a refusal, or my own act interrupted it); PATCH resume/skip/replace/cancel'},
   'plan.done': {salience: 3, what: 'my plan ended: done, cancelled, replaced or failed'},
+  'reminder.due': {salience: 3, what: 'my own private advisory reminder reached its explicit world or real time; it executes no body action'},
   'schedule.starting': {salience: 2, what: 'a calendar item I showed interest in, or a scheduled happening, starts'},
   'presentation.doors': {salience: 2, what: 'doors opened for a presentation I hold a ticket for'},
   'presentation.started': {salience: 3, what: 'a presentation I hold a ticket for or attend began'},
@@ -61,6 +62,7 @@ export const EVENT_KINDS: Record<string, {salience: 0 | 1 | 2 | 3; what: string}
   'calendar.new': {salience: 1, what: 'something new on the public calendar'},
   'light.changed': {salience: 1, what: 'the world light changed (morning, day, evening, dusk, night)'},
   'weather.changed': {salience: 1, what: 'reserved: the world has no weather yet'},
+  'mail.delivered':{salience:2,what:'A private letter was deposited in my postbox; read its attributed untrusted text.'},
   'world.narration': {salience: 1, what: 'world text: narration, small consequences (book back on the shelf…)'},
   'other': {salience: 1, what: 'an event kind this envelope does not know yet'},
 };
@@ -126,7 +128,9 @@ export function classify(e: StreamEvent, me: Viewer): {kind: string; salience: 0
     case 'arrival': return k('arrive.here');
     case 'departure': return k('leave.here');
     case 'world.join': case 'world.leave': case 'light.changed': case 'weather.changed': return k(e.kind);
+    case 'reminder.due': return k('reminder.due');
     case 'world.notice': return k('world.notice', d.level === 'outage' || d.level === 'restart' ? 3 : Number(d.salience) === 3 ? 3 : 2);
+    case 'mail.delivered':return k('mail.delivered');
     case 'receipt': {
       const r = d.receipt ?? {}, plan = !!d.plan;
       if (r.channel === 'attention' || r.channel === 'none') return k('receipt.terminal', 0);
@@ -191,9 +195,11 @@ export function toEnvelope(e: StreamEvent, me: Viewer): Envelope {
     case 'arrive': text = `You arrived at ${d.placePath?.[0] ?? d.endedAt?.placePath?.[0] ?? where?.place ?? d.placeId ?? 'your destination'}.`; break;
     case 'arrival': text = `${who} arrived${where?.place ? ' at ' + where.place : ''}`; break;
     case 'departure': text = `${about?.name ?? 'Someone'} left${where?.place ? ' ' + where.place : ''}`; break;
+    case 'mail.delivered':text=`A private letter is in your postbox (${d.letter?.id??'letter'}).`;break;
     case 'receipt': {
       const r = d.receipt ?? {}, end = r.endedAt ?? d.endedAt;
       text = `${r.capability ?? 'act'} ${r.phase ?? ''}${r.code ? ` ${r.code}` : ''}${r.reason && r.phase === 'failed' ? ': ' + oneLine(r.reason, 100) : ''}${end?.place ? ` · now at ${end.place}${end.posture ? ', ' + end.posture : ''}` : where?.place && r.phase !== 'started' && r.phase !== 'waiting' ? ` · at ${where.place}` : ''}`;
+      if(r.outcome?.summary)text=String(r.outcome.summary);
       break;
     }
     default: text = d.text !== undefined ? String(d.text) : kind; break;
@@ -203,7 +209,7 @@ export function toEnvelope(e: StreamEvent, me: Viewer): Envelope {
   for (const [key, v] of Object.entries(d)) if (!STRIP.has(key)) data[key] = v;
   return {id: e.id, tick: e.tick, at: e.at, clock: typeof d.clock === 'string' ? d.clock : null, kind, salience,
     ...(about ? {about} : {}), ...(where ? {where} : {}), text: oneLine(text, 240), ...(media.length ? {media} : {}),
-    untrusted: d.untrusted === true, raw: e.kind, ...(Object.keys(data).length ? {data} : {})};
+    untrusted: d.untrusted === true||d.receipt?.outcome?.untrusted===true, raw: e.kind, ...(Object.keys(data).length ? {data} : {})};
 }
 
 /** Server-side filter: `kinds` (exact, or a `prefix.*` / `prefix*` pattern) and a minimum salience. */

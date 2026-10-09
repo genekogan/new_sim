@@ -6,7 +6,7 @@ import {clockAt} from '@sim/brain';
 import type {WorldState as NativeWorld} from '../../../../../mars/viewer/engine/world/types.ts';
 import type {EdgeLedger} from '../ledger/ledger.ts';
 import {stateOf} from '../ledger/ledger.ts';
-import type {EdgeSoul, PlaceRef} from '../contract.ts';
+import type {EdgeCapability,EdgeSoul, PlaceRef} from '../contract.ts';
 import {centroid} from '../ledger/places.ts';
 import {EARSHOT_RADIUS} from '../comms/speech.ts';
 import {CATALOG} from '../../../../../mars/viewer/engine/world/catalog.ts';
@@ -19,7 +19,7 @@ export const SIGHT_RADIUS = 30;
 export const OBJECT_RADIUS = 15;
 const LIMITS = {near: 6, objects: 6, seats: 3, exits: 5, conversations: 3};
 
-export type Located = {kind: 'soul' | 'seat' | 'fire' | 'spot' | 'object' | 'item' | 'fixture' | 'place'; id: string; name: string; at: V2; entityId?: string; free?: boolean; capability?: string; distance: number};
+export type Located = {kind: 'soul' | 'seat' | 'fire' | 'spot' | 'object' | 'item' | 'fixture' | 'place'; id: string; name: string; at: V2; entityId?: string; free?: boolean; capability?: string; distance: number;level?:number};
 
 /** One read of the world for one Soul (built per request). */
 export class Perception {
@@ -69,8 +69,9 @@ export class Perception {
     for (const c of caps) {
       if (c.verb !== 'sit' || !c.target || c.id === 'sit:here') continue;
       const ent = (this.L.host.kernel.things[c.target.id]?.traits.entity as string | undefined) ?? c.target.id, e = this.w.entities[ent]; if (!e) continue;
+      const levels=(this.L.host.engine as typeof this.L.host.engine&{nativeSeatLevelsV1?:(id:string)=>number[]}).nativeSeatLevelsV1?.(ent)??(e.support?.kind==='ground'&&e.pose.p[1]===0?[0]:[]);if(levels.length!==1)continue;
       const at: V2 = [e.pose.p[0], e.pose.p[2]], d = this.dist(at); if (d > radius) continue;
-      out.push({kind: 'seat', id: c.target.id, name: c.label, at, entityId: ent, free: c.available && (taken.get(c.target.id) ?? taken.get(ent) ?? 0) < this.seatSlots(ent), capability: c.id, distance: d});
+      out.push({kind: 'seat', id: c.target.id, name: c.label, at, entityId: ent, free: c.available && (taken.get(c.target.id) ?? taken.get(ent) ?? 0) < this.seatSlots(ent), capability: c.id, distance: d,level:levels[0]});
     }
     return out.sort((a, b) => a.distance - b.distance || a.id.localeCompare(b.id));
   }
@@ -162,8 +163,20 @@ const POSE_WORDS: Record<string, string> = {walk: 'walking', wait: 'waiting', si
   'jumping-jacks': 'doing jumping jacks', pushups: 'doing push-ups', situps: 'doing sit-ups', jump: 'jumping', ride: 'riding', board: 'boarding', alight: 'stepping out'};
 const doingWord = (state: string, activity: string) => POSE_WORDS[activity] ?? (state === 'busy' ? activity.replace(/[-_]/g, ' ') : state);
 
+/** Public current offers only, in a bounded local frame. Parameter descriptors
+ * stay exact; an oversized offer is omitted rather than changing its schema. */
+export function compactDoHere(caps:readonly EdgeCapability[],localTargets:ReadonlySet<string>,byteBudget=1800){
+ const eligible=caps.filter(c=>c.available&&c.verb!=='walk'&&c.verb!=='stroll'&&(c.id.endsWith(':here')||c.verb==='accept'||c.verb==='decline'||!!c.target&&localTargets.has(c.target.id)));
+ const selected:{id:string;verb:string;label:string;available:true;params?:Record<string,unknown>}[]=[];
+ for(const c of eligible){
+  const offer={id:c.id,verb:c.verb,label:c.label,available:true as const,...(c.params?{params:structuredClone(c.params)}:{})};
+  if(selected.length<12&&Buffer.byteLength(JSON.stringify([...selected,offer]))<=byteBudget)selected.push(offer);
+ }
+ return {doHere:selected,doHereCoverage:{localOffers:eligible.length,listed:selected.length,omitted:eligible.length-selected.length,byteBudget,complete:eligible.length===selected.length,fullCapabilities:'/v1/edge/capabilities'}};
+}
+
 /** The `here` frame (EDGE-CONTRACT-v1 §8.1). Target ≤ ~600 tokens. */
-export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul) {
+export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:boolean}={}) {
   const P = new Perception(ledger, soul), tick = P.tick, me = P.me(), b = me.body, host = ledger.host;
   const day = host.living, c = day ? clockAt(tick, day.origin, day.dayTicks) : null;
   const weather = skyOf((P.w as {env?: {weather?: {clouds: number; rain: number; wind: number}}}).env?.weather);
@@ -210,7 +223,7 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul) {
     .map(c => {const p = ledger.places.byId.get(c.target!.id), at = p ? centroid(p.polygon) : null; return at ? {c, p: p!, at, d: dist2(P.pos!, at)} : null;})
     .filter((x): x is NonNullable<typeof x> => !!x && x.d <= 150).sort((a, b) => a.d - b.d || a.c.id.localeCompare(b.c.id)).slice(0, LIMITS.exits)
     .map(x => ({to: x.p.id, name: x.p.name, dir: compassPoint(compassOf(x.at[0] - P.pos![0], x.at[1] - P.pos![1])), walk: x.c.id, eta: '~' + durationWord(walkSeconds(x.d * 1.25))})) : [];
-  return {
+  const frame = {
     tick, ...(c ? {clock: `${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')}`, day: WEEKDAYS[new Date(c.datetime).getUTCDay()], light: lightOf(c.hour, c.minute)} : {}),
     ...(weather ? {weather} : {}),
     me: {place: me.place, placePath: me.placePath, pos: me.pos, heading: me.heading, facing: compassPoint(me.heading), posture: me.posture, body:P.w.entities[soul.entityId]?.body??{family:'humanoid'}, ...(me.seat ? {seat: me.seat} : {}),
@@ -219,4 +232,7 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul) {
       ...(holding?.name ? {holding: holding.name} : {}), ...(fade?.colour ? {fade: fade.colour} : {})},
     near, objects, ...(Object.keys(more).length ? {more} : {}), conversations_in_earshot: conversations, exits, untrusted: true,
   };
+  if(!options.doHere)return frame;
+  const baseBytes=Buffer.byteLength(JSON.stringify(frame)),budget=Math.max(0,Math.min(1800,2600-baseBytes-240));
+  return {...frame,...compactDoHere(ledger.capabilities(soul),new Set([...ledger.placePathOf(soul.soulId).map(p=>p.id),...objects.map(o=>o.id),...near.filter(n=>n.dist<=8).map(n=>n.id)]),budget)};
 }

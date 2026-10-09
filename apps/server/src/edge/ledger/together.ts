@@ -74,7 +74,7 @@ const INVITABLE = new Set(['walk', 'stroll', 'wander', 'hang-out', 'gather', 'wa
   'use-computer', 'sing', 'listen', 'lift-weights', 'bench-press', 'pull-ups', 'dips', 'play-frisbee', 'play-petanque', 'play-volleyball']);
 
 export type Invite = {id: string; what: string; host: {soulId: string; name: string}; guests: {soulId: string; name: string}[]; capability: string; label: string;
-  kind: 'paired' | 'give' | 'activity' | 'ride'; activity?: string; seconds?: number; gap?: number; prop?: string; base?: string;
+  kind: 'paired' | 'give' | 'activity' | 'ride'; pairedPolicy?: 'ready-v1'; activity?: string; seconds?: number; gap?: number; prop?: string; base?: string;
   createdTick: number; expiresTick: number; state: 'pending' | 'closed'; responses: Record<string, 'accepted' | 'declined' | 'expired' | 'cancelled'>;
   hostReceipt: string | null; guestReceipts: Record<string, string>; item?: {id: string; kind: ItemKind; name: string}; ride?: {object: string; carrier: string}; place?: string | null};
 export type Item = {id: string; kind: ItemKind; name: string; holder: string | null; placeId: string | null; at: V2 | null; state: 'held' | 'placed' | 'gone'; claimedBy: string | null; by: string | null; createdAt: number; placedAt: number | null};
@@ -111,6 +111,7 @@ export class Together {
     this.p = port;
     port.db.db.exec(`CREATE TABLE IF NOT EXISTS edge_invites_v1 (world_id TEXT NOT NULL, invite_id TEXT NOT NULL, state TEXT NOT NULL, body TEXT NOT NULL, created_at INTEGER NOT NULL, PRIMARY KEY (world_id, invite_id));
       CREATE INDEX IF NOT EXISTS edge_invites_v1_state ON edge_invites_v1 (world_id, state);
+      CREATE TABLE IF NOT EXISTS edge_invite_receipts_v1(world_id TEXT NOT NULL,receipt_id TEXT NOT NULL,invite_id TEXT NOT NULL,PRIMARY KEY(world_id,receipt_id)) WITHOUT ROWID;
       CREATE TABLE IF NOT EXISTS edge_items_v1 (world_id TEXT NOT NULL, item_id TEXT NOT NULL, state TEXT NOT NULL, holder TEXT, place_id TEXT, body TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (world_id, item_id));
       CREATE INDEX IF NOT EXISTS edge_items_v1_holder ON edge_items_v1 (world_id, holder);
       CREATE INDEX IF NOT EXISTS edge_items_v1_state ON edge_items_v1 (world_id, state);
@@ -164,7 +165,8 @@ export class Together {
   // ---------------------------------------------------------------- storage
   invite(id: string): Invite | null {const r = this.p.db.db.prepare('SELECT body FROM edge_invites_v1 WHERE world_id=? AND invite_id=?').get(this.p.host.worldId, id) as {body: string} | undefined; return r ? JSON.parse(r.body) as Invite : null;}
   private pending(): Invite[] {return (this.p.db.db.prepare("SELECT body FROM edge_invites_v1 WHERE world_id=? AND state='pending' ORDER BY created_at").all(this.p.host.worldId) as {body: string}[]).map(r => JSON.parse(r.body) as Invite);}
-  private saveInvite(i: Invite) {this.p.db.db.prepare('INSERT INTO edge_invites_v1 (world_id,invite_id,state,body,created_at) VALUES (?,?,?,?,?) ON CONFLICT (world_id,invite_id) DO UPDATE SET state=excluded.state, body=excluded.body').run(this.p.host.worldId, i.id, i.state, JSON.stringify(i), Date.now());}
+  private saveInvite(i: Invite) {this.p.db.db.prepare('INSERT INTO edge_invites_v1 (world_id,invite_id,state,body,created_at) VALUES (?,?,?,?,?) ON CONFLICT (world_id,invite_id) DO UPDATE SET state=excluded.state, body=excluded.body').run(this.p.host.worldId, i.id, i.state, JSON.stringify(i), Date.now());for(const receipt of [i.hostReceipt,...Object.values(i.guestReceipts)].filter((r):r is string=>!!r))this.p.db.db.prepare('INSERT OR IGNORE INTO edge_invite_receipts_v1(world_id,receipt_id,invite_id) VALUES(?,?,?)').run(this.p.host.worldId,receipt,i.id);}
+  inviteForReceipt(receipt:string):Invite|null{const r=this.p.db.db.prepare('SELECT invite_id FROM edge_invite_receipts_v1 WHERE world_id=? AND receipt_id=?').get(this.p.host.worldId,receipt) as {invite_id:string}|undefined;return r?this.invite(r.invite_id):null;}
   /** Pending invitations addressed to this Soul that it has not answered. */
   invitesFor(soulId: string): Invite[] {return this.pending().filter(i => i.guests.some(g => g.soulId === soulId) && !i.responses[soulId]);}
   item(id: string): Item | null {const r = this.p.db.db.prepare('SELECT body FROM edge_items_v1 WHERE world_id=? AND item_id=?').get(this.p.host.worldId, id) as {body: string} | undefined; return r ? JSON.parse(r.body) as Item : null;}
@@ -311,10 +313,10 @@ export class Together {
       const meet = this.meetSteps(soul.entityId, g.entityId, 1.1, def?.gap ?? 0.8);
       if (!meet) return {code: 'gesture.no-room', reason: `There is no clear spot beside ${g.name} right now (someone else is standing too close); try again in a moment or somewhere roomier.`};
       const out = structuredClone(steps).flatMap(s => s.verb === 'walk_to' && s.params.to === g.entityId ? meet : [s]);
-      for (const s of out) if (s.verb === 'mars:pose_v1') {s.params.group = id; s.params.seconds = seconds;}
+      for (const s of out) if (s.verb === 'mars:pose_v1') {s.params.group = id; s.params.seconds = seconds;if(tag.kind==='paired')s.params.pairedPolicy='ready-v1';}
       return {steps: out, commit: receipt => {
         const inv: Invite = {id, what: tag.kind === 'paired' ? tag.what : 'give', kind: tag.kind, host: {soulId: soul.soulId, name: soul.name}, guests: [{soulId: g.soulId, name: g.name}], capability: cap.id,
-          label: tag.kind === 'paired' ? `offers you ${def!.ask}` : `wants to give you ${held!.name}`, activity: def?.activity ?? 'take', seconds, gap: def?.gap ?? 0.8, ...(held ? {item: {id: held.id, kind: held.kind, name: held.name}, prop: held.kind} : {}),
+          ...(tag.kind==='paired'?{pairedPolicy:'ready-v1' as const}:{}), label: tag.kind === 'paired' ? `offers you ${def!.ask}` : `wants to give you ${held!.name}`, activity: def?.activity ?? 'take', seconds, gap: def?.gap ?? 0.8, ...(held ? {item: {id: held.id, kind: held.kind, name: held.name}, prop: held.kind} : {}),
           createdTick: this.tick, expiresTick: this.tick + (def?.lapse ?? 30) * 20, state: 'pending', responses: {}, hostReceipt: receipt, guestReceipts: {}};
         this.saveInvite(inv); this.announce(inv);
         if (held) this.saveOp(receipt, {soulId: soul.soulId, op: 'give', item: held.id, to: g.soulId, invite: id});
@@ -403,6 +405,7 @@ export class Together {
   acceptPlan(soul: EdgeSoul, inviteId: string, ownCaps: EdgeCapability[], ownPlans: Map<string, TogetherPlan>): {code: string; reason: string} | {label: string; steps: Steps; capability: string; ride?: {object: string}; commit: (receipt: string) => void} {
     const inv = this.invite(inviteId);
     if (!inv || inv.state !== 'pending' || !inv.guests.some(g => g.soulId === soul.soulId) || inv.responses[soul.soulId]) return {code: 'invite.gone', reason: 'That invitation is no longer open.'};
+    if(inv.pairedPolicy!==undefined&&inv.pairedPolicy!=='ready-v1')return {code:'gesture.policy-unsupported',reason:'That invitation names an unsupported paired policy.'};
     const host = this.mindOf(inv.host.soulId), hb = host ? this.p.body(host.entityId) : undefined, me = this.p.body(soul.entityId);
     if (!host || !hb || !me || this.p.faded(inv.host.soulId)) return {code: 'invite.gone', reason: `${inv.host.name} is not here any more.`};
     const commit = (receipt: string) => this.respond(inv.id, soul, 'accepted', receipt);
@@ -414,7 +417,7 @@ export class Together {
       const meet = seatedTake ? [] : this.meetSteps(soul.entityId, host.entityId, 1.1, inv.gap ?? 0.8);
       if (!meet) return {code: 'gesture.no-room', reason: `There is no clear spot beside ${inv.host.name} right now (someone else is standing too close); try again in a moment.`};
       const steps: Steps = [...(seatedTake ? [] : [...this.standFirst(soul.entityId), ...meet]),
-        pose(inv.activity!, inv.seconds!, {group: inv.id, gap: inv.gap, waitSeconds: 30, alone: 'fail', clear: true, ...(inv.kind === 'give' ? {prop: inv.item!.kind, hold: inv.item!.kind} : {})})];
+        pose(inv.activity!, inv.seconds!, {group: inv.id, gap: inv.gap, ...(inv.pairedPolicy?{pairedPolicy:inv.pairedPolicy}:{}), waitSeconds: 30, alone: 'fail', clear: true, ...(inv.kind === 'give' ? {prop: inv.item!.kind, hold: inv.item!.kind} : {})})];
       return {label: inv.kind === 'give' ? `Take ${inv.item!.name} from ${inv.host.name}` : `${inv.what} with ${inv.host.name}`, steps, capability: 'accept:' + inv.id, commit: receipt => {
         commit(receipt); if (inv.kind === 'give') this.saveOp(receipt, {soulId: soul.soulId, op: 'take', item: inv.item!.id, invite: inv.id});
       }};

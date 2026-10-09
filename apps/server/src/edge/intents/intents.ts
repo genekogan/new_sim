@@ -10,6 +10,7 @@ import {Perception, type Located} from '../perception/here.ts';
 import {centroid, inPoly} from '../ledger/places.ts';
 import {dist2, durationWord, headingOfYaw, round1, walkSeconds, yawOfHeading, yawTowards} from '../perception/geometry.ts';
 import {strictCheck} from './strict.ts';
+import {resolvePlaceForVerb,lookupPlaceIdentity,explicitPlaceCapability,knownBootPlaces,offeredWalkObject} from '../boot/world-places.ts';
 
 type V2 = [number, number];
 type Steps = Program['steps'];
@@ -20,9 +21,9 @@ export type Resolution =
   | {ok: true; kind: 'plan'; capability: string; label: string; steps: Steps; chosen: Chosen}
   | {ok: true; kind: 'attention'; capability: string; gaze: Gaze; yaw?: number; chosen: Chosen}
   | {ok: true; kind: 'setting'; capability: string; apply: () => void; chosen: Chosen}
-  | {ok: false; code: string; reason: string; did_you_mean?: {id: string; label: string}[]};
+  | {ok: false; code: string; reason: string; did_you_mean?: {id: string; label: string}[];resolvedIfName?:{input:string;placeId:string;name:string};ambiguous?:string[]};
 export type IntentInput = {verb?: unknown; target?: unknown; params?: unknown; clientRef?: unknown; [k: string]: unknown};
-type Refused = {accepted: false; code: string; reason: string; capability: string; did_you_mean?: {id: string; label: string}[]};
+type Refused = {accepted: false; code: string; reason: string; capability: string; did_you_mean?: {id: string; label: string}[];resolvedIfName?:{input:string;placeId:string;name:string};ambiguous?:string[]};
 
 /** Intent verbs this module resolves (anything else is passed on as `<verb>:<target>` to ordinary capabilities). */
 export const INTENT_VERBS = ['sit', 'go', 'walk', 'swim', 'approach', 'follow', 'walk-with', 'turn', 'face', 'look', 'auto-face'];
@@ -88,7 +89,8 @@ export class Intents {
       case 'look': return this.look(P, s);
       case 'auto-face': return this.autoFaceSetting(soul, s);
       default: {
-        const target = str(s.target) ?? str(s.place);
+        let target = str(s.target) ?? str(s.place);
+        if(str(s.place)){const place=resolvePlaceForVerb(this.L,soul,str(s.place),verb);if(!place.ok)return place;target=place.chosen.place;return {ok:true,kind:'capability',capability:place.chosen.capability,...(typeof s.seconds==='number'?{params:{seconds:s.seconds}}:{}),chosen:place.chosen};}
         const {caps} = this.L.coreA.binds(soul), here = caps.find(c => c.id === `${verb}:here`);
         const capability = target ? `${verb}:${target}` : here ? here.id : verb;
         return {ok: true, kind: 'capability', capability, ...(typeof s.seconds === 'number' ? {params: {seconds: s.seconds}} : {}), chosen: {capability}};
@@ -115,10 +117,13 @@ export class Intents {
     const free = s.free !== false, all = P.seats(1e9), here = (seat: Located) => ({seat: seat.id, label: seat.name, free: !!seat.free, distFromYou: seat.distance, ...this.eta(P, seat.at)});
     const room = str(s.in);
     if (room) {
-      const loc = this.L.places.byId.has(room) ? null : P.locate(room, {souls: false, things: false});
-      const place = this.L.places.byId.get(room) ?? (loc ? this.L.places.byId.get(loc.id) : undefined);
+      const identity=lookupPlaceIdentity(this.L,room);if(!identity.ok)return {...identity,code:identity.code==='capability.unknown'?'place.unknown':identity.code};
+      const place=this.L.places.byId.get(identity.chosen.place);
       if (!place) return no('place.unknown', `No place called "${room}" in the map.`);
-      const inRoom = all.filter(x => inPoly(x.at[0], x.at[1], place.polygon) && !PRESENTER_SEAT.test(x.id + ' ' + x.name));
+      const admission=knownBootPlaces(this.L).find(p=>p.id===place.id)!;
+      if(admission.access==='unsupported-floor')return no('place.unsupported-floor','This room has no admitted native floor; no downstairs substitute was chosen.');
+      if(admission.access==='dynamic-carrier')return no('place.dynamic','This room moves with a carrier; use its current ride capabilities.');
+      const inRoom = all.filter(x => x.level===place.level && inPoly(x.at[0], x.at[1], place.polygon) && !PRESENTER_SEAT.test(x.id + ' ' + x.name));
       if (!inRoom.length) return no('seat.none-in-place', `${place.name} has no seats you can sit on.`, all.filter(x => x.free).slice(0, 3).map(x => ({id: x.capability!, label: x.name})));
       // the room's focus: a lectern/screen/stage inside it, else the way its seats face
       const w = P.w, mid: V2 = [inRoom.reduce((a, x) => a + x.at[0], 0) / inRoom.length, inRoom.reduce((a, x) => a + x.at[1], 0) / inRoom.length];
@@ -171,18 +176,14 @@ export class Intents {
     const asked = str(s.place) ?? str(s.target); if (!asked) return no('capability.params', `${verb} needs a place: {"verb":"go","target":{"place":"<id or name>"}}.`);
     const {caps} = this.L.coreA.binds(P.soul), via = s.via !== undefined ? {via: s.via} : {}, withP = s.with !== undefined ? {with: s.with} : {};
     const walkTo = (c: EdgeCapability) => {const p = this.L.places.byId.get(c.target!.id); return {ok: true as const, kind: 'capability' as const, capability: c.id, ...(Object.keys({...via, ...withP}).length ? {params: {...via, ...withP}} : {}), chosen: {...(c.target!.kind==='place'?{place:c.target!.id}:{target:c.target!.id,kind:c.target!.kind}), name: p?.name ?? c.label, ...(p ? this.eta(P, centroid(p.polygon)) : {})}};};
-    const exact = caps.find(c => c.id === `walk:${asked}`); if (exact) {if (!exact.available && exact.blocked) return no(exact.blocked.code, exact.blocked.reason); return walkTo(exact);}
-    const place = this.L.places.byId.get(asked);
-    if (place) {
-      // a real place in the map that no walk reaches: refuse with the reason and the walks nearest to it
-      const at = centroid(place.polygon), walks = caps.filter(c => c.verb === 'walk' && c.available && c.target?.kind === 'place').map(c => ({c, p: this.L.places.byId.get(c.target!.id)})).filter(x => x.p)
-        .sort((a, b) => dist2(centroid(a.p!.polygon), at) - dist2(centroid(b.p!.polygon), at) || a.c.id.localeCompare(b.c.id)).slice(0, 3).map(x => ({id: x.c.id, label: x.c.label}));
-      return no('place.unwalkable', `${place.name} is in the map but no walk reaches it yet (scenery, not walkable ground); nothing was done.`, walks);
-    }
-    const r = this.L.coreA.resolveText(P.soul, `walk:${asked}`, caps);
-    if (r.kind === 'unknown') return no((r as {code?: string}).code ?? 'capability.unknown', r.reason, r.didYouMean);
-    if (r.cap.verb !== 'walk' || !r.cap.target || !['place','object'].includes(r.cap.target.kind)) return no('capability.unknown', `"${asked}" is not a destination you can walk to.`);
-    const out = walkTo(r.cap); return {...out, chosen: {...out.chosen, resolved: r.kind === 'alias' ? r.note : undefined}};
+    // Preserve exact non-place destinations such as a carrier boarding object.
+    const exact = caps.find(c => c.verb==='walk'&&(c.id===asked||c.id === `walk:${asked}`));
+    if (exact?.target?.kind === 'object') {if (!exact.available && exact.blocked) return no(exact.blocked.code, exact.blocked.reason);return walkTo(exact);}
+    const object=offeredWalkObject(this.L,P.soul,asked);if(object){if(!object.ok)return object;const out=walkTo(object.cap);return {...out,chosen:{...out.chosen,matchedBy:object.matchedBy}};}
+    const r=resolvePlaceForVerb(this.L,P.soul,exact?.target?.kind==='place'?exact.target.id:asked);
+    if(!r.ok)return r;
+    const cap=caps.find(c=>c.id===r.chosen.capability)!;
+    const out=walkTo(cap);return {...out,chosen:{...out.chosen,...r.chosen}};
   }
 
   private swim(P: Perception, s: Record<string, unknown>): Resolution {
@@ -192,7 +193,8 @@ export class Intents {
     let cap = swims[0];
     if (asked) {
       const named = swims.find(c => c.id === asked || c.id === `swim:${asked}` || c.target?.id === asked);
-      const loc = named ? null : P.locate(asked, {souls: false, things: false});
+      const identity=named?null:lookupPlaceIdentity(this.L,asked);if(identity&&!identity.ok)return identity;
+      const loc=identity?.ok?P.locate(identity.chosen.place,{souls:false,things:false}):null;
       const hit = named ?? (loc ? swims.find(c => {const p = c.target ? this.L.places.byId.get(c.target.id) : undefined; return !!p && (p.id === loc.id || inPoly(loc.at[0], loc.at[1], p.polygon) || this.L.coreA.isAncestor(loc.id, p.id));}) : undefined);
       if (!hit) return no('swim.not-swimmable', `${loc?.name ?? asked} is not water you can swim in; you can swim in ${swims.map(c => this.L.places.byId.get(c.target?.id ?? '')?.name ?? c.label).join(', ')}.`, swims.map(c => ({id: c.id, label: c.label})));
       cap = hit;
@@ -273,7 +275,7 @@ export class Intents {
     if (clientRef) {const old = this.L.coreA.byClientRef(soul.soulId, clientRef); if (old) return {accepted: true, receipt: old, chosen: (old as {chosen?: Chosen}).chosen ?? {}, channel: (old as {channel?: string}).channel ?? 'body'};}
     await this.L.coreA.reclaim(soul);
     const r = this.resolve(soul, input), verb = String(input.verb ?? '');
-    if (!r.ok) {this.L.recordRefusal(soul.soulId, 'intent', verb, r.code); return {accepted: false, code: r.code, reason: r.reason, capability: verb, ...(r.did_you_mean ? {did_you_mean: r.did_you_mean} : {})};}
+    if (!r.ok) {this.L.recordRefusal(soul.soulId, 'intent', verb, r.code); const {ok:_ok,...refusal}=r;return {accepted:false,...refusal,capability:verb};}
     const extra = input.params && typeof input.params === 'object' && !Array.isArray(input.params) ? input.params as Record<string, unknown> : {};
     if (r.kind === 'capability') {
       const out = await this.L.act(soul, {capability: r.capability, params: {...extra, ...(r.params ?? {})}, ...(clientRef ? {clientRef} : {})});
@@ -282,7 +284,7 @@ export class Intents {
       return {accepted: true, receipt, chosen: r.chosen, channel: (receipt as {channel?: string}).channel ?? 'body', ...(out.resolved ? {resolved: out.resolved} : {})};
     }
     if (r.kind === 'plan') {
-      const out = await this.L.coreA.launchPlan(soul, r.capability, r.label, r.steps, clientRef);
+      const out = await this.L.coreA.launchPlan(soul, r.capability, r.label, r.steps, clientRef,input.params&&typeof input.params==='object'&&!Array.isArray(input.params)?input.params as Record<string,unknown>:{});
       if (!out.accepted) return out as Refused;
       const receipt = this.L.coreA.setDetail(out.receipt.id, {chosen: r.chosen, intent: intentOf(input)}) ?? out.receipt;
       this.L.comms?.fading.touch?.(soul.soulId);
@@ -324,6 +326,7 @@ export class Intents {
     if (typeof input.capability === 'string' && input.verb === undefined) {
       const walk=walkWithDestinationWords(input.capability,[...this.L.host.minds.values()].map(m=>m.name));if(walk)return this.dryRun(soul,{...walk,...(input.params?{params:input.params}:{})});
       const {caps} = this.L.coreA.binds(soul), asked = input.capability.trim();
+      const place=explicitPlaceCapability(this.L,soul,asked);if(place){if(!place.ok)return place;return {ok:true,would:{capability:place.chosen.capability,channel:'body',chosen:place.chosen}};}
       const bodyIssue=asked.startsWith('object:')?null:this.L.bodyVerbProblem(soul,asked.split(/[:\s]/)[0]!);if(bodyIssue)return {ok:false,...bodyIssue};
       if (!asked || asked.length > 200) return {ok: false, code: 'capability.params', reason: 'capability must be 1..200 characters.'};
       const plain = attentionWords(asked); if (plain) return this.dryRun(soul, plain);
@@ -335,7 +338,7 @@ export class Intents {
         ...(r.kind === 'alias' ? {resolved: r.note} : {}), ...(at && P.pos ? this.eta(P, at) : {})}};
     }
     const r = this.resolve(soul, input);
-    if (!r.ok) return {ok: false, code: r.code, reason: r.reason, ...(r.did_you_mean ? {did_you_mean: r.did_you_mean} : {})};
+    if (!r.ok) return {...r};
     if (r.kind === 'capability') {
       // the concrete capability must itself be offered (or resolve) right now
       const {caps} = this.L.coreA.binds(soul), strict = strictCheck(this.L, soul, r.capability, caps); if (strict) return {ok: false, ...strict};

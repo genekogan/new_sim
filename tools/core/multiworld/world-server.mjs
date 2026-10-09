@@ -120,7 +120,7 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
   const profile=worldKey==='mars'?marsEdgeProfile(host):null,rigid=floaterEdgeProfile(host);
   const experienceProfile=experiencesData?(await load('apps/server/src/worlds/experiences-edge.ts')).lmExperienceEdgeProfile(host,experiencesData):undefined;
   const aliasesProfile=authored?(await load('apps/server/src/worlds/authored-lm-edge.ts')).authoredLmAliasProfile(host,authored.aliases):undefined;
-  edge.worldProfile=(soul,caps,plans)=>{profile?.(soul,caps,plans);aliasesProfile?.(soul,caps,plans);experienceProfile?.(soul,caps,plans);rigid(soul,caps,plans);};
+  edge.worldProfile=Object.assign((soul,caps,plans)=>{profile?.(soul,caps,plans);aliasesProfile?.(soul,caps,plans);experienceProfile?.(soul,caps,plans);rigid(soul,caps,plans);},{nativePlaceAliases:aliasesProfile?.nativePlaceAliases??[]});
   server=createServer();const strip=url=>stripWorldRequestPath(url,cfg.worldPath);server.on('upgrade',req=>{req.url=strip(req.url);});
   hub=new Hub(server,host,auth,db);hub.brain=brain;hub.build=build;
   const previousFading=process.env.EDGE_FADING;delete process.env.EDGE_FADING;

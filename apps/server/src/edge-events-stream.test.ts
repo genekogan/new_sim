@@ -7,6 +7,7 @@ import {eventsFixture, readSSE} from './edge/events/testing.ts';
 import {relativeBearing, toEnvelope, mediaOf} from './edge/events/envelope.ts';
 import {EDGE_CONTRACT} from './edge/contract.ts';
 import {HEARTBEAT_MS} from './edge/events/index.ts';
+import {mountBodyRoutes} from './edge/body/routes.ts';
 
 const MIN = 60_000;
 
@@ -273,11 +274,14 @@ test('new kinds: approach (once, hysteresis), follow.stop to the followed Soul, 
 test('schema: machine-readable verbs, plan grammar, event kinds and limits (public)', async () => {
   const f = eventsFixture(['Roger']);
   try {
+    mountBodyRoutes(f.app,{...f.deps,souls:{cfg:{worldPath:'/w/eden'}}} as never);
     const res = await f.app.request('/v1/edge/schema'), body = await res.json() as any;
     assert.equal(res.status, 200); assert.equal(body.contract, EDGE_CONTRACT); assert.equal(body.schema, 'eden-edge-schema/1');
     assert.equal(body.events.kinds['speech.to-me'].salience, 3); assert.equal(body.events.kinds['plan.step.failed'].salience, 3);
     assert.ok(body.act.verbs.includes('sit')); assert.ok(body.plan.step.until); assert.equal(body.limits.eventStreamsPerSoul, 3);
     assert.ok(body.endpoints.some((e: any) => e.path === '/v1/edge/events' && e.produces === 'text/event-stream'));
+    assert.equal(body.body.contract,'body/1');
+    assert.equal(Object.keys(body.act.verbOutcomes).length,body.act.verbs.length);
     assert.ok(JSON.stringify(body).length < 16_000, 'small enough to fetch once per session');
   } finally { f.destroy(); }
 });

@@ -541,6 +541,12 @@ export class MarsEngine implements Engine {
     return { verb, params: { ...a, ...('actor' in shape && !('actor' in a) ? { actor: me } : {}), ...('actors' in shape && !('actors' in a) ? { actors: [me] } : {}) } };
   }
 
+  /** Read-only seat support levels, using the same native slot calculation as sit.
+   * No route/admission, runtime mutation or historical policy change. */
+  nativeSeatLevelsV1(fixture:string):number[]{
+    const entity=this.ents[fixture];if(!entity)return [];
+    return [...new Set(fixtureSlots(this.rt,entity).filter(slot=>slot.kind==='seat').map(slot=>slot.level))].sort((a,b)=>a-b);
+  }
   private seatedAt(actor:string,fixture:string){const body=this.ents[actor],entity=this.ents[fixture];if(!body?.human||body.human.activity!=='sit'||!entity)return false;return fixtureSlots(this.rt,entity).some(slot=>{const r=slot.claimedBy?this.rt.records.get(slot.claimedBy):undefined;return slot.kind==='seat'&&slot.level===body.human.level&&r?.params.actor===actor&&r.phase==='occupied'&&this.rt.isActive(r.id)&&Math.hypot(slot.p[0]-body.pose.p[0],slot.p[1]-body.pose.p[2])<=.001&&Math.abs(angleDelta(slot.yaw,body.pose.yaw))<=.03;});}
 
   /** One body-language step → the Mars actions and waits that depict it, decided when the step begins. */

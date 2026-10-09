@@ -1,7 +1,7 @@
 // One durable event stream per Soul (EDGE-CONTRACT-v1 §5). Cursors are opaque strings
 // `c_<seq>`, monotonic per Soul. Old events are pruned by count and age; a cursor older
 // than the retained floor reads as a gap carrying the oldest usable cursor.
-import {tx, type Sql} from './store.ts';
+import {afterCommit,tx, type Sql} from './store.ts';
 
 export type StreamEvent = {id: string; kind: string; tick: number; at: number} & Record<string, unknown>;
 export type ReadResult = {cursor: string; events: StreamEvent[]; gap?: true};
@@ -48,11 +48,17 @@ export class EventStreams {
       this.db.prepare('INSERT INTO edge_comms_stream (world_id, soul_id, seq, tick, at, kind, body) VALUES (?,?,?,?,?,?,?)').run(this.worldId, soulId, seq, tick, at, kind, JSON.stringify(stored));
       this.db.prepare('INSERT INTO edge_comms_heads (world_id, soul_id, head, floor) VALUES (?,?,?,?) ON CONFLICT (world_id, soul_id) DO UPDATE SET head = excluded.head').run(this.worldId, soulId, seq, floor);
       if (seq % 25 === 0) this.prune(soulId, seq, floor);
-      return {id: cursorOf(seq), kind, tick, at, ...stored} as StreamEvent;
+      const event={id: cursorOf(seq), kind, tick, at, ...stored} as StreamEvent;
+      // Capture the exact JSON fact now: a producer can mutate its return value
+      // before outer commit, but that must not change subscriber-visible data.
+      const notification=JSON.parse(JSON.stringify(event)) as StreamEvent;
+      afterCommit(this.db,()=>{
+        const waiting=this.waiters.get(soulId);
+        if(waiting){this.waiters.delete(soulId);for(const wake of waiting)wake();}
+        for(const listener of this.listeners){try{listener(soulId,notification);}catch{/* listener faults never break committed delivery */}}
+      });
+      return event;
     });
-    const waiting = this.waiters.get(soulId);
-    if (waiting) { this.waiters.delete(soulId); for (const wake of waiting) wake(); }
-    for (const l of this.listeners) { try { l(soulId, event); } catch { /* listeners never break delivery */ } }
     return event;
   }
 
