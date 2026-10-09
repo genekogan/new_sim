@@ -88,7 +88,7 @@ export class Souls {
     const row=this.db.db.prepare("SELECT seq FROM events WHERE world_id=? AND kind='birth' AND json_extract(payload,'$.soulId')=? ORDER BY seq LIMIT 1").get(this.host.worldId,soul.id) as {seq:number}|undefined;
     const birth=row?this.db.events(this.host.worldId,row.seq-1,1)[0]:undefined;
     return !!birth&&birth.kind==='birth'&&birth.payload.owner===current.owner&&birth.payload.entityId===current.entity_id
-      &&birth.payload.name===current.name&&ownedBodyCorresponds(this.host,{worldId:this.host.worldId,soulId:soul.id,entityId:current.entity_id,owner:current.owner},current.name);
+      &&this.host.currentProfileName(soul.id,birth.payload.name)===current.name&&ownedBodyCorresponds(this.host,{worldId:this.host.worldId,soulId:soul.id,entityId:current.entity_id,owner:current.owner},current.name);
   }
   requireControlReady(soul:SoulRow){if(!this.controlReady(soul))throw new ApiError(409,'not-in-world','this Soul is not currently admitted and ready');}
   /** A live request carries its authority to each sequenced write and final
@@ -190,6 +190,7 @@ export class Souls {
   /** Find a kernel thing by id, by a body's entity id, or by name ("the kiosk", "kiosk", "Oda"). */
   resolveThing(ref: string): string | null {
     const k = this.host.kernel; if (k.things[ref]) return ref;
+    if(this.host.soulNameRefusal(ref))return null;
     const low = ref.toLowerCase().replace(/^the /, '');
     const hit = Object.values(k.things).find((t) => t.traits.body === ref || t.traits.entity === ref) ?? Object.values(k.things).find((t) => t.name.toLowerCase().replace(/^the /, '') === low);
     return hit?.id ?? null;

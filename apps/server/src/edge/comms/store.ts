@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS edge_comms_speech (world_id TEXT NOT NULL, id TEXT NO
 CREATE INDEX IF NOT EXISTS edge_comms_speech_at ON edge_comms_speech (world_id, at);
 CREATE TABLE IF NOT EXISTS edge_comms_conversations (world_id TEXT NOT NULL, id TEXT NOT NULL, state TEXT NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, body TEXT NOT NULL, PRIMARY KEY (world_id, id)) WITHOUT ROWID;
 CREATE INDEX IF NOT EXISTS edge_comms_conversations_open ON edge_comms_conversations (world_id, state);
+CREATE TABLE IF NOT EXISTS edge_comms_turn_names_v1(world_id TEXT NOT NULL,conversation_id TEXT NOT NULL,seq INTEGER NOT NULL,name TEXT NOT NULL,PRIMARY KEY(world_id,conversation_id,seq)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS edge_comms_turns (world_id TEXT NOT NULL, conversation_id TEXT NOT NULL, seq INTEGER NOT NULL, soul_id TEXT NOT NULL, tick INTEGER NOT NULL, at INTEGER NOT NULL, text TEXT NOT NULL, PRIMARY KEY (world_id, conversation_id, seq)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS edge_comms_subscriptions (world_id TEXT NOT NULL, soul_id TEXT NOT NULL, url TEXT NOT NULL, secret TEXT NOT NULL, cursor INTEGER NOT NULL, created_at INTEGER NOT NULL, failures INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (world_id, soul_id)) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS edge_comms_objects (world_id TEXT NOT NULL, id TEXT NOT NULL, kind TEXT NOT NULL, version INTEGER NOT NULL, body TEXT NOT NULL, updated_at INTEGER NOT NULL, PRIMARY KEY (world_id, id)) WITHOUT ROWID;

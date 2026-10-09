@@ -43,6 +43,7 @@ export function bindLiveSoulReferences(refs,{ownerText='',identityBasis,resolve}
  const list=Array.isArray(refs)?refs:[refs],generic=GENERIC_IDENTITY_BASES.has(identityText(identityBasis))&&literalSoulReference(ownerText,identityBasis);
  const resolved=resolve(list);if(!resolved.ok)return resolved;
  if(ownerText&&!generic){for(let i=0;i<list.length;i++){const ref=list[i],chosen=resolved.chosen[i],name=typeof ref==='string'&&!ref.startsWith('s_')?ref:ref?.name??chosen.name,id=typeof ref==='string'&&ref.startsWith('s_')?ref:ref?.id??chosen.id;
+  if(chosen.nameAmbiguous&&!literalSoulReference(ownerText,chosen.id))return {ok:false,code:'identity.reassigned-name',reason:'The named label was reassigned. An explicit canonical ID must come from the trusted owner request, not a model-invented pair; clarify instead of substituting.',requested:resolved.requested,chosen:resolved.chosen};
   if(!literalSoulReference(ownerText,name)&&!literalSoulReference(ownerText,id))return {ok:false,code:'identity.owner-binding-required',reason:'Selected full name/ID is not a literal reference in the trusted owner request. Use the exact intended full name, wait for it, or ask for clarification; no similar-name substitution.',requested:resolved.requested,chosen:resolved.chosen};}}
  return {...resolved,basis:ownerText?(generic?'literal-generic-choice':'literal-owner-reference'):'observed-autonomous-choice'};
 }

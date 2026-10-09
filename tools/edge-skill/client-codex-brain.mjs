@@ -6,7 +6,7 @@ import {spawn} from 'node:child_process';
 export const CODEX_CLIENT_GUARD=[...['shell_tool','unified_exec','shell_snapshot','hooks','apps','goals','multi_agent','multi_agent_v2','plugins','remote_plugin','memories','browser_use','browser_use_external','browser_use_full_cdp_access','computer_use','in_app_browser','image_generation','code_mode_host','workspace_dependencies','auth_elicitation','tool_suggest','skill_mcp_dependency_install','tool_call_mcp_elicitation'].flatMap(f=>['--disable',f]),'-c','web_search="disabled"','-c','tools.view_image=false','-c','project_doc_max_bytes=0','-c','mcp_servers={}','-c','sandbox_mode="read-only"'];
 export function codexExecArgs({model,resumeId,effort}={}){return [...CODEX_CLIENT_GUARD,...(effort?['-c',`model_reasoning_effort=${JSON.stringify(effort)}`]:[]),'exec',...(resumeId?['resume',resumeId]:[]),'--ignore-user-config','--skip-git-repo-check','--json','--model',model,'-'];}
 export function codexExecBrain({model,system,resumeId,stateless,effort,executable='codex',env=process.env,timeoutMs=120000,maxBytes=2097152,onProcess=()=>{}}={}){
- let thread=resumeId??null,proc=null,generation=0,cancel=null;
+ let thread=resumeId??null,proc=null,generation=0,cancel=null,closing=new Set();
  const kill=(child,signal)=>{if(child&&child.exitCode===null&&child.signalCode===null)try{if(process.platform==='win32')child.kill(signal);else process.kill(-child.pid,signal);}catch(error){if(error.code!=='ESRCH')throw error;}};
  const processEvent=(child,generation,status,extra={})=>{try{onProcess({pid:child.pid??null,pgid:process.platform==='win32'?null:child.pid??null,generation,session:thread,status,...extra});}catch{}};
  return {engine:'codex',get id(){return thread;},get isNew(){return stateless||!thread;},
@@ -36,7 +36,7 @@ export function codexExecBrain({model,system,resumeId,stateless,effort,executabl
     child.stdin.end(resuming?text:`${system}\n\n${text}`);
    });
   },
-  close(){cancel?.();generation++;proc=null;cancel=null;},
+  close(){const child=proc;if(child){const wait=new Promise(resolve=>{child.once('close',resolve);child.once('error',resolve);});cancel?.();generation++;proc=null;cancel=null;closing.add(wait);wait.finally(()=>closing.delete(wait));}return Promise.all([...closing]);},
   fresh(){this.close();thread=null;},
  };
 }

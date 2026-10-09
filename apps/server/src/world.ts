@@ -1,3 +1,4 @@
+import {soulProfileFactV1Schema,type SoulProfileFactV1} from '@sim/protocol';
 import {authoredBoundariesDeclarationV1Schema,type AuthoredBoundariesDeclarationV1} from '@sim/engine-contract';
 import {edenLectureV1} from '@sim/engine-mars';
 import {renderPlatformRowsV1Schema,type RenderPlatformV1} from '@sim/engine-contract';
@@ -477,7 +478,7 @@ export class WorldHost {
         if(stationEra)this.apply(stationEra,false);
         if(arrival)this.apply(arrival,false);
       } catch (error) {
-        if(arrival||stationEra||e.payload?.crewRemovalTransition||e.payload?.nativeSleepSnapshotPolicy||e.payload?.commonsNewcomerResources||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore||e.payload?.commonsFoodDelivery||e.payload?.socialEden||e.payload?.edenLecture||e.payload?.edenGround||e.payload?.existingGreenLandmark){
+        if(arrival||stationEra||e.payload?.soulProfileV1||e.payload?.crewRemovalTransition||e.payload?.nativeSleepSnapshotPolicy||e.payload?.commonsNewcomerResources||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore||e.payload?.commonsFoodDelivery||e.payload?.socialEden||e.payload?.edenLecture||e.payload?.edenGround||e.payload?.existingGreenLandmark){
           // A committed structural pair cannot be attributed to an unrelated
           // card or filtered out by card-fault recovery. Restore exact history.
           try{
@@ -487,7 +488,7 @@ export class WorldHost {
         }else {this.recoverFault(error, e.kind === 'decision' ? e.payload.card : undefined, e.kind === 'decision' && !e.payload?.card ? {seq: e.seq, entityId: e.payload?.entityId} : undefined); recovered = true;}
       }
       const accepted=[e,...(admission?[admission]:[]),...(stationEra?[stationEra]:[]),...(arrival?[arrival]:[])];
-      if (!recovered||arrival||stationEra||e.payload?.crewRemovalTransition||e.payload?.nativeSleepSnapshotPolicy||e.payload?.commonsNewcomerResources||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore||e.payload?.commonsFoodDelivery||e.payload?.socialEden||e.payload?.edenLecture||e.payload?.edenGround||e.payload?.existingGreenLandmark) this.acc.log.push(...accepted);
+      if (!recovered||arrival||stationEra||e.payload?.soulProfileV1||e.payload?.crewRemovalTransition||e.payload?.nativeSleepSnapshotPolicy||e.payload?.commonsNewcomerResources||e.payload?.commonsProvisions||e.payload?.commonsKitchen||e.payload?.retainedCommonsShore||e.payload?.commonsFoodDelivery||e.payload?.socialEden||e.payload?.edenLecture||e.payload?.edenGround||e.payload?.existingGreenLandmark) this.acc.log.push(...accepted);
       // No listener can observe a physical event before its committed era fold.
       for (const fact of accepted) for (const l of this.listeners) l.onApplied?.(fact);
       if (admission && recovered) { p.reject?.(new PersistedIntentAdmissionFault(e.seq)); continue; }
@@ -922,6 +923,15 @@ export class WorldHost {
       case 'rules': {
         if(e.payload?.intentArrivalV1)this.extra.intentArrivalV1=true;
         const p = e.payload;
+        if(p?.soulProfileV1){
+          const profile=soulProfileFactV1Schema.parse(p.soulProfileV1),m=this.minds.get(profile.soulId),previous=this.profileFact(profile.soulId);
+          if(profile.worldId!==this.worldId||!m||m.owner!==profile.owner||m.entityId!==profile.entityId||m.name!==profile.fromName
+            ||(previous?.revision??0)!==profile.fromRevision||(previous?.birthName??profile.birthName)!==profile.birthName)throw Error('soul-profile.identity');
+          if(profile.fromName!==profile.name){const claims=(this.extra.soulNameClaimsV1??={}) as Record<string,string[]>;const key=profile.fromName.trim().normalize('NFKC').toLowerCase();claims[key]=[...new Set([...(claims[key]??[]),profile.soulId])];}
+          m.name=profile.name;m.description=profile.description;
+          ((this.extra.soulProfilesV1??={}) as Record<string,SoulProfileFactV1>)[profile.soulId]=structuredClone(profile);
+          this.acc.dirty.add(m.soulId);this.kernelDirty=true;
+        }
         if(p?.intentNativeSequenceCompletionV1===true)this.extra.intentNativeSequenceCompletionV1=true;
         if(p?.intentExecutionRetentionV1===true)this.extra.intentExecutionRetentionV1=true;
         if(p?.intentApproachRetentionV1===true)this.extra.intentApproachRetentionV1=true;
@@ -1244,10 +1254,24 @@ export class WorldHost {
   private tickOnceForQueue() { if (!this.paused) this.tickOnce(); }
 
   // ------------------------------------------------------------ views
+  profileFact(id:string):SoulProfileFactV1|undefined{return (this.extra.soulProfilesV1 as Record<string,SoulProfileFactV1>|undefined)?.[id];}
+  /** Current accepted metadata may differ from the immutable birth label. */
+  currentProfileName(id:string,birthName:string){const p=this.profileFact(id);return p?.birthName===birthName?p.name:birthName;}
+  /** Previous accepted labels are not aliases: a fresh ambiguous old-name request must choose an ID. */
+  soulNameRefusal(ref:string):'soul.name-stale'|'soul.name-ambiguous'|null{
+    if(this.minds.has(ref))return null;const key=ref.trim().normalize('NFKC').toLowerCase(),old=(this.extra.soulNameClaimsV1 as Record<string,string[]>|undefined)?.[key];
+    if(!old?.length)return null;const current=[...this.minds.values()].filter(m=>m.name.trim().normalize('NFKC').toLowerCase()===key);
+    return current.length===1&&old.every(id=>id===current[0].soulId)?null:current.length?'soul.name-ambiguous':'soul.name-stale';
+  }
+  publicNameMetadata(id:string){const name=this.minds.get(id)?.name;return name&&this.soulNameRefusal(name)==='soul.name-ambiguous'?{nameAmbiguous:true as const}:{};}
+  profileWorldPath='';
+  profilePhoto(id:string){const p=this.profileFact(id)?.photo;return p?{...p,url:`${this.profileWorldPath}/v1/souls/${encodeURIComponent(id)}/profile-photo/${p.hash}`}:null;}
   publicSoul(m: Mind): PublicSoul {
     const nameOf = (id: string) => this.nameOf(id);
     return {
       id: m.soulId, entityId: m.entityId, name: m.name, description: m.description, owner: ownerShort(m.owner), native: m.native,
+      ...this.publicNameMetadata(m.soulId),
+      ...(this.profilePhoto(m.soulId)?{profilePhoto:this.profilePhoto(m.soulId)!}:{}),
       intent: publicIntent(m.intent), intentText: describeIntent(publicIntent(m.intent), nameOf), mood: m.mood, energy: energyWord(m.energy), doing: m.doing,
     };
   }

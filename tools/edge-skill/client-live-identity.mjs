@@ -10,7 +10,7 @@ export function openLiveSoulEvidence({worldId,scope,call,here,conversations,now=
   if(snapshot.scope!==scope)throw Error('identity conversation scope mismatch');
   const participants=snapshot.groups.filter(g=>g.attached&&g.state==='open'&&['member','invited','asked'].includes(g.role)).flatMap(g=>[...g.members,...g.invited]);
   return [
-   {worldId,kind:'perceived',rows:(here()?.near??[]).map(p=>({id:p.id,name:p.name}))},
+   {worldId,kind:'perceived',rows:(here()?.near??[]).map(p=>({id:p.id,name:p.name,...(p.nameAmbiguous===true?{nameAmbiguous:true}:{})}))},
    {worldId,kind:'conversation-participants',rows:participants},
    {worldId,kind:'perceived',rows:refreshedAt!==null&&now()-refreshedAt<=5000?extraRows:[]},
   ];
@@ -23,7 +23,7 @@ export function openLiveSoulEvidence({worldId,scope,call,here,conversations,now=
    if(response.status!==200)throw Error('identity here unavailable: '+response.status);
    const frame=response.data?.here??response.data;
    if(!Array.isArray(frame?.near))throw Error('identity here roster unavailable');
-   extraRows=frame.near.map(p=>({id:p.id,name:p.name}));
+   extraRows=frame.near.map(p=>({id:p.id,name:p.name,...(p.nameAmbiguous===true?{nameAmbiguous:true}:{})}));
   },
  };
 }

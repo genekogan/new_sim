@@ -1,3 +1,4 @@
+import {SoulProfiles} from './soul-profile.ts';
 import { bodyLimit } from 'hono/body-limit';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -33,6 +34,8 @@ export function buildApp(d: Deps) {
   if(d.stationV2&&d.stationV2.host!==d.host)throw new Error('V2 station must belong to selected host');
   if(d.intentV2&&(d.intentV2.host!==d.host||d.intentV2.brain!==d.brain||d.intentV2.souls!==d.souls))throw new Error('intent transport must belong to selected host');
   const app = new Hono();
+  d.host.profileWorldPath=d.cfg.worldPath;
+  const profiles=new SoulProfiles(d.host,d.souls);
   const bearer = (c: Context) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
   if (d.edge) { if (d.edge.host !== d.host) throw new Error('edge ledger must belong to selected host'); const comms = mountEdgeRoutes(app, { host: d.host, db: d.db, souls: d.souls, build: d.cfg.build, soul: edgeSoulResolver(d.host, d.souls, bearer), ledger: d.edge }); comms.onSpectator(m => d.hub?.broadcast?.(m as never)); d.hub?.joinMessages?.push(() => comms.spectatorJoin()); d.hub?.upgradeHandlers?.push((req, socket, head) => comms.events.upgrade(req, socket, head)); }
   const ip = (c: Context) => (c.req.header('x-forwarded-for') ?? 'local').split(',')[0].trim();
@@ -79,12 +82,12 @@ export function buildApp(d: Deps) {
   for(const path of ['/v1/lifecycle','/v1/lifecycle/*','/v1/me','/v1/souls','/v1/souls/*','/v1/agent/*'])
     app.use(path,async(c,next)=>{if(d.souls.lifecycle)c.header('Cache-Control','no-store');await next();});
   app.use('/v1/brain',async(c,next)=>{if(d.souls.lifecycle)c.header('Cache-Control','no-store');await next();});
-  app.use('/v1/*', bodyLimit({ maxSize: 64 * 1024, onError: (c) => c.json({ ok: false, code: 'too-large', message: 'request body is larger than 64 KB' }, 413) }));
+  app.use('/v1/*',async(c,next)=>bodyLimit({ maxSize: /^\/v1\/souls\/[^/]+\/photo$/.test(c.req.path)?360*1024:64*1024, onError: (c) => c.json({ ok: false, code: 'too-large', message: 'request body is too large' }, 413) })(c,next));
 
   // ---- public
   mountStationRoutesV2(app,d.stationV2);
   app.get('/healthz', (c) => c.json({ ok: true, tick: d.host.engine.world.tick, clients: d.hub.clients.size, paused: d.host.paused, build: d.cfg.build, worldId: d.host.worldId }));
-  app.get('/v1/config', (c) => c.json({ privyAppId: d.cfg.privyAppId, publicUrl: baseOf(c), worldId: d.host.worldId, worldKey: d.cfg.worldKey, worldPath: d.cfg.worldPath, authReady: d.auth.ready, devAuth: d.auth.devAuth, inviteRequired: d.cfg.inviteRequired, build: d.cfg.build }));
+  app.get('/v1/config', (c) => c.json({ privyAppId: d.cfg.privyAppId, publicUrl: baseOf(c), worldURL:baseOf(c), instructionsURL:baseOf(c)+'/instructions.md', soulProfile:{contract:'soul-profile/1',auth:'owner',edit:'PATCH /v1/souls/:id/profile',photo:'POST /v1/souls/:id/photo',photoFormat:'PNG RGB/RGBA8',maxPhotoBytes:262144,maxPhotoDimension:512}, worldId: d.host.worldId, worldKey: d.cfg.worldKey, worldPath: d.cfg.worldPath, authReady: d.auth.ready, devAuth: d.auth.devAuth, inviteRequired: d.cfg.inviteRequired, build: d.cfg.build }));
   app.get('/v1/world', (c) => c.json(d.souls.worldSummary()));
   app.get('/v1/debug/world', (c) => c.json(d.host.engine.world));
   app.get('/v1/scene', c => {
@@ -128,6 +131,10 @@ export function buildApp(d: Deps) {
   };
   const skill = (c: Context) => c.text(skillText(baseOf(c)), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'public, max-age=60' });
   app.get('/skill.md', skill);
+  app.get('/instructions.md',c=>{if(!d.cfg.instructionsFile)return c.json({ok:false,code:'instructions-unavailable'},503);
+    try{const text=readFileSync(d.cfg.instructionsFile,'utf8').replaceAll('{{BASE}}',baseOf(c)).replaceAll('{{WORLD}}',(d.cfg.worldKey==='littlemartians'?'Little Martians':d.cfg.worldKey[0].toUpperCase()+d.cfg.worldKey.slice(1)));return c.text(text,200,{'content-type':'text/markdown; charset=utf-8','cache-control':'public, max-age=60'});}
+    catch{return c.json({ok:false,code:'instructions-unavailable'},503);}
+  });
   app.get('/eden-agent.mjs', c => { if (!d.cfg.cliFile) throw new ApiError(404, 'not-found', 'no agent CLI is published on this world'); let js: string; try { js = readFileSync(d.cfg.cliFile, 'utf8'); } catch { throw new ApiError(404, 'not-found', 'agent CLI unavailable'); } return c.body(js, 200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=60' }); });
   app.get('/v1/skill.md', skill);
   // Selected-world text producer, before the SPA fallback. Origin/prefix come
@@ -206,7 +213,10 @@ export function buildApp(d: Deps) {
   });
 
   // ---- signed-in users
-  const mySouls = (u: UserRow) => d.db.soulsOf(u.id).filter(s=>!d.souls.lifecycle||(s.world_id===d.host.worldId&&d.souls.invited(u)&&d.souls.controlReady(s))).map((s) => ({ id: s.id, name: s.name, description: s.description, entityId: s.entity_id, hasToken: !!s.token_hash, tokenLabel: s.token_label, tokenCreatedAt: s.token_created_at, tokenLastUsed: s.token_last_used }));
+  const mySouls = (u: UserRow) => d.db.soulsOf(u.id).filter(s=>!d.souls.lifecycle||(s.world_id===d.host.worldId&&d.souls.invited(u)&&d.souls.controlReady(s))).map((s) => ({ id: s.id, name: s.name, description: s.description, ...(s.world_id===d.host.worldId?{profile:profiles.view(s.id)}:{}), entityId: s.entity_id, hasToken: !!s.token_hash, tokenLabel: s.token_label, tokenCreatedAt: s.token_created_at, tokenLastUsed: s.token_last_used }));
+  app.patch('/v1/souls/:id/profile',async c=>{c.header('Cache-Control','no-store');const u=await requireUser(c);const result=await profiles.update(u.id,c.req.param('id'),await body(c));d.hub.refreshMe(u.id);return c.json({ok:true,profile:result});});
+  app.post('/v1/souls/:id/photo',async c=>{c.header('Cache-Control','no-store');const u=await requireUser(c);const result=await profiles.photo(u.id,c.req.param('id'),await body(c));d.hub.refreshMe(u.id);return c.json({ok:true,profile:result});});
+  app.get('/v1/souls/:id/profile-photo/:hash',c=>{const bytes=profiles.photoBytes(c.req.param('id'),c.req.param('hash'));return bytes?c.body(bytes as never,200,{'Content-Type':'image/png','X-Content-Type-Options':'nosniff','Cache-Control':'public, max-age=31536000, immutable'}):c.json({ok:false,code:'not-found'},404);});
   app.get('/v1/me', async (c) => { const u = privateUser(await requireUser(c),false),souls=mySouls(u); return c.json({ me: {...d.auth.me(u),...(d.souls.lifecycle?{souls:souls.map(s=>s.id)}:{})}, souls, maxSouls: d.cfg.maxSoulsPerUser,
     ...(d.souls.lifecycle?{lifecycleRequests:d.souls.invited(u)?d.souls.lifecycleHistory(u.id):{contract:'owner-lifecycle-list/1',worldId:d.host.worldId,requests:[],nextCursor:null},
       ...(d.souls.invited(u)?{lifecycleCapability:ownerLifecycleCapabilitySchema.parse({contract:'owner-lifecycle-capability/1',worldId:d.host.worldId,userId:u.id,
@@ -240,7 +250,7 @@ export function buildApp(d: Deps) {
     const lim = d.souls.limits.allow(`create:${u.id}`, 5, 3600_000); if (!lim.ok) throw new ApiError(429, 'rate-limited', 'too many new souls this hour', { retry_after: lim.retryAfter });
     if(d.souls.lifecycle){const op=d.souls.acceptLifecycleCreate(u.id,await body(c));d.hub.refreshMe(u.id);return lifecycleReply(c,u.id,op.requestId,optIn);}
     const s = await d.souls.create(u.id, await body(c)); d.hub.refreshMe(u.id);
-    return c.json({ ok: true, soul: { id: s.id, name: s.name, description: s.description, entityId: s.entity_id } });
+    return c.json({ ok: true, soul: { id: s.id, name: s.name, description: s.description, ...(s.world_id===d.host.worldId?{profile:profiles.view(s.id)}:{}), entityId: s.entity_id } });
   });
   app.delete('/v1/souls/:id', async (c) => { const u = await requireUser(c),optIn=lifecycleOptIn(c),soul=ownSoul(u,c.req.param('id'));if(d.souls.lifecycle){const op=d.souls.acceptLifecycleRetire(u.id,soul);d.hub.refreshMe(soul.owner);return lifecycleReply(c,u.id,op.requestId,optIn);}await d.souls.retire(soul); d.hub.refreshMe(u.id); return c.json({ ok: true }); });
   app.get('/v1/souls/:id', async (c) => {

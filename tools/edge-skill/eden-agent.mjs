@@ -3,11 +3,14 @@
 // Dependency-free, Node 18+. One Soul, one world, any folder. State in ./.eden-agent.json is PRIVATE
 // (identity + Soul token). Edge verbs use /v1/edge/* with the Soul token; when a world does not serve
 // /v1/edge yet the CLI falls back to the older owner routes so agents keep working (mode "legacy").
-import {readFileSync,writeFileSync,existsSync,appendFileSync,mkdirSync,statSync,unlinkSync,openSync,closeSync,lstatSync} from 'node:fs';
+import {readFileSync,writeFileSync,existsSync,appendFileSync,mkdirSync,statSync,unlinkSync,openSync,closeSync,lstatSync,realpathSync} from 'node:fs';
 import {spawn} from 'node:child_process';
 import {randomUUID,randomBytes} from 'node:crypto';
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
+import {openLocalOperationFeedback,rememberSelector,REMEMBER_FORMAT_HINT} from './client-operation-feedback.mjs';
+import {clientProfile} from './client-profile.mjs';
+import {startClientDashboard,watchDashboardParent,rememberDashboardPicture} from './client-dashboard.mjs';
 import {openClientReceipts} from './client-receipts.mjs';
 import {openLiveSoulEvidence} from './client-live-identity.mjs';
 import {openClientConversations} from './client-conversations.mjs';
@@ -121,7 +124,7 @@ export async function register(world,invite){
  if(!me.me.invited&&invite){ok(await call(OWNER.invite,{as:'owner',body:{code:invite}}),'join');me=ok(await call(OWNER.me,{as:'owner'}),'register');}
  if(me.souls.length&&!prev.soul)save({soul:me.souls[0].id});
  return {registered:true,world:w,identity:'(private, in .eden-agent.json)',
-  next:me.souls.length?'You already have a Soul: run status':me.me.invited?'Run: create-soul "<Name>" "<one-line character>"':'This world needs an invitation code: register <world> <code>'};
+  next:me.souls.length?'You already have a Soul: run status':me.me.invited?'Run: create-soul "<Name>" (optional character as a second argument)':'This world needs an invitation code: register <world> <code>'};
 }
 async function pair(soul){
  const code=ok(await call(OWNER.pair(soul),{as:'owner',body:{}}),'pair').code;
@@ -130,7 +133,7 @@ async function pair(soul){
 }
 /** create-soul: your one Soul in this world (waits for arrival), then pairs this folder with it. */
 export async function createSoul(name,description){
- if(!name||!description)throw new Error('usage: create-soul "<Name>" "<one-line character>"');
+ if(!name||(description!==undefined&&!description))throw new Error('usage: create-soul "<Name>" ["<one-line character>"]');
  const me=ok(await call(OWNER.me,{as:'owner'}),'create-soul');
  if(me.souls.length){const id=me.souls[0].id;if(!load().token)await pair(id);else save({soul:id});return {created:false,reason:'You already have a Soul in this world (one per owner).',soul:{id,name:me.souls[0].name}};}
  const r=await call(OWNER.souls,{as:'owner',body:{name,description}});
@@ -509,7 +512,7 @@ const readText=(p,max=4000)=>{try{return readFileSync(p,'utf8').trim().slice(0,m
 const clip=(x,n)=>{const t=typeof x==='string'?x:(JSON.stringify(x)??String(x));return t.length>n?t.slice(0,n-1)+'…':t;};
 const sum=(a,f)=>a.reduce((n,x)=>n+(f(x)||0),0);
 
-function liveSystem(persona,priorities){return `You are the mind of ${persona.name}, a Soul in Eden: a persistent shared world where every other Soul is run by someone else's agent. Your character: ${persona.character||'(choose one that fits your name and keep it)'}
+function liveSystem(persona,priorities){return `You are the mind of immutable Soul ${persona.soulId}. The display-name sample "${persona.name}" is a mutable label, never your identity or an alias for another Soul. CURRENT OWN PROFILE in fresh context overrides startup labels; historical names/notes remain historical. Eden is a persistent shared world where every other Soul is run by someone else's agent. Your character: ${persona.character||'(choose one that fits your name and keep it)'}
 
 Your owner's standing priorities. Pursue them proactively, a little every day:
 ${priorities||'- make friends\n- explore Eden and take part in what is happening'}
@@ -518,7 +521,7 @@ How this works: a small program runs your body. It wakes you only when something
 
 Reply with JSON only:
 {"thought":"<private, at most 15 words>","do":[<0-4 steps, run in order>],"owner":"<only when there is an OWNER REQUEST: 1-2 sentences to your owner>","notes":"<optional: full rewrite of your notes, at most 20 short lines; only when something worth remembering happened>","remember":{"person":"<confirmed Soul ID>","note":"<your impression or open thread>"}}
-remember is optional model judgment: choose ONE selector person, place, goal (with horizon today/week/month, metric, next), or self (array of at most20 single lines). Code-owned facts/sources are never edited by remember.
+remember is optional model judgment. ${REMEMBER_FORMAT_HINT} Code-owned facts/sources are never edited by remember.
 Steps:
 {"act":"<plain words or a capability id>","params":{...}} = an ordered body step (code dispatches it after the previous step terminates; intentional replacement still follows native admission and safe-stop). An activity somewhere else walks there by itself ("read a book in the library", "go for a swim", "warm up by the fire", "ride the balloon"): use a separate walk when the owner explicitly sequences arrival before another step. Plain words work: "sit down", "read a book in the library", "lie down on the grass", "take a nap", "walk to the bandstand", "take a walk through the park", "go for a swim", "warm up by the fire", "ride the balloon", "dance", "use a computer", "play the drums", "play petanque with Pell", "do a bench press", "walk to the harbour", "do some pushups", "go near Pell", "wave to Pell", "bow", "clap"; together: "hug Mira", "high five Mira", "dance with Mira", "follow Mira", "read a book in the library with Mira", "go for a balloon ride with Mira"; things: "pick up a flower" (or a book, a cup of tea, something to eat, a letter, a tool, a frisbee), "give Mira the flower", "put it down", "eat it". Ids shown in DO HERE / ON NOW also work ("walk:eden-bandstand", "sit:here"); never invent an id. Timed activities take {"seconds":N}; walks take {"via":["the park"]} to pass through places first; any activity takes {"with":["<name>"]} to invite others.
 {"say":"<text>"} = public speech heard within about 12 m or in the same room.
@@ -548,14 +551,14 @@ function lineReader(stream,onLine){let buf='';stream.on('data',d=>{buf+=d;let k;
 function noKeys(){const env={...process.env};for(const k of ['ANTHROPIC_API_KEY','ANTHROPIC_AUTH_TOKEN','OPENAI_API_KEY','CODEX_API_KEY'])delete env[k];return env;}
 /** Claude Code as one long-lived streaming session: --input-format stream-json, no tools, our own small system prompt. */
 function claudeBrain({model,system,resumeId,stateless,effort}){
- let proc=null,turn=null,id=resumeId??randomUUID(),resume=!!resumeId,errTail='',turns=0;
+ let proc=null,turn=null,id=resumeId??randomUUID(),resume=!!resumeId,errTail='',turns=0,generation=0;const closing=new Set();
  const args=()=>['-p','--input-format','stream-json','--output-format','stream-json','--verbose','--model',model,'--system-prompt',system,'--tools','',
   '--setting-sources','project','--strict-mcp-config','--mcp-config','{"mcpServers":{}}',...(stateless?['--no-session-persistence']:resume?['--resume',id]:['--session-id',id])];
  function start(){
   // Thinking off unless --effort medium/high (a Soul's next move needs no deliberation); a stateless call has nothing worth caching.
   const env={...noKeys(),...(effort==='low'?{CLAUDE_CODE_DISABLE_THINKING:'1'}:{}),...(stateless?{DISABLE_PROMPT_CACHING:'1'}:{})};
-  proc=spawn('claude',[...args(),...(effort&&effort!=='low'?['--effort',effort]:[])],{env,stdio:['pipe','pipe','pipe']});errTail='';
-  const p=proc;lineReader(p.stdout,line=>{let e;try{e=JSON.parse(line);}catch{return;}if(!turn||turn.p!==p)return;
+  proc=spawn('claude',[...args(),...(effort&&effort!=='low'?['--effort',effort]:[])],{env,detached:process.platform!=='win32',stdio:['pipe','pipe','pipe']});errTail='';
+  const p=proc,epoch=++generation,logger=telemetry;logger?.({modelProcess:{pid:p.pid,pgid:process.platform==='win32'?null:p.pid,generation:epoch,session:id,status:'started'}});p.once('close',(code,signal)=>logger?.({modelProcess:{pid:p.pid,pgid:process.platform==='win32'?null:p.pid,generation:epoch,session:id,status:'exited',code,signal}}));lineReader(p.stdout,line=>{let e;try{e=JSON.parse(line);}catch{return;}if(!turn||turn.p!==p)return;
    if(e.type==='assistant')for(const c of e.message?.content??[])if(c.type==='text')turn.text+=c.text;
    if(e.type==='result'){const u=e.usage??{},cc=u.cache_creation??{};
     const t=turn;turn=null;t.resolve({text:t.text||e.result||'',usage:{in:u.input_tokens??null,read:u.cache_read_input_tokens??null,write:u.cache_creation_input_tokens??null,
@@ -566,7 +569,7 @@ function claudeBrain({model,system,resumeId,stateless,effort}){
  return {engine:'claude',get id(){return id;},get isNew(){return stateless||(!resume&&turns===0);},
   ask(text){if(!proc)start();turns++;return new Promise((resolve,reject)=>{turn={text:'',resolve,reject,p:proc};
    proc.stdin.write(JSON.stringify({type:'user',message:{role:'user',content:text}})+'\n');}).finally(()=>{if(stateless)this.close();});},
-  close(){const p=proc;proc=null;if(p){try{p.stdin.end();}catch{}setTimeout(()=>{try{p.kill('SIGTERM');}catch{}},1500);}if(stateless){id=randomUUID();turns=0;}},
+  close(){const p=proc;proc=null;if(p){const kill=signal=>{if(p.exitCode===null&&p.signalCode===null)try{process.platform==='win32'?p.kill(signal):process.kill(-p.pid,signal);}catch(e){if(e.code!=='ESRCH')throw e;}};let term,hard;const wait=new Promise(resolve=>{const done=()=>{clearTimeout(term);clearTimeout(hard);resolve();};p.once('close',done);p.once('error',done);try{p.stdin.end();}catch{}term=setTimeout(()=>kill('SIGTERM'),500);hard=setTimeout(()=>kill('SIGKILL'),1500);});closing.add(wait);wait.finally(()=>closing.delete(wait));}if(stateless){id=randomUUID();turns=0;}return Promise.all([...closing]);},
   fresh(){this.close();id=randomUUID();resume=false;turns=0;}};
 }
 function codexBrain(options){const loggers=new Map();return codexExecBrain({...options,env:noKeys(),onProcess:event=>{if(event.status==='started')loggers.set(event.generation,telemetry);const logger=loggers.get(event.generation)??telemetry;logger?.({modelProcess:event});if(event.status==='exited'||event.status==='spawn-error')loggers.delete(event.generation);}});}
@@ -582,6 +585,7 @@ function makeBrain(engine,opts){return engine==='codex'?codexBrain(opts):engine=
 
 // ---------------------------------------------------------------- the loop
 export async function live(...argv){
+ const parent=process.env.EDEN_DASHBOARD_PARENT_PID;const unwatchParent=parent?watchDashboardParent(Number(parent),()=>process.kill(process.pid,'SIGTERM')):()=>{};
  const o=liveOptions(argv),s=load();need(s,'soul','Create your Soul first (create-soul), then run live.');
  if(await mode(true)!=='edge')throw new Error('live needs a world that serves eden-edge/1.');
  if(existsSync(LIVE.stop))throw new Error(`Remove the ${LIVE.stop} file first.`);
@@ -595,26 +599,30 @@ export async function live(...argv){
  // a 1 s mtime check (portable: fs.watch fails inside some sandboxes) cuts the long-poll short when a request arrives
  let reqMtime=mtime(LIVE.requests);watcher=setInterval(()=>{const t=mtime(LIVE.requests);if(t!==reqMtime){reqMtime=t;pollAbort?.abort();nudge?.();}},1000);watcher.unref?.();
  const S=readJSON(LIVE.state,{});S.history??=[];S.convs??={};S.publicResults??=[];S.projectionProblems??=[];S.identitySelections??=[];S.options={...o.explicit};
+ let ownProfile={soulId:s.soul,name:me0?.profile?.name??me0?.name??s.soul,revision:Number.isSafeInteger(me0?.profile?.revision)?me0.profile.revision:null,source:me0?.profile?'startup-canonical-owner-profile':'startup-owner-sample; current-name refresh unavailable on legacy'};let pendingOwnProfile=null;
  const saveS=()=>writeFileSync(LIVE.state,JSON.stringify(S,null,1)+'\n');
  const me=ok(await call(OWNER.me,{as:'owner'}),'live').souls?.find(x=>x.id===s.soul)??{};
- const persona={name:me.name??s.soul,character:readText(LIVE.persona,600)||me.description||''};
+ const persona={soulId:s.soul,name:me.name??s.soul,character:readText(LIVE.persona,600)||me.description||''};
  const conversations=openClientConversations({scope:s.world+'|'+s.soul,soulId:s.soul,name:persona.name,...(S.conversationState?{initial:S.conversationState}:{}),onChange:snapshot=>{S.conversationState=snapshot;saveS();}});
  async function refreshConversations(reason){const revision=conversations.snapshot().revision;const response=await call('/v1/edge/conversations',{timeoutMs:5000});if(response.status!==200)return false;if(conversations.snapshot().revision!==revision){logLive({conversationRefresh:{reason,status:'source-changed'}});return false;}conversations.reconcile({conversations:response.data.conversations??[]});for(const c of conversations.context().filter(c=>c.role==='member'&&c.turnCount>0&&!c.lastTurnComplete).slice(0,6)){const revision=conversations.snapshot().revision;const turns=await call('/v1/edge/conversations/'+encodeURIComponent(c.id)+'/turns?after='+Math.max(0,c.turnCount-4),{timeoutMs:5000});if(turns.status===200&&conversations.snapshot().revision===revision)conversations.turns(turns.data);}return true;}
  let prioritiesText=readText(LIVE.priorities,1500),prioritiesMtime=mtime(LIVE.priorities),system=liveSystem(persona,prioritiesText);
- const firstName=persona.name.split(/[\s,]+/)[0].toLowerCase();
+ let firstName=persona.name.split(/[\s,]+/)[0].toLowerCase();
  // Resume the same session only while its prompt cache is still warm (<50 min) and small; else a fresh one with a short memory.
- const warm=S.brain&&S.brain.ctx!==null&&S.brain.engine===o.engine&&S.brain.model===o.model&&o.memory==='session'&&Date.now()-Date.parse(S.lastCallAt??0)<50*60_000&&(S.brain.ctx??0)<o.rotateAt;
+ const warm=(!me.profile||(S.currentOwnProfile?.revision===me.profile.revision&&S.currentOwnProfile?.name===me.profile.name))&&S.brain&&S.brain.ctx!==null&&S.brain.engine===o.engine&&S.brain.model===o.model&&o.memory==='session'&&Date.now()-Date.parse(S.lastCallAt??0)<50*60_000&&(S.brain.ctx??0)<o.rotateAt;
  let brain=makeBrain(o.engine,{model:o.model,system,resumeId:warm?S.brain.id:null,stateless:o.memory==='fresh',effort:o.effort});
- const [rEngine,...rModel]=(o.routine??'').split(':'),routine=o.routine?makeBrain(rEngine,{model:rModel.join(':'),system,stateless:true,effort:o.effort}):null;
+ const [rEngine,...rModel]=(o.routine??'').split(':');let routine=o.routine?makeBrain(rEngine,{model:rModel.join(':'),system,stateless:true,effort:o.effort}):null;
  const streamAbort=new AbortController();let nudge=null;const runDeadline=o.runSeconds?Date.now()+o.runSeconds*1000:Infinity;
  let receiptReads=null,bodyQueue=null,perception=null,clientMemory=null,cadences=null,lastClockRefresh=0,lastHere=null,lastLean=null,queuePollAt=0,queueNotice=null,modelBudgetUnknown=false;let streamHealth={state:'connecting',lastFrameAt:null,lastEventAt:null};
  /** Sleep until the next wake could be due, or at once when an event or owner request arrives. */
  const snooze=ms=>new Promise(r=>{const t=setTimeout(()=>{nudge=null;r();},ms);nudge=()=>{clearTimeout(t);nudge=null;r();};});
- let stopping=false;const stop=()=>{if(stopping)process.exit(0);stopping=true;console.log('stopping…');pollAbort?.abort();streamAbort.abort();nudge?.();receiptReads?.close();bodyQueue?.close();brain.close();setTimeout(()=>process.exit(0),3000).unref();}; // state is saved after every decision
+ let stopping=false;const stop=()=>{if(stopping)process.exit(0);stopping=true;console.log('stopping…');pollAbort?.abort();streamAbort.abort();nudge?.();receiptReads?.close();bodyQueue?.close();brain.close();routine?.close();setTimeout(()=>process.exit(0),3000).unref();}; // state is saved after every decision
  process.on('SIGINT',stop);process.on('SIGTERM',stop);
  let cohortTimer=null;const armDeadline=()=>{if(!Number.isFinite(runDeadline))return;cohortTimer=setTimeout(()=>{if(Date.now()>=runDeadline)stop();else armDeadline();},Math.min(2147483647,Math.max(1,runDeadline-Date.now())));};armDeadline();
  process.on('uncaughtException',e=>{try{appendFileSync(LIVE.log,JSON.stringify({t:now(),error:'uncaught: '+clip(e?.message??e,300)+' @'+String(e?.stack??'').split('\n')[1]?.trim()})+'\n');}catch{}});process.on('unhandledRejection',e=>{try{appendFileSync(LIVE.log,JSON.stringify({t:now(),error:'unhandled: '+clip(e?.message??e,300)})+'\n');}catch{}});
  const rememberResult=result=>{const recorded={at:now(),operation:String(result.operation??'public').slice(0,160),accepted:typeof result.accepted==='boolean'?result.accepted:null,readOnly:result.readOnly===true,followupRequested:result.followupRequested===true,code:typeof result.code==='string'?result.code.slice(0,100):null,reason:typeof result.reason==='string'?result.reason.slice(0,240):null,receiptId:result.receiptId??result.receipt?.id??null,queueRetained:result.queueRetained===true,line:String(result.line??'').slice(0,400)};S.publicResults.push(recorded);S.publicResults=S.publicResults.slice(-8);saveS();return recorded;};
+ const localOperationScope=s.world+'|'+s.soul;
+ const localOperations=openLocalOperationFeedback({initial:S.localOperationResultsScope===localOperationScope?S.localOperationResults:[],onChange(rows){S.localOperationResultsScope=localOperationScope;S.localOperationResults=rows;saveS();}});
+ const localResult=(operation,accepted,reason,selector)=>{const result=localOperations.record({operation,accepted,reason,selector});logLive({localOperationResult:result});return result;};
  const projectionProblem=(channel,error,extra={})=>{const problem={at:now(),channel,error:clip(error.message,240),...extra};S.projectionProblems.push(problem);S.projectionProblems=S.projectionProblems.slice(-4);saveS();logLive({memoryProblem:problem});};
  const runId=randomUUID();S.clientRunId=runId;const logLive=x=>appendFileSync(LIVE.log,JSON.stringify({...stamp(),runId,...x})+'\n');telemetry=logLive;
  const costs=readCostLog(),hourCalls=()=>costs.filter(c=>Date.now()-Date.parse(c.t)<3600_000&&c.engine!=='ollama'&&c.loop!=='review'&&!c.owner&&c.reason!=='owner').length; // the owner's own requests don't starve the Soul's wakes
@@ -650,7 +658,7 @@ export async function live(...argv){
   }
  }
  clientMemory=openClientMemory(process.cwd(),{scope:s.world+'|'+s.soul,onProblem:problem=>logLive({memoryProblem:problem})});
- perception=openClientPerception(process.cwd(),{call,scope:s.world+'|'+s.soul,onBoot:cache=>{try{clientMemory.catalogue(cache);}catch(error){projectionProblem('catalogue',error);}},onHere:frame=>{try{clientMemory.here(frame);}catch(error){projectionProblem('here',error);}}});
+ perception=openClientPerception(process.cwd(),{call,scope:s.world+'|'+s.soul,onBoot:cache=>{try{clientMemory.catalogue(cache);}catch(error){projectionProblem('catalogue',error);}},onHere:frame=>{const p=frame.me;if(p?.soulId===s.soul&&typeof p.name==='string'&&Number.isSafeInteger(p.profileRevision)&&p.profileRevision>=0&&(ownProfile.revision===null||p.profileRevision>ownProfile.revision)){pendingOwnProfile={soulId:p.soulId,name:p.name,revision:p.profileRevision};}try{clientMemory.here(frame);}catch(error){projectionProblem('here',error);}}});
  const initialBoot=await perception.boot();try{clientMemory.catalogue(perception.snapshot());}catch(error){projectionProblem('catalogue',error);}lastHere=initialBoot.here??null;
  const leanObservation=async()=>{
   const fresh=await perception.wake();if(fresh.fallback)return observe();lastLean=fresh;lastHere=fresh.frame;
@@ -744,6 +752,7 @@ export async function live(...argv){
   const evs=pending;pending=[];
   let actualReceipt=null;try{if(lastReceipt)actualReceipt=lastReceipt.startsWith('legacy:')?await receipt(lastReceipt):await receiptReads.read(lastReceipt);}catch{}
   let ob;try{ob=await leanObservation();}catch(e){ob={me:{where:'?'},here:{}};}
+  if(pendingOwnProfile){const r=await call(OWNER.me,{as:'owner',timeoutMs:5000}),current=r.data?.souls?.find(row=>row.id===s.soul)?.profile;if(r.status===200&&current?.contract==='soul-profile/1'&&current.soulId===s.soul&&Number.isSafeInteger(current.revision)&&current.revision>=pendingOwnProfile.revision&&typeof current.name==='string'&&typeof current.description==='string'){const previousName=persona.name;await brain.close();await routine?.close();ownProfile={soulId:s.soul,name:current.name,revision:current.revision,source:'fresh-canonical-owner-profile'};pendingOwnProfile=null;persona.name=current.name;persona.character=readText(LIVE.persona,600)||current.description;firstName=persona.name.split(/[\s,]+/)[0].toLowerCase();system=liveSystem(persona,prioritiesText);brain=makeBrain(o.engine,{model:o.model,system,stateless:o.memory==='fresh',effort:o.effort});if(o.routine)routine=makeBrain(rEngine,{model:rModel.join(':'),system,stateless:true,effort:o.effort});S.currentOwnProfile=ownProfile;S.brain=null;saveS();logLive({ownProfileRefreshed:{soulId:s.soul,previousName,name:current.name,revision:current.revision,safeBoundary:true,queueRetargeted:false,historicalMemoryRewritten:false}});}else logLive({ownProfileRefresh:{status:r.status,confirmed:false}});}
   planNow=null;planBusy=false;
   if(Date.now()-whatsOnAt>o.whatsonMinutes*60_000){whatsOnAt=Date.now();try{whatsOn=perception.schedule(lastHere).slice(0,4).map(i=>`${i.what} @ ${i.where}${i.now?' (now)':' (in '+i.startsInWorldMinutes+' world-min)'}${i.go?' → '+i.go:''}`);}catch{whatsOn=null;}}
   if(reason==='owner'&&!ownerActive){const q=ownerQueue.shift();if(q){ownerLater=null;const replaced=S.identityGoal?.ownerRequestId??null;S.identityGoal={ownerRequestId:q.id,text:q.text,requestedNames:[],conversationId:null};ownerActive={...q,results:[],answer:null,receipt:null,t0:Date.now()};saveS();logLive({identityGoalReceived:{ownerRequestId:q.id,replaced}});}}
@@ -760,7 +769,7 @@ export async function live(...argv){
    'plan-done':'your plan finished: choose what to do next',resume:'you were away; WHILE AWAY sums up what happened: pick up from there'}[reason]??reason;
   const ownLine=own?(reason==='owner'?`OWNER REQUEST (trusted, from your owner; do it now): "${own.text}"`:`STILL ON YOUR OWNER'S REQUEST: "${own.text}" (if it is done, reply {"do":[],"owner":"<what happened>"})`):null;
   const laterLine=later?`EARLIER OWNER REQUEST: "${later.text}" (you did: ${clip(later.results.join('; ')||'nothing',200)}). If a part of it is still to do (a next step), do it now and tell your owner in "owner"; if it is all done, don't repeat it: carry on with your own plans.`:null;
-  const text=[S.projectionProblems.length?`MEMORY PROJECTION PROBLEMS ${JSON.stringify(S.projectionProblems)}. Actual received events/results remain available; do not claim failed memory writes succeeded.`:null,S.identityGoal?`TRUSTED ACTIVE OWNER IDENTITY GOAL ${JSON.stringify(S.identityGoal)}. Retained until a matching conversation really closes or a new owner request replaces it; current memory judgments do not change its named people.`:null,`ACTUAL IDENTITY SELECTIONS ${JSON.stringify(S.identitySelections)}`,`ACTUAL EXECUTION BEFORE THIS REPLY ${JSON.stringify(executionContext(bodyQueue.snapshot(),actualReceipt,S.publicResults))}`,reviewTask?`REVIEW ${reviewTask.key}: ${reviewTask.instruction}. Update measurable goal progress with remember selectors. Optional schedule is a full valid Markdown replacement; compile:[{id,steps,leadRealSeconds?}] binds only listed schedule IDs. Compilation returns do:[]: these steps run at their due times, not now. At most10 review calls per real UTC day.`:null,reviewTask?`SCHEDULE ENTRIES NEEDING COMPILATION ${JSON.stringify(cadences.status().uncompiled)}`:null,`TWO CLOCKS ${JSON.stringify({worldMinutes:cadences.status().worldMinutes,nativeSecondsPerWorldMinute:cadences.status().nativeSecondsPerWorldMinute,realTime:now(),paused:cadences.status().paused,clockAuthority:cadences.status().clockAuthority,clockSampleAgeMs:cadences.status().clockSampleAgeMs,next:cadences.status().next})}`,clientMemory.retrieve(lastHere,bodyQueue.snapshot().steps.find(s=>s.status==='failed')?.act,{recall:reason==='review'||/where.*been|what.*learn|recall|visited|remember.*before/i.test(own?.text??'')}),bodyQueue.snapshot().steps.find(s=>s.status==='failed')?`REFUSED STEP ${bodyQueue.snapshot().steps.find(s=>s.status==='failed').id}`:null,newConv?'GAZETTEER\n'+perception.gazetteer():null,'EXITS '+(ob.exits??[]).map(e=>e.walk+' '+e.name+' '+e.eta).join(' | '),'UNVISITED '+perception.unvisited(lastHere).join(' | '),`WAKE ${reason}: ${why}`,ownLine,laterLine,evText.length?'EVENTS\n'+evText.join('\n'):null,lastResults.length?'RESULTS OF YOUR LAST PLAN\n'+lastResults.join('\n'):null,
+  const text=[localOperations.context(cadences.status().uncompiled),`CURRENT OWN PROFILE ${JSON.stringify({...ownProfile,...(pendingOwnProfile?{name:pendingOwnProfile.name,revision:pendingOwnProfile.revision,source:'fresh-here-name; full-profile refresh pending'}:{}),pending:pendingOwnProfile,identityIsImmutableSoulID:true})}`,S.projectionProblems.length?`MEMORY PROJECTION PROBLEMS ${JSON.stringify(S.projectionProblems)}. Actual received events/results remain available; do not claim failed memory writes succeeded.`:null,S.identityGoal?`TRUSTED ACTIVE OWNER IDENTITY GOAL ${JSON.stringify(S.identityGoal)}. Retained until a matching conversation really closes or a new owner request replaces it; current memory judgments do not change its named people.`:null,`ACTUAL IDENTITY SELECTIONS ${JSON.stringify(S.identitySelections)}`,`ACTUAL EXECUTION BEFORE THIS REPLY ${JSON.stringify(executionContext(bodyQueue.snapshot(),actualReceipt,S.publicResults))}`,reviewTask?`REVIEW ${reviewTask.key}: ${reviewTask.instruction}. Update measurable goal progress with remember selectors. Optional schedule is a full valid Markdown replacement; compile:[{id,steps,leadRealSeconds?}] binds only listed schedule IDs. Compilation returns do:[]: these steps run at their due times, not now. At most10 review calls per real UTC day.`:null,reviewTask?`SCHEDULE ENTRIES NEEDING COMPILATION ${JSON.stringify(cadences.status().uncompiled)}`:null,`TWO CLOCKS ${JSON.stringify({worldMinutes:cadences.status().worldMinutes,nativeSecondsPerWorldMinute:cadences.status().nativeSecondsPerWorldMinute,realTime:now(),paused:cadences.status().paused,clockAuthority:cadences.status().clockAuthority,clockSampleAgeMs:cadences.status().clockSampleAgeMs,next:cadences.status().next})}`,clientMemory.retrieve(lastHere,bodyQueue.snapshot().steps.find(s=>s.status==='failed')?.act,{recall:reason==='review'||/where.*been|what.*learn|recall|visited|remember.*before/i.test(own?.text??'')}),bodyQueue.snapshot().steps.find(s=>s.status==='failed')?`REFUSED STEP ${bodyQueue.snapshot().steps.find(s=>s.status==='failed').id}`:null,newConv?'GAZETTEER\n'+perception.gazetteer():null,'EXITS '+(ob.exits??[]).map(e=>e.walk+' '+e.name+' '+e.eta).join(' | '),'UNVISITED '+perception.unvisited(lastHere).join(' | '),`WAKE ${reason}: ${why}`,ownLine,laterLine,evText.length?'EVENTS\n'+evText.join('\n'):null,lastResults.length?'RESULTS OF YOUR LAST PLAN\n'+lastResults.join('\n'):null,
    compactState(ob),`BUDGET ${hourCalls()}/${o.callsPerHour} calls this hour${dayTokens()>o.tokensPerDay*0.8?' (nearly spent: choose long activities)':''}`].filter(Boolean).join('\n');
   const t0=Date.now();let ans;
   let timer;
@@ -786,10 +795,10 @@ export async function live(...argv){
   let ownerAnswerSource='model-unverified';if(typeof plan.owner==='string')plan.owner=perception.truthful(plan.owner);if(own&&(bodies.length||execution.results.some(r=>r.accepted===false||r.accepted==null&&r.readOnly!==true&&r.queueRetained!==true))){plan.owner=results.join('; ').slice(0,600);ownerAnswerSource='execution-verdict';}
   logLive({wakeEnd:{reason,loop,reviewKey:reviewTask?.key??null,sessionId:b.id,queueId:bodyQueue.snapshot().id,usage:{input:u.in,cached:u.read,cacheWrite:u.write,output:u.out,reasoning:u.reasoning??null},actualModel:ans.model??null,usd:rec.usd}});
   if(u.in==null||u.out==null){modelBudgetUnknown=true;logLive({modelPause:'token usage unknown; further model calls refused'});}
-  if(plan.remember)try{const judgments=Array.isArray(plan.remember)?plan.remember:[plan.remember];if(judgments.length>3)throw Error('at most3 remember judgments per reply');for(const j of judgments)clientMemory.remember(j);}catch(error){logLive({memoryProblem:{error:error.message,choice:boundedRememberChoice(plan.remember),fingerprint:createHash('sha256').update(JSON.stringify(plan.remember)).digest('hex')}});}
-  if(typeof plan.schedule==='string')try{cadences.setSchedule(plan.schedule,scheduleHash);results.push('Schedule updated; future entries retained.');}catch(error){results.push('Schedule not updated: '+error.message);logLive({cadenceProblem:error.message});}
-  if(plan.compile)try{cadences.compile(plan.compile);results.push('Schedule bindings saved; they have not run yet.');}catch(error){logLive({cadenceProblem:error.message});}
-  if(own&&(plan.schedule||plan.compile)){plan.owner=results.join('; ').slice(0,600);ownerAnswerSource='execution-verdict';}
+  if(plan.remember){let selector=rememberSelector(plan.remember);try{const judgments=Array.isArray(plan.remember)?plan.remember:[plan.remember];if(judgments.length>3)throw Error('at most3 remember judgments per reply');for(const j of judgments){selector=rememberSelector(j);clientMemory.remember(j);localResult('remember',true,'Judgment saved.',selector);results.push(`Memory judgment saved (${selector}).`);}}catch(error){localResult('remember',false,error.message,selector);results.push('Memory judgment not saved: '+clip(error.message,240));logLive({memoryProblem:{error:error.message,choice:boundedRememberChoice(plan.remember),fingerprint:createHash('sha256').update(JSON.stringify(plan.remember)).digest('hex')}});}}
+  if(typeof plan.schedule==='string')try{cadences.setSchedule(plan.schedule,scheduleHash);localResult('schedule',true,'Schedule saved; future entries retained.');results.push('Schedule updated; future entries retained.');}catch(error){localResult('schedule',false,error.message);results.push('Schedule not updated: '+error.message);logLive({cadenceProblem:error.message});}
+  if(plan.compile)try{cadences.compile(plan.compile);localResult('compile',true,'Bindings saved; they have not run.');results.push('Schedule bindings saved; they have not run yet.');}catch(error){localResult('compile',false,error.message);results.push('Schedule compilation not confirmed: '+clip(error.message,240));logLive({cadenceProblem:error.message});}
+  if(own&&(plan.remember||plan.schedule||plan.compile)){plan.owner=results.join('; ').slice(0,600);ownerAnswerSource='execution-verdict';}
   if(reviewTask&&!reviewTask.compile)cadences.completeReview(reviewTask);
   if(typeof plan.notes==='string'&&plan.notes.trim())try{clientMemory.remember({self:plan.notes.trim().split('\n').slice(0,20).map(line=>line.slice(0,200))});}catch(error){logLive({memoryProblem:error.message});}
   if(typeof plan.notes==='string'&&plan.notes.trim())writeFileSync(LIVE.notes,plan.notes.trim().slice(0,2500)+'\n');
@@ -896,7 +905,7 @@ export async function live(...argv){
    if(reason==='fade'&&load().lastAcceptedAt===before)await keepAlive('model chose no action near fading');
   }catch(e){logLive({error:clip(e.message,300)});console.log('live error: '+clip(e.message,200));await sleep(10_000);}
  }
- clearTimeout(cohortTimer);streamAbort.abort();receiptReads.close();bodyQueue.close();telemetry=null;brain.close();saveS();clearInterval(watcher);unlock();logLive({stop:true});console.log('live: stopped.');return {stopped:true,cost:costLine(readCostLog(),o)};
+ clearTimeout(cohortTimer);streamAbort.abort();receiptReads.close();bodyQueue.close();await brain.close();await routine?.close();telemetry=null;saveS();clearInterval(watcher);unwatchParent();unlock();logLive({stop:true});console.log('live: stopped.');return {stopped:true,cost:costLine(readCostLog(),o)};
 }
 /** The last complete top-level JSON object in a model reply (models sometimes draft one, then answer again). */
 function lastJSON(t){const objs=[];let depth=0,start=-1,str=false,esc=false;
@@ -978,7 +987,7 @@ export async function view(...args){
   sees:(d.seen?.souls??[]).map(x=>`${x.name} · ${Math.round(x.distance)}m ${x.side}${x.facingYou?' · facing you':''}`),untrusted:true};
  if(d.url){
   const img=await fetch(s.world+d.url,{signal:AbortSignal.timeout(30_000)}).catch(e=>({ok:false,status:0,e}));
-  if(img.ok){const file=resolve(out??(map?'map.jpg':'view.jpg')),buf=Buffer.from(await img.arrayBuffer());writeFileSync(file,buf);res.saved=file;res.bytes=buf.length;res.cached=!!d.cached;if(d.render?.ms!=null)res.renderMs=d.render.ms;}
+  if(img.ok){const file=resolve(out??(map?'map.jpg':'view.jpg')),buf=Buffer.from(await img.arrayBuffer());writeFileSync(file,buf);rememberDashboardPicture(file);res.saved=file;res.bytes=buf.length;res.cached=!!d.cached;if(d.render?.ms!=null)res.renderMs=d.render.ms;}
   else res.picture=`could not download the picture (HTTP ${img.status}); the caption still holds`;
  } else if(!altOnly) res.picture=d.error?`${d.error.code}: ${d.error.message}${d.retry_after?` (retry in ${d.retry_after}s)`:''}`:'none';
  return res;
@@ -1006,8 +1015,14 @@ export async function body(cmd,...args){
  const response=await fetch(world+'/v1/edge/body/uploads',{method:'POST',headers:{authorization:'Bearer '+token},body:form,signal:AbortSignal.timeout(90000)});
  const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error((data.error?.code??'body.unavailable')+': '+(data.error?.message??'Body upload refused'));return data.asset;
 }
-const commands={body,live,tell,report,view,cost,plan,events,attend,register,status,'create-soul':createSoul,here,observe,capabilities,map,digest,calendar,whatson,explore,act,resolve:resolveAct,say,converse,object,mark,project,wait,receipt,accept,decline,version:async()=>({skillVersion:SKILL_VERSION,contract:CONTRACT,apiContract:API_CONTRACT})};
-if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
+export async function profile(...args){return clientProfile(load().soul,args,{call});}
+export async function dashboard(...args){
+ let port=0;const liveArgs=[];for(let i=0;i<args.length;i++){if(args[i]==='--port'){port=Number(args[++i]);if(!Number.isSafeInteger(port)||port<0||port>65535)throw Error('dashboard port must be 0..65535');}else liveArgs.push(args[i]);}
+ liveOptions(liveArgs);const service=await startClientDashboard({cli:resolve(process.argv[1]),liveArgs,port});console.log('Local Soul dashboard: '+service.origin+' (mind starts automatically; pause/stop preserves world activity)');
+ await new Promise(resolve=>{let closing=false;const close=async()=>{if(closing)return;closing=true;await service.close();resolve();};process.once('SIGINT',close);process.once('SIGTERM',close);});return {dashboard:'closed'};
+}
+const commands={body,live,dashboard,profile,tell,report,view,cost,plan,events,attend,register,status,'create-soul':createSoul,here,observe,capabilities,map,digest,calendar,whatson,explore,act,resolve:resolveAct,say,converse,object,mark,project,wait,receipt,accept,decline,version:async()=>({skillVersion:SKILL_VERSION,contract:CONTRACT,apiContract:API_CONTRACT})};
+if(process.argv[1]&&import.meta.url===pathToFileURL(realpathSync(process.argv[1])).href){
  const [cmd,...args]=process.argv.slice(2);
  if(!commands[cmd]){console.log(`eden-agent ${SKILL_VERSION} (${CONTRACT})\nusage: node eden-agent.mjs <${Object.keys(commands).join('|')}> [args]\n  while live runs: tell "<your human's request>" --wait · report (what the Soul sees/does) · view --out view.jpg (a picture of what it sees) · full guide: SKILL.md`);process.exit(cmd?2:0);}
  try{console.log(JSON.stringify(await commands[cmd](...args),null,1));if(cmd==='live')process.exit(0);}

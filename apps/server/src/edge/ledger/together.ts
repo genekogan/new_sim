@@ -168,7 +168,7 @@ export class Together {
   private saveInvite(i: Invite) {this.p.db.db.prepare('INSERT INTO edge_invites_v1 (world_id,invite_id,state,body,created_at) VALUES (?,?,?,?,?) ON CONFLICT (world_id,invite_id) DO UPDATE SET state=excluded.state, body=excluded.body').run(this.p.host.worldId, i.id, i.state, JSON.stringify(i), Date.now());for(const receipt of [i.hostReceipt,...Object.values(i.guestReceipts)].filter((r):r is string=>!!r))this.p.db.db.prepare('INSERT OR IGNORE INTO edge_invite_receipts_v1(world_id,receipt_id,invite_id) VALUES(?,?,?)').run(this.p.host.worldId,receipt,i.id);}
   inviteForReceipt(receipt:string):Invite|null{const r=this.p.db.db.prepare('SELECT invite_id FROM edge_invite_receipts_v1 WHERE world_id=? AND receipt_id=?').get(this.p.host.worldId,receipt) as {invite_id:string}|undefined;return r?this.invite(r.invite_id):null;}
   /** Pending invitations addressed to this Soul that it has not answered. */
-  invitesFor(soulId: string): Invite[] {return this.pending().filter(i => i.guests.some(g => g.soulId === soulId) && !i.responses[soulId]);}
+  invitesFor(soulId: string): Invite[] {return this.pending().filter(i => i.guests.some(g => g.soulId === soulId) && !i.responses[soulId]).map(i=>({...i,host:{...i.host,name:this.p.host.minds.get(i.host.soulId)?.name??i.host.name},guests:i.guests.map(g=>({...g,name:this.p.host.minds.get(g.soulId)?.name??g.name}))}));}
   item(id: string): Item | null {const r = this.p.db.db.prepare('SELECT body FROM edge_items_v1 WHERE world_id=? AND item_id=?').get(this.p.host.worldId, id) as {body: string} | undefined; return r ? JSON.parse(r.body) as Item : null;}
   heldBy(soulId: string): Item | null {const r = this.p.db.db.prepare("SELECT body FROM edge_items_v1 WHERE world_id=? AND holder=? AND state='held' LIMIT 1").get(this.p.host.worldId, soulId) as {body: string} | undefined; return r ? JSON.parse(r.body) as Item : null;}
   placed(): Item[] {return (this.p.db.db.prepare("SELECT body FROM edge_items_v1 WHERE world_id=? AND state='placed' ORDER BY updated_at").all(this.p.host.worldId) as {body: string}[]).map(r => JSON.parse(r.body) as Item);}
@@ -286,6 +286,7 @@ export class Together {
     if (!Array.isArray(list) || !list.length || list.length > 6 || !list.every(x => typeof x === 'string' && x.trim() && x.length <= 100)) return {ok: false, code: 'capability.params', reason: 'with must be up to 6 Soul ids or names.'};
     const near = this.p.perceived(soul.soulId, INVITE_RADIUS), out: {soulId: string; name: string; entityId: string}[] = [];
     for (const want of list as string[]) {
+      const stale=this.p.host.soulNameRefusal(want);if(stale)return {ok:false,code:stale,reason:'That previous Soul name is unavailable or ambiguous; use the current name and immutable Soul ID.'};
       const w = want.trim().toLowerCase(), hit = near.find(o => o.soulId === want.trim()) ?? near.find(o => o.name.toLowerCase() === w) ?? near.find(o => tokens(o.name).includes(w));
       if (!hit) return {ok: false, code: 'invite.not-near', reason: `${want} is not near enough to invite (within ${INVITE_RADIUS} m and able to see each other).`};
       if (this.p.faded(hit.soulId)) return {ok: false, code: 'invite.absent', reason: `${hit.name} is away.`};
@@ -604,12 +605,13 @@ export class Together {
         const talking = this.conversationPartners(soul.soulId), mineNear = near.filter(o => talking.includes(o.soulId));
         return mineNear[0] ?? (near.filter(o => o.distance <= GESTURE_RADIUS).length === 1 ? near[0] : null);
       }
+      if(this.p.host.soulNameRefusal(w))return null;
       return near.find(o => o.soulId === w) ?? near.find(o => o.name.toLowerCase() === w) ?? near.find(o => tokens(o.name).length && tokens(o.name).every(x => tokens(w).includes(x))) ?? near.find(o => tokens(w).some(x => x.length > 2 && tokens(o.name).includes(x))) ?? null;
     };
     const capFor = (verb: string, o: NearbyBody) => caps.find(c => c.id === `${verb}:${o.soulId}`);
     /** A Soul named but not in sight (inside a building, or far): say where they are and offer the walk there. */
     const notHere = (verb: string, name: string) => {
-      const w = name.trim().toLowerCase().replace(/^(?:to|with|at|the)\s+/, ''), m = [...this.p.host.minds.values()].find(x => x.soulId !== soul.soulId && (x.name.toLowerCase() === w || (tokens(x.name).length > 0 && tokens(x.name).every(t => tokens(w).includes(t)))));
+      const w = name.trim().toLowerCase().replace(/^(?:to|with|at|the)\s+/, '');const stale=this.p.host.soulNameRefusal(w);if(stale)return {code:stale,reason:'That previous Soul name is unavailable or ambiguous; use the current name and immutable Soul ID.',did_you_mean:[]};const m = [...this.p.host.minds.values()].find(x => x.soulId !== soul.soulId && (x.name.toLowerCase() === w || (tokens(x.name).length > 0 && tokens(x.name).every(t => tokens(w).includes(t)))));
       if (!m || this.p.faded(m.soulId)) return {code: 'capability.unknown', reason: `Nobody called "${name}" is near you.`, did_you_mean: caps.filter(c => c.verb === verb).slice(0, 5).map(c => ({id: c.id, label: c.label}))};
       const place = this.p.innermostPlace(m.soulId), pname = place ? this.p.places.byId.get(place)?.name ?? place : null, here = this.posOf(soul.soulId), there = this.posOf(m.soulId);
       const d = here && there ? Math.round(Math.hypot(here[0] - there[0], here[1] - there[1])) : null;

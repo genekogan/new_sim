@@ -70,11 +70,11 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   const now = options.now ?? Date.now;
   const streams = new EventStreams(db, worldId, {now, retainEvents: options.retainEvents ?? 1000, retainMs: options.retainMs ?? 24 * 3600_000});
   const spectators: ((m: SpectatorEdgeMessage) => void)[] = [];
-  const names = new Map<string, string>();
   const core: CommsCore = {
     deps, db, worldId, streams, now,
     tick: () => { try { return deps.host.engine.world.tick; } catch { return 0; } },
-    nameOf: id => { let n = names.get(id); if (!n) { n = deps.db.soul(id)?.name ?? 'someone'; names.set(id, n); } return n; },
+    nameOf: id => deps.host.minds?.get(id)?.name ?? deps.db.soul(id)?.name ?? 'someone',
+    nameMetadata:id=>deps.host.publicNameMetadata?.(id)??{},
     liveSoulIds: () => deps.db.liveSouls(worldId).map(s => s.id),
     isLive: id => { const s = deps.db.soul(id); return !!s && s.world_id === worldId && s.retired_at === null; },
     spectate: m => { if (!spectators.length) return; const msg = {type: 'edge', at: now(), ...m} as SpectatorEdgeMessage; for (const l of spectators) { try { l(msg); } catch { /* never break comms */ } } },
