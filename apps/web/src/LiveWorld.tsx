@@ -65,6 +65,7 @@ import {WorldGames} from './WorldGames.ts';
 import {parsePlatformFloors,type PlatformFloor} from '../../../mars/viewer/lib/platform-floor.ts';
 import {WorldPlatforms} from './WorldPlatforms.ts';
 import {cameraGround} from './WorldCameraGround.ts';
+import {cameraGroundSampler} from './WorldPublishedGround.ts';
 import {WorldRenderedVisibility} from './WorldRenderedVisibility.ts';
 import {WorldFollowMotion} from './WorldFollowMotion.ts';
 import { WorldBroadcast, type WorldCameraMode } from './WorldBroadcast.ts';
@@ -267,9 +268,11 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     let logicalFov = 45;
     let expansion:ReturnType<typeof createWorldEdenExpansion>|null=null,expansionFailed=false;
     let expansionSceneInfo:ReturnType<typeof parseSceneInfo>|null=null;
+    let cameraGroundInfo:ReturnType<typeof parseSceneInfo>|null|undefined,cameraGroundOwner:ReturnType<typeof createWorldEdenExpansion>|null|undefined;
+    const refreshCameraGround=()=>{const owner=expansion?.group.visible?expansion:null;if(cameraGroundInfo===expansionSceneInfo&&cameraGroundOwner===owner)return;cameraGroundInfo=expansionSceneInfo;cameraGroundOwner=owner;cameraGround.bindGround(cameraGroundSampler(expansionSceneInfo??undefined,owner?.sampleVisualGround),expansionSceneInfo);};
     let houseWindows:ReturnType<typeof createEdenHouseWindows>=null;
     let shadowDetail:WorldShadowDetail|null=null;
-    const clearExpansion=()=>{shadowDetail?.dispose();shadowDetail=null;houseWindows?.dispose();houseWindows=null;expansion?.dispose();expansion=null;};
+    const clearExpansion=()=>{shadowDetail?.dispose();shadowDetail=null;houseWindows?.dispose();houseWindows=null;expansion?.dispose();expansion=null;refreshCameraGround();};
     let geometry = new WorldGeometry(null);
     scene.add(geometry.group);
     const groupSelection=new Set<string>();
@@ -381,6 +384,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       planting?.dispose();planting=null;plantingFailed=false;
       clearSocialPaths();
       clearNewcomerMarkers();restMarkers?.dispose();restMarkers=null;publication=verifiedPublication??null;expansionSceneInfo=info;
+      refreshCameraGround();
       people?.dispose();people=null;applied=null;
       base=info.scene;nativeBoat=info.shore?.metadata.boat&&info.shore.appearance?{layout:info.shore.metadata.boat.layout,proposal:info.shore.appearance.boat}:undefined;dayTicks=info.clock?.dayTicks??null;broadcast.reset();followView.reset();followed=null;
       capturedPlatforms=info.platforms??null;
@@ -715,6 +719,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           renderer.domElement.dataset.cameraShot = shot.shot ?? '';
         }
       }
+      refreshCameraGround();
       if(cameraGround.apply(camera,scene)>0&&!(viewing==='manual'&&context.current.manualNavigation==='free'))camera.lookAt(controls.target);  // never underground (Gene)
       if(context.current.cameraMode==='manual'&&expansion?.group.visible)constrainOfficeGuardCamera(camera,controls.target,officeGuardFrom,expansion.officeGuards);
       authoredBoundaries.bind(publication);if(context.current.cameraMode==='manual')authoredBoundaries.constrain(camera,controls.target,officeGuardFrom,at.tick);
@@ -848,7 +853,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       clearSocialPaths();
       planting?.dispose();planting=null;
       clearNewcomerMarkers();restMarkers?.dispose();restMarkers=null;publication=null;
-      clearExpansion();geometry.dispose();
+      clearExpansion();cameraGround.bindGround(undefined);geometry.dispose();
       light.dispose();
       ring.geometry.dispose(); (ring.material as THREE.Material).dispose();
       standInGeometry.dispose(); standInMaterial.dispose();

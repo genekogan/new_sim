@@ -2,11 +2,10 @@ import * as THREE from 'three';
 
 /** Gene: "prevent the camera from going underground, thats confusing." Presentation only: after every camera
  * mode has placed the camera (Broadcast, Follow, Look around, Free, zoom/orbit), keep it a margin above the
- * terrain or water surface under it and under a point a little along its view. The ground is what is drawn:
- * a downward ray against the large terrain/water surfaces (wide, flat-ish, non-instanced meshes, never the
- * atmosphere), so houses,
- * roofs and trees never count and interior views keep working. Heights are cached per 2 m cell for a few
- * seconds, so a moving camera costs at most a ray or two per frame. */
+ * terrain or water surface under it and under a point a little along its view. A selected ground-only provider
+ * excludes buildings and decoration and samples exact positions, including narrow support/water boundaries.
+ * Without a qualified provider, retain the legacy wide-mesh ray fallback; that heuristic can mistake merged
+ * building geometry for ground. Its ray heights are cached per 2 m cell for a few seconds. */
 export const CAMERA_GROUND_MARGIN=1.2;
 const CELL=2,CACHE_MS=4_000,MESH_REFRESH_MS=3_000,MIN_SPAN=40,TOP=400,MAX_GROUND_Y=150;
 
@@ -18,8 +17,17 @@ export class CameraGroundClamp{
  private meshesAt=-Infinity;
  private box=new THREE.Box3();
  private ahead=new THREE.Vector3();
+ private provider:((x:number,z:number)=>number|null)|undefined;
+ private source:unknown;
  /** Last result, for diagnostics/proofs: ground height under the camera, whether it was lifted this frame. */
  last:{ground:number|null;lifted:number;surfaces:number}={ground:null,lifted:0,surfaces:0};
+
+ /** Bind selected immutable scenery/ground ownership, never a current-world fallback
+  * for recorded history. A qualified provider returning null means no support. */
+ bindGround(provider:((x:number,z:number)=>number|null)|undefined,source:unknown=provider){
+  if(provider===this.provider&&source===this.source)return;
+  this.provider=provider;this.source=source;this.cells.clear();this.meshes=[];this.meshesAt=-Infinity;
+ }
 
  /** Wide, mostly flat drawn surfaces: terrain, ground planes, water. Not the sky or weather. */
  private groundMeshes(scene:THREE.Object3D,now:number){
@@ -42,6 +50,7 @@ export class CameraGroundClamp{
  /** Highest drawn ground/water surface at (x, z), or null where there is none. */
  heightAt(scene:THREE.Object3D,x:number,z:number,now=performance.now()):number|null{
   if(!Number.isFinite(x)||!Number.isFinite(z))return null;
+  if(this.provider){const y=this.provider(x,z);return y!==null&&Number.isFinite(y)?y:null;}
   const meshes=this.groundMeshes(scene,now),key=`${Math.round(x/CELL)},${Math.round(z/CELL)}`,hit=this.cells.get(key);
   if(hit&&now-hit.at<CACHE_MS)return hit.y;
   let y:number|null=null;
