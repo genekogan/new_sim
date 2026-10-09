@@ -1,4 +1,6 @@
 import * as THREE from 'three';
+import {publishedGroundSampler} from './WorldPublishedGround.ts';
+import type {SceneInfo} from './WorldGeometry.ts';
 
 /** Gene: "prevent the camera from going underground, thats confusing." Presentation only: after every camera
  * mode has placed the camera (Broadcast, Follow, Look around, Free, zoom/orbit), keep it a margin above the
@@ -80,3 +82,16 @@ export class CameraGroundClamp{
 
 /** The live view's clamp (one viewer per page). */
 export const cameraGround=new CameraGroundClamp();
+
+/** Camera clearance uses selected land only, with the selected pond surface above
+ * its submerged bed. It does not admit floors, routes, or new native support.
+ * Undefined means no qualified provider; null from a provider means no support. */
+export function cameraGroundSampler(info?:Pick<SceneInfo,'scene'|'shore'>,drawnGround?:((x:number,z:number)=>number|null)){
+ if(!drawnGround&&!info?.shore?.metadata.terrain&&!info?.scene?.surfaces.some(s=>s.level===0))return undefined;
+ const land=drawnGround??publishedGroundSampler(info),water=info?.shore?.metadata.water;
+ return (x:number,z:number):number|null=>{
+  const y=land(x,z);if(y===null||!Number.isFinite(y))return null;
+  if(water){const b=water.wetBoundsXZ;if(x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3]&&y<water.datumY)return water.datumY;}
+  return y;
+ };
+}

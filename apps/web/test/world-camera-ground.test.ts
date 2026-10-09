@@ -1,8 +1,7 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import * as THREE from 'three';
-import {CameraGroundClamp,CAMERA_GROUND_MARGIN} from '../src/WorldCameraGround.ts';
-import {cameraGroundSampler} from '../src/WorldPublishedGround.ts';
+import {CameraGroundClamp,CAMERA_GROUND_MARGIN,cameraGroundSampler} from '../src/WorldCameraGround.ts';
 import type {SceneInfo} from '../src/WorldGeometry.ts';
 import {groundTriangleSampler} from '../../../mars/viewer/lib/ground-triangles.ts';
 import {Builder,Materials} from '../../../mars/viewer/app/engine-view/content/assets/eden-regions/kit.ts';
