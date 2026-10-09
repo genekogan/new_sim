@@ -1,6 +1,6 @@
 const CV=/^cv_[A-Za-z0-9_-]{1,40}$/,SOUL=/^s_[A-Za-z0-9_-]{1,100}$/;
 const copy=structuredClone,plain=x=>x&&typeof x==='object'&&!Array.isArray(x),text=(x,max)=>typeof x==='string'?x.slice(0,max):null;
-const refs=(xs,max=12)=>{if(!Array.isArray(xs)||xs.length>max)throw Error('invalid bounded conversation roster');const out=new Map();for(const x of xs){if(!plain(x)||!SOUL.test(x.soulId)||typeof x.name!=='string')throw Error('invalid conversation Soul reference');out.set(x.soulId,{soulId:x.soulId,name:x.name.slice(0,200)});}return [...out.values()];};
+const refs=(xs,max=12)=>{if(!Array.isArray(xs)||xs.length>max)throw Error('invalid bounded conversation roster');const out=new Map();for(const x of xs){if(!plain(x)||!SOUL.test(x.soulId)||typeof x.name!=='string')throw Error('invalid conversation Soul reference');out.set(x.soulId,{soulId:x.soulId,name:x.name.slice(0,200),...(x.nameAmbiguous===true?{nameAmbiguous:true}:{})});}return [...out.values()];};
 const ids=xs=>xs.map(x=>x.soulId),party=g=>[...new Set([...ids(g.members),...ids(g.invited)])].sort().join('|');
 const active=g=>g.state==='open'&&g.attached&&g.role==='member';
 const ordinal=id=>typeof id==='string'&&/^c_\d+$/.test(id)&&Number.isSafeInteger(Number(id.slice(2)))?Number(id.slice(2)):null;
