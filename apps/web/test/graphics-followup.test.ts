@@ -50,3 +50,8 @@ void test('actual conversation peers override nearby strangers and idle standing
 void test('hover/info text is compact while the complete activity remains available on its card',async()=>{
  const {hoverTooltipText}=await import('../src/WorldHover.ts');const text=hoverTooltipText('A'.repeat(120),'B'.repeat(180));assert.ok(text.length<=133);assert.equal(text.split(' · ').length,2);assert.ok(text.endsWith('…'));assert.equal(hoverTooltipText('Moss','Reading'),'Moss · Reading');
 });
+
+void test('Vite-inlined original image data is admitted without admitting inline videos or executable URLs',()=>{
+ const image={...WALL_FRAME_MANIFEST[0],media:{kind:'image' as const,url:'data:image/svg+xml;base64,PHN2Zy8+'}};
+ assert.equal(validWallFrames([image]),true);assert.equal(validWallFrames([{...image,media:{kind:'video',url:image.media.url}}]),false);assert.equal(validWallFrames([{...image,media:{kind:'image',url:'javascript:alert(1)'}}]),false);
+});
