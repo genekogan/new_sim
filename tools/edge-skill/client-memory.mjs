@@ -26,7 +26,7 @@ export function openClientMemory(directory,{scope,now=()=>new Date().toISOString
    const out=receipt.outcome??{kind:'act',summary:`${receipt.capability} ${receipt.phase}.`,learned:[],produced:[],met:[],untrusted:false};
    const met=(out.met??[]).map(p=>({id:p.soulId??p.id,name:p.name,where:p.placeId??null}));
    const produced=(out.produced??[]).map(o=>({id:o.id,title:o.title,kind:o.kind,where:o.where??null}));
-   observed(receipt.endedAt?.place);for(const where of [...met.map(p=>p.where),...produced.map(o=>o.where)])observed(where);refs((out.learned??[]).map(f=>({id:f.about,kind:'public',name:f.about,source:f.source})));
+   observed(receipt.endedAt?.place);for(const where of [...met.map(p=>p.where),...produced.map(o=>o.where)])observed(where);refs((out.learned??[]).map(f=>({id:f.about,kind:'public',name:f.about.slice(0,200),source:f.source})));
    fold('terminal:'+receipt.id,{type:'outcome',receiptId:receipt.id,act:receipt.capability??step.act,phase:receipt.phase,summary:out.summary,untrusted:!!out.untrusted,learned:(out.learned??[]).map(f=>({fact:f.fact,about:f.about,source:f.source,provenance:f.provenance==='authored-content'?'authored-fiction':f.provenance??'world-fact',untrusted:!!f.untrusted})),produced,met,...(receipt.endedAt?.place?{placeId:receipt.endedAt.place}:{})});
    if(receipt.phase==='completed'&&step.fixes&&state.refusals[step.fixes]){const r=state.refusals[step.fixes];fold('lesson:'+receipt.id,{type:'lesson',attempt:r.act,fix:receipt.capability??step.act,refusalId:r.id,successId:'terminal:'+receipt.id});}
    for(const p of met)state.people[p.id]=p.name;
