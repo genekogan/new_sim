@@ -1,4 +1,5 @@
 import {createWorldWallFrames} from './WorldWallFrames.ts';
+import {highestDrawnDecorationSoil} from './WorldDecorationGround.ts';
 import {publishedGroundSampler} from './WorldPublishedGround.ts';
 import type {SceneInfo} from './WorldGeometry.ts';
 import type {AuthoredBoundaryBox} from '../../../mars/viewer/lib/authored-boundaries.ts';
@@ -74,7 +75,7 @@ export function createWorldEdenExpansion(officeGuards:readonly OfficeGuardBox[]=
   try{const regions=createEdenRegions(proposedGround);if(regions){owners.push(regions);group.add(regions.group);regionalGround=regions.sampleVisualGround;authoredBoundaries=regions.authoredBoundaries;}}catch(error){console.warn('Eden regional scenery unavailable; unsupported decorative roots are omitted',error);}
   for(const make of [createEdenStreetProps,createEdenInteriors,createEdenWayfinding,createEdenFacades,createEdenEventKit,createEdenComputers,createEdenSportsKit,createEdenDistricts,createEdenImports]){try{const lane=make(proposedGround);if(lane){owners.push(lane);group.add(lane.group);}}catch(error){console.warn('Eden lane scenery unavailable',error);}}
   // Ground details: near-camera grass tufts and wildflowers, worn path edges, field stones, fallen leaves.
-  try{const details=createWorldGroundDetails(proposedGround,(x,z)=>{const water=groundPublication?.shore?.metadata.water;if(!water)return false;const b=water.wetBoundsXZ,y=nativeGround(x,z);return x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3]&&y!==null&&y<water.datumY;});owners.push(details);group.add(details.group);}catch(error){console.warn('Eden ground details unavailable',error);}
+  try{const decorationGround=highestDrawnDecorationSoil(groundPublication,visualGround,(x,z)=>regionalGround?.(x,z)??null);const details=createWorldGroundDetails(decorationGround,(x,z)=>{const water=groundPublication?.shore?.metadata.water;if(!water)return false;const b=water.wetBoundsXZ,y=nativeGround(x,z);return x>=b[0]&&x<=b[2]&&z>=b[1]&&z<=b[3]&&y!==null&&y<water.datumY;});owners.push(details);group.add(details.group);}catch(error){console.warn('Eden ground details unavailable',error);}
   const bankY=landscape.sampleVisualGround(-81,-22);if(bankY!==null){const bridge=createEdenRiverCrossing({deckTopY:bankY+.35,bankSample:landscape.sampleVisualGround});if(bridge){owners.push(bridge);group.add(bridge.group);}}
   const buildings=[...neighborhood.plan.map(b=>({id:b.id,group:neighborhood.buildingOwners.find(o=>o.id===b.id)?.group as THREE.Group,root:b.root,parts:b.sourceInspection.parts})),...publicQuarter.plan.map(b=>({id:b.id,group:publicQuarter.group.getObjectByName(b.id) as THREE.Group,root:b.root,parts:b.originalInspection.parts}))];
   if(buildings.some(b=>!b.group))throw Error('Selected building owner unavailable');
