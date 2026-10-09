@@ -27,6 +27,8 @@ export type ActionOutcome<S> = {state: S; result?: Record<string, unknown>; even
 
 export type ActionDef<S> = {
   label: string;
+  /** Explicit admission boundary for actions that request a native body plan. */
+  movesBody?:true;
   /** Roles allowed to take the action; 'anyone' includes Souls with no role. */
   roles: string[] | 'anyone';
   /** 'place': the Soul must be inside the object's place; 'anywhere': listed objects only. */

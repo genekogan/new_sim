@@ -53,6 +53,7 @@ export const rideKind: ObjectKind<RideState> = {
   },
   actions: {
     join: {
+      movesBody:true,
       label: 'Take a ride: walk to the boarding step and climb into the basket', roles: 'anyone', reach: 'anywhere', params: {},
       available: (s, ctx) => s.riders.some(r => r.soulId === ctx.soul.soulId) ? {code: 'ride.already-aboard', reason: 'You are already in it.'}
         : s.phase === 'aloft' ? {code: 'ride.departed', reason: 'It is in the air; it lands where it started.'}
@@ -66,6 +67,7 @@ export const rideKind: ObjectKind<RideState> = {
       },
     },
     leave: {
+      movesBody:true,
       label: 'Step out of the basket (only on the ground)', roles: ['rider'], reach: 'anywhere', params: {},
       available: s => s.phase === 'aloft' ? {code: 'ride.aloft', reason: 'You are in the air; it lands by itself and you step out then.'} : null,
       validate(s, _p, ctx) { return rideKind.actions.leave.available!(s, ctx); },
@@ -75,6 +77,7 @@ export const rideKind: ObjectKind<RideState> = {
       },
     },
     start: {
+      movesBody:true,
       label: 'Lift off now instead of waiting for more riders', roles: ['rider'], reach: 'anywhere', params: {},
       available: s => s.phase !== 'boarding' ? {code: 'ride.not-boarding', reason: 'It is not waiting on the ground.'} : null,
       validate(s, _p, ctx) { return rideKind.actions.start.available!(s, ctx); },

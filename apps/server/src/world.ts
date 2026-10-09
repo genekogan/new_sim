@@ -1,3 +1,4 @@
+import {tx} from './edge/comms/store.ts';
 import {soulProfileFactV1Schema,type SoulProfileFactV1} from '@sim/protocol';
 import {authoredBoundariesDeclarationV1Schema,type AuthoredBoundariesDeclarationV1} from '@sim/engine-contract';
 import {edenLectureV1} from '@sim/engine-mars';
@@ -80,7 +81,7 @@ export class PersistedIntentAdmissionFault extends Error {
   readonly decisionSeq: number;
   constructor(decisionSeq:number) { super('decision and admission persisted; physical application requires reconciliation'); this.decisionSeq=decisionSeq; }
 }
-type Pending = { kind: EventKind; author: string; payload: any; resolve?: (e: LogEvent) => void; guard?: AcceptanceGuard; journal?: AcceptanceJournal; reject?: (error: unknown) => void; purpose?: PurposeRef; stationEra?:boolean };
+type Pending = { kind: EventKind; author: string; payload: any; resolve?: (e: LogEvent) => void; guard?: AcceptanceGuard; journal?: AcceptanceJournal; reject?: (error: unknown) => void; purpose?: PurposeRef; stationEra?:boolean; atomicObjectDecision?:boolean };
 export type SnapshotBody = { runtime: EngineSnapshot; minds: Mind[]; seq: number; extra: Record<string, unknown>; kernel?: KState; counts?: Record<string, number> };
 export type HostListener = {
   onBatch?(b: Batch): void;
@@ -446,6 +447,24 @@ export class WorldHost {
       let admission: LogEvent | undefined;
       let stationEra:LogEvent|undefined;
       let preview: FoldResult | undefined;
+      if(p.atomicObjectDecision){
+        // Only the new object/body producer selects this boundary. Legacy facts
+        // and replay retain their original fold. No transaction crosses await.
+        let baseline:SnapshotBody|undefined;const acc=structuredClone(this.acc),kernelDirty=this.kernelDirty;
+        let notify=()=>{};const decisionNotices:(()=>void)[]=[];
+        try{
+          checkAcceptanceGuard(p.guard!);baseline=this.captureBody();
+          tx(this.db.db,()=>{
+            checkAcceptanceGuard(p.guard!);this.db.appendEvent(this.worldId,e);
+            const folded=this.apply(e,false,notice=>decisionNotices.push(notice));
+            if(!folded?.programOk||!folded.programId)throw new Error('object.native-admission-refused:'+String(folded?.programCode??'unknown'));
+            if(p.journal!(e)!==true)throw new TypeError('acceptance journal must synchronously return true');
+          },{immediate:true,deferNotifications:n=>{notify=n;}});
+        }catch(error){if(baseline)this.restoreBody(baseline);this.acc=acc;this.kernelDirty=kernelDirty;p.reject!(error);continue;}
+        this.seq=e.seq;this.acc.log.push(e);
+        notify();for(const notice of decisionNotices)notice();
+        for(const l of this.listeners)l.onApplied?.(e);p.resolve?.(e);continue;
+      }
       if (p.journal) {
         // Accepted log fact and its private request reference either both exist
         // or neither does. Check current DB authority under the same write lock.
@@ -548,6 +567,13 @@ export class WorldHost {
     this.assertClockReady();
     const current:AcceptanceGuard=()=>{checkAcceptanceGuard(guard);if(kind==='decision'){const p=payload as DecisionPayload;if(!this.ownLectureRosterV1(p.soulId,p.steps))throw new StaleIntentAttempt();}return true;};
     return new Promise((resolve, reject) => this.queue.push({ kind, author, payload, guard:current, journal, resolve, reject }));
+  }
+
+  /** Atomic object/body producer: commit its side effects only after the real
+   * decision fold succeeds; restore the exact captured native/kernel head on failure. */
+  enqueueObjectDecision(author:string,payload:unknown,guard:AcceptanceGuard,journal:AcceptanceJournal):Promise<LogEvent>{
+    this.assertClockReady();const current:AcceptanceGuard=()=>{checkAcceptanceGuard(guard);const p=payload as DecisionPayload;if(!this.ownLectureRosterV1(p.soulId,p.steps))throw new StaleIntentAttempt();return true;};
+    return new Promise((resolve,reject)=>this.queue.push({kind:'decision',author,payload,guard:current,journal,atomicObjectDecision:true,resolve,reject}));
   }
 
   /** Internal opt-in choice producer. No wire operation accepts a purpose ref
@@ -705,7 +731,7 @@ export class WorldHost {
   }
 
   /** Apply a logged event: the fold moves the engine and the kernel; this adds the minds' bookkeeping. */
-  apply(e: LogEvent, replay: boolean) {
+  apply(e: LogEvent, replay: boolean,deferDecisionNotice?:(notify:()=>void)=>void) {
     const tick = e.tick;
     if(e.kind==='rules'&&e.payload?.reflection?.episodeMemory){
       const p=e.payload,record=p.reflection.episodeMemory,m=this.minds.get(p.soulId);
@@ -739,7 +765,7 @@ export class WorldHost {
     if(e.kind==='rules'&&e.payload?.commonsKitchen&&this.stationHistoryV1())throw Error('commons-kitchen.station-carry-required');
     if(e.kind==='rules'&&e.payload?.commonsProvisions&&this.stationHistoryV1())throw Error('commons-provisions.station-carry-required');
     const r = foldEvent(this.engine, this.kernel, e, this.counts);
-    if (e.kind === 'decision' && !replay) for (const l of this.listeners) l.onDecision?.(e, r);
+    if(e.kind==='decision'&&!replay){const notify=()=>{for(const l of this.listeners)l.onDecision?.(e,r);};if(deferDecisionNotice)deferDecisionNotice(notify);else notify();}
     if(isStationFactV1(e.kind))this.extra.stationV1=foldStationFactV1(this.stationHistoryV1(),e,this.stationBindingV1());
     if(e.kind==='station-rules-era-v1'){
       const old=this.extra.stationV1 as StationHistoryV1|undefined;
