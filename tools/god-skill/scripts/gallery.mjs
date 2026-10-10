@@ -102,7 +102,9 @@ const entry = resolve(out, 'studio-entry.ts');
 writeFileSync(entry, [...meshFiles, resolve(meshDir, 'kits/studio.ts')].map((f) => `import ${JSON.stringify(relative(out, f).startsWith('.') ? relative(out, f) : './' + relative(out, f))};`).join('\n') + '\n');
 await esbuild.build({ entryPoints: [entry], bundle: true, format: 'iife', platform: 'browser', outfile: resolve(out, 'studio.js'), logLevel: 'error', absWorkingDir: resolve(root, 'apps/web'), nodePaths: [resolve(root, 'apps/web/node_modules')], define: { 'import.meta.env': '{}' } });
 writeFileSync(resolve(out, 'studio.html'), `<!doctype html><meta charset=utf-8><style>body{margin:0;background:#efe9dc;font:12px system-ui;color:#2a2622}h1{font:600 15px system-ui;margin:0;padding:10px 12px}#sheet{position:relative}.lbl{position:absolute;box-sizing:border-box;padding:3px 7px;background:#f8f5ee;border-top:1px solid #e2dccd;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}.lbl b{font-weight:600;margin-right:6px}.lbl i{color:#8a8278;font-style:normal;font-size:11px}</style><h1 id=title></h1><div id=sheet></div><script src="./studio.js"></script>`);
-const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--allow-file-access-from-files'] });
+const { chromeLease } = await import(pathToFileURL(resolve(root, 'tools/god-skill/lib/chrome-lease.mjs')).href);
+let release = await chromeLease('L4-gallery');
+const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist', '--allow-file-access-from-files'] });
 const page = await browser.newPage({ viewport: { width: cols * 220, height: 800 } }); page.setDefaultTimeout(600000);
 const errors = []; page.on('pageerror', (e) => errors.push(String(e).slice(0, 300))); page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text().slice(0, 300)); });
 await page.goto(pathToFileURL(resolve(out, 'studio.html')).href);
@@ -113,12 +115,13 @@ const res = await page.evaluate(([d, c, w]) => window.studio.render(d, { cols: c
 await page.locator('body').screenshot({ path: resolve(out, 'sheet.png') });
 console.log(`sheet: ${resolve(out, 'sheet.png')} — ${res.cells} cells in ${((Date.now() - t0) / 1000).toFixed(1)} s, errors ${res.errors.length + errors.length}`);
 writeFileSync(resolve(out, 'gallery.json'), JSON.stringify({ base: base || 'local', count: defs.length, defs: defs.map((d, i) => ({ name: d.name, tags: d.tags, box: d.size.box, family: family(d), description: d.description })), tris: res.tris, errors: [...res.errors, ...errors] }, null, 1));
-await browser.close();
+await browser.close(); release();
 if (!has('world') || !base) process.exit(0);
 
 // ---- the grid in the world, from the viewer
 {
-const browser2 = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+release = await chromeLease('L4-gallery-world');
+const browser2 = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
 const ctx = await browser2.newContext({ viewport: { width: 960, height: 600 } });
 const page = await ctx.newPage(); page.setDefaultTimeout(180000);
 const werrors = []; page.on('pageerror', (e) => werrors.push(String(e).slice(0, 200)));
@@ -132,6 +135,6 @@ const look = (eye, at) => page.evaluate(([e, a]) => { const w = window.__simEnti
 await look([0, Math.max(30, (z - z0) * 0.9), z0 - (z - z0) * 0.35], [0, 0, zm]);
 await page.waitForTimeout(2500);
 await page.screenshot({ path: resolve(out, 'world-overview.png') });
-await browser2.close();
+await browser2.close(); release();
 console.log(`world overview: ${resolve(out, 'world-overview.png')}`);
 }

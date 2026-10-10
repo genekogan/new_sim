@@ -47,7 +47,8 @@ async function step(name, fn, expect) {
 }
 const accepted = (r) => r.status === 200 && r.data?.accepted === true;
 
-let browser = null;
+let browser = null, release = () => {};
+const { chromeLease } = await import(new URL('../lib/chrome-lease.mjs', import.meta.url).href);
 try {
   await step('mint a god token', async () => { const r = await api('/v1/god/mint', { label: 'creatures-e2e' }, 'dev:admin'); token = r.data.token; return !!token; }, (x) => x);
   await step('library search: defs?q=duck finds the kit duck first', async () => { const r = await api('/v1/god/defs?q=duck'); return { first: r.data.defs?.[0]?.ref, n: r.data.count }; }, (r) => r.first === 'core-duck@1');
@@ -72,7 +73,8 @@ try {
 
   // ---- the viewer
   const { chromium } = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test');
-  browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+  release = await chromeLease('L4-creatures-e2e');
+  browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
   const page = await (await browser.newContext({ viewport: { width: 800, height: 500 } })).newPage(); page.setDefaultTimeout(600000);
   const errors = []; page.on('pageerror', (e) => errors.push(String(e).slice(0, 300)));
   await step('open the world in the viewer (patient: the laptop is loaded)', async () => {
@@ -128,6 +130,7 @@ try {
   report.failures.push({ name: 'harness', error: String(e?.stack ?? e) }); log('harness error', e);
 } finally {
   if (browser) await browser.close().catch(() => { });
+  release();
   writeFileSync(resolve(out, 'report.json'), JSON.stringify(report, null, 2));
   writeFileSync(resolve(out, 'server.log'), serverLog);
   const md = [`# creatures e2e — ${report.startedAt}`, '', `${report.steps.length} steps · ${report.failures.length} failed`, '', '| step | ms | ok |', '|---|---:|:-:|', ...report.steps.map((s) => `| ${s.name} | ${s.ms} | ${s.ok ? '✔' : '✖ ' + (s.error ?? JSON.stringify(s.result)).slice(0, 200)} |`), '', '## shots', ...report.shots.map((s) => `- ${s.name}: \`${s.file}\``)].join('\n');
