@@ -8,14 +8,17 @@ let flight = 0;
 export function canFly(): boolean { return !!(window as unknown as { __simEntity?: Sim }).__simEntity?.camera; }
 
 /** Ease the camera over `ms` to look at (x, y, z) from `distance` metres, same heading as now. */
-export function flyTo(x: number, y: number, z: number, { distance = 45, ms = 900 }: { distance?: number; ms?: number } = {}) {
+/** `aside` (0–0.5): put the point that far left of centre, e.g. to keep it clear of the god panel on the right. */
+export function flyTo(x: number, y: number, z: number, { distance = 45, ms = 900, aside = 0 }: { distance?: number; ms?: number; aside?: number } = {}) {
   const sim = (window as unknown as { __simEntity?: Sim }).__simEntity; if (!sim?.camera) return false;
   const { camera, controls } = sim;
   const fromT = controls.target.clone(), fromP = camera.position.clone();
   const dir = fromP.clone().sub(fromT); if (dir.lengthSq() < 1e-6) dir.set(-0.6, 0.5, 0.7);
   dir.normalize();
   if (dir.y < 0.35) { dir.y = 0.35; dir.normalize(); }   // never skim the ground
-  const toT = new THREE.Vector3(x, y, z), toP = toT.clone().addScaledVector(dir, distance);
+  const toT = new THREE.Vector3(x, y, z);
+  if (aside) { const right = new THREE.Vector3().crossVectors(dir.clone().negate(), new THREE.Vector3(0, 1, 0)).normalize(); toT.addScaledVector(right, distance * aside * Math.tan(((camera.fov ?? 50) * Math.PI) / 360) * camera.aspect); }
+  const toP = toT.clone().addScaledVector(dir, distance);
   const t0 = performance.now(), id = ++flight;
   const step = (now: number) => {
     if (id !== flight) return;

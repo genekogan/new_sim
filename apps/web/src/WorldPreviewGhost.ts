@@ -164,10 +164,10 @@ type SimEntity = { scene: THREE.Scene; camera: THREE.PerspectiveCamera; controls
  */
 export function previewGhost(api: (p: string) => string): WorldPreviewGhost | null {
   const w = window as unknown as { __simEntity?: SimEntity; __simGhost?: WorldPreviewGhost };
-  if (w.__simGhost) return w.__simGhost;
-  const sim = w.__simEntity; if (!sim?.scene) return null;
-  const ghost = new WorldPreviewGhost(api);
-  sim.scene.add(ghost.group);
-  w.__simGhost = ghost;
+  const sim = w.__simEntity;
+  const ghost = w.__simGhost ?? (sim?.scene ? (w.__simGhost = new WorldPreviewGhost(api)) : null);
+  if (!ghost) return null;
+  // the world page may rebuild its scene (and re-publish __simEntity): follow it
+  if (sim?.scene && ghost.group.parent !== sim.scene) sim.scene.add(ghost.group);
   return ghost;
 }

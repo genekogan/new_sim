@@ -45,7 +45,8 @@ const edit = (seq: number, note: string | null, ops: EditRow['ops'], kind: EditR
 test('first steps tick from evidence', () => {
   const none = steps({ status: st('anonymous'), signedIn: false, edits: null, flags: 0, approvedHere: false, agentSeen: false, looks: 0 });
   assert.deepEqual(none.map((s) => s.done), [false, false, false, false, false, false]);
-  const genesisOnly = [edit(1, 'genesis 1/2: terrain', [{ op: 'place', def: 'core/knoll@1' }]), edit(2, 'flag from the website', [{ op: 'place', def: 'core/flag@1' }])];
+  const genesisOnly = [edit(1, 'genesis 1/2: terrain', [{ op: 'place', def: 'core/knoll@1' }, { op: 'place', def: 'core/flag@1' }]), edit(2, 'flag from the website', [{ op: 'place', def: 'core-flag@1' }])];
+  assert.equal(steps({ status: st('owner'), signedIn: true, edits: genesisOnly.slice(0, 1), flags: 1, approvedHere: false, agentSeen: false, looks: 0 })[3].done, false, 'a template flag is not your flag');
   const mid = steps({ status: st('owner'), signedIn: true, edits: genesisOnly, flags: 2, approvedHere: false, agentSeen: true, looks: 0 });
   assert.deepEqual(mid.map((s) => [s.id, s.done]), [['signin', true], ['claim', true], ['pair', true], ['flag', true], ['build', false], ['look', false]]);
   const all = steps({ status: st('owner', { agents: 1 }), signedIn: true, edits: [...genesisOnly, edit(3, null, [{ op: 'place', def: 'core/cottage@1', name: 'home' }])], flags: 1, approvedHere: false, agentSeen: false, looks: 1 });

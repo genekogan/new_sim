@@ -12,7 +12,7 @@
 .lh-claimed { color: var(--accent); }
 .lh-unclaimed { color: var(--warn); }
 .lh-foot { margin-top: auto !important; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 11.5px; }
-.lh-path { margin-left: auto; }
+.lh-path { flex-basis: 100%; }
 .lh-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); display: inline-block; }
 .lh-dot.lh-running { background: #2fb36a; }
 .lh-dot.lh-starting, .lh-dot.lh-restarting { background: #e0a434; }

@@ -16,6 +16,8 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import { rmSync as rmFile, writeFileSync as writeFile } from 'node:fs';
+import { chromeLease } from '../lib/chrome-lease.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../../..');
@@ -57,7 +59,11 @@ await until('the launcher', async () => (await fetch(`${origin}/__sim/worlds.jso
 
 // ---------- the browser (a person) and a fresh folder (their agent)
 const { chromium } = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test');
-const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+// One Chrome at a time across lanes (team/lanes/MERGES.md): hold the lease for this run, keep it fresh.
+const releaseLease = await chromeLease('launcher-e2e');
+const leaseBeat = setInterval(() => { try { rmFile('/tmp/eden-chrome-lease/holder', { force: true }); writeFile('/tmp/eden-chrome-lease/holder', `launcher-e2e ${process.pid} ${new Date().toISOString()}\n`); } catch { /* lease gone */ } }, 60_000);
+// Real GPU (Metal) headless Chrome; swiftshader starves on this shared machine.
+const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
 const ctx = await browser.newContext({ viewport: { width: 1200, height: 800 } });
 await ctx.grantPermissions(['clipboard-read', 'clipboard-write'], { origin });
 const page = await ctx.newPage();
@@ -178,16 +184,28 @@ try {
     return { gone, back, groupGone, restored, note: await page.locator('.gp-ok, .gp-bad').last().innerText().catch(() => null) };
   }, (r) => r.gone && r.back && r.groupGone && r.restored);
 
+  await step('drop a flag from the panel (⚑, click the ground, name it): it ticks “Drop a flag”', async () => {
+    await page.evaluate(() => { const w = window.__simEntity; w.controls.target.set(20, 0, -10); w.camera.position.set(20, 90, 40); w.camera.lookAt(w.controls.target); });
+    await sleep(1500);
+    answer = 'market';
+    await page.locator('[data-flag-button]').click();
+    await page.locator('canvas').first().click({ position: { x: 500, y: 420 } });
+    const flag = await until('the flag', async () => (await (await fetch(`${base}/v1/world/snapshot`)).json()).entities.find((e) => e.name === 'market'), 30_000);
+    await page.locator('[data-tab="start"]').click();
+    await page.locator('[data-step="flag"][data-done="1"]').waitFor({ timeout: 20_000 });
+    return { at: flag.p, label: flag.state?.label };
+  }, (r) => r.label === 'market');
+
   await step('flags: the template’s flags are listed; clicking one flies the camera there', async () => {
     await page.locator('[data-tab="flags"]').click();
     await page.locator('[data-fly="orchard"]').waitFor();
     await page.locator('[data-fly="orchard"]').click();
     // the flight is animated per frame; on a loaded machine frames are rare, so wait for it to land
-    await page.waitForFunction(() => { const t = window.__simEntity.controls.target; return Math.abs(t.x + 40) < 1 && Math.abs(t.z + 30) < 1; }, null, { timeout: 60_000 }).catch(() => {});
+    await page.waitForFunction(() => { const t = window.__simEntity.controls.target; return Math.hypot(t.x + 40, t.z + 30) < 14 && window.__simEntity.camera.position.distanceTo(t) < 40; }, null, { timeout: 60_000 }).catch(() => {});
     const target = await page.evaluate(() => window.__simEntity.controls.target.toArray().map((v) => Math.round(v)));
     await shot('08-flags');
     return { target };
-  }, (r) => r.target[0] === -40 && r.target[2] === -30);
+  }, (r) => Math.hypot(r.target[0] + 40, r.target[2] + 30) < 14);
 
   let previewId = null;
   await step('the agent previews a batch (dry run): a ghost renders over the world, nothing is built', async () => {
@@ -202,8 +220,8 @@ try {
     previewId = pv.id;
     await page.goto(`${base}/?dev=1&preview=${pv.id}`, { waitUntil: 'domcontentloaded', timeout: PAGE_MS });
     await page.locator(`[data-preview-banner="${pv.id}"][data-preview-ok="1"]`).waitFor({ timeout: PAGE_MS });
-    const ghost = await page.evaluate(() => window.__simGhost?.current);
-    await page.evaluate(() => { const w = window.__simEntity; w.controls.target.set(-10, 1, 0); w.camera.position.set(-70, 45, 60); w.camera.lookAt(w.controls.target); });
+    const ghost = await page.evaluate(() => ({ ...window.__simGhost?.current, inScene: window.__simGhost?.group.parent === window.__simEntity?.scene, meshes: (() => { let n = 0; window.__simGhost?.group.traverse((o) => { if (o.isMesh && o.visible) n++; }); return n; })() }));
+    await page.evaluate(() => { const w = window.__simEntity; w.controls.target.set(2, 1, -2); w.camera.position.set(-62, 48, 66); w.camera.lookAt(w.controls.target); });
     await sleep(3000);
     await shot('09-preview-ghost');
     const after = (await (await fetch(`${base}/v1/world/snapshot`)).json()).entities.length;
@@ -211,7 +229,7 @@ try {
     const listed = await page.locator(`[data-show-preview="${pv.id}"]`).waitFor({ timeout: 20_000 }).then(() => true, () => false);
     await shot('10-previews-tab');
     return { id: pv.id, summary: pv.summary, ghost, uncommitted: before === after, listed };
-  }, (r) => r.ghost?.ok && r.ghost.drawn >= 3 && r.ghost.added >= 2 && r.ghost.changed >= 1 && r.uncommitted && r.listed);
+  }, (r) => r.ghost?.ok && r.ghost.inScene && r.ghost.meshes >= 3 && r.ghost.drawn >= 3 && r.ghost.added >= 2 && r.ghost.changed >= 1 && r.uncommitted && r.listed);
 
   await step('a killed world restarts by itself; the barn is still there; the page carries on', async () => {
     const before = (await getJson('/__sim/launcher')).data.children.find((c) => c.slug === slug);
@@ -247,6 +265,7 @@ try {
   writeFileSync(join(out, 'report.json'), JSON.stringify(report, null, 2));
   writeFileSync(join(out, 'launcher.log'), launcherLog);
   await browser.close().catch(() => {});
+  clearInterval(leaseBeat); releaseLease();
   console.log(`\n${report.passed}/${report.total} steps passed${report.failures.length ? `, ${report.failures.length} failures` : ''} — ${out}`);
   if (!args.keep) cleanup();
   process.exit(report.failures.length ? 1 : 0);

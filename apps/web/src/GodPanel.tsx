@@ -53,8 +53,8 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
     let g = previewGhost(apiPath);
     for (let i = 0; !g && i < 100; i++) { await new Promise((r) => setTimeout(r, 300)); g = previewGhost(apiPath); }
     if (!g) { setNote({ text: 'The world view is not ready for a preview.', bad: true }); return; }
-    const s = await g.show(id); setGhost(s);
-    if (fly && s.ok && s.bounds) { const [x0, z0, x1, z1] = s.bounds; const span = Math.max(20, x1 - x0, z1 - z0); flyTo((x0 + x1) / 2, 0, (z0 + z1) / 2, { distance: span * 1.6 }); }
+    const s = await g.show(id); previewGhost(apiPath); setGhost(s);
+    if (fly && s.ok && s.bounds) { const [x0, z0, x1, z1] = s.bounds; const span = Math.max(20, x1 - x0, z1 - z0); flyTo((x0 + x1) / 2, 0, (z0 + z1) / 2, { distance: span * 1.6, aside: 0.3 }); }
   }, []);
   const hideGhost = () => { previewGhost(apiPath)?.clear(); setGhost(null); const q = new URLSearchParams(location.search); if (q.has('preview')) { q.delete('preview'); history.replaceState(null, '', `${location.pathname}${q.size ? '?' + q : ''}${location.hash}`); } };
   useEffect(() => { const id = query.get('preview'); if (id) void showPreview(id); }, [showPreview]);
@@ -86,10 +86,11 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
   if (shotMode) return null;
   const ghostBar = ghost && (
     <div className="gp-ghostbar" data-preview-banner={ghost.id} data-preview-ok={ghost.ok ? '1' : '0'}>
+      <b>Preview</b> <code>{ghost.id}</code>
       {ghost.ok
-        ? <><b>Preview</b> <code>{ghost.id}</code> · <span className="gp-add">+{ghost.added} new</span> · <span className="gp-chg">{ghost.changed} changed</span> · <span className="gp-rem">−{ghost.removed} removed</span>{ghost.tiles ? <> · {ghost.tiles} ground tiles</> : null} — <i>not built</i></>
-        : <><b>Preview</b> <code>{ghost.id}</code>: {ghost.message}{ghost.failures?.[0] ? <> <code>{ghost.failures[0].code}</code> {ghost.failures[0].detail}</> : null}</>}
-      {ghost.ok && ghost.bounds && <button className="gp-btn" onClick={() => { const [x0, z0, x1, z1] = ghost.bounds!; flyTo((x0 + x1) / 2, 0, (z0 + z1) / 2, { distance: Math.max(20, x1 - x0, z1 - z0) * 1.6 }); }}>fly there</button>}
+        ? <><span className="gp-add">+{ghost.added} new</span><span className="gp-chg">{ghost.changed} changed</span><span className="gp-rem">{ghost.removed ? '−' : ''}{ghost.removed} removed</span>{ghost.tiles ? <span>{ghost.tiles} ground tile{ghost.tiles === 1 ? '' : 's'}</span> : null}<i>not built yet</i></>
+        : <span className="gp-ghostmsg">{ghost.message}{ghost.failures?.[0] ? <> <code>{ghost.failures[0].code}</code> {ghost.failures[0].detail}</> : null}</span>}
+      {ghost.ok && ghost.bounds && <button className="gp-btn" onClick={() => { const [x0, z0, x1, z1] = ghost.bounds!; flyTo((x0 + x1) / 2, 0, (z0 + z1) / 2, { distance: Math.max(20, x1 - x0, z1 - z0) * 1.6, aside: open ? 0.3 : 0 }); }}>fly there</button>}
       <button className="gp-btn" onClick={hideGhost}>hide</button>
     </div>
   );
@@ -192,7 +193,7 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
                 <ul className="gp-list">
                   {flags.map((f) => (
                     <li key={f.id}>
-                      <button className="gp-link" data-fly={f.name} onClick={() => flyTo(f.p[0], f.p[1], f.p[2], { distance: 35 })} title="Fly the camera here">⚑ {f.label}</button>
+                      <button className="gp-link" data-fly={f.name} onClick={() => flyTo(f.p[0], f.p[1], f.p[2], { distance: 35, aside: 0.3 })} title="Fly the camera here">⚑ {f.label}</button>
                       <code className="gp-dim">flag:{f.name}</code>
                       <span className="gp-dim gp-when">{Math.round(f.p[0])}, {Math.round(f.p[2])}</span>
                     </li>

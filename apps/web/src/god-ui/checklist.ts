@@ -26,11 +26,13 @@ export function steps(ev: Evidence): Step[] {
   const owner = you === 'owner' || you === 'god';
   const agents = (ev.status?.agents ?? 0) > 0 || ev.approvedHere || ev.agentSeen;
   const built = !!ev.edits?.some(isBuild);
+  // a flag of your own: the template's flags do not count (fallback: any flag, when the journal is unknown)
+  const flagged = ev.edits ? ev.edits.some((e) => e.kind === 'edit' && !isGenesis(e) && !e.undone && e.ops.some(isFlagOp)) : ev.flags > 0;
   return [
     { id: 'signin', label: 'Sign in', done: ev.signedIn, hint: 'A local name; use the same one when you come back.' },
     { id: 'claim', label: 'Claim the world', done: owner, hint: 'The first person to claim an unowned world becomes its god.' },
     { id: 'pair', label: 'Pair your agent', done: agents, hint: 'Run the commands below in a fresh folder; approve the code that appears here.' },
-    { id: 'flag', label: 'Drop a flag', done: ev.flags > 0, hint: 'A named reference point: “⚑ drop a flag”, then click the ground.' },
+    { id: 'flag', label: 'Drop a flag', done: flagged, hint: 'A named reference point: “⚑ drop a flag”, then click the ground.' },
     { id: 'build', label: 'First build', done: built, hint: 'Ask your agent for something: “a cottage by the pond”.' },
     { id: 'look', label: 'First look', done: ev.looks > 0, hint: 'node eden-god.mjs look — your agent sees what it built.' },
   ];
