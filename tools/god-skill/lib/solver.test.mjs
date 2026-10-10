@@ -136,3 +136,13 @@ test('on a stand/floor slot (pier end, balcony): slot-frame p (never the world p
   assert.deepEqual(b.in, { parent: 'lighthouse', slot: 'balcony' }); assert.deepEqual(b.p, [0, 0]);
   assert.throws(() => solve(w, lantern, { on: 'lighthouse/nowhere' }), /no slot nowhere/);
 });
+
+test('near a building: its outer doorway stays clear (as --inside keeps inner ones)', () => {
+  // a 7 m round house facing east, front door on its east side
+  const rh = row({ id: 'e_rh', path: 'rh', name: 'rh', def: 'core/roundhouse@1', pose: [0, 0, 0, Math.PI / 2, 1], box: [7, 5, 7], doors: [{ id: 'front-door', level: 0, width: 1, at: [3.3, 0], yaw: Math.PI / 2, out: true }], slots: [{ id: 'living', kind: 'room', p: [0, 0, 0], yaw: Math.PI / 2, capacity: 64, used: 0 }] });
+  const w = mkView([rh]);
+  const s = solve(w, { def: 'core/lantern@1', form: 'point', layer: 'solid', box: [0.22, 0.45, 0.22] }, { near: 'rh', dir: 'e', dist: 0.3 });
+  const c = first(s);
+  assert.ok(!(c.p[0] > 3 && Math.abs(c.p[1]) < 0.85), `not in front of the door: ${c.p}`);
+  assert.ok(s.notes.some((n) => /doorway front-door clear/.test(n)));
+});

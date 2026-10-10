@@ -655,7 +655,20 @@ function solve(v, thing, rel) {
     const a0 = Math.atan2(start[0], start[1]);
     const items2 = [];
     const placed = [];
-    const isFree = (x, z, yaw2) => free(x, z, yaw2) && !placed.some((b) => obbHit(mine(x, z, yaw2), b, 0.1));
+    const doorZones = R.kind === "entity" ? (R.row.doors ?? []).filter((d) => d.out && (d.level ?? 0) === 0).map((d) => {
+      const f = dirOfYaw(d.yaw);
+      return { id: d.id, c: [d.at[0] + f[0] * 1.25, d.at[1] + f[1] * 1.25], half: [d.width / 2 + 0.35, 1.25], yaw: d.yaw };
+    }) : [];
+    const inDoorway = (x, z, yaw2) => doorZones.find((dz) => obbHit(mine(x, z, yaw2), dz));
+    let keptDoor = null;
+    const isFree = (x, z, yaw2) => {
+      const dz = inDoorway(x, z, yaw2);
+      if (dz) {
+        keptDoor = dz.id;
+        return false;
+      }
+      return free(x, z, yaw2) && !placed.some((b) => obbHit(mine(x, z, yaw2), b, 0.1));
+    };
     for (let k = 0; k < n; k++) {
       const cands = [];
       const fronted = n > 1 && R.kind === "entity" && (R.row.slots ?? []).some((x) => x.kind === "stand" || x.kind === "door" || x.kind === "room");
@@ -672,7 +685,7 @@ function solve(v, thing, rel) {
         const x = c02[0] + u[0] * d, z = c02[1] + u[1] * d;
         const fy = finalYaw(x, z, baseYaw);
         const c = pose(x, z, fy, { note: `near ${R.ref ?? rel.near ?? rel.around}, ${compassOfYaw(a)} of it, ${r22(gap2 + ring)} m away`, constraints: R.kind === "entity" && !R.members ? [{ kind: "near", ref: R.row.path, dist: r22(gap2 + ring + 1) }] : [] });
-        fallback ??= c;
+        if (!inDoorway(x, z, fy ?? 0)) fallback ??= c;
         if (isFree(x, z, fy ?? 0)) cands.push(c);
       }
       if (!cands.length && fallback) cands.push(fallback);
@@ -682,6 +695,7 @@ function solve(v, thing, rel) {
       placed.push(mine(c0.p[0], c0.p[1], c0.r ?? 0));
       items2.push({ candidates: cands });
     }
+    if (keptDoor) notes.push(`kept ${R.ref}'s doorway ${keptDoor} clear`);
     return { items: items2, notes };
   }
   const at = rel.at !== void 0 ? refPoint(v, rel.at, rel.offset) : { x: 0, z: 0, kind: "point" };

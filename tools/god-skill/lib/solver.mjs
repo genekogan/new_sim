@@ -435,7 +435,12 @@ export function solve(v, thing, rel) {
     const a0 = Math.atan2(start[0], start[1]);
     const items = [];
     const placed = [];
-    const isFree = (x, z, yaw) => free(x, z, yaw) && !placed.some((b) => obbHit(mine(x, z, yaw), b, 0.1));
+    // a building's outer doorways stay clear (as --inside keeps its inner ones): the step out of each ground-floor
+    // door, 2.5 m deep and 0.35 m wider either side, takes nothing — a lantern goes beside the door, not in front of it
+    const doorZones = R.kind === 'entity' ? (R.row.doors ?? []).filter((d) => d.out && (d.level ?? 0) === 0).map((d) => { const f = dirOfYaw(d.yaw); return { id: d.id, c: [d.at[0] + f[0] * 1.25, d.at[1] + f[1] * 1.25], half: [d.width / 2 + 0.35, 1.25], yaw: d.yaw }; }) : [];
+    const inDoorway = (x, z, yaw) => doorZones.find((dz) => obbHit(mine(x, z, yaw), dz));
+    let keptDoor = null;
+    const isFree = (x, z, yaw) => { const dz = inDoorway(x, z, yaw); if (dz) { keptDoor = dz.id; return false; } return free(x, z, yaw) && !placed.some((b) => obbHit(mine(x, z, yaw), b, 0.1)); };
     for (let k = 0; k < n; k++) {
       const cands = [];
       // several around a thing with a front (a door): keep a 60° cone in front of it clear
@@ -454,7 +459,7 @@ export function solve(v, thing, rel) {
         const x = c0[0] + u[0] * d, z = c0[1] + u[1] * d;
         const fy = finalYaw(x, z, baseYaw);
         const c = pose(x, z, fy, { note: `near ${R.ref ?? rel.near ?? rel.around}, ${compassOfYaw(a)} of it, ${r2(gap + ring)} m away`, constraints: R.kind === 'entity' && !R.members ? [{ kind: 'near', ref: R.row.path, dist: r2(gap + ring + 1) }] : [] });
-        fallback ??= c;
+        if (!inDoorway(x, z, fy ?? 0)) fallback ??= c;
         if (isFree(x, z, fy ?? 0)) cands.push(c);
       }
       if (!cands.length && fallback) cands.push(fallback);
@@ -463,6 +468,7 @@ export function solve(v, thing, rel) {
       const c0 = cands[0]; placed.push(mine(c0.p[0], c0.p[1], c0.r ?? 0));
       items.push({ candidates: cands });
     }
+    if (keptDoor) notes.push(`kept ${R.ref}'s doorway ${keptDoor} clear`);
     return { items, notes };
   }
 
