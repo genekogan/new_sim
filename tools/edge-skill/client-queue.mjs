@@ -105,7 +105,9 @@ export function openClientQueue(directory,{adapter,scope=null,now=Date.now,onWak
    const before=step.status;step.status='dispatching';save();
    if(pausedNow()){step.status=before;save();return snapshot();}
    let result;try{result=await adapter.runPublic(step.publicStep);}catch(error){step.status='blocked';step.reason=String(error.message).slice(0,300);notify('public-step-outcome-uncertain',step);return snapshot();}
-   lease();step.result=result;if(result?.receipt?.id){step.receiptId=result.receipt.id;step.receipt=result.receipt;step.status='running';save();return snapshot();}step.status=result?.again?'failed':'completed';save();if(result?.again){notify('public-step-refusal',step);return snapshot();}return drive(context,paused);
+   lease();step.result=result;
+   if(result?.requestNotSent&&result.acceptedMembership!==true){if(result.accepted===false){step.status=before;save();return snapshot();}step.status='blocked';step.reason=result.reason??'Prior effects are unconfirmed';notify('public-step-outcome-uncertain',step);return snapshot();}
+   if(result?.receipt?.id){step.receiptId=result.receipt.id;step.receipt=result.receipt;step.status='running';save();return snapshot();}step.status=result?.again?'failed':'completed';save();if(result?.again){notify('public-step-refusal',step);return snapshot();}return drive(context,paused);
   }
   if(context.busy&&context.busy.id!==step.receiptId&&context.busy.id!==state.replaceReceiptId){step.status='blocked';notify('protected-action',step);return snapshot();}
   if(step.if?.place&&step.if.place!==context.placeId){step.status='blocked';notify('guard-place',step);return snapshot();}
