@@ -289,7 +289,9 @@ export class GroundNav {
       for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
         if (!di && !dj) continue;
         const ni = ci + di, nj = cj + dj; if (ni < 0 || nj < 0 || ni >= W || nj >= H) continue;
-        const n = nj * W + ni, c = cost[m(n)];
+        // the goal's own 1 m cell is always enterable: the fine check already admitted the exact point (a cell's centre may
+        // read steep or deep where the goal itself, at its edge, is fine)
+        const n = nj * W + ni, c = n === g ? Math.min(cost[m(n)], 2) : cost[m(n)];
         if (!(c < Infinity)) continue;
         if (di && dj && (!(cost[m(cj * W + ni)] < Infinity) || !(cost[m(nj * W + ci)] < Infinity))) continue;
         const t = gs[cur] + (di && dj ? Math.SQRT2 : 1) * c;
