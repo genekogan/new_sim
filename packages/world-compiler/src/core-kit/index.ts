@@ -13,6 +13,7 @@ import kitchen from './kitchen.json' with { type: 'json' };
 import work from './work.json' with { type: 'json' };
 import signage from './signage.json' with { type: 'json' };
 import mesh from './mesh.json' with { type: 'json' };
+import terrain from './terrain.json' with { type: 'json' };
 import type { DefInput } from '../schemas.ts';
 
-export const FAMILY_KITS: DefInput[] = [creatures, furniture, props, structures, plants, transport, civic, play, kitchen, work, signage, mesh].flat() as DefInput[];
+export const FAMILY_KITS: DefInput[] = [creatures, furniture, props, structures, plants, transport, civic, play, kitchen, work, signage, mesh, terrain].flat() as unknown as DefInput[];

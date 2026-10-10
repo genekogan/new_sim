@@ -3,6 +3,7 @@
 // a scratch copy and never touches the model; `commit` applies a plan. The god
 // skill runs `plan` locally (dry runs); the server runs both.
 import { footprintOf, padFor, settle, waterLevelAt, SKIRT_MAX_M as SKIRT_MAX, type Landform } from '@sim/ground';
+import { prepareFor, queryOf } from '@sim/generators';
 import { hashOf } from './hash.ts';
 import { offsetPolyline, pointAlong } from '@sim/generators';
 import { WorldModel, obbOverlap, type OBB } from './model.ts';
@@ -80,6 +81,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         if (scratch.entities.size >= scratch.constants.limits.entities) { failures.push(fail(i, 'entity.limit', `${scratch.constants.limits.entities} entities`)); return; }
         const id = scratch.nextId();
         const e: Entity = { id, def: def.ref, in: { parent: parentId, ...(op.in.slot ? { slot: op.in.slot } : {}) }, by, born: tick, v: 1, ...(op.name ? { name: op.name } : {}), ...(op.p ? { p: op.p } : {}), ...(op.r !== undefined ? { r: op.r } : {}), ...(op.s !== undefined ? { s: op.s } : {}), ...(op.shape ? { shape: op.shape } : {}), ...(op.anchor ? { anchor: op.anchor } : {}), ...(Object.keys(fieldsOk.values).length ? { params: fieldsOk.values } : {}), ...(Object.keys(stateOk.values).length ? { state: stateOk.values } : {}), ...(op.seed !== undefined ? { seed: op.seed } : {}), ...(op.constraints?.length ? { constraints: op.constraints } : {}) };
+        prepareEntity(scratch, def, e, op.params);
         const problem = admit(scratch, e, def, i, op.mode, true);
         if (problem) { failures.push(problem); return; }
         scratch.insert(e); indexAndGround(scratch, e, def, diff);
@@ -117,6 +119,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         if (op.p) next.p = op.p; if (op.r !== undefined) next.r = op.r; if (op.s !== undefined) next.s = op.s; if (op.shape) next.shape = op.shape;
         if (op.constraints) next.constraints = op.constraints;
         scratch.delete(id); clearGround(scratch, prev, diff);
+        if (op.shape) prepareEntity(scratch, def, next, undefined);
         const problem = admit(scratch, next, def, i, op.mode, false);
         if (problem) { failures.push(problem); return; }
         scratch.insert(next); indexAndGround(scratch, next, def, diff);
@@ -146,6 +149,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
           inv.name = prev.name; next.name = op.name;
         }
         scratch.delete(id); clearGround(scratch, prev, diff);
+        if (op.params) prepareEntity(scratch, def, next, op.params);
         if (op.params || op.constraints) { const problem = admit(scratch, next, def, i, 'strict', false); if (problem) { failures.push(problem); return; } }
         scratch.insert(next); indexAndGround(scratch, next, def, diff);
         upsert(next);
@@ -175,6 +179,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
               if (copy.shape) copy.shape = shiftShape(copy.shape, x - (src.p?.[0] ?? 0), z - (src.p?.[src.p.length - 1] ?? 0));
               if (copy.seed !== undefined) copy.seed = (copy.seed + k + 1) | 0;
               const cdef = scratch.resolvedDef(copy.def)!;
+              if (copy.shape) prepareEntity(scratch, cdef, copy, undefined);
               const problem = admit(scratch, copy, cdef, i, op.mode, true);
               if (problem) { failures.push(problem); return; }
             }
@@ -286,6 +291,16 @@ function checkDef(w: WorldModel, def: Parameters<WorldModel['defineDef']>[0], i:
   return null;
 }
 
+/** L3: freeze what a path/area generator needs from the ground (road grade + bridges, river flow + snapped ends, deck heights) into the entity's params, before admission. Explicitly given params win. */
+function prepareEntity(w: WorldModel, def: StoredDef, e: Entity, explicit: Record<string, unknown> | undefined) {
+  if (def.make.kind !== 'gen' || def.form === 'point' || !e.shape) return;
+  const prep = prepareFor(def.make.gen, queryOf(w), e.shape as never, e.params ?? {});
+  if (!prep) return;
+  let took = false;
+  for (const [k, v] of Object.entries(prep.params)) if (def.params[k] && explicit?.[k] === undefined) { e.params = { ...(e.params ?? {}), [k]: v }; took = true; }
+  if (took && prep.path && 'path' in e.shape) e.shape = { ...e.shape, path: prep.path };
+}
+
 /** Physical admission of an entity at its (new) pose: size, extent, support/settle, slot, overlap. May adjust `e.p` (settle y, nudge). */
 function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'strict' | 'nudge', creating: boolean): Failure | null {
   const s = e.s ?? 1;
@@ -331,6 +346,9 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
       const level = waterLevelAt(w.ground(), x, z);
       if (level === null) return fail(i, 'float.no-water', `no water at (${x.toFixed(1)}, ${z.toFixed(1)}); place it on a lake, pond, river or the sea`);
       e.p = [x, level - (floatC?.sink ?? 0), z];
+    } else if (def.form !== 'point') {
+      // world-frame shapes (roads, walls, lawns…): heights are ground-relative per point (or absolute with `abs`); no settle
+      e.p = [0, 0, 0];
     } else if (p.length === 2 && def.layer !== 'volume' && !baked.landform) {
       const yaw = typeof e.r === 'number' ? e.r : Array.isArray(e.r) ? e.r[0] : 0;
       const fp = footprintOf(p[0], p[1], (baked.box[0] * s) / 2, (baked.box[2] * s) / 2, yaw);
@@ -409,7 +427,11 @@ function indexAndGround(w: WorldModel, e: Entity, def: StoredDef, diff: Diff) {
     for (const c of changed) for (const t of w.terrain.invalidate(c)) diff.tiles.push(t);
   }
   if (baked.water && e.shape && 'area' in e.shape) w.setWater({ id: e.id, area: e.shape.area, level: baked.water.level }, e.id);
-  else if (baked.water && e.shape && 'path' in e.shape) w.setWater({ id: e.id, path: e.shape.path, w: baked.water.width ?? e.shape.width ?? 4, level: baked.water.level }, e.id);
+  else if (baked.water && e.shape && 'path' in e.shape) {
+    const bw = baked.water as typeof baked.water & { levels?: number[] };
+    const path = bw.path ?? e.shape.path;
+    w.setWater({ id: e.id, path, w: bw.width ?? e.shape.width ?? 4, level: bw.level, ...(bw.levels && bw.levels.length === path.length ? { levels: bw.levels } : {}) }, e.id);
+  }
   const pad = (e as Entity & { _pad?: Landform })._pad;
   if (pad) { delete (e as Entity & { _pad?: Landform })._pad; for (const c of w.setLandform(pad, pad.id)) for (const t of w.terrain.invalidate(c)) diff.tiles.push(t); }
 }
@@ -421,6 +443,7 @@ function clearGround(w: WorldModel, e: Entity, diff: Diff) {
 /** A def's landform is authored in the def frame; bumps move to the entity's world position, shapes are already in world metres. */
 function placeLandform(lf: NonNullable<ReturnType<WorldModel['bake']>['landform']>, wp: { x: number; z: number; s: number }, id: string): Landform {
   if (lf.kind === 'bump') return { ...lf, id, c: [wp.x + lf.c[0] * wp.s, wp.z + lf.c[1] * wp.s], r: lf.r * wp.s, h: lf.h * wp.s };
+  if (lf.kind === 'brush') return { ...lf, id, c: [wp.x + lf.c[0] * wp.s, wp.z + lf.c[1] * wp.s], r: lf.r * wp.s };
   return { ...lf, id } as Landform;
 }
 

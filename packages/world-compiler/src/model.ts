@@ -167,6 +167,10 @@ export class WorldModel {
   footprint(e: Entity, def = this.resolvedDef(e.def)): OBB[] {
     if (!def) return [];
     const baked = this.bake(def, e.params ?? {}, e.seed ?? 0, e.shape);
+    if (def.form !== 'point' && e.in.parent === 'world') {
+      // world-frame shapes (L3): collider heights are ground-relative at their centre unless `abs`
+      return baked.colliders.map((o) => { const y = (o as typeof o & { abs?: boolean }).abs ? 0 : this.terrain.sample(o.c[0], o.c[1]); return { c: [o.c[0], o.c[1]] as [number, number], half: [o.half[0], o.half[1]] as [number, number], yaw: o.yaw, y0: y + o.y0, y1: y + o.y1 }; });
+    }
     const wp = this.worldPose(e);
     const c = Math.cos(wp.yaw), s = Math.sin(wp.yaw);
     return baked.colliders.map((o) => ({

@@ -10,7 +10,7 @@ import { CORE_KIT, WorldModel, applyBatch, coreRef, type Accepted, type DefInput
 function fresh() {
   const w = new WorldModel({ constants: { extent: 1000, ground: 'land' }, seed: 'terrain' });
   const have = new Set(CORE_KIT.map((d) => d.name));
-  for (const d of [...CORE_KIT, ...(terrainKit as DefInput[]).filter((d) => !have.has(d.name))]) w.defineDef(d, 'core', 0);
+  for (const d of [...CORE_KIT, ...(terrainKit as unknown as DefInput[]).filter((d) => !have.has(d.name))]) w.defineDef(d, 'core', 0);
   return w;
 }
 const ok = (r: ReturnType<typeof applyBatch>) => { assert.equal(r.result.accepted, true, JSON.stringify((r.result as Refused).failures)); return r.result as Accepted; };
