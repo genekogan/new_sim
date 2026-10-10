@@ -29,6 +29,7 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
 
   // ---- public reads (the renderer's view of the world; Gene: topology and placements are public)
   app.get('/v1/world/snapshot', (c) => c.json(d.god.publicSnapshot(), 200, noStore));
+  app.get('/v1/world/seq', (c) => c.json({ seq: d.god.model.editSeq, entities: d.god.model.entities.size }, 200, noStore));
   app.get('/v1/world/ground', (c) => c.json({ contract: 'ground/1', ground: d.god.model.ground(), tiles: d.god.tileHashes() }, 200, noStore));
   app.get('/v1/world/tiles/:tx/:tz', (c) => {
     const tx = Number(c.req.param('tx')), tz = Number(c.req.param('tz'));

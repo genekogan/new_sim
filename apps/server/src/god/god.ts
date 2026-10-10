@@ -18,7 +18,7 @@ const normCode = (c: string) => c.toUpperCase().replace(/[^A-Z0-9]/g, '').replac
 export const newGodToken = (worldId: string) => `god_${worldId}_${randomBytes(24).toString('base64url')}`;
 
 type Pairing = { code: string; poll: string; agent: string; expires: number; token?: string };
-export type WorldDiffMessage = { type: 'edge'; kind: 'world-diff'; seq: number; tick: number; at: number; diff: Diff; by: 'god' | 'undo' | 'redo'; ground?: ReturnType<WorldModel['ground']> };
+export type WorldDiffMessage = { type: 'edge'; kind: 'world-diff'; seq: number; tick: number; at: number; diff: Diff; by: 'god' | 'undo' | 'redo'; ground?: ReturnType<WorldModel['ground']>; /** every def the upserts reference (viewers only hold defs in use) */ defs: ReturnType<typeof publicDef>[] };
 export type GodEvent = { id: number; event: 'diff' | 'prayer' | 'soul'; data: unknown };
 
 export type GodOptions = {
@@ -46,7 +46,12 @@ export class GodMode {
     this.db = db; this.opts = opts;
     this.store = new WorldStore(db, opts.worldId);
     const loaded = this.store.load();
-    if (loaded) { this.model = loaded.model; this.owner = loaded.owner; }
+    if (loaded) {
+      this.model = loaded.model; this.owner = loaded.owner;
+      // a newer release may add core defs: make them available to older worlds (existing hashes are untouched)
+      const added = CORE_KIT.filter((d) => !this.model.def(`${d.name}@${d.version ?? 1}`)).map((d) => this.model.defineDef(d, 'core', 0));
+      if (added.length) this.store.commit(this.model, this.owner, { upserts: [], removes: [], defs: added, tiles: [], answers: [] }, { seq: this.model.editSeq, by: 'core', at: Date.now(), note: `core kit: +${added.map((d) => d.ref).join(', ')}`, ops: [], inverse: [], kind: 'edit' });
+    }
     else {
       this.model = new WorldModel({ constants: { ground: 'land', extent: 1000, ...opts.constants } as never, seed: opts.seed ?? `${opts.worldId}:genesis` });
       for (const d of CORE_KIT) this.model.defineDef(d, 'core', 0);
@@ -134,7 +139,9 @@ export class GodMode {
   }
 
   private publish(seq: number, tick: number, diff: Diff, by: WorldDiffMessage['by']) {
-    const m: WorldDiffMessage = { type: 'edge', kind: 'world-diff', seq, tick, at: Date.now(), diff, by, ...(diff.tiles.length ? { ground: this.model.ground() } : {}) };
+    const referenced = new Map<string, StoredDef>();
+    for (const e of diff.upserts) for (let ref: string | undefined = e.def; ref; ref = referenced.get(ref)?.extends) { const d = this.model.def(ref); if (!d || referenced.has(ref)) break; referenced.set(ref, d); }
+    const m: WorldDiffMessage = { type: 'edge', kind: 'world-diff', seq, tick, at: Date.now(), diff, by, defs: [...referenced.values()].map(publicDef), ...(diff.tiles.length ? { ground: this.model.ground() } : {}) };
     try { this.opts.emit(m); } catch { /* viewers are best-effort */ }
     this.push('diff', m);
   }
@@ -146,7 +153,7 @@ export class GodMode {
     const s = this.model.snapshot();
     const used = new Set(s.entities.map((e) => e.def));
     const defs = s.defs.filter((d) => used.has(d.ref) || used.has('sha:' + d.hash) || used.has(d.ref.replace(/^core-/, 'core/')));
-    return { contract: 'world/1', worldId: this.opts.worldId, seq: s.editSeq, counter: s.seq, seed: s.seed, tick: this.opts.tick(), constants: s.constants, state: s.state, ground: s.ground, defs: defs.map(publicDef), entities: s.entities, tiles: this.tileHashes() };
+    return { contract: 'world/1', worldId: this.opts.worldId, seq: s.editSeq, counter: s.seq, seed: s.seed, tick: this.opts.tick(), constants: s.constants, state: s.state, ground: s.ground, defs: defs.map(publicDef), entities: s.entities };
   }
   /** God sees the same plus the whole library, prayers waiting, tokens and the edit journal head. */
   godSnapshot() {

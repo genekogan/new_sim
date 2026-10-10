@@ -257,7 +257,23 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(eye?.length===3&&at?.length===3&&eye.every(Number.isFinite)&&at.every(Number.isFinite)){controls.target.set(at[0],at[1],at[2]);camera.position.set(eye[0],eye[1],eye[2]);}
       else{const [x0,z0,x1,z1]=entityLayer.viewBounds(),cx=(x0+x1)/2,cz=(z0+z1)/2,span=Math.max(60,x1-x0,z1-z0),gy=entityLayer.groundAt(cx,cz)??0;controls.target.set(cx,gy,cz);camera.position.set(cx-span*0.9,gy+span*0.55,cz+span*1.1);}
       camera.lookAt(controls.target);context.current.setCameraMode('manual');};
-    void entityLayer.start(abort.signal).then(frameEntityWorld);(window as unknown as {__simEntity?:unknown}).__simEntity={layer:entityLayer,camera,controls,scene};  // the entity world (god mode), when this world has one
+    void entityLayer.start(abort.signal).then(frameEntityWorld);
+    // Alt+click on the ground drops a labelled flag (a core/flag entity) the god can refer to as flag:<label>.
+    // Owner authority: a god token minted with the page's dev identity (Privy owners: the Game lane wires getToken later).
+    let godToken:string|null=sessionStorage.getItem('sim.godToken');
+    const godMint=async()=>{if(godToken)return godToken;const dev=localStorage.getItem('sim.dev');if(!dev)return null;const r=await fetch(apiPath('/v1/god/mint'),{method:'POST',headers:{authorization:'Bearer dev:'+dev,'content-type':'application/json'},body:JSON.stringify({label:'browser'})});if(!r.ok)return null;godToken=(await r.json()).token;sessionStorage.setItem('sim.godToken',godToken!);return godToken;};
+    const flagRay=new THREE.Raycaster(),flagNdc=new THREE.Vector2();
+    const onFlagClick=async(ev:MouseEvent)=>{
+      if(!ev.altKey||!entityLayer.active)return;
+      const rect=renderer.domElement.getBoundingClientRect();flagNdc.set(((ev.clientX-rect.left)/rect.width)*2-1,-((ev.clientY-rect.top)/rect.height)*2+1);
+      flagRay.setFromCamera(flagNdc,camera);const hit=flagRay.intersectObjects(entityLayer.terrainMeshes(),false)[0];if(!hit)return;
+      const label=window.prompt(`Flag at (${hit.point.x.toFixed(0)}, ${hit.point.z.toFixed(0)}) — label:`);if(!label)return;
+      const token=await godMint();if(!token){problem('Only the world owner can drop flags (sign in with ?dev=1 locally).');return;}
+      const name=label.toLowerCase().replace(/[^a-z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48)||'flag';
+      const r=await fetch(apiPath('/v1/god/act'),{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({ops:[{op:'place',def:'core/flag@1',name,p:[Math.round(hit.point.x*10)/10,Math.round(hit.point.z*10)/10],state:{label}}],note:'flag from the website'})});
+      const d=await r.json().catch(()=>null);if(!d?.accepted)problem(`Flag refused: ${d?.failures?.[0]?.code??r.status} ${d?.failures?.[0]?.detail??''}`);
+    };
+    renderer.domElement.addEventListener('click',onFlagClick);(window as unknown as {__simEntity?:unknown}).__simEntity={layer:entityLayer,camera,controls,scene};  // the entity world (god mode), when this world has one
     const games=new WorldGames();scene.add(games.group);
     const platformDraw=new WorldPlatforms();scene.add(platformDraw.group);
     const placeActivity=new WorldPlaceActivity();scene.add(placeActivity.group);
@@ -846,6 +862,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       renderer.domElement.removeEventListener('pointermove', onMove);
       renderer.domElement.removeEventListener('wheel', onWheel);
       renderer.domElement.removeEventListener('pointerup', onUp);
+      renderer.domElement.removeEventListener('click', onFlagClick);
       renderer.domElement.removeEventListener('webglcontextlost', onContextLost);
       renderer.domElement.removeEventListener('webglcontextrestored', onContextRestored);
       navigation?.dispose();

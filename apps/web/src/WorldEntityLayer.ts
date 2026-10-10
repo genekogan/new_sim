@@ -8,7 +8,7 @@ import { TILE_M, TILE_N, Terrain, type Ground } from '@sim/ground';
 import { WorldModel, scatterPoints, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
 
 type Snapshot = { contract: string; worldId: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[]; tiles: Record<string, string> };
-type DiffMsg = { type: 'edge'; kind: 'world-diff'; seq: number; diff: { upserts: Entity[]; removes: string[]; defs: StoredDef[]; tiles: string[]; world?: Partial<WorldModel['state']> }; ground?: Ground };
+type DiffMsg = { type: 'edge'; kind: 'world-diff'; seq: number; diff: { upserts: Entity[]; removes: string[]; defs: StoredDef[]; tiles: string[]; world?: Partial<WorldModel['state']> }; ground?: Ground; defs?: StoredDef[] };
 
 const SECTOR_TILES = 4;              // 4×4 tiles (256 m) per terrain mesh
 const TERRAIN_STEP = 2;              // metres between terrain vertices in the picture
@@ -38,7 +38,29 @@ export class WorldEntityLayer {
     this.group.add(this.terrainGroup, this.waterGroup, this.thingsGroup);
   }
 
+  private signal: AbortSignal | null = null;
+  private lastSeqCheck = 0;
+  private resyncing = false;
+  /** Full resync: refetch the snapshot and redraw everything (no easing). Used after a missed diff. */
+  async resync() {
+    if (this.resyncing || !this.signal) return;
+    this.resyncing = true;
+    try {
+      const r = await fetch(this.api('/v1/world/snapshot'), { signal: this.signal }); if (!r.ok) return;
+      const snap: Snapshot = await r.json(); if (snap.contract !== 'world/1') return;
+      const prevGround = JSON.stringify(this.model?.ground() ?? null);
+      this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground });
+      this.seq = snap.seq;
+      if (JSON.stringify(snap.ground) !== prevGround) { this.rebuildTerrain(); this.rebuildWater(); this.buildHorizon(); }
+      const keep = new Set(snap.entities.map((e) => e.id));
+      for (const id of [...this.drawn.keys()]) if (!keep.has(id)) this.undraw(id);
+      for (const e of snap.entities) this.draw(e, !this.drawn.has(e.id));
+      this.stats.resyncs++;
+    } catch { /* next check retries */ } finally { this.resyncing = false; }
+  }
+
   async start(signal: AbortSignal) {
+    this.signal = signal;
     let snap: Snapshot;
     try { const r = await fetch(this.api('/v1/world/snapshot'), { signal }); if (!r.ok) return; snap = await r.json(); } catch { return; }
     if (signal.aborted || snap.contract !== 'world/1') return;
@@ -52,13 +74,21 @@ export class WorldEntityLayer {
   }
 
   /** Consume hub messages (the viewer keeps the last 300 edge messages; we only act on newer diffs). */
+  readonly stats = { edgeSeen: 0, applied: 0, resyncs: 0, lastError: null as string | null };
   applyEdge(msgs: readonly { type: string; kind?: string; seq?: unknown }[]) {
     if (!this.model) return;
     for (const m of msgs) {
       if (m.kind !== 'world-diff' || typeof m.seq !== 'number' || m.seq <= this.seq) continue;
-      const d = m as unknown as DiffMsg;
+      this.stats.edgeSeen++;
+      if (m.seq > this.seq + 1) { void this.resync(); return; }  // a gap: something was missed; take the whole picture again
+      try { this.applyDiff(m as unknown as DiffMsg); this.stats.applied++; } catch (e) { this.stats.lastError = String(e); this.seq = m.seq; }
+    }
+  }
+  private applyDiff(d: DiffMsg) {
+    if (!this.model) return;
+    {
       this.seq = d.seq;
-      for (const def of d.diff.defs) { this.model.defs.set('sha:' + def.hash, def); this.model.defs.set(def.ref, def); if (def.ref.startsWith('core-')) this.model.defs.set('core/' + def.ref.slice(5), def); }
+      for (const def of [...(d.defs ?? []), ...d.diff.defs]) { this.model.defs.set('sha:' + def.hash, def); this.model.defs.set(def.ref, def); if (def.ref.startsWith('core-')) this.model.defs.set('core/' + def.ref.slice(5), def); }
       for (const id of d.diff.removes) { this.model.delete(id); this.undraw(id); }
       for (const e of d.diff.upserts) { if (this.model.entities.has(e.id)) this.model.delete(e.id); this.model.insert(e); }
       if (d.ground) { this.model.terrain = new Terrain(d.ground); this.rebuildTerrain(new Set(d.diff.tiles)); this.rebuildWater(); }
@@ -72,6 +102,10 @@ export class WorldEntityLayer {
   update(dt: number, nowMs: number, baseGround?: THREE.Object3D) {
     this.now = nowMs;
     if (!this.active) return;
+    if (nowMs - this.lastSeqCheck > 20_000 && this.signal) {  // cheap heartbeat: did we miss anything while the socket was down?
+      this.lastSeqCheck = nowMs;
+      void fetch(this.api('/v1/world/seq'), { signal: this.signal }).then((r) => (r.ok ? r.json() : null)).then((j: { seq: number } | null) => { if (j && j.seq !== this.seq) void this.resync(); }).catch(() => {});
+    }
     if (baseGround) baseGround.traverse((o) => { if (o.name === 'outside-ground' && !this.hiddenBase.has(o)) { o.visible = false; this.hiddenBase.add(o); } });
     for (const [id, d] of this.drawn) {
       const t = easeOut((nowMs - d.t0) / 1000 / d.dur);
@@ -96,6 +130,9 @@ export class WorldEntityLayer {
     if (!Number.isFinite(x0)) { const h = Math.min(120, this.model.constants.extent / 4); return [-h, -h, h, h]; }
     return [x0, z0, x1, z1];
   }
+
+  /** Terrain meshes, for picking a ground point with a ray (flags). */
+  terrainMeshes(): THREE.Object3D[] { return [...this.sectors.values()]; }
 
   /** Height for the camera clamp and anything else that asks; null outside the extent. */
   groundAt = (x: number, z: number): number | null => {
@@ -176,8 +213,6 @@ export class WorldEntityLayer {
       geo.rotateX(Math.PI / 2); // Shape (x, y) → world (x, z); +y up handled by rotation
       const mesh = new THREE.Mesh(geo, this.material('water', () => new THREE.MeshStandardMaterial({ color: 0x3a7ca8, transparent: true, opacity: 0.78, roughness: 0.25, metalness: 0.1, side: THREE.DoubleSide, depthWrite: false })));
       mesh.position.y = w.level; mesh.name = 'entity-water'; mesh.userData.cameraTransparent = true;
-      // ShapeGeometry's rotateX maps shape y → -z; flip to match world z
-      mesh.scale.z = -1;
       this.waterGroup.add(mesh);
     }
     if (g.seaLevel !== undefined) {
@@ -255,6 +290,12 @@ export class WorldEntityLayer {
           mesh.scale.set(w, h, d); mesh.position.y = h / 2;
           mesh.castShadow = true; mesh.receiveShadow = true;
           const holder = new THREE.Group(); holder.add(mesh); holder.name = `entity ${e.name ?? e.id}`;
+          if (def.tags.includes('flag')) { // pennant + floating label
+            const pennant = new THREE.Mesh(this.box(), this.material('std:#d9534f', () => new THREE.MeshStandardMaterial({ color: '#d9534f', roughness: 0.7, side: THREE.DoubleSide })));
+            pennant.scale.set(0.9, 0.5, 0.02); pennant.position.set(0.45, h - 0.3, 0); holder.add(pennant);
+            const label = typeof e.state?.label === 'string' && e.state.label ? e.state.label : (e.name ?? e.id);
+            const sprite = labelSprite(label); sprite.position.y = h + 0.6; holder.add(sprite);
+          }
           if (def.tags.includes('tree')) { // a quick canopy so trees read as trees until M5's generator
             const canopy = new THREE.Mesh(this.sphere(), this.material('std:#3f7d3a', () => new THREE.MeshStandardMaterial({ color: '#3f7d3a', roughness: 0.9 })));
             canopy.scale.set(w * 5, h * 0.55, d * 5); canopy.position.y = h * 0.8; canopy.castShadow = true; holder.add(canopy);
@@ -305,19 +346,29 @@ export class WorldEntityLayer {
   private material(key: string, make: () => THREE.Material) { let m = this.materials.get(key); if (!m) { m = make(); this.materials.set(key, m); } return m; }
 }
 
+function labelSprite(text: string): THREE.Sprite {
+  const canvas = document.createElement('canvas'); const ctx = canvas.getContext('2d')!;
+  ctx.font = '600 28px system-ui, sans-serif'; const w = Math.ceil(ctx.measureText(text).width) + 28;
+  canvas.width = w; canvas.height = 44; const c2 = canvas.getContext('2d')!;
+  c2.fillStyle = 'rgba(20,20,20,0.75)'; c2.beginPath(); c2.roundRect(0, 0, w, 44, 10); c2.fill();
+  c2.font = '600 28px system-ui, sans-serif'; c2.fillStyle = '#fff'; c2.textBaseline = 'middle'; c2.fillText(text, 14, 23);
+  const tex = new THREE.CanvasTexture(canvas); tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+  sprite.scale.set(w / 44 * 1.2, 1.2, 1); sprite.renderOrder = 10; return sprite;
+}
 function applyTilt(obj: THREE.Object3D, e: Entity) { if (Array.isArray(e.r)) { obj.rotation.x = e.r[1]; obj.rotation.z = e.r[2]; } }
 function disposeObject(o: THREE.Object3D) { o.traverse((c) => { const m = c as THREE.Mesh; if ((m as unknown as THREE.InstancedMesh).isInstancedMesh) (m as unknown as THREE.InstancedMesh).dispose(); }); }
 const num = (v: unknown, d: number) => (typeof v === 'number' ? v : d);
 const frac = (n: number) => { const x = Math.sin(n) * 43758.5453; return x - Math.floor(x); };
 function hashSeed(s: string) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return (h >>> 0) % 100000; }
+const GRASS = new THREE.Color(0x5f9a4c), MEADOW = new THREE.Color(0x7e8a6e), ROCK = new THREE.Color(0x8d8a84), SAND = new THREE.Color(0xa89b6f), SNOW = new THREE.Color(0xf2f4f6);
 function terrainColor(c: THREE.Color, y: number, slope: number, base: number) {
   const h = y - base;
-  if (slope > 0.9 || h > 120) c.set(0x8d8a84);        // rock
-  else if (h > 70) c.set(0x7e8a6e);                     // high meadow
-  else if (slope > 0.5) c.set(0x7a8d5e);                // steep grass
-  else if (h < -0.2) c.set(0xa89b6f);                   // lake bed / sand
-  else c.set(0x5f9a4c);                                  // grass
-  if (h > 150) c.lerp(new THREE.Color(0xf2f4f6), Math.min(1, (h - 150) / 40)); // snow
+  c.copy(h < -0.2 ? SAND : GRASS);
+  if (h > 40) c.lerp(MEADOW, Math.min(1, (h - 40) / 60));          // thinner grass with altitude
+  const rocky = Math.min(1, Math.max(0, (slope - 0.7) / 0.9));       // grass holds to ~35°, bare rock past ~58°
+  c.lerp(ROCK, rocky);
+  if (h > 140) c.lerp(SNOW, Math.min(1, (h - 140) / 50));           // snow line
 }
 function waterLevel(g: Ground, x: number, z: number): number | null {
   let level: number | null = null;

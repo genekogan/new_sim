@@ -224,7 +224,7 @@ export class WorldModel {
   snapshot() {
     return {
       constants: this.constants, state: this.state, seed: this.seed, seq: this.seq, editSeq: this.editSeq,
-      defs: [...new Set(this.defs.values())], entities: [...this.entities.values()], ground: this.terrain.ground,
+      defs: [...new Set(this.defs.values())].sort((a, b) => (a.ref < b.ref ? -1 : 1)), entities: [...this.entities.values()].sort((a, b) => (a.id < b.id ? -1 : 1)), ground: this.terrain.ground,
     };
   }
   static fromSnapshot(s: ReturnType<WorldModel['snapshot']>, assets?: AssetLookup): WorldModel {

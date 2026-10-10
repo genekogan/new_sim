@@ -64,6 +64,8 @@ export async function map(opts = {}) {
   if (s.ground.waters.length) { lines.push('## water'); for (const w of s.ground.waters) lines.push(`- ${nameOf(w.id)}: level ${w.level}${w.area ? ` over ${w.area.length}-gon` : ''}`); }
   const roots = s.entities.filter((e) => e.in.parent === 'world');
   if (roots.length) { lines.push('## things'); for (const e of roots) { const kids = s.entities.filter((k) => k.in.parent === e.id); lines.push(`- ${path(e)} [${e.def}] ${e.p ? `at (${e.p.map((v) => +v.toFixed(2)).join(', ')})` : e.shape ? `shape ${Object.keys(e.shape)[0]}` : ''}${e.r !== undefined ? ` yaw ${typeof e.r === 'number' ? e.r.toFixed(2) : e.r.map((v) => v.toFixed(2)).join('/')}` : ''}${e.state ? ` state ${JSON.stringify(e.state)}` : ''}${kids.length ? ` (${kids.map((k) => k.name ?? k.id).join(', ')})` : ''}`); } }
+  const fl = s.entities.filter((e) => e.def.includes('flag'));
+  if (fl.length) { lines.push('## flags (reference points: --at flag:<name> [--offset dx,dz])'); for (const e of fl) lines.push(`- flag:${e.name} "${e.state?.label ?? ''}" at (${e.p?.[0]}, ${e.p?.[e.p.length - 1]})`); }
   if (s.prayers.length) { lines.push('## prayers'); for (const p of s.prayers) lines.push(`- ${p.id} from ${p.soul_name}: ${p.text}`); }
   if (opts.json) return { text: lines.join('\n'), snapshot: s };
   return lines.join('\n');
@@ -78,10 +80,31 @@ export async function defs(filter) {
 export async function act(batch, note) { return ok(await call('/v1/god/act', { body: { ...batch, ...(note ? { note } : {}) } }), 'act'); }
 export async function dryrun(batch) { return ok(await call('/v1/god/dryrun', { body: batch }), 'dryrun'); }
 const num = (v) => { const n = Number(v); if (!Number.isFinite(n)) throw new Error(`not a number: ${v}`); return n; };
+/** Resolve "x,z" | "flag:<name>" | "<path>" [+ "--offset dx,dz"] to [x, z] using the live snapshot. */
+async function resolveAt(spec, offset) {
+  let p;
+  if (/^-?\d/.test(spec)) p = spec.split(',').map(num);
+  else {
+    const s = await snapshot(); const byId = new Map(s.entities.map((e) => [e.id, e]));
+    const name = spec.replace(/^flag:/, '');
+    const e = s.entities.find((x) => x.name === name && (!spec.startsWith('flag:') || x.def.includes('flag'))) ?? s.entities.find((x) => x.state?.label === name);
+    if (!e) throw new Error(`no such reference: ${spec} (run: flags)`);
+    // world pose: walk up parents (flags and most references are roots; children use the parent's frame)
+    let x = 0, z = 0, cur = e; const chain = []; while (cur) { chain.unshift(cur); cur = cur.in.parent === 'world' ? null : byId.get(cur.in.parent); }
+    let yaw = 0; for (const c of chain) { const lp = c.p ?? [0, 0], lx = lp[0], lz = lp[lp.length - 1], ly = typeof c.r === 'number' ? c.r : Array.isArray(c.r) ? c.r[0] : 0; x += lx * Math.cos(yaw) + lz * Math.sin(yaw); z += -lx * Math.sin(yaw) + lz * Math.cos(yaw); yaw += ly; }
+    p = [Math.round(x * 100) / 100, Math.round(z * 100) / 100];
+  }
+  if (offset) { const [dx, dz] = offset.split(',').map(num); p = [p[0] + dx, p[1] + dz]; }
+  return p;
+}
+/** flags: every reference point with its label and position. */
+export async function flags() { const s = await snapshot(); return s.entities.filter((e) => e.def.includes('flag')).map((e) => ({ name: e.name, label: e.state?.label ?? '', at: e.p ? [e.p[0], e.p[e.p.length - 1]] : null })); }
+/** flag <label> --at x,z : drop a reference point. */
+export async function flag(label, flagsIn) { const p = await resolveAt(flagsIn.at ?? '0,0', flagsIn.offset); const name = label.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'flag'; return act({ ops: [{ op: 'place', def: 'core/flag@1', name, p, state: { label } }] }); }
 /** place <def> --at x,z [--yaw r] [--name n] [--in parent[/slot]] [--param k=v]... [--nudge] */
 export async function place(def, flags) {
   const op = { op: 'place', def: def.includes('@') ? def : `core/${def}@1`, mode: flags.nudge ? 'nudge' : 'strict' };
-  if (flags.at) op.p = flags.at.split(',').map(num);
+  if (flags.at) op.p = flags.in ? flags.at.split(',').map(num) : await resolveAt(flags.at, flags.offset);
   if (flags.yaw !== undefined) op.r = num(flags.yaw);
   if (flags.name) op.name = flags.name;
   if (flags.in) { const [parent, slot] = flags.in.split('/'); op.in = { parent, ...(slot ? { slot } : {}) }; }
@@ -94,7 +117,7 @@ export async function place(def, flags) {
 /** terrain <mountain|hill|knoll|plateau|lake|pond> ... same flags as place; shapes for ranges/lakes. */
 export const terrain = place;
 export async function remove(id) { return act({ ops: [{ op: 'remove', id }] }); }
-export async function move(id, flags) { const op = { op: 'move', id, mode: flags.nudge ? 'nudge' : 'strict' }; if (flags.at) op.p = flags.at.split(',').map(num); if (flags.yaw !== undefined) op.r = num(flags.yaw); if (flags.in) { const [parent, slot] = flags.in.split('/'); op.in = { parent, ...(slot ? { slot } : {}) }; } if (flags.scale) op.s = num(flags.scale); return act({ ops: [op] }); }
+export async function move(id, flags) { const op = { op: 'move', id, mode: flags.nudge ? 'nudge' : 'strict' }; if (flags.at) op.p = flags.in ? flags.at.split(',').map(num) : await resolveAt(flags.at, flags.offset); if (flags.yaw !== undefined) op.r = num(flags.yaw); if (flags.in) { const [parent, slot] = flags.in.split('/'); op.in = { parent, ...(slot ? { slot } : {}) }; } if (flags.scale) op.s = num(flags.scale); return act({ ops: [op] }); }
 export async function set(id, flags) { const op = { op: 'set', id }; if (flags.state) op.state = JSON.parse(flags.state); if (flags.param) op.params = Object.fromEntries([].concat(flags.param).map((kv) => { const [k, v] = kv.split('='); return [k, /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v]; })); if (flags.name) op.name = flags.name; return act({ ops: [op] }); }
 export async function recolor(id, color) { return act({ ops: [{ op: 'set', id, state: { paint: color } }] }).catch(() => act({ ops: [{ op: 'set', id, params: { color } }] })); }
 export async function sky(flags) { return act({ ops: [{ op: 'world', state: { sky: { palette: flags.palette ?? 'clear-day', sun: flags.sun !== undefined ? num(flags.sun) : 0.6 } } }] }); }
@@ -119,6 +142,7 @@ const COMMANDS = {
   map: (r, f) => map({ json: !!f.json }), defs: (r) => defs(r[0]), snapshot,
   act: (r, f) => act(JSON.parse(r[0] ?? readFileSync(0, 'utf8')), f.note), dryrun: (r) => dryrun(JSON.parse(r[0] ?? readFileSync(0, 'utf8'))),
   place: (r, f) => place(r[0], f), terrain: (r, f) => terrain(r[0], f), remove: (r) => remove(r[0]), move: (r, f) => move(r[0], f), set: (r, f) => set(r[0], f), recolor: (r) => recolor(r[0], r[1]), sky: (r, f) => sky(f), constitution: (r) => constitution(r.join(' ')),
+  flags, flag: (r, f) => flag(r.join(' '), f),
   undo, redo, prayers, answer: (r) => answer(r[0], r.slice(1).join(' ')), edits: (r) => edits(r[0] ? Number(r[0]) : 20), stream: (r) => stream(r[0] ? Number(r[0]) : 60),
 };
 if (import.meta.url === `file://${process.argv[1]}`) {

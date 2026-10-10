@@ -47,11 +47,16 @@ test('knoll here, cottage on it: settles on a terrace, bench in front, path addr
   const wp = w.worldPose(bench);
   assert.ok(Math.hypot(wp.x - 48, wp.z - 10) > 4, 'bench is in the cottage frame, in front');
   // undo = apply the inverse
-  const undo = ok(applyBatch(w, { ops: placed.inverse! }, 'god', 3, { trusted: true }));
+  const undoR = applyBatch(w, { ops: placed.inverse! }, 'god', 3, { trusted: true }); const undo = ok(undoR); lastUndoInverse = undoR.inverse!;
   assert.ok(undo.seq === 3);
   assert.equal(w.get('cottage-1'), undefined);
   assert.ok(!w.ground().landforms.some((l) => l.id.endsWith(':pad')), 'pad removed with the cottage');
+  // undo the undo: the cottage and its terrace come back
+  ok(applyBatch(w, { ops: undo_inverse() }, 'god', 4, { trusted: true }));
+  assert.ok(w.ground().landforms.some((l) => l.id.endsWith(':pad')), 'pad restored with the cottage');
+  function undo_inverse() { return lastUndoInverse; }
 });
+let lastUndoInverse: unknown[] = [];
 
 test('overlap is refused with a suggestion; nudge moves it; declared overlaps pass', () => {
   const w = fresh();
@@ -151,4 +156,17 @@ test('a batch of 50 placements validates fast', () => {
   ok(applyBatch(w, { ops }, 'god', 1));
   const ms = performance.now() - t0;
   assert.ok(ms < 250, `50 placements took ${ms.toFixed(1)} ms`);
+});
+
+test('furniture inside a building is not an overlap with the building; two chairs on one spot are', () => {
+  const w = fresh();
+  ok(applyBatch(w, { ops: [
+    { op: 'place', tmp: '$c', def: coreRef('cottage'), name: 'c', p: [0, 0] },
+    { op: 'place', tmp: '$t', def: coreRef('table'), name: 't', in: { parent: '$c' }, p: [0, 0, 0] },
+    { op: 'place', def: coreRef('chair'), name: 'ch', in: { parent: '$c' }, p: [1.0, 0, 0] },
+    { op: 'place', def: coreRef('bowl'), name: 'b', in: { parent: '$t', slot: 'top' } },
+  ] }, 'god', 1));
+  const f = refused(applyBatch(w, { ops: [{ op: 'place', def: coreRef('chair'), name: 'ch2', in: { parent: 'c' }, p: [1.0, 0, 0] }] }, 'god', 2));
+  assert.equal(f[0].code, 'overlap.solid');
+  assert.ok(f[0].detail.includes('ch'), f[0].detail);
 });

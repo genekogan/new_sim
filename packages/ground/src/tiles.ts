@@ -1,6 +1,6 @@
 // Tiles: 64 m squares sampled at 1 m (65 × 65 Float32). Both sides bake from
 // the same Ground and sample tiles bilinearly; tile hashes are compared.
-import { heightAt, influenceBounds } from './height.ts';
+import { heightAt, influenceBounds, orderedLandforms } from './height.ts';
 import { TILE_M, TILE_N, type Ground, type Landform } from './types.ts';
 
 export type TileKey = string; // "tx,tz"
@@ -11,7 +11,8 @@ export const tileOf = (x: number, z: number): [number, number] => [Math.floor(x 
 export function groundForTile(g: Ground, tx: number, tz: number): Ground {
   const x0 = tx * TILE_M, z0 = tz * TILE_M, x1 = x0 + TILE_M, z1 = z0 + TILE_M;
   const hits = (b: [number, number, number, number]) => b[2] >= x0 && b[0] <= x1 && b[3] >= z0 && b[1] <= z1;
-  return { ...g, landforms: g.landforms.filter((l) => hits(influenceBounds(l))) };
+  const landforms = orderedLandforms(g.landforms).filter((l) => hits(influenceBounds(l)));
+  return { ...g, landforms, _ordered: landforms } as Ground;
 }
 
 export function bakeTile(g: Ground, tx: number, tz: number): Float32Array {

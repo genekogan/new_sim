@@ -2,7 +2,7 @@
 // committed change with its inverse (spec §5). Two phases: `plan` simulates on
 // a scratch copy and never touches the model; `commit` applies a plan. The god
 // skill runs `plan` locally (dry runs); the server runs both.
-import { footprintOf, padFor, settle, type Landform } from '@sim/ground';
+import { footprintOf, padFor, settle, SKIRT_MAX_M as SKIRT_MAX, type Landform } from '@sim/ground';
 import { hashOf } from './hash.ts';
 import { WorldModel, obbOverlap, type OBB } from './model.ts';
 import { batchSchema, trustedBatchSchema, type Batch, type Entity, type Failure, type Field, type Op, type Result, type StoredDef, type Value, worldStateSchema } from './schemas.ts';
@@ -281,12 +281,19 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
       if (anchor === 'base' && st.needsPad && (def.components.foundation?.kind ?? 'pad') === 'pad') {
         (e as Entity & { _pad?: Landform })._pad = padFor(`${e.id}:pad`, fp, st.y);
       }
+    } else if (p.length === 3 && (e.anchor ?? def.anchor) === 'base' && def.layer !== 'volume' && !baked.landform && (def.components.foundation?.kind ?? 'pad') === 'pad') {
+      // a pre-settled pose (restore after undo, or an explicit y): keep y, but a building on a slope still needs its terrace
+      const yaw = typeof e.r === 'number' ? e.r : Array.isArray(e.r) ? e.r[0] : 0;
+      const fp = footprintOf(p[0], p[2], (baked.box[0] * s) / 2, (baked.box[2] * s) / 2, yaw);
+      const st = settle(w.terrain, fp, 'base');
+      if (st.needsPad || Math.abs(st.y - p[1]) > SKIRT_MAX) (e as Entity & { _pad?: Landform })._pad = padFor(`${e.id}:pad`, fp, p[1]);
     }
   }
   // overlap (solids only; ancestors, descendants and declared overlaps are exempt)
   if (def.layer === 'solid' && baked.colliders.length) {
     const boxes = w.footprint(e, def);
-    const exempt = new Set([e.id, ...w.ancestors(e.id), ...w.subtree(e.id)]);
+    const exempt = new Set([e.id, ...w.subtree(e.id)]);
+    for (let pid: string | undefined = e.in.parent === 'world' ? undefined : e.in.parent; pid; pid = w.entities.get(pid)?.in.parent === 'world' ? undefined : w.entities.get(pid)?.in.parent) exempt.add(pid);
     for (const other of w.near(boxes)) {
       if (exempt.has(other)) continue;
       const oe = w.entities.get(other); if (!oe) continue;
@@ -307,7 +314,8 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
 }
 
 function suggestFrom(a: OBB, b: OBB): Failure['suggest'] {
-  const dx = a.c[0] - b.c[0], dz = a.c[1] - b.c[1], len = Math.sqrt(dx * dx + dz * dz) || 1;
+  let dx = a.c[0] - b.c[0], dz = a.c[1] - b.c[1], len = Math.sqrt(dx * dx + dz * dz);
+  if (len < 1e-6) { dx = 1; dz = 0; len = 1; } // coincident centres: push east
   const push = Math.sqrt(a.half[0] ** 2 + a.half[1] ** 2) + Math.sqrt(b.half[0] ** 2 + b.half[1] ** 2) - len + 0.2;
   return { p: [Math.round((a.c[0] + (dx / len) * push) * 100) / 100, Math.round((a.c[1] + (dz / len) * push) * 100) / 100] };
 }

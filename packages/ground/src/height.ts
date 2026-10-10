@@ -15,11 +15,18 @@ export function landformBounds(l: Landform): [number, number, number, number] {
 const inBounds = (b: [number, number, number, number], x: number, z: number) => x >= b[0] && x <= b[2] && z >= b[1] && z <= b[3];
 
 /** Raw height at (x, z). Prefer Terrain.sample() (tile-interpolated) for anything that must match the browser. */
+/** Landforms in canonical fold order (class, then id), so a reloaded world sums in the same order to the bit. */
+export function orderedLandforms(landforms: Landform[]): Landform[] {
+  const rank = (l: Landform) => (l.kind === 'pad' ? 2 : l.kind === 'carve' ? 1 : 0);
+  return [...landforms].sort((a, b) => rank(a) - rank(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+}
+
 export function heightAt(g: Ground, x: number, z: number): number {
   let h = g.base;
+  const forms = (g as Ground & { _ordered?: Landform[] })._ordered ?? orderedLandforms(g.landforms);
   if (g.noise && g.noise.amp > 0) h += g.noise.amp * valueNoise(x, z, g.noise.scale, g.noise.seed);
   // natural
-  for (const l of g.landforms) {
+  for (const l of forms) {
     if (l.kind === 'bump') {
       const d = Math.sqrt(sq(x - l.c[0]) + sq(z - l.c[1])) / l.r;
       if (d < 1) h += l.h * powPeak(bumpK(d), l.peak);
@@ -33,14 +40,14 @@ export function heightAt(g: Ground, x: number, z: number): number {
     }
   }
   // carve
-  for (const l of g.landforms) {
+  for (const l of forms) {
     if (l.kind !== 'carve') continue;
     const b = landformBounds(l); if (!inBounds(b, x, z)) continue;
     const m = l.area ? areaMask(x, z, l.area, l.edge) : pathMask(x, z, l.path!, l.w!);
     if (m > 0 && l.bed < h) h += (l.bed - h) * m;
   }
   // pad
-  for (const l of g.landforms) {
+  for (const l of forms) {
     if (l.kind !== 'pad') continue;
     const b = influenceBounds(l); if (!inBounds(b, x, z)) continue;
     const m = padMask(x, z, l.area, l.edge);

@@ -61,7 +61,7 @@ export class WorldStore {
       const del = this.db.db.prepare('DELETE FROM world_entities_v1 WHERE world_id=? AND id=?');
       for (const id of diff.removes) del.run(this.worldId, id);
       this.writeMeta(model, owner);
-      this.db.db.prepare('INSERT INTO world_edits_v1 (world_id, seq, by, at, note, ops, inverse, undone, undo_of, kind) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)')
+      if (edit.ops.length || edit.kind !== 'edit') this.db.db.prepare('INSERT INTO world_edits_v1 (world_id, seq, by, at, note, ops, inverse, undone, undo_of, kind) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)')
         .run(this.worldId, edit.seq, edit.by, edit.at, edit.note ?? null, JSON.stringify(edit.ops), JSON.stringify(edit.inverse), edit.undoOf ?? null, edit.kind);
       if (edit.kind === 'undo') this.db.db.prepare('UPDATE world_edits_v1 SET undone=1 WHERE world_id=? AND seq=?').run(this.worldId, edit.undoOf!);
       if (edit.kind === 'redo') this.db.db.prepare('UPDATE world_edits_v1 SET undone=1 WHERE world_id=? AND seq=?').run(this.worldId, edit.undoOf!);

@@ -48,6 +48,14 @@ Shortcuts: `place cottage --at 48,10 --yaw 1.2 --name cottage`,
 `place bench --in cottage --at 0,0,5`, `set cottage --state '{"paint":"#3366cc"}'`,
 `move bench --at 0,0,3`, `recolor cottage '#3366cc'`, `remove woods`, `undo`, `redo`.
 
+## Flags: reference points
+
+Early on there is nothing to point at. Drop labelled flags and build relative
+to them: `flag "camp" --at 40,10`, then `place cottage --at flag:camp --offset 8,0`,
+`terrain knoll --at flag:camp`. The owner can also Alt+click the ground on the
+website to drop one. `flags` lists them; `map` shows them. Flags are `core/flag`
+entities (no collider); remove them like anything else when they have served.
+
 ## Refusal codes
 
 `overlap.solid` (a `suggest.p` is offered; or retry with `mode:"nudge"`),

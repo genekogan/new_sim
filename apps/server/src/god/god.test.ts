@@ -58,7 +58,8 @@ test('hello world over HTTP: build, read as a viewer, undo/redo, persistence acr
   const empty = await f.req('/v1/world/snapshot');
   assert.equal(empty.data.entities.length, 0);
   assert.equal(empty.data.constants.extent, 1000);
-  assert.ok(Object.keys(empty.data.tiles).length === 256, 'a 1 km world is 16×16 tiles');
+  const ground = await f.req('/v1/world/ground');
+  assert.ok(Object.keys(ground.data.tiles).length === 256, 'a 1 km world is 16×16 tiles');
   const dry = await f.req('/v1/god/dryrun', { token, body: { ops: [{ op: 'place', def: coreRef('mountain'), name: 'east', shape: { path: [[300, -200], [340, 220]], width: 140 } }] } });
   assert.equal(dry.data.accepted, true);
   assert.equal(f.god.model.entities.size, 0, 'dry run places nothing');
