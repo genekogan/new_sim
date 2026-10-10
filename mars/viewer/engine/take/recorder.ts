@@ -129,6 +129,9 @@ export class TakeRecorder implements RuntimeObserver {
     const ids = Object.keys(ents).sort();
     for (const id of ids) {
       const e = ents[id];
+      // entity-world fixtures/items (world-edit/1, lane L9) are drawn by the viewer's entity layer from the entity
+      // world's own diffs; the take carries only what the engine moves (bodies). Absent in every authored world.
+      if (e.tags?.includes('entity-world')) continue;
       const s = quantize(e, t);
       const tr = this.tracks.get(id);
       if (!tr) this.tracks.set(id, { committed: s, pending: [], out: [s] });

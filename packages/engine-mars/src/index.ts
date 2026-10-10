@@ -29,3 +29,6 @@ export * from "./eden-lecture-engine.ts";
 
 export * from "./eden-ground-engine.ts";
 export * from './mars-2026-map.ts';
+
+export * from './entity-physics.ts';
+export * from './catalog-adapter.ts';

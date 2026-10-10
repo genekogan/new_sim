@@ -1,15 +1,21 @@
 // Diagnostics for builders (spec 33 §2 row 10): terrain samples, entity bounds, free-plot search,
-// clearance at a pose. Pure functions over the WorldModel; reachability arrives with Stage B (L9).
+// clearance at a pose. Pure functions over the WorldModel; `reach` asks the Soul engine through the bridge (L9).
 // Owner: L1 (contract); L7 extends (solver helpers), L9 adds `reach`.
 import { mediumAt, waterDepthAt } from '@sim/ground';
-import { obbOverlap, type OBB, type WorldModel } from '@sim/world-compiler';
+import { obbOverlap, type OBB, WorldModel } from '@sim/world-compiler';
+
+/** A reach end: a point [x, z] (ground) or [x, y, z], an entity id/path (a Soul's body, a chair…), or `<path>:<room>`. */
+export type ReachEnd = string | [number, number] | [number, number, number];
+export type ReachFn = (from: ReachEnd, to: ReachEnd) => unknown;
+/** Reachability needs the Soul engine; the engine bridge (engine-bridge.ts, lane L9) registers it per world model. */
+export const reachProviders = new WeakMap<WorldModel, ReachFn>();
 
 export type QueryInput = {
   points?: [number, number][];
   entity?: string;
   free?: { size: [number, number]; near?: [number, number]; radius?: number; maxSlope?: number; avoidWater?: boolean; count?: number };
   clearance?: { at: [number, number]; size: [number, number]; yaw?: number };
-  reach?: { from: string | [number, number]; to: string | [number, number] };
+  reach?: { from: ReachEnd; to: ReachEnd };
 };
 
 export function runQuery(w: WorldModel, q: QueryInput) {
@@ -46,7 +52,10 @@ export function runQuery(w: WorldModel, q: QueryInput) {
     const hits = [...w.near([box])].filter((id) => w.footprintsOf(id).some((b) => obbOverlap(box, b))).map((id) => w.pathOf(id));
     out.clearance = { clear: hits.length === 0, blockedBy: hits };
   }
-  if (q.reach) out.reach = { supported: false, note: 'reachability arrives with Stage B (Souls on terrain, lane L9)' };
+  if (q.reach) {
+    const fn = reachProviders.get(w);
+    out.reach = fn ? fn(q.reach.from, q.reach.to) : { supported: false, note: 'reachability needs the Soul engine (this world runs without it)' };
+  }
   return out;
 }
 
