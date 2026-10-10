@@ -34,7 +34,8 @@ export type MeshBuilder = {
 const builders = new Map<string, MeshBuilder>();
 export function registerMesh(b: MeshBuilder) { builders.set(b.gen, b); }
 export function meshFor(def: StoredDef): MeshBuilder | undefined {
-  for (const t of def.tags) { const byTag = builders.get(`tag:${t}`); if (byTag) return byTag; }
+  // tag builders (creature, flag, sign-text) draw generated shapes; a stored model is always drawn by `mesh`
+  if (def.make.kind !== 'mesh') for (const t of def.tags) { const byTag = builders.get(`tag:${t}`); if (byTag) return byTag; }
   return def.make.kind === 'gen' ? builders.get(def.make.gen) : def.make.kind === 'mesh' ? builders.get('mesh') : undefined;
 }
 export function registeredMeshes() { return [...builders.keys()].sort(); }

@@ -161,7 +161,9 @@ test('catalog: ranked search with synonyms; def detail with an example op; thumb
   // the example op is valid as written
   assert.equal(f.god.act({ ops: [{ ...detail.data.example.ops[0], p: [0, 0] }] }).accepted, true);
   // thumbs
-  assert.equal((await f.req('/v1/god/defs/core/ceramic-tower@1/thumb.png')).status, 404);
+  // core mesh defs ship a thumbnail (worlds/core-assets/thumbs); a def without one answers 404
+  assert.equal((await f.req('/v1/god/defs/core/ceramic-tower@1/thumb.png')).status, 200);
+  assert.equal((await f.req('/v1/god/defs/core/bench@1/thumb.png')).status, 404);
   const png = Buffer.from('89504e470d0a1a0a0000000d49484452000000010000000108060000001f15c4890000000d49444154789c626001000000050001a5f645400000000049454e44ae426082', 'hex');
   assert.equal((await f.req('/v1/god/defs/core/ceramic-tower@1/thumb.png', { method: 'POST', body: png })).status, 200);
   const thumb = await f.app.request('/v1/god/defs/core/ceramic-tower@1/thumb.png');
