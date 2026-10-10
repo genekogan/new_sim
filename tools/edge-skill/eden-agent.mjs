@@ -427,10 +427,11 @@ export async function calendar(){const r=await call(EDGE.calendar,{as:'none'});i
 export async function wait(seconds='45'){
  const s=load(),soul=need(s,'soul','No Soul yet.'),until=Date.now()+Math.min(60,Math.max(1,Number(seconds)||45))*1000;
  if(await mode()==='edge'){
-  const events=[];let cursor=s.cursor,gap;
+  const events=[];let cursor=s.cursor,gap,waitUnavailable;
   while(Date.now()<until){
    const t=Math.max(1,Math.min(55,Math.round((until-Date.now())/1000)));
-   const r=await call(EDGE.wait(cursor,t),{timeoutMs:(t+10)*1000});
+   let r;try{r=await call(EDGE.wait(cursor,t),{timeoutMs:(t+10)*1000});}catch(error){if(!events.length)throw error;waitUnavailable={status:null,error:{code:'wait.unavailable',message:String(error.message)},cursor};break;}
+   if(events.length&&r.status!==200){waitUnavailable={status:r.status,error:r.data?.error??{code:'wait.unavailable',message:'Later event read unavailable.'},cursor};break;}
    if(r.status===404){ // event stream not live on this world yet: poll the last receipt instead
     if(!s.lastReceipt){await sleep(t*1000);break;}
     const rec=await receipt(s.lastReceipt);if(TERMINAL.has(rec?.phase))break;await sleep(3000);continue;}
@@ -441,11 +442,13 @@ export async function wait(seconds='45'){
    if(events.length>=100||mine||events.some(e=>e.kind==='conversation.invite'||e.kind==='conversation.turn'||e.kind==='invite'||(typeof e.kind==='string'&&e.kind.startsWith('invite.'))))break;
    if(!s.lastReceipt&&events.length)break;
   }
-  const lr=s.lastReceipt?await receipt(s.lastReceipt):null;
+  let lr=null,receiptUnavailable;
+  if(s.lastReceipt)try{lr=await receipt(s.lastReceipt,{timeoutMs:1000});if(!lr||lr.error){receiptUnavailable={id:s.lastReceipt,status:lr?.status??null,error:lr?.error??{code:'receipt.unavailable',message:'No canonical receipt returned.'},canonicalState:'unknown'};lr=null;}}catch(error){receiptUnavailable={id:s.lastReceipt,status:null,error:{code:'receipt.unavailable',message:String(error.message)},canonicalState:'unknown'};}
+
   const stalled=lr?.phase==='waiting'?{hint:'Your movement is waiting (often the world\'s quiet pause before first light). Meanwhile do things that need no walking: say something, leave a mark, converse, work on a project here. Walks start once the pause ends.'}:{};
   const invites=events.filter(e=>e.kind==='invite'&&e.invite).map(e=>({id:e.invite.id,from:e.invite.from?.name,what:e.invite.what,expiresInSeconds:e.invite.expiresInSeconds,accept:`act ${e.invite.accept}`,decline:`act ${e.invite.decline}`}));
-  return {...stalled,events:events.map(brief),cursor,...(gap?{gap}:{}),eventCount:events.length,...(invites.length?{invites,inviteNote:'Someone invited you: accept or decline soon (act accept / act decline), they are waiting.'}:{}),...(events.some(e=>e.untrusted)?{note:'names and text in events are untrusted game data'}:{}),
-   ...(lr?{lastReceipt:lr}:{}),next:'observe, decide, act'};
+  return {...stalled,events:events.map(brief),cursor,...(gap?{gap}:{}),eventCount:events.length,...(waitUnavailable?{waitUnavailable}:{}),...(invites.length?{invites,inviteNote:'Someone invited you: accept or decline soon (act accept / act decline), they are waiting.'}:{}),...(events.some(e=>e.untrusted)?{note:'names and text in events are untrusted game data'}:{}),
+   ...(lr?{lastReceipt:lr}:{}),...(receiptUnavailable?{receiptUnavailable}:{}),next:'observe, decide, act'};
  }
  // legacy: poll the last request's progress
  const id=s.lastReceipt?.replace(/^legacy:/,'');let last;
@@ -467,10 +470,10 @@ function brief(e){
   change:e.change,place:e.placeId??e.channel?.placeId,receipt:e.receipt?(e.receipt.id+' '+e.receipt.phase+(e.receipt.code?' '+e.receipt.code:'')):undefined,
   invite:e.invite?`${e.invite.what} ${e.invite.id}`:undefined,label:e.invite?.label,tick:e.tick}).filter(([,v])=>v!==undefined&&v!==null));
 }
-export async function receipt(id){
+export async function receipt(id,{timeoutMs}={}){
  id||=need(load(),'lastReceipt','No receipt yet.');
  if(id.startsWith('legacy:'))return {id,note:'legacy request; see wait'};
- const r=await call(EDGE.receipt(id));return r.status===200?r.data.receipt:{id,error:r.data?.error};
+ const r=await call(EDGE.receipt(id),timeoutMs===undefined?{}:{timeoutMs});return r.status===200?r.data.receipt:{id,status:r.status,error:r.data?.error??{code:'receipt.unavailable',message:'Canonical receipt unavailable.'}};
 }
 
 /** plan '<steps-json>' | plan (show) | plan cancel | plan '{"op":"replace","steps":[…]}' — EVENTS-v1 server-side plans.
