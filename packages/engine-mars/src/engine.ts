@@ -807,6 +807,32 @@ export class MarsEngine implements Engine {
     }
     return false;
   }
+  /** Fault recovery (logged inside the recovery recipe): a body whose programmes were rewound lands back at its last valid
+   * pose (taken the tick before the fault) instead of wherever the rewind left it (e.g. its arrival point). Upstairs it keeps
+   * its floor when the floor still has room there; otherwise the nearest free standing point on level 0 (dry or wadable
+   * ground on a ground world, never deep water), rings of 0.5 m out to 40 m. Refuses busy/held/sleeping/seated-aboard bodies. */
+  restoreHumanPoseV1(id: string, pose: { p: [number, number, number]; yaw?: number; level?: number }): boolean {
+    const e = this.ents[id];
+    if (!e?.human || this.byActor.has(id) || this.holders(id).length || e.human.sleepPose || e.human.on || e.human.riding || e.human.carrier) return false;
+    if (!Array.isArray(pose?.p) || pose.p.length !== 3 || !pose.p.every(Number.isFinite)) return false;
+    const spatial = this.rt.services.spatial as Spatial; spatial.sync(this.rt.world);
+    const people = Object.values(this.ents).filter((o: any) => o.kind === 'human' && o.id !== id).map((o: any) => [o.pose.p[0], o.pose.p[2], o.human?.level ?? 0] as [number, number, number]);
+    const free = (x: number, z: number, level: number) => !people.some(([px, pz, pl]) => pl === level && hypot(px - x, pz - z) < 0.8);
+    const land = (p: [number, number, number], level: number) => {
+      e.pose.p = p; if (typeof pose.yaw === 'number' && Number.isFinite(pose.yaw)) e.pose.yaw = r3(pose.yaw);
+      e.human.level = level; e.human.activity = 'idle'; e.human.speed = 0; delete e.human.shore; acknowledgeRelocation(this.rt, id); return true;
+    };
+    const [x0, y0, z0] = pose.p, level = Number.isInteger(pose.level) ? pose.level! : 0;
+    if (level > 0) { const g = spatial.level(level); if (g && clearanceAt(g, [x0, z0]) >= HUMAN_RADIUS && free(x0, z0, level)) return land([r3(x0), r3(y0), r3(z0)], level); }
+    const grid = spatial.level(0); if (!grid) return false;
+    const f = this.rt.world.groundV1 ? spatial.ground?.field : undefined;
+    const ok = (x: number, z: number) => clearanceAt(grid, [x, z]) >= HUMAN_RADIUS && free(x, z, 0) && (!f || f.medium(x, z) <= 1);
+    for (let ring = 0; ring <= 80; ring++) { const n = Math.max(1, ring * 8); for (let k = 0; k < n; k++) {
+      const ang = (k / n) * Math.PI * 2, x = r3(x0 + dcos(ang) * ring * 0.5), z = r3(z0 + dsin(ang) * ring * 0.5);
+      if (ok(x, z)) return land([x, f ? r3(standHeight(f, x, z)) : 0, z], 0);
+    } }
+    return false;
+  }
   /** attention/1 (logged 'edge-attention'): set or clear a body's gaze (head target: a body/fixture id or a point, until a tick),
    * and with `yaw` also turn a free standing body (no program, nothing holding it, awake, not seated/riding). Never cancels
    * or blocks anything the body is doing. Returns what turned. */
