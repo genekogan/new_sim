@@ -163,6 +163,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   const [graphicsUnavailable, setGraphicsUnavailable] = useState<string | null>(null);
   const [sceneryNotice,setSceneryNotice]=useState<string|null>(null);
   const [problems, setProblems] = useState<string[]>([]);
+  const [flagMode, setFlagMode] = useState(false); const flagModeRef = useRef(false); flagModeRef.current = flagMode;
+  const [entityWorld, setEntityWorld] = useState(false);
   const context = useRef({ sim, selected, onSelect, follow, cameraMode, setCameraMode, thing, setThing, onViewerState, loading, graphicsUnavailable, viewportInsets, manualNavigation, setManualNavigation, depictionBeatAt, publishSpeechAnchors, edenExpansion, localClassroomPresentation });
   context.current = { sim, selected, onSelect, follow, cameraMode, setCameraMode, thing, setThing, onViewerState, loading, graphicsUnavailable, viewportInsets, manualNavigation, setManualNavigation, depictionBeatAt, publishSpeechAnchors, edenExpansion, localClassroomPresentation };
   const past = useRef<Past | null>(null);
@@ -257,14 +259,15 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(eye?.length===3&&at?.length===3&&eye.every(Number.isFinite)&&at.every(Number.isFinite)){controls.target.set(at[0],at[1],at[2]);camera.position.set(eye[0],eye[1],eye[2]);}
       else{const [x0,z0,x1,z1]=entityLayer.viewBounds(),cx=(x0+x1)/2,cz=(z0+z1)/2,span=Math.max(60,x1-x0,z1-z0),gy=entityLayer.groundAt(cx,cz)??0;controls.target.set(cx,gy,cz);camera.position.set(cx-span*0.9,gy+span*0.55,cz+span*1.1);}
       camera.lookAt(controls.target);context.current.setCameraMode('manual');};
-    void entityLayer.start(abort.signal).then(frameEntityWorld);
+    void entityLayer.start(abort.signal).then(()=>{frameEntityWorld();setEntityWorld(entityLayer.active);});
     // Alt+click on the ground drops a labelled flag (a core/flag entity) the god can refer to as flag:<label>.
     // Owner authority: a god token minted with the page's dev identity (Privy owners: the Game lane wires getToken later).
     let godToken:string|null=sessionStorage.getItem('sim.godToken');
     const godMint=async()=>{if(godToken)return godToken;const dev=localStorage.getItem('sim.dev');if(!dev)return null;const r=await fetch(apiPath('/v1/god/mint'),{method:'POST',headers:{authorization:'Bearer dev:'+dev,'content-type':'application/json'},body:JSON.stringify({label:'browser'})});if(!r.ok)return null;godToken=(await r.json()).token;sessionStorage.setItem('sim.godToken',godToken!);return godToken;};
     const flagRay=new THREE.Raycaster(),flagNdc=new THREE.Vector2();
     const onFlagClick=async(ev:MouseEvent)=>{
-      if(!ev.altKey||!entityLayer.active)return;
+      if(!(ev.altKey||flagModeRef.current)||!entityLayer.active)return;
+      setFlagMode(false);
       const rect=renderer.domElement.getBoundingClientRect();flagNdc.set(((ev.clientX-rect.left)/rect.width)*2-1,-((ev.clientY-rect.top)/rect.height)*2+1);
       flagRay.setFromCamera(flagNdc,camera);const hit=flagRay.intersectObjects(entityLayer.terrainMeshes(),false)[0];if(!hit)return;
       const label=window.prompt(`Flag at (${hit.point.x.toFixed(0)}, ${hit.point.z.toFixed(0)}) — label:`);if(!label)return;
@@ -981,7 +984,11 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   const soul = selected ? r.souls.get(selected) : undefined;
   const cards = cardsAt(sim.plays, s.tick);
   return (
-    <section className="wide world-viewer" data-world-viewer="1" style={embedded ? { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0 } : undefined}>
+    <section className="wide world-viewer" data-world-viewer="1" style={embedded ? { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' } : { position: 'relative' }}>
+      {entityWorld && typeof localStorage !== 'undefined' && localStorage.getItem('sim.dev') && (
+        <button data-flag-button="1" title={flagMode ? 'Click the ground to drop a flag (Esc to cancel)' : 'Drop a labelled flag: a reference point for building (or Alt+click the ground)'} aria-pressed={flagMode} onClick={() => setFlagMode((v) => !v)}
+          style={{ position: 'absolute', right: 12, bottom: 12, zIndex: 5, padding: '6px 10px', borderRadius: 999, border: '1px solid rgba(0,0,0,.2)', background: flagMode ? '#e8c547' : 'rgba(255,255,255,.85)', cursor: 'pointer', fontSize: 13 }}>⚑ {flagMode ? 'click the ground…' : 'flag'}</button>
+      )}
       {!hideControls && <div className="row">
         <h2 style={{ margin: 0 }}>World</h2>
         {mode === 'live' && !status ? <span className="ok"><b>● Live</b></span> : null}
