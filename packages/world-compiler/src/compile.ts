@@ -4,6 +4,7 @@
 // skill runs `plan` locally (dry runs); the server runs both.
 import { footprintOf, padFor, settle, waterLevelAt, SKIRT_MAX_M as SKIRT_MAX, type Landform } from '@sim/ground';
 import { hashOf } from './hash.ts';
+import { offsetPolyline, pointAlong } from '@sim/generators';
 import { WorldModel, obbOverlap, type OBB } from './model.ts';
 import { batchSchema, trustedBatchSchema, type Batch, type Entity, type Failure, type Field, type Op, type Result, type StoredDef, type Value, worldStateSchema } from './schemas.ts';
 
@@ -218,6 +219,9 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   });
 
   if (failures.length) return { ok: false, failures };
+  // Persistent relationships: re-solve server-maintained constraints whose refs moved or whose ground changed (33 §3.3).
+  const resolved = resolveDependents(scratch, touched, new Set(diff.removes), new Set(diff.tiles), warnings);
+  for (const id of resolved) touched.add(id);
   for (const id of touched) { const e = scratch.entities.get(id); if (e) diff.upserts.push(e); }
   diff.tiles = [...new Set(diff.tiles)];
   const seq = world.editSeq + 1;
@@ -302,6 +306,18 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
       const occupants = [...(w.children.get(parent.id) ?? [])].filter((c) => c !== e.id && w.entities.get(c)?.in.slot === e.in.slot).length;
       if (occupants >= slot.capacity) return fail(i, 'slot.full', `${e.in.slot} holds ${slot.capacity}`);
     }
+  }
+  // along: position (and turn to face) a point on a path entity before settling
+  const along = e.constraints?.find((c) => c.kind === 'along') as { kind: 'along'; ref: string; t: number; side: 'center' | 'left' | 'right'; offset: number } | undefined;
+  if (along && e.in.parent === 'world') {
+    const ref = w.get(along.ref);
+    if (!ref || !ref.shape || !('path' in ref.shape)) return fail(i, 'constraint.unsatisfied', `along: ${along.ref} is not a path entity`);
+    const sideK = along.side === 'left' ? 1 : along.side === 'right' ? -1 : 0;
+    const path = sideK ? offsetPolyline(ref.shape.path, sideK * ((ref.shape.width ?? 0) / 2 + along.offset)) : ref.shape.path;
+    const { p: at, dir } = pointAlong(path, along.t);
+    e.p = [at[0], at[1]];
+    // front faces the path: rotate toward the centre line (for side placements), else along the travel direction
+    e.r = sideK ? Math.atan2(sideK * dir[1], -sideK * dir[0]) : Math.atan2(dir[0], dir[1]);
   }
   // settle on the ground when at the root with a 2-D position
   if (e.in.parent === 'world') {
@@ -468,4 +484,53 @@ function substitute(v: number | string | boolean, params: Record<string, Value>)
   if (typeof base !== 'number' || !m[2]) return base ?? v;
   const n = Number(m[3]);
   return m[2] === '+' ? base + n : m[2] === '-' ? base - n : m[2] === '*' ? base * n : base / n;
+}
+
+const MAX_DEPENDENTS = 500;
+/** Re-solve `float`, `facing`, `along` and ground settling for entities affected by this batch. Returns ids changed. */
+function resolveDependents(w: WorldModel, touched: Set<string>, removed: Set<string>, tiles: Set<string>, warnings: string[]): string[] {
+  const changed: string[] = [];
+  if (!touched.size && !tiles.size && !removed.size) return changed;
+  const tileOfXZ = (x: number, z: number) => `${Math.floor(x / 64)},${Math.floor(z / 64)}`;
+  for (const e of [...w.entities.values()]) {  // snapshot: re-inserting during iteration would revisit keys
+    if (changed.length >= MAX_DEPENDENTS) { warnings.push(`more than ${MAX_DEPENDENTS} dependents; run resolve to finish`); break; }
+    if (touched.has(e.id) && !e.constraints?.length) continue;
+    const def = w.resolvedDef(e.def); if (!def) continue;
+    let next: Entity | null = null;
+    const cons = e.constraints ?? [];
+    for (const c of cons) {
+      if (c.kind === 'facing') {
+        if (removed.has(w.get(c.ref)?.id ?? c.ref)) { warnings.push(`${w.pathOf(e.id)}: facing ref ${c.ref} was removed`); continue; }
+        const ref = w.get(c.ref); if (!ref || !touched.has(ref.id)) continue;
+        const me = w.worldPose(next ?? e), them = w.worldPose(ref);
+        const parentYaw = e.in.parent === 'world' ? 0 : w.worldPose(w.entities.get(e.in.parent)!).yaw;
+        const yaw = Math.atan2(them.x - me.x, them.z - me.z) - parentYaw + c.offset;
+        next = { ...(next ?? e), r: Array.isArray(e.r) ? [yaw, e.r[1], e.r[2]] : yaw };
+      } else if (c.kind === 'along') {
+        const ref = w.get(c.ref); if (!ref || !touched.has(ref.id)) continue;
+        next = { ...(next ?? e) };  // admit() recomputes the point on the path
+      }
+    }
+    // ground: root things on changed tiles settle again (float re-reads the water level)
+    if (e.in.parent === 'world' && e.p && tiles.size && !def.components.landform && def.layer !== 'volume') {
+      const x = e.p[0], z = e.p[e.p.length - 1];
+      if (tiles.has(tileOfXZ(x, z))) next = { ...(next ?? e), p: [x, z] };
+    }
+    if (!next) continue;
+    // keep a pre-existing pad-free settle: re-admit (settles y, re-applies float/facing); skip if it no longer fits
+    const prevP = e.p, prevR = e.r;
+    const trial: Entity = { ...next, v: e.v + 1 };
+    w.delete(e.id);
+    const problem = admitForResolve(w, trial, def);
+    if (problem) { w.insert(e); w.index(e.id, w.footprint(e, def)); warnings.push(`${w.pathOf(e.id)}: ${problem}`); continue; }
+    w.insert(trial); if (def.layer === 'solid') w.index(trial.id, w.footprint(trial, def));
+    if (JSON.stringify(prevP) !== JSON.stringify(trial.p) || JSON.stringify(prevR) !== JSON.stringify(trial.r)) changed.push(e.id); else { w.delete(trial.id); w.insert(e); if (def.layer === 'solid') w.index(e.id, w.footprint(e, def)); }
+  }
+  return changed;
+}
+/** Settle-and-orient only (no overlap refusal: a dependent follows its ref even into a tight spot; warnings report it). */
+function admitForResolve(w: WorldModel, e: Entity, def: StoredDef): string | null {
+  const f = admit(w, e, def, -1, 'strict', false);
+  if (!f) return null;
+  return f.code === 'overlap.solid' ? null : `${f.code}: ${f.detail}`;
 }

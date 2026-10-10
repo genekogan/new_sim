@@ -77,3 +77,28 @@ test('river/1 stub carves a bed and lays path water; building/1 stub is hollow w
   assert.ok(baked.colliders.length >= 4 && baked.openings!.length === 1 && baked.rooms!.length === 1);
   assert.equal(w.get('house/table')!.in.slot, 'ground');
 });
+
+test('persistent relationships: the bench keeps facing the fountain when it moves; houses ride along a road; things re-settle on new hills; ducks follow the water level', () => {
+  const w = fresh();
+  ok(applyBatch(w, { ops: [
+    { op: 'define', def: duck },
+    { op: 'place', def: coreRef('fountain'), name: 'fountain', p: [0, 0] },
+    { op: 'place', def: coreRef('bench'), name: 'b', p: [0, 8], constraints: [{ kind: 'facing', ref: 'fountain' }] },
+    { op: 'define', def: { schema: 'def/1', name: 'road', version: 1, form: 'path', layer: 'surface', size: { box: [10, 0.1, 10] }, make: { kind: 'gen', gen: 'road/1' } } },
+    { op: 'place', def: 'road@1', name: 'lane', shape: { path: [[-50, 40], [50, 40]], width: 6 } },
+    { op: 'place', def: coreRef('cottage'), name: 'h1', p: [0, 0], constraints: [{ kind: 'along', ref: 'lane', t: 0.25, side: 'left', offset: 6 }] },
+    { op: 'place', def: coreRef('rock'), name: 'rock', p: [100, 100] },
+    { op: 'place', def: coreRef('pond'), name: 'pond', shape: { area: [[200, 200], [220, 200], [220, 220], [200, 220]] }, params: { level: -0.2 } },
+    { op: 'place', def: 'duck@1', name: 'duck', p: [210, 210] },
+  ] }, 'god', 1));
+  ok(applyBatch(w, { ops: [{ op: 'move', id: 'fountain', p: [20, 8] }] }, 'god', 2));
+  const yaw = w.get('b')!.r as number;
+  assert.ok(Math.abs(yaw - Math.PI / 2) < 1e-6, `bench turned east to face the moved fountain: ${yaw}`);
+  ok(applyBatch(w, { ops: [{ op: 'move', id: 'lane', shape: { path: [[-50, 60], [50, 60]], width: 6 } }] }, 'god', 3));
+  const h1 = w.get('h1')!; assert.ok(Math.abs(h1.p![h1.p!.length - 1] - (60 + 9)) < 1e-6 || Math.abs(h1.p![h1.p!.length - 1] - (60 - 9)) < 1e-6, `house rode with the road: ${JSON.stringify(h1.p)}`);
+  const y0 = w.get('rock')!.p![1];
+  ok(applyBatch(w, { ops: [{ op: 'place', def: coreRef('hill'), name: 'hill', p: [100, 100], params: { height: 20, radius: 60 } }] }, 'god', 4));
+  assert.ok(w.get('rock')!.p![1] > y0 + 15, 'rock sits on top of the new hill, not inside it');
+  ok(applyBatch(w, { ops: [{ op: 'set', id: 'pond', params: { level: 0.5 } }] }, 'god', 5));
+  assert.equal(w.get('duck')!.p![1], 0.5, 'duck rose with the water');
+});

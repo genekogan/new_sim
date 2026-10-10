@@ -260,7 +260,10 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(eye?.length===3&&at?.length===3&&eye.every(Number.isFinite)&&at.every(Number.isFinite)){controls.target.set(at[0],at[1],at[2]);camera.position.set(eye[0],eye[1],eye[2]);}
       else{const [x0,z0,x1,z1]=entityLayer.viewBounds(),cx=(x0+x1)/2,cz=(z0+z1)/2,span=Math.max(60,x1-x0,z1-z0),gy=entityLayer.groundAt(cx,cz)??0;controls.target.set(cx,gy,cz);camera.position.set(cx-span*0.9,gy+span*0.55,cz+span*1.1);}
       camera.lookAt(controls.target);context.current.setCameraMode('manual');};
-    void entityLayer.start(abort.signal).then(()=>{frameEntityWorld();setEntityWorld(entityLayer.active);});
+    // ?shot=1: a clean picture for `god look` (canvas over every overlay, camera from eye/at, title 'ready' once drawn).
+    const shotMode=new URLSearchParams(location.search).has('shot');
+    if(shotMode){const c=renderer.domElement;Object.assign(c.style,{position:'fixed',inset:'0',width:'100vw',height:'100vh',zIndex:'2147483000'});document.title='loading';}
+    void entityLayer.start(abort.signal).then(()=>{frameEntityWorld();setEntityWorld(entityLayer.active);if(shotMode)setTimeout(()=>{document.title=entityLayer.active?'ready':'no-entity-world';(window as unknown as {__shotReady?:boolean}).__shotReady=true;},Math.max(2500,Number(new URLSearchParams(location.search).get('settle')??'3000')));});
     // Alt+click on the ground drops a labelled flag (a core/flag entity) the god can refer to as flag:<label>.
     // Owner authority: a god token minted with the page's dev identity (Privy owners: the Game lane wires getToken later).
     let godToken:string|null=sessionStorage.getItem('sim.godToken');
