@@ -45,6 +45,9 @@ const meshBuilder: MeshBuilder = {
     loadAsset(make.asset).then((gltf) => {
       if (gone) return;
       inst = instantiate(gltf, { box: ctx.def.size.box as [number, number, number] });
+      // flat things (rugs, boards, plates a few cm thick) would z-fight with gently uneven ground: draw them
+      // a hair towards the camera (the materials are shared per asset, so every copy of it gets the same)
+      if (ctx.def.size.box[1] <= 0.06) inst.object.traverse((o) => { const mats = (o as THREE.Mesh).material; for (const m of Array.isArray(mats) ? mats : mats ? [mats] : []) { m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -4; } });
       holder.add(inst.object);
       if (inst.clips.length) inst.play('Idle', Date.now() / 1000, { phase });
     }).catch(() => {

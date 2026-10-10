@@ -42,7 +42,9 @@ console.log(`thumbs: ${defs.length} defs`);
 
 // place them all at once on a grid (one batch per 40 so a bad one refuses alone)
 const GRID = 40, cols = Math.ceil(Math.sqrt(defs.length));
-const spot = (i) => [((i % cols) - cols / 2) * GRID, (Math.floor(i / cols) - cols / 2) * GRID];
+const big = (d) => Math.max(...d.size.box) > 10;
+const bigIdx = new Map(defs.filter(big).map((d, k) => [d.name, k]));
+const spot = (i) => (big(defs[i]) ? [260 + bigIdx.get(defs[i].name) * 120, 300] : [((i % cols) - cols / 2) * GRID, (Math.floor(i / cols) - cols / 2) * GRID]);
 const placed = [];
 for (let i = 0; i < defs.length; i += 40) {
   const chunk = defs.slice(i, i + 40);
@@ -51,12 +53,12 @@ for (let i = 0; i < defs.length; i += 40) {
   if (r.data?.accepted) placed.push(...chunk.map((d, j) => ({ d, i: i + j })));
   else for (const [j, op] of ops.entries()) { const r1 = await god('/v1/god/act', { body: { ops: [op] } }); if (r1.data?.accepted) placed.push({ d: chunk[j], i: i + j }); else console.log(`  skip ${chunk[j].publicRef}: ${r1.data?.failures?.[0]?.code}`); }
 }
-const pose = async (name) => (await api(`/v1/world/entities/${name}`)).data?.pose;
+const pose = async (name) => { const r = (await api(`/v1/world/entities/${name}`)).data; return r?.pose ? { ...r.pose, id: r.entity.id } : null; };
 
 const { chromium } = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test');
 const releaseChrome = await chromeLease('L5-thumbs');
 const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
-const page = await (await browser.newContext({ viewport: { width: 256, height: 256 } })).newPage();
+const page = await (await browser.newContext({ viewport: { width: 768, height: 768 } })).newPage();
 page.setDefaultTimeout(900_000);
 const first = placed[0];
 const p0 = first ? await pose(`t${first.i}`) : { x: 0, y: 0, z: 0 };
@@ -65,13 +67,36 @@ await page.waitForFunction(() => document.title === 'ready', null, { timeout: 1_
 let ok = 0;
 for (const { d, i } of placed) {
   const p = await pose(`t${i}`); if (!p) continue;
-  const [w, h, dd] = d.size.box, r = Math.max(w, h, dd) * 0.5 * (p.s ?? 1), dist = Math.max(1.2, r * 2.6);
-  const at = [p.x, p.y + h * 0.45 * (p.s ?? 1), p.z], eye = [at[0] - dist * 0.55, at[1] + dist * 0.45, at[2] + dist * 0.8];
-  await page.evaluate(([e, a]) => { const s = window.__simEntity; s.controls.target.set(a[0], a[1], a[2]); s.camera.position.set(e[0], e[1], e[2]); s.camera.lookAt(s.controls.target); s.controls.update?.(); }, [eye, at]);
-  // wait until this entity's GLB (if any) has loaded, then a beat for the frame
+  // wait until this entity's GLB (if any) has loaded
   await page.waitForFunction((name) => { let ready = true; window.__simEntity.layer.group.traverse((o) => { if (o.name === name && !o.getObjectByName('asset') && !o.getObjectByName('asset missing')) ready = false; }); return ready; }, `mesh ${d.name}`, { timeout: 60_000 }).catch(() => {});
-  await page.waitForTimeout(900);
-  const png = await page.screenshot({ type: 'png' });
+  // frame what is drawn now (animals wander and kin hover away from their resting pose): the object's live
+  // position and yaw, the def's box for its size (the mesh half fits the model to it), seen from its
+  // front-left (front = +z in its own frame). The page keeps its camera 2 m or more away and its own lens,
+  // so the picture is cropped around the object's projection from a fresh render and scaled to 256 × 256.
+  const [bw, bh, bd] = d.size.box, sc = p.s ?? 1;
+  const shot = await page.evaluate(async ([id, fb]) => {
+    const s = window.__simEntity, dr = s.layer.drawn.get(id), o = dr && !dr.inst ? dr.obj : null;
+    const c = o ? [o.position.x, o.position.y + fb.h / 2, o.position.z] : fb.at, yaw = o ? o.rotation.y : fb.yaw;
+    const dist = Math.max(2.4, fb.r * 2.6), k = fb.flat ? [-0.35, 1.1, 0.55] : [-0.55, 0.42, 0.8], n = Math.hypot(...k), cy = Math.cos(yaw), sy = Math.sin(yaw);
+    const eye = [c[0] + (k[0] * cy + k[2] * sy) / n * dist, c[1] + k[1] / n * dist, c[2] + (-k[0] * sy + k[2] * cy) / n * dist];
+    s.controls.target.set(c[0], c[1], c[2]); s.camera.position.set(eye[0], eye[1], eye[2]); s.camera.lookAt(s.controls.target); s.controls.update?.();
+    await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+    // where the object is now on screen, with whatever camera the page settled on
+    const cam = s.camera, cc = o ? [o.position.x, o.position.y + fb.h / 2, o.position.z] : c;
+    const v = cam.position.clone().set(cc[0], cc[1], cc[2]), dcam = cam.position.distanceTo(v);
+    v.project(cam);
+    const src = s.renderer.domElement, W = src.width, H = src.height;
+    const rpx = (fb.r / Math.max(0.01, dcam)) / Math.tan(cam.fov * Math.PI / 360) * (H / 2);
+    const side = Math.max(40, Math.min(Math.min(W, H), rpx * 2.3));
+    const px = (v.x + 1) / 2 * W, py = (1 - v.y) / 2 * H;
+    const x0 = Math.max(0, Math.min(W - side, px - side / 2)), y0 = Math.max(0, Math.min(H - side, py - side * 0.52));
+    s.renderer.render(s.scene, cam);   // draw now, then copy in the same task (the drawing buffer is not preserved)
+    const out = document.createElement('canvas'); out.width = out.height = 256;
+    const g = out.getContext('2d'); g.imageSmoothingQuality = 'high'; g.drawImage(src, x0, y0, side, side, 0, 0, 256, 256);
+    return { live: !!o, url: out.toDataURL('image/png'), side: Math.round(side) };
+  }, [p.id, { at: [p.x, p.y + bh * sc / 2, p.z], h: bh * sc, r: Math.hypot(bw, bh, bd) * 0.5 * sc, yaw: p.yaw ?? 0, flat: bh < 0.15 * Math.max(bw, bd) }]);   // rugs, boards, plates: look down on them
+  if (!shot.live) console.log(`  ${d.publicRef}: framed from the server pose (instanced or no live object)`);
+  const png = Buffer.from(shot.url.split(',')[1], 'base64');
   writeFileSync(resolve(out, `${d.name}.png`), png);
   if (args.core && d.ref.startsWith('core-')) { mkdirSync(resolve(root, 'worlds/core-assets/thumbs'), { recursive: true }); writeFileSync(resolve(root, 'worlds/core-assets/thumbs', `${d.hash}.png`), png); }
   const put = await god(`/v1/god/defs/${d.publicRef}/thumb.png`, { raw: png, headers: { 'content-type': 'image/png' } });
