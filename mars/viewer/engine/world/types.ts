@@ -220,6 +220,9 @@ export type WorldState = {
   /** Prospective elevated guard prisms; absent before their explicit rules fact. No office floor/traversal grant. */
   officeStairGuardsV1?: import('../../../../packages/engine-contract/src/office-stair-guards-v1.ts').OfficeStairGuardsV1;
   authoredBoundariesV1?: import('../../../../packages/engine-contract/src/authored-boundaries-v1.ts').AuthoredBoundariesV1;
+  /** entity-physics/1 (logged `world-edit` events, packages/engine-mars/src/entity-physics.ts): walls, floors, stairs and
+   *  doors derived from a god-built entity world, plus the engine asset defs of its fixtures; absent before the first edit. */
+  entityPhysicsV1?: import('../spatial/edits.ts').EntityPhysicsV1;
   env: Environment;
   inventory: 'finite' | 'unlimited';
   rng: RngState;
@@ -243,6 +246,7 @@ export function physicalView(w: WorldState) {
     ...(w.navV1 ? { navV1: w.navV1 } : {}),
     ...(w.officeStairGuardsV1 ? { officeStairGuardsV1:w.officeStairGuardsV1 } : {}),
     ...(w.authoredBoundariesV1 ? { authoredBoundariesV1:w.authoredBoundariesV1 } : {}),
+    ...(w.entityPhysicsV1 ? { entityPhysicsV1: w.entityPhysicsV1.hash } : {}),
     entities,
     regions: Object.values(w.regions).map((r) => {
       const layout = (r as { layout?: unknown }).layout;

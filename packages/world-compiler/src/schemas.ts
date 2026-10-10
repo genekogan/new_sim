@@ -155,7 +155,8 @@ export type Constraint = z.infer<typeof constraintSchema>;
 const constraintsSchema = z.array(constraintSchema).max(8);
 
 export const entitySchema = z.object({
-  id: z.string().regex(/^e_[a-z0-9]{4,12}$/),
+  /** `e_…` for things; `h_…` for Souls' bodies, whose id is the engine's entity id (spec 31 §3 rule 3). */
+  id: z.string().regex(/^[eh]_[a-z0-9]{4,12}$/),
   name: z.string().regex(NAME).optional(),
   def: z.string().regex(DEF_REF),
   in: z.object({ parent: z.union([z.literal('world'), z.string()]), slot: z.string().optional() }),

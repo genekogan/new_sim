@@ -104,6 +104,16 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       if(e.author!=='world:body'||k.things[p.soulId]?.traits.body!==p.entityId||!engine.assignBodyV1||!engine.assignBodyV1(p.entityId,p.body))throw Error('body.assignment-invalid');
       return {};
     }
+    case 'world-edit': {
+      // world-edit/1 (lane L9): an entity-world commit's derived physics and fixtures, applied from the log alone.
+      // The payload carries everything (the fold never reads the entity model), so replay re-derives the same Spatial.
+      const apply = (engine as unknown as { applyWorldEditV1?: (p: unknown) => { hash: string } }).applyWorldEditV1;
+      if (!apply) throw Error('world-edit.reader-required');
+      const r = apply.call(engine, e.payload);
+      const want = (e.payload as { hash?: string } | null)?.hash;
+      if (want && r.hash !== want) console.error(`[world-edit] seq ${(e.payload as { seq?: number }).seq}: derived physics ${r.hash.slice(0, 12)} differs from the logged ${want.slice(0, 12)}`);
+      return {};
+    }
     case 'edge-attention': {
       // attention/1: a Soul's own look / turn / face (or auto-face in a conversation). Head only, or a free standing body
       // turns; never stops, replaces or blocks the body's program (independent attention channel).

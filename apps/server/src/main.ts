@@ -19,6 +19,7 @@ import { CampCards } from './camp.ts';
 import {FloaterCards} from './floaters.ts';
 import { worldDefinition } from './world-config.ts';
 import { GodMode } from './god/god.ts';
+import { installEngineBridge } from './god/engine-bridge.ts';
 import { stripWorldRequestPath } from './world-request-path.ts';
 import {edenCoreRequested,edenHistoryFactory,installEdenCore,settleEmptyEden,drainEdenThought,installEdenLifeV1,installEdenExpansionV1} from './eden-bootstrap.ts';
 import {IntentControlV2} from './intent-control.ts';
@@ -107,6 +108,8 @@ if (edge && host.engine.configureRuntimePolicy && host.enableQuietStallReleaseV1
 // God mode + entity world (spec eden4/28): the owner's edge agent builds the world; viewers get diffs over the hub.
 const genesis = process.env.GENESIS_FILE ? JSON.parse(readFileSync(process.env.GENESIS_FILE, 'utf8')) : undefined;
 const god = config.worldEngine ? new GodMode(db, { genesis, worldId: host.worldId, ownerId: process.env.WORLD_OWNER_ID || null /* explicit only: on a fresh world the first person to claim it becomes its god */, tick: () => host.engine.world.tick, emit: (m) => hub.broadcast(m as never) }) : undefined;
+// Stage B (lane L9): Souls live among god-built things — entity physics into the engine, fixtures usable, bodies as entities.
+if (god && config.engine === 'mars' && process.env.ENTITY_BRIDGE !== '0') installEngineBridge({ host, god, edge });
 if (god) console.log(`[god] entity world ready: ${god.model.entities.size} entities, ${new Set(god.model.defs.values()).size} defs, owner ${god.owner ?? '(unclaimed)'}`);
 const app = buildApp({ cfg: config, db, host, auth, hub, brain, souls, takes, intentV2, edge, god });
 const listener = getRequestListener(app.fetch);
