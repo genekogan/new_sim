@@ -43,7 +43,8 @@ const LM_LICENSE = 'Vanessa Rosa (Little Martians); private to this project — 
 
 // ---- the catalogue: which models become defs, and how they read in the library
 // facing: yaw (radians about +y) that turns the model's front to +z. clips: source clip suffix → our clip name.
-const animal = (model, d) => ({ pack: 'eden-animals.glb', model, name: `${model}-pack`, layer: 'decor', credit: QUAT_ANIMALS, scale: [0.4, 2.5], ...d, tags: ['animal', 'creature', 'pack', model, ...(d.tags ?? [])] });
+const animal = (model, d) => ({ pack: 'eden-animals.glb', model, name: `${model}-pack`, layer: 'decor', credit: QUAT_ANIMALS, scale: [0.4, 2.5], ...d, tags: ['animal', 'pack', model, ...(d.tags ?? [])] });
+// no `creature` tag: that tag routes a def to L4's kit/2 creature builder (tag:creature), which draws nothing for a mesh def.
 const ANIMALS = [
   animal('cow', { description: 'A cow (rigged, Idle and Walk clips). Grazes in pastures.', tags: ['farm', 'cattle', 'livestock'], components: { behavior: { kind: 'graze', speed: 0.6, radius: 7 } } }),
   animal('horse', { description: 'A horse (rigged, Idle and Walk clips).', tags: ['farm', 'livestock', 'pony'], components: { behavior: { kind: 'graze', speed: 0.9, radius: 9 } } }),
@@ -53,7 +54,7 @@ const ANIMALS = [
   animal('pug', { description: 'A pug, a small dog (rigged, Idle and Walk clips).', tags: ['pet', 'dog'], components: { behavior: { kind: 'wander', speed: 0.9, radius: 6 } } }),
   animal('dog', { description: 'A dog (rigged, Idle and Walk clips). Trots about town and gardens.', tags: ['pet', 'puppy'], facing: -Math.PI / 2, components: { behavior: { kind: 'wander', speed: 1.1, radius: 10 } } }),
   animal('cat', { description: 'A cat (rigged, Idle and Walk clips).', tags: ['pet', 'kitten'], facing: -Math.PI / 2, components: { behavior: { kind: 'wander', speed: 0.7, radius: 6 } } }),
-  animal('fox', { description: 'A red fox (rigged, Walk clip). Woodland edges.', tags: ['wild', 'woodland'], components: { behavior: { kind: 'wander', speed: 0.9, radius: 10 } } }),
+  animal('fox', { description: 'A red fox (rigged, Walk clip). Woodland edges.', tags: ['wild', 'woodland'], facing: Math.PI, components: { behavior: { kind: 'wander', speed: 0.9, radius: 10 } } }),
   animal('bird', { description: 'A small bird (rigged, Fly clip). Wheels over meadows.', tags: ['wild', 'flying', 'songbird'], components: { behavior: { kind: 'fly', speed: 6, radius: 18 } } }),
   animal('koi', { description: 'A koi carp (rigged, Swim clip). Swims just under a pond\'s surface.', tags: ['fish', 'water', 'pond'], anchor: 'float', components: { behavior: { kind: 'swim', speed: 0.6, radius: 4 } } }),
 ];

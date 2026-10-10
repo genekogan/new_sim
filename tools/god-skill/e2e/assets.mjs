@@ -17,6 +17,7 @@ import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { chromeLease } from '../lib/chrome-lease.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
@@ -83,13 +84,14 @@ function hugePngGlbFake() {
 // ---------- browser
 let chromium = null;
 try { chromium = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test').chromium; } catch { log('  (no @playwright/test; screenshots skipped)'); }
-let browser = null, page = null; const pageErrors = [];
-// One page load for the whole run (a swiftshader page takes minutes to come up on a loaded laptop); views move the camera.
+let browser = null, page = null, releaseChrome = null; const pageErrors = [];
+// One page load for the whole run (real GPU via Metal; the machine-wide Chrome lease is held only while it is open); views move the camera.
 async function look(name, { eye, at, settle = 6000, size = [1280, 800] } = {}) {
   if (!chromium) return null;
   const t0 = now();
   if (!page) {
-    browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+    releaseChrome = await chromeLease('L5-assets-e2e');
+    browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
     page = await (await browser.newContext({ viewport: { width: size[0], height: size[1] } })).newPage();
     page.setDefaultTimeout(900_000);
     page.on('pageerror', (e) => pageErrors.push(String(e).slice(0, 300)));
@@ -104,10 +106,10 @@ async function look(name, { eye, at, settle = 6000, size = [1280, 800] } = {}) {
   const state = await page.evaluate(() => {
     const w = window.__simEntity; if (!w) return null;
     const meshes = []; w.layer.group.traverse((o) => { if (o.name.startsWith('mesh ')) meshes.push({ name: o.name, loaded: !!o.getObjectByName('asset'), missing: !!o.getObjectByName('asset missing') }); });
-    return { drawn: w.layer.drawn?.size, lastError: w.layer.stats?.lastError, meshes };
+    return { drawn: w.layer.drawn?.size, ids: [...(w.layer.drawn?.keys?.() ?? [])], lastError: w.layer.stats?.lastError, meshes };
   });
   const file = resolve(out, `${name}.png`); await page.screenshot({ path: file, timeout: 900_000 });
-  report.shots.push({ name, file, state: { drawn: state?.drawn, lastError: state?.lastError, meshes: state?.meshes.length, loaded: state?.meshes.filter((m) => m.loaded).length, missing: state?.meshes.filter((m) => m.missing).map((m) => m.name) }, errors: [...pageErrors], ms: +(now() - t0).toFixed(0) });
+  report.shots.push({ name, file, state: { drawn: state?.drawn, ids: state?.ids, lastError: state?.lastError, meshes: state?.meshes.length, loaded: state?.meshes.filter((m) => m.loaded).length, missing: state?.meshes.filter((m) => m.missing).map((m) => m.name) }, errors: [...pageErrors], ms: +(now() - t0).toFixed(0) });
   log(`  📷 ${name}.png drawn ${state?.drawn} meshes ${state?.meshes.filter((m) => m.loaded).length}/${state?.meshes.length} loaded${pageErrors.length ? ' errors ' + pageErrors.join(' | ') : ''}`);
   return { state, file };
 }
@@ -121,7 +123,9 @@ try {
   await step('A1 defs?q=kitty → a cat', () => first('kitty'), (h) => /cat/.test(h[0] ?? ''));
   await step('A1 defs?q=lighthouse → a tower', () => first('lighthouse'), (h) => /lighthouse|tower/.test(h[0] ?? ''));
   await step('A1 defs?q=boat → a rowing boat', () => first('boat'), (h) => /row/.test(h[0] ?? ''));
-  await step('A1 defs?q=oak → an oak tree', () => first('oak'), (h) => /oak/.test(h[0] ?? ''));
+  await step('A1 defs?q=oak → an oak tree (the kit\'s oak-like tree first, then the pack oaks)', () => first('oak'), (h) => /oak|^core\/tree@/.test(h[0] ?? '') && h.slice(0, 3).some((r) => /oak/.test(r)));
+  await step('A1 defs?q=hen → the kit chicken (library first)', () => first('hen'), (h) => h[0] === 'core/chicken@1');
+  await step('A1 kit creatures before pack meshes (duck, pup, kitty, cow)', async () => Promise.all(['duck', 'pup', 'kitty', 'cow'].map(first)), (all) => all[0][0] === 'core/duck@1' && all[1][0] === 'core/dog@1' && all[2][0] === 'core/cat@1' && all[3][0] === 'core/cow@1' && all[3].includes('core/cow-pack@1'));
   await step('A1 defs/<ref> → full def and an example op that works', async () => { const d = await api('/v1/god/defs/core/rowboat-pack@1'); return d; }, (r) => r.status === 200 && r.data.example.ops[0].op === 'place' && r.data.asset?.tris > 0);
 
   // A2 import a GLB made from nothing
@@ -133,7 +137,7 @@ try {
   }, (r) => r.status === 200 && r.data.asset.tris === 24 && r.data.defined?.accepted === true && Math.abs(r.data.def.size.box[1] - 0.9) < 1e-6);
   log(imp?.data?.report ? '    ' + imp.data.report.replace(/\n/g, '\n    ') : '');
   await step('A2 the file is served immutable with an ETag', async () => api(imp.data.asset.url), (r) => r.status === 200 && r.bytes.byteLength === crate.byteLength && /immutable/.test(r.headers.get('cache-control') ?? '') && r.headers.get('etag') === `"${imp.data.asset.sha}"`);
-  await step('A2 the crate is in the library (defs?q=crate)', () => first('crate'), (h) => h[0] === 'crate@1');
+  await step('A2 the crate is in the library (defs?q=crate: the kit crate, then this world\'s)', () => first('crate'), (h) => h.slice(0, 2).includes('crate@1'));
   await step('A2 place three crates by the path', () => act([[0, 6], [1.2, 6], [0.6, 7.1]].map((p, i) => ({ op: 'place', def: 'crate@1', name: `crate-${i + 1}`, p, r: i * 0.4 })), 'A2 crates'), accepted);
 
   // A3 a Draco + WebP scan scaled to a stated height
@@ -149,6 +153,11 @@ try {
 
   // A5 the core library on the ground
   await step('A5 five pack animals on the meadow', () => act(['cow', 'sheep', 'horse', 'pig', 'dog'].map((s, i) => ({ op: 'place', def: `core/${s}-pack@1`, name: `${s}-1`, p: [-14 + i * 3.2, -6], r: 0.5 })), 'A5 animals'), accepted);
+  await step('A5 a pond with two koi, a bird over the meadow, a fox and a cat', () => act([
+    { op: 'place', def: 'core/pond@1', name: 'pond', shape: { area: [[12, -12], [26, -13], [28, 0], [14, 2]] }, params: { depth: 1.2, level: -0.15 } },
+    { op: 'place', def: 'core/koi-pack@1', name: 'koi-1', p: [19, -6] }, { op: 'place', def: 'core/koi-pack@1', name: 'koi-2', p: [21, -4] },
+    { op: 'place', def: 'core/bird-pack@1', name: 'bird-1', p: [-8, -3] }, { op: 'place', def: 'core/fox-pack@1', name: 'fox-1', p: [-4, -2] }, { op: 'place', def: 'core/cat-pack@1', name: 'cat-1', p: [-11, -2] },
+  ], 'A5 water and air'), accepted);
   await step('A5 a few trees and a mossy log', () => act([
     { op: 'place', def: 'core/oak-tree-1-pack@1', name: 'oak', p: [-22, -14] }, { op: 'place', def: 'core/birch-tree-1-pack@1', name: 'birch', p: [-28, -4] },
     { op: 'place', def: 'core/willow-tree-1-pack@1', name: 'willow', p: [8, -14] }, { op: 'place', def: 'core/mossy-log-pack@1', name: 'log', p: [-6, -12], r: 1.2 },
@@ -164,10 +173,16 @@ try {
   await step('A5 the tower is hollow: a crate fits in the ground hall, one in the east wall is refused', async () => ({ inside: await act([{ op: 'place', def: 'crate@1', name: 'hall-crate', p: [30, 26] }]), wall: await act([{ op: 'place', def: 'crate@1', name: 'wall-crate', p: [38.7, 28.6] }]) }), (r) => accepted(r.inside) && r.wall.data?.accepted === false && r.wall.data.failures[0].code === 'overlap.solid');
 
   // A6 look
-  const pic = await look('a6-overview', { eye: [-38, 22, 42], at: [0, 2, 0], settle: 8000 });
-  await step('A6 every mesh def in view drew its GLB (no placeholders)', async () => pic?.state, (s) => !chromium || (s && s.meshes.length >= 20 && s.meshes.every((m) => m.loaded && !m.missing)));
-  await look('a6-animals-close', { eye: [-8, 3.2, 2], at: [-8, 0.6, -6], settle: 6000 });
+  const snap = (await api('/v1/world/snapshot')).data;
+  const meshEntities = (snap?.entities ?? []).filter((e) => /pack|tower|temple|kin|crate|statue/.test(String(e.def)) && !/bench/.test(String(e.def)));
+  report.meshEntities = meshEntities.map((e) => `${e.id} ${e.name} ${e.def}`);
+  const pic = await look('a6-overview', { eye: [48, 30, -46], at: [-2, 3, 6], settle: 8000 });
+  await step(`A6 every placed mesh entity drew its GLB (no placeholders, ${meshEntities.length} expected)`, async () => pic?.state, (s) => !chromium || (s && s.meshes.length >= meshEntities.length && s.meshes.every((m) => m.loaded && !m.missing)));
+  await look('a6-animals-close', { eye: [-7.5, 2.6, 3], at: [-7.5, 0.6, -6], settle: 6000 });
+  await look('a6-kin', { eye: [-0.5, 1.6, 21], at: [-0.5, 0.9, 16], settle: 6000 });
   await look('a6-crates-statue', { eye: [2.5, 2.2, 11], at: [-0.5, 0.6, 6.5], settle: 6000 });
+  await look('a6-trees', { eye: [-8, 5, 4], at: [-14, 3, -12], settle: 6000 });
+  await look('a6-pond', { eye: [20, 4.5, 6], at: [20, -0.2, -5], settle: 6000 });
   await look('a6-tower', { eye: [70, 30, 80], at: [10, 14, 20], settle: 8000 });
 
   // A7 thumbnail: render the crate alone, store, read back
@@ -177,11 +192,11 @@ try {
     const png = new Uint8Array(readFileSync(thumb.file));
     const put = await api('/v1/god/defs/crate@1/thumb.png', { raw: png, headers: { 'content-type': 'image/png' } });
     const get = await fetch(`${base}/v1/god/defs/crate@1/thumb.png`);
-    const listed = (await api('/v1/god/defs?q=crate')).data.defs[0];
+    const listed = (await api('/v1/god/defs?q=crate')).data.defs.find((d) => d.publicRef === 'crate@1');
     return { put: put.status, get: get.status, type: get.headers.get('content-type'), listed: listed.thumb };
   }, (r) => r.skipped || (r.put === 200 && r.get === 200 && r.type === 'image/png' && /thumb\.png$/.test(r.listed)));
 } finally {
-  await browser?.close();
+  await browser?.close().catch(() => {}); releaseChrome?.();
   report.finishedAt = new Date().toISOString();
   report.passed = report.steps.filter((s) => s.ok).length; report.total = report.steps.length;
   writeFileSync(resolve(out, 'report.json'), JSON.stringify(report, null, 2));

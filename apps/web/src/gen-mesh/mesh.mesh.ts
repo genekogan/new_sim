@@ -5,9 +5,13 @@
 // Clips: a def with a moving behaviour (wander/graze/fly/swim/follow) plays `Walk` (Fly/Swim for birds
 // and fish) while its entity moves and `Idle` while it stands; anything else with clips plays `Idle`
 // (or its only clip). Time is wall-clock seconds so every viewer sees the same phase.
+// Motion: a def with a `behavior` component gets L4's creature rig (no role pivots: the GLB's own clips
+// move the legs), so motion.ts walks, grazes, flies or swims it like a kit creature.
 import * as THREE from 'three';
 import { frameHook, instantiate, loadAsset, type ModelInstance } from './gltf-assets.ts';
 import { registerMesh, type MeshBuilder } from './registry.ts';
+import { bindMotionModel, makeRig, type Gait } from './motion.ts';
+import { seedOf, type BehaviorKind } from './creatures/behavior.ts';
 
 const MOVING = new Set(['wander', 'graze', 'fly', 'swim', 'follow']);
 const hashPhase = (s: string) => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return ((h >>> 0) % 10000) / 1000; };
@@ -22,6 +26,12 @@ const meshBuilder: MeshBuilder = {
     let inst: ModelInstance | null = null, gone = false;
     const last = new THREE.Vector3(Number.NaN, 0, 0), now = new THREE.Vector3();
     let stillFor = 0;
+    const b = ctx.def.components.behavior;
+    if (b) {
+      bindMotionModel(ctx.model);
+      const gait: Gait = b.kind === 'fly' ? 'bird-fly' : b.kind === 'swim' ? 'fish-swim' : 'none';
+      holder.userData.rig = makeRig(holder, { gait, kind: b.kind as BehaviorKind, speed: b.speed ?? 1, radius: b.radius ?? 6, follow: b.ref, seed: ctx.entity.seed ?? seedOf(ctx.entity.id), model: ctx.model, species: ctx.def.name.replace(/^core-|-pack$/g, ''), box: ctx.def.size.box as [number, number, number] });
+    }
     holder.add(frameHook(() => {
       if (!inst || !inst.clips.length) return;
       const t = Date.now() / 1000;

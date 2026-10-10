@@ -242,12 +242,12 @@
    "license": "CC0 1.0",
    "source": "Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb"
   },
-  "56d7a971c898c1752d807a8d941118ed59b3795a5d29d975c9b24710e1b4bb89": {
+  "90af46babc5f19ff68fd746f1479b51cf09ee6a86bff38cc4a7223ea685b5470": {
    "ext": "glb",
    "kind": "mesh",
    "path": "worlds/core-assets/packs/fox-pack.glb",
    "tris": 490,
-   "bytes": 223564,
+   "bytes": 223640,
    "textures": 0,
    "texPx": 0,
    "box": [
@@ -256,7 +256,7 @@
     0.936
    ],
    "min": [
-    -0.14,
+    -0.137,
     0.009,
     -0.468
    ],
@@ -264,7 +264,7 @@
     "Walk"
    ],
    "nodes": [
-    "fox"
+    "fox-front"
    ],
    "extensions": [],
    "name": "fox-pack",

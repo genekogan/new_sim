@@ -15,6 +15,7 @@ import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startWorld } from '../dev-world.mjs';
+import { chromeLease } from '../lib/chrome-lease.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
@@ -53,7 +54,8 @@ for (let i = 0; i < defs.length; i += 40) {
 const pose = async (name) => (await api(`/v1/world/entities/${name}`)).data?.pose;
 
 const { chromium } = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test');
-const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const releaseChrome = await chromeLease('L5-thumbs');
+const browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
 const page = await (await browser.newContext({ viewport: { width: 256, height: 256 } })).newPage();
 page.setDefaultTimeout(900_000);
 const first = placed[0];
@@ -75,6 +77,6 @@ for (const { d, i } of placed) {
   const put = await god(`/v1/god/defs/${d.publicRef}/thumb.png`, { raw: png, headers: { 'content-type': 'image/png' } });
   if (put.status === 200) ok++; else console.log(`  ${d.publicRef}: ${put.status} ${JSON.stringify(put.data)}`);
 }
-await browser.close();
+await browser.close(); releaseChrome();
 console.log(`thumbs: ${ok}/${placed.length} stored (copies in ${out})`);
 stop(); process.exit(0);
