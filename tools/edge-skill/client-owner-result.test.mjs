@@ -14,3 +14,27 @@ test('an elapsed conditional step is reported as skipped while the last physical
  const hold=completedOwnerResult({}, {steps:[{act:'sit:here',status:'completed',receiptId:'hold',receipt:{id:'hold',capability:'sit:here',phase:'replaced'}}]});
  assert.match(hold.answer,/native replaced/);assert.equal(hold.finalReceipt.phase,'replaced');
 });
+
+test('actual sit refusal followed by lie completion reports facts without proving the original owner intent',()=>{
+ const q={id:'owner',source:'owner',steps:[{id:'lie-fix',act:'lie:here',params:{},status:'completed',receiptId:'r-lie',receipt:{id:'r-lie',capability:'lie:here',phase:'completed',endedAt:{place:'tables'},outcome:{summary:'lie completed at tables.'}}}],repairs:[{failedStep:{id:'sit-original',act:'sit down',params:{seconds:30},status:'failed',code:'slot.none-free'},replacementStepId:'lie-fix'}]};
+ const r=completedOwnerResult({id:'owner',text:'Sit for 30 seconds.',answer:'Finished.'},q);
+ assert.equal(r.queueComplete,true);assert.equal(r.ownerIntentFulfillment.status,'unproven');
+ assert.deepEqual(r.repairs[0].failedParams,{seconds:30});assert.equal(r.repairs[0].replacement.act,'lie:here');assert.equal(r.repairs[0].replacement.phase,'completed');
+ assert.match(r.answer,/original owner intent is unproven/i);assert.match(r.answer,/sit down.*seconds.*30.*lie:here.*completed/);
+ assert.ok(!r.answer.startsWith('Finished'),'repaired execution must not imply the original request was fulfilled');
+});
+
+test('legitimate offered-ID correction remains completed evidence, not an automatic intent failure',()=>{
+ const q={id:'owner',source:'owner',steps:[{id:'sit-fix',act:'sit:offered-bench',params:{seconds:30},status:'completed',receiptId:'r-sit',receipt:{id:'r-sit',capability:'sit:offered-bench',phase:'completed',outcome:{summary:'Completed a 30-second sit.'}}}],repairs:[{failedStep:{id:'original',act:'sit on the offered bench',params:{seconds:30},code:'capability.unknown'},replacementStepId:'sit-fix'}]};
+ const r=completedOwnerResult({id:'owner',text:'Sit on the offered bench for 30 seconds.'},q);
+ assert.equal(r.queueComplete,true);assert.equal(r.repairs[0].replacement.phase,'completed');assert.deepEqual(r.repairs[0].replacement.params,{seconds:30});
+ assert.equal(r.ownerIntentFulfillment.status,'unproven');assert.notEqual(r.ownerIntentFulfillment.status,'failed');assert.match(r.results[0],/Completed a 30-second sit/);
+ assert.match(r.answer,/semantic judgment/,'code cannot resolve arbitrary original wording from an offered ID alone');
+});
+
+test('successive repairs retain intermediate refused replacements separately from the actual terminal replacement',()=>{
+ const q={id:'owner',steps:[{id:'lie',act:'lie:here',status:'completed',receiptId:'r',receipt:{id:'r',phase:'completed',capability:'lie:here'}}],repairs:[{failedStep:{id:'sit1',act:'sit down',params:{seconds:30},code:'slot.none-free'},replacementStepId:'sit2'},{failedStep:{id:'sit2',act:'sit:here',params:{},status:'failed',code:'slot.none-free'},replacementStepId:'lie'}]};
+ const r=completedOwnerResult({id:'owner'},q);
+ assert.equal(r.repairs[0].replacement.act,'sit:here');assert.equal(r.repairs[0].replacement.status,'failed');assert.equal(r.repairs[0].receiptId,null);
+ assert.equal(r.repairs[1].replacement.act,'lie:here');assert.equal(r.repairs[1].receiptId,'r');assert.match(r.answer,/sit:here.*failed/);
+});
