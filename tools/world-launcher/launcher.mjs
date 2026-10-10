@@ -19,7 +19,7 @@
 //   GET  /worlds                 the launcher homepage (worlds + New world) when / belongs to another release
 //   GET  /we-assets/*            the web build when built with `vite build --assetsDir we-assets` (deploy builds)
 //
-// Production (lane P3; tools/world-launcher/deploy/README.md): --public-origin https://sim.eden.art
+// Production (lane P3; eden2 unit + scripts in tools/world-launcher/deploy/): --public-origin https://sim.eden.art
 // --auth-env-file <path> --max-worlds N --max-running N --min-free-mb N --world-heap-mb N --create-limit N. Children then run edge
 // minds with the account provider's settings loaded by node from that file; dev auth only on an http origin.
 //
@@ -325,7 +325,8 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     const num = (k) => (flag(k) === undefined ? undefined : Number(flag(k)));
     const l = await openLauncher({ port: num('port'), dataDir: flag('data'), range: range?.length === 2 ? range : undefined, eager: num('eager'),
       publicOrigin: flag('public-origin'), authEnvFile: flag('auth-env') ?? flag('auth-env-file'), devAuth: argv.includes('--dev-auth') ? true : undefined,
-      maxWorlds: num('max-worlds'), maxRunning: num('max-running'), minFreeMb: num('min-free-mb'), worldHeapMb: num('world-heap-mb'), idleMs: num('idle-ms'), createLimit: num('create-limit') });
+      maxWorlds: num('max-worlds'), maxRunning: num('max-running'), minFreeMb: num('min-free-mb'), worldHeapMb: num('world-heap-mb'), idleMs: num('idle-ms'), createLimit: num('create-limit'),
+      marsWebDir: flag('mars-web'), webDir: flag('web') });
     let stopping = false;
     for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { if (stopping) return; stopping = true; console.log(`[launcher] ${sig}: stopping worlds…`); void l.close().then(() => process.exit(0)); });
   } catch (e) { console.error(`[launcher] refused: ${e.message}`); process.exitCode = 1; }
