@@ -105,14 +105,14 @@ function drawBuilding(L: BuildingLayout, ctx: MeshCtx, paint: string, seed: numb
   if (!L.open) facade(b, L, { trim, quoin: F.quoin, base: F.base, mat, r, detail, ext: paint, lighthouse });
 
   // ---- stairs and rails
-  for (const st of L.stairs) { b.group = at(st.from); drawStairs(b, L, st, trim); }
+  for (const st of L.stairs) { b.group = at(st.from); drawStairs(b, L, st, trim, detail); }
   for (const rl of L.rails) {
     const k = Math.max(0, Math.min(L.floors - 1, Math.round((rl.y0 - FLOOR0) / L.fh)));
     b.group = at(k);
     const h = rl.y1 - rl.y0, len = Math.hypot(rl.b[0] - rl.a[0], rl.b[1] - rl.a[1]);
     b.run(rl.a[0], rl.a[1], rl.b[0], rl.b[1], rl.y0 + h - 0.06, 0.06, 0.07, trim);
     if (len > 1.6 && detail >= 1) b.run(rl.a[0], rl.a[1], rl.b[0], rl.b[1], rl.y0 + h * 0.45, 0.04, 0.04, trim);
-    const posts = Math.max(2, Math.ceil(len / 2) + 1);
+    const posts = Math.max(2, Math.ceil(len / (detail >= 1 ? 2 : 3.2)) + 1);
     for (let i = 0; i < posts - 1; i++) { const t = i / (posts - 1); b.box(rl.a[0] + (rl.b[0] - rl.a[0]) * t, rl.y0, rl.a[1] + (rl.b[1] - rl.a[1]) * t, 0.06, h - 0.03, 0.06, trim); }
   }
 
@@ -224,7 +224,7 @@ function dressOpening(b: Builder, L: BuildingLayout, w: Wall, op: Opening, o: Wa
     const tall = op.height > 2.2;
     if ((op.width > 1.05 || op.height > 1.6) && !tall && o.detail >= 1) b.box(cx, sill, 0, 0.05, op.height, 0.05, fc);
     if (op.height > 1.1 && op.width > 0.7 && !tall && o.detail >= 1) b.box(cx, sill + op.height * 0.62, 0, op.width, 0.045, 0.05, fc);
-    if (!w.exterior) return;
+    if (!w.exterior || (o.detail < 1 && L.round)) return; // round towers at the lowest detail: the string courses frame them
     // sill and lintel (eden-facades), shutters and flower boxes on some
     b.box(cx, sill - 0.07, sOut * (T / 2 + 0.03), op.width + 0.2, 0.08, 0.16, o.F.quoin);
     b.box(cx, top, sOut * (T / 2 + 0.02), op.width + 0.24, 0.14, 0.08, o.mat === 'wood' ? o.trim : o.F.quoin);
@@ -307,7 +307,7 @@ function facade(b: Builder, L: BuildingLayout, o: { trim: string; quoin: string;
   }
 }
 
-function drawStairs(b: Builder, L: BuildingLayout, st: BuildingLayout['stairs'][number], trim: Col) {
+function drawStairs(b: Builder, L: BuildingLayout, st: BuildingLayout['stairs'][number], trim: Col, detail: number) {
   const rise = (st.y1 - st.y0) / st.risers, wood = '#9a6b43', dark = '#6e4c32';
   if (st.rect && st.axis && st.dir) {
     const [x0, z0, x1, z1] = st.rect, along = st.axis === 'x';
@@ -341,10 +341,10 @@ function drawStairs(b: Builder, L: BuildingLayout, st: BuildingLayout['stairs'][
       const cx = st.c[0] + st.r * Math.sin(a), cz = st.c[1] + st.r * Math.cos(a);
       // tread: long axis radial
       b.box(cx, y - 0.07, cz, st.width + 0.08, 0.07, wedge * 1.12, wood, 'floor', a + Math.PI / 2);
-      if (i % 4 === 0) { const ri = st.r - st.width / 2 + 0.04; b.box(st.c[0] + ri * Math.sin(a), y, st.c[1] + ri * Math.cos(a), 0.04, 0.95, 0.04, trim); }
+      if (i % (detail >= 1 ? 4 : 8) === 0) { const ri = st.r - st.width / 2 + 0.04; b.box(st.c[0] + ri * Math.sin(a), y, st.c[1] + ri * Math.cos(a), 0.04, 0.95, 0.04, trim); }
     }
     // the inner handrail, segment by segment along the helix
-    const segs = 6, ri = st.r - st.width / 2 + 0.04;
+    const segs = detail >= 1 ? 6 : 4, ri = st.r - st.width / 2 + 0.04;
     for (let i = 0; i < segs; i++) {
       const a0 = st.a0! + (st.sweep! * i) / segs, a1 = st.a0! + (st.sweep! * (i + 1)) / segs;
       const p0: THREE.Vector3Tuple = [st.c[0] + ri * Math.sin(a0), st.y0 + ((st.y1 - st.y0) * i) / segs + 0.95, st.c[1] + ri * Math.cos(a0)];
