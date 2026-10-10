@@ -145,6 +145,7 @@ export class GroundNav {
   fits(r: TileRect): boolean { return r[2] - r[0] + 1 <= MAX_WINDOW_TILES + 2 && r[3] - r[1] + 1 <= MAX_WINDOW_TILES + 2; }
   extentTiles(): TileRect { const e = this.field.extent; return [tileOf(e[0]), tileOf(e[1]), tileOf(e[2] - 1e-6), tileOf(e[3] - 1e-6)]; }
   bounds(): [number, number, number, number] { return rectBounds(this.window ?? [0, 0, 0, 0]); }
+  boundsOf(r: TileRect): [number, number, number, number] { return rectBounds(r); }
 
   // ---------------------------------------------------------------- fine tiles
 
@@ -370,7 +371,8 @@ export function groundRoute(nav: GroundNav, scene: SpatialScene, profile: AgentP
   if (goalIssue) return goalIssue;
   const sm = f.medium(start.p[0], start.p[1]);
   if (sm === G_SWIM) return failR('ground.in-water', `you are swimming (${fmt(start.p)}); swim to the shore before walking`, start);
-  const path = nav.coarsePath(start.p, goal.p, WALK_COST);
+  // the coarse search looks 48 m around the straight line first, then wider (a way round a long cliff)
+  const path = nav.coarsePath(start.p, goal.p, WALK_COST) ?? nav.coarsePath(start.p, goal.p, WALK_COST, 160, 2_000_000);
   if (!path) {
     const alt = nav.coarsePath(start.p, goal.p, EXPLAIN_COST, 96);
     if (alt) for (const q of alt) {

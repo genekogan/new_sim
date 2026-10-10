@@ -5,6 +5,7 @@
 // (Terrain.sample / slope), never the raw height function, so it agrees with
 // the picture and with the god's query to the bit.
 import { areaMask, pathMask } from './geom.ts';
+import { levelAlong } from './forms.ts';
 import { MEDIA_EPS, WADE_MAX_M, WALK_MAX_SLOPE } from './settle.ts';
 import type { Terrain } from './tiles.ts';
 import { TILE_M, type Ground, type Water } from './types.ts';
@@ -49,10 +50,10 @@ export function watersNear(g: Ground, x0: number, z0: number, x1: number, z1: nu
     return bx + pad >= x0 && ax - pad <= x1 && bz + pad >= z0 && az - pad <= z1;
   });
 }
-/** Water surface at (x, z) among `waters` (last wins, as waterLevelAt), else the sea level, else null. */
+/** Water surface at (x, z) among `waters` (last wins; rivers' sloping `levels` as waterLevelAt), else the sea level, else null. */
 export function levelAmong(waters: Water[], seaLevel: number | undefined, x: number, z: number): number | null {
   let level: number | null = null;
-  for (const w of waters) if ((w.area ? areaMask(x, z, w.area, 1e-9) : pathMask(x, z, w.path!, w.w!)) > 0) level = w.level;
+  for (const w of waters) if ((w.area ? areaMask(x, z, w.area, 1e-9) : pathMask(x, z, w.path!, w.w!)) > 0) level = w.levels ? levelAlong(x, z, w.path!, w.levels).level : w.level;
   return level ?? (seaLevel ?? null);
 }
 

@@ -375,6 +375,8 @@ export class Spatial {
       const here: Obstacle[] = [];
       for (const { o, foot } of placed) {
         if (foot === undefined) here.push(o);
+        // ground mode: level 0 is the terrain, not a flat floor at g.y; a person standing on it blocks there
+        else if (this.ground && id === 0) { if (this.onGroundAt(o, foot)) here.push({ ...o, y0: -1e9, y1: 1e9 }); }
         else if (g.y >= foot - 0.3 && g.y < foot + PERSON_H) here.push({ ...o, y0: g.y, y1: g.y + PERSON_H });
       }
       if (here.length) levels.set(id, gridsWithObstacles({ cell: this.grids.cell, levels: new Map([[id, g]]) }, here).levels.get(id)!);
@@ -388,7 +390,7 @@ export class Spatial {
   /** One-off route treating standing people as temporary obstacles (a walker blocked by someone not moving). */
   routeAround(world: WorldState, profile: AgentProfile, start: Place, goal: Place, people: AroundPerson[], explainUnusable?: (linkId: string) => boolean): RouteResult {
     const run = () => {
-      const { scene, grids } = this.gridsAround(world, people);
+      const { scene, grids } = (this.ground && start.level === 0 && goal.level === 0 && this.groundAround(world, start, goal, people)) || this.gridsAround(world, people);
       // a people-avoidance replan fails often (walled in, a pocket cut off): prove it early (path.ts proveUnreachable);
       // a failure names the people / loads behind it (path.ts nameObstacles: the walker's fewer-obstacles fallback)
       const ids = new Set(people.map((q) => q.id));
@@ -399,6 +401,30 @@ export class Spatial {
       return findRoute(grids, scene, profile, start, goal, opts);
     };
     return this.prof ? this.prof.time('spatial.routeAround', run) : run();
+  }
+
+  /**
+   * Ground mode: a people-avoiding level-0 replan searches only the tiles around its start and goal (as the hierarchical
+   * planner's hops do), so its route does not depend on how far the engine window has grown (live vs restored engines).
+   */
+  private groundAround(world: WorldState, start: Place, goal: Place, people: AroundPerson[]): { scene: SpatialScene; grids: GridSet } | null {
+    this.sync(world);
+    const g = this.ground!, r = rectOf([start.p, goal.p]);
+    if (!this.groundInclude(world, r)) return null;
+    const base = g.compose(r, this.scene.obstacles), placed = people.flatMap((q) => aroundObstacle(world, q));
+    const here: Obstacle[] = [];
+    for (const { o, foot } of placed) {
+      if (foot === undefined) here.push(o);
+      else if (this.onGroundAt(o, foot)) here.push({ ...o, y0: -1e9, y1: 1e9 });
+    }
+    const level = here.length ? gridsWithObstacles({ cell: this.cell, levels: new Map([[0, base]]) }, here).levels.get(0)! : base;
+    return { scene: { ...this.scene, bounds: g.boundsOf(r), links: [], obstacles: [...this.scene.obstacles, ...placed.map((x) => x.o)] }, grids: { cell: this.cell, levels: new Map([[0, level]]) } };
+  }
+
+  /** Ground mode: whether a person whose feet are at `foot` stands on level 0 (the ground or a slab) at their obstacle's centre. */
+  private onGroundAt(o: Obstacle, foot: number): boolean {
+    const h = this.ground!.standY(o.obb.c[0], o.obb.c[1]);
+    return foot >= h - 1.3 && foot < h + PERSON_H;
   }
 
   private narrowCache = new Map<string, Int32Array>();

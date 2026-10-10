@@ -47,3 +47,10 @@ test('TileSampler agrees with Terrain to the bit', async () => {
   const t = new Terrain(world()), s = new TileSampler(t);
   for (let k = 0; k < 2000; k++) { const x = -250 + ((k * 7919) % 500) + (k % 13) / 13, z = -250 + ((k * 104729) % 500) + (k % 7) / 7; assert.equal(s.sample(x, z), t.sample(x, z)); assert.equal(s.slope(x, z), t.slope(x, z)); }
 });
+
+test('levelAmong agrees with waterLevelAt, rivers with sloping levels included', async () => {
+  const { levelAmong, waterLevelAt } = await import('./index.ts');
+  const g = world();
+  g.waters.push({ id: 'river', path: [[0, -200], [0, -100], [0, -40]], w: 6, level: -1, levels: [2, 0.5, -1] } as never);
+  for (const [x, z] of [[0, -150], [1, -60], [-35, -5], [-80, -20], [200, 200]] as [number, number][]) assert.equal(levelAmong(g.waters, g.seaLevel, x, z), waterLevelAt(g, x, z));
+});

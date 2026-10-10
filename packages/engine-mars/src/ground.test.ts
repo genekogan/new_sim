@@ -155,3 +155,34 @@ test('tiled ground Spatial: a large solid is routed round (coarse + fine agree),
   sp.route(w, HUMAN_PROFILE, { level: 0, p: [0, -8] }, { level: 0, p: [5, 9] });
   assert.equal(sp.ground!.stats.fineBuilds, builds, 'no tile rebuilt for a second route');
 });
+
+test('two Souls on the knoll flank: a walker passes one standing in its way on the slope without overlap', () => {
+  const e = world('pass');
+  e.spawnHuman({ id: 'h_bob', label: 'Bob', soul: 's_bob' });
+  const bob = e.perform({ actor: 'h_bob', label: 'stand', steps: [{ verb: 'walk_to', params: { to: [20, 0.2] } }] });
+  for (let i = 0; i < 20 * 40; i++) { const o = e.step(); if (o.programs.some((p) => p.id === bob.id && p.kind !== 'step')) break; }
+  const b = body(e, 'h_bob').pose.p;
+  assert.ok(Math.hypot(b[0] - 20, b[2] - 0.2) < 0.6 && b[1] > 1, `Bob stands on the flank: ${b}`);
+  const r = run(e, [{ verb: 'walk_to', params: { to: [30, 0] } }]);
+  assert.equal(r.end?.kind, 'completed', JSON.stringify(r.end));
+  assert.deepEqual(e.runtime.violations, []);
+});
+
+test('an L3 cliff (core/cliff): its face cannot be climbed, so the Soul walks round its end and up the back slope (hierarchical hops)', () => {
+  const g = terrain();
+  g.landforms.push({ id: 'escarpment', kind: 'cliff', path: [[40, -20], [40, 20]], h: 6, side: -1, face: 1, w: 20, back: 40, steps: 1 } as never);
+  const e = factory.create(factory.genesis('cliff')) as never as Engine & { installGroundV1(f: unknown): unknown };
+  const f2 = groundFact(g, 9); e.installGroundV1(f2);
+  e.spawnHuman({ id: 'h_ada', label: 'Ada', soul: 's_ada' });
+  const fld = groundField(f2.recipeHash);
+  assert.equal(fld.medium(40, 0), 3, 'the face is steep');
+  assert.ok(fld.height(50, 0) > 5.9, 'the top is up');
+  const r = run(e, [{ verb: 'walk_to', params: { to: [50, 0] } }], 20 * 600);
+  assert.equal(r.end?.kind, 'completed', JSON.stringify(r.end));
+  const p = body(e).pose.p;
+  assert.ok(Math.hypot(p[0] - 50, p[2]) < 0.6 && p[1] > 5.9, `on top: ${p}`);
+  let walked = 0; for (let i = 1; i < r.ys.length; i++) walked += Math.hypot(r.ys[i].x - r.ys[i - 1].x, r.ys[i].z - r.ys[i - 1].z);
+  assert.ok(walked > 100, `went round (walked ${walked.toFixed(0)} m for a 50 m crow-fly)`);
+  assert.ok(r.ys.every((s) => fld.medium(s.x, s.z) !== 3), 'never set foot on the face');
+  assert.deepEqual(e.runtime.violations, []);
+});
