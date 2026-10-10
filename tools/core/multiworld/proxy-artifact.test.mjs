@@ -1,0 +1,40 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {createServer,request} from 'node:http';
+import {mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync,symlinkSync} from 'node:fs';
+import {tmpdir} from 'node:os';import {join} from 'node:path';import {createHash} from 'node:crypto';
+import {prepareArtifactOverlay,worldProxyRequestHandler,openWorldProxy} from './proxy.mjs';
+const hash=b=>createHash('sha256').update(b).digest('hex');
+function fixture(t){const dir=mkdtempSync(join(tmpdir(),'proxy-artifacts-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));const web=join(dir,'web');mkdirSync(join(web,'assets'),{recursive:true});const files={'index.html':'<script src="/assets/index-abc123.js"></script><link href="/assets/style-abc123.css">','assets/index-abc123.js':'export const artifact="new";','assets/style-abc123.css':'body{color:blue}'};for(const [p,b]of Object.entries(files))writeFileSync(join(web,p),b);const manifest=join(dir,'manifest.json');writeFileSync(manifest,JSON.stringify({files:Object.fromEntries(Object.entries(files).map(([p,b])=>[p,{bytes:Buffer.byteLength(b),sha256:hash(b)}]))}));const cli=join(dir,'eden-agent.mjs');writeFileSync(cli,'// qualified CLI\n');const options={webDir:web,webManifest:manifest,webManifestSha256:hash(readFileSync(manifest)),cliFile:cli,cliSha256:hash(readFileSync(cli)),frontendSource:'a'.repeat(40),cliSource:'b'.repeat(40)};return{dir,web,manifest,cli,options,files};}
+async function listen(t,handler){const server=createServer(handler);await new Promise((r,j)=>{server.once('error',j);server.listen(0,'127.0.0.1',r);});t.after(async()=>{server.closeAllConnections();await new Promise(r=>server.close(r));});return server.address().port;}
+function get(port,path,method='GET'){return new Promise((resolve,reject)=>{const req=request({hostname:'127.0.0.1',port,path,method,headers:{connection:'close'}},res=>{const chunks=[];res.on('data',b=>chunks.push(b));res.on('end',()=>resolve({status:res.statusCode,headers:res.headers,body:Buffer.concat(chunks).toString()}));});req.on('error',reject);req.end();});}
+test('artifact overlay serves only exact entries, MIME/HEAD/cache and separately pinned source; default handler retains passthrough',async t=>{
+ const f=fixture(t),hits=[];const worlds={};for(const key of ['eden','mars','littlemartians'])worlds[key]=await listen(t,(req,res)=>{hits.push([key,req.method,req.url]);res.writeHead(200,{'content-type':'text/plain','x-backend':'5e'}).end(key+':'+req.url);});
+ const overlay=prepareArtifactOverlay(f.options);const port=await listen(t,worldProxyRequestHandler({worlds,overlay}));
+ for(const key of ['eden','mars','littlemartians']){for(const path of [`/w/${key}`,`/w/${key}/`])assert.equal((await get(port,path)).body,f.files['index.html']);assert.equal((await get(port,`/w/${key}/assets/index-abc123.js`)).body,f.files['assets/index-abc123.js']);assert.equal((await get(port,`/w/${key}/eden-agent.mjs`)).body,'// qualified CLI\n');}
+ const asset=await get(port,'/assets/index-abc123.js?x=1');assert.match(asset.headers['content-type'],/javascript/);assert.match(asset.headers['cache-control'],/immutable/);assert.equal(asset.headers['x-sim-frontend-source'],'a'.repeat(40));assert.equal(asset.headers['x-sim-cli-source'],'b'.repeat(40));
+ const head=await get(port,'/eden-agent.mjs','HEAD');assert.equal(head.body,'');assert.equal(Number(head.headers['content-length']),Buffer.byteLength('// qualified CLI\n'));assert.equal((await get(port,'/')).headers['cache-control'],'no-cache');assert.match((await get(port,'/assets/style-abc123.css')).headers['content-type'],/css/);
+ for(const path of ['/worlds','/worlds/assets/launcher.js','/w/eden/v1/account','/w/mars/v1/approval','/v1/me','/w/eden/v1/events','/world-assets/littlemartians/a.glb','/browser','/w/mars/2026','/skill.md','/instructions.md','/v1/skill.md','/w/eden/unknown','/assets/old-hashed.js','/w/mars/browser','/w/mars/modular','/w/mars/engine'])assert.equal((await get(port,path)).headers['x-backend'],'5e',path);
+ assert.equal((await get(port,'/w/mars','POST')).headers['x-backend'],'5e');assert.equal((await get(port,'/__sim/worlds.json')).headers['x-sim-frontend-source'],undefined);
+ const plain=await listen(t,worldProxyRequestHandler({worlds}));assert.equal((await get(plain,'/w/mars')).body,'mars:/w/mars');assert.equal(prepareArtifactOverlay(undefined),null);
+ // Retained verified bytes remain stable after source file mutation.
+ writeFileSync(join(f.web,'assets/index-abc123.js'),'mutated');assert.equal((await get(port,'/assets/index-abc123.js')).body,f.files['assets/index-abc123.js']);
+ assert.ok(hits.some(h=>h[0]==='littlemartians'&&h[2].startsWith('/world-assets/')));
+});
+test('overlay refuses malformed/traversing/escaping artifacts and missing index dependencies before listen',async t=>{
+ const f=fixture(t);assert.throws(()=>prepareArtifactOverlay({...f.options,webManifestSha256:'0'.repeat(64)}),/manifest hash/);assert.throws(()=>prepareArtifactOverlay({...f.options,cliSha256:'0'.repeat(64)}),/CLI hash/);
+ const change=files=>{writeFileSync(f.manifest,JSON.stringify({files}));return {...f.options,webManifestSha256:hash(readFileSync(f.manifest))};};
+ assert.throws(()=>prepareArtifactOverlay(change({'../escape':{bytes:1,sha256:'0'.repeat(64)},'index.html':{bytes:0,sha256:hash('')}})),/entry invalid/);
+ const original=JSON.parse(JSON.stringify(Object.fromEntries(Object.entries(f.files).map(([p,b])=>[p,{bytes:Buffer.byteLength(b),sha256:hash(b)}]))));
+ const missing={...original};delete missing['assets/index-abc123.js'];assert.throws(()=>prepareArtifactOverlay(change(missing)),/dependency/);
+ const outside=join(f.dir,'outside.js');writeFileSync(outside,f.files['assets/index-abc123.js']);rmSync(join(f.web,'assets/index-abc123.js'));symlinkSync(outside,join(f.web,'assets/index-abc123.js'));assert.throws(()=>prepareArtifactOverlay(change(original)),/escapes root|regular file/);
+ rmSync(join(f.web,'assets/index-abc123.js'));writeFileSync(join(f.web,'assets/index-abc123.js'),f.files['assets/index-abc123.js']);const overlay=prepareArtifactOverlay(change(original));const port=await listen(t,worldProxyRequestHandler({worlds:{},overlay}));for(const p of ['/assets/../index.html','/assets/%2e%2e/index.html','/assets/%5cindex.js','/assets/%ZZ'])assert.equal((await get(port,p)).status,400,p);
+ await assert.rejects(()=>openWorldProxy({port:0,worlds:{eden:0,mars:0,littlemartians:0},artifactOverlay:f.options}),/explicit local world ports/);
+});
+
+test('HTTP passthrough retains request bodies, headers and streaming event output; no artifact auth authority',async t=>{
+ const f=fixture(t);const backend=await listen(t,(req,res)=>{if(req.url.endsWith('/events')){res.writeHead(200,{'content-type':'text/event-stream'});res.write('event: state\ndata: unchanged\n\n');setImmediate(()=>res.end('event: done\ndata: native\n\n'));return;}const chunks=[];req.on('data',b=>chunks.push(b));req.on('end',()=>{res.writeHead(401,{'content-type':'application/json'}).end(JSON.stringify({method:req.method,path:req.url,body:Buffer.concat(chunks).toString(),testHeader:req.headers['x-fixture']}));});});
+ const port=await listen(t,worldProxyRequestHandler({worlds:{eden:backend,mars:backend,littlemartians:backend},overlay:prepareArtifactOverlay(f.options)}));
+ const response=await new Promise((resolve,reject)=>{const req=request({hostname:'127.0.0.1',port,path:'/w/eden/v1/approval',method:'POST',headers:{'x-fixture':'nonsecret','connection':'close'}},res=>{let body='';res.on('data',b=>body+=b);res.on('end',()=>resolve({status:res.statusCode,body:JSON.parse(body)}));});req.on('error',reject);req.end('approval remains upstream');});assert.equal(response.status,401);assert.deepEqual(response.body,{method:'POST',path:'/w/eden/v1/approval',body:'approval remains upstream',testHeader:'nonsecret'});
+ const events=await get(port,'/w/mars/v1/events');assert.equal(events.headers['content-type'],'text/event-stream');assert.equal(events.body,'event: state\ndata: unchanged\n\nevent: done\ndata: native\n\n');
+});

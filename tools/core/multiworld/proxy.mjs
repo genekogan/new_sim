@@ -2,8 +2,9 @@
 // credentials, tunnels, production services or DNS are managed by this module.
 import {createServer,request} from 'node:http';
 import {connect} from 'node:net';
-import {readFileSync} from 'node:fs';
-import {resolve} from 'node:path';
+import {readFileSync,realpathSync,lstatSync} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {resolve,relative,sep,extname} from 'node:path';
 import {pathToFileURL} from 'node:url';
 const KEYS=['eden','mars','littlemartians'];
 export function worldForPath(path='/'){
@@ -16,23 +17,66 @@ export function worldForPath(path='/'){
  if(/^\/(?:browser|modular|engine)(?:\/|$)/.test(url.pathname))return 'mars';
  return 'eden';
 }
-export async function openWorldProxy({port=4966,worlds,exposure='local',expectedWorldIds,expectedBuild}){
- const publicPreview=exposure==='shared-preview';if(!['local','shared-preview'].includes(exposure))throw Error('explicit proxy exposure required');
- if(!Number.isInteger(port)||!(port>=4963&&port<=4969||publicPreview&&port===4970)||!worlds||KEYS.some(k=>!Number.isInteger(worlds[k])||!(worlds[k]>=4950&&worlds[k]<=4969||k==='eden'&&worlds[k]===4970)))throw Error('explicit local world ports and private proxy4963..4969 required');
- if(publicPreview&&(port!==4970||worlds.eden<4950||worlds.eden>4959||new Set(Object.values(worlds)).size!==3||typeof expectedBuild!=='string'||!expectedBuild||!expectedWorldIds||KEYS.some(k=>typeof expectedWorldIds[k]!=='string'||!expectedWorldIds[k])||new Set(Object.values(expectedWorldIds)).size!==3))throw Error('shared preview requires private distinct backends and exact world/build identities');
- const identities=new Map();
- if(expectedWorldIds){for(const key of KEYS){const response=await fetch(`http://127.0.0.1:${worlds[key]}/w/${key}/v1/config`,{signal:AbortSignal.timeout(3000)});if(!response.ok||!response.headers.get('content-type')?.includes('application/json'))throw Error('world bootstrap unavailable: '+key);const cfg=await response.json();if(cfg.worldKey!==key||cfg.worldPath!==`/w/${key}`||cfg.worldId!==expectedWorldIds[key]||expectedBuild&&cfg.build!==expectedBuild)throw Error('world bootstrap identity differs: '+key);identities.set(key,{worldId:cfg.worldId,build:cfg.build});}}
- const sockets=new Set();let closing=false;
- const server=createServer((req,res)=>{
-  if(closing){res.writeHead(503).end('Local worlds are draining.');return;}
+// Explicit release-artifact snapshot. Verified bytes are retained so later file
+// replacement cannot change this proxy's artifact authority. No API interception.
+export function prepareArtifactOverlay(options){
+ if(options===undefined)return null;
+ const {webDir,webManifest,webManifestSha256,cliFile,cliSha256,frontendSource,cliSource}=options;
+ const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
+ const sha=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
+ if(![webDir,webManifest,cliFile].every(v=>typeof v==='string'&&v.startsWith('/'))||!sha(webManifestSha256)||!sha(cliSha256)||![frontendSource,cliSource].every(v=>typeof v==='string'&&/^[a-f0-9]{40}$/.test(v)))throw Error('artifact overlay requires exact paths, hashes and source pins');
+ const root=realpathSync(webDir);
+ const boundedRead=(path,max)=>{const st=lstatSync(path);if(!st.isFile()||st.size>max)throw Error('artifact must be bounded regular file');return readFileSync(path);};
+ const raw=boundedRead(webManifest,2*1024*1024);if(hash(raw)!==webManifestSha256)throw Error('artifact manifest hash differs');
+ const manifest=JSON.parse(raw);const files=manifest.files;
+ if(!files||typeof files!=='object'||Array.isArray(files)||!Object.hasOwn(files,'index.html')||Object.keys(files).length>4096)throw Error('artifact manifest files invalid');
+ let total=0;const entries=Object.entries(files);
+ for(const [name,pin]of entries){if(!/^(?:index\.html|assets\/[A-Za-z0-9_./-]+)$/.test(name)||name.split('/').some(p=>p==='.'||p==='..'||!p)||!pin||!sha(pin.sha256)||!Number.isSafeInteger(pin.bytes)||pin.bytes<0||pin.bytes>32*1024*1024)throw Error('artifact manifest entry invalid');total+=pin.bytes;}
+ if(total>128*1024*1024)throw Error('artifact snapshot budget exceeded');
+ const bytes=new Map();
+ for(const [name,pin]of entries){const path=resolve(root,name),actual=realpathSync(path),rel=relative(root,actual);if(rel==='..'||rel.startsWith('..'+sep)||resolve(root,rel)!==actual)throw Error('artifact path escapes root');const data=boundedRead(path,32*1024*1024);if(data.length!==pin.bytes||hash(data)!==pin.sha256)throw Error('artifact bytes differ: '+name);bytes.set(name,data);}
+ const index=bytes.get('index.html').toString('utf8');
+ for(const match of index.matchAll(/(?:src|href)=["']([^"']+)["']/g)){const url=match[1];if(!url.startsWith('/assets/')||!bytes.has(url.slice(1)))throw Error('artifact index dependency is not manifest-listed');}
+ const cli=boundedRead(cliFile,32*1024*1024);if(hash(cli)!==cliSha256)throw Error('artifact CLI hash differs');
+ const indexPaths=new Set(['/',...KEYS.flatMap(k=>[`/w/${k}`,`/w/${k}/`])]);
+ const cliPaths=new Set(['/eden-agent.mjs',...KEYS.map(k=>`/w/${k}/eden-agent.mjs`)]);
+ const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.woff':'font/woff','.woff2':'font/woff2','.wasm':'application/wasm','.ico':'image/x-icon'};
+ const attribution=Object.freeze({frontendSource,cliSource,webManifestSha256,cliSha256});
+ return Object.freeze({attribution,handle(req,res){
+  if(req.method!=='GET'&&req.method!=='HEAD')return false;
+  // Inspect raw spelling before URL normalization; traversal never gets an index.
+  const rawPath=req.url.split('?')[0];let decoded;try{decoded=decodeURIComponent(rawPath);}catch{res.writeHead(400).end();return true;}
+  if(decoded.includes('\\')||decoded.includes('\0')||decoded.split('/').some(p=>p==='.'||p==='..')){res.writeHead(400).end();return true;}
+  const path=rawPath;let name,data,cache;
+  if(indexPaths.has(path)){name='index.html';data=bytes.get(name);cache='no-cache';}
+  else if(cliPaths.has(path)){name='eden-agent.mjs';data=cli;cache='public, max-age=60';}
+  else{const asset=path.replace(/^\/w\/(?:eden|mars|littlemartians)(?=\/assets\/)/,'').slice(1);if(asset.startsWith('assets/')&&bytes.has(asset)){name=asset;data=bytes.get(asset);cache='public, max-age=31536000, immutable';}}
+  if(!data)return false;
+  res.writeHead(200,{'Content-Type':mime[extname(name)]||'application/octet-stream','Content-Length':data.length,'Cache-Control':cache,'X-Sim-Frontend-Source':frontendSource,'X-Sim-CLI-Source':cliSource,'X-Sim-Artifact-Manifest':webManifestSha256});res.end(req.method==='HEAD'?undefined:data);return true;
+ }});
+}
+// Shared handler exposed for disposable loopback fixture coverage without
+// relaxing the launcher's private/shared port and identity admission.
+export function worldProxyRequestHandler({worlds,identities=new Map(),overlay=null,isClosing=()=>false}){return (req,res)=>{
+  if(isClosing()){res.writeHead(503).end('Local worlds are draining.');return;}
   if(new URL(req.url,'http://local').pathname==='/__sim/worlds.json'){
    res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'}).end(JSON.stringify({contract:'local-worlds/1',worlds:KEYS.map(key=>({key,worldKey:key,...identities.get(key),name:key==='littlemartians'?'Little Martians':key==='mars'?'Mars':'Eden',basePath:`/w/${key}`,configPath:`/w/${key}/v1/config`}))}));return;
   }
+  if(overlay?.handle(req,res))return;
   const key=worldForPath(req.url);if(!key){res.writeHead(404,{'Content-Type':'application/json'}).end(JSON.stringify({ok:false,code:'world.not-served'}));return;}
   const up=request({hostname:'127.0.0.1',port:worlds[key],path:req.url,method:req.method,headers:req.headers},r=>{res.writeHead(r.statusCode,r.headers);r.pipe(res);});
   up.on('error',()=>{if(!res.headersSent)res.writeHead(502,{'Content-Type':'application/json','Cache-Control':'no-store'}).end(JSON.stringify({ok:false,code:'world.unavailable',worldKey:key}));else res.destroy();});
   req.on('aborted',()=>up.destroy());res.on('close',()=>up.destroy());req.pipe(up);
- });
+ };}
+export async function openWorldProxy({port=4966,worlds,exposure='local',expectedWorldIds,expectedBuild,artifactOverlay}){
+ const publicPreview=exposure==='shared-preview';if(!['local','shared-preview'].includes(exposure))throw Error('explicit proxy exposure required');
+ if(!Number.isInteger(port)||!(port>=4963&&port<=4969||publicPreview&&port===4970)||!worlds||KEYS.some(k=>!Number.isInteger(worlds[k])||!(worlds[k]>=4950&&worlds[k]<=4969||k==='eden'&&worlds[k]===4970)))throw Error('explicit local world ports and private proxy4963..4969 required');
+ if(publicPreview&&(port!==4970||worlds.eden<4950||worlds.eden>4959||new Set(Object.values(worlds)).size!==3||typeof expectedBuild!=='string'||!expectedBuild||!expectedWorldIds||KEYS.some(k=>typeof expectedWorldIds[k]!=='string'||!expectedWorldIds[k])||new Set(Object.values(expectedWorldIds)).size!==3))throw Error('shared preview requires private distinct backends and exact world/build identities');
+ const overlay=prepareArtifactOverlay(artifactOverlay);
+ const identities=new Map();
+ if(expectedWorldIds){for(const key of KEYS){const response=await fetch(`http://127.0.0.1:${worlds[key]}/w/${key}/v1/config`,{signal:AbortSignal.timeout(3000)});if(!response.ok||!response.headers.get('content-type')?.includes('application/json'))throw Error('world bootstrap unavailable: '+key);const cfg=await response.json();if(cfg.worldKey!==key||cfg.worldPath!==`/w/${key}`||cfg.worldId!==expectedWorldIds[key]||expectedBuild&&cfg.build!==expectedBuild)throw Error('world bootstrap identity differs: '+key);identities.set(key,{worldId:cfg.worldId,build:cfg.build});}}
+ const sockets=new Set();let closing=false;
+ const server=createServer(worldProxyRequestHandler({worlds,identities,overlay,isClosing:()=>closing}));
  server.on('connection',socket=>{sockets.add(socket);socket.on('close',()=>sockets.delete(socket));});
  server.on('upgrade',(req,socket,head)=>{
   const key=worldForPath(req.url);if(closing||!key){socket.end('HTTP/1.1 404 Not Found\r\nConnection: close\r\n\r\n');return;}
@@ -43,7 +87,7 @@ export async function openWorldProxy({port=4966,worlds,exposure='local',expected
   up.on('error',()=>socket.destroy());socket.on('error',()=>up.destroy());socket.on('close',()=>up.destroy());up.on('close',()=>socket.destroy());
  });
  await new Promise((yes,no)=>{server.once('error',no);server.listen(port,'127.0.0.1',yes);});
- return{server,url:`http://127.0.0.1:${port}`,close:async()=>{closing=true;const done=new Promise(r=>server.close(r));for(const socket of sockets)socket.destroy();await done;}};
+ return{server,artifactAttribution:overlay?.attribution??null,url:`http://127.0.0.1:${port}`,close:async()=>{closing=true;const done=new Promise(r=>server.close(r));for(const socket of sockets)socket.destroy();await done;}};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  try{const path=process.argv[2];if(!path)throw Error('usage: node tools/core/multiworld/proxy.mjs <descriptor.json>');const proxy=await openWorldProxy(JSON.parse(readFileSync(resolve(path),'utf8')));console.log(proxy.url);for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>void proxy.close().then(()=>process.exit(0)));}
