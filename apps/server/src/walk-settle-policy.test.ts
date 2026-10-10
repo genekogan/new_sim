@@ -4,7 +4,9 @@ import {marsFactory,MARS_2026_MAP} from '@sim/engine-mars';
 import {Db} from './db.ts';
 import {WorldHost,replayFromGenesis} from './world.ts';
 import {kernelHash} from '@sim/kernel';
-import {installWalkSettleWaitV1} from '../../../tools/core/multiworld/world-server.mjs';
+const {installWalkSettleWaitV1}=await import(new URL('../../../tools/core/multiworld/world-server.mjs',import.meta.url).href) as {
+ installWalkSettleWaitV1(host:WorldHost,enabled:unknown,drive:<T>(p:Promise<T>)=>Promise<T>):Promise<{policy:string;worldId:string;seq:number;tick:number;alreadyAccepted:boolean}|undefined>;
+};
 const factory=await marsFactory({scene:'eden-camp',arrival:[-3,18],arrivalPlace:'arrival',reference:[-1,17],grounds:{id:'grounds',name:'Grounds'},map:MARS_2026_MAP,disassemblyV1:true});
 test('walk settle policy is accepted once, survives snapshots/genesis replay and native compaction',async()=>{
  const db=new Db(':memory:'),host=new WorldHost(db,factory,'settle-policy',1e9,'settle-policy');host.boot();
