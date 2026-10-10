@@ -5,7 +5,7 @@
 // (Terrain.sample / slope), never the raw height function, so it agrees with
 // the picture and with the god's query to the bit.
 import { areaMask, pathMask } from './geom.ts';
-import { WADE_MAX_M, WALK_MAX_SLOPE } from './settle.ts';
+import { MEDIA_EPS, WADE_MAX_M, WALK_MAX_SLOPE } from './settle.ts';
 import type { Terrain } from './tiles.ts';
 import { TILE_M, type Ground, type Water } from './types.ts';
 
@@ -102,7 +102,7 @@ export function mediumOf(t: HeightSampler, x: number, z: number, body: BodyMedia
   if (!inExtent(t.ground, x, z)) return MEDIUM.outside;
   const lvl = levelAmong(waters, t.ground.seaLevel, x, z);
   const depth = lvl === null ? 0 : Math.max(0, lvl - t.sample(x, z));
-  if (depth > body.wadeMax) return MEDIUM.swim;
+  if (depth > body.wadeMax + MEDIA_EPS) return MEDIUM.swim;
   if (t.slope(x, z) > body.maxSlope) return MEDIUM.steep;
   return depth > 0 ? MEDIUM.wade : MEDIUM.walk;
 }

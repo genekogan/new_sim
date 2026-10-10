@@ -142,7 +142,7 @@ export class GroundNav {
         if (c === G_STEEP) { blk[k] = 1; continue; }
         if (wet[cj * cw + ci]) {
           const lvl = field.waterLevel(x, z);
-          if (lvl !== null && lvl - field.height(x, z) > field.wadeMax) { blk[k] = 2; continue; }
+          if (lvl !== null && lvl - field.height(x, z) > field.wadeMax + 1e-4) { blk[k] = 2; continue; }
         }
         free[k] = 1;
       }

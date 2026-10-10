@@ -55,7 +55,7 @@ export function groundFact(g: Ground, editSeq: number): GroundV1 { return { vers
 // ---------------------------------------------------------------- the engine side
 
 import { swimTo, shoreToward, groundTravel, inDeepWater } from '../../../mars/viewer/engine/locomotion/swim.ts';
-import { humanStaticClearance, humanStaticClearanceWithOverlay, speedWithinCap, SPEED_CAPS } from '../../../mars/viewer/engine/runtime/invariants.ts';
+import { acknowledgeRelocation, humanStaticClearance, humanStaticClearanceWithOverlay, speedWithinCap, SPEED_CAPS } from '../../../mars/viewer/engine/runtime/invariants.ts';
 import { WALK_SPEED_CAP } from '../../../mars/viewer/engine/locomotion/walk.ts';
 import { G_SWIM, swimRootY } from '../../../mars/viewer/engine/spatial/ground.ts';
 import type { Spatial } from '../../../mars/viewer/engine/spatial/service.ts';
@@ -129,7 +129,7 @@ export function settleBodies(rt: Rt): string[] {
     if (e.kind !== 'human' || !e.human || (e.human.level ?? 0) !== 0 || e.human.on || e.human.carrier || e.human.riding || e.human.sleepPose) continue;
     if (e.human.activity.startsWith('sit') || e.human.activity.startsWith('climb') || e.human.activity.startsWith('stand-up')) continue;
     const y = standHeight(f, e.pose.p[0], e.pose.p[2]);
-    if (y !== e.pose.p[1]) { e.pose.p = [e.pose.p[0], y, e.pose.p[2]]; moved.push(id); }
+    if (y !== e.pose.p[1]) { e.pose.p = [e.pose.p[0], y, e.pose.p[2]]; acknowledgeRelocation(rt as never, id); moved.push(id); }
   }
   return moved;
 }
