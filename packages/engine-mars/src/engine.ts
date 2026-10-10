@@ -14,6 +14,7 @@ import {existingGreenLandmarkV1} from './green-landmark.ts';
 import {existingGreenLandmarkTransitionV1Schema,type ExistingGreenLandmarkTransitionV1} from '@sim/engine-contract';
 import {fixtureSlots} from '../../../mars/viewer/engine/social/slots.ts';
 import {angleDelta} from '../../../mars/viewer/engine/core/math.ts';
+import {publishedWaitsFor} from '../../../mars/viewer/engine/runtime/waits.ts';
 import {inShoreDomain} from '../../../mars/viewer/engine/locomotion/connected-shore.ts';
 import {setCarrierRoute} from '../../../mars/viewer/engine/vehicles/carrier.ts';
 import {commonsFoodDeliveryItemsV1} from './food-delivery.ts';
@@ -78,7 +79,8 @@ const RELEASE_TIMEOUT = 15 * TPS;          // how long a program waits for its a
 const KEEP_RECORDS = 120 * TPS;            // finished Mars action records are kept this long, then forgotten
 const SNAPSHOT_FORMAT = 'sim-mars-snapshot/1';
 
-type Diag = { code: string; message: string };
+type Diag = { code: string; message: string; subjects?: string[] };
+const SHARED_WATER_WAIT_POLICY = 'shared-water-wait/1';
 type Op = { verb: string; params: Record<string, unknown>; settle: 'done' | 'held'; soft?: boolean; raw?: boolean } | { wait: number };
 type Prog = {
   id: string; actor: string; label: string; steps: Program['steps'];
@@ -86,7 +88,9 @@ type Prog = {
   blockedSince?: number;
   quietHeldSince?: number;
   spreadWaits?: number;
+  waterWait?: {step: number; since: number; attempts: number};
   walkStopping?: Diag;
+  waterStopRetry?: Diag;
   walkResume?: true;
   trafficSince?: number;
   trafficTries?: number;
@@ -199,7 +203,7 @@ export class MarsEngine implements Engine {
     if(this.cfg.walkSettleWaitV1===true)this.rt.services.walkSettleWaitV1=true;
     if(rt.world.authoredBoundariesV1)immutableAuthoredBoundaryFact(rt.world.authoredBoundariesV1);
     this.schema = rt.world.schema;
-    if (saved) { for (const p of saved.programs) { this.programs.set(p.id, p); this.byActor.set(p.actor, p.id); } this.nextProg = saved.nextProg; this.leaving = saved.leaving; }
+    if (saved) { for (const p of saved.programs) { for(const step of p.steps)if(step.params?.spreadWaitPolicy!==undefined&&!this.sharedWaterStep(step))throw Error('snapshot.unknown-spread-wait-policy');this.programs.set(p.id, p); this.byActor.set(p.actor, p.id); } this.nextProg = saved.nextProg; this.leaving = saved.leaving; }
     if(saved?.renderPlatformsV1)this.renderPlatformMetadata=renderPlatformsV1Schema.parse(saved.renderPlatformsV1);
     this.cursor = rt.events.length;
     this.startRecorder();
@@ -300,7 +304,7 @@ export class MarsEngine implements Engine {
           return;
         }
         p.started = true; this.emit(p, 'step');
-        const ops = this.lower(p, p.steps[0]); if (!Array.isArray(ops)) return this.end(p, 'failed', ops);
+        const ops = this.lower(p, p.steps[0]); if (!Array.isArray(ops)) {if(this.retrySharedWaterV1(p,ops))continue;return this.end(p, 'failed', ops);}
         p.ops = ops;
       }
       if (p.until !== undefined) { if (tick < p.until) return; p.until = undefined; }
@@ -310,6 +314,7 @@ export class MarsEngine implements Engine {
         // program until native cancellation actually reaches a safe landing.
         if (p.walkStopping) {
           if (rec && this.rt.isActive(rec.id)) { this.rt.cancel(rec.id, p.walkStopping); return; }
+          if(p.waterStopRetry){const retry=p.waterStopRetry;p.waterStopRetry=undefined;p.walkStopping=undefined;p.action=undefined;p.settle=undefined;p.soft=undefined;p.blockedSince=undefined;p.quietHeldSince=undefined;if(this.retrySharedWaterV1(p,retry))return;return this.end(p,'failed',retry);}
           if (p.walkResume) { const why = p.walkStopping; p.walkStopping = undefined; p.walkResume = undefined; return this.trafficStepBack(p, why); }
           return this.end(p, 'failed', p.walkStopping);
         }
@@ -347,8 +352,9 @@ export class MarsEngine implements Engine {
             p.quietHeldSince ??= tick;
             if (tick - p.quietHeldSince > yieldLimit) {
               const why = {code:'route.blocked',message:this.quiet?'quiet checkpoint: this walk stayed held waiting on other people for 30 seconds':'this walk stayed held waiting on other people for a minute'};
-              this.rt.cancel(rec.id, why);
-              if (this.rt.isActive(rec.id)) { p.walkStopping = why; return; }
+              const water=this.sharedWaterBlockingAction(p,rec);this.rt.cancel(rec.id, why);
+              if (this.rt.isActive(rec.id)) { p.walkStopping = why;if(water)p.waterStopRetry=water;return; }
+              if(water&&this.retrySharedWaterV1(p,water)){p.action=undefined;p.settle=undefined;p.soft=undefined;p.quietHeldSince=undefined;return;}
               if (this.spreadRetry(p, 'route.occupied')) { p.action = undefined; p.settle = undefined; p.soft = undefined; p.quietHeldSince = undefined; return; }
               return this.end(p, 'failed', why);
             }
@@ -357,14 +363,15 @@ export class MarsEngine implements Engine {
             p.blockedSince ??= tick;
             if (tick-p.blockedSince > (sleepBlocked ? this.cfg.sleepBlockTicks! : 1200)) {
               const why = walkBlocked ? {code:'route.blocked',message:`walking has remained blocked for a minute: ${rec.diagnostic?.code ?? 'action.blocked'}`} : routeBlocked ? {code:'route.blocked',message:'the route has remained blocked for a minute'} : {code:'activity.blocked',message:`sleep has remained blocked for a minute: ${rec.diagnostic?.code}`};
-              this.rt.cancel(rec.id,why);
-              if (walkBlocked && this.rt.isActive(rec.id)) { p.walkStopping = why; return; }
+              const water=this.sharedWaterBlockingAction(p,rec);this.rt.cancel(rec.id,why);
+              if (walkBlocked && this.rt.isActive(rec.id)) { p.walkStopping = why;if(water)p.waterStopRetry=water;return; }
+              if(water&&this.retrySharedWaterV1(p,water)){p.action=undefined;p.settle=undefined;p.soft=undefined;p.blockedSince=undefined;return;}
               if (walkBlocked && this.spreadRetry(p, 'route.occupied')) { p.action = undefined; p.settle = undefined; p.soft = undefined; p.blockedSince = undefined; return; }
               return this.end(p,'failed',why);
             }
           } else p.blockedSince = undefined;
-          if (rec.status === 'failed' && this.spreadRetry(p, rec.diagnostic?.code)) { p.action = undefined; p.settle = undefined; p.soft = undefined; continue; }
-          if (rec.status === 'failed') { if (!p.soft) return this.end(p, 'failed', { code: rec.diagnostic?.code ?? 'action.failed', message: rec.diagnostic?.message ?? 'failed' }); }
+          if (rec.status === 'failed' && this.spreadRetry(p, rec.diagnostic?.code,rec.diagnostic)) { p.action = undefined; p.settle = undefined; p.soft = undefined; continue; }
+          if (rec.status === 'failed') { if (!p.soft || this.sharedWaterStep(p.steps[p.index]) && !!rec.diagnostic && this.waterBodyObstruction(rec.diagnostic,p.actor)) return this.end(p, 'failed', { code: rec.diagnostic?.code ?? 'action.failed', message: rec.diagnostic?.message ?? 'failed' }); }
           else if (rec.status === 'cancelled') { if (!p.soft) return this.end(p, 'failed', { code: rec.diagnostic?.code ?? 'action.interrupted', message: rec.diagnostic?.message ?? 'interrupted' }); }
           else if (rec.status !== 'completed' && !(p.settle === 'held' && SETTLED.has(rec.phase))) return; // still under way
         }
@@ -379,6 +386,7 @@ export class MarsEngine implements Engine {
         if (!Array.isArray(ops)) {
           // A shared-space spread goal that is momentarily full or crossed by another body waits
           // in place and re-chooses (1 s, at most a minute) rather than failing the programme.
+          if(this.sharedWaterStep(p.steps[p.index])){if(this.retrySharedWaterV1(p,ops))continue;return this.end(p,'failed',ops);}
           const spread = String(p.steps[p.index]?.params?.spread ?? '');
           if (['pond/1','region/1','pond-lap/1'].includes(spread) && /occupied|region-full|goal-occupied/.test(ops.code) && (p.spreadWaits = (p.spreadWaits ?? 0) + 1) <= 60) { p.index--; p.ops = [{ wait: 20 }]; continue; }
           return this.end(p, 'failed', ops);
@@ -399,8 +407,8 @@ export class MarsEngine implements Engine {
         }
       }
       const rec = this.rt.submit(op.verb, op.params);
-      if (rec.status === 'failed' && !op.soft && this.spreadRetry(p, rec.diagnostic?.code)) continue;
-      if (rec.status === 'failed') { if (op.soft) continue; return this.end(p, 'failed', { code: rec.diagnostic?.code ?? 'action.failed', message: rec.diagnostic?.message ?? 'refused' }); }
+      if (rec.status === 'failed' && (!op.soft || this.sharedWaterStep(p.steps[p.index])) && this.spreadRetry(p, rec.diagnostic?.code,rec.diagnostic)) continue;
+      if (rec.status === 'failed') { if (op.soft && !(this.sharedWaterStep(p.steps[p.index]) && !!rec.diagnostic && this.waterBodyObstruction(rec.diagnostic,p.actor))) continue; return this.end(p, 'failed', { code: rec.diagnostic?.code ?? 'action.failed', message: rec.diagnostic?.message ?? 'refused' }); }
       p.action = rec.id; p.settle = op.settle; p.soft = op.soft;
     }
   }
@@ -414,13 +422,13 @@ export class MarsEngine implements Engine {
     const r = this.rt.world.regions[to]; if (r) return centroid(r.polygon);
     return null;
   }
-  private plan(verb: string, params: unknown): Diag | null {
+  private plan(verb: string, params: unknown, subjects = false): Diag | null {
     const def = this.registry.get(verb); if (!def) return { code: 'action.unknown-verb', message: `no action verb "${verb}"` };
     const parsed = def.schema.safeParse(params); if (!parsed.success) return { code: 'action.invalid-params', message: parsed.error.issues.map((i: any) => `${i.path.join('.')}: ${i.message}`).join('; ') };
     const body=this.m.admitFloaters(verb,parsed.data,(id:string)=>this.ents[id]?.body);
     if(body.status==='refuses')return {code:body.reason,message:body.note};
     const r = def.plan(this.rt, parsed.data);
-    return r.ok ? null : { code: r.diagnostic.code, message: r.diagnostic.message };
+    return r.ok ? null : { code: r.diagnostic.code, message: r.diagnostic.message, ...(subjects?{subjects:[...(r.diagnostic.subjects??[])]}:{}) };
   }
   /** A reachable standing point `standoff` metres from a target, on the side the actor comes from if possible. 'here' if already there. */
   private goalNear(actor: string, to: unknown, standoff: number): { x: number; z: number; level: number } | 'here' | Diag {
@@ -446,7 +454,7 @@ export class MarsEngine implements Engine {
    * retry re-chooses: a spaced spot inside the region away from other bodies and from
    * other running shore/walk targets, first with a currently plannable native route.
    * Absent the parameter, region goals keep the original single-centroid behaviour. */
-  private spreadGoalV1(actor:string,region:string,mode:unknown='pond/1'):{x:number;z:number;level:number}|'here'|Diag{
+  private spreadGoalV1(actor:string,region:string,mode:unknown='pond/1',subjects=false):{x:number;z:number;level:number}|'here'|Diag{
     const r=this.rt.world.regions[region],e=this.ents[actor];if(!r||!e)return {code:'target.unknown',message:`nothing to walk to: ${region}`};
     const lap=mode==='pond-lap/1'; // pond-lap/1: from inside the water, glide on to a different spaced spot
     if(!lap&&inPoly(e.pose.p[0],e.pose.p[2],r.polygon))return 'here';
@@ -470,15 +478,34 @@ export class MarsEngine implements Engine {
     if(!spots.length&&!ring.length)return {code:'route.region-full',message:`no spaced free spot remains in ${region}`};
     const offset=[...actor].reduce((h,c)=>(h*31+c.charCodeAt(0))>>>0,7)%spots.length;
     const order=[...spots.slice(offset),...spots.slice(0,offset)].map((p,i)=>({p,i,band:lap?Math.round(Math.abs(Math.hypot(p[0]-e.pose.p[0],p[1]-e.pose.p[2])-6)/2):pond?Math.round(Math.hypot(p[0]-e.pose.p[0],p[1]-e.pose.p[2])/8):Math.round(Math.hypot(p[0]-mid[0],p[1]-mid[1])/2)})).sort((a,b)=>a.band-b.band||a.i-b.i).slice(0,24);
-    let last:Diag={code:'route.unreachable',message:'no reachable spaced spot'};
-    for(const {p} of order){const no=this.plan(this.movementVerb(actor,p[0],p[1]),{actor,x:p[0],z:p[1],level});if(!no)return {x:p[0],z:p[1],level};last=no;}
+    let last:Diag={code:'route.unreachable',message:'no reachable spaced spot'},crowded:Diag|undefined;
+    for(const {p} of order){const no=this.plan(this.movementVerb(actor,p[0],p[1]),{actor,x:p[0],z:p[1],level},subjects);if(!no)return {x:p[0],z:p[1],level};last=no;if(subjects&&this.waterBodyObstruction(no,actor))crowded??=no;}
     if(v2&&ring.length){const ground=0;for(const p of ring.sort((a,b)=>Math.hypot(a[0]-e.pose.p[0],a[1]-e.pose.p[2])-Math.hypot(b[0]-e.pose.p[0],b[1]-e.pose.p[2])).slice(0,24)){const no=this.plan(this.movementVerb(actor,p[0],p[1]),{actor,x:p[0],z:p[1],level:ground});if(!no)return {x:p[0],z:p[1],level:ground};}
       return {code:'route.region-full',message:`${region} is full and nobody can stand beside it right now`};}
-    return last;
+    return crowded??last;
+  }
+  private sharedWaterStep(step:Program['steps'][number]|undefined):boolean{return step?.verb==='walk_to'&&step.params?.spreadWaitPolicy===SHARED_WATER_WAIT_POLICY&&['pond/1','pond-lap/1'].includes(String(step.params?.spread));}
+  /** Prospective plan-only policy: finite waits for actual human obstructions.
+   * Static geometry and unknown envelopes never become waiting/success. */
+  private waterBodyObstruction(d:Diag,actor:string):boolean{return d.code==='shore.occupied-route'&&!!d.subjects?.includes(actor)&&!!d.subjects?.some(id=>id!==actor&&!!this.ents[id]?.human);}
+  /** Read only the native mover dependency graph; never infer blockers from text.
+   * Connected dry-gate children report their actual body dependency here. */
+  private sharedWaterBlockingAction(p:Prog,record:ActionRecord):Diag|undefined{
+    if(!this.sharedWaterStep(p.steps[p.index]))return;
+    if(record.diagnostic&&this.waterBodyObstruction(record.diagnostic,p.actor))return record.diagnostic;
+    const owned=new Set([record.id]);for(let depth=0;depth<4;depth++){let added=false;for(const child of this.rt.records.values())if(child.parent&&owned.has(child.parent)&&!owned.has(child.id)&&this.rt.isActive(child.id)){owned.add(child.id);added=true;if(child.diagnostic&&this.waterBodyObstruction(child.diagnostic,p.actor))return child.diagnostic;}if(!added)break;}
+    for(const id of Object.keys(this.ents))if(id!==p.actor&&this.ents[id]?.human)for(const code of ['traffic.person','traffic.yield','walk.goal-occupied'])if(publishedWaitsFor(this.rt,p.actor,id,code))return {code:'shore.occupied-route',message:'The native connected shore entry is waiting for another body.',subjects:[p.actor,id]};
+  }
+  private retrySharedWaterV1(p:Prog,d:Diag):boolean{
+    if(!this.sharedWaterStep(p.steps[p.index])||!this.waterBodyObstruction(d,p.actor))return false;
+    const tick=this.rt.tick,wait=p.waterWait?.step===p.index?p.waterWait:{step:p.index,since:tick,attempts:0};
+    p.waterWait=wait;if(++wait.attempts>60)return false;
+    p.index--;p.ops=[{wait:TPS}];return true;
   }
   /** Edge reflex floor (yieldTimeoutV1): a shared-space spread step whose movement failed only because another body
    * was in the way waits 1 s and re-chooses its spot (at most a minute) instead of failing the programme. */
-  private spreadRetry(p: Prog, code: string | undefined): boolean {
+  private spreadRetry(p: Prog, code: string | undefined, diagnostic?:Diag): boolean {
+    if(this.sharedWaterStep(p.steps[p.index]))return this.retrySharedWaterV1(p,diagnostic??{code:code??'',message:'blocked'});
     if (this.cfg.yieldTimeoutV1 !== true || !code || !/occupied/.test(code)) return false;
     const spread = String(p.steps[p.index]?.params?.spread ?? '');
     if (!['pond/1','region/1','pond-lap/1'].includes(spread) || (p.spreadWaits = (p.spreadWaits ?? 0) + 1) > 60) return false;
@@ -564,7 +591,7 @@ export class MarsEngine implements Engine {
       }
       case 'control_classroom_v1': return [{verb:'classroom_control',params:{session:a.session,intent:{kind:a.kind}},settle:'done',raw:true}];
       case 'walk_to': {
-        const g = (a.spread === 'pond/1' || a.spread === 'region/1' || a.spread === 'pond-lap/1') && typeof a.to === 'string' && this.rt.world.regions[a.to] ? this.spreadGoalV1(me, a.to, a.spread) : this.goalNear(me, a.to, typeof a.standoff === 'number' ? a.standoff : 0);
+        const g = (a.spread === 'pond/1' || a.spread === 'region/1' || a.spread === 'pond-lap/1') && typeof a.to === 'string' && this.rt.world.regions[a.to] ? this.spreadGoalV1(me, a.to, a.spread,this.sharedWaterStep(step)) : this.goalNear(me, a.to, typeof a.standoff === 'number' ? a.standoff : 0);
         if (g === 'here') return [];
         if ('code' in g) return g;
         const ops: Op[] = [{ verb: this.movementVerb(me,g.x,g.z), params: { actor: me, x: g.x, z: g.z, level:g.level, ...(this.cfg.nativeArrivalWitnessV1&&this.movementVerb(me,g.x,g.z)==='walk_to'?{arrivalEvidence:'navigation-arrival/1'}:{}) }, settle: 'done', ...(a.spread === 'pond-lap/1' ? { soft: true } : {}) }];
@@ -646,6 +673,7 @@ export class MarsEngine implements Engine {
     return [...ids].sort();
   }
   canPerform(program: Program): Diag | null {
+    for(const step of program.steps)if(step.params?.spreadWaitPolicy!==undefined&&!this.sharedWaterStep(step))return {code:'action.invalid-spread-wait-policy',message:'Only shared-water-wait/1 on a pond/1 or pond-lap/1 walk is supported.'};
     const bodyIssue=this.bodyProgramProblemV1(program); if(bodyIssue)return bodyIssue;
     if(program.steps[0]?.verb==='control_classroom_v1'){const p=program.steps[0].params;if(program.steps.length!==1||!['cancel','advance'].includes(String(p.kind))||typeof p.session!=='string'||!this.ownedClassroomControlRosterV1(program.actor,p.session))return {code:'classroom.owned-host-control-required',message:'Only the active classroom host can apply this control.'};return this.plan('classroom_control',{session:p.session,intent:{kind:p.kind}});}
     if ([...this.programs.values()].some(p=>p.readiedActors?.includes(program.actor)&&!p.action))return {code:'activity.readiness-committed',message:'This body has committed its explicit ready wait to a starting classroom.'};
@@ -700,7 +728,7 @@ export class MarsEngine implements Engine {
     if (first.verb === 'mars:take_item') { const it=this.ents[String(first.params.item)]; if (it?.support?.kind==='in-hand' && it.support.by===program.actor && (!first.params.hand || it.support.hand===first.params.hand)) return null; }
     if (first.verb.startsWith('mars:')) { const r = this.raw(program.actor, first); return 'code' in r ? r : this.plan(r.verb, r.params); }
     if (!BODY.has(first.verb)) return { code: 'action.unknown-verb', message: `no body verb "${first.verb}"` };
-    if (first.verb === 'walk_to') { const g = (first.params.spread === 'pond/1' || first.params.spread === 'region/1' || first.params.spread === 'pond-lap/1') && typeof first.params.to === 'string' && this.rt.world.regions[first.params.to] ? this.spreadGoalV1(program.actor, first.params.to, first.params.spread) : this.goalNear(program.actor, first.params.to, typeof first.params.standoff === 'number' ? first.params.standoff : 0); return g !== 'here' && 'code' in g ? g : null; }
+    if (first.verb === 'walk_to') { const g = (first.params.spread === 'pond/1' || first.params.spread === 'region/1' || first.params.spread === 'pond-lap/1') && typeof first.params.to === 'string' && this.rt.world.regions[first.params.to] ? this.spreadGoalV1(program.actor, first.params.to, first.params.spread,this.sharedWaterStep(first)) : this.goalNear(program.actor, first.params.to, typeof first.params.standoff === 'number' ? first.params.standoff : 0); return g !== 'here' && 'code' in g ? g : null; }
     if (first.verb === 'sit') {
       const fixture = String(first.params.on ?? '');
       if (this.cfg.scene === 'eden-camp' && this.ents[fixture]?.def === 'bench-6ft') {
