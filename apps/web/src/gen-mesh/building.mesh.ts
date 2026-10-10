@@ -1,45 +1,510 @@
-// building/1 + stairs/1 mesh halves. Owner: L2. CONTRACT STUB (L1): draws the baked wall
-// segments, floor slabs and a simple roof so placeholder buildings read as hollow houses.
-// L2 replaces with the Eden look (port dwelling-kit, eden-facades, eden-interiors): framed
-// windows and doors, trims, porches, balconies, stairs with treads, roofs by style, and the
-// interior view (hide roof/upper floors above the camera; ?hideRoofs=1).
+// building/1 + stairs/1 mesh halves in the Eden look. Owner: L2 (buildings). Spec <eden4>/29 WP2.
+// Draws the generator's own layout (shared with the physics half, so what you see is what collides):
+// double-skinned walls with real window and door cut-outs, framed and glazed, sills and lintels,
+// shutters and flower boxes, a door hood and step (ported from eden-facades); floors and ceilings per
+// storey, stairs with treads, stringers and handrails, stairwell rails, porches on posts, balconies;
+// roofs by style with overhangs (gable, hip, shed, flat with parapet, dome, cone on round towers),
+// chimneys. Interior view: `?hideRoofs=1` hides roofs everywhere (`&cut=<floor>` also hides the
+// storeys above that floor); a camera inside a building's footprint hides its roof and the storeys
+// above the camera. Geometry is built once per (def, params, paint) and shared by every instance.
 import * as THREE from 'three';
-import { registerMesh } from './registry.ts';
+import { GENERATORS, type Value } from '@sim/generators';
+import type { BuildingLayout } from '../../../../packages/generators/src/building.ts';
+import { Builder, hashStr, mix, rng, type Col } from './building-kit.ts';
+import { registerMesh, type MeshCtx } from './registry.ts';
 
-const box = new THREE.BoxGeometry(1, 1, 1);
-const col = (v: unknown, d: string) => (typeof v === 'string' && /^#/.test(v) ? v : d);
+type V2 = [number, number];
+type Wall = BuildingLayout['walls'][number];
+type Opening = BuildingLayout['openings'][number];
+const FLOOR0 = 0.1, SLAB = 0.18;
+const col = (v: unknown, d: string) => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v) ? v : d);
+
+/** Facade palettes from eden-facades (trim, base, quoin, shutters, hood) by wall material. */
+const FACADE: Record<string, { trim: string; base: string; quoin: string; shutters: string[]; hood: string }> = {
+  brick: { trim: '#ece4d2', base: '#a99d88', quoin: '#d9cdb4', shutters: ['#4f6d5a', '#2f4f6f', '#7a2f2a'], hood: '#3f4a46' },
+  plaster: { trim: '#f4eee2', base: '#a7a08f', quoin: '#e4d9c5', shutters: ['#5b7f8c', '#8a6a3a', '#4f6d5a'], hood: '#7a2f2a' },
+  wood: { trim: '#5e412b', base: '#8f877a', quoin: '#6e4c32', shutters: ['#355e3b', '#7a2f2a', '#2f4f5f'], hood: '#4a3423' },
+  stone: { trim: '#dad3c3', base: '#958d7c', quoin: '#cbc2af', shutters: ['#2f4f5f', '#4f6d5a', '#6a4a6a'], hood: '#3a3f42' },
+  glass: { trim: '#f4f4f0', base: '#a7a08f', quoin: '#f4f4f0', shutters: [], hood: '#5e6a6a' },
+  metal: { trim: '#d8dadc', base: '#8c9196', quoin: '#b9bdc1', shutters: ['#3f4a46'], hood: '#3f4a46' },
+};
+const FLOWERS = ['#d9485f', '#f1c84b', '#e86aa8', '#f4f1e8', '#9b6fd1', '#ff8a3d'];
+const LEAVES = ['#3f6e33', '#4c7f3c', '#355f2b', '#5a8a3f', '#2f5428'];
+/** Interior wall paints (from eden-window-interiors' room shader) by room kind, seeded otherwise. */
+const PAINTS = ['#eddbb8', '#f2c7a8', '#bdd1ad', '#b3c7e0', '#f5eddb'];
+const ROOM_PAINT: Record<string, string> = { kitchen: '#f3e6c4', bath: '#dfe9ea', bedroom: '#c9d6e6', living: '#efdcc0', hall: '#efe6d4', landing: '#ece4d2', shop: '#f2ead8', nave: '#ece7dc', barn: '#c9a982', loft: '#c9a982', greenhouse: '#eef4ee' };
+const FLOOR_FINISH: Record<string, string> = { kitchen: '#c79e7a', bath: '#d9dcd6', shop: '#b88d60', barn: '#a08060', loft: '#b08b5a', greenhouse: '#9e968a', entrance: '#b9b3a6', nave: '#c8bfae', pavilion: '#a77c52' };
+
+const templates = new Map<string, THREE.Group>();
 
 registerMesh({
   gen: 'building/1',
   build(ctx) {
-    const g = new THREE.Group(), b = ctx.baked, p = ctx.params;
-    const wall = ctx.materials.get((p.material as never) ?? 'plaster', col(ctx.entity.state?.paint, col(p.wall, '#f1e7d2')));
-    for (const c of b.colliders) {
-      const m = new THREE.Mesh(box, wall); m.scale.set(c.half[0] * 2, c.y1 - c.y0, c.half[1] * 2); m.position.set(c.c[0], (c.y0 + c.y1) / 2, c.c[1]); m.rotation.y = c.yaw; m.castShadow = m.receiveShadow = true; g.add(m);
+    const gen = GENERATORS['building/1'] as unknown as { layout(p: Record<string, unknown>, a: Record<string, unknown>): BuildingLayout };
+    const L = gen.layout(ctx.params as Record<string, unknown>, ctx.args);
+    // state.paint repaints the walls; while it still holds the def's default, the `wall` param decides
+    const paintDefault = (ctx.def.state?.paint as { default?: string } | undefined)?.default;
+    const painted = ctx.entity.state?.paint !== undefined && ctx.entity.state.paint !== paintDefault;
+    const paint = painted ? col(ctx.entity.state!.paint, '#f1e7d2') : col(ctx.params.wall, col(paintDefault, '#f1e7d2'));
+    const key = `${ctx.def.hash}|${JSON.stringify(ctx.params)}|${paint}|${JSON.stringify(ctx.args)}`;
+    let tpl = templates.get(key);
+    if (!tpl) {
+      const seed = hashStr(key);
+      let built: { group: THREE.Group; tris: number } | null = null;
+      for (const detail of [2, 1, 0]) { built = drawBuilding(L, ctx, paint, seed, detail); if (built.tris <= 6000 || detail === 0) break; disposeGroup(built.group); }
+      tpl = built!.group;
+      tpl.userData.tris = built!.tris;
+      if (templates.size > 64) { for (const g of templates.values()) disposeGroup(g); templates.clear(); }
+      templates.set(key, tpl);
     }
-    const floorMat = ctx.materials.get('wood', '#b08b5a');
-    for (const s of b.surfaces ?? []) {
-      const shape = new THREE.Shape(s.polygon.map(([x, z]) => new THREE.Vector2(x, z)));
-      const geo = new THREE.ShapeGeometry(shape); geo.rotateX(Math.PI / 2);
-      const m = new THREE.Mesh(geo, floorMat); m.position.y = s.y; m.receiveShadow = true; m.material = floorMat; (m.material as THREE.Material).side = THREE.DoubleSide; g.add(m);
-    }
-    const [w, , d] = b.box, top = Math.max(...b.colliders.map((c) => c.y1), 2.6);
-    if (p.roof !== 'none' && !new URLSearchParams(location.search).has('hideRoofs')) {
-      const pitch = ((typeof p.roofPitch === 'number' ? p.roofPitch : 32) * Math.PI) / 180, rise = Math.tan(pitch) * (d / 2);
-      const s = new THREE.Shape([new THREE.Vector2(-d / 2 - 0.3, 0), new THREE.Vector2(d / 2 + 0.3, 0), new THREE.Vector2(0, rise + 0.2)]);
-      const geo = new THREE.ExtrudeGeometry(s, { depth: w + 0.6, bevelEnabled: false }); geo.translate(0, 0, -(w + 0.6) / 2); geo.rotateY(Math.PI / 2);
-      const roof = new THREE.Mesh(geo, ctx.materials.get('tile', col(p.roofColor, '#8a3b2a'))); roof.position.y = top; roof.castShadow = true; roof.name = 'roof'; g.add(roof);
-    }
+    const g = tpl.clone(true);
+    g.userData = { ...tpl.userData };
+    attachInteriorView(g, L);
     return g;
   },
+  // no instanceKey: the interior view hides storeys per building per frame, which instancing would lose;
+  // the geometry is still shared (one template per def/params/paint, cloned).
 });
+
+function disposeGroup(g: THREE.Object3D) { g.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) m.geometry.dispose(); }); }
+
+// ---------------------------------------------------------------- the drawing
+
+function drawBuilding(L: BuildingLayout, ctx: MeshCtx, paint: string, seed: number, detail: number): { group: THREE.Group; tris: number } {
+  const b = new Builder(), r = rng(seed);
+  const p = ctx.params as Record<string, Value>;
+  const mat = L.material in FACADE ? L.material : 'plaster', F = FACADE[mat];
+  const trim = col(p.trim, F.trim === '#f4eee2' ? '#6b4a2b' : F.trim), roofCol = col(p.roofColor, '#8a3b2a');
+  const glassWalls = mat === 'glass';
+  const lighthouse = !!L.args.lantern;
+  const extOf = (floor: number) => (lighthouse && floor % 2 === 1 ? trim : paint);
+  const roomPaint = (id: string | null) => { if (!id) return paint; const room = L.rooms.find((x) => x.id === id); return ROOM_PAINT[room?.kind ?? ''] ?? PAINTS[hashStr(id) % PAINTS.length]; };
+  const shutter = F.shutters.length ? F.shutters[Math.floor(r() * F.shutters.length)] : trim;
+  const fy = (k: number) => k * L.fh + FLOOR0;
+  const at = (k: number) => `level-${k}`;
+
+  // ---- plinth, floors, ceilings
+  const outline = L.round ? ngon(L.round.R + L.t / 2 + 0.06, L.round.sides) : rectPoly(-L.W / 2 - 0.06, -L.D / 2 - 0.06, L.W / 2 + 0.06, L.D / 2 + 0.06);
+  b.group = at(0);
+  b.slab(outline, 0, FLOOR0 - 0.02, F.base, 'floor');
+  for (const lv of L.levels) {
+    b.group = at(lv.floor);
+    for (const q of lv.polys) {
+      const kind = L.rooms.find((x) => x.id === q.room)?.kind ?? '';
+      const finish = FLOOR_FINISH[kind] ?? mix('#a77c52', '#c49a63', (hashStr(q.room) % 100) / 200);
+      if (lv.floor === 0) b.slab(q.poly, FLOOR0 - 0.02, 0.02, finish, 'floor');
+      else { b.group = `slab-${lv.floor}`; b.slab(q.poly, lv.y - SLAB, SLAB, finish, 'floor'); b.slab(q.poly, lv.y - SLAB - 0.005, 0.006, '#f4efe6', 'wall'); b.group = at(lv.floor); }
+    }
+  }
+  if (!L.open) { b.group = `slab-${L.floors}`; b.slab(L.round ? ngon(L.round.R + L.t / 2, L.round.sides) : rectPoly(-L.W / 2, -L.D / 2, L.W / 2, L.D / 2), L.wallTop - 0.1, 0.12, '#f4efe6', 'wall'); }
+
+  // ---- walls with openings
+  L.walls.forEach((w, wi) => drawWall(b, L, w, L.openings.filter((o) => o.wall === wi), { ext: extOf(w.floor), trim, quoin: F.quoin, roomPaint, glassWalls, shutter, r, detail, mat, F, fy }));
+
+  // ---- facade details: plinth band, string courses, cornice, corners
+  if (!L.open) facade(b, L, { trim, quoin: F.quoin, base: F.base, mat, r, detail, ext: paint, lighthouse });
+
+  // ---- stairs and rails
+  for (const st of L.stairs) { b.group = at(st.from); drawStairs(b, L, st, trim, detail); }
+  for (const rl of L.rails) {
+    const k = Math.max(0, Math.min(L.floors - 1, Math.round((rl.y0 - FLOOR0) / L.fh)));
+    b.group = at(k);
+    const h = rl.y1 - rl.y0, len = Math.hypot(rl.b[0] - rl.a[0], rl.b[1] - rl.a[1]);
+    b.run(rl.a[0], rl.a[1], rl.b[0], rl.b[1], rl.y0 + h - 0.06, 0.06, 0.07, trim);
+    if (len > 1.6 && detail >= 1) b.run(rl.a[0], rl.a[1], rl.b[0], rl.b[1], rl.y0 + h * 0.45, 0.04, 0.04, trim);
+    const posts = Math.max(2, Math.ceil(len / (detail >= 1 ? 2 : 3.2)) + 1);
+    for (let i = 0; i < posts - 1; i++) { const t = i / (posts - 1); b.box(rl.a[0] + (rl.b[0] - rl.a[0]) * t, rl.y0, rl.a[1] + (rl.b[1] - rl.a[1]) * t, 0.06, h - 0.03, 0.06, trim); }
+  }
+
+  // ---- porch, balcony, pavilion posts
+  if (L.porch) {
+    b.group = at(0);
+    const [x0, z0, x1, z1] = bboxOf(L.porch.poly);
+    b.box((x0 + x1) / 2, 0, (z0 + z1) / 2, x1 - x0, FLOOR0, z1 - z0, '#a07a52', 'floor');
+    for (let x = x0 + 0.4; x < x1 - 0.2; x += 0.45) b.box(x, FLOOR0 - 0.005, (z0 + z1) / 2, 0.02, 0.01, z1 - z0 - 0.04, '#8a6644', 'floor');
+    b.box(0, 0, z1 + 0.18, Math.min(2.2, x1 - x0), FLOOR0 * 0.55, 0.36, F.base, 'floor');
+    // a veranda under a balcony gets a flat roof at the balcony's level; otherwise a lean-to
+    const under = L.balcony && !L.balcony.ring && L.balcony.floor === 1;
+    const roofY = under ? fy(1) - SLAB - 0.02 : Math.min(L.fh - 0.12, 2.9), lowY = under ? roofY : Math.min(roofY - 0.25, 2.55);
+    for (const post of L.posts) { b.cyl(post.c[0], FLOOR0, post.c[1], 0.075, 0.09, lowY - FLOOR0, trim, 'trim', 8); b.box(post.c[0], FLOOR0, post.c[1], 0.22, 0.12, 0.22, F.base); }
+    const run = z1 - z0 + 0.3, drop = roofY - lowY, ang = Math.atan2(drop, run);
+    b.group = under ? at(1) : 'roof';
+    if (under) b.box(0, roofY, (z0 + z1 + 0.3) / 2, x1 - x0 + 0.3, 0.14, run, '#b9b3a6', 'floor');
+    else b.tilt(0, (roofY + lowY) / 2 + 0.12, (z0 + z1 + 0.3) / 2, x1 - x0 + 0.4, 0.1, Math.hypot(run, drop) + 0.1, ang, 0, roofCol, 'roof');
+    b.group = at(0);
+    b.box(0, lowY - 0.18, z1 - 0.15, x1 - x0, 0.18, 0.14, trim);
+  }
+  if (L.balcony) {
+    b.group = at(L.balcony.floor);
+    for (const q of L.balcony.polys) b.slab(q, L.balcony.y - 0.16, 0.16, '#b9b3a6', 'floor');
+    if (L.balcony.rect && !L.porch) { const [x0, , x1, z1] = L.balcony.rect; for (const x of [x0 + 0.25, x1 - 0.25]) b.tilt(x, L.balcony.y - 0.45, z1 - 0.55, 0.1, 0.12, 0.9, -0.6, 0, trim); }
+  }
+  if (L.open) {
+    b.group = at(0);
+    for (const post of L.posts) { b.cyl(post.c[0], FLOOR0, post.c[1], 0.1, 0.12, L.fh - FLOOR0, trim, 'trim', 8); b.box(post.c[0], FLOOR0, post.c[1], 0.3, 0.14, 0.3, F.base); }
+    const y = L.fh - 0.25, hx = L.W / 2 - 0.15, hz = L.D / 2 - 0.15;
+    b.run(-hx, -hz, hx, -hz, y, 0.25, 0.16, trim).run(-hx, hz, hx, hz, y, 0.25, 0.16, trim).run(-hx, -hz, -hx, hz, y, 0.25, 0.16, trim).run(hx, -hz, hx, hz, y, 0.25, 0.16, trim);
+  }
+
+  // ---- roof
+  b.group = 'roof';
+  drawRoof(b, L, { roofCol, trim, ext: paint, glass: glassWalls, r, detail });
+
+  // ---- lit lantern (lighthouse) and a lamp in every room
+  if (lighthouse) { b.group = at(L.floors - 1); b.cyl(0, fy(L.floors - 1) + 0.9, 0, 0.35, 0.35, 0.8, '#fff3c9', 'glow', 10); b.cyl(0, fy(L.floors - 1), 0, 0.25, 0.4, 0.9, '#3b3d40', 'trim', 8); }
+  for (const room of L.rooms) {
+    if (L.open || detail < 1) break;
+    b.group = at(room.floor);
+    const [cx, cz] = room.centre, top = room.y + room.height - 0.05;
+    b.cyl(cx, top - 0.5, cz, 0.012, 0.012, 0.5, '#3b3d40', 'trim', 4);
+    b.cone(cx, top - 0.72, cz, 0.2, 0.22, '#ffd99a', 'glow', 8);
+  }
+
+  const { groups, tris } = b.emit(ctx.materials);
+  const root = new THREE.Group(); root.name = 'building';
+  const inner = new THREE.Group(); inner.name = 'building-canonical'; inner.rotation.y = L.yaw;
+  for (const g of groups.values()) inner.add(g);
+  root.add(inner);
+  return { group: root, tris };
+}
+
+type WallOpts = { ext: string; trim: string; quoin: string; roomPaint: (id: string | null) => string; glassWalls: boolean; shutter: string; r: () => number; detail: number; mat: string; F: (typeof FACADE)[string]; fy: (k: number) => number };
+
+/** One wall run: two skins (outside / inside colours, or room paints either side), cut at its openings, then dressed. */
+function drawWall(b: Builder, L: BuildingLayout, w: Wall, ops: Opening[], o: WallOpts) {
+  b.group = `level-${w.floor}`;
+  const ux = w.b[0] - w.a[0], uz = w.b[1] - w.a[1], len = Math.hypot(ux, uz) || 1;
+  const yaw = Math.atan2(-uz / len, ux / len);
+  // local +z after the yaw is (-uz, ux); find which room sits there
+  const lz: V2 = [-uz / len, ux / len];
+  const posN: V2 = w.axis === 'x' ? [0, 1] : w.axis === 'z' ? [1, 0] : (w.out ?? [0, 1]);
+  const plusIsPos = lz[0] * posN[0] + lz[1] * posN[1] > 0;
+  const posCol = w.pos ? o.roomPaint(w.pos) : o.ext, negCol = w.neg ? o.roomPaint(w.neg) : o.ext;
+  const [plusCol, minusCol] = plusIsPos ? [posCol, negCol] : [negCol, posCol];
+  // outward (for frames): local +z or -z
+  const outSign = w.exterior ? (w.out ? (lz[0] * w.out[0] + lz[1] * w.out[1] > 0 ? 1 : -1) : 1) : 1;
+  const T = w.thick, H = w.y1 - w.y0, base = FLOOR0 + w.floor * L.fh - w.y0;
+  b.push(w.a[0], w.y0, w.a[1], yaw);
+  const reveal = w.exterior ? o.ext : plusCol;
+  const seg = (s0: number, s1: number, y0: number, y1: number) => {
+    if (s1 - s0 < 1e-3 || y1 - y0 < 1e-3) return;
+    if (o.glassWalls && w.exterior) { b.face([s0, y0, 0], [s1, y0, 0], [s1, y1, 0], [s0, y1, 0], '#dff0ec', 'glass'); return; }
+    b.wallSlab(s0, s1, y0, y1, -T / 2, T / 2, plusCol, minusCol, { top: y1 < H - 1e-3 || w.floor === L.floors - 1 ? reveal : undefined, bottom: y0 > 1e-3 ? reveal : undefined, ends: reveal, endL: s0 > 1e-3, endR: s1 < len - 1e-3 });
+  };
+  const sorted = [...ops].sort((a, c) => a.s - c.s);
+  let x = 0;
+  for (const op of sorted) {
+    const a = op.s - op.width / 2, c = op.s + op.width / 2, sill = base + op.sill, top = base + op.sill + op.height;
+    seg(x, a, 0, H); seg(a, c, 0, op.sill > 0 ? sill : 0); seg(a, c, top, H);
+    x = c;
+  }
+  seg(x, len, 0, H);
+  if (o.glassWalls && w.exterior) {
+    // greenhouse: slender frames every ~1.1 m and a base board
+    const n = Math.max(1, Math.round(len / 1.1));
+    for (let i = 0; i <= n; i++) b.box((len * i) / n, 0, 0, 0.05, H, 0.07, o.trim);
+    b.box(len / 2, 0, 0, len, 0.45, T * 0.6, o.F.base, 'wall'); b.box(len / 2, H - 0.06, 0, len, 0.06, 0.08, o.trim);
+  }
+  for (const op of sorted) dressOpening(b, L, w, op, { ...o, outSign, base });
+  b.pop();
+}
+
+/** Frames, glass, sills, lintels, shutters, flower boxes (windows); jambs, a leaf, hood and step (doors). Wall-local frame. */
+function dressOpening(b: Builder, L: BuildingLayout, w: Wall, op: Opening, o: WallOpts & { outSign: number; base: number }) {
+  const T = w.thick, sOut = o.outSign, face = sOut * (T / 2 + 0.015);
+  const sill = o.base + op.sill, top = sill + op.height, cx = op.s, hw = op.width / 2;
+  const r = o.r, framed = !o.glassWalls || !w.exterior;
+  if (op.kind === 'window') {
+    b.face([cx - hw, sill, 0], [cx + hw, sill, 0], [cx + hw, top, 0], [cx - hw, top, 0], '#bcd6e0', 'glass');
+    if (!framed) return;
+    const fc = w.exterior ? o.trim : '#f4efe6', ft = 0.07;
+    b.box(cx - hw + ft / 2, sill, face * 0.6, ft, op.height, T * 0.5, fc);
+    b.box(cx + hw - ft / 2, sill, face * 0.6, ft, op.height, T * 0.5, fc);
+    b.box(cx, top - ft, face * 0.6, op.width, ft, T * 0.5, fc);
+    const tall = op.height > 2.2;
+    if ((op.width > 1.05 || op.height > 1.6) && !tall && o.detail >= 1) b.box(cx, sill, 0, 0.05, op.height, 0.05, fc);
+    if (op.height > 1.1 && op.width > 0.7 && !tall && o.detail >= 1) b.box(cx, sill + op.height * 0.62, 0, op.width, 0.045, 0.05, fc);
+    if (!w.exterior || (o.detail < 1 && L.round)) return; // round towers at the lowest detail: the string courses frame them
+    // sill and lintel (eden-facades), shutters and flower boxes on some
+    b.box(cx, sill - 0.07, sOut * (T / 2 + 0.03), op.width + 0.2, 0.08, 0.16, o.F.quoin);
+    b.box(cx, top, sOut * (T / 2 + 0.02), op.width + 0.24, 0.14, 0.08, o.mat === 'wood' ? o.trim : o.F.quoin);
+    if (o.detail >= 1 && L.round === undefined && op.width <= 1.4 && op.height <= 1.9 && o.mat !== 'stone' && o.F.shutters.length && r() < 0.65) {
+      const sw = Math.min(0.5, op.width / 2);
+      for (const sd of [-1, 1]) {
+        const x = cx + sd * (hw + sw / 2 + 0.04);
+        b.box(x, sill, sOut * (T / 2 + 0.03), sw, op.height, 0.04, o.shutter);
+        if (o.detail >= 2) b.face([x - sw / 2 + 0.05, sill + op.height * 0.5, sOut * (T / 2 + 0.051)], [x + sw / 2 - 0.05, sill + op.height * 0.5, sOut * (T / 2 + 0.051)], [x + sw / 2 - 0.05, sill + op.height * 0.53, sOut * (T / 2 + 0.051)], [x - sw / 2 + 0.05, sill + op.height * 0.53, sOut * (T / 2 + 0.051)], '#2b2b2b', 'trim');
+      }
+    }
+    if (o.detail >= 2 && w.floor === 0 && op.sill > 0.4 && op.sill < 1.4 && r() < 0.5) {
+      b.box(cx, sill - 0.3, sOut * (T / 2 + 0.13), op.width + 0.06, 0.18, 0.2, '#6e4a30');
+      for (let k = 0; k < 4; k++) { const fx = cx - hw + 0.1 + ((op.width - 0.2) * (k + 0.5)) / 4; b.ball(fx, sill - 0.08 + r() * 0.04, sOut * (T / 2 + 0.13), 0.075, 0.06, 0.07, k % 2 ? LEAVES[k % LEAVES.length] : FLOWERS[Math.floor(r() * FLOWERS.length)]); }
+    }
+    return;
+  }
+  if (op.kind !== 'door') return;
+  // jambs and head on both faces
+  const jc = w.exterior ? o.trim : '#d8cbb1';
+  for (const sd of [-1, 1]) b.box(cx + sd * (hw + 0.035), o.base, 0, 0.07, op.height + 0.07, T + 0.04, jc);
+  b.box(cx, o.base + op.height, 0, op.width + 0.14, 0.08, T + 0.04, jc);
+  // the leaf, standing open into the room (hinged on the left jamb)
+  const leafW = op.width - 0.04, swing = sOut * 1.25;
+  b.at(cx - hw + 0.02, o.base, 0, 0, () => b.at(0, 0, 0, swing, () => b.box(leafW / 2, 0, -sOut * 0.03, leafW, op.height - 0.02, 0.05, w.exterior ? mix(o.trim, '#5e412b', 0.4) : '#a77c52')));
+  if (!w.exterior || op.to === 'balcony') return;
+  if (o.glassWalls) { b.box(cx, 0, sOut * (T / 2 + 0.25), op.width + 0.5, FLOOR0 + 0.02, 0.5, o.F.base); return; }
+  // hood on brackets and a step (eden-facades), a lamp beside the door
+  b.tilt(cx, o.base + op.height + 0.32, sOut * 0.38, op.width + 0.6, 0.06, 0.62, sOut * 0.2, 0, o.F.hood);
+  for (const sd of [-1, 1]) b.box(cx + sd * (hw + 0.22), o.base + op.height + 0.04, sOut * 0.17, 0.06, 0.24, 0.3, o.trim);
+  if (!L.porch || w.side !== 's') b.box(cx, 0, sOut * (T / 2 + 0.25), op.width + 0.5, FLOOR0 + 0.02, 0.5, o.F.base);
+  if (o.detail >= 1) { b.box(cx + hw + 0.4, o.base + 1.75, sOut * (T / 2 + 0.06), 0.05, 0.05, 0.12, '#3b3d40'); b.box(cx + hw + 0.4, o.base + 1.58, sOut * (T / 2 + 0.14), 0.12, 0.2, 0.12, '#ffd99a', 'glow'); }
+}
+
+/** Plinth band, string courses between storeys, cornice at the top, quoins or pilasters at corners, a downpipe, ivy. */
+function facade(b: Builder, L: BuildingLayout, o: { trim: string; quoin: string; base: string; mat: string; r: () => number; detail: number; ext: string; lighthouse: boolean }) {
+  if (L.round) {
+    const R = L.round.R + L.t / 2;
+    b.group = 'level-0'; b.cyl(0, 0, 0, R + 0.06, R + 0.08, 0.45, o.base, 'wall', L.round.sides);
+    for (let k = 1; k <= L.floors; k++) { b.group = `level-${Math.min(k, L.floors - 1)}`; b.cyl(0, k * L.fh - 0.12, 0, R + 0.07, R + 0.07, 0.14, k === L.floors ? o.base : o.quoin, 'trim', L.round.sides); }
+    return;
+  }
+  const hx = L.W / 2, hz = L.D / 2, top = L.wallTop;
+  const sides: { a: V2; b: V2; out: V2 }[] = [{ a: [-hx, hz], b: [hx, hz], out: [0, 1] }, { a: [hx, -hz], b: [-hx, -hz], out: [0, -1] }, { a: [hx, hz], b: [hx, -hz], out: [1, 0] }, { a: [-hx, -hz], b: [-hx, hz], out: [-1, 0] }];
+  const doorsOn = (out: V2, floor: number) => L.openings.filter((op) => op.exterior && op.kind === 'door' && op.floor === floor && L.walls[op.wall]?.out?.[0] === out[0] && L.walls[op.wall]?.out?.[1] === out[1]).map((op) => op.at);
+  for (const s of sides) {
+    const len = Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1]), ux = (s.b[0] - s.a[0]) / len, uz = (s.b[1] - s.a[1]) / len;
+    const P = (t: number, d: number): V2 => [s.a[0] + ux * t + s.out[0] * d, s.a[1] + uz * t + s.out[1] * d];
+    const yaw = Math.atan2(-uz, ux);
+    // plinth band, broken at doors
+    b.group = 'level-0';
+    const cuts = doorsOn(s.out, 0).map((d) => (d[0] - s.a[0]) * ux + (d[1] - s.a[1]) * uz).sort((a, c) => a - c);
+    let t0 = -0.05;
+    for (const c of [...cuts.map((c) => [c - 0.62, c + 0.62]), [len + 0.05, len + 0.05]]) { if (c[0] - t0 > 0.05) { const m = P((t0 + c[0]) / 2, 0.035); b.box(m[0], 0, m[1], c[0] - t0, 0.42, 0.07, o.base, 'wall', yaw); } t0 = c[1]; }
+    // string courses and the cornice
+    for (let k = 1; k < L.floors; k++) { b.group = `level-${k}`; const m = P(len / 2, 0.03); b.box(m[0], k * L.fh - 0.06, m[1], len + 0.08, 0.12, 0.06, o.trim, 'trim', yaw); }
+    b.group = `level-${L.floors - 1}`;
+    { const m = P(len / 2, 0.06); b.box(m[0], top - 0.2, m[1], len + 0.3, 0.2, 0.14, o.trim, 'trim', yaw); }
+    // corners: quoins on brick/stone, pilasters on plaster/wood
+    if (o.detail >= 1) for (const end of [0.0]) {
+      const sign = 1, c0 = P(end, 0.025);
+      if (o.mat === 'brick' || o.mat === 'stone') {
+        for (let y = 0.45, k = 0; y < top - 0.45; y += 0.84, k++) { const wq = k % 2 ? 0.34 : 0.52; const m = P(end + sign * (wq / 2 - 0.01), 0.025); b.group = `level-${Math.min(L.floors - 1, Math.floor(y / L.fh))}`; b.box(m[0], y, m[1], wq, 0.36, 0.06, o.quoin, 'trim', yaw); }
+      } else if (o.mat !== 'glass') { const m = P(end + 0.12, 0.025); for (let k = 0; k < L.floors; k++) { b.group = `level-${k}`; const y0 = k === 0 ? 0.42 : k * L.fh, y1 = k === L.floors - 1 ? top - 0.2 : (k + 1) * L.fh; b.box(m[0], y0, m[1], 0.24, y1 - y0, 0.06, o.quoin, 'trim', yaw); } void c0; }
+    }
+    // a downpipe at the clockwise end of the long sides
+    if (o.detail >= 1 && len > 3.5 && o.mat !== 'glass') { const m = P(len - 0.25, 0.1); for (let k = 0; k < L.floors; k++) { b.group = `level-${k}`; const y0 = k === 0 ? 0.1 : k * L.fh, y1 = k === L.floors - 1 ? top - 0.3 : (k + 1) * L.fh; b.cyl(m[0], y0, m[1], 0.045, 0.045, y1 - y0, '#4a4f4d', 'trim', 6); } }
+  }
+  // ivy on one wall of older (stone/brick) houses, clear of the windows
+  if (o.detail >= 2 && (o.mat === 'stone' || o.mat === 'brick') && o.r() < 0.7) {
+    const s = sides[Math.floor(o.r() * 4)], len = Math.hypot(s.b[0] - s.a[0], s.b[1] - s.a[1]), ux = (s.b[0] - s.a[0]) / len, uz = (s.b[1] - s.a[1]) / len;
+    const cx = len * (0.2 + 0.6 * o.r()), w0 = Math.min(2.2, len * 0.4), hgt = Math.min(top - 0.3, 2 + o.r() * 2.5);
+    b.group = 'level-0';
+    for (let k = 0; k < 48; k++) {
+      const t = Math.pow(o.r(), 0.6), y = 0.1 + t * hgt, a = cx + (o.r() - 0.5) * w0 * (1 - t * 0.6);
+      const wx = s.a[0] + ux * a, wz = s.a[1] + uz * a;
+      if (L.openings.some((op) => op.kind !== 'arch' && Math.hypot(op.at[0] - wx, op.at[1] - wz) < op.width / 2 + 0.1 && y > FLOOR0 + op.floor * L.fh + op.sill - 0.1 && y < FLOOR0 + op.floor * L.fh + op.sill + op.height + 0.15)) continue;
+      b.ball(wx + s.out[0] * 0.05, y, wz + s.out[1] * 0.05, 0.11, 0.09, 0.11, LEAVES[Math.floor(o.r() * LEAVES.length)]);
+    }
+  }
+}
+
+function drawStairs(b: Builder, L: BuildingLayout, st: BuildingLayout['stairs'][number], trim: Col, detail: number) {
+  const rise = (st.y1 - st.y0) / st.risers, wood = '#9a6b43', dark = '#6e4c32';
+  if (st.rect && st.axis && st.dir) {
+    const [x0, z0, x1, z1] = st.rect, along = st.axis === 'x';
+    const lo = along ? x0 : z0, hi = along ? x1 : z1, run = hi - lo, going = run / Math.max(1, st.risers - 1);
+    const mid = along ? (z0 + z1) / 2 : (x0 + x1) / 2, w = st.width;
+    const bottom = st.dir === 1 ? lo : hi;
+    const P = (s: number, off = 0): V2 => (along ? [bottom + st.dir! * s, mid + off] : [mid + off, bottom + st.dir! * s]);
+    const yaw = along ? 0 : Math.PI / 2;
+    for (let i = 0; i < st.risers - 1; i++) {
+      const [x, z] = P((i + 0.5) * going), y = st.y0 + (i + 1) * rise;
+      b.box(x, y - 0.06, z, along ? going + 0.03 : w, 0.06, along ? w : going + 0.03, wood, 'floor');
+      b.box(along ? x - st.dir! * (going / 2 - 0.01) : x, y - rise, along ? z : z - st.dir! * (going / 2 - 0.01), along ? 0.02 : w - 0.02, rise - 0.06, along ? w - 0.02 : 0.02, '#e9e2d0', 'floor');
+    }
+    // stringers and a handrail on the room side
+    const pitch = Math.atan2(st.y1 - st.y0, run), slope = Math.hypot(run, st.y1 - st.y0);
+    for (const off of [-w / 2 - 0.03, w / 2 + 0.03]) {
+      const [cx, cz] = P(run / 2, off);
+      const rz = st.dir === 1 ? pitch : -pitch;
+      b.tilt(cx, (st.y0 + st.y1) / 2 - 0.1, cz, slope, 0.22, 0.05, along ? 0 : rz, along ? rz : 0, dark, 'trim', along ? 0 : Math.PI / 2);
+    }
+    const [hx, hz] = P(run / 2, (w / 2 + 0.03) * 1);
+    b.tilt(hx, (st.y0 + st.y1) / 2 + 0.9, hz, slope, 0.05, 0.06, along ? 0 : (st.dir === 1 ? pitch : -pitch), along ? (st.dir === 1 ? pitch : -pitch) : 0, trim, 'trim', along ? 0 : Math.PI / 2);
+    for (const s of [0, run]) { const [px, pz] = P(s, w / 2 + 0.03); b.box(px, st.y0 + (s / run) * (st.y1 - st.y0), pz, 0.07, 0.95, 0.07, trim); }
+    void yaw;
+    return;
+  }
+  if (st.c && st.r !== undefined) {
+    const n = st.risers, wedge = (st.r * st.sweep!) / n;
+    for (let i = 0; i < n; i++) {
+      const a = st.a0! + (st.sweep! * (i + 0.5)) / n, y = st.y0 + (i + 1) * rise;
+      const cx = st.c[0] + st.r * Math.sin(a), cz = st.c[1] + st.r * Math.cos(a);
+      // tread: long axis radial
+      b.box(cx, y - 0.07, cz, st.width + 0.08, 0.07, wedge * 1.12, wood, 'floor', a + Math.PI / 2);
+      if (i % (detail >= 1 ? 4 : 8) === 0) { const ri = st.r - st.width / 2 + 0.04; b.box(st.c[0] + ri * Math.sin(a), y, st.c[1] + ri * Math.cos(a), 0.04, 0.95, 0.04, trim); }
+    }
+    // the inner handrail, segment by segment along the helix
+    const segs = detail >= 1 ? 6 : 4, ri = st.r - st.width / 2 + 0.04;
+    for (let i = 0; i < segs; i++) {
+      const a0 = st.a0! + (st.sweep! * i) / segs, a1 = st.a0! + (st.sweep! * (i + 1)) / segs;
+      const p0: THREE.Vector3Tuple = [st.c[0] + ri * Math.sin(a0), st.y0 + ((st.y1 - st.y0) * i) / segs + 0.95, st.c[1] + ri * Math.cos(a0)];
+      const p1: THREE.Vector3Tuple = [st.c[0] + ri * Math.sin(a1), st.y0 + ((st.y1 - st.y0) * (i + 1)) / segs + 0.95, st.c[1] + ri * Math.cos(a1)];
+      beam(b, p0, p1, 0.05, trim);
+    }
+  }
+}
+
+/** A box between two 3-D points (handrails). */
+function beam(b: Builder, p0: THREE.Vector3Tuple, p1: THREE.Vector3Tuple, t: number, c: Col) {
+  const dx = p1[0] - p0[0], dy = p1[1] - p0[1], dz = p1[2] - p0[2], hl = Math.hypot(dx, dz), len = Math.hypot(hl, dy);
+  b.tilt((p0[0] + p1[0]) / 2, (p0[1] + p1[1]) / 2, (p0[2] + p1[2]) / 2, len, t, t, 0, Math.atan2(dy, hl), c, 'trim', Math.atan2(-dz, dx));
+}
+
+function drawRoof(b: Builder, L: BuildingLayout, o: { roofCol: string; trim: string; ext: string; glass: boolean; r: () => number; detail: number }) {
+  const top = L.wallTop, rise = L.roofRise, layer = o.glass ? 'glass' as const : 'roof' as const;
+  const rc = o.glass ? '#dff0ec' : o.roofCol, dark = mix(o.roofCol, '#000000', 0.25);
+  if (L.round) {
+    const R = L.round.R + L.t / 2;
+    if (L.roof === 'dome' || L.args.lantern) {
+      b.cyl(0, top, 0, R + 0.25, R + 0.25, 0.14, o.trim, 'trim', L.round.sides);
+      b.dome(0, top + 0.14, 0, R * 0.92, Math.max(rise, R * 0.7), rc, layer, 14);
+      b.cyl(0, top + 0.14 + Math.max(rise, R * 0.7), 0, 0.05, 0.08, 0.6, '#3b3d40', 'trim', 6); b.ball(0, top + 0.9 + Math.max(rise, R * 0.7), 0, 0.12, 0.12, 0.12, o.trim);
+    } else if (L.roof !== 'none' && L.roof !== 'flat') {
+      b.cone(0, top, 0, R + 0.4, rise, rc, layer, L.round.sides * 2);
+      b.cyl(0, top - 0.12, 0, R + 0.42, R + 0.42, 0.12, o.trim, 'trim', L.round.sides * 2);
+    } else parapet(b, L.round ? ngon(R, L.round.sides) : [], top, o);
+    return;
+  }
+  const W = L.W, D = L.D, ov = L.open ? 0.4 : 0.35;
+  if (L.roof === 'none') return;
+  if (L.roof === 'flat') { parapet(b, rectPoly(-W / 2, -D / 2, W / 2, D / 2), top, o); return; }
+  if (L.roof === 'dome') {
+    parapet(b, rectPoly(-W / 2, -D / 2, W / 2, D / 2), top, o);
+    const R = Math.min(W, D) / 2 * 0.8; b.cyl(0, top, 0, R + 0.1, R + 0.1, 0.3, o.trim, 'trim', 16); b.dome(0, top + 0.3, 0, R, rise, rc, layer, 16);
+    return;
+  }
+  // gable / hip / shed: work in a frame where the ridge runs along local x (the longer side)
+  const alongX = W >= D || L.roof === 'shed';
+  const Lx = alongX ? W : D, Lz = alongX ? D : W;
+  b.push(0, 0, 0, alongX ? 0 : Math.PI / 2);
+  if (L.roof === 'shed') {
+    const run = Lz + 2 * ov, ang = Math.atan2(rise, run), slope = Math.hypot(run, rise);
+    b.tilt(0, top + rise / 2 + 0.07, 0, Lx + 2 * ov, 0.14, slope, -ang, 0, rc, layer);
+    // side walls fill the slope
+    for (const sx of [-1, 1]) b.tri([sx * Lx / 2, top, Lz / 2], [sx * Lx / 2, top, -Lz / 2], [sx * Lx / 2, top + rise * (Lz / run + ov / run), -Lz / 2], o.ext, 'wall'), b.tri([sx * Lx / 2, top, -Lz / 2], [sx * Lx / 2, top, Lz / 2], [sx * Lx / 2, top + rise * (Lz / run + ov / run), -Lz / 2], o.ext, 'wall');
+    b.box(0, top - 0.02, Lz / 2 + ov - 0.05, Lx + 2 * ov, 0.12, 0.08, o.trim);
+    b.pop(); return;
+  }
+  const half = Lz / 2 + ov, ang = Math.atan2(rise, half), slope = Math.hypot(half, rise);
+  if (L.roof === 'gable') {
+    const len = Lx + 2 * 0.3;
+    for (const sz of [-1, 1]) {
+      b.tilt(0, top + rise / 2 + 0.06, sz * half / 2, len, 0.12, slope + 0.04, sz * ang, 0, rc, layer);
+      // tile courses
+      if (!o.glass && o.detail >= 1) for (const f of [0.3, 0.62]) b.tilt(0, top + rise * (1 - f) + 0.14, sz * half * f, len + 0.02, 0.04, 0.12, sz * ang, 0, dark, 'roof');
+      // bargeboards (fascia along the gable edges) and eaves
+      for (const sx of [-1, 1]) b.tilt(sx * (len / 2 - 0.03), top + rise / 2 + 0.02, sz * half / 2, 0.08, 0.2, slope, sz * ang, 0, o.trim);
+      b.box(0, top - 0.1, sz * (half - 0.05), len, 0.14, 0.1, o.trim);
+    }
+    b.cylX(0, top + rise + 0.08, 0, 0.1, len + 0.06, dark, 'roof', 8);
+    // gable-end walls
+    const rw = rise * (Lz / 2) / half;
+    if (!L.open) for (const sx of [-1, 1]) b.at(sx * (Lx / 2 - L.t / 2), top, 0, Math.PI / 2, () => b.prism(0, 0, 0, Lz, rw, L.t, o.ext, 'wall'));
+  } else {
+    // hip: two trapezoids and two triangles over the eaves rectangle
+    const ex = Lx / 2 + ov, ez = Lz / 2 + ov, rx = Math.max(0, ex - ez), y0 = top - 0.02, y1 = top + rise;
+    b.quad([-ex, y0, ez], [ex, y0, ez], [rx, y1, 0], [-rx, y1, 0], rc, layer);
+    b.quad([ex, y0, -ez], [-ex, y0, -ez], [-rx, y1, 0], [rx, y1, 0], rc, layer);
+    b.tri([ex, y0, ez], [ex, y0, -ez], [rx, y1, 0], rc, layer);
+    b.tri([-ex, y0, -ez], [-ex, y0, ez], [-rx, y1, 0], rc, layer);
+    // underside (soffit) so the eaves read from below
+    b.quad([-ex, y0 - 0.01, ez], [-ex, y0 - 0.01, -ez], [ex, y0 - 0.01, -ez], [ex, y0 - 0.01, ez], o.trim, 'trim');
+    for (const [ax, az, bx, bz] of [[-ex, ez, ex, ez], [-ex, -ez, ex, -ez], [-ex, -ez, -ex, ez], [ex, -ez, ex, ez]]) b.run(ax, az, bx, bz, y0 - 0.12, 0.12, 0.08, o.trim);
+    if (rx > 0.05) b.cylX(0, y1 + 0.04, 0, 0.08, 2 * rx + 0.1, dark, 'roof', 8);
+  }
+  b.pop();
+  // a chimney with pots on houses
+  if (o.detail >= 1 && /cottage|townhouse|shop|plan/.test(L.style) && !L.open) {
+    const cx = (alongX ? 1 : 0) * (W / 2 - 0.9) * (o.r() < 0.5 ? -1 : 1), cz = (alongX ? 0 : 1) * (D / 2 - 0.9) - (alongX ? 0.5 : 0);
+    const h = rise + 1.0, brick = '#8a4a36';
+    b.box(cx, top, cz, 0.6, h, 0.6, brick, 'roof'); b.box(cx, top + h, cz, 0.74, 0.08, 0.74, o.trim);
+    for (const sd of [-1, 1]) b.cyl(cx + sd * 0.13, top + h + 0.08, cz, 0.06, 0.07, 0.3, '#a3442f', 'roof', 6);
+  }
+}
+
+function parapet(b: Builder, poly: V2[], top: number, o: { trim: string; ext: string }) {
+  if (poly.length < 3) return;
+  b.slab(poly, top - 0.02, 0.06, '#9a958a', 'roof');
+  for (let i = 0; i < poly.length; i++) { const a = poly[i], c = poly[(i + 1) % poly.length]; b.run(a[0], a[1], c[0], c[1], top, 0.42, 0.2, o.ext, 'wall'); b.run(a[0], a[1], c[0], c[1], top + 0.42, 0.06, 0.28, o.trim); }
+}
+
+// ---------------------------------------------------------------- interior view
+
+const query = typeof location !== 'undefined' ? new URLSearchParams(location.search) : new URLSearchParams();
+const HIDE_ROOFS = query.has('hideRoofs') && query.get('hideRoofs') !== '0';
+const CUT = query.has('cut') ? Number(query.get('cut')) : null;
+const camLocal = new THREE.Vector3(), inv = new THREE.Matrix4();
+let mainCamera: THREE.Camera | null = null;
+
+/** Hide the roof and the storeys above the camera when it is inside the footprint (or always, with ?hideRoofs=1). */
+function attachInteriorView(root: THREE.Object3D, L: BuildingLayout) {
+  const inner = root.children[0];
+  if (!inner) return;
+  const halfX = (L.round ? L.round.R : L.W / 2) + 0.4, halfZ = (L.round ? L.round.R : L.D / 2) + 0.4 + (L.porch?.depth ?? 0);
+  let hideAbove = Infinity, hideRoof = false, keepSlab = -1;
+  const decide = (camera: THREE.Camera) => {
+    const live = (globalThis as { __buildingView?: { hideRoofs?: boolean; cut?: number | null } }).__buildingView;
+    const roofsOff = live?.hideRoofs ?? HIDE_ROOFS, cut = live?.cut !== undefined ? live.cut : CUT;
+    hideRoof = roofsOff; hideAbove = cut !== null && cut !== undefined && roofsOff ? cut : Infinity; keepSlab = -1;
+    inv.copy(inner.matrixWorld).invert(); camLocal.setFromMatrixPosition(camera.matrixWorld).applyMatrix4(inv);
+    if (Math.abs(camLocal.x) < halfX && Math.abs(camLocal.z) < halfZ && camLocal.y < L.wallTop + L.roofRise && camLocal.y > -1) {
+      hideRoof = true;
+      const level = Math.max(0, Math.floor((camLocal.y - FLOOR0 + 0.3) / L.fh));
+      hideAbove = Math.min(hideAbove, level);
+      // the camera's own ceiling stays while the camera is below it (an eye-level view keeps its ceiling)
+      if (!roofsOff && camLocal.y < (level + 1) * L.fh + FLOOR0 - SLAB - 0.05) keepSlab = level + 1;
+    }
+  };
+  // furniture and other children on hidden storeys follow the cut (WorldEntityLayer reads this; L1 patch 04)
+  const floorOf: Record<string, number> = { ground: 0, porch: 0, roof: L.floors, ...(L.balcony ? { balcony: L.balcony.floor } : {}) };
+  for (let k = 1; k < L.floors; k++) floorOf[`floor-${k}`] = k;
+  for (const r of L.rooms) floorOf[r.id] = r.floor;
+  root.userData.interior = { cut: () => hideAbove, floorOf };
+  inner.traverse((o) => {
+    const mesh = o as THREE.Mesh; if (!mesh.isMesh) return;
+    const gname = mesh.parent?.name ?? '';
+    const slab = gname.startsWith('slab-'), level = gname === 'roof' ? Infinity : Number(gname.replace(/^(level|slab)-/, ''));
+    const hidden = () => (level === Infinity ? hideRoof : slab ? level !== keepSlab && (level > hideAbove || (level === L.floors && hideRoof)) : level > hideAbove);
+    mesh.onBeforeRender = (_r, _s, camera, geometry) => {
+      mainCamera = camera; decide(camera);
+      (geometry as THREE.BufferGeometry).setDrawRange(0, hidden() ? 0 : Infinity);
+    };
+    mesh.onBeforeShadow = (_r, _o, _c, _sc, geometry) => {
+      if (mainCamera) decide(mainCamera);
+      (geometry as THREE.BufferGeometry).setDrawRange(0, hidden() ? 0 : Infinity);
+    };
+    mesh.onAfterRender = (_r, _s, _c, geometry) => { (geometry as THREE.BufferGeometry).setDrawRange(0, Infinity); };
+    mesh.onAfterShadow = (_r, _o, _c, _sc, geometry) => { (geometry as THREE.BufferGeometry).setDrawRange(0, Infinity); };
+  });
+}
+// ---------------------------------------------------------------- helpers
+
+function rectPoly(x0: number, z0: number, x1: number, z1: number): V2[] { return [[x0, z0], [x1, z0], [x1, z1], [x0, z1]]; }
+function ngon(R: number, n: number): V2[] { return Array.from({ length: n }, (_, i) => { const a = ((i + 0.5) * 2 * Math.PI) / n; return [R * Math.sin(a), R * Math.cos(a)] as V2; }); }
+function bboxOf(poly: V2[]): [number, number, number, number] { let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity; for (const [x, z] of poly) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); } return [x0, z0, x1, z1]; }
+
+// ---------------------------------------------------------------- stairs/1 (a free-standing flight)
 
 registerMesh({
   gen: 'stairs/1',
   build(ctx) {
-    const g = new THREE.Group(), rise = Number(ctx.params.rise ?? 2.8), run = Number(ctx.params.run ?? 4), width = Number(ctx.params.width ?? 1.1);
-    const n = Math.max(2, Math.round(rise / 0.18)), mat = ctx.materials.get('wood');
-    for (let i = 0; i < n; i++) { const t = new THREE.Mesh(box, mat); t.scale.set(width, rise / n, run / n); t.position.set(0, (rise / n) * (i + 0.5), run / 2 - (run / n) * (i + 0.5)); t.castShadow = true; g.add(t); }
-    return g;
+    const b = new Builder(), rise = Number(ctx.params.rise ?? 2.8), run = Number(ctx.params.run ?? 4), width = Number(ctx.params.width ?? 1.1);
+    const n = Math.max(2, Math.round(rise / 0.18)), going = run / n, stone = ctx.params.material === 'stone', wood = stone ? '#b9b3a6' : ctx.params.material === 'metal' ? '#8c9196' : '#9a6b43';
+    for (let i = 0; i < n; i++) b.rbox(0, 0, run / 2 - going * (i + 0.5), width, (rise / n) * (i + 1), going + 0.02, wood, 'floor');
+    if (ctx.params.rail !== false) for (const sx of [-1, 1]) {
+      beam(b, [sx * (width / 2 + 0.03), 0.95, run / 2], [sx * (width / 2 + 0.03), rise + 0.95, -run / 2], 0.05, '#5e412b');
+      for (const t of [0, 0.5, 1]) b.box(sx * (width / 2 + 0.03), rise * t, run / 2 - run * t, 0.06, 0.95, 0.06, '#5e412b');
+    }
+    const { groups } = b.emit(ctx.materials), g = new THREE.Group(); for (const x of groups.values()) g.add(x); return g;
   },
 });
