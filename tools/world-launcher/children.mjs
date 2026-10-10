@@ -5,6 +5,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { createServer } from 'node:net';
 import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+import { memAvailableMb, rotateLog } from './production.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const backoffMs = (n) => Math.min(30_000, 500 * 2 ** Math.max(0, n));
@@ -22,7 +23,11 @@ export class ChildPool {
   /**
    * @param {{ root: string, range: [number, number], logDir: string, marsWebDir?: string, publicOrigin: string,
    *           command?: (w: object, port: number) => { cmd: string, args: string[], env?: object },
-   *           healthPath?: (slug: string) => string, onChange?: (slug: string) => void, pidFile?: string, idleMs?: number }} o
+   *           healthPath?: (slug: string) => string, onChange?: (slug: string) => void, pidFile?: string, idleMs?: number,
+   *           maxRunning?: number, minFreeMb?: number, busy?: (slug: string) => boolean,
+   *           decorate?: (c: { cmd: string, args: string[], env?: object }) => { cmd: string, args: string[], env?: object } }} o
+   * maxRunning / minFreeMb: before a world boots, idle worlds are put to sleep until it fits; when none can sleep the
+   * boot is refused (error.code 'capacity'). busy(slug): a world with live viewers is never put to sleep.
    */
   constructor(o) {
     this.o = o;
@@ -59,7 +64,7 @@ export class ChildPool {
   /** Put the least recently used idle world to sleep to free a port (it wakes on its next visit). */
   async evictIdle(except) {
     const idleMs = this.o.idleMs ?? 60_000, now = Date.now();
-    const victim = [...this.kids.values()].filter((k) => k.slug !== except && k.status === 'running' && now - (k.lastUsed ?? 0) > idleMs).sort((a, b) => (a.lastUsed ?? 0) - (b.lastUsed ?? 0))[0];
+    const victim = [...this.kids.values()].filter((k) => k.slug !== except && k.status === 'running' && now - (k.lastUsed ?? 0) > idleMs && !this.o.busy?.(k.slug)).sort((a, b) => (a.lastUsed ?? 0) - (b.lastUsed ?? 0))[0];
     if (!victim) return null;
     await this.stop(victim.slug);
     victim.asleep = true;
@@ -94,8 +99,25 @@ export class ChildPool {
     return k.ready;
   }
 
+  /** Live (or booting) children other than `except`. */
+  running(except) { return [...this.kids.values()].filter((k) => k.slug !== except && (k.child || k.status === 'starting' || k.status === 'restarting')).length; }
+  /** Make room for one more world under the running cap and the free-memory floor, sleeping idle worlds if needed. */
+  async makeRoom(slug) {
+    const { maxRunning = Infinity, minFreeMb = 0 } = this.o;
+    for (;;) {
+      const full = this.running(slug) >= maxRunning, low = minFreeMb > 0 && memAvailableMb() < minFreeMb;
+      if (!full && !low) return;
+      if (!(await this.evictIdle(slug))) {
+        const e = new Error(full ? `all ${maxRunning} world slots are in use; try again in a minute` : `the server is low on memory (under ${minFreeMb} MB free); try again in a minute`);
+        e.code = 'capacity'; throw e;
+      }
+      await sleep(200);   // the sleeper's memory takes a moment to come back
+    }
+  }
+
   async boot(k, timeoutMs) {
     k.status = 'starting'; this.o.onChange?.(k.slug);
+    try { await this.makeRoom(k.slug); } catch (e) { k.status = 'failed'; this.o.onChange?.(k.slug); throw e; }
     let port;
     try { port = await this.pickPort(k.port ?? k.world.port, k.slug); }
     catch (e) {
@@ -103,8 +125,11 @@ export class ChildPool {
       for (let i = 0; ; i++) { try { port = await this.pickPort(k.port ?? k.world.port, k.slug); break; } catch (again) { if (i >= 50) throw again; await sleep(100); } }  // the sleeper's socket takes a moment to close
     }
     k.port = port; k.asleep = false;
-    const { cmd, args, env } = (this.o.command ?? defaultCommand)(k.world, port, this.o);
-    const log = createWriteStream(join(this.o.logDir, `${k.slug}.log`), { flags: 'a' });
+    const base = (this.o.command ?? defaultCommand)(k.world, port, this.o);
+    const { cmd, args, env } = this.o.decorate ? this.o.decorate(base) : base;
+    const logFile = join(this.o.logDir, `${k.slug}.log`);
+    rotateLog(logFile);
+    const log = createWriteStream(logFile, { flags: 'a' });
     log.write(`\n--- ${new Date().toISOString()} start ${k.slug} on :${port} (restart ${k.restarts})\n`);
     const child = spawn(cmd, args, { cwd: this.o.root, env, stdio: ['ignore', 'pipe', 'pipe'] });
     k.child = child; k.script = args.find((a) => !a.startsWith('-')) ?? args[0]; this.savePids();

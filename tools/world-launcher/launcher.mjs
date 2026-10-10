@@ -11,8 +11,17 @@
 //   GET  /__sim/templates.json   genesis templates (worlds/templates/*.json) + the empty plain
 //   POST /__sim/worlds           {name, template} → creates, waits for /healthz → {slug, url}
 //   GET  /__sim/worlds/<slug>    one world + what the launcher has seen (looks, agent, previews)
-//   GET  /__sim/launcher         children, ports, pids, restarts (diagnostics)
+//   GET  /__sim/launcher         children, ports, pids, restarts (diagnostics; direct local requests only)
+//   GET  /__sim/healthz          {ok, build, worlds, running, caps, memAvailableMb} (also /healthz)
 //   /w/<slug>/*                  proxied to that world (HTTP, SSE, WebSocket); started on demand
+//   /__worlds/*                  the same API as /__sim/* under a prefix the existing sim.eden.art release never
+//                                uses (it answers /__sim/worlds.json itself), so Caddy can route it here
+//   GET  /worlds                 the launcher homepage (worlds + New world) when / belongs to another release
+//   GET  /we-assets/*            the web build when built with `vite build --assetsDir we-assets` (deploy builds)
+//
+// Production (lane P3; tools/world-launcher/deploy/README.md): --public-origin https://sim.eden.art
+// --auth-env-file <path> --max-worlds N --max-running N --min-free-mb N --world-heap-mb N --create-limit N. Children then run edge
+// minds with the account provider's settings loaded by node from that file; dev auth only on an http origin.
 //
 // Sign-in: dev auth (local names) by default. With --auth-env <file> (or SIM_AUTH_ENV_FILE) every world signs in
 // with Clerk: children read the file by path (node --env-file), dev tokens are refused, all worlds share one
@@ -24,21 +33,27 @@
 import { execFileSync } from 'node:child_process';
 import { createServer, request } from 'node:http';
 import { connect } from 'node:net';
-import { createReadStream, existsSync, mkdirSync, rmSync, statSync } from 'node:fs';
+import { createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Registry, SLUG_RE, listTemplates, slugFor } from './registry.mjs';
 import { ChildPool } from './children.mjs';
+import { decorateCommand, memAvailableMb, productionSettings } from './production.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 export const ROOT = resolve(here, '../..');
 const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp', '.glb': 'model/gltf-binary', '.bin': 'application/octet-stream', '.wasm': 'application/wasm', '.woff2': 'font/woff2', '.ico': 'image/x-icon', '.md': 'text/markdown; charset=utf-8', '.txt': 'text/plain; charset=utf-8' };
 const json = (res, status, body, headers = {}) => { res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store', ...headers }).end(JSON.stringify(body)); };
-const MAX_WORLDS = 200;
+const BUILD = (() => { try { return readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../BUILD'), 'utf8').trim(); } catch { return 'dev'; } })();
+/** Direct requests from this machine (not through a reverse proxy, which adds x-forwarded-for). */
+const direct = (req) => !req.headers['x-forwarded-for'] && ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(req.socket.remoteAddress ?? '');
 
 /**
  * @param {{ port?: number, dataDir?: string, range?: [number, number], root?: string, webDir?: string,
- *           templatesDir?: string, marsWebDir?: string, eager?: number, idleMs?: number, command?: Function, log?: (s: string) => void }} cfg
+ *           templatesDir?: string, marsWebDir?: string, eager?: number, idleMs?: number, command?: Function, log?: (s: string) => void,
+ *           publicOrigin?: string, devAuth?: boolean, authEnvFile?: string, maxWorlds?: number, maxRunning?: number,
+ *           minFreeMb?: number, worldHeapMb?: number, createLimit?: number }} cfg
+ * Without the production fields the launcher behaves as it always did locally (dev auth, 200 worlds, origin = bind).
  */
 export async function openLauncher(cfg = {}) {
   const root = resolve(cfg.root ?? ROOT);
@@ -53,13 +68,21 @@ export async function openLauncher(cfg = {}) {
   const log = cfg.log ?? ((s) => console.log(`[launcher] ${s}`));
   const origin = `http://127.0.0.1:${port}`;
   const publicOrigin = (cfg.publicOrigin ?? origin).replace(/\/$/, '');
-  const auth = clerkAuth(cfg.authEnvFile ?? process.env.SIM_AUTH_ENV_FILE, dataDir, publicOrigin);
+  const authEnvFile = cfg.authEnvFile ?? process.env.SIM_AUTH_ENV_FILE;
+  const prod = productionSettings({ ...cfg, authEnvFile, range }, origin);
+  const auth = clerkAuth(authEnvFile, dataDir, publicOrigin);
+  const MAX_WORLDS = prod.maxWorlds;
+  const behindProxy = publicOrigin !== origin;
   const registry = new Registry(dataDir);
+  const createLimit = cfg.createLimit ?? Infinity, made = new Map();
+  /** Open WebSocket (upgraded) connections per world: a world someone is watching never goes to sleep. */
+  const live = new Map();
   /** What the launcher sees go past, per world (not persisted beyond the registry's own fields). */
   const seen = new Map();
   const seenOf = (slug) => { let s = seen.get(slug); if (!s) { s = { looks: registry.get(slug)?.looks ?? 0, lastLookAt: registry.get(slug)?.lastLookAt ?? null, agentSeenAt: registry.get(slug)?.agentSeenAt ?? null, previews: [] }; seen.set(slug, s); } return s; };
   const stats = new Map();   // slug → { at, god, entities, seq }
-  const pool = new ChildPool({ root, range, logDir: join(dataDir, 'logs'), pidFile: join(dataDir, 'children.json'), idleMs: cfg.idleMs, marsWebDir, publicOrigin, auth: auth?.child, command: cfg.command, onChange: (slug) => { const s = pool.status(slug); if (s.port && registry.get(slug) && registry.get(slug).port !== s.port) registry.update(slug, { port: s.port }); } });
+  const pool = new ChildPool({ root, range, logDir: join(dataDir, 'logs'), pidFile: join(dataDir, 'children.json'), idleMs: cfg.idleMs, marsWebDir, publicOrigin, auth: auth?.child, command: cfg.command,
+    maxRunning: prod.maxRunning, minFreeMb: prod.minFreeMb, busy: (slug) => (live.get(slug) ?? 0) > 0, decorate: (c) => decorateCommand(c, prod), onChange: (slug) => { const s = pool.status(slug); if (s.port && registry.get(slug) && registry.get(slug).port !== s.port) registry.update(slug, { port: s.port }); } });
   const worldEnv = (w) => ({ ...w, dataDir: registry.worldDir(w.slug), templateFile: w.template && w.template !== 'empty' ? listTemplates(templatesDir).find((t) => t.id === w.template)?.file ?? null : null });
 
   // ---------- reads
@@ -82,7 +105,7 @@ export async function openLauncher(cfg = {}) {
   };
   async function worldsJson() {
     await Promise.all(registry.worlds.map(refreshStats));
-    return { contract: 'local-worlds/1', launcher: 'world-launcher/1', worlds: [...registry.worlds].sort((a, b) => b.createdAt - a.createdAt).map(describe), templates: listTemplates(templatesDir).map(({ file: _f, ...t }) => t), limits: { maxWorlds: MAX_WORLDS, childPorts: range }, auth: auth ? auth.public : { provider: 'dev' } };
+    return { contract: 'local-worlds/1', launcher: 'world-launcher/1', worlds: [...registry.worlds].sort((a, b) => b.createdAt - a.createdAt).map(describe), templates: listTemplates(templatesDir).map(({ file: _f, ...t }) => t), limits: { maxWorlds: MAX_WORLDS, maxRunning: prod.maxRunning, childPorts: range }, auth: auth ? auth.public : { provider: 'dev' } };
   }
 
   // ---------- create
@@ -112,7 +135,8 @@ export async function openLauncher(cfg = {}) {
     const t0 = performance.now();
     try { await pool.ensure(worldEnv(entry)); }
     catch (e) {
-      await pool.stop(slug); pool.kids.delete(slug); registry.remove(slug);
+      await pool.stop(slug); pool.kids.delete(slug); registry.remove(slug); rmSync(registry.worldDir(slug), { recursive: true, force: true });
+      if (e.code === 'capacity') return [503, { ok: false, code: 'capacity', message: e.message }];
       return [500, { ok: false, code: 'boot-failed', message: e.message }];
     }
     const ms = Math.round(performance.now() - t0);
@@ -155,7 +179,10 @@ export async function openLauncher(cfg = {}) {
     return rest;
   }
   function proxyHttp(req, res, targetPort, { tee } = {}) {
-    const up = request({ hostname: '127.0.0.1', port: targetPort, path: req.url, method: req.method, headers: { ...req.headers, 'x-forwarded-for': req.socket.remoteAddress ?? '127.0.0.1' } }, (r) => {
+    // Behind Caddy (a public origin other than our own) keep the visitor's x-forwarded-for, so per-person limits in
+    // the worlds see people, not the proxy; locally it is set to the connecting address as before.
+    const xff = behindProxy && req.headers['x-forwarded-for'] ? req.headers['x-forwarded-for'] : (req.socket.remoteAddress ?? '127.0.0.1');
+    const up = request({ hostname: '127.0.0.1', port: targetPort, path: req.url, method: req.method, headers: { ...req.headers, 'x-forwarded-for': xff } }, (r) => {
       res.writeHead(r.statusCode ?? 502, r.headers);
       if (tee && (r.statusCode ?? 0) < 300) { const chunks = []; r.on('data', (c) => { if (chunks.length < 64) chunks.push(c); }); r.on('end', () => { try { tee(JSON.parse(Buffer.concat(chunks).toString('utf8'))); } catch { /* not json */ } }); }
       r.pipe(res);
@@ -181,7 +208,8 @@ export async function openLauncher(cfg = {}) {
   const sockets = new Set();
   const server = createServer(async (req, res) => {
     let url; try { url = new URL(req.url ?? '/', origin); } catch { json(res, 400, { ok: false, code: 'bad-url' }); return; }
-    const path = url.pathname;
+    // /__worlds/* is /__sim/* under the prefix production routes here (see the header).
+    const path = url.pathname.startsWith('/__worlds/') ? `/__sim/${url.pathname.slice('/__worlds/'.length)}` : url.pathname;
     try {
       if (path === '/__sim/worlds.json' && req.method === 'GET') { json(res, 200, await worldsJson()); return; }
       if (path === '/__sim/templates.json' && req.method === 'GET') { json(res, 200, { templates: listTemplates(templatesDir).map(({ file: _f, ...t }) => t) }); return; }
@@ -189,8 +217,13 @@ export async function openLauncher(cfg = {}) {
         const chunks = []; let n = 0;
         for await (const c of req) { n += c.length; if (n > 16_384) { json(res, 413, { ok: false, code: 'too-large' }); return; } chunks.push(c); }
         let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
+        // per-client creation limit (production): the first x-forwarded-for hop is the visitor Caddy saw
+        const who = String(req.headers['x-forwarded-for'] ?? req.socket.remoteAddress ?? '').split(',')[0].trim();
+        const recent = (made.get(who) ?? []).filter((t) => Date.now() - t < 10 * 60_000);
+        if (recent.length >= createLimit) { json(res, 429, { ok: false, code: 'slow-down', message: `at most ${createLimit} new worlds per 10 minutes from one place` }, { 'retry-after': '120' }); return; }
         const run = creating.then(() => createWorld(body, req.headers.authorization)); creating = run.catch(() => {});
-        const [status, out] = await run; json(res, status, out); return;
+        const out = await run; if (out[0] === 201) made.set(who, [...recent, Date.now()]);
+        json(res, out[0], out[1]); return;
       }
       const one = path.match(/^\/__sim\/worlds\/([a-z][a-z0-9-]{0,31})(\/previews)?$/);
       if (one && req.method === 'GET') {
@@ -206,7 +239,14 @@ export async function openLauncher(cfg = {}) {
         }
         json(res, 200, { world: describe(w), seen: { looks: s.looks, lastLookAt: s.lastLookAt, agentSeenAt: s.agentSeenAt, previews: s.previews.length } }); return;
       }
-      if (path === '/__sim/launcher' && req.method === 'GET') { json(res, 200, { origin, dataDir, range, children: registry.worlds.map((w) => ({ slug: w.slug, ...pool.status(w.slug) })) }); return; }
+      if (path === '/__sim/launcher' && req.method === 'GET') {
+        if (!direct(req)) { json(res, 404, { ok: false, code: 'not-found' }); return; }
+        json(res, 200, { origin, publicOrigin: prod.publicOrigin, devAuth: prod.devAuth, dataDir, range, maxWorlds: MAX_WORLDS, maxRunning: prod.maxRunning, minFreeMb: prod.minFreeMb, memAvailableMb: memAvailableMb(), children: registry.worlds.map((w) => ({ slug: w.slug, viewers: live.get(w.slug) ?? 0, ...pool.status(w.slug) })) }); return;
+      }
+      if ((path === '/__sim/healthz' || path === '/healthz') && (req.method === 'GET' || req.method === 'HEAD')) {
+        const running = registry.worlds.filter((w) => pool.status(w.slug).status === 'running').length;
+        json(res, 200, { ok: true, service: 'world-launcher', build: BUILD, auth: auth ? 'clerk' : 'dev', worlds: registry.worlds.length, running, maxWorlds: MAX_WORLDS, maxRunning: prod.maxRunning, ...(direct(req) ? { memAvailableMb: memAvailableMb() } : {}) }); return;
+      }
       const world = path.match(/^\/w\/([^/]+)(?:\/|$)/)?.[1];
       if (world) {
         if (!SLUG_RE.test(world)) { json(res, 404, { ok: false, code: 'world.not-served' }); return; }
@@ -214,8 +254,8 @@ export async function openLauncher(cfg = {}) {
         await toWorld(req, res, world, url); return;
       }
       if (req.method === 'GET' || req.method === 'HEAD') {
-        if (path === '/' || path === '/index.html') { if (serveFile(res, join(webDir, 'index.html'), 'no-cache')) return; res.writeHead(500, { 'content-type': 'text/plain' }).end('The web app is not built: pnpm --filter @sim/web build'); return; }
-        if (path.startsWith('/assets/')) { const f = inside(webDir, path); if (f && serveFile(res, f, 'public, max-age=31536000, immutable')) return; }
+        if (path === '/' || path === '/index.html' || path === '/worlds' || path === '/worlds/') { if (serveFile(res, join(webDir, 'index.html'), 'no-cache')) return; res.writeHead(500, { 'content-type': 'text/plain' }).end('The web app is not built: pnpm --filter @sim/web build'); return; }
+        if (path.startsWith('/assets/') || path.startsWith('/we-assets/')) { const f = inside(webDir, path); if (f && serveFile(res, f, 'public, max-age=31536000, immutable')) return; }
         if (path.startsWith('/world-assets/')) { const f = inside(join(root, 'worlds'), decodeURIComponent(path.slice('/world-assets'.length))); if (f && serveFile(res, f, 'public, max-age=3600')) return; }
       }
       // Anything else a world page asks for (Mars assets, engine files, …): any running world serves it.
@@ -240,10 +280,14 @@ export async function openLauncher(cfg = {}) {
       socket.pipe(up).pipe(socket);
     });
     up.on('error', () => socket.destroy()); socket.on('error', () => up.destroy()); socket.on('close', () => up.destroy()); up.on('close', () => socket.destroy());
+    live.set(slug, (live.get(slug) ?? 0) + 1);
+    let gone = false;
+    const left = () => { if (gone) return; gone = true; const n = (live.get(slug) ?? 1) - 1; if (n > 0) live.set(slug, n); else live.delete(slug); const k = pool.state(slug); if (k) k.lastUsed = Date.now(); };
+    socket.once('end', left); socket.once('close', left);
   });
   await new Promise((yes, no) => { server.once('error', no); server.listen(port, '127.0.0.1', yes); });
   for (const r of await pool.reapOrphans()) log(`stopped ${r.slug} (pid ${r.pid}) left running by an earlier launcher`);
-  log(`${origin}  (data ${dataDir}, worlds ${registry.worlds.length}, children ${range[0]}–${range[1]}, sign-in ${auth ? `Clerk for ${publicOrigin}` : 'dev names'})`);
+  log(`${origin}  (data ${dataDir}, worlds ${registry.worlds.length}/${MAX_WORLDS}, running cap ${prod.maxRunning}, children ${range[0]}–${range[1]}, sign-in ${auth ? `Clerk for ${publicOrigin}` : 'dev names'}, build ${BUILD})`);
 
   // Eagerly wake the most recent worlds so the homepage numbers are live; the rest start on first visit.
   const eager = cfg.eager ?? 4;
@@ -278,7 +322,10 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   const flag = (k) => { const i = argv.indexOf(`--${k}`); return i >= 0 ? argv[i + 1] : undefined; };
   const range = flag('range')?.split('-').map(Number);
   try {
-    const l = await openLauncher({ port: flag('port') ? Number(flag('port')) : undefined, authEnvFile: flag('auth-env'), publicOrigin: flag('public-origin'), dataDir: flag('data'), range: range?.length === 2 ? range : undefined, eager: flag('eager') ? Number(flag('eager')) : undefined });
+    const num = (k) => (flag(k) === undefined ? undefined : Number(flag(k)));
+    const l = await openLauncher({ port: num('port'), dataDir: flag('data'), range: range?.length === 2 ? range : undefined, eager: num('eager'),
+      publicOrigin: flag('public-origin'), authEnvFile: flag('auth-env') ?? flag('auth-env-file'), devAuth: argv.includes('--dev-auth') ? true : undefined,
+      maxWorlds: num('max-worlds'), maxRunning: num('max-running'), minFreeMb: num('min-free-mb'), worldHeapMb: num('world-heap-mb'), idleMs: num('idle-ms'), createLimit: num('create-limit') });
     let stopping = false;
     for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { if (stopping) return; stopping = true; console.log(`[launcher] ${sig}: stopping worlds…`); void l.close().then(() => process.exit(0)); });
   } catch (e) { console.error(`[launcher] refused: ${e.message}`); process.exitCode = 1; }

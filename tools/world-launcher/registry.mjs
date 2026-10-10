@@ -3,17 +3,23 @@
 // writes; no world process is touched here.
 import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
+import { shadowsExisting } from './production.mjs';
 
 export const SLUG_RE = /^[a-z][a-z0-9-]{0,31}$/;
 /** Names the server or the proxy already use for something else. */
 const RESERVED = new Set(['toy', 'mars', 'littlemartians', 'eden', 'assets', 'world-assets', 'mars-assets', 'api', 'new', 'sim', 'god', 'launcher']);
 
-/** A URL-safe, unique slug for a human name ("Gene's Valley" → genes-valley, then genes-valley-2 …). */
+/**
+ * A URL-safe, unique slug for a human name ("Gene's Valley" → genes-valley, then genes-valley-2 …).
+ * Names that would land under an existing release's world (`/w/mars*`, `/w/eden*` …) get a `my-`
+ * prefix ("Mars" → my-mars, "Eden Garden" → my-eden-garden), so no Caddy glob can mis-route them.
+ */
 export function slugFor(name, taken = new Set()) {
   let base = String(name ?? '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase()
     .replace(/['’]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   if (!/^[a-z]/.test(base)) base = `world-${base}`.replace(/-+$/, '');
   base = base.slice(0, 28).replace(/-+$/, '') || 'world';
+  if (shadowsExisting(base)) base = `my-${base}`.slice(0, 28).replace(/-+$/, '');
   if (RESERVED.has(base)) base = `${base}-world`;
   let slug = base;
   for (let i = 2; taken.has(slug); i++) slug = `${base}-${i}`;
