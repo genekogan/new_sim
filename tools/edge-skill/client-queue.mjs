@@ -69,7 +69,7 @@ export function openClientQueue(directory,{adapter,scope=null,now=Date.now,onWak
   const before=structuredClone(step);
   const ref=reference(step,part);if(part==='stop')step.stopRequested=true;else step.clientRef=ref;step.status=part==='stop'?'stopping':'dispatching';step.attempts=(step.attempts??0)+1;save();
   if(pausedNow()){for(const key of Object.keys(step))delete step[key];Object.assign(step,before);save();return null;}
-  let result;try{result=await adapter.send({...body,clientRef:ref});}catch{state.notice={reason:'transport-uncertain',step:step.id,at:now()};save();return null;}
+  let result;try{result=await adapter.send({...body,clientRef:ref});}catch(error){if(error.code==='local.attended'&&error.requestNotSent){for(const key of Object.keys(step))delete step[key];Object.assign(step,before);save();return null;}state.notice={reason:'transport-uncertain',step:step.id,at:now()};save();return null;}
   lease();if(!result?.accepted||!result.receipt?.id){step.status='failed';step.code=result?.code??'transport.invalid-response';step.reason=result?.reason??'No accepted receipt';notify('refusal',step);return null;}
   return result.receipt;
  }

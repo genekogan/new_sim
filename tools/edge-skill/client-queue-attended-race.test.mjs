@@ -22,3 +22,7 @@ test('takeover at saved dispatch boundary rolls back unsent intent without false
  f.release();await q.pump();assert.equal(sent.length,1);
  q.enqueue([{say:'Hello'}],{replace:true});takeover=true;await q.pump();assert.equal(said.length,0);assert.equal(q.snapshot().steps[0].status,'pending');f.release();await q.pump();assert.equal(said.length,1);
 });
+test('transport-adapter lease refusal restores unsent stable intent without falsely marking uncertain dispatch',async t=>{
+ const {assertLiveDispatch}=await import('./client-dispatch-authority.mjs'),f=fixture(t),sent=[];
+ const q=openClientQueue(f.root,{scope:'fixture',isPaused:f.isPaused,adapter:{send:async body=>{await Promise.resolve();f.hold();assertLiveDispatch(true,f.isPaused);sent.push(body);return {accepted:true,receipt:{id:'r1',phase:'started'}};}}});t.after(()=>q.close());q.enqueue([{act:'walk:tea'}]);await q.pump();assert.equal(sent.length,0);assert.equal(q.snapshot().steps[0].status,'pending');assert.equal(q.snapshot().steps[0].attempts,0);assert.equal(q.snapshot().notice,null);assert.equal(Object.hasOwn(q.snapshot().steps[0],'clientRef'),false);
+});

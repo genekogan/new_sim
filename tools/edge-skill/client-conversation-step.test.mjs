@@ -1,0 +1,33 @@
+import test from 'node:test';import assert from 'node:assert/strict';
+const {runConversationStep}=await import(process.env.EDEN_PUBLIC_STEP_ORIGINAL??'./client-conversation-step.mjs');import {openClientConversations} from './client-conversations.mjs';import {assertLiveDispatch} from './client-dispatch-authority.mjs';
+const view=role=>({id:'cv_fixture',state:'open',role,members:role==='member'?[{soulId:'s_peer',name:'Peer'},{soulId:'s_self',name:'Self'}]:[{soulId:'s_peer',name:'Peer'}],invited:role==='invited'?[{soulId:'s_self',name:'Self'}]:[],asks:[],turns:0});
+function fixture(){const conversations=openClientConversations({scope:'fixture',soulId:'s_self',name:'Self'});let paused=false;const calls=[];return {conversations,calls,isPaused:()=>paused,pause:()=>paused=true,resume:()=>paused=false,converse:async(op)=>{calls.push(op);return {accepted:true,conversation:view('member')};}};}
+test('actual public conversation helper rechecks attendance after awaited unknown-state refresh before mutation',async t=>{
+ const f=fixture(),result=await runConversationStep({converse:'say',id:'cv_fixture',text:'Hello'},{...f,refresh:async()=>{f.conversations.reconcile({conversations:[view('member')]});await Promise.resolve();f.pause();}});
+ t.diagnostic(JSON.stringify({calls:f.calls,accepted:result.accepted,code:result.code??null,role:f.conversations.context()[0]?.role}));
+ assert.equal(result.accepted,false);assert.equal(result.code,'local.attended');assert.equal(result.requestNotSent,true);assert.deepEqual(f.calls,[]);assert.equal(f.conversations.context()[0].role,'member');
+});
+test('accept response remains accepted membership when takeover suppresses followup speech',async t=>{
+ const f=fixture();f.conversations.reconcile({conversations:[view('invited')]});const result=await runConversationStep({converse:'accept',id:'cv_fixture',text:'My separate thought.'},{...f,refresh:async()=>{},converse:async op=>{const response=await f.converse(op);f.pause();return response;}});
+ t.diagnostic(JSON.stringify({calls:f.calls,accepted:result.accepted,acceptedMembership:result.acceptedMembership??null,followingSpeech:result.followingSpeech??null,role:f.conversations.context()[0]?.role}));
+ assert.deepEqual(f.calls,['accept']);assert.equal(result.accepted,true);assert.equal(result.acceptedMembership,true);assert.equal(result.partial,true);assert.deepEqual(result.followingSpeech,{sent:false,accepted:false});assert.equal(result.code,'local.attended');assert.equal(f.conversations.context()[0].role,'member');assert.match(result.line,/Accepted membership/);
+});
+test('followup speech mode/lookup awaits use actual transport fence without undoing prior acceptance',async()=>{
+ const f=fixture();f.conversations.reconcile({conversations:[view('invited')]});const result=await runConversationStep({converse:'accept',id:'cv_fixture',text:'Not sent after mode await.'},{...f,refresh:async()=>{},converse:async op=>{if(op==='say'){await Promise.resolve();f.pause();assertLiveDispatch(true,f.isPaused);throw Error('unreachable');}return f.converse(op);}});
+ assert.deepEqual(f.calls,['accept']);assert.equal(result.acceptedMembership,true);assert.equal(result.partial,true);assert.equal(result.followingSpeech.sent,false);assert.equal(f.conversations.context()[0].role,'member');
+});
+test('ordinary accepted speech and actual declined invitation stay distinct, no fabricated consent',async()=>{
+ const f=fixture();f.conversations.reconcile({conversations:[view('invited')]});const result=await runConversationStep({converse:'accept',id:'cv_fixture',text:'Separate accepted speech.'},{...f,refresh:async()=>{}});assert.equal(result.accepted,true);assert.deepEqual(f.calls,['accept','say']);assert.equal(result.partial,undefined);
+ const g=fixture();g.conversations.reconcile({conversations:[view('invited')]});const refused=await runConversationStep({converse:'accept',id:'cv_fixture',text:'Never sent.'},{...g,refresh:async()=>{},converse:async op=>{g.calls.push(op);return {accepted:false,code:'conversation.expired',reason:'Actual invitation expired.'};}});assert.equal(refused.accepted,false);assert.deepEqual(g.calls,['accept']);assert.equal(g.conversations.context()[0].role,'invited');
+});
+test('common live mutation fence covers post-await body/object/mark/project and keyed retry transport; manual/read commands unchanged',async()=>{
+ let paused=false;const isPaused=()=>paused,mutations=[];
+ for(const verb of ['body','object','mark','project','plan-retry']){paused=false;await Promise.resolve();paused=true;assert.throws(()=>{assertLiveDispatch(true,isPaused,verb==='plan-retry'?'PATCH':'POST');mutations.push(verb);},e=>e.code==='local.attended'&&e.requestNotSent);}
+ assert.deepEqual(mutations,[]);assert.doesNotThrow(()=>assertLiveDispatch(false,isPaused,'POST'));assert.doesNotThrow(()=>assertLiveDispatch(true,isPaused,'GET'));
+});
+test('actual queue retains accepted membership/unsent speech result and does not dispatch dependent body after takeover',async t=>{
+ const {openClientQueue}=await import('./client-queue.mjs'),{mkdtempSync,realpathSync,rmSync}=await import('node:fs'),{tmpdir}=await import('node:os'),{join}=await import('node:path');const root=mkdtempSync(join(realpathSync(tmpdir()),'eden-public-attended-'));t.after(()=>rmSync(root,{recursive:true,force:true}));
+ const f=fixture(),sent=[];f.conversations.reconcile({conversations:[view('invited')]});const q=openClientQueue(root,{scope:'fixture',isPaused:f.isPaused,adapter:{runPublic:st=>runConversationStep(st,{...f,refresh:async()=>{},converse:async op=>{const result=await f.converse(op);f.pause();return result;}}),send:async body=>{sent.push(body);return {accepted:true,receipt:{id:'r1',phase:'started'}};}}});t.after(()=>q.close());
+ q.enqueue([{converse:'accept',id:'cv_fixture',text:'Separate thought.'},{act:'walk:tea'}]);await q.pump();assert.deepEqual(f.calls,['accept']);assert.equal(sent.length,0);const first=q.snapshot().steps[0];assert.equal(first.result.acceptedMembership,true);assert.equal(first.result.followingSpeech.sent,false);assert.equal(q.snapshot().steps[1].status,'pending');
+ f.resume();await q.pump();assert.deepEqual(f.calls,['accept']);assert.deepEqual(sent.map(b=>b.capability),['walk:tea']);
+});

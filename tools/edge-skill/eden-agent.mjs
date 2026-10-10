@@ -15,6 +15,8 @@ import {startClientDashboard,watchDashboardParent,rememberDashboardPicture} from
 import {openClientReceipts} from './client-receipts.mjs';
 import {openLiveSoulEvidence} from './client-live-identity.mjs';
 import {openClientConversations} from './client-conversations.mjs';
+import {runConversationStep} from './client-conversation-step.mjs';
+import {assertLiveDispatch,attendedStepRefusal} from './client-dispatch-authority.mjs';
 import {executeReplySteps,executionContext,publicVerdict,boundedRememberChoice,bodyStep,bindLiveSoulReferences,literalSoulReference} from './client-execution.mjs';
 import {createHash} from 'node:crypto';
 import {openClientQueue,replySteps} from './client-queue.mjs';
@@ -86,6 +88,7 @@ function need(s,k,hint){if(!s[k])throw new Error(`No ${k} yet. ${hint}`);return 
 
 /** as: 'owner' (identity bearer) | 'soul' (Soul token) | 'none' */
 async function call(path,{body,method,as='soul',timeoutMs=90_000,signal,extraHeaders={}}={}){
+ assertLiveDispatch(IN_LIVE,leaseHeld,method??(body?'POST':'GET'));
  const s=load(),url=need(s,'world','Run: node eden-agent.mjs register <world-url>')+path,headers={'content-type':'application/json',...extraHeaders};
  // TODO(G1): real worlds will not accept a self-made owner identity; it is only used to own and pair the Soul.
  if(as==='owner'&&s.identity)headers.authorization=`Bearer dev:${s.identity}`;
@@ -446,6 +449,7 @@ async function callKeyed(path,body,headers,method='POST'){
  return callH(path,body,headers,method);
 }
 async function callH(path,body,extra,method){
+ assertLiveDispatch(IN_LIVE,leaseHeld,method??'POST');
  const s=load(),url=need(s,'world','Run: node eden-agent.mjs register <world-url>')+path,headers={'content-type':'application/json',...extra};if(s.token)headers.authorization=`Bearer ${s.token}`;
  let r;try{r=await fetch(url,{method,headers,body:JSON.stringify(body),signal:AbortSignal.timeout(60_000)});}catch(e){return {status:0,data:{error:{code:'unreachable',message:String(e.message)}}};}
  const text=await r.text();let data;try{data=JSON.parse(text);}catch{data={raw:text.slice(0,200)};}return {status:r.status,data};
@@ -753,7 +757,7 @@ export async function live(...argv){
  const memory=()=>{const n=readText(LIVE.notes,2500);return `${n?'YOUR NOTES\n'+n+'\n':''}${S.history.length?'RECENTLY\n'+S.history.slice(-8).join('\n')+'\n':''}`;};
 
  async function think(reason,chain=0,useRoutine=false){
-  if(modelBudgetUnknown)return;const reviewTask=reason==='review'?cadences.nextReview():null;if(reason==='review'&&!reviewTask)return;if(reviewTask&&!cadences.reserveReview(reviewTask))return;const loop=reviewTask?'review':'moment',scheduleHash=cadences.status().scheduleHash;if(reviewTask&&cadences.status().priorityPending){system=liveSystem(persona,prioritiesText);brain.close();brain=makeBrain(o.engine,{model:o.model,system,stateless:o.memory==='fresh',effort:o.effort});const boot=await perception.boot();cadences.refreshClock(boot.clock);logLive({priorities:'applied at review; fresh session'});}logLive({wakeStart:{reason,loop,reviewKey:reviewTask?.key??null,chain,sessionId:brain.id,queueId:bodyQueue?.snapshot().id}});
+  if(modelBudgetUnknown||leaseHeld())return;const reviewTask=reason==='review'?cadences.nextReview():null;if(reason==='review'&&!reviewTask)return;if(reviewTask&&!cadences.reserveReview(reviewTask))return;const loop=reviewTask?'review':'moment',scheduleHash=cadences.status().scheduleHash;if(reviewTask&&cadences.status().priorityPending){system=liveSystem(persona,prioritiesText);brain.close();brain=makeBrain(o.engine,{model:o.model,system,stateless:o.memory==='fresh',effort:o.effort});const boot=await perception.boot();cadences.refreshClock(boot.clock);logLive({priorities:'applied at review; fresh session'});}logLive({wakeStart:{reason,loop,reviewKey:reviewTask?.key??null,chain,sessionId:brain.id,queueId:bodyQueue?.snapshot().id}});
   if(Date.now()-lastClockRefresh>1000||cadences.status().clockNotice)await refreshAuthoritativeClock();
   const evs=pending;pending=[];
   let actualReceipt=null;try{if(lastReceipt)actualReceipt=lastReceipt.startsWith('legacy:')?await receipt(lastReceipt):await receiptReads.read(lastReceipt);}catch{}
@@ -848,6 +852,11 @@ export async function live(...argv){
  const stepLabel=st=>st.plan!==undefined?`plan ${clip(st.plan,120)}`:st.act?`act ${st.act}${st.params?' '+JSON.stringify(st.params):''}`:st.say?`say "${st.say}"`:st.converse?`converse ${st.converse} ${st.with??st.id??''}${st.text?' "'+st.text+'"':''}`:
   st.object?`object ${st.object} ${st.action??''}`:st.mark?`mark ${st.mark} "${st.title}"`:st.project?`project "${st.project}"`:st.look?`look ${st.look}`:JSON.stringify(st);
  async function runStep(st){
+  if(leaseHeld()&&!st.look&&!(st.object&&!st.action))return attendedStepRefusal();
+  try{return await runAvailableStep(st);}catch(error){if(error.code!=='local.attended'||!error.requestNotSent)throw error;
+   return {accepted:null,code:error.code,reason:error.message,requestNotSent:true,again:false,line:'No further request sent after attended takeover; earlier admitted or in-flight work is preserved, full step outcome unconfirmed.'};}
+ }
+ async function runAvailableStep(st){
   if(st.plan!==undefined){
    if(!pushed)return {accepted:false,code:'local.no-plans',again:true,line:'refused local.no-plans: this world has no server-side plans; do one step now'};
    const arg=typeof st.plan==='string'?st.plan:JSON.stringify(st.plan),r=await plan(arg);
@@ -858,15 +867,8 @@ export async function live(...argv){
    if(r.accepted){if(!ATTENTION.test(st.act)&&r.receipt?.channel!=='attention'&&r.receipt?.channel!=='none'){lastReceipt=load().lastReceipt;busy=r.receipt?.capability??String(st.act);if(ownerActive)ownerActive.receipt=lastReceipt;}return {accepted:true,receipt:r.receipt,line:`ok${r.resolved?' ('+(r.resolved.to??clip(r.resolved,60))+')':''} ${r.receipt?.capability??''} ${r.receipt?.phase??''}${r.then?` (next step when this completes: "${r.then}")`:''}`.trim()};}
    return {accepted:false,code:r.code,reason:r.reason,line:`refused ${r.code}: ${clip(r.reason??'',120)}${r.hint?' — '+clip(r.hint,100):''}${r.did_you_mean?' did_you_mean '+clip(r.did_you_mean,120):''}`,again:r.code!=='local.in-progress'};}
   if(st.say){const r=await say(String(st.say));return {accepted:r.said===false?false:r.said&&typeof r.said==='object'?true:null,reason:r.reason??null,line:r.said===false?'not said: '+r.reason:r.said&&typeof r.said==='object'?`said (heard by ${r.said.heardBy??'?'})`:'Speech admission unconfirmed',again:!r.said};}
-  if(st.converse){const op=st.converse,request={id:st.id,conversation:st.id,with:st.with,text:st.text,separate:st.separate,topic:st.topic,reason:st.reason};let decision=conversations.guard(op,request);
-   if(!decision.allowed&&decision.code==='conversation.context-unknown'){await refreshConversations('unknown-state');decision=conversations.guard(op,request);}
-   if(!decision.allowed){logLive({conversationGuard:{op,allowed:false,code:decision.code,conversation:decision.conversation??st.id??null,existingIds:decision.existingIds??[]}});return {accepted:false,code:decision.code,reason:decision.reason,line:`refused ${decision.code}: ${decision.reason}${decision.conversation?' Existing ID '+decision.conversation:''}`,again:true};}
-   const r=op==='start'?await converse('start',st.with,...(st.text?[st.text]:[])):op==='say'?await converse('say',st.id,st.text??''):await converse(op,st.id),verdict=publicVerdict(r),recorded=conversations.response(op,request,r,{revision:decision.revision}),cv=recorded.conversation??r.conversation?.id??r.conversation??st.id;
-   if(op==='start'&&verdict===true&&S.identityGoal&&typeof cv==='string'){S.identityGoal.conversationId=cv;saveS();}reconcileIdentityGoal();
-   logLive({conversationVerdict:{op,accepted:verdict,code:r.code??null,conversation:typeof cv==='string'?cv:null}});
-   if(verdict!==true)return {accepted:verdict,code:r.code??'conversation.verdict-unknown',reason:r.reason??r.error??'No explicit accepted conversation verdict',line:`${verdict===false?'refused':'unconfirmed'} ${r.code??'conversation.verdict-unknown'}: ${clip(r.reason??r.error??'No explicit accepted verdict',120)}`,again:true};
-   if(op==='accept'&&st.text){const next={id:st.id,conversation:st.id,text:st.text},guard=conversations.guard('say',next);if(!guard.allowed)return {accepted:false,code:guard.code,reason:guard.reason,line:'Accepted membership; following speech not sent: '+guard.reason,again:true};const said=await converse('say',st.id,st.text);conversations.response('say',next,said,{revision:guard.revision});if(publicVerdict(said)!==true)return {accepted:publicVerdict(said),code:said.code??'conversation.say-unconfirmed',reason:said.reason??null,line:'Accepted membership; following speech was refused or unconfirmed',again:true};}
-   return {accepted:true,line:'accepted'+(typeof cv==='string'?' '+cv:'')};}
+  if(st.converse)return runConversationStep(st,{conversations,refresh:refreshConversations,converse,isPaused:leaseHeld,log:logLive,clip,
+   onAcceptedStart:cv=>{if(S.identityGoal){S.identityGoal.conversationId=cv;saveS();}},reconcile:reconcileIdentityGoal});
   if(st.object){const r=await object(st.object,st.action,st.params?JSON.stringify(st.params):undefined);return st.action?{accepted:publicVerdict(r),code:r.code,reason:r.reason,receipt:r.receipt,line:publicVerdict(r)===true?'accepted':publicVerdict(r)===false?`refused ${r.code}: ${clip(r.reason??'',100)}`:'Admission unconfirmed',again:publicVerdict(r)!==true}:{readOnly:true,line:clip(r,700),again:true};}
   if(st.mark){const r=await mark(st.mark,st.title??'',st.text??'');return {accepted:publicVerdict(r),code:r.code,reason:r.reason,receipt:r.receipt,again:publicVerdict(r)!==true,line:publicVerdict(r)===true?'accepted':publicVerdict(r)===false?`refused ${r.code}: ${clip(r.reason??'',100)}`:'Admission unconfirmed'};}
   if(st.project){const r=await project(st.project,st.text??'');return {accepted:publicVerdict(r),code:r.code,reason:r.reason,receipt:r.receipt,again:publicVerdict(r)!==true,line:publicVerdict(r)===true?'accepted':publicVerdict(r)===false?`refused ${r.code}: ${clip(r.reason??'',100)}`:'Admission unconfirmed'};}
