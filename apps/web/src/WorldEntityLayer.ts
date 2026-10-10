@@ -10,6 +10,7 @@ import { GENERATORS, offsetPolyline } from '@sim/generators';
 import { meshFor, type MeshCtx } from './gen-mesh/index.ts';
 import { MaterialLib } from './gen-mesh/materials.ts';
 import { animate, hasMotion } from './gen-mesh/motion.ts';
+import { EntityInstancer, instanceable } from './EntityInstancer.ts';
 
 type Snapshot = { contract: string; worldId: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[]; tiles: Record<string, string> };
 type DiffMsg = { type: 'edge'; kind: 'world-diff'; seq: number; diff: { upserts: Entity[]; removes: string[]; defs: StoredDef[]; tiles: string[]; world?: Partial<WorldModel['state']> }; ground?: Ground; defs?: StoredDef[] };
@@ -19,7 +20,7 @@ const TERRAIN_STEP = 2;              // metres between terrain vertices in the p
 const EASE_IN_S = 2.5, EASE_OUT_S = 0.6, DROP_M = 40;
 const easeOut = (t: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
 
-type Drawn = { obj: THREE.Object3D; from: { p: THREE.Vector3; s: number }; to: { p: THREE.Vector3; s: number }; t0: number; dur: number; removing?: boolean; defHash: string; world?: boolean; motion?: { entity: Entity; def: StoredDef; yaw: number } };
+type Drawn = { inst?: string; settled?: boolean; obj: THREE.Object3D; from: { p: THREE.Vector3; s: number }; to: { p: THREE.Vector3; s: number }; t0: number; dur: number; removing?: boolean; defHash: string; world?: boolean; motion?: { entity: Entity; def: StoredDef; yaw: number } };
 
 export class WorldEntityLayer {
   readonly group = new THREE.Group();
@@ -33,6 +34,8 @@ export class WorldEntityLayer {
   private drawn = new Map<string, Drawn>();
   private materials = new Map<string, THREE.Material>();
   readonly lib = new MaterialLib();
+  readonly instancer = new EntityInstancer();
+  get entityCount() { return this.model?.entities.size ?? 0; }
   private horizon: THREE.Mesh | null = null;
   private hiddenBase = new WeakSet<THREE.Object3D>();
   private now = 0;
@@ -40,7 +43,7 @@ export class WorldEntityLayer {
   constructor(api: (p: string) => string) {
     this.api = api;
     this.group.name = 'entity-world';
-    this.group.add(this.terrainGroup, this.waterGroup, this.thingsGroup);
+    this.group.add(this.terrainGroup, this.waterGroup, this.thingsGroup, this.instancer.group);
   }
 
   private signal: AbortSignal | null = null;
@@ -117,6 +120,11 @@ export class WorldEntityLayer {
       d.obj.position.lerpVectors(d.from.p, d.to.p, t);
       const s = d.from.s + (d.to.s - d.from.s) * t;
       d.obj.scale.setScalar(s);
+      if (d.inst) {
+        if (d.removing && t >= 1) { this.instancer.remove(d.inst, id); this.drawn.delete(id); continue; }
+        if (!d.settled) { this.instancer.set(d.inst, id, d.obj.position, d.obj.rotation.y, d.obj.scale.x, [d.obj.rotation.x, d.obj.rotation.z]); if (t >= 1) d.settled = true; }
+        continue;
+      }
       if (d.removing && t >= 1) { this.thingsGroup.remove(d.obj); disposeObject(d.obj); this.drawn.delete(id); continue; }
       if (d.motion && t >= 1) animate(d.obj, d.motion.entity, d.motion.def, nowMs / 1000, { y: d.to.p.y, yaw: d.motion.yaw });
     }
@@ -151,6 +159,7 @@ export class WorldEntityLayer {
   };
 
   dispose() {
+    this.instancer.dispose();
     for (const m of this.sectors.values()) { m.geometry.dispose(); }
     this.sectors.clear();
     for (const d of this.drawn.values()) disposeObject(d.obj);
@@ -275,24 +284,27 @@ export class WorldEntityLayer {
       if (isWorld) return;
       existing.obj.rotation.set(0, wp.yaw, 0); applyTilt(existing.obj, e);
       existing.from = { p: ease ? existing.obj.position.clone() : target.clone(), s: ease ? existing.obj.scale.x : wp.s };
-      existing.to = { p: target, s: wp.s }; existing.t0 = this.now; existing.dur = ease ? EASE_IN_S : 0.001;
+      existing.to = { p: target, s: wp.s }; existing.t0 = this.now; existing.dur = ease ? EASE_IN_S : 0.001; existing.settled = false;
       return;
     }
-    const built = this.build(e, def);
+    let built = this.build(e, def);
     if (!built) { if (existing) this.undraw(e.id); return; }
-    if (existing) { this.thingsGroup.remove(existing.obj); disposeObject(existing.obj); this.drawn.delete(e.id); }
+    if (existing) { if (existing.inst) this.instancer.remove(existing.inst, e.id); else { this.thingsGroup.remove(existing.obj); disposeObject(existing.obj); } this.drawn.delete(e.id); }
+    // static things with an instance key share one InstancedMesh per part (a few draws for hundreds of props)
+    const instKey = !isWorld && !hasMotion(def) && typeof built.userData.instanceKey === 'string' && instanceable(built) ? built.userData.instanceKey as string : undefined;
+    if (instKey) { this.instancer.ensure(instKey, built); built = new THREE.Object3D(); }
     if (!isWorld) { built.rotation.set(0, wp.yaw, 0); applyTilt(built, e); }
     const fresh = !existing;
     const from = fresh && ease ? { p: target.clone().add(new THREE.Vector3(0, DROP_M, 0)), s: wp.s * 0.2 } : { p: target.clone(), s: wp.s };
     built.position.copy(from.p); built.scale.setScalar(from.s);
-    this.thingsGroup.add(built);
+    if (!instKey) this.thingsGroup.add(built);
     const to = { p: target, s: isWorld ? 1 : wp.s };
     if (isWorld) { from.s = fresh && ease ? 1 : 1; }
-    this.drawn.set(e.id, { obj: built, from, to, t0: this.now, dur: ease ? EASE_IN_S : 0.001, defHash, world: isWorld, ...(hasMotion(def) && !isWorld ? { motion: { entity: e, def, yaw: wp.yaw } } : {}) });
+    this.drawn.set(e.id, { ...(instKey ? { inst: instKey, settled: false } : {}), obj: built, from, to, t0: this.now, dur: ease ? EASE_IN_S : 0.001, defHash, world: isWorld, ...(hasMotion(def) && !isWorld ? { motion: { entity: e, def, yaw: wp.yaw } } : {}) });
   }
   private undraw(id: string) {
     const d = this.drawn.get(id); if (!d || d.removing) return;
-    d.removing = true; d.from = { p: d.obj.position.clone(), s: d.obj.scale.x }; d.to = { p: d.obj.position.clone().add(new THREE.Vector3(0, 2, 0)), s: 0.01 }; d.t0 = this.now; d.dur = EASE_OUT_S;
+    d.removing = true; d.settled = false; d.from = { p: d.obj.position.clone(), s: d.obj.scale.x }; d.to = { p: d.obj.position.clone().add(new THREE.Vector3(0, 2, 0)), s: 0.01 }; d.t0 = this.now; d.dur = EASE_OUT_S;
   }
   /** One Object3D for an entity, from its def's mesh half (gen-mesh registry). Null when it has no picture (landforms, prefab roots, bodies). */
   private build(e: Entity, def: StoredDef): THREE.Object3D | null {
@@ -309,7 +321,7 @@ export class WorldEntityLayer {
       baked: m.bake(def, e.params ?? {}, e.seed ?? 0, e.shape), model: m, materials: this.lib,
       tint: (key, fallback) => { if (!key) return fallback; const v = params[key]; return typeof v === 'string' && /^#/.test(v) ? v : def.palette?.[key] ?? fallback; },
     };
-    try { const obj = builder.build(ctx); if (obj) obj.name ||= `entity ${e.name ?? e.id}`; return obj; } catch (err) { this.stats.lastError = `${def.ref}: ${String(err)}`; return null; }
+    try { const obj = builder.build(ctx); if (obj) { obj.name ||= `entity ${e.name ?? e.id}`; const k = builder.instanceKey?.(ctx); if (k) obj.userData.instanceKey = `${def.make.kind === 'gen' ? def.make.gen : def.make.kind}|${k}`; } return obj; } catch (err) { this.stats.lastError = `${def.ref}: ${String(err)}`; return null; }
   }
 
   private material(key: string, make: () => THREE.Material) { let m = this.materials.get(key); if (!m) { m = make(); this.materials.set(key, m); } return m; }

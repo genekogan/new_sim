@@ -112,5 +112,5 @@ registerMesh({
     const obj = proto.clone(true); obj.userData = { ...proto.userData };
     return obj;
   },
-  instanceKey(ctx) { return ctx.def.hash; },
+  instanceKey(ctx) { return ctx.def.hash + ':' + JSON.stringify(Object.fromEntries(Object.entries(ctx.params).filter(([, v]) => typeof v === 'string' && /^#/.test(v)))); },
 });

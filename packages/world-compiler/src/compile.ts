@@ -44,7 +44,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   const ops = parsed.data.ops as unknown as Op[];
   // Scratch copy: structural maps are cloned; the terrain is shared but every landform change is recorded and
   // undone if the plan fails, so a failed dry run leaves the model untouched.
-  const scratch = WorldModel.fromSnapshot(world.snapshot(), world.assets);
+  const scratch = world.fork();
   const failures: Failure[] = [], warnings: string[] = [], ids: Record<string, string> = {};
   const diff: Diff = { upserts: [], removes: [], defs: [], tiles: [], answers: [] };
   const inverse: Op[] = [];

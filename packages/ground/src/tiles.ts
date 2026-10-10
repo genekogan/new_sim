@@ -97,4 +97,6 @@ export class Terrain {
     return [...seen];
   }
   get cachedTiles(): number { return this.tiles.size; }
+  /** Copy-on-write clone: baked tiles are immutable and shared; invalidation only touches the clone's maps. */
+  clone(): Terrain { const t = new Terrain(this.ground); t.tiles = new Map(this.tiles); t.hashes = new Map(this.hashes); return t; }
 }

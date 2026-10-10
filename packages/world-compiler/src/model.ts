@@ -221,6 +221,20 @@ export class WorldModel {
     this.terrain.update({ ...g, waters }, []);
   }
 
+  /** Cheap scratch copy for planning: structural maps copied, immutable caches (bakes, tiles) shared. */
+  fork(): WorldModel {
+    const w = Object.create(WorldModel.prototype) as WorldModel;
+    const self = this as unknown as Record<string, unknown>, out = w as unknown as Record<string, unknown>;
+    w.constants = this.constants; w.state = this.state; w.seed = this.seed; w.seq = this.seq; w.editSeq = this.editSeq; w.assets = this.assets;
+    w.defs = new Map(this.defs); w.entities = new Map(this.entities); w.names = new Map(this.names);
+    w.children = new Map([...this.children].map(([k, v]) => [k, new Set(v)]));
+    out.bakes = self.bakes;  // keyed by content hash: safe to share
+    out.cells = new Map([...(self.cells as Map<string, Set<string>>)].map(([k, v]) => [k, new Set(v)]));
+    out.footprints = new Map(self.footprints as Map<string, unknown>);
+    w.terrain = this.terrain.clone();
+    return w;
+  }
+
   snapshot() {
     return {
       constants: this.constants, state: this.state, seed: this.seed, seq: this.seq, editSeq: this.editSeq,
