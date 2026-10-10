@@ -80,7 +80,7 @@ test('world-edit: the Soul takes the god bowl from the table upstairs and puts i
 test('world-edit: a closed door blocks the route; opening it restores it; replay and restore agree', async () => {
   const { f, e, ev } = await built();
   const door = { ...house()!, solids: [...house()!.solids!, wall('house:door', [10, 3], [0.55, 0.06], 2.1)] };
-  const closed = edit(2, { e_house1: door }, e.world.entityPhysicsV1);
+  const closed = edit(2, { e_house1: door }, (e.world as unknown as { entityPhysicsV1?: any }).entityPhysicsV1);
   e.applyWorldEditV1(closed);
   const blocked = e.reachV1({ p: [10, 8] }, { p: [10, 0] });
   assert.equal(blocked.ok, false);
@@ -91,12 +91,12 @@ test('world-edit: a closed door blocks the route; opening it restores it; replay
   const back = f.restore(snap) as unknown as MarsEngine;
   assert.equal(back.reachV1({ p: [10, 8] }, { p: [10, 0] }).ok, false);
   assert.equal(back.stateHash(), e.stateHash());
-  e.applyWorldEditV1(edit(3, { e_house1: house() }, e.world.entityPhysicsV1));
+  e.applyWorldEditV1(edit(3, { e_house1: house() }, (e.world as unknown as { entityPhysicsV1?: any }).entityPhysicsV1));
   assert.equal(e.reachV1({ p: [10, 8] }, { p: [10, 0] }).ok, true);
   // a fresh engine fed the same events derives the same physics hash
   const g = f.create(f.genesis('entity-physics')) as unknown as MarsEngine;
   g.applyWorldEditV1(ev); g.applyWorldEditV1(closed);
-  assert.equal(g.world.entityPhysicsV1!.hash, entityPhysicsHash(g.world.entityPhysicsV1!));
+  (assert.equal(g.world as unknown as { entityPhysicsV1?: any }).entityPhysicsV1!.hash, (entityPhysicsHash(g.world as unknown as { entityPhysicsV1?: any }).entityPhysicsV1!));
   assert.equal(g.reachV1({ p: [10, 8] }, { p: [10, 0] }).ok, false);
 });
 
@@ -105,7 +105,7 @@ test('world-edit: removing a solid entity removes its physics; a world without e
   assert.equal(a.stateHash(), b.stateHash());
   b.applyWorldEditV1(edit(1, { e_wall001: { solids: [wall('w', [0, 5], [5, 0.2])] } }));
   assert.notEqual(a.stateHash(), b.stateHash());
-  assert.equal(Object.keys(b.world.entityPhysicsV1!.byEntity).length, 1);
-  b.applyWorldEditV1(edit(2, { e_wall001: null }, b.world.entityPhysicsV1));
-  assert.equal(Object.keys(b.world.entityPhysicsV1!.byEntity).length, 0);
+  (assert.equal(Object.keys(b.world as unknown as { entityPhysicsV1?: any }).entityPhysicsV1!.byEntity).length, 1);
+  b.applyWorldEditV1(edit(2, { e_wall001: null }, (b.world as unknown as { entityPhysicsV1?: any }).entityPhysicsV1));
+  (assert.equal(Object.keys(b.world as unknown as { entityPhysicsV1?: any }).entityPhysicsV1!.byEntity).length, 0);
 });
