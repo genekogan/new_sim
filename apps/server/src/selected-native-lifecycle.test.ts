@@ -9,12 +9,13 @@ for(const [name,cfg]of cases){const old=await marsFactory(cfg),reader=await sele
  test(name+': old native bytes unchanged until accepted policy; normal lifecycle creation and snapshot/genesis prefix replay',async t=>{
   const f=fixture(':memory:',reader,{durableClockV1:true});f.brain.quiesce();t.after(()=>{f.host.stop();f.db.close();});
   const plain=old.create(old.genesis(f.host.seed)),actual=f.host.engine;assert.equal(JSON.stringify(actual.snapshot()),JSON.stringify(plain.snapshot()));
+  await invite(f,'legacy');const retained=await accept(f.host,f.souls.create('dev:legacy',{name:'Legacy '+name,description:'Existing ordinary legacy owner retained'}));const retainedRow=JSON.stringify(f.db.soul(retained.id));
   const originalBodies=JSON.stringify(actual.world.entities),prefix=JSON.stringify(f.db.events(f.host.worldId)),before=actual.stateHash(),kernel=kernelHash(f.host.kernel),scene=hashOf(actual.renderScene!());
   assert.throws(()=>f.souls.enableLifecycle(),/qualified crew-removal/);
   const event=await accept(f.host,f.host.adoptCrewRemovalPolicyV1('operator:selected-native-test'));
   assert.equal(event.payload.crewRemovalTransition.fromStateHash,before);assert.equal(actual.rulesVersion,(await marsFactory({...cfg,safeCrewRemoval:true})).rulesVersion);
-  assert.equal(JSON.stringify(actual.world.entities),originalBodies);assert.equal(kernelHash(f.host.kernel),kernel);assert.equal(JSON.stringify(f.db.events(f.host.worldId).slice(0,JSON.parse(prefix).length)),prefix);assert.equal(hashOf(actual.renderScene!()),scene);
-  f.souls.enableLifecycle();await invite(f,'alder');
+  assert.equal(JSON.stringify(actual.world.entities),originalBodies);assert.equal(kernelHash(f.host.kernel),kernel);assert.equal(JSON.stringify(f.db.events(f.host.worldId).slice(0,JSON.parse(prefix).length)),prefix);assert.equal(hashOf(actual.renderScene!()),scene);assert.equal(JSON.stringify(f.db.soul(retained.id)),retainedRow);
+  f.souls.enableLifecycle();assert.equal(f.souls.controlReady(f.db.soul(retained.id)!),true);await invite(f,'alder');
   const response=await f.app.request('/v1/souls',{method:'POST',headers:{authorization:'Bearer dev:alder','Content-Type':'application/json','X-Sim-Lifecycle':'1'},body:JSON.stringify({name:'Alder '+name,description:'Normal selected native lifecycle fixture'})});assert.equal(response.status,202);
   for(let i=0;i<8;i++){f.host.drainInputs();await setImmediate();}const rows=f.db.liveSouls(f.host.worldId).filter(r=>r.name==='Alder '+name);assert.equal(rows.length,1);assert.equal(f.souls.controlReady(rows[0]!),true);assert.equal(f.souls.lifecycle!.faults.size,0);assert.deepEqual(actual.runtime.violations,[]);
   const head={engine:actual.stateHash(),kernel:kernelHash(f.host.kernel),seq:f.host.seq,rows:JSON.stringify(f.db.liveSouls(f.host.worldId))};f.host.saveSnapshot(true);
