@@ -4,6 +4,8 @@ const WORLD_ID = 'toy-1';
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn, type ChildProcess } from 'node:child_process';
+import { createServer } from 'node:net';
+import { once } from 'node:events';
 import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -70,24 +72,39 @@ else {
   });
 
   // ---------------------------------------------------------------- a real server process on the Mars engine
-  const PORT = 4950; // Core's reserved local range; suite runs serially.
+  const PORT = Number(process.env.TEST_MARS_PORT ?? 4950); // CI retains its original isolated default.
+  assert.ok(Number.isInteger(PORT) && PORT >= 1024 && PORT <= 65535,'explicit valid fixture port');
+  if(process.env.TEST_MARS_PORT)assert.ok(![4950,4963,4964,4970].includes(PORT),'local override cannot target release listeners');
   const BASE = `http://127.0.0.1:${PORT}`;
-  let proc: ChildProcess;
+  let proc: ChildProcess;let fixtureReady=false;
+  const fixtureBuild=`isolated-mars-test-${process.pid}`,connections=new Set<Connection>();
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
-  const client = () => { const c = new Connection(`ws://127.0.0.1:${PORT}/ws`, async () => null, {}, (u) => new WebSocket(u) as any); c.connect(); return c; };
+  const client = () => { assert.ok(fixtureReady,'owned fixture must be ready before WS');const c = new Connection(`ws://127.0.0.1:${PORT}/ws`, async () => null, {}, (u) => new WebSocket(u) as any); connections.add(c);c.connect(); return c; };
   const api = async (path: string, token: string, body?: unknown) => {
-    const r = await fetch(BASE + path, { method: body ? 'POST' : 'GET', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    assert.ok(fixtureReady,'owned fixture must be ready before API');const r = await fetch(BASE + path, { method: body ? 'POST' : 'GET', headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
     const t = await r.text(); try { return { status: r.status, body: JSON.parse(t) }; } catch { return { status: r.status, body: t as any }; }
   };
   before(async () => {
+    const vacancy=createServer();await new Promise<void>((resolve,reject)=>{vacancy.once('error',reject);vacancy.listen(PORT,'127.0.0.1',()=>vacancy.close(error=>error?reject(error):resolve()));});
+    let listening=false,startupError:Error|undefined;
     proc = spawn(process.execPath, [new URL('./main.ts', import.meta.url).pathname], {
-      env: { PATH: process.env.PATH, HOME: process.env.HOME, ...(process.env.MARS_ENGINE_DIR ? { MARS_ENGINE_DIR: process.env.MARS_ENGINE_DIR } : {}), ENGINE: 'mars', MIND_DRIVER: 'central', PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR: mkdtempSync(join(tmpdir(), 'sim-mars-')), BRAIN_MODE: 'fake', DEV_AUTH: '1', PUBLIC_URL: BASE, WEB_DIR: '/nonexistent' },
-      stdio: ['ignore', 'inherit', 'inherit'],
+      env: { PATH: process.env.PATH, HOME: process.env.HOME, ...(process.env.MARS_ENGINE_DIR ? { MARS_ENGINE_DIR: process.env.MARS_ENGINE_DIR } : {}), WORLD_ID:WORLD_ID, BUILD_ID:fixtureBuild, ENGINE: 'mars', MIND_DRIVER: 'central', PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR: mkdtempSync(join(tmpdir(), 'sim-mars-')), BRAIN_MODE: 'fake', DEV_AUTH: '1', PUBLIC_URL: BASE, WEB_DIR: '/nonexistent' },
+      stdio: ['ignore', 'pipe', 'inherit'],
     });
-    for (let i = 0; i < 50; i++) { try { if ((await fetch(`${BASE}/healthz`)).ok) return; } catch { /* not up yet */ } await sleep(200); }
+    proc.once('error',error=>{startupError=error;});
+    let stdout='';proc.stdout!.on('data',chunk=>{stdout=(stdout+String(chunk)).slice(-65536);listening=stdout.includes(`[http] listening on ${BASE} `)&&stdout.includes(`build ${fixtureBuild},`);});
+    for (let i = 0; i < 50; i++) {
+      if(startupError)throw startupError;
+      if(proc.exitCode!==null||proc.signalCode!==null)throw Error('owned Mars fixture exited before readiness');
+      if(listening){try{const response=await fetch(`${BASE}/healthz`);if(response.ok){const health=await response.json() as any;assert.equal(health.worldId,WORLD_ID,'fixture world identity');assert.equal(health.build,fixtureBuild,'fixture child-specific build identity');fixtureReady=true;return;}}catch(error){if(error instanceof assert.AssertionError)throw error;}}
+      await sleep(200);
+    }
     throw new Error('server did not start');
   });
-  after(() => { proc?.kill('SIGTERM'); });
+  after(async () => {
+    fixtureReady=false;for(const c of connections)c.close();
+    if(proc?.pid&&proc.exitCode===null&&proc.signalCode===null){const exited=once(proc,'exit');proc.kill('SIGTERM');await exited;}
+  });
 
   test('mars: clients fed keyframes agree with the server', async () => {
     const a = client(); await sleep(4000);
