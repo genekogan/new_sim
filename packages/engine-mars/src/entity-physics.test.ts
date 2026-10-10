@@ -4,6 +4,7 @@ import { marsFactory, GREEN_FIELD_WORLD, type MarsEngine } from './engine.ts';
 import { entityPhysicsHash, nextEntityPhysics, type WorldEditV1 } from './entity-physics.ts';
 import { assetFromDef, assetIdFor, type DefFacts } from './catalog-adapter.ts';
 import type { Engine } from '@sim/engine-contract';
+import { CATALOG } from '../../../mars/viewer/engine/world/catalog.ts';
 
 // A two-floor house as the bridge derives it (hand-written here): walls with a front door gap, an upper floor at
 // 2.85 m, a straight flight along the east wall, a chair and a table upstairs, a bowl on the table.
@@ -84,8 +85,10 @@ test('world-edit: a closed door blocks the route; opening it restores it; replay
   const blocked = e.reachV1({ p: [10, 8] }, { p: [10, 0] });
   assert.equal(blocked.ok, false);
   if (!blocked.ok) assert.match(blocked.code, /route\./);
-  // snapshot/restore re-bases on the restored physics
-  const back = f.restore(e.snapshot()) as unknown as MarsEngine;
+  // snapshot/restore re-bases on the restored physics, in a fresh process too (the derived assets come from the snapshot)
+  const snap = e.snapshot();
+  for (const id of Object.keys(CATALOG)) if (id.startsWith('ew:')) delete CATALOG[id];
+  const back = f.restore(snap) as unknown as MarsEngine;
   assert.equal(back.reachV1({ p: [10, 8] }, { p: [10, 0] }).ok, false);
   assert.equal(back.stateHash(), e.stateHash());
   e.applyWorldEditV1(edit(3, { e_house1: house() }, e.world.entityPhysicsV1));
