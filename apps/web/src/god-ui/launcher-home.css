@@ -1,0 +1,39 @@
+/* Homepage under the world launcher (LauncherHome.tsx); extends .world-list in styles.css. */
+.lh-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
+.lh-top p { margin: 0; max-width: 620px; }
+.lh-new { font: 600 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 11px 18px; border-radius: 8px; border: 1px solid var(--fg); background: var(--fg); color: var(--bg); cursor: pointer; white-space: nowrap; }
+.lh-new:hover { opacity: .88; }
+.lh-empty { margin: 40px 0; padding: 36px; border: 1px dashed var(--line); border-radius: 12px; text-align: center; }
+.lh-empty p { margin: 0 0 10px; }
+.lh-cards > a.lh-card { display: flex; flex-direction: column; text-decoration: none; min-height: 170px; }
+.lh-card h2 { margin: 0 0 10px; font-size: 18px; overflow-wrap: anywhere; }
+.lh-card p { margin: 0 0 6px; }
+.lh-meta { color: var(--fg); }
+.lh-claimed { color: var(--accent); }
+.lh-unclaimed { color: var(--warn); }
+.lh-foot { margin-top: auto !important; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 11.5px; }
+.lh-path { margin-left: auto; }
+.lh-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--dim); display: inline-block; }
+.lh-dot.lh-running { background: #2fb36a; }
+.lh-dot.lh-starting, .lh-dot.lh-restarting { background: #e0a434; }
+.lh-dot.lh-failed { background: var(--bad); }
+.lh-backdrop { position: fixed; inset: 0; background: rgba(16, 17, 16, .42); display: flex; align-items: flex-start; justify-content: center; padding: 9vh 16px 16px; z-index: 50; overflow: auto; }
+.lh-dialog { width: min(560px, 100%); background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 14px; padding: 24px 26px 20px; box-shadow: 0 18px 60px rgba(0, 0, 0, .25); }
+.lh-dialog h2 { margin: 0 0 18px; font-size: 18px; }
+.lh-label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; color: var(--dim); margin: 0 0 6px; padding: 0; }
+.lh-dialog input[type="text"], .lh-dialog #lh-name { width: 100%; font-size: 16px; padding: 10px 12px; border-radius: 8px; background: var(--bg); }
+.lh-slug { margin: 6px 0 16px; font-size: 11.5px; min-height: 1.2em; }
+.lh-templates { border: 0; margin: 0; padding: 0; display: grid; gap: 8px; }
+.lh-template { display: grid; grid-template-columns: 18px 1fr; gap: 10px; align-items: start; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; }
+.lh-template.on { border-color: var(--fg); background: var(--bg); }
+.lh-template input { margin: 2px 0 0; }
+.lh-template b { display: block; margin-bottom: 2px; }
+.lh-desc { display: block; color: var(--dim); }
+.lh-after { margin: 16px 0 0; font-size: 11.5px; }
+.lh-actions { display: flex; justify-content: flex-end; gap: 10px; margin-top: 18px; }
+.lh-cancel, .lh-create { font: 600 13px/1 ui-monospace, SFMono-Regular, Menlo, monospace; padding: 10px 16px; border-radius: 8px; cursor: pointer; }
+.lh-cancel { background: transparent; border: 1px solid var(--line); }
+.lh-create { background: var(--fg); color: var(--bg); border: 1px solid var(--fg); min-width: 150px; }
+.lh-create:disabled { opacity: .5; cursor: default; }
+.lh-wait { margin: 10px 0 0; font-size: 11.5px; text-align: right; }
+.lh-cards { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }

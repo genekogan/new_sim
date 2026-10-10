@@ -1,88 +1,232 @@
-// The god panel on an entity world: sign in, claim the world, read the authored
-// welcome (skill + CLI + pairing steps), approve your agent's pairing request,
-// drop flags. Self-contained; dev identities today, Privy owners via the Game
-// lane's token hook later.
-import { useEffect, useState } from 'react';
-import { apiPath } from './world-path.ts';
+// The god panel on an entity world (spec <eden4>/29 WP6): sign in, claim,
+// the authored welcome (rendered, with copy buttons), first steps ticked live,
+// pairing approvals, undo/redo and the recent edits (undo a whole group), flags
+// (click to fly there), and the god's previews drawn as ghosts. Compact (380 px)
+// and collapsible. Owner-only controls; visitors see the world and its name.
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { apiPath, worldKey } from './world-path.ts';
+import { Markdown } from './god-ui/markdown.tsx';
+import * as G from './god-ui/god-api.ts';
+import { describeEdit, steps, type Step } from './god-ui/checklist.ts';
+import { flyTo } from './god-ui/camera.ts';
+import { previewGhost, type GhostSummary } from './WorldPreviewGhost.ts';
+import './god-ui/god-panel.css';
 
-type Status = { worldId: string; name: string; hasOwner: boolean; you: 'god' | 'owner' | 'claimant' | 'visitor' | 'anonymous'; pending: { code: string; agent: string; expiresIn: number }[]; entities: number; seq: number; base: string };
-
-const devName = () => (typeof localStorage === 'undefined' ? null : localStorage.getItem('sim.dev'));
-const authHeaders = (): Record<string, string> => { const n = devName(); return n ? { authorization: `Bearer dev:${n}` } : {}; };
+type Tab = 'start' | 'edits' | 'flags' | 'previews';
+const query = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
+const shotMode = query.get('shot') === '1';
+const PAIRED_KEY = `sim.godPaired:${worldKey}`;
+const OPEN_KEY = 'sim.godPanel.open';
+const ago = (t: number) => { const s = Math.max(0, Math.round((Date.now() - t) / 1000)); return s < 60 ? `${s}s ago` : s < 3600 ? `${Math.round(s / 60)} min ago` : `${Math.round(s / 3600)} h ago`; };
 
 export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMode: (v: boolean) => void }) {
-  const [status, setStatus] = useState<Status | null>(null);
-  const [open, setOpen] = useState<boolean>(true);
+  const [status, setStatus] = useState<G.Status | null>(null);
+  const [open, setOpen] = useState<boolean>(() => localStorage.getItem(OPEN_KEY) !== '0');
+  const [tab, setTab] = useState<Tab>('start');
   const [welcome, setWelcome] = useState<string | null>(null);
+  const [edits, setEdits] = useState<G.EditRow[] | null>(null);
+  const [flags, setFlags] = useState<G.FlagRef[]>([]);
+  const [previews, setPreviews] = useState<G.PreviewRow[]>([]);
+  const [launcher, setLauncher] = useState<Awaited<ReturnType<typeof G.launcherWorld>>>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  const [note, setNote] = useState<{ text: string; bad?: boolean } | null>(null);
+  const [ghost, setGhost] = useState<GhostSummary | null>(null);
+  const [approvedHere, setApprovedHere] = useState(() => localStorage.getItem(PAIRED_KEY) === '1');
   const hashCode = location.hash.startsWith('#godpair/') ? decodeURIComponent(location.hash.slice('#godpair/'.length)) : null;
+  const owner = status?.you === 'owner' || status?.you === 'god';
+  const seq = status?.seq;
 
-  const refresh = async () => {
-    try { const r = await fetch(apiPath('/v1/god/status'), { headers: authHeaders() }); if (r.ok) setStatus(await r.json()); } catch { /* offline */ }
-  };
-  useEffect(() => { void refresh(); const t = setInterval(() => void refresh(), 4000); return () => clearInterval(t); }, []);
+  const refresh = useCallback(async () => { const s = await G.getStatus(); if (s) setStatus(s); }, []);
+  useEffect(() => { void refresh(); const t = setInterval(() => void refresh(), 4000); return () => clearInterval(t); }, [refresh]);
+  useEffect(() => { localStorage.setItem(OPEN_KEY, open ? '1' : '0'); }, [open]);
+  useEffect(() => { if (!owner) { setWelcome(null); return; } void G.getWelcome().then(setWelcome); }, [owner]);
+  // journal, flags: whenever the world's edit counter moves
+  useEffect(() => { if (seq === undefined) return; void G.flags().then(setFlags).catch(() => {}); if (owner) void G.edits(30).then(setEdits).catch(() => setEdits(null)); }, [seq, owner]);
+  // what the launcher saw (looks, an agent's calls) and the god's previews: a slower poll
   useEffect(() => {
-    if (!status || (status.you !== 'owner' && status.you !== 'god')) { setWelcome(null); return; }
-    fetch(apiPath('/v1/god/welcome'), { headers: authHeaders() }).then((r) => (r.ok ? r.text() : null)).then(setWelcome).catch(() => setWelcome(null));
-  }, [status?.you]);
+    const go = () => { void G.launcherWorld().then(setLauncher); if (owner) void G.previews().then(setPreviews); };
+    go(); const t = setInterval(go, 8000); return () => clearInterval(t);
+  }, [owner]);
 
+  // ?preview=<id>: draw it as soon as the world's scene exists, then fly there
+  const showPreview = useCallback(async (id: string, fly = true) => {
+    let g = previewGhost(apiPath);
+    for (let i = 0; !g && i < 100; i++) { await new Promise((r) => setTimeout(r, 300)); g = previewGhost(apiPath); }
+    if (!g) { setNote({ text: 'The world view is not ready for a preview.', bad: true }); return; }
+    const s = await g.show(id); setGhost(s);
+    if (fly && s.ok && s.bounds) { const [x0, z0, x1, z1] = s.bounds; const span = Math.max(20, x1 - x0, z1 - z0); flyTo((x0 + x1) / 2, 0, (z0 + z1) / 2, { distance: span * 1.6 }); }
+  }, []);
+  const hideGhost = () => { previewGhost(apiPath)?.clear(); setGhost(null); const q = new URLSearchParams(location.search); if (q.has('preview')) { q.delete('preview'); history.replaceState(null, '', `${location.pathname}${q.size ? '?' + q : ''}${location.hash}`); } };
+  useEffect(() => { const id = query.get('preview'); if (id) void showPreview(id); }, [showPreview]);
+
+  const run = async (key: string, fn: () => Promise<unknown>, ok?: (r: unknown) => string | null) => {
+    setBusy(key); setNote(null);
+    try { const r = await fn(); const t = ok?.(r); if (t) setNote({ text: t }); await refresh(); }
+    catch (e) { setNote({ text: String((e as Error).message), bad: true }); }
+    finally { setBusy(null); }
+  };
   const signIn = () => {
-    const n = window.prompt('A local name for you on this server (use the same name when you return):', devName() ?? '');
+    const n = window.prompt('A local name for you on this server (use the same name when you return):', G.devName() ?? '');
     if (!n) return; localStorage.setItem('sim.dev', n.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').slice(0, 36)); location.reload();
   };
-  const claim = async () => {
-    setBusy('claim'); setNote(null);
-    try { const r = await fetch(apiPath('/v1/god/mint'), { method: 'POST', headers: { ...authHeaders(), 'content-type': 'application/json' }, body: JSON.stringify({ label: 'browser' }) }); const d = await r.json(); if (!r.ok) throw new Error(d.message ?? r.status); sessionStorage.setItem('sim.godToken', d.token); await refresh(); }
-    catch (e) { setNote(`Could not claim: ${String((e as Error).message)}`); } finally { setBusy(null); }
-  };
-  const approve = async (code: string) => {
-    setBusy(code); setNote(null);
-    try { const r = await fetch(apiPath('/v1/god/pair/approve'), { method: 'POST', headers: { ...authHeaders(), 'content-type': 'application/json' }, body: JSON.stringify({ code }) }); const d = await r.json(); if (!r.ok) throw new Error(d.message ?? r.status); setNote(`Approved ${code}. Your agent now holds god mode here.`); if (hashCode === code) history.replaceState(null, '', location.pathname + location.search); await refresh(); }
-    catch (e) { setNote(`Could not approve ${code}: ${String((e as Error).message)}`); } finally { setBusy(null); }
-  };
+  const claim = () => run('claim', G.claim, () => 'This world is yours. Pair your agent next.');
+  const approve = (code: string) => run(code, async () => { await G.approve(code); localStorage.setItem(PAIRED_KEY, '1'); setApprovedHere(true); if (hashCode === code) history.replaceState(null, '', location.pathname + location.search); }, () => `Approved ${code}. Your agent now holds god mode here.`);
+  const undoRedo = (which: 'undo' | 'redo') => run(which, () => (which === 'undo' ? G.undo() : G.redo()), (r) => { const x = r as G.UndoResult; return x.accepted ? `${which === 'undo' ? 'Undid' : 'Redid'} edit ${x.reverted}.` : (x.failures?.[0]?.detail ?? `nothing to ${which}`); });
+  const undoGroup = (group: string) => run('g:' + group, () => G.undoGroup(group), (r) => { const x = r as G.UndoResult; return x.accepted ? `Undid group “${group}” (${Array.isArray(x.reverted) ? x.reverted.length : 1} edits).` : (x.failures?.[0]?.detail ?? 'nothing undone'); });
 
-  if (!status) return null;
-  const me = devName();
-  const card: React.CSSProperties = { position: 'absolute', right: 12, top: 64, zIndex: 6, width: open ? 380 : 'auto', maxHeight: 'calc(100% - 140px)', overflow: 'auto', background: 'rgba(255,255,255,.92)', color: '#1a1a1a', borderRadius: 14, boxShadow: '0 6px 24px rgba(0,0,0,.18)', padding: open ? '14px 16px' : '8px 12px', fontSize: 13, lineHeight: 1.45 };
-  const btn: React.CSSProperties = { padding: '6px 10px', borderRadius: 999, border: '1px solid rgba(0,0,0,.2)', background: '#fff', cursor: 'pointer', fontSize: 13 };
-  const primary: React.CSSProperties = { ...btn, background: '#1a1a1a', color: '#fff', border: '1px solid #1a1a1a' };
-  if (!open) return <button data-god-panel-toggle="1" style={{ ...card, cursor: 'pointer' }} onClick={() => setOpen(true)}>✦ {status.you === 'owner' || status.you === 'god' ? 'God mode' : status.hasOwner ? 'This world has a god' : 'Claim this world'}</button>;
-  return (
-    <div data-god-panel="1" style={card}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <b style={{ fontSize: 15 }}>✦ {status.name}</b>
-        <span style={{ color: '#666' }}>{status.entities} things · edit {status.seq}</span>
-        <span style={{ marginLeft: 'auto' }} />
-        <button style={btn} onClick={() => setOpen(false)} title="hide">×</button>
-      </div>
-      {status.you === 'anonymous' && (
-        <p>{status.hasOwner ? 'This world already has a god. Watch, or sign in if it is yours.' : 'This world has no god yet. Sign in to claim it; your agent will build it.'}<br /><button style={primary} onClick={signIn}>Sign in</button></p>
-      )}
-      {status.you === 'claimant' && (
-        <p>Signed in as <b>{me}</b>. Nobody owns this world yet.<br /><button style={primary} disabled={busy === 'claim'} onClick={claim}>Become its god</button></p>
-      )}
-      {status.you === 'visitor' && <p>Signed in as <b>{me}</b>. Another account owns this world; you can watch. <button style={btn} onClick={signIn}>Switch name</button></p>}
-      {(status.you === 'owner' || status.you === 'god') && (
-        <>
-          {hashCode && !status.pending.some((p) => p.code === hashCode) && <p style={{ color: '#a33' }}>Pairing request <code>{hashCode}</code> is not pending (expired, or already approved).</p>}
-          {status.pending.length > 0 && (
-            <div style={{ background: '#fff6d6', border: '1px solid #e8c547', borderRadius: 10, padding: '8px 10px', margin: '8px 0' }}>
-              <b>Pairing requests</b>
-              {status.pending.map((p) => <div key={p.code} style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}><span><code>{p.code}</code> · {p.agent} <span style={{ color: '#777' }}>({Math.round(p.expiresIn / 60)} min left)</span></span><span style={{ marginLeft: 'auto' }} /><button data-approve={p.code} style={primary} disabled={busy === p.code} onClick={() => approve(p.code)}>Approve</button></div>)}
-            </div>
-          )}
-          {status.pending.length === 0 && <p style={{ color: '#555' }}>No pairing request waiting. When your agent runs <code>node eden-god.mjs pair</code>, its code appears here to approve.</p>}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', margin: '6px 0 10px' }}>
-            <button data-flag-button="1" aria-pressed={flagMode} style={{ ...btn, background: flagMode ? '#e8c547' : '#fff' }} onClick={() => onFlagMode(!flagMode)} title="Drop a labelled flag: a reference point your agent can build around (or Alt+click the ground)">⚑ {flagMode ? 'click the ground…' : 'drop a flag'}</button>
-            <a style={{ ...btn, textDecoration: 'none', color: '#1a1a1a' }} href={apiPath('/god/SKILL.md')} target="_blank" rel="noreferrer">SKILL.md</a>
-            <a style={{ ...btn, textDecoration: 'none', color: '#1a1a1a' }} href={apiPath('/god/eden-god.mjs')} download>eden-god.mjs</a>
-            <a style={{ ...btn, textDecoration: 'none', color: '#1a1a1a' }} href={apiPath('/v1/god/welcome')} target="_blank" rel="noreferrer">welcome.md</a>
-          </div>
-          {welcome && <pre style={{ whiteSpace: 'pre-wrap', fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 12, background: '#f4f4f2', borderRadius: 10, padding: 10, margin: 0 }}>{welcome}</pre>}
-        </>
-      )}
-      {note && <p style={{ marginTop: 8, color: note.startsWith('Could not') ? '#a33' : '#2a6' }}>{note}</p>}
+  const checklist: Step[] = useMemo(() => steps({ status, signedIn: !!G.devName() && status?.you !== 'anonymous', edits, flags: flags.length, approvedHere, agentSeen: !!launcher?.seen.agentSeenAt, looks: launcher?.seen.looks ?? 0 }), [status, edits, flags.length, approvedHere, launcher]);
+  const done = checklist.filter((s) => s.done).length;
+  const recent = useMemo(() => (edits ?? []).slice().sort((a, b) => b.seq - a.seq).slice(0, 8), [edits]);
+  const canUndo = (edits ?? []).some((e) => !e.undone && e.kind !== 'undo' && e.ops.length > 0);
+  // one "undo group" per group, on its newest row that undo would still revert
+  const groupRow = useMemo(() => { const m = new Map<string, number>(); for (const e of (edits ?? []).slice().sort((a, b) => b.seq - a.seq)) if (e.grp && !e.undone && e.kind !== 'undo' && !m.has(e.grp)) m.set(e.grp, e.seq); return m; }, [edits]);
+  const firstTab = useRef(false);
+  useEffect(() => { if (!firstTab.current && owner && edits && done === checklist.length) { firstTab.current = true; setTab('edits'); } }, [owner, edits, done, checklist.length]);
+
+  if (shotMode) return null;
+  const ghostBar = ghost && (
+    <div className="gp-ghostbar" data-preview-banner={ghost.id} data-preview-ok={ghost.ok ? '1' : '0'}>
+      {ghost.ok
+        ? <><b>Preview</b> <code>{ghost.id}</code> · <span className="gp-add">+{ghost.added} new</span> · <span className="gp-chg">{ghost.changed} changed</span> · <span className="gp-rem">−{ghost.removed} removed</span>{ghost.tiles ? <> · {ghost.tiles} ground tiles</> : null} — <i>not built</i></>
+        : <><b>Preview</b> <code>{ghost.id}</code>: {ghost.message}{ghost.failures?.[0] ? <> <code>{ghost.failures[0].code}</code> {ghost.failures[0].detail}</> : null}</>}
+      {ghost.ok && ghost.bounds && <button className="gp-btn" onClick={() => { const [x0, z0, x1, z1] = ghost.bounds!; flyTo((x0 + x1) / 2, 0, (z0 + z1) / 2, { distance: Math.max(20, x1 - x0, z1 - z0) * 1.6 }); }}>fly there</button>}
+      <button className="gp-btn" onClick={hideGhost}>hide</button>
     </div>
   );
+  if (!status) return ghostBar || null;
+  const name = launcher?.world.name ?? status.name;
+  const isNew = query.has('new');
+
+  if (!open) return <>{ghostBar}<button data-god-panel-toggle="1" className="gp-card gp-collapsed" onClick={() => setOpen(true)}>✦ {owner ? <>God mode · {done}/{checklist.length}{status.pending.length ? <span className="gp-badge">{status.pending.length}</span> : null}</> : status.hasOwner ? 'This world has a god' : 'Claim this world'}</button></>;
+  return (
+    <>
+      {ghostBar}
+      <div data-god-panel="1" className="gp-card">
+        <div className="gp-head">
+          <b className="gp-title" title={status.worldId}>✦ {name}</b>
+          <span className="gp-dim">{status.entities} things · edit {status.seq}</span>
+          <button className="gp-icon" onClick={() => setOpen(false)} title="Collapse the panel" aria-label="collapse">–</button>
+        </div>
+        {launcher?.world.templateName && <div className="gp-dim gp-sub">from <i>{launcher.world.templateName}</i>{launcher.world.createdAt ? <> · made {ago(launcher.world.createdAt)}</> : null}</div>}
+
+        {status.you === 'anonymous' && (
+          <div className="gp-block">
+            {isNew && !status.hasOwner && <p className="gp-hello">Your new world is ready. Whoever claims it first becomes its god, so sign in and claim it now.</p>}
+            <p>{status.hasOwner ? 'This world already has a god. Watch, or sign in if it is yours.' : 'This world has no god yet. Sign in to claim it; your agent will build it.'}</p>
+            <button className="gp-btn gp-primary" data-signin="1" onClick={signIn}>Sign in</button>
+          </div>
+        )}
+        {status.you === 'claimant' && (
+          <div className="gp-block">
+            <p>Signed in as <b>{G.devName()}</b>. Nobody owns this world yet.</p>
+            <button className="gp-btn gp-primary" data-claim="1" disabled={busy === 'claim'} onClick={claim}>{busy === 'claim' ? 'Claiming…' : 'Become its god'}</button>
+          </div>
+        )}
+        {status.you === 'visitor' && <div className="gp-block"><p>Signed in as <b>{G.devName()}</b>. Another account owns this world; you can watch.</p><button className="gp-btn" onClick={signIn}>Switch name</button></div>}
+
+        {owner && (
+          <>
+            {hashCode && !status.pending.some((p) => p.code === hashCode) && <p className="gp-bad">Pairing request <code>{hashCode}</code> is not pending (expired, or already approved).</p>}
+            {status.pending.length > 0 && (
+              <div className="gp-pairs" data-pairing="1">
+                <b>Your agent asks to be this world's god</b>
+                {status.pending.map((p) => (
+                  <div key={p.code} className="gp-row">
+                    <span><code className="gp-code-big">{p.code}</code> {p.agent} <span className="gp-dim">({Math.max(1, Math.round(p.expiresIn / 60))} min)</span></span>
+                    <button data-approve={p.code} className="gp-btn gp-primary" disabled={busy === p.code} onClick={() => approve(p.code)}>Approve</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="gp-tools">
+              <button className="gp-btn" data-undo="1" disabled={!canUndo || busy === 'undo'} onClick={() => undoRedo('undo')} title="Undo the newest edit">↶ Undo</button>
+              <button className="gp-btn" data-redo="1" disabled={busy === 'redo'} onClick={() => undoRedo('redo')} title="Redo the newest undone edit">↷ Redo</button>
+              <button className={'gp-btn' + (flagMode ? ' gp-armed' : '')} data-flag-button="1" aria-pressed={flagMode} onClick={() => onFlagMode(!flagMode)} title="Drop a labelled flag: a reference point your agent can build around (or Alt+click the ground)">⚑ {flagMode ? 'click the ground…' : 'Drop a flag'}</button>
+            </div>
+            <div className="gp-tabs" role="tablist">
+              {(['start', 'edits', 'flags', 'previews'] as Tab[]).map((t) => (
+                <button key={t} role="tab" aria-selected={tab === t} data-tab={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
+                  {t === 'start' ? <>First steps <span className="gp-count">{done}/{checklist.length}</span></> : t === 'edits' ? <>Edits</> : t === 'flags' ? <>Flags <span className="gp-count">{flags.length}</span></> : <>Previews{previews.length ? <span className="gp-count">{previews.length}</span> : null}</>}
+                </button>
+              ))}
+            </div>
+
+            {tab === 'start' && (
+              <div className="gp-pane">
+                <ol className="gp-steps" data-checklist="1">
+                  {checklist.map((s) => <li key={s.id} data-step={s.id} data-done={s.done ? '1' : '0'} className={s.done ? 'done' : ''}><span className="gp-tick" aria-hidden="true">{s.done ? '✓' : ''}</span><span><b>{s.label}</b>{!s.done && <span className="gp-hint">{s.hint}</span>}</span></li>)}
+                </ol>
+                {welcome ? <Markdown source={welcome} skipFirstHeading /> : <p className="gp-dim">Loading the welcome…</p>}
+                <div className="gp-files">
+                  <a className="gp-btn" href={apiPath('/god/SKILL.md')} target="_blank" rel="noreferrer">SKILL.md</a>
+                  <a className="gp-btn" href={apiPath('/god/eden-god.mjs')} download>eden-god.mjs</a>
+                  <a className="gp-btn" href={apiPath('/v1/god/welcome')} target="_blank" rel="noreferrer">welcome.md</a>
+                </div>
+              </div>
+            )}
+
+            {tab === 'edits' && (
+              <div className="gp-pane" data-edits="1">
+                {!recent.length && <p className="gp-dim">No edits yet. Everything your agent changes appears here, newest first, and can be undone.</p>}
+                <ul className="gp-list">
+                  {recent.map((e) => (
+                    <li key={e.seq} data-edit={e.seq} className={'gp-edit' + (e.undone ? ' undone' : '')}>
+                      <span className="gp-seq">#{e.seq}</span>
+                      <span className="gp-what" title={e.ops.map((o) => o.op + (o.name ? ' ' + o.name : '')).join(', ')}>{describeEdit(e)}</span>
+                      <span className="gp-meta">
+                        {e.grp && <span className="gp-group" title={`group ${e.grp}`}>{e.grp}</span>}
+                        {e.kind === 'edit' && <span className="gp-dim">{e.ops.length} op{e.ops.length === 1 ? '' : 's'}</span>}
+                        {e.undone ? <span className="gp-dim">undone</span> : null}
+                        <span className="gp-dim">{ago(e.at)}</span>
+                        {e.grp && e.grp !== 'genesis' && groupRow.get(e.grp) === e.seq && <button className="gp-mini" data-undo-group={e.grp} disabled={busy === 'g:' + e.grp} onClick={() => undoGroup(e.grp!)} title={`Undo every edit in group ${e.grp}`}>undo group</button>}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {tab === 'flags' && (
+              <div className="gp-pane" data-flags="1">
+                {!flags.length && <p className="gp-dim">No flags yet. Drop one and your agent can say <code>place cottage --at flag:camp</code>.</p>}
+                <ul className="gp-list">
+                  {flags.map((f) => (
+                    <li key={f.id}>
+                      <button className="gp-link" data-fly={f.name} onClick={() => flyTo(f.p[0], f.p[1], f.p[2], { distance: 35 })} title="Fly the camera here">⚑ {f.label}</button>
+                      <code className="gp-dim">flag:{f.name}</code>
+                      <span className="gp-dim gp-when">{Math.round(f.p[0])}, {Math.round(f.p[2])}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {tab === 'previews' && (
+              <div className="gp-pane" data-previews="1">
+                {!previews.length && <p className="gp-dim">When your agent runs <code>preview</code> (a dry run), its proposal appears here; show it as a ghost before it is built.</p>}
+                <ul className="gp-list">
+                  {previews.map((p) => (
+                    <li key={p.id}>
+                      <code>{p.id}</code>
+                      <span className="gp-what">{p.accepted ? summaryText(p.summary) : <span className="gp-bad">would be refused</span>}</span>
+                      <span className="gp-dim gp-when">{ago(p.at)}</span>
+                      {p.accepted && <button className="gp-btn gp-small" data-show-preview={p.id} onClick={() => void showPreview(p.id)}>{ghost?.id === p.id ? 'shown' : 'show'}</button>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </>
+        )}
+        {note && <p className={note.bad ? 'gp-bad' : 'gp-ok'}>{note.text}</p>}
+      </div>
+    </>
+  );
+}
+
+function summaryText(s: Record<string, unknown> | null) {
+  if (!s) return '';
+  const n = (k: string) => (typeof s[k] === 'number' ? (s[k] as number) : 0);
+  const parts = [n('upserts') && `${n('upserts')} things`, n('removes') && `−${n('removes')}`, n('tiles') && `${n('tiles')} tiles`].filter(Boolean);
+  return parts.join(' · ') || 'no change';
 }

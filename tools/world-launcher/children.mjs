@@ -120,7 +120,7 @@ export function defaultCommand(world, port, o) {
     PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR, LANG: process.env.LANG,
     // fake minds and no model keys: $0 model spend, always
     ANTHROPIC_API_KEY: '', TYPESAFE_API_KEY: '', OPENAI_API_KEY: '', BRAIN_MODE: 'fake',
-    WORLD_KEY: world.slug, WORLD_ID: `${world.slug}-1`, ENGINE: 'mars', PORT: String(port), HOST: '127.0.0.1',
+    WORLD_KEY: world.slug, WORLD_ID: `${world.slug}-1`, WORLD_NAME: world.name ?? '', ENGINE: 'mars', PORT: String(port), HOST: '127.0.0.1',
     DEV_AUTH: '1', SEED_NATIVES: '0', DATA_DIR: world.dataDir, PUBLIC_URL: o.publicOrigin, ENABLE_WORLD_ENGINE: '1',
     ...(marsWeb && existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}),
     ...(world.templateFile ? { GENESIS_FILE: world.templateFile } : {}),

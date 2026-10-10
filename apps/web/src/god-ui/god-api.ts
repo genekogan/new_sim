@@ -1,0 +1,101 @@
+// The god panel's view of the server: status, the god token for *this* world,
+// edits, undo/redo, flags, previews. One origin may front many worlds (the
+// launcher), so the token is kept per world and checked against the world id it
+// was minted for.
+import { apiPath, worldKey } from '../world-path.ts';
+import { isFlagDef } from './checklist.ts';
+export { isFlagDef };
+
+export type Pending = { code: string; agent: string; expiresIn: number };
+export type Status = { worldId: string; name: string; hasOwner: boolean; you: 'god' | 'owner' | 'claimant' | 'visitor' | 'anonymous'; pending: Pending[]; entities: number; seq: number; base: string; template?: string | null; agents?: number };
+export type Op = { op: string; def?: string; name?: string; id?: string; [k: string]: unknown };
+export type EditRow = { seq: number; by: string; at: number; note: string | null; grp: string | null; ops: Op[]; undone: number; undo_of: number | null; kind: 'edit' | 'undo' | 'redo' };
+export type FlagRef = { id: string; name: string; label: string; p: [number, number, number] };
+export type PreviewRow = { id: string; accepted: boolean; summary: Record<string, unknown> | null; at: number };
+export type LauncherWorld = { slug: string; name: string; template: string; templateName: string; createdAt: number };
+export type LauncherSeen = { looks: number; lastLookAt: number | null; agentSeenAt: number | null; previews: number };
+
+const TOKEN_KEY = `sim.godToken:${worldKey}`;
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+/** Tokens are `god_<worldId>_<secret>` and world ids are `<slug>-<n>`. */
+export const tokenIsFor = (token: string | null, key = worldKey) => !!token && new RegExp(`^god_${escapeRe(key)}-\\d+_`).test(token);
+
+export const devName = () => (typeof localStorage === 'undefined' ? null : localStorage.getItem('sim.dev'));
+export const authHeaders = (): Record<string, string> => { const n = devName(); return n ? { authorization: `Bearer dev:${n}` } : {}; };
+
+/**
+ * Run once at import (before the world page's own effects read 'sim.godToken'):
+ * a token another world left in this tab is dropped, and this world's remembered
+ * token is offered to the page so it does not mint another.
+ */
+export function adoptStoredToken() {
+  try {
+    const session = sessionStorage.getItem('sim.godToken');
+    if (session && !tokenIsFor(session)) sessionStorage.removeItem('sim.godToken');
+    if (session && tokenIsFor(session) && !localStorage.getItem(TOKEN_KEY)) localStorage.setItem(TOKEN_KEY, session);
+    const kept = localStorage.getItem(TOKEN_KEY);
+    if (kept && tokenIsFor(kept) && !sessionStorage.getItem('sim.godToken')) sessionStorage.setItem('sim.godToken', kept);
+  } catch { /* storage disabled */ }
+}
+if (typeof window !== 'undefined') adoptStoredToken();
+
+export function storedToken(): string | null {
+  try { const t = localStorage.getItem(TOKEN_KEY) ?? sessionStorage.getItem('sim.godToken'); return tokenIsFor(t) ? t : null; } catch { return null; }
+}
+export function keepToken(token: string) { try { localStorage.setItem(TOKEN_KEY, token); sessionStorage.setItem('sim.godToken', token); } catch { /* storage disabled */ } }
+export function forgetToken() { try { localStorage.removeItem(TOKEN_KEY); if (!tokenIsFor(sessionStorage.getItem('sim.godToken'))) return; sessionStorage.removeItem('sim.godToken'); } catch { /* storage disabled */ } }
+
+async function json<T>(r: Response): Promise<T> { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error((d as { message?: string }).message ?? `HTTP ${r.status}`); return d as T; }
+
+export async function getStatus(): Promise<Status | null> {
+  try { const r = await fetch(apiPath('/v1/god/status'), { headers: authHeaders() }); return r.ok ? await r.json() : null; } catch { return null; }
+}
+export async function getWelcome(): Promise<string | null> {
+  try { const r = await fetch(apiPath('/v1/god/welcome'), { headers: authHeaders() }); return r.ok ? await r.text() : null; } catch { return null; }
+}
+/** The owner's browser token for this world: the remembered one, else minted with the owner's identity (claims an unowned world). */
+export async function ensureToken(): Promise<string> {
+  const t = storedToken(); if (t) return t;
+  const d = await json<{ token: string }>(await fetch(apiPath('/v1/god/mint'), { method: 'POST', headers: { ...authHeaders(), 'content-type': 'application/json' }, body: JSON.stringify({ label: 'browser' }) }));
+  keepToken(d.token); return d.token;
+}
+/** A god call with this world's token; a refused token is forgotten and re-minted once. */
+export async function god<T>(path: string, init: RequestInit = {}): Promise<T> {
+  for (let attempt = 0; ; attempt++) {
+    const token = await ensureToken();
+    const r = await fetch(apiPath(path), { ...init, headers: { 'content-type': 'application/json', ...(init.headers ?? {}), authorization: `Bearer ${token}` } });
+    if (r.status === 401 && attempt === 0) { forgetToken(); continue; }
+    return json<T>(r);
+  }
+}
+export const claim = () => ensureToken();
+export const approve = async (code: string) => json(await fetch(apiPath('/v1/god/pair/approve'), { method: 'POST', headers: { ...authHeaders(), 'content-type': 'application/json' }, body: JSON.stringify({ code }) }));
+export const edits = (limit = 30) => god<{ edits: EditRow[] }>(`/v1/god/edits?limit=${limit}`).then((d) => d.edits);
+export type UndoResult = { accepted: boolean; reverted?: number | number[]; failures?: { code: string; detail: string }[] };
+export const undo = () => god<UndoResult>('/v1/god/undo', { method: 'POST' });
+export const redo = () => god<UndoResult>('/v1/god/redo', { method: 'POST' });
+export const undoGroup = (group: string) => god<UndoResult>(`/v1/god/undo?group=${encodeURIComponent(group)}`, { method: 'POST' });
+
+/** Flags from the public snapshot (positions resolved for the camera). */
+export async function flags(): Promise<FlagRef[]> {
+  const r = await fetch(apiPath('/v1/world/snapshot')); if (!r.ok) return [];
+  const s = await r.json() as { entities: { id: string; name?: string; def: string; p?: number[]; state?: { label?: string }; in: { parent: string } }[] };
+  return s.entities.filter((e) => isFlagDef(e.def) && e.in.parent === 'world' && Array.isArray(e.p)).map((e) => {
+    const p = e.p!; const xyz: [number, number, number] = p.length === 3 ? [p[0], p[1], p[2]] : [p[0], 0, p[1]];
+    return { id: e.id, name: e.name ?? e.id, label: e.state?.label ?? e.name ?? e.id, p: xyz };
+  });
+}
+
+// ---- the launcher (only when this page is served by tools/world-launcher)
+export async function launcherWorld(): Promise<{ world: LauncherWorld; seen: LauncherSeen } | null> {
+  try { const r = await fetch(`/__sim/worlds/${worldKey}`); return r.ok ? await r.json() : null; } catch { return null; }
+}
+/** Recent previews the god asked for: the server's own list when it has one, else what the launcher saw. */
+export async function previews(): Promise<PreviewRow[]> {
+  try { return (await god<{ previews: PreviewRow[] }>('/v1/god/previews')).previews; } catch { /* not on this server yet */ }
+  try {
+    const token = await ensureToken();
+    const r = await fetch(`/__sim/worlds/${worldKey}/previews`, { headers: { authorization: `Bearer ${token}` } });
+    return r.ok ? (await r.json()).previews : [];
+  } catch { return []; }
+}
