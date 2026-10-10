@@ -842,6 +842,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const onUp = (e: PointerEvent) => {
       if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) { down = null; return; }
       down = null;
+      if (e.altKey || flagModeRef.current) return;  // a flag drop (onFlagClick), not a selection: no place card over the god panel
       const target=hover.pick(e.clientX,e.clientY);if(target)inspectHover(target);else{setPlaceCard(null);context.current.setThing(null);}
 
     };
