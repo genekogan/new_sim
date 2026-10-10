@@ -234,7 +234,10 @@ function edenDistrict() {
         place('core/footpath@1', 'commons-path', { shape: { path: [[-30, 2], [0, 6], [20, 10], [27, street]], width: 2 }, params: { width: 2, material: 'gravel' } }),
       ] },
       { note: 'the lamp-lit housing street', group: 'street', ops: [
-        place('core/street@1', 'eden-housing', { shape: { path: [[26, street], [88, street]], width: 5 }, params: { width: 5 } }),
+        // x 20 → 66 (source: 26 → 88): the commons path joins it mid-length (a path that ends at a street's endpoint
+        // draws a stray asphalt band toward the path), and it ends at the plaza's edge instead of running under the
+        // plaza and out its far side (district lane, 2026-10-10)
+        place('core/street@1', 'eden-housing', { shape: { path: [[20, street], [66, street]], width: 5 }, params: { width: 5 } }),
         ...[30, 42, 54, 64].map((x, i) => place('core/lamp-post@1', `street-lamp-${i + 1}`, { p: [x, street - 3.3] })),
         ...[36, 48, 60].map((x, i) => place('core/lamp-post@1', `street-lamp-${i + 5}`, { p: [x, street + 3.3] })),
       ] },
