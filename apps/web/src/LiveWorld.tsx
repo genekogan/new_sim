@@ -266,7 +266,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const shotMode=new URLSearchParams(location.search).has('shot');
     if(shotMode){const c=renderer.domElement;Object.assign(c.style,{position:'fixed',inset:'0',width:'100vw',height:'100vh',zIndex:'2147483000'});document.title='loading';}
     void entityLayer.start(abort.signal).then(()=>{frameEntityWorld();setEntityWorld(entityLayer.active);if(shotMode)setTimeout(()=>{document.title=entityLayer.active?'ready':'no-entity-world';(window as unknown as {__shotReady?:boolean}).__shotReady=true;},Math.max(2500,Number(new URLSearchParams(location.search).get('settle')??'3000')));});
-    const ghost=new WorldPreviewGhost(apiPath);scene.add(ghost.group);(window as unknown as {__simGhost?:unknown}).__simGhost=ghost;  // ?preview=<id> ghosts (GodPanel drives it)
+    const gw=window as unknown as {__simGhost?:WorldPreviewGhost};const ghost=gw.__simGhost??(gw.__simGhost=new WorldPreviewGhost(apiPath));scene.add(ghost.group);  // ?preview=<id> ghosts (GodPanel drives it; one ghost per page, whoever makes it first)
     // Alt+click on the ground drops a labelled flag (a core/flag entity) the god can refer to as flag:<label>.
     // Owner authority: a god token minted with the page's dev identity (Privy owners: the Game lane wires getToken later).
     let godToken:string|null=sessionStorage.getItem('sim.godToken');if(godToken&&!new RegExp('^god_'+worldKey.replace(/[-]/g,'\\-')+'-\\d+_').test(godToken))godToken=null;  // one origin may front many worlds (launcher)

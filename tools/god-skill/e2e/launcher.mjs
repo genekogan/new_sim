@@ -246,8 +246,12 @@ try {
     const lookPage = await ctx.newPage();
     await lookPage.goto(`${base}/?dev=1&shot=1&eye=-60,40,60&at=-20,0,-10`, { waitUntil: 'domcontentloaded', timeout: PAGE_MS });
     await lookPage.close();
-    await page.locator('[data-tab="start"]').click();
-    await page.locator('[data-step="look"][data-done="1"]').waitFor({ timeout: 30_000 });
+    // the look is the last step: when it ticks, the panel moves itself once to the Edits tab (GodPanel), so keep reopening Start
+    for (const t0 = Date.now(); ; await sleep(1000)) {
+      await page.locator('[data-tab="start"]').click();
+      if (await page.locator('[data-step="look"][data-done="1"]').count()) break;
+      if (Date.now() - t0 > 30_000) throw new Error('the look step did not tick within 30 s');
+    }
     const ticks = await page.locator('[data-step]').evaluateAll((els) => els.map((e) => e.getAttribute('data-done')).join(''));
     await shot('12-all-steps');
     await page.goto(origin + '/', { waitUntil: 'domcontentloaded', timeout: PAGE_MS });
