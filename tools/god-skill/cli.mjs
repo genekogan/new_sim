@@ -253,6 +253,11 @@ async function commitItems(v, def, info, flags, params, items, notes, { op = 'pl
   if (!items.length) throw new Error('the solver found no placement');
   for (const it of items) for (const c of it.candidates) if (c.shape && PREPARED.has(info.gen)) { const pr = await prepareShape(def, info, c.shape, params); c.shape = pr.shape; c.params = pr.params; }
   const taken = new Set();
+  if (op === 'place' && flags.name && items.length === 1) {
+    const parentId = items[0].candidates[0]?.in ? v.get(items[0].candidates[0].in.parent)?.id ?? items[0].candidates[0].in.parent : 'world';
+    const clash = v.rows.find((r) => r.parent === parentId && r.name === flags.name);
+    if (clash) throw new Error(`REFUSED: name.taken: "${flags.name}" is already ${clash.path} [${clash.def.replace(/^core-/, 'core/')}]. Pick another --name, or move/remove that one.`);
+  }
   const stem = flags.name ?? def.replace(/^core\//, '').replace(/@\d+$/, '').replace(/^core-/, '');
   const state = flags.state ? JSON.parse(flags.state) : undefined;
   const choice = items.map(() => 0), fixes = items.map(() => []);

@@ -37,18 +37,21 @@ var need = (s, k, hint) => {
   return s[k];
 };
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-async function call(path, { body, method, as = "god", timeoutMs = 6e4 } = {}) {
+async function call(path, { body, method, as = "god", timeoutMs = Number(process.env.EDEN_GOD_TIMEOUT_MS ?? 18e4) } = {}) {
   const s = load(), url = need(s, "world", "Run: node eden-god.mjs register <world-url>") + path, headers = { "content-type": "application/json" };
   if (as === "god" && s.token) headers.authorization = `Bearer ${s.token}`;
   if (as === "owner" && s.identity) headers.authorization = `Bearer ${s.identity}`;
+  const t0 = Date.now();
   let r;
   try {
     r = await fetch(url, { method: method ?? (body ? "POST" : "GET"), headers, body: body ? JSON.stringify(body) : void 0, signal: AbortSignal.timeout(timeoutMs) });
   } catch (e) {
-    return { status: 0, data: { ok: false, code: "unreachable", message: String(e.message) } };
+    const slow = /timeout|abort/i.test(String(e.message));
+    return { status: 0, data: { ok: false, code: slow ? "slow" : "unreachable", message: slow ? `the world did not answer within ${Math.round(timeoutMs / 1e3)} s (a busy server). An edit may still have landed: run \`history 3\` before you retry.` : String(e.message) } };
   }
   const text = await r.text();
   let data;
+  if (process.env.EDEN_GOD_TRACE) console.error(`[trace] ${method ?? (body ? "POST" : "GET")} ${path} ${r.status} ${Date.now() - t0} ms ${body ? JSON.stringify(body).slice(0, 160) : ""}`);
   try {
     data = JSON.parse(text);
   } catch {
@@ -333,7 +336,15 @@ function solve(v, thing, rel) {
   };
   if (thing.form === "path" && (rel.from || rel.between)) {
     const [a, b] = rel.between ?? [rel.from, rel.to];
-    const A = refPoint(v, a), B = refPoint(v, b);
+    let A = refPoint(v, a), B = refPoint(v, b);
+    const toEdge = (P, Q) => {
+      if (P.kind !== "region") return P;
+      const d = norm(COMPASS[P.word]), h = v.extent / 2 - 2;
+      const k = Math.min(...[0, 1].map((i) => Math.abs(d[i]) < 1e-9 ? Infinity : (Math.sign(d[i]) * h - (i ? Q.z : Q.x)) / d[i]));
+      return { x: r22(Q.x + d[0] * k), z: r22(Q.z + d[1] * k), kind: "point", ref: `the ${P.word} edge` };
+    };
+    if (A.kind === "region" && B.kind !== "region") A = toEdge(A, B);
+    else if (B.kind === "region") B = toEdge(B, A.kind === "region" ? { x: 0, z: 0 } : A);
     const edge = (P, Q) => {
       if (P.kind !== "entity" || P.row.form !== "point") return [P.x, P.z];
       const u = norm([Q.x - P.x, Q.z - P.z]);
@@ -1312,6 +1323,11 @@ async function commitItems(v, def, info, flags2, params, items, notes, { op = "p
     c.params = pr.params;
   }
   const taken = /* @__PURE__ */ new Set();
+  if (op === "place" && flags2.name && items.length === 1) {
+    const parentId = items[0].candidates[0]?.in ? v.get(items[0].candidates[0].in.parent)?.id ?? items[0].candidates[0].in.parent : "world";
+    const clash = v.rows.find((r3) => r3.parent === parentId && r3.name === flags2.name);
+    if (clash) throw new Error(`REFUSED: name.taken: "${flags2.name}" is already ${clash.path} [${clash.def.replace(/^core-/, "core/")}]. Pick another --name, or move/remove that one.`);
+  }
   const stem = flags2.name ?? def.replace(/^core\//, "").replace(/@\d+$/, "").replace(/^core-/, "");
   const state = flags2.state ? JSON.parse(flags2.state) : void 0;
   const choice = items.map(() => 0), fixes = items.map(() => []);

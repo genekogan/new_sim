@@ -144,7 +144,10 @@ export function solve(v, thing, rel) {
   // ---- path/area forms: from/to/via, between → a shape, not a pose
   if (thing.form === 'path' && (rel.from || rel.between)) {
     const [a, b] = rel.between ?? [rel.from, rel.to];
-    const A = refPoint(v, a), B = refPoint(v, b);
+    let A = refPoint(v, a), B = refPoint(v, b);
+    // a compass word as a path end means the world's edge that way, straight from the other end ("a river to the south edge")
+    const toEdge = (P, Q) => { if (P.kind !== 'region') return P; const d = norm(COMPASS[P.word]), h = v.extent / 2 - 2; const k = Math.min(...[0, 1].map((i) => (Math.abs(d[i]) < 1e-9 ? Infinity : ((Math.sign(d[i]) * h) - (i ? Q.z : Q.x)) / d[i]))); return { x: r2(Q.x + d[0] * k), z: r2(Q.z + d[1] * k), kind: 'point', ref: `the ${P.word} edge` }; };
+    if (A.kind === 'region' && B.kind !== 'region') A = toEdge(A, B); else if (B.kind === 'region') B = toEdge(B, A.kind === 'region' ? { x: 0, z: 0 } : A);
     // start and end at the edges of entity refs, not their centres (a road from the plaza to the bridge)
     const edge = (P, Q) => { if (P.kind !== 'entity' || P.row.form !== 'point') return [P.x, P.z]; const u = norm([Q.x - P.x, Q.z - P.z]); const e = extentAlong(boxOf(P.row), u) + 1; return [r2(P.x + u[0] * e), r2(P.z + u[1] * e)]; };
     const via = rel.via ? [].concat(rel.via).map((x) => { const p = refPoint(v, x); return [p.x, p.z]; }) : [];

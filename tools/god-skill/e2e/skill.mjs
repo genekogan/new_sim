@@ -103,6 +103,12 @@ try {
   check('plan describes a batch without building it', /would be accepted/.test(g(`plan '${JSON.stringify({ ops: [{ op: 'place', def: 'core/rock@1', p: [-90, -90] }] })}'`).out));
   check('preview gives a ghost URL', /preview=pv_/.test(g(`preview '${JSON.stringify({ ops: [{ op: 'place', def: 'core/rock@1', p: [-90, -90] }] })}'`).out));
   check('defs search', /core\/bench@1/.test(g('defs bench').out));
+  check('defs ranks whole words and synonyms (house → a building, not the warehouse rack)', ((o) => /core\/(cottage|townhouse)@1/.test(o.split('\n').slice(0, 4).join('\n')) && !/pallet-rack/.test(o))(g('defs houses').out), g('defs houses').out.slice(0, 300));
+  check('place <unknown> names what the library has', /the library has: .*core\/lamp-post@1/.test(g('place street-light --at 5,5 --dry').out));
+  r = g('place bench --at 40,40 --name home');
+  check('a taken name is refused before the server sees it', !r.ok && /name\.taken/.test(r.out), r.out);
+  r = g('place stream --from 0,100 --to s --width 2 --name runoff --dry');
+  check('a compass word as a path end reaches the world edge', /"path":\[\[0,100\],\[0,(4\d\d|\d{4})(\.\d+)?\]\]/.test(r.out), r.out.slice(0, 400));
   check('define-kit (search first, then define)', /defined birdbath@1/.test(g(`define-kit '${JSON.stringify({ name: 'birdbath', tags: ['garden'], shapes: [{ kind: 'cyl', at: [0, 0, 0], r: 0.18, h: 0.8, material: 'stone' }, { kind: 'cyl', at: [0, 0.8, 0], r: 0.5, h: 0.12, material: 'stone' }] })}'`).out) && g('place birdbath@1 --near home --dir e').ok);
   // export → import into a second world
   const n0 = j('select --all --json').length;

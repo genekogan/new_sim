@@ -144,6 +144,7 @@ place lake --circle -260,0,80 --name west-lake                            # cx,c
 place plaza --rect 0,0,30,24 --name square                                # cx,cz,w,d
 place road --from square --to bridge [--via 40,60] --width 6 --name main-road   # from/to refs' edges
 place river --path '[[-260,60],[-120,180],[0,480]]' --width 10
+place river --from west-lake --to s --width 10 --name river             # a compass word as an end = the world's edge that way
 ```
 Roads grade the ground under them (≤ 8 %, `maxGrade`) and **bridge water by themselves**
 (`autoBridge`); rivers flow from the first point to the last, snap their ends into lakes and ponds
@@ -213,7 +214,8 @@ Refusals come back as `REFUSED: <code> (op k): <detail> [hint]`. Read the hint; 
 | `slot.unknown` · `slot.full` · `slot.incompatible` | `describe <parent>` for its slots and rooms; choose another |
 | `def.unknown` | `defs <word>`; refs look like `core/bench@1` |
 | `params.invalid` · `state.invalid` | `defs <name>` shows params with ranges |
-| `name.taken` | names are unique per parent; pick another `--name` |
+| `name.taken` | names are unique per parent (refs are names): pick another `--name`, or `remove`/`move` the old one |
+| `slow` | the server was busy; the edit may have landed: `history 3`, then retry only if it is not there |
 | `architecture.unreachable` · `architecture.headroom` | the building's plan has a sealed room / too-low floor; change params (`floors`, `floorHeight`, `plan`) |
 | `occupied.by-body` · `held.by-body` | a Soul is using it; wait or build elsewhere |
 | `undo.conflict` | something later depends on it; undo that first, or fix by hand |
