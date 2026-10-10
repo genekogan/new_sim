@@ -2,7 +2,7 @@
 // terrain. Pure data + lookups; no I/O. The server persists it; the god skill
 // mirrors it from snapshot + stream.
 import { Terrain, emptyGround, type Ground, type Landform, type Water } from '@sim/ground';
-import { GENERATORS, type Baked, type LocalOBB } from './generators.ts';
+import { GENERATORS, type Baked, type LocalOBB } from '@sim/generators';
 import { hashOf } from './hash.ts';
 import { defSchema, type Def, type DefInput, type Entity, type StoredDef, type Value, type WorldConstants, type WorldState, worldConstantsSchema, worldStateSchema } from './schemas.ts';
 
@@ -73,7 +73,7 @@ export class WorldModel {
     if (m.kind === 'gen') {
       const g = GENERATORS[m.gen];
       if (!g) throw new Error(`generator ${m.gen} unknown`);
-      baked = g.bake({ params, seed, shape: shape as never });
+      baked = g.physics({ params: { ...defaultsOf(g.params), ...params }, args: (m.args ?? {}) as Record<string, unknown>, seed, shape: shape as never });
     } else if (m.kind === 'mesh') {
       const info = this.assets(m.asset);
       const box = info?.box ?? def.size.box;
@@ -254,4 +254,11 @@ export function obbOverlap(a: OBB, b: OBB): boolean {
     if (a1 <= b0 + 1e-6 || b1 <= a0 + 1e-6) return false;
   }
   return true;
+}
+
+/** Generator param defaults (a def's own params already merged into the instance by the compiler). */
+function defaultsOf(fields: Record<string, { default?: unknown }>): Record<string, Value> {
+  const out: Record<string, Value> = {};
+  for (const [k, f] of Object.entries(fields)) if (f.default !== undefined) out[k] = f.default as Value;
+  return out;
 }

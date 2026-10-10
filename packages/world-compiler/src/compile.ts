@@ -2,7 +2,7 @@
 // committed change with its inverse (spec §5). Two phases: `plan` simulates on
 // a scratch copy and never touches the model; `commit` applies a plan. The god
 // skill runs `plan` locally (dry runs); the server runs both.
-import { footprintOf, padFor, settle, SKIRT_MAX_M as SKIRT_MAX, type Landform } from '@sim/ground';
+import { footprintOf, padFor, settle, waterLevelAt, SKIRT_MAX_M as SKIRT_MAX, type Landform } from '@sim/ground';
 import { hashOf } from './hash.ts';
 import { WorldModel, obbOverlap, type OBB } from './model.ts';
 import { batchSchema, trustedBatchSchema, type Batch, type Entity, type Failure, type Field, type Op, type Result, type StoredDef, type Value, worldStateSchema } from './schemas.ts';
@@ -78,7 +78,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         if (def.form !== 'point' && !op.shape) { failures.push(fail(i, 'params.invalid', `${def.form} form needs a shape`)); return; }
         if (scratch.entities.size >= scratch.constants.limits.entities) { failures.push(fail(i, 'entity.limit', `${scratch.constants.limits.entities} entities`)); return; }
         const id = scratch.nextId();
-        const e: Entity = { id, def: def.ref, in: { parent: parentId, ...(op.in.slot ? { slot: op.in.slot } : {}) }, by, born: tick, v: 1, ...(op.name ? { name: op.name } : {}), ...(op.p ? { p: op.p } : {}), ...(op.r !== undefined ? { r: op.r } : {}), ...(op.s !== undefined ? { s: op.s } : {}), ...(op.shape ? { shape: op.shape } : {}), ...(op.anchor ? { anchor: op.anchor } : {}), ...(Object.keys(fieldsOk.values).length ? { params: fieldsOk.values } : {}), ...(Object.keys(stateOk.values).length ? { state: stateOk.values } : {}), ...(op.seed !== undefined ? { seed: op.seed } : {}) };
+        const e: Entity = { id, def: def.ref, in: { parent: parentId, ...(op.in.slot ? { slot: op.in.slot } : {}) }, by, born: tick, v: 1, ...(op.name ? { name: op.name } : {}), ...(op.p ? { p: op.p } : {}), ...(op.r !== undefined ? { r: op.r } : {}), ...(op.s !== undefined ? { s: op.s } : {}), ...(op.shape ? { shape: op.shape } : {}), ...(op.anchor ? { anchor: op.anchor } : {}), ...(Object.keys(fieldsOk.values).length ? { params: fieldsOk.values } : {}), ...(Object.keys(stateOk.values).length ? { state: stateOk.values } : {}), ...(op.seed !== undefined ? { seed: op.seed } : {}), ...(op.constraints?.length ? { constraints: op.constraints } : {}) };
         const problem = admit(scratch, e, def, i, op.mode, true);
         if (problem) { failures.push(problem); return; }
         scratch.insert(e); indexAndGround(scratch, e, def, diff);
@@ -114,6 +114,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         const next: Entity = { ...prev, v: prev.v + 1 };
         if (op.in) { const pid = resolveId(op.in.parent, i); if (!pid) return; if (scratch.subtree(id).includes(pid)) { failures.push(fail(i, 'parent.unknown', 'cannot move a thing into itself')); return; } next.in = { parent: pid, ...(op.in.slot ? { slot: op.in.slot } : {}) }; }
         if (op.p) next.p = op.p; if (op.r !== undefined) next.r = op.r; if (op.s !== undefined) next.s = op.s; if (op.shape) next.shape = op.shape;
+        if (op.constraints) next.constraints = op.constraints;
         scratch.delete(id); clearGround(scratch, prev, diff);
         const problem = admit(scratch, next, def, i, op.mode, false);
         if (problem) { failures.push(problem); return; }
@@ -138,15 +139,51 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
           inv.params = Object.fromEntries(Object.keys(op.params).map((k) => [k, prev.params?.[k] ?? (def.params[k]?.default as Value) ?? null]));
           next.params = { ...prev.params, ...ok.values };
         }
+        if (op.constraints !== undefined) { inv.constraints = prev.constraints ?? []; next.constraints = op.constraints; }
         if (op.name !== undefined) {
           if (scratch.names.has(`${prev.in.parent}/${op.name}`)) { failures.push(fail(i, 'name.taken', op.name)); return; }
           inv.name = prev.name; next.name = op.name;
         }
         scratch.delete(id); clearGround(scratch, prev, diff);
-        if (op.params) { const problem = admit(scratch, next, def, i, 'strict', false); if (problem) { failures.push(problem); return; } }
+        if (op.params || op.constraints) { const problem = admit(scratch, next, def, i, 'strict', false); if (problem) { failures.push(problem); return; } }
         scratch.insert(next); indexAndGround(scratch, next, def, diff);
         upsert(next);
         inverse.unshift(inv);
+        return;
+      }
+      case 'clone': {
+        const srcId = resolveId(op.id, i); if (!srcId || srcId === 'world') return;
+        const src = scratch.entities.get(srcId)!;
+        const parentId = op.in ? resolveId(op.in.parent, i) : src.in.parent; if (!parentId) return;
+        const base = op.p ?? (src.p ? [src.p[0], src.p[src.p.length - 1]] as [number, number] : [0, 0] as [number, number]);
+        const step = op.step ?? (op.count > 1 ? [Math.max(2, scratch.bake(scratch.resolvedDef(src.def)!, src.params ?? {}, src.seed ?? 0, src.shape).box[0] * 1.5), 0] as [number, number] : [0, 0] as [number, number]);
+        const subtree = scratch.subtree(srcId).map((id) => scratch.entities.get(id)!);
+        for (let k = 0; k < op.count; k++) {
+          const map = new Map<string, string>();
+          for (const orig of subtree) map.set(orig.id, scratch.nextId());
+          let rootName = op.name ? (op.count > 1 ? `${op.name}-${k + 1}` : op.name) : src.name ? uniqueName(scratch, parentId, src.name) : undefined;
+          if (rootName && scratch.names.has(`${parentId}/${rootName}`)) rootName = uniqueName(scratch, parentId, rootName);
+          for (const orig of subtree) {
+            const isRoot = orig.id === srcId;
+            const copy: Entity = { ...structuredClone(orig), id: map.get(orig.id)!, by, born: tick, v: 1, in: isRoot ? { parent: parentId, ...(op.in?.slot ? { slot: op.in.slot } : {}) } : { ...orig.in, parent: map.get(orig.in.parent) ?? orig.in.parent } };
+            if (isRoot) {
+              if (rootName) copy.name = rootName; else delete copy.name;
+              const x = base[0] + step[0] * (op.p || op.count > 1 ? k : k + 1), z = base[base.length - 1] + step[1] * (op.p || op.count > 1 ? k : k + 1);
+              copy.p = base.length === 3 && op.p ? [x, base[1], z] : [x, z];
+              if (op.r !== undefined) copy.r = op.r;
+              if (copy.shape) copy.shape = shiftShape(copy.shape, x - (src.p?.[0] ?? 0), z - (src.p?.[src.p.length - 1] ?? 0));
+              if (copy.seed !== undefined) copy.seed = (copy.seed + k + 1) | 0;
+              const cdef = scratch.resolvedDef(copy.def)!;
+              const problem = admit(scratch, copy, cdef, i, op.mode, true);
+              if (problem) { failures.push(problem); return; }
+            }
+            scratch.insert(copy); indexAndGround(scratch, copy, scratch.resolvedDef(copy.def)!, diff); upsert(copy);
+          }
+          const rootCopy = map.get(srcId)!;
+          if (op.tmp) ids[op.count > 1 ? `${op.tmp}${k + 1}` : op.tmp] = rootCopy;
+          ids[rootCopy] = rootCopy;
+          inverse.unshift({ op: 'remove', id: rootCopy, cascade: true });
+        }
         return;
       }
       case 'world': {
@@ -271,10 +308,17 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
     const p = e.p ?? [0, 0];
     const half = w.constants.extent / 2;
     if (Math.abs(p[0]) > half || Math.abs(p[p.length - 1]) > half) return fail(i, 'extent.outside', `(${p[0]}, ${p[p.length - 1]}) is outside ±${half} m`);
-    if (p.length === 2 && def.layer !== 'volume' && !baked.landform) {
+    const floatC = e.constraints?.find((c) => c.kind === 'float') as { kind: 'float'; sink: number } | undefined;
+    const anchorKind = floatC ? 'float' : (e.anchor ?? def.anchor);
+    if (anchorKind === 'float') {
+      const x = p[0], z = p[p.length - 1];
+      const level = waterLevelAt(w.ground(), x, z);
+      if (level === null) return fail(i, 'float.no-water', `no water at (${x.toFixed(1)}, ${z.toFixed(1)}); place it on a lake, pond, river or the sea`);
+      e.p = [x, level - (floatC?.sink ?? 0), z];
+    } else if (p.length === 2 && def.layer !== 'volume' && !baked.landform) {
       const yaw = typeof e.r === 'number' ? e.r : Array.isArray(e.r) ? e.r[0] : 0;
       const fp = footprintOf(p[0], p[1], (baked.box[0] * s) / 2, (baked.box[2] * s) / 2, yaw);
-      const anchor = e.anchor ?? def.anchor;
+      const anchor = anchorKind as Exclude<typeof anchorKind, 'float'>;
       const st = settle(w.terrain, fp, anchor, { maxTiltRad: def.tilt ? (def.tilt.maxDeg * Math.PI) / 180 : 0 });
       e.p = [p[0], st.y, p[1]];
       if (anchor === 'conform' && st.pitch !== undefined) e.r = [yaw, st.pitch, st.roll ?? 0];
@@ -288,6 +332,16 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
       const st = settle(w.terrain, fp, 'base');
       if (st.needsPad || Math.abs(st.y - p[1]) > SKIRT_MAX) (e as Entity & { _pad?: Landform })._pad = padFor(`${e.id}:pad`, fp, p[1]);
     }
+  }
+  // facing: turn the entity's front (+z) toward the ref
+  const facing = e.constraints?.find((c) => c.kind === 'facing') as { kind: 'facing'; ref: string; offset: number } | undefined;
+  if (facing) {
+    const ref = w.get(facing.ref);
+    if (!ref) return fail(i, 'constraint.unsatisfied', `facing: no such ref ${facing.ref}`);
+    const me = w.worldPose(e), them = w.worldPose(ref);
+    const parentYaw = e.in.parent === 'world' ? 0 : w.worldPose(w.entities.get(e.in.parent)!).yaw;
+    const yaw = Math.atan2(them.x - me.x, them.z - me.z) - parentYaw + facing.offset;
+    e.r = Array.isArray(e.r) ? [yaw, e.r[1], e.r[2]] : yaw;
   }
   // overlap (solids only; ancestors, descendants and declared overlaps are exempt)
   if (def.layer === 'solid' && baked.colliders.length) {
@@ -339,6 +393,7 @@ function indexAndGround(w: WorldModel, e: Entity, def: StoredDef, diff: Diff) {
     for (const c of changed) for (const t of w.terrain.invalidate(c)) diff.tiles.push(t);
   }
   if (baked.water && e.shape && 'area' in e.shape) w.setWater({ id: e.id, area: e.shape.area, level: baked.water.level }, e.id);
+  else if (baked.water && e.shape && 'path' in e.shape) w.setWater({ id: e.id, path: e.shape.path, w: baked.water.width ?? e.shape.width ?? 4, level: baked.water.level }, e.id);
   const pad = (e as Entity & { _pad?: Landform })._pad;
   if (pad) { delete (e as Entity & { _pad?: Landform })._pad; for (const c of w.setLandform(pad, pad.id)) for (const t of w.terrain.invalidate(c)) diff.tiles.push(t); }
 }
@@ -356,19 +411,57 @@ function placeLandform(lf: NonNullable<ReturnType<WorldModel['bake']>['landform'
 function expandParts(w: WorldModel, root: Entity, def: StoredDef, by: string, tick: number, diff: Diff, inverse: Op[], upsert: (e: Entity) => void, depth = 1) {
   if (def.make.kind !== 'parts') return;
   const local: Record<string, string> = {};
+  const rp = root.params ?? {};
   for (const part of def.make.parts) {
+    if (part.when !== undefined && !truthy(evaluate(part.when, rp))) continue;
     const pdef = w.resolvedDef(part.def); if (!pdef) continue;
-    const params = Object.fromEntries(Object.entries(part.params ?? {}).map(([k, v]) => [k, substitute(v, root.params ?? {})]));
-    const state = Object.fromEntries(Object.entries(part.state ?? {}).map(([k, v]) => [k, substitute(v, root.params ?? {})]));
-    const parentId = part.in ? local[part.in] ?? root.id : root.id;
-    const e: Entity = { id: w.nextId(), name: part.id, def: pdef.ref, in: { parent: parentId, ...(part.slot ? { slot: part.slot } : {}) }, by, born: tick, v: 1, ...(part.p ? { p: part.p } : {}), ...(part.r !== undefined ? { r: part.r } : {}), ...(part.s !== undefined ? { s: part.s } : {}), ...(Object.keys(params).length ? { params } : {}), ...(Object.keys(state).length ? { state } : {}) };
-    w.insert(e); indexAndGround(w, e, pdef, diff); upsert(e); local[part.id] = e.id;
-    if (pdef.make.kind === 'parts' && depth < 4) expandParts(w, e, pdef, by, tick, diff, inverse, upsert, depth + 1);
+    const count = part.repeat ? Math.max(0, Math.min(64, Math.round(Number(typeof part.repeat.count === 'number' ? part.repeat.count : evaluate(part.repeat.count, rp)) || 0))) : 1;
+    for (let k = 0; k < count; k++) {
+      const params = Object.fromEntries(Object.entries(part.params ?? {}).map(([key, v]) => [key, substitute(v, rp)]));
+      const state = Object.fromEntries(Object.entries(part.state ?? {}).map(([key, v]) => [key, substitute(v, rp)]));
+      const parentId = part.in ? local[part.in] ?? root.id : root.id;
+      const p0 = part.p?.map((v) => (typeof v === 'number' ? v : Number(substitute(v as never, rp)))) as Entity['p'] | undefined;
+      const step = part.repeat?.step ?? [0, 0];
+      const p = p0 ? (p0.length === 3 ? [p0[0] + step[0] * k, p0[1], p0[2] + step[1] * k] : [p0[0] + step[0] * k, p0[1] + step[1] * k]) as Entity['p'] : (k ? [step[0] * k, step[1] * k] as Entity['p'] : undefined);
+      const yaw = (typeof part.r === 'number' ? part.r : 0) + (part.repeat?.yaw ?? 0) * k;
+      const name = count > 1 ? `${part.id}-${k + 1}` : part.id;
+      const e: Entity = { id: w.nextId(), name, def: pdef.ref, in: { parent: parentId, ...(part.slot ? { slot: part.slot } : {}) }, by, born: tick, v: 1, ...(p ? { p } : {}), ...(part.r !== undefined || part.repeat?.yaw ? { r: Array.isArray(part.r) ? part.r : yaw } : {}), ...(part.s !== undefined ? { s: part.s } : {}), ...(Object.keys(params).length ? { params } : {}), ...(Object.keys(state).length ? { state } : {}) };
+      w.insert(e); indexAndGround(w, e, pdef, diff); upsert(e);
+      if (k === 0) local[part.id] = e.id;
+      if (pdef.make.kind === 'parts' && depth < 4) expandParts(w, e, pdef, by, tick, diff, inverse, upsert, depth + 1);
+    }
   }
+}
+/** Tiny expression evaluator for prefab `when`/`repeat`: "$x", "!$x", "$x > 2", "$x * 2", "$x == cottage". */
+function evaluate(expr: string, params: Record<string, Value>): Value {
+  const t = expr.trim();
+  if (t.startsWith('!')) return !truthy(evaluate(t.slice(1), params));
+  const m = t.match(/^\$([a-zA-Z][a-zA-Z0-9_]*)(?:\s*(==|!=|>=|<=|>|<|[+\-*/])\s*(.+))?$/);
+  if (!m) return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : t;
+  const a = params[m[1]];
+  if (!m[2]) return a ?? null;
+  const rhsRaw = m[3].trim(); const rhs: Value = /^-?\d+(\.\d+)?$/.test(rhsRaw) ? Number(rhsRaw) : rhsRaw === 'true' ? true : rhsRaw === 'false' ? false : rhsRaw.replace(/^['"]|['"]$/g, '');
+  switch (m[2]) {
+    case '==': return a === rhs; case '!=': return a !== rhs;
+    case '>': return Number(a) > Number(rhs); case '<': return Number(a) < Number(rhs); case '>=': return Number(a) >= Number(rhs); case '<=': return Number(a) <= Number(rhs);
+    case '+': return Number(a) + Number(rhs); case '-': return Number(a) - Number(rhs); case '*': return Number(a) * Number(rhs); case '/': return Number(a) / Number(rhs);
+  }
+  return null;
+}
+const truthy = (v: Value) => !(v === false || v === null || v === 0 || v === '' || v === undefined);
+function uniqueName(w: WorldModel, parent: string, base: string): string {
+  const stem = base.replace(/-\d+$/, '');
+  for (let k = 2; k < 1000; k++) { const n = `${stem}-${k}`; if (!w.names.has(`${parent}/${n}`)) return n; }
+  return `${stem}-${Date.now() % 100000}`;
+}
+function shiftShape(shape: NonNullable<Entity['shape']>, dx: number, dz: number): NonNullable<Entity['shape']> {
+  if ('area' in shape) return { area: shape.area.map(([x, z]) => [x + dx, z + dz] as [number, number]) };
+  return { ...shape, path: shape.path.map(([x, z]) => [x + dx, z + dz] as [number, number]) };
 }
 /** `$param` substitution and `+ - * /` with one operator: "$floors * 3", "$w / 2 + 1" is not supported (one op). */
 function substitute(v: number | string | boolean, params: Record<string, Value>): Value {
   if (typeof v !== 'string' || !v.includes('$')) return v;
+  if (/(==|!=|>=|<=|>|<)/.test(v) || v.trim().startsWith('!')) return evaluate(v, params);
   const m = v.trim().match(/^\$([a-z][a-z0-9_]*)(?:\s*([+\-*/])\s*(-?\d+(?:\.\d+)?))?$/);
   if (!m) return v;
   const base = params[m[1]];

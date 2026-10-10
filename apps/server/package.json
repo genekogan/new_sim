@@ -24,7 +24,8 @@
     "@sim/world-compiler": "workspace:*",
     "@sim/ground": "workspace:*",
     "@sim/engine-mars": "workspace:*",
-    "@aws-sdk/client-s3": "^3.1146.0"
+    "@aws-sdk/client-s3": "^3.1146.0",
+    "@sim/generators": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.19.19",

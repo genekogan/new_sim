@@ -5,7 +5,11 @@
 // Inactive (and invisible) on worlds that have no entity layer.
 import * as THREE from 'three';
 import { TILE_M, TILE_N, Terrain, type Ground } from '@sim/ground';
-import { WorldModel, scatterPoints, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
+import { WorldModel, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
+import { GENERATORS, offsetPolyline } from '@sim/generators';
+import { meshFor, type MeshCtx } from './gen-mesh/index.ts';
+import { MaterialLib } from './gen-mesh/materials.ts';
+import { animate, hasMotion } from './gen-mesh/motion.ts';
 
 type Snapshot = { contract: string; worldId: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[]; tiles: Record<string, string> };
 type DiffMsg = { type: 'edge'; kind: 'world-diff'; seq: number; diff: { upserts: Entity[]; removes: string[]; defs: StoredDef[]; tiles: string[]; world?: Partial<WorldModel['state']> }; ground?: Ground; defs?: StoredDef[] };
@@ -15,7 +19,7 @@ const TERRAIN_STEP = 2;              // metres between terrain vertices in the p
 const EASE_IN_S = 2.5, EASE_OUT_S = 0.6, DROP_M = 40;
 const easeOut = (t: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
 
-type Drawn = { obj: THREE.Object3D; from: { p: THREE.Vector3; s: number }; to: { p: THREE.Vector3; s: number }; t0: number; dur: number; removing?: boolean; defHash: string };
+type Drawn = { obj: THREE.Object3D; from: { p: THREE.Vector3; s: number }; to: { p: THREE.Vector3; s: number }; t0: number; dur: number; removing?: boolean; defHash: string; world?: boolean; motion?: { entity: Entity; def: StoredDef; yaw: number } };
 
 export class WorldEntityLayer {
   readonly group = new THREE.Group();
@@ -28,6 +32,7 @@ export class WorldEntityLayer {
   private sectors = new Map<string, THREE.Mesh>();
   private drawn = new Map<string, Drawn>();
   private materials = new Map<string, THREE.Material>();
+  readonly lib = new MaterialLib();
   private horizon: THREE.Mesh | null = null;
   private hiddenBase = new WeakSet<THREE.Object3D>();
   private now = 0;
@@ -112,7 +117,8 @@ export class WorldEntityLayer {
       d.obj.position.lerpVectors(d.from.p, d.to.p, t);
       const s = d.from.s + (d.to.s - d.from.s) * t;
       d.obj.scale.setScalar(s);
-      if (d.removing && t >= 1) { this.thingsGroup.remove(d.obj); disposeObject(d.obj); this.drawn.delete(id); }
+      if (d.removing && t >= 1) { this.thingsGroup.remove(d.obj); disposeObject(d.obj); this.drawn.delete(id); continue; }
+      if (d.motion && t >= 1) animate(d.obj, d.motion.entity, d.motion.def, nowMs / 1000, { y: d.to.p.y, yaw: d.motion.yaw });
     }
     void dt;
   }
@@ -176,7 +182,7 @@ export class WorldEntityLayer {
     }
     for (const [key, mesh] of this.sectors) if (!wanted.has(key)) { this.terrainGroup.remove(mesh); mesh.geometry.dispose(); this.sectors.delete(key); }
     // things settle on the new ground: refresh poses of root entities (no easing)
-    if (onlyTiles) for (const e of m.entities.values()) if (e.in.parent === 'world') this.draw(e, false);
+    if (onlyTiles) for (const e of m.entities.values()) if (e.in.parent === 'world') this.draw(e, false, !!this.drawn.get(e.id)?.world);
   }
   private sectorMesh(sx: number, sz: number, t0: number, t1: number): THREE.Mesh {
     const m = this.model!;
@@ -207,6 +213,15 @@ export class WorldEntityLayer {
     this.waterGroup.clear();
     const g = this.model!.ground();
     for (const w of g.waters) {
+      if (w.path && w.w) {  // rivers: a ribbon at the water level along the path
+        const left = offsetPolyline(w.path, w.w / 2), right = offsetPolyline(w.path, -w.w / 2);
+        const pos: number[] = []; for (let i = 0; i < w.path.length; i++) pos.push(left[i][0], w.level, left[i][1], right[i][0], w.level, right[i][1]);
+        const idx: number[] = []; for (let i = 0; i < w.path.length - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+        const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
+        const mesh = new THREE.Mesh(geo, this.material('water', () => new THREE.MeshStandardMaterial({ color: 0x3a7ca8, transparent: true, opacity: 0.78, roughness: 0.25, metalness: 0.1, side: THREE.DoubleSide, depthWrite: false })));
+        mesh.name = 'entity-river'; mesh.userData.cameraTransparent = true; this.waterGroup.add(mesh);
+        continue;
+      }
       if (!w.area) continue;
       const shape = new THREE.Shape(w.area.map(([x, z]) => new THREE.Vector2(x, z)));
       const geo = new THREE.ShapeGeometry(shape);
@@ -247,102 +262,56 @@ export class WorldEntityLayer {
 
   // ---------- things ----------
 
-  private draw(e: Entity, ease: boolean) {
+  private draw(e: Entity, ease: boolean, force = false) {
     const m = this.model!; const def = m.resolvedDef(e.def);
     if (!def) return;
-    const built = this.build(e, def);
-    const wp = m.worldPose(e);
-    const target = new THREE.Vector3(wp.x, wp.y, wp.z);
     const existing = this.drawn.get(e.id);
-    if (!built) { if (existing) this.undraw(e.id); return; }
-    const defHash = def.hash + ':' + JSON.stringify(e.params ?? {}) + ':' + JSON.stringify(e.state ?? {}) + ':' + JSON.stringify(e.shape ?? null);
-    if (existing && existing.defHash === defHash && !existing.removing) {
+    const defHash = def.hash + ':' + JSON.stringify(e.params ?? {}) + ':' + JSON.stringify(e.state ?? {}) + ':' + JSON.stringify(e.shape ?? null) + ':' + JSON.stringify(e.r ?? 0);
+    const builder = meshFor(def);
+    const isWorld = !!builder?.world;
+    const wp = m.worldPose(e);
+    const target = isWorld ? new THREE.Vector3(0, 0, 0) : new THREE.Vector3(wp.x, wp.y, wp.z);
+    if (existing && existing.defHash === defHash && !existing.removing && !force) {
+      if (isWorld) return;
       existing.obj.rotation.set(0, wp.yaw, 0); applyTilt(existing.obj, e);
       existing.from = { p: ease ? existing.obj.position.clone() : target.clone(), s: ease ? existing.obj.scale.x : wp.s };
       existing.to = { p: target, s: wp.s }; existing.t0 = this.now; existing.dur = ease ? EASE_IN_S : 0.001;
       return;
     }
+    const built = this.build(e, def);
+    if (!built) { if (existing) this.undraw(e.id); return; }
     if (existing) { this.thingsGroup.remove(existing.obj); disposeObject(existing.obj); this.drawn.delete(e.id); }
-    built.rotation.set(0, wp.yaw, 0); applyTilt(built, e);
+    if (!isWorld) { built.rotation.set(0, wp.yaw, 0); applyTilt(built, e); }
     const fresh = !existing;
     const from = fresh && ease ? { p: target.clone().add(new THREE.Vector3(0, DROP_M, 0)), s: wp.s * 0.2 } : { p: target.clone(), s: wp.s };
     built.position.copy(from.p); built.scale.setScalar(from.s);
     this.thingsGroup.add(built);
-    this.drawn.set(e.id, { obj: built, from, to: { p: target, s: wp.s }, t0: this.now, dur: ease ? EASE_IN_S : 0.001, defHash });
+    const to = { p: target, s: isWorld ? 1 : wp.s };
+    if (isWorld) { from.s = fresh && ease ? 1 : 1; }
+    this.drawn.set(e.id, { obj: built, from, to, t0: this.now, dur: ease ? EASE_IN_S : 0.001, defHash, world: isWorld, ...(hasMotion(def) && !isWorld ? { motion: { entity: e, def, yaw: wp.yaw } } : {}) });
   }
   private undraw(id: string) {
     const d = this.drawn.get(id); if (!d || d.removing) return;
     d.removing = true; d.from = { p: d.obj.position.clone(), s: d.obj.scale.x }; d.to = { p: d.obj.position.clone().add(new THREE.Vector3(0, 2, 0)), s: 0.01 }; d.t0 = this.now; d.dur = EASE_OUT_S;
   }
-  /** One Object3D for an entity, from its def. Null when the thing has no picture of its own (landforms, prefab roots, bodies). */
+  /** One Object3D for an entity, from its def's mesh half (gen-mesh registry). Null when it has no picture (landforms, prefab roots, bodies). */
   private build(e: Entity, def: StoredDef): THREE.Object3D | null {
     const m = this.model!;
-    const params = e.params ?? {};
     if (def.make.kind === 'none' || def.make.kind === 'parts') return null;
-    if (def.make.kind === 'gen') {
-      switch (def.make.gen) {
-        case 'landform/1': case 'lake/1': return null;
-        case 'scatter/1': return this.scatter(e, def);
-        case 'box/1': default: {
-          const w = num(params.w, def.size.box[0]), h = num(params.h, def.size.box[1]), d = num(params.d, def.size.box[2]);
-          const color = typeof e.state?.paint === 'string' ? e.state.paint : typeof params.color === 'string' ? params.color : '#9a9a9a';
-          const mesh = new THREE.Mesh(this.box(), this.material('std:' + color, () => new THREE.MeshStandardMaterial({ color, roughness: 0.85 })));
-          mesh.scale.set(w, h, d); mesh.position.y = h / 2;
-          mesh.castShadow = true; mesh.receiveShadow = true;
-          const holder = new THREE.Group(); holder.add(mesh); holder.name = `entity ${e.name ?? e.id}`;
-          if (def.tags.includes('flag')) { // pennant + floating label
-            const pennant = new THREE.Mesh(this.box(), this.material('std:#d9534f', () => new THREE.MeshStandardMaterial({ color: '#d9534f', roughness: 0.7, side: THREE.DoubleSide })));
-            pennant.scale.set(0.9, 0.5, 0.02); pennant.position.set(0.45, h - 0.3, 0); holder.add(pennant);
-            const label = typeof e.state?.label === 'string' && e.state.label ? e.state.label : (e.name ?? e.id);
-            const sprite = labelSprite(label); sprite.position.y = h + 0.6; holder.add(sprite);
-          }
-          if (def.tags.includes('tree')) { // a quick canopy so trees read as trees until M5's generator
-            const canopy = new THREE.Mesh(this.sphere(), this.material('std:#3f7d3a', () => new THREE.MeshStandardMaterial({ color: '#3f7d3a', roughness: 0.9 })));
-            canopy.scale.set(w * 5, h * 0.55, d * 5); canopy.position.y = h * 0.8; canopy.castShadow = true; holder.add(canopy);
-          }
-          return holder;
-        }
-      }
-    }
-    // mesh defs: a placeholder box until the asset pipeline (M5) streams GLBs
-    const [w, h, d] = def.size.box;
-    const mesh = new THREE.Mesh(this.box(), this.material('std:#b0a090', () => new THREE.MeshStandardMaterial({ color: '#b0a090', roughness: 0.8 })));
-    mesh.scale.set(w, h, d); mesh.position.y = h / 2; mesh.castShadow = true;
-    void m;
-    return mesh;
-  }
-  private scatter(e: Entity, def: StoredDef): THREE.Object3D | null {
-    const m = this.model!; const params = e.params ?? {};
-    if (!e.shape || !('area' in e.shape)) return null;
-    const density = num(params.density, 0.05), spacing = num(params.minSpacing, 2), height = num(params.height, def.tags.includes('garden') ? 0.5 : 6);
-    const pts = scatterPoints(e.shape.area, density, spacing, e.seed ?? hashSeed(e.id), 3000);
-    if (!pts.length) return null;
-    const forest = def.name.includes('forest') || height >= 3;
-    const holder = new THREE.Group(); holder.name = `scatter ${e.name ?? e.id}`;
-    const dummy = new THREE.Object3D();
-    if (forest) {
-      const trunks = new THREE.InstancedMesh(this.box(), this.material('std:#5a3d22', () => new THREE.MeshStandardMaterial({ color: '#5a3d22', roughness: 0.9 })), pts.length);
-      const crowns = new THREE.InstancedMesh(this.cone(), this.material('std:#2f6b2f', () => new THREE.MeshStandardMaterial({ color: '#2f6b2f', roughness: 0.9 })), pts.length);
-      pts.forEach(([x, z], i) => {
-        const y = m.terrain.sample(x, z), h = height * (0.7 + 0.6 * frac(i * 7919 + (e.seed ?? 0)));
-        dummy.position.set(x, y + h * 0.25, z); dummy.scale.set(0.3, h * 0.5, 0.3); dummy.rotation.set(0, 0, 0); dummy.updateMatrix(); trunks.setMatrixAt(i, dummy.matrix);
-        dummy.position.set(x, y + h * 0.5 + h * 0.3, z); dummy.scale.set(h * 0.35, h * 0.6, h * 0.35); dummy.updateMatrix(); crowns.setMatrixAt(i, dummy.matrix);
-      });
-      trunks.castShadow = crowns.castShadow = true; trunks.instanceMatrix.needsUpdate = crowns.instanceMatrix.needsUpdate = true;
-      holder.add(trunks, crowns);
-    } else {
-      const color = def.tags.includes('garden') ? '#c75c7a' : '#7fb24a';
-      const tufts = new THREE.InstancedMesh(this.cone(), this.material('std:' + color, () => new THREE.MeshStandardMaterial({ color, roughness: 1 })), pts.length);
-      pts.forEach(([x, z], i) => { const y = m.terrain.sample(x, z), h = height * (0.6 + 0.8 * frac(i * 104729 + (e.seed ?? 0))); dummy.position.set(x, y + h / 2, z); dummy.scale.set(h * 0.5, h, h * 0.5); dummy.rotation.set(0, frac(i * 31) * 6.28, 0); dummy.updateMatrix(); tufts.setMatrixAt(i, dummy.matrix); });
-      tufts.instanceMatrix.needsUpdate = true; holder.add(tufts);
-    }
-    return holder;
+    const builder = meshFor(def);
+    if (!builder) return null;
+    const gen = def.make.kind === 'gen' ? GENERATORS[def.make.gen] : undefined;
+    const defaults: Record<string, unknown> = {};
+    for (const [k, f] of Object.entries({ ...(gen?.params ?? {}), ...def.params })) if ((f as { default?: unknown }).default !== undefined) defaults[k] = (f as { default?: unknown }).default;
+    const params = { ...defaults, ...(e.params ?? {}) } as MeshCtx['params'];
+    const ctx: MeshCtx = {
+      def, entity: e, params, args: def.make.kind === 'gen' ? ((def.make.args ?? {}) as Record<string, unknown>) : {},
+      baked: m.bake(def, e.params ?? {}, e.seed ?? 0, e.shape), model: m, materials: this.lib,
+      tint: (key, fallback) => { if (!key) return fallback; const v = params[key]; return typeof v === 'string' && /^#/.test(v) ? v : def.palette?.[key] ?? fallback; },
+    };
+    try { const obj = builder.build(ctx); if (obj) obj.name ||= `entity ${e.name ?? e.id}`; return obj; } catch (err) { this.stats.lastError = `${def.ref}: ${String(err)}`; return null; }
   }
 
-  private _box?: THREE.BoxGeometry; private _sphere?: THREE.SphereGeometry; private _cone?: THREE.ConeGeometry;
-  private box() { return (this._box ??= new THREE.BoxGeometry(1, 1, 1)); }
-  private sphere() { return (this._sphere ??= new THREE.SphereGeometry(0.5, 10, 7)); }
-  private cone() { return (this._cone ??= new THREE.ConeGeometry(0.5, 1, 7)); }
   private material(key: string, make: () => THREE.Material) { let m = this.materials.get(key); if (!m) { m = make(); this.materials.set(key, m); } return m; }
 }
 

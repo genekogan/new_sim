@@ -5,7 +5,7 @@
 import type { Db } from '../db.ts';
 import { WorldModel, type Diff, type Op, type StoredDef, type Entity } from '@sim/world-compiler';
 
-export type EditRow = { seq: number; by: string; at: number; note: string | null; ops: Op[]; inverse: Op[]; undone: number; undo_of: number | null; kind: 'edit' | 'undo' | 'redo' };
+export type EditRow = { seq: number; by: string; at: number; note: string | null; grp: string | null; ops: Op[]; inverse: Op[]; undone: number; undo_of: number | null; kind: 'edit' | 'undo' | 'redo' };
 export type PrayerRow = { id: string; soul_id: string; soul_name: string; text: string; at: number; answer: string | null; answered_at: number | null };
 
 export function ensureWorldSchema(db: Db) {
@@ -18,6 +18,8 @@ export function ensureWorldSchema(db: Db) {
     CREATE TABLE IF NOT EXISTS god_tokens_v1 (world_id TEXT NOT NULL, token_hash TEXT NOT NULL, label TEXT, created_at INTEGER NOT NULL, last_used INTEGER, PRIMARY KEY (world_id, token_hash)) WITHOUT ROWID;
     CREATE TABLE IF NOT EXISTS god_prayers_v1 (world_id TEXT NOT NULL, id TEXT NOT NULL, soul_id TEXT NOT NULL, soul_name TEXT NOT NULL, text TEXT NOT NULL, at INTEGER NOT NULL, answer TEXT, answered_at INTEGER, PRIMARY KEY (world_id, id)) WITHOUT ROWID;
   `);
+  const cols = (db.db.prepare('PRAGMA table_info(world_edits_v1)').all() as { name: string }[]).map((c) => c.name);
+  if (!cols.includes('grp')) db.db.exec('ALTER TABLE world_edits_v1 ADD COLUMN grp TEXT');
 }
 
 type Meta = { constants: WorldModel['constants']; state: WorldModel['state']; seed: string; seq: number; editSeq: number; ground: ReturnType<WorldModel['ground']>; owner: string | null };
@@ -53,7 +55,7 @@ export class WorldStore {
     this.db.db.prepare('INSERT OR IGNORE INTO world_defs_v1 (world_id, hash, ref, body) VALUES (?, ?, ?, ?)').run(this.worldId, d.hash, d.ref, JSON.stringify(d));
   }
   /** One committed batch: entity rows, defs, meta, and the edit with its inverse. */
-  commit(model: WorldModel, owner: string | null, diff: Diff, edit: { seq: number; by: string; at: number; note?: string; ops: Op[]; inverse: Op[]; kind: EditRow['kind']; undoOf?: number }) {
+  commit(model: WorldModel, owner: string | null, diff: Diff, edit: { seq: number; by: string; at: number; note?: string; group?: string; ops: Op[]; inverse: Op[]; kind: EditRow['kind']; undoOf?: number }) {
     this.tx(() => {
       for (const d of diff.defs) this.writeDef(d);
       const up = this.db.db.prepare('INSERT INTO world_entities_v1 (world_id, id, parent, body) VALUES (?, ?, ?, ?) ON CONFLICT(world_id, id) DO UPDATE SET parent=excluded.parent, body=excluded.body');
@@ -61,8 +63,8 @@ export class WorldStore {
       const del = this.db.db.prepare('DELETE FROM world_entities_v1 WHERE world_id=? AND id=?');
       for (const id of diff.removes) del.run(this.worldId, id);
       this.writeMeta(model, owner);
-      if (edit.ops.length || edit.kind !== 'edit') this.db.db.prepare('INSERT INTO world_edits_v1 (world_id, seq, by, at, note, ops, inverse, undone, undo_of, kind) VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?)')
-        .run(this.worldId, edit.seq, edit.by, edit.at, edit.note ?? null, JSON.stringify(edit.ops), JSON.stringify(edit.inverse), edit.undoOf ?? null, edit.kind);
+      if (edit.ops.length || edit.kind !== 'edit') this.db.db.prepare('INSERT INTO world_edits_v1 (world_id, seq, by, at, note, grp, ops, inverse, undone, undo_of, kind) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)')
+        .run(this.worldId, edit.seq, edit.by, edit.at, edit.note ?? null, edit.group ?? null, JSON.stringify(edit.ops), JSON.stringify(edit.inverse), edit.undoOf ?? null, edit.kind);
       if (edit.kind === 'undo') this.db.db.prepare('UPDATE world_edits_v1 SET undone=1 WHERE world_id=? AND seq=?').run(this.worldId, edit.undoOf!);
       if (edit.kind === 'redo') this.db.db.prepare('UPDATE world_edits_v1 SET undone=1 WHERE world_id=? AND seq=?').run(this.worldId, edit.undoOf!);
       // a fresh edit clears the redo stack: pending undos can no longer be redone
@@ -72,7 +74,7 @@ export class WorldStore {
   setOwner(model: WorldModel, owner: string) { this.tx(() => this.writeMeta(model, owner)); }
 
   edits(limit = 50): EditRow[] {
-    return (this.db.db.prepare('SELECT seq, by, at, note, ops, inverse, undone, undo_of, kind FROM world_edits_v1 WHERE world_id=? ORDER BY seq DESC LIMIT ?').all(this.worldId, limit) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string })[])
+    return (this.db.db.prepare('SELECT seq, by, at, note, grp, ops, inverse, undone, undo_of, kind FROM world_edits_v1 WHERE world_id=? ORDER BY seq DESC LIMIT ?').all(this.worldId, limit) as (Omit<EditRow, 'ops' | 'inverse'> & { ops: string; inverse: string })[])
       .map((r) => ({ ...r, ops: JSON.parse(r.ops), inverse: JSON.parse(r.inverse) }));
   }
   /** The edit `undo` would revert: newest not-undone edit or redo. */

@@ -19,6 +19,8 @@ export const newGodToken = (worldId: string) => `god_${worldId}_${randomBytes(24
 
 type Pairing = { code: string; poll: string; agent: string; expires: number; token?: string };
 export type WorldDiffMessage = { type: 'edge'; kind: 'world-diff'; seq: number; tick: number; at: number; diff: Diff; by: 'god' | 'undo' | 'redo'; ground?: ReturnType<WorldModel['ground']>; /** every def the upserts reference (viewers only hold defs in use) */ defs: ReturnType<typeof publicDef>[] };
+/** Called for every committed batch, in order, synchronously, before viewers hear of it (Stage B: the engine patches its Spatial here). */
+export type CommitListener = (c: { seq: number; diff: Diff; kind: 'edit' | 'undo' | 'redo'; by: string; group?: string }) => void;
 export type GodEvent = { id: number; event: 'diff' | 'prayer' | 'soul'; data: unknown };
 
 export type GodOptions = {
@@ -30,13 +32,24 @@ export type GodOptions = {
   emit: (m: WorldDiffMessage) => void;
   constants?: Partial<WorldModel['constants']>;
   seed?: string;
+  /** A genesis/1 template applied once when the world is first created (worlds/templates/*.json). */
+  genesis?: Genesis;
 };
+
+/** genesis/1: constants, state and ordered batches that build a world from nothing (spec 29 §4.5). */
+export type Genesis = { schema: 'genesis/1'; name?: string; description?: string; constants?: Partial<WorldModel['constants']>; state?: Record<string, unknown>; batches: { note?: string; group?: string; ops: unknown[] }[] };
 
 export class GodMode {
   readonly store: WorldStore;
   model: WorldModel;
   owner: string | null;
   private pairings = new Map<string, Pairing>();
+  private commitListeners: CommitListener[] = [];
+  /** Name of the genesis template this world was created from (null = empty plain). */
+  template: string | null = null;
+  private previews = new Map<string, { at: number; diff: Diff; ground?: ReturnType<WorldModel['ground']>; ops: unknown; failures?: unknown }>();
+  /** Subscribe to committed batches (ordered, synchronous). Returns an unsubscribe. */
+  onCommit(fn: CommitListener): () => void { this.commitListeners.push(fn); return () => { this.commitListeners = this.commitListeners.filter((f) => f !== fn); }; }
   private subscribers = new Set<(e: GodEvent) => void>();
   private ring: GodEvent[] = [];
   private eventSeq = 0;
@@ -53,10 +66,11 @@ export class GodMode {
       if (added.length) this.store.commit(this.model, this.owner, { upserts: [], removes: [], defs: added, tiles: [], answers: [] }, { seq: this.model.editSeq, by: 'core', at: Date.now(), note: `core kit: +${added.map((d) => d.ref).join(', ')}`, ops: [], inverse: [], kind: 'edit' });
     }
     else {
-      this.model = new WorldModel({ constants: { ground: 'land', extent: 1000, ...opts.constants } as never, seed: opts.seed ?? `${opts.worldId}:genesis` });
+      this.model = new WorldModel({ constants: { ground: 'land', extent: 1000, ...opts.constants, ...opts.genesis?.constants } as never, seed: opts.seed ?? `${opts.worldId}:genesis` });
       for (const d of CORE_KIT) this.model.defineDef(d, 'core', 0);
       this.owner = opts.ownerId;
       this.store.init(this.model, this.owner);
+      if (opts.genesis) this.applyGenesis(opts.genesis);
     }
   }
 
@@ -145,8 +159,9 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const tick = this.opts.tick();
     const r = applyBatch(this.model, batch, 'god', tick);
     if (!r.result.accepted) return r.result;
-    const ops = (batch as { ops: Op[] }).ops;
-    this.store.commit(this.model, this.owner, r.diff!, { seq: r.result.seq, by: 'god', at: Date.now(), note, ops, inverse: r.inverse!, kind: 'edit' });
+    const ops = (batch as { ops: Op[] }).ops; const group = typeof (batch as { group?: unknown }).group === 'string' ? (batch as { group: string }).group : undefined;
+    this.store.commit(this.model, this.owner, r.diff!, { seq: r.result.seq, by: 'god', at: Date.now(), note, group, ops, inverse: r.inverse!, kind: 'edit' });
+    this.notify(r.result.seq, r.diff!, 'edit', group);
     this.publish(r.result.seq, tick, r.diff!, 'god');
     for (const a of r.diff!.answers) this.answer(a.prayer, a.text);
     return r.result;
@@ -166,17 +181,54 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const tick = this.opts.tick();
     const r = applyBatch(this.model, { ops: target.inverse }, 'god', tick, { trusted: true });
     if (!r.result.accepted) return { ...r.result, failures: r.result.failures.map((f) => ({ ...f, code: 'undo.conflict' })) };
-    this.store.commit(this.model, this.owner, r.diff!, { seq: r.result.seq, by: 'god', at: Date.now(), note: `${kind} of ${target.seq}`, ops: target.inverse, inverse: r.inverse!, kind, undoOf: target.seq });
+    this.store.commit(this.model, this.owner, r.diff!, { seq: r.result.seq, by: 'god', at: Date.now(), note: `${kind} of ${target.seq}`, group: target.grp ?? undefined, ops: target.inverse, inverse: r.inverse!, kind, undoOf: target.seq });
+    this.notify(r.result.seq, r.diff!, kind, target.grp ?? undefined);
     this.publish(r.result.seq, tick, r.diff!, kind);
     return { ...r.result, reverted: target.seq };
   }
 
+  /** Undo every edit of a group (newest first). Stops at the first conflict and reports how far it got. */
+  undoGroup(group: string): { accepted: boolean; reverted: number[]; failures?: unknown } {
+    const reverted: number[] = [];
+    for (;;) {
+      const target = this.store.edits(500).find((e) => !e.undone && e.kind !== 'undo' && e.grp === group);
+      if (!target) break;
+      const r = this.revert(target, 'undo');
+      if (!r.accepted) return { accepted: reverted.length > 0, reverted, failures: r.failures };
+      reverted.push(target.seq);
+    }
+    return { accepted: reverted.length > 0, reverted, ...(reverted.length ? {} : { failures: [{ op: -1, code: 'undo.conflict', detail: `no edits in group ${group}` }] }) };
+  }
+  /** Dry-run a batch and keep its would-be diff for a ghost preview (?preview=<id>), 10 minutes. */
+  preview(batch: unknown) {
+    const p = plan(this.model, batch, 'god', this.opts.tick());
+    const id = 'pv_' + randomBytes(6).toString('hex');
+    for (const [k, v] of this.previews) if (Date.now() - v.at > 600_000) this.previews.delete(k);
+    if (!p.ok) { this.previews.set(id, { at: Date.now(), diff: { upserts: [], removes: [], defs: [], tiles: [], answers: [] }, ops: batch, failures: p.failures }); return { id, accepted: false as const, failures: p.failures }; }
+    this.previews.set(id, { at: Date.now(), diff: p.diff, ops: batch });
+    return { id, accepted: true as const, summary: summarize(p.diff), url: `?preview=${id}` };
+  }
+  getPreview(id: string) { const v = this.previews.get(id); if (!v || Date.now() - v.at > 600_000) return null; return v; }
+  private notify(seq: number, diff: Diff, kind: 'edit' | 'undo' | 'redo', group?: string) {
+    for (const fn of this.commitListeners) fn({ seq, diff, kind, by: 'god', group });
+  }
   private publish(seq: number, tick: number, diff: Diff, by: WorldDiffMessage['by']) {
     const referenced = new Map<string, StoredDef>();
     for (const e of diff.upserts) for (let ref: string | undefined = e.def; ref; ref = referenced.get(ref)?.extends) { const d = this.model.def(ref); if (!d || referenced.has(ref)) break; referenced.set(ref, d); }
     const m: WorldDiffMessage = { type: 'edge', kind: 'world-diff', seq, tick, at: Date.now(), diff, by, defs: [...referenced.values()].map(publicDef), ...(diff.tiles.length ? { ground: this.model.ground() } : {}) };
     try { this.opts.emit(m); } catch { /* viewers are best-effort */ }
     this.push('diff', m);
+  }
+
+  /** Apply a template's batches through the compiler (each atomic, journaled like a god edit). Throws on the first refusal. */
+  applyGenesis(g: Genesis) {
+    if (g.schema !== 'genesis/1') throw new Error('genesis: schema must be genesis/1');
+    if (g.state) { const r = this.act({ ops: [{ op: 'world', state: g.state }], note: 'genesis: state' }); if (!r.accepted) throw new Error(`genesis state refused: ${JSON.stringify(r.failures)}`); }
+    for (const [i, b] of g.batches.entries()) {
+      const r = this.act({ ops: b.ops, group: b.group ?? 'genesis', note: `genesis ${i + 1}/${g.batches.length}${b.note ? ': ' + b.note : ''}` });
+      if (!r.accepted) throw new Error(`genesis batch ${i + 1} (${b.note ?? ''}) refused: ${JSON.stringify(r.failures).slice(0, 600)}`);
+    }
+    this.template = g.name ?? 'custom';
   }
 
   // ---------- reads ----------

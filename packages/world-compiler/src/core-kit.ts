@@ -2,6 +2,7 @@
 // `core/<name>@v` resolves (see WorldModel.defineDef). M5 replaces the boxes
 // with real generators and the migrated Eden kits; the refs stay.
 import type { DefInput } from './schemas.ts';
+import { FAMILY_KITS } from './core-kit/index.ts';
 
 export const coreRef = (name: string, v = 1) => `core/${name}@${v}`;
 
@@ -10,7 +11,7 @@ const gen = (name: string, genId: string, extra: Partial<DefInput>): DefInput =>
   make: { kind: 'gen', gen: genId }, size: { box: [1, 1, 1] }, ...extra,
 });
 
-export const CORE_KIT: DefInput[] = [
+const BASE_KIT: DefInput[] = [
   gen('box', 'box/1', { description: 'A plain box. Placeholder for anything.', tags: ['prop'], size: { box: [1, 1, 1], scale: [0.1, 50] } }),
 
   // --- terrain ---
@@ -47,3 +48,6 @@ export const CORE_KIT: DefInput[] = [
   { schema: 'def/1', name: 'core-humanoid', version: 1, description: 'A human body on the humanoid rig.', tags: ['body'], form: 'point', make: { kind: 'none' }, size: { box: [0.56, 1.8, 0.56] }, layer: 'solid', anchor: 'base', components: { body: { media: ['walk', 'swim'], radius: 0.28, height: 1.8, landmarks: { eye: [0, 1.65, 0.08], top: [0, 1.8, 0], seat: [0, 0.45, 0] }, carry: { slot: 'hands', maxMass: 25, maxSize: [1.2, 1.2, 1.2] }, settle: 'sit', rig: 'humanoid' } }, slots: [{ id: 'carry', kind: 'carry', p: [0, 1.0, 0.35], yaw: 0, accepts: { tags: ['item'], maxMass: 25 }, capacity: 2 }] },
   { schema: 'def/1', name: 'core-floater', version: 1, description: 'A rigid hovering body (a sculpture, a head, a lantern).', tags: ['body'], form: 'point', make: { kind: 'none' }, size: { box: [0.7, 0.7, 0.7], scale: [0.4, 2.5] }, layer: 'solid', anchor: 'center', components: { body: { media: ['float'], radius: 0.35, height: 0.7, landmarks: { top: [0, 0.7, 0], eye: [0, 0.5, 0.3] }, carry: { slot: 'top', maxMass: 3, maxSize: [0.5, 0.5, 0.5] }, settle: 'hover', rig: null } }, slots: [{ id: 'carry', kind: 'carry', p: [0, 0.7, 0], yaw: 0, accepts: { tags: ['item'], maxMass: 3 }, capacity: 1 }] },
 ];
+
+/** Base defs plus the family files; a family def with the same name@version replaces the base one (L4 upgrades). */
+export const CORE_KIT: DefInput[] = (() => { const byRef = new Map<string, DefInput>(); for (const d of [...BASE_KIT, ...FAMILY_KITS]) byRef.set(`${d.name}@${d.version ?? 1}`, d); return [...byRef.values()]; })();

@@ -129,3 +129,28 @@ test('prayers: a Soul prays, the god sees it on the stream and answers; rate lim
   assert.ok(String(con.data).startsWith('# Hello world'));
   unsub();
 });
+
+test('contract endpoints: schema, query (terrain, entity, free plots, clearance), preview, grouped undo, onCommit order', async () => {
+  const f = fixture();
+  const token = (await f.req('/v1/god/mint', { body: {}, token: 'dev:gene' })).data.token as string;
+  const seen: number[] = []; f.god.onCommit((c) => seen.push(c.seq));
+  const schema = await f.req('/v1/god/schema');
+  assert.equal(schema.data.contract, 'god-schema/1');
+  assert.ok(schema.data.generators.some((g: { id: string }) => g.id === 'building/1'));
+  assert.ok(schema.data.kit.primitives.includes('capsule'));
+  await f.req('/v1/god/act', { token, body: { ops: [{ op: 'place', def: coreRef('knoll'), name: 'knoll', p: [0, 0], params: { height: 5, radius: 20 } }, { op: 'place', def: coreRef('cottage'), name: 'c', p: [30, 0] }], group: 'hamlet' } });
+  await f.req('/v1/god/act', { token, body: { ops: [{ op: 'place', def: coreRef('bench'), name: 'b', p: [40, 0] }], group: 'hamlet' } });
+  await f.req('/v1/god/act', { token, body: { ops: [{ op: 'place', def: coreRef('rock'), name: 'r', p: [-40, 0] }] } });
+  assert.deepEqual(seen, [1, 2, 3]);
+  const q = await f.req('/v1/god/query', { body: { points: [[0, 0], [100, 100]], entity: 'c', free: { size: [8, 6], near: [0, 40], count: 2 }, clearance: { at: [30, 0], size: [2, 2] } } });
+  assert.equal(q.data.points[0].y, 5); assert.equal(q.data.points[1].medium, 'walk');
+  assert.equal(q.data.entity.path, 'c'); assert.equal(q.data.free.length, 2);
+  assert.equal(q.data.clearance.clear, false); assert.ok(q.data.clearance.blockedBy.includes('c'));
+  const pv = await f.req('/v1/god/preview', { token, body: { ops: [{ op: 'place', def: coreRef('fountain'), p: [0, 60] }] } });
+  assert.equal(pv.data.accepted, true); assert.equal(f.god.model.entities.size, 4, 'preview commits nothing');
+  const got = await f.req(`/v1/god/preview/${pv.data.id}`); assert.equal(got.data.diff.upserts.length, 1);
+  const ug = await f.req('/v1/god/undo?group=hamlet', { method: 'POST', token });
+  assert.deepEqual(ug.data.reverted, [2, 1]); assert.ok(f.god.model.get('r') && !f.god.model.get('c') && !f.god.model.get('b'));
+  const edits = await f.req('/v1/god/edits', { token });
+  assert.equal(edits.data.edits.find((e: { seq: number }) => e.seq === 1).grp, 'hamlet');
+});

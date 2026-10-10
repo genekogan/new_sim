@@ -35,6 +35,9 @@ importers:
       '@sim/engine-toy':
         specifier: workspace:*
         version: link:../../packages/engine-toy
+      '@sim/generators':
+        specifier: workspace:*
+        version: link:../../packages/generators
       '@sim/ground':
         specifier: workspace:*
         version: link:../../packages/ground
@@ -81,6 +84,9 @@ importers:
       '@sim/engine-contract':
         specifier: workspace:*
         version: link:../../packages/engine-contract
+      '@sim/generators':
+        specifier: workspace:*
+        version: link:../../packages/generators
       '@sim/ground':
         specifier: workspace:*
         version: link:../../packages/ground
@@ -256,6 +262,19 @@ importers:
         specifier: ^22.19.19
         version: 22.20.4
 
+  packages/generators:
+    dependencies:
+      '@sim/ground':
+        specifier: workspace:*
+        version: link:../ground
+      zod:
+        specifier: ^4.6.5
+        version: 4.6.5
+    devDependencies:
+      '@types/node':
+        specifier: ^22.19.19
+        version: 22.19.19
+
   packages/ground:
     dependencies:
       zod:
@@ -297,6 +316,9 @@ importers:
 
   packages/world-compiler:
     dependencies:
+      '@sim/generators':
+        specifier: workspace:*
+        version: link:../generators
       '@sim/ground':
         specifier: workspace:*
         version: link:../ground
