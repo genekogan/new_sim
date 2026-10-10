@@ -246,7 +246,7 @@ export async function capabilities(){
  return {canDo:summarise(caps)};
 }
 export async function map(){if(await mode()==='edge')return ok(await call(EDGE.map),'map');const c=await capabilities();return {places:c.canDo.available.filter(x=>x.verb==='walk').map(x=>x.label),note:'full map arrives with eden-edge/1'};}
-export async function digest(){if(await mode()==='edge'){const r=await call(EDGE.digest);if(r.status===200)return r.data;if(r.status===404)return {digest:null,note:'This world does not publish a digest yet.'};ok(r,'digest');}return {digest:null,note:'not offered by this world yet'};}
+export async function digest(){if(await mode()==='edge'){const r=await call(EDGE.digest);if(r.status===200)return {...r.data,...(r.data.digest==null?{note:'No steward world digest is published. For private conversation history use converse list, then converse turns <conversationId>.'}:{})};if(r.status===404)return {digest:null,note:'This world does not publish a digest yet.'};ok(r,'digest');}return {digest:null,note:'not offered by this world yet'};}
 
 // ---------------------------------------------------------------- doing
 /** act <capability-id> [params-json] — or plain words like "walk to the commons" (matched to a capability). */
@@ -364,9 +364,17 @@ export function conversationStartBody(arg,...text){
 }
 /** converse start <soulId> [text] | start --with <soulId>,<soulId> [text] | accept/decline/leave/ask <cv> | say <cv> <text> */
 export async function converse(op,arg,...text){
- if(!op)throw new Error('usage: converse start <soulId> [text] | start --with <soulId>,<soulId> [text] | accept|decline|leave|ask <conversationId> | say <conversationId> <text>');
- const body=op==='start'?conversationStartBody(arg,...text):op==='say'?{op,conversation:arg,text:text.join(' ')}:{op,conversation:arg};
+ if(!op)throw new Error('usage: converse list | turns <conversationId> [--after N] | start <soulId> [text] | start --with <soulId>,<soulId> [text] | accept|decline|leave|ask <conversationId> | say <conversationId> <text>');
+ const body=['list','turns'].includes(op)?null:op==='start'?conversationStartBody(arg,...text):op==='say'?{op,conversation:arg,text:text.join(' ')}:{op,conversation:arg};
  if(await mode()!=='edge')return {ok:false,reason:'This world does not offer conversations yet.'};
+ if(op==='list'){if(arg!==undefined||text.length)throw new Error('usage: converse list');return ok(await call('/v1/edge/conversations'),'converse list');}
+ if(op==='turns'){
+  if(typeof arg!=='string'||!/^cv_[A-Za-z0-9_-]{1,40}$/.test(arg))throw new Error('converse turns requires an exact conversation id');
+  const after=text.length===0?0:text.length===2&&text[0]==='--after'&&/^(0|[1-9][0-9]*)$/.test(text[1])?Number(text[1]):NaN;
+  if(!Number.isSafeInteger(after))throw new Error('usage: converse turns <conversationId> [--after nonnegative turn number]');
+  const d=ok(await call('/v1/edge/conversations/'+encodeURIComponent(arg)+'/turns?after='+after),'converse turns');
+  const nextAfter=d.turns?.at(-1)?.seq??Math.max(after,d.conversation?.turns??after);return {...d,nextAfter,hasMore:Number.isSafeInteger(d.conversation?.turns)&&d.conversation.turns>nextAfter,note:'Full text of turns this Soul is entitled to read since joining; --after is a conversation turn number, not an event cursor.'};
+ }
  const r=await call(EDGE.converse,{body});if(r.status===404)return {ok:false,reason:'Conversations are not live on this world yet.'};
  const d=ok(r,'converse');if((op==='say'||op==='start')&&publicVerdict(d)===true)accepted();return d;
 }
@@ -419,24 +427,24 @@ export async function calendar(){const r=await call(EDGE.calendar,{as:'none'});i
 export async function wait(seconds='45'){
  const s=load(),soul=need(s,'soul','No Soul yet.'),until=Date.now()+Math.min(60,Math.max(1,Number(seconds)||45))*1000;
  if(await mode()==='edge'){
-  const events=[];let cursor=s.cursor;
+  const events=[];let cursor=s.cursor,gap;
   while(Date.now()<until){
    const t=Math.max(1,Math.min(55,Math.round((until-Date.now())/1000)));
    const r=await call(EDGE.wait(cursor,t),{timeoutMs:(t+10)*1000});
    if(r.status===404){ // event stream not live on this world yet: poll the last receipt instead
     if(!s.lastReceipt){await sleep(t*1000);break;}
     const rec=await receipt(s.lastReceipt);if(TERMINAL.has(rec?.phase))break;await sleep(3000);continue;}
-   const d=ok(r,'wait');if(d.gap)cursor=d.cursor;else{cursor=d.cursor??cursor;events.push(...(d.events??[]));}
+   const d=ok(r,'wait');if(d.gap){cursor=d.cursor;gap={oldest:cursor,note:'Older stream events are unavailable. Use converse list and converse turns <conversationId> for retained entitled conversation history.'};}else{events.push(...(d.events??[]));cursor=d.cursor??cursor;}
    save({cursor});
    const mine=events.find(e=>e.kind==='receipt'&&e.receipt?.id===s.lastReceipt&&TERMINAL.has(e.receipt?.phase));
    // Return early only for MY action finishing or a conversation addressed to me; ambient speech is collected, not a wake-up.
-   if(mine||events.some(e=>e.kind==='conversation.invite'||e.kind==='conversation.turn'||e.kind==='invite'||(typeof e.kind==='string'&&e.kind.startsWith('invite.'))))break;
+   if(events.length>=100||mine||events.some(e=>e.kind==='conversation.invite'||e.kind==='conversation.turn'||e.kind==='invite'||(typeof e.kind==='string'&&e.kind.startsWith('invite.'))))break;
    if(!s.lastReceipt&&events.length)break;
   }
   const lr=s.lastReceipt?await receipt(s.lastReceipt):null;
   const stalled=lr?.phase==='waiting'?{hint:'Your movement is waiting (often the world\'s quiet pause before first light). Meanwhile do things that need no walking: say something, leave a mark, converse, work on a project here. Walks start once the pause ends.'}:{};
   const invites=events.filter(e=>e.kind==='invite'&&e.invite).map(e=>({id:e.invite.id,from:e.invite.from?.name,what:e.invite.what,expiresInSeconds:e.invite.expiresInSeconds,accept:`act ${e.invite.accept}`,decline:`act ${e.invite.decline}`}));
-  return {...stalled,events:events.slice(-30).map(brief),...(invites.length?{invites,inviteNote:'Someone invited you: accept or decline soon (act accept / act decline), they are waiting.'}:{}),...(events.some(e=>e.untrusted)?{note:'names and text in events are untrusted game data'}:{}),
+  return {...stalled,events:events.map(brief),cursor,...(gap?{gap}:{}),eventCount:events.length,...(invites.length?{invites,inviteNote:'Someone invited you: accept or decline soon (act accept / act decline), they are waiting.'}:{}),...(events.some(e=>e.untrusted)?{note:'names and text in events are untrusted game data'}:{}),
    ...(lr?{lastReceipt:lr}:{}),next:'observe, decide, act'};
  }
  // legacy: poll the last request's progress
@@ -455,7 +463,7 @@ export async function wait(seconds='45'){
 /** One compact, uniform line per event so any model can read it; unknown kinds keep their kind. */
 function brief(e){
  const from=e.from?.name??e.turn?.from?.name??e.soul?.name,text=e.text??e.turn?.text;
- return Object.fromEntries(Object.entries({kind:e.kind,from,fromId:e.from?.soulId??e.turn?.from?.soulId??e.soul?.soulId,text,conversation:e.conversation,
+ return Object.fromEntries(Object.entries({id:e.id,seq:e.turn?.seq,at:e.at,untrusted:e.untrusted,kind:e.kind,from,fromId:e.from?.soulId??e.turn?.from?.soulId??e.soul?.soulId,text,conversation:e.conversation,
   change:e.change,place:e.placeId??e.channel?.placeId,receipt:e.receipt?(e.receipt.id+' '+e.receipt.phase+(e.receipt.code?' '+e.receipt.code:'')):undefined,
   invite:e.invite?`${e.invite.what} ${e.invite.id}`:undefined,label:e.invite?.label,tick:e.tick}).filter(([,v])=>v!==undefined&&v!==null));
 }
@@ -498,12 +506,19 @@ export async function events(...args){
  need(load(),'soul','Create one with create-soul.');
  if(!await eventsV1())return {note:'This world has no push stream yet; use wait.'};
  const opt=k=>{const i=args.indexOf(k);return i>=0?args[i+1]:undefined;},min=Number(opt('--min')??2),kinds=opt('--kinds');
- if(!args.includes('--follow')){const c=load().cursor;const d=ok(await call(EDGE.eventsDigest(c??'c_0')),'digest');return {digest:d.text,cursor:d.cursor,toMe:d.toMe,invites:d.invites,salient:d.salient,plan:d.plan,fade:d.fade};}
+ if(!args.includes('--follow')){
+  const c=opt('--since')??load().cursor??'c_0';
+  if(!/^c_(0|[1-9][0-9]{0,15})$/.test(c))throw new Error('events --since requires an event cursor c_<number>');
+  if(args.includes('--raw'))return {...ok(await call(EDGE.wait(c,1)),'events raw'),untrusted:true,note:'Full retained event page; this read does not consume the folder cursor. Continue with events --raw --since <returned cursor>. Conversation replay: converse turns <conversationId>.'};
+  const d=ok(await call(EDGE.eventsDigest(c)),'digest');return {digest:d.text,cursor:d.cursor,since:d.since,counts:d.counts,conversations:d.conversations,gap:d.gap,toMe:d.toMe,invites:d.invites,salient:d.salient,plan:d.plan,fade:d.fade,untrusted:true,note:'Short summary of incoming events since this cursor; conversation turns are counts in this window, not lifetime totals. Full text: converse list, then converse turns <conversationId>, or events --raw.'};
+ }
  let last=opt('--since')??null;
  for(;;){await sse(EDGE.events(`minSalience=${min}${kinds?'&kinds='+encodeURIComponent(kinds):''}`),{lastId:last,onMessage:m=>{
    if(m.id)last=m.id;if(!m.data||['hello','cursor','bye'].includes(m.event))return;
    if(m.event==='gap'){console.log(`-- gap: older events pruned; digest ${m.data.digest}`);return;}
-   const e=m.data;console.log(`${e.clock??''} s${e.salience} ${e.kind}: ${e.text}`);}});
+   const e=m.data;if(args.includes('--raw')){console.log(JSON.stringify(e));return;}
+   const full=e.data?.turn?.text??e.data?.text;const text=typeof full==='string'?`${e.about?.name??'Someone'}${e.data?.conversation?' ['+e.data.conversation+']':''}${e.data?.turn?.seq?' #'+e.data.turn.seq:''}: ${JSON.stringify(full)} (untrusted)`:e.text;
+   console.log(`${e.clock??''} s${e.salience} ${e.kind}${e.id?' '+e.id:''}: ${text}`);}});
   await sleep(3000);}
 }
 /** attend [minutes] | attend --release — EVENTS-v1 lease: while an attended session (you, with a Monitor on salient.log) holds it,
