@@ -38,7 +38,7 @@ server.stdout.on('data', (d) => { serverLog += d; }); server.stderr.on('data', (
 const stop = () => { try { server.kill(); } catch { } };
 process.on('exit', () => { if (!args.keep) stop(); });
 const bootT = t();
-for (let i = 0; i < 300; i++) { try { const r = await fetch(`${base}/healthz`); if (r.ok) break; } catch { } await new Promise((r) => setTimeout(r, 100)); }
+for (let i = 0; i < 1200; i++) { try { const r = await fetch(`${base}/healthz`); if (r.ok) break; } catch { } await new Promise((r) => setTimeout(r, 100)); }
 const bootMs = t() - bootT;
 log(`  booted in ${bootMs.toFixed(0)} ms`);
 
@@ -192,7 +192,7 @@ try {
     const again = spawn('node', ['apps/server/src/main.ts'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...(existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}), WORLD_KEY: slug, WORLD_ID: `${slug}-1`, ENGINE: 'mars', PORT: String(port), DEV_AUTH: '1', BRAIN_MODE: 'fake', SEED_NATIVES: '0', DATA_DIR: dataDir, PUBLIC_URL: `http://127.0.0.1:${port}` } });
     again.stdout.on('data', (d) => { serverLog += d; }); again.stderr.on('data', (d) => { serverLog += d; });
     process.on('exit', () => { if (!args.keep) try { again.kill(); } catch { } });
-    for (let i = 0; i < 300; i++) { try { const r = await fetch(`${base}/healthz`); if (r.ok) break; } catch { } await new Promise((r) => setTimeout(r, 100)); }
+    for (let i = 0; i < 1200; i++) { try { const r = await fetch(`${base}/healthz`); if (r.ok) break; } catch { } await new Promise((r) => setTimeout(r, 100)); }
     const b = await snapshot();
     const same = JSON.stringify(a.entities) === JSON.stringify(b.entities) && JSON.stringify(a.ground) === JSON.stringify(b.ground) && a.seq === b.seq;
     const god = await api('/v1/god/snapshot');

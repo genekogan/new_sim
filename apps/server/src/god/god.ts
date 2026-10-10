@@ -214,6 +214,8 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     return { id, accepted: true as const, summary: summarize(p.diff), url: `?preview=${id}` };
   }
   getPreview(id: string) { const v = this.previews.get(id); if (!v || Date.now() - v.at > 600_000) return null; return v; }
+  /** The god's recent previews, newest first (the panel lists them to show as ghosts). */
+  listPreviews() { const now = Date.now(); return [...this.previews].filter(([, v]) => now - v.at <= 600_000).sort((a, b) => b[1].at - a[1].at).slice(0, 20).map(([id, v]) => ({ id, at: v.at, accepted: !v.failures, summary: v.failures ? null : summarize(v.diff) })); }
   private notify(seq: number, diff: Diff, kind: 'edit' | 'undo' | 'redo', group?: string) {
     for (const fn of this.commitListeners) fn({ seq, diff, kind, by: 'god', group });
   }
@@ -228,9 +230,9 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   /** Apply a template's batches through the compiler (each atomic, journaled like a god edit). Throws on the first refusal. */
   applyGenesis(g: Genesis) {
     if (g.schema !== 'genesis/1') throw new Error('genesis: schema must be genesis/1');
-    if (g.state) { const r = this.act({ ops: [{ op: 'world', state: g.state }], note: 'genesis: state' }); if (!r.accepted) throw new Error(`genesis state refused: ${JSON.stringify(r.failures)}`); }
+    if (g.state) { const r = this.act({ ops: [{ op: 'world', state: g.state }], group: 'genesis' }, 'genesis: state'); if (!r.accepted) throw new Error(`genesis state refused: ${JSON.stringify(r.failures)}`); }
     for (const [i, b] of g.batches.entries()) {
-      const r = this.act({ ops: b.ops, group: b.group ?? 'genesis', note: `genesis ${i + 1}/${g.batches.length}${b.note ? ': ' + b.note : ''}` });
+      const r = this.act({ ops: b.ops, group: b.group ?? 'genesis' }, `genesis ${i + 1}/${g.batches.length}${b.note ? ': ' + b.note : ''}`);
       if (!r.accepted) throw new Error(`genesis batch ${i + 1} (${b.note ?? ''}) refused: ${JSON.stringify(r.failures).slice(0, 600)}`);
     }
     this.template = g.name ?? 'custom';

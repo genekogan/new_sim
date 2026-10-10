@@ -53,10 +53,11 @@ import type { PlayView, PublicSoul } from '@sim/protocol';
 import type { Sim } from './useSim.ts';
 import { decodeSceneCapturePublication } from '@sim/protocol/scene-capture';
 import { WorldSceneHistory } from './WorldSceneHistory.ts';
-import { apiPath } from './world-path.ts';
+import { apiPath, worldKey } from './world-path.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
 import { setAssetLoader } from './gen-mesh/gltf-assets.ts';
 import { GodPanel } from './GodPanel.tsx';
+import { WorldPreviewGhost } from './WorldPreviewGhost.ts';
 import {WorldEdgeItems} from './WorldEdgeItems.ts';
 import { WorldNavigation, createWorldOrbitControls, type ManualNavigation, type CameraMove } from './WorldNavigation.ts';
 import {WorldPlaceCamera} from './WorldPlaceCamera.ts';
@@ -265,9 +266,10 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const shotMode=new URLSearchParams(location.search).has('shot');
     if(shotMode){const c=renderer.domElement;Object.assign(c.style,{position:'fixed',inset:'0',width:'100vw',height:'100vh',zIndex:'2147483000'});document.title='loading';}
     void entityLayer.start(abort.signal).then(()=>{frameEntityWorld();setEntityWorld(entityLayer.active);if(shotMode)setTimeout(()=>{document.title=entityLayer.active?'ready':'no-entity-world';(window as unknown as {__shotReady?:boolean}).__shotReady=true;},Math.max(2500,Number(new URLSearchParams(location.search).get('settle')??'3000')));});
+    const ghost=new WorldPreviewGhost(apiPath);scene.add(ghost.group);(window as unknown as {__simGhost?:unknown}).__simGhost=ghost;  // ?preview=<id> ghosts (GodPanel drives it)
     // Alt+click on the ground drops a labelled flag (a core/flag entity) the god can refer to as flag:<label>.
     // Owner authority: a god token minted with the page's dev identity (Privy owners: the Game lane wires getToken later).
-    let godToken:string|null=sessionStorage.getItem('sim.godToken');
+    let godToken:string|null=sessionStorage.getItem('sim.godToken');if(godToken&&!new RegExp('^god_'+worldKey.replace(/[-]/g,'\\-')+'-\\d+_').test(godToken))godToken=null;  // one origin may front many worlds (launcher)
     const godMint=async()=>{if(godToken)return godToken;const dev=localStorage.getItem('sim.dev');if(!dev)return null;const r=await fetch(apiPath('/v1/god/mint'),{method:'POST',headers:{authorization:'Bearer dev:'+dev,'content-type':'application/json'},body:JSON.stringify({label:'browser'})});if(!r.ok)return null;godToken=(await r.json()).token;sessionStorage.setItem('sim.godToken',godToken!);return godToken;};
     const flagRay=new THREE.Raycaster(),flagNdc=new THREE.Vector2();
     const onFlagClick=async(ev:MouseEvent)=>{
