@@ -54,6 +54,7 @@ import type { Sim } from './useSim.ts';
 import { decodeSceneCapturePublication } from '@sim/protocol/scene-capture';
 import { WorldSceneHistory } from './WorldSceneHistory.ts';
 import { apiPath } from './world-path.ts';
+import { WorldEntityLayer } from './WorldEntityLayer.ts';
 import {WorldEdgeItems} from './WorldEdgeItems.ts';
 import { WorldNavigation, createWorldOrbitControls, type ManualNavigation, type CameraMove } from './WorldNavigation.ts';
 import {WorldPlaceCamera} from './WorldPlaceCamera.ts';
@@ -250,6 +251,13 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const portraits=new WorldSoulAvatars(renderer);
     const idleLife=new WorldIdleLife();const idleSouls:IdleSoul[]=[];let attentionTargets=new Map<string,readonly string[]>();
     const edgeItems=new WorldEdgeItems(apiPath('/v1/edge/items'));scene.add(edgeItems.group);edgeItems.start(abort.signal);  // things lying around (together/1)
+    const entityLayer=new WorldEntityLayer(apiPath);scene.add(entityLayer.group);let entityWorldFramed=false;
+    // Entity worlds have no Souls to broadcast at first: frame what the god built (or ?eye=x,y,z&at=x,y,z for stable shots).
+    const frameEntityWorld=()=>{if(!entityLayer.active||entityWorldFramed)return;entityWorldFramed=true;const q=new URLSearchParams(location.search),eye=q.get('eye')?.split(',').map(Number),at=q.get('at')?.split(',').map(Number);
+      if(eye?.length===3&&at?.length===3&&eye.every(Number.isFinite)&&at.every(Number.isFinite)){controls.target.set(at[0],at[1],at[2]);camera.position.set(eye[0],eye[1],eye[2]);}
+      else{const [x0,z0,x1,z1]=entityLayer.viewBounds(),cx=(x0+x1)/2,cz=(z0+z1)/2,span=Math.max(60,x1-x0,z1-z0),gy=entityLayer.groundAt(cx,cz)??0;controls.target.set(cx,gy,cz);camera.position.set(cx-span*0.9,gy+span*0.55,cz+span*1.1);}
+      camera.lookAt(controls.target);context.current.setCameraMode('manual');};
+    void entityLayer.start(abort.signal).then(frameEntityWorld);(window as unknown as {__simEntity?:unknown}).__simEntity={layer:entityLayer,camera,controls,scene};  // the entity world (god mode), when this world has one
     const games=new WorldGames();scene.add(games.group);
     const platformDraw=new WorldPlatforms();scene.add(platformDraw.group);
     const placeActivity=new WorldPlaceActivity();scene.add(placeActivity.group);
@@ -268,7 +276,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     let expansion:ReturnType<typeof createWorldEdenExpansion>|null=null,expansionFailed=false;
     let expansionSceneInfo:ReturnType<typeof parseSceneInfo>|null=null;
     let cameraGroundInfo:ReturnType<typeof parseSceneInfo>|null|undefined,cameraGroundOwner:ReturnType<typeof createWorldEdenExpansion>|null|undefined;
-    const refreshCameraGround=()=>{const owner=expansion?.group.visible?expansion:null;if(cameraGroundInfo===expansionSceneInfo&&cameraGroundOwner===owner)return;cameraGroundInfo=expansionSceneInfo;cameraGroundOwner=owner;cameraGround.bindGround(cameraGroundSampler(expansionSceneInfo??undefined,owner?.sampleVisualGround),expansionSceneInfo);};
+    const refreshCameraGround=()=>{if(entityLayer.active){cameraGround.bindGround(entityLayer.groundAt,entityLayer);return;}const owner=expansion?.group.visible?expansion:null;if(cameraGroundInfo===expansionSceneInfo&&cameraGroundOwner===owner)return;cameraGroundInfo=expansionSceneInfo;cameraGroundOwner=owner;cameraGround.bindGround(cameraGroundSampler(expansionSceneInfo??undefined,owner?.sampleVisualGround),expansionSceneInfo);};
     let houseWindows:ReturnType<typeof createEdenHouseWindows>=null;
     let shadowDetail:WorldShadowDetail|null=null;
     const clearExpansion=()=>{shadowDetail?.dispose();shadowDetail=null;houseWindows?.dispose();houseWindows=null;expansion?.dispose();expansion=null;refreshCameraGround();};
@@ -277,6 +285,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const groupSelection=new Set<string>();
     const framing=new WorldPlaceCamera();let followed: string | null = null;
     const overview = (b: readonly [number, number, number, number]) => {
+      if(entityWorldFramed)return;  // the entity world framed itself; a later scene install must not yank the camera back
       const [x0, z0, x1, z1] = b, span = Math.max(10, x1 - x0, z1 - z0);
       controls.target.set((x0 + x1) / 2, 0, (z0 + z1) / 2);
       camera.position.set(controls.target.x + span * 0.1, span * 0.6, controls.target.z + span * 0.75);
@@ -698,6 +707,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         }
       }
       if(viewing==='follow' && at.take && !focus){navigation?.release();context.current.setCameraMode('manual');followed=null;}
+      entityLayer.applyEdge(context.current.sim.edge??[]);entityLayer.update(step,now,geometry.group);
+      frameEntityWorld();
       navigation?.update(step);
       rts.update(step);
       hover.update(now);
@@ -843,7 +854,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       for (const l of labels.values()) { scene.remove(l.obj); l.obj.element.remove(); }
       labels.clear();
       people?.dispose();
-      edgeItems.dispose();
+      edgeItems.dispose();entityLayer.dispose();
       diagnostics.dispose();placePreviews.dispose();bodyModels.dispose();
       floaters.dispose();
       kin.dispose();

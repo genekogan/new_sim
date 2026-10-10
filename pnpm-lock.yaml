@@ -35,12 +35,18 @@ importers:
       '@sim/engine-toy':
         specifier: workspace:*
         version: link:../../packages/engine-toy
+      '@sim/ground':
+        specifier: workspace:*
+        version: link:../../packages/ground
       '@sim/kernel':
         specifier: workspace:*
         version: link:../../packages/kernel
       '@sim/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@sim/world-compiler':
+        specifier: workspace:*
+        version: link:../../packages/world-compiler
       hono:
         specifier: ^4.13.11
         version: 4.13.11
@@ -75,9 +81,15 @@ importers:
       '@sim/engine-contract':
         specifier: workspace:*
         version: link:../../packages/engine-contract
+      '@sim/ground':
+        specifier: workspace:*
+        version: link:../../packages/ground
       '@sim/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
+      '@sim/world-compiler':
+        specifier: workspace:*
+        version: link:../../packages/world-compiler
       react:
         specifier: 19.3.0
         version: 19.3.0

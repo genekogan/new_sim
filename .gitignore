@@ -10,3 +10,6 @@ data/
 .DS_Store
 BUILD
 .e2e/
+
+# root world-engine lane scratch (local servers, logs)
+.lane/

@@ -8,6 +8,7 @@ const schema = z.object({
   cast: z.array(z.object({ name: z.string(), description: z.string() })), cardPack: z.string(),
 });
 export function worldDefinition(key: string) {
-  if (!['toy', 'mars', 'littlemartians', 'eden'].includes(key)) throw new Error('unknown world');
+  // Entity worlds (any other slug) start as an empty green field with no cast; their content is placed by the god.
+  if (!['toy', 'mars', 'littlemartians', 'eden'].includes(key)) return { id: 'eden' as const, worldId: `${key}-1`, name: key, engine: 'mars' as const, capabilities: ['humanoid'], dayTicks: 72000 as const, scene: 'greenfield', customs: [] as string[], cast: [] as { name: string; description: string }[], cardPack: 'idle' };
   return schema.parse(JSON.parse(readFileSync(new URL(`../../../worlds/${key}/world.json`, import.meta.url), 'utf8')));
 }

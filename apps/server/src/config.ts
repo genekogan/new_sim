@@ -5,11 +5,15 @@ import { resolve } from 'node:path';
 const env = process.env;
 const thinkingBudget=worldThinkingBudgetV1(env);
 const worldKey = env.WORLD_KEY ?? 'toy';
-if (!['toy', 'mars', 'littlemartians', 'eden'].includes(worldKey)) throw new Error('invalid WORLD_KEY');
+if (!/^[a-z][a-z0-9-]{0,31}$/.test(worldKey)) throw new Error('invalid WORLD_KEY');
+/** Worlds with authored content and their own factories; any other key is an entity world (ENABLE_WORLD_ENGINE) on the green field. */
+export const KNOWN_WORLD_KEYS = ['toy', 'mars', 'littlemartians', 'eden'] as const;
 export const config = {
   archiveTakes: env.ARCHIVE_TAKES === '1',
   r2: {account:env.R2_ACCOUNT_ID,bucket:env.R2_BUCKET,endpoint:env.R2_ENDPOINT,access:env.R2_ACCESS_KEY_ID,secret:env.R2_SECRET_ACCESS_KEY,prefix:env.R2_PREFIX??'sim'},
   worldKey,
+  /** God mode + entity world (spec eden4/28): on for every non-authored key, or by explicit flag. */
+  worldEngine: env.ENABLE_WORLD_ENGINE === '1' || !['toy', 'mars', 'littlemartians', 'eden'].includes(worldKey),
   /** Markdown served at /skill.md (App's agent skill). Unset: edge worlds get a built-in edge stub; central worlds the legacy skill. */
   skillFile: env.EDGE_SKILL_FILE || undefined as string | undefined,
   /** Source-owned onboarding Markdown, served with the selected world's base and display name. */

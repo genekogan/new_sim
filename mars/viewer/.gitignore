@@ -41,3 +41,4 @@ next-env.d.ts
 
 # shared local Playwright browser cache (directory or worktree symlink)
 /.pw-browsers
+.lane/

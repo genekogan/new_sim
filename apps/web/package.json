@@ -11,6 +11,8 @@
   "dependencies": {
     "@privy-io/react-auth": "^3.46.0",
     "@sim/client": "workspace:*",
+    "@sim/ground": "workspace:*",
+    "@sim/world-compiler": "workspace:*",
     "@sim/engine-contract": "workspace:*",
     "@sim/protocol": "workspace:*",
     "react": "19.3.0",
