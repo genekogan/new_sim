@@ -9,8 +9,8 @@ import { meshFor, type MeshCtx } from '../registry.ts';
 import { MaterialLib } from '../materials.ts';
 import { gait, type Rig } from '../motion.ts';
 
-type Cell = { def: StoredDef; label: string; sub: string; walk?: boolean };
-declare global { interface Window { studio: { render(defs: StoredDef[], o?: { cols?: number; cw?: number; ch?: number; walk?: boolean }): Promise<{ cells: number; tris: number[]; errors: string[] }> } } }
+type Cell = { def: StoredDef; label: string; sub: string; walk?: boolean; phase?: number };
+declare global { interface Window { studio: { render(defs: StoredDef[], o?: { cols?: number; cw?: number; ch?: number; walk?: boolean; frames?: number }): Promise<{ cells: number; tris: number[]; errors: string[] }> } } }
 
 function ctxFor(def: StoredDef, model: WorldModel, lib: MaterialLib): MeshCtx {
   const gen = def.make.kind === 'gen' ? GENERATORS[def.make.gen] : undefined;
@@ -31,7 +31,9 @@ window.studio = {
     const cells: Cell[] = [];
     for (const d of defs) {
       cells.push({ def: d, label: d.name.replace(/^core-/, ''), sub: d.tags.slice(0, 3).join(' · ') });
-      if (o.walk && d.tags.includes('creature')) cells.push({ def: d, label: d.name.replace(/^core-/, '') + ' (stride)', sub: String((d.make as { args?: { gait?: string } }).args?.gait ?? ''), walk: true });
+      const gaitName = String((d.make as { args?: { gait?: string } }).args?.gait ?? '');
+      if (o.frames && d.tags.includes('creature')) for (let k = 0; k < o.frames; k++) cells.push({ def: d, label: `${d.name.replace(/^core-/, '')} ${k + 1}/${o.frames}`, sub: gaitName, walk: true, phase: k / o.frames });
+      else if (o.walk && d.tags.includes('creature')) cells.push({ def: d, label: d.name.replace(/^core-/, '') + ' (stride)', sub: gaitName, walk: true, phase: 0.25 });
     }
     const rows = Math.ceil(cells.length / cols), W = cols * cw, H = rows * (ch + labelH);
     const root = document.getElementById('sheet')!; root.style.width = W + 'px'; root.style.height = H + 'px';
@@ -55,7 +57,7 @@ window.studio = {
       if (!obj) { errors.push(`${c.def.name}: no mesh`); continue; }
       const yaw0 = c.def.tags.includes('creature') ? 1.05 : 0.5; obj.rotation.y = yaw0;
       const rig = (obj.userData as { rig?: Rig }).rig;
-      if (rig) gait(obj, rig, { x: 0, z: 0, yaw: yaw0, speed: c.walk ? rig.speed : 0, dist: c.walk ? rig.hip * 2 * 0.25 : 0, rest: c.walk ? 0 : 1, activity: c.walk ? (rig.gait === 'bird-fly' ? 'fly' : 'walk') : 'look', alt: 0, u: 0.5 }, 0, 1, 0);
+      if (rig) gait(obj, rig, { x: 0, z: 0, yaw: yaw0, speed: c.walk ? rig.speed : 0, dist: c.walk ? Math.max(0.1, 4 * rig.hip * Math.sin(rig.gait === 'quadruped-walk' ? (rig.hip > 0.6 ? 0.34 : 0.42) : 0.5)) * (c.phase ?? 0.25) : 0, rest: c.walk ? 0 : 1, activity: c.walk ? (rig.gait === 'bird-fly' ? 'fly' : 'walk') : 'look', alt: 0, u: 0.5 }, 0, 1, 0);
       obj.rotation.y = yaw0;
       scene.add(obj); obj.updateMatrixWorld(true);
       let n = 0; obj.traverse((m) => { const mm = m as THREE.Mesh; if (mm.isMesh) { n += (mm.geometry.index ? mm.geometry.index.count : mm.geometry.attributes.position.count) / 3; mm.castShadow = true; mm.receiveShadow = true; } }); tris.push(Math.round(n));

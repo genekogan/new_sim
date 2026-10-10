@@ -203,7 +203,10 @@ export function gait(obj: THREE.Object3D, rig: Rig, P: Pose, t: number, s: numbe
   const sd = (rig.seed % 997) / 997 * Math.PI * 2;
   const nominal = Math.max(0.2, rig.speed);
   const m = Math.min(1, P.speed / (nominal * 0.6));                         // stride amplitude factor
-  const stride = Math.max(0.12, rig.hip * 2.0) * s;
+  // swing amplitude by leg length (long legs swing less), and a stride (body travel per cycle) that
+  // matches it — 4·hip·sin(amp) — so planted feet do not slide
+  const legAmp = rig.gait === 'quadruped-walk' ? (rig.hip > 0.6 ? 0.34 : 0.42) : 0.5;
+  const stride = Math.max(0.1, 4 * rig.hip * Math.sin(legAmp)) * s;
   const ph = (P.dist / stride) * Math.PI * 2 + sd;
   const breathe = Math.sin(t * (P.activity === 'sleep' ? 1.4 : 2.6) + sd);
   obj.scale.y = obj.scale.x * (1 + 0.012 * breathe);
@@ -211,7 +214,7 @@ export function gait(obj: THREE.Object3D, rig: Rig, P: Pose, t: number, s: numbe
   const turning = P.activity === 'turn' ? 1 : 0;
   switch (rig.gait) {
     case 'quadruped-walk': {
-      const amp = 0.5 * m + 0.12 * turning, tph = turning ? t * 9 : ph;
+      const amp = legAmp * m + 0.12 * turning, tph = turning ? t * 9 : ph;
       // diagonal pairs: fore-left with hind-right, fore-right with hind-left
       setX(R(rig, 'leg.fl'), amp * Math.sin(tph)); setX(R(rig, 'leg.br'), amp * Math.sin(tph));
       setX(R(rig, 'leg.fr'), amp * Math.sin(tph + Math.PI)); setX(R(rig, 'leg.bl'), amp * Math.sin(tph + Math.PI));

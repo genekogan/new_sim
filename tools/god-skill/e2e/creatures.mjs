@@ -78,7 +78,7 @@ try {
   const page = await (await browser.newContext({ viewport: { width: 800, height: 500 } })).newPage(); page.setDefaultTimeout(600000);
   const errors = []; page.on('pageerror', (e) => errors.push(String(e).slice(0, 300)));
   await step('open the world in the viewer (patient: the laptop is loaded)', async () => {
-    await page.goto(`${base}?dev=1&eye=-22,7,-12&at=-29,0,0`, { waitUntil: 'commit', timeout: 300000 });
+    await page.goto(`${base}?dev=1&shot=1&eye=-25.5,2.4,-6.8&at=-29,0.3,-0.8`, { waitUntil: 'commit', timeout: 300000 });
     // the page may remount its entity layer once after the first snapshot: wait until one stays up
     let steady = 0;
     for (let i = 0; i < 900; i++) { const ok = await page.evaluate(() => { const w = window.__simEntity; return !!w?.layer?.active && !!w.layer.model && w.layer.drawn?.size > 5; }).catch(() => false); steady = ok ? steady + 1 : 0; if (steady >= 5) return true; await page.waitForTimeout(1000); }
@@ -91,7 +91,7 @@ try {
     const snap = [...w.layer.model.entities.values()];
     for (const n of names) {
       const e = snap.find((x) => x.name === n); const d = e && w.layer.drawn.get(e.id); if (!d) { out[n] = null; continue; }
-      if (d.obj.userData.tick) out[n] = d.obj.children.map((c) => [c.position.x, c.position.y, c.position.z]);
+      if (d.obj.userData.tick) out[n] = d.obj.children.filter((c) => c.userData.rig).map((c) => [c.position.x, c.position.y, c.position.z]);
       else out[n] = [[d.obj.position.x, d.obj.position.y, d.obj.position.z]];
     }
     return out;
@@ -119,6 +119,10 @@ try {
   const p0 = await where(['mother-duck', 'ducklings', 'koi-1']); await shot('pond-1');
   await page.waitForTimeout(5000);
   const p1 = await where(['mother-duck', 'ducklings', 'koi-1']); await shot('pond-2');
+  // swimmers rest between legs: also compare with a third look 15 s later (the largest displacement counts)
+  await page.waitForTimeout(15000);
+  const p2 = await where(['mother-duck', 'ducklings', 'koi-1']);
+  for (const k of ['mother-duck', 'ducklings']) if (p2[k] && p0[k]) p1[k] = p1[k].map((q, i) => (dist(p2[k][i], p0[k][i]) > dist(q, p0[k][i]) ? p2[k][i] : q));
   await step('the duck family swims: the mother and the ducklings moved, all afloat on the pond', () => {
     const mother = p0['mother-duck'] && p1['mother-duck'] ? dist(p0['mother-duck'][0], p1['mother-duck'][0]) : null;
     const kids = (p1.ducklings ?? []).map((q, i) => dist(q, p0.ducklings[i]));

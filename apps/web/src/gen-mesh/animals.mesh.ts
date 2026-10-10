@@ -11,6 +11,7 @@ import { seedOf, type BehaviorKind } from './creatures/behavior.ts';
 import { bindMotionModel, creatureStep, waterAt, worldSeconds, type Rig } from './motion.ts';
 
 const bundled = new Map<string, StoredDef>();
+let markerMaterial: THREE.MeshBasicMaterial | undefined;
 /** A core creature def by species, from the world model if present, else from the bundled kit. */
 export function speciesDef(model: WorldModel, ref: string): StoredDef | undefined {
   const inWorld = model.resolvedDef(ref) ?? model.resolvedDef(`core/${ref}@1`);
@@ -60,8 +61,11 @@ registerMesh({
       for (const m of members) { m.obj.scale.setScalar(m.rig.scale!); creatureStep(m.obj, m.rig, null, t, { y: 0, yaw: 0 }, m.home); }
     };
     group.userData.tick = tick;
-    // world builders get no per-frame call from the layer: tick from the first visible member's draw
-    for (const m of members) m.obj.traverse((o) => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).onBeforeRender = () => tick(Date.now() / 1000); });
+    // world builders get no per-frame call from the layer: tick from a never-culled, empty marker mesh
+    // (drawn as nothing; its onBeforeRender runs every frame whether or not the herd is on screen)
+    const marker = new THREE.Mesh(new THREE.BufferGeometry(), markerMaterial ??= new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
+    marker.frustumCulled = false; marker.name = 'herd-ticker'; marker.onBeforeRender = () => tick(Date.now() / 1000);
+    group.add(marker);
     tick(Date.now() / 1000);
     return group;
   },

@@ -8,6 +8,7 @@
 //        same, from this checkout's core kit (no server)
 //   node tools/god-skill/scripts/gallery.mjs <world-url> --world [--cols 8]
 //        also place every def in a grid in that world and photograph the grid from the viewer
+//   --frames <n>    creatures: one row of n stride phases each (judge the walk cycle)
 //   --serve <port>  start an own small studio world (240 m, fresh) for --world and stop it after
 //
 // Writes <out>/sheet.png (+ sheet-walk rows with --walk), <out>/gallery.json (defs, tris, errors),
@@ -111,7 +112,7 @@ await page.goto(pathToFileURL(resolve(out, 'studio.html')).href);
 await page.waitForFunction(() => !!window.studio, null, { timeout: 120000 });
 await page.evaluate((t) => { document.getElementById('title').textContent = t; }, `Eden core library — ${defs.length} defs — ${new Date().toISOString().slice(0, 16)}Z${filter ? ` — filter “${filter}”` : ''}`);
 const t0 = Date.now();
-const res = await page.evaluate(([d, c, w]) => window.studio.render(d, { cols: c, walk: w }), [defs, cols, has('walk')]);
+const res = await page.evaluate(([d, c, w, f]) => window.studio.render(d, { cols: c, walk: w, frames: f }), [defs, cols, has('walk'), Number(flag('frames', 0)) || 0]);
 await page.locator('body').screenshot({ path: resolve(out, 'sheet.png') });
 console.log(`sheet: ${resolve(out, 'sheet.png')} — ${res.cells} cells in ${((Date.now() - t0) / 1000).toFixed(1)} s, errors ${res.errors.length + errors.length}`);
 writeFileSync(resolve(out, 'gallery.json'), JSON.stringify({ base: base || 'local', count: defs.length, defs: defs.map((d, i) => ({ name: d.name, tags: d.tags, box: d.size.box, family: family(d), description: d.description })), tris: res.tris, errors: [...res.errors, ...errors] }, null, 1));
@@ -125,7 +126,7 @@ const browser2 = await chromium.launch({ channel: 'chrome', headless: true, args
 const ctx = await browser2.newContext({ viewport: { width: 960, height: 600 } });
 const page = await ctx.newPage(); page.setDefaultTimeout(180000);
 const werrors = []; page.on('pageerror', (e) => werrors.push(String(e).slice(0, 200)));
-const zm = (z0 + z) / 2; const q = new URLSearchParams({ dev: '1', eye: `-40,40,${z0 - 20}`, at: `0,0,${zm}` });
+const zm = (z0 + z) / 2; const q = new URLSearchParams({ dev: '1', shot: '1', eye: `-40,40,${z0 - 20}`, at: `0,0,${zm}` });
 await page.goto(`${base}?${q}`, { waitUntil: 'commit', timeout: 120000 });
 for (let i = 0; i < 60; i++) { const ok = await page.evaluate(() => !!window.__simEntity?.layer?.active).catch(() => false); if (ok) break; await page.waitForTimeout(500); }
 await page.waitForTimeout(6000);
