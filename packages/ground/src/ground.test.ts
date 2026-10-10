@@ -1,0 +1,111 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { SKIRT_MAX_M, Terrain, bakeTile, emptyGround, footprintOf, groundSchema, heightAt, mediumAt, padFor, settle, tileHash, tilesTouched, waterDepthAt, TILE_N, type Ground, type Landform } from './index.ts';
+
+const hill: Landform = { id: 'knoll', kind: 'bump', c: [0, 0], r: 20, h: 6, peak: 1 };
+const mountain: Landform = { id: 'east', kind: 'ridge', path: [[300, -200], [340, 220]], w: 140, h: 180, peak: 2 };
+const lakeArea: [number, number][] = [[-260, -40], [-180, -90], [-150, 10], [-230, 60]];
+const lake: Landform = { id: 'west-lake', kind: 'carve', area: lakeArea, bed: -5, edge: 6 };
+
+function world(): Ground {
+  const g = emptyGround(1000);
+  g.landforms.push(hill, mountain, lake);
+  g.waters.push({ id: 'west-lake', area: lakeArea, level: -0.5 });
+  return groundSchema.parse(g);
+}
+
+test('flat world is base everywhere', () => {
+  const g = emptyGround(1000, 0);
+  for (const [x, z] of [[0, 0], [499, -499], [-123.4, 77.7]]) assert.equal(heightAt(g, x, z), 0);
+});
+
+test('a bump peaks at its centre and vanishes at its radius; a ridge rises along its path', () => {
+  const g = world();
+  assert.equal(heightAt(g, 0, 0), 6);
+  assert.equal(heightAt(g, 20, 0), 0);
+  assert.ok(heightAt(g, 10, 0) > 0 && heightAt(g, 10, 0) < 6);
+  assert.ok(heightAt(g, 320, 0) > 150, 'mountain crest');
+  assert.equal(heightAt(g, 100, 0), 0, 'plain between');
+});
+
+test('carve lowers to the bed inside, leaves the plain outside; water depth follows', () => {
+  const g = world(); const t = new Terrain(g);
+  assert.ok(Math.abs(heightAt(g, -210, -20) - -5) < 1e-6, 'lake bed');
+  assert.equal(heightAt(g, -100, 0), 0);
+  assert.ok(waterDepthAt(t, -210, -20) > 4);
+  assert.equal(waterDepthAt(t, -100, 0), 0);
+  assert.equal(mediumAt(t, -210, -20), 'swim');
+  assert.equal(mediumAt(t, -100, 0), 'walk');
+});
+
+test('tiles reproduce the function at samples and interpolate between; hash is stable and order-independent of time', () => {
+  const g = world(); const t = new Terrain(g);
+  for (const [x, z] of [[0, 0], [7, 3], [-200, -20], [320, 10]]) assert.equal(t.sample(x, z), Math.fround(heightAt(g, x, z)));
+  const mid = t.sample(0.5, 0);
+  assert.ok(mid < 6 && mid > heightAt(g, 1, 0), 'bilinear between samples');
+  const a = tileHash(bakeTile(g, 0, 0)), b = tileHash(bakeTile(world(), 0, 0));
+  assert.equal(a, b);
+  assert.equal(a.length, 16);
+  assert.equal(bakeTile(g, 0, 0).length, TILE_N * TILE_N);
+});
+
+// Golden hashes: if these change, server and browser (or two Node versions) would disagree. Update only on purpose.
+test('golden tile hashes (bit-exactness fixture)', () => {
+  const t = new Terrain(world());
+  assert.deepEqual([t.hash(0, 0), t.hash(-1, -1), t.hash(4, 0), t.hash(-4, -1)], ['2c87af0aa39f648e', '147cf2660f9e26d2', 'd8691134fa39165c', '73efff3d30c0594f']);
+});
+
+test('noise is deterministic and bounded', () => {
+  const g = emptyGround(1000); g.noise = { amp: 0.4, scale: 9, seed: 7 };
+  const a = heightAt(g, 12.3, -45.6), b = heightAt(structuredClone(g), 12.3, -45.6);
+  assert.equal(a, b);
+  for (let i = 0; i < 200; i++) assert.ok(Math.abs(heightAt(g, i * 3.7, -i * 1.3)) <= 0.4 + 1e-9);
+});
+
+test('settle: base takes the lowest corner and asks for a pad on a slope; the pad then flattens the footprint', () => {
+  const g = world(); const t = new Terrain(g);
+  const fp = footprintOf(8, 0, 4, 3, 0.3); // on the knoll's flank
+  const s = settle(t, fp, 'base');
+  assert.equal(s.y, Math.min(...s.samples));
+  assert.ok(s.gap > 0.6, `gap ${s.gap}`);
+  assert.equal(s.needsPad, true);
+  const pad = padFor('cottage-pad', fp, s.y);
+  g.landforms.push(pad);
+  const keys = t.update(g, [pad]);
+  assert.ok(keys.includes('0,0') && keys.includes('0,-1'), `touched ${keys}`);
+  const s2 = settle(t, fp, 'base');
+  assert.ok(s2.gap <= SKIRT_MAX_M, `flattened to a skirt-sized gap, got ${s2.gap}`);
+  assert.ok(Math.abs(s2.y - s.y) < 0.3, `level kept, ${s2.y} vs ${s.y}`);
+  assert.equal(s2.needsPad, false);
+});
+
+test('settle: center sinks the trunk; conform tilts within the clamp; drape uses the mean', () => {
+  const t = new Terrain(world());
+  const fp = footprintOf(10, 0, 0.3, 0.3, 0);
+  assert.ok(Math.abs(settle(t, fp, 'center').y - (t.sample(10, 0) - 0.2)) < 1e-9);
+  const c = settle(t, footprintOf(10, 0, 1, 1, 0), 'conform');
+  assert.ok(Math.abs(c.roll!) > 0 && Math.abs(c.roll!) <= 0.35);
+  const d = settle(t, fp, 'drape');
+  assert.ok(d.y > 0);
+});
+
+test('tilesTouched covers a landform and pads reach beyond their area', () => {
+  assert.deepEqual(tilesTouched(hill).sort(), ['-1,-1', '-1,0', '0,-1', '0,0']);
+  const pad: Landform = { id: 'p', kind: 'pad', area: [[63, 63], [63.5, 63], [63.5, 63.5], [63, 63.5]], level: 0, edge: 1.5 };
+  assert.ok(tilesTouched(pad).includes('1,1'));
+});
+
+test('schema refuses malformed landforms', () => {
+  const g = emptyGround(100);
+  (g.landforms as unknown[]).push({ id: 'x', kind: 'carve', bed: -1 });
+  assert.throws(() => groundSchema.parse(g));
+});
+
+test('a 1 km world bakes in budget', () => {
+  const t = new Terrain(world());
+  const t0 = performance.now();
+  for (let tz = -8; tz < 8; tz++) for (let tx = -8; tx < 8; tx++) t.tile(tx, tz);
+  const ms = performance.now() - t0;
+  assert.equal(t.cachedTiles, 256);
+  assert.ok(ms < 4000, `256 tiles took ${ms.toFixed(0)} ms`);
+});
