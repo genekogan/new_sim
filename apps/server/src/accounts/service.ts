@@ -1,6 +1,6 @@
 import {hashOf} from '@sim/engine-contract';
 import {realpathSync} from 'node:fs';
-import type {VerifiedAccountIdentity} from '../auth.ts';
+import {hasFreshAttributionProof,type AttributionAccountIdentity} from '../auth.ts';
 import {AccountStore,AccountStoreError,type AccountIdentity,type ApprovalDTO} from './store.ts';
 import {tx,afterCommit} from '../edge/comms/store.ts';
 import {ApiError,type Souls} from '../souls.ts';
@@ -57,8 +57,8 @@ export class WorldAccounts {
  }
  /** Only a source-reviewed attribution manifest and verified provider identity
   * may call this helper. Name/bio or caller-supplied email is never attribution. */
- associateAttributed(identity:VerifiedAccountIdentity,input:{worldId:string;dbPath:string;soulId:string;entityId:string;birthSeq:number;birthHash:string;evidenceHash:string;verifiedSubject:string;verifiedEmail:string}){
-  if(identity.subject!==input.verifiedSubject||identity.verifiedEmail!==input.verifiedEmail.toLowerCase()||!identity.emailVerifiedAt||Date.now()-identity.emailVerifiedAt>300000||input.worldId!==this.host.worldId||realpathSync(this.host.db.path)!==realpathSync(input.dbPath))throw new ApiError(403,'forbidden','Verified attribution identity or public lineage differs.');
+ associateAttributed(identity:AttributionAccountIdentity,input:{worldId:string;dbPath:string;soulId:string;entityId:string;birthSeq:number;birthHash:string;evidenceHash:string;verifiedSubject:string;verifiedEmail:string}){
+  if(!hasFreshAttributionProof(identity)||identity.subject!==input.verifiedSubject||identity.verifiedEmail!==input.verifiedEmail.toLowerCase()||input.worldId!==this.host.worldId||realpathSync(this.host.db.path)!==realpathSync(input.dbPath))throw new ApiError(403,'forbidden','Verified attribution identity or public lineage differs.');
   const row=this.host.db.soul(input.soulId),event=this.host.db.events(this.host.worldId,input.birthSeq-1,1)[0];
   if(!row||row.entity_id!==input.entityId||row.native||!event||event.kind!=='birth'||event.payload.soulId!==row.id||event.payload.entityId!==row.entity_id||event.payload.owner!==row.owner||event.payload.owner==='system'||hashOf(event)!==input.birthHash)throw new ApiError(409,'attribution-unconfirmed','Historical creation attribution differs.');
   return this.store.associate(identity,row.id,{attribution:'reviewed-historical-creator',evidenceHash:input.evidenceHash});

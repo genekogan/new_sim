@@ -9,6 +9,10 @@ import type { Db, UserRow } from './db.ts';
 import { ownerShort } from './world.ts';
 
 export type VerifiedAccountIdentity={id:string;issuer:string;subject:string;verifiedEmail?:string;emailVerifiedAt?:number;verifiedAt:number;expiresAt:number};
+export type AttributionAccountIdentity=VerifiedAccountIdentity&{verifiedEmail:string;emailVerifiedAt:number;attributionFetchedAt:number;attributionProvider:'email'|'google_oauth'};
+const attributionProofs=new WeakSet<AttributionAccountIdentity>();
+/** In-process provider proof, not serializable caller claims or profile cache. */
+export function hasFreshAttributionProof(identity:VerifiedAccountIdentity):identity is AttributionAccountIdentity {const now=Date.now(),proof=identity as AttributionAccountIdentity;return attributionProofs.has(proof)&&identity.expiresAt>now&&proof.attributionFetchedAt<=now&&now-proof.attributionFetchedAt<=300000;}
 
 export class Auth {
   private key: CryptoKey | null = null;
@@ -84,6 +88,25 @@ export class Auth {
   /** Only validated provider JWTs establish account authority. Caller emails,
    * public Soul IDs and legacy dev identities never satisfy this predicate. */
   async accountFromToken(token:string|undefined|null){const user=await this.userFromToken(token),identity=user?this.verified.get(user):undefined;return user&&identity&&identity.expiresAt>Date.now()?{user,identity}:null;}
+
+  /** Use only from a normal authenticated browser request and a trusted manifest
+   * email. This fresh read neither updates profile cache nor changes roles. */
+  async freshAttributionAccountFromToken(token:string|undefined|null,expectedEmail:string){
+    const account=await this.accountFromToken(token);if(!account||typeof expectedEmail!=='string'||expectedEmail.length>254)return null;
+    const expected=expectedEmail.trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(expected))return null;
+    try{
+      const response=await fetch(`https://auth.privy.io/api/v1/users/${encodeURIComponent(account.identity.subject)}`,{headers:{Authorization:this.basic(),'privy-app-id':this.cfg.privyAppId},signal:AbortSignal.timeout(8000)});
+      if(!response.ok)return null;const user=await response.json() as {id?:unknown;linked_accounts?:unknown};const now=Date.now();
+      if(user.id!==account.identity.subject||!Array.isArray(user.linked_accounts)||account.identity.expiresAt<=now)return null;
+      const timestamp=(value:unknown)=>typeof value==='number'&&Number.isFinite(value)&&value>0&&value*1000<=now;
+      const link=user.linked_accounts.find((value:unknown)=>{if(!value||typeof value!=='object')return false;const a=value as Record<string,unknown>,email=a.type==='email'?a.address:a.type==='google_oauth'?a.email:null;
+        // REST user metadata documents last verification; imported/unverified
+        // null timestamps and first-link metadata alone are not sufficient.
+        return typeof email==='string'&&email.trim().toLowerCase()===expected&&(timestamp(a.latest_verified_at)||timestamp(a.verified_at));
+      }) as {type:'email'|'google_oauth';latest_verified_at?:number;verified_at?:number}|undefined;
+      if(!link)return null;const identity:AttributionAccountIdentity=Object.freeze({...account.identity,verifiedEmail:expected,emailVerifiedAt:(timestamp(link.latest_verified_at)?link.latest_verified_at!:link.verified_at!)*1000,attributionFetchedAt:now,attributionProvider:link.type});attributionProofs.add(identity);return {user:account.user,identity};
+    }catch{return null;}
+  }
 
   private async fetchProfile(did: string): Promise<{ email: string | null; wallet: string | null }> {
     const res = await fetch(`https://auth.privy.io/api/v1/users/${encodeURIComponent(did)}`, { headers: { Authorization: this.basic(), 'privy-app-id': this.cfg.privyAppId } });
