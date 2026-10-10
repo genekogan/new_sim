@@ -149,7 +149,25 @@ const creature = (name, description, tags, shapes, palette, gait, behavior, extr
   },
 });
 
+/** A herd, flock or school living in an area (animals/1): each member is the species' kit creature. */
+const herd = {
+  schema: 'def/1', name: 'core-animals', version: 1, form: 'area', layer: 'decor',
+  description: 'Animals living in an area: a herd, flock or school (species: dog, cat, pug, duck, goose, chicken, sheep, goat, cow, horse, pig, fox, deer, rabbit, bird, crow, seagull, koi, fish; or def: any kit creature). Each one wanders, grazes or swims (on water areas) around its own spot. Area shape. Client-side, no server cost.',
+  tags: ['animals', 'herd', 'flock', 'school', 'creature-group', 'livestock'],
+  make: { kind: 'gen', gen: 'animals/1' },
+  params: {
+    species: { type: 'enum', values: ['dog', 'cat', 'pug', 'duck', 'goose', 'chicken', 'sheep', 'goat', 'cow', 'horse', 'pig', 'fox', 'deer', 'rabbit', 'bird', 'crow', 'seagull', 'koi', 'fish'], default: 'sheep' },
+    def: { type: 'ref', doc: 'a kit creature def instead of the species (e.g. "core/dog@1" or your own)' },
+    count: { type: 'int', min: 1, max: 60, default: 5 },
+    behavior: { type: 'enum', values: ['wander', 'graze', 'swim', 'perch', 'sleep', 'fly', 'follow', 'idle'], default: 'graze', doc: 'water areas always swim' },
+    speed: { type: 'number', min: 0.1, max: 6, default: 1, doc: 'multiplies the species speed' },
+    scale: { type: 'number', min: 0.3, max: 3, default: 1, doc: 'size (ducklings: 0.5)' },
+  },
+  size: { box: [40, 2, 40] },
+};
+
 export default [
+  herd,
   creature('dog', 'A friendly medium dog (rounded low-poly, ~600 tris) that trots about its yard: diagonal-pair walk, head nod, wagging tail. Recolour with params fur/muzzle/ear. Behaviours: wander (default), follow, sleep.', ['dog', 'pet', 'pup', 'puppy', 'quadruped'],
     quadruped({ L: 0.72, H: 0.3, leg: 0.36, legR: 0.045, twoSegment: true, neck: { len: 0.17, angle: 0.55, r: 0.085 }, head: { r: 0.11, scale: [0.9, 0.92, 1.0] }, snout: { len: 0.13, r: 0.048 }, ears: { kind: 'floppy', r: 0.07, color: 'ear' }, tail: { kind: 'hook', len: 0.3, r: 0.026, angle: 0.75, angle2: 1.7, y: 0.3 }, belly: true }),
     { fur: '#b8814a', belly: '#e6cfa6', muzzle: '#e6cfa6', ear: '#7a4f2a' }, 'quadruped-walk', 'wander', { speed: 1.1, radius: 7 }),

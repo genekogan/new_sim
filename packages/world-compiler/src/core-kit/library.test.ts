@@ -17,7 +17,7 @@ test('family defs parse, are unique, described, tagged, and within the Eden budg
     assert.ok(def.description.length > 20, `${def.name}: one-line description`);
     assert.ok(def.tags.length >= 2, `${def.name}: tags`);
     const tris = kitPhysics(kitArgs.parse((def.make as { args: unknown }).args)).tris;
-    const budget = def.tags.includes('creature') ? 600 : def.tags.includes('structure') || def.tags.includes('ride') || def.tags.includes('large') ? 6000 : def.tags.includes('vehicle') || def.tags.includes('tree') ? 1200 : 400;
+    const budget = def.tags.includes('creature') ? 600 : def.tags.includes('structure') || def.tags.includes('ride') || def.tags.includes('large') ? 6000 : def.tags.includes('vehicle') ? 1200 : 400;
     assert.ok(tris <= budget, `${def.name}: ${tris} tris > ${budget}`);
   }
   assert.ok(kit.length >= 19, `only ${kit.length} kit defs`);
