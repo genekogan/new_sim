@@ -122,3 +122,27 @@ test('path ends at area edges and path ends, not centres; rows never pile up at 
   const xs = trees.items.map((it) => it.candidates[0].p[0]).sort((a, b) => a - b);
   for (let i = 1; i < xs.length; i++) assert.ok(Math.abs(xs[i] - xs[i - 1] - 12) < 0.01, xs.join(','));
 });
+
+test('on a stand/floor slot (pier end, balcony): slot-frame p (never the world point), a row across the slot', () => {
+  const pier = row({ id: 'e_pi', path: 'pier', name: 'pier', def: 'core/pier@1', form: 'path', layer: 'surface', shape: { path: [[12, -1], [14, 45]], width: 3 }, pose: [0, 0, 0, 0, 1], aabb: [10, -3, 16, 47], slots: [{ id: 'end', kind: 'stand', p: [14, 0.4, 45], yaw: 0, capacity: 12, used: 0 }] });
+  const tower = row({ id: 'e_lh', path: 'lighthouse', name: 'lighthouse', def: 'core/lighthouse@1', pose: [62, 3, -40, -Math.PI / 2, 1], box: [7.8, 18, 7.8], slots: [{ id: 'ground', kind: 'floor', p: [62, 3, -40], yaw: 0, capacity: 256, used: 0 }, { id: 'balcony', kind: 'floor', p: [58.55, 15.1, -40], yaw: 0, capacity: 8, used: 0 }, { id: 'room', kind: 'room', p: [62, 3, -40], yaw: -Math.PI / 2, capacity: 64, used: 0, local: [[-2, -2], [2, -2], [2, 2], [-2, 2]] }] });
+  const w = mkView([pier, tower]);
+  const lantern = { def: 'core/lantern@1', form: 'point', layer: 'solid', box: [0.22, 0.45, 0.22] };
+  const a = first(solve(w, lantern, { on: 'pier' }));
+  assert.deepEqual(a.in, { parent: 'pier', slot: 'end' }); assert.deepEqual(a.p, [0, 0]);
+  const three = solve(w, lantern, { on: 'pier/end', count: 3 });
+  assert.equal(three.items.length, 3); assert.ok(three.items.every((it) => Math.hypot(...it.candidates[0].p) < 3.6));
+  const b = first(solve(w, lantern, { inside: 'lighthouse/balcony' }));
+  assert.deepEqual(b.in, { parent: 'lighthouse', slot: 'balcony' }); assert.deepEqual(b.p, [0, 0]);
+  assert.throws(() => solve(w, lantern, { on: 'lighthouse/nowhere' }), /no slot nowhere/);
+});
+
+test('near a building: its outer doorway stays clear (as --inside keeps inner ones)', () => {
+  // a 7 m round house facing east, front door on its east side
+  const rh = row({ id: 'e_rh', path: 'rh', name: 'rh', def: 'core/roundhouse@1', pose: [0, 0, 0, Math.PI / 2, 1], box: [7, 5, 7], doors: [{ id: 'front-door', level: 0, width: 1, at: [3.3, 0], yaw: Math.PI / 2, out: true }], slots: [{ id: 'living', kind: 'room', p: [0, 0, 0], yaw: Math.PI / 2, capacity: 64, used: 0 }] });
+  const w = mkView([rh]);
+  const s = solve(w, { def: 'core/lantern@1', form: 'point', layer: 'solid', box: [0.22, 0.45, 0.22] }, { near: 'rh', dir: 'e', dist: 0.3 });
+  const c = first(s);
+  assert.ok(!(c.p[0] > 3 && Math.abs(c.p[1]) < 0.85), `not in front of the door: ${c.p}`);
+  assert.ok(s.notes.some((n) => /doorway front-door clear/.test(n)));
+});

@@ -12,13 +12,17 @@ human answer; add `--json` for data. `node eden-god.mjs help` lists everything.
 ## Setup (once per folder)
 
 ```
-node eden-god.mjs register <world-url>       # e.g. http://127.0.0.1:4990/w/hello-world
+node eden-god.mjs register <world-url>       # the world page's address, exactly as the owner sees it
 node eden-god.mjs pair                       # prints a link; the owner approves in the browser
 # local dev server only:  register <url> dev:admin  then  mint
 ```
+The world URL is the page's address without `?…` or `#…`. Hosted worlds may sit under a prefix:
+`https://sim.eden.art/worlds/w/<slug>`, `http://localhost:5300/worlds/w/<slug>`; a single local
+world is `http://127.0.0.1:4990/w/<slug>`. Copy it from the browser rather than guessing the shape.
 `.eden-god.json` holds the token; never print it. `.eden-god.cache.json` is your mirror of the world
 (refreshed automatically when the world changes; used as is when the server is unreachable).
-`look` needs Google Chrome and Playwright next to the CLI (`npm i @playwright/test` in this folder).
+`look` needs Google Chrome. If no Playwright package sits next to the CLI, the first look fetches
+`playwright-core` once through npx (no browser download; it drives your Chrome).
 
 ## The world in one page (the ontology)
 
@@ -57,7 +61,8 @@ node eden-god.mjs pair                       # prints a link; the owner approves
 - **Groups** label edits ("market", "ducks"): `group market`, build, then `undo --group market`
   takes the whole market back out.
 - **Flags** are labelled reference points (no collider): `flag "camp" --at 40,10`, then
-  `--near flag:camp`. The owner can drop flags from the website too.
+  `--near flag:camp`. The owner can drop flags from the website too. (A `flagpole` is an ordinary
+  8 m civic thing, not a flag.)
 
 ## The loop
 
@@ -81,6 +86,9 @@ yourself is slower, uglier and knows nothing about Souls. The order is always:
 1. `defs <words>` (plain words work: `defs houses`, `defs street lamp`, `defs market`); a wrong
    name also tells you what the library has (`place house` → "the library has: core/cottage@1 …").
 2. A def's **params** make variants: size, colours, `floors`, `roof`, `material`, `behavior`.
+   `--scale s` resizes a point thing within **its def's range**, which `defs` prints (`scale 0.3–6`;
+   `fixed size` = no `--scale`: a lantern, a boat); outside it the server refuses `size.range`.
+   For a bigger version use params (`w`, `d`, `height`, `radius`) or another def.
    `recolor`, `--scale` and `set --param` change one already placed.
 3. Several library things together (a stall = a `parasol-table` + `crate`s + `barrel`s) or a
    **prefab** of them.
@@ -117,7 +125,7 @@ that def in full: params with ranges and defaults, state, size, slots, rooms; se
 | relation | meaning |
 |---|---|
 | `--at x,z` · `--at <ref>` · `--at east` | a point, a thing's centre, or a region of the world (n, ne, e … centre); `--offset dx,dz` shifts it |
-| `--near <ref> [--dist m] [--dir ne]` | just outside the ref's footprint, `dist` metres from its edge (default ~2), on the `dir` side (default its front, else south); tries other sides if blocked |
+| `--near <ref> [--dist m] [--dir ne]` | just outside the ref's footprint, `dist` metres from its edge (default ~2), on the `dir` side (default its front, else south); tries other sides if blocked. Next to a building its doorways stay clear (it moves round and says "kept … doorway clear") |
 | `--near <ref> --count n` | n things evenly around the ref (benches round a fountain); round an area's **rim** (reeds round a pond); beside a road/river, spread along it (`--dir` picks the side) |
 | `--facing <ref>` · `--facing n\|e\|s\|w` · `--facing away:<ref>` | turn the front toward a thing (kept as a constraint), a compass direction, or away |
 | `--against <ref>[.n\|.e\|.s\|.w]` | back flush to that side of the ref, front facing away (default: the ref's back) |
@@ -127,11 +135,12 @@ that def in full: params with ranges and defaults, state, size, slots, rooms; se
 | `--across <path> [--t 0.5] [--span m]` | across a road/river at t: path defs (a bridge) get a crossing path `span` m past each bank; point things are turned to face across |
 | `--inside <house>/<room>` | a free spot in that room (local frame handled for you) |
 | `--inside <house>/<room> --wall back` · `--corner front-left` | back to a wall facing into the room, or tucked into a corner (`--count n` lines several along the wall). Words are **the house's own sides**: `front` = the way the house faces (its front door), `back`, and `left`/`right` **as you walk out of its front door**; corners `back-left`, `front-right`… (in a corner the back goes to the first-named wall: `back-left` = back to the back wall) Compass words (`n`, `se`) still work and mean the world's compass. Doorways stay clear (it slides along the wall and says so); in a round room things stay inside the curved wall |
-| `--on <thing>` | on a surface slot (a bowl on a table); `--count n` spreads them over the top |
+| `--on <thing>` · `--on <thing>/<slot>` | on a table's top (a bowl), else where one stands on it: a pier's end platform, a deck, a porch, a balcony (`--on pier`, `--on lighthouse/balcony`); `--count n` spreads them over the top or in a row across the slot. A plain `--at` point over a pier or deck lands on the ground or lake bed below it: use `--on` |
 | `--row n --gap g` · `--grid WxH --gap g` | n side by side (along the thing's width), or a grid, around the `--at` point |
 | `--free [--near ref] [--radius r]` | the nearest flat, dry, empty plot that fits |
 | `--float --at <lake\|pond\|river>` | on the water (ducks, boats); `--count n` spreads them out |
 | `--yaw r` | an explicit yaw (radians) |
+| `--scale s` | bigger or smaller, within the def's range (`defs <name>` prints it) |
 
 References (`<ref>`): a path (`house`, `house/table`), `flag:<name>`, or `x,z`. A row/grid/count placed with
 `--name stall` makes `stall-1`, `stall-2`…; **the bare name `stall` refers to the whole set** (`--near stall`,
@@ -153,12 +162,25 @@ place river --path '[[-260,60],[-120,180],[0,480]]' --width 10
 place river --from west-lake --to s --width 10 --name river             # a compass word as an end = the world's edge that way
 ```
 Roads grade the ground under them (≤ 8 %, `maxGrade`) and **bridge water by themselves**
-(`autoBridge`); rivers flow from the first point to the last, snap their ends into lakes and ponds
+(`autoBridge`), also water added after them: a stream laid across an existing lane gives the lane its
+bridge, and the answer says so (`warnings: lane: now bridges the water it crosses`); rivers flow from the first point to the last, snap their ends into lakes and ponds
 and make waterfalls where the bed steps; the CLI freezes those ground facts into the params for
 you. `describe <road>` shows grade and spans. Shape the land with landforms (they are entities;
 remove one and the ground goes back): `place cliff --path …`, `place terrace --rect … --param
 level=4`, `place channel --path …`, `place brush --at x,z --param op=flatten --param radius=10`.
 Growth avoids roads, water and buildings by itself: lay roads and houses first, then `woodland`.
+
+**A coast or a sea.** There is no ocean def: a sea is a big `lake` area that runs to the world's edge
+(`map` prints the extent; ±500 in a 1000 m world), with a sand `shore` on the same outline and a
+`pier` out into it. A bay is a lake area whose mouth opens onto the sea area (or one lake drawn with a
+notch). Boats and ducks `--float --at sea`; things on the pier go `--on pier`.
+```
+place lake --area '[[-500,60],[-150,70],[0,55],[150,75],[500,60],[500,500],[-500,500]]' --param depth=6 --name sea
+place shore --area '<the same outline>' --param material=sand --param width=8 --name beach
+place pier --path '[[10,50],[12,80]]' --param width=3 --param platform=6 --name pier   # from the sand out over the water
+place lantern --on pier --count 2 --name pier-lamp
+place sailboat --float --at sea --name sail
+```
 
 **Buildings.** `place cottage --param floors=2 --param porch=2 --param balcony=true --facing s` (porch depth in m): the preset picks the
 plan (rooms per floor, stairs, doors, windows); `--param plan='…'` gives your own (`schema --md`).
@@ -177,6 +199,7 @@ at?:0…1}]` (the first exterior door is `front-door`); top level `stairs:[{from
 
 ```
 move <ref> --near … | --at … | --by dx,dz | --yaw r | --facing … | --in <parent>[/slot]   # children ride along
+move lantern --in pier/end · move gull --in lighthouse/balcony · move lamp --in house/kitchen   # into a slot or room; the solver picks the spot
 set <ref> --param w=10 --state '{"paint":"#3366cc"}'   # params regenerate the thing in place
 recolor <ref> '#aa5533' [--part fur]                    # paint, else its main colour param (or the part named)
 remove <ref> [<ref>…]                                    # and everything inside it
@@ -244,7 +267,8 @@ an extra word, several options in one quoted argument); nothing was sent. Fix th
 | `overlap.solid` | already retried with candidates/suggestion/nudge; pick another relation, `--dist`, `--free`, or remove the blocker |
 | `extent.outside` | place nearer the centre, or `expand <metres>` |
 | `support.none` | give a 2-D position (it settles on the ground) or a parent |
-| `float.no-water` | `--float --at <lake>`: floating needs water under it |
+| `float.no-water` | `--float --at <lake>`: floating needs water under it (boats always float: no beached boats) |
+| `size.range` | the scale (or size) is outside what the def allows: `defs <name>` prints its `--scale` range (`fixed size` = none); use params (`w`, `d`, `height`) or another def |
 | `slot.unknown` · `slot.full` · `slot.incompatible` · `slot.outside` | `describe <parent>` for its slots and rooms; choose another (outside = the point is not in that room) |
 | `def.unknown` | `defs <word>`; refs look like `core/bench@1` |
 | `params.invalid` · `state.invalid` | `defs <name>` shows params with ranges |
@@ -264,8 +288,10 @@ an extra word, several options in one quoted argument); nothing was sent. Fix th
 
 ## Prayers
 
-`prayers` lists what Souls asked; `answer <id> <text>` replies. Interpret prayers under the world's
-constitution (`constitution "<markdown>"` sets it; Souls can read it).
+`prayers` lists the prayers **waiting** for an answer; `answer <id> <text>` replies, and the answered
+prayer then **leaves** `prayers` (the Soul sees your answer). `prayers --all` shows the answered ones
+too, with what you said. `map` and `status` count the waiting ones. Interpret prayers under the
+world's constitution (`constitution "<markdown>"` sets it; Souls can read it).
 
 ## Six worked examples
 

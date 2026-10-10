@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } fr
 import { resolve } from 'node:path';
 import { call, load, num, ok, r2, save, sleep } from './lib/state.mjs';
 import { mirror, view, normDef, follow, invalidate } from './lib/mirror.mjs';
-import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS, setOf, relocate, frameOf } from './lib/solver.mjs';
+import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS, setOf, relocate, frameOf, slotTarget, isFlagDef } from './lib/solver.mjs';
 import { camera, shoot, keeper, stopKeeper } from './lib/look.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -55,7 +55,7 @@ export async function map(opts = {}) {
   const nameOf = (id) => v.byId.get(id)?.path ?? id;
   if (land.length) { lines.push('## terrain'); for (const l of land) lines.push(`- ${nameOf(l.id)}: ${l.kind}${l.kind === 'bump' ? ` at (${r2(l.c[0])}, ${r2(l.c[1])}) r ${r2(l.r)} h ${r2(l.h)}` : l.kind === 'ridge' ? ` along ${l.path.length} pts w ${l.w} h ${l.h}` : l.h !== undefined ? ` h ${l.h}` : ''}`); }
   if (s.ground.waters.length) { lines.push('## water'); for (const w of s.ground.waters) lines.push(`- ${nameOf(w.id)}: level ${w.level}`); }
-  const roots = v.rows.filter((r) => r.parent === 'world' && !r.def.includes('flag'));
+  const roots = v.rows.filter((r) => r.parent === 'world' && !isFlagDef(r.def));
   const limit = opts.all ? Infinity : 120;
   if (roots.length) {
     lines.push(`## things (${roots.length} at the root${roots.length > limit ? `; first ${limit}, --all for every one` : ''})`);
@@ -65,7 +65,7 @@ export async function map(opts = {}) {
       lines.push(`- ${r.path} [${r.def.replace(/^core-/, 'core/')}]${shape}${r.form === 'point' && !r.shape ? ` ${r2(r.box[0])}×${r2(r.box[2])} m` : ''}${kids.length ? ` — ${kids.length} inside: ${kids.slice(0, 8).map((k) => k.name ?? k.id).join(', ')}${kids.length > 8 ? '…' : ''}` : ''}`);
     }
   }
-  const fl = v.rows.filter((r) => r.def.includes('flag'));
+  const fl = v.rows.filter((r) => isFlagDef(r.def));
   if (fl.length) { lines.push('## flags (refer to them as flag:<name>)'); for (const r of fl) lines.push(`- flag:${r.name} "${v.entity(r.id)?.state?.label ?? ''}" at (${r.pose[0]}, ${r.pose[2]})`); }
   if (s.prayers.length) { lines.push('## prayers'); for (const p of s.prayers) lines.push(`- ${p.id} from ${p.soul_name}: ${p.text}`); }
   return opts.json ? { text: lines.join('\n'), snapshot: s } : lines.join('\n');
@@ -80,11 +80,13 @@ const SYNONYMS = { house: ['townhouse'], home: ['townhouse'], street: ['road'], 
   herd: ['animals'], flock: ['animals'], pet: ['dog', 'cat'], stall: ['parasol-table', 'crate'], market: ['parasol-table', 'crate', 'barrel'], church: ['chapel'] };
 const forms = (w) => [...new Set([w, ...(w.length > 3 ? [w.replace(/s$/, ''), w.replace(/es$/, ''), w.replace(/ies$/, 'y')] : [])])];
 const synonymsOf = (w) => [...new Set(forms(w).flatMap((f) => SYNONYMS[f] ?? []))];
+/** A def's --scale range in words: "--scale 0.4–2.5" or "fixed size". */
+const scaleText = (d) => { const sc = d?.size?.scale; return !sc ? '' : sc[0] === sc[1] ? (sc[0] === 1 ? 'fixed size (no --scale)' : `--scale ${sc[0]} only`) : `--scale ${sc[0]}–${sc[1]}`; };
 const fieldText = (k, f) => `${k}: ${f.type}${f.values ? ` ${f.values.join('|')}` : ''}${f.min !== undefined || f.max !== undefined ? ` ${f.min ?? ''}…${f.max ?? ''}` : ''}${f.default !== undefined ? ` = ${typeof f.default === 'object' ? JSON.stringify(f.default) : f.default}` : ''}${f.doc ? ` — ${f.doc}` : ''}`;
 /** defs <one def's name or full ref>: that def in full (params with ranges and defaults, size, slots, rooms). */
 async function defDetail(d, others) {
   const ref = d.ref.replace(/^core-/, 'core/');
-  const L = [`${ref} — ${d.form}, ${d.layer}, ${d.size.box.map(r2).join('×')} m${d.make?.gen ? `, made by ${d.make.gen}` : ''}${d.tags.length ? ` [${d.tags.join(' ')}]` : ''}`];
+  const L = [`${ref} — ${d.form}, ${d.layer}, ${d.size.box.map(r2).join('×')} m${d.form === 'point' ? `, ${scaleText(d)}` : ''}${d.make?.gen ? `, made by ${d.make.gen}` : ''}${d.tags.length ? ` [${d.tags.join(' ')}]` : ''}`];
   if (d.description) L.push(`  ${d.description}`);
   const ps = Object.entries(d.params ?? {});
   if (ps.length) { L.push(`  params (--param k=v):`); for (const [k, f] of ps) L.push(`  - ${fieldText(k, f).slice(0, 240)}`); }
@@ -115,10 +117,10 @@ export async function defs(q, flags = {}) {
     const seen = new Set(r.defs.map((d) => d.ref));
     for (const syn of [...new Set(q.toLowerCase().split(/\s+/).filter(Boolean).flatMap(synonymsOf))]) for (const d of (await get(syn)).slice(0, 3)) if (!seen.has(d.ref)) { seen.add(d.ref); r.defs.push(d); }
   }
-  const rows = r.defs.map((d) => ({ ref: d.ref.replace(/^core-/, 'core/'), form: d.form, layer: d.layer, box: d.size.box, tags: d.tags, params: Object.fromEntries(Object.entries(d.params).map(([k, f]) => [k, f.default ?? f.type])), slots: d.slots.map((x) => `${x.id}:${x.kind}`), description: d.description }));
+  const rows = r.defs.map((d) => ({ ref: d.ref.replace(/^core-/, 'core/'), form: d.form, layer: d.layer, box: d.size.box, scale: d.size.scale, tags: d.tags, params: Object.fromEntries(Object.entries(d.params).map(([k, f]) => [k, f.default ?? f.type])), slots: d.slots.map((x) => `${x.id}:${x.kind}`), description: d.description }));
   if (flags.json) return rows;
   if (!rows.length) return `no defs match "${q ?? ''}". Try a broader word, or define one: define-kit (see SKILL.md).`;
-  return [`${rows.length} defs${q ? ` matching "${q}"` : ''}:`, ...rows.slice(0, flags.all ? 999 : 40).map((d) => `- ${d.ref} (${d.form}, ${d.layer}, ${d.box.map(r2).join('×')} m)${d.tags.length ? ` [${d.tags.slice(0, 6).join(' ')}]` : ''}${Object.keys(d.params).length ? ` params: ${Object.entries(d.params).slice(0, 10).map(([k, v]) => `${k}=${typeof v === 'object' ? 'json' : v}`).join(' ')}` : ''}${d.slots.length ? ` slots: ${d.slots.slice(0, 6).join(' ')}` : ''}${d.description ? ` — ${d.description.slice(0, 110)}` : ''}`), rows.length > 40 && !flags.all ? `… ${rows.length - 40} more (--all)` : ''].filter(Boolean).join('\n');
+  return [`${rows.length} defs${q ? ` matching "${q}"` : ''}:`, ...rows.slice(0, flags.all ? 999 : 40).map((d) => `- ${d.ref} (${d.form}, ${d.layer}, ${d.box.map(r2).join('×')} m${d.form === 'point' && d.scale ? `, ${d.scale[0] === d.scale[1] ? 'fixed size' : `scale ${d.scale[0]}–${d.scale[1]}`}` : ''})${d.tags.length ? ` [${d.tags.slice(0, 6).join(' ')}]` : ''}${Object.keys(d.params).length ? ` params: ${Object.entries(d.params).slice(0, 10).map(([k, v]) => `${k}=${typeof v === 'object' ? 'json' : v}`).join(' ')}` : ''}${d.slots.length ? ` slots: ${d.slots.slice(0, 6).join(' ')}` : ''}${d.description ? ` — ${d.description.slice(0, 110)}` : ''}`), rows.length > 40 && !flags.all ? `… ${rows.length - 40} more (--all)` : ''].filter(Boolean).join('\n');
 }
 
 export async function schema(flags = {}) { const s = ok(await call('/v1/god/schema', { as: 'none' }), 'schema'); return flags.md ? schemaMarkdown(s) : s; }
@@ -141,7 +143,8 @@ export async function describe(ref, flags = {}) {
   const L = [];
   L.push(`${d.path} [${d.def.replace(/^core-/, 'core/')}] ${d.layer} ${d.form}${d.anchor !== 'base' ? `, anchor ${d.anchor}` : ''} — ${d.in === 'world' ? 'at the root' : `in ${d.in.parent}${d.in.slot ? ` (slot ${d.in.slot})` : ''}`}`);
   if (d.description) L.push(`  ${d.description.slice(0, 200)}`);
-  L.push(`  pose (${d.pose.x}, ${d.pose.y}, ${d.pose.z}) facing ${d.pose.faces} (yaw ${d.pose.yaw})${d.pose.s !== 1 ? ` scale ${d.pose.s}` : ''}; size ${d.box.join('×')} m; bounds x ${d.aabb[0]}…${d.aabb[2]}, z ${d.aabb[1]}…${d.aabb[3]}, y ${d.y[0]}…${d.y[1]}; ${d.colliders} colliders, ~${d.tris} tris`);
+  const sc = d.form === 'point' ? scaleText(view(await mirror()).def(d.def)) : '';
+  L.push(`  pose (${d.pose.x}, ${d.pose.y}, ${d.pose.z}) facing ${d.pose.faces} (yaw ${d.pose.yaw})${d.pose.s !== 1 ? ` scale ${d.pose.s}` : ''}${sc ? `, ${sc}` : ''}; size ${d.box.join('×')} m; bounds x ${d.aabb[0]}…${d.aabb[2]}, z ${d.aabb[1]}…${d.aabb[3]}, y ${d.y[0]}…${d.y[1]}; ${d.colliders} colliders, ~${d.tris} tris`);
   if (d.shape?.path) L.push(`  path: ${d.shape.points} points, ${d.shape.length} m${d.shape.width ? `, ${d.shape.width} m wide` : ''}: ${d.shape.path.map((p) => `${r2(p[0])},${r2(p[1])}`).join(' → ')}${d.shape.points > d.shape.path.length ? ' (ends)' : ''}; middle ${d.shape.middle.join(',')}`);
   if (d.shape?.points && !d.shape.path) L.push(`  area: ${d.shape.points} corners, ${d.shape.size.join('×')} m around ${d.shape.centre.join(',')}`);
   if (Object.keys(d.params).length) L.push(`  params ${JSON.stringify(d.params).slice(0, 300)}`);
@@ -203,6 +206,7 @@ const HINTS = {
   'slot.full': 'the slot is full; pick another slot or room',
   'slot.incompatible': 'the slot does not accept this kind/size',
   'slot.outside': 'the point is not inside that room; use --inside <house>/<room> or a world point inside it',
+  'size.range': 'that scale or size is outside what the def allows: `defs <name>` shows its --scale range (fixed size = no --scale); use params (w, d, height, radius) or a bigger def instead',
   'float.no-water': 'there is no water there; use --float --at <lake|pond|river>',
   'def.unknown': 'no such def; `defs <word>` searches the library',
   'params.invalid': '`defs <name>` shows params with ranges',
@@ -380,13 +384,29 @@ export async function move(ref, flags = {}) {
     return `moved ${row.path} by (${dx}, ${dz})${after && !after.shape ? ` to (${after.pose[0]}, ${after.pose[1]}, ${after.pose[2]})` : ''}${note ? ` — ${note}${after ? `; now ${after.path}` : ''}` : ''}`;
   }
   if (!hasRelation(flags) && flags.yaw === undefined && flags.facing === undefined && !flags.in) throw new Error('usage: move <ref> --at …|--near …|--by dx,dz|--yaw r|--facing …|--in parent[/slot]');
-  if (flags.in && !hasRelation(flags)) { const [parent, slot] = String(flags.in).split(/\/(?=[^/]+$)/); const host = v.get(flags.in) ? flags.in : parent; const r = await act({ ops: [{ op: 'move', id: row.path, in: host === flags.in ? { parent: host } : { parent, ...(slot ? { slot } : {}) }, ...(flags.local ? { p: String(flags.local).split(',').map(Number) } : {}) }] }); return r.accepted ? `moved ${row.path} into ${flags.in}` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
+  if (flags.in && !hasRelation(flags)) {
+    // --in world: out to the root where it stands; --in <host>[/slot] --local x,z: exactly there in the slot's frame
+    if (flags.in === 'world' || flags.local) {
+      const [parent, slot] = String(flags.in).split(/\/(?=[^/]+$)/); const host = flags.in === 'world' || v.get(flags.in) ? flags.in : parent;
+      const o = { op: 'move', id: row.path, in: host === flags.in ? { parent: host } : { parent, ...(slot ? { slot } : {}) }, p: flags.local ? String(flags.local).split(',').map(Number) : [row.pose[0], row.pose[2]] };
+      const r = await act({ ops: [o] }); if (!r.accepted) return `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
+      const after = view(await mirror()).byId.get(row.id);
+      return `moved ${row.path} into ${flags.in}${after ? ` — now ${after.path} at (${after.pose[0]}, ${after.pose[1]}, ${after.pose[2]})` : ''}`;
+    }
+    // otherwise the solver picks the spot: a room (--inside) or a slot to stand on (--on: a table top, a pier's end, a balcony)
+    const T = slotTarget(v, flags.in); if (!T) throw new Error(`no such thing: ${flags.in}`);
+    const rooms = (T.host.slots ?? []).some((x) => x.kind === 'room'), tops = (T.host.slots ?? []).some((x) => ['surface', 'shelf'].includes(x.kind));
+    const intoRoom = T.slot ? T.slot.kind === 'room' : rooms && !tops;
+    flags = { ...flags, in: undefined, [intoRoom ? 'inside' : 'on']: flags.in };
+  }
   const info = { form: row.form, layer: row.layer, box: row.box };
   const rel = relFrom(flags);
   if (!hasRelation(flags)) rel.at = `${row.pose[0]},${row.pose[2]}`;
   const sol = solve(v, { def: row.def, ...info, s: row.pose[4] }, { ...rel, skip: [...sub] });
   // world-frame answers (near, at, along…) for a thing that lives inside something: into its parent's frame
   const items = sol.items.slice(0, 1).map((it) => ({ candidates: it.candidates.map((c) => {
+    // into a slot: keep the thing's world heading unless the solver turned it
+    if (c.in && c.r === undefined) { const h = v.get(c.in.parent); return h ? { ...c, r: r2(row.pose[3] - frameOf(h, c.in.slot).RY) } : c; }
     if (c.in || c.shape || row.parent === 'world') return c;
     const R = relocated(c.p[0], c.p[1], c.r ?? row.pose[3], c.constraints ?? []);
     return { ...c, ...R.o, ...(R.o.r === undefined && c.r !== undefined ? { r: r2(c.r - (frameOf(v.byId.get(row.parent), row.slot).RY)) } : {}), note: `${c.note}${R.note ? `; ${R.note}` : ''}` };
@@ -504,7 +524,7 @@ export async function look(flags = {}) {
     if (p.kind === 'entity') { const [x0, z0, x1, z1] = p.row.aabb; target = [p.x, p.row.y?.[0] ?? p.row.pose[1], p.z]; span = Math.max(x1 - x0, z1 - z0, 4); }
     else { target = [p.x, 0, p.z]; span = flags.span ? num(flags.span) : 40; }
   } else {
-    const roots = v.rows.filter((r) => r.parent === 'world' && !r.def.includes('flag') && !(r.shape && r.aabb[2] - r.aabb[0] > m.extent * 0.6));
+    const roots = v.rows.filter((r) => r.parent === 'world' && !isFlagDef(r.def) && !(r.shape && r.aabb[2] - r.aabb[0] > m.extent * 0.6));
     if (!roots.length) { target = [0, 0, 0]; span = 160; }
     else { const x0 = Math.min(...roots.map((r) => r.aabb[0])), z0 = Math.min(...roots.map((r) => r.aabb[1])), x1 = Math.max(...roots.map((r) => r.aabb[2])), z1 = Math.max(...roots.map((r) => r.aabb[3])); target = [(x0 + x1) / 2, 0, (z0 + z1) / 2]; span = Math.max(30, x1 - x0, z1 - z0); }
   }
@@ -625,9 +645,10 @@ export async function examples(name) {
 export async function gallery() { return 'gallery: run `node tools/god-skill/scripts/gallery.mjs <world-url>` from the sim repo (it places every core def in a labelled grid and screenshots it).'; }
 
 // ---------------------------------------------------------------- flags, prayers, stream
-export async function flags() { const v = view(await mirror()); return v.rows.filter((r) => r.def.includes('flag')).map((r) => ({ name: `flag:${r.name}`, label: v.entity(r.id)?.state?.label ?? '', at: [r.pose[0], r.pose[2]] })); }
+export async function flags() { const v = view(await mirror()); return v.rows.filter((r) => isFlagDef(r.def)).map((r) => ({ name: `flag:${r.name}`, label: v.entity(r.id)?.state?.label ?? '', at: [r.pose[0], r.pose[2]] })); }
 export async function flag(label, f) { const v = view(await mirror()); const p = refPoint(v, f.at ?? '0,0', f.offset); const name = label.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'flag'; const r = await act({ ops: [{ op: 'place', def: 'core/flag@1', name, p: [p.x, p.z], state: { label } }] }); return r.accepted ? `flag:${name} at (${p.x}, ${p.z})` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
-export async function prayers() { return ok(await call('/v1/god/prayers'), 'prayers'); }
+/** prayers [--all]: the prayers waiting for an answer (an answered prayer leaves this list); --all also the answered ones, with their answers. */
+export async function prayers(flags = {}) { return ok(await call(`/v1/god/prayers${flags.all ? '?all=1' : ''}`), 'prayers'); }
 export async function answer(prayer, text) { return ok(await call('/v1/god/answer', { body: { prayer, text } }), 'answer'); }
 export async function stream(seconds = 60) { return follow(seconds, (e) => console.log(JSON.stringify(e))); }
 export async function status() { const s = load(); const st = ok(await call('/v1/god/status'), 'status'); return `${s.world} — you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ''}; skill ${SKILL_VERSION}`; }
@@ -659,7 +680,7 @@ const FLAGS = {
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`, terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
   move: `${REL} by in local nudge note dry plan`, look: 'at from dist inside floor keep out span height width h hide-roofs stop', defs: 'tag all', where: 'at offset', free: 'near radius count slope',
   select: 'def tag name in area near radius all remove by set-state set-param recolor yaw part note', set: 'state param name constraints note', recolor: 'part', clone: 'name count step yaw at offset nudge note',
-  sky: 'palette sun list', weather: 'clouds wind rain', group: 'off', undo: 'group', map: 'all', furnish: 'style dry group', 'define-kit': 'dry', register: 'identity', mirror: 'fresh', export: 'name', import: 'group', flag: 'at offset', schema: 'md', act: 'note',
+  sky: 'palette sun list', weather: 'clouds wind rain', group: 'off', undo: 'group', map: 'all', furnish: 'style dry group', 'define-kit': 'dry', register: 'identity', mirror: 'fresh', export: 'name', import: 'group', flag: 'at offset', schema: 'md', act: 'note', prayers: 'all',
 };
 // how many positional words each command takes (Infinity: free text or a list)
 const POS = { place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
@@ -692,19 +713,19 @@ export const COMMANDS = {
   look: (r, f) => look(f), 'look-keeper': (r) => keeper(r[0], Number(r[1])), 'look-shot': async (r) => { const res = await shoot(JSON.parse(r[0])); console.log(JSON.stringify(res)); process.exit(0); }, export: (r, f) => exportWorld(r[0], f), import: (r, f) => importWorld(r[0], f), define: (r) => define(readArg(r)), 'define-kit': (r, f) => defineKit(readArg(r), f),
   furnish: (r, f) => furnish(r[0], f), gallery, examples: (r) => examples(r[0]),
   sky: (r, f) => sky(f), weather: (r, f) => weather(f), constitution: (r) => constitution(r.join(' ')), expand: (r) => expand(r[0]),
-  flags, flag: (r, f) => flag(r.join(' '), f), prayers, answer: (r) => answer(r[0], r.slice(1).join(' ')), stream: (r) => stream(r[0] ? Number(r[0]) : 60),
+  flags, flag: (r, f) => flag(r.join(' '), f), prayers: (r, f) => prayers(f), answer: (r) => answer(r[0], r.slice(1).join(' ')), stream: (r) => stream(r[0] ? Number(r[0]) : 60),
   follow: (r) => follow(r[0] ? Number(r[0]) : 3600, (e) => console.log(`${e.event} ${e.data?.seq ?? ''}`)), mirror: async (r, f) => { const m = await mirror({ fresh: !!f.fresh }); return `mirror: seq ${m.seq}, ${m.rows.length} entities${m.offline ? ' (offline)' : ''}`; },
   help: () => HELP,
 };
 const HELP = `eden-god ${SKILL_VERSION} — god mode for one Eden world. Read SKILL.md.
 read:   map · defs <words> · describe <ref> · where <x,z|ref> · free WxD [--near ref] · look [--at ref] [--from s|n|e|w|above] [--inside [--floor k]] · history · resolve · schema [--md]
-build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--wall back|front|left|right|n…] [--corner back-left|…] | --on table [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--dry]
+build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--wall back|front|left|right|n…] [--corner back-left|…] | --on table|pier|house/balcony [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--scale s (defs <name> shows its range)] [--dry]
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],…]' · place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],…]'
-edit:   move <ref> <relations>|--by dx,dz · set <ref> --param k=v --state '{…}' · recolor <ref> #hex · remove <ref>… · clone <ref> [--at] [--count n --step dx,dz] · select [filters] [--remove|--by|--recolor|--set-state|--set-param]
+edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen · set <ref> --param k=v --state '{…}' · recolor <ref> #hex · remove <ref>… · clone <ref> [--at] [--count n --step dx,dz] · select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> · group --off · undo [--group name] · redo
 batch:  plan '<batch>' · preview '<batch>' · act '<batch>' · dryrun '<batch>'
 world:  sky [--palette p --sun s] · weather --clouds c --wind w --rain r · constitution <md> · expand <m> · export [file] · import <genesis.json> · define <def.json> · define-kit <kit.json> · furnish <house>[/room]
-pair:   register <url> · pair · flags · flag <label> --at x,z · prayers · answer <id> <text> · status
+pair:   register <world-url> · pair · flags · flag <label> --at x,z · prayers [--all: answered too] · answer <id> <text> · status
 learn:  examples [name] · defs <name|core/x@1> (one def in full) · sky (palettes) · a row named stall = the set "stall"`;
 
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('eden-god.mjs')) {

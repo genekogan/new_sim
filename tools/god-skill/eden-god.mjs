@@ -56,101 +56,6 @@ var r2 = (v) => Math.round(v * 100) / 100;
 
 // lib/mirror.mjs
 import { existsSync as existsSync2, readFileSync as readFileSync2, writeFileSync as writeFileSync2 } from "node:fs";
-var CACHE = ".eden-god.cache.json";
-var memo = null;
-function readCache() {
-  try {
-    return existsSync2(CACHE) ? JSON.parse(readFileSync2(CACHE, "utf8")) : null;
-  } catch {
-    return null;
-  }
-}
-function writeCache(c) {
-  try {
-    writeFileSync2(CACHE, JSON.stringify(c), { mode: 384 });
-  } catch {
-  }
-}
-async function mirror({ fresh = false } = {}) {
-  const world = load().world;
-  if (memo && memo.world === world && !fresh) {
-    const s = await call("/v1/world/seq", { as: "none", timeoutMs: 5e3 });
-    if (s.status === 0) return { ...memo, offline: true };
-    if (s.data.seq === memo.seq) return memo;
-  }
-  const cached = memo?.world === world ? memo : readCache();
-  const seqR = await call("/v1/world/seq", { as: "none", timeoutMs: 5e3 });
-  if (seqR.status === 0) {
-    if (cached && cached.world === world) {
-      memo = cached;
-      return { ...cached, offline: true };
-    }
-    throw new Error(`world unreachable (${seqR.data.message}) and no cached mirror`);
-  }
-  if (!fresh && cached && cached.world === world && cached.seq === seqR.data.seq) {
-    memo = cached;
-    return cached;
-  }
-  const [snap, lay] = await Promise.all([call("/v1/god/snapshot"), call("/v1/god/query", { body: { layout: { obbs: true } } })]);
-  const snapshot2 = ok(snap, "snapshot"), layout = ok(lay, "layout").layout;
-  memo = build(world, snapshot2, layout);
-  writeCache(memo);
-  return memo;
-}
-function invalidate() {
-  memo = null;
-}
-function build(world, snapshot2, layout) {
-  return { world, seq: snapshot2.seq, at: Date.now(), extent: snapshot2.constants.extent, snapshot: snapshot2, rows: layout.entities };
-}
-function view(m) {
-  const byId = new Map(m.rows.map((r) => [r.id, r]));
-  const byPath = new Map(m.rows.map((r) => [r.path, r]));
-  const lib = /* @__PURE__ */ new Map();
-  for (const d of m.snapshot.library ?? []) {
-    lib.set(d.ref, d);
-    if (d.ref.startsWith("core-")) lib.set("core/" + d.ref.slice(5), d);
-  }
-  const get = (ref) => {
-    if (!ref) return null;
-    const r = String(ref).replace(/^flag:/, "");
-    return byId.get(r) ?? byPath.get(r) ?? m.rows.find((x) => x.name === r && x.parent === m.rows.find((p) => p.id === x.parent)?.id) ?? m.rows.find((x) => x.name === r) ?? m.rows.find((x) => x.def.includes("flag") && m.snapshot.entities.find((e) => e.id === x.id)?.state?.label === r) ?? null;
-  };
-  const entity = (id) => m.snapshot.entities.find((e) => e.id === id) ?? null;
-  const children = (id) => m.rows.filter((r) => r.parent === id);
-  const def = (ref) => lib.get(ref) ?? lib.get(normDef(ref)) ?? null;
-  return { m, rows: m.rows, byId, byPath, get, entity, children, def, extent: m.extent };
-}
-var normDef = (d) => d.includes("@") || d.startsWith("sha:") ? d : `core/${d}@1`;
-async function follow(seconds = 3600, onEvent = () => {
-}) {
-  const s = load();
-  const r = await fetch(s.world + "/v1/god/stream", { headers: { authorization: `Bearer ${s.token}`, accept: "text/event-stream" }, signal: AbortSignal.timeout(seconds * 1e3) });
-  const reader = r.body.getReader();
-  const dec = new TextDecoder();
-  let buf = "";
-  try {
-    for (; ; ) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      let i;
-      while ((i = buf.indexOf("\n\n")) >= 0) {
-        const frame = buf.slice(0, i);
-        buf = buf.slice(i + 2);
-        if (frame.startsWith(":")) continue;
-        const ev = /^event: (.*)$/m.exec(frame)?.[1], data = /^data: (.*)$/m.exec(frame)?.[1];
-        if (ev === "diff") {
-          invalidate();
-          await mirror({ fresh: true });
-        }
-        if (ev) onEvent({ event: ev, data: data ? JSON.parse(data) : null });
-      }
-    }
-  } catch {
-  }
-  return { ended: true };
-}
 
 // lib/solver.mjs
 var COMPASS = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0], ne: [Math.SQRT1_2, -Math.SQRT1_2], nw: [-Math.SQRT1_2, -Math.SQRT1_2], se: [Math.SQRT1_2, Math.SQRT1_2], sw: [-Math.SQRT1_2, Math.SQRT1_2] };
@@ -163,6 +68,7 @@ var yawOf = (dx, dz) => Math.atan2(dx, dz);
 var dirOfYaw = (y) => [Math.sin(y), Math.cos(y)];
 var compassOfYaw = (y) => ["s", "se", "e", "ne", "n", "nw", "w", "sw"][Math.round((y % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / (Math.PI / 4)) % 8];
 var r22 = (v) => Math.round(v * 100) / 100;
+var isFlagDef = (def) => /^core[-/]flag@/.test(String(def ?? ""));
 var rot = (yaw, x, z) => {
   const c = Math.cos(yaw), s = Math.sin(yaw);
   return [x * c + z * s, -x * s + z * c];
@@ -436,19 +342,47 @@ function solve(v, thing, rel) {
     return { items: [{ candidates: [pose(p[0], p[1], finalYaw(p[0], p[1], yawOf(nrm[0], nrm[1])), { note: `across ${host.path} at ${Math.round(t * 100)}%` })] }], notes };
   }
   if (rel.on) {
-    const host = v.get(rel.on);
-    if (!host) throw new Error(`no such thing to put it on: ${rel.on}`);
-    const slots = (host.slots ?? []).filter((x) => ["surface", "shelf"].includes(x.kind) && x.used < x.capacity);
-    if (!slots.length) throw new Error(`${host.path} has no free surface slot (slots: ${(host.slots ?? []).map((x) => `${x.id}:${x.kind} ${x.used}/${x.capacity}`).join(", ") || "none"})`);
+    const T = slotTarget(v, rel.on);
+    if (!T) throw new Error(`no such thing to put it on: ${rel.on}`);
+    const host = T.host;
+    if (T.slot?.kind === "room") return solve(v, thing, { ...rel, on: void 0, inside: rel.on });
+    const listing = () => (host.slots ?? []).filter((x) => x.kind !== "wall").map((x) => `${x.id}:${x.kind} ${x.used}/${x.capacity}`).join(", ") || "none";
+    const open = (x) => x.used < x.capacity;
+    let slots = T.slot ? [T.slot].filter(open) : (host.slots ?? []).filter((x) => ["surface", "shelf"].includes(x.kind) && open(x));
+    if (!T.slot && !slots.length) slots = (host.slots ?? []).filter((x) => (["stand", "deck"].includes(x.kind) || x.kind === "floor" && !/^(ground|floor-\d+)$/.test(x.id)) && open(x));
+    if (T.slot && !slots.length) throw new Error(`${host.path}/${T.slot.id} is full (${T.slot.used}/${T.slot.capacity})`);
+    if (!slots.length) throw new Error(`${host.path} has no free slot to put things on (slots: ${listing()}); name one with --on ${host.path}/<slot>`);
     const n = Number(rel.count ?? 1);
     const items2 = [];
-    for (const sl of slots) {
+    for (const sl of slots.filter((x) => !["surface", "shelf"].includes(x.kind))) {
+      if (items2.length >= n) break;
+      const F = frameOf(host, sl.id);
+      const there = v.rows.filter((r) => r.parent === host.id && r.slot === sl.id && !skip.has(r.id)).map((r) => {
+        const e = v.entity?.(r.id);
+        const p = e?.p ?? [0, 0];
+        return [p[0], p[p.length - 1]];
+      });
+      const sep = Math.max(hw, hd) * 2 + 0.3, side = rot(F.RY - F.PY, 1, 0);
+      const offs = [0, 1, -1, 2, -2, 3, -3, 4, -4].map((k) => [r22(side[0] * k * sep) + 0, r22(side[1] * k * sep) + 0]).filter(([x, z]) => Math.hypot(x, z) <= 3.6);
+      for (let k = 0; k < sl.capacity - sl.used && items2.length < n; k++) {
+        const q = offs.find(([x, z]) => there.every(([a, b]) => Math.hypot(a - x, b - z) >= sep * 0.9));
+        if (!q) {
+          notes.push(`${host.path}/${sl.id} has no more room for things this size`);
+          break;
+        }
+        there.push(q);
+        const [wx, wz] = toWorldIn(F, q[0], q[1]);
+        const f = faceAt(wx, wz), yaw2 = f !== void 0 ? f : baseYaw;
+        items2.push({ candidates: [{ in: { parent: host.path, slot: sl.id }, p: q, ...yaw2 !== void 0 ? { r: r22(yaw2 - F.RY) } : {}, constraints: [...constraints, ...facingConstraint()], note: `on ${host.path}/${sl.id}` }] });
+      }
+    }
+    for (const sl of slots.filter((x) => ["surface", "shelf"].includes(x.kind))) {
       if (items2.length >= n) break;
       const F = frameOf(host, sl.id), HF = frameOf(host);
       const [ox, oz] = toLocal(HF, F.O[0], F.O[1]);
       const hx = (host.box?.[0] ?? 1) / 2 - 0.06, hz = (host.box?.[2] ?? 1) / 2 - 0.06;
       const sep = Math.max(hw, hd) * 2 + 0.06;
-      const there = v.rows.filter((r) => r.parent === host.id && r.slot === sl.id).map((r) => {
+      const there = v.rows.filter((r) => r.parent === host.id && r.slot === sl.id && !skip.has(r.id)).map((r) => {
         const e = v.entity?.(r.id);
         const p = e?.p ?? [0, 0];
         return [p[0], p[p.length - 1]];
@@ -503,6 +437,14 @@ function solve(v, thing, rel) {
       }
     }
     if (!host) throw new Error(`no such building: ${spec}`);
+    if (roomId) {
+      let T = null;
+      try {
+        T = slotTarget(v, spec);
+      } catch {
+      }
+      if (T?.slot && T.slot.kind !== "room") return solve(v, thing, { ...rel, inside: void 0, on: spec });
+    }
     const rooms = (host.slots ?? []).filter((x) => x.kind === "room");
     if (!rooms.length) throw new Error(`${host.path} has no rooms (it is not a building); use --near or --on`);
     const bare = (t) => String(t).toLowerCase().replace(/[^a-z]/g, "");
@@ -615,11 +557,24 @@ function solve(v, thing, rel) {
     }
     const rim = shapeOf?.area ? (u) => rayExit(shapeOf.area, [R.x, R.z], u) : null;
     const gap2 = rel.dist !== void 0 ? Number(rel.dist) : Math.max(1.5, Math.min(6, Math.max(hw, hd)));
-    const start = rel.dir && compassKey(rel.dir) ? COMPASS[compassKey(rel.dir)] : R.kind === "entity" && R.row.form === "point" && !R.row.def.includes("flag") ? dirOfYaw(R.yaw) : COMPASS.s;
+    const start = rel.dir && compassKey(rel.dir) ? COMPASS[compassKey(rel.dir)] : R.kind === "entity" && R.row.form === "point" && !isFlagDef(R.row.def) ? dirOfYaw(R.yaw) : COMPASS.s;
     const a0 = Math.atan2(start[0], start[1]);
     const items2 = [];
     const placed = [];
-    const isFree = (x, z, yaw2) => free(x, z, yaw2) && !placed.some((b) => obbHit(mine(x, z, yaw2), b, 0.1));
+    const doorZones = R.kind === "entity" ? (R.row.doors ?? []).filter((d) => d.out && (d.level ?? 0) === 0).map((d) => {
+      const f = dirOfYaw(d.yaw);
+      return { id: d.id, c: [d.at[0] + f[0] * 1.25, d.at[1] + f[1] * 1.25], half: [d.width / 2 + 0.35, 1.25], yaw: d.yaw };
+    }) : [];
+    const inDoorway = (x, z, yaw2) => doorZones.find((dz) => obbHit(mine(x, z, yaw2), dz));
+    let keptDoor = null;
+    const isFree = (x, z, yaw2) => {
+      const dz = inDoorway(x, z, yaw2);
+      if (dz) {
+        keptDoor = dz.id;
+        return false;
+      }
+      return free(x, z, yaw2) && !placed.some((b) => obbHit(mine(x, z, yaw2), b, 0.1));
+    };
     for (let k = 0; k < n; k++) {
       const cands = [];
       const fronted = n > 1 && R.kind === "entity" && (R.row.slots ?? []).some((x) => x.kind === "stand" || x.kind === "door" || x.kind === "room");
@@ -636,7 +591,7 @@ function solve(v, thing, rel) {
         const x = c02[0] + u[0] * d, z = c02[1] + u[1] * d;
         const fy = finalYaw(x, z, baseYaw);
         const c = pose(x, z, fy, { note: `near ${R.ref ?? rel.near ?? rel.around}, ${compassOfYaw(a)} of it, ${r22(gap2 + ring)} m away`, constraints: R.kind === "entity" && !R.members ? [{ kind: "near", ref: R.row.path, dist: r22(gap2 + ring + 1) }] : [] });
-        fallback ??= c;
+        if (!inDoorway(x, z, fy ?? 0)) fallback ??= c;
         if (isFree(x, z, fy ?? 0)) cands.push(c);
       }
       if (!cands.length && fallback) cands.push(fallback);
@@ -646,6 +601,7 @@ function solve(v, thing, rel) {
       placed.push(mine(c0.p[0], c0.p[1], c0.r ?? 0));
       items2.push({ candidates: cands });
     }
+    if (keptDoor) notes.push(`kept ${R.ref}'s doorway ${keptDoor} clear`);
     return { items: items2, notes };
   }
   const at = rel.at !== void 0 ? refPoint(v, rel.at, rel.offset) : { x: 0, z: 0, kind: "point" };
@@ -724,6 +680,19 @@ var toWorldIn = (F, lx, lz) => {
   const [dx, dz] = rot(F.PY, lx * F.s, lz * F.s);
   return [F.O[0] + dx, F.O[1] + dz];
 };
+function slotTarget(v, spec) {
+  const s = String(spec ?? "");
+  const whole = v.get(s);
+  if (whole) return { host: whole, slot: null };
+  const cut = s.lastIndexOf("/");
+  if (cut <= 0) return null;
+  const host = v.get(s.slice(0, cut));
+  if (!host) return null;
+  const want = s.slice(cut + 1), bare = (t) => String(t).toLowerCase().replace(/[^a-z0-9]/g, "");
+  const sl = (host.slots ?? []).find((x) => x.id === want) ?? (host.slots ?? []).find((x) => bare(x.id) === bare(want)) ?? (host.slots ?? []).find((x) => bare(x.id).startsWith(bare(want)));
+  if (!sl) throw new Error(`${host.path} has no slot ${want}; its slots: ${(host.slots ?? []).filter((x) => x.kind !== "wall").map((x) => `${x.id} (${x.kind})`).join(", ") || "none"}`);
+  return { host, slot: sl };
+}
 function roomsAt(v, wx, wz, exclude = /* @__PURE__ */ new Set()) {
   const out = [];
   for (const r of v.rows) {
@@ -923,6 +892,103 @@ function solveInRoom(v, host, room, thing, rel, ctx) {
   return choose(spots, "free");
 }
 
+// lib/mirror.mjs
+var CACHE = ".eden-god.cache.json";
+var memo = null;
+function readCache() {
+  try {
+    return existsSync2(CACHE) ? JSON.parse(readFileSync2(CACHE, "utf8")) : null;
+  } catch {
+    return null;
+  }
+}
+function writeCache(c) {
+  try {
+    writeFileSync2(CACHE, JSON.stringify(c), { mode: 384 });
+  } catch {
+  }
+}
+async function mirror({ fresh = false } = {}) {
+  const world = load().world;
+  if (memo && memo.world === world && !fresh) {
+    const s = await call("/v1/world/seq", { as: "none", timeoutMs: 5e3 });
+    if (s.status === 0) return { ...memo, offline: true };
+    if (s.data.seq === memo.seq) return memo;
+  }
+  const cached = memo?.world === world ? memo : readCache();
+  const seqR = await call("/v1/world/seq", { as: "none", timeoutMs: 5e3 });
+  if (seqR.status === 0) {
+    if (cached && cached.world === world) {
+      memo = cached;
+      return { ...cached, offline: true };
+    }
+    throw new Error(`world unreachable (${seqR.data.message}) and no cached mirror`);
+  }
+  if (!fresh && cached && cached.world === world && cached.seq === seqR.data.seq) {
+    memo = cached;
+    return cached;
+  }
+  const [snap, lay] = await Promise.all([call("/v1/god/snapshot"), call("/v1/god/query", { body: { layout: { obbs: true } } })]);
+  const snapshot2 = ok(snap, "snapshot"), layout = ok(lay, "layout").layout;
+  memo = build(world, snapshot2, layout);
+  writeCache(memo);
+  return memo;
+}
+function invalidate() {
+  memo = null;
+}
+function build(world, snapshot2, layout) {
+  return { world, seq: snapshot2.seq, at: Date.now(), extent: snapshot2.constants.extent, snapshot: snapshot2, rows: layout.entities };
+}
+function view(m) {
+  const byId = new Map(m.rows.map((r) => [r.id, r]));
+  const byPath = new Map(m.rows.map((r) => [r.path, r]));
+  const lib = /* @__PURE__ */ new Map();
+  for (const d of m.snapshot.library ?? []) {
+    lib.set(d.ref, d);
+    if (d.ref.startsWith("core-")) lib.set("core/" + d.ref.slice(5), d);
+  }
+  const get = (ref) => {
+    if (!ref) return null;
+    const r = String(ref).replace(/^flag:/, "");
+    return byId.get(r) ?? byPath.get(r) ?? m.rows.find((x) => x.name === r && x.parent === m.rows.find((p) => p.id === x.parent)?.id) ?? m.rows.find((x) => x.name === r) ?? m.rows.find((x) => isFlagDef(x.def) && m.snapshot.entities.find((e) => e.id === x.id)?.state?.label === r) ?? null;
+  };
+  const entity = (id) => m.snapshot.entities.find((e) => e.id === id) ?? null;
+  const children = (id) => m.rows.filter((r) => r.parent === id);
+  const def = (ref) => lib.get(ref) ?? lib.get(normDef(ref)) ?? null;
+  return { m, rows: m.rows, byId, byPath, get, entity, children, def, extent: m.extent };
+}
+var normDef = (d) => d.includes("@") || d.startsWith("sha:") ? d : `core/${d}@1`;
+async function follow(seconds = 3600, onEvent = () => {
+}) {
+  const s = load();
+  const r = await fetch(s.world + "/v1/god/stream", { headers: { authorization: `Bearer ${s.token}`, accept: "text/event-stream" }, signal: AbortSignal.timeout(seconds * 1e3) });
+  const reader = r.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  try {
+    for (; ; ) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf("\n\n")) >= 0) {
+        const frame = buf.slice(0, i);
+        buf = buf.slice(i + 2);
+        if (frame.startsWith(":")) continue;
+        const ev = /^event: (.*)$/m.exec(frame)?.[1], data = /^data: (.*)$/m.exec(frame)?.[1];
+        if (ev === "diff") {
+          invalidate();
+          await mirror({ fresh: true });
+        }
+        if (ev) onEvent({ event: ev, data: data ? JSON.parse(data) : null });
+      }
+    }
+  } catch {
+  }
+  return { ended: true };
+}
+
 // lib/look.mjs
 import { spawn, spawnSync } from "node:child_process";
 import { existsSync as existsSync3, mkdirSync as mkdirSync2, readFileSync as readFileSync3, writeFileSync as writeFileSync4, rmSync as rmSync2, statSync as statSync2, utimesSync } from "node:fs";
@@ -997,6 +1063,19 @@ function findPlaywright() {
       } catch {
       }
     }
+  }
+  if (process.env.EDEN_GOD_NO_NPX) return null;
+  try {
+    const r = spawnSync("npx", ["-y", "-p", "playwright-core@1", "-c", 'echo "$PATH"'], { encoding: "utf8", timeout: 3e5, stdio: ["ignore", "pipe", "pipe"] });
+    const bin = (r.stdout ?? "").trim().split(":").find((d) => /[\\/]_npx[\\/][^\\/]+[\\/]node_modules[\\/]\.bin$/.test(d));
+    if (bin) {
+      const base = resolve(bin, "../.."), m = createRequire(resolve(base, "noop.js"))("playwright-core");
+      if (m?.chromium) {
+        process.env.EDEN_GOD_PLAYWRIGHT_FROM = base;
+        return m;
+      }
+    }
+  } catch {
   }
   return null;
 }
@@ -1094,7 +1173,8 @@ async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = null, sp
   const t0 = Date.now();
   const pw = findPlaywright();
   if (!pw) {
-    const q = new URLSearchParams({ shot: "1", eye: eye.join(","), at: at.join(",") });
+    if (keep) throw new Error("look --keep needs a Playwright package (npm i playwright-core here) and npx could not fetch one; look without --keep works");
+    const q = new URLSearchParams({ shot: "1", eye: eye.join(","), at: at.join(","), ...hideRoofs ? { hideRoofs: "1", ...cut !== null ? { cut: String(cut) } : {} } : {} });
     const r = spawnSync("npx", ["-y", "playwright-core@1", "screenshot", "--channel", "chrome", "--wait-for-timeout", "30000", "--viewport-size", "1024,640", `${worldUrl}?${q}`, resolve(out)], { stdio: "pipe", encoding: "utf8", timeout: timeoutMs });
     if (r.status !== 0) throw new Error(`look: no Playwright found and npx playwright-core failed: ${(r.stderr || r.stdout || "").slice(0, 300)}. Install one (npm i -g playwright-core) and Google Chrome`);
     return { file: resolve(out), ms: Date.now() - t0, via: "npx playwright-core screenshot" };
@@ -1244,7 +1324,7 @@ function selectRows(v, f = {}) {
     const rad = Number(f.radius ?? 20);
     rows = rows.filter((r) => r.id !== c.row?.id && Math.hypot(r.pose[0] - c.x, r.pose[2] - c.z) <= rad);
   }
-  if (!f.flags) rows = rows.filter((r) => !r.def.includes("flag") || f.def === "flag");
+  if (!f.flags) rows = rows.filter((r) => !isFlagDef(r.def) || f.def === "flag");
   return rows;
 }
 
@@ -1345,7 +1425,7 @@ async function map(opts = {}) {
     lines.push("## water");
     for (const w of s.ground.waters) lines.push(`- ${nameOf(w.id)}: level ${w.level}`);
   }
-  const roots = v.rows.filter((r) => r.parent === "world" && !r.def.includes("flag"));
+  const roots = v.rows.filter((r) => r.parent === "world" && !isFlagDef(r.def));
   const limit = opts.all ? Infinity : 120;
   if (roots.length) {
     lines.push(`## things (${roots.length} at the root${roots.length > limit ? `; first ${limit}, --all for every one` : ""})`);
@@ -1355,7 +1435,7 @@ async function map(opts = {}) {
       lines.push(`- ${r.path} [${r.def.replace(/^core-/, "core/")}]${shape}${r.form === "point" && !r.shape ? ` ${r2(r.box[0])}\xD7${r2(r.box[2])} m` : ""}${kids.length ? ` \u2014 ${kids.length} inside: ${kids.slice(0, 8).map((k) => k.name ?? k.id).join(", ")}${kids.length > 8 ? "\u2026" : ""}` : ""}`);
     }
   }
-  const fl = v.rows.filter((r) => r.def.includes("flag"));
+  const fl = v.rows.filter((r) => isFlagDef(r.def));
   if (fl.length) {
     lines.push("## flags (refer to them as flag:<name>)");
     for (const r of fl) lines.push(`- flag:${r.name} "${v.entity(r.id)?.state?.label ?? ""}" at (${r.pose[0]}, ${r.pose[2]})`);
@@ -1395,10 +1475,14 @@ var SYNONYMS = {
 };
 var forms = (w) => [.../* @__PURE__ */ new Set([w, ...w.length > 3 ? [w.replace(/s$/, ""), w.replace(/es$/, ""), w.replace(/ies$/, "y")] : []])];
 var synonymsOf = (w) => [...new Set(forms(w).flatMap((f) => SYNONYMS[f] ?? []))];
+var scaleText = (d) => {
+  const sc = d?.size?.scale;
+  return !sc ? "" : sc[0] === sc[1] ? sc[0] === 1 ? "fixed size (no --scale)" : `--scale ${sc[0]} only` : `--scale ${sc[0]}\u2013${sc[1]}`;
+};
 var fieldText = (k, f) => `${k}: ${f.type}${f.values ? ` ${f.values.join("|")}` : ""}${f.min !== void 0 || f.max !== void 0 ? ` ${f.min ?? ""}\u2026${f.max ?? ""}` : ""}${f.default !== void 0 ? ` = ${typeof f.default === "object" ? JSON.stringify(f.default) : f.default}` : ""}${f.doc ? ` \u2014 ${f.doc}` : ""}`;
 async function defDetail(d, others) {
   const ref = d.ref.replace(/^core-/, "core/");
-  const L = [`${ref} \u2014 ${d.form}, ${d.layer}, ${d.size.box.map(r2).join("\xD7")} m${d.make?.gen ? `, made by ${d.make.gen}` : ""}${d.tags.length ? ` [${d.tags.join(" ")}]` : ""}`];
+  const L = [`${ref} \u2014 ${d.form}, ${d.layer}, ${d.size.box.map(r2).join("\xD7")} m${d.form === "point" ? `, ${scaleText(d)}` : ""}${d.make?.gen ? `, made by ${d.make.gen}` : ""}${d.tags.length ? ` [${d.tags.join(" ")}]` : ""}`];
   if (d.description) L.push(`  ${d.description}`);
   const ps = Object.entries(d.params ?? {});
   if (ps.length) {
@@ -1441,10 +1525,10 @@ async function defs(q, flags2 = {}) {
       r.defs.push(d);
     }
   }
-  const rows = r.defs.map((d) => ({ ref: d.ref.replace(/^core-/, "core/"), form: d.form, layer: d.layer, box: d.size.box, tags: d.tags, params: Object.fromEntries(Object.entries(d.params).map(([k, f]) => [k, f.default ?? f.type])), slots: d.slots.map((x) => `${x.id}:${x.kind}`), description: d.description }));
+  const rows = r.defs.map((d) => ({ ref: d.ref.replace(/^core-/, "core/"), form: d.form, layer: d.layer, box: d.size.box, scale: d.size.scale, tags: d.tags, params: Object.fromEntries(Object.entries(d.params).map(([k, f]) => [k, f.default ?? f.type])), slots: d.slots.map((x) => `${x.id}:${x.kind}`), description: d.description }));
   if (flags2.json) return rows;
   if (!rows.length) return `no defs match "${q ?? ""}". Try a broader word, or define one: define-kit (see SKILL.md).`;
-  return [`${rows.length} defs${q ? ` matching "${q}"` : ""}:`, ...rows.slice(0, flags2.all ? 999 : 40).map((d) => `- ${d.ref} (${d.form}, ${d.layer}, ${d.box.map(r2).join("\xD7")} m)${d.tags.length ? ` [${d.tags.slice(0, 6).join(" ")}]` : ""}${Object.keys(d.params).length ? ` params: ${Object.entries(d.params).slice(0, 10).map(([k, v]) => `${k}=${typeof v === "object" ? "json" : v}`).join(" ")}` : ""}${d.slots.length ? ` slots: ${d.slots.slice(0, 6).join(" ")}` : ""}${d.description ? ` \u2014 ${d.description.slice(0, 110)}` : ""}`), rows.length > 40 && !flags2.all ? `\u2026 ${rows.length - 40} more (--all)` : ""].filter(Boolean).join("\n");
+  return [`${rows.length} defs${q ? ` matching "${q}"` : ""}:`, ...rows.slice(0, flags2.all ? 999 : 40).map((d) => `- ${d.ref} (${d.form}, ${d.layer}, ${d.box.map(r2).join("\xD7")} m${d.form === "point" && d.scale ? `, ${d.scale[0] === d.scale[1] ? "fixed size" : `scale ${d.scale[0]}\u2013${d.scale[1]}`}` : ""})${d.tags.length ? ` [${d.tags.slice(0, 6).join(" ")}]` : ""}${Object.keys(d.params).length ? ` params: ${Object.entries(d.params).slice(0, 10).map(([k, v]) => `${k}=${typeof v === "object" ? "json" : v}`).join(" ")}` : ""}${d.slots.length ? ` slots: ${d.slots.slice(0, 6).join(" ")}` : ""}${d.description ? ` \u2014 ${d.description.slice(0, 110)}` : ""}`), rows.length > 40 && !flags2.all ? `\u2026 ${rows.length - 40} more (--all)` : ""].filter(Boolean).join("\n");
 }
 async function schema(flags2 = {}) {
   const s = ok(await call("/v1/god/schema", { as: "none" }), "schema");
@@ -1478,7 +1562,8 @@ async function describe(ref, flags2 = {}) {
   const L = [];
   L.push(`${d.path} [${d.def.replace(/^core-/, "core/")}] ${d.layer} ${d.form}${d.anchor !== "base" ? `, anchor ${d.anchor}` : ""} \u2014 ${d.in === "world" ? "at the root" : `in ${d.in.parent}${d.in.slot ? ` (slot ${d.in.slot})` : ""}`}`);
   if (d.description) L.push(`  ${d.description.slice(0, 200)}`);
-  L.push(`  pose (${d.pose.x}, ${d.pose.y}, ${d.pose.z}) facing ${d.pose.faces} (yaw ${d.pose.yaw})${d.pose.s !== 1 ? ` scale ${d.pose.s}` : ""}; size ${d.box.join("\xD7")} m; bounds x ${d.aabb[0]}\u2026${d.aabb[2]}, z ${d.aabb[1]}\u2026${d.aabb[3]}, y ${d.y[0]}\u2026${d.y[1]}; ${d.colliders} colliders, ~${d.tris} tris`);
+  const sc = d.form === "point" ? scaleText(view(await mirror()).def(d.def)) : "";
+  L.push(`  pose (${d.pose.x}, ${d.pose.y}, ${d.pose.z}) facing ${d.pose.faces} (yaw ${d.pose.yaw})${d.pose.s !== 1 ? ` scale ${d.pose.s}` : ""}${sc ? `, ${sc}` : ""}; size ${d.box.join("\xD7")} m; bounds x ${d.aabb[0]}\u2026${d.aabb[2]}, z ${d.aabb[1]}\u2026${d.aabb[3]}, y ${d.y[0]}\u2026${d.y[1]}; ${d.colliders} colliders, ~${d.tris} tris`);
   if (d.shape?.path) L.push(`  path: ${d.shape.points} points, ${d.shape.length} m${d.shape.width ? `, ${d.shape.width} m wide` : ""}: ${d.shape.path.map((p) => `${r2(p[0])},${r2(p[1])}`).join(" \u2192 ")}${d.shape.points > d.shape.path.length ? " (ends)" : ""}; middle ${d.shape.middle.join(",")}`);
   if (d.shape?.points && !d.shape.path) L.push(`  area: ${d.shape.points} corners, ${d.shape.size.join("\xD7")} m around ${d.shape.centre.join(",")}`);
   if (Object.keys(d.params).length) L.push(`  params ${JSON.stringify(d.params).slice(0, 300)}`);
@@ -1550,6 +1635,7 @@ var HINTS = {
   "slot.full": "the slot is full; pick another slot or room",
   "slot.incompatible": "the slot does not accept this kind/size",
   "slot.outside": "the point is not inside that room; use --inside <house>/<room> or a world point inside it",
+  "size.range": "that scale or size is outside what the def allows: `defs <name>` shows its --scale range (fixed size = no --scale); use params (w, d, height, radius) or a bigger def instead",
   "float.no-water": "there is no water there; use --float --at <lake|pond|river>",
   "def.unknown": "no such def; `defs <word>` searches the library",
   "params.invalid": "`defs <name>` shows params with ranges",
@@ -1814,16 +1900,30 @@ async function move(ref, flags2 = {}) {
   }
   if (!hasRelation(flags2) && flags2.yaw === void 0 && flags2.facing === void 0 && !flags2.in) throw new Error("usage: move <ref> --at \u2026|--near \u2026|--by dx,dz|--yaw r|--facing \u2026|--in parent[/slot]");
   if (flags2.in && !hasRelation(flags2)) {
-    const [parent, slot] = String(flags2.in).split(/\/(?=[^/]+$)/);
-    const host = v.get(flags2.in) ? flags2.in : parent;
-    const r = await act({ ops: [{ op: "move", id: row.path, in: host === flags2.in ? { parent: host } : { parent, ...slot ? { slot } : {} }, ...flags2.local ? { p: String(flags2.local).split(",").map(Number) } : {} }] });
-    return r.accepted ? `moved ${row.path} into ${flags2.in}` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
+    if (flags2.in === "world" || flags2.local) {
+      const [parent, slot] = String(flags2.in).split(/\/(?=[^/]+$)/);
+      const host = flags2.in === "world" || v.get(flags2.in) ? flags2.in : parent;
+      const o = { op: "move", id: row.path, in: host === flags2.in ? { parent: host } : { parent, ...slot ? { slot } : {} }, p: flags2.local ? String(flags2.local).split(",").map(Number) : [row.pose[0], row.pose[2]] };
+      const r = await act({ ops: [o] });
+      if (!r.accepted) return `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
+      const after = view(await mirror()).byId.get(row.id);
+      return `moved ${row.path} into ${flags2.in}${after ? ` \u2014 now ${after.path} at (${after.pose[0]}, ${after.pose[1]}, ${after.pose[2]})` : ""}`;
+    }
+    const T = slotTarget(v, flags2.in);
+    if (!T) throw new Error(`no such thing: ${flags2.in}`);
+    const rooms = (T.host.slots ?? []).some((x) => x.kind === "room"), tops = (T.host.slots ?? []).some((x) => ["surface", "shelf"].includes(x.kind));
+    const intoRoom = T.slot ? T.slot.kind === "room" : rooms && !tops;
+    flags2 = { ...flags2, in: void 0, [intoRoom ? "inside" : "on"]: flags2.in };
   }
   const info = { form: row.form, layer: row.layer, box: row.box };
   const rel = relFrom(flags2);
   if (!hasRelation(flags2)) rel.at = `${row.pose[0]},${row.pose[2]}`;
   const sol = solve(v, { def: row.def, ...info, s: row.pose[4] }, { ...rel, skip: [...sub] });
   const items = sol.items.slice(0, 1).map((it) => ({ candidates: it.candidates.map((c) => {
+    if (c.in && c.r === void 0) {
+      const h = v.get(c.in.parent);
+      return h ? { ...c, r: r2(row.pose[3] - frameOf(h, c.in.slot).RY) } : c;
+    }
     if (c.in || c.shape || row.parent === "world") return c;
     const R = relocated(c.p[0], c.p[1], c.r ?? row.pose[3], c.constraints ?? []);
     return { ...c, ...R.o, ...R.o.r === void 0 && c.r !== void 0 ? { r: r2(c.r - frameOf(v.byId.get(row.parent), row.slot).RY) } : {}, note: `${c.note}${R.note ? `; ${R.note}` : ""}` };
@@ -2008,7 +2108,7 @@ async function look(flags2 = {}) {
       span = flags2.span ? num(flags2.span) : 40;
     }
   } else {
-    const roots = v.rows.filter((r) => r.parent === "world" && !r.def.includes("flag") && !(r.shape && r.aabb[2] - r.aabb[0] > m.extent * 0.6));
+    const roots = v.rows.filter((r) => r.parent === "world" && !isFlagDef(r.def) && !(r.shape && r.aabb[2] - r.aabb[0] > m.extent * 0.6));
     if (!roots.length) {
       target = [0, 0, 0];
       span = 160;
@@ -2175,7 +2275,7 @@ async function gallery() {
 }
 async function flags() {
   const v = view(await mirror());
-  return v.rows.filter((r) => r.def.includes("flag")).map((r) => ({ name: `flag:${r.name}`, label: v.entity(r.id)?.state?.label ?? "", at: [r.pose[0], r.pose[2]] }));
+  return v.rows.filter((r) => isFlagDef(r.def)).map((r) => ({ name: `flag:${r.name}`, label: v.entity(r.id)?.state?.label ?? "", at: [r.pose[0], r.pose[2]] }));
 }
 async function flag(label, f) {
   const v = view(await mirror());
@@ -2184,8 +2284,8 @@ async function flag(label, f) {
   const r = await act({ ops: [{ op: "place", def: "core/flag@1", name, p: [p.x, p.z], state: { label } }] });
   return r.accepted ? `flag:${name} at (${p.x}, ${p.z})` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
 }
-async function prayers() {
-  return ok(await call("/v1/god/prayers"), "prayers");
+async function prayers(flags2 = {}) {
+  return ok(await call(`/v1/god/prayers${flags2.all ? "?all=1" : ""}`), "prayers");
 }
 async function answer(prayer, text) {
   return ok(await call("/v1/god/answer", { body: { prayer, text } }), "answer");
@@ -2245,7 +2345,8 @@ var FLAGS = {
   import: "group",
   flag: "at offset",
   schema: "md",
-  act: "note"
+  act: "note",
+  prayers: "all"
 };
 var POS = { place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 var NUMERIC = /* @__PURE__ */ new Set(["dist", "count", "t", "setback", "row", "spacing", "width", "span", "radius", "sun", "clouds", "wind", "rain", "scale", "floor", "height", "h", "slope", "gap", "yaw"]);
@@ -2316,7 +2417,7 @@ var COMMANDS = {
   expand: (r) => expand(r[0]),
   flags,
   flag: (r, f) => flag(r.join(" "), f),
-  prayers,
+  prayers: (r, f) => prayers(f),
   answer: (r) => answer(r[0], r.slice(1).join(" ")),
   stream: (r) => stream(r[0] ? Number(r[0]) : 60),
   follow: (r) => follow(r[0] ? Number(r[0]) : 3600, (e) => console.log(`${e.event} ${e.data?.seq ?? ""}`)),
@@ -2328,13 +2429,13 @@ var COMMANDS = {
 };
 var HELP = `eden-god ${SKILL_VERSION} \u2014 god mode for one Eden world. Read SKILL.md.
 read:   map \xB7 defs <words> \xB7 describe <ref> \xB7 where <x,z|ref> \xB7 free WxD [--near ref] \xB7 look [--at ref] [--from s|n|e|w|above] [--inside [--floor k]] \xB7 history \xB7 resolve \xB7 schema [--md]
-build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--wall back|front|left|right|n\u2026] [--corner back-left|\u2026] | --on table [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--dry]
+build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--wall back|front|left|right|n\u2026] [--corner back-left|\u2026] | --on table|pier|house/balcony [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--scale s (defs <name> shows its range)] [--dry]
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],\u2026]' \xB7 place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],\u2026]'
-edit:   move <ref> <relations>|--by dx,dz \xB7 set <ref> --param k=v --state '{\u2026}' \xB7 recolor <ref> #hex \xB7 remove <ref>\u2026 \xB7 clone <ref> [--at] [--count n --step dx,dz] \xB7 select [filters] [--remove|--by|--recolor|--set-state|--set-param]
+edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen \xB7 set <ref> --param k=v --state '{\u2026}' \xB7 recolor <ref> #hex \xB7 remove <ref>\u2026 \xB7 clone <ref> [--at] [--count n --step dx,dz] \xB7 select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> \xB7 group --off \xB7 undo [--group name] \xB7 redo
 batch:  plan '<batch>' \xB7 preview '<batch>' \xB7 act '<batch>' \xB7 dryrun '<batch>'
 world:  sky [--palette p --sun s] \xB7 weather --clouds c --wind w --rain r \xB7 constitution <md> \xB7 expand <m> \xB7 export [file] \xB7 import <genesis.json> \xB7 define <def.json> \xB7 define-kit <kit.json> \xB7 furnish <house>[/room]
-pair:   register <url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB7 prayers \xB7 answer <id> <text> \xB7 status
+pair:   register <world-url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB7 prayers [--all: answered too] \xB7 answer <id> <text> \xB7 status
 learn:  examples [name] \xB7 defs <name|core/x@1> (one def in full) \xB7 sky (palettes) \xB7 a row named stall = the set "stall"`;
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("eden-god.mjs")) {
   const [cmd, ...argv] = process.argv.slice(2);

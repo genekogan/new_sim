@@ -15,6 +15,8 @@ export const yawOf = (dx, dz) => Math.atan2(dx, dz);
 export const dirOfYaw = (y) => [Math.sin(y), Math.cos(y)];
 export const compassOfYaw = (y) => ['s', 'se', 'e', 'ne', 'n', 'nw', 'w', 'sw'][Math.round((((y % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) / (Math.PI / 4)) % 8];
 const r2 = (v) => Math.round(v * 100) / 100;
+/** An owner's reference flag (core/flag, dropped with `flag` or Alt+click) — not a flagpole or anything else named flag-something. */
+export const isFlagDef = (def) => /^core[-/]flag@/.test(String(def ?? ''));
 const rot = (yaw, x, z) => { const c = Math.cos(yaw), s = Math.sin(yaw); return [x * c + z * s, -x * s + z * c]; };     // local → world
 const unrot = (yaw, x, z) => { const c = Math.cos(yaw), s = Math.sin(yaw); return [x * c - z * s, x * s + z * c]; };    // world → local
 const norm = ([x, z]) => { const l = Math.hypot(x, z) || 1; return [x / l, z / l]; };
@@ -243,19 +245,44 @@ export function solve(v, thing, rel) {
 
   // ---- on: a surface slot of a table, shelf, counter; several things spread over the top, clear of what is there
   if (rel.on) {
-    const host = v.get(rel.on); if (!host) throw new Error(`no such thing to put it on: ${rel.on}`);
-    const slots = (host.slots ?? []).filter((x) => ['surface', 'shelf'].includes(x.kind) && x.used < x.capacity);
-    if (!slots.length) throw new Error(`${host.path} has no free surface slot (slots: ${(host.slots ?? []).map((x) => `${x.id}:${x.kind} ${x.used}/${x.capacity}`).join(', ') || 'none'})`);
+    const T = slotTarget(v, rel.on);
+    if (!T) throw new Error(`no such thing to put it on: ${rel.on}`);
+    const host = T.host;
+    if (T.slot?.kind === 'room') return solve(v, thing, { ...rel, on: undefined, inside: rel.on });
+    const listing = () => (host.slots ?? []).filter((x) => x.kind !== 'wall').map((x) => `${x.id}:${x.kind} ${x.used}/${x.capacity}`).join(', ') || 'none';
+    // a named slot (pier/end, lighthouse/balcony), else the host's tops (surface, shelf), else where one stands on it
+    // (a pier's end platform, a deck, a porch or balcony; never a building's whole storey floors)
+    const open = (x) => x.used < x.capacity;
+    let slots = T.slot ? [T.slot].filter(open) : (host.slots ?? []).filter((x) => ['surface', 'shelf'].includes(x.kind) && open(x));
+    if (!T.slot && !slots.length) slots = (host.slots ?? []).filter((x) => (['stand', 'deck'].includes(x.kind) || (x.kind === 'floor' && !/^(ground|floor-\d+)$/.test(x.id))) && open(x));
+    if (T.slot && !slots.length) throw new Error(`${host.path}/${T.slot.id} is full (${T.slot.used}/${T.slot.capacity})`);
+    if (!slots.length) throw new Error(`${host.path} has no free slot to put things on (slots: ${listing()}); name one with --on ${host.path}/<slot>`);
     const n = Number(rel.count ?? 1);
     const items = [];
-    for (const sl of slots) {
+    for (const sl of slots.filter((x) => !['surface', 'shelf'].includes(x.kind))) {
+      // stand/deck/floor slots: the slot origin, then steps sideways along the slot (a row across the pier end)
+      if (items.length >= n) break;
+      const F = frameOf(host, sl.id);
+      const there = v.rows.filter((r) => r.parent === host.id && r.slot === sl.id && !skip.has(r.id)).map((r) => { const e = v.entity?.(r.id); const p = e?.p ?? [0, 0]; return [p[0], p[p.length - 1]]; });
+      const sep = Math.max(hw, hd) * 2 + 0.3, side = rot(F.RY - F.PY, 1, 0);
+      const offs = [0, 1, -1, 2, -2, 3, -3, 4, -4].map((k) => [r2(side[0] * k * sep) + 0, r2(side[1] * k * sep) + 0]).filter(([x, z]) => Math.hypot(x, z) <= 3.6);
+      for (let k = 0; k < sl.capacity - sl.used && items.length < n; k++) {
+        const q = offs.find(([x, z]) => there.every(([a, b]) => Math.hypot(a - x, b - z) >= sep * 0.9));
+        if (!q) { notes.push(`${host.path}/${sl.id} has no more room for things this size`); break; }
+        there.push(q);
+        const [wx, wz] = toWorldIn(F, q[0], q[1]);
+        const f = faceAt(wx, wz), yaw = f !== undefined ? f : baseYaw;
+        items.push({ candidates: [{ in: { parent: host.path, slot: sl.id }, p: q, ...(yaw !== undefined ? { r: r2(yaw - F.RY) } : {}), constraints: [...constraints, ...facingConstraint()], note: `on ${host.path}/${sl.id}` }] });
+      }
+    }
+    for (const sl of slots.filter((x) => ['surface', 'shelf'].includes(x.kind))) {
       if (items.length >= n) break;
       const F = frameOf(host, sl.id), HF = frameOf(host);
       const [ox, oz] = toLocal(HF, F.O[0], F.O[1]);           // the slot origin in the host's frame
       const hx = (host.box?.[0] ?? 1) / 2 - 0.06, hz = (host.box?.[2] ?? 1) / 2 - 0.06;
       const sep = Math.max(hw, hd) * 2 + 0.06;
       // what already stands there (in the slot frame); things placed without p sit at the slot origin
-      const there = v.rows.filter((r) => r.parent === host.id && r.slot === sl.id).map((r) => { const e = v.entity?.(r.id); const p = e?.p ?? [0, 0]; return [p[0], p[p.length - 1]]; });
+      const there = v.rows.filter((r) => r.parent === host.id && r.slot === sl.id && !skip.has(r.id)).map((r) => { const e = v.entity?.(r.id); const p = e?.p ?? [0, 0]; return [p[0], p[p.length - 1]]; });
       const lattice = [];
       for (let i = -8; i <= 8; i++) for (let j = -8; j <= 8; j++) { const lx = i * 0.06, lz = j * 0.06; if (Math.abs(ox + lx) + hw > hx + 0.04 || Math.abs(oz + lz) + hd > hz + 0.04) continue; lattice.push([lx, lz]); }
       const free = sl.capacity - sl.used;
@@ -289,6 +316,8 @@ export function solve(v, thing, rel) {
       if (cut > 0 && v.get(spec.slice(0, cut))) { host = v.get(spec.slice(0, cut)); roomId = spec.slice(cut + 1); }
     }
     if (!host) throw new Error(`no such building: ${spec}`);
+    // a slot that is not a room (pier/end, lighthouse/balcony, house/porch): things stand on it
+    if (roomId) { let T = null; try { T = slotTarget(v, spec); } catch { /* not a slot: a room word */ } if (T?.slot && T.slot.kind !== 'room') return solve(v, thing, { ...rel, inside: undefined, on: spec }); }
     const rooms = (host.slots ?? []).filter((x) => x.kind === 'room');
     if (!rooms.length) throw new Error(`${host.path} has no rooms (it is not a building); use --near or --on`);
     // a room by id, else by a word of it (bedroom → bedroom-1, bed → bedroom-2): the first match in the building's order
@@ -404,11 +433,16 @@ export function solve(v, thing, rel) {
     // around an area (a pond, a plaza): just outside its rim, not its bounding box
     const rim = shapeOf?.area ? (u) => rayExit(shapeOf.area, [R.x, R.z], u) : null;
     const gap = rel.dist !== undefined ? Number(rel.dist) : Math.max(1.5, Math.min(6, Math.max(hw, hd)));
-    const start = rel.dir && compassKey(rel.dir) ? COMPASS[compassKey(rel.dir)] : R.kind === 'entity' && R.row.form === 'point' && !R.row.def.includes('flag') ? dirOfYaw(R.yaw) : COMPASS.s;
+    const start = rel.dir && compassKey(rel.dir) ? COMPASS[compassKey(rel.dir)] : R.kind === 'entity' && R.row.form === 'point' && !isFlagDef(R.row.def) ? dirOfYaw(R.yaw) : COMPASS.s;
     const a0 = Math.atan2(start[0], start[1]);
     const items = [];
     const placed = [];
-    const isFree = (x, z, yaw) => free(x, z, yaw) && !placed.some((b) => obbHit(mine(x, z, yaw), b, 0.1));
+    // a building's outer doorways stay clear (as --inside keeps its inner ones): the step out of each ground-floor
+    // door, 2.5 m deep and 0.35 m wider either side, takes nothing — a lantern goes beside the door, not in front of it
+    const doorZones = R.kind === 'entity' ? (R.row.doors ?? []).filter((d) => d.out && (d.level ?? 0) === 0).map((d) => { const f = dirOfYaw(d.yaw); return { id: d.id, c: [d.at[0] + f[0] * 1.25, d.at[1] + f[1] * 1.25], half: [d.width / 2 + 0.35, 1.25], yaw: d.yaw }; }) : [];
+    const inDoorway = (x, z, yaw) => doorZones.find((dz) => obbHit(mine(x, z, yaw), dz));
+    let keptDoor = null;
+    const isFree = (x, z, yaw) => { const dz = inDoorway(x, z, yaw); if (dz) { keptDoor = dz.id; return false; } return free(x, z, yaw) && !placed.some((b) => obbHit(mine(x, z, yaw), b, 0.1)); };
     for (let k = 0; k < n; k++) {
       const cands = [];
       // several around a thing with a front (a door): keep a 60° cone in front of it clear
@@ -427,7 +461,7 @@ export function solve(v, thing, rel) {
         const x = c0[0] + u[0] * d, z = c0[1] + u[1] * d;
         const fy = finalYaw(x, z, baseYaw);
         const c = pose(x, z, fy, { note: `near ${R.ref ?? rel.near ?? rel.around}, ${compassOfYaw(a)} of it, ${r2(gap + ring)} m away`, constraints: R.kind === 'entity' && !R.members ? [{ kind: 'near', ref: R.row.path, dist: r2(gap + ring + 1) }] : [] });
-        fallback ??= c;
+        if (!inDoorway(x, z, fy ?? 0)) fallback ??= c;
         if (isFree(x, z, fy ?? 0)) cands.push(c);
       }
       if (!cands.length && fallback) cands.push(fallback);
@@ -436,6 +470,7 @@ export function solve(v, thing, rel) {
       const c0 = cands[0]; placed.push(mine(c0.p[0], c0.p[1], c0.r ?? 0));
       items.push({ candidates: cands });
     }
+    if (keptDoor) notes.push(`kept ${R.ref}'s doorway ${keptDoor} clear`);
     return { items, notes };
   }
 
@@ -495,6 +530,17 @@ export function frameOf(parent, slotId) {
 export const toLocal = (F, wx, wz) => { const [x, z] = unrot(F.PY, wx - F.O[0], wz - F.O[1]); return [x / F.s, z / F.s]; };
 export const toWorldIn = (F, lx, lz) => { const [dx, dz] = rot(F.PY, lx * F.s, lz * F.s); return [F.O[0] + dx, F.O[1] + dz]; };
 
+/** "host" or "host/slot" → { host, slot|null }: the slot by id, else by a word of it (balcony, end). Null if no host. */
+export function slotTarget(v, spec) {
+  const s = String(spec ?? ''); const whole = v.get(s);
+  if (whole) return { host: whole, slot: null };
+  const cut = s.lastIndexOf('/'); if (cut <= 0) return null;
+  const host = v.get(s.slice(0, cut)); if (!host) return null;
+  const want = s.slice(cut + 1), bare = (t) => String(t).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const sl = (host.slots ?? []).find((x) => x.id === want) ?? (host.slots ?? []).find((x) => bare(x.id) === bare(want)) ?? (host.slots ?? []).find((x) => bare(x.id).startsWith(bare(want)));
+  if (!sl) throw new Error(`${host.path} has no slot ${want}; its slots: ${(host.slots ?? []).filter((x) => x.kind !== 'wall').map((x) => `${x.id} (${x.kind})`).join(', ') || 'none'}`);
+  return { host, slot: sl };
+}
 /** The room (of any building) a world point is in: { host, slot } candidates, the given floor first. */
 export function roomsAt(v, wx, wz, exclude = new Set()) {
   const out = [];

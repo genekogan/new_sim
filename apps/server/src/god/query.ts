@@ -6,7 +6,7 @@
 // Owner: L1 (contract); L7 owns it from tranche 2; `reach` is L9's.
 import { mediumAt, waterDepthAt, waterLevelAt } from '@sim/ground';
 import { creatureAbilities, offsetPolyline, pointAlong, pointInPoly, prepareFor, queryOf, type Baked, type Vec2 } from '@sim/generators';
-import { obbOverlap, type Entity, type OBB, type StoredDef, WorldModel } from '@sim/world-compiler';
+import { aimOf, obbOverlap, type Entity, type OBB, type StoredDef, WorldModel } from '@sim/world-compiler';
 // L2's furnish recipes (pure over the WorldModel; reads tools/god-skill/recipes/furnish/*.json)
 import { furnishBatch } from '../../../../tools/god-skill/lib/furnish.mjs';
 
@@ -287,7 +287,8 @@ function checkConstraint(w: WorldModel, e: Entity, c: NonNullable<Entity['constr
   switch (c.kind) {
     case 'float': { const lvl = waterLevelAt(w.ground(), pose.x, pose.z); return lvl === null ? { ...c, ok: false, why: 'no water here' } : { ...c, ok: Math.abs(pose.y - (lvl - c.sink)) < 0.05, why: `water level ${round(lvl)}, y ${round(pose.y)}` }; }
     case 'ground': return { ...c, ok: true };
-    case 'facing': { const t = w.worldPose(refE!); const want = Math.atan2(t.x - pose.x, t.z - pose.z) + c.offset; const d = Math.abs(angDiff(want, pose.yaw)); return { ...c, ok: d < 0.15, why: d < 0.15 ? `faces ${c.ref}` : `off by ${round((d * 180) / Math.PI)}°` }; }
+    // aimed as the compiler aims (compile.ts aimOf): a point thing's pose, an area's centroid, a path's midpoint
+    case 'facing': { const t = aimOf(w, refE!); const want = Math.atan2(t.x - pose.x, t.z - pose.z) + c.offset; const d = Math.abs(angDiff(want, pose.yaw)); return { ...c, ok: d < 0.15, why: d < 0.15 ? `faces ${c.ref}` : `off by ${round((d * 180) / Math.PI)}°` }; }
     case 'near': { const gap = gapBetween(w, e, refE!); return { ...c, ok: gap <= c.dist + 0.25, why: `gap ${round(gap)} m (want ≤ ${c.dist})` }; }
     case 'inside': {
       const anc = w.ancestors(e.id);
@@ -333,11 +334,59 @@ function resolveConstraints(w: WorldModel, refs: string[] | null) {
   const violated = rows.flatMap((r) => r.constraints.filter((c) => !c.ok).map((c) => ({ path: r.path, kind: c.kind, why: (c as { why?: string }).why })));
   return { checked: rows.length, violated, entities: rows };
 }
+/** The gap a `near` constraint measures, by the solver's own rule (tools/god-skill/lib/solver.mjs, near): along
+ *  the line from the ref's centre (an area's corner mean, a path's nearest point) to the thing, the distance between
+ *  the ref's edge (its box × scale, the area's rim, the path's half width) and the thing's box × scale. A thing the
+ *  solver put `--dist g` away measures exactly g. Shapes near shapes: the bounds gap. */
 function gapBetween(w: WorldModel, a: Entity, b: Entity): number {
   const ba = bakedOf(w, a)!, bb = bakedOf(w, b)!;
+  if (ba.def.form === 'point' && !a.shape) {
+    const me = w.worldPose(a), bp = w.worldPose(b);
+    const along = (half: [number, number], yaw: number, u: Vec2) => half[0] * Math.abs(u[0] * Math.cos(yaw) - u[1] * Math.sin(yaw)) + half[1] * Math.abs(u[0] * Math.sin(yaw) + u[1] * Math.cos(yaw));
+    const mine = (u: Vec2) => along([(ba.baked.box[0] * me.s) / 2, (ba.baked.box[2] * me.s) / 2], me.yaw, u);
+    const toWorld = (q: [number, number]): Vec2 => { const c = Math.cos(bp.yaw), sn = Math.sin(bp.yaw); return [bp.x + q[0] * c + q[1] * sn, bp.z - q[0] * sn + q[1] * c]; };
+    const sh = b.shape as { area?: [number, number][]; path?: [number, number][]; width?: number } | undefined;
+    let c0: Vec2 | null = null, edge: (u: Vec2) => number = () => 0;
+    if (sh?.area?.length) {
+      const poly = sh.area.map(toWorld); c0 = [poly.reduce((t, q) => t + q[0], 0) / poly.length, poly.reduce((t, q) => t + q[1], 0) / poly.length];
+      const cc = c0; edge = (u) => rayExit(poly, cc, u);
+    } else if (sh?.path?.length) {
+      const path = sh.path.map(toWorld); c0 = nearestOn(path, [me.x, me.z]); const hw = (sh.width ?? 4) / 2; edge = () => hw;
+    } else if (bb.def.form === 'point') {
+      c0 = [bp.x, bp.z]; edge = (u) => along([(bb.baked.box[0] * bp.s) / 2, (bb.baked.box[2] * bp.s) / 2], bp.yaw, u);
+    }
+    if (c0) {
+      const dx = me.x - c0[0], dz = me.z - c0[1], d = Math.hypot(dx, dz);
+      if (d < 1e-6) return 0;
+      const u: Vec2 = [dx / d, dz / d];
+      return Math.max(0, d - edge(u) - mine(u));
+    }
+  }
   const A = boundsOf(w, a, ba.def, ba.baked).aabb, B = boundsOf(w, b, bb.def, bb.baked).aabb;
   const dx = Math.max(0, Math.max(A[0], B[0]) - Math.min(A[2], B[2])), dz = Math.max(0, Math.max(A[1], B[1]) - Math.min(A[3], B[3]));
   return Math.hypot(dx, dz);
+}
+
+/** Distance from c along unit u to where the ray leaves polygon poly (0 if c is outside); the solver's rayExit. */
+function rayExit(poly: Vec2[], c: Vec2, u: Vec2): number {
+  let best = 0;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [ax, az] = poly[j], [bx, bz] = poly[i], ex = bx - ax, ez = bz - az;
+    const den = u[0] * ez - u[1] * ex; if (Math.abs(den) < 1e-12) continue;
+    const t = ((ax - c[0]) * ez - (az - c[1]) * ex) / den, k = ((ax - c[0]) * u[1] - (az - c[1]) * u[0]) / den;
+    if (t > 0 && k >= 0 && k <= 1) best = Math.max(best, t);
+  }
+  return best;
+}
+/** The nearest point of a polyline to q. */
+function nearestOn(path: Vec2[], q: Vec2): Vec2 {
+  let best: Vec2 = path[0], bd = Infinity;
+  for (let i = 1; i < path.length; i++) {
+    const [ax, az] = path[i - 1], [bx, bz] = path[i], ex = bx - ax, ez = bz - az, l2 = ex * ex + ez * ez;
+    const k = l2 ? Math.max(0, Math.min(1, ((q[0] - ax) * ex + (q[1] - az) * ez) / l2)) : 0, p: Vec2 = [ax + ex * k, az + ez * k], d = Math.hypot(p[0] - q[0], p[1] - q[1]);
+    if (d < bd) { bd = d; best = p; }
+  }
+  return best;
 }
 
 // ---------------------------------------------------------------- free plots
