@@ -110,6 +110,9 @@ try {
   await step('sign in (a local name)', async () => {
     answer = 'gene';
     await page.locator('[data-signin]').click();
+    // the panel asks for the local name inline (no window.prompt: embedded browsers drop it)
+    await page.locator('[data-signin-name]').fill('gene');
+    await page.locator('[data-signin-go]').click();
     await page.waitForLoadState('domcontentloaded');
     await page.locator('[data-claim]').waitFor({ timeout: PAGE_MS });
     return { text: (await panel().innerText()).slice(0, 200) };
