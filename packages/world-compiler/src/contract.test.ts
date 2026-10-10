@@ -74,7 +74,7 @@ test('river/1 stub carves a bed and lays path water; building/1 stub is hollow w
   assert.ok(w.terrain.sample(0, 0) < -1, 'bed carved');
   assert.ok(w.ground().waters.some((x) => x.path), 'path water');
   const h = w.get('house')!; const baked = w.bake(w.resolvedDef(h.def)!, h.params ?? {}, 0);
-  assert.ok(baked.colliders.length >= 4 && baked.openings!.length === 1 && baked.rooms!.length === 1);
+  assert.ok(baked.colliders.length >= 4 && baked.openings!.some((o) => o.id === 'front-door') && baked.rooms!.length >= 1);
   assert.equal(w.get('house/table')!.in.slot, 'ground');
 });
 

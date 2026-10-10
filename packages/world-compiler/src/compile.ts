@@ -153,6 +153,21 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         if (op.params || op.constraints) { const problem = admit(scratch, next, def, i, 'strict', false); if (problem) { failures.push(problem); return; } }
         scratch.insert(next); indexAndGround(scratch, next, def, diff);
         upsert(next);
+        // children in slots the new params no longer have (a room that went away) move to the ground floor
+        const orphans: Op[] = [];
+        if (op.params) {
+          const oldSlots = scratch.bake(def, prev.params ?? {}, prev.seed ?? 0, prev.shape).slots, newSlots = scratch.slotsOf(next);
+          for (const cid of [...(scratch.children.get(id) ?? [])]) {
+            const c = scratch.entities.get(cid); if (!c?.in.slot || newSlots.some((x) => x.id === c.in.slot)) continue;
+            const from = oldSlots.find((x) => x.id === c.in.slot), ground = newSlots.some((x) => x.id === 'ground');
+            const lp = c.p ?? [0, 0], lx = lp[0], lz = lp[lp.length - 1];
+            const moved: Entity = { ...c, v: c.v + 1, in: ground ? { parent: id, slot: 'ground' } : { parent: id }, p: [(from?.p[0] ?? 0) + lx, 0, (from?.p[2] ?? 0) + lz] };
+            scratch.delete(cid); scratch.insert(moved); indexAndGround(scratch, moved, scratch.resolvedDef(moved.def)!, diff); upsert(moved);
+            orphans.push({ op: 'move', id: cid, in: c.in, p: c.p ?? [0, 0], r: c.r ?? 0, s: c.s ?? 1, mode: 'strict' } as Op);
+            warnings.push(`${scratch.pathOf(cid)}: ${c.in.slot} is gone; moved to the ground floor`);
+          }
+        }
+        for (const o of orphans) inverse.unshift(o);
         inverse.unshift(inv);
         return;
       }
@@ -306,6 +321,9 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
   const s = e.s ?? 1;
   if (s < def.size.scale[0] || s > def.size.scale[1]) return fail(i, 'size.range', `scale ${s} outside [${def.size.scale.join(', ')}]`);
   const baked = w.bake(def, e.params ?? {}, e.seed ?? 0, e.shape);
+  // generators report design faults as `violation:` notes (building/1: sealed rooms, blocked stairs, headroom)
+  const violations = (baked.notes ?? []).filter((n) => n.startsWith('violation: '));
+  if (violations.length) return fail(i, 'architecture', violations.map((n) => n.slice(11)).join('; '));
   const lim = w.constants.limits.sizeMax;
   if (def.layer === 'solid' && (baked.box[0] * s > lim[0] || baked.box[1] * s > lim[1] || baked.box[2] * s > lim[2])) return fail(i, 'size.range', `${baked.box.map((v) => (v * s).toFixed(1)).join('×')} exceeds ${lim.join('×')}`);
   // slot compatibility
@@ -380,6 +398,19 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
   // overlap (solids only; ancestors, descendants and declared overlaps are exempt)
   if (def.layer === 'solid' && baked.colliders.length) {
     const boxes = w.footprint(e, def);
+    // inside an enterable thing (rooms: building/1): never through its walls, stairs, rails or posts
+    for (let pid = e.in.parent; pid !== 'world';) {
+      const pe = w.entities.get(pid); if (!pe) break;
+      const pd = w.resolvedDef(pe.def);
+      if (pd) {
+        const pb = w.bake(pd, pe.params ?? {}, pe.seed ?? 0, pe.shape);
+        if (pb.rooms?.length) {
+          const fp = w.footprint(pe, pd);
+          for (const a of boxes) for (let k = 0; k < fp.length; k++) if (obbOverlap(a, fp[k])) return fail(i, 'overlap.solid', `crosses ${w.pathOf(pe.id)} ${pb.colliders[k]?.tag ?? 'wall'}`, suggestFrom(a, fp[k]));
+        }
+      }
+      pid = pe.in.parent;
+    }
     const exempt = new Set([e.id, ...w.subtree(e.id)]);
     for (let pid: string | undefined = e.in.parent === 'world' ? undefined : e.in.parent; pid; pid = w.entities.get(pid)?.in.parent === 'world' ? undefined : w.entities.get(pid)?.in.parent) exempt.add(pid);
     for (const other of w.near(boxes)) {

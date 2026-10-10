@@ -142,7 +142,7 @@ test('contract endpoints: schema, query (terrain, entity, free plots, clearance)
   await f.req('/v1/god/act', { token, body: { ops: [{ op: 'place', def: coreRef('bench'), name: 'b', p: [40, 0] }], group: 'hamlet' } });
   await f.req('/v1/god/act', { token, body: { ops: [{ op: 'place', def: coreRef('rock'), name: 'r', p: [-40, 0] }] } });
   assert.deepEqual(seen, [1, 2, 3]);
-  const q = await f.req('/v1/god/query', { body: { points: [[0, 0], [100, 100]], entity: 'c', free: { size: [8, 6], near: [0, 40], count: 2 }, clearance: { at: [30, 0], size: [2, 2] } } });
+  const q = await f.req('/v1/god/query', { body: { points: [[0, 0], [100, 100]], entity: 'c', free: { size: [8, 6], near: [0, 40], count: 2 }, clearance: { at: [30, 3], size: [2, 2] } } }); // across the hollow cottage's front wall
   assert.equal(q.data.points[0].y, 5); assert.equal(q.data.points[1].medium, 'walk');
   assert.equal(q.data.entity.path, 'c'); assert.equal(q.data.free.length, 2);
   assert.equal(q.data.clearance.clear, false); assert.ok(q.data.clearance.blockedBy.includes('c'));

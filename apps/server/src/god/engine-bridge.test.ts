@@ -21,7 +21,7 @@ export const HOUSE_BATCH = (at: [number, number] = [10, 0]) => ({ ops: [
   { op: 'place', tmp: '$h', def: 'house2@1', name: 'house', p: at },
   { op: 'place', def: 'flight@1', name: 'stairs', in: { parent: '$h', slot: 'ground' }, p: [2.9, 0, 0] },
   { op: 'place', def: coreRef('chair'), name: 'chair', in: { parent: '$h', slot: 'floor-1' }, p: [-2, 0, -1] },
-  { op: 'place', tmp: '$t', def: coreRef('table'), name: 'table', in: { parent: '$h', slot: 'floor-1' }, p: [0, 0, -1.6] },
+  { op: 'place', tmp: '$t', def: coreRef('table'), name: 'table', in: { parent: '$h', slot: 'floor-1' }, p: [2, 0, 1.2] },
   { op: 'place', def: coreRef('bowl'), name: 'bowl', in: { parent: '$t', slot: 'top' } },
 ] });
 
@@ -45,12 +45,12 @@ test('Souls among god-built things: enter, climb, sit, carry, pray; bodies refus
   const E = w.host.engine as any, ids = Object.fromEntries(['house', 'house/stairs', 'house/chair', 'house/table', 'house/table/bowl'].map((p) => [p, w.god.model.get(p)!.id]));
   const ep = E.world.entityPhysicsV1;
   assert.ok(ep?.byEntity[ids.house]?.solids?.length >= 5, 'walls');
-  assert.equal(ep.byEntity[ids.house].surfaces.length, 2, 'two floors');
+  assert.deepEqual([...new Set(ep.byEntity[ids.house].surfaces.map((x: any) => x.level))].sort(), [0, 1], 'two floors (one surface per room)');
   assert.equal(ep.byEntity[ids['house/stairs']].links.length, 1, 'stairs');
   assert.ok(E.world.entities[ids['house/chair']]?.tags.includes('entity-world'), 'chair registered with the same id');
   assert.equal(E.world.entities[ids['house/table/bowl']]?.support?.kind, 'resting-on');
   // reach: from the lawn to the upstairs room, through the door and up the stairs
-  const reach = runQuery(w.god.model, { reach: { from: [10, 9], to: 'house:floor-1' } }).reach as any;
+  const reach = runQuery(w.god.model, { reach: { from: [10, 9], to: 'house:bedroom-2' } }).reach as any;
   assert.equal(reach.reachable, true, JSON.stringify(reach)); assert.ok(reach.levels.includes(1));
 
   // a Soul born through the owner flow gets a body entity with the engine's id

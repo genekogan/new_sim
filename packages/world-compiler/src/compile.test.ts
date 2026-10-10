@@ -64,9 +64,9 @@ test('overlap is refused with a suggestion; nudge moves it; declared overlaps pa
   const f = refused(applyBatch(w, { ops: [{ op: 'place', def: coreRef('cottage'), name: 'b', p: [2, 0] }] }, 'god', 2));
   assert.equal(f[0].code, 'overlap.solid');
   assert.ok(f[0].suggest?.p, 'suggests a free pose');
-  const n = ok(applyBatch(w, { ops: [{ op: 'place', def: coreRef('bench'), name: 'nb', p: [1, 0], mode: 'nudge' }] }, 'god', 3));
+  const n = ok(applyBatch(w, { ops: [{ op: 'place', def: coreRef('bench'), name: 'nb', p: [3.2, 0], mode: 'nudge' }] }, 'god', 3)); // its east legs straddle the (hollow) cottage's east wall
   assert.ok(n.accepted);
-  const nb = w.get('nb')!; const nz = nb.p![nb.p!.length - 1]!; assert.ok(Math.abs(nb.p![0]) > 4 || Math.abs(nz) > 3, `nudged out: ${nb.p}`);
+  const nb = w.get('nb')!; const nz = nb.p![nb.p!.length - 1]!; assert.ok(Math.abs(nb.p![0] - 3.2) > 0.1 || Math.abs(nz) > 0.1, `nudged off the wall: ${nb.p}`);
   // a tree declared to overlap decks
   ok(applyBatch(w, { ops: [{ op: 'define', def: { schema: 'def/1', name: 'deck-tree', version: 1, make: { kind: 'gen', gen: 'box/1' }, size: { box: [0.6, 7, 0.6] }, tags: ['tree'], overlaps: ['building'], params: { w: { type: 'number', default: 0.6 }, h: { type: 'number', default: 7 }, d: { type: 'number', default: 0.6 }, color: { type: 'color', default: '#2f6b2f' } } } }, { op: 'place', def: 'deck-tree@1', p: [1, 1] }] }, 'god', 4));
 });

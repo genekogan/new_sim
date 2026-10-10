@@ -145,7 +145,8 @@ test('catalog: ranked search with synonyms; def detail with an example op; thumb
   assert.equal(await first('dog'), 'core/dog@1');
   assert.equal(await first('pup'), 'core/dog@1');
   assert.equal(await first('kitty'), 'core/cat@1');
-  assert.equal(await first('lighthouse'), 'core/ceramic-tower@1');
+  assert.equal(await first('lighthouse'), 'core/lighthouse@1');  // L2's enterable lighthouse ranks ahead of the LM tower mesh
+  assert.equal(await first('ceramic tower'), 'core/ceramic-tower@1');
   assert.match((await first('boat'))!, /row(ing-)?boat/);
   assert.match((await first('cows'))!, /cow/);
   assert.match((await first('birch trees'))!, /birch/);

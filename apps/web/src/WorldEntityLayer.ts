@@ -20,7 +20,7 @@ const TERRAIN_STEP = 2;              // metres between terrain vertices in the p
 const EASE_IN_S = 2.5, EASE_OUT_S = 0.6, DROP_M = 40;
 const easeOut = (t: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
 
-type Drawn = { inst?: string; settled?: boolean; obj: THREE.Object3D; from: { p: THREE.Vector3; s: number }; to: { p: THREE.Vector3; s: number }; t0: number; dur: number; removing?: boolean; defHash: string; world?: boolean; motion?: { entity: Entity; def: StoredDef; yaw: number } };
+type Drawn = { inst?: string; settled?: boolean; shown?: boolean; obj: THREE.Object3D; from: { p: THREE.Vector3; s: number }; to: { p: THREE.Vector3; s: number }; t0: number; dur: number; removing?: boolean; defHash: string; world?: boolean; motion?: { entity: Entity; def: StoredDef; yaw: number } };
 
 export class WorldEntityLayer {
   readonly group = new THREE.Group();
@@ -121,15 +121,29 @@ export class WorldEntityLayer {
       d.obj.position.lerpVectors(d.from.p, d.to.p, t);
       const s = d.from.s + (d.to.s - d.from.s) * t;
       d.obj.scale.setScalar(s);
+      const shown = this.interiorVisible(id);
       if (d.inst) {
         if (d.removing && t >= 1) { this.instancer.remove(d.inst, id); this.drawn.delete(id); continue; }
-        if (!d.settled) { this.instancer.set(d.inst, id, d.obj.position, d.obj.rotation.y, d.obj.scale.x, [d.obj.rotation.x, d.obj.rotation.z]); if (t >= 1) d.settled = true; }
+        if (!d.settled || shown !== (d.shown ?? true)) { this.instancer.set(d.inst, id, d.obj.position, d.obj.rotation.y, shown ? d.obj.scale.x : 0, [d.obj.rotation.x, d.obj.rotation.z]); d.shown = shown; if (t >= 1) d.settled = true; }
         continue;
       }
+      d.obj.visible = shown;
       if (d.removing && t >= 1) { this.thingsGroup.remove(d.obj); disposeObject(d.obj); this.drawn.delete(id); continue; }
       if (d.motion && t >= 1) animate(d.obj, d.motion.entity, d.motion.def, nowMs / 1000, { y: d.to.p.y, yaw: d.motion.yaw });
     }
     void dt;
+  }
+
+  /** Interior view (building/1's mesh sets `userData.interior`): a thing on a storey its building hides is hidden too. */
+  private interiorVisible(id: string): boolean {
+    if (!this.model) return true;
+    let e = this.model.entities.get(id), slot = e?.in.slot;
+    for (let depth = 0; e && e.in.parent !== 'world' && depth < 6; depth++) {
+      const host = this.drawn.get(e.in.parent)?.obj.userData.interior as { cut(): number; floorOf: Record<string, number> } | undefined;
+      if (host) return (host.floorOf[slot ?? ''] ?? 0) <= host.cut();
+      e = this.model.entities.get(e.in.parent); slot = e?.in.slot;
+    }
+    return true;
   }
 
   /** A box worth looking at first: the placed things if any, else the middle of the world. */
