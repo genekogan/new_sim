@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } fr
 import { resolve } from 'node:path';
 import { call, load, num, ok, r2, save, sleep } from './lib/state.mjs';
 import { mirror, view, normDef, follow, invalidate } from './lib/mirror.mjs';
-import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS, setOf, relocate, frameOf } from './lib/solver.mjs';
+import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS, setOf, relocate, frameOf, slotTarget } from './lib/solver.mjs';
 import { camera, shoot, keeper, stopKeeper } from './lib/look.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -380,13 +380,29 @@ export async function move(ref, flags = {}) {
     return `moved ${row.path} by (${dx}, ${dz})${after && !after.shape ? ` to (${after.pose[0]}, ${after.pose[1]}, ${after.pose[2]})` : ''}${note ? ` — ${note}${after ? `; now ${after.path}` : ''}` : ''}`;
   }
   if (!hasRelation(flags) && flags.yaw === undefined && flags.facing === undefined && !flags.in) throw new Error('usage: move <ref> --at …|--near …|--by dx,dz|--yaw r|--facing …|--in parent[/slot]');
-  if (flags.in && !hasRelation(flags)) { const [parent, slot] = String(flags.in).split(/\/(?=[^/]+$)/); const host = v.get(flags.in) ? flags.in : parent; const r = await act({ ops: [{ op: 'move', id: row.path, in: host === flags.in ? { parent: host } : { parent, ...(slot ? { slot } : {}) }, ...(flags.local ? { p: String(flags.local).split(',').map(Number) } : {}) }] }); return r.accepted ? `moved ${row.path} into ${flags.in}` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
+  if (flags.in && !hasRelation(flags)) {
+    // --in world: out to the root where it stands; --in <host>[/slot] --local x,z: exactly there in the slot's frame
+    if (flags.in === 'world' || flags.local) {
+      const [parent, slot] = String(flags.in).split(/\/(?=[^/]+$)/); const host = flags.in === 'world' || v.get(flags.in) ? flags.in : parent;
+      const o = { op: 'move', id: row.path, in: host === flags.in ? { parent: host } : { parent, ...(slot ? { slot } : {}) }, p: flags.local ? String(flags.local).split(',').map(Number) : [row.pose[0], row.pose[2]] };
+      const r = await act({ ops: [o] }); if (!r.accepted) return `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
+      const after = view(await mirror()).byId.get(row.id);
+      return `moved ${row.path} into ${flags.in}${after ? ` — now ${after.path} at (${after.pose[0]}, ${after.pose[1]}, ${after.pose[2]})` : ''}`;
+    }
+    // otherwise the solver picks the spot: a room (--inside) or a slot to stand on (--on: a table top, a pier's end, a balcony)
+    const T = slotTarget(v, flags.in); if (!T) throw new Error(`no such thing: ${flags.in}`);
+    const rooms = (T.host.slots ?? []).some((x) => x.kind === 'room'), tops = (T.host.slots ?? []).some((x) => ['surface', 'shelf'].includes(x.kind));
+    const intoRoom = T.slot ? T.slot.kind === 'room' : rooms && !tops;
+    flags = { ...flags, in: undefined, [intoRoom ? 'inside' : 'on']: flags.in };
+  }
   const info = { form: row.form, layer: row.layer, box: row.box };
   const rel = relFrom(flags);
   if (!hasRelation(flags)) rel.at = `${row.pose[0]},${row.pose[2]}`;
   const sol = solve(v, { def: row.def, ...info, s: row.pose[4] }, { ...rel, skip: [...sub] });
   // world-frame answers (near, at, along…) for a thing that lives inside something: into its parent's frame
   const items = sol.items.slice(0, 1).map((it) => ({ candidates: it.candidates.map((c) => {
+    // into a slot: keep the thing's world heading unless the solver turned it
+    if (c.in && c.r === undefined) { const h = v.get(c.in.parent); return h ? { ...c, r: r2(row.pose[3] - frameOf(h, c.in.slot).RY) } : c; }
     if (c.in || c.shape || row.parent === 'world') return c;
     const R = relocated(c.p[0], c.p[1], c.r ?? row.pose[3], c.constraints ?? []);
     return { ...c, ...R.o, ...(R.o.r === undefined && c.r !== undefined ? { r: r2(c.r - (frameOf(v.byId.get(row.parent), row.slot).RY)) } : {}), note: `${c.note}${R.note ? `; ${R.note}` : ''}` };

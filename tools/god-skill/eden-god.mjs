@@ -436,19 +436,47 @@ function solve(v, thing, rel) {
     return { items: [{ candidates: [pose(p[0], p[1], finalYaw(p[0], p[1], yawOf(nrm[0], nrm[1])), { note: `across ${host.path} at ${Math.round(t * 100)}%` })] }], notes };
   }
   if (rel.on) {
-    const host = v.get(rel.on);
-    if (!host) throw new Error(`no such thing to put it on: ${rel.on}`);
-    const slots = (host.slots ?? []).filter((x) => ["surface", "shelf"].includes(x.kind) && x.used < x.capacity);
-    if (!slots.length) throw new Error(`${host.path} has no free surface slot (slots: ${(host.slots ?? []).map((x) => `${x.id}:${x.kind} ${x.used}/${x.capacity}`).join(", ") || "none"})`);
+    const T = slotTarget(v, rel.on);
+    if (!T) throw new Error(`no such thing to put it on: ${rel.on}`);
+    const host = T.host;
+    if (T.slot?.kind === "room") return solve(v, thing, { ...rel, on: void 0, inside: rel.on });
+    const listing = () => (host.slots ?? []).filter((x) => x.kind !== "wall").map((x) => `${x.id}:${x.kind} ${x.used}/${x.capacity}`).join(", ") || "none";
+    const open = (x) => x.used < x.capacity;
+    let slots = T.slot ? [T.slot].filter(open) : (host.slots ?? []).filter((x) => ["surface", "shelf"].includes(x.kind) && open(x));
+    if (!T.slot && !slots.length) slots = (host.slots ?? []).filter((x) => (["stand", "deck"].includes(x.kind) || x.kind === "floor" && !/^(ground|floor-\d+)$/.test(x.id)) && open(x));
+    if (T.slot && !slots.length) throw new Error(`${host.path}/${T.slot.id} is full (${T.slot.used}/${T.slot.capacity})`);
+    if (!slots.length) throw new Error(`${host.path} has no free slot to put things on (slots: ${listing()}); name one with --on ${host.path}/<slot>`);
     const n = Number(rel.count ?? 1);
     const items2 = [];
-    for (const sl of slots) {
+    for (const sl of slots.filter((x) => !["surface", "shelf"].includes(x.kind))) {
+      if (items2.length >= n) break;
+      const F = frameOf(host, sl.id);
+      const there = v.rows.filter((r) => r.parent === host.id && r.slot === sl.id && !skip.has(r.id)).map((r) => {
+        const e = v.entity?.(r.id);
+        const p = e?.p ?? [0, 0];
+        return [p[0], p[p.length - 1]];
+      });
+      const sep = Math.max(hw, hd) * 2 + 0.3, side = rot(F.RY - F.PY, 1, 0);
+      const offs = [0, 1, -1, 2, -2, 3, -3, 4, -4].map((k) => [r22(side[0] * k * sep) + 0, r22(side[1] * k * sep) + 0]).filter(([x, z]) => Math.hypot(x, z) <= 3.6);
+      for (let k = 0; k < sl.capacity - sl.used && items2.length < n; k++) {
+        const q = offs.find(([x, z]) => there.every(([a, b]) => Math.hypot(a - x, b - z) >= sep * 0.9));
+        if (!q) {
+          notes.push(`${host.path}/${sl.id} has no more room for things this size`);
+          break;
+        }
+        there.push(q);
+        const [wx, wz] = toWorldIn(F, q[0], q[1]);
+        const f = faceAt(wx, wz), yaw2 = f !== void 0 ? f : baseYaw;
+        items2.push({ candidates: [{ in: { parent: host.path, slot: sl.id }, p: q, ...yaw2 !== void 0 ? { r: r22(yaw2 - F.RY) } : {}, constraints: [...constraints, ...facingConstraint()], note: `on ${host.path}/${sl.id}` }] });
+      }
+    }
+    for (const sl of slots.filter((x) => ["surface", "shelf"].includes(x.kind))) {
       if (items2.length >= n) break;
       const F = frameOf(host, sl.id), HF = frameOf(host);
       const [ox, oz] = toLocal(HF, F.O[0], F.O[1]);
       const hx = (host.box?.[0] ?? 1) / 2 - 0.06, hz = (host.box?.[2] ?? 1) / 2 - 0.06;
       const sep = Math.max(hw, hd) * 2 + 0.06;
-      const there = v.rows.filter((r) => r.parent === host.id && r.slot === sl.id).map((r) => {
+      const there = v.rows.filter((r) => r.parent === host.id && r.slot === sl.id && !skip.has(r.id)).map((r) => {
         const e = v.entity?.(r.id);
         const p = e?.p ?? [0, 0];
         return [p[0], p[p.length - 1]];
@@ -503,6 +531,14 @@ function solve(v, thing, rel) {
       }
     }
     if (!host) throw new Error(`no such building: ${spec}`);
+    if (roomId) {
+      let T = null;
+      try {
+        T = slotTarget(v, spec);
+      } catch {
+      }
+      if (T?.slot && T.slot.kind !== "room") return solve(v, thing, { ...rel, inside: void 0, on: spec });
+    }
     const rooms = (host.slots ?? []).filter((x) => x.kind === "room");
     if (!rooms.length) throw new Error(`${host.path} has no rooms (it is not a building); use --near or --on`);
     const bare = (t) => String(t).toLowerCase().replace(/[^a-z]/g, "");
@@ -724,6 +760,19 @@ var toWorldIn = (F, lx, lz) => {
   const [dx, dz] = rot(F.PY, lx * F.s, lz * F.s);
   return [F.O[0] + dx, F.O[1] + dz];
 };
+function slotTarget(v, spec) {
+  const s = String(spec ?? "");
+  const whole = v.get(s);
+  if (whole) return { host: whole, slot: null };
+  const cut = s.lastIndexOf("/");
+  if (cut <= 0) return null;
+  const host = v.get(s.slice(0, cut));
+  if (!host) return null;
+  const want = s.slice(cut + 1), bare = (t) => String(t).toLowerCase().replace(/[^a-z0-9]/g, "");
+  const sl = (host.slots ?? []).find((x) => x.id === want) ?? (host.slots ?? []).find((x) => bare(x.id) === bare(want)) ?? (host.slots ?? []).find((x) => bare(x.id).startsWith(bare(want)));
+  if (!sl) throw new Error(`${host.path} has no slot ${want}; its slots: ${(host.slots ?? []).filter((x) => x.kind !== "wall").map((x) => `${x.id} (${x.kind})`).join(", ") || "none"}`);
+  return { host, slot: sl };
+}
 function roomsAt(v, wx, wz, exclude = /* @__PURE__ */ new Set()) {
   const out = [];
   for (const r of v.rows) {
@@ -1814,16 +1863,30 @@ async function move(ref, flags2 = {}) {
   }
   if (!hasRelation(flags2) && flags2.yaw === void 0 && flags2.facing === void 0 && !flags2.in) throw new Error("usage: move <ref> --at \u2026|--near \u2026|--by dx,dz|--yaw r|--facing \u2026|--in parent[/slot]");
   if (flags2.in && !hasRelation(flags2)) {
-    const [parent, slot] = String(flags2.in).split(/\/(?=[^/]+$)/);
-    const host = v.get(flags2.in) ? flags2.in : parent;
-    const r = await act({ ops: [{ op: "move", id: row.path, in: host === flags2.in ? { parent: host } : { parent, ...slot ? { slot } : {} }, ...flags2.local ? { p: String(flags2.local).split(",").map(Number) } : {} }] });
-    return r.accepted ? `moved ${row.path} into ${flags2.in}` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
+    if (flags2.in === "world" || flags2.local) {
+      const [parent, slot] = String(flags2.in).split(/\/(?=[^/]+$)/);
+      const host = flags2.in === "world" || v.get(flags2.in) ? flags2.in : parent;
+      const o = { op: "move", id: row.path, in: host === flags2.in ? { parent: host } : { parent, ...slot ? { slot } : {} }, p: flags2.local ? String(flags2.local).split(",").map(Number) : [row.pose[0], row.pose[2]] };
+      const r = await act({ ops: [o] });
+      if (!r.accepted) return `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
+      const after = view(await mirror()).byId.get(row.id);
+      return `moved ${row.path} into ${flags2.in}${after ? ` \u2014 now ${after.path} at (${after.pose[0]}, ${after.pose[1]}, ${after.pose[2]})` : ""}`;
+    }
+    const T = slotTarget(v, flags2.in);
+    if (!T) throw new Error(`no such thing: ${flags2.in}`);
+    const rooms = (T.host.slots ?? []).some((x) => x.kind === "room"), tops = (T.host.slots ?? []).some((x) => ["surface", "shelf"].includes(x.kind));
+    const intoRoom = T.slot ? T.slot.kind === "room" : rooms && !tops;
+    flags2 = { ...flags2, in: void 0, [intoRoom ? "inside" : "on"]: flags2.in };
   }
   const info = { form: row.form, layer: row.layer, box: row.box };
   const rel = relFrom(flags2);
   if (!hasRelation(flags2)) rel.at = `${row.pose[0]},${row.pose[2]}`;
   const sol = solve(v, { def: row.def, ...info, s: row.pose[4] }, { ...rel, skip: [...sub] });
   const items = sol.items.slice(0, 1).map((it) => ({ candidates: it.candidates.map((c) => {
+    if (c.in && c.r === void 0) {
+      const h = v.get(c.in.parent);
+      return h ? { ...c, r: r2(row.pose[3] - frameOf(h, c.in.slot).RY) } : c;
+    }
     if (c.in || c.shape || row.parent === "world") return c;
     const R = relocated(c.p[0], c.p[1], c.r ?? row.pose[3], c.constraints ?? []);
     return { ...c, ...R.o, ...R.o.r === void 0 && c.r !== void 0 ? { r: r2(c.r - frameOf(v.byId.get(row.parent), row.slot).RY) } : {}, note: `${c.note}${R.note ? `; ${R.note}` : ""}` };
