@@ -141,13 +141,14 @@ test('routes: upload a GLB, define it, place it, fetch it immutable; refuse junk
 test('catalog: ranked search with synonyms; def detail with an example op; thumbnails round-trip', async () => {
   const f = fixture();
   const first = async (q: string) => (await f.req(`/v1/god/defs?q=${encodeURIComponent(q)}`)).data.defs[0]?.publicRef as string | undefined;
-  assert.equal(await first('dog'), 'core/dog-pack@1');
-  assert.equal(await first('pup'), 'core/dog-pack@1');
-  assert.equal(await first('kitty'), 'core/cat-pack@1');
+  // L4's kit creatures (rounded, animated) rank ahead of the pack meshes
+  assert.equal(await first('dog'), 'core/dog@1');
+  assert.equal(await first('pup'), 'core/dog@1');
+  assert.equal(await first('kitty'), 'core/cat@1');
   assert.equal(await first('lighthouse'), 'core/ceramic-tower@1');
-  assert.match((await first('boat'))!, /rowboat/);
-  assert.match((await first('cows'))!, /cow-pack/);
-  assert.match((await first('birch trees'))!, /birch-tree/);
+  assert.match((await first('boat'))!, /row(ing-)?boat/);
+  assert.match((await first('cows'))!, /cow/);
+  assert.match((await first('birch trees'))!, /birch/);
   const hen = await first('hen'); if (hen) assert.match(hen, /chicken/); // L4's chicken (kit/2) answers once it lands
   const none = await f.req('/v1/god/defs?q=xylophone-zeppelin');
   assert.equal(none.data.count, 0); assert.match(none.data.hint, /define it/);

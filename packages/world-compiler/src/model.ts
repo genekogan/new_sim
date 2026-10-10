@@ -7,7 +7,8 @@ import { hashOf } from './hash.ts';
 import { defSchema, type Def, type DefInput, type Entity, type StoredDef, type Value, type WorldConstants, type WorldState, worldConstantsSchema, worldStateSchema } from './schemas.ts';
 
 export type OBB = { c: [number, number]; half: [number, number]; yaw: number; y0: number; y1: number };
-export type AssetInfo = { tris: number; bytes: number; textures: number; box: [number, number, number] };
+/** `baked`: physics of a footprint sidecar (asset store, L5), already in the def's metres. */
+export type AssetInfo = { tris: number; bytes: number; textures: number; box: [number, number, number]; baked?: Pick<Baked, 'colliders' | 'slots'> & Partial<Pick<Baked, 'surfaces' | 'openings' | 'links' | 'rooms' | 'notes'>> };
 export type AssetLookup = (hash: string) => AssetInfo | undefined;
 
 export class WorldModel {
@@ -75,10 +76,11 @@ export class WorldModel {
       if (!g) throw new Error(`generator ${m.gen} unknown`);
       baked = g.physics({ params: { ...defaultsOf(g.params), ...params }, args: (m.args ?? {}) as Record<string, unknown>, seed, shape: shape as never });
     } else if (m.kind === 'mesh') {
-      const info = this.assets(m.asset);
-      const box = info?.box ?? def.size.box;
-      const colliders: LocalOBB[] = m.collide === 'none' ? [] : [{ c: [0, 0], half: [box[0] / 2, box[2] / 2], yaw: 0, y0: 0, y1: box[1] }];
-      baked = { box, colliders, slots: [], tris: info?.tris ?? 0 };
+      // the def states the size (the viewer fits the model to it); a footprint sidecar gives walls, rooms, openings, links
+      const info = this.assets(m.asset), fp = m.footprint ? this.assets(m.footprint)?.baked : undefined;
+      const box = def.size.box;
+      const colliders: LocalOBB[] = m.collide === 'none' ? [] : fp?.colliders.length ? fp.colliders : [{ c: [0, 0], half: [box[0] / 2, box[2] / 2], yaw: 0, y0: 0, y1: box[1] }];
+      baked = { box, colliders, slots: fp?.slots ?? [], tris: info?.tris ?? 0, ...(fp ? { surfaces: fp.surfaces, openings: fp.openings, links: fp.links, rooms: fp.rooms, notes: fp.notes } : {}) };
     } else if (m.kind === 'parts') {
       // Physics of a prefab = union of its parts' boxes (parts are placed as their own entities at expansion time).
       baked = { box: def.size.box, colliders: [], slots: [], tris: 0 };

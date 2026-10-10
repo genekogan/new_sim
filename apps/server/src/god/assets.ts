@@ -245,7 +245,7 @@ export function scaleFootprint(fp: LmFootprint, k: number): LmFootprint {
     ...fp,
     bounds: fp.bounds && { min: v(fp.bounds.min) as Vec3, max: v(fp.bounds.max) as Vec3 },
     levels: fp.levels?.map((l) => ({ ...l, y: r4(l.y * k) })),
-    rooms: fp.rooms?.map((r) => ({ ...r, y0: r4(r.y0 * k), y1: r4(r.y1 * k), polygon: r.polygon.map((p) => v(p) as Vec2), ...((r as { clearHeight?: number }).clearHeight !== undefined ? { clearHeight: r4((r as { clearHeight: number }).clearHeight * k) } : {}) })),
+    rooms: fp.rooms?.map((r) => ({ ...r, y0: r4(r.y0 * k), y1: r4(r.y1 * k), polygon: r.polygon.map((p) => v(p) as Vec2), ...((r as { clearHeight?: number }).clearHeight !== undefined ? { clearHeight: r4((r as unknown as { clearHeight: number }).clearHeight * k) } : {}) })),
     terraces: fp.terraces?.map((t) => ({ ...t, y: r4(t.y * k), polygon: t.polygon.map((p) => v(p) as Vec2), hole: t.hole?.map((p) => v(p) as Vec2) })),
     obstacles: fp.obstacles?.map((o) => ({ ...o, obb: { ...o.obb, c: v(o.obb.c) as Vec2, half: v(o.obb.half) as Vec2 }, y0: r4(o.y0 * k), y1: r4(o.y1 * k) })),
     portals: fp.portals?.map((p) => ({ ...p, center: v(p.center) as Vec3, y0: r4(p.y0 * k), y1: r4(p.y1 * k), ...(p.width !== undefined ? { width: r4(p.width * k) } : {}), ...(p.diameter !== undefined ? { diameter: r4(p.diameter * k) } : {}) })),

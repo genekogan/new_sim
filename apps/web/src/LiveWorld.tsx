@@ -55,6 +55,7 @@ import { decodeSceneCapturePublication } from '@sim/protocol/scene-capture';
 import { WorldSceneHistory } from './WorldSceneHistory.ts';
 import { apiPath } from './world-path.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
+import { setAssetLoader } from './gen-mesh/gltf-assets.ts';
 import { GodPanel } from './GodPanel.tsx';
 import {WorldEdgeItems} from './WorldEdgeItems.ts';
 import { WorldNavigation, createWorldOrbitControls, type ManualNavigation, type CameraMove } from './WorldNavigation.ts';
@@ -372,6 +373,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const draco = new DRACOLoader(manager).setDecoderPath('/mars-assets/draco/');
     const placePreviews=new WorldPlacePreviews(renderer,()=>[geometry.group,...(expansion?[expansion.group]:[])]);
     const loader = new GLTFLoader(manager).setDRACOLoader(draco).setMeshoptDecoder(MeshoptDecoder);
+    setAssetLoader(loader);
     const floaters = new FloaterView(scene, { baseUrl: '/world-assets/littlemartians/characters/', loader });
     const bodyModels=new WorldBodyModels(loader,problem);
     let capturedPlatforms:readonly PlatformFloor[]|null=null;

@@ -1,4 +1,4 @@
-// Mesh halves for box/1, scatter/1, landform/1, lake/1, flags, mesh defs (placeholder). Owner: L1.
+// Mesh halves for box/1, scatter/1, landform/1, lake/1, flags. Owner: L1. (mesh defs: mesh.mesh.ts, L5)
 import * as THREE from 'three';
 import { scatterPoints } from '@sim/generators';
 import { registerMesh, type MeshCtx } from './registry.ts';
@@ -66,12 +66,6 @@ registerMesh({
     const sprite = labelSprite(label); sprite.position.y = h + 0.6; holder.add(sprite);
     return holder;
   },
-});
-
-/** Mesh defs: a placeholder box until L5's asset store streams GLBs (L5 replaces this builder). */
-registerMesh({
-  gen: 'mesh',
-  build(ctx) { const [w, h, d] = ctx.def.size.box; const m = new THREE.Mesh(box(), ctx.materials.get('paint', '#b0a090')); m.scale.set(w, h, d); m.position.y = h / 2; m.castShadow = true; return m; },
 });
 
 export function labelSprite(text: string): THREE.Sprite {

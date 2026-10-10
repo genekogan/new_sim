@@ -99,7 +99,7 @@ export const partSchema = z.object({
 export type Part = z.infer<typeof partSchema>;
 
 export const makeSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('mesh'), asset: z.string().regex(/^[0-9a-f]{64}$/), lod1: z.string().regex(/^[0-9a-f]{64}$/).optional(), collide: z.enum(['box', 'hull', 'mesh', 'none']).default('box') }),
+  z.object({ kind: z.literal('mesh'), asset: z.string().regex(/^[0-9a-f]{64}$/), lod1: z.string().regex(/^[0-9a-f]{64}$/).optional(), collide: z.enum(['box', 'hull', 'mesh', 'none']).default('box'), /** sha of an lm-building-footprint/1 sidecar in the asset store (rooms, walls, openings, links) */ footprint: z.string().regex(/^[0-9a-f]{64}$/).optional() }),
   z.object({ kind: z.literal('gen'), gen: z.string().regex(/^[a-z][a-z0-9-]*\/\d+$/), args: z.record(z.string(), z.unknown()).optional() }),
   z.object({ kind: z.literal('parts'), parts: z.array(partSchema).min(1).max(256) }),
   /** Nothing to draw or collide with: a place marker, a region, a landform-only def. */

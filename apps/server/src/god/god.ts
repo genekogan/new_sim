@@ -10,6 +10,7 @@ import { hashToken } from '../auth.ts';
 import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
 import { WorldStore, type EditRow, type PrayerRow } from './store.ts';
+import { AssetStore, defaultAssetDir } from './assets.ts';
 
 const PAIR_TTL = 15 * 60_000;
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -34,6 +35,8 @@ export type GodOptions = {
   seed?: string;
   /** A genesis/1 template applied once when the world is first created (worlds/templates/*.json). */
   genesis?: Genesis;
+  /** Content-addressed asset files (default $ASSET_DIR or <DATA_DIR>/../assets), shared by every world on the box. */
+  assetDir?: string;
 };
 
 /** genesis/1: constants, state and ordered batches that build a world from nothing (spec 29 §4.5). */
@@ -41,6 +44,7 @@ export type Genesis = { schema: 'genesis/1'; name?: string; description?: string
 
 export class GodMode {
   readonly store: WorldStore;
+  readonly assets: AssetStore;
   model: WorldModel;
   owner: string | null;
   private pairings = new Map<string, Pairing>();
@@ -58,7 +62,8 @@ export class GodMode {
   constructor(db: Db, opts: GodOptions) {
     this.db = db; this.opts = opts;
     this.store = new WorldStore(db, opts.worldId);
-    const loaded = this.store.load();
+    this.assets = new AssetStore({ dir: opts.assetDir ?? defaultAssetDir(), db, worldId: opts.worldId });
+    const loaded = this.store.load(this.assets.lookup);
     if (loaded) {
       this.model = loaded.model; this.owner = loaded.owner;
       // a newer release may add core defs: make them available to older worlds (existing hashes are untouched)
@@ -66,7 +71,7 @@ export class GodMode {
       if (added.length) this.store.commit(this.model, this.owner, { upserts: [], removes: [], defs: added, tiles: [], answers: [] }, { seq: this.model.editSeq, by: 'core', at: Date.now(), note: `core kit: +${added.map((d) => d.ref).join(', ')}`, ops: [], inverse: [], kind: 'edit' });
     }
     else {
-      this.model = new WorldModel({ constants: { ground: 'land', extent: 1000, ...opts.constants, ...opts.genesis?.constants } as never, seed: opts.seed ?? `${opts.worldId}:genesis` });
+      this.model = new WorldModel({ constants: { ground: 'land', extent: 1000, ...opts.constants, ...opts.genesis?.constants } as never, seed: opts.seed ?? `${opts.worldId}:genesis`, assets: this.assets.lookup });
       for (const d of CORE_KIT) this.model.defineDef(d, 'core', 0);
       this.owner = opts.ownerId;
       this.store.init(this.model, this.owner);

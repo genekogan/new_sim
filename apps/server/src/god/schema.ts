@@ -30,8 +30,8 @@ export function godSchema() {
     generators: describeGenerators(),
     refusals: refusalCodes,
     endpoints: {
-      read: ['GET /v1/world/snapshot', 'GET /v1/world/ground', 'GET /v1/world/tiles/:tx/:tz', 'GET /v1/world/entities/:path', 'GET /v1/god/schema', 'POST /v1/god/query'],
-      god: ['GET /v1/god/snapshot', 'GET /v1/god/defs?q=&tag=', 'POST /v1/god/dryrun', 'POST /v1/god/preview', 'POST /v1/god/act', 'POST /v1/god/undo[?group=]', 'POST /v1/god/redo', 'GET /v1/god/edits', 'GET /v1/god/stream (SSE)', 'GET /v1/god/prayers', 'POST /v1/god/answer'],
+      read: ['GET /assets/<sha>.<ext>', 'GET /v1/god/assets/<sha>', 'GET /v1/god/defs/<ref>/thumb.png', 'GET /v1/world/snapshot', 'GET /v1/world/ground', 'GET /v1/world/tiles/:tx/:tz', 'GET /v1/world/entities/:path', 'GET /v1/god/schema', 'POST /v1/god/query'],
+      god: ['GET /v1/god/snapshot', 'GET /v1/god/defs?q=&tag=', 'GET /v1/god/defs/<ref>', 'POST /v1/god/assets (multipart: file, footprint?, name, height?, tags?, license?, source?, define?)', 'GET /v1/god/assets[?core=1]', 'POST /v1/god/dryrun', 'POST /v1/god/preview', 'POST /v1/god/act', 'POST /v1/god/undo[?group=]', 'POST /v1/god/redo', 'GET /v1/god/edits', 'GET /v1/god/stream (SSE)', 'GET /v1/god/prayers', 'POST /v1/god/answer'],
     },
   };
   return cached;

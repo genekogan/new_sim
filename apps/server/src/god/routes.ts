@@ -9,6 +9,7 @@ import type { UserRow } from '../db.ts';
 import type { GodMode } from './god.ts';
 import { godSchema } from './schema.ts';
 import { runQuery } from './query.ts';
+import { mountAssetRoutes } from './assets.ts';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -32,6 +33,8 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   const bearer = (c: Context) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
   const requireGod = (c: Context) => { if (!d.god.godFromToken(bearer(c))) throw new ApiError(401, 'unauthorized', 'missing or invalid god token; pair with POST /v1/god/pair/start'); };
   const body = async (c: Context) => { try { return await c.req.json(); } catch { throw new ApiError(400, 'bad-json', 'body must be JSON'); } };
+  // assets (GET /assets/<sha>.<ext>, POST /v1/god/assets) and the catalog (GET /v1/god/defs?q=, /v1/god/defs/<ref>[/thumb.png]): L5
+  mountAssetRoutes(app, { god: d.god, requireGod, store: d.god.assets });
 
   // ---- public reads (the renderer's view of the world; Gene: topology and placements are public)
   app.get('/v1/world/snapshot', (c) => c.json(d.god.publicSnapshot(), 200, noStore));
@@ -77,14 +80,6 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.post('/v1/god/preview', async (c) => { requireGod(c); return c.json(d.god.preview(await body(c)), 200, noStore); });
   app.get('/v1/god/preview/:id', (c) => { const v = d.god.getPreview(c.req.param('id')); if (!v) throw new ApiError(404, 'not-found', 'preview expired or unknown'); return c.json({ id: c.req.param('id'), diff: v.diff, failures: v.failures ?? null }, 200, noStore); });
   app.get('/v1/god/snapshot', (c) => { requireGod(c); return c.json(d.god.godSnapshot(), 200, noStore); });
-  app.get('/v1/god/defs', (c) => {
-    requireGod(c);
-    const q = (c.req.query('q') ?? '').toLowerCase().trim(), tag = c.req.query('tag');
-    let defs = d.god.godSnapshot().library as { name: string; ref: string; description: string; tags: string[] }[];
-    if (tag) defs = defs.filter((x) => x.tags.includes(tag));
-    if (q) { const words = q.split(/\s+/); defs = defs.map((x) => ({ x, score: words.reduce((acc, w) => acc + (x.name.includes(w) ? 3 : 0) + (x.tags.some((t) => t.includes(w)) ? 2 : 0) + (x.description.toLowerCase().includes(w) ? 1 : 0), 0) })).filter((r) => r.score > 0).sort((a, b) => b.score - a.score).map((r) => r.x); }
-    return c.json({ defs, count: defs.length }, 200, noStore);
-  });
   app.post('/v1/god/dryrun', async (c) => { requireGod(c); return c.json(d.god.dryrun(await body(c)), 200, noStore); });
   app.post('/v1/god/act', async (c) => { requireGod(c); const b = await body(c); const r = d.god.act(b, typeof b?.note === 'string' ? b.note : undefined); return c.json(r, 200, noStore); });
   app.post('/v1/god/undo', (c) => { requireGod(c); const g = c.req.query('group'); return c.json(g ? d.god.undoGroup(g) : d.god.undo(), 200, noStore); });
