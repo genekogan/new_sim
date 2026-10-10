@@ -2,68 +2,73 @@
 
 $ eden-god group market
   current group: market (every edit until `group --off`; undo it all with `undo --group market`)
-  (98 ms)
+  (1205 ms)
 $ eden-god place plaza --rect 0,0,36,28 --name square
   placed square [core/plaza@1] — area of 4 corners
     seq 1, group "market" — undo with: undo
-  (256 ms)
+  (4774 ms)
 $ eden-god place fountain --at square --name fountain
   placed fountain [core/fountain@1] at (0, 0, 0) facing s — at square
     seq 2, group "market" — undo with: undo
-  (287 ms)
+  (3803 ms)
 $ eden-god place bench --near fountain --count 4 --facing fountain --dist 2.5
   placed bench [core/bench@1] at (2.79, 0, 4.83) facing nw — near fountain, se of it, 2.5 m away; keeps: facing fountain, near fountain
   placed bench-2 [core/bench@1] at (4.34, 0, -3.64) facing sw — near fountain, ne of it, 2.5 m away; keeps: facing fountain, near fountain
   placed bench-3 [core/bench@1] at (-4.34, 0, -3.64) facing se — near fountain, nw of it, 2.5 m away; keeps: facing fountain, near fountain
   placed bench-4 [core/bench@1] at (-2.79, 0, 4.83) facing ne — near fountain, sw of it, 2.5 m away; keeps: facing fountain, near fountain
     seq 3, group "market" — undo with: undo
-  (279 ms)
+  (4342 ms)
 $ eden-god place parasol-table --at 0,-11 --row 4 --gap 3 --facing fountain --name stall
   placed stall-1 [core/parasol-table@1] at (-7.95, 0, -11) facing se — at (-7.95, -11) (row of 4); keeps: facing fountain
   placed stall-2 [core/parasol-table@1] at (-2.65, 0, -11) facing s — at (-2.65, -11) (row of 4); keeps: facing fountain
   placed stall-3 [core/parasol-table@1] at (2.65, 0, -11) facing s — at (2.65, -11) (row of 4); keeps: facing fountain
   placed stall-4 [core/parasol-table@1] at (7.95, 0, -11) facing sw — at (7.95, -11) (row of 4); keeps: facing fountain
     seq 4, group "market" — undo with: undo
-  (375 ms)
+  (3984 ms)
 $ eden-god place parasol-table --at 0,11 --row 4 --gap 3 --facing fountain --name south-stall
   placed south-stall-1 [core/parasol-table@1] at (7.95, 0, 11) facing nw — at (7.95, 11) (row of 4); keeps: facing fountain
   placed south-stall-2 [core/parasol-table@1] at (2.65, 0, 11) facing n — at (2.65, 11) (row of 4); keeps: facing fountain
   placed south-stall-3 [core/parasol-table@1] at (-2.65, 0, 11) facing n — at (-2.65, 11) (row of 4); keeps: facing fountain
   placed south-stall-4 [core/parasol-table@1] at (-7.95, 0, 11) facing ne — at (-7.95, 11) (row of 4); keeps: facing fountain
     seq 5, group "market" — undo with: undo
-  (359 ms)
+  (2514 ms)
 $ eden-god place crate --near stall-1 --count 3 --dist 0.6
   placed crate [core/crate@1] at (-6.71, 0, -9.3) facing s — near stall-1, se of it, 0.6 m away; keeps: near stall-1
   placed crate-2 [core/crate@1] at (-6.94, 0, -13.29) facing s — near stall-1, ne of it, 0.6 m away; keeps: near stall-1
   placed crate-3 [core/crate@1] at (-10.42, 0, -10.74) facing s — near stall-1, w of it, 0.6 m away; keeps: near stall-1
     seq 6, group "market" — undo with: undo
-  (288 ms)
+  (2220 ms)
 $ eden-god place barrel --near south-stall-2 --count 2 --dist 0.6
   placed barrel [core/barrel@1] at (2.17, 0, 8.95) facing s — near south-stall-2, n of it, 0.6 m away; keeps: near south-stall-2
   placed barrel-2 [core/barrel@1] at (3.13, 0, 13.05) facing s — near south-stall-2, s of it, 0.6 m away; keeps: near south-stall-2
     seq 7, group "market" — undo with: undo
-  (307 ms)
+  (2332 ms)
 $ eden-god place lamp-post --at -16,-12 --name lamp-nw
   placed lamp-nw [core/lamp-post@1] at (-16, -0.2, -12) facing s — at (-16, -12)
     seq 8, group "market" — undo with: undo
-  (233 ms)
+  (2055 ms)
 $ eden-god place lamp-post --at 16,-12 --name lamp-ne
   placed lamp-ne [core/lamp-post@1] at (16, -0.2, -12) facing s — at (16, -12)
     seq 9, group "market" — undo with: undo
-  (243 ms)
+  (2427 ms)
 $ eden-god place lamp-post --at -16,12 --name lamp-sw
   placed lamp-sw [core/lamp-post@1] at (-16, -0.2, 12) facing s — at (-16, 12)
     seq 10, group "market" — undo with: undo
-  (311 ms)
+  (4465 ms)
 $ eden-god place lamp-post --at 16,12 --name lamp-se
   placed lamp-se [core/lamp-post@1] at (16, -0.2, 12) facing s — at (16, 12)
     seq 11, group "market" — undo with: undo
-  (338 ms)
+  (3550 ms)
 $ eden-god group --off
   no current group
-  (91 ms)
+  (967 ms)
 $ eden-god history 3
   11. edit [market]  — place lamp-post
   10. edit [market]  — place lamp-post
   9. edit [market]  — place lamp-post
-  (162 ms)
+  (2145 ms)
+$ eden-god look --at square --from s --out <worktrees>/t2-skill/tools/god-skill/examples/shots/market-square.png
+  look: <worktrees>/t2-skill/tools/god-skill/examples/shots/market-square.png
+    from the s at (0, 24.5, 44.9) toward (0, 0, 0), 76.4 s
+    Read the image file; then fix what looks wrong.
+  (80896 ms)

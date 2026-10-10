@@ -4,7 +4,7 @@
 $ eden-god place ex-townhouse@1 --at 0,0 --param floors=2 --facing s --name townhouse
   placed townhouse [ex-townhouse@1] at (0, 0, 0) facing s — at (0, 0)
     seq 2 — undo with: undo
-  (266 ms)
+  (5580 ms)
 $ eden-god describe townhouse
   townhouse [ex-townhouse@1] solid point — at the root
     stand-in for core/townhouse (example two-floor-house)
@@ -17,36 +17,36 @@ $ eden-god describe townhouse
     slots: front (stand, 0/8)
     ground: y 0, slope 0°, walk
     notes: placeholder shell (L2 replaces with planned rooms, stairs, windows, roofs)
-  (445 ms)
+  (1995 ms)
 $ eden-god place bed --inside townhouse/floor-1 --wall n --name bed
   placed townhouse/bed [core/bed@1] at (0, 2.85, -1.6) facing s — inside townhouse/floor-1, against the n wall; keeps: inside townhouse/floor-1
     seq 3 — undo with: undo
-  (303 ms)
+  (3165 ms)
 $ eden-god place chair --inside townhouse/floor-1 --corner se --name reading-chair
   placed townhouse/reading-chair [core/chair@1] at (3.33, 2.85, 2.33) facing nw — inside townhouse/floor-1, se corner; keeps: inside townhouse/floor-1
     seq 4 — undo with: undo
-  (299 ms)
+  (2906 ms)
 $ eden-god place bookshelf --inside townhouse/floor-1 --wall w --name bookshelf
   placed townhouse/bookshelf [core/bookshelf@1] at (-3.47, 2.85, 0) facing e — inside townhouse/floor-1, against the w wall; keeps: inside townhouse/floor-1
     seq 5 — undo with: undo
-  (262 ms)
+  (2832 ms)
 $ eden-god place table --inside townhouse/ground --name table
   placed townhouse/table [core/table@1] at (0, 0.05, 0) facing s — inside townhouse/ground, a free spot; keeps: inside townhouse/ground
     seq 6 — undo with: undo
-  (266 ms)
+  (2653 ms)
 $ eden-god place chair --inside townhouse/ground --count 2 --facing townhouse/table --name dining-chair
   placed townhouse/dining-chair-1 [core/chair@1] at (0, 0.05, 0) facing s — inside townhouse/ground, a free spot; keeps: facing townhouse/table, inside townhouse/ground
   placed townhouse/dining-chair-2 [core/chair@1] at (-1, 0.05, 0) facing e — inside townhouse/ground, a free spot; keeps: facing townhouse/table, inside townhouse/ground
     seq 7 — undo with: undo
-  (270 ms)
+  (2592 ms)
 $ eden-god place bowl --on townhouse/table --name bowl
   placed townhouse/table/bowl [core/bowl@1] at (0, 0.8, 0) facing s — on townhouse/table (slot top)
     seq 8 — undo with: undo
-  (214 ms)
+  (2618 ms)
 $ eden-god place bench --near townhouse --dir s --facing s --name porch-bench
   placed porch-bench [core/bench@1] at (0, 0, 4.78) facing s — near townhouse, s of it, 1.5 m away; keeps: near townhouse
     seq 10 — undo with: undo
-  (484 ms)
+  (4392 ms)
 $ eden-god describe townhouse
   townhouse [ex-townhouse@1] solid point — at the root
     stand-in for core/townhouse (example two-floor-house)
@@ -60,4 +60,9 @@ $ eden-god describe townhouse
     ground: y 0, slope 0°, walk
     near: porch-bench 4.47 m s
     notes: placeholder shell (L2 replaces with planned rooms, stairs, windows, roofs)
-  (222 ms)
+  (2881 ms)
+$ eden-god look --at townhouse --inside --from s --out <worktrees>/t2-skill/tools/god-skill/examples/shots/two-floor-house.png
+  look: <worktrees>/t2-skill/tools/god-skill/examples/shots/two-floor-house.png
+    from the s at (0, 13.2, 9.4) toward (0, 0, 0), 90.5 s
+    Read the image file; then fix what looks wrong.
+  (98232 ms)

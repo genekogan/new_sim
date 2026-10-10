@@ -3,16 +3,16 @@
 $ eden-god place lake --circle -60,-70,32 --name lake
   placed lake [core/lake@1] — area of 10 corners
     seq 1 — undo with: undo
-  (1462 ms)
+  (1616 ms)
 $ eden-god place river --path '[[-45,-42],[-20,0],[0,40],[6,120]]' --width 8 --name river
   placed river [core/river@1] — path of 4 points
     seq 2 — undo with: undo
-  (3707 ms)
+  (1658 ms)
 $ eden-god place road --from -70,10 --to 70,30 --width 5 --name crossing
   placed crossing [core/road@1] — path from -70,10 to 70,30, 141.42 m
     note: path from -70,10 to 70,30, 141.42 m
     seq 3 — undo with: undo
-  (8182 ms)
+  (9428 ms)
 $ eden-god describe crossing
   crossing [core/road@1] surface path — at the root
     A road along a path: cobble/asphalt/gravel/dirt, kerbs, verges; graded to ≤ maxGrade on hills (prepareRoad) and bridged over water automatically. T and X junctions merge.
@@ -21,18 +21,18 @@ $ eden-god describe crossing
     ground: y 0, slope 0°, walk
     near: river 0 m sw, lake 48.52 m nw
     notes: bridge 55–69 m, deck 1.1→1.1 m | graded to ≤ 8.0 % (cut 0.3 m, fill 3.2 m)
-  (844 ms)
+  (1578 ms)
 $ eden-god place bridge --across river --t 0.8 --span 2 --width 2 --name footbridge
   placed footbridge [core/bridge@1] — across river at 80%, 12 m long
     seq 4 — undo with: undo
-  (6987 ms)
+  (6305 ms)
 $ eden-god place duck --float --at lake --count 4
   placed duck [core/duck@1] at (-59.85, -0.3, -70.35) facing s — floating on lake; keeps: float
   placed duck-2 [core/duck@1] at (-59.08, -0.3, -69.43) facing ne — floating on lake; keeps: float
   placed duck-3 [core/duck@1] at (-58.67, -0.3, -70.56) facing w — floating on lake; keeps: float
   placed duck-4 [core/duck@1] at (-60.62, -0.3, -71.27) facing n — floating on lake; keeps: float
     seq 5 — undo with: undo
-  (4788 ms)
+  (399 ms)
 $ eden-god place tree --along river --row 4 --gap 14 --side left --offset 4
   placed tree [core/tree@1] at (-7.98, -0.2, 1.33) facing sw — along river at 34%, left side, 4 m back from the edge; keeps: along river
   placed tree-2 [core/tree@1] at (1.01, 0.51, 19.63) facing sw — along river at 45%, left side, 4 m back from the edge; keeps: along river
@@ -40,4 +40,9 @@ $ eden-god place tree --along river --row 4 --gap 14 --side left --offset 4
   placed tree-4 [core/tree@1] at (11.38, -0.2, 56.41) facing w — along river at 66%, left side, 4 m back from the edge; keeps: along river
     note: 4 along river (181.03 m long, 8 m wide)
     seq 6 — undo with: undo
-  (2848 ms)
+  (454 ms)
+$ eden-god look --at crossing --from se --dist 80 --out <worktrees>/t2-skill/tools/god-skill/examples/shots/river-bridge.png
+  look: <worktrees>/t2-skill/tools/god-skill/examples/shots/river-bridge.png
+    from the se at (49.6, 38.8, 69.6) toward (0, 0.5, 20), 224.8 s
+    Read the image file; then fix what looks wrong.
+  (227770 ms)
