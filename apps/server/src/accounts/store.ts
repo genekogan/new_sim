@@ -90,6 +90,11 @@ export class AccountStore {
         token_hash TEXT UNIQUE, created_at INTEGER NOT NULL, revoked_at INTEGER
       );
       CREATE INDEX IF NOT EXISTS account_agent_grants_soul_v1 ON account_agent_grants_v1(world_id,soul_id);
+      CREATE TABLE IF NOT EXISTS account_legacy_authority_v1 (
+        world_id TEXT NOT NULL,soul_id TEXT NOT NULL,legacy_owner_id TEXT NOT NULL,
+        captured_at INTEGER NOT NULL,revoked_at INTEGER,revoked_reason TEXT,
+        PRIMARY KEY(world_id,soul_id)
+      ) WITHOUT ROWID;
     `));
   }
   private time(): number {
@@ -159,6 +164,17 @@ export class AccountStore {
     this.identity(identity);
     return (this.db.db.prepare('SELECT * FROM account_soul_memberships_v1 WHERE world_id=? AND account_id=? ORDER BY created_at,soul_id').all(this.worldId, identity.id) as MemberRow[]).map(row => this.membership(row));
   }
+  registerIdentity(identity:AccountIdentity){this.db.tx(()=>this.capture(identity));}
+  recordedAccount(accountId:string){return !!this.db.db.prepare('SELECT 1 FROM account_identities_v1 WHERE account_id=?').get(accountId);}
+  /** Capture only pre-existing valid legacy authority at the trusted adapter
+   * boundary. INSERT OR IGNORE never revives an explicitly revoked owner. */
+  captureLegacyAuthority(soulId:string,ownerId:string){if(!/^dev:agent-[a-f0-9]{24}$/.test(ownerId))return;this.db.tx(()=>this.db.db.prepare('INSERT OR IGNORE INTO account_legacy_authority_v1(world_id,soul_id,legacy_owner_id,captured_at) VALUES(?,?,?,?)').run(this.worldId,soulId,ownerId,this.time()));}
+  legacyAuthority(soulId:string,ownerId:string){return !!this.db.db.prepare('SELECT 1 FROM account_legacy_authority_v1 WHERE world_id=? AND soul_id=? AND legacy_owner_id=? AND revoked_at IS NULL').get(this.worldId,soulId,ownerId);}
+  invalidateSoul(soulId:string,ownerId:string,reason:string){this.db.tx(()=>{
+    this.db.db.prepare('UPDATE account_agent_grants_v1 SET revoked_at=? WHERE world_id=? AND soul_id=? AND revoked_at IS NULL').run(this.time(),this.worldId,soulId);
+    this.db.db.prepare('UPDATE account_soul_memberships_v1 SET current_grant_id=NULL WHERE world_id=? AND soul_id=?').run(this.worldId,soulId);
+    if(/^dev:agent-[a-f0-9]{24}$/.test(ownerId))this.db.db.prepare('INSERT INTO account_legacy_authority_v1(world_id,soul_id,legacy_owner_id,captured_at,revoked_at,revoked_reason) VALUES(?,?,?,?,?,?) ON CONFLICT(world_id,soul_id) DO UPDATE SET revoked_at=COALESCE(account_legacy_authority_v1.revoked_at,excluded.revoked_at),revoked_reason=COALESCE(account_legacy_authority_v1.revoked_reason,excluded.revoked_reason)').run(this.worldId,soulId,ownerId,this.time(),this.time(),text(reason,'revocation reason',1,80));
+  });}
   private begin(input: StartApprovalInput, repairSoulId: string | null): ApprovalDTO & { pollSecret?: string } {
     const agentLabel = text(input.agentLabel, 'agent label', 1, 120), name = text(input.name, 'Soul name', 2, 32), description = text(input.description ?? '', 'description', 0, 1200);
     const idempotencyHash = sha(text(input.idempotencyKey, 'idempotency key', 16, 256));

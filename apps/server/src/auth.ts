@@ -16,6 +16,7 @@ export class Auth {
   private verified=new WeakMap<UserRow,VerifiedAccountIdentity>();
   private profileProof=new Map<string,{email:string|null;at:number}>();
   ready = false;
+  legacyOwnerAllowed?:(ownerId:string)=>boolean;
   devAuth: boolean;
   cfg: Config; db: Db;
   constructor(cfg: Config, db: Db) {
@@ -45,7 +46,7 @@ export class Auth {
       // Existing high-entropy agent-local legacy credentials retain their own
       // startup projection. They are not verified human account identities.
       if(!/^dev:agent-[0-9a-f]{24}$/.test(token))return null;
-      const row=this.db.user(token);return row&&this.db.soulsOf(row.id).some(s=>s.world_id===this.cfg.worldId&&s.token_hash)?row:null;
+      const row=this.db.user(token);return row&&(this.legacyOwnerAllowed?this.legacyOwnerAllowed(row.id):this.db.soulsOf(row.id).some(s=>s.world_id===this.cfg.worldId&&s.token_hash))?row:null;
     }
     if (this.devAuth && token.startsWith('dev:')) {
       // Public exposure (EDGE_PUBLIC=1): only self-generated agent identities; never admin or chosen names.

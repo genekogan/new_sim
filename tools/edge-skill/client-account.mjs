@@ -15,6 +15,8 @@ export function approvalPublic(data,world){
 }
 export function acceptDelegation(data,pending,world){
  if(data?.status!=='ready')return null;
- if(data.id!==pending.approvalId||data.worldId!==pending.worldId||!/^s_[A-Za-z0-9_-]+$/.test(data.soulId??'')||typeof data.token!=='string'||!data.token.startsWith('sim_'+data.soulId+'_'))throw Error('Account approval scope differs; no credential was selected.');
+ if(data.id!==pending.approvalId||data.worldId!==pending.worldId||!/^s_[A-Za-z0-9_-]+$/.test(data.soulId??''))throw Error('Account approval scope differs; no credential was selected.');
+ if(data.token===undefined)return null;
+ if(typeof data.token!=='string'||!data.token.startsWith('sim_'+data.soulId+'_'))throw Error('Account approval credential differs; no credential was selected.');
  return {world,soul:data.soulId,token:data.token};
 }

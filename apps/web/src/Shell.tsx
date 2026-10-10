@@ -38,7 +38,7 @@ export type AuthCtx = {
   login(): void; logout(): Promise<void> | void; getToken(): Promise<string | null>;
   debug: { privyUserId: string | null; wallet: unknown; linked: unknown[] };
 };
-type Cfg = { privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean; inviteRequired?: boolean; build?: string; localIntegrationMetadataPath?:string };
+type Cfg = { privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean; accountAuthRequired?:boolean; inviteRequired?: boolean; build?: string; localIntegrationMetadataPath?:string };
 const qualifiedEdenWorlds=edenReleaseWorlds(import.meta.env.VITE_EDEN_EXPERIENCE_WORLD_IDS);
 const TABS = ['watch', 'my soul', 'grammar', 'notebook', 'world', 'debug', 'brain', 'story', 'sync', 'spend', 'admin', 'architecture', 'everything'] as const;
 const ADMIN_TABS = new Set<string>(['spend', 'admin']);
@@ -113,6 +113,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   const pins=useMySouls();
   // Local favourites never establish ownership. Navbar comes only from server Me.
   const ownedIds=currentMe?.souls??[];
+  const signinEnabled=AUTH_UI&&!!cfg.privyAppId;
   const mine = new Set(currentMe?.souls ?? []);
   const inspect = (id: string | null) => { setSelected(id); if (id) revealPanel(); };
   const edenExpansion=edenExperienceEnabled(location.hostname,worldPath,cfg.worldId,sim.conn.welcome?.worldId,qualifiedEdenWorlds);
@@ -121,7 +122,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   const openAccount = () => { setAdvanced(false); setPairCode(null); setTab('my soul'); revealPanel(); };
   return (
     <div ref={frame} className={`human-world ${advanced ? 'has-advanced' : ''}`}>
-      {approvalId&&<AccountApproval key={JSON.stringify([cfg.worldId,authIdentity(auth),approvalId])} id={approvalId} worldId={cfg.worldId} worldUrl={location.origin+worldPath} worldName={worldKey==='littlemartians'?'Little Martians':worldKey[0].toUpperCase()+worldKey.slice(1)} auth={auth} api={api} onClose={()=>{setApprovalId(null);history.replaceState(null,'',location.pathname+location.search+'#watch');}} onReady={id=>{setSelected(id);setApprovalFollow(id);setAdvanced(false);setTab('watch');setPanelOpen(true);setApprovalId(null);}}/>}
+      {approvalId&&<AccountApproval key={JSON.stringify([privatePanelKey,approvalId])} id={approvalId} worldId={cfg.worldId} worldUrl={location.origin+worldPath} worldName={worldKey==='littlemartians'?'Little Martians':worldKey[0].toUpperCase()+worldKey.slice(1)} auth={auth} api={api} onClose={()=>{setApprovalId(null);history.replaceState(null,'',location.pathname+location.search+'#watch');}} onReady={id=>{setSelected(id);setApprovalFollow(id);setAdvanced(false);setTab('watch');setPanelOpen(true);setApprovalId(null);}}/>}
       <div className="world-scene"><LiveWorld sim={sim} selected={selected} onSelect={inspect} embedded {...{edenExpansion,localClassroomPresentation,publishSpeechAnchors:!advanced,humanPresets:humanPresetsEnabled&&edenExpansion}} hideControls={!advanced} hideSoulInfo={!advanced} viewportInsets={viewportInsets} onViewerHandle={receiveHandle} onViewerState={receiveState} /></div>
       <WorldSpeechOverlay root={frame} sim={sim} state={viewerState} active={!advanced} handle={viewerHandle}/>
       {!advanced && <ViewerFrame handle={viewerHandle} state={viewerState} dt={sim.conn.welcome?.dt ?? 0.05} navigationOpen={navigationOpen} onNavigationChange={setNavigationOpen} onNavigationOpen={openNavigation} worldTime={worldTimeText(worldClockAt((sim as Sim&{takes?:{chunks?:unknown[]}|null}).takes?.chunks,viewerState?.shownTick))} connected={!connectionLost(sim.conn)} connecting={!sim.conn.welcome} worldName={worldKey === 'littlemartians' ? 'Little Martians' : worldKey[0].toUpperCase() + worldKey.slice(1)} followName={viewerState?.cameraMode === 'follow' ? r.souls.get(viewerState.selection.soulId ?? '')?.name ?? null : null} slots={{ status: statusSlot, camera: cameraSlot }} />}
@@ -137,12 +138,12 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
         <LocalIntegrationNotice source={cfg.localIntegrationMetadataPath}/>{AUTH_UI&&<LocalConnectionHelp devAuth={cfg.devAuth}/>}
         <div className="hud-actions">
           {!advanced&&<MySouls ids={ownedIds} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} select={inspect}/>}
-          {AUTH_UI&&auth.authed&&<button onClick={openAccount}>Account</button>}
+          {signinEnabled&&auth.authed&&<button onClick={openAccount}>Account</button>}
           {advanced&&<a className="world-back" href="#watch" onClick={e => { e.preventDefault(); setAdvanced(false); setPairCode(null); setTab('watch'); history.replaceState(null, '', '#watch'); }}>← Back to the world</a>}
-          {!AUTH_UI ? null : !auth.ready ? <span className="dim">Signing in…</span> : auth.authed
+          {!signinEnabled ? null : !auth.ready ? <span className="dim">Signing in…</span> : auth.authed
             ? <button onClick={() => void auth.logout()}>Sign out</button>
             : <button className="primary" onClick={auth.login}>Sign in</button>}
-          {!advanced&&<BringAgent auth={auth}/>}
+          {!advanced&&<BringAgent auth={auth} requireAuth={cfg.accountAuthRequired===true}/>}
         </div>
       </header>
       <aside id="soul-panel" tabIndex={-1} className="human-panel" hidden={advanced || !panelOpen || tab === 'my soul'} aria-label="Selected Soul">

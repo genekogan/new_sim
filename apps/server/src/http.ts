@@ -37,6 +37,7 @@ export function buildApp(d: Deps) {
   if(d.intentV2&&(d.intentV2.host!==d.host||d.intentV2.brain!==d.brain||d.intentV2.souls!==d.souls))throw new Error('intent transport must belong to selected host');
   const app = new Hono();
   if(d.cfg.accountAuthRequired)d.souls.accounts??=new WorldAccounts(d.host,d.souls);
+  if(d.souls.accounts)d.auth.legacyOwnerAllowed=owner=>d.souls.ownedRows(owner).length>0;
   d.host.profileWorldPath=d.cfg.worldPath;
   const profiles=new SoulProfiles(d.host,d.souls);
   const bearer = (c: Context) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
@@ -288,8 +289,8 @@ export function buildApp(d: Deps) {
     const p = setIntentSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { intent: { agenda: [{card, target?, of?}], note? } } or { intent: { goal, target?, note? } }; see /skill.md');
     const guard=d.souls.ownerControlGuard(s,u.id);return controlReply(c,guard,async()=>{const r=await d.souls.setIntent(s,p.data.intent,'web',guard);return {ok:true,intent:r.intent,text:r.text,tick:r.event.tick,seq:r.event.seq};});
   });
-  app.post('/v1/souls/:id/pair', async (c) => { if(d.cfg.accountAuthRequired&&!await d.auth.accountFromToken(bearer(c)))throw new ApiError(401,'account-signin-required','Sign in to delegate a Soul.');const u = await requireUser(c); d.souls.requireInvited(u); return c.json({ ok: true, ...d.souls.pairCode(ownSoul(u, c.req.param('id')), baseOf(c), u) }); });
-  app.post('/v1/souls/:id/revoke', async (c) => { const account=d.cfg.accountAuthRequired?await d.auth.accountFromToken(bearer(c)):null;if(d.cfg.accountAuthRequired&&!account)throw new ApiError(401,'account-signin-required','Sign in to revoke a Soul.');const u = await requireUser(c),s=ownSoul(u,c.req.param('id'));if(account&&d.souls.accounts?.store.memberships(account.identity).some(m=>m.soulId===s.id))d.souls.accounts.store.revoke(account.identity,s.id);d.db.setSoulToken(s.id, null); return c.json({ ok: true }); });
+  app.post('/v1/souls/:id/pair', async (c) => { const account=d.cfg.accountAuthRequired?await d.auth.accountFromToken(bearer(c)):null;if(d.cfg.accountAuthRequired&&!account)throw new ApiError(401,'account-signin-required','Sign in to delegate a Soul.');if(account)d.souls.accounts!.verifySession(account.identity);const u = await requireUser(c); d.souls.requireInvited(u); return c.json({ ok: true, ...d.souls.pairCode(ownSoul(u, c.req.param('id')), baseOf(c), u) }); });
+  app.post('/v1/souls/:id/revoke', async (c) => { const account=d.cfg.accountAuthRequired?await d.auth.accountFromToken(bearer(c)):null;if(d.cfg.accountAuthRequired&&!account)throw new ApiError(401,'account-signin-required','Sign in to revoke a Soul.');if(account)d.souls.accounts!.verifySession(account.identity);const u = await requireUser(c),s=ownSoul(u,c.req.param('id'));if(account)d.souls.accounts!.revoke(account.identity,s.id);else d.db.setSoulToken(s.id, null); return c.json({ ok: true }); });
   app.post('/v1/souls/:id/shot', async (c) => {
     const u = await requireUser(c); const s = ownSoul(u, c.req.param('id')); const m = d.host.minds.get(s.id); if (!m) throw new ApiError(409, 'not-in-world', 'not in the world');
     const lim = d.souls.limits.allow(`shot:${s.owner}`, 12, 60_000); if (!lim.ok) throw new ApiError(429, 'rate-limited', 'slow down', { retry_after: lim.retryAfter });
@@ -299,7 +300,7 @@ export function buildApp(d: Deps) {
   // approving an agent that asked to be paired
   app.get('/v1/pair/:code', async (c) => { await requireUser(c); return c.json(d.souls.pairInfo(c.req.param('code'))); });
   app.post('/v1/pair/approve', async (c) => {
-    if(d.cfg.accountAuthRequired&&!await d.auth.accountFromToken(bearer(c)))throw new ApiError(401,'account-signin-required','Sign in to delegate a Soul.');
+    if(d.cfg.accountAuthRequired){const account=await d.auth.accountFromToken(bearer(c));if(!account)throw new ApiError(401,'account-signin-required','Sign in to delegate a Soul.');d.souls.accounts!.verifySession(account.identity);}
     const u = await requireUser(c); d.souls.requireInvited(u); const p = pairApproveSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { code, soulId }');
     d.souls.pairApprove(u, p.data.code, ownSoul(u, p.data.soulId)); return c.json({ ok: true });
   });
@@ -384,7 +385,7 @@ export function buildApp(d: Deps) {
   app.delete('/v1/agent/mandate/:rule',async c=>{const s=agentSoul(c),guard=d.souls.agentControlGuard(s,bearer(c));return controlReply(c,guard,()=>d.souls.removeRule(s,c.req.param('rule'),guard));});
   app.get('/v1/agent/deck', (c) => c.json(d.souls.deck(agentSoul(c))));
   app.post('/v1/agent/cards', async (c) => {const s=agentSoul(c),input=await body(c),guard=d.souls.agentControlGuard(s,bearer(c));return controlReply(c,guard,()=>d.souls.proposeCards(s,input,guard));});
-  app.post('/v1/agent/release', (c) => { const s = agentSoul(c);if(d.souls.agentCredential(bearer(c)!)?.kind==='grant')d.souls.accounts!.store.releaseGrant(bearer(c)!);else d.db.setSoulToken(s.id, null); return c.json({ ok: true }); });
+  app.post('/v1/agent/release', (c) => { const s = agentSoul(c);if(d.souls.accounts)d.souls.accounts.releaseAgent(bearer(c)!);else d.db.setSoulToken(s.id, null); return c.json({ ok: true }); });
 
   // ---- static web app (SPA)
   const worldAssets = new URL('../../../worlds', import.meta.url).pathname;

@@ -9,7 +9,7 @@ const startSchema=z.object({agentLabel:z.string().min(1).max(120),name:z.string(
 const pollSchema=z.object({approvalId:z.string().regex(/^ap_[a-f0-9]{32}$/),pollSecret:z.string().regex(/^[A-Za-z0-9_-]{43}$/)}).strict();
 export function mountAccountRoutes(app:Hono,deps:{accounts:WorldAccounts;auth:Auth;baseOf:(c:Context)=>string;limit:(c:Context,key:string,max:number,ms:number)=>void}){
  const {accounts,auth}=deps;
- const verified=async(c:Context)=>{const account=await auth.accountFromToken(c.req.header('authorization')?.replace(/^Bearer\s+/i,''));if(!account)throw new ApiError(401,'account-signin-required','Sign in with Google or email.');accounts.syncCanonical(account.identity);return account;};
+ const verified=async(c:Context)=>{const account=await auth.accountFromToken(c.req.header('authorization')?.replace(/^Bearer\s+/i,''));if(!account)throw new ApiError(401,'account-signin-required','Sign in with Google or email.');accounts.verifySession(account.identity);return account;};
  const json=async(c:Context)=>{try{return await c.req.json();}catch{throw new ApiError(400,'invalid','Body must be JSON.');}};
  const parse=<T>(schema:z.ZodType<T>,value:unknown):T=>{const result=schema.safeParse(value);if(!result.success)throw new ApiError(400,'invalid','Approval request format is invalid.');return result.data;};
  const wrap=async(c:Context,run:()=>unknown|Promise<unknown>)=>{c.header('Cache-Control','no-store');try{return c.json(await run());}catch(error){if(error instanceof AccountStoreError)throw new ApiError(error.code==='not-found'?404:error.code==='forbidden'?403:error.code==='identity'||error.code==='poll-secret'?401:error.code==='invalid'?400:409,error.code,error.message);throw error;}};

@@ -471,10 +471,12 @@ export class Souls {
   }
 
   // ------------------------------------------------------------ pairing an agent
-  private mint(soulId: string, label: string | null) { const token = newSoulToken(soulId); this.db.setSoulToken(soulId, hashToken(token), label); return token; }
+  invalidatePairings(soulId:string,keepCode?:string){for(const [code,pair]of this.pairings)if(pair.soulId===soulId&&code!==keepCode)this.pairings.delete(code);}
+  private mint(soulId: string, label: string | null,keepPairCode?:string) { const token = newSoulToken(soulId);if(this.accounts){const row=this.db.soul(soulId);if(!row)throw new ApiError(404,'not-found','No such Soul.');this.accounts.rotateLegacy(row,hashToken(token),label,keepPairCode);}else this.db.setSoulToken(soulId, hashToken(token), label); return token; }
   /** Owner-initiated: a short code the owner pastes to their agent along with the skill link. */
   pairCode(soul: SoulRow, base: string, issuer?: UserRow) {
     this.requireControlReady(soul);
+    if(this.accounts&&!this.accounts.pairingEligible(soul,issuer?.id??soul.owner))throw new ApiError(403,'account-signin-required','Verified account approval is required to pair this Soul.');
     for (const [k, p] of this.pairings) if (p.kind === 'owner' && p.soulId === soul.id) this.pairings.delete(k);
     const code = humanCode();
     this.pairings.set(code, { kind: 'owner', code, soulId: soul.id, owner: soul.owner, issuer: issuer?.id ?? soul.owner, expires: Date.now() + PAIR_TTL });
@@ -506,7 +508,7 @@ export class Souls {
     if (p.token) throw new ApiError(409, 'pair-done', 'already approved');
     const current = this.db.soul(soul.id);
     if (!this.pairAuthority(current, soul.owner, user.id)) throw new ApiError(403, 'forbidden', 'pairing authority changed');
-    p.token = this.mint(soul.id, p.agent); p.soulId = soul.id; p.owner = soul.owner; p.issuer = user.id;
+    p.token = this.mint(soul.id, p.agent,p.code); p.soulId = soul.id; p.owner = soul.owner; p.issuer = user.id;
   }
   pairPoll(poll: string) {
     const p = [...this.pairings.values()].find((x) => x.kind === 'agent' && x.poll === poll);
@@ -524,6 +526,7 @@ export class Souls {
     const user = this.db.user(issuer),currentOwner=this.lifecycle?this.db.user(owner):undefined;
     return !!soul && !soul.retired_at && soul.world_id === this.host.worldId && soul.owner === owner
       && !!user && this.invited(user) && (this.owns(user.id,soul) || user.role === 'admin')
+      && (!this.accounts||this.accounts.pairingEligible(soul,issuer))
       && (!this.lifecycle||!!currentOwner&&this.invited(currentOwner)) && this.controlReady(soul);
   }
 

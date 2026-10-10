@@ -6,12 +6,12 @@ export function AccountApproval({id,worldId,worldUrl,worldName,auth,api,onReady,
  const [approval,setApproval]=useState<Approval|null>(null),[busy,setBusy]=useState(false),[error,setError]=useState('');
  const generation=useRef(0),active=useRef(true),ready=useRef(false),inflight=useRef(false);
  const callback=useRef(onReady);callback.current=onReady;
- useEffect(()=>{active.current=true;return()=>{active.current=false;generation.current++;};},[]);
+ useEffect(()=>{active.current=true;inflight.current=false;setBusy(false);return()=>{active.current=false;generation.current++;inflight.current=false;};},[]);
  const check=async(approve=false)=>{if(!auth.authed||inflight.current)return;inflight.current=true;const current=++generation.current;setBusy(true);setError('');try{
   const response=await api('/v1/account/approvals/'+id+(approve?'/approve':''),approve?{}:undefined);if(!active.current||generation.current!==current)return;
   const value=response.status===200?accountApproval(response.data,id,worldId):null;if(!value){setApproval(null);setError(response.status===403?'This approval belongs to another account.':'Approval is unavailable or unconfirmed. Sign in with the intended account and check again.');return;}
   setApproval(value);if(value.status==='ready'&&value.soulId&&!ready.current){ready.current=true;callback.current(value.soulId);}
- }catch{if(active.current&&generation.current===current)setError('The response was interrupted. Check the same approval again; no new Soul was requested.');}finally{inflight.current=false;if(active.current&&generation.current===current)setBusy(false);}};
+ }catch{if(active.current&&generation.current===current)setError('The response was interrupted. Check the same approval again; no new Soul was requested.');}finally{if(generation.current===current){inflight.current=false;if(active.current)setBusy(false);}}};
  useEffect(()=>{if(auth.authed)void check();},[auth.authed,id,worldId]);
  useEffect(()=>{if(!auth.authed||approval?.status!=='creating')return;const timer=setInterval(()=>void check(),3000);return()=>clearInterval(timer);},[auth.authed,approval?.status]);
  return <div className="bring-agent-scrim"><section className="bring-agent" role="dialog" aria-modal="true" aria-labelledby="account-approval-title">

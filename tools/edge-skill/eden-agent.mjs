@@ -146,7 +146,7 @@ async function pair(soul){
 export async function createSoul(name,description){
  if(liveRunning())throw Error('Stop this folder’s mind before changing its selected Soul, or use a fresh agent folder.');
  if(!name||(description!==undefined&&!description))throw new Error('usage: create-soul "<Name>" ["<one-line character>"]');
- if(load().accountAuth)return startApproval({name,description});
+ if(load().accountAuth){const s=load();if(s.soul&&s.token){const own=await call('/v1/agent/me');if(own.status===200&&own.data?.soul?.id===s.soul&&own.data.soul.name===name)return {created:false,soul:{id:s.soul,name},paired:true,reason:'The exact selected Soul is already ready and granted; no new birth was requested.'};}return startApproval({name,description,...(s.reconnectSoul?.world===s.world&&s.reconnectSoul.name===name?{soulId:s.reconnectSoul.id}:{})});}
  const me=ok(await call(OWNER.me,{as:'owner'}),'create-soul');
  const existing=me.souls.filter(s=>s.name===name);if(existing.length===1){const id=existing[0].id;if(load().soul!==id||!load().token)await pair(id);return {created:false,reason:'This exact named Soul already belongs to this owner.',soul:{id,name}};}
  const r=await call(OWNER.souls,{as:'owner',body:{name,description}});
@@ -156,18 +156,28 @@ export async function createSoul(name,description){
  await pair(id);accepted();folderGuide(d.soul?.name??name);return {created:true,soul:{id,name:d.soul?.name??name},paired:true,wrote:'AGENTS.md + CLAUDE.md (so a later agent session here knows how to relay your requests)'};
 }
 async function startApproval({name,description,soulId}){
- const s=load();if(!s.accountAuth)throw Error('This world does not advertise account approvals.');
+ let s=load();if(!s.accountAuth)throw Error('This world does not advertise account approvals.');
+ if(s.pendingApproval?.approvalId){const p=s.pendingApproval,r=ok(await call('/v1/agent/approval/poll',{as:'none',body:{approvalId:p.approvalId,pollSecret:p.input.pollSecret}}),'check previous approval');if(['refused','cancelled','expired'].includes(r.status)||r.status==='ready'&&!r.token){finishApproval(r,p,s.world,r.status==='ready'?'unavailable':'terminal');s=load();}}
+ if(!soulId&&s.reconnectSoul?.world===s.world&&s.reconnectSoul.name===name)soulId=s.reconnectSoul.id;
  let pending=s.pendingApproval;if(pending&&(pending.world!==s.world||pending.input.name!==name||pending.input.description!==description||pending.input.soulId!==soulId))throw Error('A different approval is pending. Check it with approval status or cancel it before creating another.');
  if(!pending){pending={world:s.world,worldId:s.worldId,input:{name,...(description===undefined?{}:{description}),...(soulId?{soulId}:{}),agentLabel:'eden-agent '+SKILL_VERSION,idempotencyKey:randomUUID(),pollSecret:randomBytes(32).toString('base64url')}};save({pendingApproval:pending});}
  const data=ok(await call('/v1/agent/approval/start',{as:'none',body:pending.input}),'approval start');if(data.approval.worldId!==pending.worldId)throw Error('Approval world differs from registration.');pending.approvalId=data.approval.id;save({pendingApproval:pending});return approvalPublic(data,s.world);
+}
+function finishApproval(dto,pending,world,connection){
+ if(dto.id!==pending.approvalId||dto.worldId!==pending.worldId||pending.world!==world)throw Error('Approval receipt scope differs; no pending request was discarded.');if(dto.status==='ready')acceptDelegation(dto,pending,world);
+ const receipt={...approvalPublic(dto,world),connection,worldId:pending.worldId,recordedAt:now()};
+ const file='approval-'+dto.id+'-'+dto.status+'-'+connection+'.json';try{writeFileSync(file,JSON.stringify(receipt)+'\n',{flag:'wx',mode:0o600});}catch(error){if(error.code!=='EEXIST')throw error;const stat=lstatSync(file);if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1)throw Error('Public approval receipt path is linked or nonregular.');}
+ save({pendingApproval:undefined,...(connection==='unavailable'?{reconnectSoul:{id:dto.soulId,name:dto.name,world}}:{})});return receipt;
 }
 export async function approval(action='status'){
  if(liveRunning())throw Error('Stop this folder’s mind before selecting a newly approved Soul, or use a fresh folder.');
  if(!['status','wait','cancel'].includes(action))throw Error('usage: approval [status|wait|cancel]');const s=load(),pending=need(s,'pendingApproval','Run create-soul or pair-soul first.');if(pending.world!==s.world||pending.worldId!==s.worldId)throw Error('Approval belongs to another world.');if(!pending.approvalId)return startApproval(pending.input);
  const body={approvalId:pending.approvalId,pollSecret:pending.input.pollSecret},deadline=Date.now()+15*60000;
- for(;;){const data=ok(await call('/v1/agent/approval/'+(action==='cancel'?'cancel':'poll'),{as:'none',body}),'approval '+action),dto=data.approval??data;
-  if(action==='cancel'){save({pendingApproval:undefined});return approvalPublic(dto,s.world);}
-  const delegate=acceptDelegation(data,pending,s.world);if(delegate){const grants={...(load().delegations??{}),[delegate.soul]:{world:delegate.world,token:delegate.token}};save({...delegate,delegations:grants,pendingApproval:undefined,mode:undefined});accepted();folderGuide(dto.name);return {approvalId:dto.id,status:'ready',soul:{id:delegate.soul,name:dto.name},paired:true,next:'Run status. Manual control and dashboard/live now use this Soul grant; signing out of the browser does not stop it.'};}
+ for(;;){let data=ok(await call('/v1/agent/approval/poll',{as:'none',body}),'approval '+action),dto=data.approval??data;
+  if(['refused','cancelled','expired'].includes(dto.status))return finishApproval(dto,pending,s.world,'terminal');
+  if(dto.status==='ready'&&!data.token){const receipt=finishApproval(dto,pending,s.world,'unavailable');return {...receipt,next:'The body exists but this agent grant is unavailable. Run pair-soul '+dto.soulId+' "'+dto.name+'" for fresh human approval; do not create a replacement Soul.'};}
+  if(action==='cancel'){data=ok(await call('/v1/agent/approval/cancel',{as:'none',body}),'approval cancel');dto=data.approval??data;return finishApproval(dto,pending,s.world,'terminal');}
+  const delegate=acceptDelegation(data,pending,s.world);if(delegate){finishApproval(dto,pending,s.world,'delegated');const grants={...(load().delegations??{}),[delegate.soul]:{world:delegate.world,token:delegate.token}};save({...delegate,delegations:grants,reconnectSoul:undefined,mode:undefined});accepted();folderGuide(dto.name);return {approvalId:dto.id,status:'ready',soul:{id:delegate.soul,name:dto.name},paired:true,next:'Run status. Manual control and dashboard/live now use this Soul grant; signing out of the browser does not stop it.'};}
   if(action!=='wait'||['refused','cancelled','expired'].includes(dto.status)||Date.now()>=deadline)return approvalPublic(dto,s.world);
   await sleep(3000);
  }
