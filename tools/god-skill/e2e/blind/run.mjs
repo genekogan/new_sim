@@ -75,7 +75,9 @@ if (cmd === 'approve') {
 if (cmd === 'finish') {
   const dir = resolve(rest[0]);
   const w = JSON.parse(readFileSync(resolve(dir, 'world.json'), 'utf8'));
-  const tr = existsSync(resolve(dir, 'transcript.jsonl')) ? readFileSync(resolve(dir, 'transcript.jsonl'), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
+  let tr = existsSync(resolve(dir, 'transcript.jsonl')) ? readFileSync(resolve(dir, 'transcript.jsonl'), 'utf8').trim().split('\n').filter(Boolean).map((l) => JSON.parse(l)) : [];
+  const started = tr.filter((x) => x.phase === 'start'); tr = tr.filter((x) => x.phase !== 'start');
+  const lostLooks = started.filter((st) => !tr.some((x) => x.cmd === st.cmd && Date.parse(x.at) >= Date.parse(st.at)));
   const progress = existsSync(resolve(dir, 'progress.log')) ? readFileSync(resolve(dir, 'progress.log'), 'utf8').trim().split('\n').map((l) => l.split(' ')) : [];
   const t = (kind, n) => Number(progress.find((x) => x[0] === kind && x[1] === String(n))?.[2]) * 1000 || null;
   const rows = PROMPTS.map((p, i) => {
@@ -90,7 +92,7 @@ if (cmd === 'finish') {
   const exported = existsSync(resolve(dir, 'work/world.genesis.json'));
   const md = [`# Blind god test — ${dir.split('/').pop()}`, '', `world ${w.base}, started ${w.startedAt}; ${tr.length} CLI commands, ${tr.filter((x) => /REFUSED/.test(x.out ?? '') || x.error).length} refused or failed, ${looks.length} looks; export ${exported ? 'written' : 'MISSING'}.`, '',
     '| # | prompt | min | commands | refused |', '|---|---|---:|---:|---:|', ...rows.map((r) => `| ${r.n} | ${r.prompt} | ${r.minutes ?? '—'} | ${r.commands} | ${r.refused} |`), '',
-    '## Refusals and errors', ...rows.flatMap((r) => r.refusals.map((x) => `- (${r.n}) ${x}`)), '', '## Looks', ...looks.map((l) => `- ${l}`), last ? `\nFinal look: ${resolve(dir, 'final-look.png')}` : '', '',
+    '## Refusals and errors', ...rows.flatMap((r) => r.refusals.map((x) => `- (${r.n}) ${x}`)), '', '## Looks', ...looks.map((l) => `- ${l}`), ...lostLooks.map((x) => `- (never finished — the caller gave up) ${x.at} ${x.cmd}`), last ? `\nFinal look: ${resolve(dir, 'final-look.png')}` : '', '',
     existsSync(resolve(dir, 'notes.md')) ? '## The agent\'s notes\n\n' + readFileSync(resolve(dir, 'notes.md'), 'utf8') : '(no notes.md)'].join('\n');
   writeFileSync(resolve(dir, 'REPORT.md'), md + '\n');
   for (const pid of [w.pid, w.approver]) try { process.kill(pid); } catch { /* gone */ }

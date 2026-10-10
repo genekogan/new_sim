@@ -579,6 +579,7 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
   // optional transcript (blind tests, demos): `"transcript": "<file>"` in .eden-god.json appends every command and answer
   const tr = (() => { try { return load().transcript; } catch { return null; } })();
   const record = (out, error) => { if (!tr || cmd === 'look-shot' || cmd === 'look-keeper') return; try { appendFileSync(tr, JSON.stringify({ at: new Date().toISOString(), cmd: [cmd, ...argv].join(' ').replace(/god_[A-Za-z0-9_-]+/g, 'god_…'), ms: Date.now() - t0, ...(error ? { error } : { out: typeof out === 'string' ? out : JSON.stringify(out).slice(0, 4000) }) }) + '\n'); } catch { /* best effort */ } };
+  if (tr && cmd === 'look') try { appendFileSync(tr, JSON.stringify({ at: new Date().toISOString(), cmd: [cmd, ...argv].join(' '), phase: 'start' }) + '\n'); } catch { /* best effort */ }
   Promise.resolve(fn(rest, f)).then((out) => { record(out); if (typeof out === 'string') console.log(out); else console.log(JSON.stringify(out, null, 2)); if (process.env.EDEN_GOD_TIMING) console.error(`(${Date.now() - t0} ms)`); }).catch((e) => { record(null, String(e.message ?? e)); console.error(String(e.message ?? e)); process.exit(1); });
 }
 export { mirror, view, solve, refPoint, compassKey, COMPASS, mkdirSync };

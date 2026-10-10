@@ -105,3 +105,11 @@ test('furnish: L2 recipes run on the server and their ops are accepted', () => {
   assert.ok(beds.length >= 1, 'something upstairs');
   assert.match(q({ furnish: { ref: 'nope' } }).furnish.error, /no such building/);
 });
+
+test('free: plots avoid plazas and roads (paved), not just solids and water', () => {
+  const { act, q } = world();
+  act([{ op: 'place', def: 'core/plaza@1', name: 'square', shape: { area: [[-16, -16], [16, -16], [16, 16], [-16, 16]] } }]);
+  const plots = q({ free: { size: [8, 6], near: [0, 0], count: 3 } }).free as { at: [number, number] }[];
+  assert.equal(plots.length, 3);
+  for (const p of plots) assert.ok(Math.abs(p.at[0]) > 16 || Math.abs(p.at[1]) > 16, JSON.stringify(p));
+});

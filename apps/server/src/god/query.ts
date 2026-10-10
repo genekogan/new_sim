@@ -19,7 +19,7 @@ export const reachProviders = new WeakMap<WorldModel, ReachFn>();
 export type QueryInput = {
   points?: [number, number][];
   entity?: string;
-  free?: { size: [number, number]; near?: [number, number]; radius?: number; maxSlope?: number; avoidWater?: boolean; count?: number };
+  free?: { size: [number, number]; near?: [number, number]; radius?: number; maxSlope?: number; avoidWater?: boolean; avoidPaved?: boolean; count?: number };
   clearance?: { at: [number, number]; size: [number, number]; yaw?: number };
   reach?: { from: ReachEnd; to: ReachEnd };
   /** Compact world-frame layout of every entity (or those whose bounds touch `area`): the skill's mirror. */
@@ -329,6 +329,15 @@ function findFree(w: WorldModel, f: NonNullable<QueryInput['free']>) {
   const [sw, sd] = f.size, maxSlope = f.maxSlope ?? 0.25, half = w.constants.extent / 2 - Math.max(sw, sd);
   const centre = f.near ?? [0, 0], radius = Math.min(f.radius ?? 120, half * 2), want = Math.min(f.count ?? 3, 12);
   const found: { at: [number, number]; y: number; slope: number; dist: number }[] = [];
+  // paved ways and squares are not building plots (roads, paths, plazas, pitches, parking): point-in tests
+  const paved: ((x: number, z: number) => boolean)[] = [];
+  for (const e of w.entities.values()) {
+    if (!e.shape) continue;
+    const d = w.resolvedDef(e.def); if (!d || d.layer !== 'surface' || !d.tags.some((t) => PAVED.has(t))) continue;
+    const sh = e.shape as { area?: Vec2[]; path?: Vec2[]; width?: number };
+    if (sh.area) { const poly = sh.area; paved.push((x, z) => pointInPoly(x, z, poly)); }
+    else if (sh.path) { const path = sh.path, hw = (sh.width ?? Number((e.params as Record<string, unknown> | undefined)?.width ?? 4)) / 2 + 1; paved.push((x, z) => distToPath(path, x, z) <= hw); }
+  }
   // spiral search on a 2 m lattice, nearest first
   const step = 2, rings = Math.ceil(radius / step);
   for (let r = 0; r <= rings && found.length < want; r++) {
@@ -343,11 +352,23 @@ function findFree(w: WorldModel, f: NonNullable<QueryInput['free']>) {
       if ((f.avoidWater ?? true) && corners.some(([a, c]) => waterDepthAt(w.terrain, a, c) > 0)) continue;
       const box: OBB = { c: [x, z], half: [sw / 2 + 0.5, sd / 2 + 0.5], yaw: 0, y0: Math.min(...ys), y1: Math.max(...ys) + 3 };
       if ([...w.near([box])].some((id) => w.footprintsOf(id).some((b) => obbOverlap(box, b)))) continue;
+      if ((f.avoidPaved ?? true) && corners.some(([a, c]) => paved.some((p) => p(a, c)))) continue;
       if (found.some((p) => Math.abs(p.at[0] - x) < sw && Math.abs(p.at[1] - z) < sd)) continue;
       found.push({ at: [x, z], y: round(ys[4]), slope: round(slope), dist: round(Math.hypot(x - centre[0], z - centre[1])) });
     }
   }
   return found;
+}
+
+const PAVED = new Set(['road', 'path', 'path-network', 'plaza', 'paving', 'pitch', 'parking', 'bridge']);
+function distToPath(path: Vec2[], x: number, z: number) {
+  let best = Infinity;
+  for (let i = 1; i < path.length; i++) {
+    const [ax, az] = path[i - 1], [bx, bz] = path[i], dx = bx - ax, dz = bz - az, L = dx * dx + dz * dz || 1;
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / L));
+    best = Math.min(best, Math.hypot(x - (ax + t * dx), z - (az + t * dz)));
+  }
+  return best;
 }
 
 // ---------------------------------------------------------------- small geometry

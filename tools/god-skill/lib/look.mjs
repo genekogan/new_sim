@@ -133,6 +133,11 @@ export async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = n
     // L2's interior view: roofs (and the storeys above `cut`) off for every building
     window.__buildingView = roofs ? { hideRoofs: true, cut: cutAt } : { hideRoofs: false, cut: null };
     w.controls.target.set(a[0], a[1], a[2]); w.camera.position.set(e[0], e[1], e[2]); w.camera.lookAt(w.controls.target); w.controls.update?.();
+    // a world-scale look (the camera a kilometre out) must not be cut by the play camera's far plane or fog
+    const dist = Math.hypot(e[0] - a[0], e[1] - a[1], e[2] - a[2]);
+    if (w.camera.far < dist * 3) { w.camera.far = dist * 3; w.camera.updateProjectionMatrix?.(); }
+    const fog = w.scene.fog; if (fog && 'far' in fog && fog.far < dist * 2.5) { fog.near = Math.max(fog.near ?? 0, dist * 0.8); fog.far = dist * 2.5; }
+    if (fog && 'density' in fog) fog.density = Math.min(fog.density, 0.6 / Math.max(1, dist));
     const hidden = [];
     if (roofs) w.scene.traverse((o) => { if (o.visible && (/roof/i.test(o.name ?? '') || o.userData?.role === 'roof')) { o.visible = false; hidden.push(o); } });
     window.__lookRestore = () => { for (const o of hidden) o.visible = true; };

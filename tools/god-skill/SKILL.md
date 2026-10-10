@@ -18,6 +18,7 @@ node eden-god.mjs pair                       # prints a link; the owner approves
 ```
 `.eden-god.json` holds the token; never print it. `.eden-god.cache.json` is your mirror of the world
 (refreshed automatically when the world changes; used as is when the server is unreachable).
+`look` needs Google Chrome and Playwright next to the CLI (`npm i @playwright/test` in this folder).
 
 ## The world in one page (the ontology)
 
@@ -175,10 +176,13 @@ sky --palette golden-hour --sun 0.4 · weather --clouds 0.3 --wind 0.2 · consti
 
 ## Seeing and checking
 
-- `look [--at <ref>|x,z] [--from s|n|e|w|ne…|above] [--dist m] [--inside] [--out file.png]` — a
-  screenshot (Chrome + Playwright). It prints the file path: **open the image and look at it.**
-  `--inside` hides roofs to see the top storey's rooms; `--floor 0` shows that floor (storeys above it hidden). The first look starts a background browser (can take a
-  minute or more); later looks take seconds. `look --stop` ends it.
+- `look [--at <ref>|x,z] [--from s|n|e|w|ne…|above] [--dist m] [--inside [--floor k]] [--out f.png]` —
+  a screenshot (Chrome + Playwright). It prints the file path: **open the image and look at it.**
+  `--at` frames that thing (always give one: the whole world from afar shows little); `--inside`
+  hides roofs to show a building's top storey, `--floor 0` its ground floor. Each look opens Chrome
+  and waits for the world to settle: a minute or several on a busy machine, so give the shell call a
+  10-minute timeout rather than giving up. `look --keep` keeps the browser for faster later looks;
+  `look --stop` closes it.
 - `describe <ref>` — size, pose, rooms (with doors and occupants), openings, stairs, slots,
   children, constraints (ok / VIOLATED), behaviours a creature supports and why not, the ground
   under it, its neighbours.
