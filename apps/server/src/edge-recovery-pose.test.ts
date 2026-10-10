@@ -1,6 +1,6 @@
 // E-polish item 1 (souls-r2 run 4): the engine's fault recovery rewinds an edge Soul's decisions to the recovery
 // baseline, which on a young world is genesis, so she was left at her arrival point ([0, 0, 0] in that run) instead of
-// where she was. Now the recovery recipe carries the rewound bodies' last valid poses (taken before the faulting tick)
+// where she was. Now only the decision she was running is set aside, the recovery recipe carries the rewound bodies' last valid poses (taken before the faulting tick)
 // and each lands back there (or at the nearest free standing point); the recipe is logged, so replay stays exact.
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -44,7 +44,9 @@ test('fault recovery puts a rewound edge Soul back where she last stood validly,
   const rec = f.db.events(host.worldId).filter((e) => e.kind === 'rules' && e.payload?.recovery);
   assert.equal(rec.length, 1, 'one logged recovery');
   const recipe = rec[0].payload.recovery;
-  assert.deepEqual(recipe.edge.stopActors, [id]);
+  // only the decision she was running is set aside: her earlier walk replays as it was
+  const walks = f.db.events(host.worldId).filter((e) => e.kind === 'decision' && e.payload?.entityId === id).map((e) => [e.payload.option, e.seq]);
+  assert.deepEqual(recipe.edge.excludedSeqs, [walks.find(([o]) => o === 'walk2')![1]], JSON.stringify({ walks, edge: recipe.edge }));
   assert.ok(recipe.edge.poses?.[id], `the recipe carries her last valid pose: ${JSON.stringify(recipe.edge)}`);
   assert.ok(Math.hypot(recipe.edge.poses[id].p[0] - before[0], recipe.edge.poses[id].p[2] - before[2]) < 0.2, 'taken before the faulting tick');
   const now = ents()[id].pose.p as number[];

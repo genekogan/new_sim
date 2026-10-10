@@ -307,7 +307,7 @@ test('a pier over the lake: a swimmer heading for its end lands at the real shor
 });
 
 test('fault recovery restores a body to its last valid pose on the ground; from deep water, to the nearest standable shore', () => {
-  const e = world() as Engine & { restoreHumanPoseV1(id: string, pose: { p: [number, number, number]; yaw?: number; level?: number }): boolean };
+  const e = world() as unknown as Engine & { restoreHumanPoseV1(id: string, pose: { p: [number, number, number]; yaw?: number; level?: number }): boolean };
   // on the knoll's flank: exactly there, standing on the tiles (not y = 0)
   assert.equal(e.restoreHumanPoseV1('h_ada', { p: [24, field.height(24, 3), 3], yaw: 1.2, level: 0 }), true);
   let p = body(e).pose.p;

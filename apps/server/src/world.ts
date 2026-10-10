@@ -1279,8 +1279,9 @@ export class WorldHost {
   private edgeRecovery(): boolean { return this.recoveryForEdge; }
   /** Set by the edge server: faults are recovered by edge attribution (never a process exit). */
   recoveryForEdge = false;
-  /** Edge fault attribution, narrowest first: the faulting bodies' running edge programmes and their decisions since the
-   *  baseline; then every edge decision since the baseline (all running programmes stopped). */
+  /** Edge fault attribution, narrowest first: the faulting bodies' running edge programmes and only the decisions
+   *  that started them; then all their decisions since the baseline; then every edge decision since the baseline (all
+   *  running programmes stopped). Each plan is tried in a replay and kept only if that replay is clean. */
   private edgePlans(error: unknown, all: LogEvent[], hint?: {seq: number; entityId?: string}): NonNullable<RecoveryRecipe['edge']>[] {
     let subjects: string[] = [];
     try { const v = JSON.parse(String(error instanceof Error ? error.message : error).replace(/^Error:\s*/, '')) as {subjects?: string[]}[]; subjects = [...new Set(v.flatMap(d => d.subjects ?? []))]; } catch { /* not a violation list */ }
@@ -1295,7 +1296,17 @@ export class WorldHost {
       const souls = [...new Set([...stop, ...all.filter(e => seqs.includes(e.seq)).map(e => e.payload.entityId as string)].map(soulOf).filter((x): x is string => !!x))].sort();
       return {stopActors: stop, excludedSeqs: seqs.sort((a, b) => a - b), souls};
     };
-    const out = [plan(running(named.length ? named : humans), false), plan(named.length ? named : humans, false), plan(running(humans), true)];
+    // Narrowest first: only the decision each faulting body is running now (its latest edge decision since the
+    // baseline), so its earlier walks and sits replay as they were and no unrelated history is set aside.
+    // (A body whose running programme began before the baseline has no such decision: that programme is stopped there.)
+    const current = (actors: string[]) => {
+      const ids = [...new Set(actors)].sort(), seqs: number[] = [], stop: string[] = [];
+      for (const id of ids) { const last = [...all].reverse().find(e => edgeDecision(e) && e.payload.entityId === id); if (last) seqs.push(last.seq); else stop.push(id); }
+      if (hint && !seqs.includes(hint.seq)) seqs.push(hint.seq);
+      const souls = [...new Set([...ids, ...all.filter(e => seqs.includes(e.seq)).map(e => e.payload.entityId as string)].map(soulOf).filter((x): x is string => !!x))].sort();
+      return {stopActors: stop, excludedSeqs: seqs.sort((a, b) => a - b), souls};
+    };
+    const out = [...(named.length ? [current(running(named))] : []), plan(running(named.length ? named : humans), false), plan(named.length ? named : humans, false), plan(running(humans), true)];
     return out.filter((p, i) => p.stopActors.length + p.excludedSeqs.length > 0 && out.findIndex(q => JSON.stringify(q) === JSON.stringify(p)) === i);
   }
   /** Last resort for edge worlds: keep the process up, the world paused and the fault reported (never a crash loop). */
