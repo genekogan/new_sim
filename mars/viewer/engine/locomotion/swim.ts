@@ -26,9 +26,17 @@ type Exec = { actor: string; id: string; points: Vec2[]; index: number };
 const fail = (code: string, message: string, subjects?: string[]): Diagnostic => ({ code: `swim.${code}`, message, subjects });
 const fmt = (p: Vec2) => `${p[0].toFixed(1)}, ${p[1].toFixed(1)}`;
 
+/** Water is the recipe's (`base`): a deck (pier, bridge) over it is walked on, not swum under or climbed onto from below. */
 function groundOf(rt: Runtime): { sp: Spatial; f: GroundField } | null {
   const sp = rt.services.spatial as Spatial | undefined;
-  return sp?.ground ? { sp, f: sp.ground.field } : null;
+  return sp?.ground ? { sp, f: sp.ground.base } : null;
+}
+/** A deck's height over (x, z) when the body's root is at or above it (it stands on the deck), else null. */
+function onDeck(rt: Runtime, actor: string): boolean {
+  const sp = rt.services.spatial as Spatial | undefined, e = rt.world.entities[actor], nav = sp?.ground;
+  if (!nav || !e || nav.field === nav.base) return false;
+  const x = e.pose.p[0], z = e.pose.p[2];
+  return nav.field.medium(x, z) !== G_SWIM && nav.base.medium(x, z) === G_SWIM && e.pose.p[1] >= nav.field.height(x, z) - 0.5;
 }
 function bodyIssue(rt: Runtime, actor: string): Diagnostic | null {
   const e = rt.world.entities[actor];
@@ -38,6 +46,7 @@ function bodyIssue(rt: Runtime, actor: string): Diagnostic | null {
     || Object.values(rt.world.entities).some((it) => it.support?.kind === 'in-hand' && it.support.by === actor))
     return fail('occupied-body', `${actor} must put things down and be on their feet before swimming`, [actor]);
   if (e.human.activity.startsWith('sit') || e.human.activity.startsWith('stand-up') || (e.human.level ?? 0) !== 0) return fail('occupied-body', `${actor} must stand on the ground before swimming`, [actor]);
+  if (onDeck(rt, actor)) return fail('on-deck', `${actor} stands on a deck over the water; walk to the shore to get in`, [actor]);
   return null;
 }
 /** Medium-aware pose: root height and activity at a point. */
@@ -90,6 +99,25 @@ export function shoreToward(rt: Runtime, actor: string, to: Vec2): Vec2 | null {
   const e = rt.world.entities[actor], path = g.sp.ground!.coarsePath([e.pose.p[0], e.pose.p[2]], to, SWIM_COST);
   if (!path) return null;
   for (const q of path) { const m = coarseMedium(g.f, q[0], q[1]); if (m === G_WALK) return q; }
+  // the destination is on a deck over the water (a pier's end): head for where the deck meets dry ground instead
+  const land = deckLanding(g.sp, to);
+  return land && (land[0] !== to[0] || land[1] !== to[1]) ? shoreToward(rt, actor, land) : null;
+}
+/** Where a deck over water at `at` meets dry ground: breadth-first over the deck's 1 m cells (bounded); null: not on a deck. */
+function deckLanding(sp: Spatial, at: Vec2): Vec2 | null {
+  const nav = sp.ground; if (!nav || nav.field === nav.base) return null;
+  const key = (x: number, z: number) => `${x},${z}`, start: Vec2 = [Math.floor(at[0]) + 0.5, Math.floor(at[1]) + 0.5];
+  if (coarseMedium(nav.field, start[0], start[1]) !== G_WALK || coarseMedium(nav.base, start[0], start[1]) === G_WALK) return null;
+  const seen = new Set([key(start[0], start[1])]), queue: Vec2[] = [start];
+  for (let k = 0; k < queue.length && k < 4000; k++) {
+    const [x, z] = queue[k];
+    for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const q: Vec2 = [x + dx, z + dz], id = key(q[0], q[1]); if (seen.has(id)) continue; seen.add(id);
+      if (coarseMedium(nav.field, q[0], q[1]) !== G_WALK) continue;
+      if (coarseMedium(nav.base, q[0], q[1]) === G_WALK) return q;
+      queue.push(q);
+    }
+  }
   return null;
 }
 
@@ -140,7 +168,7 @@ type TravelExec = { id: string; actor: string; ops: TravelOp[]; index: number; c
 /** Whether the actor's root is in water too deep to stand in. */
 export function inDeepWater(rt: Runtime, actor: string): boolean {
   const g = groundOf(rt), e = rt.world.entities[actor];
-  return !!g && !!e?.human && (e.human.level ?? 0) === 0 && g.f.medium(e.pose.p[0], e.pose.p[2]) === G_SWIM;
+  return !!g && !!e?.human && (e.human.level ?? 0) === 0 && g.f.medium(e.pose.p[0], e.pose.p[2]) === G_SWIM && !onDeck(rt, actor);
 }
 /**
  * Going somewhere on foot from the water (ground worlds): swim to where the water route toward the destination

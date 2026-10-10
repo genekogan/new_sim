@@ -244,3 +244,64 @@ test('world-edit/1 on a ground world: the house walls are routed round, its stai
   for (const s of hill.ys) if (Math.hypot(s.x - cx, s.z - cz) > 6) assert.ok(Math.abs(s.y - field.height(s.x, s.z)) < 1e-9, `y off the ground at ${s.x},${s.z}`);
   assert.deepEqual(e.runtime.violations, []);
 });
+
+test('a footbridge deck over a deep river is walkable in ground mode (decks: height, medium, rails); without it the river refuses', () => {
+  // a channel 6 m wide and 2 m deep across the whole world (no way round), banks at 0, water at 0
+  const g = emptyGround(1000);
+  const river: [number, number][] = [[-3, -500], [3, -500], [3, 500], [-3, 500]];
+  g.landforms.push({ id: 'river', kind: 'carve', area: river, bed: -2, edge: 1 });
+  g.waters.push({ id: 'river', area: river, level: 0 });
+  const rf = groundFact(g, 1), rfield = groundField(rf.recipeHash);
+  const make = () => { const e = factory.create(factory.genesis('deck')) as never as Engine & { installGroundV1(f: unknown): unknown; applyWorldEditV1(ev: WorldEditV1): { hash: string } }; e.installGroundV1(rf); e.spawnHuman({ id: 'h_ada', label: 'Ada', soul: 's_ada' }); return e; };
+  const a = make();
+  a.world.entities.h_ada && ((a.world.entities.h_ada as unknown as Body).pose.p = [-10, 0, 0]);
+  const blocked = run(a, [{ verb: 'walk_to', params: { to: [10, 0] } }]);
+  assert.equal(blocked.end?.kind, 'failed', JSON.stringify(blocked.end));
+  assert.equal(blocked.end?.code, 'ground.deep-water');
+  // the god's bridge: a deck 0.6 m above the banks from x -6 to 6, 2.4 m wide, rails along both sides over the water
+  const e = make(); (e.world.entities.h_ada as unknown as Body).pose.p = [-10, 0, 0];
+  const rail = (id: string, z: number) => ({ id, obb: { c: [0, z] as [number, number], half: [3.2, 0.06] as [number, number], yaw: 0 }, y0: 0.6, y1: 1.6, kind: 'fixture' as const, label: 'bridge rail' });
+  const ev: WorldEditV1 = { contract: 'world-edit/1', seq: 1, hash: '', levels: [], assets: {}, set: { e_bridge1: {
+    surfaces: [{ id: 'bridge:deck', level: 0, y: 0.6, obb: { c: [0, 0], half: [6, 1.2], yaw: 0 } }],
+    solids: [rail('bridge:rail-n', -1.25), rail('bridge:rail-s', 1.25)], links: [],
+  } } };
+  ev.hash = nextEntityPhysics(undefined, ev).hash;
+  e.applyWorldEditV1(ev);
+  const across = run(e, [{ verb: 'walk_to', params: { to: [10, 0] } }]);
+  assert.equal(across.end?.kind, 'completed', JSON.stringify(across.end));
+  const mid = across.ys.filter((s) => Math.abs(s.x) < 2.5);
+  assert.ok(mid.length > 3, 'crossed the middle');
+  for (const s of mid) assert.ok(Math.abs(s.y - 0.6) < 1e-9 && Math.abs(s.z) < 1.2, `on the deck at ${s.x},${s.y},${s.z}`);
+  assert.ok(!across.acts.has('swim') && !across.acts.has('wade'), [...across.acts].join());
+  assert.ok(Math.abs(body(e).pose.p[1] - rfield.height(10, 0)) < 1e-9, 'off the far end on the bank');
+  // the river beside the bridge is still deep water: walking into it is refused
+  const into = run(e, [{ verb: 'walk_to', params: { to: [0, 8] } }]);
+  assert.equal(into.end?.code, 'ground.deep-water', JSON.stringify(into.end));
+  assert.deepEqual(e.runtime.violations, []);
+});
+
+test('a pier over the lake: a swimmer heading for its end lands at the real shore and walks out on the deck; no swimming off it', () => {
+  const e = world('pier') as never as Engine & { applyWorldEditV1(ev: WorldEditV1): { hash: string } };
+  // the god's pier: from the east shore (x -46) out to x -62 at z -20, deck 0.7 m above the water, a 4 m end platform
+  const ev: WorldEditV1 = { contract: 'world-edit/1', seq: 1, hash: '', levels: [], assets: {}, set: { e_pier1: {
+    surfaces: [{ id: 'pier:deck', level: 0, y: 0.7, obb: { c: [-54, -20], half: [8, 1.2], yaw: 0 } }, { id: 'pier:end', level: 0, y: 0.7, obb: { c: [-64, -20], half: [2, 2], yaw: 0 } }],
+    solids: [], links: [],
+  } } };
+  ev.hash = nextEntityPhysics(undefined, ev).hash;
+  e.applyWorldEditV1(ev);
+  assert.equal(run(e, [{ verb: 'walk_to', params: { to: [-49, -26] } }]).end?.kind, 'completed');
+  const sw = run(e, [{ verb: 'mars:swim_to', params: { x: -72, z: -16 } }], 20 * 400);
+  assert.equal(sw.end?.kind, 'completed', JSON.stringify(sw.end));
+  const out = run(e, [{ verb: 'walk_to', params: { to: [-64, -20] } }], 20 * 600);
+  assert.equal(out.end?.kind, 'completed', JSON.stringify(out.end));
+  assert.ok(out.acts.has('swim') && out.acts.has('walk'), [...out.acts].join(','));
+  // she climbed out where the lake bed meets the bank and walked onto the deck from there, never up onto it from below
+  for (let i = 1; i < out.ys.length; i++) assert.ok(Math.abs(out.ys[i].y - out.ys[i - 1].y) < 0.15, `no jump at ${JSON.stringify(out.ys[i])}`);
+  const firstOnDeck = out.ys.findIndex((s) => Math.abs(s.y - 0.7) < 1e-6);
+  assert.ok(firstOnDeck > 0 && out.ys[firstOnDeck].x > -50, `stepped onto the deck at its landward end: ${JSON.stringify(out.ys[firstOnDeck])}`);
+  assert.ok(Math.abs(body(e).pose.p[1] - 0.7) < 1e-9, `on the pier's end: ${body(e).pose.p}`);
+  assert.equal(body(e).human.activity, 'idle');
+  // from the deck she cannot swim (step off at the shore first)
+  assert.equal(run(e, [{ verb: 'mars:swim_to', params: { x: -72, z: -16 } }]).end?.code, 'swim.on-deck');
+  assert.deepEqual(e.runtime.violations, []);
+});

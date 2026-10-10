@@ -64,8 +64,54 @@ class ComposedBlockers extends Map<number, string> {
   override forEach(fn: (v: string, k: number, m: Map<number, string>) => void, thisArg?: unknown) { for (const [k, v] of this.entries()) fn.call(thisArg, v, k, this); }
 }
 
+/**
+ * Decks (lane A-souls, R2): a level-0 floor slab that lies more than FLOOR_RISE above the ground under it somewhere — a
+ * bridge over a river, a pier over a lake, a raised platform — is ground in its own right: where it covers a cell (and
+ * lies on or above the ground there), the walker's height is the deck's, the medium is walk (never water or steep), and
+ * obstacles (rails) are measured from the deck. The overlay is a GroundField over the recipe's field, so the coarse
+ * media, the fine rasters, swimming and settling all see the same thing. No decks: the recipe's field itself.
+ * 80/20: the ground under a deck is not walkable separately (one height per cell), and a deck's open sides are entered
+ * as from any neighbouring cell — the generators put rails on the open sides of bridges and piers.
+ */
+export function deckedField(base: GroundField, decks: Surface[], key: string): GroundField {
+  const buckets = new Map<string, Surface[]>();
+  for (const s of decks) {
+    let ax = Infinity, az = Infinity, bx = -Infinity, bz = -Infinity;
+    for (const [x, z] of obbCorners(s.obb)) { if (x < ax) ax = x; if (x > bx) bx = x; if (z < az) az = z; if (z > bz) bz = z; }
+    for (let j = Math.floor(az / 8); j <= Math.floor(bz / 8); j++) for (let i = Math.floor(ax / 8); i <= Math.floor(bx / 8); i++) {
+      const k = `${i},${j}`, l = buckets.get(k); if (l) l.push(s); else buckets.set(k, [s]);
+    }
+  }
+  const deckY = (x: number, z: number): number | null => {
+    const l = buckets.get(`${Math.floor(x / 8)},${Math.floor(z / 8)}`); if (!l) return null;
+    let y = -Infinity, g = NaN;
+    for (const s of l) if (s.y > y && pointInObb([x, z], s.obb)) { if (g !== g) g = base.height(x, z); if (s.y >= g - 0.05) y = s.y; }
+    return y === -Infinity ? null : y;
+  };
+  const tiles = new Map<string, Uint8Array>();
+  return {
+    id: `${base.id}|decks:${key}`, extent: base.extent, wadeMax: base.wadeMax, maxSlope: base.maxSlope,
+    height: (x, z) => deckY(x, z) ?? base.height(x, z),
+    waterLevel: (x, z) => (deckY(x, z) === null ? base.waterLevel(x, z) : null),
+    medium: (x, z) => (deckY(x, z) === null ? base.medium(x, z) : G_WALK),
+    mediaTile: (tx, tz) => {
+      const k = `${tx},${tz}`; let m = tiles.get(k); if (m) return m;
+      m = base.mediaTile(tx, tz);
+      const x0 = tx * GROUND_TILE_M, z0 = tz * GROUND_TILE_M;
+      if (buckets.size && [...buckets.keys()].some((b) => { const [i, j] = b.split(',').map(Number); return i * 8 < x0 + GROUND_TILE_M && i * 8 + 8 > x0 && j * 8 < z0 + GROUND_TILE_M && j * 8 + 8 > z0; })) {
+        m = m.slice();
+        for (let j = 0; j < GROUND_TILE_M; j++) for (let i = 0; i < GROUND_TILE_M; i++) if (deckY(x0 + i + 0.5, z0 + j + 0.5) !== null) m[j * GROUND_TILE_M + i] = G_WALK;
+      }
+      tiles.set(k, m);
+      return m;
+    },
+  };
+}
+
 export class GroundNav {
-  readonly field: GroundField;
+  /** The recipe's field; `field` is it, or it overlaid with decks (setFloors). */
+  readonly base: GroundField;
+  field: GroundField;
   readonly cell: number;
   /** Fine cells per tile edge (640 at 0.1 m). */
   readonly per: number;
@@ -78,7 +124,7 @@ export class GroundNav {
   private composed = new Map<string, LevelGrid>();
 
   constructor(field: GroundField, cell = 0.1) {
-    this.field = field; this.cell = cell;
+    this.base = this.field = field; this.cell = cell;
     this.per = Math.round(GROUND_TILE_M / cell);
     if (Math.abs(this.per * cell - GROUND_TILE_M) > 1e-9) throw new Error('ground: the cell must divide the 64 m tile');
     this.apron = Math.round(FINE_APRON_M / cell);
@@ -88,7 +134,12 @@ export class GroundNav {
   private floors = new Map<string, Surface[]>();
   /** Floor slabs at most this far above the ground there raise the standing height to the slab (m). */
   static FLOOR_RISE = 0.5;
+  private deckKey = '';
   setFloors(surfaces: Surface[]) {
+    // decks first (they change the field the floors below are measured on)
+    const b = this.base, decks = surfaces.filter((s) => [s.obb.c as Vec2, ...obbCorners(s.obb)].some(([x, z]) => s.y > b.height(x, z) + GroundNav.FLOOR_RISE));
+    const key = decks.length ? fnv(decks.map((s) => `${s.id}:${s.y}:${s.obb.c}:${s.obb.half}:${s.obb.yaw}`).join('|')).toString(16) : '';
+    if (key !== this.deckKey) { this.deckKey = key; this.field = key ? deckedField(b, decks, key) : b; this.composed.clear(); }
     this.floors.clear();
     for (const s of surfaces) {
       let ax = Infinity, az = Infinity, bx = -Infinity, bz = -Infinity;

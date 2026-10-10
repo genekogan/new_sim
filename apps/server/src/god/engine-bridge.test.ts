@@ -73,6 +73,15 @@ test('Souls among god-built things: enter, climb, sit, carry, pray; bodies refus
     const no = w.god.act({ ops: [{ op: 'remove', id }] }) as any;
     assert.equal(no.accepted, false); assert.equal(no.failures[0].code, 'occupied.by-body'); assert.match(no.failures[0].detail, /Ana/);
   }
+  // nor bury her or unseat her as a side effect (R2): a hill raised under the house, a crate dropped on her seat
+  const groundBefore = w.god.model.terrain.sample(10, 0);
+  const mound: any = w.god.act({ ops: [{ op: 'place', def: coreRef('knoll'), name: 'mound', p: [10, 0], params: { height: 4, radius: 9 } }] });
+  assert.equal(mound.accepted, false, JSON.stringify(mound)); assert.equal(mound.failures[0].code, 'occupied.by-body'); assert.match(mound.failures[0].detail, /Ana/);
+  assert.equal(w.god.model.get('mound'), undefined); assert.equal(w.god.model.terrain.sample(10, 0), groundBefore, 'the ground is unchanged');
+  const crate: any = w.god.act({ ops: [{ op: 'place', def: coreRef('crate'), name: 'crate', in: { parent: ids.house, slot: 'floor-1' }, p: [-2, 0, 1] }] });
+  assert.equal(crate.accepted, false, JSON.stringify(crate)); assert.equal(crate.failures[0].code, 'occupied.by-body'); assert.match(crate.failures[0].detail, /bury Ana/);
+  const dry: any = w.god.dryrun({ ops: [{ op: 'place', def: coreRef('knoll'), name: 'mound', p: [10, 0], params: { height: 4, radius: 9 } }] });
+  assert.equal(dry.accepted, false); assert.match(dry.failures[0].detail, /Ana/);
   // pick up the bowl: stand, walk to the table, take it; the journal shows the engine's move into her hands
   const pick: any = await accept(w.host, w.edge.act(soul, { capability: `pick-up:${ids['house/table/bowl']}` }));
   assert.equal(pick.accepted, true, JSON.stringify(pick));

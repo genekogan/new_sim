@@ -843,7 +843,11 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   }
   // ground worlds (spatial/ground.ts): level 0 is the terrain, so the body stands at the tiles' height and wades in shallows
   const gn = g.level === 0 ? sp.ground : undefined, gf = gn?.field;
-  a.pose.p = [p[0], gn ? gn.standY(p[0], p[1]) : g.y, p[1]];
+  let y = gn ? gn.standY(p[0], p[1]) : g.y;
+  // ground worlds: a step up/down (a deck's end, a floor slab's edge) is taken over a few ticks, never in one jump
+  // (runtime/invariants.ts motion.teleport); slopes change far less than this per tick, so on them y is the tiles' exactly
+  if (gn) { const dy = y - a.pose.p[1], h = hypot(p[0] - cur[0], p[1] - cur[1]), v = Math.max(0.02, Math.sqrt(Math.max(0, 0.145 * 0.145 - h * h))); if (Math.abs(dy) > v && Math.abs(dy) < 1.5) y = a.pose.p[1] + Math.sign(dy) * v; }
+  a.pose.p = [p[0], y, p[1]];
   // animation signal: 'walk' only while the body actually covers ground (the renderer's Walk clip);
   // a stopped walker waits (named reason) or stands idle — it never walks on the spot
   const gs = dist2(cur, p) / dt;
