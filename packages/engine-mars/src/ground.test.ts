@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { marsFactory, GREEN_FIELD_WORLD } from './engine.ts';
 import { groundFact, groundField } from './ground-bridge.ts';
+import { nextEntityPhysics, type WorldEditV1 } from './entity-physics.ts';
 import { emptyGround, type Ground } from '../../ground/src/index.ts';
 import type { Engine } from '@sim/engine-contract';
 
@@ -210,4 +211,36 @@ test('snapshot mid-swim restores (the ground verbs come back with the snapshot) 
   assert.deepEqual(body(b).pose.p, body(a).pose.p);
   assert.equal(b.stateHash(), a.stateHash());
   assert.deepEqual(b.runtime.violations, []);
+});
+
+// L9's entity physics (world-edit/1) on a ground world: a god-built house with an upper floor stands on flat ground
+// beside the knoll. Its walls, door gap and stairs reach the tiled ground Spatial through the same scene composition.
+test('world-edit/1 on a ground world: the house walls are routed round, its stairs planned, and the knoll still followed', () => {
+  const e = world('ground-house') as never as Engine & { applyWorldEditV1(ev: WorldEditV1): { hash: string; trapped: string[] }; reachV1(a: unknown, b: unknown): { ok: boolean; length?: number; levels?: number[]; code?: string } };
+  const [cx, cz] = [-5, 22];
+  const wall = (id: string, c: [number, number], half: [number, number]) => ({ id, obb: { c, half, yaw: 0 }, y0: 0, y1: 5.6, kind: 'fixture' as const, label: 'house wall' });
+  const set: WorldEditV1['set'] = { e_house1: {
+    surfaces: [{ id: 'house:ground', level: 0, y: 0, obb: { c: [cx, cz], half: [3.9, 2.9], yaw: 0 } }, { id: 'house:floor-1', level: 1, y: 2.85, obb: { c: [cx, cz], half: [3.9, 2.9], yaw: 0 } }],
+    solids: [wall('house:n', [cx, cz - 3], [4, 0.11]), wall('house:e', [cx + 4, cz], [0.11, 3]), wall('house:w', [cx - 4, cz], [0.11, 3]), wall('house:s1', [cx - 2.275, cz + 3], [1.725, 0.11]), wall('house:s2', [cx + 2.275, cz + 3], [1.725, 0.11])],
+    links: [{ id: 'house:stairs', kind: 'stairs', from: { level: 0, p: [cx + 3.2, cz + 1.6], y: 0 }, to: { level: 1, p: [cx + 3.2, cz - 1.6], y: 2.85 }, width: 1.1, heading: -Math.PI / 2, path: Array.from({ length: 17 }, (_, i) => [cx + 3.2, (2.85 * i) / 16, cz + 1.6 - (3.2 * i) / 16] as [number, number, number]), usable: true }],
+  } };
+  const ev: WorldEditV1 = { contract: 'world-edit/1', seq: 1, hash: '', levels: [{ id: 1, y: 2.85, label: 'floor at 2.85 m' }], set, assets: {} };
+  ev.hash = nextEntityPhysics(undefined, ev).hash;
+  const r = e.applyWorldEditV1(ev);
+  assert.equal(r.hash, ev.hash); assert.deepEqual(r.trapped, []);
+  assert.ok((e as never as { rt: { services: { spatial: { ground?: unknown } } } }).rt.services.spatial.ground, 'still in ground mode after the edit');
+  const up = e.reachV1({ p: [cx, cz + 8] }, { p: [cx - 2, cz - 1], level: 1 });
+  assert.equal(up.ok, true, JSON.stringify(up)); assert.ok(up.levels?.includes(1));
+  // from behind the house into its ground-floor room: round the walls to the door (a straight line would be 8 m)
+  const round = e.reachV1({ p: [cx, cz - 8] }, { p: [cx, cz] });
+  assert.equal(round.ok, true, JSON.stringify(round)); assert.ok((round.length ?? 0) > 13, `round the walls: ${round.length}`);
+  const into = run(e, [{ verb: 'walk_to', params: { to: [cx, cz] } }]);
+  assert.equal(into.end?.kind, 'completed', JSON.stringify(into.end));
+  for (const s of into.ys) assert.ok(!(Math.abs(s.z - (cz - 3)) < 0.3 && Math.abs(s.x - cx) < 4), `through the north wall at ${s.x},${s.z}`);
+  // (the body verb walk_to takes no level for bare coordinates; the climb itself is covered by reachV1 above)
+  const hill = run(e, [{ verb: 'walk_to', params: { to: [30, 0] } }]);
+  assert.equal(hill.end?.kind, 'completed', JSON.stringify(hill.end));
+  assert.ok(body(e).pose.p[1] > 4.9, `on the knoll top: ${body(e).pose.p}`);
+  for (const s of hill.ys) if (Math.hypot(s.x - cx, s.z - cz) > 6) assert.ok(Math.abs(s.y - field.height(s.x, s.z)) < 1e-9, `y off the ground at ${s.x},${s.z}`);
+  assert.deepEqual(e.runtime.violations, []);
 });
