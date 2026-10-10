@@ -31,6 +31,11 @@ export const config = {
   publicUrl: (env.PUBLIC_URL ?? `http://localhost:${env.PORT ?? 4500}`).replace(/\/$/, ''),
   /** Account-linked creation is explicit until its independent rollout is qualified. */
   accountAuthRequired: env.ACCOUNT_AUTH_REQUIRED === '1',
+  authProvider: (env.AUTH_PROVIDER ?? 'privy') as 'clerk'|'privy'|'none',
+  clerkPublishableKey: env.CLERK_PUBLISHABLE_KEY ?? '',
+  clerkIssuer: env.CLERK_ISSUER_URL ?? '',
+  clerkAuthorizedParties: (env.CLERK_AUTHORIZED_PARTIES ?? '').split(',').map(s=>s.trim()).filter(Boolean),
+  accountRegistryPath: env.ACCOUNT_REGISTRY_PATH ?? '',
   privyAppId: env.PRIVY_APP_ID ?? '',
   privyAppSecret: env.PRIVY_APP_SECRET ?? '',
   typesafeKey: env.TYPESAFE_API_KEY || undefined,

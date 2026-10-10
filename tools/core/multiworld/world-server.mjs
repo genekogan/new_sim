@@ -50,7 +50,7 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
   unlinkSync(lockPath);writeFileSync(lockPath,JSON.stringify({pid:process.pid,startedAt:new Date().toISOString()}),{flag:'wx'});
  }
  const load=p=>import(pathToFileURL(join(input,p)).href),require=createRequire(join(input,'apps/server/package.json'));
- let db,host,server,hub,brain,edge,closing=false;
+ let db,host,server,hub,auth,brain,edge,closing=false;
  async function drive(p){let done=false;p.then(()=>done=true,()=>done=true);for(let i=0;i<100&&!done;i++){host.drainInputs();await setImmediate();}if(!done)throw Error('world bootstrap sequencer did not settle');return p;}
  try{
   const prior=process.env.DATA_DIR;process.env.DATA_DIR=dataDir;
@@ -60,7 +60,7 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
    webDir:resolve(webDir??join(input,'apps/web/dist')),marsWebDir:resolve(marsWebDir??join(input,'mars/viewer/dist/client')),
    publicUrl:`${origin.replace(/\/$/,'')}/w/${worldKey}`,engine:'mars',livingWorld:true,seedNatives:false,ownerId,
    brainMode:'fake',budgetUsdPerDay:0,thinkingBudgetCeiling:1,authorizedThinkingWorldId:undefined,typesafeKey:undefined,anthropicKey:undefined,
-   ...(exposure.configured?{}:{privyAppId:'',privyAppSecret:''}),r2:{prefix:'sim'},archiveTakes:false,inviteRequired:exposure.configured?defaults.inviteRequired:false,maxSoulsPerUser:exposure.configured?defaults.maxSoulsPerUser:50,build,mindDriver:'edge',
+   ...(exposure.configured?{}:{authProvider:'none',privyAppId:'',privyAppSecret:''}),r2:{prefix:'sim'},archiveTakes:false,inviteRequired:exposure.configured?defaults.inviteRequired:false,maxSoulsPerUser:exposure.configured?defaults.maxSoulsPerUser:50,build,mindDriver:'edge',
    skillFile:undefined,cliFile:cliFile?resolve(cliFile):undefined,instructionsFile:instructionsFile?resolve(instructionsFile):join(input,'tools/edge-skill/INSTRUCTIONS.md')};
   const {Db}=await load('apps/server/src/db.ts'),{WorldHost}=await load('apps/server/src/world.ts'),native=await load('packages/engine-mars/src/index.ts');
   const {worldDefinition}=await load('apps/server/src/world-config.ts'),definition=worldDefinition(worldKey);
@@ -79,7 +79,7 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
   const {Auth}=await load('apps/server/src/auth.ts'),{Brain}=await load('apps/server/src/brain.ts'),{Souls,ApiError}=await load('apps/server/src/souls.ts');
   const {LivingWorld}=await load('apps/server/src/living.ts'),{Hub}=await load('apps/server/src/hub.ts'),{buildApp}=await load('apps/server/src/http.ts');
   const {stripWorldRequestPath}=await load('apps/server/src/world-request-path.ts'),{handleMcp}=await load('apps/server/src/mcp.ts'),{EdgeLedger}=await load('apps/server/src/edge/ledger/ledger.ts');
-  const auth=new Auth(cfg,db);auth.devAuth=exposure.devAuth;if(exposure.configured)await auth.init();if(cfg.accountAuthRequired&&!auth.ready)throw Error('Account authentication verifier unavailable');
+  auth=new Auth(cfg,db);auth.devAuth=exposure.devAuth;if(exposure.configured)await auth.init();if(cfg.accountAuthRequired&&!auth.ready)throw Error('Account authentication verifier unavailable');
   // The application exposes edge control; a separate fake-only config enables
   // the existing needs-driven native cast. A token or non-cast identity excludes
   // the Soul from every native thought/speech/reflection route immediately.
@@ -150,10 +150,10 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
    if(closing)return;closing=true;brain.quiesce();host.stop();edge.comms?.close();for(const c of hub.clients)c.ws.close(1001,'local world stopping');
    const closed=new Promise(r=>server.close(r));server.closeAllConnections?.();const pump=setInterval(()=>host.drainInputs(),10);
    try{await closed;await brain.settled();host.drainInputs();if(host.engine.canSnapshot?.())host.saveSnapshot(true);else host.persistClockFrontier();}
-   finally{clearInterval(pump);await new Promise(r=>hub.wss.close(r));db.close();releaseLock();}
+   finally{clearInterval(pump);await new Promise(r=>hub.wss.close(r));auth.close();db.close();releaseLock();}
   }
   return{cfg,boot,db,host,auth,brain,souls,hub,server,edge,close};
- }catch(error){brain?.quiesce();host?.stop();server?.close();if(db?.db.isOpen)db.close();releaseLock();throw error;}
+ }catch(error){brain?.quiesce();host?.stop();server?.close();auth?.close();if(db?.db.isOpen)db.close();releaseLock();throw error;}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
  try{const [path,mode]=process.argv.slice(2);if(!path)throw Error('usage: node tools/core/multiworld/world-server.mjs <descriptor.json> [check]');

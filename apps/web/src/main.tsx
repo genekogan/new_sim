@@ -1,9 +1,10 @@
 import {discoverWorlds,readWorldBootstrap,WorldBootstrapError} from './world-discovery.ts';
 import { apiPath, worldPath, worldKey } from './world-path.ts';
 import {singleLocalPreview} from './local-navigation.ts';
-import { StrictMode, useEffect, useState } from 'react';
+import { StrictMode, Suspense, lazy, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { PrivyProvider, usePrivy } from '@privy-io/react-auth';
+import {ClerkProvider,useAuth,useClerk,useUser} from '@clerk/clerk-react';
+const PrivyAuth=lazy(()=>import('./PrivyAuth.tsx'));
 import { Shell, type AuthCtx } from './Shell.tsx';
 import './styles.css';
 
@@ -12,18 +13,29 @@ import './styles.css';
 declare const __SIM_ARRIVAL_ENABLED__: boolean;
 const arrivalEnabled=typeof __SIM_ARRIVAL_ENABLED__!=='undefined'&&__SIM_ARRIVAL_ENABLED__===true;
 
-type Cfg = { privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean;worldKey?:string;accountAuthRequired?:boolean };
+type Cfg = { authProvider?:'clerk'|'privy'|'none';clerkPublishableKey?:string;clerkIssuer?:string;privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean;worldKey?:string;accountAuthRequired?:boolean };
 
-function WithPrivy({ cfg }: { cfg: Cfg }) {
-  const p = usePrivy();
-  const email = p.user?.email?.address ?? p.user?.google?.email ?? null;
-  const auth: AuthCtx = {
-    ready: p.ready, authed: p.ready && p.authenticated, label: email ?? p.user?.id ?? null,
-    login: () => p.login(), logout: () => p.logout(),
-    getToken: async () => (p.ready && p.authenticated ? await p.getAccessToken() : null),
-    debug: { privyUserId:p.user?.id??null,wallet:null,linked:[] },
-  };
-  return <Shell cfg={cfg} auth={auth} arrivalEnabled={arrivalEnabled} />;
+
+function WithClerk({cfg}:{cfg:Cfg}){
+ const session=useAuth(),clerk=useClerk(),profile=useUser();
+ const [binding,setBinding]=useState<{accountId:string;issuer:string;subject:string}|null>(null);
+ const subject=session.userId,sessionId=session.sessionId;
+ const [resolveAttempt,setResolveAttempt]=useState(0);
+ useEffect(()=>{
+  setBinding(null);if(!session.isLoaded||!session.isSignedIn||!subject)return;
+  let active=true;const abort=new AbortController();
+  void (async()=>{for(let attempt=0;active&&attempt<5;attempt++){try{const token=await session.getToken();if(!active||!token)return;
+   const response=await fetch(apiPath('/v1/account/session'),{headers:{authorization:'Bearer '+token},signal:abort.signal,cache:'no-store'});
+   const value=await response.json();if(active&&response.ok&&value.subject===subject&&value.issuer===cfg.clerkIssuer&&typeof value.accountId==='string'&&value.accountId.startsWith('acct_')){setBinding(value);return;}
+  }catch{}if(active)await new Promise<void>(yes=>setTimeout(yes,1000));}})();return()=>{active=false;abort.abort();};
+ },[session.isLoaded,session.isSignedIn,subject,sessionId,cfg.clerkIssuer,resolveAttempt]);
+ const accountId=binding&&binding.subject===subject&&binding.issuer===cfg.clerkIssuer?binding.accountId:null;
+ const auth:AuthCtx={ready:session.isLoaded,authed:session.isLoaded&&!!session.isSignedIn&&!!accountId,
+  label:profile.user?.primaryEmailAddress?.emailAddress??profile.user?.firstName??null,
+  login:()=>{if(session.isSignedIn)setResolveAttempt(n=>n+1);else clerk.openSignIn({afterSignInUrl:location.href,afterSignUpUrl:location.href});},
+  logout:()=>clerk.signOut(),getToken:async()=>session.isLoaded&&session.isSignedIn?session.getToken():null,
+  debug:{privyUserId:null,accountIdentity:accountId,wallet:null,linked:[]}};
+ return <Shell cfg={cfg} auth={auth} arrivalEnabled={arrivalEnabled}/>;
 }
 
 function WithDev({ cfg }: { cfg: Cfg }) {
@@ -46,12 +58,9 @@ function WorldRoot() {
   if (!cfg) return <pre>connecting…</pre>;
   const useDev = !cfg.accountAuthRequired&&cfg.devAuth && new URLSearchParams(location.search).has('dev');
   if (useDev || (!cfg.accountAuthRequired&&!cfg.privyAppId && cfg.devAuth)) return <WithDev cfg={cfg} />;
-  if (!cfg.privyAppId) return <Shell cfg={cfg} auth={{ ready: true, authed: false, label: null, login: () => alert('Sign-in is not configured on this server.'), logout: () => {}, getToken: async () => null, debug: { privyUserId: null, wallet: null, linked: [] } }} arrivalEnabled={arrivalEnabled} />;
-  return (
-    <PrivyProvider appId={cfg.privyAppId} config={{ loginMethods:['google','email'],embeddedWallets: { ethereum: { createOnLogin: 'off' }, showWalletUIs: false }, appearance: { theme: 'dark' } }}>
-      <WithPrivy cfg={cfg} />
-    </PrivyProvider>
-  );
+  if(cfg.authProvider==='clerk'&&cfg.clerkPublishableKey&&cfg.clerkIssuer)return <ClerkProvider publishableKey={cfg.clerkPublishableKey}><WithClerk cfg={cfg}/></ClerkProvider>;
+  if (cfg.authProvider==='none'||cfg.authProvider==='clerk'||!cfg.privyAppId) return <Shell cfg={cfg} auth={{ ready: true, authed: false, label: null, login: () => alert('Sign-in is not configured on this server.'), logout: () => {}, getToken: async () => null, debug: { privyUserId: null, wallet: null, linked: [] } }} arrivalEnabled={arrivalEnabled} />;
+  return <Suspense fallback={<pre>connecting sign-in…</pre>}><PrivyAuth cfg={cfg} arrivalEnabled={arrivalEnabled}/></Suspense>;
 }
 
 createRoot(document.getElementById('root')!).render(<StrictMode>{location.pathname==='/'&&!location.hash?<WorldList/>:<WorldRoot/>}</StrictMode>);

@@ -83,7 +83,7 @@ export function buildApp(d: Deps) {
   for(const path of ['/v1/souls/:id/intent-v2','/v1/souls/:id/intent-v2/*','/v1/agent/intent-v2','/v1/agent/intent-v2/*'])
     app.use(path,async(c,next)=>{c.header('Cache-Control','no-store');await next();});
   app.use('/v1/souls/:id',async(c,next)=>{if(d.intentV2)c.header('Cache-Control','no-store');await next();});
-  for(const path of ['/v1/lifecycle','/v1/lifecycle/*','/v1/me','/v1/souls','/v1/souls/*','/v1/agent/*'])
+  for(const path of ['/v1/lifecycle','/v1/lifecycle/*','/v1/me','/v1/account/*','/v1/souls','/v1/souls/*','/v1/agent/*'])
     app.use(path,async(c,next)=>{if(d.souls.lifecycle)c.header('Cache-Control','no-store');await next();});
   app.use('/v1/brain',async(c,next)=>{if(d.souls.lifecycle)c.header('Cache-Control','no-store');await next();});
   app.use('/v1/*',async(c,next)=>bodyLimit({ maxSize: /^\/v1\/(?:souls\/[^/]+\/photo|agent\/photo)$/.test(c.req.path)?360*1024:64*1024, onError: (c) => c.json({ ok: false, code: 'too-large', message: 'request body is too large' }, 413) })(c,next));
@@ -92,7 +92,7 @@ export function buildApp(d: Deps) {
   if(d.souls.accounts)mountAccountRoutes(app,{accounts:d.souls.accounts,auth:d.auth,baseOf,limit:limitIp});
   mountStationRoutesV2(app,d.stationV2);
   app.get('/healthz', (c) => c.json({ ok: true, tick: d.host.engine.world.tick, clients: d.hub.clients.size, paused: d.host.paused, build: d.cfg.build, worldId: d.host.worldId }));
-  app.get('/v1/config', (c) => c.json({ privyAppId: d.cfg.privyAppId, publicUrl: baseOf(c), worldURL:baseOf(c), instructionsURL:baseOf(c)+'/instructions.md', accountAuthRequired:d.cfg.accountAuthRequired, accountApproval:d.souls.accounts?{contract:'account-soul-approval/1',start:'/v1/agent/approval/start',poll:'/v1/agent/approval/poll',cancel:'/v1/agent/approval/cancel'}:null, soulProfile:{contract:'soul-profile/1',auth:'owner',edit:'PATCH /v1/souls/:id/profile',photo:'POST /v1/souls/:id/photo',photoFormat:'PNG RGB/RGBA8',maxPhotoBytes:262144,maxPhotoDimension:512}, worldId: d.host.worldId, worldKey: d.cfg.worldKey, worldPath: d.cfg.worldPath, authReady: d.auth.ready, devAuth: d.auth.devAuth, inviteRequired: d.cfg.inviteRequired, build: d.cfg.build }));
+  app.get('/v1/config', (c) => c.json({ authProvider:d.cfg.authProvider, clerkPublishableKey:d.cfg.authProvider==='clerk'?d.cfg.clerkPublishableKey:'', clerkIssuer:d.cfg.authProvider==='clerk'?d.cfg.clerkIssuer:'', privyAppId:d.cfg.authProvider==='privy'?d.cfg.privyAppId:'', publicUrl: baseOf(c), worldURL:baseOf(c), instructionsURL:baseOf(c)+'/instructions.md', accountAuthRequired:d.cfg.accountAuthRequired, accountApproval:d.souls.accounts?{contract:'account-soul-approval/1',start:'/v1/agent/approval/start',poll:'/v1/agent/approval/poll',cancel:'/v1/agent/approval/cancel'}:null, soulProfile:{contract:'soul-profile/1',auth:'owner',edit:'PATCH /v1/souls/:id/profile',photo:'POST /v1/souls/:id/photo',photoFormat:'PNG RGB/RGBA8',maxPhotoBytes:262144,maxPhotoDimension:512}, worldId: d.host.worldId, worldKey: d.cfg.worldKey, worldPath: d.cfg.worldPath, authReady: d.auth.ready, devAuth: d.auth.devAuth, inviteRequired: d.cfg.inviteRequired, build: d.cfg.build }));
   app.get('/v1/world', (c) => c.json(d.souls.worldSummary()));
   app.get('/v1/debug/world', (c) => c.json(d.host.engine.world));
   app.get('/v1/scene', c => {
@@ -223,6 +223,11 @@ export function buildApp(d: Deps) {
   app.patch('/v1/souls/:id/profile',async c=>{c.header('Cache-Control','no-store');const {u,guard}=await profileIdentity(c);const result=await profiles.update(u.id,c.req.param('id'),await body(c),guard);d.hub.refreshMe(u.id);return c.json({ok:true,profile:result});});
   app.post('/v1/souls/:id/photo',async c=>{c.header('Cache-Control','no-store');const {u,guard}=await profileIdentity(c);const result=await profiles.photo(u.id,c.req.param('id'),await body(c),guard);d.hub.refreshMe(u.id);return c.json({ok:true,profile:result});});
   app.get('/v1/souls/:id/profile-photo/:hash',c=>{const bytes=profiles.photoBytes(c.req.param('id'),c.req.param('hash'));return bytes?c.body(bytes as never,200,{'Content-Type':'image/png','X-Content-Type-Options':'nosniff','Cache-Control':'public, max-age=31536000, immutable'}):c.json({ok:false,code:'not-found'},404);});
+  app.get('/v1/account/session',async c=>{
+    c.header('Cache-Control','no-store');
+    const account=await d.auth.accountFromToken(bearer(c));if(!account)throw new ApiError(401,'account-signin-required','Sign in first.');
+    return c.json({accountId:account.identity.id,issuer:account.identity.issuer,subject:account.identity.subject});
+  });
   app.get('/v1/me', async (c) => { const u = privateUser(await requireUser(c),false),souls=mySouls(u); return c.json({ me: {...d.auth.me(u),...(d.souls.lifecycle?{souls:souls.map(s=>s.id)}:{})}, souls, maxSouls: d.cfg.maxSoulsPerUser,
     ...(d.souls.lifecycle?{lifecycleRequests:d.souls.invited(u)?d.souls.lifecycleHistory(u.id):{contract:'owner-lifecycle-list/1',worldId:d.host.worldId,requests:[],nextCursor:null},
       ...(d.souls.invited(u)?{lifecycleCapability:ownerLifecycleCapabilitySchema.parse({contract:'owner-lifecycle-capability/1',worldId:d.host.worldId,userId:u.id,

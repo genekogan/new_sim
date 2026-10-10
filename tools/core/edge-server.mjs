@@ -9,10 +9,11 @@ import {readFileSync,mkdirSync,statSync,writeFileSync,unlinkSync} from 'node:fs'
 import {createHash} from 'node:crypto';
 import {setImmediate} from 'node:timers/promises';
 
-export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,marsWebDir,build='local-edge/1',checkOnly=false,placeData,seedObjects,inviteRequired=false,skillFile,cliFile,instructionsFile,accountAuth=false,ambient=true,
+export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,marsWebDir,build='local-edge/1',checkOnly=false,placeData,seedObjects,inviteRequired=false,skillFile,cliFile,instructionsFile,accountAuth=false,publicOrigin,ambient=true,
   officeStairGuards=false,authoredBoundariesFile=undefined,authoredBoundariesSHA256=undefined,inputManifestSHA256,modelCredentialFile=undefined,localBudget=0,autonomous=false,localSoulLimit=5,humanRest=false,provisions=false,sequences=false,floorGoals=false,kitchen=false,shore=false,foodDeliveryId,quietLandingCourtesy=false,social=false,closedGoals=false,approachRetention=false,activateExpansion=false,humanDirectionBurstUsd=1,quiesceThought=false,nativePlaces=[],nav=null,activitySpots}) {
   if(!input||!dataDir||!worldId||!Number.isInteger(port)||!(port>=4950&&port<=4959||port===4970))throw Error('explicit local input/data/world/allowed port required');
   if(!build.startsWith('local-'))throw Error('local build identity required');
+  const origin=new URL(publicOrigin??`http://127.0.0.1:${port}`);if(origin.origin!==origin.href.replace(/\/$/,'')||origin.username||origin.password||!['http:','https:'].includes(origin.protocol)||origin.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(origin.hostname))throw Error('explicit canonical public origin required');
   input=resolve(input);dataDir=resolve(dataDir);
   let authoredBoundaryDeclaration;
   if(authoredBoundariesFile!==undefined||authoredBoundariesSHA256!==undefined){
@@ -32,7 +33,7 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
   const releaseLock=()=>{try{if(JSON.parse(readFileSync(lockPath,'utf8')).pid===process.pid)unlinkSync(lockPath);}catch{/* already gone */}};
   const manifest=inputManifestSHA256?JSON.parse(readFileSync(join(input,'../CONTENT-MANIFEST.json'),'utf8')):null;
   if(inputManifestSHA256&&(!/^[a-f0-9]{64}$/.test(inputManifestSHA256)||createHash('sha256').update(readFileSync(join(input,'../CONTENT-MANIFEST.json'))).digest('hex')!==inputManifestSHA256))throw Error('not the explicitly selected runtime content manifest');
-  const sources=['db','world','auth','brain','souls','http','hub','intent-control','mcp','living','config','world-request-path'];
+  const sources=['db','world','auth','account-registry','brain','souls','http','hub','intent-control','mcp','living','config','world-request-path'];
   const pins=sources.map(name=>{
     const path=`apps/server/src/${name}.ts`,sha256=createHash('sha256').update(readFileSync(join(input,path))).digest('hex');
     if(manifest&&sha256!==manifest[path]?.sha256)throw Error('sealed runtime differs: '+path);
@@ -45,7 +46,7 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
   let defaults;try{defaults=(await load('apps/server/src/config.ts')).config;}finally{if(prior===undefined)delete process.env.DATA_DIR;else process.env.DATA_DIR=prior;}
   const cfg={...defaults,worldKey:'eden',worldId,worldPath:'/w/eden',worldSeed:'sim-genesis-1',
     host:'127.0.0.1',port,dataDir,webDir:resolve(webDir??join(input,'apps/web/dist')),marsWebDir:resolve(marsWebDir??join(input,'mars/viewer/dist/client')),
-    publicUrl:`http://127.0.0.1:${port}/w/eden`,engine:'mars',livingWorld:true,seedNatives:false,
+    publicUrl:`${origin.origin}/w/eden`,engine:'mars',livingWorld:true,seedNatives:false,
     ownerId:'dev:admin',brainMode:'fake',budgetUsdPerDay:0,typesafeKey:undefined,anthropicKey:undefined,
     accountAuthRequired:accountAuth===true,privyAppId:accountAuth?defaults.privyAppId:'',privyAppSecret:accountAuth?defaults.privyAppSecret:'',archiveTakes:false,inviteRequired,maxSoulsPerUser:5,build,mindDriver:'edge',skillFile:skillFile?resolve(skillFile):defaults.skillFile,cliFile:cliFile?resolve(cliFile):defaults.cliFile,instructionsFile:instructionsFile?resolve(instructionsFile):join(input,'tools/edge-skill/INSTRUCTIONS.md')};  // Gene 2026-10-07: pairing open
   if(!Number.isInteger(localSoulLimit)||localSoulLimit<1||localSoulLimit>50)throw Error('local Soul allowance must be 1..50');
@@ -53,7 +54,7 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
   if(modelCredentialFile)throw Error('edge server runs no Soul mind and takes no model credentials');
   const {Db}=await load('apps/server/src/db.ts'),{WorldHost}=await load('apps/server/src/world.ts');
   const native=await load('packages/engine-mars/src/index.ts'),db=new Db(join(dataDir,'sim.db'));
-  let host,server,hub,service,provisionBirths,kitchenInstallation,shoreInstallation,foodDelivery,socialInstallation,closing=false;
+  let host,server,hub,auth,service,provisionBirths,kitchenInstallation,shoreInstallation,foodDelivery,socialInstallation,closing=false;
   async function drive(p){let done=false;p.then(()=>done=true,()=>done=true);for(let i=0;i<100&&!done;i++){host.drainInputs();await setImmediate();}if(!done)throw Error('bootstrap sequencer did not settle');return p;}
   try {
     const header=db.world(worldId),beforeRows=db.liveSouls(worldId),beforeEvents=db.events(worldId);
@@ -92,8 +93,8 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
     const {Auth}=await load('apps/server/src/auth.ts'),{Brain}=await load('apps/server/src/brain.ts'),{Souls}=await load('apps/server/src/souls.ts');
     const {Hub}=await load('apps/server/src/hub.ts'),{IntentControlV2}=await load('apps/server/src/intent-control.ts'),{buildApp}=await load('apps/server/src/http.ts');
     const {stripWorldRequestPath}=await load('apps/server/src/world-request-path.ts'),{handleMcp}=await load('apps/server/src/mcp.ts');
-    const auth=new Auth(cfg,db);auth.devAuth=!accountAuth;
-    if(accountAuth&&!checkOnly){if(!cfg.privyAppId||!cfg.privyAppSecret)throw Error('Account authentication requires configured Privy app credentials');await auth.init();if(!auth.ready)throw Error('Account authentication verifier unavailable');}
+    auth=new Auth(cfg,db);auth.devAuth=!accountAuth;
+    if(accountAuth&&!checkOnly){await auth.init();if(!auth.ready)throw Error('Account authentication verifier unavailable');}
     const brain=new Brain(host,db,cfg,{clients:()=>hub?.clients.size??0,onCall:c=>hub?.brainCall(c),onCamera:line=>hub?.broadcast({t:'camera',line}),onTicker:lines=>hub?.broadcast({t:'ticker',lines}),onNarrative:view=>hub?.broadcast({t:'narrative',view}),onTalk:lines=>hub?.broadcast({t:'talk',lines})},{intentV2Choices:true,intentV2Retries:false});
     brain.quiesce();
     const souls=new Souls(host,db,brain,cfg);souls.enableLifecycle();
@@ -161,11 +162,11 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
       try{await closed;for(const handle of [provisionBirths,socialInstallation,foodDelivery,shoreInstallation,kitchenInstallation])handle?.close();const outcomes=await Promise.allSettled([service.settled(),brain.settled?.(),...[provisionBirths,socialInstallation,foodDelivery,shoreInstallation,kitchenInstallation].map(h=>h?.settled())]);for(const r of outcomes)if(r.status==='rejected')failures.push(r.reason);host.drainInputs();}finally{clearInterval(pump);}
       let snapshotSaved=false;
       try{host.stop();snapshotSaved=host.engine.canSnapshot?.()===true;if(snapshotSaved)host.saveSnapshot(true);else if(!db.db.prepare('SELECT 1 FROM clock_frontiers_v1 WHERE world_id=?').get(worldId))failures.push(Error('active-work-without-durable-frontier'));}
-      finally{clearInterval(pump);await new Promise(r=>hub.wss.close(r));if(db.db.isOpen)db.close();releaseLock();}
+      finally{clearInterval(pump);await new Promise(r=>hub.wss.close(r));auth.close();if(db.db.isOpen)db.close();releaseLock();}
       if(failures.length)throw Error('local-expanded-close.installation-failed-resources-closed');return {snapshotSaved,activeNativeSnapshotRefused:!snapshotSaved};}
 
     return {cfg,pins,boot,db,host,auth,brain,souls,service,hub,server,edge,kitchenInstallation,shoreInstallation,foodDelivery,socialInstallation,close};
-  } catch(error){host?.stop();server?.close();db.close();releaseLock();throw error;}
+  } catch(error){host?.stop();server?.close();auth?.close();db.close();releaseLock();throw error;}
 }
 
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
@@ -173,7 +174,7 @@ if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).hr
   try {
     if(!descriptorPath)throw Error('usage: node tools/core/edge-server.mjs <descriptor.json> [check]');
     const d=JSON.parse(readFileSync(resolve(descriptorPath),'utf8')),flags=d.flags??{};
-    const app=await openEdgeServerV1({input:d.input,dataDir:d.dataDir,worldId:d.worldId,port:Number(d.port),webDir:d.webDir,marsWebDir:d.marsWebDir,build:d.build??'local-edge/1',checkOnly:mode==='check',placeData:d.placeData,seedObjects:d.objects,inviteRequired:d.inviteRequired===true,skillFile:d.skillFile,cliFile:d.cliFile,instructionsFile:d.instructionsFile,accountAuth:flags.accountAuth===true,inputManifestSHA256:d.inputManifestSHA256,
+    const app=await openEdgeServerV1({input:d.input,dataDir:d.dataDir,worldId:d.worldId,port:Number(d.port),webDir:d.webDir,marsWebDir:d.marsWebDir,build:d.build??'local-edge/1',checkOnly:mode==='check',placeData:d.placeData,seedObjects:d.objects,inviteRequired:d.inviteRequired===true,skillFile:d.skillFile,cliFile:d.cliFile,instructionsFile:d.instructionsFile,accountAuth:flags.accountAuth===true,publicOrigin:d.publicOrigin,inputManifestSHA256:d.inputManifestSHA256,
       authoredBoundariesFile:d.authoredBoundariesFile,authoredBoundariesSHA256:d.authoredBoundariesSHA256,officeStairGuards:flags.officeStairGuards??false,ambient:d.ambient!==false,localSoulLimit:Number(d.localSoulLimit??9),humanRest:flags.humanRest??true,provisions:flags.provisions??true,sequences:flags.sequences??true,floorGoals:flags.floorGoals??true,kitchen:flags.kitchen??true,shore:flags.shore??true,foodDeliveryId:flags.foodDeliveryId,quietLandingCourtesy:flags.quietLandingCourtesy??true,social:flags.social??true,approachRetention:flags.approachRetention??true,closedGoals:flags.closedGoals??true,activateExpansion:flags.activateExpansion??true,nativePlaces:Array.isArray(d.nativePlaces)?d.nativePlaces:[],nav:d.nav??null,activitySpots:d.activitySpots});
     if(app.checkOnly)console.log(JSON.stringify(app,null,2));
     else {console.log(JSON.stringify({url:app.cfg.publicUrl,worldId:app.host.worldId,boot:app.boot,mindDriver:app.cfg.mindDriver,edge:'/v1/edge',places:app.edge.places.byId.size,build:app.cfg.build}));

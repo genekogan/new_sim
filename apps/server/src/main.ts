@@ -60,7 +60,8 @@ const edenCapabilities=edenCore&&host.engine.rulesVersion.includes('+crew-remova
 console.log(`[world] ${host.worldId} booted from ${boot.from}, tick ${host.engine.world.tick}, replayed ${boot.replayed} events, ${host.minds.size} souls, rules ${host.engine.rulesVersion}`);
 
 const auth = new Auth(config, db);
-await auth.init().catch((e) => console.error('[auth] init failed:', e.message));
+await auth.init().catch((e) => {if(config.accountAuthRequired)throw e;console.error('[auth] init failed:', e.message);});
+if(config.accountAuthRequired&&!auth.ready)throw Error('Account authentication verifier unavailable');
 
 const living = config.worldKey !== 'toy' && config.livingWorld ? new LivingWorld(host) : null;
 if(edenCore)await settleEmptyEden(host,living,definition.customs);
@@ -148,7 +149,7 @@ const shutdown = async (sig: string) => {
   host.stop(); takes.stop();
   try { host.saveSnapshot(true); } catch (e) { console.error('[world] snapshot failed', e); }
   server.close(); for (const c of hub.clients) c.ws.close(1001, 'server restarting');
-  db.close(); process.exit(0);
+  auth.close();db.close(); process.exit(0);
 };
 process.on('SIGTERM', () => void shutdown('SIGTERM').catch(()=>console.error('[world] shutdown is incomplete; retain database and inspect')));
 process.on('SIGINT', () => void shutdown('SIGINT').catch(()=>console.error('[world] shutdown is incomplete; retain database and inspect')));

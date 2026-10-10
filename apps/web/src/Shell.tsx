@@ -36,7 +36,7 @@ import { BacklogPanel, HeardPanel, LibraryPanel, NotebookPanel, SentencesPanel, 
 export type AuthCtx = {
   ready: boolean; authed: boolean; label: string | null;
   login(): void; logout(): Promise<void> | void; getToken(): Promise<string | null>;
-  debug: { privyUserId: string | null; wallet: unknown; linked: unknown[] };
+  debug: { privyUserId: string | null; accountIdentity?:string|null; wallet: unknown; linked: unknown[] };
 };
 type Cfg = { privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean; accountAuthRequired?:boolean; inviteRequired?: boolean; build?: string; localIntegrationMetadataPath?:string };
 const qualifiedEdenWorlds=edenReleaseWorlds(import.meta.env.VITE_EDEN_EXPERIENCE_WORLD_IDS);

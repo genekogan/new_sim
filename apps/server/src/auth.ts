@@ -1,8 +1,8 @@
-// Privy auth. The browser holds a Privy access token (ES256 JWT); the server
-// verifies it with the app's verification key, fetched once with the app secret.
-// To the user this is just "sign in"; the embedded wallet is incidental for now.
+// Explicit provider verification; delegated Soul credentials remain independent.
 import { createHash, randomBytes } from 'node:crypto';
-import { importSPKI, jwtVerify, type CryptoKey } from 'jose';
+import { createRemoteJWKSet, importSPKI, jwtVerify, type CryptoKey } from 'jose';
+import {AccountRegistry} from './account-registry.ts';
+import {isAbsolute} from 'node:path';
 import type { Me } from '@sim/protocol';
 import type { Config } from './config.ts';
 import type { Db, UserRow } from './db.ts';
@@ -16,6 +16,8 @@ export function hasFreshAttributionProof(identity:VerifiedAccountIdentity):ident
 
 export class Auth {
   private key: CryptoKey | null = null;
+  private clerkKeys:ReturnType<typeof createRemoteJWKSet>|null=null;
+  private registry:AccountRegistry|null=null;
   private profileAt = new Map<string, number>();
   private verified=new WeakMap<UserRow,VerifiedAccountIdentity>();
   private profileProof=new Map<string,{email:string|null;at:number}>();
@@ -32,6 +34,19 @@ export class Auth {
   private basic() { return 'Basic ' + Buffer.from(`${this.cfg.privyAppId}:${this.cfg.privyAppSecret}`).toString('base64'); }
 
   async init() {
+    if(!['clerk','privy','none'].includes(this.cfg.authProvider))throw Error('Unknown AUTH_PROVIDER');
+    if(this.cfg.authProvider==='none')return;
+    if(this.cfg.authProvider==='clerk'){
+      if(!this.cfg.accountAuthRequired)throw Error('Clerk activation requires ACCOUNT_AUTH_REQUIRED=1');
+      const issuer=new URL(this.cfg.clerkIssuer),pk=this.cfg.clerkPublishableKey;
+      let domain='';try{domain=Buffer.from(pk.split('_').slice(2).join('_'),'base64').toString().replace(/\$$/,'');}catch{}
+      if(issuer.protocol!=='https:'||issuer.origin!==this.cfg.clerkIssuer||domain!==issuer.hostname||!pk.startsWith('pk_live_'))throw Error('Clerk requires the exact production issuer and matching live publishable key');
+      if(!isAbsolute(this.cfg.accountRegistryPath)||!this.cfg.clerkAuthorizedParties.length||!this.cfg.clerkAuthorizedParties.includes(new URL(this.cfg.publicUrl).origin))throw Error('Clerk requires an absolute shared account registry and explicit authorized application origin');
+      for(const party of this.cfg.clerkAuthorizedParties){const u=new URL(party);if(u.origin!==party||u.username||u.password||!['https:','http:'].includes(u.protocol)||u.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(u.hostname))throw Error('Invalid Clerk authorized party');}
+      this.registry=new AccountRegistry(this.cfg.accountRegistryPath);
+      this.clerkKeys=createRemoteJWKSet(new URL('/.well-known/jwks.json',issuer));
+      this.devAuth=false;this.ready=true;return;
+    }
     if (!this.cfg.privyAppId || !this.cfg.privyAppSecret) { console.warn('[auth] Privy not configured; logins disabled'); return; }
     const res = await fetch(`https://auth.privy.io/api/v1/apps/${this.cfg.privyAppId}`, { headers: { Authorization: this.basic(), 'privy-app-id': this.cfg.privyAppId } });
     if (!res.ok) throw new Error(`privy app config ${res.status}`);
@@ -59,7 +74,8 @@ export class Auth {
       if (!this.db.user(id)) this.db.upsertUser({ id, email: `${token.slice(4)}@dev.local`, wallet: null, role: token === 'dev:admin' ? 'admin' : 'user' });
       return this.db.user(id)!;
     }
-    if (!this.key) return null;
+    if(this.cfg.authProvider==='clerk')return this.clerkUser(token);
+    if(this.cfg.authProvider==='none'||!this.key)return null;
     let did: string,expiresAt:number;
     try {
       const { payload } = await jwtVerify(token, this.key, { issuer: 'privy.io', audience: this.cfg.privyAppId });
@@ -92,6 +108,7 @@ export class Auth {
   /** Use only from a normal authenticated browser request and a trusted manifest
    * email. This fresh read neither updates profile cache nor changes roles. */
   async freshAttributionAccountFromToken(token:string|undefined|null,expectedEmail:string){
+    if(this.cfg.authProvider!=='privy')return null;
     const account=await this.accountFromToken(token);if(!account||typeof expectedEmail!=='string'||expectedEmail.length>254)return null;
     const expected=expectedEmail.trim().toLowerCase();if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(expected))return null;
     try{
@@ -121,9 +138,24 @@ export class Auth {
     return { email, wallet };
   }
 
+  private async clerkUser(token:string):Promise<UserRow|null>{
+    if(!this.clerkKeys||!this.registry)return null;
+    let subject:string,expiresAt:number;
+    try{
+      const {payload}=await jwtVerify(token,this.clerkKeys,{issuer:this.cfg.clerkIssuer,algorithms:['RS256'],requiredClaims:['sub','exp','iat','nbf','sid','azp']});
+      if(typeof payload.sub!=='string'||!/^user_[A-Za-z0-9]{1,128}$/.test(payload.sub)||typeof payload.sid!=='string'||!/^sess_[A-Za-z0-9]{1,128}$/.test(payload.sid)||typeof payload.azp!=='string'||!this.cfg.clerkAuthorizedParties.includes(payload.azp)||typeof payload.exp!=='number'||!Number.isSafeInteger(payload.exp))return null;
+      subject=payload.sub;expiresAt=payload.exp*1000;
+    }catch{return null;}
+    const id=this.registry.bind(this.cfg.clerkIssuer,subject);
+    if(!this.db.user(id))this.db.upsertUser({id,email:null,wallet:null,role:'user'});
+    const user=this.db.user(id)!;this.db.touchUser(id);
+    this.verified.set(user,{id,issuer:this.cfg.clerkIssuer,subject,verifiedAt:Date.now(),expiresAt});return user;
+  }
+
   me(u: UserRow): Me {
     return { userId: u.id, short: ownerShort(u.id), email: u.email, wallet: this.cfg.accountAuthRequired?null:u.wallet, role: u.role, souls: this.db.soulsOf(u.id).map((s) => s.id), invited: !this.cfg.inviteRequired || u.role === 'admin' || !!u.invited_by };
   }
+  close(){this.registry?.close();this.registry=null;this.clerkKeys=null;this.key=null;this.ready=false;}
 }
 
 export const newId = (prefix: string) => `${prefix}_${randomBytes(5).toString('hex')}`;
