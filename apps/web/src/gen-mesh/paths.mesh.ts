@@ -22,7 +22,9 @@ export function drapedPolygon(ctx: MeshCtx, s: Surface, lift = 0.03): THREE.Mesh
   const elevated = s.y > 0.3; // decks and bridges keep their own height
   for (let i = 0; i < pos.count; i++) { const x = pos.getX(i), z = pos.getZ(i); pos.setY(i, elevated ? (ctx.model.terrain.sample(x, z) + s.y) : ctx.model.terrain.sample(x, z) + s.y + lift); }
   geo.computeVertexNormals();
-  const mesh = new THREE.Mesh(geo, ctx.materials.get((s.material as never) ?? 'gravel', SURFACE_COLORS[s.material ?? ''] ?? '#b3ac9e', { side: THREE.DoubleSide }));
+  // an area's documented `color` param (plaza/1 "base colour", lawn/1 color) tints its main surface; kerbs and edges keep their material colour
+  const tint = typeof ctx.params.color === 'string' && /^#[0-9a-f]{6}$/i.test(ctx.params.color) && !/kerb|edge|rail/.test(s.tag ?? '') ? ctx.params.color : undefined;
+  const mesh = new THREE.Mesh(geo, ctx.materials.get((s.material as never) ?? 'gravel', tint ?? SURFACE_COLORS[s.material ?? ''] ?? '#b3ac9e', { side: THREE.DoubleSide }));
   mesh.receiveShadow = true; mesh.name = `surface:${s.tag ?? ''}`; mesh.userData.cameraTransparent = true;
   return mesh;
 }
