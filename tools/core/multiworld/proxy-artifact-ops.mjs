@@ -37,6 +37,17 @@ export function validateProxyOperation(planPin,goPin,{now=Date.now(),probe=syste
  check(probe.absent(old.pid)&&probe.vacant(4970),'old proxy alive or4970 not vacant');
  check(typeof plan.outputDir==='string'&&plan.outputDir.startsWith('/'),'exclusive receipt directory required');return{plan,descriptor:d,qualification,go,protectedPIDs:[...seen],protectedPGIDs:[...Object.values(plan.writers).map(w=>w.pgid),plan.ssh.pgid]};
 }
+// Do not infer overlay activation merely from a descriptor an old module may ignore.
+export async function openVerifiedProxy(module,descriptor,mode,isCancelled=()=>false){
+ let proxy;
+ try{
+  proxy=await module.openWorldProxy(descriptor);check(!isCancelled(),'startup cancelled');
+  const actual=proxy.artifactAttribution;
+  if(mode==='start')for(const field of ['frontendSource','cliSource','webManifestSha256','cliSha256'])check(actual?.[field]===descriptor.artifactOverlay?.[field]&&typeof actual?.[field]==='string','returned artifact attribution differs: '+field);
+  else check(mode==='rollback'&&actual==null,'rollback returned overlay authority');
+  return proxy;
+ }catch(e){if(proxy){await proxy.close();e.ownProxyClosed=true;}throw e;}
+}
 export async function runProxyOperation(planPin,goPin){
  const checked=validateProxyOperation(planPin,goPin);const {plan}=checked;mkdirSync(plan.outputDir,{recursive:false});
  let proxy,cancelled=false,closing;const close=()=>closing??=(proxy?proxy.close():Promise.resolve());const signal=()=>{cancelled=true;if(proxy)void close();};
@@ -47,11 +58,11 @@ export async function runProxyOperation(planPin,goPin){
   // opened listener is closed before READY. Existing writers/tunnel are untouched.
   const pgid=Number(execFileSync('/bin/ps',['-p',String(process.pid),'-o','pgid='],{encoding:'utf8'}).trim());check(pgid===process.pid&&!checked.protectedPGIDs.includes(pgid),'proxy requires its own detached process group');
   const module=await import(pathToFileURL(plan.proxyModule.path).href);check(!cancelled,'startup cancelled');
-  proxy=await module.openWorldProxy(checked.descriptor);check(!cancelled,'startup cancelled');
+  proxy=await openVerifiedProxy(module,checked.descriptor,plan.mode,()=>cancelled);check(!cancelled,'startup cancelled');
   record('READY.json',{mode:plan.mode,pid:process.pid,pgid,port:4970,planSHA256:planPin.sha256,goSHA256:goPin.sha256,backendSource:BASE,artifactSource:plan.artifactSource,artifactAttribution:proxy.artifactAttribution??null,writers:plan.writers,sshPID:plan.ssh.pid});
   if(!cancelled)await new Promise(resolve=>{const finish=()=>resolve();process.once('SIGTERM',finish);process.once('SIGINT',finish);});
   await close();record('CLOSURE.json',{pid:process.pid,port:4970,normalClosed:true,onlyOwnProxyClosed:true});
- }catch(e){await close();record('FIRST-FAILURE.json',{pid:process.pid,error:e.message,ownProxyClosed:!!proxy});throw e;}
+ }catch(e){await close();record('FIRST-FAILURE.json',{pid:process.pid,error:e.message,ownProxyClosed:!!proxy||e.ownProxyClosed===true});throw e;}
  finally{process.removeListener('SIGTERM',signal);process.removeListener('SIGINT',signal);}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
