@@ -150,8 +150,9 @@ try {
   await step('T3 an asphalt street tees into the road; a gravel footpath to the pond', async () => {
     const a = await placePrepared(R('street'), 'street', { path: [[0, -34], [50, -42], [100, -38], [150, -26]] }, { width: 7 });
     const b = await placePrepared(R('footpath'), 'pond-path', { path: [[60, -36], [70, -10], [82, 18]] }, { width: 1.8 });
-    return { a: a.data?.accepted, b: b.data?.accepted, fa: a.data?.failures, fb: b.data?.failures };
-  }, (r) => r.a && r.b);
+    const c = await placePrepared(R('road'), 'cross-lane', { path: [[-46, 62], [6, 64], [56, 70]] }, { width: 5, material: 'cobble', maxGrade: 0.08 });
+    return { a: a.data?.accepted, b: b.data?.accepted, c: c.data?.accepted, fa: a.data?.failures, fb: b.data?.failures, fc: c.data?.failures };
+  }, (r) => r.a && r.b && r.c);
 
   // areas: plaza, pitch, pier, deck
   await step('T4 a radial plaza with a kerb, a garden wall with a gate behind it', () => act([
@@ -231,6 +232,8 @@ try {
   await shot('t11-courts', [106, 32, -88], [106, 0, -134]);
   await shot('t12-footbridge', [156, 7, -38], [170, 0.5, -50]);
   await shot('t13-street-junction', [-22, 14, -18], [4, 0, -36]);
+  await shot('t14-crossing', [22, 16, 82], [5, 0, 64]);
+  await shot('t15-path-tee', [74, 8, -52], [61, 0, -40]);
   await step('T7 ground palette: desert', async () => { const r = await act([{ op: 'world', state: { ground: { palette: 'desert' } } }], 'palette'); return { accepted: r.data?.accepted, failures: r.data?.failures }; }, (r) => r.accepted);
   await shot('t10-desert-palette', [-170, 150, 210], [0, 0, -10], 6000);
 } catch (e) {
