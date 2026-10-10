@@ -7,7 +7,7 @@
 // The derived physics is plain data in the logged event, so the engine's replay never reads the entity model.
 // Fastest working path on the engine's existing structures (nav/1-style static scene re-base, CATALOG fixtures);
 // the per-tile patch follows L8's tiled Spatial.
-import { applyBatch, type Diff, type Entity, type Op, type Result, type StoredDef, type WorldModel } from '@sim/world-compiler';
+import { applyBatch, plan, type Diff, type Entity, type Op, type Result, type StoredDef, type WorldModel } from '@sim/world-compiler';
 import { assetFromDef, assetIdFor, isFixtureDef, nearestSurfaceSlot, nextEntityPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
 import type { WorldHost } from '../world.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
@@ -61,6 +61,7 @@ export class EngineBridge {
     // body-aware edits: the compiler hook when GodMode has it (lead patch 5), else wrap its entry points
     if ('bodies' in (this.god as object)) (this.god as unknown as { bodies: unknown }).bodies = { uses: (id: string) => this.usesOne(id), lifted: (ids: string[]) => this.buried(ids) };
     else this.guardGod();
+    this.guardPinned();
     if (this.edge) this.hookEdge(this.edge);
   }
   private get engine(): EngineV1 { return this.host.engine as unknown as EngineV1; }
@@ -382,6 +383,88 @@ export class EngineBridge {
       }
     }
     return out;
+  }
+
+  /** Bodies that cannot step clear of an edit: seated, standing on an upper floor, lying down, carried or aboard.
+   *  (Idle bodies on the ground are lifted/stepped clear instead — `buried` warns, the engine relocates them.) */
+  private pinnedBodies(): { id: string; p: [number, number, number]; doing: string }[] {
+    const out: { id: string; p: [number, number, number]; doing: string }[] = [];
+    for (const b of Object.values(this.engine.world.entities) as any[]) {
+      const h = b.human; if (!h) continue;
+      const seated = h.activity === 'sit' || h.baseActivity === 'sit', level = h.level ?? 0;
+      if (!seated && level === 0 && !h.on && !h.carrier && !h.sleepPose) continue;
+      const seat = seated ? this.seatOf(b.id) : null;
+      out.push({ id: b.id, p: [b.pose.p[0], b.pose.p[1], b.pose.p[2]], doing: seated ? `sitting${seat ? ` on ${this.model.pathOf(seat)}` : ''}` : level !== 0 ? `standing on floor ${level}` : 'busy' });
+    }
+    return out;
+  }
+  private seatOf(body: string): string | null {
+    for (const id of this.model.entities.keys()) { const u = this.engine.bodyUsesV1(id); if (u?.body === body && u.how === 'occupied') return id; }
+    return null;
+  }
+
+  /** 31 §3 rule 8 (R2): a god edit that would bury or unseat a body that cannot step clear is refused, naming the body —
+   *  the ground rising over it, a new solid where it is, or the thing it sits on (or the house around it) moved as a
+   *  side effect (re-settled on new ground, re-solved constraints). Direct removes/moves/param edits of a used thing
+   *  are refused by the compiler's `uses` hook; this covers what only the would-be world shows. Null = fine. */
+  pinnedRefusal(batch: unknown, trusted = false): Result | null {
+    const pinned = this.pinnedBodies(); if (!pinned.length) return null;
+    const ops = batch && typeof batch === 'object' ? ((batch as { ops?: unknown[] }).ops ?? []) : [];
+    const name = (b: { id: string; doing: string }) => `${this.soulName(b.id)} (${b.id}), ${b.doing}`;
+    const no = (i: number, detail: string): Result => { this.stats.refusals++; return { accepted: false, failures: [{ op: i, code: 'occupied.by-body', detail: `${detail}; wait until they are done (or ask them in a prayer answer)` }] }; };
+    const opOf = (id: string) => { const k = ops.findIndex((o) => { const x = o as { id?: string; name?: string }; return x?.id === id || x?.id === this.model.pathOf(id) || (x?.name && this.model.get(x.name)?.id === id); }); return k < 0 ? 0 : k; };
+    const f = this.model.fork();
+    const p = plan(f, batch, 'god', this.engine.world.tick, { trusted });
+    if (!p.ok) {
+      // a solid dropped onto a seated body overlaps its seat first: name the body, not just the seat
+      for (const fl of p.failures) {
+        if (fl.code !== 'overlap.solid') continue;
+        const hit = /overlaps (\S+)(?: (\S+))?$/.exec(fl.detail); const other = hit ? this.model.get(hit[2] ?? hit[1]) : undefined;
+        const b = other && pinned.find((x) => this.engine.bodyUsesV1(other.id)?.body === x.id);
+        if (b) return no(fl.op, `would bury ${name(b)}: ${fl.detail}`);
+      }
+      return null;
+    }
+    p.apply();
+    for (const e of p.diff.upserts) {
+      const live = this.model.entities.get(e.id); if (!live || this.model.resolvedDef(live.def)?.components.body) continue;
+      // 1. the seat (or anything around it) moved as a side effect
+      const a = this.model.worldPose(live), w = f.worldPose(e);
+      if (Math.hypot(a.x - w.x, a.y - w.y, a.z - w.z) > 1e-3 || Math.abs(a.yaw - w.yaw) > 1e-4) for (const sid of this.model.subtree(e.id)) {
+        const u = this.engine.bodyUsesV1(sid); const b = u && pinned.find((x) => x.id === u.body);
+        if (b) return no(opOf(e.id), `would move ${this.model.pathOf(e.id)} by ${Math.round(Math.hypot(a.x - w.x, a.y - w.y, a.z - w.z) * 100) / 100} m and unseat ${name(b)}`);
+      }
+    }
+    // 2. the ground rising over a pinned body
+    if (p.diff.tiles.length) for (const b of pinned) {
+      const g = f.terrain.sample(b.p[0], b.p[2]);
+      if (g > b.p[1] + 0.25) return no(Math.max(0, ops.findIndex((o) => (o as { op?: string })?.op === 'place' || (o as { op?: string })?.op === 'move' || (o as { op?: string })?.op === 'set')), `would raise the ground at (${r3(b.p[0])}, ${r3(b.p[2])}) to ${r3(g)} m, over ${name(b)} at ${r3(b.p[1])} m`);
+    }
+    // 3. a new or changed solid where a pinned body is
+    for (const e of p.diff.upserts) {
+      const def = f.resolvedDef(e.def); if (!def || def.layer !== 'solid' || def.components.body) continue;
+      const after = f.footprint(e, def); if (!after.length) continue;
+      const live = this.model.entities.get(e.id);
+      if (live && JSON.stringify(this.model.footprint(live)) === JSON.stringify(after)) continue;
+      for (const o of after) for (const b of pinned) {
+        const y = b.p[1]; if (o.y1 <= y + 0.22 || o.y0 >= y + 1.6) continue;
+        const c = Math.cos(o.yaw), s = Math.sin(o.yaw), dx = b.p[0] - o.c[0], dz = b.p[2] - o.c[1];
+        if (Math.abs(dx * c - dz * s) <= o.half[0] + 0.2 && Math.abs(dx * s + dz * c) <= o.half[1] + 0.2) return no(opOf(e.id), `would bury ${name(b)} under ${f.pathOf(e.id)}`);
+      }
+    }
+    return null;
+  }
+
+  /** Wrap the god's edit entry points with the pinned-body check (L1: a `bodies.refuse(scratch, diff)` hook would make
+   *  this one plan instead of two; see the status file). Only costs anything while some body is pinned. */
+  private guardPinned() {
+    const g = this.god as any;
+    const act = g.act.bind(g), dryrun = g.dryrun.bind(g), preview = g.preview.bind(g), undo = g.undo.bind(g), redo = g.redo.bind(g);
+    g.act = (batch: unknown, note?: string) => this.pinnedRefusal(batch) ?? act(batch, note);
+    g.dryrun = (batch: unknown) => { const r = this.pinnedRefusal(batch); return r ? { accepted: false, failures: (r as { failures: unknown }).failures } : dryrun(batch); };
+    g.preview = (batch: unknown) => { const r = this.pinnedRefusal(batch); return r ? { id: null, accepted: false, failures: (r as { failures: unknown }).failures } : preview(batch); };
+    g.undo = () => { const t = this.god.store.undoable(); return (t && t.inverse.length ? this.pinnedRefusal({ ops: t.inverse }, true) : null) ?? undo(); };
+    g.redo = () => { const t = this.god.store.redoable(); return (t && t.inverse.length ? this.pinnedRefusal({ ops: t.inverse }, true) : null) ?? redo(); };
   }
 
   /** Wrap the god's edit entry points with body-aware refusals (L1: replace with a compiler hook, see status file). */
