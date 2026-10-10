@@ -194,6 +194,8 @@ export const worldStateSchema = z.object({
   time: z.object({ dayTicks: z.number().int().default(72000), startTick: z.number().int().default(0) }).prefault({}),
   weather: z.object({ clouds: num.min(0).max(1).default(0.1), wind: num.min(0).max(1).default(0.1), rain: num.min(0).max(1).default(0) }).prefault({}),
   constitution: z.string().max(20000).default(''),
+  /** What the bare ground is made of (L3): the terrain colouring reads it. */
+  ground: z.object({ palette: z.enum(['grass', 'desert', 'dust', 'sand', 'snow', 'rock', 'garden']).default('grass') }).prefault({}),
 });
 export type WorldState = z.infer<typeof worldStateSchema>;
 

@@ -19,7 +19,7 @@ import './boundaries.mesh.ts';
 function world() {
   const w = new WorldModel({ constants: { extent: 1000, ground: 'land' }, seed: 'mesh' });
   const have = new Set(CORE_KIT.map((d) => d.name));
-  for (const d of [...CORE_KIT, ...(terrainKit as DefInput[]).filter((d) => !have.has(d.name))]) w.defineDef(d, 'core', 0);
+  for (const d of [...CORE_KIT, ...(terrainKit as unknown as DefInput[]).filter((d) => !have.has(d.name))]) w.defineDef(d, 'core', 0);
   return w;
 }
 const lib = new MaterialLib();

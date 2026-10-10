@@ -4,13 +4,15 @@
 // `{type:'edge', kind:'world-diff'}`; new or moved things ease in over ~2.5 s.
 // Inactive (and invisible) on worlds that have no entity layer.
 import * as THREE from 'three';
-import { TILE_M, TILE_N, Terrain, type Ground } from '@sim/ground';
+import { TILE_M, TILE_N, Terrain, waterLevelAt, type Ground } from '@sim/ground';
 import { WorldModel, type Def, type Entity, type StoredDef } from '@sim/world-compiler';
-import { GENERATORS, offsetPolyline } from '@sim/generators';
+import { GENERATORS } from '@sim/generators';
 import { meshFor, type MeshCtx } from './gen-mesh/index.ts';
 import { MaterialLib } from './gen-mesh/materials.ts';
 import { animate, hasMotion } from './gen-mesh/motion.ts';
 import { EntityInstancer, instanceable } from './EntityInstancer.ts';
+import { terrainColorFor } from './gen-mesh/ground-palette.ts';
+import { waterMaterial, waterMesh } from './gen-mesh/water.ts';
 
 type Snapshot = { contract: string; worldId: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[]; tiles: Record<string, string> };
 type DiffMsg = { type: 'edge'; kind: 'world-diff'; seq: number; diff: { upserts: Entity[]; removes: string[]; defs: StoredDef[]; tiles: string[]; world?: Partial<WorldModel['state']> }; ground?: Ground; defs?: StoredDef[] };
@@ -101,7 +103,7 @@ export class WorldEntityLayer {
       for (const e of d.diff.upserts) { if (this.model.entities.has(e.id)) this.model.delete(e.id); this.model.insert(e); }
       for (const e of d.diff.upserts) { const def = this.model.resolvedDef(e.def); if (def?.layer === 'solid') { try { this.model.index(e.id, this.model.footprint(e, def)); } catch { /* best effort */ } } }
       if (d.ground) { this.model.terrain = new Terrain(d.ground); this.rebuildTerrain(new Set(d.diff.tiles)); this.rebuildWater(); }
-      if (d.diff.world) this.model.state = { ...this.model.state, ...d.diff.world } as WorldModel['state'];
+      if (d.diff.world) { const before = JSON.stringify((this.model.state as { ground?: unknown }).ground ?? null); this.model.state = { ...this.model.state, ...d.diff.world } as WorldModel['state']; if (JSON.stringify((this.model.state as { ground?: unknown }).ground ?? null) !== before) this.rebuildTerrain(); }
       for (const e of d.diff.upserts) this.draw(e, true);
       // children ride with a moved parent: refresh their targets without easing
       for (const e of d.diff.upserts) for (const cid of this.model.subtree(e.id).slice(1)) { const c = this.model.entities.get(cid); if (c) this.draw(c, false); }
@@ -115,7 +117,9 @@ export class WorldEntityLayer {
       this.lastSeqCheck = nowMs;
       void fetch(this.api('/v1/world/seq'), { signal: this.signal }).then((r) => (r.ok ? r.json() : null)).then((j: { seq: number } | null) => { if (j && j.seq !== this.seq) void this.resync(); }).catch(() => {});
     }
-    if (baseGround) baseGround.traverse((o) => { if (o.name === 'outside-ground' && !this.hiddenBase.has(o)) { o.visible = false; this.hiddenBase.add(o); } });
+    // the entity terrain is the only ground: hide the native backdrop and the native floor planes (a flat
+    // plane at y ≈ 0 would cover every pond, river and cut below it)
+    if (baseGround) baseGround.traverse((o) => { if ((o.name === 'outside-ground' || o.name === 'commons-ground' || (o.parent === baseGround && (o as THREE.Mesh).isMesh && (o as THREE.Mesh).geometry?.type === 'PlaneGeometry')) && !this.hiddenBase.has(o)) { o.visible = false; this.hiddenBase.add(o); } });
     for (const [id, d] of this.drawn) {
       const t = easeOut((nowMs - d.t0) / 1000 / d.dur);
       d.obj.position.lerpVectors(d.from.p, d.to.p, t);
@@ -216,13 +220,14 @@ export class WorldEntityLayer {
     const nx = w / TERRAIN_STEP, nz = d / TERRAIN_STEP;
     const pos = new Float32Array((nx + 1) * (nz + 1) * 3), col = new Float32Array((nx + 1) * (nz + 1) * 3);
     const c = new THREE.Color();
+    const terrainColor = terrainColorFor((m.state as { ground?: { palette?: string } }).ground?.palette);
     for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) {
       const x = x0 + i * TERRAIN_STEP, z = z0 + j * TERRAIN_STEP;
       const y = m.terrain.sample(Math.min(x, x0 + w - 1e-3), Math.min(z, z0 + d - 1e-3));
       const k = (j * (nx + 1) + i) * 3;
       pos[k] = x; pos[k + 1] = y; pos[k + 2] = z;
       const slope = m.terrain.slope(Math.min(x, x0 + w - 1e-3), Math.min(z, z0 + d - 1e-3));
-      terrainColor(c, y, slope, m.constants.base);
+      terrainColor(c, y, slope, m.constants.base, x, z);
       col[k] = c.r; col[k + 1] = c.g; col[k + 2] = c.b;
     }
     const idx: number[] = [];
@@ -237,27 +242,20 @@ export class WorldEntityLayer {
     this.waterGroup.clear();
     const g = this.model!.ground();
     for (const w of g.waters) {
-      if (w.path && w.w) {  // rivers: a ribbon at the water level along the path
-        const left = offsetPolyline(w.path, w.w / 2), right = offsetPolyline(w.path, -w.w / 2);
-        const pos: number[] = []; for (let i = 0; i < w.path.length; i++) pos.push(left[i][0], w.level, left[i][1], right[i][0], w.level, right[i][1]);
-        const idx: number[] = []; for (let i = 0; i < w.path.length - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
-        const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.computeVertexNormals();
-        const mesh = new THREE.Mesh(geo, this.material('water', () => new THREE.MeshStandardMaterial({ color: 0x3a7ca8, transparent: true, opacity: 0.78, roughness: 0.25, metalness: 0.1, side: THREE.DoubleSide, depthWrite: false })));
-        mesh.name = 'entity-river'; mesh.userData.cameraTransparent = true; this.waterGroup.add(mesh);
-        continue;
-      }
+      // path water (rivers) is drawn by the river's own mesh half (per-point levels, flow, trimmed at lakes)
+      if (w.path) continue;
       if (!w.area) continue;
       const shape = new THREE.Shape(w.area.map(([x, z]) => new THREE.Vector2(x, z)));
       const geo = new THREE.ShapeGeometry(shape);
       geo.rotateX(Math.PI / 2); // Shape (x, y) → world (x, z); +y up handled by rotation
-      const mesh = new THREE.Mesh(geo, this.material('water', () => new THREE.MeshStandardMaterial({ color: 0x3a7ca8, transparent: true, opacity: 0.78, roughness: 0.25, metalness: 0.1, side: THREE.DoubleSide, depthWrite: false })));
-      mesh.position.y = w.level; mesh.name = 'entity-water'; mesh.userData.cameraTransparent = true;
+      geo.translate(0, w.level, 0);
+      const mesh = waterMesh(geo, waterMaterial(), 'entity-water');
       this.waterGroup.add(mesh);
     }
     if (g.seaLevel !== undefined) {
       const half = this.model!.constants.extent / 2;
-      const sea = new THREE.Mesh(new THREE.PlaneGeometry(half * 8, half * 8), this.material('water', () => new THREE.MeshStandardMaterial({ color: 0x3a7ca8, transparent: true, opacity: 0.78, roughness: 0.25, side: THREE.DoubleSide, depthWrite: false })));
-      sea.rotation.x = -Math.PI / 2; sea.position.y = g.seaLevel; sea.name = 'entity-sea'; sea.userData.cameraTransparent = true;
+      const seaGeo = new THREE.PlaneGeometry(half * 8, half * 8); seaGeo.rotateX(-Math.PI / 2); seaGeo.translate(0, g.seaLevel, 0);
+      const sea = waterMesh(seaGeo, waterMaterial(), 'entity-sea');
       this.waterGroup.add(sea);
     }
   }
@@ -357,18 +355,9 @@ function disposeObject(o: THREE.Object3D) { o.traverse((c) => { const m = c as T
 const num = (v: unknown, d: number) => (typeof v === 'number' ? v : d);
 const frac = (n: number) => { const x = Math.sin(n) * 43758.5453; return x - Math.floor(x); };
 function hashSeed(s: string) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return (h >>> 0) % 100000; }
-const GRASS = new THREE.Color(0x5f9a4c), MEADOW = new THREE.Color(0x7e8a6e), ROCK = new THREE.Color(0x8d8a84), SAND = new THREE.Color(0xa89b6f), SNOW = new THREE.Color(0xf2f4f6);
-function terrainColor(c: THREE.Color, y: number, slope: number, base: number) {
-  const h = y - base;
-  c.copy(h < -0.2 ? SAND : GRASS);
-  if (h > 40) c.lerp(MEADOW, Math.min(1, (h - 40) / 60));          // thinner grass with altitude
-  const rocky = Math.min(1, Math.max(0, (slope - 0.7) / 0.9));       // grass holds to ~35°, bare rock past ~58°
-  c.lerp(ROCK, rocky);
-  if (h > 140) c.lerp(SNOW, Math.min(1, (h - 140) / 50));           // snow line
-}
 function waterLevel(g: Ground, x: number, z: number): number | null {
   let level: number | null = null;
-  for (const w of g.waters) if (w.area && pointInPoly(x, z, w.area)) level = w.level;
+  for (const w of g.waters) if (w.area && pointInPoly(x, z, w.area)) level = w.level; else if (w.path && w.w) { const lv = waterLevelAt(g, x, z); if (lv !== null) level = lv; }
   return level ?? g.seaLevel ?? null;
 }
 function pointInPoly(px: number, pz: number, poly: [number, number][]) { let inside = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > pz) !== (zj > pz) && px < ((xj - xi) * (pz - zi)) / (zj - zi) + xi) inside = !inside; } return inside; }

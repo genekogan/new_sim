@@ -9,9 +9,9 @@ export type Vec2 = [number, number];
 export type Vec3 = [number, number, number];
 
 /** Oriented box in the def frame: centre (x, z), half extents, yaw, vertical span. Solids only. */
-export type LocalOBB = { c: Vec2; half: Vec2; yaw: number; y0: number; y1: number; tag?: string };
+export type LocalOBB = { c: Vec2; half: Vec2; yaw: number; y0: number; y1: number; tag?: string; /** world-frame (path/area) bakes: y0/y1 are absolute, not above the ground */ abs?: boolean };
 /** A walkable floor at a level (Stage B feeds these into Spatial). */
-export type Surface = { level: number; y: number; polygon: Vec2[]; material?: string; tag?: string };
+export type Surface = { level: number; y: number; polygon: Vec2[]; material?: string; tag?: string; /** world-frame (path/area) bakes: y is absolute, not above the ground */ abs?: boolean };
 /** A gap in a wall: door, window, gate, arch. `wall` indexes the generator's wall list. */
 export type Opening = { id: string; kind: 'door' | 'window' | 'gate' | 'arch'; wall?: number; at: Vec2; yaw: number; width: number; height: number; sill?: number; level: number; state?: 'open' | 'closed' | 'always' };
 /** A connection between levels: stairs, ramps, ladders, float shafts. Path in the def frame. */
@@ -29,7 +29,7 @@ export type Baked = {
   rooms?: Room[];
   slots: Slot[];
   landform?: LandformBody;
-  water?: { level: number; area?: Vec2[]; path?: Vec2[]; width?: number };
+  water?: { level: number; area?: Vec2[]; path?: Vec2[]; width?: number; /** path water: level per path point (rivers flow) */ levels?: number[] };
   /** Triangle estimate for budgets. */
   tris: number;
   /** Free-form facts for `describe` (e.g. reachability, warnings). */
