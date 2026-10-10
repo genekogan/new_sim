@@ -189,15 +189,31 @@ function refPoint(v, spec, offset) {
     const k = v.extent * 0.32;
     out = { x: r22(d[0] * k), z: r22(d[1] * k), kind: "region", word: compassKey(s) };
   } else {
-    const row = v.get(s);
+    const row = v.get(s) ?? setOf(v, s);
     if (!row) throw new Error(`no such reference: ${s} (see: map, flags)`);
-    out = { ...centreOf(row), kind: "entity", row, ref: row.path };
+    out = { ...centreOf(row), kind: "entity", row, ref: row.path, ...row.members ? { members: row.members.map((r) => r.id) } : {} };
   }
   if (offset) {
     const [dx, dz] = String(offset).split(",").map(Number);
     out = { ...out, x: r22(out.x + dx), z: r22(out.z + dz) };
   }
   return out;
+}
+function setOf(v, name) {
+  const s = String(name ?? "").replace(/^flag:/, "");
+  const cut = s.lastIndexOf("/");
+  const parentPath = cut > 0 ? s.slice(0, cut) : null, stem = cut > 0 ? s.slice(cut + 1) : s;
+  if (!/^[a-z0-9][a-z0-9._-]*$/i.test(stem)) return null;
+  const parent = parentPath ? v.get(parentPath) : null;
+  if (parentPath && !parent) return null;
+  const re = new RegExp(`^${stem.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}-\\d+$`);
+  const members = v.rows.filter((r) => r.name && re.test(r.name) && (parent ? r.parent === parent.id : true));
+  if (members.length < 2) return null;
+  const pid = members[0].parent;
+  const same = members.filter((r) => r.parent === pid);
+  if (same.length < 2) return null;
+  const x0 = Math.min(...same.map((r) => r.aabb[0])), z0 = Math.min(...same.map((r) => r.aabb[1])), x1 = Math.max(...same.map((r) => r.aabb[2])), z1 = Math.max(...same.map((r) => r.aabb[3]));
+  return { id: `set:${s}`, path: s, name: stem, set: true, members: same, parent: pid, def: same[0].def, form: "set", layer: "set", tags: [], aabb: [x0, z0, x1, z1], pose: [r22((x0 + x1) / 2), same[0].pose[1], r22((z0 + z1) / 2), 0, 1], box: [x1 - x0, 0, z1 - z0], y: same[0].y };
 }
 function centreOf(row) {
   if (row.shape?.area) {
@@ -232,6 +248,18 @@ function rayExit(poly, c, u) {
     if (Math.abs(den) < 1e-12) continue;
     const t = ((ax - c[0]) * ez - (az - c[1]) * ex) / den, s = ((ax - c[0]) * u[1] - (az - c[1]) * u[0]) / den;
     if (t > 0 && s >= 0 && s <= 1) best = Math.max(best, t);
+  }
+  return best;
+}
+function nearestOnPath(path, q) {
+  const L = polylineLength(path) || 1;
+  let best = { p: path[0], t: 0, d: Infinity }, run = 0;
+  for (let i = 1; i < path.length; i++) {
+    const [ax, az] = path[i - 1], [bx, bz] = path[i], ex = bx - ax, ez = bz - az, l2 = ex * ex + ez * ez, len = Math.sqrt(l2);
+    const k = l2 ? Math.max(0, Math.min(1, ((q[0] - ax) * ex + (q[1] - az) * ez) / l2)) : 0;
+    const p = [ax + ex * k, az + ez * k], d = Math.hypot(p[0] - q[0], p[1] - q[1]);
+    if (d < best.d) best = { p, t: (run + len * k) / L, d };
+    run += len;
   }
   return best;
 }
@@ -341,12 +369,26 @@ function solve(v, thing, rel) {
     };
     if (A.kind === "region" && B.kind !== "region") A = toEdge(A, B);
     else if (B.kind === "region") B = toEdge(B, A.kind === "region" ? { x: 0, z: 0 } : A);
+    const ENDS_ONLY = /bridge|pier|deck|dock|jetty/;
+    const approach = (P) => [P.x, P.z];
     const edge = (P, Q) => {
       if (P.kind !== "entity") return [P.x, P.z];
       const sh = P.row.shape;
       if (sh?.path) {
         const a2 = sh.path[0], b2 = sh.path[sh.path.length - 1];
-        return Math.hypot(a2[0] - Q.x, a2[1] - Q.z) <= Math.hypot(b2[0] - Q.x, b2[1] - Q.z) ? [r22(a2[0]), r22(a2[1])] : [r22(b2[0]), r22(b2[1])];
+        const nearerEnd = () => Math.hypot(a2[0] - Q.x, a2[1] - Q.z) <= Math.hypot(b2[0] - Q.x, b2[1] - Q.z) ? [r22(a2[0]), r22(a2[1])] : [r22(b2[0]), r22(b2[1])];
+        if (ENDS_ONLY.test(P.row.def)) return nearerEnd();
+        const q = nearestOnPath(sh.path, [Q.x, Q.z]);
+        if (Math.hypot(q.p[0] - a2[0], q.p[1] - a2[1]) < 3 || Math.hypot(q.p[0] - b2[0], q.p[1] - b2[1]) < 3) return nearerEnd();
+        const inset = P.row.layer === "surface" ? Math.max(0, (sh.width ?? 4) / 2 - 0.5) : 0, u2 = norm([Q.x - q.p[0], Q.z - q.p[1]]);
+        return [r22(q.p[0] + u2[0] * inset), r22(q.p[1] + u2[1] * inset)];
+      }
+      const doors = (P.row.doors ?? []).filter((d) => d.out && (d.level ?? 0) === 0);
+      if (doors.length) {
+        const d = doors.slice().sort((x, y) => Math.hypot(x.at[0] - Q.x, x.at[1] - Q.z) - Math.hypot(y.at[0] - Q.x, y.at[1] - Q.z))[0];
+        const f = dirOfYaw(d.yaw);
+        doorUsed.set(P.row.path, d.id);
+        return [r22(d.at[0] + f[0]), r22(d.at[1] + f[1])];
       }
       const u = norm([Q.x - P.x, Q.z - P.z]);
       if (sh?.area) {
@@ -358,11 +400,24 @@ function solve(v, thing, rel) {
       const e = extentAlong(boxOf(P.row), u) + 1;
       return [r22(P.x + u[0] * e), r22(P.z + u[1] * e)];
     };
+    const doorUsed = /* @__PURE__ */ new Map();
     const via = rel.via ? [].concat(rel.via).map((x) => {
       const p = refPoint(v, x);
       return [p.x, p.z];
     }) : [];
-    const path = [edge(A, via.length ? { x: via[0][0], z: via[0][1] } : B), ...via, edge(B, via.length ? { x: via.at(-1)[0], z: via.at(-1)[1] } : A)];
+    const asQ = ([x, z]) => ({ x, z });
+    const isPath = (P) => P.kind === "entity" && !!P.row.shape?.path;
+    const towardA = via.length ? asQ(via[0]) : null, towardB = via.length ? asQ(via.at(-1)) : null;
+    let pa, pb;
+    if (isPath(A) && !isPath(B)) {
+      pb = edge(B, towardB ?? asQ(isPath(A) ? nearestOnPath(A.row.shape.path, approach(B)).p : approach(A)));
+      pa = edge(A, towardA ?? asQ(pb));
+    } else {
+      pa = edge(A, towardA ?? asQ(isPath(B) ? nearestOnPath(B.row.shape.path, approach(A)).p : approach(B)));
+      pb = edge(B, towardB ?? asQ(pa));
+    }
+    const path = [pa, ...via, pb];
+    for (const [ref, id] of doorUsed) notes.push(`starts at ${ref}'s door ${id}`);
     notes.push(`path from ${A.ref ?? a} to ${B.ref ?? b}${via.length ? ` via ${via.length} point(s)` : ""}, ${r22(polylineLength(path))} m`);
     return { items: [{ candidates: [{ shape: { path, ...rel.width ? { width: Number(rel.width) } : {} }, note: notes.at(-1) }] }], notes };
   }
@@ -387,9 +442,54 @@ function solve(v, thing, rel) {
     if (!slots.length) throw new Error(`${host.path} has no free surface slot (slots: ${(host.slots ?? []).map((x) => `${x.id}:${x.kind} ${x.used}/${x.capacity}`).join(", ") || "none"})`);
     const n = Number(rel.count ?? 1);
     const items2 = [];
-    let k = 0;
-    for (const sl of slots) for (let u = sl.used; u < sl.capacity && items2.length < n; u++) items2.push({ candidates: [{ in: { parent: host.path, slot: sl.id }, constraints, note: `on ${host.path} (slot ${sl.id})` }] }), k++;
-    if (items2.length < n) notes.push(`only ${items2.length} free surface places on ${host.path}`);
+    for (const sl of slots) {
+      if (items2.length >= n) break;
+      const F = frameOf(host, sl.id), HF = frameOf(host);
+      const [ox, oz] = toLocal(HF, F.O[0], F.O[1]);
+      const hx = (host.box?.[0] ?? 1) / 2 - 0.06, hz = (host.box?.[2] ?? 1) / 2 - 0.06;
+      const sep = Math.max(hw, hd) * 2 + 0.06;
+      const there = v.rows.filter((r) => r.parent === host.id && r.slot === sl.id).map((r) => {
+        const e = v.entity?.(r.id);
+        const p = e?.p ?? [0, 0];
+        return [p[0], p[p.length - 1]];
+      });
+      const lattice = [];
+      for (let i = -8; i <= 8; i++) for (let j = -8; j <= 8; j++) {
+        const lx = i * 0.06, lz = j * 0.06;
+        if (Math.abs(ox + lx) + hw > hx + 0.04 || Math.abs(oz + lz) + hd > hz + 0.04) continue;
+        lattice.push([lx, lz]);
+      }
+      const free2 = sl.capacity - sl.used;
+      const want = Math.min(free2, n - items2.length);
+      if (!there.length && want > 1) {
+        const rr = Math.max(0, Math.min(hx - hw, hz - hd, 0.12 + 0.06 * want));
+        for (let k = 0; k < want; k++) {
+          const a = 2 * Math.PI * k / want + Math.PI / 2;
+          const q = [r22(Math.sin(a) * rr * (hx >= hz ? 1 : 0.6)), r22(Math.cos(a) * rr * (hz > hx ? 1 : 0.6))];
+          there.push(q);
+          items2.push({ candidates: [{ in: { parent: host.path, slot: sl.id }, p: q, constraints, note: `on ${host.path} (slot ${sl.id})` }] });
+        }
+        continue;
+      }
+      for (let k = 0; k < free2 && items2.length < n; k++) {
+        let best = null, bestD = -1;
+        for (const [lx, lz] of lattice) {
+          const d = there.length ? Math.min(...there.map(([a, b]) => Math.hypot(a - lx, b - lz))) : 10 - Math.hypot(lx, lz);
+          if (d > bestD + 1e-9) {
+            bestD = d;
+            best = [lx, lz];
+          }
+        }
+        if (!best || there.length && bestD < sep * 0.75) {
+          notes.push(`${host.path}'s ${sl.id} is full for things this size`);
+          break;
+        }
+        there.push(best);
+        items2.push({ candidates: [{ in: { parent: host.path, slot: sl.id }, p: [r22(best[0]), r22(best[1])], constraints, note: `on ${host.path} (slot ${sl.id})` }] });
+      }
+    }
+    if (items2.length < n) notes.push(`only ${items2.length} free places on ${host.path}`);
+    if (!items2.length) throw new Error(`no room left on ${host.path}`);
     return { items: items2, notes };
   }
   if (rel.inside) {
@@ -408,78 +508,7 @@ function solve(v, thing, rel) {
     const bare = (t) => String(t).toLowerCase().replace(/[^a-z]/g, "");
     const room = !roomId ? rooms[0] : rooms.find((x) => x.id === roomId) ?? rooms.find((x) => bare(x.id) === bare(roomId) || x.name && bare(x.name) === bare(roomId)) ?? rooms.find((x) => bare(x.id).startsWith(bare(roomId)) || bare(roomId).startsWith(bare(x.id)) || x.name && bare(x.name).includes(bare(roomId)));
     if (!room) throw new Error(`${host.path} has no room ${roomId}; rooms: ${rooms.map((x) => x.id).join(", ")}`);
-    const RY = room.yaw, O = room.p;
-    const local = room.local ?? [[-2, -2], [2, -2], [2, 2], [-2, 2]];
-    const lx0 = Math.min(...local.map((p) => p[0])), lx1 = Math.max(...local.map((p) => p[0])), lz0 = Math.min(...local.map((p) => p[1])), lz1 = Math.max(...local.map((p) => p[1]));
-    const m = 0.15;
-    const siblings = new Set(v.rows.filter((x) => x.parent !== host.id || x.slot !== room.id).map((x) => x.id));
-    const roomSkip = /* @__PURE__ */ new Set([...skip, host.id, ...[...v.rows].filter((x) => x.parent !== host.id).map((x) => x.id)]);
-    void siblings;
-    const toW = (lx, lz) => {
-      const [dx, dz] = rot(RY, lx, lz);
-      return [O[0] + dx, O[2] + dz];
-    };
-    const freeIn = (lx, lz, ly2) => {
-      const [x, z] = toW(lx, lz);
-      return !solid || blockers(v, mine(x, z, RY + ly2), roomSkip).length === 0;
-    };
-    const ext = (ly2) => [hw * Math.abs(Math.cos(ly2)) + hd * Math.abs(Math.sin(ly2)), hw * Math.abs(Math.sin(ly2)) + hd * Math.abs(Math.cos(ly2))];
-    const toLocalYaw = (wy) => wy - RY;
-    const label = `${host.path}/${room.id}`;
-    const at2 = (lx, lz, ly2, how) => {
-      const [wx, wz] = toW(lx, lz);
-      const f = faceAt(wx, wz);
-      const yl = f !== void 0 ? toLocalYaw(f) : ly2;
-      return { in: { parent: host.path, slot: room.id }, p: [r22(lx), r22(lz)], r: r22(yl), constraints: [...constraints, ...facingConstraint(), { kind: "inside", ref: label }], note: `inside ${label}${how ? ", " + how : ""}` };
-    };
-    const n = Number(rel.count ?? 1);
-    if (rel.corner || rel.wall) {
-      const key = compassKey(rel.corner ?? rel.wall);
-      if (!key) throw new Error(`corner/wall must be a compass word (n, ne, e, \u2026), got ${rel.corner ?? rel.wall}`);
-      const d = COMPASS[key];
-      const [dl0, dl1] = unrot(RY, d[0], d[1]);
-      if (rel.wall) {
-        const alongX = Math.abs(dl0) >= Math.abs(dl1);
-        const ly3 = alongX ? yawOf(-Math.sign(dl0), 0) : yawOf(0, -Math.sign(dl1));
-        const [ex3, ez3] = ext(ly3);
-        const items3 = [];
-        const span = alongX ? [lz0 + ez3 + m, lz1 - ez3 - m] : [lx0 + ex3 + m, lx1 - ex3 - m];
-        const step = (alongX ? 2 * ez3 : 2 * ex3) + Number(rel.gap ?? 0.3);
-        const total = step * (n - 1), mid = (span[0] + span[1]) / 2;
-        for (let k = 0; k < n; k++) {
-          const t = mid - total / 2 + k * step;
-          const lx2 = alongX ? dl0 > 0 ? lx1 - ex3 - m : lx0 + ex3 + m : t, lz2 = alongX ? t : dl1 > 0 ? lz1 - ez3 - m : lz0 + ez3 + m;
-          items3.push({ candidates: [at2(lx2, lz2, ly3, `against the ${key} wall`)] });
-        }
-        return { items: items3, notes };
-      }
-      const ly2 = baseYaw !== void 0 ? baseYaw - RY : yawOf(-Math.sign(dl0) || 0, -Math.sign(dl1) || 1);
-      const [ex2, ez2] = ext(ly2);
-      const lx = Math.abs(dl0) < 0.3 ? (lx0 + lx1) / 2 : dl0 > 0 ? lx1 - ex2 - m : lx0 + ex2 + m;
-      const lz = Math.abs(dl1) < 0.3 ? (lz0 + lz1) / 2 : dl1 > 0 ? lz1 - ez2 - m : lz0 + ez2 + m;
-      return { items: [{ candidates: [at2(lx, lz, ly2, `${key} corner`)] }], notes };
-    }
-    const ly = baseYaw !== void 0 ? baseYaw - RY : 0;
-    const [ex, ez] = ext(ly);
-    const cx = (lx0 + lx1) / 2, cz = (lz0 + lz1) / 2;
-    const spots = [];
-    for (let i = -6; i <= 6; i++) for (let j = -6; j <= 6; j++) {
-      const lx = cx + i * 0.5, lz = cz + j * 0.5;
-      if (lx - ex < lx0 + m || lx + ex > lx1 - m || lz - ez < lz0 + m || lz + ez > lz1 - m) continue;
-      spots.push([lx, lz, Math.hypot(i, j)]);
-    }
-    spots.sort((a, b) => a[2] - b[2]);
-    const items2 = [];
-    const taken = [];
-    for (const [lx, lz] of spots) {
-      if (items2.length >= n) break;
-      if (!freeIn(lx, lz, ly)) continue;
-      if (taken.some(([a, b]) => Math.abs(a - lx) < 2 * ex + 0.2 && Math.abs(b - lz) < 2 * ez + 0.2)) continue;
-      taken.push([lx, lz]);
-      items2.push({ candidates: [at2(lx, lz, ly, "a free spot")] });
-    }
-    if (!items2.length) throw new Error(`no free spot for a ${r22(2 * hw)}\xD7${r22(2 * hd)} m thing in ${label} (room ${r22(lx1 - lx0)}\xD7${r22(lz1 - lz0)} m)`);
-    return { items: items2, notes };
+    return solveInRoom(v, host, room, thing, rel, { hw, hd, solid, skip, constraints, faceAt, facingConstraint, baseYaw, notes });
   }
   if (rel.along) {
     const host = v.get(rel.along);
@@ -562,6 +591,29 @@ function solve(v, thing, rel) {
     const rb = R.kind === "entity" ? boxOf(R.row) : { c: [R.x, R.z], half: [0, 0], yaw: 0 };
     const n = Number(rel.count ?? 1);
     if (R.kind === "entity") skip.add(R.row.id);
+    for (const id of R.members ?? []) skip.add(id);
+    const shapeOf = R.kind === "entity" ? R.row.shape : null;
+    if (shapeOf?.path) {
+      const path = shapeOf.path, pw = (shapeOf.width ?? 4) / 2, gap3 = rel.dist !== void 0 ? Number(rel.dist) : 1.5;
+      const items3 = [];
+      for (let k = 0; k < n; k++) {
+        const t = rel.t !== void 0 ? Number(rel.t) : n > 1 ? 0.1 + 0.8 * k / (n - 1) : 0.5;
+        const { p, dir } = pointAlong(path, t), left = leftOf(dir);
+        const want = rel.dir && compassKey(rel.dir) ? COMPASS[compassKey(rel.dir)] : left;
+        const sg = left[0] * want[0] + left[1] * want[1] >= 0 ? 1 : -1;
+        const cands = [];
+        for (const extra of [0, 1, 2.5, 5]) {
+          const y1 = finalYaw(p[0] + left[0] * sg * (pw + gap3), p[1] + left[1] * sg * (pw + gap3), baseYaw ?? yawOf(-left[0] * sg, -left[1] * sg)) ?? 0;
+          const d = pw + extentAlong(mine(0, 0, y1), left) + gap3 + extra;
+          const x = p[0] + left[0] * sg * d, z = p[1] + left[1] * sg * d;
+          const c = pose(x, z, y1, { note: `beside ${R.ref} at ${Math.round(t * 100)}%, ${r22(gap3 + extra)} m from its edge`, constraints: [{ kind: "near", ref: R.row.path, dist: r22(pw + gap3 + extra + 1) }] });
+          if (free(x, z, y1) || !cands.length) cands.push(c);
+        }
+        items3.push({ candidates: cands });
+      }
+      return { items: items3, notes };
+    }
+    const rim = shapeOf?.area ? (u) => rayExit(shapeOf.area, [R.x, R.z], u) : null;
     const gap2 = rel.dist !== void 0 ? Number(rel.dist) : Math.max(1.5, Math.min(6, Math.max(hw, hd)));
     const start = rel.dir && compassKey(rel.dir) ? COMPASS[compassKey(rel.dir)] : R.kind === "entity" && R.row.form === "point" && !R.row.def.includes("flag") ? dirOfYaw(R.yaw) : COMPASS.s;
     const a0 = Math.atan2(start[0], start[1]);
@@ -577,12 +629,13 @@ function solve(v, thing, rel) {
       for (const ring of [0, 2, 5, 10]) for (const da of tries) {
         if (cands.length >= 4) break;
         const a = ak + da, u = [Math.sin(a), Math.cos(a)];
-        const d0 = extentAlong(rb, u) + Math.max(hw, hd) + gap2 + ring;
-        const y1 = finalYaw(rb.c[0] + u[0] * d0, rb.c[1] + u[1] * d0, baseYaw) ?? 0;
-        const d = extentAlong(rb, u) + extentAlong(mine(0, 0, y1), u) + gap2 + ring;
-        const x = rb.c[0] + u[0] * d, z = rb.c[1] + u[1] * d;
+        const c02 = rim ? [R.x, R.z] : rb.c, out = rim ? rim(u) : extentAlong(rb, u);
+        const d0 = out + Math.max(hw, hd) + gap2 + ring;
+        const y1 = finalYaw(c02[0] + u[0] * d0, c02[1] + u[1] * d0, baseYaw) ?? 0;
+        const d = out + extentAlong(mine(0, 0, y1), u) + gap2 + ring;
+        const x = c02[0] + u[0] * d, z = c02[1] + u[1] * d;
         const fy = finalYaw(x, z, baseYaw);
-        const c = pose(x, z, fy, { note: `near ${R.ref ?? rel.near ?? rel.around}, ${compassOfYaw(a)} of it, ${r22(gap2 + ring)} m away`, constraints: R.kind === "entity" ? [{ kind: "near", ref: R.row.path, dist: r22(gap2 + ring + 1) }] : [] });
+        const c = pose(x, z, fy, { note: `near ${R.ref ?? rel.near ?? rel.around}, ${compassOfYaw(a)} of it, ${r22(gap2 + ring)} m away`, constraints: R.kind === "entity" && !R.members ? [{ kind: "near", ref: R.row.path, dist: r22(gap2 + ring + 1) }] : [] });
         fallback ??= c;
         if (isFree(x, z, fy ?? 0)) cands.push(c);
       }
@@ -658,6 +711,213 @@ function circleArea(spec, wobble = 0.12) {
     const a = k / n * 2 * Math.PI, rr = r * (1 - wobble / 2 + rnd() * wobble);
     return [r22(cx + Math.sin(a) * rr), r22(cz + Math.cos(a) * rr)];
   });
+}
+function frameOf(parent, slotId) {
+  const sl = slotId ? (parent.slots ?? []).find((x) => x.id === slotId) ?? null : null;
+  return { O: sl ? [sl.p[0], sl.p[2]] : [parent.pose[0], parent.pose[2]], PY: parent.pose[3] ?? 0, RY: sl ? sl.yaw : parent.pose[3] ?? 0, s: parent.pose[4] ?? 1, slot: sl };
+}
+var toLocal = (F, wx, wz) => {
+  const [x, z] = unrot(F.PY, wx - F.O[0], wz - F.O[1]);
+  return [x / F.s, z / F.s];
+};
+var toWorldIn = (F, lx, lz) => {
+  const [dx, dz] = rot(F.PY, lx * F.s, lz * F.s);
+  return [F.O[0] + dx, F.O[1] + dz];
+};
+function roomsAt(v, wx, wz, exclude = /* @__PURE__ */ new Set()) {
+  const out = [];
+  for (const r of v.rows) {
+    if (exclude.has(r.id)) continue;
+    for (const sl of r.slots ?? []) if (sl.kind === "room" && sl.polygon && inPoly(wx, wz, sl.polygon)) out.push({ host: r, slot: sl });
+  }
+  return out;
+}
+function roomOf(v, row) {
+  for (let r = row, k = 0; r && r.parent !== "world" && k < 16; k++) {
+    const p = v.byId?.get(r.parent) ?? v.get(r.parent);
+    if (!p) return null;
+    const sl = (p.slots ?? []).find((x) => x.id === r.slot && x.kind === "room");
+    if (sl) return { host: p, slot: sl };
+    r = p;
+  }
+  return null;
+}
+function relocate(v, row, wx, wz, wy) {
+  const sub = /* @__PURE__ */ new Set([row.id]);
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const r of v.rows) if (sub.has(r.parent) && !sub.has(r.id)) {
+      sub.add(r.id);
+      grew = true;
+    }
+  }
+  const parent = row.parent === "world" ? null : v.byId?.get(row.parent) ?? v.get(row.parent);
+  const local = (host, slotId) => {
+    const F = frameOf(host, slotId);
+    const [lx, lz] = toLocal(F, wx, wz);
+    return { F, lx, lz, r: wy === void 0 ? void 0 : r22(wy - F.RY) };
+  };
+  if (parent && row.slot && !(parent.slots ?? []).some((x) => x.id === row.slot && x.kind === "room")) {
+    const L = local(parent, row.slot), hx = (parent.box?.[0] ?? 1) / 2, hz = (parent.box?.[2] ?? 1) / 2;
+    const [ox, oz] = toLocal(frameOf(parent), L.F.O[0], L.F.O[1]);
+    if (Math.abs(ox + L.lx) <= hx && Math.abs(oz + L.lz) <= hz) return { in: { parent: parent.path, slot: row.slot }, p: [r22(L.lx), r22(L.lz)], r: L.r, note: `on ${parent.path}` };
+  }
+  if (row.parent !== "world") {
+    const cur = roomOf(v, row);
+    const rooms = roomsAt(v, wx, wz, sub);
+    const pick = (cur && rooms.find((x) => x.host.id === cur.host.id && x.slot.id === cur.slot.id)) ?? (cur && rooms.find((x) => x.host.id === cur.host.id && (x.slot.floor ?? 0) === (cur.slot.floor ?? 0))) ?? rooms.find((x) => (x.slot.floor ?? 0) === (cur?.slot.floor ?? 0)) ?? rooms[0];
+    if (pick) {
+      const L = local(pick.host, pick.slot.id);
+      return { in: { parent: pick.host.path, slot: pick.slot.id }, p: [r22(L.lx), r22(L.lz)], r: L.r, note: `inside ${pick.host.path}/${pick.slot.id}`, room: `${pick.host.path}/${pick.slot.id}` };
+    }
+    return { in: { parent: "world" }, p: [r22(wx), r22(wz)], r: wy === void 0 ? void 0 : r22(wy), note: `out of ${parent?.path ?? "its parent"}, now at the root`, left: true };
+  }
+  return { p: [r22(wx), r22(wz)], r: wy === void 0 ? void 0 : r22(wy) };
+}
+function sideDir(word, frontL) {
+  let w = String(word ?? "").toLowerCase().replace(/[^a-z]/g, "");
+  const parts = { front: [1, 0], back: [-1, 0], rear: [-1, 0], left: [0, 1], right: [0, -1] };
+  let a = 0, b = 0, n = 0;
+  for (const k of Object.keys(parts)) if (w.includes(k)) {
+    a += parts[k][0];
+    b += parts[k][1];
+    w = w.replace(k, "");
+    n++;
+  }
+  if (!n || w || a === 0 && b === 0) return null;
+  const l = leftOf(frontL);
+  return norm([a * frontL[0] + b * l[0], a * frontL[1] + b * l[1]]);
+}
+var steps = (max, step) => {
+  const out = [0];
+  for (let k = 1; k * step <= max + 1e-9; k++) out.push(k * step, -k * step);
+  return out;
+};
+function solveInRoom(v, host, room, thing, rel, ctx) {
+  const { hw, hd, solid, skip, constraints, faceAt, facingConstraint, baseYaw, notes } = ctx;
+  const F = frameOf(host, room.id);
+  const poly = room.local ?? [[-2, -2], [2, -2], [2, 2], [-2, 2]];
+  const label = `${host.path}/${room.id}`;
+  const m = 0.13, n = Number(rel.count ?? 1), dY = F.RY - F.PY;
+  const lx0 = Math.min(...poly.map((p) => p[0])), lx1 = Math.max(...poly.map((p) => p[0])), lz0 = Math.min(...poly.map((p) => p[1])), lz1 = Math.max(...poly.map((p) => p[1]));
+  const isRect = poly.length === 4 && poly.every(([x, z]) => (Math.abs(x - lx0) < 1e-3 || Math.abs(x - lx1) < 1e-3) && (Math.abs(z - lz0) < 1e-3 || Math.abs(z - lz1) < 1e-3));
+  const cx = isRect ? (lx0 + lx1) / 2 : poly.reduce((a, p) => a + p[0], 0) / poly.length, cz = isRect ? (lz0 + lz1) / 2 : poly.reduce((a, p) => a + p[1], 0) / poly.length;
+  const boxL = (lx, lz, ly2, grow = 0) => ({ c: [lx, lz], half: [hw + grow, hd + grow], yaw: ly2 + dY });
+  const fits = (lx, lz, ly2) => corners(boxL(lx, lz, ly2, 0.08)).every(([x, z]) => inPoly(x, z, poly));
+  const floor = room.floor ?? 0;
+  const doors = (host.doors ?? []).filter((d) => (d.level ?? 0) === floor).map((d) => ({ id: d.id, zone: { c: toLocal(F, d.at[0], d.at[1]), half: [d.width / 2 + 0.15, 0.85], yaw: d.yaw - F.PY } }));
+  const roomSkip = /* @__PURE__ */ new Set([...skip, host.id, ...v.rows.filter((x) => !(x.parent === host.id && x.slot === room.id)).map((x) => x.id)]);
+  const taken = [];
+  const yawAt = (lx, lz, ly2) => {
+    const [wx, wz] = toWorldIn(F, lx, lz);
+    const f = faceAt(wx, wz);
+    return f !== void 0 ? f - F.RY : ly2;
+  };
+  const why = (lx, lz, ly2) => {
+    if (!fits(lx, lz, ly2)) return "through a wall";
+    const d = solid && doors.find((x) => obbHit(boxL(lx, lz, ly2), x.zone));
+    if (d) return `in the doorway ${d.id}`;
+    if (solid) {
+      const [x, z] = toWorldIn(F, lx, lz);
+      const b = blockers(v, { c: [x, z], half: [hw, hd], yaw: F.RY + ly2 }, roomSkip);
+      if (b.length) return `against ${b[0]}`;
+    }
+    if (taken.some((t) => obbHit(boxL(lx, lz, ly2, 0.08), t))) return "on another one";
+    return null;
+  };
+  const at = (lx, lz, ly2, how) => ({ in: { parent: host.path, slot: room.id }, p: [r22(lx), r22(lz)], r: r22(ly2), constraints: [...constraints, ...facingConstraint(), { kind: "inside", ref: label }], note: `inside ${label}${how ? ", " + how : ""}` });
+  const reach = (c, u, ly2) => {
+    if (!fits(c[0], c[1], ly2)) return -1;
+    let lo = 0, hi = Math.hypot(lx1 - lx0, lz1 - lz0);
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2;
+      if (fits(c[0] + u[0] * mid, c[1] + u[1] * mid, ly2)) lo = mid;
+      else hi = mid;
+    }
+    return lo;
+  };
+  const choose = (cands, what) => {
+    const items = [];
+    const skipped = /* @__PURE__ */ new Map();
+    for (const [lx, lz, ly0, how] of cands) {
+      if (items.length >= n) break;
+      const ly2 = yawAt(lx, lz, ly0);
+      const w = why(lx, lz, ly2);
+      if (w) {
+        if (!skipped.has(w)) skipped.set(w, how);
+        continue;
+      }
+      taken.push(boxL(lx, lz, ly2));
+      items.push({ candidates: [at(lx, lz, ly2, how)] });
+    }
+    const door = [...skipped.keys()].find((k) => k.startsWith("in the doorway"));
+    if (door && items.length) notes.push(`kept ${door.replace("in the ", "")} clear`);
+    if (!items.length) throw new Error(`no room for a ${r22(2 * hw)}\xD7${r22(2 * hd)} m thing ${what} in ${label} (${r22(lx1 - lx0)}\xD7${r22(lz1 - lz0)} m): ${[...skipped.keys()].slice(0, 3).join("; ") || "nothing fits"}`);
+    if (items.length < n) notes.push(`only ${items.length} of ${n} fit ${what} in ${label}`);
+    return { items, notes };
+  };
+  const fL = dirOfYaw((host.front ?? host.pose[3]) - F.PY);
+  const dirWord = (w) => {
+    const rd = sideDir(w, fL);
+    if (rd) return rd;
+    const k = compassKey(w);
+    if (k) return norm(unrot(F.PY, COMPASS[k][0], COMPASS[k][1]));
+    return null;
+  };
+  const round = !isRect;
+  const R = Math.max(lx1 - lx0, lz1 - lz0) / 2;
+  if (rel.corner || rel.wall) {
+    const word = rel.wall ?? rel.corner;
+    let u = dirWord(word);
+    if (!u) throw new Error(`--${rel.wall ? "wall" : "corner"} takes the house's own sides: back, front, left, right (corners back-left, front-right, \u2026; left/right as you walk out of the front door), or a world compass word (n, ne, \u2026); got ${word}`);
+    const cands = [];
+    if (rel.wall) {
+      if (isRect) u = Math.abs(u[0]) >= Math.abs(u[1]) ? [Math.sign(u[0]), 0] : [0, Math.sign(u[1])];
+      if (!round) {
+        const ly3 = baseYaw !== void 0 ? baseYaw - F.RY : yawOf(-u[0], -u[1]) - dY, tg = [-u[1], u[0]];
+        for (const t of steps(Math.abs(u[0]) ? (lz1 - lz0) / 2 : (lx1 - lx0) / 2, 0.25)) {
+          const c0 = [cx + tg[0] * t, cz + tg[1] * t];
+          const d = reach(c0, u, ly3);
+          if (d >= 0) cands.push([c0[0] + u[0] * d, c0[1] + u[1] * d, ly3, `against the ${word} wall${Math.abs(t) > 0.01 ? ` (${r22(Math.abs(t))} m along it)` : ""}`]);
+        }
+      } else {
+        for (const a of steps(Math.PI * 0.95, 0.25 / Math.max(1, R))) {
+          const uu = rot(a, u[0], u[1]);
+          const ly3 = baseYaw !== void 0 ? baseYaw - F.RY : yawOf(-uu[0], -uu[1]) - dY;
+          const d = reach([cx, cz], uu, ly3);
+          if (d >= 0) cands.push([cx + uu[0] * d, cz + uu[1] * d, ly3, `against the ${word} wall${Math.abs(a) > 0.01 ? ` (${Math.round(Math.abs(a) * 180 / Math.PI)}\xB0 round it)` : ""}`]);
+        }
+      }
+      return choose(cands, `against the ${word} wall`);
+    }
+    const ly2 = (uu) => baseYaw !== void 0 ? baseYaw - F.RY : yawOf(-uu[0], -uu[1]) - dY;
+    if (isRect) {
+      const sx = Math.abs(u[0]) < 0.3 ? 0 : Math.sign(u[0]), sz = Math.abs(u[1]) < 0.3 ? 0 : Math.sign(u[1]);
+      const y = ly2([sx, sz]), b = boxL(0, 0, y), ex = extentAlong(b, [1, 0]), ez = extentAlong(b, [0, 1]);
+      const x = sx > 0 ? lx1 - ex - m : sx < 0 ? lx0 + ex + m : cx, z = sz > 0 ? lz1 - ez - m : sz < 0 ? lz0 + ez + m : cz;
+      cands.push([x, z, y, `${word} corner`]);
+      for (let t = 0.25; t < Math.max(lx1 - lx0, lz1 - lz0); t += 0.25) {
+        if (sx) cands.push([x, z - (sz || 1) * t, y, `${word} corner, ${r22(t)} m along the wall`]);
+        if (sz) cands.push([x - (sx || 1) * t, z, y, `${word} corner, ${r22(t)} m along the wall`]);
+      }
+    } else {
+      for (const a of steps(Math.PI * 0.95, 0.25 / Math.max(1, R))) {
+        const uu = rot(a, u[0], u[1]);
+        const d = reach([cx, cz], uu, ly2(uu));
+        if (d >= 0) cands.push([cx + uu[0] * d, cz + uu[1] * d, ly2(uu), `${word} side of the round room${Math.abs(a) > 0.01 ? ` (${Math.round(Math.abs(a) * 180 / Math.PI)}\xB0 round)` : ""}`]);
+      }
+    }
+    return choose(cands, `in the ${word} corner`);
+  }
+  const ly = baseYaw !== void 0 ? baseYaw - F.RY : 0;
+  const spots = [];
+  for (let i = -16; i <= 16; i++) for (let j = -16; j <= 16; j++) {
+    const lx = cx + i * 0.5, lz = cz + j * 0.5;
+    if (lx < lx0 || lx > lx1 || lz < lz0 || lz > lz1) continue;
+    spots.push([lx, lz, ly, "a free spot", Math.hypot(i, j)]);
+  }
+  spots.sort((a, b) => a[4] - b[4]);
+  return choose(spots, "free");
 }
 
 // lib/look.mjs
@@ -985,6 +1245,20 @@ function selectRows(v, f = {}) {
   return rows;
 }
 
+// lib/sky.mjs
+var PALETTE_LIST = [
+  { id: "clear-day", doc: "the default daylight (sun 0.6)" },
+  { id: "golden-hour", doc: "late, low, warm light: use with --sun 0.3\u20130.4" },
+  { id: "dawn", doc: "early light; lamps half lit" },
+  { id: "sunset", doc: "evening; lamps half lit" },
+  { id: "dusk", doc: "after sunset; lamps half lit" },
+  { id: "twilight", doc: "between dusk and night; lamps half lit" },
+  { id: "night", doc: "dark; every lamp lit (use --sun 0.05)" },
+  { id: "midnight", doc: "darkest; every lamp lit" },
+  { id: "mars-desert", doc: "the Mars camp template's sky (daylight)" },
+  { id: "lm-garden", doc: "the Little Martians garden template's sky (daylight)" }
+];
+
 // lib/schema-md.mjs
 function schemaMarkdown(s) {
   const L = ["# SCHEMA \u2014 the vocabulary of this world (generated from GET /v1/god/schema)", "", `contract ${s.contract}. Regenerate: \`node eden-god.mjs schema --md > SCHEMA.md\`.`, "", "## Conventions", ...Object.entries(s.conventions).map(([k, v]) => `- **${k}**: ${v}`), ""];
@@ -1045,6 +1319,11 @@ async function snapshot() {
   return ok(await call("/v1/god/snapshot"), "snapshot");
 }
 var fmtP = (p) => p ? `(${p.map((v) => r2(v)).join(", ")})` : "";
+var dxdz = (x, what) => {
+  const a = String(x).split(",").map(Number);
+  if (a.length !== 2 || !a.every(Number.isFinite)) throw new Error(`${what} takes dx,dz (two numbers), got ${x}`);
+  return a;
+};
 var yawWord = (y) => typeof y === "number" ? `facing ${compassOfYaw(y)}` : "";
 async function map(opts = {}) {
   const m = await mirror();
@@ -1113,7 +1392,38 @@ var SYNONYMS = {
 };
 var forms = (w) => [.../* @__PURE__ */ new Set([w, ...w.length > 3 ? [w.replace(/s$/, ""), w.replace(/es$/, ""), w.replace(/ies$/, "y")] : []])];
 var synonymsOf = (w) => [...new Set(forms(w).flatMap((f) => SYNONYMS[f] ?? []))];
+var fieldText = (k, f) => `${k}: ${f.type}${f.values ? ` ${f.values.join("|")}` : ""}${f.min !== void 0 || f.max !== void 0 ? ` ${f.min ?? ""}\u2026${f.max ?? ""}` : ""}${f.default !== void 0 ? ` = ${typeof f.default === "object" ? JSON.stringify(f.default) : f.default}` : ""}${f.doc ? ` \u2014 ${f.doc}` : ""}`;
+async function defDetail(d, others) {
+  const ref = d.ref.replace(/^core-/, "core/");
+  const L = [`${ref} \u2014 ${d.form}, ${d.layer}, ${d.size.box.map(r2).join("\xD7")} m${d.make?.gen ? `, made by ${d.make.gen}` : ""}${d.tags.length ? ` [${d.tags.join(" ")}]` : ""}`];
+  if (d.description) L.push(`  ${d.description}`);
+  const ps = Object.entries(d.params ?? {});
+  if (ps.length) {
+    L.push(`  params (--param k=v):`);
+    for (const [k, f] of ps) L.push(`  - ${fieldText(k, f).slice(0, 240)}`);
+  }
+  if (d.state && Object.keys(d.state).length) L.push(`  state (--state '{\u2026}'): ${Object.entries(d.state).map(([k, f]) => fieldText(k, f)).join("; ").slice(0, 300)}`);
+  try {
+    const b = await bakeInfo(ref.includes("@") ? ref : `${ref}@1`, {});
+    if (b.rooms?.length) L.push(`  rooms at the defaults: ${b.rooms.map((r) => `${r.id} (floor ${r.floor})`).join(", ")}`);
+    const sl = (b.slots ?? []).filter((x) => !["room", "wall"].includes(x.kind));
+    if (sl.length) L.push(`  slots: ${sl.map((x) => `${x.id} (${x.kind}, holds ${x.capacity})`).join(", ")}`);
+  } catch {
+  }
+  if (others.length) L.push(`  other defs matching: ${others.slice(0, 12).join(", ")}${others.length > 12 ? " \u2026" : ""}`);
+  return L.join("\n");
+}
 async function defs(q, flags2 = {}) {
+  if (q && !/\s/.test(q.trim())) {
+    const name = q.trim().toLowerCase().replace(/^core[/-]/, "").replace(/@\d+$/, "");
+    const qs = new URLSearchParams({ q: name.replace(/-/g, " ") });
+    const list = ok(await call(`/v1/god/defs?${qs}`), "defs").defs;
+    const want = /@\d+$/.test(q) ? q.trim().replace(/^core\//, "core-") : null;
+    const hit = list.find((d) => want ? d.ref === want || d.ref === want.replace(/^core-/, "") : d.name === `core-${name}` || d.name === name);
+    if (hit && !flags2.json) return defDetail(hit, list.filter((d) => d !== hit).map((d) => d.ref.replace(/^core-/, "core/")));
+    if (hit && flags2.json) return hit;
+    if (want) return `no def ${q}. \`defs ${name.replace(/-/g, " ")}\` searches the library.`;
+  }
   const get = async (words) => {
     const qs = new URLSearchParams();
     if (words) qs.set("q", words);
@@ -1142,6 +1452,15 @@ async function query(q) {
 }
 async function describe(ref, flags2 = {}) {
   if (!ref) throw new Error("usage: describe <path|flag:name>");
+  {
+    const v = view(await mirror());
+    const set2 = !v.get(ref) && setOf(v, ref);
+    if (set2) {
+      const parts = [];
+      for (const r of set2.members) parts.push((await describe(r.path, flags2)).split("\n").slice(0, 3).join("\n"));
+      return flags2.json ? parts : [`${ref} is a set of ${set2.members.length}: ${set2.members.map((r) => r.name).join(", ")} \u2014 refer to all of them as ${ref} (--near, --facing, look --at, move --by, remove, recolor) or one by its own name`, ...parts].join("\n");
+    }
+  }
   const d = (await query({ describe: ref.replace(/^flag:/, "") })).describe;
   if (d.error) throw new Error(d.error);
   if (flags2.json) return d;
@@ -1219,6 +1538,7 @@ var HINTS = {
   "slot.unknown": "that slot does not exist; `describe <parent>` lists slots and rooms",
   "slot.full": "the slot is full; pick another slot or room",
   "slot.incompatible": "the slot does not accept this kind/size",
+  "slot.outside": "the point is not inside that room; use --inside <house>/<room> or a world point inside it",
   "float.no-water": "there is no water there; use --float --at <lake|pond|river>",
   "def.unknown": "no such def; `defs <word>` searches the library",
   "params.invalid": "`defs <name>` shows params with ranges",
@@ -1327,7 +1647,7 @@ async function prepareShape(def, info, shape, params) {
   if (!p || p.error) return { params, shape };
   return { params: { ...params ?? {}, ...p.params ?? {} }, shape: p.path ? { ...shape, path: p.path } : shape };
 }
-async function commitItems(v, def, info, flags2, params, items, notes, { op = "place", id } = {}) {
+async function commitItems(v, def, info, flags2, params, items, notes, { op = "place", id, rowId } = {}) {
   if (!items.length) throw new Error("the solver found no placement");
   for (const it of items) for (const c of it.candidates) if (c.shape && PREPARED.has(info.gen)) {
     const pr = await prepareShape(def, info, c.shape, params);
@@ -1413,7 +1733,7 @@ async function commitItems(v, def, info, flags2, params, items, notes, { op = "p
     const o = ops[k];
     const c = items[k].candidates[Math.min(choice[k], items[k].candidates.length - 1)];
     const placedIds = Object.keys(res.ids).filter((key) => res.ids[key] === key);
-    const row = op === "place" ? v2.byId.get(placedIds[k]) : v2.get(id);
+    const row = op === "place" ? v2.byId.get(placedIds[k]) : v2.byId.get(rowId) ?? v2.get(id);
     const where2 = row ? row.shape ? "" : ` at (${row.pose[0]}, ${row.pose[1]}, ${row.pose[2]}) ${yawWord(row.pose[3])}` : "";
     lines.push(`${op === "place" ? "placed" : "moved"} ${row?.path ?? o.name ?? id}${op === "place" ? ` [${def}]` : ""}${where2} \u2014 ${c?.note ?? ""}${fixes[k].length ? ` (${fixes[k].join("; ")})` : ""}${o.constraints?.length ? `; keeps: ${o.constraints.map((x) => x.kind + (x.ref ? " " + x.ref : "")).join(", ")}` : ""}`);
   }
@@ -1426,8 +1746,16 @@ var terrain = place;
 async function move(ref, flags2 = {}) {
   const m = await mirror();
   const v = view(m);
+  if (!ref) throw new Error("usage: move <ref> --at \u2026|--near \u2026|--by dx,dz|--yaw r|--facing \u2026|--in parent[/slot]");
   const row = v.get(ref);
-  if (!row) throw new Error(`no such thing: ${ref}`);
+  if (!row) {
+    const set2 = setOf(v, ref);
+    if (!set2) throw new Error(`no such thing: ${ref} (see: map)`);
+    if (!flags2.by && flags2.yaw === void 0) throw new Error(`${ref} is a set of ${set2.members.length} (${set2.members.map((r) => r.name).join(", ")}): move it with --by dx,dz, or move one member by its own name`);
+    const out = [];
+    for (const r of set2.members) out.push(await move(r.path, flags2));
+    return out.join("\n");
+  }
   const sub = /* @__PURE__ */ new Set([row.id]);
   for (let grew = true; grew; ) {
     grew = false;
@@ -1436,29 +1764,60 @@ async function move(ref, flags2 = {}) {
       grew = true;
     }
   }
+  const e = v.entity(row.id);
+  const relocated = (wx, wz, wy, extra = []) => {
+    const L = relocate(v, row, wx, wz, wy);
+    const o = {};
+    let note = "";
+    if (row.parent === "world") {
+      o.p = L.p;
+      return { o, note };
+    }
+    const parentPath = v.byId.get(row.parent)?.path;
+    const changed = L.in && (L.in.parent !== parentPath || (L.in.slot ?? null) !== (row.slot ?? null));
+    o.p = e.p?.length === 3 && !changed ? [L.p[0], e.p[1], L.p[1]] : L.p;
+    if (changed) {
+      o.in = L.in;
+      o.r = L.r;
+      note = L.note;
+    }
+    const kept = (e.constraints ?? []).filter((c) => c.kind !== "inside" && !extra.some((x) => x.kind === c.kind));
+    if (changed || extra.length) o.constraints = [...kept, ...extra.filter((c) => c.kind !== "inside"), ...L.room ? [{ kind: "inside", ref: L.room }] : []];
+    return { o, note };
+  };
   if (flags2.by) {
-    const [dx, dz] = String(flags2.by).split(",").map(Number);
-    const e2 = v.entity(row.id);
+    const [dx, dz] = dxdz(flags2.by, "--by");
     const o = { op: "move", id: row.path, mode: flags2.nudge ? "nudge" : "strict" };
-    if (e2.shape) o.shape = e2.shape.area ? { area: e2.shape.area.map(([x, z]) => [x + dx, z + dz]) } : { ...e2.shape, path: e2.shape.path.map(([x, z]) => [x + dx, z + dz]) };
-    else o.p = e2.p.length === 3 && row.parent !== "world" ? [e2.p[0] + dx, e2.p[1], e2.p[2] + dz] : [e2.p[0] + dx, e2.p[e2.p.length - 1] + dz];
+    let note = "";
+    if (e.shape) o.shape = e.shape.area ? { area: e.shape.area.map(([x, z]) => [x + dx, z + dz]) } : { ...e.shape, path: e.shape.path.map(([x, z]) => [x + dx, z + dz]) };
+    else {
+      const R = relocated(row.pose[0] + dx, row.pose[2] + dz, row.pose[3]);
+      Object.assign(o, R.o);
+      note = R.note;
+    }
     if (flags2.yaw !== void 0) o.r = num(flags2.yaw);
     const r = await act({ ops: [o] }, flags2.note);
-    return r.accepted ? `moved ${row.path} by (${dx}, ${dz})` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
+    if (!r.accepted) return `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
+    const after = view(await mirror()).byId.get(row.id);
+    return `moved ${row.path} by (${dx}, ${dz})${after && !after.shape ? ` to (${after.pose[0]}, ${after.pose[1]}, ${after.pose[2]})` : ""}${note ? ` \u2014 ${note}${after ? `; now ${after.path}` : ""}` : ""}`;
   }
   if (!hasRelation(flags2) && flags2.yaw === void 0 && flags2.facing === void 0 && !flags2.in) throw new Error("usage: move <ref> --at \u2026|--near \u2026|--by dx,dz|--yaw r|--facing \u2026|--in parent[/slot]");
   if (flags2.in && !hasRelation(flags2)) {
     const [parent, slot] = String(flags2.in).split(/\/(?=[^/]+$)/);
-    const r = await act({ ops: [{ op: "move", id: row.path, in: { parent, ...slot ? { slot } : {} }, ...flags2.local ? { p: String(flags2.local).split(",").map(Number) } : {} }] });
+    const host = v.get(flags2.in) ? flags2.in : parent;
+    const r = await act({ ops: [{ op: "move", id: row.path, in: host === flags2.in ? { parent: host } : { parent, ...slot ? { slot } : {} }, ...flags2.local ? { p: String(flags2.local).split(",").map(Number) } : {} }] });
     return r.accepted ? `moved ${row.path} into ${flags2.in}` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
   }
-  const e = v.entity(row.id);
   const info = { form: row.form, layer: row.layer, box: row.box };
   const rel = relFrom(flags2);
   if (!hasRelation(flags2)) rel.at = `${row.pose[0]},${row.pose[2]}`;
   const sol = solve(v, { def: row.def, ...info, s: row.pose[4] }, { ...rel, skip: [...sub] });
-  void e;
-  return commitItems(v, row.def, info, { ...flags2, name: void 0 }, void 0, sol.items.slice(0, 1).map((it) => ({ candidates: it.candidates.map((c) => ({ ...c, ...c.in || row.parent === "world" ? {} : { in: { parent: v.byId.get(row.parent).path, ...row.slot ? { slot: row.slot } : {} } } })) })), sol.notes, { op: "move", id: row.path });
+  const items = sol.items.slice(0, 1).map((it) => ({ candidates: it.candidates.map((c) => {
+    if (c.in || c.shape || row.parent === "world") return c;
+    const R = relocated(c.p[0], c.p[1], c.r ?? row.pose[3], c.constraints ?? []);
+    return { ...c, ...R.o, ...R.o.r === void 0 && c.r !== void 0 ? { r: r2(c.r - frameOf(v.byId.get(row.parent), row.slot).RY) } : {}, note: `${c.note}${R.note ? `; ${R.note}` : ""}` };
+  }) }));
+  return commitItems(v, row.def, info, { ...flags2, name: void 0 }, void 0, items, sol.notes, { op: "move", id: row.path, rowId: row.id });
 }
 async function set(id, flags2) {
   const op = { op: "set", id };
@@ -1482,6 +1841,11 @@ function recolorOp(d, id, color, part) {
 async function recolor(id, color, flags2 = {}) {
   if (!id || !color) throw new Error("usage: recolor <ref> <#hex> [--part fur]");
   const v = view(await mirror()), row = v.get(id);
+  if (!row && setOf(v, id)) {
+    const out = [];
+    for (const r3 of setOf(v, id).members) out.push(await recolor(r3.path, color, flags2));
+    return out.join("\n");
+  }
   if (!row) throw new Error(`no such thing: ${id}`);
   const op = recolorOp(v.def(row.def), row.path, color, flags2.part);
   if (!op) return `${id} has no colour to change (no paint state, no colour params)`;
@@ -1489,7 +1853,8 @@ async function recolor(id, color, flags2 = {}) {
   return r.accepted ? `recoloured ${id} ${color}${op.params ? ` (${Object.keys(op.params)[0]})` : ""}` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
 }
 async function remove(ids) {
-  const list = [].concat(ids).filter(Boolean);
+  const v0 = view(await mirror());
+  const list = [].concat(ids).filter(Boolean).flatMap((id) => v0.get(id) ? [id] : setOf(v0, id)?.members.map((r3) => r3.path) ?? [id]);
   if (!list.length) throw new Error("usage: remove <ref> [<ref>\u2026]");
   const r = await act({ ops: list.map((id) => ({ op: "remove", id })) });
   return r.accepted ? `removed ${list.join(", ")} (and what was inside)` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
@@ -1504,13 +1869,37 @@ async function clone(id, flags2) {
   const r = await act({ ops: [o] }, flags2.note);
   return r.accepted ? `cloned ${id}${o.count > 1 ? ` \xD7${o.count}` : ""} (seq ${r.seq})` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
 }
-async function sky(flags2) {
-  return act({ ops: [{ op: "world", state: { sky: { palette: flags2.palette ?? "clear-day", sun: flags2.sun !== void 0 ? num(flags2.sun) : 0.6 } } }] });
+var SKY_PALETTES = PALETTE_LIST;
+async function worldState() {
+  return (await snapshot()).state ?? {};
 }
-async function weather(flags2) {
-  const w = {};
-  for (const k of ["clouds", "wind", "rain"]) if (flags2[k] !== void 0) w[k] = num(flags2[k]);
-  return act({ ops: [{ op: "world", state: { weather: w } }] });
+var skyText = (st) => `sky ${st.sky?.palette ?? "clear-day"}, sun ${st.sky?.sun ?? 0.6}; weather clouds ${st.weather?.clouds ?? 0}, wind ${st.weather?.wind ?? 0}, rain ${st.weather?.rain ?? 0}`;
+async function sky(flags2 = {}) {
+  const st = await worldState();
+  if (flags2.palette === void 0 && flags2.sun === void 0) return `${skyText(st)}
+palettes: ${SKY_PALETTES.map((p) => p.id).join(", ")}
+${SKY_PALETTES.map((p) => `  ${p.id}: ${p.doc}`).join("\n")}
+set with: sky --palette <name> [--sun 0\u20261]`;
+  const palette = flags2.palette ?? st.sky?.palette ?? "clear-day";
+  if (!SKY_PALETTES.some((p) => p.id === palette)) throw new Error(`unknown sky palette "${palette}"; palettes: ${SKY_PALETTES.map((p) => p.id).join(", ")}`);
+  const sun = flags2.sun !== void 0 ? num(flags2.sun) : st.sky?.sun ?? 0.6;
+  if (!(sun >= 0 && sun <= 1)) throw new Error("--sun is 0\u20261 (0 = night, 1 = noon)");
+  const r = await act({ ops: [{ op: "world", state: { sky: { ...st.sky ?? {}, palette, sun }, ...st.weather ? { weather: st.weather } : {} } }] });
+  return r.accepted ? `${skyText({ ...st, sky: { palette, sun } })} (seq ${r.seq})` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
+}
+async function weather(flags2 = {}) {
+  const st = await worldState();
+  const w = { ...st.weather ?? {} };
+  let any = false;
+  for (const k of ["clouds", "wind", "rain"]) if (flags2[k] !== void 0) {
+    const x = num(flags2[k]);
+    if (!(x >= 0 && x <= 1)) throw new Error(`--${k} is 0\u20261`);
+    w[k] = x;
+    any = true;
+  }
+  if (!any) return skyText(st);
+  const r = await act({ ops: [{ op: "world", state: { weather: w, ...st.sky ? { sky: st.sky } : {} } }] });
+  return r.accepted ? `${skyText({ ...st, weather: w })} (seq ${r.seq})` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
 }
 async function constitution(text) {
   return act({ ops: [{ op: "world", state: { constitution: text } }] });
@@ -1754,6 +2143,22 @@ async function furnish(ref, flags2 = {}) {
   const r = await act({ ops: f.ops, ...flags2.group ? { group: flags2.group } : {} }, `furnish ${ref}`);
   return r.accepted ? [`furnished ${ref}: ${summarizeOps(f.ops)} (seq ${r.seq})`, ...lines].join("\n") : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
 }
+var EXAMPLES = { hamlet: "a hamlet in 8 commands: knoll, cottage, pond + bench, trees, well + lamps, a dog", "two-floor-house": "a townhouse furnished, an upstairs bedroom by hand, look --inside --floor 1", "river-bridge": "a lake, a river to the south edge, roads that bridge it", "market-square": "a plaza, a row of stalls, benches, lamps, a fountain", "forest-edge": "a woodland, a meadow, a track along the edge, deer", "hillside-village": "a hill, a road up it, cottages along it, a chapel, door paths" };
+async function examples(name) {
+  if (!name) return ["worked examples (each = the exact commands a god agent typed and the answers it got):", ...Object.entries(EXAMPLES).map(([k, d]) => `- ${k}: ${d}`), `read one: examples <name>  (saves examples/<name>.log and .mjs here; also served at ${load().world}/god/examples/<name>.log)`].join("\n");
+  if (!EXAMPLES[name]) throw new Error(`no example ${name}; examples: ${Object.keys(EXAMPLES).join(", ")}`);
+  mkdirSync3("examples", { recursive: true });
+  const out = [];
+  for (const ext of ["log", "mjs"]) {
+    const r = await fetch(`${load().world}/god/examples/${name}.${ext}`);
+    if (!r.ok) throw new Error(`the world did not serve ${name}.${ext} (${r.status})`);
+    const t = await r.text();
+    writeFileSync5(`examples/${name}.${ext}`, t);
+    if (ext === "log") out.push(t);
+  }
+  return `${out[0].trim()}
+(saved examples/${name}.log and examples/${name}.mjs)`;
+}
 async function gallery() {
   return "gallery: run `node tools/god-skill/scripts/gallery.mjs <world-url>` from the sim repo (it places every core def in a labelled grid and screenshots it).";
 }
@@ -1782,7 +2187,9 @@ async function status() {
   const st = ok(await call("/v1/god/status"), "status");
   return `${s.world} \u2014 you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ""}; skill ${SKILL_VERSION}`;
 }
-function parseFlags(argv) {
+var BOOL = /* @__PURE__ */ new Set(["float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "off", "md", "fresh", "remove", "free", "list"]);
+var boolsFor = (cmd) => cmd === "look" ? /* @__PURE__ */ new Set([...BOOL, "inside"]) : BOOL;
+function parseFlags(argv, bools = BOOL) {
   const flags2 = {}, rest = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -1793,12 +2200,59 @@ function parseFlags(argv) {
       if (eq > 0) v = a.slice(eq + 1);
       else if (k === "between") {
         v = [argv[++i], argv[++i]];
-      } else v = argv[i + 1] !== void 0 && !(argv[i + 1].startsWith("--") && argv[i + 1].length > 2) ? argv[++i] : true;
+      } else if (bools.has(k)) v = true;
+      else v = argv[i + 1] !== void 0 && !(argv[i + 1].startsWith("--") && argv[i + 1].length > 2) ? argv[++i] : true;
       if (flags2[k] !== void 0 && k !== "between") flags2[k] = [].concat(flags2[k], v);
       else flags2[k] = v;
     } else rest.push(a);
   }
   return { flags: flags2, rest };
+}
+var REL = "at offset near around dist dir count facing yaw against between along t side setback inside corner wall on row grid gap spacing float from to via width across span free radius";
+var FLAGS = {
+  place: `${REL} path area rect circle name param state scale dry plan nudge group note`,
+  terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
+  move: `${REL} by in local nudge note dry plan`,
+  look: "at from dist inside floor keep out span height width h hide-roofs stop",
+  defs: "tag all",
+  where: "at offset",
+  free: "near radius count slope",
+  select: "def tag name in area near radius all remove by set-state set-param recolor yaw part note",
+  set: "state param name constraints note",
+  recolor: "part",
+  clone: "name count step yaw at offset nudge note",
+  sky: "palette sun list",
+  weather: "clouds wind rain",
+  group: "off",
+  undo: "group",
+  map: "all",
+  furnish: "style dry group",
+  "define-kit": "dry",
+  register: "identity",
+  mirror: "fresh",
+  export: "name",
+  import: "group",
+  flag: "at offset",
+  schema: "md",
+  act: "note"
+};
+var POS = { place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+var NUMERIC = /* @__PURE__ */ new Set(["dist", "count", "t", "setback", "row", "spacing", "width", "span", "radius", "sun", "clouds", "wind", "rain", "scale", "floor", "height", "h", "slope", "gap", "yaw"]);
+function checkArgs(cmd, f, rest) {
+  const allowed = /* @__PURE__ */ new Set(["json", ...(FLAGS[cmd] ?? "").split(/\s+/).filter(Boolean)]);
+  for (const [k, v] of Object.entries(f)) {
+    if (/\s/.test(k)) throw new Error(`cannot read "--${k}\u2026": several options arrived as ONE argument (a quoted string or an unsplit shell variable). Give each option separately, e.g. --param floors=1 --param w=8`);
+    if (!allowed.has(k)) throw new Error(`${cmd} has no option --${k}. Its options: ${[...allowed].map((x) => "--" + x).join(" ")}`);
+    for (const x of [].concat(v)) {
+      if (x === true && !BOOL.has(k) && !(cmd === "look" && k === "inside") && !(cmd === "undo" && k === "group") && !(k === "free")) throw new Error(`--${k} needs a value`);
+      if (NUMERIC.has(k) && x !== true && !Number.isFinite(Number(x))) throw new Error(`--${k} takes a number, got "${x}"`);
+      if (k === "param" && (typeof x !== "string" || !/^[A-Za-z][\w-]*=/.test(x))) throw new Error(`--param takes key=value (one per --param), got "${x}"`);
+      if ((k === "by" || k === "step") && !/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(String(x))) throw new Error(`--${k} takes dx,dz (e.g. --${k} 1.5,-2), got "${x}"`);
+      if (k === "grid" && !/^\d+[x×]\d+$/.test(String(x))) throw new Error(`--grid takes WxH (e.g. 3x2), got "${x}"`);
+    }
+  }
+  const max = POS[cmd] ?? Infinity;
+  if (rest.length > max) throw new Error(`${cmd} takes ${max === 0 ? "no words" : max === 1 ? "one word" : `${max} words`} before its options; cannot read: ${rest.slice(max).map((x) => JSON.stringify(x)).join(" ")}${rest.slice(max).some((x) => /^-\w/.test(x)) ? " (options start with two dashes)" : ""}`);
 }
 var readArg = (r) => r[0] !== void 0 ? existsSync4(r[0]) && !r[0].trim().startsWith("{") ? readFileSync4(r[0], "utf8") : r[0] : readFileSync4(0, "utf8");
 var COMMANDS = {
@@ -1844,6 +2298,7 @@ var COMMANDS = {
   "define-kit": (r, f) => defineKit(readArg(r), f),
   furnish: (r, f) => furnish(r[0], f),
   gallery,
+  examples: (r) => examples(r[0]),
   sky: (r, f) => sky(f),
   weather: (r, f) => weather(f),
   constitution: (r) => constitution(r.join(" ")),
@@ -1862,20 +2317,27 @@ var COMMANDS = {
 };
 var HELP = `eden-god ${SKILL_VERSION} \u2014 god mode for one Eden world. Read SKILL.md.
 read:   map \xB7 defs <words> \xB7 describe <ref> \xB7 where <x,z|ref> \xB7 free WxD [--near ref] \xB7 look [--at ref] [--from s|n|e|w|above] [--inside [--floor k]] \xB7 history \xB7 resolve \xB7 schema [--md]
-build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--corner ne|--wall n] | --on table | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--dry]
+build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--wall back|front|left|right|n\u2026] [--corner back-left|\u2026] | --on table [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--dry]
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],\u2026]' \xB7 place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],\u2026]'
 edit:   move <ref> <relations>|--by dx,dz \xB7 set <ref> --param k=v --state '{\u2026}' \xB7 recolor <ref> #hex \xB7 remove <ref>\u2026 \xB7 clone <ref> [--at] [--count n --step dx,dz] \xB7 select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> \xB7 group --off \xB7 undo [--group name] \xB7 redo
 batch:  plan '<batch>' \xB7 preview '<batch>' \xB7 act '<batch>' \xB7 dryrun '<batch>'
-world:  sky --palette p --sun s \xB7 weather --clouds c --wind w --rain r \xB7 constitution <md> \xB7 expand <m> \xB7 export [file] \xB7 import <genesis.json> \xB7 define <def.json> \xB7 define-kit <kit.json> \xB7 furnish <house>[/room]
-pair:   register <url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB7 prayers \xB7 answer <id> <text> \xB7 status`;
+world:  sky [--palette p --sun s] \xB7 weather --clouds c --wind w --rain r \xB7 constitution <md> \xB7 expand <m> \xB7 export [file] \xB7 import <genesis.json> \xB7 define <def.json> \xB7 define-kit <kit.json> \xB7 furnish <house>[/room]
+pair:   register <url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB7 prayers \xB7 answer <id> <text> \xB7 status
+learn:  examples [name] \xB7 defs <name|core/x@1> (one def in full) \xB7 sky (palettes) \xB7 a row named stall = the set "stall"`;
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("eden-god.mjs")) {
   const [cmd, ...argv] = process.argv.slice(2);
-  const { flags: f, rest } = parseFlags(argv);
+  const { flags: f, rest } = parseFlags(argv, boolsFor(cmd));
   const fn = COMMANDS[cmd ?? "help"];
   if (!fn) {
     console.error(`unknown command ${cmd}
 ${HELP}`);
+    process.exit(2);
+  }
+  if (!["look-shot", "look-keeper"].includes(cmd)) try {
+    checkArgs(cmd ?? "help", f, rest);
+  } catch (e) {
+    console.error(`REFUSED by the CLI: ${e.message}`);
     process.exit(2);
   }
   const t0 = Date.now();
@@ -1911,10 +2373,13 @@ ${HELP}`);
 export {
   COMMANDS,
   COMPASS,
+  EXAMPLES,
   SKILL_VERSION,
+  SKY_PALETTES,
   act,
   answer,
   bakeInfo,
+  checkArgs,
   clone,
   compassKey,
   constitution,
@@ -1923,6 +2388,7 @@ export {
   defs,
   describe,
   dryrun,
+  examples,
   expand,
   explainFailure,
   exportWorld,

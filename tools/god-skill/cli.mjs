@@ -7,12 +7,13 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } fr
 import { resolve } from 'node:path';
 import { call, load, num, ok, r2, save, sleep } from './lib/state.mjs';
 import { mirror, view, normDef, follow, invalidate } from './lib/mirror.mjs';
-import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS } from './lib/solver.mjs';
+import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS, setOf, relocate, frameOf } from './lib/solver.mjs';
 import { camera, shoot, keeper, stopKeeper } from './lib/look.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 const SELF = (() => { try { return fileURLToPath(import.meta.url); } catch { return process.argv[1]; } })();
 import { selectRows } from './lib/select.mjs';
+import { PALETTE_LIST } from './lib/sky.mjs';
 import { schemaMarkdown } from './lib/schema-md.mjs';
 export { schemaMarkdown };
 
@@ -41,6 +42,7 @@ export async function mint(label = 'eden-god') { const r = ok(await call('/v1/go
 // ---------------------------------------------------------------- reading
 export async function snapshot() { return ok(await call('/v1/god/snapshot'), 'snapshot'); }
 const fmtP = (p) => (p ? `(${p.map((v) => r2(v)).join(', ')})` : '');
+const dxdz = (x, what) => { const a = String(x).split(',').map(Number); if (a.length !== 2 || !a.every(Number.isFinite)) throw new Error(`${what} takes dx,dz (two numbers), got ${x}`); return a; };
 const yawWord = (y) => (typeof y === 'number' ? `facing ${compassOfYaw(y)}` : '');
 
 /** map: the whole world as structure — extent, terrain, water, every root thing with pose and children, flags, prayers. */
@@ -78,7 +80,35 @@ const SYNONYMS = { house: ['townhouse'], home: ['townhouse'], street: ['road'], 
   herd: ['animals'], flock: ['animals'], pet: ['dog', 'cat'], stall: ['parasol-table', 'crate'], market: ['parasol-table', 'crate', 'barrel'], church: ['chapel'] };
 const forms = (w) => [...new Set([w, ...(w.length > 3 ? [w.replace(/s$/, ''), w.replace(/es$/, ''), w.replace(/ies$/, 'y')] : [])])];
 const synonymsOf = (w) => [...new Set(forms(w).flatMap((f) => SYNONYMS[f] ?? []))];
+const fieldText = (k, f) => `${k}: ${f.type}${f.values ? ` ${f.values.join('|')}` : ''}${f.min !== undefined || f.max !== undefined ? ` ${f.min ?? ''}…${f.max ?? ''}` : ''}${f.default !== undefined ? ` = ${typeof f.default === 'object' ? JSON.stringify(f.default) : f.default}` : ''}${f.doc ? ` — ${f.doc}` : ''}`;
+/** defs <one def's name or full ref>: that def in full (params with ranges and defaults, size, slots, rooms). */
+async function defDetail(d, others) {
+  const ref = d.ref.replace(/^core-/, 'core/');
+  const L = [`${ref} — ${d.form}, ${d.layer}, ${d.size.box.map(r2).join('×')} m${d.make?.gen ? `, made by ${d.make.gen}` : ''}${d.tags.length ? ` [${d.tags.join(' ')}]` : ''}`];
+  if (d.description) L.push(`  ${d.description}`);
+  const ps = Object.entries(d.params ?? {});
+  if (ps.length) { L.push(`  params (--param k=v):`); for (const [k, f] of ps) L.push(`  - ${fieldText(k, f).slice(0, 240)}`); }
+  if (d.state && Object.keys(d.state).length) L.push(`  state (--state '{…}'): ${Object.entries(d.state).map(([k, f]) => fieldText(k, f)).join('; ').slice(0, 300)}`);
+  try {
+    const b = await bakeInfo(ref.includes('@') ? ref : `${ref}@1`, {});
+    if (b.rooms?.length) L.push(`  rooms at the defaults: ${b.rooms.map((r) => `${r.id} (floor ${r.floor})`).join(', ')}`);
+    const sl = (b.slots ?? []).filter((x) => !['room', 'wall'].includes(x.kind));
+    if (sl.length) L.push(`  slots: ${sl.map((x) => `${x.id} (${x.kind}, holds ${x.capacity})`).join(', ')}`);
+  } catch { /* bake is a nicety */ }
+  if (others.length) L.push(`  other defs matching: ${others.slice(0, 12).join(', ')}${others.length > 12 ? ' …' : ''}`);
+  return L.join('\n');
+}
 export async function defs(q, flags = {}) {
+  if (q && !/\s/.test(q.trim())) {
+    const name = q.trim().toLowerCase().replace(/^core[/-]/, '').replace(/@\d+$/, '');
+    const qs = new URLSearchParams({ q: name.replace(/-/g, ' ') });
+    const list = ok(await call(`/v1/god/defs?${qs}`), 'defs').defs;
+    const want = /@\d+$/.test(q) ? q.trim().replace(/^core\//, 'core-') : null;
+    const hit = list.find((d) => (want ? d.ref === want || d.ref === want.replace(/^core-/, '') : d.name === `core-${name}` || d.name === name));
+    if (hit && !flags.json) return defDetail(hit, list.filter((d) => d !== hit).map((d) => d.ref.replace(/^core-/, 'core/')));
+    if (hit && flags.json) return hit;
+    if (want) return `no def ${q}. \`defs ${name.replace(/-/g, ' ')}\` searches the library.`;
+  }
   const get = async (words) => { const qs = new URLSearchParams(); if (words) qs.set('q', words); if (flags.tag) qs.set('tag', flags.tag); return ok(await call(`/v1/god/defs?${qs}`), 'defs').defs; };
   const r = { defs: await get(q) };
   if (q) {
@@ -98,6 +128,7 @@ export async function query(q) { return ok(await call('/v1/god/query', { body: t
 /** describe <ref>: rooms, doors, stairs, slots, occupants, constraints (satisfied or not), behaviours, ground, neighbours. */
 export async function describe(ref, flags = {}) {
   if (!ref) throw new Error('usage: describe <path|flag:name>');
+  { const v = view(await mirror()); const set = !v.get(ref) && setOf(v, ref); if (set) { const parts = []; for (const r of set.members) parts.push((await describe(r.path, flags)).split('\n').slice(0, 3).join('\n')); return flags.json ? parts : [`${ref} is a set of ${set.members.length}: ${set.members.map((r) => r.name).join(', ')} — refer to all of them as ${ref} (--near, --facing, look --at, move --by, remove, recolor) or one by its own name`, ...parts].join('\n'); } }
   const d = (await query({ describe: ref.replace(/^flag:/, '') })).describe;
   if (d.error) throw new Error(d.error);
   if (flags.json) return d;
@@ -165,6 +196,7 @@ const HINTS = {
   'slot.unknown': 'that slot does not exist; `describe <parent>` lists slots and rooms',
   'slot.full': 'the slot is full; pick another slot or room',
   'slot.incompatible': 'the slot does not accept this kind/size',
+  'slot.outside': 'the point is not inside that room; use --inside <house>/<room> or a world point inside it',
   'float.no-water': 'there is no water there; use --float --at <lake|pond|river>',
   'def.unknown': 'no such def; `defs <word>` searches the library',
   'params.invalid': '`defs <name>` shows params with ranges',
@@ -235,7 +267,7 @@ export async function prepareShape(def, info, shape, params) {
   return { params: { ...(params ?? {}), ...(p.params ?? {}) }, shape: p.path ? { ...shape, path: p.path } : shape };
 }
 /** Build ops from solver items, dry-run, repair, commit. */
-async function commitItems(v, def, info, flags, params, items, notes, { op = 'place', id } = {}) {
+async function commitItems(v, def, info, flags, params, items, notes, { op = 'place', id, rowId } = {}) {
   if (!items.length) throw new Error('the solver found no placement');
   for (const it of items) for (const c of it.candidates) if (c.shape && PREPARED.has(info.gen)) { const pr = await prepareShape(def, info, c.shape, params); c.shape = pr.shape; c.params = pr.params; }
   const taken = new Set();
@@ -291,7 +323,7 @@ async function commitItems(v, def, info, flags, params, items, notes, { op = 'pl
   for (let k = 0; k < ops.length; k++) {
     const o = ops[k]; const c = items[k].candidates[Math.min(choice[k], items[k].candidates.length - 1)];
     const placedIds = Object.keys(res.ids).filter((key) => res.ids[key] === key);
-    const row = op === 'place' ? v2.byId.get(placedIds[k]) : v2.get(id);
+    const row = op === 'place' ? v2.byId.get(placedIds[k]) : v2.byId.get(rowId) ?? v2.get(id);
     const where = row ? (row.shape ? '' : ` at (${row.pose[0]}, ${row.pose[1]}, ${row.pose[2]}) ${yawWord(row.pose[3])}`) : '';
     lines.push(`${op === 'place' ? 'placed' : 'moved'} ${row?.path ?? o.name ?? id}${op === 'place' ? ` [${def}]` : ''}${where} — ${c?.note ?? ''}${fixes[k].length ? ` (${fixes[k].join('; ')})` : ''}${o.constraints?.length ? `; keeps: ${o.constraints.map((x) => x.kind + (x.ref ? ' ' + x.ref : '')).join(', ')}` : ''}`);
   }
@@ -302,30 +334,58 @@ async function commitItems(v, def, info, flags, params, items, notes, { op = 'pl
 }
 export const terrain = place;
 
-/** move <ref> [relations] (or --by dx,dz, --yaw, --in parent[/slot]). Children ride along. */
+/** move <ref> [relations] (or --by dx,dz, --yaw, --in parent[/slot]). Children ride along. A thing inside a house or
+ *  on a table moves in the world frame like everything else; where it lands decides its parent (still on the
+ *  table, the room the point is in, else the world root), and the answer says so. A set (a row's name) moves --by. */
 export async function move(ref, flags = {}) {
   const m = await mirror(); const v = view(m);
-  const row = v.get(ref); if (!row) throw new Error(`no such thing: ${ref}`);
+  if (!ref) throw new Error('usage: move <ref> --at …|--near …|--by dx,dz|--yaw r|--facing …|--in parent[/slot]');
+  const row = v.get(ref);
+  if (!row) {
+    const set = setOf(v, ref); if (!set) throw new Error(`no such thing: ${ref} (see: map)`);
+    if (!flags.by && flags.yaw === undefined) throw new Error(`${ref} is a set of ${set.members.length} (${set.members.map((r) => r.name).join(', ')}): move it with --by dx,dz, or move one member by its own name`);
+    const out = []; for (const r of set.members) out.push(await move(r.path, flags)); return out.join('\n');
+  }
   const sub = new Set([row.id]); for (let grew = true; grew;) { grew = false; for (const r of v.rows) if (sub.has(r.parent) && !sub.has(r.id)) { sub.add(r.id); grew = true; } }
+  const e = v.entity(row.id);
+  // the op that puts a contained thing at a world point: same parent if it still fits there, else a new one
+  const relocated = (wx, wz, wy, extra = []) => {
+    const L = relocate(v, row, wx, wz, wy);
+    const o = {}; let note = '';
+    if (row.parent === 'world') { o.p = L.p; return { o, note }; }
+    const parentPath = v.byId.get(row.parent)?.path;
+    const changed = L.in && (L.in.parent !== parentPath || (L.in.slot ?? null) !== (row.slot ?? null));
+    o.p = e.p?.length === 3 && !changed ? [L.p[0], e.p[1], L.p[1]] : L.p;
+    if (changed) { o.in = L.in; o.r = L.r; note = L.note; }
+    const kept = (e.constraints ?? []).filter((c) => c.kind !== 'inside' && !extra.some((x) => x.kind === c.kind));
+    if (changed || extra.length) o.constraints = [...kept, ...extra.filter((c) => c.kind !== 'inside'), ...(L.room ? [{ kind: 'inside', ref: L.room }] : [])];
+    return { o, note };
+  };
   if (flags.by) {
-    const [dx, dz] = String(flags.by).split(',').map(Number);
-    const e = v.entity(row.id);
+    const [dx, dz] = dxdz(flags.by, '--by');
     const o = { op: 'move', id: row.path, mode: flags.nudge ? 'nudge' : 'strict' };
+    let note = '';
     if (e.shape) o.shape = e.shape.area ? { area: e.shape.area.map(([x, z]) => [x + dx, z + dz]) } : { ...e.shape, path: e.shape.path.map(([x, z]) => [x + dx, z + dz]) };
-    else o.p = e.p.length === 3 && row.parent !== 'world' ? [e.p[0] + dx, e.p[1], e.p[2] + dz] : [e.p[0] + dx, e.p[e.p.length - 1] + dz];
+    else { const R = relocated(row.pose[0] + dx, row.pose[2] + dz, row.pose[3]); Object.assign(o, R.o); note = R.note; }
     if (flags.yaw !== undefined) o.r = num(flags.yaw);
     const r = await act({ ops: [o] }, flags.note);
-    return r.accepted ? `moved ${row.path} by (${dx}, ${dz})` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
+    if (!r.accepted) return `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
+    const after = view(await mirror()).byId.get(row.id);
+    return `moved ${row.path} by (${dx}, ${dz})${after && !after.shape ? ` to (${after.pose[0]}, ${after.pose[1]}, ${after.pose[2]})` : ''}${note ? ` — ${note}${after ? `; now ${after.path}` : ''}` : ''}`;
   }
   if (!hasRelation(flags) && flags.yaw === undefined && flags.facing === undefined && !flags.in) throw new Error('usage: move <ref> --at …|--near …|--by dx,dz|--yaw r|--facing …|--in parent[/slot]');
-  if (flags.in && !hasRelation(flags)) { const [parent, slot] = String(flags.in).split(/\/(?=[^/]+$)/); const r = await act({ ops: [{ op: 'move', id: row.path, in: { parent, ...(slot ? { slot } : {}) }, ...(flags.local ? { p: String(flags.local).split(',').map(Number) } : {}) }] }); return r.accepted ? `moved ${row.path} into ${flags.in}` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
-  const e = v.entity(row.id);
+  if (flags.in && !hasRelation(flags)) { const [parent, slot] = String(flags.in).split(/\/(?=[^/]+$)/); const host = v.get(flags.in) ? flags.in : parent; const r = await act({ ops: [{ op: 'move', id: row.path, in: host === flags.in ? { parent: host } : { parent, ...(slot ? { slot } : {}) }, ...(flags.local ? { p: String(flags.local).split(',').map(Number) } : {}) }] }); return r.accepted ? `moved ${row.path} into ${flags.in}` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
   const info = { form: row.form, layer: row.layer, box: row.box };
   const rel = relFrom(flags);
   if (!hasRelation(flags)) rel.at = `${row.pose[0]},${row.pose[2]}`;
   const sol = solve(v, { def: row.def, ...info, s: row.pose[4] }, { ...rel, skip: [...sub] });
-  void e;
-  return commitItems(v, row.def, info, { ...flags, name: undefined }, undefined, sol.items.slice(0, 1).map((it) => ({ candidates: it.candidates.map((c) => ({ ...c, ...(c.in || row.parent === 'world' ? {} : { in: { parent: v.byId.get(row.parent).path, ...(row.slot ? { slot: row.slot } : {}) } }) })) })), sol.notes, { op: 'move', id: row.path });
+  // world-frame answers (near, at, along…) for a thing that lives inside something: into its parent's frame
+  const items = sol.items.slice(0, 1).map((it) => ({ candidates: it.candidates.map((c) => {
+    if (c.in || c.shape || row.parent === 'world') return c;
+    const R = relocated(c.p[0], c.p[1], c.r ?? row.pose[3], c.constraints ?? []);
+    return { ...c, ...R.o, ...(R.o.r === undefined && c.r !== undefined ? { r: r2(c.r - (frameOf(v.byId.get(row.parent), row.slot).RY)) } : {}), note: `${c.note}${R.note ? `; ${R.note}` : ''}` };
+  }) }));
+  return commitItems(v, row.def, info, { ...flags, name: undefined }, undefined, items, sol.notes, { op: 'move', id: row.path, rowId: row.id });
 }
 export async function set(id, flags) { const op = { op: 'set', id }; if (flags.state) op.state = JSON.parse(flags.state); if (flags.param) op.params = parseKV(flags.param); if (flags.name) op.name = flags.name; if (flags.constraints) op.constraints = JSON.parse(flags.constraints); const r = await act({ ops: [op] }, flags.note); return r.accepted ? `set ${id}: ${Object.keys(op).filter((k) => !['op', 'id'].includes(k)).map((k) => `${k} ${JSON.stringify(op[k])}`).join(', ')}` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
 /** The op that recolours one thing: its `paint` state, else its `color` param, else its main colour param (the first
@@ -339,16 +399,41 @@ function recolorOp(d, id, color, part) {
 }
 export async function recolor(id, color, flags = {}) {
   if (!id || !color) throw new Error('usage: recolor <ref> <#hex> [--part fur]');
-  const v = view(await mirror()), row = v.get(id); if (!row) throw new Error(`no such thing: ${id}`);
+  const v = view(await mirror()), row = v.get(id);
+  if (!row && setOf(v, id)) { const out = []; for (const r of setOf(v, id).members) out.push(await recolor(r.path, color, flags)); return out.join('\n'); }
+  if (!row) throw new Error(`no such thing: ${id}`);
   const op = recolorOp(v.def(row.def), row.path, color, flags.part);
   if (!op) return `${id} has no colour to change (no paint state, no colour params)`;
   const r = await act({ ops: [op] });
   return r.accepted ? `recoloured ${id} ${color}${op.params ? ` (${Object.keys(op.params)[0]})` : ''}` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
 }
-export async function remove(ids) { const list = [].concat(ids).filter(Boolean); if (!list.length) throw new Error('usage: remove <ref> [<ref>…]'); const r = await act({ ops: list.map((id) => ({ op: 'remove', id })) }); return r.accepted ? `removed ${list.join(', ')} (and what was inside)` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
+export async function remove(ids) { const v0 = view(await mirror()); const list = [].concat(ids).filter(Boolean).flatMap((id) => (v0.get(id) ? [id] : setOf(v0, id)?.members.map((r) => r.path) ?? [id])); if (!list.length) throw new Error('usage: remove <ref> [<ref>…]'); const r = await act({ ops: list.map((id) => ({ op: 'remove', id })) }); return r.accepted ? `removed ${list.join(', ')} (and what was inside)` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
 export async function clone(id, flags) { const o = { op: 'clone', id, ...(flags.name ? { name: flags.name } : {}), ...(flags.count ? { count: num(flags.count) } : {}), ...(flags.step ? { step: String(flags.step).split(',').map(Number) } : {}), ...(flags.yaw !== undefined ? { r: num(flags.yaw) } : {}), mode: flags.nudge ? 'nudge' : 'strict' }; if (flags.at) { const v = view(await mirror()); const p = refPoint(v, flags.at, flags.offset); o.p = [p.x, p.z]; } const r = await act({ ops: [o] }, flags.note); return r.accepted ? `cloned ${id}${o.count > 1 ? ` ×${o.count}` : ''} (seq ${r.seq})` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
-export async function sky(flags) { return act({ ops: [{ op: 'world', state: { sky: { palette: flags.palette ?? 'clear-day', sun: flags.sun !== undefined ? num(flags.sun) : 0.6 } } }] }); }
-export async function weather(flags) { const w = {}; for (const k of ['clouds', 'wind', 'rain']) if (flags[k] !== undefined) w[k] = num(flags[k]); return act({ ops: [{ op: 'world', state: { weather: w } }] }); }
+/** The sky palettes the viewer draws (apps/web; the server refuses others once L7 patch S2 lands). */
+export const SKY_PALETTES = PALETTE_LIST;
+async function worldState() { return (await snapshot()).state ?? {}; }
+const skyText = (st) => `sky ${st.sky?.palette ?? 'clear-day'}, sun ${st.sky?.sun ?? 0.6}; weather clouds ${st.weather?.clouds ?? 0}, wind ${st.weather?.wind ?? 0}, rain ${st.weather?.rain ?? 0}`;
+/** sky [--palette p] [--sun 0…1]: no flags = show the sky and the palettes. Weather is kept. */
+export async function sky(flags = {}) {
+  const st = await worldState();
+  if (flags.palette === undefined && flags.sun === undefined) return `${skyText(st)}\npalettes: ${SKY_PALETTES.map((p) => p.id).join(', ')}\n${SKY_PALETTES.map((p) => `  ${p.id}: ${p.doc}`).join('\n')}\nset with: sky --palette <name> [--sun 0…1]`;
+  const palette = flags.palette ?? st.sky?.palette ?? 'clear-day';
+  if (!SKY_PALETTES.some((p) => p.id === palette)) throw new Error(`unknown sky palette "${palette}"; palettes: ${SKY_PALETTES.map((p) => p.id).join(', ')}`);
+  const sun = flags.sun !== undefined ? num(flags.sun) : st.sky?.sun ?? 0.6;
+  if (!(sun >= 0 && sun <= 1)) throw new Error('--sun is 0…1 (0 = night, 1 = noon)');
+  const r = await act({ ops: [{ op: 'world', state: { sky: { ...(st.sky ?? {}), palette, sun }, ...(st.weather ? { weather: st.weather } : {}) } }] });
+  return r.accepted ? `${skyText({ ...st, sky: { palette, sun } })} (seq ${r.seq})` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
+}
+/** weather [--clouds 0…1] [--wind 0…1] [--rain 0…1]: no flags = show it. The sky is kept. */
+export async function weather(flags = {}) {
+  const st = await worldState();
+  const w = { ...(st.weather ?? {}) };
+  let any = false;
+  for (const k of ['clouds', 'wind', 'rain']) if (flags[k] !== undefined) { const x = num(flags[k]); if (!(x >= 0 && x <= 1)) throw new Error(`--${k} is 0…1`); w[k] = x; any = true; }
+  if (!any) return skyText(st);
+  const r = await act({ ops: [{ op: 'world', state: { weather: w, ...(st.sky ? { sky: st.sky } : {}) } }] });
+  return r.accepted ? `${skyText({ ...st, weather: w })} (seq ${r.seq})` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
+}
 export async function constitution(text) { return act({ ops: [{ op: 'world', state: { constitution: text } }] }); }
 export async function expand(extent) { return act({ ops: [{ op: 'expand', extent: num(extent) }] }); }
 
@@ -521,6 +606,16 @@ export async function furnish(ref, flags = {}) {
   const r = await act({ ops: f.ops, ...(flags.group ? { group: flags.group } : {}) }, `furnish ${ref}`);
   return r.accepted ? [`furnished ${ref}: ${summarizeOps(f.ops)} (seq ${r.seq})`, ...lines].join('\n') : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
 }
+export const EXAMPLES = { hamlet: 'a hamlet in 8 commands: knoll, cottage, pond + bench, trees, well + lamps, a dog', 'two-floor-house': 'a townhouse furnished, an upstairs bedroom by hand, look --inside --floor 1', 'river-bridge': 'a lake, a river to the south edge, roads that bridge it', 'market-square': 'a plaza, a row of stalls, benches, lamps, a fountain', 'forest-edge': 'a woodland, a meadow, a track along the edge, deer', 'hillside-village': 'a hill, a road up it, cottages along it, a chapel, door paths' };
+/** examples [name]: the worked examples served by the world (the exact commands and their answers). */
+export async function examples(name) {
+  if (!name) return ['worked examples (each = the exact commands a god agent typed and the answers it got):', ...Object.entries(EXAMPLES).map(([k, d]) => `- ${k}: ${d}`), `read one: examples <name>  (saves examples/<name>.log and .mjs here; also served at ${load().world}/god/examples/<name>.log)`].join('\n');
+  if (!EXAMPLES[name]) throw new Error(`no example ${name}; examples: ${Object.keys(EXAMPLES).join(', ')}`);
+  mkdirSync('examples', { recursive: true });
+  const out = [];
+  for (const ext of ['log', 'mjs']) { const r = await fetch(`${load().world}/god/examples/${name}.${ext}`); if (!r.ok) throw new Error(`the world did not serve ${name}.${ext} (${r.status})`); const t = await r.text(); writeFileSync(`examples/${name}.${ext}`, t); if (ext === 'log') out.push(t); }
+  return `${out[0].trim()}\n(saved examples/${name}.log and examples/${name}.mjs)`;
+}
 export async function gallery() { return 'gallery: run `node tools/god-skill/scripts/gallery.mjs <world-url>` from the sim repo (it places every core def in a labelled grid and screenshots it).'; }
 
 // ---------------------------------------------------------------- flags, prayers, stream
@@ -532,7 +627,10 @@ export async function stream(seconds = 60) { return follow(seconds, (e) => conso
 export async function status() { const s = load(); const st = ok(await call('/v1/god/status'), 'status'); return `${s.world} — you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ''}; skill ${SKILL_VERSION}`; }
 
 // ---------------------------------------------------------------- cli
-export function parseFlags(argv) {
+/** Flags that never take a value (the next word stays a positional argument). */
+const BOOL = new Set(['float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'off', 'md', 'fresh', 'remove', 'free', 'list']);
+const boolsFor = (cmd) => (cmd === 'look' ? new Set([...BOOL, 'inside']) : BOOL);
+export function parseFlags(argv, bools = BOOL) {
   const flags = {}, rest = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -542,11 +640,40 @@ export function parseFlags(argv) {
       let v;
       if (eq > 0) v = a.slice(eq + 1);
       else if (k === 'between') { v = [argv[++i], argv[++i]]; }
+      else if (bools.has(k)) v = true;
       else v = argv[i + 1] !== undefined && !(argv[i + 1].startsWith('--') && argv[i + 1].length > 2) ? argv[++i] : true;
       if (flags[k] !== undefined && k !== 'between') flags[k] = [].concat(flags[k], v); else flags[k] = v;
     } else rest.push(a);
   }
   return { flags, rest };
+}
+// What each command accepts: anything else is refused, never silently ignored.
+const REL = 'at offset near around dist dir count facing yaw against between along t side setback inside corner wall on row grid gap spacing float from to via width across span free radius';
+const FLAGS = {
+  place: `${REL} path area rect circle name param state scale dry plan nudge group note`, terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
+  move: `${REL} by in local nudge note dry plan`, look: 'at from dist inside floor keep out span height width h hide-roofs stop', defs: 'tag all', where: 'at offset', free: 'near radius count slope',
+  select: 'def tag name in area near radius all remove by set-state set-param recolor yaw part note', set: 'state param name constraints note', recolor: 'part', clone: 'name count step yaw at offset nudge note',
+  sky: 'palette sun list', weather: 'clouds wind rain', group: 'off', undo: 'group', map: 'all', furnish: 'style dry group', 'define-kit': 'dry', register: 'identity', mirror: 'fresh', export: 'name', import: 'group', flag: 'at offset', schema: 'md', act: 'note',
+};
+// how many positional words each command takes (Infinity: free text or a list)
+const POS = { place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+const NUMERIC = new Set(['dist', 'count', 't', 'setback', 'row', 'spacing', 'width', 'span', 'radius', 'sun', 'clouds', 'wind', 'rain', 'scale', 'floor', 'height', 'h', 'slope', 'gap', 'yaw']);
+/** Refuse what the CLI cannot read: unknown options, missing values, extra words, non-numbers. */
+export function checkArgs(cmd, f, rest) {
+  const allowed = new Set(['json', ...(FLAGS[cmd] ?? '').split(/\s+/).filter(Boolean)]);
+  for (const [k, v] of Object.entries(f)) {
+    if (/\s/.test(k)) throw new Error(`cannot read "--${k}…": several options arrived as ONE argument (a quoted string or an unsplit shell variable). Give each option separately, e.g. --param floors=1 --param w=8`);
+    if (!allowed.has(k)) throw new Error(`${cmd} has no option --${k}. Its options: ${[...allowed].map((x) => '--' + x).join(' ')}`);
+    for (const x of [].concat(v)) {
+      if (x === true && !BOOL.has(k) && !(cmd === 'look' && k === 'inside') && !(cmd === 'undo' && k === 'group') && !(k === 'free')) throw new Error(`--${k} needs a value`);
+      if (NUMERIC.has(k) && x !== true && !Number.isFinite(Number(x))) throw new Error(`--${k} takes a number, got "${x}"`);
+      if (k === 'param' && (typeof x !== 'string' || !/^[A-Za-z][\w-]*=/.test(x))) throw new Error(`--param takes key=value (one per --param), got "${x}"`);
+      if ((k === 'by' || k === 'step') && !/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(String(x))) throw new Error(`--${k} takes dx,dz (e.g. --${k} 1.5,-2), got "${x}"`);
+      if (k === 'grid' && !/^\d+[x×]\d+$/.test(String(x))) throw new Error(`--grid takes WxH (e.g. 3x2), got "${x}"`);
+    }
+  }
+  const max = POS[cmd] ?? Infinity;
+  if (rest.length > max) throw new Error(`${cmd} takes ${max === 0 ? 'no words' : max === 1 ? 'one word' : `${max} words`} before its options; cannot read: ${rest.slice(max).map((x) => JSON.stringify(x)).join(' ')}${rest.slice(max).some((x) => /^-\w/.test(x)) ? ' (options start with two dashes)' : ''}`);
 }
 const readArg = (r) => (r[0] !== undefined ? (existsSync(r[0]) && !r[0].trim().startsWith('{') ? readFileSync(r[0], 'utf8') : r[0]) : readFileSync(0, 'utf8'));
 export const COMMANDS = {
@@ -557,7 +684,7 @@ export const COMMANDS = {
   act: (r, f) => act(JSON.parse(readArg(r)), f.note), dryrun: (r) => dryrun(JSON.parse(readArg(r))), plan: (r) => planBatch(readArg(r)), preview: (r) => preview(readArg(r)),
   select: (r, f) => select(f), group: (r, f) => group(r[0], f), undo: (r, f) => undo(f), redo, history: (r, f) => history(r[0] ? Number(r[0]) : 20, f), resolve: (r, f) => resolveCmd(r, f),
   look: (r, f) => look(f), 'look-keeper': (r) => keeper(r[0], Number(r[1])), 'look-shot': async (r) => { const res = await shoot(JSON.parse(r[0])); console.log(JSON.stringify(res)); process.exit(0); }, export: (r, f) => exportWorld(r[0], f), import: (r, f) => importWorld(r[0], f), define: (r) => define(readArg(r)), 'define-kit': (r, f) => defineKit(readArg(r), f),
-  furnish: (r, f) => furnish(r[0], f), gallery,
+  furnish: (r, f) => furnish(r[0], f), gallery, examples: (r) => examples(r[0]),
   sky: (r, f) => sky(f), weather: (r, f) => weather(f), constitution: (r) => constitution(r.join(' ')), expand: (r) => expand(r[0]),
   flags, flag: (r, f) => flag(r.join(' '), f), prayers, answer: (r) => answer(r[0], r.slice(1).join(' ')), stream: (r) => stream(r[0] ? Number(r[0]) : 60),
   follow: (r) => follow(r[0] ? Number(r[0]) : 3600, (e) => console.log(`${e.event} ${e.data?.seq ?? ''}`)), mirror: async (r, f) => { const m = await mirror({ fresh: !!f.fresh }); return `mirror: seq ${m.seq}, ${m.rows.length} entities${m.offline ? ' (offline)' : ''}`; },
@@ -565,18 +692,20 @@ export const COMMANDS = {
 };
 const HELP = `eden-god ${SKILL_VERSION} — god mode for one Eden world. Read SKILL.md.
 read:   map · defs <words> · describe <ref> · where <x,z|ref> · free WxD [--near ref] · look [--at ref] [--from s|n|e|w|above] [--inside [--floor k]] · history · resolve · schema [--md]
-build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--corner ne|--wall n] | --on table | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--dry]
+build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--wall back|front|left|right|n…] [--corner back-left|…] | --on table [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--dry]
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],…]' · place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],…]'
 edit:   move <ref> <relations>|--by dx,dz · set <ref> --param k=v --state '{…}' · recolor <ref> #hex · remove <ref>… · clone <ref> [--at] [--count n --step dx,dz] · select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> · group --off · undo [--group name] · redo
 batch:  plan '<batch>' · preview '<batch>' · act '<batch>' · dryrun '<batch>'
-world:  sky --palette p --sun s · weather --clouds c --wind w --rain r · constitution <md> · expand <m> · export [file] · import <genesis.json> · define <def.json> · define-kit <kit.json> · furnish <house>[/room]
-pair:   register <url> · pair · flags · flag <label> --at x,z · prayers · answer <id> <text> · status`;
+world:  sky [--palette p --sun s] · weather --clouds c --wind w --rain r · constitution <md> · expand <m> · export [file] · import <genesis.json> · define <def.json> · define-kit <kit.json> · furnish <house>[/room]
+pair:   register <url> · pair · flags · flag <label> --at x,z · prayers · answer <id> <text> · status
+learn:  examples [name] · defs <name|core/x@1> (one def in full) · sky (palettes) · a row named stall = the set "stall"`;
 
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('eden-god.mjs')) {
-  const [cmd, ...argv] = process.argv.slice(2); const { flags: f, rest } = parseFlags(argv);
+  const [cmd, ...argv] = process.argv.slice(2); const { flags: f, rest } = parseFlags(argv, boolsFor(cmd));
   const fn = COMMANDS[cmd ?? 'help'];
   if (!fn) { console.error(`unknown command ${cmd}\n${HELP}`); process.exit(2); }
+  if (!['look-shot', 'look-keeper'].includes(cmd)) try { checkArgs(cmd ?? 'help', f, rest); } catch (e) { console.error(`REFUSED by the CLI: ${e.message}`); process.exit(2); }
   const t0 = Date.now();
   // optional transcript (blind tests, demos): `"transcript": "<file>"` in .eden-god.json appends every command and answer
   const tr = (() => { try { return load().transcript; } catch { return null; } })();

@@ -89,7 +89,7 @@ yourself is slower, uglier and knows nothing about Souls. The order is always:
 
 | family (`defs --tag …`) | what is in it |
 |---|---|
-| buildings (`building`) | cottage townhouse shop hall chapel barn shed greenhouse pavilion tower lighthouse — hollow, with rooms, doors, stairs; params `floors w d roof material wall trim front porch balcony windows plan` |
+| buildings (`building`) | cottage townhouse shop hall chapel barn shed greenhouse pavilion tower lighthouse — hollow, with rooms, doors, stairs; params `floors w d roof material wall trim front porch balcony windows plan`. A round house / hut = **`roundhouse`** (one round `living` room, dome roof, `furnish` works) |
 | furniture | chair armchair sofa stool table round-table long-table desk bed bunk wardrobe bookshelf dresser piano easel workbench bench-seat rug floor-lamp |
 | kitchen | stove sink counter fridge hearth pot kettle bowl cup plate loaf |
 | street & yard (`prop`) | bench picnic-table lamp-post lantern bird-table bin wheelie-bin bollard mailbox hydrant crate barrel sack planter-box flower-pot wheelbarrow firewood trough bike-rack parasol-table laundry-line |
@@ -106,8 +106,9 @@ yourself is slower, uglier and knows nothing about Souls. The order is always:
 | edges & areas | garden-wall fence hedge power-line · plaza lawn ground-paint pitch football-pitch tennis-court parking garden-bed |
 | growth (`ecology`) | woodland wildflowers orchard reedbed rock-field (scatter by slope and water; keep off roads and buildings) · simpler forest meadow garden |
 
-`defs <name>` prints a def's params with defaults, its slots and size. `schema --md` (= SCHEMA.md)
-has every generator's params with ranges.
+`defs <name>` (one def's exact name, e.g. `defs roundhouse`, or its full ref `defs core/roundhouse@1`) prints
+that def in full: params with ranges and defaults, state, size, slots, rooms; several words search.
+`schema --md` (= SCHEMA.md) has every generator's params with ranges.
 
 ## Placing with relations (the solver)
 
@@ -117,7 +118,7 @@ has every generator's params with ranges.
 |---|---|
 | `--at x,z` · `--at <ref>` · `--at east` | a point, a thing's centre, or a region of the world (n, ne, e … centre); `--offset dx,dz` shifts it |
 | `--near <ref> [--dist m] [--dir ne]` | just outside the ref's footprint, `dist` metres from its edge (default ~2), on the `dir` side (default its front, else south); tries other sides if blocked |
-| `--near <ref> --count n` | n things evenly around the ref (benches around a fountain, houses around a plaza) |
+| `--near <ref> --count n` | n things evenly around the ref (benches round a fountain); round an area's **rim** (reeds round a pond); beside a road/river, spread along it (`--dir` picks the side) |
 | `--facing <ref>` · `--facing n\|e\|s\|w` · `--facing away:<ref>` | turn the front toward a thing (kept as a constraint), a compass direction, or away |
 | `--against <ref>[.n\|.e\|.s\|.w]` | back flush to that side of the ref, front facing away (default: the ref's back) |
 | `--between <a> <b>` | the midpoint, width along a→b; for path defs, a path from a to b |
@@ -125,14 +126,17 @@ has every generator's params with ranges.
 | `--along <path> --row n --spacing s --side both` | a row along it (trees lining a road), `s` metres centre to centre (`--gap g`: clear metres between neighbours); a row that does not fit is shortened and says so |
 | `--across <path> [--t 0.5] [--span m]` | across a road/river at t: path defs (a bridge) get a crossing path `span` m past each bank; point things are turned to face across |
 | `--inside <house>/<room>` | a free spot in that room (local frame handled for you) |
-| `--inside <house>/<room> --corner ne` · `--wall n` | tucked into a corner, or back to a wall facing into the room (`--count n` lines several along the wall) |
-| `--on <thing>` | on a surface slot (a bowl on a table); `--count n` fills several |
+| `--inside <house>/<room> --wall back` · `--corner front-left` | back to a wall facing into the room, or tucked into a corner (`--count n` lines several along the wall). Words are **the house's own sides**: `front` = the way the house faces (its front door), `back`, and `left`/`right` **as you walk out of its front door**; corners `back-left`, `front-right`… Compass words (`n`, `se`) still work and mean the world's compass. Doorways stay clear (it slides along the wall and says so); in a round room things stay inside the curved wall |
+| `--on <thing>` | on a surface slot (a bowl on a table); `--count n` spreads them over the top |
 | `--row n --gap g` · `--grid WxH --gap g` | n side by side (along the thing's width), or a grid, around the `--at` point |
 | `--free [--near ref] [--radius r]` | the nearest flat, dry, empty plot that fits |
 | `--float --at <lake\|pond\|river>` | on the water (ducks, boats); `--count n` spreads them out |
 | `--yaw r` | an explicit yaw (radians) |
 
-References (`<ref>`): a path (`house`, `house/table`), `flag:<name>`, or `x,z`. Every placement is a
+References (`<ref>`): a path (`house`, `house/table`), `flag:<name>`, or `x,z`. A row/grid/count placed with
+`--name stall` makes `stall-1`, `stall-2`…; **the bare name `stall` refers to the whole set** (`--near stall`,
+`--facing stall`, `look --at stall`, `describe stall`, `move stall --by 2,0`, `remove stall`, `recolor stall`);
+`select --name 'stall-*'` selects them for the other bulk edits. Every placement is a
 dry run first; on `overlap.solid` the CLI tries the next candidate, then the server's suggestion,
 then a small nudge, and reports it ("blocked by tree-3 → next candidate"). `--dry` stops before
 committing and prints the ops.
@@ -144,6 +148,7 @@ place mountain --path '[[300,-260],[340,240]]' --width 150 --name range   # a ra
 place lake --circle -260,0,80 --name west-lake                            # cx,cz,r → a natural 10-gon
 place plaza --rect 0,0,30,24 --name square                                # cx,cz,w,d
 place road --from square --to bridge [--via 40,60] --width 6 --name main-road   # from the square's edge to the bridge's nearer end
+place footpath --from rose-house --to lane --width 1.5   # from the house's door to the nearest point of the lane
 place river --path '[[-260,60],[-120,180],[0,480]]' --width 10
 place river --from west-lake --to s --width 10 --name river             # a compass word as an end = the world's edge that way
 ```
@@ -158,6 +163,13 @@ Growth avoids roads, water and buildings by itself: lay roads and houses first, 
 **Buildings.** `place cottage --param floors=2 --param porch=2 --param balcony=true --facing s` (porch depth in m): the preset picks the
 plan (rooms per floor, stairs, doors, windows); `--param plan='…'` gives your own (`schema --md`).
 `describe <house>` lists room ids per floor (`living kitchen bath` / `landing bedroom bedroom-2`).
+Own plan (`--param plan='{…}'`; with a plan, `front` and `floors` are ignored): metres from the
+building's **north-west outer corner**, `0≤x≤w` east, `0≤z≤d` south (the s wall is +z, the front unless
+you put the door elsewhere); per floor `rooms:[{id, rect:[x0,z0,x1,z1]}]` (corners, not centre+size; a
+room ≥ 0.8 m), `doors:[{between:[a,b], at?:0…1}]` (the two rects must share an edge ≥ door width + 0.3;
+omit `doors` to connect every touching pair), `exterior:[{room, wall:'s'|'n'|'e'|'w', kind:'door'|'window',
+at?:0…1}]` (the first exterior door is `front-door`); top level `stairs:[{from:0, to:1, room, wall}]`. E.g. w=8 d=5:
+`{"floors":[{"rooms":[{"id":"kitchen","rect":[0,0,3,5]},{"id":"living","rect":[3,0,8,5]}],"doors":[{"between":["kitchen","living"]}],"exterior":[{"room":"living","wall":"s","kind":"door"}]}]}`
 `furnish <house>` fills every room from the building's recipe, `furnish <house>/<room>` one room
 (`--style shop`, `--dry` to see first); by hand: `--inside <house>/<room> --wall n | --corner se`.
 
@@ -173,6 +185,14 @@ select --def bench --near square --radius 30            # list; add one action t
 select --def tree --area -50,-50,50,50 --remove          #   --remove · --by dx,dz · --yaw r · --recolor #hex · --set-state '{…}' · --set-param k=v
 sky --palette golden-hour --sun 0.4 · weather --clouds 0.3 --wind 0.2 · constitution "<markdown>" · expand 2000
 ```
+Positions are always **world** coordinates, also for things inside a house or on a table: `move
+house/lamp --near house/bed --dir e` or `--by 0.5,0` works in the world frame, and where the thing lands
+decides its parent (still on the table if over its top, else the room the point is in, else the world
+root), which the answer says. **Sky**: `sky` alone shows the sky, the weather and the palettes:
+`clear-day` (default), `golden-hour` (with `--sun 0.3–0.4`), `dawn`, `sunset`, `dusk`, `twilight` (lamps
+half lit), `night`, `midnight` (every lamp lit), `mars-desert`, `lm-garden`; an unknown name is refused.
+`sky` keeps the weather and `weather` keeps the sky. Today the viewer's sky colour does not change
+with the palette; the palette and `--sun` light the lamps.
 
 ## Seeing and checking
 
@@ -216,6 +236,8 @@ Eden look is rounded low-poly, never voxel. `define '<def/1 json>'` takes a full
 ## When the world says no
 
 Refusals come back as `REFUSED: <code> (op k): <detail> [hint]`. Read the hint; do not retry blindly.
+`REFUSED by the CLI: …` means the CLI could not read your command (an unknown option, a missing value,
+an extra word, several options in one quoted argument); nothing was sent. Fix the command as it says.
 
 | code | do this |
 |---|---|
@@ -223,7 +245,7 @@ Refusals come back as `REFUSED: <code> (op k): <detail> [hint]`. Read the hint; 
 | `extent.outside` | place nearer the centre, or `expand <metres>` |
 | `support.none` | give a 2-D position (it settles on the ground) or a parent |
 | `float.no-water` | `--float --at <lake>`: floating needs water under it |
-| `slot.unknown` · `slot.full` · `slot.incompatible` | `describe <parent>` for its slots and rooms; choose another |
+| `slot.unknown` · `slot.full` · `slot.incompatible` · `slot.outside` | `describe <parent>` for its slots and rooms; choose another (outside = the point is not in that room) |
 | `def.unknown` | `defs <word>`; refs look like `core/bench@1` |
 | `params.invalid` · `state.invalid` | `defs <name>` shows params with ranges |
 | `name.taken` | names are unique per parent (refs are names): pick another `--name`, or `remove`/`move` the old one |
@@ -247,8 +269,8 @@ constitution (`constitution "<markdown>"` sets it; Souls can read it).
 
 ## Six worked examples
 
-Each is a runnable script in `examples/` (`node examples/<name>.mjs` against a fresh world); its
-transcript and screenshot are in `examples/shots/`.
+`examples` lists them; `examples <name>` prints its transcript (every command with the answer it got)
+and saves `examples/<name>.log` and `.mjs` here (also served at `<world-url>/god/examples/<name>.log`).
 
 **1. A hamlet** (`hamlet.mjs`)
 ```
@@ -266,9 +288,9 @@ look --from sw
 ```
 place townhouse --at 0,0 --param floors=2 --facing s --name townhouse
 describe townhouse                       # rooms per floor (ids), stairs, doors
-place bed --inside townhouse/bedroom --wall n --name bed
-place chair --inside townhouse/bedroom --corner se
-place bookshelf --inside townhouse/bedroom --wall w
+place bed --inside townhouse/bedroom --wall back --name bed
+place chair --inside townhouse/bedroom --corner front-right
+place bookshelf --inside townhouse/bedroom --wall left
 place table --inside townhouse/parlour --name table
 place chair --inside townhouse/parlour --count 2 --facing townhouse/table
 place bowl --on townhouse/table
