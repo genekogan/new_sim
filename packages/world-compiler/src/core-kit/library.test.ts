@@ -61,3 +61,18 @@ test('every point def places in a world (water things on a pond), nudged apart',
     assert.equal(r.result.accepted, true, JSON.stringify((r.result as Refused).failures?.slice(0, 3)));
   }
 });
+
+test('perch slots: a robin perches on a tree branch and a lamp; a dog is refused', () => {
+  const w = new WorldModel({ constants: { extent: 1000, ground: 'land' }, seed: 'perch' });
+  for (const d of CORE_KIT) w.defineDef(d, 'core', 0);
+  const ok = applyBatch(w, { ops: [
+    { op: 'place', tmp: '$t', def: 'core/tree@1', name: 'oak', p: [0, 0] },
+    { op: 'place', def: 'core/bird@1', name: 'robin', in: { parent: '$t', slot: 'branch-1' }, params: { behavior: 'perch' } },
+    { op: 'place', tmp: '$l', def: 'core/lamp-post@1', name: 'lamp', p: [6, 0] },
+    { op: 'place', def: 'core/crow@1', name: 'crow', in: { parent: '$l', slot: 'top' }, params: { behavior: 'perch' } },
+  ] }, 'god', 1);
+  assert.equal(ok.result.accepted, true, JSON.stringify((ok.result as Refused).failures));
+  const robin = w.get('oak/robin')!; assert.ok(w.worldPose(robin).y > 3, 'up in the tree');
+  const no = applyBatch(w, { ops: [{ op: 'place', def: 'core/dog@1', in: { parent: 'oak', slot: 'branch-2' } }] }, 'god', 2);
+  assert.equal(no.result.accepted, false);
+});

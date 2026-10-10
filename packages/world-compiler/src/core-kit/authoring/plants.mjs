@@ -1,7 +1,7 @@
 // Plants and stones (L4): four tree species, bushes, flower beds, reeds, rocks, logs. Rounded
 // low-poly clusters of spheres and cones in the Eden palette; trees replace the box placeholders
 // (same names: core/tree, core/rock). Origin at the ground, front +z.
-import { cap, cbox, cone, cyl, kitDef, limb, sph } from './dsl.mjs';
+import { cap, cbox, cone, cyl, kitDef, limb, perch, sph } from './dsl.mjs';
 
 const LEAF = '#4f7f3a', LEAF2 = '#5f9142', LEAF3 = '#6aa152', BARK = '#5a3d22';
 const BLOOMS = ['#d9567a', '#f1c84b', '#e9eef0', '#9a6fd0', '#e7844a'];
@@ -12,7 +12,7 @@ export default [
   tree('tree', 'A broadleaf (oak-like) tree, about 7 m: a stout trunk and a rounded crown of leaf clusters. Scale 0.3–3.', ['oak', 'broadleaf', 'shade'],
     [cyl([0, 1.4, 0], 0.32, 2.8, 'bark', { r2: 0.2, seg: 7 }), limb([0, 2.4, 0], [0.9, 3.6, 0.2], 0.12, 'bark', { kind: 'cyl', r2: 0.07, seg: 5 }), limb([0, 2.6, 0], [-0.7, 3.9, -0.3], 0.11, 'bark', { kind: 'cyl', r2: 0.06, seg: 5 }),
       sph([0, 4.6, 0], 2.2, 'leaf', { scale: [1, 0.85, 1], seg: 8 }), sph([1.3, 4.1, 0.4], 1.5, 'leaf2', { seg: 7 }), sph([-1.2, 4.3, -0.5], 1.5, 'leaf2', { seg: 7 }), sph([0.2, 5.6, -0.6], 1.3, 'leaf3', { seg: 7 })],
-    { bark: BARK, leaf: LEAF, leaf2: LEAF2, leaf3: LEAF3 }, { components: { plant: { stages: 3, daysPerStage: 30 } } }),
+    { bark: BARK, leaf: LEAF, leaf2: LEAF2, leaf3: LEAF3 }, { slots: [perch('branch-1', [0.9, 3.62, 0.2]), perch('branch-2', [-0.7, 3.92, -0.3])], components: { plant: { stages: 3, daysPerStage: 30 } } }),
   tree('pine', 'A tall conifer (about 9 m) of stacked rounded cones over a slim trunk.', ['pine', 'conifer', 'evergreen', 'forest'],
     [cyl([0, 1.2, 0], 0.24, 2.4, 'bark', { r2: 0.14, seg: 6 }), cone([0, 3.2, 0], 2.0, 3.0, 'needle', { seg: 9 }), cone([0, 5.0, 0], 1.55, 2.7, 'needle2', { seg: 9 }), cone([0, 6.7, 0], 1.1, 2.4, 'needle', { seg: 8 }), cone([0, 8.2, 0], 0.65, 1.8, 'needle2', { seg: 7 })],
     { bark: '#4d3420', needle: '#2f5d3a', needle2: '#3a6b43' }),
@@ -24,7 +24,7 @@ export default [
     [limb([0, 0, 0], [0.35, 2.4, 0], 0.22, 'bark', { kind: 'cyl', r2: 0.18, seg: 6 }), limb([0.35, 2.4, 0], [0.9, 4.6, 0], 0.18, 'bark', { kind: 'cyl', r2: 0.15, seg: 6 }), limb([0.9, 4.6, 0], [1.25, 6.4, 0], 0.15, 'bark', { kind: 'cyl', r2: 0.12, seg: 6 }),
       ...[0, 1, 2, 3, 4, 5, 6].map((i) => { const a = (i / 7) * Math.PI * 2; return limb([1.25, 6.45, 0], [1.25 + Math.cos(a) * 2.4, 5.6 + (i % 2) * 0.4, Math.sin(a) * 2.4], 0.3, i % 2 ? 'frond' : 'frond2', { kind: 'cone', seg: 3, scale: [1, 1, 0.18] }); }),
       sph([1.3, 6.2, 0.15], 0.14, 'nut', { seg: 5 }), sph([1.15, 6.2, -0.1], 0.14, 'nut', { seg: 5 })],
-    { bark: '#9c7a52', frond: '#4f8a3c', frond2: '#5f9a46', nut: '#6b4a2f' }),
+    { bark: '#9c7a52', frond: '#4f8a3c', frond2: '#5f9a46', nut: '#6b4a2f' }, { slots: [perch('crown', [1.25, 6.55, 0], 2)] }),
   tree('fruit-tree', 'A small apple tree (about 4 m) with red fruit in a round crown; an orchard tree.', ['apple', 'fruit', 'orchard', 'broadleaf', 'food'],
     [cyl([0, 0.8, 0], 0.16, 1.6, 'bark', { r2: 0.12, seg: 6 }), sph([0, 2.6, 0], 1.35, 'leaf', { scale: [1, 0.85, 1], seg: 8 }), sph([0.7, 2.3, 0.3], 0.8, 'leaf2', { seg: 6 }),
       ...[[0.9, 2.2, 0.9], [-0.8, 2.5, 0.7], [0.3, 2.0, 1.2], [-0.5, 3.1, 0.8], [1.1, 2.9, -0.3], [-1.1, 2.2, -0.4]].map((p) => sph(p, 0.11, 'fruit', { seg: 4 }))],

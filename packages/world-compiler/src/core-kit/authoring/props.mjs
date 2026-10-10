@@ -1,7 +1,7 @@
 // Street and yard props (L4), ported from the Eden street-prop kit
 // (mars/viewer/app/engine-view/content/assets/eden-street-props/kit.ts): same sizes, palette and
 // parts, drawn as rounded low-poly kit/2. Origin on the ground, front +z.
-import { box, cap, cbox, cone, cyl, kitDef, lathe, rbox, seat, sph, surface, tor } from './dsl.mjs';
+import { box, cap, cbox, cone, cyl, kitDef, lathe, limb, perch, rbox, seat, sph, surface, tor } from './dsl.mjs';
 
 const IRON = '#2f3633', WOOD = '#9a6b46', DWOOD = '#6e4a30', LEAF = '#4f7f3a', LEAF2 = '#5f9142', TERRA = '#b5653e', STONE = '#b8b2a5', BRASS = '#b8913f';
 const BLOOMS = ['#d9567a', '#f1c84b', '#e9eef0', '#9a6fd0', '#e7844a'];
@@ -20,7 +20,10 @@ export default [
   prop('lamp-post', 'A cast-iron street lamp (4 m) with a glass lantern; lights up at dusk (state on).', ['light', 'lamp'],
     [cyl([0, 0.15, 0], 0.16, 0.3, 'iron', { r2: 0.12, seg: 8 }), cyl([0, 1.9, 0], 0.055, 3.4, 'iron', { r2: 0.04, seg: 6 }), tor([0, 3.62, 0], 0.09, 0.02, 'iron', { pitch: Math.PI / 2, seg: 8 }),
       cyl([0, 3.72, 0], 0.13, 0.06, 'iron', { seg: 6 }), cyl([0, 3.92, 0], 0.11, 0.34, 'glow', { r2: 0.15, seg: 6, glow: 0.8 }), cone([0, 4.17, 0], 0.2, 0.18, 'iron', { seg: 6 }), sph([0, 4.29, 0], 0.035, 'iron', { seg: 4 })],
-    { iron: IRON, glow: '#ffe2a8' }, { anchor: 'center', components: { light: { color: '#ffe9c4', range: 10, on: true } }, state: { on: { type: 'bool', default: true } } }),
+    { iron: IRON, glow: '#ffe2a8' }, { anchor: 'center', slots: [perch('top', [0, 4.33, 0])], components: { light: { color: '#ffe9c4', range: 10, on: true } }, state: { on: { type: 'bool', default: true } } }),
+  prop('bird-table', 'A wooden bird table with a little roof and seed; birds perch on its rim (perch slots).', ['bird', 'garden', 'feeder'],
+    [cyl([0, 0.65, 0], 0.04, 1.3, 'wood', { seg: 6 }), cbox([0, 1.32, 0], [0.5, 0.04, 0.5], 'wood'), box([0, 1.36, 0], [0.4, 0.02, 0.4], 'seed'), ...[[-0.22, -0.22], [0.22, 0.22]].map(([x, z]) => cyl([x, 1.48, z], 0.015, 0.3, 'wood', { seg: 4 })), box([0, 1.68, 0.14], [0.62, 0.03, 0.36], 'roof', { pitch: 0.5 }), box([0, 1.68, -0.14], [0.62, 0.03, 0.36], 'roof', { pitch: -0.5 }), ...[0, 1, 2].map((i) => limb([0, 0.02, 0], [Math.cos(i * 2.1) * 0.3, 0, Math.sin(i * 2.1) * 0.3], 0.03, 'wood', { kind: 'cyl', seg: 4 }))],
+    { wood: '#8a6a48', seed: '#c9a45c', roof: '#6e4a30' }, { slots: [perch('rim-1', [0.2, 1.34, 0.2]), perch('rim-2', [-0.2, 1.34, 0.2]), perch('rim-3', [0, 1.34, -0.2]), perch('roof', [0, 1.78, 0])] }),
   prop('lantern', 'A small hanging or standing lantern that glows at night.', ['light', 'lantern'],
     [cyl([0, 0.03, 0], 0.09, 0.06, 'metal', { seg: 6 }), cyl([0, 0.17, 0], 0.075, 0.22, 'glow', { seg: 6, glow: 0.8 }), cone([0, 0.33, 0], 0.11, 0.1, 'metal', { seg: 6 }), tor([0, 0.41, 0], 0.035, 0.008, 'metal', { seg: 8 })],
     { metal: '#4a3f33', glow: '#ffd99a' }, { components: { light: { color: '#ffd99a', range: 4, on: true }, carryable: { mass: 1, grips: 1 } }, state: { on: { type: 'bool', default: true } } }),
