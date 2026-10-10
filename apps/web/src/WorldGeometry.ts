@@ -20,6 +20,7 @@ import { createCommonsMeadow } from '../../../mars/viewer/app/engine-view/conten
 import { createPavilionVines } from '../../../mars/viewer/app/engine-view/content/assets/pavilion-vines.ts';
 import { recordedTakeSchema, recordedTakeChunkSchema } from '@sim/protocol';
 import type { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import {StaticRootRegistry} from './rendering/StaticRootRegistry.ts';
 import type { Link, Obstacle, SpatialScene } from '../../../mars/viewer/engine/spatial/types.ts';
 import type { KinPlacement } from '../../../mars/viewer/app/engine-view/floaters.ts';
 import type { Take } from '../../../mars/viewer/engine/take/types.ts';
@@ -201,6 +202,9 @@ export class WorldGeometry {
   };
   private readonly prisms: THREE.Mesh[] = [];
   private readonly buildings = new THREE.Group();
+  private readonly staticRoots=new StaticRootRegistry(this.group);
+  staticRenderRoots(){return this.staticRoots.roots();}
+  get staticRenderRevision(){return this.staticRoots.revision;}
   private disposed = false;
   private desert?: MarsDesert;
   private commons:CommonsSceneMetadataV1|null=null;
@@ -285,8 +289,8 @@ export class WorldGeometry {
   setAssetRoot(assetRoot:string){if(/^\/world-assets\/[a-z0-9][a-z0-9_-]{0,63}$/.test(assetRoot))this.assetRoot=assetRoot;}
 
   /** Plain campus walls hide only after the authored mesh loads; navigation remains authoritative. */
-  async addBackdrop(backdrop:MarsBackdrop,loader:GLTFLoader):Promise<boolean>{
-    try{const gltf=await loader.loadAsync(backdrop.url);if(this.disposed){disposeTree(gltf.scene);return false;}const root=gltf.scene;root.name='mars-campus-backdrop';root.position.fromArray(backdrop.at);applyBackdropVisibility(root,backdrop.hide);root.traverse(o=>{if(o instanceof THREE.Mesh)o.castShadow=o.receiveShadow=true;});this.buildings.add(root);for(const m of this.prisms)if(m.name.startsWith('scene:campus:'))m.visible=false;return true;}catch{return false;}
+  async addBackdrop(backdrop:MarsBackdrop,loader:GLTFLoader,onProgress?:(url:string,event:ProgressEvent)=>void):Promise<boolean>{
+    try{const gltf=await loader.loadAsync(backdrop.url,event=>onProgress?.(backdrop.url,event));if(this.disposed){disposeTree(gltf.scene);return false;}const root=gltf.scene;root.name='mars-campus-backdrop';root.position.fromArray(backdrop.at);applyBackdropVisibility(root,backdrop.hide);root.traverse(o=>{if(o instanceof THREE.Mesh)o.castShadow=o.receiveShadow=true;});this.buildings.add(root);this.staticRoots.register(root,gltf.animations);for(const m of this.prisms)if(m.name.startsWith('scene:campus:'))m.visible=false;return true;}catch{return false;}
   }
 
   /** Mars camp only: mark material piles and the build site once the recording supplies regions (WorldMarsDesert.ts). */
@@ -331,13 +335,13 @@ export class WorldGeometry {
    * Load decorative buildings (static, positioned by the world). Resolves with the files that could not be
    * shown; their engine walls stay visible instead.
    */
-  async addBuildings(list: readonly BuildingPlacement[], loader: GLTFLoader): Promise<string[]> {
+  async addBuildings(list: readonly BuildingPlacement[], loader: GLTFLoader,onProgress?:(url:string,event:ProgressEvent)=>void): Promise<string[]> {
     const failed: string[] = [];
     await Promise.all(list.map(async (b) => {
       const url = buildingUrl(b.file,this.assetRoot);
       if (!url) { failed.push(b.file); return; }
       try {
-        const gltf = await loader.loadAsync(url);
+        const gltf = await loader.loadAsync(url,event=>onProgress?.(url,event));
         if (this.disposed) { disposeTree(gltf.scene); return; }
         const root = gltf.scene;
         root.name = `building:${b.file}`;
@@ -346,6 +350,7 @@ export class WorldGeometry {
         if(typeof b.scale==='number')root.scale.multiplyScalar(b.scale);else if(b.scale)root.scale.multiply(new THREE.Vector3(...b.scale));
         root.traverse((o) => { if (o instanceof THREE.Mesh) o.castShadow = o.receiveShadow = true; });
         this.buildings.add(root);
+        this.staticRoots.register(root,gltf.animations);
         root.updateMatrixWorld(true);
         const box = new THREE.Box3().setFromObject(root).expandByVector(new THREE.Vector3(0.25, 0, 0.25));
         const at = new THREE.Vector3();
@@ -364,6 +369,7 @@ export class WorldGeometry {
   dispose() {
     if(this.disposed)return;
     this.disposed = true;
+    this.staticRoots.clear();
     this.desert?.dispose();
     this.shore?.dispose();this.shore=null;
     for(const view of this.scenery)view.dispose();this.scenery=[];

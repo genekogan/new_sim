@@ -32,10 +32,11 @@ function WithClerk({cfg}:{cfg:Cfg}){
   }catch{}if(active)await new Promise<void>(yes=>setTimeout(yes,1000));}})();return()=>{active=false;abort.abort();};
  },[session.isLoaded,session.isSignedIn,subject,sessionId,cfg.clerkIssuer,resolveAttempt]);
  const accountId=binding&&binding.subject===subject&&binding.issuer===cfg.clerkIssuer?binding.accountId:null;
+ const currentProfile=profile.user?.id===subject?profile.user:null;
  const auth:AuthCtx={ready:session.isLoaded,authed:session.isLoaded&&!!session.isSignedIn&&!!accountId,
-  label:profile.user?.primaryEmailAddress?.emailAddress??profile.user?.firstName??null,
+  label:currentProfile?.primaryEmailAddress?.emailAddress??currentProfile?.firstName??null,
   login:()=>{if(session.isSignedIn)setResolveAttempt(n=>n+1);else clerk.openSignIn({afterSignInUrl:location.href,afterSignUpUrl:location.href});},
-  logout:()=>clerk.signOut(),getToken:async()=>session.isLoaded&&session.isSignedIn?session.getToken():null,
+  avatarUrl:currentProfile?.imageUrl??null,logout:(returnUrl)=>clerk.signOut({redirectUrl:returnUrl??location.href}),getToken:async()=>session.isLoaded&&session.isSignedIn?session.getToken():null,
   debug:{privyUserId:null,accountIdentity:accountId,wallet:null,linked:[]}};
  return <Shell cfg={cfg} auth={auth} arrivalEnabled={arrivalEnabled}/>;
 }
