@@ -90,7 +90,7 @@ export function buildRoad(ctx: MeshCtx, kind: 'road' | 'path'): THREE.Object3D |
   }
   // 2) setts: running bond along the road (cobble 0.45 × 0.3, stone flags 0.9 × 0.6, wood boards)
   if (mat === 'cobble' || mat === 'stone' || mat === 'wood') {
-    const len = mat === 'cobble' ? 0.42 : mat === 'stone' ? 0.9 : 0.25, wid = mat === 'cobble' ? 0.3 : mat === 'stone' ? 0.6 : w, gap = mat === 'wood' ? 0.03 : 0.05;
+    const len = mat === 'cobble' ? 0.5 : mat === 'stone' ? 0.9 : 0.25, wid = mat === 'cobble' ? 0.34 : mat === 'stone' ? 0.6 : w, gap = mat === 'wood' ? 0.03 : 0.05;
     const nAcross = Math.max(1, Math.round(w / wid)), ww = w / nAcross;
     let row = 0;
     for (let q = 0; q < L.total - 0.05; q += len, row++) {

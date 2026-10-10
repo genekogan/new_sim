@@ -1513,7 +1513,7 @@
     "type": "number",
     "min": 0.0005,
     "max": 8,
-    "default": 0.6
+    "default": 0.3
    },
    "cluster": {
     "type": "number",
@@ -1526,7 +1526,7 @@
     "type": "number",
     "min": 0.2,
     "max": 30,
-    "default": 0.5
+    "default": 0.8
    },
    "avoid": {
     "type": "json",

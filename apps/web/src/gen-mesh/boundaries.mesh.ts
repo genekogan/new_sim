@@ -103,14 +103,14 @@ registerMesh({
     const h = num(ctx.params.height, 1.2), w = num(ctx.params.width, 0.8), gates = gatesOf(ctx.params.gates);
     const base = rgb(typeof ctx.params.color === 'string' ? ctx.params.color : '#3f6b35'), flowers = ctx.params.flowers === true;
     const g = (x: number, z: number) => ctx.model.terrain.sample(x, z), soup = new Soup(), pal: RGB[] = [rgb('#f2f0e6'), rgb('#e88aa8'), rgb('#e8c547')];
-    const runs = pieces(smoothPath(path, 0.7, 400), 0.7);
+    const runs = pieces(smoothPath(path, 1.1, 400), 1.1);
     runs.forEach((r, i) => {
       const len = Math.hypot(r.b[0] - r.a[0], r.b[1] - r.a[1]); if (inGate(gates, r.s0 + len / 2, 0.2)) return;
       const x = (r.a[0] + r.b[0]) / 2, z = (r.a[1] + r.b[1]) / 2, y = g(x, z), jit = 0.9 + h01(i, 1) * 0.2;
       const yaw = Math.atan2(-(r.b[1] - r.a[1]), r.b[0] - r.a[0]), co = Math.cos(yaw), si = Math.sin(yaw);
       // a squashed blob per 0.7 m, overlapping, so the hedge reads rounded and lumpy, never boxed
       soup.blob([x, y + h * 0.5, z], [len * 0.85 * Math.abs(co) + w * 0.55 * Math.abs(si), h * 0.55 * jit, len * 0.85 * Math.abs(si) + w * 0.55 * Math.abs(co)], scale(base, 0.9 + h01(i, 2) * 0.18), 1, 0.08, i);
-      if (flowers) for (let k = 0; k < 3; k++) { const a = h01(i, k, 5) * 6.28, px = x + Math.cos(a) * w * 0.45, pz = z + Math.sin(a) * w * 0.45; soup.blob([px, y + h * (0.4 + h01(i, k, 6) * 0.55), pz], [0.07, 0.06, 0.07], pal[k % 3], 0, 0, i * 3 + k, false); }
+      if (flowers) for (let k = 0; k < 2; k++) { const a = h01(i, k, 5) * 6.28, px = x + Math.cos(a) * w * 0.45, pz = z + Math.sin(a) * w * 0.45; soup.blob([px, y + h * (0.4 + h01(i, k, 6) * 0.55), pz], [0.07, 0.06, 0.07], pal[k % 3], 0, 0, i * 3 + k, false); }
     });
     return soupMesh(soup, `hedge ${ctx.entity.name ?? ctx.entity.id}`);
   },

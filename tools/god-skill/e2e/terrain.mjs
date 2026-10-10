@@ -196,6 +196,19 @@ try {
   }, (r) => r.accepted && r.mound > 0.8 && Math.abs(r.moundOff) < 0.05);
   await step('T6 undo the brushes group restores the ground', async () => { const before = (await mirror()).w.terrain.sample(-30, 90); const u = await api('/v1/god/undo', { method: 'POST' }); const after = (await mirror()).w.terrain.sample(-30, 90); await api('/v1/god/redo', { method: 'POST' }); return { u: u.data?.accepted, before: +before.toFixed(2), after: +after.toFixed(2) }; }, (r) => r.u && Math.abs(r.after) < 0.05 && r.before > 0.8);
 
+  await step('T8 courts: tennis (fenced), basketball, volleyball, petanque', () => act([
+    { op: 'place', def: R('tennis-court'), name: 'tennis', shape: { area: [[70, -150], [106, -150], [106, -132], [70, -132]] } },
+    { op: 'place', def: R('pitch'), name: 'basketball', shape: { area: [[112, -150], [142, -150], [142, -134], [112, -134]] }, params: { sport: 'basketball' } },
+    { op: 'place', def: R('pitch'), name: 'volleyball', shape: { area: [[70, -124], [88, -124], [88, -114], [70, -114]] }, params: { sport: 'volleyball' } },
+    { op: 'place', def: R('pitch'), name: 'petanque', shape: { area: [[94, -124], [110, -124], [110, -119], [94, -119]] }, params: { sport: 'petanque' } },
+  ], 'courts'), accepted);
+  await step('T8 a stream with pebble banks and a wooden footbridge across it (prepareBridge)', async () => {
+    const a = await placePrepared(R('stream'), 'stream', { path: [[176, -112], [168, -70], [172, -30], [166, 10]] }, { width: 2.5 });
+    const b = await placePrepared(R('footbridge'), 'footbridge', { path: [[163, -50], [177, -50.5]] }, { width: 1.8 });
+    const { s } = await mirror(); const fb = s.entities.find((x) => x.name === 'footbridge');
+    return { a: a.data?.accepted, b: b.data?.accepted, at: fb?.params?.at, fa: a.data?.failures, fb: b.data?.failures };
+  }, (r) => r.a && r.b && r.at);
+
   const { s: snapNow } = await mirror();
   const span = snapNow.entities.find((x) => x.name === 'high-road')?.params?.grade?.spans?.[0];
   const road = snapNow.entities.find((x) => x.name === 'high-road');
@@ -213,6 +226,9 @@ try {
   await shot('t7-pier', [-112, 11, 46], [-131, 3.5, 12]);
   await shot('t8-forest-edge', [-8, 24, -28], [-55, 2, -60]);
   await shot('t9-pond-reeds', [118, 14, 20], [90, 0, 48]);
+  await shot('t11-courts', [106, 32, -88], [106, 0, -134]);
+  await shot('t12-footbridge', [156, 7, -38], [170, 0.5, -50]);
+  await shot('t13-street-junction', [-22, 14, -18], [4, 0, -36]);
   await step('T7 ground palette: desert', async () => { const r = await act([{ op: 'world', state: { ground: { palette: 'desert' } } }], 'palette'); return { accepted: r.data?.accepted, failures: r.data?.failures }; }, (r) => r.accepted);
   await shot('t10-desert-palette', [-170, 150, 210], [0, 0, -10], 6000);
 } catch (e) {
