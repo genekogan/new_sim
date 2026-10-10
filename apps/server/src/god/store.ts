@@ -5,7 +5,7 @@
 import type { Db } from '../db.ts';
 import { WorldModel, type Diff, type Op, type StoredDef, type Entity } from '@sim/world-compiler';
 
-export type EditRow = { seq: number; by: string; at: number; note: string | null; grp: string | null; ops: Op[]; inverse: Op[]; undone: number; undo_of: number | null; kind: 'edit' | 'undo' | 'redo' };
+export type EditRow = { seq: number; by: string; at: number; note: string | null; grp: string | null; ops: Op[]; inverse: Op[]; undone: number; undo_of: number | null; kind: 'edit' | 'undo' | 'redo' | 'engine' };
 export type PrayerRow = { id: string; soul_id: string; soul_name: string; text: string; at: number; answer: string | null; answered_at: number | null };
 
 export function ensureWorldSchema(db: Db) {
@@ -78,7 +78,7 @@ export class WorldStore {
       .map((r) => ({ ...r, ops: JSON.parse(r.ops), inverse: JSON.parse(r.inverse) }));
   }
   /** The edit `undo` would revert: newest not-undone edit or redo. */
-  undoable(): EditRow | null { return this.edits(500).find((e) => !e.undone && e.kind !== 'undo') ?? null; }
+  undoable(): EditRow | null { return this.edits(500).find((e) => !e.undone && e.kind !== 'undo' && e.kind !== 'engine') ?? null; }
   /** The undo `redo` would revert: newest not-undone undo. */
   redoable(): EditRow | null { return this.edits(500).find((e) => !e.undone && e.kind === 'undo') ?? null; }
 

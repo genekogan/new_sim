@@ -10,6 +10,11 @@ import { WorldModel, obbOverlap, type OBB } from './model.ts';
 import { batchSchema, trustedBatchSchema, type Batch, type Entity, type Failure, type Field, type Op, type Result, type StoredDef, type Value, worldStateSchema } from './schemas.ts';
 
 export type Diff = { upserts: Entity[]; removes: string[]; defs: StoredDef[]; world?: Partial<WorldModel['state']>; constants?: WorldModel['constants']; tiles: string[]; answers: { prayer: string; text: string }[] };
+/** Body-aware edits (31 §3 rule 8): who uses an entity — a Soul seated on it, holding it, or the entity is a body.
+ *  Checked for every entity in the subtree of a remove / move / set-params target; null = free. */
+export type UsesHook = (id: string) => { code: 'occupied.by-body' | 'held.by-body'; detail: string } | null;
+export type PlanOptions = { trusted?: boolean; uses?: UsesHook };
+
 export type Plan = { ok: true; apply: () => { seq: number; undoId: string; diff: Diff; inverse: Op[] }; ids: Record<string, string>; warnings: string[]; diff: Diff } | { ok: false; failures: Failure[] };
 
 const fail = (op: number, code: string, detail: string, suggest?: Failure['suggest']): Failure => ({ op, code, detail, suggest });
@@ -38,7 +43,7 @@ export function checkFields(fields: Record<string, Field>, values: Record<string
   return { ok: true, values: out };
 }
 
-export function plan(world: WorldModel, input: unknown, by: string, tick: number, opts: { trusted?: boolean } = {}): Plan {
+export function plan(world: WorldModel, input: unknown, by: string, tick: number, opts: PlanOptions = {}): Plan {
   const parsed = (opts.trusted ? trustedBatchSchema : batchSchema).safeParse(input);
   if (!parsed.success) return { ok: false, failures: [fail(-1, 'schema', parsed.error.issues.map((i) => `${i.path.join('.')}: ${i.message}`).join('; '))] };
   const batch: Batch = parsed.data as Batch;
@@ -57,6 +62,15 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
     const e = scratch.get(ref);
     if (!e) { failures.push(fail(opIndex, 'entity.unknown', `${ref}`)); return null; }
     return e.id;
+  };
+  /** A Soul uses something in this subtree: refuse naming them. */
+  const inUse = (id: string, i: number): boolean => {
+    if (!opts.uses) return false;
+    for (const sid of scratch.subtree(id)) {
+      const u = opts.uses(sid);
+      if (u) { failures.push(fail(i, u.code, `${sid !== id ? `${scratch.pathOf(id)}: ` : ''}${u.detail}`)); return true; }
+    }
+    return false;
   };
 
   ops.forEach((op, i) => {
@@ -96,6 +110,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         const id = resolveId(op.id, i); if (!id || id === 'world') return;
         const sub = scratch.subtree(id);
         if (!op.cascade && sub.length > 1) { failures.push(fail(i, 'params.invalid', `${op.id} has ${sub.length - 1} children; set cascade`)); return; }
+        if (inUse(id, i)) return;
         for (const sid of sub) {
           const e = scratch.entities.get(sid)!;
           if (isBody(scratch, e) && sid !== id) { failures.push(fail(i, 'occupied.by-body', `${scratch.pathOf(sid)} is a body inside ${op.id}`)); return; }
@@ -112,6 +127,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
       }
       case 'move': {
         const id = resolveId(op.id, i); if (!id || id === 'world') return;
+        if (inUse(id, i)) return;
         const prev = scratch.entities.get(id)!;
         const def = scratch.resolvedDef(prev.def)!;
         const next: Entity = { ...prev, v: prev.v + 1 };
@@ -133,6 +149,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         const def = scratch.resolvedDef(prev.def)!;
         const next: Entity = { ...prev, v: prev.v + 1 };
         const inv: Extract<Op, { op: 'set' }> = { op: 'set', id };
+        if (op.params && inUse(id, i)) return;
         if (op.state) {
           const ok = checkFields(def.state, op.state, false); if (!ok.ok) { failures.push(fail(i, 'state.invalid', ok.detail)); return; }
           inv.state = Object.fromEntries(Object.keys(op.state).map((k) => [k, prev.state?.[k] ?? (def.state[k]?.default as Value) ?? null]));
@@ -263,7 +280,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
 }
 
 /** Plan + apply in one step (the server's path). */
-export function applyBatch(world: WorldModel, input: unknown, by: string, tick: number, opts?: { trusted?: boolean }): { result: Result; diff?: Diff; inverse?: Op[] } {
+export function applyBatch(world: WorldModel, input: unknown, by: string, tick: number, opts?: PlanOptions): { result: Result; diff?: Diff; inverse?: Op[] } {
   const p = plan(world, input, by, tick, opts);
   if (!p.ok) return { result: { accepted: false, failures: p.failures } };
   const { seq, undoId, diff, inverse } = p.apply();

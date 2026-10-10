@@ -205,7 +205,7 @@ export class EngineBridge {
       if (l.kind !== 'stairs' && l.kind !== 'ramp') continue;
       const lid = l.id.slice(e.id.length + 1), d: Vec2 = [Math.cos(l.heading), Math.sin(l.heading)], T = 0.4;
       for (const o of part.solids ?? []) {
-        if (!o.label.endsWith(` stairs:${lid}`)) continue;
+        if (!o.label?.endsWith(` stairs:${lid}`)) continue;
         const along = Math.abs(Math.cos(o.obb.yaw - l.heading)) > 0.7 ? 0 : 1;
         if (o.obb.half[along] <= T) continue;
         o.obb.half[along] = r3(o.obb.half[along] - T / 2); o.obb.c = [r3(o.obb.c[0] + d[0] * T / 2), r3(o.obb.c[1] + d[1] * T / 2)];
