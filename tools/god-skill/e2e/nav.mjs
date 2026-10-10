@@ -4,9 +4,11 @@
 //   the GOD (god token) builds a fountain, a cottage named rose-house (its front door faces away from the Soul), a plaza
 //   with bench-2, a pond with an unnamed bench by it and another unnamed bench by the fountain — and no flags;
 //   a SOUL (created and paired through the normal owner flow, acting only through /v1/edge/*) is told, by name: walk to
-//   the fountain, walk to rose-house (its front door), go into rose-house, walk to plaza/bench-2, sit on the bench by
-//   the pond, then go into rose-house's kitchen (an intent). The plain-word acts go through the real Soul CLI
-//   (tools/edge-skill/eden-agent.mjs, unchanged), so the CLI's own vocabulary path is what is proven.
+//   the fountain, go into rose-house (round the house, in at its front door), walk:rose-house/kitchen, walk:plaza/bench-2,
+//   sit on the bench by the pond, then walk to the bedroom in rose-house. The plain-word acts go through the real Soul
+//   CLI (tools/edge-skill/eden-agent.mjs, unchanged) and the ledger's own vocabulary (unchanged): the world-engine side
+//   only offers `walk:<path>` capabilities and labels seats with what they are by. Where she ends up is read from the
+//   god's `where` query (room / area), not from any new edge field.
 //
 //   node tools/god-skill/e2e/nav.mjs [--port 5260] [--keep] [--no-shots]
 //
@@ -171,7 +173,8 @@ async function follow(acted, { maxS = 240, until: stopWhen } = {}) {
     await sleep(700);
   }
   const o = await observe();
-  return { accepted: true, resolved: acted.resolved, phase: rec?.phase, code: rec?.code, reason: rec?.reason, samples, end: { p: o.self.position, activity: o.self.activity, state: o.self.state }, built: o.built };
+  const w = o.self.position ? (await api('/v1/god/query', { body: { where: [o.self.position[0], o.self.position[2]] } })).data.where : null;
+  return { accepted: true, resolved: acted.resolved, phase: rec?.phase, code: rec?.code, reason: rec?.reason, samples, end: { p: o.self.position, activity: o.self.activity, state: o.self.state }, room: w?.room ?? null, on: (w?.inside ?? []).map((x) => x.path) };
 }
 const walked = (s) => s.reduce((l, x, i) => (i ? l + Math.hypot(x.p[0] - s[i - 1].p[0], x.p[2] - s[i - 1].p[2]) : 0), 0);
 const minDist = (s, q) => Math.min(...s.map((x) => Math.hypot(x.p[0] - q[0], x.p[2] - q[1])));
@@ -226,12 +229,8 @@ try {
   await step('S1 her capabilities offer the god\'s things by name (walk:fountain, walk:rose-house and its rooms, walk:plaza/bench-2, walk:pond), and no flags exist', () => until(async () => {
     const c = (await caps()).map((x) => x.id);
     const want = ['walk:fountain', 'walk:rose-house', 'walk:rose-house/living', 'walk:plaza', 'walk:plaza/bench-2', 'walk:pond'];
-    return { ok: want.every((w) => c.includes(w)) && !c.some((x) => x.startsWith('walk:flag-')), missing: want.filter((w) => !c.includes(w)), flags: c.filter((x) => x.startsWith('walk:flag-')), walks: c.filter((x) => x.startsWith('walk:')) };
+    return { ok: want.every((w) => c.includes(w)) && !c.some((x) => x.startsWith('walk:flag-')), missing: want.filter((w) => !c.includes(w)), flags: c.filter((x) => x.startsWith('walk:flag-')), walks: c.filter((x) => x.startsWith('walk:')), seats: (await caps()).filter((x) => x.verb === 'sit' && x.target).map((x) => x.label) };
   }, 30000), (r) => r?.ok);
-  await step('S1 observe → built names what is near her; /v1/edge/map lists the rooms', async () => {
-    const o = await observe(), m = (await api('/v1/edge/map', { as: 'soul' })).data.places ?? [];
-    return { near: (o.built?.near ?? []).map((x) => `${x.name} (${x.distance} m)`), inside: o.built?.inside, mapRooms: m.filter((p) => p.kind === 'built:room').map((p) => p.id) };
-  }, (r) => r.near.some((x) => x.startsWith('fountain')) && r.near.some((x) => x.startsWith('rose-house')) && r.inside === null && r.mapRooms.includes('rose-house/living'));
   await step('S1 the Soul CLI (unchanged) sees them too: observe → canDo has walk:fountain and walk:rose-house/living', async () => {
     const r = await cli('observe'); const ids_ = (r.data?.canDo?.available ?? []).map((c) => c.id);
     return { code: r.code, n: ids_.length, has: ids_.filter((x) => ['walk:fountain', 'walk:rose-house', 'walk:rose-house/living'].includes(x)), err: r.stderr || r.raw };
@@ -245,27 +244,25 @@ try {
     return { cli: { code: a.code, accepted: a.data?.accepted, resolved: a.data?.resolved }, phase: r.phase, code: r.code, reason: r.reason, end: r.end, dist: r.end ? +Math.hypot(r.end.p[0] - FOUNTAIN[0], r.end.p[2] - FOUNTAIN[1]).toFixed(2) : null, walked: +walked(r.samples).toFixed(1) };
   }, (r) => r.cli.accepted && r.cli.resolved?.to === 'walk:fountain' && r.phase === 'completed' && r.dist < 3.5);
 
-  // ---- 2. rose-house: to its front door (outside), then into it
-  const f2 = await step('S3 act walk:rose-house → she walks round the house to its front door and stops outside it', async () => {
-    const a = (await api('/v1/edge/act', { as: 'soul', body: { capability: 'walk:rose-house' } })).data;
-    const r = await follow(a);
-    report.samples.door = r.samples;
-    const d = door ? Math.hypot(r.end.p[0] - door.at[0], r.end.p[2] - door.at[1]) : null;
-    return { accepted: a.accepted, phase: r.phase, code: r.code, reason: r.reason, end: r.end, toDoor: d === null ? null : +d.toFixed(2), outside: r.end ? r.end.p[2] > door.at[1] : null, inside: r.built?.inside ?? null };
-  }, (r) => r.accepted && r.phase === 'completed' && r.toDoor < 2.5 && r.outside && !r.inside);
-  const f3 = await step('S4 CLI: act "go into rose-house" → walk:rose-house/<entrance room>; in through the front door, inside the room', async () => {
+  // ---- 2. rose-house: round it, in at its front door; then a room by path
+  const f3 = await step('S3 CLI: act "go into rose-house" → walk:rose-house; she walks round the house and in at its front door', async () => {
     const a = await cli('act', 'go into rose-house');
     const r = await follow(a.data);
     report.samples.enter = r.samples;
-    return { cli: { code: a.code, accepted: a.data?.accepted, resolved: a.data?.resolved, reason: a.data?.reason }, phase: r.phase, code: r.code, reason: r.reason, end: r.end, inside: r.built?.inside ?? null, viaDoor: door ? +minDist(r.samples, door.at).toFixed(2) : null };
-  }, (r) => r.cli.accepted && /^walk:rose-house\//.test(r.cli.resolved?.to ?? '') && r.phase === 'completed' && r.inside?.building === 'rose-house' && r.inside.room === r.cli.resolved.to.slice(5) && r.viaDoor < 1.2);
-  { const p = f3?.end?.p; if (p) await shots([{ name: 's4-inside-rose-house-roof-hidden', eye: [p[0] + 4, p[1] + 9, p[2] + 6], at: [p[0], p[1] + 0.9, p[2]], wait: 7000, hideRoofs: true }]); }
+    return { cli: { code: a.code, accepted: a.data?.accepted, resolved: a.data?.resolved, reason: a.data?.reason }, phase: r.phase, code: r.code, reason: r.reason, end: r.end, room: r.room, viaDoor: door ? +minDist(r.samples, door.at).toFixed(2) : null, walked: +walked(r.samples).toFixed(1) };
+  }, (r) => r.cli.accepted && r.cli.resolved?.to === 'walk:rose-house' && r.phase === 'completed' && r.room?.building === 'rose-house' && r.viaDoor < 1.2);
+  { const p = f3?.end?.p; if (p) await shots([{ name: 's3-inside-rose-house-roof-hidden', eye: [p[0] + 4, p[1] + 9, p[2] + 6], at: [p[0], p[1] + 0.9, p[2]], wait: 7000, hideRoofs: true }]); }
+  await step('S4 act walk:rose-house/kitchen → from the hall into the kitchen', async () => {
+    const a = (await api('/v1/edge/act', { as: 'soul', body: { capability: 'walk:rose-house/kitchen' } })).data;
+    const r = await follow(a);
+    return { accepted: a.accepted, phase: r.phase, code: r.code, reason: r.reason, end: r.end, room: r.room };
+  }, (r) => r.accepted && r.phase === 'completed' && r.room?.building === 'rose-house' && r.room.room === 'kitchen');
 
   // ---- 3. a bench in the plaza, by path
   await step('S5 act walk:plaza/bench-2 → out of the house and across to the plaza\'s bench', async () => {
     const a = (await api('/v1/edge/act', { as: 'soul', body: { capability: 'walk:plaza/bench-2' } })).data;
     const r = await follow(a, { maxS: 300 });
-    return { accepted: a.accepted, phase: r.phase, code: r.code, reason: r.reason, end: r.end, dist: r.end ? +Math.hypot(r.end.p[0] - BENCH2[0], r.end.p[2] - BENCH2[1]).toFixed(2) : null, on: r.built?.on, walked: +walked(r.samples).toFixed(1) };
+    return { accepted: a.accepted, phase: r.phase, code: r.code, reason: r.reason, end: r.end, dist: r.end ? +Math.hypot(r.end.p[0] - BENCH2[0], r.end.p[2] - BENCH2[1]).toFixed(2) : null, on: r.on, walked: +walked(r.samples).toFixed(1) };
   }, (r) => r.accepted && r.phase === 'completed' && r.dist < 2 && (r.on ?? []).includes('plaza'));
 
   // ---- 4. the bench by the pond (unnamed; another unnamed bench is by the fountain, bench-2 is nearer her)
@@ -274,17 +271,17 @@ try {
     const r = await follow(a.data, { maxS: 300, until: (me) => me.activity === 'sit' });
     const used = (await api('/v1/god/query', { body: { entity: ids.pondBench } })).data.entity?.usedBy;
     return { cli: { code: a.code, accepted: a.data?.accepted, resolved: a.data?.resolved, reason: a.data?.reason }, end: r.end, usedBy: used, dist: r.end ? +Math.hypot(r.end.p[0] - POND_BENCH[0], r.end.p[2] - POND_BENCH[1]).toFixed(2) : null };
-  }, (r) => r.cli.accepted && r.end?.activity === 'sit' && r.usedBy?.soul === 'Ana' && r.dist < 1.5);
+  }, (r) => r.cli.accepted && /^sit:/.test(r.cli.resolved?.to ?? '') && r.end?.activity === 'sit' && r.usedBy?.soul === 'Ana' && r.dist < 1.5);
   { const p = f5?.end?.p; if (p) await shots([{ name: 's6-on-the-bench-by-the-pond', eye: [p[0] + 5, p[1] + 3.5, p[2] + 6], at: [p[0], p[1] + 0.7, p[2] - 2], wait: 6000 }]); }
 
-  // ---- 5. an intent (the CLI's `act go --place …` shape): from the bench into the kitchen
-  await step('S7 intent {verb:"go", target:{place:"rose-house/kitchen"}} → she stands up and walks into the kitchen', async () => {
-    const a = (await api('/v1/edge/act', { as: 'soul', body: { verb: 'go', target: { place: 'rose-house/kitchen' } } })).data;
-    const r = await follow(a, { maxS: 300 });
-    return { accepted: a.accepted, resolved: a.resolved, code: a.code, reason: a.reason, phase: r.phase, end: r.end, inside: r.built?.inside ?? null };
-  }, (r) => r.accepted && r.phase === 'completed' && r.inside?.room === 'rose-house/kitchen');
+  // ---- 5. from the seat, by words naming a room: she stands up and walks into the bedroom
+  await step('S7 CLI: act "walk to the bedroom in rose-house" → walk:rose-house/bedroom; she stands up and walks into it', async () => {
+    const a = await cli('act', 'walk to the bedroom in rose-house');
+    const r = await follow(a.data, { maxS: 300 });
+    return { cli: { code: a.code, accepted: a.data?.accepted, resolved: a.data?.resolved, reason: a.data?.reason }, phase: r.phase, end: r.end, room: r.room };
+  }, (r) => r.cli.accepted && r.cli.resolved?.to === 'walk:rose-house/bedroom' && r.phase === 'completed' && r.room?.room === 'bedroom');
   await step('S8 nothing faulted: no engine faults or violations in the server log', async () => ({ faults: (serverLog.match(/engine fault|violat/g) ?? []).length }), (r) => r.faults === 0);
-  void f1; void f2;
+  void f1;
 } catch (e) {
   report.failures.push({ name: 'harness', error: String(e?.stack ?? e) });
   log('harness error', e);

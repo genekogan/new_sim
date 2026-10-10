@@ -1,14 +1,13 @@
 // Soul navigation to god-built named things (party lane P4). On an entity world a Soul can walk to anything the god
-// built and named, by its path: `walk:fountain`, `walk:rose-house` (to its front door), `walk:rose-house/living` (into
-// that room), `walk:plaza/bench-2` (to the bench's front). Each resolves to a reachable standing point the engine can
-// plan to: a door's approach for a building, a room's floor, the approach to a seat, the shore of a pond.
+// built and named, by its path: `walk:fountain`, `walk:rose-house` (in at its front door), `walk:rose-house/living`
+// (that room's floor), `walk:plaza/bench-2` (the bench's front). Each resolves to a standing point the engine can plan
+// to: inside a building's open front door (outside it when the door is closed), a room's floor, the approach to a seat,
+// a fountain's rim, the nearest shore of a pond.
 //
-//  capabilities ── `walk:<path>` for the nearest named things + rooms (and any the Soul asked for by name), labelled
-//                  with what they are and where (so plain words resolve through the ledger's own vocabulary)
-//  act          ── plain words and near-miss ids naming a god thing ("go into rose-house", "sit on the bench by the
-//                  pond", `walk:Rose House`, `sit:plaza/bench-2`, intents {verb:'go', target:{place:'fountain'}}) are
-//                  turned into the offered capability id before the ledger sees them; `resolved` says so
-//  observe/map  ── `built`: the named things near the Soul (and the room it is in); /v1/edge/map lists them as places
+// World-engine side only: the engine bridge offers these as ordinary `walk:<path>` capabilities through the ledger's
+// existing world-profile hook (as the ground host offers `walk:flag-<name>`), labelled with what each thing is and what
+// it is by, so the ledger's own vocabulary resolves plain words ("walk to the fountain", "go into rose-house",
+// "sit on the bench by the pond") to them. No edge contract change: no new verbs, fields or routes.
 //
 // Pure reads over the entity model and the engine's standing grids; nothing here is logged or changes the world.
 import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
@@ -54,20 +53,21 @@ export type Thing = {
   /** Rooms: their world outline (for "you are in"). Buildings: their rooms' refs. */
   poly?: Vec2[];
   rooms?: string[];
-  /** Standing points to approach from (door approach, seat fronts, a fountain's rim), on `level`. */
+  /** Standing points to approach from (seat fronts, a fountain's rim; a building's door approach), on `level`. */
   stands?: Vec2[];
+  /** Buildings: just inside the front door, and whether that door is open now. */
+  inside?: Vec2;
+  doorOpen?: boolean;
   /** Has a seat (sit:<id> is offered near it). */
   seat?: boolean;
 };
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
-const SHOW = 40;             // walk capabilities offered: the nearest this many named things (plus rooms of near buildings)
-const ROOMS_WITHIN = 60;     // rooms of buildings within this many metres are offered too
-const STOP = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'at', 'on', 'into', 'inside', 'onto', 'my', 'that', 'this', 'please', 'over', 'up', 'down', 'there']);
-export const words = (s: string) => s.toLowerCase().replace(/[’']/g, '').split(/[^a-z0-9]+/).filter((w) => w && !STOP.has(w));
-const plural = (w: string) => (w.length > 3 && w.endsWith('s') ? w.slice(0, -1) : w);
-const wordHit = (q: string, set: string[]) => set.some((t) => t === q || plural(t) === plural(q));
+const SHOW = 120;            // walk capabilities offered: the nearest this many named things (plus rooms of near buildings)
+const ROOMS_WITHIN = 80;     // rooms of buildings within this many metres are offered too
+const STOP = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'at', 'on']);
+const words = (s: string) => s.toLowerCase().replace(/[’']/g, '').split(/[^a-z0-9]+/).filter((w) => w && !STOP.has(w));
 
 function centroid(pts: Vec2[]): Vec2 { let x = 0, z = 0; for (const p of pts) { x += p[0]; z += p[1]; } return [x / pts.length, z / pts.length]; }
 function inPoly(x: number, z: number, poly: Vec2[]) { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c; } return c; }
@@ -88,8 +88,6 @@ const article = (w: string) => (/^[aeiou]/.test(w) ? `an ${w}` : `a ${w}`);
 export class GodNav {
   private h: NavHost;
   private cache: { key: string; things: Thing[]; byRef: Map<string, Thing> } | null = null;
-  /** Things a Soul asked for by name that are beyond the nearest SHOW: offered to it too (soulId → refs). */
-  private wanted = new Map<string, Set<string>>();
   private goals = new Map<string, { tick: number; key: string; goal: { p: Vec2; level: number } | null }>();
   constructor(h: NavHost) { this.h = h; }
 
@@ -138,7 +136,14 @@ export class GodNav {
       const front = doors.find((o) => /front|main|entr/.test(o.id)) ?? [...doors].sort((a, b) => Math.hypot(b.at[0], b.at[1]) - Math.hypot(a.at[0], a.at[1]))[0];
       const stands: Vec2[] = [];
       const frontSlot = baked.slots.find((x) => x.kind === 'stand' && /front|door|entr/.test(x.id));
-      if (front) { const n = Math.hypot(front.at[0], front.at[1]) || 1; stands.push(toWorld(front.at[0] + (front.at[0] / n) * 1.2, front.at[1] + (front.at[1] / n) * 1.2)); }
+      let inside: Vec2 | undefined, doorOpen = false;
+      if (front) {
+        const n = Math.hypot(front.at[0], front.at[1]) || 1, ux = front.at[0] / n, uz = front.at[1] / n;
+        stands.push(toWorld(front.at[0] + ux * 1.2, front.at[1] + uz * 1.2));
+        inside = toWorld(front.at[0] - ux * 1.0, front.at[1] - uz * 1.0);
+        const st = ((e.state?.doors ?? {}) as Record<string, unknown>)[front.id];
+        doorOpen = st === 'open' || (st === undefined && front.state !== 'closed' && !(def.components.opening && e.state?.open === false));
+      }
       if (frontSlot) stands.push(toWorld(frontSlot.p[0], frontSlot.p[2]));
       const roomRefs: string[] = [];
       for (const r of rooms) {
@@ -156,7 +161,7 @@ export class GodNav {
       }
       // the room the front door opens into goes first (the entrance)
       if (front) { const fa = toWorld(front.at[0], front.at[1]); roomRefs.sort((a, b) => { const A = out.find((t) => t.ref === a)!, B = out.find((t) => t.ref === b)!; return (A.level - B.level) || (polyDist(A.poly!, fa) - polyDist(B.poly!, fa)); }); }
-      out.unshift({ ...base, ref, kind: 'building', what: `${article(kind0)}${rooms.length ? ` (${roomRefs.length} rooms)` : ''}`, at: [wp.x, wp.z], level, stands, rooms: roomRefs, words: [...base.words, 'building', 'house'] });
+      out.unshift({ ...base, ref, kind: 'building', what: article(kind0), at: [wp.x, wp.z], level, stands, ...(inside ? { inside, doorOpen } : {}), rooms: roomRefs, words: [...base.words, 'building', 'house'] });
       return out;
     }
     // seats: approach in front of each seat; stand slots (a fountain's rim): those points
@@ -198,6 +203,10 @@ export class GodNav {
       goal = inPoly(me[0], me[1], t.area!) ? near(me, 0, 8) : near(t.at, 0, 40);
     } else if (t.kind === 'room') {
       goal = near(t.at, t.level, 40);
+    } else if (t.kind === 'building' && t.inside && t.doorOpen) {
+      // in at the front door: standing room just inside it (the room it opens into); else its approach outside
+      goal = near(t.inside, 0, 4);
+      for (const s of t.stands ?? []) { if (goal) break; goal = near(s, t.level, 6); }
     } else {
       // a door approach, a seat's front, a fountain's rim: the nearest to me with standing room; else around the thing
       const stands = [...(t.stands ?? [])].sort((a, b) => Math.hypot(a[0] - me[0], a[1] - me[1]) - Math.hypot(b[0] - me[0], b[1] - me[1]));
@@ -215,11 +224,10 @@ export class GodNav {
     const me = this.h.engine.world.entities[soul.entityId]; if (!me?.human) return;
     const here: Vec2 = [me.pose.p[0], me.pose.p[2]], myLevel = me.human.level ?? 0;
     const seated = me.human.activity === 'sit' || me.human.baseActivity === 'sit';
-    const all = this.things(), want = this.wanted.get(soul.soulId) ?? new Set<string>();
+    const all = this.things();
     const ranked = all.filter((t) => t.kind !== 'room').map((t) => ({ t, d: this.distance(t, here) })).sort((a, b) => a.d - b.d || (a.t.ref < b.t.ref ? -1 : 1));
     const pick: { t: Thing; d: number }[] = ranked.slice(0, SHOW);
     for (const { t, d } of ranked) if (t.kind === 'building' && d <= ROOMS_WITHIN) for (const r of t.rooms ?? []) { const rt = this.thing(r); if (rt) pick.push({ t: rt, d: this.distance(rt, here) }); }
-    for (const ref of want) { const t = this.thing(ref); if (t && !pick.some((x) => x.t.ref === ref)) pick.push({ t, d: this.distance(t, here) }); }
     for (const { t, d } of pick) {
       const id = `walk:${t.ref}`; if (caps.some((c) => c.id === id)) continue;
       const goal = this.goal(t, here, soul.entityId), where = this.label(t, Math.round(d));
@@ -236,7 +244,7 @@ export class GodNav {
   private label(t: Thing, d: number): string {
     const by = this.landmarks(t).map((x) => x.ref);
     if (t.kind === 'room') return `Go into ${t.what} (${t.ref}; ${d} m)`;
-    if (t.kind === 'building') return `Walk to ${t.ref}, ${t.what}, to its front door (go into it: walk:${t.rooms?.[0] ?? t.ref}; ${d} m)`;
+    if (t.kind === 'building') return `Walk to ${t.ref}, ${t.what}: ${t.doorOpen ? 'in at its front door' : 'to its front door (closed)'} (${t.rooms?.length ?? 0} rooms, each walk:${t.ref}/<room>; ${d} m)`;
     if (t.kind === 'water') return `Walk to the shore of ${t.ref}, ${t.what} (${d} m)`;
     return `Walk to ${t.ref}, ${t.what}${by.length ? `, by ${by.join(' and ')}` : ''} (${d} m)`;
   }
@@ -244,50 +252,10 @@ export class GodNav {
   landmarks(t: Thing, n = 2): Thing[] {
     return this.things().filter((o) => o.kind !== 'room' && o.id !== t.id && !t.ref.startsWith(o.ref + '/')).map((o) => ({ o, d: this.distance(o, t.at) })).filter((x) => x.d <= 15).sort((a, b) => a.d - b.d).slice(0, n).map((x) => x.o);
   }
-  /** Offer this thing to this Soul from now on (asked for by name, beyond the nearest SHOW). */
-  want(soulId: string, ref: string) { const s = this.wanted.get(soulId) ?? new Set<string>(); s.add(ref); if (s.size > 16) s.delete(s.values().next().value!); this.wanted.set(soulId, s); }
-
-  // ------------------------------------------------------------------ names → things
-
-  /** Things a phrase names, best first ("rose-house", "Rose House", "the living room of rose-house", "bench"):
-   *  exact path / name first, then all words in its words; ties by distance to `near`. `filter` narrows the pool. */
-  match(phrase: string, near: Vec2, filter: (t: Thing) => boolean = () => true): Thing[] {
-    const raw = phrase.trim().toLowerCase().replace(/^(?:the|a|an)\s+/, '').replace(/[.!?]+$/, '').trim();
-    if (!raw) return [];
-    const flat = (s: string) => s.toLowerCase().replace(/[^a-z0-9/]+/g, '');
-    const pool = this.things().filter(filter), q = words(raw);
-    const tiers: Thing[][] = [
-      pool.filter((t) => t.ref === raw || t.ref.toLowerCase() === raw),
-      pool.filter((t) => flat(t.ref) === flat(raw) || flat(t.name) === flat(raw) || flat(t.ref.split('/').pop()!) === flat(raw)),
-      pool.filter((t) => t.kind === 'room' && (flat(t.what.split(' of ')[0]) === flat(raw) || flat(`${t.ref.split('/').slice(-2).join(' ')}`) === flat(raw))),
-      q.length ? pool.filter((t) => q.every((w) => wordHit(w, t.words))) : [],
-    ];
-    const found = tiers.find((x) => x.length) ?? [];
-    return [...found].sort((a, b) => this.distance(a, near) - this.distance(b, near) || (a.ref < b.ref ? -1 : 1));
+  /** Names of the named things within `within` m of a point (not `except`, not rooms), nearest first: "by the X". */
+  namesNear(at: Vec2, except: string, n = 2, within = 12): string[] {
+    return this.things().filter((o) => o.kind !== 'room' && o.id !== except).map((o) => ({ o, d: this.distance(o, at) })).filter((x) => x.d <= within).sort((a, b) => a.d - b.d).slice(0, n).map((x) => x.o.ref);
   }
 }
 
 function polyDist(poly: Vec2[], p: Vec2) { return inPoly(p[0], p[1], poly) ? 0 : nearestOn(poly, p, true).d; }
-
-// ------------------------------------------------------------------ the words a Soul sends
-
-/** "go into X", "walk to the X by the Y", "sit on the X near the Y", `walk:X`, `sit:X`: the verb class and the names. */
-export function parseNavWords(input: string): { verb: 'walk' | 'enter' | 'sit'; rest: string; target: string; by?: string } | null {
-  const text = input.trim().replace(/[.!?]+$/, '');
-  let verb: 'walk' | 'enter' | 'sit' | null = null, rest = '';
-  const colon = /^([a-z][a-z-]*):(.+)$/i.exec(text);
-  if (colon) {
-    const v = colon[1].toLowerCase();
-    verb = ['walk', 'go', 'go-to', 'walk-to', 'visit', 'head', 'approach', 'go-near'].includes(v) ? 'walk' : ['enter', 'go-into', 'go-inside', 'walk-into'].includes(v) ? 'enter' : ['sit', 'sit-on', 'sit-at', 'seat'].includes(v) ? 'sit' : null;
-    rest = colon[2];
-  } else {
-    const m = /^(?:please\s+|let'?s\s+|i\s+want\s+to\s+)?(?:(go|walk|head|step|come)\s+(?:back\s+)?(into|inside|in\s+to|in|over\s+to|up\s+to|to|towards?|by)\s+|(enter|visit|approach)\s+|(sit|sit\s+down|take\s+a\s+seat|have\s+a\s+seat|rest)\s+(?:on|at|in|by|upon)\s+)(.+)$/i.exec(text);
-    if (!m) return null;
-    verb = m[4] ? 'sit' : m[3] ? (m[3].toLowerCase() === 'enter' ? 'enter' : 'walk') : /^(into|inside|in\s+to|in)$/i.test(m[2] ?? '') ? 'enter' : 'walk';
-    rest = m[5];
-  }
-  if (!verb) return null;
-  rest = rest.trim();
-  const by = /^(.+?)\s+(?:by|near|next\s+to|beside|close\s+to|at|in|on)\s+(?:the\s+)?(.+)$/i.exec(rest);
-  return by && verb !== 'enter' ? { verb, rest, target: by[1], by: by[2] } : { verb, rest, target: rest };
-}
