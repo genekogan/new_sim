@@ -619,6 +619,15 @@ function substitute(v: number | string | boolean, params: Record<string, Value>)
 }
 
 const MAX_DEPENDENTS = 500;
+const ROADS = new Set(['road/1', 'path/1']);
+/** Does a polyline pass through any of these 64 m tiles (sampled every 8 m)? */
+function crossesTiles(path: [number, number][], tiles: Set<string>, tileOf: (x: number, z: number) => string): boolean {
+  for (let i = 0; i < path.length; i++) {
+    const a = path[i], b = path[i + 1] ?? a, n = Math.max(1, Math.ceil(Math.hypot(b[0] - a[0], b[1] - a[1]) / 8));
+    for (let k = 0; k <= n; k++) if (tiles.has(tileOf(a[0] + ((b[0] - a[0]) * k) / n, a[1] + ((b[1] - a[1]) * k) / n))) return true;
+  }
+  return false;
+}
 /** Re-solve `float`, `facing`, `along` and ground settling for entities affected by this batch. Returns ids changed. */
 function resolveDependents(w: WorldModel, touched: Set<string>, removed: Set<string>, tiles: Set<string>, warnings: string[]): string[] {
   const changed: string[] = [];
@@ -643,6 +652,17 @@ function resolveDependents(w: WorldModel, touched: Set<string>, removed: Set<str
         next = { ...(next ?? e) };  // admit() recomputes the point on the path
       }
     }
+    // roads and paths on changed tiles: a stream, river or lake added (or removed) across them since they were laid
+    // gets (or loses) its bridge — the same prepare step that froze their grade, kept only when the crossings change
+    if (e.in.parent === 'world' && tiles.size && !touched.has(e.id) && def.make.kind === 'gen' && ROADS.has(def.make.gen) && e.shape && 'path' in e.shape && crossesTiles(e.shape.path as [number, number][], tiles, tileOfXZ)) {
+      const prep = prepareFor(def.make.gen, queryOf(w), e.shape as never, e.params ?? {});
+      const spansOf = (g: unknown) => JSON.stringify(((g as { spans?: unknown[] } | undefined)?.spans ?? []).map((s) => { const x = s as { from: number; to: number }; return [Math.round(x.from), Math.round(x.to)]; }));
+      if (prep?.params.grade && spansOf(prep.params.grade) !== spansOf(e.params?.grade)) {
+        const n = ((prep.params.grade as { spans?: unknown[] }).spans ?? []).length;
+        next = { ...(next ?? e), params: { ...(e.params ?? {}), grade: prep.params.grade } };
+        warnings.push(`${w.pathOf(e.id)}: ${n ? `now bridges the water it crosses (${n} span${n > 1 ? 's' : ''})` : 'no longer crosses water (bridge removed)'}`);
+      }
+    }
     // ground: root things on changed tiles settle again (float re-reads the water level)
     if (e.in.parent === 'world' && e.p && tiles.size && !def.components.landform && def.layer !== 'volume') {
       const x = e.p[0], z = e.p[e.p.length - 1];
@@ -656,7 +676,7 @@ function resolveDependents(w: WorldModel, touched: Set<string>, removed: Set<str
     const problem = admitForResolve(w, trial, def);
     if (problem) { w.insert(e); w.index(e.id, w.footprint(e, def)); warnings.push(`${w.pathOf(e.id)}: ${problem}`); continue; }
     w.insert(trial); if (def.layer === 'solid') w.index(trial.id, w.footprint(trial, def));
-    if (JSON.stringify(prevP) !== JSON.stringify(trial.p) || JSON.stringify(prevR) !== JSON.stringify(trial.r)) changed.push(e.id); else { w.delete(trial.id); w.insert(e); if (def.layer === 'solid') w.index(e.id, w.footprint(e, def)); }
+    if (JSON.stringify(prevP) !== JSON.stringify(trial.p) || JSON.stringify(prevR) !== JSON.stringify(trial.r) || trial.params !== e.params) changed.push(e.id); else { w.delete(trial.id); w.insert(e); if (def.layer === 'solid') w.index(e.id, w.footprint(e, def)); }
   }
   return changed;
 }

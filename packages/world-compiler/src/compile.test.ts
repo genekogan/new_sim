@@ -170,3 +170,15 @@ test('furniture inside a building is not an overlap with the building; two chair
   assert.equal(f[0].code, 'overlap.solid');
   assert.ok(f[0].detail.includes('ch'), f[0].detail);
 });
+
+test('a road laid before a stream gets its bridge when the stream crosses it (and loses it on undo)', () => {
+  const w = fresh();
+  ok(applyBatch(w, { ops: [{ op: 'place', def: coreRef('road'), name: 'lane', shape: { path: [[-60, 0], [0, 2], [60, 0]] } }] }, 'god', 1));
+  const spans = () => ((w.get('lane')!.params?.grade as { spans?: unknown[] } | undefined)?.spans ?? []).length;
+  assert.equal(spans(), 0);
+  const r = ok(applyBatch(w, { ops: [{ op: 'place', def: coreRef('stream'), name: 'beck', shape: { path: [[2, -60], [0, 0], [-3, 60]] } }] }, 'god', 2));
+  assert.equal(spans(), 1, 'one span over the beck');
+  assert.ok(r.warnings.some((x) => /lane: now bridges/.test(x)), r.warnings.join('; '));
+  ok(applyBatch(w, { ops: [{ op: 'remove', id: 'beck' }] }, 'god', 3));
+  assert.equal(spans(), 0, 'the bridge goes with the stream');
+});
