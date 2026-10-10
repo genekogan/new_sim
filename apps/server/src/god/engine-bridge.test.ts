@@ -7,7 +7,6 @@ import assert from 'node:assert/strict';
 import { setImmediate } from 'node:timers/promises';
 import { kernelHash } from '@sim/kernel';
 import { coreRef } from '@sim/world-compiler';
-import { GENERATORS } from '@sim/generators';
 import { fixture, invite, accept, factory, seed } from '../../test/native-owner-fixture.ts';
 import { WorldHost } from '../world.ts';
 import { EdgeLedger } from '../edge/ledger/ledger.ts';
@@ -18,11 +17,9 @@ import { runQuery } from './query.ts';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export const HOUSE_BATCH = (at: [number, number] = [10, 0]) => ({ ops: [
   { op: 'define', def: { schema: 'def/1', name: 'house2', version: 1, description: 'A two-floor house.', tags: ['building'], size: { box: [8, 6, 6] }, make: { kind: 'gen', gen: 'building/1' }, params: { floors: { type: 'int', min: 1, max: 6, default: 2 } }, state: { doors: { type: 'json', default: {} } }, components: { foundation: { kind: 'none' } } } },
-  { op: 'define', def: { schema: 'def/1', name: 'flight', version: 1, description: 'A straight flight of stairs.', tags: ['stairs'], size: { box: [1.1, 2.8, 3.2] }, make: { kind: 'gen', gen: 'stairs/1' }, params: { rise: { type: 'number', default: 2.8 }, run: { type: 'number', default: 3.2 }, width: { type: 'number', default: 1.1 } } } },
   { op: 'place', tmp: '$h', def: 'house2@1', name: 'house', p: at },
-  { op: 'place', def: 'flight@1', name: 'stairs', in: { parent: '$h', slot: 'ground' }, p: [2.9, 0, 0] },
-  { op: 'place', def: coreRef('chair'), name: 'chair', in: { parent: '$h', slot: 'floor-1' }, p: [-2, 0, -1] },
-  { op: 'place', tmp: '$t', def: coreRef('table'), name: 'table', in: { parent: '$h', slot: 'floor-1' }, p: [2, 0, 1.2] },
+  { op: 'place', def: coreRef('chair'), name: 'chair', in: { parent: '$h', slot: 'floor-1' }, p: [-2, 0, 1] },
+  { op: 'place', tmp: '$t', def: coreRef('table'), name: 'table', in: { parent: '$h', slot: 'floor-1' }, p: [2, 0, 1] },
   { op: 'place', def: coreRef('bowl'), name: 'bowl', in: { parent: '$t', slot: 'top' } },
 ] });
 
@@ -43,15 +40,15 @@ test('Souls among god-built things: enter, climb, sit, carry, pray; bodies refus
   const r = w.god.act(HOUSE_BATCH(), 'two-floor house');
   assert.equal(r.accepted, true, JSON.stringify(r));
   await w.settle(3);
-  const E = w.host.engine as any, ids = Object.fromEntries(['house', 'house/stairs', 'house/chair', 'house/table', 'house/table/bowl'].map((p) => [p, w.god.model.get(p)!.id]));
+  const E = w.host.engine as any, ids = Object.fromEntries(['house', 'house/chair', 'house/table', 'house/table/bowl'].map((p) => [p, w.god.model.get(p)!.id]));
   const ep = E.world.entityPhysicsV1;
   assert.ok(ep?.byEntity[ids.house]?.solids?.length >= 5, 'walls');
-  assert.deepEqual([...new Set(ep.byEntity[ids.house].surfaces.map((x: any) => x.level))].sort(), [0, 1], 'two floors (one surface per room)');
-  assert.equal(ep.byEntity[ids['house/stairs']].links.length, 1, 'stairs');
+  assert.ok(ep.byEntity[ids.house].surfaces.some((x: any) => x.level === 1), 'an upper floor');
+  assert.equal(ep.byEntity[ids.house].links.length, 1, 'its own stairs (L2 building/1)');
   assert.ok(E.world.entities[ids['house/chair']]?.tags.includes('entity-world'), 'chair registered with the same id');
   assert.equal(E.world.entities[ids['house/table/bowl']]?.support?.kind, 'resting-on');
   // reach: from the lawn to the upstairs room, through the door and up the stairs
-  const reach = runQuery(w.god.model, { reach: { from: [10, 9], to: 'house:bedroom-2' } }).reach as any;
+  const reach = runQuery(w.god.model, { reach: { from: [10, 9], to: 'house:floor-1' } }).reach as any;
   assert.equal(reach.reachable, true, JSON.stringify(reach)); assert.ok(reach.levels.includes(1));
 
   // a Soul born through the owner flow gets a body entity with the engine's id
@@ -203,9 +200,7 @@ test('L3 shapes in the engine: a garden wall makes Souls go round, a deck is wal
   assert.equal(onSpan.reachable, true, JSON.stringify(onSpan));
 });
 
-// L2's building/1 bakes its own rooms and stairs (the lead's stub does not): this runs once L2 lands.
-const L2_STAIRS = !!(GENERATORS as any)['building/1']?.physics({ params: { floors: 2 }, args: {}, seed: 0 } as any)?.links?.length;
-test('Souls in an L2 cottage: lawn → front door → stairs → bedroom chair; rooms are reach ends', { timeout: 300000, skip: !L2_STAIRS && 'building/1 has no stairs yet (L2 not merged)' }, async (t) => {
+test('Souls in an L2 cottage: lawn → front door → stairs → bedroom chair; rooms are reach ends', { timeout: 300000}, async (t) => {
   const w = await world();
   w.brain.quiesce();
   t.after(() => { w.brain.quiesce(); w.host.stop(); w.db.close(); });
