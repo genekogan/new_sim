@@ -186,3 +186,13 @@ test('an L3 cliff (core/cliff): its face cannot be climbed, so the Soul walks ro
   assert.ok(r.ys.every((s) => fld.medium(s.x, s.z) !== 3), 'never set foot on the face');
   assert.deepEqual(e.runtime.violations, []);
 });
+
+test('a floater body glides up the knoll: its root follows the tiles (the picture adds its hover)', () => {
+  const e = world('floater');
+  (e.world.entities.h_ada as unknown as { body: unknown }).body = { family: 'floater', model: 'verdelis', radius: 0.35, hoverHeight: 1.45 };
+  const r = run(e, [{ verb: 'walk_to', params: { to: [30, 0] } }]);
+  assert.equal(r.end?.kind, 'completed', JSON.stringify(r.end));
+  for (const s of r.ys) assert.ok(Math.abs(s.y - field.height(s.x, s.z)) < 1e-9);
+  assert.ok(body(e).pose.p[1] > 4.9);
+  assert.deepEqual(e.runtime.violations, []);
+});
