@@ -199,6 +199,19 @@ export class EngineBridge {
       const la = this.levelFor(ya, a), lb = this.levelFor(yb, b);
       return { id: `${e.id}#${l.id}`, kind: kind as 'stairs' | 'ramp' | 'ladder' | 'climb', from: { level: la, p: a, y: la === 0 && Math.abs(ya) <= GROUND_BAND ? 0 : ya }, to: { level: lb, p: b, y: lb === 0 && Math.abs(yb) <= GROUND_BAND ? 0 : yb }, width: r3(l.width * wp.s), heading: r3(Math.atan2(b[1] - a[1], b[0] - a[0])), path, usable: true };
     });
+    // each flight's ends: its under-stair block stops short of the foot (the first tread is stepped onto, not walked
+    // under) and a head tread on the upper level bridges the stairwell edge, so both ends have standing room
+    for (const l of part.links ?? []) {
+      if (l.kind !== 'stairs' && l.kind !== 'ramp') continue;
+      const lid = l.id.slice(e.id.length + 1), d: Vec2 = [Math.cos(l.heading), Math.sin(l.heading)], T = 0.4;
+      for (const o of part.solids ?? []) {
+        if (!o.label.endsWith(` stairs:${lid}`)) continue;
+        const along = Math.abs(Math.cos(o.obb.yaw - l.heading)) > 0.7 ? 0 : 1;
+        if (o.obb.half[along] <= T) continue;
+        o.obb.half[along] = r3(o.obb.half[along] - T / 2); o.obb.c = [r3(o.obb.c[0] + d[0] * T / 2), r3(o.obb.c[1] + d[1] * T / 2)];
+      }
+      if (l.to.level > 0) (part.surfaces ??= []).push({ id: `${l.id}:head`, level: l.to.level, y: l.to.y, obb: { c: [r3(l.to.p[0] - d[0] * 0.25), r3(l.to.p[1] - d[1] * 0.25)], half: [0.35, r3(l.width / 2)], yaw: l.heading }, label: `${this.model.pathOf(e.id)} ${lid} head`.slice(0, 100) });
+    }
     return part.solids || part.surfaces || part.links ? withLinkApproaches(part) : null;
   }
 

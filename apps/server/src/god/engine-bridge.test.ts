@@ -218,7 +218,11 @@ test('Souls in an L2 cottage: lawn → front door → stairs → bedroom chair; 
   assert.ok(part.links?.length >= 1, 'stairs link');
   assert.ok(part.surfaces.some((x: any) => x.level === 1), 'upper floor');
   for (const l of part.links) { const a = l.from.p, z = l.to.p; t.diagnostic(`link ${l.id} ${l.from.level}→${l.to.level} bottom ${a} clear0=${E.clearanceAtV1(a[0], a[1], l.from.level).toFixed(2)} top ${z} clear1=${E.clearanceAtV1(z[0], z[1], l.to.level).toFixed(2)}; mid-landing clear1=${E.clearanceAtV1(10, -1.35, 1).toFixed(2)} bedroom=${E.clearanceAtV1(8.08, 1, 1).toFixed(2)} approach=${JSON.stringify(l.approach)} ${l.approach?.from ? `a0=${E.clearanceAtV1(l.approach.from[0], l.approach.from[1], 0).toFixed(2)}` : ""} ${l.approach?.to ? `a1=${E.clearanceAtV1(l.approach.to[0], l.approach.to[1], 1).toFixed(2)}` : ""} heading=${l.heading}`); }
-  for (const to of ['house:living', 'house:bedroom', 'house:bedroom-2', 'house:floor-1']) {
+  // a three-storey house: two flights, the second turning back over the first
+  const r3: any = w.god.act({ ops: [{ op: 'place', def: 'cottage2@1', name: 'tall', p: [-12, 14], params: { floors: 3 } }] });
+  assert.equal(r3.accepted, true, JSON.stringify(r3).slice(0, 400));
+  await w.settle(3);
+  for (const to of ['house:living', 'house:bedroom', 'house:bedroom-2', 'house:floor-1', 'tall:floor-2']) {
     const q = runQuery(w.god.model, { reach: { from: [10, 10], to } }).reach as any;
     t.diagnostic(`reach ${to}: ${JSON.stringify(q).slice(0, 220)}`);
     assert.equal(q.reachable, true, `${to}: ${JSON.stringify(q)}`);
