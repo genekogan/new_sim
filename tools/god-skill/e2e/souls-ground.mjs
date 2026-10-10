@@ -81,7 +81,7 @@ async function soulDoes(capability, { maxS = 240 } = {}) {
     await sleep(700);
   }
   const o = await observe();
-  return { accepted: true, phase: rec?.phase, code: rec?.code, reason: rec?.reason, samples, end: { p: o.self.position, activity: o.self.activity, state: o.self.state } };
+  return { accepted: true, phase: rec?.phase, code: rec?.code, reason: rec?.reason, samples, fromTick: r.data.receipt.acceptedTick ?? samples[0]?.tick ?? 0, toTick: o.tick, end: { p: o.self.position, activity: o.self.activity, state: o.self.state } };
 }
 const near = (p, q, d) => Math.hypot(p[0] - q[0], p[2] - q[1]) <= d;
 
@@ -182,11 +182,16 @@ try {
     report.samples.hill = r.samples;
     const gs = r.samples.length ? await groundAt(r.samples.map((s) => [s.p[0], s.p[2]])) : [];
     const off = r.samples.map((s, i) => Math.abs(s.p[1] - gs[i].y));
-    return { phase: r.phase, code: r.code, end: r.end, n: r.samples.length, maxOff: off.length ? Math.max(...off) : null, ys: r.samples.map((s) => s.p[1]) };
+    return { phase: r.phase, code: r.code, end: r.end, n: r.samples.length, maxOff: off.length ? Math.max(...off) : null, ys: r.samples.map((s) => s.p[1]), fromTick: r.fromTick, toTick: r.toTick };
   }, (r) => r.phase === 'completed' && near(r.end.p, KNOLL, 1.5) && r.end.p[1] > 5.5 && r.maxOff !== null && r.maxOff < 0.03 && r.ys.filter((y, i) => i && y > r.ys[i - 1] + 0.01).length >= 3);
   await step('S4 the takes carry the climb: the Soul\'s track rises from the field to the knoll top', async () => {
-    const d = (await api('/v1/take?after=-1', { as: 'none' })).data;
-    const ys = []; for (const c of d.chunks ?? []) for (const k of c.take?.tracks?.[soul.entityId] ?? []) ys.push(k[2] / 1000);
+    // the archived takes of the climb (1 s chunks), paged from the tick the walk was accepted
+    const ys = []; let from = (hill?.fromTick ?? 0) - 20;
+    for (let page = 0; page < 20 && from !== null; page++) {
+      const d = (await api(`/v1/takes?from=${from}&to=${(hill?.toTick ?? 0) + 20}&limit=120`, { as: 'none' })).data;
+      for (const c of d.chunks ?? []) for (const k of c.take?.tracks?.[soul.entityId] ?? []) ys.push(k[2] / 1000);
+      from = d.next ?? null;
+    }
     return { n: ys.length, min: Math.min(...ys), max: Math.max(...ys), rises: ys.filter((y, i) => i && y > ys[i - 1] + 0.005).length };
   }, (r) => r.n > 10 && r.max > 5.5 && r.min < 1 && r.rises >= 5);
   if (hill?.end) {
