@@ -6,7 +6,6 @@
   "description": "A cow (rigged, Idle and Walk clips). Grazes in pastures. Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Idle, Walk.",
   "tags": [
    "animal",
-   "creature",
    "pack",
    "cow",
    "farm",
@@ -48,7 +47,6 @@
   "description": "A horse (rigged, Idle and Walk clips). Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Idle, Walk.",
   "tags": [
    "animal",
-   "creature",
    "pack",
    "horse",
    "farm",
@@ -90,7 +88,6 @@
   "description": "A llama (rigged, Idle and Walk clips). Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Idle, Walk.",
   "tags": [
    "animal",
-   "creature",
    "pack",
    "llama",
    "farm",
@@ -132,7 +129,6 @@
   "description": "A pig (rigged, Idle and Walk clips). Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Idle, Walk.",
   "tags": [
    "animal",
-   "creature",
    "pack",
    "pig",
    "farm",
@@ -173,7 +169,6 @@
   "description": "A woolly sheep (rigged, Idle and Walk clips). Flocks graze meadows. Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Idle, Walk.",
   "tags": [
    "animal",
-   "creature",
    "pack",
    "sheep",
    "farm",
@@ -215,7 +210,6 @@
   "description": "A pug, a small dog (rigged, Idle and Walk clips). Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Idle, Walk.",
   "tags": [
    "animal",
-   "creature",
    "pack",
    "pug",
    "pet",
@@ -256,7 +250,6 @@
   "description": "A dog (rigged, Idle and Walk clips). Trots about town and gardens. Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Idle, Walk.",
   "tags": [
    "animal",
-   "creature",
    "pack",
    "dog",
    "pet",
@@ -297,7 +290,6 @@
   "description": "A cat (rigged, Idle and Walk clips). Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Idle, Walk.",
   "tags": [
    "animal",
-   "creature",
    "pack",
    "cat",
    "pet",
@@ -338,7 +330,6 @@
   "description": "A red fox (rigged, Walk clip). Woodland edges. Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Walk.",
   "tags": [
    "animal",
-   "creature",
    "pack",
    "fox",
    "wild",
@@ -348,7 +339,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "56d7a971c898c1752d807a8d941118ed59b3795a5d29d975c9b24710e1b4bb89",
+   "asset": "90af46babc5f19ff68fd746f1479b51cf09ee6a86bff38cc4a7223ea685b5470",
    "collide": "none"
   },
   "size": {
@@ -379,7 +370,6 @@
   "description": "A small bird (rigged, Fly clip). Wheels over meadows. Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Fly.",
   "tags": [
    "animal",
-   "creature",
    "pack",
    "bird",
    "wild",
@@ -421,7 +411,6 @@
   "description": "A koi carp (rigged, Swim clip). Swims just under a pond's surface. Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Swim.",
   "tags": [
    "animal",
-   "creature",
    "pack",
    "koi",
    "fish",
@@ -3687,7 +3676,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "5e3ad5159e06d18a70d405a9f1fcede4623f5f392761043e0b7838ea0c47ebc9",
+   "asset": "5911a5de663569fc184d04eae2940f26377e21e78b70e369ef74322236906516",
    "collide": "none"
   },
   "size": {
@@ -3769,7 +3758,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "261e30cbfba0e9ad13288b0cf3b657d1e15b1ebf829558e6f7a64d9f88f69fdb",
+   "asset": "9b04ddd9e4bd264da45d0a5a59fc120ff6ce4e33422bbf08e91ff103d11ff034",
    "collide": "none"
   },
   "size": {

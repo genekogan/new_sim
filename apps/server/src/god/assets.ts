@@ -377,7 +377,7 @@ export const SYNONYMS: Record<string, string[]> = {
   gull: ['seagull'], songbird: ['bird'], sparrow: ['bird'], robin: ['bird'], raven: ['crow'], duck: ['duck', 'waterfowl'], waterfowl: ['duck', 'goose'],
   boat: ['rowing-boat', 'rowboat'], rowboat: ['rowing-boat', 'rowboat'], 'rowing-boat': ['rowboat'], kayak: ['canoe'],
   ship: ['boat', 'sailboat'], bike: ['bicycle'], cycle: ['bicycle'], car: ['car', 'cart'], wagon: ['cart', 'wagon'],
-  lighthouse: ['lighthouse', 'tower', 'beacon'], beacon: ['lighthouse', 'tower'], tower: ['tower', 'minaret'], minaret: ['tower', 'temple'], temple: ['temple', 'chapel', 'shrine'], church: ['chapel', 'temple'],
+  lighthouse: ['lighthouse', 'tower', 'beacon'], beacon: ['lighthouse', 'tower'], tower: ['tower', 'minaret'], minaret: ['tower', 'temple'], temple: ['temple', 'shrine'], church: ['chapel', 'temple'],
   house: ['house', 'cottage', 'building', 'home'], home: ['house', 'cottage'], hut: ['cottage', 'shed'], cabin: ['cottage'], barn: ['barn', 'shed'],
   shrub: ['bush'], bush: ['bush', 'shrub', 'plant'], boulder: ['rock'], stone: ['rock', 'stone'], pebble: ['rock'], log: ['log', 'woodlog'], stump: ['treestump', 'stump'],
   sofa: ['sofa', 'couch'], couch: ['sofa'], seat: ['chair', 'bench', 'seat'], stool: ['stool', 'chair'], lamp: ['lamp', 'light'], light: ['lamp', 'light'], streetlight: ['lamp-post'],
@@ -423,7 +423,7 @@ export function searchDefs<T extends Searchable>(defs: T[], q: string, opts: { t
         if (name === v) cand.push([100, `name=${v}`]);
         if (ntoks.includes(v)) cand.push([40, `name~${v}`]);
         else if (name.includes(v) && v.length >= 3) cand.push([14, `name*${v}`]);
-        if (tags.includes(v)) cand.push([16, `tag=${v}`]); else if (tags.some((t) => t.startsWith(v) && v.length >= 3)) cand.push([6, `tag*${v}`]);
+        if (tags.includes(v)) cand.push([16, `tag=${v}`]); else if (tags.some((t) => t.startsWith(v) && v.length >= 4)) cand.push([6, `tag*${v}`]);
         if (dwords.has(v)) cand.push([4, `desc=${v}`]); else if (v.length >= 4 && desc.includes(v)) cand.push([1, `desc*${v}`]);
         for (const [c, label] of cand) if (c * wgt > best) { best = c * wgt; bestWhy = label; }
       }

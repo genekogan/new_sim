@@ -70,13 +70,16 @@ export type ModelInstance = {
 /**
  * A clone of a loaded asset (SkeletonUtils clone, so skinned meshes animate independently), fitted to the
  * def's frame: bounds centred on x/z, standing on y = 0, uniformly scaled so its height is `height`
- * (or, with `box`, so its height matches box[1]). Materials and geometry are shared with the source.
+ * (or, with `box`, so its largest extent matches the box on that axis). Materials and geometry are shared with the source.
  */
 export function instantiate(gltf: GLTF, opts: { height?: number; box?: [number, number, number] } = {}): ModelInstance {
   const src = gltf.userData.bounds as THREE.Box3;
   const size = src.getSize(new THREE.Vector3());
-  const want = opts.height ?? opts.box?.[1] ?? size.y;
-  const k = size.y > 1e-6 ? want / size.y : 1;
+  // With a box, fit the model's LARGEST extent to the box on that axis: defs clamp every side to ≥ 5 cm,
+  // so a flat thing (a rug 2 cm thick, a plate) scaled by height came out 1.5–2.5× too big.
+  const ext = [size.x, size.y, size.z], a = opts.box && opts.height === undefined ? ext.indexOf(Math.max(...ext)) : 1;
+  const want = opts.height ?? opts.box?.[a] ?? ext[a];
+  const k = ext[a] > 1e-6 ? want / ext[a] : 1;
   const model = cloneSkinned(gltf.scene);
   const centre = src.getCenter(new THREE.Vector3());
   model.position.set(-centre.x, -src.min.y, -centre.z);
