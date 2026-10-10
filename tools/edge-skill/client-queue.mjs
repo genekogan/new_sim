@@ -70,7 +70,7 @@ export function openClientQueue(directory,{adapter,scope=null,now=Date.now,onWak
   const ref=reference(step,part);if(part==='stop')step.stopRequested=true;else step.clientRef=ref;step.status=part==='stop'?'stopping':'dispatching';step.attempts=(step.attempts??0)+1;save();
   if(pausedNow()){for(const key of Object.keys(step))delete step[key];Object.assign(step,before);save();return null;}
   let result;try{result=await adapter.send({...body,clientRef:ref});}catch(error){if(error.code==='local.attended'&&error.requestNotSent){for(const key of Object.keys(step))delete step[key];Object.assign(step,before);save();return null;}state.notice={reason:'transport-uncertain',step:step.id,at:now()};save();return null;}
-  lease();if(!result?.accepted||!result.receipt?.id){step.status='failed';step.code=result?.code??'transport.invalid-response';step.reason=result?.reason??'No accepted receipt';notify('refusal',step);return null;}
+  lease();if(!result?.accepted||!result.receipt?.id){step.status='failed';step.refusalConfirmed=result?.accepted===false;step.code=result?.code??'transport.invalid-response';step.reason=result?.reason??'No accepted receipt';notify('refusal',step);return null;}
   return result.receipt;
  }
  async function drive(context={},paused=false){
@@ -125,8 +125,19 @@ export function openClientQueue(directory,{adapter,scope=null,now=Date.now,onWak
   snapshot,
   enqueue(steps,{id=randomUUID(),source='mind',replace=false,force=false}={}){
    lease();stable(id);stable(source);const normalized=replySteps({do:steps});if(normalized.some(s=>!s.act&&(s.for||s.until||s.if)))fail('public steps cannot carry body conditions');
+   if(normalized.some(s=>s.fixes!==undefined)){
+    const active=current(),replacement=normalized[0];
+    if(normalized.length!==1||!replacement.act||replacement.publicStep||/^(look|turn|face|glance)\b/i.test(replacement.act))fail('repair needs one replacement body step; original remaining steps are retained');
+    if(!active||replacement.fixes!==active.id)fail('fixes must name the current failed body step, never a foreign, earlier or completed step');
+    if(state.source==='owner'&&source==='owner'&&id!==state.id)fail('a new owner request must explicitly replace the queue; fixes continues its original request');
+    if(active.publicStep||active.status!=='failed'||active.refusalConfirmed!==true||active.receiptId)fail('repair requires a confirmed refused body request; accepted, active or uncertain effects cannot be replayed');
+    const index=state.steps.indexOf(active),next={...replacement,...(active.protected?{protected:true}:{}),id:`step-repair-${randomUUID()}`,status:'pending',attempts:0};
+    state.repairs=[...(state.repairs??[]),{failedStep:structuredClone(active),replacementStepId:next.id,requestedBy:id,requestedSource:source,at:now()}].slice(-24);
+    state.steps[index]=next;state.notice=null;save();return snapshot();
+   }
    if(state.id===id)return snapshot();
    const active=current();if(active&&!replace)fail('queue already has pending work');
+   if(active&&state.source==='owner'&&source==='mind'&&replace)fail('an unfinished owner queue needs an explicit current fixes continuation, not an implicit mind replacement');
    if(['dispatching','stopping'].includes(active?.status)&&replace)fail('transport outcome uncertain; reconcile before replacement');
    if(active?.protected&&replace&&!force)fail('local protected step requires explicit owner force/attended takeover');
    const previous=[...(state.previous??[])];if(active?.receiptId)previous.push({...active,status:'superseded'});
