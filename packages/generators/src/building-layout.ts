@@ -238,7 +238,7 @@ export function realize(p: Plan): Layout {
     const rIn = s.r - s.width / 2 - 0.02;
     L.stairs.push({ id: s.id, kind: 'spiral', from: s.from, to: s.to, room: p.rooms.find((r) => r.floor === s.from)?.id ?? '', width: s.width, risers: s.risers, y0, y1, c: s.c, r: s.r, a0: s.a0, sweep: s.sweep, path, hole: annulus(s.c, rIn, s.r + s.width / 2 + 0.05, 24) });
     // the inner disc of the upper floor gets a rail round its edge, open where the helix arrives
-    const disc = ngon(rIn, 8), arrive = s.a0 + s.sweep;
+    const disc = ngon(rIn, 6), arrive = s.a0 + s.sweep;
     disc.forEach((a, i) => { const b = disc[(i + 1) % disc.length]; const m = Math.atan2((a[0] + b[0]) / 2, (a[1] + b[1]) / 2); if (Math.abs(angDiff(m, arrive)) < 0.45) return; L.rails.push({ a, b, y0: y1, y1: y1 + 1.0 }); });
   }
 
@@ -280,7 +280,9 @@ export function realize(p: Plan): Layout {
     } else {
       const door = L.openings.find((o) => o.id === 'balcony-door');
       const xc = door ? door.at[0] : 0, w = Math.max(1.4, b.width);
-      const r: Rect = [Math.max(-W / 2 + 0.2, xc - w / 2), D / 2, Math.min(W / 2 - 0.2, xc + w / 2), D / 2 + b.depth];
+      // over a porch the balcony runs the porch's full width and depth (a veranda with a balcony on its roof)
+      const over = L.porch && b.floor === 1;
+      const r: Rect = over ? [-W / 2 + 0.1, D / 2, W / 2 - 0.1, D / 2 + L.porch!.depth] : [Math.max(-W / 2 + 0.2, xc - w / 2), D / 2, Math.min(W / 2 - 0.2, xc + w / 2), D / 2 + b.depth];
       L.balcony = { floor: b.floor, y, polys: [rectPolyOf(r)], ring: false, rect: r };
       L.rails.push({ a: [r[0], r[1]], b: [r[0], r[3]], y0: y, y1: y + 1.0 }, { a: [r[0], r[3]], b: [r[2], r[3]], y0: y, y1: y + 1.0 }, { a: [r[2], r[3]], b: [r[2], r[1]], y0: y, y1: y + 1.0 });
     }

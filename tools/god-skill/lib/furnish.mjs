@@ -57,6 +57,15 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
   const ends = (baked.links ?? []).flatMap((l) => [{ p: l.path[0], level: l.from }, { p: l.path[l.path.length - 1], level: l.to }]);
   const defOf = (alts) => (Array.isArray(alts) ? alts : [alts]).map((ref) => [ref, model.resolvedDef(ref)]).find(([, d]) => d);
   const want = opts.rooms ? new Set(opts.rooms) : null;
+  // pieces already in the building's rooms are obstacles too
+  for (const cid of model.children.get(b.id) ?? []) {
+    const ch = model.entities.get(cid), room = baked.rooms.find((r) => r.id === ch?.in.slot);
+    if (!ch || !room) continue;
+    const cd = model.resolvedDef(ch.def); if (!cd || cd.layer !== 'solid') continue;
+    const cb = model.bake(cd, ch.params ?? {}, ch.seed ?? 0), lp = ch.p ?? [0, 0], lx = lp[0], lz = lp[lp.length - 1];
+    const yaw = typeof ch.r === 'number' ? ch.r : Array.isArray(ch.r) ? ch.r[0] : 0;
+    taken.push({ floor: room.floor, solid: cb.box[1] > 0.06, box: { c: [room.origin[0] + lx, room.origin[1] + lz], half: [cb.box[0] / 2, cb.box[2] / 2], yaw, y0: room.y, y1: room.y + cb.box[1] } });
+  }
   for (const room of baked.rooms) {
     if (want && !want.has(room.id)) continue;
     const items = recipe.rooms?.[kindOf(room.id)] ?? recipe.default ?? [];

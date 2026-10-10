@@ -344,7 +344,9 @@
    {
     "name": "bed",
     "def": [
-     "core/bed@1"
+     "core/bed@1",
+     "core/bench-seat@1",
+     "core/bench@1"
     ],
     "try": [
      [

@@ -229,7 +229,7 @@ function towerPlan(c: Ctx): Plan {
   const inner = R - c.t / 2, sw = Math.min(0.9, inner * 0.36), rm = inner - sw / 2;
   const a0 = 0.5;
   const sweep = (320 * Math.PI) / 180;
-  const risers = Math.max(Math.ceil(c.fh / MAX_RISE), Math.ceil((rm * sweep) / 0.62));
+  const risers = Math.ceil(c.fh / MAX_RISE - 1e-9);
   for (let k = 0; k < c.floors - 1; k++) p.spirals.push({ id: ids.take('stairs'), from: k, to: k + 1, c: [0, 0], r: rm, width: sw, a0: a0 + k * sweep, sweep, risers });
   if (c.floors > 1 && inner - sw < 0.9) p.warnings.push('tower: narrow; little floor beside the stair');
   if (lantern && c.floors > 1) p.balcony = { floor: c.floors - 1, room: p.rooms[p.rooms.length - 1].id, width: 0, depth: 0.9, ring: true };

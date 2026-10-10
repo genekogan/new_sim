@@ -179,9 +179,12 @@ function outline(L: Layout): Vec2[] {
 function normalOf(w: Layout['walls'][number]): Vec2 { const dx = w.b[0] - w.a[0], dz = w.b[1] - w.a[1], l = Math.hypot(dx, dz) || 1; return [dz / l, -dx / l]; }
 /** Triangle estimate matching the mesh half's budget (walls, openings with frames, floors, stairs, roof, details). */
 export function estimateTris(L: Layout): number {
-  const walls = L.walls.length * 24, ops = L.openings.length * 56, floors = L.levels.reduce((m, lv) => m + lv.polys.length * 12, 0) * 2;
-  const stairs = L.stairs.reduce((m, st) => m + st.risers * 12 + 48, 0), rails = L.rails.length * 24, posts = L.posts.length * 24;
-  return walls + ops + floors + stairs + rails + posts + 400 + (L.round ? 300 : 0);
+  // calibrated against the mesh half (apps/web/.lane/tris.mts): walls as faces, framed openings, slabs, stairs, rails
+  const walls = L.walls.length * 30, ops = L.openings.reduce((m, o) => m + (o.kind === 'window' ? (o.exterior ? 100 : 60) : 90), 0);
+  const floors = L.levels.reduce((m, lv) => m + lv.polys.length * 40, 0), rooms = L.rooms.length * 32;
+  const stairs = L.stairs.reduce((m, st) => m + st.risers * (st.kind === 'spiral' ? 14 : 26) + 80, 0), rails = L.rails.length * 40, posts = L.posts.length * 48;
+  // the mesh half drops detail (ivy, flowers, shutters, lamps, mullions) until it fits 6 k, so the budget is capped there
+  return Math.min(6000, Math.round(walls + ops + floors + rooms + stairs + rails + posts + 500 + (L.round ? 400 : 0)));
 }
 
 export const buildingGen: Generator & { layout: typeof buildingLayout } = {
