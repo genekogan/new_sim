@@ -33,10 +33,17 @@ const t = () => performance.now();
 log(`▶ world "${slug}" on :${port}`);
 const marsWeb = resolve(root, '.lane/mars-web');
 const env = { ...process.env, ...(existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}), WORLD_KEY: slug, WORLD_ID: `${slug}-1`, ENGINE: 'mars', PORT: String(port), DEV_AUTH: '1', BRAIN_MODE: 'fake', SEED_NATIVES: '0', DATA_DIR: dataDir, PUBLIC_URL: `http://127.0.0.1:${port}` };
-const server = spawn(process.execPath, ['apps/server/src/main.ts'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env });
+let server = spawn(process.execPath, ['apps/server/src/main.ts'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env });
 let serverLog = '';
 server.stdout.on('data', (d) => { serverLog += d; }); server.stderr.on('data', (d) => { serverLog += d; });
 const stop = () => { try { server.kill(); } catch { } };
+async function restart() {
+  const gone = new Promise((r) => server.once('exit', r)); server.kill('SIGTERM'); await gone;
+  server = spawn(process.execPath, ['apps/server/src/main.ts'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env });
+  server.stdout.on('data', (d) => { serverLog += d; }); server.stderr.on('data', (d) => { serverLog += d; });
+  for (let i = 0; i < 3000; i++) { try { if ((await fetch(`${base}/healthz`)).ok) return true; } catch { } await wait(100); }
+  return false;
+}
 process.on('exit', () => { if (!args.keep) stop(); });
 const bootT = t();
 let up = false;
@@ -172,6 +179,14 @@ try {
     const g = await act([{ op: 'move', id: 'house/chair', p: [-1, 0, 0] }]);
     return { accepted: r.data.accepted, seated: s?.ok, refused: g.data.failures?.[0]?.code };
   }, (r) => r.accepted && r.seated && r.refused === 'occupied.by-body');
+  await step('S7 restart the world process: Ana, her seat, the god\'s things and the house physics survive', async () => {
+    const up2 = await restart(); if (!up2) return { up2 };
+    const body = await entity(soul.entityId), bowl = await entity(ids['house/table/bowl']);
+    const reach = await until(async () => { const q = (await api('/v1/god/query', { body: { reach: { from: [10, 9], to: 'house:floor-1' } } })).data.reach; return { ok: q?.reachable === true, q }; }, 60000);
+    const o = await until(async () => { const x = await observe(); return { ok: !!x?.self, activity: x?.self?.activity, at: x?.self?.position }; }, 60000);
+    const refused = await act([{ op: 'remove', id: 'house/chair' }]);
+    return { up2, body: body?.entity?.id === soul.entityId, bowlOnTable: bowl?.entity?.in?.parent === ids['house/table'], reach: reach?.ok, activity: o?.activity, at: o?.at, refused: refused.data.failures?.[0]?.code };
+  }, (r) => r.up2 && r.body && r.bowlOnTable && r.reach && r.refused === 'occupied.by-body');
   await shot('s6-inside-roof-hidden', { eye: [10, 16, 7], at: [10, 2.5, -0.5], wait: 10000 });
   await shot('s6-house-outside', { eye: [24, 9, 20], at: [10, 2, 0], wait: 4000, hideRoofs: false });
 } catch (e) {
