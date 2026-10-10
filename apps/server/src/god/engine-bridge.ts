@@ -14,6 +14,7 @@ import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { GodMode } from './god.ts';
 import { reachProviders, usesProviders, type ReachEnd } from './query.ts';
+import { GodNav } from './nav.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -48,9 +49,12 @@ export class EngineBridge {
   private writeBackBusy = false;
   private log: (m: string) => void;
   stats = { edits: 0, entities: 0, writeBacks: 0, refusals: 0, bodies: 0, lastMs: 0 };
+  /** P4: Souls walk to god-built named things (nav.ts). */
+  readonly nav: GodNav;
 
   constructor(o: BridgeOptions) {
     this.host = o.host; this.god = o.god; this.edge = o.edge; this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
+    this.nav = new GodNav({ model: this.god.model, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e) });
     this.god.onCommit((c) => { if (c.by !== 'engine') this.onCommit(c.diff); });
     this.host.listeners.push({
       afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); } },
@@ -538,6 +542,13 @@ export class EngineBridge {
     const p = this.engine.standableNearV1([wp.x, wp.z], level, undefined, 0.4, 40);
     return p ? { p, level, what: this.model.pathOf(e.id) } : { error: `no standing room near ${this.model.pathOf(e.id)}` };
   }
+  /** Engine level of a standing height at (x, z): 0 within reach of the terrain there (hills too), else a floor's level. */
+  levelAt(x: number, z: number, y: number): number {
+    if (Math.abs(y - this.model.terrain.sample(x, z)) <= GROUND_BAND + 0.5) return 0;
+    const hit = this.levels.find((l) => Math.abs(l.y - y) <= 0.6); if (hit) return hit.id;
+    const below = this.levels.filter((l) => l.y <= y + 0.5).sort((a, b) => b.y - a.y)[0];
+    return below?.id ?? 0;
+  }
   private levelOfY(y: number) { if (Math.abs(y) <= GROUND_BAND + 0.5) return 0; const l = this.levels.reduce<Level | null>((b, l) => (l.y <= y + 0.5 && (!b || l.y > b.y) ? l : b), null); return l?.id ?? 0; }
   reach(from: ReachEnd, to: ReachEnd) {
     const a = this.endOf(from), b = this.endOf(to);
@@ -572,6 +583,7 @@ export class EngineBridge {
 
   /** Capabilities on god-placed things near this Soul: sit on chairs, pick up items, put them on tables; and pray. */
   capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>) {
+    try { this.nav.capabilities(soul, caps, plans); } catch (e) { this.log(`nav capabilities: ${(e as Error).message}`); }
     caps.push({ id: 'pray', verb: 'pray', label: 'Pray to the god of this world (params: {"text": "…"}); answers come back under GET /v1/god/prayers/mine', available: true, params: { text: { type: 'string', maxLength: 2000 } } });
     const ents = this.engine.world.entities, me = ents[soul.entityId]; if (!me?.human) return;
     const here: Vec2 = [me.pose.p[0], me.pose.p[2]];
@@ -591,7 +603,11 @@ export class EngineBridge {
       const d = Math.round(Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]));
       if (asset.slots?.some((s) => s.kind === 'seat')) {
         const u = this.engine.bodyUsesV1(x.id), mine = u?.body === soul.entityId;
-        const id = `sit:${x.id}`, label = `Sit on ${name(x.id)} (${d} m${levelOf(x) ? `, floor ${levelOf(x)}` : ''})`;
+        // what it is and what it is by (P4): "Sit on e_… (a bench, by pond; 12 m)" — so "sit on the bench by the pond"
+        // resolves through the ledger's vocabulary (every word in the label) to this seat and not another bench
+        const ent = this.model.entities.get(x.id), kind = ent ? this.model.resolvedDef(ent.def)?.name.replace(/^core-/, '') : undefined;
+        const by = ent ? this.nav.namesNear([x.pose.p[0], x.pose.p[2]], x.id) : [];
+        const id = `sit:${x.id}`, label = `Sit on ${name(x.id)} (${kind && !name(x.id).split('/').pop()!.includes(kind) ? `a ${kind}, ` : ''}${by.length ? `by ${by.join(' and ')}; ` : ''}${d} m${levelOf(x) ? `, floor ${levelOf(x)}` : ''})`;
         caps.push({ id, verb: 'sit', label, target: { id: x.id, kind: 'object' }, available: !u || mine, ...(u && !mine ? { blocked: { code: 'seat.taken', reason: `${this.soulName(u.body)} is sitting there.` } } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: 60 } } });
         plans.set(id, { label, steps: [{ verb: 'sit', params: { on: x.id, seconds: 60 } }], seconds: true });
       }
