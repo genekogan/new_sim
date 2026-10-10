@@ -26,6 +26,9 @@ export class Auth {
   devAuth: boolean;
   cfg: Config; db: Db;
   constructor(cfg: Config, db: Db) {
+    // Guard construction too: legacy launchers may omit init when their account
+    // flag is false, then enable development fallback. Selected Clerk refuses.
+    if(cfg.authProvider==='clerk'&&!cfg.accountAuthRequired)throw Error('Clerk activation requires ACCOUNT_AUTH_REQUIRED=1');
     this.cfg = cfg; this.db = db; this.devAuth = process.env.DEV_AUTH === '1';
     // "Bearer dev:admin" is an admin when dev auth is on. It must never be on for a public site.
     if (this.devAuth && cfg.publicUrl.startsWith('https://')) throw new Error('DEV_AUTH=1 with a public https PUBLIC_URL: refusing to start');

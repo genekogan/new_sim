@@ -38,3 +38,14 @@ test('Clerk activation rejects test keys, mismatched issuer, missing origin and 
  const db=new Db(':memory:');const base={...config,accountAuthRequired:true,authProvider:'clerk' as const,publicUrl:'https://sim.example.test',clerkIssuer:'https://clerk.example.test',clerkPublishableKey:'pk_live_'+Buffer.from('clerk.example.test$').toString('base64'),clerkAuthorizedParties:['https://sim.example.test'],accountRegistryPath:':memory:'};
  try{for(const change of [{clerkPublishableKey:'pk_test_invalid'},{clerkIssuer:'https://wrong.example.test'},{clerkAuthorizedParties:[]},{accountRegistryPath:''}])await assert.rejects(new Auth({...base,...change},db).init());}finally{db.close();}
 });
+test('selected Clerk refuses construction before omitted init can enable anonymous dev fallback',async()=>{
+ const db=new Db(':memory:');
+ try{
+  for(const publicUrl of ['http://127.0.0.1:4959','https://sim.example.test/w/eden']){
+   assert.throws(()=>new Auth({...config,authProvider:'clerk',accountAuthRequired:false,publicUrl,privyAppId:'synthetic-disabled',privyAppSecret:'synthetic-disabled'},db),/Clerk activation requires ACCOUNT_AUTH_REQUIRED=1/);
+  }
+  assert.equal(db.db.prepare('SELECT COUNT(*) AS n FROM users').get()?.n,0);
+  // Existing explicit local/legacy flows retain their original semantics.
+  const legacy=new Auth({...config,authProvider:'privy',accountAuthRequired:false,publicUrl:'http://127.0.0.1:4959'},db);legacy.devAuth=true;assert.ok(await legacy.userFromToken('dev:agent-'+'b'.repeat(24)));legacy.close();
+ }finally{db.close();}
+});
