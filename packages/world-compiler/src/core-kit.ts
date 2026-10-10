@@ -45,5 +45,25 @@ export const CORE_KIT: DefInput[] = [
 
   // --- bodies (families; a Soul's body entity extends one) ---
   { schema: 'def/1', name: 'core-humanoid', version: 1, description: 'A human body on the humanoid rig.', tags: ['body'], form: 'point', make: { kind: 'none' }, size: { box: [0.56, 1.8, 0.56] }, layer: 'solid', anchor: 'base', components: { body: { media: ['walk', 'swim'], radius: 0.28, height: 1.8, landmarks: { eye: [0, 1.65, 0.08], top: [0, 1.8, 0], seat: [0, 0.45, 0] }, carry: { slot: 'hands', maxMass: 25, maxSize: [1.2, 1.2, 1.2] }, settle: 'sit', rig: 'humanoid' } }, slots: [{ id: 'carry', kind: 'carry', p: [0, 1.0, 0.35], yaw: 0, accepts: { tags: ['item'], maxMass: 25 }, capacity: 2 }] },
+  // humanoid@2: the same body, with a look composed from the humanoid kit (apps/web/src/humanoid, plan 32).
+  // Params are paint only; the engine body is unchanged. Height/build morphs are Phase 2 (after Stage B5).
+  { schema: 'def/1', name: 'core-humanoid', version: 2, extends: 'core/humanoid@1', description: 'A human body on the humanoid rig whose look (frame, face, hair, clothes, hat, glasses, bag, colours) is composed from the shared humanoid kit.', tags: ['body'], form: 'point', make: { kind: 'none' }, size: { box: [0.56, 1.8, 0.56] }, layer: 'solid', anchor: 'base',
+    params: {
+      preset: { type: 'enum', values: ['none', 'casual', 'punk', 'woman'], default: 'none' },
+      frame: { type: 'enum', values: ['masc', 'fem'], default: 'masc' },
+      face: { type: 'enum', values: ['open', 'pierced', 'soft'], default: 'open' },
+      hair: { type: 'enum', values: ['short', 'mohawk', 'bob', 'bald'], default: 'short' },
+      top: { type: 'enum', values: ['shirt', 'jacket', 'tank'], default: 'shirt' },
+      bottom: { type: 'enum', values: ['jeans', 'ripped', 'slacks'], default: 'jeans' },
+      shoes: { type: 'enum', values: ['sneakers', 'boots', 'flats'], default: 'sneakers' },
+      hat: { type: 'enum', values: ['none', 'cap', 'beanie', 'sunhat'], default: 'none' },
+      glasses: { type: 'enum', values: ['none', 'round', 'square', 'shades'], default: 'none' },
+      bag: { type: 'enum', values: ['none', 'backpack', 'satchel'], default: 'none' },
+      pattern: { type: 'enum', values: ['plain', 'stripes', 'checks', 'knit'], default: 'plain' },
+      headScale: { type: 'number', min: 0.9, max: 1.1, default: 1 },
+      skin: { type: 'color', default: '#cead86' }, hair1: { type: 'color', default: '#492e18' }, brows: { type: 'color', default: '#3e3429' }, eyes: { type: 'color', default: '#31251c' },
+      top1: { type: 'color', default: '#969083' }, top2: { type: 'color', default: '#b4b4b4' }, bottom1: { type: 'color', default: '#333f47' },
+      shoes1: { type: 'color', default: '#7d2734' }, soles: { type: 'color', default: '#b4b4b4' }, accent: { type: 'color', default: '#af8749' }, gear: { type: 'color', default: '#3c5a6e' },
+    } },
   { schema: 'def/1', name: 'core-floater', version: 1, description: 'A rigid hovering body (a sculpture, a head, a lantern).', tags: ['body'], form: 'point', make: { kind: 'none' }, size: { box: [0.7, 0.7, 0.7], scale: [0.4, 2.5] }, layer: 'solid', anchor: 'center', components: { body: { media: ['float'], radius: 0.35, height: 0.7, landmarks: { top: [0, 0.7, 0], eye: [0, 0.5, 0.3] }, carry: { slot: 'top', maxMass: 3, maxSize: [0.5, 0.5, 0.5] }, settle: 'hover', rig: null } }, slots: [{ id: 'carry', kind: 'carry', p: [0, 0.7, 0], yaw: 0, accepts: { tags: ['item'], maxMass: 3 }, capacity: 1 }] },
 ];

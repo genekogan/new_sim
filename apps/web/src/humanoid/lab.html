@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="robots" content="noindex, nofollow" />
+<title>Humanoid lab</title>
+<link rel="icon" href="data:," />
+<style>
+ body{margin:0;background:#dcd6c8;font:13px/1.35 ui-sans-serif,system-ui,sans-serif;color:#2a2620}
+ #view canvas{display:block}
+ #icons{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;background:#ece8de}
+ #icons figure{margin:0;text-align:center} #icons img{width:64px;height:64px;border-radius:50%;display:block;background:#e9e6dc;box-shadow:0 0 0 1px #0002}
+ #icons figcaption{font-size:10px;color:#6a6255}
+ body.picker #icons{display:none}
+ body.picker #picker{padding:12px 14px;background:#f4f1ea;max-width:360px}
+</style>
+</head>
+<body>
+<div id="view"></div>
+<div id="picker"></div>
+<div id="icons"></div>
+<script type="module" src="./lab.ts"></script>
+</body>
+</html>

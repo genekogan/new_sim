@@ -83,6 +83,11 @@ export function templateFromGltf(name:string,gltf:GLTF,appearance?:TemplateAppea
  return {name,gltf,arms,...measureWalk(gltf),...(appearance?{appearance}:{}),...(jog.found?{jogSpeed:jog.walkSpeed}:{}),...(sprint.found?{sprintSpeed:sprint.walkSpeed}:{})};
 }
 
+/** A composed body (humanoid@2 kit: one shared rig + parts) as a template: same fit/fitArms/measureWalk. */
+export function templateFromParts(name:string,scene:THREE.Group,animations:THREE.AnimationClip[]):Template{
+ return templateFromGltf(name,{scene,scenes:[scene],animations,cameras:[],asset:{version:'2.0'},parser:null,userData:{}} as unknown as GLTF);
+}
+
 function clip(gltf: GLTF, name: string) {
   const c = THREE.AnimationClip.findByName(gltf.animations, name);
   if (!c) throw Error(`Missing ${name} animation`);
