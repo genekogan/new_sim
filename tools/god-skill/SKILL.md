@@ -154,6 +154,12 @@ remove one and the ground goes back): `place cliff --path …`, `place terrace -
 level=4`, `place channel --path …`, `place brush --at x,z --param op=flatten --param radius=10`.
 Growth avoids roads, water and buildings by itself: lay roads and houses first, then `woodland`.
 
+**Buildings.** `place cottage --param floors=2 --param porch=2 --param balcony=true --facing s` (porch depth in m): the preset picks the
+plan (rooms per floor, stairs, doors, windows); `--param plan='…'` gives your own (`schema --md`).
+`describe <house>` lists room ids per floor (`living kitchen bath` / `landing bedroom bedroom-2`).
+`furnish <house>` fills every room from the building's recipe, `furnish <house>/<room>` one room
+(`--style shop`, `--dry` to see first); by hand: `--inside <house>/<room> --wall n | --corner se`.
+
 ## Editing
 
 ```
@@ -257,9 +263,10 @@ describe townhouse                       # rooms per floor (ids), stairs, doors
 place bed --inside townhouse/bedroom --wall n --name bed
 place chair --inside townhouse/bedroom --corner se
 place bookshelf --inside townhouse/bedroom --wall w
-place table --inside townhouse/kitchen --name table
-place chair --inside townhouse/kitchen --count 2 --facing townhouse/table
+place table --inside townhouse/parlour --name table
+place chair --inside townhouse/parlour --count 2 --facing townhouse/table
 place bowl --on townhouse/table
+furnish townhouse/kitchen                # a whole room from the building's recipe
 look --at townhouse --inside --from s    # roofs and upper storeys hidden
 ```
 **3. A river with a bridge** (`river-bridge.mjs`)

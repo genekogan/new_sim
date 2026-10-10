@@ -7,6 +7,8 @@
 import { mediumAt, waterDepthAt, waterLevelAt } from '@sim/ground';
 import { creatureAbilities, offsetPolyline, pointAlong, pointInPoly, prepareFor, queryOf, type Baked, type Vec2 } from '@sim/generators';
 import { obbOverlap, type Entity, type OBB, type StoredDef, WorldModel } from '@sim/world-compiler';
+// L2's furnish recipes (pure over the WorldModel; reads tools/god-skill/recipes/furnish/*.json)
+import { furnishBatch } from '../../../../tools/god-skill/lib/furnish.mjs';
 
 /** A reach end: a point [x, z] (ground) or [x, y, z], an entity id/path (a Soul's body, a chair…), or `<path>:<room>`. */
 export type ReachEnd = string | [number, number] | [number, number, number];
@@ -30,6 +32,8 @@ export type QueryInput = {
   where?: [number, number];
   /** Constraint status: every constrained entity, or the given refs. */
   resolve?: true | string[];
+  /** Furniture for a building's rooms from L2's recipes: { ops, placed, dropped, notes } (not applied). */
+  furnish?: { ref: string; style?: string; rooms?: string[] };
   /** Freeze what a path/area generator needs from the ground (road grade + bridge spans, river flow, deck heights; L3's
    *  prepareFor) so the client can send exact params. Returns { params, path? } or null when nothing is needed. */
   prepare?: { def: string; shape: { path?: [number, number][]; area?: [number, number][]; width?: number }; params?: Record<string, unknown> };
@@ -78,6 +82,11 @@ export function runQuery(w: WorldModel, q: QueryInput) {
   if (q.describe) out.describe = describe(w, q.describe);
   if (q.where) out.where = where(w, q.where);
   if (q.resolve) out.resolve = resolveConstraints(w, q.resolve === true ? null : q.resolve);
+  if (q.furnish) {
+    const e = getRef(w, q.furnish.ref);
+    if (!e) out.furnish = { error: `no such building ${q.furnish.ref}` };
+    else { try { out.furnish = furnishBatch(w, e.id, q.furnish.style, q.furnish.rooms ? { rooms: q.furnish.rooms } : {}); } catch (err) { out.furnish = { error: String((err as Error).message ?? err) }; } }
+  }
   if (q.prepare) {
     const ref = q.prepare.def.includes('@') || q.prepare.def.startsWith('sha:') ? q.prepare.def : `core/${q.prepare.def}@1`;
     const def = w.resolvedDef(ref);

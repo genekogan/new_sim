@@ -70,37 +70,21 @@ export async function map(opts = {}) {
 }
 
 /** defs <query>: search the library (always search before you define). */
-/** Words a builder says → words the library uses (searched too, ranked below the words given). */
-const SYNONYMS = { house: ['building', 'cottage'], home: ['building', 'cottage'], hut: ['shed', 'cottage'], church: ['chapel'], shop: ['building'], store: ['shop'],
-  street: ['road'], lane: ['road', 'track'], trail: ['footpath'], path: ['footpath'], walkway: ['footpath'], square: ['plaza'],
-  forest: ['woodland'], woods: ['woodland'], wood: ['woodland'], meadow: ['wildflowers'], field: ['lawn', 'wildflowers'], grass: ['lawn'],
-  lamp: ['lamp-post', 'lantern'], light: ['lamp-post', 'lantern'], seat: ['bench', 'chair'], sofa: ['sofa'], couch: ['sofa'],
-  water: ['lake', 'pond', 'river'], stream: ['river'], creek: ['stream'], hill: ['knoll'], wall: ['garden-wall', 'fence'],
-  animal: ['creature'], animals: ['creature'], herd: ['animals'], flock: ['animals'], pet: ['dog', 'cat'], boat: ['rowing-boat', 'canoe', 'sailboat'] };
-/** A word and its singulars (houses → house, benches → bench, ponies → pony). */
+/** Builder words the server's catalog search (L5, ranked, with its own synonyms) does not map yet: their
+ *  matches are appended after the server's own ranking. */
+const SYNONYMS = { house: ['townhouse'], home: ['townhouse'], street: ['road'], lane: ['road', 'track'], trail: ['footpath'], path: ['footpath'],
+  walkway: ['footpath'], square: ['plaza'], forest: ['woodland'], woods: ['woodland'], wood: ['woodland'], meadow: ['wildflowers'], field: ['lawn', 'wildflowers'],
+  grass: ['lawn'], water: ['lake', 'pond', 'river'], creek: ['stream'], wall: ['garden-wall', 'fence'], animal: ['creature'], animals: ['animals'],
+  herd: ['animals'], flock: ['animals'], pet: ['dog', 'cat'], stall: ['parasol-table', 'crate'], market: ['parasol-table', 'crate', 'barrel'], church: ['chapel'] };
 const forms = (w) => [...new Set([w, ...(w.length > 3 ? [w.replace(/s$/, ''), w.replace(/es$/, ''), w.replace(/ies$/, 'y')] : [])])];
 const synonymsOf = (w) => [...new Set(forms(w).flatMap((f) => SYNONYMS[f] ?? []))];
-/** Rank the server's matches by how well each word fits: whole name > a word of the name > an exact tag > the
- *  description as a word; a word buried inside another (house in warehouse) counts little. */
-function rankDefs(defsIn, q) {
-  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
-  const score = (d, w) => Math.max(...forms(w).map((f) => score1(d, f)));
-  const score1 = (d, sw) => {
-    const name = d.name.replace(/^core-/, ''), parts = name.split('-'), w = sw;
-    let s = 0;
-    if (name === w || name === sw) s += 12; else if (parts.includes(w) || parts.includes(sw)) s += 7; else if (name.includes(sw)) s += 3;
-    if (d.tags.includes(w) || d.tags.includes(sw)) s += 4; else if (d.tags.some((t) => t.includes(sw))) s += 0.5;
-    if (new RegExp(`\\b${sw}`, 'i').test(d.description)) s += 1;
-    return s;
-  };
-  return defsIn.map((d) => ({ d, s: words.reduce((a, w) => a + score(d, w) + 0.4 * Math.max(0, ...synonymsOf(w).map((x) => score(d, x))), 0) }))
-    .filter((r) => r.s >= 1).sort((a, b) => b.s - a.s).map((r) => r.d);
-}
 export async function defs(q, flags = {}) {
-  const qs = new URLSearchParams(); if (flags.tag) qs.set('tag', flags.tag);
-  if (q) { const words = q.toLowerCase().split(/\s+/).filter(Boolean); qs.set('q', [...new Set([...words.flatMap(forms), ...words.flatMap(synonymsOf)])].join(' ')); }
-  const r = ok(await call(`/v1/god/defs?${qs}`), 'defs');
-  if (q) r.defs = rankDefs(r.defs, q);
+  const get = async (words) => { const qs = new URLSearchParams(); if (words) qs.set('q', words); if (flags.tag) qs.set('tag', flags.tag); return ok(await call(`/v1/god/defs?${qs}`), 'defs').defs; };
+  const r = { defs: await get(q) };
+  if (q) {
+    const seen = new Set(r.defs.map((d) => d.ref));
+    for (const syn of [...new Set(q.toLowerCase().split(/\s+/).filter(Boolean).flatMap(synonymsOf))]) for (const d of (await get(syn)).slice(0, 3)) if (!seen.has(d.ref)) { seen.add(d.ref); r.defs.push(d); }
+  }
   const rows = r.defs.map((d) => ({ ref: d.ref.replace(/^core-/, 'core/'), form: d.form, layer: d.layer, box: d.size.box, tags: d.tags, params: Object.fromEntries(Object.entries(d.params).map(([k, f]) => [k, f.default ?? f.type])), slots: d.slots.map((x) => `${x.id}:${x.kind}`), description: d.description }));
   if (flags.json) return rows;
   if (!rows.length) return `no defs match "${q ?? ''}". Try a broader word, or define one: define-kit (see SKILL.md).`;
@@ -518,17 +502,22 @@ export async function defineKit(json, flags = {}) {
 }
 
 // ---------------------------------------------------------------- furnish / gallery (other lanes' libs)
+/** furnish <house>[/room] [--style townhouse] [--dry]: L2's recipes, run on the server (where the model and the
+ *  recipe files are), dry-run, then one batch the audience sees arrive. */
 export async function furnish(ref, flags = {}) {
-  const furnishLib = await import('./lib/furnish.mjs').catch(() => ({}));
-  if (typeof furnishLib.furnishBatch !== 'function') throw new Error('furnish is not available in this build (the recipes ship with the buildings lane); place furniture with --inside <house>/<room> [--corner|--wall]');
+  if (!ref) throw new Error('usage: furnish <house>[/room] [--style cottage|townhouse|shop|…] [--dry]');
   const v = view(await mirror());
-  const [houseRef, room] = String(ref).split(/\/(?=[^/]+$)/);
-  const host = v.get(ref) ?? v.get(houseRef); if (!host) throw new Error(`no such building: ${ref}`);
-  const b = await furnishLib.furnishBatch(v, host.path, flags.style ?? 'auto', { room: v.get(ref) ? undefined : room, describe: (x) => query({ describe: x }).then((q) => q.describe), bake: bakeInfo });
-  const batch = Array.isArray(b) ? { ops: b } : b;
-  if (!batch.ops?.length) return `nothing to furnish in ${ref}`;
-  const r = await act({ ...batch, ...(flags.group ? { group: flags.group } : {}) }, `furnish ${ref}`);
-  return r.accepted ? `furnished ${ref}: ${summarizeOps(batch.ops)} (seq ${r.seq})` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
+  const [houseRef, room] = v.get(ref) ? [ref, undefined] : String(ref).split(/\/(?=[^/]+$)/);
+  const host = v.get(houseRef); if (!host) throw new Error(`no such building: ${ref}`);
+  const rooms = room ? (host.slots ?? []).filter((x) => x.kind === 'room').map((x) => x.id).filter((id) => id === room || id.replace(/[^a-z]/g, '').startsWith(room.replace(/[^a-z]/g, ''))) : undefined;
+  if (room && !rooms.length) throw new Error(`${host.path} has no room ${room}; rooms: ${(host.slots ?? []).filter((x) => x.kind === 'room').map((x) => x.id).join(', ')}`);
+  const f = (await query({ furnish: { ref: host.path, ...(flags.style ? { style: flags.style } : {}), ...(rooms ? { rooms } : {}) } })).furnish;
+  if (!f || f.error) throw new Error(f?.error ?? 'furnish is not available on this server; place furniture with --inside <house>/<room> [--corner|--wall]');
+  const lines = [...(f.notes ?? []).map((n) => `  note: ${n}`), ...(f.dropped ?? []).slice(0, 8).map((d) => `  dropped: ${typeof d === 'string' ? d : `${d.name ?? d.def} (${d.why ?? d.reason ?? ''})`}`)];
+  if (!f.ops?.length) return [`nothing to furnish in ${ref}`, ...lines].join('\n');
+  if (flags.dry) return [`would furnish ${ref}: ${summarizeOps(f.ops)}`, ...lines].join('\n');
+  const r = await act({ ops: f.ops, ...(flags.group ? { group: flags.group } : {}) }, `furnish ${ref}`);
+  return r.accepted ? [`furnished ${ref}: ${summarizeOps(f.ops)} (seq ${r.seq})`, ...lines].join('\n') : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
 }
 export async function gallery() { return 'gallery: run `node tools/god-skill/scripts/gallery.mjs <world-url>` from the sim repo (it places every core def in a labelled grid and screenshots it).'; }
 

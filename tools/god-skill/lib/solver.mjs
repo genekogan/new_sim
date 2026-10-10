@@ -95,7 +95,10 @@ export function blockers(v, box, skip = new Set(), margin = 0.05) {
     if (row.layer !== 'solid' || !row.obbs || skip.has(row.id)) continue;
     const [x0, z0, x1, z1] = row.aabb;
     if (box.c[0] + r < x0 || box.c[0] - r > x1 || box.c[1] + r < z0 || box.c[1] - r > z1) continue;
-    if (row.obbs.some(([cx, cz, hx, hz, yaw]) => obbHit(box, { c: [cx, cz], half: [hx, hz], yaw }, margin))) out.push(row.path);
+    // furniture and props keep their whole footprint clear (a chair is not placed between a table's legs); buildings
+    // (walls with rooms inside) and plants (a bench under a tree's crown) keep only their colliders
+    const whole = row.form === 'point' && !(row.slots ?? []).some((x) => x.kind === 'room') && !(row.tags ?? []).some((t) => t === 'plant' || t === 'tree');
+    if (whole ? obbHit(box, boxOf(row), margin) : row.obbs.some(([cx, cz, hx, hz, yaw]) => obbHit(box, { c: [cx, cz], half: [hx, hz], yaw }, margin))) out.push(row.path);
   }
   return out;
 }
