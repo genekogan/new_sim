@@ -145,7 +145,9 @@ export class GodNav {
         const rref = `${ref}/${r.id}`; if (m.get(rref)) continue; // a child named like a room keeps its name
         const slot = baked.slots.find((x) => x.id === r.id);
         const local = slot ? [slot.p[0], slot.p[2]] as Vec2 : centroid(r.polygon as Vec2[]);
-        const poly = (r.polygon as Vec2[]).map(([a, b]) => toWorld((slot?.p[0] ?? 0) + a, (slot?.p[2] ?? 0) + b));
+        // a room slot's outline is relative to the slot; the baked room's own outline is in the building's frame
+        const sp = (slot as { polygon?: Vec2[] } | undefined)?.polygon;
+        const poly = sp?.length ? sp.map(([a, b]) => toWorld(slot!.p[0] + a, slot!.p[2] + b)) : (r.polygon as Vec2[]).map(([a, b]) => toWorld(a, b));
         const ry = wp.y + (r.y ?? 0) * wp.s, at = toWorld(local[0], local[1]);
         const rname = r.name ?? r.id, floor = r.floor ?? 0;
         roomRefs.push(rref);
