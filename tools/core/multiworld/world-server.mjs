@@ -1,3 +1,4 @@
+import {worldAuthMode,validateWorldOrigin} from './world-auth-mode.mjs';
 // Local edge-era Mars/LM launcher. One process and durable DB per world; fake
 // world cast only, while paired Souls remain exclusively agent controlled.
 import {createServer} from 'node:http';
@@ -9,9 +10,10 @@ import {readFileSync,mkdirSync,writeFileSync,unlinkSync} from 'node:fs';
 import {setImmediate} from 'node:timers/promises';
 import {readAuthoredSidecars} from './authored-sidecars.mjs';
 
-export async function openWorldServer({input,dataDir,worldKey,worldId,port,build='local-multiworld/1',webDir,marsWebDir,publicOrigin,ownerId='dev:admin',seedCast=true,nativeCast=true,runtimePolicies=true,installLiving=true,cards=true,skillFile,cliFile,checkOnly=false,worldVariant='legacy',sceneSha256,nativeCastIds,experiencesFile,experiencesSha256,placeData,placeDataSha256,activityData,activityDataSha256,nativeAliases,nativeAliasesSha256}){
+export async function openWorldServer({input,dataDir,worldKey,worldId,port,build='local-multiworld/1',webDir,marsWebDir,publicOrigin,ownerId='dev:admin',seedCast=true,nativeCast=true,runtimePolicies=true,installLiving=true,cards=true,skillFile,cliFile,instructionsFile,authMode='local-dev',checkOnly=false,worldVariant='legacy',sceneSha256,nativeCastIds,experiencesFile,experiencesSha256,placeData,placeDataSha256,activityData,activityDataSha256,nativeAliases,nativeAliasesSha256}){
  if(!['mars','littlemartians'].includes(worldKey)||!input||!dataDir||!worldId||!Number.isInteger(port)||port<4963||port>4969)throw Error('explicit local Mars/LM input/data/world and port4963..4969 required');
  if(!build.startsWith('local-')||!ownerId)throw Error('local build and explicit cast owner required');
+ const exposure=worldAuthMode(authMode,{edgePublic:process.env.EDGE_PUBLIC,devAuth:process.env.DEV_AUTH,seedCast,nativeCast});
  input=resolve(input);dataDir=resolve(dataDir);
  if(worldKey==='littlemartians'){
   const actual=createHash('sha256').update(readFileSync(join(input,'worlds/littlemartians/scene.json'))).digest('hex');
@@ -42,14 +44,13 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
  try{
   const prior=process.env.DATA_DIR;process.env.DATA_DIR=dataDir;
   let defaults;try{defaults=(await load('apps/server/src/config.ts')).config;}finally{if(prior===undefined)delete process.env.DATA_DIR;else process.env.DATA_DIR=prior;}
-  const origin=publicOrigin??`http://127.0.0.1:${port}`,url=new URL(origin);
-  if(url.protocol!=='http:'||!['127.0.0.1','localhost','[::1]'].includes(url.hostname))throw Error('local publicOrigin must be loopback HTTP');
+  const origin=validateWorldOrigin(publicOrigin??`http://127.0.0.1:${port}`,authMode);
   const cfg={...defaults,worldKey,worldId,worldPath:`/w/${worldKey}`,worldSeed:'sim-genesis-1',host:'127.0.0.1',port,dataDir,
    webDir:resolve(webDir??join(input,'apps/web/dist')),marsWebDir:resolve(marsWebDir??join(input,'mars/viewer/dist/client')),
    publicUrl:`${origin.replace(/\/$/,'')}/w/${worldKey}`,engine:'mars',livingWorld:true,seedNatives:false,ownerId,
    brainMode:'fake',budgetUsdPerDay:0,thinkingBudgetCeiling:1,authorizedThinkingWorldId:undefined,typesafeKey:undefined,anthropicKey:undefined,
-   privyAppId:'',privyAppSecret:'',r2:{prefix:'sim'},archiveTakes:false,inviteRequired:false,maxSoulsPerUser:50,build,mindDriver:'edge',
-   skillFile:undefined,cliFile:cliFile?resolve(cliFile):undefined};
+   ...(exposure.configured?{}:{privyAppId:'',privyAppSecret:''}),r2:{prefix:'sim'},archiveTakes:false,inviteRequired:exposure.configured?defaults.inviteRequired:false,maxSoulsPerUser:exposure.configured?defaults.maxSoulsPerUser:50,build,mindDriver:'edge',
+   skillFile:undefined,cliFile:cliFile?resolve(cliFile):undefined,instructionsFile:instructionsFile?resolve(instructionsFile):join(input,'tools/edge-skill/INSTRUCTIONS.md')};
   const {Db}=await load('apps/server/src/db.ts'),{WorldHost}=await load('apps/server/src/world.ts'),native=await load('packages/engine-mars/src/index.ts');
   const {worldDefinition}=await load('apps/server/src/world-config.ts'),definition=worldDefinition(worldKey);
   db=new Db(join(dataDir,'sim.db'));
@@ -67,7 +68,7 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
   const {Auth}=await load('apps/server/src/auth.ts'),{Brain}=await load('apps/server/src/brain.ts'),{Souls,ApiError}=await load('apps/server/src/souls.ts');
   const {LivingWorld}=await load('apps/server/src/living.ts'),{Hub}=await load('apps/server/src/hub.ts'),{buildApp}=await load('apps/server/src/http.ts');
   const {stripWorldRequestPath}=await load('apps/server/src/world-request-path.ts'),{handleMcp}=await load('apps/server/src/mcp.ts'),{EdgeLedger}=await load('apps/server/src/edge/ledger/ledger.ts');
-  const auth=new Auth(cfg,db);auth.devAuth=true;
+  const auth=new Auth(cfg,db);auth.devAuth=exposure.devAuth;if(exposure.configured)await auth.init();
   // The application exposes edge control; a separate fake-only config enables
   // the existing needs-driven native cast. A token or non-cast identity excludes
   // the Soul from every native thought/speech/reflection route immediately.

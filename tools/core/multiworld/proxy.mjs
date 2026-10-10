@@ -16,13 +16,17 @@ export function worldForPath(path='/'){
  if(/^\/(?:browser|modular|engine)(?:\/|$)/.test(url.pathname))return 'mars';
  return 'eden';
 }
-export async function openWorldProxy({port=4966,worlds}){
- if(!Number.isInteger(port)||port<4963||port>4969||!worlds||KEYS.some(k=>!Number.isInteger(worlds[k])||!(worlds[k]>=4950&&worlds[k]<=4969||k==='eden'&&worlds[k]===4970)))throw Error('explicit local world ports and private proxy4963..4969 required');
+export async function openWorldProxy({port=4966,worlds,exposure='local',expectedWorldIds,expectedBuild}){
+ const publicPreview=exposure==='shared-preview';if(!['local','shared-preview'].includes(exposure))throw Error('explicit proxy exposure required');
+ if(!Number.isInteger(port)||!(port>=4963&&port<=4969||publicPreview&&port===4970)||!worlds||KEYS.some(k=>!Number.isInteger(worlds[k])||!(worlds[k]>=4950&&worlds[k]<=4969||k==='eden'&&worlds[k]===4970)))throw Error('explicit local world ports and private proxy4963..4969 required');
+ if(publicPreview&&(port!==4970||worlds.eden<4950||worlds.eden>4959||new Set(Object.values(worlds)).size!==3||typeof expectedBuild!=='string'||!expectedBuild||!expectedWorldIds||KEYS.some(k=>typeof expectedWorldIds[k]!=='string'||!expectedWorldIds[k])||new Set(Object.values(expectedWorldIds)).size!==3))throw Error('shared preview requires private distinct backends and exact world/build identities');
+ const identities=new Map();
+ if(expectedWorldIds){for(const key of KEYS){const response=await fetch(`http://127.0.0.1:${worlds[key]}/w/${key}/v1/config`,{signal:AbortSignal.timeout(3000)});if(!response.ok||!response.headers.get('content-type')?.includes('application/json'))throw Error('world bootstrap unavailable: '+key);const cfg=await response.json();if(cfg.worldKey!==key||cfg.worldPath!==`/w/${key}`||cfg.worldId!==expectedWorldIds[key]||expectedBuild&&cfg.build!==expectedBuild)throw Error('world bootstrap identity differs: '+key);identities.set(key,{worldId:cfg.worldId,build:cfg.build});}}
  const sockets=new Set();let closing=false;
  const server=createServer((req,res)=>{
   if(closing){res.writeHead(503).end('Local worlds are draining.');return;}
   if(new URL(req.url,'http://local').pathname==='/__sim/worlds.json'){
-   res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'}).end(JSON.stringify({contract:'local-worlds/1',worlds:KEYS.map(key=>({key,worldKey:key,name:key==='littlemartians'?'Little Martians':key==='mars'?'Mars':'Eden',basePath:`/w/${key}`,configPath:`/w/${key}/v1/config`}))}));return;
+   res.writeHead(200,{'Content-Type':'application/json','Cache-Control':'no-store'}).end(JSON.stringify({contract:'local-worlds/1',worlds:KEYS.map(key=>({key,worldKey:key,...identities.get(key),name:key==='littlemartians'?'Little Martians':key==='mars'?'Mars':'Eden',basePath:`/w/${key}`,configPath:`/w/${key}/v1/config`}))}));return;
   }
   const key=worldForPath(req.url);if(!key){res.writeHead(404,{'Content-Type':'application/json'}).end(JSON.stringify({ok:false,code:'world.not-served'}));return;}
   const up=request({hostname:'127.0.0.1',port:worlds[key],path:req.url,method:req.method,headers:req.headers},r=>{res.writeHead(r.statusCode,r.headers);r.pipe(res);});

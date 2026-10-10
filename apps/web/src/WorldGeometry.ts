@@ -1,3 +1,4 @@
+import {parseBackdropHide,applyBackdropVisibility,type BackdropHide} from './WorldBackdropVisibility.ts';
 // Static parts of the live world view: the camp's ground, walls and stairs straight from the engine's
 // SpatialScene (doors are the gaps the engine leaves), optional decorative building GLBs, the daylight
 // that follows the world clock, and the small pure helpers the live view uses to pick recorded chunks
@@ -33,7 +34,7 @@ export type RawChunk = { fromTick: number; toTick: number; take: unknown };
 /** What the server streams over the socket (useSim keeps the latest). `receivedAt` is performance.now(). */
 export type LiveTakes = { serverTick: number; chunks: RawChunk[]; receivedAt: number };
 export type BuildingPlacement = { file: string; p: [number, number, number]; yaw?: number;scale?:number|[number,number,number] };
-export type MarsBackdrop={contract:'mars-campus-backdrop/1';url:string;at:[number,number,number]};
+export type MarsBackdrop={contract:'mars-campus-backdrop/1';url:string;at:[number,number,number];hide?:BackdropHide};
 export type SceneInfo = { scene: SpatialScene | null; buildings: BuildingPlacement[]; kin: KinPlacement[]; backdrop?:MarsBackdrop;assetRoot?:string;platforms?:PlatformFloor[]; clock?: { origin: number; dayTicks: number } | null; ground?: 'grass'; commons?: CommonsSceneMetadataV1; shore?:WorldShore };
 
 const num = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
@@ -81,7 +82,7 @@ export function parseSceneInfo(x: unknown): SceneInfo {
   const clock = obj(o.clock) && num(o.clock.origin) && num(o.clock.dayTicks) && o.clock.dayTicks > 0 ? { origin: o.clock.origin, dayTicks: o.clock.dayTicks } : null;
   const commons=obj(s)?commonsSceneMetadataV1Schema.safeParse(s.commons):null;
   const b=obj(s)?s.backdrop:null;
-  const backdrop=obj(b)&&b.contract==='mars-campus-backdrop/1'&&typeof b.url==='string'&&/^\/browser\/campus\.glb(?:\?[a-zA-Z0-9=._-]+)?$/.test(b.url)&&vec3(b.at)?b as MarsBackdrop:undefined;
+  const backdrop=obj(b)&&b.contract==='mars-campus-backdrop/1'&&typeof b.url==='string'&&/^\/browser\/campus\.glb(?:\?[a-zA-Z0-9=._-]+)?$/.test(b.url)&&vec3(b.at)?{contract:b.contract,url:b.url,at:b.at,hide:parseBackdropHide(b.hide)} as MarsBackdrop:undefined;
   const platforms=obj(s)&&Array.isArray(s.platforms)?parsePlatformFloors(s.platforms):undefined;
   return { scene, buildings, kin, backdrop,assetRoot:safeRoot,...(platforms?{platforms}:{}),clock,ground:o.ground==='grass'?'grass':undefined, commons:commons?.success?commons.data:undefined, ...(o.shore===undefined?{}:{shore:parseWorldShore(o.shore,scene)}) };
 }
@@ -282,7 +283,7 @@ export class WorldGeometry {
 
   /** Plain campus walls hide only after the authored mesh loads; navigation remains authoritative. */
   async addBackdrop(backdrop:MarsBackdrop,loader:GLTFLoader):Promise<boolean>{
-    try{const gltf=await loader.loadAsync(backdrop.url);if(this.disposed){disposeTree(gltf.scene);return false;}const root=gltf.scene;root.name='mars-campus-backdrop';root.position.fromArray(backdrop.at);root.traverse(o=>{if(o instanceof THREE.Mesh)o.castShadow=o.receiveShadow=true;});this.buildings.add(root);for(const m of this.prisms)if(m.name.startsWith('scene:campus:'))m.visible=false;return true;}catch{return false;}
+    try{const gltf=await loader.loadAsync(backdrop.url);if(this.disposed){disposeTree(gltf.scene);return false;}const root=gltf.scene;root.name='mars-campus-backdrop';root.position.fromArray(backdrop.at);applyBackdropVisibility(root,backdrop.hide);root.traverse(o=>{if(o instanceof THREE.Mesh)o.castShadow=o.receiveShadow=true;});this.buildings.add(root);for(const m of this.prisms)if(m.name.startsWith('scene:campus:'))m.visible=false;return true;}catch{return false;}
   }
 
   /** Mars camp only: mark material piles and the build site once the recording supplies regions (WorldMarsDesert.ts). */
