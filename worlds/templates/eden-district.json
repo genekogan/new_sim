@@ -1,0 +1,2370 @@
+{
+ "schema": "genesis/1",
+ "name": "Eden district",
+ "description": "A representative Eden district in the new vocabulary: the four homes of the housing street at their source footprints (brick courtyard house, two-storey balcony house, timber and stone two-storey houses) with furnished interiors, the lamp-lit street, the commons pavilion, the pond with its sloping bank, reeds and a family of ducks, the library, and the old-town plaza with its fountain, café tables and benches brought to the end of the street, plus the hot-air balloon (from the festival meadow) and the ferris wheel (from the seaside resort) brought into view. Place names kept from worlds/eden/places.v1.json (parity proof, docs/god/PARITY.md). Courtyards are drawn as plain rooms (courtyard plans are a gap).",
+ "constants": {
+  "extent": 600,
+  "ground": "land"
+ },
+ "state": {
+  "constitution": "# Eden district\nA growing settlement between hills and the sea: a commons by a calm pond, a lamp-lit street of homes, a library and a plaza with a fountain.\n\nParity demonstrator: generated from the Eden places.",
+  "sky": {
+   "palette": "clear-day",
+   "sun": 0.6
+  }
+ },
+ "batches": [
+  {
+   "note": "the pond with its sloping bank, reeds and stones; the commons lawn",
+   "group": "pond",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/pond@1",
+     "name": "shore-water",
+     "shape": {
+      "area": [
+       [
+        -60,
+        -8
+       ],
+       [
+        -55,
+        -11
+       ],
+       [
+        -47,
+        -9
+       ],
+       [
+        -46,
+        0
+       ],
+       [
+        -48,
+        9
+       ],
+       [
+        -56,
+        11
+       ],
+       [
+        -61,
+        5
+       ]
+      ]
+     },
+     "params": {
+      "depth": 1.6,
+      "level": -0.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/shore@1",
+     "name": "shore-bank",
+     "shape": {
+      "area": [
+       [
+        -60,
+        -8
+       ],
+       [
+        -55,
+        -11
+       ],
+       [
+        -47,
+        -9
+       ],
+       [
+        -46,
+        0
+       ],
+       [
+        -48,
+        9
+       ],
+       [
+        -56,
+        11
+       ],
+       [
+        -61,
+        5
+       ]
+      ]
+     },
+     "params": {
+      "material": "grass",
+      "width": 4,
+      "inner": 0.5
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/reedbed@1",
+     "name": "pond-reeds",
+     "shape": {
+      "area": [
+       [
+        -49,
+        -9
+       ],
+       [
+        -44,
+        -9
+       ],
+       [
+        -44,
+        -2
+       ],
+       [
+        -49,
+        -2
+       ]
+      ]
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/lawn@1",
+     "name": "commons",
+     "shape": {
+      "area": [
+       [
+        -46,
+        -14
+       ],
+       [
+        26,
+        -14
+       ],
+       [
+        26,
+        14
+       ],
+       [
+        -46,
+        14
+       ]
+      ]
+     },
+     "params": {
+      "material": "grass"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/duck@1",
+     "name": "mother-duck",
+     "p": [
+      -53,
+      0
+     ],
+     "params": {
+      "behavior": "swim",
+      "radius": 5,
+      "speed": 0.45
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/animals@1",
+     "name": "ducklings",
+     "shape": {
+      "area": [
+       [
+        -57,
+        -5
+       ],
+       [
+        -50,
+        -5
+       ],
+       [
+        -50,
+        5
+       ],
+       [
+        -57,
+        5
+       ]
+      ]
+     },
+     "params": {
+      "species": "duck",
+      "count": 5,
+      "scale": 0.5,
+      "speed": 0.5,
+      "behavior": "swim"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/lilypad-pack@1",
+     "name": "lilypads",
+     "p": [
+      -58,
+      6
+     ],
+     "constraints": [
+      {
+       "kind": "float"
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/bench@1",
+     "name": "bank-bench",
+     "p": [
+      -40,
+      4
+     ],
+     "r": -1.5707963267948966
+    }
+   ]
+  },
+  {
+   "note": "the commons pavilion and a path to the housing street",
+   "group": "commons",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/pavilion@1",
+     "name": "commons-pavilion",
+     "p": [
+      9,
+      -5
+     ],
+     "params": {
+      "w": 6,
+      "d": 4.5
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "commons-path",
+     "shape": {
+      "path": [
+       [
+        -30,
+        2
+       ],
+       [
+        0,
+        6
+       ],
+       [
+        20,
+        10
+       ],
+       [
+        27,
+        21.5
+       ]
+      ],
+      "width": 2
+     },
+     "params": {
+      "width": 2,
+      "material": "gravel"
+     }
+    }
+   ]
+  },
+  {
+   "note": "the lamp-lit housing street",
+   "group": "street",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/street@1",
+     "name": "eden-housing",
+     "shape": {
+      "path": [
+       [
+        26,
+        21.5
+       ],
+       [
+        88,
+        21.5
+       ]
+      ],
+      "width": 5
+     },
+     "params": {
+      "width": 5
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/lamp-post@1",
+     "name": "street-lamp-1",
+     "p": [
+      30,
+      18.2
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/lamp-post@1",
+     "name": "street-lamp-2",
+     "p": [
+      42,
+      18.2
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/lamp-post@1",
+     "name": "street-lamp-3",
+     "p": [
+      54,
+      18.2
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/lamp-post@1",
+     "name": "street-lamp-4",
+     "p": [
+      64,
+      18.2
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/lamp-post@1",
+     "name": "street-lamp-5",
+     "p": [
+      36,
+      24.8
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/lamp-post@1",
+     "name": "street-lamp-6",
+     "p": [
+      48,
+      24.8
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/lamp-post@1",
+     "name": "street-lamp-7",
+     "p": [
+      60,
+      24.8
+     ]
+    }
+   ]
+  },
+  {
+   "note": "the four homes at their source footprints, and the library",
+   "group": "houses",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/cottage@1",
+     "name": "eden-house-1",
+     "p": [
+      34,
+      15
+     ],
+     "params": {
+      "w": 7,
+      "d": 6,
+      "front": "s",
+      "material": "brick",
+      "wall": "#b86a4b",
+      "roof": "flat",
+      "roofColor": "#5e5a57"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/cottage@1",
+     "name": "eden-house-2",
+     "p": [
+      52,
+      11.76
+     ],
+     "params": {
+      "w": 8,
+      "d": 12.48,
+      "front": "s",
+      "floors": 2,
+      "balcony": true,
+      "roof": "flat",
+      "wall": "#e8dcc6",
+      "roofColor": "#5e5a57"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/cottage@1",
+     "name": "eden-house-3",
+     "p": [
+      33.98,
+      30
+     ],
+     "params": {
+      "w": 11.96,
+      "d": 10,
+      "front": "n",
+      "floors": 2,
+      "material": "wood",
+      "roof": "flat",
+      "wall": "#b98a5c",
+      "roofColor": "#5e5a57"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/cottage@1",
+     "name": "eden-house-4",
+     "p": [
+      53.98,
+      30
+     ],
+     "params": {
+      "w": 11.96,
+      "d": 10,
+      "front": "n",
+      "floors": 2,
+      "material": "stone",
+      "roof": "flat",
+      "wall": "#cfc8bb",
+      "roofColor": "#5e5a57"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/hall@1",
+     "name": "eden-library-1",
+     "p": [
+      74,
+      -7
+     ],
+     "params": {
+      "w": 10.4,
+      "d": 8.4,
+      "front": "s",
+      "wall": "#efe6d4",
+      "windows": 0.8
+     }
+    }
+   ]
+  },
+  {
+   "note": "roof gardens: planters and a bench on the flat roofs of houses 3 and 4 (as in Eden)",
+   "group": "roofs",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/planter-box@1",
+     "name": "eden-house-3-roof-planter-1",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "roof"
+     },
+     "p": [
+      -3,
+      0,
+      -2
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/planter-box@1",
+     "name": "eden-house-3-roof-planter-2",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "roof"
+     },
+     "p": [
+      3,
+      0,
+      -2
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/planter-box@1",
+     "name": "eden-house-4-roof-planter-1",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "roof"
+     },
+     "p": [
+      -3,
+      0,
+      -2
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/planter-box@1",
+     "name": "eden-house-4-roof-planter-2",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "roof"
+     },
+     "p": [
+      3,
+      0,
+      -2
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/bench-seat@1",
+     "name": "eden-house-4-roof-bench",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "roof"
+     },
+     "p": [
+      0,
+      0,
+      2
+     ],
+     "r": 3.141592653589793
+    }
+   ]
+  },
+  {
+   "note": "the plaza with the fountain, café tables and benches (relocated from the old town)",
+   "group": "plaza",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/plaza@1",
+     "name": "region-old-town.plaza",
+     "shape": {
+      "area": [
+       [
+        66,
+        12
+       ],
+       [
+        84,
+        12
+       ],
+       [
+        84,
+        26
+       ],
+       [
+        66,
+        26
+       ]
+      ]
+     },
+     "params": {
+      "material": "cobble",
+      "pattern": "radial"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/fountain@1",
+     "name": "plaza-fountain",
+     "p": [
+      75,
+      19
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/parasol-table@1",
+     "name": "cafe-table-1",
+     "p": [
+      69,
+      15
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/parasol-table@1",
+     "name": "cafe-table-2",
+     "p": [
+      81,
+      15
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/parasol-table@1",
+     "name": "cafe-table-3",
+     "p": [
+      69,
+      23
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/parasol-table@1",
+     "name": "cafe-table-4",
+     "p": [
+      81,
+      23
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/bench@1",
+     "name": "plaza-bench-1",
+     "p": [
+      75,
+      14.6
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/bench@1",
+     "name": "plaza-bench-2",
+     "p": [
+      75,
+      23.4
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/tree@1",
+     "name": "plaza-tree-1",
+     "p": [
+      67,
+      13
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/tree@1",
+     "name": "plaza-tree-2",
+     "p": [
+      83,
+      13
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/tree@1",
+     "name": "plaza-tree-3",
+     "p": [
+      67,
+      25
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/tree@1",
+     "name": "plaza-tree-4",
+     "p": [
+      83,
+      25
+     ]
+    }
+   ]
+  },
+  {
+   "note": "the balloon and the ferris wheel, brought into view",
+   "group": "attractions",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/ferris-wheel@1",
+     "name": "region-seaside-resort.ferris-wheel",
+     "p": [
+      12,
+      46
+     ],
+     "r": 0.3
+    },
+    {
+     "op": "place",
+     "def": "core/balloon@1",
+     "name": "festival-balloon",
+     "p": [
+      -14,
+      34
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/oak-tree-1-pack@1",
+     "name": "oak-1",
+     "p": [
+      20,
+      -20
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/oak-tree-1-pack@1",
+     "name": "oak-2",
+     "p": [
+      60,
+      -2
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/oak-tree-1-pack@1",
+     "name": "oak-3",
+     "p": [
+      -4,
+      26
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/oak-tree-1-pack@1",
+     "name": "oak-4",
+     "p": [
+      92,
+      4
+     ]
+    }
+   ]
+  },
+  {
+   "note": "furniture for eden-house-1, eden-house-2, eden-house-3, eden-house-4, eden-library-1 (L2 furnish recipes)",
+   "group": "furniture",
+   "ops": [
+    {
+     "op": "place",
+     "tmp": "$f0",
+     "def": "core/rug@1",
+     "name": "living-rug",
+     "in": {
+      "parent": "eden-house-1",
+      "slot": "living"
+     },
+     "p": [
+      0,
+      0,
+      0.49
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "tmp": "$f1",
+     "def": "core/sofa@1",
+     "name": "living-sofa",
+     "in": {
+      "parent": "eden-house-1",
+      "slot": "living"
+     },
+     "p": [
+      1.625,
+      0,
+      0.338
+     ],
+     "r": -1.571
+    },
+    {
+     "op": "place",
+     "tmp": "$f2",
+     "def": "core/round-table@1",
+     "name": "living-table",
+     "in": {
+      "parent": "eden-house-1",
+      "slot": "living"
+     },
+     "p": [
+      0,
+      0,
+      0.458
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/bowl@1",
+     "name": "living-bowl",
+     "in": {
+      "parent": "$f2",
+      "slot": "top"
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$f4",
+     "def": "core/floor-lamp@1",
+     "name": "living-lamp",
+     "in": {
+      "parent": "eden-house-1",
+      "slot": "living"
+     },
+     "p": [
+      -1.845,
+      0,
+      2.52
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "tmp": "$f5",
+     "def": "core/workbench@1",
+     "name": "kitchen-counter",
+     "in": {
+      "parent": "eden-house-1",
+      "slot": "kitchen"
+     },
+     "p": [
+      0,
+      0,
+      -0.922
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "tmp": "$f6",
+     "def": "core/table@1",
+     "name": "kitchen-table",
+     "in": {
+      "parent": "eden-house-1",
+      "slot": "kitchen"
+     },
+     "p": [
+      -0.69,
+      0,
+      0.735
+     ],
+     "r": 1.571
+    },
+    {
+     "op": "place",
+     "def": "core/bowl@1",
+     "name": "kitchen-bowl",
+     "in": {
+      "parent": "$f6",
+      "slot": "top"
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$f8",
+     "def": "core/chair@1",
+     "name": "kitchen-chair-1",
+     "in": {
+      "parent": "eden-house-1",
+      "slot": "kitchen"
+     },
+     "p": [
+      0,
+      0,
+      0.778
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f9",
+     "def": "core/chair@1",
+     "name": "kitchen-chair-2",
+     "in": {
+      "parent": "eden-house-1",
+      "slot": "kitchen"
+     },
+     "p": [
+      0.684,
+      0,
+      1
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f10",
+     "def": "core/rug@1",
+     "name": "bedroom-rug",
+     "in": {
+      "parent": "eden-house-1",
+      "slot": "bedroom"
+     },
+     "p": [
+      0,
+      0,
+      0
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "tmp": "$f11",
+     "def": "core/wardrobe@1",
+     "name": "bedroom-wardrobe",
+     "in": {
+      "parent": "eden-house-1",
+      "slot": "bedroom"
+     },
+     "p": [
+      -0.756,
+      0,
+      0.596
+     ],
+     "r": 1.571
+    },
+    {
+     "op": "place",
+     "tmp": "$f12",
+     "def": "core/floor-lamp@1",
+     "name": "bedroom-lamp",
+     "in": {
+      "parent": "eden-house-1",
+      "slot": "bedroom"
+     },
+     "p": [
+      -0.855,
+      0,
+      -1.1
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "tmp": "$f0",
+     "def": "core/rug@1",
+     "name": "living-rug",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "living"
+     },
+     "p": [
+      0,
+      0,
+      1.267
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "tmp": "$f1",
+     "def": "core/sofa@1",
+     "name": "living-sofa",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "living"
+     },
+     "p": [
+      2.125,
+      0,
+      0.986
+     ],
+     "r": -1.571
+    },
+    {
+     "op": "place",
+     "tmp": "$f2",
+     "def": "core/round-table@1",
+     "name": "living-table",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "living"
+     },
+     "p": [
+      0,
+      0,
+      1.106
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/bowl@1",
+     "name": "living-bowl",
+     "in": {
+      "parent": "$f2",
+      "slot": "top"
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$f4",
+     "def": "core/armchair@1",
+     "name": "living-armchair",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "living"
+     },
+     "p": [
+      2.165,
+      0,
+      2.765
+     ],
+     "r": -1.571
+    },
+    {
+     "op": "place",
+     "tmp": "$f5",
+     "def": "core/bookshelf@1",
+     "name": "living-shelf",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "living"
+     },
+     "p": [
+      2.405,
+      0,
+      -2.21
+     ],
+     "r": -1.571
+    },
+    {
+     "op": "place",
+     "tmp": "$f6",
+     "def": "core/floor-lamp@1",
+     "name": "living-lamp",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "living"
+     },
+     "p": [
+      -2.345,
+      0,
+      5.76
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "tmp": "$f7",
+     "def": "core/workbench@1",
+     "name": "kitchen-counter",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "kitchen"
+     },
+     "p": [
+      0,
+      0,
+      -2.542
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "tmp": "$f8",
+     "def": "core/table@1",
+     "name": "kitchen-table",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "kitchen"
+     },
+     "p": [
+      -0.69,
+      0,
+      0
+     ],
+     "r": 1.571
+    },
+    {
+     "op": "place",
+     "def": "core/bowl@1",
+     "name": "kitchen-bowl",
+     "in": {
+      "parent": "$f8",
+      "slot": "top"
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$f10",
+     "def": "core/chair@1",
+     "name": "kitchen-chair-1",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "kitchen"
+     },
+     "p": [
+      0,
+      0,
+      1.912
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f11",
+     "def": "core/chair@1",
+     "name": "kitchen-chair-2",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "kitchen"
+     },
+     "p": [
+      0,
+      0,
+      -1.366
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "tmp": "$f12",
+     "def": "core/stool@1",
+     "name": "kitchen-stool",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "kitchen"
+     },
+     "p": [
+      -0.895,
+      0,
+      2.76
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f13",
+     "def": "core/rug@1",
+     "name": "bath-rug",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "bath"
+     },
+     "p": [
+      0,
+      0,
+      0
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "tmp": "$f14",
+     "def": "core/stool@1",
+     "name": "bath-stool",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "bath"
+     },
+     "p": [
+      -0.895,
+      0,
+      -2.76
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "tmp": "$f15",
+     "def": "core/floor-lamp@1",
+     "name": "landing-lamp",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "landing"
+     },
+     "p": [
+      -3.52,
+      0,
+      -0.685
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "tmp": "$f16",
+     "def": "core/bed@1",
+     "name": "bedroom-bed",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "bedroom"
+     },
+     "p": [
+      -0.79,
+      0,
+      0
+     ],
+     "r": 1.571
+    },
+    {
+     "op": "place",
+     "tmp": "$f17",
+     "def": "core/rug@1",
+     "name": "bedroom-rug",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "bedroom"
+     },
+     "p": [
+      0,
+      0,
+      0
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "tmp": "$f18",
+     "def": "core/wardrobe@1",
+     "name": "bedroom-wardrobe",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "bedroom"
+     },
+     "p": [
+      -1.501,
+      0,
+      3.52
+     ],
+     "r": 1.571
+    },
+    {
+     "op": "place",
+     "tmp": "$f19",
+     "def": "core/dresser@1",
+     "name": "bedroom-dresser",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "bedroom"
+     },
+     "p": [
+      1.568,
+      0,
+      3.143
+     ],
+     "r": -1.571
+    },
+    {
+     "op": "place",
+     "tmp": "$f20",
+     "def": "core/floor-lamp@1",
+     "name": "bedroom-lamp",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "bedroom"
+     },
+     "p": [
+      -1.6,
+      0,
+      -4.755
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "tmp": "$f21",
+     "def": "core/bed@1",
+     "name": "bedroom-2-bed",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "bedroom-2"
+     },
+     "p": [
+      0,
+      0,
+      3.945
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f22",
+     "def": "core/rug@1",
+     "name": "bedroom-2-rug",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "bedroom-2"
+     },
+     "p": [
+      0,
+      0,
+      0
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "tmp": "$f23",
+     "def": "core/wardrobe@1",
+     "name": "bedroom-2-wardrobe",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "bedroom-2"
+     },
+     "p": [
+      -1.501,
+      0,
+      3.52
+     ],
+     "r": 1.571
+    },
+    {
+     "op": "place",
+     "tmp": "$f24",
+     "def": "core/dresser@1",
+     "name": "bedroom-2-dresser",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "bedroom-2"
+     },
+     "p": [
+      1.568,
+      0,
+      3.143
+     ],
+     "r": -1.571
+    },
+    {
+     "op": "place",
+     "tmp": "$f25",
+     "def": "core/floor-lamp@1",
+     "name": "bedroom-2-lamp",
+     "in": {
+      "parent": "eden-house-2",
+      "slot": "bedroom-2"
+     },
+     "p": [
+      -1.6,
+      0,
+      -4.755
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "tmp": "$f0",
+     "def": "core/rug@1",
+     "name": "living-rug",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "living"
+     },
+     "p": [
+      0,
+      0,
+      -0.97
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f1",
+     "def": "core/sofa@1",
+     "name": "living-sofa",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "living"
+     },
+     "p": [
+      -2.054,
+      0,
+      -4.3
+     ],
+     "r": 6.283
+    },
+    {
+     "op": "place",
+     "tmp": "$f2",
+     "def": "core/round-table@1",
+     "name": "living-table",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "living"
+     },
+     "p": [
+      0,
+      0,
+      -0.858
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "def": "core/bowl@1",
+     "name": "living-bowl",
+     "in": {
+      "parent": "$f2",
+      "slot": "top"
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$f4",
+     "def": "core/armchair@1",
+     "name": "living-armchair",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "living"
+     },
+     "p": [
+      -3.584,
+      0,
+      -2.145
+     ],
+     "r": 1.571
+    },
+    {
+     "op": "place",
+     "tmp": "$f5",
+     "def": "core/bookshelf@1",
+     "name": "living-shelf",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "living"
+     },
+     "p": [
+      -3.824,
+      0,
+      1.714
+     ],
+     "r": 1.571
+    },
+    {
+     "op": "place",
+     "tmp": "$f6",
+     "def": "core/floor-lamp@1",
+     "name": "living-lamp",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "living"
+     },
+     "p": [
+      3.764,
+      0,
+      -4.52
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f7",
+     "def": "core/workbench@1",
+     "name": "kitchen-counter",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "kitchen"
+     },
+     "p": [
+      0,
+      0,
+      1.922
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f8",
+     "def": "core/table@1",
+     "name": "kitchen-table",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "kitchen"
+     },
+     "p": [
+      0,
+      0,
+      -0.387
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "def": "core/bowl@1",
+     "name": "kitchen-bowl",
+     "in": {
+      "parent": "$f8",
+      "slot": "top"
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$f10",
+     "def": "core/chair@1",
+     "name": "kitchen-chair-1",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "kitchen"
+     },
+     "p": [
+      1.085,
+      0,
+      -0.42
+     ],
+     "r": 4.712
+    },
+    {
+     "op": "place",
+     "tmp": "$f11",
+     "def": "core/chair@1",
+     "name": "kitchen-chair-2",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "kitchen"
+     },
+     "p": [
+      0,
+      0,
+      1.056
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f12",
+     "def": "core/stool@1",
+     "name": "kitchen-stool",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "kitchen"
+     },
+     "p": [
+      1.456,
+      0,
+      2.14
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f13",
+     "def": "core/rug@1",
+     "name": "bath-rug",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "bath"
+     },
+     "p": [
+      0,
+      0,
+      0
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f14",
+     "def": "core/stool@1",
+     "name": "bath-stool",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "bath"
+     },
+     "p": [
+      1.456,
+      0,
+      2.14
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f15",
+     "def": "core/floor-lamp@1",
+     "name": "landing-lamp",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "landing"
+     },
+     "p": [
+      5.5,
+      0,
+      0.685
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f16",
+     "def": "core/bed@1",
+     "name": "bedroom-bed",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "bedroom"
+     },
+     "p": [
+      0,
+      0,
+      -2.705
+     ],
+     "r": 6.283
+    },
+    {
+     "op": "place",
+     "tmp": "$f17",
+     "def": "core/rug@1",
+     "name": "bedroom-rug",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "bedroom"
+     },
+     "p": [
+      0,
+      0,
+      0
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f18",
+     "def": "core/wardrobe@1",
+     "name": "bedroom-wardrobe",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "bedroom"
+     },
+     "p": [
+      1.513,
+      0,
+      -2.528
+     ],
+     "r": 4.712
+    },
+    {
+     "op": "place",
+     "tmp": "$f19",
+     "def": "core/dresser@1",
+     "name": "bedroom-dresser",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "bedroom"
+     },
+     "p": [
+      -1.579,
+      0,
+      -2.275
+     ],
+     "r": 1.571
+    },
+    {
+     "op": "place",
+     "tmp": "$f20",
+     "def": "core/floor-lamp@1",
+     "name": "bedroom-lamp",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "bedroom"
+     },
+     "p": [
+      1.612,
+      0,
+      3.515
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f21",
+     "def": "core/bed@1",
+     "name": "bedroom-2-bed",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "bedroom-2"
+     },
+     "p": [
+      0,
+      0,
+      -2.705
+     ],
+     "r": 6.283
+    },
+    {
+     "op": "place",
+     "tmp": "$f22",
+     "def": "core/rug@1",
+     "name": "bedroom-2-rug",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "bedroom-2"
+     },
+     "p": [
+      0,
+      0,
+      0
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f23",
+     "def": "core/wardrobe@1",
+     "name": "bedroom-2-wardrobe",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "bedroom-2"
+     },
+     "p": [
+      1.539,
+      0,
+      -2.528
+     ],
+     "r": 4.712
+    },
+    {
+     "op": "place",
+     "tmp": "$f24",
+     "def": "core/dresser@1",
+     "name": "bedroom-2-dresser",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "bedroom-2"
+     },
+     "p": [
+      -1.605,
+      0,
+      -2.275
+     ],
+     "r": 1.571
+    },
+    {
+     "op": "place",
+     "tmp": "$f25",
+     "def": "core/floor-lamp@1",
+     "name": "bedroom-2-lamp",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "bedroom-2"
+     },
+     "p": [
+      1.637,
+      0,
+      3.515
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f26",
+     "def": "core/rug@1",
+     "name": "bath-2-rug",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "bath-2"
+     },
+     "p": [
+      -0.001,
+      0,
+      0
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f27",
+     "def": "core/stool@1",
+     "name": "bath-2-stool",
+     "in": {
+      "parent": "eden-house-3",
+      "slot": "bath-2"
+     },
+     "p": [
+      1.651,
+      0,
+      3.555
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f0",
+     "def": "core/rug@1",
+     "name": "living-rug",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "living"
+     },
+     "p": [
+      0,
+      0,
+      -0.97
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f1",
+     "def": "core/sofa@1",
+     "name": "living-sofa",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "living"
+     },
+     "p": [
+      -2.054,
+      0,
+      -4.3
+     ],
+     "r": 6.283
+    },
+    {
+     "op": "place",
+     "tmp": "$f2",
+     "def": "core/round-table@1",
+     "name": "living-table",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "living"
+     },
+     "p": [
+      0,
+      0,
+      -0.858
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "def": "core/bowl@1",
+     "name": "living-bowl",
+     "in": {
+      "parent": "$f2",
+      "slot": "top"
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$f4",
+     "def": "core/armchair@1",
+     "name": "living-armchair",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "living"
+     },
+     "p": [
+      -3.584,
+      0,
+      -2.145
+     ],
+     "r": 1.571
+    },
+    {
+     "op": "place",
+     "tmp": "$f5",
+     "def": "core/bookshelf@1",
+     "name": "living-shelf",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "living"
+     },
+     "p": [
+      -3.824,
+      0,
+      1.714
+     ],
+     "r": 1.571
+    },
+    {
+     "op": "place",
+     "tmp": "$f6",
+     "def": "core/floor-lamp@1",
+     "name": "living-lamp",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "living"
+     },
+     "p": [
+      3.764,
+      0,
+      -4.52
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f7",
+     "def": "core/workbench@1",
+     "name": "kitchen-counter",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "kitchen"
+     },
+     "p": [
+      0,
+      0,
+      1.922
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f8",
+     "def": "core/table@1",
+     "name": "kitchen-table",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "kitchen"
+     },
+     "p": [
+      0,
+      0,
+      -0.387
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "def": "core/bowl@1",
+     "name": "kitchen-bowl",
+     "in": {
+      "parent": "$f8",
+      "slot": "top"
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$f10",
+     "def": "core/chair@1",
+     "name": "kitchen-chair-1",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "kitchen"
+     },
+     "p": [
+      1.085,
+      0,
+      -0.42
+     ],
+     "r": 4.712
+    },
+    {
+     "op": "place",
+     "tmp": "$f11",
+     "def": "core/chair@1",
+     "name": "kitchen-chair-2",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "kitchen"
+     },
+     "p": [
+      0,
+      0,
+      1.056
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f12",
+     "def": "core/stool@1",
+     "name": "kitchen-stool",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "kitchen"
+     },
+     "p": [
+      1.456,
+      0,
+      2.14
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f13",
+     "def": "core/rug@1",
+     "name": "bath-rug",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "bath"
+     },
+     "p": [
+      0,
+      0,
+      0
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f14",
+     "def": "core/stool@1",
+     "name": "bath-stool",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "bath"
+     },
+     "p": [
+      1.456,
+      0,
+      2.14
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f15",
+     "def": "core/floor-lamp@1",
+     "name": "landing-lamp",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "landing"
+     },
+     "p": [
+      5.5,
+      0,
+      0.685
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f16",
+     "def": "core/bed@1",
+     "name": "bedroom-bed",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "bedroom"
+     },
+     "p": [
+      0,
+      0,
+      -2.705
+     ],
+     "r": 6.283
+    },
+    {
+     "op": "place",
+     "tmp": "$f17",
+     "def": "core/rug@1",
+     "name": "bedroom-rug",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "bedroom"
+     },
+     "p": [
+      0,
+      0,
+      0
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f18",
+     "def": "core/wardrobe@1",
+     "name": "bedroom-wardrobe",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "bedroom"
+     },
+     "p": [
+      1.513,
+      0,
+      -2.528
+     ],
+     "r": 4.712
+    },
+    {
+     "op": "place",
+     "tmp": "$f19",
+     "def": "core/dresser@1",
+     "name": "bedroom-dresser",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "bedroom"
+     },
+     "p": [
+      -1.579,
+      0,
+      -2.275
+     ],
+     "r": 1.571
+    },
+    {
+     "op": "place",
+     "tmp": "$f20",
+     "def": "core/floor-lamp@1",
+     "name": "bedroom-lamp",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "bedroom"
+     },
+     "p": [
+      1.612,
+      0,
+      3.515
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f21",
+     "def": "core/bed@1",
+     "name": "bedroom-2-bed",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "bedroom-2"
+     },
+     "p": [
+      0,
+      0,
+      -2.705
+     ],
+     "r": 6.283
+    },
+    {
+     "op": "place",
+     "tmp": "$f22",
+     "def": "core/rug@1",
+     "name": "bedroom-2-rug",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "bedroom-2"
+     },
+     "p": [
+      0,
+      0,
+      0
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f23",
+     "def": "core/wardrobe@1",
+     "name": "bedroom-2-wardrobe",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "bedroom-2"
+     },
+     "p": [
+      1.539,
+      0,
+      -2.528
+     ],
+     "r": 4.712
+    },
+    {
+     "op": "place",
+     "tmp": "$f24",
+     "def": "core/dresser@1",
+     "name": "bedroom-2-dresser",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "bedroom-2"
+     },
+     "p": [
+      -1.605,
+      0,
+      -2.275
+     ],
+     "r": 1.571
+    },
+    {
+     "op": "place",
+     "tmp": "$f25",
+     "def": "core/floor-lamp@1",
+     "name": "bedroom-2-lamp",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "bedroom-2"
+     },
+     "p": [
+      1.637,
+      0,
+      3.515
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f26",
+     "def": "core/rug@1",
+     "name": "bath-2-rug",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "bath-2"
+     },
+     "p": [
+      -0.001,
+      0,
+      0
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f27",
+     "def": "core/stool@1",
+     "name": "bath-2-stool",
+     "in": {
+      "parent": "eden-house-4",
+      "slot": "bath-2"
+     },
+     "p": [
+      1.651,
+      0,
+      3.555
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f0",
+     "def": "core/long-table@1",
+     "name": "hall-table",
+     "in": {
+      "parent": "eden-library-1",
+      "slot": "hall"
+     },
+     "p": [
+      0,
+      0,
+      -2.453
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "tmp": "$f1",
+     "def": "core/bench-seat@1",
+     "name": "hall-bench-0",
+     "in": {
+      "parent": "eden-library-1",
+      "slot": "hall"
+     },
+     "p": [
+      -2.553,
+      0,
+      0
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f2",
+     "def": "core/bench-seat@1",
+     "name": "hall-bench-1",
+     "in": {
+      "parent": "eden-library-1",
+      "slot": "hall"
+     },
+     "p": [
+      0,
+      0,
+      0
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f3",
+     "def": "core/bench-seat@1",
+     "name": "hall-bench-2",
+     "in": {
+      "parent": "eden-library-1",
+      "slot": "hall"
+     },
+     "p": [
+      2.553,
+      0,
+      0
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f4",
+     "def": "core/bench-seat@1",
+     "name": "hall-bench-3",
+     "in": {
+      "parent": "eden-library-1",
+      "slot": "hall"
+     },
+     "p": [
+      -2.553,
+      0,
+      1.514
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f5",
+     "def": "core/bench-seat@1",
+     "name": "hall-bench-4",
+     "in": {
+      "parent": "eden-library-1",
+      "slot": "hall"
+     },
+     "p": [
+      0,
+      0,
+      1.514
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f6",
+     "def": "core/bench-seat@1",
+     "name": "hall-bench-5",
+     "in": {
+      "parent": "eden-library-1",
+      "slot": "hall"
+     },
+     "p": [
+      2.553,
+      0,
+      1.514
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f7",
+     "def": "core/floor-lamp@1",
+     "name": "hall-lamp-1",
+     "in": {
+      "parent": "eden-library-1",
+      "slot": "hall"
+     },
+     "p": [
+      -4.72,
+      0,
+      -3.72
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "tmp": "$f8",
+     "def": "core/floor-lamp@1",
+     "name": "hall-lamp-2",
+     "in": {
+      "parent": "eden-library-1",
+      "slot": "hall"
+     },
+     "p": [
+      4.72,
+      0,
+      3.72
+     ],
+     "r": 3.142
+    },
+    {
+     "op": "place",
+     "tmp": "$f9",
+     "def": "core/piano@1",
+     "name": "hall-piano",
+     "in": {
+      "parent": "eden-library-1",
+      "slot": "hall"
+     },
+     "p": [
+      4.39,
+      0,
+      1.938
+     ],
+     "r": -1.571
+    }
+   ]
+  }
+ ]
+}

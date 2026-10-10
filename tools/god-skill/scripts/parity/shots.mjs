@@ -26,10 +26,20 @@ try {
   for (const j of jobs) {
     const page = await (await browser.newContext({ viewport: { width: 1280, height: 760 } })).newPage();
     page.setDefaultTimeout(300000);
+    if (j.roofsOff) await page.addInitScript(() => { globalThis.__buildingView = { hideRoofs: true }; });   // building.mesh's roofs-off view
     const errors = []; page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
     const sep = j.url.includes('?') ? '&' : '?';
     const t0 = Date.now();
-    if (j.original) {
+    if (j.original) await page.route('**/*', (r) => (['GET', 'HEAD'].includes(r.request().method()) ? r.continue() : r.abort()));   // read-only: originals may be live
+    if (j.preset) {
+      // a live original from an older build: pick its own Explore view by label (no camera handle there)
+      await page.goto(`${j.url}`, { waitUntil: 'commit', timeout: 300000 });
+      await page.waitForFunction(() => document.querySelector('canvas')?.dataset.sceneBinding === 'bound', null, { timeout: 180000 }).catch(() => {});
+      await page.waitForTimeout(j.settle ?? 20000);
+      const sel = await page.$('select'); if (!sel) throw new Error(`${j.name}: no place selector`);
+      await sel.selectOption({ label: j.preset });
+      await page.waitForTimeout(12000);
+    } else if (j.original) {
       await page.goto(`${j.url}${sep}shot=1`, { waitUntil: 'commit', timeout: 300000 });
       for (let i = 0; i < 240; i++) { const ok = await page.evaluate(() => !!window.__simEntity?.camera).catch(() => false); if (ok) break; await page.waitForTimeout(500); }
       await page.waitForTimeout(j.settle ?? 20000);   // let the legacy scene stream its kits and GLBs

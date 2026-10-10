@@ -1,0 +1,2546 @@
+{
+ "schema": "genesis/1",
+ "name": "Mars camp",
+ "description": "The Mars College camp in the new vocabulary: desert floor, low hills and creosote scatter, the kitchen, the living room with its classroom corner and the bunk house as open-topped walled rooms, every fixture and item of the camp manifest at its source position (names kept), the stock piles (pallet racks with their beams in the sockets, timber, plywood), the lookout bay as built, solar panels, a shipping container and water totes. Campfire, chess board, sleeping mats, spoons, book and sketch pad are defined (kit/2) in the template. Generated from worlds/mars/camp/manifest.json + eden-camp.ts (parity proof, docs/god/PARITY.md). Not here: dust in the air and the desert sky (world weather/sky are not rendered yet, B7), the Souls' construction process (B5).",
+ "constants": {
+  "extent": 400,
+  "ground": "land"
+ },
+ "state": {
+  "constitution": "# Mars camp\nA Mars College camp on the low Sonoran desert by the Salton Sea: a kitchen, a living room and classroom corner, a bunk house, a fire circle, a garden and a build site.\n\nParity demonstrator: generated from the Mars camp manifest.",
+  "sky": {
+   "palette": "mars-desert",
+   "sun": 0.85
+  },
+  "weather": {
+   "clouds": 0.05,
+   "wind": 0.35,
+   "rain": 0
+  }
+ },
+ "batches": [
+  {
+   "note": "desert floor; creosote, stones and the odd cactus outside the camp (desert-coloured hills are a gap: relief takes the grass colour)",
+   "group": "desert",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/lawn@1",
+     "name": "desert-floor",
+     "shape": {
+      "area": [
+       [
+        -150,
+        -150
+       ],
+       [
+        150,
+        -150
+       ],
+       [
+        150,
+        150
+       ],
+       [
+        -150,
+        150
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/rock-field@1",
+     "name": "desert-scatter-1",
+     "shape": {
+      "area": [
+       [
+        -90,
+        -90
+       ],
+       [
+        90,
+        -90
+       ],
+       [
+        90,
+        -32
+       ],
+       [
+        -90,
+        -32
+       ]
+      ]
+     },
+     "params": {
+      "palette": [
+       {
+        "def": "core/bush@1",
+        "weight": 3,
+        "scale": [
+         0.5,
+         0.9
+        ]
+       },
+       {
+        "def": "core/rock@1",
+        "weight": 2
+       },
+       {
+        "def": "core/cactus@1",
+        "weight": 0.3
+       },
+       {
+        "def": "core/boulder-pile@1",
+        "weight": 0.3
+       }
+      ],
+      "density": 0.01,
+      "cluster": 0.5
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/rock-field@1",
+     "name": "desert-scatter-2",
+     "shape": {
+      "area": [
+       [
+        -90,
+        32
+       ],
+       [
+        90,
+        32
+       ],
+       [
+        90,
+        90
+       ],
+       [
+        -90,
+        90
+       ]
+      ]
+     },
+     "params": {
+      "palette": [
+       {
+        "def": "core/bush@1",
+        "weight": 3,
+        "scale": [
+         0.5,
+         0.9
+        ]
+       },
+       {
+        "def": "core/rock@1",
+        "weight": 2
+       },
+       {
+        "def": "core/cactus@1",
+        "weight": 0.3
+       },
+       {
+        "def": "core/boulder-pile@1",
+        "weight": 0.3
+       }
+      ],
+      "density": 0.01,
+      "cluster": 0.5
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/rock-field@1",
+     "name": "desert-scatter-3",
+     "shape": {
+      "area": [
+       [
+        -90,
+        -32
+       ],
+       [
+        -32,
+        -32
+       ],
+       [
+        -32,
+        32
+       ],
+       [
+        -90,
+        32
+       ]
+      ]
+     },
+     "params": {
+      "palette": [
+       {
+        "def": "core/bush@1",
+        "weight": 3,
+        "scale": [
+         0.5,
+         0.9
+        ]
+       },
+       {
+        "def": "core/rock@1",
+        "weight": 2
+       },
+       {
+        "def": "core/cactus@1",
+        "weight": 0.3
+       },
+       {
+        "def": "core/boulder-pile@1",
+        "weight": 0.3
+       }
+      ],
+      "density": 0.01,
+      "cluster": 0.5
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/rock-field@1",
+     "name": "desert-scatter-4",
+     "shape": {
+      "area": [
+       [
+        32,
+        -32
+       ],
+       [
+        90,
+        -32
+       ],
+       [
+        90,
+        32
+       ],
+       [
+        32,
+        32
+       ]
+      ]
+     },
+     "params": {
+      "palette": [
+       {
+        "def": "core/bush@1",
+        "weight": 3,
+        "scale": [
+         0.5,
+         0.9
+        ]
+       },
+       {
+        "def": "core/rock@1",
+        "weight": 2
+       },
+       {
+        "def": "core/cactus@1",
+        "weight": 0.3
+       },
+       {
+        "def": "core/boulder-pile@1",
+        "weight": 0.3
+       }
+      ],
+      "density": 0.01,
+      "cluster": 0.5
+     }
+    }
+   ]
+  },
+  {
+   "note": "defined things the library lacks (kit/2): campfire, chess board, sleeping mat, small items, container, water tote",
+   "group": "defs",
+   "ops": [
+    {
+     "op": "define",
+     "def": {
+      "schema": "def/1",
+      "name": "mars-campfire",
+      "version": 1,
+      "description": "A camp fire: a ring of stones, three crossed logs and a flame; glows at night.",
+      "tags": [
+       "fire",
+       "campfire",
+       "light",
+       "mars"
+      ],
+      "form": "point",
+      "make": {
+       "kind": "gen",
+       "gen": "kit/2",
+       "args": {
+        "shapes": [
+         {
+          "kind": "sphere",
+          "at": [
+           0.55,
+           0.08,
+           0
+          ],
+          "r": 0.13,
+          "segments": 6,
+          "tint": "stone"
+         },
+         {
+          "kind": "sphere",
+          "at": [
+           0.39,
+           0.08,
+           0.39
+          ],
+          "r": 0.13,
+          "segments": 6,
+          "tint": "stone"
+         },
+         {
+          "kind": "sphere",
+          "at": [
+           0,
+           0.08,
+           0.55
+          ],
+          "r": 0.13,
+          "segments": 6,
+          "tint": "stone"
+         },
+         {
+          "kind": "sphere",
+          "at": [
+           -0.39,
+           0.08,
+           0.39
+          ],
+          "r": 0.13,
+          "segments": 6,
+          "tint": "stone"
+         },
+         {
+          "kind": "sphere",
+          "at": [
+           -0.55,
+           0.08,
+           0
+          ],
+          "r": 0.13,
+          "segments": 6,
+          "tint": "stone"
+         },
+         {
+          "kind": "sphere",
+          "at": [
+           -0.39,
+           0.08,
+           -0.39
+          ],
+          "r": 0.13,
+          "segments": 6,
+          "tint": "stone"
+         },
+         {
+          "kind": "sphere",
+          "at": [
+           0,
+           0.08,
+           -0.55
+          ],
+          "r": 0.13,
+          "segments": 6,
+          "tint": "stone"
+         },
+         {
+          "kind": "sphere",
+          "at": [
+           0.39,
+           0.08,
+           -0.39
+          ],
+          "r": 0.13,
+          "segments": 6,
+          "tint": "stone"
+         },
+         {
+          "kind": "cyl",
+          "at": [
+           0,
+           0.12,
+           0
+          ],
+          "r": 0.06,
+          "h": 0.8,
+          "segments": 8,
+          "tint": "log",
+          "pitch": 1.5707963267948966,
+          "yaw": 0
+         },
+         {
+          "kind": "cyl",
+          "at": [
+           0,
+           0.12,
+           0
+          ],
+          "r": 0.06,
+          "h": 0.8,
+          "segments": 8,
+          "tint": "log",
+          "pitch": 1.5707963267948966,
+          "yaw": 1.0471975511965976
+         },
+         {
+          "kind": "cyl",
+          "at": [
+           0,
+           0.12,
+           0
+          ],
+          "r": 0.06,
+          "h": 0.8,
+          "segments": 8,
+          "tint": "log",
+          "pitch": 1.5707963267948966,
+          "yaw": 2.0943951023931953
+         },
+         {
+          "kind": "lathe",
+          "at": [
+           0,
+           0.14,
+           0
+          ],
+          "profile": [
+           [
+            0.22,
+            0
+           ],
+           [
+            0.13,
+            0.22
+           ],
+           [
+            0,
+            0.5
+           ]
+          ],
+          "segments": 6,
+          "tint": "flame",
+          "glow": 1
+         }
+        ],
+        "round": 0.015
+       }
+      },
+      "params": {
+       "stone": {
+        "type": "color",
+        "default": "#8f877a",
+        "doc": "stone colour"
+       },
+       "log": {
+        "type": "color",
+        "default": "#5e4630",
+        "doc": "log colour"
+       },
+       "flame": {
+        "type": "color",
+        "default": "#f39a3a",
+        "doc": "flame colour"
+       }
+      },
+      "size": {
+       "box": [
+        1.36,
+        0.39,
+        1.36
+       ]
+      },
+      "palette": {
+       "stone": "#8f877a",
+       "log": "#5e4630",
+       "flame": "#f39a3a"
+      },
+      "components": {
+       "light": {
+        "color": "#ffb36a",
+        "range": 7,
+        "on": true
+       }
+      }
+     }
+    },
+    {
+     "op": "define",
+     "def": {
+      "schema": "def/1",
+      "name": "mars-chess-board",
+      "version": 1,
+      "description": "A folding chess board with a tray of pieces.",
+      "tags": [
+       "game",
+       "chess",
+       "board",
+       "mars"
+      ],
+      "form": "point",
+      "make": {
+       "kind": "gen",
+       "gen": "kit/2",
+       "args": {
+        "shapes": [
+         {
+          "kind": "box",
+          "at": [
+           0,
+           0.01,
+           0
+          ],
+          "size": [
+           0.42,
+           0.02,
+           0.42
+          ],
+          "tint": "board"
+         },
+         {
+          "kind": "box",
+          "at": [
+           -0.16,
+           0.022,
+           -0.16
+          ],
+          "size": [
+           0.0525,
+           0.004,
+           0.0525
+          ],
+          "tint": "light"
+         },
+         {
+          "kind": "box",
+          "at": [
+           -0.16,
+           0.022,
+           -0.05
+          ],
+          "size": [
+           0.0525,
+           0.004,
+           0.0525
+          ],
+          "tint": "dark"
+         },
+         {
+          "kind": "box",
+          "at": [
+           -0.16,
+           0.022,
+           0.05
+          ],
+          "size": [
+           0.0525,
+           0.004,
+           0.0525
+          ],
+          "tint": "light"
+         },
+         {
+          "kind": "box",
+          "at": [
+           -0.16,
+           0.022,
+           0.16
+          ],
+          "size": [
+           0.0525,
+           0.004,
+           0.0525
+          ],
+          "tint": "dark"
+         },
+         {
+          "kind": "box",
+          "at": [
+           -0.05,
+           0.022,
+           -0.16
+          ],
+          "size": [
+           0.0525,
+           0.004,
+           0.0525
+          ],
+          "tint": "dark"
+         },
+         {
+          "kind": "box",
+          "at": [
+           -0.05,
+           0.022,
+           -0.05
+          ],
+          "size": [
+           0.0525,
+           0.004,
+           0.0525
+          ],
+          "tint": "light"
+         },
+         {
+          "kind": "box",
+          "at": [
+           -0.05,
+           0.022,
+           0.05
+          ],
+          "size": [
+           0.0525,
+           0.004,
+           0.0525
+          ],
+          "tint": "dark"
+         },
+         {
+          "kind": "box",
+          "at": [
+           -0.05,
+           0.022,
+           0.16
+          ],
+          "size": [
+           0.0525,
+           0.004,
+           0.0525
+          ],
+          "tint": "light"
+         },
+         {
+          "kind": "box",
+          "at": [
+           0.05,
+           0.022,
+           -0.16
+          ],
+          "size": [
+           0.0525,
+           0.004,
+           0.0525
+          ],
+          "tint": "light"
+         },
+         {
+          "kind": "box",
+          "at": [
+           0.05,
+           0.022,
+           -0.05
+          ],
+          "size": [
+           0.0525,
+           0.004,
+           0.0525
+          ],
+          "tint": "dark"
+         },
+         {
+          "kind": "box",
+          "at": [
+           0.05,
+           0.022,
+           0.05
+          ],
+          "size": [
+           0.0525,
+           0.004,
+           0.0525
+          ],
+          "tint": "light"
+         },
+         {
+          "kind": "box",
+          "at": [
+           0.05,
+           0.022,
+           0.16
+          ],
+          "size": [
+           0.0525,
+           0.004,
+           0.0525
+          ],
+          "tint": "dark"
+         },
+         {
+          "kind": "box",
+          "at": [
+           0.16,
+           0.022,
+           -0.16
+          ],
+          "size": [
+           0.0525,
+           0.004,
+           0.0525
+          ],
+          "tint": "dark"
+         },
+         {
+          "kind": "box",
+          "at": [
+           0.16,
+           0.022,
+           -0.05
+          ],
+          "size": [
+           0.0525,
+           0.004,
+           0.0525
+          ],
+          "tint": "light"
+         },
+         {
+          "kind": "box",
+          "at": [
+           0.16,
+           0.022,
+           0.05
+          ],
+          "size": [
+           0.0525,
+           0.004,
+           0.0525
+          ],
+          "tint": "dark"
+         },
+         {
+          "kind": "box",
+          "at": [
+           0.16,
+           0.022,
+           0.16
+          ],
+          "size": [
+           0.0525,
+           0.004,
+           0.0525
+          ],
+          "tint": "light"
+         }
+        ],
+        "round": 0.015
+       }
+      },
+      "params": {
+       "board": {
+        "type": "color",
+        "default": "#a07a4f",
+        "doc": "board colour"
+       },
+       "dark": {
+        "type": "color",
+        "default": "#3b2f25",
+        "doc": "dark colour"
+       },
+       "light": {
+        "type": "color",
+        "default": "#efe4cf",
+        "doc": "light colour"
+       }
+      },
+      "size": {
+       "box": [
+        0.42,
+        0.05,
+        0.42
+       ]
+      },
+      "palette": {
+       "board": "#a07a4f",
+       "dark": "#3b2f25",
+       "light": "#efe4cf"
+      },
+      "components": {
+       "boardGame": {
+        "game": "chess"
+       }
+      }
+     }
+    },
+    {
+     "op": "define",
+     "def": {
+      "schema": "def/1",
+      "name": "mars-sleep-mat",
+      "version": 1,
+      "description": "A rolled-out sleeping mat with a pillow.",
+      "tags": [
+       "bed",
+       "mat",
+       "sleep",
+       "mars"
+      ],
+      "form": "point",
+      "make": {
+       "kind": "gen",
+       "gen": "kit/2",
+       "args": {
+        "shapes": [
+         {
+          "kind": "box",
+          "at": [
+           0,
+           0.025,
+           0
+          ],
+          "size": [
+           0.8,
+           0.05,
+           1.95
+          ],
+          "tint": "mat",
+          "round": 0.02
+         },
+         {
+          "kind": "box",
+          "at": [
+           0,
+           0.07,
+           -0.78
+          ],
+          "size": [
+           0.55,
+           0.08,
+           0.3
+          ],
+          "tint": "pillow",
+          "round": 0.03
+         }
+        ],
+        "round": 0.015
+       }
+      },
+      "params": {
+       "mat": {
+        "type": "color",
+        "default": "#4f7a8a",
+        "doc": "mat colour"
+       },
+       "pillow": {
+        "type": "color",
+        "default": "#efe4cf",
+        "doc": "pillow colour"
+       }
+      },
+      "size": {
+       "box": [
+        0.8,
+        0.11,
+        1.95
+       ]
+      },
+      "palette": {
+       "mat": "#4f7a8a",
+       "pillow": "#efe4cf"
+      },
+      "components": {
+       "bed": {
+        "height": 0.06
+       }
+      },
+      "slots": [
+       {
+        "id": "mat",
+        "kind": "bed",
+        "p": [
+         0,
+         0.06,
+         0
+        ],
+        "yaw": 0,
+        "height": 0.06,
+        "accepts": {
+         "tags": [
+          "body"
+         ]
+        },
+        "capacity": 1
+       }
+      ]
+     }
+    },
+    {
+     "op": "define",
+     "def": {
+      "schema": "def/1",
+      "name": "mars-spoon",
+      "version": 1,
+      "description": "A wooden spoon.",
+      "tags": [
+       "item",
+       "spoon",
+       "kitchen"
+      ],
+      "form": "point",
+      "make": {
+       "kind": "gen",
+       "gen": "kit/2",
+       "args": {
+        "shapes": [
+         {
+          "kind": "box",
+          "at": [
+           0,
+           0.01,
+           0.04
+          ],
+          "size": [
+           0.025,
+           0.012,
+           0.13
+          ],
+          "tint": "wood"
+         },
+         {
+          "kind": "sphere",
+          "at": [
+           0,
+           0.015,
+           -0.05
+          ],
+          "r": 0.028,
+          "segments": 6,
+          "tint": "wood"
+         }
+        ],
+        "round": 0.015
+       }
+      },
+      "params": {
+       "wood": {
+        "type": "color",
+        "default": "#b08a5a",
+        "doc": "wood colour"
+       }
+      },
+      "size": {
+       "box": [
+        0.06,
+        0.05,
+        0.18
+       ]
+      },
+      "palette": {
+       "wood": "#b08a5a"
+      },
+      "components": {
+       "carryable": {
+        "mass": 0.05
+       }
+      },
+      "layer": "decor"
+     }
+    },
+    {
+     "op": "define",
+     "def": {
+      "schema": "def/1",
+      "name": "mars-book",
+      "version": 1,
+      "description": "A paperback book.",
+      "tags": [
+       "item",
+       "book",
+       "readable"
+      ],
+      "form": "point",
+      "make": {
+       "kind": "gen",
+       "gen": "kit/2",
+       "args": {
+        "shapes": [
+         {
+          "kind": "box",
+          "at": [
+           0,
+           0.015,
+           0
+          ],
+          "size": [
+           0.15,
+           0.03,
+           0.22
+          ],
+          "tint": "cover"
+         },
+         {
+          "kind": "box",
+          "at": [
+           0.004,
+           0.015,
+           0
+          ],
+          "size": [
+           0.14,
+           0.026,
+           0.21
+          ],
+          "tint": "pages"
+         }
+        ],
+        "round": 0.015
+       }
+      },
+      "params": {
+       "cover": {
+        "type": "color",
+        "default": "#b3482f",
+        "doc": "cover colour"
+       },
+       "pages": {
+        "type": "color",
+        "default": "#f3eee2",
+        "doc": "pages colour"
+       }
+      },
+      "size": {
+       "box": [
+        0.15,
+        0.05,
+        0.22
+       ]
+      },
+      "palette": {
+       "cover": "#b3482f",
+       "pages": "#f3eee2"
+      },
+      "components": {
+       "carryable": {
+        "mass": 0.3
+       },
+       "readable": {
+        "pages": 120
+       }
+      },
+      "layer": "decor"
+     }
+    },
+    {
+     "op": "define",
+     "def": {
+      "schema": "def/1",
+      "name": "mars-sketch-pad",
+      "version": 1,
+      "description": "A sketch pad.",
+      "tags": [
+       "item",
+       "paper",
+       "drawing"
+      ],
+      "form": "point",
+      "make": {
+       "kind": "gen",
+       "gen": "kit/2",
+       "args": {
+        "shapes": [
+         {
+          "kind": "box",
+          "at": [
+           0,
+           0.006,
+           0
+          ],
+          "size": [
+           0.3,
+           0.012,
+           0.22
+          ],
+          "tint": "paper"
+         }
+        ],
+        "round": 0.015
+       }
+      },
+      "params": {
+       "paper": {
+        "type": "color",
+        "default": "#f6f2e8",
+        "doc": "paper colour"
+       }
+      },
+      "size": {
+       "box": [
+        0.3,
+        0.05,
+        0.22
+       ]
+      },
+      "palette": {
+       "paper": "#f6f2e8"
+      },
+      "components": {
+       "carryable": {
+        "mass": 0.2
+       }
+      },
+      "layer": "decor"
+     }
+    },
+    {
+     "op": "define",
+     "def": {
+      "schema": "def/1",
+      "name": "mars-pencil",
+      "version": 1,
+      "description": "A pencil.",
+      "tags": [
+       "item",
+       "pencil",
+       "drawing"
+      ],
+      "form": "point",
+      "make": {
+       "kind": "gen",
+       "gen": "kit/2",
+       "args": {
+        "shapes": [
+         {
+          "kind": "cyl",
+          "at": [
+           0,
+           0.005,
+           0
+          ],
+          "r": 0.004,
+          "h": 0.17,
+          "segments": 8,
+          "tint": "wood",
+          "pitch": 1.5707963267948966
+         }
+        ],
+        "round": 0.015
+       }
+      },
+      "params": {
+       "wood": {
+        "type": "color",
+        "default": "#e0b23a",
+        "doc": "wood colour"
+       }
+      },
+      "size": {
+       "box": [
+        0.17,
+        0.05,
+        0.17
+       ]
+      },
+      "palette": {
+       "wood": "#e0b23a"
+      },
+      "components": {
+       "carryable": {
+        "mass": 0.01
+       }
+      },
+      "layer": "decor"
+     }
+    },
+    {
+     "op": "define",
+     "def": {
+      "schema": "def/1",
+      "name": "mars-container",
+      "version": 1,
+      "description": "A weathered 20 ft shipping container, doors to the camp.",
+      "tags": [
+       "container",
+       "shipping",
+       "mars",
+       "storage"
+      ],
+      "form": "point",
+      "make": {
+       "kind": "gen",
+       "gen": "kit/2",
+       "args": {
+        "shapes": [
+         {
+          "kind": "box",
+          "at": [
+           0,
+           1.295,
+           0
+          ],
+          "size": [
+           6.06,
+           2.59,
+           2.44
+          ],
+          "tint": "steel"
+         },
+         {
+          "kind": "box",
+          "at": [
+           -2.4,
+           1.295,
+           1.23
+          ],
+          "size": [
+           0.12,
+           2.5,
+           0.04
+          ],
+          "tint": "rib"
+         },
+         {
+          "kind": "box",
+          "at": [
+           -1.2,
+           1.295,
+           1.23
+          ],
+          "size": [
+           0.12,
+           2.5,
+           0.04
+          ],
+          "tint": "rib"
+         },
+         {
+          "kind": "box",
+          "at": [
+           0,
+           1.295,
+           1.23
+          ],
+          "size": [
+           0.12,
+           2.5,
+           0.04
+          ],
+          "tint": "rib"
+         },
+         {
+          "kind": "box",
+          "at": [
+           1.2,
+           1.295,
+           1.23
+          ],
+          "size": [
+           0.12,
+           2.5,
+           0.04
+          ],
+          "tint": "rib"
+         },
+         {
+          "kind": "box",
+          "at": [
+           2.4,
+           1.295,
+           1.23
+          ],
+          "size": [
+           0.12,
+           2.5,
+           0.04
+          ],
+          "tint": "rib"
+         },
+         {
+          "kind": "box",
+          "at": [
+           3.04,
+           1.295,
+           0
+          ],
+          "size": [
+           0.04,
+           2.4,
+           2.3
+          ],
+          "tint": "rib"
+         }
+        ],
+        "round": 0.015
+       }
+      },
+      "params": {
+       "steel": {
+        "type": "color",
+        "default": "#a8553f",
+        "doc": "steel colour"
+       },
+       "rib": {
+        "type": "color",
+        "default": "#8a4232",
+        "doc": "rib colour"
+       }
+      },
+      "size": {
+       "box": [
+        6.09,
+        2.59,
+        2.47
+       ]
+      },
+      "palette": {
+       "steel": "#a8553f",
+       "rib": "#8a4232"
+      },
+      "layer": "solid"
+     }
+    },
+    {
+     "op": "define",
+     "def": {
+      "schema": "def/1",
+      "name": "mars-lookout-stair",
+      "version": 1,
+      "description": "The lookout bay stair: a 10-tread timber flight up to the 2 m deck.",
+      "tags": [
+       "stairs",
+       "mars",
+       "build"
+      ],
+      "form": "point",
+      "make": {
+       "kind": "gen",
+       "gen": "stairs/1"
+      },
+      "params": {
+       "rise": {
+        "type": "number",
+        "default": 2
+       },
+       "run": {
+        "type": "number",
+        "default": 2.6
+       },
+       "width": {
+        "type": "number",
+        "default": 0.9
+       },
+       "material": {
+        "type": "string",
+        "default": "wood"
+       }
+      },
+      "size": {
+       "box": [
+        0.9,
+        2,
+        2.6
+       ]
+      },
+      "layer": "solid"
+     }
+    },
+    {
+     "op": "define",
+     "def": {
+      "schema": "def/1",
+      "name": "mars-water-tote",
+      "version": 1,
+      "description": "An IBC water tote: a white tank in a grey cage on a pallet.",
+      "tags": [
+       "water",
+       "tote",
+       "tank",
+       "mars"
+      ],
+      "form": "point",
+      "make": {
+       "kind": "gen",
+       "gen": "kit/2",
+       "args": {
+        "shapes": [
+         {
+          "kind": "box",
+          "at": [
+           0,
+           0.07,
+           0
+          ],
+          "size": [
+           1.2,
+           0.14,
+           1
+          ],
+          "tint": "pallet"
+         },
+         {
+          "kind": "box",
+          "at": [
+           0,
+           0.65,
+           0
+          ],
+          "size": [
+           1.1,
+           1,
+           0.95
+          ],
+          "tint": "tank",
+          "round": 0.08
+         },
+         {
+          "kind": "box",
+          "at": [
+           0,
+           0.65,
+           0
+          ],
+          "size": [
+           1.16,
+           1.04,
+           1
+          ],
+          "tint": "cage",
+          "round": 0.01
+         }
+        ],
+        "round": 0.015
+       }
+      },
+      "params": {
+       "pallet": {
+        "type": "color",
+        "default": "#a07a4f",
+        "doc": "pallet colour"
+       },
+       "tank": {
+        "type": "color",
+        "default": "#eef0ec",
+        "doc": "tank colour"
+       },
+       "cage": {
+        "type": "color",
+        "default": "#8c9196",
+        "doc": "cage colour"
+       }
+      },
+      "size": {
+       "box": [
+        1.2,
+        1.17,
+        1
+       ]
+      },
+      "palette": {
+       "pallet": "#a07a4f",
+       "tank": "#eef0ec",
+       "cage": "#8c9196"
+      },
+      "layer": "solid"
+     }
+    }
+   ]
+  },
+  {
+   "note": "the three camp buildings (open-topped walled rooms, 2.6 m walls, one door each)",
+   "group": "buildings",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/hall@1",
+     "name": "kitchen",
+     "p": [
+      -14,
+      -14
+     ],
+     "params": {
+      "w": 12,
+      "d": 12,
+      "floorHeight": 2.6,
+      "roof": "none",
+      "material": "plaster",
+      "wall": "#e6c9a0",
+      "trim": "#b08a62",
+      "windows": 0.25,
+      "front": "s",
+      "plan": {
+       "floors": [
+        {
+         "rooms": [
+          {
+           "id": "kitchen",
+           "rect": [
+            0,
+            0,
+            12,
+            12
+           ]
+          }
+         ],
+         "exterior": [
+          {
+           "room": "kitchen",
+           "wall": "s",
+           "width": 1.4
+          }
+         ]
+        }
+       ]
+      }
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/hall@1",
+     "name": "living-room",
+     "p": [
+      2,
+      -14
+     ],
+     "params": {
+      "w": 16,
+      "d": 12,
+      "floorHeight": 2.6,
+      "roof": "none",
+      "material": "plaster",
+      "wall": "#e6c9a0",
+      "trim": "#b08a62",
+      "windows": 0.25,
+      "front": "s",
+      "plan": {
+       "floors": [
+        {
+         "rooms": [
+          {
+           "id": "classroom-corner",
+           "rect": [
+            0,
+            0,
+            6.2,
+            12
+           ]
+          },
+          {
+           "id": "living-room",
+           "rect": [
+            6.2,
+            0,
+            16,
+            12
+           ]
+          }
+         ],
+         "exterior": [
+          {
+           "room": "living-room",
+           "wall": "s",
+           "width": 1.6
+          }
+         ]
+        }
+       ]
+      }
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/hall@1",
+     "name": "bunkhouse",
+     "p": [
+      16.5,
+      -14
+     ],
+     "params": {
+      "w": 9,
+      "d": 12,
+      "floorHeight": 2.6,
+      "roof": "none",
+      "material": "plaster",
+      "wall": "#e6c9a0",
+      "trim": "#b08a62",
+      "windows": 0.25,
+      "front": "s",
+      "plan": {
+       "floors": [
+        {
+         "rooms": [
+          {
+           "id": "bunkhouse",
+           "rect": [
+            0,
+            0,
+            9,
+            12
+           ]
+          }
+         ],
+         "exterior": [
+          {
+           "room": "bunkhouse",
+           "wall": "s",
+           "width": 1.4
+          }
+         ]
+        }
+       ]
+      }
+     }
+    }
+   ]
+  },
+  {
+   "note": "every camp fixture at its source position (kitchen tables, classroom, computers, chess, reading and drawing tables, fire circle, garden)",
+   "group": "fixtures",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/long-table@1",
+     "name": "prep-table",
+     "r": 0,
+     "in": {
+      "parent": "kitchen",
+      "slot": "kitchen"
+     },
+     "p": [
+      -2,
+      0,
+      -2
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/long-table@1",
+     "name": "dining-table",
+     "r": 0,
+     "in": {
+      "parent": "kitchen",
+      "slot": "kitchen"
+     },
+     "p": [
+      1.5,
+      0,
+      1.5
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/bench-seat@1",
+     "name": "dining-bench",
+     "r": 3.14,
+     "in": {
+      "parent": "kitchen",
+      "slot": "kitchen"
+     },
+     "p": [
+      1.5,
+      0,
+      2.45
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/screen@1",
+     "name": "class-display",
+     "r": 0,
+     "in": {
+      "parent": "living-room",
+      "slot": "classroom-corner"
+     },
+     "p": [
+      -0.1,
+      0,
+      -5.3
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/podium@1",
+     "name": "class-lectern",
+     "r": 0,
+     "in": {
+      "parent": "living-room",
+      "slot": "classroom-corner"
+     },
+     "p": [
+      -0.1,
+      0,
+      -2.5
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/chair@1",
+     "name": "class-seat-1",
+     "r": 3.14,
+     "in": {
+      "parent": "living-room",
+      "slot": "classroom-corner"
+     },
+     "p": [
+      -1.6,
+      0,
+      0.5
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/chair@1",
+     "name": "class-seat-2",
+     "r": 3.14,
+     "in": {
+      "parent": "living-room",
+      "slot": "classroom-corner"
+     },
+     "p": [
+      -0.1,
+      0,
+      0.5
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/chair@1",
+     "name": "class-seat-3",
+     "r": 3.14,
+     "in": {
+      "parent": "living-room",
+      "slot": "classroom-corner"
+     },
+     "p": [
+      1.4,
+      0,
+      0.5
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/chair@1",
+     "name": "class-seat-4",
+     "r": 3.14,
+     "in": {
+      "parent": "living-room",
+      "slot": "classroom-corner"
+     },
+     "p": [
+      -1.6,
+      0,
+      2.5
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/chair@1",
+     "name": "class-seat-5",
+     "r": 3.14,
+     "in": {
+      "parent": "living-room",
+      "slot": "classroom-corner"
+     },
+     "p": [
+      -0.1,
+      0,
+      2.5
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/chair@1",
+     "name": "class-seat-6",
+     "r": 3.14,
+     "in": {
+      "parent": "living-room",
+      "slot": "classroom-corner"
+     },
+     "p": [
+      1.4,
+      0,
+      2.5
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/desk@1",
+     "name": "computer-1",
+     "r": 3.14,
+     "in": {
+      "parent": "living-room",
+      "slot": "living-room"
+     },
+     "p": [
+      -0.1,
+      0,
+      -5
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/chair@1",
+     "name": "computer-1-chair",
+     "r": 3.14,
+     "in": {
+      "parent": "living-room",
+      "slot": "living-room"
+     },
+     "p": [
+      -0.1,
+      0,
+      -3.8
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/desk@1",
+     "name": "computer-2",
+     "r": 3.14,
+     "in": {
+      "parent": "living-room",
+      "slot": "living-room"
+     },
+     "p": [
+      2.9,
+      0,
+      -5
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/chair@1",
+     "name": "computer-2-chair",
+     "r": 3.14,
+     "in": {
+      "parent": "living-room",
+      "slot": "living-room"
+     },
+     "p": [
+      2.9,
+      0,
+      -3.8
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/long-table@1",
+     "name": "chess-table",
+     "r": 0,
+     "in": {
+      "parent": "living-room",
+      "slot": "living-room"
+     },
+     "p": [
+      -0.6,
+      0,
+      0.5
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/long-table@1",
+     "name": "reading-table",
+     "r": 0,
+     "in": {
+      "parent": "living-room",
+      "slot": "living-room"
+     },
+     "p": [
+      2.4,
+      0,
+      4
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/chair@1",
+     "name": "reading-chair",
+     "r": 0,
+     "in": {
+      "parent": "living-room",
+      "slot": "living-room"
+     },
+     "p": [
+      2.25,
+      0,
+      3.15
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/long-table@1",
+     "name": "drawing-table",
+     "r": 0,
+     "in": {
+      "parent": "living-room",
+      "slot": "living-room"
+     },
+     "p": [
+      3.4,
+      0,
+      -0.6
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/bench-seat@1",
+     "name": "living-bench",
+     "r": 3.14,
+     "in": {
+      "parent": "living-room",
+      "slot": "living-room"
+     },
+     "p": [
+      -0.6,
+      0,
+      5.25
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/chair@1",
+     "name": "listening-chair",
+     "r": 3.14,
+     "in": {
+      "parent": "living-room",
+      "slot": "living-room"
+     },
+     "p": [
+      1.4,
+      0,
+      -2.3
+     ]
+    },
+    {
+     "op": "place",
+     "def": "mars-campfire@1",
+     "name": "campfire",
+     "r": 0,
+     "p": [
+      0,
+      4
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/bench-seat@1",
+     "name": "fire-bench-north",
+     "r": 0,
+     "p": [
+      0,
+      0.6000000000000001
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/bench-seat@1",
+     "name": "fire-bench-south",
+     "r": 3.14,
+     "p": [
+      0,
+      7.4
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/long-table@1",
+     "name": "garden-table",
+     "r": 0,
+     "p": [
+      14,
+      1
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/planter-box@1",
+     "name": "planter-1",
+     "r": 0,
+     "p": [
+      12,
+      4.5
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/planter-box@1",
+     "name": "planter-2",
+     "r": 0,
+     "p": [
+      16,
+      4.5
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/planter-box@1",
+     "name": "planter-3",
+     "r": 0,
+     "p": [
+      12,
+      8
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/planter-box@1",
+     "name": "planter-4",
+     "r": 0,
+     "p": [
+      16,
+      8
+     ]
+    },
+    {
+     "op": "place",
+     "def": "mars-chess-board@1",
+     "name": "chess-board",
+     "in": {
+      "parent": "living-room/chess-table",
+      "slot": "top"
+     },
+     "p": [
+      -0.15,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "note": "items on the tables (pots, bowls, spoons, book, sketch pad, pencil) and the bunk-house mats",
+   "group": "items",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/pot@1",
+     "name": "supper-pot",
+     "in": {
+      "parent": "kitchen/prep-table",
+      "slot": "top"
+     },
+     "p": [
+      -0.15,
+      0,
+      -0.3
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/bowl@1",
+     "name": "beans-bowl",
+     "in": {
+      "parent": "kitchen/prep-table",
+      "slot": "top"
+     },
+     "p": [
+      -0.45,
+      0,
+      -0.3
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/bowl@1",
+     "name": "greens-bowl",
+     "in": {
+      "parent": "kitchen/prep-table",
+      "slot": "top"
+     },
+     "p": [
+      0.15,
+      0,
+      -0.3
+     ]
+    },
+    {
+     "op": "place",
+     "def": "mars-spoon@1",
+     "name": "prep-spoon",
+     "in": {
+      "parent": "kitchen/prep-table",
+      "slot": "top"
+     },
+     "p": [
+      -0.75,
+      0,
+      0
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/pot@1",
+     "name": "stew-pot",
+     "in": {
+      "parent": "kitchen/dining-table",
+      "slot": "top"
+     },
+     "p": [
+      -0.15,
+      0,
+      -0.3
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/bowl@1",
+     "name": "bowl-1",
+     "in": {
+      "parent": "kitchen/dining-table",
+      "slot": "top"
+     },
+     "p": [
+      -0.75,
+      0,
+      -0.3
+     ]
+    },
+    {
+     "op": "place",
+     "def": "mars-spoon@1",
+     "name": "spoon-1",
+     "in": {
+      "parent": "kitchen/dining-table",
+      "slot": "top"
+     },
+     "p": [
+      -0.45,
+      0,
+      -0.3
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/bowl@1",
+     "name": "bowl-2",
+     "in": {
+      "parent": "kitchen/dining-table",
+      "slot": "top"
+     },
+     "p": [
+      0.45,
+      0,
+      -0.3
+     ]
+    },
+    {
+     "op": "place",
+     "def": "mars-spoon@1",
+     "name": "spoon-2",
+     "in": {
+      "parent": "kitchen/dining-table",
+      "slot": "top"
+     },
+     "p": [
+      0.75,
+      0,
+      -0.3
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/bowl@1",
+     "name": "bowl-3",
+     "in": {
+      "parent": "kitchen/dining-table",
+      "slot": "top"
+     },
+     "p": [
+      -0.75,
+      0,
+      0.3
+     ]
+    },
+    {
+     "op": "place",
+     "def": "mars-spoon@1",
+     "name": "spoon-3",
+     "in": {
+      "parent": "kitchen/dining-table",
+      "slot": "top"
+     },
+     "p": [
+      -0.45,
+      0,
+      0.3
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/bowl@1",
+     "name": "bowl-4",
+     "in": {
+      "parent": "kitchen/dining-table",
+      "slot": "top"
+     },
+     "p": [
+      0.45,
+      0,
+      0.3
+     ]
+    },
+    {
+     "op": "place",
+     "def": "mars-spoon@1",
+     "name": "spoon-4",
+     "in": {
+      "parent": "kitchen/dining-table",
+      "slot": "top"
+     },
+     "p": [
+      0.75,
+      0,
+      0.3
+     ]
+    },
+    {
+     "op": "place",
+     "def": "mars-book@1",
+     "name": "camp-book",
+     "in": {
+      "parent": "living-room/reading-table",
+      "slot": "top"
+     },
+     "p": [
+      -0.15,
+      0,
+      -0.3
+     ]
+    },
+    {
+     "op": "place",
+     "def": "mars-sketch-pad@1",
+     "name": "sketch-pad",
+     "in": {
+      "parent": "living-room/drawing-table",
+      "slot": "top"
+     },
+     "p": [
+      -0.15,
+      0,
+      -0.3
+     ]
+    },
+    {
+     "op": "place",
+     "def": "mars-pencil@1",
+     "name": "sketch-pencil",
+     "in": {
+      "parent": "living-room/drawing-table",
+      "slot": "top"
+     },
+     "p": [
+      0.15,
+      0,
+      -0.3
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/bowl@1",
+     "name": "water-bowl",
+     "in": {
+      "parent": "garden-table",
+      "slot": "top"
+     },
+     "p": [
+      -0.45,
+      0,
+      -0.3
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/bowl@1",
+     "name": "seed-bowl",
+     "in": {
+      "parent": "garden-table",
+      "slot": "top"
+     },
+     "p": [
+      0.45,
+      0,
+      -0.3
+     ]
+    },
+    {
+     "op": "place",
+     "def": "mars-sleep-mat@1",
+     "name": "mat-1",
+     "in": {
+      "parent": "bunkhouse",
+      "slot": "bunkhouse"
+     },
+     "p": [
+      -2.3,
+      0,
+      -3.6
+     ],
+     "r": 1.5707963267948966
+    },
+    {
+     "op": "place",
+     "def": "mars-sleep-mat@1",
+     "name": "mat-2",
+     "in": {
+      "parent": "bunkhouse",
+      "slot": "bunkhouse"
+     },
+     "p": [
+      2.3,
+      0,
+      -3.6
+     ],
+     "r": 1.5707963267948966
+    },
+    {
+     "op": "place",
+     "def": "mars-sleep-mat@1",
+     "name": "mat-3",
+     "in": {
+      "parent": "bunkhouse",
+      "slot": "bunkhouse"
+     },
+     "p": [
+      -2.3,
+      0,
+      0.4
+     ],
+     "r": 1.5707963267948966
+    },
+    {
+     "op": "place",
+     "def": "mars-sleep-mat@1",
+     "name": "mat-4",
+     "in": {
+      "parent": "bunkhouse",
+      "slot": "bunkhouse"
+     },
+     "p": [
+      2.3,
+      0,
+      0.4
+     ],
+     "r": 1.5707963267948966
+    }
+   ]
+  },
+  {
+   "note": "build stock: pallet racks with their beams in the sockets, the timber and plywood piles; the lookout bay as built",
+   "group": "build",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/pallet-rack@1",
+     "name": "upright-a",
+     "tmp": "$ra",
+     "p": [
+      -19.4,
+      -2.8
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/pallet-rack@1",
+     "name": "upright-b",
+     "tmp": "$rb",
+     "p": [
+      -19.4,
+      0
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/rack-beam@1",
+     "name": "beam-1",
+     "in": {
+      "parent": "$ra",
+      "slot": "beam-l-1"
+     },
+     "p": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/rack-beam@1",
+     "name": "beam-2",
+     "in": {
+      "parent": "$ra",
+      "slot": "beam-l-2"
+     },
+     "p": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/rack-beam@1",
+     "name": "beam-3",
+     "in": {
+      "parent": "$rb",
+      "slot": "beam-l-1"
+     },
+     "p": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/rack-beam@1",
+     "name": "beam-4",
+     "in": {
+      "parent": "$rb",
+      "slot": "beam-l-2"
+     },
+     "p": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/timber-pile@1",
+     "name": "timber-pile",
+     "p": [
+      -19.25,
+      14.25
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/plywood-stack@1",
+     "name": "plywood-pile",
+     "p": [
+      -19,
+      19
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/deck@1",
+     "name": "lookout-bay",
+     "shape": {
+      "area": [
+       [
+        -13.3,
+        6.5
+       ],
+       [
+        -10.55,
+        6.5
+       ],
+       [
+        -10.55,
+        8.3
+       ],
+       [
+        -13.3,
+        8.3
+       ]
+      ]
+     },
+     "params": {
+      "height": 2,
+      "rails": true,
+      "material": "wood"
+     }
+    },
+    {
+     "op": "place",
+     "def": "mars-lookout-stair@1",
+     "name": "lookout-stair",
+     "p": [
+      -9.1,
+      7.4
+     ],
+     "r": -1.5707963267948966,
+     "params": {
+      "rise": 2,
+      "run": 2.6,
+      "width": 0.9,
+      "material": "wood"
+     }
+    }
+   ]
+  },
+  {
+   "note": "the edge of camp: solar panels, a shipping container and water totes outside the walls",
+   "group": "edge",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/solar-panel@1",
+     "name": "solar-panel-1",
+     "p": [
+      26,
+      -16
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/solar-panel@1",
+     "name": "solar-panel-2",
+     "p": [
+      26,
+      -13
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/solar-panel@1",
+     "name": "solar-panel-3",
+     "p": [
+      26,
+      -10
+     ]
+    },
+    {
+     "op": "place",
+     "def": "mars-container@1",
+     "name": "shipping-container",
+     "p": [
+      30,
+      6
+     ],
+     "r": -1.5707963267948966
+    },
+    {
+     "op": "place",
+     "def": "mars-water-tote@1",
+     "name": "water-tote-1",
+     "p": [
+      26,
+      14
+     ]
+    },
+    {
+     "op": "place",
+     "def": "mars-water-tote@1",
+     "name": "water-tote-2",
+     "p": [
+      27.5,
+      14
+     ]
+    },
+    {
+     "op": "place",
+     "def": "mars-water-tote@1",
+     "name": "water-tote-3",
+     "p": [
+      29,
+      14
+     ]
+    }
+   ]
+  }
+ ]
+}
