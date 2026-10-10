@@ -82,6 +82,14 @@ test('Souls among god-built things: enter, climb, sit, carry, pray; bodies refus
   assert.equal(crate.accepted, false, JSON.stringify(crate)); assert.equal(crate.failures[0].code, 'occupied.by-body'); assert.match(crate.failures[0].detail, /bury Ana/);
   const dry: any = w.god.dryrun({ ops: [{ op: 'place', def: coreRef('knoll'), name: 'mound', p: [10, 0], params: { height: 4, radius: 9 } }] });
   assert.equal(dry.accepted, false); assert.match(dry.failures[0].detail, /Ana/);
+  // the check runs as the compiler's refuse hook on the plan's own scratch: one plan (one fork) per batch, refused or not
+  const model = w.god.model as any, fork = model.fork; let forks = 0; model.fork = function (this: unknown) { forks++; return fork.call(this); };
+  try {
+    assert.equal((w.god.act({ ops: [{ op: 'place', def: coreRef('knoll'), name: 'mound', p: [10, 0], params: { height: 4, radius: 9 } }] }) as any).accepted, false);
+    assert.equal(forks, 1, 'a refused batch is planned once');
+    assert.equal((w.god.dryrun({ ops: [{ op: 'place', def: coreRef('bench'), name: 'lawn-bench', p: [10, 14] }] }) as any).accepted, true);
+    assert.equal(forks, 2, 'a harmless batch is planned once');
+  } finally { model.fork = fork; }
   // pick up the bowl: stand, walk to the table, take it; the journal shows the engine's move into her hands
   const pick: any = await accept(w.host, w.edge.act(soul, { capability: `pick-up:${ids['house/table/bowl']}` }));
   assert.equal(pick.accepted, true, JSON.stringify(pick));

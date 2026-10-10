@@ -7,7 +7,7 @@
 // The derived physics is plain data in the logged event, so the engine's replay never reads the entity model.
 // Fastest working path on the engine's existing structures (nav/1-style static scene re-base, CATALOG fixtures);
 // the per-tile patch follows L8's tiled Spatial.
-import { applyBatch, plan, type Diff, type Entity, type Op, type Result, type StoredDef, type WorldModel } from '@sim/world-compiler';
+import { applyBatch, plan, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type WorldModel } from '@sim/world-compiler';
 import { assetFromDef, assetIdFor, isFixtureDef, nearestSurfaceSlot, nextEntityPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
 import type { WorldHost } from '../world.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
@@ -59,9 +59,10 @@ export class EngineBridge {
     reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
     usesProviders.set(this.god.model, (id) => { const u = this.usesOf(id); return u ? { soul: u.soul, body: u.body, how: u.how, thing: this.model.pathOf(u.id) } : null; });
     // body-aware edits: the compiler hook when GodMode has it (lead patch 5), else wrap its entry points
-    if ('bodies' in (this.god as object)) (this.god as unknown as { bodies: unknown }).bodies = { uses: (id: string) => this.usesOne(id), lifted: (ids: string[]) => this.buried(ids) };
+    const hooked = 'bodies' in (this.god as object);
+    if (hooked) (this.god as unknown as { bodies: unknown }).bodies = { uses: (id: string) => this.usesOne(id), lifted: (ids: string[]) => this.buried(ids), refuse: (after: WorldModel, diff: Diff, ops: unknown[]) => this.pinnedCheck(after, diff, ops) };
     else this.guardGod();
-    this.guardPinned();
+    this.guardPinned(hooked);
     if (this.edge) this.hookEdge(this.edge);
   }
   private get engine(): EngineV1 { return this.host.engine as unknown as EngineV1; }
@@ -414,60 +415,83 @@ export class EngineBridge {
   /** 31 §3 rule 8 (R2): a god edit that would bury or unseat a body that cannot step clear is refused, naming the body —
    *  the ground rising over it, a new solid where it is, or the thing it sits on (or the house around it) moved as a
    *  side effect (re-settled on new ground, re-solved constraints). Direct removes/moves/param edits of a used thing
-   *  are refused by the compiler's `uses` hook; this covers what only the would-be world shows. Null = fine. */
-  pinnedRefusal(batch: unknown, trusted = false): Result | null {
+   *  are refused by the compiler's `uses` hook; this covers what only the would-be world shows. It runs as the compiler's
+   *  `refuse` hook on the plan's own scratch (`after`), once per plan, after the plan succeeds. Null = fine. */
+  pinnedCheck(after: WorldModel, diff: Diff, ops: unknown[]): Failure | null {
     const pinned = this.pinnedBodies(); if (!pinned.length) return null;
-    const ops = batch && typeof batch === 'object' ? ((batch as { ops?: unknown[] }).ops ?? []) : [];
     const name = (b: { id: string; doing: string }) => `${this.soulName(b.id)} (${b.id}), ${b.doing}`;
-    const no = (i: number, detail: string): Result => { this.stats.refusals++; return { accepted: false, failures: [{ op: i, code: 'occupied.by-body', detail: `${detail}; wait until they are done (or ask them in a prayer answer)` }] }; };
+    const no = (i: number, detail: string): Failure => { this.stats.refusals++; return { op: i, code: 'occupied.by-body', detail: `${detail}; wait until they are done (or ask them in a prayer answer)` }; };
     const opOf = (id: string) => { const k = ops.findIndex((o) => { const x = o as { id?: string; name?: string }; return x?.id === id || x?.id === this.model.pathOf(id) || (x?.name && this.model.get(x.name)?.id === id); }); return k < 0 ? 0 : k; };
-    const f = this.model.fork();
-    const p = plan(f, batch, 'god', this.engine.world.tick, { trusted });
-    if (!p.ok) {
-      // a solid dropped onto a seated body overlaps its seat first: name the body, not just the seat
-      for (const fl of p.failures) {
-        if (fl.code !== 'overlap.solid') continue;
-        const hit = /overlaps (\S+)(?: (\S+))?$/.exec(fl.detail); const other = hit ? this.model.get(hit[2] ?? hit[1]) : undefined;
-        const b = other && pinned.find((x) => this.engine.bodyUsesV1(other.id)?.body === x.id);
-        if (b) return no(fl.op, `would bury ${name(b)}: ${fl.detail}`);
-      }
-      return null;
-    }
-    p.apply();
-    for (const e of p.diff.upserts) {
+    for (const e of diff.upserts) {
       const live = this.model.entities.get(e.id); if (!live || this.model.resolvedDef(live.def)?.components.body) continue;
       // 1. the seat (or anything around it) moved as a side effect
-      const a = this.model.worldPose(live), w = f.worldPose(e);
+      const a = this.model.worldPose(live), w = after.worldPose(e);
       if (Math.hypot(a.x - w.x, a.y - w.y, a.z - w.z) > 1e-3 || Math.abs(a.yaw - w.yaw) > 1e-4) for (const sid of this.model.subtree(e.id)) {
         const u = this.engine.bodyUsesV1(sid); const b = u && pinned.find((x) => x.id === u.body);
         if (b) return no(opOf(e.id), `would move ${this.model.pathOf(e.id)} by ${Math.round(Math.hypot(a.x - w.x, a.y - w.y, a.z - w.z) * 100) / 100} m and unseat ${name(b)}`);
       }
     }
     // 2. the ground rising over a pinned body
-    if (p.diff.tiles.length) for (const b of pinned) {
-      const g = f.terrain.sample(b.p[0], b.p[2]);
+    if (diff.tiles.length) for (const b of pinned) {
+      const g = after.terrain.sample(b.p[0], b.p[2]);
       if (g > b.p[1] + 0.25) return no(Math.max(0, ops.findIndex((o) => (o as { op?: string })?.op === 'place' || (o as { op?: string })?.op === 'move' || (o as { op?: string })?.op === 'set')), `would raise the ground at (${r3(b.p[0])}, ${r3(b.p[2])}) to ${r3(g)} m, over ${name(b)} at ${r3(b.p[1])} m`);
     }
     // 3. a new or changed solid where a pinned body is
-    for (const e of p.diff.upserts) {
-      const def = f.resolvedDef(e.def); if (!def || def.layer !== 'solid' || def.components.body) continue;
-      const after = f.footprint(e, def); if (!after.length) continue;
+    for (const e of diff.upserts) {
+      const def = after.resolvedDef(e.def); if (!def || def.layer !== 'solid' || def.components.body) continue;
+      const fp = after.footprint(e, def); if (!fp.length) continue;
       const live = this.model.entities.get(e.id);
-      if (live && JSON.stringify(this.model.footprint(live)) === JSON.stringify(after)) continue;
-      for (const o of after) for (const b of pinned) {
+      if (live && JSON.stringify(this.model.footprint(live)) === JSON.stringify(fp)) continue;
+      for (const o of fp) for (const b of pinned) {
         const y = b.p[1]; if (o.y1 <= y + 0.22 || o.y0 >= y + 1.6) continue;
         const c = Math.cos(o.yaw), s = Math.sin(o.yaw), dx = b.p[0] - o.c[0], dz = b.p[2] - o.c[1];
-        if (Math.abs(dx * c - dz * s) <= o.half[0] + 0.2 && Math.abs(dx * s + dz * c) <= o.half[1] + 0.2) return no(opOf(e.id), `would bury ${name(b)} under ${f.pathOf(e.id)}`);
+        if (Math.abs(dx * c - dz * s) <= o.half[0] + 0.2 && Math.abs(dx * s + dz * c) <= o.half[1] + 0.2) return no(opOf(e.id), `would bury ${name(b)} under ${after.pathOf(e.id)}`);
       }
     }
     return null;
   }
+  /** A refused plan whose overlap is with a pinned body's seat: a solid dropped onto a seated body overlaps its seat
+   *  first, so name the body, not just the seat (null = leave the refusal as it is). */
+  buryRefusal(failures: readonly Failure[], codes: readonly string[] = ['overlap.solid']): Result | null {
+    if (!failures.some((fl) => codes.includes(fl.code))) return null;
+    const pinned = this.pinnedBodies(); if (!pinned.length) return null;
+    for (const fl of failures) {
+      if (!codes.includes(fl.code)) continue;
+      const hit = /overlaps (\S+)(?: (\S+))?$/.exec(fl.detail); const other = hit ? this.model.get(hit[2] ?? hit[1]) : undefined;
+      const b = other && pinned.find((x) => this.engine.bodyUsesV1(other.id)?.body === x.id);
+      if (b) { this.stats.refusals++; return { accepted: false, failures: [{ op: fl.op, code: 'occupied.by-body', detail: `would bury ${this.soulName(b.id)} (${b.id}), ${b.doing}: ${fl.detail}; wait until they are done (or ask them in a prayer answer)` }] }; }
+    }
+    return null;
+  }
+  /** The same check for a god without the compiler hook: plans the batch on a fork (a second plan). */
+  pinnedRefusal(batch: unknown, trusted = false): Result | null {
+    if (!this.pinnedBodies().length) return null;
+    const ops = batch && typeof batch === 'object' ? ((batch as { ops?: unknown[] }).ops ?? []) : [];
+    let pinned: Failure | null = null;
+    const p = plan(this.model.fork(), batch, 'god', this.engine.world.tick, { trusted, refuse: (after, diff) => (pinned = this.pinnedCheck(after, diff, ops)) });
+    if (p.ok) return null;
+    return pinned ? { accepted: false, failures: [pinned] } : this.buryRefusal(p.failures);
+  }
 
-  /** Wrap the god's edit entry points with the pinned-body check (L1: a `bodies.refuse(scratch, diff)` hook would make
-   *  this one plan instead of two; see the status file). Only costs anything while some body is pinned. */
-  private guardPinned() {
+  /** Body checks on the god's edit entry points. With the compiler's `refuse` hook installed (GodMode.bodies) each batch
+   *  is planned once: the check runs on the plan's own scratch, and a refused plan's overlap with a seat is renamed to
+   *  the body; without it, each batch is first planned on a fork. Only costs anything while some body is pinned. */
+  private guardPinned(hooked: boolean) {
     const g = this.god as any;
     const act = g.act.bind(g), dryrun = g.dryrun.bind(g), preview = g.preview.bind(g), undo = g.undo.bind(g), redo = g.redo.bind(g);
+    if (hooked) {
+      const named = <T extends { accepted: boolean; failures?: Failure[] }>(r: T, codes?: string[], extra: object = {}): T => {
+        if (r.accepted || !r.failures) return r;
+        const b = this.buryRefusal(r.failures, codes); return b ? ({ ...extra, accepted: false, failures: (b as { failures: Failure[] }).failures } as unknown as T) : r;
+      };
+      g.act = (batch: unknown, note?: string) => named(act(batch, note));
+      g.dryrun = (batch: unknown) => named(dryrun(batch));
+      g.preview = (batch: unknown) => { const r = preview(batch); return named(r, undefined, { id: r.id }); };
+      // a revert reports an overlap as undo.conflict (same detail)
+      g.undo = () => named(undo(), ['overlap.solid', 'undo.conflict']);
+      g.redo = () => named(redo(), ['overlap.solid', 'undo.conflict']);
+      return;
+    }
     g.act = (batch: unknown, note?: string) => this.pinnedRefusal(batch) ?? act(batch, note);
     g.dryrun = (batch: unknown) => { const r = this.pinnedRefusal(batch); return r ? { accepted: false, failures: (r as { failures: unknown }).failures } : dryrun(batch); };
     g.preview = (batch: unknown) => { const r = this.pinnedRefusal(batch); return r ? { id: null, accepted: false, failures: (r as { failures: unknown }).failures } : preview(batch); };

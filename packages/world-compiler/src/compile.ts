@@ -13,7 +13,11 @@ export type Diff = { upserts: Entity[]; removes: string[]; defs: StoredDef[]; wo
 /** Body-aware edits (31 §3 rule 8): who uses an entity — a Soul seated on it, holding it, or the entity is a body.
  *  Checked for every entity in the subtree of a remove / move / set-params target; null = free. */
 export type UsesHook = (id: string) => { code: 'occupied.by-body' | 'held.by-body'; detail: string } | null;
-export type PlanOptions = { trusted?: boolean; uses?: UsesHook };
+/** Body-aware edits, the would-be world's side (31 §3 rule 8, R2): called once after a plan succeeds, with the plan's own
+ *  scratch (the world as it would be), its diff and the batch's ops; a Failure refuses the whole batch (null = fine). The
+ *  engine bridge uses it to refuse burying or unseating a body that cannot step clear, without planning a second time. */
+export type RefuseHook = (scratch: WorldModel, diff: Diff, ops: Op[]) => Failure | null;
+export type PlanOptions = { trusted?: boolean; uses?: UsesHook; refuse?: RefuseHook };
 
 export type Plan = { ok: true; apply: () => { seq: number; undoId: string; diff: Diff; inverse: Op[] }; ids: Record<string, string>; warnings: string[]; diff: Diff } | { ok: false; failures: Failure[] };
 
@@ -270,6 +274,8 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   for (const id of resolved) touched.add(id);
   for (const id of touched) { const e = scratch.entities.get(id); if (e) diff.upserts.push(e); }
   diff.tiles = [...new Set(diff.tiles)];
+  const refused = opts.refuse?.(scratch, diff, ops);
+  if (refused) return { ok: false, failures: [refused] };
   const seq = world.editSeq + 1;
   const undoId = 'u_' + hashOf([world.seed, seq]).slice(0, 10);
   return {
