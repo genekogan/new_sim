@@ -1,0 +1,72 @@
+# example: a hamlet in 8 commands
+
+$ eden-god place knoll --at 40,10 --param height=5 --param radius=26 --name knoll
+  placed knoll [core/knoll@1] at (40, 0, 10) facing s — at (40, 10)
+    seq 1 — undo with: undo
+  (927 ms)
+$ eden-god place cottage --at knoll --facing s --name cottage
+  placed cottage [core/cottage@1] at (40, 4.47, 10) facing s — at knoll
+    seq 2 — undo with: undo
+  (862 ms)
+$ eden-god place pond --circle 30,38,8 --name pond
+  placed pond [core/pond@1] — area of 10 corners
+    seq 3 — undo with: undo
+  (758 ms)
+$ eden-god place bench --near pond --facing pond --dir n --name pond-bench
+  placed pond-bench [core/bench@1] at (30.24, 0.19, 28.11) facing s — near pond, n of it, 1.5 m away; keeps: near pond
+    seq 4 — undo with: undo
+  (1193 ms)
+$ eden-god place tree --near cottage --count 5 --dist 4
+  placed tree [core/tree@1] at (45.94, 2.28, 20.29) facing s — near cottage, se of it, 4 m away; keeps: near cottage
+  placed tree-2 [core/tree@1] at (51.46, 2.28, 6.93) facing s — near cottage, e of it, 4 m away; keeps: near cottage
+  placed tree-3 [core/tree@1] at (40, 3.15, 0.8) facing s — near cottage, n of it, 4 m away; keeps: near cottage
+  placed tree-4 [core/tree@1] at (28.54, 2.28, 6.93) facing s — near cottage, w of it, 4 m away; keeps: near cottage
+  placed tree-5 [core/tree@1] at (34.06, 2.28, 20.29) facing s — near cottage, sw of it, 4 m away; keeps: near cottage
+    seq 5 — undo with: undo
+  (1006 ms)
+$ eden-god place fountain --at 18,4 --name well
+  placed well [core/fountain@1] at (18, 0, 4) facing s — at (18, 4)
+    seq 6 — undo with: undo
+  (828 ms)
+$ eden-god place lamp-post --near well --count 4 --dist 2
+  placed lamp-post [core/lamp-post@1] at (20.54, 0.22, 8.39) facing s — near well, se of it, 2 m away; keeps: near well
+  placed lamp-post-2 [core/lamp-post@1] at (21.96, 0.1, 0.68) facing s — near well, ne of it, 2 m away; keeps: near well
+  placed lamp-post-3 [core/lamp-post@1] at (14.04, -0.2, 0.68) facing s — near well, nw of it, 2 m away; keeps: near well
+  placed lamp-post-4 [core/lamp-post@1] at (15.46, -0.19, 8.39) facing s — near well, sw of it, 2 m away; keeps: near well
+    seq 7 — undo with: undo
+  (970 ms)
+$ eden-god place dog --near cottage --dir s --dist 3 --name rex
+  placed rex [core/dog@1] at (40, 3.93, 16.6) facing s — near cottage, s of it, 3 m away; keeps: near cottage
+    seq 8 — undo with: undo
+  (1022 ms)
+$ eden-god describe rex
+  rex [core/dog@1] decor point — at the root
+    A friendly medium dog (rounded low-poly, ~600 tris) that trots about its yard: diagonal-pair walk, head nod, wagging tail. Recolour with params fur/muzzle/ear. Behaviours: wander (default), follow, sl
+    pose (40, 3.93, 16.6) facing s (yaw 0); size 0.29×0.77×1.19 m; bounds x 39.86…40.14, z 16…17.2, y 3.93…4.7; 0 colliders, ~533 tris
+    params {"fur":"#b8814a","belly":"#e6cfa6","muzzle":"#e6cfa6","ear":"#7a4f2a","behavior":"wander","speed":1.1,"radius":7,"follow":""}
+    constraints: ok near cottage (gap 3 m (want ≤ 4))
+    behaviours: idle, sleep, follow, wander, graze, swim; cannot: fly (fly needs wings (wing.l, wing.r)); perch (perch needs two legs (leg.l, leg.r))
+    ground: y 4.09, slope 14.23°, walk
+    near: knoll 0 m n, cottage 3.6 m n, tree-5 5.9 m sw, tree 6.06 m se, pond 13.44 m sw, tree-4 14 m nw
+  (687 ms)
+$ eden-god describe cottage
+  cottage [core/cottage@1] solid point — at the root
+    A cottage: living room, kitchen and bedroom (with floors: 2, bedrooms and a landing upstairs, stairs in the living room). Rooms are slots: kitchen, living, bedroom, …
+    pose (40, 4.47, 10) facing s (yaw 0); size 8×4.89×6 m; bounds x 36…44, z 7…13, y 4.47…7.27; 40 colliders, ~2086 tris
+    params {"w":8,"d":6,"floors":1,"floorHeight":2.8,"roof":"gable","roofPitch":32,"material":"plaster","wall":"#f1e7d2","trim":"#6b4a2b","roofColor":"#8a3b2a","front":"s","porch":0,"balcony":false,"windows":0.6}
+    state {"paint":"#f1e7d2"}
+    rooms (3):
+    - living "Living room" floor 0 (y 4.57), 5.21×5.56 m, headroom 2.62 m, door door-bedroom-living (open), door door-kitchen-living (open), door front-door (open), window window-2, window window-4, window window-5, window window-6; empty — place into it with --inside cottage/living
+    - kitchen "Kitchen" floor 0 (y 4.57), 2.23×2.72 m, headroom 2.62 m, door door-kitchen-living (open), window window-3, window window-8; empty — place into it with --inside cottage/kitchen
+    - bedroom "Bedroom" floor 0 (y 4.57), 2.23×2.72 m, headroom 2.62 m, door door-bedroom-living (open), window window-1, window window-7; empty — place into it with --inside cottage/bedroom
+    openings: door door-bedroom-living (floor 0, 0.9×2.1 m, faces e, open) at (38.51, 8.56); door door-kitchen-living (floor 0, 0.9×2.1 m, faces e, open) at (38.51, 11.45); door front-door (floor 0, 1×2.1 m, faces s, open) at (41.18, 12.89); window window-1 (floor 0, 1×1.25 m, faces n, always) at (37.34, 7.11); window window-2 (floor 0, 1×1.25 m, faces n, always) at (41.18, 7.11); window window-3 (floor 0, 1×1.25 m, faces s, always) at (37.34, 12.89); window window-4 (floor 0, 1×1.25 m, faces s, always) at (39.54, 12.89); window window-5 (floor 0, 1×1.25 m, faces e, always) at (43.89, 8.71); window window-6 (floor 0, 1×1.25 m, faces e, always) at (43.89, 11.3); window window-7 (floor 0, 1×1.25 m, faces w, always) at (36.11, 8.56); window window-8 (floor 0, 1×1.25 m, faces w, always) at (36.11, 11.45)
+    slots: ground (floor, 0/256); front (stand, 0/8); wall-n-1 (wall, 0/1); wall-s-1 (wall, 0/1); wall-e-1 (wall, 0/1)
+    ground: y 5, slope 1.79°, walk
+    near: knoll 0 m s, rex 6 m s, tree-3 8.86 m n, tree-4 10.79 m w, tree-2 10.97 m e, tree-5 11.01 m sw
+    notes: rooms: floor 0: living 29.0 m², kitchen 6.1 m², bedroom 6.1 m² | doors: 1 outside (front-door), 2 inside; windows: 8 | reachable from outside: all 3 rooms | headroom: rooms 2.62 m
+  (883 ms)
+$ eden-god look --from sw --out <worktrees>/t2-skill/tools/god-skill/examples/shots/hamlet.png
+  look: <worktrees>/t2-skill/tools/god-skill/examples/shots/hamlet.png
+    from the sw at (-10.9, 43.8, 65.6) toward (39.9, 4.5, 14.8), 31.2 s
+    Read the image file; then fix what looks wrong.
+  (33382 ms)

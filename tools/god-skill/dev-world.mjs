@@ -22,7 +22,7 @@ export async function startWorld({ slug, port, data, genesis, fresh = false, log
   const out = log ? openSync(log, 'a') : 'ignore';
   const child = spawn(process.execPath, ['apps/server/src/main.ts'], { cwd: root, env, stdio: ['ignore', out, out], detached: !!log });
   const base = `http://127.0.0.1:${port}/w/${slug}`;
-  for (let i = 0; i < 300; i++) { try { const r = await fetch(`${base}/healthz`); if (r.ok) return { child, base, dataDir }; } catch { /* booting */ } await new Promise((r) => setTimeout(r, 100)); }
+  for (let i = 0; i < 1800; i++) { try { const r = await fetch(`${base}/healthz`); if (r.ok) return { child, base, dataDir }; } catch { /* booting */ } await new Promise((r) => setTimeout(r, 100)); }
   child.kill(); throw new Error(`world ${slug} did not come up on :${port}`);
 }
 

@@ -1,0 +1,5 @@
+# blind runs: keep prompt, transcript, notes, REPORT, final look; not the tooling links or the server log
+*/work/node_modules
+*/work/.eden-god*.json
+*/server.log
+*/work/eden-god.mjs
