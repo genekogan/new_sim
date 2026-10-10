@@ -1,18 +1,68 @@
-// animals/1 mesh half: a herd in an area. Owner: L4. CONTRACT STUB (L1): static rounded blobs at
-// seeded points. L4 replaces with pack animals (eden-animals.glb clips) or kit creatures with
-// gaits, moving by behaviour (wander, graze, swim, perch, sleep, fly) as a function of world time.
+// animals/1 mesh half: a herd living in an area. Owner: L4. Each member is a kit creature (the
+// species def from the world, else the bundled core kit) with its own home inside the area and
+// the same deterministic behaviour as a single creature entity. Water areas make swimmers.
+// The herd ticks itself while any member is on screen (world builders get no per-frame call).
 import * as THREE from 'three';
-import { scatterPoints } from '@sim/generators';
+import { scatterPoints, type Value } from '@sim/generators';
+import { CORE_KIT, defSchema, type StoredDef, type WorldModel } from '@sim/world-compiler';
 import { registerMesh } from './registry.ts';
+import { creatureObject } from './creatures/creature.mesh.ts';
+import { seedOf, type BehaviorKind } from './creatures/behavior.ts';
+import { bindMotionModel, creatureStep, waterAt, worldSeconds, type Rig } from './motion.ts';
 
-const body = new THREE.SphereGeometry(0.35, 8, 6);
+const bundled = new Map<string, StoredDef>();
+/** A core creature def by species, from the world model if present, else from the bundled kit. */
+export function speciesDef(model: WorldModel, ref: string): StoredDef | undefined {
+  const inWorld = model.resolvedDef(ref) ?? model.resolvedDef(`core/${ref}@1`);
+  if (inWorld) return inWorld;
+  const name = ref.startsWith('core/') ? `core-${ref.slice(5).replace(/@\d+$/, '')}` : `core-${ref}`;
+  let d = bundled.get(name);
+  if (!d) {
+    const input = CORE_KIT.find((x) => x.name === name); if (!input) return undefined;
+    d = { ...defSchema.parse(input), hash: `bundled-${name}`, ref: `${name}@1`, by: 'core', born: 0, budget: { tris: 0, bytes: 0, textures: 0 } } as StoredDef;
+    bundled.set(name, d);
+  }
+  return d;
+}
+
 registerMesh({
   gen: 'animals/1', world: true,
   build(ctx) {
     const e = ctx.entity; if (!e.shape || !('area' in e.shape)) return null;
-    const count = Number(ctx.params.count ?? 3), pts = scatterPoints(e.shape.area, 1, 1, e.seed ?? 7, count);
-    const g = new THREE.Group(), mat = ctx.materials.get('fur');
-    for (const [x, z] of pts.slice(0, count)) { const m = new THREE.Mesh(body, mat); m.scale.set(1.3, 0.8, 0.8); m.position.set(x, ctx.model.terrain.sample(x, z) + 0.35, z); m.castShadow = true; g.add(m); }
-    return g;
+    bindMotionModel(ctx.model);
+    const area = e.shape.area as [number, number][];
+    const p = ctx.params, count = Math.max(1, Math.min(60, Number(p.count ?? 3)));
+    const ref = typeof p.def === 'string' && p.def ? p.def : String(p.species ?? 'dog');
+    const def = speciesDef(ctx.model, ref); if (!def) return null;
+    const seed = e.seed ?? seedOf(e.id);
+    const homes = scatterPoints(area, 1, 0.8, seed, count);
+    // a herd on water swims; koi and fish always do
+    const [cx, cz] = homes[0] ?? area[0], g = ctx.model.terrain.sample(cx, cz), wl = waterAt(ctx.model, cx, cz);
+    const wet = (wl !== null && wl > g + 0.2) || /koi|fish/.test(def.name);
+    const kind = (wet ? 'swim' : String(p.behavior ?? 'wander')) as BehaviorKind;
+    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity; for (const [x, z] of area) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
+    const radius = Math.max(2, Math.min(20, 0.45 * Math.min(x1 - x0, z1 - z0)));
+    const scale = Number(p.scale ?? 1), speed = Number(p.speed ?? 1) * (def.components.behavior?.speed ?? 1);
+    const tint = (k: string | undefined, f: string) => (k ? (typeof (p as Record<string, Value>)[k] === 'string' && /^#/.test(String(p[k])) ? String(p[k]) : def.palette?.[k] ?? f) : f);
+    const group = new THREE.Group(); group.name = `herd ${e.name ?? e.id}`;
+    const members: { obj: THREE.Object3D; rig: Rig; home: [number, number] }[] = [];
+    homes.slice(0, count).forEach(([x, z], i) => {
+      const made = creatureObject(def, {}, tint, ctx.materials, ctx.model, (seed + i * 7919) >>> 0, { kind, speed, radius });
+      if (!made) return;
+      made.rig.area = area; made.rig.scale = scale * (0.85 + 0.3 * ((i * 0.618) % 1));
+      made.obj.scale.setScalar(made.rig.scale);
+      made.obj.position.set(x, ctx.model.terrain.sample(x, z), z);
+      group.add(made.obj); members.push({ obj: made.obj, rig: made.rig, home: [x, z] });
+    });
+    let last = -1;
+    const tick = (tIn: number) => {
+      const t = worldSeconds(tIn); if (t === last) return; last = t;
+      for (const m of members) { m.obj.scale.setScalar(m.rig.scale!); creatureStep(m.obj, m.rig, null, t, { y: 0, yaw: 0 }, m.home); }
+    };
+    group.userData.tick = tick;
+    // world builders get no per-frame call from the layer: tick from the first visible member's draw
+    for (const m of members) m.obj.traverse((o) => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).onBeforeRender = () => tick(Date.now() / 1000); });
+    tick(Date.now() / 1000);
+    return group;
   },
 });
