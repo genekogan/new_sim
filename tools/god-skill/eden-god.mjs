@@ -1475,10 +1475,14 @@ var SYNONYMS = {
 };
 var forms = (w) => [.../* @__PURE__ */ new Set([w, ...w.length > 3 ? [w.replace(/s$/, ""), w.replace(/es$/, ""), w.replace(/ies$/, "y")] : []])];
 var synonymsOf = (w) => [...new Set(forms(w).flatMap((f) => SYNONYMS[f] ?? []))];
+var scaleText = (d) => {
+  const sc = d?.size?.scale;
+  return !sc ? "" : sc[0] === sc[1] ? sc[0] === 1 ? "fixed size (no --scale)" : `--scale ${sc[0]} only` : `--scale ${sc[0]}\u2013${sc[1]}`;
+};
 var fieldText = (k, f) => `${k}: ${f.type}${f.values ? ` ${f.values.join("|")}` : ""}${f.min !== void 0 || f.max !== void 0 ? ` ${f.min ?? ""}\u2026${f.max ?? ""}` : ""}${f.default !== void 0 ? ` = ${typeof f.default === "object" ? JSON.stringify(f.default) : f.default}` : ""}${f.doc ? ` \u2014 ${f.doc}` : ""}`;
 async function defDetail(d, others) {
   const ref = d.ref.replace(/^core-/, "core/");
-  const L = [`${ref} \u2014 ${d.form}, ${d.layer}, ${d.size.box.map(r2).join("\xD7")} m${d.make?.gen ? `, made by ${d.make.gen}` : ""}${d.tags.length ? ` [${d.tags.join(" ")}]` : ""}`];
+  const L = [`${ref} \u2014 ${d.form}, ${d.layer}, ${d.size.box.map(r2).join("\xD7")} m${d.form === "point" ? `, ${scaleText(d)}` : ""}${d.make?.gen ? `, made by ${d.make.gen}` : ""}${d.tags.length ? ` [${d.tags.join(" ")}]` : ""}`];
   if (d.description) L.push(`  ${d.description}`);
   const ps = Object.entries(d.params ?? {});
   if (ps.length) {
@@ -1521,10 +1525,10 @@ async function defs(q, flags2 = {}) {
       r.defs.push(d);
     }
   }
-  const rows = r.defs.map((d) => ({ ref: d.ref.replace(/^core-/, "core/"), form: d.form, layer: d.layer, box: d.size.box, tags: d.tags, params: Object.fromEntries(Object.entries(d.params).map(([k, f]) => [k, f.default ?? f.type])), slots: d.slots.map((x) => `${x.id}:${x.kind}`), description: d.description }));
+  const rows = r.defs.map((d) => ({ ref: d.ref.replace(/^core-/, "core/"), form: d.form, layer: d.layer, box: d.size.box, scale: d.size.scale, tags: d.tags, params: Object.fromEntries(Object.entries(d.params).map(([k, f]) => [k, f.default ?? f.type])), slots: d.slots.map((x) => `${x.id}:${x.kind}`), description: d.description }));
   if (flags2.json) return rows;
   if (!rows.length) return `no defs match "${q ?? ""}". Try a broader word, or define one: define-kit (see SKILL.md).`;
-  return [`${rows.length} defs${q ? ` matching "${q}"` : ""}:`, ...rows.slice(0, flags2.all ? 999 : 40).map((d) => `- ${d.ref} (${d.form}, ${d.layer}, ${d.box.map(r2).join("\xD7")} m)${d.tags.length ? ` [${d.tags.slice(0, 6).join(" ")}]` : ""}${Object.keys(d.params).length ? ` params: ${Object.entries(d.params).slice(0, 10).map(([k, v]) => `${k}=${typeof v === "object" ? "json" : v}`).join(" ")}` : ""}${d.slots.length ? ` slots: ${d.slots.slice(0, 6).join(" ")}` : ""}${d.description ? ` \u2014 ${d.description.slice(0, 110)}` : ""}`), rows.length > 40 && !flags2.all ? `\u2026 ${rows.length - 40} more (--all)` : ""].filter(Boolean).join("\n");
+  return [`${rows.length} defs${q ? ` matching "${q}"` : ""}:`, ...rows.slice(0, flags2.all ? 999 : 40).map((d) => `- ${d.ref} (${d.form}, ${d.layer}, ${d.box.map(r2).join("\xD7")} m${d.form === "point" && d.scale ? `, ${d.scale[0] === d.scale[1] ? "fixed size" : `scale ${d.scale[0]}\u2013${d.scale[1]}`}` : ""})${d.tags.length ? ` [${d.tags.slice(0, 6).join(" ")}]` : ""}${Object.keys(d.params).length ? ` params: ${Object.entries(d.params).slice(0, 10).map(([k, v]) => `${k}=${typeof v === "object" ? "json" : v}`).join(" ")}` : ""}${d.slots.length ? ` slots: ${d.slots.slice(0, 6).join(" ")}` : ""}${d.description ? ` \u2014 ${d.description.slice(0, 110)}` : ""}`), rows.length > 40 && !flags2.all ? `\u2026 ${rows.length - 40} more (--all)` : ""].filter(Boolean).join("\n");
 }
 async function schema(flags2 = {}) {
   const s = ok(await call("/v1/god/schema", { as: "none" }), "schema");
@@ -1558,7 +1562,8 @@ async function describe(ref, flags2 = {}) {
   const L = [];
   L.push(`${d.path} [${d.def.replace(/^core-/, "core/")}] ${d.layer} ${d.form}${d.anchor !== "base" ? `, anchor ${d.anchor}` : ""} \u2014 ${d.in === "world" ? "at the root" : `in ${d.in.parent}${d.in.slot ? ` (slot ${d.in.slot})` : ""}`}`);
   if (d.description) L.push(`  ${d.description.slice(0, 200)}`);
-  L.push(`  pose (${d.pose.x}, ${d.pose.y}, ${d.pose.z}) facing ${d.pose.faces} (yaw ${d.pose.yaw})${d.pose.s !== 1 ? ` scale ${d.pose.s}` : ""}; size ${d.box.join("\xD7")} m; bounds x ${d.aabb[0]}\u2026${d.aabb[2]}, z ${d.aabb[1]}\u2026${d.aabb[3]}, y ${d.y[0]}\u2026${d.y[1]}; ${d.colliders} colliders, ~${d.tris} tris`);
+  const sc = d.form === "point" ? scaleText(view(await mirror()).def(d.def)) : "";
+  L.push(`  pose (${d.pose.x}, ${d.pose.y}, ${d.pose.z}) facing ${d.pose.faces} (yaw ${d.pose.yaw})${d.pose.s !== 1 ? ` scale ${d.pose.s}` : ""}${sc ? `, ${sc}` : ""}; size ${d.box.join("\xD7")} m; bounds x ${d.aabb[0]}\u2026${d.aabb[2]}, z ${d.aabb[1]}\u2026${d.aabb[3]}, y ${d.y[0]}\u2026${d.y[1]}; ${d.colliders} colliders, ~${d.tris} tris`);
   if (d.shape?.path) L.push(`  path: ${d.shape.points} points, ${d.shape.length} m${d.shape.width ? `, ${d.shape.width} m wide` : ""}: ${d.shape.path.map((p) => `${r2(p[0])},${r2(p[1])}`).join(" \u2192 ")}${d.shape.points > d.shape.path.length ? " (ends)" : ""}; middle ${d.shape.middle.join(",")}`);
   if (d.shape?.points && !d.shape.path) L.push(`  area: ${d.shape.points} corners, ${d.shape.size.join("\xD7")} m around ${d.shape.centre.join(",")}`);
   if (Object.keys(d.params).length) L.push(`  params ${JSON.stringify(d.params).slice(0, 300)}`);
@@ -1630,6 +1635,7 @@ var HINTS = {
   "slot.full": "the slot is full; pick another slot or room",
   "slot.incompatible": "the slot does not accept this kind/size",
   "slot.outside": "the point is not inside that room; use --inside <house>/<room> or a world point inside it",
+  "size.range": "that scale or size is outside what the def allows: `defs <name>` shows its --scale range (fixed size = no --scale); use params (w, d, height, radius) or a bigger def instead",
   "float.no-water": "there is no water there; use --float --at <lake|pond|river>",
   "def.unknown": "no such def; `defs <word>` searches the library",
   "params.invalid": "`defs <name>` shows params with ranges",
@@ -2278,8 +2284,8 @@ async function flag(label, f) {
   const r = await act({ ops: [{ op: "place", def: "core/flag@1", name, p: [p.x, p.z], state: { label } }] });
   return r.accepted ? `flag:${name} at (${p.x}, ${p.z})` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
 }
-async function prayers() {
-  return ok(await call("/v1/god/prayers"), "prayers");
+async function prayers(flags2 = {}) {
+  return ok(await call(`/v1/god/prayers${flags2.all ? "?all=1" : ""}`), "prayers");
 }
 async function answer(prayer, text) {
   return ok(await call("/v1/god/answer", { body: { prayer, text } }), "answer");
@@ -2339,7 +2345,8 @@ var FLAGS = {
   import: "group",
   flag: "at offset",
   schema: "md",
-  act: "note"
+  act: "note",
+  prayers: "all"
 };
 var POS = { place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 var NUMERIC = /* @__PURE__ */ new Set(["dist", "count", "t", "setback", "row", "spacing", "width", "span", "radius", "sun", "clouds", "wind", "rain", "scale", "floor", "height", "h", "slope", "gap", "yaw"]);
@@ -2410,7 +2417,7 @@ var COMMANDS = {
   expand: (r) => expand(r[0]),
   flags,
   flag: (r, f) => flag(r.join(" "), f),
-  prayers,
+  prayers: (r, f) => prayers(f),
   answer: (r) => answer(r[0], r.slice(1).join(" ")),
   stream: (r) => stream(r[0] ? Number(r[0]) : 60),
   follow: (r) => follow(r[0] ? Number(r[0]) : 3600, (e) => console.log(`${e.event} ${e.data?.seq ?? ""}`)),
@@ -2422,13 +2429,13 @@ var COMMANDS = {
 };
 var HELP = `eden-god ${SKILL_VERSION} \u2014 god mode for one Eden world. Read SKILL.md.
 read:   map \xB7 defs <words> \xB7 describe <ref> \xB7 where <x,z|ref> \xB7 free WxD [--near ref] \xB7 look [--at ref] [--from s|n|e|w|above] [--inside [--floor k]] \xB7 history \xB7 resolve \xB7 schema [--md]
-build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--wall back|front|left|right|n\u2026] [--corner back-left|\u2026] | --on table [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--dry]
+build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--wall back|front|left|right|n\u2026] [--corner back-left|\u2026] | --on table|pier|house/balcony [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--scale s (defs <name> shows its range)] [--dry]
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],\u2026]' \xB7 place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],\u2026]'
-edit:   move <ref> <relations>|--by dx,dz \xB7 set <ref> --param k=v --state '{\u2026}' \xB7 recolor <ref> #hex \xB7 remove <ref>\u2026 \xB7 clone <ref> [--at] [--count n --step dx,dz] \xB7 select [filters] [--remove|--by|--recolor|--set-state|--set-param]
+edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen \xB7 set <ref> --param k=v --state '{\u2026}' \xB7 recolor <ref> #hex \xB7 remove <ref>\u2026 \xB7 clone <ref> [--at] [--count n --step dx,dz] \xB7 select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> \xB7 group --off \xB7 undo [--group name] \xB7 redo
 batch:  plan '<batch>' \xB7 preview '<batch>' \xB7 act '<batch>' \xB7 dryrun '<batch>'
 world:  sky [--palette p --sun s] \xB7 weather --clouds c --wind w --rain r \xB7 constitution <md> \xB7 expand <m> \xB7 export [file] \xB7 import <genesis.json> \xB7 define <def.json> \xB7 define-kit <kit.json> \xB7 furnish <house>[/room]
-pair:   register <url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB7 prayers \xB7 answer <id> <text> \xB7 status
+pair:   register <world-url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB7 prayers [--all: answered too] \xB7 answer <id> <text> \xB7 status
 learn:  examples [name] \xB7 defs <name|core/x@1> (one def in full) \xB7 sky (palettes) \xB7 a row named stall = the set "stall"`;
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("eden-god.mjs")) {
   const [cmd, ...argv] = process.argv.slice(2);
