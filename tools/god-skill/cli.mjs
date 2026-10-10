@@ -419,7 +419,7 @@ export async function look(flags = {}) {
   if (flags.span) span = num(flags.span);
   const cam = camera({ target, span, from: flags.from ?? 's', dist: flags.dist ? num(flags.dist) : undefined, inside: !!flags.inside, height: flags.height ? num(flags.height) : undefined });
   const out = resolve(flags.out ?? `looks/look-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.png`);
-  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags.inside || flags['hide-roofs']), expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
+  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags.inside || flags['hide-roofs'] || flags.floor !== undefined), cut: flags.floor !== undefined ? num(flags.floor) : null, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
   let shot;
   if (!flags.keep) shot = await shoot(args);
   else {
@@ -562,7 +562,7 @@ export const COMMANDS = {
   help: () => HELP,
 };
 const HELP = `eden-god ${SKILL_VERSION} — god mode for one Eden world. Read SKILL.md.
-read:   map · defs <words> · describe <ref> · where <x,z|ref> · free WxD [--near ref] · look [--at ref] [--from s|n|e|w|above] [--inside] · history · resolve · schema [--md]
+read:   map · defs <words> · describe <ref> · where <x,z|ref> · free WxD [--near ref] · look [--at ref] [--from s|n|e|w|above] [--inside [--floor k]] · history · resolve · schema [--md]
 build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--corner ne|--wall n] | --on table | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--dry]
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],…]' · place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],…]'
 edit:   move <ref> <relations>|--by dx,dz · set <ref> --param k=v --state '{…}' · recolor <ref> #hex · remove <ref>… · clone <ref> [--at] [--count n --step dx,dz] · select [filters] [--remove|--by|--recolor|--set-state|--set-param]

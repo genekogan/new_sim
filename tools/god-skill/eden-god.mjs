@@ -801,7 +801,7 @@ function stopKeeper() {
   rmSync2(KEEPER, { force: true });
   return k ? `stopped the look keeper (pid ${k.pid})` : "no look keeper running";
 }
-async function shoot({ worldUrl, eye, at, out, hideRoofs = false, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 6e5), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }) {
+async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = null, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 6e5), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }) {
   mkdirSync2(dirname(resolve(out)), { recursive: true });
   const t0 = Date.now();
   const pw = findPlaywright();
@@ -827,7 +827,7 @@ async function shoot({ worldUrl, eye, at, out, hideRoofs = false, expect = 0, ti
     const ctx = await browser.newContext({ viewport: { width, height } });
     await ctx.addInitScript(PRESERVE);
     page = await ctx.newPage();
-    const q = new URLSearchParams({ shot: "1", eye: eye.join(","), at: at.join(","), settle: "1500" });
+    const q = new URLSearchParams({ shot: "1", eye: eye.join(","), at: at.join(","), settle: "1500", ...hideRoofs ? { hideRoofs: "1", ...cut !== null ? { cut: String(cut) } : {} } : {} });
     await page.goto(`${worldUrl}?${q}`, { waitUntil: "commit", timeout: timeoutMs });
   }
   try {
@@ -849,8 +849,9 @@ async function shoot({ worldUrl, eye, at, out, hideRoofs = false, expect = 0, ti
       if (state.why === "no entity world on this page") throw new Error("look: this world has no entity layer");
       await new Promise((r) => setTimeout(r, 1e3));
     }
-    const frames = await page.evaluate(([e, a, roofs]) => new Promise((res) => {
+    const frames = await page.evaluate(([e, a, roofs, cutAt]) => new Promise((res) => {
       const w = window.__simEntity;
+      window.__buildingView = roofs ? { hideRoofs: true, cut: cutAt } : { hideRoofs: false, cut: null };
       w.controls.target.set(a[0], a[1], a[2]);
       w.camera.position.set(e[0], e[1], e[2]);
       w.camera.lookAt(w.controls.target);
@@ -878,7 +879,7 @@ async function shoot({ worldUrl, eye, at, out, hideRoofs = false, expect = 0, ti
         else requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
-    }), [eye, at, hideRoofs]);
+    }), [eye, at, hideRoofs, cut]);
     await page.waitForTimeout(settleMs);
     const data = await page.evaluate(() => {
       const c = [...document.querySelectorAll("canvas")].sort((a, b) => b.width * b.height - a.width * a.height)[0];
@@ -1579,7 +1580,7 @@ async function look(flags2 = {}) {
   if (flags2.span) span = num(flags2.span);
   const cam = camera({ target, span, from: flags2.from ?? "s", dist: flags2.dist ? num(flags2.dist) : void 0, inside: !!flags2.inside, height: flags2.height ? num(flags2.height) : void 0 });
   const out = resolve2(flags2.out ?? `looks/look-${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").slice(0, 19)}.png`);
-  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags2.inside || flags2["hide-roofs"]), expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags2.keep, ...flags2.width ? { width: num(flags2.width) } : {}, ...flags2.h ? { height: num(flags2.h) } : {} };
+  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags2.inside || flags2["hide-roofs"] || flags2.floor !== void 0), cut: flags2.floor !== void 0 ? num(flags2.floor) : null, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags2.keep, ...flags2.width ? { width: num(flags2.width) } : {}, ...flags2.h ? { height: num(flags2.h) } : {} };
   let shot;
   if (!flags2.keep) shot = await shoot(args);
   else {
@@ -1815,7 +1816,7 @@ var COMMANDS = {
   help: () => HELP
 };
 var HELP = `eden-god ${SKILL_VERSION} \u2014 god mode for one Eden world. Read SKILL.md.
-read:   map \xB7 defs <words> \xB7 describe <ref> \xB7 where <x,z|ref> \xB7 free WxD [--near ref] \xB7 look [--at ref] [--from s|n|e|w|above] [--inside] \xB7 history \xB7 resolve \xB7 schema [--md]
+read:   map \xB7 defs <words> \xB7 describe <ref> \xB7 where <x,z|ref> \xB7 free WxD [--near ref] \xB7 look [--at ref] [--from s|n|e|w|above] [--inside [--floor k]] \xB7 history \xB7 resolve \xB7 schema [--md]
 build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--corner ne|--wall n] | --on table | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--dry]
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],\u2026]' \xB7 place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],\u2026]'
 edit:   move <ref> <relations>|--by dx,dz \xB7 set <ref> --param k=v --state '{\u2026}' \xB7 recolor <ref> #hex \xB7 remove <ref>\u2026 \xB7 clone <ref> [--at] [--count n --step dx,dz] \xB7 select [filters] [--remove|--by|--recolor|--set-state|--set-param]

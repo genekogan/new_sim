@@ -177,7 +177,7 @@ sky --palette golden-hour --sun 0.4 · weather --clouds 0.3 --wind 0.2 · consti
 
 - `look [--at <ref>|x,z] [--from s|n|e|w|ne…|above] [--dist m] [--inside] [--out file.png]` — a
   screenshot (Chrome + Playwright). It prints the file path: **open the image and look at it.**
-  `--inside` hides roofs to see rooms. The first look starts a background browser (can take a
+  `--inside` hides roofs to see the top storey's rooms; `--floor 0` shows that floor (storeys above it hidden). The first look starts a background browser (can take a
   minute or more); later looks take seconds. `look --stop` ends it.
 - `describe <ref>` — size, pose, rooms (with doors and occupants), openings, stairs, slots,
   children, constraints (ok / VIOLATED), behaviours a creature supports and why not, the ground
