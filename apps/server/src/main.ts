@@ -20,6 +20,7 @@ import {FloaterCards} from './floaters.ts';
 import { worldDefinition } from './world-config.ts';
 import { GodMode } from './god/god.ts';
 import { installEngineBridge } from './god/engine-bridge.ts';
+import { GroundHost, installGroundCapabilities, loadGroundRecipes } from './god/ground-host.ts';
 import { stripWorldRequestPath } from './world-request-path.ts';
 import {edenCoreRequested,edenHistoryFactory,installEdenCore,settleEmptyEden,drainEdenThought,installEdenLifeV1,installEdenExpansionV1} from './eden-bootstrap.ts';
 import {IntentControlV2} from './intent-control.ts';
@@ -55,6 +56,8 @@ if(sleepSnapshot&&!edenLife)throw Error('eden-bootstrap.sleep-snapshot-reader-re
 const applyExpansion=process.env.APPLY_EDEN_EXPANSION_CHECKPOINT==='1';
 if(applyExpansion&&(!edenLife||!newcomerResources||!sleepSnapshot||!lecture||!expansionGround||process.env.EDEN_CORE_RETAIN_READER==='1'))throw Error('eden-bootstrap.expansion-requires-complete-explicit-readers-and-install-mode');
 const factory=edenCore?await edenHistoryFactory(db,config.worldId,{lifeV1:edenLife,newcomerResourcesV1:newcomerResources,sleepSnapshotV1:sleepSnapshot,lectureV1:lecture,groundV1:expansionGround}):mars?await mars.marsFactory(config.worldKey==='littlemartians'?mars.LITTLE_MARTIANS_WORLD:config.worldKey==='eden'||!KNOWN_WORLD_KEYS.includes(config.worldKey as never)?mars.GREEN_FIELD_WORLD:undefined):recordedToyFactory;
+// ground/1 (lane L8): every terrain recipe this entity world logged resolves by hash before the engine replays
+if (config.worldEngine) loadGroundRecipes(db, config.worldId);
 const host = new WorldHost(db, factory, config.worldSeed, config.snapshotEveryTicks, config.worldId,edenCore?{durableClockV1:true}:undefined);
 const boot = host.boot();
 if(edenCore)await installEdenCore(host,{applyCrew:process.env.APPLY_EDEN_CREW_CHECKPOINT==='1',applyCommons:process.env.APPLY_EDEN_COMMONS_CHECKPOINT==='1',retainReader:process.env.EDEN_CORE_RETAIN_READER==='1'});
@@ -108,6 +111,9 @@ if (edge && host.engine.configureRuntimePolicy && host.enableQuietStallReleaseV1
 // God mode + entity world (spec eden4/28): the owner's edge agent builds the world; viewers get diffs over the hub.
 const genesis = process.env.GENESIS_FILE ? JSON.parse(readFileSync(process.env.GENESIS_FILE, 'utf8')) : undefined;
 const god = config.worldEngine ? new GodMode(db, { genesis, worldId: host.worldId, ownerId: process.env.WORLD_OWNER_ID || null /* explicit only: on a fresh world the first person to claim it becomes its god */, tick: () => host.engine.world.tick, emit: (m) => hub.broadcast(m as never) }) : undefined;
+// Stage B (lane L8): the ground fact is queued before the entity bridge so boot installs the terrain first.
+const groundHost = god && (host.engine as unknown as {installGroundV1?:unknown}).installGroundV1 ? new GroundHost(db, host, god) : undefined;
+if (groundHost && edge) installGroundCapabilities(edge as never, god!, host);
 // Stage B (lane L9): Souls live among god-built things — entity physics into the engine, fixtures usable, bodies as entities.
 if (god && config.engine === 'mars' && process.env.ENTITY_BRIDGE !== '0') installEngineBridge({ host, god, edge });
 if (god) console.log(`[god] entity world ready: ${god.model.entities.size} entities, ${new Set(god.model.defs.values()).size} defs, owner ${god.owner ?? '(unclaimed)'}`);

@@ -22,6 +22,7 @@ import {socialEdenV1} from './social-eden.ts';
 import {applyWorldEdit,type WorldEditV1} from './entity-physics.ts';
 import {registerAssets} from './catalog-adapter.ts';
 import {socialEdenTransitionV1Schema,type SocialEdenTransitionV1} from '@sim/engine-contract';
+import {attachGround,groundRegistry,installGroundV1 as installGround,previewGroundV1,standHeight,groundArrival,inDeepWater} from './ground-bridge.ts';
 // The Mars engine behind Sim's engine contract.
 //
 // The shell speaks a small BODY LANGUAGE (walk_to, sit, stand, rest, wave,
@@ -202,6 +203,8 @@ export class MarsEngine implements Engine {
 
   constructor(m: Mars, rt: any, cfg: MarsWorldConfig, saved?: { programs: Prog[]; nextProg: number; leaving: string[];renderPlatformsV1?:RenderPlatformsV1 }, physical?:MarsPhysicalBinding) {
     this.m = m; this.rt = rt; this.cfg = structuredClone(cfg); this.registry = rt.registry;this.physical=physical;
+    // ground/1 (lane L8): an entity world's terrain; absent in every authored world
+    if(rt.world.groundV1){attachGround(rt);this.registry=rt.registry;}
     if(rt.world.authoredBoundariesV1)immutableAuthoredBoundaryFact(rt.world.authoredBoundariesV1);
     this.schema = rt.world.schema;
     if (saved) { for (const p of saved.programs) { this.programs.set(p.id, p); this.byActor.set(p.actor, p.id); } this.nextProg = saved.nextProg; this.leaving = saved.leaving; }
@@ -530,7 +533,7 @@ export class MarsEngine implements Engine {
     if ((p.trafficTries = (p.trafficTries ?? 0) + 1) > 6) return this.end(p, 'failed', why);
     p.index--; p.ops = [{ wait: (waiters.length ? 80 : 20) + this.stagger(p.actor) * 10 }];
   }
-  private movementVerb(actor:string,x:number,z:number){const a=this.ents[actor];return this.physical&&(inShoreDomain(this.rt.world,x,z)||!!a&&inShoreDomain(this.rt.world,a.pose.p[0],a.pose.p[2]))?'commons_shore_travel':'walk_to';}
+  private movementVerb(actor:string,x:number,z:number){const a=this.ents[actor];if(this.rt.world.groundV1&&inDeepWater(this.rt,actor))return 'ground_travel';return this.physical&&(inShoreDomain(this.rt.world,x,z)||!!a&&inShoreDomain(this.rt.world,a.pose.p[0],a.pose.p[2]))?'commons_shore_travel':'walk_to';}
   private free(id: string): boolean { return !!this.ents[id] && this.holders(id).length === 0 && !this.byActor.has(id) && ![...this.programs.values()].some(p=>p.build?.crew.includes(id)); }
 
   /** A raw Mars verb, with the actor filled in where the verb takes one (`actor`, or `actors` when none are given). */
@@ -836,7 +839,7 @@ export class MarsEngine implements Engine {
   }
   spawnHuman({ id, label, soul }: { id: string; label: string; soul: string }): string {
     if (this.ents[id]) return id;
-    const [ax, az] = this.cfg.arrival;
+    const [ax, az] = this.rt.world.groundV1 ? groundArrival(this.rt, this.cfg.arrival) : this.cfg.arrival;
     const body=this.cfg.scene==='littlemartians'&&['Verdelis','Kalama','Kweku','Mycos','Ada','Shuijing','Nyx'].includes(label)?{family:'floater',model:label.toLowerCase(),radius:.35,hoverHeight:1.45}:undefined;
     const people = Object.values(this.ents).filter((e: any) => e.kind === 'human').map((e: any) => [e.pose.p[0], e.pose.p[2]] as [number, number]);
     let spot: [number, number] | null = null;
@@ -860,6 +863,7 @@ export class MarsEngine implements Engine {
     }
     if (!spot) throw new Error('no free standing room at the arrival point');
     const e = this.m.human(id, spot[0], spot[1], { label, provenance: { origin: 'simulation', confidence: 'hypothetical' } });
+    if(this.rt.world.groundV1){const f=(this.rt.services.spatial as Spatial).ground!.field;e.pose.p[1]=standHeight(f,spot[0],spot[1]);}
     e.human.soul = soul; if(body)e.body=body;
     this.ents[id] = e; this.m.canonicalEntityOrder(this.rt.world);
     this.out.changes.push([this.rt.tick, id, 'present', e]);
@@ -1396,6 +1400,13 @@ export class MarsEngine implements Engine {
     const levels=[...new Set(r.route.legs.map((l:any)=>l.kind==='walk'?l.level:l.link.to.level))] as number[];
     return {ok:true,length:Math.round(r.route.length*100)/100,legs:r.route.legs.length,levels};
   }
+  /** ground/1 (logged rules fact `groundV1`, lane L8): the world stands on this terrain recipe from now on; bodies take its height.
+   *  Idempotent for the same recipe; the recipe must be registered (ground-bridge.ts registerGroundRecipe) before the fact folds. */
+  previewGroundV1(fact:unknown){return previewGroundV1(fact);}
+  installGroundV1(fact:any):{installed:boolean;settled:string[]}{
+    const r=installGround(this.rt,fact);this.registry=this.rt.registry;
+    return r;
+  }
   /** nav/1: the world.navV1 value a valid spec installs (pure; prefixed ids so they never collide with source obstacles). */
   navFromSpecV1(spec:NavSpecV1){
     return {version:'nav/1' as const,
@@ -1601,7 +1612,7 @@ export class MarsEngine implements Engine {
   /** Mars's own resumable snapshot, plus which program each actor is in. Body-language steps lower only to verbs Mars can resume exactly. */
   snapshot(): EngineSnapshot {
     const mars = this.rt.snapshot();
-    return structuredClone({ ...(this.lecturePlacement?{edenLectureV1:this.lecturePlacement,lectureBaseStateHash:this.lectureBaseStateHash()}:{}), ...(this.sleepSnapshotActive?{nativeSleepSnapshotV1:true,sleepSnapshotBaseStateHash:this.sleepSnapshotBaseStateHash()}:{}), ...(this.newcomerResources.length?{commonsNewcomerResourcesV1:structuredClone(this.newcomerResources),newcomerBaseStateHash:this.newcomerBaseStateHash()}:{}), ...(this.renderPlatformMetadata?{renderPlatformsV1:structuredClone(this.renderPlatformMetadata)}:{}), format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, ...(this.cfg.scene==='eden-commons'?{commonsVersion:'commons/1'}:{}), quiet: this.quiet, ...(this.commonsProvisionsActive?{commonsProvisionsV1:true}:{}), ...(this.commonsKitchenActive?{commonsKitchenV1:true}:{}), ...(this.socialEdenActive?{socialEdenV1:true}:{}), ...(this.greenLandmarkActive?{greenLandmarkV1:true}:{}), ...(this.foodDeliveries.length?{foodDeliveriesV1:structuredClone(this.foodDeliveries)}:{}), ...(this.commonsKitchenActive&&this.commonsKitchenVersion==='commons-kitchen/2'?{commonsKitchenVersion:this.commonsKitchenVersion}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion}:{}) });
+    return structuredClone({ ...(this.lecturePlacement?{edenLectureV1:this.lecturePlacement,lectureBaseStateHash:this.lectureBaseStateHash()}:{}), ...(this.sleepSnapshotActive?{nativeSleepSnapshotV1:true,sleepSnapshotBaseStateHash:this.sleepSnapshotBaseStateHash()}:{}), ...(this.newcomerResources.length?{commonsNewcomerResourcesV1:structuredClone(this.newcomerResources),newcomerBaseStateHash:this.newcomerBaseStateHash()}:{}), ...(this.renderPlatformMetadata?{renderPlatformsV1:structuredClone(this.renderPlatformMetadata)}:{}), format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, ...(this.cfg.scene==='eden-commons'?{commonsVersion:'commons/1'}:{}), quiet: this.quiet, ...(this.commonsProvisionsActive?{commonsProvisionsV1:true}:{}), ...(this.commonsKitchenActive?{commonsKitchenV1:true}:{}), ...(this.socialEdenActive?{socialEdenV1:true}:{}), ...(this.greenLandmarkActive?{greenLandmarkV1:true}:{}), ...(this.foodDeliveries.length?{foodDeliveriesV1:structuredClone(this.foodDeliveries)}:{}), ...(this.commonsKitchenActive&&this.commonsKitchenVersion==='commons-kitchen/2'?{commonsKitchenVersion:this.commonsKitchenVersion}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion}:{}), ...(this.rt.world.groundV1?{groundV1:true}:{}) });
   }
   canSnapshot(): boolean {
     // A legacy formation callback is not data and must wait for a quiet point.
@@ -1683,7 +1694,7 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
       const base = scene === 'eden-commons' ? m.edenCommonsWorld() : scene === 'littlemartians' ? m.littleMartiansWorld() : scene === 'greenfield' ? m.greenFieldWorld() : scene === 'eden-camp' ? m.edenCampWorld() : scene === 'meal' ? m.mealWorld() : m.provingGroundWorld();
       // entity-physics/1: the derived fixture assets must be known before the restored Spatial first syncs
       {const ep=(decodeSnapshot(s.mars) as any).world?.entityPhysicsV1;if(ep)registerAssets(ep.assets);}
-      const rt = m.Runtime.restore(s.mars, registry, services(base), m.invariants);
+      const rt = m.Runtime.restore(s.mars, (s as {groundV1?:boolean}).groundV1 ? groundRegistry(registry) : registry, services(base), m.invariants);
       if(cfg.scene==='eden-commons'&&(rt.world.base.campus!=='eden-commons'||rt.world.base.staticHash!==base.base.staticHash))throw new Error('snapshot commons physical base differs from the native factory');
       const engine = new MarsEngine(m, rt, s.cfg ?? cfg, { programs: s.programs, nextProg: s.nextProg, leaving: s.leaving,renderPlatformsV1:s.renderPlatformsV1 });
       if (s.quiet) engine.beginQuiet();

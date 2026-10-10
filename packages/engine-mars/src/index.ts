@@ -32,3 +32,4 @@ export * from './mars-2026-map.ts';
 
 export * from './entity-physics.ts';
 export * from './catalog-adapter.ts';
+export * from './ground-bridge.ts';

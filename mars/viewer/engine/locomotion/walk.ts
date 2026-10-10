@@ -24,6 +24,7 @@ import { PLAN_MARGIN, type Leg, type LinkLeg, type Route, type WalkLeg } from '.
 import { smoothPolyline, type PathSeg } from './spline.ts';
 import { type AgentProfile } from '../spatial/types.ts';
 import { gapToSleep, SLEEP_BODY_MARGIN } from '../activities/sleep.ts';
+import { G_WADE } from '../spatial/ground.ts';
 
 const ACCEL = 1.2; // m/s²
 const BRAKE = 2 * ACCEL; // m/s² ordinary deceleration
@@ -840,11 +841,13 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
       lagging = false;
     }
   }
-  a.pose.p = [p[0], g.y, p[1]];
+  // ground worlds (spatial/ground.ts): level 0 is the terrain, so the body stands at the tiles' height and wades in shallows
+  const gn = g.level === 0 ? sp.ground : undefined, gf = gn?.field;
+  a.pose.p = [p[0], gn ? gn.standY(p[0], p[1]) : g.y, p[1]];
   // animation signal: 'walk' only while the body actually covers ground (the renderer's Walk clip);
   // a stopped walker waits (named reason) or stands idle — it never walks on the spot
   const gs = dist2(cur, p) / dt;
-  a.human!.activity = gs >= WALK_MIN ? 'walk' : yieldTo || personBlock || loadBlock || geoBlock ? 'wait' : 'idle';
+  a.human!.activity = gs >= WALK_MIN ? (gf && gf.medium(p[0], p[1]) === G_WADE ? 'wade' : 'walk') : yieldTo || personBlock || loadBlock || geoBlock ? 'wait' : 'idle';
 
   // decide within DECIDE_TICKS (0.5 s) of being stopped: a blocker that has not moved since (a
   // standing person, a parked load) is routed around (they become temporary obstacles); one that keeps

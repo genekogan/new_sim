@@ -10,6 +10,8 @@ export const SKIRT_MAX_M = 0.6;
 export const WALK_MAX_SLOPE = 0.5774;
 /** Water deeper than this is swimming, not wading. */
 export const WADE_MAX_M = 0.3;
+/** Tolerance on the wading depth: tiles are Float32, so a pond carved exactly WADE_MAX_M deep must still be wadable. */
+export const MEDIA_EPS = 1e-4;
 
 export type Footprint = { corners: [Vec2, Vec2, Vec2, Vec2]; center: Vec2 };
 
@@ -75,7 +77,7 @@ export type Medium = 'walk' | 'wade' | 'swim' | 'steep';
 /** What a ground-bound body meets at (x, z). */
 export function mediumAt(t: Terrain, x: number, z: number, maxSlope = WALK_MAX_SLOPE): Medium {
   const depth = waterDepthAt(t, x, z);
-  if (depth > WADE_MAX_M) return 'swim';
+  if (depth > WADE_MAX_M + MEDIA_EPS) return 'swim';
   if (t.slope(x, z) > maxSlope) return 'steep';
   return depth > 0 ? 'wade' : 'walk';
 }

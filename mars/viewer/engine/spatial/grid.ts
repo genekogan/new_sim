@@ -137,8 +137,8 @@ export function latticeOf(bounds: readonly [number, number, number, number], cel
   return { ox, oz, nx: Math.max(0, Math.ceil(maxX / cell) - ox), nz: Math.max(0, Math.ceil(maxZ / cell) - oz) };
 }
 
-const BODY_HEIGHT = 1.8;
-const STEP = 0.22;
+export const BODY_HEIGHT = 1.8;
+export const STEP = 0.22;
 
 /**
  * Memoised rasters of a fixed obstacle list (a static base scene, e.g. the 2.7k campus obstacles):
@@ -513,7 +513,7 @@ function edtRows(free: Uint8Array, g: Float64Array, nx: number, cell: number, ou
 }
 
 /** Felzenszwalb–Huttenlocher exact squared EDT, returned as metres. Out-of-grid counts as blocked. `g` receives the column pass. */
-function edt(free: Uint8Array, nx: number, nz: number, cell: number, g = new Float64Array(nx * nz)): Float32Array {
+export function edt(free: Uint8Array, nx: number, nz: number, cell: number, g = new Float64Array(nx * nz)): Float32Array {
   edtColumns(free, nx, nz, g, 0, nx - 1);
   const out = new Float32Array(nx * nz);
   edtRows(free, g, nx, cell, out, 0, nz - 1);

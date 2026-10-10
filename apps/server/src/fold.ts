@@ -227,6 +227,9 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
           if(!result.ok)throw new Error('camp-expansion.anchor:'+result.message);
         }
       }
+      // ground/1 (lane L8): an entity world's terrain recipe (by hash); Souls stand and route on it from here on (prospective; idempotent).
+      const groundV1=(e.payload as {groundV1?:unknown}|null)?.groundV1;
+      if(groundV1){const install=(engine as unknown as {installGroundV1?:(f:unknown)=>unknown}).installGroundV1;if(!install)throw Error('ground.reader-required');install.call(engine,groundV1);}
       // nav/1: extra flat walking ground and solid building/water footprints join the static walk scene (prospective; idempotent).
       const nav=(e.payload as {navV1?:unknown}|null)?.navV1;
       if(nav){const install=(engine as unknown as {installNavV1?:(s:unknown)=>unknown}).installNavV1;if(!install)throw Error('nav.reader-required');install.call(engine,nav);}
