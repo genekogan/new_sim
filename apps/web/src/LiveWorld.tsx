@@ -1,3 +1,4 @@
+import {ALL_OPTIONAL_APPEARANCE_PROFILES,optionalAppearanceProfilesForVerifiedCapture,type OptionalAppearanceProfiles} from './optional-appearance-profiles.ts';
 import {historyTakePath,historyTakePage} from './WorldTakeTransport.ts';
 import {WorldAuthoredBoundaries} from './WorldAuthoredBoundaries.ts';
 import {exploreRoom} from './explore-data.ts';
@@ -359,6 +360,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // bound segments load their verified base; old unbound history uses neutral ground.
     let dayTicks: number | null = null;
     let base: ReturnType<typeof parseSceneInfo>['scene'] = null, sceneSettled = false, people: TakePeople | null = null;
+    let appearanceProfiles=ALL_OPTIONAL_APPEARANCE_PROFILES;
     let publication:unknown=null,restMarkers:ReturnType<typeof createPublishedRestMarkers>=null;
     let newcomerMarkers:ReturnType<typeof createPublishedNewcomerMarkers>=null,newcomerMarkersFailed=false;
     const clearNewcomerMarkers=()=>{const owner=newcomerMarkers;newcomerMarkers=null;newcomerMarkersFailed=false;try{owner?.dispose();}catch{if(!abort.signal.aborted)problem('Some sleeping-area scenery could not be shown; keeping the original ground.');}};
@@ -376,7 +378,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       const response=await fetch(apiPath('/v1/scenes/'+hash),{signal});
       if(!response.ok)throw Error('Recorded scenery unavailable');return response.json();
     },decodeSceneCapturePublication);
-    const installScene=(info:ReturnType<typeof parseSceneInfo>,verifiedPublication?:unknown)=>{
+    const installScene=(info:ReturnType<typeof parseSceneInfo>,verifiedPublication?:unknown,profiles:OptionalAppearanceProfiles=ALL_OPTIONAL_APPEARANCE_PROFILES)=>{
+      appearanceProfiles=profiles;
       nativeSocialDraw.reset(people);
       clearExpansion();expansionFailed=false;
       clearConnectedDressing();
@@ -431,7 +434,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       }else if(mismatch){sceneryStatus('The scenery reference does not match this recording.');sceneRetryAt=now+5000;renderer.domElement.dataset.sceneBinding='unavailable';}
       else void sceneHistory.resolve(reference).then(result=>{
         if(!active())return;
-        if(result.status==='bound'){installScene(result.info,result.publication);sceneryStatus(null);renderer.domElement.dataset.sceneHash=result.ref.hash;renderer.domElement.dataset.sceneBinding='bound';}
+        if(result.status==='bound'){installScene(result.info,result.publication,optionalAppearanceProfilesForVerifiedCapture(result.publication,context.current.sim.conn.welcome?.worldId??'',result.ref));sceneryStatus(null);renderer.domElement.dataset.sceneHash=result.ref.hash;renderer.domElement.dataset.sceneBinding='bound';}
         else if(result.status!=='stale'){sceneryStatus(result.reason);sceneRetryAt=performance.now()+5000;renderer.domElement.dataset.sceneBinding='unavailable';}
       });
       return false;
@@ -544,14 +547,14 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
             restMarkers?.setTake(take);
             if(!newcomerMarkers&&!newcomerMarkersFailed&&publication){const choice=publishedNewcomerSelection(context.current.sim.conn.welcome?.worldId??'',(take as Take&{renderSceneRef?:unknown}).renderSceneRef);if(choice)try{newcomerMarkers=createPublishedNewcomerMarkers(publication,take,choice,{enabled:true});if(newcomerMarkers)scene.add(newcomerMarkers.group);}catch{newcomerMarkersFailed=true;problem('Some sleeping-area scenery could not be shown; keeping the original ground.');}}
             if(newcomerMarkers)try{newcomerMarkers.setTake(take);}catch{clearNewcomerMarkers();newcomerMarkersFailed=true;problem('Some sleeping-area scenery could not be shown; keeping the original ground.');}
-            if(!planting&&!plantingFailed&&publication){
+            if(!planting&&!plantingFailed&&publication&&appearanceProfiles.understory){
               let createPlanting:typeof createCurrentProvisionsUnderstory|undefined;
               try{if(inspectCurrentProvisionsUnderstory(publication,take,{enabled:true}))createPlanting=createCurrentProvisionsUnderstory;else if(inspectLiveKitchenUnderstory(publication,take,{enabled:true}))createPlanting=createLiveKitchenUnderstory;else if(inspectLiveFoodShoreUnderstory(publication,take,{enabled:true}))createPlanting=createLiveFoodShoreUnderstory;else if(inspectLiveSocialUnderstory(publication,take,{enabled:true}))createPlanting=createLiveSocialUnderstory;else if(inspectLiveFoodBUnderstory(publication,take,{enabled:true}))createPlanting=createLiveFoodBUnderstory;}catch{}
               if(createPlanting)try{planting=createPlanting(publication,take,{enabled:true});if(planting)scene.add(planting.group);}catch{plantingFailed=true;problem('Some planting could not be shown; keeping the original scenery.');}
             }
             if(planting)try{planting.setTake(take);}catch{const failed=planting;planting=null;plantingFailed=true;try{failed.dispose();}catch{}problem('Some planting could not be shown; keeping the original scenery.');}
             // Eligibility reserves the whole recorded chunk; never rehash it per display frame.
-            if(publication&&!connectedDressingFailed){
+            if(publication&&!connectedDressingFailed&&appearanceProfiles.understory){
               if(!connectedDressing)try{connectedDressing=createCurrentSocialDressingOwner(publication,take,true);if(connectedDressing)scene.add(connectedDressing.group);}catch{connectedDressingFailed=true;}
               else try{connectedDressing.setTake(take);}catch{clearConnectedDressing();connectedDressingFailed=true;}
             }
@@ -576,7 +579,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           bodyModels.sync(records,sampled.entities);
           const sampledFloaters=new Map(Object.entries(sampled.entities).flatMap(([id,e])=>{const body=recordedBody(records[id]?.body,e.state);if(body?.family!=='floater')return [];const url=admittedBodyUrl(body.modelUrl,apiPath('').replace(/\/$/,''));return [[id,{...body,...(url?{modelUrl:url}:{})} as NonNullable<Entity['body']>]] as [string,NonNullable<Entity['body']>][];}));
           floaters.sync(sampledFloaters);
-          nativeSocialDraw.update(people,publication,take,records,sampled);
+          nativeSocialDraw.update(people,publication,take,records,sampled,appearanceProfiles.nativeSocial);
           geometry?.setRecordedFixtures(sampled.entities,records);
           geometry?.setViewTime(depictedTick*take.dt);
           const expansionWanted=edenExpansionCapture(!!context.current.edenExpansion,s.conn.welcome?.worldId,expansionSceneInfo,publication,!!past.current);

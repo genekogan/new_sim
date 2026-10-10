@@ -4,6 +4,7 @@ import {parseBackdropHide,applyBackdropVisibility,type BackdropHide} from './Wor
 // that follows the world clock, and the small pure helpers the live view uses to pick recorded chunks
 // and keep the rewind buffer bounded. Nothing here runs the engine.
 import * as THREE from 'three';
+import {ownedLiveChunk} from './owned-live-chunks.ts';
 import {parsePlatformFloors,type PlatformFloor} from '../../../mars/viewer/lib/platform-floor.ts';
 import {parseWorldShore,type WorldShore} from './WorldShore.ts';
 import {createConnectedNativeShore} from '../../../mars/viewer/app/engine-view/content/environment/connected-native-shore.ts';
@@ -51,6 +52,8 @@ export function validChunks(list: unknown): Chunk[] {
   if (!Array.isArray(list)) return [];
   const byStart = new Map<number, Chunk>();
   for (const raw of list) {
+    const retained=ownedLiveChunk(raw);
+    if(retained){byStart.set(retained.fromTick,retained as unknown as Chunk);continue;}
     const parsed = recordedTakeChunkSchema.safeParse(raw);
     if (parsed.success) byStart.set(parsed.data.fromTick, parsed.data as unknown as Chunk);
   }
