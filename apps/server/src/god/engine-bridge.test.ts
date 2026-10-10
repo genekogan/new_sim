@@ -173,4 +173,31 @@ test('L3 shapes in the engine: a garden wall makes Souls go round, a deck is wal
   assert.ok(after.length > before.length + 8, `goes round the wall: ${before.length} → ${after.length}`);
   const onDeck = runQuery(w.god.model, { reach: { from: [0, 0], to: 'deck' } }).reach as any;
   assert.equal(onDeck.reachable, true, JSON.stringify(onDeck));
+  // a fence across the south field with one closed gate: Souls go round it; opening the gate lets them through
+  const r2: any = w.god.act({ ops: [
+    { op: 'place', def: coreRef('fence'), name: 'fence', shape: { path: [[-40, -22], [40, -22]] }, params: { gates: [{ at: 40, width: 1.6 }] } },
+    { op: 'place', def: coreRef('footbridge'), name: 'span', shape: { path: [[20, -8], [20, 8]] } },
+  ] });
+  assert.equal(r2.accepted, true, JSON.stringify(r2).slice(0, 600));
+  await w.settle(3);
+  const fence = w.god.model.get('fence')!.id, span = w.god.model.get('span')!;
+  const gate = (E.world.entityPhysicsV1.byEntity[fence]?.solids ?? []).find((x: any) => x.id.endsWith('#door:gate-1'));
+  assert.ok(gate, 'closed gate blocks its gap');
+  assert.ok(Math.abs(gate.y0 - w.god.model.terrain.sample(0, -22)) < 0.05 && gate.y1 - gate.y0 > 0.8, `gate stands on the ground: ${gate.y0}..${gate.y1}`);
+  // the fence runs past both edges of the field, so a closed gate cuts the south strip off
+  const shut = runQuery(w.god.model, { reach: { from: [0, -20], to: [0, -26] } }).reach as any;
+  assert.equal(shut.reachable, false, `closed gate: ${JSON.stringify(shut).slice(0, 200)}`);
+  const r3: any = w.god.act({ ops: [{ op: 'set', id: fence, params: { gates: [{ at: 40, width: 1.6, state: 'open' }] } }] });
+  assert.equal(r3.accepted, true, JSON.stringify(r3).slice(0, 400));
+  await w.settle(3);
+  assert.ok(!(E.world.entityPhysicsV1.byEntity[fence]?.solids ?? []).some((x: any) => x.id.includes('#door:')), 'open gate: no blocker');
+  const open = runQuery(w.god.model, { reach: { from: [0, -20], to: [0, -26] } }).reach as any;
+  assert.equal(open.reachable, true, JSON.stringify(open));
+  assert.ok(open.length < 12, `through the open gate: ${open.length}`);
+  // a footbridge: deck quads on level 0 at their own (absolute) heights, rails block, the deck is reachable
+  const sp = E.world.entityPhysicsV1.byEntity[span.id];
+  t.diagnostic(`footbridge params.at=${JSON.stringify(span.params?.at)} surfaces=${sp?.surfaces?.length} rails=${sp?.solids?.length}`);
+  assert.ok(sp?.surfaces?.length >= 2 && sp.surfaces.every((x: any) => x.level === 0), 'deck quads on level 0');
+  const onSpan = runQuery(w.god.model, { reach: { from: [20, -12], to: [20, 0] } }).reach as any;
+  assert.equal(onSpan.reachable, true, JSON.stringify(onSpan));
 });

@@ -161,8 +161,9 @@ export class EngineBridge {
     for (const o of baked.openings ?? []) {
       const closed = doorState[o.id] === 'closed' || (doorState[o.id] === undefined && o.state === 'closed') || (def.components.opening && e.state?.open === false);
       if (!closed) continue;
-      const c = toWorld(o.at[0], o.at[1]);
-      (part.solids ??= []).push({ id: `${e.id}#door:${o.id}`, obb: { c, half: [r3((o.width / 2) * wp.s), r3(0.08 * wp.s)], yaw: r3(-(wp.yaw + o.yaw)) }, y0: r3(wp.y + (o.sill ?? 0) * wp.s), y1: r3(wp.y + ((o.sill ?? 0) + o.height) * wp.s), kind: 'fixture' as const, label: `${this.model.pathOf(e.id)} ${o.id} (closed)` });
+      // a gate of a world-frame wall/fence sits on the ground under it (sill and height are ground-relative)
+      const c = toWorld(o.at[0], o.at[1]), sc = worldFrame ? 1 : wp.s;
+      (part.solids ??= []).push({ id: `${e.id}#door:${o.id}`, obb: { c, half: [r3((o.width / 2) * sc), r3(0.08 * sc)], yaw: r3(-((worldFrame ? 0 : wp.yaw) + o.yaw)) }, y0: heightAt(o.sill ?? 0, c), y1: heightAt((o.sill ?? 0) + o.height, c), kind: 'fixture' as const, label: `${this.model.pathOf(e.id)} ${o.id} (closed)` });
     }
     // floors: polygons → oriented rectangles on levels
     const surfaces = [...(baked.surfaces ?? [])];
