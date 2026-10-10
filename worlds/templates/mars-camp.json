@@ -16,39 +16,40 @@
    "clouds": 0.05,
    "wind": 0.35,
    "rain": 0
+  },
+  "ground": {
+   "palette": "desert"
   }
  },
  "batches": [
   {
-   "note": "desert floor; creosote, stones and the odd cactus outside the camp (desert-coloured hills are a gap: relief takes the grass colour)",
+   "note": "desert palette ground, low hills to the north and east (toward the Chocolate Mountains), dry grass tufts, stones and cacti outside the camp (creosote shrubs approximated)",
    "group": "desert",
    "ops": [
     {
      "op": "place",
-     "def": "core/lawn@1",
-     "name": "desert-floor",
-     "shape": {
-      "area": [
-       [
-        -150,
-        -150
-       ],
-       [
-        150,
-        -150
-       ],
-       [
-        150,
-        150
-       ],
-       [
-        -150,
-        150
-       ]
-      ]
-     },
+     "def": "core/hill@1",
+     "name": "north-hills",
+     "p": [
+      -20,
+      -120
+     ],
      "params": {
-      "material": "sand"
+      "height": 9,
+      "radius": 45
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/hill@1",
+     "name": "chocolate-mountains",
+     "p": [
+      110,
+      -70
+     ],
+     "params": {
+      "height": 14,
+      "radius": 55
      }
     },
     {
@@ -78,12 +79,8 @@
      "params": {
       "palette": [
        {
-        "def": "core/bush@1",
-        "weight": 3,
-        "scale": [
-         0.5,
-         0.9
-        ]
+        "def": "core/grass-tuft@1",
+        "weight": 3
        },
        {
         "def": "core/rock@1",
@@ -91,14 +88,18 @@
        },
        {
         "def": "core/cactus@1",
-        "weight": 0.3
+        "weight": 0.6
        },
        {
         "def": "core/boulder-pile@1",
         "weight": 0.3
+       },
+       {
+        "def": "core/pebbles@1",
+        "weight": 1
        }
       ],
-      "density": 0.01,
+      "density": 0.008,
       "cluster": 0.5
      }
     },
@@ -129,12 +130,8 @@
      "params": {
       "palette": [
        {
-        "def": "core/bush@1",
-        "weight": 3,
-        "scale": [
-         0.5,
-         0.9
-        ]
+        "def": "core/grass-tuft@1",
+        "weight": 3
        },
        {
         "def": "core/rock@1",
@@ -142,14 +139,18 @@
        },
        {
         "def": "core/cactus@1",
-        "weight": 0.3
+        "weight": 0.6
        },
        {
         "def": "core/boulder-pile@1",
         "weight": 0.3
+       },
+       {
+        "def": "core/pebbles@1",
+        "weight": 1
        }
       ],
-      "density": 0.01,
+      "density": 0.008,
       "cluster": 0.5
      }
     },
@@ -180,12 +181,8 @@
      "params": {
       "palette": [
        {
-        "def": "core/bush@1",
-        "weight": 3,
-        "scale": [
-         0.5,
-         0.9
-        ]
+        "def": "core/grass-tuft@1",
+        "weight": 3
        },
        {
         "def": "core/rock@1",
@@ -193,14 +190,18 @@
        },
        {
         "def": "core/cactus@1",
-        "weight": 0.3
+        "weight": 0.6
        },
        {
         "def": "core/boulder-pile@1",
         "weight": 0.3
+       },
+       {
+        "def": "core/pebbles@1",
+        "weight": 1
        }
       ],
-      "density": 0.01,
+      "density": 0.008,
       "cluster": 0.5
      }
     },
@@ -231,12 +232,8 @@
      "params": {
       "palette": [
        {
-        "def": "core/bush@1",
-        "weight": 3,
-        "scale": [
-         0.5,
-         0.9
-        ]
+        "def": "core/grass-tuft@1",
+        "weight": 3
        },
        {
         "def": "core/rock@1",
@@ -244,14 +241,18 @@
        },
        {
         "def": "core/cactus@1",
-        "weight": 0.3
+        "weight": 0.6
        },
        {
         "def": "core/boulder-pile@1",
         "weight": 0.3
+       },
+       {
+        "def": "core/pebbles@1",
+        "weight": 1
        }
       ],
-      "density": 0.01,
+      "density": 0.008,
       "cluster": 0.5
      }
     }

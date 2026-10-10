@@ -15,6 +15,9 @@
   "sky": {
    "palette": "lm-garden",
    "sun": 0.65
+  },
+  "ground": {
+   "palette": "sand"
   }
  },
  "batches": [
@@ -22,34 +25,6 @@
    "note": "the garden ground and the glazed court",
    "group": "garden",
    "ops": [
-    {
-     "op": "place",
-     "def": "core/lawn@1",
-     "name": "garden",
-     "shape": {
-      "area": [
-       [
-        -40,
-        -32
-       ],
-       [
-        40,
-        -32
-       ],
-       [
-        40,
-        32
-       ],
-       [
-        -40,
-        32
-       ]
-      ]
-     },
-     "params": {
-      "material": "sand"
-     }
-    },
     {
      "op": "place",
      "def": "core/plaza@1",

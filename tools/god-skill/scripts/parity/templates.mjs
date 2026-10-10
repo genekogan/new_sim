@@ -39,10 +39,10 @@ function lmGarden() {
       constitution: `# Little Martians garden\n${w.customs?.garden ?? 'A ceramic garden between a glazed tower and a temple; the kin float where they like.'}\n\nParity demonstrator: generated from the Little Martians scene.`,
       time: { dayTicks: w.dayTicks ?? 72000, startTick: 0 },
       sky: { palette: 'lm-garden', sun: 0.65 },
+      ground: { palette: 'sand' },
     },
     batches: [
       { note: 'the garden ground and the glazed court', group: 'garden', ops: [
-        place('core/lawn@1', 'garden', { shape: { area: rect(x0, z0, x1, z1) }, params: { material: 'sand' } }),
         place('core/plaza@1', 'glazed-court', { shape: { area: rect(-7, -8, 7, 8) }, params: { material: 'tile', pattern: 'radial', kerb: true } }),
         place('core/footpath@1', 'path-to-tower', { shape: { path: [[-7, 0], [tp[0] + 9.2, 0]], width: 2.4 }, params: { material: 'stone', width: 2.4 } }),
         place('core/footpath@1', 'path-to-temple', { shape: { path: [[7, 0], [mp[0] - 10.4, 0]], width: 2.4 }, params: { material: 'stone', width: 2.4 } }),
@@ -147,13 +147,14 @@ async function marsCamp() {
     constants: { extent: 400, ground: 'land' },
     state: {
       constitution: '# Mars camp\nA Mars College camp on the low Sonoran desert by the Salton Sea: a kitchen, a living room and classroom corner, a bunk house, a fire circle, a garden and a build site.\n\nParity demonstrator: generated from the Mars camp manifest.',
-      sky: { palette: 'mars-desert', sun: 0.85 }, weather: { clouds: 0.05, wind: 0.35, rain: 0 },
+      sky: { palette: 'mars-desert', sun: 0.85 }, weather: { clouds: 0.05, wind: 0.35, rain: 0 }, ground: { palette: 'desert' },
     },
     _furnish: [],
     batches: [
-      { note: 'desert floor; creosote, stones and the odd cactus outside the camp (desert-coloured hills are a gap: relief takes the grass colour)', group: 'desert', ops: [
-        place('core/lawn@1', 'desert-floor', { shape: { area: rect(-150, -150, 150, 150) }, params: { material: 'sand' } }),
-        ...ring(32, 90).map((a, i) => place('core/rock-field@1', `desert-scatter-${i + 1}`, { shape: { area: a }, params: { palette: [{ def: 'core/bush@1', weight: 3, scale: [0.5, 0.9] }, { def: 'core/rock@1', weight: 2 }, { def: 'core/cactus@1', weight: 0.3 }, { def: 'core/boulder-pile@1', weight: 0.3 }], density: 0.01, cluster: 0.5 } })),
+      { note: 'desert palette ground, low hills to the north and east (toward the Chocolate Mountains), dry grass tufts, stones and cacti outside the camp (creosote shrubs approximated)', group: 'desert', ops: [
+        place('core/hill@1', 'north-hills', { p: [-20, -120], params: { height: 9, radius: 45 } }),
+        place('core/hill@1', 'chocolate-mountains', { p: [110, -70], params: { height: 14, radius: 55 } }),
+        ...ring(32, 90).map((a, i) => place('core/rock-field@1', `desert-scatter-${i + 1}`, { shape: { area: a }, params: { palette: [{ def: 'core/grass-tuft@1', weight: 3 }, { def: 'core/rock@1', weight: 2 }, { def: 'core/cactus@1', weight: 0.6 }, { def: 'core/boulder-pile@1', weight: 0.3 }, { def: 'core/pebbles@1', weight: 1 }], density: 0.008, cluster: 0.5 } })),
       ] },
       { note: 'defined things the library lacks (kit/2): campfire, chess board, sleeping mat, small items, container, water tote', group: 'defs', ops: [
         kitDef('mars-campfire', 'A camp fire: a ring of stones, three crossed logs and a flame; glows at night.', ['fire', 'campfire', 'light', 'mars'],
@@ -215,7 +216,7 @@ function edenDistrict() {
     name: 'Eden district',
     description: 'A representative Eden district in the new vocabulary: the four homes of the housing street at their source footprints (brick courtyard house, two-storey balcony house, timber and stone two-storey houses) with furnished interiors, the lamp-lit street, the commons pavilion, the pond with its sloping bank, reeds and a family of ducks, the library, and the old-town plaza with its fountain, café tables and benches brought to the end of the street, plus the hot-air balloon (from the festival meadow) and the ferris wheel (from the seaside resort) brought into view. Place names kept from worlds/eden/places.v1.json (parity proof, docs/god/PARITY.md). Courtyards are drawn as plain rooms (courtyard plans are a gap).',
     constants: { extent: 600, ground: 'land' },
-    state: { constitution: '# Eden district\nA growing settlement between hills and the sea: a commons by a calm pond, a lamp-lit street of homes, a library and a plaza with a fountain.\n\nParity demonstrator: generated from the Eden places.', sky: { palette: 'clear-day', sun: 0.6 } },
+    state: { ground: { palette: 'grass' }, constitution: '# Eden district\nA growing settlement between hills and the sea: a commons by a calm pond, a lamp-lit street of homes, a library and a plaza with a fountain.\n\nParity demonstrator: generated from the Eden places.', sky: { palette: 'clear-day', sun: 0.6 } },
     _furnish: ['eden-house-1', 'eden-house-2', 'eden-house-3', 'eden-house-4', 'eden-library-1'],
     batches: [
       { note: 'the pond with its sloping bank, reeds and stones; the commons lawn', group: 'pond', ops: [
@@ -257,7 +258,7 @@ function edenDistrict() {
       ] },
       { note: 'the balloon and the ferris wheel, brought into view', group: 'attractions', ops: [
         place('core/ferris-wheel@1', 'region-seaside-resort.ferris-wheel', { p: [12, 46], r: 0.3 }),
-        place('core/balloon@1', 'festival-balloon', { p: [-14, 34] }),
+        place('core/balloon@1', 'festival-balloon', { p: [-12, -12] }),
         ...[[20, -20], [60, -2], [-4, 26], [92, 4]].map(([x, z], i) => place('core/oak-tree-1-pack@1', `oak-${i + 1}`, { p: [x, z] })),
       ] },
     ],

@@ -7,6 +7,9 @@
   "ground": "land"
  },
  "state": {
+  "ground": {
+   "palette": "grass"
+  },
   "constitution": "# Eden district\nA growing settlement between hills and the sea: a commons by a calm pond, a lamp-lit street of homes, a library and a plaza with a fountain.\n\nParity demonstrator: generated from the Eden places.",
   "sky": {
    "palette": "clear-day",
@@ -694,8 +697,8 @@
      "def": "core/balloon@1",
      "name": "festival-balloon",
      "p": [
-      -14,
-      34
+      -12,
+      -12
      ]
     },
     {
