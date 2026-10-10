@@ -1348,13 +1348,10 @@ export class MarsEngine implements Engine {
   applyWorldEditV1(raw:WorldEditV1):{hash:string;relocated:string[];trapped:string[];kept:string[]}{
     if(!raw||raw.contract!=='world-edit/1'||typeof raw.set!=='object'||!Array.isArray(raw.levels))throw Error('world-edit.bad-payload');
     if(this.renderPlatformMetadata)this.finishRecorder();
-    const before=new Set(Object.keys(this.ents)),baseKey=this.rt.world.entityPhysicsV1?.baseKey;
+    const baseKey=this.rt.world.entityPhysicsV1?.baseKey;
     const {physics,kept}=applyWorldEdit(this.rt.world,raw);
     this.m.canonicalEntityOrder(this.rt.world);
-    for(const id of Object.keys(raw.set).sort()){
-      if(this.ents[id]&&raw.set[id]?.fixture&&!kept.includes(id))this.out.changes.push([this.rt.tick,id,'present',this.ents[id]]);
-      else if(!this.ents[id]&&before.has(id))this.out.changes.push([this.rt.tick,id,'present',null]);
-    }
+    // entity-world fixtures are depicted by the viewer's entity layer (entity diffs), not by engine change events or takes
     const spatial=this.rt.services.spatial as Spatial;
     // new levels / wider raster: re-base once; otherwise the next sync patches only the changed cells (incremental)
     if(physics.baseKey!==baseKey&&spatial.source)spatial.refreshForWorld(this.rt.world);

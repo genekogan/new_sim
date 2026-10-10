@@ -119,8 +119,10 @@ export class EngineBridge {
   }
 
   /** Level id for a floor at world height y (allocated in height order of first appearance, logged in the event). */
-  private levelFor(y: number): number {
-    if (Math.abs(y) <= GROUND_BAND) return 0;
+  private levelFor(y: number, at?: Vec2): number {
+    // level 0 is the ground itself: a floor within the band of the terrain under it (L8 makes level 0 follow the tiles)
+    const ground = at ? this.model.terrain.sample(at[0], at[1]) : 0;
+    if (Math.abs(y - ground) <= GROUND_BAND) return 0;
     const hit = this.levels.find((l) => Math.abs(l.y - y) <= LEVEL_MATCH);
     if (hit) return hit.id;
     const used = new Set(this.levels.map((l) => l.id));
@@ -164,7 +166,8 @@ export class EngineBridge {
     if (surfaces.length) part.surfaces = surfaces.map((s, i) => {
       const r = rectOf(s.polygon);
       const y = r3(wp.y + s.y * wp.s);
-      return { id: `${e.id}#f${i}`, level: this.levelFor(y), y: Math.abs(y) <= GROUND_BAND ? 0 : y, obb: { c: toWorld(r.c[0], r.c[1]), half: [r3(r.half[0] * wp.s), r3(r.half[1] * wp.s)] as Vec2, yaw: r3(-(wp.yaw + r.yaw)) }, label: `${this.model.pathOf(e.id)} ${s.tag ?? 'floor'}`.slice(0, 100) };
+      const c = toWorld(r.c[0], r.c[1]), level = this.levelFor(y, c);
+      return { id: `${e.id}#f${i}`, level, y: level === 0 && Math.abs(y) <= GROUND_BAND ? 0 : y, obb: { c, half: [r3(r.half[0] * wp.s), r3(r.half[1] * wp.s)] as Vec2, yaw: r3(-(wp.yaw + r.yaw)) }, label: `${this.model.pathOf(e.id)} ${s.tag ?? 'floor'}`.slice(0, 100) };
     });
     // stairs, ramps, ladders: links between levels
     if (baked.links?.length) part.links = baked.links.filter((l) => l.path.length >= 2).map((l) => {
@@ -173,7 +176,8 @@ export class EngineBridge {
       const n = Math.max(2, Math.ceil(Math.abs(yb - ya) / 0.18) + 1), path: [number, number, number][] = [];
       for (let k = 0; k < n; k++) { const t = k / (n - 1); path.push([r3(a[0] + (b[0] - a[0]) * t), r3(ya + (yb - ya) * t), r3(a[1] + (b[1] - a[1]) * t)]); }
       const kind = l.kind === 'float' ? 'climb' : l.kind;
-      return { id: `${e.id}#${l.id}`, kind: kind as 'stairs' | 'ramp' | 'ladder' | 'climb', from: { level: this.levelFor(ya), p: a, y: Math.abs(ya) <= GROUND_BAND ? 0 : ya }, to: { level: this.levelFor(yb), p: b, y: Math.abs(yb) <= GROUND_BAND ? 0 : yb }, width: r3(l.width * wp.s), heading: r3(Math.atan2(b[1] - a[1], b[0] - a[0])), path, usable: true };
+      const la = this.levelFor(ya, a), lb = this.levelFor(yb, b);
+      return { id: `${e.id}#${l.id}`, kind: kind as 'stairs' | 'ramp' | 'ladder' | 'climb', from: { level: la, p: a, y: la === 0 && Math.abs(ya) <= GROUND_BAND ? 0 : ya }, to: { level: lb, p: b, y: lb === 0 && Math.abs(yb) <= GROUND_BAND ? 0 : yb }, width: r3(l.width * wp.s), heading: r3(Math.atan2(b[1] - a[1], b[0] - a[0])), path, usable: true };
     });
     return part.solids || part.surfaces || part.links ? part : null;
   }
