@@ -830,6 +830,19 @@ export async function live(...argv){
   const rec={...stamp(),runId,loop,reviewKey:reviewTask?.key??null,queueSource:bodyQueue.snapshot().source,engine:b.engine,model:b===routine?rModel.join(':'):o.model,memory:o.memory,reason,in:u.in,read:u.read,write:u.write,out:u.out,...(u.reasoning?{reasoning:u.reasoning}:{}),ctx,usd:usd===null?null:Number(usd.toFixed(6)),billingSource:ans.billing?.source??(b.engine==='ollama'?'local':'subscription-unknown'),actualModel:ans.model??null,...(own||later?{owner:(own??later).id}:{}),ms,session:b.id};
   try{clientMemory.cost(rec);}catch(error){projectionProblem('cost',error,{session:rec.session});}costs.push(rec);appendFileSync(LIVE.costLog,JSON.stringify(rec)+'\n');lastCallAt=Date.now();
   if(b===brain){S.brain={engine:o.engine,model:o.model,id:b.id,ctx};S.lastCallAt=now();if(ctx>o.rotateAt&&o.memory==='session'){brain.fresh();await perception.boot();logLive({rotated:{ctx,sessionId:b.id}});}}
+  // Human input can arrive while the SDK is thinking. Account for the finished
+  // turn, then recheck before any of its world/public/local decision effects.
+  ownerPoll();
+  if(!own&&ownerQueue.length){
+   const ownerIds=ownerQueue.map(r=>r.id);pending=[...evs,...pending];
+   lastResults=['Autonomous decision discarded before effects because a new owner request arrived.'];
+   logLive({wakeEnd:{reason,loop,reviewKey:reviewTask?.key??null,sessionId:b.id,queueId:bodyQueue.snapshot().id,usage:{input:u.in,cached:u.read,cacheWrite:u.write,output:u.out,reasoning:u.reasoning??null},actualModel:ans.model??null,usd:rec.usd,discarded:true}});
+   logLive({decisionDiscarded:{reason:'new-owner-pending',ownerIds,physicalQueueChanged:false,SDKCancelled:false,modelUsageRecorded:true}});
+   if(u.in==null||u.out==null){modelBudgetUnknown=true;logLive({modelPause:'token usage unknown; further model calls refused'});}
+   saveS();
+   if(!modelBudgetUnknown&&!stopping&&!leaseHeld())return think('owner',0,false);
+   return;
+  }
   const plan=lastJSON(ans.text)??{do:[],unparsed:clip(ans.text,200)};
   let steps;try{steps=replySteps(plan).map(normaliseStep);}catch(error){steps=[];pending.push({kind:'queue.refusal',text:error.message,_rx:Date.now()});}
   const results=[],localOwnerResults=[];const localOwnerResult=(operation,accepted,line)=>{localOwnerResults.push({operation,accepted,line});results.push(line);};let follow=false;if(reviewTask?.compile&&steps.length){results.push('Compilation body steps deferred: provide compile bindings instead of do.');steps=[];}
