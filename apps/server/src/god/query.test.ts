@@ -113,3 +113,16 @@ test('free: plots avoid plazas and roads (paved), not just solids and water', ()
   assert.equal(plots.length, 3);
   for (const p of plots) assert.ok(Math.abs(p.at[0]) > 16 || Math.abs(p.at[1]) > 16, JSON.stringify(p));
 });
+
+test('resolve: facing an area aims at its centroid, and near measures the solver\'s gap (rehearsal false violations)', () => {
+  const { act, q } = world();
+  // a plaza far from the origin and a bench east of it facing it; a bench 3 m south of a pond's rim
+  act([{ op: 'place', def: 'core/plaza@1', name: 'plaza', shape: { area: [[40, 40], [60, 40], [60, 60], [40, 60]] } },
+    { op: 'place', def: 'core/bench@1', name: 'b', p: [70, 50], constraints: [{ kind: 'facing', ref: 'plaza', offset: 0 }] },
+    { op: 'place', def: 'core/pond@1', name: 'pond', shape: { area: [[-30, -30], [-10, -30], [-10, -10], [-30, -10]] } },
+    { op: 'place', def: 'core/bench@1', name: 'c', p: [-20, -6.75], constraints: [{ kind: 'near', ref: 'pond', dist: 4 }] }]);
+  const r = q({ resolve: true }).resolve;
+  assert.deepEqual(r.violated, [], JSON.stringify(r.violated));
+  const c = r.entities.find((e: { path: string }) => e.path === 'c').constraints[0];
+  assert.match(c.why, /gap 2\.9\d m/);   // pond rim at z -10, bench half depth ~0.27: 10 - 6.75 - 0.27
+});

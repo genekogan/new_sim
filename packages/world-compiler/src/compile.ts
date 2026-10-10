@@ -634,7 +634,7 @@ function resolveDependents(w: WorldModel, touched: Set<string>, removed: Set<str
       if (c.kind === 'facing') {
         if (removed.has(w.get(c.ref)?.id ?? c.ref)) { warnings.push(`${w.pathOf(e.id)}: facing ref ${c.ref} was removed`); continue; }
         const ref = w.get(c.ref); if (!ref || !touched.has(ref.id)) continue;
-        const me = w.worldPose(next ?? e), them = w.worldPose(ref);
+        const me = w.worldPose(next ?? e), them = aimOf(w, ref);
         const parentYaw = e.in.parent === 'world' ? 0 : w.worldPose(w.entities.get(e.in.parent)!).yaw;
         const yaw = Math.atan2(them.x - me.x, them.z - me.z) - parentYaw + c.offset;
         next = { ...(next ?? e), r: Array.isArray(e.r) ? [yaw, e.r[1], e.r[2]] : yaw };
@@ -668,7 +668,7 @@ function admitForResolve(w: WorldModel, e: Entity, def: StoredDef): string | nul
 }
 
 /** Where `facing` aims: an area's centroid or a path's midpoint (in the ref's frame), else the ref's origin. */
-function aimOf(w: WorldModel, ref: Entity): { x: number; z: number } {
+export function aimOf(w: WorldModel, ref: Entity): { x: number; z: number } {
   const pose = w.worldPose(ref), sh = ref.shape as { area?: [number, number][]; path?: [number, number][] } | undefined;
   let local: [number, number] | undefined;
   if (sh?.area?.length) { let x = 0, z = 0; for (const q of sh.area) { x += q[0]; z += q[1]; } local = [x / sh.area.length, z / sh.area.length]; }
