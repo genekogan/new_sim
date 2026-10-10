@@ -19,10 +19,13 @@ import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
 type Plans = Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>;
-export type BuiltState = { what: string; text: string; near: string[]; at: Vec2 | null; def: string };
+export type BuiltState = { what: string; text: string; near: string[]; at: Vec2 | null; def: string; removed?: boolean; key?: string };
 
 export const BUILT_KIND = 'built';
 const clip = (v: unknown, n: number) => String(v ?? '').replace(/\r/g, '').trim().slice(0, n);
+/** The kind, per world: its `advance` brings an object's state to what the entity world says now (the framework keeps a
+ *  versioned log per object, so objects are never re-created: a change is an advance, a removal hides it). */
+export const builtKindFor = (want: (key: string) => BuiltState | undefined) => ({ ...builtKind, advance(state: BuiltState) { const w = state.key ? want(state.key) : undefined; return w && JSON.stringify(w) !== JSON.stringify(state) ? { state: w } : null; } });
 export const builtKind = {
   kind: BUILT_KIND,
   description: 'Something the god of this world built: what it is, what it is by and where, and any words written on it (a sign). The words are the god\'s, untrusted.',
@@ -32,7 +35,7 @@ export const builtKind = {
     what: { type: 'string', visibility: 'public' }, text: { type: 'string', visibility: 'public' }, near: { type: 'string[]', visibility: 'public' },
     at: { type: 'json', visibility: 'public' }, def: { type: 'string', visibility: 'public' },
   },
-  initial: (p: Record<string, unknown>): BuiltState => ({ what: clip(p.what, 120), text: clip(p.text, 600), near: Array.isArray(p.near) ? p.near.map((x) => clip(x, 80)).slice(0, 4) : [], at: Array.isArray(p.at) && p.at.length === 2 ? [Number(p.at[0]), Number(p.at[1])] : null, def: clip(p.def, 80) }),
+  initial: (p: Record<string, unknown>): BuiltState => ({ what: clip(p.what, 120), text: clip(p.text, 600), near: Array.isArray(p.near) ? p.near.map((x) => clip(x, 80)).slice(0, 4) : [], at: Array.isArray(p.at) && p.at.length === 2 ? [Number(p.at[0]), Number(p.at[1])] : null, def: clip(p.def, 80), ...(p.removed ? { removed: true } : {}), ...(typeof p.key === 'string' ? { key: p.key } : {}) }),
   rolesOf: () => [] as string[],
   actions: {},
 };
@@ -63,13 +66,15 @@ export class GodPerceive {
   private h: PerceiveHost;
   private synced = -1;
   private sigs = new Map<string, string>();
+  /** What each `built` object's state should be now (its kind's advance reads this). */
+  private desired = new Map<string, BuiltState>();
   private signs: { id: string; at: Vec2; name: string; text: string }[] = [];
   constructor(h: PerceiveHost) { this.h = h; }
 
   private objects() {
-    const o = (this.h.edge as any)?.comms?.objects as { kindOf(k: string): unknown; register(k: unknown): void; create(i: unknown): unknown; remove(id: string): void; all(): { id: string; kind: string; name: string; state: unknown }[] } | undefined;
+    const o = (this.h.edge as any)?.comms?.objects as { kindOf(k: string): unknown; register(k: unknown): void; create(i: unknown): unknown; fresh(): unknown; all(): { id: string; kind: string; name: string; state: unknown }[] } | undefined;
     if (!o) return null;
-    if (!o.kindOf(BUILT_KIND)) o.register(builtKind);
+    if (!o.kindOf(BUILT_KIND)) o.register(builtKindFor((key) => this.desired.get(key)));
     return o;
   }
   private rootPlace(): string | null {
@@ -114,19 +119,21 @@ export class GodPerceive {
     const root = this.rootPlace(); if (!root) return;
     this.synced = seq;
     const want = this.wanted();
-    if (!this.sigs.size) for (const o of objs.all()) if (o.kind === BUILT_KIND) this.sigs.set(o.id, JSON.stringify([o.name, o.state]));
-    let made = 0, gone = 0;
-    for (const [id] of this.sigs) if (!want.has(id)) { objs.remove(id); this.sigs.delete(id); gone++; }
+    if (!this.sigs.size) for (const o of objs.all()) if (o.kind === BUILT_KIND) this.sigs.set(o.id, JSON.stringify(o.state));
+    let made = 0, changed = 0;
+    // gone from the entity world: hidden (removed), never deleted (an undo brings the same id back)
+    for (const [id, sig] of this.sigs) if (!want.has(id)) { const st = { ...(JSON.parse(sig) as BuiltState), removed: true, key: id }; const n = JSON.stringify(st); if (n !== sig) { this.desired.set(id, st); this.sigs.set(id, n); changed++; } }
     for (const [id, w] of want) {
-      const state = builtKind.initial(w.params as never), sig = JSON.stringify([w.name.slice(0, 100), state]);
+      const state = builtKind.initial({ ...w.params, key: id } as never), sig = JSON.stringify(state);
       if (this.sigs.get(id) === sig) continue;
+      this.desired.set(id, state);
       try {
-        if (this.sigs.has(id)) objs.remove(id);
-        objs.create({ id, kind: BUILT_KIND, name: w.name, description: w.description, placeId: root, params: w.params });
-        this.sigs.set(id, sig); made++;
+        if (!this.sigs.has(id)) { objs.create({ id, kind: BUILT_KIND, name: w.name, description: w.description, placeId: root, params: { ...w.params, key: id } }); made++; } else changed++;
+        this.sigs.set(id, sig);
       } catch (err) { this.h.log(`built object ${id}: ${(err as Error).message}`); }
     }
-    if (made + gone > 8) this.h.log(`built objects: ${made} made, ${gone} removed (${this.sigs.size} in all)`);
+    if (changed) objs.fresh();   // apply the advances now (reads that skip the framework's advance see them too)
+    if (made + changed > 8) this.h.log(`built objects: ${made} made, ${changed} changed (${this.sigs.size} in all)`);
   }
 
   /** `read:<sign>` for signs near this Soul: walk up to it and face it; the label carries its words. */
