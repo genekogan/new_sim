@@ -1,5 +1,9 @@
 /** Sign-in is part of the shared world chrome; public viewing remains unsigned. */
 export const AUTH_UI=true;
+export function configuredSignIn(cfg:{authProvider?:'clerk'|'privy'|'none';privyAppId?:string;clerkPublishableKey?:string;clerkIssuer?:string}){
+ if(cfg.authProvider==='none')return false;
+ return cfg.authProvider==='clerk'?!!cfg.clerkPublishableKey&&!!cfg.clerkIssuer:!!cfg.privyAppId;
+}
 
 /** Raw-world bootstrap prompt; full runtime instructions live in the installed skill. */
 export function agentOnboarding(worldUrl:string,worldName?:string){

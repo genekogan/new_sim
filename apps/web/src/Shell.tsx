@@ -30,7 +30,7 @@ import type { WorldViewerHandle, WorldViewerState } from './WorldViewer.ts';
 import { worldKey } from './world-path.ts';
 import { SpendPanel } from './Spend.tsx';
 import {soulFragment,soulFromFragment} from './soul-link.ts';
-import {AUTH_UI} from './auth-ui.ts';
+import {AUTH_UI,configuredSignIn} from './auth-ui.ts';
 import { BacklogPanel, HeardPanel, LibraryPanel, NotebookPanel, SentencesPanel, ThingsPanel, VocabularyPanel } from './Grammar.tsx';
 
 export type AuthCtx = {
@@ -38,7 +38,7 @@ export type AuthCtx = {
   login(): void; logout(): Promise<void> | void; getToken(): Promise<string | null>;
   debug: { privyUserId: string | null; accountIdentity?:string|null; wallet: unknown; linked: unknown[] };
 };
-type Cfg = { privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean; accountAuthRequired?:boolean; inviteRequired?: boolean; build?: string; localIntegrationMetadataPath?:string };
+type Cfg = { authProvider?:'clerk'|'privy'|'none';clerkPublishableKey?:string;clerkIssuer?:string;privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean; accountAuthRequired?:boolean; inviteRequired?: boolean; build?: string; localIntegrationMetadataPath?:string };
 const qualifiedEdenWorlds=edenReleaseWorlds(import.meta.env.VITE_EDEN_EXPERIENCE_WORLD_IDS);
 const TABS = ['watch', 'my soul', 'grammar', 'notebook', 'world', 'debug', 'brain', 'story', 'sync', 'spend', 'admin', 'architecture', 'everything'] as const;
 const ADMIN_TABS = new Set<string>(['spend', 'admin']);
@@ -113,7 +113,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   const pins=useMySouls();
   // Local favourites never establish ownership. Navbar comes only from server Me.
   const ownedIds=currentMe?.souls??[];
-  const signinEnabled=AUTH_UI&&!!cfg.privyAppId;
+  const signinEnabled=AUTH_UI&&configuredSignIn(cfg);
   const mine = new Set(currentMe?.souls ?? []);
   const inspect = (id: string | null) => { setSelected(id); if (id) revealPanel(); };
   const edenExpansion=edenExperienceEnabled(location.hostname,worldPath,cfg.worldId,sim.conn.welcome?.worldId,qualifiedEdenWorlds);
