@@ -175,7 +175,8 @@ export function solve(v, thing, rel) {
     const f = String(rel.facing); if (f.startsWith('away:')) { const row = v.get(f.slice(5)); return row ? [{ kind: 'facing', ref: row.path, offset: Math.PI }] : []; }
     const row = !compassKey(f) || v.get(f) ? v.get(f) : null;
     // the compiler aims at the ref's pose; area/path things have no pose of their own (yaw only, no constraint)
-    return row && row.form === 'point' && !row.shape ? [{ kind: 'facing', ref: row.path, offset: 0 }] : [];
+    // the compiler aims at a point thing's pose, an area's centroid, a path's midpoint (L7 patch P3, in since 8c1c497d)
+    return row ? [{ kind: 'facing', ref: row.path, offset: 0 }] : [];
   };
   const pose = (x, z, yaw, extra = {}) => ({ ...extra, p: [r2(x), r2(z)], ...(yaw !== undefined ? { r: r2(yaw) } : {}), constraints: [...constraints, ...facingConstraint(), ...(extra.constraints ?? [])] });
   const finalYaw = (x, z, fallback) => { const f = faceAt(x, z); return f !== undefined ? f : baseYaw !== undefined ? baseYaw : fallback; };
@@ -611,7 +612,11 @@ function solveInRoom(v, host, room, thing, rel, ctx) {
     const ly = (uu) => (baseYaw !== undefined ? baseYaw - F.RY : yawOf(-uu[0], -uu[1]) - dY);
     if (isRect) {
       const sx = Math.abs(u[0]) < 0.3 ? 0 : Math.sign(u[0]), sz = Math.abs(u[1]) < 0.3 ? 0 : Math.sign(u[1]);
-      const y = ly([sx, sz]), b = boxL(0, 0, y), ex = extentAlong(b, [1, 0]), ez = extentAlong(b, [0, 1]);
+      // back to a wall, not diagonal: the first-named side's wall (back-left → the back wall), else the nearer axis
+      const first = String(word).toLowerCase().match(/front|back|rear|left|right/)?.[0];
+      const fu = first ? dirWord(first) : null;
+      const wallAx = fu ? (Math.abs(fu[0]) >= Math.abs(fu[1]) ? [Math.sign(fu[0]), 0] : [0, Math.sign(fu[1])]) : sz ? [0, sz] : [sx, 0];
+      const y = baseYaw !== undefined ? baseYaw - F.RY : yawOf(-wallAx[0], -wallAx[1]) - dY, b = boxL(0, 0, y), ex = extentAlong(b, [1, 0]), ez = extentAlong(b, [0, 1]);
       const x = sx > 0 ? lx1 - ex - m : sx < 0 ? lx0 + ex + m : cx, z = sz > 0 ? lz1 - ez - m : sz < 0 ? lz0 + ez + m : cz;
       cands.push([x, z, y, `${word} corner`]);
       // blocked (a doorway): slide out of the corner along either wall

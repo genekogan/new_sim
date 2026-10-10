@@ -54,6 +54,13 @@ try {
   check('move <room item> --near <room item>: stays in the room, beside the bed', r.ok && lamp2.in.parent !== 'world' && Math.hypot(lamp2.pose.x - bed.pose.x, lamp2.pose.z - bed.pose.z) < 3.5, `${r.out} ${JSON.stringify(lamp2.pose)}`);
   r = g('place chair --inside slate --wall up');
   check('a bad wall word is refused with the words that work', !r.ok && /back, front, left, right/.test(r.out), r.out);
+  r = g(`describe slate/${room.id}`);
+  check('describe <house>/<room>: that room', r.ok && new RegExp(`room .* of slate`).test(r.out) && /holds: .*bed/.test(r.out), r.out);
+  g('place cottage --at 40,-40 --facing s --name box');
+  const living = ent('box').rooms[0].id;
+  r = g(`place wardrobe --inside box/${living} --corner back-left --name wardrobe`);
+  const wd = ent('box/wardrobe');
+  check('--corner back-left in a square room: back to the back wall, not diagonal', r.ok && wd.pose.faces === 's', `${r.out} faces ${wd.pose.faces}`);
   // rims, footpaths from doors, sets
   g('place pond --circle 80,60,16 --name pond');
   r = g('place reeds --near pond --count 6 --dist 0.5');

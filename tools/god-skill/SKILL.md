@@ -126,7 +126,7 @@ that def in full: params with ranges and defaults, state, size, slots, rooms; se
 | `--along <path> --row n --spacing s --side both` | a row along it (trees lining a road), `s` metres centre to centre (`--gap g`: clear metres between neighbours); a row that does not fit is shortened and says so |
 | `--across <path> [--t 0.5] [--span m]` | across a road/river at t: path defs (a bridge) get a crossing path `span` m past each bank; point things are turned to face across |
 | `--inside <house>/<room>` | a free spot in that room (local frame handled for you) |
-| `--inside <house>/<room> --wall back` · `--corner front-left` | back to a wall facing into the room, or tucked into a corner (`--count n` lines several along the wall). Words are **the house's own sides**: `front` = the way the house faces (its front door), `back`, and `left`/`right` **as you walk out of its front door**; corners `back-left`, `front-right`… Compass words (`n`, `se`) still work and mean the world's compass. Doorways stay clear (it slides along the wall and says so); in a round room things stay inside the curved wall |
+| `--inside <house>/<room> --wall back` · `--corner front-left` | back to a wall facing into the room, or tucked into a corner (`--count n` lines several along the wall). Words are **the house's own sides**: `front` = the way the house faces (its front door), `back`, and `left`/`right` **as you walk out of its front door**; corners `back-left`, `front-right`… (in a corner the back goes to the first-named wall: `back-left` = back to the back wall) Compass words (`n`, `se`) still work and mean the world's compass. Doorways stay clear (it slides along the wall and says so); in a round room things stay inside the curved wall |
 | `--on <thing>` | on a surface slot (a bowl on a table); `--count n` spreads them over the top |
 | `--row n --gap g` · `--grid WxH --gap g` | n side by side (along the thing's width), or a grid, around the `--at` point |
 | `--free [--near ref] [--radius r]` | the nearest flat, dry, empty plot that fits |
@@ -144,7 +144,7 @@ committing and prints the ops.
 **Shapes** (path and area defs):
 ```
 place mountain --at east --param height=180 --param radius=160            # a single peak (point)
-place mountain --path '[[300,-260],[340,240]]' --width 150 --name range   # a range (path)
+place mountain --path '[[380,-300],[390,300]]' --width 300 --param height=150 --name range   # a range: keep height ≤ width/2 (35–45° sides); width 150 + height 180 is a sheer wall
 place lake --circle -260,0,80 --name west-lake                            # cx,cz,r → a natural 10-gon
 place plaza --rect 0,0,30,24 --name square                                # cx,cz,w,d
 place road --from square --to bridge [--via 40,60] --width 6 --name main-road   # from the square's edge to the bridge's nearer end
@@ -162,7 +162,7 @@ Growth avoids roads, water and buildings by itself: lay roads and houses first, 
 
 **Buildings.** `place cottage --param floors=2 --param porch=2 --param balcony=true --facing s` (porch depth in m): the preset picks the
 plan (rooms per floor, stairs, doors, windows); `--param plan='…'` gives your own (`schema --md`).
-`describe <house>` lists room ids per floor (`living kitchen bath` / `landing bedroom bedroom-2`).
+`describe <house>` (or `describe <house>/<room>` for one room) lists room ids per floor (`living kitchen bath` / `landing bedroom bedroom-2`).
 Own plan (`--param plan='{…}'`; with a plan, `front` and `floors` are ignored): metres from the
 building's **north-west outer corner**, `0≤x≤w` east, `0≤z≤d` south (the s wall is +z, the front unless
 you put the door elsewhere); per floor `rooms:[{id, rect:[x0,z0,x1,z1]}]` (corners, not centre+size; a

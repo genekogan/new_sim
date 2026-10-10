@@ -351,7 +351,7 @@ function solve(v, thing, rel) {
       return row2 ? [{ kind: "facing", ref: row2.path, offset: Math.PI }] : [];
     }
     const row = !compassKey(f) || v.get(f) ? v.get(f) : null;
-    return row && row.form === "point" && !row.shape ? [{ kind: "facing", ref: row.path, offset: 0 }] : [];
+    return row ? [{ kind: "facing", ref: row.path, offset: 0 }] : [];
   };
   const pose = (x, z, yaw2, extra = {}) => ({ ...extra, p: [r22(x), r22(z)], ...yaw2 !== void 0 ? { r: r22(yaw2) } : {}, constraints: [...constraints, ...facingConstraint(), ...extra.constraints ?? []] });
   const finalYaw = (x, z, fallback) => {
@@ -893,7 +893,10 @@ function solveInRoom(v, host, room, thing, rel, ctx) {
     const ly2 = (uu) => baseYaw !== void 0 ? baseYaw - F.RY : yawOf(-uu[0], -uu[1]) - dY;
     if (isRect) {
       const sx = Math.abs(u[0]) < 0.3 ? 0 : Math.sign(u[0]), sz = Math.abs(u[1]) < 0.3 ? 0 : Math.sign(u[1]);
-      const y = ly2([sx, sz]), b = boxL(0, 0, y), ex = extentAlong(b, [1, 0]), ez = extentAlong(b, [0, 1]);
+      const first = String(word).toLowerCase().match(/front|back|rear|left|right/)?.[0];
+      const fu = first ? dirWord(first) : null;
+      const wallAx = fu ? Math.abs(fu[0]) >= Math.abs(fu[1]) ? [Math.sign(fu[0]), 0] : [0, Math.sign(fu[1])] : sz ? [0, sz] : [sx, 0];
+      const y = baseYaw !== void 0 ? baseYaw - F.RY : yawOf(-wallAx[0], -wallAx[1]) - dY, b = boxL(0, 0, y), ex = extentAlong(b, [1, 0]), ez = extentAlong(b, [0, 1]);
       const x = sx > 0 ? lx1 - ex - m : sx < 0 ? lx0 + ex + m : cx, z = sz > 0 ? lz1 - ez - m : sz < 0 ? lz0 + ez + m : cz;
       cands.push([x, z, y, `${word} corner`]);
       for (let t = 0.25; t < Math.max(lx1 - lx0, lz1 - lz0); t += 0.25) {
@@ -1461,7 +1464,15 @@ async function describe(ref, flags2 = {}) {
       return flags2.json ? parts : [`${ref} is a set of ${set2.members.length}: ${set2.members.map((r) => r.name).join(", ")} \u2014 refer to all of them as ${ref} (--near, --facing, look --at, move --by, remove, recolor) or one by its own name`, ...parts].join("\n");
     }
   }
-  const d = (await query({ describe: ref.replace(/^flag:/, "") })).describe;
+  let d = (await query({ describe: ref.replace(/^flag:/, "") })).describe;
+  if (d.error && ref.includes("/")) {
+    const cut = ref.lastIndexOf("/"), h = (await query({ describe: ref.slice(0, cut) })).describe, word = ref.slice(cut + 1).toLowerCase().replace(/[^a-z0-9]/g, "");
+    const room = h.error ? null : (h.rooms ?? []).find((r) => r.id === ref.slice(cut + 1)) ?? (h.rooms ?? []).find((r) => r.id.replace(/[^a-z0-9]/g, "").startsWith(word));
+    if (room) {
+      if (flags2.json) return room;
+      return [`${h.path}/${room.id} \u2014 room "${room.name}" of ${h.path}, floor ${room.floor} (y ${room.y}), ${room.size.join("\xD7")} m, headroom ${room.height} m`, `  doors: ${room.doors.join(", ") || "none"}`, `  holds: ${room.occupants.map((o) => o.name).join(", ") || "nothing"}`, `  place into it: --inside ${h.path}/${room.id} [--wall back|front|left|right] [--corner back-left|\u2026]; furnish ${h.path}/${room.id}`].join("\n");
+    }
+  }
   if (d.error) throw new Error(d.error);
   if (flags2.json) return d;
   const L = [];
@@ -2334,12 +2345,6 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
 ${HELP}`);
     process.exit(2);
   }
-  if (!["look-shot", "look-keeper"].includes(cmd)) try {
-    checkArgs(cmd ?? "help", f, rest);
-  } catch (e) {
-    console.error(`REFUSED by the CLI: ${e.message}`);
-    process.exit(2);
-  }
   const t0 = Date.now();
   const tr = (() => {
     try {
@@ -2355,6 +2360,13 @@ ${HELP}`);
     } catch {
     }
   };
+  if (!["look-shot", "look-keeper"].includes(cmd)) try {
+    checkArgs(cmd ?? "help", f, rest);
+  } catch (e) {
+    record(null, `REFUSED by the CLI: ${e.message}`);
+    console.error(`REFUSED by the CLI: ${e.message}`);
+    process.exit(2);
+  }
   if (tr && cmd === "look") try {
     appendFileSync(tr, JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), cmd: [cmd, ...argv].join(" "), phase: "start" }) + "\n");
   } catch {

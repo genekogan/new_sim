@@ -129,7 +129,13 @@ export async function query(q) { return ok(await call('/v1/god/query', { body: t
 export async function describe(ref, flags = {}) {
   if (!ref) throw new Error('usage: describe <path|flag:name>');
   { const v = view(await mirror()); const set = !v.get(ref) && setOf(v, ref); if (set) { const parts = []; for (const r of set.members) parts.push((await describe(r.path, flags)).split('\n').slice(0, 3).join('\n')); return flags.json ? parts : [`${ref} is a set of ${set.members.length}: ${set.members.map((r) => r.name).join(', ')} — refer to all of them as ${ref} (--near, --facing, look --at, move --by, remove, recolor) or one by its own name`, ...parts].join('\n'); } }
-  const d = (await query({ describe: ref.replace(/^flag:/, '') })).describe;
+  let d = (await query({ describe: ref.replace(/^flag:/, '') })).describe;
+  if (d.error && ref.includes('/')) {
+    // a room of a building: house/<room> (rooms are slots, not entities)
+    const cut = ref.lastIndexOf('/'), h = (await query({ describe: ref.slice(0, cut) })).describe, word = ref.slice(cut + 1).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const room = h.error ? null : (h.rooms ?? []).find((r) => r.id === ref.slice(cut + 1)) ?? (h.rooms ?? []).find((r) => r.id.replace(/[^a-z0-9]/g, '').startsWith(word));
+    if (room) { if (flags.json) return room; return [`${h.path}/${room.id} — room "${room.name}" of ${h.path}, floor ${room.floor} (y ${room.y}), ${room.size.join('×')} m, headroom ${room.height} m`, `  doors: ${room.doors.join(', ') || 'none'}`, `  holds: ${room.occupants.map((o) => o.name).join(', ') || 'nothing'}`, `  place into it: --inside ${h.path}/${room.id} [--wall back|front|left|right] [--corner back-left|…]; furnish ${h.path}/${room.id}`].join('\n'); }
+  }
   if (d.error) throw new Error(d.error);
   if (flags.json) return d;
   const L = [];
@@ -705,11 +711,12 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
   const [cmd, ...argv] = process.argv.slice(2); const { flags: f, rest } = parseFlags(argv, boolsFor(cmd));
   const fn = COMMANDS[cmd ?? 'help'];
   if (!fn) { console.error(`unknown command ${cmd}\n${HELP}`); process.exit(2); }
-  if (!['look-shot', 'look-keeper'].includes(cmd)) try { checkArgs(cmd ?? 'help', f, rest); } catch (e) { console.error(`REFUSED by the CLI: ${e.message}`); process.exit(2); }
+
   const t0 = Date.now();
   // optional transcript (blind tests, demos): `"transcript": "<file>"` in .eden-god.json appends every command and answer
   const tr = (() => { try { return load().transcript; } catch { return null; } })();
   const record = (out, error) => { if (!tr || cmd === 'look-shot' || cmd === 'look-keeper') return; try { appendFileSync(tr, JSON.stringify({ at: new Date().toISOString(), cmd: [cmd, ...argv].join(' ').replace(/god_[A-Za-z0-9_-]+/g, 'god_…'), ms: Date.now() - t0, ...(error ? { error } : { out: typeof out === 'string' ? out : JSON.stringify(out).slice(0, 4000) }) }) + '\n'); } catch { /* best effort */ } };
+  if (!['look-shot', 'look-keeper'].includes(cmd)) try { checkArgs(cmd ?? 'help', f, rest); } catch (e) { record(null, `REFUSED by the CLI: ${e.message}`); console.error(`REFUSED by the CLI: ${e.message}`); process.exit(2); }
   if (tr && cmd === 'look') try { appendFileSync(tr, JSON.stringify({ at: new Date().toISOString(), cmd: [cmd, ...argv].join(' '), phase: 'start' }) + '\n'); } catch { /* best effort */ }
   Promise.resolve(fn(rest, f)).then((out) => { record(out); if (typeof out === 'string') console.log(out); else console.log(JSON.stringify(out, null, 2)); if (process.env.EDEN_GOD_TIMING) console.error(`(${Date.now() - t0} ms)`); }).catch((e) => { record(null, String(e.message ?? e)); console.error(String(e.message ?? e)); process.exit(1); });
 }
