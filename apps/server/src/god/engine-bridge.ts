@@ -14,6 +14,7 @@ import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { GodMode } from './god.ts';
 import { reachProviders, usesProviders, type ReachEnd } from './query.ts';
+import { GodNav, parseNavWords, words as navWords, type Thing } from './nav.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -48,9 +49,14 @@ export class EngineBridge {
   private writeBackBusy = false;
   private log: (m: string) => void;
   stats = { edits: 0, entities: 0, writeBacks: 0, refusals: 0, bodies: 0, lastMs: 0 };
+  /** P4: Souls walk to god-built named things (nav.ts). */
+  readonly nav: GodNav;
+  /** Seats a Soul asked for by name beyond NEAR: offered to it too (soulId → entity ids). */
+  private wantedSeats = new Map<string, Set<string>>();
 
   constructor(o: BridgeOptions) {
     this.host = o.host; this.god = o.god; this.edge = o.edge; this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
+    this.nav = new GodNav({ model: this.god.model, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e) });
     this.god.onCommit((c) => { if (c.by !== 'engine') this.onCommit(c.diff); });
     this.host.listeners.push({
       afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); } },
@@ -538,6 +544,13 @@ export class EngineBridge {
     const p = this.engine.standableNearV1([wp.x, wp.z], level, undefined, 0.4, 40);
     return p ? { p, level, what: this.model.pathOf(e.id) } : { error: `no standing room near ${this.model.pathOf(e.id)}` };
   }
+  /** Engine level of a standing height at (x, z): 0 within reach of the terrain there (hills too), else a floor's level. */
+  levelAt(x: number, z: number, y: number): number {
+    if (Math.abs(y - this.model.terrain.sample(x, z)) <= GROUND_BAND + 0.5) return 0;
+    const hit = this.levels.find((l) => Math.abs(l.y - y) <= 0.6); if (hit) return hit.id;
+    const below = this.levels.filter((l) => l.y <= y + 0.5).sort((a, b) => b.y - a.y)[0];
+    return below?.id ?? 0;
+  }
   private levelOfY(y: number) { if (Math.abs(y) <= GROUND_BAND + 0.5) return 0; const l = this.levels.reduce<Level | null>((b, l) => (l.y <= y + 0.5 && (!b || l.y > b.y) ? l : b), null); return l?.id ?? 0; }
   reach(from: ReachEnd, to: ReachEnd) {
     const a = this.endOf(from), b = this.endOf(to);
@@ -554,10 +567,103 @@ export class EngineBridge {
     const prev = L.worldProfile;
     L.worldProfile = (soul, caps, plans) => { prev?.(soul, caps, plans); try { this.capabilities(soul, caps, plans as never); } catch (e) { this.log(`capabilities: ${(e as Error).message}`); } };
     const act = L.act.bind(L), self = this;
-    (L as any).act = async function (soul: EdgeSoul, input: { capability?: unknown; params?: unknown; clientRef?: unknown }) {
+    (L as any).act = async function (soul: EdgeSoul, input: { capability?: unknown; params?: unknown; clientRef?: unknown; verb?: unknown; target?: unknown }) {
       if (input?.capability === 'pray' || (typeof input?.capability === 'string' && /^pray(\s|:|$)/.test(input.capability))) return self.pray(L, soul, input);
-      return act(soul, input as never);
+      // P4: words naming a god-built thing become the offered capability (the ledger's vocabulary sees an exact id)
+      let nav: { capability: string; note: string; from: string } | null = null;
+      try { nav = self.navResolve(L, soul, input); } catch (e) { self.log(`nav: ${(e as Error).message}`); }
+      if (!nav) return act(soul, input as never);
+      const { verb: _v, target: _t, ...rest } = input;
+      const out = await act(soul, { ...rest, capability: nav.capability } as never) as any;
+      return out?.accepted ? { ...out, resolved: { from: nav.from, to: nav.capability, note: nav.note } } : { ...out, note: nav.note };
     };
+    // P4: what the god built near this Soul, and the room it is in (observe → built; /v1/edge/map lists them as places)
+    const observe = L.observe.bind(L);
+    (L as any).observe = function (soul: EdgeSoul, include: Set<string>) {
+      const out = observe(soul, include) as Record<string, unknown>;
+      try { const b = self.built(soul); if (b) out.built = b; } catch (e) { self.log(`built: ${(e as Error).message}`); }
+      return out;
+    };
+    const map = L.map.bind(L);
+    (L as any).map = function () {
+      const out = map() as unknown[];
+      try { for (const t of self.nav.things()) out.push({ id: t.ref, name: t.ref, kind: `built:${t.kind}`, what: t.what, parent: t.kind === 'room' ? t.ref.slice(0, t.ref.lastIndexOf('/')) : null, walkable: true, center: t.at.map((v) => Math.round(v * 10) / 10), level: t.level, capability: `walk:${t.ref}` }); } catch { /* the map never breaks */ }
+      return out;
+    };
+  }
+
+  /** observe → built: the room/building this Soul is in, and the nearest named things (with the capability for each). */
+  built(soul: EdgeSoul) {
+    const me = this.engine.world.entities[soul.entityId]; if (!me?.human) return null;
+    const here: Vec2 = [me.pose.p[0], me.pose.p[2]], level = me.human.level ?? 0, things = this.nav.things();
+    if (!things.length) return null;
+    const room = things.find((t) => t.kind === 'room' && t.level === level && this.nav.distance(t, here) === 0);
+    const on = things.filter((t) => t.kind === 'area' && this.nav.distance(t, here) === 0).map((t) => t.ref);
+    const near = things.filter((t) => t.kind !== 'room').map((t) => ({ t, d: this.nav.distance(t, here) })).sort((a, b) => a.d - b.d).slice(0, 12)
+      .map(({ t, d }) => ({ name: t.ref, what: t.what, distance: Math.round(d), walk: `walk:${t.ref}`, ...(t.rooms?.length ? { rooms: t.rooms.map((r) => `walk:${r}`) } : {}), ...(t.seat ? { sit: `sit:${t.id}` } : {}) }));
+    return { inside: room ? { room: room.ref, building: room.ref.slice(0, room.ref.lastIndexOf('/')), what: room.what } : null, ...(on.length ? { on } : {}), near,
+      note: 'Things the god built here, by name: act walk:<name> (a building: to its front door; <building>/<room>: inside), sit:<id> to sit, or plain words ("go into rose-house", "sit on the bench by the pond").' };
+  }
+
+  /** Plain words / near-miss ids / intents that name a god-built thing → the offered capability id (null: not ours). */
+  navResolve(L: EdgeLedger, soul: EdgeSoul, input: { capability?: unknown; verb?: unknown; target?: unknown }): { capability: string; note: string; from: string } | null {
+    let text: string | null = null, intent = false;
+    if (typeof input?.capability === 'string') text = input.capability;
+    else if (input?.capability === undefined && typeof input?.verb === 'string' && ['go', 'walk', 'sit', 'enter', 'approach'].includes(input.verb)) {
+      const t = input.target as { place?: unknown; target?: unknown; on?: unknown } | string | undefined;
+      const name = typeof t === 'string' ? t : typeof t?.place === 'string' ? t.place : typeof t?.on === 'string' ? t.on : typeof t?.target === 'string' ? t.target : null;
+      if (name) { text = `${input.verb === 'sit' ? 'sit' : input.verb === 'enter' ? 'enter' : 'walk'}:${name}`; intent = true; }
+    }
+    if (!text || text.length > 200) return null;
+    const caps = (L as any).coreA.binds(soul).caps as EdgeCapability[];
+    // an exact id is the ledger's (an intent naming one exactly becomes that capability)
+    if (caps.some((c) => c.id === text)) return intent && text.startsWith('walk:') && this.nav.thing(text.slice(5)) ? { capability: text, from: JSON.stringify({ verb: input.verb, target: input.target }), note: `${text}.` } : null;
+    const parsed = parseNavWords(text); if (!parsed) return null;
+    const me = this.engine.world.entities[soul.entityId]; if (!me?.human) return null;
+    const here: Vec2 = [me.pose.p[0], me.pose.p[2]];
+    // the whole phrase first ("bench by the pond" may be a name), then "<target> by <landmark>"
+    const whole = parsed.rest;
+    let target = parsed.target, landmark: Thing | undefined;
+    if (parsed.by) {
+      const asWhole = parsed.verb === 'sit' ? this.seatsNamed(whole, here) : this.nav.match(whole, here);
+      if (asWhole.length) target = whole; else { landmark = this.nav.match(parsed.by, here)[0]; if (!landmark) return null; }
+    }
+    const ref: Vec2 = landmark?.at ?? here;
+    const byLm = <T extends { at: Vec2 }>(xs: T[]) => landmark ? [...xs].sort((a, b) => this.nav.distance(landmark!, a.at) - this.nav.distance(landmark!, b.at)) : xs;
+    const offered = (id: string) => (L as any).coreA.binds(soul).caps.some((c: EdgeCapability) => c.id === id);
+    const refresh = () => (L as any).invalidateBodies?.();
+    if (parsed.verb === 'sit') {
+      const seats = byLm(this.seatsNamed(target, ref)); if (!seats.length) return null;
+      const free = seats.find((s) => !this.engine.bodyUsesV1(s.id)) ?? seats[0], id = `sit:${free.id}`;
+      if (!offered(id)) { const w = this.wantedSeats.get(soul.soulId) ?? new Set<string>(); w.add(free.id); this.wantedSeats.set(soul.soulId, w); refresh(); }
+      return { capability: id, from: text, note: `${text} is ${id} (${free.path}${landmark ? `, the one nearest ${landmark.ref}` : ''}).` };
+    }
+    let things = byLm(this.nav.match(target, ref)); if (!things.length) return null;
+    let t = things[0];
+    if (parsed.verb === 'enter') {
+      const b = t.kind === 'room' ? t : t.kind === 'building' && t.rooms?.length ? this.nav.thing(t.rooms[0]) : undefined;
+      if (!b) { things = things.filter((x) => x.kind === 'building' || x.kind === 'room'); if (!things.length) return null; t = things[0].kind === 'room' ? things[0] : this.nav.thing(things[0].rooms![0])!; }
+      else t = b;
+    }
+    const id = `walk:${t.ref}`;
+    if (!offered(id)) { this.nav.want(soul.soulId, t.ref); refresh(); }
+    return { capability: id, from: text, note: `${text} is ${id} (${t.kind === 'room' ? `inside ${t.what}` : t.kind === 'building' ? `the front door of ${t.ref}` : t.ref}${landmark ? `, the one nearest ${landmark.ref}` : ''}).` };
+  }
+  /** Seats (named or not) whose name, def or container a phrase names, nearest `near` first. */
+  private seatsNamed(phrase: string, near: Vec2): { id: string; path: string; at: Vec2 }[] {
+    const q = navWords(phrase.replace(/^(?:the|a|an)\s+/i, '')), raw = phrase.trim().toLowerCase();
+    if (!q.length) return [];
+    const out: { id: string; path: string; at: Vec2; d: number }[] = [];
+    for (const e of this.model.entities.values()) {
+      const def = this.model.resolvedDef(e.def); if (!def?.components.seat || !this.engine.world.entities[e.id]) continue;
+      const path = this.model.pathOf(e.id), parent = e.in.parent !== 'world' ? this.model.entities.get(e.in.parent) : undefined;
+      const ws = [...navWords(e.name ?? ''), ...navWords(def.name.replace(/^core-/, '')), ...def.tags.flatMap(navWords), ...navWords(parent?.name ?? '')];
+      const exact = path.toLowerCase() === raw || e.id === raw || (e.name ?? '').toLowerCase() === raw;
+      if (!exact && !q.every((w) => ws.some((t) => t === w || t.replace(/s$/, '') === w.replace(/s$/, '')))) continue;
+      const wp = this.model.worldPose(e), at: Vec2 = [wp.x, wp.z];
+      out.push({ id: e.id, path, at, d: exact ? -1 : Math.hypot(at[0] - near[0], at[1] - near[1]) });
+    }
+    return out.sort((a, b) => a.d - b.d || (a.id < b.id ? -1 : 1));
   }
   private pray(L: EdgeLedger, soul: EdgeSoul, input: { capability?: unknown; params?: unknown; clientRef?: unknown }) {
     const params = (input.params ?? {}) as { text?: unknown };
@@ -572,13 +678,15 @@ export class EngineBridge {
 
   /** Capabilities on god-placed things near this Soul: sit on chairs, pick up items, put them on tables; and pray. */
   capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>) {
+    try { this.nav.capabilities(soul, caps, plans); } catch (e) { this.log(`nav capabilities: ${(e as Error).message}`); }
     caps.push({ id: 'pray', verb: 'pray', label: 'Pray to the god of this world (params: {"text": "…"}); answers come back under GET /v1/god/prayers/mine', available: true, params: { text: { type: 'string', maxLength: 2000 } } });
     const ents = this.engine.world.entities, me = ents[soul.entityId]; if (!me?.human) return;
     const here: Vec2 = [me.pose.p[0], me.pose.p[2]];
     const held = Object.values(ents).find((x: any) => x.tags?.includes('entity-world') && x.support?.kind === 'in-hand' && x.support.by === soul.entityId) as any;
     const name = (id: string) => (this.model.entities.has(id) ? this.model.pathOf(id) : String(ents[id]?.label ?? id));
     const levelOf = (x: any) => this.levelOfY(x.pose.p[1]);
-    const near = Object.values(ents).filter((x: any) => x.tags?.includes('entity-world') && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) <= NEAR) as any[];
+    const wantSeat = this.wantedSeats.get(soul.soulId);
+    const near = Object.values(ents).filter((x: any) => x.tags?.includes('entity-world') && (Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) <= NEAR || wantSeat?.has(x.id))) as any[];
     near.sort((a, b) => Math.hypot(a.pose.p[0] - here[0], a.pose.p[2] - here[1]) - Math.hypot(b.pose.p[0] - here[0], b.pose.p[2] - here[1]) || (a.id < b.id ? -1 : 1));
     const approach = (x: any): { verb: string; params: Record<string, unknown> }[] => {
       const level = levelOf(x); if (level === (me.human.level ?? 0) && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) < 3) return [];
