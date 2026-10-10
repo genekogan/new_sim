@@ -1,4 +1,5 @@
 // Settling: five height samples and an anchor rule, no gravity (spec §4.3).
+import { levelAlong } from './forms.ts';
 import { areaMask, pathMask } from './geom.ts';
 import type { Terrain } from './tiles.ts';
 import type { Anchor, Ground, Vec2 } from './types.ts';
@@ -58,7 +59,7 @@ export function waterLevelAt(g: Ground, x: number, z: number): number | null {
   let level: number | null = null;
   for (const w of g.waters) {
     const m = w.area ? areaMask(x, z, w.area, 1e-9) : pathMask(x, z, w.path!, w.w!);
-    if (m > 0) level = w.level;
+    if (m > 0) level = w.levels ? levelAlong(x, z, w.path!, w.levels).level : w.level;
   }
   if (level === null && g.seaLevel !== undefined) level = g.seaLevel;
   return level;

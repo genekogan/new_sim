@@ -1,0 +1,1918 @@
+[
+ {
+  "schema": "def/1",
+  "name": "core-road",
+  "version": 1,
+  "description": "A road along a path: cobble/asphalt/gravel/dirt, kerbs, verges; graded to ≤ maxGrade on hills (prepareRoad) and bridged over water automatically. T and X junctions merge.",
+  "tags": [
+   "road",
+   "path-network",
+   "terrain"
+  ],
+  "form": "path",
+  "layer": "surface",
+  "make": {
+   "kind": "gen",
+   "gen": "road/1"
+  },
+  "size": {
+   "box": [
+    10,
+    0.2,
+    10
+   ]
+  },
+  "params": {
+   "width": {
+    "type": "number",
+    "min": 2,
+    "max": 30,
+    "default": 6
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "asphalt",
+     "cobble",
+     "gravel",
+     "dirt",
+     "sand"
+    ],
+    "default": "cobble"
+   },
+   "kerb": {
+    "type": "bool",
+    "default": true
+   },
+   "shoulder": {
+    "type": "number",
+    "min": 0,
+    "max": 4,
+    "default": 0.6
+   },
+   "maxGrade": {
+    "type": "number",
+    "min": 0,
+    "max": 0.2,
+    "default": 0.08,
+    "doc": "carve/fill to keep slope below this (0 = follow terrain)"
+   },
+   "autoBridge": {
+    "type": "bool",
+    "default": true
+   },
+   "lines": {
+    "type": "bool",
+    "default": false
+   },
+   "grade": {
+    "type": "json",
+    "doc": "frozen by prepareRoad: {sig, h[], spans[]} — profile per centre-line point and bridge spans"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-street",
+  "version": 1,
+  "description": "An asphalt street with a dashed centre line and kerbs.",
+  "tags": [
+   "road",
+   "path-network",
+   "terrain"
+  ],
+  "form": "path",
+  "layer": "surface",
+  "make": {
+   "kind": "gen",
+   "gen": "road/1"
+  },
+  "size": {
+   "box": [
+    10,
+    0.2,
+    10
+   ]
+  },
+  "params": {
+   "width": {
+    "type": "number",
+    "min": 2,
+    "max": 30,
+    "default": 7
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "asphalt",
+     "cobble",
+     "gravel",
+     "dirt",
+     "sand"
+    ],
+    "default": "asphalt"
+   },
+   "kerb": {
+    "type": "bool",
+    "default": true
+   },
+   "shoulder": {
+    "type": "number",
+    "min": 0,
+    "max": 4,
+    "default": 0.6
+   },
+   "maxGrade": {
+    "type": "number",
+    "min": 0,
+    "max": 0.2,
+    "default": 0.08,
+    "doc": "carve/fill to keep slope below this (0 = follow terrain)"
+   },
+   "autoBridge": {
+    "type": "bool",
+    "default": true
+   },
+   "lines": {
+    "type": "bool",
+    "default": true
+   },
+   "grade": {
+    "type": "json",
+    "doc": "frozen by prepareRoad: {sig, h[], spans[]} — profile per centre-line point and bridge spans"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-track",
+  "version": 1,
+  "description": "A dirt or gravel track: no kerbs, follows the ground closely.",
+  "tags": [
+   "road",
+   "path-network",
+   "terrain"
+  ],
+  "form": "path",
+  "layer": "surface",
+  "make": {
+   "kind": "gen",
+   "gen": "road/1"
+  },
+  "size": {
+   "box": [
+    10,
+    0.2,
+    10
+   ]
+  },
+  "params": {
+   "width": {
+    "type": "number",
+    "min": 2,
+    "max": 30,
+    "default": 3.5
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "asphalt",
+     "cobble",
+     "gravel",
+     "dirt",
+     "sand"
+    ],
+    "default": "dirt"
+   },
+   "kerb": {
+    "type": "bool",
+    "default": false
+   },
+   "shoulder": {
+    "type": "number",
+    "min": 0,
+    "max": 4,
+    "default": 0.3
+   },
+   "maxGrade": {
+    "type": "number",
+    "min": 0,
+    "max": 0.2,
+    "default": 0.14,
+    "doc": "carve/fill to keep slope below this (0 = follow terrain)"
+   },
+   "autoBridge": {
+    "type": "bool",
+    "default": true
+   },
+   "lines": {
+    "type": "bool",
+    "default": false
+   },
+   "grade": {
+    "type": "json",
+    "doc": "frozen by prepareRoad: {sig, h[], spans[]} — profile per centre-line point and bridge spans"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-footpath",
+  "version": 1,
+  "description": "A footpath: gravel, dirt, cobble, stone flags or boardwalk; follows the ground; bridges water.",
+  "tags": [
+   "path",
+   "path-network",
+   "terrain"
+  ],
+  "form": "path",
+  "layer": "surface",
+  "make": {
+   "kind": "gen",
+   "gen": "path/1"
+  },
+  "size": {
+   "box": [
+    4,
+    0.1,
+    4
+   ]
+  },
+  "params": {
+   "width": {
+    "type": "number",
+    "min": 0.5,
+    "max": 6,
+    "default": 1.6
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "gravel",
+     "dirt",
+     "cobble",
+     "stone",
+     "wood"
+    ],
+    "default": "gravel"
+   },
+   "edging": {
+    "type": "bool",
+    "default": false
+   },
+   "maxGrade": {
+    "type": "number",
+    "min": 0,
+    "max": 0.3,
+    "default": 0
+   },
+   "autoBridge": {
+    "type": "bool",
+    "default": true
+   },
+   "grade": {
+    "type": "json",
+    "doc": "frozen by prepareRoad"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-river",
+  "version": 1,
+  "description": "A river: carves its bed, flows from the first point to the last; snapRiver snaps the ends into lakes and ponds and freezes the flow; waterfalls where the ground steps; shores.",
+  "tags": [
+   "water",
+   "river",
+   "terrain"
+  ],
+  "form": "path",
+  "layer": "volume",
+  "make": {
+   "kind": "gen",
+   "gen": "river/1"
+  },
+  "size": {
+   "box": [
+    20,
+    2,
+    20
+   ]
+  },
+  "params": {
+   "width": {
+    "type": "number",
+    "min": 1,
+    "max": 60,
+    "default": 6
+   },
+   "depth": {
+    "type": "number",
+    "min": 0.2,
+    "max": 10,
+    "default": 1.2
+   },
+   "level": {
+    "type": "number",
+    "min": -50,
+    "max": 400,
+    "default": -0.3,
+    "doc": "water level at the source (used flat until snapRiver freezes a profile)"
+   },
+   "banks": {
+    "type": "enum",
+    "values": [
+     "grass",
+     "sand",
+     "stone",
+     "reeds",
+     "pebble"
+    ],
+    "default": "grass"
+   },
+   "bankWidth": {
+    "type": "number",
+    "min": 0,
+    "max": 12,
+    "default": 2.5
+   },
+   "flow": {
+    "type": "json",
+    "doc": "frozen by snapRiver: {sig, levels[] per centre-line point, falls[], source, mouth}"
+   }
+  },
+  "components": {
+   "water": {
+    "level": -0.3
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-stream",
+  "version": 1,
+  "description": "A narrow stream with pebble banks.",
+  "tags": [
+   "water",
+   "river",
+   "terrain"
+  ],
+  "form": "path",
+  "layer": "volume",
+  "make": {
+   "kind": "gen",
+   "gen": "river/1"
+  },
+  "size": {
+   "box": [
+    10,
+    1,
+    10
+   ]
+  },
+  "params": {
+   "width": {
+    "type": "number",
+    "min": 1,
+    "max": 60,
+    "default": 2.5
+   },
+   "depth": {
+    "type": "number",
+    "min": 0.2,
+    "max": 10,
+    "default": 0.6
+   },
+   "level": {
+    "type": "number",
+    "min": -50,
+    "max": 400,
+    "default": -0.3,
+    "doc": "water level at the source (used flat until snapRiver freezes a profile)"
+   },
+   "banks": {
+    "type": "enum",
+    "values": [
+     "grass",
+     "sand",
+     "stone",
+     "reeds",
+     "pebble"
+    ],
+    "default": "pebble"
+   },
+   "bankWidth": {
+    "type": "number",
+    "min": 0,
+    "max": 12,
+    "default": 1.2
+   },
+   "flow": {
+    "type": "json",
+    "doc": "frozen by snapRiver: {sig, levels[] per centre-line point, falls[], source, mouth}"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-shore",
+  "version": 1,
+  "description": "A beach or stone edge around a lake or pond: give the water outline as the area.",
+  "tags": [
+   "water",
+   "shore",
+   "terrain"
+  ],
+  "form": "area",
+  "layer": "surface",
+  "make": {
+   "kind": "gen",
+   "gen": "shore/1"
+  },
+  "size": {
+   "box": [
+    20,
+    0.3,
+    20
+   ]
+  },
+  "params": {
+   "material": {
+    "type": "enum",
+    "values": [
+     "sand",
+     "stone",
+     "pebble",
+     "grass",
+     "reeds"
+    ],
+    "default": "sand"
+   },
+   "width": {
+    "type": "number",
+    "min": 0.5,
+    "max": 20,
+    "default": 3
+   },
+   "inner": {
+    "type": "number",
+    "min": 0,
+    "max": 10,
+    "default": 1.5
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-bridge",
+  "version": 1,
+  "description": "A bridge over a stream or gap along a short path: humped deck, rails, posts or a stone arch to the bed.",
+  "tags": [
+   "bridge",
+   "path-network",
+   "structure"
+  ],
+  "form": "path",
+  "layer": "surface",
+  "make": {
+   "kind": "gen",
+   "gen": "bridge/1"
+  },
+  "size": {
+   "box": [
+    10,
+    3,
+    4
+   ]
+  },
+  "params": {
+   "width": {
+    "type": "number",
+    "min": 1,
+    "max": 20,
+    "default": 3
+   },
+   "deck": {
+    "type": "number",
+    "min": 0,
+    "max": 20,
+    "default": 0.8,
+    "doc": "extra height at mid-span above the line between the ends"
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "wood",
+     "stone",
+     "metal"
+    ],
+    "default": "wood"
+   },
+   "arch": {
+    "type": "number",
+    "min": 0,
+    "max": 6,
+    "default": 0.6,
+    "doc": "additional rise at mid-span"
+   },
+   "rails": {
+    "type": "bool",
+    "default": true
+   },
+   "at": {
+    "type": "json",
+    "doc": "frozen by prepareBridge: {sig, y0, y1} absolute end heights"
+   }
+  },
+  "components": {
+   "floor": {
+    "level": 0,
+    "y": 0
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-footbridge",
+  "version": 1,
+  "description": "A narrow wooden garden footbridge.",
+  "tags": [
+   "bridge",
+   "path-network",
+   "structure"
+  ],
+  "form": "path",
+  "layer": "surface",
+  "make": {
+   "kind": "gen",
+   "gen": "bridge/1"
+  },
+  "size": {
+   "box": [
+    6,
+    2,
+    2
+   ]
+  },
+  "params": {
+   "width": {
+    "type": "number",
+    "min": 1,
+    "max": 20,
+    "default": 1.8
+   },
+   "deck": {
+    "type": "number",
+    "min": 0,
+    "max": 20,
+    "default": 0.5,
+    "doc": "extra height at mid-span above the line between the ends"
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "wood",
+     "stone",
+     "metal"
+    ],
+    "default": "wood"
+   },
+   "arch": {
+    "type": "number",
+    "min": 0,
+    "max": 6,
+    "default": 0.6,
+    "doc": "additional rise at mid-span"
+   },
+   "rails": {
+    "type": "bool",
+    "default": true
+   },
+   "at": {
+    "type": "json",
+    "doc": "frozen by prepareBridge: {sig, y0, y1} absolute end heights"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-pier",
+  "version": 1,
+  "description": "A pier or jetty on posts from the shore out over the water, with rails and an end platform.",
+  "tags": [
+   "pier",
+   "water",
+   "structure"
+  ],
+  "form": "path",
+  "layer": "surface",
+  "make": {
+   "kind": "gen",
+   "gen": "pier/1"
+  },
+  "size": {
+   "box": [
+    20,
+    2,
+    4
+   ]
+  },
+  "params": {
+   "width": {
+    "type": "number",
+    "min": 1,
+    "max": 8,
+    "default": 2.4
+   },
+   "height": {
+    "type": "number",
+    "min": 0.2,
+    "max": 6,
+    "default": 0.7,
+    "doc": "deck above the water (or above the ground at the start when dry)"
+   },
+   "rails": {
+    "type": "bool",
+    "default": true
+   },
+   "platform": {
+    "type": "number",
+    "min": 0,
+    "max": 16,
+    "default": 5,
+    "doc": "end platform size (0 = none)"
+   },
+   "color": {
+    "type": "color",
+    "default": "#a07a4f"
+   },
+   "at": {
+    "type": "json",
+    "doc": "frozen by prepareDeck: {sig, y}"
+   }
+  },
+  "components": {
+   "floor": {
+    "level": 0,
+    "y": 0
+   },
+   "place": {
+    "kind": "pier",
+    "enclosed": false
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-deck",
+  "version": 1,
+  "description": "A raised wooden deck or terrace on posts, over ground or water, with rails on the open edges.",
+  "tags": [
+   "deck",
+   "structure"
+  ],
+  "form": "area",
+  "layer": "surface",
+  "make": {
+   "kind": "gen",
+   "gen": "deck/1"
+  },
+  "size": {
+   "box": [
+    8,
+    1.6,
+    8
+   ]
+  },
+  "params": {
+   "height": {
+    "type": "number",
+    "min": 0,
+    "max": 12,
+    "default": 0.6,
+    "doc": "above the highest ground under it, or above the water"
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "wood",
+     "stone",
+     "metal"
+    ],
+    "default": "wood"
+   },
+   "rails": {
+    "type": "bool",
+    "default": true
+   },
+   "color": {
+    "type": "color",
+    "default": "#a07a4f"
+   },
+   "at": {
+    "type": "json",
+    "doc": "frozen by prepareDeck: {sig, y}"
+   }
+  },
+  "components": {
+   "floor": {
+    "level": 0,
+    "y": 0
+   },
+   "place": {
+    "kind": "deck",
+    "enclosed": false
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-garden-wall",
+  "version": 1,
+  "description": "A freestanding wall along a path (stone, brick, plaster) with a cap and optional gates [{at, width}].",
+  "tags": [
+   "wall",
+   "boundary",
+   "structure"
+  ],
+  "form": "path",
+  "layer": "solid",
+  "make": {
+   "kind": "gen",
+   "gen": "wall/1"
+  },
+  "size": {
+   "box": [
+    10,
+    1.8,
+    1
+   ]
+  },
+  "params": {
+   "height": {
+    "type": "number",
+    "min": 0.3,
+    "max": 12,
+    "default": 1.8
+   },
+   "thickness": {
+    "type": "number",
+    "min": 0.08,
+    "max": 3,
+    "default": 0.3
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "stone",
+     "brick",
+     "plaster",
+     "wood",
+     "hedge",
+     "glass"
+    ],
+    "default": "stone"
+   },
+   "color": {
+    "type": "color",
+    "default": "#c9c1b2"
+   },
+   "gates": {
+    "type": "json",
+    "doc": "[{at: metres along, width}]"
+   },
+   "cap": {
+    "type": "bool",
+    "default": true
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-fence",
+  "version": 1,
+  "description": "A fence: picket, rail, wire or iron railings; gates [{at, width}]. Blocks walking, not sight.",
+  "tags": [
+   "fence",
+   "boundary"
+  ],
+  "form": "path",
+  "layer": "solid",
+  "make": {
+   "kind": "gen",
+   "gen": "fence/1"
+  },
+  "size": {
+   "box": [
+    10,
+    1.1,
+    0.2
+   ]
+  },
+  "params": {
+   "height": {
+    "type": "number",
+    "min": 0.4,
+    "max": 3,
+    "default": 1.1
+   },
+   "style": {
+    "type": "enum",
+    "values": [
+     "picket",
+     "rail",
+     "wire",
+     "iron"
+    ],
+    "default": "picket"
+   },
+   "color": {
+    "type": "color",
+    "default": "#e9e2d0"
+   },
+   "postSpacing": {
+    "type": "number",
+    "min": 0.5,
+    "max": 6,
+    "default": 2
+   },
+   "gates": {
+    "type": "json"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-hedge",
+  "version": 1,
+  "description": "A clipped, rounded hedge along a path; optional flowers; gaps [{at, width}].",
+  "tags": [
+   "hedge",
+   "boundary",
+   "plant"
+  ],
+  "form": "path",
+  "layer": "solid",
+  "make": {
+   "kind": "gen",
+   "gen": "hedge/1"
+  },
+  "size": {
+   "box": [
+    10,
+    1.2,
+    1
+   ]
+  },
+  "params": {
+   "height": {
+    "type": "number",
+    "min": 0.3,
+    "max": 4,
+    "default": 1.2
+   },
+   "width": {
+    "type": "number",
+    "min": 0.3,
+    "max": 3,
+    "default": 0.8
+   },
+   "color": {
+    "type": "color",
+    "default": "#3f6b35"
+   },
+   "flowers": {
+    "type": "bool",
+    "default": false
+   },
+   "gates": {
+    "type": "json",
+    "doc": "[{at, width}] gaps"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-power-line",
+  "version": 1,
+  "description": "Wooden poles along a path with drooping wires.",
+  "tags": [
+   "power",
+   "infrastructure"
+  ],
+  "form": "path",
+  "layer": "decor",
+  "make": {
+   "kind": "gen",
+   "gen": "power-line/1"
+  },
+  "size": {
+   "box": [
+    30,
+    8,
+    1
+   ]
+  },
+  "params": {
+   "spacing": {
+    "type": "number",
+    "min": 10,
+    "max": 80,
+    "default": 30
+   },
+   "height": {
+    "type": "number",
+    "min": 4,
+    "max": 20,
+    "default": 8
+   },
+   "wires": {
+    "type": "int",
+    "min": 1,
+    "max": 6,
+    "default": 3
+   },
+   "droop": {
+    "type": "number",
+    "min": 0,
+    "max": 0.1,
+    "default": 0.03,
+    "doc": "sag as a fraction of the span"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-plaza",
+  "version": 1,
+  "description": "A paved square: cobble/stone/tile/brick, grid/herringbone/radial pattern, a low kerb.",
+  "tags": [
+   "plaza",
+   "paving",
+   "place"
+  ],
+  "form": "area",
+  "layer": "surface",
+  "make": {
+   "kind": "gen",
+   "gen": "plaza/1"
+  },
+  "size": {
+   "box": [
+    20,
+    0.2,
+    20
+   ]
+  },
+  "params": {
+   "material": {
+    "type": "enum",
+    "values": [
+     "cobble",
+     "stone",
+     "tile",
+     "brick",
+     "gravel",
+     "asphalt"
+    ],
+    "default": "cobble"
+   },
+   "pattern": {
+    "type": "enum",
+    "values": [
+     "grid",
+     "herringbone",
+     "radial",
+     "plain"
+    ],
+    "default": "grid"
+   },
+   "color": {
+    "type": "color",
+    "default": "#b9b2a4"
+   },
+   "kerb": {
+    "type": "bool",
+    "default": true
+   },
+   "size": {
+    "type": "number",
+    "min": 0.2,
+    "max": 3,
+    "default": 0.8,
+    "doc": "paving unit (m)"
+   }
+  },
+  "components": {
+   "place": {
+    "kind": "plaza",
+    "enclosed": false
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-lawn",
+  "version": 1,
+  "description": "A mown lawn (optional stripes) draped on the ground.",
+  "tags": [
+   "lawn",
+   "ground-paint",
+   "terrain"
+  ],
+  "form": "area",
+  "layer": "surface",
+  "make": {
+   "kind": "gen",
+   "gen": "lawn/1"
+  },
+  "size": {
+   "box": [
+    20,
+    0.1,
+    20
+   ]
+  },
+  "params": {
+   "material": {
+    "type": "enum",
+    "values": [
+     "grass",
+     "sand",
+     "gravel",
+     "moss",
+     "mud",
+     "rock",
+     "snow",
+     "dirt"
+    ],
+    "default": "grass"
+   },
+   "color": {
+    "type": "color",
+    "doc": "override the material colour"
+   },
+   "edge": {
+    "type": "number",
+    "min": 0,
+    "max": 10,
+    "default": 1,
+    "doc": "ragged, softened border (m)"
+   },
+   "stripes": {
+    "type": "bool",
+    "default": false,
+    "doc": "mowing stripes (grass)"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-ground-paint",
+  "version": 1,
+  "description": "Paint the ground with a material: sand, gravel, moss, mud, rock, snow, dirt.",
+  "tags": [
+   "ground-paint",
+   "terrain"
+  ],
+  "form": "area",
+  "layer": "surface",
+  "make": {
+   "kind": "gen",
+   "gen": "lawn/1"
+  },
+  "size": {
+   "box": [
+    20,
+    0.1,
+    20
+   ]
+  },
+  "params": {
+   "material": {
+    "type": "enum",
+    "values": [
+     "grass",
+     "sand",
+     "gravel",
+     "moss",
+     "mud",
+     "rock",
+     "snow",
+     "dirt"
+    ],
+    "default": "sand"
+   },
+   "color": {
+    "type": "color",
+    "doc": "override the material colour"
+   },
+   "edge": {
+    "type": "number",
+    "min": 0,
+    "max": 10,
+    "default": 1,
+    "doc": "ragged, softened border (m)"
+   },
+   "stripes": {
+    "type": "bool",
+    "default": false,
+    "doc": "mowing stripes (grass)"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-pitch",
+  "version": 1,
+  "description": "A sports pitch in the area (long side = length): football, tennis, basketball, petanque, volleyball — lines, goals, nets, hoops.",
+  "tags": [
+   "pitch",
+   "sport",
+   "place"
+  ],
+  "form": "area",
+  "layer": "surface",
+  "make": {
+   "kind": "gen",
+   "gen": "pitch/1"
+  },
+  "size": {
+   "box": [
+    100,
+    3,
+    64
+   ]
+  },
+  "params": {
+   "sport": {
+    "type": "enum",
+    "values": [
+     "football",
+     "tennis",
+     "basketball",
+     "petanque",
+     "volleyball"
+    ],
+    "default": "football"
+   },
+   "color": {
+    "type": "color",
+    "doc": "surface colour override"
+   },
+   "fence": {
+    "type": "bool",
+    "default": false
+   }
+  },
+  "components": {
+   "place": {
+    "kind": "pitch",
+    "enclosed": false
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-football-pitch",
+  "version": 1,
+  "description": "A football pitch with goals and mowing stripes.",
+  "tags": [
+   "pitch",
+   "sport",
+   "place"
+  ],
+  "form": "area",
+  "layer": "surface",
+  "make": {
+   "kind": "gen",
+   "gen": "pitch/1"
+  },
+  "size": {
+   "box": [
+    100,
+    3,
+    64
+   ]
+  },
+  "params": {
+   "sport": {
+    "type": "enum",
+    "values": [
+     "football",
+     "tennis",
+     "basketball",
+     "petanque",
+     "volleyball"
+    ],
+    "default": "football"
+   },
+   "color": {
+    "type": "color",
+    "doc": "surface colour override"
+   },
+   "fence": {
+    "type": "bool",
+    "default": false
+   }
+  },
+  "components": {
+   "place": {
+    "kind": "pitch",
+    "enclosed": false
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-tennis-court",
+  "version": 1,
+  "description": "A hard tennis court with a net and a high fence.",
+  "tags": [
+   "pitch",
+   "sport",
+   "place"
+  ],
+  "form": "area",
+  "layer": "surface",
+  "make": {
+   "kind": "gen",
+   "gen": "pitch/1"
+  },
+  "size": {
+   "box": [
+    36,
+    3,
+    18
+   ]
+  },
+  "params": {
+   "sport": {
+    "type": "enum",
+    "values": [
+     "football",
+     "tennis",
+     "basketball",
+     "petanque",
+     "volleyball"
+    ],
+    "default": "tennis"
+   },
+   "color": {
+    "type": "color",
+    "doc": "surface colour override"
+   },
+   "fence": {
+    "type": "bool",
+    "default": true
+   }
+  },
+  "components": {
+   "place": {
+    "kind": "court",
+    "enclosed": false
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-parking",
+  "version": 1,
+  "description": "A car park with marked bays.",
+  "tags": [
+   "parking",
+   "road"
+  ],
+  "form": "area",
+  "layer": "surface",
+  "make": {
+   "kind": "gen",
+   "gen": "parking/1"
+  },
+  "size": {
+   "box": [
+    20,
+    0.1,
+    20
+   ]
+  },
+  "params": {
+   "bay": {
+    "type": "number",
+    "min": 2,
+    "max": 4,
+    "default": 2.5
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-garden-bed",
+  "version": 1,
+  "description": "A planted bed in rows: flowers, vegetables, herbs, wheat, pumpkins.",
+  "tags": [
+   "garden",
+   "plant"
+  ],
+  "form": "area",
+  "layer": "surface",
+  "make": {
+   "kind": "gen",
+   "gen": "garden-bed/1"
+  },
+  "size": {
+   "box": [
+    6,
+    0.6,
+    3
+   ]
+  },
+  "params": {
+   "crop": {
+    "type": "enum",
+    "values": [
+     "flowers",
+     "vegetables",
+     "herbs",
+     "wheat",
+     "pumpkins",
+     "mixed"
+    ],
+    "default": "mixed"
+   },
+   "rows": {
+    "type": "number",
+    "min": 0.3,
+    "max": 3,
+    "default": 0.7,
+    "doc": "row spacing (m)"
+   },
+   "border": {
+    "type": "bool",
+    "default": true
+   }
+  },
+  "components": {
+   "plant": {
+    "stages": 3,
+    "daysPerStage": 1
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-orchard",
+  "version": 1,
+  "description": "Fruit or shade trees in a grid with age variation.",
+  "tags": [
+   "orchard",
+   "tree",
+   "plant"
+  ],
+  "form": "area",
+  "layer": "solid",
+  "make": {
+   "kind": "gen",
+   "gen": "orchard/1"
+  },
+  "size": {
+   "box": [
+    20,
+    5,
+    20
+   ]
+  },
+  "params": {
+   "species": {
+    "type": "enum",
+    "values": [
+     "apple",
+     "pear",
+     "cherry",
+     "olive",
+     "lemon",
+     "oak",
+     "birch",
+     "pine",
+     "palm"
+    ],
+    "default": "apple"
+   },
+   "spacing": {
+    "type": "number",
+    "min": 2,
+    "max": 20,
+    "default": 5
+   },
+   "height": {
+    "type": "number",
+    "min": 2,
+    "max": 20,
+    "default": 4.5
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-woodland",
+  "version": 1,
+  "description": "A mixed wood: oaks, pines, birches, bushes and ferns in groves, reeds by any water, rocks on the steep, saplings at the edge; keeps off roads and buildings.",
+  "tags": [
+   "cover",
+   "forest",
+   "plant",
+   "ecology"
+  ],
+  "form": "area",
+  "layer": "decor",
+  "make": {
+   "kind": "gen",
+   "gen": "scatter/2"
+  },
+  "size": {
+   "box": [
+    100,
+    14,
+    100
+   ]
+  },
+  "params": {
+   "palette": {
+    "type": "json",
+    "doc": "[{kind: oak|pine|birch|poplar|palm|bush|fern|reed|rock|boulder|flower|grass|cactus, or def: ref, weight, nearWater?, farWater?, minSlope?, maxSlope?, wet?, scale?: [min,max]}]"
+   },
+   "density": {
+    "type": "number",
+    "min": 0.0005,
+    "max": 8,
+    "default": 0.03
+   },
+   "cluster": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.4,
+    "doc": "0 uniform … 1 tight clumps"
+   },
+   "minSpacing": {
+    "type": "number",
+    "min": 0.2,
+    "max": 30,
+    "default": 2
+   },
+   "avoid": {
+    "type": "json",
+    "doc": "tags or layers to avoid (default: solid, road, water)"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-reedbed",
+  "version": 1,
+  "description": "Reeds and rushes along a shore (only within 4 m of water, standing in the shallows).",
+  "tags": [
+   "cover",
+   "water",
+   "plant",
+   "ecology"
+  ],
+  "form": "area",
+  "layer": "decor",
+  "make": {
+   "kind": "gen",
+   "gen": "scatter/2"
+  },
+  "size": {
+   "box": [
+    20,
+    2,
+    20
+   ]
+  },
+  "params": {
+   "palette": {
+    "type": "json",
+    "doc": "[{kind: oak|pine|birch|poplar|palm|bush|fern|reed|rock|boulder|flower|grass|cactus, or def: ref, weight, nearWater?, farWater?, minSlope?, maxSlope?, wet?, scale?: [min,max]}]",
+    "default": [
+     {
+      "kind": "reed",
+      "weight": 6,
+      "nearWater": 4,
+      "wet": 0.5
+     },
+     {
+      "kind": "grass",
+      "weight": 2,
+      "nearWater": 6
+     },
+     {
+      "kind": "flower",
+      "weight": 0.5,
+      "nearWater": 6,
+      "farWater": 1
+     }
+    ]
+   },
+   "density": {
+    "type": "number",
+    "min": 0.0005,
+    "max": 8,
+    "default": 0.6
+   },
+   "cluster": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.4,
+    "doc": "0 uniform … 1 tight clumps"
+   },
+   "minSpacing": {
+    "type": "number",
+    "min": 0.2,
+    "max": 30,
+    "default": 0.5
+   },
+   "avoid": {
+    "type": "json",
+    "doc": "tags or layers to avoid (default: solid, road, water)"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-rock-field",
+  "version": 1,
+  "description": "Rocks and boulders, thickest on steep ground.",
+  "tags": [
+   "cover",
+   "rock",
+   "ecology"
+  ],
+  "form": "area",
+  "layer": "decor",
+  "make": {
+   "kind": "gen",
+   "gen": "scatter/2"
+  },
+  "size": {
+   "box": [
+    40,
+    3,
+    40
+   ]
+  },
+  "params": {
+   "palette": {
+    "type": "json",
+    "doc": "[{kind: oak|pine|birch|poplar|palm|bush|fern|reed|rock|boulder|flower|grass|cactus, or def: ref, weight, nearWater?, farWater?, minSlope?, maxSlope?, wet?, scale?: [min,max]}]",
+    "default": [
+     {
+      "kind": "rock",
+      "weight": 4,
+      "scale": [
+       0.5,
+       1.6
+      ]
+     },
+     {
+      "kind": "boulder",
+      "weight": 1,
+      "minSlope": 0.3,
+      "scale": [
+       0.8,
+       2
+      ]
+     },
+     {
+      "kind": "grass",
+      "weight": 2,
+      "maxSlope": 0.4
+     }
+    ]
+   },
+   "density": {
+    "type": "number",
+    "min": 0.0005,
+    "max": 8,
+    "default": 0.04
+   },
+   "cluster": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.6,
+    "doc": "0 uniform … 1 tight clumps"
+   },
+   "minSpacing": {
+    "type": "number",
+    "min": 0.2,
+    "max": 30,
+    "default": 2
+   },
+   "avoid": {
+    "type": "json",
+    "doc": "tags or layers to avoid (default: solid, road, water)"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-wildflowers",
+  "version": 1,
+  "description": "A wildflower meadow: grasses and flowers in drifts.",
+  "tags": [
+   "cover",
+   "meadow",
+   "plant",
+   "ecology"
+  ],
+  "form": "area",
+  "layer": "decor",
+  "make": {
+   "kind": "gen",
+   "gen": "scatter/2"
+  },
+  "size": {
+   "box": [
+    40,
+    1,
+    40
+   ]
+  },
+  "params": {
+   "palette": {
+    "type": "json",
+    "doc": "[{kind: oak|pine|birch|poplar|palm|bush|fern|reed|rock|boulder|flower|grass|cactus, or def: ref, weight, nearWater?, farWater?, minSlope?, maxSlope?, wet?, scale?: [min,max]}]",
+    "default": [
+     {
+      "kind": "grass",
+      "weight": 4
+     },
+     {
+      "kind": "flower",
+      "weight": 3,
+      "maxSlope": 0.6
+     }
+    ]
+   },
+   "density": {
+    "type": "number",
+    "min": 0.0005,
+    "max": 8,
+    "default": 0.8
+   },
+   "cluster": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.6,
+    "doc": "0 uniform … 1 tight clumps"
+   },
+   "minSpacing": {
+    "type": "number",
+    "min": 0.2,
+    "max": 30,
+    "default": 0.5
+   },
+   "avoid": {
+    "type": "json",
+    "doc": "tags or layers to avoid (default: solid, road, water)"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-cliff",
+  "version": 1,
+  "description": "A cliff or escarpment along a path: one side rises over a steep face, optionally in ledges.",
+  "tags": [
+   "landform",
+   "terrain"
+  ],
+  "form": "path",
+  "layer": "decor",
+  "make": {
+   "kind": "gen",
+   "gen": "cliff/1"
+  },
+  "size": {
+   "box": [
+    60,
+    10,
+    60
+   ]
+  },
+  "params": {
+   "height": {
+    "type": "number",
+    "min": -120,
+    "max": 200,
+    "default": 10
+   },
+   "side": {
+    "type": "int",
+    "min": -1,
+    "max": 1,
+    "default": 1
+   },
+   "face": {
+    "type": "number",
+    "min": 0.5,
+    "max": 60,
+    "default": 3
+   },
+   "steps": {
+    "type": "int",
+    "min": 1,
+    "max": 12,
+    "default": 1
+   },
+   "shelf": {
+    "type": "number",
+    "min": 0,
+    "max": 400,
+    "default": 30
+   },
+   "back": {
+    "type": "number",
+    "min": 1,
+    "max": 200,
+    "default": 12
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-terrace",
+  "version": 1,
+  "description": "Flatten an area to a named level, or cut a hillside into terraces (step).",
+  "tags": [
+   "landform",
+   "terrain"
+  ],
+  "form": "area",
+  "layer": "decor",
+  "make": {
+   "kind": "gen",
+   "gen": "terrace/1"
+  },
+  "size": {
+   "box": [
+    30,
+    2,
+    30
+   ]
+  },
+  "params": {
+   "level": {
+    "type": "number",
+    "min": -200,
+    "max": 400,
+    "doc": "absolute level (m); omit with step for a stepped hillside"
+   },
+   "step": {
+    "type": "number",
+    "min": 0.3,
+    "max": 20,
+    "doc": "ledge height (m)"
+   },
+   "riser": {
+    "type": "number",
+    "min": 0.05,
+    "max": 0.95,
+    "default": 0.3,
+    "doc": "fraction of each step that is the riser"
+   },
+   "edge": {
+    "type": "number",
+    "min": 0.5,
+    "max": 60,
+    "default": 4
+   },
+   "label": {
+    "type": "string",
+    "max": 48,
+    "doc": "a name for the level (describe: \"upper lawn at 12 m\")"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-channel",
+  "version": 1,
+  "description": "A ditch, cutting or embankment along a path to levels.",
+  "tags": [
+   "landform",
+   "terrain"
+  ],
+  "form": "path",
+  "layer": "decor",
+  "make": {
+   "kind": "gen",
+   "gen": "channel/1"
+  },
+  "size": {
+   "box": [
+    30,
+    2,
+    30
+   ]
+  },
+  "params": {
+   "width": {
+    "type": "number",
+    "min": 0.5,
+    "max": 200,
+    "default": 4,
+    "doc": "flat bottom width"
+   },
+   "edge": {
+    "type": "number",
+    "min": 0.5,
+    "max": 60,
+    "default": 3
+   },
+   "from": {
+    "type": "number",
+    "min": -200,
+    "max": 400,
+    "default": -1
+   },
+   "to": {
+    "type": "number",
+    "min": -200,
+    "max": 400,
+    "default": -1
+   },
+   "levels": {
+    "type": "json",
+    "doc": "absolute levels per path point (overrides from/to)"
+   },
+   "mode": {
+    "type": "enum",
+    "values": [
+     "cut",
+     "fill",
+     "set"
+    ],
+    "default": "cut"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-brush",
+  "version": 1,
+  "description": "A terrain brush stroke: raise, lower, flatten or smooth around a point.",
+  "tags": [
+   "landform",
+   "terrain",
+   "brush"
+  ],
+  "form": "point",
+  "layer": "decor",
+  "make": {
+   "kind": "gen",
+   "gen": "brush/1"
+  },
+  "size": {
+   "box": [
+    16,
+    1,
+    16
+   ]
+  },
+  "params": {
+   "op": {
+    "type": "enum",
+    "values": [
+     "raise",
+     "lower",
+     "flatten",
+     "smooth"
+    ],
+    "default": "raise"
+   },
+   "radius": {
+    "type": "number",
+    "min": 1,
+    "max": 400,
+    "default": 8
+   },
+   "amount": {
+    "type": "number",
+    "min": 0,
+    "max": 60,
+    "default": 1
+   },
+   "level": {
+    "type": "number",
+    "min": -200,
+    "max": 400,
+    "doc": "flatten target (absolute m)"
+   }
+  },
+  "anchor": "center"
+ }
+]

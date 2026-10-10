@@ -1,5 +1,6 @@
 // Tiles: 64 m squares sampled at 1 m (65 × 65 Float32). Both sides bake from
 // the same Ground and sample tiles bilinearly; tile hashes are compared.
+import { smoothRadius } from './forms.ts';
 import { heightAt, influenceBounds, orderedLandforms } from './height.ts';
 import { TILE_M, TILE_N, type Ground, type Landform } from './types.ts';
 
@@ -11,7 +12,14 @@ export const tileOf = (x: number, z: number): [number, number] => [Math.floor(x 
 export function groundForTile(g: Ground, tx: number, tz: number): Ground {
   const x0 = tx * TILE_M, z0 = tz * TILE_M, x1 = x0 + TILE_M, z1 = z0 + TILE_M;
   const hits = (b: [number, number, number, number]) => b[2] >= x0 && b[0] <= x1 && b[3] >= z0 && b[1] <= z1;
-  const landforms = orderedLandforms(g.landforms).filter((l) => hits(influenceBounds(l)));
+  let landforms = orderedLandforms(g.landforms).filter((l) => hits(influenceBounds(l)));
+  // a smooth brush (L3) samples neighbours up to its kernel radius outside the tile: widen the subset by that much
+  let reach = 0;
+  for (const l of landforms) if (l.kind === 'brush' && l.op === 'smooth') { const r = smoothRadius(l); if (r > reach) reach = r; }
+  if (reach > 0) {
+    const wide = (b: [number, number, number, number]) => b[2] >= x0 - reach && b[0] <= x1 + reach && b[3] >= z0 - reach && b[1] <= z1 + reach;
+    landforms = orderedLandforms(g.landforms).filter((l) => wide(influenceBounds(l)));
+  }
   return { ...g, landforms, _ordered: landforms } as Ground;
 }
 
