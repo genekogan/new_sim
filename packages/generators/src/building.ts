@@ -1,10 +1,14 @@
-// building/1 and stairs/1. Owner: L2 (buildings). Spec <eden4>/29 WP2, 33 §2 row 3.
-// CONTRACT STUB (L1): params are final; physics is a working placeholder — a hollow one-room
-// shell with a door on `front`, a floor surface, wall-segment colliders and a room slot — so
-// gods can place buildings before L2 lands. L2 replaces `buildingPhysics` (auto-plan, floors,
-// stairs, openings, roofs, balconies, architecture checks) keeping the params and Baked shape.
-import { n, s, segmentColliders, rectPoly } from './geom.ts';
-import type { Baked, Generator, Opening, Room, Vec2 } from './types.ts';
+// building/1 and stairs/1. Owner: L2 (buildings). Spec <eden4>/29 WP2, 33 §2 row 3, 31 §3.
+// Physics half: params (+ def `make.args` presets) → a floor plan (auto per style, or the explicit
+// `plan` json; building-plan.ts) → a layout in the canonical frame (front = +z; building-layout.ts)
+// → architecture checks → Baked turned to `front`: wall segments split at doors and windows (sill and
+// lintel pieces kept), stair bodies, rails, posts; floors per level minus stairwells; openings; stair
+// links; rooms with frames and `room` slots. The mesh half (apps/web/src/gen-mesh/building.mesh.ts)
+// draws the same layout via `buildingGen.layout`.
+import { n, s, b, segmentColliders, rectPoly } from './geom.ts';
+import type { Baked, Generator, LocalOBB, Opening, Room, Slot, Surface, Vec2, Link } from './types.ts';
+import { autoPlan, explicitPlan, SLAB, FLOOR0 } from './building-plan.ts';
+import { realize, architectureChecks, type Layout, type Checks } from './building-layout.ts';
 
 export const BUILDING_STYLES = ['cottage', 'townhouse', 'hall', 'barn', 'tower', 'pavilion', 'greenhouse', 'shed', 'shop', 'chapel'] as const;
 
@@ -28,45 +32,166 @@ export const buildingParams = {
   wallThickness: { type: 'number', min: 0.1, max: 0.6, default: 0.22 },
 } as const;
 
-export function buildingPhysics(params: Record<string, unknown>): Baked {
-  const w = n(params.w, 8), d = n(params.d, 6), fh = n(params.floorHeight, 2.8), floors = Math.round(n(params.floors, 1));
-  const t = n(params.wallThickness, 0.22), front = s(params.front, 's'), height = fh * floors;
-  const hx = w / 2, hz = d / 2, door = Math.min(1.1, w * 0.4);
-  // perimeter walls; the front wall has a door gap at its middle
-  const walls: Record<string, Vec2[]> = { s: [[-hx, hz], [hx, hz]], e: [[hx, hz], [hx, -hz]], n: [[hx, -hz], [-hx, -hz]], w: [[-hx, -hz], [-hx, hz]] };
-  const colliders = Object.entries(walls).flatMap(([side, path]) => {
-    const len = side === 's' || side === 'n' ? w : d;
-    const gaps = side === front ? [{ from: len / 2 - door / 2, to: len / 2 + door / 2 }] : [];
-    return segmentColliders(path, t, 0, height, gaps, `wall:${side}`);
-  });
-  const doorAt: Record<string, Vec2> = { s: [0, hz], n: [0, -hz], e: [hx, 0], w: [-hx, 0] };
-  const doorYaw: Record<string, number> = { s: 0, n: Math.PI, e: -Math.PI / 2, w: Math.PI / 2 };
-  const openings: Opening[] = [{ id: 'front-door', kind: 'door', at: doorAt[front], yaw: doorYaw[front], width: door, height: 2.1, level: 0, state: 'always' }];
-  const inner = rectPoly(-hx + t, -hz + t, hx - t, hz - t);
-  const rooms: Room[] = Array.from({ length: floors }, (_, f) => ({ id: f === 0 ? 'ground' : `floor-${f}`, name: f === 0 ? 'Ground floor' : `Floor ${f}`, floor: f, y: f * fh, polygon: inner, origin: [0, 0], yaw: 0, height: fh }));
-  const outside: Vec2 = [doorAt[front][0] * (1 + 1.2 / Math.max(hx, hz)), doorAt[front][1] * (1 + 1.2 / Math.max(hx, hz))];
-  return {
-    box: [w, height + (s(params.roof, 'gable') === 'flat' ? 0.3 : Math.min(w, d) * 0.35), d],
-    colliders,
-    surfaces: rooms.map((r) => ({ level: r.floor, y: r.y + 0.05, polygon: inner, tag: r.id })),
-    openings,
-    links: [],
-    rooms,
-    slots: [
-      ...rooms.map((r) => ({ id: r.id, kind: 'room' as const, p: [r.origin[0], r.y + 0.05, r.origin[1]] as [number, number, number], yaw: r.yaw, floor: r.floor, polygon: r.polygon, accepts: {}, capacity: 64, label: r.name })),
-      { id: 'front', kind: 'stand' as const, p: [outside[0], 0, outside[1]] as [number, number, number], yaw: doorYaw[front], accepts: {}, capacity: 8 },
-    ],
-    tris: 400 * floors,
-    notes: ['placeholder shell (L2 replaces with planned rooms, stairs, windows, roofs)'],
-  };
+const FRONT_YAW: Record<string, number> = { s: 0, e: Math.PI / 2, n: Math.PI, w: -Math.PI / 2 };
+
+export type BuildingLayout = Layout & { yaw: number; front: string; style: string; roof: string; roofPitch: number; roofRise: number; material: string; checks: Checks; params: Record<string, unknown>; args: Record<string, unknown> };
+
+/** Roof rise above the wall top for the box and the mesh. */
+function roofRise(roof: string, pitchDeg: number, W: number, D: number, round: boolean): number {
+  const pitch = (Math.min(60, Math.max(0, pitchDeg)) * Math.PI) / 180, short = Math.min(W, D);
+  switch (roof) {
+    case 'gable': case 'hip': return round ? Math.max(1.2, Math.tan(Math.max(pitch, 0.7)) * (short / 2 + 0.3)) : Math.tan(pitch) * (short / 2 + 0.35);
+    case 'shed': return Math.tan(pitch) * 0.5 * (D + 0.5);
+    case 'dome': return short * 0.42;
+    case 'flat': return 0.45;
+    default: return 0;
+  }
 }
 
-export const buildingGen: Generator = {
+const layoutCache = new Map<string, BuildingLayout>();
+/** The full layout (canonical frame + yaw) for params and def args; cached by value. */
+export function buildingLayout(params: Record<string, unknown>, args: Record<string, unknown> = {}): BuildingLayout {
+  const key = JSON.stringify([params, args]);
+  const hit = layoutCache.get(key); if (hit) return hit;
+  const style = s(args.style ?? params.style, 'cottage'), front = s(params.front, 's');
+  const w = n(params.w, 8), d = n(params.d, 6), t = n(params.wallThickness, 0.22);
+  const floorsMax = style === 'tower' ? 6 : 4;
+  const floors = Math.max(1, Math.min(floorsMax, Math.round(n(params.floors, 1))));
+  const fh = Math.max(2.4, Math.min(5, n(params.floorHeight, 2.8)));
+  const turned = front === 'e' || front === 'w';
+  const W = turned ? d : w, D = turned ? w : d;
+  const common = { W, D, t, fh, floors, balcony: b(params.balcony, false), porch: n(params.porch, 0), density: n(params.windows, 0.6) };
+  const usePlan = !!params.plan && typeof params.plan === 'object' && Array.isArray((params.plan as { floors?: unknown }).floors);
+  const plan = usePlan ? explicitPlan(params.plan, { ...common, W: w, D: d }) : autoPlan({ ...common, style }, args);
+  const L = realize(plan);
+  const roof = s(params.roof, 'gable');
+  const out: BuildingLayout = { ...L, yaw: usePlan ? 0 : FRONT_YAW[front] ?? 0, front: usePlan ? 's' : front, style: usePlan ? 'plan' : style, roof, roofPitch: n(params.roofPitch, 32), roofRise: roofRise(roof, n(params.roofPitch, 32), L.W, L.D, !!L.round), material: s(params.material, 'plaster'), checks: architectureChecks(L), params, args };
+  if (layoutCache.size > 256) layoutCache.clear();
+  layoutCache.set(key, out);
+  return out;
+}
+
+export function buildingPhysics(params: Record<string, unknown>, args: Record<string, unknown> = {}): Baked {
+  const L = buildingLayout(params, args);
+  const c = Math.cos(L.yaw), sn = Math.sin(L.yaw);
+  const R = (p: Vec2): Vec2 => [p[0] * c + p[1] * sn, -p[0] * sn + p[1] * c];
+  const Rp = (poly: Vec2[]) => poly.map(R);
+  const side = (canon: string | undefined) => { if (!canon) return undefined; const nrm: Vec2 = canon === 's' ? [0, 1] : canon === 'n' ? [0, -1] : canon === 'e' ? [1, 0] : [-1, 0]; const [x, z] = R(nrm); return Math.abs(z) >= Math.abs(x) ? (z > 0 ? 's' : 'n') : x > 0 ? 'e' : 'w'; };
+  const r2 = (v: number) => Math.round(v * 1000) / 1000;
+  const rr = (p: Vec2): Vec2 => [r2(p[0]), r2(p[1])];
+  const fy = (k: number) => k * L.fh + FLOOR0;
+
+  // ---- colliders: wall segments split at openings (sill and lintel pieces kept), stairs, rails, posts
+  const colliders: LocalOBB[] = [];
+  L.walls.forEach((w, wi) => {
+    const tag = w.exterior ? `wall:f${w.floor}:${side(w.side) ?? w.id}` : `wall:f${w.floor}:${[w.neg, w.pos].sort().join('|')}`;
+    const ops = L.openings.filter((o) => o.wall === wi);
+    const gaps = ops.map((o) => ({ from: o.s - o.width / 2, to: o.s + o.width / 2 }));
+    const path: Vec2[] = [R(w.a), R(w.b)];
+    colliders.push(...segmentColliders(path, w.thick, w.y0, w.y1, gaps, tag));
+    const ux = path[1][0] - path[0][0], uz = path[1][1] - path[0][1], len = Math.hypot(ux, uz) || 1, yaw = Math.atan2(-uz / len, ux / len);
+    for (const o of ops) {
+      const cxz = R(o.at), base = fy(o.floor), half: Vec2 = [o.width / 2, w.thick / 2];
+      if (o.sill > 0.05) colliders.push({ c: cxz, half, yaw, y0: w.y0, y1: base + o.sill, tag });
+      if (base + o.sill + o.height < w.y1 - 0.05) colliders.push({ c: cxz, half, yaw, y0: base + o.sill + o.height, y1: w.y1, tag });
+    }
+  });
+  for (const st of L.stairs) {
+    if (st.rect) {
+      const [x0, z0, x1, z1] = st.rect, cc = R([(x0 + x1) / 2, (z0 + z1) / 2]);
+      colliders.push({ c: cc, half: [(x1 - x0) / 2, (z1 - z0) / 2], yaw: L.yaw, y0: st.y0 - FLOOR0, y1: st.y1 - 0.05, tag: `stairs:${st.id}` });
+    } else if (st.c && st.r !== undefined) {
+      const segs = 8;
+      for (let i = 0; i < segs; i++) {
+        const a0 = st.a0! + (st.sweep! * i) / segs, a1 = st.a0! + (st.sweep! * (i + 1)) / segs, am = (a0 + a1) / 2;
+        const chord = 2 * st.r * Math.sin((a1 - a0) / 2) + 0.1;
+        const h0 = st.y0 + ((st.y1 - st.y0) * i) / segs, h1 = st.y0 + ((st.y1 - st.y0) * (i + 1)) / segs;
+        colliders.push({ c: R([st.c[0] + st.r * Math.sin(am), st.c[1] + st.r * Math.cos(am)]), half: [chord / 2, st.width / 2], yaw: am + L.yaw, y0: Math.max(st.y0 - FLOOR0, h0 - 0.35), y1: h1, tag: `stairs:${st.id}` });
+      }
+    }
+  }
+  for (const rl of L.rails) colliders.push(...segmentColliders([R(rl.a), R(rl.b)], 0.06, rl.y0, rl.y1, [], 'rail'));
+  for (const p of L.posts) colliders.push({ c: R(p.c), half: [p.r, p.r], yaw: L.yaw, y0: p.y0, y1: p.y1, tag: 'post' });
+
+  // ---- surfaces (walkable floors), rooms, openings, links
+  const surfaces: Surface[] = [];
+  for (const lv of L.levels) for (const q of lv.polys) surfaces.push({ level: lv.floor, y: r2(lv.y), polygon: Rp(q.poly).map(rr), tag: q.room });
+  if (L.porch) surfaces.push({ level: 0, y: r2(L.porch.y), polygon: Rp(L.porch.poly).map(rr), tag: 'porch', material: 'wood' });
+  if (L.balcony) for (const q of L.balcony.polys) surfaces.push({ level: L.balcony.floor, y: r2(L.balcony.y), polygon: Rp(q).map(rr), tag: 'balcony' });
+  const roofY = L.wallTop + 0.02;
+  const flatRoof = L.roof === 'flat' && !L.open;
+  if (flatRoof) surfaces.push({ level: L.floors, y: r2(roofY), polygon: Rp(outline(L)).map(rr), tag: 'roof' });
+  const rooms: Room[] = L.rooms.map((r) => ({ id: r.id, name: r.name, floor: r.floor, y: r2(r.y), polygon: Rp(r.poly).map(rr), origin: rr(R(r.centre)), yaw: 0, height: r2(r.height) }));
+  const openings: Opening[] = L.openings.map((o) => {
+    const wall = o.wall >= 0 ? L.walls[o.wall] : undefined;
+    const outN: Vec2 = wall?.out ?? (wall ? normalOf(wall) : (Math.abs(o.at[1]) >= Math.abs(o.at[0]) ? [0, Math.sign(o.at[1]) || 1] : [Math.sign(o.at[0]), 0]));
+    const heading = Math.atan2(outN[0], outN[1]) + L.yaw;
+    return { id: o.id, kind: o.kind, ...(o.wall >= 0 ? { wall: o.wall } : {}), at: rr(R(o.at)), yaw: r2(heading), width: r2(o.width), height: r2(o.height), ...(o.sill ? { sill: r2(o.sill) } : {}), level: o.floor, ...(o.kind !== 'window' ? { state: o.kind === 'arch' ? 'always' as const : 'open' as const } : {}) };
+  });
+  const links: Link[] = L.stairs.map((st) => ({ id: st.id, kind: 'stairs', from: st.from, to: st.to, path: st.path.map(R).map(rr), width: r2(st.width), y0: r2(st.y0), y1: r2(st.y1) }));
+
+  // ---- slots: rooms, floors, front stand, porch/balcony/roof, wall hang points
+  const slots: Slot[] = [];
+  for (const r of rooms) {
+    const poly = r.polygon.map(([x, z]) => [r2(x - r.origin[0]), r2(z - r.origin[1])] as Vec2);
+    slots.push({ id: r.id, kind: 'room', p: [r.origin[0], r.y, r.origin[1]], yaw: 0, floor: r.floor, polygon: poly, height: r.height, accepts: {}, capacity: 64, label: r.name });
+  }
+  for (let k = 0; k < L.floors; k++) slots.push({ id: k === 0 ? 'ground' : `floor-${k}`, kind: 'floor', p: [0, r2(fy(k)), 0], yaw: 0, floor: k, polygon: Rp(outline(L)).map(rr), accepts: {}, capacity: 256, label: k === 0 ? 'Ground floor' : `Floor ${k}` });
+  const door = L.openings.find((o) => o.id === 'front-door') ?? L.openings.find((o) => o.exterior && o.kind !== 'window');
+  if (door) {
+    const wall = door.wall >= 0 ? L.walls[door.wall] : undefined, outN: Vec2 = wall?.out ?? [0, 1];
+    const away = (L.porch && wall?.side === 's' ? L.porch.depth : 0) + 1.2;
+    const at = R([door.at[0] + outN[0] * away, door.at[1] + outN[1] * away]);
+    slots.push({ id: 'front', kind: 'stand', p: [r2(at[0]), 0, r2(at[1])], yaw: r2(Math.atan2(-outN[0], -outN[1]) + L.yaw), accepts: {}, capacity: 8, label: 'Outside the front door' });
+  }
+  if (L.porch) { const pc = R([0, L.D / 2 + L.porch.depth / 2]); slots.push({ id: 'porch', kind: 'floor', p: [r2(pc[0]), r2(L.porch.y), r2(pc[1])], yaw: 0, floor: 0, accepts: {}, capacity: 16, label: 'Porch' }); }
+  if (L.balcony) { const bc = L.balcony.rect ? R([(L.balcony.rect[0] + L.balcony.rect[2]) / 2, (L.balcony.rect[1] + L.balcony.rect[3]) / 2]) : R([0, (L.balcony.r0! + L.balcony.r1!) / 2]); slots.push({ id: 'balcony', kind: 'floor', p: [r2(bc[0]), r2(L.balcony.y), r2(bc[1])], yaw: 0, floor: L.balcony.floor, accepts: {}, capacity: 8, label: 'Balcony' }); }
+  if (flatRoof) slots.push({ id: 'roof', kind: 'roof', p: [0, r2(roofY), 0], yaw: 0, floor: L.floors, polygon: Rp(outline(L)).map(rr), accepts: {}, capacity: 64, label: 'Roof terrace' });
+  // hang points: outside faces of the ground-floor walls, clear of openings (`wall-<side>-<i>`)
+  const counts: Record<string, number> = {};
+  L.walls.forEach((w, wi) => {
+    if (!w.exterior || w.floor !== 0 || !w.out) return;
+    const total = Math.hypot(w.b[0] - w.a[0], w.b[1] - w.a[1]);
+    const ops = L.openings.filter((o) => o.wall === wi);
+    for (const f of [0.5, 0.25, 0.75]) {
+      const sc = total * f; if (ops.some((o) => Math.abs(o.s - sc) < o.width / 2 + 0.45)) continue;
+      const sd = side(w.side) ?? 's'; counts[sd] = (counts[sd] ?? 0) + 1; if (counts[sd] > 3) break;
+      const pt: Vec2 = [w.a[0] + (w.b[0] - w.a[0]) * f + w.out[0] * (w.thick / 2 + 0.02), w.a[1] + (w.b[1] - w.a[1]) * f + w.out[1] * (w.thick / 2 + 0.02)];
+      const at = R(pt);
+      slots.push({ id: `wall-${sd}-${counts[sd]}`, kind: 'wall', p: [r2(at[0]), 1.7, r2(at[1])], yaw: r2(Math.atan2(w.out[0], w.out[1]) + L.yaw), accepts: { maxSize: [2.5, 2, 0.4] }, capacity: 1, label: `${sd} wall` });
+      break;
+    }
+  });
+
+  const H = L.wallTop + L.roofRise + (L.args.lantern ? 0.9 : 0);
+  const turned = !(Math.abs(Math.sin(L.yaw)) < 1e-6);
+  const porchExtra = L.porch ? 2 * L.porch.depth : 0, ringExtra = L.balcony?.ring ? Math.max(0, 2 * L.balcony.r1! - Math.max(L.W, L.D)) : 0;
+  const [bw, bd] = turned ? [L.D, L.W] : [L.W, L.D];
+  const box: [number, number, number] = [r2(bw + (turned ? porchExtra : 0) + ringExtra), r2(H), r2(bd + (turned ? 0 : porchExtra) + ringExtra)];
+  return { box, colliders, surfaces, openings, links, rooms, slots, tris: estimateTris(L), notes: L.checks.notes };
+}
+
+/** Outer outline of the footprint (canonical). */
+function outline(L: Layout): Vec2[] {
+  if (L.round) { const R = L.round.R + L.t / 2, k = L.round.sides; return Array.from({ length: k }, (_, i) => { const a = ((i + 0.5) * 2 * Math.PI) / k; return [R * Math.sin(a), R * Math.cos(a)] as Vec2; }); }
+  return rectPoly(-L.W / 2, -L.D / 2, L.W / 2, L.D / 2);
+}
+function normalOf(w: Layout['walls'][number]): Vec2 { const dx = w.b[0] - w.a[0], dz = w.b[1] - w.a[1], l = Math.hypot(dx, dz) || 1; return [dz / l, -dx / l]; }
+/** Triangle estimate matching the mesh half's budget (walls, openings with frames, floors, stairs, roof, details). */
+export function estimateTris(L: Layout): number {
+  const walls = L.walls.length * 24, ops = L.openings.length * 56, floors = L.levels.reduce((m, lv) => m + lv.polys.length * 12, 0) * 2;
+  const stairs = L.stairs.reduce((m, st) => m + st.risers * 12 + 48, 0), rails = L.rails.length * 24, posts = L.posts.length * 24;
+  return walls + ops + floors + stairs + rails + posts + 400 + (L.round ? 300 : 0);
+}
+
+export const buildingGen: Generator & { layout: typeof buildingLayout } = {
   id: 'building/1', form: 'point', owner: 'L2', params: buildingParams as never,
-  doc: 'A building with floors, rooms, doors, windows, stairs and a roof. Rooms are slots (`in: {parent, slot: "kitchen"}`). Style presets plan the rooms; `plan` overrides.',
-  physics({ params }) { return buildingPhysics(params); },
+  doc: 'A building with floors, rooms, doors, windows, stairs and a roof. Rooms are slots (`in: {parent, slot: "kitchen"}`); floors are slots `ground`, `floor-1`…; `front` is a stand slot outside the door. Style presets plan the rooms (cottage, townhouse, shop, hall, chapel, barn, shed, greenhouse, pavilion, tower); `plan` overrides. `describe` lists rooms, doors, stairs and the architecture checks.',
+  physics({ params, args }) { return buildingPhysics(params, args); },
+  layout: buildingLayout,
 };
 
+export { architectureChecks, SLAB };
 export const stairsGen: Generator = {
   id: 'stairs/1', form: 'point', owner: 'L2',
   doc: 'A straight flight of stairs from y=0 to `rise`, `run` long, `width` wide; a link between two levels.',

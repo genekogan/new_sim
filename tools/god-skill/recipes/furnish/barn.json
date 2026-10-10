@@ -1,0 +1,140 @@
+{
+ "schema": "furnish/1",
+ "style": "barn",
+ "rooms": {
+  "barn": [
+   {
+    "name": "workbench",
+    "def": [
+     "core/workbench@1",
+     "core/long-table@1",
+     "core/table@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0,
+      "s"
+     ],
+     [
+      0.9,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "bench",
+    "def": [
+     "core/bench-seat@1",
+     "core/bench@1"
+    ],
+    "try": [
+     [
+      0.9,
+      0.2,
+      "w"
+     ],
+     [
+      0.1,
+      0.3,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "table",
+    "def": [
+     "core/long-table@1",
+     "core/table@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.5,
+      "s"
+     ]
+    ]
+   }
+  ],
+  "loft": [
+   {
+    "name": "bed",
+    "def": [
+     "core/bunk@1",
+     "core/bed@1"
+    ],
+    "try": [
+     [
+      1,
+      0.5,
+      "w"
+     ],
+     [
+      0,
+      0.5,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "lamp",
+    "def": [
+     "core/floor-lamp@1"
+    ],
+    "try": [
+     [
+      0,
+      0,
+      "s"
+     ],
+     [
+      1,
+      0,
+      "s"
+     ],
+     [
+      0,
+      1,
+      "n"
+     ],
+     [
+      1,
+      1,
+      "n"
+     ]
+    ]
+   }
+  ]
+ },
+ "default": [
+  {
+   "name": "lamp",
+   "def": [
+    "core/floor-lamp@1"
+   ],
+   "try": [
+    [
+     0,
+     0,
+     "s"
+    ],
+    [
+     1,
+     0,
+     "s"
+    ],
+    [
+     0,
+     1,
+     "n"
+    ],
+    [
+     1,
+     1,
+     "n"
+    ]
+   ]
+  }
+ ]
+}
