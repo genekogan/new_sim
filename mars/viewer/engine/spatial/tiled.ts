@@ -13,10 +13,10 @@
 //    a *window* that always covers every body and every active route; it only grows.
 //    Each hop is planned with the existing planner (findRoute) on a composite of
 //    just that hop's tiles, so a route never depends on how far the window has grown.
-import { obbCorners, type Vec2 } from '../core/math.ts';
+import { datan2, hypot, obbCorners, pointInObb, type Vec2 } from '../core/math.ts';
 import { BODY_HEIGHT, STEP, buildGrids, edt, latticeCentre, latticeOf, rasterObb, type GridSet, type LevelGrid } from './grid.ts';
 import { findRoute, type Leg, type Place, type RouteOpts, type RouteResult, type WalkLeg } from './path.ts';
-import type { AgentProfile, Obstacle, SpatialScene } from './types.ts';
+import type { AgentProfile, Obstacle, SpatialScene, Surface } from './types.ts';
 import { GROUND_TILE_M, G_OUTSIDE, G_STEEP, G_SWIM, G_WADE, G_WALK, MEDIUM_NAMES, coarseMedium, type GroundField } from './ground.ts';
 
 /** Apron (m) around each fine tile: clearance is exact up to this distance across tile seams. */
@@ -82,6 +82,53 @@ export class GroundNav {
     this.per = Math.round(GROUND_TILE_M / cell);
     if (Math.abs(this.per * cell - GROUND_TILE_M) > 1e-9) throw new Error('ground: the cell must divide the 64 m tile');
     this.apron = Math.round(FINE_APRON_M / cell);
+  }
+
+  /** Level-0 floors laid over the ground (a house's ground-floor slab, a deck at grade), bucketed by 8 m cell. */
+  private floors = new Map<string, Surface[]>();
+  /** Floor slabs at most this far above the ground there raise the standing height to the slab (m). */
+  static FLOOR_RISE = 0.5;
+  setFloors(surfaces: Surface[]) {
+    this.floors.clear();
+    for (const s of surfaces) {
+      let ax = Infinity, az = Infinity, bx = -Infinity, bz = -Infinity;
+      for (const [x, z] of obbCorners(s.obb)) { if (x < ax) ax = x; if (x > bx) bx = x; if (z < az) az = z; if (z > bz) bz = z; }
+      for (let j = Math.floor(az / 8); j <= Math.floor(bz / 8); j++) for (let i = Math.floor(ax / 8); i <= Math.floor(bx / 8); i++) {
+        const k = `${i},${j}`, l = this.floors.get(k); if (l) l.push(s); else this.floors.set(k, [s]);
+      }
+    }
+  }
+  /** Large solids (both half-extents ≥ 1.25 m, in the body band above the ground) as coarse 1 m blockers, bucketed by 8 m cell. */
+  private solids = new Map<string, Obstacle[]>();
+  static SOLID_MIN_HALF = 1.25;
+  setSolids(obstacles: Obstacle[]) {
+    this.solids.clear();
+    for (const o of obstacles) {
+      if (Math.min(o.obb.half[0], o.obb.half[1]) < GroundNav.SOLID_MIN_HALF) continue;
+      const h = this.field.height(o.obb.c[0], o.obb.c[1]);
+      if (o.y1 <= h + STEP || o.y0 >= h + BODY_HEIGHT) continue;
+      let ax = Infinity, az = Infinity, bx = -Infinity, bz = -Infinity;
+      for (const [x, z] of obbCorners(o.obb)) { if (x < ax) ax = x; if (x > bx) bx = x; if (z < az) az = z; if (z > bz) bz = z; }
+      for (let j = Math.floor(az / 8); j <= Math.floor(bz / 8); j++) for (let i = Math.floor(ax / 8); i <= Math.floor(bx / 8); i++) {
+        const k = `${i},${j}`, l = this.solids.get(k); if (l) l.push(o); else this.solids.set(k, [o]);
+      }
+    }
+  }
+  /** Whether the 1 m cell centred at (x, z) lies well inside a large solid (0.75 m in from its edge). */
+  coarseSolid(x: number, z: number): boolean {
+    if (!this.solids.size) return false;
+    const l = this.solids.get(`${Math.floor(x / 8)},${Math.floor(z / 8)}`);
+    if (l) for (const o of l) if (pointInObb([x, z], { c: o.obb.c, half: [o.obb.half[0] - 0.75, o.obb.half[1] - 0.75], yaw: o.obb.yaw })) return true;
+    return false;
+  }
+
+  /** Where a body's feet are on level 0 at (x, z): the ground, or a floor slab laid on it (within FLOOR_RISE above). */
+  standY(x: number, z: number): number {
+    let h = this.field.height(x, z);
+    if (!this.floors.size) return h;
+    const l = this.floors.get(`${Math.floor(x / 8)},${Math.floor(z / 8)}`);
+    if (l) { const g = h; for (const s of l) if (s.y > h && s.y >= g - 0.05 && s.y <= g + GroundNav.FLOOR_RISE && pointInObb([x, z], s.obb)) h = s.y; }
+    return h;
   }
 
   /** Grow the window to cover `r`: 'same' | 'grown' | 'too-big' (then nothing changes). */
@@ -227,7 +274,7 @@ export class GroundNav {
     const s = idx(from[0], from[1]), g = idx(to[0], to[1]);
     if (s < 0 || g < 0 || s >= W * H || g >= W * H) return null;
     const med = new Uint8Array(W * H).fill(255);
-    const m = (k: number) => { let v = med[k]; if (v === 255) { v = med[k] = coarseMedium(this.field, bx0 + (k % W) + 0.5, bz0 + Math.floor(k / W) + 0.5); } return v; };
+    const m = (k: number) => { let v = med[k]; if (v === 255) { const x = bx0 + (k % W) + 0.5, z = bz0 + Math.floor(k / W) + 0.5; v = med[k] = this.coarseSolid(x, z) ? G_SOLID : coarseMedium(this.field, x, z); } return v; };
     const gs = new Float64Array(W * H).fill(Infinity), came = new Int32Array(W * H).fill(-1), shut = new Uint8Array(W * H);
     const gxC = g % W, gzC = Math.floor(g / W);
     const h = (k: number) => { const dx = Math.abs((k % W) - gxC), dz = Math.abs(Math.floor(k / W) - gzC); return Math.max(dx, dz) + (Math.SQRT2 - 1) * Math.min(dx, dz); };
@@ -290,12 +337,14 @@ class MinHeap {
 
 // ---------------------------------------------------------------- hierarchical route
 
-/** Costs per medium for walking (walk, wade, swim, steep, outside). Dry ground is preferred to the shallows. */
-export const WALK_COST = [1, 2, Infinity, Infinity, Infinity] as const;
+/** Coarse code of a 1 m cell inside a large solid (coarse routing only; never in a media tile). */
+export const G_SOLID = 5;
+/** Costs per medium for walking (walk, wade, swim, steep, outside, solid). Dry ground is preferred to the shallows. */
+export const WALK_COST = [1, 2, Infinity, Infinity, Infinity, Infinity] as const;
 /** Costs for explaining a refused walk: what is the cheapest thing in the way. */
-const EXPLAIN_COST = [1, 2, 8, 60, Infinity] as const;
+const EXPLAIN_COST = [1, 2, 8, 60, Infinity, Infinity] as const;
 /** Costs for swimming: water first, the shallows and a little dry ground to step in and out. */
-export const SWIM_COST = [3, 1.5, 1, Infinity, Infinity] as const;
+export const SWIM_COST = [3, 1.5, 1, Infinity, Infinity, Infinity] as const;
 
 const fmt = (p: Vec2) => `${p[0].toFixed(1)}, ${p[1].toFixed(1)}`;
 const failR = (code: string, message: string, at?: Place): RouteResult => ({ ok: false, diagnostic: { code, message, subjects: [], ...(at ? { at: [at.p[0], 0, at.p[1]] as [number, number, number] } : {}) } });
@@ -308,7 +357,7 @@ export function groundGoalIssue(f: GroundField, p: Vec2, place = 'destination'):
   if (m === G_STEEP) return failR('ground.steep', `the ${place} (${fmt(p)}) is on ground steeper than ${slopeDeg(f.maxSlope)}° (a cliff); no footing there`);
   return null;
 }
-const slopeDeg = (s: number) => Math.round((Math.atan(s) * 180) / Math.PI);
+const slopeDeg = (s: number) => Math.round((datan2(s, 1) * 180) / Math.PI);
 
 /** The hierarchical walk planner for ground worlds. `include` grows the engine window (false: too big). */
 export function groundRoute(nav: GroundNav, scene: SpatialScene, profile: AgentProfile, start: Place, goal: Place, opts: RouteOpts, include: (r: TileRect) => boolean, windowGrids: () => GridSet): RouteResult {
@@ -335,7 +384,7 @@ export function groundRoute(nav: GroundNav, scene: SpatialScene, profile: AgentP
   const hops: { to: Vec2; via: Vec2[] }[] = [];
   let acc = 0, via: Vec2[] = [];
   for (let k = 1; k < path.length; k++) {
-    acc += Math.hypot(path[k][0] - path[k - 1][0], path[k][1] - path[k - 1][1]); via.push(path[k]);
+    acc += hypot(path[k][0] - path[k - 1][0], path[k][1] - path[k - 1][1]); via.push(path[k]);
     if (acc >= HOP_M && k < path.length - 4) { hops.push({ to: path[k], via }); acc = 0; via = []; }
   }
   hops.push({ to: goal.p, via });

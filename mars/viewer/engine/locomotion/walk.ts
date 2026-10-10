@@ -842,8 +842,8 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     }
   }
   // ground worlds (spatial/ground.ts): level 0 is the terrain, so the body stands at the tiles' height and wades in shallows
-  const gf = g.level === 0 ? sp.ground?.field : undefined;
-  a.pose.p = [p[0], gf ? gf.height(p[0], p[1]) : g.y, p[1]];
+  const gn = g.level === 0 ? sp.ground : undefined, gf = gn?.field;
+  a.pose.p = [p[0], gn ? gn.standY(p[0], p[1]) : g.y, p[1]];
   // animation signal: 'walk' only while the body actually covers ground (the renderer's Walk clip);
   // a stopped walker waits (named reason) or stands idle — it never walks on the spot
   const gs = dist2(cur, p) / dt;

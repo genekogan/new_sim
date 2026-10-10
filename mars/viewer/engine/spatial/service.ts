@@ -281,6 +281,10 @@ export class Spatial {
       if (r.links) links.push(...r.links);
     }
     this.scene = { bounds: g.bounds(), levels, surfaces, obstacles, links };
+    // level-0 floors laid on the ground (not the source scene's own flat field): they raise the standing height
+    const own = new Set((this.source?.scene ?? this.base).surfaces.map((x) => x.id));
+    g.setFloors(surfaces.filter((x) => x.level === 0 && !own.has(x.id)));
+    g.setSolids(obstacles);
     const grids = () => g.grids(this.scene);
     this.grids = this.prof ? this.prof.time('spatial.sync.grids', grids) : grids();
     if (this.planner === 'corridor') prepareCorridor(this.grids);

@@ -135,3 +135,23 @@ test('a world without the ground fact keeps flat level-0 behaviour (no ground mo
   assert.ok(r.ys.every((s) => s.y === 0));
   assert.ok(!e.describeVerbs().some((v) => v.verb === 'mars:swim_to'));
 });
+
+test('tiled ground Spatial: a large solid is routed round (coarse + fine agree), a floor slab raises the standing height, tiles are cached', async () => {
+  const { Spatial } = await import('../../../mars/viewer/engine/spatial/service.ts');
+  const { GREEN_FIELD_SCENE, greenFieldWorld } = await import('../../../mars/viewer/engine/scenarios/greenfield.ts');
+  const { HUMAN_PROFILE } = await import('../../../mars/viewer/engine/spatial/types.ts');
+  const wall = { id: 'big-block', obb: { c: [0, 0] as [number, number], half: [12, 3] as [number, number], yaw: 0 }, y0: -1, y1: 4, kind: 'solid' as const };
+  const slab = { id: 'deck', level: 0, y: 0.3, obb: { c: [20, 20] as [number, number], half: [3, 3] as [number, number], yaw: 0 } };
+  const sp = new Spatial({ ...GREEN_FIELD_SCENE, obstacles: [wall], surfaces: [...GREEN_FIELD_SCENE.surfaces, slab] }, { source: { scene: GREEN_FIELD_SCENE, id: 'green-field' } });
+  const w = greenFieldWorld('tiles') as never;
+  sp.setGround(field, w, [[0, 0]]);
+  const r = sp.route(w, HUMAN_PROFILE, { level: 0, p: [0, -8] }, { level: 0, p: [0, 8] });
+  assert.ok(r.ok, JSON.stringify(!r.ok && r.diagnostic));
+  assert.ok(r.ok && r.route.length > 24, 'goes round the 24 m block');
+  assert.equal(sp.ground!.coarseSolid(0, 0), true);
+  assert.ok(Math.abs(sp.ground!.standY(20, 20) - 0.3) < 1e-9, 'on the deck');
+  assert.equal(sp.ground!.standY(30, 30), field.height(30, 30), 'off the deck: the ground');
+  const builds = sp.ground!.stats.fineBuilds;
+  sp.route(w, HUMAN_PROFILE, { level: 0, p: [0, -8] }, { level: 0, p: [5, 9] });
+  assert.equal(sp.ground!.stats.fineBuilds, builds, 'no tile rebuilt for a second route');
+});

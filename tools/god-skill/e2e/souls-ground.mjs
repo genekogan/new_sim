@@ -12,6 +12,7 @@ import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { chromeLease } from '../lib/chrome-lease.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../../..');
@@ -85,20 +86,30 @@ async function soulDoes(capability, { maxS = 240 } = {}) {
 const near = (p, q, d) => Math.hypot(p[0] - q[0], p[2] - q[1]) <= d;
 
 // ---------- screenshots (Chrome via the viewer's Playwright)
-let chromium = null, browser = null, page = null;
+let chromium = null;
 if (!args['no-shots']) try { chromium = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test').chromium; } catch { log('  (no @playwright/test; screenshots skipped)'); }
-async function shot(name, { eye, at, wait = 6000 } = {}) {
-  if (!chromium) return;
+async function shot(name, opts = {}) { for (let attempt = 1; attempt <= 2; attempt++) if (await shotOnce(name, opts)) return; }
+async function shotOnce(name, { eye, at, wait = 4000 } = {}) {
+  if (!chromium) return true;
+  const release = await chromeLease('ground').catch(() => null);
+  if (!release) { log('  (chrome lease busy; screenshot skipped)'); return true; }
+  let browser = null;
   try {
-    if (!browser) { browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] }); const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } }); await ctx.addInitScript(() => { localStorage.setItem('sim.dev', 'admin'); }); page = await ctx.newPage(); }
-    const q = new URLSearchParams({ dev: '1' }); if (eye) q.set('eye', eye.join(',')); if (at) q.set('at', at.join(','));
-    if (!page.url().startsWith(base)) { await page.goto(`${base}?${q}`, { waitUntil: 'domcontentloaded' }); await page.waitForTimeout(Math.max(wait, 25000)); }
-    else { await page.evaluate(([e, a]) => { const w = window.__simEntity; if (!w) return; w.controls.target.set(a[0], a[1], a[2]); w.camera.position.set(e[0], e[1], e[2]); w.camera.lookAt(w.controls.target); }, [eye, at]); await page.waitForTimeout(wait); }
+    browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    await ctx.addInitScript(() => { localStorage.setItem('sim.dev', 'admin'); });
+    const page = await ctx.newPage();
+    const q = new URLSearchParams({ dev: '1', shot: '1', settle: String(wait) }); if (eye) q.set('eye', eye.map((v) => v.toFixed(2)).join(',')); if (at) q.set('at', at.map((v) => v.toFixed(2)).join(','));
+    await page.goto(`${base}?${q}`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+    await page.waitForFunction(() => window.__shotReady === true, null, { timeout: 150_000 }).catch(() => log('  (shot not ready in 150 s; taking it anyway)'));
+    await page.waitForTimeout(1500);
     const file = resolve(out, `${name}.png`);
-    await page.screenshot({ path: file });
-    report.shots.push({ name, file });
+    await page.screenshot({ path: file, timeout: 120_000 });
+    report.shots.push({ name, file, title: await page.title() });
     log(`  📷 ${name}.png`);
-  } catch (e) { log('  (screenshot failed: ' + String(e.message).split('\n')[0] + ')'); }
+    return true;
+  } catch (e) { log('  (screenshot failed: ' + String(e.message).split('\n')[0] + ')'); return false; }
+  finally { if (browser) await browser.close().catch(() => { }); release(); }
 }
 
 // ================================================================ the scenario
@@ -200,7 +211,6 @@ try {
   report.failures.push({ name: 'harness', error: String(e?.stack ?? e) });
   log('harness error', e);
 } finally {
-  if (browser) await browser.close().catch(() => { });
   report.summary = { steps: report.steps.length, failed: report.failures.length, bootMs: +bootMs.toFixed(0), faults: (serverLog.match(/engine fault|violat/g) ?? []).length };
   writeFileSync(resolve(out, 'report.json'), JSON.stringify(report, null, 2));
   writeFileSync(resolve(out, 'server.log'), serverLog);

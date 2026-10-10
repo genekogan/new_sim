@@ -122,13 +122,13 @@ export function standHeight(f: GroundField, x: number, z: number): number { retu
  * every person on level 0 who is not seated, lying, aboard or climbing takes the new height. Returns their ids.
  */
 export function settleBodies(rt: Rt): string[] {
-  const f = (rt.services.spatial as Spatial).ground?.field; if (!f) return [];
+  const nav = (rt.services.spatial as Spatial).ground, f = nav?.field; if (!nav || !f) return [];
   const moved: string[] = [];
   for (const id of Object.keys(rt.world.entities).sort()) {
     const e = rt.world.entities[id];
     if (e.kind !== 'human' || !e.human || (e.human.level ?? 0) !== 0 || e.human.on || e.human.carrier || e.human.riding || e.human.sleepPose) continue;
     if (e.human.activity.startsWith('sit') || e.human.activity.startsWith('climb') || e.human.activity.startsWith('stand-up')) continue;
-    const y = standHeight(f, e.pose.p[0], e.pose.p[2]);
+    const y = f.medium(e.pose.p[0], e.pose.p[2]) === G_SWIM ? swimRootY(f, e.pose.p[0], e.pose.p[2]) : nav.standY(e.pose.p[0], e.pose.p[2]);
     if (y !== e.pose.p[1]) { e.pose.p = [e.pose.p[0], y, e.pose.p[2]]; acknowledgeRelocation(rt as never, id); moved.push(id); }
   }
   return moved;
