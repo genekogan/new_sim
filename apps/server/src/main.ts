@@ -105,7 +105,7 @@ const takes=new TakeArchive(db,host.worldId,config.archiveTakes?r2Store(config):
 const edge = config.mindDriver === 'edge' ? new EdgeLedger(host, db, process.env.PLACE_DATA ? JSON.parse(readFileSync(process.env.PLACE_DATA, 'utf8')) : undefined) : undefined;
 if (edge && host.engine.configureRuntimePolicy && host.enableQuietStallReleaseV1) void host.enableQuietStallReleaseV1().then(async () => { await host.enableYieldTimeoutV1?.(); await host.enableSpreadV2?.(); });
 // God mode + entity world (spec eden4/28): the owner's edge agent builds the world; viewers get diffs over the hub.
-const god = config.worldEngine ? new GodMode(db, { worldId: host.worldId, ownerId: config.ownerId || null, tick: () => host.engine.world.tick, emit: (m) => hub.broadcast(m as never) }) : undefined;
+const god = config.worldEngine ? new GodMode(db, { worldId: host.worldId, ownerId: process.env.WORLD_OWNER_ID || null /* explicit only: on a fresh world the first person to claim it becomes its god */, tick: () => host.engine.world.tick, emit: (m) => hub.broadcast(m as never) }) : undefined;
 if (god) console.log(`[god] entity world ready: ${god.model.entities.size} entities, ${new Set(god.model.defs.values()).size} defs, owner ${god.owner ?? '(unclaimed)'}`);
 const app = buildApp({ cfg: config, db, host, auth, hub, brain, souls, takes, intentV2, edge, god });
 const listener = getRequestListener(app.fetch);

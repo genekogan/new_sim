@@ -15,7 +15,7 @@ function fixture(dbFile = ':memory:') {
   const app = new Hono();
   const users: Record<string, { id: string; role: 'user' | 'admin' }> = { 'dev:gene': { id: 'dev:gene', role: 'user' }, 'dev:other': { id: 'dev:other', role: 'user' } };
   mountGodRoutes(app, {
-    god,
+    god, worldName: 'Hello',
     requireUser: async (c: Context) => { const t = c.req.header('authorization')?.replace(/^Bearer\s+/i, ''); const u = t ? users[t] : undefined; if (!u) throw new ApiError(401, 'unauthorized', 'sign in'); return { ...u, email: null, wallet: null, created_at: 0, last_seen: 0, invited_by: null }; },
     soulFromBearer: (c) => (c.req.header('authorization') === 'Bearer sim_s1_x' ? { id: 's_1', name: 'Ada' } : null),
     baseOf: () => 'http://localhost:4990/w/hello',

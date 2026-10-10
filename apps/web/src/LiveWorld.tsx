@@ -55,6 +55,7 @@ import { decodeSceneCapturePublication } from '@sim/protocol/scene-capture';
 import { WorldSceneHistory } from './WorldSceneHistory.ts';
 import { apiPath } from './world-path.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
+import { GodPanel } from './GodPanel.tsx';
 import {WorldEdgeItems} from './WorldEdgeItems.ts';
 import { WorldNavigation, createWorldOrbitControls, type ManualNavigation, type CameraMove } from './WorldNavigation.ts';
 import {WorldPlaceCamera} from './WorldPlaceCamera.ts';
@@ -985,10 +986,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   const cards = cardsAt(sim.plays, s.tick);
   return (
     <section className="wide world-viewer" data-world-viewer="1" style={embedded ? { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' } : { position: 'relative' }}>
-      {entityWorld && typeof localStorage !== 'undefined' && localStorage.getItem('sim.dev') && (
-        <button data-flag-button="1" title={flagMode ? 'Click the ground to drop a flag (Esc to cancel)' : 'Drop a labelled flag: a reference point for building (or Alt+click the ground)'} aria-pressed={flagMode} onClick={() => setFlagMode((v) => !v)}
-          style={{ position: 'absolute', right: 12, bottom: 12, zIndex: 5, padding: '6px 10px', borderRadius: 999, border: '1px solid rgba(0,0,0,.2)', background: flagMode ? '#e8c547' : 'rgba(255,255,255,.85)', cursor: 'pointer', fontSize: 13 }}>⚑ {flagMode ? 'click the ground…' : 'flag'}</button>
-      )}
+      {entityWorld && <GodPanel flagMode={flagMode} onFlagMode={setFlagMode} />}
       {!hideControls && <div className="row">
         <h2 style={{ margin: 0 }}>World</h2>
         {mode === 'live' && !status ? <span className="ok"><b>● Live</b></span> : null}

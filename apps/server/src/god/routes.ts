@@ -7,9 +7,13 @@ import { TILE_N } from '@sim/ground';
 import { ApiError } from '../souls.ts';
 import type { UserRow } from '../db.ts';
 import type { GodMode } from './god.ts';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 
 export type GodDeps = {
   god: GodMode;
+  /** Human world name for the welcome text. */
+  worldName: string;
   requireUser: (c: Context) => Promise<UserRow>;
   /** Resolve a Soul from a bearer token for `pray`; null when the token is not a Soul's. */
   soulFromBearer: (c: Context) => { id: string; name: string } | null;
@@ -41,6 +45,21 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
     return c.body(new Uint8Array(t.buffer, t.byteOffset, t.byteLength) as never, 200, { 'content-type': 'application/octet-stream', 'x-tile-n': String(TILE_N), etag: `"${hash}"`, 'cache-control': 'public, max-age=60' });
   });
   app.get('/v1/world/entities/:id{.+}', (c) => { const e = d.god.model.get(c.req.param('id')); if (!e) throw new ApiError(404, 'not-found', 'no such entity'); return c.json({ entity: e, path: d.god.model.pathOf(e.id), pose: d.god.model.worldPose(e) }, 200, noStore); });
+
+  // ---- onboarding: who am I here, the welcome text, the skill and CLI files
+  const skillDir = resolve(new URL('../../../../tools/god-skill/', import.meta.url).pathname);
+  const serveFile = (name: string, type: string) => (c: Context) => { try { return c.body(readFileSync(resolve(skillDir, name), 'utf8'), 200, { 'content-type': type, 'cache-control': 'no-cache' }); } catch { throw new ApiError(404, 'not-found', `${name} is not available on this server`); } };
+  app.get('/god/SKILL.md', serveFile('SKILL.md', 'text/markdown; charset=utf-8'));
+  app.get('/god/skill.md', serveFile('SKILL.md', 'text/markdown; charset=utf-8'));
+  app.get('/god/eden-god.mjs', serveFile('eden-god.mjs', 'text/javascript; charset=utf-8'));
+  app.get('/v1/god/status', async (c) => {
+    let user: UserRow | null = null; try { user = await d.requireUser(c); } catch { /* visitor */ }
+    const god = d.god.godFromToken(bearer(c));
+    const you = god ? 'god' : user && d.god.owner === user.id ? 'owner' : user && !d.god.owner ? 'claimant' : user ? 'visitor' : 'anonymous';
+    return c.json({ worldId: d.god.opts.worldId, name: d.worldName, hasOwner: !!d.god.owner, you, pending: you === 'owner' || you === 'god' ? d.god.pendingPairings() : [], entities: d.god.model.entities.size, seq: d.god.model.editSeq, base: d.baseOf(c) }, 200, noStore);
+  });
+  app.get('/v1/god/welcome', async (c) => { const u = await d.requireUser(c); if (!d.god.canApprove(u)) throw new ApiError(403, 'forbidden', 'only this world\'s owner'); return c.text(d.god.welcome(d.baseOf(c), d.worldName), 200, { 'content-type': 'text/markdown; charset=utf-8', ...noStore }); });
+  app.get('/v1/god/pairings', async (c) => { const u = await d.requireUser(c); if (!d.god.canApprove(u)) throw new ApiError(403, 'forbidden', 'only this world\'s owner'); return c.json({ pending: d.god.pendingPairings() }, 200, noStore); });
 
   // ---- pairing (agent-initiated, approved by the world's owner in the browser)
   app.post('/v1/god/pair/start', async (c) => { d.limitIp(c, 'godpairstart', 6, 60_000); const b = await body(c).catch(() => ({})); return c.json({ ok: true, ...d.god.pairStart(typeof b?.agent === 'string' ? b.agent : undefined, d.baseOf(c)) }, 200, noStore); });

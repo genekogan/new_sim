@@ -86,6 +86,39 @@ export class GodMode {
     p.token = newGodToken(this.opts.worldId);
     this.store.addToken(hashToken(p.token), p.agent);
   }
+  /** Requests waiting for the owner's approval (shown on the world page). */
+  pendingPairings() { const now = Date.now(); return [...this.pairings.values()].filter((p) => !p.token && p.expires > now).map((p) => ({ code: p.code, agent: p.agent, expiresIn: Math.round((p.expires - now) / 1000) })); }
+  /** The authored onboarding text for this world's owner (served as markdown and shown on the page). */
+  welcome(base: string, worldName: string) {
+    return `# You are the god of ${worldName}
+
+Your agent (Claude Code, Codex, any always-on agent) builds this world through **god mode**:
+it reads the whole world as structure, proposes edits, and the world validates them against
+physics (support, no interpenetration, size, extent). Souls are mortal; they pray to you.
+
+## Pair your agent (once per folder)
+
+\`\`\`
+mkdir ${worldName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-god && cd $_
+curl -sO ${base}/god/eden-god.mjs && curl -sO ${base}/god/SKILL.md
+node eden-god.mjs register ${base}
+node eden-god.mjs pair        # prints a code; approve it on this page (or open the link it prints)
+\`\`\`
+
+Then open SKILL.md in that folder with your agent and talk: *"put mountains in the east and a lake
+in the west"*, *"a cottage on the knoll, door facing the lake"*, *"undo that"*.
+
+## Reference points
+
+Press **⚑ flag** on this page, click the ground, name it. Your agent refers to it as \`flag:<name>\`
+(\`place cottage --at flag:camp --offset 8,0\`). \`node eden-god.mjs flags\` lists them.
+
+## What the world keeps
+
+Every accepted edit is journaled with its inverse (undo/redo). The world runs while you are away.
+Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <text>\`.
+`;
+  }
   pairPoll(poll: string) {
     const p = [...this.pairings.values()].find((x) => x.poll === poll);
     if (!p || p.expires < Date.now()) throw new ApiError(404, 'pair-invalid', 'unknown or expired pairing; start again');
