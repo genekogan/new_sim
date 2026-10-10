@@ -140,3 +140,31 @@ test('a god edit that would bury a standing Soul lifts it clear, and says so', {
   assert.ok(E.clearanceAtV1(p[0], p[2]) >= 0.27, 'standing on clear ground');
   assert.deepEqual(E.runtime.violations, []);
 });
+
+test('L3 shapes in the engine: a garden wall makes Souls go round, a deck is walkable, a far road does not widen the raster', { timeout: 300000 }, async (t) => {
+  const w = await world();
+  w.brain.quiesce();
+  t.after(() => { w.brain.quiesce(); w.host.stop(); w.db.close(); });
+  await w.settle(2);
+  const before = runQuery(w.god.model, { reach: { from: [0, 0], to: [0, 12] } }).reach as any;
+  assert.equal(before.reachable, true, JSON.stringify(before));
+  const r: any = w.god.act({ ops: [
+    { op: 'place', def: coreRef('garden-wall'), name: 'wall', shape: { path: [[-12, 6], [12, 6]] }, params: { gates: 0 } },
+    { op: 'place', def: coreRef('deck'), name: 'deck', shape: { area: [[-4, -18], [4, -18], [4, -12], [-4, -12]] } },
+    { op: 'place', def: coreRef('road'), name: 'far-road', shape: { path: [[200, -100], [200, 100]] } },
+  ] });
+  if (!r.accepted) { t.diagnostic(JSON.stringify(r).slice(0, 600)); }
+  assert.equal(r.accepted, true);
+  await w.settle(3);
+  const E = w.host.engine as any, ep = E.world.entityPhysicsV1;
+  const wall = w.god.model.get('wall')!.id, deck = w.god.model.get('deck')!.id, road = w.god.model.get('far-road')!.id;
+  assert.ok(ep.byEntity[wall]?.solids?.length, 'wall solids');
+  assert.ok(ep.byEntity[deck]?.surfaces?.length, 'deck floor');
+  assert.equal(ep.byEntity[road], undefined, 'a road is ground cover, not engine physics');
+  assert.ok(!ep.bounds || ep.bounds.every((v: number) => Math.abs(v) <= 64), `raster bounded: ${ep.bounds}`);
+  const after = runQuery(w.god.model, { reach: { from: [0, 0], to: [0, 12] } }).reach as any;
+  assert.equal(after.reachable, true, JSON.stringify(after));
+  assert.ok(after.length > before.length + 8, `goes round the wall: ${before.length} → ${after.length}`);
+  const onDeck = runQuery(w.god.model, { reach: { from: [0, 0], to: 'deck' } }).reach as any;
+  assert.equal(onDeck.reachable, true, JSON.stringify(onDeck));
+});

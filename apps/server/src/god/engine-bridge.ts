@@ -137,7 +137,10 @@ export class EngineBridge {
     const def = this.model.resolvedDef(e.def); if (!def) return null;
     const baked = this.model.bake(def, e.params ?? {}, e.seed ?? 0, e.shape);
     const wp = this.model.worldPose(e);
-    const toWorld = (x: number, z: number): Vec2 => { const c = Math.cos(wp.yaw), s = Math.sin(wp.yaw); return [r3(wp.x + (x * c + z * s) * wp.s), r3(wp.z + (-x * s + z * c) * wp.s)]; };
+    // path/area forms at the root carry world-frame geometry (L3): heights ground-relative unless `abs`
+    const worldFrame = def.form !== 'point' && e.in.parent === 'world';
+    const toWorld = (x: number, z: number): Vec2 => { if (worldFrame) return [r3(x), r3(z)]; const c = Math.cos(wp.yaw), s = Math.sin(wp.yaw); return [r3(wp.x + (x * c + z * s) * wp.s), r3(wp.z + (-x * s + z * c) * wp.s)]; };
+    const heightAt = (y: number, at: Vec2, abs?: boolean) => r3(worldFrame ? (abs ? y : this.model.terrain.sample(at[0], at[1]) + y) : wp.y + y * wp.s);
     const part: Part = {};
     if (isFixtureDef(def)) {
       const facts = factsOf(def, baked, wp.s);
@@ -147,7 +150,7 @@ export class EngineBridge {
       return part;
     }
     // solids: wall segments and blocks (solid layer only; a def's own stair treads are walked by its links)
-    if (def.layer === 'solid' && baked.colliders.length) {
+    if ((def.layer === 'solid' || def.layer === 'surface') && baked.colliders.length) {
       const fp = this.model.footprint(e, def);
       const solids = fp.map((o, i) => ({ o, local: baked.colliders[i] })).filter(({ local }) => !(baked.links?.length && local.y1 - local.y0 <= 0.5));
       if (solids.length) part.solids = solids.map(({ o, local }, i) => ({ id: `${e.id}#c${i}`, obb: { c: [r3(o.c[0]), r3(o.c[1])] as Vec2, half: [r3(o.half[0]), r3(o.half[1])] as Vec2, yaw: r3(-o.yaw) }, y0: r3(o.y0), y1: r3(o.y1), kind: 'fixture' as const, label: `${this.model.pathOf(e.id)}${local.tag ? ' ' + local.tag : ''}`.slice(0, 100) }));
@@ -163,16 +166,20 @@ export class EngineBridge {
     // floors: polygons → oriented rectangles on levels
     const surfaces = [...(baked.surfaces ?? [])];
     if (!surfaces.length && def.components.floor) { const [w, , d] = baked.box; surfaces.push({ level: 0, y: def.components.floor.y ?? baked.box[1], polygon: [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]] }); }
-    if (surfaces.length) part.surfaces = surfaces.map((s, i) => {
-      const r = rectOf(s.polygon);
-      const y = r3(wp.y + s.y * wp.s);
-      const c = toWorld(r.c[0], r.c[1]), level = this.levelFor(y, c);
-      return { id: `${e.id}#f${i}`, level, y: level === 0 && Math.abs(y) <= GROUND_BAND ? 0 : y, obb: { c, half: [r3(r.half[0] * wp.s), r3(r.half[1] * wp.s)] as Vec2, yaw: r3(-(wp.yaw + r.yaw)) }, label: `${this.model.pathOf(e.id)} ${s.tag ?? 'floor'}`.slice(0, 100) };
+    // ground cover (roads, lawns, plazas: ground-relative level-0 surfaces of world-frame shapes) is the ground itself
+    const floors = surfaces.filter((x) => !(worldFrame && !(x as { abs?: boolean }).abs && x.level === 0));
+    if (floors.length) part.surfaces = floors.map((s, i) => {
+      const r = rectOf(s.polygon), abs = (s as { abs?: boolean }).abs;
+      const c = toWorld(r.c[0], r.c[1]), y = heightAt(s.y, c, abs);
+      // decks and bridges of world-frame shapes are walked from the ground: level 0 at their own height (L8 slabs)
+      const level = worldFrame && abs && s.level === 0 ? 0 : this.levelFor(y, c);
+      const sc = worldFrame ? 1 : wp.s, yaw = worldFrame ? r.yaw : wp.yaw + r.yaw;
+      return { id: `${e.id}#f${i}`, level, y: level === 0 && Math.abs(y) <= GROUND_BAND ? 0 : y, obb: { c, half: [r3(r.half[0] * sc), r3(r.half[1] * sc)] as Vec2, yaw: r3(-yaw) }, label: `${this.model.pathOf(e.id)} ${s.tag ?? 'floor'}`.slice(0, 100) };
     });
     // stairs, ramps, ladders: links between levels
     if (baked.links?.length) part.links = baked.links.filter((l) => l.path.length >= 2).map((l) => {
       const a = toWorld(l.path[0][0], l.path[0][1]), b = toWorld(l.path[l.path.length - 1][0], l.path[l.path.length - 1][1]);
-      const ya = r3(wp.y + l.y0 * wp.s), yb = r3(wp.y + l.y1 * wp.s);
+      const ya = heightAt(l.y0, a), yb = heightAt(l.y1, b);
       const n = Math.max(2, Math.ceil(Math.abs(yb - ya) / 0.18) + 1), path: [number, number, number][] = [];
       for (let k = 0; k < n; k++) { const t = k / (n - 1); path.push([r3(a[0] + (b[0] - a[0]) * t), r3(ya + (yb - ya) * t), r3(a[1] + (b[1] - a[1]) * t)]); }
       const kind = l.kind === 'float' ? 'climb' : l.kind;

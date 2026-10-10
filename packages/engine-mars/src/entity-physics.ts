@@ -35,14 +35,17 @@ export const emptyEntityPhysics = (): EntityPhysicsV1 => ({ version: 'entity-phy
 export const entityPhysicsHash = (ep: Pick<EntityPhysicsV1, 'levels' | 'byEntity' | 'assets'>) => hashOf({ levels: ep.levels, byEntity: sortKeys(ep.byEntity), assets: sortKeys(ep.assets) });
 function sortKeys<T>(r: Record<string, T>): Record<string, T> { const o: Record<string, T> = {}; for (const k of Object.keys(r).sort()) o[k] = r[k]; return o; }
 
+const RASTER_HALF = 64;
 /** Integer bounds covering every floor (and solid) of the physics, or null when there is none. */
 function floorBounds(ep: EntityPhysicsV1): [number, number, number, number] | null {
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
   const add = (c: [number, number], h: [number, number], yaw: number) => { const ca = Math.abs(Math.cos(yaw)), sa = Math.abs(Math.sin(yaw)), hx = h[0] * ca + h[1] * sa, hz = h[0] * sa + h[1] * ca; x0 = Math.min(x0, c[0] - hx); z0 = Math.min(z0, c[1] - hz); x1 = Math.max(x1, c[0] + hx); z1 = Math.max(z1, c[1] + hz); };
   for (const b of Object.values(ep.byEntity)) for (const s of b.surfaces ?? []) add(s.obb.c, s.obb.half, s.obb.yaw);
   if (x0 === Infinity) return null;
-  // round out to 8 m so a small move does not re-base the raster
-  return [Math.floor(x0 / 8) * 8, Math.floor(z0 / 8) * 8, Math.ceil(x1 / 8) * 8, Math.ceil(z1 / 8) * 8];
+  // round out to 8 m so a small move does not re-base the raster; never beyond ±64 m (one flat 0.1 m raster per level;
+  // a wider world waits for L8's tiled Spatial — floors beyond it are simply not walkable yet)
+  const c = (v: number) => Math.max(-RASTER_HALF, Math.min(RASTER_HALF, v));
+  return [c(Math.floor(x0 / 8) * 8), c(Math.floor(z0 / 8) * 8), c(Math.ceil(x1 / 8) * 8), c(Math.ceil(z1 / 8) * 8)];
 }
 
 /** The physics state a world-edit produces from `prev` (pure). */
