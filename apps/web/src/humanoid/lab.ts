@@ -12,6 +12,23 @@ import {applyHumanFinish} from '../../../../mars/viewer/app/engine-view/content/
 import {WorldSoulAvatars, soulAvatars} from '../SoulAvatars.ts';
 import {HumanoidKit} from './compose.ts';
 import {appearanceFromSeed, describeLook, lookKey, PRESETS, resolveLook, type Look} from './look.ts';
+import {socialLook} from './legacy.ts';
+import {HumanActorAppearance} from '../../../../mars/viewer/app/engine-view/human-appearance.ts';
+import {SOCIAL_PUBLIC_ASSIGNMENTS} from '../../../../mars/viewer/app/engine-view/content/details/human-presets/presets.mjs';
+type SocialRow = {actorId: string; stableSoulKey: string; template: string; presetId: string};
+const SOCIAL = SOCIAL_PUBLIC_ASSIGNMENTS as unknown as SocialRow[];
+/** Today's look of an audited social Soul: its template GLB with the provenance-gated palette adapter. */
+async function todaySocial(row: SocialRow, legacy: Template[], x: number, z: number) {
+  const r = place(legacy.find(t => t.name === row.template)!, x, z, 0.3, 0.4);
+  const ap = new HumanActorAppearance(r.model, r.appearance, row.stableSoulKey); await ap.ready;
+  if (ap.snapshot().state !== 'attached') throw Error(`${row.actorId}: social palette not attached (${ap.snapshot().state})`);
+  return r;
+}
+async function legacyTemplates(appearances = false) {
+  const t = await loadTemplates(new AbortController().signal, new ThreeResources(), {appearances});
+  for (const l of t) applyHumanFinish(l.name, l.gltf.scene);
+  return t;
+}
 
 const q = new URLSearchParams(location.search), mode = q.get('mode') ?? 'grid';
 const W = Number(q.get('w') ?? 1600), H = Number(q.get('h') ?? 1000);
@@ -117,8 +134,22 @@ function headshots(entries: {id: string; rig: Rig; label: string}[], size: numbe
   return entries.length;
 }
 const resolveLookSafe = (l: Partial<Look>) => { try { return resolveLook(l); } catch { return resolveLook({}); } };
+/** The 8 audited social Souls: today (adapter) above, the kit's explicit-colour looks below. */
+async function social() {
+  const legacy = await legacyTemplates(true), entries: {id: string; rig: Rig; label: string}[] = [];
+  for (const [i, row] of SOCIAL.entries()) {
+    const x = (i - 3.5) * 0.95;
+    entries.push({id: `today-${row.actorId}`, rig: await todaySocial(row, legacy, x, 0), label: `today ${row.presetId}`});
+    entries.push({id: `kit-${row.actorId}`, rig: place(await kit.template(socialLook(row.presetId)!), x, 1.6, 0.3, 0.4), label: `kit ${row.presetId}`});
+  }
+  camera.position.set(0, 2.2, 9.5); camera.lookAt(0, 0.9, 0.6);
+  Object.assign(lab, stats()); lab.icons = await portraits(entries); renderer.render(scene, camera);
+}
 async function parity() {
-  const p = (q.get('preset') ?? 'casual') as typeof PRESETS[number], src = q.get('src') ?? 'kit';
+  const p = (q.get('preset') ?? 'casual') as typeof PRESETS[number], src = q.get('src') ?? 'kit', soc = q.get('social');
+  if (soc) { const row = SOCIAL.find(r => r.actorId === soc)!;
+    if (src === 'legacy') await todaySocial(row, await legacyTemplates(true), 0, 0); else place(await kit.template(socialLook(row.presetId)!), 0, 0, 0.3, 0.4);
+    camera.position.set(0, 1.25, 3.3); camera.lookAt(0, 0.92, 0); Object.assign(lab, stats()); renderer.render(scene, camera); return; }
   let t: Template;
   if (src === 'legacy') { const legacy = await loadTemplates(new AbortController().signal, new ThreeResources()); for (const l of legacy) applyHumanFinish(l.name, l.gltf.scene); t = legacy.find(l => l.name === p)!; }
   else t = await kit.template({preset: p});
@@ -132,5 +163,5 @@ async function picker() {
   const initial = q.get('look') ? JSON.parse(q.get('look')!) : appearanceFromSeed(Number(q.get('seed') ?? 11));
   await new Promise<void>(done => mountLookPicker(document.getElementById('picker')!, {kit, initial, onState: (s: Record<string, unknown>) => { Object.assign(lab, s); done(); }}));
 }
-try { await ({grid, presets, parity, picker, showcase} as Record<string, () => Promise<void>>)[mode](); lab.ready = true; }
+try { await ({grid, presets, parity, picker, showcase, social} as Record<string, () => Promise<void>>)[mode](); lab.ready = true; }
 catch (e) { lab.error = e instanceof Error ? e.message : String(e); console.error(e); }

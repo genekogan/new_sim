@@ -65,4 +65,19 @@ try {
       if (Math.abs(a[i] - bg[0]) + Math.abs(a[i + 1] - bg[1]) + Math.abs(a[i + 2] - bg[2]) > 30) body++; }
     ok(`preset ${p} pixel diff < 0.5 %`, diff / (a.length / 4) < 0.005, {differing: diff, pixels: a.length / 4, pct: +(100 * diff / (a.length / 4)).toFixed(3), ofBodyPct: +(100 * diff / Math.max(1, body)).toFixed(3)});
   }
+  // 5. migration: the 8 audited social Souls (today's provenance-gated adapter) vs their explicit kit looks
+  {
+    const {page} = await open('mode=social', 1600, 900);
+    await page.screenshot({path: `${out}/humanoid-social-today-vs-kit.png`, fullPage: true}); await page.close();
+    const rows = ['h_006a68883b', 'h_52ec515f8c', 'h_6e60aea722', 'h_9915b192c3'];
+    for (const id of rows) {
+      const shots = {};
+      for (const src of ['legacy', 'kit']) { const {page} = await open(`mode=parity&social=${id}&src=${src}`, 480, 640);
+        shots[src] = await page.evaluate(() => { const c = document.querySelector('canvas'); const g = document.createElement('canvas'); g.width = c.width; g.height = c.height; const x = g.getContext('2d'); x.drawImage(c, 0, 0); return Array.from(x.getImageData(0, 0, c.width, c.height).data); });
+        await page.close(); }
+      let diff = 0; const a = shots.legacy, b = shots.kit;
+      for (let i = 0; i < a.length; i += 4) if (Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2])) > 16) diff++;
+      ok(`social Soul ${id} pixel diff < 0.5 %`, diff / (a.length / 4) < 0.005, {differing: diff, pct: +(100 * diff / (a.length / 4)).toFixed(3)});
+    }
+  }
 } finally { await browser.close(); writeFileSync(`${out}/humanoid-lab-results.json`, JSON.stringify(results, null, 1)); }
