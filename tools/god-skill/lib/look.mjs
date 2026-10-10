@@ -9,8 +9,9 @@
 // machine, not a shared one. GPU by default; EDEN_GOD_GL=swiftshader forces software GL.
 //
 // Needs Google Chrome and a Playwright package (playwright-core, playwright or @playwright/test)
-// resolvable from the current folder, EDEN_GOD_PLAYWRIGHT_FROM, or the sim repo; else it falls back
-// to `npx -y playwright-core screenshot` (slow, UI visible).
+// resolvable from the current folder, EDEN_GOD_PLAYWRIGHT_FROM, or the sim repo; else npx's cached
+// playwright-core (fetched once). Only without npx does it fall back to `npx playwright-core screenshot`
+// (a fixed 30 s wait, no --keep).
 import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, rmSync, statSync, utimesSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -36,6 +37,17 @@ export function findPlaywright() {
       try { const m = createRequire(pkg)(name); if (m?.chromium) return m; } catch { /* next */ }
     }
   }
+  // none next to the CLI (a god folder holds only eden-god.mjs): npx's own cache, fetched once (~10 MB, no browser;
+  // Google Chrome draws). The folder is remembered in the environment, so the keeper and shot children skip this.
+  if (process.env.EDEN_GOD_NO_NPX) return null;
+  try {
+    const r = spawnSync('npx', ['-y', '-p', 'playwright-core@1', '-c', 'echo "$PATH"'], { encoding: 'utf8', timeout: 300_000, stdio: ['ignore', 'pipe', 'pipe'] });
+    const bin = (r.stdout ?? '').trim().split(':').find((d) => /[\\/]_npx[\\/][^\\/]+[\\/]node_modules[\\/]\.bin$/.test(d));
+    if (bin) {
+      const base = resolve(bin, '../..'), m = createRequire(resolve(base, 'noop.js'))('playwright-core');
+      if (m?.chromium) { process.env.EDEN_GOD_PLAYWRIGHT_FROM = base; return m; }
+    }
+  } catch { /* no npx */ }
   return null;
 }
 
@@ -91,7 +103,8 @@ export async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = n
   const t0 = Date.now();
   const pw = findPlaywright();
   if (!pw) {
-    const q = new URLSearchParams({ shot: '1', eye: eye.join(','), at: at.join(',') });
+    if (keep) throw new Error('look --keep needs a Playwright package (npm i playwright-core here) and npx could not fetch one; look without --keep works');
+    const q = new URLSearchParams({ shot: '1', eye: eye.join(','), at: at.join(','), ...(hideRoofs ? { hideRoofs: '1', ...(cut !== null ? { cut: String(cut) } : {}) } : {}) });
     const r = spawnSync('npx', ['-y', 'playwright-core@1', 'screenshot', '--channel', 'chrome', '--wait-for-timeout', '30000', '--viewport-size', '1024,640', `${worldUrl}?${q}`, resolve(out)], { stdio: 'pipe', encoding: 'utf8', timeout: timeoutMs });
     if (r.status !== 0) throw new Error(`look: no Playwright found and npx playwright-core failed: ${(r.stderr || r.stdout || '').slice(0, 300)}. Install one (npm i -g playwright-core) and Google Chrome`);
     return { file: resolve(out), ms: Date.now() - t0, via: 'npx playwright-core screenshot' };
