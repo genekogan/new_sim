@@ -11,9 +11,10 @@ import { describeEdit, steps, type Step } from './god-ui/checklist.ts';
 import { flyTo } from './god-ui/camera.ts';
 import { previewGhost, type GhostSummary } from './WorldPreviewGhost.ts';
 import { useSession } from './auth-session.ts';
+import { JoinPanel } from './god-ui/JoinPanel.tsx';
 import './god-ui/god-panel.css';
 
-type Tab = 'start' | 'edits' | 'flags' | 'previews';
+type Tab = 'start' | 'edits' | 'flags' | 'previews' | 'souls';
 const query = new URLSearchParams(typeof location === 'undefined' ? '' : location.search);
 const shotMode = query.get('shot') === '1';
 const PAIRED_KEY = `sim.godPaired:${worldKey}`;
@@ -22,8 +23,10 @@ const ago = (t: number) => { const s = Math.max(0, Math.round((Date.now() - t) /
 
 export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMode: (v: boolean) => void }) {
   const [status, setStatus] = useState<G.Status | null>(null);
-  const [open, setOpen] = useState<boolean>(() => localStorage.getItem(OPEN_KEY) !== '0');
-  const [tab, setTab] = useState<Tab>('start');
+  // #join (the link a god shares): open the panel on the Join section / the Souls tab
+  const joinHash = typeof location !== 'undefined' && location.hash === '#join';
+  const [open, setOpen] = useState<boolean>(() => joinHash || localStorage.getItem(OPEN_KEY) !== '0');
+  const [tab, setTab] = useState<Tab>(joinHash ? 'souls' : 'start');
   const [welcome, setWelcome] = useState<string | null>(null);
   const [edits, setEdits] = useState<G.EditRow[] | null>(null);
   const [flags, setFlags] = useState<G.FlagRef[]>([]);
@@ -97,14 +100,15 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
   const undoRedo = (which: 'undo' | 'redo') => run(which, () => (which === 'undo' ? G.undo() : G.redo()), (r) => { const x = r as G.UndoResult; return x.accepted ? `${which === 'undo' ? 'Undid' : 'Redid'} edit ${x.reverted}.` : (x.failures?.[0]?.detail ?? `nothing to ${which}`); });
   const undoGroup = (group: string) => run('g:' + group, () => G.undoGroup(group), (r) => { const x = r as G.UndoResult; return x.accepted ? `Undid group “${group}” (${Array.isArray(x.reverted) ? x.reverted.length : 1} edits).` : (x.failures?.[0]?.detail ?? 'nothing undone'); });
 
-  const checklist: Step[] = useMemo(() => steps({ status, signedIn: session.authed && status?.you !== 'anonymous', edits, flags: flags.length, approvedHere, agentSeen: !!launcher?.seen.agentSeenAt, looks: launcher?.seen.looks ?? 0 }), [status, edits, flags.length, approvedHere, launcher]);
+  const signedIn = session.authed && !!status && status.you !== 'anonymous';
+  const checklist: Step[] = useMemo(() => steps({ status, signedIn, edits, flags: flags.length, approvedHere, agentSeen: !!launcher?.seen.agentSeenAt, looks: launcher?.seen.looks ?? 0 }), [status, signedIn, edits, flags.length, approvedHere, launcher]);
   const done = checklist.filter((s) => s.done).length;
   const recent = useMemo(() => (edits ?? []).slice().sort((a, b) => b.seq - a.seq).slice(0, 8), [edits]);
   const canUndo = (edits ?? []).some((e) => !e.undone && e.kind !== 'undo' && e.ops.length > 0);
   // one "undo group" per group, on its newest row that undo would still revert
   const groupRow = useMemo(() => { const m = new Map<string, number>(); for (const e of (edits ?? []).slice().sort((a, b) => b.seq - a.seq)) if (e.grp && !e.undone && e.kind !== 'undo' && !m.has(e.grp)) m.set(e.grp, e.seq); return m; }, [edits]);
   const firstTab = useRef(false);
-  useEffect(() => { if (!firstTab.current && owner && edits && done === checklist.length) { firstTab.current = true; setTab('edits'); } }, [owner, edits, done, checklist.length]);
+  useEffect(() => { if (!firstTab.current && owner && edits && done === checklist.length) { firstTab.current = true; if (!joinHash) setTab('edits'); } }, [owner, edits, done, checklist.length, joinHash]);
 
   if (shotMode) return null;
   const ghostBar = ghost && (
@@ -121,7 +125,7 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
   const name = launcher?.world.name ?? status.name;
   const isNew = query.has('new');
 
-  if (!open) return <>{ghostBar}<button data-god-panel-toggle="1" className="gp-card gp-collapsed" onClick={() => setOpen(true)}>✦ {owner ? <>God mode · {done}/{checklist.length}{status.pending.length ? <span className="gp-badge">{status.pending.length}</span> : null}</> : status.hasOwner ? 'This world has a god' : 'Claim this world'}</button></>;
+  if (!open) return <>{ghostBar}<button data-god-panel-toggle="1" className="gp-card gp-collapsed" onClick={() => setOpen(true)}>✦ {owner ? <>God mode · {done}/{checklist.length}{status.pending.length ? <span className="gp-badge">{status.pending.length}</span> : null}</> : status.hasOwner ? 'Join as a Soul' : 'Claim this world'}</button></>;
   return (
     <>
       {ghostBar}
@@ -149,7 +153,8 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
             <button className="gp-btn gp-primary" data-claim="1" disabled={busy === 'claim'} onClick={claim}>{busy === 'claim' ? 'Claiming…' : 'Become its god'}</button>
           </div>
         )}
-        {status.you === 'visitor' && <div className="gp-block"><p>Signed in as <b>{who}</b>. Another account owns this world; you can watch.</p>{session.mode === 'dev' ? (!naming && <button className="gp-btn" onClick={signIn}>Switch name</button>) : <button className="gp-btn" onClick={() => void session.logout()}>Sign out</button>}{signInForm}</div>}
+        {status.you === 'visitor' && <div className="gp-block"><p>Signed in as <b>{who}</b>. Another account owns this world; you can watch, or live here as a Soul.</p>{session.mode === 'dev' ? (!naming && <button className="gp-btn" onClick={signIn}>Switch name</button>) : <button className="gp-btn" onClick={() => void session.logout()}>Sign out</button>}{signInForm}</div>}
+        {!owner && <JoinPanel signedIn={signedIn} worldName={name} base={status.base} owner={false} />}
 
         {owner && (
           <>
@@ -171,9 +176,9 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
               <button className={'gp-btn' + (flagMode ? ' gp-armed' : '')} data-flag-button="1" aria-pressed={flagMode} onClick={() => onFlagMode(!flagMode)} title="Drop a labelled flag: a reference point your agent can build around (or Alt+click the ground)">⚑ {flagMode ? 'click the ground…' : 'Drop a flag'}</button>
             </div>
             <div className="gp-tabs" role="tablist">
-              {(['start', 'edits', 'flags', 'previews'] as Tab[]).map((t) => (
+              {(['start', 'edits', 'flags', 'previews', 'souls'] as Tab[]).map((t) => (
                 <button key={t} role="tab" aria-selected={tab === t} data-tab={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
-                  {t === 'start' ? <>First steps <span className="gp-count">{done}/{checklist.length}</span></> : t === 'edits' ? <>Edits</> : t === 'flags' ? <>Flags <span className="gp-count">{flags.length}</span></> : <>Previews{previews.length ? <span className="gp-count">{previews.length}</span> : null}</>}
+                  {t === 'start' ? <>First steps <span className="gp-count">{done}/{checklist.length}</span></> : t === 'edits' ? <>Edits</> : t === 'flags' ? <>Flags <span className="gp-count">{flags.length}</span></> : t === 'souls' ? <>Souls</> : <>Previews{previews.length ? <span className="gp-count">{previews.length}</span> : null}</>}
                 </button>
               ))}
             </div>
@@ -185,12 +190,14 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
                 </ol>
                 {welcome ? <Markdown source={welcome} skipFirstHeading /> : <p className="gp-dim">Loading the welcome…</p>}
                 <div className="gp-files">
-                  <a className="gp-btn" href={apiPath('/god/SKILL.md')} target="_blank" rel="noreferrer">SKILL.md</a>
+                  <a className="gp-btn" href={apiPath('/SKILL.md')} target="_blank" rel="noreferrer" title="This world's one skill: God mode and Soul mode">SKILL.md</a>
                   <a className="gp-btn" href={apiPath('/god/eden-god.mjs')} download>eden-god.mjs</a>
                   <a className="gp-btn" href={apiPath('/v1/god/welcome')} target="_blank" rel="noreferrer">welcome.md</a>
                 </div>
               </div>
             )}
+
+            {tab === 'souls' && <div className="gp-pane" data-souls-tab="1"><JoinPanel signedIn={signedIn} worldName={name} base={status.base} owner /></div>}
 
             {tab === 'edits' && (
               <div className="gp-pane" data-edits="1">

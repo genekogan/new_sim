@@ -26,6 +26,7 @@ import {mountStationRoutesV2} from './station-routes-v2.ts';
 import type {EdgeLedger} from './edge/ledger/ledger.ts';
 import {mountEdgeRoutes,edgeSoulResolver} from './edge/routes.ts';
 import { mountGodRoutes } from './god/routes.ts';
+import { mountJoinRoutes } from './god/join.ts';
 import type { GodMode } from './god/god.ts';
 import { intentArrivalReadError,intentHistoryReadError,intentTransportError, intentLookupError, type IntentControlV2, type IntentIdentityV2 } from './intent-control.ts';
 
@@ -62,7 +63,10 @@ export function buildApp(d: Deps) {
   const body = async (c: Context) => { try { return await c.req.json(); } catch { throw new ApiError(400, 'bad-json', 'body must be JSON'); } };
   const limitIp = (c: Context, key: string, max: number, windowMs: number) => { const l = d.souls.limits.allow(`${key}:${ip(c)}`, max, windowMs); if (!l.ok) throw new ApiError(429, 'rate-limited', 'too many requests', { retry_after: l.retryAfter }); };
 
-  if (d.god) mountGodRoutes(app, { god: d.god, worldName: process.env.WORLD_NAME?.slice(0, 60) || d.cfg.worldKey.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' '), requireUser, soulFromBearer: (c) => { const s = d.souls.soulFromToken(bearer(c)); return s ? { id: s.id, name: s.name } : null; }, baseOf, limitIp });
+  const worldName = process.env.WORLD_NAME?.slice(0, 60) || d.cfg.worldKey.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+  // the world's one skill (/SKILL.md) and who lives here (/v1/world/souls): lane P2
+  if (d.god) { mountJoinRoutes(app, { worldName, baseOf, souls: () => d.db.liveSouls(d.host.worldId), poseOf: (id) => { const p = (d.host.engine.world.entities as Record<string, { pose?: { p?: number[] } } | undefined>)[id]?.pose?.p; return p ? { x: p[0], y: p[1], z: p[2] } : null; } }); }
+  if (d.god) mountGodRoutes(app, { god: d.god, worldName, requireUser, soulFromBearer: (c) => { const s = d.souls.soulFromToken(bearer(c)); return s ? { id: s.id, name: s.name } : null; }, baseOf, limitIp });
 
   app.onError((err, c) => {
     if (err instanceof ApiError) { if (err.status === 429 && err.extra?.retry_after) c.header('Retry-After', String(err.extra.retry_after)); return c.json({ ok: false, code: err.code, message: err.message, ...err.extra }, err.status as 400); }
