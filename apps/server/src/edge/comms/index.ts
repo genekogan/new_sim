@@ -18,7 +18,7 @@ import {say} from './speech.ts';
 import {dialogueReplay} from './dialogue-replay.ts';
 import {Steward} from './steward.ts';
 import {Fading} from './fading.ts';
-import {ensureCommsSchema,tx} from './store.ts';
+import {ensureCommsSchema,tx,afterCommit} from './store.ts';
 import {EventStreams, parseCursor} from './stream.ts';
 import {Webhooks, type Fetch} from './webhook.ts';
 
@@ -77,7 +77,7 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
     nameMetadata:id=>deps.host.publicNameMetadata?.(id)??{},
     liveSoulIds: () => deps.db.liveSouls(worldId).map(s => s.id),
     isLive: id => { const s = deps.db.soul(id); return !!s && s.world_id === worldId && s.retired_at === null; },
-    spectate: m => { if (!spectators.length) return; const msg = {type: 'edge', at: now(), ...m} as SpectatorEdgeMessage; for (const l of spectators) { try { l(msg); } catch { /* never break comms */ } } },
+    spectate: m => { if (!spectators.length) return; const msg = structuredClone({type:'edge',at:now(),...m}) as SpectatorEdgeMessage;afterCommit(db,()=>{for(const l of spectators)try{l(msg);}catch{/* never break comms */}}); },
   };
   const conversations = new Conversations(core, options.conversationTimeoutMs ?? 10 * 60_000, options.inviteTimeoutMs ?? 2 * 60_000);
   const webhooks = new Webhooks(core, options.fetch === null ? undefined : options.fetch ?? (globalThis.fetch as unknown as Fetch));
@@ -150,13 +150,14 @@ export function registerEdgeComms(app: Hono, deps: EdgeDeps, options: CommsOptio
   app.get('/v1/edge/objects', route((_c, soul) => ({objects: objects.visibleTo(soul)})));
   app.get('/v1/edge/objects/:id', route((c, soul) => objects.get(c.req.param('id') ?? '', soul)));
   app.post('/v1/edge/objects/:id/act', route(async (c, soul) => {
-    const body = await json(c), id = c.req.param('id') ?? '', cap = `object:${id}:${String(body.action ?? '')}`, out = objects.act(id, soul, body);
-    if (!out.accepted) { deps.ledger.recordRefusal?.(soul.soulId, 'object', cap, String((out as {code?: unknown}).code ?? 'refused')); return out; }
-    fading.touch(soul.soulId);
+    const body = await json(c), id = c.req.param('id') ?? '', cap = `object:${id}:${String(body.action ?? '')}`,prepared=objects.prepareAct(id,soul,body),out=prepared.result;
+    if (!out.accepted) { if(!prepared.movesBody)objects.act(id,soul,body);deps.ledger.recordRefusal?.(soul.soulId, 'object', cap, String((out as {code?: unknown}).code ?? 'refused')); return out; }
     // A body-moving action (a ride's join/leave/start) gets a normal receipt from the Ledger, or its genuine refusal.
     const {bodies, ...rest} = out;
-    if (!bodies?.length || !deps.ledger.performBodies) return rest;
-    const b = await deps.ledger.performBodies(soul, cap, bodies[0]!.label, bodies[0]!.steps as never, typeof body.clientRef === 'string' ? `obj:${body.clientRef}` : undefined);
+    if(!bodies?.length){const accepted=prepared.commit();fading.touch(soul.soulId);return accepted;}
+    if(!deps.ledger.performBodies)return {accepted:false,code:'object.body-unavailable',reason:'Body admission is unavailable.',object:id,action:out.action};
+    const b = await deps.ledger.performBodies(soul, cap, bodies[0]!.label, bodies[0]!.steps as never, typeof body.clientRef === 'string' ? `obj:${body.clientRef}` : undefined,undefined,{guard:prepared.guard,commit:()=>{prepared.commit();}});
+    if(b.accepted)fading.touch(soul.soulId);
     return b.accepted ? {...rest, receipt: b.receipt} : {accepted: false, code: b.code, reason: b.reason, object: id, action: out.action};
   }));
   app.get('/v1/edge/calendar', c => c.json(edgeBody({tick: core.tick(), items: objects.all().filter(o => o.kind === 'calendar-item' && (o.state as {phase: string}).phase !== 'over').map(o => ({id: o.id, ...(o.state as object)}))})));

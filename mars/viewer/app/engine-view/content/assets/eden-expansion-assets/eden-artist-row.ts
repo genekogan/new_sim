@@ -12,9 +12,9 @@ export const EDEN_ARTIST_ROW_PLAN=Object.freeze({
  yurt:{root:[67.5,0,-18.5] as V,yaw:-.6},
  towerHouse:{root:[69,0,20] as V,yaw:Math.PI/2},
  teaHouse:{root:[92.5,0,4.5] as V,yaw:0},
- muralWall:{root:[73.5,0,4.5] as V,yaw:0},
+ muralWall:{root:[73.5,0,5.4] as V,yaw:0},
  waterTower:{root:[102,0,-27] as V,yaw:0},
- footprints:[[73,-29,80,-22],[64,-22,71,-15],[66,17,72,23],[89.5,1.5,95.5,7.5],[70.5,3,76.5,6],[99.5,-29.5,104.5,-24.5]] as [number,number,number,number][],
+ footprints:[[73,-29,80,-22],[64,-22,71,-15],[66,17,72,23],[89.5,1.5,95.5,7.5],[70.5,4,76.5,7],[99.5,-29.5,104.5,-24.5]] as [number,number,number,number][],
 });
 export function createEdenArtistRow(ground:Ground){
  if(typeof ground!=='function')return null;
@@ -89,6 +89,12 @@ export function createEdenArtistRow(ground:Ground){
    const tri=side>0?[[x0,y0],[x1,y0],[x1,y1],[x0,y0],[x1,y1],[x0,y1]]:[[x0,y0],[x1,y1],[x1,y0],[x0,y0],[x0,y1],[x1,y1]];for(const [x,y2] of tri){mural.push(x,y2,z);colours.push(c.r,c.g,c.b);}}
   const muralGeometry=geo(new THREE.BufferGeometry());muralGeometry.setAttribute('position',new THREE.Float32BufferAttribute(mural,3));muralGeometry.setAttribute('color',new THREE.Float32BufferAttribute(colours,3));muralGeometry.computeVertexNormals();
   const muralMesh=new THREE.Mesh(muralGeometry,(()=>{const m=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.85});mats.push(m);return m;})());muralMesh.name='mural-paint';muralMesh.receiveShadow=true;w.add(muralMesh);
+  // Small upward-facing ground lamps use the existing shared night-light map, not extra real lights.
+  for(const x of[-2.1,0,2.1]){
+   part(w,geo(new THREE.CylinderGeometry(.09,.11,.09,8)),steel,'mural-ground-uplight-base',[x,.045,.65]);
+   part(w,geo(new THREE.BoxGeometry(.14,.018,.14)),cream,'mural-ground-uplight-lens',[x,.11,.63],[-Math.PI/4,0,0]);
+  }
+  w.userData.edenLightSources=[-2.1,0,2.1].map(x=>[P.muralWall.root[0]+x,0,P.muralWall.root[2]+.65,'mural-uplight',1]);
   // 6. Water tower: four splayed steel legs, cross bracing, timber tank and conical lid.
   const o=site('water-tower',P.waterTower.root,P.waterTower.yaw);
   repeat(o,geo(new THREE.CylinderGeometry(.09,.12,6.2,6)),steel,'tower-legs',[[-1.3,-1.3],[1.3,-1.3],[1.3,1.3],[-1.3,1.3]].map(([x,z])=>({at:[x*.92,3.1,z*.92] as V,rot:[z*-.06,0,x*.06] as V})));

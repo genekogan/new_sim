@@ -35,7 +35,8 @@ export function boundedRememberChoice(value){if(!value||typeof value!=='object')
 
 const identityText=value=>String(value??'').normalize('NFKC').replace(/\s+/gu,' ').trim().toLocaleLowerCase('en-US');
 export const literalSoulReference=(text,reference)=>{const id=typeof reference==='string'&&/^s_[A-Za-z0-9_-]+$/.test(reference);const source=id?String(text??'').normalize('NFKC').replace(/\s+/gu,' ').trim():identityText(text),needle=id?reference:identityText(reference);if(!needle)return false;let offset=-1;while((offset=source.indexOf(needle,offset+1))>=0){if(!/[\p{L}\p{N}_-]/u.test(source[offset-1]??'')&&!/[\p{L}\p{N}_-]/u.test(source[offset+needle.length]??''))return true;}return false;};
-const GENERIC_IDENTITY_BASES=new Set(['anyone','anyone nearby','someone nearby','somebody nearby','people nearby','everyone nearby','everyone','any nearby person']);
+const GENERIC_IDENTITY_BASES=new Set(['anyone','anyone nearby','someone','someone nearby','somebody','somebody nearby','people nearby','everyone nearby','everyone','any nearby person']);
+export const literalGenericIdentityBases=ownerText=>[...GENERIC_IDENTITY_BASES].filter(basis=>literalSoulReference(ownerText,basis));
 /** Validate supplied references, not arbitrary prose semantics. A generic choice
  * needs an explicit supported selector actually present in the trusted request.
  * Neither a model judgment nor a similar first name supplies owner authority. */
@@ -44,6 +45,6 @@ export function bindLiveSoulReferences(refs,{ownerText='',identityBasis,resolve}
  const resolved=resolve(list);if(!resolved.ok)return resolved;
  if(ownerText&&!generic){for(let i=0;i<list.length;i++){const ref=list[i],chosen=resolved.chosen[i],name=typeof ref==='string'&&!ref.startsWith('s_')?ref:ref?.name??chosen.name,id=typeof ref==='string'&&ref.startsWith('s_')?ref:ref?.id??chosen.id;
   if(chosen.nameAmbiguous&&!literalSoulReference(ownerText,chosen.id))return {ok:false,code:'identity.reassigned-name',reason:'The named label was reassigned. An explicit canonical ID must come from the trusted owner request, not a model-invented pair; clarify instead of substituting.',requested:resolved.requested,chosen:resolved.chosen};
-  if(!literalSoulReference(ownerText,name)&&!literalSoulReference(ownerText,id))return {ok:false,code:'identity.owner-binding-required',reason:'Selected full name/ID is not a literal reference in the trusted owner request. Use the exact intended full name, wait for it, or ask for clarification; no similar-name substitution.',requested:resolved.requested,chosen:resolved.chosen};}}
+  if(!literalSoulReference(ownerText,name)&&!literalSoulReference(ownerText,id))return {ok:false,code:'identity.owner-binding-required',reason:'Selected full name/ID is not a literal reference in the trusted owner request. '+(literalGenericIdentityBases(ownerText).length?'For an intended generic choice, this request contains a literal selector: retry the step with top-level identityBasis:'+JSON.stringify(literalGenericIdentityBases(ownerText)[0])+', keeping the exact observed with/targetSoul reference. identityBasis belongs on this do step, not inside params. This is a repair hint, not acceptance or consent.':'Use the exact intended full name, wait for it, or ask for clarification; no similar-name substitution.'),requested:resolved.requested,chosen:resolved.chosen};}}
  return {...resolved,basis:ownerText?(generic?'literal-generic-choice':'literal-owner-reference'):'observed-autonomous-choice'};
 }

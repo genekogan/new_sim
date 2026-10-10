@@ -7,6 +7,7 @@ import type {Souls} from '../souls.ts';
 import type {EdgeOutcomeV1} from '@sim/protocol';
 
 export const EDGE_CONTRACT = 'eden-edge/1' as const;
+export type ObjectBodyAdmission={guard:()=>true;commit:(receiptId:string)=>Record<string,unknown>|void};
 export type PlaceRef = {id: string; name: string; kind: string};
 export type EdgeSoul = {soulId: string; entityId: string; name: string; owner: string};
 export type ReceiptPhase = 'waiting' | 'started' | 'completed' | 'failed' | 'replaced';
@@ -37,7 +38,7 @@ export interface EdgeLedgerHooks {
   poseOf?(soulId: string): {x: number; z: number; yaw: number} | null;
   /** EVENTS-v1 fade-by-abandonment: what the body holds that its own agent chose (an activity in progress, seated, lying, riding…), or null. */
   postureHold?(soulId: string): string | null;
-  performBodies?(soul: EdgeSoul, capability: string, label: string, steps: {verb: string; params: Record<string, unknown>}[], clientRef?: string): Promise<{accepted: true; receipt: EdgeReceipt} | {accepted: false; code: string; reason: string}>;
+  performBodies?(soul: EdgeSoul, capability: string, label: string, steps: {verb: string; params: Record<string, unknown>}[], clientRef?: string,effects?:unknown,admission?:ObjectBodyAdmission): Promise<{accepted: true; receipt: EdgeReceipt} | {accepted: false; code: string; reason: string}>;
 }
 export type EdgeCapability = {id: string; verb: string; label: string; available: boolean; target?: {id: string; kind: string}; blocked?: {code: string; reason: string}; params?: Record<string, unknown>; object?: string; action?: string};
 export type EdgeDeps = {host: WorldHost; db: Db; souls: Souls; build?: string; soul(c: Context): EdgeSoul; ledger: EdgeLedgerHooks};

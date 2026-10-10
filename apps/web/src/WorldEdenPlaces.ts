@@ -54,7 +54,8 @@ export function createWorldEdenPlaces(input:{ground:Ground;buildings:Building[]}
   const roofFixtures=[...roofPlan.seats.map(s=>({id:s.id,def:s.def,p:s.root,yaw:s.yaw,corners:[[-.28,-.32],[.28,-.32],[-.28,.32],[.28,.32]]})),{id:roofPlan.table.id,def:roofPlan.table.defProposal,p:roofPlan.table.root,yaw:roofPlan.table.yaw,corners:[[-.7,-.4],[.7,-.4],[-.7,.4],[.7,.4]]}];
   if(roof&&roof.top===3&&roofFixtures.every(f=>f.corners.every(([dx,dz])=>renderedTop(roof.building.group,f.p[0]+dx,f.p[2]+dz,3))))for(const f of roofFixtures)fixtures.push({id:f.id,def:f.def,kind:'fixture',pose:{p:f.p as [number,number,number],yaw:f.yaw},support:{kind:'ground'}});
   else omitted.push('house3 lower roof table and catalog chairs');
-  outlook=createEdenOutlookAtmosphere({worldSeed:20261006,recordedSeconds:null},true);if(outlook){owners.push(outlook);group.add(outlook.group);}else omitted.push('outlook and ornamental clouds');
+  // WorldAtmosphere already supplies the textured cloud sky; keep the woodland without the obsolete block clouds.
+  outlook=createEdenOutlookAtmosphere({worldSeed:20261006,recordedSeconds:null},true,false);if(outlook){owners.push(outlook);group.add(outlook.group);}else omitted.push('woodland outlook');
  }catch(error){views.dispose();for(const owner of owners.reverse())try{owner.dispose();}catch{}throw error;}
  let presence='';
  return {group,omitted,

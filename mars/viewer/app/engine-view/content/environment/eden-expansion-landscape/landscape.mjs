@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {indexGroundQuads} from './quad-ground.ts';
 import {VegetationViews} from '../../../vegetation.ts';
 import {createForestUnderstory} from '../forest-understory.ts';
 import {createBirchFamily} from '../birch-family-proposal/birch.mjs';
@@ -23,8 +24,9 @@ export function createEdenExpansionLandscape(enabled=false){
  const layout=edenExpansionLayout(),planting=edenExpansionPlanting(),group=new THREE.Group(),owners=[],resources=[],instances=[],waterOwners=[];
  group.name='Connected Eden: woodland, neighborhood gardens, country and lake';
  group.userData.environmentScope=layout.scope;
+ let groundLookup=null;
  const own=o=>{owners.push(o);return o;};
- const release=()=>{const errors=[];for(const fn of[()=>group.removeFromParent(),...instances.map(i=>()=>i.dispose()),...owners.map(o=>()=>o.dispose()),...resources.map(r=>()=>r.dispose()),()=>group.clear()])try{fn();}catch(e){errors.push(e);}return errors;};
+ const release=()=>{const errors=[];for(const fn of[()=>group.removeFromParent(),()=>{groundLookup?.dispose();groundLookup=null;},...instances.map(i=>()=>i.dispose()),...owners.map(o=>()=>o.dispose()),...resources.map(r=>()=>r.dispose()),()=>group.clear()])try{fn();}catch(e){errors.push(e);}return errors;};
  function mesh(name,positions,colors,indices,material){
   const g=new THREE.BufferGeometry();resources.push(g);g.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));if(colors)g.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));if(indices)g.setIndex(indices);g.computeVertexNormals();const m=new THREE.Mesh(g,material);m.name=name;m.receiveShadow=true;group.add(m);return m;
  }
@@ -44,10 +46,10 @@ export function createEdenExpansionLandscape(enabled=false){
    for(const [a,b] of [[x0,z0],[x1,z0],[x1,z1],[x0,z1]]){const y=expansionHeight(a,b)??expansionHeight(x,z)??0;pos.push(a,y,b);const c=new THREE.Color('#8a9b6e').lerp(new THREE.Color('#b6ae89'),Math.min(1,Math.max(0,-y/2)));col.push(c.r,c.g,c.b);}idx.push(first,first+2,first+1,first,first+3,first+2);
   }
   const ground=mesh('NEW expansion cosmetic ground; original native rectangles omitted',pos,col,idx,simpleMaterial({vertexColors:true,roughness:1}));
+  groundLookup=indexGroundQuads(ground.geometry.attributes.position.array);
   function sampleVisualGround(x,z){
    if(!Number.isFinite(x)||!Number.isFinite(z)||inNative(x,z))return null;
-   const a=ground.geometry.attributes.position.array;
-   for(let i=0;i<a.length;i+=12){const x0=a[i],x1=a[i+3],z0=a[i+2],z1=a[i+8];if(x<x0||x>x1||z<z0||z>z1)continue;const u=(x-x0)/(x1-x0),v=(z-z0)/(z1-z0),A=a[i+1],B=a[i+4],C=a[i+7],D=a[i+10];return v<=u?A+(B-A)*u+(C-B)*v:A+(C-D)*u+(D-A)*v;}return null;
+   return groundLookup?.heightAt(x,z)??null;
   }
   // Fit new authored roots to the ACTUAL Float32 ground triangles, not the analytic sketch.
   for(const p of [...planting.plants,...Object.values(planting.special).flat()]){const y=sampleVisualGround(p.p[0],p.p[2]);if(y===null)throw Error('New expansion plant lacks supplied cosmetic triangle');p.p[1]=y;}
@@ -67,7 +69,7 @@ export function createEdenExpansionLandscape(enabled=false){
   batched('Flowering garden trellis edges',()=>createClimbingVine('lattice',true),planting.special.vine);
   batched('Country and river bank stone clusters',()=>createRiverbankStones('long'),planting.special.stones);
   for(const p of planting.special.meadow){const o=own(createMeadowFamily('square'));o.group.position.fromArray(p.p);o.group.rotation.y=-p.yaw;group.add(o.group);}
-  for(const w of layout.water){if(w.kind==='connection'){const m=mesh('Proposed lake to original-shore water connection',[-65,-2,0,-68,-2,-2,-62,-2,-2,-62,-2,2,-68,-2,2],null,[0,2,1,0,3,2,0,4,3,0,1,4],simpleMaterial({color:'#286a8d',roughness:.32,transparent:true,opacity:.88,depthWrite:false}));m.userData.cameraTransparent=true;group.remove(m);const connection=new THREE.Group();connection.add(m);group.add(connection);waterOwners.push({owner:{group:connection},w});continue;}const o=own(createWaterLandscape(w.kind));o.group.position.fromArray(w.p);o.group.rotation.y=-w.yaw;for(const m of o.group.children)if(m.userData.cameraTransparent){m.material.color.set('#286a8d');m.material.opacity=.68;}group.add(o.group);waterOwners.push({owner:o,w});}
+  for(const w of layout.water){if(w.kind==='connection'){const m=mesh('Proposed lake to original-shore water connection',[-65,-2,0,-68,-2,-2,-62,-2,-2,-62,-2,2,-68,-2,2],null,[0,2,1,0,3,2,0,4,3,0,1,4],simpleMaterial({color:'#286a8d',roughness:.32,transparent:true,opacity:.88,depthWrite:false,side:THREE.DoubleSide,forceSinglePass:true,emissive:'#101c27',emissiveIntensity:.12}));m.userData.cameraTransparent=true;group.remove(m);const connection=new THREE.Group();connection.add(m);group.add(connection);waterOwners.push({owner:{group:connection},w});continue;}const o=own(createWaterLandscape(w.kind));o.group.position.fromArray(w.p);o.group.rotation.y=-w.yaw;for(const m of o.group.children)if(m.userData.cameraTransparent){m.material.color.set('#286a8d');m.material.opacity=.88;m.material.side=THREE.DoubleSide;m.material.forceSinglePass=true;m.material.emissive.set('#101c27');m.material.emissiveIntensity=.12;}group.add(o.group);waterOwners.push({owner:o,w});}
   const waterJoin=joinExpansionWater(waterOwners,group,g=>resources.push(g),m=>resources.push(m));
   function sampleVisibleBank(x,z){
    if(inNative(x,z)||!Number.isFinite(x)||!Number.isFinite(z))return null;

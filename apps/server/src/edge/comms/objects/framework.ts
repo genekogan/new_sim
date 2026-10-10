@@ -68,14 +68,13 @@ export class Objects {
     return {soul, roles: kind.rolesOf(o.state, soul.soulId), tick: this.core.tick(), now: this.core.now(), nameOf: this.core.nameOf, inPlace: this.inPlace(soul.soulId, o.placeId), carrier: this.carrierRead};
   }
   /** Apply time-driven transitions and persist them (with their events). */
-  private advanced(o: ObjectRecord): ObjectRecord {
+  private advanced(o: ObjectRecord,persist=true): ObjectRecord {
     const kind = this.kinds.get(o.kind);
     const step = kind?.advance?.(structuredClone(o.state), this.timeCtx());
     if (!kind || !step) return o;
     checkState(kind, step.state);
     const next = {...o, state: step.state, version: o.version + 1};
-    this.save(next); this.log(next, null, 'advance', {});
-    this.emit(next, step.events ?? []);
+    if(persist){this.save(next); this.log(next, null, 'advance', {});this.emit(next, step.events ?? []);}
     return next;
   }
   /** Every object with its time-driven transitions applied (also the sweep timer). */
@@ -148,7 +147,7 @@ export class Objects {
       return out;
     });
   }
-  private actOnce(id: string, soul: EdgeSoul, action: string, params: Record<string, unknown>): ObjectActResult {
+  private actOnce(id: string, soul: EdgeSoul, action: string, params: Record<string, unknown>,persist=true,preview?:{after?:unknown}): ObjectActResult {
     const refuse = (r: Refusal): ObjectActResult => ({accepted: false, code: r.code, reason: r.reason, object: id, action});
     const raw = OBJECT_ID.test(id) ? this.row(id) : undefined;
     const kind = raw && this.kinds.get(raw.kind);
@@ -158,7 +157,7 @@ export class Objects {
     if(actor.body&&!['humanoid','floater'].includes(actor.body.family))return refuse({code:'body.unsupported',reason:'This body family is unsupported; this object action cannot be accepted.'});
     const bodyIssue=bodyCapabilityProblem(actor,{id:`object:${id}:${action}`,verb:'object',action,label:action,available:true});
     if(bodyIssue)return refuse(bodyIssue);
-    const o = this.advanced(raw);
+    const o = this.advanced(raw,persist);
     const a = kind.actions[action];
     if (!a) return refuse({code: 'object.action-unknown', reason: `${o.name} has no action ${action}.`});
     const ctx = this.ctx(o, kind, soul);
@@ -171,9 +170,30 @@ export class Objects {
     const outcome = a.apply(structuredClone(o.state), params, ctx);
     checkState(kind, outcome.state);
     const next = {...o, state: outcome.state, version: o.version + 1};
-    this.save(next); this.log(next, soul.soulId, action, params);
-    this.emit(next, outcome.events ?? []);
+    if(persist){this.save(next); this.log(next, soul.soulId, action, params);this.emit(next, outcome.events ?? []);}
+    if(preview)preview.after={object:this.view(next,soul)};
     return {accepted: true, object: {id: o.id, version: next.version}, action, ...(outcome.result ? {result: outcome.result} : {}), ...(outcome.bodies?.length ? {bodies: outcome.bodies} : {})};
+  }
+
+  /** Prepare using the same production validators, but no writes, events or
+   * in-memory commits. Body admission can then fence this exact object version. */
+  prepareAct(id:string,soul:EdgeSoul,input:Record<string,unknown>){
+    const action=input.action,params=input.params??{};
+    if(typeof action!=='string'||!ACTION.test(action))throw new EdgeError(400,'invalid','action must be an action name');
+    if(!params||typeof params!=='object'||Array.isArray(params))throw new EdgeError(400,'invalid','params must be an object');
+    const clientRef=input.clientRef;if(clientRef!==undefined&&(typeof clientRef!=='string'||clientRef.length<1||clientRef.length>100))throw new EdgeError(400,'invalid','clientRef must be 1..100 characters');
+    const baseline=JSON.stringify(this.row(id)),preview:{after?:unknown}={};
+    const prior=clientRef?this.core.db.prepare('SELECT response FROM edge_comms_object_refs WHERE world_id=? AND soul_id=? AND client_ref=?').get(this.core.worldId,soul.soulId,clientRef) as {response:string}|undefined:undefined;
+    const result=prior?JSON.parse(prior.response) as ObjectActResult:this.actOnce(id,soul,action,params as Record<string,unknown>,false,preview);
+    const guard=():true=>{
+      if(prior)return true;
+      if(JSON.stringify(this.row(id))!==baseline)throw new EdgeError(409,'object.changed','The object changed before body admission; observe it and retry.');
+      const fresh=this.actOnce(id,soul,action,params as Record<string,unknown>,false);
+      if(!fresh.accepted)throw new EdgeError(409,fresh.code,fresh.reason);
+      if(result.accepted&&JSON.stringify(fresh.bodies)!==JSON.stringify(result.bodies))throw new EdgeError(409,'object.changed','The object body request changed before admission.');
+      return true;
+    };
+    return {result,movesBody:this.kinds.get(this.row(id)?.kind??'')?.actions[action]?.movesBody===true,before:this.row(id)?{object:this.view(this.row(id)!,soul)}:undefined,after:preview.after,guard,commit:()=>{guard();const out=this.act(id,soul,input);if(!out.accepted)throw new EdgeError(409,out.code,out.reason);return out;}};
   }
 
   /** Object actions as capabilities (`object:<id>:<action>`), merged by Ledger. */

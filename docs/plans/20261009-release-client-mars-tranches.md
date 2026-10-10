@@ -132,3 +132,19 @@ The two-hour published run began2026-10-09T18:09:31.925192Z, due20:09:31.925192Z
 Mars is a founding example of Eden worlds, not a disconnected implementation sharing a URL namespace. Use the shared entity/state/action/receipt/consent/perception/identity/carrying/seating/navigation/Follow systems, with world differences primarily in configuration, content, layout and object availability. Any genuinely new capability must be built as a reusable core feature with a Mars binding and a path to another world; record the shared seam and evidence.
 
 The owner's pallet-rack example establishes generality: building/unbuilding means durable action-driven world-map/state changes that can later instantiate other structures and effects. It does not move the previously deferred evolution/genesis/build-unbuild/dust/water release B ahead of adoption A. Preserve versioned reconstruction, persistent identity, safe boundaries, outcomes and shared release gates; never substitute a camp room or posed demonstration.
+
+## New Soul released; consolidated drawings underway
+
+New Soul is released on main `7f5c71df` and preview source `1f90dfe0`, with hosted CI, current-history replay, ordinary boots, side-table preservation, served artifacts and Chrome checks passing. Original history and first evaluation failures are retained. Bounded parallel owners: Viewer D2/D4/D6/D7/D8; World D1/D3/D5; Performance D9/D10/D11. Root reviews imports serially and runs one consolidated validation. No graphical change is live yet. Integration branch: `pm/graphics-integration-20261009`, based on `7f5c71df`.
+
+Next, close client memory, arrival truth, traffic, status and social-scope gaps, plus remaining outcomes, reconnect and audit work. The 24-hour soak is unstarted. Mars A retains actual Mimos, persistent bowl, couch, independent consent, Follow, restart and negative cases, with a maximum 12 hours of new work after pre-Mars closure. Mars B remains deferred.
+
+## Latest parallel start instruction
+
+The human now authorizes Mars to start alongside graphics and requests an immediate independent auth/account lane. This supersedes the earlier serial start boundary; essential acceptance, compatibility and release gates remain. Neither lane waits for auth, and an unready auth lane must not delay either release.
+
+Graphics/core candidate a53eaea8 has built; the combined check and private qualification continue under Root. Mars owner is Performance/Core: work began October 9 at 22:17:31 UTC, with a twelve-hour new-work cap ending October 10 at 10:17:31 UTC. Reuse the existing Mars 2026 map and rendered Mimos topology, add actual shared room/object bindings, and prove the required journey. Preserve chosen rigid-body limitations; do not fake seating or carrying. Release B remains deferred.
+
+Auth owner is the independent Core lane, based on a53eaea8: restore Privy Google/email; authenticated multi-Soul ownership; browser approval and actual-ready Follow; delegated grants and revocation; verified and auditable grandfathering of Gene's attributed Souls. The exact human request is in team/pm-integration/auth-account-20261009/OWNER-REQUEST.md. Hosted Privy is currently unconfigured; real Google acceptance is still required. Attribution exceptions must be batched for Gene, not guessed from names or favorites.
+
+Root continues the remaining client/outcome/memory/performance evidence and repairs. The 24-hour soak has no actual start or due time yet. No sustained acceptance claim or essential release gate is waived by parallel scheduling.

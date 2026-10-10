@@ -19,6 +19,7 @@ const library:RoomDraw={id:'eden-library-1',draw(b){const y=.1;
  b.label='library books on tables';for(const x of[71.2,76.2]){b.box(x,y+.35,-6.6,.22,.05,.3,C.navy);b.box(x+.02,y+.4,-6.62,.2,.04,.27,C.rust);b.box(x+.5,y+.35,-6.5,.3,.012,.22,C.cream);}
  b.label='library pendants';for(const [x,z] of[[71.5,-6.6],[76.5,-6.6],[71.3,-9],[76.3,-9],[74,-5]])b.at(x,y,z,0,()=>F.pendant(b,3.1,.85));
  b.label='library desk cabinets';b.at(71.5,y,-9,0,()=>F.stockDeskCabinet(b,21));b.at(76.5,y,-9,0,()=>F.stockDeskCabinet(b,23));
+ b.label='library desk chairs';for(const x of[70.65,75.65])b.at(x,y,-8.25,S,()=>F.chair(b,C.walnut,C.sage));
  b.label='library clock';b.at(74,y,-3.2,S,()=>F.clock(b,2.62));
 }};
 // ---------------------------------------------------------------- barn workshop (interior 82.16..93.84 × 47.16..54.84, floor .1, tie beams 3.15; door S x86.8–89.2)

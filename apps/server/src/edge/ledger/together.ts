@@ -1,3 +1,4 @@
+import {afterCommit} from '../comms/store.ts';
 // together/1 (core-next4, ACTION-COVERAGE-AUDIT §3/§5 P2; Gene: gestures are "absolutely. critical even"):
 // Souls do things with each other, natively and visibly, with light consent. No model calls; deterministic plans.
 // - Gestures: hug / high-five / handshake / dance-with <soul> ask first (the other accepts, declines or ignores; an
@@ -184,8 +185,8 @@ export class Together {
     const r = this.p.db.db.prepare('SELECT body FROM edge_item_ops_v1 WHERE world_id=? AND receipt_id=?').get(this.p.host.worldId, receipt) as {body: string} | undefined;
     if (!r) return null; this.p.db.db.prepare('DELETE FROM edge_item_ops_v1 WHERE world_id=? AND receipt_id=?').run(this.p.host.worldId, receipt); return JSON.parse(r.body) as ItemOp;
   }
-  private saveFollow(f: Follow) {this.follows.set(f.receipt, f); this.p.db.db.prepare('INSERT OR REPLACE INTO edge_follows_v1 (world_id,receipt_id,body) VALUES (?,?,?)').run(this.p.host.worldId, f.receipt, JSON.stringify(f));}
-  private dropFollow(receipt: string) {this.follows.delete(receipt); this.p.db.db.prepare('DELETE FROM edge_follows_v1 WHERE world_id=? AND receipt_id=?').run(this.p.host.worldId, receipt);}
+  private saveFollow(f: Follow) {this.p.db.db.prepare('INSERT OR REPLACE INTO edge_follows_v1 (world_id,receipt_id,body) VALUES (?,?,?)').run(this.p.host.worldId, f.receipt, JSON.stringify(f));afterCommit(this.p.db.db,()=>this.follows.set(f.receipt,f));}
+  private dropFollow(receipt: string) {this.p.db.db.prepare('DELETE FROM edge_follows_v1 WHERE world_id=? AND receipt_id=?').run(this.p.host.worldId, receipt);afterCommit(this.p.db.db,()=>this.follows.delete(receipt));}
   followingOf(soulId: string) {return [...this.follows.values()].find(f => f.soulId === soulId) ?? null;}
   followersOf(soulId: string) {return [...this.follows.values()].filter(f => f.target === soulId);}
   /** A guest with an unanswered invitation is not idle (ambient life leaves it be while its agent decides). */

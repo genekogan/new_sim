@@ -23,7 +23,7 @@ export function inspectCapturedWaterSurface(terrain:NativeShoreTerrainInput,wate
 // weaker slopes/highlights and explicit bounded alpha. No source shader mutation.
 const vertexShader=`varying vec3 vWorld;
 void main(){vec4 world=modelMatrix*vec4(position,1.0);vWorld=world.xyz;gl_Position=projectionMatrix*viewMatrix*world;}`;
-const fragmentShader=`uniform float uViewTime;uniform vec3 uBaseColor;uniform float uBaseAlpha;uniform float uGrazingAlpha;varying vec3 vWorld;
+const fragmentShader=`uniform float uViewTime;uniform float uDaylight;uniform vec3 uBaseColor;uniform float uBaseAlpha;uniform float uGrazingAlpha;varying vec3 vWorld;
 void main(){
   // Four drifting wave trains (swell to capillary); finer trains fade before they alias. Alpha formula unchanged.
   vec2 p=vWorld.xz;float t=uViewTime;
@@ -41,6 +41,8 @@ void main(){
   vec3 colour=uBaseColor*diffuse*(.9+.16*swell)+vec3(.055,.075,.07)*grazing+vec3(.08,.09,.08)*highlight+vec3(.9,.88,.8)*glint*(.4+.6*fine);
   colour=mix(colour,vec3(.55,.68,.78),fresnel*.35);
   colour+=vec3(.009,.012,.010)*(sin(a)*sin(b));
+  // Eden optionally binds scene daylight; the original owner defaults to full day.
+  colour*=mix(vec3(.11,.16,.23),vec3(1.0),clamp(uDaylight,0.0,1.0));
   gl_FragColor=vec4(colour,uBaseAlpha+uGrazingAlpha*grazing);
   #include <tonemapping_fragment>
   #include <colorspace_fragment>
@@ -51,7 +53,7 @@ export function createCapturedWaterSurface(terrain:NativeShoreTerrainInput,water
   const release=()=>{const errors:unknown[]=[];for(const f of[()=>group.removeFromParent(),()=>geometry.dispose(),()=>material?.dispose(),()=>group.clear()])try{f();}catch(e){errors.push(e);}return errors;};
   try{
     geometry.setAttribute('position',new THREE.Float32BufferAttribute(spec.vertices.flat(),3));geometry.setIndex(spec.indices);geometry.computeVertexNormals();
-    material=new THREE.ShaderMaterial({uniforms:{uViewTime:{value:0},uBaseColor:{value:new THREE.Color('#4f969b')},uBaseAlpha:{value:spec.alpha.frontOn},uGrazingAlpha:{value:spec.alpha.grazingIncreaseMax}},vertexShader,fragmentShader,transparent:true,depthWrite:false,side:THREE.DoubleSide,forceSinglePass:true});
+    material=new THREE.ShaderMaterial({uniforms:{uViewTime:{value:0},uDaylight:{value:1},uBaseColor:{value:new THREE.Color('#4f969b')},uBaseAlpha:{value:spec.alpha.frontOn},uGrazingAlpha:{value:spec.alpha.grazingIncreaseMax}},vertexShader,fragmentShader,transparent:true,depthWrite:false,side:THREE.DoubleSide,forceSinglePass:true});
     mesh=new THREE.Mesh(geometry,material);mesh.name='eden-shore-water';mesh.castShadow=false;group.add(mesh);
   }catch(error){const errors=release();if(errors.length)throw new AggregateError([error,...errors],'Captured water creation and rollback failed',{cause:error});throw error;}
   const ownedMaterial=material;let closed=false;

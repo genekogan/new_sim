@@ -8,4 +8,4 @@ export interface EdenOutlookOwner {
  dispose():void;
 }
 export function inspectEdenOutlookAppearance(input:unknown,enabled?:boolean):EdenOutlookOwner['inspection']|null;
-export function createEdenOutlookAtmosphere(input:unknown,enabled?:boolean):EdenOutlookOwner|null;
+export function createEdenOutlookAtmosphere(input:unknown,enabled?:boolean,ornamentalClouds?:boolean):EdenOutlookOwner|null;

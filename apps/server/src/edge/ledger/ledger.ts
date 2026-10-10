@@ -11,7 +11,7 @@ import type {WorldHost, Mind} from '../../world.ts';
 import type {Db} from '../../db.ts';
 import {readHumanCapabilitiesV1, type HumanBindingV1} from '../../human-capabilities.ts';
 import {humanBlockedExplanationV1} from '../../human-wait-condition.ts';
-import {EdgeError, type EdgeCapability, type EdgeLedgerHooks, type EdgeReceipt, type EdgeSoul, type NearbyBody, type PlaceRef} from '../contract.ts';
+import {EdgeError, type EdgeCapability, type EdgeLedgerHooks, type EdgeReceipt, type EdgeSoul, type NearbyBody, type PlaceRef,type ObjectBodyAdmission} from '../contract.ts';
 import {CATALOG} from '../../../../../mars/viewer/engine/world/catalog.ts';
 import {PlaceIndex, centroid, derivePlaceData, happenings, validatePlaceData, type PlaceData,type Place} from './places.ts';
 const area = (p: [number, number][]) => Math.abs(p.reduce((s, [x, z], i) => {const [x2, z2] = p[(i + 1) % p.length]; return s + x * z2 - x2 * z;}, 0)) / 2;
@@ -27,7 +27,7 @@ import {holdingFact,receiptItemOp,confirmedTogetherEffects,confirmedObjectEffect
 import {resolveMailRecipient} from '../outcomes/recipients.ts';
 import {terminalSnapshot} from '../outcomes/providers.ts';
 import {EDEN_LIBRARY_CATALOGUE} from '../content/eden-library-catalogue.ts';
-import {tx} from '../comms/store.ts';
+import {tx,afterCommit} from '../comms/store.ts';
 
 type Resolved = {from: string; to: string; note: string};
 const WAIT_CODES = new Set(['program.safe-stop-required', 'program.safe-stop-pending']);
@@ -49,7 +49,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** Server start (ms): metrics count world model calls only from here, not copied history. */
   readonly startedAt = Date.now();
   private capCache = new Map<string, {tick: number; value: {caps: EdgeCapability[]; plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>}}>();
-  comms?: {streams: {headCursor(soulId: string): string;deliver?(soulId:string,kind:string,tick:number,body:Record<string,unknown>):unknown}; fading: {status(soulId: string): unknown; touch?(soulId: string): void}; objects: {act?(id: string, soul: EdgeSoul, input: Record<string, unknown>): unknown;get?(id:string,soul:EdgeSoul):unknown; visibleTo(soul: EdgeSoul): unknown[]; create(i: {id: string; kind: string; name: string; description?: string; placeId: string; params?: Record<string, unknown>}): {id: string}; all(): {id: string; kind: string; placeId: string; state: unknown}[]}; close(): void};
+  comms?: {streams: {headCursor(soulId: string): string;deliver?(soulId:string,kind:string,tick:number,body:Record<string,unknown>):unknown}; fading: {status(soulId: string): unknown; touch?(soulId: string): void}; objects: {prepareAct?(id:string,soul:EdgeSoul,input:Record<string,unknown>):ReturnType<import('../comms/objects/framework.ts').Objects['prepareAct']>;act?(id: string, soul: EdgeSoul, input: Record<string, unknown>): unknown;get?(id:string,soul:EdgeSoul):unknown; visibleTo(soul: EdgeSoul): unknown[]; create(i: {id: string; kind: string; name: string; description?: string; placeId: string; params?: Record<string, unknown>}): {id: string}; all(): {id: string; kind: string; placeId: string; state: unknown}[]}; close(): void};
   attachComms(c: NonNullable<EdgeLedger['comms']>) {
     this.comms = c;this.notifyMail();
     // Re-deliver only persisted post-feature terminal projections whose event marker was not committed.
@@ -169,9 +169,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private view(r: Row): EdgeReceipt {const outcome=this.outcomes.read(r.receipt_id);return {id: r.receipt_id, soulId: r.soul_id, capability: r.capability, phase: r.phase, acceptedTick: r.accepted_tick, startedTick: r.started_tick, endedTick: r.ended_tick, code: r.code, reason: r.reason, programId: r.program_id, ...detailOf(r),...(outcome?{outcome}:{})};}
   receipt(soulId: string, id: string): EdgeReceipt | null {const r = this.rows('receipt_id=? AND soul_id=?', id, soulId)[0]; return r ? this.view(r) : null;}
   openReceipts(soulId: string): EdgeReceipt[] {return this.rows("soul_id=? AND phase IN ('waiting','started') ORDER BY accepted_tick", soulId).map(r => this.view(r));}
-  private insert(soul: EdgeSoul, capability: string, phase: EdgeReceipt['phase'], clientRef?: string, keepActivity = false, detail: Record<string, unknown> = {},contentParams:Record<string,unknown>={}): EdgeReceipt {
-    const id = 'r_' + randomUUID(), tick = this.host.engine.world.tick,content=['read','write','use-computer','listen','paint','craft','post-letter'].includes(capability.split(':')[0])?outcomeParams(contentParams):{};
-    if (!keepActivity) {for (const old of this.openReceipts(soul.soulId)) this.update(old.id, {phase: 'replaced', reason: 'A newer action from this Soul replaced it.'}); this.pending.delete(soul.soulId);}
+  private insert(soul: EdgeSoul, capability: string, phase: EdgeReceipt['phase'], clientRef?: string, keepActivity = false, detail: Record<string, unknown> = {},contentParams:Record<string,unknown>={},receiptId?:string): EdgeReceipt {
+    const id = receiptId??'r_' + randomUUID(), tick = this.host.engine.world.tick,content=['read','write','use-computer','listen','paint','craft','post-letter'].includes(capability.split(':')[0])?outcomeParams(contentParams):{};
+    if (!keepActivity) {for (const old of this.openReceipts(soul.soulId)) this.update(old.id, {phase: 'replaced', reason: 'A newer action from this Soul replaced it.'}); afterCommit(this.db.db,()=>this.pending.delete(soul.soulId));}
     tx(this.db.db,()=>{this.db.db.prepare('INSERT INTO edge_receipts_v1 (world_id,receipt_id,soul_id,capability,phase,accepted_tick,ended_tick,client_ref,created_at) VALUES (?,?,?,?,?,?,?,?,?)').run(this.host.worldId, id, soul.soulId, capability, phase, tick,OPEN.includes(phase)?null:tick, clientRef ?? null, Date.now());
     this.outcomes.capture(id,{soulId:soul.soulId,capability,params:content,acceptedTick:tick,holdingBefore:holdingFact(this.together.heldBy(soul.soulId)),...(detail.confirmedEffects?{confirmedEffects:detail.confirmedEffects as ConfirmedEffects}:{}),...(Array.isArray(detail.confirmedProduced)?{confirmedProduced:detail.confirmedProduced as NonNullable<EdgeReceipt['outcome']>['produced']}:{}),...(Array.isArray(detail.confirmedChanges)?{confirmedChanges:detail.confirmedChanges as NonNullable<EdgeReceipt['outcome']>['changed']}:{} )});
     if(capability.startsWith('warm-by-fire:'))this.setDetail(id,{warmTargetV1:capability.slice('warm-by-fire:'.length)});
@@ -195,7 +195,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** Called only inside the original terminal phase transaction. Replay only reads the immutable result. */
   private finishOutcome(row:Row){if(this.outcomes.read(row.receipt_id))return;const receipt=this.view(row),op=receiptItemOp(this,receipt.id);this.together.onReceipt(receipt);const mind=this.host.minds.get(row.soul_id);if(!mind)return;const soul={soulId:mind.soulId,entityId:mind.entityId,name:mind.name,owner:mind.owner};this.outcomes.terminal(receipt,terminalSnapshot(this,soul,row.capability.split(':')[0]),confirmedTogetherEffects(this,receipt,op));this.notifyMail();}
   private notifyMail(){const streams=this.comms?.streams;if(streams?.deliver)this.outcomes.deliverMail((to,tick,body)=>streams.deliver!(to,'mail.delivered',tick,body));}
-  private emit(r: EdgeReceipt) {for (const l of this.receiptListeners) try {l(r);} catch {/* listener faults never break the ledger */}}
+  private emit(r: EdgeReceipt) {const captured=structuredClone(r);afterCommit(this.db.db,()=>{for(const l of this.receiptListeners)try{l(captured);}catch{/* listener faults never break the ledger */}});}
   private onDecision(e: {payload: unknown}, r: {programId?: string; programOk?: boolean; programCode?: string}) {
     const p = e.payload as {trigger?: string}, m = /^edge-act:(r_[0-9a-f-]+)$/.exec(p.trigger ?? ''); if (!m) return;
     if (r.programOk && r.programId) this.update(m[1], {phase: 'started', program_id: r.programId});
@@ -512,20 +512,22 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if (cap.target?.kind === 'soul' && cap.verb in PAIRED) {const back = this.together.reciprocal(soul.soulId, cap.target.id, cap.verb), acc = back ? caps.find(c => c.id === 'accept:' + back.id) : undefined; if (acc) {cap = acc; capability = acc.id;}}
     const resolved: {resolved?: Resolved} = capability !== asked ? {resolved: {from: asked, to: cap.id, note: note || `${asked} is ${cap.id}.`}} : {};
     if (cap.verb === 'accept') return this.acceptInvite(soul, cap, plans, caps, clientRef, resolved, refuse);
-    if (cap.verb === 'object' && cap.object && cap.action && this.comms?.objects.act) {
+    if (cap.verb === 'object' && cap.object && cap.action && this.comms?.objects.prepareAct) {
       // Object actions listed in capabilities may be acted on here too (same effect as POST /objects/:id/act);
       // an accepted one gets a completed receipt (like make:mark) and never interrupts the body.
       const {with: invited, ...objParams} = params;
       if (invited !== undefined && cap.action !== 'join') return {...refuse('capability.params', 'with (inviting others) works with a ride\'s join, activities and walks.'), ...resolved};
-      const before=this.comms.objects.get?.(cap.object,soul);
-      const out = this.comms.objects.act(cap.object, soul, {action: cap.action, params: objParams}) as {accepted: boolean; code?: string; reason?: string; result?: unknown;object?:{id:string;version:number}};
+      const prepared=this.comms.objects.prepareAct(cap.object,soul,{action:cap.action,params:objParams});
+      const before=prepared.before;
+      const out = prepared.result as {accepted: boolean; code?: string; reason?: string; result?: unknown;object?:{id:string;version:number}};
       if (!out.accepted) {
+        // Keep legacy independent clock advances for non-body objects.
+        if(!prepared.movesBody)this.comms.objects.act?.(cap.object,soul,{action:cap.action,params:objParams});
         // Out of reach: point at the walk that gets there.
         const placeId = out.code === 'object.out-of-reach' ? this.comms.objects.all().find(o => o.id === cap.object)?.placeId : undefined, go = placeId ? caps.find(c => c.id === 'walk:' + placeId) : undefined;
         return {...refuse(out.code ?? 'object.refused', out.reason ?? 'The object refused that action.'), ...(go ? {did_you_mean: [{id: go.id, label: go.label}]} : {}), ...resolved};
       }
-      const effects=out.object?confirmedObjectEffects(before,this.comms.objects.get?.(cap.object,soul),cap.action,out.object.version):{};
-      this.comms.fading.touch?.(soul.soulId);
+      const effects=out.object?confirmedObjectEffects(before,prepared.after,cap.action,out.object.version):{};
       // An object action that moves the body (a ride's join/leave/start) is an ordinary logged decision with a normal receipt.
       const bodies = (out as {bodies?: {label: string; steps: Program['steps']}[]}).bodies;
       if (bodies?.length) {
@@ -536,12 +538,13 @@ export class EdgeLedger implements EdgeLedgerHooks {
           if ('code' in prep) return {...refuse(prep.code, prep.reason), ...resolved};
           steps = prep.steps; commit = prep.commit;
         }
-        const b = await this.performBodies(soul, capability, bodies[0].label, steps, clientRef,effects);
+        const bodyGuard=():true=>{prepared.guard();if(invited!==undefined){const current=this.together.prepare(soul,cap,{label:bodies[0].label,steps:bodies[0].steps},{with:invited},bodies[0].steps);if('code'in current)throw new EdgeError(409,current.code,current.reason);}return true;};
+        const b = await this.performBodies(soul, capability, bodies[0].label, steps, clientRef,undefined,{guard:bodyGuard,commit:id=>{prepared.commit();commit?.(id);return {confirmedEffects:effects};}});
         if (!b.accepted) return {...refuse(b.code, b.reason), ...resolved};
-        commit?.(b.receipt.id);
+        this.comms.fading.touch?.(soul.soulId);
         return {accepted: true, receipt: {...this.receipt(soul.soulId, b.receipt.id)!, object: cap.object} as EdgeReceipt, ...(out.result ? {result: out.result} : {}), ...resolved};
       }
-      const r = this.insert(soul, capability, 'completed', clientRef, true,{confirmedEffects:effects});
+      const r = tx(this.db.db,()=>{prepared.commit();return this.insert(soul, capability, 'completed', clientRef, true,{confirmedEffects:effects});});this.comms.fading.touch?.(soul.soulId);
       return {accepted: true, receipt: {...this.receipt(soul.soulId, r.id)!, object: cap.object} as EdgeReceipt, ...(out.result ? {result: out.result} : {}), ...resolved};
     }
     const plan = plans.get(capability) as TogetherPlan & {stop?: boolean} | undefined;
@@ -666,13 +669,15 @@ export class EdgeLedger implements EdgeLedgerHooks {
     if ('code' in plan) return {...refuse(plan.code, plan.reason), ...resolved};
     this.comms?.fading.touch?.(soul.soulId);
     if (plan.ride) {
-      if (!this.comms?.objects.act) return {...refuse('invite.gone', 'Rides are not available here.'), ...resolved};
-      const out = this.comms.objects.act(plan.ride.object, soul, {action: 'join', params: {}}) as {accepted: boolean; code?: string; reason?: string; bodies?: {label: string; steps: Program['steps']}[]};
+      if (!this.comms?.objects.prepareAct) return {...refuse('invite.gone', 'Rides are not available here.'), ...resolved};
+      const prepared=this.comms.objects.prepareAct(plan.ride.object,soul,{action:'join',params:{}});
+      const out = prepared.result as {accepted: boolean; code?: string; reason?: string; bodies?: {label: string; steps: Program['steps']}[]};
       if (!out.accepted || !out.bodies?.length) return {...refuse(out.code ?? 'ride.refused', out.reason ?? 'The ride refused.'), ...resolved};
       const steps = structuredClone(out.bodies[0].steps); for (const s of steps) if (s.verb === 'mars:carrier_ride') s.params.reserved = true;
-      const b = await this.performBodies(soul, cap.id, out.bodies[0].label, steps, clientRef);
+      let acceptCommit=plan.commit;
+      const inviteGuard=():true=>{prepared.guard();const fresh=this.together.acceptPlan(soul,cap.id.slice('accept:'.length),caps,plans as Map<string,TogetherPlan>);if('code'in fresh)throw new EdgeError(409,fresh.code,fresh.reason);if(fresh.ride?.object!==plan.ride!.object)throw new EdgeError(409,'invite.gone','That ride invitation changed.');acceptCommit=fresh.commit;return true;};
+      const b = await this.performBodies(soul, cap.id, out.bodies[0].label, steps, clientRef,undefined,{guard:inviteGuard,commit:id=>{prepared.commit();acceptCommit(id);}});
       if (!b.accepted) return {...refuse(b.code, b.reason), ...resolved};
-      plan.commit(b.receipt.id);
       return {accepted: true as const, receipt: {...this.receipt(soul.soulId, b.receipt.id)!, object: plan.ride.object} as EdgeReceipt, ...resolved};
     }
     return this.launch(soul, cap.id, plan.label, plan.steps, clientRef, resolved, refuse, plan.commit);
@@ -693,8 +698,9 @@ export class EdgeLedger implements EdgeLedgerHooks {
 
   /** Body steps requested by an object action (OBJECT-CONTRACT §7): performed like `act` — refused with a genuine code, or
    *  accepted with a receipt (waiting → started → completed/failed) for a logged decision with trigger edge-act. */
-  async performBodies(soul: EdgeSoul, capability: string, label: string, steps: Program['steps'], clientRef?: string,effects?:ConfirmedEffects): Promise<{accepted: true; receipt: EdgeReceipt} | {accepted: false; code: string; reason: string}> {
+  async performBodies(soul: EdgeSoul, capability: string, label: string, steps: Program['steps'], clientRef?: string,effects?:ConfirmedEffects,admission?:ObjectBodyAdmission): Promise<{accepted: true; receipt: EdgeReceipt} | {accepted: false; code: string; reason: string}> {
     if (clientRef) {const old = this.rows('soul_id=? AND client_ref=?', soul.soulId, clientRef)[0]; if (old) return {accepted: true, receipt: this.view(old)};}
+    if(admission)return this.performAtomicObjectBodies(soul,capability,label,steps,clientRef,admission);
     const refuse = (code: string, reason: string) => {this.recordRefusal(soul.soulId, 'object', capability, code); return {accepted: false as const, code, reason};};
     if (this.faded.has(soul.soulId)) return refuse('soul.faded', 'This Soul has faded; act once (e.g. stand:here) to come back first.');
     if (this.host.quietBarrier) {const r = this.insert(soul, capability, 'waiting', clientRef,false,{...(effects?{confirmedEffects:effects}:{})}); this.arm({receipt: r.id, soul, steps, label, deadline: this.host.engine.world.tick + WAIT_LIMIT_TICKS, capability}); return {accepted: true, receipt: this.receipt(soul.soulId, r.id)!};}
@@ -708,6 +714,27 @@ export class EdgeLedger implements EdgeLedgerHooks {
     }
     await this.decide(soul, r.id, capability, label, steps);
     return {accepted: true, receipt: this.receipt(soul.soulId, r.id)!};
+  }
+
+  private async performAtomicObjectBodies(soul:EdgeSoul,capability:string,label:string,steps:Program['steps'],clientRef:string|undefined,admission:ObjectBodyAdmission){
+    const refuse=(code:string,reason:string)=>{this.recordRefusal(soul.soulId,'object',capability,code);return {accepted:false as const,code,reason};};
+    const source=this.db.soul(soul.soulId),id='r_'+randomUUID();
+    const authority=():true=>{const row=this.db.soul(soul.soulId),mind=this.host.minds.get(soul.soulId);if(!source||!row||row.owner!==source.owner||row.owner!==soul.owner||mind?.owner!==row.owner||row.token_hash!==source.token_hash||row.retired_at!==null||row.world_id!==this.host.worldId||row.entity_id!==soul.entityId||mind?.entityId!==soul.entityId)throw new EdgeError(401,'unauthorized','Soul authority changed before object admission.');if(this.faded.has(soul.soulId))throw new EdgeError(409,'soul.faded','This Soul has faded; act to return first.');admission.guard();return true;};
+    try{
+      authority();const issue=this.host.engine.canPerform({actor:soul.entityId,label,steps});
+      if(issue&&!WAIT_CODES.has(issue.code))return refuse(issue.code,issue.code.startsWith('carrier.')?issue.message:humanBlockedExplanationV1(issue.code,label));
+      if(this.host.quietBarrier||issue){
+        // Accepted waiting is a durable intent/reservation, not physical completion.
+        // A later start can fail or be replaced; that terminal receipt is authoritative.
+        // Ride apply() adds no member: riders/custody are projected from native state.
+        tx(this.db.db,()=>{authority();const fresh=this.host.engine.canPerform({actor:soul.entityId,label,steps});if(fresh&&!WAIT_CODES.has(fresh.code))throw new EdgeError(409,fresh.code,fresh.code.startsWith('carrier.')?fresh.message:humanBlockedExplanationV1(fresh.code,label));const detail=admission.commit(id)??{};this.insert(soul,capability,'waiting',clientRef,false,detail,{},id);afterCommit(this.db.db,()=>this.arm({receipt:id,soul,steps,label,deadline:this.host.engine.world.tick+WAIT_LIMIT_TICKS,capability}));},{immediate:true});
+        if(issue?.code==='program.safe-stop-required')await this.host.enqueue('edge-stop',`edge:${soul.soulId}`,{soulId:soul.soulId,entityId:soul.entityId,receipt:id});
+      }else{
+        const guard=():true=>{authority();if(this.host.quietBarrier)throw new EdgeError(409,'state.changed','The world entered a quiet barrier; retry.');const fresh=this.host.engine.canPerform({actor:soul.entityId,label,steps});if(fresh)throw new EdgeError(409,fresh.code,fresh.code.startsWith('carrier.')?fresh.message:humanBlockedExplanationV1(fresh.code,label));return true;};
+        await this.host.enqueueObjectDecision(`edge:${soul.soulId}`,{soulId:soul.soulId,entityId:soul.entityId,option:capability,label,steps,reevalTicks:1e9,fallback:false,trigger:`edge-act:${id}`},guard,()=>{const detail=admission.commit(id)??{};this.insert(soul,capability,'waiting',clientRef,false,detail,{},id);const program=this.host.engine.programOf(soul.entityId);if(!program)throw Error('object.native-program-missing');this.update(id,{phase:'started',program_id:program});return true;});
+      }
+      return {accepted:true as const,receipt:this.receipt(soul.soulId,id)!};
+    }catch(error){return refuse(error instanceof EdgeError?error.code:'object.admission-failed',error instanceof EdgeError?error.message:'Object/body admission did not commit; observe and retry.');}
   }
 
   // ---------------------------------------------------------------- rides (carrier/1)

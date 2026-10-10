@@ -23,7 +23,7 @@ const BASE_MIN=-10,BASE_RANGE=100;
 const WARM='#ffc27a',FIRE='#ff9448',WINDOW='#ffd79a',PATH='#ffcf8a',COOL='#cfe3ff';
 const lamp=(x:number,z:number):NightSource=>({x,z,radius:3.4,intensity:1.35,color:WARM,halo:10});
 /** Light kinds published by scenery modules. Lamps match the residential cluster (the reference look). */
-export type NightKind='lamp'|'park-lamp'|'lantern'|'window'|'fire'|'string';
+export type NightKind='lamp'|'park-lamp'|'lantern'|'window'|'fire'|'string'|'mural-uplight';
 export function nightSource(x:number,base:number,z:number,kind:string,scale=1):NightSource|null{
  if(![x,base,z,scale].every(Number.isFinite))return null;const k=Math.max(.3,Math.min(2,scale));
  switch(kind as NightKind){
@@ -34,6 +34,7 @@ export function nightSource(x:number,base:number,z:number,kind:string,scale=1):N
   case 'window':return {x,z,base,radius:4*k,intensity:.2,color:WINDOW,halo:7*k};
   case 'fire':return {x,z,base,radius:4.5*k,intensity:1.3,color:FIRE,halo:13*k};
   case 'string':return {x,z,base,radius:4*k,intensity:.7,color:'#ffe0a8',halo:9*k};
+  case 'mural-uplight':return {x,z,base,radius:1.8*k,intensity:1.2,color:WINDOW,halo:5*k};
   default:return null;
  }
 }

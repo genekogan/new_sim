@@ -42,10 +42,10 @@ export const REGION_PLACES:readonly RegionPlace[]=Object.freeze([
   ['gazebo','Park gazebo','pavilion',[-31.6,106.4,-24.4,113.6],false,null,'An octagonal white gazebo with a green roof — shelter from rain, or a tiny bandstand.'],
   ['playground','Playground','playground',[11,97,27,109],false,null,'A fenced sandpit playground with swings, a slide, a climbing frame and a see-saw.'],
  ],{starting:true}),
- ...district('sports-ground','Sports ground',[33,86,106,134],'A football pitch with crisp white lines, goals and a covered grandstand, two tennis courts and a clubhouse with a veranda.',[
-  ['pitch','Football pitch','field',[36,95,92,129],false,null,'A striped grass pitch, 56 by 34 metres, with full markings and goals.'],
-  ['tennis-courts','Tennis courts','field',[91,92,103,126],false,null,'Two fenced hard courts, one blue and one clay-red.'],
-  ['clubhouse','Clubhouse','building',[33.5,123,39.5,133],true,cap(33.5,123,39.5,133),'A small white clubhouse with a green roof and a veranda over the pitch.'],
+ ...district('sports-ground','Sports ground',[19.5,86,106,134],'A football pitch with crisp white lines, goals and a covered grandstand, two tennis courts and a clubhouse with a veranda.',[
+  ['pitch','Football pitch','field',[36,97,86,127],false,null,'A striped grass pitch, 50 by 30 metres, with full markings and goals.'],
+  ['tennis-courts','Tennis courts','field',[93.5,94,105.5,133],false,null,'Two fenced hard courts, one blue and one clay-red.'],
+  ['clubhouse','Clubhouse','building',[19.5,112,25.5,122],true,cap(19.5,112,25.5,122),'A small white clubhouse with a green roof and a veranda over the pitch.'],
  ]),
  ...district('farm-hamlet','Farm hamlet',[-104,92,-44,136],'Crop fields in green and gold rows divided by hedges, a red barn, a farmhouse with a veranda, three silos, hay bales, a tractor and a white windmill.',[
   ['fields','Crop fields','garden',[-102,94,-62,112],false,null,'Rows of vegetables and grain, tended by hand.'],
@@ -58,7 +58,7 @@ export const REGION_PLACES:readonly RegionPlace[]=Object.freeze([
   ['west-pier','West pier','pier',[8.4,141.5,11.6,167.5],false,null,'A timber pier with boats moored on both sides.'],
   ['east-pier','East pier','pier',[60.4,141.5,63.6,175.5],false,null,'The longer pier, reaching into deeper water.'],
   ['lighthouse','Lighthouse','building',[93.9,185.9,98.1,190.1],true,5,'A red-and-white striped lighthouse at the end of the breakwater.'],
-  ['fish-market','Fish market','building',[41,128,55,134],true,cap(41,128,55,134),'A blue timber shed where the day’s catch is sold.'],
+  ['fish-market','Fish market','building',[13.5,129,27.5,135],true,cap(13.5,129,27.5,135),'A blue timber shed where the day’s catch is sold.'],
   ['beach','Beach','beach',[-100,134,-44,146],false,null,'Pale sand, colourful bathing huts, umbrellas and towels at the water’s edge.'],
  ],{starting:true}),
  ...district('seaside-resort','Seaside resort',[106,112,206,192],'Pastel hotels with balconies line a seafront promenade; a ferris wheel and a carousel turn on the beach, a café terrace spreads umbrellas, and sailboats crowd the marina.',[

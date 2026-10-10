@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {leafSpell} from './visual-transitions.ts';
 import {hash01} from './weather.ts';
 /** Rain streaks and wind-blown autumn leaves near the camera only: one draw of
  * small camera-facing quads (rain and leaves are two ranges of one buffer). Each drop is
@@ -33,14 +34,15 @@ void leaf(){
  float a=t*(2.0+aSeed.x*3.0)+ph,flip=cos(t*(1.3+aSeed.y*2.0)+ph*.7);
  vec2 c=vec2(aSide,aSeed.w*2.0-1.0)*mix(vec2(.05,.035),vec2(mix(.011,.016,dust)),mote);c=vec2(c.x*cos(a)-c.y*sin(a),c.x*sin(a)+c.y*cos(a));
  p+=r*c.x*mix(.25+.75*abs(flip),1.0,mote)+u*c.y;
- float on=step(fract(aSeed.x*17.3+aSeed.z*5.1),mix(uRain.w,uMotes.x,mote));
+ float threshold=fract(aSeed.x*17.3+aSeed.z*5.1);
+ float on=mix(smoothstep(threshold-.03,threshold+.03,uRain.w),step(threshold,uMotes.x),mote);
  vC=mix(mix(mix(vec3(.62,.24,.06),vec3(.78,.55,.12),fract(aSeed.z*9.7)),vec3(.36,.22,.1),step(.7,fract(aSeed.x*5.3)))*(.35+.65*uRain.z)*(.75+.25*abs(flip)),mix(vec3(1.0,.97,.86)*1.3,vec3(.72,.62,.48)*(.45+.55*uRain.z),uMotes.y),mote);
  vUv=vec3(aSide,aSeed.w*2.0-1.0,1.0+mote);
  // motes glint as they turn in the sun and only show close to the camera
  float glint=mix(1.0,mix(.35+.65*pow(.5+.5*sin(t*2.6+ph*3.0),3.0),.55,uMotes.y),mote);
  vA=on*glint*smoothstep(1.0,2.5,dist)*(1.0-smoothstep(BOX*mix(.3,.12,mote),BOX*mix(.5,.22,mote),length(p.xz-uCam.xz)))*mix(1.0,.75,mote);
  gl_Position=projectionMatrix*viewMatrix*vec4(p,1.0);
- if(on<.5)gl_Position=vec4(2.0,2.0,2.0,1.0);
+ if(on<.001)gl_Position=vec4(2.0,2.0,2.0,1.0);
 }
 void main(){
  vUv=vec3(0.0);
@@ -69,7 +71,7 @@ varying vec3 vUv;
 void main(){if(vUv.z>1.5){if(dot(vUv.xy,vUv.xy)>1.0)discard;}else if(vUv.z>.5&&abs(vUv.x)>(1.0-vUv.y*vUv.y)*.95)discard;gl_FragColor=vec4(vC,vA);
  #include <colorspace_fragment>
 }`;
-export const RAIN_DROPS=4200,LEAVES=420,MOTES=700;
+export const RAIN_DROPS=4200,LEAVES=280,MOTES=700;
 export class Rain{
  readonly lines:THREE.Mesh<THREE.BufferGeometry,THREE.ShaderMaterial>;
  readonly uniforms={uMotes:{value:new THREE.Vector4()},uRain:{value:new THREE.Vector4()},uCam:{value:new THREE.Vector3()},uWind:{value:new THREE.Vector3()}};
@@ -87,6 +89,7 @@ export class Rain{
  }
  /** Rain and leaves together: the draw range covers only the populations that are on. */
  update2(seconds:number,intensity:number,leaves:number,daylight:number,camera:THREE.Camera,windX:number,windZ:number,wind:number,motes=0,dust=0){
+  leaves*=leafSpell(seconds,wind);
   const rainOn=intensity>.01,leavesOn=leaves>.01,motesOn=motes>.01;this.lines.visible=rainOn||leavesOn||motesOn;if(!this.lines.visible)return;
   // contiguous ranges: [rain][leaves][motes]; start at the first one on, end after the last one on
   const start=rainOn?0:leavesOn?RAIN_DROPS:RAIN_DROPS+LEAVES,end=motesOn?RAIN_DROPS+LEAVES+MOTES:leavesOn?RAIN_DROPS+LEAVES:RAIN_DROPS;

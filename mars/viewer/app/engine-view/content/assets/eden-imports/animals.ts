@@ -11,6 +11,8 @@ import {HERDS,FLOCKS,AVOID,type Herd,type Rect} from './animal-plan.ts';
  * Rendering: one skinned clone per animal (one draw each: colours baked into vertex colours), drawn within DRAW_M of the
  * camera, animated within ANIMATE_M (farther ones hold their pose), all updated from one per-frame hook. */
 const DRAW_M=140,ANIMATE_M=70,ROAM_SEGMENTS=6;
+/** Placement adapter outside the animation mixer; never modifies source rigs/tracks. */
+export const animalFacingYaw=(model:string,yaw:number)=>yaw-(['dog','cat'].includes(model)?Math.PI/2:0);
 type Agent={id:string;herd:Herd;root:THREE.Object3D;model:THREE.Object3D;mixer:THREE.AnimationMixer;acts:Record<string,THREE.AnimationAction|undefined>;cur:string;speed:number};
 type Flyer={root:THREE.Object3D;model:THREE.Object3D;mixer:THREE.AnimationMixer;act?:THREE.AnimationAction;c:[number,number];r:number;h:number;w:number;ph:number;y?:number};
 const inRect=(r:Rect,x:number,z:number)=>x>=r[0]&&x<=r[2]&&z>=r[1]&&z<=r[3];
@@ -57,7 +59,7 @@ export function createEdenAnimals(ground:(x:number,z:number)=>number|null,assets
   for(const a of agents){
    const [x,z,yaw,moving]=agentAt(a.herd,a.id,t),d=Math.hypot(x-cam.x,z-cam.z);
    const y=decorationGround(ground,x,z);a.root.visible=d<DRAW_M&&y!==null;if(!a.root.visible)continue;
-   a.root.position.set(x,y!,z);a.root.rotation.y=yaw;
+   a.root.position.set(x,y!,z);a.root.rotation.y=animalFacingYaw(a.herd.model,yaw);
    if(d>ANIMATE_M&&a.cur)continue;
    // standing still without an idle clip: the walk clip held at its first frame
    let want=moving?'walk':(a.herd.clips.eat&&a.acts.eat&&hash01(a.id,Math.floor(t/23))<.55?'eat':'idle');const hold=want==='idle'&&!a.acts.idle;if(hold)want='walk';
