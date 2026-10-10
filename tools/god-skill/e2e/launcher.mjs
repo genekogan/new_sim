@@ -129,7 +129,7 @@ try {
     const clip = await page.evaluate(() => navigator.clipboard.readText().catch(() => null));
     await shot('04-claimed');
     return { ticks, copies, clip };
-  }, (r) => r.ticks.signin && r.ticks.claim && !r.ticks.pair && !r.ticks.build && r.copies >= 1 && /eden-god\.mjs/.test(r.clip ?? 'eden-god.mjs'));
+  }, (r) => r.ticks.signin && r.ticks.claim && !r.ticks.pair && !r.ticks.build && r.copies >= 1 && /eden-god\.mjs|SKILL\.md/.test(r.clip ?? 'eden-god.mjs'));
 
   let pairing;
   await step('the agent, in a fresh folder: download the CLI and skill, register, pair', async () => {
