@@ -801,7 +801,17 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   let into = intrusion(rt, a, cur, pl.p, r) ?? loadIntrusion(rt, a, cur, pl.p, r);
   if (into && pl.off !== bodyOff && !lagging) {
     const keep = place(ex.s, bodyOff);
-    if (dist2(cur, keep.p) <= stepMax + 1e-9 && !(intrusion(rt, a, cur, keep.p, r) ?? loadIntrusion(rt, a, cur, keep.p, r))) { pl = keep; into = null; }
+    if (dist2(cur, keep.p) <= stepMax + 1e-9 && !(intrusion(rt, a, cur, keep.p, r) ?? loadIntrusion(rt, a, cur, keep.p, r))) {
+      // Prospective reporting only: at the endpoint a held sidestep can be
+      // obstructed even though the destination itself is free. Retain the real
+      // dependency for existing wait/recovery instead of an unnamed settle.
+      if (arrived && rt.services.walkSettleWaitV1 === true) {
+        if (rt.world.entities[into]?.kind === 'human') personBlock ??= into;
+        else loadBlock ??= into;
+        ex.v = 0;
+      }
+      pl = keep; into = null;
+    }
   }
   let p = pl.p;
   ex.offset = pl.off;
