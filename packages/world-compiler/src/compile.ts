@@ -87,6 +87,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         const def = scratch.resolvedDef(op.def);
         if (!def) { failures.push(fail(i, 'def.unknown', op.def)); return; }
         const parentId = resolveId(op.in.parent, i); if (!parentId) return;
+        if (op.name && scratch.names.has(`${parentId}/${op.name}`)) { failures.push(fail(i, 'name.taken', op.name)); return; }
         const fieldsOk = checkFields(def.params, op.params, true);
         if (!fieldsOk.ok) { failures.push(fail(i, 'params.invalid', fieldsOk.detail)); return; }
         const stateOk = checkFields(def.state, op.state, true);
@@ -362,7 +363,7 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
   if (along && e.in.parent === 'world') {
     const ref = w.get(along.ref);
     if (!ref || !ref.shape || !('path' in ref.shape)) return fail(i, 'constraint.unsatisfied', `along: ${along.ref} is not a path entity`);
-    const sideK = along.side === 'left' ? 1 : along.side === 'right' ? -1 : 0;
+    const sideK = along.side === 'left' ? -1 : along.side === 'right' ? 1 : 0;   // offsetPolyline(+d) is the walker's right (+z is south)
     const path = sideK ? offsetPolyline(ref.shape.path, sideK * ((ref.shape.width ?? 0) / 2 + along.offset)) : ref.shape.path;
     const { p: at, dir } = pointAlong(path, along.t);
     e.p = [at[0], at[1]];
@@ -407,7 +408,7 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
   if (facing) {
     const ref = w.get(facing.ref);
     if (!ref) return fail(i, 'constraint.unsatisfied', `facing: no such ref ${facing.ref}`);
-    const me = w.worldPose(e), them = w.worldPose(ref);
+    const me = w.worldPose(e), them = aimOf(w, ref);
     const parentYaw = e.in.parent === 'world' ? 0 : w.worldPose(w.entities.get(e.in.parent)!).yaw;
     const yaw = Math.atan2(them.x - me.x, them.z - me.z) - parentYaw + facing.offset;
     e.r = Array.isArray(e.r) ? [yaw, e.r[1], e.r[2]] : yaw;
@@ -604,4 +605,15 @@ function admitForResolve(w: WorldModel, e: Entity, def: StoredDef): string | nul
   const f = admit(w, e, def, -1, 'strict', false);
   if (!f) return null;
   return f.code === 'overlap.solid' ? null : `${f.code}: ${f.detail}`;
+}
+
+/** Where `facing` aims: an area's centroid or a path's midpoint (in the ref's frame), else the ref's origin. */
+function aimOf(w: WorldModel, ref: Entity): { x: number; z: number } {
+  const pose = w.worldPose(ref), sh = ref.shape as { area?: [number, number][]; path?: [number, number][] } | undefined;
+  let local: [number, number] | undefined;
+  if (sh?.area?.length) { let x = 0, z = 0; for (const q of sh.area) { x += q[0]; z += q[1]; } local = [x / sh.area.length, z / sh.area.length]; }
+  else if (sh?.path?.length) { const m = pointAlong(sh.path, 0.5).p; local = [m[0], m[1]]; }
+  if (!local) return pose;
+  const c = Math.cos(pose.yaw), sn = Math.sin(pose.yaw);
+  return { x: pose.x + local[0] * c + local[1] * sn, z: pose.z - local[0] * sn + local[1] * c };
 }

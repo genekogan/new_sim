@@ -76,11 +76,9 @@ export function pointAlong(path, t) {
 }
 /** Left of a path = the walker's left going from its first point to its last (north when walking east). */
 export const leftOf = (dir) => [dir[1], -dir[0]];
-/** The compiler (L1, compile.ts) re-places `along` things itself with generators' offsetPolyline, whose
- *  positive side is (−dz, +dx): the walker's RIGHT in this frame (+z is south). Until that is flipped
- *  server-side, the solver translates the walker's side into the server's label so both agree on the
- *  spot. Set to false when compile.ts uses the walker's-left convention. */
-export const SERVER_SIDE_MIRRORED = true;
+/** The compiler (compile.ts `along`) and query.ts use the walker's side since L7 patch P2, so labels pass
+ *  through unchanged. True would translate for a server that still uses offsetPolyline's sign. */
+export const SERVER_SIDE_MIRRORED = false;
 const serverSide = (side) => (SERVER_SIDE_MIRRORED && side === 'left' ? 'right' : SERVER_SIDE_MIRRORED && side === 'right' ? 'left' : side);
 
 // ---------------------------------------------------------------- overlap (local pre-check; the server decides)

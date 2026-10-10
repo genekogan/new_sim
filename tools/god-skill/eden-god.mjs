@@ -254,7 +254,7 @@ function pointAlong(path, t) {
   return { p: path[0], dir: [1, 0] };
 }
 var leftOf = (dir) => [dir[1], -dir[0]];
-var SERVER_SIDE_MIRRORED = true;
+var SERVER_SIDE_MIRRORED = false;
 var serverSide = (side) => SERVER_SIDE_MIRRORED && side === "left" ? "right" : SERVER_SIDE_MIRRORED && side === "right" ? "left" : side;
 function corners(b) {
   const c = Math.cos(b.yaw), s = Math.sin(b.yaw);

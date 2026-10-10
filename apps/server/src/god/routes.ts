@@ -10,6 +10,7 @@ import type { GodMode } from './god.ts';
 import { godSchema } from './schema.ts';
 import { runQuery } from './query.ts';
 import { mountAssetRoutes } from './assets.ts';
+import { schemaMarkdown } from '../../../../tools/god-skill/lib/schema-md.mjs';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -57,6 +58,8 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.get('/god/SKILL.md', serveFile('SKILL.md', 'text/markdown; charset=utf-8'));
   app.get('/god/skill.md', serveFile('SKILL.md', 'text/markdown; charset=utf-8'));
   app.get('/god/eden-god.mjs', serveFile('eden-god.mjs', 'text/javascript; charset=utf-8'));
+  app.get('/god/SCHEMA.md', (c) => c.body(schemaMarkdown(godSchema()), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-cache' }));
+  app.get('/god/examples/:file{[a-z0-9-]+\\.(mjs|log)}', (c) => { const f = c.req.param('file'); return serveFile(`examples/${f.endsWith('.mjs') ? '' : 'shots/'}${f}`, f.endsWith('.mjs') ? 'text/javascript; charset=utf-8' : 'text/plain; charset=utf-8')(c); });
   app.get('/v1/god/status', async (c) => {
     let user: UserRow | null = null; try { user = await d.requireUser(c); } catch { /* visitor */ }
     const god = d.god.godFromToken(bearer(c));

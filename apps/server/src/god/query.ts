@@ -306,7 +306,7 @@ function checkConstraint(w: WorldModel, e: Entity, c: NonNullable<Entity['constr
       const path = refE!.shape && 'path' in refE!.shape ? refE!.shape.path : null;
       if (!path) return { ...c, ok: false, why: `${c.ref} is not a path` };
       // exactly the compiler's placement (compile.ts admit): offset from the path edge, side by offsetPolyline
-      const sideK = c.side === 'left' ? 1 : c.side === 'right' ? -1 : 0;
+      const sideK = c.side === 'left' ? -1 : c.side === 'right' ? 1 : 0;
       const line = sideK ? offsetPolyline(path, sideK * (((refE!.shape as { width?: number }).width ?? 0) / 2 + c.offset)) : path;
       const { p } = pointAlong(line, c.t);
       const d = Math.hypot(p[0] - pose.x, p[1] - pose.z);

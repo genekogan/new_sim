@@ -4,7 +4,7 @@
 import { Terrain, emptyGround, type Ground, type Landform, type Water } from '@sim/ground';
 import { GENERATORS, type Baked, type LocalOBB } from '@sim/generators';
 import { hashOf } from './hash.ts';
-import { defSchema, type Def, type DefInput, type Entity, type StoredDef, type Value, type WorldConstants, type WorldState, worldConstantsSchema, worldStateSchema } from './schemas.ts';
+import { defSchema, fieldSchema, type Def, type DefInput, type Entity, type StoredDef, type Value, type WorldConstants, type WorldState, worldConstantsSchema, worldStateSchema } from './schemas.ts';
 
 export type OBB = { c: [number, number]; half: [number, number]; yaw: number; y0: number; y1: number };
 /** `baked`: physics of a footprint sidecar (asset store, L5), already in the def's metres. */
@@ -57,10 +57,16 @@ export class WorldModel {
   /** Follow `extends` to merge params defaults/components/slots. Child overrides parent field-by-field. */
   resolvedDef(ref: string, depth = 0): StoredDef | undefined {
     const d = this.defs.get(ref);
-    if (!d || !d.extends || depth > 8) return d;
-    const base = this.resolvedDef(d.extends, depth + 1);
-    if (!base) return d;
-    return { ...base, ...d, params: { ...base.params, ...d.params }, state: { ...base.state, ...d.state }, components: { ...base.components, ...d.components }, slots: d.slots.length ? d.slots : base.slots, actions: d.actions.length ? d.actions : base.actions, make: d.make.kind === 'none' && base.make.kind !== 'none' ? base.make : d.make };
+    if (!d) return d;
+    const base = d.extends && depth <= 8 ? this.resolvedDef(d.extends, depth + 1) : undefined;
+    const r = base ? { ...base, ...d, params: { ...base.params, ...d.params }, state: { ...base.state, ...d.state }, components: { ...base.components, ...d.components }, slots: d.slots.length ? d.slots : base.slots, actions: d.actions.length ? d.actions : base.actions, make: d.make.kind === 'none' && base.make.kind !== 'none' ? base.make : d.make } : d;
+    // a gen-made def exposes its generator's params; the def's own params override them
+    if (depth === 0 && r.make.kind === 'gen') {
+      const hit = r === d ? withGenParams.get(d) : undefined; if (hit) return hit;
+      const gp = genParams(r.make.gen); if (!gp) return r;
+      const out = { ...r, params: { ...gp, ...r.params } }; if (r === d) withGenParams.set(d, out); return out;
+    }
+    return r;
   }
 
   // ---------- baking ----------
@@ -281,4 +287,16 @@ function defaultsOf(fields: Record<string, { default?: unknown }>): Record<strin
   const out: Record<string, Value> = {};
   for (const [k, f] of Object.entries(fields)) if (f.default !== undefined) out[k] = f.default as Value;
   return out;
+}
+
+const withGenParams = new WeakMap<StoredDef, StoredDef>();
+const genParamsCache = new Map<string, StoredDef['params'] | null>();
+/** A generator's params parsed as def fields (defaults filled), cached per generator id. */
+function genParams(gen: string): StoredDef['params'] | undefined {
+  if (!genParamsCache.has(gen)) {
+    const g = GENERATORS[gen]; let out: StoredDef['params'] | null = null;
+    if (g?.params && Object.keys(g.params).length) { out = {}; for (const [k, f] of Object.entries(g.params)) { const parsed = fieldSchema.safeParse(f); if (parsed.success) out[k] = parsed.data as StoredDef['params'][string]; } }
+    genParamsCache.set(gen, out);
+  }
+  return genParamsCache.get(gen) ?? undefined;
 }
