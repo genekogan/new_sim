@@ -15,7 +15,12 @@ function primitive(sh: KitShape, round: number): THREE.BufferGeometry {
     case 'box': case 'rbox': {
       const [w, h, d] = sh.size ?? [1, 1, 1];
       const r = Math.min(sh.round ?? (sh.kind === 'rbox' ? Math.max(round, 0.06) : round), Math.min(w, h, d) / 2 - 1e-4);
-      return r > 0.005 ? new RoundedBoxGeometry(w, h, d, 1, r) : new THREE.BoxGeometry(w, h, d);
+      if (r <= 0.005) return new THREE.BoxGeometry(w, h, d);
+      if (sh.kind === 'rbox' && (sh.segments ?? 0) >= 2) return new RoundedBoxGeometry(w, h, d, 2, r);  // explicitly smooth
+      // chamfered box: a bevelled extrude (~28–44 tris) instead of RoundedBox (108): rounded look, 80/20 budget
+      const s = new THREE.Shape(); s.moveTo(-w / 2 + r, -h / 2 + r); s.lineTo(w / 2 - r, -h / 2 + r); s.lineTo(w / 2 - r, h / 2 - r); s.lineTo(-w / 2 + r, h / 2 - r); s.closePath();
+      const g = new THREE.ExtrudeGeometry(s, { depth: Math.max(1e-3, d - 2 * r), bevelEnabled: true, bevelSize: r, bevelThickness: r, bevelSegments: 1, curveSegments: 1 });
+      g.translate(0, 0, -(d - 2 * r) / 2); return g;
     }
     case 'cyl': return new THREE.CylinderGeometry(sh.r2 ?? sh.r ?? 0.5, sh.r ?? 0.5, sh.h ?? 1, seg);
     case 'cone': return new THREE.ConeGeometry(sh.r ?? 0.5, sh.h ?? 1, seg);
@@ -26,7 +31,7 @@ function primitive(sh: KitShape, round: number): THREE.BufferGeometry {
     case 'wedge': {
       const [w, h, d] = sh.size ?? [1, 1, 1];
       const s = new THREE.Shape([new THREE.Vector2(-d / 2, -h / 2), new THREE.Vector2(d / 2, -h / 2), new THREE.Vector2(-d / 2, h / 2)]);
-      const g = new THREE.ExtrudeGeometry(s, { depth: w, bevelEnabled: round > 0.005, bevelSize: Math.min(round, 0.03), bevelThickness: Math.min(round, 0.03), bevelSegments: 1 });
+      const g = new THREE.ExtrudeGeometry(s, { depth: w, bevelEnabled: (sh.round ?? round) > 0.005, bevelSize: Math.min(sh.round ?? round, 0.03), bevelThickness: Math.min(sh.round ?? round, 0.03), bevelSegments: 1 });
       g.translate(0, 0, -w / 2); g.rotateY(-Math.PI / 2); return g;
     }
     case 'arch': {
@@ -37,7 +42,7 @@ function primitive(sh: KitShape, round: number): THREE.BufferGeometry {
     case 'lathe': return new THREE.LatheGeometry((sh.profile ?? [[0.5, 0], [0.5, 1]]).map(([r, y]) => new THREE.Vector2(Math.max(0, r), y)), seg);
     case 'extrude': {
       const s = new THREE.Shape((sh.polygon ?? [[0, 0], [1, 0], [0, 1]]).map(([x, z]) => new THREE.Vector2(x, z)));
-      const g = new THREE.ExtrudeGeometry(s, { depth: sh.h ?? 0.2, bevelEnabled: round > 0.005, bevelSize: Math.min(round, 0.03), bevelThickness: Math.min(round, 0.03), bevelSegments: 1 });
+      const g = new THREE.ExtrudeGeometry(s, { depth: sh.h ?? 0.2, bevelEnabled: (sh.round ?? round) > 0.005, bevelSize: Math.min(sh.round ?? round, 0.03), bevelThickness: Math.min(sh.round ?? round, 0.03), bevelSegments: 1 });
       g.rotateX(Math.PI / 2); g.translate(0, sh.h ?? 0.2, 0); return g;
     }
     case 'sweep': {

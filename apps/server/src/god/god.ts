@@ -237,6 +237,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   publicSnapshot() {
     const s = this.model.snapshot();
     const used = new Set(s.entities.map((e) => e.def));
+    for (const e of s.entities) for (const v of Object.values(e.params ?? {})) if (typeof v === 'string' && /@\d+$/.test(v) && this.model.def(v)) used.add(this.model.def(v)!.ref);
     const defs = s.defs.filter((d) => used.has(d.ref) || used.has('sha:' + d.hash) || used.has(d.ref.replace(/^core-/, 'core/')));
     return { contract: 'world/1', worldId: this.opts.worldId, seq: s.editSeq, counter: s.seq, seed: s.seed, tick: this.opts.tick(), constants: s.constants, state: s.state, ground: s.ground, defs: defs.map(publicDef), entities: s.entities };
   }

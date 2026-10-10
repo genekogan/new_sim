@@ -100,7 +100,8 @@ export function kitPhysics(args: KitArgs): Baked {
     y0 = Math.min(y0, c[1] - rh[1]); y1 = Math.max(y1, c[1] + rh[1]);
     z0 = Math.min(z0, c[2] - rh[2]); z1 = Math.max(z1, c[2] + rh[2]);
     const seg = sh.segments ?? 10;
-    tris += sh.kind === 'box' ? 12 : sh.kind === 'rbox' || sh.kind === 'wedge' ? 60 : sh.kind === 'sphere' ? seg * seg : sh.kind === 'capsule' ? seg * (seg + 4) : sh.kind === 'torus' || sh.kind === 'ring' ? seg * seg * 2 : sh.kind === 'lathe' ? seg * 2 * (sh.profile?.length ?? 2) : sh.kind === 'sweep' ? seg * 2 * (sh.path?.length ?? 2) : sh.kind === 'extrude' ? (sh.polygon?.length ?? 3) * 4 : seg * 4;
+    const r = sh.round ?? args.round;
+    tris += sh.kind === 'box' ? (r > 0.005 ? 44 : 12) : sh.kind === 'rbox' ? ((sh.segments ?? 0) >= 2 ? 300 : 44) : sh.kind === 'wedge' ? 30 : sh.kind === 'sphere' ? seg * seg : sh.kind === 'capsule' ? seg * (seg + 4) : sh.kind === 'torus' || sh.kind === 'ring' ? seg * seg * 2 : sh.kind === 'lathe' ? seg * 2 * (sh.profile?.length ?? 2) : sh.kind === 'sweep' ? seg * 2 * (sh.path?.length ?? 2) : sh.kind === 'extrude' ? (sh.polygon?.length ?? 3) * 4 : seg * 4;
     const tall = 2 * h[1] >= 0.3;
     const collide = sh.collide ?? ((sh.kind === 'box' || sh.kind === 'rbox' || sh.kind === 'cyl' || sh.kind === 'extrude') && tall && !sh.role);
     if (collide) colliders.push({ c: [c[0], c[2]], half: [rh[0], rh[2]], yaw: 0, y0: c[1] - rh[1], y1: c[1] + rh[1] });

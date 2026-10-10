@@ -99,6 +99,7 @@ export class WorldEntityLayer {
       for (const def of [...(d.defs ?? []), ...d.diff.defs]) { this.model.defs.set('sha:' + def.hash, def); this.model.defs.set(def.ref, def); if (def.ref.startsWith('core-')) this.model.defs.set('core/' + def.ref.slice(5), def); }
       for (const id of d.diff.removes) { this.model.delete(id); this.undraw(id); }
       for (const e of d.diff.upserts) { if (this.model.entities.has(e.id)) this.model.delete(e.id); this.model.insert(e); }
+      for (const e of d.diff.upserts) { const def = this.model.resolvedDef(e.def); if (def?.layer === 'solid') { try { this.model.index(e.id, this.model.footprint(e, def)); } catch { /* best effort */ } } }
       if (d.ground) { this.model.terrain = new Terrain(d.ground); this.rebuildTerrain(new Set(d.diff.tiles)); this.rebuildWater(); }
       if (d.diff.world) this.model.state = { ...this.model.state, ...d.diff.world } as WorldModel['state'];
       for (const e of d.diff.upserts) this.draw(e, true);
@@ -300,7 +301,7 @@ export class WorldEntityLayer {
     if (!instKey) this.thingsGroup.add(built);
     const to = { p: target, s: isWorld ? 1 : wp.s };
     if (isWorld) { from.s = fresh && ease ? 1 : 1; }
-    this.drawn.set(e.id, { ...(instKey ? { inst: instKey, settled: false } : {}), obj: built, from, to, t0: this.now, dur: ease ? EASE_IN_S : 0.001, defHash, world: isWorld, ...(hasMotion(def) && !isWorld ? { motion: { entity: e, def, yaw: wp.yaw } } : {}) });
+    this.drawn.set(e.id, { ...(instKey ? { inst: instKey, settled: false } : {}), obj: built, from, to, t0: this.now, dur: ease ? EASE_IN_S : 0.001, defHash, world: isWorld, ...(hasMotion(def) ? { motion: { entity: e, def, yaw: wp.yaw } } : {}) });
   }
   private undraw(id: string) {
     const d = this.drawn.get(id); if (!d || d.removing) return;

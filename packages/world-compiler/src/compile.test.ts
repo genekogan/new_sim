@@ -152,9 +152,9 @@ test('dry run (plan) never mutates; snapshot round-trips', () => {
 test('a batch of 50 placements validates fast', () => {
   const w = fresh();
   const ops = Array.from({ length: 50 }, (_, i) => ({ op: 'place' as const, def: coreRef('tree'), p: [i * 3 - 75, 0] as [number, number] }));
-  const t0 = performance.now();
+  const c0 = process.cpuUsage();  // CPU time: the bound is about the compiler, not machine load
   ok(applyBatch(w, { ops }, 'god', 1));
-  const ms = performance.now() - t0;
+  const c1 = process.cpuUsage(c0), ms = (c1.user + c1.system) / 1000;
   assert.ok(ms < 250, `50 placements took ${ms.toFixed(1)} ms`);
 });
 
