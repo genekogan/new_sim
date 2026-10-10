@@ -10,8 +10,8 @@ const dir=await mkdtemp(join(tmpdir(),'sim-soul-context-'));
 globalThis.location={origin:'https://sim.eden.art',pathname:'/w/eden/',hash:''};
 globalThis.sessionStorage={getItem:()=>null};
 const outfile=join(dir,'context.cjs');
-await build({stdin:{contents:`export {SoulFocus} from './SoulFocus.tsx';export {SoulAccount} from './SoulAccount.tsx';export {SoulMindDetails} from './SoulMind.tsx';export {createElement} from 'react';export {renderToStaticMarkup} from 'react-dom/server';`,resolveDir:new URL('.',import.meta.url).pathname,loader:'tsx'},outfile,bundle:true,format:'cjs',platform:'node',jsx:'automatic',loader:{'.css':'empty'},logLevel:'silent'});
-const {SoulFocus,SoulAccount,SoulMindDetails,createElement:h,renderToStaticMarkup:render}=require(outfile);
+await build({stdin:{contents:`export {SoulFocus} from './SoulFocus.tsx';export {SoulAccount} from './SoulAccount.tsx';export {SoulMindDetails} from './SoulMind.tsx';export {pollSoulConnection} from './soul-connection-poll.ts';export {connectionSetupPrompt} from './connection-prompt.ts';export {createElement} from 'react';export {renderToStaticMarkup} from 'react-dom/server';`,resolveDir:new URL('.',import.meta.url).pathname,loader:'tsx'},outfile,bundle:true,format:'cjs',platform:'node',jsx:'automatic',loader:{'.css':'empty'},logLevel:'silent'});
+const {SoulFocus,SoulAccount,SoulMindDetails,pollSoulConnection,connectionSetupPrompt,createElement:h,renderToStaticMarkup:render}=require(outfile);
 const soul={id:'s_A',entityId:'h_A',name:'Mutable Name',description:'Curious artist',doing:'',energy:'fine'};
 const auth=(id=null)=>({authed:!!id,ready:true,label:id,debug:{accountIdentity:id,privyUserId:null},login(){},logout(){}});
 const me={userId:'acct_A',souls:['s_A'],role:'user',invited:true};
@@ -40,5 +40,16 @@ test('owner mind shows only validated granted access, never claims an active cli
 test('multiple stable Soul IDs remain selectable despite mutable duplicate names',()=>{
  const s2={...soul,id:'s_B',entityId:'h_B'};const state={...sim,me:{...me,souls:['s_A','s_B']},conn:{...sim.conn,replica:{...sim.conn.replica,souls:new Map([['s_A',soul],['s_B',s2]])}}};
  const html=render(h(SoulAccount,{sim:state,auth:auth('acct_A'),api,select(){},pairCode:null,clearPair(){}}));assert.equal((html.match(/Mutable Name/g)??[]).length,2);assert.equal(calls,0);
+});
+test('published reconnect prompt preserves exact ID/world and accepts names only as data',()=>{
+ const prompt=connectionSetupPrompt('https://sim.eden.art/w/mars','s_A','Changed name');assert.match(prompt,/pair-soul/);assert.match(prompt,/approval wait/);assert.match(prompt,/instructions.md/);assert.match(prompt,/"soulId":"s_A"/);assert.match(prompt,/"currentName":"Changed name"/);assert.doesNotMatch(prompt,/Start connect|OS store|plaintext|skill.md/);assert.match(prompt,/Do not create another/);
+ for(const base of ['https://evil.example/w/unknown','https://sim.eden.art/w/mars?secret=x','https://user:pass@sim.eden.art/w/eden'])assert.equal(connectionSetupPrompt(base,'s_A'),null);
+ assert.equal(connectionSetupPrompt('https://sim.eden.art/w/eden','bad ID'),null);
+});
+test('private polling pauses when hidden and cancels stale in-flight grant reads',async()=>{
+ let reads=0,finish;const values=[],scheduled=[];const read=()=>{reads++;return new Promise(resolve=>finish=resolve);};const schedule=fn=>{scheduled.push(fn);return scheduled.length;};const cancel=()=>{};
+ const hidden=pollSoulConnection(false,read,v=>values.push(v),schedule,cancel);assert.equal(reads,0);hidden();
+ const stop=pollSoulConnection(true,read,v=>values.push(v),schedule,cancel);assert.equal(reads,1);assert.equal(scheduled.length,0);stop();finish({attached:true,label:'OLD_GRANT',since:1,last_used:1});await new Promise(resolve=>setImmediate(resolve));assert.deepEqual(values,[null,null]);assert.equal(scheduled.length,0);
+ const current=pollSoulConnection(true,read,v=>values.push(v),schedule,cancel);assert.equal(reads,2);finish({attached:false,label:null,since:null,last_used:null});await new Promise(resolve=>setImmediate(resolve));assert.equal(scheduled.length,1);assert.equal(values.at(-1).attached,false);scheduled[0]();assert.equal(reads,3);assert.equal(scheduled.length,1);current();finish({attached:true,label:'STALE',since:2,last_used:2});await new Promise(resolve=>setImmediate(resolve));assert.equal(values.at(-1).attached,false);assert.equal(scheduled.length,1);scheduled[0]();assert.equal(reads,3);
 });
 test.after(async()=>rm(dir,{recursive:true,force:true}));

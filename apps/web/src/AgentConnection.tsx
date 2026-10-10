@@ -15,7 +15,7 @@ function ConnectionCard({api,soulId,name,base,connection,refresh,notice}:Props){
   useEffect(()=>{live.current=true;const timer=setInterval(()=>setClock(Date.now()),1000);return()=>{live.current=false;clearInterval(timer);};},[]);
   useEffect(()=>{if(connection?.attached&&connection.since&&connection.since>=issuedAt)setCode(null);},[connection?.since,connection?.attached,issuedAt]);
   const expired=!!code&&clock-issuedAt>=15*60_000;
-  const setupPrompt=connectionSetupPrompt(base,soulId);
+  const setupPrompt=connectionSetupPrompt(base,soulId,name);
   const act=async(kind:'pair'|'revoke')=>{
     if(pending.current)return;pending.current=true;setBusy(true);setMessage(kind==='pair'?'Requesting a one-use code…':'Requesting disconnection…');
     try{

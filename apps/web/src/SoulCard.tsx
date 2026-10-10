@@ -63,7 +63,7 @@ export function SoulCard({api,soul,doing,energy,plays,talk,camera,pin,ownerActio
   <div className="soul-actions">
    <button onClick={()=>requestSoulConversations(soul.id)}>Conversations</button>
    {ownerAction&&<button onClick={ownerAction}>This mind</button>}
-   {pin&&<button aria-pressed={pin.pinned} aria-label={pin.pinned?'Pinned to your Souls; unpin this Soul':'Pin this Soul to your Souls'} title={pin.pinned?'Unpin from your Souls':'Pin to your Souls'} onClick={pin.toggle}>{pin.pinned?'Pinned':'This is mine'}</button>}
+   {pin&&<button aria-pressed={pin.pinned} aria-label={pin.pinned?'Pinned favourite; unpin this Soul':'Pin this Soul as a favourite'} title={pin.pinned?'Unpin favourite':'Pin favourite'} onClick={pin.toggle}>{pin.pinned?'Pinned':'Pin'}</button>}
    {camera&&<button className={camera.following?'soul-follow on':'soul-follow'} aria-pressed={camera.following} title={camera.following?'Stop following':'Keep the camera on this Soul'} onClick={camera.following?camera.stop:camera.follow}><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="2.6" fill="currentColor"/><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" strokeWidth="1.4"/></svg>{camera.following?'Following':'Follow'}</button>}
    <button className="soul-share" onClick={()=>void share()}><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6.5 9.5l3-3M7 4.5l1.3-1.3a2.6 2.6 0 013.6 3.6L10.5 8.2M9 11.5l-1.3 1.3a2.6 2.6 0 01-3.6-3.6l1.4-1.4" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>Share</button>
    <span className="soul-copied" role="status" aria-live="polite">{copied==='ok'?'Link copied':copied==='failed'?'Copy unavailable':''}</span>
