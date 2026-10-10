@@ -1,6 +1,7 @@
 // The homepage when the page is served by the world launcher
 // (tools/world-launcher): the worlds on this computer, and a New world dialog
 // that names a world, picks its template, starts it and opens it.
+import { BASE } from '../base-path.ts';
 import { useEffect, useRef, useState } from 'react';
 import './launcher-home.css';
 import { useSession, userAuthHeaders } from '../auth-session.ts';
@@ -22,7 +23,7 @@ export function LauncherHome({ initial }: { initial: LauncherList }) {
   const needsSignIn = session.mode === 'clerk' && !session.authed;
   const setDialog = (open: boolean) => { if (open && needsSignIn) { if (session.signInUrl) location.assign(session.signInUrl + '?new=1'); else session.login(); return; } setDialogRaw(open); };
   useEffect(() => {
-    const t = setInterval(() => { void fetch('/__sim/worlds.json').then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.launcher) setList(d); }).catch(() => {}); }, 6000);
+    const t = setInterval(() => { void fetch(`${BASE}/__sim/worlds.json`).then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.launcher) setList(d); }).catch(() => {}); }, 6000);
     return () => clearInterval(t);
   }, []);
   return (
@@ -56,7 +57,7 @@ export function LauncherHome({ initial }: { initial: LauncherList }) {
           </a>
         ))}
       </div>
-      {dialog && <NewWorldDialog templates={list.templates} onClose={() => { setDialog(false); const q = new URLSearchParams(location.search); if (q.has('new')) history.replaceState(null, '', '/'); }} />}
+      {dialog && <NewWorldDialog templates={list.templates} onClose={() => { setDialog(false); const q = new URLSearchParams(location.search); if (q.has('new')) history.replaceState(null, '', location.pathname); }} />}
     </main>
   );
 }
@@ -77,7 +78,7 @@ function NewWorldDialog({ templates, onClose }: { templates: LauncherTemplate[];
     setState({ phase: 'creating', started: Date.now() });
     try {
       // the creator's sign-in goes along: the launcher has the new world claim them as its god at birth
-      const r = await fetch('/__sim/worlds', { method: 'POST', headers: { 'content-type': 'application/json', ...await userAuthHeaders() }, body: JSON.stringify({ name: name.trim(), template, creator: localStorage.getItem('sim.dev') ?? undefined }) });
+      const r = await fetch(`${BASE}/__sim/worlds`, { method: 'POST', headers: { 'content-type': 'application/json', ...await userAuthHeaders() }, body: JSON.stringify({ name: name.trim(), template, creator: localStorage.getItem('sim.dev') ?? undefined }) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok || !d.url) throw new Error(d.message ?? `the launcher answered ${r.status}`);
       location.href = d.url;

@@ -1,5 +1,6 @@
 import { apiPath, worldPath, worldKey } from './world-path.ts';
 import {singleLocalPreview} from './local-navigation.ts';
+import {BASE} from './base-path.ts';
 import { StrictMode, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { PrivyProvider, usePrivy } from '@privy-io/react-auth';
@@ -88,14 +89,14 @@ function WorldRoot() {
   );
 }
 
-createRoot(document.getElementById('root')!).render(<StrictMode>{location.pathname==='/'&&!location.hash?<WorldList/>:<WorldRoot/>}</StrictMode>);
+createRoot(document.getElementById('root')!).render(<StrictMode>{location.pathname===BASE+'/'&&!location.hash?<WorldList/>:<WorldRoot/>}</StrictMode>);
 
 function WorldList(){
  const local=singleLocalPreview(location.hostname);
  const [served,setServed]=useState<Set<string>|null>(local?null:new Set(['eden','mars','littlemartians']));
  // Served by the world launcher (tools/world-launcher): its own homepage with New world.
  const [launcher,setLauncher]=useState<LauncherList|null>(null);
- useEffect(()=>{if(!local)return;let active=true;void fetch('/__sim/worlds.json').then(r=>r.ok?r.json():null).then(data=>{if(!active)return;if(data?.contract==='local-worlds/1'&&typeof data.launcher==='string'&&Array.isArray(data.worlds)){setLauncher(data);return;}setServed(data?.contract==='local-worlds/1'&&Array.isArray(data.worlds)?new Set(data.worlds.filter((w:{key?:unknown;basePath?:unknown})=>typeof w.key==='string'&&w.basePath==='/w/'+w.key).map((w:{key:string})=>w.key)):new Set(['eden']));}).catch(()=>{if(active)setServed(new Set(['eden']));});return()=>{active=false;};},[local]);
+ useEffect(()=>{if(!local&&!BASE)return;let active=true;void fetch(BASE+'/__sim/worlds.json').then(r=>r.ok?r.json():null).then(data=>{if(!active)return;if(data?.contract==='local-worlds/1'&&typeof data.launcher==='string'&&Array.isArray(data.worlds)){setLauncher(data);return;}setServed(data?.contract==='local-worlds/1'&&Array.isArray(data.worlds)?new Set(data.worlds.filter((w:{key?:unknown;basePath?:unknown})=>typeof w.key==='string'&&w.basePath==='/w/'+w.key).map((w:{key:string})=>w.key)):new Set(['eden']));}).catch(()=>{if(active)setServed(new Set(['eden']));});return()=>{active=false;};},[local]);
  if(launcher)return <LauncherRoot list={launcher}/>;
  const card=(key:string,name:string,description:string)=>served?.has(key)?<a href={'/w/'+key}><h2>{name}</h2><p>{description}</p><span>enter world →</span></a>:<article aria-disabled="true" style={{border:'1px solid var(--line)',borderRadius:12,padding:18}}><h2>{name}</h2><p>{description}</p><span className="dim">{served?'Not connected to this local preview':'Checking connection…'}</span></article>;
  return <main className="world-list"><h1>Sim</h1><p>Persistent worlds. Open one to watch, meet its Souls, or give yours direction.</p><div className="world-cards">{card('eden','Eden','Our shared playground. Meet its Souls and see what develops.')}{card('mars','Mars','The 2026 camp, shared places and pallet-rack construction.')}{card('littlemartians','Little Martians','Floating ceramic characters and enterable glazed buildings.')}</div>{!local&&<p><a href="/l/mars">Mars Lab</a> · <a href="/l/littlemartians">Little Martians snapshot</a> · <a href="/l/eden">Eden snapshot</a></p>}</main>;

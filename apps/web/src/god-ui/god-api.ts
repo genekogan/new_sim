@@ -2,6 +2,7 @@
 // edits, undo/redo, flags, previews. One origin may front many worlds (the
 // launcher), so the token is kept per world and checked against the world id it
 // was minted for.
+import { BASE } from '../base-path.ts';
 import { apiPath, worldKey } from '../world-path.ts';
 import { isFlagDef } from './checklist.ts';
 import { userAuthHeaders } from '../auth-session.ts';
@@ -95,14 +96,14 @@ export async function flags(): Promise<FlagRef[]> {
 
 // ---- the launcher (only when this page is served by tools/world-launcher)
 export async function launcherWorld(): Promise<{ world: LauncherWorld; seen: LauncherSeen } | null> {
-  try { const r = await fetch(`/__sim/worlds/${worldKey}`); return r.ok ? await r.json() : null; } catch { return null; }
+  try { const r = await fetch(`${BASE}/__sim/worlds/${worldKey}`); return r.ok ? await r.json() : null; } catch { return null; }
 }
 /** Recent previews the god asked for: the server's own list when it has one, else what the launcher saw. */
 export async function previews(): Promise<PreviewRow[]> {
   try { return (await god<{ previews: PreviewRow[] }>('/v1/god/previews')).previews; } catch { /* not on this server yet */ }
   try {
     const token = await ensureToken();
-    const r = await fetch(`/__sim/worlds/${worldKey}/previews`, { headers: { authorization: `Bearer ${token}` } });
+    const r = await fetch(`${BASE}/__sim/worlds/${worldKey}/previews`, { headers: { authorization: `Bearer ${token}` } });
     return r.ok ? (await r.json()).previews : [];
   } catch { return []; }
 }
