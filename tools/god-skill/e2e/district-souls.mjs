@@ -314,23 +314,29 @@ try {
   const pos = {}; for (const k of Object.keys(souls)) pos[k] = (await observe(S(k))).self.position;
   const close = (p, dx, dz, h = 3.2) => ({ eye: [p[0] + dx, p[1] + h, p[2] + dz], at: [p[0], p[1] + 0.8, p[2]] });
   await shots([
-    { name: 'overview-three-souls', eye: [50, 42, 64], at: [52, 0, 12], wait: 8000 },
-    { name: 'ana-on-the-plaza-bench', ...close(pos.ana, 3.5, 6), wait: 6000 },
+    // the district as a visitor sees it (roofs on), then the same three with the roofs off (Cleo is upstairs
+    // against the house's south wall, so that view comes from the east, where no wall stands between)
+    { name: 'overview-district', eye: [50, 42, 64], at: [52, 0, 12], wait: 8000 },
+    { name: 'overview-three-souls-roofs-off', eye: [96, 34, 22], at: [58, 0, 14], wait: 8000, hideRoofs: true },
+    { name: 'ana-on-the-plaza-bench', ...close(pos.ana, 3.5, 4.5, 2.4), wait: 6000 },
     { name: 'ben-on-the-gods-bench', ...close(pos.ben, -1.5, 6.5), wait: 6000 },
-    { name: 'cleo-upstairs-roof-hidden', eye: [pos.cleo[0] - 4, pos.cleo[1] + 7, pos.cleo[2] + 6], at: [pos.cleo[0], pos.cleo[1] + 0.6, pos.cleo[2]], wait: 8000, hideRoofs: true },
+    // from inside her room, in front of her (she faces north, away from the landing wall), so the stool shows
+    { name: 'cleo-upstairs-roof-hidden', eye: [pos.cleo[0] - 0.6, pos.cleo[1] + 1.9, pos.cleo[2] - 2.6], at: [pos.cleo[0], pos.cleo[1] + 0.6, pos.cleo[2]], wait: 8000, hideRoofs: true },
   ]);
 
   // ======================== known issue, recorded (not a pass/fail step): a café chair (core/parasol-table seat)
   if (!args['no-cafe']) {
-    const t0 = t();
+    const t0 = t(), before = recoveries().length;
     await soulDoes(S('ana'), 'stand:here', { maxS: 30 });
     const cap = `sit:${ids[CAFE]}`;
     await until(async () => ({ ok: (await caps(S('ana'))).some((c) => c.id === cap) }), 20000);
     const r = await soulDoes(S('ana'), cap, { params: { seconds: 600 }, maxS: 120, until: (me) => me.activity === 'sit' });
     await sleep(1500);
-    const fault = recoveries().map((x) => x.reason).join(' | ') || null;
-    report.notes = { cafeChair: { ms: +(t() - t0).toFixed(0), phase: r.phase, code: r.code, reason: r.reason, end: r.end, seated: r.end?.activity === 'sit', fromCafe: r.end ? +dist(xz(r.end.p), CAFE_P).toFixed(2) : null, fault } };
-    log(`  note: Ana at a café chair → ${r.end?.activity === 'sit' ? 'seated' : `${r.code ?? r.phase}, ended at ${JSON.stringify(r.end?.p)}`}`);
+    // a recovery may replay her back onto the plaza bench (seated, but not at the café): judge by where she sits
+    const fresh = recoveries().slice(before), fromCafe = r.end ? +dist(xz(r.end.p), CAFE_P).toFixed(2) : null;
+    const seated = r.end?.activity === 'sit' && fromCafe !== null && fromCafe < 1.3 && !fresh.length;
+    report.notes = { cafeChair: { ms: +(t() - t0).toFixed(0), phase: r.phase, code: r.code, reason: r.reason, end: r.end, seated, fromCafe, recoveries: fresh } };
+    log(`  note: Ana at a café chair → ${seated ? 'seated' : `not seated (${fresh.length ? 'engine fault recovered: ' + fresh[0].reason.slice(0, 160) : r.code ?? r.phase}); she ended at ${JSON.stringify(r.end?.p)}`}`);
   }
 } catch (e) {
   report.failures.push({ name: 'harness', error: String(e?.stack ?? e) });
