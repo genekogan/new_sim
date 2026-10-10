@@ -1400,7 +1400,6 @@ export class MarsEngine implements Engine {
   }
   configureRuntimePolicy(policy: {sleepBlockTicks:number;walkSettleWaitV1?:boolean;quietSeatCourtesy?:boolean;fixtureGroundGoalsV1?:boolean;nativeArrivalWitnessV1?:boolean;quietLandingCourtesyV1?:boolean;quietStallReleaseV1?:boolean;stairMakeWayV1?:boolean;yieldTimeoutV1?:boolean;spreadV2?:boolean}) {
     if(policy.walkSettleWaitV1!==undefined&&typeof policy.walkSettleWaitV1!=='boolean')throw Error('runtime-policy.walk-settle-wait');
-    if(policy.walkSettleWaitV1===true){this.cfg={...this.cfg,walkSettleWaitV1:true};this.rt.services.walkSettleWaitV1=true;}
     if(policy.stairMakeWayV1===true)this.cfg={...this.cfg,stairMakeWayV1:true};
     if((policy as {reflexTimeoutV1?:boolean}).reflexTimeoutV1===true)this.cfg={...this.cfg,reflexTimeoutV1:true};
     if((policy as {edgeMotionV1?:boolean}).edgeMotionV1===true)this.cfg={...this.cfg,edgeMotionV1:true};
@@ -1413,6 +1412,7 @@ export class MarsEngine implements Engine {
     if(policy.fixtureGroundGoalsV1===true)this.cfg={...this.cfg,fixtureGroundGoalsV1:true};
     if (!Number.isInteger(policy.sleepBlockTicks) || policy.sleepBlockTicks < 20 || policy.sleepBlockTicks > 72000) throw new Error('runtime-policy.sleep-limit');
     if(policy.quietSeatCourtesy !== undefined && typeof policy.quietSeatCourtesy !== "boolean") throw new Error("runtime-policy.quiet-seat-courtesy");
+    if(policy.walkSettleWaitV1===true){this.cfg={...this.cfg,walkSettleWaitV1:true};this.rt.services.walkSettleWaitV1=true;}
     this.cfg.sleepBlockTicks = policy.sleepBlockTicks;
     this.cfg.quietSeatCourtesy = policy.quietSeatCourtesy;
   }
