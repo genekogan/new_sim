@@ -47,3 +47,13 @@ test('a house with a sealed room is refused with the room named', { skip: !patch
   const f = (r.result as Refused).failures[0];
   assert.equal(f.code, 'architecture'); assert.match(f.detail, /room\.unreachable: store/);
 });
+
+test('set floors 2 → 1: furniture in rooms that went away moves to the ground floor, with a warning; undo puts it back', { skip: !patched && 'needs L1 patch 01 (set: orphaned slots)' }, () => {
+  const w = fresh();
+  ok(applyBatch(w, { ops: [{ op: 'place', tmp: '$h', def: 'core/cottage@1', name: 'c', p: [0, 0], params: { floors: 2 } }, { op: 'place', def: 'core/chair@1', name: 'up', in: { parent: '$h', slot: 'bedroom-2' } }] }, 'god', 1));
+  const r = applyBatch(w, { ops: [{ op: 'set', id: 'c', params: { floors: 1 } }] }, 'god', 2); const a = ok(r);
+  assert.equal(w.get('c/up')!.in.slot, 'ground'); assert.ok(a.warnings.some((x) => /bedroom-2 is gone/.test(x)), JSON.stringify(a.warnings));
+  assert.ok(w.worldPose(w.get('c/up')!).y < 0.2, 'on the ground floor');
+  ok(applyBatch(w, { ops: r.inverse! }, 'god', 3, { trusted: true }));
+  assert.equal(w.get('c/up')!.in.slot, 'bedroom-2');
+});
