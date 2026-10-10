@@ -70,11 +70,16 @@ async function shot(name, { eye, at, q = {} }) {
   const t0 = t();
   try {
     if (!browser) { browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] }); const ctx = await browser.newContext({ viewport: { width: 1100, height: 700 } }); await ctx.addInitScript(() => { localStorage.setItem('sim.dev', 'admin'); }); page = await ctx.newPage(); }
-    const qs = new URLSearchParams({ dev: '1', eye: eye.join(','), at: at.join(','), ...q }).toString();
-    const url = `${base}?${qs}`, sameQuery = lastUrl && lastUrl.split('&').filter((p) => !/^(eye|at)=/.test(p)).join('&') === url.split('?')[1].split('&').filter((p) => !/^(eye|at)=/.test(p)).join('&');
-    if (!sameQuery) { await page.goto(url, { waitUntil: 'commit', timeout: 300000 }); await page.waitForFunction(() => window.__simEntity?.layer?.active && window.__simEntity.layer.drawn?.size > 0, null, { timeout: 400000 }); await page.waitForTimeout(8000); }
-    lastUrl = url;
-    await page.evaluate(([e, a]) => { const w = window.__simEntity; w.controls.target.set(a[0], a[1], a[2]); w.camera.position.set(e[0], e[1], e[2]); w.camera.lookAt(w.controls.target); w.controls.update?.(); }, [eye, at]);
+    // one page load; the interior view switches live (window.__buildingView) so views do not reload
+    if (!lastUrl) {
+      lastUrl = `${base}?${new URLSearchParams({ dev: '1', eye: eye.join(','), at: at.join(',') })}`;
+      await page.goto(lastUrl, { waitUntil: 'commit', timeout: 300000 });
+      await page.waitForFunction(() => window.__simEntity?.layer?.active && window.__simEntity.layer.drawn?.size > 0, null, { timeout: 900000, polling: 5000 });
+      await page.waitForFunction(() => !/Arriving in/.test(document.body.innerText), null, { timeout: 300000, polling: 3000 }).catch(() => {});
+      await page.waitForTimeout(8000);
+      await page.evaluate(() => { for (const b of document.querySelectorAll('button')) if (b.textContent.trim() === '×') b.click(); }).catch(() => {});
+    }
+    await page.evaluate(([e, a, v]) => { window.__buildingView = v; const w = window.__simEntity; w.controls.target.set(a[0], a[1], a[2]); w.camera.position.set(e[0], e[1], e[2]); w.camera.lookAt(w.controls.target); w.controls.update?.(); }, [eye, at, { hideRoofs: q.hideRoofs === '1', cut: q.cut !== undefined ? Number(q.cut) : null }]);
     await page.waitForTimeout(4000);
     const state = await page.evaluate(() => { const w = window.__simEntity; let tris = 0, draws = 0; w.layer.group.traverse((o) => { if (o.isMesh && o.parent?.parent?.name === 'building-canonical') { draws++; tris += o.geometry.attributes.position.count / 3; } }); return { drawn: w.layer.drawn?.size, lastError: w.layer.stats.lastError, buildingDraws: draws, buildingTris: Math.round(tris) }; });
     const file = resolve(out, `${name}.png`);
@@ -133,13 +138,17 @@ try {
   await step('B5 undo: back to one floor, the same furniture', async () => { const r = await api('/v1/god/undo', { method: 'POST' }); const q = await query('cot'); const k = await kidsOf('cot'); return { r: r.data, floors: [...new Set(q.rooms.map((x) => x.floor))].length, n: k.kids.length }; }, (x) => x.r?.accepted !== false && x.floors === 1 && x.n === k1.kids.length);
   await step('B6 move the furnished cottage; everything rides along', async () => { const r = await act([{ op: 'move', id: 'house', p: [4, -4], r: 0.4 }]); const k = await kidsOf('house'); return { r: r.data, n: k.kids.length }; }, (x) => x.r?.accepted && x.n >= 5);
 
-  // pictures: outside, roofs off, the ground floor cut, the lighthouse, and a camera inside the house
-  await shot('b-outside', { eye: [-22, 16, 30], at: [2, 2, 2] });
-  await shot('b-lighthouse', { eye: [-12, 12, 26], at: [-26, 8, 6] });
-  await shot('b-hall-cottage', { eye: [44, 18, 34], at: [22, 2, 12] });
-  await shot('b-roofs-off', { eye: [-6, 18, 16], at: [4, 1, -4], q: { hideRoofs: '1' } });
-  await shot('b-cut-ground', { eye: [-6, 16, 15], at: [4, 0, -4], q: { hideRoofs: '1', cut: '0' } });
-  await shot('b-inside', { eye: [3.2, 1.6, -1.5], at: [6, 1.0, -6] });
+  // pictures, framed on where things stand now: outside, the lighthouse, the hall, roofs off, the ground floor cut, a camera in the living room
+  const m = await mirror();
+  const W = (name, lx, ly, lz) => { const e = m.get(name), p = m.worldPose(e), c = Math.cos(p.yaw), sn = Math.sin(p.yaw); return [+(p.x + lx * c + lz * sn).toFixed(2), +(p.y + ly).toFixed(2), +(p.z - lx * sn + lz * c).toFixed(2)]; };
+  const slot = (id) => m.slotsOf(m.get('house')).find((x) => x.id === id).p;
+  const living = slot('living'), kitchen = slot('kitchen');
+  await shot('b-outside', { eye: W('house', -9, 6, 14), at: W('house', 0, 2.5, 0) });
+  await shot('b-lighthouse', { eye: W('lighthouse', 12, 9, 18), at: W('lighthouse', 0, 8, 0) });
+  await shot('b-hall-cottage', { eye: W('hall', -14, 9, 22), at: W('hall', -8, 2, 6) });
+  await shot('b-roofs-off', { eye: W('house', -5, 15, 11), at: W('house', 0, 2, 0), q: { hideRoofs: '1' } });
+  await shot('b-cut-ground', { eye: W('house', -5, 13, 10), at: W('house', 0, 0, 0), q: { hideRoofs: '1', cut: '0' } });
+  await shot('b-inside', { eye: W('house', living[0] + 1.6, 1.65, living[2] + 2.0), at: W('house', kitchen[0], 1.0, kitchen[2] - 0.5) });
 } catch (e) {
   report.failures.push({ name: 'harness', error: String(e?.stack ?? e) }); log('harness error', e);
 } finally {

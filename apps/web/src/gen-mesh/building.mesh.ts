@@ -250,6 +250,7 @@ function dressOpening(b: Builder, L: BuildingLayout, w: Wall, op: Opening, o: Wa
   const leafW = op.width - 0.04, swing = sOut * 1.25;
   b.at(cx - hw + 0.02, o.base, 0, 0, () => b.at(0, 0, 0, swing, () => b.box(leafW / 2, 0, -sOut * 0.03, leafW, op.height - 0.02, 0.05, w.exterior ? mix(o.trim, '#5e412b', 0.4) : '#a77c52')));
   if (!w.exterior || op.to === 'balcony') return;
+  if (o.glassWalls) { b.box(cx, 0, sOut * (T / 2 + 0.25), op.width + 0.5, FLOOR0 + 0.02, 0.5, o.F.base); return; }
   // hood on brackets and a step (eden-facades), a lamp beside the door
   b.tilt(cx, o.base + op.height + 0.32, sOut * 0.38, op.width + 0.6, 0.06, 0.62, sOut * 0.2, 0, o.F.hood);
   for (const sd of [-1, 1]) b.box(cx + sd * (hw + 0.22), o.base + op.height + 0.04, sOut * 0.17, 0.06, 0.24, 0.3, o.trim);
@@ -289,7 +290,7 @@ function facade(b: Builder, L: BuildingLayout, o: { trim: string; quoin: string;
       } else if (o.mat !== 'glass') { b.group = 'level-0'; const m = P(end + 0.12, 0.025); b.box(m[0], 0.42, m[1], 0.24, top - 0.62, 0.06, o.quoin, 'trim', yaw); void c0; }
     }
     // a downpipe at the clockwise end of the long sides
-    if (o.detail >= 1 && len > 3.5 && o.mat !== 'glass') { b.group = 'level-0'; const m = P(len - 0.25, 0.1); b.cyl(m[0], 0.1, m[1], 0.045, 0.045, top - 0.4, '#4a4f4d', 'trim', 6); }
+    if (o.detail >= 1 && len > 3.5 && o.mat !== 'glass') { const m = P(len - 0.25, 0.1); for (let k = 0; k < L.floors; k++) { b.group = `level-${k}`; const y0 = k === 0 ? 0.1 : k * L.fh, y1 = k === L.floors - 1 ? top - 0.3 : (k + 1) * L.fh; b.cyl(m[0], y0, m[1], 0.045, 0.045, y1 - y0, '#4a4f4d', 'trim', 6); } }
   }
   // ivy on one wall of older (stone/brick) houses, clear of the windows
   if (o.detail >= 2 && (o.mat === 'stone' || o.mat === 'brick') && o.r() < 0.7) {
@@ -463,6 +464,11 @@ function attachInteriorView(root: THREE.Object3D, L: BuildingLayout) {
       if (!roofsOff && camLocal.y < (level + 1) * L.fh + FLOOR0 - SLAB - 0.05) keepSlab = level + 1;
     }
   };
+  // furniture and other children on hidden storeys follow the cut (WorldEntityLayer reads this; L1 patch 04)
+  const floorOf: Record<string, number> = { ground: 0, porch: 0, roof: L.floors, ...(L.balcony ? { balcony: L.balcony.floor } : {}) };
+  for (let k = 1; k < L.floors; k++) floorOf[`floor-${k}`] = k;
+  for (const r of L.rooms) floorOf[r.id] = r.floor;
+  root.userData.interior = { cut: () => hideAbove, floorOf };
   inner.traverse((o) => {
     const mesh = o as THREE.Mesh; if (!mesh.isMesh) return;
     const gname = mesh.parent?.name ?? '';

@@ -320,7 +320,7 @@ export function realize(p: Plan): Layout {
       const lantern = p.rooms.find((r) => r.floor === w.floor && (r.id === w.neg || r.id === w.pos))?.kind === 'lantern';
       let width = ws.width, sill = ws.sill, top = Math.min(ws.top, p.fh - SLAB - 0.15);
       if (p.round) {
-        const step = ws.spacing <= 2.4 ? 2 : ws.spacing <= 4 ? 4 : 8, chord = i % p.round.sides;
+        const step = ws.spacing <= 2.4 ? 2 : ws.spacing <= 5 ? 4 : 8, chord = i % p.round.sides;
         n = (chord + w.floor) % step === 0 && fullLen >= width + 0.3 ? 1 : 0;
         if (lantern) { n = 1; width = Math.max(0.6, total - p.t - 0.25); sill = 0.85; top = p.fh - SLAB - 0.1; }
       }
