@@ -22,7 +22,11 @@ The retained Mars p440 counterexample is a sit approach followed by its original
 programme's natural terminal execution; it does not demonstrate completion of
 the pending external walk receipt. That requires Root's separate stage activation
 and observation on a whole retained-history copy. No live activation is part of
-this leaf.
+this leaf. The native `world-server.mjs` descriptor accepts the optional boolean
+`walkSettleWaitV1`: only explicit `true` drives the same method after boot, logs
+the accepted seq/tick and prior acceptance, and runs before listening. False or
+absence adds no acceptance; check-only never installs it. Eden’s launcher and
+all descriptor defaults are unchanged.
 
 After this fact is accepted, the minimum rollback reader must understand
 `walkSettleWaitV1` and its canonical hash input. A pre-policy binary is not a

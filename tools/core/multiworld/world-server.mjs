@@ -10,7 +10,16 @@ import {readFileSync,mkdirSync,writeFileSync,unlinkSync} from 'node:fs';
 import {setImmediate} from 'node:timers/promises';
 import {readAuthoredSidecars} from './authored-sidecars.mjs';
 
-export async function openWorldServer({input,dataDir,worldKey,worldId,port,build='local-multiworld/1',webDir,marsWebDir,publicOrigin,ownerId='dev:admin',seedCast=true,nativeCast=true,runtimePolicies=true,installLiving=true,cards=true,skillFile,cliFile,instructionsFile,authMode='local-dev',checkOnly=false,worldVariant='legacy',sceneSha256,nativeCastIds,experiencesFile,experiencesSha256,placeData,placeDataSha256,activityData,activityDataSha256,nativeAliases,nativeAliasesSha256}){
+export async function installWalkSettleWaitV1(host,enabled,drive){
+ if(enabled!==undefined&&typeof enabled!=='boolean')throw Error('world.walk-settle-wait-flag');
+ if(enabled!==true)return;
+ const alreadyAccepted=host.extra.runtimePolicy?.walkSettleWaitV1===true;
+ const fact=await drive(host.enableWalkSettleWaitV1());
+ return{policy:'walk-settle-wait/1',worldId:host.worldId,seq:fact.seq,tick:fact.tick,alreadyAccepted};
+}
+
+export async function openWorldServer({input,dataDir,worldKey,worldId,port,build='local-multiworld/1',webDir,marsWebDir,publicOrigin,ownerId='dev:admin',seedCast=true,nativeCast=true,runtimePolicies=true,walkSettleWaitV1,installLiving=true,cards=true,skillFile,cliFile,instructionsFile,authMode='local-dev',checkOnly=false,worldVariant='legacy',sceneSha256,nativeCastIds,experiencesFile,experiencesSha256,placeData,placeDataSha256,activityData,activityDataSha256,nativeAliases,nativeAliasesSha256}){
+ if(walkSettleWaitV1!==undefined&&typeof walkSettleWaitV1!=='boolean')throw Error('world.walk-settle-wait-flag');
  if(!['mars','littlemartians'].includes(worldKey)||!input||!dataDir||!worldId||!Number.isInteger(port)||port<4963||port>4969)throw Error('explicit local Mars/LM input/data/world and port4963..4969 required');
  if(!build.startsWith('local-')||!ownerId)throw Error('local build and explicit cast owner required');
  const exposure=worldAuthMode(authMode,{edgePublic:process.env.EDGE_PUBLIC,devAuth:process.env.DEV_AUTH,seedCast,nativeCast});
@@ -104,6 +113,7 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
    if(castIds.has(row.id)&&!row.token_hash&&(host.engine.programOf(row.entity_id)||host.engine.actorBorrowed?.(row.entity_id)))throw new ApiError(409,'native-cast.busy','The current native activity must reach a safe boundary before pairing. Retry after it finishes.');
    return true;
   }});
+  if(walkSettleWaitV1===true)console.log(JSON.stringify(await installWalkSettleWaitV1(host,walkSettleWaitV1,drive)));
   if(installLiving){const living=new LivingWorld(host);living.camp=worldKey==='mars';await drive(living.install(definition.customs));}
   if(runtimePolicies){
    if(host.engine.configureRuntimePolicy&&!host.extra.runtimePolicy?.quietSeatCourtesy)await drive(host.enqueue('rules','world',{runtimePolicy:{sleepBlockTicks:1200,...host.extra.runtimePolicy,quietSeatCourtesy:true},why:'enable native quiet-seat courtesy prospectively'}));
