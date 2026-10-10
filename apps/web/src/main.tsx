@@ -7,13 +7,14 @@ import {ClerkProvider,useAuth,useClerk,useUser} from '@clerk/clerk-react';
 const PrivyAuth=lazy(()=>import('./PrivyAuth.tsx'));
 import { Shell, type AuthCtx } from './Shell.tsx';
 import './styles.css';
+import {clerkOriginRoute,unsignedPreviewAuth} from './auth-ui.ts';
 
 // Presentation gate only. Exact reviewed candidate builds may enable it;
 // current-owner capability/readiness and server authority remain mandatory.
 declare const __SIM_ARRIVAL_ENABLED__: boolean;
 const arrivalEnabled=typeof __SIM_ARRIVAL_ENABLED__!=='undefined'&&__SIM_ARRIVAL_ENABLED__===true;
 
-type Cfg = { authProvider?:'clerk'|'privy'|'none';clerkPublishableKey?:string;clerkIssuer?:string;privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean;worldKey?:string;accountAuthRequired?:boolean };
+type Cfg = { authenticationOrigin?:string; authProvider?:'clerk'|'privy'|'none';clerkPublishableKey?:string;clerkIssuer?:string;privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean;worldKey?:string;accountAuthRequired?:boolean };
 
 
 function WithClerk({cfg}:{cfg:Cfg}){
@@ -57,9 +58,14 @@ function WorldRoot() {
   useEffect(() => { let tries = 0; const go = () => { fetch(apiPath('/v1/config')).then(r=>readWorldBootstrap(r,worldKey)).then(raw=>setCfg(raw as Cfg)).catch((e) => { if (!(e instanceof WorldBootstrapError)&&++tries < 20) setTimeout(go, 3000); else setErr(String(e)); }); }; go(); }, []);
   if (err) return <pre>cannot reach the server: {err}</pre>;
   if (!cfg) return <pre>connecting…</pre>;
-  const useDev = !cfg.accountAuthRequired&&cfg.devAuth && new URLSearchParams(location.search).has('dev');
-  if (useDev || (!cfg.accountAuthRequired&&!cfg.privyAppId && cfg.devAuth)) return <WithDev cfg={cfg} />;
-  if(cfg.authProvider==='clerk'&&cfg.clerkPublishableKey&&cfg.clerkIssuer)return <ClerkProvider publishableKey={cfg.clerkPublishableKey}><WithClerk cfg={cfg}/></ClerkProvider>;
+  const useDev = cfg.authProvider!=='clerk'&&!cfg.accountAuthRequired&&cfg.devAuth && new URLSearchParams(location.search).has('dev');
+  if (useDev || (cfg.authProvider!=='clerk'&&!cfg.accountAuthRequired&&!cfg.privyAppId && cfg.devAuth)) return <WithDev cfg={cfg} />;
+  if(cfg.authProvider==='clerk'&&cfg.clerkPublishableKey&&cfg.clerkIssuer){
+   const route=clerkOriginRoute(cfg.authenticationOrigin,location.origin,worldPath,location.hash);
+   if(route.initialize)return <ClerkProvider publishableKey={cfg.clerkPublishableKey}><WithClerk cfg={cfg}/></ClerkProvider>;
+   const login=()=>{const target=clerkOriginRoute(cfg.authenticationOrigin,location.origin,worldPath,location.hash).signInUrl;if(target)location.assign(target);};
+   return <Shell cfg={cfg} auth={unsignedPreviewAuth(route.signInUrl,login)} arrivalEnabled={arrivalEnabled}/>;
+  }
   if (cfg.authProvider==='none'||cfg.authProvider==='clerk'||!cfg.privyAppId) return <Shell cfg={cfg} auth={{ ready: true, authed: false, label: null, login: () => alert('Sign-in is not configured on this server.'), logout: () => {}, getToken: async () => null, debug: { privyUserId: null, wallet: null, linked: [] } }} arrivalEnabled={arrivalEnabled} />;
   return <Suspense fallback={<pre>connecting sign-in…</pre>}><PrivyAuth cfg={cfg} arrivalEnabled={arrivalEnabled}/></Suspense>;
 }

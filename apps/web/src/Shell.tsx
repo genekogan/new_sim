@@ -34,7 +34,7 @@ import {AUTH_UI,configuredSignIn} from './auth-ui.ts';
 import { BacklogPanel, HeardPanel, LibraryPanel, NotebookPanel, SentencesPanel, ThingsPanel, VocabularyPanel } from './Grammar.tsx';
 
 export type AuthCtx = {
-  ready: boolean; authed: boolean; label: string | null;
+  ready: boolean; authed: boolean; label: string | null; signInUrl?:string;
   login(): void; logout(): Promise<void> | void; getToken(): Promise<string | null>;
   debug: { privyUserId: string | null; accountIdentity?:string|null; wallet: unknown; linked: unknown[] };
 };
@@ -142,7 +142,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
           {advanced&&<a className="world-back" href="#watch" onClick={e => { e.preventDefault(); setAdvanced(false); setPairCode(null); setTab('watch'); history.replaceState(null, '', '#watch'); }}>← Back to the world</a>}
           {!signinEnabled ? null : !auth.ready ? <span className="dim">Signing in…</span> : auth.authed
             ? <button onClick={() => void auth.logout()}>Sign out</button>
-            : <button className="primary" onClick={auth.login}>Sign in</button>}
+            : auth.signInUrl?<a className="primary" href={auth.signInUrl}>Sign in at sim.eden.art</a>:<button className="primary" onClick={auth.login}>Sign in</button>}
           {!advanced&&<BringAgent auth={auth} requireAuth={cfg.accountAuthRequired===true}/>}
         </div>
       </header>

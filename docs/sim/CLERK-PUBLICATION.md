@@ -97,3 +97,10 @@ proofs remain separate. They do not prove hosted human login, cross-subdomain SS
 Google/MFA, browser readiness/Follow, independent human-agent pairing, or live model
 execution. Root confirmed the human's existing Eden1 session; Sim proof remains
 pending until the reviewed build is reachable at its authorized production origin.
+
+The public config now exposes `authenticationOrigin` from the configured Clerk
+application URL, independently of the request-derived `publicUrl`. Only that exact
+origin mounts Clerk. Trycloudflare, loopback and other preview hosts retain unsigned
+viewing on the same runtime; account actions link to the canonical world, preserving
+only valid Soul/approval fragments or `#join`. Clerk approval links also use the
+configured canonical world URL. No preview origin is added to the server azp list.
