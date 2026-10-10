@@ -53,6 +53,8 @@ function WithDev({ cfg }: { cfg: Cfg }) {
 }
 
 function WorldRoot() {
+  const [hash,setHash]=useState(location.hash);
+  useEffect(()=>{const changed=()=>setHash(location.hash);addEventListener('hashchange',changed);return()=>removeEventListener('hashchange',changed);},[]);
   const [cfg, setCfg] = useState<Cfg | null>(null);
   const [err, setErr] = useState('');
   useEffect(() => { let tries = 0; const go = () => { fetch(apiPath('/v1/config')).then(r=>readWorldBootstrap(r,worldKey)).then(raw=>setCfg(raw as Cfg)).catch((e) => { if (!(e instanceof WorldBootstrapError)&&++tries < 20) setTimeout(go, 3000); else setErr(String(e)); }); }; go(); }, []);
@@ -61,7 +63,7 @@ function WorldRoot() {
   const useDev = cfg.authProvider!=='clerk'&&!cfg.accountAuthRequired&&cfg.devAuth && new URLSearchParams(location.search).has('dev');
   if (useDev || (cfg.authProvider!=='clerk'&&!cfg.accountAuthRequired&&!cfg.privyAppId && cfg.devAuth)) return <WithDev cfg={cfg} />;
   if(cfg.authProvider==='clerk'&&cfg.clerkPublishableKey&&cfg.clerkIssuer){
-   const route=clerkOriginRoute(cfg.authenticationOrigin,location.origin,worldPath,location.hash);
+   const route=clerkOriginRoute(cfg.authenticationOrigin,location.origin,worldPath,hash);
    if(route.initialize)return <ClerkProvider publishableKey={cfg.clerkPublishableKey}><WithClerk cfg={cfg}/></ClerkProvider>;
    const login=()=>{const target=clerkOriginRoute(cfg.authenticationOrigin,location.origin,worldPath,location.hash).signInUrl;if(target)location.assign(target);};
    return <Shell cfg={cfg} auth={unsignedPreviewAuth(route.signInUrl,login)} arrivalEnabled={arrivalEnabled}/>;
