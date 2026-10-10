@@ -87,8 +87,9 @@ else {
   before(async () => {
     const vacancy=createServer();await new Promise<void>((resolve,reject)=>{vacancy.once('error',reject);vacancy.listen(PORT,'127.0.0.1',()=>vacancy.close(error=>error?reject(error):resolve()));});
     let listening=false,startupError:Error|undefined;
+    const fixtureData=mkdtempSync(join(tmpdir(),'sim-mars-'));
     proc = spawn(process.execPath, [new URL('./main.ts', import.meta.url).pathname], {
-      env: { PATH: process.env.PATH, HOME: process.env.HOME, ...(process.env.MARS_ENGINE_DIR ? { MARS_ENGINE_DIR: process.env.MARS_ENGINE_DIR } : {}), WORLD_ID:WORLD_ID, BUILD_ID:fixtureBuild, ENGINE: 'mars', MIND_DRIVER: 'central', PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR: mkdtempSync(join(tmpdir(), 'sim-mars-')), BRAIN_MODE: 'fake', DEV_AUTH: '1', PUBLIC_URL: BASE, WEB_DIR: '/nonexistent' },
+      env: { PATH: process.env.PATH, HOME: process.env.HOME, ...(process.env.MARS_ENGINE_DIR ? { MARS_ENGINE_DIR: process.env.MARS_ENGINE_DIR } : {}), WORLD_KEY:'toy',WORLD_ID:WORLD_ID, BUILD_ID:fixtureBuild, ENGINE: 'mars', MIND_DRIVER: 'central', PORT: String(PORT), HOST: '127.0.0.1', DATA_DIR:fixtureData,ACCOUNT_REGISTRY_PATH:join(fixtureData,'accounts.sqlite'),ACCOUNT_AUTH_REQUIRED:'0',SEED_NATIVES:'1', BRAIN_MODE: 'fake', DEV_AUTH: '1', PUBLIC_URL: BASE, WEB_DIR: '/nonexistent' },
       stdio: ['ignore', 'pipe', 'inherit'],
     });
     proc.once('error',error=>{startupError=error;});
@@ -106,9 +107,9 @@ else {
     if(proc?.pid&&proc.exitCode===null&&proc.signalCode===null){const exited=once(proc,'exit');proc.kill('SIGTERM');await exited;}
   });
 
-  test('mars: clients fed keyframes agree with the server', async () => {
-    const a = client(); await sleep(4000);
-    const b = client(); await sleep(12000);
+  test('mars: clients fed keyframes agree with the server', async t => {
+    const a = client();t.after(()=>a.close()); await sleep(4000);
+    const b = client();t.after(()=>b.close()); await sleep(12000);
     for (const c of [a, b]) {
       assert.equal(c.stats.state, 'open');
       assert.ok(c.stats.heartbeats >= 2, `heartbeats ${c.stats.heartbeats}`);
@@ -119,10 +120,10 @@ else {
     a.close(); b.close();
   });
 
-  test('mars: the DJ story, with Mars bodies', async () => {
+  test('mars: the DJ story, with Mars bodies', async t => {
     const admin = 'dev:admin';
-    const rob = (await api('/v1/souls', admin, { name: 'Rob', description: 'a generous host who loves a crowd' })).body.soul;
-    const wren = (await api('/v1/souls', admin, { name: 'Wren', description: 'a kite maker who secretly wants to DJ' })).body.soul;
+    const robReply=await api('/v1/souls', admin, { name: 'Rob', description: 'a generous host who loves a crowd' });assert.equal(robReply.status,200,'private legacy fixture creates Rob through actual dev-auth route');const rob=robReply.body.soul;
+    const wrenReply=await api('/v1/souls', admin, { name: 'Wren', description: 'a kite maker who secretly wants to DJ' });assert.equal(wrenReply.status,200,'private legacy fixture creates Wren through actual dev-auth route');const wren=wrenReply.body.soul;
     assert.ok(rob?.id && wren?.id);
     await sleep(600);
     const grammar = await (await fetch(`${BASE}/cards.md`)).text();
@@ -154,7 +155,7 @@ else {
     // the bodies really were there: both ended up near the fire
     const snap = (await api('/v1/world', admin)).body;
     void snap;
-    const c = client(); await sleep(6500);
+    const c = client();t.after(()=>c.close()); await sleep(6500);
     const near = (id: string) => { const e = c.replica.entities[id], f = c.replica.entities['fire']; return Math.hypot(e.pose.p[0] - f.pose.p[0], e.pose.p[2] - f.pose.p[2]); };
     assert.ok(near(rob.entityId) < 6 && near(wren.entityId) < 6, `Rob ${near(rob.entityId).toFixed(1)} m and Wren ${near(wren.entityId).toFixed(1)} m from the fire`);
     assert.equal(c.stats.lastCheck, 'ok'); c.close();
