@@ -1,7 +1,6 @@
-// Path and area mesh halves: roads, paths, walls, fences, hedges, bridges, rivers (banks), plazas,
-// lawns, pitches, decks, gardens. Owner: L3. CONTRACT STUB (L1): surfaces become draped ribbons
-// or polygons sampled on the terrain every ~2 m; colliders become boxes. World-frame builders.
-// L3 replaces with kerbs, paving patterns, line markings, rails, posts, shores, waterfalls.
+// Generic fallback for path/area mesh halves (owner L3): surfaces draped on the terrain, colliders
+// as boxes. The real builders live in roads / water / areas / ecology / boundaries .mesh.ts; this
+// file registers nothing (so registration order never matters) and exports the helpers.
 import * as THREE from 'three';
 import type { Surface } from '@sim/generators';
 import { registerMesh, type MeshCtx } from './registry.ts';
@@ -39,7 +38,4 @@ function pathOrArea(ctx: MeshCtx): THREE.Object3D | null {
   return g.children.length ? g : null;
 }
 
-for (const gen of ['road/1', 'path/1', 'wall/1', 'fence/1', 'hedge/1', 'bridge/1', 'power-line/1', 'plaza/1', 'lawn/1', 'pitch/1', 'deck/1', 'parking/1', 'garden-bed/1', 'orchard/1', 'scatter/2'])
-  registerMesh({ gen, world: true, build: pathOrArea });
-// rivers: the water ribbon is drawn by the entity layer from the ground record; banks are L3's.
-registerMesh({ gen: 'river/1', world: true, build: () => null });
+export { pathOrArea };

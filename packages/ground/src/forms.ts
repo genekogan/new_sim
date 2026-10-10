@@ -4,7 +4,8 @@
 //   channel  — a cut / fill / set along a path to per-vertex levels (river beds, graded roads); carve class
 //   brush    — small edits: raise / lower (natural), smooth (after carve), flatten (terrace class)
 // Fold order (the scales blend by it): base + noise → natural (bump, ridge, plateau, cliff, raise/lower)
-// → carve (carve, channel) → smooth → terrace (terrace, flatten) → pad. Height field only: no caves,
+// → fill/set channels (graded roads, embankments) → carve (carve, cut channels: lakes and rivers cut
+// through embankments) → smooth → terrace (terrace, flatten) → pad. Height field only: no caves,
 // no overhangs. Same arithmetic discipline as geom.ts: + − × ÷, comparisons and sqrt only.
 import { z } from 'zod';
 import { bumpK, clamp01, smooth, sq } from './geom.ts';
