@@ -214,12 +214,12 @@ function towerPlan(c: Ctx): Plan {
   const sides = round ? 12 : 4;
   p.W = p.D = Math.min(c.W, c.D);
   if (round) p.round = { R, sides };
-  const lantern = !!c.args.lantern;
+  const lantern = !!c.args.lantern, home = !!c.args.home;   // home: a round cottage (living room, bedroom upstairs)
   for (let k = 0; k < c.floors; k++) {
     const top = k === c.floors - 1;
-    const kind = k === 0 ? 'entrance' : top && lantern ? 'lantern' : top ? 'top' : 'room';
+    const kind = k === 0 ? (home ? 'living' : 'entrance') : top && lantern ? 'lantern' : top ? (home ? 'bedroom' : 'top') : 'room';
     const id = ids.take(kind === 'room' ? 'room' : kind);
-    const name = kind === 'room' ? `Room ${k}` : title(kind) + (kind === 'top' ? ' room' : kind === 'lantern' ? ' room' : '');
+    const name = kind === 'room' ? `Room ${k}` : kind === 'living' ? 'Living room' : title(kind) + (kind === 'top' ? ' room' : kind === 'lantern' ? ' room' : '');
     if (round) p.rooms.push({ id, name, floor: k, kind, poly: ngon(R, sides) });
     else { const h = R; p.rooms.push({ id, name, floor: k, kind, rect: [-h, -h, h, h] }); }
   }

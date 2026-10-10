@@ -44,7 +44,7 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
   const baked = model.bake(def, b.params ?? {}, b.seed ?? 0, b.shape);
   if (!baked.rooms?.length) return { ops: [], placed: [], dropped: [], notes: [`${buildingId} has no rooms`] };
   const args = def.make?.args ?? {};
-  const st = style ?? args.style ?? b.params?.style ?? 'cottage';
+  const st = style ?? args.furnish ?? args.style ?? b.params?.style ?? 'cottage';   // args.furnish: a def may borrow another style's recipe (roundhouse → cottage)
   const recipe = opts.recipe ?? loadRecipe(st);
   const th = def.make?.kind === 'gen' && def.make.gen === 'building/1' && !(b.params?.plan) ? FRONT_YAW[b.params?.front ?? def.params?.front?.default ?? 's'] ?? 0 : 0;
   const c = Math.cos(th), s = Math.sin(th);

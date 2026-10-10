@@ -265,7 +265,7 @@ function facade(b: Builder, L: BuildingLayout, o: { trim: string; quoin: string;
   if (L.round) {
     const R = L.round.R + L.t / 2;
     b.group = 'level-0'; b.cyl(0, 0, 0, R + 0.06, R + 0.08, 0.45, o.base, 'wall', L.round.sides);
-    for (let k = 1; k <= L.floors; k++) { b.group = `level-${Math.min(k, L.floors - 1)}`; b.cyl(0, k * L.fh - 0.12, 0, R + 0.07, R + 0.07, 0.14, k === L.floors ? o.base : o.quoin, 'trim', L.round.sides); }
+    for (let k = 1; k <= L.floors; k++) { b.group = k === L.floors ? `slab-${L.floors}` : `level-${k}`; /* capped bands: the top one hides with the ceiling (interior view), the others with the storey above */ b.cyl(0, k * L.fh - 0.12, 0, R + 0.07, R + 0.07, 0.14, k === L.floors ? o.base : o.quoin, 'trim', L.round.sides); }
     return;
   }
   const hx = L.W / 2, hz = L.D / 2, top = L.wallTop;
