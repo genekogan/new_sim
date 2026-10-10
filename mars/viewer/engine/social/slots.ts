@@ -201,6 +201,8 @@ export function assignNearest(w: WorldState, actors: string[], slots: Slot[]): {
  * for a given grid; it is made at claim (plan) time against the current grid.
  */
 export const APPROACH_GAPS = [0.35, 0.4, 0.45, 0.5] as const;
+/** Side approaches of a god-built seat (a boat's), tried after front and back: the gap may span a little water. */
+export const SIDE_GAPS = [0.35, 0.5, 0.7, 0.9] as const;
 /** Clearance an approach point needs: the body radius plus 2 cm, so the walk goal never snaps. */
 export const APPROACH_CLEARANCE = HUMAN_RADIUS + 0.02;
 
@@ -251,6 +253,17 @@ export function seatApproach(rt: Runtime, s: Slot): Vec2 | Diagnostic {
       const cl = g ? clearanceAt(g, p) : Infinity;
       if (cl >= APPROACH_CLEARANCE) return p;
       tried.push({ p, cl });
+    }
+  }
+  // a god-built seat (entity world, party F1): a canoe's seats face along it, so front and back are both water; it is
+  // boarded from its side, from a jetty or the bank (a step of up to a metre over the water). Other worlds unchanged.
+  if (e.tags?.includes('entity-world')) for (const side of [1, -1]) {
+    const yawL = s.yaw - e.pose.yaw + side * Math.PI / 2;
+    const u: Vec2 = [dcos(yawL), dsin(yawL)];
+    const edge = edgeDistance(local, u, half);
+    for (const gap of SIDE_GAPS) {
+      const p = add2(c, rot2([local[0] + u[0] * (edge + gap), local[1] + u[1] * (edge + gap)], e.pose.yaw));
+      if ((g ? clearanceAt(g, p) : Infinity) >= APPROACH_CLEARANCE) return p;
     }
   }
   const front = tried[0], back = tried[APPROACH_GAPS.length];

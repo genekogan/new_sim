@@ -78,7 +78,7 @@ export function installGroundCapabilities(ledger: Ledger, god: GodMode, host: Wo
     const me = (host.engine.world.entities as Record<string, { pose: { p: number[] } }>)[soul.entityId];
     if (!me) return;
     for (const e of god.model.entities.values()) {
-      if (!e.def.includes('flag')) continue;
+      if (!/^core[-/]flag@/.test(e.def)) continue;
       const wp = god.model.worldPose(e), label = String(e.state?.label ?? e.name ?? e.id), id = `walk:flag-${slug(e.name ?? label)}`;
       if (caps.some((c) => c.id === id)) continue;
       caps.push({ id, verb: 'walk', label: `Walk to the flag "${label}" (${Math.round(Math.hypot(wp.x - me.pose.p[0], wp.z - me.pose.p[2]))} m)`, available: true, target: { id: e.id, kind: 'object' } });

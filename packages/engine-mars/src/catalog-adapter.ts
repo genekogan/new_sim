@@ -50,22 +50,29 @@ export function surfaceLattice(slot: string, w: number, d: number, y: number, cx
   return out;
 }
 
-/** The engine AssetDef of an entity-world def (for an id from assetIdFor). */
-export function assetFromDef(id: string, d: DefFacts): AssetDef {
+/** A thing that floats or hovers (a canoe, a rowing boat): it lies in the water beside a jetty or a bank, so its box is
+ *  no walking obstacle there (party F1: a moored canoe's box closed the jetty); it is boarded from its side. */
+export const isFloatingDef = (d: Pick<DefFacts, 'components'>) => !!d.components.hover;
+
+/** The engine AssetDef of an entity-world def (for an id from assetIdFor). `seen`: a decoration that is only perceived
+ *  (a fountain, a lamp, a sign): a fixture Souls can see, look at and name, with no slots and no obstacle of its own
+ *  (its walls and rims are the entity's solids, as before). */
+export function assetFromDef(id: string, d: DefFacts, o: { seen?: boolean } = {}): AssetDef {
   const c = d.components as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
   const [w, h, dd] = d.box;
   const label = (d.description?.replace(/\.$/, '') || d.name.replace(/^core-/, '')).slice(0, 80);
   const color = d.palette ? Object.values(d.palette)[0] : undefined;
   const out: AssetDef = {
-    id, label, category: c.carryable ? 'item' : 'fixture', size: [r4(w), r4(h), r4(dd)],
+    id, label, category: c.carryable && !o.seen ? 'item' : 'fixture', size: [r4(w), r4(h), r4(dd)],
     massKg: typeof c.carryable?.mass === 'number' ? c.carryable.mass : Math.max(1, Math.round(w * h * dd * 40)),
     ...(color ? { color } : {}),
     dims: { confidence: 'hypothetical', note: `derived from entity-world def ${d.ref} (${d.hash.slice(0, 12)}) by the L9 catalog adapter` },
   };
+  if (o.seen) return out;
   if (c.carryable) {
     // one hand, palm under the base (catalog-items.ts hand1): the engine's take_item / put_item / serve verbs
     out.handling = { carryCrew: [1, 1], carryPose: 'flat', grips: { 1: [{ id: 'hand', local: [0, 0, 0] }] }, carryHeight: 0.95, hands: 1, small: true };
-  } else out.obstacle = true;
+  } else if (!isFloatingDef(d)) out.obstacle = true;
   const seats: SlotDef[] = d.slots.filter((s) => s.kind === 'seat').map((s) => ({ id: s.id, kind: 'seat' as const, local: [r4(s.p[0]), r4(s.p[2])], yaw: r4(Math.PI / 2 - s.yaw) }));
   const stands: SlotDef[] = d.slots.filter((s) => s.kind === 'stand').map((s) => ({ id: s.id, kind: 'stand' as const, local: [r4(s.p[0]), r4(s.p[2])], yaw: r4(Math.PI / 2 - s.yaw) }));
   if (seats.length || stands.length) out.slots = [...seats, ...stands];
