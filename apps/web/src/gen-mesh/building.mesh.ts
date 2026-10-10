@@ -62,7 +62,8 @@ registerMesh({
     attachInteriorView(g, L);
     return g;
   },
-  instanceKey(ctx) { return `${ctx.def.hash}|${JSON.stringify(ctx.params)}|${col(ctx.entity.state?.paint, '')}`; },
+  // no instanceKey: the interior view hides storeys per building per frame, which instancing would lose;
+  // the geometry is still shared (one template per def/params/paint, cloned).
 });
 
 function disposeGroup(g: THREE.Object3D) { g.traverse((o) => { const m = o as THREE.Mesh; if (m.isMesh) m.geometry.dispose(); }); }
