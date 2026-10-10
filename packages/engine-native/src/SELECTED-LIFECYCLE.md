@@ -11,3 +11,11 @@ The original Mars waiting programme must naturally finish after its separately a
 Minimum reader after acceptance: this selected dual reader plus the existing crew-removal transition contract and safe removal runtime. The original legacy factory refuses the new header/checkpoint. An old-code rollback requires the preserved pre-acceptance whole-data lineage, never a relabelled header or discarded accepted event.
 
 The focused fixtures use actual selected Mars2026-map/disassembly and Little Martians native factories, normal local owner lifecycle requests, SQLite and fake/quiesced model service. They do not qualify production accounts, canonical retirement execution, browser behavior or the corrected Mimos content.
+
+## Launcher
+
+Native `openWorldServer` accepts only explicit `nativeLifecycleV1:true` to install the dual reader before boot and the lifecycle producer before listening. False/absence keeps the old factory and behavior. `checkOnly` never accepts a policy.
+
+If a canonical candidate is still doing accepted work, a trusted private operator can supply the internal function `prepareNativeLifecycle({host,souls,drive})` to wait for its actual native quiet boundary. The launcher does not implement a timeout, force quiet or cancel a programme on its behalf. No listener starts during that callback. Then the existing accepted policy is installed exactly once; a cold restart with the flag reuses the recorded fact. Root must bound the operator wait and preserve its first failure.
+
+The standalone internal helper `installSelectedNativeLifecycleV1(host,souls,drive,author)` performs that same guarded acceptance and idempotent lifecycle enablement. It is not exposed as HTTP. The returned runtime context also exposes `bootstrapNativeLifecycle()` only when the explicit flag is enabled.

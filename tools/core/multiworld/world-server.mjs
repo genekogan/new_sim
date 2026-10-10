@@ -18,7 +18,10 @@ export async function installWalkSettleWaitV1(host,enabled,drive){
  return{policy:'walk-settle-wait/1',worldId:host.worldId,seq:fact.seq,tick:fact.tick,alreadyAccepted};
 }
 
-export async function openWorldServer({input,dataDir,worldKey,worldId,port,build='local-multiworld/1',webDir,marsWebDir,publicOrigin,ownerId='dev:admin',seedCast=true,nativeCast=true,runtimePolicies=true,walkSettleWaitV1,installLiving=true,cards=true,skillFile,cliFile,instructionsFile,authMode='local-dev',accountAuth,checkOnly=false,worldVariant='legacy',sceneSha256,nativeCastIds,experiencesFile,experiencesSha256,placeData,placeDataSha256,activityData,activityDataSha256,nativeAliases,nativeAliasesSha256}){
+export function nativeLifecycleFlagV1(value){if(value!==undefined&&typeof value!=='boolean')throw Error('world.native-lifecycle-flag');return value===true;}
+
+export async function openWorldServer({input,dataDir,worldKey,worldId,port,build='local-multiworld/1',webDir,marsWebDir,publicOrigin,ownerId='dev:admin',seedCast=true,nativeCast=true,runtimePolicies=true,walkSettleWaitV1,nativeLifecycleV1,prepareNativeLifecycle,installLiving=true,cards=true,skillFile,cliFile,instructionsFile,authMode='local-dev',accountAuth,checkOnly=false,worldVariant='legacy',sceneSha256,nativeCastIds,experiencesFile,experiencesSha256,placeData,placeDataSha256,activityData,activityDataSha256,nativeAliases,nativeAliasesSha256}){
+ const lifecycleEnabled=nativeLifecycleFlagV1(nativeLifecycleV1);if(prepareNativeLifecycle!==undefined&&(!lifecycleEnabled||typeof prepareNativeLifecycle!=='function'))throw Error('world.native-lifecycle-bootstrap-callback');
  if(walkSettleWaitV1!==undefined&&typeof walkSettleWaitV1!=='boolean')throw Error('world.walk-settle-wait-flag');
  if(!['mars','littlemartians'].includes(worldKey)||!input||!dataDir||!worldId||!Number.isInteger(port)||port<4963||port>4969)throw Error('explicit local Mars/LM input/data/world and port4963..4969 required');
  if(!build.startsWith('local-')||!ownerId)throw Error('local build and explicit cast owner required');
@@ -66,7 +69,7 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
   const {worldDefinition}=await load('apps/server/src/world-config.ts'),definition=worldDefinition(worldKey);
   db=new Db(join(dataDir,'sim.db'));
   const selected=worldKey==='littlemartians'?native.LITTLE_MARTIANS_WORLD:{scene:'eden-camp',arrival:[-3,18],arrivalPlace:'arrival',reference:[-1,17],grounds:{id:'grounds',name:'Mars camp'},map:native.MARS_2026_MAP,disassemblyV1:true};
-  const factory=await native.marsFactory(selected);
+  const factory=lifecycleEnabled?await (await load('packages/engine-native/src/selected-crew-removal.ts')).selectedNativeCrewRemovalFactoryV1(selected):await native.marsFactory(selected);
   host=new WorldHost(db,factory,db.world(worldId)?.seed??cfg.worldSeed,cfg.snapshotEveryTicks,worldId,{durableClockV1:true});const boot=host.boot();
   if(worldKey==='littlemartians'&&host.engine.world.base.staticHash!==factory.genesis(host.seed).base.staticHash)throw Error('LM persisted physical base differs from selected map; preserve the old reader and database');
   const authored=authoredData?(await load('apps/server/src/worlds/authored-lm-edge.ts')).validateAuthoredLmSidecars(host,authoredData):undefined;
@@ -122,6 +125,18 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
    for(const name of ['enableQuietStallReleaseV1','enableYieldTimeoutV1','enableSpreadV2','enableStairMakeWayV1','enableReflexTimeoutV1','enableEdgeMotionV1'])if(host[name])await drive(host[name]());
    // continuousDay deliberately omitted: Mars food replenishes at quiet first light.
   }
+  let lifecycleFact;
+  const bootstrapNativeLifecycle=async()=>{
+   if(!lifecycleEnabled)throw Error('world.native-lifecycle-not-enabled');
+   return lifecycleFact=await (await load('packages/engine-native/src/selected-lifecycle-bootstrap.ts')).installSelectedNativeLifecycleV1(host,souls,drive);
+  };
+  if(lifecycleEnabled){
+   // Trusted private operator may await actual existing programme completion.
+   // No listener/public approval route starts before the accepted policy and
+   // lifecycle producer are ready. The callback cannot come from JSON config.
+   if(prepareNativeLifecycle)await prepareNativeLifecycle({host,souls,drive});
+   console.log(JSON.stringify(await bootstrapNativeLifecycle()));
+  }
   if(seedCast&&births.length===0&&db.liveSouls(worldId).length===0){db.upsertUser({id:ownerId,email:null,wallet:null,role:'admin'});for(const entry of definition.cast){const row=await drive(souls.create(ownerId,entry,true));castIds.add(row.id);castEntities.set(row.id,row.entity_id);roster.push({soulId:row.id,entityId:row.entity_id,name:row.name});}}
   if(nativeCast&&!recorded)await drive(host.enqueue('rules','operator:local-native-cast-roster',{nativeCastRosterV1:{contract:'native-cast-roster/1',worldKey,ownerId,cast:roster},why:'authorize only original cast birth identities; later name reuse never grants control'}));
   if(nativeCast&&!recorded)for(const entry of roster){const mind=host.minds.get(entry.soulId);if(mind&&!skipMind(mind))await drive(brain.attune(mind));}
@@ -152,7 +167,7 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
    try{await closed;await brain.settled();host.drainInputs();if(host.engine.canSnapshot?.())host.saveSnapshot(true);else host.persistClockFrontier();}
    finally{clearInterval(pump);await new Promise(r=>hub.wss.close(r));auth.close();db.close();releaseLock();}
   }
-  return{cfg,boot,db,host,auth,brain,souls,hub,server,edge,close};
+  return{cfg,boot,db,host,auth,brain,souls,hub,server,edge,close,...(lifecycleEnabled?{lifecycleFact,bootstrapNativeLifecycle}:{})};
  }catch(error){brain?.quiesce();host?.stop();server?.close();auth?.close();if(db?.db.isOpen)db.close();releaseLock();throw error;}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
