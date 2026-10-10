@@ -1,0 +1,67 @@
+diff --git a/mars/viewer/app/engine-view/recorded-body.ts b/mars/viewer/app/engine-view/recorded-body.ts
+index 33b2774e..fbcf0274 100644
+--- a/mars/viewer/app/engine-view/recorded-body.ts
++++ b/mars/viewer/app/engine-view/recorded-body.ts
+@@ -1,5 +1,5 @@
+ /** Additive BODY-v1 reader: recorded discrete state wins, including explicit legacy resets. */
+-export type RenderBody={family:'humanoid'|'floater';type?:'humanoid'|'ceramic'|'floater';model?:string;modelUrl?:string;radius?:number;hoverHeight?:number};
++export type RenderBody={family:'humanoid'|'floater';type?:'humanoid'|'ceramic'|'floater';model?:string;modelUrl?:string;radius?:number;hoverHeight?:number;params?:Record<string,string|number>};
+ export function recordedBody(fallback:unknown,state:Readonly<Record<string,unknown>>):RenderBody|null{
+  const value=Object.hasOwn(state,'body')?state.body:fallback;
+  if(!value||typeof value!=='object'||Array.isArray(value))return null;const b=value as Record<string,unknown>;
+diff --git a/mars/viewer/app/engine-view/take-replay.ts b/mars/viewer/app/engine-view/take-replay.ts
+index 5d6c22f0..3c04ec93 100644
+--- a/mars/viewer/app/engine-view/take-replay.ts
++++ b/mars/viewer/app/engine-view/take-replay.ts
+@@ -341,7 +341,7 @@ export class TakePeople {
+       const seatHeight=this.nativeBoat?.seatHeightFor(frame,id)??(typeof st.seatHeight==='number'&&Number.isFinite(st.seatHeight)?st.seatHeight:undefined);
+       const publicSoulKey=(src.human as {soul?:unknown}|undefined)?.soul;
+       const game=recordedGame(e.state.game);
+-      people.push({ ...(body?.modelUrl?{bodyModel:admittedBodyUrl(body.modelUrl)??body.modelUrl}:{}),...(typeof publicSoulKey==='string'?{publicSoulKey}:{}), ...(seatHeight!==undefined?{seatHeight}:{}), ...(shore.status==='recorded'?{shore:shore.contact}:{}), shoreTime:(this.take.startTick+t/this.take.dt)*this.take.dt,waterTransition:this.waterTransition(id,t), id, p: e.p, yaw: e.yaw, walk, walkDist: dist, activity: e.activity, grip: g?.entity, gripSlot: g?.slot, hands: e.hands, baseActivity: st.baseActivity ?? undefined, ...this.activityHistory(id, frame.tick), ...(typeof (st as {partner?: unknown}).partner==='string'?{partner:(st as {partner:string}).partner}:{}), ...(typeof st.prop==='string'?{prop:st.prop}:{}), ...(typeof e.state.instrument==='string'?{instrument:e.state.instrument}:{}),...(game?{game,gameTick:this.take.startTick+frame.tick,gameDt:this.take.dt}:{}),...(Number.isFinite(speed)?{speed:Math.abs(speed)}:{}), on: st.on ?? undefined, ...(proneYaw !== undefined ? { proneYaw } : {}), ...(phaseK !== undefined ? { phaseK } : {}), ...(st.sleepPose ? { sleepPose: recordedSleepPose(this.take,id,frame.tick,st.sleepPose) } : {}) });
++      people.push({ ...(body?.modelUrl?{bodyModel:admittedBodyUrl(body.modelUrl)??body.modelUrl}:body?.params&&typeof body.model==='string'?{bodyModel:body.model}:{}),...(typeof publicSoulKey==='string'?{publicSoulKey}:{}), ...(seatHeight!==undefined?{seatHeight}:{}), ...(shore.status==='recorded'?{shore:shore.contact}:{}), shoreTime:(this.take.startTick+t/this.take.dt)*this.take.dt,waterTransition:this.waterTransition(id,t), id, p: e.p, yaw: e.yaw, walk, walkDist: dist, activity: e.activity, grip: g?.entity, gripSlot: g?.slot, hands: e.hands, baseActivity: st.baseActivity ?? undefined, ...this.activityHistory(id, frame.tick), ...(typeof (st as {partner?: unknown}).partner==='string'?{partner:(st as {partner:string}).partner}:{}), ...(typeof st.prop==='string'?{prop:st.prop}:{}), ...(typeof e.state.instrument==='string'?{instrument:e.state.instrument}:{}),...(game?{game,gameTick:this.take.startTick+frame.tick,gameDt:this.take.dt}:{}),...(Number.isFinite(speed)?{speed:Math.abs(speed)}:{}), on: st.on ?? undefined, ...(proneYaw !== undefined ? { proneYaw } : {}), ...(phaseK !== undefined ? { phaseK } : {}), ...(st.sleepPose ? { sleepPose: recordedSleepPose(this.take,id,frame.tick,st.sleepPose) } : {}) });
+     }
+     this.stairs(comps);
+     this.comps.onTick({ entities: comps });
+diff --git a/mars/viewer/engine/bodies/body.ts b/mars/viewer/engine/bodies/body.ts
+index ca4749c1..556ed81c 100644
+--- a/mars/viewer/engine/bodies/body.ts
++++ b/mars/viewer/engine/bodies/body.ts
+@@ -37,7 +37,7 @@ export function bodyProblem(body: unknown): string | null {
+   if (body === undefined) return null;
+   if (!body || typeof body !== 'object' || Array.isArray(body)) return 'body.not-object';
+   const b = body as Record<string, unknown>;
+-  for (const k of Object.keys(b)) if (!['family', 'type', 'model', 'modelUrl', 'avatar', 'radius', 'hoverHeight'].includes(k)) return `body.unknown-field:${k}`;
++  for (const k of Object.keys(b)) if (!['family', 'type', 'model', 'modelUrl', 'avatar', 'radius', 'hoverHeight', 'params'].includes(k)) return `body.unknown-field:${k}`;
+   if (b.family !== 'humanoid' && b.family !== 'floater') return 'body.family';
+   if (b.type !== undefined && !(b.family==='humanoid' ? b.type==='humanoid' : b.type==='ceramic'||b.type==='floater')) return 'body.type';
+   if (b.model !== undefined && (typeof b.model !== 'string' || !/^(?:[a-z0-9-]{1,64}|body_[a-f0-9]{64})$/.test(b.model))) return 'body.model';
+@@ -47,7 +47,13 @@ export function bodyProblem(body: unknown): string | null {
+   const inRange = (v: unknown, [lo, hi]: readonly [number, number]) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
+   if (b.radius !== undefined && !inRange(b.radius, FLOATER_RADIUS_RANGE)) return 'body.radius';
+   if (b.hoverHeight !== undefined && !inRange(b.hoverHeight, FLOATER_HOVER_RANGE)) return 'body.hover-height';
+-  if (b.family === 'humanoid' && (b.radius !== undefined || b.hoverHeight !== undefined || (b.model!==undefined && !b.modelUrl))) return 'body.humanoid-fields';
++  // core/humanoid@2 look (paint only; the engine body is unchanged): compact params, model = the look key
++  if (b.params !== undefined) {
++    const p = b.params as Record<string, unknown>;
++    if (b.family !== 'humanoid' || !p || typeof p !== 'object' || Array.isArray(p) || Object.keys(p).length > 24 || b.modelUrl !== undefined || typeof b.model !== 'string' || !/^humanoid2-[0-9a-f]{16}$/.test(b.model)) return 'body.params';
++    for (const [k, v] of Object.entries(p)) if (!/^[a-zA-Z][a-zA-Z0-9_-]{0,31}$/.test(k) || !(typeof v === 'string' && v.length <= 32 || typeof v === 'number' && Number.isFinite(v))) return 'body.params';
++  }
++  if (b.family === 'humanoid' && (b.radius !== undefined || b.hoverHeight !== undefined || (b.model!==undefined && !b.modelUrl && b.params === undefined))) return 'body.humanoid-fields';
+   return null;
+ }
+ 
+diff --git a/mars/viewer/engine/world/types.ts b/mars/viewer/engine/world/types.ts
+index 01024747..68b6e73b 100644
+--- a/mars/viewer/engine/world/types.ts
++++ b/mars/viewer/engine/world/types.ts
+@@ -132,7 +132,9 @@ export type FoodPreparation = {
+  * hovers at `hoverHeight` above its ground pose with radius `radius`; `model` names its GLB.
+  */
+ export type Body = { family: 'humanoid' | 'floater'; type?: 'humanoid' | 'ceramic' | 'floater'; model?: string; modelUrl?: string;
+-  avatar?: {kind:'body'; modelUrl:string; bodyType:'humanoid'|'ceramic'|'floater'}; radius?: number; hoverHeight?: number };
++  avatar?: {kind:'body'; modelUrl:string; bodyType:'humanoid'|'ceramic'|'floater'}; radius?: number; hoverHeight?: number;
++  /** core/humanoid@2 look params (paint only), with `model` = the look key `humanoid2-<sha16>`. */
++  params?: Record<string, string | number> };
+ 
+ export type Entity = {
+   /** carrier/1 (vehicles/carrier.ts): a ride with seats that carries its riders along a deterministic route. */

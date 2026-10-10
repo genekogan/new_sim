@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {createRig, type Rig} from '../../../../mars/viewer/app/engine-view/people.ts';
 import {WorldSoulAvatars, soulAvatars} from '../SoulAvatars.ts';
-import {HumanoidKit, type KitManifest} from './compose.ts';
+import {humanoidKit, type HumanoidKit, type KitManifest} from './compose.ts';
 import {appearanceFromSeed, compactLook, describeLook, editLook, HUMANOID_PARAMS, lookKey, resolveLook, COLOR_KEYS, type Look} from './look.ts';
 
 const CHOICES = ['frame', 'face', 'hair', 'top', 'bottom', 'shoes', 'hat', 'glasses', 'bag', 'pattern'] as const;
@@ -15,11 +15,10 @@ const NAMES: Record<string, string> = {frame: 'Frame', face: 'Face', hair: 'Hair
   skin: 'Skin', hair1: 'Hair colour', brows: 'Brows', eyes: 'Eyes', top1: 'Top', top2: 'Top accent', bottom1: 'Bottom', shoes1: 'Shoes', soles: 'Soles', accent: 'Trinkets', gear: 'Hat / bag'};
 const FRAME_LABEL: Record<string, string> = {masc: 'Broad (masc)', fem: 'Slender (fem)'};
 const SKINS = ['#f3d4bc', '#dcae86', '#cead86', '#b97750', '#8f5b3f', '#64391f', '#3b2216'];
-let sharedKit: HumanoidKit | null = null;
-export const humanoidKit = () => sharedKit ??= new HumanoidKit(new GLTFLoader());
+export const pickerKit = () => humanoidKit(new GLTFLoader());
 
 type Props = {initial?: unknown; kit?: HumanoidKit; onSave?: (params: Partial<Look>) => Promise<void> | void; onState?: (s: Record<string, unknown>) => void; saveLabel?: string};
-export function LookPicker({initial, kit = humanoidKit(), onSave, onState, saveLabel = 'Use this look'}: Props) {
+export function LookPicker({initial, kit = pickerKit(), onSave, onState, saveLabel = 'Use this look'}: Props) {
   const [look, setLook] = useState<Look>(() => resolveLook(initial ?? {}));
   const [manifest, setManifest] = useState<KitManifest | null>(null);
   const [icon, setIcon] = useState(''); const [busy, setBusy] = useState(false); const [note, setNote] = useState('');

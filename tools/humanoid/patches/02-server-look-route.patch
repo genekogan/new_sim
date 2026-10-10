@@ -1,0 +1,52 @@
+diff --git a/apps/server/src/edge/body/routes.ts b/apps/server/src/edge/body/routes.ts
+index e15a70ce..f321de8c 100644
+--- a/apps/server/src/edge/body/routes.ts
++++ b/apps/server/src/edge/body/routes.ts
+@@ -5,6 +5,8 @@ import type {EdgeLedger} from '../ledger/ledger.ts';
+ import {admitBodyGLB,BodyAdmissionError,BODY_LIMITS} from './admission.ts';
+ import {FLOATER_MODELS} from '../../../../../mars/viewer/engine/bodies/models.ts';
+ import {addSchemaPart} from '../events/schema.ts';
++import {randomInt} from 'node:crypto';
++import {lookRequest,resolveLook,legacyPreset,LookError,HUMANOID_PARAMS,HUMANOID_REF} from '../../../../web/src/humanoid/look.ts';
+ 
+ export const BODY_PRESETS=[{id:'humanoid',name:'Humanoid',body:null},...FLOATER_MODELS.map(m=>{
+   // Trusted flat aliases retain the same shipped bytes; placement roles stay in the world catalog.
+@@ -45,7 +47,10 @@ export function mountBodyRoutes(app:Hono,deps:EdgeDeps&{ledger:EdgeLedger}){
+   };
+   const current=(id:string)=>deps.host.engine.world.entities[id]?.body??null;
+   const record=(id:string,owner:string)=>db.prepare('SELECT descriptor FROM edge_body_owners_v1 WHERE world_id=? AND owner=? AND asset_id=?').get(world,owner,id) as {descriptor:string}|undefined;
+-  app.get('/v1/edge/body',wrap(c=>{const s=deps.soul(c);return {available,body:current(s.entityId),types:available?['humanoid','ceramic','floater']:[],presets:available?BODY_PRESETS:[],limits:BODY_LIMITS,
++  /** core/humanoid@2: the look being worn (resolved params) and the choices an owner or Soul may set. */
++  const lookOf=(body:Entity['body']|null|undefined)=>(body as {params?:unknown}|null|undefined)?.params?resolveLook((body as {params:unknown}).params):null;
++  const lookChoices=Object.fromEntries(Object.entries(HUMANOID_PARAMS).map(([k,f])=>[k,f.type==='enum'?f.values:f.type==='number'?{min:f.min,max:f.max}:f.type]));
++  app.get('/v1/edge/body',wrap(c=>{const s=deps.soul(c);return {available,body:current(s.entityId),look:lookOf(current(s.entityId)),lookDef:HUMANOID_REF,lookChoices,types:available?['humanoid','ceramic','floater']:[],presets:available?BODY_PRESETS:[],limits:BODY_LIMITS,
+     uploads:(db.prepare('SELECT descriptor FROM edge_body_owners_v1 WHERE world_id=? AND owner=? ORDER BY asset_id').all(world,s.owner) as {descriptor:string}[]).map(r=>JSON.parse(r.descriptor))};}));
+   app.post('/v1/edge/body/uploads',wrap(async c=>{
+     const s=deps.soul(c);if(!available)throw new EdgeError(503,'body.unavailable','This world engine cannot assign bodies');if(!deps.souls.limits.allow(`edge-body-upload:${s.soulId}`,2,60000).ok)throw new EdgeError(429,'rate-limited','At most two body uploads per minute');
+@@ -65,14 +70,17 @@ export function mountBodyRoutes(app:Hono,deps:EdgeDeps&{ledger:EdgeLedger}){
+   }));
+   app.put('/v1/edge/body',wrap(async c=>{
+     const s=deps.soul(c),source=deps.db.soul(s.soulId);if(!source)throw new EdgeError(401,'unauthorized','Soul owner is unavailable');
+-    const raw=await c.req.json().catch(()=>null);if(!raw||typeof raw!=='object'||Array.isArray(raw)||Object.keys(raw).length!==1)throw new EdgeError(400,'body.assignment','Choose exactly one preset or assetId');
++    const raw=await c.req.json().catch(()=>null);if(!raw||typeof raw!=='object'||Array.isArray(raw)||Object.keys(raw).length!==1)throw new EdgeError(400,'body.assignment','Choose exactly one preset, assetId or look');
+     let body:Entity['body']|null;
+     if(typeof raw.preset==='string'){const preset=BODY_PRESETS.find(p=>p.id===raw.preset);if(!preset)throw new EdgeError(400,'body.preset-unknown','Unknown body preset');body=preset.body;}
+     else if(typeof raw.assetId==='string'&&ASSET.test(raw.assetId)){
+       if(!db.prepare('SELECT 1 FROM edge_body_owners_v1 WHERE world_id=? AND owner=? AND asset_id=?').get(world,s.owner,raw.assetId))throw new EdgeError(403,'body.not-owned','This upload does not belong to the Soul owner');
+       const row=record(raw.assetId,s.owner);if(!row)throw new EdgeError(404,'body.asset-not-found','No admitted body asset');const asset=JSON.parse(row.descriptor);
+       const type=asset.type,modelUrl=asset.modelUrl;body={family:type==='humanoid'?'humanoid':'floater',type,model:asset.assetId,modelUrl,avatar:{kind:'body',modelUrl,bodyType:type},...(type==='humanoid'?{}:{radius:.35,hoverHeight:1.45})};
+-    }else throw new EdgeError(400,'body.assignment','Choose a preset or admitted assetId');
++    }else if(raw.look!==undefined){ // core/humanoid@2: edits over the current look (today's look when none), a preset, or {random:true,seed?}
++      try{body=lookRequest(current(s.entityId),raw.look,{preset:legacyPreset(s.entityId)},()=>randomInt(0,2**32-1)) as Entity['body'];}
++      catch(e){if(e instanceof LookError)throw new EdgeError(400,'body.look',e.message);throw e;}
++    }else throw new EdgeError(400,'body.assignment','Choose a preset, admitted assetId or look');
+     const authority=():true=>{const row=deps.db.soul(s.soulId),mind=deps.host.minds.get(s.soulId);
+       if(!row||row.retired_at!==null||row.owner!==source.owner||row.world_id!==world||row.entity_id!==s.entityId||row.token_hash!==source.token_hash||!mind||mind.owner!==row.owner||mind.entityId!==row.entity_id)throw new EdgeError(401,'unauthorized','Soul authority changed before body assignment');
+       return true;};
+@@ -91,5 +99,5 @@ export function mountBodyRoutes(app:Hono,deps:EdgeDeps&{ledger:EdgeLedger}){
+     const row=db.prepare('SELECT content FROM edge_body_assets_v1 WHERE world_id=? AND asset_id=?').get(world,file.slice(0,-4)) as {content:Uint8Array}|undefined;if(!row)return c.notFound();
+     return c.body(new Uint8Array(row.content),200,{'Content-Type':'model/gltf-binary','Cache-Control':'public, max-age=31536000, immutable','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'"});
+   });
+-  addSchemaPart('body',{contract:'body/1',types:['humanoid','ceramic','floater'],limits:BODY_LIMITS,endpoints:['GET /v1/edge/body','POST /v1/edge/body/uploads (multipart model+manifest)','PUT /v1/edge/body (preset|assetId)'],rig:'quaternius/1',safeSwap:'Standing, idle, free hands and no carriers/paired/construction commitments'});
++  addSchemaPart('body',{contract:'body/1',types:['humanoid','ceramic','floater'],limits:BODY_LIMITS,endpoints:['GET /v1/edge/body','POST /v1/edge/body/uploads (multipart model+manifest)','PUT /v1/edge/body (preset|assetId|look)'],rig:'quaternius/1',look:{def:HUMANOID_REF,choices:lookChoices,random:'{look:{random:true,seed?}}',edit:'{look:{key:value,...}} over the current look'},safeSwap:'Standing, idle, free hands and no carriers/paired/construction commitments'});
+ }

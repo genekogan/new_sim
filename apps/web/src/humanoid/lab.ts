@@ -84,8 +84,8 @@ async function showcase() {
   const rows: Partial<Look>[][] = set === 'props'
     ? [[{hat: 'cap'}, {hat: 'beanie'}, {hat: 'sunhat'}, {glasses: 'round'}, {glasses: 'square'}, {glasses: 'shades'}], [{bag: 'backpack'}, {bag: 'satchel'}, {pattern: 'stripes'}, {pattern: 'checks'}, {pattern: 'knit'}, {hair: 'mohawk', hat: 'cap'}]]
     : set === 'parts'
-      ? (['masc', 'fem'] as const).map(frame => (['short', 'mohawk', 'bob', 'bald'] as const).flatMap(hair => [{frame, hair, face: hair === 'bob' ? 'soft' : hair === 'mohawk' ? 'pierced' : 'open'}]).concat([{frame, top: 'jacket', bottom: 'slacks'}, {frame, top: 'tank', bottom: 'ripped'}]))
-      : (['masc', 'fem'] as const).map(frame => (['shirt', 'jacket', 'tank'] as const).flatMap(top => [{frame, top, bottom: top === 'tank' ? 'slacks' : top === 'jacket' ? 'ripped' : 'jeans', shoes: top === 'tank' ? 'flats' : top === 'jacket' ? 'boots' : 'sneakers', top2: '#e8e4dc', bottom1: top === 'tank' ? '#9e6238' : '#333f47'}]).concat([{frame, headScale: 0.9}, {frame, headScale: 1.1}, {frame, face: 'soft', hair: 'bob', top: 'tank', bottom: 'slacks'}]));
+      ? (['masc', 'fem'] as const).map(frame => (['short', 'mohawk', 'bob', 'bald'] as const).flatMap((hair): Partial<Look>[] => [{frame, hair, face: hair === 'bob' ? 'soft' : hair === 'mohawk' ? 'pierced' : 'open'}]).concat([{frame, top: 'jacket', bottom: 'slacks'}, {frame, top: 'tank', bottom: 'ripped'}]))
+      : (['masc', 'fem'] as const).map(frame => (['shirt', 'jacket', 'tank'] as const).flatMap((top): Partial<Look>[] => [{frame, top, bottom: top === 'tank' ? 'slacks' : top === 'jacket' ? 'ripped' : 'jeans', shoes: top === 'tank' ? 'flats' : top === 'jacket' ? 'boots' : 'sneakers', top2: '#e8e4dc', bottom1: top === 'tank' ? '#9e6238' : '#333f47'}]).concat([{frame, headScale: 0.9}, {frame, headScale: 1.1}, {frame, face: 'soft', hair: 'bob', top: 'tank', bottom: 'slacks'}]));
   const entries: {id: string; rig: Rig; label: string}[] = [];
   for (const [r, row] of rows.entries()) for (const [c, edit] of row.entries()) {
     const look = {...base, ...edit}, n = rows.flat().length, i = rows.slice(0, r).flat().length + c, gap = head ? 0.62 : 0.9;

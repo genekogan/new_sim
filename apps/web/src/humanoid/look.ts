@@ -8,7 +8,8 @@ if (!DEF) throw Error('core/humanoid@2 is missing from the core kit');
 /** The def's params (typed fields). Every look key is one of these. */
 export const HUMANOID_PARAMS = DEF.params as Readonly<Record<string, Field>>;
 export const HUMANOID_REF = 'core/humanoid@2';
-export const LOOK_KEY_PREFIX = 'humanoid@2:';
+/** Template keys double as the body record's `model` (BODY-v1 model regex: [a-z0-9-]{1,64}). */
+export const LOOK_KEY_PREFIX = 'humanoid2-';
 
 type EnumField = Extract<Field, {type: 'enum'}>;
 const values = (k: string) => (HUMANOID_PARAMS[k] as EnumField).values;
@@ -111,6 +112,28 @@ export function appearanceFromSeed(seed: number): Look {
     headScale: Math.round((0.96 + r() * 0.08) * 200) / 200,
     skin: pick(r, SKIN), hair1, brows: darken(hair1, 0.8), eyes: pick(r, EYES), top1, top2, bottom1: pick(r, BOTTOMS), shoes1: pick(r, SHOES), soles: pick(r, SOLES), accent: pick(r, ACCENT), gear: pick(r, GEAR)};
   return resolveLook(look);
+}
+
+// ---------- body records ----------
+
+export const LOOK_MODEL = /^humanoid2-[0-9a-f]{16}$/;
+/** The BODY-v1 record of a composed look: family humanoid, model = template key, params = compact look. */
+export function lookBody(params: unknown): {family: 'humanoid'; model: string; params: Partial<Look>} {
+  const look = resolveLook(params);
+  return {family: 'humanoid', model: lookKey(look), params: compactLook(look)};
+}
+/** An owner's look request applied to a current body (PUT /v1/edge/body {look}): edits, a preset, or random.
+ *  `{random: true, seed?}` draws a seeded look; any other keys are params edits over the current look. */
+export function lookRequest(current: unknown, request: unknown, fallbackLook: unknown, randomSeed: () => number): {family: 'humanoid'; model: string; params: Partial<Look>} {
+  if (!request || typeof request !== 'object' || Array.isArray(request)) throw new LookError('look must be an object');
+  const r = request as Record<string, unknown>;
+  if (r.random === true) {
+    const keys = Object.keys(r).filter(k => k !== 'random' && k !== 'seed'); if (keys.length) throw new LookError('random takes only an optional seed');
+    if (r.seed !== undefined && (typeof r.seed !== 'number' || !Number.isInteger(r.seed) || r.seed < 0 || r.seed > 0xffffffff)) throw new LookError('seed must be an integer 0..4294967295');
+    return lookBody(appearanceFromSeed(r.seed === undefined ? randomSeed() : r.seed as number));
+  }
+  const cur = current && typeof current === 'object' && (current as {params?: unknown}).params ? (current as {params: unknown}).params : fallbackLook;
+  return lookBody(editLook(cur, r));
 }
 
 // ---------- legacy migration ----------

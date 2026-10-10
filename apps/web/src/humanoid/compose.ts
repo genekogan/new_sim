@@ -60,6 +60,11 @@ function scaleHead(g: THREE.BufferGeometry, s: number, joint: [number, number, n
 }
 
 export type KitReader = (url: string) => Promise<ArrayBuffer>;
+let shared: HumanoidKit | null = null;
+/** The page's kit (one cache for the world view, the picker and portraits). */
+export function humanoidKit(loader: GLTFLoader): HumanoidKit { return shared ??= new HumanoidKit(loader); }
+/** True for templates composed by a kit (their geometry belongs to the kit's cache, not to the template). */
+export const isComposed = (t: Template) => !!t.gltf.scene.userData.humanoid;
 /** One kit per base URL: caches rigs, parts, merged geometry and templates; counts fetched bytes. */
 export class HumanoidKit {
   readonly base: string; readonly loader: GLTFLoader; private read: KitReader;
