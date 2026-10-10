@@ -1,0 +1,245 @@
+// entity/1 — the world's state model and edit grammar (spec <eden4>/28 §3, §5).
+// Everything a god or the server exchanges is one of these shapes. Keep them
+// compact; the compiler (compile.ts) is the only thing that interprets them.
+import { z } from 'zod';
+import { landformBodySchema } from '@sim/ground';
+
+export const ENTITY_SCHEMA = 'entity/1';
+export const DEF_SCHEMA = 'def/1';
+export const EDIT_SCHEMA = 'edit/1';
+
+export const ID = /^[a-zA-Z][a-zA-Z0-9_-]{0,31}$/;
+export const NAME = /^[a-z0-9][a-z0-9._-]{0,47}$/;
+export const DEF_REF = /^(core\/[a-z0-9][a-z0-9._-]*@\d+|sha:[0-9a-f]{16,64}|[a-z0-9][a-z0-9._-]*@\d+)$/;
+
+const num = z.number().finite();
+const v2 = z.tuple([num, num]);
+const v3 = z.tuple([num, num, num]);
+export const value = z.union([z.string().max(2000), num, z.boolean(), z.null(), z.array(z.union([z.string().max(200), num])).max(64)]);
+export type Value = z.infer<typeof value>;
+
+// ---------- defs ----------
+
+/** Typed, ranged parameter / state field. `vis` restricts who may read a state field (default public). */
+export const fieldSchema = z.discriminatedUnion('type', [
+  z.object({ type: z.literal('number'), min: num.optional(), max: num.optional(), default: num.optional(), vis: z.array(z.string()).optional() }),
+  z.object({ type: z.literal('int'), min: z.number().int().optional(), max: z.number().int().optional(), default: z.number().int().optional(), vis: z.array(z.string()).optional() }),
+  z.object({ type: z.literal('bool'), default: z.boolean().optional(), vis: z.array(z.string()).optional() }),
+  z.object({ type: z.literal('string'), max: z.number().int().max(2000).default(200), default: z.string().optional(), vis: z.array(z.string()).optional() }),
+  z.object({ type: z.literal('enum'), values: z.array(z.string()).min(1).max(64), default: z.string().optional(), vis: z.array(z.string()).optional() }),
+  z.object({ type: z.literal('color'), default: z.string().regex(/^#[0-9a-f]{6}$/).optional(), vis: z.array(z.string()).optional() }),
+  z.object({ type: z.literal('ref'), default: z.string().optional(), vis: z.array(z.string()).optional() }),
+]);
+export type Field = z.infer<typeof fieldSchema>;
+export const fieldsSchema = z.record(z.string().regex(ID), fieldSchema).refine((r) => Object.keys(r).length <= 32, 'at most 32 fields');
+
+export const slotKind = z.enum(['seat', 'bed', 'surface', 'stand', 'door', 'hang', 'carry', 'socket', 'room', 'floor']);
+export const slotSchema = z.object({
+  id: z.string().regex(NAME),
+  kind: slotKind,
+  /** Local frame of the slot: position and yaw in the def's frame (metres, radians). */
+  p: v3, yaw: num.default(0),
+  accepts: z.object({ kinds: z.array(z.string()).optional(), tags: z.array(z.string()).optional(), maxSize: v3.optional(), maxMass: num.optional() }).default({}),
+  capacity: z.number().int().min(1).max(4096).default(1),
+});
+export type Slot = z.infer<typeof slotSchema>;
+
+/** Closed component set; each is a config object the engine understands. New components are level-3 code work. */
+export const componentsSchema = z.object({
+  seat: z.object({ height: num.default(0.45) }).optional(),
+  bed: z.object({ height: num.default(0.5) }).optional(),
+  surface: z.object({ height: num }).optional(),
+  container: z.object({ capacity: num.positive(), of: z.array(z.string()).optional() }).optional(),
+  carryable: z.object({ mass: num.positive(), grips: z.number().int().min(1).max(4).default(1) }).optional(),
+  opening: z.object({ width: num.positive(), height: num.positive(), state: z.enum(['open', 'closed', 'always']).default('always') }).optional(),
+  floor: z.object({ level: z.number().int().default(0), y: num.default(0) }).optional(),
+  stairs: z.object({ rise: num.positive(), run: num.positive(), treads: z.number().int().min(1) }).optional(),
+  ramp: z.object({ grade: num.positive().max(1) }).optional(),
+  water: z.object({ level: num }).optional(),
+  landform: landformBodySchema.optional(),
+  scatter: z.object({ of: z.array(z.object({ def: z.string().regex(DEF_REF), weight: num.positive().default(1) })).min(1).max(16), density: num.positive().max(10), minSpacing: num.positive().default(1.5), except: z.array(v2).max(256).default([]) }).optional(),
+  light: z.object({ color: z.string().regex(/^#[0-9a-f]{6}$/).default('#ffe9c4'), range: num.positive().default(8), on: z.boolean().default(true) }).optional(),
+  display: z.object({ w: num.positive(), h: num.positive() }).optional(),
+  paint: z.object({ faces: z.array(z.enum(['front', 'back', 'all'])).default(['all']) }).optional(),
+  plant: z.object({ stages: z.number().int().min(1).max(8).default(3), daysPerStage: num.positive().default(1) }).optional(),
+  instrument: z.object({ kind: z.string() }).optional(),
+  readable: z.object({ pages: z.number().int().min(1) }).optional(),
+  workstation: z.object({ kind: z.string() }).optional(),
+  boardGame: z.object({ game: z.string() }).optional(),
+  venue: z.object({ presenter: z.string().optional(), audience: z.string().optional(), capacity: z.number().int().positive().optional() }).optional(),
+  carrier: z.object({ seats: z.number().int().min(1), route: z.string().optional() }).optional(),
+  foundation: z.object({ kind: z.enum(['pad', 'skirt', 'none']).default('pad') }).optional(),
+  body: z.object({
+    media: z.array(z.enum(['walk', 'swim', 'fly', 'float'])).min(1),
+    radius: num.positive(), height: num.positive(),
+    landmarks: z.record(z.string(), v3).default({}),
+    carry: z.object({ slot: z.enum(['hands', 'top', 'mouth', 'back']), maxMass: num.nonnegative(), maxSize: v3 }),
+    settle: z.enum(['sit', 'lie', 'rest', 'hover']).default('rest'),
+    rig: z.enum(['humanoid', 'quadruped']).nullable().default(null),
+  }).optional(),
+});
+export type Components = z.infer<typeof componentsSchema>;
+
+/** Declarative action on a def's own subtree. `when` compares own state; `then` changes own state or attachments. */
+export const actionSchema = z.object({
+  name: z.string().regex(NAME),
+  label: z.string().max(80),
+  roles: z.union([z.literal('anyone'), z.array(z.string())]).default('anyone'),
+  reach: z.enum(['touch', 'place', 'anywhere']).default('touch'),
+  params: z.record(z.string().regex(ID), fieldSchema).default({}),
+  when: z.array(z.object({ field: z.string(), is: value.optional(), not: value.optional() })).max(8).default([]),
+  then: z.array(z.discriminatedUnion('op', [
+    z.object({ op: z.literal('set'), field: z.string(), value: z.union([value, z.object({ param: z.string() })]) }),
+    z.object({ op: z.literal('toggle'), field: z.string() }),
+    z.object({ op: z.literal('attach'), what: z.enum(['actor', 'held']), slot: z.string() }),
+    z.object({ op: z.literal('detach'), what: z.enum(['actor', 'held']) }),
+  ])).min(1).max(8),
+});
+export type Action = z.infer<typeof actionSchema>;
+
+/** `$param` substitution and simple arithmetic only; no loops. Evaluated at expansion time. */
+export const expr = z.union([num, z.string().max(200), z.boolean()]);
+
+export const partSchema = z.object({
+  id: z.string().regex(NAME),
+  def: z.string().regex(DEF_REF),
+  slot: z.string().optional(),      // slot on the parent part (or on the prefab root when `in` is absent)
+  in: z.string().optional(),        // parent part id; default: the prefab root
+  p: z.union([v2, v3]).optional(), r: z.union([num, v3]).optional(), s: num.optional(),
+  params: z.record(z.string(), expr).optional(),
+  state: z.record(z.string(), expr).optional(),
+});
+export type Part = z.infer<typeof partSchema>;
+
+export const makeSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('mesh'), asset: z.string().regex(/^[0-9a-f]{64}$/), lod1: z.string().regex(/^[0-9a-f]{64}$/).optional(), collide: z.enum(['box', 'hull', 'mesh', 'none']).default('box') }),
+  z.object({ kind: z.literal('gen'), gen: z.string().regex(/^[a-z][a-z0-9-]*\/\d+$/) }),
+  z.object({ kind: z.literal('parts'), parts: z.array(partSchema).min(1).max(256) }),
+  /** Nothing to draw or collide with: a place marker, a region, a landform-only def. */
+  z.object({ kind: z.literal('none') }),
+]);
+
+export const defSchema = z.object({
+  schema: z.literal(DEF_SCHEMA),
+  name: z.string().regex(NAME),
+  version: z.number().int().min(1).default(1),
+  extends: z.string().regex(DEF_REF).optional(),
+  description: z.string().max(4000).default(''),
+  tags: z.array(z.string().regex(NAME)).max(32).default([]),
+  form: z.enum(['point', 'path', 'area']).default('point'),
+  make: makeSchema,
+  params: fieldsSchema.default({}),
+  state: fieldsSchema.default({}),
+  slots: z.array(slotSchema).max(512).default([]),
+  components: componentsSchema.default({}),
+  actions: z.array(actionSchema).max(32).default([]),
+  anchor: z.enum(['base', 'center', 'conform', 'drape']).default('base'),
+  tilt: z.object({ maxDeg: num.min(0).max(90) }).optional(),
+  layer: z.enum(['solid', 'surface', 'volume', 'decor']).default('solid'),
+  /** Local box in metres (x width, y height, z depth) at scale 1, and the allowed uniform-scale range. */
+  size: z.object({ box: v3, scale: z.tuple([num.positive(), num.positive()]).default([1, 1]) }),
+  overlaps: z.array(z.string()).max(32).default([]),
+  /** Filled by the compiler at define time; never trusted from input. */
+  budget: z.object({ tris: z.number().int(), bytes: z.number().int(), textures: z.number().int() }).optional(),
+});
+export type Def = z.infer<typeof defSchema>;
+export type DefInput = z.input<typeof defSchema>;
+
+/** A def as stored: input + hash + provenance. */
+export type StoredDef = Def & { hash: string; ref: string; by: string; born: number };
+
+// ---------- entities ----------
+
+export const entitySchema = z.object({
+  id: z.string().regex(/^e_[a-z0-9]{4,12}$/),
+  name: z.string().regex(NAME).optional(),
+  def: z.string().regex(DEF_REF),
+  in: z.object({ parent: z.union([z.literal('world'), z.string()]), slot: z.string().optional() }),
+  p: z.union([v2, v3]).optional(),
+  r: z.union([num, v3]).optional(),
+  s: num.positive().optional(),
+  shape: z.union([z.object({ path: z.array(v2).min(2).max(512), width: num.positive().optional() }), z.object({ area: z.array(v2).min(3).max(512) })]).optional(),
+  anchor: z.enum(['base', 'center', 'conform', 'drape']).optional(),
+  params: z.record(z.string(), value).optional(),
+  state: z.record(z.string(), value).optional(),
+  seed: z.number().int().optional(),
+  by: z.string(), born: z.number().int(), v: z.number().int().default(1),
+});
+export type Entity = z.infer<typeof entitySchema>;
+
+// ---------- world ----------
+
+export const worldConstantsSchema = z.object({
+  extent: num.positive().max(16000),                 // side length in metres; grows only
+  ground: z.enum(['land', 'ocean', 'void']),
+  base: num.default(0),
+  seaLevel: num.optional(),
+  limits: z.object({
+    entities: z.number().int().default(50000),
+    sizeMax: v3.default([400, 120, 400]),
+    sizeMin: num.default(0.05),
+    budget: z.object({ tris: z.number().int().default(80000), bytes: z.number().int().default(3_000_000), texPx: z.number().int().default(2048) }).prefault({}),
+  }).prefault({}),
+});
+export type WorldConstants = z.infer<typeof worldConstantsSchema>;
+
+export const worldStateSchema = z.object({
+  sky: z.object({ palette: z.string().default('clear-day'), sun: num.min(0).max(1).default(0.6) }).prefault({}),
+  time: z.object({ dayTicks: z.number().int().default(72000), startTick: z.number().int().default(0) }).prefault({}),
+  weather: z.object({ clouds: num.min(0).max(1).default(0.1), wind: num.min(0).max(1).default(0.1), rain: num.min(0).max(1).default(0) }).prefault({}),
+  constitution: z.string().max(20000).default(''),
+});
+export type WorldState = z.infer<typeof worldStateSchema>;
+
+// ---------- edits ----------
+
+const place = z.object({
+  op: z.literal('place'), tmp: z.string().regex(/^\$[a-z0-9_-]{1,24}$/).optional(),
+  def: z.string().regex(DEF_REF), name: z.string().regex(NAME).optional(),
+  in: z.object({ parent: z.union([z.literal('world'), z.string()]), slot: z.string().optional() }).default({ parent: 'world' }),
+  p: z.union([v2, v3]).optional(), r: z.union([num, v3]).optional(), s: num.positive().optional(),
+  shape: entitySchema.shape.shape, anchor: entitySchema.shape.anchor,
+  params: z.record(z.string(), value).optional(), state: z.record(z.string(), value).optional(), seed: z.number().int().optional(),
+  mode: z.enum(['strict', 'nudge']).default('strict'),
+});
+const remove = z.object({ op: z.literal('remove'), id: z.string(), cascade: z.boolean().default(true) });
+const move = z.object({
+  op: z.literal('move'), id: z.string(),
+  in: z.object({ parent: z.union([z.literal('world'), z.string()]), slot: z.string().optional() }).optional(),
+  p: z.union([v2, v3]).optional(), r: z.union([num, v3]).optional(), s: num.positive().optional(), shape: entitySchema.shape.shape,
+  mode: z.enum(['strict', 'nudge']).default('strict'),
+});
+const set = z.object({ op: z.literal('set'), id: z.string(), state: z.record(z.string(), value).optional(), params: z.record(z.string(), value).optional(), name: z.string().regex(NAME).optional() });
+const define = z.object({ op: z.literal('define'), def: defSchema });
+const world = z.object({ op: z.literal('world'), state: worldStateSchema.partial() });
+const expand = z.object({ op: z.literal('expand'), extent: num.positive().max(16000) });
+const answer = z.object({ op: z.literal('answer'), prayer: z.string(), text: z.string().max(4000) });
+/** Internal: restore a previously removed entity verbatim (inverse of remove). Never accepted from clients. */
+const restore = z.object({ op: z.literal('restore'), entity: entitySchema });
+
+export const opSchema = z.discriminatedUnion('op', [place, remove, move, set, define, world, expand, answer, restore]);
+export type Op = z.infer<typeof opSchema>;
+export const clientOpSchema = z.discriminatedUnion('op', [place, remove, move, set, define, world, expand, answer]);
+
+export const batchSchema = z.object({
+  schema: z.literal(EDIT_SCHEMA).default(EDIT_SCHEMA),
+  ops: z.array(clientOpSchema).min(1).max(256),
+  clientRef: z.string().max(100).optional(),
+  note: z.string().max(400).optional(),
+});
+export type Batch = z.infer<typeof batchSchema>;
+/** Server-internal: the same batch shape but allowing `restore` (used when replaying stored inverses). */
+export const trustedBatchSchema = batchSchema.extend({ ops: z.array(opSchema).min(1).max(256) });
+
+export type Failure = { op: number; code: string; detail: string; suggest?: { p?: [number, number] | [number, number, number]; r?: number } };
+export type Accepted = { accepted: true; seq: number; undoId: string; ids: Record<string, string>; warnings: string[] };
+export type Refused = { accepted: false; failures: Failure[] };
+export type Result = Accepted | Refused;
+
+export const refusalCodes = [
+  'schema', 'def.unknown', 'def.budget', 'def.expansion', 'def.invalid',
+  'parent.unknown', 'slot.unknown', 'slot.incompatible', 'slot.full',
+  'size.range', 'extent.outside', 'overlap.solid', 'support.none', 'held.by-body', 'occupied.by-body',
+  'constant.immutable', 'entity.unknown', 'entity.limit', 'name.taken', 'params.invalid', 'state.invalid', 'undo.conflict',
+] as const;
+export type RefusalCode = (typeof refusalCodes)[number];

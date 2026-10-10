@@ -30,11 +30,13 @@ const plateau = z.object({
   area: poly, h: finite, edge: finite.positive().default(8),
 });
 /** Carve to an absolute bed level: lake bed, river bed. Applied after natural forms. */
-const carve = z.object({
+const carveBase = z.object({
   id: z.string(), kind: z.literal('carve'),
   area: poly.optional(), path: path.optional(), w: finite.positive().optional(),
   bed: finite, edge: finite.positive().default(4),
-}).refine((c) => (c.area ? !c.path : !!c.path && c.w !== undefined), { message: 'carve needs area, or path + w' });
+});
+const areaOrPath = (c: { area?: unknown; path?: unknown; w?: unknown }) => (c.area ? !c.path : !!c.path && c.w !== undefined);
+const carve = carveBase.refine(areaOrPath, { message: 'carve needs area, or path + w' });
 /** Flatten to an absolute level: a building's foundation terrace. Applied last. */
 const pad = z.object({
   id: z.string(), kind: z.literal('pad'),
@@ -43,6 +45,9 @@ const pad = z.object({
 
 export const landformSchema = z.discriminatedUnion('kind', [bump, ridge, plateau, carve, pad]);
 export type Landform = z.infer<typeof landformSchema>;
+/** A landform without its id (for defs that carry one as a component; the entity id becomes the landform id). */
+export const landformBodySchema = z.discriminatedUnion('kind', [bump.omit({ id: true }), ridge.omit({ id: true }), plateau.omit({ id: true }), carveBase.omit({ id: true }).refine(areaOrPath, { message: 'carve needs area, or path + w' }), pad.omit({ id: true })]);
+export type LandformBody = z.infer<typeof landformBodySchema>;
 
 /** Standing water: surface level over an area or along a path. Depth = level − ground. */
 export const waterSchema = z.object({
