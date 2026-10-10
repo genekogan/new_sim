@@ -167,7 +167,7 @@ try {
     { op: 'place', tmp: '$t', def: 'core/ceramic-tower@1', name: 'tower', p: [30, 26] },
     { op: 'place', def: 'core/bench@1', name: 'tower-bench', in: { parent: '$t', slot: 'tower-l1' }, p: [3, 0] },
     { op: 'place', def: 'core/minaret-temple@1', name: 'temple', p: [-30, 34] },
-    ...['chebel', 'colors-lemuet', 'crystal-freeman', 'dark-blue', 'green-brains-out', 'green-patterns-blue'].map((k, i) => ({ op: 'place', def: `core/kin-${k}@1`, name: `kin-${k}`, p: [-6 + i * 2.2, 16], r: Math.PI })),
+    ...['chebel', 'colors-lemuet', 'crystal-freeman', 'dark-blue', 'green-brains-out', 'green-patterns-blue'].map((k, i) => ({ op: 'place', def: `core/kin-${k}@1`, name: `kin-${k}`, p: [-6 + i * 2.2, 16], r: 0 })),
   ], 'A5 littlemartians'), accepted);
   await step('A5 the tower bench sits on the second floor (footprint room slot, y ≈ 9 m)', async () => (await api('/v1/world/entities/tower/tower-bench')).data, (r) => r?.pose && Math.abs(r.pose.y - 9) < 0.7);
   await step('A5 the tower is hollow: a crate fits in the ground hall, one in the east wall is refused', async () => ({ inside: await act([{ op: 'place', def: 'crate@1', name: 'hall-crate', p: [30, 26] }]), wall: await act([{ op: 'place', def: 'crate@1', name: 'wall-crate', p: [38.7, 28.6] }]) }), (r) => accepted(r.inside) && r.wall.data?.accepted === false && r.wall.data.failures[0].code === 'overlap.solid');

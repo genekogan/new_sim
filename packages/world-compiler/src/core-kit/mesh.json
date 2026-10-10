@@ -3676,7 +3676,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "5e3ad5159e06d18a70d405a9f1fcede4623f5f392761043e0b7838ea0c47ebc9",
+   "asset": "5911a5de663569fc184d04eae2940f26377e21e78b70e369ef74322236906516",
    "collide": "none"
   },
   "size": {
@@ -3758,7 +3758,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "261e30cbfba0e9ad13288b0cf3b657d1e15b1ebf829558e6f7a64d9f88f69fdb",
+   "asset": "9b04ddd9e4bd264da45d0a5a59fc120ff6ce4e33422bbf08e91ff103d11ff034",
    "collide": "none"
   },
   "size": {

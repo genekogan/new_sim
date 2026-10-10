@@ -19898,12 +19898,12 @@
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "worlds/littlemartians/characters/kin/crystal-freeman.glb (Polycam scan of a ceramic head, rebuilt by tools/floaters/build-assets.mjs)"
   },
-  "5e3ad5159e06d18a70d405a9f1fcede4623f5f392761043e0b7838ea0c47ebc9": {
+  "5911a5de663569fc184d04eae2940f26377e21e78b70e369ef74322236906516": {
    "ext": "glb",
    "kind": "mesh",
-   "path": "worlds/littlemartians/characters/kin/dark-blue.glb",
+   "path": "worlds/core-assets/packs/kin-dark-blue.glb",
    "tris": 34038,
-   "bytes": 1101080,
+   "bytes": 1101168,
    "textures": 4,
    "texPx": 2048,
    "box": [
@@ -19918,7 +19918,7 @@
    ],
    "animations": [],
    "nodes": [
-    "node-0"
+    "kin-dark-blue-front"
    ],
    "extensions": [
     "EXT_texture_webp",
@@ -19926,7 +19926,7 @@
    ],
    "name": "kin-dark-blue",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
-   "source": "worlds/littlemartians/characters/kin/dark-blue.glb (Polycam scan of a ceramic head, rebuilt by tools/floaters/build-assets.mjs)"
+   "source": "worlds/littlemartians/characters/kin/dark-blue.glb (Polycam scan of a ceramic head, rebuilt by tools/floaters/build-assets.mjs); turned 180° to face +z"
   },
   "c19e95da37e2faa91ec7ef9dbfecce12ba9f3a58ea3f6bcd8ab3b90f76a98bbb": {
    "ext": "glb",
@@ -19958,12 +19958,12 @@
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "worlds/littlemartians/characters/kin/green-brains-out.glb (Polycam scan of a ceramic head, rebuilt by tools/floaters/build-assets.mjs)"
   },
-  "261e30cbfba0e9ad13288b0cf3b657d1e15b1ebf829558e6f7a64d9f88f69fdb": {
+  "9b04ddd9e4bd264da45d0a5a59fc120ff6ce4e33422bbf08e91ff103d11ff034": {
    "ext": "glb",
    "kind": "mesh",
-   "path": "worlds/littlemartians/characters/kin/green-patterns-blue.glb",
+   "path": "worlds/core-assets/packs/kin-green-patterns-blue.glb",
    "tris": 32160,
-   "bytes": 927776,
+   "bytes": 927872,
    "textures": 4,
    "texPx": 2048,
    "box": [
@@ -19978,7 +19978,7 @@
    ],
    "animations": [],
    "nodes": [
-    "node-0"
+    "kin-green-patterns-blue-front"
    ],
    "extensions": [
     "EXT_texture_webp",
@@ -19986,7 +19986,7 @@
    ],
    "name": "kin-green-patterns-blue",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
-   "source": "worlds/littlemartians/characters/kin/green-patterns-blue.glb (Polycam scan of a ceramic head, rebuilt by tools/floaters/build-assets.mjs)"
+   "source": "worlds/littlemartians/characters/kin/green-patterns-blue.glb (Polycam scan of a ceramic head, rebuilt by tools/floaters/build-assets.mjs); turned 180° to face +z"
   }
  }
 }

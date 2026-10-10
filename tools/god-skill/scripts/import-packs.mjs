@@ -124,6 +124,24 @@ const BUILDINGS = [
   { file: `${LM}/buildings/minaret-temple.glb`, footprint: `${LM}/buildings/minaret-temple.footprint.json`, name: 'minaret-temple', tags: ['building', 'temple', 'minaret', 'ceramic', 'littlemartians', 'landmark', 'shrine'], extra: 'An open pavilion on four legs, a domed body hall and an upper hall rising into the lantern; float-only shafts between levels.' },
 ];
 const KIN = ['chebel', 'colors-lemuet', 'crystal-freeman', 'dark-blue', 'green-brains-out', 'green-patterns-blue'];
+// The scans are not oriented (manifest: "any facing"); these two face -z as scanned, so a turned copy is written
+// (looked at from +z with r = 0: the other four already show their faces).
+const KIN_FACING = { 'dark-blue': Math.PI, 'green-patterns-blue': Math.PI };
+
+/** Turn a GLB about +y by wrapping its scene roots in one rotated node: JSON chunk only, the binary chunk
+ *  (Draco geometry, WebP textures) is copied byte for byte, so nothing is re-encoded. */
+function turnGlb(bytes, yaw, name) {
+  const b = Buffer.from(bytes), jsonLen = b.readUInt32LE(12);
+  const json = JSON.parse(b.subarray(20, 20 + jsonLen).toString('utf8')), rest = b.subarray(20 + jsonLen);
+  const sc = json.scenes[json.scene ?? 0];
+  json.nodes.push({ name, rotation: [0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2)], children: sc.nodes });
+  sc.nodes = [json.nodes.length - 1];
+  let text = Buffer.from(JSON.stringify(json), 'utf8'); const pad = (4 - (text.length % 4)) % 4;
+  text = Buffer.concat([text, Buffer.alloc(pad, 0x20)]);
+  const head = Buffer.alloc(20); head.writeUInt32LE(0x46546c67, 0); head.writeUInt32LE(2, 4); head.writeUInt32LE(20 + text.length + rest.length, 8);
+  head.writeUInt32LE(text.length, 12); head.writeUInt32LE(0x4e4f534a, 16);
+  return new Uint8Array(Buffer.concat([head, text, rest]));
+}
 
 // ---- split one pack model into its own GLB
 const io = new NodeIO();
@@ -195,11 +213,14 @@ for (const b of BUILDINGS) {
 }
 const kinManifest = JSON.parse(readFileSync(join(root, `${LM}/characters/manifest.json`), 'utf8'));
 for (const k of KIN) {
-  const file = `${LM}/characters/kin/${k}.glb`, glb = readFileSync(join(root, file));
+  const src = `${LM}/characters/kin/${k}.glb`, turned = KIN_FACING[k];
+  const file = turned ? `worlds/core-assets/packs/kin-${k}.glb` : src;
+  const glb = turned ? turnGlb(readFileSync(join(root, src)), turned, `kin-${k}-front`) : readFileSync(join(root, src));
+  if (turned) written.push([join(root, file), glb]);
   const info = kinManifest.models.find((x) => x.id === k);
-  const { sha, m } = record(glb, file, 'mesh', { name: `kin-${k}`, license: LM_LICENSE, source: `${file} (Polycam scan of a ceramic head, rebuilt by tools/floaters/build-assets.mjs)` });
+  const { sha, m } = record(glb, file, 'mesh', { name: `kin-${k}`, license: LM_LICENSE, source: `${src} (Polycam scan of a ceramic head, rebuilt by tools/floaters/build-assets.mjs)${turned ? '; turned 180° to face +z' : ''}` });
   const kk = 0.9 / Math.max(...m.box); // largest extent 0.9 m, as the floater view sizes heads
-  defs.push(base({ name: `kin-${k}`, description: `${info?.name ?? k}: a ceramic Little Martians kin head (scenery, not a Soul), hovering about a metre up. ${info?.lore?.canon ?? ''}`.trim(), tags: ['kin', 'head', 'ceramic', 'littlemartians', 'sculpture', 'floater'], license: LM_LICENSE, source: file, scale: [0.25, 4], layer: 'decor', components: { hover: { height: 0.9, bob: 0.08, period: 6 } } }, sha, m.box.map((v) => v * kk)));
+  defs.push(base({ name: `kin-${k}`, description: `${info?.name ?? k}: a ceramic Little Martians kin head (scenery, not a Soul), hovering about a metre up. ${info?.lore?.canon ?? ''}`.trim(), tags: ['kin', 'head', 'ceramic', 'littlemartians', 'sculpture', 'floater'], license: LM_LICENSE, source: src, scale: [0.25, 4], layer: 'decor', components: { hover: { height: 0.9, bob: 0.08, period: 6 } } }, sha, m.box.map((v) => v * kk)));
 }
 
 const indexText = JSON.stringify(index, null, 1) + '\n';
