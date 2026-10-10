@@ -11,7 +11,8 @@ import { describeEdit, steps, type Step } from './god-ui/checklist.ts';
 import { flyTo } from './god-ui/camera.ts';
 import { previewGhost, type GhostSummary } from './WorldPreviewGhost.ts';
 import { useSession } from './auth-session.ts';
-import { JoinPanel } from './god-ui/JoinPanel.tsx';
+import { ApprovalCard, JoinPanel } from './god-ui/JoinPanel.tsx';
+import { approvalFromHash } from './god-ui/join-api.ts';
 import './god-ui/god-panel.css';
 
 type Tab = 'start' | 'edits' | 'flags' | 'previews' | 'souls';
@@ -25,7 +26,9 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
   const [status, setStatus] = useState<G.Status | null>(null);
   // #join (the link a god shares): open the panel on the Join section / the Souls tab
   const joinHash = typeof location !== 'undefined' && location.hash === '#join';
-  const [open, setOpen] = useState<boolean>(() => joinHash || localStorage.getItem(OPEN_KEY) !== '0');
+  // #approve/<id> (the link the Soul CLI prints for its human): the approval card, panel open
+  const [approvalId, setApprovalId] = useState(() => (typeof location === 'undefined' ? null : approvalFromHash(location.hash)));
+  const [open, setOpen] = useState<boolean>(() => joinHash || !!approvalId || localStorage.getItem(OPEN_KEY) !== '0');
   const [tab, setTab] = useState<Tab>(joinHash ? 'souls' : 'start');
   const [welcome, setWelcome] = useState<string | null>(null);
   const [edits, setEdits] = useState<G.EditRow[] | null>(null);
@@ -137,6 +140,7 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
         </div>
         {launcher?.world.templateName && <div className="gp-dim gp-sub">from <i>{launcher.world.templateName}</i>{launcher.world.createdAt ? <> · made {ago(launcher.world.createdAt)}</> : null}</div>}
 
+        {approvalId && <ApprovalCard id={approvalId} signedIn={signedIn} onDone={() => { setApprovalId(null); history.replaceState(null, '', location.pathname + location.search); }} />}
         {status.you === 'anonymous' && (
           <div className="gp-block">
             {isNew && !status.hasOwner && <p className="gp-hello">Your new world is ready. Whoever claims it first becomes its god, so sign in and claim it now.</p>}

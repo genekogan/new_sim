@@ -46,12 +46,12 @@ test('Clerk exact verified issuer and origin bind an opaque shared identity; a C
   assert.equal((await request('/v1/account/session', undefined, 'dev:alice')).status, 401);
   assert.equal((await request('/v1/souls', { name: 'Unsigned' })).status, 401);
   assert.equal((await request('/v1/souls', { name: 'Devvy' }, 'dev:alice')).status, 401);
-  const made = await accept(f.host, Promise.resolve(request('/v1/souls', { name: 'Ada', description: 'a gardener' }, alice)));
-  assert.equal(made.status, 200); const soul = (await made.json() as { soul: { id: string } }).soul;
-  assert.equal(f.db.soul(soul.id)?.owner, account.identity.id);
+  // as live (main 5e478f8a): a signed-in account makes a Soul only by approving its agent's request (accounts/), never directly
+  const direct = await request('/v1/souls', { name: 'Ada', description: 'a gardener' }, alice);
+  assert.equal(direct.status, 403); assert.equal((await direct.json() as { code: string }).code, 'approval-required');
   const me = await (await request('/v1/me', undefined, alice)).json() as { me: { userId: string; souls: string[] } };
-  assert.equal(me.me.userId, account.identity.id); assert.ok(me.me.souls.includes(soul.id));
-  assert.equal((await request('/v1/souls/' + soul.id, undefined, bob)).status, 403);
+  assert.equal(me.me.userId, account.identity.id); assert.deepEqual(me.me.souls, []);
+  assert.equal((await request('/v1/me', undefined, bob)).status, 200);
   const none = new Auth({ ...cfg, authProvider: 'none' }, db); await none.init(); assert.equal(await none.accountFromToken(await sign()), null);
 });
 

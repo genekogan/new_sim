@@ -199,6 +199,9 @@ export function defaultCommand(world, port, o) {
     ...(clerk ? { AUTH_PROVIDER: 'clerk', ACCOUNT_AUTH_REQUIRED: '1', ACCOUNT_REGISTRY_PATH: clerk.registryPath, INVITE_REQUIRED: '0', WORLD_OWNER_ID: '' } : {}),
     // anyone signed in may join as a Soul under dev sign-in too (Clerk sets it above; edge minds: config default + production)
     ...(clerk ? {} : { INVITE_REQUIRED: '0' }),
+    // Native Soul arrival/removal (lifecycle), so a Soul is made exactly as on the live worlds: the agent's create-soul,
+    // and under Clerk the human's approval of it (main's accounts/). Lane P2.
+    SOUL_LIFECYCLE: '1',
     // Soul mode of the world's one skill (/SKILL.md) points at Codex's Soul skill (/skill.md) and CLI (/eden-agent.mjs),
     // served as is from the published files when the launcher is given them (--soul-skill, --soul-cli).
     ...(o.soulSkillFile && existsSync(o.soulSkillFile) ? { EDGE_SKILL_FILE: resolve(o.soulSkillFile) } : {}),

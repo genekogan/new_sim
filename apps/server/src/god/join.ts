@@ -14,6 +14,8 @@ import { ApiError } from '../souls.ts';
 export type JoinDeps = {
   worldName: string;
   baseOf: (c: Context) => string;
+  /** Where agents get the Soul CLI: this world's /eden-agent.mjs when it serves one, else the published copy. */
+  soulCliUrl: (c: Context) => string;
   /** Live Souls in this world, oldest first. */
   souls: () => { id: string; entity_id: string; name: string; created_at: number; token_last_used: number | null }[];
   /** Where a body is now (its entity in the god model), when it has one. */
@@ -23,13 +25,15 @@ export type JoinDeps = {
 const skillFile = resolve(new URL('../../../../tools/world-skill/SKILL.md', import.meta.url).pathname);
 /** A world name is the creator's text: keep it to plain words so it cannot break the skill's frontmatter or markup. */
 export const safeWorldName = (name: string, fallback = 'this world') => name.replace(/[^\p{L}\p{N} '.,!&()-]/gu, '').replace(/\s+/g, ' ').trim().slice(0, 60) || fallback;
-export const worldSkill = (text: string, base: string, worldName: string) => text.replaceAll('{{BASE}}', base).replaceAll('{{WORLD}}', safeWorldName(worldName));
+/** The Soul CLI everyone installs (Codex's, published; CODEX-STATUS §5). */
+export const PUBLISHED_SOUL_CLI = 'https://sim.eden.art/w/eden/eden-agent.mjs';
+export const worldSkill = (text: string, base: string, worldName: string, soulCli = PUBLISHED_SOUL_CLI) => text.replaceAll('{{BASE}}', base).replaceAll('{{WORLD}}', safeWorldName(worldName)).replaceAll('{{SOUL_CLI}}', soulCli);
 
 export function mountJoinRoutes(app: Hono, d: JoinDeps) {
   const skill = (c: Context) => {
     let text: string;
     try { text = readFileSync(skillFile, 'utf8'); } catch { throw new ApiError(404, 'not-found', 'this server has no world skill'); }
-    return c.body(worldSkill(text, d.baseOf(c), d.worldName), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-cache' });
+    return c.body(worldSkill(text, d.baseOf(c), d.worldName, d.soulCliUrl(c)), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'no-cache' });
   };
   app.get('/SKILL.md', skill);
   app.get('/v1/world/souls', (c) => {

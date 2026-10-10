@@ -63,12 +63,12 @@ test('Clerk launcher: the signed-in creator is the god at birth; others are visi
   const mint = await (await api(`${base}/v1/god/mint`, { method: 'POST', headers: { 'content-type': 'application/json', ...bearer(alice) }, body: '{"label":"browser"}' })).json();
   assert.ok(mint.token.startsWith(`god_${made.slug}-1_`));
   assert.equal((await api(`${base}/v1/god/mint`, { method: 'POST', headers: { 'content-type': 'application/json', ...bearer(bob) }, body: '{}' })).status, 403);
-  // a Soul made by the signed-in person (the Join lane's path) belongs to the same account
+  // as live: a Soul is made only through its agent's account approval (lane P2's join.mjs proves that path), never directly
   const session = await getJson(`${base}/v1/account/session`, alice);
   assert.match(session.accountId, /^acct_/);
   const soul = await (await api(`${base}/v1/souls`, { method: 'POST', headers: { 'content-type': 'application/json', ...bearer(bob) }, body: JSON.stringify({ name: 'Bea', description: 'a visitor' }) })).json();
-  assert.equal(soul.ok, true, JSON.stringify(soul));
-  assert.equal((await getJson(`${base}/v1/me`, bob)).me.souls.includes(soul.soul.id), true);
+  assert.equal(soul.code, 'approval-required', JSON.stringify(soul));
+  assert.equal((await getJson(`/w/${made.slug}/v1/config`)).accountApproval?.contract, 'account-soul-approval/1');
 
   // with a world awake, a bad creator token is refused before anything boots
   const t0 = Date.now(); assert.equal((await create('Dev Again', 'dev:gene')).status, 401); assert.ok(Date.now() - t0 < 5000);
