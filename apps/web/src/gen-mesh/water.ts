@@ -39,8 +39,8 @@ export function waterMaterial(opts: { flow?: number; color?: string; opacity?: n
         float a = sin(p.x * 1.3 + uTime * 0.7 + sin(p.y * 0.71 + uTime * 0.13) * 2.1);
         float b = sin(p.y * 1.1 - uTime * 0.5 + sin(p.x * 0.53 - uTime * 0.11) * 2.3);
         float sparkle = smoothstep(0.93, 1.0, a * b) * (0.5 + 0.5 * sin(p.x * 0.17 + p.y * 0.23));
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.93, 0.97), sparkle * 0.22);
-        if (uFlow > 0.0) { float streak = smoothstep(0.6, 1.0, sin(p.x * 0.8 + sin(vWaterUv.y * 1.7) * 2.0)); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.7, 0.84, 0.9), streak * 0.18); }
+        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.93, 0.97), sparkle * (uFlow > 0.0 ? 0.12 : 0.2));
+        if (uFlow > 0.0) { float streak = smoothstep(0.6, 1.0, sin(p.x * 0.8 + sin(vWaterUv.y * 1.7) * 2.0)); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.7, 0.84, 0.9), streak * 0.08); }
       }`);
   };
   m.customProgramCacheKey = () => `l3-water-${flow > 0 ? 'flow' : 'still'}`;

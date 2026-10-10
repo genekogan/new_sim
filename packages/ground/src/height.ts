@@ -22,7 +22,9 @@ const inBounds = (b: [number, number, number, number], x: number, z: number) => 
 /** Raw height at (x, z). Prefer Terrain.sample() (tile-interpolated) for anything that must match the browser. */
 /** Landforms in canonical fold order (class, then id), so a reloaded world sums in the same order to the bit. */
 export function orderedLandforms(landforms: Landform[]): Landform[] {
-  const rank = (l: Landform) => (l.kind === 'pad' ? 2 : l.kind === 'carve' || l.kind === 'channel' ? 1 : l.kind === 'terrace' || (l.kind === 'brush' && l.op === 'flatten') ? 1.5 : l.kind === 'brush' && l.op === 'smooth' ? 1.25 : 0);
+  // L3 kinds slot between the originals (whose ranks 0/1/2 are unchanged): fill/set channels (graded roads,
+  // embankments) at 0.9 so lakes, rivers and cuts always carve through them; smooth 1.25; terrace/flatten 1.5.
+  const rank = (l: Landform) => (l.kind === 'pad' ? 2 : l.kind === 'carve' ? 1 : l.kind === 'channel' ? (l.mode === 'cut' ? 1 : 0.9) : l.kind === 'terrace' || (l.kind === 'brush' && l.op === 'flatten') ? 1.5 : l.kind === 'brush' && l.op === 'smooth' ? 1.25 : 0);
   return [...landforms].sort((a, b) => rank(a) - rank(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 

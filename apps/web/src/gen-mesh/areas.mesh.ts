@@ -102,10 +102,14 @@ registerMesh({
     drapeArea(soup, poly, 2, g, 0.035, (x, z) => {
       const a = (x - fr.c[0]) * fr.u[0] + (z - fr.c[1]) * fr.u[1];
       if (sport === 'football') return scale(base, Math.floor((a + fr.hl) / 5) % 2 ? 1.1 : 0.96);
-      if (sport === 'tennis') { const b = (x - fr.c[0]) * fr.v[0] + (z - fr.c[1]) * fr.v[1]; return Math.abs(a) < 11.885 && Math.abs(b) < 5.485 ? rgb('#3b6aa0') : base; }
-      if (sport === 'basketball') { const b = (x - fr.c[0]) * fr.v[0] + (z - fr.c[1]) * fr.v[1]; return Math.abs(a) < fr.hl - 1 && Math.abs(b) < fr.hw - 1 ? base : rgb('#2f5d8a'); }
+      if (sport === 'tennis') return base;
+      if (sport === 'basketball') return rgb('#2f5d8a');
       return scale(base, 0.94 + hf(x, z) * 0.1);
     });
+    // crisp inner zones (playing court over its apron) as their own draped polygons
+    const zone = (a0: number, b0: number, a1: number, b1: number, col: RGB) => drapeArea(soup, [L(a0, b0), L(a1, b0), L(a1, b1), L(a0, b1)], 2, g, 0.045, () => col);
+    if (sport === 'tennis') zone(-Math.min(11.885, fr.hl), -Math.min(5.485, fr.hw), Math.min(11.885, fr.hl), Math.min(5.485, fr.hw), rgb('#3b6aa0'));
+    if (sport === 'basketball') zone(-fr.hl + 1, -fr.hw + 1, fr.hl - 1, fr.hw - 1, base);
     const lw = sport === 'football' ? 0.12 : 0.06, lift = 0.06;
     const V = (p: [number, number]): V3 => [p[0], g(p[0], p[1]) + lift, p[1]];
     const seg = (a: [number, number], b: [number, number], w = lw, col: RGB = WHITE) => { const dx = b[0] - a[0], dz = b[1] - a[1], l = Math.hypot(dx, dz) || 1, nx = -dz / l * w / 2, nz = dx / l * w / 2; const n = Math.max(1, Math.ceil(l / 2)); for (let k = 0; k < n; k++) { const p0: [number, number] = [a[0] + dx * k / n, a[1] + dz * k / n], p1: [number, number] = [a[0] + dx * (k + 1) / n, a[1] + dz * (k + 1) / n]; soup.topQuad(V([p0[0] + nx, p0[1] + nz]), V([p1[0] + nx, p1[1] + nz]), V([p1[0] - nx, p1[1] - nz]), V([p0[0] - nx, p0[1] - nz]), col); } };
@@ -152,8 +156,9 @@ registerMesh({
     } else if (sport === 'volleyball') {
       const a = Math.min(8, hl), b = Math.min(4, hw); rect(-a, -b, a, b, 0.05);
       for (const s of [-1, 1]) soup.cyl(P3(0, s * (b + 0.6), 0), 0.05, 2.5, post, 8);
-      soup.box(P3(0, 0, 2.15), [0.02, 0.9, 2 * b + 1], Math.atan2(-fr.u[1], fr.u[0]), rgb('#2a2d30'));
-      soup.rod(P3(0, -(b + 0.6), 2.6), P3(0, b + 0.6, 2.6), 0.03, WHITE, 4);
+      for (let j = 0; j <= 8; j++) soup.rod(P3(0, -(b + 0.6), 1.7 + j * 0.1), P3(0, b + 0.6, 1.7 + j * 0.1), 0.006, rgb('#2a2d30'), 3);
+      for (let j = 0; j <= Math.round((2 * b + 1.2) / 0.25); j++) { const bb = -(b + 0.6) + j * 0.25; soup.rod(P3(0, bb, 1.7), P3(0, bb, 2.55), 0.005, rgb('#2a2d30'), 3); }
+      soup.rod(P3(0, -(b + 0.6), 2.58), P3(0, b + 0.6, 2.58), 0.035, WHITE, 4);
     }
     if (ctx.params.fence === true) {
       const h = sport === 'tennis' ? 3 : 1.2, wire = rgb('#4f5a52');

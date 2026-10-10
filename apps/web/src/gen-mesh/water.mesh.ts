@@ -75,9 +75,10 @@ registerMesh({
         for (let k = 0; k <= colsF; k++) { const t = W / 2 - (W * k) / colsF; const [x, z] = at(L, qq, t * 0.96); fpos.push(x, y + 0.04, z); fuv.push(u * (fall.top - fall.bottom) * 2, t); }
       }
       for (let r = 0; r < rows; r++) for (let k = 0; k < colsF; k++) { const a = base0 + r * (colsF + 1) + k, b = a + 1, cc = a + colsF + 1, d = cc + 1; fidx.push(a, cc, b, b, cc, d); }
-      for (let k = 0; k < 9; k++) {
-        const t = -W / 2 + (W * (k + 0.5)) / 9, foot = at(L, q1 + 0.4 + h01(i, k) * 1.2, t + (h01(i, k, 2) - 0.5) * 0.6);
-        foam.blob([foot[0], fall.bottom + 0.02, foot[1]], [0.32 + h01(i, k, 3) * 0.25, 0.12, 0.3], scale(white, 0.95 + h01(i, k, 4) * 0.05), 0, 0.3, i * 31 + k);
+      const foot = !(f?.falls ?? []).some((g) => g.i === i + 1); // foam only where the cascade ends
+      if (foot) for (let k = 0; k < 7; k++) {
+        const t = -W / 2 + (W * (k + 0.5)) / 7, p = at(L, q1 + 0.5 + h01(i, k) * 1.4, t + (h01(i, k, 2) - 0.5) * 0.6);
+        foam.blob([p[0], fall.bottom + 0.03, p[1]], [0.42 + h01(i, k, 3) * 0.3, 0.14, 0.38], scale(white, 0.95 + h01(i, k, 4) * 0.05), 1, 0.18, i * 31 + k);
       }
       for (const side of [1, -1]) { const lip = at(L, q0, side * (W / 2 + 0.3)); soup.blob([lip[0], fall.top - 0.2, lip[1]], [0.9, 0.7, 0.8], rgb('#8f8a80'), 1, 0.18, i * 17 + side); const low = at(L, q1, side * (W / 2 + 0.2)); soup.blob([low[0], fall.bottom, low[1]], [0.7, 0.5, 0.6], rgb('#857f75'), 0, 0.2, i * 19 + side); }
     }

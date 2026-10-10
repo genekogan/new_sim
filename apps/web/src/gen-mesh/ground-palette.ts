@@ -25,7 +25,7 @@ export function terrainColorFor(palette: string | undefined): (c: THREE.Color, y
   return (c, y, slope, base, x = 0, z = 0) => {
     const h = y - base;
     c.copy(h < -0.2 ? col(p.shore) : col(p.base));
-    if (h < 0.6 && h >= -0.2) c.lerp(col(p.low), (0.6 - h) / 0.8 * 0.5);
+    if (h < -0.2) c.lerp(col(p.low), Math.min(1, (-0.2 - h) / 1.5) * 0.6); // wet ground below the plain: shore → bed
     if (h > 40) c.lerp(col(p.high), Math.min(1, (h - 40) / 60));
     const rocky = Math.min(1, Math.max(0, (slope - p.rockFrom) / 0.9));
     c.lerp(col(p.rock), rocky);

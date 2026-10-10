@@ -87,3 +87,14 @@ test('golden tile hashes for cliff, terrace, channel and brushes', () => {
   assert.deepEqual(got, GOLDEN, JSON.stringify(got));
 });
 const GOLDEN = ["725de8d5617d869f", "7b2826730d96ea35", "524056614f7192cb", "d15f5dc29af0b81a"];
+
+test('a river (cut channel) carves through a road embankment (set channel) whatever their ids', () => {
+  for (const [roadId, riverId] of [['a', 'z'], ['z', 'a']]) {
+    const g = g0([
+      { id: roadId, kind: 'channel', path: [[-40, 0], [40, 0]], levels: [2, 2], w: 4, edge: 10, mode: 'set' } as Landform,
+      { id: riverId, kind: 'channel', path: [[0, -40], [0, 40]], levels: [-1.5, -1.5], w: 2, edge: 3, mode: 'cut' } as Landform,
+    ]);
+    assert.equal(heightAt(g, 0, 0), -1.5, `river bed under the bridge (road ${roadId})`);
+    assert.equal(heightAt(g, 20, 0), 2, 'embankment elsewhere');
+  }
+});

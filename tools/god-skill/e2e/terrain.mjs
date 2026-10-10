@@ -191,7 +191,7 @@ try {
     const r = await act([
       { op: 'place', def: R('brush'), name: 'mound', p: [-30, 90], params: { op: 'raise', radius: 10, amount: 3 } },
       { op: 'place', def: R('brush'), name: 'soften', p: [-30, 90], params: { op: 'smooth', radius: 14, amount: 1 } },
-      { op: 'place', def: R('terrace'), name: 'hill-terraces', shape: { area: [[15, -130], [55, -130], [55, -90], [15, -90]] }, params: { step: 2, edge: 4, label: 'vine terraces' } },
+      { op: 'place', def: R('terrace'), name: 'hill-terraces', shape: { area: [[15, -130], [55, -130], [55, -90], [15, -90]] }, params: { step: 3, riser: 0.45, edge: 4, label: 'vine terraces' } },
     ], 'brushes');
     const { w } = await mirror();
     return { accepted: r.data?.accepted, failures: r.data?.failures, mound: +w.terrain.sample(-30, 90).toFixed(2), moundOff: +w.terrain.sample(0, 90).toFixed(2), terrace: [w.terrain.sample(30, -110), w.terrain.sample(31, -110)].map((v) => +v.toFixed(2)) };
