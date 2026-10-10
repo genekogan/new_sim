@@ -18,6 +18,8 @@ export interface WorldViewerHandle {
   placePreview?(place:WorldPlaceId):Promise<string|null>;
   focusSelected(): boolean;
   selectSoul(id: string | null): boolean;
+  /** True only when this Soul has a body in the currently depicted live frame. */
+  canFollowSoul?(id: string): boolean;
   selectEntity(id: string | null): boolean;
   seek(tick: number): Promise<void>;
   live(): void;
@@ -64,6 +66,7 @@ export interface WorldViewerPort {
   placePreview?(place:WorldPlaceId):Promise<string|null>;
   focusSelected(): boolean;
   hasSoul(id: string): boolean;
+  canFollowSoul?(id: string): boolean;
   hasEntity(id: string): boolean;
   select(soulId: string | null, entityId: string | null): void;
   seek(tick: number): Promise<void>;
@@ -82,6 +85,7 @@ export function createWorldViewerHandle(current: () => WorldViewerPort): WorldVi
     framePlace: place => current().framePlace?.(place) ?? false,
     placePreview: place => current().placePreview?.(place) ?? Promise.resolve(null),
     focusSelected: () => current().focusSelected(),
+    canFollowSoul: id => current().canFollowSoul?.(id) ?? false,
     selectSoul: id => { const p = current(); if (id !== null && !p.hasSoul(id)) return false; p.select(id, null); return true; },
     selectEntity: id => { const p = current(); if (id !== null && !p.hasEntity(id)) return false; p.select(null, id); return true; },
     seek: tick => Number.isFinite(tick) ? current().seek(tick) : Promise.resolve(),

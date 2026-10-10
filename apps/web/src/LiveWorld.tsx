@@ -937,6 +937,10 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       placePreview: place => controlsApi.current?.placePreview(place) ?? Promise.resolve(null),
       focusSelected: () => { const found = controlsApi.current?.focusSelected() ?? false; if (found) context.current.setCameraMode('manual'); return found; },
       hasSoul: id => context.current.sim.conn.replica.souls.has(id),
+      canFollowSoul: id => {
+        const c=context.current,soul=c.sim.conn.replica.souls.get(id);
+        return !past.current&&!c.loading&&!c.graphicsUnavailable&&!!shown.current.take&&!!soul&&!!shown.current.entities[soul.entityId];
+      },
       hasEntity: id => !!shown.current.entities[id],
       select: (soulId, entityId) => { context.current.onSelect(soulId); context.current.setThing(entityId); },
       seek: tick => playbackCommands.current?.seek(tick) ?? Promise.resolve(),

@@ -25,6 +25,7 @@ import {connectionLost} from './viewer-arrival.ts';
 import {BringAgent} from './BringAgent.tsx';
 import {AccountApproval} from './AccountApproval.tsx';
 import {approvalFromHash} from './account-approval.ts';
+import {useApprovalFollow} from './useApprovalFollow.ts';
 import {worldClockAt,worldTimeText} from './world-clock.ts';
 import type { WorldViewerHandle, WorldViewerState } from './WorldViewer.ts';
 import { worldKey } from './world-path.ts';
@@ -66,10 +67,11 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   const [tab, setTab] = useState<Tab>(() => hashTab().tab);
   const [pairCode, setPairCode] = useState<string | null>(() => hashTab().pair);
   const [approvalId,setApprovalId]=useState(()=>approvalFromHash(location.hash));
-  const [approvalFollow,setApprovalFollow]=useState<string|null>(null);
+  const [approvalFollow,setApprovalFollow]=useState<{soulId:string;scope:string}|null>(null);
+  const approvalScope=JSON.stringify([cfg.worldId,authIdentity(auth)]);
   const [selected, setSelected] = useState<string | null>(()=>hashTab().soul??null); // public selection only
   useEffect(() => { if (!pairCode&&!approvalId){if(location.hash==='#join'||tab==='watch'&&!selected&&location.hash==='#advanced')return;const next=tab==='watch'&&selected?soulFragment(selected):tab;if(location.hash!=='#'+next)location.hash=next;} }, [tab, pairCode,selected,approvalId]);
-  useEffect(()=>{const changed=()=>setApprovalId(approvalFromHash(location.hash));addEventListener('hashchange',changed);return()=>removeEventListener('hashchange',changed);},[]);
+  useEffect(()=>{const changed=()=>{setApprovalId(approvalFromHash(location.hash));setApprovalFollow(null);};addEventListener('hashchange',changed);return()=>removeEventListener('hashchange',changed);},[]);
   useEffect(() => { const f = () => { if(location.hash==='#advanced'){setAdvanced(true);setPanelOpen(false);setTab('watch');return;} const h = hashTab(); setTab(h.tab); if (!['watch', 'my soul'].includes(h.tab)) setAdvanced(true); else if(h.soul){setAdvanced(false);setPanelOpen(true);setNavigationOpen(false);} if(h.tab==='watch')setSelected(h.soul??null); if (h.pair) setPairCode(h.pair); else if(h.tab==='watch')setPairCode(null); }; addEventListener('hashchange', f); return () => removeEventListener('hashchange', f); }, []);
   const [lessonIndex,setLessonIndex]=useState(0);
   const [lessonOpen,setLessonOpen]=useState(false);
@@ -88,8 +90,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   const [viewerState, setViewerState] = useState<WorldViewerState | null>(null);
   const receiveHandle = useCallback((handle: WorldViewerHandle | null) => setViewerHandle(handle), []);
   const receiveState = useCallback((state: WorldViewerState) => setViewerState(state), []);
-  useEffect(()=>{if(!approvalFollow||!auth.authed)return;const attempt=()=>{if(viewerHandle?.selectSoul(approvalFollow)){viewerHandle.setCameraMode('follow');setApprovalFollow(null);}};attempt();const timer=setInterval(attempt,500);return()=>clearInterval(timer);},[approvalFollow,viewerHandle,auth.authed]);
-  useEffect(()=>{setApprovalFollow(null);},[cfg.worldId,authIdentity(auth)]);
+  useApprovalFollow(approvalFollow,approvalScope,auth.authed,viewerHandle,viewerState,followed=>{setApprovalFollow(null);if(followed)setApprovalId(null);});
   const placePreview=useCallback((place:EdenTourPlace)=>viewerHandle?.placePreview?.(place)??Promise.resolve(null),[viewerHandle]);
   const openNavigation = useCallback(() => setPanelOpen(false), []);
   const viewportInsets = useViewerInsets(frame, !advanced && panelOpen, `${advanced}:${navigationOpen}:${tab}:${selected}`);
@@ -122,7 +123,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   const openAccount = () => { setAdvanced(false); setPairCode(null); setTab('my soul'); revealPanel(); };
   return (
     <div ref={frame} className={`human-world ${advanced ? 'has-advanced' : ''}`}>
-      {approvalId&&<AccountApproval key={JSON.stringify([privatePanelKey,approvalId])} id={approvalId} worldId={cfg.worldId} worldUrl={location.origin+worldPath} worldName={worldKey==='littlemartians'?'Little Martians':worldKey[0].toUpperCase()+worldKey.slice(1)} auth={auth} api={api} onClose={()=>{setApprovalId(null);history.replaceState(null,'',location.pathname+location.search+'#watch');}} onReady={id=>{setSelected(id);setApprovalFollow(id);setAdvanced(false);setTab('watch');setPanelOpen(true);setApprovalId(null);}}/>}
+      {approvalId&&!approvalFollow&&<AccountApproval key={JSON.stringify([privatePanelKey,approvalId])} id={approvalId} worldId={cfg.worldId} worldUrl={location.origin+worldPath} worldName={worldKey==='littlemartians'?'Little Martians':worldKey[0].toUpperCase()+worldKey.slice(1)} auth={auth} api={api} onClose={()=>{setApprovalId(null);history.replaceState(null,'',location.pathname+location.search+'#watch');}} onReady={id=>{setSelected(id);setApprovalFollow({soulId:id,scope:approvalScope});setAdvanced(false);setTab('watch');setPanelOpen(true);}}/>}
       <div className="world-scene"><LiveWorld sim={sim} selected={selected} onSelect={inspect} embedded {...{edenExpansion,localClassroomPresentation,publishSpeechAnchors:!advanced,humanPresets:humanPresetsEnabled&&edenExpansion}} hideControls={!advanced} hideSoulInfo={!advanced} viewportInsets={viewportInsets} onViewerHandle={receiveHandle} onViewerState={receiveState} /></div>
       <WorldSpeechOverlay root={frame} sim={sim} state={viewerState} active={!advanced} handle={viewerHandle}/>
       {!advanced && <ViewerFrame handle={viewerHandle} state={viewerState} dt={sim.conn.welcome?.dt ?? 0.05} navigationOpen={navigationOpen} onNavigationChange={setNavigationOpen} onNavigationOpen={openNavigation} worldTime={worldTimeText(worldClockAt((sim as Sim&{takes?:{chunks?:unknown[]}|null}).takes?.chunks,viewerState?.shownTick))} connected={!connectionLost(sim.conn)} connecting={!sim.conn.welcome} worldName={worldKey === 'littlemartians' ? 'Little Martians' : worldKey[0].toUpperCase() + worldKey.slice(1)} followName={viewerState?.cameraMode === 'follow' ? r.souls.get(viewerState.selection.soulId ?? '')?.name ?? null : null} slots={{ status: statusSlot, camera: cameraSlot }} />}
