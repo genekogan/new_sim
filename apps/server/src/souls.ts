@@ -1,3 +1,5 @@
+import {afterCommit} from './edge/comms/store.ts';
+import type {WorldAccounts} from './accounts/service.ts';
 // Soul operations shared by the web API, the agent API and MCP.
 import { randomBytes } from 'node:crypto';
 import { createSoulSchema, describeIntent, intentSchema, proposeCardsSchema, steerSchema, type EventKind, type MandateRule, type AgendaStep, type BirthPayload, type DeckPayload, type IntentPayload, type LogEvent, type WireIntent } from '@sim/protocol';
@@ -39,6 +41,10 @@ export class Souls {
   private lastTouch = new Map<string, number>();
   host: WorldHost; db: Db; brain: Brain; cfg: Config;
   lifecycle?:LifecycleRunner;
+  accounts?:WorldAccounts;
+  owns(principal:string,soul:SoulRow){return this.accounts?this.accounts.owns(principal,soul):soul.owner===principal;}
+  ownedRows(principal:string){return this.accounts?this.accounts.rows(principal):this.db.soulsOf(principal).filter(row=>row.world_id===this.host.worldId);}
+  agentStatus(soul:SoulRow){return soul.token_hash?{attached:true,label:soul.token_label,since:soul.token_created_at,last_used:soul.token_last_used}:this.accounts?.store.agentStatus(soul.id)??{attached:false,label:null,since:null,last_used:null};}
   readonly services?:{controlReady?:(soul:SoulRow)=>boolean};
   constructor(host: WorldHost, db: Db, brain: Brain, cfg: Config, services?:{controlReady?:(soul:SoulRow)=>boolean}) {
     this.services = services;
@@ -94,22 +100,22 @@ export class Souls {
   /** A live request carries its authority to each sequenced write and final
    * response. These predicates only read; accepted facts replay without them. */
   ownerControlGuard(soul:SoulRow,issuer:string):AcceptanceGuard|undefined{
-    if(!this.lifecycle)return undefined;
+    if(!this.lifecycle&&!this.accounts)return undefined;
     return ()=>{
       const user=this.db.user(issuer),current=this.db.soul(soul.id);
       if(!user)throw new ApiError(401,'unauthorized','sign in first');
       this.requireInvited(user);
       if(!current||current.retired_at!==null||current.world_id!==this.host.worldId||current.owner!==soul.owner||current.entity_id!==soul.entity_id)throw new ApiError(404,'not-found','no such soul');
-      if(user.id!==current.owner&&user.role!=='admin')throw new ApiError(403,'forbidden','not your soul');
+      if(!this.owns(user.id,current)&&user.role!=='admin')throw new ApiError(403,'forbidden','not your soul');
       this.requireControlReady(current);return true;
     };
   }
   agentControlGuard(soul:SoulRow,token:string|undefined):AcceptanceGuard|undefined{
-    if(!this.lifecycle)return undefined;
-    const capturedHash=token?hashToken(token):null;
+    if(!this.lifecycle&&!this.accounts)return undefined;
+    const captured=token?this.agentCredential(token):undefined;
     return ()=>{
-      const current=capturedHash?this.db.soulByTokenHash(capturedHash):undefined,user=current?this.db.user(current.owner):undefined;
-      if(!current||current.id!==soul.id||current.owner!==soul.owner||current.entity_id!==soul.entity_id||current.world_id!==this.host.worldId||current.retired_at!==null||!user||!this.invited(user)||!this.controlReady(current))throw new ApiError(401,'unauthorized','missing or invalid soul token; pair again (see /skill.md)');
+      const credential=token?this.agentCredential(token):undefined,current=credential?.row,user=current?this.db.user(current.owner):undefined;
+      if(!captured||credential?.kind!==captured.kind||(captured.kind==='grant'||captured.generation!==null)&&credential.generation!==captured.generation||!current||current.id!==soul.id||current.owner!==soul.owner||current.entity_id!==soul.entity_id||current.world_id!==this.host.worldId||current.retired_at!==null||!user||!this.invited(user)||!this.controlReady(current))throw new ApiError(401,'unauthorized','missing or invalid soul token; pair again (see /skill.md)');
       return true;
     };
   }
@@ -129,25 +135,27 @@ export class Souls {
     const user=this.lifecycleUser(userId,true);if(!this.lifecycle)throw new ApiError(404,'not-found','no such lifecycle');
     let op:LifecycleOperation|undefined;
     // Invalid IDs use the same unknown response; invariant failures propagate.
-    if(/^lc_[0-9a-f]{32}$/.test(requestId))op=this.lifecycle.journal.operationForReader(this.host.worldId,requestId,user.id,user.role==='admin');
-    if(!op||(op.scope.owner!==user.id&&user.role!=='admin'))throw new ApiError(404,'not-found','no such lifecycle');
+    const associated=(soulId:string)=>{const row=this.db.soul(soulId);return !!row&&this.accounts?.owns(user.id,row)===true;};
+    if(/^lc_[0-9a-f]{32}$/.test(requestId))op=this.lifecycle.journal.operationForReader(this.host.worldId,requestId,user.id,user.role==='admin',associated);
+    if(!op||(op.scope.owner!==user.id&&user.role!=='admin'&&!associated(op.scope.soulId)))throw new ApiError(404,'not-found','no such lifecycle');
     return projectLifecycle(this.host,op);
   }
   lifecycleHistory(userId:string,cursor:string|null=null,owner=userId){
     const user=this.lifecycleUser(userId,true);if(!this.lifecycle||(owner!==user.id&&user.role!=='admin')||!owner||owner.length>128)throw new ApiError(404,'not-found','no such lifecycle');
     if(cursor!==null&&!/^lc1_lc_[0-9a-f]{32}$/.test(cursor))throw new ApiError(404,'not-found','no such lifecycle');
-    try{return this.lifecycle.ownerPage(owner,cursor);}catch(error){if(error instanceof Error&&error.message==='Lifecycle cursor not found')throw new ApiError(404,'not-found','no such lifecycle');throw error;}
+    try{return this.lifecycle.ownerPage(owner,cursor,owner===user.id&&this.accounts?this.accounts.associationIds(user.id):[]);}catch(error){if(error instanceof Error&&error.message==='Lifecycle cursor not found')throw new ApiError(404,'not-found','no such lifecycle');throw error;}
   }
-  acceptLifecycleCreate(userId:string,input:unknown){
+  acceptLifecycleCreate(userId:string,input:unknown,request?:string){
+    if(this.cfg.accountAuthRequired&&!this.accounts?.canCreate(userId))throw new ApiError(403,'approval-required','Sign in and approve this agent creation request.');
     if(!this.lifecycle)throw new ApiError(400,'lifecycle-unavailable','lifecycle candidate is not installed');
     const p=createSoulSchema.safeParse(input);if(!p.success)throw new ApiError(400,'invalid',p.error.issues.map(i=>i.message).join('; '));
-    const id=newId('s'),entityId=`h_${id.slice(2)}`,requestId='lc_'+randomBytes(16).toString('hex');
+    const id=newId('s'),entityId=`h_${id.slice(2)}`,requestId=request??'lc_'+randomBytes(16).toString('hex');
     const accepted=this.lifecycle.journal.acceptCreate({worldId:this.host.worldId,soulId:id,entityId,owner:userId},requestId,{...p.data,native:false},()=>{
       this.lifecycleUser(userId);
-      if(this.db.soulsOf(userId).length>=this.cfg.maxSoulsPerUser)throw new ApiError(409,'too-many',`at most ${this.cfg.maxSoulsPerUser} souls per account`);
+      if(this.ownedRows(userId).length>=this.cfg.maxSoulsPerUser)throw new ApiError(409,'too-many',`at most ${this.cfg.maxSoulsPerUser} souls per account`);
       if(this.db.soulByName(this.host.worldId,p.data.name))throw new ApiError(409,'name-taken',`a soul named ${p.data.name} already exists`);
       return true;
-    });this.lifecycle.pump();return accepted;
+    });afterCommit(this.db.db,()=>this.lifecycle!.pump());return accepted;
   }
   acceptLifecycleRetire(userId:string,soul:SoulRow){
     if(!this.lifecycle)throw new ApiError(400,'lifecycle-unavailable','lifecycle candidate is not installed');
@@ -155,7 +163,7 @@ export class Souls {
     const accepted=this.lifecycle.journal.acceptRetire(scope,requestId,()=>{
       const user=this.lifecycleUser(userId),current=this.db.soul(soul.id);
       if(!current||current.retired_at!==null||current.world_id!==this.host.worldId)throw new ApiError(404,'not-found','no such soul');
-      if(current.owner!==user.id&&user.role!=='admin')throw new ApiError(403,'forbidden','not your soul');
+      if(!this.owns(user.id,current)&&user.role!=='admin')throw new ApiError(403,'forbidden','not your soul');
       this.requireControlReady(current);return true;
     });
     // Durable revocation is already committed. Remove any pending credential
@@ -172,6 +180,7 @@ export class Souls {
     }
   }
   async create(owner: string, input: unknown, native = false): Promise<SoulRow> {
+    if(!native&&this.cfg.accountAuthRequired)throw new ApiError(403,'approval-required','Sign in and approve this agent creation request.');
     const p = createSoulSchema.safeParse(input);
     if (!p.success) throw new ApiError(400, 'invalid', p.error.issues.map((i) => i.message).join('; '));
     if (!native && this.db.soulsOf(owner).length >= this.cfg.maxSoulsPerUser) throw new ApiError(409, 'too-many', `at most ${this.cfg.maxSoulsPerUser} souls per account`);
@@ -401,7 +410,7 @@ export class Souls {
   dashboard(soul: SoulRow) {
     return {
       status: this.status(soul),
-      agent: { attached: !!soul.token_hash, label: soul.token_label, since: soul.token_created_at, last_used: soul.token_last_used },
+      agent: this.agentStatus(soul),
       spend: this.db.soulSpend(soul.id),
       created_at: soul.created_at,
     };
@@ -462,10 +471,12 @@ export class Souls {
   }
 
   // ------------------------------------------------------------ pairing an agent
-  private mint(soulId: string, label: string | null) { const token = newSoulToken(soulId); this.db.setSoulToken(soulId, hashToken(token), label); return token; }
+  invalidatePairings(soulId:string,keepCode?:string){for(const [code,pair]of this.pairings)if(pair.soulId===soulId&&code!==keepCode)this.pairings.delete(code);}
+  private mint(soulId: string, label: string | null,keepPairCode?:string) { const token = newSoulToken(soulId);if(this.accounts){const row=this.db.soul(soulId);if(!row)throw new ApiError(404,'not-found','No such Soul.');this.accounts.rotateLegacy(row,hashToken(token),label,keepPairCode);}else this.db.setSoulToken(soulId, hashToken(token), label); return token; }
   /** Owner-initiated: a short code the owner pastes to their agent along with the skill link. */
   pairCode(soul: SoulRow, base: string, issuer?: UserRow) {
     this.requireControlReady(soul);
+    if(this.accounts&&!this.accounts.pairingEligible(soul,issuer?.id??soul.owner))throw new ApiError(403,'account-signin-required','Verified account approval is required to pair this Soul.');
     for (const [k, p] of this.pairings) if (p.kind === 'owner' && p.soulId === soul.id) this.pairings.delete(k);
     const code = humanCode();
     this.pairings.set(code, { kind: 'owner', code, soulId: soul.id, owner: soul.owner, issuer: issuer?.id ?? soul.owner, expires: Date.now() + PAIR_TTL });
@@ -497,7 +508,7 @@ export class Souls {
     if (p.token) throw new ApiError(409, 'pair-done', 'already approved');
     const current = this.db.soul(soul.id);
     if (!this.pairAuthority(current, soul.owner, user.id)) throw new ApiError(403, 'forbidden', 'pairing authority changed');
-    p.token = this.mint(soul.id, p.agent); p.soulId = soul.id; p.owner = soul.owner; p.issuer = user.id;
+    p.token = this.mint(soul.id, p.agent,p.code); p.soulId = soul.id; p.owner = soul.owner; p.issuer = user.id;
   }
   pairPoll(poll: string) {
     const p = [...this.pairings.values()].find((x) => x.kind === 'agent' && x.poll === poll);
@@ -514,13 +525,21 @@ export class Souls {
   private pairAuthority(soul: SoulRow | undefined, owner: string, issuer: string): soul is SoulRow {
     const user = this.db.user(issuer),currentOwner=this.lifecycle?this.db.user(owner):undefined;
     return !!soul && !soul.retired_at && soul.world_id === this.host.worldId && soul.owner === owner
-      && !!user && this.invited(user) && (user.id === soul.owner || user.role === 'admin')
+      && !!user && this.invited(user) && (this.owns(user.id,soul) || user.role === 'admin')
+      && (!this.accounts||this.accounts.pairingEligible(soul,issuer))
       && (!this.lifecycle||!!currentOwner&&this.invited(currentOwner)) && this.controlReady(soul);
   }
 
+  agentCredential(token:string|undefined){
+    if(!token?.startsWith('sim_'))return null;
+    const legacy=this.db.soulByTokenHash(hashToken(token)),grant=this.accounts?.store.resolveGrant(token);
+    const row=legacy??(grant?this.db.soul(grant.soulId):undefined);
+    if(!row||row.world_id!==this.host.worldId||row.retired_at!==null)return null;
+    return {row,kind:legacy?'legacy' as const:'grant' as const,generation:legacy?row.token_generation:grant!.id,grant};
+  }
   soulFromToken(token: string | undefined): SoulRow | null {
     if (!token?.startsWith('sim_')) return null;
-    const soul = this.db.soulByTokenHash(hashToken(token)) ?? null;
+    const soul = this.agentCredential(token)?.row??null;
     if (soul && soul.world_id !== this.host.worldId) return null;
     if(soul&&this.lifecycle){const owner=this.db.user(soul.owner);if(!owner||!this.invited(owner)||!this.controlReady(soul))return null;}
     if (soul) { const now = Date.now(); if (now - (this.lastTouch.get(soul.id) ?? 0) > 30_000) { this.lastTouch.set(soul.id, now); this.db.touchSoulToken(soul.id); } }

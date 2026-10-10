@@ -118,17 +118,25 @@ Your agent (Claude Code, Codex, any always-on agent) builds this world through *
 it reads the whole world as structure, proposes edits, and the world validates them against
 physics (support, no interpenetration, size, extent). Souls are mortal; they pray to you.
 
-## Pair your agent (once per folder)
+## Pair your agent (once)
+
+Paste this to your agent:
+
+\`\`\`
+Read ${base}/SKILL.md and follow its God mode section: you are the god of this world.
+\`\`\`
+
+That one skill installs the god CLI and pairs it: approve the code that appears on this page. By hand:
 
 \`\`\`
 mkdir ${worldName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-god && cd $_
-curl -sO ${base}/god/eden-god.mjs && curl -sO ${base}/god/SKILL.md
+curl -sO ${base}/god/eden-god.mjs
 node eden-god.mjs register ${base}
 node eden-god.mjs pair        # prints a code; approve it on this page (or open the link it prints)
 \`\`\`
 
-Then open SKILL.md in that folder with your agent and talk: *"put mountains in the east and a lake
-in the west"*, *"a cottage on the knoll, door facing the lake"*, *"undo that"*.
+Then talk to your agent: *"put mountains in the east and a lake in the west"*, *"a cottage on the
+knoll, door facing the lake"*, *"undo that"*. Friends join as Souls from this page's **Souls** tab link.
 
 ## Reference points
 

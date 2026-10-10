@@ -55,12 +55,12 @@ export class IntentControlV2 {
       const user=this.host.db.user(identity.userId);if(!user)throw new ApiError(401,'unauthorized','sign in first');
       this.souls.requireInvited(user);
       const row=this.available(this.host.db.soul(soulId));
-      if(row.owner!==user.id&&user.role!=='admin')throw new ApiError(403,'forbidden','not your soul');
+      if(!this.souls.owns(user.id,row)&&user.role!=='admin')throw new ApiError(403,'forbidden','not your soul');
       const owner=this.host.db.user(row.owner);if(!owner||!this.souls.invited(owner))throw new ApiError(403,'invite-required','Soul owner needs an invite');
       return {row,user};
     };
     const {row,user}=read(),owner=row.owner,entity=row.entity_id,mind=this.host.minds.get(row.id);
-    const source=intentSourceV2Schema.parse({kind:user.id===owner?'owner':'operator',ownerId:owner,principalId:user.id,channel});
+    const source=intentSourceV2Schema.parse({kind:this.souls.owns(user.id,row)?'owner':'operator',ownerId:owner,principalId:user.id,channel});
     return {worldId:this.host.worldId,soulId:row.id,source,currentAuthority:current=>{
       const now=read();return current.owner===owner&&current.entity_id===entity&&now.row.owner===owner
         &&now.row.entity_id===entity&&this.host.minds.get(row.id)===mind;
@@ -71,24 +71,24 @@ export class IntentControlV2 {
     if(!token?.startsWith('sim_'))throw unauthorized();
     const hash=hashToken(token),first=this.souls.soulFromToken(token);if(!first)throw unauthorized();
     const read=()=>{
-      const row=this.host.db.soulByTokenHash(hash);if(!row||row.id!==first.id||row.world_id!==this.host.worldId)throw unauthorized();
+      const credential=this.souls.agentCredential(token),row=credential?.row;if(!row||row.id!==first.id||row.world_id!==this.host.worldId)throw unauthorized();
       const owner=this.host.db.user(row.owner);if(!owner||!this.souls.invited(owner)||row.retired_at!==null)throw unauthorized();
-      return this.available(row);
+      return {...credential!,row:this.available(row)};
     };
-    let row=read();
-    if(row.token_generation===null) {
+    let credential=read(),row=credential.row;
+    if(credential.kind==='legacy'&&row.token_generation===null) {
       // Compare-and-set lazily assigns an opaque identity to pre14 credentials.
       // Never derive it from, or publish, their bearer/hash material.
       this.host.db.db.prepare('UPDATE souls SET token_generation=? WHERE id=? AND token_hash=? AND token_generation IS NULL')
         .run(`g_${randomUUID()}`,row.id,hash);
-      row=read();
+      credential=read();row=credential.row;
     }
-    const generation=row.token_generation,owner=row.owner,entity=row.entity_id,mind=this.host.minds.get(row.id);
+    const generation=credential.generation,owner=row.owner,entity=row.entity_id,mind=this.host.minds.get(row.id);
     if(!generation)throw new ApiError(503,'unavailable','credential generation unavailable');
     const source=intentSourceV2Schema.parse({kind:'owner-agent',ownerId:owner,principalId:generation,channel});
     return {worldId:this.host.worldId,soulId:row.id,source,currentAuthority:current=>{
-      const now=read();if(now.token_generation!==generation)throw unauthorized();
-      return current.owner===owner&&current.entity_id===entity&&now.owner===owner&&now.entity_id===entity
+      const now=read();if(now.generation!==generation||now.kind!==credential.kind)throw unauthorized();
+      return current.owner===owner&&current.entity_id===entity&&now.row.owner===owner&&now.row.entity_id===entity
         &&this.host.minds.get(row.id)===mind;
     }};
   }
@@ -102,9 +102,9 @@ export class IntentControlV2 {
    * the genuine owner's web UI. The transport still rechecks every request. */
   ownerControl(scope:IntentRequestScope):IntentOwnerControlV2|undefined {
     this.guard(scope);
-    if(scope.source.kind!=='owner'||scope.source.channel!=='web'||scope.source.principalId!==scope.source.ownerId)return undefined;
+    const row=this.host.db.soul(scope.soulId);if(scope.source.kind!=='owner'||scope.source.channel!=='web'||!row||!this.souls.owns(scope.source.principalId,row))return undefined;
     return intentOwnerControlV2Schema.parse({worldId:this.host.worldId,soulId:scope.soulId,
-      ownerId:scope.source.ownerId,intentContract:INTENT_V2,...(this.historyEnabled?{intentHistoryContract:INTENT_HISTORY_V1}:{}),...(this.host.extra.intentArrivalV1?{intentArrivalContract:INTENT_ARRIVAL_V1}:{}),...(this.closedGoalsV1?{humanGoalContract:this.registeredActivitiesV1?'human-capabilities/2':'human-capabilities/1'}:{})});
+      ownerId:scope.source.ownerId,...(scope.source.principalId!==scope.source.ownerId?{accountOwnerId:scope.source.principalId}:{}),intentContract:INTENT_V2,...(this.historyEnabled?{intentHistoryContract:INTENT_HISTORY_V1}:{}),...(this.host.extra.intentArrivalV1?{intentArrivalContract:INTENT_ARRIVAL_V1}:{}),...(this.closedGoalsV1?{humanGoalContract:this.registeredActivitiesV1?'human-capabilities/2':'human-capabilities/1'}:{})});
   }
   humanCapabilities(scope:IntentRequestScope){if(!this.closedGoalsV1)throw new ApiError(404,'not-found','human goal registry unavailable');this.guard(scope);const allowed=this.souls.limits.allow(`human-capabilities:${scope.worldId}:${scope.soulId}:${scope.source.principalId}`,120,60_000);if(!allowed.ok)throw new ApiError(429,'rate-limited','too many capability reads');const view=readHumanCapabilitiesV1(this.host,this.host.minds.get(scope.soulId)!,{registeredActivitiesV1:this.registeredActivitiesV1}).view;this.guard(scope);return view;}
   historyCapability(scope:IntentRequestScope){return this.historyReader?.capability(scope);}

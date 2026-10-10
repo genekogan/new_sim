@@ -1,5 +1,5 @@
 // World processes behind the launcher: one `apps/server/src/main.ts` per world on
-// a free port from a private range, fake minds, dev auth, its own data dir.
+// a free port from a private range, edge minds (no server thinking), dev auth, its own data dir.
 // Crashed children restart with exponential backoff; a stop is final.
 import { spawn, execFileSync } from 'node:child_process';
 import { createServer } from 'node:net';
@@ -25,7 +25,8 @@ export class ChildPool {
    *           command?: (w: object, port: number) => { cmd: string, args: string[], env?: object },
    *           healthPath?: (slug: string) => string, onChange?: (slug: string) => void, pidFile?: string, idleMs?: number,
    *           maxRunning?: number, minFreeMb?: number, busy?: (slug: string) => boolean,
-   *           decorate?: (c: { cmd: string, args: string[], env?: object }) => { cmd: string, args: string[], env?: object } }} o
+   *           decorate?: (c: { cmd: string, args: string[], env?: object }) => { cmd: string, args: string[], env?: object },
+   *           soulCliFile?: string | null, soulSkillFile?: string | null }} o
    * maxRunning / minFreeMb: before a world boots, idle worlds are put to sleep until it fits; when none can sleep the
    * boot is refused (error.code 'capacity'). busy(slug): a world with live viewers is never put to sleep.
    */
@@ -196,6 +197,15 @@ export function defaultCommand(world, port, o) {
     WORLD_PATH: `/w/${world.slug}`,
     // the creator becomes the god by claiming at birth (launcher), never by a WORLD_OWNER_ID left in the env file
     ...(clerk ? { AUTH_PROVIDER: 'clerk', ACCOUNT_AUTH_REQUIRED: '1', ACCOUNT_REGISTRY_PATH: clerk.registryPath, INVITE_REQUIRED: '0', WORLD_OWNER_ID: '' } : {}),
+    // anyone signed in may join as a Soul under dev sign-in too (Clerk sets it above; edge minds: config default + production)
+    ...(clerk ? {} : { INVITE_REQUIRED: '0' }),
+    // Native Soul arrival/removal (lifecycle), so a Soul is made exactly as on the live worlds: the agent's create-soul,
+    // and under Clerk the human's approval of it (main's accounts/). Lane P2.
+    SOUL_LIFECYCLE: '1',
+    // Soul mode of the world's one skill (/SKILL.md) points at Codex's Soul skill (/skill.md) and CLI (/eden-agent.mjs),
+    // served as is from the published files when the launcher is given them (--soul-skill, --soul-cli).
+    ...(o.soulSkillFile && existsSync(o.soulSkillFile) ? { EDGE_SKILL_FILE: resolve(o.soulSkillFile) } : {}),
+    ...(o.soulCliFile && existsSync(o.soulCliFile) ? { EDGE_CLI_FILE: resolve(o.soulCliFile) } : {}),
     ...(marsWeb && existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}),
     ...(world.templateFile ? { GENESIS_FILE: world.templateFile } : {}),
   };

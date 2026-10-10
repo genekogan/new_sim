@@ -133,8 +133,8 @@ export class LifecycleRunner {
     const payload={soulId:s.soulId,entityId:s.entityId,owner:s.owner,name:op.name,description:op.description};
     this.queue(op,this.host.enqueueChecked('birth',op.native?'world':`soul:${s.soulId}`,payload,guard,e=>this.journal.linkAccepted(s,op.requestId,e,guard)));
   }
-  ownerPage(owner:string,cursor:string|null=null){
-    const page=this.journal.ownerPage(this.host.worldId,owner,cursor);
+  ownerPage(owner:string,cursor:string|null=null,associated:readonly string[]=[]){
+    const page=this.journal.ownerPage(this.host.worldId,owner,cursor,associated);
     return ownerLifecycleListSchema.parse({contract:'owner-lifecycle-list/1',worldId:this.host.worldId,
       requests:page.operations.map(op=>projectLifecycle(this.host,op)),nextCursor:page.nextCursor});
   }
