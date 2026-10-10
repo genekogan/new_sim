@@ -340,11 +340,6 @@
     "type": "json",
     "doc": "frozen by snapRiver: {sig, levels[] per centre-line point, falls[], source, mouth}"
    }
-  },
-  "components": {
-   "water": {
-    "level": -0.3
-   }
   }
  },
  {
