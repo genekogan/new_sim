@@ -149,6 +149,14 @@ function layout(w: WorldModel, o: { area?: [number, number, number, number]; max
     if (b.baked.rooms?.length || b.baked.slots.length) row.slots = slotWorld(w, e, b.baked).map((s) => ({ id: s.id, kind: s.kind, p: s.p, yaw: s.yaw, capacity: s.capacity, used: s.used, ...(s.polygon ? { polygon: s.polygon, local: s.local } : {}), ...(s.floor !== undefined ? { floor: s.floor } : {}) }));
     if (b.baked.water) row.water = b.baked.water.level;
     if (e.constraints?.length) row.constraints = e.constraints;
+    // doors (world frame; `out`: opens to the outside) and the building's front, for the CLI solver's
+    // doorway clearance, house-relative walls/corners and paths that start at a door
+    const doors = (b.baked.openings ?? []).filter((o) => o.kind !== 'window');
+    if (doors.length) {
+      const rooms = b.baked.rooms ?? [];
+      row.doors = doors.map((o) => { const probe: Vec2 = [o.at[0] + Math.sin(o.yaw), o.at[1] + Math.cos(o.yaw)]; return { id: o.id, kind: o.kind, level: o.level, width: o.width, at: toWorld(pose, o.at[0], o.at[1]), yaw: round(pose.yaw + o.yaw), out: !rooms.some((r) => r.floor === o.level && pointInPoly(probe[0], probe[1], r.polygon as Vec2[])) }; });
+    }
+    if (b.baked.rooms?.length) { const f = String((e.params as Record<string, unknown> | undefined)?.front ?? (b.def.params as Record<string, { default?: unknown }> | undefined)?.front?.default ?? 's'); row.front = round(pose.yaw + (({ s: 0, e: Math.PI / 2, n: Math.PI, w: -Math.PI / 2 } as Record<string, number>)[f] ?? 0)); }
     rows.push(row);
   }
   return { seq: w.editSeq, extent: w.constants.extent, entities: rows };

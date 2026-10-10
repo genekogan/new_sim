@@ -31,12 +31,27 @@ export function refPoint(v, spec, offset) {
   else if (s === 'centre' || s === 'center' || s === 'origin') out = { x: 0, z: 0, kind: 'point' };
   else if (compassKey(s) && !v.get(s)) { const d = COMPASS[compassKey(s)]; const k = v.extent * 0.32; out = { x: r2(d[0] * k), z: r2(d[1] * k), kind: 'region', word: compassKey(s) }; }
   else {
-    const row = v.get(s);
+    const row = v.get(s) ?? setOf(v, s);
     if (!row) throw new Error(`no such reference: ${s} (see: map, flags)`);
-    out = { ...centreOf(row), kind: 'entity', row, ref: row.path };
+    out = { ...centreOf(row), kind: 'entity', row, ref: row.path, ...(row.members ? { members: row.members.map((r) => r.id) } : {}) };
   }
   if (offset) { const [dx, dz] = String(offset).split(',').map(Number); out = { ...out, x: r2(out.x + dx), z: r2(out.z + dz) }; }
   return out;
+}
+/** A set made by --row/--grid/--count with --name stall: stall-1, stall-2, … (same parent). Referred to by the
+ *  bare name, it acts as one thing whose footprint is the union of its members'. Null if there is none. */
+export function setOf(v, name) {
+  const s = String(name ?? '').replace(/^flag:/, ''); const cut = s.lastIndexOf('/');
+  const parentPath = cut > 0 ? s.slice(0, cut) : null, stem = cut > 0 ? s.slice(cut + 1) : s;
+  if (!/^[a-z0-9][a-z0-9._-]*$/i.test(stem)) return null;
+  const parent = parentPath ? v.get(parentPath) : null; if (parentPath && !parent) return null;
+  const re = new RegExp(`^${stem.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-\\d+$`);
+  const members = v.rows.filter((r) => r.name && re.test(r.name) && (parent ? r.parent === parent.id : true));
+  if (members.length < 2) return null;
+  const pid = members[0].parent; const same = members.filter((r) => r.parent === pid);
+  if (same.length < 2) return null;
+  const x0 = Math.min(...same.map((r) => r.aabb[0])), z0 = Math.min(...same.map((r) => r.aabb[1])), x1 = Math.max(...same.map((r) => r.aabb[2])), z1 = Math.max(...same.map((r) => r.aabb[3]));
+  return { id: `set:${s}`, path: s, name: stem, set: true, members: same, parent: pid, def: same[0].def, form: 'set', layer: 'set', tags: [], aabb: [x0, z0, x1, z1], pose: [r2((x0 + x1) / 2), same[0].pose[1], r2((z0 + z1) / 2), 0, 1], box: [x1 - x0, 0, z1 - z0], y: same[0].y };
 }
 export function centreOf(row) {
   if (row.shape?.area) { const a = row.shape.area; let x = 0, z = 0; for (const p of a) { x += p[0]; z += p[1]; } return { x: r2(x / a.length), z: r2(z / a.length), y: row.pose[1], yaw: 0 }; }
@@ -61,6 +76,18 @@ export function rayExit(poly, c, u) {
     const den = u[0] * ez - u[1] * ex; if (Math.abs(den) < 1e-12) continue;
     const t = ((ax - c[0]) * ez - (az - c[1]) * ex) / den, s = ((ax - c[0]) * u[1] - (az - c[1]) * u[0]) / den;
     if (t > 0 && s >= 0 && s <= 1) best = Math.max(best, t);
+  }
+  return best;
+}
+/** The nearest point of a polyline to q: { p, t (0…1 of its length), d }. */
+export function nearestOnPath(path, q) {
+  const L = polylineLength(path) || 1; let best = { p: path[0], t: 0, d: Infinity }, run = 0;
+  for (let i = 1; i < path.length; i++) {
+    const [ax, az] = path[i - 1], [bx, bz] = path[i], ex = bx - ax, ez = bz - az, l2 = ex * ex + ez * ez, len = Math.sqrt(l2);
+    const k = l2 ? Math.max(0, Math.min(1, ((q[0] - ax) * ex + (q[1] - az) * ez) / l2)) : 0;
+    const p = [ax + ex * k, az + ez * k], d = Math.hypot(p[0] - q[0], p[1] - q[1]);
+    if (d < best.d) best = { p, t: (run + len * k) / L, d };
+    run += len;
   }
   return best;
 }
@@ -148,7 +175,8 @@ export function solve(v, thing, rel) {
     const f = String(rel.facing); if (f.startsWith('away:')) { const row = v.get(f.slice(5)); return row ? [{ kind: 'facing', ref: row.path, offset: Math.PI }] : []; }
     const row = !compassKey(f) || v.get(f) ? v.get(f) : null;
     // the compiler aims at the ref's pose; area/path things have no pose of their own (yaw only, no constraint)
-    return row && row.form === 'point' && !row.shape ? [{ kind: 'facing', ref: row.path, offset: 0 }] : [];
+    // the compiler aims at a point thing's pose, an area's centroid, a path's midpoint (L7 patch P3, in since 8c1c497d)
+    return row ? [{ kind: 'facing', ref: row.path, offset: 0 }] : [];
   };
   const pose = (x, z, yaw, extra = {}) => ({ ...extra, p: [r2(x), r2(z)], ...(yaw !== undefined ? { r: r2(yaw) } : {}), constraints: [...constraints, ...facingConstraint(), ...(extra.constraints ?? [])] });
   const finalYaw = (x, z, fallback) => { const f = faceAt(x, z); return f !== undefined ? f : baseYaw !== undefined ? baseYaw : fallback; };
@@ -160,19 +188,41 @@ export function solve(v, thing, rel) {
     // a compass word as a path end means the world's edge that way, straight from the other end ("a river to the south edge")
     const toEdge = (P, Q) => { if (P.kind !== 'region') return P; const d = norm(COMPASS[P.word]), h = v.extent / 2 - 2; const k = Math.min(...[0, 1].map((i) => (Math.abs(d[i]) < 1e-9 ? Infinity : ((Math.sign(d[i]) * h) - (i ? Q.z : Q.x)) / d[i]))); return { x: r2(Q.x + d[0] * k), z: r2(Q.z + d[1] * k), kind: 'point', ref: `the ${P.word} edge` }; };
     if (A.kind === 'region' && B.kind !== 'region') A = toEdge(A, B); else if (B.kind === 'region') B = toEdge(B, A.kind === 'region' ? { x: 0, z: 0 } : A);
-    // start and end at the edges of entity refs, not their centres (a road from the plaza to the bridge)
-    // ends at the refs' edges, never their centres: a point thing's footprint edge (+1 m), an area's boundary
-    // toward the other end (+1 m out; water areas: 1 m in, so a river joins its lake), a path's nearer end
+    // ends at the refs' edges, never their centres: a building's door (1 m out of it, the door nearest the other
+    // end), a point thing's footprint edge (+1 m), an area's boundary toward the other end (+1 m out; water areas:
+    // 1 m in, so a river joins its lake), the nearest point of a road/river/path (a bridge or pier: its nearer end)
+    const ENDS_ONLY = /bridge|pier|deck|dock|jetty/;
+    const approach = (P) => [P.x, P.z];
     const edge = (P, Q) => {
       if (P.kind !== 'entity') return [P.x, P.z];
       const sh = P.row.shape;
-      if (sh?.path) { const a = sh.path[0], b = sh.path[sh.path.length - 1]; return Math.hypot(a[0] - Q.x, a[1] - Q.z) <= Math.hypot(b[0] - Q.x, b[1] - Q.z) ? [r2(a[0]), r2(a[1])] : [r2(b[0]), r2(b[1])]; }
+      if (sh?.path) {
+        const a = sh.path[0], b = sh.path[sh.path.length - 1];
+        const nearerEnd = () => (Math.hypot(a[0] - Q.x, a[1] - Q.z) <= Math.hypot(b[0] - Q.x, b[1] - Q.z) ? [r2(a[0]), r2(a[1])] : [r2(b[0]), r2(b[1])]);
+        if (ENDS_ONLY.test(P.row.def)) return nearerEnd();
+        const q = nearestOnPath(sh.path, [Q.x, Q.z]);
+        if (Math.hypot(q.p[0] - a[0], q.p[1] - a[1]) < 3 || Math.hypot(q.p[0] - b[0], q.p[1] - b[1]) < 3) return nearerEnd();
+        // join a road at its edge (half a metre in), a river at its middle
+        const inset = P.row.layer === 'surface' ? Math.max(0, (sh.width ?? 4) / 2 - 0.5) : 0, u = norm([Q.x - q.p[0], Q.z - q.p[1]]);
+        return [r2(q.p[0] + u[0] * inset), r2(q.p[1] + u[1] * inset)];
+      }
+      const doors = (P.row.doors ?? []).filter((d) => d.out && (d.level ?? 0) === 0);
+      if (doors.length) { const d = doors.slice().sort((x, y) => Math.hypot(x.at[0] - Q.x, x.at[1] - Q.z) - Math.hypot(y.at[0] - Q.x, y.at[1] - Q.z))[0]; const f = dirOfYaw(d.yaw); doorUsed.set(P.row.path, d.id); return [r2(d.at[0] + f[0]), r2(d.at[1] + f[1])]; }
       const u = norm([Q.x - P.x, Q.z - P.z]);
       if (sh?.area) { const k = rayExit(sh.area, [P.x, P.z], u); const wet = P.row.layer === 'volume' || P.row.water !== undefined && P.row.water !== null; const d = k + (wet ? -1 : 1); return [r2(P.x + u[0] * d), r2(P.z + u[1] * d)]; }
       const e = extentAlong(boxOf(P.row), u) + 1; return [r2(P.x + u[0] * e), r2(P.z + u[1] * e)];
     };
+    const doorUsed = new Map();
     const via = rel.via ? [].concat(rel.via).map((x) => { const p = refPoint(v, x); return [p.x, p.z]; }) : [];
-    const path = [edge(A, via.length ? { x: via[0][0], z: via[0][1] } : B), ...via, edge(B, via.length ? { x: via.at(-1)[0], z: via.at(-1)[1] } : A)];
+    // the end that is not a path first (a house's door toward the road), then the path's nearest point to it
+    const asQ = ([x, z]) => ({ x, z });
+    const isPath = (P) => P.kind === 'entity' && !!P.row.shape?.path;
+    const towardA = via.length ? asQ(via[0]) : null, towardB = via.length ? asQ(via.at(-1)) : null;
+    let pa, pb;
+    if (isPath(A) && !isPath(B)) { pb = edge(B, towardB ?? asQ(isPath(A) ? nearestOnPath(A.row.shape.path, approach(B)).p : approach(A))); pa = edge(A, towardA ?? asQ(pb)); }
+    else { pa = edge(A, towardA ?? asQ(isPath(B) ? nearestOnPath(B.row.shape.path, approach(A)).p : approach(B))); pb = edge(B, towardB ?? asQ(pa)); }
+    const path = [pa, ...via, pb];
+    for (const [ref, id] of doorUsed) notes.push(`starts at ${ref}'s door ${id}`);
     notes.push(`path from ${A.ref ?? a} to ${B.ref ?? b}${via.length ? ` via ${via.length} point(s)` : ''}, ${r2(polylineLength(path))} m`);
     return { items: [{ candidates: [{ shape: { path, ...(rel.width ? { width: Number(rel.width) } : {}) }, note: notes.at(-1) }] }], notes };
   }
@@ -191,20 +241,46 @@ export function solve(v, thing, rel) {
     return { items: [{ candidates: [pose(p[0], p[1], finalYaw(p[0], p[1], yawOf(nrm[0], nrm[1])), { note: `across ${host.path} at ${Math.round(t * 100)}%` })] }], notes };
   }
 
-  // ---- on: a surface slot of a table, shelf, counter
+  // ---- on: a surface slot of a table, shelf, counter; several things spread over the top, clear of what is there
   if (rel.on) {
     const host = v.get(rel.on); if (!host) throw new Error(`no such thing to put it on: ${rel.on}`);
     const slots = (host.slots ?? []).filter((x) => ['surface', 'shelf'].includes(x.kind) && x.used < x.capacity);
     if (!slots.length) throw new Error(`${host.path} has no free surface slot (slots: ${(host.slots ?? []).map((x) => `${x.id}:${x.kind} ${x.used}/${x.capacity}`).join(', ') || 'none'})`);
     const n = Number(rel.count ?? 1);
     const items = [];
-    let k = 0;
-    for (const sl of slots) for (let u = sl.used; u < sl.capacity && items.length < n; u++) items.push({ candidates: [{ in: { parent: host.path, slot: sl.id }, constraints, note: `on ${host.path} (slot ${sl.id})` }] }), k++;
-    if (items.length < n) notes.push(`only ${items.length} free surface places on ${host.path}`);
+    for (const sl of slots) {
+      if (items.length >= n) break;
+      const F = frameOf(host, sl.id), HF = frameOf(host);
+      const [ox, oz] = toLocal(HF, F.O[0], F.O[1]);           // the slot origin in the host's frame
+      const hx = (host.box?.[0] ?? 1) / 2 - 0.06, hz = (host.box?.[2] ?? 1) / 2 - 0.06;
+      const sep = Math.max(hw, hd) * 2 + 0.06;
+      // what already stands there (in the slot frame); things placed without p sit at the slot origin
+      const there = v.rows.filter((r) => r.parent === host.id && r.slot === sl.id).map((r) => { const e = v.entity?.(r.id); const p = e?.p ?? [0, 0]; return [p[0], p[p.length - 1]]; });
+      const lattice = [];
+      for (let i = -8; i <= 8; i++) for (let j = -8; j <= 8; j++) { const lx = i * 0.06, lz = j * 0.06; if (Math.abs(ox + lx) + hw > hx + 0.04 || Math.abs(oz + lz) + hd > hz + 0.04) continue; lattice.push([lx, lz]); }
+      const free = sl.capacity - sl.used;
+      const want = Math.min(free, n - items.length);
+      if (!there.length && want > 1) {
+        // an empty top and several things: evenly round the middle (a pair faces across the table)
+        const rr = Math.max(0, Math.min(hx - hw, hz - hd, 0.12 + 0.06 * want));
+        for (let k = 0; k < want; k++) { const a = (2 * Math.PI * k) / want + Math.PI / 2; const q = [r2(Math.sin(a) * rr * (hx >= hz ? 1 : 0.6)), r2(Math.cos(a) * rr * (hz > hx ? 1 : 0.6))]; there.push(q); items.push({ candidates: [{ in: { parent: host.path, slot: sl.id }, p: q, constraints, note: `on ${host.path} (slot ${sl.id})` }] }); }
+        continue;
+      }
+      for (let k = 0; k < free && items.length < n; k++) {
+        // the lattice point farthest from everything there (the centre when the top is empty)
+        let best = null, bestD = -1;
+        for (const [lx, lz] of lattice) { const d = there.length ? Math.min(...there.map(([a, b]) => Math.hypot(a - lx, b - lz))) : 10 - Math.hypot(lx, lz); if (d > bestD + 1e-9) { bestD = d; best = [lx, lz]; } }
+        if (!best || (there.length && bestD < sep * 0.75)) { notes.push(`${host.path}'s ${sl.id} is full for things this size`); break; }
+        there.push(best);
+        items.push({ candidates: [{ in: { parent: host.path, slot: sl.id }, p: [r2(best[0]), r2(best[1])], constraints, note: `on ${host.path} (slot ${sl.id})` }] });
+      }
+    }
+    if (items.length < n) notes.push(`only ${items.length} free places on ${host.path}`);
+    if (!items.length) throw new Error(`no room left on ${host.path}`);
     return { items, notes };
   }
 
-  // ---- inside: a room of a building (house/room), optionally a corner or against a wall
+  // ---- inside: a room of a building (house/room), optionally against a wall or in a corner
   if (rel.inside) {
     const spec = String(rel.inside);
     let host = v.get(spec), roomId = null;
@@ -219,70 +295,7 @@ export function solve(v, thing, rel) {
     const bare = (t) => String(t).toLowerCase().replace(/[^a-z]/g, '');
     const room = !roomId ? rooms[0] : rooms.find((x) => x.id === roomId) ?? rooms.find((x) => bare(x.id) === bare(roomId) || (x.name && bare(x.name) === bare(roomId))) ?? rooms.find((x) => bare(x.id).startsWith(bare(roomId)) || bare(roomId).startsWith(bare(x.id)) || (x.name && bare(x.name).includes(bare(roomId))));
     if (!room) throw new Error(`${host.path} has no room ${roomId}; rooms: ${rooms.map((x) => x.id).join(', ')}`);
-    const RY = room.yaw, O = room.p;
-    const local = room.local ?? [[-2, -2], [2, -2], [2, 2], [-2, 2]];
-    const lx0 = Math.min(...local.map((p) => p[0])), lx1 = Math.max(...local.map((p) => p[0])), lz0 = Math.min(...local.map((p) => p[1])), lz1 = Math.max(...local.map((p) => p[1]));
-    const m = 0.15;
-    const siblings = new Set(v.rows.filter((x) => x.parent !== host.id || x.slot !== room.id).map((x) => x.id));
-    const roomSkip = new Set([...skip, host.id, ...[...v.rows].filter((x) => x.parent !== host.id).map((x) => x.id)]);
-    void siblings;
-    const toW = (lx, lz) => { const [dx, dz] = rot(RY, lx, lz); return [O[0] + dx, O[2] + dz]; };
-    const freeIn = (lx, lz, ly) => { const [x, z] = toW(lx, lz); return !solid || blockers(v, mine(x, z, RY + ly), roomSkip).length === 0; };
-    const ext = (ly) => [hw * Math.abs(Math.cos(ly)) + hd * Math.abs(Math.sin(ly)), hw * Math.abs(Math.sin(ly)) + hd * Math.abs(Math.cos(ly))];
-    const toLocalYaw = (wy) => wy - RY;
-    const label = `${host.path}/${room.id}`;
-    const at = (lx, lz, ly, how) => {
-      const [wx, wz] = toW(lx, lz);
-      const f = faceAt(wx, wz); const yl = f !== undefined ? toLocalYaw(f) : ly;
-      return { in: { parent: host.path, slot: room.id }, p: [r2(lx), r2(lz)], r: r2(yl), constraints: [...constraints, ...facingConstraint(), { kind: 'inside', ref: label }], note: `inside ${label}${how ? ', ' + how : ''}` };
-    };
-    const n = Number(rel.count ?? 1);
-    if (rel.corner || rel.wall) {
-      const key = compassKey(rel.corner ?? rel.wall); if (!key) throw new Error(`corner/wall must be a compass word (n, ne, e, …), got ${rel.corner ?? rel.wall}`);
-      const d = COMPASS[key]; const [dl0, dl1] = unrot(RY, d[0], d[1]);
-      if (rel.wall) {
-        // against the wall: back to the wall, facing into the room
-        const alongX = Math.abs(dl0) >= Math.abs(dl1);
-        const ly = alongX ? yawOf(-Math.sign(dl0), 0) : yawOf(0, -Math.sign(dl1));
-        const [ex, ez] = ext(ly);
-        const items = [];
-        const span = alongX ? [lz0 + ez + m, lz1 - ez - m] : [lx0 + ex + m, lx1 - ex - m];
-        const step = (alongX ? 2 * ez : 2 * ex) + Number(rel.gap ?? 0.3);
-        const total = step * (n - 1), mid = (span[0] + span[1]) / 2;
-        for (let k = 0; k < n; k++) {
-          const t = mid - total / 2 + k * step;
-          const lx = alongX ? (dl0 > 0 ? lx1 - ex - m : lx0 + ex + m) : t, lz = alongX ? t : (dl1 > 0 ? lz1 - ez - m : lz0 + ez + m);
-          items.push({ candidates: [at(lx, lz, ly, `against the ${key} wall`)] });
-        }
-        return { items, notes };
-      }
-      const ly = baseYaw !== undefined ? baseYaw - RY : yawOf(-Math.sign(dl0) || 0, -Math.sign(dl1) || 1);
-      const [ex, ez] = ext(ly);
-      const lx = Math.abs(dl0) < 0.3 ? (lx0 + lx1) / 2 : dl0 > 0 ? lx1 - ex - m : lx0 + ex + m;
-      const lz = Math.abs(dl1) < 0.3 ? (lz0 + lz1) / 2 : dl1 > 0 ? lz1 - ez - m : lz0 + ez + m;
-      return { items: [{ candidates: [at(lx, lz, ly, `${key} corner`)] }], notes };
-    }
-    // free spots on a lattice, centre first
-    const ly = baseYaw !== undefined ? baseYaw - RY : 0;
-    const [ex, ez] = ext(ly);
-    const cx = (lx0 + lx1) / 2, cz = (lz0 + lz1) / 2;
-    const spots = [];
-    for (let i = -6; i <= 6; i++) for (let j = -6; j <= 6; j++) {
-      const lx = cx + i * 0.5, lz = cz + j * 0.5;
-      if (lx - ex < lx0 + m || lx + ex > lx1 - m || lz - ez < lz0 + m || lz + ez > lz1 - m) continue;
-      spots.push([lx, lz, Math.hypot(i, j)]);
-    }
-    spots.sort((a, b) => a[2] - b[2]);
-    const items = [];
-    const taken = [];
-    for (const [lx, lz] of spots) {
-      if (items.length >= n) break;
-      if (!freeIn(lx, lz, ly)) continue;
-      if (taken.some(([a, b]) => Math.abs(a - lx) < 2 * ex + 0.2 && Math.abs(b - lz) < 2 * ez + 0.2)) continue;
-      taken.push([lx, lz]); items.push({ candidates: [at(lx, lz, ly, 'a free spot')] });
-    }
-    if (!items.length) throw new Error(`no free spot for a ${r2(2 * hw)}×${r2(2 * hd)} m thing in ${label} (room ${r2(lx1 - lx0)}×${r2(lz1 - lz0)} m)`);
-    return { items, notes };
+    return solveInRoom(v, host, room, thing, rel, { hw, hd, solid, skip, constraints, faceAt, facingConstraint, baseYaw, notes });
   }
 
   // ---- along a path entity (road, river, wall): at t, a side and a setback; rows step along it
@@ -365,6 +378,31 @@ export function solve(v, thing, rel) {
     const rb = R.kind === 'entity' ? boxOf(R.row) : { c: [R.x, R.z], half: [0, 0], yaw: 0 };
     const n = Number(rel.count ?? 1);
     if (R.kind === 'entity') skip.add(R.row.id);
+    for (const id of R.members ?? []) skip.add(id);
+    const shapeOf = R.kind === 'entity' ? R.row.shape : null;
+    // beside a path (a road, a river): perpendicular to it, spread along it, on the --dir side (else the left)
+    if (shapeOf?.path) {
+      const path = shapeOf.path, pw = (shapeOf.width ?? 4) / 2, gap = rel.dist !== undefined ? Number(rel.dist) : 1.5;
+      const items = [];
+      for (let k = 0; k < n; k++) {
+        const t = rel.t !== undefined ? Number(rel.t) : n > 1 ? 0.1 + (0.8 * k) / (n - 1) : 0.5;
+        const { p, dir } = pointAlong(path, t), left = leftOf(dir);
+        const want = rel.dir && compassKey(rel.dir) ? COMPASS[compassKey(rel.dir)] : left;
+        const sg = left[0] * want[0] + left[1] * want[1] >= 0 ? 1 : -1;
+        const cands = [];
+        for (const extra of [0, 1, 2.5, 5]) {
+          const y1 = finalYaw(p[0] + left[0] * sg * (pw + gap), p[1] + left[1] * sg * (pw + gap), baseYaw ?? yawOf(-left[0] * sg, -left[1] * sg)) ?? 0;
+          const d = pw + extentAlong(mine(0, 0, y1), left) + gap + extra;
+          const x = p[0] + left[0] * sg * d, z = p[1] + left[1] * sg * d;
+          const c = pose(x, z, y1, { note: `beside ${R.ref} at ${Math.round(t * 100)}%, ${r2(gap + extra)} m from its edge`, constraints: [{ kind: 'near', ref: R.row.path, dist: r2(pw + gap + extra + 1) }] });
+          if (free(x, z, y1) || !cands.length) cands.push(c);
+        }
+        items.push({ candidates: cands });
+      }
+      return { items, notes };
+    }
+    // around an area (a pond, a plaza): just outside its rim, not its bounding box
+    const rim = shapeOf?.area ? (u) => rayExit(shapeOf.area, [R.x, R.z], u) : null;
     const gap = rel.dist !== undefined ? Number(rel.dist) : Math.max(1.5, Math.min(6, Math.max(hw, hd)));
     const start = rel.dir && compassKey(rel.dir) ? COMPASS[compassKey(rel.dir)] : R.kind === 'entity' && R.row.form === 'point' && !R.row.def.includes('flag') ? dirOfYaw(R.yaw) : COMPASS.s;
     const a0 = Math.atan2(start[0], start[1]);
@@ -382,12 +420,13 @@ export function solve(v, thing, rel) {
         if (cands.length >= 4) break;
         const a = ak + da, u = [Math.sin(a), Math.cos(a)];
         // two passes: the yaw at a rough spot, then the exact distance for that yaw
-        const d0 = extentAlong(rb, u) + Math.max(hw, hd) + gap + ring;
-        const y1 = finalYaw(rb.c[0] + u[0] * d0, rb.c[1] + u[1] * d0, baseYaw) ?? 0;
-        const d = extentAlong(rb, u) + extentAlong(mine(0, 0, y1), u) + gap + ring;
-        const x = rb.c[0] + u[0] * d, z = rb.c[1] + u[1] * d;
+        const c0 = rim ? [R.x, R.z] : rb.c, out = rim ? rim(u) : extentAlong(rb, u);
+        const d0 = out + Math.max(hw, hd) + gap + ring;
+        const y1 = finalYaw(c0[0] + u[0] * d0, c0[1] + u[1] * d0, baseYaw) ?? 0;
+        const d = out + extentAlong(mine(0, 0, y1), u) + gap + ring;
+        const x = c0[0] + u[0] * d, z = c0[1] + u[1] * d;
         const fy = finalYaw(x, z, baseYaw);
-        const c = pose(x, z, fy, { note: `near ${R.ref ?? rel.near ?? rel.around}, ${compassOfYaw(a)} of it, ${r2(gap + ring)} m away`, constraints: R.kind === 'entity' ? [{ kind: 'near', ref: R.row.path, dist: r2(gap + ring + 1) }] : [] });
+        const c = pose(x, z, fy, { note: `near ${R.ref ?? rel.near ?? rel.around}, ${compassOfYaw(a)} of it, ${r2(gap + ring)} m away`, constraints: R.kind === 'entity' && !R.members ? [{ kind: 'near', ref: R.row.path, dist: r2(gap + ring + 1) }] : [] });
         fallback ??= c;
         if (isFree(x, z, fy ?? 0)) cands.push(c);
       }
@@ -443,4 +482,154 @@ export function circleArea(spec, wobble = 0.12) {
   const [cx, cz, r, n0] = String(spec).split(',').map(Number); const n = n0 || 10;
   let seed = Math.round(cx * 31 + cz * 17 + r * 7) | 0 || 1; const rnd = () => { seed ^= seed << 13; seed ^= seed >>> 17; seed ^= seed << 5; return ((seed >>> 0) % 1000) / 1000; };
   return Array.from({ length: n }, (_, k) => { const a = (k / n) * 2 * Math.PI, rr = r * (1 - wobble / 2 + rnd() * wobble); return [r2(cx + Math.sin(a) * rr), r2(cz + Math.cos(a) * rr)]; });
+}
+
+// ---------------------------------------------------------------- frames: a parent's children live in its frame
+
+/** The frame a parent gives its children (model.ts worldPose): origin = the slot's origin (or the parent's
+ *  position); positions rotate by the parent's world yaw; a child's yaw adds to the slot's world yaw. */
+export function frameOf(parent, slotId) {
+  const sl = slotId ? (parent.slots ?? []).find((x) => x.id === slotId) ?? null : null;
+  return { O: sl ? [sl.p[0], sl.p[2]] : [parent.pose[0], parent.pose[2]], PY: parent.pose[3] ?? 0, RY: sl ? sl.yaw : parent.pose[3] ?? 0, s: parent.pose[4] ?? 1, slot: sl };
+}
+export const toLocal = (F, wx, wz) => { const [x, z] = unrot(F.PY, wx - F.O[0], wz - F.O[1]); return [x / F.s, z / F.s]; };
+export const toWorldIn = (F, lx, lz) => { const [dx, dz] = rot(F.PY, lx * F.s, lz * F.s); return [F.O[0] + dx, F.O[1] + dz]; };
+
+/** The room (of any building) a world point is in: { host, slot } candidates, the given floor first. */
+export function roomsAt(v, wx, wz, exclude = new Set()) {
+  const out = [];
+  for (const r of v.rows) { if (exclude.has(r.id)) continue; for (const sl of r.slots ?? []) if (sl.kind === 'room' && sl.polygon && inPoly(wx, wz, sl.polygon)) out.push({ host: r, slot: sl }); }
+  return out;
+}
+/** The room a thing is in now (its own room slot, or the room of the table/shelf it stands on). */
+export function roomOf(v, row) {
+  for (let r = row, k = 0; r && r.parent !== 'world' && k < 16; k++) {
+    const p = v.byId?.get(r.parent) ?? v.get(r.parent); if (!p) return null;
+    const sl = (p.slots ?? []).find((x) => x.id === r.slot && x.kind === 'room');
+    if (sl) return { host: p, slot: sl };
+    r = p;
+  }
+  return null;
+}
+/**
+ * Where a thing that lives inside something ends up when it moves to world point (wx, wz) with world yaw wy:
+ * still on its table if the point is on the table's top, else the room the point is in (its own room
+ * first, then the same floor), else the world root. Returns { in, p, r, note } in the parent's frame.
+ */
+export function relocate(v, row, wx, wz, wy) {
+  const sub = new Set([row.id]); for (let grew = true; grew;) { grew = false; for (const r of v.rows) if (sub.has(r.parent) && !sub.has(r.id)) { sub.add(r.id); grew = true; } }
+  const parent = row.parent === 'world' ? null : v.byId?.get(row.parent) ?? v.get(row.parent);
+  const local = (host, slotId) => { const F = frameOf(host, slotId); const [lx, lz] = toLocal(F, wx, wz); return { F, lx, lz, r: wy === undefined ? undefined : r2(wy - F.RY) }; };
+  if (parent && row.slot && !(parent.slots ?? []).some((x) => x.id === row.slot && x.kind === 'room')) {
+    // on a surface (table top, shelf): stay if the point is over the host's top
+    const L = local(parent, row.slot), hx = (parent.box?.[0] ?? 1) / 2, hz = (parent.box?.[2] ?? 1) / 2;
+    const [ox, oz] = toLocal(frameOf(parent), L.F.O[0], L.F.O[1]);   // the slot origin in the host's frame
+    if (Math.abs(ox + L.lx) <= hx && Math.abs(oz + L.lz) <= hz) return { in: { parent: parent.path, slot: row.slot }, p: [r2(L.lx), r2(L.lz)], r: L.r, note: `on ${parent.path}` };
+  }
+  if (row.parent !== 'world') {
+    const cur = roomOf(v, row);
+    const rooms = roomsAt(v, wx, wz, sub);
+    const pick = (cur && rooms.find((x) => x.host.id === cur.host.id && x.slot.id === cur.slot.id)) ?? (cur && rooms.find((x) => x.host.id === cur.host.id && (x.slot.floor ?? 0) === (cur.slot.floor ?? 0))) ?? rooms.find((x) => (x.slot.floor ?? 0) === (cur?.slot.floor ?? 0)) ?? rooms[0];
+    if (pick) { const L = local(pick.host, pick.slot.id); return { in: { parent: pick.host.path, slot: pick.slot.id }, p: [r2(L.lx), r2(L.lz)], r: L.r, note: `inside ${pick.host.path}/${pick.slot.id}`, room: `${pick.host.path}/${pick.slot.id}` }; }
+    return { in: { parent: 'world' }, p: [r2(wx), r2(wz)], r: wy === undefined ? undefined : r2(wy), note: `out of ${parent?.path ?? 'its parent'}, now at the root`, left: true };
+  }
+  return { p: [r2(wx), r2(wz)], r: wy === undefined ? undefined : r2(wy) };
+}
+
+/** A house-relative side or corner word → a unit direction in the room frame. front = the way the house faces
+ *  (its front door side); left/right = the house's own left and right, as you walk out of its front door. */
+export function sideDir(word, frontL) {
+  let w = String(word ?? '').toLowerCase().replace(/[^a-z]/g, '');
+  const parts = { front: [1, 0], back: [-1, 0], rear: [-1, 0], left: [0, 1], right: [0, -1] };
+  let a = 0, b = 0, n = 0;
+  for (const k of Object.keys(parts)) if (w.includes(k)) { a += parts[k][0]; b += parts[k][1]; w = w.replace(k, ''); n++; }
+  if (!n || w || (a === 0 && b === 0)) return null;
+  const l = leftOf(frontL);
+  return norm([a * frontL[0] + b * l[0], a * frontL[1] + b * l[1]]);
+}
+const steps = (max, step) => { const out = [0]; for (let k = 1; k * step <= max + 1e-9; k++) out.push(k * step, -k * step); return out; };
+
+function solveInRoom(v, host, room, thing, rel, ctx) {
+  const { hw, hd, solid, skip, constraints, faceAt, facingConstraint, baseYaw, notes } = ctx;
+  const F = frameOf(host, room.id);
+  const poly = room.local ?? [[-2, -2], [2, -2], [2, 2], [-2, 2]];
+  const label = `${host.path}/${room.id}`;
+  const m = 0.13, n = Number(rel.count ?? 1), dY = F.RY - F.PY;
+  const lx0 = Math.min(...poly.map((p) => p[0])), lx1 = Math.max(...poly.map((p) => p[0])), lz0 = Math.min(...poly.map((p) => p[1])), lz1 = Math.max(...poly.map((p) => p[1]));
+  const isRect = poly.length === 4 && poly.every(([x, z]) => (Math.abs(x - lx0) < 1e-3 || Math.abs(x - lx1) < 1e-3) && (Math.abs(z - lz0) < 1e-3 || Math.abs(z - lz1) < 1e-3));
+  const cx = isRect ? (lx0 + lx1) / 2 : poly.reduce((a, p) => a + p[0], 0) / poly.length, cz = isRect ? (lz0 + lz1) / 2 : poly.reduce((a, p) => a + p[1], 0) / poly.length;
+  const boxL = (lx, lz, ly, grow = 0) => ({ c: [lx, lz], half: [hw + grow, hd + grow], yaw: ly + dY });
+  const fits = (lx, lz, ly) => corners(boxL(lx, lz, ly, 0.08)).every(([x, z]) => inPoly(x, z, poly));
+  const floor = room.floor ?? 0;
+  // doorways stay clear (as furnish keeps them): 0.85 m either side of every door on this floor
+  const doors = (host.doors ?? []).filter((d) => (d.level ?? 0) === floor).map((d) => ({ id: d.id, zone: { c: toLocal(F, d.at[0], d.at[1]), half: [d.width / 2 + 0.15, 0.85], yaw: d.yaw - F.PY } }));
+  const roomSkip = new Set([...skip, host.id, ...v.rows.filter((x) => !(x.parent === host.id && x.slot === room.id)).map((x) => x.id)]);
+  const taken = [];
+  const yawAt = (lx, lz, ly) => { const [wx, wz] = toWorldIn(F, lx, lz); const f = faceAt(wx, wz); return f !== undefined ? f - F.RY : ly; };
+  const why = (lx, lz, ly) => {
+    if (!fits(lx, lz, ly)) return 'through a wall';
+    const d = solid && doors.find((x) => obbHit(boxL(lx, lz, ly), x.zone)); if (d) return `in the doorway ${d.id}`;
+    if (solid) { const [x, z] = toWorldIn(F, lx, lz); const b = blockers(v, { c: [x, z], half: [hw, hd], yaw: F.RY + ly }, roomSkip); if (b.length) return `against ${b[0]}`; }
+    if (taken.some((t) => obbHit(boxL(lx, lz, ly, 0.08), t))) return 'on another one';
+    return null;
+  };
+  const at = (lx, lz, ly, how) => ({ in: { parent: host.path, slot: room.id }, p: [r2(lx), r2(lz)], r: r2(ly), constraints: [...constraints, ...facingConstraint(), { kind: 'inside', ref: label }], note: `inside ${label}${how ? ', ' + how : ''}` });
+  // the farthest distance along u from c at which the thing still fits (−1 if it does not fit at c)
+  const reach = (c, u, ly) => { if (!fits(c[0], c[1], ly)) return -1; let lo = 0, hi = Math.hypot(lx1 - lx0, lz1 - lz0); for (let i = 0; i < 24; i++) { const mid = (lo + hi) / 2; if (fits(c[0] + u[0] * mid, c[1] + u[1] * mid, ly)) lo = mid; else hi = mid; } return lo; };
+  const choose = (cands, what) => {
+    const items = []; const skipped = new Map();
+    for (const [lx, lz, ly0, how] of cands) {
+      if (items.length >= n) break;
+      const ly = yawAt(lx, lz, ly0);
+      const w = why(lx, lz, ly); if (w) { if (!skipped.has(w)) skipped.set(w, how); continue; }
+      taken.push(boxL(lx, lz, ly)); items.push({ candidates: [at(lx, lz, ly, how)] });
+    }
+    const door = [...skipped.keys()].find((k) => k.startsWith('in the doorway'));
+    if (door && items.length) notes.push(`kept ${door.replace('in the ', '')} clear`);
+    if (!items.length) throw new Error(`no room for a ${r2(2 * hw)}×${r2(2 * hd)} m thing ${what} in ${label} (${r2(lx1 - lx0)}×${r2(lz1 - lz0)} m): ${[...skipped.keys()].slice(0, 3).join('; ') || 'nothing fits'}`);
+    if (items.length < n) notes.push(`only ${items.length} of ${n} fit ${what} in ${label}`);
+    return { items, notes };
+  };
+  const fL = dirOfYaw((host.front ?? host.pose[3]) - F.PY);
+  const dirWord = (w) => { const rd = sideDir(w, fL); if (rd) return rd; const k = compassKey(w); if (k) return norm(unrot(F.PY, COMPASS[k][0], COMPASS[k][1])); return null; };
+  const round = !isRect;
+  const R = Math.max(lx1 - lx0, lz1 - lz0) / 2;
+  if (rel.corner || rel.wall) {
+    const word = rel.wall ?? rel.corner;
+    let u = dirWord(word);
+    if (!u) throw new Error(`--${rel.wall ? 'wall' : 'corner'} takes the house's own sides: back, front, left, right (corners back-left, front-right, …; left/right as you walk out of the front door), or a world compass word (n, ne, …); got ${word}`);
+    const cands = [];
+    if (rel.wall) {
+      if (isRect) u = Math.abs(u[0]) >= Math.abs(u[1]) ? [Math.sign(u[0]), 0] : [0, Math.sign(u[1])];
+      if (!round) {
+        const ly = baseYaw !== undefined ? baseYaw - F.RY : yawOf(-u[0], -u[1]) - dY, tg = [-u[1], u[0]];
+        for (const t of steps(Math.abs(u[0]) ? (lz1 - lz0) / 2 : (lx1 - lx0) / 2, 0.25)) { const c0 = [cx + tg[0] * t, cz + tg[1] * t]; const d = reach(c0, u, ly); if (d >= 0) cands.push([c0[0] + u[0] * d, c0[1] + u[1] * d, ly, `against the ${word} wall${Math.abs(t) > 0.01 ? ` (${r2(Math.abs(t))} m along it)` : ''}`]); }
+      } else {
+        for (const a of steps(Math.PI * 0.95, 0.25 / Math.max(1, R))) { const uu = rot(a, u[0], u[1]); const ly = baseYaw !== undefined ? baseYaw - F.RY : yawOf(-uu[0], -uu[1]) - dY; const d = reach([cx, cz], uu, ly); if (d >= 0) cands.push([cx + uu[0] * d, cz + uu[1] * d, ly, `against the ${word} wall${Math.abs(a) > 0.01 ? ` (${Math.round(Math.abs(a) * 180 / Math.PI)}° round it)` : ''}`]); }
+      }
+      return choose(cands, `against the ${word} wall`);
+    }
+    const ly = (uu) => (baseYaw !== undefined ? baseYaw - F.RY : yawOf(-uu[0], -uu[1]) - dY);
+    if (isRect) {
+      const sx = Math.abs(u[0]) < 0.3 ? 0 : Math.sign(u[0]), sz = Math.abs(u[1]) < 0.3 ? 0 : Math.sign(u[1]);
+      // back to a wall, not diagonal: the first-named side's wall (back-left → the back wall), else the nearer axis
+      const first = String(word).toLowerCase().match(/front|back|rear|left|right/)?.[0];
+      const fu = first ? dirWord(first) : null;
+      const wallAx = fu ? (Math.abs(fu[0]) >= Math.abs(fu[1]) ? [Math.sign(fu[0]), 0] : [0, Math.sign(fu[1])]) : sz ? [0, sz] : [sx, 0];
+      const y = baseYaw !== undefined ? baseYaw - F.RY : yawOf(-wallAx[0], -wallAx[1]) - dY, b = boxL(0, 0, y), ex = extentAlong(b, [1, 0]), ez = extentAlong(b, [0, 1]);
+      const x = sx > 0 ? lx1 - ex - m : sx < 0 ? lx0 + ex + m : cx, z = sz > 0 ? lz1 - ez - m : sz < 0 ? lz0 + ez + m : cz;
+      cands.push([x, z, y, `${word} corner`]);
+      // blocked (a doorway): slide out of the corner along either wall
+      for (let t = 0.25; t < Math.max(lx1 - lx0, lz1 - lz0); t += 0.25) { if (sx) cands.push([x, z - (sz || 1) * t, y, `${word} corner, ${r2(t)} m along the wall`]); if (sz) cands.push([x - (sx || 1) * t, z, y, `${word} corner, ${r2(t)} m along the wall`]); }
+    } else {
+      for (const a of steps(Math.PI * 0.95, 0.25 / Math.max(1, R))) { const uu = rot(a, u[0], u[1]); const d = reach([cx, cz], uu, ly(uu)); if (d >= 0) cands.push([cx + uu[0] * d, cz + uu[1] * d, ly(uu), `${word} side of the round room${Math.abs(a) > 0.01 ? ` (${Math.round(Math.abs(a) * 180 / Math.PI)}° round)` : ''}`]); }
+    }
+    return choose(cands, `in the ${word} corner`);
+  }
+  // free spots on a lattice, centre first
+  const ly = baseYaw !== undefined ? baseYaw - F.RY : 0;
+  const spots = [];
+  for (let i = -16; i <= 16; i++) for (let j = -16; j <= 16; j++) { const lx = cx + i * 0.5, lz = cz + j * 0.5; if (lx < lx0 || lx > lx1 || lz < lz0 || lz > lz1) continue; spots.push([lx, lz, ly, 'a free spot', Math.hypot(i, j)]); }
+  spots.sort((a, b) => a[4] - b[4]);
+  return choose(spots, 'free');
 }

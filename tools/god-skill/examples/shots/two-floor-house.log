@@ -1,8 +1,9 @@
 # example: a two-floor house, bedroom upstairs
 
 $ eden-god defs house
-  17 defs matching "house":
+  18 defs matching "house":
   - core/cottage@1 (point, solid, 8×4.8×6 m) [structure building cottage] params: w=8 d=6 floors=1 floorHeight=2.8 roof=gable roofPitch=32 material=plaster wall=#f1e7d2 trim=#6b4a2b roofColor=#8a3b2a — A cottage: living room, kitchen and bedroom (with floors: 2, bedrooms and a landing upstairs, stairs in the li
+  - core/roundhouse@1 (point, solid, 7×5.2×7 m) [structure building cottage house home round] params: w=7 d=7 floors=1 floorHeight=2.8 roof=dome roofPitch=32 material=plaster wall=#f1e7d2 trim=#6b4a2b roofColor=#8a3b2a — A round cottage: one round living room under a dome (or a cone: roof gable/hip), door on the front; `furnish` 
   - core/townhouse@1 (point, solid, 6×10.4×10 m) [structure building townhouse] params: w=6 d=10 floors=3 floorHeight=2.8 roof=gable roofPitch=38 material=brick wall=#e9d9c4 trim=#3f4a46 roofColor=#5e5a57 — A narrow townhouse: a hall with the stairs down one side, parlour and kitchen, bedrooms above.
   - core/greenhouse@1 (point, solid, 6×4.6×4 m) [structure building greenhouse] params: w=6 d=4 floors=1 floorHeight=2.6 roof=gable roofPitch=30 material=glass wall=#dfeee8 trim=#f4f4f0 roofColor=#cfe6e0 — A glasshouse for plants: glazed walls and roof.
   - core/lighthouse@1 (point, solid, 6×17×6 m) [structure building tower lighthouse] params: w=6 d=6 floors=5 floorHeight=3 roof=dome roofPitch=32 material=plaster wall=#f4f1ea trim=#b23a2e roofColor=#b23a2e — A round lighthouse: a spiral stair up five floors to a glazed lantern room with a gallery.
@@ -19,16 +20,16 @@ $ eden-god defs house
   - core/round-carpet-pack@1 (point, decor, 3.17×0.05×3.22 m) [carpet rug interior furniture pack mesh] — A round woven carpet (rug) for a floor. Licence: CC0 1.0. Source: Quaternius Ultimate House Interior (CC0), vi
   - core/flag@1 (point, decor, 0.1×3×0.1 m) [flag marker] params: w=0.08 h=3 d=0.08 color=#e8c547 — A labelled flag on a pole: a reference point for building ("put the well near flag:camp"). No collider; Souls 
   - core/woodland@1 (area, decor, 100×14×100 m) [cover forest plant ecology] params: palette=json density=0.03 cluster=0.4 minSpacing=2 avoid=json — A mixed wood: oaks, pines, birches, bushes and ferns in groves, reeds by any water, rocks on the steep, saplin
-  (2672 ms)
+  (84 ms)
 $ eden-god place townhouse --at 0,0 --param floors=2 --facing s --name townhouse
   placed townhouse [core/townhouse@1] at (0, 0, 0) facing s — at (0, 0)
     seq 1 — undo with: undo
-  (5092 ms)
+  (100 ms)
 $ eden-god describe townhouse
   townhouse [core/townhouse@1] solid point — at the root
     A narrow townhouse: a hall with the stairs down one side, parlour and kitchen, bedrooms above.
     pose (0, 0, 0) facing s (yaw 0); size 6×8.22×10 m; bounds x -3…3, z -5…5, y 0…5.6; 69 colliders, ~3786 tris
-    params {"floors":2,"w":6,"d":10,"floorHeight":2.8,"roof":"gable","roofPitch":38,"material":"brick","wall":"#e9d9c4","trim":"#3f4a46","roofColor":"#5e5a57","front":"s","porch":0,"balcony":false,"windows":0.6}
+    params {"floors":2,"w":6,"d":10,"floorHeight":2.8,"style":"cottage","roof":"gable","roofPitch":38,"material":"brick","wall":"#e9d9c4","trim":"#3f4a46","roofColor":"#5e5a57","front":"s","porch":0,"balcony":false,"windows":0.6,"wallThickness":0.22}
     state {"paint":"#e9d9c4"}
     rooms (6):
     - hall "Hall" floor 0 (y 0.1), 1.78×9.56 m, headroom 2.62 m, door door-parlour-hall (open), door door-kitchen-hall (open), door front-door (open), window window-3, window window-4; empty — place into it with --inside townhouse/hall
@@ -42,49 +43,50 @@ $ eden-god describe townhouse
     slots: ground (floor, 0/256); floor-1 (floor, 0/256); front (stand, 0/8); wall-n-1 (wall, 0/1); wall-n-2 (wall, 0/1); wall-s-1 (wall, 0/1); wall-w-1 (wall, 0/1); wall-e-1 (wall, 0/1); wall-e-2 (wall, 0/1)
     ground: y 0, slope 0°, walk
     notes: rooms: floor 0: hall 17.0 m², parlour 17.3 m², kitchen 17.3 m²; floor 1: landing 17.0 m², bedroom 17.3 m², bath 17.3 m² | doors: 1 outside (front-door), 4 inside; windows: 12 | stairs stairs: floor 0→1 in hall, straight, 14 risers of 0.200 m, 0.95 m wide | reachable from outside: all 6 rooms | headroom: rooms 2.62 m, stairs ≥ 2.98 m
-  (823 ms)
-$ eden-god place bed --inside townhouse/bedroom --wall n --name bed
-  placed townhouse/bed [core/bed@1] at (0.95, 2.9, 1.24) facing s — inside townhouse/bedroom, against the n wall; keeps: inside townhouse/bedroom
+  (203 ms)
+$ eden-god place bed --inside townhouse/bedroom --wall back --name bed
+  placed townhouse/bed [core/bed@1] at (0.95, 2.9, 1.17) facing s — inside townhouse/bedroom, against the back wall; keeps: inside townhouse/bedroom
     seq 2 — undo with: undo
-  (1262 ms)
-$ eden-god place chair --inside townhouse/bedroom --corner se --name reading-chair
-  placed townhouse/reading-chair [core/chair@1] at (2.33, 2.9, 4.33) facing nw — inside townhouse/bedroom, se corner; keeps: inside townhouse/bedroom
+  (86 ms)
+$ eden-god place chair --inside townhouse/bedroom --corner front-right --name reading-chair
+  placed townhouse/reading-chair [core/chair@1] at (-0.45, 2.9, 4.35) facing ne — inside townhouse/bedroom, front-right corner; keeps: inside townhouse/bedroom
     seq 3 — undo with: undo
-  (805 ms)
-$ eden-god place bookshelf --inside townhouse/bedroom --wall w --name bookshelf
-  placed townhouse/bookshelf [core/bookshelf@1] at (-0.57, 2.9, 2.42) facing e — inside townhouse/bedroom, against the w wall; keeps: inside townhouse/bedroom
+  (189 ms)
+$ eden-god place bookshelf --inside townhouse/bedroom --wall left --name bookshelf
+  placed townhouse/bookshelf [core/bookshelf@1] at (2.54, 2.9, 2.42) facing w — inside townhouse/bedroom, against the left wall; keeps: inside townhouse/bedroom
     seq 4 — undo with: undo
-  (893 ms)
+  (258 ms)
 $ eden-god place rug --inside townhouse/bedroom --name rug
   placed townhouse/rug [core/rug@1] at (0.95, 2.9, 2.42) facing s — inside townhouse/bedroom, a free spot; keeps: inside townhouse/bedroom
     seq 5 — undo with: undo
-  (616 ms)
+  (84 ms)
 $ eden-god place table --inside townhouse/parlour --name table
   placed townhouse/table [core/table@1] at (0.95, 0.1, 2.42) facing s — inside townhouse/parlour, a free spot; keeps: inside townhouse/parlour
     seq 6 — undo with: undo
-  (806 ms)
+  (83 ms)
 $ eden-god place chair --inside townhouse/parlour --count 2 --facing townhouse/table --name dining-chair
-  placed townhouse/dining-chair-1 [core/chair@1] at (-0.05, 0.1, 2.42) facing e — inside townhouse/parlour, a free spot; keeps: facing townhouse/table, inside townhouse/parlour
-  placed townhouse/dining-chair-2 [core/chair@1] at (0.95, 0.1, 1.42) facing s — inside townhouse/parlour, a free spot; keeps: facing townhouse/table, inside townhouse/parlour
+  placed townhouse/dining-chair-1 [core/chair@1] at (0.95, 0.1, 1.42) facing s — inside townhouse/parlour, a free spot; keeps: facing townhouse/table, inside townhouse/parlour
+  placed townhouse/dining-chair-2 [core/chair@1] at (0.95, 0.1, 3.42) facing n — inside townhouse/parlour, a free spot; keeps: facing townhouse/table, inside townhouse/parlour
+    note: kept doorway door-parlour-hall clear
     seq 7 — undo with: undo
-  (803 ms)
+  (219 ms)
 $ eden-god place bowl --on townhouse/table --name bowl
-  placed townhouse/table/bowl [core/bowl@1] at (0.8, 0.85, 2.27) facing s — on townhouse/table (slot top)
+  placed townhouse/table/bowl [core/bowl@1] at (0.95, 0.85, 2.42) facing s — on townhouse/table (slot top)
     seq 8 — undo with: undo
-  (1146 ms)
+  (142 ms)
 $ eden-god furnish townhouse/kitchen
-  furnished townhouse/kitchen: place workbench, place table, place bowl, place chair ×2, place stool (seq 10)
+  furnished townhouse/kitchen: place workbench, place table, place bowl, place chair ×2, place stool (seq 9)
     note: furnish townhouse (townhouse): 6 pieces in 1 rooms, 0 dropped
-  (849 ms)
+  (109 ms)
 $ eden-god place bench --near townhouse --dir s --facing s --name porch-bench
   placed porch-bench [core/bench@1] at (0, 0, 6.78) facing s — near townhouse, s of it, 1.5 m away; keeps: near townhouse
-    seq 12 — undo with: undo
-  (1149 ms)
+    seq 10 — undo with: undo
+  (204 ms)
 $ eden-god describe townhouse
   townhouse [core/townhouse@1] solid point — at the root
     A narrow townhouse: a hall with the stairs down one side, parlour and kitchen, bedrooms above.
     pose (0, 0, 0) facing s (yaw 0); size 6×8.22×10 m; bounds x -3…3, z -5…5, y 0…5.6; 69 colliders, ~3786 tris
-    params {"floors":2,"w":6,"d":10,"floorHeight":2.8,"roof":"gable","roofPitch":38,"material":"brick","wall":"#e9d9c4","trim":"#3f4a46","roofColor":"#5e5a57","front":"s","porch":0,"balcony":false,"windows":0.6}
+    params {"floors":2,"w":6,"d":10,"floorHeight":2.8,"style":"cottage","roof":"gable","roofPitch":38,"material":"brick","wall":"#e9d9c4","trim":"#3f4a46","roofColor":"#5e5a57","front":"s","porch":0,"balcony":false,"windows":0.6,"wallThickness":0.22}
     state {"paint":"#e9d9c4"}
     rooms (6):
     - hall "Hall" floor 0 (y 0.1), 1.78×9.56 m, headroom 2.62 m, door door-parlour-hall (open), door door-kitchen-hall (open), door front-door (open), window window-3, window window-4; empty — place into it with --inside townhouse/hall
@@ -99,9 +101,4 @@ $ eden-god describe townhouse
     ground: y 0, slope 0°, walk
     near: porch-bench 6.47 m s
     notes: rooms: floor 0: hall 17.0 m², parlour 17.3 m², kitchen 17.3 m²; floor 1: landing 17.0 m², bedroom 17.3 m², bath 17.3 m² | doors: 1 outside (front-door), 4 inside; windows: 12 | stairs stairs: floor 0→1 in hall, straight, 14 risers of 0.200 m, 0.95 m wide | reachable from outside: all 6 rooms | headroom: rooms 2.62 m, stairs ≥ 2.98 m
-  (654 ms)
-$ eden-god look --at townhouse --inside --from s --out <worktrees>/t2-skill/tools/god-skill/examples/shots/two-floor-house.png
-  look: <worktrees>/t2-skill/tools/god-skill/examples/shots/two-floor-house.png
-    from the s at (0, 14.6, 10.5) toward (0, 0, 0), 123.1 s
-    Read the image file; then fix what looks wrong.
-  (124546 ms)
+  (152 ms)
