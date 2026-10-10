@@ -13,6 +13,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { WorldModel } from '../../../packages/world-compiler/src/index.ts';
 import { furnishBatch } from '../lib/furnish.mjs';
+import { chromeLease } from '../lib/chrome-lease.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../../..');
@@ -63,13 +64,13 @@ const query = async (entity) => (await api('/v1/god/query', { body: { entity } }
 const mirror = async () => { const s = (await api('/v1/god/snapshot')).data; return WorldModel.fromSnapshot({ constants: s.constants, state: s.state, seed: s.seed ?? slug, seq: s.counter ?? 0, editSeq: s.seq, defs: [...s.defs, ...(s.library ?? [])], entities: s.entities, ground: s.ground }); };
 
 // ---------- screenshots (the viewer's Playwright, Chrome, swiftshader); generous timeouts under load
-let chromium = null, browser = null, page = null, lastUrl = '';
+let chromium = null, browser = null, page = null, lastUrl = '', releaseChrome = null;
 if (!args['no-shots']) try { chromium = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test').chromium; } catch { log('  (no @playwright/test; screenshots skipped)'); }
 async function shot(name, { eye, at, q = {} }) {
   if (!chromium) return;
   const t0 = t();
   try {
-    if (!browser) { browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] }); const ctx = await browser.newContext({ viewport: { width: 1100, height: 700 } }); await ctx.addInitScript(() => { localStorage.setItem('sim.dev', 'admin'); }); page = await ctx.newPage(); }
+    if (!browser) { releaseChrome = await chromeLease('buildings-e2e'); browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] }); const ctx = await browser.newContext({ viewport: { width: 1100, height: 700 } }); await ctx.addInitScript(() => { localStorage.setItem('sim.dev', 'admin'); }); page = await ctx.newPage(); }
     // one page load; the interior view switches live (window.__buildingView) so views do not reload
     if (!lastUrl) {
       lastUrl = `${base}?${new URLSearchParams({ dev: '1', eye: eye.join(','), at: at.join(',') })}`;
@@ -153,6 +154,7 @@ try {
   report.failures.push({ name: 'harness', error: String(e?.stack ?? e) }); log('harness error', e);
 } finally {
   if (browser) await browser.close().catch(() => { });
+  releaseChrome?.();
   report.summary = { steps: report.steps.length, failed: report.failures.length, shots: report.shots.filter((s) => s.file).length };
   writeFileSync(resolve(out, 'report.json'), JSON.stringify(report, null, 2));
   writeFileSync(resolve(out, 'server.log'), serverLog);
