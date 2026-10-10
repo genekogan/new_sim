@@ -288,7 +288,7 @@ function facade(b: Builder, L: BuildingLayout, o: { trim: string; quoin: string;
       const sign = 1, c0 = P(end, 0.025);
       if (o.mat === 'brick' || o.mat === 'stone') {
         for (let y = 0.45, k = 0; y < top - 0.45; y += 0.84, k++) { const wq = k % 2 ? 0.34 : 0.52; const m = P(end + sign * (wq / 2 - 0.01), 0.025); b.group = `level-${Math.min(L.floors - 1, Math.floor(y / L.fh))}`; b.box(m[0], y, m[1], wq, 0.36, 0.06, o.quoin, 'trim', yaw); }
-      } else if (o.mat !== 'glass') { b.group = 'level-0'; const m = P(end + 0.12, 0.025); b.box(m[0], 0.42, m[1], 0.24, top - 0.62, 0.06, o.quoin, 'trim', yaw); void c0; }
+      } else if (o.mat !== 'glass') { const m = P(end + 0.12, 0.025); for (let k = 0; k < L.floors; k++) { b.group = `level-${k}`; const y0 = k === 0 ? 0.42 : k * L.fh, y1 = k === L.floors - 1 ? top - 0.2 : (k + 1) * L.fh; b.box(m[0], y0, m[1], 0.24, y1 - y0, 0.06, o.quoin, 'trim', yaw); } void c0; }
     }
     // a downpipe at the clockwise end of the long sides
     if (o.detail >= 1 && len > 3.5 && o.mat !== 'glass') { const m = P(len - 0.25, 0.1); for (let k = 0; k < L.floors; k++) { b.group = `level-${k}`; const y0 = k === 0 ? 0.1 : k * L.fh, y1 = k === L.floors - 1 ? top - 0.3 : (k + 1) * L.fh; b.cyl(m[0], y0, m[1], 0.045, 0.045, y1 - y0, '#4a4f4d', 'trim', 6); } }
