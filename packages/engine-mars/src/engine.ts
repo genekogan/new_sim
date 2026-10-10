@@ -74,6 +74,9 @@ import {officeStairGuardsV1Schema,type OfficeStairGuardsV1} from '@sim/engine-co
 import {authoredBoundariesV1Schema,authoredBoundariesDeclarationV1Schema,type AuthoredBoundariesV1,type AuthoredBoundariesDeclarationV1} from '@sim/engine-contract';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/** Make the next Spatial.sync rebuild (incrementally, from the previous grids): the world's scene contribution changed
+ *  without a static entity changing. L8: please replace with a public `Spatial.invalidate()`. */
+function invalidateSpatialV1(spatial:Spatial){const snaps=(spatial as unknown as {snaps:unknown[]}).snaps;snaps.push({id:'\u0000world-edit'});}
 const TPS = 20;
 const KEY_EVERY = 5;                       // ticks between broadcast keyframes for a moving body (4 per second)
 const SETTLED = new Set(['gathered', 'occupied', 'talking']); // phases in which a Mars hold has arrived and simply continues
@@ -1345,7 +1348,7 @@ export class MarsEngine implements Engine {
   applyWorldEditV1(raw:WorldEditV1):{hash:string;relocated:string[];trapped:string[];kept:string[]}{
     if(!raw||raw.contract!=='world-edit/1'||typeof raw.set!=='object'||!Array.isArray(raw.levels))throw Error('world-edit.bad-payload');
     if(this.renderPlatformMetadata)this.finishRecorder();
-    const before=new Set(Object.keys(this.ents));
+    const before=new Set(Object.keys(this.ents)),baseKey=this.rt.world.entityPhysicsV1?.baseKey;
     const {physics,kept}=applyWorldEdit(this.rt.world,raw);
     this.m.canonicalEntityOrder(this.rt.world);
     for(const id of Object.keys(raw.set).sort()){
@@ -1353,7 +1356,9 @@ export class MarsEngine implements Engine {
       else if(!this.ents[id]&&before.has(id))this.out.changes.push([this.rt.tick,id,'present',null]);
     }
     const spatial=this.rt.services.spatial as Spatial;
-    if(spatial.source)spatial.refreshForWorld(this.rt.world);
+    // new levels / wider raster: re-base once; otherwise the next sync patches only the changed cells (incremental)
+    if(physics.baseKey!==baseKey&&spatial.source)spatial.refreshForWorld(this.rt.world);
+    else invalidateSpatialV1(spatial);
     const relocated:string[]=[],trapped:string[]=[];
     for(const id of Object.keys(this.ents).sort()){
       const e=this.ents[id];if(e.kind!=='human'||!e.human||e.human.shore||e.human.carrier||e.human.sleepPose||e.human.on)continue;

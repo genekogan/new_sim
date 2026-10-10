@@ -121,3 +121,22 @@ test('Souls among god-built things: enter, climb, sit, carry, pray; bodies refus
   assert.deepEqual({ engine: h.engine.stateHash(), kernel: kernelHash(h.kernel), physics: (h.engine as any).world.entityPhysicsV1.hash }, head, 'replay exact');
   h.stop();
 });
+
+test('a god edit that would bury a standing Soul lifts it clear, and says so', { timeout: 300000 }, async (t) => {
+  const w = await world();
+  w.brain.quiesce();
+  t.after(() => { w.brain.quiesce(); w.host.stop(); w.db.close(); });
+  await w.settle(2);
+  await invite(w, 'bo');
+  const row: any = await accept(w.host, w.souls.create('dev:bo', { name: 'Bo', description: 'stands still' }));
+  await w.settle(3);
+  const E = w.host.engine as any, b = E.world.entities[row.entity_id], at: [number, number] = [b.pose.p[0], b.pose.p[2]];
+  const r: any = w.god.act({ ops: [{ op: 'place', def: coreRef('wall'), name: 'wall', p: at, params: { w: 4, h: 2.6, d: 0.5 } }] });
+  assert.equal(r.accepted, true, JSON.stringify(r));
+  assert.ok(r.warnings.some((x: string) => x.startsWith('body.lifted') && x.includes('Bo')), JSON.stringify(r.warnings));
+  await w.settle(4);
+  const p = E.world.entities[row.entity_id].pose.p;
+  assert.ok(Math.abs(p[2] - at[1]) > 0.5 || Math.abs(p[0] - at[0]) > 2.2, `Bo stepped clear: ${p} (was ${at})`);
+  assert.ok(E.clearanceAtV1(p[0], p[2]) >= 0.27, 'standing on clear ground');
+  assert.deepEqual(E.runtime.violations, []);
+});

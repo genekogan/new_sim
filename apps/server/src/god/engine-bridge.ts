@@ -305,12 +305,32 @@ export class EngineBridge {
     return null;
   }
 
+  /** Bodies standing where newly placed/moved solids now are: the engine lifts them clear (warned, never refused). */
+  private buried(ids: string[]): string[] {
+    const out: string[] = [], seen = new Set<string>();
+    for (const id of new Set(ids)) for (const sid of this.model.entities.has(id) ? this.model.subtree(id) : []) for (const o of this.model.footprintsOf(sid)) {
+      for (const b of Object.values(this.engine.world.entities) as any[]) {
+        if (!b.human || seen.has(b.id)) continue;
+        const y = b.pose.p[1]; if (o.y1 <= y + 0.22 || o.y0 >= y + 1.8) continue;
+        const c = Math.cos(o.yaw), s = Math.sin(o.yaw), dx = b.pose.p[0] - o.c[0], dz = b.pose.p[2] - o.c[1];
+        const lx = dx * c - dz * s, lz = dx * s + dz * c; // into the box frame (entity convention)
+        if (Math.abs(lx) <= o.half[0] + 0.28 && Math.abs(lz) <= o.half[1] + 0.28) { seen.add(b.id); out.push(`body.lifted: ${this.soulName(b.id)} (${b.id}) stood where ${this.model.pathOf(sid)} now is; they step clear to the nearest open ground`); }
+      }
+    }
+    return out;
+  }
+
   /** Wrap the god's edit entry points with body-aware refusals (L1: replace with a compiler hook, see status file). */
   private guardGod() {
     const g = this.god as any;
     const act = g.act.bind(g), dryrun = g.dryrun.bind(g), preview = g.preview.bind(g), undo = g.undo.bind(g), redo = g.redo.bind(g);
     const opsOf = (b: unknown) => (b && typeof b === 'object' ? (b as { ops?: unknown[] }).ops ?? [] : []);
-    g.act = (batch: unknown, note?: string) => this.bodyRefusal(opsOf(batch)) ?? act(batch, note);
+    g.act = (batch: unknown, note?: string) => {
+      const no = this.bodyRefusal(opsOf(batch)); if (no) return no;
+      const r = act(batch, note) as Result;
+      if (r.accepted) for (const w of this.buried(Object.values(r.ids))) r.warnings.push(w);
+      return r;
+    };
     g.dryrun = (batch: unknown) => { const r = this.bodyRefusal(opsOf(batch)); return r ? { accepted: false, failures: (r as { failures: unknown }).failures } : dryrun(batch); };
     g.preview = (batch: unknown) => { const r = this.bodyRefusal(opsOf(batch)); return r ? { id: null, accepted: false, failures: (r as { failures: unknown }).failures } : preview(batch); };
     g.undo = () => { const t = this.god.store.undoable(); const r = t ? this.bodyRefusal(t.inverse) : null; return r ?? undo(); };

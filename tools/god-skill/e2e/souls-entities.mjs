@@ -75,18 +75,22 @@ const observe = async () => (await api('/v1/edge/observe', { as: 'soul' })).data
 // ---------- screenshots (Chrome via the viewer's Playwright), roofs hidden to see inside
 let chromium = null;
 try { chromium = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test').chromium; } catch { log('  (no @playwright/test; screenshots skipped)'); }
-let browser = null, page = null;
-async function shot(name, { eye, at, wait: ms = 6000, hideRoofs = true } = {}) {
+let browser = null, page = null, releaseChrome = null;
+const lease = async () => { if (releaseChrome) return; try { const { chromeLease } = await import(resolve(root, 'tools/god-skill/lib/chrome-lease.mjs')); releaseChrome = await chromeLease('L9-entities'); } catch { releaseChrome = () => {}; } };
+async function closeBrowser() { if (browser) await browser.close().catch(() => { }); browser = null; page = null; releaseChrome?.(); releaseChrome = null; }
+async function shot(name, { eye, at, wait: ms = 5000, hideRoofs = true } = {}) {
   if (!chromium) return;
   try {
-    if (!browser) { browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] }); const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } }); await ctx.addInitScript(() => { localStorage.setItem('sim.dev', 'admin'); }); page = await ctx.newPage(); }
-    const q = new URLSearchParams({ dev: '1', ...(hideRoofs ? { hideRoofs: '1' } : {}) }); if (eye) q.set('eye', eye.join(',')); if (at) q.set('at', at.join(','));
+    // one Chrome at a time across lanes (MERGES.md), on the real GPU (no swiftshader); ?shot=1 = clean canvas
+    if (!browser) { await lease(); browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] }); const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } }); await ctx.addInitScript(() => { localStorage.setItem('sim.dev', 'admin'); }); page = await ctx.newPage(); }
+    const q = new URLSearchParams({ dev: '1', shot: '1', ...(hideRoofs ? { hideRoofs: '1' } : {}) }); if (eye) q.set('eye', eye.join(',')); if (at) q.set('at', at.join(','));
     const t0 = t();
-    if (!page.url().startsWith(base)) { await page.goto(`${base}?${q}`, { waitUntil: 'domcontentloaded', timeout: 120000 }); await page.waitForTimeout(Math.max(ms, 25000)); }
-    else { await page.evaluate(([e, a]) => { const w = window.__simEntity; if (!w || !e || !a) return; w.controls.target.set(a[0], a[1], a[2]); w.camera.position.set(e[0], e[1], e[2]); w.camera.lookAt(w.controls.target); }, [eye, at]); await page.waitForTimeout(ms); }
+    await page.goto(`${base}?${q}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await page.waitForFunction(() => (window).__shotReady === true, null, { timeout: 180000 }).catch(() => log('  (no __shotReady; shooting anyway)'));
+    await page.waitForTimeout(ms); // people arrive over the take stream
     const state = await page.evaluate(() => { const w = window.__simEntity; return w ? { active: w.layer.active, drawn: w.layer.drawn?.size ?? null } : null; });
     const file = resolve(out, `${name}.png`);
-    await page.screenshot({ path: file });
+    await page.screenshot({ path: file, timeout: 120000 });
     report.shots.push({ name, file, state, ms: +(t() - t0).toFixed(0) });
     log(`  📷 ${name}.png ${JSON.stringify(state)}`);
   } catch (e) { log(`  (shot ${name} failed: ${String(e?.message ?? e).split('\n')[0]})`); }
@@ -132,7 +136,8 @@ try {
     if (r.data.accepted !== true) return { r: r.data };
     return until(async () => { const o = await observe(); const me = o?.self ?? o?.body ?? o; const s = JSON.stringify(o ?? {}); return { ok: /"activity":"sit"/.test(s) || /\bsit\b/.test(String(me?.activity ?? '')), receipt: r.data.receipt?.id, self: me && { activity: me.activity, level: me.level, at: me.at ?? me.pose } }; }, 180000, 1000);
   }, (r) => r?.ok);
-  await shot('s2-seated-upstairs', { eye: [2, 14, 12], at: [8, 3, -1], wait: 8000 });
+  await shot('s2-seated-upstairs', { eye: [5, 13, 8], at: [9, 2.8, -1], wait: 10000 });
+  await closeBrowser();
   await step('G3 the god tries to remove the chair: refused, naming the Soul', () => act([{ op: 'remove', id: 'house/chair' }]), (r) => r.data?.accepted === false && r.data.failures?.[0]?.code === 'occupied.by-body' && /Ana/.test(r.data.failures[0].detail));
   await step('G3 the god tries to remove the whole house: refused, naming the Soul', () => act([{ op: 'remove', id: 'house' }]), (r) => r.data?.accepted === false && r.data.failures?.[0]?.code === 'occupied.by-body' && /Ana/.test(r.data.failures[0].detail));
 
@@ -142,7 +147,8 @@ try {
     if (r.data.accepted !== true) return { r: r.data };
     return until(async () => { const e = await entity(ids['house/table/bowl']); return { ok: e?.entity?.in?.parent === soul.entityId, in: e?.entity?.in }; }, 180000, 1000);
   }, (r) => r?.ok);
-  await shot('s3-holding-bowl', { eye: [2, 14, 12], at: [9, 3, -1], wait: 6000 });
+  await shot('s3-holding-bowl', { eye: [5, 13, 8], at: [10, 2.8, -1], wait: 10000 });
+  await closeBrowser();
   await step('G4 the journal shows the engine\'s move (not undoable by the god)', async () => { const e = (await api('/v1/god/edits?limit=20')).data.edits; const m = e.find((x) => x.by === 'engine' && x.ops.some((o) => o.op === 'move' && o.id === ids['house/table/bowl'])); return { found: !!m, note: m?.note, undone: m?.undone }; }, (r) => r.found && r.undone === 1);
   await step('G4 the god tries to take the bowl away: refused, held by the Soul', () => act([{ op: 'remove', id: ids['house/table/bowl'] }]), (r) => r.data?.accepted === false && r.data.failures?.[0]?.code === 'held.by-body' && /Ana/.test(r.data.failures[0].detail));
   await step('S4 the Soul puts the bowl on the table', async () => {
@@ -166,13 +172,13 @@ try {
     const g = await act([{ op: 'move', id: 'house/chair', p: [-1, 0, 0] }]);
     return { accepted: r.data.accepted, seated: s?.ok, refused: g.data.failures?.[0]?.code };
   }, (r) => r.accepted && r.seated && r.refused === 'occupied.by-body');
-  await shot('s6-inside-roof-hidden', { eye: [10, 18, 9], at: [10, 2, 0], wait: 6000 });
+  await shot('s6-inside-roof-hidden', { eye: [10, 16, 7], at: [10, 2.5, -0.5], wait: 10000 });
   await shot('s6-house-outside', { eye: [24, 9, 20], at: [10, 2, 0], wait: 4000, hideRoofs: false });
 } catch (e) {
   report.failures.push({ name: 'harness', error: String(e?.stack ?? e) });
   log('harness error', e);
 } finally {
-  if (browser) await browser.close().catch(() => { });
+  await closeBrowser();
   const ms = report.steps.map((s) => s.ms).sort((a, b) => a - b);
   report.summary = { steps: report.steps.length, failed: report.failures.length, p50: ms.length ? ms[Math.floor(ms.length / 2)] : null, max: ms.length ? ms[ms.length - 1] : null };
   writeFileSync(resolve(out, 'report.json'), JSON.stringify(report, null, 2));

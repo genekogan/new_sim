@@ -31,9 +31,19 @@ export type WorldEditV1 = {
   assets?: Record<string, unknown>;
 };
 
-export const emptyEntityPhysics = (): EntityPhysicsV1 => ({ version: 'entity-physics/1', seq: 0, hash: '', levels: [], byEntity: {}, assets: {} });
+export const emptyEntityPhysics = (): EntityPhysicsV1 => ({ version: 'entity-physics/1', seq: 0, hash: '', baseKey: '', levels: [], bounds: null, byEntity: {}, assets: {} });
 export const entityPhysicsHash = (ep: Pick<EntityPhysicsV1, 'levels' | 'byEntity' | 'assets'>) => hashOf({ levels: ep.levels, byEntity: sortKeys(ep.byEntity), assets: sortKeys(ep.assets) });
 function sortKeys<T>(r: Record<string, T>): Record<string, T> { const o: Record<string, T> = {}; for (const k of Object.keys(r).sort()) o[k] = r[k]; return o; }
+
+/** Integer bounds covering every floor (and solid) of the physics, or null when there is none. */
+function floorBounds(ep: EntityPhysicsV1): [number, number, number, number] | null {
+  let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+  const add = (c: [number, number], h: [number, number], yaw: number) => { const ca = Math.abs(Math.cos(yaw)), sa = Math.abs(Math.sin(yaw)), hx = h[0] * ca + h[1] * sa, hz = h[0] * sa + h[1] * ca; x0 = Math.min(x0, c[0] - hx); z0 = Math.min(z0, c[1] - hz); x1 = Math.max(x1, c[0] + hx); z1 = Math.max(z1, c[1] + hz); };
+  for (const b of Object.values(ep.byEntity)) for (const s of b.surfaces ?? []) add(s.obb.c, s.obb.half, s.obb.yaw);
+  if (x0 === Infinity) return null;
+  // round out to 8 m so a small move does not re-base the raster
+  return [Math.floor(x0 / 8) * 8, Math.floor(z0 / 8) * 8, Math.ceil(x1 / 8) * 8, Math.ceil(z1 / 8) * 8];
+}
 
 /** The physics state a world-edit produces from `prev` (pure). */
 export function nextEntityPhysics(prev: EntityPhysicsV1 | undefined, e: WorldEditV1): EntityPhysicsV1 {
@@ -51,7 +61,9 @@ export function nextEntityPhysics(prev: EntityPhysicsV1 | undefined, e: WorldEdi
   cur.levels = structuredClone(e.levels).sort((a, b) => a.id - b.id);
   cur.seq = Math.max(cur.seq, e.seq);
   cur.byEntity = sortKeys(cur.byEntity); cur.assets = sortKeys(cur.assets);
+  cur.bounds = floorBounds(cur);
   cur.hash = entityPhysicsHash(cur);
+  cur.baseKey = hashOf({ levels: cur.levels, bounds: cur.bounds });
   return cur;
 }
 
