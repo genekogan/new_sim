@@ -52,7 +52,7 @@ export function JoinPanel({ signedIn, worldName, base, owner }: { signedIn: bool
 
   const refresh = useCallback(async () => { const [h, m] = await Promise.all([J.soulsHere(), signedIn ? J.mySouls() : Promise.resolve(null)]); setHere(h); setMine(m); }, [signedIn]);
   useEffect(() => { void refresh(); const t = setInterval(() => void refresh(), 5000); return () => clearInterval(t); }, [refresh]);
-  useEffect(() => { if (location.hash === '#join') ref.current?.scrollIntoView({ block: 'nearest' }); }, []);
+  useEffect(() => { if (J.landingHash === '#join') ref.current?.scrollIntoView({ block: 'nearest' }); }, []);
 
   const approveNote = account ? 'Your agent installs the Soul CLI and asks for your Soul. It gives you a link: open it here, signed in, and press Approve.' : 'This is a local test world: your agent makes the Soul itself, no approval needed.';
   const mineIds = new Set((mine ?? []).map((s) => s.id));

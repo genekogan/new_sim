@@ -11,7 +11,7 @@
 // --mode dev: the same world flow on dev sign-in (the agent makes its own Soul), plus the panel in Chrome
 //   (Chrome lease, real GPU): a stranger's Join section, ben's line for his agent, his agent joins, the god's Souls tab.
 //
-//   node tools/god-skill/e2e/join.mjs [--mode clerk|dev] [--port 5225] [--range 5226-5229] [--keep] [--no-shots]
+//   node tools/god-skill/e2e/join.mjs [--mode clerk|dev] [--base /worlds] [--port 5225] [--range 5226-5229] [--keep] [--no-shots]
 //        [--soul-cli <eden-agent.mjs>] [--soul-skill <SKILL.md>]   (default: the frozen published 5e478f8a copies)
 //
 // Report under .lane/e2e-join/<stamp>-<mode>/ (report.json, REPORT.md, PNGs). $0: edge minds, fake brain.
@@ -34,10 +34,12 @@ const SOUL_SKILL = resolve(typeof args['soul-skill'] === 'string' ? args['soul-s
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 const port = Number(args.port ?? 5225);
 const range = typeof args.range === 'string' ? args.range : '5226-5229';
-const out = resolve(root, '.lane/e2e-join', `${stamp}-${MODE}`);
+const out = resolve(root, '.lane/e2e-join', `${stamp}-${MODE}${typeof args.base === 'string' ? '-base' : ''}`);
 mkdirSync(out, { recursive: true });
 const origin = `http://127.0.0.1:${port}`;
-const report = { mode: MODE, port, range, soulCli: SOUL_CLI, soulSkill: SOUL_SKILL, startedAt: new Date().toISOString(), steps: [], shots: [], failures: [] };
+/** The launcher's path prefix (production: /worlds). */
+const BASE = typeof args.base === 'string' ? args.base.replace(/\/+$/, '') : '';
+const report = { mode: MODE, base: BASE, port, range, soulCli: SOUL_CLI, soulSkill: SOUL_SKILL, startedAt: new Date().toISOString(), steps: [], shots: [], failures: [] };
 const t = () => performance.now();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const exec = promisify(execFile);
@@ -72,7 +74,7 @@ const tokenOf = async (who) => (who ? (sign ? await sign(`user_${who}`) : `dev:$
 
 // ---------- the launcher (own process, own data dir)
 const dataDir = resolve(out, 'data');
-const launcher = spawn(process.execPath, ['tools/world-launcher/launcher.mjs', '--port', String(port), '--range', range, '--data', dataDir, '--eager', '0', '--soul-cli', SOUL_CLI, '--soul-skill', SOUL_SKILL, ...launchArgs], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
+const launcher = spawn(process.execPath, ['tools/world-launcher/launcher.mjs', '--port', String(port), '--range', range, '--data', dataDir, '--eager', '0', '--soul-cli', SOUL_CLI, '--soul-skill', SOUL_SKILL, ...(BASE ? ['--base', BASE] : []), ...launchArgs], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
 let launcherLog = ''; launcher.stdout.on('data', (d) => { launcherLog += d; }); launcher.stderr.on('data', (d) => { launcherLog += d; });
 const cleanup = () => { try { launcher.kill('SIGTERM'); } catch { /* gone */ } };
 process.on('exit', () => { if (!args.keep) cleanup(); });
@@ -81,7 +83,7 @@ for (const s of ['SIGINT', 'SIGTERM']) process.on(s, () => { cleanup(); process.
 let slug = '', base = '';
 async function api(path, { who, token, method, body } = {}) {
   const bearer = token ?? await tokenOf(who);
-  const r = await fetch((path.startsWith('/__sim') ? origin : base) + path, { method: method ?? (body ? 'POST' : 'GET'), headers: { 'content-type': 'application/json', ...(bearer ? { authorization: `Bearer ${bearer}` } : {}) }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(120_000) });
+  const r = await fetch((path.startsWith('/__sim') ? origin + BASE : base) + path, { method: method ?? (body ? 'POST' : 'GET'), headers: { 'content-type': 'application/json', ...(bearer ? { authorization: `Bearer ${bearer}` } : {}) }, body: body ? JSON.stringify(body) : undefined, signal: AbortSignal.timeout(120_000) });
   const text = await r.text(); let data; try { data = JSON.parse(text); } catch { data = text; }
   return { status: r.status, data };
 }
@@ -143,14 +145,14 @@ const ids = {};
 let gaiaDir = '', ana = null;
 try {
   await step('L0 the published Soul CLI and skill are at hand (frozen 5e478f8a copies)', async () => ({ cli: existsSync(SOUL_CLI), skill: existsSync(SOUL_SKILL), bytes: existsSync(SOUL_CLI) ? readFileSync(SOUL_CLI).length : 0 }), (r) => r.cli && r.skill);
-  await until('the launcher', async () => (await fetch(`${origin}/__sim/worlds.json`)).ok, 60_000);
+  await until('the launcher', async () => (await fetch(`${origin}${BASE}/__sim/worlds.json`)).ok, 60_000);
   const worldName = `Join Party ${stamp.slice(11, 16).replace('-', '')}`;
   await step(`L1 gaia makes a new world (Empty plain)${MODE === 'clerk' ? ', signed in with Clerk: the god at birth' : ''}`, async () => {
     const r = await api('/__sim/worlds', { who: MODE === 'clerk' ? 'gaia' : null, body: { name: worldName, template: 'empty' } });
-    slug = r.data.slug; base = `${origin}/w/${slug}`;
+    slug = r.data.slug; base = `${origin}${r.data.world?.basePath ?? `${BASE}/w/${slug}`}`;
     if (MODE === 'dev') await api('/v1/god/mint', { who: 'gaia', body: { label: 'browser' } });
-    return { status: r.status, slug, you: (await api('/v1/god/status', { who: 'gaia' })).data.you };
-  }, (r) => r.slug && r.you === 'owner');
+    return { status: r.status, slug, base, you: (await api('/v1/god/status', { who: 'gaia' })).data.you };
+  }, (r) => r.slug && r.you === 'owner' && r.base === `${origin}${BASE}/w/${r.slug}`);
   await step('L2 launcher worlds: edge minds, no invitations, native arrivals; the published Soul CLI and skill served as is', async () => {
     const cfg = (await api('/v1/config')).data, edge = await api('/v1/edge/schema');
     const cli = await (await fetch(`${base}/eden-agent.mjs`)).text(), soulSkill = await (await fetch(`${base}/skill.md`)).text();
@@ -240,7 +242,7 @@ try {
       };
       await step('P0 a stranger (not signed in) sees the Join section and who lives here', async () => {
         const page = await open(null, '#join');
-        await page.locator('[data-join]').waitFor();
+        await page.locator('[data-join]').waitFor({ timeout: 60_000 });
         const text = await page.locator('[data-god-panel]').innerText();
         await shot(page, '01-anonymous-join'); await page.context().close();
         return { join: /Join this world as a Soul/.test(text), hint: /Sign in/.test(text), lists: /Ana/.test(text) };
@@ -271,7 +273,7 @@ try {
       await benPage.context().close();
       await step('P3 the god\'s Souls tab: the link to share and both Souls; clicking Ana flies to her', async () => {
         const page = await open('gaia', '#join');
-        await page.locator('[data-souls-tab]').waitFor();
+        await page.locator('[data-souls-tab]').waitFor({ timeout: 60_000 });
         await page.locator('[data-soul="Ben"]').waitFor({ timeout: 30_000 });
         const link = await page.locator('[data-join-link]').innerText();
         await page.locator('[data-soul="Ana"] .gp-link').click().catch(() => {});
@@ -289,10 +291,10 @@ try {
         const text = await page.locator('[data-god-panel]').innerText();
         await shot(page, '06-god-start-one-skill'); await page.context().close();
         return { href, paste: text.includes(`Read ${base}/SKILL.md and follow its God mode section`) };
-      }, (r) => r.href === `/w/${slug}/SKILL.md` && r.paste);
+      }, (r) => r.href === `${BASE}/w/${slug}/SKILL.md` && r.paste);
       await step('P5 an approval link opens the approval card (signed out: it asks to sign in; the request stays pending)', async () => {
         const page = await open(null, '#approve/ap_' + '0'.repeat(32));
-        await page.locator('[data-approval]').waitFor();
+        await page.locator('[data-approval]').waitFor({ timeout: 60_000 });
         const text = await page.locator('[data-approval]').innerText();
         await shot(page, '07-approval-card-signed-out'); await page.context().close();
         return { text };

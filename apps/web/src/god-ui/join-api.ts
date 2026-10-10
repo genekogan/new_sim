@@ -3,7 +3,7 @@
 // person approves it on this page; the agent's `approval wait` connects. Only existing endpoints: /v1/me, the public
 // /v1/world/souls, and main's account approvals (/v1/account/approvals/:id[/approve|/cancel]). Who is signed in comes
 // from auth-session.ts, the one place.
-import { apiPath, worldKey } from '../world-path.ts';
+import { apiPath, worldPath } from '../world-path.ts';
 import { userAuthHeaders } from '../auth-session.ts';
 
 export type MySoul = { id: string; name: string; entityId: string; hasToken: boolean };
@@ -20,6 +20,9 @@ export async function soulsHere(): Promise<SoulHere[]> {
   try { const r = await fetch(apiPath('/v1/world/souls'), { cache: 'no-store' }); return r.ok ? ((await r.json()) as { souls: SoulHere[] }).souls : []; } catch { return []; }
 }
 
+/** The URL fragment the page was opened with, read when this module loads: the page shell rewrites the fragment to its
+ *  own tab once it renders, so `#join` and `#approve/<id>` must be caught before that. */
+export const landingHash = typeof location === 'undefined' ? '' : location.hash;
 /** `#approve/ap_…` — the link the Soul CLI prints for its human (main's format). */
 export const approvalFromHash = (hash: string) => /^#approve\/(ap_[a-f0-9]{32})$/.exec(hash)?.[1] ?? null;
 const valid = (a: Approval | undefined, id: string): a is Approval => !!a && a.id === id && ['create', 'repair'].includes(a.mode) && ['pending', 'creating', 'ready', 'refused', 'cancelled', 'expired'].includes(a.status) && typeof a.name === 'string' && typeof a.agentLabel === 'string' && (a.soulId === null || /^s_[A-Za-z0-9_-]+$/.test(a.soulId));
@@ -33,7 +36,7 @@ export async function approval(id: string, action?: 'approve' | 'cancel'): Promi
 }
 
 /** The absolute URL of this world (what agents fetch), from the server's own base when known. */
-export const worldUrl = (base?: string) => base || `${location.origin}/w/${worldKey}`;
+export const worldUrl = (base?: string) => base || `${location.origin}${worldPath}`;
 /** The one thing the person pastes to their agent: make my Soul here. */
 export const joinPrompt = (base: string, worldName: string, name?: string) =>
   `Read ${base}/SKILL.md and follow its Soul mode section: make my Soul${name ? ` "${name}"` : ''} in the Eden world "${worldName}". If it gives an approval link, show it to me and I'll approve it.`;
