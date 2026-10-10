@@ -12,6 +12,8 @@ import type { AgentProfile, Link, Obstacle, SpatialScene, Surface } from './type
 import type { Profiler } from '../runtime/profile.ts';
 import { sleepEnvelope, SLEEP_BODY_MARGIN } from '../activities/sleep.ts';
 import { sceneForWorld, worldBaseId } from './edits.ts';
+import { GroundNav, groundRoute, rectOf, type TileRect } from './tiled.ts';
+import type { GroundField } from './ground.ts';
 
 /** Phases in which a component physically occupies space as a static obstacle. */
 const STATIC_PHASES = new Set(['stored', 'reserved', 'staged', 'placed', 'installed', 'raising']);
@@ -142,6 +144,12 @@ export class Spatial {
 
   /** The unedited source scene and its id (servicesFor), so a world edit (nav/1) can re-base this service in place. */
   source?: { scene: SpatialScene; id: string };
+  /**
+   * Ground mode (lane L8; worlds whose state carries `groundV1` only): level 0 is the terrain, tiled and windowed
+   * (spatial/tiled.ts), heights come from the field, and routes are planned hierarchically. Absent: unchanged behaviour.
+   */
+  ground?: GroundNav;
+  private groundDirty = false;
 
   constructor(base: SpatialScene, opts: { cell?: number; contributors?: Contributor[]; baseId?: string; planner?: 'exact' | 'corridor'; incremental?: boolean; source?: { scene: SpatialScene; id: string } } = {}) {
     this.base = base;
@@ -174,6 +182,33 @@ export class Spatial {
     return true;
   }
 
+  /**
+   * Enter (or leave, with null) ground mode on `field`, the window covering `points` (bodies, active goals). The next sync
+   * rebuilds the grids and advances the navigation epoch, so walkers replan on the new ground.
+   */
+  setGround(field: GroundField | null, world: WorldState, points: Vec2[] = []): void {
+    const prev = this.ground;
+    this.ground = field ? new GroundNav(field, this.cell) : undefined;
+    if (this.ground) {
+      if (prev?.window) this.ground.include(prev.window);
+      for (const p of points) this.ground.include(rectOf([p]));
+      if (!this.ground.window) this.ground.include(rectOf([[0, 0]]));
+    }
+    this.scene = undefined as unknown as SpatialScene;
+    this.snaps = [];
+    this.aroundCache.clear();
+    this.narrowCache.clear();
+    this.sync(world);
+  }
+
+  /** Ground mode: grow the window to cover `r` (resync on growth). False when the window would be too big. */
+  groundInclude(world: WorldState, r: TileRect): boolean {
+    const g = this.ground!, res = g.include(r);
+    if (res === 'too-big') return false;
+    if (res === 'grown') { this.groundDirty = true; this.sync(world); }
+    return true;
+  }
+
   /** Rebuild derived scene/grids iff navigation-relevant world content changed. */
   sync(world: WorldState): boolean {
     const p = this.prof;
@@ -185,6 +220,7 @@ export class Spatial {
   }
 
   private syncNow(world: WorldState): boolean {
+    if (this.ground) return this.syncGround(world);
     if (!this.navChanged(world) && this.scene) return false;
     const obstacles: Obstacle[] = [...this.base.obstacles];
     const surfaces: Surface[] = [...this.base.surfaces];
@@ -214,6 +250,45 @@ export class Spatial {
     return true;
   }
 
+  /** Ground mode sync: the same scene composition, grids from the tiled ground over the window (spatial/tiled.ts). */
+  private syncGround(world: WorldState): boolean {
+    const g = this.ground!;
+    // every body on level 0 stays inside the window (a body outside it would read clearance 0)
+    for (const id in world.entities) {
+      const e = world.entities[id];
+      if (e.kind !== 'human' || !e.human || (e.human.level ?? 0) !== 0) continue;
+      const tx = Math.floor(e.pose.p[0] / 64), tz = Math.floor(e.pose.p[2] / 64), w = g.window;
+      if (!w || tx < w[0] || tx > w[2] || tz < w[1] || tz > w[3]) { if (g.include(rectOf([[e.pose.p[0], e.pose.p[2]]])) === 'grown') this.groundDirty = true; }
+    }
+    if (!this.navChanged(world) && this.scene && !this.groundDirty) return false;
+    this.groundDirty = false;
+    const obstacles: Obstacle[] = [...this.base.obstacles];
+    const surfaces: Surface[] = [...this.base.surfaces];
+    const links: Link[] = [...this.base.links];
+    const levels = this.base.levels.some((l) => l.id === 0) ? [...this.base.levels] : [{ id: 0, y: 0, label: 'ground' }, ...this.base.levels];
+    for (const e of Object.values(world.entities)) {
+      if (!isStatic(e)) continue;
+      const f = entityFootprint(e);
+      obstacles.push({ id: e.id, obb: f.obb, y0: f.y0, y1: f.y1, kind: 'component', label: e.label ?? def(e.def).label });
+    }
+    for (const c of this.contributors) {
+      const r = c(world, this.base);
+      if (r.obstacles) obstacles.push(...r.obstacles);
+      if (r.surfaces) for (const s of r.surfaces) {
+        surfaces.push(s);
+        if (!levels.some((l) => l.id === s.level)) levels.push({ id: s.level, y: s.y, label: s.label ?? `level ${s.level}` });
+      }
+      if (r.links) links.push(...r.links);
+    }
+    this.scene = { bounds: g.bounds(), levels, surfaces, obstacles, links };
+    const grids = () => g.grids(this.scene);
+    this.grids = this.prof ? this.prof.time('spatial.sync.grids', grids) : grids();
+    if (this.planner === 'corridor') prepareCorridor(this.grids);
+    this.epoch++;
+    this.aroundCache.clear();
+    return true;
+  }
+
   /**
    * Whether any navigation-relevant field of the static entities (or their set / order) differs from
    * the last call; refreshes the snapshots. Allocation-free when nothing changed (~35k calls a run),
@@ -236,6 +311,11 @@ export class Spatial {
 
   route(world: WorldState, profile: AgentProfile, start: Place, goal: Place, opts?: RouteOpts): RouteResult {
     const o = this.planner === 'exact' ? opts : { planner: this.planner, ...opts };
+    if (this.ground) {
+      this.sync(world);
+      const run = () => groundRoute(this.ground!, this.scene, profile, start, goal, o ?? {}, (r) => this.groundInclude(world, r), () => this.grids);
+      return this.prof ? this.prof.time('spatial.route', run) : run();
+    }
     if (this.prof) return this.prof.time('spatial.route', () => (this.sync(world), findRoute(this.grids, this.scene, profile, start, goal, o)));
     this.sync(world);
     return findRoute(this.grids, this.scene, profile, start, goal, o);
