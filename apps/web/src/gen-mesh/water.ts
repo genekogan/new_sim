@@ -16,7 +16,8 @@ export function waterMaterial(opts: { flow?: number; color?: string; opacity?: n
   const flow = opts.flow ?? 0, color = opts.color ?? '#3a7ca8', opacity = opts.opacity ?? 0.8;
   const key = `${flow}|${color}|${opacity}`;
   const hit = cache.get(key); if (hit) return hit;
-  const m = new THREE.MeshStandardMaterial({ color, transparent: true, opacity, roughness: 0.18, metalness: 0.12, side: THREE.DoubleSide, depthWrite: false });
+  // flowing water: a softer glint (no white glare bands at grazing angles)
+  const m = new THREE.MeshStandardMaterial({ color, transparent: true, opacity, roughness: flow > 0 ? 0.34 : 0.18, metalness: flow > 0 ? 0.06 : 0.12, side: THREE.DoubleSide, depthWrite: false });
   m.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = shared.uTime;
     shader.uniforms.uFlow = { value: flow };
@@ -29,7 +30,7 @@ export function waterMaterial(opts: { flow?: number; color?: string; opacity?: n
       {
         vec2 p = uFlow > 0.0 ? vec2(vWaterUv.x - uTime * uFlow, vWaterUv.y) : vWaterWorld.xz;
         vec2 g = wv(p, normalize(vec2(1.0, 0.3)), 0.9, 1.3) * 0.05 + wv(p, normalize(vec2(-0.4, 1.0)), 1.7, 1.9) * 0.03 + wv(p, normalize(vec2(0.7, -0.8)), 3.1, 2.7) * 0.015;
-        if (uFlow > 0.0) g += vec2(0.0, sin(vWaterUv.y * 2.3 + vWaterUv.x * 0.6 - uTime * uFlow * 1.7) * 0.03);
+        if (uFlow > 0.0) g = g * 0.6 + vec2(sin(vWaterUv.x * 1.4 + sin(vWaterUv.y * 0.9) * 1.2 - uTime * uFlow * 1.7) * 0.012, 0.0); // ripples across the flow (no chevrons)
         vec3 wn = normalize(vec3(-g.x, 1.0, -g.y));
         normal = normalize((viewMatrix * vec4(wn, 0.0)).xyz);
       }`)
@@ -40,7 +41,8 @@ export function waterMaterial(opts: { flow?: number; color?: string; opacity?: n
         float b = sin(p.y * 1.1 - uTime * 0.5 + sin(p.x * 0.53 - uTime * 0.11) * 2.3);
         float sparkle = smoothstep(0.93, 1.0, a * b) * (0.5 + 0.5 * sin(p.x * 0.17 + p.y * 0.23));
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.93, 0.97), sparkle * (uFlow > 0.0 ? 0.12 : 0.2));
-        if (uFlow > 0.0) { float streak = smoothstep(0.6, 1.0, sin(p.x * 0.8 + sin(vWaterUv.y * 1.7) * 2.0)); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.7, 0.84, 0.9), streak * 0.08); }
+        if (uFlow > 0.0) { float streak = smoothstep(0.75, 1.0, sin(p.x * 0.8 + sin(vWaterUv.y * 0.5 + p.x * 0.11) * 0.7)) * (0.6 + 0.4 * sin(vWaterUv.y * 1.3 + p.x * 0.07)); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.7, 0.84, 0.9), streak * 0.06);
+        } // soft broken streaks, not a W across the bed
       }`);
   };
   m.customProgramCacheKey = () => `l3-water-${flow > 0 ? 'flow' : 'still'}`;

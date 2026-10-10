@@ -52,13 +52,19 @@ registerMesh({
     }
     // banks
     const soup = new Soup(), bankCol = rgb(BANKS[banks] ?? BANKS.grass), wet = scale(bankCol, 0.72);
+    // the bank fades into the bare ground of the world's palette (green on grass, sand on desert…)
+    const pal = (ctx.model.state as { ground?: { palette?: string } }).ground?.palette ?? 'grass';
+    const outer = rgb(pal === 'desert' || pal === 'dust' || pal === 'sand' ? '#d1ad74' : pal === 'snow' ? '#e6ebef' : pal === 'rock' ? '#9b958a' : '#6f9a4f');
+    const dry = mix(bankCol, outer, banks === 'grass' && outer[1] > outer[0] ? 0 : 0.35);
+    const ACROSS = 4; // strips across the bank so the drape follows the trench wall (no terrain poking through)
     if (bankW > 0) for (const side of [1, -1]) for (let i = 0; i < c.length - 1; i++) {
       const q0 = L.s[i], q1 = L.s[i + 1], t0 = side * (W / 2 - 0.5), t1 = side * (W / 2 + bankW);
       const m = at(L, (q0 + q1) / 2, (t0 + t1) / 2); if (inLake(g, m[0], m[1])) continue;
-      const a = at(L, q0, t0), b = at(L, q1, t0), cc = at(L, q1, t1), d = at(L, q0, t1);
       const G = (p: [number, number], lift: number): V3 => [p[0], ground(p[0], p[1]) + lift, p[1]];
-      const dry = mix(bankCol, rgb('#6f9a4f'), banks === 'grass' ? 0 : 0.35);
-      soup.topQuad(G(a, 0.03), G(b, 0.03), G(cc, 0.02), G(d, 0.02), [wet, wet, dry, dry]);
+      for (let k = 0; k < ACROSS; k++) {
+        const ta = t0 + ((t1 - t0) * k) / ACROSS, tb = t0 + ((t1 - t0) * (k + 1)) / ACROSS, ca = mix(wet, dry, k / ACROSS), cb = mix(wet, dry, (k + 1) / ACROSS);
+        soup.topQuad(G(at(L, q0, ta), 0.07), G(at(L, q1, ta), 0.07), G(at(L, q1, tb), 0.07), G(at(L, q0, tb), 0.07), [ca, ca, cb, cb]);
+      }
       const edge = at(L, (q0 + q1) / 2, side * (W / 2 - 0.2)), ey = ground(edge[0], edge[1]);
       const seed = (i * 7 + (side > 0 ? 1 : 2)) * 13 + (e.seed ?? 0);
       if (banks === 'reeds' && h01(seed, 1) < 0.7) reeds(soup, edge[0], Math.max(ey, lv[i] - 0.3), edge[1], 1, seed);

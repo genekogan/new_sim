@@ -80,6 +80,7 @@ async function placePrepared(def, name, shape, params = {}) {
 
 // ---------- screenshots
 let chromium = null, browser = null, page = null, releaseLease = null;
+const glErrors = []; // WebGL shader/program errors from the page (a broken shader hides every mesh using it)
 const { chromeLease } = await import(resolve(root, 'tools/god-skill/lib/chrome-lease.mjs'));
 if (!args['no-shots']) try { chromium = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test').chromium; } catch { log('  (no @playwright/test; screenshots skipped)'); }
 async function shot(name, eye, at, wait = 5000) {
@@ -87,7 +88,7 @@ async function shot(name, eye, at, wait = 5000) {
   const t0 = t();
   try {
     // one Chrome at a time across lanes (MERGES.md 08:25), on the real GPU (Metal), not swiftshader (08:55)
-    if (!browser) { releaseLease = await chromeLease('terrain'); browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] }); const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } }); await ctx.addInitScript(() => { localStorage.setItem('sim.dev', 'admin'); }); page = await ctx.newPage(); page.setDefaultTimeout(180000); }
+    if (!browser) { releaseLease = await chromeLease('terrain'); browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] }); const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } }); await ctx.addInitScript(() => { localStorage.setItem('sim.dev', 'admin'); }); page = await ctx.newPage(); page.setDefaultTimeout(180000); page.on('console', (m) => { if (m.type() === 'error' && /shader|WebGLProgram|GL_INVALID/i.test(m.text())) glErrors.push(m.text().slice(0, 300)); }); }
     if (!page.url().startsWith(base)) { await page.goto(`${base}?dev=1&shot=1&eye=${eye.join(',')}&at=${at.join(',')}`, { waitUntil: 'domcontentloaded', timeout: 180000 }); await page.waitForFunction(() => window.__shotReady === true || (window.__simEntity?.layer?.active && document.title === 'ready'), null, { timeout: 180000 }).catch(() => {}); await page.waitForTimeout(Math.max(wait, 8000)); }
     // a clean picture: hide every overlay (panels, banners, buttons) that is not on the canvas's own ancestor chain
     await page.evaluate(() => { const c = document.querySelector('canvas'); if (!c) return; for (let el = c; el && el !== document.body; el = el.parentElement) for (const sib of el.parentElement?.children ?? []) if (sib !== el && !sib.contains(c) && sib.tagName !== 'SCRIPT') sib.style.visibility = 'hidden'; });
@@ -149,10 +150,18 @@ try {
   }, (r) => r.worst < 0.1 && r.spans === 1 && r.cut > 2);
   await step('T3 an asphalt street tees into the road; a gravel footpath to the pond', async () => {
     const a = await placePrepared(R('street'), 'street', { path: [[0, -34], [50, -42], [100, -38], [150, -26]] }, { width: 7 });
-    const b = await placePrepared(R('footpath'), 'pond-path', { path: [[60, -36], [70, -10], [82, 18]] }, { width: 1.8 });
+    const b = await placePrepared(R('footpath'), 'pond-path', { path: [[60, -40], [70, -10], [82, 18]] }, { width: 1.8 });
     const c = await placePrepared(R('road'), 'cross-lane', { path: [[-46, 62], [6, 64], [56, 70]] }, { width: 5, material: 'cobble', maxGrade: 0.08 });
     return { a: a.data?.accepted, b: b.data?.accepted, c: c.data?.accepted, fa: a.data?.failures, fb: b.data?.failures, fc: c.data?.failures };
   }, (r) => r.a && r.b && r.c);
+  await step('T3 the river stays open under the roads: its bed lies below the water at every point outside the lake and pond', async () => {
+    const { s, w } = await mirror(); const e = s.entities.find((x) => x.name === 'river'), lv = e.params.flow.levels, c = G.riverLine(e.shape);
+    const inPoly = (x, z, poly) => { let o = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) o = !o; } return o; };
+    let worst = -Infinity, worstAt = null;
+    for (let i = 0; i < c.length; i++) { const [x, z] = c[i]; if (inPoly(x, z, lakeArea) || inPoly(x, z, pondArea)) continue; const d = w.terrain.sample(x, z) - lv[i]; if (d > worst) { worst = d; worstAt = [+x.toFixed(1), +z.toFixed(1)]; } }
+    report.numbers.riverOpen = { worstBedAboveWater: +worst.toFixed(2), at: worstAt };
+    return { worst: +worst.toFixed(2), at: worstAt };
+  }, (r) => r.worst < -0.3);
 
   // areas: plaza, pitch, pier, deck
   await step('T4 a radial plaza with a kerb, a garden wall with a gate behind it', () => act([
@@ -236,6 +245,7 @@ try {
   await shot('t15-path-tee', [74, 8, -52], [61, 0, -40]);
   await step('T7 ground palette: desert', async () => { const r = await act([{ op: 'world', state: { ground: { palette: 'desert' } } }], 'palette'); return { accepted: r.data?.accepted, failures: r.data?.failures }; }, (r) => r.accepted);
   await shot('t10-desert-palette', [-170, 150, 210], [0, 0, -10], 6000);
+  if (chromium) await step('T9 the page compiled every shader (no WebGL errors)', async () => ({ errors: glErrors.length, first: glErrors[0] }), (r) => r.errors === 0);
 } catch (e) {
   report.failures.push({ name: 'harness', error: String(e?.stack ?? e) }); log('harness error', e);
 } finally {
