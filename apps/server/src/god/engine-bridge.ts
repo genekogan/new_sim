@@ -58,7 +58,9 @@ export class EngineBridge {
     });
     reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
     usesProviders.set(this.god.model, (id) => { const u = this.usesOf(id); return u ? { soul: u.soul, body: u.body, how: u.how, thing: this.model.pathOf(u.id) } : null; });
-    this.guardGod();
+    // body-aware edits: the compiler hook when GodMode has it (lead patch 5), else wrap its entry points
+    if ('bodies' in (this.god as object)) (this.god as unknown as { bodies: unknown }).bodies = { uses: (id: string) => this.usesOne(id), lifted: (ids: string[]) => this.buried(ids) };
+    else this.guardGod();
     if (this.edge) this.hookEdge(this.edge);
   }
   private get engine(): EngineV1 { return this.host.engine as unknown as EngineV1; }
@@ -216,14 +218,30 @@ export class EngineBridge {
 
   /** Trusted engine edit: journaled (by 'engine', never undone by the god), published to viewers, not echoed back. */
   engineAct(ops: Op[], note: string): Result {
-    const god = this.god as any, tick = this.god.opts.tick();
+    const god = this.god as any;
+    if (typeof god.engineAct === 'function') {
+      const r = god.engineAct(ops, note) as Result;
+      if (r.accepted) this.noteSent(ops);
+      return r;
+    }
+    const tick = this.god.opts.tick();
     const r = applyBatch(this.model, { ops }, 'engine', tick, { trusted: true });
     if (!r.result.accepted) return r.result;
     this.god.store.commit(this.model, this.god.owner, r.diff!, { seq: r.result.seq, by: 'engine', at: Date.now(), note, ops, inverse: [], kind: 'engine' as never });
     this.god.db.db.prepare('UPDATE world_edits_v1 SET undone=1 WHERE world_id=? AND seq=?').run(this.god.opts.worldId, r.result.seq);
     god.publish?.(r.result.seq, tick, r.diff!, 'engine');
-    for (const e of r.diff!.upserts) { const part = this.engineOwned(e) ? undefined : this.derive(e, {}, this.physics?.assets ?? {}); if (part !== undefined) this.sent.set(e.id, JSON.stringify(normPart(part ?? {}))); }
+    this.noteSent(ops);
     return r.result;
+  }
+  /** After an engine edit: what the engine already knows about the touched entities (no echo back to it). */
+  private noteSent(ops: Op[]) {
+    const ids = new Set<string>();
+    for (const op of ops as any[]) { if (typeof op.id === 'string') ids.add(op.id); if (op.entity?.id) ids.add(op.entity.id); }
+    for (const id of ids) for (const sid of this.model.entities.has(id) ? this.model.subtree(id) : []) {
+      const e = this.model.entities.get(sid)!;
+      const part = this.engineOwned(e) ? undefined : this.derive(e, {}, this.physics?.assets ?? {});
+      if (part !== undefined) this.sent.set(e.id, JSON.stringify(normPart(part ?? {})));
+    }
   }
 
   /** Items the Souls moved: write their new support back as entity-world moves. */
@@ -296,6 +314,17 @@ export class EngineBridge {
       if (u) return { id: sid, ...u, soul: this.soulName(u.body) };
     }
     return null;
+  }
+  /** The compiler hook (one entity, no subtree walk): a body, a thing in a body's hands, a seat or item in use. */
+  usesOne(id: string): { code: 'occupied.by-body' | 'held.by-body'; detail: string } | null {
+    const e = this.model.entities.get(id); if (!e) return null;
+    if (this.model.resolvedDef(e.def)?.components.body) { this.stats.refusals++; return { code: 'occupied.by-body', detail: `${this.model.pathOf(id)} is ${this.soulName(id)}'s body; bodies move themselves` }; }
+    const holder = e.in.parent !== 'world' && this.model.resolvedDef(this.model.entities.get(e.in.parent)?.def ?? '')?.components.body ? e.in.parent : null;
+    const u = holder ? { body: holder, how: 'held' as const } : this.engine.bodyUsesV1(id);
+    if (!u) return null;
+    this.stats.refusals++;
+    const soul = this.soulName(u.body), what = this.model.pathOf(id);
+    return { code: u.how === 'held' ? 'held.by-body' : 'occupied.by-body', detail: `${soul} (${u.body}) is ${u.how === 'held' ? 'holding' : 'sitting on'} ${what}; wait until they are done (or ask them in a prayer answer)` };
   }
   private soulName(body: string) { return String(this.engine.world.entities[body]?.label ?? body); }
 
