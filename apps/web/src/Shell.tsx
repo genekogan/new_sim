@@ -14,6 +14,7 @@ import { makeApi, useSim, type Sim } from './useSim.ts';
 import { BrainPanel, BroadcastPanel, NarrativePanel } from './BrainPanels.tsx';
 import { AdminPanel } from './AdminPanel.tsx';
 import { SoulHome } from './SoulHome.tsx';
+import {SoulAccount} from './SoulAccount.tsx';
 import { ArchPanel } from './Arch.tsx';
 import {LocalIntegrationNotice,LocalConnectionHelp,DebugPanel} from './LocalIntegration.tsx';
 import './world-chrome.css';
@@ -154,7 +155,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
         <SoulFocus key={`${selected}:${sim.me?.userId ?? 'public'}`} sim={sim} api={api} auth={auth} selected={selected} select={inspect} pin={selected?{pinned:pins.ids.includes(selected),toggle:()=>pins.toggle(selected)}:undefined} camera={selected&&viewerHandle?{following:viewerState?.cameraMode==='follow'&&viewerState.selection.soulId===selected,follow:()=>{if(viewerHandle.selectSoul(selected)){viewerHandle.setCameraMode('follow');}},stop:()=>{viewerHandle.setManualNavigation?.('orbit');viewerHandle.setCameraMode('manual');}}:undefined} manage={openAccount} active={!advanced&&panelOpen&&tab!=='my soul'} />
       </aside>
       <aside id="account-panel" className="human-panel account-panel" hidden={advanced||tab!=='my soul'||!panelOpen} aria-label="Soul and account tools">
-        <button onClick={() => setTab('watch')}>← Back to the world</button><div className="grid"><SoulHome worldId={cfg.worldId} sim={sim} auth={auth} api={api} selected={selected} onSelect={inspect} pairCode={pairCode} clearPair={() => setPairCode(null)} base={cfg.publicUrl} allowCreate={false} arrivalEnabled={arrivalEnabled} onArrivalReady={id=>{inspect(id);setAdvanced(false);setTab('watch');}} active={!advanced&&tab==='my soul'&&panelOpen} /></div>
+        <button onClick={() => setTab('watch')}>← Back to the world</button><div className="grid"><SoulAccount sim={sim} auth={auth} api={api} select={id=>{inspect(id);setTab('watch');}} pairCode={pairCode} clearPair={()=>setPairCode(null)}/></div>
       </aside>
       {advanced && <div className="advanced-surface">
       <nav aria-label="Advanced tools">{TABS.filter((t) => isAdmin || !ADMIN_TABS.has(t)).map((t) => <button key={t} className={t === tab ? 'on' : ''} onClick={() => { setPairCode(null); setTab(t); }}>{t}</button>)}{singleLocalPreview(location.hostname)?<span className="dim">World Lab · not connected locally</span>:<a href={`/l/${worldKey}`}>World Lab</a>}</nav>

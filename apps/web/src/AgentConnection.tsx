@@ -10,13 +10,12 @@ export function AgentConnection(props:Props){
 function ConnectionCard({api,soulId,name,base,connection,refresh,notice}:Props){
   const [localMessage,setLocalMessage]=useState(''),[busy,setBusy]=useState(false),[code,setCode]=useState<string|null>(null);
   const message=notice?.message??localMessage,setMessage=notice?.setMessage??setLocalMessage;
-  const [issuedAt,setIssuedAt]=useState(0),[clock,setClock]=useState(Date.now()),[copied,setCopied]=useState(false);
+  const [issuedAt,setIssuedAt]=useState(0),[clock,setClock]=useState(Date.now());
   const pending=useRef(false),live=useRef(true);
   useEffect(()=>{live.current=true;const timer=setInterval(()=>setClock(Date.now()),1000);return()=>{live.current=false;clearInterval(timer);};},[]);
   useEffect(()=>{if(connection?.attached&&connection.since&&connection.since>=issuedAt)setCode(null);},[connection?.since,connection?.attached,issuedAt]);
   const expired=!!code&&clock-issuedAt>=15*60_000;
   const setupPrompt=connectionSetupPrompt(base,soulId);
-  const metadata=`World: ${base}\nSoul: ${soulId}\nInstructions: ${base}/skill.md\nAsk me before connecting. Use an approved credential store; never put a key or approval code in a prompt, URL or configuration.`;
   const act=async(kind:'pair'|'revoke')=>{
     if(pending.current)return;pending.current=true;setBusy(true);setMessage(kind==='pair'?'Requesting a one-use code…':'Requesting disconnection…');
     try{
@@ -30,14 +29,14 @@ function ConnectionCard({api,soulId,name,base,connection,refresh,notice}:Props){
     finally{pending.current=false;if(live.current)setBusy(false);}
   };
   return <section className="wide" aria-label="Assistant connection">
-    <h2>Your assistant and {name}</h2>
-    <p>{!connection?'Checking connection…':connection.attached?<><span className="ok">●</span> <b>{connection.label??'An assistant'}</b> is connected to this Soul.</>: 'No assistant connected to this Soul.'}</p>
-    {connection?.attached&&<p className="small dim">This records granted access. Check your assistant to confirm it is running and receiving this world.</p>}
-    <p>You can give direction here, or let your own assistant observe and steer this Soul with your approval.</p>
-    <ol><li>Share the world and Soul details below with your assistant.</li><li>Use a reviewed client. Open its approval link yourself and check this Soul before approving.</li><li>After connection, ask what the Soul sees. A direction being accepted does not mean it happened.</li></ol>
-    <details><summary>World and Soul details for your assistant</summary><pre className="json">{metadata}</pre><button onClick={async()=>{try{await navigator.clipboard.writeText(metadata);if(live.current)setCopied(true);}catch{if(live.current)setMessage('Copy unavailable. Select the world and Soul details manually.');}}}>{copied?'Details copied':'Copy world and Soul details'}</button></details>
-    {setupPrompt&&<details><summary>Setup prompt for your assistant</summary><p>This contains public world and Soul details, not a credential. Use the reviewed client named in the linked instructions.</p><textarea aria-label="Connection setup prompt" readOnly rows={6} value={setupPrompt} onFocus={e=>e.currentTarget.select()}/><button onClick={async()=>{try{await navigator.clipboard.writeText(setupPrompt);if(live.current)setMessage('Setup prompt copied. No agent was connected; open its approval link yourself.');}catch{if(live.current)setMessage('Copy unavailable. Select the setup prompt and copy it manually.');}}}>Copy setup prompt</button></details>}
-    <p className="note"><a href={`${base}/skill.md`} target="_blank" rel="noreferrer">Instructions for this world</a>. The macOS client has local package proof. A public download and setup inside a named assistant app are still being prepared.</p>
+    <h3>Agent access</h3>
+    <p>{!connection?'Checking connection…':connection.attached?<><span className="ok">●</span> <b>{connection.label??'Your agent'}</b> has access to {name}.</>: 'No agent has access to this Soul.'}</p>
+    {connection?.attached&&<p className="small dim">Granted access does not confirm that your agent is running.</p>}
+    <details><summary>Connect or re-pair your agent</summary>
+      <p>Give this prompt to your agent, then approve its link in your browser.</p>
+      {setupPrompt&&<><textarea aria-label="Connection setup prompt" readOnly rows={4} value={setupPrompt}/><button onClick={async()=>{try{await navigator.clipboard.writeText(setupPrompt);if(live.current)setMessage('Copied.');}catch{if(live.current)setMessage('Copy unavailable. Select the prompt and copy it.');}}}>Copy prompt</button></>}
+      <a href={`${base}/instructions.md`} target="_blank" rel="noreferrer">Read the instructions</a>
+    </details>
     {connection?.attached&&<button disabled={busy} onClick={()=>void act('revoke')}>Disconnect assistant</button>}
     <details><summary>Advanced: one-use owner code</summary><p>For a reviewed client that accepts a code through a private input channel. Keep the code out of assistant prompts and configuration. Generating a code does not connect an assistant; exchanging it replaces the current connection.</p>
       <button disabled={busy||!connection} onClick={()=>void act('pair')}>Request one-use code</button>
