@@ -45,7 +45,9 @@ export function prepareArtifactOverlay(options){
  return Object.freeze({attribution,handle(req,res){
   if(req.method!=='GET'&&req.method!=='HEAD')return false;
   // Inspect raw spelling before URL normalization; traversal never gets an index.
-  const rawPath=req.url.split('?')[0];let decoded;try{decoded=decodeURIComponent(rawPath);}catch{res.writeHead(400).end();return true;}
+  const rawPath=req.url.split('?')[0];
+  if(!indexPaths.has(rawPath)&&!cliPaths.has(rawPath)&&!/^\/(?:w\/(?:eden|mars|littlemartians)\/)?assets(?:\/|$)/.test(rawPath))return false;
+  let decoded;try{decoded=decodeURIComponent(rawPath);}catch{res.writeHead(400).end();return true;}
   if(decoded.includes('\\')||decoded.includes('\0')||decoded.split('/').some(p=>p==='.'||p==='..')){res.writeHead(400).end();return true;}
   const path=rawPath;let name,data,cache;
   if(indexPaths.has(path)){name='index.html';data=bytes.get(name);cache='no-cache';}
