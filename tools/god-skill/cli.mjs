@@ -3,7 +3,7 @@
 // SOURCE of the downloadable single file eden-god.mjs (built by build.mjs: `node build.mjs`).
 // State: ./.eden-god.json (world URL + god token + current group; private), ./.eden-god.cache.json
 // (the world mirror). Commands print short human text; add --json for machine output.
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { call, load, num, ok, r2, save, sleep } from './lib/state.mjs';
 import { mirror, view, normDef, follow, invalidate } from './lib/mirror.mjs';
@@ -211,9 +211,19 @@ export async function place(defIn, flags = {}) {
   const sol = solve(v, { def, form: info.form, layer: info.layer, box: info.box, s: flags.scale ? num(flags.scale) : 1 }, relFrom(flags));
   return commitItems(v, def, info, flags, params, sol.items, sol.notes);
 }
+const PREPARED = new Set(['road/1', 'path/1', 'river/1', 'bridge/1', 'pier/1', 'deck/1']);
+/** Roads, rivers, bridges, piers, decks freeze ground facts (grade, bridge spans, flow, deck height) into params
+ *  before placement (L3's prepareFor, run on the server where the ground is). Returns { params, shape }. */
+export async function prepareShape(def, info, shape, params) {
+  if (!shape || !PREPARED.has(info.gen)) return { params, shape };
+  const p = (await query({ prepare: { def: normDef(def), shape, params: params ?? {} } })).prepare;
+  if (!p || p.error) return { params, shape };
+  return { params: { ...(params ?? {}), ...(p.params ?? {}) }, shape: p.path ? { ...shape, path: p.path } : shape };
+}
 /** Build ops from solver items, dry-run, repair, commit. */
 async function commitItems(v, def, info, flags, params, items, notes, { op = 'place', id } = {}) {
   if (!items.length) throw new Error('the solver found no placement');
+  for (const it of items) for (const c of it.candidates) if (c.shape && PREPARED.has(info.gen)) { const pr = await prepareShape(def, info, c.shape, params); c.shape = pr.shape; c.params = pr.params; }
   const taken = new Set();
   const stem = flags.name ?? def.replace(/^core\//, '').replace(/@\d+$/, '').replace(/^core-/, '');
   const state = flags.state ? JSON.parse(flags.state) : undefined;
@@ -225,7 +235,7 @@ async function commitItems(v, def, info, flags, params, items, notes, { op = 'pl
     if (flags.yaw !== undefined && c.r === undefined) o.r = num(flags.yaw);
     if (c.constraints?.length) o.constraints = c.constraints;
     if (op === 'place') {
-      if (params) o.params = params; if (state) o.state = state; if (flags.scale) o.s = num(flags.scale);
+      if (c.params ?? params) o.params = c.params ?? params; if (state) o.state = state; if (flags.scale) o.s = num(flags.scale);
       const parentId = c.in ? v.get(c.in.parent)?.id ?? c.in.parent : 'world';
       o.name = items.length > 1 || !flags.name ? uniqueName(v, parentId, items.length > 1 && flags.name ? `${stem}-${k + 1}` : stem, taken) : flags.name;
       taken.add(`${parentId}/${o.name}`);
@@ -527,6 +537,9 @@ if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith
   const fn = COMMANDS[cmd ?? 'help'];
   if (!fn) { console.error(`unknown command ${cmd}\n${HELP}`); process.exit(2); }
   const t0 = Date.now();
-  Promise.resolve(fn(rest, f)).then((out) => { if (typeof out === 'string') console.log(out); else console.log(JSON.stringify(out, null, 2)); if (process.env.EDEN_GOD_TIMING) console.error(`(${Date.now() - t0} ms)`); }).catch((e) => { console.error(String(e.message ?? e)); process.exit(1); });
+  // optional transcript (blind tests, demos): `"transcript": "<file>"` in .eden-god.json appends every command and answer
+  const tr = (() => { try { return load().transcript; } catch { return null; } })();
+  const record = (out, error) => { if (!tr || cmd === 'look-shot' || cmd === 'look-keeper') return; try { appendFileSync(tr, JSON.stringify({ at: new Date().toISOString(), cmd: [cmd, ...argv].join(' ').replace(/god_[A-Za-z0-9_-]+/g, 'god_…'), ms: Date.now() - t0, ...(error ? { error } : { out: typeof out === 'string' ? out : JSON.stringify(out).slice(0, 4000) }) }) + '\n'); } catch { /* best effort */ } };
+  Promise.resolve(fn(rest, f)).then((out) => { record(out); if (typeof out === 'string') console.log(out); else console.log(JSON.stringify(out, null, 2)); if (process.env.EDEN_GOD_TIMING) console.error(`(${Date.now() - t0} ms)`); }).catch((e) => { record(null, String(e.message ?? e)); console.error(String(e.message ?? e)); process.exit(1); });
 }
 export { mirror, view, solve, refPoint, compassKey, COMPASS, mkdirSync };

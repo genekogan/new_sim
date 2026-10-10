@@ -80,6 +80,7 @@ garden), not one giant batch.
 | `--between <a> <b>` | the midpoint, width along a→b; for path defs, a path from a to b |
 | `--along <path> [--t 0.3] [--side left\|right\|both] [--offset m]` | on a road/river/wall at fraction t of its length; on a side, `offset` metres back from its edge, facing it. Left = walker's left from the first point to the last |
 | `--along <path> --row n --gap g --side both` | a row along it (trees lining a road), `gap` metres between neighbours |
+| `--across <path> [--t 0.5] [--span m]` | across a road/river at t: path defs (a bridge) get a crossing path `span` m past each bank; point things are turned to face across |
 | `--inside <house>/<room>` | a free spot in that room (local frame handled for you) |
 | `--inside <house>/<room> --corner ne` · `--wall n` | tucked into a corner, or back to a wall facing into the room (`--count n` lines several along the wall) |
 | `--on <thing>` | on a surface slot (a bowl on a table); `--count n` fills several |
@@ -102,6 +103,9 @@ place plaza --rect 0,0,30,24 --name square                                # cx,c
 place road --from square --to bridge [--via 40,60] --width 6 --name main-road   # from/to refs' edges
 place river --path '[[-260,60],[-120,180],[0,480]]' --width 10
 ```
+Roads grade the ground under them (≤ 8 %) and **bridge water by themselves** (`autoBridge`); rivers
+flow downhill, snap their ends to lakes and the world edge, and make waterfalls where the bed steps;
+the CLI freezes those ground facts into the params for you. `describe <road>` shows grade and spans.
 
 ## Editing
 
@@ -208,9 +212,10 @@ look --at townhouse --inside --from s
 ```
 place lake --circle -260,-40,70 --name lake
 place river --path '[[-200,-20],[-60,80],[0,200],[20,490]]' --width 10 --name river
-place bridge --between 0,195 0,205 --param width=4 --name bridge    # or: place road … --param autoBridge=true
+place road --from -200,180 --to 200,200 --width 6 --name crossing   # roads bridge water by themselves
+place bridge --across river --t 0.7 --width 2 --name footbridge      # or a bridge on its own
 place duck --float --at lake --count 4
-look --at bridge --from e
+look --at crossing --from se
 ```
 **4. A market square**
 ```

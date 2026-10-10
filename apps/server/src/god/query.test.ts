@@ -69,3 +69,13 @@ test('resolve: violated advisory constraints are listed with reasons', () => {
   assert.deepEqual(r.violated.map((x: { path: string; kind: string }) => `${x.path}:${x.kind}`).sort(), ['far:near', 'square:clear']);
   assert.match(r.violated.find((x: { kind: string }) => x.kind === 'clear').why, /rock/);
 });
+
+test('prepare: roads freeze their grade, rivers their flow, through the same prepare step the compiler uses', () => {
+  const { act, q } = world();
+  act([{ op: 'define', def: { schema: 'def/1', name: 'q-road', form: 'path', layer: 'surface', make: { kind: 'gen', gen: 'road/1' }, size: { box: [6, 0.1, 6] } } }]);
+  act([{ op: 'place', def: 'core/hill@1', name: 'hill', p: [0, 0], params: { height: 12, radius: 40 } }]);
+  const r = q({ prepare: { def: 'q-road@1', shape: { path: [[-60, 0], [60, 0]], width: 6 }, params: {} } }).prepare;
+  assert.ok(r && r.params && Object.keys(r.params).length > 0, JSON.stringify(r));
+  assert.equal(q({ prepare: { def: 'core/bench@1', shape: { path: [[0, 0], [1, 1]] } } }).prepare, null);
+  assert.match(q({ prepare: { def: 'nope@1', shape: { path: [[0, 0], [1, 1]] } } }).prepare.error, /def.unknown/);
+});

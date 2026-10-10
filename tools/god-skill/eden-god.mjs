@@ -19,7 +19,7 @@ var init_empty = __esm({
 });
 
 // cli.mjs
-import { readFileSync as readFileSync4, writeFileSync as writeFileSync4, existsSync as existsSync4, mkdirSync as mkdirSync2 } from "node:fs";
+import { readFileSync as readFileSync4, writeFileSync as writeFileSync5, existsSync as existsSync4, mkdirSync as mkdirSync3, appendFileSync } from "node:fs";
 import { resolve as resolve2 } from "node:path";
 
 // lib/state.mjs
@@ -640,23 +640,16 @@ function circleArea(spec, wobble = 0.12) {
 
 // lib/look.mjs
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync as existsSync3, mkdirSync, readFileSync as readFileSync3, writeFileSync as writeFileSync3, rmSync, statSync, utimesSync } from "node:fs";
+import { existsSync as existsSync3, mkdirSync as mkdirSync2, readFileSync as readFileSync3, writeFileSync as writeFileSync4, rmSync as rmSync2, statSync as statSync2, utimesSync } from "node:fs";
 import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-var GL_ARGS = process.env.EDEN_GOD_GL === "swiftshader" ? ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] : ["--ignore-gpu-blocklist"];
-var PRESERVE = () => {
-  const orig = HTMLCanvasElement.prototype.getContext;
-  HTMLCanvasElement.prototype.getContext = function(type, attrs) {
-    if (/webgl/.test(String(type))) attrs = { ...attrs || {}, preserveDrawingBuffer: true };
-    return orig.call(this, type, attrs);
-  };
-};
-var LEASE = process.env.EDEN_GOD_CHROME_LEASE ?? "/tmp/eden-chrome-lease";
-async function chromeLease(holder = "eden-god", { waitMs = 30 * 6e4, staleMs = 15 * 6e4 } = {}) {
-  if (process.env.EDEN_GOD_NO_LEASE) return () => {
-  };
+
+// lib/chrome-lease.mjs
+import { mkdirSync, rmSync, statSync, writeFileSync as writeFileSync3 } from "node:fs";
+var LEASE = "/tmp/eden-chrome-lease";
+async function chromeLease(holder = "unknown", { waitMs = 20 * 6e4, staleMs = 15 * 6e4 } = {}) {
   const t0 = Date.now();
   for (; ; ) {
     try {
@@ -673,7 +666,7 @@ async function chromeLease(holder = "eden-god", { waitMs = 30 * 6e4, staleMs = 1
       } catch {
         continue;
       }
-      if (Date.now() - t0 > waitMs) throw new Error(`look: the Chrome lease (${LEASE}) has been busy for ${Math.round(waitMs / 6e4)} min`);
+      if (Date.now() - t0 > waitMs) throw new Error(`chrome lease busy for ${Math.round(waitMs / 6e4)} min`);
       await new Promise((r) => setTimeout(r, 3e3 + Math.random() * 2e3));
     }
   }
@@ -687,6 +680,18 @@ async function chromeLease(holder = "eden-god", { waitMs = 30 * 6e4, staleMs = 1
   process.once("exit", release);
   return release;
 }
+
+// lib/look.mjs
+var GL_ARGS = process.env.EDEN_GOD_GL === "swiftshader" ? ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] : ["--ignore-gpu-blocklist"];
+var PRESERVE = () => {
+  const orig = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function(type, attrs) {
+    if (/webgl/.test(String(type))) attrs = { ...attrs || {}, preserveDrawingBuffer: true };
+    return orig.call(this, type, attrs);
+  };
+};
+var chromeLease2 = (holder = "eden-god", o) => process.env.EDEN_GOD_NO_LEASE ? Promise.resolve(() => {
+}) : chromeLease(holder, o);
 var KEEPER = ".eden-god.look.json";
 var IDLE_MS = 20 * 6e4;
 function findPlaywright() {
@@ -750,12 +755,12 @@ async function keeper(worldUrl, port) {
   await ctx.addInitScript(PRESERVE);
   const page = await ctx.newPage();
   await page.goto(`${worldUrl}?shot=1`, { waitUntil: "commit", timeout: 6e5 });
-  writeFileSync3(KEEPER, JSON.stringify({ world: worldUrl, port, pid: process.pid, at: Date.now() }));
+  writeFileSync4(KEEPER, JSON.stringify({ world: worldUrl, port, pid: process.pid, at: Date.now() }));
   for (; ; ) {
     await new Promise((r) => setTimeout(r, 3e4));
     let last = 0;
     try {
-      last = statSync(KEEPER).mtimeMs;
+      last = statSync2(KEEPER).mtimeMs;
     } catch {
       break;
     }
@@ -779,7 +784,7 @@ async function ensureKeeper(worldUrl, cliPath) {
     process.kill(k.pid);
   } catch {
   }
-  rmSync(KEEPER, { force: true });
+  rmSync2(KEEPER, { force: true });
   const port = await freePort();
   const child = spawn(process.execPath, [cliPath, "look-keeper", worldUrl, String(port)], { detached: true, stdio: "ignore", cwd: process.cwd(), env: process.env });
   child.unref();
@@ -796,11 +801,11 @@ function stopKeeper() {
     process.kill(k.pid);
   } catch {
   }
-  rmSync(KEEPER, { force: true });
+  rmSync2(KEEPER, { force: true });
   return k ? `stopped the look keeper (pid ${k.pid})` : "no look keeper running";
 }
 async function shoot({ worldUrl, eye, at, out, hideRoofs = false, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 6e5), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }) {
-  mkdirSync(dirname(resolve(out)), { recursive: true });
+  mkdirSync2(dirname(resolve(out)), { recursive: true });
   const t0 = Date.now();
   const pw = findPlaywright();
   if (!pw) {
@@ -817,7 +822,7 @@ async function shoot({ worldUrl, eye, at, out, hideRoofs = false, expect = 0, ti
     page = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(worldUrl));
     if (!page) throw new Error("look: the keeper has no world tab; run `look --stop` and look again");
   } else {
-    release = await chromeLease("eden-god look");
+    release = await chromeLease2("eden-god look");
     browser = await pw.chromium.launch({ channel: "chrome", headless: true, args: GL_ARGS }).catch((e) => {
       release();
       throw new Error(`look: cannot start Chrome (${String(e.message).split("\n")[0]}); install Google Chrome`);
@@ -885,7 +890,7 @@ async function shoot({ worldUrl, eye, at, out, hideRoofs = false, expect = 0, ti
       return d;
     });
     if (!data) throw new Error("look: no canvas on the page");
-    writeFileSync3(resolve(out), Buffer.from(data.split(",")[1], "base64"));
+    writeFileSync4(resolve(out), Buffer.from(data.split(",")[1], "base64"));
     return { file: resolve(out), ms: Date.now() - t0, state, frames, via: keep ? "keeper" : "chrome" };
   } finally {
     if (!keep) {
@@ -1225,8 +1230,20 @@ async function place(defIn, flags2 = {}) {
   const sol = solve(v, { def, form: info.form, layer: info.layer, box: info.box, s: flags2.scale ? num(flags2.scale) : 1 }, relFrom(flags2));
   return commitItems(v, def, info, flags2, params, sol.items, sol.notes);
 }
+var PREPARED = /* @__PURE__ */ new Set(["road/1", "path/1", "river/1", "bridge/1", "pier/1", "deck/1"]);
+async function prepareShape(def, info, shape, params) {
+  if (!shape || !PREPARED.has(info.gen)) return { params, shape };
+  const p = (await query({ prepare: { def: normDef(def), shape, params: params ?? {} } })).prepare;
+  if (!p || p.error) return { params, shape };
+  return { params: { ...params ?? {}, ...p.params ?? {} }, shape: p.path ? { ...shape, path: p.path } : shape };
+}
 async function commitItems(v, def, info, flags2, params, items, notes, { op = "place", id } = {}) {
   if (!items.length) throw new Error("the solver found no placement");
+  for (const it of items) for (const c of it.candidates) if (c.shape && PREPARED.has(info.gen)) {
+    const pr = await prepareShape(def, info, c.shape, params);
+    c.shape = pr.shape;
+    c.params = pr.params;
+  }
   const taken = /* @__PURE__ */ new Set();
   const stem = flags2.name ?? def.replace(/^core\//, "").replace(/@\d+$/, "").replace(/^core-/, "");
   const state = flags2.state ? JSON.parse(flags2.state) : void 0;
@@ -1242,7 +1259,7 @@ async function commitItems(v, def, info, flags2, params, items, notes, { op = "p
     if (flags2.yaw !== void 0 && c.r === void 0) o.r = num(flags2.yaw);
     if (c.constraints?.length) o.constraints = c.constraints;
     if (op === "place") {
-      if (params) o.params = params;
+      if (c.params ?? params) o.params = c.params ?? params;
       if (state) o.state = state;
       if (flags2.scale) o.s = num(flags2.scale);
       const parentId = c.in ? v.get(c.in.parent)?.id ?? c.in.parent : "world";
@@ -1558,7 +1575,7 @@ async function exportWorld(file, flags2 = {}) {
   }
   const g = { schema: "genesis/1", name: flags2.name ?? s.worldId, description: `exported from ${s.worldId} at seq ${s.seq}`, constants: { extent: s.constants.extent, ground: s.constants.ground, ...s.constants.seaLevel !== void 0 ? { seaLevel: s.constants.seaLevel } : {} }, state: { sky: s.state.sky, weather: s.state.weather, ...s.state.constitution ? { constitution: s.state.constitution } : {} }, batches };
   const out = resolve2(file ?? `${s.worldId}.genesis.json`);
-  writeFileSync4(out, JSON.stringify(g, null, 1));
+  writeFileSync5(out, JSON.stringify(g, null, 1));
   return `exported ${ops.length} things${custom.length ? ` and ${custom.length} defs` : ""} in ${batches.length} batches to ${out}`;
 }
 var pathOf = (byId, e) => {
@@ -1750,11 +1767,27 @@ ${HELP}`);
     process.exit(2);
   }
   const t0 = Date.now();
+  const tr = (() => {
+    try {
+      return load().transcript;
+    } catch {
+      return null;
+    }
+  })();
+  const record = (out, error) => {
+    if (!tr || cmd === "look-shot" || cmd === "look-keeper") return;
+    try {
+      appendFileSync(tr, JSON.stringify({ at: (/* @__PURE__ */ new Date()).toISOString(), cmd: [cmd, ...argv].join(" ").replace(/god_[A-Za-z0-9_-]+/g, "god_\u2026"), ms: Date.now() - t0, ...error ? { error } : { out: typeof out === "string" ? out : JSON.stringify(out).slice(0, 4e3) } }) + "\n");
+    } catch {
+    }
+  };
   Promise.resolve(fn(rest, f)).then((out) => {
+    record(out);
     if (typeof out === "string") console.log(out);
     else console.log(JSON.stringify(out, null, 2));
     if (process.env.EDEN_GOD_TIMING) console.error(`(${Date.now() - t0} ms)`);
   }).catch((e) => {
+    record(null, String(e.message ?? e));
     console.error(String(e.message ?? e));
     process.exit(1);
   });
@@ -1789,13 +1822,14 @@ export {
   map,
   mint,
   mirror,
-  mkdirSync2 as mkdirSync,
+  mkdirSync3 as mkdirSync,
   move,
   pair,
   parseFlags,
   place,
   planBatch,
   prayers,
+  prepareShape,
   preview,
   query,
   recolor,

@@ -5,7 +5,7 @@
 // WorldModel; `reach` asks the Soul engine through the bridge (L9).
 // Owner: L1 (contract); L7 owns it from tranche 2; `reach` is L9's.
 import { mediumAt, waterDepthAt, waterLevelAt } from '@sim/ground';
-import { offsetPolyline, pointAlong, pointInPoly, type Baked, type Vec2 } from '@sim/generators';
+import { offsetPolyline, pointAlong, pointInPoly, prepareFor, queryOf, type Baked, type Vec2 } from '@sim/generators';
 import { obbOverlap, type Entity, type OBB, type StoredDef, WorldModel } from '@sim/world-compiler';
 
 /** A reach end: a point [x, z] (ground) or [x, y, z], an entity id/path (a Soul's body, a chair…), or `<path>:<room>`. */
@@ -30,6 +30,9 @@ export type QueryInput = {
   where?: [number, number];
   /** Constraint status: every constrained entity, or the given refs. */
   resolve?: true | string[];
+  /** Freeze what a path/area generator needs from the ground (road grade + bridge spans, river flow, deck heights; L3's
+   *  prepareFor) so the client can send exact params. Returns { params, path? } or null when nothing is needed. */
+  prepare?: { def: string; shape: { path?: [number, number][]; area?: [number, number][]; width?: number }; params?: Record<string, unknown> };
 };
 
 export function runQuery(w: WorldModel, q: QueryInput) {
@@ -75,6 +78,13 @@ export function runQuery(w: WorldModel, q: QueryInput) {
   if (q.describe) out.describe = describe(w, q.describe);
   if (q.where) out.where = where(w, q.where);
   if (q.resolve) out.resolve = resolveConstraints(w, q.resolve === true ? null : q.resolve);
+  if (q.prepare) {
+    const ref = q.prepare.def.includes('@') || q.prepare.def.startsWith('sha:') ? q.prepare.def : `core/${q.prepare.def}@1`;
+    const def = w.resolvedDef(ref);
+    if (!def) out.prepare = { error: `def.unknown ${ref}` };
+    else if (def.make.kind !== 'gen') out.prepare = null;
+    else { try { out.prepare = prepareFor(def.make.gen, queryOf(w), q.prepare.shape, (q.prepare.params ?? {}) as never); } catch (e) { out.prepare = { error: String((e as Error).message ?? e) }; } }
+  }
   return out;
 }
 
@@ -144,7 +154,7 @@ function bakeDef(w: WorldModel, b: NonNullable<QueryInput['bake']>) {
   let baked: Baked;
   try { baked = w.bake(def, params as never, b.seed ?? 0, b.shape); } catch (e) { return { error: String((e as Error).message ?? e) }; }
   return {
-    ref: def.ref, name: def.name, form: def.form, layer: def.layer, anchor: def.anchor, tags: def.tags, box: baked.box.map(round), scale: def.size.scale,
+    ref: def.ref, name: def.name, gen: def.make.kind === 'gen' ? def.make.gen : def.make.kind, form: def.form, layer: def.layer, anchor: def.anchor, tags: def.tags, box: baked.box.map(round), scale: def.size.scale,
     colliders: baked.colliders.length, tris: baked.tris,
     rooms: baked.rooms?.map((r) => ({ id: r.id, name: r.name, floor: r.floor, y: round(r.y), height: r.height, polygon: r.polygon, origin: r.origin })) ?? [],
     slots: baked.slots.map((s) => ({ id: s.id, kind: s.kind, p: s.p, yaw: s.yaw, capacity: s.capacity, ...(s.polygon ? { polygon: s.polygon } : {}), ...(s.floor !== undefined ? { floor: s.floor } : {}), ...(s.accepts && Object.keys(s.accepts).length ? { accepts: s.accepts } : {}) })),

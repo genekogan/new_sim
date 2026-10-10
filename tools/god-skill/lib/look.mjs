@@ -21,24 +21,9 @@ import { COMPASS, compassKey } from './solver.mjs';
 
 const GL_ARGS = process.env.EDEN_GOD_GL === 'swiftshader' ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] : ['--ignore-gpu-blocklist'];
 const PRESERVE = () => { const orig = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (type, attrs) { if (/webgl/.test(String(type))) attrs = { ...(attrs || {}), preserveDrawingBuffer: true }; return orig.call(this, type, attrs); }; };
-const LEASE = process.env.EDEN_GOD_CHROME_LEASE ?? '/tmp/eden-chrome-lease';
-/** One headless Chrome at a time on a shared machine (atomic mkdir; stale after 15 min). Returns release(). */
-export async function chromeLease(holder = 'eden-god', { waitMs = 30 * 60_000, staleMs = 15 * 60_000 } = {}) {
-  if (process.env.EDEN_GOD_NO_LEASE) return () => {};
-  const t0 = Date.now();
-  for (;;) {
-    try { mkdirSync(LEASE); writeFileSync(`${LEASE}/holder`, `${holder} ${process.pid} ${new Date().toISOString()}\n`); break; }
-    catch {
-      try { if (Date.now() - statSync(LEASE).mtimeMs > staleMs) { rmSync(LEASE, { recursive: true, force: true }); continue; } } catch { continue; }
-      if (Date.now() - t0 > waitMs) throw new Error(`look: the Chrome lease (${LEASE}) has been busy for ${Math.round(waitMs / 60000)} min`);
-      await new Promise((r) => setTimeout(r, 3000 + Math.random() * 2000));
-    }
-  }
-  let released = false;
-  const release = () => { if (!released) { released = true; rmSync(LEASE, { recursive: true, force: true }); } };
-  process.once('exit', release);
-  return release;
-}
+import { chromeLease as lease } from './chrome-lease.mjs';
+/** One headless Chrome at a time on a shared machine (the lanes' lease); EDEN_GOD_NO_LEASE=1 skips it. */
+export const chromeLease = (holder = 'eden-god', o) => (process.env.EDEN_GOD_NO_LEASE ? Promise.resolve(() => {}) : lease(holder, o));
 const KEEPER = '.eden-god.look.json';
 const IDLE_MS = 20 * 60_000;
 
