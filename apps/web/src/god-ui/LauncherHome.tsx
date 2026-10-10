@@ -9,7 +9,7 @@ export type LauncherWorldCard = { slug: string; name: string; basePath: string; 
 export type LauncherList = { contract: 'local-worlds/1'; launcher: string; worlds: LauncherWorldCard[]; templates: LauncherTemplate[] };
 
 const ago = (t: number) => { const s = Math.max(0, (Date.now() - t) / 1000); if (s < 90) return 'just now'; if (s < 3600) return `${Math.round(s / 60)} minutes ago`; if (s < 86400 * 2) { const h = Math.round(s / 3600); return `${h} hour${h === 1 ? '' : 's'} ago`; } return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); };
-const STATUS: Record<string, string> = { running: 'awake', starting: 'waking…', restarting: 'restarting…', stopped: 'asleep', failed: 'could not start' };
+const STATUS: Record<string, string> = { running: 'awake', starting: 'waking…', restarting: 'restarting…', stopped: 'asleep', asleep: 'asleep', failed: 'could not start' };
 
 export function LauncherHome({ initial }: { initial: LauncherList }) {
   const [list, setList] = useState(initial);

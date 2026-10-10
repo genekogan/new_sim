@@ -1,9 +1,9 @@
 // World processes behind the launcher: one `apps/server/src/main.ts` per world on
 // a free port from a private range, fake minds, dev auth, its own data dir.
 // Crashed children restart with exponential backoff; a stop is final.
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { createServer } from 'node:net';
-import { createWriteStream, existsSync, mkdirSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -22,7 +22,7 @@ export class ChildPool {
   /**
    * @param {{ root: string, range: [number, number], logDir: string, marsWebDir?: string, publicOrigin: string,
    *           command?: (w: object, port: number) => { cmd: string, args: string[], env?: object },
-   *           healthPath?: (slug: string) => string, onChange?: (slug: string) => void }} o
+   *           healthPath?: (slug: string) => string, onChange?: (slug: string) => void, pidFile?: string, idleMs?: number }} o
    */
   constructor(o) {
     this.o = o;
@@ -30,15 +30,51 @@ export class ChildPool {
     this.closing = false;
     mkdirSync(o.logDir, { recursive: true });
   }
+
+  /** Children a previous launcher left running (it was killed hard): stop them before anyone opens their databases again. */
+  async reapOrphans() {
+    if (!this.o.pidFile || !existsSync(this.o.pidFile)) return [];
+    let rec = {}; try { rec = JSON.parse(readFileSync(this.o.pidFile, 'utf8')); } catch { return []; }
+    const reaped = [];
+    for (const [slug, { pid, script }] of Object.entries(rec)) {
+      if (!Number.isInteger(pid) || pid === process.pid) continue;
+      let cmdline = '';
+      try { process.kill(pid, 0); cmdline = execFileSync('ps', ['-p', String(pid), '-o', 'command='], { encoding: 'utf8' }); } catch { continue; }
+      if (!script || !cmdline.includes(script)) continue;   // the pid was reused by something else: leave it alone
+      try { process.kill(pid, 'SIGTERM'); } catch { continue; }
+      for (let i = 0; i < 50; i++) { try { process.kill(pid, 0); } catch { break; } await sleep(100); }
+      try { process.kill(pid, 'SIGKILL'); } catch { /* gone */ }
+      reaped.push({ slug, pid });
+    }
+    this.savePids();
+    return reaped;
+  }
+  savePids() {
+    if (!this.o.pidFile) return;
+    const rec = {};
+    for (const k of this.kids.values()) if (k.child?.pid) rec[k.slug] = { pid: k.child.pid, port: k.port, script: k.script };
+    const tmp = `${this.o.pidFile}.${process.pid}.tmp`;
+    try { writeFileSync(tmp, JSON.stringify(rec, null, 2) + '\n'); renameSync(tmp, this.o.pidFile); } catch { /* best effort */ }
+  }
+  /** Put the least recently used idle world to sleep to free a port (it wakes on its next visit). */
+  async evictIdle(except) {
+    const idleMs = this.o.idleMs ?? 60_000, now = Date.now();
+    const victim = [...this.kids.values()].filter((k) => k.slug !== except && k.status === 'running' && now - (k.lastUsed ?? 0) > idleMs).sort((a, b) => (a.lastUsed ?? 0) - (b.lastUsed ?? 0))[0];
+    if (!victim) return null;
+    await this.stop(victim.slug);
+    victim.asleep = true;
+    return victim.slug;
+  }
   state(slug) { return this.kids.get(slug) ?? null; }
   status(slug) {
     const k = this.kids.get(slug);
     if (!k) return { status: 'stopped' };
-    return { status: k.status, port: k.port, pid: k.child?.pid ?? null, restarts: k.restarts, upSince: k.upSince, lastExit: k.lastExit };
+    return { status: k.asleep && k.status === 'stopped' ? 'asleep' : k.status, port: k.port, pid: k.child?.pid ?? null, restarts: k.restarts, upSince: k.upSince, lastExit: k.lastExit };
   }
-  usedPorts() { return new Set([...this.kids.values()].map((k) => k.port).filter(Boolean)); }
-  async pickPort(prefer) {
-    const [lo, hi] = this.o.range, used = this.usedPorts();
+  /** Ports held by live or (re)starting children; a sleeping world's old port is free for anyone. */
+  usedPorts(except) { return new Set([...this.kids.values()].filter((k) => k.slug !== except && (k.child || k.status === 'starting' || k.status === 'restarting')).map((k) => k.port).filter(Boolean)); }
+  async pickPort(prefer, self) {
+    const [lo, hi] = this.o.range, used = this.usedPorts(self);
     if (prefer && prefer >= lo && prefer <= hi && !used.has(prefer) && await portFree(prefer)) return prefer;
     for (let p = lo; p <= hi; p++) if (!used.has(p) && await portFree(p)) return p;
     throw new Error(`no free port in ${lo}–${hi}`);
@@ -47,9 +83,10 @@ export class ChildPool {
   /** Start (or join the start of) a world; resolves with its port once /healthz answers. */
   ensure(world, { timeoutMs = 90_000 } = {}) {
     let k = this.kids.get(world.slug);
+    if (k) k.lastUsed = Date.now();
     if (k && (k.status === 'running')) return Promise.resolve(k.port);
     if (k?.ready) return k.ready;
-    k = k ?? { slug: world.slug, world, restarts: 0, crashes: 0, status: 'starting', port: null, child: null, upSince: null, lastExit: null, ready: null, stopped: false };
+    k = k ?? { slug: world.slug, world, restarts: 0, crashes: 0, status: 'starting', port: null, child: null, upSince: null, lastExit: null, ready: null, stopped: false, lastUsed: Date.now() };
     k.world = world; k.stopped = false;
     if (k.timer) { clearTimeout(k.timer); k.timer = null; }  // someone is waiting: restart now, not after the backoff
     this.kids.set(world.slug, k);
@@ -59,13 +96,18 @@ export class ChildPool {
 
   async boot(k, timeoutMs) {
     k.status = 'starting'; this.o.onChange?.(k.slug);
-    const port = await this.pickPort(k.port ?? k.world.port);
-    k.port = port;
+    let port;
+    try { port = await this.pickPort(k.port ?? k.world.port, k.slug); }
+    catch (e) {
+      if (!(await this.evictIdle(k.slug))) throw e;
+      for (let i = 0; ; i++) { try { port = await this.pickPort(k.port ?? k.world.port, k.slug); break; } catch (again) { if (i >= 50) throw again; await sleep(100); } }  // the sleeper's socket takes a moment to close
+    }
+    k.port = port; k.asleep = false;
     const { cmd, args, env } = (this.o.command ?? defaultCommand)(k.world, port, this.o);
     const log = createWriteStream(join(this.o.logDir, `${k.slug}.log`), { flags: 'a' });
     log.write(`\n--- ${new Date().toISOString()} start ${k.slug} on :${port} (restart ${k.restarts})\n`);
     const child = spawn(cmd, args, { cwd: this.o.root, env, stdio: ['ignore', 'pipe', 'pipe'] });
-    k.child = child;
+    k.child = child; k.script = args[0]; this.savePids();
     child.stdout.pipe(log, { end: false }); child.stderr.pipe(log, { end: false });
     let exited = false;
     child.once('exit', (code, signal) => { exited = true; log.end(`--- exit ${code ?? signal}\n`); this.onExit(k, child, code, signal); });
@@ -83,7 +125,7 @@ export class ChildPool {
 
   onExit(k, child, code, signal) {
     if (k.child !== child) return;
-    k.child = null; k.lastExit = { code, signal, at: Date.now() };
+    k.child = null; k.lastExit = { code, signal, at: Date.now() }; this.savePids();
     if (this.closing || k.stopped) { k.status = 'stopped'; this.o.onChange?.(k.slug); return; }
     if (k.status === 'starting') return;  // boot() reports it (to ensure()'s caller, or to the restart loop)
     this.scheduleRestart(k);

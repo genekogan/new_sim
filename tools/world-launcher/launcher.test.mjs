@@ -119,3 +119,27 @@ test('the registry survives a launcher restart and worlds wake again', async () 
   for (let i = 0; i < 50 && (await api('/w/genes-valley/healthz')).status !== 200; i++) await new Promise((r) => setTimeout(r, 100));
   assert.equal((await api('/w/genes-valley/healthz')).status, 200);
 });
+
+test('with every port taken, the least recently used idle world sleeps to make room, and wakes on its next visit', async () => {
+  const L2 = await openLauncher({ port: 5140, range: [5139, 5139], dataDir: join(dir, 'data-small'), webDir, templatesDir, command, idleMs: 0, eager: 0, log: () => {} });
+  try {
+    const post2 = (name) => fetch('http://127.0.0.1:5140/__sim/worlds', { method: 'POST', body: JSON.stringify({ name }) });
+    assert.equal((await post2('First')).status, 201);
+    await new Promise((r) => setTimeout(r, 20));
+    assert.equal((await post2('Second')).status, 201);
+    const kids = async () => Object.fromEntries((await (await fetch('http://127.0.0.1:5140/__sim/launcher')).json()).children.map((c) => [c.slug, c.status]));
+    assert.deepEqual(await kids(), { first: 'asleep', second: 'running' });
+    assert.equal((await fetch('http://127.0.0.1:5140/w/first/healthz')).status, 200);
+    assert.deepEqual(await kids(), { first: 'running', second: 'asleep' });
+  } finally { await L2.close(); }
+});
+test('children a hard-killed launcher left behind are stopped before their worlds start again', async () => {
+  const { spawn } = await import('node:child_process');
+  const orphan = spawn(process.execPath, [fake], { env: { ...process.env, WORLD_KEY: 'orphan', PORT: '5138' }, stdio: 'ignore' });
+  await new Promise((r) => setTimeout(r, 300));
+  const d = join(dir, 'data-orphan'); mkdirSync(d, { recursive: true });
+  writeFileSync(join(d, 'children.json'), JSON.stringify({ orphan: { pid: orphan.pid, port: 5138, script: fake } }));
+  const exited = new Promise((r) => orphan.once('exit', (code, signal) => r(signal ?? code)));
+  const L3 = await openLauncher({ port: 5137, range: [5135, 5136], dataDir: d, webDir, templatesDir, command, eager: 0, log: () => {} });
+  try { assert.equal(await exited, 'SIGTERM'); } finally { await L3.close(); }
+});

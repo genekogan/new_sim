@@ -30,7 +30,7 @@ const MAX_WORLDS = 200;
 
 /**
  * @param {{ port?: number, dataDir?: string, range?: [number, number], root?: string, webDir?: string,
- *           templatesDir?: string, marsWebDir?: string, eager?: number, command?: Function, log?: (s: string) => void }} cfg
+ *           templatesDir?: string, marsWebDir?: string, eager?: number, idleMs?: number, command?: Function, log?: (s: string) => void }} cfg
  */
 export async function openLauncher(cfg = {}) {
   const root = resolve(cfg.root ?? ROOT);
@@ -49,7 +49,7 @@ export async function openLauncher(cfg = {}) {
   const seen = new Map();
   const seenOf = (slug) => { let s = seen.get(slug); if (!s) { s = { looks: registry.get(slug)?.looks ?? 0, lastLookAt: registry.get(slug)?.lastLookAt ?? null, agentSeenAt: registry.get(slug)?.agentSeenAt ?? null, previews: [] }; seen.set(slug, s); } return s; };
   const stats = new Map();   // slug → { at, god, entities, seq }
-  const pool = new ChildPool({ root, range, logDir: join(dataDir, 'logs'), marsWebDir, publicOrigin: origin, command: cfg.command, onChange: (slug) => { const s = pool.status(slug); if (s.port && registry.get(slug) && registry.get(slug).port !== s.port) registry.update(slug, { port: s.port }); } });
+  const pool = new ChildPool({ root, range, logDir: join(dataDir, 'logs'), pidFile: join(dataDir, 'children.json'), idleMs: cfg.idleMs, marsWebDir, publicOrigin: origin, command: cfg.command, onChange: (slug) => { const s = pool.status(slug); if (s.port && registry.get(slug) && registry.get(slug).port !== s.port) registry.update(slug, { port: s.port }); } });
   const worldEnv = (w) => ({ ...w, dataDir: registry.worldDir(w.slug), templateFile: w.template && w.template !== 'empty' ? listTemplates(templatesDir).find((t) => t.id === w.template)?.file ?? null : null });
 
   // ---------- reads
@@ -211,6 +211,7 @@ export async function openLauncher(cfg = {}) {
     up.on('error', () => socket.destroy()); socket.on('error', () => up.destroy()); socket.on('close', () => up.destroy()); up.on('close', () => socket.destroy());
   });
   await new Promise((yes, no) => { server.once('error', no); server.listen(port, '127.0.0.1', yes); });
+  for (const r of await pool.reapOrphans()) log(`stopped ${r.slug} (pid ${r.pid}) left running by an earlier launcher`);
   log(`${origin}  (data ${dataDir}, worlds ${registry.worlds.length}, children ${range[0]}–${range[1]})`);
 
   // Eagerly wake the most recent worlds so the homepage numbers are live; the rest start on first visit.
