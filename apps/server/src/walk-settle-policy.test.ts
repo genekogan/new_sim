@@ -12,8 +12,9 @@ test('walk settle policy is accepted once, survives snapshots/genesis replay and
  const db=new Db(':memory:'),host=new WorldHost(db,factory,'settle-policy',1e9,'settle-policy');host.boot();
  try{
   const old=host.engine.snapshot() as any;assert.equal(Object.hasOwn(old.cfg,'walkSettleWaitV1'),false);assert.equal((host.engine as any).rt.services.walkSettleWaitV1,undefined);
+  const base=host.enqueue('rules','fixture',{runtimePolicy:{sleepBlockTicks:321,quietSeatCourtesy:false}});host.drainInputs();await base;
   const acceptance=host.enableWalkSettleWaitV1();host.drainInputs();const fact=await acceptance;
-  assert.equal(fact.kind,'rules');assert.equal(fact.payload.runtimePolicy.walkSettleWaitV1,true);
+  assert.equal(fact.kind,'rules');assert.deepEqual(fact.payload.runtimePolicy,{sleepBlockTicks:321,quietSeatCourtesy:false,walkSettleWaitV1:true});
   assert.notEqual(host.engine.stateHash(),old.stateHash,'accepted policy has canonical engine identity');
   const head=host.seq;assert.equal((await host.enableWalkSettleWaitV1()).seq,fact.seq);assert.equal(host.seq,head);
   for(let i=0;i<20;i++)host.tickOnce();host.saveSnapshot();
@@ -37,9 +38,20 @@ test('native launcher opt-in refuses malformed flag and absent/false preserve hi
   assert.equal(await installWalkSettleWaitV1(host,false,drive),undefined);
   await assert.rejects(installWalkSettleWaitV1(host,'true',drive),/world.walk-settle-wait-flag/);
   assert.equal(host.seq,before);assert.equal(host.engine.stateHash(),hash);assert.equal(JSON.stringify(host.engine.snapshot()),snapshot);
+  await assert.rejects(installWalkSettleWaitV1(host,true,drive),/runtime-policy.walk-settle-base-required/);
+  assert.equal(host.seq,before);assert.equal(host.engine.stateHash(),hash);assert.equal(JSON.stringify(host.engine.snapshot()),snapshot);
+  const base=await drive(host.enqueue('rules','fixture',{runtimePolicy:{sleepBlockTicks:987,quietSeatCourtesy:false}}));
+  const acceptedBase=structuredClone(host.extra.runtimePolicy);
+  host.extra.runtimePolicy={sleepBlockTicks:0};const baseHead=host.seq,baseHash=host.engine.stateHash();
+  assert.throws(()=>host.enableWalkSettleWaitV1(),/runtime-policy.walk-settle-base-required/);assert.equal(host.seq,baseHead);assert.equal(host.engine.stateHash(),baseHash);
+  host.extra.runtimePolicy={sleepBlockTicks:123};
+  assert.throws(()=>host.enableWalkSettleWaitV1(),/runtime-policy.accepted-base-fact-missing/);assert.equal(host.seq,baseHead);assert.equal(host.engine.stateHash(),baseHash);
+  host.extra.runtimePolicy=acceptedBase;
   const first=await installWalkSettleWaitV1(host,true,drive);assert.equal(first?.alreadyAccepted,false);
   const head=host.seq,second=await installWalkSettleWaitV1(host,true,drive);
   assert.equal(second?.alreadyAccepted,true);assert.equal(second?.seq,first?.seq);assert.equal(host.seq,head);
   assert.equal((host.engine.snapshot() as any).cfg.walkSettleWaitV1,true);
+  assert.equal((host.engine.snapshot() as any).cfg.sleepBlockTicks,base.payload.runtimePolicy.sleepBlockTicks);
+  assert.deepEqual(host.extra.runtimePolicy,{sleepBlockTicks:987,quietSeatCourtesy:false,walkSettleWaitV1:true});
  }finally{host.stop();db.close();}
 });

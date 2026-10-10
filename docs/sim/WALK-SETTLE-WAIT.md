@@ -2,7 +2,12 @@
 
 `WorldHost.enableWalkSettleWaitV1()` accepts one `rules.runtimePolicy`
 fact with `walkSettleWaitV1:true`. Repeated calls return the accepted fact.
-The policy is absent by default and monotonic after acceptance. It changes
+Activation requires an existing accepted `runtimePolicy` fact whose exact values
+match the current projection, with a valid `sleepBlockTicks` (20..72000). The
+walk helper preserves every base value; it never initializes a sleep limit. A
+pristine world is refused and must initialize its intended base policy in a
+separate explicit acceptance first. The policy is absent by default and monotonic
+after acceptance. It changes
 native execution only from that fact onward; old snapshots and replay retain
 the old path. It adds `walk-settle-wait/1` to the canonical engine hash input,
 retains the flag in the adapter snapshot configuration, and reinstalls the
@@ -26,7 +31,9 @@ this leaf. The native `world-server.mjs` descriptor accepts the optional boolean
 `walkSettleWaitV1`: only explicit `true` drives the same method after boot, logs
 the accepted seq/tick and prior acceptance, and runs before listening. False or
 absence adds no acceptance; check-only never installs it. Eden’s launcher and
-all descriptor defaults are unchanged.
+all descriptor defaults are unchanged. The opt-in intentionally requires a
+pre-existing base even if ordinary startup policies would initialize one later;
+no additional bootstrap ordering or policy initialization is implied.
 
 After this fact is accepted, the minimum rollback reader must understand
 `walkSettleWaitV1` and its canonical hash input. A pre-policy binary is not a
