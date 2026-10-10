@@ -43,7 +43,9 @@ export function waterMaterial(opts: { flow?: number; color?: string; opacity?: n
         diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.86, 0.93, 0.97), sparkle * (uFlow > 0.0 ? 0.12 : 0.2));
         if (uFlow > 0.0) { float streak = smoothstep(0.75, 1.0, sin(p.x * 0.8 + sin(vWaterUv.y * 0.5 + p.x * 0.11) * 0.7)) * (0.6 + 0.4 * sin(vWaterUv.y * 1.3 + p.x * 0.07)); diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.7, 0.84, 0.9), streak * 0.06);
         } // soft broken streaks, not a W across the bed
-      }`);
+      }`)
+      // flowing water: cap the sun glint at a pale blue so a grazing view never reads as a white strip
+      .replace('#include <dithering_fragment>', '#include <dithering_fragment>\n  if (uFlow > 0.0) gl_FragColor.rgb = min(gl_FragColor.rgb, vec3(0.58, 0.74, 0.84));');
   };
   m.customProgramCacheKey = () => `l3-water-${flow > 0 ? 'flow' : 'still'}`;
   cache.set(key, m);
