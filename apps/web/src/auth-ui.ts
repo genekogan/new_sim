@@ -1,9 +1,11 @@
-/** Edge onboarding: Souls are run by their owners' agents, so human sign-in (dev/Privy) is hidden by default.
- * The code stays; add `?auth=1` to the URL (or localStorage `sim.authUi`='1') to show it again. */
-export const AUTH_UI:boolean=(()=>{
- try{return typeof location!=='undefined'&&(new URLSearchParams(location.search).get('auth')==='1'||localStorage.getItem('sim.authUi')==='1');}
- catch{return false;}
-})();
+import {soulFromFragment,soulFragment} from './soul-link.ts';
+/** Sign-in is part of the shared world chrome; public viewing remains unsigned (live release d357). */
+export const AUTH_UI=true;
+export function configuredSignIn(cfg:{authProvider?:'clerk'|'privy'|'none';privyAppId?:string;clerkPublishableKey?:string;clerkIssuer?:string;devAuth?:boolean}){
+ if(cfg.authProvider==='none')return false;
+ // world-engine branch: local dev sign-in (dev auth, no provider) shows the same Sign in button
+ return cfg.authProvider==='clerk'?!!cfg.clerkPublishableKey&&!!cfg.clerkIssuer:!!cfg.privyAppId||!!cfg.devAuth;
+}
 
 /** Raw-world bootstrap prompt; full runtime instructions live in the installed skill. */
 export function agentOnboarding(worldUrl:string,worldName?:string){
@@ -13,3 +15,20 @@ export function agentOnboarding(worldUrl:string,worldName?:string){
  return {world,instructionsUrl,text:`Read the instructions at ${instructionsUrl} to create a new soul in the world ${world}.`};
 }
 export function agentQuickstart(worldUrl:string,worldName?:string):string{return agentOnboarding(worldUrl,worldName).text;}
+
+/** Authentication comes from server configuration, never request-derived publicUrl (d357).
+ * World-engine branch: any launcher world slug, and a god pairing link (#godpair/CODE) survives the hop. */
+export function clerkOriginRoute(authenticationOrigin:string|undefined,currentOrigin:string,path:string,hash=''){
+ let origin:URL;try{origin=new URL(authenticationOrigin??'');}catch{return {initialize:false,signInUrl:null};}
+ if(origin.origin!==authenticationOrigin||origin.username||origin.password||!['https:','http:'].includes(origin.protocol)||origin.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(origin.hostname)||!/^\/w\/[a-z][a-z0-9-]{0,31}\/?$/.test(path))return {initialize:false,signInUrl:null};
+ const soul=soulFromFragment(hash);
+ const fragment=/^#approve\/ap_[a-f0-9]{32}$/.test(hash)||/^#godpair\/[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(hash)?hash:soul?'#'+soulFragment(soul):hash==='#join'?'#join':'#watch';
+ return {initialize:currentOrigin===origin.origin,signInUrl:origin.origin+path.replace(/\/$/,'')+fragment};
+}
+/** The homepage (`/`, served by the launcher) mounts Clerk only on the configured origin too. */
+export function clerkHomeRoute(authenticationOrigin:string|undefined,currentOrigin:string){
+ let origin:URL;try{origin=new URL(authenticationOrigin??'');}catch{return {initialize:false,signInUrl:null};}
+ if(origin.origin!==authenticationOrigin||origin.username||origin.password||!['https:','http:'].includes(origin.protocol)||origin.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(origin.hostname))return {initialize:false,signInUrl:null};
+ return {initialize:currentOrigin===origin.origin,signInUrl:origin.origin+'/'};
+}
+export function unsignedPreviewAuth(signInUrl:string|null,login:()=>void){return {ready:true,authed:false,label:null,signInUrl:signInUrl??undefined,login,logout:()=>{},getToken:async()=>null,debug:{privyUserId:null,wallet:null,linked:[]}};}

@@ -57,6 +57,7 @@ import { apiPath, worldKey } from './world-path.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
 import { setAssetLoader } from './gen-mesh/gltf-assets.ts';
 import { GodPanel } from './GodPanel.tsx';
+import { ensureToken as ensureGodToken } from './god-ui/god-api.ts';
 import { WorldPreviewGhost } from './WorldPreviewGhost.ts';
 import {WorldEdgeItems} from './WorldEdgeItems.ts';
 import { WorldNavigation, createWorldOrbitControls, type ManualNavigation, type CameraMove } from './WorldNavigation.ts';
@@ -268,9 +269,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     void entityLayer.start(abort.signal).then(()=>{frameEntityWorld();setEntityWorld(entityLayer.active);if(shotMode)setTimeout(()=>{document.title=entityLayer.active?'ready':'no-entity-world';(window as unknown as {__shotReady?:boolean}).__shotReady=true;},Math.max(2500,Number(new URLSearchParams(location.search).get('settle')??'3000')));});
     const gw=window as unknown as {__simGhost?:WorldPreviewGhost};const ghost=gw.__simGhost??(gw.__simGhost=new WorldPreviewGhost(apiPath));scene.add(ghost.group);  // ?preview=<id> ghosts (GodPanel drives it; one ghost per page, whoever makes it first)
     // Alt+click on the ground drops a labelled flag (a core/flag entity) the god can refer to as flag:<label>.
-    // Owner authority: a god token minted with the page's dev identity (Privy owners: the Game lane wires getToken later).
-    let godToken:string|null=sessionStorage.getItem('sim.godToken');if(godToken&&!new RegExp('^god_'+worldKey.replace(/[-]/g,'\\-')+'-\\d+_').test(godToken))godToken=null;  // one origin may front many worlds (launcher)
-    const godMint=async()=>{if(godToken)return godToken;const dev=localStorage.getItem('sim.dev');if(!dev)return null;const r=await fetch(apiPath('/v1/god/mint'),{method:'POST',headers:{authorization:'Bearer dev:'+dev,'content-type':'application/json'},body:JSON.stringify({label:'browser'})});if(!r.ok)return null;godToken=(await r.json()).token;sessionStorage.setItem('sim.godToken',godToken!);return godToken;};
+    // Owner authority: this world's god token, minted with the page's signed-in person (Clerk in production, a local name in dev).
+    const godMint=()=>ensureGodToken().catch(()=>null);
     const flagRay=new THREE.Raycaster(),flagNdc=new THREE.Vector2();
     const onFlagClick=async(ev:MouseEvent)=>{
       if(!(ev.altKey||flagModeRef.current)||!entityLayer.active)return;
@@ -278,7 +278,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       const rect=renderer.domElement.getBoundingClientRect();flagNdc.set(((ev.clientX-rect.left)/rect.width)*2-1,-((ev.clientY-rect.top)/rect.height)*2+1);
       flagRay.setFromCamera(flagNdc,camera);const hit=flagRay.intersectObjects(entityLayer.terrainMeshes(),false)[0];if(!hit)return;
       const label=window.prompt(`Flag at (${hit.point.x.toFixed(0)}, ${hit.point.z.toFixed(0)}) — label:`);if(!label)return;
-      const token=await godMint();if(!token){problem('Only the world owner can drop flags (sign in with ?dev=1 locally).');return;}
+      const token=await godMint();if(!token){problem('Only the world owner can drop flags: sign in and claim the world first.');return;}
       const name=label.toLowerCase().replace(/[^a-z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48)||'flag';
       const r=await fetch(apiPath('/v1/god/act'),{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({ops:[{op:'place',def:'core/flag@1',name,p:[Math.round(hit.point.x*10)/10,Math.round(hit.point.z*10)/10],state:{label}}],note:'flag from the website'})});
       const d=await r.json().catch(()=>null);if(!d?.accepted)problem(`Flag refused: ${d?.failures?.[0]?.code??r.status} ${d?.failures?.[0]?.detail??''}`);
