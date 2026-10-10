@@ -4,6 +4,7 @@
 // and fronts them all on one origin.
 //
 //   node tools/world-launcher/launcher.mjs [--port 4980] [--data <dir>] [--range 5101-5149]
+//        [--auth-env <clerk.env> --public-origin https://sim.eden.art]
 //
 //   GET  /                       the web app (homepage: worlds + New world)
 //   GET  /__sim/worlds.json      local-worlds/1, extended with slug/name/template/god/entities
@@ -13,7 +14,14 @@
 //   GET  /__sim/launcher         children, ports, pids, restarts (diagnostics)
 //   /w/<slug>/*                  proxied to that world (HTTP, SSE, WebSocket); started on demand
 //
-// Local only: binds 127.0.0.1, fake minds, dev auth, no credentials, no tunnels.
+// Sign-in: dev auth (local names) by default. With --auth-env <file> (or SIM_AUTH_ENV_FILE) every world signs in
+// with Clerk: children read the file by path (node --env-file), dev tokens are refused, all worlds share one
+// account registry (<data>/accounts.sqlite), and POST /__sim/worlds needs the creator's Clerk session token —
+// the new world is claimed for them at birth. The launcher itself learns only the public Clerk settings.
+// --public-origin is the origin people use (it must be one of CLERK_AUTHORIZED_PARTIES).
+//
+// Local only: binds 127.0.0.1, fake minds, no credentials, no tunnels.
+import { execFileSync } from 'node:child_process';
 import { createServer, request } from 'node:http';
 import { connect } from 'node:net';
 import { createReadStream, existsSync, mkdirSync, rmSync, statSync } from 'node:fs';
@@ -44,12 +52,14 @@ export async function openLauncher(cfg = {}) {
   const marsWebDir = cfg.marsWebDir ?? (existsSync(join(root, '.lane/mars-web')) ? join(root, '.lane/mars-web') : undefined);
   const log = cfg.log ?? ((s) => console.log(`[launcher] ${s}`));
   const origin = `http://127.0.0.1:${port}`;
+  const publicOrigin = (cfg.publicOrigin ?? origin).replace(/\/$/, '');
+  const auth = clerkAuth(cfg.authEnvFile ?? process.env.SIM_AUTH_ENV_FILE, dataDir, publicOrigin);
   const registry = new Registry(dataDir);
   /** What the launcher sees go past, per world (not persisted beyond the registry's own fields). */
   const seen = new Map();
   const seenOf = (slug) => { let s = seen.get(slug); if (!s) { s = { looks: registry.get(slug)?.looks ?? 0, lastLookAt: registry.get(slug)?.lastLookAt ?? null, agentSeenAt: registry.get(slug)?.agentSeenAt ?? null, previews: [] }; seen.set(slug, s); } return s; };
   const stats = new Map();   // slug → { at, god, entities, seq }
-  const pool = new ChildPool({ root, range, logDir: join(dataDir, 'logs'), pidFile: join(dataDir, 'children.json'), idleMs: cfg.idleMs, marsWebDir, publicOrigin: origin, command: cfg.command, onChange: (slug) => { const s = pool.status(slug); if (s.port && registry.get(slug) && registry.get(slug).port !== s.port) registry.update(slug, { port: s.port }); } });
+  const pool = new ChildPool({ root, range, logDir: join(dataDir, 'logs'), pidFile: join(dataDir, 'children.json'), idleMs: cfg.idleMs, marsWebDir, publicOrigin, auth: auth?.child, command: cfg.command, onChange: (slug) => { const s = pool.status(slug); if (s.port && registry.get(slug) && registry.get(slug).port !== s.port) registry.update(slug, { port: s.port }); } });
   const worldEnv = (w) => ({ ...w, dataDir: registry.worldDir(w.slug), templateFile: w.template && w.template !== 'empty' ? listTemplates(templatesDir).find((t) => t.id === w.template)?.file ?? null : null });
 
   // ---------- reads
@@ -68,16 +78,25 @@ export async function openLauncher(cfg = {}) {
   }
   const describe = (w) => {
     const st = pool.status(w.slug), s = stats.get(w.slug), t = listTemplates(templatesDir).find((x) => x.id === w.template);
-    return { key: w.slug, worldKey: w.slug, slug: w.slug, name: w.name, basePath: `/w/${w.slug}`, configPath: `/w/${w.slug}/v1/config`, url: `/w/${w.slug}/?dev=1`, template: w.template, templateName: t?.name ?? (w.template === 'empty' ? 'Empty plain' : w.template), createdAt: w.createdAt, owner: w.owner ?? null, god: s?.god ?? w.god ?? false, entities: s?.entities ?? w.entities ?? null, seq: s?.seq ?? w.seq ?? null, status: st.status, restarts: st.restarts ?? 0 };
+    return { key: w.slug, worldKey: w.slug, slug: w.slug, name: w.name, basePath: `/w/${w.slug}`, configPath: `/w/${w.slug}/v1/config`, url: auth ? `/w/${w.slug}/` : `/w/${w.slug}/?dev=1`, template: w.template, templateName: t?.name ?? (w.template === 'empty' ? 'Empty plain' : w.template), createdAt: w.createdAt, owner: w.owner ?? null, god: s?.god ?? w.god ?? false, entities: s?.entities ?? w.entities ?? null, seq: s?.seq ?? w.seq ?? null, status: st.status, restarts: st.restarts ?? 0 };
   };
   async function worldsJson() {
     await Promise.all(registry.worlds.map(refreshStats));
-    return { contract: 'local-worlds/1', launcher: 'world-launcher/1', worlds: [...registry.worlds].sort((a, b) => b.createdAt - a.createdAt).map(describe), templates: listTemplates(templatesDir).map(({ file: _f, ...t }) => t), limits: { maxWorlds: MAX_WORLDS, childPorts: range } };
+    return { contract: 'local-worlds/1', launcher: 'world-launcher/1', worlds: [...registry.worlds].sort((a, b) => b.createdAt - a.createdAt).map(describe), templates: listTemplates(templatesDir).map(({ file: _f, ...t }) => t), limits: { maxWorlds: MAX_WORLDS, childPorts: range }, auth: auth ? auth.public : { provider: 'dev' } };
   }
 
   // ---------- create
   let creating = Promise.resolve();
-  async function createWorld(body) {
+  /** Under Clerk, cheaply refuse a bad creator token before booting anything (when some world is awake to ask). */
+  async function creatorOk(authorization) {
+    const awake = registry.worlds.map((w) => ({ w, s: pool.status(w.slug) })).find((x) => x.s.status === 'running');
+    if (!awake) return true;  // nobody to ask yet: the claim after boot decides
+    try { const r = await fetch(`http://127.0.0.1:${awake.s.port}/w/${awake.w.slug}/v1/account/session`, { headers: { authorization }, signal: AbortSignal.timeout(5000) }); return r.status !== 401; }
+    catch { return true; }
+  }
+  async function createWorld(body, authorization) {
+    if (auth && !/^Bearer\s+\S+/i.test(authorization ?? '')) return [401, { ok: false, code: 'signin-required', message: 'sign in first: a new world belongs to whoever makes it' }];
+    if (auth && !(await creatorOk(authorization))) return [401, { ok: false, code: 'signin-required', message: 'your sign-in was not accepted; sign in again' }];
     const name = typeof body?.name === 'string' ? body.name.trim().replace(/\s+/g, ' ') : '';
     if (!name || name.length > 60) return [400, { ok: false, code: 'invalid', message: 'name: 1–60 characters' }];
     const templates = listTemplates(templatesDir);
@@ -97,9 +116,21 @@ export async function openLauncher(cfg = {}) {
       return [500, { ok: false, code: 'boot-failed', message: e.message }];
     }
     const ms = Math.round(performance.now() - t0);
-    log(`created ${slug} (${t.id}) on :${pool.status(slug).port} in ${ms} ms`);
+    // The creator is the one god: the new world claims them now, with their own sign-in (Clerk: required).
+    let owner = null;
+    if (authorization) {
+      const port = pool.status(slug).port;
+      const r = await fetch(`http://127.0.0.1:${port}/w/${slug}/v1/god/claim`, { method: 'POST', headers: { authorization, 'content-type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(15_000) }).catch((e) => ({ ok: false, status: 0, json: async () => ({ message: e.message }) }));
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) owner = d.owner ?? null;
+      else if (auth) {
+        await pool.stop(slug); pool.kids.delete(slug); registry.remove(slug); rmSync(registry.worldDir(slug), { recursive: true, force: true });
+        return [r.status === 403 ? 403 : 401, { ok: false, code: 'signin-required', message: `the new world could not make you its god: ${d.message ?? r.status}; sign in again and retry` }];
+      } else log(`created ${slug} unclaimed: the creator's dev sign-in was refused (${r.status})`);
+    }
+    log(`created ${slug} (${t.id}) on :${pool.status(slug).port} in ${ms} ms${owner ? ', claimed by its creator' : ''}`);
     await refreshStats(entry);
-    return [201, { ok: true, slug, url: `/w/${slug}/?dev=1&new=1`, bootMs: ms, world: describe(entry) }];
+    return [201, { ok: true, slug, url: auth ? `/w/${slug}/?new=1` : `/w/${slug}/?dev=1&new=1`, bootMs: ms, claimed: !!owner, world: describe(entry) }];
   }
 
   // ---------- static (the web app itself; everything else comes from a world)
@@ -158,7 +189,7 @@ export async function openLauncher(cfg = {}) {
         const chunks = []; let n = 0;
         for await (const c of req) { n += c.length; if (n > 16_384) { json(res, 413, { ok: false, code: 'too-large' }); return; } chunks.push(c); }
         let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
-        const run = creating.then(() => createWorld(body)); creating = run.catch(() => {});
+        const run = creating.then(() => createWorld(body, req.headers.authorization)); creating = run.catch(() => {});
         const [status, out] = await run; json(res, status, out); return;
       }
       const one = path.match(/^\/__sim\/worlds\/([a-z][a-z0-9-]{0,31})(\/previews)?$/);
@@ -212,7 +243,7 @@ export async function openLauncher(cfg = {}) {
   });
   await new Promise((yes, no) => { server.once('error', no); server.listen(port, '127.0.0.1', yes); });
   for (const r of await pool.reapOrphans()) log(`stopped ${r.slug} (pid ${r.pid}) left running by an earlier launcher`);
-  log(`${origin}  (data ${dataDir}, worlds ${registry.worlds.length}, children ${range[0]}–${range[1]})`);
+  log(`${origin}  (data ${dataDir}, worlds ${registry.worlds.length}, children ${range[0]}–${range[1]}, sign-in ${auth ? `Clerk for ${publicOrigin}` : 'dev names'})`);
 
   // Eagerly wake the most recent worlds so the homepage numbers are live; the rest start on first visit.
   const eager = cfg.eager ?? 4;
@@ -220,8 +251,25 @@ export async function openLauncher(cfg = {}) {
 
   let closed = false;
   return {
-    server, url: origin, registry, pool, dataDir,
+    server, url: origin, registry, pool, dataDir, auth: auth?.public ?? { provider: 'dev' },
     close: async () => { if (closed) return; closed = true; const done = new Promise((r) => server.close(r)); for (const s of sockets) s.destroy(); await pool.closeAll(); await done; },
+  };
+}
+
+/**
+ * Clerk mode from an env file, used by path only: a one-shot `node --env-file` child hands back just the public
+ * settings (publishable key, issuer) for the homepage. Nothing else in the file is read here or logged.
+ */
+export function clerkAuth(envFile, dataDir, publicOrigin) {
+  if (!envFile) return null;
+  const file = resolve(envFile);
+  if (!existsSync(file)) throw new Error(`launcher: --auth-env file not found: ${file}`);
+  const out = execFileSync(process.execPath, [`--env-file=${file}`, '-e', 'process.stdout.write(JSON.stringify({k:process.env.CLERK_PUBLISHABLE_KEY??"",i:process.env.CLERK_ISSUER_URL??""}))'], { encoding: 'utf8', env: { PATH: process.env.PATH }, timeout: 10_000 });
+  const { k, i } = JSON.parse(out);
+  if (!/^pk_(live|test)_[A-Za-z0-9+/=_-]+$/.test(k) || !/^https:\/\/[^/]+$/.test(i)) throw new Error('launcher: the --auth-env file must set CLERK_PUBLISHABLE_KEY and CLERK_ISSUER_URL (https origin)');
+  return {
+    child: { envFile: file, registryPath: join(resolve(dataDir), 'accounts.sqlite') },
+    public: { provider: 'clerk', clerkPublishableKey: k, clerkIssuer: i, authenticationOrigin: publicOrigin },
   };
 }
 
@@ -230,7 +278,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
   const flag = (k) => { const i = argv.indexOf(`--${k}`); return i >= 0 ? argv[i + 1] : undefined; };
   const range = flag('range')?.split('-').map(Number);
   try {
-    const l = await openLauncher({ port: flag('port') ? Number(flag('port')) : undefined, dataDir: flag('data'), range: range?.length === 2 ? range : undefined, eager: flag('eager') ? Number(flag('eager')) : undefined });
+    const l = await openLauncher({ port: flag('port') ? Number(flag('port')) : undefined, authEnvFile: flag('auth-env'), publicOrigin: flag('public-origin'), dataDir: flag('data'), range: range?.length === 2 ? range : undefined, eager: flag('eager') ? Number(flag('eager')) : undefined });
     let stopping = false;
     for (const sig of ['SIGINT', 'SIGTERM']) process.on(sig, () => { if (stopping) return; stopping = true; console.log(`[launcher] ${sig}: stopping worlds…`); void l.close().then(() => process.exit(0)); });
   } catch (e) { console.error(`[launcher] refused: ${e.message}`); process.exitCode = 1; }

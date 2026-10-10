@@ -107,7 +107,7 @@ export class ChildPool {
     const log = createWriteStream(join(this.o.logDir, `${k.slug}.log`), { flags: 'a' });
     log.write(`\n--- ${new Date().toISOString()} start ${k.slug} on :${port} (restart ${k.restarts})\n`);
     const child = spawn(cmd, args, { cwd: this.o.root, env, stdio: ['ignore', 'pipe', 'pipe'] });
-    k.child = child; k.script = args[0]; this.savePids();
+    k.child = child; k.script = args.find((a) => !a.startsWith('-')) ?? args[0]; this.savePids();
     child.stdout.pipe(log, { end: false }); child.stderr.pipe(log, { end: false });
     let exited = false;
     child.once('exit', (code, signal) => { exited = true; log.end(`--- exit ${code ?? signal}\n`); this.onExit(k, child, code, signal); });
@@ -155,17 +155,24 @@ export class ChildPool {
   async closeAll() { this.closing = true; await Promise.all([...this.kids.keys()].map((s) => this.stop(s))); }
 }
 
-/** The Sim server for one entity world (same env as tools/god-skill/dev-world.mjs). */
+/** The Sim server for one entity world (same env as tools/god-skill/dev-world.mjs).
+ *  With `o.auth.envFile` (Clerk, production sign-in) the child reads its Clerk settings from that file by path
+ *  (`node --env-file`); dev auth is off and every world shares one account registry, so a person is the same
+ *  account in every world. Settings set here win over the file. */
 export function defaultCommand(world, port, o) {
   const marsWeb = o.marsWebDir ? resolve(o.marsWebDir) : null;
+  const clerk = o.auth?.envFile ? o.auth : null;
   const env = {
     PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR, LANG: process.env.LANG,
     // fake minds and no model keys: $0 model spend, always
     ANTHROPIC_API_KEY: '', TYPESAFE_API_KEY: '', OPENAI_API_KEY: '', BRAIN_MODE: 'fake',
     WORLD_KEY: world.slug, WORLD_ID: `${world.slug}-1`, WORLD_NAME: world.name ?? '', ENGINE: 'mars', PORT: String(port), HOST: '127.0.0.1',
-    DEV_AUTH: '1', SEED_NATIVES: '0', DATA_DIR: world.dataDir, PUBLIC_URL: o.publicOrigin, ENABLE_WORLD_ENGINE: '1',
+    DEV_AUTH: clerk ? '0' : '1', SEED_NATIVES: '0', DATA_DIR: world.dataDir, PUBLIC_URL: o.publicOrigin, ENABLE_WORLD_ENGINE: '1',
+    WORLD_PATH: `/w/${world.slug}`,
+    // the creator becomes the god by claiming at birth (launcher), never by a WORLD_OWNER_ID left in the env file
+    ...(clerk ? { AUTH_PROVIDER: 'clerk', ACCOUNT_AUTH_REQUIRED: '1', ACCOUNT_REGISTRY_PATH: clerk.registryPath, INVITE_REQUIRED: '0', WORLD_OWNER_ID: '' } : {}),
     ...(marsWeb && existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}),
     ...(world.templateFile ? { GENESIS_FILE: world.templateFile } : {}),
   };
-  return { cmd: process.execPath, args: ['apps/server/src/main.ts'], env };
+  return { cmd: process.execPath, args: [...(clerk ? [`--env-file=${resolve(clerk.envFile)}`] : []), 'apps/server/src/main.ts'], env };
 }

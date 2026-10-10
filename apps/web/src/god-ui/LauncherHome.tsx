@@ -3,17 +3,24 @@
 // that names a world, picks its template, starts it and opens it.
 import { useEffect, useRef, useState } from 'react';
 import './launcher-home.css';
+import { useSession, userAuthHeaders } from '../auth-session.ts';
 
 export type LauncherTemplate = { id: string; name: string; description: string; batches: number; ops?: number };
 export type LauncherWorldCard = { slug: string; name: string; basePath: string; url: string; template: string; templateName: string; createdAt: number; god: boolean; entities: number | null; seq: number | null; status: string; restarts: number };
-export type LauncherList = { contract: 'local-worlds/1'; launcher: string; worlds: LauncherWorldCard[]; templates: LauncherTemplate[] };
+/** How people sign in on this launcher's worlds (the public Clerk settings; never a secret). */
+export type LauncherAuth = { provider: 'clerk' | 'dev'; clerkPublishableKey?: string; clerkIssuer?: string; authenticationOrigin?: string };
+export type LauncherList = { contract: 'local-worlds/1'; launcher: string; worlds: LauncherWorldCard[]; templates: LauncherTemplate[]; auth?: LauncherAuth };
 
 const ago = (t: number) => { const s = Math.max(0, (Date.now() - t) / 1000); if (s < 90) return 'just now'; if (s < 3600) return `${Math.round(s / 60)} minutes ago`; if (s < 86400 * 2) { const h = Math.round(s / 3600); return `${h} hour${h === 1 ? '' : 's'} ago`; } return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); };
 const STATUS: Record<string, string> = { running: 'awake', starting: 'waking…', restarting: 'restarting…', stopped: 'asleep', asleep: 'asleep', failed: 'could not start' };
 
 export function LauncherHome({ initial }: { initial: LauncherList }) {
   const [list, setList] = useState(initial);
-  const [dialog, setDialog] = useState(() => new URLSearchParams(location.search).has('new'));
+  const [dialog, setDialogRaw] = useState(() => new URLSearchParams(location.search).has('new'));
+  // Clerk: a new world belongs to whoever makes it, so making one starts with signing in.
+  const session = useSession();
+  const needsSignIn = session.mode === 'clerk' && !session.authed;
+  const setDialog = (open: boolean) => { if (open && needsSignIn) { if (session.signInUrl) location.assign(session.signInUrl + '?new=1'); else session.login(); return; } setDialogRaw(open); };
   useEffect(() => {
     const t = setInterval(() => { void fetch('/__sim/worlds.json').then((r) => (r.ok ? r.json() : null)).then((d) => { if (d?.launcher) setList(d); }).catch(() => {}); }, 6000);
     return () => clearInterval(t);
@@ -25,7 +32,12 @@ export function LauncherHome({ initial }: { initial: LauncherList }) {
           <h1>Sim</h1>
           <p>Worlds on this computer. Each one is built by its god's agent and keeps running while you are away.</p>
         </div>
-        <button className="lh-new" data-new-world="1" onClick={() => setDialog(true)}>New world</button>
+        <div className="lh-actions">
+          {session.mode === 'clerk' && (!session.ready ? <span className="dim">Signing in…</span> : session.authed
+            ? <span className="dim" data-signed-in="1">{session.label ?? 'Signed in'} · <button className="lh-link" onClick={() => void session.logout()}>Sign out</button></span>
+            : <button className="lh-link" data-home-signin="1" onClick={() => setDialog(true)}>Sign in</button>)}
+          <button className="lh-new" data-new-world="1" onClick={() => setDialog(true)}>{needsSignIn ? 'Sign in to make a world' : 'New world'}</button>
+        </div>
       </div>
       {list.worlds.length === 0 && (
         <div className="lh-empty">
@@ -64,7 +76,8 @@ function NewWorldDialog({ templates, onClose }: { templates: LauncherTemplate[];
     if (!name.trim()) { input.current?.focus(); return; }
     setState({ phase: 'creating', started: Date.now() });
     try {
-      const r = await fetch('/__sim/worlds', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: name.trim(), template, creator: localStorage.getItem('sim.dev') ?? undefined }) });
+      // the creator's sign-in goes along: the launcher has the new world claim them as its god at birth
+      const r = await fetch('/__sim/worlds', { method: 'POST', headers: { 'content-type': 'application/json', ...await userAuthHeaders() }, body: JSON.stringify({ name: name.trim(), template, creator: localStorage.getItem('sim.dev') ?? undefined }) });
       const d = await r.json().catch(() => ({}));
       if (!r.ok || !d.url) throw new Error(d.message ?? `the launcher answered ${r.status}`);
       location.href = d.url;

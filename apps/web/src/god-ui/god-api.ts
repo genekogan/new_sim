@@ -4,6 +4,7 @@
 // was minted for.
 import { apiPath, worldKey } from '../world-path.ts';
 import { isFlagDef } from './checklist.ts';
+import { userAuthHeaders } from '../auth-session.ts';
 export { isFlagDef };
 
 export type Pending = { code: string; agent: string; expiresIn: number };
@@ -20,8 +21,8 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** Tokens are `god_<worldId>_<secret>` and world ids are `<slug>-<n>`. */
 export const tokenIsFor = (token: string | null, key = worldKey) => !!token && new RegExp(`^god_${escapeRe(key)}-\\d+_`).test(token);
 
-export const devName = () => (typeof localStorage === 'undefined' ? null : localStorage.getItem('sim.dev'));
-export const authHeaders = (): Record<string, string> => { const n = devName(); return n ? { authorization: `Bearer dev:${n}` } : {}; };
+/** The signed-in person's bearer (Clerk session token in production, `dev:<name>` locally): see auth-session.ts. */
+export const authHeaders = userAuthHeaders;
 
 /**
  * Run once at import (before the world page's own effects read 'sim.godToken'):
@@ -48,15 +49,16 @@ export function forgetToken() { try { localStorage.removeItem(TOKEN_KEY); if (!t
 async function json<T>(r: Response): Promise<T> { const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error((d as { message?: string }).message ?? `HTTP ${r.status}`); return d as T; }
 
 export async function getStatus(): Promise<Status | null> {
-  try { const r = await fetch(apiPath('/v1/god/status'), { headers: authHeaders() }); return r.ok ? await r.json() : null; } catch { return null; }
+  try { const r = await fetch(apiPath('/v1/god/status'), { headers: await authHeaders(), cache: 'no-store' }); return r.ok ? await r.json() : null; } catch { return null; }
 }
 export async function getWelcome(): Promise<string | null> {
-  try { const r = await fetch(apiPath('/v1/god/welcome'), { headers: authHeaders() }); return r.ok ? await r.text() : null; } catch { return null; }
+  try { const r = await fetch(apiPath('/v1/god/welcome'), { headers: await authHeaders(), cache: 'no-store' }); return r.ok ? await r.text() : null; } catch { return null; }
 }
-/** The owner's browser token for this world: the remembered one, else minted with the owner's identity (claims an unowned world). */
+/** The owner's browser token for this world: the remembered one, else minted with the signed-in owner's identity (claims an unowned world). */
 export async function ensureToken(): Promise<string> {
   const t = storedToken(); if (t) return t;
-  const d = await json<{ token: string }>(await fetch(apiPath('/v1/god/mint'), { method: 'POST', headers: { ...authHeaders(), 'content-type': 'application/json' }, body: JSON.stringify({ label: 'browser' }) }));
+  const headers = await authHeaders(); if (!headers.authorization) throw new Error('Sign in first.');
+  const d = await json<{ token: string }>(await fetch(apiPath('/v1/god/mint'), { method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: JSON.stringify({ label: 'browser' }) }));
   keepToken(d.token); return d.token;
 }
 /** A god call with this world's token; a refused token is forgotten and re-minted once. */
@@ -68,8 +70,13 @@ export async function god<T>(path: string, init: RequestInit = {}): Promise<T> {
     return json<T>(r);
   }
 }
-export const claim = () => ensureToken();
-export const approve = async (code: string) => json(await fetch(apiPath('/v1/god/pair/approve'), { method: 'POST', headers: { ...authHeaders(), 'content-type': 'application/json' }, body: JSON.stringify({ code }) }));
+/** Become this world's god as the signed-in person, then hold a browser god token. */
+export async function claim() {
+  const headers = await authHeaders(); if (!headers.authorization) throw new Error('Sign in first.');
+  await json(await fetch(apiPath('/v1/god/claim'), { method: 'POST', headers: { ...headers, 'content-type': 'application/json' }, body: '{}' }));
+  return ensureToken();
+}
+export const approve = async (code: string) => json(await fetch(apiPath('/v1/god/pair/approve'), { method: 'POST', headers: { ...await authHeaders(), 'content-type': 'application/json' }, body: JSON.stringify({ code }) }));
 export const edits = (limit = 30) => god<{ edits: EditRow[] }>(`/v1/god/edits?limit=${limit}`).then((d) => d.edits);
 export type UndoResult = { accepted: boolean; reverted?: number | number[]; failures?: { code: string; detail: string }[] };
 export const undo = () => god<UndoResult>('/v1/god/undo', { method: 'POST' });

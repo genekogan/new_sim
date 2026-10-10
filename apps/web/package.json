@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.61.3",
     "@privy-io/react-auth": "^3.46.0",
     "@sim/client": "workspace:*",
     "@sim/ground": "workspace:*",

@@ -75,7 +75,14 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   app.get('/v1/god/pair/:code', async (c) => { await d.requireUser(c); return c.json(d.god.pairInfo(c.req.param('code')), 200, noStore); });
   app.post('/v1/god/pair/approve', async (c) => { const u = await d.requireUser(c); const p = codeSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { code }'); d.god.pairApprove(u, p.data.code); return c.json({ ok: true }, 200, noStore); });
   app.post('/v1/god/pair/poll', async (c) => { d.limitIp(c, 'godpairpoll', 60, 60_000); const b = await body(c); if (typeof b?.poll_token !== 'string') throw new ApiError(400, 'invalid', 'body must be { poll_token }'); return c.json({ ok: true, ...d.god.pairPoll(b.poll_token) }, 200, noStore); });
-  /** Owner shortcut for local/dev: mint a god token directly with the owner's own identity. */
+  /** Claim an unowned world for the signed-in user (the launcher does this for the creator at birth). Idempotent for the owner. */
+  app.post('/v1/god/claim', async (c) => {
+    const u = await d.requireUser(c);
+    if (d.god.owner && d.god.owner !== u.id) throw new ApiError(403, 'forbidden', 'this world already has a god');
+    d.god.claim(u);
+    return c.json({ ok: true, worldId: d.god.opts.worldId, owner: u.id }, 200, noStore);
+  });
+  /** The owner's browser (or a local agent) mints a god token with the owner's own signed-in identity; claims an unowned world. */
   app.post('/v1/god/mint', async (c) => { const u = await d.requireUser(c); const b = await body(c).catch(() => ({})); return c.json({ ok: true, token: d.god.mintFor(u, typeof b?.label === 'string' ? b.label : 'owner'), world: d.god.opts.worldId }, 200, noStore); });
 
   // ---- god

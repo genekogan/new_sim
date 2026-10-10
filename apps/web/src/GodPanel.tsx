@@ -10,6 +10,7 @@ import * as G from './god-ui/god-api.ts';
 import { describeEdit, steps, type Step } from './god-ui/checklist.ts';
 import { flyTo } from './god-ui/camera.ts';
 import { previewGhost, type GhostSummary } from './WorldPreviewGhost.ts';
+import { useSession } from './auth-session.ts';
 import './god-ui/god-panel.css';
 
 type Tab = 'start' | 'edits' | 'flags' | 'previews';
@@ -35,9 +36,15 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
   const hashCode = location.hash.startsWith('#godpair/') ? decodeURIComponent(location.hash.slice('#godpair/'.length)) : null;
   const owner = status?.you === 'owner' || status?.you === 'god';
   const seq = status?.seq;
+  // who is signed in on this page (Clerk in production, a local name in dev): auth-session.ts
+  const session = useSession();
+  const [naming, setNaming] = useState(false);
+  const [devName, setDevName] = useState('');
+  const wasAuthed = useRef(false);
+  useEffect(() => { if (wasAuthed.current && !session.authed) G.forgetToken(); wasAuthed.current = session.authed; }, [session.authed]);
 
   const refresh = useCallback(async () => { const s = await G.getStatus(); if (s) setStatus(s); }, []);
-  useEffect(() => { void refresh(); const t = setInterval(() => void refresh(), 4000); return () => clearInterval(t); }, [refresh]);
+  useEffect(() => { void refresh(); const t = setInterval(() => void refresh(), 4000); return () => clearInterval(t); }, [refresh, session.authed, session.label]);
   useEffect(() => { localStorage.setItem(OPEN_KEY, open ? '1' : '0'); }, [open]);
   useEffect(() => { if (!owner) { setWelcome(null); return; } void G.getWelcome().then(setWelcome); }, [owner]);
   // journal, flags: whenever the world's edit counter moves
@@ -65,16 +72,32 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
     catch (e) { setNote({ text: String((e as Error).message), bad: true }); }
     finally { setBusy(null); }
   };
+  // Sign in as the page does: Clerk's own sign-in in production; locally, a name typed here (no window.prompt:
+  // embedded browsers drop it).
   const signIn = () => {
-    const n = window.prompt('A local name for you on this server (use the same name when you return):', G.devName() ?? '');
-    if (!n) return; localStorage.setItem('sim.dev', n.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').slice(0, 36)); location.reload();
+    if (session.signInUrl) { location.assign(session.signInUrl); return; }
+    if (session.mode === 'dev') { setDevName(localStorage.getItem('sim.dev') ?? ''); setNaming(true); return; }
+    if (session.mode === 'none') { setNote({ text: 'Sign-in is not configured on this server.', bad: true }); return; }
+    session.login();
   };
+  const devSignIn = (e: React.FormEvent) => {
+    e.preventDefault();
+    const n = devName.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 36);
+    if (!n) return; localStorage.setItem('sim.dev', n); G.forgetToken(); location.reload();
+  };
+  const signInForm = naming && (
+    <form className="gp-row" data-signin-form="1" onSubmit={devSignIn}>
+      <input data-signin-name="1" autoFocus value={devName} onChange={(e) => setDevName(e.target.value)} placeholder="a local name, e.g. gene" maxLength={36} aria-label="local name" />
+      <button className="gp-btn gp-primary" data-signin-go="1" type="submit">Sign in</button>
+    </form>
+  );
+  const who = session.label ?? 'you';
   const claim = () => run('claim', G.claim, () => 'This world is yours. Pair your agent next.');
   const approve = (code: string) => run(code, async () => { await G.approve(code); localStorage.setItem(PAIRED_KEY, '1'); setApprovedHere(true); if (hashCode === code) history.replaceState(null, '', location.pathname + location.search); }, () => `Approved ${code}. Your agent now holds god mode here.`);
   const undoRedo = (which: 'undo' | 'redo') => run(which, () => (which === 'undo' ? G.undo() : G.redo()), (r) => { const x = r as G.UndoResult; return x.accepted ? `${which === 'undo' ? 'Undid' : 'Redid'} edit ${x.reverted}.` : (x.failures?.[0]?.detail ?? `nothing to ${which}`); });
   const undoGroup = (group: string) => run('g:' + group, () => G.undoGroup(group), (r) => { const x = r as G.UndoResult; return x.accepted ? `Undid group “${group}” (${Array.isArray(x.reverted) ? x.reverted.length : 1} edits).` : (x.failures?.[0]?.detail ?? 'nothing undone'); });
 
-  const checklist: Step[] = useMemo(() => steps({ status, signedIn: !!G.devName() && status?.you !== 'anonymous', edits, flags: flags.length, approvedHere, agentSeen: !!launcher?.seen.agentSeenAt, looks: launcher?.seen.looks ?? 0 }), [status, edits, flags.length, approvedHere, launcher]);
+  const checklist: Step[] = useMemo(() => steps({ status, signedIn: session.authed && status?.you !== 'anonymous', edits, flags: flags.length, approvedHere, agentSeen: !!launcher?.seen.agentSeenAt, looks: launcher?.seen.looks ?? 0 }), [status, edits, flags.length, approvedHere, launcher]);
   const done = checklist.filter((s) => s.done).length;
   const recent = useMemo(() => (edits ?? []).slice().sort((a, b) => b.seq - a.seq).slice(0, 8), [edits]);
   const canUndo = (edits ?? []).some((e) => !e.undone && e.kind !== 'undo' && e.ops.length > 0);
@@ -114,16 +137,19 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
           <div className="gp-block">
             {isNew && !status.hasOwner && <p className="gp-hello">Your new world is ready. Whoever claims it first becomes its god, so sign in and claim it now.</p>}
             <p>{status.hasOwner ? 'This world already has a god. Watch, or sign in if it is yours.' : 'This world has no god yet. Sign in to claim it; your agent will build it.'}</p>
-            <button className="gp-btn gp-primary" data-signin="1" onClick={signIn}>Sign in</button>
+            {session.mode === 'clerk' && !session.ready ? <p className="gp-dim">Signing in…</p>
+              : session.mode === 'clerk' && session.label && !session.authed ? <p className="gp-dim">Signed in as <b>{session.label}</b>; connecting your account to this world…</p>
+              : !naming && <button className="gp-btn gp-primary" data-signin="1" onClick={signIn}>{session.signInUrl ? `Sign in at ${new URL(session.signInUrl).host}` : 'Sign in'}</button>}
+            {signInForm}
           </div>
         )}
         {status.you === 'claimant' && (
           <div className="gp-block">
-            <p>Signed in as <b>{G.devName()}</b>. Nobody owns this world yet.</p>
+            <p>Signed in as <b>{who}</b>. Nobody owns this world yet.</p>
             <button className="gp-btn gp-primary" data-claim="1" disabled={busy === 'claim'} onClick={claim}>{busy === 'claim' ? 'Claiming…' : 'Become its god'}</button>
           </div>
         )}
-        {status.you === 'visitor' && <div className="gp-block"><p>Signed in as <b>{G.devName()}</b>. Another account owns this world; you can watch.</p><button className="gp-btn" onClick={signIn}>Switch name</button></div>}
+        {status.you === 'visitor' && <div className="gp-block"><p>Signed in as <b>{who}</b>. Another account owns this world; you can watch.</p>{session.mode === 'dev' ? (!naming && <button className="gp-btn" onClick={signIn}>Switch name</button>) : <button className="gp-btn" onClick={() => void session.logout()}>Sign out</button>}{signInForm}</div>}
 
         {owner && (
           <>

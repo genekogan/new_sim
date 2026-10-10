@@ -65,7 +65,8 @@ const edenCapabilities=edenCore&&host.engine.rulesVersion.includes('+crew-remova
 console.log(`[world] ${host.worldId} booted from ${boot.from}, tick ${host.engine.world.tick}, replayed ${boot.replayed} events, ${host.minds.size} souls, rules ${host.engine.rulesVersion}`);
 
 const auth = new Auth(config, db);
-await auth.init().catch((e) => console.error('[auth] init failed:', e.message));
+// A selected account provider (Clerk) that cannot verify is fatal: never fall back to anonymous or dev sign-in.
+await auth.init().catch((e) => {if(config.accountAuthRequired)throw e;console.error('[auth] init failed:', e.message);});
 
 const living = config.worldKey !== 'toy' && config.livingWorld ? new LivingWorld(host) : null;
 if(edenCore)await settleEmptyEden(host,living,definition.customs);
