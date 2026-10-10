@@ -57,3 +57,16 @@ test('a terrain commit logs groundV1; the engine stands bodies on it; restart an
   assert.equal((rep.engine as unknown as Eng).world.groundV1?.recipeHash, g1.recipeHash);
   assert.ok(Math.abs((rep.engine as unknown as Eng).world.entities.h_ada.pose.p[1] - y) < 1e-9);
 });
+
+test('ground edits faster than the sequencer (raise, then undo before it applies) end on the god\'s ground', { timeout: 300_000 }, async (t) => {
+  const db = new Db(':memory:'); t.after(() => db.close());
+  const host = new WorldHost(db, factory, seed, 1e9, 'ground-host-2'); host.boot(); host.drainInputs();
+  const god = new GodMode(db, { worldId: 'ground-host-2', ownerId: null, tick: () => host.engine.world.tick, emit: () => {} });
+  new GroundHost(db, host, god);
+  await settle(host);
+  const flat = (host.engine as unknown as Eng).world.groundV1!.recipeHash;
+  assert.equal(god.act({ ops: [{ op: 'place', def: coreRef('knoll'), name: 'k', p: [0, 0], params: { height: 3, radius: 10 } }] }).accepted, true);
+  assert.equal(god.undo().accepted, true);   // both before the next drain
+  await settle(host);
+  assert.equal((host.engine as unknown as Eng).world.groundV1!.recipeHash, flat, 'back on the flat ground');
+});

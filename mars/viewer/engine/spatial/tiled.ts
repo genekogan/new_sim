@@ -141,8 +141,6 @@ export class GroundNav {
     this.window = next;
     return 'grown';
   }
-  /** Whether `r` (clamped to the extent) fits a window of at most MAX_WINDOW_TILES alone. */
-  fits(r: TileRect): boolean { return r[2] - r[0] + 1 <= MAX_WINDOW_TILES + 2 && r[3] - r[1] + 1 <= MAX_WINDOW_TILES + 2; }
   extentTiles(): TileRect { const e = this.field.extent; return [tileOf(e[0]), tileOf(e[1]), tileOf(e[2] - 1e-6), tileOf(e[3] - 1e-6)]; }
   bounds(): [number, number, number, number] { return rectBounds(this.window ?? [0, 0, 0, 0]); }
   boundsOf(r: TileRect): [number, number, number, number] { return rectBounds(r); }

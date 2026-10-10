@@ -112,6 +112,31 @@ async function shotOnce(name, { eye, at, wait = 4000 } = {}) {
   finally { if (browser) await browser.close().catch(() => { }); release(); }
 }
 
+/** Open the page first (camera on `eye`/`at`), then start `run` (e.g. a Soul's walk) and photograph it `afterMs` later, mid-motion. */
+async function shotDuring(name, { eye, at, afterMs = 10000 }, run) {
+  if (!chromium) return run();
+  const release = await chromeLease('ground').catch(() => null);
+  if (!release) { log('  (chrome lease busy; mid-motion screenshot skipped)'); return run(); }
+  let browser = null, p = null;
+  try {
+    browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    await ctx.addInitScript(() => { localStorage.setItem('sim.dev', 'admin'); });
+    const page = await ctx.newPage();
+    const q = new URLSearchParams({ dev: '1', shot: '1', settle: '3000', eye: eye.map((v) => v.toFixed(2)).join(','), at: at.map((v) => v.toFixed(2)).join(',') });
+    await page.goto(`${base}?${q}`, { waitUntil: 'domcontentloaded', timeout: 120_000 });
+    await page.waitForFunction(() => window.__shotReady === true, null, { timeout: 150_000 }).catch(() => log('  (shot not ready in 150 s; taking it anyway)'));
+    p = run();
+    await sleep(afterMs);
+    const file = resolve(out, `${name}.png`);
+    await page.screenshot({ path: file, timeout: 120_000 });
+    report.shots.push({ name, file });
+    log(`  📷 ${name}.png (mid-motion)`);
+  } catch (e) { log('  (mid-motion screenshot failed: ' + String(e.message).split('\n')[0] + ')'); }
+  finally { if (browser) await browser.close().catch(() => { }); release(); }
+  return p ?? run();
+}
+
 // ================================================================ the scenario
 // layout (metres): the Soul is born at the origin; knoll east, mesa north, pond west, lake far west
 const KNOLL = [30, 0], MESA = [[-6, 30], [6, 30], [6, 42], [-6, 42]], POND = [[-30, -10], [-18, -10], [-18, 2], [-30, 2]], LAKE = [[-95, -45], [-50, -45], [-50, 5], [-95, 5]];
@@ -152,7 +177,8 @@ try {
   await step('S3 the Soul is offered the flags and the lake', async () => (await caps()).map((c) => c.id).filter((id) => /^(walk:flag-|swim:)/.test(id)), (ids) => ['walk:flag-hilltop', 'walk:flag-mesa-top', 'walk:flag-pond-middle', 'swim:lake'].every((x) => ids.includes(x)));
 
   const hill = await step('S4 the Soul walks to the hilltop flag; its y follows the slope all the way up', async () => {
-    const r = await soulDoes('walk:flag-hilltop');
+    // photographed mid-climb: the camera south of the knoll's west flank, the Soul passing about 11 s in
+    const r = await shotDuring('soul-climbing-the-knoll', { eye: [12, 7, 16], at: [17, 2.2, 0], afterMs: 11000 }, () => soulDoes('walk:flag-hilltop'));
     report.samples.hill = r.samples;
     const gs = r.samples.length ? await groundAt(r.samples.map((s) => [s.p[0], s.p[2]])) : [];
     const off = r.samples.map((s, i) => Math.abs(s.p[1] - gs[i].y));

@@ -45,8 +45,9 @@ export class GroundHost {
     const g = this.god.model.ground(), hash = groundRecipeHash(g);
     if (!groundRecipe(hash)) registerGroundRecipe(g);
     this.db.db.prepare('INSERT OR IGNORE INTO world_ground_recipes_v1 (world_id, hash, body) VALUES (?, ?, ?)').run(this.host.worldId, hash, JSON.stringify(g));
-    const current = this.engine.world.groundV1?.recipeHash ?? null;
-    if (current === hash || this.logged === hash) return hash;
+    // compare with the newest ground this host asked for (a fact may still be queued: A → B → A must log A again)
+    const intended = this.logged ?? this.engine.world.groundV1?.recipeHash ?? null;
+    if (intended === hash) return hash;
     if (!this.engine.previewGroundV1) throw new Error('ground.reader-required: this engine has no ground reader');
     this.logged = hash; this.installs++;
     void this.host.enqueue('rules', 'god:ground', { groundV1: groundFact(g, seq), why: 'ground/1: Souls stand on the entity world\'s terrain (prospective; earlier history replays unchanged)' });
