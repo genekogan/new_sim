@@ -79,14 +79,16 @@ async function placePrepared(def, name, shape, params = {}) {
 }
 
 // ---------- screenshots
-let chromium = null, browser = null, page = null;
+let chromium = null, browser = null, page = null, releaseLease = null;
+const { chromeLease } = await import(resolve(root, 'tools/god-skill/lib/chrome-lease.mjs'));
 if (!args['no-shots']) try { chromium = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test').chromium; } catch { log('  (no @playwright/test; screenshots skipped)'); }
 async function shot(name, eye, at, wait = 5000) {
   if (!chromium) return;
   const t0 = t();
   try {
-    if (!browser) { browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] }); const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } }); await ctx.addInitScript(() => { localStorage.setItem('sim.dev', 'admin'); }); page = await ctx.newPage(); page.setDefaultTimeout(180000); }
-    if (!page.url().startsWith(base)) { await page.goto(`${base}?dev=1&eye=${eye.join(',')}&at=${at.join(',')}`, { waitUntil: 'domcontentloaded', timeout: 180000 }); await page.waitForFunction(() => { const w = window.__simEntity; return !!w && w.layer?.active; }, null, { timeout: 180000 }).catch(() => {}); await page.waitForTimeout(Math.max(wait, 15000)); }
+    // one Chrome at a time across lanes (MERGES.md 08:25), on the real GPU (Metal), not swiftshader (08:55)
+    if (!browser) { releaseLease = await chromeLease('terrain'); browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] }); const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } }); await ctx.addInitScript(() => { localStorage.setItem('sim.dev', 'admin'); }); page = await ctx.newPage(); page.setDefaultTimeout(180000); }
+    if (!page.url().startsWith(base)) { await page.goto(`${base}?dev=1&shot=1&eye=${eye.join(',')}&at=${at.join(',')}`, { waitUntil: 'domcontentloaded', timeout: 180000 }); await page.waitForFunction(() => window.__shotReady === true || (window.__simEntity?.layer?.active && document.title === 'ready'), null, { timeout: 180000 }).catch(() => {}); await page.waitForTimeout(Math.max(wait, 8000)); }
     // a clean picture: hide every overlay (panels, banners, buttons) that is not on the canvas's own ancestor chain
     await page.evaluate(() => { const c = document.querySelector('canvas'); if (!c) return; for (let el = c; el && el !== document.body; el = el.parentElement) for (const sib of el.parentElement?.children ?? []) if (sib !== el && !sib.contains(c) && sib.tagName !== 'SCRIPT') sib.style.visibility = 'hidden'; });
     await page.evaluate(([e, a]) => { const w = window.__simEntity; if (!w) return; w.controls.target.set(a[0], a[1], a[2]); w.camera.position.set(e[0], e[1], e[2]); w.camera.lookAt(w.controls.target); w.controls.update?.(); }, [eye, at]);
@@ -235,6 +237,7 @@ try {
   report.failures.push({ name: 'harness', error: String(e?.stack ?? e) }); log('harness error', e);
 } finally {
   if (browser) await browser.close().catch(() => {});
+  releaseLease?.();
   report.summary = { steps: report.steps.length, failed: report.failures.length, shots: report.shots.filter((s) => s.file).length };
   writeFileSync(resolve(out, 'report.json'), JSON.stringify(report, null, 2));
   writeFileSync(resolve(out, 'server.log'), serverLog);
