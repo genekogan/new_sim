@@ -305,3 +305,25 @@ test('a pier over the lake: a swimmer heading for its end lands at the real shor
   assert.equal(run(e, [{ verb: 'mars:swim_to', params: { x: -72, z: -16 } }]).end?.code, 'swim.on-deck');
   assert.deepEqual(e.runtime.violations, []);
 });
+
+test('fault recovery restores a body to its last valid pose on the ground; from deep water, to the nearest standable shore', () => {
+  const e = world() as unknown as Engine & { restoreHumanPoseV1(id: string, pose: { p: [number, number, number]; yaw?: number; level?: number }): boolean };
+  // on the knoll's flank: exactly there, standing on the tiles (not y = 0)
+  assert.equal(e.restoreHumanPoseV1('h_ada', { p: [24, field.height(24, 3), 3], yaw: 1.2, level: 0 }), true);
+  let p = body(e).pose.p;
+  assert.deepEqual([p[0], p[2]], [24, 3]); assert.ok(Math.abs(p[1] - field.height(24, 3)) < 1e-3 && p[1] > 1, `y ${p[1]}`);
+  for (let i = 0; i < 5; i++) e.step();
+  assert.deepEqual(e.runtime.violations, [], 'no teleport fault: the relocation is acknowledged');
+  // in the deep lake: the nearest dry or wadable point, never the water and never the origin
+  assert.equal(e.restoreHumanPoseV1('h_ada', { p: [-52, -1.2, -20], level: 0 }), true);
+  p = body(e).pose.p;
+  assert.ok(field.medium(p[0], p[2]) <= 1, `standable: medium ${field.medium(p[0], p[2])} at ${p}`);
+  assert.ok(Math.hypot(p[0] + 52, p[2] + 20) < 8 && Math.hypot(p[0], p[2]) > 20, `near the lake edge ${p}`);
+  assert.equal(body(e).human.activity, 'idle');
+  for (let i = 0; i < 5; i++) e.step();
+  assert.deepEqual(e.runtime.violations, []);
+  // a body running a programme is not moved
+  const adm = e.perform({ actor: 'h_ada', label: 'walk', steps: [{ verb: 'walk_to', params: { to: [0, 0] } }] }); assert.ok(adm.ok);
+  e.step();
+  assert.equal(e.restoreHumanPoseV1('h_ada', { p: [24, 0, 3], level: 0 }), false);
+});

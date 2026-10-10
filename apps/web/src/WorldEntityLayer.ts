@@ -19,9 +19,11 @@ type DiffMsg = { type: 'edge'; kind: 'world-diff'; seq: number; diff: { upserts:
 
 const SECTOR_TILES = 4;              // 4×4 tiles (256 m) per terrain mesh
 const TERRAIN_STEP = 2;              // metres between terrain vertices in the picture
+const WATER_SINK_M = 0.03;          // still water drawn this far below its level (no z-fighting with a rim at the level)
 const EASE_IN_S = 2.5, EASE_OUT_S = 0.6, DROP_M = 40;
 const easeOut = (t: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
 
+type Figure = { holder: THREE.Object3D; wrists: [THREE.Object3D, THREE.Object3D]; knuckles: [THREE.Object3D | null, THREE.Object3D | null] } | { missingAt: number };
 type Drawn = { inst?: string; settled?: boolean; shown?: boolean; obj: THREE.Object3D; from: { p: THREE.Vector3; s: number }; to: { p: THREE.Vector3; s: number }; t0: number; dur: number; removing?: boolean; defHash: string; world?: boolean; motion?: { entity: Entity; def: StoredDef; yaw: number } };
 
 export class WorldEntityLayer {
@@ -40,6 +42,9 @@ export class WorldEntityLayer {
   get entityCount() { return this.model?.entities.size ?? 0; }
   private horizon: THREE.Mesh | null = null;
   private hiddenBase = new WeakSet<THREE.Object3D>();
+  /** Viewer B7: things a body carries (entity parent = a body entity) by body id; they ride that figure's animated hand. */
+  private held = new Map<string, string>();
+  private figures = new Map<string, Figure>();
   private now = 0;
   private readonly api: (p: string) => string;
   constructor(api: (p: string) => string) {
@@ -126,16 +131,43 @@ export class WorldEntityLayer {
       const s = d.from.s + (d.to.s - d.from.s) * t;
       d.obj.scale.setScalar(s);
       const shown = this.interiorVisible(id);
+      const inHand = !d.removing && this.held.has(id) && this.handPoint(this.held.get(id)!, d.obj.position);
       if (d.inst) {
         if (d.removing && t >= 1) { this.instancer.remove(d.inst, id); this.drawn.delete(id); continue; }
-        if (!d.settled || shown !== (d.shown ?? true)) { this.instancer.set(d.inst, id, d.obj.position, d.obj.rotation.y, shown ? d.obj.scale.x : 0, [d.obj.rotation.x, d.obj.rotation.z]); d.shown = shown; if (t >= 1) d.settled = true; }
+        if (inHand || !d.settled || shown !== (d.shown ?? true)) { this.instancer.set(d.inst, id, d.obj.position, d.obj.rotation.y, shown ? d.obj.scale.x : 0, [d.obj.rotation.x, d.obj.rotation.z]); d.shown = shown; if (t >= 1) d.settled = true; }
         continue;
       }
       d.obj.visible = shown;
       if (d.removing && t >= 1) { this.thingsGroup.remove(d.obj); disposeObject(d.obj); this.drawn.delete(id); continue; }
-      if (d.motion && t >= 1) animate(d.obj, d.motion.entity, d.motion.def, nowMs / 1000, { y: d.to.p.y, yaw: d.motion.yaw });
+      if (d.motion && t >= 1 && !inHand) animate(d.obj, d.motion.entity, d.motion.def, nowMs / 1000, { y: d.to.p.y, yaw: d.motion.yaw });
     }
     void dt;
+  }
+
+  /** Viewer B7: where a body's figure holds a carried thing — the palm of its raised hand (the carrying arm is posed to
+   *  the engine's hand point; the free one hangs lower), or between both palms when they are level (two-handed / seated).
+   *  The figure is the native people view's rig, found in the scene by its name (= the body's engine id). False when the
+   *  body has no figure here (no takes yet, or a stand-in): then the thing stays at the body entity's carry slot. */
+  private handPoint(body: string, out: THREE.Vector3): boolean {
+    let f = this.figures.get(body);
+    if (f && 'holder' in f && !attached(f.holder)) f = undefined;
+    if (!f || ('missingAt' in f && this.now - f.missingAt > 1000)) {
+      let root: THREE.Object3D = this.group; while (root.parent) root = root.parent;
+      let found: Figure = { missingAt: this.now };
+      root.traverse((o) => {
+        if ('holder' in found || o.name !== body) return;
+        const bone = (n: string) => { let b: THREE.Object3D | null = null; o.traverse((c) => { if (!b && (c as THREE.Bone).isBone && c.name === n) b = c; }); return b as THREE.Object3D | null; };
+        const wl = bone('WristL'), wr = bone('WristR');
+        if (wl && wr) found = { holder: o, wrists: [wl, wr], knuckles: [bone('Middle2L'), bone('Middle2R')] };
+      });
+      this.figures.set(body, found); f = found;
+    }
+    if (!('holder' in f)) return false;
+    f.holder.updateWorldMatrix(true, true);
+    const palm = (k: 0 | 1, v: THREE.Vector3) => { f.wrists[k].getWorldPosition(v); const kn = f.knuckles[k]; if (kn) v.lerp(kn.getWorldPosition(_v3), 0.5); return v; };
+    palm(0, _pl); palm(1, _pr);
+    if (Math.abs(_pl.y - _pr.y) < 0.06) out.copy(_pl).lerp(_pr, 0.5); else out.copy(_pl.y > _pr.y ? _pl : _pr);
+    return true;  // its base at the palm centre (a seated figure's palms rest on the thighs: lower would sink into them)
   }
 
   /** Interior view (building/1's mesh sets `userData.interior`): a thing on a storey its building hides is hidden too. */
@@ -248,13 +280,15 @@ export class WorldEntityLayer {
       const shape = new THREE.Shape(w.area.map(([x, z]) => new THREE.Vector2(x, z)));
       const geo = new THREE.ShapeGeometry(shape);
       geo.rotateX(Math.PI / 2); // Shape (x, y) → world (x, z); +y up handled by rotation
-      geo.translate(0, w.level, 0);
+      // a hair below the level: where the ground around a pond is exactly at its level (a carve's rim) the water plane
+      // was coplanar with the terrain and z-fought into a jagged edge near the camera; now the ground wins there
+      geo.translate(0, w.level - WATER_SINK_M, 0);
       const mesh = waterMesh(geo, waterMaterial(), 'entity-water');
       this.waterGroup.add(mesh);
     }
     if (g.seaLevel !== undefined) {
       const half = this.model!.constants.extent / 2;
-      const seaGeo = new THREE.PlaneGeometry(half * 8, half * 8); seaGeo.rotateX(-Math.PI / 2); seaGeo.translate(0, g.seaLevel, 0);
+      const seaGeo = new THREE.PlaneGeometry(half * 8, half * 8); seaGeo.rotateX(-Math.PI / 2); seaGeo.translate(0, g.seaLevel - WATER_SINK_M, 0);
       const sea = waterMesh(seaGeo, waterMaterial(), 'entity-sea');
       this.waterGroup.add(sea);
     }
@@ -287,6 +321,8 @@ export class WorldEntityLayer {
   private draw(e: Entity, ease: boolean, force = false) {
     const m = this.model!; const def = m.resolvedDef(e.def);
     if (!def) return;
+    const parent = e.in.parent !== 'world' ? m.entities.get(e.in.parent) : undefined;
+    if (parent && m.resolvedDef(parent.def)?.components.body) this.held.set(e.id, parent.id); else this.held.delete(e.id);
     const existing = this.drawn.get(e.id);
     const defHash = def.hash + ':' + JSON.stringify(e.params ?? {}) + ':' + JSON.stringify(e.state ?? {}) + ':' + JSON.stringify(e.shape ?? null) + ':' + JSON.stringify(e.r ?? 0);
     const builder = meshFor(def);
@@ -316,6 +352,7 @@ export class WorldEntityLayer {
     this.drawn.set(e.id, { ...(instKey ? { inst: instKey, settled: false } : {}), obj: built, from, to, t0: this.now, dur: ease ? EASE_IN_S : 0.001, defHash, world: isWorld, ...(hasMotion(def) ? { motion: { entity: e, def, yaw: wp.yaw } } : {}) });
   }
   private undraw(id: string) {
+    this.held.delete(id);
     const d = this.drawn.get(id); if (!d || d.removing) return;
     d.removing = true; d.settled = false; d.from = { p: d.obj.position.clone(), s: d.obj.scale.x }; d.to = { p: d.obj.position.clone().add(new THREE.Vector3(0, 2, 0)), s: 0.01 }; d.t0 = this.now; d.dur = EASE_OUT_S;
   }
@@ -350,6 +387,9 @@ function labelSprite(text: string): THREE.Sprite {
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
   sprite.scale.set(w / 44 * 1.2, 1.2, 1); sprite.renderOrder = 10; return sprite;
 }
+const _pl = new THREE.Vector3(), _pr = new THREE.Vector3(), _v3 = new THREE.Vector3();
+/** Still in a scene graph (a re-created figure leaves its old holder detached). */
+function attached(o: THREE.Object3D): boolean { let p: THREE.Object3D | null = o; for (let i = 0; p && i < 64; i++) { if (p.type === 'Scene') return true; p = p.parent; } return false; }
 function applyTilt(obj: THREE.Object3D, e: Entity) { if (Array.isArray(e.r)) { obj.rotation.x = e.r[1]; obj.rotation.z = e.r[2]; } }
 function disposeObject(o: THREE.Object3D) { o.traverse((c) => { const m = c as THREE.Mesh; if ((m as unknown as THREE.InstancedMesh).isInstancedMesh) (m as unknown as THREE.InstancedMesh).dispose(); }); }
 const num = (v: unknown, d: number) => (typeof v === 'number' ? v : d);

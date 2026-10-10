@@ -5,7 +5,7 @@
 // viewers (hub) and to gods (SSE).
 import { randomBytes } from 'node:crypto';
 import { TILE_M, tileOf } from '@sim/ground';
-import { CORE_KIT, WorldModel, applyBatch, plan, type Diff, type Op, type Result, type StoredDef, type UsesHook } from '@sim/world-compiler';
+import { CORE_KIT, WorldModel, applyBatch, plan, type Diff, type Op, type Result, type StoredDef, type UsesHook, type PlanOptions } from '@sim/world-compiler';
 import { hashToken } from '../auth.ts';
 import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
@@ -55,7 +55,7 @@ export class GodMode {
   /** Subscribe to committed batches (ordered, synchronous). Returns an unsubscribe. */
   /** Body-aware edits (installed by the engine bridge): who uses an entity, and the warnings for bodies an
    *  accepted edit buries (the engine lifts them clear). Null in worlds without the engine. */
-  bodies: { uses: UsesHook; lifted?: (ids: string[]) => string[] } | null = null;
+  bodies: { uses: UsesHook; lifted?: (ids: string[]) => string[]; refuse?: PlanOptions['refuse'] } | null = null;
   onCommit(fn: CommitListener): () => void { this.commitListeners.push(fn); return () => { this.commitListeners = this.commitListeners.filter((f) => f !== fn); }; }
   private subscribers = new Set<(e: GodEvent) => void>();
   private ring: GodEvent[] = [];
@@ -160,12 +160,12 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   // ---------- edits ----------
 
   dryrun(batch: unknown) {
-    const p = plan(this.model, batch, 'god', this.opts.tick(), { uses: this.bodies?.uses });
+    const p = plan(this.model, batch, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: this.bodies?.refuse });
     return p.ok ? { accepted: true as const, ids: p.ids, warnings: p.warnings, diff: summarize(p.diff) } : { accepted: false as const, failures: p.failures };
   }
   act(batch: unknown, note?: string): Result {
     const tick = this.opts.tick();
-    const r = applyBatch(this.model, batch, 'god', tick, { uses: this.bodies?.uses });
+    const r = applyBatch(this.model, batch, 'god', tick, { uses: this.bodies?.uses, refuse: this.bodies?.refuse });
     if (!r.result.accepted) return r.result;
     if (this.bodies?.lifted) r.result.warnings.push(...this.bodies.lifted(r.diff!.upserts.map((e) => e.id)));
     const ops = (batch as { ops: Op[] }).ops; const group = typeof (batch as { group?: unknown }).group === 'string' ? (batch as { group: string }).group : undefined;
@@ -188,7 +188,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   private revert(target: EditRow, kind: 'undo' | 'redo'): Result & { reverted?: number } {
     if (!target.inverse.length) return { accepted: false, failures: [{ op: -1, code: 'undo.conflict', detail: `edit ${target.seq} has no inverse (${kind === 'undo' ? 'expand/define/answer' : 'nothing to redo'})` }] };
     const tick = this.opts.tick();
-    const r = applyBatch(this.model, { ops: target.inverse }, 'god', tick, { trusted: true, uses: this.bodies?.uses });
+    const r = applyBatch(this.model, { ops: target.inverse }, 'god', tick, { trusted: true, uses: this.bodies?.uses, refuse: this.bodies?.refuse });
     if (!r.result.accepted) return { ...r.result, failures: r.result.failures.map((f) => ({ ...f, code: f.code.endsWith('.by-body') ? f.code : 'undo.conflict' })) };
     this.store.commit(this.model, this.owner, r.diff!, { seq: r.result.seq, by: 'god', at: Date.now(), note: `${kind} of ${target.seq}`, group: target.grp ?? undefined, ops: target.inverse, inverse: r.inverse!, kind, undoOf: target.seq });
     this.notify(r.result.seq, r.diff!, kind, target.grp ?? undefined);
@@ -221,7 +221,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   }
   /** Dry-run a batch and keep its would-be diff for a ghost preview (?preview=<id>), 10 minutes. */
   preview(batch: unknown) {
-    const p = plan(this.model, batch, 'god', this.opts.tick(), { uses: this.bodies?.uses });
+    const p = plan(this.model, batch, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: this.bodies?.refuse });
     const id = 'pv_' + randomBytes(6).toString('hex');
     for (const [k, v] of this.previews) if (Date.now() - v.at > 600_000) this.previews.delete(k);
     if (!p.ok) { this.previews.set(id, { at: Date.now(), diff: { upserts: [], removes: [], defs: [], tiles: [], answers: [] }, ops: batch, failures: p.failures }); return { id, accepted: false as const, failures: p.failures }; }
