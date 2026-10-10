@@ -112,6 +112,8 @@ export function buildingPhysics(params: Record<string, unknown>, args: Record<st
   }
   for (const rl of L.rails) colliders.push(...segmentColliders([R(rl.a), R(rl.b)], 0.06, rl.y0, rl.y1, [], 'rail'));
   for (const p of L.posts) colliders.push({ c: R(p.c), half: [p.r, p.r], yaw: L.yaw, y0: p.y0, y1: p.y1, tag: 'post' });
+  // the lighthouse lamp (pedestal and lens, drawn by the mesh half) stands in the middle of the top floor
+  if (L.args.lantern) { const y = fy(L.floors - 1); colliders.push({ c: [0, 0], half: [0.4, 0.4], yaw: L.yaw, y0: y, y1: y + 1.7, tag: 'lamp' }); }
 
   // ---- surfaces (walkable floors), rooms, openings, links
   const surfaces: Surface[] = [];

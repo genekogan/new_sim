@@ -189,6 +189,8 @@ export const worldConstantsSchema = z.object({
 });
 export type WorldConstants = z.infer<typeof worldConstantsSchema>;
 
+/** Sky palettes the `world` op accepts. The viewer's lamps read night/midnight as night and dawn/dusk/sunset/twilight as half-night; the rest follow `sun`. */
+export const SKY_PALETTES = ['clear-day', 'golden-hour', 'dawn', 'sunset', 'dusk', 'twilight', 'night', 'midnight', 'mars-desert', 'lm-garden'] as const;
 export const worldStateSchema = z.object({
   sky: z.object({ palette: z.string().default('clear-day'), sun: num.min(0).max(1).default(0.6) }).prefault({}),
   time: z.object({ dayTicks: z.number().int().default(72000), startTick: z.number().int().default(0) }).prefault({}),
@@ -198,6 +200,14 @@ export const worldStateSchema = z.object({
   ground: z.object({ palette: z.enum(['grass', 'desert', 'dust', 'sand', 'snow', 'rock', 'garden']).default('grass') }).prefault({}),
 });
 export type WorldState = z.infer<typeof worldStateSchema>;
+/** A `world` op's state is a patch: no defaults (they would reset what it does not name); compile merges it per key and per field. */
+export const worldPatchSchema = z.object({
+  sky: z.object({ palette: z.string(), sun: num.min(0).max(1) }).partial(),
+  time: z.object({ dayTicks: z.number().int(), startTick: z.number().int() }).partial(),
+  weather: z.object({ clouds: num.min(0).max(1), wind: num.min(0).max(1), rain: num.min(0).max(1) }).partial(),
+  constitution: z.string().max(20000),
+  ground: z.object({ palette: worldStateSchema.shape.ground.unwrap().shape.palette.unwrap() }).partial(),
+}).partial();
 
 // ---------- edits ----------
 
@@ -229,7 +239,7 @@ const clone = z.object({
   mode: z.enum(['strict', 'nudge']).default('strict'),
 });
 const define = z.object({ op: z.literal('define'), def: defSchema });
-const world = z.object({ op: z.literal('world'), state: worldStateSchema.partial() });
+const world = z.object({ op: z.literal('world'), state: worldPatchSchema });
 const expand = z.object({ op: z.literal('expand'), extent: num.positive().max(16000) });
 const answer = z.object({ op: z.literal('answer'), prayer: z.string(), text: z.string().max(4000) });
 /** Internal: restore a previously removed entity verbatim (inverse of remove). Never accepted from clients. */
@@ -258,7 +268,7 @@ export type Result = Accepted | Refused;
 
 export const refusalCodes = [
   'schema', 'def.unknown', 'def.budget', 'def.expansion', 'def.invalid',
-  'parent.unknown', 'slot.unknown', 'slot.incompatible', 'slot.full',
+  'parent.unknown', 'slot.unknown', 'slot.incompatible', 'slot.full', 'slot.outside',
   'size.range', 'extent.outside', 'overlap.solid', 'support.none', 'held.by-body', 'occupied.by-body',
   'constant.immutable', 'float.no-water', 'constraint.unsatisfied', 'architecture.unreachable', 'architecture.headroom', 'entity.unknown', 'entity.limit', 'name.taken', 'params.invalid', 'state.invalid', 'undo.conflict',
 ] as const;

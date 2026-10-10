@@ -7,7 +7,7 @@ import { prepareFor, queryOf } from '@sim/generators';
 import { hashOf } from './hash.ts';
 import { offsetPolyline, pointAlong } from '@sim/generators';
 import { WorldModel, obbOverlap, type OBB } from './model.ts';
-import { batchSchema, trustedBatchSchema, type Batch, type Entity, type Failure, type Field, type Op, type Result, type StoredDef, type Value, worldStateSchema } from './schemas.ts';
+import { batchSchema, trustedBatchSchema, type Batch, type Entity, type Failure, type Field, type Op, type Result, type StoredDef, type Value, worldStateSchema, SKY_PALETTES } from './schemas.ts';
 
 export type Diff = { upserts: Entity[]; removes: string[]; defs: StoredDef[]; world?: Partial<WorldModel['state']>; constants?: WorldModel['constants']; tiles: string[]; answers: { prayer: string; text: string }[] };
 /** Body-aware edits (31 §3 rule 8): who uses an entity — a Soul seated on it, holding it, or the entity is a body.
@@ -73,6 +73,11 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
     return false;
   };
 
+  // sky palettes are a closed list (replayed inverses may restore an older free-form one)
+  if (!opts.trusted) ops.forEach((op, i) => {
+    const pal = op.op === 'world' ? op.state.sky?.palette : undefined;
+    if (pal !== undefined && !(SKY_PALETTES as readonly string[]).includes(pal)) failures.push(fail(i, 'state.invalid', `sky palette ${pal} is not one of ${SKY_PALETTES.join(', ')}`));
+  });
   ops.forEach((op, i) => {
     if (failures.length) return;
     switch (op.op) {
@@ -226,10 +231,13 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         return;
       }
       case 'world': {
-        const merged = worldStateSchema.parse({ ...scratch.state, ...op.state });
-        const prevPatch: Record<string, unknown> = {};
-        for (const k of Object.keys(op.state)) prevPatch[k] = (scratch.state as Record<string, unknown>)[k];
-        scratch.state = merged; diff.world = { ...(diff.world ?? {}), ...op.state };
+        // a patch: each key merges into what is there (sky, time, weather, ground field by field); keys it does not name keep their values
+        const cur = scratch.state as Record<string, unknown>, next: Record<string, unknown> = { ...cur };
+        for (const [k, v] of Object.entries(op.state)) if (v !== undefined) next[k] = v !== null && typeof v === 'object' ? { ...(cur[k] as object | undefined), ...v } : v;
+        const merged = worldStateSchema.parse(next);
+        const prevPatch: Record<string, unknown> = {}, changed: Record<string, unknown> = {};
+        for (const k of Object.keys(op.state)) { prevPatch[k] = cur[k]; changed[k] = (merged as Record<string, unknown>)[k]; }
+        scratch.state = merged; diff.world = { ...(diff.world ?? {}), ...changed };
         inverse.unshift({ op: 'world', state: prevPatch as never });
         return;
       }
@@ -356,6 +364,11 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
       if (slot.accepts.maxSize && (baked.box[0] * s > slot.accepts.maxSize[0] || baked.box[1] * s > slot.accepts.maxSize[1] || baked.box[2] * s > slot.accepts.maxSize[2])) return fail(i, 'slot.incompatible', 'too big for the slot');
       const occupants = [...(w.children.get(parent.id) ?? [])].filter((c) => c !== e.id && w.entities.get(c)?.in.slot === e.in.slot).length;
       if (occupants >= slot.capacity) return fail(i, 'slot.full', `${e.in.slot} holds ${slot.capacity}`);
+      // a slot with a polygon (rooms, floors): the child's centre lies on it; p in a slot is relative to the slot's origin, in the parent's frame
+      if (slot.polygon && slot.polygon.length >= 3) {
+        const lp = e.p ?? [0, 0], x = lp[0], z = lp[lp.length - 1], out = outsideBy(x, z, slot.polygon);
+        if (out > 0.05) return fail(i, 'slot.outside', `(${x.toFixed(2)}, ${z.toFixed(2)}) is ${out.toFixed(2)} m outside ${e.in.slot}; p in a slot is relative to the slot's origin`);
+      }
     }
   }
   // along: position (and turn to face) a point on a path entity before settling
@@ -424,7 +437,10 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
         const pb = w.bake(pd, pe.params ?? {}, pe.seed ?? 0, pe.shape);
         if (pb.rooms?.length) {
           const fp = w.footprint(pe, pd);
-          for (const a of boxes) for (let k = 0; k < fp.length; k++) if (obbOverlap(a, fp[k])) return fail(i, 'overlap.solid', `crosses ${w.pathOf(pe.id)} ${pb.colliders[k]?.tag ?? 'wall'}`, suggestFrom(a, fp[k]));
+          for (const a of boxes) for (let k = 0; k < fp.length; k++) if (obbOverlap(a, fp[k])) {
+            if (mode === 'nudge') { const nudged = nudge(w, e, def, boxes, fp[k]); if (nudged) { e.p = nudged; return admit(w, e, def, i, 'strict', creating); } }
+            return fail(i, 'overlap.solid', `crosses ${w.pathOf(pe.id)} ${pb.colliders[k]?.tag ?? 'wall'}`, localSuggest(w, e, envelope(boxes), suggestFrom(envelope(boxes), fp[k])));
+          }
         }
       }
       pid = pe.in.parent;
@@ -443,21 +459,50 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
           if (nudged) { e.p = nudged; return admit(w, e, def, i, 'strict', creating); }
         }
         const label = oe.name ? w.pathOf(other) : `${od.name} ${other}`;
-        return fail(i, 'overlap.solid', `overlaps ${label}`, suggestFrom(a, b));
+        return fail(i, 'overlap.solid', `overlaps ${label}`, localSuggest(w, e, envelope(boxes), suggestFrom(envelope(boxes), b)));
       }
     }
   }
   return null;
 }
 
+/** How far a point lies outside a polygon (0 inside). */
+function outsideBy(x: number, z: number, poly: [number, number][]): number {
+  let inside = false, best = Infinity;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [xi, zi] = poly[i], [xj, zj] = poly[j];
+    if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) inside = !inside;
+    const dx = xj - xi, dz = zj - zi, l2 = dx * dx + dz * dz || 1, t = Math.max(0, Math.min(1, ((x - xi) * dx + (z - zi) * dz) / l2));
+    best = Math.min(best, Math.hypot(x - xi - t * dx, z - zi - t * dz));
+  }
+  return inside ? 0 : best;
+}
+
+/** One round box around all of a thing's boxes (a suggestion must clear the whole thing, not the box that touched). */
+function envelope(boxes: OBB[]): OBB {
+  if (boxes.length === 1) return boxes[0];
+  let x = 0, z = 0; for (const b of boxes) { x += b.c[0]; z += b.c[1]; } x /= boxes.length; z /= boxes.length;
+  let r = 0; for (const b of boxes) r = Math.max(r, Math.hypot(b.c[0] - x, b.c[1] - z) + Math.hypot(b.half[0], b.half[1]));
+  const h = r / Math.SQRT2;
+  return { c: [x, z], half: [h, h], yaw: 0, y0: Math.min(...boxes.map((b) => b.y0)), y1: Math.max(...boxes.map((b) => b.y1)) };
+}
 function suggestFrom(a: OBB, b: OBB): Failure['suggest'] {
   let dx = a.c[0] - b.c[0], dz = a.c[1] - b.c[1], len = Math.sqrt(dx * dx + dz * dz);
-  if (len < 1e-6) { dx = 1; dz = 0; len = 1; } // coincident centres: push east
-  const push = Math.sqrt(a.half[0] ** 2 + a.half[1] ** 2) + Math.sqrt(b.half[0] ** 2 + b.half[1] ** 2) - len + 0.2;
+  const apart = len;
+  if (len < 1e-6) { dx = 1; dz = 0; len = 1; } // coincident centres: push east (the whole way: they are 0 apart, not 1)
+  const push = Math.sqrt(a.half[0] ** 2 + a.half[1] ** 2) + Math.sqrt(b.half[0] ** 2 + b.half[1] ** 2) - apart + 0.2;
   return { p: [Math.round((a.c[0] + (dx / len) * push) * 100) / 100, Math.round((a.c[1] + (dz / len) * push) * 100) / 100] };
 }
-function nudge(_w: WorldModel, e: Entity, _def: StoredDef, mine: OBB[], other: OBB): [number, number] | null {
-  const s = suggestFrom(mine[0], other);
+/** suggestFrom works on world boxes; a child's `p` is in its parent's (slot) frame — move the suggestion there. */
+function localSuggest(w: WorldModel, e: Entity, a: OBB, s: Failure['suggest']): Failure['suggest'] {
+  if (!s?.p || e.in.parent === 'world') return s;
+  const me = w.worldPose(e), lp = w.localPose(e), yaw = me.yaw - lp.yaw, k = lp.s / (me.s || 1);
+  const dx = s.p[0] - a.c[0], dz = s.p[1] - a.c[1], c = Math.cos(yaw), sn = Math.sin(yaw);
+  const lx = (dx * c - dz * sn) * k, lz = (dx * sn + dz * c) * k, p = e.p ?? [0, 0];
+  return { ...s, p: [Math.round((p[0] + lx) * 100) / 100, Math.round((p[p.length - 1] + lz) * 100) / 100] };
+}
+function nudge(w: WorldModel, e: Entity, _def: StoredDef, mine: OBB[], other: OBB): [number, number] | null {
+  const env = envelope(mine), s = localSuggest(w, e, env, suggestFrom(env, other));
   if (!s?.p) return null;
   const p = e.p ?? [0, 0];
   const moved = Math.hypot(s.p[0] - p[0], s.p[1] - p[p.length - 1]);
