@@ -67,14 +67,14 @@ test('world-edit: the Soul takes the god bowl from the table upstairs and puts i
   const { e, tableSlot } = await built();
   const take = e.perform({ actor: 'h_walker0001', label: 'take the bowl', steps: [{ verb: 'mars:walk_to', params: { x: 10, z: -0.6, level: 1 } }, { verb: 'mars:take_item', params: { item: 'e_bowl01', hand: 'right' } }] });
   assert.equal(take.ok, true, JSON.stringify(take));
-  run(e, 3000, () => e.world.entities.e_bowl01.support?.kind === 'in-hand' && !e.programOf('h_walker0001'));
-  assert.deepEqual(e.world.entities.e_bowl01.support, { kind: 'in-hand', by: 'h_walker0001', hand: 'right' });
+  run(e, 3000, () => (e.world.entities.e_bowl01 as { support?: { kind?: string } }).support?.kind === 'in-hand' && !e.programOf('h_walker0001'));
+  assert.deepEqual((e.world.entities.e_bowl01 as { support?: { kind?: string } }).support, { kind: 'in-hand', by: 'h_walker0001', hand: 'right' });
   assert.deepEqual(e.bodyUsesV1('e_bowl01'), { body: 'h_walker0001', how: 'held' });
   const other = tableSlot.replace(/c0$/, 'c1');
   const put = e.perform({ actor: 'h_walker0001', label: 'put it down', steps: [{ verb: 'mars:put_item', params: { item: 'e_bowl01', surfaceSlot: `e_table1#${other}` } }] });
   assert.equal(put.ok, true, JSON.stringify(put));
-  run(e, 1200, () => e.world.entities.e_bowl01.support?.kind === 'resting-on' && !e.programOf('h_walker0001'));
-  assert.deepEqual(e.world.entities.e_bowl01.support, { kind: 'resting-on', on: 'e_table1', slot: other });
+  run(e, 1200, () => (e.world.entities.e_bowl01 as { support?: { kind?: string } }).support?.kind === 'resting-on' && !e.programOf('h_walker0001'));
+  assert.deepEqual((e.world.entities.e_bowl01 as { support?: { kind?: string } }).support, { kind: 'resting-on', on: 'e_table1', slot: other });
 });
 
 test('world-edit: a closed door blocks the route; opening it restores it; replay and restore agree', async () => {
