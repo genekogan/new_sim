@@ -7,7 +7,8 @@
 //   (an agent works in <dir>/work with only the prompt)
 //   node tools/god-skill/e2e/blind/run.mjs finish <dir>                   → REPORT.md: timing, refusals, look
 import { spawn } from 'node:child_process';
-import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { appendFileSync, copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startWorld } from '../../dev-world.mjs';
@@ -35,6 +36,8 @@ if (cmd === 'start') {
   child.unref();
   // the files, downloaded from the world as the welcome page tells an owner to
   for (const f of ['SKILL.md', 'eden-god.mjs']) { const r = await fetch(`${base}/god/${f}`); if (!r.ok) throw new Error(`GET /god/${f}: ${r.status}`); writeFileSync(resolve(work, f), await r.text()); }
+  // what an owner's machine has after `npm i @playwright/test` (look needs Playwright + Google Chrome)
+  try { const pw = dirname(createRequire(resolve(root, 'mars/viewer/package.json')).resolve('@playwright/test/package.json')); mkdirSync(resolve(work, 'node_modules/@playwright'), { recursive: true }); symlinkSync(pw, resolve(work, 'node_modules/@playwright/test')); } catch (e) { console.error(`(no Playwright for look: ${e.message})`); }
   writeFileSync(resolve(work, '.eden-god.json'), JSON.stringify({ transcript: resolve(dir, 'transcript.jsonl') }, null, 2));
   // the owner: approve any pairing request for the next 4 hours (what the panel's Approve button does)
   const approver = spawn(process.execPath, [fileURLToPath(import.meta.url), 'approve', base, '240', resolve(dir, 'approvals.log')], { detached: true, stdio: 'ignore' });
