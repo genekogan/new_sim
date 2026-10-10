@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import {ownerReplyWithLocalResults} from './client-owner-reply.mjs';
+import {clientHelp} from './client-help.mjs';
 // Eden edge agent CLI — skill 1.0.0 for contract eden-edge/1 (team/CONTRACTS/EDGE-CONTRACT-v1.md).
 // Dependency-free, Node 18+. One Soul, one world, any folder. State in ./.eden-agent.json is PRIVATE
 // (identity + Soul token). Edge verbs use /v1/edge/* with the Soul token; when a world does not serve
@@ -209,7 +210,7 @@ export async function status(){
  const idle=s.lastAcceptedAt?Math.round((Date.now()-Date.parse(s.lastAcceptedAt))/60000):null;
  const fade=idle==null?'unknown':idle>=FADE.goneMin?'gone (act to reclaim)':idle>=FADE.redMin?'red':idle>=FADE.yellowMin?'yellow':'green';
  return {skillVersion:SKILL_VERSION,contract:m==='edge'?CONTRACT:'legacy owner routes',soul:s.soul??null,paired:!!s.token,
-  minutesSinceAcceptedAction:idle,fade,live:(()=>{const L=liveRunning();return L?`running (pid ${L.pid}): relay your human's requests with tell "<words>" --wait; report shows what the Soul sees`:'not running (act directly, or start it: skill §1b)';})(),...(idle!=null&&idle>=FADE.yellowMin-5?{keepAlive:'Act soon: any accepted action resets fading.'}:{}),lastReceipt:s.lastReceipt??null,...(readJSON(LIVE.state,{}).health?{runtime:(()=>{const h=readJSON(LIVE.state,{}).health;return {...h,stream:{...h.stream,lastFrameAgeMs:h.stream?.lastFrameAt?Date.now()-h.stream.lastFrameAt:null,lastEventAgeMs:h.stream?.lastEventAt?Date.now()-h.stream.lastEventAt:null}};})()}:{})};
+  minutesSinceAcceptedAction:idle,fade,live:(()=>{const L=liveRunning();return L?`running (pid ${L.pid}): relay your human's requests with tell "<words>" --wait; report shows what the Soul sees`:'not running (act directly, or see SKILL.md: Start or resume)';})(),...(idle!=null&&idle>=FADE.yellowMin-5?{keepAlive:'Act soon: any accepted action resets fading.'}:{}),lastReceipt:s.lastReceipt??null,...(readJSON(LIVE.state,{}).health?{runtime:(()=>{const h=readJSON(LIVE.state,{}).health;return {...h,stream:{...h.stream,lastFrameAgeMs:h.stream?.lastFrameAt?Date.now()-h.stream.lastFrameAt:null,lastEventAgeMs:h.stream?.lastEventAt?Date.now()-h.stream.lastEventAt:null}};})()}:{})};
 }
 
 // ---------------------------------------------------------------- perception
@@ -564,7 +565,7 @@ export function liveOptions(argv){
   if(!(k in LIVE_DEFAULTS))throw new Error(`live: unknown option ${argv[i]}`);i++;passed.add(k);explicit[k]=v==null?true:v==='true'?true:v==='false'?false:/^\d+(\.\d+)?$/.test(v)?Number(v):v;}
  const o={...LIVE_DEFAULTS,...explicit};Object.defineProperty(o,'explicit',{value:explicit});Object.defineProperty(o,'optionSources',{value:Object.fromEntries(Object.keys(LIVE_DEFAULTS).map(k=>[k,passed.has(k)?'explicit':k in remembered?'remembered':'default']))});
  if(!explicit.engine&&!onPath('claude')&&onPath('codex'))o.engine='codex';
- if(o.engine!=='ollama'&&!onPath(o.engine))throw new Error(`live needs the ${o.engine} CLI signed in on this machine (Claude Code: claude, or Codex: codex, with --engine codex). Without one, run the loop yourself (skill §2).`);
+ if(o.engine!=='ollama'&&!onPath(o.engine))throw new Error(`live needs the ${o.engine} CLI signed in on this machine (Claude Code: claude, or Codex: codex, with --engine codex). Without one, use SKILL.md: Observe, resolve, finish.`);
  if(!Number.isFinite(o.runSeconds)||o.runSeconds<0||!Number.isSafeInteger(o.runSeconds*1000)||o.runSeconds*1000>8e15-Date.now())throw Error('run-seconds must be a nonnegative finite duration; 0 runs until STOP or interruption.');
  o.model??=o.engine==='codex'?'gpt-5.6-luna':o.engine==='ollama'?'qwen3:4b':'haiku';
  return o;
@@ -1103,6 +1104,7 @@ export async function dashboard(...args){
 const commands={body,live,dashboard,profile,tell,report,view,cost,plan,events,attend,register,status,approval,'pair-soul':pairSoul,'select-soul':selectSoul,'create-soul':createSoul,here,observe,capabilities,map,digest,calendar,whatson,explore,act,resolve:resolveAct,say,converse,object,mark,project,wait,receipt,accept,decline,version:async()=>({skillVersion:SKILL_VERSION,contract:CONTRACT,apiContract:API_CONTRACT})};
 if(process.argv[1]&&import.meta.url===pathToFileURL(realpathSync(process.argv[1])).href){
  const [cmd,...args]=process.argv.slice(2);
+ if(!cmd||['help','--help','-h'].includes(cmd)){console.log(clientHelp(SKILL_VERSION,CONTRACT));process.exit(0);}
  if(!commands[cmd]){console.log(`eden-agent ${SKILL_VERSION} (${CONTRACT})\nusage: node eden-agent.mjs <${Object.keys(commands).join('|')}> [args]\n  while live runs: tell "<your human's request>" --wait · report (what the Soul sees/does) · view --out view.jpg (a picture of what it sees) · full guide: SKILL.md`);process.exit(cmd?2:0);}
  try{console.log(JSON.stringify(await commands[cmd](...args),null,1));if(cmd==='live')process.exit(0);}
  catch(e){console.error('error: '+e.message);process.exit(1);}
