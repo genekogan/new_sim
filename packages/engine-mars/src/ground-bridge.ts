@@ -128,7 +128,9 @@ export function settleBodies(rt: Rt): string[] {
     const e = rt.world.entities[id];
     if (e.kind !== 'human' || !e.human || (e.human.level ?? 0) !== 0 || e.human.on || e.human.carrier || e.human.riding || e.human.sleepPose) continue;
     if (e.human.activity.startsWith('sit') || e.human.activity.startsWith('climb') || e.human.activity.startsWith('stand-up')) continue;
-    const y = f.medium(e.pose.p[0], e.pose.p[2]) === G_SWIM ? swimRootY(f, e.pose.p[0], e.pose.p[2]) : nav.standY(e.pose.p[0], e.pose.p[2]);
+    // swimmers (also under a deck: the recipe's water, root below the deck) keep the swimmer root; others stand
+    const x = e.pose.p[0], z = e.pose.p[2], swimming = nav.base.medium(x, z) === G_SWIM && (f.medium(x, z) === G_SWIM || e.pose.p[1] < f.height(x, z) - 0.5);
+    const y = swimming ? swimRootY(nav.base, x, z) : nav.standY(x, z);
     if (y !== e.pose.p[1]) { e.pose.p = [e.pose.p[0], y, e.pose.p[2]]; acknowledgeRelocation(rt as never, id); moved.push(id); }
   }
   return moved;

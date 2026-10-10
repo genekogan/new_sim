@@ -279,3 +279,29 @@ test('a footbridge deck over a deep river is walkable in ground mode (decks: hei
   assert.equal(into.end?.code, 'ground.deep-water', JSON.stringify(into.end));
   assert.deepEqual(e.runtime.violations, []);
 });
+
+test('a pier over the lake: a swimmer heading for its end lands at the real shore and walks out on the deck; no swimming off it', () => {
+  const e = world('pier') as never as Engine & { applyWorldEditV1(ev: WorldEditV1): { hash: string } };
+  // the god's pier: from the east shore (x -46) out to x -62 at z -20, deck 0.7 m above the water, a 4 m end platform
+  const ev: WorldEditV1 = { contract: 'world-edit/1', seq: 1, hash: '', levels: [], assets: {}, set: { e_pier1: {
+    surfaces: [{ id: 'pier:deck', level: 0, y: 0.7, obb: { c: [-54, -20], half: [8, 1.2], yaw: 0 } }, { id: 'pier:end', level: 0, y: 0.7, obb: { c: [-64, -20], half: [2, 2], yaw: 0 } }],
+    solids: [], links: [],
+  } } };
+  ev.hash = nextEntityPhysics(undefined, ev).hash;
+  e.applyWorldEditV1(ev);
+  assert.equal(run(e, [{ verb: 'walk_to', params: { to: [-49, -26] } }]).end?.kind, 'completed');
+  const sw = run(e, [{ verb: 'mars:swim_to', params: { x: -72, z: -16 } }], 20 * 400);
+  assert.equal(sw.end?.kind, 'completed', JSON.stringify(sw.end));
+  const out = run(e, [{ verb: 'walk_to', params: { to: [-64, -20] } }], 20 * 600);
+  assert.equal(out.end?.kind, 'completed', JSON.stringify(out.end));
+  assert.ok(out.acts.has('swim') && out.acts.has('walk'), [...out.acts].join(','));
+  // she climbed out where the lake bed meets the bank and walked onto the deck from there, never up onto it from below
+  for (let i = 1; i < out.ys.length; i++) assert.ok(Math.abs(out.ys[i].y - out.ys[i - 1].y) < 0.15, `no jump at ${JSON.stringify(out.ys[i])}`);
+  const firstOnDeck = out.ys.findIndex((s) => Math.abs(s.y - 0.7) < 1e-6);
+  assert.ok(firstOnDeck > 0 && out.ys[firstOnDeck].x > -50, `stepped onto the deck at its landward end: ${JSON.stringify(out.ys[firstOnDeck])}`);
+  assert.ok(Math.abs(body(e).pose.p[1] - 0.7) < 1e-9, `on the pier's end: ${body(e).pose.p}`);
+  assert.equal(body(e).human.activity, 'idle');
+  // from the deck she cannot swim (step off at the shore first)
+  assert.equal(run(e, [{ verb: 'mars:swim_to', params: { x: -72, z: -16 } }]).end?.code, 'swim.on-deck');
+  assert.deepEqual(e.runtime.violations, []);
+});

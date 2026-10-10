@@ -272,13 +272,13 @@ export class EngineBridge {
     if (this.writeBackBusy) return;
     this.writeBackBusy = true;
     try {
-      const ops: Op[] = [], bodies = new Set<string>();
+      const ops: Op[] = [], bodies = new Set<string>(), holders = new Set<string>();
       for (const [id, x] of Object.entries(this.engine.world.entities)) {
         if (!x.tags?.includes('entity-world') || x.kind !== 'component') continue;
         const e = this.model.entities.get(id); if (!e) continue;
         const s = x.support;
         if (s?.kind === 'in-hand') {
-          if (e.in.parent === s.by && e.in.slot === 'carry') continue;
+          if (e.in.parent === s.by && e.in.slot === 'carry') { holders.add(s.by); continue; }
           if (!this.model.entities.has(s.by)) continue; // the body entity is not in the entity world (pre-bridge Soul)
           if (!bodies.has(s.by)) { const b = this.engine.world.entities[s.by]; if (b) { ops.push({ op: 'move', id: s.by, p: [r3(b.pose.p[0]), r3(b.pose.p[1]), r3(b.pose.p[2])], r: r3(-b.pose.yaw), mode: 'strict' } as Op); bodies.add(s.by); } }
           ops.push({ op: 'move', id, in: { parent: s.by, slot: 'carry' }, p: [0, 0, 0], r: 0, mode: 'strict' } as Op);
@@ -296,6 +296,14 @@ export class EngineBridge {
           if (e.in.parent === 'world') { const p = e.p ?? [0, 0]; if (Math.hypot(p[0] - x.pose.p[0], p[p.length - 1] - x.pose.p[2]) < 0.05) continue; }
           ops.push({ op: 'move', id, in: { parent: 'world' }, p: [r3(x.pose.p[0]), r3(x.pose.p[2])], r: r3(-x.pose.yaw), mode: 'strict' } as Op);
         }
+      }
+      // a body carrying god things: keep its entity's pose near the engine's, so what it holds is drawn in its hands
+      // (coarsely while it walks, exactly once it stops; viewer B7 would follow the hand from the takes instead)
+      for (const id of holders) {
+        const b = this.engine.world.entities[id], e = this.model.entities.get(id); if (!b?.human || !e || bodies.has(id)) continue;
+        const have = e.p ?? [0, 0, 0], d = Math.hypot((have[0] ?? 0) - b.pose.p[0], (have.length === 3 ? have[1] : 0) - b.pose.p[1], (have[have.length - 1] ?? 0) - b.pose.p[2]);
+        const moving = (b.human.speed ?? 0) > 0.05 || b.human.activity === 'walk';
+        if (d > (moving ? 2 : 0.15)) ops.push({ op: 'move', id, p: [r3(b.pose.p[0]), r3(b.pose.p[1]), r3(b.pose.p[2])], r: r3(-b.pose.yaw), mode: 'strict' } as Op);
       }
       if (!ops.length) return;
       for (const op of ops) {

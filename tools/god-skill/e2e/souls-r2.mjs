@@ -138,7 +138,13 @@ async function shotDuring(name, opts, run) {
   if (!chromium) return run();
   let p = null;
   try {
-    await withPage(async (page) => { await load(page, { ...opts, wait: 3000 }); p = run(); await sleep(opts.afterMs ?? 10000); await snap(page, name); return true; });
+    await withPage(async (page) => {
+      await load(page, { ...opts, wait: 3000 }); p = run();
+      // photograph when the body is where the camera looks (`when(self)`), or after `afterMs` at the latest
+      const t0 = Date.now();
+      while (Date.now() - t0 < (opts.afterMs ?? 10000)) { if (opts.when) { const o = await observe().catch(() => null); if (o?.self?.position && opts.when(o.self)) { await sleep(1200); break; } } await sleep(400); }
+      await snap(page, name); return true;
+    });
   } catch (e) { log('  (mid-motion screenshot failed: ' + String(e.message).split('\n')[0] + ')'); }
   return p ?? run();
 }
@@ -239,7 +245,7 @@ try {
 
   // ---- terrain: climb, refusals, wade, swim
   const hill = await step('S2 she walks up the knoll to the hilltop flag; her y follows the slope all the way', async () => {
-    const r = await shotDuring('s2-climbing-the-knoll', { eye: [KNOLL[0] - 22, 7, KNOLL[1] + 14], at: [KNOLL[0] - 15, 2.2, KNOLL[1] - 2], afterMs: 11000 }, () => soulDoes('walk:flag-hilltop'));
+    const r = await shotDuring('s2-climbing-the-knoll', { eye: [KNOLL[0] - 16, 6, KNOLL[1] + 14], at: [KNOLL[0] - 10, 2.6, KNOLL[1] - 1], afterMs: 40000, when: (me) => me.position[0] > KNOLL[0] - 14 }, () => soulDoes('walk:flag-hilltop'));
     report.samples.hill = r.samples;
     const gs = r.samples.length ? await groundAt(r.samples.map((s) => [s.p[0], s.p[2]])) : [];
     const off = r.samples.map((s, i) => Math.abs(s.p[1] - gs[i].y));
@@ -262,17 +268,14 @@ try {
     report.samples.pond = r.samples;
     return { phase: r.phase, code: r.code, end: r.end, acts: [...new Set(r.samples.map((s) => s.activity))] };
   }, (r) => r.phase === 'completed' && r.end?.p[1] < -0.1 && (r.acts.includes('wade') || r.end.activity === 'wade' || /wad/.test(r.end.state ?? '')));
+  if (pond?.end) await shots([{ name: 's4-wading', eye: [pond.end.p[0] + 8, 4, pond.end.p[2] + 9], at: [pond.end.p[0], 0.3, pond.end.p[2]], wait: 5000 }]);
   const swim = await step('S5 she swims in the lake: walks to its shore, swims out, treads water with her head above', async () => {
     const r = await soulDoes('swim:lake', { maxS: 300 });
     report.samples.swim = r.samples;
     const [g] = await groundAt([[r.end.p[0], r.end.p[2]]]);
     return { phase: r.phase, code: r.code, reason: r.reason, end: r.end, acts: [...new Set(r.samples.map((s) => s.activity))], depth: g.water };
   }, (r) => r.phase === 'completed' && r.acts.includes('swim') && ['tread', 'swim'].includes(r.end.activity) && r.depth > 3 && Math.abs(r.end.p[1] - -1.2) < 0.05);
-  const stills = [];
-  if (pond?.end) stills.push({ name: 's4-wading', eye: [pond.end.p[0] + 10, 5, pond.end.p[2] + 12], at: [pond.end.p[0], 0, pond.end.p[2]], wait: 5000 });
-  if (swim?.end) stills.push({ name: 's5-swimming', eye: [swim.end.p[0] + 12, 5, swim.end.p[2] + 14], at: [swim.end.p[0], 0, swim.end.p[2]], wait: 5000 });
-  // (the wading still is taken after the swim, so it shows where she waded — the pond — with her out in the lake)
-  if (swim?.end) await shots(stills.filter((s) => s.name === 's5-swimming'));
+  if (swim?.end) await shots([{ name: 's5-swimming', eye: [swim.end.p[0] + 12, 5, swim.end.p[2] + 14], at: [swim.end.p[0], 0, swim.end.p[2]], wait: 5000 }]);
   const pier = await step('S6 from the water she walks out to the end of the god\'s pier: swims to the shore first, then stands on the deck above deep water', async () => {
     const r = await soulDoes('walk:flag-pier-end', { maxS: 420 });
     report.samples.pier = r.samples;
@@ -287,7 +290,7 @@ try {
 
   // ---- the house: through the door, up the stairs, onto the chair
   const seat = await step('S7 she sits on the god\'s chair upstairs: in through the door, up the stairs, seated on floor 1', async () => {
-    const r = await shotDuring('s7-going-in', { eye: [out4[0] + 6, 4, out4[1] + 7], at: [doorXZ?.[0] ?? HOUSE[0], 1.2, doorXZ?.[1] ?? HOUSE[1]], afterMs: 6000 },
+    const r = await shotDuring('s7-going-in', { eye: [out4[0] + 6, 4, out4[1] + 7], at: [doorXZ?.[0] ?? HOUSE[0], 1.2, doorXZ?.[1] ?? HOUSE[1]], afterMs: 30000, when: (me) => doorXZ && Math.hypot(me.position[0] - doorXZ[0], me.position[2] - doorXZ[1]) < 2.6 },
       () => soulDoes(`sit:${ids['house/chair']}`, { params: { seconds: 600 }, maxS: 300, until: (me) => me.activity === 'sit' }));
     report.samples.seat = r.samples;
     const throughDoor = doorXZ ? Math.min(...r.samples.map((s) => Math.hypot(s.p[0] - doorXZ[0], s.p[2] - doorXZ[1]))) : null;
@@ -302,6 +305,7 @@ try {
     if (r.data.accepted !== true) return { r: r.data };
     return until(async () => { const e = await entity(ids['house/table/bowl']); return { ok: e?.entity?.in?.parent === soul.entityId, in: e?.entity?.in }; }, 180000, 1000);
   }, (r) => r?.ok);
+  { const me = (await observe())?.self; if (me?.position) { const q = me.position; await shots([{ name: 's8-holding-the-bowl-roof-hidden', eye: [q[0] + 2.5, q[1] + 5.5, q[2] + 3.5], at: [q[0], q[1] + 1, q[2]], wait: 6000, hideRoofs: true }]); } }
   await step('S8 the journal shows the engine\'s move of the bowl (by:engine, not the god\'s to undo)', async () => { const e = (await api('/v1/god/edits?limit=30')).data.edits; const m = e.find((x) => x.by === 'engine' && x.ops.some((o) => o.op === 'move' && o.id === ids['house/table/bowl'])); return { found: !!m, note: m?.note, kind: m?.kind }; }, (r) => r.found && r.kind === 'engine');
   await step('G6 the god tries to take the bowl away: refused, held by Ana', () => act([{ op: 'remove', id: ids['house/table/bowl'] }]), (r) => r.data?.accepted === false && r.data.failures?.[0]?.code === 'held.by-body' && /Ana/.test(r.data.failures[0].detail));
 
@@ -335,7 +339,6 @@ try {
   await step('G10 a harmless edit nearby still goes through (a bench on the lawn)', () => act([{ op: 'place', def: 'core/bench@1', name: 'garden-bench', p: [out4[0] + 3, out4[1] + 1] }], 'a bench'), (r) => r.data?.accepted === true);
   await shots([
     { name: 'g-refused-seated-roof-hidden', eye: [HOUSE[0] - 5, 13, HOUSE[1] + 8], at: [HOUSE[0] - 1, 2.8, HOUSE[1] - 1], wait: 8000, hideRoofs: true },
-    { name: 's-wading-pond', eye: [-24 + 10, 5, -4 + 12], at: [-24, 0, -4], wait: 4000 },
   ]);
 } catch (e) {
   report.failures.push({ name: 'harness', error: String(e?.stack ?? e) });
