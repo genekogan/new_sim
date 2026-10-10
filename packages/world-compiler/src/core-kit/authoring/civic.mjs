@@ -55,7 +55,7 @@ export default [
   civ('obelisk', 'A stone obelisk monument (5 m) on a stepped plinth.', ['monument', 'obelisk', 'marker', 'plaza'],
     [cbox([0, 0.15, 0], [1.6, 0.3, 1.6], 'stone2'), cbox([0, 0.45, 0], [1.2, 0.3, 1.2], 'stone'), cyl([0, 2.6, 0], 0.42, 4.0, 'stone', { r2: 0.28, seg: 4, yaw: Math.PI / 4 }), cone([0, 4.85, 0], 0.4, 0.5, 'gold', { seg: 4, yaw: Math.PI / 4 })],
     { stone: STONE, stone2: STONE2, gold: '#c79a3a' }),
-  civ('flagpole', 'A tall white flagpole (8 m) flying a pennant that sways in the wind.', ['flag', 'pole', 'marker', 'plaza'],
+  civ('flagpole', 'A tall white flagpole (8 m) flying a pennant that sways in the wind.', ['flagpole', 'pole', 'pennant', 'plaza'],
     [cyl([0, 0.1, 0], 0.3, 0.2, 'base', { seg: 8 }), cyl([0, 4.1, 0], 0.06, 8, 'pole', { r2: 0.04, seg: 6 }), sph([0, 8.15, 0], 0.09, 'gold', { seg: 5 }), box([0.62, 7.5, 0], [1.2, 0.75, 0.02], 'flag')],
     { base: STONE2, pole: WHITE, gold: '#c79a3a', flag: '#2f5d8b' }, { components: { sway: { amount: 0.06, period: 3 } } }),
 ];

@@ -5,6 +5,7 @@
 // from the god SSE stream.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { call, load, ok } from './state.mjs';
+import { isFlagDef } from './solver.mjs';
 
 export const CACHE = '.eden-god.cache.json';
 let memo = null;
@@ -48,7 +49,7 @@ export function view(m) {
   const get = (ref) => {
     if (!ref) return null;
     const r = String(ref).replace(/^flag:/, '');
-    return byId.get(r) ?? byPath.get(r) ?? m.rows.find((x) => x.name === r && x.parent === m.rows.find((p) => p.id === x.parent)?.id) ?? m.rows.find((x) => x.name === r) ?? m.rows.find((x) => x.def.includes('flag') && m.snapshot.entities.find((e) => e.id === x.id)?.state?.label === r) ?? null;
+    return byId.get(r) ?? byPath.get(r) ?? m.rows.find((x) => x.name === r && x.parent === m.rows.find((p) => p.id === x.parent)?.id) ?? m.rows.find((x) => x.name === r) ?? m.rows.find((x) => isFlagDef(x.def) && m.snapshot.entities.find((e) => e.id === x.id)?.state?.label === r) ?? null;
   };
   const entity = (id) => m.snapshot.entities.find((e) => e.id === id) ?? null;
   const children = (id) => m.rows.filter((r) => r.parent === id);

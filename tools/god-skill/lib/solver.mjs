@@ -15,6 +15,8 @@ export const yawOf = (dx, dz) => Math.atan2(dx, dz);
 export const dirOfYaw = (y) => [Math.sin(y), Math.cos(y)];
 export const compassOfYaw = (y) => ['s', 'se', 'e', 'ne', 'n', 'nw', 'w', 'sw'][Math.round((((y % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI)) / (Math.PI / 4)) % 8];
 const r2 = (v) => Math.round(v * 100) / 100;
+/** An owner's reference flag (core/flag, dropped with `flag` or Alt+click) — not a flagpole or anything else named flag-something. */
+export const isFlagDef = (def) => /^core[-/]flag@/.test(String(def ?? ''));
 const rot = (yaw, x, z) => { const c = Math.cos(yaw), s = Math.sin(yaw); return [x * c + z * s, -x * s + z * c]; };     // local → world
 const unrot = (yaw, x, z) => { const c = Math.cos(yaw), s = Math.sin(yaw); return [x * c - z * s, x * s + z * c]; };    // world → local
 const norm = ([x, z]) => { const l = Math.hypot(x, z) || 1; return [x / l, z / l]; };
@@ -431,7 +433,7 @@ export function solve(v, thing, rel) {
     // around an area (a pond, a plaza): just outside its rim, not its bounding box
     const rim = shapeOf?.area ? (u) => rayExit(shapeOf.area, [R.x, R.z], u) : null;
     const gap = rel.dist !== undefined ? Number(rel.dist) : Math.max(1.5, Math.min(6, Math.max(hw, hd)));
-    const start = rel.dir && compassKey(rel.dir) ? COMPASS[compassKey(rel.dir)] : R.kind === 'entity' && R.row.form === 'point' && !R.row.def.includes('flag') ? dirOfYaw(R.yaw) : COMPASS.s;
+    const start = rel.dir && compassKey(rel.dir) ? COMPASS[compassKey(rel.dir)] : R.kind === 'entity' && R.row.form === 'point' && !isFlagDef(R.row.def) ? dirOfYaw(R.yaw) : COMPASS.s;
     const a0 = Math.atan2(start[0], start[1]);
     const items = [];
     const placed = [];

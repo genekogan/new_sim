@@ -56,101 +56,6 @@ var r2 = (v) => Math.round(v * 100) / 100;
 
 // lib/mirror.mjs
 import { existsSync as existsSync2, readFileSync as readFileSync2, writeFileSync as writeFileSync2 } from "node:fs";
-var CACHE = ".eden-god.cache.json";
-var memo = null;
-function readCache() {
-  try {
-    return existsSync2(CACHE) ? JSON.parse(readFileSync2(CACHE, "utf8")) : null;
-  } catch {
-    return null;
-  }
-}
-function writeCache(c) {
-  try {
-    writeFileSync2(CACHE, JSON.stringify(c), { mode: 384 });
-  } catch {
-  }
-}
-async function mirror({ fresh = false } = {}) {
-  const world = load().world;
-  if (memo && memo.world === world && !fresh) {
-    const s = await call("/v1/world/seq", { as: "none", timeoutMs: 5e3 });
-    if (s.status === 0) return { ...memo, offline: true };
-    if (s.data.seq === memo.seq) return memo;
-  }
-  const cached = memo?.world === world ? memo : readCache();
-  const seqR = await call("/v1/world/seq", { as: "none", timeoutMs: 5e3 });
-  if (seqR.status === 0) {
-    if (cached && cached.world === world) {
-      memo = cached;
-      return { ...cached, offline: true };
-    }
-    throw new Error(`world unreachable (${seqR.data.message}) and no cached mirror`);
-  }
-  if (!fresh && cached && cached.world === world && cached.seq === seqR.data.seq) {
-    memo = cached;
-    return cached;
-  }
-  const [snap, lay] = await Promise.all([call("/v1/god/snapshot"), call("/v1/god/query", { body: { layout: { obbs: true } } })]);
-  const snapshot2 = ok(snap, "snapshot"), layout = ok(lay, "layout").layout;
-  memo = build(world, snapshot2, layout);
-  writeCache(memo);
-  return memo;
-}
-function invalidate() {
-  memo = null;
-}
-function build(world, snapshot2, layout) {
-  return { world, seq: snapshot2.seq, at: Date.now(), extent: snapshot2.constants.extent, snapshot: snapshot2, rows: layout.entities };
-}
-function view(m) {
-  const byId = new Map(m.rows.map((r) => [r.id, r]));
-  const byPath = new Map(m.rows.map((r) => [r.path, r]));
-  const lib = /* @__PURE__ */ new Map();
-  for (const d of m.snapshot.library ?? []) {
-    lib.set(d.ref, d);
-    if (d.ref.startsWith("core-")) lib.set("core/" + d.ref.slice(5), d);
-  }
-  const get = (ref) => {
-    if (!ref) return null;
-    const r = String(ref).replace(/^flag:/, "");
-    return byId.get(r) ?? byPath.get(r) ?? m.rows.find((x) => x.name === r && x.parent === m.rows.find((p) => p.id === x.parent)?.id) ?? m.rows.find((x) => x.name === r) ?? m.rows.find((x) => x.def.includes("flag") && m.snapshot.entities.find((e) => e.id === x.id)?.state?.label === r) ?? null;
-  };
-  const entity = (id) => m.snapshot.entities.find((e) => e.id === id) ?? null;
-  const children = (id) => m.rows.filter((r) => r.parent === id);
-  const def = (ref) => lib.get(ref) ?? lib.get(normDef(ref)) ?? null;
-  return { m, rows: m.rows, byId, byPath, get, entity, children, def, extent: m.extent };
-}
-var normDef = (d) => d.includes("@") || d.startsWith("sha:") ? d : `core/${d}@1`;
-async function follow(seconds = 3600, onEvent = () => {
-}) {
-  const s = load();
-  const r = await fetch(s.world + "/v1/god/stream", { headers: { authorization: `Bearer ${s.token}`, accept: "text/event-stream" }, signal: AbortSignal.timeout(seconds * 1e3) });
-  const reader = r.body.getReader();
-  const dec = new TextDecoder();
-  let buf = "";
-  try {
-    for (; ; ) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      buf += dec.decode(value, { stream: true });
-      let i;
-      while ((i = buf.indexOf("\n\n")) >= 0) {
-        const frame = buf.slice(0, i);
-        buf = buf.slice(i + 2);
-        if (frame.startsWith(":")) continue;
-        const ev = /^event: (.*)$/m.exec(frame)?.[1], data = /^data: (.*)$/m.exec(frame)?.[1];
-        if (ev === "diff") {
-          invalidate();
-          await mirror({ fresh: true });
-        }
-        if (ev) onEvent({ event: ev, data: data ? JSON.parse(data) : null });
-      }
-    }
-  } catch {
-  }
-  return { ended: true };
-}
 
 // lib/solver.mjs
 var COMPASS = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0], ne: [Math.SQRT1_2, -Math.SQRT1_2], nw: [-Math.SQRT1_2, -Math.SQRT1_2], se: [Math.SQRT1_2, Math.SQRT1_2], sw: [-Math.SQRT1_2, Math.SQRT1_2] };
@@ -163,6 +68,7 @@ var yawOf = (dx, dz) => Math.atan2(dx, dz);
 var dirOfYaw = (y) => [Math.sin(y), Math.cos(y)];
 var compassOfYaw = (y) => ["s", "se", "e", "ne", "n", "nw", "w", "sw"][Math.round((y % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI) / (Math.PI / 4)) % 8];
 var r22 = (v) => Math.round(v * 100) / 100;
+var isFlagDef = (def) => /^core[-/]flag@/.test(String(def ?? ""));
 var rot = (yaw, x, z) => {
   const c = Math.cos(yaw), s = Math.sin(yaw);
   return [x * c + z * s, -x * s + z * c];
@@ -651,7 +557,7 @@ function solve(v, thing, rel) {
     }
     const rim = shapeOf?.area ? (u) => rayExit(shapeOf.area, [R.x, R.z], u) : null;
     const gap2 = rel.dist !== void 0 ? Number(rel.dist) : Math.max(1.5, Math.min(6, Math.max(hw, hd)));
-    const start = rel.dir && compassKey(rel.dir) ? COMPASS[compassKey(rel.dir)] : R.kind === "entity" && R.row.form === "point" && !R.row.def.includes("flag") ? dirOfYaw(R.yaw) : COMPASS.s;
+    const start = rel.dir && compassKey(rel.dir) ? COMPASS[compassKey(rel.dir)] : R.kind === "entity" && R.row.form === "point" && !isFlagDef(R.row.def) ? dirOfYaw(R.yaw) : COMPASS.s;
     const a0 = Math.atan2(start[0], start[1]);
     const items2 = [];
     const placed = [];
@@ -984,6 +890,103 @@ function solveInRoom(v, host, room, thing, rel, ctx) {
   }
   spots.sort((a, b) => a[4] - b[4]);
   return choose(spots, "free");
+}
+
+// lib/mirror.mjs
+var CACHE = ".eden-god.cache.json";
+var memo = null;
+function readCache() {
+  try {
+    return existsSync2(CACHE) ? JSON.parse(readFileSync2(CACHE, "utf8")) : null;
+  } catch {
+    return null;
+  }
+}
+function writeCache(c) {
+  try {
+    writeFileSync2(CACHE, JSON.stringify(c), { mode: 384 });
+  } catch {
+  }
+}
+async function mirror({ fresh = false } = {}) {
+  const world = load().world;
+  if (memo && memo.world === world && !fresh) {
+    const s = await call("/v1/world/seq", { as: "none", timeoutMs: 5e3 });
+    if (s.status === 0) return { ...memo, offline: true };
+    if (s.data.seq === memo.seq) return memo;
+  }
+  const cached = memo?.world === world ? memo : readCache();
+  const seqR = await call("/v1/world/seq", { as: "none", timeoutMs: 5e3 });
+  if (seqR.status === 0) {
+    if (cached && cached.world === world) {
+      memo = cached;
+      return { ...cached, offline: true };
+    }
+    throw new Error(`world unreachable (${seqR.data.message}) and no cached mirror`);
+  }
+  if (!fresh && cached && cached.world === world && cached.seq === seqR.data.seq) {
+    memo = cached;
+    return cached;
+  }
+  const [snap, lay] = await Promise.all([call("/v1/god/snapshot"), call("/v1/god/query", { body: { layout: { obbs: true } } })]);
+  const snapshot2 = ok(snap, "snapshot"), layout = ok(lay, "layout").layout;
+  memo = build(world, snapshot2, layout);
+  writeCache(memo);
+  return memo;
+}
+function invalidate() {
+  memo = null;
+}
+function build(world, snapshot2, layout) {
+  return { world, seq: snapshot2.seq, at: Date.now(), extent: snapshot2.constants.extent, snapshot: snapshot2, rows: layout.entities };
+}
+function view(m) {
+  const byId = new Map(m.rows.map((r) => [r.id, r]));
+  const byPath = new Map(m.rows.map((r) => [r.path, r]));
+  const lib = /* @__PURE__ */ new Map();
+  for (const d of m.snapshot.library ?? []) {
+    lib.set(d.ref, d);
+    if (d.ref.startsWith("core-")) lib.set("core/" + d.ref.slice(5), d);
+  }
+  const get = (ref) => {
+    if (!ref) return null;
+    const r = String(ref).replace(/^flag:/, "");
+    return byId.get(r) ?? byPath.get(r) ?? m.rows.find((x) => x.name === r && x.parent === m.rows.find((p) => p.id === x.parent)?.id) ?? m.rows.find((x) => x.name === r) ?? m.rows.find((x) => isFlagDef(x.def) && m.snapshot.entities.find((e) => e.id === x.id)?.state?.label === r) ?? null;
+  };
+  const entity = (id) => m.snapshot.entities.find((e) => e.id === id) ?? null;
+  const children = (id) => m.rows.filter((r) => r.parent === id);
+  const def = (ref) => lib.get(ref) ?? lib.get(normDef(ref)) ?? null;
+  return { m, rows: m.rows, byId, byPath, get, entity, children, def, extent: m.extent };
+}
+var normDef = (d) => d.includes("@") || d.startsWith("sha:") ? d : `core/${d}@1`;
+async function follow(seconds = 3600, onEvent = () => {
+}) {
+  const s = load();
+  const r = await fetch(s.world + "/v1/god/stream", { headers: { authorization: `Bearer ${s.token}`, accept: "text/event-stream" }, signal: AbortSignal.timeout(seconds * 1e3) });
+  const reader = r.body.getReader();
+  const dec = new TextDecoder();
+  let buf = "";
+  try {
+    for (; ; ) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i;
+      while ((i = buf.indexOf("\n\n")) >= 0) {
+        const frame = buf.slice(0, i);
+        buf = buf.slice(i + 2);
+        if (frame.startsWith(":")) continue;
+        const ev = /^event: (.*)$/m.exec(frame)?.[1], data = /^data: (.*)$/m.exec(frame)?.[1];
+        if (ev === "diff") {
+          invalidate();
+          await mirror({ fresh: true });
+        }
+        if (ev) onEvent({ event: ev, data: data ? JSON.parse(data) : null });
+      }
+    }
+  } catch {
+  }
+  return { ended: true };
 }
 
 // lib/look.mjs
@@ -1321,7 +1324,7 @@ function selectRows(v, f = {}) {
     const rad = Number(f.radius ?? 20);
     rows = rows.filter((r) => r.id !== c.row?.id && Math.hypot(r.pose[0] - c.x, r.pose[2] - c.z) <= rad);
   }
-  if (!f.flags) rows = rows.filter((r) => !r.def.includes("flag") || f.def === "flag");
+  if (!f.flags) rows = rows.filter((r) => !isFlagDef(r.def) || f.def === "flag");
   return rows;
 }
 
@@ -1422,7 +1425,7 @@ async function map(opts = {}) {
     lines.push("## water");
     for (const w of s.ground.waters) lines.push(`- ${nameOf(w.id)}: level ${w.level}`);
   }
-  const roots = v.rows.filter((r) => r.parent === "world" && !r.def.includes("flag"));
+  const roots = v.rows.filter((r) => r.parent === "world" && !isFlagDef(r.def));
   const limit = opts.all ? Infinity : 120;
   if (roots.length) {
     lines.push(`## things (${roots.length} at the root${roots.length > limit ? `; first ${limit}, --all for every one` : ""})`);
@@ -1432,7 +1435,7 @@ async function map(opts = {}) {
       lines.push(`- ${r.path} [${r.def.replace(/^core-/, "core/")}]${shape}${r.form === "point" && !r.shape ? ` ${r2(r.box[0])}\xD7${r2(r.box[2])} m` : ""}${kids.length ? ` \u2014 ${kids.length} inside: ${kids.slice(0, 8).map((k) => k.name ?? k.id).join(", ")}${kids.length > 8 ? "\u2026" : ""}` : ""}`);
     }
   }
-  const fl = v.rows.filter((r) => r.def.includes("flag"));
+  const fl = v.rows.filter((r) => isFlagDef(r.def));
   if (fl.length) {
     lines.push("## flags (refer to them as flag:<name>)");
     for (const r of fl) lines.push(`- flag:${r.name} "${v.entity(r.id)?.state?.label ?? ""}" at (${r.pose[0]}, ${r.pose[2]})`);
@@ -2099,7 +2102,7 @@ async function look(flags2 = {}) {
       span = flags2.span ? num(flags2.span) : 40;
     }
   } else {
-    const roots = v.rows.filter((r) => r.parent === "world" && !r.def.includes("flag") && !(r.shape && r.aabb[2] - r.aabb[0] > m.extent * 0.6));
+    const roots = v.rows.filter((r) => r.parent === "world" && !isFlagDef(r.def) && !(r.shape && r.aabb[2] - r.aabb[0] > m.extent * 0.6));
     if (!roots.length) {
       target = [0, 0, 0];
       span = 160;
@@ -2266,7 +2269,7 @@ async function gallery() {
 }
 async function flags() {
   const v = view(await mirror());
-  return v.rows.filter((r) => r.def.includes("flag")).map((r) => ({ name: `flag:${r.name}`, label: v.entity(r.id)?.state?.label ?? "", at: [r.pose[0], r.pose[2]] }));
+  return v.rows.filter((r) => isFlagDef(r.def)).map((r) => ({ name: `flag:${r.name}`, label: v.entity(r.id)?.state?.label ?? "", at: [r.pose[0], r.pose[2]] }));
 }
 async function flag(label, f) {
   const v = view(await mirror());

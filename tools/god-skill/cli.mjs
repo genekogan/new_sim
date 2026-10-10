@@ -7,7 +7,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } fr
 import { resolve } from 'node:path';
 import { call, load, num, ok, r2, save, sleep } from './lib/state.mjs';
 import { mirror, view, normDef, follow, invalidate } from './lib/mirror.mjs';
-import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS, setOf, relocate, frameOf, slotTarget } from './lib/solver.mjs';
+import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS, setOf, relocate, frameOf, slotTarget, isFlagDef } from './lib/solver.mjs';
 import { camera, shoot, keeper, stopKeeper } from './lib/look.mjs';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -55,7 +55,7 @@ export async function map(opts = {}) {
   const nameOf = (id) => v.byId.get(id)?.path ?? id;
   if (land.length) { lines.push('## terrain'); for (const l of land) lines.push(`- ${nameOf(l.id)}: ${l.kind}${l.kind === 'bump' ? ` at (${r2(l.c[0])}, ${r2(l.c[1])}) r ${r2(l.r)} h ${r2(l.h)}` : l.kind === 'ridge' ? ` along ${l.path.length} pts w ${l.w} h ${l.h}` : l.h !== undefined ? ` h ${l.h}` : ''}`); }
   if (s.ground.waters.length) { lines.push('## water'); for (const w of s.ground.waters) lines.push(`- ${nameOf(w.id)}: level ${w.level}`); }
-  const roots = v.rows.filter((r) => r.parent === 'world' && !r.def.includes('flag'));
+  const roots = v.rows.filter((r) => r.parent === 'world' && !isFlagDef(r.def));
   const limit = opts.all ? Infinity : 120;
   if (roots.length) {
     lines.push(`## things (${roots.length} at the root${roots.length > limit ? `; first ${limit}, --all for every one` : ''})`);
@@ -65,7 +65,7 @@ export async function map(opts = {}) {
       lines.push(`- ${r.path} [${r.def.replace(/^core-/, 'core/')}]${shape}${r.form === 'point' && !r.shape ? ` ${r2(r.box[0])}×${r2(r.box[2])} m` : ''}${kids.length ? ` — ${kids.length} inside: ${kids.slice(0, 8).map((k) => k.name ?? k.id).join(', ')}${kids.length > 8 ? '…' : ''}` : ''}`);
     }
   }
-  const fl = v.rows.filter((r) => r.def.includes('flag'));
+  const fl = v.rows.filter((r) => isFlagDef(r.def));
   if (fl.length) { lines.push('## flags (refer to them as flag:<name>)'); for (const r of fl) lines.push(`- flag:${r.name} "${v.entity(r.id)?.state?.label ?? ''}" at (${r.pose[0]}, ${r.pose[2]})`); }
   if (s.prayers.length) { lines.push('## prayers'); for (const p of s.prayers) lines.push(`- ${p.id} from ${p.soul_name}: ${p.text}`); }
   return opts.json ? { text: lines.join('\n'), snapshot: s } : lines.join('\n');
@@ -520,7 +520,7 @@ export async function look(flags = {}) {
     if (p.kind === 'entity') { const [x0, z0, x1, z1] = p.row.aabb; target = [p.x, p.row.y?.[0] ?? p.row.pose[1], p.z]; span = Math.max(x1 - x0, z1 - z0, 4); }
     else { target = [p.x, 0, p.z]; span = flags.span ? num(flags.span) : 40; }
   } else {
-    const roots = v.rows.filter((r) => r.parent === 'world' && !r.def.includes('flag') && !(r.shape && r.aabb[2] - r.aabb[0] > m.extent * 0.6));
+    const roots = v.rows.filter((r) => r.parent === 'world' && !isFlagDef(r.def) && !(r.shape && r.aabb[2] - r.aabb[0] > m.extent * 0.6));
     if (!roots.length) { target = [0, 0, 0]; span = 160; }
     else { const x0 = Math.min(...roots.map((r) => r.aabb[0])), z0 = Math.min(...roots.map((r) => r.aabb[1])), x1 = Math.max(...roots.map((r) => r.aabb[2])), z1 = Math.max(...roots.map((r) => r.aabb[3])); target = [(x0 + x1) / 2, 0, (z0 + z1) / 2]; span = Math.max(30, x1 - x0, z1 - z0); }
   }
@@ -641,7 +641,7 @@ export async function examples(name) {
 export async function gallery() { return 'gallery: run `node tools/god-skill/scripts/gallery.mjs <world-url>` from the sim repo (it places every core def in a labelled grid and screenshots it).'; }
 
 // ---------------------------------------------------------------- flags, prayers, stream
-export async function flags() { const v = view(await mirror()); return v.rows.filter((r) => r.def.includes('flag')).map((r) => ({ name: `flag:${r.name}`, label: v.entity(r.id)?.state?.label ?? '', at: [r.pose[0], r.pose[2]] })); }
+export async function flags() { const v = view(await mirror()); return v.rows.filter((r) => isFlagDef(r.def)).map((r) => ({ name: `flag:${r.name}`, label: v.entity(r.id)?.state?.label ?? '', at: [r.pose[0], r.pose[2]] })); }
 export async function flag(label, f) { const v = view(await mirror()); const p = refPoint(v, f.at ?? '0,0', f.offset); const name = label.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 48) || 'flag'; const r = await act({ ops: [{ op: 'place', def: 'core/flag@1', name, p: [p.x, p.z], state: { label } }] }); return r.accepted ? `flag:${name} at (${p.x}, ${p.z})` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
 export async function prayers() { return ok(await call('/v1/god/prayers'), 'prayers'); }
 export async function answer(prayer, text) { return ok(await call('/v1/god/answer', { body: { prayer, text } }), 'answer'); }
