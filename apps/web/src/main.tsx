@@ -24,9 +24,10 @@ function WithClerk({cfg}:{cfg:Cfg}){
  useEffect(()=>{
   setBinding(null);if(!session.isLoaded||!session.isSignedIn||!subject)return;
   let active=true;const abort=new AbortController();
-  void (async()=>{for(let attempt=0;active&&attempt<5;attempt++){try{const token=await session.getToken();if(!active||!token)return;
-   const response=await fetch(apiPath('/v1/account/session'),{headers:{authorization:'Bearer '+token},signal:abort.signal,cache:'no-store'});
-   const value=await response.json();if(active&&response.ok&&value.subject===subject&&value.issuer===cfg.clerkIssuer&&typeof value.accountId==='string'&&value.accountId.startsWith('acct_')){setBinding(value);return;}
+  void (async()=>{for(let attempt=0;active&&attempt<5;attempt++){try{const token:string|null=await session.getToken();if(!active||!token)return;
+   const response:Response=await fetch(apiPath('/v1/account/session'),{headers:{authorization:'Bearer '+token},signal:abort.signal,cache:'no-store'});
+   const value:unknown=await response.json();
+   if(active&&response.ok&&value!==null&&typeof value==='object'){const candidate=value as Record<string,unknown>;if(candidate.subject===subject&&typeof candidate.issuer==='string'&&candidate.issuer===cfg.clerkIssuer&&typeof candidate.accountId==='string'&&candidate.accountId.startsWith('acct_')){setBinding({accountId:candidate.accountId,issuer:candidate.issuer,subject});return;}}
   }catch{}if(active)await new Promise<void>(yes=>setTimeout(yes,1000));}})();return()=>{active=false;abort.abort();};
  },[session.isLoaded,session.isSignedIn,subject,sessionId,cfg.clerkIssuer,resolveAttempt]);
  const accountId=binding&&binding.subject===subject&&binding.issuer===cfg.clerkIssuer?binding.accountId:null;
