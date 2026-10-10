@@ -196,3 +196,18 @@ test('a floater body glides up the knoll: its root follows the tiles (the pictur
   assert.ok(body(e).pose.p[1] > 4.9);
   assert.deepEqual(e.runtime.violations, []);
 });
+
+test('snapshot mid-swim restores (the ground verbs come back with the snapshot) and continues identically', () => {
+  const a = world('swim-snap');
+  assert.equal(run(a, [{ verb: 'walk_to', params: { to: [-49, -20] } }]).end?.kind, 'completed');
+  a.perform({ actor: 'h_ada', label: 'swim', steps: [{ verb: 'mars:swim_to', params: { x: -70, z: -20 } }] });
+  for (let i = 0; i < 160; i++) a.step();
+  assert.equal(body(a).human.activity, 'swim');
+  const snap = a.snapshot() as { groundV1?: boolean };
+  assert.equal(snap.groundV1, true);
+  const b = factory.restore(snap as never);
+  for (let i = 0; i < 200; i++) { a.step(); b.step(); }
+  assert.deepEqual(body(b).pose.p, body(a).pose.p);
+  assert.equal(b.stateHash(), a.stateHash());
+  assert.deepEqual(b.runtime.violations, []);
+});
