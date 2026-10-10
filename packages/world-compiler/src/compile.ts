@@ -15,7 +15,9 @@ export type Diff = { upserts: Entity[]; removes: string[]; defs: StoredDef[]; wo
 export type UsesHook = (id: string) => { code: 'occupied.by-body' | 'held.by-body'; detail: string } | null;
 /** Body-aware edits, the would-be world's side (31 §3 rule 8, R2): called once after a plan succeeds, with the plan's own
  *  scratch (the world as it would be), its diff and the batch's ops; a Failure refuses the whole batch (null = fine). The
- *  engine bridge uses it to refuse burying or unseating a body that cannot step clear, without planning a second time. */
+ *  engine bridge uses it to refuse burying or unseating a body that cannot step clear, without planning a second time.
+ *  With the hook set, `uses` refusals are held back until it has run (it is called even when one was found), so its
+ *  refusal wins as when it planned on a fork first; failing that, the earliest held-back one refuses the batch. */
 export type RefuseHook = (scratch: WorldModel, diff: Diff, ops: Op[]) => Failure | null;
 export type PlanOptions = { trusted?: boolean; uses?: UsesHook; refuse?: RefuseHook };
 
@@ -67,12 +69,18 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
     if (!e) { failures.push(fail(opIndex, 'entity.unknown', `${ref}`)); return null; }
     return e.id;
   };
+  /** With a `refuse` hook, uses refusals are held back while the batch is simulated to the end, so the hook sees the
+   *  would-be world first (its refusal wins); then the earliest held-back one is the batch's refusal. */
+  const heldBack: Failure[] = [];
   /** A Soul uses something in this subtree: refuse naming them. */
   const inUse = (id: string, i: number): boolean => {
     if (!opts.uses) return false;
     for (const sid of scratch.subtree(id)) {
       const u = opts.uses(sid);
-      if (u) { failures.push(fail(i, u.code, `${sid !== id ? `${scratch.pathOf(id)}: ` : ''}${u.detail}`)); return true; }
+      if (!u) continue;
+      const f = fail(i, u.code, `${sid !== id ? `${scratch.pathOf(id)}: ` : ''}${u.detail}`);
+      if (opts.refuse) { heldBack.push(f); return false; }
+      failures.push(f); return true;
     }
     return false;
   };
@@ -268,7 +276,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
     }
   });
 
-  if (failures.length) return { ok: false, failures };
+  if (failures.length) return { ok: false, failures: heldBack.length && heldBack[0].op <= failures[0].op ? [heldBack[0]] : failures };
   // Persistent relationships: re-solve server-maintained constraints whose refs moved or whose ground changed (33 §3.3).
   const resolved = resolveDependents(scratch, touched, new Set(diff.removes), new Set(diff.tiles), warnings);
   for (const id of resolved) touched.add(id);
@@ -276,6 +284,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   diff.tiles = [...new Set(diff.tiles)];
   const refused = opts.refuse?.(scratch, diff, ops);
   if (refused) return { ok: false, failures: [refused] };
+  if (heldBack.length) return { ok: false, failures: [heldBack[0]] };
   const seq = world.editSeq + 1;
   const undoId = 'u_' + hashOf([world.seed, seq]).slice(0, 10);
   return {
