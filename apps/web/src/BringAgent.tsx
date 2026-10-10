@@ -2,7 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {agentOnboarding} from './auth-ui.ts';
 import './BringAgent.css';
 /** VF3: the "New Soul" button (top right of the Eden viewer) and its "Bring a new Soul to Eden" dialog. Opens on #join, so the link itself can be shared. */
-export function BringAgent({auth,requireAuth=false}:{auth:{ready:boolean;authed:boolean;login():void};requireAuth?:boolean}){
+export function BringAgent({auth,requireAuth=false}:{auth:{ready:boolean;authed:boolean;login():void;signInUrl?:string};requireAuth?:boolean}){
  const worldUrl=location.origin+location.pathname.replace(/\/+$/,''),{world,instructionsUrl,text}=agentOnboarding(worldUrl);
  const pendingKey='sim.new-soul.pending.'+worldUrl;
  const [pending,setPending]=useState(()=>{try{return location.hash==='#join'||sessionStorage.getItem(pendingKey)==='1';}catch{return location.hash==='#join';}}),[open,setOpen]=useState(()=>location.hash==='#join'&&(!requireAuth||auth.authed)),[note,setNote]=useState(''),prompt=useRef<HTMLParagraphElement>(null);
@@ -12,6 +12,8 @@ export function BringAgent({auth,requireAuth=false}:{auth:{ready:boolean;authed:
  const close=()=>{setPending(false);setOpen(false);setNote('');try{sessionStorage.removeItem(pendingKey);}catch{}if(location.hash==='#join')history.replaceState(null,'',location.pathname+location.search);};
  const copy=()=>{const fallback=()=>{if(prompt.current){const range=document.createRange();range.selectNodeContents(prompt.current);const selection=getSelection();selection?.removeAllRanges();selection?.addRange(range);}setNote('Select and copy the prompt.');};
   if(navigator.clipboard?.writeText)void navigator.clipboard.writeText(text).then(()=>setNote('Copied.'),fallback);else fallback();};
+ const canonicalJoin=auth.signInUrl?new URL(auth.signInUrl):null;if(canonicalJoin)canonicalJoin.hash='join';
+ if(canonicalJoin)return <a className="bring-agent-open" href={canonicalJoin.href} title={`Bring a new Soul to ${world}`}><span>New Soul</span></a>;
  const button=<button type="button" className="bring-agent-open" aria-haspopup="dialog" aria-expanded={open} title={`Bring a new Soul to ${world}`} onClick={()=>{if(!requireAuth||auth.authed)setOpen(true);else{setPending(true);try{sessionStorage.setItem(pendingKey,'1');}catch{}history.replaceState(null,'',location.pathname+location.search+'#join');auth.login();}}}><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7.5" cy="6" r="3" fill="none" stroke="currentColor" strokeWidth="1.5"/><path d="M2.5 16v-1.5a5 5 0 0 1 10 0V16M15.5 7v6M12.5 10h6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg><span>New Soul</span></button>;
  if(!open||requireAuth&&!auth.authed)return button;
  return <>{button}<div className="bring-agent-scrim" role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget)close();}}>
