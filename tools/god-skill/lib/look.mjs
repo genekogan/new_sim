@@ -1,10 +1,12 @@
 // god look: a screenshot of the world from a chosen viewpoint, for the god's own eyes.
 //
-// The world's ordinary viewer page renders the picture. Loading that page in a headless browser with
-// software GL takes from 20 s (idle laptop) to minutes (busy one), so the first `look` starts a small
-// keeper process that holds one Chrome tab on the world (it follows edits live over the hub) and
-// later looks only move its camera and read the canvas back: seconds, not minutes. The keeper quits
-// after 20 idle minutes (`look --stop` ends it now). State: .eden-god.look.json.
+// The world's ordinary viewer page renders the picture in its `?shot=1` mode (canvas only, camera from
+// eye/at, window.__shotReady once drawn). Default: open Chrome, wait until every entity has eased in,
+// read the canvas back (the WebGL buffer is preserved by an init script), close Chrome. Machines shared
+// by many agents take a lease (/tmp/eden-chrome-lease) so only one headless Chrome renders at a time.
+// `look --keep` instead leaves a keeper process holding one tab on the world (it follows edits live),
+// so later looks cost seconds; it quits after 20 idle minutes, `look --stop` ends it. Use it on your own
+// machine, not a shared one. GPU by default; EDEN_GOD_GL=swiftshader forces software GL.
 //
 // Needs Google Chrome and a Playwright package (playwright-core, playwright or @playwright/test)
 // resolvable from the current folder, EDEN_GOD_PLAYWRIGHT_FROM, or the sim repo; else it falls back
@@ -17,7 +19,26 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { COMPASS, compassKey } from './solver.mjs';
 
-const GL_ARGS = ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'];
+const GL_ARGS = process.env.EDEN_GOD_GL === 'swiftshader' ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] : ['--ignore-gpu-blocklist'];
+const PRESERVE = () => { const orig = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (type, attrs) { if (/webgl/.test(String(type))) attrs = { ...(attrs || {}), preserveDrawingBuffer: true }; return orig.call(this, type, attrs); }; };
+const LEASE = process.env.EDEN_GOD_CHROME_LEASE ?? '/tmp/eden-chrome-lease';
+/** One headless Chrome at a time on a shared machine (atomic mkdir; stale after 15 min). Returns release(). */
+export async function chromeLease(holder = 'eden-god', { waitMs = 30 * 60_000, staleMs = 15 * 60_000 } = {}) {
+  if (process.env.EDEN_GOD_NO_LEASE) return () => {};
+  const t0 = Date.now();
+  for (;;) {
+    try { mkdirSync(LEASE); writeFileSync(`${LEASE}/holder`, `${holder} ${process.pid} ${new Date().toISOString()}\n`); break; }
+    catch {
+      try { if (Date.now() - statSync(LEASE).mtimeMs > staleMs) { rmSync(LEASE, { recursive: true, force: true }); continue; } } catch { continue; }
+      if (Date.now() - t0 > waitMs) throw new Error(`look: the Chrome lease (${LEASE}) has been busy for ${Math.round(waitMs / 60000)} min`);
+      await new Promise((r) => setTimeout(r, 3000 + Math.random() * 2000));
+    }
+  }
+  let released = false;
+  const release = () => { if (!released) { released = true; rmSync(LEASE, { recursive: true, force: true }); } };
+  process.once('exit', release);
+  return release;
+}
 const KEEPER = '.eden-god.look.json';
 const IDLE_MS = 20 * 60_000;
 
@@ -36,7 +57,7 @@ export function findPlaywright() {
 /** Camera for a target box: from a compass side (or above), at a distance that frames it. */
 export function camera({ target, span, from = 's', dist, inside = false, height }) {
   const key = from === 'above' || from === 'top' ? 'above' : compassKey(from) ?? 's';
-  const d = dist ?? Math.max(14, span * (inside ? 0.9 : 1.25) + 8);
+  const d = dist ?? Math.max(16, span * (inside ? 1.0 : 1.2) + 8);
   const el = key === 'above' ? 1.35 : inside ? 0.95 : 0.5;            // elevation (radians)
   const u = key === 'above' ? [0, 0.08] : COMPASS[key];
   const eye = [target[0] + u[0] * Math.cos(el) * d, target[1] + (height ?? Math.sin(el) * d), target[2] + u[1] * Math.cos(el) * d];
@@ -53,7 +74,7 @@ export async function keeper(worldUrl, port) {
   const browser = await pw.chromium.launch({ channel: 'chrome', headless: true, args: [...GL_ARGS, `--remote-debugging-port=${port}`] });
   const ctx = await browser.newContext({ viewport: { width: 1024, height: 640 } });
   // keep the WebGL drawing buffer so the canvas can be read back at any time (page.screenshot stalls on a slow software compositor)
-  await ctx.addInitScript(() => { const orig = HTMLCanvasElement.prototype.getContext; HTMLCanvasElement.prototype.getContext = function (type, attrs) { if (/webgl/.test(String(type))) attrs = { ...(attrs || {}), preserveDrawingBuffer: true }; return orig.call(this, type, attrs); }; });
+  await ctx.addInitScript(PRESERVE);
   const page = await ctx.newPage();
   await page.goto(`${worldUrl}?shot=1`, { waitUntil: 'commit', timeout: 600_000 });
   writeFileSync(KEEPER, JSON.stringify({ world: worldUrl, port, pid: process.pid, at: Date.now() }));
@@ -80,7 +101,7 @@ async function ensureKeeper(worldUrl, cliPath) {
 export function stopKeeper() { const k = readKeeper(); if (k?.pid) try { process.kill(k.pid); } catch { /* gone */ } rmSync(KEEPER, { force: true }); return k ? `stopped the look keeper (pid ${k.pid})` : 'no look keeper running'; }
 
 /** Take the picture. Returns { file, ms, state, via }. */
-export async function shoot({ worldUrl, eye, at, out, hideRoofs = false, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 900_000), settleMs = 800, cliPath }) {
+export async function shoot({ worldUrl, eye, at, out, hideRoofs = false, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 600_000), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }) {
   mkdirSync(dirname(resolve(out)), { recursive: true });
   const t0 = Date.now();
   const pw = findPlaywright();
@@ -90,20 +111,36 @@ export async function shoot({ worldUrl, eye, at, out, hideRoofs = false, expect 
     if (r.status !== 0) throw new Error(`look: no Playwright found and npx playwright-core failed: ${(r.stderr || r.stdout || '').slice(0, 300)}. Install one (npm i -g playwright-core) and Google Chrome`);
     return { file: resolve(out), ms: Date.now() - t0, via: 'npx playwright-core screenshot' };
   }
-  const k = await ensureKeeper(worldUrl, cliPath ?? process.argv[1]);
-  const browser = await pw.chromium.connectOverCDP(`http://127.0.0.1:${k.port}`, { timeout: 60_000 });
-  const page = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(worldUrl));
-  if (!page) throw new Error('look: the keeper has no world tab; run `look --stop` and look again');
+  let page, browser, release = () => {};
+  if (keep) {
+    const k = await ensureKeeper(worldUrl, cliPath ?? process.argv[1]);
+    browser = await pw.chromium.connectOverCDP(`http://127.0.0.1:${k.port}`, { timeout: 60_000 });
+    page = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(worldUrl));
+    if (!page) throw new Error('look: the keeper has no world tab; run `look --stop` and look again');
+  } else {
+    release = await chromeLease('eden-god look');
+    browser = await pw.chromium.launch({ channel: 'chrome', headless: true, args: GL_ARGS }).catch((e) => { release(); throw new Error(`look: cannot start Chrome (${String(e.message).split('\n')[0]}); install Google Chrome`); });
+    const ctx = await browser.newContext({ viewport: { width, height } });
+    await ctx.addInitScript(PRESERVE);
+    page = await ctx.newPage();
+    const q = new URLSearchParams({ shot: '1', eye: eye.join(','), at: at.join(','), settle: '1500' });
+    await page.goto(`${worldUrl}?${q}`, { waitUntil: 'commit', timeout: timeoutMs });
+  }
+  try {
   const deadline = Date.now() + timeoutMs;
-  let state = null;
+  let state = null, stable = 0, lastDrawn = -1;
   while (Date.now() < deadline) {
     state = await page.evaluate((want) => {
-      const w = window.__simEntity; if (!w?.layer?.active) return { ready: false, why: 'loading the viewer' };
+      const w = window.__simEntity; if (!w?.layer?.active) return { ready: false, why: document.title === 'no-entity-world' ? 'no entity world on this page' : 'loading the viewer' };
       const drawn = w.layer.drawn; const now = w.layer.now ?? performance.now();
       const easing = drawn ? [...drawn.values()].filter((d) => (now - d.t0) / 1000 < d.dur).length : 0;
-      return { ready: (!want || (drawn?.size ?? 0) >= want) && easing === 0, drawn: drawn?.size ?? null, want, easing };
+      // terrain-only entities (hills, lakes) are not drawn as things: most of `want` is enough
+      return { ready: (!want || (drawn?.size ?? 0) >= Math.floor(want * 0.6)) && easing === 0, drawn: drawn?.size ?? null, want, easing, shotReady: !!window.__shotReady };
     }, expect).catch((e) => ({ ready: false, why: String(e.message).slice(0, 80) }));
-    if (state.ready) break;
+    if (state.ready && state.drawn === lastDrawn) stable++; else stable = 0;
+    lastDrawn = state.drawn ?? -1;
+    if (state.ready && stable >= 2) break;
+    if (state.why === 'no entity world on this page') throw new Error('look: this world has no entity layer');
     await new Promise((r) => setTimeout(r, 1000));
   }
   const frames = await page.evaluate(([e, a, roofs]) => new Promise((res) => {
@@ -120,5 +157,6 @@ export async function shoot({ worldUrl, eye, at, out, hideRoofs = false, expect 
   const data = await page.evaluate(() => { const c = [...document.querySelectorAll('canvas')].sort((a, b) => b.width * b.height - a.width * a.height)[0]; const d = c ? c.toDataURL('image/png') : null; window.__lookRestore?.(); return d; });
   if (!data) throw new Error('look: no canvas on the page');
   writeFileSync(resolve(out), Buffer.from(data.split(',')[1], 'base64'));
-  return { file: resolve(out), ms: Date.now() - t0, state, frames, via: 'keeper' };
+  return { file: resolve(out), ms: Date.now() - t0, state, frames, via: keep ? 'keeper' : 'chrome' };
+  } finally { if (!keep) { await browser.close().catch(() => {}); release(); } }
 }

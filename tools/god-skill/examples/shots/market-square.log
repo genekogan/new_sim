@@ -1,0 +1,65 @@
+# example: a market square
+
+(stand-in: plaza → ex-plaza@1 from plaza/1; the library has no plaza yet)
+(stand-in: stall → ex-stall@1 from kit/2; the library has no stall yet)
+$ eden-god group market
+  current group: market (every edit until `group --off`; undo it all with `undo --group market`)
+  (1251 ms)
+$ eden-god place ex-plaza@1 --rect 0,0,36,28 --name square
+  placed square [ex-plaza@1] — area of 4 corners
+    seq 3, group "market" — undo with: undo
+  (2675 ms)
+$ eden-god place fountain --at square --name fountain
+  placed fountain [core/fountain@1] at (0, 0, 0) facing s — at square
+    seq 4, group "market" — undo with: undo
+  (4909 ms)
+$ eden-god place bench --near fountain --count 4 --facing fountain --dist 2.5
+  placed bench [core/bench@1] at (0, 0, 4.75) facing n — near fountain, s of it, 2.5 m away; keeps: facing fountain, near fountain
+  placed bench-2 [core/bench@1] at (4.75, 0, 0) facing w — near fountain, e of it, 2.5 m away; keeps: facing fountain, near fountain
+  placed bench-3 [core/bench@1] at (0, 0, -4.75) facing s — near fountain, n of it, 2.5 m away; keeps: facing fountain, near fountain
+  placed bench-4 [core/bench@1] at (-4.75, 0, 0) facing e — near fountain, w of it, 2.5 m away; keeps: facing fountain, near fountain
+    seq 5, group "market" — undo with: undo
+  (3591 ms)
+$ eden-god place ex-stall@1 --at 0,-11 --row 4 --gap 3 --facing fountain --name stall
+  placed stall-1 [ex-stall@1] at (-8.55, 0, -11) facing se — at (-8.55, -11) (row of 4); keeps: facing fountain
+  placed stall-2 [ex-stall@1] at (-2.85, 0, -11) facing s — at (-2.85, -11) (row of 4); keeps: facing fountain
+  placed stall-3 [ex-stall@1] at (2.85, 0, -11) facing s — at (2.85, -11) (row of 4); keeps: facing fountain
+  placed stall-4 [ex-stall@1] at (8.55, 0, -11) facing sw — at (8.55, -11) (row of 4); keeps: facing fountain
+    seq 6, group "market" — undo with: undo
+  (3384 ms)
+$ eden-god place ex-stall@1 --at 0,11 --row 4 --gap 3 --facing fountain --name south-stall
+  placed south-stall-1 [ex-stall@1] at (8.55, 0, 11) facing nw — at (8.55, 11) (row of 4); keeps: facing fountain
+  placed south-stall-2 [ex-stall@1] at (2.85, 0, 11) facing n — at (2.85, 11) (row of 4); keeps: facing fountain
+  placed south-stall-3 [ex-stall@1] at (-2.85, 0, 11) facing n — at (-2.85, 11) (row of 4); keeps: facing fountain
+  placed south-stall-4 [ex-stall@1] at (-8.55, 0, 11) facing ne — at (-8.55, 11) (row of 4); keeps: facing fountain
+    seq 7, group "market" — undo with: undo
+  (4107 ms)
+$ eden-god place lamp-post --at -16,-12 --name lamp-nw
+  placed lamp-nw [core/lamp-post@1] at (-16, -0.2, -12) facing s — at (-16, -12)
+    seq 8, group "market" — undo with: undo
+  (3335 ms)
+$ eden-god place lamp-post --at 16,-12 --name lamp-ne
+  placed lamp-ne [core/lamp-post@1] at (16, -0.2, -12) facing s — at (16, -12)
+    seq 9, group "market" — undo with: undo
+  (3175 ms)
+$ eden-god place lamp-post --at -16,12 --name lamp-sw
+  placed lamp-sw [core/lamp-post@1] at (-16, -0.2, 12) facing s — at (-16, 12)
+    seq 10, group "market" — undo with: undo
+  (3039 ms)
+$ eden-god place lamp-post --at 16,12 --name lamp-se
+  placed lamp-se [core/lamp-post@1] at (16, -0.2, 12) facing s — at (16, 12)
+    seq 11, group "market" — undo with: undo
+  (3340 ms)
+$ eden-god group --off
+  no current group
+  (875 ms)
+$ eden-god history 3
+  11. edit [market]  — place lamp-post
+  10. edit [market]  — place lamp-post
+  9. edit [market]  — place lamp-post
+  (1774 ms)
+$ eden-god look --at square --from s --out <worktrees>/t2-skill/tools/god-skill/examples/shots/market-square.png
+  look: <worktrees>/t2-skill/tools/god-skill/examples/shots/market-square.png
+    from the s at (0, 30.7, 56.2) toward (0, 0, 0), 96.1 s
+    Read the image file; then fix what looks wrong.
+  (101671 ms)

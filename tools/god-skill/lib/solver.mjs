@@ -65,6 +65,12 @@ export function pointAlong(path, t) {
 }
 /** Left of a path = the walker's left going from its first point to its last (north when walking east). */
 export const leftOf = (dir) => [dir[1], -dir[0]];
+/** The compiler (L1, compile.ts) re-places `along` things itself with generators' offsetPolyline, whose
+ *  positive side is (−dz, +dx): the walker's RIGHT in this frame (+z is south). Until that is flipped
+ *  server-side, the solver translates the walker's side into the server's label so both agree on the
+ *  spot. Set to false when compile.ts uses the walker's-left convention. */
+export const SERVER_SIDE_MIRRORED = true;
+const serverSide = (side) => (SERVER_SIDE_MIRRORED && side === 'left' ? 'right' : SERVER_SIDE_MIRRORED && side === 'right' ? 'left' : side);
 
 // ---------------------------------------------------------------- overlap (local pre-check; the server decides)
 
@@ -129,7 +135,8 @@ export function solve(v, thing, rel) {
     if (rel.facing === undefined) return [];
     const f = String(rel.facing); if (f.startsWith('away:')) { const row = v.get(f.slice(5)); return row ? [{ kind: 'facing', ref: row.path, offset: Math.PI }] : []; }
     const row = !compassKey(f) || v.get(f) ? v.get(f) : null;
-    return row ? [{ kind: 'facing', ref: row.path, offset: 0 }] : [];
+    // the compiler aims at the ref's pose; area/path things have no pose of their own (yaw only, no constraint)
+    return row && row.form === 'point' && !row.shape ? [{ kind: 'facing', ref: row.path, offset: 0 }] : [];
   };
   const pose = (x, z, yaw, extra = {}) => ({ ...extra, p: [r2(x), r2(z)], ...(yaw !== undefined ? { r: r2(yaw) } : {}), constraints: [...constraints, ...facingConstraint(), ...(extra.constraints ?? [])] });
   const finalYaw = (x, z, fallback) => { const f = faceAt(x, z); return f !== undefined ? f : baseYaw !== undefined ? baseYaw : fallback; };
@@ -144,6 +151,20 @@ export function solve(v, thing, rel) {
     const path = [edge(A, via.length ? { x: via[0][0], z: via[0][1] } : B), ...via, edge(B, via.length ? { x: via.at(-1)[0], z: via.at(-1)[1] } : A)];
     notes.push(`path from ${A.ref ?? a} to ${B.ref ?? b}${via.length ? ` via ${via.length} point(s)` : ''}, ${r2(polylineLength(path))} m`);
     return { items: [{ candidates: [{ shape: { path, ...(rel.width ? { width: Number(rel.width) } : {}) }, note: notes.at(-1) }] }], notes };
+  }
+
+  // ---- across a path (a bridge over a river, a gate across a road): perpendicular at t
+  if (rel.across) {
+    const host = v.get(rel.across); if (!host) throw new Error(`no such path: ${rel.across}`);
+    const path = host.shape?.path; if (!path) throw new Error(`${host.path} is not a path`);
+    const t = rel.t !== undefined ? Number(rel.t) : 0.5;
+    const { p, dir } = pointAlong(path, t), nrm = leftOf(dir);
+    const half = (host.shape.width ?? 4) / 2 + Number(rel.span ?? 3);
+    if (thing.form === 'path') {
+      const a = [r2(p[0] - nrm[0] * half), r2(p[1] - nrm[1] * half)], b = [r2(p[0] + nrm[0] * half), r2(p[1] + nrm[1] * half)];
+      return { items: [{ candidates: [{ shape: { path: [a, b], ...(rel.width ? { width: Number(rel.width) } : {}) }, note: `across ${host.path} at ${Math.round(t * 100)}%, ${r2(2 * half)} m long` }] }], notes };
+    }
+    return { items: [{ candidates: [pose(p[0], p[1], finalYaw(p[0], p[1], yawOf(nrm[0], nrm[1])), { note: `across ${host.path} at ${Math.round(t * 100)}%` })] }], notes };
   }
 
   // ---- on: a surface slot of a table, shelf, counter
@@ -263,7 +284,7 @@ export function solve(v, thing, rel) {
         const tt = Math.min(1, Math.max(0, t + dt)); const q = pointAlong(path, tt); const lf = leftOf(q.dir);
         const xx = q.p[0] + lf[0] * sg * off, zz = q.p[1] + lf[1] * sg * off;
         if (dt !== 0 && !free(xx, zz, yaw)) continue;
-        cands.push(pose(xx, zz, yaw, { constraints: [{ kind: 'along', ref: host.path, t: r2(tt), side, offset: r2(off) }], note: `along ${host.path} at ${Math.round(tt * 100)}%${sg ? `, ${side} side, ${r2(off - pw - hd)} m back from the edge` : ''}` }));
+        cands.push(pose(xx, zz, yaw, { constraints: [{ kind: 'along', ref: host.path, t: r2(tt), side: serverSide(side), offset: r2(sg ? off - pw : 0) }], note: `along ${host.path} at ${Math.round(tt * 100)}%${sg ? `, ${side} side, ${r2(off - pw - hd)} m back from the edge` : ''}` }));
       }
       items.push({ candidates: cands });
     }
@@ -321,7 +342,9 @@ export function solve(v, thing, rel) {
     const isFree = (x, z, yaw) => free(x, z, yaw) && !placed.some((b) => obbHit(mine(x, z, yaw), b, 0.1));
     for (let k = 0; k < n; k++) {
       const cands = [];
-      const ak = a0 + (n > 1 ? (2 * Math.PI * k) / n : 0);
+      // several around a thing with a front (a door): keep a 60° cone in front of it clear
+      const fronted = n > 1 && R.kind === 'entity' && (R.row.slots ?? []).some((x) => x.kind === 'stand' || x.kind === 'door' || x.kind === 'room');
+      const ak = fronted ? a0 + Math.PI / 6 + ((2 * Math.PI - Math.PI / 3) * k) / Math.max(1, n - 1) : a0 + (n > 1 ? (2 * Math.PI * k) / n : 0);
       const tries = n > 1 ? [0, 0.15, -0.15, 0.3, -0.3] : [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, (3 * Math.PI) / 4, (-3 * Math.PI) / 4, Math.PI];
       let fallback = null;
       for (const ring of [0, 2, 5, 10]) for (const da of tries) {

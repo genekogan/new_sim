@@ -1,0 +1,53 @@
+# example: a hamlet in 8 commands
+
+$ eden-god place knoll --at 40,10 --param height=5 --param radius=26 --name knoll
+  placed knoll [core/knoll@1] at (40, 0, 10) facing s — at (40, 10)
+    seq 1 — undo with: undo
+  (5036 ms)
+$ eden-god place cottage --at knoll --facing s --name cottage
+  placed cottage [core/cottage@1] at (40, 4.47, 10) facing s — at knoll
+    seq 2 — undo with: undo
+  (5715 ms)
+$ eden-god place pond --circle 30,38,8 --name pond
+  placed pond [core/pond@1] — area of 10 corners
+    seq 3 — undo with: undo
+  (4879 ms)
+$ eden-god place bench --near pond --facing pond --dir n --name pond-bench
+  placed pond-bench [core/bench@1] at (30.24, 0.19, 28.14) facing s — near pond, n of it, 1.5 m away; keeps: near pond
+    seq 4 — undo with: undo
+  (5183 ms)
+$ eden-god place tree --near cottage --count 5 --dist 4
+  placed tree [core/tree@1] at (44.5, 3.2, 17.8) facing s — near cottage, se of it, 4 m away; keeps: near cottage
+  placed tree-2 [core/tree@1] at (48.7, 3.2, 7.67) facing s — near cottage, e of it, 4 m away; keeps: near cottage
+  placed tree-3 [core/tree@1] at (40, 3.71, 2.7) facing s — near cottage, n of it, 4 m away; keeps: near cottage
+  placed tree-4 [core/tree@1] at (31.3, 3.2, 7.67) facing s — near cottage, w of it, 4 m away; keeps: near cottage
+  placed tree-5 [core/tree@1] at (35.5, 3.2, 17.8) facing s — near cottage, sw of it, 4 m away; keeps: near cottage
+    seq 5 — undo with: undo
+  (4398 ms)
+$ eden-god place fountain --at 18,4 --name well
+  placed well [core/fountain@1] at (18, 0, 4) facing s — at (18, 4)
+    seq 6 — undo with: undo
+  (5821 ms)
+$ eden-god place lamp-post --near well --count 4 --dist 2
+  placed lamp-post [core/lamp-post@1] at (18, -0.09, 8.15) facing s — near well, s of it, 2 m away; keeps: near well
+  placed lamp-post-2 [core/lamp-post@1] at (22.15, 0.34, 4) facing s — near well, e of it, 2 m away; keeps: near well
+  placed lamp-post-3 [core/lamp-post@1] at (18, -0.19, -0.15) facing s — near well, n of it, 2 m away; keeps: near well
+  placed lamp-post-4 [core/lamp-post@1] at (13.85, -0.2, 4) facing s — near well, w of it, 2 m away; keeps: near well
+    seq 7 — undo with: undo
+  (4613 ms)
+$ eden-god describe cottage
+  cottage [core/cottage@1] solid point — at the root
+    A small one-storey cottage (placeholder block until building/1).
+    pose (40, 4.47, 10) facing s (yaw 0); size 8×3.6×6 m; bounds x 36…44, z 7…13, y 4.47…8.07; 1 colliders, ~12 tris
+    params {"w":8,"h":3.6,"d":6,"color":"#f1e7d2"}
+    state {"paint":"#f1e7d2"}
+    slots: front (stand, 0/8)
+    behaviours: none
+    ground: y 5, slope 1.79°, walk
+    near: knoll 0 m s, tree-3 7 m n, tree 8.6 m se, tree-5 8.6 m sw, tree-4 8.64 m w, tree-2 8.64 m e
+  (3048 ms)
+$ eden-god look --from sw --out <worktrees>/t2-skill/tools/god-skill/examples/shots/hamlet.png
+  look: <worktrees>/t2-skill/tools/god-skill/examples/shots/hamlet.png
+    from the sw at (-10.9, 43.8, 65.6) toward (39.9, 4.5, 14.8), 351.4 s
+    Read the image file; then fix what looks wrong.
+  (356555 ms)

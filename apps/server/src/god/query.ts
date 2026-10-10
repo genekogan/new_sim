@@ -5,7 +5,7 @@
 // WorldModel; `reach` asks the Soul engine through the bridge (L9).
 // Owner: L1 (contract); L7 owns it from tranche 2; `reach` is L9's.
 import { mediumAt, waterDepthAt, waterLevelAt } from '@sim/ground';
-import { pointAlong, pointInPoly, type Baked, type Vec2 } from '@sim/generators';
+import { offsetPolyline, pointAlong, pointInPoly, type Baked, type Vec2 } from '@sim/generators';
 import { obbOverlap, type Entity, type OBB, type StoredDef, WorldModel } from '@sim/world-compiler';
 
 /** A reach end: a point [x, z] (ground) or [x, y, z], an entity id/path (a Soul's body, a chair…), or `<path>:<room>`. */
@@ -276,11 +276,11 @@ function checkConstraint(w: WorldModel, e: Entity, c: NonNullable<Entity['constr
     case 'along': {
       const path = refE!.shape && 'path' in refE!.shape ? refE!.shape.path : null;
       if (!path) return { ...c, ok: false, why: `${c.ref} is not a path` };
-      const { p, dir } = pointAlong(path, c.t);
-      const left: Vec2 = [dir[1], -dir[0]];
-      const sgn = c.side === 'left' ? 1 : c.side === 'right' ? -1 : 0;
-      const want: Vec2 = [p[0] + left[0] * sgn * c.offset, p[1] + left[1] * sgn * c.offset];
-      const d = Math.hypot(want[0] - pose.x, want[1] - pose.z);
+      // exactly the compiler's placement (compile.ts admit): offset from the path edge, side by offsetPolyline
+      const sideK = c.side === 'left' ? 1 : c.side === 'right' ? -1 : 0;
+      const line = sideK ? offsetPolyline(path, sideK * (((refE!.shape as { width?: number }).width ?? 0) / 2 + c.offset)) : path;
+      const { p } = pointAlong(line, c.t);
+      const d = Math.hypot(p[0] - pose.x, p[1] - pose.z);
       return { ...c, ok: d < 1, why: `${round(d)} m from its spot on ${c.ref}` };
     }
   }

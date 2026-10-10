@@ -79,7 +79,7 @@ test('along a road: left/right sides, setback, facing the road, along constraint
   // road runs west→east at z=30; walker's left is north (−z): 3 m half-width + 3 m half-depth + 3 setback = 9
   assert.ok(Math.abs(c.p[0]) < 0.01 && Math.abs(c.p[1] - (30 - 9)) < 0.01, JSON.stringify(c.p));
   assert.equal(compassOfYaw(c.r), 's', 'faces the road');
-  assert.ok(c.constraints.some((k) => k.kind === 'along' && k.side === 'left' && k.offset === 9));
+  assert.ok(c.constraints.some((k) => k.kind === 'along' && k.side === 'right' && k.offset === 6), JSON.stringify(c.constraints));
   const trees = solve(v, { def: 'tree', form: 'point', layer: 'solid', box: [0.6, 7, 0.6] }, { along: 'road', side: 'both', row: 5, gap: 10 });
   assert.equal(trees.items.length, 10);
   assert.ok(trees.items.slice(0, 5).every((it) => it.candidates[0].p[1] < 30) && trees.items.slice(5).every((it) => it.candidates[0].p[1] > 30));

@@ -13,6 +13,8 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 const SELF = (() => { try { return fileURLToPath(import.meta.url); } catch { return process.argv[1]; } })();
 import { selectRows } from './lib/select.mjs';
+import { schemaMarkdown } from './lib/schema-md.mjs';
+export { schemaMarkdown };
 
 export const SKILL_VERSION = '1.0';
 
@@ -177,9 +179,9 @@ const relFrom = (f) => ({
   at: f.at, offset: f.offset, near: f.near, around: f.around, dist: f.dist, dir: f.dir, count: f.count, facing: f.facing, yaw: f.yaw,
   against: f.against, between: f.between ? [].concat(f.between).flatMap((x) => String(x).split(/\s+|;/)).filter(Boolean).slice(0, 2) : undefined,
   along: f.along, t: f.t, side: f.side, setback: f.setback ?? (f.along ? f.offset : undefined), inside: f.inside, corner: f.corner, wall: f.wall, on: f.on,
-  row: f.row, grid: f.grid, gap: f.gap, float: !!f.float, from: f.from, to: f.to, via: f.via, width: f.width,
+  row: f.row, grid: f.grid, gap: f.gap, float: !!f.float, from: f.from, to: f.to, via: f.via, width: f.width, across: f.across, span: f.span,
 });
-const hasRelation = (f) => ['at', 'near', 'around', 'against', 'between', 'along', 'inside', 'on', 'free', 'from', 'row', 'grid'].some((k) => f[k] !== undefined);
+const hasRelation = (f) => ['at', 'near', 'around', 'against', 'between', 'along', 'across', 'inside', 'on', 'free', 'from', 'row', 'grid'].some((k) => f[k] !== undefined);
 
 /**
  * place <def> [relations] — the solver turns relations into a pose, dry-runs, walks to the next candidate
@@ -195,7 +197,7 @@ export async function place(defIn, flags = {}) {
   if (flags.rect) shape = { area: rectArea(flags.rect) };
   if (flags.circle) shape = { area: circleArea(flags.circle) };
   const info = await bakeInfo(def, params, shape);
-  if (info.form !== 'point' && !shape && !(info.form === 'path' && (flags.from || flags.between))) throw new Error(`${def} is a ${info.form} def: give ${info.form === 'path' ? '--path \'[[x,z],…]\' [--width w] or --from <ref> --to <ref> [--via x,z]' : '--area \'[[x,z],…]\', --rect cx,cz,w,d or --circle cx,cz,r'}`);
+  if (info.form !== 'point' && !shape && !(info.form === 'path' && (flags.from || flags.between || flags.across))) throw new Error(`${def} is a ${info.form} def: give ${info.form === 'path' ? '--path \'[[x,z],…]\' [--width w] or --from <ref> --to <ref> [--via x,z]' : '--area \'[[x,z],…]\', --rect cx,cz,w,d or --circle cx,cz,r'}`);
   const m = await mirror(); const v = view(m);
   if (flags.free) {
     const near = flags.near ? refPoint(v, flags.near) : flags.at ? refPoint(v, flags.at) : { x: 0, z: 0 };
@@ -346,7 +348,8 @@ export async function select(flags = {}) {
       if (rows.some((x) => x.id === r.parent)) continue;   // children ride with a selected parent
       ops.push(o);
     }
-    if (flags['set-state'] || flags.recolor) ops.push({ op: 'set', id: r.path, state: { ...(flags['set-state'] ? JSON.parse(flags['set-state']) : {}), ...(flags.recolor ? { paint: flags.recolor } : {}) } });
+    if (flags['set-state']) ops.push({ op: 'set', id: r.path, state: JSON.parse(flags['set-state']) });
+    if (flags.recolor) { const d = v.def(r.def); if (d?.state?.paint) ops.push({ op: 'set', id: r.path, state: { paint: flags.recolor } }); else if (d?.params?.color) ops.push({ op: 'set', id: r.path, params: { color: flags.recolor } }); }
     if (flags['set-param']) ops.push({ op: 'set', id: r.path, params: parseKV(flags['set-param']) });
   }
   const res = await act({ ops: ops.slice(0, 256) }, flags.note ?? `bulk ${flags.remove ? 'remove' : 'edit'} of ${rows.length}`);
@@ -372,11 +375,15 @@ export async function look(flags = {}) {
   if (flags.span) span = num(flags.span);
   const cam = camera({ target, span, from: flags.from ?? 's', dist: flags.dist ? num(flags.dist) : undefined, inside: !!flags.inside, height: flags.height ? num(flags.height) : undefined });
   const out = resolve(flags.out ?? `looks/look-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.png`);
-  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags.inside || flags['hide-roofs']), expect: m.snapshot.entities.length, cliPath: SELF };
-  // the shot runs in a child process: its browser connection must not keep this one alive
-  const child = spawnSync(process.execPath, [SELF, 'look-shot', JSON.stringify(args)], { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 1 << 24 });
-  if (child.status !== 0) throw new Error(`look failed: ${(child.stderr || child.stdout || '').trim().slice(0, 500)}`);
-  const shot = JSON.parse(child.stdout.trim().split('\n').pop());
+  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags.inside || flags['hide-roofs']), expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
+  let shot;
+  if (!flags.keep) shot = await shoot(args);
+  else {
+    // a kept browser: the shot runs in a child process so its browser connection does not keep this one alive
+    const child = spawnSync(process.execPath, [SELF, 'look-shot', JSON.stringify(args)], { encoding: 'utf8', cwd: process.cwd(), env: process.env, maxBuffer: 1 << 24 });
+    if (child.status !== 0) throw new Error(`look failed: ${(child.stderr || child.stdout || '').trim().slice(0, 500)}`);
+    shot = JSON.parse(child.stdout.trim().split('\n').pop());
+  }
   if (flags.json) return { ...shot, eye: cam.eye, at: cam.at };
   return `look: ${shot.file}\n  from the ${cam.from} at (${cam.eye.join(', ')}) toward (${cam.at.join(', ')}), ${Math.round(shot.ms / 100) / 10} s${shot.state && !shot.state.ready ? ` (not fully settled: ${JSON.stringify(shot.state)})` : ''}\n  Read the image file; then fix what looks wrong.`;
 }
@@ -391,7 +398,9 @@ export async function exportWorld(file, flags = {}) {
   const prefabChild = (e) => { for (let p = byId.get(e.in.parent); p; p = byId.get(p.in.parent)) if (defOf(p.def)?.make?.kind === 'parts') return true; return false; };
   const custom = [...new Set(s.entities.map((e) => e.def))].map(defOf).filter((d) => d && d.by !== 'core' && !d.ref.startsWith('core-'));
   const order = []; const seen = new Set();
-  const visit = (e) => { if (seen.has(e.id)) return; const par = byId.get(e.in.parent); if (par) visit(par); seen.add(e.id); order.push(e); };
+  const byPathE = new Map(s.entities.map((e) => [pathOf(byId, e), e]));
+  // dependency order: parents first, then whatever a constraint refers to (facing/along/near/inside refs)
+  const visit = (e, depth = 0) => { if (seen.has(e.id) || depth > 64) return; seen.add(e.id); const par = byId.get(e.in.parent); if (par) visit(par, depth + 1); for (const c of e.constraints ?? []) { const ref = c.ref && (byPathE.get(c.ref) ?? byPathE.get(c.ref.slice(0, c.ref.lastIndexOf('/')))); if (ref && ref.id !== e.id) visit(ref, depth + 1); } order.push(e); };
   for (const e of s.entities) visit(e);
   const tmp = new Map(order.map((e, i) => [e.id, `$e${i}`]));
   const ops = order.filter((e) => !prefabChild(e)).map((e) => {
@@ -428,7 +437,11 @@ export async function importWorld(file, flags = {}) {
   }
   return out.join('\n');
 }
-export async function define(json) { const def = typeof json === 'string' ? JSON.parse(existsSync(json) ? readFileSync(json, 'utf8') : json) : json; const r = await act({ ops: [{ op: 'define', def: { schema: 'def/1', ...def } }] }, `define ${def.name}`); return r.accepted ? `defined ${def.name}@${def.version ?? 1} — place it with: place ${def.name}@${def.version ?? 1} --at …` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
+export async function define(json) {
+  const def = typeof json === 'string' ? JSON.parse(existsSync(json) ? readFileSync(json, 'utf8') : json) : json;
+  // a generator-made def exposes the generator's params (ranges, defaults) unless it declares its own
+  if (def.make?.kind === 'gen' && !def.params) { const g = (await schema()).generators?.find((x) => x.id === def.make.gen); if (g && Object.keys(g.params).length) def.params = g.params; }
+  const r = await act({ ops: [{ op: 'define', def: { schema: 'def/1', ...def } }] }, `define ${def.name}`); return r.accepted ? `defined ${def.name}@${def.version ?? 1} — place it with: place ${def.name}@${def.version ?? 1} --at …` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
 /** define-kit <json|file>: a kit/2 prop or creature from rounded primitives. {name, shapes:[{kind, at, size|r|h, color, role…}], tags?, gait?, layer?, slots?, components?, description?} */
 export async function defineKit(json, flags = {}) {
   const k = typeof json === 'string' ? JSON.parse(existsSync(json) ? readFileSync(json, 'utf8') : json) : json;
@@ -466,21 +479,6 @@ export async function prayers() { return ok(await call('/v1/god/prayers'), 'pray
 export async function answer(prayer, text) { return ok(await call('/v1/god/answer', { body: { prayer, text } }), 'answer'); }
 export async function stream(seconds = 60) { return follow(seconds, (e) => console.log(JSON.stringify(e))); }
 export async function status() { const s = load(); const st = ok(await call('/v1/god/status'), 'status'); return `${s.world} — you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ''}; skill ${SKILL_VERSION}`; }
-
-// ---------------------------------------------------------------- SCHEMA.md
-export function schemaMarkdown(s) {
-  const L = ['# SCHEMA — the vocabulary of this world (generated from GET /v1/god/schema)', '', `contract ${s.contract}. Regenerate: \`node eden-god.mjs schema --md > SCHEMA.md\`.`, '', '## Conventions', ...Object.entries(s.conventions).map(([k, v]) => `- **${k}**: ${v}`), ''];
-  L.push('## Generators (what defs are made of; `params` with range and default)');
-  for (const g of s.generators) { L.push(`### ${g.id} (${g.form}${g.owner ? `, ${g.owner}` : ''})`, g.doc); const ps = Object.entries(g.params); if (ps.length) L.push(...ps.map(([k, f]) => `- \`${k}\` ${f.type}${f.values ? ` ${f.values.join('|')}` : ''}${f.min !== undefined ? ` ${f.min}…${f.max}` : ''}${f.default !== undefined ? ` = ${typeof f.default === 'object' ? JSON.stringify(f.default) : f.default}` : ''}${f.doc ? ` — ${f.doc}` : ''}`)); L.push(''); }
-  L.push('## Kit primitives (define-kit shapes)', `kinds: ${s.kit.primitives.join(', ')}`, `roles (animation pivots): ${s.kit.roles.join(', ')}`, '');
-  const shapeProps = s.kit.args?.properties?.shapes?.items?.properties; if (shapeProps) L.push('shape fields: ' + Object.entries(shapeProps).map(([k, f]) => `\`${k}\`${f.enum ? '' : f.type ? ` (${f.type})` : ''}`).join(', '), '');
-  const gaits = s.kit.args?.properties?.gait?.enum; if (gaits) L.push(`gaits: ${gaits.join(', ')}`, '');
-  L.push('## Ops', ...(s.ops.oneOf ?? s.ops.anyOf ?? []).map((o) => `- \`${o.properties?.op?.const}\`: ${Object.keys(o.properties ?? {}).filter((k) => k !== 'op').join(', ')}`), '');
-  L.push('## Constraints (persistent relations on entities)', ...(s.constraints.oneOf ?? s.constraints.anyOf ?? []).map((o) => `- \`${o.properties?.kind?.const}\`: ${Object.keys(o.properties ?? {}).filter((k) => k !== 'kind').join(', ') || '—'}`), '');
-  L.push('## Components', s.components.join(', '), '', '## Slot kinds', s.slotKinds.join(', '), '', '## Materials', s.materials.join(', '), '', '## Refusal codes', s.refusals.join(', '), '');
-  L.push('## Endpoints', ...Object.entries(s.endpoints).map(([k, v]) => `- ${k}: ${v.join(' · ')}`), '');
-  return L.join('\n');
-}
 
 // ---------------------------------------------------------------- cli
 export function parseFlags(argv) {

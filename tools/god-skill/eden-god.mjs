@@ -256,6 +256,8 @@ function pointAlong(path, t) {
   return { p: path[0], dir: [1, 0] };
 }
 var leftOf = (dir) => [dir[1], -dir[0]];
+var SERVER_SIDE_MIRRORED = true;
+var serverSide = (side) => SERVER_SIDE_MIRRORED && side === "left" ? "right" : SERVER_SIDE_MIRRORED && side === "right" ? "left" : side;
 function corners(b) {
   const c = Math.cos(b.yaw), s = Math.sin(b.yaw);
   return [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([i, j]) => [b.c[0] + i * b.half[0] * c + j * b.half[1] * s, b.c[1] - i * b.half[0] * s + j * b.half[1] * c]);
@@ -322,7 +324,7 @@ function solve(v, thing, rel) {
       return row2 ? [{ kind: "facing", ref: row2.path, offset: Math.PI }] : [];
     }
     const row = !compassKey(f) || v.get(f) ? v.get(f) : null;
-    return row ? [{ kind: "facing", ref: row.path, offset: 0 }] : [];
+    return row && row.form === "point" && !row.shape ? [{ kind: "facing", ref: row.path, offset: 0 }] : [];
   };
   const pose = (x, z, yaw2, extra = {}) => ({ ...extra, p: [r22(x), r22(z)], ...yaw2 !== void 0 ? { r: r22(yaw2) } : {}, constraints: [...constraints, ...facingConstraint(), ...extra.constraints ?? []] });
   const finalYaw = (x, z, fallback) => {
@@ -345,6 +347,20 @@ function solve(v, thing, rel) {
     const path = [edge(A, via.length ? { x: via[0][0], z: via[0][1] } : B), ...via, edge(B, via.length ? { x: via.at(-1)[0], z: via.at(-1)[1] } : A)];
     notes.push(`path from ${A.ref ?? a} to ${B.ref ?? b}${via.length ? ` via ${via.length} point(s)` : ""}, ${r22(polylineLength(path))} m`);
     return { items: [{ candidates: [{ shape: { path, ...rel.width ? { width: Number(rel.width) } : {} }, note: notes.at(-1) }] }], notes };
+  }
+  if (rel.across) {
+    const host = v.get(rel.across);
+    if (!host) throw new Error(`no such path: ${rel.across}`);
+    const path = host.shape?.path;
+    if (!path) throw new Error(`${host.path} is not a path`);
+    const t = rel.t !== void 0 ? Number(rel.t) : 0.5;
+    const { p, dir } = pointAlong(path, t), nrm = leftOf(dir);
+    const half = (host.shape.width ?? 4) / 2 + Number(rel.span ?? 3);
+    if (thing.form === "path") {
+      const a = [r22(p[0] - nrm[0] * half), r22(p[1] - nrm[1] * half)], b = [r22(p[0] + nrm[0] * half), r22(p[1] + nrm[1] * half)];
+      return { items: [{ candidates: [{ shape: { path: [a, b], ...rel.width ? { width: Number(rel.width) } : {} }, note: `across ${host.path} at ${Math.round(t * 100)}%, ${r22(2 * half)} m long` }] }], notes };
+    }
+    return { items: [{ candidates: [pose(p[0], p[1], finalYaw(p[0], p[1], yawOf(nrm[0], nrm[1])), { note: `across ${host.path} at ${Math.round(t * 100)}%` })] }], notes };
   }
   if (rel.on) {
     const host = v.get(rel.on);
@@ -473,7 +489,7 @@ function solve(v, thing, rel) {
         const lf = leftOf(q.dir);
         const xx = q.p[0] + lf[0] * sg * off, zz = q.p[1] + lf[1] * sg * off;
         if (dt !== 0 && !free(xx, zz, yaw2)) continue;
-        cands.push(pose(xx, zz, yaw2, { constraints: [{ kind: "along", ref: host.path, t: r22(tt), side, offset: r22(off) }], note: `along ${host.path} at ${Math.round(tt * 100)}%${sg ? `, ${side} side, ${r22(off - pw - hd)} m back from the edge` : ""}` }));
+        cands.push(pose(xx, zz, yaw2, { constraints: [{ kind: "along", ref: host.path, t: r22(tt), side: serverSide(side), offset: r22(sg ? off - pw : 0) }], note: `along ${host.path} at ${Math.round(tt * 100)}%${sg ? `, ${side} side, ${r22(off - pw - hd)} m back from the edge` : ""}` }));
       }
       items2.push({ candidates: cands });
     }
@@ -532,7 +548,8 @@ function solve(v, thing, rel) {
     const isFree = (x, z, yaw2) => free(x, z, yaw2) && !placed.some((b) => obbHit(mine(x, z, yaw2), b, 0.1));
     for (let k = 0; k < n; k++) {
       const cands = [];
-      const ak = a0 + (n > 1 ? 2 * Math.PI * k / n : 0);
+      const fronted = n > 1 && R.kind === "entity" && (R.row.slots ?? []).some((x) => x.kind === "stand" || x.kind === "door" || x.kind === "room");
+      const ak = fronted ? a0 + Math.PI / 6 + (2 * Math.PI - Math.PI / 3) * k / Math.max(1, n - 1) : a0 + (n > 1 ? 2 * Math.PI * k / n : 0);
       const tries = n > 1 ? [0, 0.15, -0.15, 0.3, -0.3] : [0, Math.PI / 4, -Math.PI / 4, Math.PI / 2, -Math.PI / 2, 3 * Math.PI / 4, -3 * Math.PI / 4, Math.PI];
       let fallback = null;
       for (const ring of [0, 2, 5, 10]) for (const da of tries) {
@@ -628,7 +645,48 @@ import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-var GL_ARGS = ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"];
+var GL_ARGS = process.env.EDEN_GOD_GL === "swiftshader" ? ["--use-angle=swiftshader", "--enable-unsafe-swiftshader", "--ignore-gpu-blocklist"] : ["--ignore-gpu-blocklist"];
+var PRESERVE = () => {
+  const orig = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function(type, attrs) {
+    if (/webgl/.test(String(type))) attrs = { ...attrs || {}, preserveDrawingBuffer: true };
+    return orig.call(this, type, attrs);
+  };
+};
+var LEASE = process.env.EDEN_GOD_CHROME_LEASE ?? "/tmp/eden-chrome-lease";
+async function chromeLease(holder = "eden-god", { waitMs = 30 * 6e4, staleMs = 15 * 6e4 } = {}) {
+  if (process.env.EDEN_GOD_NO_LEASE) return () => {
+  };
+  const t0 = Date.now();
+  for (; ; ) {
+    try {
+      mkdirSync(LEASE);
+      writeFileSync3(`${LEASE}/holder`, `${holder} ${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
+`);
+      break;
+    } catch {
+      try {
+        if (Date.now() - statSync(LEASE).mtimeMs > staleMs) {
+          rmSync(LEASE, { recursive: true, force: true });
+          continue;
+        }
+      } catch {
+        continue;
+      }
+      if (Date.now() - t0 > waitMs) throw new Error(`look: the Chrome lease (${LEASE}) has been busy for ${Math.round(waitMs / 6e4)} min`);
+      await new Promise((r) => setTimeout(r, 3e3 + Math.random() * 2e3));
+    }
+  }
+  let released = false;
+  const release = () => {
+    if (!released) {
+      released = true;
+      rmSync(LEASE, { recursive: true, force: true });
+    }
+  };
+  process.once("exit", release);
+  return release;
+}
 var KEEPER = ".eden-god.look.json";
 var IDLE_MS = 20 * 6e4;
 function findPlaywright() {
@@ -654,7 +712,7 @@ function findPlaywright() {
 }
 function camera({ target, span, from = "s", dist, inside = false, height }) {
   const key = from === "above" || from === "top" ? "above" : compassKey(from) ?? "s";
-  const d = dist ?? Math.max(14, span * (inside ? 0.9 : 1.25) + 8);
+  const d = dist ?? Math.max(16, span * (inside ? 1 : 1.2) + 8);
   const el = key === "above" ? 1.35 : inside ? 0.95 : 0.5;
   const u = key === "above" ? [0, 0.08] : COMPASS[key];
   const eye = [target[0] + u[0] * Math.cos(el) * d, target[1] + (height ?? Math.sin(el) * d), target[2] + u[1] * Math.cos(el) * d];
@@ -689,13 +747,7 @@ async function keeper(worldUrl, port) {
   if (!pw) throw new Error("no Playwright package found");
   const browser = await pw.chromium.launch({ channel: "chrome", headless: true, args: [...GL_ARGS, `--remote-debugging-port=${port}`] });
   const ctx = await browser.newContext({ viewport: { width: 1024, height: 640 } });
-  await ctx.addInitScript(() => {
-    const orig = HTMLCanvasElement.prototype.getContext;
-    HTMLCanvasElement.prototype.getContext = function(type, attrs) {
-      if (/webgl/.test(String(type))) attrs = { ...attrs || {}, preserveDrawingBuffer: true };
-      return orig.call(this, type, attrs);
-    };
-  });
+  await ctx.addInitScript(PRESERVE);
   const page = await ctx.newPage();
   await page.goto(`${worldUrl}?shot=1`, { waitUntil: "commit", timeout: 6e5 });
   writeFileSync3(KEEPER, JSON.stringify({ world: worldUrl, port, pid: process.pid, at: Date.now() }));
@@ -747,7 +799,7 @@ function stopKeeper() {
   rmSync(KEEPER, { force: true });
   return k ? `stopped the look keeper (pid ${k.pid})` : "no look keeper running";
 }
-async function shoot({ worldUrl, eye, at, out, hideRoofs = false, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 9e5), settleMs = 800, cliPath }) {
+async function shoot({ worldUrl, eye, at, out, hideRoofs = false, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 6e5), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }) {
   mkdirSync(dirname(resolve(out)), { recursive: true });
   const t0 = Date.now();
   const pw = findPlaywright();
@@ -757,64 +809,91 @@ async function shoot({ worldUrl, eye, at, out, hideRoofs = false, expect = 0, ti
     if (r.status !== 0) throw new Error(`look: no Playwright found and npx playwright-core failed: ${(r.stderr || r.stdout || "").slice(0, 300)}. Install one (npm i -g playwright-core) and Google Chrome`);
     return { file: resolve(out), ms: Date.now() - t0, via: "npx playwright-core screenshot" };
   }
-  const k = await ensureKeeper(worldUrl, cliPath ?? process.argv[1]);
-  const browser = await pw.chromium.connectOverCDP(`http://127.0.0.1:${k.port}`, { timeout: 6e4 });
-  const page = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(worldUrl));
-  if (!page) throw new Error("look: the keeper has no world tab; run `look --stop` and look again");
-  const deadline = Date.now() + timeoutMs;
-  let state = null;
-  while (Date.now() < deadline) {
-    state = await page.evaluate((want) => {
-      const w = window.__simEntity;
-      if (!w?.layer?.active) return { ready: false, why: "loading the viewer" };
-      const drawn = w.layer.drawn;
-      const now = w.layer.now ?? performance.now();
-      const easing = drawn ? [...drawn.values()].filter((d) => (now - d.t0) / 1e3 < d.dur).length : 0;
-      return { ready: (!want || (drawn?.size ?? 0) >= want) && easing === 0, drawn: drawn?.size ?? null, want, easing };
-    }, expect).catch((e) => ({ ready: false, why: String(e.message).slice(0, 80) }));
-    if (state.ready) break;
-    await new Promise((r) => setTimeout(r, 1e3));
-  }
-  const frames = await page.evaluate(([e, a, roofs]) => new Promise((res) => {
-    const w = window.__simEntity;
-    w.controls.target.set(a[0], a[1], a[2]);
-    w.camera.position.set(e[0], e[1], e[2]);
-    w.camera.lookAt(w.controls.target);
-    w.controls.update?.();
-    const hidden = [];
-    if (roofs) w.scene.traverse((o) => {
-      if (o.visible && (/roof/i.test(o.name ?? "") || o.userData?.role === "roof")) {
-        o.visible = false;
-        hidden.push(o);
-      }
+  let page, browser, release = () => {
+  };
+  if (keep) {
+    const k = await ensureKeeper(worldUrl, cliPath ?? process.argv[1]);
+    browser = await pw.chromium.connectOverCDP(`http://127.0.0.1:${k.port}`, { timeout: 6e4 });
+    page = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(worldUrl));
+    if (!page) throw new Error("look: the keeper has no world tab; run `look --stop` and look again");
+  } else {
+    release = await chromeLease("eden-god look");
+    browser = await pw.chromium.launch({ channel: "chrome", headless: true, args: GL_ARGS }).catch((e) => {
+      release();
+      throw new Error(`look: cannot start Chrome (${String(e.message).split("\n")[0]}); install Google Chrome`);
     });
-    window.__lookRestore = () => {
-      for (const o of hidden) o.visible = true;
-    };
-    const canvas = document.querySelector("canvas");
-    if (canvas) {
-      const keep = /* @__PURE__ */ new Set();
-      for (let n2 = canvas; n2; n2 = n2.parentElement) keep.add(n2);
-      for (const n2 of keep) for (const c of n2.children ?? []) if (!keep.has(c)) c.style.visibility = "hidden";
+    const ctx = await browser.newContext({ viewport: { width, height } });
+    await ctx.addInitScript(PRESERVE);
+    page = await ctx.newPage();
+    const q = new URLSearchParams({ shot: "1", eye: eye.join(","), at: at.join(","), settle: "1500" });
+    await page.goto(`${worldUrl}?${q}`, { waitUntil: "commit", timeout: timeoutMs });
+  }
+  try {
+    const deadline = Date.now() + timeoutMs;
+    let state = null, stable = 0, lastDrawn = -1;
+    while (Date.now() < deadline) {
+      state = await page.evaluate((want) => {
+        const w = window.__simEntity;
+        if (!w?.layer?.active) return { ready: false, why: document.title === "no-entity-world" ? "no entity world on this page" : "loading the viewer" };
+        const drawn = w.layer.drawn;
+        const now = w.layer.now ?? performance.now();
+        const easing = drawn ? [...drawn.values()].filter((d) => (now - d.t0) / 1e3 < d.dur).length : 0;
+        return { ready: (!want || (drawn?.size ?? 0) >= Math.floor(want * 0.6)) && easing === 0, drawn: drawn?.size ?? null, want, easing, shotReady: !!window.__shotReady };
+      }, expect).catch((e) => ({ ready: false, why: String(e.message).slice(0, 80) }));
+      if (state.ready && state.drawn === lastDrawn) stable++;
+      else stable = 0;
+      lastDrawn = state.drawn ?? -1;
+      if (state.ready && stable >= 2) break;
+      if (state.why === "no entity world on this page") throw new Error("look: this world has no entity layer");
+      await new Promise((r) => setTimeout(r, 1e3));
     }
-    let n = 0;
-    const t = performance.now();
-    const tick = () => {
-      if (++n >= 4 || performance.now() - t > 12e4) res({ n, ms: Math.round(performance.now() - t), roofsHidden: hidden.length });
-      else requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }), [eye, at, hideRoofs]);
-  await page.waitForTimeout(settleMs);
-  const data = await page.evaluate(() => {
-    const c = [...document.querySelectorAll("canvas")].sort((a, b) => b.width * b.height - a.width * a.height)[0];
-    const d = c ? c.toDataURL("image/png") : null;
-    window.__lookRestore?.();
-    return d;
-  });
-  if (!data) throw new Error("look: no canvas on the page");
-  writeFileSync3(resolve(out), Buffer.from(data.split(",")[1], "base64"));
-  return { file: resolve(out), ms: Date.now() - t0, state, frames, via: "keeper" };
+    const frames = await page.evaluate(([e, a, roofs]) => new Promise((res) => {
+      const w = window.__simEntity;
+      w.controls.target.set(a[0], a[1], a[2]);
+      w.camera.position.set(e[0], e[1], e[2]);
+      w.camera.lookAt(w.controls.target);
+      w.controls.update?.();
+      const hidden = [];
+      if (roofs) w.scene.traverse((o) => {
+        if (o.visible && (/roof/i.test(o.name ?? "") || o.userData?.role === "roof")) {
+          o.visible = false;
+          hidden.push(o);
+        }
+      });
+      window.__lookRestore = () => {
+        for (const o of hidden) o.visible = true;
+      };
+      const canvas = document.querySelector("canvas");
+      if (canvas) {
+        const keep2 = /* @__PURE__ */ new Set();
+        for (let n2 = canvas; n2; n2 = n2.parentElement) keep2.add(n2);
+        for (const n2 of keep2) for (const c of n2.children ?? []) if (!keep2.has(c)) c.style.visibility = "hidden";
+      }
+      let n = 0;
+      const t = performance.now();
+      const tick = () => {
+        if (++n >= 4 || performance.now() - t > 12e4) res({ n, ms: Math.round(performance.now() - t), roofsHidden: hidden.length });
+        else requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }), [eye, at, hideRoofs]);
+    await page.waitForTimeout(settleMs);
+    const data = await page.evaluate(() => {
+      const c = [...document.querySelectorAll("canvas")].sort((a, b) => b.width * b.height - a.width * a.height)[0];
+      const d = c ? c.toDataURL("image/png") : null;
+      window.__lookRestore?.();
+      return d;
+    });
+    if (!data) throw new Error("look: no canvas on the page");
+    writeFileSync3(resolve(out), Buffer.from(data.split(",")[1], "base64"));
+    return { file: resolve(out), ms: Date.now() - t0, state, frames, via: keep ? "keeper" : "chrome" };
+  } finally {
+    if (!keep) {
+      await browser.close().catch(() => {
+      });
+      release();
+    }
+  }
 }
 
 // cli.mjs
@@ -859,6 +938,28 @@ function selectRows(v, f = {}) {
   }
   if (!f.flags) rows = rows.filter((r) => !r.def.includes("flag") || f.def === "flag");
   return rows;
+}
+
+// lib/schema-md.mjs
+function schemaMarkdown(s) {
+  const L = ["# SCHEMA \u2014 the vocabulary of this world (generated from GET /v1/god/schema)", "", `contract ${s.contract}. Regenerate: \`node eden-god.mjs schema --md > SCHEMA.md\`.`, "", "## Conventions", ...Object.entries(s.conventions).map(([k, v]) => `- **${k}**: ${v}`), ""];
+  L.push("## Generators (what defs are made of; `params` with range and default)");
+  for (const g of s.generators) {
+    L.push(`### ${g.id} (${g.form}${g.owner ? `, ${g.owner}` : ""})`, g.doc);
+    const ps = Object.entries(g.params);
+    if (ps.length) L.push(...ps.map(([k, f]) => `- \`${k}\` ${f.type}${f.values ? ` ${f.values.join("|")}` : ""}${f.min !== void 0 ? ` ${f.min}\u2026${f.max}` : ""}${f.default !== void 0 ? ` = ${typeof f.default === "object" ? JSON.stringify(f.default) : f.default}` : ""}${f.doc ? ` \u2014 ${f.doc}` : ""}`));
+    L.push("");
+  }
+  L.push("## Kit primitives (define-kit shapes)", `kinds: ${s.kit.primitives.join(", ")}`, `roles (animation pivots): ${s.kit.roles.join(", ")}`, "");
+  const shapeProps = s.kit.args?.properties?.shapes?.items?.properties;
+  if (shapeProps) L.push("shape fields: " + Object.entries(shapeProps).map(([k, f]) => `\`${k}\`${f.enum ? "" : f.type ? ` (${f.type})` : ""}`).join(", "), "");
+  const gaits = s.kit.args?.properties?.gait?.enum;
+  if (gaits) L.push(`gaits: ${gaits.join(", ")}`, "");
+  L.push("## Ops", ...(s.ops.oneOf ?? s.ops.anyOf ?? []).map((o) => `- \`${o.properties?.op?.const}\`: ${Object.keys(o.properties ?? {}).filter((k) => k !== "op").join(", ")}`), "");
+  L.push("## Constraints (persistent relations on entities)", ...(s.constraints.oneOf ?? s.constraints.anyOf ?? []).map((o) => `- \`${o.properties?.kind?.const}\`: ${Object.keys(o.properties ?? {}).filter((k) => k !== "kind").join(", ") || "\u2014"}`), "");
+  L.push("## Components", s.components.join(", "), "", "## Slot kinds", s.slotKinds.join(", "), "", "## Materials", s.materials.join(", "), "", "## Refusal codes", s.refusals.join(", "), "");
+  L.push("## Endpoints", ...Object.entries(s.endpoints).map(([k, v]) => `- ${k}: ${v.join(" \xB7 ")}`), "");
+  return L.join("\n");
 }
 
 // cli.mjs
@@ -1094,9 +1195,11 @@ var relFrom = (f) => ({
   from: f.from,
   to: f.to,
   via: f.via,
-  width: f.width
+  width: f.width,
+  across: f.across,
+  span: f.span
 });
-var hasRelation = (f) => ["at", "near", "around", "against", "between", "along", "inside", "on", "free", "from", "row", "grid"].some((k) => f[k] !== void 0);
+var hasRelation = (f) => ["at", "near", "around", "against", "between", "along", "across", "inside", "on", "free", "from", "row", "grid"].some((k) => f[k] !== void 0);
 async function place(defIn, flags2 = {}) {
   if (!defIn) throw new Error("usage: place <def> [--at \u2026|--near \u2026|--inside \u2026|--on \u2026|--along \u2026|--against \u2026|--between a b] [--facing \u2026] [--name n] [--param k=v]");
   const def = normDef(defIn);
@@ -1107,7 +1210,7 @@ async function place(defIn, flags2 = {}) {
   if (flags2.rect) shape = { area: rectArea(flags2.rect) };
   if (flags2.circle) shape = { area: circleArea(flags2.circle) };
   const info = await bakeInfo(def, params, shape);
-  if (info.form !== "point" && !shape && !(info.form === "path" && (flags2.from || flags2.between))) throw new Error(`${def} is a ${info.form} def: give ${info.form === "path" ? "--path '[[x,z],\u2026]' [--width w] or --from <ref> --to <ref> [--via x,z]" : "--area '[[x,z],\u2026]', --rect cx,cz,w,d or --circle cx,cz,r"}`);
+  if (info.form !== "point" && !shape && !(info.form === "path" && (flags2.from || flags2.between || flags2.across))) throw new Error(`${def} is a ${info.form} def: give ${info.form === "path" ? "--path '[[x,z],\u2026]' [--width w] or --from <ref> --to <ref> [--via x,z]" : "--area '[[x,z],\u2026]', --rect cx,cz,w,d or --circle cx,cz,r"}`);
   const m = await mirror();
   const v = view(m);
   if (flags2.free) {
@@ -1352,7 +1455,12 @@ async function select(flags2 = {}) {
       if (rows.some((x) => x.id === r.parent)) continue;
       ops.push(o);
     }
-    if (flags2["set-state"] || flags2.recolor) ops.push({ op: "set", id: r.path, state: { ...flags2["set-state"] ? JSON.parse(flags2["set-state"]) : {}, ...flags2.recolor ? { paint: flags2.recolor } : {} } });
+    if (flags2["set-state"]) ops.push({ op: "set", id: r.path, state: JSON.parse(flags2["set-state"]) });
+    if (flags2.recolor) {
+      const d = v.def(r.def);
+      if (d?.state?.paint) ops.push({ op: "set", id: r.path, state: { paint: flags2.recolor } });
+      else if (d?.params?.color) ops.push({ op: "set", id: r.path, params: { color: flags2.recolor } });
+    }
     if (flags2["set-param"]) ops.push({ op: "set", id: r.path, params: parseKV(flags2["set-param"]) });
   }
   const res = await act({ ops: ops.slice(0, 256) }, flags2.note ?? `bulk ${flags2.remove ? "remove" : "edit"} of ${rows.length}`);
@@ -1391,10 +1499,14 @@ async function look(flags2 = {}) {
   if (flags2.span) span = num(flags2.span);
   const cam = camera({ target, span, from: flags2.from ?? "s", dist: flags2.dist ? num(flags2.dist) : void 0, inside: !!flags2.inside, height: flags2.height ? num(flags2.height) : void 0 });
   const out = resolve2(flags2.out ?? `looks/look-${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").slice(0, 19)}.png`);
-  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags2.inside || flags2["hide-roofs"]), expect: m.snapshot.entities.length, cliPath: SELF };
-  const child = spawnSync2(process.execPath, [SELF, "look-shot", JSON.stringify(args)], { encoding: "utf8", cwd: process.cwd(), env: process.env, maxBuffer: 1 << 24 });
-  if (child.status !== 0) throw new Error(`look failed: ${(child.stderr || child.stdout || "").trim().slice(0, 500)}`);
-  const shot = JSON.parse(child.stdout.trim().split("\n").pop());
+  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags2.inside || flags2["hide-roofs"]), expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags2.keep, ...flags2.width ? { width: num(flags2.width) } : {}, ...flags2.h ? { height: num(flags2.h) } : {} };
+  let shot;
+  if (!flags2.keep) shot = await shoot(args);
+  else {
+    const child = spawnSync2(process.execPath, [SELF, "look-shot", JSON.stringify(args)], { encoding: "utf8", cwd: process.cwd(), env: process.env, maxBuffer: 1 << 24 });
+    if (child.status !== 0) throw new Error(`look failed: ${(child.stderr || child.stdout || "").trim().slice(0, 500)}`);
+    shot = JSON.parse(child.stdout.trim().split("\n").pop());
+  }
   if (flags2.json) return { ...shot, eye: cam.eye, at: cam.at };
   return `look: ${shot.file}
   from the ${cam.from} at (${cam.eye.join(", ")}) toward (${cam.at.join(", ")}), ${Math.round(shot.ms / 100) / 10} s${shot.state && !shot.state.ready ? ` (not fully settled: ${JSON.stringify(shot.state)})` : ""}
@@ -1412,11 +1524,16 @@ async function exportWorld(file, flags2 = {}) {
   const custom = [...new Set(s.entities.map((e) => e.def))].map(defOf).filter((d) => d && d.by !== "core" && !d.ref.startsWith("core-"));
   const order = [];
   const seen = /* @__PURE__ */ new Set();
-  const visit = (e) => {
-    if (seen.has(e.id)) return;
-    const par = byId.get(e.in.parent);
-    if (par) visit(par);
+  const byPathE = new Map(s.entities.map((e) => [pathOf(byId, e), e]));
+  const visit = (e, depth = 0) => {
+    if (seen.has(e.id) || depth > 64) return;
     seen.add(e.id);
+    const par = byId.get(e.in.parent);
+    if (par) visit(par, depth + 1);
+    for (const c of e.constraints ?? []) {
+      const ref = c.ref && (byPathE.get(c.ref) ?? byPathE.get(c.ref.slice(0, c.ref.lastIndexOf("/"))));
+      if (ref && ref.id !== e.id) visit(ref, depth + 1);
+    }
     order.push(e);
   };
   for (const e of s.entities) visit(e);
@@ -1471,6 +1588,10 @@ async function importWorld(file, flags2 = {}) {
 }
 async function define(json) {
   const def = typeof json === "string" ? JSON.parse(existsSync4(json) ? readFileSync4(json, "utf8") : json) : json;
+  if (def.make?.kind === "gen" && !def.params) {
+    const g = (await schema()).generators?.find((x) => x.id === def.make.gen);
+    if (g && Object.keys(g.params).length) def.params = g.params;
+  }
   const r = await act({ ops: [{ op: "define", def: { schema: "def/1", ...def } }] }, `define ${def.name}`);
   return r.accepted ? `defined ${def.name}@${def.version ?? 1} \u2014 place it with: place ${def.name}@${def.version ?? 1} --at \u2026` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
 }
@@ -1531,26 +1652,6 @@ async function status() {
   const s = load();
   const st = ok(await call("/v1/god/status"), "status");
   return `${s.world} \u2014 you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ""}; skill ${SKILL_VERSION}`;
-}
-function schemaMarkdown(s) {
-  const L = ["# SCHEMA \u2014 the vocabulary of this world (generated from GET /v1/god/schema)", "", `contract ${s.contract}. Regenerate: \`node eden-god.mjs schema --md > SCHEMA.md\`.`, "", "## Conventions", ...Object.entries(s.conventions).map(([k, v]) => `- **${k}**: ${v}`), ""];
-  L.push("## Generators (what defs are made of; `params` with range and default)");
-  for (const g of s.generators) {
-    L.push(`### ${g.id} (${g.form}${g.owner ? `, ${g.owner}` : ""})`, g.doc);
-    const ps = Object.entries(g.params);
-    if (ps.length) L.push(...ps.map(([k, f]) => `- \`${k}\` ${f.type}${f.values ? ` ${f.values.join("|")}` : ""}${f.min !== void 0 ? ` ${f.min}\u2026${f.max}` : ""}${f.default !== void 0 ? ` = ${typeof f.default === "object" ? JSON.stringify(f.default) : f.default}` : ""}${f.doc ? ` \u2014 ${f.doc}` : ""}`));
-    L.push("");
-  }
-  L.push("## Kit primitives (define-kit shapes)", `kinds: ${s.kit.primitives.join(", ")}`, `roles (animation pivots): ${s.kit.roles.join(", ")}`, "");
-  const shapeProps = s.kit.args?.properties?.shapes?.items?.properties;
-  if (shapeProps) L.push("shape fields: " + Object.entries(shapeProps).map(([k, f]) => `\`${k}\`${f.enum ? "" : f.type ? ` (${f.type})` : ""}`).join(", "), "");
-  const gaits = s.kit.args?.properties?.gait?.enum;
-  if (gaits) L.push(`gaits: ${gaits.join(", ")}`, "");
-  L.push("## Ops", ...(s.ops.oneOf ?? s.ops.anyOf ?? []).map((o) => `- \`${o.properties?.op?.const}\`: ${Object.keys(o.properties ?? {}).filter((k) => k !== "op").join(", ")}`), "");
-  L.push("## Constraints (persistent relations on entities)", ...(s.constraints.oneOf ?? s.constraints.anyOf ?? []).map((o) => `- \`${o.properties?.kind?.const}\`: ${Object.keys(o.properties ?? {}).filter((k) => k !== "kind").join(", ") || "\u2014"}`), "");
-  L.push("## Components", s.components.join(", "), "", "## Slot kinds", s.slotKinds.join(", "), "", "## Materials", s.materials.join(", "), "", "## Refusal codes", s.refusals.join(", "), "");
-  L.push("## Endpoints", ...Object.entries(s.endpoints).map(([k, v]) => `- ${k}: ${v.join(" \xB7 ")}`), "");
-  return L.join("\n");
 }
 function parseFlags(argv) {
   const flags2 = {}, rest = [];
