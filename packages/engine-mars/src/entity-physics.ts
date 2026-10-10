@@ -4,6 +4,7 @@
 // The fold applies it to plain world state (`world.entityPhysicsV1` + `world.entities`), so live, restored and
 // replayed engines agree without ever reading the entity model.
 import { hashOf } from '../../../mars/viewer/engine/core/hash.ts';
+import { pointInObb, type Vec2 } from '../../../mars/viewer/engine/core/math.ts';
 import type { EntityPhysicsV1 } from '../../../mars/viewer/engine/spatial/edits.ts';
 import type { Level, Link, Obstacle, Surface } from '../../../mars/viewer/engine/spatial/types.ts';
 import type { Entity, WorldState } from '../../../mars/viewer/engine/world/types.ts';
@@ -35,14 +36,17 @@ export const emptyEntityPhysics = (): EntityPhysicsV1 => ({ version: 'entity-phy
 export const entityPhysicsHash = (ep: Pick<EntityPhysicsV1, 'levels' | 'byEntity' | 'assets'>) => hashOf({ levels: ep.levels, byEntity: sortKeys(ep.byEntity), assets: sortKeys(ep.assets) });
 function sortKeys<T>(r: Record<string, T>): Record<string, T> { const o: Record<string, T> = {}; for (const k of Object.keys(r).sort()) o[k] = r[k]; return o; }
 
+const RASTER_HALF = 64;
 /** Integer bounds covering every floor (and solid) of the physics, or null when there is none. */
 function floorBounds(ep: EntityPhysicsV1): [number, number, number, number] | null {
   let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
   const add = (c: [number, number], h: [number, number], yaw: number) => { const ca = Math.abs(Math.cos(yaw)), sa = Math.abs(Math.sin(yaw)), hx = h[0] * ca + h[1] * sa, hz = h[0] * sa + h[1] * ca; x0 = Math.min(x0, c[0] - hx); z0 = Math.min(z0, c[1] - hz); x1 = Math.max(x1, c[0] + hx); z1 = Math.max(z1, c[1] + hz); };
   for (const b of Object.values(ep.byEntity)) for (const s of b.surfaces ?? []) add(s.obb.c, s.obb.half, s.obb.yaw);
   if (x0 === Infinity) return null;
-  // round out to 8 m so a small move does not re-base the raster
-  return [Math.floor(x0 / 8) * 8, Math.floor(z0 / 8) * 8, Math.ceil(x1 / 8) * 8, Math.ceil(z1 / 8) * 8];
+  // round out to 8 m so a small move does not re-base the raster; never beyond ±64 m (one flat 0.1 m raster per level;
+  // a wider world waits for L8's tiled Spatial — floors beyond it are simply not walkable yet)
+  const c = (v: number) => Math.max(-RASTER_HALF, Math.min(RASTER_HALF, v));
+  return [c(Math.floor(x0 / 8) * 8), c(Math.floor(z0 / 8) * 8), c(Math.ceil(x1 / 8) * 8), c(Math.ceil(z1 / 8) * 8)];
 }
 
 /** The physics state a world-edit produces from `prev` (pure). */
@@ -96,4 +100,48 @@ export function applyWorldEdit(world: WorldState, e: WorldEditV1): { physics: En
     world.entities[id] = next;
   }
   return { physics, kept };
+}
+
+const AGENT_R = 0.34;
+/**
+ * Stairs whose foot or head sits close to a wall (a cottage flight along its north wall, a landing beside the
+ * stairwell) cannot be entered straight along their heading: the planner's default approach point (0.7 m back)
+ * lands in the wall. For such an end, pick a side approach on that end's own floor, clear of this part's solids,
+ * and record it on the link (`approach`). Ends whose straight approach is clear keep the default (no field).
+ */
+export function withLinkApproaches(part: EntityPartV1): EntityPartV1 {
+  if (!part.links?.length) return part;
+  const solidsAt = (y: number) => (part.solids ?? []).filter((o) => o.y0 < y + 1.7 && o.y1 > y + 0.15);
+  const floorsOf = (level: number) => (part.surfaces ?? []).filter((s) => s.level === level);
+  const onFloor = (p: Vec2, level: number) => {
+    if (level === 0) return true; // level 0 is the ground itself (and the floors laid on it)
+    const fl = floorsOf(level);
+    return [[0, 0], [AGENT_R, 0], [-AGENT_R, 0], [0, AGENT_R], [0, -AGENT_R]].every(([dx, dz]) => fl.some((s) => pointInObb([p[0] + dx, p[1] + dz], s.obb)));
+  };
+  const clear = (a: Vec2, b: Vec2, y: number, level: number) => {
+    const ss = solidsAt(y);
+    for (let k = 0; k <= 4; k++) {
+      const t = k / 4, q: Vec2 = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t], r = k === 4 ? AGENT_R + 0.04 : AGENT_R * 0.9;
+      if (ss.some((o) => pointInObb(q, o.obb, r))) return false;
+      if (k === 4 && !onFloor(q, level)) return false;
+    }
+    return true;
+  };
+  const r3 = (v: number) => Math.round(v * 1000) / 1000;
+  for (const l of part.links) {
+    const dir: Vec2 = [Math.cos(l.heading), Math.sin(l.heading)];
+    const pick = (end: { level: number; p: Vec2; y: number }, out: Vec2): Vec2 | null => {
+      const straight: Vec2 = [end.p[0] + out[0] * 0.7, end.p[1] + out[1] * 0.7];
+      if (clear(end.p, straight, end.y, end.level)) return null;
+      for (const d of [0.7, 0.9, 1.1]) for (const deg of [30, -30, 60, -60, 90, -90, 120, -120]) {
+        const a = (deg * Math.PI) / 180, c = Math.cos(a), s = Math.sin(a);
+        const q: Vec2 = [r3(end.p[0] + (out[0] * c - out[1] * s) * d), r3(end.p[1] + (out[0] * s + out[1] * c) * d)];
+        if (clear(end.p, q, end.y, end.level)) return q;
+      }
+      return null;
+    };
+    const from = pick(l.from, [-dir[0], -dir[1]]), to = pick(l.to, dir);
+    if (from || to) l.approach = { ...(from ? { from } : {}), ...(to ? { to } : {}) };
+  }
+  return part;
 }

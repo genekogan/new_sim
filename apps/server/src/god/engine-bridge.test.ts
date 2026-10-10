@@ -17,11 +17,9 @@ import { runQuery } from './query.ts';
 /* eslint-disable @typescript-eslint/no-explicit-any */
 export const HOUSE_BATCH = (at: [number, number] = [10, 0]) => ({ ops: [
   { op: 'define', def: { schema: 'def/1', name: 'house2', version: 1, description: 'A two-floor house.', tags: ['building'], size: { box: [8, 6, 6] }, make: { kind: 'gen', gen: 'building/1' }, params: { floors: { type: 'int', min: 1, max: 6, default: 2 } }, state: { doors: { type: 'json', default: {} } }, components: { foundation: { kind: 'none' } } } },
-  { op: 'define', def: { schema: 'def/1', name: 'flight', version: 1, description: 'A straight flight of stairs.', tags: ['stairs'], size: { box: [1.1, 2.8, 3.2] }, make: { kind: 'gen', gen: 'stairs/1' }, params: { rise: { type: 'number', default: 2.8 }, run: { type: 'number', default: 3.2 }, width: { type: 'number', default: 1.1 } } } },
   { op: 'place', tmp: '$h', def: 'house2@1', name: 'house', p: at },
-  { op: 'place', def: 'flight@1', name: 'stairs', in: { parent: '$h', slot: 'ground' }, p: [2.9, 0, 0] },
-  { op: 'place', def: coreRef('chair'), name: 'chair', in: { parent: '$h', slot: 'floor-1' }, p: [-2, 0, -1] },
-  { op: 'place', tmp: '$t', def: coreRef('table'), name: 'table', in: { parent: '$h', slot: 'floor-1' }, p: [2, 0, 1.2] },
+  { op: 'place', def: coreRef('chair'), name: 'chair', in: { parent: '$h', slot: 'floor-1' }, p: [-2, 0, 1] },
+  { op: 'place', tmp: '$t', def: coreRef('table'), name: 'table', in: { parent: '$h', slot: 'floor-1' }, p: [2, 0, 1] },
   { op: 'place', def: coreRef('bowl'), name: 'bowl', in: { parent: '$t', slot: 'top' } },
 ] });
 
@@ -42,15 +40,15 @@ test('Souls among god-built things: enter, climb, sit, carry, pray; bodies refus
   const r = w.god.act(HOUSE_BATCH(), 'two-floor house');
   assert.equal(r.accepted, true, JSON.stringify(r));
   await w.settle(3);
-  const E = w.host.engine as any, ids = Object.fromEntries(['house', 'house/stairs', 'house/chair', 'house/table', 'house/table/bowl'].map((p) => [p, w.god.model.get(p)!.id]));
+  const E = w.host.engine as any, ids = Object.fromEntries(['house', 'house/chair', 'house/table', 'house/table/bowl'].map((p) => [p, w.god.model.get(p)!.id]));
   const ep = E.world.entityPhysicsV1;
   assert.ok(ep?.byEntity[ids.house]?.solids?.length >= 5, 'walls');
-  assert.deepEqual([...new Set(ep.byEntity[ids.house].surfaces.map((x: any) => x.level))].sort(), [0, 1], 'two floors (one surface per room)');
-  assert.equal(ep.byEntity[ids['house/stairs']].links.length, 1, 'stairs');
+  assert.ok(ep.byEntity[ids.house].surfaces.some((x: any) => x.level === 1), 'an upper floor');
+  assert.equal(ep.byEntity[ids.house].links.length, 1, 'its own stairs (L2 building/1)');
   assert.ok(E.world.entities[ids['house/chair']]?.tags.includes('entity-world'), 'chair registered with the same id');
   assert.equal(E.world.entities[ids['house/table/bowl']]?.support?.kind, 'resting-on');
   // reach: from the lawn to the upstairs room, through the door and up the stairs
-  const reach = runQuery(w.god.model, { reach: { from: [10, 9], to: 'house:bedroom-2' } }).reach as any;
+  const reach = runQuery(w.god.model, { reach: { from: [10, 9], to: 'house:floor-1' } }).reach as any;
   assert.equal(reach.reachable, true, JSON.stringify(reach)); assert.ok(reach.levels.includes(1));
 
   // a Soul born through the owner flow gets a body entity with the engine's id
@@ -70,6 +68,7 @@ test('Souls among god-built things: enter, climb, sit, carry, pray; bodies refus
   assert.equal(E.world.entities[row.entity_id].human.level, 1, 'upstairs');
 
   // the god cannot remove the chair (or the house around it) while Ana sits on it
+  assert.deepEqual((runQuery(w.god.model, { entity: 'house/chair' }).entity as any).usedBy, { soul: 'Ana', body: row.entity_id, how: 'occupied', thing: 'house/chair' }, 'query shows who uses it');
   for (const id of [ids['house/chair'], ids.house]) {
     const no = w.god.act({ ops: [{ op: 'remove', id }] }) as any;
     assert.equal(no.accepted, false); assert.equal(no.failures[0].code, 'occupied.by-body'); assert.match(no.failures[0].detail, /Ana/);
@@ -138,5 +137,106 @@ test('a god edit that would bury a standing Soul lifts it clear, and says so', {
   const p = E.world.entities[row.entity_id].pose.p;
   assert.ok(Math.abs(p[2] - at[1]) > 0.5 || Math.abs(p[0] - at[0]) > 2.2, `Bo stepped clear: ${p} (was ${at})`);
   assert.ok(E.clearanceAtV1(p[0], p[2]) >= 0.27, 'standing on clear ground');
+  assert.deepEqual(E.runtime.violations, []);
+  // retirement removes the body entity from the entity world
+  assert.ok(w.god.model.entities.has(row.entity_id));
+  await accept(w.host, w.souls.retire(w.db.soul(row.id)!));
+  await w.settle(4);
+  assert.equal(w.god.model.entities.has(row.entity_id), false, 'body entity archived');
+});
+
+test('L3 shapes in the engine: a garden wall makes Souls go round, a deck is walkable, a far road does not widen the raster', { timeout: 300000 }, async (t) => {
+  const w = await world();
+  w.brain.quiesce();
+  t.after(() => { w.brain.quiesce(); w.host.stop(); w.db.close(); });
+  await w.settle(2);
+  const before = runQuery(w.god.model, { reach: { from: [0, 0], to: [0, 12] } }).reach as any;
+  assert.equal(before.reachable, true, JSON.stringify(before));
+  const r: any = w.god.act({ ops: [
+    { op: 'place', def: coreRef('garden-wall'), name: 'wall', shape: { path: [[-12, 6], [12, 6]] }, params: { gates: 0 } },
+    { op: 'place', def: coreRef('deck'), name: 'deck', shape: { area: [[-4, -18], [4, -18], [4, -12], [-4, -12]] } },
+    { op: 'place', def: coreRef('road'), name: 'far-road', shape: { path: [[200, -100], [200, 100]] } },
+  ] });
+  if (!r.accepted) { t.diagnostic(JSON.stringify(r).slice(0, 600)); }
+  assert.equal(r.accepted, true);
+  await w.settle(3);
+  const E = w.host.engine as any, ep = E.world.entityPhysicsV1;
+  const wall = w.god.model.get('wall')!.id, deck = w.god.model.get('deck')!.id, road = w.god.model.get('far-road')!.id;
+  assert.ok(ep.byEntity[wall]?.solids?.length, 'wall solids');
+  assert.ok(ep.byEntity[deck]?.surfaces?.length, 'deck floor');
+  assert.equal(ep.byEntity[road], undefined, 'a road is ground cover, not engine physics');
+  assert.ok(!ep.bounds || ep.bounds.every((v: number) => Math.abs(v) <= 64), `raster bounded: ${ep.bounds}`);
+  const after = runQuery(w.god.model, { reach: { from: [0, 0], to: [0, 12] } }).reach as any;
+  assert.equal(after.reachable, true, JSON.stringify(after));
+  assert.ok(after.length > before.length + 8, `goes round the wall: ${before.length} → ${after.length}`);
+  const onDeck = runQuery(w.god.model, { reach: { from: [0, 0], to: 'deck' } }).reach as any;
+  assert.equal(onDeck.reachable, true, JSON.stringify(onDeck));
+  // a fence across the south field with one closed gate: Souls go round it; opening the gate lets them through
+  const r2: any = w.god.act({ ops: [
+    { op: 'place', def: coreRef('fence'), name: 'fence', shape: { path: [[-40, -22], [40, -22]] }, params: { gates: [{ at: 40, width: 1.6 }] } },
+    { op: 'place', def: coreRef('footbridge'), name: 'span', shape: { path: [[20, -8], [20, 8]] } },
+  ] });
+  assert.equal(r2.accepted, true, JSON.stringify(r2).slice(0, 600));
+  await w.settle(3);
+  const fence = w.god.model.get('fence')!.id, span = w.god.model.get('span')!;
+  const gate = (E.world.entityPhysicsV1.byEntity[fence]?.solids ?? []).find((x: any) => x.id.endsWith('#door:gate-1'));
+  assert.ok(gate, 'closed gate blocks its gap');
+  assert.ok(Math.abs(gate.y0 - w.god.model.terrain.sample(0, -22)) < 0.05 && gate.y1 - gate.y0 > 0.8, `gate stands on the ground: ${gate.y0}..${gate.y1}`);
+  // the fence runs past both edges of the field, so a closed gate cuts the south strip off
+  const shut = runQuery(w.god.model, { reach: { from: [0, -20], to: [0, -26] } }).reach as any;
+  assert.equal(shut.reachable, false, `closed gate: ${JSON.stringify(shut).slice(0, 200)}`);
+  const r3: any = w.god.act({ ops: [{ op: 'set', id: fence, params: { gates: [{ at: 40, width: 1.6, state: 'open' }] } }] });
+  assert.equal(r3.accepted, true, JSON.stringify(r3).slice(0, 400));
+  await w.settle(3);
+  assert.ok(!(E.world.entityPhysicsV1.byEntity[fence]?.solids ?? []).some((x: any) => x.id.includes('#door:')), 'open gate: no blocker');
+  const open = runQuery(w.god.model, { reach: { from: [0, -20], to: [0, -26] } }).reach as any;
+  assert.equal(open.reachable, true, JSON.stringify(open));
+  assert.ok(open.length < 12, `through the open gate: ${open.length}`);
+  // a footbridge: deck quads on level 0 at their own (absolute) heights, rails block, the deck is reachable
+  const sp = E.world.entityPhysicsV1.byEntity[span.id];
+  t.diagnostic(`footbridge params.at=${JSON.stringify(span.params?.at)} surfaces=${sp?.surfaces?.length} rails=${sp?.solids?.length}`);
+  assert.ok(sp?.surfaces?.length >= 2 && sp.surfaces.every((x: any) => x.level === 0), 'deck quads on level 0');
+  const onSpan = runQuery(w.god.model, { reach: { from: [20, -12], to: [20, 0] } }).reach as any;
+  assert.equal(onSpan.reachable, true, JSON.stringify(onSpan));
+});
+
+test('Souls in an L2 cottage: lawn → front door → stairs → bedroom chair; rooms are reach ends', { timeout: 300000}, async (t) => {
+  const w = await world();
+  w.brain.quiesce();
+  t.after(() => { w.brain.quiesce(); w.host.stop(); w.db.close(); });
+  await w.settle(2);
+  const r: any = w.god.act({ ops: [
+    { op: 'define', def: { schema: 'def/1', name: 'cottage2', version: 1, description: 'A two-floor cottage.', tags: ['building'], size: { box: [8, 6, 6] }, make: { kind: 'gen', gen: 'building/1' }, params: { floors: { type: 'int', min: 1, max: 6, default: 2 } }, components: { foundation: { kind: 'none' } } } },
+    { op: 'place', tmp: '$h', def: 'cottage2@1', name: 'house', p: [10, 0] },
+    { op: 'place', def: coreRef('chair'), name: 'chair', in: { parent: '$h', slot: 'floor-1' }, p: [-2, 0, 1] },
+  ] });
+  assert.equal(r.accepted, true, JSON.stringify(r).slice(0, 600));
+  await w.settle(3);
+  const E = w.host.engine as any, house = w.god.model.get('house')!.id, chair = w.god.model.get('house/chair')!.id;
+  const part = E.world.entityPhysicsV1.byEntity[house];
+  t.diagnostic(`cottage: ${part.solids.length} solids, ${part.surfaces.length} floors on levels ${[...new Set(part.surfaces.map((x: any) => x.level))]}, ${part.links?.length ?? 0} links; levels ${JSON.stringify(E.world.entityPhysicsV1.levels)}`);
+  assert.ok(part.links?.length >= 1, 'stairs link');
+  assert.ok(part.surfaces.some((x: any) => x.level === 1), 'upper floor');
+  for (const l of part.links) { const a = l.from.p, z = l.to.p; t.diagnostic(`link ${l.id} ${l.from.level}→${l.to.level} bottom ${a} clear0=${E.clearanceAtV1(a[0], a[1], l.from.level).toFixed(2)} top ${z} clear1=${E.clearanceAtV1(z[0], z[1], l.to.level).toFixed(2)}; mid-landing clear1=${E.clearanceAtV1(10, -1.35, 1).toFixed(2)} bedroom=${E.clearanceAtV1(8.08, 1, 1).toFixed(2)} approach=${JSON.stringify(l.approach)} ${l.approach?.from ? `a0=${E.clearanceAtV1(l.approach.from[0], l.approach.from[1], 0).toFixed(2)}` : ""} ${l.approach?.to ? `a1=${E.clearanceAtV1(l.approach.to[0], l.approach.to[1], 1).toFixed(2)}` : ""} heading=${l.heading}`); }
+  // a three-storey house: two flights, the second turning back over the first
+  const r3: any = w.god.act({ ops: [{ op: 'place', def: 'cottage2@1', name: 'tall', p: [-12, 14], params: { floors: 3 } }] });
+  assert.equal(r3.accepted, true, JSON.stringify(r3).slice(0, 400));
+  await w.settle(3);
+  for (const to of ['house:living', 'house:bedroom', 'house:bedroom-2', 'house:floor-1', 'tall:floor-2']) {
+    const q = runQuery(w.god.model, { reach: { from: [10, 10], to } }).reach as any;
+    t.diagnostic(`reach ${to}: ${JSON.stringify(q).slice(0, 220)}`);
+    assert.equal(q.reachable, true, `${to}: ${JSON.stringify(q)}`);
+  }
+  await invite(w, 'cy');
+  const row: any = await accept(w.host, w.souls.create('dev:cy', { name: 'Cy', description: 'sits upstairs' }));
+  await w.settle(3);
+  const soul = { soulId: row.id, entityId: row.entity_id, name: row.name, owner: row.owner };
+  const until = async (pred: () => boolean, n = 4000) => { for (let i = 0; i < n && !pred(); i++) { w.host.tickOnce(); if (i % 20 === 0) { await setImmediate(); w.host.drainInputs(); } } await w.settle(2); return pred(); };
+  const sit: any = await accept(w.host, w.edge.act(soul, { capability: `sit:${chair}`, params: { seconds: 600 } }));
+  assert.equal(sit.accepted, true, JSON.stringify(sit));
+  assert.ok(await until(() => E.world.entities[row.entity_id].human.activity === 'sit'), `seated: ${JSON.stringify(E.world.entities[row.entity_id].human).slice(0, 300)}`);
+  assert.equal(E.world.entities[row.entity_id].human.level, 1, 'upstairs');
+  const no: any = w.god.act({ ops: [{ op: 'remove', id: house }] });
+  assert.equal(no.failures?.[0]?.code, 'occupied.by-body'); assert.match(no.failures[0].detail, /Cy/);
   assert.deepEqual(E.runtime.violations, []);
 });

@@ -8,12 +8,12 @@
 // Fastest working path on the engine's existing structures (nav/1-style static scene re-base, CATALOG fixtures);
 // the per-tile patch follows L8's tiled Spatial.
 import { applyBatch, type Diff, type Entity, type Op, type Result, type StoredDef, type WorldModel } from '@sim/world-compiler';
-import { assetFromDef, assetIdFor, isFixtureDef, nearestSurfaceSlot, nextEntityPhysics, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
+import { assetFromDef, assetIdFor, isFixtureDef, nearestSurfaceSlot, nextEntityPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
 import type { WorldHost } from '../world.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { GodMode } from './god.ts';
-import { reachProviders, type ReachEnd } from './query.ts';
+import { reachProviders, usesProviders, type ReachEnd } from './query.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -57,7 +57,10 @@ export class EngineBridge {
       onApplied: (e) => { if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
     });
     reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
-    this.guardGod();
+    usesProviders.set(this.god.model, (id) => { const u = this.usesOf(id); return u ? { soul: u.soul, body: u.body, how: u.how, thing: this.model.pathOf(u.id) } : null; });
+    // body-aware edits: the compiler hook when GodMode has it (lead patch 5), else wrap its entry points
+    if ('bodies' in (this.god as object)) (this.god as unknown as { bodies: unknown }).bodies = { uses: (id: string) => this.usesOne(id), lifted: (ids: string[]) => this.buried(ids) };
+    else this.guardGod();
     if (this.edge) this.hookEdge(this.edge);
   }
   private get engine(): EngineV1 { return this.host.engine as unknown as EngineV1; }
@@ -137,7 +140,10 @@ export class EngineBridge {
     const def = this.model.resolvedDef(e.def); if (!def) return null;
     const baked = this.model.bake(def, e.params ?? {}, e.seed ?? 0, e.shape);
     const wp = this.model.worldPose(e);
-    const toWorld = (x: number, z: number): Vec2 => { const c = Math.cos(wp.yaw), s = Math.sin(wp.yaw); return [r3(wp.x + (x * c + z * s) * wp.s), r3(wp.z + (-x * s + z * c) * wp.s)]; };
+    // path/area forms at the root carry world-frame geometry (L3): heights ground-relative unless `abs`
+    const worldFrame = def.form !== 'point' && e.in.parent === 'world';
+    const toWorld = (x: number, z: number): Vec2 => { if (worldFrame) return [r3(x), r3(z)]; const c = Math.cos(wp.yaw), s = Math.sin(wp.yaw); return [r3(wp.x + (x * c + z * s) * wp.s), r3(wp.z + (-x * s + z * c) * wp.s)]; };
+    const heightAt = (y: number, at: Vec2, abs?: boolean) => r3(worldFrame ? (abs ? y : this.model.terrain.sample(at[0], at[1]) + y) : wp.y + y * wp.s);
     const part: Part = {};
     if (isFixtureDef(def)) {
       const facts = factsOf(def, baked, wp.s);
@@ -147,7 +153,7 @@ export class EngineBridge {
       return part;
     }
     // solids: wall segments and blocks (solid layer only; a def's own stair treads are walked by its links)
-    if (def.layer === 'solid' && baked.colliders.length) {
+    if ((def.layer === 'solid' || def.layer === 'surface') && baked.colliders.length) {
       const fp = this.model.footprint(e, def);
       const solids = fp.map((o, i) => ({ o, local: baked.colliders[i] })).filter(({ local }) => !(baked.links?.length && local.y1 - local.y0 <= 0.5));
       if (solids.length) part.solids = solids.map(({ o, local }, i) => ({ id: `${e.id}#c${i}`, obb: { c: [r3(o.c[0]), r3(o.c[1])] as Vec2, half: [r3(o.half[0]), r3(o.half[1])] as Vec2, yaw: r3(-o.yaw) }, y0: r3(o.y0), y1: r3(o.y1), kind: 'fixture' as const, label: `${this.model.pathOf(e.id)}${local.tag ? ' ' + local.tag : ''}`.slice(0, 100) }));
@@ -157,29 +163,56 @@ export class EngineBridge {
     for (const o of baked.openings ?? []) {
       const closed = doorState[o.id] === 'closed' || (doorState[o.id] === undefined && o.state === 'closed') || (def.components.opening && e.state?.open === false);
       if (!closed) continue;
-      const c = toWorld(o.at[0], o.at[1]);
-      (part.solids ??= []).push({ id: `${e.id}#door:${o.id}`, obb: { c, half: [r3((o.width / 2) * wp.s), r3(0.08 * wp.s)], yaw: r3(-(wp.yaw + o.yaw)) }, y0: r3(wp.y + (o.sill ?? 0) * wp.s), y1: r3(wp.y + ((o.sill ?? 0) + o.height) * wp.s), kind: 'fixture' as const, label: `${this.model.pathOf(e.id)} ${o.id} (closed)` });
+      // a gate of a world-frame wall/fence sits on the ground under it (sill and height are ground-relative)
+      const c = toWorld(o.at[0], o.at[1]), sc = worldFrame ? 1 : wp.s;
+      (part.solids ??= []).push({ id: `${e.id}#door:${o.id}`, obb: { c, half: [r3((o.width / 2) * sc), r3(0.08 * sc)], yaw: r3(-((worldFrame ? 0 : wp.yaw) + o.yaw)) }, y0: heightAt(o.sill ?? 0, c), y1: heightAt((o.sill ?? 0) + o.height, c), kind: 'fixture' as const, label: `${this.model.pathOf(e.id)} ${o.id} (closed)` });
     }
     // floors: polygons → oriented rectangles on levels
     const surfaces = [...(baked.surfaces ?? [])];
     if (!surfaces.length && def.components.floor) { const [w, , d] = baked.box; surfaces.push({ level: 0, y: def.components.floor.y ?? baked.box[1], polygon: [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]] }); }
-    if (surfaces.length) part.surfaces = surfaces.map((s, i) => {
-      const r = rectOf(s.polygon);
-      const y = r3(wp.y + s.y * wp.s);
-      const c = toWorld(r.c[0], r.c[1]), level = this.levelFor(y, c);
-      return { id: `${e.id}#f${i}`, level, y: level === 0 && Math.abs(y) <= GROUND_BAND ? 0 : y, obb: { c, half: [r3(r.half[0] * wp.s), r3(r.half[1] * wp.s)] as Vec2, yaw: r3(-(wp.yaw + r.yaw)) }, label: `${this.model.pathOf(e.id)} ${s.tag ?? 'floor'}`.slice(0, 100) };
+    // ground cover (roads, lawns, plazas: ground-relative level-0 surfaces of world-frame shapes) is the ground itself
+    const floors = surfaces.filter((x) => !(worldFrame && !(x as { abs?: boolean }).abs && x.level === 0));
+    if (floors.length) part.surfaces = floors.map((s, i) => {
+      const r = rectOf(s.polygon), abs = (s as { abs?: boolean }).abs;
+      const c = toWorld(r.c[0], r.c[1]), y = heightAt(s.y, c, abs);
+      // decks and bridges of world-frame shapes are walked from the ground: level 0 at their own height (L8 slabs)
+      const level = worldFrame && abs && s.level === 0 ? 0 : this.levelFor(y, c);
+      const sc = worldFrame ? 1 : wp.s, yaw = worldFrame ? r.yaw : wp.yaw + r.yaw;
+      return { id: `${e.id}#f${i}`, level, y: level === 0 && Math.abs(y) <= GROUND_BAND ? 0 : y, obb: { c, half: [r3(r.half[0] * sc), r3(r.half[1] * sc)] as Vec2, yaw: r3(-yaw) }, label: `${this.model.pathOf(e.id)} ${s.tag ?? 'floor'}`.slice(0, 100) };
     });
+    // doorways of upper storeys: the wall's thickness has no floor polygon under it, so lay a threshold strip
+    for (const o of baked.openings ?? []) {
+      if (o.kind === 'window' || worldFrame) continue;
+      const storey = surfaces.filter((x) => x.level === o.level);
+      if (!o.level || !storey.length) continue;
+      const c = toWorld(o.at[0], o.at[1]), y = heightAt(storey[0].y, c), level = this.levelFor(y, c);
+      if (level === 0) continue;
+      (part.surfaces ??= []).push({ id: `${e.id}#t:${o.id}`, level, y, obb: { c, half: [r3((o.width / 2) * wp.s), r3(0.3 * wp.s)], yaw: r3(-(wp.yaw + o.yaw)) }, label: `${this.model.pathOf(e.id)} ${o.id} threshold`.slice(0, 100) });
+    }
     // stairs, ramps, ladders: links between levels
     if (baked.links?.length) part.links = baked.links.filter((l) => l.path.length >= 2).map((l) => {
       const a = toWorld(l.path[0][0], l.path[0][1]), b = toWorld(l.path[l.path.length - 1][0], l.path[l.path.length - 1][1]);
-      const ya = r3(wp.y + l.y0 * wp.s), yb = r3(wp.y + l.y1 * wp.s);
+      const ya = heightAt(l.y0, a), yb = heightAt(l.y1, b);
       const n = Math.max(2, Math.ceil(Math.abs(yb - ya) / 0.18) + 1), path: [number, number, number][] = [];
       for (let k = 0; k < n; k++) { const t = k / (n - 1); path.push([r3(a[0] + (b[0] - a[0]) * t), r3(ya + (yb - ya) * t), r3(a[1] + (b[1] - a[1]) * t)]); }
       const kind = l.kind === 'float' ? 'climb' : l.kind;
       const la = this.levelFor(ya, a), lb = this.levelFor(yb, b);
       return { id: `${e.id}#${l.id}`, kind: kind as 'stairs' | 'ramp' | 'ladder' | 'climb', from: { level: la, p: a, y: la === 0 && Math.abs(ya) <= GROUND_BAND ? 0 : ya }, to: { level: lb, p: b, y: lb === 0 && Math.abs(yb) <= GROUND_BAND ? 0 : yb }, width: r3(l.width * wp.s), heading: r3(Math.atan2(b[1] - a[1], b[0] - a[0])), path, usable: true };
     });
-    return part.solids || part.surfaces || part.links ? part : null;
+    // each flight's ends: its under-stair block stops short of the foot (the first tread is stepped onto, not walked
+    // under) and a head tread on the upper level bridges the stairwell edge, so both ends have standing room
+    for (const l of part.links ?? []) {
+      if (l.kind !== 'stairs' && l.kind !== 'ramp') continue;
+      const lid = l.id.slice(e.id.length + 1), d: Vec2 = [Math.cos(l.heading), Math.sin(l.heading)], T = 0.4;
+      for (const o of part.solids ?? []) {
+        if (!o.label.endsWith(` stairs:${lid}`)) continue;
+        const along = Math.abs(Math.cos(o.obb.yaw - l.heading)) > 0.7 ? 0 : 1;
+        if (o.obb.half[along] <= T) continue;
+        o.obb.half[along] = r3(o.obb.half[along] - T / 2); o.obb.c = [r3(o.obb.c[0] + d[0] * T / 2), r3(o.obb.c[1] + d[1] * T / 2)];
+      }
+      if (l.to.level > 0) (part.surfaces ??= []).push({ id: `${l.id}:head`, level: l.to.level, y: l.to.y, obb: { c: [r3(l.to.p[0] - d[0] * 0.25), r3(l.to.p[1] - d[1] * 0.25)], half: [0.35, r3(l.width / 2)], yaw: l.heading }, label: `${this.model.pathOf(e.id)} ${lid} head`.slice(0, 100) });
+    }
+    return part.solids || part.surfaces || part.links ? withLinkApproaches(part) : null;
   }
 
   private fixtureSpec(e: Entity, def: StoredDef, asset: string, a: { surfaceSlots?: { id: string; local: [number, number, number] }[]; category: string }, wp: { x: number; y: number; z: number; yaw: number }): FixtureSpecV1 {
@@ -207,14 +240,30 @@ export class EngineBridge {
 
   /** Trusted engine edit: journaled (by 'engine', never undone by the god), published to viewers, not echoed back. */
   engineAct(ops: Op[], note: string): Result {
-    const god = this.god as any, tick = this.god.opts.tick();
+    const god = this.god as any;
+    if (typeof god.engineAct === 'function') {
+      const r = god.engineAct(ops, note) as Result;
+      if (r.accepted) this.noteSent(ops);
+      return r;
+    }
+    const tick = this.god.opts.tick();
     const r = applyBatch(this.model, { ops }, 'engine', tick, { trusted: true });
     if (!r.result.accepted) return r.result;
     this.god.store.commit(this.model, this.god.owner, r.diff!, { seq: r.result.seq, by: 'engine', at: Date.now(), note, ops, inverse: [], kind: 'engine' as never });
     this.god.db.db.prepare('UPDATE world_edits_v1 SET undone=1 WHERE world_id=? AND seq=?').run(this.god.opts.worldId, r.result.seq);
     god.publish?.(r.result.seq, tick, r.diff!, 'engine');
-    for (const e of r.diff!.upserts) { const part = this.engineOwned(e) ? undefined : this.derive(e, {}, this.physics?.assets ?? {}); if (part !== undefined) this.sent.set(e.id, JSON.stringify(normPart(part ?? {}))); }
+    this.noteSent(ops);
     return r.result;
+  }
+  /** After an engine edit: what the engine already knows about the touched entities (no echo back to it). */
+  private noteSent(ops: Op[]) {
+    const ids = new Set<string>();
+    for (const op of ops as any[]) { if (typeof op.id === 'string') ids.add(op.id); if (op.entity?.id) ids.add(op.entity.id); }
+    for (const id of ids) for (const sid of this.model.entities.has(id) ? this.model.subtree(id) : []) {
+      const e = this.model.entities.get(sid)!;
+      const part = this.engineOwned(e) ? undefined : this.derive(e, {}, this.physics?.assets ?? {});
+      if (part !== undefined) this.sent.set(e.id, JSON.stringify(normPart(part ?? {})));
+    }
   }
 
   /** Items the Souls moved: write their new support back as entity-world moves. */
@@ -288,6 +337,17 @@ export class EngineBridge {
     }
     return null;
   }
+  /** The compiler hook (one entity, no subtree walk): a body, a thing in a body's hands, a seat or item in use. */
+  usesOne(id: string): { code: 'occupied.by-body' | 'held.by-body'; detail: string } | null {
+    const e = this.model.entities.get(id); if (!e) return null;
+    if (this.model.resolvedDef(e.def)?.components.body) { this.stats.refusals++; return { code: 'occupied.by-body', detail: `${this.model.pathOf(id)} is ${this.soulName(id)}'s body; bodies move themselves` }; }
+    const holder = e.in.parent !== 'world' && this.model.resolvedDef(this.model.entities.get(e.in.parent)?.def ?? '')?.components.body ? e.in.parent : null;
+    const u = holder ? { body: holder, how: 'held' as const } : this.engine.bodyUsesV1(id);
+    if (!u) return null;
+    this.stats.refusals++;
+    const soul = this.soulName(u.body), what = this.model.pathOf(id);
+    return { code: u.how === 'held' ? 'held.by-body' : 'occupied.by-body', detail: `${soul} (${u.body}) is ${u.how === 'held' ? 'holding' : 'sitting on'} ${what}; wait until they are done (or ask them in a prayer answer)` };
+  }
   private soulName(body: string) { return String(this.engine.world.entities[body]?.label ?? body); }
 
   /** Refusals for a batch whose ops would move or remove something a Soul is using (null = fine). */
@@ -349,7 +409,7 @@ export class EngineBridge {
     const e = this.model.get(path);
     if (!e) return { error: `no such entity or point ${x}` };
     if (room) {
-      const slot = this.model.slotsOf(e).find((s) => s.id === room && s.kind === 'room');
+      const slot = this.model.slotsOf(e).find((s) => s.id === room && (s.kind === 'room' || s.kind === 'floor'));
       if (!slot) return { error: `${path} has no room ${room}` };
       const wp = this.model.worldPose(e), c = Math.cos(wp.yaw), s = Math.sin(wp.yaw);
       const at: Vec2 = [wp.x + (slot.p[0] * c + slot.p[2] * s) * wp.s, wp.z + (-slot.p[0] * s + slot.p[2] * c) * wp.s];

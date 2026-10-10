@@ -29,6 +29,11 @@ export type Link = {
   /** Why not usable (e.g. 'steps 6–9 not installed'). */
   reason?: string;
   /**
+   * Where a body stands just before entering at each end (god-built stairs whose foot or head is close
+   * to a wall are entered from the side). Absent: 0.7 m back along `heading` from that end.
+   */
+  approach?: { from?: Vec2; to?: Vec2 };
+  /**
    * Rack-structure access (construction/frame.ts): `climb` = an installed upright's bracing used as a
    * ladder, `beam` = a connected beam walked as a narrow walkway. Both are narrower than a person's
    * routing disc (width < 2 × radius), so the generic route planner never uses them; only the frame
