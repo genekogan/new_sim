@@ -8,7 +8,7 @@
 // Fastest working path on the engine's existing structures (nav/1-style static scene re-base, CATALOG fixtures);
 // the per-tile patch follows L8's tiled Spatial.
 import { applyBatch, type Diff, type Entity, type Op, type Result, type StoredDef, type WorldModel } from '@sim/world-compiler';
-import { assetFromDef, assetIdFor, isFixtureDef, nearestSurfaceSlot, nextEntityPhysics, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
+import { assetFromDef, assetIdFor, isFixtureDef, nearestSurfaceSlot, nextEntityPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
 import type { WorldHost } from '../world.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
@@ -180,6 +180,15 @@ export class EngineBridge {
       const sc = worldFrame ? 1 : wp.s, yaw = worldFrame ? r.yaw : wp.yaw + r.yaw;
       return { id: `${e.id}#f${i}`, level, y: level === 0 && Math.abs(y) <= GROUND_BAND ? 0 : y, obb: { c, half: [r3(r.half[0] * sc), r3(r.half[1] * sc)] as Vec2, yaw: r3(-yaw) }, label: `${this.model.pathOf(e.id)} ${s.tag ?? 'floor'}`.slice(0, 100) };
     });
+    // doorways of upper storeys: the wall's thickness has no floor polygon under it, so lay a threshold strip
+    for (const o of baked.openings ?? []) {
+      if (o.kind === 'window' || worldFrame) continue;
+      const storey = surfaces.filter((x) => x.level === o.level);
+      if (!o.level || !storey.length) continue;
+      const c = toWorld(o.at[0], o.at[1]), y = heightAt(storey[0].y, c), level = this.levelFor(y, c);
+      if (level === 0) continue;
+      (part.surfaces ??= []).push({ id: `${e.id}#t:${o.id}`, level, y, obb: { c, half: [r3((o.width / 2) * wp.s), r3(0.3 * wp.s)], yaw: r3(-(wp.yaw + o.yaw)) }, label: `${this.model.pathOf(e.id)} ${o.id} threshold`.slice(0, 100) });
+    }
     // stairs, ramps, ladders: links between levels
     if (baked.links?.length) part.links = baked.links.filter((l) => l.path.length >= 2).map((l) => {
       const a = toWorld(l.path[0][0], l.path[0][1]), b = toWorld(l.path[l.path.length - 1][0], l.path[l.path.length - 1][1]);
@@ -190,7 +199,7 @@ export class EngineBridge {
       const la = this.levelFor(ya, a), lb = this.levelFor(yb, b);
       return { id: `${e.id}#${l.id}`, kind: kind as 'stairs' | 'ramp' | 'ladder' | 'climb', from: { level: la, p: a, y: la === 0 && Math.abs(ya) <= GROUND_BAND ? 0 : ya }, to: { level: lb, p: b, y: lb === 0 && Math.abs(yb) <= GROUND_BAND ? 0 : yb }, width: r3(l.width * wp.s), heading: r3(Math.atan2(b[1] - a[1], b[0] - a[0])), path, usable: true };
     });
-    return part.solids || part.surfaces || part.links ? part : null;
+    return part.solids || part.surfaces || part.links ? withLinkApproaches(part) : null;
   }
 
   private fixtureSpec(e: Entity, def: StoredDef, asset: string, a: { surfaceSlots?: { id: string; local: [number, number, number] }[]; category: string }, wp: { x: number; y: number; z: number; yaw: number }): FixtureSpecV1 {
@@ -387,7 +396,7 @@ export class EngineBridge {
     const e = this.model.get(path);
     if (!e) return { error: `no such entity or point ${x}` };
     if (room) {
-      const slot = this.model.slotsOf(e).find((s) => s.id === room && s.kind === 'room');
+      const slot = this.model.slotsOf(e).find((s) => s.id === room && (s.kind === 'room' || s.kind === 'floor'));
       if (!slot) return { error: `${path} has no room ${room}` };
       const wp = this.model.worldPose(e), c = Math.cos(wp.yaw), s = Math.sin(wp.yaw);
       const at: Vec2 = [wp.x + (slot.p[0] * c + slot.p[2] * s) * wp.s, wp.z + (-slot.p[0] * s + slot.p[2] * c) * wp.s];

@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { setImmediate } from 'node:timers/promises';
 import { kernelHash } from '@sim/kernel';
 import { coreRef } from '@sim/world-compiler';
+import { GENERATORS } from '@sim/generators';
 import { fixture, invite, accept, factory, seed } from '../../test/native-owner-fixture.ts';
 import { WorldHost } from '../world.ts';
 import { EdgeLedger } from '../edge/ledger/ledger.ts';
@@ -200,4 +201,43 @@ test('L3 shapes in the engine: a garden wall makes Souls go round, a deck is wal
   assert.ok(sp?.surfaces?.length >= 2 && sp.surfaces.every((x: any) => x.level === 0), 'deck quads on level 0');
   const onSpan = runQuery(w.god.model, { reach: { from: [20, -12], to: [20, 0] } }).reach as any;
   assert.equal(onSpan.reachable, true, JSON.stringify(onSpan));
+});
+
+// L2's building/1 bakes its own rooms and stairs (the lead's stub does not): this runs once L2 lands.
+const L2_STAIRS = !!(GENERATORS as any)['building/1']?.physics({ params: { floors: 2 }, args: {}, seed: 0 } as any)?.links?.length;
+test('Souls in an L2 cottage: lawn → front door → stairs → bedroom chair; rooms are reach ends', { timeout: 300000, skip: !L2_STAIRS && 'building/1 has no stairs yet (L2 not merged)' }, async (t) => {
+  const w = await world();
+  w.brain.quiesce();
+  t.after(() => { w.brain.quiesce(); w.host.stop(); w.db.close(); });
+  await w.settle(2);
+  const r: any = w.god.act({ ops: [
+    { op: 'define', def: { schema: 'def/1', name: 'cottage2', version: 1, description: 'A two-floor cottage.', tags: ['building'], size: { box: [8, 6, 6] }, make: { kind: 'gen', gen: 'building/1' }, params: { floors: { type: 'int', min: 1, max: 6, default: 2 } }, components: { foundation: { kind: 'none' } } } },
+    { op: 'place', tmp: '$h', def: 'cottage2@1', name: 'house', p: [10, 0] },
+    { op: 'place', def: coreRef('chair'), name: 'chair', in: { parent: '$h', slot: 'floor-1' }, p: [-2, 0, 1] },
+  ] });
+  assert.equal(r.accepted, true, JSON.stringify(r).slice(0, 600));
+  await w.settle(3);
+  const E = w.host.engine as any, house = w.god.model.get('house')!.id, chair = w.god.model.get('house/chair')!.id;
+  const part = E.world.entityPhysicsV1.byEntity[house];
+  t.diagnostic(`cottage: ${part.solids.length} solids, ${part.surfaces.length} floors on levels ${[...new Set(part.surfaces.map((x: any) => x.level))]}, ${part.links?.length ?? 0} links; levels ${JSON.stringify(E.world.entityPhysicsV1.levels)}`);
+  assert.ok(part.links?.length >= 1, 'stairs link');
+  assert.ok(part.surfaces.some((x: any) => x.level === 1), 'upper floor');
+  for (const l of part.links) { const a = l.from.p, z = l.to.p; t.diagnostic(`link ${l.id} ${l.from.level}→${l.to.level} bottom ${a} clear0=${E.clearanceAtV1(a[0], a[1], l.from.level).toFixed(2)} top ${z} clear1=${E.clearanceAtV1(z[0], z[1], l.to.level).toFixed(2)}; mid-landing clear1=${E.clearanceAtV1(10, -1.35, 1).toFixed(2)} bedroom=${E.clearanceAtV1(8.08, 1, 1).toFixed(2)} approach=${JSON.stringify(l.approach)} ${l.approach?.from ? `a0=${E.clearanceAtV1(l.approach.from[0], l.approach.from[1], 0).toFixed(2)}` : ""} ${l.approach?.to ? `a1=${E.clearanceAtV1(l.approach.to[0], l.approach.to[1], 1).toFixed(2)}` : ""} heading=${l.heading}`); }
+  for (const to of ['house:living', 'house:bedroom', 'house:bedroom-2', 'house:floor-1']) {
+    const q = runQuery(w.god.model, { reach: { from: [10, 10], to } }).reach as any;
+    t.diagnostic(`reach ${to}: ${JSON.stringify(q).slice(0, 220)}`);
+    assert.equal(q.reachable, true, `${to}: ${JSON.stringify(q)}`);
+  }
+  await invite(w, 'cy');
+  const row: any = await accept(w.host, w.souls.create('dev:cy', { name: 'Cy', description: 'sits upstairs' }));
+  await w.settle(3);
+  const soul = { soulId: row.id, entityId: row.entity_id, name: row.name, owner: row.owner };
+  const until = async (pred: () => boolean, n = 4000) => { for (let i = 0; i < n && !pred(); i++) { w.host.tickOnce(); if (i % 20 === 0) { await setImmediate(); w.host.drainInputs(); } } await w.settle(2); return pred(); };
+  const sit: any = await accept(w.host, w.edge.act(soul, { capability: `sit:${chair}`, params: { seconds: 600 } }));
+  assert.equal(sit.accepted, true, JSON.stringify(sit));
+  assert.ok(await until(() => E.world.entities[row.entity_id].human.activity === 'sit'), `seated: ${JSON.stringify(E.world.entities[row.entity_id].human).slice(0, 300)}`);
+  assert.equal(E.world.entities[row.entity_id].human.level, 1, 'upstairs');
+  const no: any = w.god.act({ ops: [{ op: 'remove', id: house }] });
+  assert.equal(no.failures?.[0]?.code, 'occupied.by-body'); assert.match(no.failures[0].detail, /Cy/);
+  assert.deepEqual(E.runtime.violations, []);
 });

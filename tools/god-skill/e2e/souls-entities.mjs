@@ -109,16 +109,22 @@ let soul = null;
 try {
   // ================= GOD builds
   await step('G0 the owner mints a god token', async () => { const r = await api('/v1/god/mint', { as: 'admin', body: { label: 'e2e god' } }); godToken = r.data.token; return r; }, (r) => r.status === 200 && !!godToken);
-  await step('G1 the god builds a two-floor house: door, stairs, a chair upstairs, a table with a bowl', () => act([
+  // building/1 with its own rooms and stairs (L2) is furnished in its bedrooms; the lead's stub gets a flight
+  await step('G1 the god builds a two-floor house with a door', () => act([
     { op: 'define', def: { schema: 'def/1', name: 'house2', version: 1, description: 'A two-floor house.', tags: ['building'], size: { box: [8, 6, 6] }, make: { kind: 'gen', gen: 'building/1' }, params: { floors: { type: 'int', min: 1, max: 6, default: 2 }, wall: { type: 'color', default: '#e9dcc3' } }, state: { doors: { type: 'json', default: {} } }, components: { foundation: { kind: 'none' } } } },
+    { op: 'place', def: 'house2@1', name: 'house', p: HOUSE },
+  ], 'two-floor house'), (r) => r.data?.accepted === true);
+  const ownStairs = ((await api('/v1/god/query', { body: { entity: 'house' } })).data.entity?.links ?? []).length > 0;
+  const at = ownStairs ? { chair: [-2, 0, 1], table: [2, 0, 1] } : { chair: [-2, 0, -1], table: [0, 0, -1.6] };
+  await step(`G1 the god furnishes it: ${ownStairs ? 'its own stairs' : 'a flight of stairs'}, a chair upstairs, a table with a bowl`, () => act([
+    ...(ownStairs ? [] : [
     { op: 'define', def: { schema: 'def/1', name: 'flight', version: 1, description: 'A straight flight of stairs.', tags: ['stairs'], size: { box: [1.1, 2.8, 3.2] }, make: { kind: 'gen', gen: 'stairs/1' }, params: { rise: { type: 'number', default: 2.8 }, run: { type: 'number', default: 3.2 }, width: { type: 'number', default: 1.1 } } } },
-    { op: 'place', tmp: '$h', def: 'house2@1', name: 'house', p: HOUSE },
-    { op: 'place', def: 'flight@1', name: 'stairs', in: { parent: '$h', slot: 'ground' }, p: [2.9, 0, 0] },
-    { op: 'place', def: 'core/chair@1', name: 'chair', in: { parent: '$h', slot: 'floor-1' }, p: [-2, 0, -1], r: 0 },
-    { op: 'place', tmp: '$t', def: 'core/table@1', name: 'table', in: { parent: '$h', slot: 'floor-1' }, p: [0, 0, -1.6] },
+    { op: 'place', def: 'flight@1', name: 'stairs', in: { parent: 'house', slot: 'ground' }, p: [2.9, 0, 0] }]),
+    { op: 'place', def: 'core/chair@1', name: 'chair', in: { parent: 'house', slot: 'floor-1' }, p: at.chair, r: 0 },
+    { op: 'place', tmp: '$t', def: 'core/table@1', name: 'table', in: { parent: 'house', slot: 'floor-1' }, p: at.table },
     { op: 'place', def: 'core/bowl@1', name: 'bowl', in: { parent: '$t', slot: 'top' } },
     { op: 'place', def: 'core/bench@1', name: 'garden-bench', p: [4, 7], r: 3.14 },
-  ], 'two-floor house'), (r) => r.data?.accepted === true);
+  ], 'furnish the house'), (r) => r.data?.accepted === true);
   for (const p of ['house', 'house/stairs', 'house/chair', 'house/table', 'house/table/bowl']) ids[p] = (await entity(p)).entity?.id;
   await step('G2 reach: the lawn reaches the upper floor through the door and up the stairs', () => until(async () => { const r = (await api('/v1/god/query', { body: { reach: { from: [10, 9], to: 'house:floor-1' } } })).data.reach; return { ok: r?.reachable === true && r.levels?.includes(1), r }; }, 60000), (r) => r?.ok);
 
@@ -156,7 +162,7 @@ try {
   }, (r) => r?.ok);
   await shot('s3-holding-bowl', { eye: [5, 13, 8], at: [10, 2.8, -1], wait: 10000 });
   await closeBrowser();
-  await step('G4 the journal shows the engine\'s move (not undoable by the god)', async () => { const e = (await api('/v1/god/edits?limit=20')).data.edits; const m = e.find((x) => x.by === 'engine' && x.ops.some((o) => o.op === 'move' && o.id === ids['house/table/bowl'])); return { found: !!m, note: m?.note, undone: m?.undone }; }, (r) => r.found && r.undone === 1);
+  await step('G4 the journal shows the engine\'s move (not undoable by the god)', async () => { const e = (await api('/v1/god/edits?limit=20')).data.edits; const m = e.find((x) => x.by === 'engine' && x.ops.some((o) => o.op === 'move' && o.id === ids['house/table/bowl'])); return { found: !!m, note: m?.note, undone: m?.undone, kind: m?.kind }; }, (r) => r.found && (r.kind === 'engine' || r.undone === 1));
   await step('G4 the god tries to take the bowl away: refused, held by the Soul', () => act([{ op: 'remove', id: ids['house/table/bowl'] }]), (r) => r.data?.accepted === false && r.data.failures?.[0]?.code === 'held.by-body' && /Ana/.test(r.data.failures[0].detail));
   await step('S4 the Soul puts the bowl on the table', async () => {
     const r = await api('/v1/edge/act', { as: 'soul', body: { capability: `put-on:${ids['house/table']}` } });

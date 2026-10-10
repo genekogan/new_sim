@@ -24,9 +24,9 @@ type LinkEdge = { link: Link; ascending: boolean; toLevel: number; toCell: numbe
 
 /** Where to stand before traversing a link, facing along its heading (no side entry). */
 export function linkApproach(link: Link, ascending: boolean, back = 0.7): { entry: Place; approach: Vec2; exit: Place } {
-  const dir = rot2([1, 0], link.heading);
-  if (ascending) return { entry: link.from, approach: sub2(link.from.p, [dir[0] * back, dir[1] * back]), exit: link.to };
-  return { entry: link.to, approach: add2(link.to.p, [dir[0] * back, dir[1] * back]), exit: link.from };
+  const dir = rot2([1, 0], link.heading), own = ascending ? link.approach?.from : link.approach?.to;
+  if (ascending) return { entry: link.from, approach: own ?? sub2(link.from.p, [dir[0] * back, dir[1] * back]), exit: link.to };
+  return { entry: link.to, approach: own ?? add2(link.to.p, [dir[0] * back, dir[1] * back]), exit: link.from };
 }
 
 export type RouteOpts = {
