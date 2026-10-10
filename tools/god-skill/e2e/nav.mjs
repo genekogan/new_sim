@@ -251,7 +251,7 @@ try {
     report.samples.enter = r.samples;
     return { cli: { code: a.code, accepted: a.data?.accepted, resolved: a.data?.resolved, reason: a.data?.reason }, phase: r.phase, code: r.code, reason: r.reason, end: r.end, room: r.room, viaDoor: door ? +minDist(r.samples, door.at).toFixed(2) : null, walked: +walked(r.samples).toFixed(1) };
   }, (r) => r.cli.accepted && r.cli.resolved?.to === 'walk:rose-house' && r.phase === 'completed' && r.room?.building === 'rose-house' && r.viaDoor < 1.2);
-  { const p = f3?.end?.p; if (p) await shots([{ name: 's3-inside-rose-house-roof-hidden', eye: [p[0] + 4, p[1] + 9, p[2] + 6], at: [p[0], p[1] + 0.9, p[2]], wait: 7000, hideRoofs: true }]); }
+  { const p = f3?.end?.p; if (p) await shots([{ name: 's3-inside-rose-house-roof-hidden', eye: [p[0] + 2, p[1] + 7, p[2] - 6], at: [p[0], p[1] + 0.9, p[2]], wait: 7000, hideRoofs: true }]); }
   await step('S4 act walk:rose-house/kitchen → from the hall into the kitchen', async () => {
     const a = (await api('/v1/edge/act', { as: 'soul', body: { capability: 'walk:rose-house/kitchen' } })).data;
     const r = await follow(a);
@@ -280,6 +280,7 @@ try {
     const r = await follow(a.data, { maxS: 300 });
     return { cli: { code: a.code, accepted: a.data?.accepted, resolved: a.data?.resolved, reason: a.data?.reason }, phase: r.phase, end: r.end, room: r.room };
   }, (r) => r.cli.accepted && r.cli.resolved?.to === 'walk:rose-house/bedroom' && r.phase === 'completed' && r.room?.room === 'bedroom');
+  { const p = (await observe())?.self?.position; if (p) await shots([{ name: 's7-in-the-bedroom-roof-hidden', eye: [p[0] + 5, p[1] + 8, p[2] - 3], at: [p[0], p[1] + 0.9, p[2]], wait: 7000, hideRoofs: true }]); }
   await step('S8 nothing faulted: no engine faults or violations in the server log', async () => ({ faults: (serverLog.match(/engine fault|violat/g) ?? []).length }), (r) => r.faults === 0);
   void f1;
 } catch (e) {
