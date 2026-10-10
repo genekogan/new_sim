@@ -31,7 +31,7 @@ export function LauncherHome({ initial }: { initial: LauncherList }) {
       <div className="lh-top">
         <div>
           <h1>Sim</h1>
-          <p>Worlds on this computer. Each one is built by its god's agent and keeps running while you are away.</p>
+          <p>New worlds, each built by its god's agent: sign in, make one, and pair your agent. Friends join as Souls. Worlds keep running while you are away.</p>
         </div>
         <div className="lh-actions">
           {session.mode === 'clerk' && (!session.ready ? <span className="dim">Signing in…</span> : session.authed
