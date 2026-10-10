@@ -12,6 +12,8 @@ await run('hamlet', {
     'place tree --near cottage --count 5 --dist 4',
     'place fountain --at 18,4 --name well',
     'place lamp-post --near well --count 4 --dist 2',
+    'place dog --near cottage --dir s --dist 3 --name rex',
+    'describe rex',
     'describe cottage',
   ],
   look: '--from sw',

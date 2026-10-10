@@ -33,7 +33,7 @@ test('bake: a def at params without placing it', () => {
   assert.equal(b.box[0], 12); assert.equal(b.rooms.length, 2); assert.ok(b.slots.some((s: { kind: string }) => s.kind === 'room'));
   assert.match(q({ bake: { def: 'nope' } }).bake.error, /def.unknown/);
   const bench = q({ bake: { def: 'bench' } }).bake;
-  assert.deepEqual(bench.box, [1.6, 0.45, 0.5]);
+  assert.equal(bench.box.length, 3); assert.equal(bench.box[0], 1.6);   // L4's library bench (with a back)
 });
 
 test('describe: rooms with occupants and doors, openings in the world frame, constraints checked, behaviours', () => {
@@ -78,4 +78,15 @@ test('prepare: roads freeze their grade, rivers their flow, through the same pre
   assert.ok(r && r.params && Object.keys(r.params).length > 0, JSON.stringify(r));
   assert.equal(q({ prepare: { def: 'core/bench@1', shape: { path: [[0, 0], [1, 1]] } } }).prepare, null);
   assert.match(q({ prepare: { def: 'nope@1', shape: { path: [[0, 0], [1, 1]] } } }).prepare.error, /def.unknown/);
+});
+
+test('bake/describe behaviours: kit creatures report what their roles allow (L4 creatureAbilities)', () => {
+  const { act, q } = world();
+  const dog = q({ bake: { def: 'core/dog@1' } }).bake.behaviours;
+  assert.ok(dog.supported.includes('wander'), JSON.stringify(dog)); assert.match(dog.missing.fly, /wings/);
+  const fish = q({ bake: { def: 'core/fish@1' } }).bake.behaviours;
+  assert.ok(fish.supported.includes('swim'), JSON.stringify(fish)); assert.match(fish.missing.wander, /legs/);
+  act([{ op: 'place', def: 'core/duck@1', name: 'duck', p: [5, 5] }]);
+  const duck = q({ describe: 'duck' }).describe.behaviours;
+  assert.ok(duck.supported.includes('wander') && duck.gait, JSON.stringify(duck));
 });

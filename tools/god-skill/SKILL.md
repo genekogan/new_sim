@@ -30,7 +30,7 @@ node eden-god.mjs pair                       # prints a link; the owner approves
   (roads, rivers, walls, mountain ranges) take a polyline; `area` things (lakes, plazas, forests,
   meadows) take a polygon. A def has a **layer**: `solid` collides; `surface` drapes on the ground
   (roads, lawns); `volume` is water you can float on; `decor` never collides. **Params** shape a
-  def (a house's `w`, `d`, `floors`, `style`, `roof`); **state** is what changes in play (`paint`,
+  def (a house's `w`, `d`, `floors`, `roof`, `porch`); **state** is what changes in play (`paint`,
   a lamp's `on`, a door's state).
 - **Entities** are placed things. Each has a **path** of names from the root: `house`,
   `house/table`, `house/table/bowl`. Name everything you place (`--name`); unnamed things get
@@ -40,8 +40,13 @@ node eden-god.mjs pair                       # prints a link; the owner approves
   **Slots** are named places on a thing: `seat`, `surface` (table tops), `room` (each room of a
   building is a slot: `house/kitchen`), `stand`, `perch`, `hang`, `shelf`… `describe` lists them.
 - **Buildings** are hollow: walls with door and window openings, floors, stairs between floors,
-  roofs. Each room is a slot; furniture goes `--inside house/<room>`. `describe house` prints
-  rooms, doors, stairs and what is in each room.
+  roofs. Each room is a slot; furniture goes `--inside house/<room>` (a word of the room is
+  enough: `--inside townhouse/bedroom`). `describe house` prints rooms per floor, doors, stairs and
+  what is in each room; the server refuses a sealed room or a too-low floor.
+- **Creatures** move by themselves, the same on every screen: `--param behavior=wander|graze|
+  swim|perch|sleep|fly|follow|idle` (`follow` with `--param follow=<ref>`), `radius`, `speed`.
+  `describe` lists what a creature can do and why not ("fly needs wings"). A herd is one entity:
+  `place animals --circle x,z,r --param species=sheep --param count=8`.
 - **Terrain** is entities too: hills, mountains (point bumps or path ranges), plateaus (areas),
   lakes and ponds (areas that carve their bed and fill with water), rivers (paths). Buildings on
   slopes get a terrace automatically. Remove the mountain entity and the mountain is gone.
@@ -57,14 +62,51 @@ node eden-god.mjs pair                       # prints a link; the owner approves
 
 1. `map` — the whole world as structure: terrain, water, every root thing with pose and contents,
    flags, prayers. It is complete and exact; plan from it.
-2. `defs <words>` — search the library **before** you invent anything (`defs duck`, `defs table`).
+2. `defs <words>` — **search the library before you place or invent anything** (see below).
 3. `place <def> <relations>` — the solver turns relations into a pose, dry-runs it, steps around
    collisions, commits, and tells you what it did.
-4. **`look` after every few edits** — then read the PNG it names. Fix what looks wrong.
+4. **`look` after every few edits** — then open the PNG it names. Fix what looks wrong.
 5. `undo` (or `undo --group <name>`) when something went wrong; `history` shows the journal.
 
 Build in **small batches the audience can watch arrive** (a house, then its furniture, then the
 garden), not one giant batch.
+
+## The library first (the rule)
+
+The world ships with ~180 kinds of things, made to look right together (rounded low-poly, the Eden
+look) and to work for Souls (seats, beds, surfaces, doors, rooms). **Use them.** A def you write
+yourself is slower, uglier and knows nothing about Souls. The order is always:
+
+1. `defs <words>` (plain words work: `defs houses`, `defs street lamp`, `defs market`); a wrong
+   name also tells you what the library has (`place house` → "the library has: core/cottage@1 …").
+2. A def's **params** make variants: size, colours, `floors`, `roof`, `material`, `behavior`.
+   `recolor`, `--scale` and `set --param` change one already placed.
+3. Several library things together (a stall = a `parasol-table` + `crate`s + `barrel`s) or a
+   **prefab** of them.
+4. Only when nothing fits: `define-kit` (below), and say so to the owner ("the library has no
+   market stall; I made one from a table, posts and an awning").
+
+| family (`defs --tag …`) | what is in it |
+|---|---|
+| buildings (`building`) | cottage townhouse shop hall chapel barn shed greenhouse pavilion tower lighthouse — hollow, with rooms, doors, stairs; params `floors w d roof material wall trim front porch balcony windows plan` |
+| furniture | chair armchair sofa stool table round-table long-table desk bed bunk wardrobe bookshelf dresser piano easel workbench bench-seat rug floor-lamp |
+| kitchen | stove sink counter fridge hearth pot kettle bowl cup plate loaf |
+| street & yard (`prop`) | bench picnic-table lamp-post lantern bird-table bin wheelie-bin bollard mailbox hydrant crate barrel sack planter-box flower-pot wheelbarrow firewood trough bike-rack parasol-table laundry-line |
+| civic | fountain well podium stage bandstand pergola gazebo dome totem arch gate obelisk flagpole |
+| play | swings slide see-saw sandpit climbing-frame goal ferris-wheel carousel |
+| signs (`signage`) | sign notice-board picture-frame screen poster chalkboard signpost banner (text/images via state) |
+| work | pallet-rack timber-pile plywood-stack solar-panel forklift ladder sawhorse toolbox anvil |
+| transport | cart bicycle car rowing-boat sailboat canoe balloon rail-wagon |
+| plants & stone (`plant`) | tree pine birch palm fruit-tree bush flowering-bush flower-bed hedge-block reeds grass-tuft mushrooms cactus rock boulder-pile pebbles log stump |
+| creatures (`creature`) | dog pug cat fox sheep goat cow horse pig deer rabbit duck goose chicken bird crow seagull koi fish; `animals` = a herd/flock/school in an area |
+| land (`landform`) | knoll hill mountain (point or range) plateau cliff terrace channel brush |
+| water | lake pond (areas), river stream (paths), shore (sand edge), pier deck |
+| ways (`path-network`) | road street track footpath bridge footbridge |
+| edges & areas | garden-wall fence hedge power-line · plaza lawn ground-paint pitch football-pitch tennis-court parking garden-bed |
+| growth (`ecology`) | woodland wildflowers orchard reedbed rock-field (scatter by slope and water; keep off roads and buildings) · simpler forest meadow garden |
+
+`defs <name>` prints a def's params with defaults, its slots and size. `schema --md` (= SCHEMA.md)
+has every generator's params with ranges.
 
 ## Placing with relations (the solver)
 
@@ -103,16 +145,20 @@ place plaza --rect 0,0,30,24 --name square                                # cx,c
 place road --from square --to bridge [--via 40,60] --width 6 --name main-road   # from/to refs' edges
 place river --path '[[-260,60],[-120,180],[0,480]]' --width 10
 ```
-Roads grade the ground under them (≤ 8 %) and **bridge water by themselves** (`autoBridge`); rivers
-flow downhill, snap their ends to lakes and the world edge, and make waterfalls where the bed steps;
-the CLI freezes those ground facts into the params for you. `describe <road>` shows grade and spans.
+Roads grade the ground under them (≤ 8 %, `maxGrade`) and **bridge water by themselves**
+(`autoBridge`); rivers flow from the first point to the last, snap their ends into lakes and ponds
+and make waterfalls where the bed steps; the CLI freezes those ground facts into the params for
+you. `describe <road>` shows grade and spans. Shape the land with landforms (they are entities;
+remove one and the ground goes back): `place cliff --path …`, `place terrace --rect … --param
+level=4`, `place channel --path …`, `place brush --at x,z --param op=flatten --param radius=10`.
+Growth avoids roads, water and buildings by itself: lay roads and houses first, then `woodland`.
 
 ## Editing
 
 ```
 move <ref> --near … | --at … | --by dx,dz | --yaw r | --facing … | --in <parent>[/slot]   # children ride along
 set <ref> --param w=10 --state '{"paint":"#3366cc"}'   # params regenerate the thing in place
-recolor <ref> '#aa5533'
+recolor <ref> '#aa5533' [--part fur]                    # paint, else its main colour param (or the part named)
 remove <ref> [<ref>…]                                    # and everything inside it
 clone <ref> [--at ref|x,z] [--count n --step dx,dz]      # deep copy with fresh names
 select --def bench --near square --radius 30            # list; add one action to change them all:
@@ -136,10 +182,9 @@ sky --palette golden-hour --sun 0.4 · weather --clouds 0.3 --wind 0.2 · consti
 - `history` — the journal (seq, group, note, what each edit did). `schema --md` — the full
   vocabulary (every generator's params with ranges, kit primitives, ops, refusal codes) = SCHEMA.md.
 
-## New kinds of things (library first)
+## New kinds of things (only after `defs` found nothing)
 
-Search first: `defs lamp`, `defs --tag furniture`. Prefer a def's params (`--param style=barn`) over
-a new def. Only when nothing fits, compose a **kit** from rounded primitives:
+When the library truly lacks a thing (see the rule above), compose a **kit** from rounded primitives:
 ```
 define-kit '{"name":"birdbath","tags":["garden","prop"],"shapes":[
   {"kind":"cyl","at":[0,0,0],"r":0.18,"h":0.8,"material":"stone"},
@@ -188,60 +233,73 @@ constitution (`constitution "<markdown>"` sets it; Souls can read it).
 
 ## Six worked examples
 
-**1. A hamlet in 8 commands**
+Each is a runnable script in `examples/` (`node examples/<name>.mjs` against a fresh world); its
+transcript and screenshot are in `examples/shots/`.
+
+**1. A hamlet** (`hamlet.mjs`)
 ```
 place knoll --at 40,10 --param height=5 --param radius=26 --name knoll
 place cottage --at knoll --facing s --name cottage
-place pond --circle 10,40,9 --name pond
-place bench --near pond --facing pond --name pond-bench
+place pond --circle 30,38,8 --name pond
+place bench --near pond --facing pond --dir n --name pond-bench
 place tree --near cottage --count 5 --dist 4
-place fountain --at 0,-30 --name well
-place lamp-post --near well --count 4 --dist 3
-look --at cottage --from sw
+place fountain --at 18,4 --name well
+place lamp-post --near well --count 4 --dist 2
+place dog --near cottage --dir s --dist 3 --name rex     # wanders its yard
+look --from sw
 ```
-**2. A two-floor house, bedroom upstairs** (`defs house` to find the building def)
+**2. A two-floor house, bedroom upstairs** (`two-floor-house.mjs`)
 ```
-place house --at 0,0 --param floors=2 --param style=townhouse --facing s --name townhouse
-describe townhouse                       # rooms per floor, stairs, doors
-place bed --inside townhouse/bedroom --wall n
+place townhouse --at 0,0 --param floors=2 --facing s --name townhouse
+describe townhouse                       # rooms per floor (ids), stairs, doors
+place bed --inside townhouse/bedroom --wall n --name bed
 place chair --inside townhouse/bedroom --corner se
-place table --inside townhouse/kitchen && place bowl --on townhouse/kitchen/table
-look --at townhouse --inside --from s
+place bookshelf --inside townhouse/bedroom --wall w
+place table --inside townhouse/kitchen --name table
+place chair --inside townhouse/kitchen --count 2 --facing townhouse/table
+place bowl --on townhouse/table
+look --at townhouse --inside --from s    # roofs and upper storeys hidden
 ```
-**3. A river with a bridge**
+**3. A river with a bridge** (`river-bridge.mjs`)
 ```
-place lake --circle -260,-40,70 --name lake
-place river --path '[[-200,-20],[-60,80],[0,200],[20,490]]' --width 10 --name river
-place road --from -200,180 --to 200,200 --width 6 --name crossing   # roads bridge water by themselves
-place bridge --across river --t 0.7 --width 2 --name footbridge      # or a bridge on its own
+place lake --circle -60,-70,32 --name lake
+place river --path '[[-45,-42],[-20,0],[0,40],[6,120]]' --width 8 --name river
+place road --from -70,10 --to 70,30 --width 5 --name crossing   # bridges the river by itself
+describe crossing                                              # grade, bridge spans
+place footbridge --across river --t 0.8 --span 2 --name footbridge
 place duck --float --at lake --count 4
+place tree --along river --row 4 --gap 14 --side left --offset 4
 look --at crossing --from se
 ```
-**4. A market square**
+**4. A market square** (`market-square.mjs`)
 ```
 group market
-place plaza --rect 0,-60,36,28 --name square
+place plaza --rect 0,0,36,28 --name square
 place fountain --at square --name fountain
-place bench --near fountain --count 4 --facing fountain --dist 2
-place stall --near square --count 6 --facing square --dist 1
-place lamp-post --near square --count 4 --dist 0.5
-group --off && look --at square --from s
+place bench --near fountain --count 4 --facing fountain --dist 2.5
+place parasol-table --at 0,-11 --row 4 --gap 3 --facing fountain --name stall
+place lamp-post --at -16,-12 --name lamp-nw      # … one per corner
+group --off
+look --at square --from s
 ```
-**5. A forest edge**
+**5. A forest edge** (`forest-edge.mjs`)
 ```
-place forest --rect -150,-150,140,120 --name old-wood
-place meadow --rect -60,-150,40,120 --name meadow
-place path --from meadow --to old-wood --width 1.6 --name trail
-place rock --along trail --row 4 --gap 12 --side right --offset 1
-place bench --along trail --t 0.5 --side left --offset 1 --name rest
+place woodland --rect -70,0,80,90 --name old-wood
+place wildflowers --rect 30,0,60,90 --name meadow
+place footpath --path '[[45,40],[10,20],[-20,5],[-55,-10]]' --width 1.6 --name trail
+place rock --along trail --row 4 --gap 10 --side right --offset 1.5
+place bench --along trail --t 0.3 --side left --offset 1.2 --name rest
+where rest
 look --at trail --from s
 ```
-**6. A hillside village**
+**6. A hillside village** (`hillside-village.mjs`)
 ```
-place hill --at 0,-120 --param height=30 --param radius=110 --name hill
-place road --path '[[-90,-60],[-30,-110],[40,-110],[90,-160]]' --width 5 --name lane
-place cottage --along lane --row 5 --gap 6 --side left --offset 3
-place cottage --along lane --row 4 --gap 8 --side right --offset 3
-place tree --along lane --row 8 --gap 9 --side both --offset 10
+place hill --at 0,-60 --param height=18 --param radius=90 --name hill
+place road --path '[[-80,-20],[-30,-55],[30,-60],[80,-100]]' --width 5 --name lane
+place cottage --along lane --row 4 --gap 8 --side left --offset 2 --name north-house
+place cottage --along lane --row 4 --gap 8 --side right --offset 2 --name south-house
+place tree --along lane --row 7 --gap 14 --side both --offset 14
+place well --free --near lane --name village-well
+resolve                                          # every kept relation still holds?
 look --at hill --from s
 ```

@@ -72,7 +72,7 @@ A straight flight of stairs from y=0 to `rise`, `run` long, `width` wide; a link
 - `rail` bool = true
 
 ### animals/1 (area, L4)
-Animals living in an area: species (or a def ref of a kit creature), count, behaviour (wander, graze, swim, perch, sleep, fly). Moves on every viewer identically; no server cost.
+Animals living in an area: species (or a def ref of a kit creature), count, behaviour (wander, graze, swim, perch, sleep, fly). Moves on every viewer identically; no server cost. Water areas always swim.
 - `species` enum dog|cat|pug|duck|goose|chicken|sheep|goat|cow|horse|pig|fox|deer|rabbit|bird|crow|seagull|koi|fish = dog
 - `def` ref — use a kit creature def instead of the species mesh (e.g. "core/dog@1")
 - `count` int 1…60 = 3
@@ -81,7 +81,7 @@ Animals living in an area: species (or a def ref of a kit creature), count, beha
 - `scale` number 0.3…3 = 1
 
 ### road/1 (path, L3)
-A road along a spline: width, material, kerbs, shoulders; follows and grades the terrain; auto-bridges water when asked.
+A road along a spline: width, material, kerbs, shoulders; follows and grades the terrain (prepareRoad); auto-bridges water.
 - `width` number 2…30 = 6
 - `material` enum asphalt|cobble|gravel|dirt|sand = cobble
 - `kerb` bool = true
@@ -89,12 +89,16 @@ A road along a spline: width, material, kerbs, shoulders; follows and grades the
 - `maxGrade` number 0…0.2 = 0.08 — carve/fill to keep slope below this (0 = follow terrain)
 - `autoBridge` bool = true
 - `lines` bool = false
+- `grade` json — frozen by prepareRoad: {sig, h[], spans[]} — profile per centre-line point and bridge spans
 
 ### path/1 (path, L3)
-A footpath: narrow, follows the terrain, gravel or stepping stones.
+A footpath: narrow, follows the terrain, gravel, dirt, cobble, stone flags or a boardwalk; bridges water like a road.
 - `width` number 0.5…6 = 1.6
 - `material` enum gravel|dirt|cobble|stone|wood = gravel
 - `edging` bool = false
+- `maxGrade` number 0…0.3 = 0
+- `autoBridge` bool = true
+- `grade` json — frozen by prepareRoad
 
 ### wall/1 (path, L3)
 A freestanding wall along a path (garden wall, partition, rampart) with optional gates at arc-length positions.
@@ -119,55 +123,112 @@ A clipped hedge along a path.
 - `width` number 0.3…3 = 0.8
 - `color` color = #3f6b35
 - `flowers` bool = false
-
-### river/1 (path, L3)
-A river along a path: carves a bed, fills with water flowing from the first point to the last; ends snap to lakes; waterfalls where the bed steps.
-- `width` number 1…60 = 6
-- `depth` number 0.2…10 = 1.2
-- `level` number -50…400 = -0.3 — water level at the source; L3 interpolates along the flow
-- `banks` enum grass|sand|stone|reeds = grass
-
-### bridge/1 (path, L3)
-A bridge deck along a short path (over water or a gap), with rails and posts; a walkable surface above the water.
-- `width` number 1…20 = 3
-- `deck` number 0…20 = 0.8 — deck height above the higher end
-- `material` enum wood|stone|metal = wood
-- `arch` number 0…6 = 0.6 — rise at mid-span
-- `rails` bool = true
+- `gates` json — [{at, width}] gaps
 
 ### power-line/1 (path, L3)
 Poles along a path with drooping wires (decor).
 - `spacing` number 10…80 = 30
 - `height` number 4…20 = 8
+- `wires` int 1…6 = 3
+- `droop` number 0…0.1 = 0.03 — sag as a fraction of the span
+
+### river/1 (path, L3)
+A river along a path: carves a bed, fills it with water flowing from the first point to the last (snapRiver freezes levels, snaps the ends into lakes); waterfalls where the bed steps; shores.
+- `width` number 1…60 = 6
+- `depth` number 0.2…10 = 1.2
+- `level` number -50…400 = -0.3 — water level at the source (used flat until snapRiver freezes a profile)
+- `banks` enum grass|sand|stone|reeds|pebble = grass
+- `bankWidth` number 0…12 = 2.5
+- `flow` json — frozen by snapRiver: {sig, levels[] per centre-line point, falls[], source, mouth}
+
+### shore/1 (area, L3)
+A shore band around a lake or pond outline (the area): sand beach, stone edge, pebbles or reeds; a surface ring from `inner` m inside to `width` m outside.
+- `material` enum sand|stone|pebble|grass|reeds = sand
+- `width` number 0.5…20 = 3
+- `inner` number 0…10 = 1.5
+
+### bridge/1 (path, L3)
+A bridge along a short path over water or a gap: ends on the banks, a humped deck (deck + arch at mid-span), rails, posts or a stone arch to the bed.
+- `width` number 1…20 = 3
+- `deck` number 0…20 = 0.8 — extra height at mid-span above the line between the ends
+- `material` enum wood|stone|metal = wood
+- `arch` number 0…6 = 0.6 — additional rise at mid-span
+- `rails` bool = true
+- `at` json — frozen by prepareBridge: {sig, y0, y1} absolute end heights
+
+### pier/1 (path, L3)
+A pier / jetty / boardwalk on posts: from the shore out over water along a path, a flat deck `height` above the water, rails, an end platform.
+- `width` number 1…8 = 2.4
+- `height` number 0.2…6 = 0.7 — deck above the water (or above the ground at the start when dry)
+- `rails` bool = true
+- `platform` number 0…16 = 5 — end platform size (0 = none)
+- `color` color = #a07a4f
+- `at` json — frozen by prepareDeck: {sig, y}
+
+### deck/1 (area, L3)
+A raised platform on posts (deck, terrace, jetty head) over ground or water; walkable surface with rails on the open edges.
+- `height` number 0…12 = 0.6 — above the highest ground under it, or above the water
+- `material` enum wood|stone|metal = wood
+- `rails` bool = true
+- `color` color = #a07a4f
+- `at` json — frozen by prepareDeck: {sig, y}
+
+### cliff/1 (path, L3)
+A cliff or escarpment along a path: the left side (side 1) or right (−1) rises `height` m over a `face` m face in `steps` ledges, holds a shelf `shelf` m deep, falls back over `back` m.
+- `height` number -120…200 = 10
+- `side` int -1…1 = 1
+- `face` number 0.5…60 = 3
+- `steps` int 1…12 = 1
+- `shelf` number 0…400 = 30
+- `back` number 1…200 = 12
+
+### terrace/1 (area, L3)
+A terrace: flatten the area to a named `level` (absolute m), or with `step` cut whatever ground is there into ledges `step` m high (rice terraces, a stepped garden).
+- `level` number -200…400 — absolute level (m); omit with step for a stepped hillside
+- `step` number 0.3…20 — ledge height (m)
+- `riser` number 0.05…0.95 = 0.3 — fraction of each step that is the riser
+- `edge` number 0.5…60 = 4
+- `label` string — a name for the level (describe: "upper lawn at 12 m")
+
+### channel/1 (path, L3)
+Cut (or fill, or set) the ground along a path to levels: a ditch, a dry channel, a cutting, an embankment. `levels` per path point, or `from`→`to` linearly.
+- `width` number 0.5…200 = 4 — flat bottom width
+- `edge` number 0.5…60 = 3
+- `from` number -200…400 = -1
+- `to` number -200…400 = -1
+- `levels` json — absolute levels per path point (overrides from/to)
+- `mode` enum cut|fill|set = cut
+
+### brush/1 (point, L3)
+A terrain brush stroke at a point: raise or lower by `amount` m, flatten toward `level`, or smooth (amount 0..1). Small, stackable, undoable like any edit.
+- `op` enum raise|lower|flatten|smooth = raise
+- `radius` number 1…400 = 8
+- `amount` number 0…60 = 1
+- `level` number -200…400 — flatten target (absolute m)
 
 ### plaza/1 (area, L3)
-A paved square with a pattern and an optional kerb.
+A paved square: material, pattern (grid, herringbone, radial, plain), base colour, a low kerb around it.
 - `material` enum cobble|stone|tile|brick|gravel|asphalt = cobble
 - `pattern` enum grid|herringbone|radial|plain = grid
 - `color` color = #b9b2a4
 - `kerb` bool = true
+- `size` number 0.2…3 = 0.8 — paving unit (m)
 
 ### lawn/1 (area, L3)
-A mown lawn or painted ground material (grass, sand, gravel, moss, mud, rock, snow).
+Paint the ground: a mown lawn or a ground material (grass, sand, gravel, moss, mud, rock, snow, dirt) draped over the terrain.
 - `material` enum grass|sand|gravel|moss|mud|rock|snow|dirt = grass
-- `color` color = #6aa84f
-- `edge` number 0…10 = 1 — soft blend into the ground (m)
+- `color` color — override the material colour
+- `edge` number 0…10 = 1 — ragged, softened border (m)
+- `stripes` bool = false — mowing stripes (grass)
 
 ### pitch/1 (area, L3)
-A sports pitch with line markings and goals/nets: football, tennis, basketball, petanque, volleyball.
+A sports pitch laid out in the area (longest side = length): line markings, goals/nets/hoops/borders as parts. football, tennis, basketball, petanque, volleyball.
 - `sport` enum football|tennis|basketball|petanque|volleyball = football
-- `color` color = #4f8f3a
+- `color` color — surface colour override
 - `fence` bool = false
 
-### deck/1 (area, L3)
-A raised platform on posts (deck, terrace, pier when narrow) over ground or water; walkable surface with rails.
-- `height` number 0…12 = 0.6
-- `material` enum wood|stone|metal = wood
-- `rails` bool = true
-- `color` color = #a07a4f
-
 ### parking/1 (area, L3)
-A parking area with marked bays.
+A parking area with marked bays along its long sides.
 - `bay` number 2…4 = 2.5
 
 ### garden-bed/1 (area, L3)
@@ -177,14 +238,14 @@ A planted bed: rows of vegetables or flowers in soil, optional low border.
 - `border` bool = true
 
 ### orchard/1 (area, L3)
-Trees in a grid (orchard, avenue block): species, spacing, age variation.
+Trees in a grid (orchard, avenue block): species, spacing, height; age varies per tree.
 - `species` enum apple|pear|cherry|olive|lemon|oak|birch|pine|palm = apple
 - `spacing` number 2…20 = 5
 - `height` number 2…20 = 4.5
 
 ### scatter/2 (area, L3)
-Ecological scatter: a species palette with weights, clustering, auto-exclusion of solids/roads/water, slope and water-distance rules, age/size variation from the seed.
-- `palette` json — [{def, weight, nearWater?: m, minSlope?, maxSlope?, scale?: [min,max]}]
+Ecological scatter: a species palette with weights, clustering, auto-exclusion of solids/roads/water, slope and water-distance rules (reeds by water, rocks on the steep), size/age from the seed, saplings at the edge.
+- `palette` json — [{kind: oak|pine|birch|poplar|palm|bush|fern|reed|rock|boulder|flower|grass|cactus, or def: ref, weight, nearWater?, farWater?, minSlope?, maxSlope?, wet?, scale?: [min,max]}]
 - `density` number 0.0005…8 = 0.03
 - `cluster` number 0…1 = 0.4 — 0 uniform … 1 tight clumps
 - `minSpacing` number 0.2…30 = 2
@@ -233,3 +294,4 @@ schema, def.unknown, def.budget, def.expansion, def.invalid, parent.unknown, slo
 ## Endpoints
 - read: GET /v1/world/snapshot · GET /v1/world/ground · GET /v1/world/tiles/:tx/:tz · GET /v1/world/entities/:path · GET /v1/god/schema · POST /v1/god/query
 - god: GET /v1/god/snapshot · GET /v1/god/defs?q=&tag= · POST /v1/god/dryrun · POST /v1/god/preview · POST /v1/god/act · POST /v1/god/undo[?group=] · POST /v1/god/redo · GET /v1/god/edits · GET /v1/god/stream (SSE) · GET /v1/god/prayers · POST /v1/god/answer
+

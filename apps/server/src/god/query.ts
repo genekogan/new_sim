@@ -5,7 +5,7 @@
 // WorldModel; `reach` asks the Soul engine through the bridge (L9).
 // Owner: L1 (contract); L7 owns it from tranche 2; `reach` is L9's.
 import { mediumAt, waterDepthAt, waterLevelAt } from '@sim/ground';
-import { offsetPolyline, pointAlong, pointInPoly, prepareFor, queryOf, type Baked, type Vec2 } from '@sim/generators';
+import { creatureAbilities, offsetPolyline, pointAlong, pointInPoly, prepareFor, queryOf, type Baked, type Vec2 } from '@sim/generators';
 import { obbOverlap, type Entity, type OBB, type StoredDef, WorldModel } from '@sim/world-compiler';
 
 /** A reach end: a point [x, z] (ground) or [x, y, z], an entity id/path (a Soul's body, a chair…), or `<path>:<room>`. */
@@ -165,25 +165,26 @@ function bakeDef(w: WorldModel, b: NonNullable<QueryInput['bake']>) {
   };
 }
 
-/** What a creature / thing can do and why not (spec 33 §3.2): gaits from kit args, components. */
-function behaviours(def: StoredDef): { supported: string[]; missing: Record<string, string> } {
+/** What a creature / thing can do and why not (spec 33 §3.2). Kit creatures (roles/gait in kit/2 args) use L4's
+ *  creatureAbilities (the same rules the herd and the gait use); bodies and anchors add their media. */
+function behaviours(def: StoredDef): { supported: string[]; missing: Record<string, string>; gait?: string; roles?: string[] } {
   const args = (def.make.kind === 'gen' ? def.make.args ?? {} : {}) as { gait?: string; shapes?: { role?: string }[] };
-  const roles = new Set((args.shapes ?? []).map((s) => s.role).filter(Boolean) as string[]);
-  const gait = args.gait && args.gait !== 'none' ? args.gait : null;
   const body = def.components.body;
-  const legs = [...roles].some((r) => r.startsWith('leg.')), wings = roles.has('wing.l') || roles.has('wing.r'), fins = roles.has('fin') || roles.has('tail');
+  const creature = !!(args.gait && args.gait !== 'none') || (args.shapes ?? []).some((s) => s.role && /^(leg|wing|tail|head)/.test(s.role));
   const supported: string[] = [], missing: Record<string, string> = {};
-  const walker = !!gait && /walk|waddle/.test(gait) || (body?.media.includes('walk') ?? false) || legs;
-  const flyer = gait === 'bird-fly' || gait === 'hover' || (body?.media.includes('fly') ?? false) || wings;
-  const swimmer = gait === 'fish-swim' || (body?.media.includes('swim') ?? false) || def.anchor === 'float';
-  if (walker) supported.push('wander', 'graze', 'follow', 'sleep', 'idle'); else { missing.wander = 'no legs (kit role leg.*) and no walking gait'; missing.graze = missing.wander; missing.follow = missing.wander; }
-  if (flyer) supported.push('fly', 'perch'); else { missing.fly = 'no wings (role wing.l/wing.r) and no bird-fly gait'; missing.perch = missing.fly; }
-  if (swimmer) supported.push('swim'); else missing.swim = 'no fish-swim gait, no swim medium and not a floating anchor';
-  if (!supported.includes('idle') && (gait || roles.size)) supported.push('idle');
+  let extra: { gait?: string; roles?: string[] } = {};
+  if (creature) {
+    const a = creatureAbilities(args);
+    supported.push(...a.behaviors); Object.assign(missing, a.refusals); extra = { gait: a.gait, roles: a.roles };
+  }
+  const media = body?.media ?? [];
+  if (media.includes('walk')) for (const b of ['wander', 'follow', 'idle']) { supported.push(b); delete missing[b]; }
+  if (media.includes('fly')) { supported.push('fly'); delete missing.fly; }
+  if (media.includes('swim') || def.anchor === 'float') { supported.push('swim'); delete missing.swim; }
   if (def.components.spin) supported.push('spin'); if (def.components.sway) supported.push('sway'); if (def.components.hover) supported.push('hover'); if (def.components.route) supported.push('route');
   if (def.components.seat) supported.push('sit'); if (def.components.bed) supported.push('lie'); if (def.components.carryable) supported.push('carry'); if (def.components.surface) supported.push('put-on');
   if (def.components.light) supported.push('light on/off'); if (def.components.opening) supported.push('open/close');
-  return { supported: [...new Set(supported)], missing };
+  return { supported: [...new Set(supported)], missing, ...extra };
 }
 
 // ---------------------------------------------------------------- describe / where

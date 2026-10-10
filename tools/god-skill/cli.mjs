@@ -70,9 +70,37 @@ export async function map(opts = {}) {
 }
 
 /** defs <query>: search the library (always search before you define). */
+/** Words a builder says → words the library uses (searched too, ranked below the words given). */
+const SYNONYMS = { house: ['building', 'cottage'], home: ['building', 'cottage'], hut: ['shed', 'cottage'], church: ['chapel'], shop: ['building'], store: ['shop'],
+  street: ['road'], lane: ['road', 'track'], trail: ['footpath'], path: ['footpath'], walkway: ['footpath'], square: ['plaza'],
+  forest: ['woodland'], woods: ['woodland'], wood: ['woodland'], meadow: ['wildflowers'], field: ['lawn', 'wildflowers'], grass: ['lawn'],
+  lamp: ['lamp-post', 'lantern'], light: ['lamp-post', 'lantern'], seat: ['bench', 'chair'], sofa: ['sofa'], couch: ['sofa'],
+  water: ['lake', 'pond', 'river'], stream: ['river'], creek: ['stream'], hill: ['knoll'], wall: ['garden-wall', 'fence'],
+  animal: ['creature'], animals: ['creature'], herd: ['animals'], flock: ['animals'], pet: ['dog', 'cat'], boat: ['rowing-boat', 'canoe', 'sailboat'] };
+/** A word and its singulars (houses → house, benches → bench, ponies → pony). */
+const forms = (w) => [...new Set([w, ...(w.length > 3 ? [w.replace(/s$/, ''), w.replace(/es$/, ''), w.replace(/ies$/, 'y')] : [])])];
+const synonymsOf = (w) => [...new Set(forms(w).flatMap((f) => SYNONYMS[f] ?? []))];
+/** Rank the server's matches by how well each word fits: whole name > a word of the name > an exact tag > the
+ *  description as a word; a word buried inside another (house in warehouse) counts little. */
+function rankDefs(defsIn, q) {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const score = (d, w) => Math.max(...forms(w).map((f) => score1(d, f)));
+  const score1 = (d, sw) => {
+    const name = d.name.replace(/^core-/, ''), parts = name.split('-'), w = sw;
+    let s = 0;
+    if (name === w || name === sw) s += 12; else if (parts.includes(w) || parts.includes(sw)) s += 7; else if (name.includes(sw)) s += 3;
+    if (d.tags.includes(w) || d.tags.includes(sw)) s += 4; else if (d.tags.some((t) => t.includes(sw))) s += 0.5;
+    if (new RegExp(`\\b${sw}`, 'i').test(d.description)) s += 1;
+    return s;
+  };
+  return defsIn.map((d) => ({ d, s: words.reduce((a, w) => a + score(d, w) + 0.4 * Math.max(0, ...synonymsOf(w).map((x) => score(d, x))), 0) }))
+    .filter((r) => r.s >= 1).sort((a, b) => b.s - a.s).map((r) => r.d);
+}
 export async function defs(q, flags = {}) {
-  const qs = new URLSearchParams(); if (q) qs.set('q', q); if (flags.tag) qs.set('tag', flags.tag);
+  const qs = new URLSearchParams(); if (flags.tag) qs.set('tag', flags.tag);
+  if (q) { const words = q.toLowerCase().split(/\s+/).filter(Boolean); qs.set('q', [...new Set([...words.flatMap(forms), ...words.flatMap(synonymsOf)])].join(' ')); }
   const r = ok(await call(`/v1/god/defs?${qs}`), 'defs');
+  if (q) r.defs = rankDefs(r.defs, q);
   const rows = r.defs.map((d) => ({ ref: d.ref.replace(/^core-/, 'core/'), form: d.form, layer: d.layer, box: d.size.box, tags: d.tags, params: Object.fromEntries(Object.entries(d.params).map(([k, f]) => [k, f.default ?? f.type])), slots: d.slots.map((x) => `${x.id}:${x.kind}`), description: d.description }));
   if (flags.json) return rows;
   if (!rows.length) return `no defs match "${q ?? ''}". Try a broader word, or define one: define-kit (see SKILL.md).`;
@@ -171,7 +199,7 @@ const bakeCache = new Map();
 /** The physical facts of a def at given params (box, rooms, slots), from the server's own generators. */
 export async function bakeInfo(def, params, shape) {
   const key = JSON.stringify([def, params ?? {}, shape ?? null]);
-  if (!bakeCache.has(key)) { const b = (await query({ bake: { def: normDef(def), params: params ?? {}, ...(shape ? { shape } : {}) } })).bake; if (b.error) throw new Error(b.error + '. `defs <word>` searches the library.'); bakeCache.set(key, b); }
+  if (!bakeCache.has(key)) { const b = (await query({ bake: { def: normDef(def), params: params ?? {}, ...(shape ? { shape } : {}) } })).bake; if (b.error) { const word = String(def).replace(/^core[/-]/, '').replace(/@\d+$/, '').replace(/-/g, ' '); let near = []; if (/def\.unknown/.test(b.error)) try { near = (await defs(word, { json: true })).slice(0, 4).map((d) => d.ref); } catch { /* offline */ } throw new Error(`${b.error}${near.length ? ` — the library has: ${near.join(', ')}` : ''}. \`defs ${word}\` searches the library; define only what it lacks.`); } bakeCache.set(key, b); }
   return bakeCache.get(key);
 }
 const uniqueName = (v, parentId, stem, taken) => { const has = (n) => taken.has(`${parentId}/${n}`) || v.rows.some((r) => r.parent === parentId && r.name === n); if (!has(stem)) return stem; for (let k = 2; k < 9999; k++) if (!has(`${stem}-${k}`)) return `${stem}-${k}`; return `${stem}-${Date.now() % 1e5}`; };
@@ -309,7 +337,23 @@ export async function move(ref, flags = {}) {
   return commitItems(v, row.def, info, { ...flags, name: undefined }, undefined, sol.items.slice(0, 1).map((it) => ({ candidates: it.candidates.map((c) => ({ ...c, ...(c.in || row.parent === 'world' ? {} : { in: { parent: v.byId.get(row.parent).path, ...(row.slot ? { slot: row.slot } : {}) } }) })) })), sol.notes, { op: 'move', id: row.path });
 }
 export async function set(id, flags) { const op = { op: 'set', id }; if (flags.state) op.state = JSON.parse(flags.state); if (flags.param) op.params = parseKV(flags.param); if (flags.name) op.name = flags.name; if (flags.constraints) op.constraints = JSON.parse(flags.constraints); const r = await act({ ops: [op] }, flags.note); return r.accepted ? `set ${id}: ${Object.keys(op).filter((k) => !['op', 'id'].includes(k)).map((k) => `${k} ${JSON.stringify(op[k])}`).join(', ')}` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
-export async function recolor(id, color) { let r = await act({ ops: [{ op: 'set', id, state: { paint: color } }] }); if (!r.accepted) r = await act({ ops: [{ op: 'set', id, params: { color } }] }); return r.accepted ? `recoloured ${id} ${color}` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
+/** The op that recolours one thing: its `paint` state, else its `color` param, else its main colour param (the first
+ *  colour-typed param: a dog's fur, a lamp's iron) or the one named with --part. */
+function recolorOp(d, id, color, part) {
+  const colorParams = Object.entries(d?.params ?? {}).filter(([, f]) => f?.type === 'color').map(([k]) => k);
+  if (part) { if (!colorParams.includes(part)) throw new Error(`${id} has no colour part ${part}; parts: ${colorParams.join(', ') || 'none'}`); return { op: 'set', id, params: { [part]: color } }; }
+  if (d?.state?.paint) return { op: 'set', id, state: { paint: color } };
+  const k = colorParams.includes('color') ? 'color' : colorParams[0];
+  return k ? { op: 'set', id, params: { [k]: color } } : null;
+}
+export async function recolor(id, color, flags = {}) {
+  if (!id || !color) throw new Error('usage: recolor <ref> <#hex> [--part fur]');
+  const v = view(await mirror()), row = v.get(id); if (!row) throw new Error(`no such thing: ${id}`);
+  const op = recolorOp(v.def(row.def), row.path, color, flags.part);
+  if (!op) return `${id} has no colour to change (no paint state, no colour params)`;
+  const r = await act({ ops: [op] });
+  return r.accepted ? `recoloured ${id} ${color}${op.params ? ` (${Object.keys(op.params)[0]})` : ''}` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
+}
 export async function remove(ids) { const list = [].concat(ids).filter(Boolean); if (!list.length) throw new Error('usage: remove <ref> [<ref>…]'); const r = await act({ ops: list.map((id) => ({ op: 'remove', id })) }); return r.accepted ? `removed ${list.join(', ')} (and what was inside)` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
 export async function clone(id, flags) { const o = { op: 'clone', id, ...(flags.name ? { name: flags.name } : {}), ...(flags.count ? { count: num(flags.count) } : {}), ...(flags.step ? { step: String(flags.step).split(',').map(Number) } : {}), ...(flags.yaw !== undefined ? { r: num(flags.yaw) } : {}), mode: flags.nudge ? 'nudge' : 'strict' }; if (flags.at) { const v = view(await mirror()); const p = refPoint(v, flags.at, flags.offset); o.p = [p.x, p.z]; } const r = await act({ ops: [o] }, flags.note); return r.accepted ? `cloned ${id}${o.count > 1 ? ` ×${o.count}` : ''} (seq ${r.seq})` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`; }
 export async function sky(flags) { return act({ ops: [{ op: 'world', state: { sky: { palette: flags.palette ?? 'clear-day', sun: flags.sun !== undefined ? num(flags.sun) : 0.6 } } }] }); }
@@ -359,9 +403,10 @@ export async function select(flags = {}) {
       ops.push(o);
     }
     if (flags['set-state']) ops.push({ op: 'set', id: r.path, state: JSON.parse(flags['set-state']) });
-    if (flags.recolor) { const d = v.def(r.def); if (d?.state?.paint) ops.push({ op: 'set', id: r.path, state: { paint: flags.recolor } }); else if (d?.params?.color) ops.push({ op: 'set', id: r.path, params: { color: flags.recolor } }); }
+    if (flags.recolor) { const o = recolorOp(v.def(r.def), r.path, flags.recolor, flags.part); if (o) ops.push(o); }
     if (flags['set-param']) ops.push({ op: 'set', id: r.path, params: parseKV(flags['set-param']) });
   }
+  if (!ops.length) return `${rows.length} selected, but none of them has that to change (recolor needs a paint state or a colour param)`;
   const res = await act({ ops: ops.slice(0, 256) }, flags.note ?? `bulk ${flags.remove ? 'remove' : 'edit'} of ${rows.length}`);
   return res.accepted ? `${flags.remove ? 'removed' : 'changed'} ${ops.length} thing(s) in one batch (seq ${res.seq})${ops.length > 256 ? ' — first 256 only; run again' : ''}` : `REFUSED: ${res.failures.map(explainFailure).join('; ')}`;
 }
@@ -512,7 +557,7 @@ export const COMMANDS = {
   register: (r, f) => register(r[0], r[1] ?? f.identity), pair: (r) => pair(r[0]), mint: (r) => mint(r[0]), status,
   map: (r, f) => map({ json: !!f.json, all: !!f.all }), defs: (r, f) => defs(r.join(' ') || undefined, f), schema: (r, f) => schema(f), snapshot,
   describe: (r, f) => describe(r[0], f), where: (r, f) => where(r[0] ?? f.at, f), query: (r) => query(readArg(r)), free: (r, f) => freePlots(r[0], f),
-  place: (r, f) => place(r[0], f), terrain: (r, f) => place(r[0], f), move: (r, f) => move(r[0], f), set: (r, f) => set(r[0], f), recolor: (r) => recolor(r[0], r[1]), remove: (r) => remove(r), clone: (r, f) => clone(r[0], f),
+  place: (r, f) => place(r[0], f), terrain: (r, f) => place(r[0], f), move: (r, f) => move(r[0], f), set: (r, f) => set(r[0], f), recolor: (r, f) => recolor(r[0], r[1], f), remove: (r) => remove(r), clone: (r, f) => clone(r[0], f),
   act: (r, f) => act(JSON.parse(readArg(r)), f.note), dryrun: (r) => dryrun(JSON.parse(readArg(r))), plan: (r) => planBatch(readArg(r)), preview: (r) => preview(readArg(r)),
   select: (r, f) => select(f), group: (r, f) => group(r[0], f), undo: (r, f) => undo(f), redo, history: (r, f) => history(r[0] ? Number(r[0]) : 20, f), resolve: (r, f) => resolveCmd(r, f),
   look: (r, f) => look(f), 'look-keeper': (r) => keeper(r[0], Number(r[1])), 'look-shot': async (r) => { const res = await shoot(JSON.parse(r[0])); console.log(JSON.stringify(res)); process.exit(0); }, export: (r, f) => exportWorld(r[0], f), import: (r, f) => importWorld(r[0], f), define: (r) => define(readArg(r)), 'define-kit': (r, f) => defineKit(readArg(r), f),

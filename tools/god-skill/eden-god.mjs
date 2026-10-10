@@ -387,7 +387,8 @@ function solve(v, thing, rel) {
     if (!host) throw new Error(`no such building: ${spec}`);
     const rooms = (host.slots ?? []).filter((x) => x.kind === "room");
     if (!rooms.length) throw new Error(`${host.path} has no rooms (it is not a building); use --near or --on`);
-    const room = roomId ? rooms.find((x) => x.id === roomId) : rooms[0];
+    const bare = (t) => String(t).toLowerCase().replace(/[^a-z]/g, "");
+    const room = !roomId ? rooms[0] : rooms.find((x) => x.id === roomId) ?? rooms.find((x) => bare(x.id) === bare(roomId) || x.name && bare(x.name) === bare(roomId)) ?? rooms.find((x) => bare(x.id).startsWith(bare(roomId)) || bare(roomId).startsWith(bare(x.id)) || x.name && bare(x.name).includes(bare(roomId)));
     if (!room) throw new Error(`${host.path} has no room ${roomId}; rooms: ${rooms.map((x) => x.id).join(", ")}`);
     const RY = room.yaw, O = room.p;
     const local = room.local ?? [[-2, -2], [2, -2], [2, 2], [-2, 2]];
@@ -1044,11 +1045,69 @@ async function map(opts = {}) {
   }
   return opts.json ? { text: lines.join("\n"), snapshot: s } : lines.join("\n");
 }
+var SYNONYMS = {
+  house: ["building", "cottage"],
+  home: ["building", "cottage"],
+  hut: ["shed", "cottage"],
+  church: ["chapel"],
+  shop: ["building"],
+  store: ["shop"],
+  street: ["road"],
+  lane: ["road", "track"],
+  trail: ["footpath"],
+  path: ["footpath"],
+  walkway: ["footpath"],
+  square: ["plaza"],
+  forest: ["woodland"],
+  woods: ["woodland"],
+  wood: ["woodland"],
+  meadow: ["wildflowers"],
+  field: ["lawn", "wildflowers"],
+  grass: ["lawn"],
+  lamp: ["lamp-post", "lantern"],
+  light: ["lamp-post", "lantern"],
+  seat: ["bench", "chair"],
+  sofa: ["sofa"],
+  couch: ["sofa"],
+  water: ["lake", "pond", "river"],
+  stream: ["river"],
+  creek: ["stream"],
+  hill: ["knoll"],
+  wall: ["garden-wall", "fence"],
+  animal: ["creature"],
+  animals: ["creature"],
+  herd: ["animals"],
+  flock: ["animals"],
+  pet: ["dog", "cat"],
+  boat: ["rowing-boat", "canoe", "sailboat"]
+};
+var forms = (w) => [.../* @__PURE__ */ new Set([w, ...w.length > 3 ? [w.replace(/s$/, ""), w.replace(/es$/, ""), w.replace(/ies$/, "y")] : []])];
+var synonymsOf = (w) => [...new Set(forms(w).flatMap((f) => SYNONYMS[f] ?? []))];
+function rankDefs(defsIn, q) {
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+  const score = (d, w) => Math.max(...forms(w).map((f) => score1(d, f)));
+  const score1 = (d, sw) => {
+    const name = d.name.replace(/^core-/, ""), parts = name.split("-"), w = sw;
+    let s = 0;
+    if (name === w || name === sw) s += 12;
+    else if (parts.includes(w) || parts.includes(sw)) s += 7;
+    else if (name.includes(sw)) s += 3;
+    if (d.tags.includes(w) || d.tags.includes(sw)) s += 4;
+    else if (d.tags.some((t) => t.includes(sw))) s += 0.5;
+    if (new RegExp(`\\b${sw}`, "i").test(d.description)) s += 1;
+    return s;
+  };
+  return defsIn.map((d) => ({ d, s: words.reduce((a, w) => a + score(d, w) + 0.4 * Math.max(0, ...synonymsOf(w).map((x) => score(d, x))), 0) })).filter((r) => r.s >= 1).sort((a, b) => b.s - a.s).map((r) => r.d);
+}
 async function defs(q, flags2 = {}) {
   const qs = new URLSearchParams();
-  if (q) qs.set("q", q);
   if (flags2.tag) qs.set("tag", flags2.tag);
+  if (q) {
+    const words = q.toLowerCase().split(/\s+/).filter(Boolean);
+    qs.set("q", [.../* @__PURE__ */ new Set([...words.flatMap(forms), ...words.flatMap(synonymsOf)])].join(" "));
+  }
   const r = ok(await call(`/v1/god/defs?${qs}`), "defs");
+  if (q) r.defs = rankDefs(r.defs, q);
   const rows = r.defs.map((d) => ({ ref: d.ref.replace(/^core-/, "core/"), form: d.form, layer: d.layer, box: d.size.box, tags: d.tags, params: Object.fromEntries(Object.entries(d.params).map(([k, f]) => [k, f.default ?? f.type])), slots: d.slots.map((x) => `${x.id}:${x.kind}`), description: d.description }));
   if (flags2.json) return rows;
   if (!rows.length) return `no defs match "${q ?? ""}". Try a broader word, or define one: define-kit (see SKILL.md).`;
@@ -1162,7 +1221,15 @@ async function bakeInfo(def, params, shape) {
   const key = JSON.stringify([def, params ?? {}, shape ?? null]);
   if (!bakeCache.has(key)) {
     const b = (await query({ bake: { def: normDef(def), params: params ?? {}, ...shape ? { shape } : {} } })).bake;
-    if (b.error) throw new Error(b.error + ". `defs <word>` searches the library.");
+    if (b.error) {
+      const word = String(def).replace(/^core[/-]/, "").replace(/@\d+$/, "").replace(/-/g, " ");
+      let near = [];
+      if (/def\.unknown/.test(b.error)) try {
+        near = (await defs(word, { json: true })).slice(0, 4).map((d) => d.ref);
+      } catch {
+      }
+      throw new Error(`${b.error}${near.length ? ` \u2014 the library has: ${near.join(", ")}` : ""}. \`defs ${word}\` searches the library; define only what it lacks.`);
+    }
     bakeCache.set(key, b);
   }
   return bakeCache.get(key);
@@ -1374,10 +1441,24 @@ async function set(id, flags2) {
   const r = await act({ ops: [op] }, flags2.note);
   return r.accepted ? `set ${id}: ${Object.keys(op).filter((k) => !["op", "id"].includes(k)).map((k) => `${k} ${JSON.stringify(op[k])}`).join(", ")}` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
 }
-async function recolor(id, color) {
-  let r = await act({ ops: [{ op: "set", id, state: { paint: color } }] });
-  if (!r.accepted) r = await act({ ops: [{ op: "set", id, params: { color } }] });
-  return r.accepted ? `recoloured ${id} ${color}` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
+function recolorOp(d, id, color, part) {
+  const colorParams = Object.entries(d?.params ?? {}).filter(([, f]) => f?.type === "color").map(([k2]) => k2);
+  if (part) {
+    if (!colorParams.includes(part)) throw new Error(`${id} has no colour part ${part}; parts: ${colorParams.join(", ") || "none"}`);
+    return { op: "set", id, params: { [part]: color } };
+  }
+  if (d?.state?.paint) return { op: "set", id, state: { paint: color } };
+  const k = colorParams.includes("color") ? "color" : colorParams[0];
+  return k ? { op: "set", id, params: { [k]: color } } : null;
+}
+async function recolor(id, color, flags2 = {}) {
+  if (!id || !color) throw new Error("usage: recolor <ref> <#hex> [--part fur]");
+  const v = view(await mirror()), row = v.get(id);
+  if (!row) throw new Error(`no such thing: ${id}`);
+  const op = recolorOp(v.def(row.def), row.path, color, flags2.part);
+  if (!op) return `${id} has no colour to change (no paint state, no colour params)`;
+  const r = await act({ ops: [op] });
+  return r.accepted ? `recoloured ${id} ${color}${op.params ? ` (${Object.keys(op.params)[0]})` : ""}` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
 }
 async function remove(ids) {
   const list = [].concat(ids).filter(Boolean);
@@ -1474,12 +1555,12 @@ async function select(flags2 = {}) {
     }
     if (flags2["set-state"]) ops.push({ op: "set", id: r.path, state: JSON.parse(flags2["set-state"]) });
     if (flags2.recolor) {
-      const d = v.def(r.def);
-      if (d?.state?.paint) ops.push({ op: "set", id: r.path, state: { paint: flags2.recolor } });
-      else if (d?.params?.color) ops.push({ op: "set", id: r.path, params: { color: flags2.recolor } });
+      const o = recolorOp(v.def(r.def), r.path, flags2.recolor, flags2.part);
+      if (o) ops.push(o);
     }
     if (flags2["set-param"]) ops.push({ op: "set", id: r.path, params: parseKV(flags2["set-param"]) });
   }
+  if (!ops.length) return `${rows.length} selected, but none of them has that to change (recolor needs a paint state or a colour param)`;
   const res = await act({ ops: ops.slice(0, 256) }, flags2.note ?? `bulk ${flags2.remove ? "remove" : "edit"} of ${rows.length}`);
   return res.accepted ? `${flags2.remove ? "removed" : "changed"} ${ops.length} thing(s) in one batch (seq ${res.seq})${ops.length > 256 ? " \u2014 first 256 only; run again" : ""}` : `REFUSED: ${res.failures.map(explainFailure).join("; ")}`;
 }
@@ -1706,7 +1787,7 @@ var COMMANDS = {
   terrain: (r, f) => place(r[0], f),
   move: (r, f) => move(r[0], f),
   set: (r, f) => set(r[0], f),
-  recolor: (r) => recolor(r[0], r[1]),
+  recolor: (r, f) => recolor(r[0], r[1], f),
   remove: (r) => remove(r),
   clone: (r, f) => clone(r[0], f),
   act: (r, f) => act(JSON.parse(readArg(r)), f.note),

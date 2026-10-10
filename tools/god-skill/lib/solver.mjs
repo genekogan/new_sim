@@ -191,7 +191,9 @@ export function solve(v, thing, rel) {
     if (!host) throw new Error(`no such building: ${spec}`);
     const rooms = (host.slots ?? []).filter((x) => x.kind === 'room');
     if (!rooms.length) throw new Error(`${host.path} has no rooms (it is not a building); use --near or --on`);
-    const room = roomId ? rooms.find((x) => x.id === roomId) : rooms[0];
+    // a room by id, else by a word of it (bedroom → bedroom-1, bed → bedroom-2): the first match in the building's order
+    const bare = (t) => String(t).toLowerCase().replace(/[^a-z]/g, '');
+    const room = !roomId ? rooms[0] : rooms.find((x) => x.id === roomId) ?? rooms.find((x) => bare(x.id) === bare(roomId) || (x.name && bare(x.name) === bare(roomId))) ?? rooms.find((x) => bare(x.id).startsWith(bare(roomId)) || bare(roomId).startsWith(bare(x.id)) || (x.name && bare(x.name).includes(bare(roomId))));
     if (!room) throw new Error(`${host.path} has no room ${roomId}; rooms: ${rooms.map((x) => x.id).join(', ')}`);
     const RY = room.yaw, O = room.p;
     const local = room.local ?? [[-2, -2], [2, -2], [2, 2], [-2, 2]];

@@ -1,44 +1,38 @@
 # example: a forest edge
 
-(stand-in: path → ex-path@1 from path/1; the library has no path yet)
-$ eden-god place forest --rect -70,0,80,90 --name old-wood
-  placed old-wood [core/forest@1] — area of 4 corners
+$ eden-god place woodland --rect -70,0,80,90 --name old-wood
+  placed old-wood [core/woodland@1] — area of 4 corners
+    seq 1 — undo with: undo
+  (464 ms)
+$ eden-god place wildflowers --rect 30,0,60,90 --name meadow
+  placed meadow [core/wildflowers@1] — area of 4 corners
     seq 2 — undo with: undo
-  (5092 ms)
-$ eden-god place meadow --rect 30,0,60,90 --name meadow
-  placed meadow [core/meadow@1] — area of 4 corners
+  (322 ms)
+$ eden-god place footpath --path '[[45,40],[10,20],[-20,5],[-55,-10]]' --width 1.6 --name trail
+  placed trail [core/footpath@1] — path of 4 points
     seq 3 — undo with: undo
-  (2756 ms)
-$ eden-god place ex-path@1 --path '[[45,40],[10,20],[-20,5],[-55,-10]]' --width 1.6 --name trail
-  placed trail [ex-path@1] — path of 4 points
-    seq 4 — undo with: undo
-  (2202 ms)
+  (237 ms)
 $ eden-god place rock --along trail --row 4 --gap 10 --side right --offset 1.5
-  placed rock [core/rock@1] at (12.28, 0, 18.08) facing sw — along trail at 35%, right side, 1.5 m back from the edge; keeps: along trail
-  placed rock-2 [core/rock@1] at (2.27, 0, 13) facing sw — along trail at 45%, right side, 1.5 m back from the edge; keeps: along trail
-  placed rock-3 [core/rock@1] at (-7.77, 0, 7.98) facing sw — along trail at 55%, right side, 1.5 m back from the edge; keeps: along trail
-  placed rock-4 [core/rock@1] at (-17.81, 0, 2.96) facing sw — along trail at 65%, right side, 1.5 m back from the edge; keeps: along trail
+  placed rock [core/rock@1] at (12.3, 0, 18.03) facing sw — along trail at 35%, right side, 1.5 m back from the edge; keeps: along trail
+  placed rock-2 [core/rock@1] at (2.29, 0, 12.96) facing sw — along trail at 45%, right side, 1.5 m back from the edge; keeps: along trail
+  placed rock-3 [core/rock@1] at (-7.75, 0, 7.94) facing sw — along trail at 55%, right side, 1.5 m back from the edge; keeps: along trail
+  placed rock-4 [core/rock@1] at (-17.79, 0, 2.92) facing sw — along trail at 65%, right side, 1.5 m back from the edge; keeps: along trail
     note: 4 along trail (111.93 m long, 1.6 m wide)
-    seq 5 — undo with: undo
-  (2030 ms)
+    seq 4 — undo with: undo
+  (381 ms)
 $ eden-god place bench --along trail --t 0.3 --side left --offset 1.2 --name rest
-  placed rest [core/bench@1] at (14.8, 0, 25.33) facing ne — along trail at 30%, left side, 1.2 m back from the edge; keeps: along trail
+  placed rest [core/bench@1] at (14.78, 0, 25.36) facing ne — along trail at 30%, left side, 1.2 m back from the edge; keeps: along trail
     note: 1 along trail (111.93 m long, 1.6 m wide)
-    seq 6 — undo with: undo
-  (1248 ms)
+    seq 5 — undo with: undo
+  (262 ms)
 $ eden-god place tree --near rest --count 3 --dist 3
-  placed tree [core/tree@1] at (16.62, -0.2, 22.16) facing s — near rest, ne of it, 3 m away; keeps: near rest
-  placed tree-2 [core/tree@1] at (10.68, -0.2, 25.34) facing s — near rest, w of it, 3 m away; keeps: near rest
-  placed tree-3 [core/tree@1] at (16.92, -0.2, 28.99) facing s — near rest, se of it, 3 m away; keeps: near rest
-    seq 7 — undo with: undo
-  (1519 ms)
+  placed tree [core/tree@1] at (18.04, -0.2, 19.68) facing s — near rest, ne of it, 3 m away; keeps: near rest
+  placed tree-2 [core/tree@1] at (8.2, -0.2, 25.37) facing s — near rest, w of it, 3 m away; keeps: near rest
+  placed tree-3 [core/tree@1] at (18.35, -0.2, 31.51) facing s — near rest, se of it, 3 m away; keeps: near rest
+    seq 6 — undo with: undo
+  (262 ms)
 $ eden-god where rest
-  (14.8, 25.33): ground y 0, slope 0°, walk
+  (14.78, 25.36): ground y 0, slope 0°, walk
     within: meadow [decor], trail [surface], rest [solid]
-    nearest: meadow 0 m ne, trail 0 m nw, rest 0 m sw, tree 3.25 m ne, tree-2 3.82 m w, tree-3 3.82 m se, rock 6.75 m n, rock-2 16.53 m nw
-  (957 ms)
-$ eden-god look --at trail --from s --dist 90 --out <worktrees>/t2-skill/tools/god-skill/examples/shots/forest-edge.png
-  look: <worktrees>/t2-skill/tools/god-skill/examples/shots/forest-edge.png
-    from the s at (-4, 43.1, 92) toward (-4, 0, 13), 771.8 s
-    Read the image file; then fix what looks wrong.
-  (773671 ms)
+    nearest: meadow 0 m ne, trail 0 m nw, rest 0 m sw, tree-2 5.56 m w, tree 5.87 m ne, tree-3 6.33 m se, rock 6.74 m n, rock-2 16.47 m nw
+  (239 ms)
