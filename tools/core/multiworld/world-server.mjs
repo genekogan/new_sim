@@ -1,4 +1,4 @@
-import {worldAuthMode,validateWorldOrigin} from './world-auth-mode.mjs';
+import {worldAuthMode,validateWorldOrigin,worldAccountAuthRequired} from './world-auth-mode.mjs';
 // Local edge-era Mars/LM launcher. One process and durable DB per world; fake
 // world cast only, while paired Souls remain exclusively agent controlled.
 import {createServer} from 'node:http';
@@ -18,11 +18,13 @@ export async function installWalkSettleWaitV1(host,enabled,drive){
  return{policy:'walk-settle-wait/1',worldId:host.worldId,seq:fact.seq,tick:fact.tick,alreadyAccepted};
 }
 
-export async function openWorldServer({input,dataDir,worldKey,worldId,port,build='local-multiworld/1',webDir,marsWebDir,publicOrigin,ownerId='dev:admin',seedCast=true,nativeCast=true,runtimePolicies=true,walkSettleWaitV1,installLiving=true,cards=true,skillFile,cliFile,instructionsFile,authMode='local-dev',checkOnly=false,worldVariant='legacy',sceneSha256,nativeCastIds,experiencesFile,experiencesSha256,placeData,placeDataSha256,activityData,activityDataSha256,nativeAliases,nativeAliasesSha256}){
+export async function openWorldServer({input,dataDir,worldKey,worldId,port,build='local-multiworld/1',webDir,marsWebDir,publicOrigin,ownerId='dev:admin',seedCast=true,nativeCast=true,runtimePolicies=true,walkSettleWaitV1,installLiving=true,cards=true,skillFile,cliFile,instructionsFile,authMode='local-dev',accountAuth,checkOnly=false,worldVariant='legacy',sceneSha256,nativeCastIds,experiencesFile,experiencesSha256,placeData,placeDataSha256,activityData,activityDataSha256,nativeAliases,nativeAliasesSha256}){
  if(walkSettleWaitV1!==undefined&&typeof walkSettleWaitV1!=='boolean')throw Error('world.walk-settle-wait-flag');
  if(!['mars','littlemartians'].includes(worldKey)||!input||!dataDir||!worldId||!Number.isInteger(port)||port<4963||port>4969)throw Error('explicit local Mars/LM input/data/world and port4963..4969 required');
  if(!build.startsWith('local-')||!ownerId)throw Error('local build and explicit cast owner required');
  const exposure=worldAuthMode(authMode,{edgePublic:process.env.EDGE_PUBLIC,devAuth:process.env.DEV_AUTH,seedCast,nativeCast});
+ // Validate explicit activation before a data directory/lock/database is touched.
+ worldAccountAuthRequired(exposure,accountAuth);
  input=resolve(input);dataDir=resolve(dataDir);
  if(worldKey==='littlemartians'){
   const actual=createHash('sha256').update(readFileSync(join(input,'worlds/littlemartians/scene.json'))).digest('hex');
@@ -54,7 +56,7 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
   const prior=process.env.DATA_DIR;process.env.DATA_DIR=dataDir;
   let defaults;try{defaults=(await load('apps/server/src/config.ts')).config;}finally{if(prior===undefined)delete process.env.DATA_DIR;else process.env.DATA_DIR=prior;}
   const origin=validateWorldOrigin(publicOrigin??`http://127.0.0.1:${port}`,authMode);
-  const cfg={...defaults,worldKey,worldId,worldPath:`/w/${worldKey}`,worldSeed:'sim-genesis-1',host:'127.0.0.1',port,dataDir,
+  const cfg={...defaults,accountAuthRequired:worldAccountAuthRequired(exposure,accountAuth,defaults.accountAuthRequired),worldKey,worldId,worldPath:`/w/${worldKey}`,worldSeed:'sim-genesis-1',host:'127.0.0.1',port,dataDir,
    webDir:resolve(webDir??join(input,'apps/web/dist')),marsWebDir:resolve(marsWebDir??join(input,'mars/viewer/dist/client')),
    publicUrl:`${origin.replace(/\/$/,'')}/w/${worldKey}`,engine:'mars',livingWorld:true,seedNatives:false,ownerId,
    brainMode:'fake',budgetUsdPerDay:0,thinkingBudgetCeiling:1,authorizedThinkingWorldId:undefined,typesafeKey:undefined,anthropicKey:undefined,
@@ -77,7 +79,7 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
   const {Auth}=await load('apps/server/src/auth.ts'),{Brain}=await load('apps/server/src/brain.ts'),{Souls,ApiError}=await load('apps/server/src/souls.ts');
   const {LivingWorld}=await load('apps/server/src/living.ts'),{Hub}=await load('apps/server/src/hub.ts'),{buildApp}=await load('apps/server/src/http.ts');
   const {stripWorldRequestPath}=await load('apps/server/src/world-request-path.ts'),{handleMcp}=await load('apps/server/src/mcp.ts'),{EdgeLedger}=await load('apps/server/src/edge/ledger/ledger.ts');
-  const auth=new Auth(cfg,db);auth.devAuth=exposure.devAuth;if(exposure.configured)await auth.init();
+  const auth=new Auth(cfg,db);auth.devAuth=exposure.devAuth;if(exposure.configured)await auth.init();if(cfg.accountAuthRequired&&!auth.ready)throw Error('Account authentication verifier unavailable');
   // The application exposes edge control; a separate fake-only config enables
   // the existing needs-driven native cast. A token or non-cast identity excludes
   // the Soul from every native thought/speech/reflection route immediately.

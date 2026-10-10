@@ -14,3 +14,11 @@ export function validateWorldOrigin(origin,mode){
  if(mode==='local-dev'?url.protocol!=='http:'||!loopback:!['http:','https:'].includes(url.protocol)||url.protocol==='http:'&&!loopback)throw Error('world-auth.origin-required');
  return url.origin;
 }
+
+/** Account approvals are an explicit configured-auth activation; legacy public
+ * preview/local fixtures never inherit a process-wide account flag. */
+export function worldAccountAuthRequired(exposure,explicit,configuredDefault=false){
+ if(explicit!==undefined&&typeof explicit!=='boolean')throw Error('world-auth.account-flag');
+ if(explicit===true&&!exposure.configured)throw Error('world-auth.account-configured-required');
+ return exposure.configured?(explicit??configuredDefault)===true:false;
+}

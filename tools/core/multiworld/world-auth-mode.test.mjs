@@ -1,5 +1,5 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
-import {worldAuthMode,validateWorldOrigin} from './world-auth-mode.mjs';
+import {worldAuthMode,validateWorldOrigin,worldAccountAuthRequired} from './world-auth-mode.mjs';
 test('public world modes preserve explicit owner semantics and never seed a native crowd',()=>{
  assert.equal(worldAuthMode().local,true);
  for(const mode of ['public-preview','configured'])assert.throws(()=>worldAuthMode(mode,{edgePublic:'1'}),/no-native-cast/);
@@ -11,4 +11,14 @@ test('origin validation accepts explicit hosted identity without credentials or 
  assert.equal(validateWorldOrigin('https://example.test','configured'),'https://example.test');assert.equal(validateWorldOrigin('http://127.0.0.1:4966','public-preview'),'http://127.0.0.1:4966');
  for(const origin of ['https://x.test','http://x.test'])assert.throws(()=>validateWorldOrigin(origin,'local-dev'),/origin/);
  for(const origin of ['https://user:pass@x.test','https://x.test/path','http://x.test','https://x.test?token=x'])assert.throws(()=>validateWorldOrigin(origin,'configured'),/origin/);
+});
+
+test('account approval activation requires configured verifier mode and legacy modes remain unchanged',()=>{
+ const configured=worldAuthMode('configured',{seedCast:false,nativeCast:false});
+ assert.equal(worldAccountAuthRequired(configured,true),true);assert.equal(worldAccountAuthRequired(configured),false);
+ assert.equal(worldAccountAuthRequired(configured,undefined,true),true);assert.equal(worldAccountAuthRequired(configured,false,true),false);
+ for(const exposure of [worldAuthMode(),worldAuthMode('public-preview',{edgePublic:'1',seedCast:false,nativeCast:false})]){
+  assert.equal(worldAccountAuthRequired(exposure,undefined,true),false);assert.throws(()=>worldAccountAuthRequired(exposure,true),/account-configured-required/);
+ }
+ for(const value of ['true',1,null])assert.throws(()=>worldAccountAuthRequired(configured,value),/account-flag/);
 });
