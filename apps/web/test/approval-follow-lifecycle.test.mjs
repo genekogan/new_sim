@@ -38,5 +38,9 @@ test('actual approval hook waits for depicted body, confirms Follow, and release
     render({presentation:'live',cameraMode:'manual',selection:{soulId:'s_new'}},'mars/account-a');
     assert.equal(complete,2);assert.deepEqual(calls,[]);assert.equal(timer,null);
     render(null,pending.scope,false);assert.equal(complete,3);assert.deepEqual(calls,[]);assert.deepEqual(completions,[true,false,false]);
+    render({presentation:'live',cameraMode:'manual',inputOwned:true,selection:{soulId:'s_new'}});
+    assert.deepEqual(calls,[],'arrival must not release a human’s active manual input');assert.equal(timer,null);assert.deepEqual(completions,[true,false,false]);
+    render({presentation:'live',cameraMode:'manual',inputOwned:false,selection:{soulId:'s_new'}});
+    assert.deepEqual(calls,[['select','s_new'],['mode','follow']],'pending arrival retries after manual input is released');
   }finally{cleanup?.();internals.H=oldDispatcher;globalThis.setInterval=oldInterval;globalThis.clearInterval=oldClear;}
 });

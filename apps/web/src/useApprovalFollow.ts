@@ -6,6 +6,9 @@ export function useApprovalFollow(pending:{soulId:string;scope:string}|null,scop
   useEffect(()=>{
     if(!pending)return;
     if(pending.scope!==scope||!authed){complete(false);return;}
+    // An explicit manual takeover outranks this unconfirmed camera transition.
+    // Retry after release, while keeping the same approval pending.
+    if(state?.inputOwned)return;
     if(state?.presentation==='live'&&state.cameraMode==='follow'&&state.selection.soulId===pending.soulId&&handle?.canFollowSoul?.(pending.soulId)){complete(true);return;}
     const attempt=()=>{
       if(handle?.canFollowSoul?.(pending.soulId)&&handle.selectSoul(pending.soulId))handle.setCameraMode('follow');
