@@ -21,14 +21,16 @@ install -d -o root -g simworlds -m 750 /etc/sim-worlds
 if [ ! -f /etc/sim-worlds/staging.conf ]; then
   cat > /etc/sim-worlds/staging.conf <<'CONF'
 # sim-worlds@staging: localhost only, dev auth (staging check before the account provider is merged).
-SIM_WORLDS_ARGS=--port 4600 --range 4601-4619 --data /srv/sim-worlds-data/staging --dev-auth --max-worlds 20 --max-running 8 --min-free-mb 2500 --world-heap-mb 768 --create-limit 20 --mars-web /srv/sim-worlds/staging/mars-web --eager 2
+SIM_WORLDS_ARGS=--base /worlds --port 4600 --range 4601-4619 --data /srv/sim-worlds-data/staging --dev-auth --max-worlds 20 --max-running 8 --min-free-mb 2500 --world-heap-mb 768 --create-limit 20 --mars-web /srv/sim-worlds/staging/mars-web --eager 2
 CONF
 fi
 if [ ! -f /etc/sim-worlds/production.conf ]; then
   cat > /etc/sim-worlds/production.conf <<'CONF'
-# sim-worlds@production: behind Caddy on https://sim.eden.art for /w/<new slug>/*, /__worlds/*, /worlds, /we-assets/*.
-# The auth env file holds the account provider's settings; each world's node loads it (--env-file), the launcher never reads it.
-SIM_WORLDS_ARGS=--port 4620 --range 4621-4659 --data /srv/sim-worlds-data/production --public-origin https://sim.eden.art --auth-env-file /etc/sim-worlds/production-auth.env --max-worlds 60 --max-running 24 --min-free-mb 2500 --world-heap-mb 768 --create-limit 6 --mars-web /srv/sim-worlds/production/mars-web --eager 4
+# sim-worlds@production: behind Caddy on https://sim.eden.art for /worlds* only (one prefix; nothing else of the origin).
+# /etc/sim-worlds/production-auth.env is a PLACEHOLDER path: Codex or Gene provisions it (CLERK_PUBLISHABLE_KEY,
+# CLERK_ISSUER_URL=https://clerk.eden.art, CLERK_AUTHORIZED_PARTIES=https://sim.eden.art; no secret key). Each world's node
+# loads it by path (--env-file); the launcher only reads the publishable key and issuer. Never copied from /opt/eden3.
+SIM_WORLDS_ARGS=--base /worlds --port 4620 --range 4621-4659 --data /srv/sim-worlds-data/production --public-origin https://sim.eden.art --auth-env /etc/sim-worlds/production-auth.env --max-worlds 60 --max-running 24 --min-free-mb 2500 --world-heap-mb 768 --create-limit 6 --mars-web /srv/sim-worlds/production/mars-web --eager 4
 CONF
 fi
 chown root:simworlds /etc/sim-worlds/*.conf && chmod 640 /etc/sim-worlds/*.conf

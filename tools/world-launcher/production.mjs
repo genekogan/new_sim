@@ -18,6 +18,13 @@ import { isAbsolute } from 'node:path';
  */
 export const EXISTING_WORLDS = Object.freeze(['eden', 'mars', 'littlemartians', 'toy']);
 
+/**
+ * Root paths the existing sim.eden.art release (laptop proxy + server routes) answers: a --base may not be one.
+ * `/w` holds its worlds; `/assets`, `/__sim`, `/v1` its app; the rest Mars static, snapshots and redirects.
+ */
+export const TAKEN_PREFIXES = Object.freeze(['/w', '/l', '/assets', '/__sim', '/v1', '/mcp', '/ws', '/browser', '/modular', '/engine', '/models',
+  '/history', '/2020', '/data', '/mars-assets', '/world-assets', '/lab', '/studio', '/buildings', '/skill.md', '/healthz']);
+
 /** True when a slug could be routed to the existing release by a `/w/<key>*` path glob. */
 export const shadowsExisting = (slug) => EXISTING_WORLDS.some((k) => slug === k || slug.startsWith(k));
 
@@ -49,8 +56,11 @@ export function productionSettings(cfg, origin) {
   const maxWorlds = cfg.maxWorlds ?? 200;
   for (const [k, v] of Object.entries({ maxRunning, maxWorlds })) if (!Number.isInteger(v) || v < 1) throw new Error(`launcher: ${k} must be a positive integer`);
   if (ports > 0 && maxRunning > ports) throw new Error(`launcher: maxRunning ${maxRunning} exceeds the ${ports} child ports`);
+  const base = (cfg.base ?? '').replace(/\/+$/, '');
+  if (base && !/^\/[a-z][a-z0-9-]{0,31}$/.test(base)) throw new Error(`launcher: base must be one path segment like /worlds, got ${cfg.base}`);
+  if (base && TAKEN_PREFIXES.includes(base)) throw new Error(`launcher: base ${base} belongs to the existing release`);
   return {
-    devAuth, publicOrigin, authEnvFile: cfg.authEnvFile ?? null, maxWorlds, maxRunning,
+    base, devAuth, publicOrigin, authEnvFile: cfg.authEnvFile ?? null, maxWorlds, maxRunning,
     minFreeMb: cfg.minFreeMb ?? 0, worldHeapMb: cfg.worldHeapMb ?? 0,
   };
 }
@@ -66,6 +76,9 @@ export function decorateCommand({ cmd, args, env }, s) {
   Object.assign(out, { MIND_DRIVER: 'edge', BRAIN_MODE: 'fake', ANTHROPIC_API_KEY: '', TYPESAFE_API_KEY: '', OPENAI_API_KEY: '' });
   if (s.devAuth) out.DEV_AUTH = '1'; else out.DEV_AUTH = '0';
   out.PUBLIC_URL = s.publicOrigin;
+  if (out.WORLD_KEY) out.WORLD_PATH = `${s.base ?? ''}/w/${out.WORLD_KEY}`;
+  // this release's identity, not a BUILD_ID that a shared settings file may carry for another release
+  if (s.build && s.build !== 'dev') out.BUILD_ID = s.build;
   if (s.worldHeapMb) out.NODE_OPTIONS = `--max-old-space-size=${s.worldHeapMb}`;
   return { cmd, args, env: out };
 }

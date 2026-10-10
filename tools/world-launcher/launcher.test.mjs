@@ -177,41 +177,46 @@ test('children get edge minds, no model keys, the public origin; the auth file s
   assert.equal(c.env.PUBLIC_URL, 'https://sim.eden.art'); assert.equal(c.env.NODE_OPTIONS, '--max-old-space-size=768');
   assert.ok(!JSON.stringify(c).includes('FAKE_FROM_FILE'), 'the launcher never reads the file');
 });
-test('production launcher: prefixed API, /worlds homepage, we-assets, health, caps, limits, hidden diagnostics', async () => {
-  mkdirSync(join(webDir, 'we-assets'), { recursive: true }); writeFileSync(join(webDir, 'we-assets', 'b.js'), 'console.log(2)');
-  const P = 5244, base = `http://127.0.0.1:${P}`;
-  const L4 = await openLauncher({ port: P, range: [5241, 5243], dataDir: join(dir, 'data-prod'), webDir, templatesDir, command, eager: 0, log: () => {},
+test('production launcher under --base /worlds: one prefix for page, assets, API, worlds and WebSocket; caps, limits, health', async () => {
+  const P = 5244, base = `http://127.0.0.1:${P}`, B = '/worlds';
+  const L4 = await openLauncher({ port: P, range: [5241, 5243], dataDir: join(dir, 'data-prod'), webDir, templatesDir, command, eager: 0, log: () => {}, base: B,
     publicOrigin: 'http://sim-worlds.localhost:5244', devAuth: true, worldHeapMb: 512, maxWorlds: 3, maxRunning: 2, idleMs: 60_000, createLimit: 3 });
-  const make = (name, headers = {}) => fetch(`${base}/__worlds/worlds`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ name }) });
+  const make = (name, headers = {}) => fetch(`${base}${B}/__sim/worlds`, { method: 'POST', headers: { 'content-type': 'application/json', ...headers }, body: JSON.stringify({ name }) });
   try {
-    const h = await (await fetch(`${base}/__worlds/healthz`)).json();
+    const h = await (await fetch(`${base}${B}/__sim/healthz`)).json();
     assert.equal(h.ok, true); assert.equal(h.auth, 'dev'); assert.equal(h.maxWorlds, 3); assert.equal(h.maxRunning, 2); assert.equal(typeof h.memAvailableMb, 'number');
-    assert.equal((await fetch(`${base}/healthz`, { headers: { 'x-forwarded-for': '1.2.3.4' } }).then((r) => r.json())).memAvailableMb, undefined);
-    assert.match(await (await fetch(`${base}/worlds`)).text(), /<title>Sim/);
-    assert.equal(await (await fetch(`${base}/we-assets/b.js`)).text(), 'console.log(2)');
+    assert.equal((await fetch(`${base}${B}/__sim/healthz`, { headers: { 'x-forwarded-for': '1.2.3.4' } }).then((r) => r.json())).memAvailableMb, undefined);
+    assert.equal((await fetch(`${base}${B}`, { redirect: 'manual' })).headers.get('location'), `${B}/`);
+    assert.match(await (await fetch(`${base}${B}/`)).text(), /<title>Sim/);
+    assert.equal(await (await fetch(`${base}${B}/assets/a.js`)).text(), 'console.log(1)');
     const a = await make('Mars'); assert.equal(a.status, 201); const ab = await a.json();
-    assert.equal(ab.slug, 'my-mars'); assert.equal(ab.url, '/w/my-mars/?dev=1&new=1');
-    const env = await (await fetch(`${base}/w/my-mars/env`)).json();
-    assert.deepEqual(env, { MIND_DRIVER: 'edge', DEV_AUTH: '1', BRAIN_MODE: 'fake', PUBLIC_URL: 'http://sim-worlds.localhost:5244', ANTHROPIC_API_KEY: '', NODE_OPTIONS: '--max-old-space-size=512', FAKE_FROM_FILE: null });
+    assert.equal(ab.slug, 'my-mars'); assert.equal(ab.url, `${B}/w/my-mars/?dev=1&new=1`);
+    const env = await (await fetch(`${base}${B}/w/my-mars/env`)).json();
+    assert.deepEqual(env, { MIND_DRIVER: 'edge', DEV_AUTH: '1', BRAIN_MODE: 'fake', PUBLIC_URL: 'http://sim-worlds.localhost:5244', ANTHROPIC_API_KEY: '', NODE_OPTIONS: '--max-old-space-size=512', FAKE_FROM_FILE: null, WORLD_PATH: `${B}/w/my-mars` });
     // behind the reverse proxy the visitor's x-forwarded-for reaches the world unchanged
-    assert.equal((await fetch(`${base}/w/my-mars/echo`, { method: 'POST', body: 'x', headers: { 'x-forwarded-for': '203.0.113.7' } })).headers.get('x-xff'), '203.0.113.7');
-    const list = await (await fetch(`${base}/__worlds/worlds.json`)).json();
-    assert.equal(list.worlds[0].url, '/w/my-mars/?dev=1'); assert.equal(list.limits.maxRunning, 2);
+    assert.equal((await fetch(`${base}${B}/w/my-mars/echo`, { method: 'POST', body: 'x', headers: { 'x-forwarded-for': '203.0.113.7' } })).headers.get('x-xff'), '203.0.113.7');
+    const ws = await new Promise((yes, no) => { const s = connect(P, '127.0.0.1', () => s.write(`GET ${B}/w/my-mars/ws HTTP/1.1\r\nHost: x\r\nUpgrade: test\r\nConnection: Upgrade\r\n\r\n`)); s.once('data', (d) => { s.destroy(); yes(String(d)); }); s.on('error', no); });
+    assert.match(ws, /101 Switching/);
+    const list = await (await fetch(`${base}${B}/__sim/worlds.json`)).json();
+    assert.equal(list.worlds[0].url, `${B}/w/my-mars/?dev=1`); assert.equal(list.worlds[0].basePath, `${B}/w/my-mars`); assert.equal(list.limits.maxRunning, 2);
+    // the other release's root paths are not ours: no launcher API, no worlds, no writes outside the base
+    assert.equal((await fetch(`${base}/__sim/worlds`, { method: 'POST', body: '{"name":"x"}' })).status, 404);
+    assert.equal((await fetch(`${base}/w/my-mars/env`)).status, 404, 'a GET outside the base only reaches public static files');
     assert.equal((await make('Second')).status, 201);
     // both slots in use, neither idle long enough to sleep: the third is refused (and not registered)
     const full = await make('Third'); assert.equal(full.status, 503); assert.equal((await full.json()).code, 'capacity');
-    assert.ok(!(await (await fetch(`${base}/__worlds/worlds.json`)).json()).worlds.some((w) => w.slug === 'third'));
-    // diagnostics only for direct local requests, not through Caddy
-    assert.equal((await fetch(`${base}/__worlds/launcher`, { headers: { 'x-forwarded-for': '1.2.3.4' } })).status, 404);
-    assert.equal((await (await fetch(`${base}/__worlds/launcher`)).json()).maxRunning, 2);
-    // per-visitor creation limit (two made + one refused for capacity does not count)
-    assert.equal((await make('Other', { 'x-forwarded-for': '5.6.7.8' })).status, 503);
+    assert.ok(!(await (await fetch(`${base}${B}/__sim/worlds.json`)).json()).worlds.some((w) => w.slug === 'third'));
+    // diagnostics only for direct local requests, not through the reverse proxy
+    assert.equal((await fetch(`${base}${B}/__sim/launcher`, { headers: { 'x-forwarded-for': '1.2.3.4' } })).status, 404);
+    assert.equal((await (await fetch(`${base}${B}/__sim/launcher`)).json()).maxRunning, 2);
   } finally { await L4.close(); }
+  assert.throws(() => productionSettings({ range: [1, 2], base: '/assets' }, 'http://x'), /belongs to the existing release/);
+  assert.throws(() => productionSettings({ range: [1, 2], base: '/a/b' }, 'http://x'), /one path segment/);
 });
 test('the world cap, the creation limit, and a watched world never sleeps', async () => {
   const P = 5240, base = `http://127.0.0.1:${P}`;
   const L5 = await openLauncher({ port: P, range: [5241, 5241], dataDir: join(dir, 'data-cap'), webDir, templatesDir, command, eager: 0, log: () => {}, maxWorlds: 2, idleMs: 0, createLimit: 2 });
-  const make = (name, ip = '9.9.9.9') => fetch(`${base}/__worlds/worlds`, { method: 'POST', headers: { 'x-forwarded-for': ip }, body: JSON.stringify({ name }) });
+  const make = (name, ip = '9.9.9.9') => fetch(`${base}/__sim/worlds`, { method: 'POST', headers: { 'x-forwarded-for': ip }, body: JSON.stringify({ name }) });
   try {
     assert.equal((await make('One')).status, 201);
     // a viewer holds a WebSocket open on One: Two cannot put it to sleep

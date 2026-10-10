@@ -3,7 +3,8 @@
 #   code     /srv/sim-worlds/%i -> /srv/sim-worlds/releases/<build>   (release.sh flips it)
 #   data     /srv/sim-worlds-data/%i                                  (registry, one dir per world, child logs)
 #   settings /etc/sim-worlds/%i.conf                                  (SIM_WORLDS_ARGS: port, caps, origin; no secrets)
-#   auth     /etc/sim-worlds/%i-auth.env (production only; named in %i.conf, loaded by each world's node, never by the launcher)
+#   auth     /etc/sim-worlds/production-auth.env (production only; placeholder path named in production.conf, provisioned
+#            by Codex/Gene; each world's node loads it by path; accounts registry <data>/accounts.sqlite, back it up)
 # Binds 127.0.0.1 only. Never touches /opt/eden3, the sim or mars users, Caddy or DNS.
 [Unit]
 Description=Sim world launcher (%i): new god-mode worlds, one Sim server per world
