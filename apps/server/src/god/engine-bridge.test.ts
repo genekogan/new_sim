@@ -70,6 +70,7 @@ test('Souls among god-built things: enter, climb, sit, carry, pray; bodies refus
   assert.equal(E.world.entities[row.entity_id].human.level, 1, 'upstairs');
 
   // the god cannot remove the chair (or the house around it) while Ana sits on it
+  assert.deepEqual((runQuery(w.god.model, { entity: 'house/chair' }).entity as any).usedBy, { soul: 'Ana', body: row.entity_id, how: 'occupied', thing: 'house/chair' }, 'query shows who uses it');
   for (const id of [ids['house/chair'], ids.house]) {
     const no = w.god.act({ ops: [{ op: 'remove', id }] }) as any;
     assert.equal(no.accepted, false); assert.equal(no.failures[0].code, 'occupied.by-body'); assert.match(no.failures[0].detail, /Ana/);
@@ -139,6 +140,11 @@ test('a god edit that would bury a standing Soul lifts it clear, and says so', {
   assert.ok(Math.abs(p[2] - at[1]) > 0.5 || Math.abs(p[0] - at[0]) > 2.2, `Bo stepped clear: ${p} (was ${at})`);
   assert.ok(E.clearanceAtV1(p[0], p[2]) >= 0.27, 'standing on clear ground');
   assert.deepEqual(E.runtime.violations, []);
+  // retirement removes the body entity from the entity world
+  assert.ok(w.god.model.entities.has(row.entity_id));
+  await accept(w.host, w.souls.retire(w.db.soul(row.id)!));
+  await w.settle(4);
+  assert.equal(w.god.model.entities.has(row.entity_id), false, 'body entity archived');
 });
 
 test('L3 shapes in the engine: a garden wall makes Souls go round, a deck is walkable, a far road does not widen the raster', { timeout: 300000 }, async (t) => {

@@ -9,6 +9,8 @@ export type ReachEnd = string | [number, number] | [number, number, number];
 export type ReachFn = (from: ReachEnd, to: ReachEnd) => unknown;
 /** Reachability needs the Soul engine; the engine bridge (engine-bridge.ts, lane L9) registers it per world model. */
 export const reachProviders = new WeakMap<WorldModel, ReachFn>();
+/** Who is using an entity right now (a Soul seated on it, holding it); registered by the engine bridge. */
+export const usesProviders = new WeakMap<WorldModel, (id: string) => unknown>();
 
 export type QueryInput = {
   points?: [number, number][];
@@ -41,6 +43,7 @@ export function runQuery(w: WorldModel, q: QueryInput) {
         slots: baked.slots.map((s) => ({ id: s.id, kind: s.kind, capacity: s.capacity, used: [...(w.children.get(e.id) ?? [])].filter((c) => w.entities.get(c)?.in.slot === s.id).length })),
         children: [...(w.children.get(e.id) ?? [])].map((c) => w.pathOf(c)),
         constraints: e.constraints ?? [],
+        ...(usesProviders.get(w) ? { usedBy: usesProviders.get(w)!(e.id) } : {}),
         notes: baked.notes ?? [],
       };
     }
