@@ -80,12 +80,15 @@ tunnel/proxy endpoints and exact three world IDs/builds, assets, `/instructions.
 agent download URLs and HTTP/WS behavior. Reload Caddy after review. Do not overwrite
 any remote world database or publish qualification clones.
 
-Deployment rollback restores the exact previous Caddy site and reloads it, while
-closing only the lane-owned tunnel/listeners. Provider rollback changes the explicit
-selector/environment and reader build; it retains the identity registry, current
-histories and delegated credentials. Routing rollback may temporarily expose old
-application presentation, so Root must make that trade explicit; no data rollback
-or old-v1-history import is allowed.
+The captured old Caddy site routes to outdated v1 histories. Restore that exact
+site only BEFORE the new runtime accepts any writes. After acceptance, rollback
+must keep routing to the current authoritative histories with the minimum lifecycle
+and account readers, or expose a maintenance/unsigned fallback on those same
+histories. Never reactivate the old v1 backend as current history. Keep the global
+account registry and delegated grants through every rollback. Explicit provider
+rollback needs its own qualification: Clerk and Privy subjects are distinct, and
+existing Clerk accounts may require human relinking. Do not merge by email,
+reassign owners, reset accounts or restore an older world database.
 
 ## Qualification boundaries
 
