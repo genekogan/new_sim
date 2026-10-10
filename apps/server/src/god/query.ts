@@ -215,14 +215,19 @@ function describe(w: WorldModel, ref: string) {
   const openings = (baked.openings ?? []).map((o) => ({ id: o.id, kind: o.kind, level: o.level, width: o.width, height: o.height, state: o.state ?? 'always', at: toWorld(pose, o.at[0], o.at[1]), faces: compassOf(pose.yaw + o.yaw) }));
   const links = (baked.links ?? []).map((l) => ({ id: l.id, kind: l.kind, from: l.from, to: l.to, width: l.width, path: l.path.map(([a, c]) => toWorld(pose, a, c)) }));
   const parent = e.in.parent === 'world' ? null : w.entities.get(e.in.parent);
-  const near = nearest(w, [pose.x, pose.z], 6, new Set([e.id, ...w.subtree(e.id)]));
-  const ground = { y: round(w.terrain.sample(pose.x, pose.z)), slopeDeg: round((Math.atan(w.terrain.slope(pose.x, pose.z)) * 180) / Math.PI), water: round(waterDepthAt(w.terrain, pose.x, pose.z)), medium: mediumAt(w.terrain, pose.x, pose.z) };
+  // shape things (roads, rivers, lakes, plazas) sit at the origin: measure from the path's middle / the area's centroid
+  const sh = e.shape as { area?: Vec2[]; path?: Vec2[]; width?: number } | undefined;
+  const [ax, az] = sh?.path ? pointAlong(sh.path, 0.5).p : sh?.area ? centroid(sh.area) : [pose.x, pose.z];
+  const near = nearest(w, [ax, az], 6, new Set([e.id, ...w.subtree(e.id)]));
+  const ground = { y: round(w.terrain.sample(ax, az)), slopeDeg: round((Math.atan(w.terrain.slope(ax, az)) * 180) / Math.PI), water: round(waterDepthAt(w.terrain, ax, az)), medium: mediumAt(w.terrain, ax, az) };
+  const shape = sh?.path ? { path: sh.path.length <= 16 ? sh.path : [sh.path[0], sh.path[sh.path.length - 1]], points: sh.path.length, length: round(sh.path.reduce((l, p, i) => (i ? l + Math.hypot(p[0] - sh.path![i - 1][0], p[1] - sh.path![i - 1][1]) : 0), 0)), width: sh.width ?? null, middle: [round(ax), round(az)] }
+    : sh?.area ? { area: sh.area.length <= 16 ? sh.area : null, points: sh.area.length, centre: [round(ax), round(az)], size: polySize(sh.area) } : null;
   return {
     id: e.id, path: w.pathOf(e.id), name: e.name ?? null, def: e.def, description: def.description, tags: def.tags, layer: def.layer, form: def.form, anchor: e.anchor ?? def.anchor,
     in: parent ? { parent: w.pathOf(parent.id), slot: e.in.slot ?? null } : 'world',
     pose: { x: round(pose.x), y: round(pose.y), z: round(pose.z), yaw: round(pose.yaw), faces: compassOf(pose.yaw), s: pose.s },
     box: baked.box.map(round), aabb, y, colliders: fp.length, tris: baked.tris,
-    params: e.params ?? {}, state: e.state ?? {}, shape: e.shape ? ('area' in e.shape ? { area: e.shape.area.length + ' points' } : { path: e.shape.path.length + ' points', width: e.shape.width }) : null,
+    params: e.params ?? {}, state: e.state ?? {}, shape,
     rooms, openings, links,
     slots: slots.filter((s) => s.kind !== 'room').map(({ polygon: _p, local: _l, ...s }) => s),
     children: kids.filter((k) => !k.in.slot || !rooms.some((r) => r.id === k.in.slot)).map((k) => ({ name: k.name ?? k.id, def: k.def, slot: k.in.slot ?? null })),
@@ -248,6 +253,7 @@ function where(w: WorldModel, at: [number, number]) {
   return { x, z, y: round(w.terrain.sample(x, z)), slopeDeg: round((Math.atan(w.terrain.slope(x, z)) * 180) / Math.PI), water: lvl === null ? null : { level: lvl, depth: round(waterDepthAt(w.terrain, x, z)) }, medium: mediumAt(w.terrain, x, z), inside: contains, room, near: nearest(w, at, 8) };
 }
 
+const centroid = (a: Vec2[]): Vec2 => { let x = 0, z = 0; for (const p of a) { x += p[0]; z += p[1]; } return [x / a.length, z / a.length]; };
 function nearest(w: WorldModel, at: [number, number], n: number, skip = new Set<string>()) {
   const rows: { path: string; def: string; dist: number; dir: string }[] = [];
   for (const e of w.entities.values()) {

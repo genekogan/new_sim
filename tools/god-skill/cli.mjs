@@ -105,6 +105,8 @@ export async function describe(ref, flags = {}) {
   L.push(`${d.path} [${d.def.replace(/^core-/, 'core/')}] ${d.layer} ${d.form}${d.anchor !== 'base' ? `, anchor ${d.anchor}` : ''} — ${d.in === 'world' ? 'at the root' : `in ${d.in.parent}${d.in.slot ? ` (slot ${d.in.slot})` : ''}`}`);
   if (d.description) L.push(`  ${d.description.slice(0, 200)}`);
   L.push(`  pose (${d.pose.x}, ${d.pose.y}, ${d.pose.z}) facing ${d.pose.faces} (yaw ${d.pose.yaw})${d.pose.s !== 1 ? ` scale ${d.pose.s}` : ''}; size ${d.box.join('×')} m; bounds x ${d.aabb[0]}…${d.aabb[2]}, z ${d.aabb[1]}…${d.aabb[3]}, y ${d.y[0]}…${d.y[1]}; ${d.colliders} colliders, ~${d.tris} tris`);
+  if (d.shape?.path) L.push(`  path: ${d.shape.points} points, ${d.shape.length} m${d.shape.width ? `, ${d.shape.width} m wide` : ''}: ${d.shape.path.map((p) => `${r2(p[0])},${r2(p[1])}`).join(' → ')}${d.shape.points > d.shape.path.length ? ' (ends)' : ''}; middle ${d.shape.middle.join(',')}`);
+  if (d.shape?.points && !d.shape.path) L.push(`  area: ${d.shape.points} corners, ${d.shape.size.join('×')} m around ${d.shape.centre.join(',')}`);
   if (Object.keys(d.params).length) L.push(`  params ${JSON.stringify(d.params).slice(0, 300)}`);
   if (Object.keys(d.state).length) L.push(`  state ${JSON.stringify(d.state).slice(0, 300)}`);
   if (d.rooms.length) { L.push(`  rooms (${d.rooms.length}):`); for (const r of d.rooms) L.push(`  - ${r.id} "${r.name}" floor ${r.floor} (y ${r.y}), ${r.size.join('×')} m, headroom ${r.height} m${r.doors.length ? `, ${r.doors.join(', ')}` : ''}; ${r.occupants.length ? `holds ${r.occupants.map((o) => o.name).join(', ')}` : 'empty'} — place into it with --inside ${d.path}/${r.id}`); }
@@ -191,7 +193,7 @@ const relFrom = (f) => ({
   at: f.at, offset: f.offset, near: f.near, around: f.around, dist: f.dist, dir: f.dir, count: f.count, facing: f.facing, yaw: f.yaw,
   against: f.against, between: f.between ? [].concat(f.between).flatMap((x) => String(x).split(/\s+|;/)).filter(Boolean).slice(0, 2) : undefined,
   along: f.along, t: f.t, side: f.side, setback: f.setback ?? (f.along ? f.offset : undefined), inside: f.inside, corner: f.corner, wall: f.wall, on: f.on,
-  row: f.row, grid: f.grid, gap: f.gap, float: !!f.float, from: f.from, to: f.to, via: f.via, width: f.width, across: f.across, span: f.span,
+  row: f.row, grid: f.grid, gap: f.gap, spacing: f.spacing, float: !!f.float, from: f.from, to: f.to, via: f.via, width: f.width, across: f.across, span: f.span,
 });
 const hasRelation = (f) => ['at', 'near', 'around', 'against', 'between', 'along', 'across', 'inside', 'on', 'free', 'from', 'row', 'grid'].some((k) => f[k] !== undefined);
 
@@ -218,7 +220,7 @@ export async function place(defIn, flags = {}) {
     flags = { ...flags, at: undefined, near: undefined };
     return commitItems(v, def, info, flags, params, spots.map((s) => ({ candidates: [{ p: s.at, ...(flags.facing ? {} : {}), note: `on a free plot ${s.dist} m from (${near.x}, ${near.z})` }] })), []);
   }
-  if (shape) return commitItems(v, def, info, flags, params, [{ candidates: [{ shape, note: `${info.form} ${shape.path ? `of ${shape.path.length} points` : `of ${shape.area.length} corners`}` }] }], []);
+  if (shape) return commitItems(v, def, info, flags, params, [{ candidates: [{ shape, note: shape.path ? `path of ${shape.path.length} points` : `area of ${shape.area.length} corners` }] }], []);
   if (!hasRelation(flags) && flags.yaw === undefined && flags.facing === undefined) throw new Error('where? give --at x,z|ref, --near ref, --inside house/room, --on table, --along road, --against ref, --between a b, or --free');
   const sol = solve(v, { def, form: info.form, layer: info.layer, box: info.box, s: flags.scale ? num(flags.scale) : 1 }, relFrom(flags));
   return commitItems(v, def, info, flags, params, sol.items, sol.notes);
@@ -419,7 +421,7 @@ export async function look(flags = {}) {
   if (flags.span) span = num(flags.span);
   const cam = camera({ target, span, from: flags.from ?? 's', dist: flags.dist ? num(flags.dist) : undefined, inside: !!flags.inside, height: flags.height ? num(flags.height) : undefined });
   const out = resolve(flags.out ?? `looks/look-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.png`);
-  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags.inside || flags['hide-roofs'] || flags.floor !== undefined), cut: flags.floor !== undefined ? num(flags.floor) : null, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
+  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags.inside || flags['hide-roofs'] || flags.floor !== undefined), cut: flags.floor !== undefined ? num(flags.floor) : null, span: flags.inside ? 0 : span, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
   let shot;
   if (!flags.keep) shot = await shoot(args);
   else {
@@ -429,7 +431,7 @@ export async function look(flags = {}) {
     shot = JSON.parse(child.stdout.trim().split('\n').pop());
   }
   if (flags.json) return { ...shot, eye: cam.eye, at: cam.at };
-  return `look: ${shot.file}\n  from the ${cam.from} at (${cam.eye.join(', ')}) toward (${cam.at.join(', ')}), ${Math.round(shot.ms / 100) / 10} s${shot.state && !shot.state.ready ? ` (not fully settled: ${JSON.stringify(shot.state)})` : ''}\n  Read the image file; then fix what looks wrong.`;
+  return `look: ${shot.file}\n  from the ${cam.from} at (${(shot.frames?.eye ?? cam.eye).join(', ')}) toward (${cam.at.join(', ')}), ${Math.round(shot.ms / 100) / 10} s${shot.state && !shot.state.ready ? ` (not fully settled: ${JSON.stringify(shot.state)})` : ''}\n  Read the image file; then fix what looks wrong.`;
 }
 
 // ---------------------------------------------------------------- export / import / define

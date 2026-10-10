@@ -53,6 +53,17 @@ export const extentAlong = (b, u) => { const X = [Math.cos(b.yaw), -Math.sin(b.y
 
 // ---------------------------------------------------------------- paths
 
+/** Distance from c along unit u to where the ray leaves polygon poly (0 if c is outside). */
+export function rayExit(poly, c, u) {
+  let best = 0;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [ax, az] = poly[j], [bx, bz] = poly[i], ex = bx - ax, ez = bz - az;
+    const den = u[0] * ez - u[1] * ex; if (Math.abs(den) < 1e-12) continue;
+    const t = ((ax - c[0]) * ez - (az - c[1]) * ex) / den, s = ((ax - c[0]) * u[1] - (az - c[1]) * u[0]) / den;
+    if (t > 0 && s >= 0 && s <= 1) best = Math.max(best, t);
+  }
+  return best;
+}
 export function polylineLength(path) { let l = 0; for (let i = 1; i < path.length; i++) l += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]); return l; }
 export function pointAlong(path, t) {
   const total = polylineLength(path); let want = Math.min(1, Math.max(0, t)) * total;
@@ -152,7 +163,16 @@ export function solve(v, thing, rel) {
     const toEdge = (P, Q) => { if (P.kind !== 'region') return P; const d = norm(COMPASS[P.word]), h = v.extent / 2 - 2; const k = Math.min(...[0, 1].map((i) => (Math.abs(d[i]) < 1e-9 ? Infinity : ((Math.sign(d[i]) * h) - (i ? Q.z : Q.x)) / d[i]))); return { x: r2(Q.x + d[0] * k), z: r2(Q.z + d[1] * k), kind: 'point', ref: `the ${P.word} edge` }; };
     if (A.kind === 'region' && B.kind !== 'region') A = toEdge(A, B); else if (B.kind === 'region') B = toEdge(B, A.kind === 'region' ? { x: 0, z: 0 } : A);
     // start and end at the edges of entity refs, not their centres (a road from the plaza to the bridge)
-    const edge = (P, Q) => { if (P.kind !== 'entity' || P.row.form !== 'point') return [P.x, P.z]; const u = norm([Q.x - P.x, Q.z - P.z]); const e = extentAlong(boxOf(P.row), u) + 1; return [r2(P.x + u[0] * e), r2(P.z + u[1] * e)]; };
+    // ends at the refs' edges, never their centres: a point thing's footprint edge (+1 m), an area's boundary
+    // toward the other end (+1 m out; water areas: 1 m in, so a river joins its lake), a path's nearer end
+    const edge = (P, Q) => {
+      if (P.kind !== 'entity') return [P.x, P.z];
+      const sh = P.row.shape;
+      if (sh?.path) { const a = sh.path[0], b = sh.path[sh.path.length - 1]; return Math.hypot(a[0] - Q.x, a[1] - Q.z) <= Math.hypot(b[0] - Q.x, b[1] - Q.z) ? [r2(a[0]), r2(a[1])] : [r2(b[0]), r2(b[1])]; }
+      const u = norm([Q.x - P.x, Q.z - P.z]);
+      if (sh?.area) { const k = rayExit(sh.area, [P.x, P.z], u); const wet = P.row.layer === 'volume' || P.row.water !== undefined && P.row.water !== null; const d = k + (wet ? -1 : 1); return [r2(P.x + u[0] * d), r2(P.z + u[1] * d)]; }
+      const e = extentAlong(boxOf(P.row), u) + 1; return [r2(P.x + u[0] * e), r2(P.z + u[1] * e)];
+    };
     const via = rel.via ? [].concat(rel.via).map((x) => { const p = refPoint(v, x); return [p.x, p.z]; }) : [];
     const path = [edge(A, via.length ? { x: via[0][0], z: via[0][1] } : B), ...via, edge(B, via.length ? { x: via.at(-1)[0], z: via.at(-1)[1] } : A)];
     notes.push(`path from ${A.ref ?? a} to ${B.ref ?? b}${via.length ? ` via ${via.length} point(s)` : ''}, ${r2(polylineLength(path))} m`);
@@ -273,13 +293,18 @@ export function solve(v, thing, rel) {
     const path = host.shape?.path; if (!path) throw new Error(`${host.path} is not a path (it has no shape.path)`);
     const L = polylineLength(path), pw = (host.shape.width ?? host.box?.[0] ?? 4) / 2;
     const sides = rel.side === 'both' ? ['left', 'right'] : [rel.side ?? 'center'];
-    const n = Number(rel.row ?? rel.count ?? 1);
-    const gap = rel.gap !== undefined ? Number(rel.gap) : 4;
-    const step = (2 * hw + gap) / L;
-    const t0 = rel.t !== undefined ? Number(rel.t) : n > 1 ? Math.max(0.02, 0.5 - (step * (n - 1)) / 2) : 0.5;
+    const want = Number(rel.row ?? rel.count ?? 1);
+    // --spacing: centre to centre; --gap: clear space between neighbours (edge to edge)
+    const step = (rel.spacing !== undefined ? Number(rel.spacing) : 2 * hw + (rel.gap !== undefined ? Number(rel.gap) : 4)) / L;
+    const tStart = rel.t !== undefined ? Number(rel.t) : null;
+    // a row never piles up at the end of the path: only what fits between 2 % and 98 % is placed
+    const room = tStart !== null ? 0.98 - tStart : 0.96;
+    const n = want > 1 ? Math.max(1, Math.min(want, Math.floor(room / step + 1e-9) + 1)) : want;
+    if (n < want) notes.push(`only ${n} of ${want} fit along ${host.path} at ${r2(step * L)} m apart (${r2(L)} m long); pass a smaller --spacing/--gap for more`);
+    const t0 = tStart !== null ? tStart : n > 1 ? Math.max(0.02, 0.5 - (step * (n - 1)) / 2) : 0.5;
     const items = [];
     for (const side of sides) for (let k = 0; k < n; k++) {
-      const t = Math.min(1, t0 + k * step);
+      const t = Math.min(0.98, t0 + k * step);
       const { p, dir } = pointAlong(path, t);
       const left = leftOf(dir), sg = side === 'left' ? 1 : side === 'right' ? -1 : 0;
       const off = sg ? pw + hd + Number(rel.setback ?? rel.offset ?? 1) : 0;

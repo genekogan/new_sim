@@ -104,3 +104,21 @@ test('row and grid around a point; float spreads inside a pond', () => {
   for (const it of ducks.items) { const [x, z] = it.candidates[0].p; assert.ok(x > -40 && x < -20 && z > -40 && z < -20); assert.equal(it.candidates[0].anchor, 'float'); }
   assert.equal(circleArea('0,0,10').length, 10);
 });
+
+test('path ends at area edges and path ends, not centres; rows never pile up at the end', async () => {
+  const { solve, rayExit } = await import('./solver.mjs');
+  assert.equal(Math.round(rayExit([[-10, -10], [10, -10], [10, 10], [-10, 10]], [0, 0], [1, 0])), 10);
+  const rows = [
+    { id: 'p', path: 'plaza', name: 'plaza', parent: 'world', def: 'core-plaza@1', form: 'area', layer: 'surface', shape: { area: [[-10, -10], [10, -10], [10, 10], [-10, 10]] }, pose: [0, 0, 0, 0, 1], box: [20, 0.2, 20], aabb: [-10, -10, 10, 10] },
+    { id: 'b', path: 'bridge', name: 'bridge', parent: 'world', def: 'core-bridge@1', form: 'path', layer: 'surface', shape: { path: [[100, -5], [100, 5]], width: 3 }, pose: [0, 0, 0, 0, 1], box: [3, 1, 10], aabb: [98.5, -5, 101.5, 5] },
+  ];
+  const v = { rows, extent: 1000, get: (r) => rows.find((x) => x.path === r || x.id === r), def: () => null, entity: () => null, children: () => [] };
+  const road = solve(v, { def: 'core/road@1', form: 'path', layer: 'surface', box: [6, 0.2, 6], s: 1 }, { from: 'plaza', to: 'bridge', width: 5 });
+  const path = road.items[0].candidates[0].shape.path;
+  assert.deepEqual(path[0], [11, 0]); assert.deepEqual(path.at(-1), [100, -5]);
+  rows.push({ id: 'r', path: 'lane', name: 'lane', parent: 'world', def: 'core-road@1', form: 'path', layer: 'surface', shape: { path: [[0, 50], [100, 50]], width: 4 }, pose: [0, 0, 0, 0, 1], box: [4, 0.2, 100], aabb: [0, 48, 100, 52] });
+  const trees = solve(v, { def: 'core/tree@1', form: 'point', layer: 'solid', box: [4, 7, 4], s: 1 }, { along: 'lane', row: 12, spacing: 12, side: 'left', offset: 3 });
+  assert.equal(trees.items.length, 9); assert.match(trees.notes.join(' '), /only 9 of 12 fit/);
+  const xs = trees.items.map((it) => it.candidates[0].p[0]).sort((a, b) => a - b);
+  for (let i = 1; i < xs.length; i++) assert.ok(Math.abs(xs[i] - xs[i - 1] - 12) < 0.01, xs.join(','));
+});

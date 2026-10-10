@@ -224,6 +224,17 @@ var extentAlong = (b, u) => {
   const X = [Math.cos(b.yaw), -Math.sin(b.yaw)], Z = [Math.sin(b.yaw), Math.cos(b.yaw)];
   return b.half[0] * Math.abs(u[0] * X[0] + u[1] * X[1]) + b.half[1] * Math.abs(u[0] * Z[0] + u[1] * Z[1]);
 };
+function rayExit(poly, c, u) {
+  let best = 0;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+    const [ax, az] = poly[j], [bx, bz] = poly[i], ex = bx - ax, ez = bz - az;
+    const den = u[0] * ez - u[1] * ex;
+    if (Math.abs(den) < 1e-12) continue;
+    const t = ((ax - c[0]) * ez - (az - c[1]) * ex) / den, s = ((ax - c[0]) * u[1] - (az - c[1]) * u[0]) / den;
+    if (t > 0 && s >= 0 && s <= 1) best = Math.max(best, t);
+  }
+  return best;
+}
 function polylineLength(path) {
   let l = 0;
   for (let i = 1; i < path.length; i++) l += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]);
@@ -331,8 +342,19 @@ function solve(v, thing, rel) {
     if (A.kind === "region" && B.kind !== "region") A = toEdge(A, B);
     else if (B.kind === "region") B = toEdge(B, A.kind === "region" ? { x: 0, z: 0 } : A);
     const edge = (P, Q) => {
-      if (P.kind !== "entity" || P.row.form !== "point") return [P.x, P.z];
+      if (P.kind !== "entity") return [P.x, P.z];
+      const sh = P.row.shape;
+      if (sh?.path) {
+        const a2 = sh.path[0], b2 = sh.path[sh.path.length - 1];
+        return Math.hypot(a2[0] - Q.x, a2[1] - Q.z) <= Math.hypot(b2[0] - Q.x, b2[1] - Q.z) ? [r22(a2[0]), r22(a2[1])] : [r22(b2[0]), r22(b2[1])];
+      }
       const u = norm([Q.x - P.x, Q.z - P.z]);
+      if (sh?.area) {
+        const k = rayExit(sh.area, [P.x, P.z], u);
+        const wet = P.row.layer === "volume" || P.row.water !== void 0 && P.row.water !== null;
+        const d = k + (wet ? -1 : 1);
+        return [r22(P.x + u[0] * d), r22(P.z + u[1] * d)];
+      }
       const e = extentAlong(boxOf(P.row), u) + 1;
       return [r22(P.x + u[0] * e), r22(P.z + u[1] * e)];
     };
@@ -466,13 +488,16 @@ function solve(v, thing, rel) {
     if (!path) throw new Error(`${host.path} is not a path (it has no shape.path)`);
     const L = polylineLength(path), pw = (host.shape.width ?? host.box?.[0] ?? 4) / 2;
     const sides = rel.side === "both" ? ["left", "right"] : [rel.side ?? "center"];
-    const n = Number(rel.row ?? rel.count ?? 1);
-    const gap2 = rel.gap !== void 0 ? Number(rel.gap) : 4;
-    const step = (2 * hw + gap2) / L;
-    const t0 = rel.t !== void 0 ? Number(rel.t) : n > 1 ? Math.max(0.02, 0.5 - step * (n - 1) / 2) : 0.5;
+    const want = Number(rel.row ?? rel.count ?? 1);
+    const step = (rel.spacing !== void 0 ? Number(rel.spacing) : 2 * hw + (rel.gap !== void 0 ? Number(rel.gap) : 4)) / L;
+    const tStart = rel.t !== void 0 ? Number(rel.t) : null;
+    const room = tStart !== null ? 0.98 - tStart : 0.96;
+    const n = want > 1 ? Math.max(1, Math.min(want, Math.floor(room / step + 1e-9) + 1)) : want;
+    if (n < want) notes.push(`only ${n} of ${want} fit along ${host.path} at ${r22(step * L)} m apart (${r22(L)} m long); pass a smaller --spacing/--gap for more`);
+    const t0 = tStart !== null ? tStart : n > 1 ? Math.max(0.02, 0.5 - step * (n - 1) / 2) : 0.5;
     const items2 = [];
     for (const side of sides) for (let k = 0; k < n; k++) {
-      const t = Math.min(1, t0 + k * step);
+      const t = Math.min(0.98, t0 + k * step);
       const { p, dir } = pointAlong(path, t);
       const left = leftOf(dir), sg = side === "left" ? 1 : side === "right" ? -1 : 0;
       const off = sg ? pw + hd + Number(rel.setback ?? rel.offset ?? 1) : 0;
@@ -801,7 +826,7 @@ function stopKeeper() {
   rmSync2(KEEPER, { force: true });
   return k ? `stopped the look keeper (pid ${k.pid})` : "no look keeper running";
 }
-async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = null, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 6e5), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }) {
+async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = null, span = 0, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 6e5), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }) {
   mkdirSync2(dirname(resolve(out)), { recursive: true });
   const t0 = Date.now();
   const pw = findPlaywright();
@@ -849,8 +874,14 @@ async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = null, ex
       if (state.why === "no entity world on this page") throw new Error("look: this world has no entity layer");
       await new Promise((r) => setTimeout(r, 1e3));
     }
-    const frames = await page.evaluate(([e, a, roofs, cutAt]) => new Promise((res) => {
+    const frames = await page.evaluate(([e0, a, roofs, cutAt, fitSpan]) => new Promise((res) => {
       const w = window.__simEntity;
+      let e = e0;
+      if (fitSpan > 0 && w.camera.fov) {
+        const v = w.camera.fov * Math.PI / 180, h = 2 * Math.atan(Math.tan(v / 2) * (w.camera.aspect || 1.6));
+        const need2 = fitSpan / 2 / Math.tan(Math.min(v, h) / 2) * 1.05, d = [e0[0] - a[0], e0[1] - a[1], e0[2] - a[2]], len = Math.hypot(...d) || 1;
+        if (len < need2) e = d.map((c, i) => a[i] + c / len * need2);
+      }
       window.__buildingView = roofs ? { hideRoofs: true, cut: cutAt } : { hideRoofs: false, cut: null };
       w.controls.target.set(a[0], a[1], a[2]);
       w.camera.position.set(e[0], e[1], e[2]);
@@ -886,11 +917,11 @@ async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = null, ex
       let n = 0;
       const t = performance.now();
       const tick = () => {
-        if (++n >= 4 || performance.now() - t > 12e4) res({ n, ms: Math.round(performance.now() - t), roofsHidden: hidden.length });
+        if (++n >= 4 || performance.now() - t > 12e4) res({ n, ms: Math.round(performance.now() - t), roofsHidden: hidden.length, eye: e.map((c) => Math.round(c * 10) / 10) });
         else requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
-    }), [eye, at, hideRoofs, cut]);
+    }), [eye, at, hideRoofs, cut, span]);
     await page.waitForTimeout(settleMs);
     const data = await page.evaluate(() => {
       const c = [...document.querySelectorAll("canvas")].sort((a, b) => b.width * b.height - a.width * a.height)[0];
@@ -1118,6 +1149,8 @@ async function describe(ref, flags2 = {}) {
   L.push(`${d.path} [${d.def.replace(/^core-/, "core/")}] ${d.layer} ${d.form}${d.anchor !== "base" ? `, anchor ${d.anchor}` : ""} \u2014 ${d.in === "world" ? "at the root" : `in ${d.in.parent}${d.in.slot ? ` (slot ${d.in.slot})` : ""}`}`);
   if (d.description) L.push(`  ${d.description.slice(0, 200)}`);
   L.push(`  pose (${d.pose.x}, ${d.pose.y}, ${d.pose.z}) facing ${d.pose.faces} (yaw ${d.pose.yaw})${d.pose.s !== 1 ? ` scale ${d.pose.s}` : ""}; size ${d.box.join("\xD7")} m; bounds x ${d.aabb[0]}\u2026${d.aabb[2]}, z ${d.aabb[1]}\u2026${d.aabb[3]}, y ${d.y[0]}\u2026${d.y[1]}; ${d.colliders} colliders, ~${d.tris} tris`);
+  if (d.shape?.path) L.push(`  path: ${d.shape.points} points, ${d.shape.length} m${d.shape.width ? `, ${d.shape.width} m wide` : ""}: ${d.shape.path.map((p) => `${r2(p[0])},${r2(p[1])}`).join(" \u2192 ")}${d.shape.points > d.shape.path.length ? " (ends)" : ""}; middle ${d.shape.middle.join(",")}`);
+  if (d.shape?.points && !d.shape.path) L.push(`  area: ${d.shape.points} corners, ${d.shape.size.join("\xD7")} m around ${d.shape.centre.join(",")}`);
   if (Object.keys(d.params).length) L.push(`  params ${JSON.stringify(d.params).slice(0, 300)}`);
   if (Object.keys(d.state).length) L.push(`  state ${JSON.stringify(d.state).slice(0, 300)}`);
   if (d.rooms.length) {
@@ -1252,6 +1285,7 @@ var relFrom = (f) => ({
   row: f.row,
   grid: f.grid,
   gap: f.gap,
+  spacing: f.spacing,
   float: !!f.float,
   from: f.from,
   to: f.to,
@@ -1281,7 +1315,7 @@ async function place(defIn, flags2 = {}) {
     flags2 = { ...flags2, at: void 0, near: void 0 };
     return commitItems(v, def, info, flags2, params, spots.map((s) => ({ candidates: [{ p: s.at, ...flags2.facing ? {} : {}, note: `on a free plot ${s.dist} m from (${near.x}, ${near.z})` }] })), []);
   }
-  if (shape) return commitItems(v, def, info, flags2, params, [{ candidates: [{ shape, note: `${info.form} ${shape.path ? `of ${shape.path.length} points` : `of ${shape.area.length} corners`}` }] }], []);
+  if (shape) return commitItems(v, def, info, flags2, params, [{ candidates: [{ shape, note: shape.path ? `path of ${shape.path.length} points` : `area of ${shape.area.length} corners` }] }], []);
   if (!hasRelation(flags2) && flags2.yaw === void 0 && flags2.facing === void 0) throw new Error("where? give --at x,z|ref, --near ref, --inside house/room, --on table, --along road, --against ref, --between a b, or --free");
   const sol = solve(v, { def, form: info.form, layer: info.layer, box: info.box, s: flags2.scale ? num(flags2.scale) : 1 }, relFrom(flags2));
   return commitItems(v, def, info, flags2, params, sol.items, sol.notes);
@@ -1591,7 +1625,7 @@ async function look(flags2 = {}) {
   if (flags2.span) span = num(flags2.span);
   const cam = camera({ target, span, from: flags2.from ?? "s", dist: flags2.dist ? num(flags2.dist) : void 0, inside: !!flags2.inside, height: flags2.height ? num(flags2.height) : void 0 });
   const out = resolve2(flags2.out ?? `looks/look-${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").slice(0, 19)}.png`);
-  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags2.inside || flags2["hide-roofs"] || flags2.floor !== void 0), cut: flags2.floor !== void 0 ? num(flags2.floor) : null, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags2.keep, ...flags2.width ? { width: num(flags2.width) } : {}, ...flags2.h ? { height: num(flags2.h) } : {} };
+  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags2.inside || flags2["hide-roofs"] || flags2.floor !== void 0), cut: flags2.floor !== void 0 ? num(flags2.floor) : null, span: flags2.inside ? 0 : span, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags2.keep, ...flags2.width ? { width: num(flags2.width) } : {}, ...flags2.h ? { height: num(flags2.h) } : {} };
   let shot;
   if (!flags2.keep) shot = await shoot(args);
   else {
@@ -1601,7 +1635,7 @@ async function look(flags2 = {}) {
   }
   if (flags2.json) return { ...shot, eye: cam.eye, at: cam.at };
   return `look: ${shot.file}
-  from the ${cam.from} at (${cam.eye.join(", ")}) toward (${cam.at.join(", ")}), ${Math.round(shot.ms / 100) / 10} s${shot.state && !shot.state.ready ? ` (not fully settled: ${JSON.stringify(shot.state)})` : ""}
+  from the ${cam.from} at (${(shot.frames?.eye ?? cam.eye).join(", ")}) toward (${cam.at.join(", ")}), ${Math.round(shot.ms / 100) / 10} s${shot.state && !shot.state.ready ? ` (not fully settled: ${JSON.stringify(shot.state)})` : ""}
   Read the image file; then fix what looks wrong.`;
 }
 async function exportWorld(file, flags2 = {}) {

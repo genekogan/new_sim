@@ -86,7 +86,7 @@ async function ensureKeeper(worldUrl, cliPath) {
 export function stopKeeper() { const k = readKeeper(); if (k?.pid) try { process.kill(k.pid); } catch { /* gone */ } rmSync(KEEPER, { force: true }); return k ? `stopped the look keeper (pid ${k.pid})` : 'no look keeper running'; }
 
 /** Take the picture. Returns { file, ms, state, via }. */
-export async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = null, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 600_000), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }) {
+export async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = null, span = 0, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 600_000), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }) {
   mkdirSync(dirname(resolve(out)), { recursive: true });
   const t0 = Date.now();
   const pw = findPlaywright();
@@ -128,8 +128,15 @@ export async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = n
     if (state.why === 'no entity world on this page') throw new Error('look: this world has no entity layer');
     await new Promise((r) => setTimeout(r, 1000));
   }
-  const frames = await page.evaluate(([e, a, roofs, cutAt]) => new Promise((res) => {
+  const frames = await page.evaluate(([e0, a, roofs, cutAt, fitSpan]) => new Promise((res) => {
     const w = window.__simEntity;
+    // back the camera off until `fitSpan` metres fit the frame at this camera's real field of view
+    let e = e0;
+    if (fitSpan > 0 && w.camera.fov) {
+      const v = (w.camera.fov * Math.PI) / 180, h = 2 * Math.atan(Math.tan(v / 2) * (w.camera.aspect || 1.6));
+      const need = (fitSpan / 2) / Math.tan(Math.min(v, h) / 2) * 1.05, d = [e0[0] - a[0], e0[1] - a[1], e0[2] - a[2]], len = Math.hypot(...d) || 1;
+      if (len < need) e = d.map((c, i) => a[i] + (c / len) * need);
+    }
     // L2's interior view: roofs (and the storeys above `cut`) off for every building
     window.__buildingView = roofs ? { hideRoofs: true, cut: cutAt } : { hideRoofs: false, cut: null };
     w.controls.target.set(a[0], a[1], a[2]); w.camera.position.set(e[0], e[1], e[2]); w.camera.lookAt(w.controls.target); w.controls.update?.();
@@ -143,8 +150,8 @@ export async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = n
     window.__lookRestore = () => { for (const o of hidden) o.visible = true; };
     const canvas = document.querySelector('canvas');
     if (canvas) { const keep = new Set(); for (let n = canvas; n; n = n.parentElement) keep.add(n); for (const n of keep) for (const c of n.children ?? []) if (!keep.has(c)) c.style.visibility = 'hidden'; }
-    let n = 0; const t = performance.now(); const tick = () => { if (++n >= 4 || performance.now() - t > 120000) res({ n, ms: Math.round(performance.now() - t), roofsHidden: hidden.length }); else requestAnimationFrame(tick); }; requestAnimationFrame(tick);
-  }), [eye, at, hideRoofs, cut]);
+    let n = 0; const t = performance.now(); const tick = () => { if (++n >= 4 || performance.now() - t > 120000) res({ n, ms: Math.round(performance.now() - t), roofsHidden: hidden.length, eye: e.map((c) => Math.round(c * 10) / 10) }); else requestAnimationFrame(tick); }; requestAnimationFrame(tick);
+  }), [eye, at, hideRoofs, cut, span]);
   await page.waitForTimeout(settleMs);
   const data = await page.evaluate(() => { const c = [...document.querySelectorAll('canvas')].sort((a, b) => b.width * b.height - a.width * a.height)[0]; const d = c ? c.toDataURL('image/png') : null; window.__lookRestore?.(); return d; });
   if (!data) throw new Error('look: no canvas on the page');

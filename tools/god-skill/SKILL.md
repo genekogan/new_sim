@@ -122,7 +122,7 @@ has every generator's params with ranges.
 | `--against <ref>[.n\|.e\|.s\|.w]` | back flush to that side of the ref, front facing away (default: the ref's back) |
 | `--between <a> <b>` | the midpoint, width along a→b; for path defs, a path from a to b |
 | `--along <path> [--t 0.3] [--side left\|right\|both] [--offset m]` | on a road/river/wall at fraction t of its length; on a side, `offset` metres back from its edge, facing it. Left = walker's left from the first point to the last |
-| `--along <path> --row n --gap g --side both` | a row along it (trees lining a road), `gap` metres between neighbours |
+| `--along <path> --row n --spacing s --side both` | a row along it (trees lining a road), `s` metres centre to centre (`--gap g`: clear metres between neighbours); a row that does not fit is shortened and says so |
 | `--across <path> [--t 0.5] [--span m]` | across a road/river at t: path defs (a bridge) get a crossing path `span` m past each bank; point things are turned to face across |
 | `--inside <house>/<room>` | a free spot in that room (local frame handled for you) |
 | `--inside <house>/<room> --corner ne` · `--wall n` | tucked into a corner, or back to a wall facing into the room (`--count n` lines several along the wall) |
@@ -143,7 +143,7 @@ place mountain --at east --param height=180 --param radius=160            # a si
 place mountain --path '[[300,-260],[340,240]]' --width 150 --name range   # a range (path)
 place lake --circle -260,0,80 --name west-lake                            # cx,cz,r → a natural 10-gon
 place plaza --rect 0,0,30,24 --name square                                # cx,cz,w,d
-place road --from square --to bridge [--via 40,60] --width 6 --name main-road   # from/to refs' edges
+place road --from square --to bridge [--via 40,60] --width 6 --name main-road   # from the square's edge to the bridge's nearer end
 place river --path '[[-260,60],[-120,180],[0,480]]' --width 10
 place river --from west-lake --to s --width 10 --name river             # a compass word as an end = the world's edge that way
 ```
@@ -178,7 +178,9 @@ sky --palette golden-hour --sun 0.4 · weather --clouds 0.3 --wind 0.2 · consti
 
 - `look [--at <ref>|x,z] [--from s|n|e|w|ne…|above] [--dist m] [--inside [--floor k]] [--out f.png]` —
   a screenshot (Chrome + Playwright). It prints the file path: **open the image and look at it.**
-  `--at` frames that thing (always give one: the whole world from afar shows little); `--inside`
+  `--at` frames that thing. The viewer draws the land in detail only within a few hundred metres of
+  where it looks, so look at parts (`--at village`, `--at bridge`), never the whole world at once; `map` is
+  the whole-world view; `--inside`
   hides roofs to show a building's top storey, `--floor 0` its ground floor. Each look opens Chrome
   and waits for the world to settle: a minute or several on a busy machine, so give the shell call a
   10-minute timeout rather than giving up. `look --keep` keeps the browser for faster later looks;
