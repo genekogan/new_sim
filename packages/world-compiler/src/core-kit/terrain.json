@@ -347,6 +347,7 @@
   "name": "core-stream",
   "version": 1,
   "description": "A narrow stream with pebble banks.",
+  "components": { "sound": { "kind": "stream", "radius": 12, "volume": 0.45, "mode": "loop" } },
   "tags": [
    "water",
    "river",

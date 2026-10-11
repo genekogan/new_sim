@@ -75,15 +75,7 @@
    ],
    "want": [
     "lawn",
-    "gravel-patch",
-    "sand-patch",
-    "mud-patch",
-    "snow-patch",
-    "dirt-patch",
-    "paving",
-    "cobbles",
-    "boardwalk",
-    "puddle"
+    "boardwalk"
    ]
   },
   {
@@ -343,10 +335,7 @@
     "window-box"
    ],
    "want": [
-    "potted-plant",
-    "planter",
-    "window-box",
-    "hanging-basket"
+    "planter"
    ]
   },
   {
@@ -440,13 +429,6 @@
     "shrine"
    ],
    "want": [
-    "town-hall",
-    "library",
-    "school",
-    "clinic",
-    "fire-station",
-    "post-office",
-    "museum",
     "chapel",
     "temple",
     "courthouse",
@@ -467,15 +449,7 @@
     "plant"
    ],
    "want": [
-    "warehouse",
-    "workshop",
-    "factory",
-    "windmill",
-    "watermill",
-    "smithy",
-    "depot",
-    "silo",
-    "chimney"
+    "watermill"
    ]
   },
   {
@@ -496,7 +470,6 @@
     "stable",
     "chicken-coop",
     "greenhouse",
-    "silo",
     "granary",
     "farmhouse",
     "pigsty",
@@ -567,10 +540,8 @@
    ],
    "want": [
     "park",
-    "formal-garden",
     "zen-garden",
-    "maze",
-    "allotments"
+    "maze"
    ]
   },
   {
@@ -651,9 +622,6 @@
     "arch"
    ],
    "want": [
-    "statue",
-    "obelisk",
-    "memorial",
     "arch",
     "sculpture",
     "mural"
@@ -718,12 +686,7 @@
     "tram",
     "track"
    ],
-   "want": [
-    "rail-track",
-    "station-platform",
-    "tram-stop",
-    "level-crossing"
-   ]
+   "want": []
   },
   {
    "id": "transport.bridge",
@@ -776,10 +739,7 @@
    ],
    "want": [
     "signpost",
-    "traffic-light",
-    "stop-sign",
-    "waymarker",
-    "milestone"
+    "waymarker"
    ]
   },
   {
@@ -826,8 +786,6 @@
    "want": [
     "water-tank",
     "hydrant",
-    "manhole",
-    "drain",
     "pump-house"
    ]
   },
@@ -864,9 +822,6 @@
    ],
    "want": [
     "lamp-post",
-    "lantern-post",
-    "floodlight",
-    "string-lights",
     "bollard-light"
    ]
   },
@@ -928,14 +883,7 @@
     "canopy",
     "thatch"
    ],
-   "want": [
-    "gable-roof",
-    "hip-roof",
-    "flat-roof",
-    "dome-roof",
-    "awning",
-    "chimney-stack"
-   ]
+   "want": []
   },
   {
    "id": "component.opening",
@@ -969,9 +917,7 @@
     "lift"
    ],
    "want": [
-    "stairs",
     "spiral-stairs",
-    "ramp",
     "ladder",
     "lift"
    ]
@@ -1067,10 +1013,7 @@
    ],
    "want": [
     "bed",
-    "bunk",
-    "cot",
-    "hammock",
-    "crib"
+    "bunk"
    ]
   },
   {
@@ -1214,13 +1157,7 @@
     "arcade",
     "foosball"
    ],
-   "want": [
-    "chess-table",
-    "pool-table",
-    "foosball",
-    "arcade-cabinet",
-    "dartboard"
-   ]
+   "want": []
   },
   {
    "id": "object",
@@ -1296,14 +1233,9 @@
     "ladder"
    ],
    "want": [
-    "spade",
-    "rake",
-    "watering-can",
-    "broom",
     "hammer",
     "axe",
-    "toolbox",
-    "wheelbarrow"
+    "toolbox"
    ]
   },
   {
@@ -1343,14 +1275,7 @@
     "poster",
     "photo"
    ],
-   "want": [
-    "book",
-    "book-stack",
-    "newspaper",
-    "scroll",
-    "map",
-    "letter"
-   ]
+   "want": []
   },
   {
    "id": "object.sign",
@@ -1427,13 +1352,7 @@
     "doll",
     "teddy"
    ],
-   "want": [
-    "ball",
-    "kite",
-    "teddy",
-    "toy-blocks",
-    "hoop"
-   ]
+   "want": []
   },
   {
    "id": "object.art",
@@ -1472,13 +1391,9 @@
    ],
    "want": [
     "car",
-    "van",
     "truck",
-    "bus",
-    "tractor",
     "forklift",
-    "scooter",
-    "ice-cream-van"
+    "scooter"
    ]
   },
   {
@@ -1706,7 +1621,6 @@
    "want": [
     "herd",
     "flock",
-    "school",
     "swarm"
    ]
   },
@@ -1788,11 +1702,7 @@
     "leaves"
    ],
    "via": "small object defs scattered with a scatter component",
-   "want": [
-    "litter-scatter",
-    "leaf-litter",
-    "debris-pile"
-   ]
+   "want": []
   },
   {
    "id": "layer.construction",
@@ -1889,10 +1799,7 @@
     "spawn",
     "flag"
    ],
-   "want": [
-    "region-marker",
-    "spawn-point"
-   ]
+   "want": []
   }
  ]
 }

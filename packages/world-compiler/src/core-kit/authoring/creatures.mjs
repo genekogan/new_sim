@@ -212,7 +212,7 @@ export default [
     { feather: '#a0603a', head: '#a0603a', bill: '#e8b23a', legs: '#e8b23a', comb: '#d23a2e' }, 'biped-waddle', 'graze', { speed: 0.5, radius: 5 }),
   creature('bird', 'A small songbird (robin-like, red breast) that flits between perches and flies short loops; perch slots or fly.', ['bird', 'songbird', 'robin', 'sparrow', 'wild'],
     bird({ L: 0.13, H: 0.09, W: 0.08, leg: 0.03, neck: 0.015, neckAngle: 0.3, neckR: 0.025, head: 0.04, bill: { kind: 'cone', len: 0.02, r: 0.008 }, foot: 0.02, breast: true, legR: 0.004, tailLen: 0.55, tailAngle: 0.9, tailUp: 0.25 }),
-    { feather: '#7a5c45', breast: '#d8643a', head: '#7a5c45', bill: '#3a2f28', legs: '#5a4636' }, 'bird-fly', 'fly', { speed: 2.5, radius: 10, scale: [0.5, 3] }),
+    { feather: '#7a5c45', breast: '#d8643a', head: '#7a5c45', bill: '#3a2f28', legs: '#5a4636' }, 'bird-fly', 'fly', { speed: 2.5, radius: 10, scale: [0.5, 3], components: { sound: { kind: 'birds', radius: 18, volume: 0.35, mode: 'loop' } } }),
   creature('crow', 'A glossy black crow that struts, pecks and flies off in loops over fields.', ['crow', 'raven', 'bird', 'wild'],
     bird({ L: 0.36, H: 0.16, W: 0.13, leg: 0.09, neck: 0.05, neckAngle: 0.6, neckR: 0.04, head: 0.058, bill: { kind: 'cone', len: 0.06, r: 0.018, tilt: 0.1 }, foot: 0.045, legR: 0.008, tailLen: 0.5, tailAngle: 0.25, wingColor: 'wing' }),
     { feather: '#2a2c35', head: '#24262e', wing: '#1c1d24', bill: '#4a4a52', legs: '#3a3a40' }, 'bird-fly', 'fly', { speed: 3, radius: 14 }),
@@ -227,4 +227,4 @@ export default [
     { scales: '#9fb4c0', spots: '#4f6f86', fin: '#7d93a3' }, 'fish-swim', 'swim', { speed: 0.6, radius: 8, anchor: 'float' }),
 ];
 
-export { perch };
+export { perch, quadruped, bird, fish };
