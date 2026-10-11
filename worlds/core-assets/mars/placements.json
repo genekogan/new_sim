@@ -137,7 +137,7 @@
    "floorY": 2.857
   },
   {
-   "def": "core/mars-tool-library-floor@1",
+   "def": "core/mars-tool-library-floor-cushion@1",
    "cat": "seat",
    "building": "tool-camp",
    "nums": [],
@@ -153,7 +153,7 @@
    "floorY": 2.857
   },
   {
-   "def": "core/mars-tool-library-floor-2@1",
+   "def": "core/mars-tool-library-floor-cushion-2@1",
    "cat": "seat",
    "building": "tool-camp",
    "nums": [],
@@ -169,7 +169,7 @@
    "floorY": 2.857
   },
   {
-   "def": "core/mars-tool-library-floor-3@1",
+   "def": "core/mars-tool-library-floor-cushion-3@1",
    "cat": "seat",
    "building": "tool-camp",
    "nums": [],
@@ -185,7 +185,7 @@
    "floorY": 2.857
   },
   {
-   "def": "core/mars-tool-library-floor-4@1",
+   "def": "core/mars-tool-library-floor-cushion-4@1",
    "cat": "seat",
    "building": "tool-camp",
    "nums": [],
@@ -399,16 +399,41 @@
    "building": "freeside",
    "nums": [],
    "ids": [
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-seat-a0ec9773",
     "freeside-2026-observed-details-open-mic-performer-folding-chair-back-195483e0",
-    "freeside-2026-observed-details-open-mic-performer-folding-chair-back-41d0c4b3"
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-2f755ed4",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-f91d6404",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-63e469ba",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-e981e6ca"
    ],
    "p": [
-    58.208,
-    0.7,
-    -70.892
+    57.968,
+    0.143,
+    -71.393
    ],
-   "r": 0,
-   "floorY": 0.7
+   "r": -1.4486,
+   "floorY": 0.143
+  },
+  {
+   "def": "core/mars-folding-chair@1",
+   "cat": "seat",
+   "building": "freeside",
+   "nums": [],
+   "ids": [
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-seat-fb186a84",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-back-41d0c4b3",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-4d6b3a03",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-1dd3cb3f",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-110c6e15",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-7c7ead21"
+   ],
+   "p": [
+    58.09,
+    0.143,
+    -70.35
+   ],
+   "r": -1.4486,
+   "floorY": 0.143
   },
   {
    "def": "core/mars-folding-table@1",
@@ -431,12 +456,13 @@
    "floorY": 0.15
   },
   {
-   "def": "core/mars-folding-chair-2@1",
+   "def": "core/mars-folding-chair@1",
    "cat": "seat",
    "building": "freeside",
    "nums": [],
    "ids": [
     "freeside-2026-observed-details-open-mic-performer-folding-chair-seat-19831f89",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-back-fa23759c",
     "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-d688505d",
     "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-bf66bd89",
     "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-991cdbe0",
@@ -447,63 +473,7 @@
     0.143,
     -72.436
    ],
-   "r": 0,
-   "floorY": 0.143
-  },
-  {
-   "def": "core/mars-folding-chair-3@1",
-   "cat": "seat",
-   "building": "freeside",
-   "nums": [],
-   "ids": [
-    "freeside-2026-observed-details-open-mic-performer-folding-chair-back-fa23759c"
-   ],
-   "p": [
-    58.025,
-    0.7,
-    -72.456
-   ],
-   "r": 0,
-   "floorY": 0.7
-  },
-  {
-   "def": "core/mars-folding-chair-2@1",
-   "cat": "seat",
-   "building": "freeside",
-   "nums": [],
-   "ids": [
-    "freeside-2026-observed-details-open-mic-performer-folding-chair-seat-a0ec9773",
-    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-2f755ed4",
-    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-f91d6404",
-    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-63e469ba",
-    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-e981e6ca"
-   ],
-   "p": [
-    57.968,
-    0.143,
-    -71.393
-   ],
-   "r": 0,
-   "floorY": 0.143
-  },
-  {
-   "def": "core/mars-folding-chair-2@1",
-   "cat": "seat",
-   "building": "freeside",
-   "nums": [],
-   "ids": [
-    "freeside-2026-observed-details-open-mic-performer-folding-chair-seat-fb186a84",
-    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-4d6b3a03",
-    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-1dd3cb3f",
-    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-110c6e15",
-    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-7c7ead21"
-   ],
-   "p": [
-    58.09,
-    0.143,
-    -70.35
-   ],
-   "r": 0,
+   "r": -1.4486,
    "floorY": 0.143
   },
   {
@@ -686,6 +656,20 @@
    "floorY": 0.16
   },
   {
+   "def": "core/mars-og-east-folding-chair@1",
+   "cat": "seat",
+   "building": "site",
+   "nums": [],
+   "ids": [],
+   "p": [
+    -46.319,
+    0.011,
+    50.295
+   ],
+   "r": -0.2094,
+   "floorY": 0.011
+  },
+  {
    "def": "core/mars-og-east-folding-dinner-table@1",
    "cat": "table",
    "building": "site",
@@ -700,7 +684,7 @@
    "floorY": 0.02
   },
   {
-   "def": "core/mars-og-east-folding-chair@1",
+   "def": "core/mars-og-east-folding-chair-2@1",
    "cat": "seat",
    "building": "site",
    "nums": [],
@@ -715,20 +699,6 @@
   },
   {
    "def": "core/mars-og-east-folding-chair-2@1",
-   "cat": "seat",
-   "building": "site",
-   "nums": [],
-   "ids": [],
-   "p": [
-    -46.319,
-    0.011,
-    50.295
-   ],
-   "r": -0.2094,
-   "floorY": 0.011
-  },
-  {
-   "def": "core/mars-og-east-folding-chair@1",
    "cat": "seat",
    "building": "site",
    "nums": [],
@@ -1696,7 +1666,7 @@
    "floorY": 0.53
   },
   {
-   "def": "core/mars-folding-chair-4@1",
+   "def": "core/mars-folding-chair-2@1",
    "cat": "seat",
    "building": "chiba",
    "nums": [],
@@ -1717,7 +1687,7 @@
    "floorY": 3.021
   },
   {
-   "def": "core/mars-folding-chair-5@1",
+   "def": "core/mars-folding-chair-3@1",
    "cat": "seat",
    "building": "chiba",
    "nums": [],
@@ -1738,7 +1708,7 @@
    "floorY": 1.878
   },
   {
-   "def": "core/mars-folding-chair-6@1",
+   "def": "core/mars-folding-chair-4@1",
    "cat": "seat",
    "building": "chiba",
    "nums": [],

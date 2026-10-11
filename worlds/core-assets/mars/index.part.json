@@ -115,12 +115,12 @@
    "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
    "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)"
   },
-  "d5257d953af237f3cf287a68c56f0a38fc54bd518ed00dc8a5434be23af70346": {
+  "12570c85f880cd13de794851843295f34ebeb8b3f533687c612e1721494f2131": {
    "ext": "glb",
    "kind": "mesh",
-   "path": "worlds/core-assets/mars/tool-library-floor-4.glb",
+   "path": "worlds/core-assets/mars/tool-library-floor-cushion-4.glb",
    "tris": 120,
-   "bytes": 3032,
+   "bytes": 3040,
    "textures": 0,
    "texPx": 0,
    "box": [
@@ -139,7 +139,7 @@
     "EXT_meshopt_compression",
     "KHR_mesh_quantization"
    ],
-   "name": "mars-tool-library-floor-4",
+   "name": "mars-tool-library-floor-cushion-4",
    "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
    "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)"
   },
@@ -423,23 +423,23 @@
    "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
    "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)"
   },
-  "bd6bdef16a58f2ce755c641e7256e53a1d1db9910f253b0e703a96d1b8988411": {
+  "f711972d1a8e26beac75f756c230a86d79effb192877756d047f14415d8c1513": {
    "ext": "glb",
    "kind": "mesh",
    "path": "worlds/core-assets/mars/folding-chair.glb",
-   "tris": 24,
-   "bytes": 2416,
+   "tris": 120,
+   "bytes": 4708,
    "textures": 0,
    "texPx": 0,
    "box": [
-    0.193,
-    0.34,
-    1.443
+    0.402,
+    1.064,
+    0.751
    ],
    "min": [
-    -0.097,
-    0,
-    -0.722
+    -0.201,
+    -0.168,
+    -0.37
    ],
    "animations": [],
    "nodes": [],
@@ -476,62 +476,6 @@
     "KHR_mesh_quantization"
    ],
    "name": "mars-folding-table",
-   "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
-   "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)"
-  },
-  "107dfbf3861351bc3f47d0e1fd8c0bbc82d737fcc06bf508b093390a9c8a9e4f": {
-   "ext": "glb",
-   "kind": "mesh",
-   "path": "worlds/core-assets/mars/folding-chair-2.glb",
-   "tris": 108,
-   "bytes": 4532,
-   "textures": 0,
-   "texPx": 0,
-   "box": [
-    0.786,
-    0.749,
-    0.449
-   ],
-   "min": [
-    -0.398,
-    -0.168,
-    -0.224
-   ],
-   "animations": [],
-   "nodes": [],
-   "extensions": [
-    "EXT_meshopt_compression",
-    "KHR_mesh_quantization"
-   ],
-   "name": "mars-folding-chair-2",
-   "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
-   "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)"
-  },
-  "6dff4fe500332e694493f03b74c08fed2c40f8b649b4c3457baa5033ef833d40": {
-   "ext": "glb",
-   "kind": "mesh",
-   "path": "worlds/core-assets/mars/folding-chair-3.glb",
-   "tris": 12,
-   "bytes": 2200,
-   "textures": 0,
-   "texPx": 0,
-   "box": [
-    0.071,
-    0.34,
-    0.4
-   ],
-   "min": [
-    -0.036,
-    0,
-    -0.2
-   ],
-   "animations": [],
-   "nodes": [],
-   "extensions": [
-    "EXT_meshopt_compression",
-    "KHR_mesh_quantization"
-   ],
-   "name": "mars-folding-chair-3",
    "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
    "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)"
   },
@@ -731,6 +675,34 @@
    "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
    "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)"
   },
+  "ad03c607adc7df4a759dba7287b90ceaa905f998c10c3b053602dc5d25bb8553": {
+   "ext": "glb",
+   "kind": "mesh",
+   "path": "worlds/core-assets/mars/og-east-folding-chair.glb",
+   "tris": 120,
+   "bytes": 5708,
+   "textures": 0,
+   "texPx": 0,
+   "box": [
+    0.43,
+    1.143,
+    1.14
+   ],
+   "min": [
+    -0.215,
+    -0.169,
+    -0.64
+   ],
+   "animations": [],
+   "nodes": [],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "KHR_mesh_quantization"
+   ],
+   "name": "mars-og-east-folding-chair",
+   "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
+   "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)"
+  },
   "15dea0338862baf2b1308a73f7d7ce1d781718c2d2fccbf31d6b280057319a50": {
    "ext": "glb",
    "kind": "mesh",
@@ -760,34 +732,6 @@
    "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)"
   },
   "ea9ea0c999cbb9f1fdb8e42f83b710cfae37b2f0cda0ea78294f867d390b8806": {
-   "ext": "glb",
-   "kind": "mesh",
-   "path": "worlds/core-assets/mars/og-east-folding-chair.glb",
-   "tris": 120,
-   "bytes": 5708,
-   "textures": 0,
-   "texPx": 0,
-   "box": [
-    0.43,
-    1.143,
-    1.14
-   ],
-   "min": [
-    -0.215,
-    -0.169,
-    -0.64
-   ],
-   "animations": [],
-   "nodes": [],
-   "extensions": [
-    "EXT_meshopt_compression",
-    "KHR_mesh_quantization"
-   ],
-   "name": "mars-og-east-folding-chair",
-   "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
-   "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)"
-  },
-  "ad03c607adc7df4a759dba7287b90ceaa905f998c10c3b053602dc5d25bb8553": {
    "ext": "glb",
    "kind": "mesh",
    "path": "worlds/core-assets/mars/og-east-folding-chair-2.glb",
@@ -1826,7 +1770,7 @@
   "c068ea234c5855caeca7cf72851d40023e79f13577cf63ac7915ac19b9727968": {
    "ext": "glb",
    "kind": "mesh",
-   "path": "worlds/core-assets/mars/folding-chair-4.glb",
+   "path": "worlds/core-assets/mars/folding-chair-2.glb",
    "tris": 120,
    "bytes": 4756,
    "textures": 0,
@@ -1847,14 +1791,14 @@
     "EXT_meshopt_compression",
     "KHR_mesh_quantization"
    ],
-   "name": "mars-folding-chair-4",
+   "name": "mars-folding-chair-2",
    "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
    "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)"
   },
   "55dfbe34d467ec94ca713df97a23b41939fee877644f1539eda96845942232af": {
    "ext": "glb",
    "kind": "mesh",
-   "path": "worlds/core-assets/mars/folding-chair-5.glb",
+   "path": "worlds/core-assets/mars/folding-chair-3.glb",
    "tris": 120,
    "bytes": 4756,
    "textures": 0,
@@ -1875,14 +1819,14 @@
     "EXT_meshopt_compression",
     "KHR_mesh_quantization"
    ],
-   "name": "mars-folding-chair-5",
+   "name": "mars-folding-chair-3",
    "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
    "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)"
   },
   "fdd8fa8c38adcbe099f79fc99e7f096ddf79f63197051175cc1ef3bc64ad45bb": {
    "ext": "glb",
    "kind": "mesh",
-   "path": "worlds/core-assets/mars/folding-chair-6.glb",
+   "path": "worlds/core-assets/mars/folding-chair-4.glb",
    "tris": 120,
    "bytes": 4752,
    "textures": 0,
@@ -1903,7 +1847,7 @@
     "EXT_meshopt_compression",
     "KHR_mesh_quantization"
    ],
-   "name": "mars-folding-chair-6",
+   "name": "mars-folding-chair-4",
    "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
    "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)"
   },
@@ -7844,12 +7788,12 @@
    "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)",
    "footprint": "256fe5ffe0b1c2fce16a0465c7747aadb251cfe5ca2fc8ace96f8c22066305e0"
   },
-  "4ba7b189ec8537181367452f1982cc18ce0575a5400b3a0e30f08e493708b859": {
+  "8cce6ffe59bdf60e43c7e1d785f7f467287059344e95766819755a002dc4c68c": {
    "ext": "json",
    "kind": "footprint",
    "path": "worlds/core-assets/mars/freeside.footprint.json",
    "tris": 0,
-   "bytes": 22846,
+   "bytes": 22435,
    "textures": 0,
    "texPx": 0,
    "box": [
@@ -9280,34 +9224,6 @@
      },
      {
       "c": [
-       6.0622,
-       13.8857
-      ],
-      "half": [
-       0.1882,
-       0.03
-      ],
-      "yaw": 0.1166,
-      "y0": 1.4744,
-      "y1": 1.6142,
-      "tag": "obj-80"
-     },
-     {
-      "c": [
-       6.0717,
-       12.9784
-      ],
-      "half": [
-       0.065,
-       0.03
-      ],
-      "yaw": 0.1166,
-      "y0": 1.0568,
-      "y1": 1.0698,
-      "tag": "obj-81"
-     },
-     {
-      "c": [
        9.2767,
        -1.6847
       ],
@@ -9318,7 +9234,7 @@
       "yaw": 1.2754,
       "y0": 1.2717,
       "y1": 2.3543,
-      "tag": "obj-82"
+      "tag": "obj-86"
      },
      {
       "c": [
@@ -9332,7 +9248,7 @@
       "yaw": 1.2754,
       "y0": 0.4343,
       "y1": 2.3543,
-      "tag": "obj-83"
+      "tag": "obj-87"
      },
      {
       "c": [
@@ -9346,7 +9262,7 @@
       "yaw": -0.2954,
       "y0": 0.4843,
       "y1": 2.3543,
-      "tag": "obj-84"
+      "tag": "obj-88"
      },
      {
       "c": [
@@ -9360,7 +9276,7 @@
       "yaw": 1.2754,
       "y0": 0.8893,
       "y1": 2.3543,
-      "tag": "obj-85"
+      "tag": "obj-89"
      },
      {
       "c": [
@@ -9374,7 +9290,7 @@
       "yaw": 1.4514,
       "y0": 0.2793,
       "y1": 1.3043,
-      "tag": "obj-86"
+      "tag": "obj-90"
      }
     ],
     "surfaces": [],
@@ -9383,7 +9299,7 @@
     "rooms": [],
     "slots": [],
     "notes": [
-     "footprint mars-freeside: 0 rooms, 0 openings, 0 links (0 shafts, float-only), 108 wall/solid colliders"
+     "footprint mars-freeside: 0 rooms, 0 openings, 0 links (0 shafts, float-only), 106 wall/solid colliders"
     ]
    },
    "name": "mars-freeside-footprint",
@@ -9418,7 +9334,7 @@
    "name": "mars-freeside",
    "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
    "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)",
-   "footprint": "4ba7b189ec8537181367452f1982cc18ce0575a5400b3a0e30f08e493708b859"
+   "footprint": "8cce6ffe59bdf60e43c7e1d785f7f467287059344e95766819755a002dc4c68c"
   },
   "172a93af1054f945c145698851815f0c0b0e8df29d4213043b91509e089d1d97": {
    "ext": "json",

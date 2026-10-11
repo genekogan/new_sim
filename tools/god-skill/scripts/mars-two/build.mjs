@@ -135,6 +135,7 @@ function nameOf(rs, cat) {
   if (cat === 'table' && /west coffee table|shared coffee tablet/i.test(main.kind ?? '')) return 'mimos-coffee-table';
   let n = (main.kind ?? main.name).toLowerCase().replace(/\b(mimos|kitchen|diner|auditorium|chiba|source|photographed|commissary|native|fitted|loose|adjacent|continued|upper|northwest|west|left|right|rear|front|study|shared|photo|observed|occupied|separate|grounded|slender|short|performer|open mic|portable|draped|black|pale|brown|white|side)\b/g, ' ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   for (let i = 0; i < 3; i++) n = n.replace(/-(top|cabinet|carcass|cushion|base|seat|back|plinth|tabletop|body|leg|legs|foot|feet|arm|core|rail|upright|frame|crossed|mast|shade|stand|panel|edge|support|bottom|side)$/g, '');
+  if (/floor-cushion|floor$/.test(n) && /cushion/i.test(main.kind ?? '')) n = n.replace(/-floor$/, '-floor-cushion');
   if (n.length > 30) n = n.slice(0, 30).replace(/-[^-]*$/, '');
   return n || cat;
 }
@@ -209,7 +210,7 @@ const groups = [];
 // anchors (a chair's seat, a sofa's base, a table's top, a mattress, a speaker…): every other part goes to the nearest.
 const ANCHOR = /chair seat|sofa seat|sofa base|tabletop|table top|\bmattress\b|floor cushion|speaker$|lamp shade|vise base|dinner table$|folding table$|camp stove/i;
 const more = rows.filter(isMore);
-for (const g0 of clusters(more, 0.08, (r) => `${buildingOf(r)}|${ITEM.test(r.kind ?? '') ? 'item' : ''}`)) {
+for (const g0 of clusters(more, 0.15, (r) => `${buildingOf(r)}|${ITEM.test(r.kind ?? '') ? 'item' : ''}`)) {
   const fam = (r) => (SEATF.test(r.kind ?? '') ? 's' : 't');
   for (const f of ['s', 't']) {
     const g = g0.filter((r) => fam(r) === f); if (!g.length) continue;
@@ -223,7 +224,10 @@ for (const g0 of clusters(more, 0.08, (r) => `${buildingOf(r)}|${ITEM.test(r.kin
 for (const g0 of clusters(furn, 0.05, (r) => `${buildingOf(r)}|${ITEM.test(r.kind ?? '') ? 'item' : ''}`)) {
   // a chair tucked under a table: split seats from the rest, then re-cluster each
   const fam = (r) => (SEATF.test(r.kind ?? '') || /chair|sofa|recliner|papasan|stool|bus seat/i.test(r.asm ?? '') ? 's' : 't');
-  const parts = new Set(g0.map(fam)).size > 1 ? ['s', 't'].flatMap((f) => clusters(g0.filter((r) => fam(r) === f), 0.05, () => '', true)) : [g0];
+  // (a row of folding chairs touching: split at the chair seats, every other part to the nearest seat)
+  const anchorSplit = (g) => { const an = g.filter((r) => /chair seat/i.test(r.kind ?? '')); if (an.length < 2) return null; const by = new Map(an.map((t) => [t.i, [t]])); for (const r of g) { if (by.has(r.i)) continue; let best = an[0], bd = Infinity; for (const t of an) { const d = Math.hypot(t.cn - r.cn, t.ce - r.ce); if (d < bd) { bd = d; best = t; } } by.get(best.i).push(r); } return [...by.values()]; };
+  const parts = anchorSplit(g0.filter((r) => fam(r) === 's')) && new Set(g0.map(fam)).size === 1 ? anchorSplit(g0)
+    : new Set(g0.map(fam)).size > 1 ? ['s', 't'].flatMap((f) => (f === 's' && anchorSplit(g0.filter((r) => fam(r) === 's'))) || clusters(g0.filter((r) => fam(r) === f), 0.05, () => '', true)) : [g0];
   for (const g of parts) {
     // a U of counters (west, north and south runs): one piece per top, each with what stands under / on it
     const tops = g.filter((r) => TOPF.test(r.kind ?? ''));

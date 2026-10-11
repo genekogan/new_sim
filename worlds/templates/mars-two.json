@@ -608,8 +608,8 @@
    "ops": [
     {
      "op": "place",
-     "def": "core/mars-folding-chair-4@1",
-     "name": "folding-chair-6",
+     "def": "core/mars-folding-chair-2@1",
+     "name": "folding-chair-4",
      "p": [
       50.072,
       3.021,
@@ -619,8 +619,8 @@
     },
     {
      "op": "place",
-     "def": "core/mars-folding-chair-5@1",
-     "name": "folding-chair-7",
+     "def": "core/mars-folding-chair-3@1",
+     "name": "folding-chair-5",
      "p": [
       52.972,
       1.878,
@@ -630,8 +630,8 @@
     },
     {
      "op": "place",
-     "def": "core/mars-folding-chair-6@1",
-     "name": "folding-chair-8",
+     "def": "core/mars-folding-chair-4@1",
+     "name": "folding-chair-6",
      "p": [
       54.122,
       1.497,
@@ -834,8 +834,8 @@
     },
     {
      "op": "place",
-     "def": "core/mars-tool-library-floor@1",
-     "name": "tool-library-floor",
+     "def": "core/mars-tool-library-floor-cushion@1",
+     "name": "tool-library-floor-cushion",
      "p": [
       -13.921,
       2.857,
@@ -845,8 +845,8 @@
     },
     {
      "op": "place",
-     "def": "core/mars-tool-library-floor-2@1",
-     "name": "tool-library-floor-2",
+     "def": "core/mars-tool-library-floor-cushion-2@1",
+     "name": "tool-library-floor-cushion-2",
      "p": [
       -12.601,
       2.857,
@@ -856,8 +856,8 @@
     },
     {
      "op": "place",
-     "def": "core/mars-tool-library-floor-3@1",
-     "name": "tool-library-floor-3",
+     "def": "core/mars-tool-library-floor-cushion-3@1",
+     "name": "tool-library-floor-cushion-3",
      "p": [
       -13.587,
       2.857,
@@ -867,8 +867,8 @@
     },
     {
      "op": "place",
-     "def": "core/mars-tool-library-floor-4@1",
-     "name": "tool-library-floor-4",
+     "def": "core/mars-tool-library-floor-cushion-4@1",
+     "name": "tool-library-floor-cushion-4",
      "p": [
       -12.266,
       2.857,
@@ -991,11 +991,22 @@
      "def": "core/mars-folding-chair@1",
      "name": "folding-chair",
      "p": [
-      58.208,
-      0.7,
-      -70.892
+      57.968,
+      0.143,
+      -71.393
      ],
-     "r": 0
+     "r": -1.4486
+    },
+    {
+     "op": "place",
+     "def": "core/mars-folding-chair@1",
+     "name": "folding-chair-2",
+     "p": [
+      58.09,
+      0.143,
+      -70.35
+     ],
+     "r": -1.4486
     },
     {
      "op": "place",
@@ -1010,47 +1021,14 @@
     },
     {
      "op": "place",
-     "def": "core/mars-folding-chair-2@1",
-     "name": "folding-chair-2",
+     "def": "core/mars-folding-chair@1",
+     "name": "folding-chair-3",
      "p": [
       57.846,
       0.143,
       -72.436
      ],
-     "r": 0
-    },
-    {
-     "op": "place",
-     "def": "core/mars-folding-chair-3@1",
-     "name": "folding-chair-3",
-     "p": [
-      58.025,
-      0.7,
-      -72.456
-     ],
-     "r": 0
-    },
-    {
-     "op": "place",
-     "def": "core/mars-folding-chair-2@1",
-     "name": "folding-chair-4",
-     "p": [
-      57.968,
-      0.143,
-      -71.393
-     ],
-     "r": 0
-    },
-    {
-     "op": "place",
-     "def": "core/mars-folding-chair-2@1",
-     "name": "folding-chair-5",
-     "p": [
-      58.09,
-      0.143,
-      -70.35
-     ],
-     "r": 0
+     "r": -1.4486
     },
     {
      "op": "place",
@@ -1142,6 +1120,17 @@
     },
     {
      "op": "place",
+     "def": "core/mars-og-east-folding-chair@1",
+     "name": "og-east-folding-chair",
+     "p": [
+      -46.319,
+      0.011,
+      50.295
+     ],
+     "r": -0.2094
+    },
+    {
+     "op": "place",
      "def": "core/mars-og-east-folding-dinner-table@1",
      "name": "og-east-folding-dinner-table",
      "p": [
@@ -1153,8 +1142,8 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-east-folding-chair@1",
-     "name": "og-east-folding-chair",
+     "def": "core/mars-og-east-folding-chair-2@1",
+     "name": "og-east-folding-chair-2",
      "p": [
       -47.297,
       0.011,
@@ -1165,17 +1154,6 @@
     {
      "op": "place",
      "def": "core/mars-og-east-folding-chair-2@1",
-     "name": "og-east-folding-chair-2",
-     "p": [
-      -46.319,
-      0.011,
-      50.295
-     ],
-     "r": -0.2094
-    },
-    {
-     "op": "place",
-     "def": "core/mars-og-east-folding-chair@1",
      "name": "og-east-folding-chair-3",
      "p": [
       -45.341,
