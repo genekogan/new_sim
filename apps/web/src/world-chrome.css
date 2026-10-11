@@ -73,6 +73,12 @@
 .viewer-arrival-card p{margin:0}
 .viewer-arrival-title{font-weight:650;font-size:16px;letter-spacing:-.005em}
 .viewer-arrival-stage{color:var(--dim);font-size:13px;margin-top:2px!important}
+.viewer-arrival-progress{display:flex;align-items:center;gap:8px;margin-top:8px}
+.viewer-arrival-progress progress{-webkit-appearance:none;appearance:none;flex:1 1 auto;width:auto;min-width:140px;height:4px;border:0;border-radius:2px;overflow:hidden;background:color-mix(in srgb,var(--fg) 12%,transparent)}
+.viewer-arrival-progress progress::-webkit-progress-bar{background:transparent}
+.viewer-arrival-progress progress::-webkit-progress-value{background:var(--fg);border-radius:2px;transition:width .3s ease}
+.viewer-arrival-progress progress::-moz-progress-bar{background:var(--fg);border-radius:2px}
+.viewer-arrival-progress span{flex:0 0 auto;min-width:4ch;text-align:right;color:var(--dim);font-size:12px;font-variant-numeric:tabular-nums}
 .viewer-arrival-spinner{flex:0 0 auto;width:22px;height:22px;border-radius:50%;border:2.5px solid color-mix(in srgb,var(--fg) 14%,transparent);border-top-color:var(--fg);animation:viewer-arrival-turn .9s linear infinite;will-change:transform}
 @keyframes viewer-arrival-turn{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){.viewer-arrival-spinner{animation-duration:2.4s}.viewer-arrival{transition:none}}
