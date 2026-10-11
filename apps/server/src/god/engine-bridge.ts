@@ -17,6 +17,7 @@ import { reachProviders, seatProviders, usesProviders, type ReachEnd } from './q
 import { GodNav } from './nav.ts';
 import { GodPerceive } from './perceive.ts';
 import { GodPlaces, inPoly } from './places.ts';
+import { GodLayers } from './layers.ts';
 import { installWorldLore } from './world-lore.ts';
 import { installHeld } from './held.ts';
 import { installWorldClock } from './world-clock.ts';
@@ -66,15 +67,19 @@ export class EngineBridge {
   readonly perceive: GodPerceive;
   /** R4-INFO: god-built places (areas, waters, buildings and their rooms, landmarks) in the Souls' map (places.ts). */
   readonly places: GodPlaces;
+  /** LAYERS: schedules, ownership, zones, relationships, economy for Souls (layers.ts). */
+  readonly layers: GodLayers;
 
   constructor(o: BridgeOptions) {
     this.host = o.host; this.god = o.god; this.edge = o.edge; this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
     this.nav = new GodNav({ model: this.god.model, version: () => this.version, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined) });
-    this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, version: () => this.version, engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m) });
-    this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), places: this.places, levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), commit: (ops, note) => this.god.engineAct(ops as never, note) });
+    this.layers = new GodLayers({ model: this.god.model, edge: this.edge, engine: this.host.engine as never, living: () => this.host.living, engineAct: (ops, note) => this.god.engineAct(ops, note), placeOf: (e) => this.layerPlace(e), log: (m) => this.log(m) });
+    (this.god as unknown as { layers?: GodLayers }).layers = this.layers;
+    this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, version: () => this.version, engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), layers: this.layers });
+    this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), places: this.places, levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), commit: (ops, note) => this.god.engineAct(ops as never, note), layers: this.layers });
     this.god.onCommit((c) => { this.version++; if (c.by !== 'engine') { this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } });
     this.host.listeners.push({
-      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); if (tick % 20 === 5) this.perceiveSync(); if (this.rescued !== this.editTick && tick - this.editTick >= 10) this.rescueTrapped(); } },
+      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); if (tick % 20 === 5) this.perceiveSync(); if (tick % 40 === 7) this.layersStep(); if (this.rescued !== this.editTick && tick - this.editTick >= 10) this.rescueTrapped(); } },
       onApplied: (e) => { if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
     });
     reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
@@ -305,6 +310,22 @@ export class EngineBridge {
   }
 
   private perceiveSync() { try { this.perceive.sync(); } catch (e) { this.log(`perceive: ${(e as Error).message}`); } }
+  /** LAYERS: the world clock drives schedules (states that follow them, calendar items); a new day re-derives places. */
+  private layerDay = '';
+  private layersStep() {
+    try {
+      if (!this.layers.active()) return;
+      const day = this.layers.dayKey(); if (day !== this.layerDay) { this.layerDay = day; this.places.sync(); }
+      this.layers.step();
+    } catch (e) { this.log(`layers: ${(e as Error).message}`); }
+  }
+  /** The place a thing is in: its own place (a café building, a market plaza), else the innermost holding it. */
+  private layerPlace(e: Entity): { id: string; name: string } | null {
+    if (!this.edge) return null;
+    const own = this.places.ofEntity(e.id); if (own) return { id: own.id, name: own.name };
+    const wp = this.model.worldPose(e), id = this.places.placeAt([wp.x, wp.z], this.levelAt(wp.x, wp.z, wp.y)); if (!id) return null;
+    return { id, name: this.edge.places.byId.get(id)?.name ?? id };
+  }
 
   // ------------------------------------------------------------------ engine → entity world
 
@@ -657,6 +678,7 @@ export class EngineBridge {
     const act = L.act.bind(L), self = this;
     (L as any).act = async function (soul: EdgeSoul, input: { capability?: unknown; params?: unknown; clientRef?: unknown }) {
       if (input?.capability === 'pray' || (typeof input?.capability === 'string' && /^pray(\s|:|$)/.test(input.capability))) return self.pray(L, soul, input);
+      if (typeof input?.capability === 'string' && /^(buy|pay|sell):/.test(input.capability)) return self.trade(L, soul, input as { capability: string; params?: unknown; clientRef?: unknown });
       return act(soul, input as never);
     };
   }
@@ -669,6 +691,15 @@ export class EngineBridge {
       const r = (L as any).insert(soul, 'pray', 'completed', typeof input.clientRef === 'string' ? input.clientRef : undefined, true, { prayer: p.id });
       return { accepted: true as const, receipt: (L as any).receipt(soul.soulId, r.id), result: { prayer: p.id, note: 'The god reads prayers when present; answers appear in GET /v1/god/prayers/mine.' } };
     } catch (e) { const err = e as { code?: string; message?: string }; return { accepted: false as const, capability: 'pray', code: err.code ?? 'pray.refused', reason: err.message ?? 'the prayer was not heard' }; }
+  }
+
+  /** LAYERS: buy:<id>, pay:<soul>, sell:<id> — validated by the world (layers.ts), a completed receipt like pray. */
+  private trade(L: EdgeLedger, soul: EdgeSoul, input: { capability: string; params?: unknown; clientRef?: unknown }) {
+    const me = this.engine.world.entities[soul.entityId], here: Vec2 | null = me?.pose?.p ? [me.pose.p[0], me.pose.p[2]] : null;
+    const r = this.layers.act(soul, input.capability, (input.params ?? {}) as Record<string, unknown>, here);
+    if (!r.accepted) return { accepted: false as const, capability: input.capability, code: r.code, reason: r.reason };
+    const row = (L as any).insert(soul, input.capability.split(':')[0], 'completed', typeof input.clientRef === 'string' ? input.clientRef : undefined, true, r.result);
+    return { accepted: true as const, receipt: (L as any).receipt(soul.soulId, row.id), result: r.result };
   }
 
   /** Capabilities on god-placed things near this Soul: sit on chairs, pick up items, put them on tables; and pray. */
@@ -723,6 +754,7 @@ export class EngineBridge {
       }
     }
     this.sitHere(caps, plans, here);
+    if (this.layers.active()) try { this.layers.capabilities(soul, caps, plans as never, here); } catch (e) { this.log(`layers capabilities: ${(e as Error).message}`); }
   }
   /** Bodies sitting on a god-built seat fixture (any of its seat slots). */
   seatTakers(id: string): string[] {

@@ -62,6 +62,8 @@ export type ActuatorHost = {
   commit(id: string, patch: Record<string, unknown>, note: string): { accepted: boolean };
   /** The thing's actuator state as the world has it now (the object's copy may lag a sync behind). */
   stateOf?(id: string): Record<string, unknown> | null;
+  /** LAYERS: why this Soul may not touch it (a private thing of someone else's), or null. */
+  access?(id: string, soul: EdgeSoul): Refusal | null;
 };
 type BuiltLike = { at: Vec2 | null; state?: Record<string, unknown>; removed?: boolean; key?: string; front?: Vec2 | null };
 
@@ -75,6 +77,7 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
       const me = host.bodyAt(ctx.soul); if (!me) return { code: 'body.unavailable', reason: 'Your body is unavailable.' };
       const d = Math.hypot(s.at[0] - me[0], s.at[1] - me[1]);
       if (d > ACT_SIGHT) return { code: 'object.out-of-reach', reason: `${nameOf(s)} is ${Math.round(d)} m away; walk closer first.` };
+      const denied = s.key ? host.access?.(s.key, ctx.soul) : null; if (denied) return denied;
       return whenRefusal(a, (s.key && host.stateOf?.(s.key)) || s.state || {}, nameOf(s));
     };
     out[a.name] = {

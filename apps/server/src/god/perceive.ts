@@ -71,6 +71,8 @@ export type PerceiveHost = {
   /** VOCAB-MECH: commit a Soul's actuator action on a god thing (engine edit). Without it, things offer no actions. */
   commit?(ops: unknown[], note: string): { accepted: boolean };
   log(m: string): void;
+  /** LAYERS (layers.ts): owner/price/hours in what Souls see; private things refuse other Souls' actuators. */
+  layers?: { active(): boolean; tag(e: Entity): string; refusal(id: string, soul: { soulId: string; name: string }): { code: string; reason: string } | null; ownerWord(id: string, soul?: { soulId: string; name: string }): string | null; hoursOf(s: Entity['schedule']): string };
 };
 
 /** Item 6 (F1): god-built buildings, their rooms and named areas (a plaza, a pond, a meadow) join the ledger's places
@@ -115,6 +117,7 @@ export class GodPerceive {
       bodyAt: (soul: EdgeSoul): Vec2 | null => { const b = this.h.engine.world.entities[soul.entityId]; return b?.pose?.p ? [b.pose.p[0], b.pose.p[2]] : null; },
       commit: (id: string, patch: Record<string, unknown>, note: string) => this.h.commit!([{ op: 'set', id, state: patch }], note),
       stateOf: (id: string) => { const e = this.h.model.entities.get(id), def = e && this.h.model.resolvedDef(e.def); return e && def ? actuatedState(e, def) : null; },
+      access: (id: string, soul: EdgeSoul) => this.h.layers?.refusal(id, soul) ?? null,
     };
   }
   private rootPlace(): string | null {
@@ -129,14 +132,17 @@ export class GodPerceive {
     const signs: typeof this.signs = [];
     const placed = new Map<string, { place: string | null; level: number }>();
     this.placed = placed;
+    const layersOn = !!this.h.layers?.active();
     for (const e of m.entities.values()) {
       const def = m.resolvedDef(e.def); if (!def) continue;
       const c = def.components as Record<string, unknown>;
       if (c.body || c.behavior || c.hover || /^core[-/]flag@/.test(e.def) || this.h.engineOwned(e)) continue;
       const text = signText(e, def), acts = this.h.commit ? def.actions.length > 0 : false;
-      if (!e.name && text === null && !acts) continue;
+      // LAYERS: an owned, priced or scheduled thing is seen as such (a loaf for sale, Ana's door, the café's hours)
+      const lay = layersOn && (e.owner || e.access || e.price || e.schedule) ? this.h.layers!.tag(e) : '';
+      if (!e.name && text === null && !acts && !lay) continue;
       // seats and things to carry are perceived as seats and items already (unless they have actuators: a chest's lid)
-      if ((c.seat || c.carryable) && !acts) continue;
+      if ((c.seat || c.carryable) && !acts && !lay) continue;
       // R4-INFO: ground the god laid out (a plaza, a lawn, a pond, a road) is a place to be in (places.ts), not a thing
       { const sh = e.shape as { area?: unknown; path?: unknown } | undefined; if (GOD_PLACES && this.h.places && def.form !== 'point' && e.in.parent === 'world' && sh && text === null) continue; }
       const at = this.at(e, def); if (!at) continue;
@@ -145,7 +151,7 @@ export class GodPerceive {
       const near = this.h.namesNear(at, e.id).filter((n) => n !== name).slice(0, 2);
       const level = this.h.levelAt ? this.h.levelAt(at[0], at[1], this.h.model.worldPose(e).y) : 0;
       placed.set(e.id, { place: this.h.places?.ofEntity(e.id)?.id ?? this.h.places?.placeAt(at, level) ?? null, level });
-      const what = `${article(kind)}${parent?.name ? ` in ${m.pathOf(parent.id)}` : ''}${near.length ? `, by ${near.join(' and ')}` : ''}`;
+      const what = `${article(kind)}${parent?.name ? ` in ${m.pathOf(parent.id)}` : ''}${near.length ? `, by ${near.join(' and ')}` : ''}${lay ? `; ${lay}` : ''}`;
       const wp0 = m.worldPose(e), front: Vec2 | null = acts ? [Math.round((at[0] + Math.sin(wp0.yaw) * (0.6 + def.size.box[2] * (wp0.s || 1) / 2)) * 100) / 100, Math.round((at[1] + Math.cos(wp0.yaw) * (0.6 + def.size.box[2] * (wp0.s || 1) / 2)) * 100) / 100] : null;
       out.set(e.id, { name, kind: this.kindFor(text !== null ? 'sign' : kind, def), description: clip(def.description || kind, 400), params: { what, text: text ?? '', near, at: [Math.round(at[0] * 100) / 100, Math.round(at[1] * 100) / 100], def: def.ref, ...(acts ? { state: actuatedState(e, def), front } : {}) } });
       // read from in front of its face (entity frame: the front is +z, turned by the yaw)
@@ -198,7 +204,7 @@ export class GodPerceive {
       if (!me) return list;
       this.sync();
       const pos: Vec2 = [me.pose.p[0], me.pose.p[2]], path = L.placePathOf(soul.soulId), root = path.find((p) => p.kind !== 'occupier' && L.places.byId.get(p.id)?.parent === null)?.id;
-      const inside = new Set(path.map((p) => p.id)), myEnc = L.enclosureOf(soul.soulId);
+      const inside = new Set(path.map((p) => p.id)), myEnc = L.enclosureOf(soul.soulId), lay = !!this.h.layers?.active();
       const built: any[] = [], rest: any[] = [];
       for (const v of list) {
         if (!this.kinds.has(v.kind)) { rest.push(v); continue; }
@@ -207,7 +213,10 @@ export class GodPerceive {
         const pl = this.placed.get(v.id), lvl = pl?.level ?? 0;
         if (L.enclosureAtPoint(at[0], at[1], lvl) !== myEnc) continue;
         const placeId = pl?.place ?? v.placeId;
-        built.push({ ...v, placeId, here: placeId !== root && inside.has(placeId), dist: Math.round(d * 10) / 10 });
+        // LAYERS: whose it is, to this viewer ("yours" / "Ana's, private" / "public"), its price and hours now
+        const ent = lay ? this.h.model.entities.get(v.id) : undefined, word = ent ? this.h.layers!.ownerWord(v.id, soul) : null;
+        const extra = ent ? { ...(word ? { owner: word } : {}), ...(ent.price ? { price: ent.price } : {}), ...(ent.schedule ? { hours: this.h.layers!.hoursOf(ent.schedule) } : {}) } : {};
+        built.push({ ...v, placeId, here: placeId !== root && inside.has(placeId), dist: Math.round(d * 10) / 10, ...extra });
       }
       built.sort((a, b) => a.dist - b.dist || (a.id < b.id ? -1 : 1));
       return [...rest, ...built.slice(0, LISTED)];

@@ -70,6 +70,8 @@ export type PlacesHost = {
   engineOwned(e: Entity): boolean;
   levelAt(x: number, z: number, y: number): number;
   log(m: string): void;
+  /** LAYERS: schedules (today's slots), ownership and who works/lives there, in each place (layers.ts). */
+  layers?: { active(): boolean; dayKey(): string; slotsFor(e: Entity, label: string): NonNullable<Place['schedule']>; tag(e: Entity): string; peopleAt(id: string): string };
 };
 
 /** What is where on a god's world, as the ledger's places. */
@@ -90,7 +92,7 @@ export class GodPlaces {
   walkable(id: string): boolean { return this.installed.has(id); }
 
   private index() {
-    const m = this.h.model, key = `${this.h.version?.() ?? m.editSeq}:${m.entities.size}`;
+    const m = this.h.model, key = `${this.h.version?.() ?? m.editSeq}:${m.entities.size}${this.h.layers?.active() ? `:${this.h.layers.dayKey()}` : ''}`;
     if (this.cache?.key === key) return this.cache;
     const list = this.derive(), byRef = new Map<string, GodPlace>(), byEntity = new Map<string, GodPlace>();
     // a thing's walk targets its place; a water's walk (to its shore) targets the shore
@@ -175,7 +177,29 @@ export class GodPlaces {
       p.parent = p.of === 'room' ? (out.find((q) => q.of === 'building' && q.entity === p.entity)?.id ?? holders[0]?.id ?? root) : holders[0]?.id ?? root;
     }
     for (const p of out) { p.description = this.describe(p, out, things); if (p.of === 'room') { const n = this.seatsIn(p); p.capacity = n || null; } }
+    if (this.h.layers?.active()) this.layer(out);
     return out.sort((a, b) => (a.id < b.id ? -1 : 1));
+  }
+
+  /** LAYERS: a zone's kind is its use ("commercial zone"); a place's own thing adds its owner, hours and people to the
+   *  description; a scheduled thing's slots for today join its place's schedule (its own place, else the one holding it). */
+  private layer(out: GodPlace[]) {
+    const m = this.h.model, L = this.h.layers!;
+    for (const p of out) {
+      const e = m.entities.get(p.entity); if (!e) continue;
+      if (/^core[-/]zone@/.test(e.def)) { p.kind = `${String(e.params?.use ?? 'residential')} zone`; p.description = `a ${p.kind} the god drew${p.description?.includes(' with ') ? ', with' + p.description.split(' with ').slice(1).join(' with ') : ''}`; }
+      const extra = [L.tag(e), L.peopleAt(e.id)].filter(Boolean).join('; ');
+      if (extra && p.of !== 'shore') p.description = `${p.description ?? ''}; ${extra}`.slice(0, 600);
+    }
+    for (const e of m.entities.values()) {
+      if (!e.schedule) continue;
+      const own = out.find((p) => p.entity === e.id && p.of !== 'shore' && p.of !== 'room');
+      let p = own;
+      if (!p) { const wp = m.worldPose(e); p = out.filter((q) => q.of !== 'shore' && inPoly(wp.x, wp.z, q.polygon)).sort((a, b) => areaOf(a.polygon) - areaOf(b.polygon))[0]; }
+      if (!p) continue;
+      const label = e.name ? m.pathOf(e.id) : p.name, slots = L.slotsFor(e, label).map((s) => ({ ...s, id: own ? s.id : `${e.id}-${s.id}`.slice(0, 60) }));
+      if (slots.length) p.schedule = [...(p.schedule ?? []), ...slots];
+    }
   }
 
   /** Seats (seat slots of things) whose position is inside a place. */

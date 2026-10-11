@@ -1,0 +1,309 @@
+// LAYERS (2026-10-11): what Souls perceive and do with a god world's invisible systems (the data and its validation
+// live in @sim/world-compiler: layers.ts, the set/economy/mint/pay/relate ops). This module reads them for Souls and
+// drives them with the world clock:
+//
+//  - schedules: each scheduled thing's place carries today's slots (the ledger's place schedule: `whatson`, observe's
+//    happenings), its events go on the calendar (`/v1/edge/calendar`, reminders to the interested), and states that
+//    follow the schedule change as engine edits when the clock crosses a boundary (a door unlocks at opening time);
+//  - ownership: "yours / Ana's / public" on things Souls see; private things refuse other Souls' actuators, seats and
+//    hands (the owner, the owner group's members and those who work at it may);
+//  - land use: zones are places (places.ts names their kind "commercial zone"); `zoneSuggest` recommends catalogue
+//    categories for a use;
+//  - relationships: a Soul reads its own (`GET /v1/world/layers/me`), places say who works or lives there;
+//  - economy: `buy:<id>` (pay the owner its price; a thing becomes the buyer's, a service stays), `pay:<soul>` and
+//    `sell:<id>` capabilities, validated by the compiler (never below zero), journaled as engine edits.
+//
+// Nothing here acts on a world whose god never used a layer: no schedules → the clock step returns at once; no prices
+// → no buy capability; no owners → no refusals.
+import { clockAt } from '@sim/brain';
+import { describeSchedule, followPatch, minutesOf, scheduleSlots, isOpen, eventsOn, type Entity, type Op, type Result, type Schedule, type WorldModel } from '@sim/world-compiler';
+import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
+import type { EdgeLedger } from '../edge/ledger/ledger.ts';
+import { hashOf } from '@sim/world-compiler';
+import { ApiError } from '../souls.ts';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type Vec2 = [number, number];
+type Refusal = { code: string; reason: string };
+type Plans = Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>;
+
+/** Souls trade with things within this distance (m). */
+export const TRADE_REACH = 30;
+/** Calendar items are posted this many world minutes ahead. */
+const CAL_HORIZON = 24 * 60;
+
+export type LayersHost = {
+  model: WorldModel;
+  edge?: EdgeLedger;
+  engine: { world: { tick: number; entities: Record<string, any> } };
+  /** The world clock (the host's dayConfig), or null before it runs. */
+  living(): { origin: number; dayTicks: number } | null | undefined;
+  engineAct(ops: Op[], note: string): Result;
+  /** The place a thing is (its own, else the innermost holding it). */
+  placeOf?(e: Entity): { id: string; name: string } | null;
+  log(m: string): void;
+};
+
+export type WorldClock = { minute: number; weekday: number; day: string; tick: number; ticksPerMinute: number };
+
+export class GodLayers {
+  private h: LayersHost;
+  private lastDay = '';
+  private followed = new Map<string, string>();
+  constructor(h: LayersHost) { this.h = h; }
+
+  private get m() { return this.h.model; }
+  /** Is this world using any layer at all? (cheap) */
+  active(): boolean { if (this.m.state.layers) return true; for (const e of this.m.entities.values()) if (e.owner || e.schedule || e.price || e.access) return true; return false; }
+
+  // ---------- the clock ----------
+
+  clock(): WorldClock | null {
+    const l = this.h.living(); if (!l || !(l.dayTicks > 0)) return null;
+    const tick = this.h.engine.world.tick, t = clockAt(tick, l.origin, l.dayTicks);
+    return { minute: t.hour * 60 + t.minute, weekday: new Date(t.datetime).getUTCDay(), day: t.datetime.slice(0, 10), tick, ticksPerMinute: l.dayTicks / 1440 };
+  }
+  /** Today's date changed since the last call (places carry today's slots: re-derive them). */
+  dayKey(): string { return this.clock()?.day ?? ''; }
+
+  /** One clock step (the bridge calls it every couple of seconds): states that follow schedules, calendar items. */
+  step(): { changed: number; posted: number } {
+    const scheduled = [...this.m.entities.values()].filter((e) => e.schedule);
+    if (!scheduled.length) return { changed: 0, posted: 0 };
+    const c = this.clock(); if (!c) return { changed: 0, posted: 0 };
+    const ops: Op[] = [], notes: string[] = [];
+    for (const e of scheduled) {
+      if (!e.schedule?.follow?.length) continue;
+      const def = this.m.resolvedDef(e.def); if (!def) continue;
+      const want = followPatch(e.schedule, c.minute, c.weekday), patch: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(want)) { const cur = e.state?.[k] ?? (def.state as any)[k]?.default; if (cur !== v) patch[k] = v; }
+      if (!Object.keys(patch).length) continue;
+      // a value the clock already set once and a Soul then changed (Ana locks up early) is left until the next boundary
+      const sig = `${e.id}:${JSON.stringify(want)}`; if (this.followed.get(e.id) === sig) continue;
+      this.followed.set(e.id, sig);
+      ops.push({ op: 'set', id: e.id, state: patch as never } as Op);
+      notes.push(`${e.name ? this.m.pathOf(e.id) : e.id} ${Object.entries(patch).map(([k, v]) => `${k}=${v}`).join(' ')}`);
+    }
+    let changed = 0;
+    if (ops.length) {
+      const r = this.h.engineAct(ops, `schedule: ${notes.join(', ')}`.slice(0, 400));
+      if (r.accepted) changed = ops.length; else this.h.log(`schedule: refused ${JSON.stringify((r as any).failures).slice(0, 300)}`);
+    }
+    const posted = this.postCalendar(scheduled, c);
+    return { changed, posted };
+  }
+
+  /** Each scheduled event within the next day goes on the calendar once (ids from the thing, the event and the date). */
+  private postCalendar(scheduled: Entity[], c: WorldClock): number {
+    const objs = (this.h.edge as any)?.comms?.objects as { create(i: unknown): { id: string }; kindOf(k: string): unknown; all(): { id: string }[] } | undefined;
+    if (!objs?.kindOf('calendar-item')) return 0;
+    const have = new Set(objs.all().map((o) => o.id));
+    let posted = 0;
+    for (const e of scheduled) for (const ev of e.schedule?.events ?? []) {
+      const at = minutesOf(ev.at);
+      for (const dayAhead of [0, 1]) {
+        const until = at - c.minute + dayAhead * 1440; if (until < -ev.minutes || until > CAL_HORIZON) continue;
+        const weekday = (c.weekday + dayAhead) % 7; if (ev.days?.length && !ev.days.includes((['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const)[weekday])) continue;
+        const date = new Date(Date.parse(c.day + 'T00:00:00Z') + dayAhead * 86400_000).toISOString().slice(0, 10);
+        const id = `cal-g${hashOf([e.id, ev.name, date]).slice(0, 12)}`; if (have.has(id)) continue;
+        const place = this.h.placeOf?.(e), title = (ev.label ?? ev.name).slice(0, 80);
+        try {
+          objs.create({ id, kind: 'calendar-item', name: title, placeId: place?.id ?? 'world', params: { title, description: `${title} at ${place?.name ?? this.m.pathOf(e.id)}, ${ev.at} for ${ev.minutes} minutes (the god's schedule)`, placeId: place?.id ?? '', placeName: place?.name ?? this.m.pathOf(e.id), proposedBy: 'the god of this world', startsAtTick: Math.round(c.tick + until * c.ticksPerMinute), durationTicks: Math.max(1, Math.round(ev.minutes * c.ticksPerMinute)) } });
+          posted++; have.add(id);
+        } catch (err) { this.h.log(`calendar ${id}: ${(err as Error).message}`); }
+      }
+    }
+    return posted;
+  }
+
+  /** Today's place schedule slots for a thing (places.ts adds them to its place). */
+  slotsFor(e: Entity, label: string) { const c = this.clock(); return e.schedule ? scheduleSlots(e.schedule, c?.weekday ?? 6, label) : []; }
+  /** "open 07:00–15:00 (open now)". */
+  hoursOf(s: Schedule | undefined): string {
+    if (!s) return ''; const c = this.clock(), d = describeSchedule(s); if (!c || !s.open?.length) return d;
+    const on = eventsOn(s, c.minute, c.weekday).map((x) => x.label);
+    return `${d} (${isOpen(s, c.minute, c.weekday) ? 'open now' : 'closed now'}${on.length ? `; ${on.join(', ')} on now` : ''})`;
+  }
+
+  // ---------- who ----------
+
+  private minds(): Map<string, { soulId: string; entityId: string; name: string }> { return ((this.h.edge as any)?.host?.minds ?? new Map()) as never; }
+  /** A display name: "the god", "Ana", "the bakers". */
+  nameOf(ref: string | undefined): string {
+    if (!ref || ref === 'god') return 'the god';
+    if (ref.startsWith('group:')) return `the ${ref.slice(6)}`;
+    if (ref.startsWith('thing:')) { const e = this.m.entities.get(ref.slice(6)); return e ? this.m.pathOf(e.id) : ref.slice(6); }
+    const k = ref.slice(5), m = this.minds().get(k); if (m) return m.name;
+    for (const x of this.minds().values()) if (x.name.toLowerCase() === k.toLowerCase()) return x.name;
+    return k;
+  }
+  /** Does this owner ref name this Soul (by id, or by name), or a group it is a member of? */
+  isOf(ref: string | undefined, soul: { soulId: string; name: string }): boolean {
+    if (!ref) return false;
+    if (ref === `soul:${soul.soulId}` || ref.toLowerCase() === `soul:${soul.name.toLowerCase()}`) return true;
+    if (ref.startsWith('group:')) return this.relations().some((r) => r.rel === 'member-of' && r.b === ref && this.isOf(r.a, soul));
+    return false;
+  }
+  /** The wallet key of a Soul: its id (a name-keyed wallet the god minted before the Soul existed is merged on use). */
+  walletOf(soul: { soulId: string; name: string }): { key: string; amount: number; alias?: string } {
+    const w = this.m.state.layers?.wallets ?? {}, key = `soul:${soul.soulId}`;
+    const alias = Object.keys(w).find((k) => k !== key && k.toLowerCase() === `soul:${soul.name.toLowerCase()}`);
+    return { key, amount: (w[key] ?? 0) + (alias ? w[alias] : 0), ...(alias ? { alias } : {}) };
+  }
+  relations() { return this.m.state.layers?.relations ?? []; }
+  currency() { return this.m.state.layers?.currency ?? 'coins'; }
+  money(n: number) { return `${n} ${this.currency()}`; }
+
+  /** Owner and access of a thing: its own, else its nearest owned ancestor's. */
+  ownership(id: string): { owner?: string; access: 'public' | 'private'; from: string } | null {
+    for (let e = this.m.entities.get(id); e; e = e.in.parent === 'world' ? undefined : this.m.entities.get(e.in.parent)) {
+      if (e.owner || e.access) return { ...(e.owner ? { owner: e.owner } : {}), access: e.access ?? 'public', from: e.id };
+    }
+    return null;
+  }
+  /** Can this Soul use (open, sit on, take) this thing? Owners, owner-group members and those who work at it may. */
+  refusal(id: string, soul: { soulId: string; name: string }): Refusal | null {
+    const o = this.ownership(id); if (!o || o.access !== 'private') return null;
+    if (this.isOf(o.owner, soul)) return null;
+    if (this.relations().some((r) => r.rel === 'works-at' && this.isOf(r.a, soul) && (r.b === `thing:${o.from}` || r.b === `thing:${id}`))) return null;
+    const what = this.m.entities.get(id)?.name ? this.m.pathOf(id) : 'That';
+    return { code: 'object.private', reason: `${what} is ${o.owner ? `${this.nameOf(o.owner)}'s` : 'not yours'} and private.` };
+  }
+  /** "yours" / "Ana's" / "the bakers'" / "public" for a viewer. */
+  ownerWord(id: string, soul?: { soulId: string; name: string }): string | null {
+    const o = this.ownership(id); if (!o) return null;
+    if (!o.owner) return o.access === 'private' ? 'private' : 'public';
+    if (soul && this.isOf(o.owner, soul) && !o.owner.startsWith('group:')) return 'yours';
+    const n = this.nameOf(o.owner); return `${n}${n.endsWith('s') ? "'" : "'s"}${o.access === 'private' ? ', private' : ''}`;
+  }
+  /** What a thing's public description adds: "Ana's; 3 coins; open 07:00–15:00". */
+  tag(e: Entity): string {
+    const parts: string[] = [];
+    if (e.owner || e.access) { const w = this.ownerWord(e.id); if (w) parts.push(w); }
+    if (e.price) parts.push(e.price.service ? `${e.price.service} for ${this.money(e.price.amount)}` : `for sale: ${this.money(e.price.amount)}`);
+    if (e.schedule) { const d = describeSchedule(e.schedule); if (d) parts.push(d); }
+    return parts.join('; ');
+  }
+
+  // ---------- Soul capabilities and acts ----------
+
+  capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Plans, here: Vec2 | null) {
+    // ownership on the bridge's own caps: seats, hands and surfaces of private things
+    for (const c of caps) {
+      if (!c.target || !this.m.entities.has(c.target.id) || !['sit', 'pick-up', 'put-on'].includes(c.verb)) continue;
+      const r = this.refusal(c.target.id, soul) ?? (c.verb === 'pick-up' ? this.forSale(c.target.id, soul) : null);
+      if (r && c.available !== false) { c.available = false; (c as any).blocked = r; plans.delete(c.id); }
+    }
+    if (!here) return;
+    const mine = this.walletOf(soul);
+    for (const e of this.m.entities.values()) {
+      if (!e.price) continue;
+      const wp = this.m.worldPose(e), d = Math.hypot(wp.x - here[0], wp.z - here[1]); if (d > TRADE_REACH) continue;
+      const own = this.ownership(e.id), seller = own?.owner ?? 'god';
+      if (this.isOf(seller, soul)) continue;
+      const what = e.price.service ?? (e.name ? this.m.pathOf(e.id) : this.m.resolvedDef(e.def)?.name.replace(/^core-/, '') ?? 'it');
+      const id = `buy:${e.id}`, short = mine.amount < e.price.amount;
+      const label = `Buy ${what} from ${this.nameOf(seller)} for ${this.money(e.price.amount)} (you have ${this.money(mine.amount)}; ${Math.round(d)} m)`;
+      caps.push({ id, verb: 'buy', label, target: { id: e.id, kind: 'object' }, available: !short, ...(short ? { blocked: { code: 'wallet.insufficient', reason: `It costs ${this.money(e.price.amount)}; you have ${this.money(mine.amount)}.` } } : {}) } as EdgeCapability);
+    }
+    for (const b of this.h.edge?.perceivedBodies(soul.soulId, 12) ?? []) {
+      caps.push({ id: `pay:${b.soulId}`, verb: 'pay', label: `Pay ${b.name} (params: {"amount": n}; you have ${this.money(mine.amount)})`, target: { id: b.soulId, kind: 'soul' }, available: mine.amount > 0, ...(mine.amount > 0 ? {} : { blocked: { code: 'wallet.insufficient', reason: `You have no ${this.currency()}.` } }), params: { amount: { type: 'number', min: 0.01, max: mine.amount || 1 } } } as EdgeCapability);
+    }
+  }
+  private forSale(id: string, soul: { soulId: string; name: string }): Refusal | null {
+    const e = this.m.entities.get(id); if (!e?.price || e.price.service) return null;
+    if (this.isOf(this.ownership(id)?.owner ?? 'god', soul)) return null;
+    return { code: 'object.for-sale', reason: `It is for sale (${this.money(e.price.amount)}): buy:${id} first.` };
+  }
+
+  /** `buy:<id>`, `pay:<soul>` (params.amount), `sell:<id>` (params.price; 0 or none takes it off sale). */
+  act(soul: EdgeSoul, capability: string, params: Record<string, unknown>, here: Vec2 | null): { accepted: true; result: Record<string, unknown> } | { accepted: false; code: string; reason: string } {
+    const no = (code: string, reason: string) => ({ accepted: false as const, code, reason });
+    const [verb, ...rest] = capability.split(':'), arg = rest.join(':');
+    const me = this.walletOf(soul), merge: Op[] = me.alias ? [{ op: 'pay', from: me.alias, to: me.key, amount: this.m.state.layers!.wallets[me.alias] } as Op] : [];
+    if (verb === 'buy') {
+      const e = this.m.entities.get(arg); if (!e?.price) return no('capability.unknown', 'That is not for sale.');
+      if (here) { const wp = this.m.worldPose(e), d = Math.hypot(wp.x - here[0], wp.z - here[1]); if (d > TRADE_REACH) return no('object.out-of-reach', `It is ${Math.round(d)} m away; walk closer first.`); }
+      const seller = this.ownership(e.id)?.owner ?? 'god'; if (this.isOf(seller, soul)) return no('object.yours', 'It is yours already.');
+      if (me.amount < e.price.amount) return no('wallet.insufficient', `It costs ${this.money(e.price.amount)}; you have ${this.money(me.amount)}.`);
+      const what = e.price.service ?? (e.name ? this.m.pathOf(e.id) : this.m.resolvedDef(e.def)?.name.replace(/^core-/, '') ?? 'it');
+      const ops: Op[] = [...merge, ...(e.price.amount > 0 ? [{ op: 'pay', from: me.key, to: seller, amount: e.price.amount, for: what } as Op] : []), ...(e.price.service ? [] : [{ op: 'set', id: e.id, owner: me.key, price: null } as Op])];
+      if (!ops.length) return { accepted: true, result: { bought: what } };
+      const r = this.h.engineAct(ops, `${soul.name} bought ${what} from ${this.nameOf(seller)} for ${this.money(e.price.amount)}`);
+      if (!r.accepted) return no((r as any).failures?.[0]?.code ?? 'buy.refused', (r as any).failures?.[0]?.detail ?? 'the world refused');
+      return { accepted: true, result: { bought: what, from: this.nameOf(seller), paid: e.price.amount, currency: this.currency(), wallet: this.walletOf(soul).amount, ...(e.price.service ? {} : { owner: 'yours' }) } };
+    }
+    if (verb === 'pay') {
+      const amount = Number(params.amount); if (!(amount > 0)) return no('capability.params', 'pay needs {"amount": n} (more than 0)');
+      const to = this.minds().get(arg) ?? [...this.minds().values()].find((x) => x.name.toLowerCase() === arg.toLowerCase());
+      if (!to || to.soulId === soul.soulId) return no('capability.unknown', 'Pay whom? Use pay:<soulId> of someone near you.');
+      if (me.amount < amount) return no('wallet.insufficient', `You have ${this.money(me.amount)}.`);
+      const r = this.h.engineAct([...merge, { op: 'pay', from: me.key, to: `soul:${to.soulId}`, amount, ...(typeof params.for === 'string' ? { for: params.for.slice(0, 120) } : {}) } as Op], `${soul.name} paid ${to.name} ${this.money(amount)}`);
+      if (!r.accepted) return no((r as any).failures?.[0]?.code ?? 'pay.refused', (r as any).failures?.[0]?.detail ?? 'the world refused');
+      return { accepted: true, result: { paid: amount, to: to.name, currency: this.currency(), wallet: this.walletOf(soul).amount } };
+    }
+    if (verb === 'sell') {
+      const e = this.m.entities.get(arg); if (!e) return no('capability.unknown', 'No such thing.');
+      if (!this.isOf(this.ownership(e.id)?.owner, soul)) return no('object.not-yours', 'You can only sell what is yours.');
+      const price = Number(params.price ?? 0);
+      if (!(price >= 0) || price > 1_000_000) return no('capability.params', 'sell needs {"price": n} (0 takes it off sale)');
+      const r = this.h.engineAct([{ op: 'set', id: e.id, price: price > 0 ? { amount: price, ...(e.price?.service ? { service: e.price.service } : {}) } : null } as Op], `${soul.name} ${price > 0 ? `priced ${this.m.pathOf(e.id)} at ${this.money(price)}` : `took ${this.m.pathOf(e.id)} off sale`}`);
+      if (!r.accepted) return no((r as any).failures?.[0]?.code ?? 'sell.refused', (r as any).failures?.[0]?.detail ?? 'the world refused');
+      return { accepted: true, result: { thing: this.m.pathOf(e.id), price, currency: this.currency() } };
+    }
+    return no('capability.unknown', capability);
+  }
+
+  // ---------- reads ----------
+
+  /** A Soul's own view: wallet, what it owns, its relationships. */
+  me(soul: { soulId: string; name: string }) {
+    const owns = [...this.m.entities.values()].filter((e) => e.owner && this.isOf(e.owner, soul)).map((e) => ({ id: e.id, name: e.name ? this.m.pathOf(e.id) : this.m.resolvedDef(e.def)?.name.replace(/^core-/, ''), ...(e.access ? { access: e.access } : {}), ...(e.price ? { price: e.price } : {}), ...(e.owner!.startsWith('group:') ? { via: this.nameOf(e.owner) } : {}) }));
+    const rel = this.relations().filter((r) => this.isOf(r.a, soul) || this.isOf(r.b, soul)).map((r) => this.isOf(r.a, soul) ? { you: r.rel, with: this.nameOf(r.b) } : { [r.rel]: 'you', from: this.nameOf(r.a) });
+    return { currency: this.currency(), wallet: this.walletOf(soul).amount, owns, relationships: rel };
+  }
+  /** The public layer view (no wallets): currency, zones, schedules, prices, owners, relationships. */
+  publicView() {
+    const things = [...this.m.entities.values()].filter((e) => e.owner || e.access || e.schedule || e.price);
+    const zones = [...this.m.entities.values()].filter((e) => /^core-zone@/.test(e.def) || e.def === 'core/zone@1').map((e) => ({ id: e.id, name: e.name ? this.m.pathOf(e.id) : e.id, use: e.params?.use ?? 'residential' }));
+    return {
+      contract: 'layers/1', currency: this.currency(), clock: this.clock(),
+      zones,
+      things: things.map((e) => ({ id: e.id, name: e.name ? this.m.pathOf(e.id) : e.id, ...(e.owner ? { owner: this.nameOf(e.owner), ownerRef: e.owner } : {}), ...(e.access ? { access: e.access } : {}), ...(e.price ? { price: e.price } : {}), ...(e.schedule ? { schedule: e.schedule, hours: this.hoursOf(e.schedule) } : {}) })),
+      relations: this.relations().map((r) => ({ a: this.nameOf(r.a), rel: r.rel, b: this.nameOf(r.b), refs: r })),
+    };
+  }
+  /** Who works and lives at a thing: "Ana works here". */
+  peopleAt(entityId: string): string {
+    const at = this.relations().filter((r) => r.b === `thing:${entityId}` && (r.rel === 'works-at' || r.rel === 'lives-at'));
+    const w = at.filter((r) => r.rel === 'works-at').map((r) => this.nameOf(r.a)), l = at.filter((r) => r.rel === 'lives-at').map((r) => this.nameOf(r.a));
+    return [...(w.length ? [`${w.join(' and ')} work${w.length === 1 ? 's' : ''} here`] : []), ...(l.length ? [`${l.join(' and ')} live${l.length === 1 ? 's' : ''} here`] : [])].join('; ');
+  }
+}
+
+/** Catalogue categories that suit a zone's use (the god's suggestion hook; the catalogue's taxonomy ids). */
+export const ZONE_SUGGEST: Record<string, string[]> = {
+  residential: ['building.residential', 'furniture.seat', 'vegetation.shrub', 'vegetation.flower', 'utility.lighting', 'object.street'],
+  commercial: ['building.commercial', 'public.square', 'object.street', 'object.sign', 'furniture.seat', 'utility.lighting', 'object.food'],
+  park: ['public.park', 'vegetation.tree', 'vegetation.flower', 'water.feature', 'public.play', 'furniture.seat', 'utility.lighting'],
+  farm: ['building.agricultural', 'vegetation.crop', 'living.farm', 'object.tool', 'object.container'],
+  civic: ['building.civic', 'public.square', 'public.monument', 'public.venue', 'object.sign', 'water.feature'],
+  industrial: ['building.industrial', 'utility.power', 'utility.waste', 'vehicle.road', 'layer.construction', 'object.container'],
+  wild: ['vegetation.tree', 'terrain.landform', 'terrain.rock', 'water.body', 'living.wild', 'living.bird'],
+};
+
+/** GET /v1/world/layers (public: no wallets), GET /v1/world/layers/me (a Soul's own: wallet, owns, relationships),
+ *  GET /v1/god/layers (the god's: everything, wallets too), GET /v1/god/layers/zone-suggest?use=… (catalogue picks). */
+export function mountLayerRoutes(app: import('hono').Hono, d: { god: { model: WorldModel }; layers: () => GodLayers | undefined; requireGod: (c: import('hono').Context) => void; soulFromBearer: (c: import('hono').Context) => { id: string; name: string } | null; categoryOf: (def: unknown) => string }) {
+  const noStore = { 'cache-control': 'no-store' };
+  const need = () => { const l = d.layers(); if (!l) throw new ApiError(404, 'not-found', 'this world has no Souls layer (no engine bridge)'); return l; };
+  app.get('/v1/world/layers', (c) => c.json(need().publicView(), 200, noStore));
+  app.get('/v1/world/layers/me', (c) => { const s = d.soulFromBearer(c); if (!s) return c.json({ error: { code: 'unauthorized', message: 'a Soul token is required' } }, 401); return c.json(need().me({ soulId: s.id, name: s.name }), 200, noStore); });
+  app.get('/v1/god/layers', (c) => { d.requireGod(c); const l = need(); return c.json({ ...l.publicView(), wallets: d.god.model.state.layers?.wallets ?? {} }, 200, noStore); });
+  app.get('/v1/god/layers/zone-suggest', (c) => {
+    const use = c.req.query('use') ?? '', cats = ZONE_SUGGEST[use];
+    if (!cats) return c.json({ error: { code: 'invalid', message: `use is one of ${Object.keys(ZONE_SUGGEST).join(', ')}` } }, 400);
+    const defs = [...new Set(d.god.model.defs.values())].filter((x) => x.name.startsWith('core-'));
+    return c.json({ use, categories: cats.map((cat) => ({ category: cat, defs: defs.filter((x) => { const k = d.categoryOf(x); return k === cat || k.startsWith(cat + '.'); }).slice(0, 6).map((x) => x.ref.replace(/^core-/, 'core/')) })) }, 200, { 'cache-control': 'public, max-age=60' });
+  });
+}

@@ -7,3 +7,5 @@ export { CORE_KIT, coreRef } from './core-kit.ts';
 export { stormStrikes, strikesBetween, STRIKE_CELL, STRIKE_FRESH, SOUND_MPS, type Strike } from './lightning.ts';
 export * as vocab from './vocab/index.ts';
 export { categoryOf, manifestRow, manifestLine, interfacesOf, lintDef, facetFilter, hasFacet, categoryCounts, TAXONOMY, CONVENTIONS, ACTUATORS, type ManifestRow, type VocabDef } from './vocab/index.ts';
+export * as layers from './layers.ts';
+export { isOpen, eventsOn, isDark, followPatch, minutesOf, describeSchedule, scheduleSlots, OWNER_REF, RELATIONS, ZONE_USES, DAYS, type Schedule, type Price, type Relation, type LayersState } from './layers.ts';
