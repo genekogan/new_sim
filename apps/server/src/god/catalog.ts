@@ -8,6 +8,7 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import type { Context, Hono } from 'hono';
+import { compress } from 'hono/compress';
 import { vocab, type StoredDef } from '@sim/world-compiler';
 import { ApiError } from '../souls.ts';
 import type { GodMode } from './god.ts';
@@ -52,6 +53,9 @@ export function recommend(defs: StoredDef[], intent: string, per = 3) {
 
 export type CatalogDeps = { god: GodMode; requireGod: (c: Context) => void; store: AssetStore; library: () => StoredDef[] };
 export function mountCatalogRoutes(app: Hono, d: CatalogDeps) {
+  // the viewer's snapshot carries every def in use (kit shape lists): ~1.6 KB per type raw, ~0.3 KB gzipped. Compress it
+  // (and the catalogue) when the client asks; registered before mountGodRoutes' own snapshot route, so it wraps it.
+  for (const path of ['/v1/world/snapshot', '/v1/god/catalog', '/v1/god/defs']) app.use(path, compress());
   const facetsOf = (c: Context): vocab.Facets => ({ category: c.req.query('category') || undefined, tag: c.req.query('tag') || undefined, form: c.req.query('form') || undefined, has: c.req.queries('has')?.flatMap((h) => h.split(',')).filter(Boolean) });
   // the manifest changes only when the library does: ETag over the def hashes (+ the facets/page asked for)
   const etagOf = (defs: StoredDef[], extra: string) => `"cat-${createHash('sha256').update(defs.map((x) => x.hash).sort().join(',') + '|' + extra).digest('hex').slice(0, 24)}"`;
@@ -62,7 +66,7 @@ export function mountCatalogRoutes(app: Hono, d: CatalogDeps) {
     const all = d.library(), defs = vocab.facetFilter(all as never[], f) as unknown as StoredDef[];
     const tag = etagOf(all, JSON.stringify([f, per, page, c.req.query('format') ?? '']));
     const headers = { etag: tag, 'cache-control': 'private, max-age=0, must-revalidate' };
-    if (c.req.header('if-none-match') === tag) return c.body(null, 304, headers);
+    if ((c.req.header('if-none-match') ?? '').replace(/^W\//, '') === tag) return c.body(null, 304, headers);   // compress() weakens the tag
     const rows = catalogRows(defs, d.store).sort((a, b) => (a.cat < b.cat ? -1 : a.cat > b.cat ? 1 : a.ref < b.ref ? -1 : 1));
     const slice = rows.slice((page - 1) * per, page * per), pages = Math.max(1, Math.ceil(rows.length / per));
     if (c.req.query('format') === 'lines') return c.text([`# catalog ${rows.length} defs, page ${page}/${pages}${f.category ? `, category ${f.category}` : ''}${f.has?.length ? `, has ${f.has.join(',')}` : ''}. ref [category] size make tris bytes {interfaces} (params) aka synonyms — doc`, ...slice.map(vocab.manifestLine)].join('\n') + '\n', 200, headers);

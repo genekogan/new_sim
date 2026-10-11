@@ -9,6 +9,7 @@
 // move the legs), so motion.ts walks, grazes, flies or swims it like a kit creature.
 import * as THREE from 'three';
 import { frameHook, instantiate, loadAsset, type ModelInstance } from './gltf-assets.ts';
+import { deferLoad, isEager, noteDeferred } from './lazy-assets.ts';
 import { registerMesh, type MeshBuilder } from './registry.ts';
 import { bindMotionModel, makeRig, type Gait } from './motion.ts';
 import { seedOf, type BehaviorKind } from './creatures/behavior.ts';
@@ -42,7 +43,8 @@ const meshBuilder: MeshBuilder = {
       const walking = !!behavior && MOVING.has(behavior) && stillFor < 3;   // a few frames of grace across easing jitter
       inst.play(behavior === 'fly' ? 'Fly' : behavior === 'swim' ? 'Swim' : walking ? 'Walk' : 'Idle', t, { phase });
     }));
-    loadAsset(make.asset).then((gltf) => {
+    // VOCAB-MECH: GLBs outside the eager set load when the thing comes near the camera or in the background (lazy-assets.ts)
+    const load = () => { loadAsset(make.asset).then((gltf) => {
       if (gone) return;
       inst = instantiate(gltf, { box: ctx.def.size.box as [number, number, number] });
       // flat things (rugs, boards, plates a few cm thick) would z-fight with gently uneven ground: draw them
@@ -56,7 +58,8 @@ const meshBuilder: MeshBuilder = {
       const [w, h, d] = ctx.def.size.box;
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), ctx.materials.get('paint', '#b0a090')); m.position.y = h / 2; m.name = 'asset missing';
       holder.add(m);
-    });
+    }); };
+    if (isEager(make.asset)) load(); else { holder.add(deferLoad(make.asset, load, frameHook)); noteDeferred(); }
     holder.addEventListener('removed', () => { gone = true; inst?.dispose(); });
     return holder;
   },

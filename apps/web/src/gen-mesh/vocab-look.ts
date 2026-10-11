@@ -54,7 +54,7 @@ function paintSubtree(root: THREE.Object3D, look: Look, ctx: MeshCtx) {
   const key = `${mul.getHexString()}|${dh.toFixed(3)}|${dl.toFixed(3)}|${look.condition}|${glowOff}`;
   if (key === `ffffff|0.000|0.000|new|false`) return;
   root.traverse((o) => {
-    const mesh = o as THREE.Mesh; if (!mesh.isMesh || mesh.userData.vocabPainted === key) return;
+    const mesh = o as THREE.Mesh; if (!mesh.isMesh || mesh.userData.vocabPainted === key || mesh.name === 'asset frame hook') return;
     const edit = (m: THREE.MeshStandardMaterial) => {
       if (m.color) { m.color.multiply(mul); if (dh || dl) m.color.offsetHSL(dh, 0, dl); }
       if (look.condition === 'worn' || look.condition === 'damaged') { if (typeof m.roughness === 'number') m.roughness = Math.min(1, m.roughness + 0.15); }
@@ -71,7 +71,7 @@ function warpSubtree(root: THREE.Object3D, look: Look, height: number) {
   root.updateMatrixWorld(true);
   const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), v = new THREE.Vector3(), h = Math.max(0.05, height);
   root.traverse((o) => {
-    const mesh = o as THREE.Mesh; if (!mesh.isMesh || mesh.userData.vocabWarped) return;
+    const mesh = o as THREE.Mesh; if (!mesh.isMesh || mesh.userData.vocabWarped || mesh.name === 'asset frame hook') return;
     const rel = new THREE.Matrix4().multiplyMatrices(inv, mesh.matrixWorld), back = rel.clone().invert();
     const g = mesh.geometry.clone(), pos = g.attributes.position as THREE.BufferAttribute;
     for (let i = 0; i < pos.count; i++) {
