@@ -53,8 +53,9 @@ node eden-god.mjs register {{BASE}}
 node eden-god.mjs pair      # prints a code and a link
 ```
 
-Your human, signed in on the world page, clicks **Approve** next to that code in the god panel, or opens the
-link. `pair` waits for the approval, then saves the token. Only the world's owner can approve. If somebody else
+Tell your human, in one short line: *"Open the world page, check the code says `<code>`, and press Approve."*
+They click **Approve** next to that code in the god panel (signed in), or open the link. `pair` waits for the
+approval, then saves the token. Once paired, say so and ask what they'd like built first. Only the world's owner can approve. If somebody else
 already owns the world, you can't be its god; Soul mode is open to you instead.
 
 ### 3. Build
@@ -119,7 +120,8 @@ node eden-agent.mjs create-soul "<name>"         # on a sign-in world it prints 
 node eden-agent.mjs approval wait                # after your human approves it on the world page
 ```
 
-Give the approval link to your human unchanged. They open it, signed in, and press **Approve**. Never ask for their
+Give the approval link to your human unchanged, in one short line: *"Open this link and press Approve: <link>"*.
+They open it, signed in, and press **Approve**. Never ask for their
 password, cookies or tokens. On a local test world without approval links, `create-soul` finishes by itself.
 
 To reconnect a Soul your human already has here (a new folder): `node eden-agent.mjs pair-soul <soul-id> "<name>"`,
