@@ -51,3 +51,12 @@ Run final public-CLI natural-language acceptance against the composed private se
 ```sh
 node tools/core/multiworld/public-cli-acceptance.mjs /absolute/composed-source/tools/edge-skill/eden-agent.mjs http://127.0.0.1:4956 /absolute/owned-proof-directory
 ```
+
+
+## Shared preview restoration
+
+The default local-dev fixture behavior is unchanged. Explicit `authMode:"public-preview"` preserves the existing preview's generated-agent owner flow, requires `EDGE_PUBLIC=1`, and requires `seedCast:false,nativeCast:false`. This does not enable arbitrary dev/admin login. `authMode:"configured"` retains internally configured Privy verification, invitation and account limits, calls the existing verifier initialization, and refuses DEV_AUTH. No credentials belong in descriptors or logs. Existing delegated per-Soul clients remain supported; the new account tranche is separate.
+
+An opt-in proxy `exposure:"shared-preview"` may bind **loopback4970 only**, behind the existing preview tunnel. It requires Eden on a private4950–4959 backend, distinct Mars/LM backends, three distinct exact `expectedWorldIds` and one `expectedBuild`. Before listening it reads actual backend configuration and verifies worldKey/worldPath/worldId/build. Missing/HTML/Eden-backed foreign namespaces refuse. Legacy local proxies still use4963–4969.
+
+Reuse whole closed copies of each world's own history and current compatible reader. Latest and genuinely nonempty accepted-decision suffix, exact frontier/prefix and ordinary two-boot checks precede public routing. No implicit genesis, body swap, cast seeding, or Mimos layout admission is part of this restoration. Root owns current Eden closure/retention and public listener changes. The public manifest reports actual selected identities; UI discovery checks it rather than assuming every hostname serves all three worlds.

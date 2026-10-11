@@ -57,6 +57,7 @@ export class FloaterView {
   private readonly templates = new Map<string, Promise<THREE.Object3D>>();
   private readonly floaters = new Map<string, Floater>();
   private readonly pending = new Set<Promise<unknown>>();
+  private readonly byId = new Map<string,Promise<unknown>>();
   private readonly standIn = new THREE.MeshStandardMaterial({ color: 0x6fae9a, roughness: 0.35, metalness: 0.1 });
   private draco: DRACOLoader | null = null;
   private disposed = false;
@@ -129,7 +130,7 @@ export class FloaterView {
       },
       (err) => console.warn(`floater ${id}: model ${modelUrl??m?.file} failed to load; keeping the stand-in`, err),
     );
-    this.pending.add(p);
+    this.pending.add(p);this.byId.set(id,p);
     void p.finally(() => this.pending.delete(p));
   }
 
@@ -139,7 +140,7 @@ export class FloaterView {
     if (!f) return;
     this.root.remove(f.holder);
     f.stand?.geometry.dispose();
-    this.floaters.delete(id);
+    this.floaters.delete(id);this.byId.delete(id);
   }
 
   /** Make the drawn set equal `bodies` (e.g. floaterBodiesOfTake(take)). */
@@ -183,6 +184,13 @@ export class FloaterView {
   async ready(): Promise<void> {
     while (this.pending.size) await Promise.allSettled(this.pending);
   }
+
+  /** Frozen initial IDs only; later bodies never extend this barrier. */
+  async readyInitial(ids:readonly string[]):Promise<void>{
+    const tasks=ids.map(id=>this.byId.get(id));await Promise.all(tasks);
+    for(const id of ids)if(!this.floaters.get(id)?.model)throw Error('Required body '+id+' could not be prepared.');
+  }
+  retryInitial(ids:readonly string[]){for(const id of ids){const f=this.floaters.get(id);if(!f||f.model||this.pending.has(this.byId.get(id)!))continue;const body=f.body,file=admittedBodyUrl((body as {modelUrl?:string}).modelUrl)??floaterModel(body.model)?.file;if(file)this.templates.delete(file);this.remove(id);this.add(id,body);}}
 
   dispose(): void {
     this.disposed = true;
@@ -262,6 +270,7 @@ export class KinScenery {
   ready() {
     return this.view.ready();
   }
+  async readyInitial(){const ids=this.placements.map((k,i)=>`kin:${i}:${k.model}`);this.view.retryInitial(ids);await this.view.readyInitial(ids);}
 
   dispose() {
     this.view.dispose();

@@ -1,14 +1,16 @@
+import {discoverWorlds,readWorldBootstrap,WorldBootstrapError} from './world-discovery.ts';
 import { apiPath, worldPath, worldKey } from './world-path.ts';
 import {singleLocalPreview} from './local-navigation.ts';
 import {BASE} from './base-path.ts';
-import { StrictMode, useEffect, useState } from 'react';
+import { StrictMode, Suspense, lazy, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { PrivyProvider, usePrivy } from '@privy-io/react-auth';
 import {ClerkProvider,useAuth,useClerk,useUser} from '@clerk/clerk-react';
+const PrivyAuth=lazy(()=>import('./PrivyAuth.tsx'));
 import { Shell, type AuthCtx } from './Shell.tsx';
 import './styles.css';
-import { LauncherHome, type LauncherList } from './god-ui/LauncherHome.tsx';
 import {clerkHomeRoute,clerkOriginRoute,unsignedPreviewAuth} from './auth-ui.ts';
+// New worlds (world launcher, world engine): the launcher homepage and its sign-in. Old worlds never reach these.
+import { LauncherHome, type LauncherList } from './god-ui/LauncherHome.tsx';
 import {publishSession,type Session} from './auth-session.ts';
 
 // Presentation gate only. Exact reviewed candidate builds may enable it;
@@ -18,7 +20,7 @@ const arrivalEnabled=typeof __SIM_ARRIVAL_ENABLED__!=='undefined'&&__SIM_ARRIVAL
 
 type Cfg = { authenticationOrigin?:string; authProvider?:'clerk'|'privy'|'none';clerkPublishableKey?:string;clerkIssuer?:string;privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean;worldKey?:string;accountAuthRequired?:boolean };
 
-/** Clerk (production sign-in, live release d357): signed in = a Clerk session bound to this server's account id. */
+
 function WithClerk({cfg}:{cfg:Cfg}){
  const session=useAuth(),clerk=useClerk(),profile=useUser();
  const [binding,setBinding]=useState<{accountId:string;issuer:string;subject:string}|null>(null);
@@ -34,24 +36,13 @@ function WithClerk({cfg}:{cfg:Cfg}){
   }catch{}if(active)await new Promise<void>(yes=>setTimeout(yes,1000));}})();return()=>{active=false;abort.abort();};
  },[session.isLoaded,session.isSignedIn,subject,sessionId,cfg.clerkIssuer,resolveAttempt]);
  const accountId=binding&&binding.subject===subject&&binding.issuer===cfg.clerkIssuer?binding.accountId:null;
+ const currentProfile=profile.user?.id===subject?profile.user:null;
  const auth:AuthCtx={mode:'clerk',ready:session.isLoaded,authed:session.isLoaded&&!!session.isSignedIn&&!!accountId,
-  label:profile.user?.primaryEmailAddress?.emailAddress??profile.user?.firstName??null,
+  label:currentProfile?.primaryEmailAddress?.emailAddress??currentProfile?.firstName??null,
   login:()=>{if(session.isSignedIn)setResolveAttempt(n=>n+1);else clerk.openSignIn({afterSignInUrl:location.href,afterSignUpUrl:location.href});},
-  logout:()=>clerk.signOut(),getToken:async()=>session.isLoaded&&session.isSignedIn?session.getToken():null,
+  avatarUrl:currentProfile?.imageUrl??null,logout:(returnUrl)=>clerk.signOut({redirectUrl:returnUrl??location.href}),getToken:async()=>session.isLoaded&&session.isSignedIn?session.getToken():null,
   debug:{privyUserId:null,accountIdentity:accountId,wallet:null,linked:[]}};
  return <Shell cfg={cfg} auth={auth} arrivalEnabled={arrivalEnabled}/>;
-}
-
-function WithPrivy({ cfg }: { cfg: Cfg }) {
-  const p = usePrivy();
-  const email = p.user?.email?.address ?? p.user?.google?.email ?? null;
-  const auth: AuthCtx = {
-    mode: 'privy', ready: p.ready, authed: p.ready && p.authenticated, label: email ?? p.user?.id ?? null,
-    login: () => p.login(), logout: () => p.logout(),
-    getToken: async () => (p.ready && p.authenticated ? await p.getAccessToken() : null),
-    debug: { privyUserId: p.user?.id ?? null, wallet: p.user?.wallet ?? null, linked: p.user?.linkedAccounts?.map((a) => ({ type: a.type, ...(('address' in a) ? { address: (a as { address: string }).address } : {}) })) ?? [] },
-  };
-  return <Shell cfg={cfg} auth={auth} arrivalEnabled={arrivalEnabled} />;
 }
 
 function WithDev({ cfg }: { cfg: Cfg }) {
@@ -67,38 +58,39 @@ function WithDev({ cfg }: { cfg: Cfg }) {
 }
 
 function WorldRoot() {
+  const [hash,setHash]=useState(location.hash);
+  useEffect(()=>{const changed=()=>setHash(location.hash);addEventListener('hashchange',changed);return()=>removeEventListener('hashchange',changed);},[]);
   const [cfg, setCfg] = useState<Cfg | null>(null);
   const [err, setErr] = useState('');
-  useEffect(() => { let tries = 0; const go = () => { fetch(apiPath('/v1/config')).then((r) => { if (!r.ok) throw new Error(`the server answered ${r.status}`); return r.json(); }).then((cfg:Cfg)=>{if((cfg.worldKey&&cfg.worldKey!==worldKey)||(singleLocalPreview(location.hostname)&&worldKey!=='eden'&&cfg.worldKey!==worldKey))throw new Error('This world is not served by the connected preview');setCfg(cfg);}).catch((e) => { if (++tries < 20) setTimeout(go, 3000); else setErr(String(e)); }); }; go(); }, []);
+  useEffect(() => { let tries = 0; const go = () => { fetch(apiPath('/v1/config')).then(r=>readWorldBootstrap(r,worldKey,worldPath)).then(raw=>setCfg(raw as Cfg)).catch((e) => { if (!(e instanceof WorldBootstrapError)&&++tries < 20) setTimeout(go, 3000); else setErr(String(e)); }); }; go(); }, []);
   if (err) return <pre>cannot reach the server: {err}</pre>;
   if (!cfg) return <pre>connecting…</pre>;
-  // Clerk is production: never the dev sign-in, whatever the URL says.
   const useDev = cfg.authProvider!=='clerk'&&!cfg.accountAuthRequired&&cfg.devAuth && new URLSearchParams(location.search).has('dev');
   if (useDev || (cfg.authProvider!=='clerk'&&!cfg.accountAuthRequired&&!cfg.privyAppId && cfg.devAuth)) return <WithDev cfg={cfg} />;
   if(cfg.authProvider==='clerk'&&cfg.clerkPublishableKey&&cfg.clerkIssuer){
-   const route=clerkOriginRoute(cfg.authenticationOrigin,location.origin,worldPath,location.hash,BASE);
+   const route=clerkOriginRoute(cfg.authenticationOrigin,location.origin,worldPath,hash,BASE);
    if(route.initialize)return <ClerkProvider publishableKey={cfg.clerkPublishableKey}><WithClerk cfg={cfg}/></ClerkProvider>;
    const login=()=>{const target=clerkOriginRoute(cfg.authenticationOrigin,location.origin,worldPath,location.hash,BASE).signInUrl;if(target)location.assign(target);};
    return <Shell cfg={cfg} auth={{...unsignedPreviewAuth(route.signInUrl,login),mode:'clerk'}} arrivalEnabled={arrivalEnabled}/>;
   }
   if (cfg.authProvider==='none'||cfg.authProvider==='clerk'||!cfg.privyAppId) return <Shell cfg={cfg} auth={{ ready: true, authed: false, label: null, login: () => alert('Sign-in is not configured on this server.'), logout: () => {}, getToken: async () => null, debug: { privyUserId: null, wallet: null, linked: [] } }} arrivalEnabled={arrivalEnabled} />;
-  return (
-    <PrivyProvider appId={cfg.privyAppId} config={{ embeddedWallets: { ethereum: { createOnLogin: 'users-without-wallets' }, showWalletUIs: false }, appearance: { theme: 'dark' } }}>
-      <WithPrivy cfg={cfg} />
-    </PrivyProvider>
-  );
+  return <Suspense fallback={<pre>connecting sign-in…</pre>}><PrivyAuth cfg={cfg} arrivalEnabled={arrivalEnabled}/></Suspense>;
 }
 
 createRoot(document.getElementById('root')!).render(<StrictMode>{location.pathname===BASE+'/'&&!location.hash?<WorldList/>:<WorldRoot/>}</StrictMode>);
 
 function WorldList(){
  const local=singleLocalPreview(location.hostname);
- const [served,setServed]=useState<Set<string>|null>(local?null:new Set(['eden','mars','littlemartians']));
- // Served by the world launcher (tools/world-launcher): its own homepage with New world.
+ const [served,setServed]=useState<Set<string>|null>(null);
+ // Served by the world launcher (tools/world-launcher; a prefixed build or a local preview): its own homepage with New
+ // world. The production root (sim.eden.art/) never probes for it and stays main's (e8) world list.
  const [launcher,setLauncher]=useState<LauncherList|null>(null);
- useEffect(()=>{if(!local&&!BASE)return;let active=true;void fetch(BASE+'/__sim/worlds.json').then(r=>r.ok?r.json():null).then(data=>{if(!active)return;if(data?.contract==='local-worlds/1'&&typeof data.launcher==='string'&&Array.isArray(data.worlds)){setLauncher(data);return;}setServed(data?.contract==='local-worlds/1'&&Array.isArray(data.worlds)?new Set(data.worlds.filter((w:{key?:unknown;basePath?:unknown})=>typeof w.key==='string'&&w.basePath==='/w/'+w.key).map((w:{key:string})=>w.key)):new Set(['eden']));}).catch(()=>{if(active)setServed(new Set(['eden']));});return()=>{active=false;};},[local]);
+ useEffect(()=>{let active=true;void (async()=>{
+  if(BASE||local){try{const r=await fetch(BASE+'/__sim/worlds.json',{signal:AbortSignal.timeout(5000)});const data=r.ok&&r.headers.get('content-type')?.includes('application/json')?await r.json():null;if(data?.contract==='local-worlds/1'&&typeof data.launcher==='string'&&Array.isArray(data.worlds)){if(active)setLauncher(data);return;}}catch{/* not a launcher: the world list below */}}
+  const worlds=await discoverWorlds(path=>fetch(path,{signal:AbortSignal.timeout(5000)}));if(active)setServed(worlds);
+ })();return()=>{active=false;};},[local]);
  if(launcher)return <LauncherRoot list={launcher}/>;
- const card=(key:string,name:string,description:string)=>served?.has(key)?<a href={'/w/'+key}><h2>{name}</h2><p>{description}</p><span>enter world →</span></a>:<article aria-disabled="true" style={{border:'1px solid var(--line)',borderRadius:12,padding:18}}><h2>{name}</h2><p>{description}</p><span className="dim">{served?'Not connected to this local preview':'Checking connection…'}</span></article>;
+ const card=(key:string,name:string,description:string)=>served?.has(key)?<a href={'/w/'+key}><h2>{name}</h2><p>{description}</p><span>enter world →</span></a>:<article aria-disabled="true" style={{border:'1px solid var(--line)',borderRadius:12,padding:18}}><h2>{name}</h2><p>{description}</p><span className="dim">{served?'Not connected to this site':'Checking connection…'}</span></article>;
  return <main className="world-list"><h1>Sim</h1><p>Persistent worlds. Open one to watch, meet its Souls, or give yours direction.</p><div className="world-cards">{card('eden','Eden','Our shared playground. Meet its Souls and see what develops.')}{card('mars','Mars','The 2026 camp, shared places and pallet-rack construction.')}{card('littlemartians','Little Martians','Floating ceramic characters and enterable glazed buildings.')}</div>{!local&&<p><a href="/l/mars">Mars Lab</a> · <a href="/l/littlemartians">Little Martians snapshot</a> · <a href="/l/eden">Eden snapshot</a></p>}</main>;
 }
 

@@ -1,3 +1,4 @@
+import {ownLiveChunk} from './owned-live-chunks.ts';
 import {createApiRequest} from './api-request.ts';
 import {matchingMe} from './auth-projection.ts';
 import {acceptPrivateAuthority,acceptLivePrivateAuthority,retirePrivateAuthority} from './private-authority.ts';
@@ -50,7 +51,7 @@ export function useSim(getToken: () => Promise<string | null>, authed: boolean,i
       onTakes: stream => {
         const old = stream.serverTick < st.takes.serverTick ? [] : st.takes.chunks;
         const merged = new Map(old.map(c => [c.toTick, c]));
-        for (const chunk of stream.chunks) merged.set(chunk.toTick, chunk);
+        for (const raw of stream.chunks) {const chunk=ownLiveChunk(raw);if(chunk)merged.set(chunk.toTick,chunk);}
         st.takes = {serverTick: stream.serverTick, chunks: [...merged.values()].sort((a,b) => a.toTick-b.toTick).slice(-12), receivedAt: performance.now()};
       },
       onWelcome: (me, w) => {

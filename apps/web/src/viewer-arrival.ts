@@ -3,8 +3,7 @@
  * "Reconnecting" is only true after a socket that was open has been down for a moment: the very first connect
  * is part of arriving, and a quick drop-and-reconnect (the browser was busy, the network blinked) is invisible
  * because playback runs a moment behind the server on frames it already holds. */
-/** An initial-assets gate's progress, when the viewer has one (old worlds' InitialWorldReadiness shape). */
-export type InitialWorldProgress = { stage: 'waiting' | 'downloading' | 'preparing' | 'first-frame' | 'ready' | 'failed' | 'cancelled'; required: number; completed: number; bytesLoaded: number; bytesTotal: number | null };
+import type { InitialWorldProgress } from './InitialWorldReadiness.ts';
 
 export const RECONNECT_GRACE_MS = 3000;
 

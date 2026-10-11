@@ -10,6 +10,6 @@ export function intentAdapter(status:number,dashboard:unknown,scope:{worldId:str
   const parsed=intentOwnerControlV2Schema.safeParse(data.control);
   if(!parsed.success)return {kind:'unavailable'};
   const control=parsed.data;
-  if(control.worldId!==scope.worldId||control.soulId!==scope.soulId||control.ownerId!==scope.ownerId)return {kind:'unavailable'};
+  if(control.worldId!==scope.worldId||control.soulId!==scope.soulId||(control.accountOwnerId??control.ownerId)!==scope.ownerId)return {kind:'unavailable'};
   return {kind:'candidate',control};
 }

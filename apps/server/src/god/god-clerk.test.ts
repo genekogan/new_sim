@@ -17,7 +17,7 @@ import { clerkKeys, clerkSettings, stubJwks } from '../../test/clerk-fixture.ts'
 
 async function clerkWorld(t: { after: (fn: () => void) => void }, registryPath: string, worldId = 'hello-1') {
   const db = new Db(':memory:');
-  const auth = new Auth({ ...config, ...clerkSettings(registryPath), worldId }, db);
+  const auth = new Auth({ ...config, ...clerkSettings(registryPath), worldId, worldEngine: true /* a new world: main's legacy dev projection stays on old worlds only */ }, db);
   await auth.init();
   const god = new GodMode(db, { worldId, ownerId: null, tick: () => 1, emit: () => {} });
   const app = new Hono();
@@ -56,7 +56,7 @@ test('production (Clerk) refuses every dev token: claim, mint, pairing approval,
   assert.equal(w.god.store.tokens().length, 0);
   // and a Clerk world never boots with DEV_AUTH=1 in its environment
   const before = process.env.DEV_AUTH; process.env.DEV_AUTH = '1';
-  try { assert.throws(() => new Auth({ ...config, ...clerkSettings(join(dir, 'b.sqlite')) }, w.db), /DEV_AUTH=1 with AUTH_PROVIDER=clerk/); }
+  try { assert.throws(() => new Auth({ ...config, ...clerkSettings(join(dir, 'b.sqlite')), worldEngine: true }, w.db), /DEV_AUTH=1 with AUTH_PROVIDER=clerk/); }
   finally { if (before === undefined) delete process.env.DEV_AUTH; else process.env.DEV_AUTH = before; }
 });
 
