@@ -40,6 +40,8 @@ export const builtKind = {
   actions: {},
 };
 
+const SIGHT = 30;              // here.objects: god-built things within sight (here.ts SIGHT_RADIUS)
+const LISTED = 12;             // … at most this many, nearest first
 const SIGN_READ_RADIUS = 30;   // read:<sign> is offered for signs within this many metres
 const shortDef = (def: StoredDef) => def.name.replace(/^core-/, '').replace(/^ew-/, '');
 const article = (w: string) => (/^[aeiou]/.test(w) ? `an ${w}` : `a ${w}`);
@@ -59,8 +61,11 @@ export type PerceiveHost = {
   engine: { world: { entities: Record<string, any> } };
   engineOwned(e: Entity): boolean;
   namesNear(at: Vec2, except: string): string[];
-  /** nav.ts's named things (buildings, rooms, areas, waters) for the places layer. */
-  things?(): { ref: string; id: string; room?: string; name: string; kind: string; level: number; area?: Vec2[]; poly?: Vec2[]; at: Vec2 }[];
+  /** R4-INFO: the god-built places layer (places.ts): synced first, then each object's place is the innermost one
+   *  holding it. */
+  places?: { sync(): void; placeAt(at: Vec2, level?: number): string | null };
+  /** Engine level of a standing height (the bridge's levelAt). */
+  levelAt?(x: number, z: number, y: number): number;
   log(m: string): void;
 };
 
@@ -83,9 +88,12 @@ export class GodPerceive {
     if (!o) return null;
     if (!o.kindOf(BUILT_KIND)) { o.register(builtKindFor((key) => this.desired.get(key))); this.kinds.add(BUILT_KIND); }
     this.objs = o;
+    this.wrapVisible(o as never);
     return o;
   }
   private objs: { kindOf(k: string): unknown; register(k: unknown): void } | null = null;
+  /** R4-INFO: each built object's place (innermost god-built or world place holding it) and standing level. */
+  private placed = new Map<string, { place: string | null; level: number }>();
   private kinds = new Set<string>();
   /** One object kind per kind of thing (fountain, lamp-post, sign …): here.objects lists at most two of each kind, so
    *  a single kind would show only the two nearest god things. A name the framework already uses gets `built-`. */
@@ -105,6 +113,8 @@ export class GodPerceive {
   private wanted(): Map<string, { name: string; kind: string; description: string; params: BuiltState }> {
     const m = this.h.model, out = new Map<string, { name: string; kind: string; description: string; params: BuiltState }>();
     const signs: typeof this.signs = [];
+    const placed = new Map<string, { place: string | null; level: number }>();
+    this.placed = placed;
     for (const e of m.entities.values()) {
       const def = m.resolvedDef(e.def); if (!def) continue;
       const c = def.components as Record<string, unknown>;
@@ -117,6 +127,8 @@ export class GodPerceive {
       const kind = shortDef(def), parent = e.in.parent !== 'world' ? m.entities.get(e.in.parent) : undefined;
       const name = e.name ? m.pathOf(e.id) : `${kind} ${e.id.slice(2, 6)}`;
       const near = this.h.namesNear(at, e.id).filter((n) => n !== name).slice(0, 2);
+      const level = this.h.levelAt ? this.h.levelAt(at[0], at[1], this.h.model.worldPose(e).y) : 0;
+      placed.set(e.id, { place: this.h.places?.placeAt(at, level) ?? null, level });
       const what = `${article(kind)}${parent?.name ? ` in ${m.pathOf(parent.id)}` : ''}${near.length ? `, by ${near.join(' and ')}` : ''}`;
       out.set(e.id, { name, kind: this.kindFor(text !== null ? 'sign' : kind), description: clip(def.description || kind, 400), params: { what, text: text ?? '', near, at: [Math.round(at[0] * 100) / 100, Math.round(at[1] * 100) / 100], def: def.ref } });
       // read from in front of its face (entity frame: the front is +z, turned by the yaw)
@@ -137,6 +149,8 @@ export class GodPerceive {
     const objs = this.objects(); if (!objs) return;
     const root = this.rootPlace(); if (!root) return;
     this.synced = seq;
+    // the places first (an object's place is the innermost one holding it)
+    if (GOD_PLACES) try { this.h.places?.sync(); } catch (err) { this.h.log(`god places: ${(err as Error).message}`); }
     const want = this.wanted();
     if (!this.sigs.size) for (const o of objs.all()) if (this.kinds.has(o.kind) || (o.state as BuiltState)?.key === o.id) { this.sigs.set(o.id, JSON.stringify(o.state)); if (!this.kinds.has(o.kind)) this.kindFor(o.kind.replace(/^built-/, '')); }
     let made = 0, changed = 0;
@@ -152,24 +166,35 @@ export class GodPerceive {
       } catch (err) { this.h.log(`built object ${id}: ${(err as Error).message}`); }
     }
     if (changed) objs.fresh();
-    if (GOD_PLACES) try { this.syncPlaces(root); } catch (err) { this.h.log(`god places: ${(err as Error).message}`); }   // apply the advances now (reads that skip the framework's advance see them too)
     if (made + changed > 8) this.h.log(`built objects: ${made} made, ${changed} changed (${this.sigs.size} in all)`);
   }
 
-  private placeIds = new Set<string>();
-  private syncPlaces(root: string) {
-    const places = (this.h.edge as any)?.places as { byId: Map<string, any>; add(p: unknown): void } | undefined; if (!places || !this.h.things) return;
-    const want = new Map<string, any>();
-    const idOf = (ref: string) => `g-${ref.toLowerCase().replace(/\//g, '.').replace(/[^a-z0-9._-]+/g, '-').replace(/^[^a-z0-9]+/, '')}`.slice(0, 100);
-    for (const t of this.h.things()) {
-      const poly = t.kind === 'room' ? t.poly : t.kind === 'area' ? t.area : undefined;
-      if (!poly || poly.length < 3) continue;
-      const id = idOf(t.ref);
-      const parent = root;
-      want.set(id, { id, name: t.kind === 'room' ? t.ref : t.name, kind: t.kind === 'room' ? 'room' : t.kind === 'water' ? 'water' : 'outdoor', parent, polygon: poly.map(([x, z]) => [Math.round(x * 100) / 100, Math.round(z * 100) / 100]), level: t.level, enclosed: false, capacity: null, starting: false, description: `built by the god of this world` });
-    }
-    for (const id of this.placeIds) if (!want.has(id)) { places.byId.delete(id); this.placeIds.delete(id); }
-    for (const [id, p] of want) { const cur = places.byId.get(id); if (cur && !this.placeIds.has(id)) continue; /* a boot place keeps its own */ if (!cur || JSON.stringify(cur) !== JSON.stringify(p)) { places.add(p); this.placeIds.add(id); } }
+  /** R4-INFO: `observe` → here.objects lists what a Soul sees of god-built things as Eden lists things: those within
+   *  sight (30 m) in the same enclosure (a room's walls hide the plaza; the plaza does not see into the cottage), nearest
+   *  first, each with the place it stands in (`placeId`), `here` when that is a place the Soul is in, and its distance.
+   *  (The framework would list every one, everywhere, `here`, in the world's root place.) Other kinds pass unchanged. */
+  private wrapVisible(o: { visibleTo(soul: EdgeSoul): any[] } & { __godVisible?: boolean }) {
+    if (o.__godVisible || !this.h.edge) return; o.__godVisible = true;
+    const orig = o.visibleTo.bind(o), L = this.h.edge;
+    o.visibleTo = (soul: EdgeSoul) => {
+      const list = orig(soul), me = this.h.engine.world.entities[soul.entityId];
+      if (!me) return list;
+      this.sync();
+      const pos: Vec2 = [me.pose.p[0], me.pose.p[2]], path = L.placePathOf(soul.soulId), root = path.find((p) => p.kind !== 'occupier' && L.places.byId.get(p.id)?.parent === null)?.id;
+      const inside = new Set(path.map((p) => p.id)), myEnc = L.enclosureOf(soul.soulId);
+      const built: any[] = [], rest: any[] = [];
+      for (const v of list) {
+        if (!this.kinds.has(v.kind)) { rest.push(v); continue; }
+        const at = v.public?.at as Vec2 | null | undefined; if (!Array.isArray(at)) continue;
+        const d = Math.hypot(at[0] - pos[0], at[1] - pos[1]); if (d > SIGHT) continue;
+        const pl = this.placed.get(v.id), lvl = pl?.level ?? 0;
+        if (L.enclosureAtPoint(at[0], at[1], lvl) !== myEnc) continue;
+        const placeId = pl?.place ?? v.placeId;
+        built.push({ ...v, placeId, here: placeId !== root && inside.has(placeId), dist: Math.round(d * 10) / 10 });
+      }
+      built.sort((a, b) => a.dist - b.dist || (a.id < b.id ? -1 : 1));
+      return [...rest, ...built.slice(0, LISTED)];
+    };
   }
 
   /** `read:<sign>` for signs near this Soul: walk up to it and face it; the label carries its words. */

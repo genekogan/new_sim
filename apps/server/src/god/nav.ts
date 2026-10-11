@@ -31,6 +31,8 @@ export type NavHost = {
   levelAt(x: number, z: number, y: number): number;
   /** Things the engine owns (bodies and what they carry). */
   engineOwned(e: Entity): boolean;
+  /** R4-INFO: the place (places.ts) a thing is, if it is one: its walk then targets that place (exits, map, `via`). */
+  placeOf?(ref: string): string | undefined;
 };
 
 export type ThingKind = 'building' | 'room' | 'seat' | 'water' | 'area' | 'path' | 'thing';
@@ -274,8 +276,8 @@ export class GodNav {
     for (const { t, d } of ranked) if (t.kind === 'building' && d <= ROOMS_WITHIN) for (const r of t.rooms ?? []) { const rt = this.thing(r); if (rt) pick.push({ t: rt, d: this.distance(rt, here) }); }
     for (const { t, d } of pick) {
       const id = `walk:${t.ref}`; if (caps.some((c) => c.id === id)) continue;
-      const goal = this.goal(t, here, soul.entityId), where = this.label(t, Math.round(d));
-      const cap: EdgeCapability = { id, verb: 'walk', label: where, target: { id: t.id, kind: 'object' }, available: !!goal,
+      const goal = this.goal(t, here, soul.entityId), where = this.label(t, Math.round(d)), place = this.h.placeOf?.(t.ref);
+      const cap: EdgeCapability = { id, verb: 'walk', label: where, target: place ? { id: place, kind: 'place' } : { id: t.id, kind: 'object' }, available: !!goal,
         ...(goal ? {} : { blocked: this.blocked.has(t.ref) ? { code: 'route.unreachable', reason: this.blocked.get(t.ref)! } : { code: 'place.no-standing-room', reason: `There is no clear standing room at ${t.ref} right now.` } }) };
       caps.push(cap);
       if (!goal) continue;
