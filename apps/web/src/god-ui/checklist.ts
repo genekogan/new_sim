@@ -31,7 +31,7 @@ export function steps(ev: Evidence): Step[] {
   return [
     { id: 'signin', label: 'Sign in', done: ev.signedIn, hint: 'So this world knows you when you come back.' },
     { id: 'claim', label: 'Claim the world', done: owner, hint: 'Whoever claims an unowned world first becomes its god.' },
-    { id: 'pair', label: 'Connect your agent', done: agents, hint: 'Paste the line above to your agent, then press Approve when its code appears here.' },
+    { id: 'pair', label: 'Connect your agent', done: agents, hint: 'Open the bolt right of Explore, paste its line to your agent, then press Approve when its code appears there.' },
     { id: 'flag', label: 'Drop a flag', done: flagged, hint: 'A named spot your agent can build around: ⚑ Drop a flag, then click the ground.' },
     { id: 'build', label: 'First build', done: built, hint: 'Ask your agent for something: “a cottage by the pond”.' },
     { id: 'look', label: 'First look', done: ev.looks > 0, hint: 'Ask your agent to take a look at what it built.' },

@@ -290,7 +290,8 @@ try {
         await page.locator('[data-tab="start"]').click();
         await page.locator('.gp-files a', { hasText: 'SKILL.md' }).waitFor();
         const href = await page.locator('.gp-files a', { hasText: 'SKILL.md' }).getAttribute('href');
-        const text = await page.locator('[data-god-panel]').innerText();
+        await page.locator('[data-god-bolt]').click();   // GODUI: the paste line moved to the bolt panel
+        const text = await page.locator('[data-god-bolt-panel]').innerText();
         await shot(page, '06-god-start-one-skill'); await page.context().close();
         return { href, paste: text.includes(`Read ${base}/SKILL.md and follow its God mode section`) };
       }, (r) => r.href === `${BASE}/w/${slug}/SKILL.md` && r.paste);

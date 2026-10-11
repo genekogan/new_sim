@@ -38,8 +38,7 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
   const [busy, setBusy] = useState<string | null>(null);
   const [note, setNote] = useState<{ text: string; bad?: boolean } | null>(null);
   const [ghost, setGhost] = useState<GhostSummary | null>(null);
-  const [approvedHere, setApprovedHere] = useState(() => localStorage.getItem(PAIRED_KEY) === '1');
-  const hashCode = location.hash.startsWith('#godpair/') ? decodeURIComponent(location.hash.slice('#godpair/'.length)) : null;
+  const approvedHere = localStorage.getItem(PAIRED_KEY) === '1';   // GODUI: the bolt panel (GodBolt) approves now
   const owner = status?.you === 'owner' || status?.you === 'god';
   const seq = status?.seq;
   // who is signed in on this page (Clerk in production, a local name in dev): auth-session.ts
@@ -102,7 +101,6 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
     : !naming && <button className="gp-btn gp-primary" data-signin="1" onClick={signIn}>Sign in</button>;
   const who = (session.label ?? 'you').replace(/^dev:/, '');
   const claim = () => run('claim', G.claim, () => 'This world is yours.');
-  const approve = (code: string) => run(code, async () => { await G.approve(code); localStorage.setItem(PAIRED_KEY, '1'); setApprovedHere(true); if (hashCode === code) history.replaceState(null, '', location.pathname + location.search); }, () => `Approved. Your agent is now this world's god.`);
   const undoRedo = (which: 'undo' | 'redo') => run(which, () => (which === 'undo' ? G.undo() : G.redo()), (r) => { const x = r as G.UndoResult; return x.accepted ? `${which === 'undo' ? 'Undid' : 'Redid'} edit ${x.reverted}.` : (x.failures?.[0]?.detail ?? `nothing to ${which}`); });
   const undoGroup = (group: string) => run('g:' + group, () => G.undoGroup(group), (r) => { const x = r as G.UndoResult; return x.accepted ? `Undid group “${group}” (${Array.isArray(x.reverted) ? x.reverted.length : 1} edits).` : (x.failures?.[0]?.detail ?? 'nothing undone'); });
 
@@ -164,18 +162,6 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
         )}
         {owner && (
           <>
-            {hashCode && !status.pending.some((p) => p.code === hashCode) && <p className="gp-bad">Pairing request <code>{hashCode}</code> is not pending (expired, or already approved).</p>}
-            {status.pending.length > 0 && (
-              <div className="gp-pairs" data-pairing="1">
-                <b>Your agent asks to be this world's god</b><span className="gp-dim">Check the code matches what your agent shows, then approve.</span>
-                {status.pending.map((p) => (
-                  <div key={p.code} className="gp-row">
-                    <span><code className="gp-code-big">{p.code}</code> {p.agent} <span className="gp-dim">({Math.max(1, Math.round(p.expiresIn / 60))} min)</span></span>
-                    <button data-approve={p.code} className="gp-btn gp-primary" disabled={busy === p.code} onClick={() => approve(p.code)}>Approve</button>
-                  </div>
-                ))}
-              </div>
-            )}
             {paired && <div className="gp-tools">
               <button className="gp-btn" data-undo="1" disabled={!canUndo || busy === 'undo'} onClick={() => undoRedo('undo')} title="Undo the newest edit">↶ Undo</button>
               <button className="gp-btn" data-redo="1" disabled={busy === 'redo'} onClick={() => undoRedo('redo')} title="Redo the newest undone edit">↷ Redo</button>
@@ -191,12 +177,6 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
 
             {tab === 'start' && (
               <div className="gp-pane">
-                <div className="gp-next" data-next-step={paired ? 'build' : 'pair'}>
-                  {paired
-                    ? <><b>Your agent is this world's god.</b><p>Ask it for things: “a cottage by the pond”, “hills to the east”, “undo that”. Invite friends from your account menu (Copy invite link).</p><p className="gp-dim">Another agent or folder? Give it the same line:</p></>
-                    : <><b>Next: give your agent this line</b><p className="gp-dim">Paste it to Claude Code, Codex or any agent you use. It sets itself up and shows a code here: press Approve.</p></>}
-                  <Markdown source={'```paste-to-your-agent\n' + G.godPrompt(status.base) + '\n```'} />
-                </div>
                 <ol className="gp-steps" data-checklist="1">
                   {checklist.map((s) => <li key={s.id} data-step={s.id} data-done={s.done ? '1' : '0'} className={s.done ? 'done' : ''}><span className="gp-tick" aria-hidden="true">{s.done ? '✓' : ''}</span><span><b>{s.label}</b>{!s.done && <span className="gp-hint">{s.hint}</span>}</span></li>)}
                 </ol>

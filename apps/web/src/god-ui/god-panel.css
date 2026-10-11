@@ -103,3 +103,13 @@
   .gp-pane .gp-next { background: #1f3326; }
   .gp-more > summary { color: #9b9b92; }
 }
+/* GODUI: the owner's bolt right of the Explore bar (styled as the header's round glass buttons) and its panel */
+.god-bolt { position: relative; display: inline-flex; }
+.god-bolt-open { position: relative; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; border-radius: 50%; border: 1px solid var(--glass-line, var(--line)); background: var(--glass, var(--panel)); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); color: var(--fg); cursor: pointer; }
+.god-bolt-open[aria-expanded="true"] { background: var(--fg); color: var(--bg); }
+.god-bolt-open svg { width: 18px; height: 18px; }
+.god-bolt-open .gp-badge { position: absolute; top: -4px; right: -6px; margin: 0; }
+.gp-card.god-bolt-panel { position: absolute; top: calc(100% + 8px); left: 50%; right: auto; transform: translateX(-50%); width: 340px; max-width: calc(100vw - 24px); max-height: calc(100vh - 120px); z-index: 16; text-align: left; }
+.god-bolt-weather { display: flex; gap: 6px; margin-top: 10px; }
+.god-bolt-weather .gp-btn { flex: 1; justify-content: center; }
+@media (max-width: 700px) { .god-bolt-open { width: 32px; height: 32px; } .gp-card.god-bolt-panel { position: fixed; top: 96px; left: 12px; right: 12px; transform: none; width: auto; } }

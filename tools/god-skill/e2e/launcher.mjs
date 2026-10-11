@@ -121,11 +121,12 @@ try {
   await step('claim → god mode: welcome rendered with copy buttons, checklist ticks sign-in and claim', async () => {
     await page.locator('[data-claim]').click();
     await page.locator('[data-checklist]').waitFor();
-    await page.locator('.gp-md .gp-code').first().waitFor();
+    await page.locator('[data-god-bolt]').click();   // GODUI: the pairing line lives in the bolt panel right of Explore
+    await page.locator('[data-god-bolt-panel] .gp-md .gp-code').first().waitFor();
     const ticks = await page.locator('[data-step]').evaluateAll((els) => Object.fromEntries(els.map((e) => [e.getAttribute('data-step'), e.getAttribute('data-done') === '1'])));
     const copies = await page.locator('.gp-copy').count();
     // the copy button puts the commands (without the comments) on the clipboard
-    await page.locator('.gp-copy').first().click();
+    await page.locator('[data-god-bolt-panel] .gp-copy').first().click();
     const clip = await page.evaluate(() => navigator.clipboard.readText().catch(() => null));
     await shot('04-claimed');
     return { ticks, copies, clip };
