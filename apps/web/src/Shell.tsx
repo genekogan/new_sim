@@ -143,7 +143,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
         <LocalIntegrationNotice source={cfg.localIntegrationMetadataPath}/>{AUTH_UI&&<LocalConnectionHelp devAuth={cfg.devAuth}/>}
         <div className="hud-actions">
           {advanced&&<a className="world-back" href="#watch" onClick={e => { e.preventDefault(); setAdvanced(false); setPairCode(null); setTab('watch'); history.replaceState(null, '', '#watch'); }}>← Back to the world</a>}
-          <WorldAccountControls signinEnabled={signinEnabled} accountAuthRequired={cfg.accountAuthRequired} auth={auth} newSoul={!advanced&&<BringAgent key={cfg.worldId??location.pathname} auth={auth} requireAuth={cfg.accountAuthRequired===true}/>}/>
+          <WorldAccountControls signinEnabled={signinEnabled} accountAuthRequired={cfg.accountAuthRequired} auth={auth} newSoul={<BringAgent showButton={!advanced} key={cfg.worldId??location.pathname} auth={auth} requireAuth={cfg.accountAuthRequired===true}/>}/>
 
         </div>
       </header>

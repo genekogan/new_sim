@@ -4,7 +4,7 @@ import {pendingNewSoul,requestNewSoul,resumeNewSoul,dismissNewSoul} from './new-
 import {agentOnboarding} from './auth-ui.ts';
 import './BringAgent.css';
 /** VF3: the "New Soul" button (top right of the Eden viewer) and its "Bring a new Soul to Eden" dialog. Opens on #join, so the link itself can be shared. */
-export function BringAgent({auth,requireAuth=false}:{auth:{ready:boolean;authed:boolean;login():void;signInUrl?:string};requireAuth?:boolean}){
+export function BringAgent({auth,requireAuth=false,showButton=true}:{auth:{ready:boolean;authed:boolean;login():void;signInUrl?:string};requireAuth?:boolean;showButton?:boolean}){
  const worldUrl=location.origin+location.pathname.replace(/\/+$/,''),{world,instructionsUrl,text}=agentOnboarding(worldUrl);
  const port={location,history:{replaceState:(data:unknown,title:string,url?:string|URL|null)=>history.replaceState(data,title,url)},storage:()=>sessionStorage};
  const [pending,setPending]=useState(()=>pendingNewSoul(worldUrl,location.hash,port.storage)),[open,setOpen]=useState(()=>location.hash==='#join'&&(!requireAuth||auth.authed)),[note,setNote]=useState(''),prompt=useRef<HTMLParagraphElement>(null),modal=useRef<HTMLElement>(null);
@@ -15,10 +15,11 @@ export function BringAgent({auth,requireAuth=false}:{auth:{ready:boolean;authed:
  const copy=()=>{const fallback=()=>{if(prompt.current){const range=document.createRange();range.selectNodeContents(prompt.current);const selection=getSelection();selection?.removeAllRanges();selection?.addRange(range);}setNote('Select and copy the prompt.');};
   if(navigator.clipboard?.writeText)void navigator.clipboard.writeText(text).then(()=>setNote('Copied.'),fallback);else fallback();};
  const canonicalJoin=auth.signInUrl?new URL(auth.signInUrl):null;if(canonicalJoin)canonicalJoin.hash='join';
- if(canonicalJoin)return <a className="bring-agent-open" href={canonicalJoin.href} title={`Bring a new Soul to ${world}`}><span>New Soul</span></a>;
+ if(canonicalJoin)return showButton?<a className="bring-agent-open" href={canonicalJoin.href} title={`Bring a new Soul to ${world}`}><span>New Soul</span></a>:null;
  const button=<button type="button" className="bring-agent-open" aria-haspopup="dialog" aria-expanded={open} title={`Bring a new Soul to ${world}`} onClick={()=>{if(requestNewSoul(auth,requireAuth,worldUrl,port))setOpen(true);else setPending(true);}}><svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="7.5" cy="6" r="3" fill="none" stroke="currentColor" strokeWidth="1.5"/><path d="M2.5 16v-1.5a5 5 0 0 1 10 0V16M15.5 7v6M12.5 10h6" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg><span>New Soul</span></button>;
- if(!open||requireAuth&&!auth.authed)return button;
- return <>{button}{createPortal(<div className="bring-agent-scrim" role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget)close();}}>
+ const entry=showButton?button:null;
+ if(!open||requireAuth&&!auth.authed)return entry;
+ return <>{entry}{createPortal(<div className="bring-agent-scrim" role="presentation" onPointerDown={e=>{if(e.target===e.currentTarget)close();}}>
   <section ref={modal} className="bring-agent" role="dialog" aria-modal="true" aria-labelledby="bring-agent-title">
    <button type="button" className="bring-agent-close" aria-label="Close" onClick={close}>×</button>
    <h2 id="bring-agent-title">Give this prompt to your agent:</h2>
@@ -27,3 +28,6 @@ export function BringAgent({auth,requireAuth=false}:{auth:{ready:boolean;authed:
   </section>
  </div>,document.body)}</>;
 }
+
+/** Secondary entry has no onboarding state or portal; the header owns #join. */
+export function NewSoulLink({auth}:{auth:{signInUrl?:string}}){const target=auth.signInUrl?new URL(auth.signInUrl):null;if(target)target.hash='join';return <a className="bring-agent-open" href={target?.href??'#join'}>New Soul</a>;}
