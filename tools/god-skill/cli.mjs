@@ -93,6 +93,9 @@ async function defDetail(d, others) {
   const ps = Object.entries(d.params ?? {});
   if (ps.length) { L.push(`  params (--param k=v):`); for (const [k, f] of ps) L.push(`  - ${fieldText(k, f).slice(0, 240)}`); }
   if (d.state && Object.keys(d.state).length) L.push(`  state (--state '{…}'): ${Object.entries(d.state).map(([k, f]) => fieldText(k, f)).join('; ').slice(0, 300)}`);
+  // VOCAB-MECH: where it sits in the catalogue, the words for it, and what Souls can do with it
+  if (d.category || d.synonyms?.length) L.push(`  catalogue: ${d.category ?? '(inferred)'}${d.synonyms?.length ? ` · aka ${d.synonyms.join(', ')}` : ''}`);
+  if (d.actions?.length) L.push(`  Souls can: ${d.actions.map((a) => `${a.name}${a.when?.length ? ` (when ${a.when.map((w) => `${w.field}${w.is !== undefined ? '=' + JSON.stringify(w.is) : '≠' + JSON.stringify(w.not)}`).join(', ')})` : ''}`).join('; ')} — offered to Souls near it as object:<id>:<action>`);
   try {
     const b = await bakeInfo(ref.includes('@') ? ref : `${ref}@1`, {});
     if (b.rooms?.length) L.push(`  rooms at the defaults: ${b.rooms.map((r) => `${r.id} (floor ${r.floor})`).join(', ')}`);

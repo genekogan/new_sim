@@ -1628,6 +1628,8 @@ async function defDetail(d, others) {
     for (const [k, f] of ps) L.push(`  - ${fieldText(k, f).slice(0, 240)}`);
   }
   if (d.state && Object.keys(d.state).length) L.push(`  state (--state '{\u2026}'): ${Object.entries(d.state).map(([k, f]) => fieldText(k, f)).join("; ").slice(0, 300)}`);
+  if (d.category || d.synonyms?.length) L.push(`  catalogue: ${d.category ?? "(inferred)"}${d.synonyms?.length ? ` \xB7 aka ${d.synonyms.join(", ")}` : ""}`);
+  if (d.actions?.length) L.push(`  Souls can: ${d.actions.map((a) => `${a.name}${a.when?.length ? ` (when ${a.when.map((w) => `${w.field}${w.is !== void 0 ? "=" + JSON.stringify(w.is) : "\u2260" + JSON.stringify(w.not)}`).join(", ")})` : ""}`).join("; ")} \u2014 offered to Souls near it as object:<id>:<action>`);
   try {
     const b = await bakeInfo(ref.includes("@") ? ref : `${ref}@1`, {});
     if (b.rooms?.length) L.push(`  rooms at the defaults: ${b.rooms.map((r) => `${r.id} (floor ${r.floor})`).join(", ")}`);
