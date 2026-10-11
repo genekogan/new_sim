@@ -16,7 +16,7 @@
 // - Catalog: `GET /v1/god/defs?q=` ranks name > tags > description with synonyms and plurals;
 //   `GET /v1/god/defs/<ref>` returns the full def plus an example op; thumbnails per def hash.
 import { createHash } from 'node:crypto';
-import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { Context, Hono } from 'hono';
@@ -266,6 +266,10 @@ export class AssetStore {
     this.dir = resolve(opts.dir); this.db = opts.db; this.worldId = opts.worldId;
     const idx = opts.coreIndex === undefined ? CORE_ASSET_INDEX : opts.coreIndex;
     if (idx && existsSync(idx)) { try { this.core = (JSON.parse(readFileSync(idx, 'utf8')) as CoreIndex).assets ?? {}; } catch { this.core = {}; } }
+    // lane LM: template asset sets beside the core index (`<name>.index.json`, same schema) resolve on any box too
+    if (opts.coreIndex === undefined && existsSync(dirname(CORE_ASSET_INDEX))) for (const f of readdirSync(dirname(CORE_ASSET_INDEX)).filter((n) => n.endsWith('.index.json')).sort()) {
+      try { this.core = { ...(JSON.parse(readFileSync(join(dirname(CORE_ASSET_INDEX), f), 'utf8')) as CoreIndex).assets, ...this.core }; } catch { /* a broken extra index is skipped */ }
+    }
     if (this.db) this.db.db.exec(`CREATE TABLE IF NOT EXISTS world_assets_v1 (world_id TEXT NOT NULL, sha TEXT NOT NULL, kind TEXT NOT NULL, ext TEXT NOT NULL, bytes INTEGER NOT NULL, tris INTEGER NOT NULL, textures INTEGER NOT NULL, box TEXT NOT NULL, name TEXT, license TEXT, source TEXT, by TEXT, at INTEGER NOT NULL, PRIMARY KEY (world_id, sha)) WITHOUT ROWID`);
   }
 
