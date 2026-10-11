@@ -461,3 +461,32 @@ Items with too little data are left alone, so the score never punishes something
    other lanes), or on an on-demand cloud GPU box (~$0.5–1/h)?
 10. **LAYERS defaults** (owner, hours, prices) stay optional and hidden, per brief item 4. Should they be dropped from the
     item schema entirely until economy is designed, or kept as an inert field?
+
+## Gene's answers (2026-10-11 ~20:10 UTC): binding
+
+1. **Who publishes:** core-only for now. Later, probably a CI where world owners and gods create their own objects;
+   whether custom items get promoted to core is undecided (they may be very world-specific). Build the structured registry
+   with that in mind.
+2. **Licences:** permissive with our own assets.
+   - Gene must stay free to use restricted third-party assets when he chooses.
+   - Every item records its licence and source.
+   - The registry enforces only redistribution limits, for example a restricted asset is never offered to other owners'
+     worlds or exported.
+   - Nothing blocks Gene's own use.
+3. **Size and retrieval:** pre-anticipate many kinds of objects, but don't let low-use items clog memory, context or disk.
+   - **Hot/cold tiers:** a hot set loaded and in agent context; cold storage promoted on demand.
+   - **Retrieval:** go straight to embedding retrieval so agents never need the whole catalogue in context.
+4. **Generated meshes:**
+   - No text-to-3D in the central pipeline.
+   - Do plan agent-uploaded GLBs, onboarded through the gates, so agents can use their own txt2glb tools.
+   - Worlds without "the Eden look" are fine, but enforce hard budgets (triangles, bytes, draws) with automatic
+     decimation or rejection, so no upload makes a world unplayable for most Souls.
+5. **Real-mind vignettes:** no budget; playability uses scripted Souls (the question was about paying for model-driven
+   Souls to watch).
+6. **Delivery:** go straight to a scalable CDN in Eden's infra. Account and DNS steps belong to Gene / the internet session.
+7. **Text outside the hash:** yes. Hierarchy and inheritance are welcome wherever they let things branch efficiently.
+8. **Core vs world catalogues:** punt. For now core is available to everyone. First solve the very-large-catalogue context
+   problem; it pays off under any later multi-level design. **Roadmap:** decide core vs per-world vs hierarchy later.
+9. **G4 renders:** a few dollars of GPU is fine. G4 is a continuous gate, not a one-time event: every new or changed item
+   is rendered and checked.
+10. **LAYERS fields:** keep them as inert fields, clearly marked inert, so coding agents don't treat them as live.
