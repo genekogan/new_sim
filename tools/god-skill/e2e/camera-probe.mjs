@@ -24,11 +24,13 @@ const measure = (page, tag) => page.evaluate((tag) => {
   const c = w.camera, t = w.controls.target, p = t.clone().project(c);
   return { tag, active: w.layer.active, view: c.view && c.view.enabled ? [Math.round(c.view.offsetX), Math.round(c.view.offsetY)] : 'off',
     fov: +c.fov.toFixed(1), targetNDC: [+p.x.toFixed(2), +p.y.toFixed(2)], dist: +c.position.distanceTo(t).toFixed(1),
-    up: c.up.toArray().map((v) => +v.toFixed(2)) };
+    up: c.up.toArray().map((v) => +v.toFixed(2)), aspect: +c.aspect.toFixed(3),
+    canvasCss: (() => { const r = w.renderer.domElement.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height), +(r.width / r.height).toFixed(3)]; })(),
+    buffer: [w.renderer.domElement.width, w.renderer.domElement.height], pixelRatio: w.renderer.getPixelRatio(), dpr: devicePixelRatio };
 }, tag);
 try {
   for (const [W, H] of sizes) {
-    const ctx = await browser.newContext({ viewport: { width: W, height: H } });
+    const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: Number(opt('dpr', '1')) });
     await ctx.addInitScript((name) => { try { localStorage.setItem('sim.dev', name); } catch {} }, opt('name', 'gene'));
     const page = await ctx.newPage();
     const errors = []; page.on('pageerror', (e) => errors.push(String(e)));
