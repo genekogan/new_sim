@@ -7,7 +7,7 @@ export function worldSignOutReturnUrl(location:Pick<Location,'origin'|'pathname'
 export function AccountMenu({auth,newSoul}:{auth:AccountMenuAuth;newSoul?:ReactNode}){
  const menu=useRef<HTMLDetailsElement>(null);
  if(!auth.ready)return <span className="dim">Signing in…</span>;
- if(!auth.authed)return auth.signInUrl?<a className="account-sign-in" href={auth.signInUrl}>Sign in</a>:<button type="button" className="account-sign-in" onClick={auth.login}>Sign in</button>;
+ if(!auth.authed)return <>{auth.signInUrl?<a className="account-sign-in" href={auth.signInUrl}>Sign in</a>:<button type="button" className="account-sign-in" onClick={auth.login}>Sign in</button>}{newSoul}</>;
  return <details ref={menu} className="account-menu" onKeyDown={e=>{if(e.key==='Escape'&&menu.current){menu.current.open=false;menu.current.querySelector('summary')?.focus();}}} onBlur={e=>{if(e.relatedTarget instanceof Node&&!e.currentTarget.contains(e.relatedTarget)&&!document.querySelector('.bring-agent-scrim'))e.currentTarget.open=false;}}>
   <summary className="account-avatar" aria-label="Account menu" title={auth.label??'Your account'}>{auth.avatarUrl?<img src={auth.avatarUrl} alt="" referrerPolicy="no-referrer"/>:<span aria-hidden="true">{auth.label?.trim()[0]?.toUpperCase()??'●'}</span>}</summary>
   <div className="account-menu-items">{newSoul}<button type="button" onClick={()=>{if(menu.current)menu.current.open=false;void auth.logout(worldSignOutReturnUrl(location));}}>Sign out</button></div>
