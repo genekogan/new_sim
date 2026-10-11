@@ -227,7 +227,7 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
     .map(x => ({to: x.p.id, name: x.p.name, dir: compassPoint(compassOf(x.at[0] - P.pos![0], x.at[1] - P.pos![1])), walk: x.c.id, eta: '~' + durationWord(walkSeconds(x.d * 1.25))})) : [];
   const frame = {
     tick, ...(c ? {clock: `${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')}`, day: WEEKDAYS[new Date(c.datetime).getUTCDay()], light: lightOf(c.hour, c.minute)} : {}),
-    ...(weather ? {weather} : {}),
+    ...(weather ? {weather: (() => {const l = P.pos ? ledger.lightningNear?.(P.pos[0], P.pos[1]) : null; return l ? {...weather, lightning: l} : weather;})()} : {}),
     me: {soulId:soul.soulId,name:host.minds.get(soul.soulId)?.name??soul.name,profileRevision:host.profileFact(soul.soulId)?.revision??0,place: me.place, placePath: me.placePath, pos: me.pos, heading: me.heading, facing: compassPoint(me.heading), posture: me.posture, body:P.w.entities[soul.entityId]?.body??{family:'humanoid'}, ...(me.seat ? {seat: me.seat} : {}),
       activity: {kind: activityKind, ...(endsIn ? {endsIn} : {})},
       ...(gaze ? {gaze: {kind: gaze.kind, ...(gaze.target ? {at: nameOfEntity(gaze.target)} : gaze.at && P.pos ? {bearing: P.bearing(gaze.at)} : {})}} : {}),

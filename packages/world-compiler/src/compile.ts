@@ -248,7 +248,12 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         for (const [k, v] of Object.entries(op.state)) if (v !== undefined) next[k] = v !== null && typeof v === 'object' ? { ...(cur[k] as object | undefined), ...v } : v;
         const merged = worldStateSchema.parse(next);
         const prevPatch: Record<string, unknown> = {}, changed: Record<string, unknown> = {};
-        for (const k of Object.keys(op.state)) { prevPatch[k] = cur[k]; changed[k] = (merged as Record<string, unknown>)[k]; }
+        for (const k of Object.keys(op.state)) {
+          prevPatch[k] = cur[k]; changed[k] = (merged as Record<string, unknown>)[k];
+          // a field the patch sets that was absent before (an optional, nullable one: time.set, weather.strike) undoes to null
+          const pv = (op.state as Record<string, unknown>)[k], was = cur[k];
+          if (pv && typeof pv === 'object' && was && typeof was === 'object') { const back = { ...(was as object) } as Record<string, unknown>; let added = false; for (const f of Object.keys(pv)) if (!(f in back)) { back[f] = null; added = true; } if (added) prevPatch[k] = back; }
+        }
         scratch.state = merged; diff.world = { ...(diff.world ?? {}), ...changed };
         inverse.unshift({ op: 'world', state: prevPatch as never });
         return;
