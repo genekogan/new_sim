@@ -25,7 +25,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { ROOT, readV3, indexNodes, cut, v3ToLocal, mul, rotY, translate, xz, X0, minRect, nodePoints, rectOverlap, NORTH, core, ext, MeshoptEncoder } from './v3.mjs';
+import { ROOT, readV3, indexNodes, cut, v3ToLocal, mul, rotY, translate, xz, X0, minRect, nodePoints, rectOverlap, NORTH, EAST, O, core, ext, MeshoptEncoder } from './v3.mjs';
 import { ROOMS, WALLS, DOORS, STAIRS, RAISED, ENTRANCES, TERRACES, ROOM_AT, LOFTS, LOFT_Y, FIXTURES, STAIR_RUN, REPLACED } from './layout.mjs';
 
 const { measureGlb, footprintToBaked } = await import(join(ROOT, 'apps/server/src/god/assets.ts'));
@@ -281,10 +281,12 @@ for (const g of groups) {
       // (FURN: only parts that match; none matching → 0, never "0 − the piece's floor height": the Tool library low
       // table's top read −2.857 m and the auditorium cloth −1.127 m, so things put on them sank through the floor)
       const top = (re) => { const ys = g.filter((r) => re.test(r.kind ?? '')).map((r) => r.y1 - b.y0); return ys.length ? Math.max(0, ...ys) : 0; };
+      // (seats keep their released heights: Souls' routes around the tea stools and the booths were planned with them)
+      const seatTop = (re) => Math.max(...g.filter((r) => re.test(r.kind ?? '')).map((r) => r.y1), 0) - b.y0;
       let slots, components, tags = [], description, layer = 'solid';
       const numbered = c.nums.length ? ` Mars number #${c.nums.join(', #')} (handover stable ids).` : '';
       if (c.cat === 'seat') {
-        const sh = r3(Math.min(h, Math.max(0.3, top(/seat|cushion|plinth|base|pedestal|rim/i) || 0.45)));
+        const sh = r3(Math.min(h, Math.max(0.3, seatTop(/seat|cushion|plinth|base|pedestal|rim/i) || 0.45)));
         const n = /sofa|bench|bus/i.test(c.kinds) ? Math.max(1, Math.min(4, Math.round(w / 0.65))) : 1;
         slots = Array.from({ length: n }, (_, i) => ({ id: n === 1 ? 'seat' : `seat-${i + 1}`, kind: 'seat', p: [r3((i - (n - 1) / 2) * (w / n)), sh, r3(Math.min(0.1, d / 4))], yaw: 0, height: sh, accepts: { tags: ['body'] }, capacity: 1 }));
         components = { seat: { height: sh } }; tags = ['furniture', 'seat', ...(/sofa/i.test(c.kinds) ? ['sofa', 'couch'] : /stool/i.test(c.kinds) ? ['stool'] : /bus/i.test(c.kinds) ? ['bench', 'booth', 'diner'] : ['chair'])];
@@ -315,8 +317,6 @@ for (const g of groups) {
 console.log(`furniture/items: ${nFurn} placed, ${kinds.size} kinds`);
 
 // 1b. FURN: things sim.mars.college shows that V3 lost or never cut out.
-// - The Mimos burgundy rug: V3's correction stood it on its edge (a 2.8 m tall carpet through the study area, which the
-//   building filter then dropped as "below ground"). Laid flat again, as a decor def, under the study table and chairs.
 // - The old kitchen's rice cooker and two-tier water urn (the sim.mars.college kitchen, the raw 2026 campus CAD). Gene's
 //   kitchen correction rebuilt the counters and left them out; they go back on the corrected west perimeter counter.
 const RAW_GLB = '<mars-campus-repo>/viewer/public/browser/campus.glb';   // sha 675f4beb… (read-only)
@@ -331,17 +331,6 @@ async function extraPiece(dname, d, get) {
   defs.push(def(dname, { ...d, asset, box: piece.box }));
   console.log(`extra ${dname}: ${piece.tris} tris, box ${piece.box.map(r3).join(' × ')}`);
   return piece;
-}
-{
-  const rug = rows.find((r) => /burgundy floor rug/i.test(r.kind ?? ''));
-  const W = NODES[rug.i].getWorldMatrix();
-  // its width stays where it was (local y), its length runs north (local x), its face up (local z)
-  const flat = [NORTH[0], 0, NORTH[1], 0, W[4], W[5], W[6], 0, 0, 1, 0, 0, W[12], W[13], W[14], 1];
-  taken.add(rug.i);
-  await extraPiece('mimos-rug', { description: 'The burgundy patterned rug of Mimos\'s study corner (Mars 2026 photograph), 2.8 × 1.8 m, flat on the floor; things and people stand on it.', tags: ['furniture', 'rug', 'decor', 'floor', 'mimos'], layer: 'decor', overlaps: ['mars-campus'], scale: [0.5, 2] },
-    async () => cut(src, [rug.i], { name: 'mimos-rug', world: new Map([[rug.i, flat]]), tex: 512, maxTris: 400, compress: true }));
-  // under the study table #3 and its chairs (V3 left it 0.85 m west of them, standing); long side east–west
-  placements.push({ def: 'core/mars-mimos-rug@1', cat: 'prop', building: 'mimos', nums: [], ids: [rug.comp].filter(Boolean), p: [46.62, 0.535, -4.75], r: r4(Math.PI / 2), floorY: 0.53 });
 }
 {
   let raw = null;
@@ -392,11 +381,19 @@ function isRoof(b, r) {
   return r.y0 >= (ROOF_Y[b] ?? 2.5) - (roofish ? 0.15 : 0);
 }
 // FURN: per-node corrections to the reference. Mimos's Portuguese love posters (the poster wall Gene placed on the tea
-// room's north side) read mirrored from the room: their texture runs right-to-left, so the quad is flipped along its width.
+// room's north side) read mirrored from the room: V3 carries their texture upside down, so the quad is flipped top to bottom.
 const WORLD_FIX = { mimos: new Map() };
-for (const r of rows) if (/Portuguese love posters/.test(r.kind ?? '')) WORLD_FIX.mimos.set(r.i, mul(NODES[r.i].getWorldMatrix(), [-1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]));
+for (const r of rows) if (/Portuguese love posters/.test(r.kind ?? '')) WORLD_FIX.mimos.set(r.i, mul(NODES[r.i].getWorldMatrix(), [1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]));
+// The burgundy rug of the study corner: V3's correction stood it on its edge (a 2.8 m tall carpet, which the row filter
+// then dropped as "below ground"). Laid flat in Mimos's mesh, long side east–west, under the study table #3 and its
+// chairs (mars-two x 46.62, z −4.75 on the raised floor). Part of the floor, not a thing: as an entity it changed Souls'
+// routes through main (mars-lived D3).
+for (const r of rows) if (/burgundy floor rug/i.test(r.kind ?? '')) {
+  const N = 4.75, E = 46.62 - X0, at = [O[0] + N * NORTH[0] + E * EAST[0], O[1] + N * NORTH[1] + E * EAST[1]];
+  WORLD_FIX.mimos.set(r.i, [EAST[0], 0, EAST[1], 0, NORTH[0], 0, NORTH[1], 0, 0, 1, 0, 0, at[0], 0.385, at[1], 1]);
+}
 const byB = new Map();
-for (const r of rows) { if (taken.has(r.i)) continue; const b = buildingOf(r); if (b === 'people' || b === 'site') continue; if (r.y1 < 0.02 || r.y0 < -0.3) continue; if (!byB.has(b)) byB.set(b, []); byB.get(b).push(r); }
+for (const r of rows) { if (taken.has(r.i)) continue; const b = buildingOf(r); if (b === 'people' || b === 'site') continue; if ((r.y1 < 0.02 || r.y0 < -0.3) && !WORLD_FIX[b]?.has(r.i)) continue; if (!byB.has(b)) byB.set(b, []); byB.get(b).push(r); }
 for (const [b, rs] of byB) {
   if (only && !only.test(b)) continue;
   const B = BUILDINGS[b];

@@ -715,7 +715,7 @@
    },
    {
     "v": 2,
-    "hash": "ce89bcd9829233e7ee340e531178f98fda3ff879d48f3bff289d54b408b9cf6f"
+    "hash": "5cefe7b20f42c6373d7c58e6c8d8d27cf35323897cc5690e11ca67c016619114"
    }
   ],
   "core-mars-mimos": [
@@ -733,7 +733,7 @@
    },
    {
     "v": 2,
-    "hash": "507aea14aace87113cd0e83978e2f995e6038ad3ee2b8d55b12379f7812fc4a9"
+    "hash": "372ec1140a841336611e6ff01f972715837f39e4e64876fdfe06f13dd2b07ad4"
    }
   ],
   "core-mars-kitchen": [
@@ -751,7 +751,7 @@
    },
    {
     "v": 2,
-    "hash": "4031ca67e5d327b354c535d785e37d7db1c8952ed686b48d03c405fde5a30165"
+    "hash": "0ab788b3d5fb67a016d28822114009718046685360be0bd1230508eb3afe465f"
    }
   ],
   "core-mars-showers": [
@@ -775,7 +775,7 @@
    },
    {
     "v": 2,
-    "hash": "a18e6917c6c3f837a12a581d8ec146c9856243cbe17cbfcd21918073e2772b67"
+    "hash": "ad8875e871f64151e14f45041b91d09a2b4904a88c3309815870f9cf2aa3d192"
    }
   ],
   "core-mars-tool-camp": [
@@ -793,7 +793,7 @@
    },
    {
     "v": 2,
-    "hash": "fcebc9887d8e9057716e465a7c353e8f75bfa14559d5120a517f30461b243e05"
+    "hash": "f849fe21c198e527978d541c84dd31b8b8e710c9cd5caafb8539053fc943bb35"
    }
   ],
   "core-mars-freeside": [
@@ -1131,13 +1131,13 @@
   "core-mars-rice-cooker": [
    {
     "v": 1,
-    "hash": "cb76e8148c17652b7c25e49c985e5a0105aed7c2e9f5073400504c98cbc5f212"
+    "hash": "6696933f91554f74122466ee3bb2209ac4640a96650188f7fe0eb23e71bb451a"
    }
   ],
   "core-mars-water-urn": [
    {
     "v": 1,
-    "hash": "48e549d2e58442239f6918d9243ac0baf341c50512c8eae7541cc1ef33c49381"
+    "hash": "d189af5499447f382b522adfebf9f0949825d28449e1d110ae7882699ed46a8b"
    }
   ]
  }

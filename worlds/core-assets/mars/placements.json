@@ -969,7 +969,7 @@
    "floorY": 0.53
   },
   {
-   "def": "core/mars-bus-seat-3@2",
+   "def": "core/mars-bus-seat-3@1",
    "cat": "seat",
    "building": "kitchen",
    "nums": [
@@ -1022,7 +1022,7 @@
    "floorY": 0.53
   },
   {
-   "def": "core/mars-diner-table@2",
+   "def": "core/mars-diner-table@1",
    "cat": "table",
    "building": "kitchen",
    "nums": [
@@ -1041,7 +1041,7 @@
    "floorY": 0.53
   },
   {
-   "def": "core/mars-diner-table@2",
+   "def": "core/mars-diner-table@1",
    "cat": "table",
    "building": "kitchen",
    "nums": [
@@ -1060,7 +1060,7 @@
    "floorY": 0.53
   },
   {
-   "def": "core/mars-diner-table@2",
+   "def": "core/mars-diner-table@1",
    "cat": "table",
    "building": "kitchen",
    "nums": [
@@ -1472,7 +1472,7 @@
    "floorY": 1.29
   },
   {
-   "def": "core/mars-papasan@2",
+   "def": "core/mars-papasan@1",
    "cat": "seat",
    "building": "mimos",
    "nums": [
@@ -1501,7 +1501,7 @@
    "floorY": 0
   },
   {
-   "def": "core/mars-tea-stool@2",
+   "def": "core/mars-tea-stool@1",
    "cat": "seat",
    "building": "mimos",
    "nums": [
@@ -1522,7 +1522,7 @@
    "floorY": 0
   },
   {
-   "def": "core/mars-tea-stool-2@2",
+   "def": "core/mars-tea-stool-2@1",
    "cat": "seat",
    "building": "mimos",
    "nums": [
@@ -1543,7 +1543,7 @@
    "floorY": 0
   },
   {
-   "def": "core/mars-tea-stool-3@2",
+   "def": "core/mars-tea-stool-3@1",
    "cat": "seat",
    "building": "mimos",
    "nums": [
@@ -2003,22 +2003,6 @@
    "floorY": 0.09
   },
   {
-   "def": "core/mars-mimos-rug@1",
-   "cat": "prop",
-   "building": "mimos",
-   "nums": [],
-   "ids": [
-    "mimos-home-mimos-photographed-burgundy-floor-rug-b1ed8548"
-   ],
-   "p": [
-    46.62,
-    0.535,
-    -4.75
-   ],
-   "r": 1.5708,
-   "floorY": 0.53
-  },
-  {
    "def": "core/mars-rice-cooker@1",
    "cat": "item",
    "building": "kitchen",
@@ -2080,7 +2064,7 @@
    "r": 0
   },
   {
-   "def": "core/mars-showers@2",
+   "def": "core/mars-showers@1",
    "cat": "building",
    "building": "showers",
    "p": [
@@ -2124,7 +2108,7 @@
    "r": 0
   },
   {
-   "def": "core/mars-west-racks@2",
+   "def": "core/mars-west-racks@1",
    "cat": "building",
    "building": "west-racks",
    "p": [
@@ -2234,11 +2218,11 @@
    "r": 1.0933
   },
   {
-   "def": "core/mars-shelter-3@2",
+   "def": "core/mars-shelter-3@1",
    "cat": "site",
    "building": "site",
    "p": [
-    56.808,
+    56.807,
     0.167,
     -39.791
    ],

@@ -68,7 +68,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-showers@2",
+     "def": "core/mars-showers@1",
      "name": "showers",
      "p": [
       50.44,
@@ -112,7 +112,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-west-racks@2",
+     "def": "core/mars-west-racks@1",
      "name": "west-racks",
      "p": [
       -57.393,
@@ -277,7 +277,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-papasan@2",
+     "def": "core/mars-papasan@1",
      "name": "papasan-8",
      "in": {
       "parent": "mimos",
@@ -291,7 +291,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-tea-stool@2",
+     "def": "core/mars-tea-stool@1",
      "name": "tea-stool-9",
      "in": {
       "parent": "mimos",
@@ -305,7 +305,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-tea-stool-2@2",
+     "def": "core/mars-tea-stool-2@1",
      "name": "tea-stool-10",
      "in": {
       "parent": "mimos",
@@ -319,7 +319,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-tea-stool-3@2",
+     "def": "core/mars-tea-stool-3@1",
      "name": "tea-stool-11",
      "in": {
       "parent": "mimos",
@@ -372,20 +372,6 @@
       1.105
      ],
      "r": -1.5708
-    },
-    {
-     "op": "place",
-     "def": "core/mars-mimos-rug@1",
-     "name": "mimos-rug",
-     "in": {
-      "parent": "mimos",
-      "slot": "main"
-     },
-     "p": [
-      0.985,
-      -1.745
-     ],
-     "r": 1.5708
     }
    ]
   },
@@ -543,7 +529,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-bus-seat-3@2",
+     "def": "core/mars-bus-seat-3@1",
      "name": "bus-seat-23",
      "in": {
       "parent": "kitchen",
@@ -571,7 +557,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-diner-table@2",
+     "def": "core/mars-diner-table@1",
      "name": "diner-table-26",
      "in": {
       "parent": "kitchen",
@@ -585,7 +571,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-diner-table@2",
+     "def": "core/mars-diner-table@1",
      "name": "diner-table-27",
      "in": {
       "parent": "kitchen",
@@ -599,7 +585,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-diner-table@2",
+     "def": "core/mars-diner-table@1",
      "name": "diner-table-28",
      "in": {
       "parent": "kitchen",
@@ -1513,10 +1499,10 @@
     },
     {
      "op": "place",
-     "def": "core/mars-shelter-3@2",
+     "def": "core/mars-shelter-3@1",
      "name": "shelter-3",
      "p": [
-      56.808,
+      56.807,
       0.167,
       -39.791
      ],

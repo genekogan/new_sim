@@ -122,11 +122,12 @@ export async function cut(src, nodeIdx, { name, frame = v3ToLocal(0, 0), tex = 5
   // mesh by its own bounds (centred on x/z, base on y = 0), so re-centre on what is left and move the origin with it —
   // otherwise the whole building draws offset from its footprint and furniture (Freeside was 1.07 m west).
   const nb = fn.getBounds(scene), d = [(nb.min[0] + nb.max[0]) / 2, nb.min[1], (nb.min[2] + nb.max[2]) / 2];
-  if (Math.hypot(...d) > 1e-4) {
+  // (only a visible offset, over 2 cm: smaller ones leave released pieces byte-identical)
+  if (Math.hypot(d[0], d[2]) > 0.02 || Math.abs(d[1]) > 0.02) {
     for (const g of scene.listChildren()) g.setTranslation([-d[0], -d[1], -d[2]]);
     shift[0] += d[0]; shift[1] += d[1]; shift[2] += d[2];
+    b.min = [nb.min[0] - d[0], nb.min[1] - d[1], nb.min[2] - d[2]]; b.max = [nb.max[0] - d[0], nb.max[1] - d[1], nb.max[2] - d[2]];
   }
-  b.min = [nb.min[0] - d[0], nb.min[1] - d[1], nb.min[2] - d[2]]; b.max = [nb.max[0] - d[0], nb.max[1] - d[1], nb.max[2] - d[2]];
   await doc.transform(fn.textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [tex, tex], quality: 80 }));
   if (compress) { await MeshoptEncoder.ready; await doc.transform(fn.reorder({ encoder: MeshoptEncoder }), fn.quantize(), fn.meshopt({ encoder: MeshoptEncoder, level: 'medium' })); }
   const bufs = doc.getRoot().listBuffers();
