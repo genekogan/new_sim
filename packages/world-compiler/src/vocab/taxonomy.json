@@ -75,15 +75,7 @@
    ],
    "want": [
     "lawn",
-    "gravel-patch",
-    "sand-patch",
-    "mud-patch",
-    "snow-patch",
-    "dirt-patch",
-    "paving",
-    "cobbles",
-    "boardwalk",
-    "puddle"
+    "boardwalk"
    ]
   },
   {
@@ -467,15 +459,7 @@
     "plant"
    ],
    "want": [
-    "warehouse",
-    "workshop",
-    "factory",
-    "windmill",
-    "watermill",
-    "smithy",
-    "depot",
-    "silo",
-    "chimney"
+    "watermill"
    ]
   },
   {
@@ -496,7 +480,6 @@
     "stable",
     "chicken-coop",
     "greenhouse",
-    "silo",
     "granary",
     "farmhouse",
     "pigsty",
@@ -718,12 +701,7 @@
     "tram",
     "track"
    ],
-   "want": [
-    "rail-track",
-    "station-platform",
-    "tram-stop",
-    "level-crossing"
-   ]
+   "want": []
   },
   {
    "id": "transport.bridge",
@@ -928,14 +906,7 @@
     "canopy",
     "thatch"
    ],
-   "want": [
-    "gable-roof",
-    "hip-roof",
-    "flat-roof",
-    "dome-roof",
-    "awning",
-    "chimney-stack"
-   ]
+   "want": []
   },
   {
    "id": "component.opening",
@@ -1214,13 +1185,7 @@
     "arcade",
     "foosball"
    ],
-   "want": [
-    "chess-table",
-    "pool-table",
-    "foosball",
-    "arcade-cabinet",
-    "dartboard"
-   ]
+   "want": []
   },
   {
    "id": "object",
@@ -1343,14 +1308,7 @@
     "poster",
     "photo"
    ],
-   "want": [
-    "book",
-    "book-stack",
-    "newspaper",
-    "scroll",
-    "map",
-    "letter"
-   ]
+   "want": []
   },
   {
    "id": "object.sign",
@@ -1427,13 +1385,7 @@
     "doll",
     "teddy"
    ],
-   "want": [
-    "ball",
-    "kite",
-    "teddy",
-    "toy-blocks",
-    "hoop"
-   ]
+   "want": []
   },
   {
    "id": "object.art",
@@ -1788,11 +1740,7 @@
     "leaves"
    ],
    "via": "small object defs scattered with a scatter component",
-   "want": [
-    "litter-scatter",
-    "leaf-litter",
-    "debris-pile"
-   ]
+   "want": []
   },
   {
    "id": "layer.construction",
@@ -1889,10 +1837,7 @@
     "spawn",
     "flag"
    ],
-   "want": [
-    "region-marker",
-    "spawn-point"
-   ]
+   "want": []
   }
  ]
 }

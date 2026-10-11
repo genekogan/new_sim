@@ -19,6 +19,7 @@ import littlemartians from './littlemartians.json' with { type: 'json' };
 // VOCAB-MECH: catalogue types inducted with the mechanism (authoring/vocab*.mjs → vocab.json; guide docs/god/VOCAB.md)
 import vocab from './vocab.json' with { type: 'json' };
 import vocab2 from './vocab-2.json' with { type: 'json' };
+import vocabW1 from './vocab-w1.json' with { type: 'json' };
 import type { DefInput } from '../schemas.ts';
 
-export const FAMILY_KITS: DefInput[] = [creatures, furniture, props, structures, plants, transport, civic, play, kitchen, work, signage, mesh, terrain, littlemartians, vocab, vocab2].flat() as unknown as DefInput[];
+export const FAMILY_KITS: DefInput[] = [creatures, furniture, props, structures, plants, transport, civic, play, kitchen, work, signage, mesh, terrain, littlemartians, vocab, vocab2, vocabW1].flat() as unknown as DefInput[];
