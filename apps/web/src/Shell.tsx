@@ -27,6 +27,7 @@ import {worldClockAt,worldTimeText} from './world-clock.ts';
 import type { WorldViewerHandle, WorldViewerState } from './WorldViewer.ts';
 import { worldKey } from './world-path.ts';
 import { BASE } from './base-path.ts';
+import { SoulsHeader } from './god-ui/JoinPanel.tsx';
 // A world made with "New world" (the world launcher): its god panel carries sign-in, claim and Join as a Soul, so the
 // legacy Soul/account setup is hidden there. The existing worlds (root build, these keys) are unchanged.
 const launcherWorld = BASE !== '' || !['eden', 'mars', 'littlemartians', 'toy'].includes(worldKey);
@@ -138,6 +139,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
         {!launcherWorld&&<LocalIntegrationNotice source={cfg.localIntegrationMetadataPath}/>}{AUTH_UI&&!launcherWorld&&<LocalConnectionHelp devAuth={cfg.devAuth}/>}
         <div className="hud-actions">
           {!advanced&&<MySouls ids={pinnedIds} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} select={id=>{inspect(id);if(viewerHandle?.selectSoul(id))viewerHandle.setCameraMode('follow');}}/>}
+          {AUTH_UI&&launcherWorld&&!advanced&&<SoulsHeader/>}
           {AUTH_UI&&!launcherWorld&&<button disabled={auth.authed&&!currentMe} onClick={() => { const id = currentMe?.souls[0]; if (id) { inspect(id); setTab('watch'); setAdvanced(false); } else openAccount(); }}>Your Soul</button>}
           {advanced&&<a className="world-back" href="#watch" onClick={e => { e.preventDefault(); setAdvanced(false); setPairCode(null); setTab('watch'); history.replaceState(null, '', '#watch'); }}>← Back to the world</a>}
           {!signinEnabled ? null : !auth.ready ? <span className="dim">Signing in…</span> : auth.authed
