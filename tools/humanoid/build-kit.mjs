@@ -8,7 +8,7 @@
 //   parts/<slot>-<id>.<frame>.glb  one merged skinned part per slot and frame (no skin node: joints index the
 //                                  rig's bone order), per-vertex _HINFO = [palette slot, finish role, roughness, flags]
 //   kit.json                    manifest: frames, parts (label, native frame, tris, bytes, sha256, licence, landmarks)
-import {readFileSync, writeFileSync, mkdirSync, existsSync, rmSync} from 'node:fs';
+import {readFileSync, writeFileSync, mkdirSync, existsSync, rmSync, readdirSync} from 'node:fs';
 import {createHash} from 'node:crypto';
 import {THREE, ENV_DIR, parseGlb} from './three.mjs';
 import {GlbWriter} from './glb.mjs';
@@ -51,6 +51,37 @@ export const LABELS = {
   shoes: {sneakers: 'Sneakers', boots: 'Boots', flats: 'Flats'},
 };
 const FRAMES = {masc: 'casual', fem: 'woman'}; // frame → shipped GLB that defines its skeleton + clips
+
+// ---------- more characters (the other 18 Quaternius blends, when they are on disk) ----------
+// build-kit.sh exports every .blend under SOURCE_DIR, SOURCE_DIR/men and SOURCE_DIR/women to PARTS_DIR and writes
+// PARTS_DIR/frames.json {Name: 'masc'|'fem'} (men → masc, women → fem). Every exported character that is not one
+// of the three hand-mapped ones above gets an automatic row: part ids from its name (adventurer → face-adventurer,
+// hair-adventurer, top-adventurer, …) and palette slots from its material names and sizes (skin, brows, eyes and
+// hair by name; the largest other material of a part is its main colour, the next its accent).
+const slug = name => name.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
+const nameOf = file => file.replace(/\.glb$/, '');
+const autoFrames = existsSync(PARTS_DIR + 'frames.json') ? JSON.parse(readFileSync(PARTS_DIR + 'frames.json', 'utf8')) : {};
+function autoCharacter(source, g) {
+  const id = slug(source), bySuffix = {};
+  g.scene.traverse(o => { if (!o.isSkinnedMesh) return; const holder = o.parent && !o.parent.isBone && o.parent.name !== 'CharacterArmature' ? o.parent.name : o.name, suffix = holder.slice(holder.lastIndexOf('_') + 1);
+    (bySuffix[suffix] ??= {})[o.material.name] = (bySuffix[suffix][o.material.name] ?? 0) + o.geometry.attributes.position.count; });
+  const partMaterials = {};
+  for (const [suffix, mats] of Object.entries(bySuffix)) {
+    const out = partMaterials[suffix] = {}, rest = [];
+    for (const [m] of Object.entries(mats).sort((a, b) => b[1] - a[1])) {
+      if (/skin/i.test(m)) out[m] = /dark/i.test(m) ? ['skinShade', 'skin', .62] : ['skin', 'skin', .62];
+      else if (/brow/i.test(m)) out[m] = ['brows', 'brow', .82];
+      else if (/^eye/i.test(m)) out[m] = ['eyes', 'eye', .22];
+      else if (suffix === 'Head' && /hair|beard|mustache|moustache/i.test(m)) out[m] = ['hair', 'hair', .58, 'hair'];
+      else rest.push(m);
+    }
+    const main = {Head: [['accent', 'trinket', .36]], Body: [['top1', 'cloth', .88], ['top2', 'cloth', .88]], Legs: [['bottom', 'cloth', .9], ['top2', 'cloth', .88]], Feet: [['shoes', 'leather', .6], ['soles', 'sole', .9]]}[suffix] ?? [];
+    rest.forEach((m, i) => { out[m] = main[i] ?? ['accent', 'trinket', .36]; });
+  }
+  return {source, frame: autoFrames[source] ?? 'masc', auto: true, parts: {Head: {face: id, hair: id}, Body: {top: id}, Legs: {bottom: id}, Feet: {shoes: id}}, materials: {}, partMaterials};
+}
+const known = new Set(CHARACTERS.map(c => c.source));
+const extra = existsSync(PARTS_DIR) ? readdirSync(PARTS_DIR).filter(f => f.endsWith('.glb') && !known.has(nameOf(f))).map(nameOf).sort() : [];
 
 const sha = b => createHash('sha256').update(b).digest('hex');
 const load = async file => parseGlb(readFileSync(file));
@@ -120,8 +151,14 @@ const quantWeights = (w4) => { // uint8 weights summing to exactly 255 (largest 
 };
 const repose = (from, to) => from.ib.map((ibFrom, j) => new THREE.Matrix4().copy(frames[to].ib[j]).invert().multiply(ibFrom));
 
+const skipped = [];
+for (const source of extra) CHARACTERS.push(autoCharacter(source, await load(PARTS_DIR + source + '.glb')));
 for (const ch of CHARACTERS) {
   const file = PARTS_DIR + ch.source + '.glb', g = existsSync(file) ? await load(file) : shipped[ch.shipped];
+  if (ch.auto) { // an automatic character whose skeleton is not one of the two frames' bind poses is skipped, named
+    let bad = null; g.scene.traverse(o => { if (bad || !o.isSkinnedMesh) return; o.skeleton.bones.forEach((b, i) => { const j = frames[ch.frame].names.indexOf(b.name); if (j < 0) bad = 'bone ' + b.name; else if (o.skeleton.boneInverses[i].elements.some((v, k) => Math.abs(v - frames[ch.frame].ib[j].elements[k]) > 1e-4)) bad ??= 'bind pose of ' + b.name; }); });
+    if (bad) { skipped.push(`${ch.source}: ${bad} differs from frame ${ch.frame}`); continue; }
+  }
   const via = existsSync(file) ? 'blend export' : 'shipped GLB';
   const groups = new Map(); // part node suffix → [skinned meshes]
   g.scene.traverse(o => {
@@ -152,7 +189,7 @@ for (const ch of CHARACTERS) {
       const I = geo.index; for (let t = 0; t < I.count; t++) idx.push(base + I.getX(t));
     }
     const count = pos.length / 3;
-    parts[slot] ??= {}; const entry = parts[slot][id] = {label: LABELS[slot][id], native: ch.frame, source: `${ch.source}.blend (${via})`, licence: LICENCE, tris: idx.length / 3, verts: count, files: {}, landmarks: {}};
+    parts[slot] ??= {}; const entry = parts[slot][id] = {label: LABELS[slot]?.[id] ?? `${ch.source.replace(/_/g, ' ')} ${slot}`, native: ch.frame, source: `${ch.source}.blend (${via})`, licence: LICENCE, tris: idx.length / 3, verts: count, files: {}, landmarks: {}};
     for (const frame of Object.keys(frames)) {
       let P = Float32Array.from(pos), Nn = Float32Array.from(nor);
       if (frame !== ch.frame) { // re-pose into the other frame's bind pose: v' = Σ w · inv(IB_to)·IB_from · v
@@ -200,7 +237,7 @@ for (const ch of CHARACTERS) {
 }
 // Legacy looks (presets casual/punk/woman): parts and the exact linear baseColorFactor of every material slot.
 const presets = {};
-for (const ch of CHARACTERS) {
+for (const ch of CHARACTERS.filter(c => c.shipped)) {
   const palette = {}, g = shipped[ch.shipped];
   g.scene.traverse(o => { if (!o.isSkinnedMesh) return; const holder = o.parent && !o.parent.isBone && o.parent.name !== 'CharacterArmature' ? o.parent.name : o.name, suffix = holder.slice(holder.lastIndexOf('_') + 1);
     const def = ch.partMaterials?.[suffix]?.[o.material.name] ?? ch.materials[o.material.name], c = o.material.color.toArray().map(v => +v.toFixed(6));
@@ -215,3 +252,16 @@ const total = Object.values(parts).flatMap(p => Object.values(p)).flatMap(p => O
 console.log('rigs', Object.entries(frames).map(([k, f]) => `${k} ${f.bytes} B (${f.clips} clips, ${f.channels} channels)`).join('; '));
 console.log('parts', Object.entries(parts).map(([s, p]) => `${s}: ${Object.entries(p).map(([id, e]) => `${id} ${e.tris} tris ${e.files.masc.bytes}/${e.files.fem.bytes} B`).join(', ')}`).join('\n      '));
 console.log('part bytes total', total);
+if (skipped.length) console.log('skipped characters:\n  ' + skipped.join('\n  '));
+// The def's part enums follow the kit (core/humanoid@2 in packages/world-compiler/src/core-kit.ts; hair adds 'bald').
+{
+  const defFile = ROOT + 'packages/world-compiler/src/core-kit.ts'; let src = readFileSync(defFile, 'utf8'); const before = src;
+  const at = src.indexOf("name: 'core-humanoid', version: 2"), end = src.indexOf('} },', at);
+  let block = src.slice(at, end);
+  for (const slot of ['face', 'hair', 'top', 'bottom', 'shoes']) {
+    const values = [...Object.keys(parts[slot] ?? {}), ...(slot === 'hair' ? ['bald'] : [])];
+    block = block.replace(new RegExp(`(\\b${slot}: \\{ type: 'enum', values: )\\[[^\\]]*\\]`), `$1[${values.map(v => `'${v}'`).join(', ')}]`);
+  }
+  src = src.slice(0, at) + block + src.slice(end);
+  if (src !== before) { writeFileSync(defFile, src); console.log('core/humanoid@2 part enums updated in', defFile); }
+}
