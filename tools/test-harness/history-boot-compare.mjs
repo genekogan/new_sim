@@ -9,7 +9,7 @@
 // compared. Production processes, data files and ports are never written to, signalled or bound.
 //
 //   node tools/test-harness/history-boot-compare.mjs --descriptors <dir with successor-<world>-descriptor.json>
-//        --baseline <tree> --candidate <tree> --out <scratch dir> [--worlds mars,littlemartians,eden]
+//        --baseline <tree> --candidate <tree> --out <scratch dir> [--worlds mars,littlemartians,eden] [--data-root <dir>]
 import { spawnSync, execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
@@ -22,12 +22,23 @@ if (args[0] === '--child') {
   // child: one tree, one world, check-only boot on an already-made copy
   const [, tree, key, descriptorPath, dataDir] = args;
   const d = JSON.parse(readFileSync(descriptorPath, 'utf8'));
-  const common = { ...d, input: tree, dataDir, checkOnly: true };
+  // The trees are git checkouts, not Codex's sealed release dirs: the descriptor's inputManifestSHA256 pins that release's
+  // <input>/../CONTENT-MANIFEST.json, which a checkout doesn't have (V8 2026-10-11 looked for sim-wt/CONTENT-MANIFEST.json).
+  // Drop the seal pin; the comparison itself (tick/head/stateHash/rules/boot on identical copies) is the check here.
+  const { inputManifestSHA256: _seal, ...unsealed } = d;
+  const common = { ...unsealed, input: tree, dataDir, checkOnly: true };
   let r;
   if (key === 'eden') {
+    // Eden's check-only return carries only {boot}; capture the same facts world-server's check-only reports (tick, head,
+    // state hash, rules) right after WorldHost.boot(). Same module URL as edge-server's own load(), so the same class.
+    const { WorldHost } = await import(pathToFileURL(join(tree, 'apps/server/src/world.ts')).href);
+    const boot0 = WorldHost.prototype.boot;
+    let facts = null;
+    WorldHost.prototype.boot = function (...a) { const b = boot0.apply(this, a); facts ??= { tick: this.engine.world.tick, head: this.seq, stateHash: this.engine.stateHash(), rulesVersion: this.engine.rulesVersion, eventCount: this.db.events(this.worldId).length }; return b; };
     const { openEdgeServerV1 } = await import(pathToFileURL(join(tree, 'tools/core/edge-server.mjs')));
     const f = d.flags ?? {};
-    r = await openEdgeServerV1({ ...common, accountAuth: true, seedObjects: d.objects, localBudget: 0, autonomous: false, quiesceThought: true, officeStairGuards: f.officeStairGuards ?? false, ambient: d.ambient !== false, foodDeliveryId: f.foodDeliveryId });
+    // same option mapping as the production runner (runtime-modern-context-prep-001/successor-world-run.mjs)
+    r = { ...(await openEdgeServerV1({ ...common, accountAuth: true, seedObjects: d.objects, localBudget: 0, autonomous: false, quiesceThought: true, officeStairGuards: f.officeStairGuards ?? false, ambient: d.ambient !== false, humanRest: f.humanRest ?? true, provisions: f.provisions ?? true, sequences: f.sequences ?? true, floorGoals: f.floorGoals ?? true, kitchen: f.kitchen ?? true, shore: f.shore ?? true, foodDeliveryId: f.foodDeliveryId, quietLandingCourtesy: f.quietLandingCourtesy ?? true, social: f.social ?? true, approachRetention: f.approachRetention ?? true, closedGoals: f.closedGoals ?? true, activateExpansion: f.activateExpansion ?? true })), ...facts };
   } else {
     const { openWorldServer } = await import(pathToFileURL(join(tree, 'tools/core/multiworld/world-server.mjs')));
     r = await openWorldServer(common);
@@ -37,7 +48,7 @@ if (args[0] === '--child') {
 }
 
 const descriptors = resolve(opt('descriptors')), baseline = resolve(opt('baseline')), candidate = resolve(opt('candidate')), out = resolve(opt('out'));
-const worlds = opt('worlds', 'mars,littlemartians,eden').split(',');
+const worlds = opt('worlds', 'mars,littlemartians,eden').split(','), dataRoot = opt('data-root') && resolve(opt('data-root'));
 mkdirSync(out, { recursive: true });
 const { copySqliteReadOnly } = await import(pathToFileURL(join(candidate, 'tools/core/multiworld/copy-sqlite.mjs')));
 const preload = `--import=${join(here, 'port-remap.mjs')}`;
@@ -50,7 +61,8 @@ for (const key of worlds) {
     const dataDir = join(out, key, label);
     if (existsSync(join(dataDir, 'sim.db'))) throw Error(`${dataDir} already has a copy: use a fresh --out`);
     // one read-only VACUUM copy of production; the second tree gets an APFS clone of that copy (cheap, same bytes)
-    if (label === 'baseline') copySqliteReadOnly(join(d.dataDir, 'sim.db'), join(dataDir, 'sim.db'));
+    // --data-root <dir>: copy from <dir>/<world>/sim.db (an existing read-only backup) instead of the live writer's DB
+    if (label === 'baseline') copySqliteReadOnly(join(dataRoot ? join(dataRoot, key) : d.dataDir, 'sim.db'), join(dataDir, 'sim.db'));
     else { mkdirSync(dataDir, { recursive: true }); execFileSync('/bin/cp', ['-c', join(out, key, 'baseline.pristine.db'), join(dataDir, 'sim.db')]); }
     if (label === 'baseline') execFileSync('/bin/cp', ['-c', join(dataDir, 'sim.db'), join(out, key, 'baseline.pristine.db')]);
     const t0 = Date.now();
