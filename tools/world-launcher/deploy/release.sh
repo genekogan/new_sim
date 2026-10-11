@@ -50,7 +50,9 @@ rsync -az --delete ${PREV:+--link-dest="$PREV/"} --exclude node_modules "$OUT/" 
 
 echo "== install (user, dirs, unit; idempotent) and Linux dependencies"
 ssh "$HOST" "set -e; bash $REL/tools/world-launcher/deploy/install.sh; chown -R simworlds:simworlds $REL;
-  sudo -u simworlds -H bash -c 'set -euo pipefail; cd $REL; COREPACK_ENABLE_DOWNLOAD_PROMPT=0 nice -n 10 corepack pnpm install --frozen-lockfile --filter @sim/server... > /srv/sim-worlds/releases/$BUILD.deps.log 2>&1' || { tail -20 /srv/sim-worlds/releases/$BUILD.deps.log; exit 1; }"
+  sudo -u simworlds -H bash -c 'set -euo pipefail; cd $REL; COREPACK_ENABLE_DOWNLOAD_PROMPT=0 nice -n 10 corepack pnpm install --frozen-lockfile --filter @sim/server... > /srv/sim-worlds/releases/$BUILD.deps.log 2>&1 && mkdir -p apps/web/node_modules/@sim && ln -sfn ../../../../packages/world-compiler apps/web/node_modules/@sim/world-compiler' || { tail -20 /srv/sim-worlds/releases/$BUILD.deps.log; exit 1; }"
+# The server imports apps/web/src/humanoid/look.ts (shared look rules), which imports @sim/world-compiler; the server-only
+# install doesn't link web's workspace deps, so link that one package (2026-10-11: we-39cb14d848af worlds failed to boot).
 
 if [ "$ACTIVATE" = 0 ]; then echo "uploaded $BUILD (not activated)"; exit 0; fi
 echo "== activate $STAGE -> $BUILD"
@@ -61,6 +63,12 @@ ssh "$HOST" "set -e
   systemctl enable sim-worlds@$STAGE >/dev/null 2>&1; systemctl restart sim-worlds@$STAGE
   port=\$(sed -n 's/.*--port \([0-9]*\).*/\1/p' /etc/sim-worlds/$STAGE.conf)
   for i in \$(seq 1 60); do if curl -fsS http://127.0.0.1:\$port$BASE/__sim/healthz 2>/dev/null | grep -q '\"build\":\"$BUILD\"'; then echo \"healthy on 127.0.0.1:\$port\"; break; fi; [ \$i != 60 ] || { journalctl -u sim-worlds@$STAGE -n 30 --no-pager; exit 1; }; sleep 1; done
+  # boot smoke: every registered world must answer on the new release, else roll back to the previous one (2026-10-11)
+  data=\$(sed -n 's/.*--data \([^ ]*\).*/\1/p' /etc/sim-worlds/$STAGE.conf)
+  for slug in \$(node -e \"const d=require(process.argv[1]);for(const w of (Array.isArray(d)?d:(d.worlds||Object.values(d))))console.log(w.slug)\" \$data/worlds.json 2>/dev/null); do
+    ok=0; for i in \$(seq 1 90); do if curl -fsS -m 5 http://127.0.0.1:\$port$BASE/w/\$slug/v1/config >/dev/null 2>&1; then ok=1; break; fi; sleep 1; done
+    if [ \$ok = 1 ]; then echo \"world \$slug boots\"; else echo \"world \$slug FAILED to boot on $BUILD; rolling back\"; tail -15 \$data/logs/\$slug.log; prev=\$(readlink /srv/sim-worlds/$STAGE.previous); ln -sfn \$prev /srv/sim-worlds/$STAGE; systemctl restart sim-worlds@$STAGE; echo \"rolled back to \$prev\"; exit 1; fi
+  done
   # retention: keep what a stage points at plus the three newest others
   keep=\$(for s in staging production staging.previous production.previous; do readlink -f /srv/sim-worlds/\$s 2>/dev/null; done)
   ls -1dt /srv/sim-worlds/releases/we-*/ | sed 's:/\$::' | tail -n +4 | while read -r d; do echo \"\$keep\" | grep -qx \"\$d\" || { rm -rf \"\$d\" \"\$d.deps.log\"; echo \"pruned \$d\"; }; done"
