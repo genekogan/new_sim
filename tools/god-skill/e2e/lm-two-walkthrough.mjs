@@ -97,14 +97,20 @@ try {
   const you = await page.evaluate(async (b) => { const t = await window.Clerk.session.getToken(); const r = await fetch(b + '/v1/god/status', { headers: { authorization: 'Bearer ' + t } }); return (await r.json()).you; }, base);
   check('world page: Clerk mounted and the homepage session is seen (checklist: signed in + claimed; owner; no Sign in button)', steps[0]?.startsWith('✓') && /Sign in/.test(steps[0]) && steps[1]?.startsWith('✓') && signinButtons === 0 && you === 'owner' && /Sign out/.test(await page.locator('body').innerText()),
     { url, signinButtons, steps, you, clerkMounted: await page.evaluate(() => window.Clerk.loaded) });
-  const st = await page.evaluate(async (b) => { const t = await window.Clerk.session.getToken(); const r = await fetch(b + '/v1/god/snapshot', { headers: { authorization: 'Bearer ' + t } }); const s = await r.json(); return { entities: s.entities?.length, lm: (s.entities ?? []).filter((e) => /core\/lm-/.test(e.def)).length, dpr: window.devicePixelRatio, canvas: (() => { const c = document.querySelector('canvas'); return c && { w: c.width, h: c.height, cssW: c.clientWidth, cssH: c.clientHeight }; })() }; }, base);
-  check('the new world is the Arium world (468 entities, 111 of them core/lm-* library things); canvas drawn at the pixel ratio', st.entities >= 468 && st.lm >= 100 && st.dpr === DPR && Math.abs(st.canvas.w - st.canvas.cssW * DPR) <= 2, st);
+  const st = await page.evaluate(async ([b, o, base0, sl]) => {
+    const w = (await (await fetch(`${o}${base0}/__sim/worlds.json`)).json()).worlds.find((x) => x.slug === sl);
+    const mad = await (await fetch(b + '/v1/world/entities/madmaraca')).json();
+    const c = document.querySelector('canvas');
+    return { entities: w?.entities, template: w?.template, madmaraca: mad?.entity?.def, dpr: window.devicePixelRatio, canvas: c && { w: c.width, h: c.height, cssW: c.clientWidth, cssH: c.clientHeight } };
+  }, [base, origin, BASE, slug]);
+  check('the new world is the Arium world (the template\'s 432 things; Madmaraca is the library def core/lm-madmaraca@1); canvas drawn at the pixel ratio', st.entities >= 432 && st.template === TEMPLATE && /lm-madmaraca/.test(st.madmaraca ?? '') && st.dpr === DPR && Math.abs(st.canvas.w - st.canvas.cssW * DPR) <= 2, st);
   await shot('03-world-signed-in');
   // 3. camera with real input
   const cam = () => page.evaluate(() => { const c = window.__simCamera; return { p: c.p, t: c.pivot, d: +Math.hypot(c.p[0] - c.pivot[0], c.p[1] - c.pivot[1], c.p[2] - c.pivot[2]).toFixed(2) }; });
   const moved = (a, b) => +Math.hypot(a.p[0] - b.p[0], a.p[1] - b.p[1], a.p[2] - b.p[2]).toFixed(2);
   const cx = 450, cy = 520; let a = await cam();
-  check('camera arrives near (not at the 320 m limit)', a.d < 40, a);
+  // a 270 m world is framed whole at entity-arrival's ARRIVAL_MAX (110 m), by design (lane X); never the old 320 m limit
+  check('camera arrives framing the world (≤ 110 m, not at the 320 m limit)', a.d <= 110.5, a);
   await page.keyboard.down('w'); await sleep(1000); await page.keyboard.up('w'); await sleep(300); let b = await cam();
   check('W (no click first) moves the camera forward', moved(a, b) > 2, { moved: moved(a, b), a: a.p, b: b.p });
   await page.mouse.click(cx, cy); a = await cam(); await page.keyboard.down('a'); await sleep(800); await page.keyboard.up('a'); await sleep(300); b = await cam();
