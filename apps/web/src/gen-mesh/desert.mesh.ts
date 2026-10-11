@@ -102,15 +102,16 @@ export function scrubGeometry(kind: number, leaf = '#56603f'): THREE.BufferGeome
   const key = `${kind}|${leaf}`, hit = scrubCache.get(key); if (hit) return hit;
   const s = new Soup(), L = rgb(leaf), dark = scale(L, 0.78), light = mix(L, rgb('#8a9160'), 0.35);
   if (kind <= 2) {
-    // an open dome of small leaf clusters on thin stems fanning from one root (creosote is airy, never a solid ball)
-    const [spread, top, count] = ([[0.46, 0.82, 8], [0.62, 0.6, 8], [0.36, 0.95, 7]] as const)[kind];
-    for (let i = 0; i < count; i++) {
-      const a = i * 2.39996 + kind, ring = i === 0 ? 0 : 0.45 + 0.55 * h01(i, kind, 1), x = Math.cos(a) * spread * ring, z = Math.sin(a) * spread * ring;
-      const y = top * (0.55 + 0.35 * (1 - ring * ring) + 0.12 * h01(i, kind, 2)) * (kind === 2 ? 0.75 + 0.25 * (1 - ring) : 1);
-      const r = (0.17 + 0.09 * h01(i, kind, 3)) * (kind === 1 ? 1.15 : 1);
-      s.rod([x * 0.12, 0, z * 0.12], [x * 0.85, y - r * 0.7, z * 0.85], 0.022, STEM, 3);
-      s.blob([x, y, z], [r * 1.15, r * 0.85, r * 1.1], i % 3 === 1 ? dark : i % 3 === 2 ? light : L, 0, 0.3, kind * 13 + i);
-    }
+    // a low open dome of small leaf clusters, from near the ground up, on short thin stems (creosote is airy, never a ball on a stick)
+    const [w, top] = ([[0.5, 0.85], [0.66, 0.62], [0.38, 1.0]] as const)[kind];
+    const cl: [number, number, number, number][] = [[0, top - 0.17, 0, 0.21]];                                   // crown
+    for (let i = 0; i < 4; i++) { const a = i * 1.571 + 0.4 + kind; cl.push([Math.cos(a) * w * 0.55, top * 0.58, Math.sin(a) * w * 0.55, 0.2]); }      // middle ring
+    for (let i = 0; i < 3; i++) { const a = i * 2.094 + 1.1 + kind; cl.push([Math.cos(a) * w * 0.85, top * 0.3, Math.sin(a) * w * 0.85, 0.17]); }      // low skirt
+    cl.forEach(([x0, y, z0, r0], i) => {
+      const j = h01(i, kind, 7) - 0.5, x = x0 * (1 + j * 0.3), z = z0 * (1 - j * 0.3), r = r0 * (0.85 + 0.35 * h01(i, kind, 3)) * (kind === 1 ? 1.12 : 1);
+      s.rod([x * 0.1, 0, z * 0.1], [x * 0.8, Math.max(0.05, y - r * 0.6), z * 0.8], 0.018, STEM, 3);
+      s.blob([x, y, z], [r * 1.2, r * 0.95, r * 1.15], i % 3 === 1 ? dark : i % 3 === 2 ? light : L, 0, 0.32, kind * 13 + i);
+    });
   } else {
     const straw = kind === 3, c0 = rgb(straw ? '#c2b183' : '#8e9470'), c1 = rgb(straw ? '#9f8c62' : '#737a58');
     for (let k = 0; k < 7; k++) {
@@ -166,7 +167,7 @@ function inside(px: number, pz: number, poly: [number, number][]) { let r = fals
 // ---------------------------------------------------------------- tyre tracks
 
 let trackMat: THREE.MeshStandardMaterial | null = null;
-const REF = rgb('#c4beb0');   // the playa base: a track darkens whatever ground it crosses by color / REF
+const REF = rgb('#b2b2b3');   // the playa base: a track darkens whatever ground it crosses by color / REF
 registerMesh({
   gen: 'tire-tracks/1', world: true,
   build(ctx) {
@@ -181,7 +182,7 @@ registerMesh({
         const wheel = offsetAlong(line, side) as [number, number][], lo = offsetAlong(wheel, -w) as [number, number][], hi = offsetAlong(wheel, w) as [number, number][];
         const colAt = (i: number): RGB => {
           const [x, z] = wheel[i]; groundCol(c, g(x, z), 0, base, x, z);
-          const fadeEnds = Math.min(1, i / 6, (wheel.length - 1 - i) / 6), fade = fadeEnds * (0.15 + 0.5 * h01(li, Math.floor(i / 7)));   // tracks fade in and out
+          const fadeEnds = Math.min(1, i / 6, (wheel.length - 1 - i) / 6), fade = fadeEnds * (0.3 + 0.6 * h01(li, Math.floor(i / 7)));   // tracks fade in and out
           return mix([c.r, c.g, c.b], [c.r * (col[0] / REF[0]), c.g * (col[1] / REF[1]), c.b * (col[2] / REF[2])], Math.max(0, Math.min(1, fade)));
         };
         for (let i = 1; i < wheel.length; i++) {

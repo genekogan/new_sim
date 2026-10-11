@@ -67,7 +67,7 @@ const isClosed = (p: Vec2[]) => p.length > 2 && Math.hypot(p[0][0] - p[p.length 
 export function tireLine(path0: Vec2[], params: Record<string, Value>, seed: number, cap = 4000): TirePose[] {
   const closed = params.closed === true || (params.closed !== false && isClosed(path0));
   const path = closed && !isClosed(path0) ? [...path0, path0[0]] : path0;
-  const D = n(params.diameter, 0.62), spacing = Math.max(D * 1.05, n(params.spacing, 2)), jitter = Math.min(0.9, Math.max(0, n(params.jitter, 0.35)));
+  const D = n(params.diameter, 0.62), spacing = Math.max(D * 1.05, n(params.spacing, 1.5)), jitter = Math.min(0.9, Math.max(0, n(params.jitter, 0.35)));
   const gapP = n(params.gaps, 0.08), gapMax = Math.max(1, Math.round(n(params.gapMax, 4))), clusterP = n(params.clusters, 0.07), clusterMax = Math.max(2, Math.round(n(params.clusterMax, 4)));
   const strayP = n(params.strays, 0.05), strayDist = n(params.strayDist, 12), flatP = n(params.flat, 0.1), burial = Math.min(0.9, Math.max(0, n(params.burial, 0.35)));
   const heaps = closed ? Math.max(0, Math.round(n(params.innerClusters, 2))) : 0;
@@ -128,7 +128,7 @@ export function tireRingPath(px: number, pz: number, yaw: number, params: Record
 const LINE_PARAMS = {
   diameter: { type: 'number', min: 0.3, max: 1.6, default: 0.62, doc: 'tyre outer diameter (m)' },
   burial: { type: 'number', min: 0, max: 0.9, default: 0.35, doc: 'fraction of the diameter sunk into the ground (upright tyres)' },
-  spacing: { type: 'number', min: 0.5, max: 30, default: 2, doc: 'mean distance between tyres along the line (m)' },
+  spacing: { type: 'number', min: 0.5, max: 30, default: 1.5, doc: 'mean distance between tyres along the line (m)' },
   jitter: { type: 'number', min: 0, max: 0.9, default: 0.35, doc: 'spacing randomness (fraction)' },
   gaps: { type: 'number', min: 0, max: 0.6, default: 0.08, doc: 'chance a slot starts a gap' },
   gapMax: { type: 'int', min: 1, max: 20, default: 4, doc: 'longest gap, in slots' },
@@ -188,7 +188,7 @@ const clearsOf = (v: unknown): Clear[] => (Array.isArray(v) ? (v as Clear[]).fil
  * `clear` circles and wherever `blocked(x, z)` says (solids, roads; the viewer passes it).
  */
 export function scrubPoints(area: Vec2[], params: Record<string, Value>, seed: number, blocked: (x: number, z: number) => boolean = () => false, cap = 30000): ScrubPoint[] {
-  const density = n(params.density, 0.0015), grass = n(params.grass, 2), g = Math.min(1, Math.max(0, n(params.gradient, 0.6))), veins = Math.min(1, Math.max(0, n(params.veins, 0.6)));
+  const density = n(params.density, 0.0015), grass = n(params.grass, 3), g = Math.min(1, Math.max(0, n(params.gradient, 0.6))), veins = Math.min(1, Math.max(0, n(params.veins, 0.6)));
   const cluster = Math.min(1, Math.max(0, n(params.cluster, 0.35))), hMin = n(params.minHeight, 0.4), hMax = Math.max(hMin, n(params.maxHeight, 1.6)), spacing = n(params.minSpacing, 2.5);
   const dir = DIRS[String(params.toward ?? 'none')] ?? null, clears = clearsOf(params.clear);
   const [x0, z0, x1, z1] = bounds2(area), cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, hx = Math.max(1, (x1 - x0) / 2), hz = Math.max(1, (z1 - z0) / 2), A = (x1 - x0) * (z1 - z0);
@@ -234,7 +234,7 @@ export const desertScrubGen: Generator = {
   id: 'desert-scrub/1', form: 'area', owner: 'MARSLAND', doc: 'Sparse desert scrub: creosote bushes (3 shapes, 0.4–1.6 m) and dry grass tufts that follow the playa veins; denser toward a side; keeps off buildings and roads and out of `clear` circles. Five instanced meshes for any area. Decor, no colliders.',
   params: {
     density: { type: 'number', min: 0, max: 0.2, default: 0.0015, doc: 'bushes per m² on average (0.0015 ≈ one per 670 m²)' },
-    grass: { type: 'number', min: 0, max: 20, default: 2, doc: 'grass tufts per bush' },
+    grass: { type: 'number', min: 0, max: 20, default: 3, doc: 'grass tufts per bush' },
     toward: { type: 'enum', values: ['none', 'n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'], default: 'none', doc: 'denser toward this side of the area (engine north = −z)' },
     gradient: { type: 'number', min: 0, max: 1, default: 0.6, doc: 'how much denser (1 = from none at one side to double at the other)' },
     veins: { type: 'number', min: 0, max: 1, default: 0.6, doc: 'how much plants follow the playa drainage veins' },
@@ -260,7 +260,7 @@ export const creosoteGen: Generator = {
 
 /** Centre lines of vehicle tracks wandering over an area (random-walk curvature: arcs, S-bends, donuts). */
 export function trackLines(area: Vec2[], params: Record<string, Value>, seed: number): Vec2[][] {
-  const count = Math.max(0, Math.min(200, Math.round(n(params.count, 24)))), lmin = n(params.minLength, 40), lmax = Math.max(lmin, n(params.maxLength, 180)), curl = n(params.curl, 0.5);
+  const count = Math.max(0, Math.min(400, Math.round(n(params.count, 60)))), lmin = n(params.minLength, 40), lmax = Math.max(lmin, n(params.maxLength, 180)), curl = n(params.curl, 0.5);
   const [x0, z0, x1, z1] = bounds2(area), rnd = rng(((seed | 0) ^ 0x7ac5) || 1), step = 2, out: Vec2[][] = [];
   for (let tries = 0; out.length < count && tries < count * 8; tries++) {
     let x = x0 + rnd() * (x1 - x0), z = z0 + rnd() * (z1 - z0); if (!pointInPoly(x, z, area)) continue;
@@ -279,12 +279,12 @@ export function trackLines(area: Vec2[], params: Record<string, Value>, seed: nu
 export const tireTracksGen: Generator = {
   id: 'tire-tracks/1', form: 'area', owner: 'MARSLAND', doc: 'Faint vehicle tracks on the ground: pairs of darker lines wandering over the area in arcs, S-bends and a few donuts. Ground marking, one mesh, walkable.',
   params: {
-    count: { type: 'int', min: 0, max: 200, default: 24, doc: 'number of tracks' },
+    count: { type: 'int', min: 0, max: 400, default: 60, doc: 'number of tracks' },
     minLength: { type: 'number', min: 5, max: 1000, default: 40 }, maxLength: { type: 'number', min: 5, max: 2000, default: 180 },
     curl: { type: 'number', min: 0, max: 2, default: 0.5, doc: 'how much tracks bend and loop' },
     gauge: { type: 'number', min: 0.8, max: 3, default: 1.6, doc: 'wheel-track distance (m)' },
     lineWidth: { type: 'number', min: 0.05, max: 1, default: 0.24 },
-    color: { type: 'color', default: '#a89c84', doc: 'track colour (a little darker than the ground)' },
+    color: { type: 'color', default: '#979080', doc: 'track colour (a little darker than the ground)' },
   },
   physics({ params, shape, seed }) {
     const area = shape?.area ?? ([[-20, -20], [20, -20], [20, 20], [-20, 20]] as Vec2[]);

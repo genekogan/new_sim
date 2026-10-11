@@ -17,15 +17,15 @@ const PAL: Record<GroundPalette, P> = {
   snow: { low: '#dfe6ea', base: '#eef2f5', high: '#f6f8fa', rock: '#7f858c', snow: 0, snowC: '#f8fafc', rockFrom: 0.75, noise: 0.03, shore: '#c9d2d8' },
   rock: { low: '#8a857b', base: '#8f8a80', high: '#a19c92', rock: '#6f6b65', snow: 120, snowC: '#eef0f2', rockFrom: 0.5, noise: 0.08, shore: '#8a857b' },
   // MARSLAND-NEAR: the Salton Sea playa (pale crusted cream, tan drainage veins and dusty patches; mottling in playaMottle)
-  playa: { low: '#bdb5a0', base: '#c4beb0', high: '#b9ad96', rock: '#a39478', rockFrom: 0.5, noise: 0, shore: '#c6bfae' },
+  playa: { low: '#aaa8a2', base: '#b2b2b3', high: '#aaa392', rock: '#978d78', rockFrom: 0.5, noise: 0, shore: '#b4b4b1' },
 };
-const PLAYA = { crust: '#d3cfc4', dust: '#b9ac92', vein: '#ab9877', grass: '#b4a26e' };
+const PLAYA = { crust: '#c5c6c6', dust: '#aaa392', vein: '#a69c87', grass: '#a89d78' };
 /** Playa mottling: soft crust/dust patches (40–200 m), thin tan veins with dry grass along them, fine speckle. */
 function playaMottle(c: THREE.Color, x: number, z: number) {
   const p = playaPatch(x, z);
-  if (p > 0) c.lerp(col(PLAYA.crust), Math.min(1, p * 1.3) * 0.5); else c.lerp(col(PLAYA.dust), Math.min(1, -p * 1.3) * 0.38);
+  if (p > 0) c.lerp(col(PLAYA.crust), Math.min(1, p * 1.3) * 0.45); else c.lerp(col(PLAYA.dust), Math.min(1, -p * 1.3) * 0.2);
   const v = playaVein(x, z);
-  if (v > 0.02) { c.lerp(col(PLAYA.vein), v * 0.6); c.lerp(col(PLAYA.grass), v * v * 0.25 * fbm(x, z, 18, 1, 3)); }
+  if (v > 0.02) { c.lerp(col(PLAYA.vein), v * 0.7); c.lerp(col(PLAYA.grass), v * v * 0.25 * fbm(x, z, 18, 1, 3)); }
   const k = 1 + (fbm(x, z, 7, 2, 61) - 0.5) * 0.09; c.r = Math.min(1, c.r * k); c.g = Math.min(1, c.g * k); c.b = Math.min(1, c.b * k);
 }
 const C = new Map<string, THREE.Color>(); const col = (h: string) => { let c = C.get(h); if (!c) { c = new THREE.Color(h); C.set(h, c); } return c; };

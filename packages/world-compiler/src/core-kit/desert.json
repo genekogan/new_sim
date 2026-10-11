@@ -119,7 +119,7 @@
     "type": "number",
     "min": 0.5,
     "max": 30,
-    "default": 2,
+    "default": 1.5,
     "doc": "mean distance between tyres along the line (m)"
    },
    "jitter": {
@@ -263,7 +263,7 @@
     "type": "number",
     "min": 0.5,
     "max": 30,
-    "default": 2,
+    "default": 1.5,
     "doc": "mean distance between tyres along the line (m)"
    },
    "jitter": {
@@ -439,7 +439,7 @@
     "type": "number",
     "min": 0,
     "max": 20,
-    "default": 2,
+    "default": 3,
     "doc": "grass tufts per bush"
    },
    "toward": {
@@ -540,8 +540,8 @@
    "count": {
     "type": "int",
     "min": 0,
-    "max": 200,
-    "default": 24,
+    "max": 400,
+    "default": 60,
     "doc": "number of tracks"
    },
    "minLength": {
@@ -578,7 +578,7 @@
    },
    "color": {
     "type": "color",
-    "default": "#b3a080",
+    "default": "#979080",
     "doc": "track colour (a little darker than the ground)"
    }
   }
