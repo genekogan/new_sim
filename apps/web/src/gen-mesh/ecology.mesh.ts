@@ -77,7 +77,7 @@ registerMesh({
     const pts: ScatterPoint[] = scatter2Points(e.shape.area as [number, number][], ctx.params, e.seed ?? hashSeed(e.id), queryOf(ctx.model), blockedBy(ctx.model, e));
     const group = new THREE.Group(); group.name = `scatter ${e.name ?? e.id}`;
     const g = ground(ctx), byK = new Map<number, { x: number; y: number; z: number; s: number; yaw: number; tone: number; sink?: number }[]>();
-    for (const p of pts) { const l = byK.get(p.k) ?? []; const kind = pal[p.k].kind; const y = g(p.x, p.z); l.push({ x: p.x, y, z: p.z, s: p.s, yaw: p.yaw, tone: p.tone, sink: kind === 'rock' || kind === 'boulder' ? 0.15 : 0.05 }); byK.set(p.k, l); }
+    for (const p of pts) { const l = byK.get(p.k) ?? []; const kind = pal[p.k].kind; const y = g(p.x, p.z); l.push({ x: p.x, y, z: p.z, s: p.s, yaw: p.yaw, tone: p.tone, sink: pal[p.k].def ? 0 : kind === 'rock' || kind === 'boulder' ? 0.15 : 0.05 }); byK.set(p.k, l); }
     for (const [k, list] of byK) {
       const entry = pal[k];
       if (entry.def && instanceDef(group, ctx, entry.def, list)) continue;
