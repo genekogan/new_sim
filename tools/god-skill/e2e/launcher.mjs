@@ -245,7 +245,7 @@ try {
     return { pid: [before.pid, after.pid], restarts: after.restarts, barn: snap.entities.some((e) => e.name === 'barn'), entities: snap.entities.length };
   }, (r) => r.restarts >= 1 && r.barn);
 
-  await step('the agent looks (a ?shot=1 page load): the last step ticks; homepage shows the world claimed', async () => {
+  await step('the agent looks (a ?shot=1 page load): the last step ticks; homepage lists the world (UXFIX2: no \'god: claimed\' line without a god name)', async () => {
     const lookPage = await ctx.newPage();
     await lookPage.goto(`${base}/?dev=1&shot=1&eye=-60,40,60&at=-20,0,-10`, { waitUntil: 'domcontentloaded', timeout: PAGE_MS });
     await lookPage.close();
@@ -262,7 +262,7 @@ try {
     const text = await card.innerText();
     await shot('13-home-after');
     return { ticks, card: text };
-  }, (r) => r.ticks === '111111' && /god: claimed/.test(r.card));
+  }, (r) => r.ticks === '111111' && /Open/.test(r.card) && !/god: claimed/.test(r.card));
 } catch (e) {
   report.failures.push({ name: 'harness', error: String(e?.stack ?? e) }); console.error(e);
 } finally {
