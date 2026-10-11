@@ -48,7 +48,8 @@ export const isEager = (sha: string) => !LAZY || !eager || eager.has(sha) || sta
 export function deferLoad(sha: string, start: () => void, makeHook: (fn: (cam: THREE.Camera) => void) => THREE.Object3D): THREE.Object3D {
   let done = false;
   const at = new THREE.Vector3();
-  const go = () => { if (done) return; done = true; started.add(sha); start(); };
+  // once started the hook has done its job: leave the scene (lane PERF: one no-op draw fewer per thing, every frame)
+  const go = () => { if (done) return; done = true; started.add(sha); start(); queueMicrotask(() => hook.removeFromParent()); };
   const entry = { start: go, at };
   const list = waiting.get(sha) ?? []; list.push(entry); waiting.set(sha, list);
   const hook = makeHook((cam) => {

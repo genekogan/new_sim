@@ -18,6 +18,7 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { apiPath } from '../world-path.ts';
 import { BASE } from '../base-path.ts';
+import { mergeStatic } from './static-merge.ts';
 
 let shared: GLTFLoader | null = null;
 /** LiveWorld may hand over its own loader (download progress, one Draco worker pool). */
@@ -59,6 +60,8 @@ function prepare(g: GLTF) {
       if (m.geometry.attributes.color) { mat.vertexColors = true; if (!mat.metalnessMap) mat.metalness = 0; if (!mat.roughnessMap) mat.roughness = Math.max(mat.roughness, 0.8); mat.needsUpdate = true; }
     }
   });
+  // lane PERF: a static model's many nodes/materials become a few merged meshes (static-merge.ts)
+  try { const r = mergeStatic(g.scene, g.animations.length > 0); if (r) g.userData.merged = r; } catch (e) { console.warn('static merge skipped', e); }
   const box = new THREE.Box3().setFromObject(g.scene, true);
   g.userData.bounds = box.isEmpty() ? new THREE.Box3(new THREE.Vector3(-0.5, 0, -0.5), new THREE.Vector3(0.5, 1, 0.5)) : box;
 }

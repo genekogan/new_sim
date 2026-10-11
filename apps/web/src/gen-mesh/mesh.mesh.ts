@@ -34,7 +34,9 @@ const meshBuilder: MeshBuilder = {
       const gait: Gait = b.kind === 'fly' ? 'bird-fly' : b.kind === 'swim' ? 'fish-swim' : 'none';
       holder.userData.rig = makeRig(holder, { gait, kind: b.kind as BehaviorKind, speed: b.speed ?? 1, radius: b.radius ?? 6, follow: b.ref, seed: ctx.entity.seed ?? seedOf(ctx.entity.id), model: ctx.model, species: ctx.def.name.replace(/^core-|-pack$/g, ''), box: ctx.def.size.box as [number, number, number] });
     }
-    holder.add(frameHook(() => {
+    // lane PERF: the clip hook is added once the model is in and only if it has clips (a static model costs no per-frame
+    // hook draw; mars-two had 166 of them)
+    const clipHook = () => frameHook(() => {
       if (!inst || !inst.clips.length) return;
       const t = Date.now() / 1000;
       holder.getWorldPosition(now);
@@ -43,7 +45,7 @@ const meshBuilder: MeshBuilder = {
       stillFor = moved ? 0 : stillFor + 1;
       const walking = !!behavior && MOVING.has(behavior) && stillFor < 3;   // a few frames of grace across easing jitter
       inst.play(behavior === 'fly' ? 'Fly' : behavior === 'swim' ? 'Swim' : walking ? 'Walk' : 'Idle', t, { phase });
-    }));
+    });
     // VOCAB-MECH: GLBs outside the eager set load when the thing comes near the camera or in the background (lazy-assets.ts)
     const load = () => { loadAsset(make.asset).then((gltf) => {
       if (gone) return;
@@ -52,7 +54,7 @@ const meshBuilder: MeshBuilder = {
       // a hair towards the camera (the materials are shared per asset, so every copy of it gets the same)
       if (ctx.def.size.box[1] <= 0.06) inst.object.traverse((o) => { const mats = (o as THREE.Mesh).material; for (const m of Array.isArray(mats) ? mats : mats ? [mats] : []) { m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -4; } });
       holder.add(inst.object);
-      if (inst.clips.length) inst.play('Idle', Date.now() / 1000, { phase });
+      if (inst.clips.length) { inst.play('Idle', Date.now() / 1000, { phase }); holder.add(clipHook()); }
       // a building cut with a `roof` group (the Mars campus pieces): hidden in the roofs-off view (?hideRoofs=1 or the
       // viewer's toggle) and while the camera is inside the building below its roof, like building/1's interior view
       const roof = inst.object.getObjectByName('roof');

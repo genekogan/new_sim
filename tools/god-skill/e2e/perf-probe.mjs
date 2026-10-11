@@ -27,7 +27,8 @@ const pw = findPlaywright(); if (!pw) throw new Error('no playwright');
 
 // In-page instrumentation, installed before the app runs.
 const INIT = `(() => {
-  const P = window.__perf = { frames: [], longtasks: [], marks: {}, render: [], gpu: [], recording: false, installed: false };
+  try { performance.setResourceTimingBufferSize(20000); } catch {}
+  const P = window.__perf = { frames: [], longtasks: [], marks: {}, render: [], gpu: [], recording: true, installed: false };
   try { new PerformanceObserver((l) => { for (const e of l.getEntries()) P.longtasks.push([e.startTime, e.duration]); }).observe({ type: 'longtask', buffered: true }); } catch {}
   const tick = (t) => { if (P.recording) P.frames.push(t); requestAnimationFrame(tick); }; requestAnimationFrame(tick);
   const poll = setInterval(() => {
@@ -50,6 +51,8 @@ const INIT = `(() => {
     }
     if (P.marks.live === undefined && [...document.querySelectorAll('.ok b, .ok')].some((e) => /\\bLive\\b/.test(e.textContent || ''))) P.marks.live = performance.now();
     if (w?.layer?.active && P.marks.layerActive === undefined) P.marks.layerActive = performance.now();
+    const card = document.querySelector('.viewer-arrival'); if (card) P.sawCard = true;
+    if (P.sawCard && P.marks.cardDone === undefined && (!card || card.getAttribute('data-done') === 'true')) P.marks.cardDone = performance.now();
   }, 50);
 })();`;
 
@@ -93,8 +96,10 @@ try {
       if (Date.now() - tNav > settleMax * 1000) break;
     }
     const marks = await page.evaluate(() => window.__perf.marks);
+    const ld = await page.evaluate(() => { const P = window.__perf; const f0 = P.marks.firstEntityFrame ?? 0; const fr = P.frames.filter((t) => t >= f0); const res = performance.getEntriesByType('resource').filter((e) => /\.glb(\?|$)/.test(e.name)); const cut = (t) => res.filter((e) => e.responseEnd <= t); const bytes = (a) => +(a.reduce((n, e) => n + (e.encodedBodySize || e.transferSize || 0), 0) / 1e6).toFixed(1); const cd = P.marks.cardDone ?? 0; return { frames: fr, longtasks: P.longtasks.filter((l) => l[0] >= f0), glbAll: res.length, glbMB: bytes(res), glbAtCard: cut(cd).length, glbMBAtCard: bytes(cut(cd)), lastGlbEnd: res.length ? Math.round(Math.max(...res.map((e) => e.responseEnd))) : null }; });
+    const load = { ...summarize(ld.frames, [], [], ld.longtasks, 0), glbAll: ld.glbAll, glbMB: ld.glbMB, glbAtCard: ld.glbAtCard, glbMBAtCard: ld.glbMBAtCard, lastGlbEndMs: ld.lastGlbEnd };
     const nav = await page.evaluate(() => performance.timeOrigin);
-    const timing = { firstEntityFrameMs: marks.firstEntityFrame ? Math.round(marks.firstEntityFrame) : null, liveMs: marks.live ? Math.round(marks.live) : null, layerActiveMs: marks.layerActive ? Math.round(marks.layerActive) : null, settledMs: settledAt, navOffsetMs: Math.round(nav - tNav) };
+    const timing = { firstEntityFrameMs: marks.firstEntityFrame ? Math.round(marks.firstEntityFrame) : null, liveMs: marks.live ? Math.round(marks.live) : null, layerActiveMs: marks.layerActive ? Math.round(marks.layerActive) : null, settledMs: settledAt, cardDoneMs: marks.cardDone ? Math.round(marks.cardDone) : null, navOffsetMs: Math.round(nav - tNav) };
     const window_ = async (name, during) => {
       await page.evaluate(() => { const P = window.__perf; P.frames = []; P.render = []; P.gpu = []; P.lt0 = performance.now(); P.recording = true; });
       const t0 = Date.now(); await during(); const ms = Date.now() - t0;
@@ -112,9 +117,9 @@ try {
       await page.mouse.up();
     });
     const after = await page.evaluate(() => ({ info: window.__perf.lastInfo, gpuExt: window.__perf.gpuExt, installs: window.__perf.installs }));
-    const r = { world: url, label, size: `${W}x${H}`, dpr, load1m: +load0.toFixed(1), timing, still, orbit, stats, afterOrbitInfo: after.info, gpuExt: after.gpuExt, rendererInstalls: after.installs, errors };
+    const r = { world: url, label, size: `${W}x${H}`, dpr, load1m: +load0.toFixed(1), timing, load, still, orbit, stats, afterOrbitInfo: after.info, gpuExt: after.gpuExt, rendererInstalls: after.installs, errors };
     results.push(r);
-    console.log(`${tag} load ${r.load1m} | first ${timing.firstEntityFrameMs} live ${timing.liveMs} settled ${timing.settledMs} ms | still ${still.fps} fps p50 ${still.frameP50} p95 ${still.frameP95} >50:${still.over50} cpu ${still.renderCpuP50}/${still.renderCpuP95} gpu ${still.gpuP50}/${still.gpuP95} | orbit ${orbit.fps} fps p95 ${orbit.frameP95} >50:${orbit.over50} gpu ${orbit.gpuP50}/${orbit.gpuP95} | draws ${stats.info?.calls} tris ${stats.info?.triangles} prog ${stats.programs} geo ${stats.geometries} tex ${stats.textures} meshes ${stats.visibleMeshes}/${stats.meshes} casters ${stats.casters} heap ${stats.heapMB} MB${errors.length ? ' errors ' + errors.length : ''}`);
+    console.log(`${tag} load ${r.load1m} | first ${timing.firstEntityFrameMs} live ${timing.liveMs} settled ${timing.settledMs} card ${timing.cardDoneMs} ms | load: max ${load.frameMax} >50:${load.over50} >100:${load.over100} lt ${load.longtaskMs}ms glb ${load.glbAtCard}/${load.glbAll} ${load.glbMBAtCard}/${load.glbMB}MB last ${load.lastGlbEndMs} | still ${still.fps} fps p50 ${still.frameP50} p95 ${still.frameP95} >50:${still.over50} cpu ${still.renderCpuP50}/${still.renderCpuP95} gpu ${still.gpuP50}/${still.gpuP95} | orbit ${orbit.fps} fps p95 ${orbit.frameP95} >50:${orbit.over50} gpu ${orbit.gpuP50}/${orbit.gpuP95} | draws ${stats.info?.calls} tris ${stats.info?.triangles} prog ${stats.programs} geo ${stats.geometries} tex ${stats.textures} meshes ${stats.visibleMeshes}/${stats.meshes} casters ${stats.casters} heap ${stats.heapMB} MB${errors.length ? ' errors ' + errors.length : ''}`);
     await ctx.close();
   }
 } finally { await browser.close(); release(); }
