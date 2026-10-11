@@ -22,6 +22,8 @@ import { fileURLToPath } from 'node:url';
 import type { Context, Hono } from 'hono';
 import type { Baked, LocalOBB, Link, Opening, Room, Slot, Surface, Vec2, Vec3 } from '@sim/generators';
 import type { AssetInfo, AssetLookup, StoredDef } from '@sim/world-compiler';
+import { vocab } from '@sim/world-compiler';
+import { assetBytesOf, mountCatalogRoutes } from './catalog.ts';
 import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
 import type { GodMode } from './god.ts';
@@ -394,7 +396,7 @@ export const SYNONYMS: Record<string, string[]> = {
 const words = (s: string) => s.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
 const singular = (w: string) => (w.length > 4 && w.endsWith('ies') ? w.slice(0, -3) + 'y' : w.length > 4 && /(ches|shes|xes|ses)$/.test(w) ? w.slice(0, -2) : w.length > 3 && w.endsWith('s') && !w.endsWith('ss') ? w.slice(0, -1) : w);
 
-type Searchable = { name: string; ref: string; description?: string; tags?: string[]; hash?: string; make?: { kind: string; gen?: string } };
+type Searchable = { name: string; ref: string; description?: string; tags?: string[]; hash?: string; make?: { kind: string; gen?: string }; synonyms?: string[]; category?: string };
 export type SearchHit<T> = { def: T; score: number; why: string[] };
 
 /**
@@ -404,9 +406,10 @@ export type SearchHit<T> = { def: T; score: number; why: string[] };
  * something unless none of the defs matches all words (then any). Ties: shorter names first, core
  * kit defs (kit/2 creatures before pack meshes) before world defs.
  */
-export function searchDefs<T extends Searchable>(defs: T[], q: string, opts: { tag?: string; limit?: number } = {}): SearchHit<T>[] {
+export function searchDefs<T extends Searchable>(defs: T[], q: string, opts: { tag?: string; limit?: number } & vocab.Facets = {}): SearchHit<T>[] {
   let pool = defs;
-  if (opts.tag) pool = pool.filter((d) => d.tags?.includes(opts.tag!));
+  // VOCAB-MECH facets: category subtree, tag, form, has (slot:sit, action:open, comp:light, actuator:door …)
+  if (opts.tag || opts.category || opts.form || opts.has?.length) pool = vocab.facetFilter(pool as never[], { tag: opts.tag, category: opts.category, form: opts.form, has: opts.has }) as unknown as T[];
   const qw = words(q);
   if (!qw.length) return pool.slice(0, opts.limit ?? 500).map((def) => ({ def, score: 0, why: [] }));
   const whole = qw.join('-');
@@ -416,10 +419,17 @@ export function searchDefs<T extends Searchable>(defs: T[], q: string, opts: { t
     for (const k of [w, s]) for (const syn of SYNONYMS[k] ?? []) if (!base.has(syn)) base.set(syn, 0.7);
     return base;
   });
+  // VOCAB-MECH: words that name a category ("bodega" → building.commercial), per query word and for the whole phrase
+  const catOf = new Map<string, string[]>();
+  for (const w of [...qw, whole]) { const c = [...new Set([...vocab.categoriesForWord(w), ...vocab.categoriesForWord(singular(w))])]; if (c.length) catOf.set(w, c); }
+  const phraseCats = catOf.get(whole) ?? [];
   const scored = pool.map((def) => {
     const name = def.name.replace(/^core-/, ''), ntoks = name.split(/[-._]+/), tags = def.tags ?? [], desc = (def.description ?? '').toLowerCase(), dwords = new Set(words(desc).map(singular));
     const why: string[] = []; let score = 0, matched = 0;
+    const syns = (def.synonyms ?? []).map((x) => x.toLowerCase().replace(/\s+/g, '-')), cat = vocab.categoryOf(def as never);
     if (name === whole || name === singular(whole) || name === `${singular(whole)}-pack`) { score += 100; why.push('name'); }
+    else if (qw.length > 1 && (syns.includes(whole) || syns.includes(singular(whole)))) { score += 80; matched = qw.length; why.push(`aka=${whole}`); }
+    else if (qw.length > 1 && phraseCats.some((c) => vocab.within(cat, c))) { score += 20; matched = qw.length; why.push(`cat=${cat}`); }
     for (const vs of variants) {
       let best = 0, bestWhy = '';
       for (const [v, wgt] of vs) {
@@ -428,15 +438,18 @@ export function searchDefs<T extends Searchable>(defs: T[], q: string, opts: { t
         if (ntoks.includes(v)) cand.push([40, `name~${v}`]);
         else if (name.includes(v) && v.length >= 3) cand.push([14, `name*${v}`]);
         if (tags.includes(v)) cand.push([16, `tag=${v}`]); else if (tags.some((t) => t.startsWith(v) && v.length >= 4)) cand.push([6, `tag*${v}`]);
+        if (syns.includes(v)) cand.push([45, `aka=${v}`]);
+        if ((catOf.get(v) ?? []).some((c) => vocab.within(cat, c))) cand.push([3.5, `cat=${cat}`]);   // below a description word: a tiebreak, and the answer when nothing else knows the word
         if (dwords.has(v)) cand.push([4, `desc=${v}`]); else if (v.length >= 4 && desc.includes(v)) cand.push([1, `desc*${v}`]);
         for (const [c, label] of cand) if (c * wgt > best) { best = c * wgt; bestWhy = label; }
       }
-      if (best > 0) { matched++; score += best; why.push(bestWhy); }
+      if (best > 0) { matched = Math.min(qw.length, matched + 1); score += best; why.push(bestWhy); }
     }
     return { def, score, matched, why };
   }).filter((r) => r.score > 0);
   const all = scored.filter((r) => r.matched === qw.length);
-  const hits = all.length ? all : scored;
+  // partial matches (no def matched every word) never stand on a category word alone ("xylophone zeppelin")
+  const hits = all.length ? all : scored.filter((r) => r.why.some((w) => !w.startsWith('cat=')));
   const rank = (d: Searchable) => (d.ref.startsWith('core-') ? (d.make?.kind === 'mesh' ? 1 : 0) : 2);
   hits.sort((a, b) => b.score - a.score || rank(a.def) - rank(b.def) || a.def.name.length - b.def.name.length || (a.def.name < b.def.name ? -1 : 1));
   return hits.slice(0, opts.limit ?? 500).map(({ def, score, why }) => ({ def, score: Math.round(score * 10) / 10, why }));
@@ -499,7 +512,8 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
   const store = d.store ?? (d.god as { assets?: AssetStore }).assets ?? new AssetStore({ dir: d.dir ?? defaultAssetDir(), db: d.god.db, worldId: d.god.opts.worldId });
   d.god.model.assets = store.lookup;
   const budget = (): Budget => ({ ...DEFAULT_BUDGET, ...d.god.model.constants.limits.budget });
-  const library = () => [...new Set(d.god.model.defs.values())] as StoredDef[];
+  // a def that extends another (a preset of a generator: corner-shop of shop) is listed as it resolves (its make, slots, params)
+  const library = () => [...new Set(d.god.model.defs.values())].map((x) => (x.extends ? d.god.model.resolvedDef(x.ref) ?? x : x)) as StoredDef[];
   const findDef = (ref: string): StoredDef | undefined => d.god.model.resolvedDef(ref) ?? d.god.model.def(ref.replace(/^core\//, 'core-'));
 
   app.get('/assets/:file{[0-9a-f]{64}\\.(glb|png|jpg|json)}', (c) => {
@@ -558,10 +572,13 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
 
   app.get('/v1/god/defs', (c) => {
     d.requireGod(c);
-    const q = c.req.query('q') ?? '', tag = c.req.query('tag'), limit = Math.min(500, Math.max(1, Number(c.req.query('limit') ?? 200) || 200));
-    const hits = searchDefs(library().map((x) => ({ ...x, by: undefined })), q, { tag, limit });
-    const defs = hits.map((h) => ({ ...h.def, publicRef: publicRef(h.def), ...(q ? { score: h.score, why: h.why } : {}), thumb: store.thumbFile(h.def.hash) ? `/v1/god/defs/${publicRef(h.def)}/thumb.png` : null }));
-    return c.json({ defs, count: defs.length, query: q || null, ...(q && !defs.length ? { hint: 'nothing in the library matches; define it (kit/2 parts, a generator, or an imported mesh: POST /v1/god/assets)' } : {}) }, 200, noStore);
+    const q = c.req.query('q') ?? '', tag = c.req.query('tag'), limit = Math.min(500, Math.max(1, Number(c.req.query('limit') ?? 200) || 200)), offset = Math.max(0, Number(c.req.query('offset') ?? 0) || 0);
+    // VOCAB-MECH facets: &category=building.commercial &has=slot:sit (repeatable or comma list) &form=area; `compact=1` = manifest rows
+    const facets = { category: c.req.query('category') || undefined, form: c.req.query('form') || undefined, has: c.req.queries('has')?.flatMap((h) => h.split(',')).filter(Boolean) };
+    const all = searchDefs(library().map((x) => ({ ...x, by: undefined })), q, { tag, limit: offset + limit, ...facets }), hits = all.slice(offset);
+    const compact = c.req.query('compact') === '1';
+    const defs = hits.map((h) => compact ? { ...vocab.manifestRow(h.def as never, { bytes: assetBytesOf(h.def as never, store), publicRef: publicRef(h.def) }), ...(q ? { score: h.score, why: h.why } : {}) } : ({ ...h.def, publicRef: publicRef(h.def), category: vocab.categoryOf(h.def as never), interfaces: vocab.interfacesOf(h.def as never), ...(q ? { score: h.score, why: h.why } : {}), thumb: store.thumbFile(h.def.hash) ? `/thumbs/${h.def.hash}.png` : null }));
+    return c.json({ defs, count: defs.length, offset, query: q || null, ...(facets.category || facets.has?.length || facets.form ? { facets } : {}), ...(q && !defs.length ? { hint: 'nothing in the library matches; define it (kit/2 parts, a generator, or an imported mesh: POST /v1/god/assets)' } : {}) }, 200, noStore);
   });
   app.get('/v1/god/defs/*', (c) => {
     const rest = decodeURIComponent(c.req.path.replace(/^.*\/v1\/god\/defs\//, ''));
@@ -582,8 +599,9 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
       def: pub, publicRef: publicRef(def), example: { ops: [exampleOp(def)] },
       slots: def.slots.map((s) => ({ id: s.id, kind: s.kind, capacity: s.capacity, ...(s.label ? { label: s.label } : {}) })),
       components: Object.keys(def.components ?? {}), extends: extendsChain,
+      category: vocab.categoryOf(def as never), interfaces: vocab.interfacesOf(def as never), manifest: vocab.manifestLine(vocab.manifestRow(def as never, { bytes: assetBytesOf(def, store), publicRef: publicRef(def) })),
       asset: asset ? (({ baked: _b, ...m }) => ({ ...m, url: `/assets/${m.sha}.${m.ext}` }))(asset) : null,
-      thumb: store.thumbFile(def.hash) ? `/v1/god/defs/${publicRef(def)}/thumb.png` : null,
+      thumb: store.thumbFile(def.hash) ? `/thumbs/${def.hash}.png` : null,
     }, 200, noStore);
   });
   app.post('/v1/god/defs/*', async (c) => {
@@ -593,7 +611,8 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
     const def = findDef(rest.slice(0, -'/thumb.png'.length));
     if (!def) throw new ApiError(404, 'not-found', 'no such def');
     store.putThumb(def.hash, new Uint8Array(await c.req.arrayBuffer()));
-    return c.json({ ok: true, thumb: `/v1/god/defs/${publicRef(def)}/thumb.png` }, 200, noStore);
+    return c.json({ ok: true, thumb: `/v1/god/defs/${publicRef(def)}/thumb.png`, immutable: `/thumbs/${def.hash}.png` }, 200, noStore);
   });
+  mountCatalogRoutes(app, { god: d.god, requireGod: d.requireGod, store, library });
   return store;
 }

@@ -118,6 +118,20 @@ yourself is slower, uglier and knows nothing about Souls. The order is always:
 that def in full: params with ranges and defaults, state, size, slots, rooms; several words search.
 `schema --md` (= SCHEMA.md) has every generator's params with ranges.
 
+**The catalogue (any number of types).** Every def has a category (`taxonomy` prints the tree with counts, the
+params every type may take, and the actuators) and the words people use for it:
+- `find <words>` ranks by name, synonyms ("bodega" → corner-shop, "call box" → phone-box) and category words;
+  `find --category furniture.seat`, `find --has slot:sit` (or `slot:lie`, `verb:put-on`, `actuator:door`,
+  `action:light`, `comp:light`, `param:taper`) filter by what a thing is and what it offers.
+- `catalog [--category c] [--has …] [--page n]` lists every def, one line each (ref, category, size, triangles, asset
+  bytes, {interfaces}, (params), synonyms, first sentence) — read it whole when you plan a big build.
+- `recommend <what you want>` turns an intent into picks per need and an example batch.
+- Convention params many catalogue types take (see `defs <ref>`): `sx sy sz` (stretch per axis), `taper bend skew`
+  (warp), `tint vary` (paint), `condition=new|worn|damaged|construction` (wear; construction puts a scaffold up),
+  `variant=…` (styles), and one colour param per part. Things with **actuators** (doors, lamps, fires, taps…) are
+  things Souls can open/close/lock, switch on/off, light/put out, fill/empty, play/stop; set their start state with
+  `--state '{"open":true}'`.
+
 ## Placing with relations (the solver)
 
 `place <def> [relation] [--facing …] [--name n] [--param k=v]… [--state '{…}'] [--dry]`

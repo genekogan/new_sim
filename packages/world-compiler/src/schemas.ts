@@ -113,6 +113,10 @@ export const defSchema = z.object({
   extends: z.string().regex(DEF_REF).optional(),
   description: z.string().max(4000).default(''),
   tags: z.array(z.string().regex(NAME)).max(32).default([]),
+  /** VOCAB-MECH: the catalogue category (a node of vocab/taxonomy.json, e.g. "building.commercial") and the words people
+   *  use for it ("bodega", "corner shop"). Optional (no default) so defs without them hash as before; search infers one. */
+  category: z.string().regex(/^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*){0,3}$/).optional(),
+  synonyms: z.array(z.string().min(2).max(40)).max(24).optional(),
   form: z.enum(['point', 'path', 'area']).default('point'),
   make: makeSchema,
   params: fieldsSchema.default({}),

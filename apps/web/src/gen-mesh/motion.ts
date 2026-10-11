@@ -36,7 +36,8 @@ export function animate(obj: THREE.Object3D, entity: Entity, def: StoredDef, tIn
   const model = ud.rig?.model ?? ud.model ?? boundModel;
   if (c.route && model) routeStep(obj, entity, def, model, t, base);
   if (ud.rig) creatureStep(obj, ud.rig, entity, t, base);
-  if (c.spin) {
+  // VOCAB-MECH: a spinning part stops when its actuator is off (power on:false, play playing:false)
+  if (c.spin && entity.state?.on !== false && entity.state?.playing !== false) {
     const ang = (t * (c.spin.rpm / 60)) * Math.PI * 2;
     const target = c.spin.role ? obj.getObjectByName(`role:${c.spin.role}`) : obj;
     if (target) { if (c.spin.axis === 'x') target.rotation.x = ang; else if (c.spin.axis === 'z') target.rotation.z = ang; else target.rotation.y = (target === obj ? base.yaw : 0) + ang; }
