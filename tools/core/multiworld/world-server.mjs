@@ -20,11 +20,13 @@ export async function installWalkSettleWaitV1(host,enabled,drive){
 
 export function nativeLifecycleFlagV1(value){if(value!==undefined&&typeof value!=='boolean')throw Error('world.native-lifecycle-flag');return value===true;}
 
-export async function openWorldServer({input,dataDir,worldKey,worldId,port,build='local-multiworld/1',webDir,marsWebDir,publicOrigin,ownerId='dev:admin',seedCast=true,nativeCast=true,runtimePolicies=true,walkSettleWaitV1,nativeLifecycleV1,prepareNativeLifecycle,installLiving=true,cards=true,skillFile,cliFile,instructionsFile,authMode='local-dev',accountAuth,checkOnly=false,worldVariant='legacy',sceneSha256,nativeCastIds,experiencesFile,experiencesSha256,placeData,placeDataSha256,activityData,activityDataSha256,nativeAliases,nativeAliasesSha256}){
+export async function openWorldServer({input,dataDir,worldKey,worldId,port,build='local-multiworld/1',webDir,marsWebDir,publicOrigin,ownerId='dev:admin',seedCast=true,nativeCast=true,runtimePolicies=true,walkSettleWaitV1,nativeLifecycleV1,prepareNativeLifecycle,installLiving=true,cards=true,skillFile,cliFile,instructionsFile,authMode='local-dev',accountAuth,checkOnly=false,worldVariant='legacy',sceneSha256,nativeCastIds,experiencesFile,experiencesSha256,placeData,placeDataSha256,activityData,activityDataSha256,nativeAliases,nativeAliasesSha256,basePath=''}){
+ // basePath (world launcher fork, e.g. '/worlds'): served at <basePath>/w/<key> on a launcher child port with the launcher's build id.
+ if(basePath!==''&&!/^\/[a-z][a-z0-9-]{0,31}$/.test(basePath))throw Error('basePath must be one path segment like /worlds');
  const lifecycleEnabled=nativeLifecycleFlagV1(nativeLifecycleV1);if(prepareNativeLifecycle!==undefined&&(!lifecycleEnabled||typeof prepareNativeLifecycle!=='function'))throw Error('world.native-lifecycle-bootstrap-callback');
  if(walkSettleWaitV1!==undefined&&typeof walkSettleWaitV1!=='boolean')throw Error('world.walk-settle-wait-flag');
- if(!['mars','littlemartians'].includes(worldKey)||!input||!dataDir||!worldId||!Number.isInteger(port)||port<4963||port>4969)throw Error('explicit local Mars/LM input/data/world and port4963..4969 required');
- if(!build.startsWith('local-')||!ownerId)throw Error('local build and explicit cast owner required');
+ if(!['mars','littlemartians'].includes(worldKey)||!input||!dataDir||!worldId||!Number.isInteger(port)||(basePath?port<1024||port>65535:port<4963||port>4969))throw Error('explicit local Mars/LM input/data/world and port4963..4969 required');
+ if(!basePath&&!build.startsWith('local-')||!ownerId)throw Error('local build and explicit cast owner required');
  const exposure=worldAuthMode(authMode,{edgePublic:process.env.EDGE_PUBLIC,devAuth:process.env.DEV_AUTH,seedCast,nativeCast});
  // Validate explicit activation before a data directory/lock/database is touched.
  worldAccountAuthRequired(exposure,accountAuth);
@@ -59,9 +61,9 @@ export async function openWorldServer({input,dataDir,worldKey,worldId,port,build
   const prior=process.env.DATA_DIR;process.env.DATA_DIR=dataDir;
   let defaults;try{defaults=(await load('apps/server/src/config.ts')).config;}finally{if(prior===undefined)delete process.env.DATA_DIR;else process.env.DATA_DIR=prior;}
   const origin=validateWorldOrigin(publicOrigin??`http://127.0.0.1:${port}`,authMode);
-  const cfg={...defaults,accountAuthRequired:worldAccountAuthRequired(exposure,accountAuth,defaults.accountAuthRequired),worldKey,worldId,worldPath:`/w/${worldKey}`,worldSeed:'sim-genesis-1',host:'127.0.0.1',port,dataDir,
+  const cfg={...defaults,accountAuthRequired:worldAccountAuthRequired(exposure,accountAuth,defaults.accountAuthRequired),worldKey,worldId,worldPath:`${basePath}/w/${worldKey}`,worldSeed:'sim-genesis-1',host:'127.0.0.1',port,dataDir,
    webDir:resolve(webDir??join(input,'apps/web/dist')),marsWebDir:resolve(marsWebDir??join(input,'mars/viewer/dist/client')),
-   publicUrl:`${origin.replace(/\/$/,'')}/w/${worldKey}`,engine:'mars',livingWorld:true,seedNatives:false,ownerId,
+   publicUrl:`${origin.replace(/\/$/,'')}${basePath}/w/${worldKey}`,engine:'mars',livingWorld:true,seedNatives:false,ownerId,
    brainMode:'fake',budgetUsdPerDay:0,thinkingBudgetCeiling:1,authorizedThinkingWorldId:undefined,typesafeKey:undefined,anthropicKey:undefined,
    ...(exposure.configured?{}:{authProvider:'none',privyAppId:'',privyAppSecret:''}),r2:{prefix:'sim'},archiveTakes:false,inviteRequired:exposure.configured?defaults.inviteRequired:false,maxSoulsPerUser:exposure.configured?defaults.maxSoulsPerUser:50,build,mindDriver:'edge',
    skillFile:undefined,cliFile:cliFile?resolve(cliFile):undefined,instructionsFile:instructionsFile?resolve(instructionsFile):join(input,'tools/edge-skill/INSTRUCTIONS.md')};

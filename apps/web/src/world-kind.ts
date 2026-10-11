@@ -8,6 +8,8 @@ import { BASE } from './base-path.ts';
 import { worldKey } from './world-path.ts';
 
 export const OLD_WORLD_KEYS: readonly string[] = ['eden', 'mars', 'littlemartians', 'toy'];
-export const isNewWorld = (base: string, key: string) => base !== '' || !OLD_WORLD_KEYS.includes(key);
+// An old world's key is an old world under a prefix too: the operator's forks /worlds/w/{eden,mars,littlemartians} (lane
+// FORKS) run main's old-world server (config.worldEngine off); public creation never yields these slugs (registry slugFor).
+export const isNewWorld = (_base: string, key: string) => !OLD_WORLD_KEYS.includes(key);
 /** This page shows a new (world-engine) world. */
 export const newWorld = isNewWorld(BASE, worldKey);

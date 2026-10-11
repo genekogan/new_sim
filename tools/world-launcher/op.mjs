@@ -4,18 +4,34 @@
 //
 //   node tools/world-launcher/op.mjs create-world --port 4620 [--base /worlds] --name "Little Martians (Arium)"
 //        --template littlemartians-two (--owner <account id> | --owner-of <slug of a world that account owns>) [--god-name <shown name>]
+//   node tools/world-launcher/op.mjs register-fork --port 4620 [--base /worlds] --slug eden|mars|littlemartians
+//        --descriptor <abs fork.json> [--accounts <abs accounts.sqlite>] [--name <shown name>]
+//   node tools/world-launcher/op.mjs remove-fork --port 4620 [--base /worlds] --slug <slug>      (its data stays)
 //
-// The world is born owned by that existing account (its god), exactly as if that person had created it signed in.
+// create-world: the world is born owned by that existing account (its god), exactly as if that person had created it signed in.
+// register-fork: serve the copy of an old world already in <data>/worlds/<slug>/sim.db under <base>/w/<slug> (lane FORKS).
 const argv = process.argv.slice(2);
 const flag = (k) => { const i = argv.indexOf(`--${k}`); return i >= 0 ? argv[i + 1] : undefined; };
 const cmd = argv[0];
-if (cmd !== 'create-world' || !flag('port') || !flag('name') || !flag('template') || !(flag('owner') || flag('owner-of'))) {
-  console.error('usage: op.mjs create-world --port <launcher port> [--base /worlds] --name <name> --template <id> (--owner <account id> | --owner-of <slug>) [--god-name <name>]');
+const usage = () => {
+  console.error('usage: op.mjs create-world --port <launcher port> [--base /worlds] --name <name> --template <id> (--owner <account id> | --owner-of <slug>) [--god-name <name>]\n'
+    + '       op.mjs register-fork --port <launcher port> [--base /worlds] --slug <eden|mars|littlemartians> --descriptor <abs path> [--accounts <abs path>] [--name <name>]\n'
+    + '       op.mjs remove-fork --port <launcher port> [--base /worlds] --slug <slug>');
   process.exit(2);
-}
+};
+let body;
+if (cmd === 'create-world') {
+  if (!flag('port') || !flag('name') || !flag('template') || !(flag('owner') || flag('owner-of'))) usage();
+  body = { name: flag('name'), template: flag('template'), ...(flag('owner') ? { owner: flag('owner') } : { ownerOf: flag('owner-of') }), ...(flag('god-name') ? { godName: flag('god-name') } : {}) };
+} else if (cmd === 'register-fork') {
+  if (!flag('port') || !flag('slug') || !flag('descriptor')) usage();
+  body = { slug: flag('slug'), descriptor: flag('descriptor'), ...(flag('accounts') ? { accounts: flag('accounts') } : {}), ...(flag('name') ? { name: flag('name') } : {}) };
+} else if (cmd === 'remove-fork') {
+  if (!flag('port') || !flag('slug')) usage();
+  body = { slug: flag('slug') };
+} else usage();
 const base = (flag('base') ?? '').replace(/\/$/, '');
-const body = { name: flag('name'), template: flag('template'), ...(flag('owner') ? { owner: flag('owner') } : { ownerOf: flag('owner-of') }), ...(flag('god-name') ? { godName: flag('god-name') } : {}) };
-const r = await fetch(`http://127.0.0.1:${Number(flag('port'))}${base}/__sim/op/create-world`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(180_000) });
+const r = await fetch(`http://127.0.0.1:${Number(flag('port'))}${base}/__sim/op/${cmd}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: AbortSignal.timeout(240_000) });
 const d = await r.json().catch(() => ({}));
 console.log(JSON.stringify({ status: r.status, ...d }, null, 2));
 process.exit(r.ok ? 0 : 1);

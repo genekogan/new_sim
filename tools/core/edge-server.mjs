@@ -10,9 +10,11 @@ import {createHash} from 'node:crypto';
 import {setImmediate} from 'node:timers/promises';
 
 export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,marsWebDir,build='local-edge/1',checkOnly=false,placeData,seedObjects,inviteRequired=false,skillFile,cliFile,instructionsFile,accountAuth=false,publicOrigin,ambient=true,
-  officeStairGuards=false,authoredBoundariesFile=undefined,authoredBoundariesSHA256=undefined,inputManifestSHA256,modelCredentialFile=undefined,localBudget=0,autonomous=false,localSoulLimit=5,humanRest=false,provisions=false,sequences=false,floorGoals=false,kitchen=false,shore=false,foodDeliveryId,quietLandingCourtesy=false,social=false,closedGoals=false,approachRetention=false,activateExpansion=false,humanDirectionBurstUsd=1,quiesceThought=false,nativePlaces=[],nav=null,activitySpots}) {
-  if(!input||!dataDir||!worldId||!Number.isInteger(port)||!(port>=4950&&port<=4959||port===4970))throw Error('explicit local input/data/world/allowed port required');
-  if(!build.startsWith('local-'))throw Error('local build identity required');
+  officeStairGuards=false,authoredBoundariesFile=undefined,authoredBoundariesSHA256=undefined,inputManifestSHA256,modelCredentialFile=undefined,localBudget=0,autonomous=false,localSoulLimit=5,humanRest=false,provisions=false,sequences=false,floorGoals=false,kitchen=false,shore=false,foodDeliveryId,quietLandingCourtesy=false,social=false,closedGoals=false,approachRetention=false,activateExpansion=false,humanDirectionBurstUsd=1,quiesceThought=false,nativePlaces=[],nav=null,activitySpots,basePath=''}) {
+  // basePath (world launcher fork, e.g. '/worlds'): served at <basePath>/w/eden on a launcher child port with the launcher's build id.
+  if(basePath!==''&&!/^\/[a-z][a-z0-9-]{0,31}$/.test(basePath))throw Error('basePath must be one path segment like /worlds');
+  if(!input||!dataDir||!worldId||!Number.isInteger(port)||!(basePath?port>=1024&&port<=65535:port>=4950&&port<=4959||port===4970))throw Error('explicit local input/data/world/allowed port required');
+  if(!basePath&&!build.startsWith('local-'))throw Error('local build identity required');
   const origin=new URL(publicOrigin??`http://127.0.0.1:${port}`);if(origin.origin!==origin.href.replace(/\/$/,'')||origin.username||origin.password||!['http:','https:'].includes(origin.protocol)||origin.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(origin.hostname))throw Error('explicit canonical public origin required');
   input=resolve(input);dataDir=resolve(dataDir);
   let authoredBoundaryDeclaration;
@@ -44,9 +46,9 @@ export async function openEdgeServerV1({input,dataDir,worldId,port=4959,webDir,m
   // explicit local folder; no .env reader or provider/auth credentials.
   mkdirSync(dataDir,{recursive:true});const prior=process.env.DATA_DIR;process.env.DATA_DIR=dataDir;
   let defaults;try{defaults=(await load('apps/server/src/config.ts')).config;}finally{if(prior===undefined)delete process.env.DATA_DIR;else process.env.DATA_DIR=prior;}
-  const cfg={...defaults,worldKey:'eden',worldId,worldPath:'/w/eden',worldSeed:'sim-genesis-1',
+  const cfg={...defaults,worldKey:'eden',worldId,worldPath:`${basePath}/w/eden`,worldSeed:'sim-genesis-1',
     host:'127.0.0.1',port,dataDir,webDir:resolve(webDir??join(input,'apps/web/dist')),marsWebDir:resolve(marsWebDir??join(input,'mars/viewer/dist/client')),
-    publicUrl:`${origin.origin}/w/eden`,engine:'mars',livingWorld:true,seedNatives:false,
+    publicUrl:`${origin.origin}${basePath}/w/eden`,engine:'mars',livingWorld:true,seedNatives:false,
     ownerId:'dev:admin',brainMode:'fake',budgetUsdPerDay:0,typesafeKey:undefined,anthropicKey:undefined,
     accountAuthRequired:accountAuth===true,privyAppId:accountAuth?defaults.privyAppId:'',privyAppSecret:accountAuth?defaults.privyAppSecret:'',archiveTakes:false,inviteRequired,maxSoulsPerUser:5,build,mindDriver:'edge',skillFile:skillFile?resolve(skillFile):defaults.skillFile,cliFile:cliFile?resolve(cliFile):defaults.cliFile,instructionsFile:instructionsFile?resolve(instructionsFile):join(input,'tools/edge-skill/INSTRUCTIONS.md')};  // Gene 2026-10-07: pairing open
   if(!Number.isInteger(localSoulLimit)||localSoulLimit<1||localSoulLimit>50)throw Error('local Soul allowance must be 1..50');

@@ -216,3 +216,23 @@ export function defaultCommand(world, port, o) {
   };
   return { cmd: process.execPath, args: [...(clerk ? [`--env-file=${resolve(clerk.envFile)}`] : []), 'apps/server/src/main.ts'], env };
 }
+
+/** A fork of an old world (launcher op register-fork; tools/world-launcher/fork-world.mjs): main's old-world entry points
+ *  under the launcher's base, Clerk with the forks' own account registry (the old worlds' accounts, so their Souls keep
+ *  their owners), no world-engine flag (config.worldEngine stays off for the old keys), fake brain, no model keys. */
+export function forkCommand(world, port, o) {
+  const marsWeb = o.marsWebDir ? resolve(o.marsWebDir) : null;
+  const clerk = o.auth?.envFile ? o.auth : null;
+  if (!clerk) throw new Error(`fork ${world.slug}: forks sign in with Clerk; start the launcher with --auth-env`);
+  if (!world.fork?.descriptor || !world.fork?.accounts) throw new Error(`fork ${world.slug}: descriptor and account registry required`);
+  const env = {
+    PATH: process.env.PATH, HOME: process.env.HOME, TMPDIR: process.env.TMPDIR, LANG: process.env.LANG,
+    ANTHROPIC_API_KEY: '', TYPESAFE_API_KEY: '', OPENAI_API_KEY: '', BRAIN_MODE: 'fake', MIND_DRIVER: 'edge',
+    WORLD_KEY: world.slug, PORT: String(port), HOST: '127.0.0.1', DATA_DIR: world.dataDir, PUBLIC_URL: o.publicOrigin,
+    WORLD_PATH: `/w/${world.slug}`, DEV_AUTH: '0', AUTH_PROVIDER: 'clerk', ACCOUNT_AUTH_REQUIRED: '1', ACCOUNT_REGISTRY_PATH: world.fork.accounts,
+    SIM_FORK: world.slug,
+    ...(o.soulCliFile && existsSync(o.soulCliFile) ? { EDGE_CLI_FILE: resolve(o.soulCliFile) } : {}),
+    ...(marsWeb && existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}),
+  };
+  return { cmd: process.execPath, args: [`--env-file=${resolve(clerk.envFile)}`, '--experimental-transform-types', 'tools/world-launcher/fork-world.mjs', world.fork.descriptor], env };
+}
