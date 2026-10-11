@@ -395,7 +395,7 @@ function circleFit(rt: Runtime, c: Circle, members: Set<string>): Diagnostic | n
   const sp = rt.services.spatial as Spatial;
   sp.sync(rt.world);
   for (const m of c.moves) {
-    const g = sp.level(m.level);
+    const g = sp.levelAt(m.level, m.p);
     const cl = g ? clearanceAt(g, m.p) : 0;
     if (cl < SLOT_CLEARANCE) {
       const what = (g && nearestBlocker(g, m.p)) ?? 'the edge of walkable ground';

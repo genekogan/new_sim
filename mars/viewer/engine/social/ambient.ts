@@ -47,9 +47,9 @@ function draw(rt: Runtime, ex: WanderExec) {
 function pickTarget(rt: Runtime, ex: WanderExec, me: string): Vec2 | null {
   const sp = rt.services.spatial as Spatial;
   sp.sync(rt.world);
-  const g = sp.level(ex.level);
-  if (!g) return null;
   const [x0, z0, x1, z1] = ex.bbox;
+  const g = sp.levelAt(ex.level, [(x0 + x1) / 2, (z0 + z1) / 2]);
+  if (!g) return null;
   const taken: Vec2[] = [];
   for (const e of Object.values(rt.world.entities)) if (e.id !== me && e.kind === 'human' && e.human?.level === ex.level) taken.push([e.pose.p[0], e.pose.p[2]]);
   for (const w of ex.who) if (w.child && w.actor !== me && rt.isActive(w.child.id)) { const q = w.child.params as { x: number; z: number }; taken.push([q.x, q.z]); }

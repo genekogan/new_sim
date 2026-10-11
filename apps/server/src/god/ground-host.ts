@@ -47,12 +47,13 @@ export class GroundHost {
     this.db.db.prepare('INSERT OR IGNORE INTO world_ground_recipes_v1 (world_id, hash, body) VALUES (?, ?, ?)').run(this.host.worldId, hash, JSON.stringify(g));
     // compare with the newest ground this host asked for (a fact may still be queued: A → B → A must log A again)
     // god worlds walk the whole ground (lane NAV: paged navigation); a world standing on the old 384 m window adopts it once
-    const paged = this.engine.world.groundV1?.nav === 'paged/1';
+    // (NAV_PAGED=0: the old 384 m window, for comparison runs)
+    const want = process.env.NAV_PAGED !== '0', paged = (this.engine.world.groundV1?.nav === 'paged/1') === want;
     const intended = this.logged ?? (paged ? this.engine.world.groundV1?.recipeHash : null) ?? null;
     if (intended === hash) return hash;
     if (!this.engine.previewGroundV1) throw new Error('ground.reader-required: this engine has no ground reader');
     this.logged = hash; this.installs++;
-    void this.host.enqueue('rules', 'god:ground', { groundV1: groundFact(g, seq, { paged: true }), why: 'ground/1: Souls stand on the entity world\'s terrain (prospective; earlier history replays unchanged)' });
+    void this.host.enqueue('rules', 'god:ground', { groundV1: groundFact(g, seq, { paged: process.env.NAV_PAGED !== '0' }), why: 'ground/1: Souls stand on the entity world\'s terrain (prospective; earlier history replays unchanged)' });
     return hash;
   }
   /** Ground height for a body standing at (x, z) on the current recipe (diagnostics, e2e). */

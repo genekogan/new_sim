@@ -813,7 +813,7 @@ export class MarsEngine implements Engine {
     if(!this.free(id)||this.actorBorrowed(id)||h.task||h.grip||h.on||h.riding||h.carrier||h.boatPassenger||h.boatTransit||h.sleepPose||h.shore||h.together||h.partner||h.holding||h.prop||h.baseActivity==='sit'||!['idle','wait'].includes(h.activity))return 'body.safe-standing-required';
     if(Object.values(this.ents).some((o:any)=>o.support?.kind==='in-hand'&&o.support.by===id))return 'body.safe-standing-required';
     const radius=body?.family==='floater'?(body.radius??.35):humanRadius({body:body??undefined});
-    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.level(h.level);
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.levelAt(h.level,[e.pose.p[0],e.pose.p[2]]);
     if(!grid||clearanceAt(grid,[e.pose.p[0],e.pose.p[2]])<radius)return 'body.no-clearance';
     if(Object.values(this.ents).some((o:any)=>o.id!==id&&o.kind==='human'&&o.human?.level===h.level&&hypot(o.pose.p[0]-e.pose.p[0],o.pose.p[2]-e.pose.p[2])<radius+humanRadius(o)))return 'body.no-clearance';
     return null;
@@ -830,7 +830,7 @@ export class MarsEngine implements Engine {
     const e = this.ents[id];
     if (!e?.human || this.byActor.has(id) || this.holders(id).length || e.human.sleepPose || e.human.on || e.human.riding) return false;
     const people = Object.values(this.ents).filter((o: any) => o.kind === 'human' && o.id !== id).map((o: any) => [o.pose.p[0], o.pose.p[2]] as [number, number]);
-    const spatial = this.rt.services.spatial as Spatial; spatial.sync(this.rt.world); const grid = spatial.level(0);
+    const spatial = this.rt.services.spatial as Spatial; spatial.sync(this.rt.world); const grid = spatial.levelAt(0, [to[0], to[1]]);
     for (let ring = 0; ring < 8; ring++) for (let k = 0; k < Math.max(1, ring * 6); k++) {
       const ang = (k / Math.max(1, ring * 6)) * Math.PI * 2 + ring * 0.5, x = r3(to[0] + dcos(ang) * ring * 0.9), z = r3(to[1] + dsin(ang) * ring * 0.9);
       if (people.some(([px, pz]) => hypot(px - x, pz - z) < 0.8)) continue;
@@ -910,7 +910,7 @@ export class MarsEngine implements Engine {
       if (people.some(([px, pz]) => (this.cfg.safeArrivalV1?hypot(px-x,pz-z):Math.hypot(px-x,pz-z)) < 0.8)) continue;
       if(this.cfg.safeArrivalV1){
         const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);
-        const grid=spatial.level(0),radius=body?.radius??HUMAN_RADIUS;
+        const grid=spatial.levelAt(0,[x,z]),radius=body?.radius??HUMAN_RADIUS;
         if(!grid||clearanceAt(grid,[x,z])<radius)continue;
       }
       this.ents[id] = this.m.human(id, x, z, { label }); if(body)this.ents[id].body=body;
@@ -933,7 +933,7 @@ export class MarsEngine implements Engine {
   humanBirthIssue(id:string):Diag|null {
     const e=this.ents[id];if(!e?.human)throw new Error('birth body is missing');
     const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);
-    const grid=spatial.level(e.human.level),radius=e.body?.family==='floater'?e.body.radius:HUMAN_RADIUS;
+    const grid=spatial.levelAt(e.human.level,[e.pose.p[0],e.pose.p[2]]),radius=e.body?.family==='floater'?e.body.radius:HUMAN_RADIUS;
     if(!grid||clearanceAt(grid,[e.pose.p[0],e.pose.p[2]])<radius)
       return {code:'birth.arrival-unavailable',message:'No safe standing room at the arrival point.'};
     return null;
@@ -1353,7 +1353,7 @@ export class MarsEngine implements Engine {
     if(this.rt.world.regions[r.id]||this.ents[r.id])return {code:'region.exists',message:`${r.id} already names a region or entity`};
     if(typeof r.label!=='string'||!r.label||r.label.length>100)return {code:'region.bad-label',message:'label 1..100 characters'};
     if(!Array.isArray(r.polygon)||r.polygon.length<3||r.polygon.length>64||!r.polygon.every(v=>Array.isArray(v)&&v.length===2&&v.every(Number.isFinite)))return {code:'region.bad-polygon',message:'3..64 [x,z] points'};
-    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.level(0);if(!grid)return {code:'region.no-ground',message:'no level-0 ground'};
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.levelAt(0,[r.polygon.reduce((s,v)=>s+v[0],0)/r.polygon.length,r.polygon.reduce((s,v)=>s+v[1],0)/r.polygon.length]);if(!grid)return {code:'region.no-ground',message:'no level-0 ground'};
     const xs=r.polygon.map(v=>v[0]),zs=r.polygon.map(v=>v[1]);let clear=0;
     for(let x=Math.ceil(Math.min(...xs))+.5;x<Math.max(...xs);x+=1)for(let z=Math.ceil(Math.min(...zs))+.5;z<Math.max(...zs);z+=1)if(inPoly(x,z,r.polygon)&&clearanceAt(grid,[x,z])>=HUMAN_RADIUS+.07)clear++;
     return clear>=3?null:{code:'region.unsupported',message:`${r.id} has ${clear} clear standing spots on admitted native ground (needs 3)`};
@@ -1421,7 +1421,7 @@ export class MarsEngine implements Engine {
     const relocated:string[]=[],trapped:string[]=[];
     for(const id of Object.keys(this.ents).sort()){
       const e=this.ents[id];if(e.kind!=='human'||!e.human||e.human.shore||e.human.carrier||e.human.sleepPose||e.human.on)continue;
-      const grid=spatial.level(e.human.level??0);if(!grid||clearanceAt(grid,[e.pose.p[0],e.pose.p[2]])>=HUMAN_RADIUS*0.9)continue;
+      const grid=spatial.levelAt(e.human.level??0,[e.pose.p[0],e.pose.p[2]]);if(!grid||clearanceAt(grid,[e.pose.p[0],e.pose.p[2]])>=HUMAN_RADIUS*0.9)continue;
       if(e.human.activity==='sit'||e.human.baseActivity==='sit')continue; // a seated body's own seat is its support
       const to=(e.human.level??0)===0?this.nearestStandableV1([e.pose.p[0],e.pose.p[2]],id):null;
       if(to&&this.relocateHumanV1(id,to))relocated.push(id);else trapped.push(id);
@@ -1432,7 +1432,7 @@ export class MarsEngine implements Engine {
   /** world-edit/1 read: the nearest clear standing point to `at` on a level (rings of 0.25 m out to `maxRing`), away from
    *  other bodies; null when none. Used to plan a Soul's approach to a god-placed thing on another floor. */
   standableNearV1(at:[number,number],level=0,except?:string,minClear=HUMAN_RADIUS+.12,maxRing=24):[number,number]|null{
-    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.level(level);if(!grid)return null;
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.levelAt(level,at);if(!grid)return null;
     const people=Object.values(this.ents).filter((o:any)=>o.kind==='human'&&o.id!==except&&(o.human?.level??0)===level).map((o:any)=>[o.pose.p[0],o.pose.p[2]] as [number,number]);
     for(let ring=0;ring<=maxRing;ring++){const n=Math.max(1,ring*8);for(let k=0;k<n;k++){
       const ang=(k/n)*Math.PI*2,x=r3(at[0]+dcos(ang)*ring*.25),z=r3(at[1]+dsin(ang)*ring*.25);
@@ -1482,9 +1482,9 @@ export class MarsEngine implements Engine {
   /** nav/1 read: current raster bounds, widened by installed navigation overlays. */
   groundBoundsV1():[number,number,number,number]{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);return [...spatial.scene.bounds] as [number,number,number,number];}
   /** nav/1 read: clearance (m) of level-0 standing ground at a point (0 off ground or inside a solid). */
-  clearanceAtV1(x:number,z:number,level=0):number{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const g=spatial.level(level);return g?clearanceAt(g,[x,z]):0;}
+  clearanceAtV1(x:number,z:number,level=0):number{const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const g=spatial.levelAt(level,[x,z]);return g?clearanceAt(g,[x,z]):0;}
   nearestStandableV1(at:[number,number],except?:string,minClear=HUMAN_RADIUS+.15,maxRing=80):[number,number]|null{
-    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.level(0);if(!grid)return null;
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.levelAt(0,at);if(!grid)return null;
     const people=Object.values(this.ents).filter((o:any)=>o.kind==='human'&&o.id!==except).map((o:any)=>[o.pose.p[0],o.pose.p[2]] as [number,number]);
     for(let ring=0;ring<=maxRing;ring++){const n=Math.max(1,ring*8);for(let k=0;k<n;k++){
       const ang=(k/n)*Math.PI*2,x=r3(at[0]+dcos(ang)*ring*.5),z=r3(at[1]+dsin(ang)*ring*.5);
@@ -1493,7 +1493,7 @@ export class MarsEngine implements Engine {
   }
   /** nav/1 read: up to `n` clear standing points spread over a polygon (2 m lattice, farthest-point order from its centre), for strolls. */
   clearSpotsV1(polygon:[number,number][],n:number):[number,number][]{
-    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.level(0);if(!grid||!Array.isArray(polygon)||polygon.length<3)return [];
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);if(!Array.isArray(polygon)||polygon.length<3)return [];const grid=spatial.levelAt(0,[polygon.reduce((s,v)=>s+v[0],0)/polygon.length,polygon.reduce((s,v)=>s+v[1],0)/polygon.length]);if(!grid)return [];
     const xs=polygon.map(v=>v[0]),zs=polygon.map(v=>v[1]),cand:[number,number][]=[];
     for(let x=Math.ceil(Math.min(...xs))+1;x<Math.max(...xs);x+=2)for(let z=Math.ceil(Math.min(...zs))+1;z<Math.max(...zs);z+=2)if(inPoly(x,z,polygon)&&clearanceAt(grid,[x,z])>=HUMAN_RADIUS+.4)cand.push([x,z]);
     if(!cand.length)return [];
@@ -1515,7 +1515,7 @@ export class MarsEngine implements Engine {
     if(this.ents[spec.id])return this.ents[spec.id].carrier?null:{code:'carrier.id-taken',message:`${spec.id} already names another entity`};
     if(!Array.isArray(spec.at)||!spec.at.every(Number.isFinite))return {code:'carrier.bad-home',message:'at must be [x,z]'};
     const e=this.m.carrierEntity(spec,this.rt.tick);if('code' in e)return e;
-    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.level(0);
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.levelAt(0,[spec.at[0],spec.at[1]]);
     const need=Math.hypot(0.75,0.6)+0.3;
     if(!grid||clearanceAt(grid,spec.at)<need)return {code:'carrier.home-blocked',message:'the carrier home is not clear level-0 ground'};
     for(const o of Object.values(this.ents) as any[])if(o.human&&Math.hypot(o.pose.p[0]-spec.at[0],o.pose.p[2]-spec.at[1])<2.5)return {code:'carrier.home-occupied',message:`${o.id} stands where the carrier would be`};
