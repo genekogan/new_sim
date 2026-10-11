@@ -75,6 +75,7 @@ const r2 = (v: number) => Math.round(v * 100) / 100;
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 const SHOW = 120;            // walk capabilities offered: the nearest this many named things (plus rooms of near buildings)
 const ROOMS_WITHIN = 80;
+const BUILDINGS_WITHIN = 150;
 const STROLL_AREA = 150;     // m²: an open area this big offers a stroll through it (the ledger strolls places ≥ 250 m²)     // rooms of buildings within this many metres are offered too
 const STOP = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'at', 'on']);
 const words = (s: string) => s.toLowerCase().replace(/[’']/g, '').split(/[^a-z0-9]+/).filter((w) => w && !STOP.has(w));
@@ -275,6 +276,9 @@ export class GodNav {
     const all = this.things();
     const ranked = all.filter((t) => t.kind !== 'room').map((t) => ({ t, d: this.distance(t, here) })).sort((a, b) => a.d - b.d || (a.t.ref < b.t.ref ? -1 : 1));
     const pick: { t: Thing; d: number }[] = ranked.slice(0, SHOW);
+    // SOULFIX2: a furnished town has more named things near than SHOW (each chair is one): buildings within
+    // BUILDINGS_WITHIN stay offered however many pieces of furniture are nearer, so a Soul can always head for one
+    for (const x of ranked.slice(SHOW)) if (x.t.kind === 'building' && x.d <= BUILDINGS_WITHIN) pick.push(x);
     for (const { t, d } of ranked) if (t.kind === 'building' && d <= ROOMS_WITHIN) for (const r of t.rooms ?? []) { const rt = this.thing(r); if (rt) pick.push({ t: rt, d: this.distance(rt, here) }); }
     for (const { t, d } of pick) {
       const id = `walk:${t.ref}`; if (caps.some((c) => c.id === id)) continue;

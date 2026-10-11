@@ -162,7 +162,7 @@ export function realize(p: Plan): Layout {
     if (!shared || shared.s1 - shared.s0 < w + 0.3) { if (d.width !== undefined || d.at !== undefined) L.warnings.push(`door ${d.a}↔${d.b} (floor ${d.floor}): rooms do not share a wall long enough`); continue; }
     doorsTried.add(key);
     const at = d.at ?? 0.5, lo = shared.s0 + w / 2 + 0.2, hi = shared.s1 - w / 2 - 0.2;
-    const sc = lo > hi ? (shared.s0 + shared.s1) / 2 : Math.min(hi, Math.max(lo, shared.s0 + (shared.s1 - shared.s0) * at));
+    const sc = stairClear(p, d.floor, shared, w, lo, hi, lo > hi ? (shared.s0 + shared.s1) / 2 : Math.min(hi, Math.max(lo, shared.s0 + (shared.s1 - shared.s0) * at)));
     const wi = L.walls.findIndex((x) => x.floor === d.floor && x.axis === shared.axis && Math.abs((x.axis === 'x' ? x.a[1] : x.a[0]) - shared.c) < 1e-4 && !x.exterior && sOf(x, sc) >= 0 && sOf(x, sc) <= len2(x.a, x.b));
     if (wi < 0) continue;
     const wall = L.walls[wi], s = sOf(wall, sc);
@@ -209,10 +209,11 @@ export function realize(p: Plan): Layout {
     const rlo = ir ? (axis === 'x' ? ir[0] : ir[1]) : lo - 1, rhi = ir ? (axis === 'x' ? ir[2] : ir[3]) : hi + 1;
     const room0 = dir === 1 ? bottom - rlo : rhi - bottom, roomTop = dir === 1 ? rhi - top : top - rlo;
     const side = (s.width / 2 + 0.45) * s.away;
-    const approach = room0 >= 0.5 ? pt(bottom - dir * 0.35) : pt(bottom + dir * 0.3, side);
-    const arrive = roomTop >= 0.5 ? pt(top + dir * 0.35) : pt(top - dir * 0.3, side);
+    // a sideways step on or off stays >= 0.55 m from the end wall, so a body (0.34 m) fits there
+    const approach = room0 >= 0.8 ? pt(bottom - dir * 0.35) : pt(bottom + dir * Math.max(0.3, 0.55 - room0), side);
+    const arrive = roomTop >= 0.8 ? pt(top + dir * 0.35) : pt(top - dir * Math.max(0.3, 0.55 - roomTop), side);
     const path = [approach, pt(bottom), pt(top), arrive];
-    const sideways = roomTop < 0.5;
+    const sideways = roomTop < 0.8;
     L.stairs.push({ id: s.id, kind: 'straight', from: s.from, to: s.to, room: s.room, width: s.width, risers: s.risers, y0, y1, rect: s.rect, axis, dir, path, hole: rectPolyOf([x0 - 0.02, z0 - 0.02, x1 + 0.02, z1 + 0.02]) });
     // rails round the stairwell on the upper floor, except the arrival end and edges against a wall
     const edges: [Vec2, Vec2, 'lo' | 'hi' | 'side'][] = axis === 'x'
@@ -343,6 +344,24 @@ function sideOf(n: Vec2): Side { return Math.abs(n[1]) >= Math.abs(n[0]) ? (n[1]
 const angDiff = (a: number, b: number) => { let d = (a - b) % (2 * Math.PI); if (d > Math.PI) d -= 2 * Math.PI; if (d < -Math.PI) d += 2 * Math.PI; return d; };
 /** Distance along a wall from its a-end to the foot of a coordinate on the wall's axis. */
 function sOf(w: LWall, coord: number) { return w.axis === 'x' ? (w.b[0] >= w.a[0] ? coord - w.a[0] : w.a[0] - coord) : (w.b[1] >= w.a[1] ? coord - w.a[1] : w.a[1] - coord); }
+/**
+ * A door is walked through from both sides: keep it off a flight of stairs (on the floor it starts from) or a stairwell
+ * (on the floor it arrives at) that runs along its wall closer than a body's width (0.85 m) — slide it along the wall to the
+ * nearest clear spot, else leave it where it was asked for.
+ */
+function stairClear(p: Plan, floor: number, e: { axis: 'x' | 'z'; c: number }, w: number, lo: number, hi: number, want: number): number {
+  const bad: [number, number][] = [];
+  for (const st of p.stairs) {
+    if (st.from !== floor && st.to !== floor) continue;
+    const [x0, z0, x1, z1] = st.rect, [a0, a1, b0, b1] = e.axis === 'x' ? [x0, x1, z0, z1] : [z0, z1, x0, x1];
+    if (Math.max(b0 - e.c, e.c - b1, 0) >= 0.85) continue;
+    bad.push([a0 - w / 2 - 0.45, a1 + w / 2 + 0.45]);
+  }
+  const ok = (x: number) => !bad.some(([u, v]) => x > u && x < v);
+  if (!bad.length || ok(want) || lo > hi) return want;
+  for (let k = 1; k <= 400; k++) for (const x of [want - k * 0.05, want + k * 0.05]) if (x >= lo - 1e-9 && x <= hi + 1e-9 && ok(x)) return x;
+  return want;
+}
 function sharedEdge(a: Rect, b: Rect): { axis: 'x' | 'z'; c: number; s0: number; s1: number } | null {
   const near = (u: number, v: number) => Math.abs(u - v) < 1e-4;
   if (near(a[2], b[0]) || near(a[0], b[2])) { const c = near(a[2], b[0]) ? a[2] : a[0]; const s0 = Math.max(a[1], b[1]), s1 = Math.min(a[3], b[3]); return s1 > s0 ? { axis: 'z', c, s0, s1 } : null; }

@@ -64,6 +64,8 @@ export type ActuatorHost = {
   stateOf?(id: string): Record<string, unknown> | null;
   /** LAYERS: why this Soul may not touch it (a private thing of someone else's), or null. */
   access?(id: string, soul: EdgeSoul): Refusal | null;
+  /** SOULFIX: a standing point within reach that the body can walk to (front, back, else any side), or null. */
+  approach?(id: string, soul: EdgeSoul, front: Vec2 | null): { p: Vec2; level: number } | null;
 };
 type BuiltLike = { at: Vec2 | null; state?: Record<string, unknown>; removed?: boolean; key?: string; front?: Vec2 | null };
 
@@ -87,7 +89,9 @@ export function kindActions(def: StoredDef, host: ActuatorHost, nameOf: (s: Buil
       apply: (s: BuiltLike, params: Record<string, unknown>, ctx: any) => {
         const me = host.bodyAt(ctx.soul)!, to = s.front ?? s.at!, far = Math.hypot(s.at![0] - me[0], s.at![1] - me[1]) > ACT_REACH;
         const patch = thenPatch(a, (s.key && host.stateOf?.(s.key)) || s.state || {}, params);
-        return { state: s, result: { action: a.name, set: patch }, bodies: [{ label: `${a.label}`, steps: [...(far ? [{ verb: 'walk_to', params: { to, standoff: 0.5 } }] : []), { verb: 'wave', params: { at: s.key, seconds: 1 } }] }] };
+        const ap = far && s.key ? host.approach?.(s.key, ctx.soul, s.front ?? null) : null;
+        const walk = !far ? [] : ap ? [ap.level === 0 ? { verb: 'walk_to', params: { to: ap.p, standoff: 0 } } : { verb: 'mars:walk_to', params: { x: ap.p[0], z: ap.p[1], level: ap.level } }] : [{ verb: 'walk_to', params: { to, standoff: 0.5 } }];
+        return { state: s, result: { action: a.name, set: patch }, bodies: [{ label: `${a.label}`, steps: [...walk, { verb: 'wave', params: { at: s.key, seconds: 1 } }] }] };
       },
     };
   }
