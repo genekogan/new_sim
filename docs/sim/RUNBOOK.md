@@ -1,5 +1,22 @@
 # Runbook — Sim on eden2
 
+## Current October 10 publication (supersedes historical previews below)
+
+Public sim.eden.art currently proxies to laptop4970 via eden2 loopback4505 SSH.
+Artifact-only frontend/CLI/guide source e8bcdcd3, backend5e478f8a unchanged.
+Proxy23263, writers14238/4950 Eden,14806/4963 Mars,18341/4964 LM,
+SSH46457 and party caffeinate35386 must remain running. /worlds retains its
+prefix to Claude5340. No trycloudflare preview remains. Hosting is laptop-dependent.
+
+Current receipt [RELEASE-20261010-RETAINED-CLIENT.md](RELEASE-20261010-RETAINED-CLIENT.md).
+Exact external ops plan and rollback are under
+`<team>/pm-integration/client-viewer-clean-release-20261010/publication-e8bc-001/`.
+Use fresh pinned identity/closure/GO, never replay expired startup approvals.
+Rollback preserves current routing including /worlds, authoritative data,
+accounts and writers; never restore v1 data or older accepted history.
+Preserve publication20be files referenced by current descriptor.
+No full suites during party; one coordinated heavy suite laptop-wide.
+
 ## October 9 local preview checkpoint
 
 The local preview is separate from the remote units below. Runtime is pinned at

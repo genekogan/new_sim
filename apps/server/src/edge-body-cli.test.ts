@@ -3,13 +3,15 @@ import {createServer} from 'node:http';import {once} from 'node:events';import {
 import {mkdtempSync,writeFileSync,rmSync,statSync} from 'node:fs';import {join} from 'node:path';import {tmpdir} from 'node:os';import {execFile} from 'node:child_process';import {promisify} from 'node:util';import {fileURLToPath} from 'node:url';
 import {fixture,invite,accept} from '../test/native-owner-fixture.ts';import {EdgeLedger} from './edge/ledger/ledger.ts';import {mountEdgeRoutes,edgeSoulResolver} from './edge/routes.ts';import {rigidGLB} from './edge/body/testing.ts';
 
+// CI keeps its original port; a shared laptop runs it elsewhere: TEST_BODY_CLI_PORT=54xx (never 4930-4970, the release listeners).
+const BODY_CLI_PORT=Number(process.env.TEST_BODY_CLI_PORT??4958);if(process.env.TEST_BODY_CLI_PORT&&BODY_CLI_PORT>=4930&&BODY_CLI_PORT<=4970)throw Error('TEST_BODY_CLI_PORT must be outside 4930-4970');
 test('CLI BODY authenticates privately and completed plans remain readable by ID',async()=>{
  const f=fixture(':memory:'),dir=mkdtempSync(join(tmpdir(),'body-cli-'));f.brain.quiesce();let server:ReturnType<typeof createServer>|undefined,pump:NodeJS.Timeout|undefined,closed=false;
  try{
-  await invite(f,'cli');const row=await accept(f.host,f.souls.create('dev:cli',{name:'Body CLI',description:'local scripted CLI fixture'})),pair=f.souls.pairCode(row,'http://127.0.0.1:4958'),credential=f.souls.pairExchange(pair.code,'scripted-cli');
+  await invite(f,'cli');const row=await accept(f.host,f.souls.create('dev:cli',{name:'Body CLI',description:'local scripted CLI fixture'})),pair=f.souls.pairCode(row,'http://127.0.0.1:'+BODY_CLI_PORT),credential=f.souls.pairExchange(pair.code,'scripted-cli');
   const app=new Hono(),ledger=new EdgeLedger(f.host,f.db,undefined,{ambient:false});mountEdgeRoutes(app,{host:f.host,db:f.db,souls:f.souls,ledger,soul:edgeSoulResolver(f.host,f.souls,c=>c.req.header('authorization')?.replace(/^Bearer /,''))});
-  const listener=getRequestListener(app.fetch);server=createServer((req,res)=>{req.url=req.url?.replace(/^\/w\/eden(?=\/)/,'');void listener(req,res);});server.listen(4958,'127.0.0.1');await once(server,'listening');pump=setInterval(()=>f.host.drainInputs(),10);
-  const state=join(dir,'.eden-agent.json');writeFileSync(state,JSON.stringify({world:'http://127.0.0.1:4958/w/eden',soul:row.id,token:credential.token}),{mode:0o600});assert.equal(statSync(state).mode&0o777,0o600);writeFileSync(join(dir,'fixture.glb'),rigidGLB());
+  const listener=getRequestListener(app.fetch);server=createServer((req,res)=>{req.url=req.url?.replace(/^\/w\/eden(?=\/)/,'');void listener(req,res);});server.listen(BODY_CLI_PORT,'127.0.0.1');await once(server,'listening');pump=setInterval(()=>f.host.drainInputs(),10);
+  const state=join(dir,'.eden-agent.json');writeFileSync(state,JSON.stringify({world:'http://127.0.0.1:'+BODY_CLI_PORT+'/w/eden',soul:row.id,token:credential.token}),{mode:0o600});assert.equal(statSync(state).mode&0o777,0o600);writeFileSync(join(dir,'fixture.glb'),rigidGLB());
   const cli=fileURLToPath(new URL('../../../tools/edge-skill/eden-agent.mjs',import.meta.url));
   const command=async(cmd:string,...args:string[])=>{const {stdout}=await promisify(execFile)(process.execPath,[cli,cmd,...args],{cwd:dir,timeout:30000,maxBuffer:256*1024});assert.ok(!stdout.includes(credential.token));return JSON.parse(stdout);},run=(...args:string[])=>command('body',...args);
   const presets=await run('presets');assert.equal(presets.length,14);const uploaded=await run('upload','fixture.glb','--type','ceramic','--license','owned','--rights-confirmed');assert.match(uploaded.assetId,/^body_[a-f0-9]{64}$/);

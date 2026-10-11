@@ -42,7 +42,7 @@ export function replySteps(reply,depth=0){
 /** One local writer, one body request. Dispatch intent is saved BEFORE transport;
  * uncertain replies retry only the SAME clientRef/body, relying on edge1 idempotency.
  * No model, server planner, body force, timetable, identity or credential access. */
-export function openClientQueue(directory,{adapter,scope=null,now=Date.now,onWake=()=>{},onReceipt=()=>{},onChange=()=>{}}={}){
+export function openClientQueue(directory,{adapter,scope=null,now=Date.now,onWake=()=>{},onReceipt=()=>{},onChange=()=>{},isPaused=()=>false}={}){
  const root=resolve(directory),stateFile=join(root,'.client-queue.json'),lockFile=join(root,'.client-queue.lock');
  const safe=path=>{try{const s=lstatSync(path);if(s.isSymbolicLink()||s.nlink>1)fail('linked file refused');}catch(e){if(e.code!=='ENOENT')throw e;}return path;};
  if(lstatSync(root).isSymbolicLink())fail('linked root refused');
@@ -64,22 +64,26 @@ export function openClientQueue(directory,{adapter,scope=null,now=Date.now,onWak
  const current=()=>state.steps.find(s=>!['completed','cancelled','skipped','superseded'].includes(s.status));
  const condition=(step,context)=>{const u=step.until;if(!u)return true;if(u.event)return state.events?.some(e=>e.kind===u.event&&e.sequence>(step.untilAfterSequence??0));return Number.isFinite(context.worldMinutes)&&Number.isFinite(step.untilWorldMinutes)&&context.worldMinutes>=step.untilWorldMinutes;};
  const reference=(step,part)=>'queue-'+createHash('sha256').update(JSON.stringify([state.id,step.id,part,step.act,step.params])).digest('hex');
- async function send(step,body,part){
+ async function send(step,body,part,pausedNow){
+  if(pausedNow())return null;
+  const before=structuredClone(step);
   const ref=reference(step,part);if(part==='stop')step.stopRequested=true;else step.clientRef=ref;step.status=part==='stop'?'stopping':'dispatching';step.attempts=(step.attempts??0)+1;save();
-  let result;try{result=await adapter.send({...body,clientRef:ref});}catch{state.notice={reason:'transport-uncertain',step:step.id,at:now()};save();return null;}
-  lease();if(!result?.accepted||!result.receipt?.id){step.status='failed';step.code=result?.code??'transport.invalid-response';step.reason=result?.reason??'No accepted receipt';notify('refusal',step);return null;}
+  if(pausedNow()){for(const key of Object.keys(step))delete step[key];Object.assign(step,before);save();return null;}
+  let result;try{result=await adapter.send({...body,clientRef:ref});}catch(error){if(error.code==='local.attended'&&error.requestNotSent){for(const key of Object.keys(step))delete step[key];Object.assign(step,before);save();return null;}state.notice={reason:'transport-uncertain',step:step.id,at:now()};save();return null;}
+  lease();if(!result?.accepted||!result.receipt?.id){step.status='failed';step.refusalConfirmed=result?.accepted===false;step.code=result?.code??'transport.invalid-response';step.reason=result?.reason??'No accepted receipt';notify('refusal',step);return null;}
   return result.receipt;
  }
  async function drive(context={},paused=false){
+  const pausedNow=()=>paused||isPaused();
   lease();
   for(const previous of state.previous??[]){if(previous.folded)continue;const r=await adapter.readReceipt(previous.receiptId).catch(()=>null);if(r&&TERMINAL.has(r.phase)){await onReceipt(r,previous);previous.folded=true;save();}}
   let step=current();if(!step||['failed','interrupted','blocked'].includes(step.status))return snapshot();
   if(step.receiptId){
    const receipt=await adapter.readReceipt(step.receiptId).catch(()=>null);lease();if(!receipt||receipt.id!==step.receiptId)return snapshot();step.receipt=receipt;step.lastReconciledAt=now();
-   const reached=condition(step,context);if(step.stopRequested&&!step.stopReceiptId&&TERMINAL.has(receipt.phase)){const stop=await send(step,{capability:'stand:here',params:{}},'stop');if(!stop)return snapshot();step.stopReceiptId=stop.id;save();}
+   const reached=condition(step,context);if(step.stopRequested&&!step.stopReceiptId&&TERMINAL.has(receipt.phase)){const stop=await send(step,{capability:'stand:here',params:{}},'stop',pausedNow);if(!stop)return snapshot();step.stopReceiptId=stop.id;save();}
    if(!TERMINAL.has(receipt.phase)){
-    if(step.until&&reached&&!paused){
-     if(!step.stopReceiptId){const stop=await send(step,{capability:'stand:here',params:{}},'stop');if(!stop)return snapshot();step.stopReceiptId=stop.id;save();}
+    if(step.until&&reached&&!pausedNow()){
+     if(!step.stopReceiptId){const stop=await send(step,{capability:'stand:here',params:{}},'stop',pausedNow);if(!stop)return snapshot();step.stopReceiptId=stop.id;save();}
      const stop=await adapter.readReceipt(step.stopReceiptId).catch(()=>null);if(stop&&TERMINAL.has(stop.phase)){if(stop.phase!=='completed'){step.status='failed';notify('stop-refused',step);return snapshot();}await onReceipt(stop,step);}
      step.status='stopping';save();return snapshot();
     }
@@ -95,12 +99,15 @@ export function openClientQueue(directory,{adapter,scope=null,now=Date.now,onWak
    }else{step.status='completed';save();}
    context=adapter.context?await adapter.context():{...context,busy:null,placeId:receipt.endedAt?.place??context.placeId};step=current();if(!step)return snapshot();
   }
-  if(paused)return snapshot();
+  if(pausedNow())return snapshot();
   if(step.publicStep){
    if(step.status==='dispatching'){step.status='blocked';notify('public-step-outcome-uncertain',step);return snapshot();}
-   step.status='dispatching';save();
+   const before=step.status;step.status='dispatching';save();
+   if(pausedNow()){step.status=before;save();return snapshot();}
    let result;try{result=await adapter.runPublic(step.publicStep);}catch(error){step.status='blocked';step.reason=String(error.message).slice(0,300);notify('public-step-outcome-uncertain',step);return snapshot();}
-   lease();step.result=result;if(result?.receipt?.id){step.receiptId=result.receipt.id;step.receipt=result.receipt;step.status='running';save();return snapshot();}step.status=result?.again?'failed':'completed';save();if(result?.again){notify('public-step-refusal',step);return snapshot();}return drive(context,paused);
+   lease();step.result=result;
+   if(result?.requestNotSent&&result.acceptedMembership!==true){if(result.accepted===false){step.status=before;save();return snapshot();}step.status='blocked';step.reason=result.reason??'Prior effects are unconfirmed';notify('public-step-outcome-uncertain',step);return snapshot();}
+   if(result?.receipt?.id){step.receiptId=result.receipt.id;step.receipt=result.receipt;step.status='running';save();return snapshot();}step.status=result?.again?'failed':'completed';save();if(result?.again){notify('public-step-refusal',step);return snapshot();}return drive(context,paused);
   }
   if(context.busy&&context.busy.id!==step.receiptId&&context.busy.id!==state.replaceReceiptId){step.status='blocked';notify('protected-action',step);return snapshot();}
   if(step.if?.place&&step.if.place!==context.placeId){step.status='blocked';notify('guard-place',step);return snapshot();}
@@ -111,15 +118,26 @@ export function openClientQueue(directory,{adapter,scope=null,now=Date.now,onWak
    if(step.until.worldTime&&!Number.isFinite(step.untilWorldMinutes)){if(!Number.isFinite(context.worldMinutes)){step.status='blocked';notify('clock-unavailable',step);return snapshot();}const minute=Number(step.until.worldTime.slice(0,2))*60+Number(step.until.worldTime.slice(3));step.untilWorldMinutes=Math.floor(context.worldMinutes/1440)*1440+minute;if(step.untilWorldMinutes<context.worldMinutes)step.untilWorldMinutes+=1440;}
   }
   const body={capability:step.act,params:step.until?{...step.params,seconds:step.holdProfile.seconds}:step.params??{}};
-  const result=await send(step,body,'hold-'+(step.renewal??0));if(!result)return snapshot();step.receiptId=result.id;step.receipt=result;step.status=result.phase==='waiting'?'waiting':'running';state.notice=null;state.replaceReceiptId=null;save();return snapshot();
+  const result=await send(step,body,'hold-'+(step.renewal??0),pausedNow);if(!result)return snapshot();step.receiptId=result.id;step.receipt=result;step.status=result.phase==='waiting'?'waiting':'running';state.notice=null;state.replaceReceiptId=null;save();return snapshot();
  }
 
  return {
   snapshot,
   enqueue(steps,{id=randomUUID(),source='mind',replace=false,force=false}={}){
    lease();stable(id);stable(source);const normalized=replySteps({do:steps});if(normalized.some(s=>!s.act&&(s.for||s.until||s.if)))fail('public steps cannot carry body conditions');
+   if(normalized.some(s=>s.fixes!==undefined)){
+    const active=current(),replacement=normalized[0];
+    if(normalized.length!==1||!replacement.act||replacement.publicStep||/^(look|turn|face|glance)\b/i.test(replacement.act))fail('repair needs one replacement body step; original remaining steps are retained');
+    if(!active||replacement.fixes!==active.id)fail('fixes must name the current failed body step, never a foreign, earlier or completed step');
+    if(state.source==='owner'&&source==='owner'&&id!==state.id)fail('a new owner request must explicitly replace the queue; fixes continues its original request');
+    if(active.publicStep||active.status!=='failed'||active.refusalConfirmed!==true||active.receiptId)fail('repair requires a confirmed refused body request; accepted, active or uncertain effects cannot be replayed');
+    const index=state.steps.indexOf(active),next={...replacement,...(active.protected?{protected:true}:{}),id:`step-repair-${randomUUID()}`,status:'pending',attempts:0};
+    state.repairs=[...(state.repairs??[]),{failedStep:structuredClone(active),replacementStepId:next.id,requestedBy:id,requestedSource:source,at:now()}].slice(-24);
+    state.steps[index]=next;state.notice=null;save();return snapshot();
+   }
    if(state.id===id)return snapshot();
    const active=current();if(active&&!replace)fail('queue already has pending work');
+   if(active&&state.source==='owner'&&source==='mind'&&replace)fail('an unfinished owner queue needs an explicit current fixes continuation, not an implicit mind replacement');
    if(['dispatching','stopping'].includes(active?.status)&&replace)fail('transport outcome uncertain; reconcile before replacement');
    if(active?.protected&&replace&&!force)fail('local protected step requires explicit owner force/attended takeover');
    const previous=[...(state.previous??[])];if(active?.receiptId)previous.push({...active,status:'superseded'});

@@ -1,0 +1,67 @@
+{
+ "schema": "lm-building-footprint/1",
+ "id": "scan-celadon-tower-arch",
+ "bounds": {
+  "min": [
+   -6.844535022816889,
+   0,
+   -6.427716981968012
+  ],
+  "max": [
+   6.844535022816889,
+   30,
+   6.427716981968012
+  ]
+ },
+ "obstacles": [
+  {
+   "id": "celadon-tower-scan-envelope-west",
+   "obb": {
+    "c": [
+     -3.92,
+     0
+    ],
+    "half": [
+     2.92,
+     6.43
+    ],
+    "yaw": 0
+   },
+   "y0": 0,
+   "y1": 30
+  },
+  {
+   "id": "celadon-tower-scan-envelope-east",
+   "obb": {
+    "c": [
+     3.92,
+     0
+    ],
+    "half": [
+     2.92,
+     6.43
+    ],
+    "yaw": 0
+   },
+   "y0": 0,
+   "y1": 30
+  },
+  {
+   "id": "celadon-tower-scan-envelope-overhead",
+   "obb": {
+    "c": [
+     0,
+     0
+    ],
+    "half": [
+     6.84,
+     6.43
+    ],
+    "yaw": 0
+   },
+   "y0": 2.25,
+   "y1": 30
+  }
+ ],
+ "note": "Measured ground arch from 953613972438 worlds/littlemartians/buildings/celadon-passage.validation.json: a 2 m wide, 2.25 m clear passage north–south through the scan; the rest of the envelope is conservative."
+}

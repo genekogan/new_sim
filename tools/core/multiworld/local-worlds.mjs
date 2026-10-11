@@ -9,9 +9,10 @@ import {copySqliteReadOnly} from './copy-sqlite.mjs';
 const args=process.argv.slice(2);if(args.length!==1)throw Error('usage: node tools/core/multiworld/local-worlds.mjs <local-config.json>');
 const config=JSON.parse(readFileSync(resolve(args[0]),'utf8')),input=resolve(config.input),dataDir=resolve(config.dataDir);
 if(!config.input||!config.dataDir)throw Error('explicit input and dataDir required');mkdirSync(dataDir,{recursive:true});
+const exposure=config.exposure??'local';if(!['local','shared-preview'].includes(exposure))throw Error('explicit proxy exposure required');
 const ports={eden:config.edenPort??4970,mars:config.mars?.port??4963,littlemartians:config.littlemartians?.port??4964},proxyPort=config.proxyPort??4966;
 if(new Set([...Object.values(ports),proxyPort]).size!==4)throw Error('each world and proxy requires a distinct port');
-if(!Number.isInteger(ports.eden)||!(ports.eden>=4950&&ports.eden<=4959||ports.eden===4970)||Object.entries({...ports,proxy:proxyPort}).some(([k,p])=>k!=='eden'&&(!Number.isInteger(p)||p<4963||p>4969)))throw Error('private local world ports required');
+if(!Number.isInteger(ports.eden)||!(ports.eden>=4950&&ports.eden<=4959||ports.eden===4970)||Object.entries({...ports,proxy:proxyPort}).some(([k,p])=>k!=='eden'&&(!Number.isInteger(p)||!(p>=4963&&p<=4969||k==='proxy'&&exposure==='shared-preview'&&p===4970))))throw Error('private local world ports required');
 const children=[];let closing=false;
 async function stop(code=0){if(closing)return;closing=true;for(const c of children)if(c.exitCode===null)c.kill('SIGTERM');await Promise.race([Promise.all(children.map(c=>c.exitCode!==null?Promise.resolve():new Promise(r=>c.once('exit',r)))),new Promise(r=>setTimeout(r,10000))]);for(const c of children)if(c.exitCode===null)c.kill('SIGKILL');process.exitCode=code;}
 for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>void stop());
@@ -32,8 +33,8 @@ for(const key of ['mars','littlemartians']){
   const target=join(dir,'sim.db');if(existsSync(target))throw Error('restoration destination already exists');
   copySqliteReadOnly(resolve(selected.sourceDb),target);
  }
- launch(key,'tools/core/multiworld/world-server.mjs',{...selected,sourceDb:undefined,input,dataDir:dir,worldKey:key,worldId:selected.worldId??(key==='mars'?'mars-2026-1':'littlemartians-1'),port:ports[key],publicOrigin:`http://127.0.0.1:${proxyPort}`,webDir:config.webDir,marsWebDir:config.marsWebDir,skillFile:config.skillFile,cliFile:config.cliFile,ownerId:config.ownerId??'dev:admin',build:config.build??'local-multiworld/1'});
+ launch(key,'tools/core/multiworld/world-server.mjs',{...selected,sourceDb:undefined,input,dataDir:dir,worldKey:key,worldId:selected.worldId??(key==='mars'?'mars-2026-1':'littlemartians-1'),port:ports[key],publicOrigin:`http://127.0.0.1:${proxyPort}`,webDir:config.webDir,marsWebDir:config.marsWebDir,skillFile:config.skillFile,cliFile:config.cliFile,instructionsFile:config.instructionsFile,authMode:selected.authMode??config.authMode??'local-dev',ownerId:config.ownerId??'dev:admin',build:config.build??'local-multiworld/1'});
 }
 async function ready(){const deadline=performance.now()+90000;for(;;){if(closing)throw Error('local children stopped');let ok=true;for(const [key,port] of Object.entries(ports)){try{const r=await fetch(`http://127.0.0.1:${port}/w/${key}/v1/config`,{signal:AbortSignal.timeout(1500)}),body=await r.json();if(!r.ok||body.worldKey!==key)ok=false;}catch{ok=false;}}if(ok)return;if(performance.now()>deadline)throw Error('local world readiness timeout');await new Promise(r=>setTimeout(r,250));}}
-try{await ready();launch('proxy','tools/core/multiworld/proxy.mjs',{port:proxyPort,worlds:ports});console.log(JSON.stringify({url:`http://127.0.0.1:${proxyPort}`,worlds:ports,dataDir,nativeMinds:'fake-only'}));}
+try{await ready();launch('proxy','tools/core/multiworld/proxy.mjs',{port:proxyPort,worlds:ports,exposure,expectedWorldIds:config.expectedWorldIds,expectedBuild:config.expectedBuild});console.log(JSON.stringify({url:`http://127.0.0.1:${proxyPort}`,worlds:ports,dataDir,nativeMinds:'fake-only'}));}
 catch(error){console.error(error.message);await stop(1);}

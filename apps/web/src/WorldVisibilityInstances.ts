@@ -82,7 +82,10 @@ export class WorldVisibilityInstances {
    if(far<Infinity&&!cell.box.intersectsBox(segment))continue;
    // Conservative: a cell is skipped only if the ray misses its box or enters it beyond far.
    if(!cell.box.containsPoint(this.localRay.origin)){if(!this.localRay.intersectBox(cell.box,this.entry))continue;if(this.entry.applyMatrix4(mesh.matrixWorld).distanceTo(raycaster.ray.origin)>raycaster.far)continue;}
-   proxy.geometry=cell.geometry;this.hits.length=0;proxy.raycast(raycaster,this.hits);
+   // Bounds can be replaced without changing vertex/index versions. Stock
+   // raycast uses the mesh's current bounds, even when its triangle cells reuse.
+   proxy.geometry=cell.geometry;proxy.geometry.boundingSphere=mesh.geometry.boundingSphere;proxy.geometry.boundingBox=mesh.geometry.boundingBox;
+   this.hits.length=0;proxy.raycast(raycaster,this.hits);
    for(const hit of this.hits){hit.object=mesh;target.push(hit);}this.hits.length=0;
   }
  }

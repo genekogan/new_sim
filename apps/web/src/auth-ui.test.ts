@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {agentOnboarding,agentQuickstart} from './auth-ui.ts';
+import {agentOnboarding,agentQuickstart,clerkOriginRoute,unsignedPreviewAuth} from './auth-ui.ts';
 await test('New Soul prompt keeps a raw clickable-world URL and exact plain clipboard sentence',()=>{
  const onboarding=agentOnboarding('https://sim.example/w/eden/');
  assert.equal(onboarding.instructionsUrl,'https://sim.example/w/eden/instructions.md');
@@ -13,8 +13,26 @@ await test('bootstrap preserves actual world prefix and display name across worl
  const custom=agentOnboarding('https://sim.example/w/mars','Mars College');assert.equal(custom.instructionsUrl,'https://sim.example/w/mars/instructions.md');assert.ok(custom.text.endsWith('world Mars College.'));
 });
 
-// Ported from the live release d357; world-engine branch: any launcher world slug, and #godpair/<code> survives.
 await test('only trusted authentication origin initializes Clerk; unsigned preview has no token or dev identity',async()=>{
+ const origin='https://sim.eden.art',path='/w/eden';
+ assert.equal(clerkOriginRoute(origin,origin,path).initialize,true);
+ for(const current of ['https://example.trycloudflare.com','http://localhost:4970','http://127.0.0.1:4970','https://<eden2-sslip-host>']){
+  const route=clerkOriginRoute(origin,current,path);assert.equal(route.initialize,false);assert.equal(route.signInUrl,origin+path+'#watch');
+  let navigations=0;const auth=unsignedPreviewAuth(route.signInUrl,()=>navigations++);assert.equal(auth.ready,true);assert.equal(auth.authed,false);assert.equal(await auth.getToken(),null);assert.equal(navigations,0);auth.login();assert.equal(navigations,1);
+ }
+ for(const untrusted of [undefined,'','https://evil.test/path','javascript:alert(1)','https://user:pw@sim.eden.art','http://evil.test'])assert.deepEqual(clerkOriginRoute(untrusted,origin,path),{initialize:false,signInUrl:null});
+});
+await test('canonical links preserve intended world/approval/Soul/New Soul without forwarding arbitrary queries or fragments',()=>{
+ const origin='https://sim.eden.art',id='ap_'+'a'.repeat(32);
+ for(const path of ['/w/eden','/w/mars','/w/littlemartians']){
+  for(const hash of ['#approve/'+id,'#soul/s_Avery','#join'])assert.equal(clerkOriginRoute(origin,'http://localhost:4970',path,hash).signInUrl,origin+path+hash);
+  for(const hash of ['#approve/'+id+'/extra','#pair/ABCD-EFGH','#https://evil.test','?redirect=https://evil.test'])assert.equal(clerkOriginRoute(origin,'http://localhost:4970',path,hash).signInUrl,origin+path+'#watch');
+ }
+ assert.equal(clerkOriginRoute(origin,origin,'/w/eden?redirect=https://evil.test').signInUrl,null);
+});
+
+// New worlds (world-engine branch, reconciled with e8): ported launcher tests.
+await test('new worlds: only trusted authentication origin initializes Clerk on any launcher slug',async()=>{
  const {clerkOriginRoute,unsignedPreviewAuth}=await import('./auth-ui.ts');
  const origin='https://sim.eden.art';
  for(const path of ['/w/eden','/w/willow-hollow','/w/meetup-hollow-2/']){
@@ -27,10 +45,12 @@ await test('only trusted authentication origin initializes Clerk; unsigned previ
  for(const untrusted of [undefined,'','https://evil.test/path','javascript:alert(1)','https://user:pw@sim.eden.art','http://evil.test'])assert.deepEqual(clerkOriginRoute(untrusted,origin,'/w/eden'),{initialize:false,signInUrl:null});
  for(const bad of ['/w/Eden','/w/eden/extra','/x/eden','/w/9lives','/w/eden?redirect=https://evil.test'])assert.equal(clerkOriginRoute(origin,origin,bad).signInUrl,null);
 });
-await test('canonical links keep a Soul, #join, an approval or a god pairing, nothing else',async()=>{
+await test('new worlds: canonical links keep a Soul, #join, an approval or a god pairing, nothing else',async()=>{
  const {clerkOriginRoute,clerkHomeRoute,configuredSignIn}=await import('./auth-ui.ts');
  const origin='https://sim.eden.art',id='ap_'+'a'.repeat(32);
- for(const path of ['/w/eden','/w/willow-hollow']){
+ // old root worlds keep e8's rule: a god pairing link is not preserved there
+ assert.equal(clerkOriginRoute(origin,'http://localhost:4970','/w/eden','#godpair/ABCD-EF23').signInUrl,origin+'/w/eden#watch');
+ for(const path of ['/w/willow-hollow']){
   for(const hash of ['#approve/'+id,'#soul/s_Avery','#join','#godpair/ABCD-EF23'])assert.equal(clerkOriginRoute(origin,'http://localhost:4970',path,hash).signInUrl,origin+path+hash);
   for(const hash of ['#approve/'+id+'/extra','#godpair/abcd-efgh','#godpair/ABCD-EFGH/x','#pair/ABCD-EFGH','#https://evil.test'])assert.equal(clerkOriginRoute(origin,'http://localhost:4970',path,hash).signInUrl,origin+path+'#watch');
  }
@@ -39,7 +59,8 @@ await test('canonical links keep a Soul, #join, an approval or a god pairing, no
  assert.deepEqual(clerkHomeRoute('javascript:alert(1)',origin),{initialize:false,signInUrl:null});
  assert.equal(configuredSignIn({authProvider:'clerk',clerkPublishableKey:'pk_live_x',clerkIssuer:'https://clerk.eden.art'}),true);
  assert.equal(configuredSignIn({authProvider:'clerk',clerkPublishableKey:'',clerkIssuer:'https://clerk.eden.art',devAuth:true}),false,'dev auth never stands in for Clerk');
- assert.equal(configuredSignIn({authProvider:'privy',privyAppId:'',devAuth:true}),true);
+ assert.equal(configuredSignIn({authProvider:'privy',privyAppId:'',devAuth:true},true),true,'new worlds: local dev sign-in');
+ assert.equal(configuredSignIn({authProvider:'privy',privyAppId:'',devAuth:true}),false,'old worlds: e8 rule unchanged');
  assert.equal(configuredSignIn({authProvider:'none',devAuth:true}),false);
 });
 
@@ -89,7 +110,7 @@ await test('Share Soul, the connection prompt and the onboarding name work on a 
  const origin='https://sim.eden.art',base='/worlds',path='/worlds/w/willow-hollow';
  assert.equal(publicSoulLink(origin,path,'s_Avery',base),origin+path+'#soul/s_Avery');
  assert.throws(()=>publicSoulLink(origin,path,'s_Avery'));assert.throws(()=>publicSoulLink(origin,'/w/willow-hollow','s_Avery',base));
- assert.ok(connectionSetupPrompt(origin+path,'s_Avery',base)?.includes(JSON.stringify(origin+path+'/skill.md').slice(1,-1)));
+ assert.ok(connectionSetupPrompt(origin+path,'s_Avery',undefined,base)?.includes(JSON.stringify(origin+path)));
  assert.equal(connectionSetupPrompt(origin+path,'s_Avery'),null);
  assert.equal(agentOnboarding(origin+path).world,'Willow-hollow');
 });

@@ -50,3 +50,6 @@ export function worldPlaceView(id:string){return Object.hasOwn(WORLD_PLACE_VIEWS
 export const WORLD_PLACES=Object.freeze(Object.entries(WORLD_PLACE_VIEWS).map(([id,view])=>Object.freeze({id:id as WorldPlaceId,label:view.label})));
 export const REGION_PLACES_FOR_TOUR=Object.freeze(Object.entries(REGION_PLACE_VIEWS).map(([id,view])=>Object.freeze({id:id as RegionPlaceId,label:view.label})));
 export const INTERIOR_PLACES_FOR_TOUR=Object.freeze(Object.entries(INTERIOR_PLACE_VIEWS).map(([id,view])=>Object.freeze({id:id as InteriorPlaceId,label:view.label})));
+
+export const curatedExploreLocations=Object.freeze([...WORLD_PLACES,...INTERIOR_PLACES_FOR_TOUR,...REGION_PLACES_FOR_TOUR]);
+export const CURATED_WORLD_LOCATIONS=Object.freeze(curatedExploreLocations.flatMap(place=>{const view=worldPlaceView(place.id);return view?[{id:place.id,label:place.label,p:view.p,target:view.target,radius:Math.max(2,Math.hypot(view.p[0]-view.target[0],view.p[1]-view.target[1],view.p[2]-view.target[2])*.3)}]:[]}));

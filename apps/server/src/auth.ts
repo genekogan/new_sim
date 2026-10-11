@@ -22,8 +22,9 @@ export class Auth {
   private verified=new WeakMap<UserRow,VerifiedAccountIdentity>();
   private profileProof=new Map<string,{email:string|null;at:number}>();
   ready = false;
-  /** Clerk selected: the production sign-in. Dev tokens are refused outright. */
-  get production(){return this.cfg.authProvider==='clerk';}
+  /** New (world-engine) worlds under Clerk: the production sign-in, and dev tokens are refused outright.
+   * Old worlds (eden/mars/littlemartians) keep main's legacy agent-local projection unchanged. */
+  get production(){return this.cfg.authProvider==='clerk'&&this.cfg.worldEngine===true;}
   legacyOwnerAllowed?:(ownerId:string)=>boolean;
   devAuth: boolean;
   cfg: Config; db: Db;
@@ -31,9 +32,10 @@ export class Auth {
     // Guard construction too: legacy launchers may omit init when their account
     // flag is false, then enable development fallback. Selected Clerk refuses.
     if(cfg.authProvider==='clerk'&&!cfg.accountAuthRequired)throw Error('Clerk activation requires ACCOUNT_AUTH_REQUIRED=1');
-    // World-engine branch: Clerk is production mode, and production never takes dev identities.
-    if(cfg.authProvider==='clerk'&&process.env.DEV_AUTH==='1')throw Error('DEV_AUTH=1 with AUTH_PROVIDER=clerk: refusing to start');
-    this.cfg = cfg; this.db = db; this.devAuth = cfg.authProvider!=='clerk' && process.env.DEV_AUTH === '1';
+    // New worlds: Clerk is production mode, and production never takes dev identities.
+    const newWorldClerk=cfg.authProvider==='clerk'&&cfg.worldEngine===true;
+    if(newWorldClerk&&process.env.DEV_AUTH==='1')throw Error('DEV_AUTH=1 with AUTH_PROVIDER=clerk on a world-engine world: refusing to start');
+    this.cfg = cfg; this.db = db; this.devAuth = !newWorldClerk && process.env.DEV_AUTH === '1';
     // "Bearer dev:admin" is an admin when dev auth is on. It must never be on for a public site.
     if (this.devAuth && cfg.publicUrl.startsWith('https://')) throw new Error('DEV_AUTH=1 with a public https PUBLIC_URL: refusing to start');
   }
@@ -68,7 +70,7 @@ export class Auth {
   /** Verify a Privy access token and return the user (creating the row on first sight). */
   async userFromToken(token: string | undefined | null): Promise<UserRow | null> {
     if (!token) return null;
-    // Production (Clerk): no `dev:` identity of any shape, legacy agent-local ones included.
+    // New-world production (Clerk): no `dev:` identity of any shape, legacy agent-local ones included.
     if(this.production&&token.startsWith('dev:'))return null;
     if(token.startsWith('dev:')&&this.cfg.accountAuthRequired){
       // Existing high-entropy agent-local legacy credentials retain their own

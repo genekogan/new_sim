@@ -1,4 +1,5 @@
 import type {AssetDownloadProgress} from './AssetDownloads.ts';
+import type {WorldLocation} from './WorldLocations.ts';
 import type {WorldPlaceId} from './WorldPlaces.ts';
 import type { WorldCameraMode } from './WorldBroadcast.ts';
 export type { ViewportInsets } from './WorldViewport.ts';
@@ -16,8 +17,13 @@ export interface WorldViewerHandle {
   /** Local current-world scenery tour; no simulation command or selection. */
   framePlace?(place:WorldPlaceId): boolean;
   placePreview?(place:WorldPlaceId):Promise<string|null>;
+  locations?():readonly WorldLocation[];
+  frameLocation?(id:string):boolean;
+  locationPreview?(id:string):Promise<string|null>;
   focusSelected(): boolean;
   selectSoul(id: string | null): boolean;
+  /** True only when this Soul has a body in the currently depicted live frame. */
+  canFollowSoul?(id: string): boolean;
   selectEntity(id: string | null): boolean;
   seek(tick: number): Promise<void>;
   live(): void;
@@ -62,8 +68,12 @@ export interface WorldViewerPort {
   /** Local current-world scenery tour; no simulation command or selection. */
   framePlace?(place:WorldPlaceId): boolean;
   placePreview?(place:WorldPlaceId):Promise<string|null>;
+  locations?():readonly WorldLocation[];
+  frameLocation?(id:string):boolean;
+  locationPreview?(id:string):Promise<string|null>;
   focusSelected(): boolean;
   hasSoul(id: string): boolean;
+  canFollowSoul?(id: string): boolean;
   hasEntity(id: string): boolean;
   select(soulId: string | null, entityId: string | null): void;
   seek(tick: number): Promise<void>;
@@ -81,7 +91,11 @@ export function createWorldViewerHandle(current: () => WorldViewerPort): WorldVi
     frameSouls: ids => current().frameSouls?.(ids) ?? false,
     framePlace: place => current().framePlace?.(place) ?? false,
     placePreview: place => current().placePreview?.(place) ?? Promise.resolve(null),
+    locations:()=>current().locations?.()??[],
+    frameLocation:id=>current().frameLocation?.(id)??false,
+    locationPreview:id=>current().locationPreview?.(id)??Promise.resolve(null),
     focusSelected: () => current().focusSelected(),
+    canFollowSoul: id => current().canFollowSoul?.(id) ?? false,
     selectSoul: id => { const p = current(); if (id !== null && !p.hasSoul(id)) return false; p.select(id, null); return true; },
     selectEntity: id => { const p = current(); if (id !== null && !p.hasEntity(id)) return false; p.select(null, id); return true; },
     seek: tick => Number.isFinite(tick) ? current().seek(tick) : Promise.resolve(),

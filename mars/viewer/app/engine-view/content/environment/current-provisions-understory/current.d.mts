@@ -1,3 +1,5 @@
+export const CURRENT_UNDERSTORY_CAPTURE_HASHES:readonly string[];
+export const LIVE_NATIVE_SOCIAL_CAPTURE_HASHES:readonly string[];
 import type {LowPlant,ProtectedBounds} from '../../../social-render-types.ts';
 import type {Group} from 'three';
 export type CurrentUnderstoryInspection={plants:LowPlant[];omitted:{id:string;reasons:string[]}[];budget:Record<string,number>;protectedBounds:ProtectedBounds[];frame:{captureHash:string;takeHash:string;fromTick:number;toTick:number};[key:string]:unknown};

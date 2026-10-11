@@ -179,7 +179,7 @@ export class TakePeople {
   frame: TakeFrame | null = null;
   /** Wall ms of the last show()'s `sampleTake` (the rest of show() is posing the three.js views). */
   sampleMs = 0;
-  appearancesSettled(){return this.humans.appearancesSettled();}
+  appearancesSettled(ids?:ReadonlySet<string>){return this.humans.appearancesSettled(ids);}
   appearanceStatus(){return this.humans.appearanceStatus();}
 
   constructor(take: Take, opts: { scene?: SpatialScene; commonsContrast?:boolean; humanPresets?:boolean; nativeBoat?:{layout:NativeBoatLayoutV1;proposal:ShoreDesign['boat']} } = {}) {
