@@ -1,10 +1,12 @@
+import {approvalFromHash} from './account-approval.ts';
 import {soulFromFragment,soulFragment} from './soul-link.ts';
-/** Sign-in is part of the shared world chrome; public viewing remains unsigned (live release d357). */
+/** Sign-in is part of the shared world chrome; public viewing remains unsigned. */
 export const AUTH_UI=true;
-export function configuredSignIn(cfg:{authProvider?:'clerk'|'privy'|'none';privyAppId?:string;clerkPublishableKey?:string;clerkIssuer?:string;devAuth?:boolean}){
+/** `devSignIn`: new (world-engine) worlds only — local dev sign-in (dev auth, no provider) shows the same Sign in
+ * button there. Old worlds pass nothing and keep main's (e8) rule exactly. */
+export function configuredSignIn(cfg:{authProvider?:'clerk'|'privy'|'none';privyAppId?:string;clerkPublishableKey?:string;clerkIssuer?:string;devAuth?:boolean},devSignIn=false){
  if(cfg.authProvider==='none')return false;
- // world-engine branch: local dev sign-in (dev auth, no provider) shows the same Sign in button
- return cfg.authProvider==='clerk'?!!cfg.clerkPublishableKey&&!!cfg.clerkIssuer:!!cfg.privyAppId||!!cfg.devAuth;
+ return cfg.authProvider==='clerk'?!!cfg.clerkPublishableKey&&!!cfg.clerkIssuer:!!cfg.privyAppId||devSignIn&&!!cfg.devAuth;
 }
 
 /** Raw-world bootstrap prompt; full runtime instructions live in the installed skill. */
@@ -19,22 +21,25 @@ export function agentQuickstart(worldUrl:string,worldName?:string):string{return
 
 /** The app's path prefix: '' (root build) or e.g. '/worlds' (launcher `--base /worlds`); see base-path.ts. */
 const basePrefix=/^(?:\/[a-z0-9][a-z0-9-]{0,31})*$/;
+/** The old root-path worlds, whose rules stay main's (e8) exactly. */
+const oldWorldPath=/^\/w\/(eden|mars|littlemartians|toy)\/?$/;
 /** `path` is exactly `<base>/w/<slug>` (optional trailing slash): a world page under this build's prefix.
- * With base '' this is the pre-prefix check, unchanged. */
+ * With base '' and an old world key this is main's check, unchanged. */
 export function isWorldPath(path:string,base='',trailingSlash=false){
  if(!basePrefix.test(base)||!path.startsWith(base+'/'))return false;
  return (trailingSlash?/^\/w\/[a-z][a-z0-9-]{0,31}\/?$/:/^\/w\/[a-z][a-z0-9-]{0,31}$/).test(path.slice(base.length));
 }
-/** Authentication comes from server configuration, never request-derived publicUrl (d357).
- * World-engine branch: any launcher world slug, and a god pairing link (#godpair/CODE) survives the hop. */
+/** Authentication comes from server configuration, never request-derived publicUrl.
+ * New worlds: any launcher world slug under the build prefix, and a god pairing link (#godpair/CODE) survives the hop. */
 export function clerkOriginRoute(authenticationOrigin:string|undefined,currentOrigin:string,path:string,hash='',base=''){
  let origin:URL;try{origin=new URL(authenticationOrigin??'');}catch{return {initialize:false,signInUrl:null};}
  if(origin.origin!==authenticationOrigin||origin.username||origin.password||!['https:','http:'].includes(origin.protocol)||origin.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(origin.hostname)||!isWorldPath(path,base,true))return {initialize:false,signInUrl:null};
- const soul=soulFromFragment(hash);
- const fragment=/^#approve\/ap_[a-f0-9]{32}$/.test(hash)||/^#godpair\/[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(hash)?hash:soul?'#'+soulFragment(soul):hash==='#join'?'#join':'#watch';
+ const oldWorld=base===''&&oldWorldPath.test(path);
+ const approval=approvalFromHash(hash),soul=soulFromFragment(hash);
+ const fragment=approval?'#approve/'+approval:!oldWorld&&/^#godpair\/[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(hash)?hash:soul?'#'+soulFragment(soul):hash==='#join'?'#join':'#watch';
  return {initialize:currentOrigin===origin.origin,signInUrl:origin.origin+path.replace(/\/$/,'')+fragment};
 }
-/** The homepage (`/`, served by the launcher) mounts Clerk only on the configured origin too. */
+/** The launcher homepage (`<base>/`) mounts Clerk only on the configured origin too. */
 export function clerkHomeRoute(authenticationOrigin:string|undefined,currentOrigin:string,base=''){
  let origin:URL;try{origin=new URL(authenticationOrigin??'');}catch{return {initialize:false,signInUrl:null};}
  if(origin.origin!==authenticationOrigin||origin.username||origin.password||!['https:','http:'].includes(origin.protocol)||origin.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(origin.hostname))return {initialize:false,signInUrl:null};

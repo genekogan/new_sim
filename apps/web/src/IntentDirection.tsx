@@ -10,7 +10,7 @@ import { intentResponse, type IntentResponse } from './intent-response.ts';
 import {IntentLookup} from './IntentLookup.tsx';
 import {AvailableActions} from './AvailableActions.tsx';
 const interpretationReadDelays = [1000, 2000, 4000, 8000, 8000, 8000] as const;
-export type IntentDirectionProps = {api:Api;worldId:string;soulId:string;soulName:string;ownerId:string;authorityKey:string;active:boolean;suggestions?:unknown;diagnosticContext?:Pick<DiagnosticContext,'backendBuild'|'body'>;humanGoalsEnabled?:boolean;humanGoalContract?:'human-capabilities/1'|'human-capabilities/2';entityId?:string;onUnderstood?():void};
+export type IntentDirectionProps = {api:Api;worldId:string;soulId:string;soulName:string;ownerId:string;principalId?:string;authorityKey:string;active:boolean;suggestions?:unknown;diagnosticContext?:Pick<DiagnosticContext,'backendBuild'|'body'>;humanGoalsEnabled?:boolean;humanGoalContract?:'human-capabilities/1'|'human-capabilities/2';entityId?:string;onUnderstood?():void};
 /** Explicit candidate consumer. Parent must supply current own-authorized scope;
  * Shell selects the strict positive Core DTO; no error/engine-flag inference. */
 export function IntentDirection(props:IntentDirectionProps) {
@@ -29,7 +29,7 @@ function Direction(props:IntentDirectionProps) {
   const consume=(request:IntentRequestV2,status:number,data:unknown)=>{
     if(!alive.current)return;
     setDiagnosticContext({worldId,soulId,entityId:props.entityId,...props.diagnosticContext,sentAt:sentAt.current,observedAt:new Date().toISOString(),responseStatus:status});
-    const response=intentResponse(status,data,{worldId,soulId,ownerId,entityId:props.entityId,request});setResult(response);
+    const response=intentResponse(status,data,{worldId,soulId,ownerId,principalId:props.principalId,entityId:props.entityId,request});setResult(response);
     if(response.kind==='recorded'&&response.receipt.phase==='understood'&&request.op==='upsert')setWords(old=>old.trim()===request.words?'':old);
     if(response.kind==='recorded'&&response.receipt.phase==='understood'&&notifiedRequest.current!==request.requestId){notifiedRequest.current=request.requestId;props.onUnderstood?.();}
   };
@@ -68,10 +68,10 @@ function Direction(props:IntentDirectionProps) {
         <b>{intentFeedback(result.receipt).title}</b>
         <p>{intentFeedback(result.receipt).detail}</p>
         {intentFeedback(result.receipt).adaptation&&<p className="small">{intentFeedback(result.receipt).adaptation}</p>}
-        {result.receipt.phase==='understood'&&pending&&<RequestProgress key={pending.requestId} api={api} scope={{worldId,soulId,ownerId,entityId:props.entityId,requestId:pending.requestId}}/>}
+        {result.receipt.phase==='understood'&&pending&&<RequestProgress key={pending.requestId} api={api} scope={{worldId,soulId,ownerId,principalId:props.principalId,entityId:props.entityId,requestId:pending.requestId}}/>}
       </>}
     </div>
-    {pending&&result&&requestNeedsDiagnostics(result)&&diagnosticContext&&<RequestDiagnostics key={pending.requestId} api={api} scope={{worldId,soulId,ownerId,entityId:props.entityId,requestId:pending.requestId}} request={pending} result={result} context={diagnosticContext} soulName={soulName}/>}
+    {pending&&result&&requestNeedsDiagnostics(result)&&diagnosticContext&&<RequestDiagnostics key={pending.requestId} api={api} scope={{worldId,soulId,ownerId,principalId:props.principalId,entityId:props.entityId,requestId:pending.requestId}} request={pending} result={result} context={diagnosticContext} soulName={soulName}/>}
     {pending&&<>
       {!terminal&&<p className="small dim">{automaticReads.current<interpretationReadDelays.length?'Checking this saved request for interpretation. No direction is being sent again.':'Automatic checks paused. Choose Check this direction to read the same request again.'}</p>}
       <button disabled={busy} onClick={()=>void check()}>{busy?'Checking…':'Check this direction'}</button>

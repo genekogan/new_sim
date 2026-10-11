@@ -253,6 +253,20 @@ export function openMemoryFolder(directory) {
   }
   preflight(); render();
   const recentReceiptEvidence=()=>recentOutcomes.map(e=>({receiptId:e.receiptId,at:e.at,act:e.act,phase:e.phase,summary:e.summary,placeId:e.placeId??null,untrusted:e.untrusted,confirmedEncounters:e.met.map(p=>({id:p.id,name:p.name,where:p.where})),producedIds:e.produced.map(p=>p.id),learnedSources:e.learned.map(f=>({source:f.source,provenance:f.provenance,untrusted:f.untrusted}))}));
+  const readingRecallEvidence=()=>{
+    const lines=['## Requested reading recall — canonical completed own receipts, max2 / 2400 bytes'];
+    const reading=[...terminals.values()].filter(e=>e.phase==='completed'&&/^read(?::|\s|$)/i.test(e.act)).sort((a,b)=>lexical(b.at,a.at)||lexical(b.receiptId,a.receiptId));
+    let used=Buffer.byteLength(lines[0]),kept=0;
+    for(const e of reading){
+      if(kept===2)break;
+      const line=JSON.stringify({receiptId:e.receiptId,at:e.at,capability:e.act,phase:e.phase,summary:e.summary,placeId:e.placeId??null,untrusted:e.untrusted,learnedSources:e.learned.slice(0,2).map(f=>({source:f.source,provenance:f.provenance,untrusted:f.untrusted,factExcerpt:f.fact.length>300?f.fact.slice(0,299)+'…':f.fact}))});
+      if(used+Buffer.byteLength(line)+1>2400)continue;
+      lines.push(line);used+=Buffer.byteLength(line)+1;kept++;
+    }
+    if(!kept)lines.push('No completed reading receipt fits this compact view. This is not proof no reading exists.');
+    return lines;
+  };
+
   return {
     eventValue(eventId){fresh();id(eventId);const value=seen.get(eventId);if(!value)return null;const record=JSON.parse(value);return record.kind==='event'?structuredClone(record.value):null;},
     fold: input => append({version: VERSION, kind: 'event', value: validateEvent(input)}),
@@ -264,14 +278,16 @@ export function openMemoryFolder(directory) {
     },
     retrieve(input) {
       fresh();
-      keys(input, ['day', 'place', 'people', 'attempt','recall']);
+      keys(input, ['day', 'place', 'people', 'attempt','recall','readingRecall']);
       if (!/^\d{4}-\d\d-\d\d$/.test(input.day ?? '') || new Date(`${input.day}T00:00:00.000Z`).toISOString().slice(0, 10) !== input.day) fail('retrieval day required');
       const near = list(input.people ?? [], 8); near.forEach(id);
       if (input.place !== undefined) {id(input.place); knownPlace(input.place);}
       if(input.recall!==undefined&&typeof input.recall!=='boolean')fail('invalid recall selector');
+      if(input.readingRecall!==undefined&&typeof input.readingRecall!=='boolean')fail('invalid reading recall selector');
       if (input.attempt !== undefined) text(input.attempt, 160);
       const p = input.place ? places.get(input.place) : null;
       return [
+        ...(input.readingRecall?readingRecallEvidence():[]),
         '## Receipt evidence — recent own terminal outcomes, max 6',
         ...recentReceiptEvidence().map(e=>JSON.stringify(e)),
         'These receipts verify your own recorded actions only. A confirmed encounter is not proof of a shared journey or another Soul completing a read. Conversation membership, invitations, speech, and scorecard counts do not establish peer physical completion. Missing peer completion evidence is unknown, not evidence of a solo activity. Local protection requires explicit queue metadata; a completed receipt or old self judgment does not establish it.',

@@ -2,6 +2,14 @@ import * as THREE from 'three';
 import {clone} from 'three/addons/utils/SkeletonUtils.js';
 export const soulAvatars={images:new Map<string,string>(),sources:new Map<string,{entityId:string;model:string;bodyRoot:string}>(),events:new EventTarget()};
 const activityProp=(o:THREE.Object3D)=>{for(let p:THREE.Object3D|null=o;p;p=p.parent)if(p.name.startsWith('activity prop:'))return true;return false;};
+/** Fit visible portrait geometry and aim at its actual head, independent of world pose/hidden helpers. */
+export function soulPortraitView(root:THREE.Object3D,rigid:boolean){
+ root.position.set(0,0,0);root.rotation.set(0,0,0);root.visible=true;root.updateMatrixWorld(true);const box=new THREE.Box3();let head:THREE.Object3D|null=null;
+ root.traverse(o=>{for(let p:THREE.Object3D|null=o;p;p=p.parent)if(!p.visible)return;if((o as THREE.Bone).isBone&&/head$/i.test(o.name))head??=o;if((o as THREE.Mesh).isMesh){const mesh=o as THREE.Mesh;let local:THREE.Box3|null;if((o as THREE.SkinnedMesh).isSkinnedMesh){const skin=o as THREE.SkinnedMesh;skin.skeleton.update();skin.computeBoundingBox();local=skin.boundingBox;}else if((o as THREE.InstancedMesh).isInstancedMesh){const instances=o as THREE.InstancedMesh;instances.computeBoundingBox();local=instances.boundingBox;}else{if(!mesh.geometry.boundingBox)mesh.geometry.computeBoundingBox();local=mesh.geometry.boundingBox;}if(local)box.union(local.clone().applyMatrix4(o.matrixWorld));}});
+ if(box.isEmpty()||![...box.min.toArray(),...box.max.toArray()].every(Number.isFinite))return null;const size=box.getSize(new THREE.Vector3()),target=box.getCenter(new THREE.Vector3());
+ if(!rigid){if(head){(head as THREE.Object3D).getWorldPosition(target);target.y+=(box.max.y-target.y)*.35;}else target.y=box.max.y-size.y*.17;}
+ const height=rigid?Math.max(size.x,size.y,size.z):head?Math.max(size.y*.42,.35):Math.max(size.y*.42,size.x*.85);return{box,target,height};
+}
 /** Bounded portraits use the world renderer and one reusable offscreen target. */
 export class WorldSoulAvatars{
  private target:THREE.WebGLRenderTarget|null=null;private failed=false;private last=0;private keys=new Map<string,string>();
@@ -14,12 +22,7 @@ export class WorldSoulAvatars{
    this.target??=new THREE.WebGLRenderTarget(96,96,{depthBuffer:true});this.target.texture.colorSpace=THREE.SRGBColorSpace;
    portrait=clone(body);if(!rigid&&body.userData.avatarIdleClip){const mixer=new THREE.AnimationMixer(portrait);mixer.clipAction(THREE.AnimationClip.parse(body.userData.avatarIdleClip)).play();mixer.update(.01);}
    const props:THREE.Object3D[]=[];portrait.traverse(o=>{if(o.name.startsWith('activity prop:'))props.push(o);});props.forEach(p=>p.removeFromParent());
-   portrait.position.set(0,0,0);portrait.rotation.set(0,0,0);portrait.visible=true;this.scene.add(portrait);portrait.updateMatrixWorld(true);
-   portrait.traverse(o=>{if((o as THREE.SkinnedMesh).isSkinnedMesh)(o as THREE.SkinnedMesh).computeBoundingBox();});
-   const box=new THREE.Box3().setFromObject(portrait),size=box.getSize(new THREE.Vector3());
-   if(box.isEmpty()||![...box.min.toArray(),...box.max.toArray()].every(Number.isFinite))return;
-   const target=box.getCenter(new THREE.Vector3());if(!rigid)target.y=box.max.y-size.y*.17;
-   const height=rigid?Math.max(size.x,size.y,size.z):Math.max(size.y*.42,size.x*.85);
+   this.scene.add(portrait);const view=soulPortraitView(portrait,rigid);if(!view)return;const {target,height}=view;
    const distance=height/(2*Math.tan(this.camera.fov*Math.PI/360))*1.25;
    // Both rigs and canonical ceramic heads face local +X after their model adapter.
    this.camera.position.copy(target).add(new THREE.Vector3(distance,height*.08,distance*.45));this.camera.lookAt(target);

@@ -228,9 +228,12 @@ function hashId(id: string) {
   return h;
 }
 
+/** Exact legacy full-collection choice, also used while only required initial templates are loaded. */
+export function templateNameFor(id:string,order:readonly string[]){return order[hashId(id)%order.length];}
+
 /** Stable template choice per actor id. */
-function templateFor(id: string, ts: Template[]) {
-  return ts[hashId(id) % ts.length];
+export function templateFor(id: string, ts: Template[]) {
+  const order=(ts as Template[]&{stableOrder?:readonly string[]}).stableOrder;return order?ts.find(t=>t.name===templateNameFor(id,order)):ts[hashId(id) % ts.length];
 }
 
 type Fixtures = { seats: [number, number, number][]; fires: [number, number, number][] };
@@ -296,7 +299,7 @@ export class HumanViews {
     this.templates = ts;
   }
   /** Optional presentation readiness, never a simulation/action barrier. */
-  async appearancesSettled(){await Promise.all([...this.views.values()].flatMap(v=>v.appearance?[v.appearance.ready]:[]));}
+  async appearancesSettled(ids?:ReadonlySet<string>){await Promise.all([...this.views].filter(([id])=>!ids||ids.has(id)).flatMap(([,v])=>v.appearance?[v.appearance.ready]:[]));}
   appearanceStatus(){return [...this.views].map(([id,v])=>({id,...(v.appearance?.snapshot()??{state:'simple',presetId:null,template:v.rig.template.name,ownedMaterials:0})}));}
   private syncAppearance(v:View,key:string|undefined){
     if(!this.humanPresets||v.appearance&&v.appearanceSoulKey===key)return;
@@ -346,7 +349,7 @@ export class HumanViews {
   }
 
   private make(id: string, s: Snap, activity: string,publicSoulKey?:string,bodyModel?:string): View {
-    const rig = createRig(bodyModel?this.bodyTemplates.get(bodyModel)!:templateFor(id, this.templates));
+    const rig = createRig(bodyModel?this.bodyTemplates.get(bodyModel)!:templateFor(id, this.templates)!);
     rig.holder.name = id;
     rig.holder.traverse(o=>{o.userData.entity=id;});
     this.group.add(rig.holder);
@@ -369,7 +372,7 @@ export class HumanViews {
     ).map(e => String(e.equipment!.config.user)));
     let fx: Fixtures | undefined;
     for (const e of Object.values(world.entities)) {
-      if (e.kind !== 'human' || !e.human || e.body?.family==='floater') continue;
+      if (e.kind !== 'human' || !e.human || e.body?.family==='floater'||!templateFor(e.id,this.templates)) continue;
       const act = e.human.activity;
       const base = baseOf(act, e.human.baseActivity);
       let v = this.views.get(e.id);
@@ -569,7 +572,7 @@ export class HumanViews {
     const seen = new Set<string>();
     const world = { entities: parts } as unknown as WorldState;
     for (const f of frame) {
-      if(f.bodyModel?!this.bodyTemplates.has(f.bodyModel):!this.templates.length)continue;
+      if(f.bodyModel?!this.bodyTemplates.has(f.bodyModel):!templateFor(f.id,this.templates))continue;
       seen.add(f.id);
       const act = f.activity ?? 'idle';
       const base = baseOf(act, f.baseActivity);
