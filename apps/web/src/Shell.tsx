@@ -40,6 +40,7 @@ import { SpendPanel } from './Spend.tsx';
 import {soulFragment,soulFromFragment} from './soul-link.ts';
 import {AUTH_UI,configuredSignIn} from './auth-ui.ts';
 import {publishSession,type SessionMode} from './auth-session.ts';
+import {getStatus as godStatus} from './god-ui/god-api.ts';
 import { BacklogPanel, HeardPanel, LibraryPanel, NotebookPanel, SentencesPanel, ThingsPanel, VocabularyPanel } from './Grammar.tsx';
 
 export type AuthCtx = {
@@ -82,6 +83,10 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   const [approvalFollow,setApprovalFollow]=useState<{soulId:string;scope:string}|null>(null);
   const approvalScope=JSON.stringify([cfg.worldId,authIdentity(auth)]);
   const [selected, setSelected] = useState<string | null>(()=>hashTab().soul??null); // public selection only
+  // New worlds: the display name their server was given ("Little Martians (Arium)"), not the slug.
+  const [newWorldName,setNewWorldName]=useState<string|null>(null);
+  useEffect(()=>{if(launcherWorld)void godStatus().then(s=>{if(s?.name)setNewWorldName(s.name);});},[]);
+  const worldName=newWorldName??(worldKey==='littlemartians'?'Little Martians':worldKey[0].toUpperCase()+worldKey.slice(1));
   useEffect(() => { if (!pairCode&&!approvalId){if(location.hash==='#join'||tab==='watch'&&!selected&&location.hash==='#advanced')return;const next=tab==='watch'&&selected?soulFragment(selected):tab;if(location.hash!=='#'+next)location.hash=next;} }, [tab, pairCode,selected,approvalId]);
   useEffect(()=>{const changed=()=>{setApprovalId(approvalFromHash(location.hash));setApprovalFollow(null);};addEventListener('hashchange',changed);return()=>removeEventListener('hashchange',changed);},[]);
   useEffect(() => { const f = () => { if(location.hash==='#advanced'){setAdvanced(true);setPanelOpen(false);setTab('watch');return;} const h = hashTab(); setTab(h.tab); if (!['watch', 'my soul'].includes(h.tab)) setAdvanced(true); else if(h.soul){setAdvanced(false);setPanelOpen(true);setNavigationOpen(false);} if(h.tab==='watch')setSelected(h.soul??null); if (h.pair) setPairCode(h.pair); else if(h.tab==='watch')setPairCode(null); }; addEventListener('hashchange', f); return () => removeEventListener('hashchange', f); }, []);
@@ -133,19 +138,19 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   const edenExpansion=edenExperienceEnabled(location.hostname,worldPath,cfg.worldId,sim.conn.welcome?.worldId,qualifiedEdenWorlds);
   const tourHandle=viewerHandle;
   const exploreLocations=viewerHandle?.locations?.()??[];
-  const exploreName=worldKey==='littlemartians'?'Little Martians':worldKey[0].toUpperCase()+worldKey.slice(1);
+  const exploreName=worldName;
   const localClassroomPresentation=classroomProjection(edenExpansion,sim.conn.welcome?.worldId,Object.hasOwn(r.entities,classroomScreenEntityId),viewerState?.presentation==='live'&&!viewerState.loading&&!viewerState.unavailableReason,lessonIndex,cfg.worldId);
   const openAccount = () => { setAdvanced(false); setPairCode(null); setTab('my soul'); revealPanel(); };
   return (
     <div ref={frame} className={`human-world ${advanced ? 'has-advanced' : ''}`}>
-      {!launcherWorld&&approvalId&&!approvalFollow&&<AccountApproval key={JSON.stringify([privatePanelKey,approvalId])} id={approvalId} worldId={cfg.worldId} worldUrl={location.origin+worldPath} worldName={worldKey==='littlemartians'?'Little Martians':worldKey[0].toUpperCase()+worldKey.slice(1)} auth={auth} api={api} onClose={()=>{setApprovalId(null);history.replaceState(null,'',location.pathname+location.search+'#watch');}} onReady={id=>{setSelected(id);setApprovalFollow({soulId:id,scope:approvalScope});setAdvanced(false);setTab('watch');setPanelOpen(true);}}/>}
+      {!launcherWorld&&approvalId&&!approvalFollow&&<AccountApproval key={JSON.stringify([privatePanelKey,approvalId])} id={approvalId} worldId={cfg.worldId} worldUrl={location.origin+worldPath} worldName={worldName} auth={auth} api={api} onClose={()=>{setApprovalId(null);history.replaceState(null,'',location.pathname+location.search+'#watch');}} onReady={id=>{setSelected(id);setApprovalFollow({soulId:id,scope:approvalScope});setAdvanced(false);setTab('watch');setPanelOpen(true);}}/>}
       <div className="world-scene"><LiveWorld sim={sim} selected={selected} onSelect={inspect} embedded {...{edenExpansion,localClassroomPresentation,publishSpeechAnchors:!advanced,humanPresets:humanPresetsEnabled&&edenExpansion}} hideControls={!advanced} hideSoulInfo={!advanced} viewportInsets={viewportInsets} onViewerHandle={receiveHandle} onViewerState={receiveState} onInitialProgress={advanced ? undefined : setInitialProgress} /></div>
       <WorldSpeechOverlay root={frame} sim={sim} state={viewerState} active={!advanced} handle={viewerHandle}/>
-      {!advanced && <ViewerFrame handle={viewerHandle} state={viewerState} dt={sim.conn.welcome?.dt ?? 0.05} navigationOpen={navigationOpen} onNavigationChange={setNavigationOpen} onNavigationOpen={openNavigation} worldTime={worldTimeText(worldClockAt((sim as Sim&{takes?:{chunks?:unknown[]}|null}).takes?.chunks,viewerState?.shownTick))} connected={!connectionLost(sim.conn)} connecting={!sim.conn.welcome} worldName={worldKey === 'littlemartians' ? 'Little Martians' : worldKey[0].toUpperCase() + worldKey.slice(1)} followName={viewerState?.cameraMode === 'follow' ? r.souls.get(viewerState.selection.soulId ?? '')?.name ?? null : null} slots={{ status: statusSlot, camera: cameraSlot }} initial={initialProgress} />}
+      {!advanced && <ViewerFrame handle={viewerHandle} state={viewerState} dt={sim.conn.welcome?.dt ?? 0.05} navigationOpen={navigationOpen} onNavigationChange={setNavigationOpen} onNavigationOpen={openNavigation} worldTime={worldTimeText(worldClockAt((sim as Sim&{takes?:{chunks?:unknown[]}|null}).takes?.chunks,viewerState?.shownTick))} connected={!connectionLost(sim.conn)} connecting={!sim.conn.welcome} worldName={worldName} followName={viewerState?.cameraMode === 'follow' ? r.souls.get(viewerState.selection.soulId ?? '')?.name ?? null : null} slots={{ status: statusSlot, camera: cameraSlot }} initial={initialProgress} />}
       <header className={`world-hud${advanced ? '' : ' slim'}`}>
         {advanced && <>
         <a href="/" className="world-home">SIM</a>
-        <span className="world-name">{worldKey === 'littlemartians' ? 'Little Martians' : worldKey[0].toUpperCase() + worldKey.slice(1)}</span>
+        <span className="world-name">{worldName}</span>
         <span className={st.state === 'open' ? 'ok' : 'dim'}>{st.state === 'open' ? '● Connected' : 'Connecting…'}</span>
         </>}
         {!advanced&&<div className="hud-status" ref={setStatusSlot}/>}
@@ -154,7 +159,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
         {!launcherWorld&&<LocalIntegrationNotice source={cfg.localIntegrationMetadataPath}/>}{AUTH_UI&&!launcherWorld&&<LocalConnectionHelp devAuth={cfg.devAuth}/>}
         <div className="hud-actions">
           {advanced&&<a className="world-back" href="#watch" onClick={e => { e.preventDefault(); setAdvanced(false); setPairCode(null); setTab('watch'); history.replaceState(null, '', '#watch'); }}>← Back to the world</a>}
-          <WorldAccountControls signinEnabled={signinEnabled} accountAuthRequired={cfg.accountAuthRequired} auth={auth} inviteUrl={launcherWorld?joinLink():undefined} newSoul={<BringAgent showButton={!advanced} key={cfg.worldId??location.pathname} auth={auth} requireAuth={cfg.accountAuthRequired===true}/>}/>
+          <WorldAccountControls signinEnabled={signinEnabled} accountAuthRequired={cfg.accountAuthRequired} auth={auth} inviteUrl={launcherWorld?joinLink():undefined} newSoul={<BringAgent showButton={!advanced} key={cfg.worldId??location.pathname} auth={auth} requireAuth={cfg.accountAuthRequired===true} worldName={newWorldName??undefined}/>}/>
 
         </div>
       </header>

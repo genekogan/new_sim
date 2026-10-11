@@ -132,7 +132,15 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
   const name = launcher?.world.name ?? status.name;
   const isNew = query.has('new');
 
-  if (!open) return <>{ghostBar}<button data-god-panel-toggle="1" className="gp-card gp-collapsed" onClick={() => setOpen(true)}>✦ {owner ? <>God mode · {done}/{checklist.length}{status.pending.length ? <span className="gp-badge">{status.pending.length}</span> : null}</> : status.hasOwner ? 'Join as a Soul' : 'Claim this world'}</button></>;
+  // A visitor on a world that has a god sees no card, as on the old worlds (e8): the header's New Soul is the way to
+  // join. Only the approval link their agent printed (#approve/<id>) opens one, to approve it.
+  if (status.hasOwner && !owner) return <>{ghostBar}{approvalId && (
+    <div data-god-panel="1" className="gp-card">
+      <ApprovalCard id={approvalId} signedIn={signedIn} onDone={() => setApprovalId(null)} />
+      {!signedIn && <div className="gp-block">{signInButton}{signInForm}</div>}
+    </div>
+  )}</>;
+  if (!open) return <>{ghostBar}<button data-god-panel-toggle="1" className="gp-card gp-collapsed" onClick={() => setOpen(true)}>✦ {owner ? <>God mode · {done}/{checklist.length}{status.pending.length ? <span className="gp-badge">{status.pending.length}</span> : null}</> : 'Claim this world'}</button></>;
   return (
     <>
       {ghostBar}
@@ -154,10 +162,6 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
               : <>{!isNew && <p>This world has no god yet. Sign in to claim it; your agent will build it.</p>}{signInButton}{signInForm}</>}
           </div>
         )}
-        {status.hasOwner && !owner && <JoinPanel signedIn={signedIn} worldName={name} base={status.base} owner={false}
-          signIn={<>{signInButton}{signInForm}</>}
-          account={status.you === 'visitor' ? <span className="gp-dim">Signed in as <b>{who}</b> {session.mode === 'dev' ? <button className="gp-mini" onClick={signIn}>switch name</button> : <button className="gp-mini" onClick={() => void session.logout()}>sign out</button>}</span> : null} />}
-
         {owner && (
           <>
             {hashCode && !status.pending.some((p) => p.code === hashCode) && <p className="gp-bad">Pairing request <code>{hashCode}</code> is not pending (expired, or already approved).</p>}
@@ -204,7 +208,7 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
               </div>
             )}
 
-            {tab === 'souls' && <div className="gp-pane" data-souls-tab="1"><JoinPanel signedIn={signedIn} worldName={name} base={status.base} owner /></div>}
+            {tab === 'souls' && <div className="gp-pane" data-souls-tab="1"><JoinPanel signedIn={signedIn} worldName={name} base={status.base} /></div>}
 
             {tab === 'edits' && (
               <div className="gp-pane" data-edits="1">

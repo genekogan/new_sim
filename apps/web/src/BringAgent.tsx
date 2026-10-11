@@ -4,8 +4,8 @@ import {pendingNewSoul,requestNewSoul,resumeNewSoul,dismissNewSoul} from './new-
 import {agentOnboarding} from './auth-ui.ts';
 import './BringAgent.css';
 /** VF3: the "New Soul" button (top right of the Eden viewer) and its "Bring a new Soul to Eden" dialog. Opens on #join, so the link itself can be shared. */
-export function BringAgent({auth,requireAuth=false,showButton=true}:{auth:{ready:boolean;authed:boolean;login():void;signInUrl?:string};requireAuth?:boolean;showButton?:boolean}){
- const worldUrl=location.origin+location.pathname.replace(/\/+$/,''),{world,instructionsUrl,text}=agentOnboarding(worldUrl);
+export function BringAgent({auth,requireAuth=false,showButton=true,worldName}:{auth:{ready:boolean;authed:boolean;login():void;signInUrl?:string};requireAuth?:boolean;showButton?:boolean;worldName?:string}){
+ const worldUrl=location.origin+location.pathname.replace(/\/+$/,''),{world,instructionsUrl,text}=agentOnboarding(worldUrl,worldName);
  const port={location,history:{replaceState:(data:unknown,title:string,url?:string|URL|null)=>history.replaceState(data,title,url)},storage:()=>sessionStorage};
  const [pending,setPending]=useState(()=>pendingNewSoul(worldUrl,location.hash,port.storage)),[open,setOpen]=useState(()=>location.hash==='#join'&&(!requireAuth||auth.authed)),[note,setNote]=useState(''),prompt=useRef<HTMLParagraphElement>(null),modal=useRef<HTMLElement>(null);
  useEffect(()=>{const h=()=>{if(location.hash==='#join'){setPending(true);if(!requireAuth||auth.authed)setOpen(true);}};addEventListener('hashchange',h);return()=>removeEventListener('hashchange',h);},[auth.authed,requireAuth]);
