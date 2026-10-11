@@ -6,7 +6,7 @@
 // renderer.info (draw calls, triangles, programs, geometries, textures), scene counts and JS heap. One screenshot
 // per configuration (after the still window). Chrome lease held for the whole run; machine load is recorded.
 //   node tools/god-skill/e2e/perf-probe.mjs <worldUrl> [--sizes 1352x800,1440x900] [--dprs 1,2] [--seconds 6]
-//        [--label before] [--out dir] [--name admin] [--settle-max 120] [--json]
+//        [--label before] [--out dir] [--name admin] [--settle-max 120] [--mbps 60]
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { loadavg } from 'node:os';
 import { resolve } from 'node:path';
@@ -83,6 +83,8 @@ try {
     await ctx.addInitScript((name) => { try { localStorage.setItem('sim.dev', name); } catch {} }, opt('name', 'admin'));
     await ctx.addInitScript(INIT);
     const page = await ctx.newPage();
+    const mbps = Number(opt('mbps', '0'));   // --mbps N: emulate an N Mbit/s link (40 ms latency) to see loading as on the real network
+    if (mbps > 0) { const cdp = await ctx.newCDPSession(page); await cdp.send('Network.enable'); await cdp.send('Network.emulateNetworkConditions', { offline: false, latency: 40, downloadThroughput: mbps * 125000, uploadThroughput: mbps * 125000 }); }
     const errors = []; page.on('pageerror', (e) => errors.push(String(e).slice(0, 300)));
     const tNav = Date.now();
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 180_000 });

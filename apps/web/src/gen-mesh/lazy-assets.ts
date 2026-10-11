@@ -74,7 +74,8 @@ export function deferLoad(sha: string, start: () => void, makeHook: (fn: (cam: T
   const hook = makeHook((cam) => {
     if (done) return;
     hook.getWorldPosition(at); camera.copy(cam.position);
-    if (started.has(sha) || at.distanceTo(cam.position) < NEAR_M) go();
+    // while the arrival card waits on the eager set, the rest waits too: the eager GLBs get the whole link (lane PERF)
+    if (started.has(sha) || (at.distanceTo(cam.position) < NEAR_M && !arrivalGate.pending())) go();
   });
   hook.addEventListener('removed', () => { done = true; const l = waiting.get(sha); if (l) { const i = l.indexOf(entry); if (i >= 0) l.splice(i, 1); if (!l.length) waiting.delete(sha); } });
   return hook;
@@ -85,6 +86,7 @@ function scheduleBackground() {
   if (background) clearTimeout(background);
   background = setTimeout(function tick() {
     background = null;
+    if (arrivalGate.pending()) { background = setTimeout(tick, 500); return; }
     while (running < BACKGROUND_PARALLEL && waiting.size) {
       let best: string | null = null, bd = Infinity;
       for (const [sha, list] of waiting) for (const w of list) { const d = w.at.lengthSq() ? w.at.distanceTo(camera) : 1e9; if (d < bd) { bd = d; best = sha; } }

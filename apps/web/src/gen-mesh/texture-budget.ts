@@ -26,7 +26,9 @@ export function setTextureRenderer(r: THREE.WebGLRenderer | null, s: THREE.Scene
  *  material variant otherwise blocks the frame that first draws it (~0.3 s over LM's load). */
 export async function compileModel(g: GLTF): Promise<void> {
   if (!renderer || !scene || !camera) return;
-  try { await renderer.compileAsync(g.scene, camera, scene); } catch { /* compiled on first draw instead */ }
+  // never wait long: three's readiness poll can throw inside its own timer (a material without a program) and then its
+  // promise never settles; the model must still appear (it compiles on first draw instead)
+  try { await Promise.race([renderer.compileAsync(g.scene, camera, scene), new Promise((r) => setTimeout(r, 3000))]); } catch { /* compiled on first draw */ }
 }
 
 /** Downscale a loaded model's oversized textures (each texture once, even when shared by several materials). */
