@@ -4,7 +4,15 @@ import { areaMask, bumpK, distPolyEdge, distPolyline, pathMask, pointInPoly, pol
 import { brushFalloff, brushRaise, channelApply, cliffReach, cliffRise, KERNEL, smoothRadius, terraceTarget } from './forms.ts';
 import type { Ground, Landform, Vec2 } from './types.ts';
 
+// lane PERF2: memoized per landform object (landforms are immutable data; every sample asked again: a 226-thing world spent
+// ~115 ms of a terrain edit's 200 ms stall recomputing polygon bounds)
+const boundsMemo = new WeakMap<Landform, [number, number, number, number]>();
 export function landformBounds(l: Landform): [number, number, number, number] {
+  let b = boundsMemo.get(l);
+  if (!b) { b = landformBoundsRaw(l); boundsMemo.set(l, b); }
+  return b;
+}
+function landformBoundsRaw(l: Landform): [number, number, number, number] {
   switch (l.kind) {
     case 'bump': return [l.c[0] - l.r, l.c[1] - l.r, l.c[0] + l.r, l.c[1] + l.r];
     case 'ridge': return polyBounds(l.path, l.w);
