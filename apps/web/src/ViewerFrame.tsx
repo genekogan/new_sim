@@ -139,7 +139,7 @@ export function ViewerFrame({ handle, state, dt, navigationOpen, onNavigationCha
       <div className="viewer-arrival-card"><span className="viewer-arrival-spinner" aria-hidden="true" />
         <div><p className="viewer-arrival-title">Arriving in {worldName ?? 'the world'}</p>
           <p className="viewer-arrival-stage">{arriving ? state?.assetDownloads?.pending ? `Downloading world assets · ${state.assetDownloads.loaded} of ${state.assetDownloads.total} ready` : `${arrivalStage(reason, connecting)}…` : preparing ? 'Preparing the world…' : 'Ready'}</p>
-          {progress !== null && <div className="viewer-arrival-progress"><progress aria-label="World loading progress" max={100} value={Math.round(progress * 100)} /><span>{Math.round(progress * 100)}%</span></div>}</div></div>
+          {progress !== null && <div className="viewer-arrival-progress"><progress aria-label="World loading progress" max={100} value={Math.round(progress * 100)} /><span>{Math.round(progress * 100)}%{initial && initial.bytesLoaded > 0 ? ` · ${(initial.bytesLoaded / 1048576).toFixed(1)} MB` : ''}</span></div>}</div></div>
     </div>}
     {followCue && !arriving && <div className="viewer-follow-hint" role="status" aria-live="polite" data-cue={followCue}>{followCue === 'follow'
       ? coarse ? <>Following <b>{followName ?? 'a Soul'}</b> · drag to look around · × to stop</> : <>Following <b>{followName ?? 'a Soul'}</b> · drag to look around, scroll to zoom · press <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to look around freely</>
