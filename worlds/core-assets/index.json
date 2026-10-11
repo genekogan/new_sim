@@ -23945,12 +23945,12 @@
    "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)",
    "footprint": "3f0f1c1ee9ecd2620950f0d93aff121dd817ea90813aceea9c22b3656d290dd0"
   },
-  "28ce4acd56aa6bd15cdeeea3e8d7a2b22a69c840b28580bad2c5342b4f369a7b": {
+  "b6da2430b9b9420bc6dbd26e8b0b34deca7e0a5273339b5d755ba5476378abc7": {
    "ext": "json",
    "kind": "footprint",
    "path": "worlds/core-assets/mars/mimos.footprint.json",
    "tris": 0,
-   "bytes": 8771,
+   "bytes": 9389,
    "textures": 0,
    "texPx": 0,
    "box": [
@@ -24051,6 +24051,34 @@
      },
      {
       "c": [
+       -2.885,
+       4.3987
+      ],
+      "half": [
+       0.725,
+       0.05
+      ],
+      "yaw": 0,
+      "y0": 0.2403,
+      "y1": 2.8403,
+      "tag": "front-glazing-w"
+     },
+     {
+      "c": [
+       -0.435,
+       4.3987
+      ],
+      "half": [
+       0.725,
+       0.05
+      ],
+      "yaw": 0,
+      "y0": 0.2403,
+      "y1": 2.8403,
+      "tag": "front-glazing-e"
+     },
+     {
+      "c": [
        -2.48,
        2.3687
       ],
@@ -24118,6 +24146,20 @@
       "y0": 0.2403,
       "y1": 0.7603,
       "tag": "under-landing"
+     },
+     {
+      "c": [
+       -1.63,
+       -4.2063
+      ],
+      "half": [
+       0.45,
+       0.635
+      ],
+      "yaw": 0,
+      "y0": 0.2403,
+      "y1": 0.7503,
+      "tag": "stairs:rear-stair"
      },
      {
       "c": [
@@ -24503,7 +24545,7 @@
        4.3987
       ],
       "yaw": 0,
-      "width": 3.8,
+      "width": 1,
       "height": 2.6,
       "sill": 0.2403,
       "level": 0,
@@ -24758,7 +24800,7 @@
      }
     ],
     "notes": [
-     "footprint mars-mimos: 3 rooms, 2 openings, 2 links (0 shafts, float-only), 31 wall/solid colliders"
+     "footprint mars-mimos: 3 rooms, 2 openings, 2 links (0 shafts, float-only), 34 wall/solid colliders"
     ]
    },
    "name": "mars-mimos-footprint",
@@ -24793,14 +24835,14 @@
    "name": "mars-mimos",
    "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
    "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)",
-   "footprint": "28ce4acd56aa6bd15cdeeea3e8d7a2b22a69c840b28580bad2c5342b4f369a7b"
+   "footprint": "b6da2430b9b9420bc6dbd26e8b0b34deca7e0a5273339b5d755ba5476378abc7"
   },
-  "8fb5d0d1acc8432d4e5182b252976de0f17e4fb9dbd708a4e0125d74c89c6eb1": {
+  "285900cb3c9dd958891d64aaf81c96c97132c8f54cd66fd202cd60d54d6662d6": {
    "ext": "json",
    "kind": "footprint",
    "path": "worlds/core-assets/mars/kitchen.footprint.json",
    "tris": 0,
-   "bytes": 5833,
+   "bytes": 5842,
    "textures": 0,
    "texPx": 0,
    "box": [
@@ -24859,17 +24901,31 @@
      },
      {
       "c": [
-       0.0163,
-       -0.637
+       -0.0937,
+       -0.582
       ],
       "half": [
        0.04,
-       1.5
+       1.445
       ],
       "yaw": 0,
       "y0": 0.7703,
       "y1": 3.1203,
       "tag": "bay-partition"
+     },
+     {
+      "c": [
+       0.8663,
+       -0.167
+      ],
+      "half": [
+       0.03,
+       0.04
+      ],
+      "yaw": 0,
+      "y0": 0.2403,
+      "y1": 2.4403,
+      "tag": "rack-upright"
      },
      {
       "c": [
@@ -24957,6 +25013,20 @@
      },
      {
       "c": [
+       2.0163,
+       4.673
+      ],
+      "half": [
+       0.47,
+       0.78
+      ],
+      "yaw": 0,
+      "y0": 0.2403,
+      "y1": 0.7503,
+      "tag": "stairs:diner-step"
+     },
+     {
+      "c": [
        -2.0387,
        -0.137
       ],
@@ -25027,20 +25097,6 @@
      },
      {
       "c": [
-       0.748,
-       -0.1692
-      ],
-      "half": [
-       0.0381,
-       0.03
-      ],
-      "yaw": 1.5681,
-      "y0": 0.2403,
-      "y1": 2.4403,
-      "tag": "obj-3"
-     },
-     {
-      "c": [
        -0.7662,
        -0.1733
       ],
@@ -25051,21 +25107,7 @@
       "yaw": 1.5681,
       "y0": 0.2403,
       "y1": 2.4403,
-      "tag": "obj-4"
-     },
-     {
-      "c": [
-       -0.0277,
-       -0.632
-      ],
-      "half": [
-       0.0665,
-       1.5
-      ],
-      "yaw": 0,
-      "y0": 0.7703,
-      "y1": 2.4403,
-      "tag": "obj-5"
+      "tag": "obj-3"
      },
      {
       "c": [
@@ -25079,7 +25121,7 @@
       "yaw": 0.6208,
       "y0": 1.6703,
       "y1": 1.7503,
-      "tag": "obj-6"
+      "tag": "obj-4"
      }
     ],
     "surfaces": [
@@ -25361,7 +25403,7 @@
    "name": "mars-kitchen",
    "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
    "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)",
-   "footprint": "8fb5d0d1acc8432d4e5182b252976de0f17e4fb9dbd708a4e0125d74c89c6eb1"
+   "footprint": "285900cb3c9dd958891d64aaf81c96c97132c8f54cd66fd202cd60d54d6662d6"
   },
   "67ddb2f41e5205b80ce6db4ce3d9057a78c080def45d3c97743e5b1deb5e79cd": {
    "ext": "json",
@@ -26464,12 +26506,12 @@
    "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)",
    "footprint": "4905bd2412b552b8f4d17fa5ffe22c068f0481e70df5fcb31872af8829d040a1"
   },
-  "256fe5ffe0b1c2fce16a0465c7747aadb251cfe5ca2fc8ace96f8c22066305e0": {
+  "f77a6b5388d46c8a7fa314c4d08417b087a7069803095c09eddf21b819578483": {
    "ext": "json",
    "kind": "footprint",
    "path": "worlds/core-assets/mars/tool-camp.footprint.json",
    "tris": 0,
-   "bytes": 18703,
+   "bytes": 19252,
    "textures": 0,
    "texPx": 0,
    "box": [
@@ -27731,7 +27773,54 @@
       "tag": "obj-37"
      }
     ],
-    "surfaces": [],
+    "surfaces": [
+     {
+      "level": 2,
+      "y": 2.857,
+      "polygon": [
+       [
+        -7.6461,
+        -12.9207
+       ],
+       [
+        -4.0665,
+        -12.1577
+       ],
+       [
+        -4.5751,
+        -9.7713
+       ],
+       [
+        -8.1547,
+        -10.5343
+       ]
+      ],
+      "tag": "library-loft"
+     },
+     {
+      "level": 2,
+      "y": 2.857,
+      "polygon": [
+       [
+        -3.9489,
+        -12.7473
+       ],
+       [
+        -0.3693,
+        -11.9843
+       ],
+       [
+        -1.1323,
+        -8.4047
+       ],
+       [
+        -4.7119,
+        -9.1677
+       ]
+      ],
+      "tag": "library-terrace"
+     }
+    ],
     "openings": [],
     "links": [],
     "rooms": [],
@@ -27772,7 +27861,7 @@
    "name": "mars-tool-camp",
    "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
    "source": "V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections)",
-   "footprint": "256fe5ffe0b1c2fce16a0465c7747aadb251cfe5ca2fc8ace96f8c22066305e0"
+   "footprint": "f77a6b5388d46c8a7fa314c4d08417b087a7069803095c09eddf21b819578483"
   },
   "8cce6ffe59bdf60e43c7e1d785f7f467287059344e95766819755a002dc4c68c": {
    "ext": "json",

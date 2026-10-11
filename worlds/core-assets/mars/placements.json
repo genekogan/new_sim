@@ -2663,6 +2663,30 @@
     56.676
    ],
    "r": 2.9322
+  },
+  {
+   "def": "core/mars-tool-library-stair@1",
+   "cat": "fixture",
+   "building": "tool-camp",
+   "name": "tool-library-stair",
+   "p": [
+    -9.341,
+    0,
+    -50.868
+   ],
+   "r": -0.21
+  },
+  {
+   "def": "core/mars-mimos-front-glazing@1",
+   "cat": "fixture",
+   "building": "mimos",
+   "name": "mimos-front-glazing",
+   "p": [
+    45.22,
+    0,
+    1.94
+   ],
+   "r": 0
   }
  ]
 }

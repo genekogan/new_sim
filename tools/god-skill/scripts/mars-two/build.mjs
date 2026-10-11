@@ -25,7 +25,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { ROOT, readV3, indexNodes, cut, v3ToLocal, mul, rotY, translate, xz, X0, minRect, nodePoints, rectOverlap } from './v3.mjs';
-import { ROOMS, WALLS, DOORS, STAIRS, RAISED, ENTRANCES, TERRACES, ROOM_AT } from './layout.mjs';
+import { ROOMS, WALLS, DOORS, STAIRS, RAISED, ENTRANCES, TERRACES, ROOM_AT, LOFTS, LOFT_Y, FIXTURES, STAIR_RUN, REPLACED } from './layout.mjs';
 
 const { measureGlb, footprintToBaked } = await import(join(ROOT, 'apps/server/src/god/assets.ts'));
 const OUT = join(ROOT, 'worlds/core-assets/mars');
@@ -170,7 +170,13 @@ function authoredFootprint(b, o, box, contents) {
   const portals = (DOORS[b] ?? []).map(([id, n, e, nn, ne_, w, y0, y1]) => ({ id, kind: y0 > 1 ? 'window' : 'door', level: y0 > 0.35 && y0 < 1 ? 1 : 0, center: [r4(e + X0 - o[0]), r4((y0 + y1) / 2 - o[1]), r4(-n - o[2])], normal: [ne_, 0, -nn], width: w, y0: r4(y0 - o[1]), y1: r4(y1 - o[1]) }));
   const links = (STAIRS[b] ?? []).map(([id, a, z, w]) => ({ id, kind: 'stairs', width: w, from: { level: a[2] > 0.35 ? 1 : 0, y: r4(a[2] - o[1]) }, to: { level: z[2] > 0.35 ? 1 : 0, y: r4(z[2] - o[1]) }, path: [a, z].map(([n, e, y]) => [r4(e + X0 - o[0]), r4(y - o[1]), r4(-n - o[2])]) }));
   const terraces = (TERRACES[b] ?? []).map(([id, n0, n1, e0, e1, y]) => ({ id, level: y > 0.35 ? 1 : 0, y: r4(y - o[1]), polygon: [[e0, -n1], [e1, -n1], [e1, -n0], [e0, -n0]].map(([e, z]) => [r4(e + X0 - o[0]), r4(z - o[2])]) }));
-  return { schema: 'lm-building-footprint/1', id: `mars-${b}`, name: b, bounds: { min: [-box[0] / 2, 0, -box[2] / 2], max: [box[0] / 2, box[1], box[2] / 2] }, levels: [{ id: 0, y: 0 }, { id: 1, y: RAISED }], rooms, obstacles, portals, links, ...(terraces.length ? { terraces } : {}) };
+  // MARSLIVED: rack-deck floors (the Tool library loft), turned with the rack grid, in mars-two coordinates
+  for (const [id, c, [hu, hv], yaw, y] of LOFTS[b] ?? []) {
+    const u = [Math.cos(yaw), -Math.sin(yaw)], v = [Math.sin(yaw), Math.cos(yaw)];
+    terraces.push({ id, level: 2, y: r4(y - o[1]), polygon: [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([i, j]) => [r4(c[0] + i * hu * u[0] + j * hv * v[0] - o[0]), r4(c[1] + i * hu * u[1] + j * hv * v[1] - o[2])]) });
+  }
+  const levels = [{ id: 0, y: 0 }, { id: 1, y: RAISED }, ...(LOFTS[b]?.length ? [{ id: 2, y: LOFT_Y }] : [])];
+  return { schema: 'lm-building-footprint/1', id: `mars-${b}`, name: b, bounds: { min: [-box[0] / 2, 0, -box[2] / 2], max: [box[0] / 2, box[1], box[2] / 2] }, levels, rooms, obstacles, portals, links, ...(terraces.length ? { terraces } : {}) };
 }
 
 // ------------------------------------------------------------------ build
@@ -317,7 +323,8 @@ for (const [b, rs] of byB) {
   const own = (r) => (b !== 'chiba' || !(inRect(r, -1.95, 6.0, -11.8, 3.7) || inRect(r, 5.9, 10.9, -0.1, 4.95)))
     // what stands on or against a cut-out piece of furniture (the espresso machine on the counter) is that furniture's business
     && !furnBoxes.some((f) => r.n0 < f.n1 + 0.08 && f.n0 - 0.08 < r.n1 && r.e0 < f.e1 + 0.08 && f.e0 - 0.08 < r.e1 && r.y0 < f.y1 + 0.3 && f.y0 < r.y1);
-  const contents = contentObstacles(rs.filter((r) => own(r) && (!/Walls and screens/.test(r.layer ?? '') || !B.authored)), o, floorY).filter((ob) => !B.authored || ob.y1 > RAISED + 0.3);
+  const replaced = (r) => (REPLACED[b] ?? []).some(([n0, n1, e0, e1]) => inRect(r, n0, n1, e0, e1));
+  const contents = contentObstacles(rs.filter((r) => own(r) && !replaced(r) && (!/Walls and screens/.test(r.layer ?? '') || !B.authored)), o, floorY).filter((ob) => !B.authored || ob.y1 > RAISED + 0.3);
   const fp = authoredFootprint(b, o, piece.box, contents);
   const fpBytes = Buffer.from(JSON.stringify(fp, null, 1) + '\n');
   const baked = footprintToBaked(fp);
@@ -373,6 +380,25 @@ for (const g of objs.sort((a, b) => a[0].i - b[0].i)) {
   nSite++;
 }
 console.log(`site: ${nSite} objects, ${siteKinds.size} kinds`);
+
+// 4. MARSLIVED: authored fixtures the reference lacks (layout.mjs FIXTURES), as generated defs
+const glass = (x, w) => ({ kind: 'box', at: [x, 1.31, 0], size: [w, 2.46, 0.02], material: 'glass', collide: false });
+const timber = (at, size) => ({ kind: 'box', at, size, tint: 'frame', collide: false });
+const FIXTURE_DEFS = {
+  'tool-library-stair': { schema: 'def/1', name: 'core-mars-tool-library-stair', version: 1, description: `A timber flight (${STAIR_RUN} m, 16 risers) from the ground up to the Tool library's east terrace and loft (${LOFT_Y} m): the reference draws the loft but no way up. Souls climb it to the library's cushions.`, tags: ['mars', 'mars-campus', 'stairs', 'access', 'library', 'tool-camp'], form: 'point', make: { kind: 'gen', gen: 'stairs/1' }, params: { rise: { type: 'number', default: LOFT_Y }, run: { type: 'number', default: STAIR_RUN }, width: { type: 'number', default: 0.9 }, material: { type: 'string', default: 'wood' } }, size: { box: [0.9, LOFT_Y, STAIR_RUN] }, layer: 'solid', overlaps: ['mars-campus'], category: 'component.access' },
+  'mimos-front-glazing': { schema: 'def/1', name: 'core-mars-mimos-front-glazing', version: 1, description: 'Mimos main south\'s glazed front: timber-framed glass either side of a glass door (open, swung in), 3.9 m along the south wall west of the sloping plexiglass. The reference left this front open.', tags: ['mars', 'mars-campus', 'glazing', 'window', 'door', 'mimos'], form: 'point', make: { kind: 'gen', gen: 'kit/2', args: { round: 0.01, shapes: [
+    glass(-1.225, 1.37), glass(1.225, 1.37),
+    ...[-1.95, -0.5, 0.5, 1.95].map((x) => timber([x, 1.3, 0], [0.08, 2.6, 0.1])), timber([-1.225, 1.3, 0], [0.04, 2.5, 0.06]), timber([1.225, 1.3, 0], [0.04, 2.5, 0.06]),
+    timber([0, 2.57, 0], [3.98, 0.08, 0.12]), timber([-1.225, 0.04, 0], [1.45, 0.08, 0.12]), timber([1.225, 0.04, 0], [1.45, 0.08, 0.12]),
+    // the door leaf, open: hinged on the east jamb, swung in (north = local −z) against the glass
+    { kind: 'box', at: [0.47, 1.25, -0.47], size: [0.02, 2.3, 0.88], material: 'glass', collide: false }, timber([0.47, 1.25, -0.92], [0.05, 2.36, 0.05]), timber([0.47, 2.41, -0.47], [0.05, 0.05, 0.9]),
+  ] } }, params: { frame: { type: 'color', default: '#7a5536', doc: 'timber frame colour' } }, palette: { frame: '#7a5536' }, size: { box: [4, 2.62, 1.0] }, layer: 'decor', overlaps: ['mars-campus'], category: 'building.part' },
+};
+for (const [name, defName, building, p, r] of FIXTURES) {
+  const d = FIXTURE_DEFS[defName]; if (!d) throw new Error(`fixture ${name}: no def ${defName}`);
+  if (!defs.some((x) => x.name === d.name)) defs.push(d);
+  placements.push({ def: `core/mars-${defName}@1`, cat: 'fixture', building, name, p: p.map(r3), r: r4(r) });
+}
 
 if (!only) {
   for (const f of readdirSync(OUT)) { const p = join(OUT, f); if (/\.(glb|json)$/.test(f) && !written.has(p) && !/^(index\.part|placements)\.json$/.test(f)) rmSync(p); }

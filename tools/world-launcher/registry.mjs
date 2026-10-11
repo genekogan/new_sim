@@ -61,8 +61,10 @@ export class Registry {
   }
 }
 
-/** Every template on disk plus the built-in empty plain, in the order the dialog shows them. */
-export function listTemplates(dir) {
+/** Every template on disk plus the built-in empty plain, in the order the dialog shows them. A template with
+ *  `"hidden": true` (a retired one: mars-camp, superseded by mars-two) is left out of the dialog and cannot start a new
+ *  world; `{ all: true }` still finds it, so worlds already made from it keep their genesis file. */
+export function listTemplates(dir, { all = false } = {}) {
   const out = [{ id: 'empty', name: 'Empty plain', description: 'A flat, empty kilometre of grass. Nothing on it but the sky; your agent starts from zero.', file: null, batches: 0 }];
   let files = [];
   try { files = readdirSync(dir).filter((f) => f.endsWith('.json')).sort(); } catch { /* no templates */ }
@@ -73,6 +75,7 @@ export function listTemplates(dir) {
       if (g?.schema !== 'genesis/1' || !Array.isArray(g.batches)) continue;
       const id = basename(f, '.json');
       if (!SLUG_RE.test(id) || id === 'empty') continue;
+      if (g.hidden === true && !all) continue;
       const ops = g.batches.reduce((n, b) => n + (Array.isArray(b.ops) ? b.ops.length : 0), 0);
       found.push({ id, name: typeof g.name === 'string' ? g.name : id, description: typeof g.description === 'string' ? g.description : '', file: join(dir, f), batches: g.batches.length, ops });
     } catch { /* a broken template is skipped, not fatal */ }

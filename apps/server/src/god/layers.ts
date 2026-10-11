@@ -27,6 +27,23 @@ type Vec2 = [number, number];
 type Refusal = { code: string; reason: string };
 type Plans = Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>;
 
+/** DEFER (2026-10-11, PM brief 37 item 4): the default experience has no economy and no god-set relationships. The
+ *  code stays; its Soul-facing verbs (buy/sell/pay), perception (prices, wallets, who works or lives where) and the god's
+ *  economy/mint/pay/relate ops and prices only exist in a world that opts in: env LAYERS=1 for that world's process.
+ *  Schedules, ownership and zones are always on. */
+export const economyOn = (): boolean => process.env.LAYERS === '1';
+/** The god ops (and fields) only an opted-in world accepts; null when the batch is fine. */
+export function deferredOp(batch: unknown): { op: number; code: string; detail: string } | null {
+  if (economyOn()) return null;
+  const ops = (batch as { ops?: unknown[] })?.ops; if (!Array.isArray(ops)) return null;
+  for (let i = 0; i < ops.length; i++) {
+    const o = ops[i] as Record<string, any> | null; if (!o || typeof o !== 'object') continue;
+    if (['economy', 'mint', 'pay', 'relate'].includes(o.op)) return { op: i, code: 'layers.deferred', detail: `\`${o.op}\`: this world has no economy or god-set relationships (deferred; a world opts in with LAYERS=1). Schedules, ownership and zones work.` };
+    if ((o.price != null) || (o.layers?.price != null)) return { op: i, code: 'layers.deferred', detail: 'prices: this world has no economy (deferred; a world opts in with LAYERS=1). Schedules, ownership and zones work.' };
+  }
+  return null;
+}
+
 /** Souls trade with things within this distance (m). */
 export const TRADE_REACH = 30;
 /** Calendar items are posted this many world minutes ahead. */
@@ -182,7 +199,7 @@ export class GodLayers {
   tag(e: Entity): string {
     const parts: string[] = [];
     if (e.owner || e.access) { const w = this.ownerWord(e.id); if (w) parts.push(w); }
-    if (e.price) parts.push(e.price.service ? `${e.price.service} for ${this.money(e.price.amount)}` : `for sale: ${this.money(e.price.amount)}`);
+    if (e.price && economyOn()) parts.push(e.price.service ? `${e.price.service} for ${this.money(e.price.amount)}` : `for sale: ${this.money(e.price.amount)}`);
     if (e.schedule) { const d = describeSchedule(e.schedule); if (d) parts.push(d); }
     return parts.join('; ');
   }
@@ -200,10 +217,10 @@ export class GodLayers {
         continue;
       }
       if (!c.target || !this.m.entities.has(c.target.id) || !['sit', 'pick-up', 'put-on'].includes(c.verb)) continue;
-      const r = this.refusal(c.target.id, soul) ?? (c.verb === 'pick-up' ? this.forSale(c.target.id, soul) : null);
+      const r = this.refusal(c.target.id, soul) ?? (c.verb === 'pick-up' && economyOn() ? this.forSale(c.target.id, soul) : null);
       if (r) { c.available = false; (c as any).blocked = r; plans.delete(c.id); }
     }
-    if (!here) return;
+    if (!here || !economyOn()) return;
     const mine = this.walletOf(soul);
     for (const e of this.m.entities.values()) {
       if (!e.price) continue;
@@ -230,6 +247,7 @@ export class GodLayers {
   /** `buy:<id>`, `pay:<soul>` (params.amount), `sell:<id>` (params.price; 0 or none takes it off sale). */
   act(soul: EdgeSoul, capability: string, params: Record<string, unknown>, here: Vec2 | null = null): { accepted: true; result: Record<string, unknown> } | { accepted: false; code: string; reason: string } {
     const no = (code: string, reason: string) => ({ accepted: false as const, code, reason });
+    if (!economyOn()) return no('capability.unknown', `${capability.split(':')[0]}: this world has no economy.`);
     const [verb, ...rest] = capability.split(':'), arg = rest.join(':');
     const me = this.walletOf(soul), merge: Op[] = me.alias ? [{ op: 'pay', from: me.alias, to: me.key, amount: this.m.state.layers!.wallets[me.alias] } as Op] : [];
     if (verb === 'buy') {
@@ -271,21 +289,23 @@ export class GodLayers {
   me(soul: { soulId: string; name: string }) {
     const owns = [...this.m.entities.values()].filter((e) => e.owner && this.isOf(e.owner, soul)).map((e) => ({ id: e.id, name: e.name ? this.m.pathOf(e.id) : this.m.resolvedDef(e.def)?.name.replace(/^core-/, ''), ...(e.access ? { access: e.access } : {}), ...(e.price ? { price: e.price } : {}), ...(e.owner!.startsWith('group:') ? { via: this.nameOf(e.owner) } : {}) }));
     const rel = this.relations().filter((r) => this.isOf(r.a, soul) || this.isOf(r.b, soul)).map((r) => this.isOf(r.a, soul) ? { you: r.rel, with: this.nameOf(r.b) } : { [r.rel]: 'you', from: this.nameOf(r.a) });
+    if (!economyOn()) return { owns: owns.map(({ price: _p, ...o }) => o) };
     return { currency: this.currency(), wallet: this.walletOf(soul).amount, owns, relationships: rel };
   }
   /** The public layer view (no wallets): currency, zones, schedules, prices, owners, relationships. */
   publicView() {
-    const things = [...this.m.entities.values()].filter((e) => e.owner || e.access || e.schedule || e.price);
+    const econ = economyOn(), things = [...this.m.entities.values()].filter((e) => e.owner || e.access || e.schedule || (econ && e.price));
     const zones = [...this.m.entities.values()].filter((e) => /^core-zone@/.test(e.def) || e.def === 'core/zone@1').map((e) => ({ id: e.id, name: e.name ? this.m.pathOf(e.id) : e.id, use: e.params?.use ?? 'residential' }));
     return {
-      contract: 'layers/1', currency: this.currency(), clock: this.clock(),
+      contract: 'layers/1', ...(econ ? { currency: this.currency() } : {}), clock: this.clock(),
       zones,
-      things: things.map((e) => ({ id: e.id, name: e.name ? this.m.pathOf(e.id) : e.id, ...(e.owner ? { owner: this.nameOf(e.owner), ownerRef: e.owner } : {}), ...(e.access ? { access: e.access } : {}), ...(e.price ? { price: e.price } : {}), ...(e.schedule ? { schedule: e.schedule, hours: this.hoursOf(e.schedule) } : {}) })),
-      relations: this.relations().map((r) => ({ a: this.nameOf(r.a), rel: r.rel, b: this.nameOf(r.b), refs: r })),
+      things: things.map((e) => ({ id: e.id, name: e.name ? this.m.pathOf(e.id) : e.id, ...(e.owner ? { owner: this.nameOf(e.owner), ownerRef: e.owner } : {}), ...(e.access ? { access: e.access } : {}), ...(econ && e.price ? { price: e.price } : {}), ...(e.schedule ? { schedule: e.schedule, hours: this.hoursOf(e.schedule) } : {}) })),
+      ...(econ ? { relations: this.relations().map((r) => ({ a: this.nameOf(r.a), rel: r.rel, b: this.nameOf(r.b), refs: r })) } : {}),
     };
   }
   /** Who works and lives at a thing: "Ana works here". */
   peopleAt(entityId: string): string {
+    if (!economyOn()) return '';
     const at = this.relations().filter((r) => r.b === `thing:${entityId}` && (r.rel === 'works-at' || r.rel === 'lives-at'));
     const w = at.filter((r) => r.rel === 'works-at').map((r) => this.nameOf(r.a)), l = at.filter((r) => r.rel === 'lives-at').map((r) => this.nameOf(r.a));
     return [...(w.length ? [`${w.join(' and ')} work${w.length === 1 ? 's' : ''} here`] : []), ...(l.length ? [`${l.join(' and ')} live${l.length === 1 ? 's' : ''} here`] : [])].join('; ');
@@ -310,7 +330,7 @@ export function mountLayerRoutes(app: import('hono').Hono, d: { god: { model: Wo
   const need = () => { const l = d.layers(); if (!l) throw new ApiError(404, 'not-found', 'this world has no Souls layer (no engine bridge)'); return l; };
   app.get('/v1/world/layers', (c) => c.json(need().publicView(), 200, noStore));
   app.get('/v1/world/layers/me', (c) => { const s = d.soulFromBearer(c); if (!s) return c.json({ error: { code: 'unauthorized', message: 'a Soul token is required' } }, 401); return c.json(need().me({ soulId: s.id, name: s.name }), 200, noStore); });
-  app.get('/v1/god/layers', (c) => { d.requireGod(c); const l = need(); const w = d.god.model.state.layers?.wallets ?? {}; return c.json({ ...l.publicView(), souls: l.souls(), wallets: Object.fromEntries(Object.entries(w).map(([k, v]) => [l.nameOf(k), v])), walletRefs: w }, 200, noStore); });
+  app.get('/v1/god/layers', (c) => { d.requireGod(c); const l = need(); const w = d.god.model.state.layers?.wallets ?? {}; return c.json({ ...l.publicView(), souls: l.souls(), ...(economyOn() ? {} : { deferred: 'economy and relationships are off in this world (LAYERS=1 opts in)' }), wallets: Object.fromEntries(Object.entries(w).map(([k, v]) => [l.nameOf(k), v])), walletRefs: w }, 200, noStore); });
   app.get('/v1/god/layers/zone-suggest', (c) => {
     const use = c.req.query('use') ?? '', cats = ZONE_SUGGEST[use];
     if (!cats) return c.json({ error: { code: 'invalid', message: `use is one of ${Object.keys(ZONE_SUGGEST).join(', ')}` } }, 400);

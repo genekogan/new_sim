@@ -81,6 +81,19 @@ const STOP = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'at', 'on']);
 const words = (s: string) => s.toLowerCase().replace(/[’']/g, '').split(/[^a-z0-9]+/).filter((w) => w && !STOP.has(w));
 
 const polyArea = (p: Vec2[]) => Math.abs(p.reduce((s, [x, z], i) => { const [x2, z2] = p[(i + 1) % p.length]; return s + x * z2 - x2 * z; }, 0)) / 2;
+/** MARSLIVED: the height a thing is reached from — the floor its support stands on. A cup on a tea table is reached from
+ *  the table's floor, not at the table top's height: a 0.55 m top matched Mimos's 0.53 m raised floor (its own level),
+ *  so Souls were sent up there to fetch a cup from a ground-floor table, and found no standing room. */
+export function supportY(m: { entities: Map<string, Entity>; slotsOf(e: Entity): { id: string; kind: string }[]; worldPose(e: Entity): { y: number } }, e: Entity): number {
+  let x = e;
+  for (let i = 0; i < 8 && x.in.parent !== 'world'; i++) {
+    const p = m.entities.get(x.in.parent); if (!p) break;
+    const kind = m.slotsOf(p).find((s) => s.id === x.in.slot)?.kind;
+    if (!kind || kind === 'room' || kind === 'floor' || kind === 'stand') break;   // in a building's room: on its floor
+    x = p;
+  }
+  return m.worldPose(x).y;
+}
 function centroid(pts: Vec2[]): Vec2 { let x = 0, z = 0; for (const p of pts) { x += p[0]; z += p[1]; } return [x / pts.length, z / pts.length]; }
 function inPoly(x: number, z: number, poly: Vec2[]) { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c; } return c; }
 /** Nearest point on a polyline (closed when `loop`). */
@@ -141,7 +154,7 @@ export class GodNav {
       const deck = !water && def.components.floor ? [...baked.slots.filter((x) => x.kind === 'stand').map((x) => [r3(x.p[0]), r3(x.p[2])] as Vec2), ...(area ? [centroid(area)] : path ? [path[Math.floor(path.length / 2)], ...(path.length === 2 ? [[(path[0][0] + path[1][0]) / 2, (path[0][1] + path[1][1]) / 2] as Vec2] : [])] : [])] : [];
       return [{ ...base, ref, kind, what: article(kind0), at: deck[0] ?? at, level: 0, ...(area ? { area } : {}), ...(path ? { path, width } : {}), ...(deck.length ? { deck } : {}) }];
     }
-    const y = wp.y, level = this.h.levelAt(wp.x, wp.z, y);
+    const y = wp.y, level = this.h.levelAt(wp.x, wp.z, supportY(m, e));
     // buildings: rooms (ground floor first), a door approach from outside
     const rooms = (baked.rooms ?? []).filter((r) => r.polygon?.length >= 3);
     if (rooms.length) {
@@ -200,7 +213,8 @@ export class GodNav {
   goal(t: Thing, me: Vec2, except?: string): { p: Vec2; level: number } | null {
     const E = this.h.engine, tick = E.world.tick;
     // a Soul-dependent goal (the shore nearest me, the nearest point of a road) is never cached
-    const mine = t.kind === 'water' || (t.kind === 'path' && !t.deck?.length) || (t.stands?.length ?? 0) > 1;
+    // MARSLIVED: a room's goal is refined live round whoever already stands there (roomGoal itself is cached per version)
+    const mine = t.kind === 'water' || t.kind === 'room' || (t.kind === 'path' && !t.deck?.length) || (t.stands?.length ?? 0) > 1;
     const key = `${t.ref}|${mine ? `${Math.round(me[0])},${Math.round(me[1])}` : ''}`;
     const hit = this.goals.get(key); if (hit && tick - hit.tick < 50) return hit.goal;
     const near = (at: Vec2, level: number, ring = 24) => { const p = E.standableNearV1(at, level, except, 0.4, ring); return p ? { p: [r2(p[0]), r2(p[1])] as Vec2, level } : null; };
@@ -219,7 +233,10 @@ export class GodNav {
     } else if (t.kind === 'area') {
       goal = inPoly(me[0], me[1], t.area!) ? near(me, 0, 8) : near(t.at, 0, 40);
     } else if (t.kind === 'room') {
-      goal = this.roomGoal(t, near);
+      // the room's reachable standing point, moved aside when another body already stands on it (two Souls told to go
+      // into the tea room do not queue for one spot)
+      const base = this.roomGoal(t, near), free = base ? near(base.p, base.level, 6) : null;
+      goal = free && (!t.poly || inPoly(free.p[0], free.p[1], t.poly)) ? free : base;
     } else if (t.kind === 'building' && t.inside && t.doorOpen) {
       // in at the front door: standing room just inside it (the room it opens into); else its approach outside
       goal = near(t.inside, 0, 4);

@@ -101,7 +101,7 @@ export async function openLauncher(cfg = {}) {
   const stats = new Map();   // slug → { at, god, entities, seq }
   const pool = new ChildPool({ root, range, logDir: join(dataDir, 'logs'), pidFile: join(dataDir, 'children.json'), idleMs: cfg.idleMs, marsWebDir, publicOrigin, auth: auth?.child, soulCliFile: resolve(cfg.soulCli ?? SOUL.cli), soulSkillFile: resolve(cfg.soulSkill ?? SOUL.skill), soulInstructionsFile: resolve(cfg.soulInstructions ?? SOUL.instructions), command: cfg.command ?? ((w, p, o) => (w.fork ? forkCommand : defaultCommand)(w, p, o)), healthPath: (s) => `${wp(s)}/healthz`,
     maxRunning: prod.maxRunning, minFreeMb: prod.minFreeMb, busy: (slug) => (live.get(slug) ?? 0) > 0, decorate: (c) => { const d = decorateCommand({ ...c, env: { ...c.env, WEB_DIR: webDir } }, prod); if (d.env.SIM_FORK) d.env.NODE_OPTIONS = `--max-old-space-size=${cfg.forkHeapMb ?? 1536}`; return d; }, /* worlds serve the same web build, with its --base */ onChange: (slug) => { const s = pool.status(slug); if (s.port && registry.get(slug) && registry.get(slug).port !== s.port) registry.update(slug, { port: s.port }); } });
-  const worldEnv = (w) => ({ ...w, dataDir: registry.worldDir(w.slug), templateFile: w.template && w.template !== 'empty' ? listTemplates(templatesDir).find((t) => t.id === w.template)?.file ?? null : null });
+  const worldEnv = (w) => ({ ...w, dataDir: registry.worldDir(w.slug), templateFile: w.template && w.template !== 'empty' ? listTemplates(templatesDir, { all: true }).find((t) => t.id === w.template)?.file ?? null : null });
 
   // ---------- reads
   async function refreshStats(w) {
@@ -120,7 +120,7 @@ export async function openLauncher(cfg = {}) {
     } catch { /* busy; keep the cached numbers */ }
   }
   const describe = (w) => {
-    const st = pool.status(w.slug), s = stats.get(w.slug), t = listTemplates(templatesDir).find((x) => x.id === w.template);
+    const st = pool.status(w.slug), s = stats.get(w.slug), t = listTemplates(templatesDir, { all: true }).find((x) => x.id === w.template);
     return { key: w.slug, worldKey: w.slug, slug: w.slug, name: w.name, basePath: wp(w.slug), configPath: `${wp(w.slug)}/v1/config`, url: auth ? `${wp(w.slug)}/` : `${wp(w.slug)}/?dev=1`, template: w.template, templateName: t?.name ?? (w.template === 'empty' ? 'Empty plain' : w.template), createdAt: w.createdAt, owner: w.owner ?? null, god: s?.god ?? w.god ?? false, entities: s?.entities ?? w.entities ?? null, seq: s?.seq ?? w.seq ?? null, souls: s?.souls ?? w.souls ?? null, godName: (s?.god ?? w.god) ? (w.godName ?? null) : null, status: st.status, restarts: st.restarts ?? 0 };
   };
   async function worldsJson() {

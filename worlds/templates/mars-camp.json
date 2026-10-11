@@ -1,5 +1,5 @@
 {
- "schema": "genesis/1",
+ "schema": "genesis/1", "hidden": true,
  "name": "Mars camp",
  "description": "The Mars College camp in the new vocabulary: desert floor, low hills and creosote scatter, the kitchen, the living room with its classroom corner and the bunk house as open-topped walled rooms, every fixture and item of the camp manifest at its source position (names kept), the stock piles (pallet racks with their beams in the sockets, timber, plywood), the lookout bay as built, solar panels, a shipping container and water totes. Campfire, chess board, sleeping mats, spoons, book and sketch pad are defined (kit/2) in the template. Generated from worlds/mars/camp/manifest.json + eden-camp.ts (parity proof, docs/god/PARITY.md). Not here: dust in the air and the desert sky (world weather/sky are not rendered yet, B7), the Souls' construction process (B5).",
  "constants": {

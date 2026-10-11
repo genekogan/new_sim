@@ -38,6 +38,8 @@ const roomAt = (b, x, z, y) => (ROOMS[b] ?? []).find(([, , n0, n1, e0, e1, ry]) 
 
 const ops = { campus: [], site: [], mimos: [], kitchen: [], chiba: [], more: [], items: [], places: [] };
 for (const b of bld) ops.campus.push({ op: 'place', def: b.def, name: b.building, p: b.p, r: 0 });
+// MARSLIVED: the authored fixtures the reference lacks (Mimos's glazed front, the Tool library's stair)
+for (const f of P.filter((p) => p.cat === 'fixture')) ops.campus.push({ op: 'place', def: f.def, name: f.name, p: f.p, r: f.r });
 for (const s of P.filter((p) => p.cat === 'site')) ops.site.push({ op: 'place', def: s.def, name: uniq(short(s.def)), p: s.p, r: s.r });
 
 const tables = [];
