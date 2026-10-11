@@ -19,6 +19,7 @@ import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { apiPath } from '../world-path.ts';
 import { BASE } from '../base-path.ts';
 import { mergeStatic } from './static-merge.ts';
+import { compileModel, fitTextures, uploadTextures } from './texture-budget.ts';
 
 let shared: GLTFLoader | null = null;
 /** LiveWorld may hand over its own loader (download progress, one Draco worker pool). */
@@ -38,7 +39,8 @@ export function loadAsset(sha: string): Promise<GLTF> {
   const l = loader();
   const hit = cache.get(sha);
   if (hit && (hit.settled || hit.by === l)) return hit.p;
-  const entry = { p: l.loadAsync(assetUrl(sha)).then((g) => { prepare(g); return g; }), by: l, settled: false };
+  // lane PERF (texture-budget.ts): oversized textures are fitted before upload, and uploads are paced across frames
+  const entry = { p: l.loadAsync(assetUrl(sha)).then(async (g) => { await fitTextures(g); prepare(g); await compileModel(g); await uploadTextures(g); return g; }), by: l, settled: false };
   cache.set(sha, entry);
   entry.p.then(() => { entry.settled = true; }, (e: unknown) => {
     if (cache.get(sha) !== entry) return;

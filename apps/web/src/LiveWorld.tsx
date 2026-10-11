@@ -65,7 +65,7 @@ import { WorldEntityLayer } from './WorldEntityLayer.ts';
 import { GodWorldLiving, godTourViews } from './world-env.ts';
 import { WorldLightning } from './WorldLightning.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
-import { setAssetLoader } from './gen-mesh/gltf-assets.ts';
+import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { setTextureRenderer } from './gen-mesh/texture-budget.ts';
 import { GodPanel } from './GodPanel.tsx';
 import { ensureToken as ensureGodToken } from './god-ui/god-api.ts';
 import { WorldPreviewGhost } from './WorldPreviewGhost.ts';
@@ -417,7 +417,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const draco = new DRACOLoader(manager).setDecoderPath(BASE+'/mars-assets/draco/');
     const placePreviews=new WorldPlacePreviews(renderer,()=>[geometry.group,...(expansion?[expansion.group]:[])]);
     const loader = new GLTFLoader(manager).setDRACOLoader(draco).setMeshoptDecoder(MeshoptDecoder);
-    setAssetLoader(loader);
+    setAssetLoader(loader);if(newWorld){setTextureRenderer(renderer,scene,camera);renderer.debug.checkShaderErrors=false;}  // lane PERF: paced GLB texture uploads; no sync link-status reads (new worlds only)
     const floaters = new FloaterView(scene, { baseUrl: '/world-assets/littlemartians/characters/', loader });
     const bodyModels=new WorldBodyModels(loader,problem);
     let capturedPlatforms:readonly PlatformFloor[]|null=null;
