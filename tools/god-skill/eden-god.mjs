@@ -1628,10 +1628,10 @@ async function layers(f) {
   const L = ok(await call("/v1/god/layers"), "layers");
   if (f.json) return L;
   const c = L.clock ? `${String(Math.floor(L.clock.minute / 60)).padStart(2, "0")}:${String(L.clock.minute % 60).padStart(2, "0")} ${DAYS[L.clock.weekday]} ${L.clock.day}` : "no clock yet";
-  const lines = [`clock ${c} \xB7 currency ${L.currency}`];
+  const lines = [`clock ${c}${L.currency ? ` \xB7 currency ${L.currency}` : " \xB7 no economy (LAYERS=1 opts in)"}`];
   if (L.zones.length) lines.push(`zones: ${L.zones.map((z) => `${z.name} (${z.use})`).join(", ")}`);
   for (const t of L.things) lines.push(`  ${t.name}: ${[t.owner ? `${t.owner}${t.access === "private" ? " (private)" : ""}` : t.access, t.price ? `${t.price.service ? t.price.service + " " : ""}${t.price.amount} ${L.currency}` : "", t.hours ?? "", ...(t.schedule?.follow ?? []).map((x) => `${x.field} follows ${x.when}`)].filter(Boolean).join(" \xB7 ")}`);
-  if (L.relations.length) lines.push(`relations: ${L.relations.map((r) => `${r.a} ${r.rel} ${r.b}`).join("; ")}`);
+  if (L.relations?.length) lines.push(`relations: ${L.relations.map((r) => `${r.a} ${r.rel} ${r.b}`).join("; ")}`);
   const w = Object.entries(L.wallets ?? {});
   if (w.length) lines.push(`wallets: ${w.map(([k, v]) => `${k} ${v}`).join(", ")}`);
   if (L.souls?.length) lines.push(`souls: ${L.souls.map((s) => s.name).join(", ")}`);
@@ -1640,7 +1640,7 @@ async function layers(f) {
 var LAYERS_FLAGS = { hours: "open event follow clear note", own: "private public", access: "", price: "service", currency: "", give: "", pay: "", zone: "rect circle area", "zone-suggest": "", relate: "off", layers: "" };
 var LAYERS_BOOLS = ["clear", "private", "public", "off"];
 var LAYERS_POS = { hours: 1, own: 2, access: 2, price: 2, currency: 1, give: 2, pay: 3, zone: 2, "zone-suggest": 1, relate: 3, layers: 0 };
-var LAYERS_HELP = `layers: hours <ref> --open 07:00-15:00[@sat,sun] [--event "market 09:00 240 sat"] [--follow locked@open=false/true | on@dark=true/false] [--clear] \xB7 own <ref> <soul|god|group:x|none> [--private|--public] \xB7 access <ref> private|public|none \xB7 price <ref> <n|none> [--service "a coffee"] \xB7 currency <name> \xB7 give <soul> <n> \xB7 pay <from> <to> <n> \xB7 zone <name> <residential|commercial|park|farm|civic|industrial|wild> --rect|--circle|--area \xB7 zone-suggest <use> \xB7 relate <a> <friend|neighbour|family|works-at|lives-at|member-of> <b> [--off] \xB7 layers`;
+var LAYERS_HELP = `layers: hours <ref> --open 07:00-15:00[@sat,sun] [--event "market 09:00 240 sat"] [--follow locked@open=false/true | on@dark=true/false] [--clear] \xB7 own <ref> <soul|god|group:x|none> [--private|--public] \xB7 access <ref> private|public|none \xB7 zone <name> <residential|commercial|park|farm|civic|industrial|wild> --rect|--circle|--area \xB7 zone-suggest <use> \xB7 layers \xB7 only where the world opts in (LAYERS=1): price <ref> <n|none> [--service "a coffee"] \xB7 currency <name> \xB7 give <soul> <n> \xB7 pay <from> <to> <n> \xB7 relate <a> <friend|neighbour|family|works-at|lives-at|member-of> <b> [--off]`;
 
 // cli.mjs
 var SELF = (() => {

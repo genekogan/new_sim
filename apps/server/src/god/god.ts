@@ -11,6 +11,7 @@ import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
 import { WorldStore, type EditRow, type PrayerRow } from './store.ts';
 import { AssetStore, defaultAssetDir } from './assets.ts';
+import { deferredOp } from './layers.ts';
 
 const PAIR_TTL = 15 * 60_000;
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -168,10 +169,12 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   // ---------- edits ----------
 
   dryrun(batch: unknown) {
+    const off = deferredOp(batch); if (off) return { accepted: false as const, failures: [off] };
     const p = plan(this.model, batch, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: this.bodies?.refuse });
     return p.ok ? { accepted: true as const, ids: p.ids, warnings: p.warnings, diff: summarize(p.diff) } : { accepted: false as const, failures: p.failures };
   }
   act(batch: unknown, note?: string): Result {
+    const off = deferredOp(batch); if (off) return { accepted: false, failures: [off] } as Result;
     const tick = this.opts.tick();
     const r = applyBatch(this.model, batch, 'god', tick, { uses: this.bodies?.uses, refuse: this.bodies?.refuse });
     if (!r.result.accepted) return r.result;

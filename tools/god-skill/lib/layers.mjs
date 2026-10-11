@@ -1,5 +1,7 @@
-// LAYERS: the god's controls over a world's invisible systems (schedules, ownership, land use, relationships,
-// economy). Each verb is one validated, undoable edit (POST /v1/god/act); `layers` reads them back.
+// LAYERS: the god's controls over a world's invisible systems (schedules, ownership, land use; and, only in a world
+// that opts in with LAYERS=1, relationships and the economy: price, currency, give, pay, relate — deferred by default,
+// the world refuses them with layers.deferred). Each verb is one validated, undoable edit (POST /v1/god/act); `layers`
+// reads them back.
 //   hours <ref> --open 07:00-15:00[@sat,sun] … [--event "market 09:00 240 sat"] [--follow locked@open=false/true] [--clear]
 //   own <ref> <soul|god|group:name|none> [--private|--public] · access <ref> private|public|none
 //   price <ref> <amount|none> [--service "a coffee"] · currency <name> · give <soul|group:x> <amount> · pay <from> <to> <amount>
@@ -92,10 +94,10 @@ export async function layers(f) {
   const L = ok(await call('/v1/god/layers'), 'layers');
   if (f.json) return L;
   const c = L.clock ? `${String(Math.floor(L.clock.minute / 60)).padStart(2, '0')}:${String(L.clock.minute % 60).padStart(2, '0')} ${DAYS[L.clock.weekday]} ${L.clock.day}` : 'no clock yet';
-  const lines = [`clock ${c} · currency ${L.currency}`];
+  const lines = [`clock ${c}${L.currency ? ` · currency ${L.currency}` : ' · no economy (LAYERS=1 opts in)'}`];
   if (L.zones.length) lines.push(`zones: ${L.zones.map((z) => `${z.name} (${z.use})`).join(', ')}`);
   for (const t of L.things) lines.push(`  ${t.name}: ${[t.owner ? `${t.owner}${t.access === 'private' ? ' (private)' : ''}` : t.access, t.price ? `${t.price.service ? t.price.service + ' ' : ''}${t.price.amount} ${L.currency}` : '', t.hours ?? '', ...(t.schedule?.follow ?? []).map((x) => `${x.field} follows ${x.when}`)].filter(Boolean).join(' · ')}`);
-  if (L.relations.length) lines.push(`relations: ${L.relations.map((r) => `${r.a} ${r.rel} ${r.b}`).join('; ')}`);
+  if (L.relations?.length) lines.push(`relations: ${L.relations.map((r) => `${r.a} ${r.rel} ${r.b}`).join('; ')}`);
   const w = Object.entries(L.wallets ?? {}); if (w.length) lines.push(`wallets: ${w.map(([k, v]) => `${k} ${v}`).join(', ')}`);
   if (L.souls?.length) lines.push(`souls: ${L.souls.map((s) => s.name).join(', ')}`);
   return lines.join('\n');
@@ -103,4 +105,4 @@ export async function layers(f) {
 export const LAYERS_FLAGS = { hours: 'open event follow clear note', own: 'private public', access: '', price: 'service', currency: '', give: '', pay: '', zone: 'rect circle area', 'zone-suggest': '', relate: 'off', layers: '' };
 export const LAYERS_BOOLS = ['clear', 'private', 'public', 'off'];
 export const LAYERS_POS = { hours: 1, own: 2, access: 2, price: 2, currency: 1, give: 2, pay: 3, zone: 2, 'zone-suggest': 1, relate: 3, layers: 0 };
-export const LAYERS_HELP = `layers: hours <ref> --open 07:00-15:00[@sat,sun] [--event "market 09:00 240 sat"] [--follow locked@open=false/true | on@dark=true/false] [--clear] · own <ref> <soul|god|group:x|none> [--private|--public] · access <ref> private|public|none · price <ref> <n|none> [--service "a coffee"] · currency <name> · give <soul> <n> · pay <from> <to> <n> · zone <name> <residential|commercial|park|farm|civic|industrial|wild> --rect|--circle|--area · zone-suggest <use> · relate <a> <friend|neighbour|family|works-at|lives-at|member-of> <b> [--off] · layers`;
+export const LAYERS_HELP = `layers: hours <ref> --open 07:00-15:00[@sat,sun] [--event "market 09:00 240 sat"] [--follow locked@open=false/true | on@dark=true/false] [--clear] · own <ref> <soul|god|group:x|none> [--private|--public] · access <ref> private|public|none · zone <name> <residential|commercial|park|farm|civic|industrial|wild> --rect|--circle|--area · zone-suggest <use> · layers · only where the world opts in (LAYERS=1): price <ref> <n|none> [--service "a coffee"] · currency <name> · give <soul> <n> · pay <from> <to> <n> · relate <a> <friend|neighbour|family|works-at|lives-at|member-of> <b> [--off]`;

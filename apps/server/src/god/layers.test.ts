@@ -1,7 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { CORE_KIT, WorldModel, applyBatch, coreRef, type Op } from '@sim/world-compiler';
-import { GodLayers } from './layers.ts';
+import { GodLayers, deferredOp } from './layers.ts';
+
+// The economy and relationships are opt-in (LAYERS=1); these tests exercise the opted-in world, the last one the default.
+process.env.LAYERS = '1';
 
 function world() {
   const m = new WorldModel({ constants: { extent: 400, ground: 'land' }, seed: 'layers-srv' });
@@ -65,4 +68,25 @@ test('the clock: follow states change at the boundary as one engine edit, once; 
   assert.equal(L.step().changed, 1); assert.equal(m.get('door')!.state?.locked, false);
   assert.ok(edits.every((e) => /^schedule: door locked=/.test(e)));
   assert.match(L.hoursOf(m.get('door')!.schedule), /open 07:00–15:00 \(open now\)/);
+});
+
+test('DEFER: without LAYERS=1 the god cannot set prices, money or relationships, and Souls see no economy; ownership and schedules work', () => {
+  const was = process.env.LAYERS; delete process.env.LAYERS;
+  try {
+    const { m, L, god } = world();
+    for (const op of [{ op: 'economy', currency: 'shells' }, { op: 'mint', to: 'soul:ben', amount: 6 }, { op: 'relate', a: 'soul:s_ben', rel: 'works-at', b: 'thing:x' }, { op: 'place', def: coreRef('chair'), name: 'c', p: [0, 0], price: { amount: 2 } }])
+      assert.equal(deferredOp({ ops: [op] })?.code, 'layers.deferred', JSON.stringify(op));
+    assert.equal(deferredOp({ ops: [{ op: 'place', def: coreRef('cottage'), name: 'h', p: [0, 0], owner: 'soul:Ana', access: 'private' }] }), null, 'ownership stays');
+    // a world that had prices before (an old journal) shows none of them now
+    god([{ op: 'place', def: coreRef('chair'), name: 'stall-chair', p: [3, 0], price: { amount: 2 } }, { op: 'place', def: coreRef('cottage'), name: 'house', p: [20, 0], owner: 'soul:Ana', access: 'private' }]);
+    const chair = m.get('stall-chair')!.id;
+    assert.doesNotMatch(L.tag(m.entities.get(chair)!), /sale/);
+    const caps: never[] = []; L.capabilities(ben as never, caps, new Map(), [3, 0]);
+    assert.equal(caps.length, 0, 'no buy/pay capabilities');
+    assert.equal(L.act(ben as never, `buy:${chair}`, {}).accepted, false);
+    assert.deepEqual(Object.keys(L.me(ana)), ['owns']);
+    const v = L.publicView() as Record<string, unknown>;
+    assert.equal(v.currency, undefined); assert.equal(v.relations, undefined);
+    assert.match(L.refusal(m.get('house')!.id, ben)!.reason, /Ana's and private/, 'ownership still refuses');
+  } finally { if (was !== undefined) process.env.LAYERS = was; }
 });

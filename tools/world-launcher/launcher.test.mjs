@@ -18,6 +18,7 @@ const templatesDir = join(dir, 'templates'); mkdirSync(templatesDir);
 writeFileSync(join(templatesDir, 'hello-hamlet.json'), JSON.stringify({ schema: 'genesis/1', name: 'Hello hamlet', description: 'a hamlet', batches: [{ ops: [{ op: 'place' }] }] }));
 writeFileSync(join(templatesDir, 'island.json'), JSON.stringify({ schema: 'genesis/1', name: 'Island', description: 'sea all round', batches: [] }));
 writeFileSync(join(templatesDir, 'broken.json'), '{ not json');
+writeFileSync(join(templatesDir, 'retired.json'), JSON.stringify({ schema: 'genesis/1', hidden: true, name: 'Retired', description: 'gone from the dialog', batches: [] }));
 const webDir = join(dir, 'web'); mkdirSync(join(webDir, 'assets'), { recursive: true });
 writeFileSync(join(webDir, 'index.html'), '<!doctype html><title>Sim</title>');
 writeFileSync(join(webDir, 'assets', 'a.js'), 'console.log(1)');
@@ -50,6 +51,7 @@ test('slugs are url-safe, unique and avoid reserved names', () => {
 test('templates: empty first, hello hamlet next, broken files skipped', () => {
   const t = listTemplates(templatesDir).map((x) => x.id);
   assert.deepEqual(t, ['empty', 'hello-hamlet', 'island']);
+  assert.deepEqual(listTemplates(templatesDir, { all: true }).map((x) => x.id), ['empty', 'hello-hamlet', 'island', 'retired'], 'a hidden template is still found for worlds made from it');
   assert.equal(backoffMs(0), 500); assert.equal(backoffMs(3), 4000); assert.equal(backoffMs(20), 30000);
 });
 test('homepage and assets come from the web build', async () => {

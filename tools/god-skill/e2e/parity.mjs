@@ -42,7 +42,7 @@ async function step(name, fn, expect) {
 
 const TEMPLATES = [
   ['littlemartians-garden', 'garden-proof', { eye: '0,26,60', at: '0,8,0' }],
-  ['mars-camp', 'camp-proof', { eye: '0,30,42', at: '0,0,-4', roofsOff: true }],
+  // mars-camp is retired from the dialog (hidden: true; MARSLIVED 2026-10-11): mars-two replaces it
   ['eden-district', 'district-proof', { eye: '68,23,48', at: '44,2,23' }],
 ];
 const opsOf = (id) => JSON.parse(readFileSync(resolve(root, `worlds/templates/${id}.json`), 'utf8')).batches.reduce((n, b) => n + b.ops.filter((o) => o.op === 'place').length, 0);
@@ -56,7 +56,7 @@ try {
   page.setDefaultTimeout(PAGE_MS);
   const errors = []; page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
   page.on('dialog', (d) => d.dismiss());
-  await step('templates.json lists the three demonstrators', async () => (await (await fetch(`${origin}/__sim/templates.json`)).json()), (j) => ['eden-district', 'mars-camp', 'littlemartians-garden'].every((id) => JSON.stringify(j).includes(`"${id}"`)));
+  await step('templates.json lists the three demonstrators', async () => (await (await fetch(`${origin}/__sim/templates.json`)).json()), (j) => ['eden-district', 'mars-two', 'littlemartians-garden'].every((id) => JSON.stringify(j).includes(`"${id}"`)) && !JSON.stringify(j).includes('"mars-camp"'));
   for (const [id, name, view] of TEMPLATES) {
     await step(`New world → dialog → ${id}`, async () => {
       await page.goto(`${origin}/`, { waitUntil: 'domcontentloaded' });
