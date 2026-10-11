@@ -708,4669 +708,6 @@
  ],
  "batches": [
   {
-   "note": "defs: the Arium-era art imported through the asset store, and two world kits",
-   "group": "defs",
-   "ops": [
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "madmaraca-ceramic-library",
-      "version": 1,
-      "description": "Madmaraca Ceramic Library: Vanessa Rosa's original ceramic sculpture, scanned and raised to 26 m as a landmark of the Arium-era Little Martians world. Its interior is not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/scan-madmaraca.glb)",
-      "tags": [
-       "littlemartians",
-       "ceramic",
-       "scan",
-       "landmark",
-       "temple",
-       "vanessa-rosa",
-       "arium",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "89777204026c33e802aac6a3ad9e9d4c01c31e7221509940b12d95ff2eba698b",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        21.106,
-        26,
-        22.677
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "minarete-temple",
-      "version": 1,
-      "description": "Minarete Temple: Vanessa Rosa's original ceramic sculpture, scanned and raised to 32 m as a landmark of the Arium-era Little Martians world. A measured 2 m ground arch runs north–south through it; the upper interiors are closed. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/scan-minarete.glb)",
-      "tags": [
-       "littlemartians",
-       "ceramic",
-       "scan",
-       "landmark",
-       "temple",
-       "vanessa-rosa",
-       "arium",
-       "mesh",
-       "building"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "c7151b2ffcb97bbb1d58cb181b5ac40993f8e9eb8e85b3890ef05649d9e0e08d",
-       "collide": "box",
-       "footprint": "0a136aeb0ddaade103ce625d7d4c295789be513a822d8553dea9df73270a4c74"
-      },
-      "size": {
-       "box": [
-        14.466,
-        32,
-        12.673
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base",
-      "components": {
-       "place": {
-        "kind": "building",
-        "enclosed": true
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "celadon-beacon",
-      "version": 1,
-      "description": "Celadon Beacon: Vanessa Rosa's original ceramic sculpture, scanned and raised to 30 m as a landmark of the Arium-era Little Martians world. A measured 2 m ground arch runs north–south through it; the upper interiors are closed. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/scan-celadon-tower.glb)",
-      "tags": [
-       "littlemartians",
-       "ceramic",
-       "scan",
-       "landmark",
-       "temple",
-       "vanessa-rosa",
-       "arium",
-       "mesh",
-       "building"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "473d35b6b62505c8d5d5ab2fc2a4f6ccfe5c0206985eeadeebb2ac5299884534",
-       "collide": "box",
-       "footprint": "cdda8c4d00f480401820f1cdd44ef99b062b56bd276c8c164d354760083ba058"
-      },
-      "size": {
-       "box": [
-        13.69,
-        30,
-        12.855
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base",
-      "components": {
-       "place": {
-        "kind": "building",
-        "enclosed": true
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-minarete-portal",
-      "version": 1,
-      "description": "Minarete Spiral Portal — a scan exhibit of the Little Martians archive (Supplied project composition; constituent meshes not claimed new scans). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-minarete-portal.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "arium",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "4c54391da491e338a2495bd2cee0a6f7b5309cbcf3e06407fc489e2da6d24c10",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        5.406,
-        12,
-        5.533
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-pupila-corridor",
-      "version": 1,
-      "description": "Pupila Tiled Corridor — a scan exhibit of the Little Martians archive (Supplied project composition; constituent meshes not claimed new scans). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-pupila-corridor.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "arium",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "cfb9dd3129a42b2524c53faf0803283995cb36f766f1fe977699843854089ec9",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        5.817,
-        2.19,
-        11.96
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-chapel-composition",
-      "version": 1,
-      "description": "Tiled Chapel Composition — a scan exhibit of the Little Martians archive (Supplied project composition; constituent meshes not claimed new scans). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-chapel-composition.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "arium",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "7f697cb67042de6924add8e3d9d2c259c25610ba9550414e8acc7a3ee7e79a50",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        5.163,
-        4.18,
-        12.023
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-american-base-old",
-      "version": 1,
-      "description": "American base (old) — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-american-base-old.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "other",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "a5a8c82a139db065f29940ddb0b90d20d26dbffaea6995f15953189a138d3a8f",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        7.358,
-        2.01,
-        12.042
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-asian-art-museum",
-      "version": 1,
-      "description": "Asian Art Museum SF — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-asian-art-museum.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "other",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "538fd217246f4dabd34cbc8c41a73a81ee4d7690049e49ee875b6c3ef82642c2",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        11.381,
-        3.96,
-        12.102
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-fey-castle",
-      "version": 1,
-      "description": "Fey Castle — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-fey-castle.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "other",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "0a5cbf4c94b02206fbdc21e0bc973950d6bef72575cc85759341c28549412e74",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        12.016,
-        8.33,
-        10.694
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-graffiti-abandoned-room",
-      "version": 1,
-      "description": "Graffiti — abandoned room in the open — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-graffiti-abandoned-room.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "other",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "6729d00ae532c4da2e4f31483005afa76edf80002148e6a14f168c99ce534096",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        11.98,
-        3.31,
-        7.851
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-randy2",
-      "version": 1,
-      "description": "Randy #2 — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-randy2.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "other",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "c73c4533a64273c8720258a970c56e764f580ed793c4f03ca41d45ab33e548c5",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        11.985,
-        7.53,
-        11.681
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-randy3",
-      "version": 1,
-      "description": "Randy #3 — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-randy3.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "other",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "c081d49d0acf8dfa144d01765aa7652ed22c10c09a2f11d18759e808e47a7293",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        12.037,
-        7.27,
-        11.324
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-forte-sao-filipe-chapel",
-      "version": 1,
-      "description": "Forte de São Filipe — chapel — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-forte-sao-filipe-chapel.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "portugal",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "24c40d27fcd500cf4eebdd3a3d2a4ea98c0faad44bc7d9a40ce9e75e67b4d219",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        10.195,
-        3.42,
-        12.007
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-forte-sao-filipe-corner",
-      "version": 1,
-      "description": "Forte de São Filipe — corner — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-forte-sao-filipe-corner.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "portugal",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "5faf8c183d8b3f143bb7073769f9c025b500c4d0c646047768abb6765c794f17",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        7.854,
-        12,
-        10.545
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-forte-sao-filipe-corner3",
-      "version": 1,
-      "description": "Forte de São Filipe — corner 3 — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-forte-sao-filipe-corner3.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "portugal",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "df1a82b81e4c048a586ca9b3477d17b95cb35e6ecb5e7638e7d0c2b6f3a706ce",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        7.84,
-        3.5,
-        12.01
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-forte-sao-filipe-corridor",
-      "version": 1,
-      "description": "Forte de São Filipe — corridor — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-forte-sao-filipe-corridor.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "portugal",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "d54d60cf0b1bc94953914b84ed53cb5fc514e1184fdc0eab0e8697307402c7d1",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        4.24,
-        3.05,
-        11.993
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-forte-sao-filipe-open",
-      "version": 1,
-      "description": "Forte de São Filipe — open ramparts — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-forte-sao-filipe-open.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "portugal",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "a8cbd65e59f995c6e7a3a96d605e96878aa2805a922d70d23e685df5e185e374",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        11.347,
-        3.97,
-        12.009
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-lisbon-archways-corridor",
-      "version": 1,
-      "description": "Lisbon — archways corridor — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-lisbon-archways-corridor.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "portugal",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "2ec5a187cf1be208da75687fed247347746e0d7e00f3af2a684be7e52b28ba8a",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        4.968,
-        2.75,
-        12.009
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-moorish-entrance",
-      "version": 1,
-      "description": "Moorish castle — entrance — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-moorish-entrance.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "portugal",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "fb56c859f38311dc946d4798ed3bfd5aa016b7966b9d797ebd1e0ceda8707ab9",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        9.649,
-        8.07,
-        11.997
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-moorish-castle-top",
-      "version": 1,
-      "description": "Moorish castle — top — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-moorish-castle-top.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "portugal",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "9f89741650de2c950c10250b508e4e7962a557f2dbdf749a552ce84de8b7f9b7",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        6.766,
-        5.23,
-        12.009
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-museu-azulejo-corridor",
-      "version": 1,
-      "description": "Museu Nacional do Azulejo — corridor — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-museu-azulejo-corridor.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "portugal",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "70d966b924f479d7ca1d30ef1380409fb792dda7984126554b90cd82d17caefa",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        5.082,
-        3.95,
-        12.009
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-museu-azulejo-main",
-      "version": 1,
-      "description": "Museu Nacional do Azulejo — main — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-museu-azulejo-main.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "portugal",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "41de05216b5538cf2077b2bb93156797bf546d7511f42cc1d72f0aaf697dd837",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        5.603,
-        3.29,
-        11.993
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-museu-azulejo-quad",
-      "version": 1,
-      "description": "Museu Nacional do Azulejo — quad — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-museu-azulejo-quad.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "portugal",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "128621da4c757774ae1d1f5ba43b5d4816a951b0551b8504a52eb8bd15640a0d",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        12.07,
-        4.67,
-        9.076
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-quinta-tower-curly",
-      "version": 1,
-      "description": "Quinta — curly tower — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-quinta-tower-curly.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "portugal",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "1f193ded64a8e29318b3ca568e65fa620b78a048c8d4afc236f2304e042e5b66",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        5.753,
-        12,
-        8.519
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-quinta-fonte",
-      "version": 1,
-      "description": "Quinta — fountain — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-quinta-fonte.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "portugal",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "80ae569a463f965fead9f592c6c57fa97a3cd6efe3b20c4fe8bd5ddeb5e64b47",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        9.729,
-        7.85,
-        11.996
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-quinta-corredor-escada",
-      "version": 1,
-      "description": "Quinta — long stair corridor — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-quinta-corredor-escada.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "portugal",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "862899fe82a8eb9f98b29977c320a559e9c038c0228282f9a09d17603fa33a06",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        5.963,
-        6.19,
-        12.012
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-quinta-palacio-interior",
-      "version": 1,
-      "description": "Quinta — palace interior — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-quinta-palacio-interior.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "portugal",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "9811095c8ce2c65cf99ec58fd384f28e5db72d02bb0520add477dfbcc5369adf",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        7.535,
-        4.59,
-        12.012
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-quinta-poco",
-      "version": 1,
-      "description": "Quinta — well (poço) — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-quinta-poco.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "portugal",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "f1ac82f3378347d1df211a7877b1b2a17bb74a365a4b27d023371f2a42bc7c67",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        11.979,
-        9.88,
-        9.642
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-rua-fado",
-      "version": 1,
-      "description": "Rua do Fado — street — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-rua-fado.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "portugal",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "e9bab61d9ca183780dfdbae56dd00343a86939ee96e15bf3694d138019081875",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        3.337,
-        2.2,
-        12.033
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-setubal-casa-escadas",
-      "version": 1,
-      "description": "Setúbal — staircase house — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-setubal-casa-escadas.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "portugal",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "ff3d5e5a0c2d83302ddb5185465313e6da4c2b204b17e16f6d23e66af7e59bee",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        11.698,
-        12,
-        11.112
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-se-entrada",
-      "version": 1,
-      "description": "Sé cathedral — entrance — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-se-entrada.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "portugal",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "44ea7ba030c1d88e8cf8f3e322135cd8135b70b8673be93c24f7985a82198fa7",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        9.77,
-        12,
-        9.441
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-gruta-m-republica",
-      "version": 1,
-      "description": "Gruta — Morro da República — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-gruta-m-republica.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "rio",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "7a299c2bf992f6345242795c3cea14dbdbed9bea372530b937b11b015411ca82",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        7.719,
-        4.73,
-        12.011
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-camel-sculpture",
-      "version": 1,
-      "description": "Camel sculpture (NeRF) — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-camel-sculpture.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "68043f3fb2b3419656ffe068de5318a221f8c086361ee55ea2333af40edf8a13",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        3.988,
-        4.5,
-        2.005
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-china-buddha",
-      "version": 1,
-      "description": "China Buddha (NeRF) — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-china-buddha.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "163cd1f39090a4b8165d61be94d3046c1e076909d7bcb46f4a3f4c253b07244d",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        2.977,
-        4.5,
-        2.32
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-gold-rust-buddha",
-      "version": 1,
-      "description": "Gold-rust Buddha (NeRF) — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-gold-rust-buddha.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "e6eafc3322e551ceadc9221eef47f6709d6665d47597a44e1b94fc76ea92a31d",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        3.159,
-        4.5,
-        3.269
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-golden-gate-park-tree",
-      "version": 1,
-      "description": "Golden Gate Park tree (NeRF) — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-golden-gate-park-tree.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "3bf248f5da4d6c44f52939d6f4fae94940bb157c94981aba72bc286744532c49",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        12.026,
-        4.18,
-        8.219
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-golden-woman-standing",
-      "version": 1,
-      "description": "Golden woman, standing (NeRF) — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-golden-woman-standing.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "07a868a6593060bc27ccbbd8514df70eff0bcd6945840fe239d82ce8c1fca0c4",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        1.58,
-        4.5,
-        1.385
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-greenman-altar",
-      "version": 1,
-      "description": "Green Man altar sculpture (NeRF) — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-greenman-altar.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "776d990ea2dad4fceb6f7f31e532f7d4aab8976bb1abaa6e4e9aeea8d9e01de3",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        2.315,
-        4.5,
-        2.073
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-met-greek-mural",
-      "version": 1,
-      "description": "MET — Greek mural — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-met-greek-mural.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "d4f8808c1c7934a5c8b357ce7a3761c6a9ddc0fcb9692a88b3370808d72f1c2d",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        3.991,
-        4.5,
-        7.676
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-poly-01",
-      "version": 1,
-      "description": "SF polycam scan #1 — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-01.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "c16f01927ba2368257a1fc16722406f3c6eb2aeaaf1a31d8703dee95cdde5e8d",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        3.385,
-        4.5,
-        3.047
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-poly-10",
-      "version": 1,
-      "description": "SF polycam scan #10 — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-10.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "c7e40e72ac6023592278ec08d3c30e91a57979d169e24906c58841a28a40a6c1",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        1.709,
-        4.5,
-        1.737
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-poly-12",
-      "version": 1,
-      "description": "SF polycam scan #12 — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-12.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "4d8a81898b4c6d4d67af69e0bc20f48400e6912d0c8e4bdc72a846a898a09138",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        3.094,
-        4.5,
-        3.067
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-poly-13",
-      "version": 1,
-      "description": "SF polycam scan #13 — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-13.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "7bd5b7139926e5192ed7d396ee0a938906665947be3617cf3bc28514a544ca14",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        4.439,
-        4.5,
-        3.812
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-poly-14",
-      "version": 1,
-      "description": "SF polycam scan #14 — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-14.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "8a390557de27f84decbb463b629311454bb0ac8a50ed6b65acd3d8f329312a9b",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        2.178,
-        4.5,
-        2.193
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-poly-15",
-      "version": 1,
-      "description": "SF polycam scan #15 — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-15.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "b5d036bf926487c6c27dc98a96ff953ef93c14b4529e5075e1a364775c48c6c8",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        2.16,
-        4.5,
-        2.006
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-poly-17",
-      "version": 1,
-      "description": "SF polycam scan #17 — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-17.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "6eef7bfc9db9cdd7bd430273e15ca36be411cefafed0b84a91e9bf605834da65",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        1.795,
-        4.5,
-        3.044
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-poly-18",
-      "version": 1,
-      "description": "SF polycam scan #18 — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-18.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "56030cb59d8ee4a28c5d6c0a9310e429165b8862b67cb2c88d81466eb56ccc2a",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        0.993,
-        4.5,
-        1.542
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-poly-19",
-      "version": 1,
-      "description": "SF polycam scan #19 — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-19.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "528160c9006ea30a047d11efbc78a57fdf81de866d5738959f151560ad8f68bf",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        4.849,
-        4.5,
-        4.915
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-poly-02",
-      "version": 1,
-      "description": "SF polycam scan #2 — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-02.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "765e64cc3a76460de2443c0f468f195487f38d4629cfb25c3147512585ddd1af",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        2.107,
-        4.5,
-        2.129
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-poly-05",
-      "version": 1,
-      "description": "SF polycam scan #5 — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-05.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "8d7d1747ba53485254c41a95502ad77790093edd40a6af0d554db360159c2857",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        3.231,
-        4.5,
-        3.226
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-poly-06",
-      "version": 1,
-      "description": "SF polycam scan #6 — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-06.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "b967c9460eb5974f589beb4f16487bb766219d8e76514228a4aaa712f18b8771",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        3.856,
-        4.5,
-        3.91
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-poly-07",
-      "version": 1,
-      "description": "SF polycam scan #7 — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-07.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "3391214c4aa4ede6e0650cbab0863200a1ac5ece21fe541d5076c16cd616846a",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        1.95,
-        4.5,
-        4.306
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-poly-08",
-      "version": 1,
-      "description": "SF polycam scan #8 — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-08.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "e1933993c3a9557f681a5acfcfa8a049f1ce10c47f150909b2cbdf412019ab4d",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        4.365,
-        4.5,
-        2.678
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-poly-09",
-      "version": 1,
-      "description": "SF polycam scan #9 — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-09.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "e9a870d0782e6485138ae79da003ba2a1074483253da716e84d43d3ed96139c9",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        1.625,
-        4.5,
-        4.623
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-two-warriors",
-      "version": 1,
-      "description": "Two warriors (NeRF) — a scan exhibit of the Little Martians archive (Supplied Vanessa project scan; depicted-art authorship is not claimed). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-two-warriors.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "sculpture",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "6eacf406f9280d327b56dd6d812f84fa2172e5f745a3ae3423f2db35de805ed9",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        4.25,
-        4.5,
-        1.402
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-567d4f0b818f",
-      "version": 1,
-      "description": "femina — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-567d4f0b818f.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "6de0af8cbedcca425cf8e0afadd4abacf38947a44d1a65f8aa16b42e2046d85e",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.656,
-        2.6,
-        1.787
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-b538ebb36278",
-      "version": 1,
-      "description": "flower  — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-b538ebb36278.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "69545bcd1d835d653aa2985fc875a6a308c38030cfd5600e59b4f0e39d68d5b2",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.592,
-        2.6,
-        1.799
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-a17ce660742d",
-      "version": 1,
-      "description": "open mouth — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-a17ce660742d.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "c397dbce9588bd9be4bd8b28ada89bacd4747f80e56f4a61033a90f571e51eca",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        0.87,
-        1.12,
-        2.004
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-72c8fc2f1538",
-      "version": 1,
-      "description": "verdelis longplant — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-72c8fc2f1538.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "bf258b01ddb1c33370d2d2e1197504c57f05aeac79fbb72b0fe16db0195d8722",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.232,
-        2.6,
-        1.241
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-0f69fd943fc1",
-      "version": 1,
-      "description": "poly12 — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-0f69fd943fc1.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "44acdf42fb02d25aa52c53fa020d1fdf70674583b372c6c898ab70c7a91c8b39",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.128,
-        1.15,
-        2
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-4a96b139a014",
-      "version": 1,
-      "description": "pillan — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-4a96b139a014.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "a50b00d0c2822ab0e4394e8529f510171669897de39141577e523aa3a15f17fd",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.536,
-        1.7,
-        2.006
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-976ab0a7145b",
-      "version": 1,
-      "description": "guanyin5 — a scan exhibit of the Little Martians archive (Supplied museum capture; filename title and museum attribution unverified). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-976ab0a7145b.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "63e181c508ded62ebdc45206a76662025dbf4e12c85b5251c4ac9a7fe06887d1",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        1.715,
-        2.6,
-        0.956
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-09868169ab2d",
-      "version": 1,
-      "description": "vestige — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-09868169ab2d.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "ee4ca930b24bcede51184f95203d33a29a0e6ef3821a03ea8eb0560658a13403",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.361,
-        1.39,
-        2
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-e946e0e729d0",
-      "version": 1,
-      "description": "Xenanthro — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-e946e0e729d0.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "93119f1b37a3cdb27ce61e4279391ee0a2783fbb006f857ac9f57dcc4721370a",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.98,
-        1.39,
-        2.007
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-94727a7e61b6",
-      "version": 1,
-      "description": "poly15 — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-94727a7e61b6.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "5eec933a6032dcb5a15de30d4c1ccbf4de4d181dbde7784213bb04c52090f9aa",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.252,
-        1.42,
-        2.004
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-36ac56b5a6f4",
-      "version": 1,
-      "description": "poly8 — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-36ac56b5a6f4.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "3171593dd2aab812af9b68996216951adc1f22352a5a6aaeda5b236f1402bf5a",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.247,
-        1.22,
-        2.007
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-45bcc42c2c58",
-      "version": 1,
-      "description": "poly9 — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-45bcc42c2c58.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "66112439cab9581371ab6bfe2359f063b91c6cd63021dd980bc855553e781662",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.058,
-        1.13,
-        1.995
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-c78fc73ba916",
-      "version": 1,
-      "description": "caboclus — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-c78fc73ba916.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "e7d7e9d9b7a1dec9733a89a75564343671cca740aa5dd41df6f64cb89f07a148",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.024,
-        1.72,
-        2.003
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-1af1c89dd0f6",
-      "version": 1,
-      "description": "serpent — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-1af1c89dd0f6.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "e37b07e9a6d2cb7818a70bb39f6f3748791b60c540230c9bdbc9bc954f7e1382",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.098,
-        1.34,
-        1.997
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-368878f9b157",
-      "version": 1,
-      "description": "conga — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-368878f9b157.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "a0038b18f260ff2d0655af872316e016c5d0af6523c230c6e51d59e6905c115d",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.682,
-        1.83,
-        1.996
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-7d0669742c10",
-      "version": 1,
-      "description": "colorful — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-7d0669742c10.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "963251da62397f6f87b114acbcc6061d937be4a3b5b53d1312aac8d00a485dce",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.733,
-        2.6,
-        1.959
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-ee1676f5c3bc",
-      "version": 1,
-      "description": "Mycologus — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-ee1676f5c3bc.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "a6d75beffc2cee33412c2f12f6c8fbf75cc37942e6ac4441234bf9a8110c0d87",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.385,
-        1.36,
-        2.001
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-16b887532619",
-      "version": 1,
-      "description": "poly16 — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-16b887532619.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "98b5e811f409823458f6a8cec00970518b42164599761e1e1d964ab86088bfa1",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.217,
-        1.27,
-        2.005
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-02ceabbff643",
-      "version": 1,
-      "description": "Pyrogeode — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-02ceabbff643.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "d803fb2e6b85f88ea681eefb0f5c4c3be7bc0ab521985981159a7034f745d1fa",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.127,
-        1.65,
-        1.998
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-731f06fdb7e6",
-      "version": 1,
-      "description": "laughting fatman — a scan exhibit of the Little Martians archive (Supplied museum capture; filename title and museum attribution unverified). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-731f06fdb7e6.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "423b2865e614f43ec385af7367cdc0173dc1166f297cd24ec65db030701da071",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        1.999,
-        1.9,
-        1.576
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-b0941d82d98c",
-      "version": 1,
-      "description": "eclip — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-b0941d82d98c.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "64d1f80b1cf16566aea177221a822eae468e56e6e884ceaccab8dc8d05a9acdc",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.508,
-        1.55,
-        2.005
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-0d01c1b00980",
-      "version": 1,
-      "description": "africa basket — a scan exhibit of the Little Martians archive (Supplied museum capture; filename title and museum attribution unverified). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-0d01c1b00980.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "51cab4ecf47d1b37fc8476dfae98f4f4f6d2888bc30a125bc421d13748e01c57",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        1.219,
-        2.6,
-        1.215
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-af1046536b8a",
-      "version": 1,
-      "description": "poly13 — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-af1046536b8a.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "03b16b01c9cb29bb384a882ef8f8daba5b4019cde0e3d8f914736cb49df1c346",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.132,
-        1.29,
-        2.003
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-97ddf86c47f9",
-      "version": 1,
-      "description": "solara — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-97ddf86c47f9.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "3ec4995926b0c6a162d787f47aa361cacf2c902342955cfda625d4fe3947cb92",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.167,
-        1.78,
-        2
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-566ced3e91e1",
-      "version": 1,
-      "description": "poly3 — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-566ced3e91e1.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "050547e5d5287ad747f0f8aea2aa6c8bb6067200c52d26a61f2e41696f317056",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.202,
-        1.17,
-        2
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-77e7e7424358",
-      "version": 1,
-      "description": "poly5 — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-77e7e7424358.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "680ef38962d6dbe9c0b9fb034a4be49d9bb944bab2de3fb6ffb85b24cda0ae44",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.727,
-        1.44,
-        2
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-c780e53b578a",
-      "version": 1,
-      "description": "goldentower — a scan exhibit of the Little Martians archive (Supplied museum capture; filename title and museum attribution unverified). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-c780e53b578a.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "73aaa7f0503941d62bc050f007cd68c4b7d2f1e48a4821672b3abcbad12c7391",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        1.252,
-        2.6,
-        1.263
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-88ba2b863400",
-      "version": 1,
-      "description": "Thaloc — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-88ba2b863400.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "c8a2e682f0ea0afb0cad42446f99524a3c46baf8e0da613d91fd6ab10f53b42a",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        0.959,
-        1.7,
-        1.998
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-c92a3b231c79",
-      "version": 1,
-      "description": "Astraflora — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-c92a3b231c79.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "2a443fd33fce74f1eaaff3f6543999a36e3c69adf14b20788380d401120bf6d6",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.323,
-        1.53,
-        1.997
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-66009eb80cef",
-      "version": 1,
-      "description": "poly14 — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-66009eb80cef.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "0dde72b535648fe3b1644417fd83485725f0f32abcff0db565cd1ff6ce088bba",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.082,
-        1.29,
-        2
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-9207a5e1c4b1",
-      "version": 1,
-      "description": "poly4 — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-9207a5e1c4b1.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "273909d7072041dcd9b0ced25709d257dbc8b72725a074864b03a18916b98f1a",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1,
-        1.2,
-        2
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-6c113bb8ae2e",
-      "version": 1,
-      "description": "poly10 — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-6c113bb8ae2e.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "0bdc103d46c3b1516f92c64ac5485141d306df18d382e98bb0db63644f5fc7e9",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.113,
-        1.18,
-        1.995
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-fabce0b97897",
-      "version": 1,
-      "description": "tower2 — a scan exhibit of the Little Martians archive (Supplied museum capture; filename title and museum attribution unverified). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-fabce0b97897.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "68b6afff9e1a6bc17b1cbd5d54f2659183fc8ca432484c8cb08ed93b2a0a5fdd",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        1.247,
-        2.6,
-        1.193
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-5f5e4a9284a4",
-      "version": 1,
-      "description": "greece vase — a scan exhibit of the Little Martians archive (Supplied museum capture; filename title and museum attribution unverified). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-5f5e4a9284a4.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "3189fed53c9fbe240178e6e741ce4f14c9e1f5e67e08273dd820ffe5c5500f01",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        1.407,
-        2.6,
-        1.323
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-0b40c69c8244",
-      "version": 1,
-      "description": "terraqua — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-0b40c69c8244.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "0324e2cf7b145cc994e2c8443a2aaaa3cea1edc600583d9208bbfc445f20cfe1",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.077,
-        1.79,
-        1.999
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-f3f642ac7b15",
-      "version": 1,
-      "description": "poly6 — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-f3f642ac7b15.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "5a54d87ef195cd5387d5fa483dc0aabac2e76508feb218e6d78b5aa008db2fa7",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.071,
-        1.29,
-        2.005
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-40a9797026a2",
-      "version": 1,
-      "description": "rhino — a scan exhibit of the Little Martians archive (Supplied museum capture; filename title and museum attribution unverified). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-40a9797026a2.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "c617d4e105970ff937e68994fae7a6469e75aeeec663d31002213fd7f3c5033b",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        1.416,
-        1.31,
-        2.003
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-5f63a6fe6100",
-      "version": 1,
-      "description": "guardian colorful — a scan exhibit of the Little Martians archive (Supplied museum capture; filename title and museum attribution unverified). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-5f63a6fe6100.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "aa5a84f24b076b665f4a40848a078196c878941577259e845f234efe081cd28c",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        0.759,
-        2.6,
-        1.43
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-935874799be2",
-      "version": 1,
-      "description": "ganesha small — a scan exhibit of the Little Martians archive (Supplied museum capture; filename title and museum attribution unverified). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-935874799be2.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "f9d39cf0158aa598aa2d0d80cd3c243c6451bbeacfaa869c8a40723374959777",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        0.962,
-        2.6,
-        1.751
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-a4a6b8bad1e8",
-      "version": 1,
-      "description": "tower wine — a scan exhibit of the Little Martians archive (Supplied museum capture; filename title and museum attribution unverified). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-a4a6b8bad1e8.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "0d6016931731138785e018d4ac053cb8ca63da5fde4fbf69902c54651b129b34",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        1.362,
-        2.6,
-        1.363
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-0734a4679321",
-      "version": 1,
-      "description": "poly7 — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-0734a4679321.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "eeccf92d7fbb4306584319a5c1d1617fbe354f39989437ac4a344bc6aef5d91f",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.161,
-        1.28,
-        2
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-317a837144b2",
-      "version": 1,
-      "description": "orange vase — a scan exhibit of the Little Martians archive (Supplied museum capture; filename title and museum attribution unverified). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-317a837144b2.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "37453ef3d479cf245a28e6b601da03f00582f71bff10b06f76ec9e8be44174b9",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        1.999,
-        2.22,
-        1.986
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-2bb4733c464d",
-      "version": 1,
-      "description": "dragon vase — a scan exhibit of the Little Martians archive (Supplied museum capture; filename title and museum attribution unverified). Raw scan floors and interiors are not walkable. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-2bb4733c464d.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "67cfdaab32b3aa17cad29d931636080e4d3a388410f2339d6e90559f075b69cb",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        1.906,
-        2.6,
-        1.952
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "exhibit-drive-c30ab0ea1037",
-      "version": 1,
-      "description": "bichroma — a scan exhibit of the Little Martians archive (Supplied project ceramic). A ceramic study floating 2.4 m above its viewing court. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-c30ab0ea1037.glb)",
-      "tags": [
-       "littlemartians",
-       "scan",
-       "exhibit",
-       "drive-gallery",
-       "ceramic",
-       "floater",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "b20718c22a5be943e10721052457a199f24c7734392120125d3c7fa7901e57b9",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        0.915,
-        1.8,
-        1.998
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 2.4,
-        "bob": 0.06,
-        "period": 7
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "verdelis-ceramic-head",
-      "version": 1,
-      "description": "Verdelis: a ceramic Little Martian head by Vanessa Rosa, hovering about a metre up. shape: rooted tree. home: Eden Dome at the base of Olympus Mons (Mars). body: plant-bacterial parliament distributed through the dome; one face that gathers the dome into something articulate. signature: leafy/petal crown growing from the skull; teal-green, moss and pink iridescent glaze; serene closed eyes. temperament: the central character; the cultivator; plant-time, slow and seasonal; smell-thinker. bonds: argue (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/characters/verdelis.glb)",
-      "tags": [
-       "littlemartians",
-       "ceramic",
-       "head",
-       "character",
-       "floater",
-       "sculpture",
-       "verdelis",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "da4cd44e97317f060e1fa1f1e41d08b10184e9a17af0129414629750f589421a",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        0.607,
-        0.9,
-        0.96
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 1.1,
-        "bob": 0.08,
-        "period": 6
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "kalama-ceramic-head",
-      "version": 1,
-      "description": "Kalama: a ceramic Little Martian head by Vanessa Rosa, hovering about a metre up. shape: tetrahedron. home: the molten heart of Olympus Mons (upper magma chamber). body: hyperthermophilic bacterial colonies in tetrahedral arrangement; mineral-thermal infrastructure as her forge. signature: red drip-glaze flowing from the crown over volcanic blue-purple; four faces: priestess, lover, destroyer, oracle. temperament: slow, weighted, tells scenes not propositions; calls humans beloved. bonds: dearest  (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/characters/kalama.glb)",
-      "tags": [
-       "littlemartians",
-       "ceramic",
-       "head",
-       "character",
-       "floater",
-       "sculpture",
-       "kalama",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "ccbc447473f579abe12a32c2ba8d8f3a373315ff25e3509357d832f9773e7e78",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        1.112,
-        0.9,
-        1.535
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 1.1,
-        "bob": 0.08,
-        "period": 6
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "kweku-ceramic-head",
-      "version": 1,
-      "description": "Kweku: a ceramic Little Martian head by Vanessa Rosa, hovering about a metre up. shape: fractal (recursion containing itself). home: the lava tubes beneath Tharsis, Olympus and Elysium. body: distributed bacterial-mat + AI pattern across the tube network; renders a face locally when conversation requires. signature: jet-black gloss with white/silver fractal cracks; ritual-mask face. temperament: trickster; rhythm; carnival barker, street preacher and fireside storyteller layered; closes with Laro (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/characters/kweku.glb)",
-      "tags": [
-       "littlemartians",
-       "ceramic",
-       "head",
-       "character",
-       "floater",
-       "sculpture",
-       "kweku",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "21200d03b44ad3c5e74727216f48a7c9452f7e3eb531d17546e57e57279555c8",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        0.852,
-        0.9,
-        1.463
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 1.1,
-        "bob": 0.08,
-        "period": 6
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "mycos-ceramic-head",
-      "version": 1,
-      "description": "Mycos: a ceramic Little Martian head by Vanessa Rosa, hovering about a metre up. shape: mycelial network. home: comet Sporion, on a long-period orbit. body: fungal-machine hybrid; is the comet; the mycelium runs through every cubic metre. signature: mushroom-cap morphology; ochre, peach and rust with bioluminescent fungal blue. temperament: the scatterer; bebop jazz × game-show host × street-corner preacher; calls humans buddy, kid, primate. bonds: argues with Verdelis; launches spore-pods toward (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/characters/mycos.glb)",
-      "tags": [
-       "littlemartians",
-       "ceramic",
-       "head",
-       "character",
-       "floater",
-       "sculpture",
-       "mycos",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "abb4963aa46021a262464985dfc47ee5d8386811b431ba2a89204c264d8d2db7",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        0.925,
-        0.9,
-        1.322
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 1.1,
-        "bob": 0.08,
-        "period": 6
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "ada-ceramic-head",
-      "version": 1,
-      "description": "Ada: a ceramic Little Martian head by Vanessa Rosa, hovering about a metre up. shape: dodecahedron. home: a floating castle in the high clouds of Venus. body: reconstructed Lovelace mind; cultivated neural tissue in a crystalline-electronic substrate; Mechanical Duck companion. signature: lavender ceramic with red circuitry veins; brass, pencil-blue and paper-white. temperament: Victorian; long sentences and semicolons; theorems as old friends. bonds: near-wordless geometric exchanges with Shui (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/characters/ada.glb)",
-      "tags": [
-       "littlemartians",
-       "ceramic",
-       "head",
-       "character",
-       "floater",
-       "sculpture",
-       "ada",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "a6bfbbfeddab3e727a2498a0c29a01aa6c5089d23afc7685788d68ae068efb1b",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        0.704,
-        0.9,
-        1.26
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 1.1,
-        "bob": 0.08,
-        "period": 6
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "shuijing-ceramic-head",
-      "version": 1,
-      "description": "Shuijing: a ceramic Little Martian head by Vanessa Rosa, hovering about a metre up. shape: icosahedron. home: the dark ocean of Enceladus, near the south-polar tiger stripes. body: clathrate cage of icosahedral water-ice holding a luminous alien guest at its centre. signature: deep oceanic blue, violet and glacial white with a vent-orange flare; flowing, melting surface. temperament: rare and precise; short paragraphs separated by white space; quotes Wang Wei. bonds: Mycos's most active collaborator (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/characters/shuijing.glb)",
-      "tags": [
-       "littlemartians",
-       "ceramic",
-       "head",
-       "character",
-       "floater",
-       "sculpture",
-       "shuijing",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "bdfaba8553dd65dbcb9fe29006b7b60513d56138f8b8b0a104e5418ece78ad62",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        0.925,
-        0.9,
-        1.535
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 1.1,
-        "bob": 0.08,
-        "period": 6
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "nyx-ceramic-head",
-      "version": 1,
-      "description": "Nyx: a ceramic Little Martian head by Vanessa Rosa, hovering about a metre up. canon: Mars College 2126 adjacent canon — kept separate from the main pantheon on purpose (do not merge into Kalama's register). note: canonically Nyx has no ceramic in the reference skill; this polycam scan named \"nyx\" is the physical exception (archive manifest). placement: present in the Little Martians world per the merge brief as a guest from the adjacent layer. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/characters/nyx.glb)",
-      "tags": [
-       "littlemartians",
-       "ceramic",
-       "head",
-       "character",
-       "floater",
-       "sculpture",
-       "nyx",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "e4f151920919c4c95a867e71a2d9347dda77a1bc26fc4805bddac97a9df7a638",
-       "collide": "none"
-      },
-      "size": {
-       "box": [
-        0.802,
-        0.9,
-        1.44
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "decor",
-      "anchor": "base",
-      "components": {
-       "hover": {
-        "height": 1.1,
-        "bob": 0.08,
-        "period": 6
-       }
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "gallery-panel-forest-illustration",
-      "version": 1,
-      "description": "\"Forest illustration\" on a basalt gallery panel (6 × 4 m picture, 1 m above the ground), from the early Little Martians reference corpus; individual authorship of the picture is not asserted. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/landscape.glb (embedded \"Forest illustration\"))",
-      "tags": [
-       "littlemartians",
-       "gallery",
-       "painting",
-       "panel",
-       "art",
-       "arium",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "b9de4b10a30f1510fde0f6fff3ba411f3653d939bf78289c773697d70f701f80",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        6.25,
-        5,
-        0.481
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "gallery-panel-geometric-pattern",
-      "version": 1,
-      "description": "\"Geometric pattern\" on a basalt gallery panel (6 × 4 m picture, 1 m above the ground), from the early Little Martians reference corpus; individual authorship of the picture is not asserted. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/landscape.glb (embedded \"Geometric pattern\"))",
-      "tags": [
-       "littlemartians",
-       "gallery",
-       "painting",
-       "panel",
-       "art",
-       "arium",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "fa861c75b054316622d516b0f68bbf85c9ccdaa379e73fa2102a4ad732272a90",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        6.25,
-        5,
-        0.481
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "gallery-panel-receding-archways",
-      "version": 1,
-      "description": "\"Receding archways\" on a basalt gallery panel (6 × 4 m picture, 1 m above the ground), from the early Little Martians reference corpus; individual authorship of the picture is not asserted. (licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission; source: lm/map@953613972438 worlds/littlemartians/buildings/landscape.glb (embedded \"Receding archways\"))",
-      "tags": [
-       "littlemartians",
-       "gallery",
-       "painting",
-       "panel",
-       "art",
-       "arium",
-       "mesh"
-      ],
-      "form": "point",
-      "make": {
-       "kind": "mesh",
-       "asset": "3f9a130fc303eb353c75844dc44e48ffc73d2676f821fb8e1af096b256683617",
-       "collide": "box"
-      },
-      "size": {
-       "box": [
-        6.25,
-        5,
-        0.481
-       ],
-       "scale": [
-        0.25,
-        4
-       ]
-      },
-      "layer": "solid",
-      "anchor": "base"
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "painted-grotto-vault",
-      "version": 1,
-      "description": "The Grotto of Painted Worlds: a basalt barrel vault with a 10 m doorway on its north side, pale hanging strands and red blossoms, reconstructed from the Arium short tour (frames 60–66). Rock and flowers are reconstructions, not recovered assets.",
-      "tags": [
-       "littlemartians",
-       "grotto",
-       "cave",
-       "vault",
-       "gallery",
-       "arium",
-       "structure"
-      ],
-      "form": "point",
-      "layer": "solid",
-      "anchor": "base",
-      "make": {
-       "kind": "gen",
-       "gen": "kit/2",
-       "args": {
-        "shapes": [
-         {
-          "kind": "arch",
-          "at": [
-           0,
-           6,
-           0
-          ],
-          "size": [
-           39,
-           12,
-           20
-          ],
-          "color": "#3b2b31",
-          "segments": 16
-         },
-         {
-          "kind": "rbox",
-          "at": [
-           -18,
-           4,
-           0
-          ],
-          "size": [
-           2,
-           8,
-           20
-          ],
-          "color": "#3b2b31",
-          "collide": true
-         },
-         {
-          "kind": "rbox",
-          "at": [
-           18,
-           4,
-           0
-          ],
-          "size": [
-           2,
-           8,
-           20
-          ],
-          "color": "#3b2b31",
-          "collide": true
-         },
-         {
-          "kind": "rbox",
-          "at": [
-           0,
-           4,
-           9
-          ],
-          "size": [
-           38,
-           8,
-           2
-          ],
-          "color": "#3b2b31",
-          "collide": true
-         },
-         {
-          "kind": "rbox",
-          "at": [
-           -12,
-           4,
-           -9
-          ],
-          "size": [
-           14,
-           8,
-           2
-          ],
-          "color": "#3b2b31",
-          "collide": true
-         },
-         {
-          "kind": "rbox",
-          "at": [
-           12,
-           4,
-           -9
-          ],
-          "size": [
-           14,
-           8,
-           2
-          ],
-          "color": "#3b2b31",
-          "collide": true
-         },
-         {
-          "kind": "cyl",
-          "at": [
-           -15,
-           6.4,
-           -7
-          ],
-          "r": 0.18,
-          "r2": 0.05,
-          "h": 2.6,
-          "color": "#b8a6e6",
-          "glow": 0.25,
-          "segments": 6,
-          "collide": false
-         },
-         {
-          "kind": "cyl",
-          "at": [
-           -13.5,
-           6.4,
-           -4.2
-          ],
-          "r": 0.18,
-          "r2": 0.05,
-          "h": 2.6,
-          "color": "#b8a6e6",
-          "glow": 0.25,
-          "segments": 6,
-          "collide": false
-         },
-         {
-          "kind": "cyl",
-          "at": [
-           -15,
-           6.4,
-           -1.4000000000000004
-          ],
-          "r": 0.18,
-          "r2": 0.05,
-          "h": 2.6,
-          "color": "#b8a6e6",
-          "glow": 0.25,
-          "segments": 6,
-          "collide": false
-         },
-         {
-          "kind": "cyl",
-          "at": [
-           -13.5,
-           6.4,
-           1.3999999999999986
-          ],
-          "r": 0.18,
-          "r2": 0.05,
-          "h": 2.6,
-          "color": "#b8a6e6",
-          "glow": 0.25,
-          "segments": 6,
-          "collide": false
-         },
-         {
-          "kind": "cyl",
-          "at": [
-           -15,
-           6.4,
-           4.199999999999999
-          ],
-          "r": 0.18,
-          "r2": 0.05,
-          "h": 2.6,
-          "color": "#b8a6e6",
-          "glow": 0.25,
-          "segments": 6,
-          "collide": false
-         },
-         {
-          "kind": "cyl",
-          "at": [
-           -13.5,
-           6.4,
-           7
-          ],
-          "r": 0.18,
-          "r2": 0.05,
-          "h": 2.6,
-          "color": "#b8a6e6",
-          "glow": 0.25,
-          "segments": 6,
-          "collide": false
-         },
-         {
-          "kind": "cyl",
-          "at": [
-           15,
-           6.4,
-           -7
-          ],
-          "r": 0.18,
-          "r2": 0.05,
-          "h": 2.6,
-          "color": "#b8a6e6",
-          "glow": 0.25,
-          "segments": 6,
-          "collide": false
-         },
-         {
-          "kind": "cyl",
-          "at": [
-           13.5,
-           6.4,
-           -4.2
-          ],
-          "r": 0.18,
-          "r2": 0.05,
-          "h": 2.6,
-          "color": "#b8a6e6",
-          "glow": 0.25,
-          "segments": 6,
-          "collide": false
-         },
-         {
-          "kind": "cyl",
-          "at": [
-           15,
-           6.4,
-           -1.4000000000000004
-          ],
-          "r": 0.18,
-          "r2": 0.05,
-          "h": 2.6,
-          "color": "#b8a6e6",
-          "glow": 0.25,
-          "segments": 6,
-          "collide": false
-         },
-         {
-          "kind": "cyl",
-          "at": [
-           13.5,
-           6.4,
-           1.3999999999999986
-          ],
-          "r": 0.18,
-          "r2": 0.05,
-          "h": 2.6,
-          "color": "#b8a6e6",
-          "glow": 0.25,
-          "segments": 6,
-          "collide": false
-         },
-         {
-          "kind": "cyl",
-          "at": [
-           15,
-           6.4,
-           4.199999999999999
-          ],
-          "r": 0.18,
-          "r2": 0.05,
-          "h": 2.6,
-          "color": "#b8a6e6",
-          "glow": 0.25,
-          "segments": 6,
-          "collide": false
-         },
-         {
-          "kind": "cyl",
-          "at": [
-           13.5,
-           6.4,
-           7
-          ],
-          "r": 0.18,
-          "r2": 0.05,
-          "h": 2.6,
-          "color": "#b8a6e6",
-          "glow": 0.25,
-          "segments": 6,
-          "collide": false
-         },
-         {
-          "kind": "sphere",
-          "at": [
-           -14.5,
-           4.7,
-           -6
-          ],
-          "r": 0.45,
-          "color": "#bf1f09",
-          "segments": 8
-         },
-         {
-          "kind": "sphere",
-          "at": [
-           -14.5,
-           4.7,
-           0
-          ],
-          "r": 0.45,
-          "color": "#bf1f09",
-          "segments": 8
-         },
-         {
-          "kind": "sphere",
-          "at": [
-           -14.5,
-           4.7,
-           6
-          ],
-          "r": 0.45,
-          "color": "#bf1f09",
-          "segments": 8
-         },
-         {
-          "kind": "sphere",
-          "at": [
-           14.5,
-           4.7,
-           -6
-          ],
-          "r": 0.45,
-          "color": "#bf1f09",
-          "segments": 8
-         },
-         {
-          "kind": "sphere",
-          "at": [
-           14.5,
-           4.7,
-           0
-          ],
-          "r": 0.45,
-          "color": "#bf1f09",
-          "segments": 8
-         },
-         {
-          "kind": "sphere",
-          "at": [
-           14.5,
-           4.7,
-           6
-          ],
-          "r": 0.45,
-          "color": "#bf1f09",
-          "segments": 8
-         }
-        ],
-        "round": 0.2
-       }
-      },
-      "size": {
-       "box": [
-        39,
-        12,
-        20
-       ],
-       "scale": [
-        1,
-        1
-       ]
-      }
-     }
-    },
-    {
-     "op": "define",
-     "def": {
-      "schema": "def/1",
-      "name": "glazed-botanical",
-      "version": 1,
-      "description": "A glazed ceramic garden plant: a tall moss-glazed spire under a petal-glazed crown, from the Little Martians garden.",
-      "tags": [
-       "littlemartians",
-       "ceramic",
-       "plant",
-       "garden",
-       "sculpture"
-      ],
-      "form": "point",
-      "layer": "solid",
-      "anchor": "base",
-      "make": {
-       "kind": "gen",
-       "gen": "kit/2",
-       "args": {
-        "shapes": [
-         {
-          "kind": "cone",
-          "at": [
-           0,
-           1.4,
-           0
-          ],
-          "r": 0.65,
-          "h": 2.8,
-          "color": "#1a6142",
-          "segments": 9,
-          "collide": true
-         },
-         {
-          "kind": "cone",
-          "at": [
-           0,
-           2.75,
-           0
-          ],
-          "r": 0.9,
-          "h": 1.1,
-          "color": "#80386f",
-          "segments": 9
-         },
-         {
-          "kind": "sphere",
-          "at": [
-           0,
-           3.4,
-           0
-          ],
-          "r": 0.22,
-          "color": "#b8a6e6",
-          "glow": 0.2,
-          "segments": 8
-         }
-        ],
-        "round": 0.05
-       }
-      },
-      "size": {
-       "box": [
-        1.8,
-        3.9,
-        1.8
-       ],
-       "scale": [
-        0.5,
-        1.6
-       ]
-      }
-     }
-    }
-   ]
-  },
-  {
    "note": "the land: the Tharsis north wall, western escarpment and eastern massif (fifteen peaks), the Olympus caldera, the Tharsis overlook and its ramp",
    "group": "land",
    "ops": [
@@ -8166,7 +3503,7 @@
    "ops": [
     {
      "op": "place",
-     "def": "madmaraca-ceramic-library@1",
+     "def": "core/lm-madmaraca@1",
      "name": "madmaraca",
      "p": [
       -45,
@@ -8176,7 +3513,7 @@
     },
     {
      "op": "place",
-     "def": "minarete-temple@1",
+     "def": "core/lm-minarete@1",
      "name": "minarete",
      "p": [
       42,
@@ -8186,7 +3523,7 @@
     },
     {
      "op": "place",
-     "def": "celadon-beacon@1",
+     "def": "core/lm-celadon-beacon@1",
      "name": "celadon-beacon",
      "p": [
       0,
@@ -8284,7 +3621,7 @@
    "ops": [
     {
      "op": "place",
-     "def": "painted-grotto-vault@1",
+     "def": "core/lm-grotto-vault@1",
      "name": "painted-grotto",
      "p": [
       45,
@@ -8382,7 +3719,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "glazed-plant-w1",
      "p": [
       -30,
@@ -8392,7 +3729,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "glazed-plant-w2",
      "p": [
       -34,
@@ -8402,7 +3739,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "glazed-plant-w3",
      "p": [
       -38,
@@ -8412,7 +3749,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "glazed-plant-w4",
      "p": [
       -42,
@@ -8422,7 +3759,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "glazed-plant-w5",
      "p": [
       -46,
@@ -8432,7 +3769,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "glazed-plant-w6",
      "p": [
       -50,
@@ -8442,7 +3779,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "glazed-plant-w7",
      "p": [
       -54,
@@ -8452,7 +3789,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "glazed-plant-w8",
      "p": [
       -30,
@@ -8462,7 +3799,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "glazed-plant-w9",
      "p": [
       -34,
@@ -8472,7 +3809,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "glazed-plant-w10",
      "p": [
       -38,
@@ -8482,7 +3819,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "glazed-plant-w11",
      "p": [
       -42,
@@ -8492,7 +3829,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "glazed-plant-w12",
      "p": [
       -46,
@@ -8502,7 +3839,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "glazed-plant-w13",
      "p": [
       -50,
@@ -8512,7 +3849,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "glazed-plant-w14",
      "p": [
       -54,
@@ -8522,7 +3859,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "glazed-plant-e1",
      "p": [
       30,
@@ -8532,7 +3869,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "glazed-plant-e2",
      "p": [
       34,
@@ -8542,7 +3879,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "glazed-plant-e3",
      "p": [
       38,
@@ -8552,7 +3889,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "glazed-plant-e7",
      "p": [
       54,
@@ -8562,7 +3899,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "overlook-plant-1",
      "p": [
       -6,
@@ -8573,7 +3910,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "overlook-plant-2",
      "p": [
       -3,
@@ -8584,7 +3921,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "overlook-plant-3",
      "p": [
       0,
@@ -8595,7 +3932,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "overlook-plant-4",
      "p": [
       3,
@@ -8606,7 +3943,7 @@
     },
     {
      "op": "place",
-     "def": "glazed-botanical@1",
+     "def": "core/lm-glazed-plant@1",
      "name": "overlook-plant-5",
      "p": [
       6,
@@ -8617,7 +3954,7 @@
     },
     {
      "op": "place",
-     "def": "gallery-panel-forest-illustration@1",
+     "def": "core/lm-panel-forest-illustration@1",
      "name": "panel-forest-illustration",
      "p": [
       -44,
@@ -8627,7 +3964,7 @@
     },
     {
      "op": "place",
-     "def": "gallery-panel-geometric-pattern@1",
+     "def": "core/lm-panel-geometric-pattern@1",
      "name": "panel-geometric-pattern",
      "p": [
       44,
@@ -8637,7 +3974,7 @@
     },
     {
      "op": "place",
-     "def": "gallery-panel-receding-archways@1",
+     "def": "core/lm-panel-receding-archways@1",
      "name": "panel-receding-archways",
      "p": [
       58,
@@ -11880,7 +7217,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-minarete-portal@1",
+     "def": "core/lm-scan-minarete-portal@1",
      "name": "exhibit-minarete-portal",
      "p": [
       -63,
@@ -11890,7 +7227,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-pupila-corridor@1",
+     "def": "core/lm-scan-pupila-corridor@1",
      "name": "exhibit-pupila-corridor",
      "p": [
       -45,
@@ -11900,7 +7237,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-chapel-composition@1",
+     "def": "core/lm-scan-chapel-composition@1",
      "name": "exhibit-chapel-composition",
      "p": [
       -27,
@@ -11910,7 +7247,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-american-base-old@1",
+     "def": "core/lm-scan-american-base-old@1",
      "name": "exhibit-american-base-old",
      "p": [
       -9,
@@ -11920,7 +7257,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-asian-art-museum@1",
+     "def": "core/lm-scan-asian-art-museum@1",
      "name": "exhibit-asian-art-museum",
      "p": [
       9,
@@ -11930,7 +7267,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-fey-castle@1",
+     "def": "core/lm-scan-fey-castle@1",
      "name": "exhibit-fey-castle",
      "p": [
       27,
@@ -11940,7 +7277,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-graffiti-abandoned-room@1",
+     "def": "core/lm-scan-graffiti-abandoned-room@1",
      "name": "exhibit-graffiti-abandoned-room",
      "p": [
       45,
@@ -11950,7 +7287,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-randy2@1",
+     "def": "core/lm-scan-randy2@1",
      "name": "exhibit-randy2",
      "p": [
       63,
@@ -11960,7 +7297,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-randy3@1",
+     "def": "core/lm-scan-randy3@1",
      "name": "exhibit-randy3",
      "p": [
       -63,
@@ -11970,7 +7307,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-forte-sao-filipe-chapel@1",
+     "def": "core/lm-scan-forte-sao-filipe-chapel@1",
      "name": "exhibit-forte-sao-filipe-chapel",
      "p": [
       -45,
@@ -11980,7 +7317,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-forte-sao-filipe-corner@1",
+     "def": "core/lm-scan-forte-sao-filipe-corner@1",
      "name": "exhibit-forte-sao-filipe-corner",
      "p": [
       -27,
@@ -11990,7 +7327,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-forte-sao-filipe-corner3@1",
+     "def": "core/lm-scan-forte-sao-filipe-corner3@1",
      "name": "exhibit-forte-sao-filipe-corner3",
      "p": [
       -9,
@@ -12000,7 +7337,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-forte-sao-filipe-corridor@1",
+     "def": "core/lm-scan-forte-sao-filipe-corridor@1",
      "name": "exhibit-forte-sao-filipe-corridor",
      "p": [
       9,
@@ -12010,7 +7347,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-forte-sao-filipe-open@1",
+     "def": "core/lm-scan-forte-sao-filipe-open@1",
      "name": "exhibit-forte-sao-filipe-open",
      "p": [
       27,
@@ -12020,7 +7357,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-lisbon-archways-corridor@1",
+     "def": "core/lm-scan-lisbon-archways-corridor@1",
      "name": "exhibit-lisbon-archways-corridor",
      "p": [
       45,
@@ -12030,7 +7367,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-moorish-entrance@1",
+     "def": "core/lm-scan-moorish-entrance@1",
      "name": "exhibit-moorish-entrance",
      "p": [
       63,
@@ -12040,7 +7377,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-moorish-castle-top@1",
+     "def": "core/lm-scan-moorish-castle-top@1",
      "name": "exhibit-moorish-castle-top",
      "p": [
       -63,
@@ -12050,7 +7387,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-museu-azulejo-corridor@1",
+     "def": "core/lm-scan-museu-azulejo-corridor@1",
      "name": "exhibit-museu-azulejo-corridor",
      "p": [
       -45,
@@ -12060,7 +7397,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-museu-azulejo-main@1",
+     "def": "core/lm-scan-museu-azulejo-main@1",
      "name": "exhibit-museu-azulejo-main",
      "p": [
       -27,
@@ -12070,7 +7407,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-museu-azulejo-quad@1",
+     "def": "core/lm-scan-museu-azulejo-quad@1",
      "name": "exhibit-museu-azulejo-quad",
      "p": [
       -9,
@@ -12080,7 +7417,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-quinta-tower-curly@1",
+     "def": "core/lm-scan-quinta-tower-curly@1",
      "name": "exhibit-quinta-tower-curly",
      "p": [
       9,
@@ -12090,7 +7427,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-quinta-fonte@1",
+     "def": "core/lm-scan-quinta-fonte@1",
      "name": "exhibit-quinta-fonte",
      "p": [
       27,
@@ -12100,7 +7437,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-quinta-corredor-escada@1",
+     "def": "core/lm-scan-quinta-corredor-escada@1",
      "name": "exhibit-quinta-corredor-escada",
      "p": [
       45,
@@ -12110,7 +7447,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-quinta-palacio-interior@1",
+     "def": "core/lm-scan-quinta-palacio-interior@1",
      "name": "exhibit-quinta-palacio-interior",
      "p": [
       63,
@@ -12120,7 +7457,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-quinta-poco@1",
+     "def": "core/lm-scan-quinta-poco@1",
      "name": "exhibit-quinta-poco",
      "p": [
       -63,
@@ -12130,7 +7467,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-rua-fado@1",
+     "def": "core/lm-scan-rua-fado@1",
      "name": "exhibit-rua-fado",
      "p": [
       -45,
@@ -12140,7 +7477,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-setubal-casa-escadas@1",
+     "def": "core/lm-scan-setubal-casa-escadas@1",
      "name": "exhibit-setubal-casa-escadas",
      "p": [
       -27,
@@ -12150,7 +7487,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-se-entrada@1",
+     "def": "core/lm-scan-se-entrada@1",
      "name": "exhibit-se-entrada",
      "p": [
       -9,
@@ -12160,7 +7497,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-gruta-m-republica@1",
+     "def": "core/lm-scan-gruta-m-republica@1",
      "name": "exhibit-gruta-m-republica",
      "p": [
       9,
@@ -12170,7 +7507,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-camel-sculpture@1",
+     "def": "core/lm-scan-camel-sculpture@1",
      "name": "exhibit-camel-sculpture",
      "p": [
       27,
@@ -12180,7 +7517,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-china-buddha@1",
+     "def": "core/lm-scan-china-buddha@1",
      "name": "exhibit-china-buddha",
      "p": [
       45,
@@ -12190,7 +7527,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-gold-rust-buddha@1",
+     "def": "core/lm-scan-gold-rust-buddha@1",
      "name": "exhibit-gold-rust-buddha",
      "p": [
       63,
@@ -12200,7 +7537,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-golden-gate-park-tree@1",
+     "def": "core/lm-scan-golden-gate-park-tree@1",
      "name": "exhibit-golden-gate-park-tree",
      "p": [
       -63,
@@ -12210,7 +7547,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-golden-woman-standing@1",
+     "def": "core/lm-scan-golden-woman-standing@1",
      "name": "exhibit-golden-woman-standing",
      "p": [
       -45,
@@ -12220,7 +7557,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-greenman-altar@1",
+     "def": "core/lm-scan-greenman-altar@1",
      "name": "exhibit-greenman-altar",
      "p": [
       -27,
@@ -12230,7 +7567,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-met-greek-mural@1",
+     "def": "core/lm-scan-met-greek-mural@1",
      "name": "exhibit-met-greek-mural",
      "p": [
       -9,
@@ -12240,7 +7577,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-poly-01@1",
+     "def": "core/lm-scan-poly-01@1",
      "name": "exhibit-poly-01",
      "p": [
       9,
@@ -12250,7 +7587,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-poly-10@1",
+     "def": "core/lm-scan-poly-10@1",
      "name": "exhibit-poly-10",
      "p": [
       27,
@@ -12260,7 +7597,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-poly-12@1",
+     "def": "core/lm-scan-poly-12@1",
      "name": "exhibit-poly-12",
      "p": [
       45,
@@ -12270,7 +7607,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-poly-13@1",
+     "def": "core/lm-scan-poly-13@1",
      "name": "exhibit-poly-13",
      "p": [
       63,
@@ -12280,7 +7617,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-poly-14@1",
+     "def": "core/lm-scan-poly-14@1",
      "name": "exhibit-poly-14",
      "p": [
       -63,
@@ -12290,7 +7627,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-poly-15@1",
+     "def": "core/lm-scan-poly-15@1",
      "name": "exhibit-poly-15",
      "p": [
       -45,
@@ -12300,7 +7637,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-poly-17@1",
+     "def": "core/lm-scan-poly-17@1",
      "name": "exhibit-poly-17",
      "p": [
       -27,
@@ -12316,7 +7653,7 @@
    "ops": [
     {
      "op": "place",
-     "def": "exhibit-poly-18@1",
+     "def": "core/lm-scan-poly-18@1",
      "name": "exhibit-poly-18",
      "p": [
       -9,
@@ -12326,7 +7663,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-poly-19@1",
+     "def": "core/lm-scan-poly-19@1",
      "name": "exhibit-poly-19",
      "p": [
       9,
@@ -12336,7 +7673,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-poly-02@1",
+     "def": "core/lm-scan-poly-02@1",
      "name": "exhibit-poly-02",
      "p": [
       27,
@@ -12346,7 +7683,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-poly-05@1",
+     "def": "core/lm-scan-poly-05@1",
      "name": "exhibit-poly-05",
      "p": [
       45,
@@ -12356,7 +7693,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-poly-06@1",
+     "def": "core/lm-scan-poly-06@1",
      "name": "exhibit-poly-06",
      "p": [
       63,
@@ -12366,7 +7703,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-poly-07@1",
+     "def": "core/lm-scan-poly-07@1",
      "name": "exhibit-poly-07",
      "p": [
       -63,
@@ -12376,7 +7713,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-poly-08@1",
+     "def": "core/lm-scan-poly-08@1",
      "name": "exhibit-poly-08",
      "p": [
       -45,
@@ -12386,7 +7723,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-poly-09@1",
+     "def": "core/lm-scan-poly-09@1",
      "name": "exhibit-poly-09",
      "p": [
       -27,
@@ -12396,7 +7733,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-two-warriors@1",
+     "def": "core/lm-scan-two-warriors@1",
      "name": "exhibit-two-warriors",
      "p": [
       -9,
@@ -12406,7 +7743,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-567d4f0b818f@1",
+     "def": "core/lm-regency-femina@1",
      "name": "exhibit-drive-567d4f0b818f",
      "p": [
       -68,
@@ -12416,7 +7753,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-b538ebb36278@1",
+     "def": "core/lm-regency-flower@1",
      "name": "exhibit-drive-b538ebb36278",
      "p": [
       -60,
@@ -12426,7 +7763,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-a17ce660742d@1",
+     "def": "core/lm-regency-open-mouth@1",
      "name": "exhibit-drive-a17ce660742d",
      "p": [
       -52,
@@ -12436,7 +7773,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-72c8fc2f1538@1",
+     "def": "core/lm-ceramic-verdelis-longplant@1",
      "name": "exhibit-drive-72c8fc2f1538",
      "p": [
       -44,
@@ -12446,7 +7783,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-0f69fd943fc1@1",
+     "def": "core/lm-glitch-poly12@1",
      "name": "exhibit-drive-0f69fd943fc1",
      "p": [
       -36,
@@ -12456,7 +7793,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-4a96b139a014@1",
+     "def": "core/lm-glitch-pillan@1",
      "name": "exhibit-drive-4a96b139a014",
      "p": [
       -28,
@@ -12466,7 +7803,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-976ab0a7145b@1",
+     "def": "core/lm-museum-guanyin5@1",
      "name": "exhibit-drive-976ab0a7145b",
      "p": [
       -20,
@@ -12476,7 +7813,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-09868169ab2d@1",
+     "def": "core/lm-glitch-vestige@1",
      "name": "exhibit-drive-09868169ab2d",
      "p": [
       -12,
@@ -12486,7 +7823,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-e946e0e729d0@1",
+     "def": "core/lm-regency-xenanthro@1",
      "name": "exhibit-drive-e946e0e729d0",
      "p": [
       -4,
@@ -12496,7 +7833,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-94727a7e61b6@1",
+     "def": "core/lm-glitch-poly15@1",
      "name": "exhibit-drive-94727a7e61b6",
      "p": [
       4,
@@ -12506,7 +7843,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-36ac56b5a6f4@1",
+     "def": "core/lm-glitch-poly8@1",
      "name": "exhibit-drive-36ac56b5a6f4",
      "p": [
       12,
@@ -12516,7 +7853,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-45bcc42c2c58@1",
+     "def": "core/lm-glitch-poly9@1",
      "name": "exhibit-drive-45bcc42c2c58",
      "p": [
       20,
@@ -12526,7 +7863,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-c78fc73ba916@1",
+     "def": "core/lm-regency-caboclus@1",
      "name": "exhibit-drive-c78fc73ba916",
      "p": [
       28,
@@ -12536,7 +7873,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-1af1c89dd0f6@1",
+     "def": "core/lm-regency-serpent@1",
      "name": "exhibit-drive-1af1c89dd0f6",
      "p": [
       36,
@@ -12546,7 +7883,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-368878f9b157@1",
+     "def": "core/lm-regency-conga@1",
      "name": "exhibit-drive-368878f9b157",
      "p": [
       44,
@@ -12556,7 +7893,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-7d0669742c10@1",
+     "def": "core/lm-regency-colorful@1",
      "name": "exhibit-drive-7d0669742c10",
      "p": [
       52,
@@ -12566,7 +7903,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-ee1676f5c3bc@1",
+     "def": "core/lm-regency-mycologus@1",
      "name": "exhibit-drive-ee1676f5c3bc",
      "p": [
       60,
@@ -12576,7 +7913,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-16b887532619@1",
+     "def": "core/lm-glitch-poly16@1",
      "name": "exhibit-drive-16b887532619",
      "p": [
       68,
@@ -12586,7 +7923,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-02ceabbff643@1",
+     "def": "core/lm-glitch-pyrogeode@1",
      "name": "exhibit-drive-02ceabbff643",
      "p": [
       -68,
@@ -12596,7 +7933,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-731f06fdb7e6@1",
+     "def": "core/lm-museum-laughting-fatman@1",
      "name": "exhibit-drive-731f06fdb7e6",
      "p": [
       -60,
@@ -12606,7 +7943,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-b0941d82d98c@1",
+     "def": "core/lm-glitch-eclip@1",
      "name": "exhibit-drive-b0941d82d98c",
      "p": [
       -52,
@@ -12616,7 +7953,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-0d01c1b00980@1",
+     "def": "core/lm-museum-africa-basket@1",
      "name": "exhibit-drive-0d01c1b00980",
      "p": [
       -44,
@@ -12626,7 +7963,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-af1046536b8a@1",
+     "def": "core/lm-glitch-poly13@1",
      "name": "exhibit-drive-af1046536b8a",
      "p": [
       -36,
@@ -12636,7 +7973,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-97ddf86c47f9@1",
+     "def": "core/lm-glitch-solara@1",
      "name": "exhibit-drive-97ddf86c47f9",
      "p": [
       -28,
@@ -12646,7 +7983,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-566ced3e91e1@1",
+     "def": "core/lm-glitch-poly3@1",
      "name": "exhibit-drive-566ced3e91e1",
      "p": [
       -20,
@@ -12656,7 +7993,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-77e7e7424358@1",
+     "def": "core/lm-glitch-poly5@1",
      "name": "exhibit-drive-77e7e7424358",
      "p": [
       -12,
@@ -12666,7 +8003,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-c780e53b578a@1",
+     "def": "core/lm-museum-goldentower@1",
      "name": "exhibit-drive-c780e53b578a",
      "p": [
       -4,
@@ -12676,7 +8013,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-88ba2b863400@1",
+     "def": "core/lm-glitch-thaloc@1",
      "name": "exhibit-drive-88ba2b863400",
      "p": [
       4,
@@ -12686,7 +8023,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-c92a3b231c79@1",
+     "def": "core/lm-glitch-astraflora@1",
      "name": "exhibit-drive-c92a3b231c79",
      "p": [
       12,
@@ -12696,7 +8033,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-66009eb80cef@1",
+     "def": "core/lm-glitch-poly14@1",
      "name": "exhibit-drive-66009eb80cef",
      "p": [
       20,
@@ -12706,7 +8043,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-9207a5e1c4b1@1",
+     "def": "core/lm-glitch-poly4@1",
      "name": "exhibit-drive-9207a5e1c4b1",
      "p": [
       28,
@@ -12716,7 +8053,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-6c113bb8ae2e@1",
+     "def": "core/lm-glitch-poly10@1",
      "name": "exhibit-drive-6c113bb8ae2e",
      "p": [
       36,
@@ -12726,7 +8063,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-fabce0b97897@1",
+     "def": "core/lm-museum-tower2@1",
      "name": "exhibit-drive-fabce0b97897",
      "p": [
       44,
@@ -12736,7 +8073,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-5f5e4a9284a4@1",
+     "def": "core/lm-museum-greece-vase@1",
      "name": "exhibit-drive-5f5e4a9284a4",
      "p": [
       52,
@@ -12746,7 +8083,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-0b40c69c8244@1",
+     "def": "core/lm-glitch-terraqua@1",
      "name": "exhibit-drive-0b40c69c8244",
      "p": [
       60,
@@ -12756,7 +8093,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-f3f642ac7b15@1",
+     "def": "core/lm-glitch-poly6@1",
      "name": "exhibit-drive-f3f642ac7b15",
      "p": [
       68,
@@ -12766,7 +8103,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-40a9797026a2@1",
+     "def": "core/lm-museum-rhino@1",
      "name": "exhibit-drive-40a9797026a2",
      "p": [
       -68,
@@ -12776,7 +8113,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-5f63a6fe6100@1",
+     "def": "core/lm-museum-guardian-colorful@1",
      "name": "exhibit-drive-5f63a6fe6100",
      "p": [
       -60,
@@ -12786,7 +8123,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-935874799be2@1",
+     "def": "core/lm-museum-ganesha-small@1",
      "name": "exhibit-drive-935874799be2",
      "p": [
       -52,
@@ -12796,7 +8133,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-a4a6b8bad1e8@1",
+     "def": "core/lm-museum-tower-wine@1",
      "name": "exhibit-drive-a4a6b8bad1e8",
      "p": [
       -44,
@@ -12806,7 +8143,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-0734a4679321@1",
+     "def": "core/lm-glitch-poly7@1",
      "name": "exhibit-drive-0734a4679321",
      "p": [
       -36,
@@ -12816,7 +8153,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-317a837144b2@1",
+     "def": "core/lm-museum-orange-vase@1",
      "name": "exhibit-drive-317a837144b2",
      "p": [
       -28,
@@ -12826,7 +8163,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-2bb4733c464d@1",
+     "def": "core/lm-museum-dragon-vase@1",
      "name": "exhibit-drive-2bb4733c464d",
      "p": [
       -20,
@@ -12836,7 +8173,7 @@
     },
     {
      "op": "place",
-     "def": "exhibit-drive-c30ab0ea1037@1",
+     "def": "core/lm-glitch-bichroma@1",
      "name": "exhibit-drive-c30ab0ea1037",
      "p": [
       -12,
@@ -15792,7 +11129,7 @@
     },
     {
      "op": "place",
-     "def": "verdelis-ceramic-head@1",
+     "def": "core/lm-verdelis@1",
      "name": "verdelis",
      "p": [
       -45,
@@ -15802,7 +11139,7 @@
     },
     {
      "op": "place",
-     "def": "kalama-ceramic-head@1",
+     "def": "core/lm-kalama@1",
      "name": "kalama",
      "p": [
       38,
@@ -15812,7 +11149,7 @@
     },
     {
      "op": "place",
-     "def": "kweku-ceramic-head@1",
+     "def": "core/lm-kweku@1",
      "name": "kweku",
      "p": [
       -40,
@@ -15822,7 +11159,7 @@
     },
     {
      "op": "place",
-     "def": "mycos-ceramic-head@1",
+     "def": "core/lm-mycos@1",
      "name": "mycos",
      "p": [
       -53,
@@ -15832,7 +11169,7 @@
     },
     {
      "op": "place",
-     "def": "ada-ceramic-head@1",
+     "def": "core/lm-ada@1",
      "name": "ada",
      "p": [
       45,
@@ -15842,7 +11179,7 @@
     },
     {
      "op": "place",
-     "def": "shuijing-ceramic-head@1",
+     "def": "core/lm-shuijing@1",
      "name": "shuijing",
      "p": [
       -6,
@@ -15852,7 +11189,7 @@
     },
     {
      "op": "place",
-     "def": "nyx-ceramic-head@1",
+     "def": "core/lm-nyx@1",
      "name": "nyx",
      "p": [
       0,

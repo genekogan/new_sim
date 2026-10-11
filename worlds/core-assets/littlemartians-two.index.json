@@ -28,7 +28,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-0b40c69c8244",
+   "name": "lm-glitch-terraqua",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-0b40c69c8244.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-0b40c69c8244.glb"
@@ -59,7 +59,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-af1046536b8a",
+   "name": "lm-glitch-poly13",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-af1046536b8a.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-af1046536b8a.glb"
@@ -90,7 +90,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-566ced3e91e1",
+   "name": "lm-glitch-poly3",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-566ced3e91e1.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-566ced3e91e1.glb"
@@ -130,7 +130,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-golden-woman-standing",
+   "name": "lm-scan-golden-woman-standing",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-golden-woman-standing.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-golden-woman-standing.glb"
@@ -206,7 +206,7 @@
      "footprint scan-minarete-arch: 0 rooms, 0 openings, 0 links (0 shafts, float-only), 3 wall/solid colliders"
     ]
    },
-   "name": "minarete-temple-footprint",
+   "name": "lm-minarete-footprint",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/scan-minarete.glb",
    "path": "worlds/littlemartians-two/assets/scan-minarete.footprint.json"
@@ -238,7 +238,7 @@
     "KHR_materials_unlit",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-fey-castle",
+   "name": "lm-scan-fey-castle",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-fey-castle.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-fey-castle.glb"
@@ -269,7 +269,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-6c113bb8ae2e",
+   "name": "lm-glitch-poly10",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-6c113bb8ae2e.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-6c113bb8ae2e.glb"
@@ -300,7 +300,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-a4a6b8bad1e8",
+   "name": "lm-museum-tower-wine",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-a4a6b8bad1e8.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-a4a6b8bad1e8.glb"
@@ -331,7 +331,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-66009eb80cef",
+   "name": "lm-glitch-poly14",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-66009eb80cef.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-66009eb80cef.glb"
@@ -362,7 +362,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-museu-azulejo-quad",
+   "name": "lm-scan-museu-azulejo-quad",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-museu-azulejo-quad.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-museu-azulejo-quad.glb"
@@ -397,7 +397,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-china-buddha",
+   "name": "lm-scan-china-buddha",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-china-buddha.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-china-buddha.glb"
@@ -428,7 +428,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-quinta-tower-curly",
+   "name": "lm-scan-quinta-tower-curly",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-quinta-tower-curly.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-quinta-tower-curly.glb"
@@ -459,7 +459,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "kweku-ceramic-head",
+   "name": "lm-kweku",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/characters/kweku.glb",
    "path": "worlds/littlemartians-two/assets/character-kweku.glb"
@@ -490,7 +490,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-forte-sao-filipe-chapel",
+   "name": "lm-scan-forte-sao-filipe-chapel",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-forte-sao-filipe-chapel.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-forte-sao-filipe-chapel.glb"
@@ -521,7 +521,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-9207a5e1c4b1",
+   "name": "lm-glitch-poly4",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-9207a5e1c4b1.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-9207a5e1c4b1.glb"
@@ -552,7 +552,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-c92a3b231c79",
+   "name": "lm-glitch-astraflora",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-c92a3b231c79.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-c92a3b231c79.glb"
@@ -583,7 +583,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-lisbon-archways-corridor",
+   "name": "lm-scan-lisbon-archways-corridor",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-lisbon-archways-corridor.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-lisbon-archways-corridor.glb"
@@ -614,7 +614,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-36ac56b5a6f4",
+   "name": "lm-glitch-poly8",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-36ac56b5a6f4.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-36ac56b5a6f4.glb"
@@ -645,7 +645,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-5f5e4a9284a4",
+   "name": "lm-museum-greece-vase",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-5f5e4a9284a4.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-5f5e4a9284a4.glb"
@@ -676,7 +676,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-poly-07",
+   "name": "lm-scan-poly-07",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-07.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-poly-07.glb"
@@ -707,7 +707,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-317a837144b2",
+   "name": "lm-museum-orange-vase",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-317a837144b2.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-317a837144b2.glb"
@@ -739,7 +739,7 @@
     "KHR_mesh_quantization",
     "KHR_texture_transform"
    ],
-   "name": "exhibit-golden-gate-park-tree",
+   "name": "lm-scan-golden-gate-park-tree",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-golden-gate-park-tree.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-golden-gate-park-tree.glb"
@@ -770,7 +770,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-97ddf86c47f9",
+   "name": "lm-glitch-solara",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-97ddf86c47f9.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-97ddf86c47f9.glb"
@@ -800,7 +800,7 @@
    "extensions": [
     "EXT_texture_webp"
    ],
-   "name": "gallery-panel-receding-archways",
+   "name": "lm-panel-receding-archways",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/landscape.glb (embedded \"Receding archways\")",
    "path": "worlds/littlemartians-two/assets/panel-receding-archways.glb"
@@ -831,7 +831,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-museu-azulejo-main",
+   "name": "lm-scan-museu-azulejo-main",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-museu-azulejo-main.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-museu-azulejo-main.glb"
@@ -862,7 +862,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-731f06fdb7e6",
+   "name": "lm-museum-laughting-fatman",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-731f06fdb7e6.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-731f06fdb7e6.glb"
@@ -893,7 +893,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-0f69fd943fc1",
+   "name": "lm-glitch-poly12",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-0f69fd943fc1.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-0f69fd943fc1.glb"
@@ -924,7 +924,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-se-entrada",
+   "name": "lm-scan-se-entrada",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-se-entrada.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-se-entrada.glb"
@@ -956,7 +956,7 @@
     "KHR_mesh_quantization"
    ],
    "footprint": "cdda8c4d00f480401820f1cdd44ef99b062b56bd276c8c164d354760083ba058",
-   "name": "celadon-beacon",
+   "name": "lm-celadon-beacon",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/scan-celadon-tower.glb",
    "path": "worlds/littlemartians-two/assets/scan-celadon-tower.glb"
@@ -988,7 +988,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-minarete-portal",
+   "name": "lm-scan-minarete-portal",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-minarete-portal.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-minarete-portal.glb"
@@ -1019,7 +1019,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-poly-12",
+   "name": "lm-scan-poly-12",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-12.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-poly-12.glb"
@@ -1050,7 +1050,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-0d01c1b00980",
+   "name": "lm-museum-africa-basket",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-0d01c1b00980.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-0d01c1b00980.glb"
@@ -1081,7 +1081,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-poly-19",
+   "name": "lm-scan-poly-19",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-19.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-poly-19.glb"
@@ -1113,7 +1113,7 @@
     "KHR_materials_unlit",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-asian-art-museum",
+   "name": "lm-scan-asian-art-museum",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-asian-art-museum.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-asian-art-museum.glb"
@@ -1144,7 +1144,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-poly-18",
+   "name": "lm-scan-poly-18",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-18.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-poly-18.glb"
@@ -1175,7 +1175,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-f3f642ac7b15",
+   "name": "lm-glitch-poly6",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-f3f642ac7b15.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-f3f642ac7b15.glb"
@@ -1206,7 +1206,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-94727a7e61b6",
+   "name": "lm-glitch-poly15",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-94727a7e61b6.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-94727a7e61b6.glb"
@@ -1237,7 +1237,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-forte-sao-filipe-corner",
+   "name": "lm-scan-forte-sao-filipe-corner",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-forte-sao-filipe-corner.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-forte-sao-filipe-corner.glb"
@@ -1268,7 +1268,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-976ab0a7145b",
+   "name": "lm-museum-guanyin5",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-976ab0a7145b.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-976ab0a7145b.glb"
@@ -1299,7 +1299,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-b0941d82d98c",
+   "name": "lm-glitch-eclip",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-b0941d82d98c.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-b0941d82d98c.glb"
@@ -1330,7 +1330,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-45bcc42c2c58",
+   "name": "lm-glitch-poly9",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-45bcc42c2c58.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-45bcc42c2c58.glb"
@@ -1362,7 +1362,7 @@
     "KHR_materials_unlit",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-graffiti-abandoned-room",
+   "name": "lm-scan-graffiti-abandoned-room",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-graffiti-abandoned-room.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-graffiti-abandoned-room.glb"
@@ -1393,7 +1393,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-2bb4733c464d",
+   "name": "lm-museum-dragon-vase",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-2bb4733c464d.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-2bb4733c464d.glb"
@@ -1436,7 +1436,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-camel-sculpture",
+   "name": "lm-scan-camel-sculpture",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-camel-sculpture.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-camel-sculpture.glb"
@@ -1467,7 +1467,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-77e7e7424358",
+   "name": "lm-glitch-poly5",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-77e7e7424358.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-77e7e7424358.glb"
@@ -1498,7 +1498,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-fabce0b97897",
+   "name": "lm-museum-tower2",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-fabce0b97897.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-fabce0b97897.glb"
@@ -1529,7 +1529,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-b538ebb36278",
+   "name": "lm-regency-flower",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-b538ebb36278.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-b538ebb36278.glb"
@@ -1560,7 +1560,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-567d4f0b818f",
+   "name": "lm-regency-femina",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-567d4f0b818f.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-567d4f0b818f.glb"
@@ -1611,7 +1611,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-two-warriors",
+   "name": "lm-scan-two-warriors",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-two-warriors.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-two-warriors.glb"
@@ -1642,7 +1642,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-poly-17",
+   "name": "lm-scan-poly-17",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-17.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-poly-17.glb"
@@ -1673,7 +1673,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-museu-azulejo-corridor",
+   "name": "lm-scan-museu-azulejo-corridor",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-museu-azulejo-corridor.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-museu-azulejo-corridor.glb"
@@ -1704,7 +1704,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-c780e53b578a",
+   "name": "lm-museum-goldentower",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-c780e53b578a.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-c780e53b578a.glb"
@@ -1735,7 +1735,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-poly-02",
+   "name": "lm-scan-poly-02",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-02.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-poly-02.glb"
@@ -1778,7 +1778,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-greenman-altar",
+   "name": "lm-scan-greenman-altar",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-greenman-altar.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-greenman-altar.glb"
@@ -1809,7 +1809,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-gruta-m-republica",
+   "name": "lm-scan-gruta-m-republica",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-gruta-m-republica.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-gruta-m-republica.glb"
@@ -1840,7 +1840,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-poly-13",
+   "name": "lm-scan-poly-13",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-13.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-poly-13.glb"
@@ -1871,7 +1871,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-chapel-composition",
+   "name": "lm-scan-chapel-composition",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-chapel-composition.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-chapel-composition.glb"
@@ -1902,7 +1902,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-quinta-fonte",
+   "name": "lm-scan-quinta-fonte",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-quinta-fonte.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-quinta-fonte.glb"
@@ -1933,7 +1933,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-quinta-corredor-escada",
+   "name": "lm-scan-quinta-corredor-escada",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-quinta-corredor-escada.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-quinta-corredor-escada.glb"
@@ -1964,7 +1964,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "madmaraca-ceramic-library",
+   "name": "lm-madmaraca",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/scan-madmaraca.glb",
    "path": "worlds/littlemartians-two/assets/scan-madmaraca.glb"
@@ -1995,7 +1995,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-poly-14",
+   "name": "lm-scan-poly-14",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-14.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-poly-14.glb"
@@ -2026,7 +2026,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-poly-05",
+   "name": "lm-scan-poly-05",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-05.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-poly-05.glb"
@@ -2057,7 +2057,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-e946e0e729d0",
+   "name": "lm-regency-xenanthro",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-e946e0e729d0.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-e946e0e729d0.glb"
@@ -2088,7 +2088,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-7d0669742c10",
+   "name": "lm-regency-colorful",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-7d0669742c10.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-7d0669742c10.glb"
@@ -2119,7 +2119,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-quinta-palacio-interior",
+   "name": "lm-scan-quinta-palacio-interior",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-quinta-palacio-interior.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-quinta-palacio-interior.glb"
@@ -2150,7 +2150,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-16b887532619",
+   "name": "lm-glitch-poly16",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-16b887532619.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-16b887532619.glb"
@@ -2181,7 +2181,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-moorish-castle-top",
+   "name": "lm-scan-moorish-castle-top",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-moorish-castle-top.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-moorish-castle-top.glb"
@@ -2212,7 +2212,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-368878f9b157",
+   "name": "lm-regency-conga",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-368878f9b157.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-368878f9b157.glb"
@@ -2243,7 +2243,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-4a96b139a014",
+   "name": "lm-glitch-pillan",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-4a96b139a014.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-4a96b139a014.glb"
@@ -2275,7 +2275,7 @@
     "KHR_materials_unlit",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-american-base-old",
+   "name": "lm-scan-american-base-old",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-american-base-old.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-american-base-old.glb"
@@ -2306,7 +2306,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "ada-ceramic-head",
+   "name": "lm-ada",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/characters/ada.glb",
    "path": "worlds/littlemartians-two/assets/character-ada.glb"
@@ -2337,7 +2337,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-ee1676f5c3bc",
+   "name": "lm-regency-mycologus",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-ee1676f5c3bc.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-ee1676f5c3bc.glb"
@@ -2368,7 +2368,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-forte-sao-filipe-open",
+   "name": "lm-scan-forte-sao-filipe-open",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-forte-sao-filipe-open.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-forte-sao-filipe-open.glb"
@@ -2399,7 +2399,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-5f63a6fe6100",
+   "name": "lm-museum-guardian-colorful",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-5f63a6fe6100.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-5f63a6fe6100.glb"
@@ -2430,7 +2430,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "mycos-ceramic-head",
+   "name": "lm-mycos",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/characters/mycos.glb",
    "path": "worlds/littlemartians-two/assets/character-mycos.glb"
@@ -2461,7 +2461,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-c30ab0ea1037",
+   "name": "lm-glitch-bichroma",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-c30ab0ea1037.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-c30ab0ea1037.glb"
@@ -2492,7 +2492,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-poly-15",
+   "name": "lm-scan-poly-15",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-15.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-poly-15.glb"
@@ -2523,7 +2523,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-poly-06",
+   "name": "lm-scan-poly-06",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-06.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-poly-06.glb"
@@ -2553,7 +2553,7 @@
    "extensions": [
     "EXT_texture_webp"
    ],
-   "name": "gallery-panel-forest-illustration",
+   "name": "lm-panel-forest-illustration",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/landscape.glb (embedded \"Forest illustration\")",
    "path": "worlds/littlemartians-two/assets/panel-forest-illustration.glb"
@@ -2584,7 +2584,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "shuijing-ceramic-head",
+   "name": "lm-shuijing",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/characters/shuijing.glb",
    "path": "worlds/littlemartians-two/assets/character-shuijing.glb"
@@ -2615,7 +2615,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-72c8fc2f1538",
+   "name": "lm-ceramic-verdelis-longplant",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-72c8fc2f1538.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-72c8fc2f1538.glb"
@@ -2646,7 +2646,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-randy3",
+   "name": "lm-scan-randy3",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-randy3.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-randy3.glb"
@@ -2677,7 +2677,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-poly-01",
+   "name": "lm-scan-poly-01",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-01.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-poly-01.glb"
@@ -2708,7 +2708,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-a17ce660742d",
+   "name": "lm-regency-open-mouth",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-a17ce660742d.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-a17ce660742d.glb"
@@ -2739,7 +2739,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-40a9797026a2",
+   "name": "lm-museum-rhino",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-40a9797026a2.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-40a9797026a2.glb"
@@ -2771,7 +2771,7 @@
     "KHR_mesh_quantization"
    ],
    "footprint": "0a136aeb0ddaade103ce625d7d4c295789be513a822d8553dea9df73270a4c74",
-   "name": "minarete-temple",
+   "name": "lm-minarete",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/scan-minarete.glb",
    "path": "worlds/littlemartians-two/assets/scan-minarete.glb"
@@ -2802,7 +2802,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-randy2",
+   "name": "lm-scan-randy2",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-randy2.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-randy2.glb"
@@ -2833,7 +2833,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-poly-10",
+   "name": "lm-scan-poly-10",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-10.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-poly-10.glb"
@@ -2864,7 +2864,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-88ba2b863400",
+   "name": "lm-glitch-thaloc",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-88ba2b863400.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-88ba2b863400.glb"
@@ -2895,7 +2895,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "kalama-ceramic-head",
+   "name": "lm-kalama",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/characters/kalama.glb",
    "path": "worlds/littlemartians-two/assets/character-kalama.glb"
@@ -2971,7 +2971,7 @@
      "footprint scan-celadon-tower-arch: 0 rooms, 0 openings, 0 links (0 shafts, float-only), 3 wall/solid colliders"
     ]
    },
-   "name": "celadon-beacon-footprint",
+   "name": "lm-celadon-beacon-footprint",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/scan-celadon-tower.glb",
    "path": "worlds/littlemartians-two/assets/scan-celadon-tower.footprint.json"
@@ -3003,7 +3003,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-pupila-corridor",
+   "name": "lm-scan-pupila-corridor",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-pupila-corridor.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-pupila-corridor.glb"
@@ -3034,7 +3034,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-met-greek-mural",
+   "name": "lm-scan-met-greek-mural",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-met-greek-mural.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-met-greek-mural.glb"
@@ -3065,7 +3065,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-forte-sao-filipe-corridor",
+   "name": "lm-scan-forte-sao-filipe-corridor",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-forte-sao-filipe-corridor.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-forte-sao-filipe-corridor.glb"
@@ -3096,7 +3096,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-02ceabbff643",
+   "name": "lm-glitch-pyrogeode",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-02ceabbff643.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-02ceabbff643.glb"
@@ -3127,7 +3127,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "verdelis-ceramic-head",
+   "name": "lm-verdelis",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/characters/verdelis.glb",
    "path": "worlds/littlemartians-two/assets/character-verdelis.glb"
@@ -3158,7 +3158,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-forte-sao-filipe-corner3",
+   "name": "lm-scan-forte-sao-filipe-corner3",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-forte-sao-filipe-corner3.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-forte-sao-filipe-corner3.glb"
@@ -3189,7 +3189,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-poly-08",
+   "name": "lm-scan-poly-08",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-08.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-poly-08.glb"
@@ -3220,7 +3220,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-1af1c89dd0f6",
+   "name": "lm-regency-serpent",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-1af1c89dd0f6.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-1af1c89dd0f6.glb"
@@ -3251,7 +3251,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "nyx-ceramic-head",
+   "name": "lm-nyx",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/characters/nyx.glb",
    "path": "worlds/littlemartians-two/assets/character-nyx.glb"
@@ -3292,7 +3292,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-gold-rust-buddha",
+   "name": "lm-scan-gold-rust-buddha",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-gold-rust-buddha.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-gold-rust-buddha.glb"
@@ -3323,7 +3323,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-c78fc73ba916",
+   "name": "lm-regency-caboclus",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-c78fc73ba916.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-c78fc73ba916.glb"
@@ -3354,7 +3354,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-poly-09",
+   "name": "lm-scan-poly-09",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-09.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-poly-09.glb"
@@ -3385,7 +3385,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-rua-fado",
+   "name": "lm-scan-rua-fado",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-rua-fado.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-rua-fado.glb"
@@ -3416,7 +3416,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-09868169ab2d",
+   "name": "lm-glitch-vestige",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-09868169ab2d.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-09868169ab2d.glb"
@@ -3447,7 +3447,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-0734a4679321",
+   "name": "lm-glitch-poly7",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-0734a4679321.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-0734a4679321.glb"
@@ -3478,7 +3478,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-quinta-poco",
+   "name": "lm-scan-quinta-poco",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-quinta-poco.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-quinta-poco.glb"
@@ -3509,7 +3509,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-drive-935874799be2",
+   "name": "lm-museum-ganesha-small",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-935874799be2.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-drive-935874799be2.glb"
@@ -3539,7 +3539,7 @@
    "extensions": [
     "EXT_texture_webp"
    ],
-   "name": "gallery-panel-geometric-pattern",
+   "name": "lm-panel-geometric-pattern",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/landscape.glb (embedded \"Geometric pattern\")",
    "path": "worlds/littlemartians-two/assets/panel-geometric-pattern.glb"
@@ -3570,7 +3570,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-moorish-entrance",
+   "name": "lm-scan-moorish-entrance",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-moorish-entrance.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-moorish-entrance.glb"
@@ -3601,7 +3601,7 @@
     "EXT_texture_webp",
     "KHR_mesh_quantization"
    ],
-   "name": "exhibit-setubal-casa-escadas",
+   "name": "lm-scan-setubal-casa-escadas",
    "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
    "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-setubal-casa-escadas.glb",
    "path": "worlds/littlemartians-two/assets/exhibit-setubal-casa-escadas.glb"

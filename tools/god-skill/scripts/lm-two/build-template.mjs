@@ -80,7 +80,7 @@ process.env.ASSET_DIR = join(build, 'assets');
 // the extra index must not satisfy the imports: build it from the store afterwards
 const indexBackup = existsSync(INDEX) ? readFileSync(INDEX) : null; if (indexBackup) rmSync(INDEX);
 const { startWorld } = await import(join(root, 'tools/god-skill/dev-world.mjs'));
-const { child, base } = await startWorld({ slug: 'lm-two-build', port: PORT, data: join(build, 'data'), fresh: true, log: join(build, 'server.log') });
+let { child, base } = await startWorld({ slug: 'lm-two-build', port: PORT, data: join(build, 'data'), fresh: true, log: join(build, 'server.log') });
 const stop = () => { if (!argv.includes('--keep')) try { child.kill(); } catch { } };
 process.on('exit', stop);
 let token = '';
@@ -107,7 +107,15 @@ const imported = {};   // file → { def, asset, footprint }
 const defs = [];
 
 // the three original scans
-const LANDMARK_NAMES = { madmaraca: 'madmaraca-ceramic-library', minarete: 'minarete-temple', 'celadon-tower': 'celadon-beacon' };
+const LANDMARK_NAMES = { madmaraca: 'lm-madmaraca', minarete: 'lm-minarete', 'celadon-tower': 'lm-celadon-beacon' };
+const slug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+/** The library name of a scan exhibit: scenario/real-space scans by their id; drive-gallery pieces by family and title. */
+const exhibitName = (m) => {
+  if (!m.id.startsWith('drive-')) return `lm-scan-${m.id}`;
+  const fam = /glitch_martians/.test(m.raw) ? 'glitch' : /Regency/.test(m.raw) ? 'regency' : /museum-scans/.test(m.raw) ? 'museum' : 'ceramic';
+  return `lm-${fam}-${slug(m.title)}`;
+};
+const LIB = (short) => `core/${short}@1`;
 for (const l of LANDMARKS) {
   const r = await importGlb(l.file, { name: LANDMARK_NAMES[l.id], height: l.scan.heightMetres, tags: ['littlemartians', 'ceramic', 'scan', 'landmark', 'temple', 'vanessa-rosa', 'arium'], footprint: footprints[l.file],
     description: `${l.name}: Vanessa Rosa's original ceramic sculpture, scanned and raised to ${l.scan.heightMetres} m as a landmark of the Arium-era Little Martians world. ${l.interior === 'unqualified' ? 'Its interior is not walkable.' : 'A measured 2 m ground arch runs north–south through it; the upper interiors are closed.'}` });
@@ -116,7 +124,7 @@ for (const l of LANDMARKS) {
 // the 96 scan-court exhibits
 for (const m of districts) {
   const h = r2(m.boundsYUp[1][1] - m.boundsYUp[0][1]), floating = m.p[1] > 0.5;
-  const r = await importGlb(m.file, { name: m.file, height: h, tags: ['littlemartians', 'scan', 'exhibit', m.district ?? 'drive-gallery', ...(floating ? ['ceramic', 'floater'] : [])],
+  const r = await importGlb(m.file, { name: exhibitName(m), height: h, tags: ['littlemartians', 'scan', 'exhibit', m.district ?? 'drive-gallery', ...(floating ? ['ceramic', 'floater'] : [])],
     description: `${m.title} — a scan exhibit of the Little Martians archive (${m.origin ?? 'drive gallery'}).${floating ? ' A ceramic study floating 2.4 m above its viewing court.' : ' Raw scan floors and interiors are not walkable.'}` });
   let def = r.def;
   if (floating) def = { ...def, layer: 'decor', make: { ...def.make, collide: 'none' }, components: { ...(def.components ?? {}), hover: { height: 2.4, bob: 0.06, period: 7 } } };
@@ -126,13 +134,13 @@ log(`imported ${districts.length} exhibits`);
 // the seven cast floaters (the six kin are the core kin defs, the same files)
 for (const c of characters.filter((x) => x.group === 'floater')) {
   const cast = worldJson.cast?.find((x) => x.name === c.name);
-  const r = await importGlb(`character-${c.id}`, { name: `${c.id}-ceramic-head`, height: 0.9, layer: 'decor', tags: ['littlemartians', 'ceramic', 'head', 'character', 'floater', 'sculpture', c.id],
+  const r = await importGlb(`character-${c.id}`, { name: `lm-${c.id}`, height: 0.9, layer: 'decor', tags: ['littlemartians', 'ceramic', 'head', 'character', 'floater', 'sculpture', c.id],
     description: `${c.name}: a ceramic Little Martian head by Vanessa Rosa, hovering about a metre up. ${(cast?.description ?? '').slice(0, 420)}`, source: SRC(`character-${c.id}`) });
   imported[`character-${c.id}`] = r; defs.push({ ...r.def, layer: 'decor', make: { ...r.def.make, collide: 'none' }, components: { hover: { height: 1.1, bob: 0.08, period: 6 } } });
 }
 // the three gallery panels
 for (const a of ARTWORKS) {
-  const r = await importGlb(`panel-${a.id}`, { name: `gallery-panel-${a.id}`, height: 5, tags: ['littlemartians', 'gallery', 'painting', 'panel', 'art', 'arium'], source: `lm/map@${LM_MAP_COMMIT.slice(0, 12)} ${LM}/buildings/landscape.glb (embedded "${a.title}")`,
+  const r = await importGlb(`panel-${a.id}`, { name: `lm-panel-${a.id}`, height: 5, tags: ['littlemartians', 'gallery', 'painting', 'panel', 'art', 'arium'], source: `lm/map@${LM_MAP_COMMIT.slice(0, 12)} ${LM}/buildings/landscape.glb (embedded "${a.title}")`,
     description: `"${a.title}" on a basalt gallery panel (6 × 4 m picture, 1 m above the ground), from the early Little Martians reference corpus; individual authorship of the picture is not asserted.` });
   imported[`panel-${a.id}`] = r; defs.push(r.def);
 }
@@ -148,9 +156,27 @@ const vaultShapes = [
   ...[-1, 1].flatMap((side) => [0, 1, 2, 3, 4, 5].map((i) => ({ kind: 'cyl', at: [side * (GW / 2 - 4 - (i % 2) * 1.5), G.wallHeight - 1.6, -7 + i * 2.8], r: 0.18, r2: 0.05, h: 2.6, color: PALE, glow: 0.25, segments: 6, collide: false }))),
   ...[-1, 1].flatMap((side) => [0, 1, 2].map((i) => ({ kind: 'sphere', at: [side * (GW / 2 - 4.5), G.wallHeight - 3.3, -6 + i * 6], r: 0.45, color: EMBER, segments: 8 }))),
 ];
-defs.push({ schema: 'def/1', name: 'painted-grotto-vault', version: 1, description: 'The Grotto of Painted Worlds: a basalt barrel vault with a 10 m doorway on its north side, pale hanging strands and red blossoms, reconstructed from the Arium short tour (frames 60–66). Rock and flowers are reconstructions, not recovered assets.', tags: ['littlemartians', 'grotto', 'cave', 'vault', 'gallery', 'arium', 'structure'], form: 'point', layer: 'solid', anchor: 'base', make: { kind: 'gen', gen: 'kit/2', args: { shapes: vaultShapes, round: 0.2 } }, size: { box: [GW + 1, G.crownHeight, GD], scale: [1, 1] } });
-defs.push({ schema: 'def/1', name: 'glazed-botanical', version: 1, description: 'A glazed ceramic garden plant: a tall moss-glazed spire under a petal-glazed crown, from the Little Martians garden.', tags: ['littlemartians', 'ceramic', 'plant', 'garden', 'sculpture'], form: 'point', layer: 'solid', anchor: 'base', make: { kind: 'gen', gen: 'kit/2', args: { shapes: [{ kind: 'cone', at: [0, 1.4, 0], r: 0.65, h: 2.8, color: MOSS, segments: 9, collide: true }, { kind: 'cone', at: [0, 2.75, 0], r: 0.9, h: 1.1, color: PETAL, segments: 9 }, { kind: 'sphere', at: [0, 3.4, 0], r: 0.22, color: PALE, glow: 0.2, segments: 8 }], round: 0.05 } }, size: { box: [1.8, 3.9, 1.8], scale: [0.5, 1.6] } });
+defs.push({ schema: 'def/1', name: 'lm-grotto-vault', version: 1, description: 'The Grotto of Painted Worlds: a basalt barrel vault with a 10 m doorway on its north side, pale hanging strands and red blossoms, reconstructed from the Arium short tour (frames 60–66). Rock and flowers are reconstructions, not recovered assets.', tags: ['littlemartians', 'grotto', 'cave', 'vault', 'gallery', 'arium', 'structure'], form: 'point', layer: 'solid', anchor: 'base', make: { kind: 'gen', gen: 'kit/2', args: { shapes: vaultShapes, round: 0.2 } }, size: { box: [GW + 1, G.crownHeight, GD], scale: [1, 1] } });
+defs.push({ schema: 'def/1', name: 'lm-glazed-plant', version: 1, description: 'A glazed ceramic garden plant: a tall moss-glazed spire under a petal-glazed crown, from the Little Martians garden.', tags: ['littlemartians', 'ceramic', 'plant', 'garden', 'sculpture'], form: 'point', layer: 'solid', anchor: 'base', make: { kind: 'gen', gen: 'kit/2', args: { shapes: [{ kind: 'cone', at: [0, 1.4, 0], r: 0.65, h: 2.8, color: MOSS, segments: 9, collide: true }, { kind: 'cone', at: [0, 2.75, 0], r: 0.9, h: 1.1, color: PETAL, segments: 9 }, { kind: 'sphere', at: [0, 3.4, 0], r: 0.22, color: PALE, glow: 0.2, segments: 8 }], round: 0.05 } }, size: { box: [1.8, 3.9, 1.8], scale: [0.5, 1.6] } });
 
+function writeIndex() {
+// the asset index: the store's own measurements of what the god imported, pointed at the repo files
+const assetsIdx = {};
+for (const [file, r] of Object.entries(imported)) {
+  const meta = JSON.parse(readFileSync(join(process.env.ASSET_DIR, `${r.asset.sha}.meta.json`), 'utf8'));
+  assetsIdx[r.asset.sha] = { ...meta, path: `worlds/littlemartians-two/assets/${file}.glb` };
+  if (r.footprint) {
+    const fm = JSON.parse(readFileSync(join(process.env.ASSET_DIR, `${r.footprint.sha}.meta.json`), 'utf8'));
+    const fpFile = `worlds/littlemartians-two/assets/${file}.footprint.json`;
+    // the store holds the exact bytes it measured: keep those beside the GLB
+    writeFileSync(join(root, fpFile), readFileSync(join(process.env.ASSET_DIR, `${r.footprint.sha}.json`)));
+    assetsIdx[r.footprint.sha] = { ...fm, path: fpFile };
+  }
+}
+for (const m of Object.values(assetsIdx)) delete m.at;
+writeFileSync(INDEX, JSON.stringify({ schema: 'core-assets/1', note: 'littlemartians-two: the Arium-era Little Martians art, measured by the god import path (POST /v1/god/assets) in tools/god-skill/scripts/lm-two/build-template.mjs. Licence per asset.', assets: Object.fromEntries(Object.entries(assetsIdx).sort()) }, null, 1) + '\n');
+log(`asset index: ${INDEX} — ${Object.keys(assetsIdx).length} assets`);
+}
 const act = async (ops, note, group) => { const r = await api('/v1/god/act', { body: { ops, note, group } }); if (!r.accepted) throw new Error(`${note}: refused ${JSON.stringify(r.failures).slice(0, 900)}`); return r; };
 const BATCHES = [];
 async function batch(note, group, ops) {
@@ -160,7 +186,17 @@ async function batch(note, group, ops) {
   }
   log(`✔ ${note}: ${ops.length} ops`);
 }
-await batch('defs: the Arium-era art imported through the asset store, and two world kits', 'defs', defs.map((d) => ({ op: 'define', def: d })));
+// every proposed def becomes a library def (core/lm-*@1): any god in any world can place it
+const KIT = join(root, 'packages/world-compiler/src/core-kit/littlemartians.json');
+const lib = defs.map((d) => ({ ...d, name: `core-${d.name}` })).sort((a, b) => (a.name < b.name ? -1 : 1));
+writeFileSync(KIT, JSON.stringify(lib, null, 1) + '\n');
+log(`library: ${KIT} — ${lib.length} defs`);
+writeIndex();
+child.kill(); await new Promise((r) => setTimeout(r, 1500));
+// a fresh world: the server now loads the new library (and the index) like any other world on the box
+rmSync(process.env.ASSET_DIR, { recursive: true, force: true });
+({ child, base } = await startWorld({ slug: 'lm-two-build', port: PORT, data: join(build, 'data2'), fresh: true, log: join(build, 'server2.log') }));
+token = (await api('/v1/god/mint', { as: 'admin', body: { label: 'lm-two build' } })).token;
 
 // ---------------------------------------------------------------- 4. the world, built by god ops
 const rect = ([x0, z0, x1, z1]) => [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
@@ -189,7 +225,7 @@ await batch('the ceramic commons, the gallery and garden courts, the stone walks
 // the three original scans and the auxiliary pavilions (core defs with rooms and float-only shafts)
 const passageOps = LANDMARKS.filter((l) => l.passage).map((l) => { const p = P[l.passage.id]; return paint(l.passage.id, p.polygon, '#7a5a48', 'rock'); });
 await batch('Vanessa\'s three original ceramic scans: Madmaraca, Minarete, the Celadon beacon (with their measured ground arches); the auxiliary ceramic tower and minaret temple', 'landmarks', [
-  ...LANDMARKS.map((l) => place(`${LANDMARK_NAMES[l.id]}@1`, l.id === 'celadon-tower' ? 'celadon-beacon' : l.id, { p: [l.at[0], l.at[2]], r: l.yaw ?? 0 })),
+  ...LANDMARKS.map((l) => place(LIB(LANDMARK_NAMES[l.id]), l.id === 'celadon-tower' ? 'celadon-beacon' : l.id, { p: [l.at[0], l.at[2]], r: l.yaw ?? 0 })),
   ...passageOps,
   place('core/ceramic-tower@1', 'auxiliary-tower', { p: [-46, 16], r: 0, s: 0.5 }),
   place('core/minaret-temple@1', 'auxiliary-temple', { p: [46, 16], r: 0, s: 0.5 }),
@@ -201,16 +237,16 @@ const plants = []; for (const side of [-1, 1]) for (let i = 0; i < 14; i++) {
   if (ax <= x && x <= bx && az <= z && z <= bz) continue;
   if (side === 1 && z > 38 && x > G.rect[0] && x < G.rect[2]) continue; // inside the vault: the pools and the causeway keep the floor
   if (side === 1 && x > G.entrance[0] - 2 && x < G.entrance[2] + 2) continue; // keep the grotto's doorway open
-  plants.push(place('glazed-botanical@1', `glazed-plant-${side < 0 ? 'w' : 'e'}${i + 1}`, { p: [x, z], r: 0 }));
+  plants.push(place(LIB('lm-glazed-plant'), `glazed-plant-${side < 0 ? 'w' : 'e'}${i + 1}`, { p: [x, z], r: 0 }));
 }
-for (let i = 0; i < 5; i++) plants.push(place('glazed-botanical@1', `overlook-plant-${i + 1}`, { p: [-6 + i * 3, 76.5], r: 0, s: 0.8 }));
+for (let i = 0; i < 5; i++) plants.push(place(LIB('lm-glazed-plant'), `overlook-plant-${i + 1}`, { p: [-6 + i * 3, 76.5], r: 0, s: 0.8 }));
 await batch('the Grotto of Painted Worlds (vault, two turquoise pools, the dry causeway), the glazed garden plants, three gallery panels', 'grotto-garden', [
-  place('painted-grotto-vault@1', 'painted-grotto', { p: GC, r: 0 }),
+  place(LIB('lm-grotto-vault'), 'painted-grotto', { p: GC, r: 0 }),
   ...G.pools.map((pr, i) => place('core/pond@1', `grotto-pool-${i + 1}`, { shape: { area: rect(pr) }, params: { depth: 0.8, edge: 0.6 } })),
   paint('grotto-causeway', rect(G.clearWalk), '#3a2c30', 'rock'),
   ...plants,
   // lm/map's panels were double-sided quads facing +z; these are framed, so each faces its visitors (north)
-  ...ARTWORKS.map((a) => place(`gallery-panel-${a.id}@1`, `panel-${a.id}`, { p: a.at, r: Math.PI })),
+  ...ARTWORKS.map((a) => place(LIB(`lm-panel-${a.id}`), `panel-${a.id}`, { p: a.at, r: Math.PI })),
   ...[[-60, 41], [-52, 41], [-36, 47], [-60, 55], [-36, 55]].map(([x, z], i) => place('core/flower-bed@1', `verdelis-bed-${i + 1}`, { p: [x, z], params: { leaf: '#3f8f5a', soil: '#4a2c26' } })),
   ...[[-57, 46, 'red'], [-33, 42, 'tan'], [-48, 56, 'red'], [-27, 50, 'tan']].map(([x, z, k], i) => place(`core/mushrooms-${k}-pack@1`, `verdelis-mushrooms-${i + 1}`, { p: [x, z], s: 2.5 })),
 ]);
@@ -221,7 +257,7 @@ await batch('the scan courts: 96 exhibits of the Little Martians archive in an e
   place('core/footpath@1', 'scan-promenade', { shape: { path: [[0, 60], [0, 235]], width: 2 }, params: { material: 'stone', width: 2 } }),
   ...rows.map((z, i) => place('core/footpath@1', `scan-crosswalk-${i + 1}`, { shape: { path: [[-72, z + 9.5], [72, z + 9.5]], width: 1.2 }, params: { material: 'stone', width: 1.2 } })),
   ...districts.map((m) => paint(`pad-${m.id}`, rect(m.rect ?? [m.p[0] - 8, m.p[2] - 8, m.p[0] + 8, m.p[2] + 8]), OCHRE, 'dirt')),
-  ...districts.map((m) => place(`${m.file}@1`, m.file, { p: [m.p[0], m.p[2]], r: m.yaw ?? 0 })),
+  ...districts.map((m) => place(LIB(exhibitName(m)), m.file, { p: [m.p[0], m.p[2]], r: m.yaw ?? 0 })),
   ...districts.map((m) => P[`scan-${m.id}`] ? paint(`scan-${m.id}`, P[`scan-${m.id}`].polygon, '#c49a6c', 'sand') : null).filter(Boolean),
 ]);
 
@@ -229,7 +265,7 @@ await batch('the scan courts: 96 exhibits of the Little Martians archive in an e
 const CAST_AT = { verdelis: [-45, 46], mycos: [-53, 51], kweku: [-40, 9], kalama: [38, 10], ada: [45, 50], shuijing: [-6, -16], nyx: [0, 72] };
 await batch('the six ceramic kin hovering in their row; the seven cast heads at home in the courts', 'ceramics', [
   ...scene.kin.map((k) => place(`core/kin-${k.model}@1`, `kin-${k.model}`, { p: [k.p[0], k.p[2]], r: Math.PI })),
-  ...characters.filter((c) => c.group === 'floater').map((c) => place(`${c.id}-ceramic-head@1`, c.id, { p: CAST_AT[c.id], r: Math.PI })),
+  ...characters.filter((c) => c.group === 'floater').map((c) => place(LIB(`lm-${c.id}`), c.id, { p: CAST_AT[c.id], r: Math.PI })),
 ]);
 
 // flags: the places a newcomer is pointed to (labels), and the arrival
@@ -256,21 +292,6 @@ const genesis = {
 writeFileSync(TEMPLATE, JSON.stringify(genesis, null, 1) + '\n');
 log(`template: ${TEMPLATE} — ${BATCHES.length} batches, ${BATCHES.reduce((n, b) => n + b.ops.length, 0)} ops${entities !== null ? `, ${entities} entities in the build world` : ''}`);
 
-// the asset index: the store's own measurements of what the god imported, pointed at the repo files
-const assetsIdx = {};
-for (const [file, r] of Object.entries(imported)) {
-  const meta = JSON.parse(readFileSync(join(process.env.ASSET_DIR, `${r.asset.sha}.meta.json`), 'utf8'));
-  assetsIdx[r.asset.sha] = { ...meta, path: `worlds/littlemartians-two/assets/${file}.glb` };
-  if (r.footprint) {
-    const fm = JSON.parse(readFileSync(join(process.env.ASSET_DIR, `${r.footprint.sha}.meta.json`), 'utf8'));
-    const fpFile = `worlds/littlemartians-two/assets/${file}.footprint.json`;
-    // the store holds the exact bytes it measured: keep those beside the GLB
-    writeFileSync(join(root, fpFile), readFileSync(join(process.env.ASSET_DIR, `${r.footprint.sha}.json`)));
-    assetsIdx[r.footprint.sha] = { ...fm, path: fpFile };
-  }
-}
-for (const m of Object.values(assetsIdx)) delete m.at;
-writeFileSync(INDEX, JSON.stringify({ schema: 'core-assets/1', note: 'littlemartians-two: the Arium-era Little Martians art, measured by the god import path (POST /v1/god/assets) in tools/god-skill/scripts/lm-two/build-template.mjs. Licence per asset.', assets: Object.fromEntries(Object.entries(assetsIdx).sort()) }, null, 1) + '\n');
-log(`asset index: ${INDEX} — ${Object.keys(assetsIdx).length} assets`);
+
 stop();
 process.exit(0);
