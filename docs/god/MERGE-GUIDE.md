@@ -113,6 +113,15 @@ templates) are not listed; nothing old imports them except through the gates bel
 - `WorldEntityLayer.ts` (active only on new worlds): terrain sectors, `groundAt`, sea plane and horizon read the ground
   recipe's bounds (a rectangle once the god extends the world) instead of ±extent/2; a diff's `constants` is applied.
 
+**`WorldEntityLayer.ts`, `gen-mesh/registry.ts`, `gen-mesh/kit.mesh.ts`, `gen-mesh/mesh.mesh.ts`** (VOCAB-MECH; entity worlds only)
+- `registry.ts` `meshFor` wraps every builder with `vocab-look.ts` (stretch/warp/paint/wear/state roles); a def without
+  convention params or actuator state gets the builder unchanged (`lookOf` → null), so old content draws as before.
+- `kit.mesh.ts`: shapes with `when` are filtered by params/state (no `when` → unchanged); cache/instance keys gain a
+  suffix only for kits that use `when`.
+- `mesh.mesh.ts` + `WorldEntityLayer.ts`: lazy GLBs (`lazy-assets.ts`): the snapshot plans an eager set (≤ 24 MB nearest
+  the arrival) and the loading bar expects only it; the rest load near the camera or in the background. `?shot` and
+  `?assets=eager` load everything (god `look`, thumbnails). Old worlds never mount the entity layer.
+
 ### Server (`apps/server`)
 
 **`auth.ts`**
@@ -181,6 +190,20 @@ templates) are not listed; nothing old imports them except through the gates bel
   unset on old worlds, so their `here` is unchanged. `main.ts` installs it under `if (god)`.
 - god files only: bounds-aware tiles/free plots, `ground` published with a `constants` diff, ground-host re-logs on growth;
   new routes `POST /v1/god/land`, `POST /v1/god/strike` (god token).
+
+**`edge/ledger/vocabulary.ts`, `god/perceive.ts`, `god/engine-bridge.ts`, `god/god.ts`, `god/assets.ts`** (VOCAB-MECH)
+- `vocabulary.ts`: object capabilities whose object id is a god entity (`e_…`) also answer to their action as a verb
+  ("open the blue door", "put out the fire", + aliases turn-on/off, shut, extinguish …). Eden/Mars/LM objects never have
+  `e_` ids, so their resolution is unchanged.
+- `perceive.ts`: god things whose def has `actions` become `built` objects of a kind with those actions (schema + `state`);
+  plain kinds keep the old schema. `actuators.ts` wraps `objects.act` to commit the state as an engine edit after the
+  ledger's transaction (`afterCommit`). `engine-bridge.ts` passes `commit` (engineAct) to perceive.
+- `god.ts`: `publicSnapshot` includes the bases of `extends` defs (presets). `assets.ts`: facets, synonyms and category
+  words in `searchDefs`; the library lists presets resolved; `mountCatalogRoutes` (`catalog.ts`: manifest, taxonomy,
+  recommend, `/thumbs/<hash>.png`, gzip for snapshot/catalog/defs).
+- world-compiler: `schemas.ts` def `category?`/`synonyms?` (optional; hashes unchanged); `model.ts` bake applies
+  stretch for defs that declare `sx/sy/sz` and fills kit/2 def param defaults; `vocab/` (taxonomy, conventions, lint).
+  generators `kit.ts`: shape `when`, roles `fill`, `screen`.
 
 ### Engine (`mars/viewer/engine`, `packages/engine-mars`, `packages/protocol`, `packages/engine-contract`)
 
