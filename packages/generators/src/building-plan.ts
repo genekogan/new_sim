@@ -310,7 +310,10 @@ export function explicitPlan(json: unknown, c0: { W: number; D: number; t: numbe
     const along = wall === 'n' || wall === 's' ? 'x' : 'z';
     const lo = along === 'x' ? x0 + inset(x0, X0) : z0 + inset(z0, Z0), hi = along === 'x' ? x1 - inset(x1, X1) : z1 - inset(z1, Z1);
     const at = typeof s.at === 'number' ? Math.min(1, Math.max(0, s.at)) : 0.5;
-    const s0 = lo + Math.max(0, (hi - lo - run) * at), s1 = s0 + run;
+    // approach the bottom straight over >= 0.9 m (a 0.34 m body 0.35 m before the first tread clears the wall) and
+    // arrive onto >= 1 m of landing when the wall has room; `at` places the flight in what is left
+    const free = Math.max(0, hi - lo - run), mB = Math.min(0.9, free), mT = Math.min(1.0, free - mB);
+    const s0 = lo + mB + (free - mB - mT) * at, s1 = s0 + run;
     const b0 = wall === 'n' ? z0 + inset(z0, Z0) : wall === 's' ? z1 - inset(z1, Z1) - STAIR_W : wall === 'w' ? x0 + inset(x0, X0) : x1 - inset(x1, X1) - STAIR_W;
     const rect: Rect = along === 'x' ? [s0, b0, s1, b0 + STAIR_W] : [b0, s0, b0 + STAIR_W, s1];
     p.stairs.push({ id: ids.take('stairs'), from, to, room: room.id, rect, axis: along, dir: 1, width: STAIR_W, risers, going: GOING, away: wall === 'n' || wall === 'w' ? 1 : -1 });

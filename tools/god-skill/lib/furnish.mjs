@@ -54,6 +54,8 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
   const ops = [], placed = [], dropped = [], notes = [];
   const taken = [];   // accepted item OBBs in the def frame, with floor
   const doors = (baked.openings ?? []).filter((o) => o.kind === 'door' || o.kind === 'arch');
+  // the ends of each flight: the walk planner steps on and off 0.7 m beyond them (sideways where a flight starts against a
+  // wall), so keep 0.9 m round each end clear
   const ends = (baked.links ?? []).flatMap((l) => [{ p: l.path[0], level: l.from }, { p: l.path[l.path.length - 1], level: l.to }]);
   const defOf = (alts) => (Array.isArray(alts) ? alts : [alts]).map((ref) => [ref, model.resolvedDef(ref)]).find(([, d]) => d);
   const want = opts.rooms ? new Set(opts.rooms) : null;
@@ -103,10 +105,10 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
         const solid = ib.box[1] > 0.06;
         const hit = baked.colliders.find((o) => obbOverlap(bx, o));
         if (hit) { why = `would cross ${hit.tag ?? 'a wall'}`; continue; }
-        // keep a clear zone 0.8 m deep either side of every doorway, and 0.5 m round the ends of the stairs
+        // keep a clear zone 0.8 m deep either side of every doorway, and 0.9 m round the ends of the stairs
         const zone = (d) => ({ c: d.at, half: [d.width / 2 + 0.1, 0.8], yaw: d.yaw, y0: room.y, y1: room.y + 2 });
         if (solid && doors.some((d) => d.level === room.floor && obbOverlap(bx, zone(d)))) { why = 'in a doorway'; continue; }
-        if (ends.some((e) => e.level === room.floor && obbOverlap(bx, { c: e.p, half: [0.5, 0.5], yaw: 0, y0: room.y, y1: room.y + 2 }))) { why = 'at the foot or head of the stairs'; continue; }
+        if (ends.some((e) => e.level === room.floor && obbOverlap(bx, { c: e.p, half: [0.9, 0.9], yaw: 0, y0: room.y, y1: room.y + 2 }))) { why = 'at the foot or head of the stairs'; continue; }
         if (solid && taken.some((t) => t.floor === room.floor && t.solid && obbOverlap(bx, t.box))) { why = 'overlaps another piece'; continue; }
         box = bx; at = p; yaw = fyaw + th; break;
       }
