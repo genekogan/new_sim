@@ -146,12 +146,23 @@ try {
     const childOf = (bn, pred) => { const b = ents.find((e) => e.name === bn && e.in?.parent === 'world'); if (!b) return null; const desc = []; const walk = (id) => { for (const e of ents.filter((x) => x.in?.parent === id)) { desc.push(e); walk(e.id); } }; walk(b.id); return desc.find(pred) ?? null; };
     const observe = async (cli) => (await api('/v1/edge/observe', { token: cli.token() })).data;
     const caps = async (cli) => (await api('/v1/edge/observe?include=capabilities', { token: cli.token() })).data?.capabilities ?? [];
+    /** walk into a room of a building; rooms are offered only within ~80 m (nav ROOMS_WITHIN), so from farther away the
+     *  Soul first walks toward the building (any of its offered entries), as a player would, then into the room */
+    const goRoom = async (cli, b, room) => {
+      let walk = (await cli.run('act', `walk:${b}/${room}`)).data;
+      if (walk?.accepted) return walk;
+      const near = (await caps(cli)).find((c) => c.available && (c.id === `walk:${b}` || c.id.startsWith(`walk:${b}/`)));
+      if (!near) return walk;
+      await cli.run('act', near.id, '{}', '--force'); await cli.run('wait', '120');
+      await until(async () => ({ ok: (await caps(cli)).some((c) => c.id === `walk:${b}/${room}` && c.available) }), 90_000, 1500);
+      return (await cli.run('act', `walk:${b}/${room}`, '{}', '--force')).data;
+    };
     /** walk into the building, then sit on the piece (its own sit capability), then stand up */
     const sitIn = async (cli, b, pred, label) => {
       const seat = childOf(b, pred); if (!seat) return { b, label, error: 'no such piece' };
       // a furnished building is offered room by room (walk:<building>/<room>): walk into the piece's room, wait to arrive
       const room = seat.in?.slot ?? ents.find((e) => e.id === seat.in?.parent)?.in?.slot;
-      const walk = (await cli.run('act', `walk:${b}/${room}`)).data;
+      const walk = await goRoom(cli, b, room);
       await cli.run('wait', '120');
       await until(async () => ({ ok: (await caps(cli)).some((c) => c.id === `sit:${seat.id}`) }), 90_000, 1500);
       const cap = (await caps(cli)).find((c) => c.id === `sit:${seat.id}`);
@@ -182,6 +193,24 @@ try {
       const st = await until(async () => { const e = (await api(`/v1/world/entities/${bars?.id}`)).data?.entity; return { ok: e?.state?.open === true, state: e?.state }; }, 60_000, 1500);
       return { bars: bars?.name, act: r?.accepted ?? r?.code, open: st?.ok, state: st?.state };
     }, (r) => r.open);
+    // SOULFIX: a bed offers sleep:<bed> (Eden's nap posture on the mattress); then the Soul gets up and walks on
+    await step('S5 Ana walks into the house bedroom and sleeps in the bed; she gets up and walks on', async () => {
+      const bed = childOf('house', (e) => /^bedroom(-\d)?-bed$/.test(e.name)); if (!bed) return { error: 'no bed' };
+      await goRoom(ana, 'house', bed.in?.slot ?? 'bedroom'); await ana.run('wait', '120');
+      await until(async () => ({ ok: (await caps(ana)).some((c) => c.id === `sleep:${bed.id}` && c.available) }), 90_000, 1500);
+      const cap = (await caps(ana)).find((c) => c.id === `sleep:${bed.id}`);
+      const act = (await ana.run('act', `sleep:${bed.id}`, '{"seconds":20}', '--force')).data;
+      const slept = await until(async () => { const o = await observe(ana); return { ok: /"activity":"nap"/.test(JSON.stringify(o ?? {})) }; }, 120_000, 1500);
+      await ana.run('wait', '30');
+      const on = (await ana.run('act', 'walk:house/living', '{}', '--force')).data;
+      return { offered: cap?.label, lieOffered: (await caps(ana)).some((c) => c.id === `lie:${bed.id}`), accepted: act?.accepted ?? act?.code, slept: !!slept?.ok, walkOn: on?.accepted ?? on?.code };
+    }, (r) => r.accepted === true && r.slept && r.walkOn === true);
+    // SOULFIX: furniture upstairs (hospital ward, floor 1) is offered as its storey and reached by the stairs; Ben gets up and walks on
+    await step('S6 Ben walks upstairs into a hospital ward and sits on the visitor chair; he gets up and walks on', async () => {
+      const r = await sitIn(ben, 'hospital', (e) => /^ward-\d-chair|^ward.*chair/.test(e.name) || (e.name.startsWith('chair') && /ward/.test(JSON.stringify(e.in ?? {}))), 'a ward chair');
+      const on = (await ben.run('act', 'walk:hospital/corridor', '{}', '--force')).data;
+      return { ...r, walkOn: on?.accepted ?? on?.code };
+    }, (r) => r.sat && r.accepted === true && /floor 1/.test(r.offered ?? '') && r.walkOn === true);
     // last: a seated Soul in a full row of theatre seats may not get up again (see the report)
     await step('S4 Ben walks into the theatre and sits in the stalls', () => sitIn(ben, 'theatre', (e) => /^auditorium-row/.test(e.name), 'the stalls'), (r) => r.sat && r.accepted === true);
 

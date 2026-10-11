@@ -734,7 +734,7 @@ export class EngineBridge {
         // resolves through the ledger's vocabulary (every word in the label) to this seat and not another bench
         const ent = this.model.entities.get(x.id), kind = ent ? this.model.resolvedDef(ent.def)?.name.replace(/^core-/, '') : undefined;
         const by = ent ? this.nav.namesNear([x.pose.p[0], x.pose.p[2]], x.id) : [];
-        const id = `sit:${x.id}`, label = `${name(x.id)} (${kind && !name(x.id).split('/').pop()!.includes(kind) ? `a ${kind}, ` : ''}${by.length ? `by ${by.join(' and ')}; ` : ''}${d} m${levelOf(x) ? `, floor ${levelOf(x)}` : ''})`;
+        const id = `sit:${x.id}`, label = `${name(x.id)} (${kind && !name(x.id).split('/').pop()!.includes(kind) ? `a ${kind}, ` : ''}${by.length ? `by ${by.join(' and ')}; ` : ''}${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
         // F1: a bench for two stays free while one of its seats is; the seat a Soul sits on is not free to itself
         const full = others.length >= seats || (!!u && !mine && seats <= 1);
         // seat fit (engine bodies/humanoid.ts): a body whose look sets its height sits only on seats whose top suits it
@@ -744,8 +744,25 @@ export class EngineBridge {
         caps.push({ id, verb: 'sit', label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: 60 } } });
         plans.set(id, { label, steps: [{ verb: 'sit', params: { on: x.id, seconds: 60 } }], seconds: true });
       }
+      // SOULFIX: a bed (a def slot of kind bed) offers lie:<bed> and sleep:<bed>, like Eden's lie/nap: the body walks to
+      // the bed's side and lies along it at the mattress height (the engine's lying-on-furniture posture)
+      const bedEnt = this.model.entities.get(x.id), bed = bedEnt ? this.model.slotsOf(bedEnt).find((q) => q.kind === 'bed') : undefined;
+      if (bed && x.support?.kind !== 'in-hand') {
+        const lying = Object.values(ents).find((o: any) => o.human && o.id !== soul.entityId && ['lie', 'nap'].includes(o.human.activity) && Math.hypot(o.pose.p[0] - x.pose.p[0], o.pose.p[2] - x.pose.p[2]) < 1.2) as any;
+        const top = Math.min(1.2, Math.max(0.2, Number(bed.height ?? bed.p[1]) || 0.5));
+        // the long axis of the bed (its slot yaw in the entity frame) and a free point at its side
+        const yaw = x.pose.yaw + (Number(bed.yaw) || 0), along: Vec2 = [Math.cos(yaw), Math.sin(yaw)], c: Vec2 = [x.pose.p[0], x.pose.p[2]];
+        const side = this.engine.standableNearV1(c, levelOf(x), soul.entityId, 0.35, 8);
+        const face: Vec2 = side ? [Math.round((side[0] + along[0]) * 100) / 100, Math.round((side[1] + along[1]) * 100) / 100] : c;
+        for (const [verb, act, sec] of [['lie', 'lie', 120], ['sleep', 'nap', 600]] as const) {
+          const id = `${verb}:${x.id}`, label = `${verb === 'lie' ? 'Lie down on' : 'Sleep in'} ${name(x.id)} (${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
+          const block = lying ? { code: 'bed.taken', reason: `${this.soulName(lying.id)} is lying there.` } : !side ? { code: 'bed.no-room', reason: `There is no room beside ${name(x.id)} to get in.` } : null;
+          caps.push({ id, verb, label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 3600, default: sec } } });
+          if (side) plans.set(id, { label, seconds: true, steps: [...stand, { verb: 'mars:walk_to', params: { x: side[0], z: side[1], level: levelOf(x) } }, { verb: 'mars:pose_v1', params: { activity: act, seconds: sec, seatHeight: top, seatTogether: true, face } }] });
+        }
+      }
       if (asset.category === 'item' && x.support?.kind !== 'in-hand' && !held) {
-        const id = `pick-up:${x.id}`, label = `Pick up ${name(x.id)} (${d} m${levelOf(x) ? `, floor ${levelOf(x)}` : ''})`;
+        const id = `pick-up:${x.id}`, label = `Pick up ${name(x.id)} (${d} m${levelOf(x) ? `, ${this.floorWord(x)}` : ''})`;
         caps.push({ id, verb: 'pick-up', label, target: { id: x.id, kind: 'item' }, available: true });
         plans.set(id, { label, steps: [...stand, ...approach(x), { verb: 'mars:take_item', params: { item: x.id, hand: 'right' } }] });
       }
@@ -759,6 +776,23 @@ export class EngineBridge {
     }
     this.sitHere(caps, plans, here);
     if (this.layers.active()) try { this.layers.capabilities(soul, caps, plans as never, here); } catch (e) { this.log(`layers capabilities: ${(e as Error).message}`); }
+  }
+  /** SOULFIX: which storey of its building a thing upstairs stands on ("floor 1" = the first floor above the ground),
+   *  from the building's own floor height (engine level ids are not storeys). */
+  private floorWord(x: any): string {
+    let e = this.model.entities.get(x.id);
+    while (e && e.in?.parent && e.in.parent !== 'world') {
+      const p = this.model.entities.get(e.in.parent); if (!p) break;
+      const def = this.model.resolvedDef(p.def) as any;
+      if (def?.components?.building || def?.params?.floorHeight) {
+        const fh = Number((p as any).params?.floorHeight ?? def.params?.floorHeight?.default ?? 3) || 3;
+        const n = Math.round((x.pose.p[1] - this.model.worldPose(p).y) / fh);
+        if (n > 0) return `floor ${n}`;
+        break;
+      }
+      e = p;
+    }
+    return `floor ${this.levelOfY(x.pose.p[1])}`;
   }
   /** Bodies sitting on a god-built seat fixture (any of its seat slots). */
   seatTakers(id: string): string[] {
