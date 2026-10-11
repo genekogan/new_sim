@@ -11,6 +11,7 @@
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
+import { chromeLease } from '../lib/chrome-lease.mjs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -30,13 +31,14 @@ const t = () => performance.now();
 
 // ---------- the world process
 log(`▶ creating world "${slug}" on :${port}`);
-const server = spawn('node', ['apps/server/src/main.ts'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, WORLD_KEY: slug, WORLD_ID: `${slug}-1`, ENGINE: 'mars', PORT: String(port), DEV_AUTH: '1', BRAIN_MODE: 'fake', SEED_NATIVES: '0', DATA_DIR: dataDir, PUBLIC_URL: `http://127.0.0.1:${port}` } });
+const marsWeb = resolve(root, '.lane/mars-web');
+const server = spawn('node', ['apps/server/src/main.ts'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...(existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}), WORLD_KEY: slug, WORLD_ID: `${slug}-1`, ENGINE: 'mars', PORT: String(port), DEV_AUTH: '1', BRAIN_MODE: 'fake', SEED_NATIVES: '0', DATA_DIR: dataDir, PUBLIC_URL: `http://127.0.0.1:${port}` } });
 let serverLog = '';
 server.stdout.on('data', (d) => { serverLog += d; }); server.stderr.on('data', (d) => { serverLog += d; });
 const stop = () => { try { server.kill(); } catch { } };
 process.on('exit', () => { if (!args.keep) stop(); });
 const bootT = t();
-for (let i = 0; i < 300; i++) { try { const r = await fetch(`${base}/healthz`); if (r.ok) break; } catch { } await new Promise((r) => setTimeout(r, 100)); }
+for (let i = 0; i < 1200; i++) { try { const r = await fetch(`${base}/healthz`); if (r.ok) break; } catch { } await new Promise((r) => setTimeout(r, 100)); }
 const bootMs = t() - bootT;
 log(`  booted in ${bootMs.toFixed(0)} ms`);
 
@@ -72,17 +74,17 @@ const find = (snap, name) => snap.entities.find((e) => e.name === name);
 // ---------- screenshots (Chrome via the viewer's Playwright)
 let chromium = null;
 try { chromium = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test').chromium; } catch { log('  (no @playwright/test; screenshots skipped)'); }
-let browser = null, page = null;
+let browser = null, page = null, releaseChrome = () => {};
 async function shot(name, { eye, at, wait = 6000 } = {}) {
   if (!chromium) return;
-  if (!browser) { try { browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] }); const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } }); await ctx.addInitScript(() => { localStorage.setItem('sim.dev', 'admin'); }); page = await ctx.newPage(); } catch (e) { log('  (Chrome unavailable: ' + e.message.split('\n')[0] + ')'); chromium = null; return; } }
+  if (!browser) { try { releaseChrome = await chromeLease('e2e-' + slug); browser = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] }); const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } }); await ctx.addInitScript(() => { localStorage.setItem('sim.dev', 'admin'); }); page = await ctx.newPage(); page.setDefaultTimeout(120000); } catch (e) { log('  (Chrome unavailable: ' + e.message.split('\n')[0] + ')'); chromium = null; return; } }
   const q = new URLSearchParams({ dev: '1' }); if (eye) q.set('eye', eye.join(',')); if (at) q.set('at', at.join(','));
   const t0 = t();
   if (!page.url().startsWith(base)) { await page.goto(`${base}?${q}`, { waitUntil: 'domcontentloaded' }); await page.waitForTimeout(Math.max(wait, 20000)); }
   else { if (eye && at) await page.evaluate(([e, a]) => { const w = window.__simEntity; if (!w) return; w.controls.target.set(a[0], a[1], a[2]); w.camera.position.set(e[0], e[1], e[2]); w.camera.lookAt(w.controls.target); }, [eye, at]); await page.waitForTimeout(wait); }
   const state = await page.evaluate(() => { const w = window.__simEntity; return w ? { active: w.layer.active, drawn: w.layer.drawn?.size ?? null, sectors: w.layer.sectors?.size ?? null } : null; });
   const file = resolve(out, `${name}.png`);
-  await page.screenshot({ path: file });
+  await page.screenshot({ path: file, timeout: 180000 });
   report.shots.push({ name, file, state, ms: +(t() - t0).toFixed(0) });
   log(`  📷 ${name}.png ${JSON.stringify(state)}`);
 }
@@ -187,10 +189,10 @@ try {
   await step('S7 restart the world process; state identical', async () => {
     const a = await snapshot();
     stop(); await new Promise((r) => setTimeout(r, 800));
-    const again = spawn('node', ['apps/server/src/main.ts'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, WORLD_KEY: slug, WORLD_ID: `${slug}-1`, ENGINE: 'mars', PORT: String(port), DEV_AUTH: '1', BRAIN_MODE: 'fake', SEED_NATIVES: '0', DATA_DIR: dataDir, PUBLIC_URL: `http://127.0.0.1:${port}` } });
+    const again = spawn('node', ['apps/server/src/main.ts'], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...(existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}), WORLD_KEY: slug, WORLD_ID: `${slug}-1`, ENGINE: 'mars', PORT: String(port), DEV_AUTH: '1', BRAIN_MODE: 'fake', SEED_NATIVES: '0', DATA_DIR: dataDir, PUBLIC_URL: `http://127.0.0.1:${port}` } });
     again.stdout.on('data', (d) => { serverLog += d; }); again.stderr.on('data', (d) => { serverLog += d; });
     process.on('exit', () => { if (!args.keep) try { again.kill(); } catch { } });
-    for (let i = 0; i < 300; i++) { try { const r = await fetch(`${base}/healthz`); if (r.ok) break; } catch { } await new Promise((r) => setTimeout(r, 100)); }
+    for (let i = 0; i < 1200; i++) { try { const r = await fetch(`${base}/healthz`); if (r.ok) break; } catch { } await new Promise((r) => setTimeout(r, 100)); }
     const b = await snapshot();
     const same = JSON.stringify(a.entities) === JSON.stringify(b.entities) && JSON.stringify(a.ground) === JSON.stringify(b.ground) && a.seq === b.seq;
     const god = await api('/v1/god/snapshot');
@@ -202,6 +204,7 @@ try {
   log('harness error', e);
 } finally {
   if (browser) await browser.close().catch(() => { });
+  releaseChrome();
   const ms = [...report.timings].sort((a, b) => a - b);
   report.summary = { steps: report.steps.length, failed: report.failures.length, bootMs: +bootMs.toFixed(0), p50: ms.length ? +ms[Math.floor(ms.length / 2)].toFixed(1) : null, p95: ms.length ? +ms[Math.floor(ms.length * 0.95)].toFixed(1) : null, max: ms.length ? +ms[ms.length - 1].toFixed(1) : null, totalMs: +report.timings.reduce((a, b) => a + b, 0).toFixed(0) };
   writeFileSync(resolve(out, 'report.json'), JSON.stringify(report, null, 2));

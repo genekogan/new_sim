@@ -1,0 +1,750 @@
+// The engine bridge (spec eden4/31 B2/B3, plan 33 §3.5, lane L9): Souls live among god-built things.
+//
+//  entity world ──GodMode.onCommit──▶ derive physics per changed entity ──host.enqueue('world-edit')──▶ engine fold
+//  engine items (take/put by a Soul) ──afterTick──▶ trusted compiler `move` (by 'engine', not undoable) ──▶ journal + viewers
+//  birth / retire ──onApplied──▶ the Soul's body entity (core/humanoid, the engine's own `h_…` id) in the entity world
+//
+// The derived physics is plain data in the logged event, so the engine's replay never reads the entity model.
+// Fastest working path on the engine's existing structures (nav/1-style static scene re-base, CATALOG fixtures);
+// the per-tile patch follows L8's tiled Spatial.
+import { applyBatch, plan, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type WorldModel } from '@sim/world-compiler';
+import { assetFromDef, assetIdFor, isFixtureDef, isFloatingDef, nearestSurfaceSlot, nextEntityPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
+import type { WorldHost } from '../world.ts';
+import type { EdgeLedger } from '../edge/ledger/ledger.ts';
+import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
+import type { GodMode } from './god.ts';
+import { reachProviders, seatProviders, usesProviders, type ReachEnd } from './query.ts';
+import { GodNav } from './nav.ts';
+import { GodPerceive } from './perceive.ts';
+import { installWorldLore } from './world-lore.ts';
+import { installHeld } from './held.ts';
+import { installWorldClock } from './world-clock.ts';
+import { config, KNOWN_WORLD_KEYS } from '../config.ts';
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+type Vec2 = [number, number];
+type Level = { id: number; y: number; label: string };
+type Part = NonNullable<WorldEditV1['set'][string]>;
+/** What the engine side of a MarsEngine offers the bridge (world-edit/1 methods; packages/engine-mars/src/engine.ts). */
+type EngineV1 = {
+  world: { tick: number; entities: Record<string, any>; entityPhysicsV1?: EntityPhysicsV1 };
+  applyWorldEditV1(p: WorldEditV1): { hash: string };
+  bodyUsesV1(id: string): { body: string; how: 'occupied' | 'held' } | null;
+  reachV1(from: { p: Vec2; level?: number }, to: { p: Vec2; level?: number }): { ok: true; length: number; legs: number; levels: number[] } | { ok: false; code: string; message: string };
+  standableNearV1(at: Vec2, level?: number, except?: string, minClear?: number, maxRing?: number): Vec2 | null;
+  programOf(id: string): string | null;
+};
+
+const GROUND_BAND = 0.35;      // a floor within this of the ground is level 0 (the engine's ground is flat at y 0 until L8's tiles)
+const LEVEL_MATCH = 0.12;      // floors this close in height share an engine level
+const MAX_LEVEL = 20;          // walk_to's level schema
+const NEAR = 60;               // capabilities: god things within this many metres
+const BODY_DEF = 'core/humanoid@1';
+const r3 = (v: number) => Math.round(v * 1000) / 1000;
+
+export type BridgeOptions = { host: WorldHost; god: GodMode; edge?: EdgeLedger; log?: (m: string) => void; /** F3: new-world lore (default: any world key but eden/mars/littlemartians/toy) */ worldLore?: boolean; /** F3: the world clock from the god's time.dayTicks (default: a god world without ENABLE_LIVING_WORLD) */ worldClock?: boolean };
+
+export class EngineBridge {
+  readonly host: WorldHost; readonly god: GodMode; readonly edge?: EdgeLedger;
+  /** What the engine was last told, per entity (JSON of its part), and the physics state that produced. */
+  private sent = new Map<string, string>();
+  private physics: EntityPhysicsV1 | undefined;
+  private levels: Level[] = [];
+  private reconciled = false;
+  private writeBackBusy = false;
+  private refusedPose = new Set<string>();
+  /** Bumped by every god edit and by engine edits of things other than bodies (a Soul moving a bowl), not by a body's
+   *  pose: what nav and perceive re-derive on. */
+  private version = 0;
+  private log: (m: string) => void;
+  stats = { edits: 0, entities: 0, writeBacks: 0, refusals: 0, bodies: 0, lastMs: 0 };
+  /** P4: Souls walk to god-built named things (nav.ts). */
+  readonly nav: GodNav;
+  /** F1: god-built things Souls can see, look at and read (perceive.ts). */
+  readonly perceive: GodPerceive;
+
+  constructor(o: BridgeOptions) {
+    this.host = o.host; this.god = o.god; this.edge = o.edge; this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
+    this.nav = new GodNav({ model: this.god.model, version: () => this.version, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e) });
+    this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), things: () => this.nav.things(), log: (m) => this.log(m) });
+    this.god.onCommit((c) => { this.version++; if (c.by !== 'engine') this.onCommit(c.diff); });
+    this.host.listeners.push({
+      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); if (tick % 20 === 5) this.perceiveSync(); } },
+      onApplied: (e) => { if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
+    });
+    reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
+    seatProviders.set(this.god.model, (id) => { const f = (this.engine as unknown as { seatOccupantsV1?: (id: string) => { slot: string; body: string }[] }).seatOccupantsV1; return f ? f.call(this.engine, id).map((x) => ({ slot: x.slot, soul: this.soulName(x.body) })) : []; });
+    usesProviders.set(this.god.model, (id) => { const u = this.usesOf(id); return u ? { soul: u.soul, body: u.body, how: u.how, thing: this.model.pathOf(u.id) } : null; });
+    // body-aware edits: the compiler hook when GodMode has it (lead patch 5), else wrap its entry points
+    const hooked = 'bodies' in (this.god as object);
+    if (hooked) (this.god as unknown as { bodies: unknown }).bodies = { uses: (id: string) => this.usesOne(id), lifted: (ids: string[]) => this.buried(ids), refuse: (after: WorldModel, diff: Diff, ops: unknown[]) => this.pinnedCheck(after, diff, ops) };
+    else this.guardGod();
+    this.guardPinned(hooked);
+    if (this.edge) this.hookEdge(this.edge);
+    // F3: a god thing in a Soul's hand shows as held (observe, receipts) and can be put down (held.ts)
+    if (this.edge) installHeld(this.edge, { engine: this.host.engine as never, model: this.model, minds: this.host.minds });
+    // F3: a god's world keeps time like the live worlds (a logged dayConfig; world-clock.ts)
+    if (o.worldClock ?? (!config.livingWorld && !(KNOWN_WORLD_KEYS as readonly string[]).includes(config.worldKey))) installWorldClock(this.host, this.god, this.log);
+    // F3: a god's new world serves its constitution (or a neutral line) as lore, never Eden's (world-lore.ts)
+    if (this.edge && (o.worldLore ?? !(KNOWN_WORLD_KEYS as readonly string[]).includes(config.worldKey))) installWorldLore(this.edge, this.god);
+  }
+  private get engine(): EngineV1 { return this.host.engine as unknown as EngineV1; }
+  private get model(): WorldModel { return this.god.model; }
+
+  // ------------------------------------------------------------------ entity world → engine
+
+  /** Boot: tell the engine about every entity whose physics differs from what its log already holds. */
+  reconcile() {
+    this.reconciled = true;
+    const ep = this.engine.world.entityPhysicsV1;
+    this.physics = ep ? structuredClone(ep) : undefined; this.levels = ep ? structuredClone(ep.levels) : [];
+    // seed `sent` from the engine's own state so only real differences are sent
+    for (const [id, part] of Object.entries(ep?.byEntity ?? {})) this.sent.set(id, JSON.stringify(normPart(part as Part)));
+    for (const [id, e] of Object.entries(this.engine.world.entities)) if (e.tags?.includes('entity-world')) this.sent.set(id, JSON.stringify(normPart({ ...(ep?.byEntity[id] ?? {}), fixture: fixtureOfEngine(e) } as Part)));
+    const all = new Set<string>([...this.model.entities.keys(), ...this.sent.keys()]);
+    this.send(all, 0, 'boot');
+  }
+
+  /** Commits between two ticks coalesce into one world-edit (one Spatial re-base per tick at most). */
+  private pending = new Set<string>();
+  private onCommit(diff: Diff) {
+    if (!this.reconciled) return; // the first tick reconciles everything
+    for (const e of diff.upserts) for (const id of this.model.subtree(e.id)) this.pending.add(id);
+    for (const id of diff.removes) this.pending.add(id);
+    // terrain moved under things (pads, landforms): re-derive everything (each entity is only sent if it changed)
+    if (diff.tiles.length) for (const id of this.model.entities.keys()) this.pending.add(id);
+  }
+  /** Send what the commits since the last tick changed (also called by tests and `reach`, so reads see the latest edit). */
+  flush() { if (!this.pending.size) return; const ids = this.pending; this.pending = new Set(); this.send(ids, this.model.editSeq, 'commit'); }
+
+  /** Derive the changed entities and enqueue one world-edit carrying exactly what differs. */
+  private send(ids: Set<string>, seq: number, why: string) {
+    const t0 = performance.now();
+    const set: WorldEditV1['set'] = {}, assets: Record<string, unknown> = {};
+    const known = this.physics?.assets ?? {};
+    for (const id of [...ids].sort()) {
+      const e = this.model.entities.get(id);
+      if (e && this.engineOwned(e)) continue;            // bodies and what they carry belong to the engine
+      const part = e ? this.derive(e, assets, known) : null;
+      const key = part ? JSON.stringify(normPart(part)) : null;
+      if ((this.sent.get(id) ?? null) === key) continue;
+      set[id] = part;
+      if (key) this.sent.set(id, key); else this.sent.delete(id);
+    }
+    if (!Object.keys(set).length) return;
+    const draft: WorldEditV1 = { contract: 'world-edit/1', seq, hash: '', levels: structuredClone(this.levels), set, ...(Object.keys(assets).length ? { assets } : {}) };
+    this.physics = nextEntityPhysics(this.physics, draft);
+    draft.hash = this.physics.hash;
+    this.stats.edits++; this.stats.entities += Object.keys(set).length; this.stats.lastMs = Math.round((performance.now() - t0) * 10) / 10;
+    void this.host.enqueue('world-edit', 'god', draft).catch((err) => this.log(`world-edit ${seq} not logged: ${err?.message ?? err}`));
+    if (why !== 'commit' || Object.keys(set).length > 8) this.log(`${why}: world-edit seq ${seq}, ${Object.keys(set).length} entities, ${this.stats.lastMs} ms`);
+  }
+
+  /** A body entity, or anything whose ancestor is a body (a carried bowl): the engine owns its physical state. */
+  private engineOwned(e: Entity): boolean {
+    for (let cur: Entity | undefined = e; cur; cur = cur.in.parent === 'world' ? undefined : this.model.entities.get(cur.in.parent)) if (this.model.resolvedDef(cur.def)?.components.body) return true;
+    return false;
+  }
+
+  /** Level id for a floor at world height y (allocated in height order of first appearance, logged in the event). */
+  private levelFor(y: number, at?: Vec2): number {
+    // level 0 is the ground itself: a floor within the band of the terrain under it (L8 makes level 0 follow the tiles)
+    const ground = at ? this.model.terrain.sample(at[0], at[1]) : 0;
+    if (Math.abs(y - ground) <= GROUND_BAND) return 0;
+    const hit = this.levels.find((l) => Math.abs(l.y - y) <= LEVEL_MATCH);
+    if (hit) return hit.id;
+    const used = new Set(this.levels.map((l) => l.id));
+    let id = 1; while (used.has(id) && id < MAX_LEVEL) id++;
+    if (used.has(id)) return this.levels.reduce((b, l) => (Math.abs(l.y - y) < Math.abs(b.y - y) ? l : b)).id; // out of level ids: nearest
+    this.levels.push({ id, y: r3(y), label: `floor at ${r3(y)} m` });
+    return id;
+  }
+
+  /** The engine physics of one entity: its solids, floors and stairs, or its fixture registration. */
+  derive(e: Entity, assets: Record<string, unknown>, known: Record<string, unknown>): Part | null {
+    const def = this.model.resolvedDef(e.def); if (!def) return null;
+    const baked = this.model.bake(def, e.params ?? {}, e.seed ?? 0, e.shape);
+    const wp = this.model.worldPose(e);
+    // path/area forms at the root carry world-frame geometry (L3): heights ground-relative unless `abs`
+    const worldFrame = def.form !== 'point' && e.in.parent === 'world';
+    const toWorld = (x: number, z: number): Vec2 => { if (worldFrame) return [r3(x), r3(z)]; const c = Math.cos(wp.yaw), s = Math.sin(wp.yaw); return [r3(wp.x + (x * c + z * s) * wp.s), r3(wp.z + (-x * s + z * c) * wp.s)]; };
+    const heightAt = (y: number, at: Vec2, abs?: boolean) => r3(worldFrame ? (abs ? y : this.model.terrain.sample(at[0], at[1]) + y) : wp.y + y * wp.s);
+    const part: Part = {};
+    if (isFixtureDef(def)) {
+      const facts = factsOf(def, baked, wp.s);
+      // a floating boat's asset carries no obstacle (catalog-adapter isFloatingDef): a new id, so worlds that registered
+      // the old one (an obstacle) are sent the new one
+      const aid = assetIdFor(facts, JSON.stringify(e.params ?? {}) + (isFloatingDef(def) ? '|afloat' : ''));
+      if (!known[aid] && !assets[aid]) assets[aid] = assetFromDef(aid, facts);
+      part.fixture = this.fixtureSpec(e, def, aid, (assets[aid] ?? known[aid]) as any, wp);
+      return part;
+    }
+    // solids: wall segments and blocks (solid layer only; a def's own stair treads are walked by its links)
+    if ((def.layer === 'solid' || def.layer === 'surface') && baked.colliders.length) {
+      const fp = this.model.footprint(e, def);
+      const solids = fp.map((o, i) => ({ o, local: baked.colliders[i] })).filter(({ local }) => !(baked.links?.length && local.y1 - local.y0 <= 0.5));
+      if (solids.length) part.solids = solids.map(({ o, local }, i) => ({ id: `${e.id}#c${i}`, obb: { c: [r3(o.c[0]), r3(o.c[1])] as Vec2, half: [r3(o.half[0]), r3(o.half[1])] as Vec2, yaw: r3(-o.yaw) }, y0: r3(o.y0), y1: r3(o.y1), kind: 'fixture' as const, label: `${this.model.pathOf(e.id)}${local.tag ? ' ' + local.tag : ''}`.slice(0, 100) }));
+    }
+    // closed doors block their gap
+    const doorState = (e.state?.doors ?? {}) as Record<string, unknown>;
+    for (const o of baked.openings ?? []) {
+      const closed = doorState[o.id] === 'closed' || (doorState[o.id] === undefined && o.state === 'closed') || (def.components.opening && e.state?.open === false);
+      if (!closed) continue;
+      // a gate of a world-frame wall/fence sits on the ground under it (sill and height are ground-relative)
+      const c = toWorld(o.at[0], o.at[1]), sc = worldFrame ? 1 : wp.s;
+      (part.solids ??= []).push({ id: `${e.id}#door:${o.id}`, obb: { c, half: [r3((o.width / 2) * sc), r3(0.08 * sc)], yaw: r3(-((worldFrame ? 0 : wp.yaw) + o.yaw)) }, y0: heightAt(o.sill ?? 0, c), y1: heightAt((o.sill ?? 0) + o.height, c), kind: 'fixture' as const, label: `${this.model.pathOf(e.id)} ${o.id} (closed)` });
+    }
+    // floors: polygons → oriented rectangles on levels
+    const surfaces = [...(baked.surfaces ?? [])];
+    if (!surfaces.length && def.components.floor) { const [w, , d] = baked.box; surfaces.push({ level: 0, y: def.components.floor.y ?? baked.box[1], polygon: [[-w / 2, -d / 2], [w / 2, -d / 2], [w / 2, d / 2], [-w / 2, d / 2]] }); }
+    // ground cover (roads, lawns, plazas: ground-relative level-0 surfaces of world-frame shapes) is the ground itself
+    const floors = surfaces.filter((x) => !(worldFrame && !(x as { abs?: boolean }).abs && x.level === 0));
+    if (floors.length) part.surfaces = floors.map((s, i) => {
+      const r = rectOf(s.polygon), abs = (s as { abs?: boolean }).abs;
+      const c = toWorld(r.c[0], r.c[1]), y = heightAt(s.y, c, abs);
+      // decks and bridges of world-frame shapes are walked from the ground: level 0 at their own height (L8 slabs)
+      const level = worldFrame && abs && s.level === 0 ? 0 : this.levelFor(y, c);
+      const sc = worldFrame ? 1 : wp.s, yaw = worldFrame ? r.yaw : wp.yaw + r.yaw;
+      return { id: `${e.id}#f${i}`, level, y: level === 0 && Math.abs(y) <= GROUND_BAND ? 0 : y, obb: { c, half: [r3(r.half[0] * sc), r3(r.half[1] * sc)] as Vec2, yaw: r3(-yaw) }, label: `${this.model.pathOf(e.id)} ${s.tag ?? 'floor'}`.slice(0, 100) };
+    });
+    // doorways of upper storeys: the wall's thickness has no floor polygon under it, so lay a threshold strip
+    for (const o of baked.openings ?? []) {
+      if (o.kind === 'window' || worldFrame) continue;
+      const storey = surfaces.filter((x) => x.level === o.level);
+      if (!o.level || !storey.length) continue;
+      const c = toWorld(o.at[0], o.at[1]), y = heightAt(storey[0].y, c), level = this.levelFor(y, c);
+      if (level === 0) continue;
+      (part.surfaces ??= []).push({ id: `${e.id}#t:${o.id}`, level, y, obb: { c, half: [r3((o.width / 2) * wp.s), r3(0.3 * wp.s)], yaw: r3(-(wp.yaw + o.yaw)) }, label: `${this.model.pathOf(e.id)} ${o.id} threshold`.slice(0, 100) });
+    }
+    // stairs, ramps, ladders: links between levels
+    if (baked.links?.length) part.links = baked.links.filter((l) => l.path.length >= 2).map((l) => {
+      const a = toWorld(l.path[0][0], l.path[0][1]), b = toWorld(l.path[l.path.length - 1][0], l.path[l.path.length - 1][1]);
+      const ya = heightAt(l.y0, a), yb = heightAt(l.y1, b);
+      const n = Math.max(2, Math.ceil(Math.abs(yb - ya) / 0.18) + 1), path: [number, number, number][] = [];
+      for (let k = 0; k < n; k++) { const t = k / (n - 1); path.push([r3(a[0] + (b[0] - a[0]) * t), r3(ya + (yb - ya) * t), r3(a[1] + (b[1] - a[1]) * t)]); }
+      const kind = l.kind === 'float' ? 'climb' : l.kind;
+      const la = this.levelFor(ya, a), lb = this.levelFor(yb, b);
+      return { id: `${e.id}#${l.id}`, kind: kind as 'stairs' | 'ramp' | 'ladder' | 'climb', from: { level: la, p: a, y: la === 0 && Math.abs(ya) <= GROUND_BAND ? 0 : ya }, to: { level: lb, p: b, y: lb === 0 && Math.abs(yb) <= GROUND_BAND ? 0 : yb }, width: r3(l.width * wp.s), heading: r3(Math.atan2(b[1] - a[1], b[0] - a[0])), path, usable: true };
+    });
+    // each flight's ends: its under-stair block stops short of the foot (the first tread is stepped onto, not walked
+    // under) and a head tread on the upper level bridges the stairwell edge, so both ends have standing room
+    for (const l of part.links ?? []) {
+      if (l.kind !== 'stairs' && l.kind !== 'ramp') continue;
+      const lid = l.id.slice(e.id.length + 1), d: Vec2 = [Math.cos(l.heading), Math.sin(l.heading)], T = 0.4;
+      for (const o of part.solids ?? []) {
+        if (!o.label?.endsWith(` stairs:${lid}`)) continue;
+        const along = Math.abs(Math.cos(o.obb.yaw - l.heading)) > 0.7 ? 0 : 1;
+        if (o.obb.half[along] <= T) continue;
+        o.obb.half[along] = r3(o.obb.half[along] - T / 2); o.obb.c = [r3(o.obb.c[0] + d[0] * T / 2), r3(o.obb.c[1] + d[1] * T / 2)];
+      }
+      if (l.to.level > 0) (part.surfaces ??= []).push({ id: `${l.id}:head`, level: l.to.level, y: l.to.y, obb: { c: [r3(l.to.p[0] - d[0] * 0.25), r3(l.to.p[1] - d[1] * 0.25)], half: [0.35, r3(l.width / 2)], yaw: l.heading }, label: `${this.model.pathOf(e.id)} ${lid} head`.slice(0, 100) });
+    }
+    // F1: a decoration (a fountain, a lamp, a sign, a statue, a house) is also a fixture Souls perceive: views list it,
+    // `look` finds it. No slots and no obstacle of its own: its solids above are what blocks, exactly as before.
+    if (this.seenOnly(e, def)) {
+      const facts = factsOf(def, baked, wp.s), aid = assetIdFor(facts, JSON.stringify(e.params ?? {}) + '|seen');
+      if (!known[aid] && !assets[aid]) assets[aid] = assetFromDef(aid, facts, { seen: true });
+      part.fixture = { def: aid, kind: 'fixture', label: (e.name ?? def.name.replace(/^core-/, '')).replace(/-/g, ' '), p: [r3(wp.x), r3(wp.y), r3(wp.z)], yaw: r3(-wp.yaw), support: { kind: 'ground' } };
+    }
+    if (part.solids || part.surfaces || part.links) withLinkApproaches(part);
+    return part.solids || part.surfaces || part.links || part.fixture ? part : null;
+  }
+  /** A god-built point thing that is not otherwise an engine fixture or item, and not a creature, a body or a flag. */
+  seenOnly(e: Entity, def: StoredDef): boolean {
+    const c = def.components as Record<string, unknown>;
+    return def.form === 'point' && !isFixtureDef(def) && !c.body && !c.behavior && !c.hover && !/^core[-/]flag@/.test(e.def) && e.in.parent !== undefined && !this.engineOwned(e);
+  }
+
+  private fixtureSpec(e: Entity, def: StoredDef, asset: string, a: { surfaceSlots?: { id: string; local: [number, number, number] }[]; category: string }, wp: { x: number; y: number; z: number; yaw: number }): FixtureSpecV1 {
+    const label = (e.name ?? def.name.replace(/^core-/, '')).replace(/-/g, ' ');
+    const spec: FixtureSpecV1 = { def: asset, kind: a.category === 'item' ? 'item' : 'fixture', label, p: [r3(wp.x), r3(wp.y), r3(wp.z)], yaw: r3(-wp.yaw) };
+    if (spec.kind !== 'item') return spec;
+    const parent = e.in.parent !== 'world' ? this.model.entities.get(e.in.parent) : undefined;
+    const pdef = parent ? this.model.resolvedDef(parent.def) : undefined;
+    if (parent && pdef && isFixtureDef(pdef)) {
+      const pfacts = factsOf(pdef, this.model.bake(pdef, parent.params ?? {}, parent.seed ?? 0, parent.shape), this.model.worldPose(parent).s);
+      const passet = assetFromDef(assetIdFor(pfacts, JSON.stringify(parent.params ?? {})), pfacts);
+      const pp = this.model.worldPose(parent), c = Math.cos(pp.yaw), s = Math.sin(pp.yaw), dx = wp.x - pp.x, dz = wp.z - pp.z;
+      const local: [number, number, number] = [dx * c - dz * s, wp.y - pp.y, dx * s + dz * c];
+      const slot = nearestSurfaceSlot(passet, local);
+      if (slot) {
+        const sl = passet.surfaceSlots!.find((x) => x.id === slot)!;
+        const wx = pp.x + sl.local[0] * c + sl.local[2] * s, wz = pp.z - sl.local[0] * s + sl.local[2] * c;
+        return { ...spec, p: [r3(wx), r3(pp.y + sl.local[1]), r3(wz)], support: { kind: 'resting-on', on: parent.id, slot } };
+      }
+    }
+    return { ...spec, support: { kind: 'ground' } };
+  }
+
+  private perceiveSync() { try { this.perceive.sync(); } catch (e) { this.log(`perceive: ${(e as Error).message}`); } }
+
+  // ------------------------------------------------------------------ engine → entity world
+
+  /** Trusted engine edit: journaled (by 'engine', never undone by the god), published to viewers, not echoed back. */
+  engineAct(ops: Op[], note: string): Result {
+    const god = this.god as any;
+    if ((ops as { id?: string }[]).some((o) => !o.id || !this.model.resolvedDef(this.model.entities.get(o.id)?.def ?? '')?.components.body)) this.version++;
+    if (typeof god.engineAct === 'function') {
+      const r = god.engineAct(ops, note) as Result;
+      if (r.accepted) this.noteSent(ops);
+      return r;
+    }
+    const tick = this.god.opts.tick();
+    const r = applyBatch(this.model, { ops }, 'engine', tick, { trusted: true });
+    if (!r.result.accepted) return r.result;
+    this.god.store.commit(this.model, this.god.owner, r.diff!, { seq: r.result.seq, by: 'engine', at: Date.now(), note, ops, inverse: [], kind: 'engine' as never });
+    this.god.db.db.prepare('UPDATE world_edits_v1 SET undone=1 WHERE world_id=? AND seq=?').run(this.god.opts.worldId, r.result.seq);
+    god.publish?.(r.result.seq, tick, r.diff!, 'engine');
+    this.noteSent(ops);
+    return r.result;
+  }
+  /** After an engine edit: what the engine already knows about the touched entities (no echo back to it). */
+  private noteSent(ops: Op[]) {
+    const ids = new Set<string>();
+    for (const op of ops as any[]) { if (typeof op.id === 'string') ids.add(op.id); if (op.entity?.id) ids.add(op.entity.id); }
+    for (const id of ids) for (const sid of this.model.entities.has(id) ? this.model.subtree(id) : []) {
+      const e = this.model.entities.get(sid)!;
+      const part = this.engineOwned(e) ? undefined : this.derive(e, {}, this.physics?.assets ?? {});
+      if (part !== undefined) this.sent.set(e.id, JSON.stringify(normPart(part ?? {})));
+    }
+  }
+
+  /** Items the Souls moved: write their new support back as entity-world moves. */
+  writeBack() {
+    if (this.writeBackBusy) return;
+    this.writeBackBusy = true;
+    try {
+      const ops: Op[] = [], bodies = new Set<string>(), holders = new Set<string>();
+      for (const [id, x] of Object.entries(this.engine.world.entities)) {
+        if (!x.tags?.includes('entity-world') || x.kind !== 'component') continue;
+        const e = this.model.entities.get(id); if (!e) continue;
+        const s = x.support;
+        if (s?.kind === 'in-hand') {
+          if (e.in.parent === s.by && e.in.slot === 'carry') { holders.add(s.by); continue; }
+          if (!this.model.entities.has(s.by)) continue; // the body entity is not in the entity world (pre-bridge Soul)
+          if (!bodies.has(s.by)) { const b = this.engine.world.entities[s.by]; if (b) { ops.push({ op: 'move', id: s.by, p: [r3(b.pose.p[0]), r3(b.pose.p[1]), r3(b.pose.p[2])], r: r3(-b.pose.yaw), mode: 'strict' } as Op); bodies.add(s.by); } }
+          ops.push({ op: 'move', id, in: { parent: s.by, slot: 'carry' }, p: [0, 0, 0], r: 0, mode: 'strict' } as Op);
+        } else if (s?.kind === 'resting-on') {
+          const parent = this.model.entities.get(s.on); if (!parent) continue;
+          const slotId = String(s.slot).replace(/-r\d+c\d+$/, '');
+          const pp = this.model.worldPose(parent), c = Math.cos(pp.yaw), sn = Math.sin(pp.yaw), dx = x.pose.p[0] - pp.x, dz = x.pose.p[2] - pp.z;
+          const slot = this.model.slotsOf(parent).find((q) => q.id === slotId);
+          const lx = dx * c - dz * sn - (slot?.p[0] ?? 0), lz = dx * sn + dz * c - (slot?.p[2] ?? 0);
+          const want: [number, number, number] = [r3(lx), 0, r3(lz)];
+          const have = e.p ?? [0, 0, 0];
+          if (e.in.parent === s.on && (e.in.slot ?? '') === (slot ? slotId : '') && Math.hypot((have[0] ?? 0) - want[0], (have[have.length - 1] ?? 0) - want[2]) < 0.05) continue;
+          ops.push({ op: 'move', id, in: { parent: s.on, ...(slot ? { slot: slotId } : {}) }, p: want, r: r3(-(x.pose.yaw) - pp.yaw), mode: 'strict' } as Op);
+        } else if (s?.kind === 'ground') {
+          if (e.in.parent === 'world') { const p = e.p ?? [0, 0]; if (Math.hypot(p[0] - x.pose.p[0], p[p.length - 1] - x.pose.p[2]) < 0.05) continue; }
+          // a thing the god stood in a room, on a pier's end or a balcony stays in it until a Soul moves it away
+          else { const wp = this.model.worldPose(e); if (Math.hypot(wp.x - x.pose.p[0], wp.z - x.pose.p[2]) < 0.05) continue; }
+          ops.push({ op: 'move', id, in: { parent: 'world' }, p: [r3(x.pose.p[0]), r3(x.pose.p[2])], r: r3(-x.pose.yaw), mode: 'strict' } as Op);
+        }
+      }
+      // a body carrying god things: keep its entity's pose near the engine's, so what it holds is drawn in its hands
+      // (coarsely while it walks, exactly once it stops; viewer B7 would follow the hand from the takes instead)
+      for (const id of holders) {
+        const b = this.engine.world.entities[id], e = this.model.entities.get(id); if (!b?.human || !e || bodies.has(id)) continue;
+        const have = e.p ?? [0, 0, 0], d = Math.hypot((have[0] ?? 0) - b.pose.p[0], (have.length === 3 ? have[1] : 0) - b.pose.p[1], (have[have.length - 1] ?? 0) - b.pose.p[2]);
+        const moving = (b.human.speed ?? 0) > 0.05 || b.human.activity === 'walk';
+        if (d > (moving ? 2 : 0.15)) ops.push({ op: 'move', id, p: [r3(b.pose.p[0]), r3(b.pose.p[1]), r3(b.pose.p[2])], r: r3(-b.pose.yaw), mode: 'strict' } as Op);
+      }
+      // F1: every Soul's body entity follows its engine body once it comes to rest (a walk's end, a seat), so the god's
+      // map and snapshot show where Souls are and what they sit on (one engine edit per stop, none while walking)
+      for (const [id, b] of Object.entries(this.engine.world.entities) as [string, any][]) {
+        if (!b?.human || bodies.has(id) || holders.has(id)) continue;
+        const e = this.model.entities.get(id); if (!e || e.in.parent !== 'world') continue;
+        if ((b.human.speed ?? 0) > 0.05 || ['walk', 'wade', 'swim', 'tread', 'sit-down', 'stand-up'].includes(b.human.activity)) continue;
+        const have = e.p ?? [0, 0, 0], d = Math.hypot((have[0] ?? 0) - b.pose.p[0], (have.length === 3 ? have[1] : 0) - b.pose.p[1], (have[have.length - 1] ?? 0) - b.pose.p[2]);
+        if (d > 0.4) ops.push({ op: 'move', id, p: [r3(b.pose.p[0]), r3(b.pose.p[1]), r3(b.pose.p[2])], r: r3(-b.pose.yaw), mode: 'strict' } as Op);
+      }
+      if (!ops.length) return;
+      for (const op of ops) {
+        { const o = op as { id: string; p?: number[] }; if (this.refusedPose.has(`${o.id}@${o.p?.join(',')}`)) continue; }
+        const r = this.engineAct([op], `engine: ${describeOp(op, this.model)}`);
+        if (r.accepted) this.stats.writeBacks++;
+        else {
+          // a body's pose refused (it sits inside a bench's footprint): try once more letting the compiler nudge it, and
+          // never retry the same refused pose
+          const o = op as { id: string; p?: number[]; mode?: string }, key = `${o.id}@${o.p?.join(',')}`;
+          if (this.model.resolvedDef(this.model.entities.get(o.id)?.def ?? '')?.components.body) {
+            const r2 = this.engineAct([{ ...(op as object), mode: 'nudge' } as Op], `engine: ${describeOp(op, this.model)}`);
+            if (r2.accepted) { this.stats.writeBacks++; continue; }
+            this.refusedPose.add(key); if (this.refusedPose.size > 500) this.refusedPose.clear();
+          }
+          this.log(`write-back refused for ${o.id}: ${JSON.stringify(r.failures).slice(0, 200)}`);
+        }
+      }
+    } finally { this.writeBackBusy = false; }
+  }
+
+  /** Birth: the Soul's body becomes an entity (core/humanoid) with the engine's own id (spec 31 §3 rule 3). */
+  bodyBorn(p: { entityId: string; soulId: string; name: string }) {
+    if (this.model.entities.has(p.entityId) || !this.model.def(BODY_DEF)) return;
+    const b = this.engine.world.entities[p.entityId];
+    const pos: [number, number, number] = b ? [r3(b.pose.p[0]), r3(b.pose.p[1]), r3(b.pose.p[2])] : [0, 0, 0];
+    const slug = (p.name ?? 'soul').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 30) || 'soul';
+    const name = this.model.names.has(`world/${slug}`) ? `${slug}-${p.entityId.slice(2, 6)}` : slug;
+    const entity = { id: p.entityId, name, def: BODY_DEF, in: { parent: 'world' }, p: pos, r: 0, anchor: 'center', state: {}, by: 'engine', born: this.god.opts.tick(), v: 1 } as unknown as Entity;
+    const r = this.engineAct([{ op: 'restore', entity } as Op], `birth: ${p.name}'s body`);
+    if (r.accepted) this.stats.bodies++; else this.log(`body entity for ${p.entityId} refused: ${JSON.stringify(r.failures).slice(0, 300)}`);
+  }
+  bodyRetired(p: { entityId: string }) {
+    if (!this.model.entities.has(p.entityId)) return;
+    const ops: Op[] = [...(this.model.children.get(p.entityId) ?? [])].map((c) => ({ op: 'move', id: c, in: { parent: 'world' }, p: [r3(this.model.worldPose(this.model.entities.get(c)!).x), r3(this.model.worldPose(this.model.entities.get(c)!).z)], mode: 'nudge' } as Op));
+    ops.push({ op: 'remove', id: p.entityId, cascade: true } as Op);
+    const r = this.engineAct(ops, 'retire: body removed');
+    if (!r.accepted) this.log(`retire ${p.entityId}: ${JSON.stringify(r.failures).slice(0, 200)}`);
+  }
+
+  // ------------------------------------------------------------------ god edits respect bodies
+
+  /** Who uses an entity (or anything in its subtree): a seated Soul, a holding Soul. */
+  usesOf(id: string): { id: string; body: string; how: 'occupied' | 'held'; soul: string } | null {
+    for (const sid of this.model.subtree(id)) {
+      const e = this.model.entities.get(sid);
+      // a thing in a body's hands (its entity-world parent is the body)
+      if (e && e.in.parent !== 'world' && this.model.resolvedDef(this.model.entities.get(e.in.parent)?.def ?? '')?.components.body) return { id: sid, body: e.in.parent, how: 'held', soul: this.soulName(e.in.parent) };
+      const u = this.engine.bodyUsesV1(sid);
+      if (u) return { id: sid, ...u, soul: this.soulName(u.body) };
+    }
+    return null;
+  }
+  /** The compiler hook (one entity, no subtree walk): a body, a thing in a body's hands, a seat or item in use. */
+  usesOne(id: string): { code: 'occupied.by-body' | 'held.by-body'; detail: string } | null {
+    const e = this.model.entities.get(id); if (!e) return null;
+    if (this.model.resolvedDef(e.def)?.components.body) { this.stats.refusals++; return { code: 'occupied.by-body', detail: `${this.model.pathOf(id)} is ${this.soulName(id)}'s body; bodies move themselves` }; }
+    const holder = e.in.parent !== 'world' && this.model.resolvedDef(this.model.entities.get(e.in.parent)?.def ?? '')?.components.body ? e.in.parent : null;
+    const u = holder ? { body: holder, how: 'held' as const } : this.engine.bodyUsesV1(id);
+    if (!u) return null;
+    this.stats.refusals++;
+    const soul = this.soulName(u.body), what = this.model.pathOf(id);
+    return { code: u.how === 'held' ? 'held.by-body' : 'occupied.by-body', detail: `${soul} (${u.body}) is ${u.how === 'held' ? 'holding' : 'sitting on'} ${what}; wait until they are done (or ask them in a prayer answer)` };
+  }
+  private soulName(body: string) { return String(this.engine.world.entities[body]?.label ?? body); }
+
+  /** Refusals for a batch whose ops would move or remove something a Soul is using (null = fine). */
+  bodyRefusal(ops: unknown[]): Result | null {
+    if (!Array.isArray(ops)) return null;
+    for (const [i, raw] of ops.entries()) {
+      const op = raw as { op?: string; id?: string; params?: unknown; entity?: Entity };
+      if (!op || (op.op !== 'remove' && op.op !== 'move' && !(op.op === 'set' && op.params))) continue;
+      const target = typeof op.id === 'string' && !op.id.startsWith('$') ? this.model.get(op.id) : undefined;
+      if (!target) continue;
+      if (this.model.resolvedDef(target.def)?.components.body) { this.stats.refusals++; return { accepted: false, failures: [{ op: i, code: 'occupied.by-body', detail: `${this.model.pathOf(target.id)} is ${this.soulName(target.id)}'s body; bodies move themselves` }] }; }
+      const u = this.usesOf(target.id);
+      if (!u) continue;
+      this.stats.refusals++;
+      const what = this.model.pathOf(u.id);
+      const detail = u.how === 'held' ? `${u.soul} (${u.body}) is holding ${what}` : `${u.soul} (${u.body}) is sitting on ${what}${u.id !== target.id ? ` inside ${this.model.pathOf(target.id)}` : ''}`;
+      return { accepted: false, failures: [{ op: i, code: u.how === 'held' ? 'held.by-body' : 'occupied.by-body', detail: `${detail}; wait until they are done (or ask them in a prayer answer)` }] };
+    }
+    return null;
+  }
+
+  /** Bodies standing where newly placed/moved solids now are: the engine lifts them clear (warned, never refused). */
+  private buried(ids: string[]): string[] {
+    const out: string[] = [], seen = new Set<string>();
+    for (const id of new Set(ids)) for (const sid of this.model.entities.has(id) ? this.model.subtree(id) : []) for (const o of this.model.footprintsOf(sid)) {
+      for (const b of Object.values(this.engine.world.entities) as any[]) {
+        if (!b.human || seen.has(b.id)) continue;
+        const y = b.pose.p[1]; if (o.y1 <= y + 0.22 || o.y0 >= y + 1.8) continue;
+        const c = Math.cos(o.yaw), s = Math.sin(o.yaw), dx = b.pose.p[0] - o.c[0], dz = b.pose.p[2] - o.c[1];
+        const lx = dx * c - dz * s, lz = dx * s + dz * c; // into the box frame (entity convention)
+        if (Math.abs(lx) <= o.half[0] + 0.28 && Math.abs(lz) <= o.half[1] + 0.28) { seen.add(b.id); out.push(`body.lifted: ${this.soulName(b.id)} (${b.id}) stood where ${this.model.pathOf(sid)} now is; they step clear to the nearest open ground`); }
+      }
+    }
+    return out;
+  }
+
+  /** Bodies that cannot step clear of an edit: seated, standing on an upper floor, lying down, carried or aboard.
+   *  (Idle bodies on the ground are lifted/stepped clear instead — `buried` warns, the engine relocates them.) */
+  private pinnedBodies(): { id: string; p: [number, number, number]; doing: string }[] {
+    const out: { id: string; p: [number, number, number]; doing: string }[] = [];
+    for (const b of Object.values(this.engine.world.entities) as any[]) {
+      const h = b.human; if (!h) continue;
+      const seated = h.activity === 'sit' || h.baseActivity === 'sit', level = h.level ?? 0;
+      if (!seated && level === 0 && !h.on && !h.carrier && !h.sleepPose) continue;
+      const seat = seated ? this.seatOf(b.id) : null;
+      out.push({ id: b.id, p: [b.pose.p[0], b.pose.p[1], b.pose.p[2]], doing: seated ? `sitting${seat ? ` on ${this.model.pathOf(seat)}` : ''}` : level !== 0 ? `standing on floor ${level}` : 'busy' });
+    }
+    return out;
+  }
+  private seatOf(body: string): string | null {
+    for (const id of this.model.entities.keys()) { const u = this.engine.bodyUsesV1(id); if (u?.body === body && u.how === 'occupied') return id; }
+    return null;
+  }
+
+  /** 31 §3 rule 8 (R2): a god edit that would bury or unseat a body that cannot step clear is refused, naming the body —
+   *  the ground rising over it, a new solid where it is, or the thing it sits on (or the house around it) moved as a
+   *  side effect (re-settled on new ground, re-solved constraints). Direct removes/moves/param edits of a used thing
+   *  are refused by the compiler's `uses` hook; this covers what only the would-be world shows. It runs as the compiler's
+   *  `refuse` hook on the plan's own scratch (`after`), once per plan, after the plan succeeds. Null = fine. */
+  pinnedCheck(after: WorldModel, diff: Diff, ops: unknown[]): Failure | null {
+    const pinned = this.pinnedBodies(); if (!pinned.length) return null;
+    const name = (b: { id: string; doing: string }) => `${this.soulName(b.id)} (${b.id}), ${b.doing}`;
+    const no = (i: number, detail: string): Failure => { this.stats.refusals++; return { op: i, code: 'occupied.by-body', detail: `${detail}; wait until they are done (or ask them in a prayer answer)` }; };
+    const opOf = (id: string) => { const k = ops.findIndex((o) => { const x = o as { id?: string; name?: string }; return x?.id === id || x?.id === this.model.pathOf(id) || (x?.name && this.model.get(x.name)?.id === id); }); return k < 0 ? 0 : k; };
+    for (const e of diff.upserts) {
+      const live = this.model.entities.get(e.id); if (!live || this.model.resolvedDef(live.def)?.components.body) continue;
+      // 1. the seat (or anything around it) moved as a side effect
+      const a = this.model.worldPose(live), w = after.worldPose(e);
+      if (Math.hypot(a.x - w.x, a.y - w.y, a.z - w.z) > 1e-3 || Math.abs(a.yaw - w.yaw) > 1e-4) for (const sid of this.model.subtree(e.id)) {
+        const u = this.engine.bodyUsesV1(sid); const b = u && pinned.find((x) => x.id === u.body);
+        if (b) return no(opOf(e.id), `would move ${this.model.pathOf(e.id)} by ${Math.round(Math.hypot(a.x - w.x, a.y - w.y, a.z - w.z) * 100) / 100} m and unseat ${name(b)}`);
+      }
+    }
+    // 2. the ground rising over a pinned body
+    if (diff.tiles.length) for (const b of pinned) {
+      const g = after.terrain.sample(b.p[0], b.p[2]);
+      if (g > b.p[1] + 0.25) return no(Math.max(0, ops.findIndex((o) => (o as { op?: string })?.op === 'place' || (o as { op?: string })?.op === 'move' || (o as { op?: string })?.op === 'set')), `would raise the ground at (${r3(b.p[0])}, ${r3(b.p[2])}) to ${r3(g)} m, over ${name(b)} at ${r3(b.p[1])} m`);
+    }
+    // 3. a new or changed solid where a pinned body is
+    for (const e of diff.upserts) {
+      const def = after.resolvedDef(e.def); if (!def || def.layer !== 'solid' || def.components.body) continue;
+      const fp = after.footprint(e, def); if (!fp.length) continue;
+      const live = this.model.entities.get(e.id);
+      if (live && JSON.stringify(this.model.footprint(live)) === JSON.stringify(fp)) continue;
+      for (const o of fp) for (const b of pinned) {
+        const y = b.p[1]; if (o.y1 <= y + 0.22 || o.y0 >= y + 1.6) continue;
+        const c = Math.cos(o.yaw), s = Math.sin(o.yaw), dx = b.p[0] - o.c[0], dz = b.p[2] - o.c[1];
+        if (Math.abs(dx * c - dz * s) <= o.half[0] + 0.2 && Math.abs(dx * s + dz * c) <= o.half[1] + 0.2) return no(opOf(e.id), `would bury ${name(b)} under ${after.pathOf(e.id)}`);
+      }
+    }
+    return null;
+  }
+  /** A refused plan whose overlap is with a pinned body's seat: a solid dropped onto a seated body overlaps its seat
+   *  first, so name the body, not just the seat (null = leave the refusal as it is). */
+  buryRefusal(failures: readonly Failure[], codes: readonly string[] = ['overlap.solid']): Result | null {
+    if (!failures.some((fl) => codes.includes(fl.code))) return null;
+    const pinned = this.pinnedBodies(); if (!pinned.length) return null;
+    for (const fl of failures) {
+      if (!codes.includes(fl.code)) continue;
+      const hit = /overlaps (\S+)(?: (\S+))?$/.exec(fl.detail); const other = hit ? this.model.get(hit[2] ?? hit[1]) : undefined;
+      const b = other && pinned.find((x) => this.engine.bodyUsesV1(other.id)?.body === x.id);
+      if (b) { this.stats.refusals++; return { accepted: false, failures: [{ op: fl.op, code: 'occupied.by-body', detail: `would bury ${this.soulName(b.id)} (${b.id}), ${b.doing}: ${fl.detail}; wait until they are done (or ask them in a prayer answer)` }] }; }
+    }
+    return null;
+  }
+  /** The same check for a god without the compiler hook: plans the batch on a fork (a second plan). */
+  pinnedRefusal(batch: unknown, trusted = false): Result | null {
+    if (!this.pinnedBodies().length) return null;
+    const ops = batch && typeof batch === 'object' ? ((batch as { ops?: unknown[] }).ops ?? []) : [];
+    let pinned: Failure | null = null;
+    const p = plan(this.model.fork(), batch, 'god', this.engine.world.tick, { trusted, refuse: (after, diff) => (pinned = this.pinnedCheck(after, diff, ops)) });
+    if (p.ok) return null;
+    return pinned ? { accepted: false, failures: [pinned] } : this.buryRefusal(p.failures);
+  }
+
+  /** Body checks on the god's edit entry points. With the compiler's `refuse` hook installed (GodMode.bodies) each batch
+   *  is planned once: the check runs on the plan's own scratch, and a refused plan's overlap with a seat is renamed to
+   *  the body; without it, each batch is first planned on a fork. Only costs anything while some body is pinned. */
+  private guardPinned(hooked: boolean) {
+    const g = this.god as any;
+    const act = g.act.bind(g), dryrun = g.dryrun.bind(g), preview = g.preview.bind(g), undo = g.undo.bind(g), redo = g.redo.bind(g);
+    if (hooked) {
+      const named = <T extends { accepted: boolean; failures?: Failure[] }>(r: T, codes?: string[], extra: object = {}): T => {
+        if (r.accepted || !r.failures) return r;
+        const b = this.buryRefusal(r.failures, codes); return b ? ({ ...extra, accepted: false, failures: (b as { failures: Failure[] }).failures } as unknown as T) : r;
+      };
+      g.act = (batch: unknown, note?: string) => named(act(batch, note));
+      g.dryrun = (batch: unknown) => named(dryrun(batch));
+      g.preview = (batch: unknown) => { const r = preview(batch); return named(r, undefined, { id: r.id }); };
+      // a revert reports an overlap as undo.conflict (same detail)
+      g.undo = () => named(undo(), ['overlap.solid', 'undo.conflict']);
+      g.redo = () => named(redo(), ['overlap.solid', 'undo.conflict']);
+      return;
+    }
+    g.act = (batch: unknown, note?: string) => this.pinnedRefusal(batch) ?? act(batch, note);
+    g.dryrun = (batch: unknown) => { const r = this.pinnedRefusal(batch); return r ? { accepted: false, failures: (r as { failures: unknown }).failures } : dryrun(batch); };
+    g.preview = (batch: unknown) => { const r = this.pinnedRefusal(batch); return r ? { id: null, accepted: false, failures: (r as { failures: unknown }).failures } : preview(batch); };
+    g.undo = () => { const t = this.god.store.undoable(); return (t && t.inverse.length ? this.pinnedRefusal({ ops: t.inverse }, true) : null) ?? undo(); };
+    g.redo = () => { const t = this.god.store.redoable(); return (t && t.inverse.length ? this.pinnedRefusal({ ops: t.inverse }, true) : null) ?? redo(); };
+  }
+
+  /** Wrap the god's edit entry points with body-aware refusals (L1: replace with a compiler hook, see status file). */
+  private guardGod() {
+    const g = this.god as any;
+    const act = g.act.bind(g), dryrun = g.dryrun.bind(g), preview = g.preview.bind(g), undo = g.undo.bind(g), redo = g.redo.bind(g);
+    const opsOf = (b: unknown) => (b && typeof b === 'object' ? (b as { ops?: unknown[] }).ops ?? [] : []);
+    g.act = (batch: unknown, note?: string) => {
+      const no = this.bodyRefusal(opsOf(batch)); if (no) return no;
+      const r = act(batch, note) as Result;
+      if (r.accepted) for (const w of this.buried(Object.values(r.ids))) r.warnings.push(w);
+      return r;
+    };
+    g.dryrun = (batch: unknown) => { const r = this.bodyRefusal(opsOf(batch)); return r ? { accepted: false, failures: (r as { failures: unknown }).failures } : dryrun(batch); };
+    g.preview = (batch: unknown) => { const r = this.bodyRefusal(opsOf(batch)); return r ? { id: null, accepted: false, failures: (r as { failures: unknown }).failures } : preview(batch); };
+    g.undo = () => { const t = this.god.store.undoable(); const r = t ? this.bodyRefusal(t.inverse) : null; return r ?? undo(); };
+    g.redo = () => { const t = this.god.store.redoable(); const r = t ? this.bodyRefusal(t.inverse) : null; return r ?? redo(); };
+  }
+
+  // ------------------------------------------------------------------ reach
+
+  private endOf(x: ReachEnd): { p: Vec2; level: number; what: string } | { error: string } {
+    if (Array.isArray(x)) { const y = x.length === 3 ? x[1] : 0; const p: Vec2 = [x[0], x[x.length - 1]]; return { p, level: this.levelOfY(y as number), what: `(${p.join(', ')})` }; }
+    const [path, room] = String(x).split(':');
+    const e = this.model.get(path);
+    if (!e) return { error: `no such entity or point ${x}` };
+    if (room) {
+      const slot = this.model.slotsOf(e).find((s) => s.id === room && (s.kind === 'room' || s.kind === 'floor'));
+      if (!slot) return { error: `${path} has no room ${room}` };
+      const wp = this.model.worldPose(e), c = Math.cos(wp.yaw), s = Math.sin(wp.yaw);
+      const at: Vec2 = [wp.x + (slot.p[0] * c + slot.p[2] * s) * wp.s, wp.z + (-slot.p[0] * s + slot.p[2] * c) * wp.s];
+      const level = this.levelOfY(wp.y + slot.p[1] * wp.s);
+      const p = this.engine.standableNearV1(at, level, undefined, 0.4, 40);
+      return p ? { p, level, what: `${path}:${room}` } : { error: `no standing room in ${path}:${room}` };
+    }
+    const body = this.engine.world.entities[e.id];
+    if (body?.human) return { p: [body.pose.p[0], body.pose.p[2]], level: body.human.level ?? 0, what: this.model.pathOf(e.id) };
+    const wp = this.model.worldPose(e), level = body ? this.levelOfY(body.pose.p[1]) : this.levelOfY(wp.y);
+    const p = this.engine.standableNearV1([wp.x, wp.z], level, undefined, 0.4, 40);
+    return p ? { p, level, what: this.model.pathOf(e.id) } : { error: `no standing room near ${this.model.pathOf(e.id)}` };
+  }
+  /** Engine level of a standing height at (x, z): 0 within reach of the terrain there (hills too), else a floor's level. */
+  levelAt(x: number, z: number, y: number): number {
+    if (Math.abs(y - this.model.terrain.sample(x, z)) <= GROUND_BAND + 0.5) return 0;
+    const hit = this.levels.find((l) => Math.abs(l.y - y) <= 0.6); if (hit) return hit.id;
+    const below = this.levels.filter((l) => l.y <= y + 0.5).sort((a, b) => b.y - a.y)[0];
+    return below?.id ?? 0;
+  }
+  private levelOfY(y: number) { if (Math.abs(y) <= GROUND_BAND + 0.5) return 0; const l = this.levels.reduce<Level | null>((b, l) => (l.y <= y + 0.5 && (!b || l.y > b.y) ? l : b), null); return l?.id ?? 0; }
+  reach(from: ReachEnd, to: ReachEnd) {
+    const a = this.endOf(from), b = this.endOf(to);
+    if ('error' in a) return { reachable: false, code: 'reach.bad-from', detail: a.error };
+    if ('error' in b) return { reachable: false, code: 'reach.bad-to', detail: b.error };
+    const r = this.engine.reachV1({ p: a.p, level: a.level }, { p: b.p, level: b.level });
+    return r.ok ? { reachable: true, from: { ...a }, to: { ...b }, length: r.length, legs: r.legs, levels: r.levels }
+      : { reachable: false, from: { ...a }, to: { ...b }, code: r.code, detail: r.message };
+  }
+
+  // ------------------------------------------------------------------ Souls: capabilities on god things, prayers
+
+  private hookEdge(L: EdgeLedger) {
+    const prev = L.worldProfile;
+    L.worldProfile = (soul, caps, plans) => { prev?.(soul, caps, plans); try { this.capabilities(soul, caps, plans as never); } catch (e) { this.log(`capabilities: ${(e as Error).message}`); } };
+    const act = L.act.bind(L), self = this;
+    (L as any).act = async function (soul: EdgeSoul, input: { capability?: unknown; params?: unknown; clientRef?: unknown }) {
+      if (input?.capability === 'pray' || (typeof input?.capability === 'string' && /^pray(\s|:|$)/.test(input.capability))) return self.pray(L, soul, input);
+      return act(soul, input as never);
+    };
+  }
+  private pray(L: EdgeLedger, soul: EdgeSoul, input: { capability?: unknown; params?: unknown; clientRef?: unknown }) {
+    const params = (input.params ?? {}) as { text?: unknown };
+    const text = typeof params.text === 'string' ? params.text.trim() : typeof input.capability === 'string' ? input.capability.replace(/^pray[:\s]*/, '').trim() : '';
+    if (!text) return { accepted: false as const, capability: 'pray', code: 'capability.params', reason: 'pray needs {"text": "…"} (what you ask of the god of this world)' };
+    try {
+      const p = this.god.pray({ id: soul.soulId, name: soul.name }, text);
+      const r = (L as any).insert(soul, 'pray', 'completed', typeof input.clientRef === 'string' ? input.clientRef : undefined, true, { prayer: p.id });
+      return { accepted: true as const, receipt: (L as any).receipt(soul.soulId, r.id), result: { prayer: p.id, note: 'The god reads prayers when present; answers appear in GET /v1/god/prayers/mine.' } };
+    } catch (e) { const err = e as { code?: string; message?: string }; return { accepted: false as const, capability: 'pray', code: err.code ?? 'pray.refused', reason: err.message ?? 'the prayer was not heard' }; }
+  }
+
+  /** Capabilities on god-placed things near this Soul: sit on chairs, pick up items, put them on tables; and pray. */
+  capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>) {
+    try { this.nav.capabilities(soul, caps, plans); } catch (e) { this.log(`nav capabilities: ${(e as Error).message}`); }
+    try { this.perceive.capabilities(soul, caps, plans); } catch (e) { this.log(`perceive capabilities: ${(e as Error).message}`); }
+    caps.push({ id: 'pray', verb: 'pray', label: 'Pray to the god of this world (params: {"text": "…"}); answers come back under GET /v1/god/prayers/mine', available: true, params: { text: { type: 'string', maxLength: 2000 } } });
+    const ents = this.engine.world.entities, me = ents[soul.entityId]; if (!me?.human) return;
+    const here: Vec2 = [me.pose.p[0], me.pose.p[2]];
+    const held = Object.values(ents).find((x: any) => x.tags?.includes('entity-world') && x.support?.kind === 'in-hand' && x.support.by === soul.entityId) as any;
+    const name = (id: string) => (this.model.entities.has(id) ? this.model.pathOf(id) : String(ents[id]?.label ?? id));
+    const levelOf = (x: any) => this.levelOfY(x.pose.p[1]);
+    const near = Object.values(ents).filter((x: any) => x.tags?.includes('entity-world') && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) <= NEAR) as any[];
+    near.sort((a, b) => Math.hypot(a.pose.p[0] - here[0], a.pose.p[2] - here[1]) - Math.hypot(b.pose.p[0] - here[0], b.pose.p[2] - here[1]) || (a.id < b.id ? -1 : 1));
+    const approach = (x: any): { verb: string; params: Record<string, unknown> }[] => {
+      const level = levelOf(x); if (level === (me.human.level ?? 0) && Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]) < 3) return [];
+      const at = this.engine.standableNearV1([x.pose.p[0], x.pose.p[2]], level, soul.entityId, 0.4, 16);
+      return at ? [{ verb: 'mars:walk_to', params: { x: at[0], z: at[1], level } }] : [];
+    };
+    const stand = me.human.activity === 'sit' || me.human.baseActivity === 'sit' ? [{ verb: 'stand', params: {} }] : [];
+    for (const x of near) {
+      const asset = (this.physics?.assets[x.def] ?? {}) as { slots?: { kind: string }[]; surfaceSlots?: { id: string }[]; category?: string };
+      const d = Math.round(Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]));
+      if (asset.slots?.some((s) => s.kind === 'seat')) {
+        const u = this.engine.bodyUsesV1(x.id), mine = u?.body === soul.entityId;
+        const seats = asset.slots.filter((s) => s.kind === 'seat').length, taken = this.seatTakers(x.id), others = taken.filter((b) => b !== soul.entityId);
+        // what it is and what it is by (P4): "Sit on e_… (a bench, by pond; 12 m)" — so "sit on the bench by the pond"
+        // resolves through the ledger's vocabulary (every word in the label) to this seat and not another bench
+        const ent = this.model.entities.get(x.id), kind = ent ? this.model.resolvedDef(ent.def)?.name.replace(/^core-/, '') : undefined;
+        const by = ent ? this.nav.namesNear([x.pose.p[0], x.pose.p[2]], x.id) : [];
+        const id = `sit:${x.id}`, label = `Sit on ${name(x.id)} (${kind && !name(x.id).split('/').pop()!.includes(kind) ? `a ${kind}, ` : ''}${by.length ? `by ${by.join(' and ')}; ` : ''}${d} m${levelOf(x) ? `, floor ${levelOf(x)}` : ''})`;
+        // F1: a bench for two stays free while one of its seats is; the seat a Soul sits on is not free to itself
+        const full = others.length >= seats || (!!u && !mine && seats <= 1);
+        const block = mine ? { code: 'seat.yours', reason: `You are sitting on ${name(x.id)} already; stand:here to get up.` } : full ? { code: 'seat.taken', reason: `${(others.length ? others : [u!.body]).map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} sitting there.` } : null;
+        caps.push({ id, verb: 'sit', label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: 60 } } });
+        plans.set(id, { label, steps: [{ verb: 'sit', params: { on: x.id, seconds: 60 } }], seconds: true });
+      }
+      if (asset.category === 'item' && x.support?.kind !== 'in-hand' && !held) {
+        const id = `pick-up:${x.id}`, label = `Pick up ${name(x.id)} (${d} m${levelOf(x) ? `, floor ${levelOf(x)}` : ''})`;
+        caps.push({ id, verb: 'pick-up', label, target: { id: x.id, kind: 'item' }, available: true });
+        plans.set(id, { label, steps: [...stand, ...approach(x), { verb: 'mars:take_item', params: { item: x.id, hand: 'right' } }] });
+      }
+      if (held && asset.surfaceSlots?.length) {
+        const taken = new Set(Object.values(ents).filter((o: any) => o.support?.kind === 'resting-on' && o.support.on === x.id).map((o: any) => o.support.slot));
+        const free = asset.surfaceSlots.find((s) => !taken.has(s.id));
+        const id = `put-on:${x.id}`, label = `Put ${name(held.id)} on ${name(x.id)} (${d} m)`;
+        caps.push({ id, verb: 'put-on', label, target: { id: x.id, kind: 'object' }, available: !!free, ...(free ? {} : { blocked: { code: 'surface.full', reason: `${name(x.id)} has no free place.` } }) });
+        if (free) plans.set(id, { label, steps: [...stand, ...approach(x), { verb: 'mars:put_item', params: { item: held.id, surfaceSlot: `${x.id}#${free.id}` } }] });
+      }
+    }
+    this.sitHere(caps, plans, here);
+  }
+  /** Bodies sitting on a god-built seat fixture (any of its seat slots). */
+  seatTakers(id: string): string[] {
+    const e = this.engine as unknown as { seatOccupantsV1?: (id: string) => { slot: string; body: string }[] };
+    if (e.seatOccupantsV1) return e.seatOccupantsV1.call(this.engine, id).map((x) => x.body);
+    const u = this.engine.bodyUsesV1(id); return u?.how === 'occupied' ? [u.body] : [];
+  }
+  /** F1: the ledger lists `sit:here` before the world profile adds god-built seats, so it says "no free seat within
+   *  30 m" beside free benches. Point it at the nearest free god-built seat instead (the same plan as its sit:<id>). */
+  private sitHere(caps: EdgeCapability[], plans: Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>, here: Vec2) {
+    const i = caps.findIndex((c) => c.id === 'sit:here'); if (i < 0 || caps[i].target) return;
+    const ents = this.engine.world.entities;
+    const best = caps.filter((c) => c.verb === 'sit' && c.id !== 'sit:here' && c.available && c.target && ents[c.target.id]?.tags?.includes('entity-world') && plans.has(c.id))
+      .map((c) => ({ c, d: Math.hypot(ents[c.target!.id].pose.p[0] - here[0], ents[c.target!.id].pose.p[2] - here[1]) })).filter((x) => x.d <= 30).sort((a, b) => a.d - b.d || (a.c.id < b.c.id ? -1 : 1))[0];
+    if (!best) return;
+    const plan = plans.get(best.c.id)!;
+    caps[i] = { ...caps[i], label: `Sit down on the nearest free seat (${best.c.label.replace(/^Sit on /, '')})`, target: best.c.target, available: true };
+    plans.set('sit:here', { label: 'Sit down', steps: structuredClone(plan.steps), seconds: true });
+  }
+}
+
+// ---------- helpers
+
+/** Adapter facts of a def at an entity's scale. */
+function factsOf(def: StoredDef, baked: ReturnType<WorldModel['bake']>, scale: number): DefFacts {
+  return {
+    ref: def.ref, hash: def.hash, name: def.name, description: def.description, tags: def.tags, layer: def.layer,
+    components: def.components as DefFacts['components'],
+    slots: baked.slots.map((s) => ({ id: s.id, kind: s.kind, p: [s.p[0] * scale, s.p[1] * scale, s.p[2] * scale] as [number, number, number], yaw: s.yaw, ...(s.height !== undefined ? { height: s.height * scale } : {}), capacity: s.capacity })),
+    box: [baked.box[0] * scale, baked.box[1] * scale, baked.box[2] * scale],
+    ...(def.palette ? { palette: def.palette } : {}),
+  };
+}
+
+/** A polygon as an oriented rectangle in its own frame (exact for rectangles; the bounding box of its longest edge's frame otherwise). */
+export function rectOf(poly: Vec2[]): { c: Vec2; half: Vec2; yaw: number } {
+  if (poly.length < 3) return { c: poly[0] ?? [0, 0], half: [0.05, 0.05], yaw: 0 };
+  let best = 0, bl = -1;
+  for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]); if (l > bl + 1e-9) { bl = l; best = i; } }
+  const a = poly[best], b = poly[(best + 1) % poly.length], ux = (b[0] - a[0]) / bl, uz = (b[1] - a[1]) / bl;
+  let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+  for (const [x, z] of poly) { const u = x * ux + z * uz, v = -x * uz + z * ux; u0 = Math.min(u0, u); u1 = Math.max(u1, u); v0 = Math.min(v0, v); v1 = Math.max(v1, v); }
+  const cu = (u0 + u1) / 2, cv = (v0 + v1) / 2;
+  // three.js-convention yaw of the frame (u along x): x = u·cos + v·sin… the frame rotates local +x onto (ux, uz)
+  const yaw = Math.atan2(-uz, ux);
+  return { c: [r3(cu * ux - cv * uz), r3(cu * uz + cv * ux)], half: [r3((u1 - u0) / 2), r3((v1 - v0) / 2)], yaw: Math.abs(yaw) < 1e-9 ? 0 : r3(yaw) };
+}
+
+function normPart(p: Part): Part { const o: Part = {}; if (p.surfaces?.length) o.surfaces = p.surfaces; if (p.solids?.length) o.solids = p.solids; if (p.links?.length) o.links = p.links; if (p.fixture) o.fixture = p.fixture; return o; }
+function fixtureOfEngine(e: any): FixtureSpecV1 { return { def: e.def, kind: e.kind === 'component' ? 'item' : 'fixture', label: e.label, p: [e.pose.p[0], e.pose.p[1], e.pose.p[2]], yaw: e.pose.yaw, ...(e.support ? { support: e.support } : {}) }; }
+function describeOp(op: Op, w: WorldModel): string {
+  const o = op as { op: string; id?: string; in?: { parent: string; slot?: string } };
+  const who = o.id ? w.pathOf(o.id) || o.id : '';
+  if (o.op === 'move' && o.in) return `${who} → ${o.in.parent === 'world' ? 'the ground' : `${w.pathOf(o.in.parent) || o.in.parent}${o.in.slot ? '/' + o.in.slot : ''}`}`;
+  return `${o.op} ${who}`;
+}
+
+/** Install the bridge on an entity world (main.ts). */
+export function installEngineBridge(o: BridgeOptions): EngineBridge { return new EngineBridge(o); }

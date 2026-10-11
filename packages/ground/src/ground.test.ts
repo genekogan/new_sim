@@ -103,9 +103,10 @@ test('schema refuses malformed landforms', () => {
 
 test('a 1 km world bakes in budget', () => {
   const t = new Terrain(world());
-  const t0 = performance.now();
+  // CPU time, not wall time: the budget is about our code, not about how loaded the machine is.
+  const c0 = process.cpuUsage();
   for (let tz = -8; tz < 8; tz++) for (let tx = -8; tx < 8; tx++) t.tile(tx, tz);
-  const ms = performance.now() - t0;
+  const c1 = process.cpuUsage(c0), ms = (c1.user + c1.system) / 1000;
   assert.equal(t.cachedTiles, 256);
   assert.ok(ms < 4000, `256 tiles took ${ms.toFixed(0)} ms`);
 });

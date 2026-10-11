@@ -3,6 +3,7 @@
 // browser bake the same 64 m tiles at 1 m spacing from the same records and
 // sample the tiles, never the raw function, so they agree to the bit.
 import { z } from 'zod';
+import { brushBody, brushForm, channelBody, channelForm, cliffBody, cliffForm, terraceBody, terraceForm } from './forms.ts';
 
 export const GROUND_SCHEMA = 'ground/1';
 /** Tile edge in metres and samples per edge (65 × 65 corner samples). */
@@ -43,16 +44,20 @@ const pad = z.object({
   area: poly, level: finite, edge: finite.positive().default(1.5),
 });
 
-export const landformSchema = z.discriminatedUnion('kind', [bump, ridge, plateau, carve, pad]);
+// Tranche-2 kinds (L3, forms.ts): cliff, terrace, channel, brush. Additive: the five originals fold exactly as before.
+export const landformSchema = z.discriminatedUnion('kind', [bump, ridge, plateau, carve, pad, cliffForm, terraceForm, channelForm, brushForm]);
 export type Landform = z.infer<typeof landformSchema>;
 /** A landform without its id (for defs that carry one as a component; the entity id becomes the landform id). */
-export const landformBodySchema = z.discriminatedUnion('kind', [bump.omit({ id: true }), ridge.omit({ id: true }), plateau.omit({ id: true }), carveBase.omit({ id: true }).refine(areaOrPath, { message: 'carve needs area, or path + w' }), pad.omit({ id: true })]);
+export const landformBodySchema = z.discriminatedUnion('kind', [bump.omit({ id: true }), ridge.omit({ id: true }), plateau.omit({ id: true }), carveBase.omit({ id: true }).refine(areaOrPath, { message: 'carve needs area, or path + w' }), pad.omit({ id: true }), cliffBody, terraceBody, channelBody, brushBody]);
 export type LandformBody = z.infer<typeof landformBodySchema>;
 
 /** Standing water: surface level over an area or along a path. Depth = level − ground. */
 export const waterSchema = z.object({
   id: z.string(), area: poly.optional(), path: path.optional(), w: finite.positive().optional(), level: finite,
-}).refine((c) => (c.area ? !c.path : !!c.path && c.w !== undefined), { message: 'water needs area, or path + w' });
+  /** Path water only (rivers, L3): surface level per path point, flowing from the first to the last. `level` stays the lowest. */
+  levels: z.array(finite).max(512).optional(),
+}).refine((c) => (c.area ? !c.path : !!c.path && c.w !== undefined), { message: 'water needs area, or path + w' })
+  .refine((c) => !c.levels || (!!c.path && c.levels.length === c.path.length), { message: 'water levels need a path and one level per point' });
 export type Water = z.infer<typeof waterSchema>;
 
 /** Low-amplitude value noise over natural forms only; integer-hash based, engine-independent. */

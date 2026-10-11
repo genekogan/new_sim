@@ -1,6 +1,7 @@
 // The height function. h = natural → carve → pad (spec §4.1). Total and
 // deterministic; order within a class is array order (callers keep it by birth).
 import { areaMask, bumpK, distPolyEdge, distPolyline, pathMask, pointInPoly, polyBounds, powPeak, smooth, sq, valueNoise } from './geom.ts';
+import { brushFalloff, brushRaise, channelApply, cliffReach, cliffRise, KERNEL, smoothRadius, terraceTarget } from './forms.ts';
 import type { Ground, Landform, Vec2 } from './types.ts';
 
 export function landformBounds(l: Landform): [number, number, number, number] {
@@ -10,6 +11,10 @@ export function landformBounds(l: Landform): [number, number, number, number] {
     case 'plateau': return polyBounds(l.area, 0);
     case 'carve': return l.area ? polyBounds(l.area, 0) : polyBounds(l.path!, l.w!);
     case 'pad': return polyBounds(l.area, 0);
+    case 'cliff': return polyBounds(l.path, cliffReach(l));
+    case 'terrace': return polyBounds(l.area, 0);
+    case 'channel': return polyBounds(l.path, l.w + l.edge);
+    case 'brush': return [l.c[0] - l.r, l.c[1] - l.r, l.c[0] + l.r, l.c[1] + l.r];
   }
 }
 const inBounds = (b: [number, number, number, number], x: number, z: number) => x >= b[0] && x <= b[2] && z >= b[1] && z <= b[3];
@@ -17,13 +22,48 @@ const inBounds = (b: [number, number, number, number], x: number, z: number) => 
 /** Raw height at (x, z). Prefer Terrain.sample() (tile-interpolated) for anything that must match the browser. */
 /** Landforms in canonical fold order (class, then id), so a reloaded world sums in the same order to the bit. */
 export function orderedLandforms(landforms: Landform[]): Landform[] {
-  const rank = (l: Landform) => (l.kind === 'pad' ? 2 : l.kind === 'carve' ? 1 : 0);
+  // L3 kinds slot between the originals (whose ranks 0/1/2 are unchanged): fill/set channels (graded roads,
+  // embankments) at 0.9 so lakes, rivers and cuts always carve through them; smooth 1.25; terrace/flatten 1.5.
+  const rank = (l: Landform) => (l.kind === 'pad' ? 2 : l.kind === 'carve' ? 1 : l.kind === 'channel' ? (l.mode === 'cut' ? 1 : 0.9) : l.kind === 'terrace' || (l.kind === 'brush' && l.op === 'flatten') ? 1.5 : l.kind === 'brush' && l.op === 'smooth' ? 1.25 : 0);
   return [...landforms].sort((a, b) => rank(a) - rank(b) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
 export function heightAt(g: Ground, x: number, z: number): number {
-  let h = g.base;
   const forms = (g as Ground & { _ordered?: Landform[] })._ordered ?? orderedLandforms(g.landforms);
+  let h = naturalAndCarve(g, forms, x, z);
+  // smooth brushes (L3): relax toward the mean of the natural + carve result at nine kernel points
+  for (const l of forms) {
+    if (l.kind !== 'brush' || l.op !== 'smooth') continue;
+    const f = brushFalloff(l, x, z); if (f <= 0) continue;
+    const rho = smoothRadius(l);
+    let sum = naturalAndCarve(g, forms, x, z);
+    for (const [dx, dz] of KERNEL) sum += naturalAndCarve(g, forms, x + dx * rho, z + dz * rho);
+    h += (sum / 9 - h) * f * (l.amount > 1 ? 1 : l.amount);
+  }
+  // terraces and flatten brushes (L3)
+  for (const l of forms) {
+    if (l.kind === 'terrace') {
+      const b = landformBounds(l); if (!inBounds(b, x, z)) continue;
+      const m = areaMask(x, z, l.area, l.edge);
+      if (m > 0) h += (terraceTarget(l, h) - h) * m;
+    } else if (l.kind === 'brush' && l.op === 'flatten') {
+      const f = brushFalloff(l, x, z);
+      if (f > 0) h += (l.level! - h) * f * (l.amount > 1 ? 1 : l.amount);
+    }
+  }
+  // pad
+  for (const l of forms) {
+    if (l.kind !== 'pad') continue;
+    const b = influenceBounds(l); if (!inBounds(b, x, z)) continue;
+    const m = padMask(x, z, l.area, l.edge);
+    if (m > 0) h += (l.level - h) * m;
+  }
+  return h;
+}
+
+/** Base, noise, natural forms and carves: the part of the fold a smooth brush samples around a point. */
+function naturalAndCarve(g: Ground, forms: Landform[], x: number, z: number): number {
+  let h = g.base;
   if (g.noise && g.noise.amp > 0) h += g.noise.amp * valueNoise(x, z, g.noise.scale, g.noise.seed);
   // natural
   for (const l of forms) {
@@ -37,21 +77,24 @@ export function heightAt(g: Ground, x: number, z: number): number {
     } else if (l.kind === 'plateau') {
       const b = landformBounds(l); if (!inBounds(b, x, z)) continue;
       h += l.h * areaMask(x, z, l.area, l.edge);
+    } else if (l.kind === 'cliff') {
+      const b = landformBounds(l); if (!inBounds(b, x, z)) continue;
+      h += cliffRise(l, x, z);
+    } else if (l.kind === 'brush' && (l.op === 'raise' || l.op === 'lower')) {
+      h += brushRaise(l, x, z);
     }
   }
   // carve
   for (const l of forms) {
+    if (l.kind === 'channel') {
+      const b = landformBounds(l); if (!inBounds(b, x, z)) continue;
+      h = channelApply(l, h, x, z);
+      continue;
+    }
     if (l.kind !== 'carve') continue;
     const b = landformBounds(l); if (!inBounds(b, x, z)) continue;
     const m = l.area ? areaMask(x, z, l.area, l.edge) : pathMask(x, z, l.path!, l.w!);
     if (m > 0 && l.bed < h) h += (l.bed - h) * m;
-  }
-  // pad
-  for (const l of forms) {
-    if (l.kind !== 'pad') continue;
-    const b = influenceBounds(l); if (!inBounds(b, x, z)) continue;
-    const m = padMask(x, z, l.area, l.edge);
-    if (m > 0) h += (l.level - h) * m;
   }
   return h;
 }
@@ -68,6 +111,6 @@ function outsideBand(x: number, z: number, area: Vec2[], edge: number): number {
 /** Bounds a landform influences, for tile invalidation (pads blend outside their area). */
 export function influenceBounds(l: Landform): [number, number, number, number] {
   const b = landformBounds(l);
-  const pad = l.kind === 'pad' ? l.edge : 0;
+  const pad = l.kind === 'pad' ? l.edge : 0;  // smooth brushes also read neighbours up to smoothRadius away (tiles.ts widens the tile subset)
   return [b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad];
 }

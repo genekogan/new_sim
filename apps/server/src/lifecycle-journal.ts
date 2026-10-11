@@ -1,3 +1,4 @@
+import {tx} from './edge/comms/store.ts';
 // Private durable candidate storage. No HTTP, host activation or historical repair.
 import { z } from 'zod';
 import { hashOf } from '@sim/engine-contract';
@@ -21,8 +22,7 @@ export class LifecycleJournal {
   db:Db;
   constructor(db:Db){this.db=db;}
   private transaction<T>(fn:()=>T):T{
-    this.db.db.exec('BEGIN IMMEDIATE');
-    try{const out=fn();this.db.db.exec('COMMIT');return out;}catch(error){this.db.db.exec('ROLLBACK');throw error;}
+    return tx(this.db.db,fn,{immediate:!this.db.db.isTransaction});
   }
   private guarded(guard:Guard){if(guard()!==true)throw new Error('Lifecycle acceptance authority changed');}
   private row(scope:LifecycleScope,requestId:string){return this.db.db.prepare('SELECT * FROM lifecycle_operations_v1 WHERE world_id=? AND request_id=? AND soul_id=? AND owner_id=? AND entity_id=?').get(scope.worldId,requestId,scope.soulId,scope.owner,scope.entityId) as Row|undefined;}
@@ -57,10 +57,10 @@ export class LifecycleJournal {
   /** Authorize minimal current identity metadata before loading/decoding private
    * evidence. Corrupt foreign operations must remain indistinguishable from absent
    * ones; authorized invariant failures still propagate from get(). */
-  operationForReader(worldId:string,requestId:string,reader:string,admin:boolean):LifecycleOperation|undefined{
+  operationForReader(worldId:string,requestId:string,reader:string,admin:boolean,associated?:(soulId:string)=>boolean):LifecycleOperation|undefined{
     id.parse(worldId);id.parse(reader);lifecycleRequestIdSchema.parse(requestId);
-    const row=this.db.db.prepare('SELECT o.soul_id,o.owner_id,o.entity_id FROM lifecycle_operations_v1 o JOIN souls s ON s.id=o.soul_id AND s.owner=o.owner_id AND s.world_id=o.world_id AND s.entity_id=o.entity_id WHERE o.world_id=? AND o.request_id=? AND (o.owner_id=? OR ?=1)').get(worldId,requestId,reader,admin?1:0) as Pick<Row,'soul_id'|'owner_id'|'entity_id'>|undefined;
-    return row?this.get({worldId,soulId:row.soul_id,owner:row.owner_id,entityId:row.entity_id},requestId):undefined;
+    const row=this.db.db.prepare('SELECT o.soul_id,o.owner_id,o.entity_id FROM lifecycle_operations_v1 o JOIN souls s ON s.id=o.soul_id AND s.owner=o.owner_id AND s.world_id=o.world_id AND s.entity_id=o.entity_id WHERE o.world_id=? AND o.request_id=?').get(worldId,requestId) as Pick<Row,'soul_id'|'owner_id'|'entity_id'>|undefined;
+    return row&&(row.owner_id===reader||admin||associated?.(row.soul_id)===true)?this.get({worldId,soulId:row.soul_id,owner:row.owner_id,entityId:row.entity_id},requestId):undefined;
   }
   creationOfSoul(worldId:string,soulId:string):LifecycleOperation|undefined{
     id.parse(worldId);id.parse(soulId);
@@ -182,11 +182,12 @@ export class LifecycleJournal {
     return (this.db.db.prepare("SELECT * FROM lifecycle_operations_v1 WHERE world_id=? AND state IN ('pending','recorded') AND (? IS NULL OR requested_at>? OR (requested_at=? AND request_id>?)) ORDER BY requested_at,request_id LIMIT ?")
       .all(worldId,after?.requestedAt??null,after?.requestedAt??null,after?.requestedAt??null,after?.requestId??null,limit) as Row[]).map(row=>this.checked(row));
   }
-  ownerPage(worldId:string,owner:string,cursor:string|null=null){
+  ownerPage(worldId:string,owner:string,cursor:string|null=null,associated:readonly string[]=[]){
     id.parse(worldId);id.parse(owner);let after:Row|undefined;
-    if(cursor){lifecycleCursorSchema.parse(cursor);after=this.db.db.prepare('SELECT o.* FROM lifecycle_operations_v1 o JOIN souls s ON s.id=o.soul_id AND s.owner=o.owner_id AND s.world_id=o.world_id AND s.entity_id=o.entity_id WHERE o.world_id=? AND o.owner_id=? AND o.request_id=?').get(worldId,owner,cursor.slice(4)) as Row|undefined;if(!after)throw new Error('Lifecycle cursor not found');}
-    const rows=this.db.db.prepare('SELECT o.* FROM lifecycle_operations_v1 o JOIN souls s ON s.id=o.soul_id AND s.owner=o.owner_id AND s.world_id=o.world_id AND s.entity_id=o.entity_id WHERE o.world_id=? AND o.owner_id=? AND (? IS NULL OR o.requested_at<? OR (o.requested_at=? AND o.request_id<?)) ORDER BY o.requested_at DESC,o.request_id DESC LIMIT 21')
-      .all(worldId,owner,after?.requested_at??null,after?.requested_at??null,after?.requested_at??null,after?.request_id??null) as Row[];
+    const ids=[...new Set(associated.map(value=>id.parse(value)))],scope=ids.length?'(o.owner_id=? OR o.soul_id IN ('+ids.map(()=>'?').join(',')+'))':'o.owner_id=?';
+    if(cursor){lifecycleCursorSchema.parse(cursor);after=this.db.db.prepare('SELECT o.* FROM lifecycle_operations_v1 o JOIN souls s ON s.id=o.soul_id AND s.owner=o.owner_id AND s.world_id=o.world_id AND s.entity_id=o.entity_id WHERE o.world_id=? AND '+scope+' AND o.request_id=?').get(worldId,owner,...ids,cursor.slice(4)) as Row|undefined;if(!after)throw new Error('Lifecycle cursor not found');}
+    const rows=this.db.db.prepare('SELECT o.* FROM lifecycle_operations_v1 o JOIN souls s ON s.id=o.soul_id AND s.owner=o.owner_id AND s.world_id=o.world_id AND s.entity_id=o.entity_id WHERE o.world_id=? AND '+scope+' AND (? IS NULL OR o.requested_at<? OR (o.requested_at=? AND o.request_id<?)) ORDER BY o.requested_at DESC,o.request_id DESC LIMIT 21')
+      .all(worldId,owner,...ids,after?.requested_at??null,after?.requested_at??null,after?.requested_at??null,after?.request_id??null) as Row[];
     return {operations:rows.slice(0,20).map(row=>this.checked(row)),nextCursor:rows.length>20?'lc1_'+rows[19].request_id:null};
   }
 }

@@ -104,6 +104,16 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
       if(e.author!=='world:body'||k.things[p.soulId]?.traits.body!==p.entityId||!engine.assignBodyV1||!engine.assignBodyV1(p.entityId,p.body))throw Error('body.assignment-invalid');
       return {};
     }
+    case 'world-edit': {
+      // world-edit/1 (lane L9): an entity-world commit's derived physics and fixtures, applied from the log alone.
+      // The payload carries everything (the fold never reads the entity model), so replay re-derives the same Spatial.
+      const apply = (engine as unknown as { applyWorldEditV1?: (p: unknown) => { hash: string } }).applyWorldEditV1;
+      if (!apply) throw Error('world-edit.reader-required');
+      const r = apply.call(engine, e.payload);
+      const want = (e.payload as { hash?: string } | null)?.hash;
+      if (want && r.hash !== want) console.error(`[world-edit] seq ${(e.payload as { seq?: number }).seq}: derived physics ${r.hash.slice(0, 12)} differs from the logged ${want.slice(0, 12)}`);
+      return {};
+    }
     case 'edge-attention': {
       // attention/1: a Soul's own look / turn / face (or auto-face in a conversation). Head only, or a free standing body
       // turns; never stops, replaces or blocks the body's program (independent attention channel).
@@ -217,6 +227,9 @@ export function foldEvent(engine: Engine, k: KState, e: LogEvent, counts: Record
           if(!result.ok)throw new Error('camp-expansion.anchor:'+result.message);
         }
       }
+      // ground/1 (lane L8): an entity world's terrain recipe (by hash); Souls stand and route on it from here on (prospective; idempotent).
+      const groundV1=(e.payload as {groundV1?:unknown}|null)?.groundV1;
+      if(groundV1){const install=(engine as unknown as {installGroundV1?:(f:unknown)=>unknown}).installGroundV1;if(!install)throw Error('ground.reader-required');install.call(engine,groundV1);}
       // nav/1: extra flat walking ground and solid building/water footprints join the static walk scene (prospective; idempotent).
       const nav=(e.payload as {navV1?:unknown}|null)?.navV1;
       if(nav){const install=(engine as unknown as {installNavV1?:(s:unknown)=>unknown}).installNavV1;if(!install)throw Error('nav.reader-required');install.call(engine,nav);}

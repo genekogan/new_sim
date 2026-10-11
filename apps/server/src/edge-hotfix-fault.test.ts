@@ -43,7 +43,7 @@ test('hotfix: a collision from an edge programme is recovered (no exit), receipt
     let min = 9; await ticks(host, 200, () => {min = Math.min(min, gap(w, liora, by), gap(w, sage, by));});
     const rec = w.f.db.events(host.worldId).filter(e => e.kind === 'rules' && e.payload?.recovery);
     assert.equal(rec.length, 1, 'one logged recovery');
-    const edge = rec[0].payload.recovery.edge; assert.ok(edge && edge.stopActors.length && edge.excludedSeqs.length, JSON.stringify(edge));
+    const edge = rec[0].payload.recovery.edge; assert.ok(edge && edge.excludedSeqs.length, JSON.stringify(edge)); // only the running decisions set aside (stopActors: programmes begun before the baseline)
     assert.match(rec[0].payload.recovery.reason, /collision\.human-human/);
     assert.deepEqual(host.engine.runtime.violations, [], 'the recovered world is clean');
     assert.ok(min >= 0.48 - 1e-9 || rec.length === 1);

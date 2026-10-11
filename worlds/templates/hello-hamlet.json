@@ -1,0 +1,19 @@
+{
+  "schema": "genesis/1",
+  "name": "Hello hamlet",
+  "description": "A knoll with a cottage, a pond, a lane of trees, and two flags to build from. The template every example starts with.",
+  "constants": { "extent": 1000, "ground": "land" },
+  "state": { "constitution": "# Hello hamlet\nA small place to start. Build gently; undo freely." },
+  "batches": [
+    { "note": "terrain", "ops": [
+      { "op": "place", "def": "core/knoll@1", "name": "knoll", "p": [40, 10], "params": { "height": 4, "radius": 22 } },
+      { "op": "place", "def": "core/pond@1", "name": "pond", "shape": { "area": [[-30, 36], [-10, 32], [-4, 50], [-24, 56]] } }
+    ] },
+    { "note": "first house and flags", "ops": [
+      { "op": "place", "tmp": "$c", "def": "core/cottage@1", "name": "cottage", "p": [44, 10], "constraints": [{ "kind": "facing", "ref": "pond" }] },
+      { "op": "place", "def": "core/bench@1", "name": "bench", "in": { "parent": "$c" }, "p": [0, 0, 5] },
+      { "op": "place", "def": "core/flag@1", "name": "plaza", "p": [0, 0], "state": { "label": "plaza" } },
+      { "op": "place", "def": "core/flag@1", "name": "orchard", "p": [-40, -30], "state": { "label": "orchard" } }
+    ] }
+  ]
+}

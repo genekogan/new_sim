@@ -1,0 +1,44 @@
+/* "Join this world as a Soul" and "Souls here" inside the god panel (lane P2). Reuses the gp-* look. */
+.jp { margin-top: 10px; border-top: 1px solid rgba(0, 0, 0, .08); padding-top: 9px; }
+.gp-pane .jp { margin-top: 0; border-top: 0; padding-top: 0; }
+.jp-title { display: block; font-size: 14px; }
+.jp-intro { margin: 3px 0 8px; font-size: 12.5px; }
+.jp-sub { display: block; margin: 12px 0 2px; font-size: 13px; }
+.jp-share { display: flex; align-items: center; gap: 6px; margin: 0 0 8px; }
+.jp-share code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.jp-share .gp-copy { color: #1c1c1a; border-color: rgba(0, 0, 0, .2); background: #fff; }
+.jp-form { display: grid; gap: 7px; margin: 8px 0 4px; }
+.jp-form label { display: grid; gap: 2px; font-size: 12px; font-weight: 600; }
+.jp-form input { font: 13px system-ui, sans-serif; padding: 6px 8px; border-radius: 8px; border: 1px solid rgba(0, 0, 0, .2); background: #fff; color: #1c1c1a; font-weight: 400; }
+.jp-form input:focus { outline: 2px solid #2d8a4e; outline-offset: -1px; }
+.jp-form .gp-btn { justify-self: start; }
+.jp-mine { margin: 6px 0; }
+.jp-ok { margin-left: 4px; font-size: 11px; padding: 0 6px; border-radius: 999px; background: #e3f2e7; color: #1f7a3d; white-space: nowrap; }
+.jp-code { background: #eef6ef; border-left: 3px solid #2d8a4e; padding: 2px 9px 4px; border-radius: 0 8px 8px 0; margin: 8px 0; }
+.jp-code p { margin: 5px 0; font-size: 12.5px; }
+.jp-code .gp-code pre { word-break: normal; overflow-wrap: anywhere; }
+.jp-dot { flex: none; width: 7px; height: 7px; border-radius: 50%; background: #c9c9c0; align-self: center; }
+.jp-dot.on { background: #2d8a4e; }
+.jp-you { font-size: 11px; padding: 0 6px; border-radius: 999px; background: #e7eef8; color: #2a4f7c; }
+@media (prefers-color-scheme: dark) {
+  .jp { border-top-color: rgba(255, 255, 255, .1); }
+  .jp-share .gp-copy { color: #ebeae3; background: #2a2b28; border-color: rgba(255, 255, 255, .2); }
+  .jp-form input { background: #2a2b28; color: #ebeae3; border-color: rgba(255, 255, 255, .2); }
+  .jp-ok { background: #1f3326; color: #6fd67f; }
+  .jp-code { background: #1f3326; }
+  .jp-you { background: #23324a; color: #a9c6ee; }
+}
+/* P6: the visitor's three steps */
+.jp-steps { margin: 6px 0 4px; padding-left: 20px; display: grid; gap: 8px; }
+.jp-steps > li { padding-left: 2px; }
+.jp-steps > li::marker { font-weight: 700; color: #2d8a4e; }
+.jp-steps > li > span:first-child { font-weight: 600; }
+.jp-steps > li .gp-btn { margin-top: 5px; }
+.jp-steps > li[data-done="1"]::marker { content: '✓  '; }
+.jp-steps > li.jp-later { color: #9a9a92; }
+.jp-steps > li.jp-later::marker { color: #b9b9b0; }
+.jp-steps .jp-form { margin-top: 5px; }
+.jp-steps .jp-mine { margin: 0; }
+.jp-self { margin-top: 10px; }
+@media (prefers-color-scheme: dark) { .jp-steps > li.jp-later { color: #7d7d75; } }
+.jp-steps > li > div[data-join-signin] .gp-btn { margin-top: 0; }

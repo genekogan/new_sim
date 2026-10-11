@@ -2,12 +2,13 @@
 // terrain. Pure data + lookups; no I/O. The server persists it; the god skill
 // mirrors it from snapshot + stream.
 import { Terrain, emptyGround, type Ground, type Landform, type Water } from '@sim/ground';
-import { GENERATORS, type Baked, type LocalOBB } from './generators.ts';
+import { GENERATORS, type Baked, type LocalOBB } from '@sim/generators';
 import { hashOf } from './hash.ts';
-import { defSchema, type Def, type DefInput, type Entity, type StoredDef, type Value, type WorldConstants, type WorldState, worldConstantsSchema, worldStateSchema } from './schemas.ts';
+import { defSchema, fieldSchema, type Def, type DefInput, type Entity, type StoredDef, type Value, type WorldConstants, type WorldState, worldConstantsSchema, worldStateSchema } from './schemas.ts';
 
 export type OBB = { c: [number, number]; half: [number, number]; yaw: number; y0: number; y1: number };
-export type AssetInfo = { tris: number; bytes: number; textures: number; box: [number, number, number] };
+/** `baked`: physics of a footprint sidecar (asset store, L5), already in the def's metres. */
+export type AssetInfo = { tris: number; bytes: number; textures: number; box: [number, number, number]; baked?: Pick<Baked, 'colliders' | 'slots'> & Partial<Pick<Baked, 'surfaces' | 'openings' | 'links' | 'rooms' | 'notes'>> };
 export type AssetLookup = (hash: string) => AssetInfo | undefined;
 
 export class WorldModel {
@@ -56,10 +57,16 @@ export class WorldModel {
   /** Follow `extends` to merge params defaults/components/slots. Child overrides parent field-by-field. */
   resolvedDef(ref: string, depth = 0): StoredDef | undefined {
     const d = this.defs.get(ref);
-    if (!d || !d.extends || depth > 8) return d;
-    const base = this.resolvedDef(d.extends, depth + 1);
-    if (!base) return d;
-    return { ...base, ...d, params: { ...base.params, ...d.params }, state: { ...base.state, ...d.state }, components: { ...base.components, ...d.components }, slots: d.slots.length ? d.slots : base.slots, actions: d.actions.length ? d.actions : base.actions, make: d.make.kind === 'none' && base.make.kind !== 'none' ? base.make : d.make };
+    if (!d) return d;
+    const base = d.extends && depth <= 8 ? this.resolvedDef(d.extends, depth + 1) : undefined;
+    const r = base ? { ...base, ...d, params: { ...base.params, ...d.params }, state: { ...base.state, ...d.state }, components: { ...base.components, ...d.components }, slots: d.slots.length ? d.slots : base.slots, actions: d.actions.length ? d.actions : base.actions, make: d.make.kind === 'none' && base.make.kind !== 'none' ? base.make : d.make } : d;
+    // a gen-made def exposes its generator's params; the def's own params override them
+    if (depth === 0 && r.make.kind === 'gen') {
+      const hit = r === d ? withGenParams.get(d) : undefined; if (hit) return hit;
+      const gp = genParams(r.make.gen); if (!gp) return r;
+      const out = { ...r, params: { ...gp, ...r.params } }; if (r === d) withGenParams.set(d, out); return out;
+    }
+    return r;
   }
 
   // ---------- baking ----------
@@ -73,12 +80,13 @@ export class WorldModel {
     if (m.kind === 'gen') {
       const g = GENERATORS[m.gen];
       if (!g) throw new Error(`generator ${m.gen} unknown`);
-      baked = g.bake({ params, seed, shape: shape as never });
+      baked = g.physics({ params: { ...defaultsOf(g.params), ...params }, args: (m.args ?? {}) as Record<string, unknown>, seed, shape: shape as never });
     } else if (m.kind === 'mesh') {
-      const info = this.assets(m.asset);
-      const box = info?.box ?? def.size.box;
-      const colliders: LocalOBB[] = m.collide === 'none' ? [] : [{ c: [0, 0], half: [box[0] / 2, box[2] / 2], yaw: 0, y0: 0, y1: box[1] }];
-      baked = { box, colliders, slots: [], tris: info?.tris ?? 0 };
+      // the def states the size (the viewer fits the model to it); a footprint sidecar gives walls, rooms, openings, links
+      const info = this.assets(m.asset), fp = m.footprint ? this.assets(m.footprint)?.baked : undefined;
+      const box = def.size.box;
+      const colliders: LocalOBB[] = m.collide === 'none' ? [] : fp?.colliders.length ? fp.colliders : [{ c: [0, 0], half: [box[0] / 2, box[2] / 2], yaw: 0, y0: 0, y1: box[1] }];
+      baked = { box, colliders, slots: fp?.slots ?? [], tris: info?.tris ?? 0, ...(fp ? { surfaces: fp.surfaces, openings: fp.openings, links: fp.links, rooms: fp.rooms, notes: fp.notes } : {}) };
     } else if (m.kind === 'parts') {
       // Physics of a prefab = union of its parts' boxes (parts are placed as their own entities at expansion time).
       baked = { box: def.size.box, colliders: [], slots: [], tris: 0 };
@@ -167,6 +175,10 @@ export class WorldModel {
   footprint(e: Entity, def = this.resolvedDef(e.def)): OBB[] {
     if (!def) return [];
     const baked = this.bake(def, e.params ?? {}, e.seed ?? 0, e.shape);
+    if (def.form !== 'point' && e.in.parent === 'world') {
+      // world-frame shapes (L3): collider heights are ground-relative at their centre unless `abs`
+      return baked.colliders.map((o) => { const y = (o as typeof o & { abs?: boolean }).abs ? 0 : this.terrain.sample(o.c[0], o.c[1]); return { c: [o.c[0], o.c[1]] as [number, number], half: [o.half[0], o.half[1]] as [number, number], yaw: o.yaw, y0: y + o.y0, y1: y + o.y1 }; });
+    }
     const wp = this.worldPose(e);
     const c = Math.cos(wp.yaw), s = Math.sin(wp.yaw);
     return baked.colliders.map((o) => ({
@@ -221,6 +233,20 @@ export class WorldModel {
     this.terrain.update({ ...g, waters }, []);
   }
 
+  /** Cheap scratch copy for planning: structural maps copied, immutable caches (bakes, tiles) shared. */
+  fork(): WorldModel {
+    const w = Object.create(WorldModel.prototype) as WorldModel;
+    const self = this as unknown as Record<string, unknown>, out = w as unknown as Record<string, unknown>;
+    w.constants = this.constants; w.state = this.state; w.seed = this.seed; w.seq = this.seq; w.editSeq = this.editSeq; w.assets = this.assets;
+    w.defs = new Map(this.defs); w.entities = new Map(this.entities); w.names = new Map(this.names);
+    w.children = new Map([...this.children].map(([k, v]) => [k, new Set(v)]));
+    out.bakes = self.bakes;  // keyed by content hash: safe to share
+    out.cells = new Map([...(self.cells as Map<string, Set<string>>)].map(([k, v]) => [k, new Set(v)]));
+    out.footprints = new Map(self.footprints as Map<string, unknown>);
+    w.terrain = this.terrain.clone();
+    return w;
+  }
+
   snapshot() {
     return {
       constants: this.constants, state: this.state, seed: this.seed, seq: this.seq, editSeq: this.editSeq,
@@ -254,4 +280,23 @@ export function obbOverlap(a: OBB, b: OBB): boolean {
     if (a1 <= b0 + 1e-6 || b1 <= a0 + 1e-6) return false;
   }
   return true;
+}
+
+/** Generator param defaults (a def's own params already merged into the instance by the compiler). */
+function defaultsOf(fields: Record<string, { default?: unknown }>): Record<string, Value> {
+  const out: Record<string, Value> = {};
+  for (const [k, f] of Object.entries(fields)) if (f.default !== undefined) out[k] = f.default as Value;
+  return out;
+}
+
+const withGenParams = new WeakMap<StoredDef, StoredDef>();
+const genParamsCache = new Map<string, StoredDef['params'] | null>();
+/** A generator's params parsed as def fields (defaults filled), cached per generator id. */
+function genParams(gen: string): StoredDef['params'] | undefined {
+  if (!genParamsCache.has(gen)) {
+    const g = GENERATORS[gen]; let out: StoredDef['params'] | null = null;
+    if (g?.params && Object.keys(g.params).length) { out = {}; for (const [k, f] of Object.entries(g.params)) { const parsed = fieldSchema.safeParse(f); if (parsed.success) out[k] = parsed.data as StoredDef['params'][string]; } }
+    genParamsCache.set(gen, out);
+  }
+  return genParamsCache.get(gen) ?? undefined;
 }

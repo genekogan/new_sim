@@ -19,7 +19,10 @@ import {setCarrierRoute} from '../../../mars/viewer/engine/vehicles/carrier.ts';
 import {commonsFoodDeliveryItemsV1} from './food-delivery.ts';
 import {commonsFoodDeliveryV1Schema,type CommonsFoodDeliveryV1} from '@sim/engine-contract';
 import {socialEdenV1} from './social-eden.ts';
+import {applyWorldEdit,type WorldEditV1} from './entity-physics.ts';
+import {registerAssets} from './catalog-adapter.ts';
 import {socialEdenTransitionV1Schema,type SocialEdenTransitionV1} from '@sim/engine-contract';
+import {attachGround,groundRegistry,installGroundV1 as installGround,previewGroundV1,standHeight,groundArrival,inDeepWater} from './ground-bridge.ts';
 // The Mars engine behind Sim's engine contract.
 //
 // The shell speaks a small BODY LANGUAGE (walk_to, sit, stand, rest, wave,
@@ -61,6 +64,7 @@ import { dcos,dsin,hypot } from '../../../mars/viewer/engine/core/math.ts';
 import { clearanceAt } from '../../../mars/viewer/engine/spatial/grid.ts';
 import { acknowledgeRelocation } from '../../../mars/viewer/engine/runtime/invariants.ts';
 import { CATALOG, HUMAN_RADIUS } from '../../../mars/viewer/engine/world/catalog.ts';
+import { HUMAN_PROFILE as HUMAN_PROFILE_V1 } from '../../../mars/viewer/engine/spatial/types.ts';
 import type { Spatial } from '../../../mars/viewer/engine/spatial/service.ts';
 import type {NativeBoatControlsV1} from '@sim/engine-contract';
 import type {BodyLocationV1} from '@sim/engine-contract';
@@ -71,6 +75,9 @@ import {officeStairGuardsV1Schema,type OfficeStairGuardsV1} from '@sim/engine-co
 import {authoredBoundariesV1Schema,authoredBoundariesDeclarationV1Schema,type AuthoredBoundariesV1,type AuthoredBoundariesDeclarationV1} from '@sim/engine-contract';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
+/** Make the next Spatial.sync rebuild (incrementally, from the previous grids): the world's scene contribution changed
+ *  without a static entity changing. L8: please replace with a public `Spatial.invalidate()`. */
+function invalidateSpatialV1(spatial:Spatial){const snaps=(spatial as unknown as {snaps:unknown[]}).snaps;snaps.push({id:'\u0000world-edit'});}
 const TPS = 20;
 const KEY_EVERY = 5;                       // ticks between broadcast keyframes for a moving body (4 per second)
 const SETTLED = new Set(['gathered', 'occupied', 'talking']); // phases in which a Mars hold has arrived and simply continues
@@ -196,10 +203,15 @@ export class MarsEngine implements Engine {
 
   constructor(m: Mars, rt: any, cfg: MarsWorldConfig, saved?: { programs: Prog[]; nextProg: number; leaving: string[];renderPlatformsV1?:RenderPlatformsV1 }, physical?:MarsPhysicalBinding) {
     this.m = m; this.rt = rt; this.cfg = structuredClone(cfg); this.registry = rt.registry;this.physical=physical;
+    // ground/1 (lane L8): an entity world's terrain; absent in every authored world
+    if(rt.world.groundV1){attachGround(rt);this.registry=rt.registry;}
     if(rt.world.authoredBoundariesV1)immutableAuthoredBoundaryFact(rt.world.authoredBoundariesV1);
     this.schema = rt.world.schema;
     if (saved) { for (const p of saved.programs) { this.programs.set(p.id, p); this.byActor.set(p.actor, p.id); } this.nextProg = saved.nextProg; this.leaving = saved.leaving; }
     if(saved?.renderPlatformsV1)this.renderPlatformMetadata=renderPlatformsV1Schema.parse(saved.renderPlatformsV1);
+    // entity-physics/1 (world-edit, lane L9): a restored entity world re-registers its derived assets and re-bases its
+    // Spatial on its own physics (absent in every authored world, so they are untouched).
+    if(rt.world.entityPhysicsV1){registerAssets(rt.world.entityPhysicsV1.assets);(rt.services.spatial as Spatial).refreshForWorld(rt.world);}
     this.cursor = rt.events.length;
     this.startRecorder();
     const self = this;
@@ -521,7 +533,7 @@ export class MarsEngine implements Engine {
     if ((p.trafficTries = (p.trafficTries ?? 0) + 1) > 6) return this.end(p, 'failed', why);
     p.index--; p.ops = [{ wait: (waiters.length ? 80 : 20) + this.stagger(p.actor) * 10 }];
   }
-  private movementVerb(actor:string,x:number,z:number){const a=this.ents[actor];return this.physical&&(inShoreDomain(this.rt.world,x,z)||!!a&&inShoreDomain(this.rt.world,a.pose.p[0],a.pose.p[2]))?'commons_shore_travel':'walk_to';}
+  private movementVerb(actor:string,x:number,z:number){const a=this.ents[actor];if(this.rt.world.groundV1&&inDeepWater(this.rt,actor))return 'ground_travel';return this.physical&&(inShoreDomain(this.rt.world,x,z)||!!a&&inShoreDomain(this.rt.world,a.pose.p[0],a.pose.p[2]))?'commons_shore_travel':'walk_to';}
   private free(id: string): boolean { return !!this.ents[id] && this.holders(id).length === 0 && !this.byActor.has(id) && ![...this.programs.values()].some(p=>p.build?.crew.includes(id)); }
 
   /** A raw Mars verb, with the actor filled in where the verb takes one (`actor`, or `actors` when none are given). */
@@ -795,6 +807,32 @@ export class MarsEngine implements Engine {
     }
     return false;
   }
+  /** Fault recovery (logged inside the recovery recipe): a body whose programmes were rewound lands back at its last valid
+   * pose (taken the tick before the fault) instead of wherever the rewind left it (e.g. its arrival point). Upstairs it keeps
+   * its floor when the floor still has room there; otherwise the nearest free standing point on level 0 (dry or wadable
+   * ground on a ground world, never deep water), rings of 0.5 m out to 40 m. Refuses busy/held/sleeping/seated-aboard bodies. */
+  restoreHumanPoseV1(id: string, pose: { p: [number, number, number]; yaw?: number; level?: number }): boolean {
+    const e = this.ents[id];
+    if (!e?.human || this.byActor.has(id) || this.holders(id).length || e.human.sleepPose || e.human.on || e.human.riding || e.human.carrier) return false;
+    if (!Array.isArray(pose?.p) || pose.p.length !== 3 || !pose.p.every(Number.isFinite)) return false;
+    const spatial = this.rt.services.spatial as Spatial; spatial.sync(this.rt.world);
+    const people = Object.values(this.ents).filter((o: any) => o.kind === 'human' && o.id !== id).map((o: any) => [o.pose.p[0], o.pose.p[2], o.human?.level ?? 0] as [number, number, number]);
+    const free = (x: number, z: number, level: number) => !people.some(([px, pz, pl]) => pl === level && hypot(px - x, pz - z) < 0.8);
+    const land = (p: [number, number, number], level: number) => {
+      e.pose.p = p; if (typeof pose.yaw === 'number' && Number.isFinite(pose.yaw)) e.pose.yaw = r3(pose.yaw);
+      e.human.level = level; e.human.activity = 'idle'; e.human.speed = 0; delete e.human.shore; acknowledgeRelocation(this.rt, id); return true;
+    };
+    const [x0, y0, z0] = pose.p, level = Number.isInteger(pose.level) ? pose.level! : 0;
+    if (level > 0) { const g = spatial.level(level); if (g && clearanceAt(g, [x0, z0]) >= HUMAN_RADIUS && free(x0, z0, level)) return land([r3(x0), r3(y0), r3(z0)], level); }
+    const grid = spatial.level(0); if (!grid) return false;
+    const f = this.rt.world.groundV1 ? spatial.ground?.field : undefined;
+    const ok = (x: number, z: number) => clearanceAt(grid, [x, z]) >= HUMAN_RADIUS && free(x, z, 0) && (!f || f.medium(x, z) <= 1);
+    for (let ring = 0; ring <= 80; ring++) { const n = Math.max(1, ring * 8); for (let k = 0; k < n; k++) {
+      const ang = (k / n) * Math.PI * 2, x = r3(x0 + dcos(ang) * ring * 0.5), z = r3(z0 + dsin(ang) * ring * 0.5);
+      if (ok(x, z)) return land([x, f ? r3(standHeight(f, x, z)) : 0, z], 0);
+    } }
+    return false;
+  }
   /** attention/1 (logged 'edge-attention'): set or clear a body's gaze (head target: a body/fixture id or a point, until a tick),
    * and with `yaw` also turn a free standing body (no program, nothing holding it, awake, not seated/riding). Never cancels
    * or blocks anything the body is doing. Returns what turned. */
@@ -827,7 +865,7 @@ export class MarsEngine implements Engine {
   }
   spawnHuman({ id, label, soul }: { id: string; label: string; soul: string }): string {
     if (this.ents[id]) return id;
-    const [ax, az] = this.cfg.arrival;
+    const [ax, az] = this.rt.world.groundV1 ? groundArrival(this.rt, this.cfg.arrival) : this.cfg.arrival;
     const body=this.cfg.scene==='littlemartians'&&['Verdelis','Kalama','Kweku','Mycos','Ada','Shuijing','Nyx'].includes(label)?{family:'floater',model:label.toLowerCase(),radius:.35,hoverHeight:1.45}:undefined;
     const people = Object.values(this.ents).filter((e: any) => e.kind === 'human').map((e: any) => [e.pose.p[0], e.pose.p[2]] as [number, number]);
     let spot: [number, number] | null = null;
@@ -851,6 +889,7 @@ export class MarsEngine implements Engine {
     }
     if (!spot) throw new Error('no free standing room at the arrival point');
     const e = this.m.human(id, spot[0], spot[1], { label, provenance: { origin: 'simulation', confidence: 'hypothetical' } });
+    if(this.rt.world.groundV1){const f=(this.rt.services.spatial as Spatial).ground!.field;e.pose.p[1]=standHeight(f,spot[0],spot[1]);}
     e.human.soul = soul; if(body)e.body=body;
     this.ents[id] = e; this.m.canonicalEntityOrder(this.rt.world);
     this.out.changes.push([this.rt.tick, id, 'present', e]);
@@ -1331,6 +1370,75 @@ export class MarsEngine implements Engine {
     if(this.renderPlatformMetadata){this.renderBaseKey='';this.startRecorder();}
     return {installed:true,relocated,trapped};
   }
+  /** world-edit/1 (logged event `world-edit`, lane L9): the entity world's derived physics for the changed entities —
+   *  floors on levels, wall solids, stairs, closed doors — and its god-placed fixtures/items (same ids) join this world's
+   *  static scene (world.entityPhysicsV1, like nav/1) and entities. The planner re-bases once; idle bodies a new solid
+   *  buries step out to the nearest clear spot (edits never bury a Soul); busy ones are named in `trapped`.
+   *  Returns the hash it derived so the host can check replay agreement. */
+  applyWorldEditV1(raw:WorldEditV1):{hash:string;relocated:string[];trapped:string[];kept:string[]}{
+    if(!raw||raw.contract!=='world-edit/1'||typeof raw.set!=='object'||!Array.isArray(raw.levels))throw Error('world-edit.bad-payload');
+    if(this.renderPlatformMetadata)this.finishRecorder();
+    const baseKey=this.rt.world.entityPhysicsV1?.baseKey;
+    const {physics,kept}=applyWorldEdit(this.rt.world,raw);
+    this.m.canonicalEntityOrder(this.rt.world);
+    // entity-world fixtures are depicted by the viewer's entity layer (entity diffs), not by engine change events or takes
+    const spatial=this.rt.services.spatial as Spatial;
+    // new levels / wider raster: re-base once; otherwise the next sync patches only the changed cells (incremental)
+    if(physics.baseKey!==baseKey&&spatial.source)spatial.refreshForWorld(this.rt.world);
+    else invalidateSpatialV1(spatial);
+    const relocated:string[]=[],trapped:string[]=[];
+    for(const id of Object.keys(this.ents).sort()){
+      const e=this.ents[id];if(e.kind!=='human'||!e.human||e.human.shore||e.human.carrier||e.human.sleepPose||e.human.on)continue;
+      const grid=spatial.level(e.human.level??0);if(!grid||clearanceAt(grid,[e.pose.p[0],e.pose.p[2]])>=HUMAN_RADIUS*0.9)continue;
+      if(e.human.activity==='sit'||e.human.baseActivity==='sit')continue; // a seated body's own seat is its support
+      const to=(e.human.level??0)===0?this.nearestStandableV1([e.pose.p[0],e.pose.p[2]],id):null;
+      if(to&&this.relocateHumanV1(id,to))relocated.push(id);else trapped.push(id);
+    }
+    if(this.renderPlatformMetadata){this.renderBaseKey='';this.startRecorder();}
+    return {hash:physics.hash,relocated,trapped,kept};
+  }
+  /** world-edit/1 read: the nearest clear standing point to `at` on a level (rings of 0.25 m out to `maxRing`), away from
+   *  other bodies; null when none. Used to plan a Soul's approach to a god-placed thing on another floor. */
+  standableNearV1(at:[number,number],level=0,except?:string,minClear=HUMAN_RADIUS+.12,maxRing=24):[number,number]|null{
+    const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.level(level);if(!grid)return null;
+    const people=Object.values(this.ents).filter((o:any)=>o.kind==='human'&&o.id!==except&&(o.human?.level??0)===level).map((o:any)=>[o.pose.p[0],o.pose.p[2]] as [number,number]);
+    for(let ring=0;ring<=maxRing;ring++){const n=Math.max(1,ring*8);for(let k=0;k<n;k++){
+      const ang=(k/n)*Math.PI*2,x=r3(at[0]+dcos(ang)*ring*.25),z=r3(at[1]+dsin(ang)*ring*.25);
+      if(clearanceAt(grid,[x,z])<minClear||people.some(([px,pz])=>hypot(px-x,pz-z)<.7))continue;return [x,z];}}
+    return null;
+  }
+  /** world-edit/1 read: engine level ids and heights (ground 0 first). */
+  levelsV1():{id:number;y:number}[]{const spatial=this.rt.services.spatial as Spatial;return spatial.base.levels.map(l=>({id:l.id,y:l.y}));}
+  /** world-edit/1 read: who uses an entity-world fixture right now — a body seated on it (its seat slot is claimed) or
+   *  holding it — so god edits can refuse with the body named (occupied.by-body / held.by-body). */
+  bodyUsesV1(id:string):{body:string;how:'occupied'|'held'}|null{
+    const e=this.ents[id];if(!e)return null;
+    const s=e.support;if(s?.kind==='in-hand')return {body:s.by,how:'held'};if(s?.kind==='held'&&s.by?.[0])return {body:s.by[0],how:'held'};
+    for(const slot of fixtureSlots(this.rt,e)){const r=slot.claimedBy?this.rt.records.get(slot.claimedBy):undefined;const actor=r?.params?.actor;if(typeof actor==='string'&&this.ents[actor]?.human)return {body:actor,how:'occupied'};}
+    return null;
+  }
+  /** world-edit/1 read (F1): who sits on which seat slot of a fixture now (`seat-1` → the body's id). */
+  seatOccupantsV1(id:string):{slot:string;body:string}[]{
+    const e=this.ents[id];if(!e)return [];const out:{slot:string;body:string}[]=[];
+    for(const slot of fixtureSlots(this.rt,e)){if(slot.kind!=='seat')continue;const r=slot.claimedBy?this.rt.records.get(slot.claimedBy):undefined;const actor=r?.params?.actor;if(typeof actor==='string'&&this.ents[actor]?.human)out.push({slot:slot.id.slice(id.length+1),body:actor});}
+    return out;
+  }
+  /** world-edit/1 read: whether a body of the default human profile can walk from one standing point to another
+   *  (levels included, stairs and doors as the planner sees them), and how far. Pure read. */
+  reachV1(from:{p:[number,number];level?:number},to:{p:[number,number];level?:number}):{ok:true;length:number;legs:number;levels:number[]}|{ok:false;code:string;message:string}{
+    const spatial=this.rt.services.spatial as Spatial;
+    const r=spatial.route(this.rt.world,HUMAN_PROFILE_V1,{level:from.level??0,p:from.p},{level:to.level??0,p:to.p});
+    if(!r.ok)return {ok:false,code:r.diagnostic.code,message:r.diagnostic.message};
+    const levels=[...new Set(r.route.legs.map((l:any)=>l.kind==='walk'?l.level:l.link.to.level))] as number[];
+    return {ok:true,length:Math.round(r.route.length*100)/100,legs:r.route.legs.length,levels};
+  }
+  /** ground/1 (logged rules fact `groundV1`, lane L8): the world stands on this terrain recipe from now on; bodies take its height.
+   *  Idempotent for the same recipe; the recipe must be registered (ground-bridge.ts registerGroundRecipe) before the fact folds. */
+  previewGroundV1(fact:unknown){return previewGroundV1(fact);}
+  installGroundV1(fact:any):{installed:boolean;settled:string[]}{
+    const r=installGround(this.rt,fact);this.registry=this.rt.registry;
+    return r;
+  }
   /** nav/1: the world.navV1 value a valid spec installs (pure; prefixed ids so they never collide with source obstacles). */
   navFromSpecV1(spec:NavSpecV1){
     return {version:'nav/1' as const,
@@ -1536,7 +1644,7 @@ export class MarsEngine implements Engine {
   /** Mars's own resumable snapshot, plus which program each actor is in. Body-language steps lower only to verbs Mars can resume exactly. */
   snapshot(): EngineSnapshot {
     const mars = this.rt.snapshot();
-    return structuredClone({ ...(this.lecturePlacement?{edenLectureV1:this.lecturePlacement,lectureBaseStateHash:this.lectureBaseStateHash()}:{}), ...(this.sleepSnapshotActive?{nativeSleepSnapshotV1:true,sleepSnapshotBaseStateHash:this.sleepSnapshotBaseStateHash()}:{}), ...(this.newcomerResources.length?{commonsNewcomerResourcesV1:structuredClone(this.newcomerResources),newcomerBaseStateHash:this.newcomerBaseStateHash()}:{}), ...(this.renderPlatformMetadata?{renderPlatformsV1:structuredClone(this.renderPlatformMetadata)}:{}), format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, ...(this.cfg.scene==='eden-commons'?{commonsVersion:'commons/1'}:{}), quiet: this.quiet, ...(this.commonsProvisionsActive?{commonsProvisionsV1:true}:{}), ...(this.commonsKitchenActive?{commonsKitchenV1:true}:{}), ...(this.socialEdenActive?{socialEdenV1:true}:{}), ...(this.greenLandmarkActive?{greenLandmarkV1:true}:{}), ...(this.foodDeliveries.length?{foodDeliveriesV1:structuredClone(this.foodDeliveries)}:{}), ...(this.commonsKitchenActive&&this.commonsKitchenVersion==='commons-kitchen/2'?{commonsKitchenVersion:this.commonsKitchenVersion}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion}:{}) });
+    return structuredClone({ ...(this.lecturePlacement?{edenLectureV1:this.lecturePlacement,lectureBaseStateHash:this.lectureBaseStateHash()}:{}), ...(this.sleepSnapshotActive?{nativeSleepSnapshotV1:true,sleepSnapshotBaseStateHash:this.sleepSnapshotBaseStateHash()}:{}), ...(this.newcomerResources.length?{commonsNewcomerResourcesV1:structuredClone(this.newcomerResources),newcomerBaseStateHash:this.newcomerBaseStateHash()}:{}), ...(this.renderPlatformMetadata?{renderPlatformsV1:structuredClone(this.renderPlatformMetadata)}:{}), format: SNAPSHOT_FORMAT, tick: this.rt.tick as number, stateHash: this.stateHash(), mars, dropped: mars.dropped?.length ?? 0, programs: [...this.programs.values()], nextProg: this.nextProg, leaving: this.leaving, cfg: this.cfg, ...(this.cfg.scene==='eden-commons'?{commonsVersion:'commons/1'}:{}), quiet: this.quiet, ...(this.commonsProvisionsActive?{commonsProvisionsV1:true}:{}), ...(this.commonsKitchenActive?{commonsKitchenV1:true}:{}), ...(this.socialEdenActive?{socialEdenV1:true}:{}), ...(this.greenLandmarkActive?{greenLandmarkV1:true}:{}), ...(this.foodDeliveries.length?{foodDeliveriesV1:structuredClone(this.foodDeliveries)}:{}), ...(this.commonsKitchenActive&&this.commonsKitchenVersion==='commons-kitchen/2'?{commonsKitchenVersion:this.commonsKitchenVersion}:{}), ...(this.physical?{physicalBinding:this.physical.rulesVersion}:{}), ...(this.rt.world.groundV1?{groundV1:true}:{}) });
   }
   canSnapshot(): boolean {
     // A legacy formation callback is not data and must wait for a quiet point.
@@ -1616,7 +1724,9 @@ export async function marsFactory(cfg: MarsWorldConfig = PROVING_GROUND): Promis
       // Spatial services are rebuilt for the same base scene; the snapshot carries the rest.
       const scene = (s.cfg ?? cfg).scene;
       const base = scene === 'eden-commons' ? m.edenCommonsWorld() : scene === 'littlemartians' ? m.littleMartiansWorld() : scene === 'greenfield' ? m.greenFieldWorld() : scene === 'eden-camp' ? m.edenCampWorld() : scene === 'meal' ? m.mealWorld() : m.provingGroundWorld();
-      const rt = m.Runtime.restore(s.mars, registry, services(base), m.invariants);
+      // entity-physics/1: the derived fixture assets must be known before the restored Spatial first syncs
+      {const ep=(decodeSnapshot(s.mars) as any).world?.entityPhysicsV1;if(ep)registerAssets(ep.assets);}
+      const rt = m.Runtime.restore(s.mars, (s as {groundV1?:boolean}).groundV1 ? groundRegistry(registry) : registry, services(base), m.invariants);
       if(cfg.scene==='eden-commons'&&(rt.world.base.campus!=='eden-commons'||rt.world.base.staticHash!==base.base.staticHash))throw new Error('snapshot commons physical base differs from the native factory');
       const engine = new MarsEngine(m, rt, s.cfg ?? cfg, { programs: s.programs, nextProg: s.nextProg, leaving: s.leaving,renderPlatformsV1:s.renderPlatformsV1 });
       if (s.quiet) engine.beginQuiet();

@@ -26,6 +26,8 @@ export type IntentRequestV2 = z.infer<typeof intentRequestV2Schema>;
  * a credential nor interpretation/admission/physical completion evidence. */
 export const intentOwnerControlV2Schema = z.strictObject({
   worldId: id, soulId: id, ownerId: id, intentContract: z.literal(INTENT_V2),
+  /** Current verified account authority, when different from recorded owner. */
+  accountOwnerId:id.optional(),
   intentHistoryContract:z.literal('private-intent-history/1').optional(),
   intentArrivalContract:z.literal('private-intent-arrival/1').optional(),
   humanGoalContract:z.enum(['human-capabilities/1','human-capabilities/2']).optional(),

@@ -1,0 +1,19 @@
+// Core-kit families as data. Owner: L4 (library & creatures) for the JSON files; L5 owns mesh.json
+// (pack imports). Each file is an array of def/1 inputs named `core-<name>` (resolvable as
+// `core/<name>@<version>`). Search them with GET /v1/god/defs?q=…; never author what exists.
+import creatures from './creatures.json' with { type: 'json' };
+import furniture from './furniture.json' with { type: 'json' };
+import props from './props.json' with { type: 'json' };
+import structures from './structures.json' with { type: 'json' };
+import plants from './plants.json' with { type: 'json' };
+import transport from './transport.json' with { type: 'json' };
+import civic from './civic.json' with { type: 'json' };
+import play from './play.json' with { type: 'json' };
+import kitchen from './kitchen.json' with { type: 'json' };
+import work from './work.json' with { type: 'json' };
+import signage from './signage.json' with { type: 'json' };
+import mesh from './mesh.json' with { type: 'json' };
+import terrain from './terrain.json' with { type: 'json' };
+import type { DefInput } from '../schemas.ts';
+
+export const FAMILY_KITS: DefInput[] = [creatures, furniture, props, structures, plants, transport, civic, play, kitchen, work, signage, mesh, terrain].flat() as unknown as DefInput[];

@@ -1,0 +1,42 @@
+# World launcher on eden2 (lane P3): new god-mode worlds beside the existing Sim release.
+# One instance per stage: sim-worlds@staging, sim-worlds@production.
+#   code     /srv/sim-worlds/%i -> /srv/sim-worlds/releases/<build>   (release.sh flips it)
+#   data     /srv/sim-worlds-data/%i                                  (registry, one dir per world, child logs)
+#   settings /etc/sim-worlds/%i.conf                                  (SIM_WORLDS_ARGS: port, caps, origin; no secrets)
+#   auth     /etc/sim-worlds/production-auth.env (production only; placeholder path named in production.conf, provisioned
+#            by Codex/Gene; each world's node loads it by path; accounts registry <data>/accounts.sqlite, back it up)
+# Binds 127.0.0.1 only. Never touches /opt/eden3, the sim or mars users, Caddy or DNS.
+[Unit]
+Description=Sim world launcher (%i): new god-mode worlds, one Sim server per world
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=simworlds
+Group=simworlds
+WorkingDirectory=/srv/sim-worlds/%i
+EnvironmentFile=/etc/sim-worlds/%i.conf
+ExecStart=/usr/bin/node tools/world-launcher/launcher.mjs $SIM_WORLDS_ARGS
+Restart=always
+RestartSec=3
+# SIGTERM: the launcher stops every world (each saves a snapshot) before it exits.
+KillMode=mixed
+TimeoutStopSec=40
+# The launcher and all its worlds share this cgroup; the per-instance drop-in sets the real budget.
+MemoryHigh=5G
+MemoryMax=6G
+TasksMax=2048
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/sim-worlds-data/%i
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

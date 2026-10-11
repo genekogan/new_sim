@@ -19,6 +19,8 @@ import { CampCards } from './camp.ts';
 import {FloaterCards} from './floaters.ts';
 import { worldDefinition } from './world-config.ts';
 import { GodMode } from './god/god.ts';
+import { installEngineBridge } from './god/engine-bridge.ts';
+import { GroundHost, installGroundCapabilities, loadGroundRecipes } from './god/ground-host.ts';
 import { stripWorldRequestPath } from './world-request-path.ts';
 import {edenCoreRequested,edenHistoryFactory,installEdenCore,settleEmptyEden,drainEdenThought,installEdenLifeV1,installEdenExpansionV1} from './eden-bootstrap.ts';
 import {IntentControlV2} from './intent-control.ts';
@@ -53,7 +55,11 @@ const sleepSnapshot=process.env.ENABLE_NATIVE_SLEEP_SNAPSHOT_READER==='1';
 if(sleepSnapshot&&!edenLife)throw Error('eden-bootstrap.sleep-snapshot-reader-requires-opted-in-Eden-life');
 const applyExpansion=process.env.APPLY_EDEN_EXPANSION_CHECKPOINT==='1';
 if(applyExpansion&&(!edenLife||!newcomerResources||!sleepSnapshot||!lecture||!expansionGround||process.env.EDEN_CORE_RETAIN_READER==='1'))throw Error('eden-bootstrap.expansion-requires-complete-explicit-readers-and-install-mode');
-const factory=edenCore?await edenHistoryFactory(db,config.worldId,{lifeV1:edenLife,newcomerResourcesV1:newcomerResources,sleepSnapshotV1:sleepSnapshot,lectureV1:lecture,groundV1:expansionGround}):mars?await mars.marsFactory(config.worldKey==='littlemartians'?mars.LITTLE_MARTIANS_WORLD:config.worldKey==='eden'||!KNOWN_WORLD_KEYS.includes(config.worldKey as never)?mars.GREEN_FIELD_WORLD:undefined):recordedToyFactory;
+// Launcher (entity) worlds opt into native Soul arrivals and removal (SOUL_LIFECYCLE=1), so account approvals create Souls as live does. Lane P2.
+const accountLifecycle=config.worldEngine&&!edenCore&&process.env.SOUL_LIFECYCLE==='1';
+const factory=edenCore?await edenHistoryFactory(db,config.worldId,{lifeV1:edenLife,newcomerResourcesV1:newcomerResources,sleepSnapshotV1:sleepSnapshot,lectureV1:lecture,groundV1:expansionGround}):mars?await mars.marsFactory(config.worldKey==='littlemartians'?mars.LITTLE_MARTIANS_WORLD:config.worldKey==='eden'||!KNOWN_WORLD_KEYS.includes(config.worldKey as never)?(accountLifecycle?{...mars.GREEN_FIELD_WORLD,safeCrewRemoval:true}:mars.GREEN_FIELD_WORLD):undefined):recordedToyFactory;
+// ground/1 (lane L8): every terrain recipe this entity world logged resolves by hash before the engine replays
+if (config.worldEngine) loadGroundRecipes(db, config.worldId);
 const host = new WorldHost(db, factory, config.worldSeed, config.snapshotEveryTicks, config.worldId,edenCore?{durableClockV1:true}:undefined);
 const boot = host.boot();
 if(edenCore)await installEdenCore(host,{applyCrew:process.env.APPLY_EDEN_CREW_CHECKPOINT==='1',applyCommons:process.env.APPLY_EDEN_COMMONS_CHECKPOINT==='1',retainReader:process.env.EDEN_CORE_RETAIN_READER==='1'});
@@ -61,7 +67,9 @@ const edenCapabilities=edenCore&&host.engine.rulesVersion.includes('+crew-remova
 console.log(`[world] ${host.worldId} booted from ${boot.from}, tick ${host.engine.world.tick}, replayed ${boot.replayed} events, ${host.minds.size} souls, rules ${host.engine.rulesVersion}`);
 
 const auth = new Auth(config, db);
-await auth.init().catch((e) => console.error('[auth] init failed:', e.message));
+// A selected account provider (Clerk) that cannot verify is fatal: never fall back to anonymous or dev sign-in.
+await auth.init().catch((e) => {if(config.accountAuthRequired)throw e;console.error('[auth] init failed:', e.message);});
+if(config.accountAuthRequired&&!auth.ready)throw Error('Account authentication verifier unavailable');
 
 const living = config.worldKey !== 'toy' && config.livingWorld ? new LivingWorld(host) : null;
 if(edenCore)await settleEmptyEden(host,living,definition.customs);
@@ -89,7 +97,7 @@ const brain = new Brain(host, db, config, {
   clients: () => hub?.clients.size ?? 0,
 },edenCapabilities?{intentV2Choices:true}:undefined);
 const souls = new Souls(host, db, brain, config);
-if(edenCapabilities)souls.enableLifecycle();
+if(edenCapabilities||accountLifecycle&&host.engine.rulesVersion.includes('+crew-removal/1'))souls.enableLifecycle();
 if(applyExpansion)await installEdenExpansionV1(host);
 const edenLifeHandles=edenLife?await installEdenLifeV1(host,brain,{retainReader:process.env.EDEN_CORE_RETAIN_READER==='1',foodDeliveryId:process.env.EDEN_FINITE_FOOD_DELIVERY_ID}):undefined;
 await installEdenSteeringModeV1(host,steeringMode,process.env.EDEN_CORE_RETAIN_READER==='1');
@@ -105,7 +113,13 @@ const takes=new TakeArchive(db,host.worldId,config.archiveTakes?r2Store(config):
 const edge = config.mindDriver === 'edge' ? new EdgeLedger(host, db, process.env.PLACE_DATA ? JSON.parse(readFileSync(process.env.PLACE_DATA, 'utf8')) : undefined) : undefined;
 if (edge && host.engine.configureRuntimePolicy && host.enableQuietStallReleaseV1) void host.enableQuietStallReleaseV1().then(async () => { await host.enableYieldTimeoutV1?.(); await host.enableSpreadV2?.(); });
 // God mode + entity world (spec eden4/28): the owner's edge agent builds the world; viewers get diffs over the hub.
-const god = config.worldEngine ? new GodMode(db, { worldId: host.worldId, ownerId: process.env.WORLD_OWNER_ID || null /* explicit only: on a fresh world the first person to claim it becomes its god */, tick: () => host.engine.world.tick, emit: (m) => hub.broadcast(m as never) }) : undefined;
+const genesis = process.env.GENESIS_FILE ? JSON.parse(readFileSync(process.env.GENESIS_FILE, 'utf8')) : undefined;
+const god = config.worldEngine ? new GodMode(db, { genesis, worldId: host.worldId, ownerId: process.env.WORLD_OWNER_ID || null /* explicit only: on a fresh world the first person to claim it becomes its god */, tick: () => host.engine.world.tick, emit: (m) => hub.broadcast(m as never) }) : undefined;
+// Stage B (lane L8): the ground fact is queued before the entity bridge so boot installs the terrain first.
+const groundHost = god && (host.engine as unknown as {installGroundV1?:unknown}).installGroundV1 ? new GroundHost(db, host, god) : undefined;
+if (groundHost && edge) installGroundCapabilities(edge as never, god!, host);
+// Stage B (lane L9): Souls live among god-built things — entity physics into the engine, fixtures usable, bodies as entities.
+if (god && config.engine === 'mars' && process.env.ENTITY_BRIDGE !== '0') installEngineBridge({ host, god, edge });
 if (god) console.log(`[god] entity world ready: ${god.model.entities.size} entities, ${new Set(god.model.defs.values()).size} defs, owner ${god.owner ?? '(unclaimed)'}`);
 const app = buildApp({ cfg: config, db, host, auth, hub, brain, souls, takes, intentV2, edge, god });
 const listener = getRequestListener(app.fetch);
@@ -152,7 +166,7 @@ const shutdown = async (sig: string) => {
   host.stop(); takes.stop();
   try { host.saveSnapshot(true); } catch (e) { console.error('[world] snapshot failed', e); }
   server.close(); for (const c of hub.clients) c.ws.close(1001, 'server restarting');
-  db.close(); process.exit(0);
+  auth.close();db.close(); process.exit(0);
 };
 process.on('SIGTERM', () => void shutdown('SIGTERM').catch(()=>console.error('[world] shutdown is incomplete; retain database and inspect')));
 process.on('SIGINT', () => void shutdown('SIGINT').catch(()=>console.error('[world] shutdown is incomplete; retain database and inspect')));

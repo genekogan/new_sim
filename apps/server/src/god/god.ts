@@ -5,11 +5,12 @@
 // viewers (hub) and to gods (SSE).
 import { randomBytes } from 'node:crypto';
 import { TILE_M, tileOf } from '@sim/ground';
-import { CORE_KIT, WorldModel, applyBatch, plan, type Diff, type Op, type Result, type StoredDef } from '@sim/world-compiler';
+import { CORE_KIT, WorldModel, applyBatch, plan, type Diff, type Op, type Result, type StoredDef, type UsesHook, type PlanOptions } from '@sim/world-compiler';
 import { hashToken } from '../auth.ts';
 import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
 import { WorldStore, type EditRow, type PrayerRow } from './store.ts';
+import { AssetStore, defaultAssetDir } from './assets.ts';
 
 const PAIR_TTL = 15 * 60_000;
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -18,7 +19,9 @@ const normCode = (c: string) => c.toUpperCase().replace(/[^A-Z0-9]/g, '').replac
 export const newGodToken = (worldId: string) => `god_${worldId}_${randomBytes(24).toString('base64url')}`;
 
 type Pairing = { code: string; poll: string; agent: string; expires: number; token?: string };
-export type WorldDiffMessage = { type: 'edge'; kind: 'world-diff'; seq: number; tick: number; at: number; diff: Diff; by: 'god' | 'undo' | 'redo'; ground?: ReturnType<WorldModel['ground']>; /** every def the upserts reference (viewers only hold defs in use) */ defs: ReturnType<typeof publicDef>[] };
+export type WorldDiffMessage = { type: 'edge'; kind: 'world-diff'; seq: number; tick: number; at: number; diff: Diff; by: 'god' | 'undo' | 'redo' | 'engine'; ground?: ReturnType<WorldModel['ground']>; /** every def the upserts reference (viewers only hold defs in use) */ defs: ReturnType<typeof publicDef>[] };
+/** Called for every committed batch, in order, synchronously, before viewers hear of it (Stage B: the engine patches its Spatial here). */
+export type CommitListener = (c: { seq: number; diff: Diff; kind: 'edit' | 'undo' | 'redo'; by: string; group?: string }) => void;
 export type GodEvent = { id: number; event: 'diff' | 'prayer' | 'soul'; data: unknown };
 
 export type GodOptions = {
@@ -30,13 +33,30 @@ export type GodOptions = {
   emit: (m: WorldDiffMessage) => void;
   constants?: Partial<WorldModel['constants']>;
   seed?: string;
+  /** A genesis/1 template applied once when the world is first created (worlds/templates/*.json). */
+  genesis?: Genesis;
+  /** Content-addressed asset files (default $ASSET_DIR or <DATA_DIR>/../assets), shared by every world on the box. */
+  assetDir?: string;
 };
+
+/** genesis/1: constants, state and ordered batches that build a world from nothing (spec 29 §4.5). */
+export type Genesis = { schema: 'genesis/1'; name?: string; description?: string; constants?: Partial<WorldModel['constants']>; state?: Record<string, unknown>; batches: { note?: string; group?: string; ops: unknown[] }[] };
 
 export class GodMode {
   readonly store: WorldStore;
+  readonly assets: AssetStore;
   model: WorldModel;
   owner: string | null;
   private pairings = new Map<string, Pairing>();
+  private commitListeners: CommitListener[] = [];
+  /** Name of the genesis template this world was created from (null = empty plain). */
+  template: string | null = null;
+  private previews = new Map<string, { at: number; diff: Diff; ground?: ReturnType<WorldModel['ground']>; ops: unknown; failures?: unknown }>();
+  /** Subscribe to committed batches (ordered, synchronous). Returns an unsubscribe. */
+  /** Body-aware edits (installed by the engine bridge): who uses an entity, and the warnings for bodies an
+   *  accepted edit buries (the engine lifts them clear). Null in worlds without the engine. */
+  bodies: { uses: UsesHook; lifted?: (ids: string[]) => string[]; refuse?: PlanOptions['refuse'] } | null = null;
+  onCommit(fn: CommitListener): () => void { this.commitListeners.push(fn); return () => { this.commitListeners = this.commitListeners.filter((f) => f !== fn); }; }
   private subscribers = new Set<(e: GodEvent) => void>();
   private ring: GodEvent[] = [];
   private eventSeq = 0;
@@ -45,7 +65,8 @@ export class GodMode {
   constructor(db: Db, opts: GodOptions) {
     this.db = db; this.opts = opts;
     this.store = new WorldStore(db, opts.worldId);
-    const loaded = this.store.load();
+    this.assets = new AssetStore({ dir: opts.assetDir ?? defaultAssetDir(), db, worldId: opts.worldId });
+    const loaded = this.store.load(this.assets.lookup);
     if (loaded) {
       this.model = loaded.model; this.owner = loaded.owner;
       // a newer release may add core defs: make them available to older worlds (existing hashes are untouched)
@@ -53,10 +74,11 @@ export class GodMode {
       if (added.length) this.store.commit(this.model, this.owner, { upserts: [], removes: [], defs: added, tiles: [], answers: [] }, { seq: this.model.editSeq, by: 'core', at: Date.now(), note: `core kit: +${added.map((d) => d.ref).join(', ')}`, ops: [], inverse: [], kind: 'edit' });
     }
     else {
-      this.model = new WorldModel({ constants: { ground: 'land', extent: 1000, ...opts.constants } as never, seed: opts.seed ?? `${opts.worldId}:genesis` });
+      this.model = new WorldModel({ constants: { ground: 'land', extent: 1000, ...opts.constants, ...opts.genesis?.constants } as never, seed: opts.seed ?? `${opts.worldId}:genesis`, assets: this.assets.lookup });
       for (const d of CORE_KIT) this.model.defineDef(d, 'core', 0);
       this.owner = opts.ownerId;
       this.store.init(this.model, this.owner);
+      if (opts.genesis) this.applyGenesis(opts.genesis);
     }
   }
 
@@ -96,17 +118,25 @@ Your agent (Claude Code, Codex, any always-on agent) builds this world through *
 it reads the whole world as structure, proposes edits, and the world validates them against
 physics (support, no interpenetration, size, extent). Souls are mortal; they pray to you.
 
-## Pair your agent (once per folder)
+## Pair your agent (once)
+
+Paste this to your agent:
+
+\`\`\`
+Read ${base}/SKILL.md and follow its God mode section: you are the god of this world.
+\`\`\`
+
+That one skill installs the god CLI and pairs it: approve the code that appears on this page. By hand:
 
 \`\`\`
 mkdir ${worldName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-god && cd $_
-curl -sO ${base}/god/eden-god.mjs && curl -sO ${base}/god/SKILL.md
+curl -sO ${base}/god/eden-god.mjs
 node eden-god.mjs register ${base}
 node eden-god.mjs pair        # prints a code; approve it on this page (or open the link it prints)
 \`\`\`
 
-Then open SKILL.md in that folder with your agent and talk: *"put mountains in the east and a lake
-in the west"*, *"a cottage on the knoll, door facing the lake"*, *"undo that"*.
+Then talk to your agent: *"put mountains in the east and a lake in the west"*, *"a cottage on the
+knoll, door facing the lake"*, *"undo that"*. Friends join as Souls from this page's **Souls** tab link.
 
 ## Reference points
 
@@ -138,15 +168,17 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   // ---------- edits ----------
 
   dryrun(batch: unknown) {
-    const p = plan(this.model, batch, 'god', this.opts.tick());
+    const p = plan(this.model, batch, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: this.bodies?.refuse });
     return p.ok ? { accepted: true as const, ids: p.ids, warnings: p.warnings, diff: summarize(p.diff) } : { accepted: false as const, failures: p.failures };
   }
   act(batch: unknown, note?: string): Result {
     const tick = this.opts.tick();
-    const r = applyBatch(this.model, batch, 'god', tick);
+    const r = applyBatch(this.model, batch, 'god', tick, { uses: this.bodies?.uses, refuse: this.bodies?.refuse });
     if (!r.result.accepted) return r.result;
-    const ops = (batch as { ops: Op[] }).ops;
-    this.store.commit(this.model, this.owner, r.diff!, { seq: r.result.seq, by: 'god', at: Date.now(), note, ops, inverse: r.inverse!, kind: 'edit' });
+    if (this.bodies?.lifted) r.result.warnings.push(...this.bodies.lifted(r.diff!.upserts.map((e) => e.id)));
+    const ops = (batch as { ops: Op[] }).ops; const group = typeof (batch as { group?: unknown }).group === 'string' ? (batch as { group: string }).group : undefined;
+    this.store.commit(this.model, this.owner, r.diff!, { seq: r.result.seq, by: 'god', at: Date.now(), note, group, ops, inverse: r.inverse!, kind: 'edit' });
+    this.notify(r.result.seq, r.diff!, 'edit', group);
     this.publish(r.result.seq, tick, r.diff!, 'god');
     for (const a of r.diff!.answers) this.answer(a.prayer, a.text);
     return r.result;
@@ -164,13 +196,52 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   private revert(target: EditRow, kind: 'undo' | 'redo'): Result & { reverted?: number } {
     if (!target.inverse.length) return { accepted: false, failures: [{ op: -1, code: 'undo.conflict', detail: `edit ${target.seq} has no inverse (${kind === 'undo' ? 'expand/define/answer' : 'nothing to redo'})` }] };
     const tick = this.opts.tick();
-    const r = applyBatch(this.model, { ops: target.inverse }, 'god', tick, { trusted: true });
-    if (!r.result.accepted) return { ...r.result, failures: r.result.failures.map((f) => ({ ...f, code: 'undo.conflict' })) };
-    this.store.commit(this.model, this.owner, r.diff!, { seq: r.result.seq, by: 'god', at: Date.now(), note: `${kind} of ${target.seq}`, ops: target.inverse, inverse: r.inverse!, kind, undoOf: target.seq });
+    const r = applyBatch(this.model, { ops: target.inverse }, 'god', tick, { trusted: true, uses: this.bodies?.uses, refuse: this.bodies?.refuse });
+    if (!r.result.accepted) return { ...r.result, failures: r.result.failures.map((f) => ({ ...f, code: f.code.endsWith('.by-body') ? f.code : 'undo.conflict' })) };
+    this.store.commit(this.model, this.owner, r.diff!, { seq: r.result.seq, by: 'god', at: Date.now(), note: `${kind} of ${target.seq}`, group: target.grp ?? undefined, ops: target.inverse, inverse: r.inverse!, kind, undoOf: target.seq });
+    this.notify(r.result.seq, r.diff!, kind, target.grp ?? undefined);
     this.publish(r.result.seq, tick, r.diff!, kind);
     return { ...r.result, reverted: target.seq };
   }
 
+  /** A trusted edit the engine made (a Soul moved a thing, a body was born or retired): journaled by 'engine',
+   *  never the god's to undo (and it does not clear the redo stack), published to viewers, not sent to onCommit. */
+  engineAct(ops: Op[], note: string): Result {
+    const tick = this.opts.tick();
+    const r = applyBatch(this.model, { ops }, 'engine', tick, { trusted: true });
+    if (!r.result.accepted) return r.result;
+    this.store.commit(this.model, this.owner, r.diff!, { seq: r.result.seq, by: 'engine', at: Date.now(), note, ops, inverse: [], kind: 'engine' });
+    this.publish(r.result.seq, tick, r.diff!, 'engine');
+    return r.result;
+  }
+
+  /** Undo every edit of a group (newest first). Stops at the first conflict and reports how far it got. */
+  undoGroup(group: string): { accepted: boolean; reverted: number[]; failures?: unknown } {
+    const reverted: number[] = [];
+    for (;;) {
+      const target = this.store.edits(500).find((e) => !e.undone && e.kind !== 'undo' && e.grp === group);
+      if (!target) break;
+      const r = this.revert(target, 'undo');
+      if (!r.accepted) return { accepted: reverted.length > 0, reverted, failures: r.failures };
+      reverted.push(target.seq);
+    }
+    return { accepted: reverted.length > 0, reverted, ...(reverted.length ? {} : { failures: [{ op: -1, code: 'undo.conflict', detail: `no edits in group ${group}` }] }) };
+  }
+  /** Dry-run a batch and keep its would-be diff for a ghost preview (?preview=<id>), 10 minutes. */
+  preview(batch: unknown) {
+    const p = plan(this.model, batch, 'god', this.opts.tick(), { uses: this.bodies?.uses, refuse: this.bodies?.refuse });
+    const id = 'pv_' + randomBytes(6).toString('hex');
+    for (const [k, v] of this.previews) if (Date.now() - v.at > 600_000) this.previews.delete(k);
+    if (!p.ok) { this.previews.set(id, { at: Date.now(), diff: { upserts: [], removes: [], defs: [], tiles: [], answers: [] }, ops: batch, failures: p.failures }); return { id, accepted: false as const, failures: p.failures }; }
+    this.previews.set(id, { at: Date.now(), diff: p.diff, ops: batch });
+    return { id, accepted: true as const, summary: summarize(p.diff), url: `?preview=${id}` };
+  }
+  getPreview(id: string) { const v = this.previews.get(id); if (!v || Date.now() - v.at > 600_000) return null; return v; }
+  /** The god's recent previews, newest first (the panel lists them to show as ghosts). */
+  listPreviews() { const now = Date.now(); return [...this.previews].filter(([, v]) => now - v.at <= 600_000).sort((a, b) => b[1].at - a[1].at).slice(0, 20).map(([id, v]) => ({ id, at: v.at, accepted: !v.failures, summary: v.failures ? null : summarize(v.diff) })); }
+  private notify(seq: number, diff: Diff, kind: 'edit' | 'undo' | 'redo', group?: string) {
+    for (const fn of this.commitListeners) fn({ seq, diff, kind, by: 'god', group });
+  }
   private publish(seq: number, tick: number, diff: Diff, by: WorldDiffMessage['by']) {
     const referenced = new Map<string, StoredDef>();
     for (const e of diff.upserts) for (let ref: string | undefined = e.def; ref; ref = referenced.get(ref)?.extends) { const d = this.model.def(ref); if (!d || referenced.has(ref)) break; referenced.set(ref, d); }
@@ -179,12 +250,24 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     this.push('diff', m);
   }
 
+  /** Apply a template's batches through the compiler (each atomic, journaled like a god edit). Throws on the first refusal. */
+  applyGenesis(g: Genesis) {
+    if (g.schema !== 'genesis/1') throw new Error('genesis: schema must be genesis/1');
+    if (g.state) { const r = this.act({ ops: [{ op: 'world', state: g.state }], group: 'genesis' }, 'genesis: state'); if (!r.accepted) throw new Error(`genesis state refused: ${JSON.stringify(r.failures)}`); }
+    for (const [i, b] of g.batches.entries()) {
+      const r = this.act({ ops: b.ops, group: b.group ?? 'genesis' }, `genesis ${i + 1}/${g.batches.length}${b.note ? ': ' + b.note : ''}`);
+      if (!r.accepted) throw new Error(`genesis batch ${i + 1} (${b.note ?? ''}) refused: ${JSON.stringify(r.failures).slice(0, 600)}`);
+    }
+    this.template = g.name ?? 'custom';
+  }
+
   // ---------- reads ----------
 
   /** What a viewer (or anyone) may read: constants, state, every entity, the defs in use, the ground recipe. */
   publicSnapshot() {
     const s = this.model.snapshot();
     const used = new Set(s.entities.map((e) => e.def));
+    for (const e of s.entities) for (const v of Object.values(e.params ?? {})) if (typeof v === 'string' && /@\d+$/.test(v) && this.model.def(v)) used.add(this.model.def(v)!.ref);
     const defs = s.defs.filter((d) => used.has(d.ref) || used.has('sha:' + d.hash) || used.has(d.ref.replace(/^core-/, 'core/')));
     return { contract: 'world/1', worldId: this.opts.worldId, seq: s.editSeq, counter: s.seq, seed: s.seed, tick: this.opts.tick(), constants: s.constants, state: s.state, ground: s.ground, defs: defs.map(publicDef), entities: s.entities };
   }

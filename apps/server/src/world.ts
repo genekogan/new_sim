@@ -65,7 +65,11 @@ export type Mind = {
 export type RecoveryRecipe = { baseline: SnapshotBody; events: LogEvent[]; untilTick: number; faults: Record<string,number>; excluded: string[]; reason: string;
   /** Hotfix (edge worlds, no mind card to blame): the bodies whose programmes are stopped at the baseline, the edge decision
    *  events left out of the replay, and the edge Souls whose open receipts end `engine.fault-recovered`. */
-  edge?: { stopActors: string[]; excludedSeqs: number[]; souls: string[] } };
+  edge?: { stopActors: string[]; excludedSeqs: number[]; souls: string[];
+    /** The rewound bodies' last valid poses (taken before the faulting tick): after the replay each lands back there, or at
+     *  the nearest free standing point, instead of where the rewind left it (its arrival point). Absent in older recipes. */
+    poses?: Record<string, RecoveryPose> } };
+export type RecoveryPose = { p: [number, number, number]; yaw: number; level: number };
 /** A synchronous, read-only acceptance check. Throw to refuse before logging. */
 export type AcceptanceGuard = () => true;
 export function checkAcceptanceGuard(guard: AcceptanceGuard): void {
@@ -127,6 +131,8 @@ export class WorldHost {
   private batchSeq = 0;
   private timer: NodeJS.Timeout | null = null;
   private recoveryBaseline: SnapshotBody | null = null;
+  /** Edge worlds: the Souls' bodies' poses at the start of the latest tick (valid: the previous tick passed the invariants). */
+  private validPoses: { tick: number; poses: Map<string, RecoveryPose> } | null = null;
   private last = 0;
   private carry = 0;
   private overruns = 0;
@@ -384,6 +390,7 @@ export class WorldHost {
     this.assertClockReady();
     const t0 = performance.now();
     const tick = this.engine.world.tick;
+    if (this.recoveryForEdge) this.validPoses = { tick, poses: this.soulPoses() };
     // 1. apply queued inputs at this tick, logging them
     this.drainInputs();
     // 2. step the engine
@@ -1202,6 +1209,7 @@ export class WorldHost {
       this.apply(e,true); this.seq=e.seq;
     }
     while (this.engine.world.tick < recipe.untilTick) { const out=this.engine.step(); this.advanceLives(); this.afterPrograms(out.programs,true); }
+    this.restorePoses(recipe.edge?.poses);
     if (this.engine.runtime.violations.length > historicViolations) throw new Error('recovery replay still violates the engine');
     this.extra.cardFaults = {...recipe.faults};
     this.extra.cardCooldown = {...this.extra.cardCooldown as Record<string,number>, ...Object.fromEntries(recipe.excluded.map(card=>[card,recipe.untilTick+1200]))};
@@ -1227,7 +1235,8 @@ export class WorldHost {
       for (const card of plan.excluded) faults[card]=(faults[card]??0)+1;
       const skip=new Set(plan.edge?.excludedSeqs ?? []);
       const events=all.filter(e=>!(['decision','play'].includes(e.kind) && plan.excluded.includes(e.payload?.card)) && !skip.has(e.seq));
-      const recipe: RecoveryRecipe={baseline:structuredClone(baseline),events,untilTick,faults:{...faults},excluded:[...plan.excluded],reason:String(error).slice(0,800),...(plan.edge?{edge:plan.edge}:{})};
+      const edge=plan.edge?{...plan.edge,...this.rewoundPoses(plan.edge, all)}:undefined;
+      const recipe: RecoveryRecipe={baseline:structuredClone(baseline),events,untilTick,faults:{...faults},excluded:[...plan.excluded],reason:String(error).slice(0,800),...(edge?{edge}:{})};
       try { this.restoreRecovery(recipe); }
       catch (replayError) { if (attempt===plans.length-1) { if (this.edgeRecovery()) return this.haltOnFault(replayError, 'recovery replay still faults'); throw replayError; } continue; }
       this.seq=originalSeq;
@@ -1239,12 +1248,40 @@ export class WorldHost {
       this.flush(); this.heartbeat(); return;
     }
   }
+  /** Where each Soul's body is now (sorted by entity id). */
+  private soulPoses(): Map<string, RecoveryPose> {
+    const out = new Map<string, RecoveryPose>(), ents = this.engine.world.entities as Record<string, { pose: { p: number[]; yaw?: number }; human?: { level?: number } }>;
+    for (const id of [...this.mindByEntity.keys()].sort()) { const e = ents[id]; if (!e?.human || e.pose.p.length !== 3) continue; out.set(id, { p: [e.pose.p[0], e.pose.p[1], e.pose.p[2]], yaw: e.pose.yaw ?? 0, level: e.human.level ?? 0 }); }
+    return out;
+  }
+  /** The last valid poses of the bodies an edge plan rewinds (its stopped actors and the authors of its left-out decisions):
+   *  taken at the start of the faulting tick, or now when the fault came between ticks. */
+  private rewoundPoses(edge: NonNullable<RecoveryRecipe['edge']>, all: LogEvent[]): { poses?: Record<string, RecoveryPose> } {
+    const seqs = new Set(edge.excludedSeqs), ids = new Set(edge.stopActors);
+    for (const e of all) if (seqs.has(e.seq) && typeof e.payload?.entityId === 'string') ids.add(e.payload.entityId);
+    const valid = this.validPoses && this.engine.world.tick - this.validPoses.tick <= 1 ? this.validPoses.poses : this.soulPoses();
+    const poses = Object.fromEntries([...ids].sort().flatMap(id => valid.has(id) ? [[id, valid.get(id)!]] : []));
+    return Object.keys(poses).length ? { poses } : {};
+  }
+  /** After a recovery replay: each rewound body lands back at its last valid pose (or the nearest free standing point).
+   *  Bodies the rewind left where they were, or that are busy, stay. Deterministic: the poses are in the logged recipe. */
+  private restorePoses(poses: Record<string, RecoveryPose> | undefined) {
+    const engine = this.engine as unknown as { restoreHumanPoseV1?: (id: string, pose: RecoveryPose) => boolean };
+    if (!poses || !engine.restoreHumanPoseV1) return;
+    const ents = this.engine.world.entities as Record<string, { pose: { p: number[] }; human?: { level?: number } }>;
+    for (const id of Object.keys(poses).sort()) {
+      const e = ents[id], to = poses[id]; if (!e?.human) continue;
+      if ((e.human.level ?? 0) === to.level && Math.hypot(e.pose.p[0] - to.p[0], e.pose.p[2] - to.p[2]) < 0.05) continue;
+      engine.restoreHumanPoseV1.call(this.engine, id, to);
+    }
+  }
   /** Edge worlds (mindDriver edge): Souls act through edge decisions, not mind cards. */
   private edgeRecovery(): boolean { return this.recoveryForEdge; }
   /** Set by the edge server: faults are recovered by edge attribution (never a process exit). */
   recoveryForEdge = false;
-  /** Edge fault attribution, narrowest first: the faulting bodies' running edge programmes and their decisions since the
-   *  baseline; then every edge decision since the baseline (all running programmes stopped). */
+  /** Edge fault attribution, narrowest first: the faulting bodies' running edge programmes and only the decisions
+   *  that started them; then all their decisions since the baseline; then every edge decision since the baseline (all
+   *  running programmes stopped). Each plan is tried in a replay and kept only if that replay is clean. */
   private edgePlans(error: unknown, all: LogEvent[], hint?: {seq: number; entityId?: string}): NonNullable<RecoveryRecipe['edge']>[] {
     let subjects: string[] = [];
     try { const v = JSON.parse(String(error instanceof Error ? error.message : error).replace(/^Error:\s*/, '')) as {subjects?: string[]}[]; subjects = [...new Set(v.flatMap(d => d.subjects ?? []))]; } catch { /* not a violation list */ }
@@ -1259,7 +1296,17 @@ export class WorldHost {
       const souls = [...new Set([...stop, ...all.filter(e => seqs.includes(e.seq)).map(e => e.payload.entityId as string)].map(soulOf).filter((x): x is string => !!x))].sort();
       return {stopActors: stop, excludedSeqs: seqs.sort((a, b) => a - b), souls};
     };
-    const out = [plan(running(named.length ? named : humans), false), plan(named.length ? named : humans, false), plan(running(humans), true)];
+    // Narrowest first: only the decision each faulting body is running now (its latest edge decision since the
+    // baseline), so its earlier walks and sits replay as they were and no unrelated history is set aside.
+    // (A body whose running programme began before the baseline has no such decision: that programme is stopped there.)
+    const current = (actors: string[]) => {
+      const ids = [...new Set(actors)].sort(), seqs: number[] = [], stop: string[] = [];
+      for (const id of ids) { const last = [...all].reverse().find(e => edgeDecision(e) && e.payload.entityId === id); if (last) seqs.push(last.seq); else stop.push(id); }
+      if (hint && !seqs.includes(hint.seq)) seqs.push(hint.seq);
+      const souls = [...new Set([...ids, ...all.filter(e => seqs.includes(e.seq)).map(e => e.payload.entityId as string)].map(soulOf).filter((x): x is string => !!x))].sort();
+      return {stopActors: stop, excludedSeqs: seqs.sort((a, b) => a - b), souls};
+    };
+    const out = [...(named.length ? [current(running(named))] : []), plan(running(named.length ? named : humans), false), plan(named.length ? named : humans, false), plan(running(humans), true)];
     return out.filter((p, i) => p.stopActors.length + p.excludedSeqs.length > 0 && out.findIndex(q => JSON.stringify(q) === JSON.stringify(p)) === i);
   }
   /** Last resort for edge worlds: keep the process up, the world paused and the fault reported (never a crash loop). */

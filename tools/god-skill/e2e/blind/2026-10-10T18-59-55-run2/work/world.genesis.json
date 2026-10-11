@@ -1,0 +1,2134 @@
+{
+ "schema": "genesis/1",
+ "name": "blind2-1",
+ "description": "exported from blind2-1 at seq 42",
+ "constants": {
+  "extent": 1000,
+  "ground": "land"
+ },
+ "state": {
+  "sky": {
+   "palette": "clear-day",
+   "sun": 0.6
+  },
+  "weather": {
+   "clouds": 0.1,
+   "wind": 0.1,
+   "rain": 0
+  }
+ },
+ "batches": [
+  {
+   "note": "things 1–61",
+   "ops": [
+    {
+     "op": "place",
+     "tmp": "$e0",
+     "def": "core-lamp-post@1",
+     "name": "lamp-ne",
+     "p": [
+      -46,
+      46
+     ],
+     "params": {
+      "iron": "#2f3633",
+      "glow": "#ffe2a8"
+     },
+     "state": {
+      "on": true
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e1",
+     "def": "core-road@1",
+     "name": "main-road",
+     "p": [
+      0,
+      0
+     ],
+     "shape": {
+      "path": [
+       [
+        -66,
+        76
+       ],
+       [
+        -90,
+        100
+       ],
+       [
+        -115,
+        128
+       ],
+       [
+        -150,
+        162
+       ],
+       [
+        -185.03,
+        189.62
+       ]
+      ],
+      "width": 6
+     },
+     "params": {
+      "grade": {
+       "sig": "x78cn9",
+       "h": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+       ],
+       "spans": [],
+       "maxGrade": 0.08,
+       "cut": 0,
+       "fill": 0
+      },
+      "width": 6,
+      "material": "cobble",
+      "kerb": true,
+      "shoulder": 0.6,
+      "maxGrade": 0.08,
+      "autoBridge": true,
+      "lines": false
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e2",
+     "def": "core-tree@1",
+     "name": "roadside-tree-10",
+     "p": [
+      -147.40111452426646,
+      170.3791972496985
+     ],
+     "r": -2.4736590097819597,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.75,
+       "side": "left",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e3",
+     "def": "core-tree@1",
+     "name": "roadside-tree-2",
+     "p": [
+      -80.14005209015168,
+      101.73232601209408
+     ],
+     "r": -2.3563017646942472,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.17,
+       "side": "left",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e4",
+     "def": "core-tree@1",
+     "name": "roadside-tree-5",
+     "p": [
+      -104.66937398102797,
+      128.73276752174422
+     ],
+     "r": -2.2997481018143473,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.39,
+       "side": "left",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e5",
+     "def": "core-plaza@1",
+     "name": "square",
+     "p": [
+      0,
+      0
+     ],
+     "shape": {
+      "area": [
+       [
+        -76,
+        44
+       ],
+       [
+        -44,
+        44
+       ],
+       [
+        -44,
+        76
+       ],
+       [
+        -76,
+        76
+       ]
+      ]
+     },
+     "params": {
+      "pattern": "radial",
+      "material": "cobble",
+      "color": "#b9b2a4",
+      "kerb": true,
+      "size": 0.8
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e6",
+     "def": "core-cottage@1",
+     "name": "house-4",
+     "p": [
+      -60,
+      36
+     ],
+     "r": 0,
+     "params": {
+      "w": 8,
+      "d": 6,
+      "floors": 1,
+      "floorHeight": 2.8,
+      "style": "cottage",
+      "roof": "gable",
+      "roofPitch": 32,
+      "material": "plaster",
+      "wall": "#f4d6d0",
+      "trim": "#6b4a2b",
+      "roofColor": "#8a3b2a",
+      "front": "s",
+      "porch": 1.5,
+      "balcony": false,
+      "windows": 0.6,
+      "wallThickness": 0.22
+     },
+     "state": {
+      "paint": "#f1e7d2"
+     },
+     "constraints": [
+      {
+       "kind": "near",
+       "ref": "square",
+       "dist": 6
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e7",
+     "def": "core-footpath@1",
+     "name": "path-1",
+     "p": [
+      0,
+      0
+     ],
+     "shape": {
+      "path": [
+       [
+        -61.17,
+        80.11
+       ],
+       [
+        -60.99,
+        77
+       ]
+      ],
+      "width": 1.6
+     },
+     "params": {
+      "grade": {
+       "sig": "q022ix",
+       "spans": []
+      },
+      "width": 1.6,
+      "material": "gravel",
+      "edging": false,
+      "maxGrade": 0,
+      "autoBridge": true
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e8",
+     "def": "core-lamp-post@1",
+     "name": "lamp-se",
+     "p": [
+      -46,
+      74
+     ],
+     "params": {
+      "iron": "#2f3633",
+      "glow": "#ffe2a8"
+     },
+     "state": {
+      "on": true
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e9",
+     "def": "core-fountain@1",
+     "name": "fountain",
+     "p": [
+      -60,
+      60
+     ],
+     "params": {
+      "stone": "#b9b3a6",
+      "water": "#5d8fa6",
+      "stone2": "#a39b8c"
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e10",
+     "def": "core-bench@1",
+     "name": "bench-3",
+     "p": [
+      -64.72,
+      56.04
+     ],
+     "r": 0.8727330420702795,
+     "params": {
+      "iron": "#2f3633",
+      "wood": "#9a6b46"
+     },
+     "constraints": [
+      {
+       "kind": "facing",
+       "ref": "fountain",
+       "offset": 0
+      },
+      {
+       "kind": "near",
+       "ref": "fountain",
+       "dist": 4
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e11",
+     "def": "core-tree@1",
+     "name": "roadside-tree-9",
+     "p": [
+      -138.82987677073592,
+      162.56858683023498
+     ],
+     "r": -2.370808647980843,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.68,
+       "side": "left",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e12",
+     "def": "core-tree@1",
+     "name": "roadside-tree-15",
+     "p": [
+      -100.49279042456669,
+      99.44533782396417
+     ],
+     "r": 0.8420392142615348,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.25,
+       "side": "right",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e13",
+     "def": "core-townhouse@1",
+     "name": "townhouse",
+     "p": [
+      -14,
+      60
+     ],
+     "r": -1.57,
+     "params": {
+      "floors": 2,
+      "balcony": true,
+      "w": 6,
+      "d": 10,
+      "floorHeight": 2.8,
+      "style": "cottage",
+      "roof": "gable",
+      "roofPitch": 38,
+      "material": "brick",
+      "wall": "#e9d9c4",
+      "trim": "#3f4a46",
+      "roofColor": "#5e5a57",
+      "front": "s",
+      "porch": 0,
+      "windows": 0.6,
+      "wallThickness": 0.22
+     },
+     "state": {
+      "paint": "#e9d9c4"
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e14",
+     "def": "core-armchair@1",
+     "name": "armchair",
+     "in": {
+      "parent": "$e13",
+      "slot": "bedroom"
+     },
+     "p": [
+      -1.1,
+      1.38
+     ],
+     "r": 2.36,
+     "params": {
+      "fabric": "#8ea47f",
+      "wood": "#5e3d27"
+     },
+     "constraints": [
+      {
+       "kind": "inside",
+       "ref": "townhouse/bedroom"
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e15",
+     "def": "core-tree@1",
+     "name": "roadside-tree-23",
+     "p": [
+      -168.22021799162414,
+      165.93331396992932
+     ],
+     "r": 0.6673990059804824,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.83,
+       "side": "right",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e16",
+     "def": "core-tree@1",
+     "name": "roadside-tree-20",
+     "p": [
+      -141.24455663672168,
+      142.07305256945764
+     ],
+     "r": 0.7710321863155974,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.61,
+       "side": "right",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e17",
+     "def": "core-tree@1",
+     "name": "roadside-tree-3",
+     "p": [
+      -89.20373134101358,
+      111.41463106775346
+     ],
+     "r": -2.2997481018143473,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.25,
+       "side": "left",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e18",
+     "def": "core-river@1",
+     "name": "river",
+     "p": [
+      0,
+      0
+     ],
+     "shape": {
+      "path": [
+       [
+        -260,
+        -5
+       ],
+       [
+        -215,
+        120
+       ],
+       [
+        -170,
+        280
+       ],
+       [
+        -150,
+        500
+       ]
+      ],
+      "width": 12
+     },
+     "params": {
+      "level": -0.3,
+      "flow": {
+       "sig": "shkqw4",
+       "levels": [
+        -0.3,
+        -0.3,
+        -0.3,
+        -0.3,
+        -0.3,
+        -0.3,
+        -0.3,
+        -0.3,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35,
+        -0.35
+       ],
+       "falls": [],
+       "source": "e_9a05aac4"
+      },
+      "width": 6,
+      "depth": 1.2,
+      "banks": "grass",
+      "bankWidth": 2.5
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e19",
+     "def": "core-flower-bed@1",
+     "name": "townhouse-flowers",
+     "p": [
+      -14,
+      65.1
+     ],
+     "params": {
+      "soil": "#5a4130",
+      "stone": "#b0aa9c",
+      "leaf": "#5f9142"
+     },
+     "constraints": [
+      {
+       "kind": "near",
+       "ref": "townhouse",
+       "dist": 2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e20",
+     "def": "core-mountain@1",
+     "name": "east-range",
+     "shape": {
+      "path": [
+       [
+        380,
+        -380
+       ],
+       [
+        400,
+        -120
+       ],
+       [
+        385,
+        140
+       ],
+       [
+        370,
+        390
+       ]
+      ],
+      "width": 300
+     },
+     "params": {
+      "height": 150,
+      "peak": 1.5,
+      "edge": 40,
+      "radius": 200
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e21",
+     "def": "core-cottage@1",
+     "name": "house-5",
+     "p": [
+      -82.93,
+      46.76
+     ],
+     "r": 1.05,
+     "params": {
+      "w": 8,
+      "d": 6,
+      "floors": 1,
+      "floorHeight": 2.8,
+      "style": "cottage",
+      "roof": "gable",
+      "roofPitch": 32,
+      "material": "stone",
+      "wall": "#f1e7d2",
+      "trim": "#6b4a2b",
+      "roofColor": "#4a5a6a",
+      "front": "s",
+      "porch": 0,
+      "balcony": false,
+      "windows": 0.6,
+      "wallThickness": 0.22
+     },
+     "state": {
+      "paint": "#f1e7d2"
+     },
+     "constraints": [
+      {
+       "kind": "near",
+       "ref": "square",
+       "dist": 6
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e22",
+     "def": "core-cottage@1",
+     "name": "house-6",
+     "p": [
+      -82.93,
+      73.24
+     ],
+     "r": 2.09,
+     "params": {
+      "w": 8,
+      "d": 6,
+      "floors": 1,
+      "floorHeight": 2.8,
+      "style": "cottage",
+      "roof": "hip",
+      "roofPitch": 32,
+      "material": "plaster",
+      "wall": "#e6e2b8",
+      "trim": "#6b4a2b",
+      "roofColor": "#8a3b2a",
+      "front": "s",
+      "porch": 0,
+      "balcony": false,
+      "windows": 0.6,
+      "wallThickness": 0.22
+     },
+     "state": {
+      "paint": "#f1e7d2"
+     },
+     "constraints": [
+      {
+       "kind": "near",
+       "ref": "square",
+       "dist": 6
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e23",
+     "def": "core-tree@1",
+     "name": "roadside-tree-22",
+     "p": [
+      -157.92051399673284,
+      157.81684523620277
+     ],
+     "r": 0.6673990059804824,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.75,
+       "side": "right",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e24",
+     "def": "core-tree@1",
+     "name": "roadside-tree-12",
+     "p": [
+      -166.9321924212457,
+      185.7871928824205
+     ],
+     "r": -2.4736590097819597,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.9,
+       "side": "left",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e25",
+     "def": "core-rug@1",
+     "name": "rug",
+     "in": {
+      "parent": "$e13",
+      "slot": "bedroom"
+     },
+     "p": [
+      0,
+      0
+     ],
+     "r": 0,
+     "params": {
+      "border": "#b0573a",
+      "field": "#f2ead8"
+     },
+     "constraints": [
+      {
+       "kind": "inside",
+       "ref": "townhouse/bedroom"
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e26",
+     "def": "core-bed@1",
+     "name": "bed",
+     "in": {
+      "parent": "$e13",
+      "slot": "bedroom"
+     },
+     "p": [
+      0,
+      -1.25
+     ],
+     "r": 0,
+     "params": {
+      "frame": "#9a6b43",
+      "linen": "#ece3cf",
+      "quilt": "#3f7f86"
+     },
+     "constraints": [
+      {
+       "kind": "inside",
+       "ref": "townhouse/bedroom"
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e27",
+     "def": "core-tree@1",
+     "name": "roadside-tree-17",
+     "p": [
+      -115.77513597069635,
+      116.56492824884022
+     ],
+     "r": 0.8420392142615348,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.39,
+       "side": "right",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e28",
+     "def": "core-footpath@1",
+     "name": "path-4",
+     "p": [
+      0,
+      0
+     ],
+     "shape": {
+      "path": [
+       [
+        -58.82,
+        39.89
+       ],
+       [
+        -59,
+        43
+       ]
+      ],
+      "width": 1.6
+     },
+     "params": {
+      "grade": {
+       "sig": "agojs3",
+       "spans": []
+      },
+      "width": 1.6,
+      "material": "gravel",
+      "edging": false,
+      "maxGrade": 0,
+      "autoBridge": true
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e29",
+     "def": "core-footpath@1",
+     "name": "path-2",
+     "p": [
+      0,
+      0
+     ],
+     "shape": {
+      "path": [
+       [
+        -41.03,
+        72.33
+       ],
+       [
+        -43.16,
+        70.94
+       ]
+      ],
+      "width": 1.6
+     },
+     "params": {
+      "grade": {
+       "sig": "1nhoodv",
+       "spans": []
+      },
+      "width": 1.6,
+      "material": "gravel",
+      "edging": false,
+      "maxGrade": 0,
+      "autoBridge": true
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e30",
+     "def": "core-bench@1",
+     "name": "bench-1",
+     "p": [
+      -56.96,
+      65.26
+     ],
+     "r": -2.617546619391052,
+     "params": {
+      "iron": "#2f3633",
+      "wood": "#9a6b46"
+     },
+     "constraints": [
+      {
+       "kind": "facing",
+       "ref": "fountain",
+       "offset": 0
+      },
+      {
+       "kind": "near",
+       "ref": "fountain",
+       "dist": 4
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e31",
+     "def": "core-bench@1",
+     "name": "bench-4",
+     "p": [
+      -63.04,
+      65.26
+     ],
+     "r": 2.617546619391052,
+     "params": {
+      "iron": "#2f3633",
+      "wood": "#9a6b46"
+     },
+     "constraints": [
+      {
+       "kind": "facing",
+       "ref": "fountain",
+       "offset": 0
+      },
+      {
+       "kind": "near",
+       "ref": "fountain",
+       "dist": 4
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e32",
+     "def": "core-cottage@1",
+     "name": "house-3",
+     "p": [
+      -37.07,
+      46.76
+     ],
+     "r": -1.05,
+     "params": {
+      "w": 8,
+      "d": 6,
+      "floors": 1,
+      "floorHeight": 2.8,
+      "style": "cottage",
+      "roof": "hip",
+      "roofPitch": 32,
+      "material": "plaster",
+      "wall": "#cfe0e8",
+      "trim": "#6b4a2b",
+      "roofColor": "#8a3b2a",
+      "front": "s",
+      "porch": 0,
+      "balcony": false,
+      "windows": 0.6,
+      "wallThickness": 0.22
+     },
+     "state": {
+      "paint": "#f1e7d2"
+     },
+     "constraints": [
+      {
+       "kind": "near",
+       "ref": "square",
+       "dist": 6
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e33",
+     "def": "core-tree@1",
+     "name": "roadside-tree-7",
+     "p": [
+      -122.17366457344536,
+      146.39222915161946
+     ],
+     "r": -2.370808647980843,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.54,
+       "side": "left",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e34",
+     "def": "core-cottage@1",
+     "name": "house-2",
+     "p": [
+      -37.07,
+      73.24
+     ],
+     "r": -2.09,
+     "params": {
+      "w": 8,
+      "d": 6,
+      "floors": 1,
+      "floorHeight": 2.8,
+      "style": "cottage",
+      "roof": "gable",
+      "roofPitch": 32,
+      "material": "plaster",
+      "wall": "#e8c9a0",
+      "trim": "#6b4a2b",
+      "roofColor": "#5a4a3a",
+      "front": "s",
+      "porch": 0,
+      "balcony": false,
+      "windows": 0.6,
+      "wallThickness": 0.22
+     },
+     "state": {
+      "paint": "#f1e7d2"
+     },
+     "constraints": [
+      {
+       "kind": "near",
+       "ref": "square",
+       "dist": 6
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e35",
+     "def": "core-lake@1",
+     "name": "west-lake",
+     "p": [
+      0,
+      0
+     ],
+     "shape": {
+      "area": [
+       [
+        -290,
+        17.08
+       ],
+       [
+        -247.14,
+        -1.01
+       ],
+       [
+        -216.57,
+        -36.14
+       ],
+       [
+        -216,
+        -84.04
+       ],
+       [
+        -247.12,
+        -119.02
+       ],
+       [
+        -290,
+        -134.24
+       ],
+       [
+        -332.66,
+        -118.71
+       ],
+       [
+        -357.84,
+        -82.04
+       ],
+       [
+        -358.64,
+        -37.7
+       ],
+       [
+        -336.52,
+        4.03
+       ]
+      ]
+     },
+     "params": {
+      "depth": 4,
+      "level": -0.3,
+      "edge": 6
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e36",
+     "def": "core-bridge@1",
+     "name": "bridge",
+     "p": [
+      0,
+      0
+     ],
+     "shape": {
+      "path": [
+       [
+        -204.28,
+        195.04
+       ],
+       [
+        -185.03,
+        189.62
+       ]
+      ]
+     },
+     "params": {
+      "width": 5,
+      "material": "stone",
+      "at": {
+       "sig": "1ohn9kq",
+       "y0": 0.12,
+       "y1": 0.12
+      },
+      "deck": 0.8,
+      "arch": 0.6,
+      "rails": true
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e37",
+     "def": "core-cottage@1",
+     "name": "house-1",
+     "p": [
+      -60,
+      84
+     ],
+     "r": 3.14,
+     "params": {
+      "w": 8,
+      "d": 6,
+      "floors": 1,
+      "floorHeight": 2.8,
+      "style": "cottage",
+      "roof": "gable",
+      "roofPitch": 32,
+      "material": "plaster",
+      "wall": "#f1e7d2",
+      "trim": "#6b4a2b",
+      "roofColor": "#8a3b2a",
+      "front": "s",
+      "porch": 0,
+      "balcony": false,
+      "windows": 0.6,
+      "wallThickness": 0.22
+     },
+     "state": {
+      "paint": "#f1e7d2"
+     },
+     "constraints": [
+      {
+       "kind": "near",
+       "ref": "square",
+       "dist": 6
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e38",
+     "def": "core-footpath@1",
+     "name": "path-6",
+     "p": [
+      0,
+      0
+     ],
+     "shape": {
+      "path": [
+       [
+        -80.13,
+        70.29
+       ],
+       [
+        -76.89,
+        68.63
+       ]
+      ],
+      "width": 1.6
+     },
+     "params": {
+      "grade": {
+       "sig": "1yoblpd",
+       "spans": []
+      },
+      "width": 1.6,
+      "material": "gravel",
+      "edging": false,
+      "maxGrade": 0,
+      "autoBridge": true
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e39",
+     "def": "core-tree@1",
+     "name": "roadside-tree-16",
+     "p": [
+      -108.13396319763152,
+      108.00513303640219
+     ],
+     "r": 0.8420392142615348,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.32,
+       "side": "right",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e40",
+     "def": "core-mountain@1",
+     "name": "north-peak",
+     "p": [
+      410,
+      -220
+     ],
+     "params": {
+      "height": 110,
+      "radius": 130,
+      "peak": 3,
+      "edge": 8
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e41",
+     "def": "core-tree@1",
+     "name": "roadside-tree-1",
+     "p": [
+      -71.93015245067113,
+      93.52418760947344
+     ],
+     "r": -2.3563017646942472,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.1,
+       "side": "left",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e42",
+     "def": "core-tree@1",
+     "name": "roadside-tree-6",
+     "p": [
+      -112.65582903213645,
+      137.1485961924106
+     ],
+     "r": -2.370808647980843,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.46,
+       "side": "left",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e43",
+     "def": "core-lamp-post@1",
+     "name": "lamp-sw",
+     "p": [
+      -74,
+      74
+     ],
+     "params": {
+      "iron": "#2f3633",
+      "glow": "#ffe2a8"
+     },
+     "state": {
+      "on": true
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e44",
+     "def": "core-tree@1",
+     "name": "roadside-tree-19",
+     "p": [
+      -133.01534417268581,
+      134.07694866515146
+     ],
+     "r": 0.7710321863155974,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.54,
+       "side": "right",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e45",
+     "def": "core-mountain@1",
+     "name": "south-peak",
+     "p": [
+      400,
+      180
+     ],
+     "params": {
+      "height": 90,
+      "radius": 120,
+      "peak": 3,
+      "edge": 8
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e46",
+     "def": "core-tree@1",
+     "name": "roadside-tree-4",
+     "p": [
+      -96.93655266102078,
+      120.07369929474883
+     ],
+     "r": -2.2997481018143473,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.32,
+       "side": "left",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e47",
+     "def": "core-bench@1",
+     "name": "bench-2",
+     "p": [
+      -55.28,
+      56.04
+     ],
+     "r": -0.8727330420702795,
+     "params": {
+      "iron": "#2f3633",
+      "wood": "#9a6b46"
+     },
+     "constraints": [
+      {
+       "kind": "facing",
+       "ref": "fountain",
+       "offset": 0
+      },
+      {
+       "kind": "near",
+       "ref": "fountain",
+       "dist": 4
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e48",
+     "def": "core-footpath@1",
+     "name": "path-3",
+     "p": [
+      0,
+      0
+     ],
+     "shape": {
+      "path": [
+       [
+        -39.86,
+        49.72
+       ],
+       [
+        -43.11,
+        51.38
+       ]
+      ],
+      "width": 1.6
+     },
+     "params": {
+      "grade": {
+       "sig": "ahx0e6",
+       "spans": []
+      },
+      "width": 1.6,
+      "material": "gravel",
+      "edging": false,
+      "maxGrade": 0,
+      "autoBridge": true
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e49",
+     "def": "core-tree@1",
+     "name": "roadside-tree-18",
+     "p": [
+      -123.61052992807336,
+      124.93854420308725
+     ],
+     "r": 0.7710321863155974,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.46,
+       "side": "right",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e50",
+     "def": "core-wardrobe@1",
+     "name": "wardrobe",
+     "in": {
+      "parent": "$e13",
+      "slot": "bedroom"
+     },
+     "p": [
+      1.37,
+      -1.35
+     ],
+     "r": 4.71,
+     "params": {
+      "wood": "#5e3d27",
+      "trim": "#9a6b43",
+      "brass": "#b8913f"
+     },
+     "constraints": [
+      {
+       "kind": "inside",
+       "ref": "townhouse/bedroom"
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e51",
+     "def": "core-floor-lamp@1",
+     "name": "lamp",
+     "in": {
+      "parent": "$e13",
+      "slot": "bedroom"
+     },
+     "p": [
+      -1.39,
+      -1.92
+     ],
+     "r": 0.79,
+     "params": {
+      "metal": "#b8913f",
+      "shade": "#ece3cf"
+     },
+     "state": {
+      "on": true
+     },
+     "constraints": [
+      {
+       "kind": "inside",
+       "ref": "townhouse/bedroom"
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e52",
+     "def": "core-dresser@1",
+     "name": "dresser",
+     "in": {
+      "parent": "$e13",
+      "slot": "bedroom"
+     },
+     "p": [
+      1.49,
+      0
+     ],
+     "r": -1.57,
+     "params": {
+      "wood": "#9a6b43",
+      "front": "#c49a63",
+      "brass": "#b8913f"
+     },
+     "constraints": [
+      {
+       "kind": "inside",
+       "ref": "townhouse/bedroom"
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e53",
+     "def": "core-tree@1",
+     "name": "roadside-tree-11",
+     "p": [
+      -157.8176894026554,
+      178.59679492048357
+     ],
+     "r": -2.4736590097819597,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.83,
+       "side": "left",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e54",
+     "def": "core-lamp-post@1",
+     "name": "lamp-nw",
+     "p": [
+      -74,
+      46
+     ],
+     "params": {
+      "iron": "#2f3633",
+      "glow": "#ffe2a8"
+     },
+     "state": {
+      "on": true
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e55",
+     "def": "core-tree@1",
+     "name": "roadside-tree-14",
+     "p": [
+      -91.50039497504977,
+      89.90801106536951
+     ],
+     "r": 0.7855039099165869,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.17,
+       "side": "right",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e56",
+     "def": "core-tree@1",
+     "name": "roadside-tree-21",
+     "p": [
+      -149.47376910075758,
+      150.06915647376383
+     ],
+     "r": 0.7710321863155974,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.68,
+       "side": "right",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e57",
+     "def": "core-tree@1",
+     "name": "roadside-tree-24",
+     "p": [
+      -177.23245898715402,
+      173.03522411194
+     ],
+     "r": 0.6673990059804824,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.9,
+       "side": "right",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e58",
+     "def": "core-tree@1",
+     "name": "roadside-tree-8",
+     "p": [
+      -130.50177067209063,
+      154.48040799092723
+     ],
+     "r": -2.370808647980843,
+     "params": {
+      "bark": "#5a3d22",
+      "leaf": "#4f7f3a",
+      "leaf2": "#5f9142",
+      "leaf3": "#6aa152"
+     },
+     "constraints": [
+      {
+       "kind": "along",
+       "ref": "main-road",
+       "t": 0.61,
+       "side": "left",
+       "offset": 5.2
+      }
+     ]
+    },
+    {
+     "op": "place",
+     "tmp": "$e59",
+     "def": "core-footpath@1",
+     "name": "townhouse-path",
+     "p": [
+      0,
+      0
+     ],
+     "shape": {
+      "path": [
+       [
+        -19.89,
+        58.11
+       ],
+       [
+        -43,
+        59.2
+       ]
+      ],
+      "width": 1.6
+     },
+     "params": {
+      "grade": {
+       "sig": "1tv6sa7",
+       "spans": []
+      },
+      "width": 1.6,
+      "material": "gravel",
+      "edging": false,
+      "maxGrade": 0,
+      "autoBridge": true
+     }
+    },
+    {
+     "op": "place",
+     "tmp": "$e60",
+     "def": "core-footpath@1",
+     "name": "path-5",
+     "p": [
+      0,
+      0
+     ],
+     "shape": {
+      "path": [
+       [
+        -78.97,
+        47.68
+       ],
+       [
+        -76.84,
+        49.06
+       ]
+      ],
+      "width": 1.6
+     },
+     "params": {
+      "grade": {
+       "sig": "12jp604",
+       "spans": []
+      },
+      "width": 1.6,
+      "material": "gravel",
+      "edging": false,
+      "maxGrade": 0,
+      "autoBridge": true
+     }
+    }
+   ]
+  }
+ ]
+}

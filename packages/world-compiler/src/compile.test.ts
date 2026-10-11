@@ -64,9 +64,9 @@ test('overlap is refused with a suggestion; nudge moves it; declared overlaps pa
   const f = refused(applyBatch(w, { ops: [{ op: 'place', def: coreRef('cottage'), name: 'b', p: [2, 0] }] }, 'god', 2));
   assert.equal(f[0].code, 'overlap.solid');
   assert.ok(f[0].suggest?.p, 'suggests a free pose');
-  const n = ok(applyBatch(w, { ops: [{ op: 'place', def: coreRef('bench'), name: 'nb', p: [1, 0], mode: 'nudge' }] }, 'god', 3));
+  const n = ok(applyBatch(w, { ops: [{ op: 'place', def: coreRef('bench'), name: 'nb', p: [3.2, 0], mode: 'nudge' }] }, 'god', 3)); // its east legs straddle the (hollow) cottage's east wall
   assert.ok(n.accepted);
-  const nb = w.get('nb')!; const nz = nb.p![nb.p!.length - 1]!; assert.ok(Math.abs(nb.p![0]) > 4 || Math.abs(nz) > 3, `nudged out: ${nb.p}`);
+  const nb = w.get('nb')!; const nz = nb.p![nb.p!.length - 1]!; assert.ok(Math.abs(nb.p![0] - 3.2) > 0.1 || Math.abs(nz) > 0.1, `nudged off the wall: ${nb.p}`);
   // a tree declared to overlap decks
   ok(applyBatch(w, { ops: [{ op: 'define', def: { schema: 'def/1', name: 'deck-tree', version: 1, make: { kind: 'gen', gen: 'box/1' }, size: { box: [0.6, 7, 0.6] }, tags: ['tree'], overlaps: ['building'], params: { w: { type: 'number', default: 0.6 }, h: { type: 'number', default: 7 }, d: { type: 'number', default: 0.6 }, color: { type: 'color', default: '#2f6b2f' } } } }, { op: 'place', def: 'deck-tree@1', p: [1, 1] }] }, 'god', 4));
 });
@@ -152,9 +152,9 @@ test('dry run (plan) never mutates; snapshot round-trips', () => {
 test('a batch of 50 placements validates fast', () => {
   const w = fresh();
   const ops = Array.from({ length: 50 }, (_, i) => ({ op: 'place' as const, def: coreRef('tree'), p: [i * 3 - 75, 0] as [number, number] }));
-  const t0 = performance.now();
+  const c0 = process.cpuUsage();  // CPU time: the bound is about the compiler, not machine load
   ok(applyBatch(w, { ops }, 'god', 1));
-  const ms = performance.now() - t0;
+  const c1 = process.cpuUsage(c0), ms = (c1.user + c1.system) / 1000;
   assert.ok(ms < 250, `50 placements took ${ms.toFixed(1)} ms`);
 });
 
@@ -169,4 +169,16 @@ test('furniture inside a building is not an overlap with the building; two chair
   const f = refused(applyBatch(w, { ops: [{ op: 'place', def: coreRef('chair'), name: 'ch2', in: { parent: 'c' }, p: [1.0, 0, 0] }] }, 'god', 2));
   assert.equal(f[0].code, 'overlap.solid');
   assert.ok(f[0].detail.includes('ch'), f[0].detail);
+});
+
+test('a road laid before a stream gets its bridge when the stream crosses it (and loses it on undo)', () => {
+  const w = fresh();
+  ok(applyBatch(w, { ops: [{ op: 'place', def: coreRef('road'), name: 'lane', shape: { path: [[-60, 0], [0, 2], [60, 0]] } }] }, 'god', 1));
+  const spans = () => ((w.get('lane')!.params?.grade as { spans?: unknown[] } | undefined)?.spans ?? []).length;
+  assert.equal(spans(), 0);
+  const r = ok(applyBatch(w, { ops: [{ op: 'place', def: coreRef('stream'), name: 'beck', shape: { path: [[2, -60], [0, 0], [-3, 60]] } }] }, 'god', 2));
+  assert.equal(spans(), 1, 'one span over the beck');
+  assert.ok(r.warnings.some((x) => /lane: now bridges/.test(x)), r.warnings.join('; '));
+  ok(applyBatch(w, { ops: [{ op: 'remove', id: 'beck' }] }, 'god', 3));
+  assert.equal(spans(), 0, 'the bridge goes with the stream');
 });

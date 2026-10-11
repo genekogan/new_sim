@@ -1,0 +1,3785 @@
+[
+ {
+  "schema": "def/1",
+  "name": "core-cow-pack",
+  "version": 1,
+  "description": "A cow (rigged, Idle and Walk clips). Grazes in pastures. Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Idle, Walk.",
+  "tags": [
+   "animal",
+   "pack",
+   "cow",
+   "farm",
+   "cattle",
+   "livestock",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "bbb287748cb8dbbe4fbf63ca5d92c823cda863139bb4830182b3fc66a1f6deb9",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.634,
+    1.45,
+    2.584
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "behavior": {
+    "kind": "graze",
+    "speed": 0.6,
+    "radius": 7
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-horse-pack",
+  "version": 1,
+  "description": "A horse (rigged, Idle and Walk clips). Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Idle, Walk.",
+  "tags": [
+   "animal",
+   "pack",
+   "horse",
+   "farm",
+   "livestock",
+   "pony",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "58b10fb973fd888e96f8828f267f34f51f71adeb7fb042d9a88d626375ca664a",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.633,
+    1.7,
+    2.273
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "behavior": {
+    "kind": "graze",
+    "speed": 0.9,
+    "radius": 9
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-llama-pack",
+  "version": 1,
+  "description": "A llama (rigged, Idle and Walk clips). Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Idle, Walk.",
+  "tags": [
+   "animal",
+   "pack",
+   "llama",
+   "farm",
+   "livestock",
+   "alpaca",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "773b49ee4e32510bfb8d76a1f5a65e424cfa0df58a52ca3b288a1f73c9aad8be",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.471,
+    1.749,
+    1.468
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "behavior": {
+    "kind": "graze",
+    "speed": 0.6,
+    "radius": 4
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-pig-pack",
+  "version": 1,
+  "description": "A pig (rigged, Idle and Walk clips). Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Idle, Walk.",
+  "tags": [
+   "animal",
+   "pack",
+   "pig",
+   "farm",
+   "livestock",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "8d0ea5b5628219d05eb1aa15a88434a13c23f1141c9c8a8e3a91056b91566e5f",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.577,
+    0.8,
+    1.706
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "behavior": {
+    "kind": "graze",
+    "speed": 0.45,
+    "radius": 4
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-sheep-pack",
+  "version": 1,
+  "description": "A woolly sheep (rigged, Idle and Walk clips). Flocks graze meadows. Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Idle, Walk.",
+  "tags": [
+   "animal",
+   "pack",
+   "sheep",
+   "farm",
+   "livestock",
+   "lamb",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "8b9fb92ac975c3d24466f44ecc434e8298815e3cb77434dc82877cfce5ea6407",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.484,
+    0.949,
+    1.288
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "behavior": {
+    "kind": "graze",
+    "speed": 0.5,
+    "radius": 6
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-pug-pack",
+  "version": 1,
+  "description": "A pug, a small dog (rigged, Idle and Walk clips). Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Idle, Walk.",
+  "tags": [
+   "animal",
+   "pack",
+   "pug",
+   "pet",
+   "dog",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "d8a6505ebaac115fbe3ee002c629072dac95a00abb9745dd201678d8c4de63cf",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.18,
+    0.329,
+    0.435
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "behavior": {
+    "kind": "wander",
+    "speed": 0.9,
+    "radius": 6
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-dog-pack",
+  "version": 1,
+  "description": "A dog (rigged, Idle and Walk clips). Trots about town and gardens. Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Idle, Walk.",
+  "tags": [
+   "animal",
+   "pack",
+   "dog",
+   "pet",
+   "puppy",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "0ac8885e23cbf4e7df854a69375f598531e0c2cc8943c67346443adc4bf5842f",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.297,
+    0.613,
+    0.966
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "behavior": {
+    "kind": "wander",
+    "speed": 1.1,
+    "radius": 10
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-cat-pack",
+  "version": 1,
+  "description": "A cat (rigged, Idle and Walk clips). Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Idle, Walk.",
+  "tags": [
+   "animal",
+   "pack",
+   "cat",
+   "pet",
+   "kitten",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "ab41fe85d961afd8d8eb82de9221db16e9f67743a6dc157f2178b43a46c53497",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.095,
+    0.295,
+    0.378
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "behavior": {
+    "kind": "wander",
+    "speed": 0.7,
+    "radius": 6
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-fox-pack",
+  "version": 1,
+  "description": "A red fox (rigged, Walk clip). Woodland edges. Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Walk.",
+  "tags": [
+   "animal",
+   "pack",
+   "fox",
+   "wild",
+   "woodland",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "90af46babc5f19ff68fd746f1479b51cf09ee6a86bff38cc4a7223ea685b5470",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.276,
+    0.411,
+    0.936
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "behavior": {
+    "kind": "wander",
+    "speed": 0.9,
+    "radius": 10
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-bird-pack",
+  "version": 1,
+  "description": "A small bird (rigged, Fly clip). Wheels over meadows. Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Fly.",
+  "tags": [
+   "animal",
+   "pack",
+   "bird",
+   "wild",
+   "flying",
+   "songbird",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "cebfaa53eb6d75802fd75a278ad3375e458c6372f9041c25b40f45ce7cfe5647",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.232,
+    0.189,
+    0.442
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "behavior": {
+    "kind": "fly",
+    "speed": 6,
+    "radius": 18
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-koi-pack",
+  "version": 1,
+  "description": "A koi carp (rigged, Swim clip). Swims just under a pond's surface. Licence: CC0 1.0. Source: Quaternius Ultimate Animated Animals / Farm Animals (CC0), via mars/viewer/public/modular/environment/eden-animals.glb. Clips: Swim.",
+  "tags": [
+   "animal",
+   "pack",
+   "koi",
+   "fish",
+   "water",
+   "pond",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "34a4ed82d53b99b11230ec07c44b6cbd8e7588d43cd0826b7520e523e49a55d6",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.058,
+    0.133,
+    0.398
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "float",
+  "components": {
+   "behavior": {
+    "kind": "swim",
+    "speed": 0.6,
+    "radius": 4
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-oak-tree-1-pack",
+  "version": 1,
+  "description": "A broad-leaved common tree (oak-like), about 6 m. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "tree",
+   "plant",
+   "oak",
+   "commontree",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "7193f408900c387d06c9b2f14d8d670eacd63b327fb4248d35d2d616187ae524",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    4.95,
+    6.5,
+    7.267
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-oak-tree-2-pack",
+  "version": 1,
+  "description": "A broad-leaved common tree, rounder crown. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "tree",
+   "plant",
+   "oak",
+   "commontree",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "50af2b6a406a2bd84f41c27583c0f41ce67626fb7b334323ea33b0f67a43b936",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    3.728,
+    7,
+    5.696
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-oak-tree-3-pack",
+  "version": 1,
+  "description": "A young common tree, slimmer. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "tree",
+   "plant",
+   "oak",
+   "commontree",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "2f6da2495eaa7d34b662a06b2474600d31a459de20d8777d7b8fe0de9f5681cd",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    2.213,
+    6,
+    2.711
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-autumn-tree-1-pack",
+  "version": 1,
+  "description": "A common tree in autumn colours. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "tree",
+   "plant",
+   "autumn",
+   "commontree",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "67a97b2b279cf86f472ac508a29a7c4daf3acd0a448e1847e0b0bdb1edd6f0eb",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    4.95,
+    6.5,
+    7.267
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-autumn-tree-2-pack",
+  "version": 1,
+  "description": "A common tree in autumn colours, rounder crown. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "tree",
+   "plant",
+   "autumn",
+   "commontree",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "6cec8a1181248d885081ba1615db427b2a988a5c60f63222bb89cb1f3a2d3c6c",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    3.728,
+    7,
+    5.696
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-birch-tree-1-pack",
+  "version": 1,
+  "description": "A white-barked birch. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "tree",
+   "plant",
+   "birch",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "5a1263a5998f1257fbf5b446e500a370b5b8a49145876a89ce682c1683ab70fc",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    3.81,
+    8,
+    5.551
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-birch-tree-2-pack",
+  "version": 1,
+  "description": "A white-barked birch, taller. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "tree",
+   "plant",
+   "birch",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "b9ce50a5e6193b3702e2eb140ea6812b8e4e842213bf1cc1f660353bc6e93295",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    2.733,
+    7.5,
+    3.15
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-birch-tree-autumn-pack",
+  "version": 1,
+  "description": "A birch in autumn yellow. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "tree",
+   "plant",
+   "birch",
+   "autumn",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "502acf583bda8dd3ca841a56b5994eeca541f347ad308b203bb9f69d81f350d7",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    3.81,
+    8,
+    5.551
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-willow-tree-1-pack",
+  "version": 1,
+  "description": "A weeping willow; good by water. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "tree",
+   "plant",
+   "willow",
+   "water",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "7013a500bc8d8cae466478a3a34d66b09769462fa1a35928495ad62e1d0509b3",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    3.565,
+    7,
+    6.281
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-willow-tree-2-pack",
+  "version": 1,
+  "description": "A large weeping willow. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "tree",
+   "plant",
+   "willow",
+   "water",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "7b56767effb0e15ed9ced482f36ae44720d4dbc5c4a7602029a204aca13ca155",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    4.41,
+    7.5,
+    7.013
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-bush-1-pack",
+  "version": 1,
+  "description": "A low leafy bush. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "bush",
+   "shrub",
+   "plant",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "e3bb12919839f3fa9bafb5ec6f1cf643193948f1b007302952be70f6cc0c1f9b",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    1.208,
+    0.497,
+    0.924
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-bush-2-pack",
+  "version": 1,
+  "description": "A small round shrub. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "bush",
+   "shrub",
+   "plant",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "73b0965037e8d06d6177b53b442fb3fd985c74f67088ca70fc57a6288505d31a",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.18,
+    0.495,
+    0.18
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-bush-3-pack",
+  "version": 1,
+  "description": "A large-leaved plant. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "bush",
+   "plant",
+   "fern",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "8c05a8bf9f8de239453ae32ca4a22b4d7b38ac7fdcc8563d7a932cd48b23c263",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.707,
+    0.603,
+    0.624
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-bush-4-pack",
+  "version": 1,
+  "description": "A bushy plant. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "bush",
+   "shrub",
+   "plant",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "551317067438b2c0424cbe7228daaf6cab41b32c9265824e9a2c25cb6cf4b6d0",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    1.175,
+    0.509,
+    1.332
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-bush-5-pack",
+  "version": 1,
+  "description": "A tall leafy plant. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "bush",
+   "plant",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "0bb2a40cf766d5546fadab21566cec69b84379830faba4a5f2b6815f0d538a9e",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.77,
+    0.589,
+    0.725
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-wildflowers-pack",
+  "version": 1,
+  "description": "A clump of wildflowers. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "flower",
+   "flowers",
+   "plant",
+   "garden",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "a44248b325c9bcaa22c13c53b03410892b86901f286a701e8460c1337fa3c575",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.21,
+    0.347,
+    0.252
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-grass-tuft-pack",
+  "version": 1,
+  "description": "A tall grass tuft. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "grass",
+   "plant",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "17bc366361c3ea27bdc9bf2345bb47fe81d26f2555e74959d4380ce1d001c247",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.108,
+    0.297,
+    0.09
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-grass-short-pack",
+  "version": 1,
+  "description": "A short grass tuft. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "grass",
+   "plant",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "c6f9e7b01a3f8a9e169cb391368428b04fc046f6369f515a84da297d5d70ca48",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.118,
+    0.152,
+    0.167
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-lilypad-pack",
+  "version": 1,
+  "description": "A lily pad with a flower; floats on water. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "water",
+   "pond",
+   "plant",
+   "flower",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "d3aab8bacb42654335c0e5bbeae09c3e2946b5540f663300494086c60c1e9daf",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.332,
+    0.059,
+    0.332
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "float"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mossy-stump-pack",
+  "version": 1,
+  "description": "A mossy tree stump; a seat in the woods. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "stump",
+   "treestump",
+   "wood",
+   "forest",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "7e3bd9d72eb343bfd006295cc14234ddd5c14a1f0b1bffa8d36fb94a88dabc1f",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    1.116,
+    0.492,
+    0.853
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "seat",
+    "kind": "seat",
+    "p": [
+     0,
+     0.45,
+     0
+    ],
+    "yaw": 0,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   }
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mossy-log-pack",
+  "version": 1,
+  "description": "A fallen mossy log. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "log",
+   "woodlog",
+   "wood",
+   "forest",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "91ac65f94fedb1af03b63259c7fd27ccfd6378ce61cf8fb2eec185da927e40e2",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.838,
+    0.628,
+    2.374
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mossy-rock-1-pack",
+  "version": 1,
+  "description": "A mossy boulder. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "rock",
+   "boulder",
+   "stone",
+   "moss",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "964c1eaef3f0978586de037a3d7ce26ea4ec992305bf5cc79d1a0f2eeb68d174",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.307,
+    0.6,
+    0.295
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "solid",
+  "anchor": "conform"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mossy-rock-2-pack",
+  "version": 1,
+  "description": "A flat mossy rock. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "rock",
+   "stone",
+   "moss",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "1764f3a8254124561efc6aa00fea11f7fb3a669726a244654ea0d721f4d09517",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.663,
+    0.5,
+    0.721
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "solid",
+  "anchor": "conform"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mushroom-red-pack",
+  "version": 1,
+  "description": "A red-capped toadstool. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "mushroom",
+   "toadstool",
+   "forest",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "7321a621cbf5d29bb7616cded038fbae793cc78b52f932d1fdbfd71dd140a16b",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.154,
+    0.18,
+    0.178
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mushrooms-red-pack",
+  "version": 1,
+  "description": "A cluster of red toadstools. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "mushroom",
+   "toadstool",
+   "forest",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "a66b0c69dfe45ad2d4fdbab754b0e97cac2e6bc828548b14a530d21f4b6c8564",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.194,
+    0.18,
+    0.183
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mushroom-tan-pack",
+  "version": 1,
+  "description": "A tan mushroom. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "mushroom",
+   "forest",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "e72f4930a221f10ed029516d6ebff41c56ef18527e42876fad9fa5586c6b548b",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.199,
+    0.16,
+    0.23
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mushrooms-tan-pack",
+  "version": 1,
+  "description": "A cluster of tan mushrooms. Licence: CC0 1.0. Source: Quaternius Ultimate Nature + Kenney Nature Kit (CC0), via eden-nature.glb.",
+  "tags": [
+   "nature",
+   "pack",
+   "mushroom",
+   "forest",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "a2525842639cc01980d550fa322c3503be4a918ffe6ed279ec70b022ac684c9b",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.172,
+    0.16,
+    0.162
+   ],
+   "scale": [
+    0.4,
+    2.5
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-carrot-crop-young-pack",
+  "version": 1,
+  "description": "Young carrots, a few weeks in. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "carrot",
+   "young",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "fe67245027b7ea7a49934de8ad56896ed430ce79d7dba1779ee2f5fa550b7b0e",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.05,
+    0.077,
+    0.05
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-carrot-crop-pack",
+  "version": 1,
+  "description": "Ripe carrots, ready to harvest. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "carrot",
+   "ripe",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "93a4524ee89c63dc81a28c1be5b1daf8cd6b6078cc154ce9100e5a5db968892b",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.173,
+    0.317,
+    0.134
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-lettuce-crop-young-pack",
+  "version": 1,
+  "description": "Young lettuce, a few weeks in. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "lettuce",
+   "young",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "eb0457cf13388f559992f7926a48e5745c2445d8b5c640d72e20d05b9630ae36",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.222,
+    0.209,
+    0.222
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-lettuce-crop-pack",
+  "version": 1,
+  "description": "Ripe lettuce, ready to harvest. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "lettuce",
+   "ripe",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "c5801c99e3a286384dc58e1d18748005c59f4e858d076b2978517bcae4020fa6",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.629,
+    0.277,
+    0.629
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-tomato-crop-young-pack",
+  "version": 1,
+  "description": "Young tomato plants, a few weeks in. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "tomato",
+   "young",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "2316f3b96843b004a02b232b1fe3eab930d35e77fe9e5be11eb32eb044893146",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.221,
+    0.455,
+    0.11
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-tomato-crop-pack",
+  "version": 1,
+  "description": "Ripe tomato plants, ready to harvest. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "tomato",
+   "ripe",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "2714b17aafea36184c194318b5e3e148da8f20a47145e7709b0d1f4693781be2",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.48,
+    0.99,
+    0.48
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-corn-crop-young-pack",
+  "version": 1,
+  "description": "Young corn (maize), a few weeks in. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "corn",
+   "young",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "a843db99b853d49f17b177b212551c806a5f2531dbc84fbe1dd4629a9304882c",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.267,
+    0.63,
+    0.305
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-corn-crop-pack",
+  "version": 1,
+  "description": "Ripe corn (maize), ready to harvest. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "corn",
+   "ripe",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "2fa367b1527b223e95df848ed57c171bf22ca499140158e0f70df027c70e966d",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.912,
+    1.881,
+    0.57
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-pumpkin-crop-young-pack",
+  "version": 1,
+  "description": "Young a pumpkin patch, a few weeks in. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "pumpkin",
+   "young",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "6899f576592f6ceb095ded077c793dd268b596ba6c80271819be5ee827b3d3c1",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.445,
+    0.236,
+    0.419
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-pumpkin-crop-pack",
+  "version": 1,
+  "description": "Ripe a pumpkin patch, ready to harvest. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "pumpkin",
+   "ripe",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "d259b393e7efa317aa0388804678df172d9a14fc6f24e13b280e6274ce412f39",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    1.226,
+    0.541,
+    1.01
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-beet-crop-young-pack",
+  "version": 1,
+  "description": "Young beets, a few weeks in. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "beet",
+   "young",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "ba0b50e353f14ce99d92b1436f9bdbb8e5bad7f51e3447c6c9ffcffc14a49e67",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.06,
+    0.247,
+    0.05
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-beet-crop-pack",
+  "version": 1,
+  "description": "Ripe beets, ready to harvest. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "beet",
+   "ripe",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "40b866da16a39198f746aa8b003f4351679fba31b9630cb41bd72b2cdec6fc29",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.211,
+    0.317,
+    0.115
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-wheat-crop-young-pack",
+  "version": 1,
+  "description": "Young wheat, a few weeks in. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "wheat",
+   "young",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "b200d0a3647cc09ddbd7b48c2bad55a6d0644788e0e503bc0c67dcd4fed9cc62",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.058,
+    0.478,
+    0.116
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-wheat-crop-pack",
+  "version": 1,
+  "description": "Ripe wheat, ready to harvest. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "wheat",
+   "ripe",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "1e2306ebc3381aee05b12649ae5fb3fb759a090b98e46f5d2565523d2b4cb412",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.102,
+    0.841,
+    0.051
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-watermelon-crop-young-pack",
+  "version": 1,
+  "description": "Young watermelons, a few weeks in. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "watermelon",
+   "young",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "2d7d4d7b574de6b3e2dc19ed79169fc538238c89e6ad6441beae2eb847dde3ba",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.283,
+    0.15,
+    0.267
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-watermelon-crop-pack",
+  "version": 1,
+  "description": "Ripe watermelons, ready to harvest. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "watermelon",
+   "ripe",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "4677db37db91ac92d1edff09e994e48d44a33906007f28618ee3f60da089ed0e",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.78,
+    0.344,
+    0.643
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-berries-crop-young-pack",
+  "version": 1,
+  "description": "Young berry bushes, a few weeks in. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "berries",
+   "young",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "a5147a2c778a38496a4192c37619804b9684b947e05e8a352a8e24ec53759c0b",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.45,
+    0.37,
+    0.37
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-berries-crop-pack",
+  "version": 1,
+  "description": "Ripe berry bushes, ready to harvest. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "berries",
+   "ripe",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "4ec41f8ebed41e1db66e4a11860adf3b4bf49263a5b6c6bace97a8f6a8159315",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    1.305,
+    0.96,
+    1.075
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-flowers-crop-young-pack",
+  "version": 1,
+  "description": "Young cut flowers, a few weeks in. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "flowers",
+   "young",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "25b74d99d17f99666a81f813cd03adbe0862ea3ee0905afe3a2491dce9ea12d4",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.05,
+    0.273,
+    0.05
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-flowers-crop-pack",
+  "version": 1,
+  "description": "Ripe cut flowers, ready to harvest. Licence: CC0 1.0. Source: Quaternius Ultimate Crops (CC0), via eden-crops.glb.",
+  "tags": [
+   "crop",
+   "garden",
+   "farm",
+   "plant",
+   "vegetable",
+   "flowers",
+   "ripe",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "466e63539fbbb0d11d5f0e0b8bcd6b8393212fce719e62b4fee0b46d690d3f7e",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.198,
+    0.544,
+    0.198
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-rowboat-pack",
+  "version": 1,
+  "description": "A wooden rowing boat for two; floats. Licence: CC0 1.0. Source: Kenney Watercraft + Nature Kit canoe, Quaternius Ships + Public Transport (CC0), via eden-boats-bikes.glb.",
+  "tags": [
+   "boat",
+   "rowing-boat",
+   "rowboat",
+   "water",
+   "transport",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "c1705860f66b02d836d6ba1e511ad6c8fa0f6f8e8d6559fae02a206e82fd424e",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    3.2,
+    0.987,
+    2.762
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "float",
+  "components": {
+   "carrier": {
+    "seats": 2
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-canoe-pack",
+  "version": 1,
+  "description": "A canoe; floats. Licence: CC0 1.0. Source: Kenney Watercraft + Nature Kit canoe, Quaternius Ships + Public Transport (CC0), via eden-boats-bikes.glb.",
+  "tags": [
+   "boat",
+   "canoe",
+   "kayak",
+   "water",
+   "transport",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "885f04bdb91c6f524e3e2e428f1a0109efeffa4a4fabd08c3f55f7ef4ddec4fe",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    1.043,
+    0.635,
+    4
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "float",
+  "components": {
+   "carrier": {
+    "seats": 2
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-dinghy-pack",
+  "version": 1,
+  "description": "A small dinghy; floats. Licence: CC0 1.0. Source: Kenney Watercraft + Nature Kit canoe, Quaternius Ships + Public Transport (CC0), via eden-boats-bikes.glb.",
+  "tags": [
+   "boat",
+   "dinghy",
+   "water",
+   "transport",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "a6c86bdd8dcd9440d11a4984f81438e554e654e1eedd41057b4a2b6bddaff587",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    1.854,
+    0.798,
+    3.4
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "float",
+  "components": {
+   "carrier": {
+    "seats": 2
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-bicycle-pack",
+  "version": 1,
+  "description": "A city bicycle (detailed: ~3k triangles). Licence: CC0 1.0. Source: Kenney Watercraft + Nature Kit canoe, Quaternius Ships + Public Transport (CC0), via eden-boats-bikes.glb.",
+  "tags": [
+   "bicycle",
+   "bike",
+   "transport",
+   "vehicle",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "042ab9c25542cf8aea3b2ac715bf93db37aaa59a585d2337741a64ca82b3f3a2",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.449,
+    0.946,
+    1.75
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "components": {
+   "carrier": {
+    "seats": 1
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-bicycle-simple-pack",
+  "version": 1,
+  "description": "A simple low-poly bicycle. Licence: CC0 1.0. Source: Kenney Watercraft + Nature Kit canoe, Quaternius Ships + Public Transport (CC0), via eden-boats-bikes.glb.",
+  "tags": [
+   "bicycle",
+   "bike",
+   "transport",
+   "vehicle",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "4f199bbf415045461ac97033e196c8cd692b404398ded414007b97ee9ee1f0cd",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.452,
+    0.946,
+    1.75
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "components": {
+   "carrier": {
+    "seats": 1
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-croissant-pack",
+  "version": 1,
+  "description": "A croissant. Licence: CC0 1.0. Source: Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb.",
+  "tags": [
+   "food",
+   "item",
+   "kitchen",
+   "pack",
+   "bread",
+   "pastry",
+   "breakfast",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "dc373b4765879f9fc1f03c1ec9628d604635bf494596365c19a201a5d0249937",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.142,
+    0.06,
+    0.08
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "carryable": {
+    "mass": 0.3,
+    "grips": 1
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-apple-pack",
+  "version": 1,
+  "description": "A red apple. Licence: CC0 1.0. Source: Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb.",
+  "tags": [
+   "food",
+   "item",
+   "kitchen",
+   "pack",
+   "fruit",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "c02bc83516a5d412db0fcee98e6acc7aa7f43d33b127b82e530c1477dea0c5bf",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.077,
+    0.08,
+    0.074
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "carryable": {
+    "mass": 0.3,
+    "grips": 1
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-banana-pack",
+  "version": 1,
+  "description": "A banana. Licence: CC0 1.0. Source: Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb.",
+  "tags": [
+   "food",
+   "item",
+   "kitchen",
+   "pack",
+   "fruit",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "64bd31e91568bc78ebf11d1bebe432f328aa4145cc7b2a2c11f8efb8bddf3676",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.05,
+    0.05,
+    0.05
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "carryable": {
+    "mass": 0.3,
+    "grips": 1
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-orange-pack",
+  "version": 1,
+  "description": "An orange. Licence: CC0 1.0. Source: Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb.",
+  "tags": [
+   "food",
+   "item",
+   "kitchen",
+   "pack",
+   "fruit",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "a31360802fd624c709fa529b6476772ed236d073d1573e8bf3e0b6bf18ac43a5",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.08,
+    0.08,
+    0.08
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "carryable": {
+    "mass": 0.3,
+    "grips": 1
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-cup-of-tea-pack",
+  "version": 1,
+  "description": "A cup of tea. Licence: CC0 1.0. Source: Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb.",
+  "tags": [
+   "food",
+   "item",
+   "kitchen",
+   "pack",
+   "cup",
+   "tea",
+   "drink",
+   "mug",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "e53249d5c85f545bace9ff83167b2223b1420512567171b127bdc74aab16771a",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.082,
+    0.07,
+    0.102
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "carryable": {
+    "mass": 0.3,
+    "grips": 1
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-cup-of-coffee-pack",
+  "version": 1,
+  "description": "A cup of coffee. Licence: CC0 1.0. Source: Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb.",
+  "tags": [
+   "food",
+   "item",
+   "kitchen",
+   "pack",
+   "cup",
+   "coffee",
+   "drink",
+   "mug",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "4157e75110d2146f11748c232a637d9054a3812396d9691ece1a420ccf95d174",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.14,
+    0.088,
+    0.184
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "carryable": {
+    "mass": 0.3,
+    "grips": 1
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-dinner-plate-pack",
+  "version": 1,
+  "description": "A dinner plate with food. Licence: CC0 1.0. Source: Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb.",
+  "tags": [
+   "food",
+   "item",
+   "kitchen",
+   "pack",
+   "plate",
+   "dinner",
+   "meal",
+   "dish",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "2ce629587f001af6fdfd001ddeb31df689e32ba3d1b33b9ad5a9d2f23928e954",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.121,
+    0.05,
+    0.121
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "carryable": {
+    "mass": 0.3,
+    "grips": 1
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-food-bowl-pack",
+  "version": 1,
+  "description": "A bowl of food. Licence: CC0 1.0. Source: Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb.",
+  "tags": [
+   "food",
+   "item",
+   "kitchen",
+   "pack",
+   "bowl",
+   "meal",
+   "dish",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "328dd0131d690e0324ed3b5824feb408643e540d956b3c4710c20abc5e83a23d",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.143,
+    0.059,
+    0.163
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "carryable": {
+    "mass": 0.3,
+    "grips": 1
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-bread-loaf-pack",
+  "version": 1,
+  "description": "A loaf of bread. Licence: CC0 1.0. Source: Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb.",
+  "tags": [
+   "food",
+   "item",
+   "kitchen",
+   "pack",
+   "bread",
+   "loaf",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "f6419deb86d1fcfc2777274c04a7ec107bf33c5da1a4bfebcf691a8f7c724a7a",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.157,
+    0.12,
+    0.101
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "carryable": {
+    "mass": 0.3,
+    "grips": 1
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-pie-pack",
+  "version": 1,
+  "description": "A whole pie. Licence: CC0 1.0. Source: Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb.",
+  "tags": [
+   "food",
+   "item",
+   "kitchen",
+   "pack",
+   "pie",
+   "baking",
+   "dessert",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "910bdaaa6253c752e6ef8b2167e236512f1515f533f097ff0d12abe12dcba0ef",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.381,
+    0.061,
+    0.381
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "carryable": {
+    "mass": 0.8,
+    "grips": 1
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-glass-of-wine-pack",
+  "version": 1,
+  "description": "A glass of red wine. Licence: CC0 1.0. Source: Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb.",
+  "tags": [
+   "food",
+   "item",
+   "kitchen",
+   "pack",
+   "glass",
+   "wine",
+   "drink",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "b47a4c5d663e96e8cfffeb998212f7f0c6268c8189ad623b54b0d84f614f2cd7",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.07,
+    0.16,
+    0.064
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "carryable": {
+    "mass": 0.3,
+    "grips": 1
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-cutting-board-pack",
+  "version": 1,
+  "description": "A wooden cutting board. Licence: CC0 1.0. Source: Quaternius Ultimate Food + Kenney Food Kit (CC0), via eden-food.glb.",
+  "tags": [
+   "food",
+   "item",
+   "kitchen",
+   "pack",
+   "board",
+   "wood",
+   "cooking",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "a45a186da8676b29b0c867d0cb046a6c1ce1076c675f3c058cbee4d5ef593494",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.295,
+    0.05,
+    0.41
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "carryable": {
+    "mass": 0.6,
+    "grips": 1
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-round-carpet-pack",
+  "version": 1,
+  "description": "A round woven carpet (rug) for a floor. Licence: CC0 1.0. Source: Quaternius Ultimate House Interior (CC0), via eden-interior.glb.",
+  "tags": [
+   "carpet",
+   "rug",
+   "interior",
+   "furniture",
+   "pack",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "92af810ce5ea82834489154b8dab8135a2710a16a097f71859419fdfca8b8dbf",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    3.168,
+    0.05,
+    3.217
+   ],
+   "scale": [
+    0.5,
+    3
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-ceramic-tower",
+  "version": 1,
+  "description": "Ceramic Tower: Pale blue-green glazed tower of four stepped tiers with round arches on every side, drip ribs, corner turrets, a rounded crown and a finial. Four rooms (ground hall 0.5 m, second room 9 m, third room 16 m, lantern room 22 m), twelve arched doors on the ground floor, terraces on every tier, float-only shafts between floors. 25148 triangles. Licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission. Source: worlds/littlemartians/buildings/ceramic-tower.glb.",
+  "tags": [
+   "building",
+   "tower",
+   "ceramic",
+   "littlemartians",
+   "landmark",
+   "lighthouse",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "658f17cb0d2fd323c194f30f1a1c7f0150d5a68f5401bdb03732516751517875",
+   "collide": "box",
+   "footprint": "cadd226c3984ae0816af32c2a51ae590fa7727c4d76fc327aa28e3defff74cf5"
+  },
+  "size": {
+   "box": [
+    19.004,
+    38.3,
+    19.004
+   ],
+   "scale": [
+    0.25,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "tower-l0",
+    "kind": "room",
+    "p": [
+     0,
+     0.5,
+     0
+    ],
+    "yaw": 0,
+    "floor": 0,
+    "polygon": [
+     [
+      8.4,
+      7.4
+     ],
+     [
+      8.3239,
+      7.7827
+     ],
+     [
+      8.1071,
+      8.1071
+     ],
+     [
+      7.7827,
+      8.3239
+     ],
+     [
+      7.4,
+      8.4
+     ],
+     [
+      -7.4,
+      8.4
+     ],
+     [
+      -7.7827,
+      8.3239
+     ],
+     [
+      -8.1071,
+      8.1071
+     ],
+     [
+      -8.3239,
+      7.7827
+     ],
+     [
+      -8.4,
+      7.4
+     ],
+     [
+      -8.4,
+      -7.4
+     ],
+     [
+      -8.3239,
+      -7.7827
+     ],
+     [
+      -8.1071,
+      -8.1071
+     ],
+     [
+      -7.7827,
+      -8.3239
+     ],
+     [
+      -7.4,
+      -8.4
+     ],
+     [
+      7.4,
+      -8.4
+     ],
+     [
+      7.7827,
+      -8.3239
+     ],
+     [
+      8.1071,
+      -8.1071
+     ],
+     [
+      8.3239,
+      -7.7827
+     ],
+     [
+      8.4,
+      -7.4
+     ]
+    ],
+    "height": 8,
+    "accepts": {},
+    "capacity": 64,
+    "label": "ground hall"
+   },
+   {
+    "id": "tower-l1",
+    "kind": "room",
+    "p": [
+     0,
+     9,
+     0
+    ],
+    "yaw": 0,
+    "floor": 1,
+    "polygon": [
+     [
+      6.7,
+      6
+     ],
+     [
+      6.6467,
+      6.2679
+     ],
+     [
+      6.495,
+      6.495
+     ],
+     [
+      6.2679,
+      6.6467
+     ],
+     [
+      6,
+      6.7
+     ],
+     [
+      -6,
+      6.7
+     ],
+     [
+      -6.2679,
+      6.6467
+     ],
+     [
+      -6.495,
+      6.495
+     ],
+     [
+      -6.6467,
+      6.2679
+     ],
+     [
+      -6.7,
+      6
+     ],
+     [
+      -6.7,
+      -6
+     ],
+     [
+      -6.6467,
+      -6.2679
+     ],
+     [
+      -6.495,
+      -6.495
+     ],
+     [
+      -6.2679,
+      -6.6467
+     ],
+     [
+      -6,
+      -6.7
+     ],
+     [
+      6,
+      -6.7
+     ],
+     [
+      6.2679,
+      -6.6467
+     ],
+     [
+      6.495,
+      -6.495
+     ],
+     [
+      6.6467,
+      -6.2679
+     ],
+     [
+      6.7,
+      -6
+     ]
+    ],
+    "height": 6.5,
+    "accepts": {},
+    "capacity": 64,
+    "label": "second room"
+   },
+   {
+    "id": "tower-l2",
+    "kind": "room",
+    "p": [
+     0,
+     16,
+     0
+    ],
+    "yaw": 0,
+    "floor": 2,
+    "polygon": [
+     [
+      5,
+      4.6
+     ],
+     [
+      4.9696,
+      4.7531
+     ],
+     [
+      4.8828,
+      4.8828
+     ],
+     [
+      4.7531,
+      4.9696
+     ],
+     [
+      4.6,
+      5
+     ],
+     [
+      -4.6,
+      5
+     ],
+     [
+      -4.7531,
+      4.9696
+     ],
+     [
+      -4.8828,
+      4.8828
+     ],
+     [
+      -4.9696,
+      4.7531
+     ],
+     [
+      -5,
+      4.6
+     ],
+     [
+      -5,
+      -4.6
+     ],
+     [
+      -4.9696,
+      -4.7531
+     ],
+     [
+      -4.8828,
+      -4.8828
+     ],
+     [
+      -4.7531,
+      -4.9696
+     ],
+     [
+      -4.6,
+      -5
+     ],
+     [
+      4.6,
+      -5
+     ],
+     [
+      4.7531,
+      -4.9696
+     ],
+     [
+      4.8828,
+      -4.8828
+     ],
+     [
+      4.9696,
+      -4.7531
+     ],
+     [
+      5,
+      -4.6
+     ]
+    ],
+    "height": 5.5,
+    "accepts": {},
+    "capacity": 64,
+    "label": "third room"
+   },
+   {
+    "id": "tower-l3",
+    "kind": "room",
+    "p": [
+     0,
+     22,
+     0
+    ],
+    "yaw": 0,
+    "floor": 3,
+    "polygon": [
+     [
+      3.5,
+      3.2
+     ],
+     [
+      3.4772,
+      3.3148
+     ],
+     [
+      3.4121,
+      3.4121
+     ],
+     [
+      3.3148,
+      3.4772
+     ],
+     [
+      3.2,
+      3.5
+     ],
+     [
+      -3.2,
+      3.5
+     ],
+     [
+      -3.3148,
+      3.4772
+     ],
+     [
+      -3.4121,
+      3.4121
+     ],
+     [
+      -3.4772,
+      3.3148
+     ],
+     [
+      -3.5,
+      3.2
+     ],
+     [
+      -3.5,
+      -3.2
+     ],
+     [
+      -3.4772,
+      -3.3148
+     ],
+     [
+      -3.4121,
+      -3.4121
+     ],
+     [
+      -3.3148,
+      -3.4772
+     ],
+     [
+      -3.2,
+      -3.5
+     ],
+     [
+      3.2,
+      -3.5
+     ],
+     [
+      3.3148,
+      -3.4772
+     ],
+     [
+      3.4121,
+      -3.4121
+     ],
+     [
+      3.4772,
+      -3.3148
+     ],
+     [
+      3.5,
+      -3.2
+     ]
+    ],
+    "height": 5,
+    "accepts": {},
+    "capacity": 64,
+    "label": "lantern room"
+   }
+  ],
+  "components": {
+   "place": {
+    "kind": "building",
+    "enclosed": true
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-minaret-temple",
+  "version": 1,
+  "description": "Minaret Temple: Darker blue glazed temple: four legs joined by tall arches, a domed body with round windows, a four-arched lantern, a stepped spire and a spike. An open pavilion on four legs, a domed body hall and an upper hall rising into the lantern; float-only shafts between levels. 17928 triangles. Licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission. Source: worlds/littlemartians/buildings/minaret-temple.glb.",
+  "tags": [
+   "building",
+   "temple",
+   "minaret",
+   "ceramic",
+   "littlemartians",
+   "landmark",
+   "shrine",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "78446d149b6d4ef4156b9ee90c4fb046e9c0c7275ef4e88dc3154b9450d15ac7",
+   "collide": "box",
+   "footprint": "41cdb507611009d0003643aea9abddffdc74e4d3cb10945a90fa8884322cd64e"
+  },
+  "size": {
+   "box": [
+    19.2,
+    45,
+    19.2
+   ],
+   "scale": [
+    0.25,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "temple-l0",
+    "kind": "room",
+    "p": [
+     0,
+     0.6,
+     0
+    ],
+    "yaw": 0,
+    "floor": 0,
+    "polygon": [
+     [
+      7.3,
+      6.5
+     ],
+     [
+      7.2391,
+      6.8061
+     ],
+     [
+      7.0657,
+      7.0657
+     ],
+     [
+      6.8061,
+      7.2391
+     ],
+     [
+      6.5,
+      7.3
+     ],
+     [
+      -6.5,
+      7.3
+     ],
+     [
+      -6.8061,
+      7.2391
+     ],
+     [
+      -7.0657,
+      7.0657
+     ],
+     [
+      -7.2391,
+      6.8061
+     ],
+     [
+      -7.3,
+      6.5
+     ],
+     [
+      -7.3,
+      -6.5
+     ],
+     [
+      -7.2391,
+      -6.8061
+     ],
+     [
+      -7.0657,
+      -7.0657
+     ],
+     [
+      -6.8061,
+      -7.2391
+     ],
+     [
+      -6.5,
+      -7.3
+     ],
+     [
+      6.5,
+      -7.3
+     ],
+     [
+      6.8061,
+      -7.2391
+     ],
+     [
+      7.0657,
+      -7.0657
+     ],
+     [
+      7.2391,
+      -6.8061
+     ],
+     [
+      7.3,
+      -6.5
+     ]
+    ],
+    "height": 13.2,
+    "accepts": {},
+    "capacity": 64,
+    "label": "pavilion"
+   },
+   {
+    "id": "temple-l1",
+    "kind": "room",
+    "p": [
+     0,
+     14.3,
+     0
+    ],
+    "yaw": 0,
+    "floor": 1,
+    "polygon": [
+     [
+      7.4,
+      6.48
+     ],
+     [
+      7.33,
+      6.8321
+     ],
+     [
+      7.1305,
+      7.1305
+     ],
+     [
+      6.8321,
+      7.33
+     ],
+     [
+      6.48,
+      7.4
+     ],
+     [
+      -6.48,
+      7.4
+     ],
+     [
+      -6.8321,
+      7.33
+     ],
+     [
+      -7.1305,
+      7.1305
+     ],
+     [
+      -7.33,
+      6.8321
+     ],
+     [
+      -7.4,
+      6.48
+     ],
+     [
+      -7.4,
+      -6.48
+     ],
+     [
+      -7.33,
+      -6.8321
+     ],
+     [
+      -7.1305,
+      -7.1305
+     ],
+     [
+      -6.8321,
+      -7.33
+     ],
+     [
+      -6.48,
+      -7.4
+     ],
+     [
+      6.48,
+      -7.4
+     ],
+     [
+      6.8321,
+      -7.33
+     ],
+     [
+      7.1305,
+      -7.1305
+     ],
+     [
+      7.33,
+      -6.8321
+     ],
+     [
+      7.4,
+      -6.48
+     ]
+    ],
+    "height": 7.7,
+    "accepts": {},
+    "capacity": 64,
+    "label": "body hall"
+   },
+   {
+    "id": "temple-l2",
+    "kind": "room",
+    "p": [
+     0,
+     22.5,
+     0
+    ],
+    "yaw": 0,
+    "floor": 2,
+    "polygon": [
+     [
+      7.0485,
+      6.1777
+     ],
+     [
+      6.9822,
+      6.511
+     ],
+     [
+      6.7935,
+      6.7935
+     ],
+     [
+      6.511,
+      6.9822
+     ],
+     [
+      6.1777,
+      7.0485
+     ],
+     [
+      -6.1777,
+      7.0485
+     ],
+     [
+      -6.511,
+      6.9822
+     ],
+     [
+      -6.7935,
+      6.7935
+     ],
+     [
+      -6.9822,
+      6.511
+     ],
+     [
+      -7.0485,
+      6.1777
+     ],
+     [
+      -7.0485,
+      -6.1777
+     ],
+     [
+      -6.9822,
+      -6.511
+     ],
+     [
+      -6.7935,
+      -6.7935
+     ],
+     [
+      -6.511,
+      -6.9822
+     ],
+     [
+      -6.1777,
+      -7.0485
+     ],
+     [
+      6.1777,
+      -7.0485
+     ],
+     [
+      6.511,
+      -6.9822
+     ],
+     [
+      6.7935,
+      -6.7935
+     ],
+     [
+      6.9822,
+      -6.511
+     ],
+     [
+      7.0485,
+      -6.1777
+     ]
+    ],
+    "height": 13,
+    "accepts": {},
+    "capacity": 64,
+    "label": "upper hall"
+   }
+  ],
+  "components": {
+   "place": {
+    "kind": "building",
+    "enclosed": true
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-kin-chebel",
+  "version": 1,
+  "description": "Chebel: a ceramic Little Martians kin head (scenery, not a Soul), hovering about a metre up. smaller place-tending kin exist below the level of full Little Martian (02-pantheon.md \"The other characters\"); these unnamed heads stand in for them Licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission. Source: worlds/littlemartians/characters/kin/chebel.glb.",
+  "tags": [
+   "kin",
+   "head",
+   "ceramic",
+   "littlemartians",
+   "sculpture",
+   "floater",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "eef400e7d641bf7208b469ca882a837a2a4196db386fdeb760db8d90b76c003a",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.602,
+    0.602,
+    0.9
+   ],
+   "scale": [
+    0.25,
+    4
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "hover": {
+    "height": 0.9,
+    "bob": 0.08,
+    "period": 6
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-kin-colors-lemuet",
+  "version": 1,
+  "description": "Colors (Lemuet): a ceramic Little Martians kin head (scenery, not a Soul), hovering about a metre up. smaller place-tending kin exist below the level of full Little Martian (02-pantheon.md \"The other characters\"); these unnamed heads stand in for them Licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission. Source: worlds/littlemartians/characters/kin/colors-lemuet.glb.",
+  "tags": [
+   "kin",
+   "head",
+   "ceramic",
+   "littlemartians",
+   "sculpture",
+   "floater",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "0be443c2a719a71d8e8b88fb19bf2ed27ef9e1d557bf586caeea3126350aee8b",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.514,
+    0.615,
+    0.9
+   ],
+   "scale": [
+    0.25,
+    4
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "hover": {
+    "height": 0.9,
+    "bob": 0.08,
+    "period": 6
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-kin-crystal-freeman",
+  "version": 1,
+  "description": "Crystal (Freeman): a ceramic Little Martians kin head (scenery, not a Soul), hovering about a metre up. smaller place-tending kin exist below the level of full Little Martian (02-pantheon.md \"The other characters\"); these unnamed heads stand in for them Licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission. Source: worlds/littlemartians/characters/kin/crystal-freeman.glb.",
+  "tags": [
+   "kin",
+   "head",
+   "ceramic",
+   "littlemartians",
+   "sculpture",
+   "floater",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "e15118c599c3f9006fba71e4178543bc9389b3031d194f2c297db80fe603fcae",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.512,
+    0.541,
+    0.9
+   ],
+   "scale": [
+    0.25,
+    4
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "hover": {
+    "height": 0.9,
+    "bob": 0.08,
+    "period": 6
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-kin-dark-blue",
+  "version": 1,
+  "description": "Dark Blue: a ceramic Little Martians kin head (scenery, not a Soul), hovering about a metre up. smaller place-tending kin exist below the level of full Little Martian (02-pantheon.md \"The other characters\"); these unnamed heads stand in for them Licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission. Source: worlds/littlemartians/characters/kin/dark-blue.glb.",
+  "tags": [
+   "kin",
+   "head",
+   "ceramic",
+   "littlemartians",
+   "sculpture",
+   "floater",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "5911a5de663569fc184d04eae2940f26377e21e78b70e369ef74322236906516",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.544,
+    0.567,
+    0.9
+   ],
+   "scale": [
+    0.25,
+    4
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "hover": {
+    "height": 0.9,
+    "bob": 0.08,
+    "period": 6
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-kin-green-brains-out",
+  "version": 1,
+  "description": "Green, Brains Out: a ceramic Little Martians kin head (scenery, not a Soul), hovering about a metre up. smaller place-tending kin exist below the level of full Little Martian (02-pantheon.md \"The other characters\"); these unnamed heads stand in for them Licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission. Source: worlds/littlemartians/characters/kin/green-brains-out.glb.",
+  "tags": [
+   "kin",
+   "head",
+   "ceramic",
+   "littlemartians",
+   "sculpture",
+   "floater",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "c19e95da37e2faa91ec7ef9dbfecce12ba9f3a58ea3f6bcd8ab3b90f76a98bbb",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.594,
+    0.553,
+    0.9
+   ],
+   "scale": [
+    0.25,
+    4
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "hover": {
+    "height": 0.9,
+    "bob": 0.08,
+    "period": 6
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-kin-green-patterns-blue",
+  "version": 1,
+  "description": "Green Patterns Blue: a ceramic Little Martians kin head (scenery, not a Soul), hovering about a metre up. smaller place-tending kin exist below the level of full Little Martian (02-pantheon.md \"The other characters\"); these unnamed heads stand in for them Licence: Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission. Source: worlds/littlemartians/characters/kin/green-patterns-blue.glb.",
+  "tags": [
+   "kin",
+   "head",
+   "ceramic",
+   "littlemartians",
+   "sculpture",
+   "floater",
+   "mesh"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "9b04ddd9e4bd264da45d0a5a59fc120ff6ce4e33422bbf08e91ff103d11ff034",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.53,
+    0.588,
+    0.9
+   ],
+   "scale": [
+    0.25,
+    4
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "hover": {
+    "height": 0.9,
+    "bob": 0.08,
+    "period": 6
+   }
+  }
+ }
+]

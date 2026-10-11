@@ -1,0 +1,80 @@
+{
+ "schema": "furnish/1",
+ "style": "pavilion",
+ "rooms": {
+  "pavilion": [
+   {
+    "name": "table",
+    "def": [
+     "core/long-table@1",
+     "core/table@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.5,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "bench-1",
+    "def": [
+     "core/bench-seat@1",
+     "core/bench@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.25,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "bench-2",
+    "def": [
+     "core/bench-seat@1",
+     "core/bench@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.75,
+      "n"
+     ]
+    ]
+   }
+  ]
+ },
+ "default": [
+  {
+   "name": "lamp",
+   "def": [
+    "core/floor-lamp@1"
+   ],
+   "try": [
+    [
+     0,
+     0,
+     "s"
+    ],
+    [
+     1,
+     0,
+     "s"
+    ],
+    [
+     0,
+     1,
+     "n"
+    ],
+    [
+     1,
+     1,
+     "n"
+    ]
+   ]
+  }
+ ]
+}

@@ -1,4 +1,5 @@
 // Settling: five height samples and an anchor rule, no gravity (spec §4.3).
+import { levelAlong } from './forms.ts';
 import { areaMask, pathMask } from './geom.ts';
 import type { Terrain } from './tiles.ts';
 import type { Anchor, Ground, Vec2 } from './types.ts';
@@ -9,6 +10,8 @@ export const SKIRT_MAX_M = 0.6;
 export const WALK_MAX_SLOPE = 0.5774;
 /** Water deeper than this is swimming, not wading. */
 export const WADE_MAX_M = 0.3;
+/** Tolerance on the wading depth: tiles are Float32, so a pond carved exactly WADE_MAX_M deep must still be wadable. */
+export const MEDIA_EPS = 1e-4;
 
 export type Footprint = { corners: [Vec2, Vec2, Vec2, Vec2]; center: Vec2 };
 
@@ -58,7 +61,7 @@ export function waterLevelAt(g: Ground, x: number, z: number): number | null {
   let level: number | null = null;
   for (const w of g.waters) {
     const m = w.area ? areaMask(x, z, w.area, 1e-9) : pathMask(x, z, w.path!, w.w!);
-    if (m > 0) level = w.level;
+    if (m > 0) level = w.levels ? levelAlong(x, z, w.path!, w.levels).level : w.level;
   }
   if (level === null && g.seaLevel !== undefined) level = g.seaLevel;
   return level;
@@ -74,7 +77,7 @@ export type Medium = 'walk' | 'wade' | 'swim' | 'steep';
 /** What a ground-bound body meets at (x, z). */
 export function mediumAt(t: Terrain, x: number, z: number, maxSlope = WALK_MAX_SLOPE): Medium {
   const depth = waterDepthAt(t, x, z);
-  if (depth > WADE_MAX_M) return 'swim';
+  if (depth > WADE_MAX_M + MEDIA_EPS) return 'swim';
   if (t.slope(x, z) > maxSlope) return 'steep';
   return depth > 0 ? 'wade' : 'walk';
 }

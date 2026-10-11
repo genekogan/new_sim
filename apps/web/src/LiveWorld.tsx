@@ -53,9 +53,12 @@ import type { PlayView, PublicSoul } from '@sim/protocol';
 import type { Sim } from './useSim.ts';
 import { decodeSceneCapturePublication } from '@sim/protocol/scene-capture';
 import { WorldSceneHistory } from './WorldSceneHistory.ts';
-import { apiPath } from './world-path.ts';
+import { apiPath, worldKey } from './world-path.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
+import { setAssetLoader } from './gen-mesh/gltf-assets.ts';
 import { GodPanel } from './GodPanel.tsx';
+import { ensureToken as ensureGodToken } from './god-ui/god-api.ts';
+import { WorldPreviewGhost } from './WorldPreviewGhost.ts';
 import {WorldEdgeItems} from './WorldEdgeItems.ts';
 import { WorldNavigation, createWorldOrbitControls, type ManualNavigation, type CameraMove } from './WorldNavigation.ts';
 import {WorldPlaceCamera} from './WorldPlaceCamera.ts';
@@ -260,11 +263,14 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(eye?.length===3&&at?.length===3&&eye.every(Number.isFinite)&&at.every(Number.isFinite)){controls.target.set(at[0],at[1],at[2]);camera.position.set(eye[0],eye[1],eye[2]);}
       else{const [x0,z0,x1,z1]=entityLayer.viewBounds(),cx=(x0+x1)/2,cz=(z0+z1)/2,span=Math.max(60,x1-x0,z1-z0),gy=entityLayer.groundAt(cx,cz)??0;controls.target.set(cx,gy,cz);camera.position.set(cx-span*0.9,gy+span*0.55,cz+span*1.1);}
       camera.lookAt(controls.target);context.current.setCameraMode('manual');};
-    void entityLayer.start(abort.signal).then(()=>{frameEntityWorld();setEntityWorld(entityLayer.active);});
+    // ?shot=1: a clean picture for `god look` (canvas over every overlay, camera from eye/at, title 'ready' once drawn).
+    const shotMode=new URLSearchParams(location.search).has('shot');
+    if(shotMode){const c=renderer.domElement;Object.assign(c.style,{position:'fixed',inset:'0',width:'100vw',height:'100vh',zIndex:'2147483000'});document.title='loading';}
+    void entityLayer.start(abort.signal).then(()=>{frameEntityWorld();setEntityWorld(entityLayer.active);if(shotMode)setTimeout(()=>{document.title=entityLayer.active?'ready':'no-entity-world';(window as unknown as {__shotReady?:boolean}).__shotReady=true;},Math.max(2500,Number(new URLSearchParams(location.search).get('settle')??'3000')));});
+    const gw=window as unknown as {__simGhost?:WorldPreviewGhost};const ghost=gw.__simGhost??(gw.__simGhost=new WorldPreviewGhost(apiPath));scene.add(ghost.group);  // ?preview=<id> ghosts (GodPanel drives it; one ghost per page, whoever makes it first)
     // Alt+click on the ground drops a labelled flag (a core/flag entity) the god can refer to as flag:<label>.
-    // Owner authority: a god token minted with the page's dev identity (Privy owners: the Game lane wires getToken later).
-    let godToken:string|null=sessionStorage.getItem('sim.godToken');
-    const godMint=async()=>{if(godToken)return godToken;const dev=localStorage.getItem('sim.dev');if(!dev)return null;const r=await fetch(apiPath('/v1/god/mint'),{method:'POST',headers:{authorization:'Bearer dev:'+dev,'content-type':'application/json'},body:JSON.stringify({label:'browser'})});if(!r.ok)return null;godToken=(await r.json()).token;sessionStorage.setItem('sim.godToken',godToken!);return godToken;};
+    // Owner authority: this world's god token, minted with the page's signed-in person (Clerk in production, a local name in dev).
+    const godMint=()=>ensureGodToken().catch(()=>null);
     const flagRay=new THREE.Raycaster(),flagNdc=new THREE.Vector2();
     const onFlagClick=async(ev:MouseEvent)=>{
       if(!(ev.altKey||flagModeRef.current)||!entityLayer.active)return;
@@ -272,12 +278,12 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       const rect=renderer.domElement.getBoundingClientRect();flagNdc.set(((ev.clientX-rect.left)/rect.width)*2-1,-((ev.clientY-rect.top)/rect.height)*2+1);
       flagRay.setFromCamera(flagNdc,camera);const hit=flagRay.intersectObjects(entityLayer.terrainMeshes(),false)[0];if(!hit)return;
       const label=window.prompt(`Flag at (${hit.point.x.toFixed(0)}, ${hit.point.z.toFixed(0)}) — label:`);if(!label)return;
-      const token=await godMint();if(!token){problem('Only the world owner can drop flags (sign in with ?dev=1 locally).');return;}
+      const token=await godMint();if(!token){problem('Only the world owner can drop flags: sign in and claim the world first.');return;}
       const name=label.toLowerCase().replace(/[^a-z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(0,48)||'flag';
       const r=await fetch(apiPath('/v1/god/act'),{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({ops:[{op:'place',def:'core/flag@1',name,p:[Math.round(hit.point.x*10)/10,Math.round(hit.point.z*10)/10],state:{label}}],note:'flag from the website'})});
       const d=await r.json().catch(()=>null);if(!d?.accepted)problem(`Flag refused: ${d?.failures?.[0]?.code??r.status} ${d?.failures?.[0]?.detail??''}`);
     };
-    renderer.domElement.addEventListener('click',onFlagClick);(window as unknown as {__simEntity?:unknown}).__simEntity={layer:entityLayer,camera,controls,scene};  // the entity world (god mode), when this world has one
+    renderer.domElement.addEventListener('click',onFlagClick);(window as unknown as {__simEntity?:unknown}).__simEntity={layer:entityLayer,camera,controls,scene,renderer,stats:()=>({draws:renderer.info.render.calls,tris:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,instances:entityLayer.instancer.instances,instanceDraws:entityLayer.instancer.draws,entities:entityLayer.entityCount})};  // the entity world (god mode), when this world has one
     const games=new WorldGames();scene.add(games.group);
     const platformDraw=new WorldPlatforms();scene.add(platformDraw.group);
     const placeActivity=new WorldPlaceActivity();scene.add(placeActivity.group);
@@ -369,6 +375,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const draco = new DRACOLoader(manager).setDecoderPath('/mars-assets/draco/');
     const placePreviews=new WorldPlacePreviews(renderer,()=>[geometry.group,...(expansion?[expansion.group]:[])]);
     const loader = new GLTFLoader(manager).setDRACOLoader(draco).setMeshoptDecoder(MeshoptDecoder);
+    setAssetLoader(loader);
     const floaters = new FloaterView(scene, { baseUrl: '/world-assets/littlemartians/characters/', loader });
     const bodyModels=new WorldBodyModels(loader,problem);
     let capturedPlatforms:readonly PlatformFloor[]|null=null;
@@ -835,6 +842,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const onUp = (e: PointerEvent) => {
       if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) { down = null; return; }
       down = null;
+      if (e.altKey || flagModeRef.current) return;  // a flag drop (onFlagClick), not a selection: no place card over the god panel
       const target=hover.pick(e.clientX,e.clientY);if(target)inspectHover(target);else{setPlaceCard(null);context.current.setThing(null);}
 
     };

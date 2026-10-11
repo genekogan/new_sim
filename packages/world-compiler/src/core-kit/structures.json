@@ -1,0 +1,1779 @@
+[
+ {
+  "schema": "def/1",
+  "name": "core-cottage",
+  "version": 1,
+  "description": "A cottage: living room, kitchen and bedroom (with floors: 2, bedrooms and a landing upstairs, stairs in the living room). Rooms are slots: kitchen, living, bedroom, …",
+  "tags": [
+   "structure",
+   "building",
+   "cottage"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "gen",
+   "gen": "building/1",
+   "args": {
+    "style": "cottage"
+   }
+  },
+  "size": {
+   "box": [
+    8,
+    4.8,
+    6
+   ]
+  },
+  "params": {
+   "w": {
+    "type": "number",
+    "min": 4,
+    "max": 20,
+    "default": 8,
+    "doc": "width (x) in metres"
+   },
+   "d": {
+    "type": "number",
+    "min": 3,
+    "max": 16,
+    "default": 6,
+    "doc": "depth (z) in metres"
+   },
+   "floors": {
+    "type": "int",
+    "min": 1,
+    "max": 3,
+    "default": 1
+   },
+   "floorHeight": {
+    "type": "number",
+    "min": 2.4,
+    "max": 5,
+    "default": 2.8
+   },
+   "roof": {
+    "type": "enum",
+    "values": [
+     "gable",
+     "hip",
+     "flat",
+     "shed",
+     "dome",
+     "none"
+    ],
+    "default": "gable"
+   },
+   "roofPitch": {
+    "type": "number",
+    "min": 0,
+    "max": 60,
+    "default": 32,
+    "doc": "degrees"
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "plaster",
+     "brick",
+     "stone",
+     "wood",
+     "glass",
+     "metal"
+    ],
+    "default": "plaster"
+   },
+   "wall": {
+    "type": "color",
+    "default": "#f1e7d2"
+   },
+   "trim": {
+    "type": "color",
+    "default": "#6b4a2b"
+   },
+   "roofColor": {
+    "type": "color",
+    "default": "#8a3b2a"
+   },
+   "front": {
+    "type": "enum",
+    "values": [
+     "s",
+     "n",
+     "e",
+     "w"
+    ],
+    "default": "s",
+    "doc": "side of the main door (s = +z)"
+   },
+   "porch": {
+    "type": "number",
+    "min": 0,
+    "max": 4,
+    "default": 0,
+    "doc": "porch depth in metres (0 = none)"
+   },
+   "balcony": {
+    "type": "bool",
+    "default": false
+   },
+   "windows": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.6,
+    "doc": "window density along exterior walls"
+   },
+   "plan": {
+    "type": "json",
+    "doc": "explicit plan (see building/1 in /v1/god/schema): {floors:[{rooms:[{id,name,rect:[x0,z0,x1,z1]}],doors:[{between:[a,b]}],exterior:[{room,wall,kind}]}],stairs:[{from,to,room,wall}]}"
+   }
+  },
+  "state": {
+   "paint": {
+    "type": "color",
+    "default": "#f1e7d2",
+    "doc": "repaint the walls"
+   }
+  },
+  "components": {
+   "foundation": {
+    "kind": "pad"
+   },
+   "place": {
+    "kind": "building",
+    "enclosed": true
+   }
+  },
+  "material": "plaster"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-roundhouse",
+  "version": 1,
+  "description": "A round cottage: one round living room under a dome (or a cone: roof gable/hip), door on the front; `furnish` fills it like a cottage. One storey. Room slot: living.",
+  "tags": [
+   "structure",
+   "building",
+   "cottage",
+   "house",
+   "home",
+   "round",
+   "roundhouse",
+   "hut",
+   "rounded"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "gen",
+   "gen": "building/1",
+   "args": {
+    "style": "tower",
+    "round": true,
+    "home": true,
+    "furnish": "cottage"
+   }
+  },
+  "size": {
+   "box": [
+    7,
+    5.2,
+    7
+   ]
+  },
+  "params": {
+   "w": {
+    "type": "number",
+    "min": 5,
+    "max": 10,
+    "default": 7,
+    "doc": "width (x) in metres"
+   },
+   "d": {
+    "type": "number",
+    "min": 5,
+    "max": 10,
+    "default": 7,
+    "doc": "depth (z) in metres"
+   },
+   "floors": {
+    "type": "int",
+    "min": 1,
+    "max": 1,
+    "default": 1
+   },
+   "floorHeight": {
+    "type": "number",
+    "min": 2.4,
+    "max": 5,
+    "default": 2.8
+   },
+   "roof": {
+    "type": "enum",
+    "values": [
+     "gable",
+     "hip",
+     "flat",
+     "shed",
+     "dome",
+     "none"
+    ],
+    "default": "dome"
+   },
+   "roofPitch": {
+    "type": "number",
+    "min": 0,
+    "max": 60,
+    "default": 32,
+    "doc": "degrees"
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "plaster",
+     "brick",
+     "stone",
+     "wood",
+     "glass",
+     "metal"
+    ],
+    "default": "plaster"
+   },
+   "wall": {
+    "type": "color",
+    "default": "#f1e7d2"
+   },
+   "trim": {
+    "type": "color",
+    "default": "#6b4a2b"
+   },
+   "roofColor": {
+    "type": "color",
+    "default": "#8a3b2a"
+   },
+   "front": {
+    "type": "enum",
+    "values": [
+     "s",
+     "n",
+     "e",
+     "w"
+    ],
+    "default": "s",
+    "doc": "side of the main door (s = +z)"
+   },
+   "porch": {
+    "type": "number",
+    "min": 0,
+    "max": 4,
+    "default": 0,
+    "doc": "porch depth in metres (0 = none)"
+   },
+   "balcony": {
+    "type": "bool",
+    "default": false
+   },
+   "windows": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.6,
+    "doc": "window density along exterior walls"
+   },
+   "plan": {
+    "type": "json",
+    "doc": "explicit plan (see building/1 in /v1/god/schema): {floors:[{rooms:[{id,name,rect:[x0,z0,x1,z1]}],doors:[{between:[a,b]}],exterior:[{room,wall,kind}]}],stairs:[{from,to,room,wall}]}"
+   }
+  },
+  "state": {
+   "paint": {
+    "type": "color",
+    "default": "#f1e7d2",
+    "doc": "repaint the walls"
+   }
+  },
+  "components": {
+   "foundation": {
+    "kind": "pad"
+   },
+   "place": {
+    "kind": "building",
+    "enclosed": true
+   }
+  },
+  "material": "plaster"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-townhouse",
+  "version": 1,
+  "description": "A narrow townhouse: a hall with the stairs down one side, parlour and kitchen, bedrooms above.",
+  "tags": [
+   "structure",
+   "building",
+   "townhouse"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "gen",
+   "gen": "building/1",
+   "args": {
+    "style": "townhouse"
+   }
+  },
+  "size": {
+   "box": [
+    6,
+    10.399999999999999,
+    10
+   ]
+  },
+  "params": {
+   "w": {
+    "type": "number",
+    "min": 3,
+    "max": 24,
+    "default": 6,
+    "doc": "width (x) in metres"
+   },
+   "d": {
+    "type": "number",
+    "min": 3,
+    "max": 24,
+    "default": 10,
+    "doc": "depth (z) in metres"
+   },
+   "floors": {
+    "type": "int",
+    "min": 1,
+    "max": 4,
+    "default": 3
+   },
+   "floorHeight": {
+    "type": "number",
+    "min": 2.4,
+    "max": 5,
+    "default": 2.8
+   },
+   "roof": {
+    "type": "enum",
+    "values": [
+     "gable",
+     "hip",
+     "flat",
+     "shed",
+     "dome",
+     "none"
+    ],
+    "default": "gable"
+   },
+   "roofPitch": {
+    "type": "number",
+    "min": 0,
+    "max": 60,
+    "default": 38,
+    "doc": "degrees"
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "plaster",
+     "brick",
+     "stone",
+     "wood",
+     "glass",
+     "metal"
+    ],
+    "default": "brick"
+   },
+   "wall": {
+    "type": "color",
+    "default": "#e9d9c4"
+   },
+   "trim": {
+    "type": "color",
+    "default": "#3f4a46"
+   },
+   "roofColor": {
+    "type": "color",
+    "default": "#5e5a57"
+   },
+   "front": {
+    "type": "enum",
+    "values": [
+     "s",
+     "n",
+     "e",
+     "w"
+    ],
+    "default": "s",
+    "doc": "side of the main door (s = +z)"
+   },
+   "porch": {
+    "type": "number",
+    "min": 0,
+    "max": 4,
+    "default": 0,
+    "doc": "porch depth in metres (0 = none)"
+   },
+   "balcony": {
+    "type": "bool",
+    "default": false
+   },
+   "windows": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.6,
+    "doc": "window density along exterior walls"
+   },
+   "plan": {
+    "type": "json",
+    "doc": "explicit plan (see building/1 in /v1/god/schema): {floors:[{rooms:[{id,name,rect:[x0,z0,x1,z1]}],doors:[{between:[a,b]}],exterior:[{room,wall,kind}]}],stairs:[{from,to,room,wall}]}"
+   }
+  },
+  "state": {
+   "paint": {
+    "type": "color",
+    "default": "#e9d9c4",
+    "doc": "repaint the walls"
+   }
+  },
+  "components": {
+   "foundation": {
+    "kind": "pad"
+   },
+   "place": {
+    "kind": "building",
+    "enclosed": true
+   }
+  },
+  "material": "brick"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-shop",
+  "version": 1,
+  "description": "A corner shop with big front windows and a storeroom; a flat above (floors: 2).",
+  "tags": [
+   "structure",
+   "building",
+   "shop"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "gen",
+   "gen": "building/1",
+   "args": {
+    "style": "shop"
+   }
+  },
+  "size": {
+   "box": [
+    8,
+    7.6,
+    9
+   ]
+  },
+  "params": {
+   "w": {
+    "type": "number",
+    "min": 3,
+    "max": 24,
+    "default": 8,
+    "doc": "width (x) in metres"
+   },
+   "d": {
+    "type": "number",
+    "min": 3,
+    "max": 24,
+    "default": 9,
+    "doc": "depth (z) in metres"
+   },
+   "floors": {
+    "type": "int",
+    "min": 1,
+    "max": 3,
+    "default": 2
+   },
+   "floorHeight": {
+    "type": "number",
+    "min": 2.4,
+    "max": 5,
+    "default": 2.8
+   },
+   "roof": {
+    "type": "enum",
+    "values": [
+     "gable",
+     "hip",
+     "flat",
+     "shed",
+     "dome",
+     "none"
+    ],
+    "default": "gable"
+   },
+   "roofPitch": {
+    "type": "number",
+    "min": 0,
+    "max": 60,
+    "default": 32,
+    "doc": "degrees"
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "plaster",
+     "brick",
+     "stone",
+     "wood",
+     "glass",
+     "metal"
+    ],
+    "default": "plaster"
+   },
+   "wall": {
+    "type": "color",
+    "default": "#ecdcc0"
+   },
+   "trim": {
+    "type": "color",
+    "default": "#3f5f57"
+   },
+   "roofColor": {
+    "type": "color",
+    "default": "#7a3d2e"
+   },
+   "front": {
+    "type": "enum",
+    "values": [
+     "s",
+     "n",
+     "e",
+     "w"
+    ],
+    "default": "s",
+    "doc": "side of the main door (s = +z)"
+   },
+   "porch": {
+    "type": "number",
+    "min": 0,
+    "max": 4,
+    "default": 0,
+    "doc": "porch depth in metres (0 = none)"
+   },
+   "balcony": {
+    "type": "bool",
+    "default": false
+   },
+   "windows": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.6,
+    "doc": "window density along exterior walls"
+   },
+   "plan": {
+    "type": "json",
+    "doc": "explicit plan (see building/1 in /v1/god/schema): {floors:[{rooms:[{id,name,rect:[x0,z0,x1,z1]}],doors:[{between:[a,b]}],exterior:[{room,wall,kind}]}],stairs:[{from,to,room,wall}]}"
+   }
+  },
+  "state": {
+   "paint": {
+    "type": "color",
+    "default": "#ecdcc0",
+    "doc": "repaint the walls"
+   }
+  },
+  "components": {
+   "foundation": {
+    "kind": "pad"
+   },
+   "place": {
+    "kind": "building",
+    "enclosed": true
+   }
+  },
+  "material": "plaster"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-hall",
+  "version": 1,
+  "description": "A meeting hall: one big room (and a kitchen at the back when it is deep).",
+  "tags": [
+   "structure",
+   "building",
+   "hall"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "gen",
+   "gen": "building/1",
+   "args": {
+    "style": "hall"
+   }
+  },
+  "size": {
+   "box": [
+    14,
+    6,
+    12
+   ]
+  },
+  "params": {
+   "w": {
+    "type": "number",
+    "min": 3,
+    "max": 30,
+    "default": 14,
+    "doc": "width (x) in metres"
+   },
+   "d": {
+    "type": "number",
+    "min": 3,
+    "max": 30,
+    "default": 12,
+    "doc": "depth (z) in metres"
+   },
+   "floors": {
+    "type": "int",
+    "min": 1,
+    "max": 3,
+    "default": 1
+   },
+   "floorHeight": {
+    "type": "number",
+    "min": 2.4,
+    "max": 5,
+    "default": 4
+   },
+   "roof": {
+    "type": "enum",
+    "values": [
+     "gable",
+     "hip",
+     "flat",
+     "shed",
+     "dome",
+     "none"
+    ],
+    "default": "hip"
+   },
+   "roofPitch": {
+    "type": "number",
+    "min": 0,
+    "max": 60,
+    "default": 28,
+    "doc": "degrees"
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "plaster",
+     "brick",
+     "stone",
+     "wood",
+     "glass",
+     "metal"
+    ],
+    "default": "plaster"
+   },
+   "wall": {
+    "type": "color",
+    "default": "#efe6d4"
+   },
+   "trim": {
+    "type": "color",
+    "default": "#5e412b"
+   },
+   "roofColor": {
+    "type": "color",
+    "default": "#6f4a35"
+   },
+   "front": {
+    "type": "enum",
+    "values": [
+     "s",
+     "n",
+     "e",
+     "w"
+    ],
+    "default": "s",
+    "doc": "side of the main door (s = +z)"
+   },
+   "porch": {
+    "type": "number",
+    "min": 0,
+    "max": 4,
+    "default": 0,
+    "doc": "porch depth in metres (0 = none)"
+   },
+   "balcony": {
+    "type": "bool",
+    "default": false
+   },
+   "windows": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.6,
+    "doc": "window density along exterior walls"
+   },
+   "plan": {
+    "type": "json",
+    "doc": "explicit plan (see building/1 in /v1/god/schema): {floors:[{rooms:[{id,name,rect:[x0,z0,x1,z1]}],doors:[{between:[a,b]}],exterior:[{room,wall,kind}]}],stairs:[{from,to,room,wall}]}"
+   }
+  },
+  "state": {
+   "paint": {
+    "type": "color",
+    "default": "#efe6d4",
+    "doc": "repaint the walls"
+   }
+  },
+  "components": {
+   "foundation": {
+    "kind": "pad"
+   },
+   "place": {
+    "kind": "building",
+    "enclosed": true
+   }
+  },
+  "material": "plaster"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-chapel",
+  "version": 1,
+  "description": "A small chapel: a tall nave with tall windows, a vestry at the back.",
+  "tags": [
+   "structure",
+   "building",
+   "chapel"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "gen",
+   "gen": "building/1",
+   "args": {
+    "style": "chapel"
+   }
+  },
+  "size": {
+   "box": [
+    8,
+    7,
+    14
+   ]
+  },
+  "params": {
+   "w": {
+    "type": "number",
+    "min": 3,
+    "max": 24,
+    "default": 8,
+    "doc": "width (x) in metres"
+   },
+   "d": {
+    "type": "number",
+    "min": 3,
+    "max": 24,
+    "default": 14,
+    "doc": "depth (z) in metres"
+   },
+   "floors": {
+    "type": "int",
+    "min": 1,
+    "max": 3,
+    "default": 1
+   },
+   "floorHeight": {
+    "type": "number",
+    "min": 2.4,
+    "max": 5,
+    "default": 5
+   },
+   "roof": {
+    "type": "enum",
+    "values": [
+     "gable",
+     "hip",
+     "flat",
+     "shed",
+     "dome",
+     "none"
+    ],
+    "default": "gable"
+   },
+   "roofPitch": {
+    "type": "number",
+    "min": 0,
+    "max": 60,
+    "default": 45,
+    "doc": "degrees"
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "plaster",
+     "brick",
+     "stone",
+     "wood",
+     "glass",
+     "metal"
+    ],
+    "default": "stone"
+   },
+   "wall": {
+    "type": "color",
+    "default": "#e9e4da"
+   },
+   "trim": {
+    "type": "color",
+    "default": "#8f877a"
+   },
+   "roofColor": {
+    "type": "color",
+    "default": "#4f5a60"
+   },
+   "front": {
+    "type": "enum",
+    "values": [
+     "s",
+     "n",
+     "e",
+     "w"
+    ],
+    "default": "s",
+    "doc": "side of the main door (s = +z)"
+   },
+   "porch": {
+    "type": "number",
+    "min": 0,
+    "max": 4,
+    "default": 0,
+    "doc": "porch depth in metres (0 = none)"
+   },
+   "balcony": {
+    "type": "bool",
+    "default": false
+   },
+   "windows": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.5,
+    "doc": "window density along exterior walls"
+   },
+   "plan": {
+    "type": "json",
+    "doc": "explicit plan (see building/1 in /v1/god/schema): {floors:[{rooms:[{id,name,rect:[x0,z0,x1,z1]}],doors:[{between:[a,b]}],exterior:[{room,wall,kind}]}],stairs:[{from,to,room,wall}]}"
+   }
+  },
+  "state": {
+   "paint": {
+    "type": "color",
+    "default": "#e9e4da",
+    "doc": "repaint the walls"
+   }
+  },
+  "components": {
+   "foundation": {
+    "kind": "pad"
+   },
+   "place": {
+    "kind": "chapel",
+    "enclosed": true
+   }
+  },
+  "material": "stone"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-barn",
+  "version": 1,
+  "description": "A timber barn with a wide door; a hay loft with floors: 2.",
+  "tags": [
+   "structure",
+   "building",
+   "barn"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "gen",
+   "gen": "building/1",
+   "args": {
+    "style": "barn"
+   }
+  },
+  "size": {
+   "box": [
+    10,
+    6.2,
+    14
+   ]
+  },
+  "params": {
+   "w": {
+    "type": "number",
+    "min": 3,
+    "max": 24,
+    "default": 10,
+    "doc": "width (x) in metres"
+   },
+   "d": {
+    "type": "number",
+    "min": 3,
+    "max": 30,
+    "default": 14,
+    "doc": "depth (z) in metres"
+   },
+   "floors": {
+    "type": "int",
+    "min": 1,
+    "max": 3,
+    "default": 1
+   },
+   "floorHeight": {
+    "type": "number",
+    "min": 2.4,
+    "max": 5,
+    "default": 4.2
+   },
+   "roof": {
+    "type": "enum",
+    "values": [
+     "gable",
+     "hip",
+     "flat",
+     "shed",
+     "dome",
+     "none"
+    ],
+    "default": "gable"
+   },
+   "roofPitch": {
+    "type": "number",
+    "min": 0,
+    "max": 60,
+    "default": 40,
+    "doc": "degrees"
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "plaster",
+     "brick",
+     "stone",
+     "wood",
+     "glass",
+     "metal"
+    ],
+    "default": "wood"
+   },
+   "wall": {
+    "type": "color",
+    "default": "#9b3b2c"
+   },
+   "trim": {
+    "type": "color",
+    "default": "#f2ece0"
+   },
+   "roofColor": {
+    "type": "color",
+    "default": "#4a4a48"
+   },
+   "front": {
+    "type": "enum",
+    "values": [
+     "s",
+     "n",
+     "e",
+     "w"
+    ],
+    "default": "s",
+    "doc": "side of the main door (s = +z)"
+   },
+   "porch": {
+    "type": "number",
+    "min": 0,
+    "max": 4,
+    "default": 0,
+    "doc": "porch depth in metres (0 = none)"
+   },
+   "balcony": {
+    "type": "bool",
+    "default": false
+   },
+   "windows": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.3,
+    "doc": "window density along exterior walls"
+   },
+   "plan": {
+    "type": "json",
+    "doc": "explicit plan (see building/1 in /v1/god/schema): {floors:[{rooms:[{id,name,rect:[x0,z0,x1,z1]}],doors:[{between:[a,b]}],exterior:[{room,wall,kind}]}],stairs:[{from,to,room,wall}]}"
+   }
+  },
+  "state": {
+   "paint": {
+    "type": "color",
+    "default": "#9b3b2c",
+    "doc": "repaint the walls"
+   }
+  },
+  "components": {
+   "foundation": {
+    "kind": "pad"
+   },
+   "place": {
+    "kind": "building",
+    "enclosed": true
+   }
+  },
+  "material": "wood"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-shed",
+  "version": 1,
+  "description": "A garden shed: one room, one door, a small window.",
+  "tags": [
+   "structure",
+   "building",
+   "shed"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "gen",
+   "gen": "building/1",
+   "args": {
+    "style": "shed"
+   }
+  },
+  "size": {
+   "box": [
+    3,
+    4.5,
+    2.6
+   ]
+  },
+  "params": {
+   "w": {
+    "type": "number",
+    "min": 2,
+    "max": 6,
+    "default": 3,
+    "doc": "width (x) in metres"
+   },
+   "d": {
+    "type": "number",
+    "min": 2,
+    "max": 6,
+    "default": 2.6,
+    "doc": "depth (z) in metres"
+   },
+   "floors": {
+    "type": "int",
+    "min": 1,
+    "max": 1,
+    "default": 1
+   },
+   "floorHeight": {
+    "type": "number",
+    "min": 2.4,
+    "max": 5,
+    "default": 2.5
+   },
+   "roof": {
+    "type": "enum",
+    "values": [
+     "gable",
+     "hip",
+     "flat",
+     "shed",
+     "dome",
+     "none"
+    ],
+    "default": "shed"
+   },
+   "roofPitch": {
+    "type": "number",
+    "min": 0,
+    "max": 60,
+    "default": 12,
+    "doc": "degrees"
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "plaster",
+     "brick",
+     "stone",
+     "wood",
+     "glass",
+     "metal"
+    ],
+    "default": "wood"
+   },
+   "wall": {
+    "type": "color",
+    "default": "#7d9a6a"
+   },
+   "trim": {
+    "type": "color",
+    "default": "#f2ece0"
+   },
+   "roofColor": {
+    "type": "color",
+    "default": "#4a4a48"
+   },
+   "front": {
+    "type": "enum",
+    "values": [
+     "s",
+     "n",
+     "e",
+     "w"
+    ],
+    "default": "s",
+    "doc": "side of the main door (s = +z)"
+   },
+   "porch": {
+    "type": "number",
+    "min": 0,
+    "max": 4,
+    "default": 0,
+    "doc": "porch depth in metres (0 = none)"
+   },
+   "balcony": {
+    "type": "bool",
+    "default": false
+   },
+   "windows": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.4,
+    "doc": "window density along exterior walls"
+   },
+   "plan": {
+    "type": "json",
+    "doc": "explicit plan (see building/1 in /v1/god/schema): {floors:[{rooms:[{id,name,rect:[x0,z0,x1,z1]}],doors:[{between:[a,b]}],exterior:[{room,wall,kind}]}],stairs:[{from,to,room,wall}]}"
+   }
+  },
+  "state": {
+   "paint": {
+    "type": "color",
+    "default": "#7d9a6a",
+    "doc": "repaint the walls"
+   }
+  },
+  "components": {
+   "foundation": {
+    "kind": "pad"
+   },
+   "place": {
+    "kind": "building",
+    "enclosed": true
+   }
+  },
+  "material": "wood"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-greenhouse",
+  "version": 1,
+  "description": "A glasshouse for plants: glazed walls and roof.",
+  "tags": [
+   "structure",
+   "building",
+   "greenhouse"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "gen",
+   "gen": "building/1",
+   "args": {
+    "style": "greenhouse"
+   }
+  },
+  "size": {
+   "box": [
+    6,
+    4.6,
+    4
+   ]
+  },
+  "params": {
+   "w": {
+    "type": "number",
+    "min": 2,
+    "max": 24,
+    "default": 6,
+    "doc": "width (x) in metres"
+   },
+   "d": {
+    "type": "number",
+    "min": 2,
+    "max": 24,
+    "default": 4,
+    "doc": "depth (z) in metres"
+   },
+   "floors": {
+    "type": "int",
+    "min": 1,
+    "max": 1,
+    "default": 1
+   },
+   "floorHeight": {
+    "type": "number",
+    "min": 2.4,
+    "max": 5,
+    "default": 2.6
+   },
+   "roof": {
+    "type": "enum",
+    "values": [
+     "gable",
+     "hip",
+     "flat",
+     "shed",
+     "dome",
+     "none"
+    ],
+    "default": "gable"
+   },
+   "roofPitch": {
+    "type": "number",
+    "min": 0,
+    "max": 60,
+    "default": 30,
+    "doc": "degrees"
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "plaster",
+     "brick",
+     "stone",
+     "wood",
+     "glass",
+     "metal"
+    ],
+    "default": "glass"
+   },
+   "wall": {
+    "type": "color",
+    "default": "#dfeee8"
+   },
+   "trim": {
+    "type": "color",
+    "default": "#f4f4f0"
+   },
+   "roofColor": {
+    "type": "color",
+    "default": "#cfe6e0"
+   },
+   "front": {
+    "type": "enum",
+    "values": [
+     "s",
+     "n",
+     "e",
+     "w"
+    ],
+    "default": "s",
+    "doc": "side of the main door (s = +z)"
+   },
+   "porch": {
+    "type": "number",
+    "min": 0,
+    "max": 4,
+    "default": 0,
+    "doc": "porch depth in metres (0 = none)"
+   },
+   "balcony": {
+    "type": "bool",
+    "default": false
+   },
+   "windows": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 1,
+    "doc": "window density along exterior walls"
+   },
+   "plan": {
+    "type": "json",
+    "doc": "explicit plan (see building/1 in /v1/god/schema): {floors:[{rooms:[{id,name,rect:[x0,z0,x1,z1]}],doors:[{between:[a,b]}],exterior:[{room,wall,kind}]}],stairs:[{from,to,room,wall}]}"
+   }
+  },
+  "state": {
+   "paint": {
+    "type": "color",
+    "default": "#dfeee8",
+    "doc": "repaint the walls"
+   }
+  },
+  "components": {
+   "foundation": {
+    "kind": "pad"
+   },
+   "place": {
+    "kind": "building",
+    "enclosed": true
+   }
+  },
+  "material": "glass"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-pavilion",
+  "version": 1,
+  "description": "An open pavilion: a roof on posts over a deck.",
+  "tags": [
+   "structure",
+   "building",
+   "pavilion"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "gen",
+   "gen": "building/1",
+   "args": {
+    "style": "pavilion"
+   }
+  },
+  "size": {
+   "box": [
+    6,
+    4.8,
+    6
+   ]
+  },
+  "params": {
+   "w": {
+    "type": "number",
+    "min": 3,
+    "max": 24,
+    "default": 6,
+    "doc": "width (x) in metres"
+   },
+   "d": {
+    "type": "number",
+    "min": 3,
+    "max": 24,
+    "default": 6,
+    "doc": "depth (z) in metres"
+   },
+   "floors": {
+    "type": "int",
+    "min": 1,
+    "max": 1,
+    "default": 1
+   },
+   "floorHeight": {
+    "type": "number",
+    "min": 2.4,
+    "max": 5,
+    "default": 2.8
+   },
+   "roof": {
+    "type": "enum",
+    "values": [
+     "gable",
+     "hip",
+     "flat",
+     "shed",
+     "dome",
+     "none"
+    ],
+    "default": "hip"
+   },
+   "roofPitch": {
+    "type": "number",
+    "min": 0,
+    "max": 60,
+    "default": 30,
+    "doc": "degrees"
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "plaster",
+     "brick",
+     "stone",
+     "wood",
+     "glass",
+     "metal"
+    ],
+    "default": "wood"
+   },
+   "wall": {
+    "type": "color",
+    "default": "#f4eee2"
+   },
+   "trim": {
+    "type": "color",
+    "default": "#5e412b"
+   },
+   "roofColor": {
+    "type": "color",
+    "default": "#8a3b2a"
+   },
+   "front": {
+    "type": "enum",
+    "values": [
+     "s",
+     "n",
+     "e",
+     "w"
+    ],
+    "default": "s",
+    "doc": "side of the main door (s = +z)"
+   },
+   "porch": {
+    "type": "number",
+    "min": 0,
+    "max": 4,
+    "default": 0,
+    "doc": "porch depth in metres (0 = none)"
+   },
+   "balcony": {
+    "type": "bool",
+    "default": false
+   },
+   "windows": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0,
+    "doc": "window density along exterior walls"
+   },
+   "plan": {
+    "type": "json",
+    "doc": "explicit plan (see building/1 in /v1/god/schema): {floors:[{rooms:[{id,name,rect:[x0,z0,x1,z1]}],doors:[{between:[a,b]}],exterior:[{room,wall,kind}]}],stairs:[{from,to,room,wall}]}"
+   }
+  },
+  "state": {
+   "paint": {
+    "type": "color",
+    "default": "#f4eee2",
+    "doc": "repaint the walls"
+   }
+  },
+  "components": {
+   "foundation": {
+    "kind": "pad"
+   },
+   "place": {
+    "kind": "pavilion",
+    "enclosed": false
+   }
+  },
+  "material": "wood"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-tower",
+  "version": 1,
+  "description": "A square stone tower with a spiral stair (up to 6 floors).",
+  "tags": [
+   "structure",
+   "building",
+   "tower"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "gen",
+   "gen": "building/1",
+   "args": {
+    "style": "tower",
+    "round": false
+   }
+  },
+  "size": {
+   "box": [
+    5,
+    11,
+    5
+   ]
+  },
+  "params": {
+   "w": {
+    "type": "number",
+    "min": 4,
+    "max": 10,
+    "default": 5,
+    "doc": "width (x) in metres"
+   },
+   "d": {
+    "type": "number",
+    "min": 4,
+    "max": 10,
+    "default": 5,
+    "doc": "depth (z) in metres"
+   },
+   "floors": {
+    "type": "int",
+    "min": 1,
+    "max": 6,
+    "default": 3
+   },
+   "floorHeight": {
+    "type": "number",
+    "min": 2.4,
+    "max": 5,
+    "default": 3
+   },
+   "roof": {
+    "type": "enum",
+    "values": [
+     "gable",
+     "hip",
+     "flat",
+     "shed",
+     "dome",
+     "none"
+    ],
+    "default": "hip"
+   },
+   "roofPitch": {
+    "type": "number",
+    "min": 0,
+    "max": 60,
+    "default": 50,
+    "doc": "degrees"
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "plaster",
+     "brick",
+     "stone",
+     "wood",
+     "glass",
+     "metal"
+    ],
+    "default": "stone"
+   },
+   "wall": {
+    "type": "color",
+    "default": "#c9c1b1"
+   },
+   "trim": {
+    "type": "color",
+    "default": "#8f877a"
+   },
+   "roofColor": {
+    "type": "color",
+    "default": "#4f5a60"
+   },
+   "front": {
+    "type": "enum",
+    "values": [
+     "s",
+     "n",
+     "e",
+     "w"
+    ],
+    "default": "s",
+    "doc": "side of the main door (s = +z)"
+   },
+   "porch": {
+    "type": "number",
+    "min": 0,
+    "max": 4,
+    "default": 0,
+    "doc": "porch depth in metres (0 = none)"
+   },
+   "balcony": {
+    "type": "bool",
+    "default": false
+   },
+   "windows": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.5,
+    "doc": "window density along exterior walls"
+   },
+   "plan": {
+    "type": "json",
+    "doc": "explicit plan (see building/1 in /v1/god/schema): {floors:[{rooms:[{id,name,rect:[x0,z0,x1,z1]}],doors:[{between:[a,b]}],exterior:[{room,wall,kind}]}],stairs:[{from,to,room,wall}]}"
+   }
+  },
+  "state": {
+   "paint": {
+    "type": "color",
+    "default": "#c9c1b1",
+    "doc": "repaint the walls"
+   }
+  },
+  "components": {
+   "foundation": {
+    "kind": "pad"
+   },
+   "place": {
+    "kind": "building",
+    "enclosed": true
+   }
+  },
+  "material": "stone"
+ },
+ {
+  "schema": "def/1",
+  "name": "core-lighthouse",
+  "version": 1,
+  "description": "A round lighthouse: a spiral stair up five floors to a glazed lantern room with a gallery.",
+  "tags": [
+   "structure",
+   "building",
+   "tower",
+   "lighthouse"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "gen",
+   "gen": "building/1",
+   "args": {
+    "style": "tower",
+    "round": true,
+    "lantern": true
+   }
+  },
+  "size": {
+   "box": [
+    6,
+    17,
+    6
+   ]
+  },
+  "params": {
+   "w": {
+    "type": "number",
+    "min": 4,
+    "max": 10,
+    "default": 6,
+    "doc": "width (x) in metres"
+   },
+   "d": {
+    "type": "number",
+    "min": 4,
+    "max": 10,
+    "default": 6,
+    "doc": "depth (z) in metres"
+   },
+   "floors": {
+    "type": "int",
+    "min": 1,
+    "max": 6,
+    "default": 5
+   },
+   "floorHeight": {
+    "type": "number",
+    "min": 2.4,
+    "max": 5,
+    "default": 3
+   },
+   "roof": {
+    "type": "enum",
+    "values": [
+     "gable",
+     "hip",
+     "flat",
+     "shed",
+     "dome",
+     "none"
+    ],
+    "default": "dome"
+   },
+   "roofPitch": {
+    "type": "number",
+    "min": 0,
+    "max": 60,
+    "default": 32,
+    "doc": "degrees"
+   },
+   "material": {
+    "type": "enum",
+    "values": [
+     "plaster",
+     "brick",
+     "stone",
+     "wood",
+     "glass",
+     "metal"
+    ],
+    "default": "plaster"
+   },
+   "wall": {
+    "type": "color",
+    "default": "#f4f1ea"
+   },
+   "trim": {
+    "type": "color",
+    "default": "#b23a2e"
+   },
+   "roofColor": {
+    "type": "color",
+    "default": "#b23a2e"
+   },
+   "front": {
+    "type": "enum",
+    "values": [
+     "s",
+     "n",
+     "e",
+     "w"
+    ],
+    "default": "s",
+    "doc": "side of the main door (s = +z)"
+   },
+   "porch": {
+    "type": "number",
+    "min": 0,
+    "max": 4,
+    "default": 0,
+    "doc": "porch depth in metres (0 = none)"
+   },
+   "balcony": {
+    "type": "bool",
+    "default": false
+   },
+   "windows": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.5,
+    "doc": "window density along exterior walls"
+   },
+   "plan": {
+    "type": "json",
+    "doc": "explicit plan (see building/1 in /v1/god/schema): {floors:[{rooms:[{id,name,rect:[x0,z0,x1,z1]}],doors:[{between:[a,b]}],exterior:[{room,wall,kind}]}],stairs:[{from,to,room,wall}]}"
+   }
+  },
+  "state": {
+   "paint": {
+    "type": "color",
+    "default": "#f4f1ea",
+    "doc": "repaint the walls"
+   }
+  },
+  "components": {
+   "foundation": {
+    "kind": "pad"
+   },
+   "place": {
+    "kind": "building",
+    "enclosed": true
+   }
+  },
+  "material": "plaster"
+ }
+]

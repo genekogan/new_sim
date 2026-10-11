@@ -1,4 +1,6 @@
 import {SoulProfiles} from './soul-profile.ts';
+import {WorldAccounts} from './accounts/service.ts';
+import {mountAccountRoutes} from './accounts/routes.ts';
 import { bodyLimit } from 'hono/body-limit';
 import { existsSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
@@ -26,6 +28,7 @@ import {mountStationRoutesV2} from './station-routes-v2.ts';
 import type {EdgeLedger} from './edge/ledger/ledger.ts';
 import {mountEdgeRoutes,edgeSoulResolver} from './edge/routes.ts';
 import { mountGodRoutes } from './god/routes.ts';
+import { mountJoinRoutes, PUBLISHED_SOUL_CLI } from './god/join.ts';
 import type { GodMode } from './god/god.ts';
 import { intentArrivalReadError,intentHistoryReadError,intentTransportError, intentLookupError, type IntentControlV2, type IntentIdentityV2 } from './intent-control.ts';
 
@@ -36,6 +39,8 @@ export function buildApp(d: Deps) {
   if(d.stationV2&&d.stationV2.host!==d.host)throw new Error('V2 station must belong to selected host');
   if(d.intentV2&&(d.intentV2.host!==d.host||d.intentV2.brain!==d.brain||d.intentV2.souls!==d.souls))throw new Error('intent transport must belong to selected host');
   const app = new Hono();
+  if(d.cfg.accountAuthRequired)d.souls.accounts??=new WorldAccounts(d.host,d.souls);
+  if(d.souls.accounts)d.auth.legacyOwnerAllowed=owner=>d.souls.ownedRows(owner).length>0;
   d.host.profileWorldPath=d.cfg.worldPath;
   const profiles=new SoulProfiles(d.host,d.souls);
   const bearer = (c: Context) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
@@ -50,7 +55,7 @@ export function buildApp(d: Deps) {
     const current=d.db.user(authenticated.id);if(!current)throw new ApiError(401,'unauthorized','sign in first');
     if(requireInvitation)d.souls.requireInvited(current);return current;
   };
-  const ownSoul = (authenticated: UserRow, id: string): SoulRow => { const u=privateUser(authenticated),s = d.db.soul(id); if (!s || s.retired_at || s.world_id !== d.host.worldId) throw new ApiError(404, 'not-found', 'no such soul'); if (s.owner !== u.id && u.role !== 'admin') throw new ApiError(403, 'forbidden', 'not your soul'); d.souls.requireControlReady(s); return s; };
+  const ownSoul = (authenticated: UserRow, id: string): SoulRow => { const u=privateUser(authenticated),s = d.db.soul(id); if (!s || s.retired_at || s.world_id !== d.host.worldId) throw new ApiError(404, 'not-found', 'no such soul'); if (!d.souls.owns(u.id,s) && u.role !== 'admin') throw new ApiError(403, 'forbidden', 'not your soul'); d.souls.requireControlReady(s); return s; };
   const agentSoul = (c: Context): SoulRow => { const s = d.souls.soulFromToken(bearer(c)); if (!s) throw new ApiError(401, 'unauthorized', 'missing or invalid soul token; pair again (see /skill.md)'); return s; };
   const controlReply=async(c:Context,guard:AcceptanceGuard|undefined,run:()=>Promise<object>)=>{
     const result=await run();if(guard)checkAcceptanceGuard(guard);return c.json(result);
@@ -62,7 +67,10 @@ export function buildApp(d: Deps) {
   const body = async (c: Context) => { try { return await c.req.json(); } catch { throw new ApiError(400, 'bad-json', 'body must be JSON'); } };
   const limitIp = (c: Context, key: string, max: number, windowMs: number) => { const l = d.souls.limits.allow(`${key}:${ip(c)}`, max, windowMs); if (!l.ok) throw new ApiError(429, 'rate-limited', 'too many requests', { retry_after: l.retryAfter }); };
 
-  if (d.god) mountGodRoutes(app, { god: d.god, worldName: d.cfg.worldKey.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' '), requireUser, soulFromBearer: (c) => { const s = d.souls.soulFromToken(bearer(c)); return s ? { id: s.id, name: s.name } : null; }, baseOf, limitIp });
+  const worldName = process.env.WORLD_NAME?.slice(0, 60) || d.cfg.worldKey.split('-').map((w) => w[0].toUpperCase() + w.slice(1)).join(' ');
+  // the world's one skill (/SKILL.md) and who lives here (/v1/world/souls): lane P2
+  if (d.god) { mountJoinRoutes(app, { worldName, baseOf, soulCliUrl: (c) => (d.cfg.cliFile ? baseOf(c) + '/eden-agent.mjs' : PUBLISHED_SOUL_CLI), souls: () => d.db.liveSouls(d.host.worldId), poseOf: (id) => { const p = (d.host.engine.world.entities as Record<string, { pose?: { p?: number[] } } | undefined>)[id]?.pose?.p; return p ? { x: p[0], y: p[1], z: p[2] } : null; } }); }
+  if (d.god) mountGodRoutes(app, { god: d.god, worldName, requireUser, soulFromBearer: (c) => { const s = d.souls.soulFromToken(bearer(c)); return s ? { id: s.id, name: s.name } : null; }, baseOf, limitIp });
 
   app.onError((err, c) => {
     if (err instanceof ApiError) { if (err.status === 429 && err.extra?.retry_after) c.header('Retry-After', String(err.extra.retry_after)); return c.json({ ok: false, code: err.code, message: err.message, ...err.extra }, err.status as 400); }
@@ -83,15 +91,16 @@ export function buildApp(d: Deps) {
   for(const path of ['/v1/souls/:id/intent-v2','/v1/souls/:id/intent-v2/*','/v1/agent/intent-v2','/v1/agent/intent-v2/*'])
     app.use(path,async(c,next)=>{c.header('Cache-Control','no-store');await next();});
   app.use('/v1/souls/:id',async(c,next)=>{if(d.intentV2)c.header('Cache-Control','no-store');await next();});
-  for(const path of ['/v1/lifecycle','/v1/lifecycle/*','/v1/me','/v1/souls','/v1/souls/*','/v1/agent/*'])
+  for(const path of ['/v1/lifecycle','/v1/lifecycle/*','/v1/me','/v1/account/*','/v1/souls','/v1/souls/*','/v1/agent/*'])
     app.use(path,async(c,next)=>{if(d.souls.lifecycle)c.header('Cache-Control','no-store');await next();});
   app.use('/v1/brain',async(c,next)=>{if(d.souls.lifecycle)c.header('Cache-Control','no-store');await next();});
-  app.use('/v1/*',async(c,next)=>bodyLimit({ maxSize: /^\/v1\/souls\/[^/]+\/photo$/.test(c.req.path)?360*1024:64*1024, onError: (c) => c.json({ ok: false, code: 'too-large', message: 'request body is too large' }, 413) })(c,next));
+  app.use('/v1/*',async(c,next)=>bodyLimit({ maxSize: /^\/v1\/(?:souls\/[^/]+\/photo|agent\/photo)$/.test(c.req.path)?360*1024:64*1024, onError: (c) => c.json({ ok: false, code: 'too-large', message: 'request body is too large' }, 413) })(c,next));
 
   // ---- public
+  if(d.souls.accounts)mountAccountRoutes(app,{accounts:d.souls.accounts,auth:d.auth,baseOf:d.cfg.authProvider==='clerk'?()=>d.cfg.publicUrl:baseOf,limit:limitIp});
   mountStationRoutesV2(app,d.stationV2);
   app.get('/healthz', (c) => c.json({ ok: true, tick: d.host.engine.world.tick, clients: d.hub.clients.size, paused: d.host.paused, build: d.cfg.build, worldId: d.host.worldId }));
-  app.get('/v1/config', (c) => c.json({ privyAppId: d.cfg.privyAppId, publicUrl: baseOf(c), worldURL:baseOf(c), instructionsURL:baseOf(c)+'/instructions.md', soulProfile:{contract:'soul-profile/1',auth:'owner',edit:'PATCH /v1/souls/:id/profile',photo:'POST /v1/souls/:id/photo',photoFormat:'PNG RGB/RGBA8',maxPhotoBytes:262144,maxPhotoDimension:512}, worldId: d.host.worldId, worldKey: d.cfg.worldKey, worldPath: d.cfg.worldPath, authReady: d.auth.ready, devAuth: d.auth.devAuth, inviteRequired: d.cfg.inviteRequired, build: d.cfg.build }));
+  app.get('/v1/config', (c) => c.json({ authProvider:d.cfg.authProvider, authenticationOrigin:d.cfg.authProvider==='clerk'&&d.auth.ready?new URL(d.cfg.publicUrl).origin:'', clerkPublishableKey:d.cfg.authProvider==='clerk'?d.cfg.clerkPublishableKey:'', clerkIssuer:d.cfg.authProvider==='clerk'?d.cfg.clerkIssuer:'', privyAppId:d.cfg.authProvider==='privy'?d.cfg.privyAppId:'', publicUrl: baseOf(c), worldURL:baseOf(c), instructionsURL:baseOf(c)+'/instructions.md', accountAuthRequired:d.cfg.accountAuthRequired, accountApproval:d.souls.accounts?{contract:'account-soul-approval/1',start:'/v1/agent/approval/start',poll:'/v1/agent/approval/poll',cancel:'/v1/agent/approval/cancel'}:null, soulProfile:{contract:'soul-profile/1',auth:'owner',edit:'PATCH /v1/souls/:id/profile',photo:'POST /v1/souls/:id/photo',photoFormat:'PNG RGB/RGBA8',maxPhotoBytes:262144,maxPhotoDimension:512}, worldId: d.host.worldId, worldKey: d.cfg.worldKey, worldPath: d.cfg.worldPath, authReady: d.auth.ready, devAuth: d.auth.devAuth, inviteRequired: d.cfg.inviteRequired, build: d.cfg.build }));
   app.get('/v1/world', (c) => c.json(d.souls.worldSummary()));
   app.get('/v1/debug/world', (c) => c.json(d.host.engine.world));
   app.get('/v1/scene', c => {
@@ -154,7 +163,7 @@ export function buildApp(d: Deps) {
   const intentService=()=>{if(!d.intentV2)throw new ApiError(404,'not-found','direction version unavailable');return d.intentV2;};
   const intentIdentity=async(c:Context):Promise<IntentIdentityV2>=>{
     const user=await requireUser(c),token=bearer(c)!;
-    if(d.auth.devAuth&&token.startsWith('dev:'))return {userId:user.id,expiresAt:Infinity};
+    if(token.startsWith('dev:'))return {userId:user.id,expiresAt:Infinity};
     // userFromToken has verified this exact token. Bind its actual expiry to
     // synchronous effect/final-response guards without trusting a client claim.
     try {const exp=decodeJwt(token).exp;if(typeof exp!=='number'||!Number.isFinite(exp))throw new Error();
@@ -217,10 +226,17 @@ export function buildApp(d: Deps) {
   });
 
   // ---- signed-in users
-  const mySouls = (u: UserRow) => d.db.soulsOf(u.id).filter(s=>!d.souls.lifecycle||(s.world_id===d.host.worldId&&d.souls.invited(u)&&d.souls.controlReady(s))).map((s) => ({ id: s.id, name: s.name, description: s.description, ...(s.world_id===d.host.worldId?{profile:profiles.view(s.id)}:{}), entityId: s.entity_id, hasToken: !!s.token_hash, tokenLabel: s.token_label, tokenCreatedAt: s.token_created_at, tokenLastUsed: s.token_last_used }));
-  app.patch('/v1/souls/:id/profile',async c=>{c.header('Cache-Control','no-store');const u=await requireUser(c);const result=await profiles.update(u.id,c.req.param('id'),await body(c));d.hub.refreshMe(u.id);return c.json({ok:true,profile:result});});
-  app.post('/v1/souls/:id/photo',async c=>{c.header('Cache-Control','no-store');const u=await requireUser(c);const result=await profiles.photo(u.id,c.req.param('id'),await body(c));d.hub.refreshMe(u.id);return c.json({ok:true,profile:result});});
+  const mySouls = (u: UserRow) => d.souls.ownedRows(u.id).filter(s=>!d.souls.lifecycle||(s.world_id===d.host.worldId&&d.souls.invited(u)&&d.souls.controlReady(s))).map((s) => ({ id: s.id, name: s.name, description: s.description, ...(s.world_id===d.host.worldId?{profile:profiles.view(s.id)}:{}), entityId: s.entity_id, hasToken: d.souls.agentStatus(s).attached, tokenLabel: d.souls.agentStatus(s).label, tokenCreatedAt: d.souls.agentStatus(s).since, tokenLastUsed: d.souls.agentStatus(s).last_used }));
+  const profileIdentity=async(c:Context)=>{const u=await requireUser(c);if(!d.cfg.accountAuthRequired)return {u,guard:undefined};const token=bearer(c)!;if(token.startsWith('dev:'))return {u,guard:undefined};const account=await d.auth.accountFromToken(token);if(!account)throw new ApiError(401,'account-signin-required','Sign in first.');return {u,guard:()=>{if(account.identity.expiresAt<=Date.now())throw new ApiError(401,'unauthorized','Sign in first.');return true as const;}};};
+  app.patch('/v1/souls/:id/profile',async c=>{c.header('Cache-Control','no-store');const {u,guard}=await profileIdentity(c);const result=await profiles.update(u.id,c.req.param('id'),await body(c),guard);d.hub.refreshMe(u.id);return c.json({ok:true,profile:result});});
+  app.post('/v1/souls/:id/photo',async c=>{c.header('Cache-Control','no-store');const {u,guard}=await profileIdentity(c);const result=await profiles.photo(u.id,c.req.param('id'),await body(c),guard);d.hub.refreshMe(u.id);return c.json({ok:true,profile:result});});
   app.get('/v1/souls/:id/profile-photo/:hash',c=>{const bytes=profiles.photoBytes(c.req.param('id'),c.req.param('hash'));return bytes?c.body(bytes as never,200,{'Content-Type':'image/png','X-Content-Type-Options':'nosniff','Cache-Control':'public, max-age=31536000, immutable'}):c.json({ok:false,code:'not-found'},404);});
+  // The verified provider account behind a browser session (Clerk): the web client checks it against its own session.
+  app.get('/v1/account/session',async c=>{
+    c.header('Cache-Control','no-store');
+    const account=await d.auth.accountFromToken(bearer(c));if(!account)throw new ApiError(401,'account-signin-required','Sign in first.');
+    return c.json({accountId:account.identity.id,issuer:account.identity.issuer,subject:account.identity.subject});
+  });
   app.get('/v1/me', async (c) => { const u = privateUser(await requireUser(c),false),souls=mySouls(u); return c.json({ me: {...d.auth.me(u),...(d.souls.lifecycle?{souls:souls.map(s=>s.id)}:{})}, souls, maxSouls: d.cfg.maxSoulsPerUser,
     ...(d.souls.lifecycle?{lifecycleRequests:d.souls.invited(u)?d.souls.lifecycleHistory(u.id):{contract:'owner-lifecycle-list/1',worldId:d.host.worldId,requests:[],nextCursor:null},
       ...(d.souls.invited(u)?{lifecycleCapability:ownerLifecycleCapabilitySchema.parse({contract:'owner-lifecycle-capability/1',worldId:d.host.worldId,userId:u.id,
@@ -249,6 +265,7 @@ export function buildApp(d: Deps) {
     d.souls.redeemInvite(u, p.data.code); d.hub.refreshMe(u.id); return c.json({ ok: true });
   });
   app.post('/v1/souls', async (c) => {
+    if(d.cfg.accountAuthRequired){if(!await d.auth.accountFromToken(bearer(c)))throw new ApiError(401,'account-signin-required','Sign in with Google or email.');throw new ApiError(403,'approval-required','Create an agent approval link and approve it while signed in.');}
     const u = await requireUser(c); d.souls.requireInvited(u);
     const optIn=lifecycleOptIn(c);
     const lim = d.souls.limits.allow(`create:${u.id}`, 5, 3600_000); if (!lim.ok) throw new ApiError(429, 'rate-limited', 'too many new souls this hour', { retry_after: lim.retryAfter });
@@ -286,8 +303,8 @@ export function buildApp(d: Deps) {
     const p = setIntentSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { intent: { agenda: [{card, target?, of?}], note? } } or { intent: { goal, target?, note? } }; see /skill.md');
     const guard=d.souls.ownerControlGuard(s,u.id);return controlReply(c,guard,async()=>{const r=await d.souls.setIntent(s,p.data.intent,'web',guard);return {ok:true,intent:r.intent,text:r.text,tick:r.event.tick,seq:r.event.seq};});
   });
-  app.post('/v1/souls/:id/pair', async (c) => { const u = await requireUser(c); d.souls.requireInvited(u); return c.json({ ok: true, ...d.souls.pairCode(ownSoul(u, c.req.param('id')), baseOf(c), u) }); });
-  app.post('/v1/souls/:id/revoke', async (c) => { const u = await requireUser(c); d.db.setSoulToken(ownSoul(u, c.req.param('id')).id, null); return c.json({ ok: true }); });
+  app.post('/v1/souls/:id/pair', async (c) => { const account=d.cfg.accountAuthRequired?await d.auth.accountFromToken(bearer(c)):null;if(d.cfg.accountAuthRequired&&!account)throw new ApiError(401,'account-signin-required','Sign in to delegate a Soul.');if(account)d.souls.accounts!.verifySession(account.identity);const u = await requireUser(c); d.souls.requireInvited(u); return c.json({ ok: true, ...d.souls.pairCode(ownSoul(u, c.req.param('id')), baseOf(c), u) }); });
+  app.post('/v1/souls/:id/revoke', async (c) => { const account=d.cfg.accountAuthRequired?await d.auth.accountFromToken(bearer(c)):null;if(d.cfg.accountAuthRequired&&!account)throw new ApiError(401,'account-signin-required','Sign in to revoke a Soul.');if(account)d.souls.accounts!.verifySession(account.identity);const u = await requireUser(c),s=ownSoul(u,c.req.param('id'));if(account)d.souls.accounts!.revoke(account.identity,s.id);else d.db.setSoulToken(s.id, null); return c.json({ ok: true }); });
   app.post('/v1/souls/:id/shot', async (c) => {
     const u = await requireUser(c); const s = ownSoul(u, c.req.param('id')); const m = d.host.minds.get(s.id); if (!m) throw new ApiError(409, 'not-in-world', 'not in the world');
     const lim = d.souls.limits.allow(`shot:${s.owner}`, 12, 60_000); if (!lim.ok) throw new ApiError(429, 'rate-limited', 'slow down', { retry_after: lim.retryAfter });
@@ -297,6 +314,7 @@ export function buildApp(d: Deps) {
   // approving an agent that asked to be paired
   app.get('/v1/pair/:code', async (c) => { await requireUser(c); return c.json(d.souls.pairInfo(c.req.param('code'))); });
   app.post('/v1/pair/approve', async (c) => {
+    if(d.cfg.accountAuthRequired){const account=await d.auth.accountFromToken(bearer(c));if(!account)throw new ApiError(401,'account-signin-required','Sign in to delegate a Soul.');d.souls.accounts!.verifySession(account.identity);}
     const u = await requireUser(c); d.souls.requireInvited(u); const p = pairApproveSchema.safeParse(await body(c)); if (!p.success) throw new ApiError(400, 'invalid', 'body must be { code, soulId }');
     d.souls.pairApprove(u, p.data.code, ownSoul(u, p.data.soulId)); return c.json({ ok: true });
   });
@@ -352,6 +370,12 @@ export function buildApp(d: Deps) {
   // Legacy compatibility only; the audited launcher uses the POST body above.
   app.get('/v1/agent/pair/poll', (c) => { limitIp(c, 'pairpoll', 60, 60_000); return c.json({ ok: true, ...d.souls.pairPoll(c.req.query('poll_token') ?? '') }, 200, { 'cache-control': 'no-store' }); });
   app.get('/v1/agent/me', (c) => { const s = agentSoul(c); return c.json({ soul: { id: s.id, name: s.name, description: s.description }, paired_as: s.token_label, since: s.token_created_at }); });
+  // Agent-local credentials expose only the selected Soul, never the browser
+  // account's other memberships or a reusable human identity credential.
+  app.get('/v1/agent/account-me',c=>{const s=agentSoul(c),credential=d.souls.agentCredential(bearer(c)!)!;return c.json({me:{id:credential.grant?.id??s.id,email:null,wallet:null,role:'user',invited:true,souls:[s.id]},souls:[{id:s.id,name:s.name,description:s.description,entityId:s.entity_id,profile:profiles.view(s.id)}]});});
+  app.get('/v1/agent/soul',c=>{const s=agentSoul(c);if(!d.intentV2)return c.json(d.souls.dashboard(s));const service=d.intentV2,scope=service.agentScope(bearer(c)),result={status:d.souls.status(s),intentHistory:service.historyCapability(scope)};service.guard(scope);return c.json(result);});
+  app.patch('/v1/agent/profile',async c=>{const s=agentSoul(c),principal=d.souls.agentCredential(bearer(c)!)!.grant?.accountId??s.owner,guard=d.souls.agentControlGuard(s,bearer(c)),profile=await profiles.update(principal,s.id,await body(c),guard);d.hub.refreshMe(principal);return c.json({ok:true,profile});});
+  app.post('/v1/agent/photo',async c=>{const s=agentSoul(c),principal=d.souls.agentCredential(bearer(c)!)!.grant?.accountId??s.owner,guard=d.souls.agentControlGuard(s,bearer(c)),profile=await profiles.photo(principal,s.id,await body(c),guard);d.hub.refreshMe(principal);return c.json({ok:true,profile});});
   app.get('/v1/agent/status', (c) => c.json(d.souls.status(agentSoul(c))));
   app.get('/v1/agent/perceive',c=>{
     if(!d.intentV2?.historyEnabled){const soul=agentSoul(c);if(!d.host.extra.intentPurposeRecallV1)return c.json(d.souls.perceive(soul));c.header('Cache-Control','no-store');const guard=d.souls.agentControlGuard(soul,bearer(c));if(guard)checkAcceptanceGuard(guard);const result=d.souls.perceive(soul);if(guard)checkAcceptanceGuard(guard);return c.json(result);}
@@ -375,7 +399,7 @@ export function buildApp(d: Deps) {
   app.delete('/v1/agent/mandate/:rule',async c=>{const s=agentSoul(c),guard=d.souls.agentControlGuard(s,bearer(c));return controlReply(c,guard,()=>d.souls.removeRule(s,c.req.param('rule'),guard));});
   app.get('/v1/agent/deck', (c) => c.json(d.souls.deck(agentSoul(c))));
   app.post('/v1/agent/cards', async (c) => {const s=agentSoul(c),input=await body(c),guard=d.souls.agentControlGuard(s,bearer(c));return controlReply(c,guard,()=>d.souls.proposeCards(s,input,guard));});
-  app.post('/v1/agent/release', (c) => { const s = agentSoul(c); d.db.setSoulToken(s.id, null); return c.json({ ok: true }); });
+  app.post('/v1/agent/release', (c) => { const s = agentSoul(c);if(d.souls.accounts)d.souls.accounts.releaseAgent(bearer(c)!);else d.db.setSoulToken(s.id, null); return c.json({ ok: true }); });
 
   // ---- static web app (SPA)
   const worldAssets = new URL('../../../worlds', import.meta.url).pathname;

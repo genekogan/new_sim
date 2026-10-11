@@ -16,7 +16,8 @@
 import { z } from 'zod';
 import { angleDelta, clamp, dist2, dsin, heading, rot2, sub2, add2, wrapAngle, type Vec2, hypot } from '../core/math.ts';
 import type { ActionDef, ActionRecord, Diagnostic, Reservation, StepResult } from '../actions/types.ts';
-import type { Runtime } from '../runtime/runtime.ts';
+import { DT, type Runtime } from '../runtime/runtime.ts';
+import { MAX_HUMAN_STEP_PER_TICK } from '../runtime/invariants.ts';
 import type { Entity } from '../world/types.ts';
 import { HUMAN_RADIUS } from '../world/catalog.ts';
 import type { Spatial } from '../spatial/service.ts';
@@ -99,6 +100,21 @@ const resolved = new WeakMap<object, Slot>();
 
 const lerp2 = (a: Vec2, b: Vec2, k: number): Vec2 => [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k];
 const smooth = (k: number) => k * k * (3 - 2 * k);
+/** The largest per-tick move of a smoothstep transition over `span` metres lasting `dur` seconds (ticks of DT). */
+function peakStep(span: number, dur: number): number {
+  let max = 0;
+  for (let t = 0; t < dur + DT; t += DT) { const a = Math.min(1, t / dur), b = Math.min(1, (t + DT) / dur); max = Math.max(max, span * (smooth(b) - smooth(a))); if (b >= 1) break; }
+  return max;
+}
+/** How long sitting down over (or standing up from) `span` metres takes: SIT_TRANSITION, unless that would move the body
+ *  further than the engine's per-tick limit (a seat whose approach point is far from it, e.g. a café chair tucked under a
+ *  parasol table: 1.5 m faulted motion.teleport); then just long enough to stay inside it. Spans that fit are unchanged. */
+export function sitDuration(span: number): number {
+  if (!(span > 0) || peakStep(span, SIT_TRANSITION) <= MAX_HUMAN_STEP_PER_TICK) return SIT_TRANSITION;
+  let dur = SIT_TRANSITION;
+  while (peakStep(span, dur) > MAX_HUMAN_STEP_PER_TICK * 0.9 && dur < 30) dur += DT;
+  return dur;
+}
 
 /** Advance a sit-down / stand-up transition toward `to`; true when it has arrived. */
 function transition(rt: Runtime, ex: SlotExec, to: Vec2, dt: number): boolean {
@@ -204,7 +220,7 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
           a.pose.yaw = turnToward(a.pose.yaw, ex.slot.yaw, HUMAN_PROFILE.turnRate * dt);
           return { status: 'running', phase: 'turn' };
         }
-        if (ex.approach) { ex.phase = 'sit-down'; ex.from = pos2(a); ex.t = 0; ex.dur = SIT_TRANSITION; }
+        if (ex.approach) { ex.phase = 'sit-down'; ex.from = pos2(a); ex.t = 0; ex.dur = sitDuration(dist2(ex.from, ex.slot.p)); }
         else ex.phase = 'occupied';
       }
       if (ex.phase === 'sit-down') {
@@ -224,7 +240,7 @@ function slotAction(verb: string, description: string, kinds: SlotKind[] | null,
         const span = dist2(ex.slot.p, ex.approach);
         const left = dist2(here, ex.approach);
         if (left > 1e-6) {
-          ex.phase = 'stand-up'; ex.from = here; ex.t = 0; ex.dur = span > 1e-9 ? SIT_TRANSITION * Math.min(1, left / span) : 0;
+          ex.phase = 'stand-up'; ex.from = here; ex.t = 0; ex.dur = span > 1e-9 ? sitDuration(span) * Math.min(1, left / span) : 0;
           return { ok: true, deferred: true };
         }
       }

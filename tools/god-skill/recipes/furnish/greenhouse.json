@@ -1,0 +1,102 @@
+{
+ "schema": "furnish/1",
+ "style": "greenhouse",
+ "rooms": {
+  "greenhouse": [
+   {
+    "name": "bench-1",
+    "def": [
+     "core/workbench@1",
+     "core/long-table@1",
+     "core/table@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0,
+      "s"
+     ],
+     [
+      0,
+      0.5,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "bench-2",
+    "def": [
+     "core/workbench@1",
+     "core/long-table@1",
+     "core/table@1"
+    ],
+    "try": [
+     [
+      1,
+      0.5,
+      "w"
+     ]
+    ]
+   },
+   {
+    "name": "stool",
+    "def": [
+     "core/stool@1",
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0,
+      0,
+      "s"
+     ],
+     [
+      1,
+      0,
+      "s"
+     ],
+     [
+      0,
+      1,
+      "n"
+     ],
+     [
+      1,
+      1,
+      "n"
+     ]
+    ]
+   }
+  ]
+ },
+ "default": [
+  {
+   "name": "lamp",
+   "def": [
+    "core/floor-lamp@1"
+   ],
+   "try": [
+    [
+     0,
+     0,
+     "s"
+    ],
+    [
+     1,
+     0,
+     "s"
+    ],
+    [
+     0,
+     1,
+     "n"
+    ],
+    [
+     1,
+     1,
+     "n"
+    ]
+   ]
+  }
+ ]
+}

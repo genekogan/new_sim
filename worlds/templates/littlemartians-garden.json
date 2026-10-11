@@ -1,0 +1,474 @@
+{
+ "schema": "genesis/1",
+ "name": "Little Martians garden",
+ "description": "The Little Martians garden in the new vocabulary: Vanessa's Ceramic Tower and Minaret Temple (imported glazed meshes whose footprints carry the rooms and the float-only shafts), the six kin hovering in their row, a glazed-tile court between the two buildings, ceramic pots and moss. Generated from worlds/littlemartians/scene.json (parity proof, docs/god/PARITY.md).",
+ "constants": {
+  "extent": 240,
+  "ground": "land"
+ },
+ "state": {
+  "constitution": "# Little Martians garden\nA ceramic garden between a glazed tower and a temple; the kin float where they like.\n\nParity demonstrator: generated from the Little Martians scene.",
+  "time": {
+   "dayTicks": 72000,
+   "startTick": 0
+  },
+  "sky": {
+   "palette": "lm-garden",
+   "sun": 0.65
+  },
+  "ground": {
+   "palette": "sand"
+  }
+ },
+ "batches": [
+  {
+   "note": "the garden ground and the glazed court",
+   "group": "garden",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/plaza@1",
+     "name": "glazed-court",
+     "shape": {
+      "area": [
+       [
+        -7,
+        -8
+       ],
+       [
+        7,
+        -8
+       ],
+       [
+        7,
+        8
+       ],
+       [
+        -7,
+        8
+       ]
+      ]
+     },
+     "params": {
+      "material": "tile",
+      "pattern": "radial",
+      "kerb": true
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "path-to-tower",
+     "shape": {
+      "path": [
+       [
+        -7,
+        0
+       ],
+       [
+        -7.800000000000001,
+        0
+       ]
+      ],
+      "width": 2.4
+     },
+     "params": {
+      "material": "stone",
+      "width": 2.4
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "path-to-temple",
+     "shape": {
+      "path": [
+       [
+        7,
+        0
+       ],
+       [
+        6.6,
+        0
+       ]
+      ],
+      "width": 2.4
+     },
+     "params": {
+      "material": "stone",
+      "width": 2.4
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "kin-walk",
+     "shape": {
+      "path": [
+       [
+        0,
+        8
+       ],
+       [
+        0,
+        21.5
+       ]
+      ],
+      "width": 2
+     },
+     "params": {
+      "material": "stone",
+      "width": 2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "kin-row",
+     "shape": {
+      "path": [
+       [
+        -15,
+        21.5
+       ],
+       [
+        16,
+        21.5
+       ]
+      ],
+      "width": 2
+     },
+     "params": {
+      "material": "stone",
+      "width": 2
+     }
+    }
+   ]
+  },
+  {
+   "note": "the two glazed buildings (imported meshes with rooms)",
+   "group": "buildings",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/ceramic-tower@1",
+     "name": "ceramic-tower",
+     "tmp": "$tower",
+     "p": [
+      -17,
+      0
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/minaret-temple@1",
+     "name": "minaret-temple",
+     "tmp": "$temple",
+     "p": [
+      17,
+      0
+     ],
+     "r": 0
+    }
+   ]
+  },
+  {
+   "note": "inside: a carpet and pots in the tower's ground hall, a kin floating in its second room, a bowl in the temple pavilion",
+   "group": "rooms",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/round-carpet-pack@1",
+     "name": "tower-hall-carpet",
+     "in": {
+      "parent": "ceramic-tower",
+      "slot": "tower-l0"
+     },
+     "p": [
+      0,
+      0,
+      0
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/flower-pot@1",
+     "name": "tower-hall-pot-1",
+     "in": {
+      "parent": "ceramic-tower",
+      "slot": "tower-l0"
+     },
+     "p": [
+      -4.5,
+      0,
+      -4.5
+     ],
+     "params": {
+      "pot": "#c9805a"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/flower-pot@1",
+     "name": "tower-hall-pot-2",
+     "in": {
+      "parent": "ceramic-tower",
+      "slot": "tower-l0"
+     },
+     "p": [
+      4.5,
+      0,
+      -4.5
+     ],
+     "params": {
+      "pot": "#c9805a"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/kin-green-brains-out@1",
+     "name": "tower-room-kin",
+     "in": {
+      "parent": "ceramic-tower",
+      "slot": "tower-l1"
+     },
+     "p": [
+      0,
+      1.2,
+      0
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/bowl@1",
+     "name": "temple-bowl",
+     "in": {
+      "parent": "minaret-temple",
+      "slot": "temple-l0"
+     },
+     "p": [
+      0,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "note": "the kin, hovering in their row (scene.json kin)",
+   "group": "kin",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/kin-green-patterns-blue@1",
+     "name": "kin-green-patterns-blue",
+     "p": [
+      -12,
+      24
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/kin-chebel@1",
+     "name": "kin-chebel",
+     "p": [
+      -7,
+      24
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/kin-colors-lemuet@1",
+     "name": "kin-colors-lemuet",
+     "p": [
+      -2,
+      24
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/kin-crystal-freeman@1",
+     "name": "kin-crystal-freeman",
+     "p": [
+      3,
+      24
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/kin-dark-blue@1",
+     "name": "kin-dark-blue",
+     "p": [
+      8,
+      24
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/kin-green-brains-out@1",
+     "name": "kin-green-brains-out",
+     "p": [
+      13,
+      24
+     ],
+     "r": 3.141592653589793
+    }
+   ]
+  },
+  {
+   "note": "ceramic and moss: pots along the court, flower beds, mossy rocks, willows at the edge",
+   "group": "planting",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/planter-box@1",
+     "name": "court-planter-1",
+     "p": [
+      -6,
+      -9.5
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/planter-box@1",
+     "name": "court-planter-2",
+     "p": [
+      6,
+      -9.5
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/planter-box@1",
+     "name": "court-planter-3",
+     "p": [
+      -6,
+      9.5
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/planter-box@1",
+     "name": "court-planter-4",
+     "p": [
+      6,
+      9.5
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/flower-bed@1",
+     "name": "bed-north",
+     "p": [
+      0,
+      -14
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/mossy-rock-1-pack@1",
+     "name": "rock-1",
+     "p": [
+      -30,
+      -22
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/mossy-rock-2-pack@1",
+     "name": "rock-2",
+     "p": [
+      30,
+      20
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/mushrooms-red-pack@1",
+     "name": "mushrooms-1",
+     "p": [
+      -33,
+      14
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/mushrooms-tan-pack@1",
+     "name": "mushrooms-2",
+     "p": [
+      34,
+      -16
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/willow-tree-1-pack@1",
+     "name": "willow-1",
+     "p": [
+      -36,
+      -28
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/willow-tree-2-pack@1",
+     "name": "willow-2",
+     "p": [
+      36,
+      -28
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/willow-tree-1-pack@1",
+     "name": "willow-3",
+     "p": [
+      -36,
+      28
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/willow-tree-2-pack@1",
+     "name": "willow-4",
+     "p": [
+      36,
+      28
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/wildflowers@1",
+     "name": "meadow-south",
+     "shape": {
+      "area": [
+       [
+        -38,
+        26
+       ],
+       [
+        38,
+        26
+       ],
+       [
+        38,
+        31
+       ],
+       [
+        -38,
+        31
+       ]
+      ]
+     },
+     "params": {}
+    }
+   ]
+  }
+ ]
+}

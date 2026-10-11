@@ -12,6 +12,8 @@ import type { AgentProfile, Link, Obstacle, SpatialScene, Surface } from './type
 import type { Profiler } from '../runtime/profile.ts';
 import { sleepEnvelope, SLEEP_BODY_MARGIN } from '../activities/sleep.ts';
 import { sceneForWorld, worldBaseId } from './edits.ts';
+import { GroundNav, groundRoute, rectOf, type TileRect } from './tiled.ts';
+import type { GroundField } from './ground.ts';
 
 /** Phases in which a component physically occupies space as a static obstacle. */
 const STATIC_PHASES = new Set(['stored', 'reserved', 'staged', 'placed', 'installed', 'raising']);
@@ -142,6 +144,12 @@ export class Spatial {
 
   /** The unedited source scene and its id (servicesFor), so a world edit (nav/1) can re-base this service in place. */
   source?: { scene: SpatialScene; id: string };
+  /**
+   * Ground mode (lane L8; worlds whose state carries `groundV1` only): level 0 is the terrain, tiled and windowed
+   * (spatial/tiled.ts), heights come from the field, and routes are planned hierarchically. Absent: unchanged behaviour.
+   */
+  ground?: GroundNav;
+  private groundDirty = false;
 
   constructor(base: SpatialScene, opts: { cell?: number; contributors?: Contributor[]; baseId?: string; planner?: 'exact' | 'corridor'; incremental?: boolean; source?: { scene: SpatialScene; id: string } } = {}) {
     this.base = base;
@@ -174,6 +182,33 @@ export class Spatial {
     return true;
   }
 
+  /**
+   * Enter (or leave, with null) ground mode on `field`, the window covering `points` (bodies, active goals). The next sync
+   * rebuilds the grids and advances the navigation epoch, so walkers replan on the new ground.
+   */
+  setGround(field: GroundField | null, world: WorldState, points: Vec2[] = []): void {
+    const prev = this.ground;
+    this.ground = field ? new GroundNav(field, this.cell) : undefined;
+    if (this.ground) {
+      if (prev?.window) this.ground.include(prev.window);
+      for (const p of points) this.ground.include(rectOf([p]));
+      if (!this.ground.window) this.ground.include(rectOf([[0, 0]]));
+    }
+    this.scene = undefined as unknown as SpatialScene;
+    this.snaps = [];
+    this.aroundCache.clear();
+    this.narrowCache.clear();
+    this.sync(world);
+  }
+
+  /** Ground mode: grow the window to cover `r` (resync on growth). False when the window would be too big. */
+  groundInclude(world: WorldState, r: TileRect): boolean {
+    const g = this.ground!, res = g.include(r);
+    if (res === 'too-big') return false;
+    if (res === 'grown') { this.groundDirty = true; this.sync(world); }
+    return true;
+  }
+
   /** Rebuild derived scene/grids iff navigation-relevant world content changed. */
   sync(world: WorldState): boolean {
     const p = this.prof;
@@ -185,6 +220,7 @@ export class Spatial {
   }
 
   private syncNow(world: WorldState): boolean {
+    if (this.ground) return this.syncGround(world);
     if (!this.navChanged(world) && this.scene) return false;
     const obstacles: Obstacle[] = [...this.base.obstacles];
     const surfaces: Surface[] = [...this.base.surfaces];
@@ -214,6 +250,49 @@ export class Spatial {
     return true;
   }
 
+  /** Ground mode sync: the same scene composition, grids from the tiled ground over the window (spatial/tiled.ts). */
+  private syncGround(world: WorldState): boolean {
+    const g = this.ground!;
+    // every body on level 0 stays inside the window (a body outside it would read clearance 0)
+    for (const id in world.entities) {
+      const e = world.entities[id];
+      if (e.kind !== 'human' || !e.human || (e.human.level ?? 0) !== 0) continue;
+      const tx = Math.floor(e.pose.p[0] / 64), tz = Math.floor(e.pose.p[2] / 64), w = g.window;
+      if (!w || tx < w[0] || tx > w[2] || tz < w[1] || tz > w[3]) { if (g.include(rectOf([[e.pose.p[0], e.pose.p[2]]])) === 'grown') this.groundDirty = true; }
+    }
+    if (!this.navChanged(world) && this.scene && !this.groundDirty) return false;
+    this.groundDirty = false;
+    const obstacles: Obstacle[] = [...this.base.obstacles];
+    const surfaces: Surface[] = [...this.base.surfaces];
+    const links: Link[] = [...this.base.links];
+    const levels = this.base.levels.some((l) => l.id === 0) ? [...this.base.levels] : [{ id: 0, y: 0, label: 'ground' }, ...this.base.levels];
+    for (const e of Object.values(world.entities)) {
+      if (!isStatic(e)) continue;
+      const f = entityFootprint(e);
+      obstacles.push({ id: e.id, obb: f.obb, y0: f.y0, y1: f.y1, kind: 'component', label: e.label ?? def(e.def).label });
+    }
+    for (const c of this.contributors) {
+      const r = c(world, this.base);
+      if (r.obstacles) obstacles.push(...r.obstacles);
+      if (r.surfaces) for (const s of r.surfaces) {
+        surfaces.push(s);
+        if (!levels.some((l) => l.id === s.level)) levels.push({ id: s.level, y: s.y, label: s.label ?? `level ${s.level}` });
+      }
+      if (r.links) links.push(...r.links);
+    }
+    this.scene = { bounds: g.bounds(), levels, surfaces, obstacles, links };
+    // level-0 floors laid on the ground (not the source scene's own flat field): they raise the standing height
+    const own = new Set((this.source?.scene ?? this.base).surfaces.map((x) => x.id));
+    g.setFloors(surfaces.filter((x) => x.level === 0 && !own.has(x.id)));
+    g.setSolids(obstacles);
+    const grids = () => g.grids(this.scene);
+    this.grids = this.prof ? this.prof.time('spatial.sync.grids', grids) : grids();
+    if (this.planner === 'corridor') prepareCorridor(this.grids);
+    this.epoch++;
+    this.aroundCache.clear();
+    return true;
+  }
+
   /**
    * Whether any navigation-relevant field of the static entities (or their set / order) differs from
    * the last call; refreshes the snapshots. Allocation-free when nothing changed (~35k calls a run),
@@ -236,6 +315,11 @@ export class Spatial {
 
   route(world: WorldState, profile: AgentProfile, start: Place, goal: Place, opts?: RouteOpts): RouteResult {
     const o = this.planner === 'exact' ? opts : { planner: this.planner, ...opts };
+    if (this.ground) {
+      this.sync(world);
+      const run = () => groundRoute(this.ground!, this.scene, profile, start, goal, o ?? {}, (r) => this.groundInclude(world, r), () => this.grids);
+      return this.prof ? this.prof.time('spatial.route', run) : run();
+    }
     if (this.prof) return this.prof.time('spatial.route', () => (this.sync(world), findRoute(this.grids, this.scene, profile, start, goal, o)));
     this.sync(world);
     return findRoute(this.grids, this.scene, profile, start, goal, o);
@@ -291,6 +375,8 @@ export class Spatial {
       const here: Obstacle[] = [];
       for (const { o, foot } of placed) {
         if (foot === undefined) here.push(o);
+        // ground mode: level 0 is the terrain, not a flat floor at g.y; a person standing on it blocks there
+        else if (this.ground && id === 0) { if (this.onGroundAt(o, foot)) here.push({ ...o, y0: -1e9, y1: 1e9 }); }
         else if (g.y >= foot - 0.3 && g.y < foot + PERSON_H) here.push({ ...o, y0: g.y, y1: g.y + PERSON_H });
       }
       if (here.length) levels.set(id, gridsWithObstacles({ cell: this.grids.cell, levels: new Map([[id, g]]) }, here).levels.get(id)!);
@@ -304,7 +390,7 @@ export class Spatial {
   /** One-off route treating standing people as temporary obstacles (a walker blocked by someone not moving). */
   routeAround(world: WorldState, profile: AgentProfile, start: Place, goal: Place, people: AroundPerson[], explainUnusable?: (linkId: string) => boolean): RouteResult {
     const run = () => {
-      const { scene, grids } = this.gridsAround(world, people);
+      const { scene, grids } = (this.ground && start.level === 0 && goal.level === 0 && this.groundAround(world, start, goal, people)) || this.gridsAround(world, people);
       // a people-avoidance replan fails often (walled in, a pocket cut off): prove it early (path.ts proveUnreachable);
       // a failure names the people / loads behind it (path.ts nameObstacles: the walker's fewer-obstacles fallback)
       const ids = new Set(people.map((q) => q.id));
@@ -315,6 +401,30 @@ export class Spatial {
       return findRoute(grids, scene, profile, start, goal, opts);
     };
     return this.prof ? this.prof.time('spatial.routeAround', run) : run();
+  }
+
+  /**
+   * Ground mode: a people-avoiding level-0 replan searches only the tiles around its start and goal (as the hierarchical
+   * planner's hops do), so its route does not depend on how far the engine window has grown (live vs restored engines).
+   */
+  private groundAround(world: WorldState, start: Place, goal: Place, people: AroundPerson[]): { scene: SpatialScene; grids: GridSet } | null {
+    this.sync(world);
+    const g = this.ground!, r = rectOf([start.p, goal.p]);
+    if (!this.groundInclude(world, r)) return null;
+    const base = g.compose(r, this.scene.obstacles), placed = people.flatMap((q) => aroundObstacle(world, q));
+    const here: Obstacle[] = [];
+    for (const { o, foot } of placed) {
+      if (foot === undefined) here.push(o);
+      else if (this.onGroundAt(o, foot)) here.push({ ...o, y0: -1e9, y1: 1e9 });
+    }
+    const level = here.length ? gridsWithObstacles({ cell: this.cell, levels: new Map([[0, base]]) }, here).levels.get(0)! : base;
+    return { scene: { ...this.scene, bounds: g.boundsOf(r), links: [], obstacles: [...this.scene.obstacles, ...placed.map((x) => x.o)] }, grids: { cell: this.cell, levels: new Map([[0, level]]) } };
+  }
+
+  /** Ground mode: whether a person whose feet are at `foot` stands on level 0 (the ground or a slab) at their obstacle's centre. */
+  private onGroundAt(o: Obstacle, foot: number): boolean {
+    const h = this.ground!.standY(o.obb.c[0], o.obb.c[1]);
+    return foot >= h - 1.3 && foot < h + PERSON_H;
   }
 
   private narrowCache = new Map<string, Int32Array>();
