@@ -4,6 +4,7 @@
 import { Terrain, emptyGround, type Ground, type Landform, type Water } from '@sim/ground';
 import { GENERATORS, type Baked, type LocalOBB } from '@sim/generators';
 import { hashOf } from './hash.ts';
+import { stretchBaked, stretchOf } from './vocab/index.ts';
 import { defSchema, fieldSchema, type Def, type DefInput, type Entity, type StoredDef, type Value, type WorldConstants, type WorldState, worldConstantsSchema, worldStateSchema } from './schemas.ts';
 
 export type OBB = { c: [number, number]; half: [number, number]; yaw: number; y0: number; y1: number };
@@ -80,7 +81,8 @@ export class WorldModel {
     if (m.kind === 'gen') {
       const g = GENERATORS[m.gen];
       if (!g) throw new Error(`generator ${m.gen} unknown`);
-      baked = g.physics({ params: { ...defaultsOf(g.params), ...params }, args: (m.args ?? {}) as Record<string, unknown>, seed, shape: shape as never });
+      // kit/2 shapes may depend on the def's own params (VOCAB-MECH `when`: variants, options): fill the def's defaults too
+      baked = g.physics({ params: { ...defaultsOf(g.params), ...(m.gen === 'kit/2' ? defaultsOf(def.params as never) : {}), ...params }, args: (m.args ?? {}) as Record<string, unknown>, seed, shape: shape as never });
     } else if (m.kind === 'mesh') {
       // the def states the size (the viewer fits the model to it); a footprint sidecar gives walls, rooms, openings, links
       const info = this.assets(m.asset), fp = m.footprint ? this.assets(m.footprint)?.baked : undefined;
@@ -97,6 +99,8 @@ export class WorldModel {
     if (def.slots.length) baked = { ...baked, slots: def.slots };
     if (def.components.landform) baked = { ...baked, landform: def.components.landform };
     if (def.components.water) baked = { ...baked, water: def.components.water };
+    // VOCAB-MECH: the stretch convention (params sx/sy/sz, when the def declares them) scales the physics with the picture
+    if (def.params.sx || def.params.sy || def.params.sz) baked = stretchBaked(baked, stretchOf(def.params, params));
     this.bakes.set(key, baked);
     return baked;
   }

@@ -79,7 +79,9 @@ export function kitDef({ name, description, tags = [], shapes: shapesIn, slots =
   const tintParams = Object.fromEntries([...used].map((k) => [k, { type: 'color', default: palette[k], doc: `${k} colour` }]));
   const args = { shapes, ...(round !== undefined ? { round } : {}), ...(gait && gait !== 'none' ? { gait } : {}), ...extraArgs };
   const parsed = kitArgs.parse(args);
-  const baked = kitPhysics(parsed);
+  // VOCAB-MECH: shapes with `when` are sized at the def's default params (variants, options)
+  const defaults = Object.fromEntries(Object.entries({ ...tintParams, ...params }).filter(([, f]) => f.default !== undefined).map(([k, f]) => [k, f.default]));
+  const baked = kitPhysics(parsed, defaults);
   if (parsed.shapes.length > 96) throw new Error(`${name}: ${parsed.shapes.length} shapes > 96`);
   const def = {
     schema: 'def/1', name: `core-${name}`, version: 1, description, tags: [...new Set(tags)], form: form ?? 'point',

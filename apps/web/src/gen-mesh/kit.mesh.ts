@@ -3,7 +3,7 @@
 // Geometry is cached per (def hash, palette) so many instances share one BufferGeometry.
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
-import { kitArgs, type KitArgs, type KitShape } from '@sim/generators';
+import { kitArgs, kitWhen, type KitArgs, type KitShape } from '@sim/generators';
 import { registerMesh, type MeshCtx } from './registry.ts';
 
 const cache = new Map<string, THREE.Object3D>();
@@ -81,12 +81,17 @@ function merge(geos: THREE.BufferGeometry[]): THREE.BufferGeometry {
 /** Material class of a shape: shapes of one class merge into one draw. */
 const classOf = (sh: KitShape) => (sh.material === 'glass' ? 'glass' : sh.material === 'water' ? 'water' : sh.glow ? 'glow' : 'solid');
 
-export function buildKit(args: KitArgs, ctx: Pick<MeshCtx, 'materials' | 'tint'>): THREE.Group {
+/** VOCAB-MECH: which `when` shapes are on for these params/state (a cache key part; '' when the kit has none). */
+export function kitWhenKey(args: KitArgs, params: Record<string, unknown> = {}, state?: Record<string, unknown>): string {
+  return args.shapes.some((s) => s.when) ? args.shapes.map((s) => (s.when ? (kitWhen(s.when, params, state ?? {}) ? '1' : '0') : '')).join('') : '';
+}
+export function buildKit(args: KitArgs, ctx: Pick<MeshCtx, 'materials' | 'tint'> & { params?: Record<string, unknown>; state?: Record<string, unknown> }): THREE.Group {
   const root = new THREE.Group();
   const byClass = new Map<string, THREE.BufferGeometry[]>();
   const byRole = new Map<string, KitShape[]>();
   const color = new THREE.Color();
   for (const sh of args.shapes) {
+    if (sh.when && !kitWhen(sh.when, ctx.params ?? {}, ctx.state ?? {})) continue;
     if (sh.role) { const list = byRole.get(sh.role) ?? []; list.push(sh); byRole.set(sh.role, list); continue; }
     color.set(ctx.tint(sh.tint, sh.color ?? ctx.materials.colorOf(sh.material)));
     const k = classOf(sh); const list = byClass.get(k) ?? []; list.push(placed(sh, args.round, color)); byClass.set(k, list);
@@ -110,12 +115,12 @@ registerMesh({
   gen: 'kit/2',
   build(ctx) {
     const parsed = kitArgs.safeParse(ctx.args); if (!parsed.success) return null;
-    const key = ctx.def.hash + ':' + JSON.stringify(Object.fromEntries(Object.entries(ctx.params).filter(([, v]) => typeof v === 'string' && /^#/.test(v))));
+    const key = ctx.def.hash + ':' + JSON.stringify(Object.fromEntries(Object.entries(ctx.params).filter(([, v]) => typeof v === 'string' && /^#/.test(v)))) + ':' + kitWhenKey(parsed.data, ctx.params, ctx.entity.state);
     let proto = cache.get(key);
-    if (!proto) { proto = buildKit(parsed.data, ctx); cache.set(key, proto); }
+    if (!proto) { proto = buildKit(parsed.data, { ...ctx, state: ctx.entity.state ?? {} }); cache.set(key, proto); }
     // clone shares geometry and materials; pivots are cloned so each instance animates on its own
     const obj = proto.clone(true); obj.userData = { ...proto.userData };
     return obj;
   },
-  instanceKey(ctx) { return ctx.def.hash + ':' + JSON.stringify(Object.fromEntries(Object.entries(ctx.params).filter(([, v]) => typeof v === 'string' && /^#/.test(v)))); },
+  instanceKey(ctx) { const a = kitArgs.safeParse(ctx.args); return ctx.def.hash + ':' + JSON.stringify(Object.fromEntries(Object.entries(ctx.params).filter(([, v]) => typeof v === 'string' && /^#/.test(v)))) + (a.success ? ':' + kitWhenKey(a.data, ctx.params, ctx.entity.state) : ''); },
 });

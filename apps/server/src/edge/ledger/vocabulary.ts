@@ -52,6 +52,8 @@ const SYNONYMS: Record<string, string[]> = {
   stage: ['deck', 'bandstand'], gazebo: ['bandstand', 'pavilion'], bandstand: ['gazebo'], garden: ['gardens'], gardens: ['garden'],
   dinner: ['dining'], food: ['dining', 'kitchen'], eat: ['dining', 'kitchen'], cafe: ['tea', 'café'], tea: ['café'], playground: ['playground'],
 };
+/** VOCAB-MECH: everyday words for god things' actuator actions (only used when such an action is offered). */
+const ACT_ALIASES: Record<string, string> = {'turn-on': 'switch-on', 'turn-off': 'switch-off', shut: 'close', 'shut-off': 'switch-off', extinguish: 'put-out', 'blow-out': 'put-out', ignite: 'light', kindle: 'light', 'light-up': 'light', 'fill-up': 'fill', drain: 'empty'};
 export const tokens = (s: string) => s.toLowerCase().replace(/\[[^\]]*\]/g, ' ').split(/[^a-z0-9]+/).filter(t => t && !STOP.has(t));
 const norm = (s: string) => tokens(s).join(' ');
 // A word names a token when equal, or one is the other with a short ending (garden/gardens, librar-/library); CN5: never a
@@ -170,7 +172,14 @@ export function resolveCapability(input: string, ctx: VocabContext): VocabResult
     const pick = (named.length ? named : rides).sort((a, b) => Number(b.available) - Number(a.available) || a.id.localeCompare(b.id))[0];
     if (pick) return {kind: 'alias', cap: pick, note: `${input} is ${pick.id} (${pick.label}).`};
   }
-  const verbs = new Set(ctx.caps.map(c => c.verb)); let {verb, rest} = parseCapability(input, verbs);
+  const verbs = new Set(ctx.caps.map(c => c.verb));
+  // VOCAB-MECH: a god-built thing's actuator actions (object caps on `e_…` entities) answer to their own names as verbs:
+  // "open the blue door", "put out the fire", "switch off the lamp" (+ everyday aliases). Other objects are unchanged.
+  const acts = ctx.caps.filter(c => c.verb === 'object' && c.action && /^e_/.test(c.object ?? ''));
+  for (const c of acts) verbs.add(c.action!);
+  for (const [k, v] of Object.entries(ACT_ALIASES)) if (verbs.has(v) && !verbs.has(k)) verbs.add(k);
+  let {verb, rest} = parseCapability(input, verbs);
+  if (ACT_ALIASES[verb] && !ctx.caps.some(c => c.verb === verb)) verb = ACT_ALIASES[verb];
   // A real fire is a qualifier of the existing fire request, not a new seat name.
   // Keep explicit/named IDs intact and require an offered actual fire before dropping it.
   const realFire = colon < 0 && ['sit', 'warm-by-fire'].includes(verb) ? /^(?:by|near|beside)\s+(?:a|the)\s+real\s+(fire|campfire)[.!]?$/i.exec(rest) : null;
@@ -178,7 +187,7 @@ export function resolveCapability(input: string, ctx: VocabContext): VocabResult
   // "stroll" with nothing named is a stroll right here.
   if (verb === 'stroll' && !tokens(rest).length && !ctx.caps.some(c => c.id === 'stroll:here')) {const w = ctx.caps.find(c => c.id === 'wander:here'); if (w) return {kind: 'alias', cap: w, note: `${input} is ${w.id}.`};}
   if (verb === 'stroll' && !verbs.has('stroll') && verbs.has('wander')) verb = 'wander';
-  const pool = ctx.caps.filter(c => c.verb === verb);
+  const pool = ctx.caps.filter(c => c.verb === verb || (c.verb === 'object' && c.action === verb && /^e_/.test(c.object ?? '')));
   const info = new Map(pool.map(c => {const t = ctx.target(c), own = [c.target?.id ?? '', c.id.slice(c.id.indexOf(':') + 1), c.label, ...t.names].filter(Boolean); return [c.id, {t, own, ownTokens: own.flatMap(tokens)}];}));
   const unknown = (reason: string, prefer: EdgeCapability[] = []) => ({kind: 'unknown' as const, reason, didYouMean: suggest(input, verb, rest, ctx, prefer)});
   const dme = (c: EdgeCapability) => dist(info.get(c.id)?.t.at ?? null, ctx.me);

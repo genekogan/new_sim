@@ -512,7 +512,8 @@ export function mountAssetRoutes(app: Hono, d: AssetDeps): AssetStore {
   const store = d.store ?? (d.god as { assets?: AssetStore }).assets ?? new AssetStore({ dir: d.dir ?? defaultAssetDir(), db: d.god.db, worldId: d.god.opts.worldId });
   d.god.model.assets = store.lookup;
   const budget = (): Budget => ({ ...DEFAULT_BUDGET, ...d.god.model.constants.limits.budget });
-  const library = () => [...new Set(d.god.model.defs.values())] as StoredDef[];
+  // a def that extends another (a preset of a generator: corner-shop of shop) is listed as it resolves (its make, slots, params)
+  const library = () => [...new Set(d.god.model.defs.values())].map((x) => (x.extends ? d.god.model.resolvedDef(x.ref) ?? x : x)) as StoredDef[];
   const findDef = (ref: string): StoredDef | undefined => d.god.model.resolvedDef(ref) ?? d.god.model.def(ref.replace(/^core\//, 'core-'));
 
   app.get('/assets/:file{[0-9a-f]{64}\\.(glb|png|jpg|json)}', (c) => {

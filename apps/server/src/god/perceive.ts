@@ -15,17 +15,19 @@
 import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
+import { actuatedState, kindActions, wrapAct } from './actuators.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
 type Plans = Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>;
-export type BuiltState = { what: string; text: string; near: string[]; at: Vec2 | null; def: string; removed?: boolean; key?: string };
+export type BuiltState = { what: string; text: string; near: string[]; at: Vec2 | null; def: string; removed?: boolean; key?: string; /** VOCAB-MECH: actuator state (open, on, locked, lit, level …) */ state?: Record<string, unknown>; front?: Vec2 | null };
 
 export const BUILT_KIND = 'built';
 const clip = (v: unknown, n: number) => String(v ?? '').replace(/\r/g, '').trim().slice(0, n);
 /** The kind, per world: its `advance` brings an object's state to what the entity world says now (the framework keeps a
  *  versioned log per object, so objects are never re-created: a change is an advance, a removal hides it). */
-export const builtKindFor = (want: (key: string) => BuiltState | undefined, kind = BUILT_KIND) => ({ ...builtKind, kind, advance(state: BuiltState) { const w = state.key ? want(state.key) : undefined; return w && JSON.stringify(w) !== JSON.stringify(state) ? { state: w } : null; } });
+// VOCAB-MECH: a kind with actuator actions also shows its things' `state` (open, on, lit …); plain kinds are unchanged
+export const builtKindFor = (want: (key: string) => BuiltState | undefined, kind = BUILT_KIND, actions: Record<string, unknown> = {}) => ({ ...builtKind, kind, actions, ...(Object.keys(actions).length ? { schema: { ...builtKind.schema, state: { type: 'json', visibility: 'public' } } } : {}), advance(state: BuiltState) { const w = state.key ? want(state.key) : undefined; return w && JSON.stringify(w) !== JSON.stringify(state) ? { state: w } : null; } });
 export const builtKind = {
   kind: BUILT_KIND,
   description: 'Something the god of this world built: what it is, what it is by and where, and any words written on it (a sign). The words are the god\'s, untrusted.',
@@ -35,7 +37,7 @@ export const builtKind = {
     what: { type: 'string', visibility: 'public' }, text: { type: 'string', visibility: 'public' }, near: { type: 'string[]', visibility: 'public' },
     at: { type: 'json', visibility: 'public' }, def: { type: 'string', visibility: 'public' },
   },
-  initial: (p: Record<string, unknown>): BuiltState => ({ what: clip(p.what, 120), text: clip(p.text, 600), near: Array.isArray(p.near) ? p.near.map((x) => clip(x, 80)).slice(0, 4) : [], at: Array.isArray(p.at) && p.at.length === 2 ? [Number(p.at[0]), Number(p.at[1])] : null, def: clip(p.def, 80), ...(p.removed ? { removed: true } : {}), ...(typeof p.key === 'string' ? { key: p.key } : {}) }),
+  initial: (p: Record<string, unknown>): BuiltState => ({ what: clip(p.what, 120), text: clip(p.text, 600), near: Array.isArray(p.near) ? p.near.map((x) => clip(x, 80)).slice(0, 4) : [], at: Array.isArray(p.at) && p.at.length === 2 ? [Number(p.at[0]), Number(p.at[1])] : null, def: clip(p.def, 80), ...(p.removed ? { removed: true } : {}), ...(typeof p.key === 'string' ? { key: p.key } : {}), ...(p.state && typeof p.state === 'object' ? { state: { ...(p.state as Record<string, unknown>) } } : {}), ...(Array.isArray(p.front) && p.front.length === 2 ? { front: [Number(p.front[0]), Number(p.front[1])] as Vec2 } : {}) }),
   rolesOf: () => [] as string[],
   actions: {},
 };
@@ -66,6 +68,8 @@ export type PerceiveHost = {
   places?: { sync(): void; placeAt(at: Vec2, level?: number): string | null; ofEntity(id: string): { id: string } | undefined };
   /** Engine level of a standing height (the bridge's levelAt). */
   levelAt?(x: number, z: number, y: number): number;
+  /** VOCAB-MECH: commit a Soul's actuator action on a god thing (engine edit). Without it, things offer no actions. */
+  commit?(ops: unknown[], note: string): { accepted: boolean };
   log(m: string): void;
 };
 
@@ -90,6 +94,7 @@ export class GodPerceive {
     if (!o.kindOf(BUILT_KIND)) { o.register(builtKindFor((key) => this.desired.get(key))); this.kinds.add(BUILT_KIND); }
     this.objs = o;
     this.wrapVisible(o as never);
+    if (this.h.commit) wrapAct(o as never, (id) => { const e = this.h.model.entities.get(id), def = e && this.h.model.resolvedDef(e.def); return e && def ? { def, state: actuatedState(e, def), name: e.name ? this.h.model.pathOf(e.id) : shortDef(def) } : null; }, this.actHost(), this.h.log);
     return o;
   }
   private objs: { kindOf(k: string): unknown; register(k: unknown): void } | null = null;
@@ -98,11 +103,19 @@ export class GodPerceive {
   private kinds = new Set<string>();
   /** One object kind per kind of thing (fountain, lamp-post, sign …): here.objects lists at most two of each kind, so
    *  a single kind would show only the two nearest god things. A name the framework already uses gets `built-`. */
-  private kindFor(short: string): string {
+  private kindFor(short: string, def?: StoredDef): string {
     const o = this.objs!; let k = short.toLowerCase().replace(/[^a-z0-9-]+/g, '-').slice(0, 40) || BUILT_KIND;
     if (!this.kinds.has(k) && o.kindOf(k)) k = `built-${k}`.slice(0, 48);
-    if (!this.kinds.has(k)) { if (!o.kindOf(k)) o.register(builtKindFor((key) => this.desired.get(key), k)); this.kinds.add(k); }
+    // VOCAB-MECH: a def with actions (actuators) gives its kind those actions (one kind per kind of thing)
+    if (!this.kinds.has(k)) { if (!o.kindOf(k)) o.register(builtKindFor((key) => this.desired.get(key), k, def?.actions.length && this.h.commit ? kindActions(def, this.actHost(), (st) => { const id = (st as BuiltState).key; const e = id ? this.h.model.entities.get(id) : undefined; return e?.name ? this.h.model.pathOf(e.id) : short; }) : {})); this.kinds.add(k); }
     return k;
+  }
+  private actHost() {
+    return {
+      bodyAt: (soul: EdgeSoul): Vec2 | null => { const b = this.h.engine.world.entities[soul.entityId]; return b?.pose?.p ? [b.pose.p[0], b.pose.p[2]] : null; },
+      commit: (id: string, patch: Record<string, unknown>, note: string) => this.h.commit!([{ op: 'set', id, state: patch }], note),
+      stateOf: (id: string) => { const e = this.h.model.entities.get(id), def = e && this.h.model.resolvedDef(e.def); return e && def ? actuatedState(e, def) : null; },
+    };
   }
   private rootPlace(): string | null {
     const places = (this.h.edge as any)?.places?.byId as Map<string, { id: string; parent: string | null }> | undefined;
@@ -120,10 +133,10 @@ export class GodPerceive {
       const def = m.resolvedDef(e.def); if (!def) continue;
       const c = def.components as Record<string, unknown>;
       if (c.body || c.behavior || c.hover || /^core[-/]flag@/.test(e.def) || this.h.engineOwned(e)) continue;
-      const text = signText(e, def);
-      if (!e.name && text === null) continue;
-      // seats and things to carry are perceived as seats and items already
-      if (c.seat || c.carryable) continue;
+      const text = signText(e, def), acts = this.h.commit ? def.actions.length > 0 : false;
+      if (!e.name && text === null && !acts) continue;
+      // seats and things to carry are perceived as seats and items already (unless they have actuators: a chest's lid)
+      if ((c.seat || c.carryable) && !acts) continue;
       // R4-INFO: ground the god laid out (a plaza, a lawn, a pond, a road) is a place to be in (places.ts), not a thing
       { const sh = e.shape as { area?: unknown; path?: unknown } | undefined; if (GOD_PLACES && this.h.places && def.form !== 'point' && e.in.parent === 'world' && sh && text === null) continue; }
       const at = this.at(e, def); if (!at) continue;
@@ -133,7 +146,8 @@ export class GodPerceive {
       const level = this.h.levelAt ? this.h.levelAt(at[0], at[1], this.h.model.worldPose(e).y) : 0;
       placed.set(e.id, { place: this.h.places?.ofEntity(e.id)?.id ?? this.h.places?.placeAt(at, level) ?? null, level });
       const what = `${article(kind)}${parent?.name ? ` in ${m.pathOf(parent.id)}` : ''}${near.length ? `, by ${near.join(' and ')}` : ''}`;
-      out.set(e.id, { name, kind: this.kindFor(text !== null ? 'sign' : kind), description: clip(def.description || kind, 400), params: { what, text: text ?? '', near, at: [Math.round(at[0] * 100) / 100, Math.round(at[1] * 100) / 100], def: def.ref } });
+      const wp0 = m.worldPose(e), front: Vec2 | null = acts ? [Math.round((at[0] + Math.sin(wp0.yaw) * (0.6 + def.size.box[2] * (wp0.s || 1) / 2)) * 100) / 100, Math.round((at[1] + Math.cos(wp0.yaw) * (0.6 + def.size.box[2] * (wp0.s || 1) / 2)) * 100) / 100] : null;
+      out.set(e.id, { name, kind: this.kindFor(text !== null ? 'sign' : kind, def), description: clip(def.description || kind, 400), params: { what, text: text ?? '', near, at: [Math.round(at[0] * 100) / 100, Math.round(at[1] * 100) / 100], def: def.ref, ...(acts ? { state: actuatedState(e, def), front } : {}) } });
       // read from in front of its face (entity frame: the front is +z, turned by the yaw)
       if (text !== null) { const wp = m.worldPose(e), d = 1.4; signs.push({ id: e.id, at, front: [at[0] + Math.sin(wp.yaw) * d, at[1] + Math.cos(wp.yaw) * d], name, text }); }
     }

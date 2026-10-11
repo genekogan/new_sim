@@ -5,6 +5,7 @@ import type * as THREE from 'three';
 import type { Baked, Value } from '@sim/generators';
 import type { Entity, StoredDef, WorldModel } from '@sim/world-compiler';
 import type { MaterialLib } from './materials.ts';
+import { applyLook, lookKey } from './vocab-look.ts';
 
 export type MeshCtx = {
   def: StoredDef;
@@ -35,8 +36,21 @@ const builders = new Map<string, MeshBuilder>();
 export function registerMesh(b: MeshBuilder) { builders.set(b.gen, b); }
 export function meshFor(def: StoredDef): MeshBuilder | undefined {
   // tag builders (creature, flag, sign-text) draw generated shapes; a stored model is always drawn by `mesh`
-  if (def.make.kind !== 'mesh') for (const t of def.tags) { const byTag = builders.get(`tag:${t}`); if (byTag) return byTag; }
-  return def.make.kind === 'gen' ? builders.get(def.make.gen) : def.make.kind === 'mesh' ? builders.get('mesh') : undefined;
+  if (def.make.kind !== 'mesh') for (const t of def.tags) { const byTag = builders.get(`tag:${t}`); if (byTag) return looked(byTag); }
+  const b = def.make.kind === 'gen' ? builders.get(def.make.gen) : def.make.kind === 'mesh' ? builders.get('mesh') : undefined;
+  return b && looked(b);
+}
+/** VOCAB-MECH: every builder gets the catalogue's look conventions (stretch, warp, paint, wear, state roles; vocab-look.ts).
+ *  An instance with a look is never merged into the plain instances' InstancedMesh. */
+const wrapped = new WeakMap<MeshBuilder, MeshBuilder>();
+function looked(b: MeshBuilder): MeshBuilder {
+  if (b.world) return b;
+  let w = wrapped.get(b);
+  if (!w) {
+    w = { ...b, build: (ctx) => applyLook(b.build(ctx), ctx), instanceKey: b.instanceKey ? (ctx) => (lookKey(ctx) ? null : b.instanceKey!(ctx)) : undefined };
+    wrapped.set(b, w);
+  }
+  return w;
 }
 export function registeredMeshes() { return [...builders.keys()].sort(); }
 

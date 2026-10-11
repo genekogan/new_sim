@@ -6,7 +6,7 @@
 // them gets an inferred category (inferCategory) so the 391 defs that predate the catalogue are findable by facet.
 import taxonomyJson from './taxonomy.json' with { type: 'json' };
 import type { DefInput, Action } from '../schemas.ts';
-import type { FieldInput } from '@sim/generators';
+import type { Baked, FieldInput } from '@sim/generators';
 
 // ------------------------------------------------------------------ taxonomy
 
@@ -327,4 +327,25 @@ export function lintDef(d: VocabDef, o: { tris?: number; requireCategory?: boole
   if (tris > budget) errors.push(`${tris} triangles over the ${cat} budget ${budget}`);
   if (!(d.synonyms?.length) && d.category) warnings.push('no synonyms: add the words people use for it (bodega, corner shop …)');
   return { name: d.name, errors, warnings };
+}
+
+// ------------------------------------------------------------------ physics of the conventions
+
+/** Stretch factors of an instance (1 when the def does not declare them). */
+export function stretchOf(defParams: Record<string, { default?: unknown }> | undefined, params: Record<string, unknown>): [number, number, number] {
+  return STRETCH.map((k) => { if (!defParams?.[k]) return 1; const v = Number(params[k] ?? defParams[k].default ?? 1); return Number.isFinite(v) && v > 0 ? v : 1; }) as [number, number, number];
+}
+/** Physics under a per-axis stretch: the box, wall colliders, slots, floors, openings and links scale with the picture. */
+export function stretchBaked(b: Baked, [sx, sy, sz]: [number, number, number]): Baked {
+  if (sx === 1 && sy === 1 && sz === 1) return b;
+  const p2 = (p: [number, number]): [number, number] => [p[0] * sx, p[1] * sz];
+  return {
+    ...b, box: [b.box[0] * sx, b.box[1] * sy, b.box[2] * sz],
+    colliders: b.colliders.map((c) => ({ ...c, c: p2(c.c), half: [c.half[0] * sx, c.half[1] * sz], ...(c.abs ? {} : { y0: c.y0 * sy, y1: c.y1 * sy }) })),
+    slots: b.slots.map((s) => ({ ...s, p: [s.p[0] * sx, s.p[1] * sy, s.p[2] * sz], ...(s.height !== undefined ? { height: s.height * sy } : {}), ...(s.polygon ? { polygon: s.polygon.map(p2) } : {}) })),
+    ...(b.surfaces ? { surfaces: b.surfaces.map((f) => ({ ...f, y: f.abs ? f.y : f.y * sy, polygon: f.polygon.map(p2) })) } : {}),
+    ...(b.openings ? { openings: b.openings.map((o) => ({ ...o, at: p2(o.at), width: o.width * (Math.abs(Math.sin(o.yaw)) > 0.7 ? sz : sx), height: o.height * sy, ...(o.sill !== undefined ? { sill: o.sill * sy } : {}) })) } : {}),
+    ...(b.links ? { links: b.links.map((l) => ({ ...l, path: l.path.map(p2), y0: l.y0 * sy, y1: l.y1 * sy })) } : {}),
+    ...(b.rooms ? { rooms: b.rooms.map((r) => ({ ...r, polygon: r.polygon.map(p2), origin: p2(r.origin), y: r.y * sy, height: r.height * sy })) } : {}),
+  };
 }

@@ -46,9 +46,10 @@ test('faceted search: category subtree, has=slot:sit, actuators; synonyms and ca
   assert.ok(furn.data.defs.every((r: { cat: string }) => r.cat.startsWith('furniture')));
   const lamp = await get('/v1/god/defs?q=streetlight');
   assert.equal(lamp.data.defs[0].name, 'core-lamp-post');
-  // a word that names a category finds what is in it ("bodega" → building.commercial → the shop)
+  // a synonym finds its def first ("bodega" → corner-shop); a word that names a category also finds what is in it (the shop)
   const bodega = await get('/v1/god/defs?q=bodega');
-  assert.equal(bodega.data.defs[0]?.name, 'core-shop', JSON.stringify(bodega.data.defs.slice(0, 3).map((d: { name: string; why: string[] }) => [d.name, d.why])));
+  assert.equal(bodega.data.defs[0]?.name, 'core-corner-shop', JSON.stringify(bodega.data.defs.slice(0, 3).map((d: { name: string; why: string[] }) => [d.name, d.why])));
+  assert.equal(bodega.data.defs[1]?.name, 'core-shop', JSON.stringify(bodega.data.defs.slice(0, 3).map((d: { name: string; why: string[] }) => [d.name, d.why])));
 });
 
 test('catalog manifest: one line per def, paged, ETag 304; taxonomy lists empty categories; recommend', async () => {
@@ -68,6 +69,34 @@ test('catalog manifest: one line per def, paged, ETag 304; taxonomy lists empty 
   const rec = await get('/v1/god/recommend?intent=' + encodeURIComponent('a corner shop with a bench outside and a street lamp'));
   const fors = rec.data.needs.map((x: { for: string }) => x.for);
   assert.ok(fors.includes('corner shop'), JSON.stringify(rec.data.needs));
-  assert.equal(rec.data.needs.find((x: { for: string }) => x.for === 'corner shop').picks[0].ref, 'core/shop@1');
+  assert.equal(rec.data.needs.find((x: { for: string }) => x.for === 'corner shop').picks[0].ref, 'core/corner-shop@1');
   assert.ok(rec.data.example.ops.length >= 3);
+});
+
+test('actuators: a door preset declares open/close/lock/unlock on state; `has=actuator:door` finds it; the patch logic', async () => {
+  const { get, god } = fixture();
+  const doors = await get('/v1/god/defs?has=actuator:door&compact=1');
+  const refs = doors.data.defs.map((r: { ref: string }) => r.ref);
+  assert.ok(refs.includes('core/door@1') && refs.includes('core/phone-box@1'), refs.join(' '));
+  const { thenPatch, whenRefusal, actuatedState } = await import('./actuators.ts');
+  const door = god.model.resolvedDef('core/door@1')!;
+  const by = (n: string) => door.actions.find((a) => a.name === n)!;
+  assert.deepEqual(door.actions.map((a) => a.name), ['open', 'close', 'lock', 'unlock']);
+  assert.equal(whenRefusal(by('open'), { open: false, locked: true }, 'the door')?.reason, 'the door is locked.');
+  assert.equal(whenRefusal(by('lock'), { open: true, locked: false }, 'the door')?.reason, 'the door is already open.');
+  assert.equal(whenRefusal(by('open'), { open: false, locked: false }, 'the door'), null);
+  assert.deepEqual(thenPatch(by('open'), { open: false }), { open: true });
+  const r = god.act({ ops: [{ op: 'place', def: 'core/door@1', name: 'd1', p: [0, 0] }] }); assert.equal(r.accepted, true);
+  assert.deepEqual(actuatedState(god.model.entities.get((r as { ids: Record<string, string> }).ids.d1 ?? [...god.model.entities.values()][0].id)!, door), { open: false, locked: false });
+});
+
+test('conventions: a stretched def bakes stretched physics; lint passes for every catalogue type', () => {
+  const { god } = fixture();
+  const cone = god.model.resolvedDef('core/traffic-cone@1')!;
+  const plain = god.model.bake(cone, {}, 0), tall = god.model.bake(cone, { sy: 1.5, sx: 0.8 }, 0);
+  assert.ok(Math.abs(tall.box[1] - plain.box[1] * 1.5) < 1e-9 && Math.abs(tall.box[0] - plain.box[0] * 0.8) < 1e-9);
+  for (const d of new Set(god.model.defs.values())) if (d.category) assert.deepEqual(vocab.lintDef(d as never).errors, [], d.name);
+  // out of range is refused by the compiler with the range
+  const bad = god.act({ ops: [{ op: 'place', def: 'core/traffic-cone@1', p: [3, 3], params: { sy: 3 } }] });
+  assert.equal(bad.accepted, false); assert.match(JSON.stringify(bad), /params\.invalid/);
 });
