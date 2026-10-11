@@ -266,8 +266,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const frameEntityWorld=()=>{if(!entityLayer.active||entityWorldFramed)return;entityWorldFramed=true;const q=new URLSearchParams(location.search),eye=q.get('eye')?.split(',').map(Number),at=q.get('at')?.split(',').map(Number);
       if(eye?.length===3&&at?.length===3&&eye.every(Number.isFinite)&&at.every(Number.isFinite)){controls.target.set(at[0],at[1],at[2]);camera.position.set(eye[0],eye[1],eye[2]);}
       else if(entityView.current){controls.target.fromArray(entityView.current.target);camera.position.fromArray(entityView.current.eye);}  // a re-mount (welcome, reconnect) keeps the person's camera
-      else{const w=host.clientWidth,visible=w>=800?(w-392)/w:1;  // the god panel (.gp-card: 380 px + 12 px margin) docks on the right on wide screens
-        const pose=entityArrivalPose(entityLayer.viewBounds(),entityLayer.entityCount,entityLayer.groundAt,camera.fov,camera.aspect,visible);controls.target.fromArray(pose.target);camera.position.fromArray(pose.eye);}
+      else{  // the orbit target is the centre of the screen and of what was built: no panel-dependent shift (Gene: off-centre pivot on small screens)
+        const pose=entityArrivalPose(entityLayer.viewBounds(),entityLayer.entityCount,entityLayer.groundAt,camera.fov,camera.aspect,1);controls.target.fromArray(pose.target);camera.position.fromArray(pose.eye);}
       camera.lookAt(controls.target);context.current.setCameraMode('manual');};
     // ?shot=1: a clean picture for `god look` (canvas over every overlay, camera from eye/at, title 'ready' once drawn).
     const shotMode=new URLSearchParams(location.search).has('shot');
@@ -765,7 +765,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(cameraGround.apply(camera,scene)>0&&!(viewing==='manual'&&context.current.manualNavigation==='free'))camera.lookAt(controls.target);  // never underground (Gene)
       if(context.current.cameraMode==='manual'&&expansion?.group.visible)constrainOfficeGuardCamera(camera,controls.target,officeGuardFrom,expansion.officeGuards);
       authoredBoundaries.bind(publication);if(context.current.cameraMode==='manual')authoredBoundaries.constrain(camera,controls.target,officeGuardFrom,at.tick);
-      composeVisibleViewport(camera, host.clientWidth, host.clientHeight, context.current.viewportInsets, logicalFov);
+      composeVisibleViewport(camera, host.clientWidth, host.clientHeight, entityLayer.active ? undefined : context.current.viewportInsets, logicalFov);  // new worlds: a centred projection (no inset view offset: it skews the view and moves the pivot off the screen centre)
       if(fadeOverride.size&&!past.current){const states=new Map<string,FadingState>(),now=performance.now();
         for(const soul of s.conn.replica.souls.values()){const v=fadeOverride.get(soul.name.toLowerCase());if(!v)continue;if(!fadeSince.has(soul.id))fadeSince.set(soul.id,now);
           states.set(soul.id,v==='beam'?{idleMinutes:60,beamedAt:fadeSince.get(soul.id)}:v==='reclaim'?{idleMinutes:0,reclaimedAt:fadeSince.get(soul.id)}:{idleMinutes:Number(v)||0});}
