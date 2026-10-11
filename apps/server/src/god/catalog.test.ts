@@ -45,7 +45,9 @@ test('faceted search: category subtree, has=slot:sit, actuators; synonyms and ca
   const furn = await get('/v1/god/defs?category=furniture&compact=1&limit=500');
   assert.ok(furn.data.defs.every((r: { cat: string }) => r.cat.startsWith('furniture')));
   const lamp = await get('/v1/god/defs?q=streetlight');
-  assert.equal(lamp.data.defs[0].name, 'core-lamp-post');
+  // VOCAB-W2: a def named streetlight exists now and wins; the lamp post (synonym "streetlight") still comes up
+  assert.equal(lamp.data.defs[0].name, 'core-streetlight');
+  assert.ok(lamp.data.defs.some((r: { name: string }) => r.name === 'core-lamp-post'));
   // a synonym finds its def first ("bodega" → corner-shop); a word that names a category also finds what is in it (the shop)
   const bodega = await get('/v1/god/defs?q=bodega');
   assert.equal(bodega.data.defs[0]?.name, 'core-corner-shop', JSON.stringify(bodega.data.defs.slice(0, 3).map((d: { name: string; why: string[] }) => [d.name, d.why])));
@@ -65,7 +67,7 @@ test('catalog manifest: one line per def, paged, ETag 304; taxonomy lists empty 
   assert.equal(again.status, 304);
   const tax = await get('/v1/god/catalog/taxonomy');
   const empty = tax.data.categories.filter((c: { count: number }) => !c.count).map((c: { id: string }) => c.id);
-  assert.ok(empty.includes('layer.sound'));
+  assert.ok(empty.includes('layer.economy') && !empty.includes('layer.sound'), empty.join(' '));
   const rec = await get('/v1/god/recommend?intent=' + encodeURIComponent('a corner shop with a bench outside and a street lamp'));
   const fors = rec.data.needs.map((x: { for: string }) => x.for);
   assert.ok(fors.includes('corner shop'), JSON.stringify(rec.data.needs));

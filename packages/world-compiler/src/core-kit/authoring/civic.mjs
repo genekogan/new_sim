@@ -12,7 +12,7 @@ export default [
     [lathe([0, 0, 0], [[1.95, 0], [2.05, 0.1], [2.05, 0.55], [1.8, 0.6], [1.8, 0.2], [0, 0.2]], 'stone', { seg: 12, collide: true }), cyl([0, 0.5, 0], 1.8, 0.04, 'water', { seg: 12, material: 'water' }),
       cyl([0, 1.0, 0], 0.22, 1.0, 'stone2', { r2: 0.16, seg: 8 }), lathe([0, 1.35, 0], [[0, 0], [0.85, 0.3], [0.8, 0.35], [0, 0.18]], 'stone', { seg: 10 }), cyl([0, 1.66, 0], 0.7, 0.03, 'water', { seg: 10, material: 'water' }),
       cyl([0, 1.9, 0], 0.08, 0.5, 'stone2', { seg: 6 }), sph([0, 2.2, 0], 0.16, 'stone', { seg: 5 })],
-    { stone: STONE, stone2: STONE2, water: WATER }, { components: { water: { level: 0.5 } }, slots: ring(6, 2.25, (x, z, i) => stand(`edge-${i + 1}`, [x, 0, z], Math.atan2(-x, -z))) }),
+    { stone: STONE, stone2: STONE2, water: WATER }, { components: { water: { level: 0.5 }, sound: { kind: 'water', radius: 14, volume: 0.5, mode: 'loop' } }, slots: ring(6, 2.25, (x, z, i) => stand(`edge-${i + 1}`, [x, 0, z], Math.atan2(-x, -z))) }),
   civ('well', 'A stone well with a wooden roof, a winch and a bucket; draw water here.', ['well', 'water', 'village', 'prop'],
     [lathe([0, 0, 0], [[0.75, 0], [0.8, 0.05], [0.8, 0.8], [0.62, 0.85], [0.62, 0.1], [0, 0.1]], 'stone', { seg: 12, collide: true }), cyl([0, 0.5, 0], 0.62, 0.02, 'water', { seg: 10, material: 'water' }),
       cbox([-0.72, 1.3, 0], [0.1, 1.9, 0.1], 'wood'), cbox([0.72, 1.3, 0], [0.1, 1.9, 0.1], 'wood'), cyl([0, 1.55, 0], 0.07, 1.4, 'wood', { roll: Math.PI / 2, seg: 6 }),

@@ -72,7 +72,7 @@ const industrialKit = [
       ...withRole('blade', [0, 10.4, 3.0], [sph([0, 10.4, 3.0], 0.35, 'wood', { seg: 6 }), ...[0, 90, 180, 270].flatMap((a) => { const c = Math.cos(a * PI / 180), s = Math.sin(a * PI / 180);
         return [limb([0.4 * c, 10.4 + 0.4 * s, 3.1], [6.4 * c, 10.4 + 6.4 * s, 3.1], 0.08, 'wood', { kind: 'cyl', seg: 4 }), box([3.7 * c - 0.58 * s, 10.4 + 3.7 * s + 0.58 * c, 3.12], a % 180 ? [1.1, 5.2, 0.04] : [5.2, 1.1, 0.04], 'sail')]; })])],
     palette: { paint: C.white, door: C.walnut, window: '#3b4b55', trim: C.oak, cap: '#5a4636', wood: '#6b4a32', sail: '#e2cfa8' },
-    components: { spin: { axis: 'z', rpm: 8, role: 'blade' }, place: { kind: 'mill', enclosed: true, capacity: 2 } }, slots: [stand('door', [0, 0, 3.6], PI)] }),
+    components: { spin: { axis: 'z', rpm: 8, role: 'blade' }, place: { kind: 'mill', enclosed: true, capacity: 2 }, sound: { kind: 'creak', radius: 22, volume: 0.5, when: 'on', mode: 'loop' } }, slots: [stand('door', [0, 0, 3.6], PI)] }),
   vocabDef({ ...IND, name: 'storage-tank', synonyms: ['fuel tank', 'oil tank', 'tank', 'cistern', 'gas holder', 'water tank'],
     description: 'A round steel storage tank (6 m across, 5 m tall) with a shallow cone roof, a stair up the side and a pipe valve; holds oil, water or grain. Fill and empty it. Variants: oil, water.',
     actuators: [['fill', { default: 0.6 }]], label: 'the tank', variants: ['oil', 'water'], ranges: { sx: [0.6, 1.8], sy: [0.5, 1.8], sz: [0.6, 1.8] },
@@ -122,7 +122,7 @@ const railKit = [
         sph([x - 0.12 * d, 1.55, z - 0.15], 0.08, 'lamp', { seg: 5, glow: 1, when: '!@open' }), sph([x - 0.12 * d, 1.55, z + 0.15], 0.08, 'lamp', { seg: 5, glow: 1, when: '!@open' }),
         sph([x - 0.12 * d, 1.55, z - 0.15], 0.08, 'off', { seg: 5, when: '@open' }), sph([x - 0.12 * d, 1.55, z + 0.15], 0.08, 'off', { seg: 5, when: '@open' })]),
       ...withRole('lid', [-4.4, 1.15, -3.5], [box([-4.4, 1.15, -0.4], [0.1, 0.1, 6.2], 'arm'), ...[-2.4, -0.4, 1.6].map((z) => box([-4.4, 1.15, z], [0.11, 0.11, 0.6], 'stripe'))])],
-    palette: { ...railPalette, deck: '#6b5a48', road: '#5a5856', line: C.white, post: '#e8e4dc', lamp: '#ff3a2a', off: '#5a2a26', arm: C.white, stripe: C.red } }),
+    palette: { ...railPalette, deck: '#6b5a48', road: '#5a5856', line: C.white, post: '#e8e4dc', lamp: '#ff3a2a', off: '#5a2a26', arm: C.white, stripe: C.red } , components: { sound: { kind: 'bell', radius: 30, volume: 0.6, when: '!open', mode: 'change' } } }),
   vocabDef({ ...RAIL, name: 'station-platform', synonyms: ['railway platform', 'train platform', 'platform', 'station', 'halt', 'railway station'],
     description: 'A railway station platform (3.5 × 14 m, 0.4 m high) beside a track on its −x side, with a yellow safety edge, a canopy on posts, a bench, a lamp and a name board; passengers wait, sit and board here.',
     ranges: { sx: [0.7, 1.6], sy: [0.8, 1.3], sz: [0.5, 2] },
