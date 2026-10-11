@@ -12,7 +12,7 @@
 //   (Chrome lease, real GPU): a stranger's Join section, ben's line for his agent, his agent joins, the god's Souls tab.
 //
 //   node tools/god-skill/e2e/join.mjs [--mode clerk|dev] [--base /worlds] [--port 5225] [--range 5226-5229] [--keep] [--no-shots]
-//        [--soul-cli <eden-agent.mjs>] [--soul-skill <SKILL.md>]   (default: the frozen published 5e478f8a copies)
+//        [--soul-cli <eden-agent.mjs>] [--soul-skill <SKILL.md>]   (default: the launcher's pinned 1.9 copies, tools/world-launcher/soul/)
 //
 // Report under .lane/e2e-join/<stamp>-<mode>/ (report.json, REPORT.md, PNGs). $0: edge minds, fake brain.
 import { execFile, spawn } from 'node:child_process';
@@ -28,9 +28,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../../..');
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
 const MODE = args.mode === 'dev' ? 'dev' : 'clerk';
-const PUBLISHED = '<team>/previews/20261010-restoration-auth/release-5e478f8a';
-const SOUL_CLI = resolve(typeof args['soul-cli'] === 'string' ? args['soul-cli'] : `${PUBLISHED}/bundle/eden-agent.mjs`);
-const SOUL_SKILL = resolve(typeof args['soul-skill'] === 'string' ? args['soul-skill'] : `${PUBLISHED}/input/tools/edge-skill/SKILL.md`);
+const SOUL_DIR = fileURLToPath(new URL('../../world-launcher/soul/', import.meta.url));
+const SOUL_CLI = resolve(typeof args['soul-cli'] === 'string' ? args['soul-cli'] : `${SOUL_DIR}eden-agent.mjs`);
+const SOUL_SKILL = resolve(typeof args['soul-skill'] === 'string' ? args['soul-skill'] : `${SOUL_DIR}skill.md`);
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 const port = Number(args.port ?? 5225);
 const range = typeof args.range === 'string' ? args.range : '5226-5229';
@@ -144,7 +144,7 @@ if (MODE === 'dev' && !args['no-shots']) try { chromium = createRequire(resolve(
 const ids = {};
 let gaiaDir = '', ana = null;
 try {
-  await step('L0 the published Soul CLI and skill are at hand (frozen 5e478f8a copies)', async () => ({ cli: existsSync(SOUL_CLI), skill: existsSync(SOUL_SKILL), bytes: existsSync(SOUL_CLI) ? readFileSync(SOUL_CLI).length : 0 }), (r) => r.cli && r.skill);
+  await step('L0 the published Soul CLI and skill are at hand (pinned 1.9 copies)', async () => ({ cli: existsSync(SOUL_CLI), skill: existsSync(SOUL_SKILL), bytes: existsSync(SOUL_CLI) ? readFileSync(SOUL_CLI).length : 0 }), (r) => r.cli && r.skill);
   await until('the launcher', async () => (await fetch(`${origin}${BASE}/__sim/worlds.json`)).ok, 60_000);
   const worldName = `Join Party ${stamp.slice(11, 16).replace('-', '')}`;
   await step(`L1 gaia makes a new world (Empty plain)${MODE === 'clerk' ? ', signed in with Clerk: the god at birth' : ''}`, async () => {
@@ -155,9 +155,10 @@ try {
   }, (r) => r.slug && r.you === 'owner' && r.base === `${origin}${BASE}/w/${r.slug}`);
   await step('L2 launcher worlds: edge minds, no invitations, native arrivals; the published Soul CLI and skill served as is', async () => {
     const cfg = (await api('/v1/config')).data, edge = await api('/v1/edge/schema');
-    const cli = await (await fetch(`${base}/eden-agent.mjs`)).text(), soulSkill = await (await fetch(`${base}/skill.md`)).text();
-    return { auth: cfg.authProvider, devAuth: cfg.devAuth, accountApproval: cfg.accountApproval?.contract ?? null, inviteRequired: cfg.inviteRequired, edge: edge.status, cliSame: cli === readFileSync(SOUL_CLI, 'utf8'), skillVersion: soulSkill.match(/version: "([\d.]+)"/)?.[1] };
-  }, (r) => r.inviteRequired === false && r.edge === 200 && r.cliSame && r.skillVersion === '1.9' && (MODE === 'dev' ? r.devAuth === true : r.auth === 'clerk' && r.devAuth === false && r.accountApproval === 'account-soul-approval/1'));
+    const cli = await (await fetch(`${base}/eden-agent.mjs`)).text(), soulSkill = await (await fetch(`${base}/skill.md`)).text(), instr = await (await fetch(`${base}/instructions.md`)).text();
+    return { auth: cfg.authProvider, devAuth: cfg.devAuth, accountApproval: cfg.accountApproval?.contract ?? null, inviteRequired: cfg.inviteRequired, edge: edge.status, cliSame: cli === readFileSync(SOUL_CLI, 'utf8'), skillVersion: soulSkill.match(/version: "([\d.]+)"/)?.[1],
+      skillHere: soulSkill.includes(`This world is **${base}**`) && !/\{\{/.test(soulSkill), instructions: instr.startsWith(`# Create a Soul in ${worldName}`) && instr.includes(`World: ${base}`) && !/\{\{/.test(instr) };
+  }, (r) => r.inviteRequired === false && r.edge === 200 && r.cliSame && r.skillVersion === '1.9' && r.skillHere && r.instructions && (MODE === 'dev' ? r.devAuth === true : r.auth === 'clerk' && r.devAuth === false && r.accountApproval === 'account-soul-approval/1'));
   await step('K1 ONE skill at /SKILL.md: God mode and Soul mode, each alone; Soul mode points at this world\'s CLI copy and Soul skill', async () => {
     skill = await (await fetch(`${base}/SKILL.md`)).text();
     const god = section('God mode'), soul = section('Soul mode');
