@@ -147,7 +147,7 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
         {approvalId && <ApprovalCard id={approvalId} signedIn={signedIn} onDone={() => setApprovalId(null)} />}
         {!status.hasOwner && !owner && (
           <div className="gp-block gp-next">
-            {isNew && <p className="gp-hello">Your new world is ready. Whoever claims it first becomes its god, so sign in and claim it now.</p>}
+            {isNew && status.you !== 'claimant' && <p className="gp-hello">Your new world is ready. Whoever claims it first becomes its god, so sign in and claim it now.</p>}
             {status.you === 'claimant'
               ? <><p>Signed in as <b>{who}</b>. Nobody owns this world yet: claim it, and your agent builds it.</p>
                 <button className="gp-btn gp-primary" data-claim="1" disabled={busy === 'claim'} onClick={claim}>{busy === 'claim' ? 'Claiming…' : 'Become its god'}</button></>
@@ -191,7 +191,7 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
                   {paired
                     ? <><b>Your agent is this world's god.</b><p>Ask it for things: “a cottage by the pond”, “hills to the east”, “undo that”. Friends can join from the Souls tab.</p><p className="gp-dim">Another agent or folder? Give it the same line:</p></>
                     : <><b>Next: give your agent this line</b><p className="gp-dim">Paste it to Claude Code, Codex or any agent you use. It sets itself up and shows a code here: press Approve.</p></>}
-                  <Markdown source={'```\n' + G.godPrompt(status.base) + '\n```'} />
+                  <Markdown source={'```paste-to-your-agent\n' + G.godPrompt(status.base) + '\n```'} />
                 </div>
                 <ol className="gp-steps" data-checklist="1">
                   {checklist.map((s) => <li key={s.id} data-step={s.id} data-done={s.done ? '1' : '0'} className={s.done ? 'done' : ''}><span className="gp-tick" aria-hidden="true">{s.done ? '✓' : ''}</span><span><b>{s.label}</b>{!s.done && <span className="gp-hint">{s.hint}</span>}</span></li>)}
