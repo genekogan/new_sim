@@ -235,7 +235,7 @@ try {
         const page = await ctx.newPage(); page.setDefaultTimeout(PAGE_MS);
         page.errors = []; page.on('pageerror', (e) => page.errors.push(e.message));
         await page.goto(`${base}/?dev=1${hash}`, { waitUntil: 'domcontentloaded', timeout: PAGE_MS });
-        await page.locator('[data-god-panel]').waitFor({ timeout: PAGE_MS });
+        await page.locator('.hud-actions').waitFor({ timeout: PAGE_MS });
         await page.waitForFunction(() => window.__simEntity?.layer?.active === true, null, { timeout: PAGE_MS }).catch(() => {});
         await page.evaluate(() => { const w = window.__simEntity; if (!w) return; w.controls.target.set(-2, 1, 8); w.camera.position.set(-16, 11, 30); w.camera.lookAt(w.controls.target); }).catch(() => {});
         await sleep(3500);
@@ -245,36 +245,33 @@ try {
         if (page.newSoulDialog) { await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'detached' }); }
         return page;
       };
-      await step('P0 a stranger (not signed in) sees the Join section and who lives here', async () => {
+      await step('P0 a stranger (not signed in) on #join gets e8\'s New Soul dialog and no god-panel card (lane UXFIX2)', async () => {
         const page = await open(null, '#join');
-        await page.locator('[data-join]').waitFor({ timeout: 60_000 });
-        const text = await page.locator('[data-god-panel]').innerText();
+        await sleep(2500);
+        const card = await page.locator('[data-god-panel]').count(), text = await page.locator('body').innerText();
         await shot(page, '01-anonymous-join'); await page.context().close();
-        return { join: /Join this world as a Soul/.test(text), hint: /Sign in/.test(text), lists: /Ana/.test(text) };
-      }, (r) => r.join && r.hint && r.lists);
+        return { card, dialog: page.newSoulDialog, joinCard: /Join this world as a Soul|Souls here/.test(text) };
+      }, (r) => r.card === 0 && !r.joinCard && r.dialog?.includes(`${base}/instructions.md`));
       let benLine = '';
       const benPage = await open('ben', '#join');
-      await step('P1 ben, signed in, opens the shared #join link, names his Soul and gets the one line for his agent', async () => {
-        await benPage.locator('[data-join-form]').waitFor();
-        await shot(benPage, '02-ben-join-form');
-        await benPage.locator('[data-soul-name]').fill('Ben');
-        await benPage.locator('[data-join-go]').click();
-        benLine = await benPage.locator('[data-join-prompt]').innerText();
-        await benPage.locator('[data-join-line] .gp-copy').click();
-        const clip = await benPage.evaluate(() => navigator.clipboard.readText().catch(() => null));
-        await shot(benPage, '03-ben-line');
-        return { benLine, clip, newSoulDialog: benPage.newSoulDialog };
-      }, (r) => r.newSoulDialog?.includes(`${base}/instructions.md`) && r.benLine.includes(`${base}/SKILL.md`) && /Soul mode/.test(r.benLine) && r.benLine.includes('"Ben"') && (r.clip === null || r.clip === r.benLine));
-      await step('P2 ben\'s agent reads the line, follows Soul mode, and walks to the garden', async () => {
-        const url = benLine.match(/Read (\S+\/SKILL\.md)/)?.[1], name = benLine.match(/make my Soul "([^"]+)"/)?.[1];
-        if (url !== `${base}/SKILL.md`) throw new Error('the line does not name this world\'s skill');
-        skill = await (await fetch(url)).text();
-        const r = await soulAgentJoins('ben', name);
+      await step('P1 ben, signed in, opens the shared #join link: New Soul\'s one line for his agent (no card, no form)', async () => {
+        benLine = benPage.newSoulDialog ?? '';
+        const card = await benPage.locator('[data-god-panel]').count();
+        await shot(benPage, '02-ben-join');
+        return { benLine, card };
+      }, (r) => r.card === 0 && r.benLine.includes(`${base}/instructions.md`) && r.benLine.includes(worldName));
+      await step('P2 ben\'s agent reads the instructions, follows Soul mode, and walks to the garden', async () => {
+        const url = benLine.match(/(\S+\/instructions\.md)/)?.[1];
+        if (url !== `${base}/instructions.md`) throw new Error('the line does not name this world\'s instructions');
+        const instr = await (await fetch(url)).text();
+        if (!instr.includes(`${base}/skill.md`)) throw new Error('the instructions do not point at this world\'s skill');
+        skill = await (await fetch(`${base}/SKILL.md`)).text();
+        const r = await soulAgentJoins('ben', 'Ben');
         const walk = await soulDoes(r.dir, 'walk:flag-garden');
-        await benPage.locator('[data-soul="Ben"]').waitFor({ timeout: 30_000 });
+        const souls = (await api('/v1/world/souls')).data.souls.map((x) => x.name);
         await shot(benPage, '04-ben-joined');
-        return { paired: r.status.paired, walk: walk.phase };
-      }, (r) => r.paired && r.walk === 'completed');
+        return { paired: r.status.paired, walk: walk.phase, souls };
+      }, (r) => r.paired && r.walk === 'completed' && r.souls.includes('Ben'));
       await benPage.context().close();
       await step('P3 the god\'s Souls tab: both Souls (the link to share is in the account menu); clicking Ana flies to her', async () => {
         const page = await open('gaia', '#join');
