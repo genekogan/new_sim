@@ -151,6 +151,8 @@ export class GodLayers {
     return { key, amount: (w[key] ?? 0) + (alias ? w[alias] : 0), ...(alias ? { alias } : {}) };
   }
   relations() { return this.m.state.layers?.relations ?? []; }
+  /** The Souls of this world (id, name): the god's CLI names them. */
+  souls() { return [...this.minds().values()].map((x) => ({ id: x.soulId, name: x.name })); }
   currency() { return this.m.state.layers?.currency ?? 'coins'; }
   money(n: number) { return `${n} ${this.currency()}`; }
 
@@ -299,7 +301,7 @@ export function mountLayerRoutes(app: import('hono').Hono, d: { god: { model: Wo
   const need = () => { const l = d.layers(); if (!l) throw new ApiError(404, 'not-found', 'this world has no Souls layer (no engine bridge)'); return l; };
   app.get('/v1/world/layers', (c) => c.json(need().publicView(), 200, noStore));
   app.get('/v1/world/layers/me', (c) => { const s = d.soulFromBearer(c); if (!s) return c.json({ error: { code: 'unauthorized', message: 'a Soul token is required' } }, 401); return c.json(need().me({ soulId: s.id, name: s.name }), 200, noStore); });
-  app.get('/v1/god/layers', (c) => { d.requireGod(c); const l = need(); return c.json({ ...l.publicView(), wallets: d.god.model.state.layers?.wallets ?? {} }, 200, noStore); });
+  app.get('/v1/god/layers', (c) => { d.requireGod(c); const l = need(); const w = d.god.model.state.layers?.wallets ?? {}; return c.json({ ...l.publicView(), souls: l.souls(), wallets: Object.fromEntries(Object.entries(w).map(([k, v]) => [l.nameOf(k), v])), walletRefs: w }, 200, noStore); });
   app.get('/v1/god/layers/zone-suggest', (c) => {
     const use = c.req.query('use') ?? '', cats = ZONE_SUGGEST[use];
     if (!cats) return c.json({ error: { code: 'invalid', message: `use is one of ${Object.keys(ZONE_SUGGEST).join(', ')}` } }, 400);
