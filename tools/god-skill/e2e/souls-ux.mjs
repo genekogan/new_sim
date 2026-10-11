@@ -68,7 +68,7 @@ const STUB = `(() => {
 })();`;
 
 // ---------- the launcher (own process, own data dir)
-const launcher = spawn(process.execPath, ['tools/world-launcher/launcher.mjs', '--port', String(port), '--range', range, '--data', join(out, 'data'), '--eager', '0', '--base', BASE, '--web', WEB,
+const launcher = spawn(process.execPath, ['tools/world-launcher/launcher.mjs', '--port', String(port), '--range', range, '--data', join(root, '.lane/souls-ux-data', out.split('/').pop()), '--eager', '0', '--base', BASE, '--web', WEB,
   '--soul-cli', SOUL_CLI, '--soul-skill', SOUL_SKILL, ...launchArgs], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
 let launcherLog = ''; launcher.stdout.on('data', (d) => { launcherLog += d; }); launcher.stderr.on('data', (d) => { launcherLog += d; });
 process.on('exit', () => { try { launcher.kill('SIGTERM'); } catch { /* gone */ } });
@@ -160,6 +160,7 @@ try {
     // ---- the god: New Soul → name → the line
     await god.page.locator('[data-new-soul]').click();
     await god.page.locator('[data-join-form]').waitFor({ state: 'visible', timeout: 30_000 });
+    await sleep(1500);
     const focused = await god.page.evaluate(() => document.activeElement?.getAttribute('data-soul-name'));
     await sleep(800); await god.shot('god-2-new-soul-form');
     check('god: New Soul opens the Souls tab on the New Soul form (name field focused)', (await god.page.locator('[data-tab="souls"][aria-selected="true"]').count()) === 1 && focused === '1', { focused });
@@ -184,7 +185,7 @@ try {
     if (MODE === 'clerk') {
       const reconnect = await god.page.locator('[data-reconnect-soul="Gene"]').count();
       await god.page.locator('[data-new-soul]').click();
-      const again = await god.page.locator('[data-join-form]').isVisible();
+      const again = await god.page.locator('[data-join-form]').waitFor({ state: 'visible', timeout: 10_000 }).then(() => true, () => false);
       check('god: Reconnect for the existing Soul, and New Soul still offers another (main\'s limit allows 5)', reconnect === 1 && again, { reconnect, again });
       await god.page.locator('[data-reconnect-soul="Gene"]').click();
       const rl = await god.page.locator('[data-join-prompt]').innerText();

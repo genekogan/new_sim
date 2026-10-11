@@ -66,6 +66,7 @@ export function JoinPanel({ signedIn, worldName, base, owner, signIn, account, a
   const [name, setName] = useState('');
   const [line, setLine] = useState<{ text: string; note: string; join?: boolean; mine: number; here: number } | null>(null);
   const [another, setAnother] = useState(false);
+  const [focusWanted, setFocusWanted] = useState(0);
   const ref = useRef<HTMLDivElement>(null), listRef = useRef<HTMLDivElement>(null), formRef = useRef<HTMLFormElement>(null);
 
   const refresh = useCallback(async () => { setAcct(signedIn ? await J.myAccount() : null); }, [signedIn]);
@@ -88,16 +89,23 @@ export function JoinPanel({ signedIn, worldName, base, owner, signIn, account, a
   useEffect(() => {
     if (!ask) return;
     if (ask.what === 'list') { listRef.current?.scrollIntoView({ block: 'nearest' }); return; }
-    setAnother(true);
-    requestAnimationFrame(() => { const f = formRef.current; if (!f) { ref.current?.scrollIntoView({ block: 'nearest' }); return; } f.scrollIntoView({ block: 'nearest' }); f.querySelector<HTMLInputElement>('[data-soul-name]')?.focus(); });
-  }, [ask]);
+    newSoul();
+  }, [ask]);   // eslint-disable-line react-hooks/exhaustive-deps
+  // focus the name as soon as the form is there (the person's Souls load after the panel opens)
+  useEffect(() => {
+    if (!focusWanted) return;
+    const f = formRef.current; if (!f) { ref.current?.scrollIntoView({ block: 'nearest' }); return; }
+    f.scrollIntoView({ block: 'nearest' }); f.querySelector<HTMLInputElement>('[data-soul-name]')?.focus(); setFocusWanted(0);
+  });
 
+  function newSoul() { setAnother(true); setLine((l) => (l?.join ? l : null)); setFocusWanted((n) => n + 1); }
+  const reconnect = (s: J.MySoul) => { setAnother(false); setLine({ text: J.reconnectPrompt(base, worldName, s), note: approvals ? `Your agent shows you a link. Open it here and press Approve; your agent then moves ${s.name} again.` : approveNote, mine: mine?.length ?? 0, here: here.length }); };
   const yours = signedIn && hasSoul && (
     <div className="jp-mine" data-my-souls={mine!.length}>
       {mine!.map((s) => (
         <div key={s.id} className="gp-row" data-my-soul={s.name}>
           <span>Your Soul <b>{s.name}</b> {s.hasToken ? <span className="jp-ok">agent connected</span> : <span className="gp-dim">no agent connected</span>}</span>
-          {approvals && <button className="gp-btn gp-small" data-reconnect-soul={s.name} onClick={() => setLine({ text: J.reconnectPrompt(base, worldName, s), note: approveNote, mine: mine!.length, here: here.length })} title="For a new agent folder: you approve it here">Reconnect</button>}
+          {approvals && <button className="gp-btn gp-small" data-reconnect-soul={s.name} onClick={() => reconnect(s)} title="For a new agent folder: you approve it here">Reconnect</button>}
         </div>
       ))}
     </div>
@@ -111,8 +119,8 @@ export function JoinPanel({ signedIn, worldName, base, owner, signIn, account, a
   const full = signedIn && !!mine && !canMore && <p className="gp-dim" data-souls-full="1">You have {mine.length} Souls here, the most one account may have.</p>;
   const prompt = line && <Prompt text={line.text} note={line.note} />;
   // with a Soul already: the form waits behind "+ New Soul" (or the header's New Soul)
-  const newSoul = (hasSoul && !another && !line?.join)
-    ? (canMore ? <button className="gp-btn gp-small" data-new-soul-inline="1" onClick={() => setAnother(true)}>+ New Soul</button> : full)
+  const newSoulUi = (hasSoul && !another && !line?.join)
+    ? (canMore ? <button className="gp-btn gp-small" data-new-soul-inline="1" onClick={newSoul}>+ New Soul</button> : full)
     : form;
   const souls = <div ref={listRef} data-souls-list="1"><b className="jp-sub">Souls here <span className="gp-count">{here.length}</span></b><SoulsHere souls={here} mine={mineIds} /></div>;
 
@@ -123,7 +131,7 @@ export function JoinPanel({ signedIn, worldName, base, owner, signIn, account, a
         <b className="jp-sub">{hasSoul ? 'Your Souls here' : 'New Soul'}</b>
         {!hasSoul && <p className="gp-dim jp-intro">Live in your world as well as build it: a body here, moved by your own agent. Name it, then give your agent the line.</p>}
         {yours}
-        {newSoul}
+        {newSoulUi}
         {prompt}
       </div>
       <b className="jp-sub">Invite friends</b>
@@ -141,7 +149,7 @@ export function JoinPanel({ signedIn, worldName, base, owner, signIn, account, a
           {signedIn ? <>{account ?? <span className="gp-dim">Signed in</span>}</> : <div data-join-signin="1">{signIn}</div>}
         </li>
         <li data-done={hasSoul && !line ? '1' : '0'} className={signedIn ? '' : 'jp-later'}>
-          {hasSoul ? <>{yours}{newSoul}</> : <><span>Get one line for your agent</span>{form}</>}
+          {hasSoul ? <>{yours}{newSoulUi}</> : <><span>Get one line for your agent</span>{form}</>}
           {prompt}
         </li>
         {approvals && (!hasSoul || line?.join) && <li className={line ? '' : 'jp-later'}><span>Approve the link your agent shows you</span></li>}
