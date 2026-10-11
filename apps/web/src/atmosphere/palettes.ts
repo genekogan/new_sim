@@ -8,6 +8,6 @@ export type SkyLook = { zenith: THREE.Color; horizon: THREE.Color; fog: number }
 const look = (zenith: string, horizon: string, fog: number): SkyLook => ({ zenith: new THREE.Color(zenith), horizon: new THREE.Color(horizon), fog });
 export const SKY_LOOKS: Record<string, SkyLook> = {
   // Mars College, Salton basin (2026 drone frames): deep blue overhead, pale near the horizon, clear dry air
-  'mars-desert': look('#0a5aa8', '#6aa6d2', 0.2),
+  'mars-desert': look('#0466aa', '#79b6da', 0.2),
 };
 export const skyLook = (palette: unknown): SkyLook | null => (typeof palette === 'string' ? SKY_LOOKS[palette] ?? null : null);

@@ -12,7 +12,7 @@ import { n } from './geom.ts';
 import type { Generator, Vec2 } from './types.ts';
 
 /** Ground finishes a far-land feature may name (or give `c: '#hex'`). Kept in step with the mesh half's colours. */
-export const FAR_MATERIALS = ['playa', 'salt', 'beach', 'scrub', 'wash', 'delta', 'mud', 'track', 'sand', 'grass', 'rock', 'dirt'] as const;
+export const FAR_MATERIALS = ['playa', 'salt', 'flats', 'beach', 'scrub', 'wash', 'delta', 'mud', 'track', 'sand', 'grass', 'rock', 'dirt'] as const;
 
 type Feat = { pts?: unknown; w?: unknown };
 const list = (v: unknown): Feat[] => (Array.isArray(v) ? (v as Feat[]).filter((f) => f && typeof f === 'object' && Array.isArray(f.pts)) : []);

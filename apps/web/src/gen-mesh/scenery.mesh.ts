@@ -14,6 +14,7 @@ import { registerMesh, type MeshCtx } from './registry.ts';
 import { terrainColorFor } from './ground-palette.ts';
 import { waterMaterial, waterMesh } from './water.ts';
 import { GRADE_A, GRADE_B, GRADE_GLSL, GRADE_PARS } from '../atmosphere/grade.ts';
+import { NOISE_MAP } from '../atmosphere/chunks.ts';
 
 type V2 = [number, number];
 type RGB = [number, number, number];
@@ -33,15 +34,17 @@ function vn(x: number, z: number, seed: number): number {
 function vn1(x: number, seed: number): number { const xi = Math.floor(x), f = x - xi, u = f * f * (3 - 2 * f); return h01(xi, seed) * (1 - u) + h01(xi + 1, seed) * u; }
 
 // ---------------------------------------------------------------- finishes
-type Finish = { c: string; m: string[]; shrub?: string; sh?: number };
+type Finish = { c: string; m: string[]; shrub?: string; sh?: number; d?: string; da?: number };
 /** Ground finishes (drone-frame colours, Salton basin): base colour, mottle colours (patches), shrub colour, shrubs/ha. */
 const FINISH: Record<string, Finish> = {
-  playa: { c: '#d3c4a4', m: ['#c2b292', '#ddd2bb', '#c9b48e'] },
-  salt: { c: '#e9e6df', m: ['#c99e72', '#dcd8cf', '#f3f1ec'] },
+  playa: { c: '#d3c4a4', m: ['#c2b292', '#ddd2bb', '#c9b48e'], d: '#b2a283', da: 0.25 },
+  salt: { c: '#e9e6df', m: ['#c99e72', '#dcd8cf', '#f3f1ec'], d: '#c39a70', da: 0.45 },
+  // the salt-pan mosaic between the levee and the shore: pale crusts, orange-brown flats and dark shrub patches
+  flats: { c: '#bdb5a5', m: ['#a8845f', '#dedad0', '#7f7862'], shrub: '#4a4838', sh: 30, d: '#4b4a38', da: 0.75 },
   beach: { c: '#eeebe4', m: ['#e2ded4', '#f6f4ef'] },
-  scrub: { c: '#6e6650', m: ['#4a4535', '#8b8064', '#5d5a44'], shrub: '#4a4635', sh: 45 },
-  wash: { c: '#8a8270', m: ['#565a4a', '#b3a88f', '#6d8350'], shrub: '#4d5340', sh: 60 },
-  delta: { c: '#6c7553', m: ['#4f5e3e', '#7f9357', '#9b917a'], shrub: '#46553a', sh: 55 },
+  scrub: { c: '#5e5946', m: ['#3f3b2e', '#857a5e', '#55533f'], shrub: '#403d2f', sh: 45, d: '#34322a', da: 0.7 },
+  wash: { c: '#57543f', m: ['#3f4334', '#8f8670', '#5a7044'], shrub: '#3c4232', sh: 60, d: '#30352a', da: 0.75 },
+  delta: { c: '#5f6a49', m: ['#465538', '#76894f', '#958b74'], shrub: '#3f4e34', sh: 55, d: '#34412c', da: 0.65 },
   mud: { c: '#a8998a', m: ['#928472', '#b8ab95'] },
   track: { c: '#e2d9c6', m: ['#d6ccb7'] },
   sand: { c: '#dccca8', m: ['#cdbb94', '#e6d9bb'] },
@@ -49,11 +52,11 @@ const FINISH: Record<string, Finish> = {
   rock: { c: '#8f877b', m: ['#7a7368', '#a39a8c'] },
   dirt: { c: '#a99276', m: ['#957f63', '#b9a386'] },
 };
-type Paint = { base: RGB; mott: RGB[]; shrub: RGB | null; sh: number; seed: number };
+type Paint = { base: RGB; mott: RGB[]; shrub: RGB | null; sh: number; seed: number; det: RGB; da: number };
 function paintOf(f: { m?: unknown; c?: unknown; shrubs?: unknown }, seed: number): Paint {
   const fin = FINISH[String(f.m ?? '')] ?? FINISH.playa;
   const base = typeof f.c === 'string' && /^#[0-9a-f]{6}$/i.test(f.c) ? rgb(f.c) : rgb(fin.c);
-  return { base, mott: fin.m.map(rgb), shrub: fin.shrub ? rgb(fin.shrub) : null, sh: num(f.shrubs, fin.sh ?? 0), seed };
+  return { base, mott: fin.m.map(rgb), shrub: fin.shrub ? rgb(fin.shrub) : null, sh: num(f.shrubs, fin.sh ?? 0), seed, det: rgb(fin.d ?? fin.c), da: fin.da ?? 0 };
 }
 /** A finish's colour at a point: base, broken into soft patches of its mottle colours, plus a little grain. */
 function paintAt(p: Paint, x: number, z: number, amount: number): RGB {
@@ -104,8 +107,26 @@ function outsideRect(p: V2[], r: [number, number, number, number]): V2[][] {
 const mats = new Map<string, THREE.Material>();
 function landMat(offset = 0): THREE.MeshStandardMaterial {
   const k = `land${offset}`; let m = mats.get(k) as THREE.MeshStandardMaterial | undefined;
-  if (!m) { m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 }); if (offset) { m.polygonOffset = true; m.polygonOffsetFactor = -1; m.polygonOffsetUnits = -4 * offset; } mats.set(k, m); }
+  if (!m) { m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, metalness: 0 }); if (offset) { m.polygonOffset = true; m.polygonOffsetFactor = -1; m.polygonOffsetUnits = -4 * offset; } withDetail(m); mats.set(k, m); }
   return m;
+}
+/** Fine ground detail the coarse grid cannot carry: a vertex's `detail` (rgb = its finish's dark mottle, a = amount)
+ *  breaks the colour into patches with the atmosphere's tiling noise at three scales (one texture, three taps). */
+function withDetail(m: THREE.MeshStandardMaterial) {
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uFarNoise = NOISE_MAP; sh.uniforms.uFarNoiseOn = { get value() { return NOISE_MAP.value ? 1 : 0; } };
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute vec4 detail;\nvarying vec4 vFarDetail;\nvarying vec2 vFarXZ;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvFarDetail = detail;\nvFarXZ = (modelMatrix * vec4(transformed, 1.0)).xz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D uFarNoise;\nuniform float uFarNoiseOn;\nvarying vec4 vFarDetail;\nvarying vec2 vFarXZ;')
+      .replace('#include <color_fragment>', `#include <color_fragment>
+      if (uFarNoiseOn > 0.5 && vFarDetail.a > 0.001) {
+        float n1 = texture2D(uFarNoise, vFarXZ * (1.0 / 173.0)).r, n2 = texture2D(uFarNoise, vFarXZ * (1.0 / 41.0) + 0.37).b, n3 = texture2D(uFarNoise, vFarXZ * (1.0 / 13.0) + 0.71).g;
+        float n = n1 * 0.5 + n2 * 0.38 + n3 * 0.12;
+        diffuseColor.rgb = mix(diffuseColor.rgb, vFarDetail.rgb, smoothstep(0.46, 0.64, n) * vFarDetail.a);
+        diffuseColor.rgb *= 1.0 + (n3 - 0.5) * 0.1 * vFarDetail.a;
+      }`);
+  };
+  m.customProgramCacheKey = () => 'far-land-detail';
 }
 function shrubMat(): THREE.MeshStandardMaterial { let m = mats.get('shrub') as THREE.MeshStandardMaterial | undefined; if (!m) { m = new THREE.MeshStandardMaterial({ roughness: 1, metalness: 0, flatShading: true }); mats.set('shrub', m); } return m; }
 function poleMat(): THREE.MeshStandardMaterial { let m = mats.get('pole') as THREE.MeshStandardMaterial | undefined; if (!m) { m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, side: THREE.DoubleSide }); mats.set('pole', m); } return m; }
@@ -113,12 +134,14 @@ function wireMat(): THREE.LineBasicMaterial { let m = mats.get('wire') as THREE.
 function disposeOnRemove(g: THREE.Object3D) { g.addEventListener('removed', () => g.traverse((o) => { const mm = o as THREE.Mesh; if (mm.geometry) mm.geometry.dispose(); })); }
 
 /** Vertex buffers for a vertex-coloured mesh. */
+type Det = [number, number, number, number];
+const NO_DET: Det = [0, 0, 0, 0];
 class Buf {
-  pos: number[] = []; col: number[] = []; idx: number[] = [];
-  v(x: number, y: number, z: number, c: RGB) { this.pos.push(x, y, z); this.col.push(c[0], c[1], c[2]); return this.pos.length / 3 - 1; }
+  pos: number[] = []; col: number[] = []; idx: number[] = []; det: number[] = [];
+  v(x: number, y: number, z: number, c: RGB, d: Det = NO_DET) { this.pos.push(x, y, z); this.col.push(c[0], c[1], c[2]); this.det.push(d[0], d[1], d[2], d[3]); return this.pos.length / 3 - 1; }
   quad(a: number, b: number, c: number, d: number) { this.idx.push(a, c, b, b, c, d); }
   get tris() { return this.idx.length / 3; }
-  geometry() { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3)); g.setIndex(this.idx); g.computeVertexNormals(); return g; }
+  geometry() { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(this.pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(this.col, 3)); g.setAttribute('detail', new THREE.Float32BufferAttribute(this.det, 4)); g.setIndex(this.idx); g.computeVertexNormals(); return g; }
 }
 
 // ---------------------------------------------------------------- far-land/1
@@ -138,7 +161,7 @@ function buildFarLand(ctx: MeshCtx): THREE.Object3D | null {
   const tc = new THREE.Color();
   terrainColor(tc, base, 0, base, 0, 0);
   const gBase: RGB = typeof P.ground === 'string' && /^#/.test(P.ground) ? rgb(P.ground) : [tc.r, tc.g, tc.b];
-  const groundP: Paint = { base: gBase, mott: [mul(gBase, 0.92), mul(gBase, 1.05), mix(gBase, [0.6, 0.6, 0.6], 0.18)], shrub: null, sh: 0, seed: seed + 1 };
+  const groundP: Paint = { base: gBase, mott: [mul(gBase, 0.92), mul(gBase, 1.05), mix(gBase, [0.6, 0.6, 0.6], 0.18)], shrub: null, sh: 0, seed: seed + 1, det: mul(gBase, 0.82), da: 0.3 };
   const areas: Area[] = (Array.isArray(P.areas) ? P.areas : []).flatMap((f, i) => { const o = f as Record<string, unknown>; const poly = W(pointsOf(o.pts)); if (poly.length < 3) return []; const edge = num(o.edge, 30); return [{ poly, bb: bbox(poly, edge), p: paintOf(o, seed + 11 + i), edge }]; });
   const strips: Strip[] = (Array.isArray(P.strips) ? P.strips : []).flatMap((f, i) => { const o = f as Record<string, unknown>; const path = W(pointsOf(o.pts)); if (path.length < 2) return []; const w = Math.max(2, num(o.w, 60)), edge = num(o.edge, Math.min(30, w * 0.3)); return [{ path, bb: bbox(path, w / 2 + edge), p: paintOf(o, seed + 31 + i), w, edge, tracks: Array.isArray(o.tracks) ? (o.tracks as unknown[]).filter((t): t is number => typeof t === 'number') : [], trackW: num(o.trackW, 4), trackC: rgb(FINISH.track.c) }]; });
   const roads: Road[] = (Array.isArray(P.roads) ? P.roads : []).flatMap((f) => { const o = f as Record<string, unknown>; const path = W(pointsOf(o.pts)); if (path.length < 2) return []; const po = o.poles as Record<string, unknown> | undefined; return [{ path, w: Math.max(4, num(o.w, 12)), lines: o.lines !== false, poles: po ? { side: num(po.side, 1) < 0 ? -1 : 1, every: Math.max(20, num(po.every, 60)), h: num(po.h, 10) } : null }]; });
@@ -154,10 +177,19 @@ function buildFarLand(ctx: MeshCtx): THREE.Object3D | null {
     for (const s of strips) { if (!inBox(x, z, s.bb)) continue; const e = Math.max(s.edge, soft), d = lineDist(x, z, s.path, false), t = sstep(s.w / 2 + e, s.w / 2 - e * 0.5, d); if (t > 0) c = mix(c, paintAt(s.p, x, z, mottle), t); }
     if (sea && inBox(x, z, sea.bb)) {
       const d = lineDist(x, z, sea.poly, true), inside = inPoly(x, z, sea.poly);
-      if (inside) c = mix(paintAt(sea.beachP, x, z, mottle), rgb('#3e6a72'), sstep(0, 60, d));
+      if (inside) c = mix(paintAt(sea.beachP, x, z, mottle), rgb('#5f8fb0'), sstep(0, 60, d));
       else if (sea.beach > 0) c = mix(c, paintAt(sea.beachP, x, z, mottle), sstep(sea.beach + Math.max(10, soft), sea.beach * 0.5, d));
     }
     return c;
+  };
+  /** The fine-detail ink at a point (same weights as colourAt): its finish's dark mottle and how much of it. */
+  const detailAt = (x: number, z: number, soft: number): Det => {
+    let d: RGB = groundP.det, a = groundP.da;
+    const blend = (p: Paint, t: number) => { const wa = a * (1 - t), wb = p.da * t, w = wa + wb; d = w > 1e-6 ? mix(d, p.det, wb / w) : d; a = w; };
+    for (const ar of areas) { if (!inBox(x, z, ar.bb)) continue; const e = Math.max(ar.edge, soft), dd = lineDist(x, z, ar.poly, true), sgn = inPoly(x, z, ar.poly) ? dd : -dd, t = sstep(-e, e, sgn); if (t > 0) blend(ar.p, t); }
+    for (const st of strips) { if (!inBox(x, z, st.bb)) continue; const e = Math.max(st.edge, soft), dd = lineDist(x, z, st.path, false), t = sstep(st.w / 2 + e, st.w / 2 - e * 0.5, dd); if (t > 0) blend(st.p, t); }
+    if (sea && inBox(x, z, sea.bb)) { const dd = lineDist(x, z, sea.poly, true); if (inPoly(x, z, sea.poly)) a = 0; else if (sea.beach > 0) a *= 1 - sstep(sea.beach + Math.max(10, soft), sea.beach * 0.5, dd); }
+    return [d[0], d[1], d[2], a];
   };
   const heightAt = (x: number, z: number): number => {
     if (!sea || !inBox(x, z, sea.bb)) return base;
@@ -183,7 +215,7 @@ function buildFarLand(ctx: MeshCtx): THREE.Object3D | null {
         const join = Math.exp(-out / 45);
         const y = k === 0 ? hEdge : heightAt(x, z) + (hEdge - base) * join;
         const c = k === 0 ? cEdge : mix(colourAt(x, z, step * 0.6), cEdge, join * 0.85);
-        b.v(x, y, z, c);
+        b.v(x, y, z, c, k === 0 ? NO_DET : (() => { const dd = detailAt(x, z, step * 0.6); return [dd[0], dd[1], dd[2], dd[3] * (1 - join)] as Det; })());
       }
     }
     for (let s = 0; s < SEG; s++) for (let k = 0; k < K; k++) { const a = s * (K + 1) + k, a2 = (s + 1) * (K + 1) + k; b.quad(a, a + 1, a2, a2 + 1); }
@@ -193,7 +225,7 @@ function buildFarLand(ctx: MeshCtx): THREE.Object3D | null {
   // ---- ribbons: strips (lateral bands with tracks) and roads; triangles inside the extent are dropped (exactly enough:
   // straddling quads are split in 4 up to 3 times), the rest drawn over the ground with a polygon offset
   const insideRect = (x: number, z: number) => x > rect[0] && x < rect[2] && z > rect[1] && z < rect[3];
-  const ribbon = (b: Buf, path: V2[], bands: { o0: number; o1: number; col: (x: number, z: number, o: number) => RGB }[], lift: number, jag: number, jseed: number) => {
+  const ribbon = (b: Buf, path: V2[], bands: { o0: number; o1: number; col: (x: number, z: number, o: number) => RGB; det?: Det }[], lift: number, jag: number, jseed: number) => {
     const pts = resample(path, 18);
     for (const piece of outsideRect(pts, rect)) {
       if (piece.length < 2) continue;
@@ -205,7 +237,7 @@ function buildFarLand(ctx: MeshCtx): THREE.Object3D | null {
           const [px, pz] = piece[i], [nx, nz] = nrm[i];
           const j0 = band.o0 === bands[0].o0 ? (vn1(sAt[i] / 37, jseed) - 0.5) * jag : 0, j1 = band.o1 === bands[bands.length - 1].o1 ? (vn1(sAt[i] / 41, jseed + 5) - 0.5) * jag : 0;
           const ids: number[] = [];
-          for (const o of [band.o0 + j0, band.o1 + j1]) { const x = px + nx * o, z = pz + nz * o; ids.push(b.v(x, heightAt(x, z) + lift, z, band.col(x, z, o))); }
+          for (const o of [band.o0 + j0, band.o1 + j1]) { const x = px + nx * o, z = pz + nz * o; ids.push(b.v(x, heightAt(x, z) + lift, z, band.col(x, z, o), band.det ?? NO_DET)); }
           row.push(ids);
         }
         for (let i = 1; i < row.length; i++) {
@@ -222,10 +254,10 @@ function buildFarLand(ctx: MeshCtx): THREE.Object3D | null {
     strips.forEach((s, i) => {
       const b = new Buf(), hw = s.w / 2;
       const cuts = [-hw, ...s.tracks.flatMap((t) => [t - s.trackW / 2, t + s.trackW / 2]).filter((o) => o > -hw && o < hw), hw].sort((x, y) => x - y);
-      const bands: { o0: number; o1: number; col: (x: number, z: number, o: number) => RGB }[] = [];
+      const bands: { o0: number; o1: number; col: (x: number, z: number, o: number) => RGB; det?: Det }[] = [];
       for (let k = 1; k < cuts.length; k++) {
         const o0 = cuts[k - 1], o1 = cuts[k], mid = (o0 + o1) / 2, track = s.tracks.some((t) => Math.abs(t - mid) < s.trackW / 2 + 1e-6);
-        bands.push({ o0, o1, col: track ? (x, z) => mix(s.trackC, paintAt(s.p, x, z, mottle), 0.15) : (x, z, o) => { const c = paintAt(s.p, x, z, mottle); return mix(c, colourAt(x, z, 0), sstep(hw * 0.55, hw * 1.05, Math.abs(o)) * 0.6); } });
+        bands.push({ o0, o1, det: track ? NO_DET : [s.p.det[0], s.p.det[1], s.p.det[2], s.p.da], col: track ? (x, z) => mix(s.trackC, paintAt(s.p, x, z, mottle), 0.45) : (x, z, o) => { const c = paintAt(s.p, x, z, mottle); return mix(c, colourAt(x, z, 0), sstep(hw * 0.55, hw * 1.05, Math.abs(o)) * 0.6); } });
       }
       ribbon(b, s.path, bands, 0.05, s.w * 0.3, seed + 101 + i);
       if (!b.tris) return;
@@ -274,7 +306,7 @@ function buildFarLand(ctx: MeshCtx): THREE.Object3D | null {
         if (insideRect(jx, jz) || Math.hypot(jx - cx, jz - cz) > R - 30) continue;
         const w = inside(jx, jz); if (w <= 0) continue;
         if (vn(jx / 60, jz / 60, k + 2) * w < 0.42) continue;   // clumps
-        const s = 1.6 + h01(Math.floor(jx), Math.floor(jz), k + 3) * 2.6;
+        const s = 0.8 + h01(Math.floor(jx), Math.floor(jz), k + 3) * 1.3;
         spots.push({ x: jx, z: jz, s, c: mix(p.shrub, p.mott[(h01(Math.floor(jx), Math.floor(jz), k + 4) * p.mott.length) | 0] ?? p.shrub, 0.25 * h01(Math.floor(jz), Math.floor(jx), k)) });
       }
     };
@@ -300,8 +332,8 @@ function buildFarLand(ctx: MeshCtx): THREE.Object3D | null {
 }
 /** Split a straddling quad (a,c | d,e) into four and keep the parts outside the rectangle. */
 function splitQuad(b: Buf, a: number, c: number, d: number, e: number, inside: (x: number, z: number) => boolean, depth: number) {
-  const P = (k: number) => [b.pos[k * 3], b.pos[k * 3 + 1], b.pos[k * 3 + 2]] as const, C = (k: number): RGB => [b.col[k * 3], b.col[k * 3 + 1], b.col[k * 3 + 2]];
-  const lerpV = (k1: number, k2: number) => { const p1 = P(k1), p2 = P(k2), c1 = C(k1), c2 = C(k2); return b.v((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2, (p1[2] + p2[2]) / 2, mix(c1, c2, 0.5)); };
+  const P = (k: number) => [b.pos[k * 3], b.pos[k * 3 + 1], b.pos[k * 3 + 2]] as const, C = (k: number): RGB => [b.col[k * 3], b.col[k * 3 + 1], b.col[k * 3 + 2]], D4 = (k: number) => b.det.slice(k * 4, k * 4 + 4);
+  const lerpV = (k1: number, k2: number) => { const p1 = P(k1), p2 = P(k2), c1 = C(k1), c2 = C(k2), d1 = D4(k1), d2 = D4(k2); return b.v((p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2, (p1[2] + p2[2]) / 2, mix(c1, c2, 0.5), [0, 1, 2, 3].map((i) => (d1[i] + d2[i]) / 2) as Det); };
   const ac = lerpV(a, c), de = lerpV(d, e), ad = lerpV(a, d), ce = lerpV(c, e), mid = lerpV(ad, ce);
   for (const [p, q, r, s] of [[a, ac, ad, mid], [ac, c, mid, ce], [ad, mid, d, de], [mid, ce, de, e]] as [number, number, number, number][]) {
     const ins = [p, q, r, s].map((k) => inside(b.pos[k * 3], b.pos[k * 3 + 2]));
@@ -340,7 +372,7 @@ attribute vec3 color;
 attribute vec3 far;       // x: distance (m; < 0 = skirt row: fraction of the horizon distance), y: haze multiplier, z: depth layer
 uniform float uBase, uK, uSkirtMin;
 varying vec3 vColor;
-varying float vD, vHz;
+varying float vD, vHz, vW;
 void main(){
   // orthographic views (maps) draw no panorama
   if (projectionMatrix[2][3] == 0.0) { gl_Position = vec4(2.0, 2.0, 2.0, 1.0); return; }
@@ -354,32 +386,37 @@ void main(){
   vec3 wp = cameraPosition + vec3(position.x * R, e * R, position.z * R);
   vec4 p = projectionMatrix * viewMatrix * vec4(wp, 1.0);
   // a fixed depth just in front of the sky dome (ndc 0.99999), nearer ranges a hair in front of farther ones
-  float Pd = farP * 0.88, zn = (m22 * -Pd + m32) / Pd - far.z * 4.0e-7;
+  float Pd = farP * 0.88, zn = (m22 * -Pd + m32) / Pd - max(far.z, 0.0) * 4.0e-7;
   p.z = zn * p.w;
   gl_Position = p;
-  vColor = color; vD = D; vHz = far.y;
+  vColor = color; vD = D; vHz = far.y; vW = far.z < 0.0 ? -far.z - 0.5 : 1.0;
 }`;
 const PANO_FRAG = /* glsl */`
 uniform vec3 fogColor;
 uniform float fogDensity;
 uniform vec3 uHaze;
 uniform float uVis, uLight, uNearCap;
+uniform vec3 uGroundLit;
 varying vec3 vColor;
-varying float vD, vHz;
+varying float vD, vHz, vW;
 ${GRADE_PARS}
 void main(){
-  vec3 c = vColor * uLight;
+  // ground in the skirt is lit like the far land (sun and sky light on a level surface); water and ranges follow the sky
+  vec3 c = vColor * mix(uGroundLit, vec3(uLight), clamp(vW, 0.0, 1.0));
   // the long-range haze, then the scene's own air (the same exp² fog as every lit thing, up to the view's reach)
   float farF = (1.0 - exp(-vD / uVis)) * vHz;
   c = mix(c, uHaze * uLight, clamp(farF, 0.0, 0.94));
-  float fd = fogDensity * min(vD, uNearCap);
-  c = mix(c, fogColor, 1.0 - exp(-fd * fd));
   gl_FragColor = vec4(c, 1.0);
   #include <colorspace_fragment>
+  // three mixes fog after the output conversion (fog_fragment follows colorspace_fragment): do the same, so the
+  // panorama's foot and the far land meet in one colour
+  float fd = fogDensity * min(vD, uNearCap);
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, fogColor, 1.0 - exp(-fd * fd));
   ${GRADE_GLSL}
 }`;
 type Range = { from: number; to: number; d: number; h: number; rough: number; c: RGB; c2: RGB | null; bands: number; haze: number; seed: number; profile: number[] | null; foot: number };
 const DEG = Math.PI / 180;
+const tmpV = new THREE.Vector3();
 function buildPanorama(ctx: MeshCtx): THREE.Object3D | null {
   const P = ctx.params, m = ctx.model, seed = (ctx.entity.seed ?? 0) | 0;
   const isHex = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v);
@@ -402,13 +439,13 @@ function buildPanorama(ctx: MeshCtx): THREE.Object3D | null {
   // ---- skirt below the horizon (layer 0): ground or water per bearing, rows by fraction of the horizon distance
   const inWater = (b: number) => { if (!water) return 0; let x = b; while (x < water.from) x += 360; const t = x - water.from, span = water.to - water.from; return t > span ? 0 : sstep(0, 2.5, t) * sstep(0, 2.5, span - t); };
   const ROWS = [1, 0.62, 0.34, 0.16, 0.06, 0];
-  const corner = (b: number, f: number): [RGB, number] => { const w = inWater(b), wc = mix(water?.c ?? ground, water?.far ?? ground, Math.pow(f, 0.6)), gc = mul(ground, 0.97 + 0.06 * vn1(b / 7, seed)); return [mix(gc, wc, w), -(f || 0.0001)]; };
+  const corner = (b: number, f: number): [RGB, number, number] => { const w = inWater(b), wc = mix(water?.c ?? ground, water?.far ?? ground, Math.pow(f, 0.6)), gc = mul(ground, 0.97 + 0.06 * vn1(b / 7, seed)); return [mix(gc, wc, w), -(f || 0.0001), -(0.5 + w)]; };
   for (let s = 0; s < 360; s += 1) {
     const b0 = s, b1 = s + 1;
     for (let r = 1; r < ROWS.length; r++) {
-      const [cA, fA] = corner(b0, ROWS[r - 1]), [cB, fB] = corner(b1, ROWS[r - 1]), [cC, fC] = corner(b0, ROWS[r]), [cD, fD] = corner(b1, ROWS[r]);
-      vert(b0, 0, cA, fA, 1, 0); vert(b0, 0, cC, fC, 1, 0); vert(b1, 0, cB, fB, 1, 0);
-      vert(b1, 0, cB, fB, 1, 0); vert(b0, 0, cC, fC, 1, 0); vert(b1, 0, cD, fD, 1, 0);
+      const [cA, fA, wA] = corner(b0, ROWS[r - 1]), [cB, fB, wB] = corner(b1, ROWS[r - 1]), [cC, fC, wC] = corner(b0, ROWS[r]), [cD, fD, wD] = corner(b1, ROWS[r]);
+      vert(b0, 0, cA, fA, 1, wA); vert(b0, 0, cC, fC, 1, wC); vert(b1, 0, cB, fB, 1, wB);
+      vert(b1, 0, cB, fB, 1, wB); vert(b0, 0, cC, fC, 1, wC); vert(b1, 0, cD, fD, 1, wD);
     }
   }
   // ---- ranges: rows foot → crest of flat-shaded facets. For shading only, each row sits nearer the eye the lower it is
@@ -457,7 +494,7 @@ function buildPanorama(ctx: MeshCtx): THREE.Object3D | null {
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setAttribute('far', new THREE.Float32BufferAttribute(far, 3));
   g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e9);
   const haze = rgb(isHex(P.haze) ? P.haze : '#c6d6e2');
-  const uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uBase: { value: m.constants.base }, uK: { value: (1 - 0.13) / (2 * 6371000) }, uSkirtMin: { value: 600 }, uHaze: { value: new THREE.Color(...haze) }, uVis: { value: num(P.visibility, 70000) }, uLight: { value: 1 }, uNearCap: { value: 2100 } }]);
+  const uniforms = THREE.UniformsUtils.merge([THREE.UniformsLib.fog, { uBase: { value: m.constants.base }, uK: { value: (1 - 0.13) / (2 * 6371000) }, uSkirtMin: { value: 600 }, uHaze: { value: new THREE.Color(...haze) }, uVis: { value: num(P.visibility, 70000) }, uLight: { value: 1 }, uNearCap: { value: 2100 }, uGroundLit: { value: new THREE.Color(1, 1, 1) } }]);
   (uniforms as Record<string, { value: unknown }>).uEdenGradeA = { value: GRADE_A }; (uniforms as Record<string, { value: unknown }>).uEdenGradeB = { value: GRADE_B };
   const mat = new THREE.ShaderMaterial({ vertexShader: PANO_VERT, fragmentShader: PANO_FRAG, uniforms, fog: true, side: THREE.DoubleSide });
   const mesh = new THREE.Mesh(g, mat);
@@ -465,10 +502,23 @@ function buildPanorama(ctx: MeshCtx): THREE.Object3D | null {
   mesh.castShadow = false; mesh.receiveShadow = false;
   // day and night: the panorama has no lights of its own; it follows the brightness of the sky colour (Daylight)
   const day = new THREE.Color('#a6bed0'), dayL = day.r * 0.2126 + day.g * 0.7152 + day.b * 0.0722;
+  // level ground's light, as MeshStandardMaterial sees it (albedo/π × (sun·up + sky + ambient)); lights found once a second
+  let lights: THREE.Light[] = [], found = -Infinity;
+  const sun = new THREE.Vector3(), lit = uniforms.uGroundLit.value as THREE.Color, tmp = new THREE.Color();
   mesh.onBeforeRender = (_r, scene) => {
     const bg = scene.background as THREE.Color | null;
     const l = bg && (bg as THREE.Color).isColor ? (bg.r * 0.2126 + bg.g * 0.7152 + bg.b * 0.0722) / dayL : 1;
     uniforms.uLight.value = Math.max(0.05, Math.min(1.1, l));
+    const now = performance.now();
+    if (now - found > 1000) { found = now; lights = []; scene.traverse((o) => { const L = o as THREE.Light; if (L.isLight && L.visible) lights.push(L); }); }
+    lit.setRGB(0, 0, 0);
+    for (const L of lights) {
+      if ((L as THREE.DirectionalLight).isDirectionalLight) { const d = L as THREE.DirectionalLight; sun.setFromMatrixPosition(d.matrixWorld).sub(tmpV.setFromMatrixPosition(d.target.matrixWorld)).normalize(); lit.add(tmp.copy(d.color).multiplyScalar(d.intensity * Math.max(0, sun.y))); }
+      else if ((L as THREE.HemisphereLight).isHemisphereLight) lit.add(tmp.copy(L.color).multiplyScalar(L.intensity));
+      else if ((L as THREE.AmbientLight).isAmbientLight) lit.add(tmp.copy(L.color).multiplyScalar(L.intensity));
+    }
+    if (!lights.length) lit.setRGB(Math.PI, Math.PI, Math.PI);
+    lit.multiplyScalar(1 / Math.PI);
   };
   mesh.userData.panorama = { tris: pos.length / 9, ranges: ranges.length };
   const group = new THREE.Group(); group.name = 'panorama'; group.add(mesh); group.userData.cameraTransparent = true;
