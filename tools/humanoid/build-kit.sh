@@ -7,7 +7,7 @@
 # hand-mapped characters (Casual_2, Punk, Woman_Casual). The other 18 CC0 characters go in
 #   .lane/quaternius-blends/men/*.blend and .lane/quaternius-blends/women/*.blend
 # (Quaternius Drive, "Individual Characters/Blends"), then:
-#   tools/humanoid/build-kit.sh <mars-media>/reconstruction/2026-campus/modular/research/appearance .lane/quaternius-blends
+#   tools/humanoid/build-kit.sh <mars-media>/reconstruction/2026-campus/modular/research/appearance <team>/assets/quaternius-blends   (the canonical copy since 2026-10-11; extracted from Gene's Ultimate Modular Men/Women zips)
 # New characters get automatic part ids and palette slots (build-kit.mjs autoCharacter); one whose skeleton is not
 # a frame's bind pose is skipped and named. Check the result in the lab (README.md) before committing the kit.
 set -eu
