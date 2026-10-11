@@ -418,7 +418,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const draco = new DRACOLoader(manager).setDecoderPath(BASE+'/mars-assets/draco/');
     const placePreviews=new WorldPlacePreviews(renderer,()=>[geometry.group,...(expansion?[expansion.group]:[])]);
     const loader = new GLTFLoader(manager).setDRACOLoader(draco).setMeshoptDecoder(MeshoptDecoder);
-    setAssetLoader(loader);if(newWorld){setTextureRenderer(renderer,scene,camera);renderer.debug.checkShaderErrors=false;}  // lane PERF: paced GLB texture uploads; no sync link-status reads (new worlds only)
+    setAssetLoader(loader);if(newWorld){setTextureRenderer(renderer,scene,camera);MeshoptDecoder.useWorkers?.(2);renderer.debug.checkShaderErrors=false;}  // lane PERF: paced GLB texture uploads, meshopt decoding in 2 workers, no sync link-status reads (new worlds only)
     const floaters = new FloaterView(scene, { baseUrl: '/world-assets/littlemartians/characters/', loader });
     const bodyModels=new WorldBodyModels(loader,problem);
     let capturedPlatforms:readonly PlatformFloor[]|null=null;

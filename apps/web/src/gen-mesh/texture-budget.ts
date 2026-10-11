@@ -12,6 +12,7 @@
 // `?tex=full` keeps the original sizes; the pacing still applies. Old worlds never come here (gen-mesh is the entity layer).
 import * as THREE from 'three';
 import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
+import { arrivalGate } from './lazy-assets.ts';
 
 const FULL = typeof location !== 'undefined' && new URLSearchParams(location.search).get('tex') === 'full';
 const CAP: Record<string, number> = { map: 1024, emissiveMap: 1024, normalMap: 512, roughnessMap: 512, metalnessMap: 512, aoMap: 512, bumpMap: 512, alphaMap: 1024 };
@@ -48,20 +49,21 @@ export async function fitTextures(g: GLTF): Promise<void> {
     const k = cap / Math.max(w, h);
     const rw = Math.max(1, Math.round(w * k)), rh = Math.max(1, Math.round(h * k));
     try {
-      const small = im instanceof ImageBitmap && worker() ? await resizeInWorker(im, rw, rh) : await createImageBitmap(im as ImageBitmap, { resizeWidth: rw, resizeHeight: rh, resizeQuality: 'high' });
+      const small = im instanceof ImageBitmap && worker() ? await resizeInWorker(im, rw, rh) : await createImageBitmap(im as ImageBitmap, { resizeWidth: rw, resizeHeight: rh, resizeQuality: 'high', premultiplyAlpha: 'none' });
       if (im !== small && typeof (im as ImageBitmap).close === 'function') { try { (im as ImageBitmap).close(); } catch { /* transferred */ } }
       t.image = small; t.needsUpdate = true;
     } catch { /* keep the original */ }
   }));
 }
 
-// The resize runs in a worker: on the main thread createImageBitmap(bitmap, {resize…}) cost ~0.9 s over LM's load.
+// premultiplyAlpha 'none' as GLTFLoader's own bitmaps: a premultiplied bitmap makes every texSubImage2D un-premultiply
+// on the CPU (it doubled the upload time). The resize runs in a worker: on the main thread createImageBitmap(bitmap, {resize…}) cost ~0.9 s over LM's load.
 let w: Worker | null | undefined;
 const pending = new Map<number, (b: ImageBitmap | null) => void>(); let nextId = 0;
 function worker(): Worker | null {
   if (w !== undefined) return w;
   try {
-    const src = `onmessage=async(e)=>{const{id,bmp,rw,rh}=e.data;try{const s=await createImageBitmap(bmp,{resizeWidth:rw,resizeHeight:rh,resizeQuality:'high'});bmp.close();postMessage({id,bmp:s},[s]);}catch(err){postMessage({id,bmp:null});}}`;
+    const src = `onmessage=async(e)=>{const{id,bmp,rw,rh}=e.data;try{const s=await createImageBitmap(bmp,{resizeWidth:rw,resizeHeight:rh,resizeQuality:'high',premultiplyAlpha:'none'});bmp.close();postMessage({id,bmp:s},[s]);}catch(err){postMessage({id,bmp:null});}}`;
     w = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
     w.onmessage = (e: MessageEvent<{ id: number; bmp: ImageBitmap | null }>) => { const f = pending.get(e.data.id); pending.delete(e.data.id); f?.(e.data.bmp); };
   } catch { w = null; }
@@ -78,12 +80,16 @@ function resizeInWorker(bmp: ImageBitmap, rw: number, rh: number): Promise<Image
 // ---- paced upload ----
 const queue: { tex: THREE.Texture; done: () => void }[] = [];
 let scheduled = false;
-const BUDGET_MS = 6;
+// per frame: ~1 Mpx of texture (one 1024² map) and 6 ms of main thread, 4x that while the arrival card is up. The
+// upload's real cost is in the GPU process (~5 ms/Mpx here), so a pixel budget is what keeps frames even.
+const BUDGET_MS = 6, BUDGET_PX = 1.1e6;
 function pump() {
   scheduled = false;
-  const t0 = performance.now();
-  while (queue.length && performance.now() - t0 < BUDGET_MS) {
+  const t0 = performance.now(), k = arrivalGate.pending() ? 4 : 1;
+  let px = 0;
+  while (queue.length && performance.now() - t0 < BUDGET_MS * k && px < BUDGET_PX * k) {
     const { tex, done } = queue.shift()!;
+    const im = tex.image as { width?: number; height?: number } | undefined; px += (im?.width ?? 0) * (im?.height ?? 0);
     try { renderer?.initTexture(tex); } catch { /* uploaded on first draw instead */ }
     done();
   }
