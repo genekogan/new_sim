@@ -149,6 +149,14 @@ templates) are not listed; nothing old imports them except through the gates bel
 **`god/god-clerk.test.ts`**
 - Its Auth configs say `worldEngine: true`.
 
+**`edge/ledger/ledger.ts`, `edge/boot/world-places.ts`** (R4-INFO, Soul-information parity)
+- Two optional hooks on `EdgeLedger`: `placeWalkable(id)` and `beforeMap()`. Only the engine bridge sets them
+  (`god/engine-bridge.ts`, so only when `config.worldEngine`): god-built places (`god/places.ts`) count as walkable in
+  `map()`, in the vocabulary's place list and in boot-place admission (`knownBootPlaces`), and the map re-derives
+  after a god edit before it is read.
+- Old worlds: both hooks unset, so `walkable` stays `id in regions` and admission stays the native-region rule.
+  (Verified: local Eden `map` identical place-for-place to the pre-change probe; edge place/here/W1 tests pass.)
+
 ### Engine (`mars/viewer/engine`, `packages/engine-mars`, `packages/protocol`, `packages/engine-contract`)
 
 **`engine-mars/src/engine.ts`**
