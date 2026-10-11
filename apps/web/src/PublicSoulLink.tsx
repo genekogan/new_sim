@@ -1,9 +1,10 @@
 import {useEffect,useRef,useState} from 'react';
 import {publicSoulLink} from './soul-link.ts';
 import {worldPath} from './world-path.ts';
+import {BASE} from './base-path.ts';
 
 export function PublicSoulLink({id}:{id:string}){
-  const link=publicSoulLink(location.origin,worldPath,id);
+  const link=publicSoulLink(location.origin,worldPath,id,BASE);
   const [message,setMessage]=useState('');const live=useRef(true);
   useEffect(()=>{live.current=true;return()=>{live.current=false;};},[]);
   return <details className="public-soul-link"><summary>Share Soul</summary>

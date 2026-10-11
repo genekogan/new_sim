@@ -42,3 +42,54 @@ await test('canonical links keep a Soul, #join, an approval or a god pairing, no
  assert.equal(configuredSignIn({authProvider:'privy',privyAppId:'',devAuth:true}),true);
  assert.equal(configuredSignIn({authProvider:'none',devAuth:true}),false);
 });
+
+// Lane X (real-user fix): the launcher served under a path prefix (`--base /worlds`, build `--base /worlds/`) puts new
+// worlds at /worlds/w/<slug>. Clerk must initialize there and Sign in must have a target; old root worlds unchanged.
+await test('a prefixed launcher world (/worlds/w/<slug>) initializes Clerk and has a sign-in URL',async()=>{
+ const {clerkOriginRoute,clerkHomeRoute,isWorldPath}=await import('./auth-ui.ts');
+ const origin='https://sim.eden.art',base='/worlds';
+ for(const path of ['/worlds/w/willow-hollow','/worlds/w/gene-s-garden-2/']){
+  const here=clerkOriginRoute(origin,origin,path,'',base);
+  assert.equal(here.initialize,true,path);assert.equal(here.signInUrl,origin+path.replace(/\/$/,'')+'#watch');
+  assert.equal(clerkOriginRoute(origin,origin,path,'#godpair/ABCD-EF23',base).signInUrl,origin+path.replace(/\/$/,'')+'#godpair/ABCD-EF23');
+  assert.equal(clerkOriginRoute(origin,origin,path,'#join',base).signInUrl,origin+path.replace(/\/$/,'')+'#join');
+  const away=clerkOriginRoute(origin,'http://127.0.0.1:5100',path,'',base);assert.equal(away.initialize,false);assert.equal(away.signInUrl,origin+path.replace(/\/$/,'')+'#watch');
+ }
+ // the prefix is required and exact; a root world path under a prefixed build (or vice versa) is not a world page
+ for(const [path,b] of [['/w/willow','/worlds'],['/worlds/w/willow',''],['/worldsx/w/willow','/worlds'],['/worlds/w/Willow','/worlds'],['/worlds/w/willow/extra','/worlds'],['/worlds/x/willow','/worlds'],['/worlds/w/willow','/../x'],['/worlds/w/willow','worlds']] as const)
+  assert.deepEqual(clerkOriginRoute(origin,origin,path,'',b),{initialize:false,signInUrl:null},path+' base '+b);
+ assert.deepEqual(clerkHomeRoute(origin,origin,base),{initialize:true,signInUrl:origin+'/worlds/'});
+ assert.deepEqual(clerkHomeRoute(origin,'http://127.0.0.1:5100',base),{initialize:false,signInUrl:origin+'/worlds/'});
+ assert.deepEqual(clerkHomeRoute(origin,origin,'/x?y'),{initialize:false,signInUrl:null});
+ assert.equal(isWorldPath('/worlds/w/a',base),true);assert.equal(isWorldPath('/worlds/w/a/',base),false);assert.equal(isWorldPath('/worlds/w/a/',base,true),true);
+});
+await test('old worlds at the root (BASE \'\') resolve exactly as before the prefix change',async()=>{
+ const {clerkOriginRoute,clerkHomeRoute,agentOnboarding}=await import('./auth-ui.ts');
+ const {publicSoulLink}=await import('./soul-link.ts');
+ const {connectionSetupPrompt}=await import('./connection-prompt.ts');
+ const origin='https://sim.eden.art';
+ for(const key of ['eden','mars','littlemartians']){
+  const path='/w/'+key;
+  // identical to the pre-change results (no base argument, and an explicit '')
+  for(const r of [clerkOriginRoute(origin,origin,path,'#join'),clerkOriginRoute(origin,origin,path,'#join','')])assert.deepEqual(r,{initialize:true,signInUrl:origin+path+'#join'});
+  assert.equal(publicSoulLink(origin,path,'s_Avery'),origin+path+'#soul/s_Avery');
+  assert.equal(publicSoulLink(origin,path,'s_Avery',''),origin+path+'#soul/s_Avery');
+  assert.ok(connectionSetupPrompt(origin+path,'s_Avery')?.includes(JSON.stringify(origin+path)));
+  assert.ok(connectionSetupPrompt(origin+path+'/','s_Avery'));
+ }
+ assert.deepEqual(clerkHomeRoute(origin,origin),{initialize:true,signInUrl:origin+'/'});
+ assert.equal(agentOnboarding(origin+'/w/littlemartians').world,'Little Martians');
+ assert.equal(agentOnboarding(origin+'/w/eden').world,'Eden');
+ assert.equal(agentOnboarding(origin+'/').world,'Eden');
+});
+await test('Share Soul, the connection prompt and the onboarding name work on a prefixed launcher world',async()=>{
+ const {publicSoulLink}=await import('./soul-link.ts');
+ const {connectionSetupPrompt}=await import('./connection-prompt.ts');
+ const {agentOnboarding}=await import('./auth-ui.ts');
+ const origin='https://sim.eden.art',base='/worlds',path='/worlds/w/willow-hollow';
+ assert.equal(publicSoulLink(origin,path,'s_Avery',base),origin+path+'#soul/s_Avery');
+ assert.throws(()=>publicSoulLink(origin,path,'s_Avery'));assert.throws(()=>publicSoulLink(origin,'/w/willow-hollow','s_Avery',base));
+ assert.ok(connectionSetupPrompt(origin+path,'s_Avery',base)?.includes(JSON.stringify(origin+path+'/skill.md').slice(1,-1)));
+ assert.equal(connectionSetupPrompt(origin+path,'s_Avery'),null);
+ assert.equal(agentOnboarding(origin+path).world,'Willow-hollow');
+});

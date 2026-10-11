@@ -2,6 +2,7 @@ import {useEffect,useRef,useState} from 'react';
 import {isConnectionRefusal,type AgentConnectionProjection} from './connection-response.ts';
 import type {Api} from './useSim.ts';
 import {connectionSetupPrompt} from './connection-prompt.ts';
+import {BASE} from './base-path.ts';
 type Connection=AgentConnectionProjection;
 type Props={api:Api;soulId:string;name:string;base:string;connection:Connection|null;refresh():void;notice?:{message:string;setMessage(value:string):void}};
 export function AgentConnection(props:Props){
@@ -15,7 +16,7 @@ function ConnectionCard({api,soulId,name,base,connection,refresh,notice}:Props){
   useEffect(()=>{live.current=true;const timer=setInterval(()=>setClock(Date.now()),1000);return()=>{live.current=false;clearInterval(timer);};},[]);
   useEffect(()=>{if(connection?.attached&&connection.since&&connection.since>=issuedAt)setCode(null);},[connection?.since,connection?.attached,issuedAt]);
   const expired=!!code&&clock-issuedAt>=15*60_000;
-  const setupPrompt=connectionSetupPrompt(base,soulId);
+  const setupPrompt=connectionSetupPrompt(base,soulId,BASE);
   const metadata=`World: ${base}\nSoul: ${soulId}\nInstructions: ${base}/skill.md\nAsk me before connecting. Use an approved credential store; never put a key or approval code in a prompt, URL or configuration.`;
   const act=async(kind:'pair'|'revoke')=>{
     if(pending.current)return;pending.current=true;setBusy(true);setMessage(kind==='pair'?'Requesting a one-use code…':'Requesting disconnection…');
