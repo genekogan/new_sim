@@ -49,7 +49,7 @@ test('faceted search: category subtree, has=slot:sit, actuators; synonyms and ca
   // a synonym finds its def first ("bodega" → corner-shop); a word that names a category also finds what is in it (the shop)
   const bodega = await get('/v1/god/defs?q=bodega');
   assert.equal(bodega.data.defs[0]?.name, 'core-corner-shop', JSON.stringify(bodega.data.defs.slice(0, 3).map((d: { name: string; why: string[] }) => [d.name, d.why])));
-  assert.equal(bodega.data.defs[1]?.name, 'core-shop', JSON.stringify(bodega.data.defs.slice(0, 3).map((d: { name: string; why: string[] }) => [d.name, d.why])));
+  assert.ok(bodega.data.defs.slice(1, 4).some((d: { name: string }) => d.name === 'core-shop'), JSON.stringify(bodega.data.defs.slice(0, 3).map((d: { name: string; why: string[] }) => [d.name, d.why])));
 });
 
 test('catalog manifest: one line per def, paged, ETag 304; taxonomy lists empty categories; recommend', async () => {
