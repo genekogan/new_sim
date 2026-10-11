@@ -27,16 +27,25 @@ let background: ReturnType<typeof setTimeout> | null = null, running = 0;
 const shasOf = (d: StoredDef | undefined) => { const a = d && d.make.kind === 'mesh' ? (d.make as { asset?: unknown }).asset : null; return typeof a === 'string' && /^[0-9a-f]{64}$/.test(a) ? [a] : []; };
 
 /** Choose the eager GLBs for a snapshot: nearest-first to `centre` until EAGER_BYTES. Returns the loading bar's sizes. */
-export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string, number> }, defOf: (ref: string) => StoredDef | undefined, posOf: (e: Entity) => [number, number] | null, centre: [number, number] = [0, 0]): Record<string, number> {
+export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string, number> }, defOf: (ref: string) => StoredDef | undefined, posOf: (e: Entity) => [number, number] | null, centre: [number, number] = [0, 0], eye?: [number, number]): Record<string, number> {
+  // lane PERF: with the arrival eye known, rank by how big a thing looks from it: distance from the eye over the thing's
+  // size, for things in front (a 60° half-cone towards the centre); things behind the camera come last. Measured on
+  // littlemartians-two at 60 Mbit/s: nearest-the-centre left the foreground bare, nearest-the-eye the plaza's towers.
+  const fx = centre[0] - (eye?.[0] ?? 0), fz = centre[1] - (eye?.[1] ?? 0), fl = Math.hypot(fx, fz) || 1;
+  const score = (x: number, z: number) => {
+    if (!eye) return Math.hypot(x - centre[0], z - centre[1]);
+    const dx = x - eye[0], dz = z - eye[1], d = Math.hypot(dx, dz);
+    return d < 15 || (dx * fx + dz * fz) / (d * fl) > 0.5 ? d : d + 1000;
+  };
   const sizes = snap.assetBytes ?? {};
   if (!LAZY) { eager = null; return sizes; }
-  const dist = new Map<string, number>();
+  const dist = new Map<string, number>(), rank = new Map<string, number>();
   for (const e of snap.entities) {
-    const shas = shasOf(defOf(e.def)); if (!shas.length) continue;
-    const p = posOf(e), d = p ? Math.hypot(p[0] - centre[0], p[1] - centre[1]) : 1e9;
-    for (const sha of shas) dist.set(sha, Math.min(dist.get(sha) ?? Infinity, d));
+    const def = defOf(e.def), shas = shasOf(def); if (!shas.length) continue;
+    const p = posOf(e), d = p ? score(p[0], p[1]) : 1e9, size = Math.max(1, ...((def?.size?.box as number[] | undefined) ?? [1]).map((v) => v * (e.s ?? 1)));
+    for (const sha of shas) { dist.set(sha, Math.min(dist.get(sha) ?? Infinity, d)); rank.set(sha, Math.min(rank.get(sha) ?? Infinity, eye ? d / size : d)); }
   }
-  const order = [...dist.keys()].sort((a, b) => dist.get(a)! - dist.get(b)!);
+  const order = [...rank.keys()].sort((a, b) => rank.get(a)! - rank.get(b)!);
   const pick = new Set<string>(); let bytes = 0;
   for (const sha of order) { const n = sizes[sha] ?? 0; if (pick.size && (bytes + n > EAGER_BYTES || dist.get(sha)! > NEAR_M * 2)) continue; pick.add(sha); bytes += n; }
   eager = pick;
