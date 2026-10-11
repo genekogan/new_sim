@@ -76,9 +76,9 @@ function WorldRoot() {
   const useDev = cfg.authProvider!=='clerk'&&!cfg.accountAuthRequired&&cfg.devAuth && new URLSearchParams(location.search).has('dev');
   if (useDev || (cfg.authProvider!=='clerk'&&!cfg.accountAuthRequired&&!cfg.privyAppId && cfg.devAuth)) return <WithDev cfg={cfg} />;
   if(cfg.authProvider==='clerk'&&cfg.clerkPublishableKey&&cfg.clerkIssuer){
-   const route=clerkOriginRoute(cfg.authenticationOrigin,location.origin,worldPath,location.hash);
+   const route=clerkOriginRoute(cfg.authenticationOrigin,location.origin,worldPath,location.hash,BASE);
    if(route.initialize)return <ClerkProvider publishableKey={cfg.clerkPublishableKey}><WithClerk cfg={cfg}/></ClerkProvider>;
-   const login=()=>{const target=clerkOriginRoute(cfg.authenticationOrigin,location.origin,worldPath,location.hash).signInUrl;if(target)location.assign(target);};
+   const login=()=>{const target=clerkOriginRoute(cfg.authenticationOrigin,location.origin,worldPath,location.hash,BASE).signInUrl;if(target)location.assign(target);};
    return <Shell cfg={cfg} auth={{...unsignedPreviewAuth(route.signInUrl,login),mode:'clerk'}} arrivalEnabled={arrivalEnabled}/>;
   }
   if (cfg.authProvider==='none'||cfg.authProvider==='clerk'||!cfg.privyAppId) return <Shell cfg={cfg} auth={{ ready: true, authed: false, label: null, login: () => alert('Sign-in is not configured on this server.'), logout: () => {}, getToken: async () => null, debug: { privyUserId: null, wallet: null, linked: [] } }} arrivalEnabled={arrivalEnabled} />;
@@ -106,7 +106,7 @@ function WorldList(){
 function LauncherRoot({list}:{list:LauncherList}){
  const a=list.auth;
  if(a?.provider==='clerk'&&a.clerkPublishableKey){
-  const route=clerkHomeRoute(a.authenticationOrigin,location.origin);
+  const route=clerkHomeRoute(a.authenticationOrigin,location.origin,BASE);
   if(route.initialize)return <ClerkProvider publishableKey={a.clerkPublishableKey}><HomeClerk list={list}/></ClerkProvider>;
   return <HomeWith list={list} session={{mode:'clerk',ready:true,authed:false,label:null,signInUrl:route.signInUrl??undefined,getToken:async()=>null,login:()=>{if(route.signInUrl)location.assign(route.signInUrl);},logout:()=>{}}}/>;
  }

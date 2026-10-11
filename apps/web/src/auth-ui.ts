@@ -9,26 +9,36 @@ export function configuredSignIn(cfg:{authProvider?:'clerk'|'privy'|'none';privy
 
 /** Raw-world bootstrap prompt; full runtime instructions live in the installed skill. */
 export function agentOnboarding(worldUrl:string,worldName?:string){
- const base=worldUrl.replace(/\/+$/,''),key=new URL(base).pathname.match(/^\/w\/(toy|mars|littlemartians|eden)(?:\/|$)/)?.[1];
+ // The world slug is the path's first `/w/<slug>` (a launcher base such as `/worlds` may precede it).
+ const base=worldUrl.replace(/\/+$/,''),key=new URL(base).pathname.match(/\/w\/([a-z][a-z0-9-]{0,31})(?:\/|$)/)?.[1];
  const world=worldName??(key==='littlemartians'?'Little Martians':key?key[0].toUpperCase()+key.slice(1):'Eden');
  const instructionsUrl=base+'/instructions.md';
  return {world,instructionsUrl,text:`Read the instructions at ${instructionsUrl} to create a new soul in the world ${world}.`};
 }
 export function agentQuickstart(worldUrl:string,worldName?:string):string{return agentOnboarding(worldUrl,worldName).text;}
 
+/** The app's path prefix: '' (root build) or e.g. '/worlds' (launcher `--base /worlds`); see base-path.ts. */
+const basePrefix=/^(?:\/[a-z0-9][a-z0-9-]{0,31})*$/;
+/** `path` is exactly `<base>/w/<slug>` (optional trailing slash): a world page under this build's prefix.
+ * With base '' this is the pre-prefix check, unchanged. */
+export function isWorldPath(path:string,base='',trailingSlash=false){
+ if(!basePrefix.test(base)||!path.startsWith(base+'/'))return false;
+ return (trailingSlash?/^\/w\/[a-z][a-z0-9-]{0,31}\/?$/:/^\/w\/[a-z][a-z0-9-]{0,31}$/).test(path.slice(base.length));
+}
 /** Authentication comes from server configuration, never request-derived publicUrl (d357).
  * World-engine branch: any launcher world slug, and a god pairing link (#godpair/CODE) survives the hop. */
-export function clerkOriginRoute(authenticationOrigin:string|undefined,currentOrigin:string,path:string,hash=''){
+export function clerkOriginRoute(authenticationOrigin:string|undefined,currentOrigin:string,path:string,hash='',base=''){
  let origin:URL;try{origin=new URL(authenticationOrigin??'');}catch{return {initialize:false,signInUrl:null};}
- if(origin.origin!==authenticationOrigin||origin.username||origin.password||!['https:','http:'].includes(origin.protocol)||origin.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(origin.hostname)||!/^\/w\/[a-z][a-z0-9-]{0,31}\/?$/.test(path))return {initialize:false,signInUrl:null};
+ if(origin.origin!==authenticationOrigin||origin.username||origin.password||!['https:','http:'].includes(origin.protocol)||origin.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(origin.hostname)||!isWorldPath(path,base,true))return {initialize:false,signInUrl:null};
  const soul=soulFromFragment(hash);
  const fragment=/^#approve\/ap_[a-f0-9]{32}$/.test(hash)||/^#godpair\/[A-Z0-9]{4}-[A-Z0-9]{4}$/.test(hash)?hash:soul?'#'+soulFragment(soul):hash==='#join'?'#join':'#watch';
  return {initialize:currentOrigin===origin.origin,signInUrl:origin.origin+path.replace(/\/$/,'')+fragment};
 }
 /** The homepage (`/`, served by the launcher) mounts Clerk only on the configured origin too. */
-export function clerkHomeRoute(authenticationOrigin:string|undefined,currentOrigin:string){
+export function clerkHomeRoute(authenticationOrigin:string|undefined,currentOrigin:string,base=''){
  let origin:URL;try{origin=new URL(authenticationOrigin??'');}catch{return {initialize:false,signInUrl:null};}
  if(origin.origin!==authenticationOrigin||origin.username||origin.password||!['https:','http:'].includes(origin.protocol)||origin.protocol==='http:'&&!['localhost','127.0.0.1','[::1]'].includes(origin.hostname))return {initialize:false,signInUrl:null};
- return {initialize:currentOrigin===origin.origin,signInUrl:origin.origin+'/'};
+ if(!basePrefix.test(base))return {initialize:false,signInUrl:null};
+ return {initialize:currentOrigin===origin.origin,signInUrl:origin.origin+base+'/'};
 }
 export function unsignedPreviewAuth(signInUrl:string|null,login:()=>void){return {ready:true,authed:false,label:null,signInUrl:signInUrl??undefined,login,logout:()=>{},getToken:async()=>null,debug:{privyUserId:null,wallet:null,linked:[]}};}

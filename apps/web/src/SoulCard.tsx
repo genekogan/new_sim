@@ -7,6 +7,7 @@ import {PUBLIC_SOUL_PATH,readPublicRecord,type PublicRecord} from './public-soul
 import {publicSoulActivity} from './PublicSoulActivity.tsx';
 import {publicSoulLink} from './soul-link.ts';
 import {worldPath} from './world-path.ts';
+import {BASE} from './base-path.ts';
 import './SoulCard.css';
 
 /** UI2 (Gene: "it looks like a markdown file"): the selected Soul as a compact card. Name, character, a status
@@ -48,7 +49,7 @@ export function SoulCard({api,soul,doing,energy,plays,talk,camera,pin}:{api:Api;
  useEffect(()=>{setView('card');setCopied('');},[soul.id]);
  useEffect(()=>{if(view==='card'&&title.current?.offsetParent)title.current.focus({preventScroll:true});},[soul.id,view]);
  useEffect(()=>{if(!copied)return;const t=setTimeout(()=>setCopied(''),2200);return()=>clearTimeout(t);},[copied]);
- const share=async()=>{try{await navigator.clipboard.writeText(publicSoulLink(location.origin,worldPath,soul.id));if(alive.current)setCopied('ok');}catch{if(alive.current)setCopied('failed');}};
+ const share=async()=>{try{await navigator.clipboard.writeText(publicSoulLink(location.origin,worldPath,soul.id,BASE));if(alive.current)setCopied('ok');}catch{if(alive.current)setCopied('failed');}};
  const fade=rec!=='loading'&&rec!=='unavailable'&&rec.fade?FADE[rec.fade.colour]??null:null;
  if(view==='activity')return <SoulActivity soul={soul} rec={rec} plays={plays} talk={talk} back={()=>setView('card')}/>;
  return <article className="soul-card" aria-labelledby="soul-card-name">

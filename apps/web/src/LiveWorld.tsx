@@ -55,6 +55,7 @@ import { decodeSceneCapturePublication } from '@sim/protocol/scene-capture';
 import { WorldSceneHistory } from './WorldSceneHistory.ts';
 import { apiPath, worldKey } from './world-path.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
+import { entityArrivalPose } from './entity-arrival.ts';
 import { setAssetLoader } from './gen-mesh/gltf-assets.ts';
 import { GodPanel } from './GodPanel.tsx';
 import { ensureToken as ensureGodToken } from './god-ui/god-api.ts';
@@ -169,6 +170,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   const [problems, setProblems] = useState<string[]>([]);
   const [flagMode, setFlagMode] = useState(false); const flagModeRef = useRef(false); flagModeRef.current = flagMode;
   const [entityWorld, setEntityWorld] = useState(false);
+  /** Entity worlds: the person's camera across scene re-mounts of this page (framed once, on first arrival). */
+  const entityView = useRef<{eye:[number,number,number];target:[number,number,number]}|null>(null);
   const context = useRef({ sim, selected, onSelect, follow, cameraMode, setCameraMode, thing, setThing, onViewerState, loading, graphicsUnavailable, viewportInsets, manualNavigation, setManualNavigation, depictionBeatAt, publishSpeechAnchors, edenExpansion, localClassroomPresentation });
   context.current = { sim, selected, onSelect, follow, cameraMode, setCameraMode, thing, setThing, onViewerState, loading, graphicsUnavailable, viewportInsets, manualNavigation, setManualNavigation, depictionBeatAt, publishSpeechAnchors, edenExpansion, localClassroomPresentation };
   const past = useRef<Past | null>(null);
@@ -258,10 +261,13 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const idleLife=new WorldIdleLife();const idleSouls:IdleSoul[]=[];let attentionTargets=new Map<string,readonly string[]>();
     const edgeItems=new WorldEdgeItems(apiPath('/v1/edge/items'));scene.add(edgeItems.group);edgeItems.start(abort.signal);  // things lying around (together/1)
     const entityLayer=new WorldEntityLayer(apiPath);scene.add(entityLayer.group);let entityWorldFramed=false;
-    // Entity worlds have no Souls to broadcast at first: frame what the god built (or ?eye=x,y,z&at=x,y,z for stable shots).
+    // Entity worlds have no Souls to broadcast at first: frame what the god built (or ?eye=x,y,z&at=x,y,z for stable shots),
+    // once, on first arrival (after the snapshot loads; never from the render loop), at a human distance (entity-arrival.ts).
     const frameEntityWorld=()=>{if(!entityLayer.active||entityWorldFramed)return;entityWorldFramed=true;const q=new URLSearchParams(location.search),eye=q.get('eye')?.split(',').map(Number),at=q.get('at')?.split(',').map(Number);
       if(eye?.length===3&&at?.length===3&&eye.every(Number.isFinite)&&at.every(Number.isFinite)){controls.target.set(at[0],at[1],at[2]);camera.position.set(eye[0],eye[1],eye[2]);}
-      else{const [x0,z0,x1,z1]=entityLayer.viewBounds(),cx=(x0+x1)/2,cz=(z0+z1)/2,span=Math.max(60,x1-x0,z1-z0),gy=entityLayer.groundAt(cx,cz)??0;controls.target.set(cx,gy,cz);camera.position.set(cx-span*0.9,gy+span*0.55,cz+span*1.1);}
+      else if(entityView.current){controls.target.fromArray(entityView.current.target);camera.position.fromArray(entityView.current.eye);}  // a re-mount (welcome, reconnect) keeps the person's camera
+      else{const w=host.clientWidth,visible=w>=800?(w-392)/w:1;  // the god panel (.gp-card: 380 px + 12 px margin) docks on the right on wide screens
+        const pose=entityArrivalPose(entityLayer.viewBounds(),entityLayer.entityCount,entityLayer.groundAt,camera.fov,camera.aspect,visible);controls.target.fromArray(pose.target);camera.position.fromArray(pose.eye);}
       camera.lookAt(controls.target);context.current.setCameraMode('manual');};
     // ?shot=1: a clean picture for `god look` (canvas over every overlay, camera from eye/at, title 'ready' once drawn).
     const shotMode=new URLSearchParams(location.search).has('shot');
@@ -735,7 +741,6 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       }
       if(viewing==='follow' && at.take && !focus){navigation?.release();context.current.setCameraMode('manual');followed=null;}
       entityLayer.applyEdge(context.current.sim.edge??[]);entityLayer.update(step,now,geometry.group);
-      frameEntityWorld();
       navigation?.update(step);
       rts.update(step);
       hover.update(now);
@@ -833,7 +838,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
 
     // click (not drag) to select a Soul, a thing, or a kin
     const inspectHover=(t:HoverTarget)=>{if(t.kind==='soul'){setPlaceCard(null);context.current.setThing(null);context.current.onSelect(t.id);}else if(t.kind==='object'){setPlaceCard(null);context.current.onSelect(null);context.current.setThing(t.id);}else setPlaceCard(t);};
-    const hover=new WorldHover(renderer.domElement,camera,{scene:()=>scene,roots:()=>[floaters.root,kin.view.root,standIns,...(people?.pickingRoots()??[]),...visualObstructionRoots()],entity:id=>{const soul=[...context.current.sim.conn.replica.souls.values()].find(s=>s.entityId===id);if(soul)return {kind:'soul',id:soul.id,name:soul.name,point:new THREE.Vector3(...(shown.current.entities[id]?.p??[0,0,0])),detail:doingText(soul.doing,shown.current.entities[id]?.activity,soul.id)};const rec=records[id];return rec?{kind:'object',id,name:rec.label??plainWords(rec.def),point:new THREE.Vector3(...(shown.current.entities[id]?.p??[0,0,0])),detail:plainWords(shown.current.entities[id]?.activity)}:null;},places:()=>expansion?EDEN_VIEWER_PLACES.filter(p=>p.kind!=='world'):Object.entries(shown.current.take?.finalState.regions??{}).flatMap(([id,r])=>r.polygon&&r.label?[{id,name:r.label,polygon:r.polygon}]:[]),available:()=>drawnTick.current!==null&&!context.current.loading&&!context.current.graphicsUnavailable,inspect:inspectHover});scene.add(hover.marker);
+    const hover=new WorldHover(renderer.domElement,camera,{scene:()=>scene,roots:()=>[floaters.root,kin.view.root,standIns,...(people?.pickingRoots()??[]),...visualObstructionRoots()],entity:id=>{const soul=[...context.current.sim.conn.replica.souls.values()].find(s=>s.entityId===id);if(soul)return {kind:'soul',id:soul.id,name:soul.name,point:new THREE.Vector3(...(shown.current.entities[id]?.p??[0,0,0])),detail:doingText(soul.doing,shown.current.entities[id]?.activity,soul.id)};const rec=records[id];return rec?{kind:'object',id,name:rec.label??plainWords(rec.def),point:new THREE.Vector3(...(shown.current.entities[id]?.p??[0,0,0])),detail:plainWords(shown.current.entities[id]?.activity)}:null;},places:()=>entityLayer.active?[]:expansion?EDEN_VIEWER_PLACES.filter(p=>p.kind!=='world'):Object.entries(shown.current.take?.finalState.regions??{}).flatMap(([id,r])=>r.polygon&&r.label?[{id,name:r.label,polygon:r.polygon}]:[]),available:()=>drawnTick.current!==null&&!context.current.loading&&!context.current.graphicsUnavailable,inspect:inspectHover});scene.add(hover.marker);
     const onDown = (e: PointerEvent) => { groupSelection.clear(); orbitPivot.cancel(); down = e.button === 0 ? { x: e.clientX, y: e.clientY } : null; };
     const onMove = (e: PointerEvent) => {
       if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) context.current.setCameraMode(cameraModeAfterGesture(context.current.cameraMode));
@@ -883,6 +888,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       for (const l of labels.values()) { scene.remove(l.obj); l.obj.element.remove(); }
       labels.clear();
       people?.dispose();
+      if(entityWorldFramed)entityView.current={eye:camera.position.toArray(),target:controls.target.toArray()};  // entity worlds only: the camera survives the scene re-mount
       edgeItems.dispose();entityLayer.dispose();
       diagnostics.dispose();placePreviews.dispose();bodyModels.dispose();
       floaters.dispose();
