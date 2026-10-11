@@ -15,6 +15,7 @@ type Cam = { position: { x: number; y: number; z: number } };
 type Host = { layer: { model?: WorldModel | null }; camera: Cam };
 type Emitter = { id: string; spec: SoundSpec; pts: [number, number, number][]; area: boolean; state: Record<string, unknown> };
 
+const KINDS = new Set<SoundKind>(['water', 'stream', 'fire', 'wind', 'creak', 'birds', 'bell', 'hum', 'engine', 'chime', 'frogs', 'music']);
 const MAX_VOICES = 8, TICK_MS = 100, MASTER = 0.55;
 const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
 
@@ -57,7 +58,10 @@ export function emittersOf(model: WorldModel): Emitter[] {
     const state: Record<string, unknown> = {};
     for (const [k, f] of Object.entries(def.state ?? {})) state[k] = (f as { default?: unknown }).default;
     Object.assign(state, e.state ?? {});
-    out.push({ id: e.id, spec, state, ...placeOf(model, e, def) });
+    // a def may let each instance pick its sound and loudness (params `sound`, `loudness`)
+    const p = e.params ?? {}, kind = p.sound, loud = p.loudness;
+    const s = { ...spec, ...(typeof kind === 'string' && KINDS.has(kind as SoundKind) ? { kind: kind as SoundKind } : {}), ...(typeof loud === 'number' ? { volume: Math.max(0, Math.min(1, loud)) } : {}) };
+    out.push({ id: e.id, spec: s, state, ...placeOf(model, e, def) });
   }
   return out;
 }
