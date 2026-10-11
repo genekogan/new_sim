@@ -187,7 +187,7 @@ export class GodPlaces {
     const m = this.h.model, L = this.h.layers!;
     for (const p of out) {
       const e = m.entities.get(p.entity); if (!e) continue;
-      if (/^core[-/]zone@/.test(e.def)) { p.kind = `${String(e.params?.use ?? 'residential')} zone`; p.description = `a ${p.kind} the god drew${p.description?.includes(' with ') ? ', with' + p.description.split(' with ').slice(1).join(' with ') : ''}`; }
+      if (/^core[-/]zone@/.test(e.def)) { p.kind = `${String(e.params?.use ?? 'residential')} zone`; const rest = p.description?.includes(' with ') ? p.description.split(' with ').slice(1).join(' with ') : ''; p.description = `a ${p.kind} the god drew${rest ? `, with ${rest}` : ''}`; }
       const extra = [L.tag(e), L.peopleAt(e.id)].filter(Boolean).join('; ');
       if (extra && p.of !== 'shore') p.description = `${p.description ?? ''}; ${extra}`.slice(0, 600);
     }
@@ -197,7 +197,8 @@ export class GodPlaces {
       let p = own;
       if (!p) { const wp = m.worldPose(e); p = out.filter((q) => q.of !== 'shore' && inPoly(wp.x, wp.z, q.polygon)).sort((a, b) => areaOf(a.polygon) - areaOf(b.polygon))[0]; }
       if (!p) continue;
-      const label = e.name ? m.pathOf(e.id) : p.name, slots = L.slotsFor(e, label).map((s) => ({ ...s, id: own ? s.id : `${e.id}-${s.id}`.slice(0, 60) }));
+      // a place's own opening hours are its slots; a thing inside (a door that follows the café's hours) adds only its events
+      const label = e.name ? m.pathOf(e.id) : p.name, slots = L.slotsFor(e, label).filter((s) => own || !s.id.startsWith('open-')).map((s) => ({ ...s, id: own ? s.id : `${e.id}-${s.id}`.slice(0, 60) }));
       if (slots.length) p.schedule = [...(p.schedule ?? []), ...slots];
     }
   }
