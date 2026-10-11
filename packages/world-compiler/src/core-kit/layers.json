@@ -1,0 +1,17 @@
+[
+  {
+    "schema": "def/1",
+    "name": "core-zone",
+    "version": 1,
+    "description": "A land-use zone the god draws: residential, commercial, park, farm, civic, industrial or wild. Nothing to see or bump into; Souls see it on the map and in `here` (a place round what stands in it). GET /v1/god/layers/zone-suggest?use=… recommends catalogue categories for it.",
+    "tags": ["zone", "land-use", "district", "place"],
+    "category": "layer.landuse",
+    "synonyms": ["zone", "zoning", "district", "quarter", "land use", "lot", "plot"],
+    "form": "area",
+    "layer": "volume",
+    "make": { "kind": "none" },
+    "size": { "box": [40, 0.1, 40] },
+    "params": { "use": { "type": "enum", "values": ["residential", "commercial", "park", "farm", "civic", "industrial", "wild"], "default": "residential", "doc": "what the land is for" } },
+    "components": { "place": { "kind": "zone", "enclosed": false } }
+  }
+]

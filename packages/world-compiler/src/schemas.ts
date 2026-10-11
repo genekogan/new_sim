@@ -4,6 +4,7 @@
 import { z } from 'zod';
 import { landformBodySchema } from '@sim/ground';
 import { ID, NAME, fieldSchema, fieldsSchema, materialEnum, num, slotSchema, v2, v3, value } from '@sim/generators';
+import { ACCESS, layersStateSchema, ownerRef, priceSchema, relRef, RELATIONS, scheduleSchema } from './layers.ts';
 
 export const ENTITY_SCHEMA = 'entity/1';
 export const DEF_SCHEMA = 'def/1';
@@ -176,6 +177,11 @@ export const entitySchema = z.object({
   state: z.record(z.string(), value).optional(),
   seed: z.number().int().optional(),
   constraints: constraintsSchema.optional(),
+  /** LAYERS (absent until the god uses them): owner, access, schedule, price. */
+  owner: ownerRef.optional(),
+  access: z.enum(ACCESS).optional(),
+  schedule: scheduleSchema.optional(),
+  price: priceSchema.optional(),
   by: z.string(), born: z.number().int(), v: z.number().int().default(1),
 });
 export type Entity = z.infer<typeof entitySchema>;
@@ -217,6 +223,8 @@ export const worldStateSchema = z.object({
   constitution: z.string().max(20000).default(''),
   /** What the bare ground is made of (L3): the terrain colouring reads it. */
   ground: z.object({ palette: z.enum(['grass', 'desert', 'dust', 'sand', 'snow', 'rock', 'garden']).default('grass') }).prefault({}),
+  /** LAYERS: currency, wallets, relationships. Absent until a layers op (economy, mint, pay, relate) makes it. */
+  layers: layersStateSchema.optional(),
 });
 export type WorldState = z.infer<typeof worldStateSchema>;
 /** A `world` op's state is a patch: no defaults (they would reset what it does not name); compile merges it per key and per field. */
@@ -238,6 +246,7 @@ const place = z.object({
   shape: entitySchema.shape.shape, anchor: entitySchema.shape.anchor,
   params: z.record(z.string(), value).optional(), state: z.record(z.string(), value).optional(), seed: z.number().int().optional(),
   constraints: constraintsSchema.optional(),
+  owner: ownerRef.optional(), access: z.enum(ACCESS).optional(), schedule: scheduleSchema.optional(), price: priceSchema.optional(),
   mode: z.enum(['strict', 'nudge']).default('strict'),
 });
 const remove = z.object({ op: z.literal('remove'), id: z.string(), cascade: z.boolean().default(true) });
@@ -248,7 +257,15 @@ const move = z.object({
   constraints: constraintsSchema.optional(),
   mode: z.enum(['strict', 'nudge']).default('strict'),
 });
-const set = z.object({ op: z.literal('set'), id: z.string(), state: z.record(z.string(), value).optional(), params: z.record(z.string(), value).optional(), name: z.string().regex(NAME).optional(), constraints: constraintsSchema.optional() });
+const set = z.object({ op: z.literal('set'), id: z.string(), state: z.record(z.string(), value).optional(), params: z.record(z.string(), value).optional(), name: z.string().regex(NAME).optional(), constraints: constraintsSchema.optional(),
+  /** LAYERS: null clears. */
+  owner: ownerRef.nullable().optional(), access: z.enum(ACCESS).nullable().optional(), schedule: scheduleSchema.nullable().optional(), price: priceSchema.nullable().optional() });
+/** LAYERS ops. economy: the world's currency name. mint: the god adds (or, negative, takes) money. pay: money moves
+ *  between wallets (never below zero). relate: a relationship on (or off). Each inverts exactly. */
+const economy = z.object({ op: z.literal('economy'), currency: z.string().min(1).max(24).nullable() });
+const mint = z.object({ op: z.literal('mint'), to: ownerRef, amount: z.number().min(-1_000_000).max(1_000_000).refine((n) => n !== 0, 'amount must not be 0') });
+const pay = z.object({ op: z.literal('pay'), from: ownerRef, to: ownerRef, amount: z.number().positive().max(1_000_000), for: z.string().max(120).optional() });
+const relate = z.object({ op: z.literal('relate'), a: relRef, rel: z.enum(RELATIONS), b: relRef, on: z.boolean().default(true) });
 /** Deep-copy a subtree with fresh ids. `count` copies stepping by `step` [dx, dz] from `p` (or from the source). */
 const clone = z.object({
   op: z.literal('clone'), id: z.string(), tmp: z.string().regex(/^\$[a-z0-9_-]{1,24}$/).optional(), name: z.string().regex(NAME).optional(),
@@ -266,9 +283,9 @@ const answer = z.object({ op: z.literal('answer'), prayer: z.string(), text: z.s
 /** Internal: restore a previously removed entity verbatim (inverse of remove). Never accepted from clients. */
 const restore = z.object({ op: z.literal('restore'), entity: entitySchema });
 
-export const opSchema = z.discriminatedUnion('op', [place, remove, move, set, clone, define, world, expand, answer, restore]);
+export const opSchema = z.discriminatedUnion('op', [place, remove, move, set, clone, define, world, expand, answer, restore, economy, mint, pay, relate]);
 export type Op = z.infer<typeof opSchema>;
-export const clientOpSchema = z.discriminatedUnion('op', [place, remove, move, set, clone, define, world, expand, answer]);
+export const clientOpSchema = z.discriminatedUnion('op', [place, remove, move, set, clone, define, world, expand, answer, economy, mint, pay, relate]);
 
 export const batchSchema = z.object({
   schema: z.literal(EDIT_SCHEMA).default(EDIT_SCHEMA),
@@ -292,5 +309,6 @@ export const refusalCodes = [
   'parent.unknown', 'slot.unknown', 'slot.incompatible', 'slot.full', 'slot.outside',
   'size.range', 'extent.outside', 'overlap.solid', 'support.none', 'held.by-body', 'occupied.by-body',
   'constant.immutable', 'float.no-water', 'constraint.unsatisfied', 'architecture.unreachable', 'architecture.headroom', 'entity.unknown', 'entity.limit', 'name.taken', 'params.invalid', 'state.invalid', 'undo.conflict',
+  'wallet.insufficient', 'relation.invalid',
 ] as const;
 export type RefusalCode = (typeof refusalCodes)[number];

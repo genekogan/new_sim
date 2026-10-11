@@ -257,6 +257,35 @@ Souls' map ("a mountain about 60 m high…; walk:thunder-peak climbs it") and ex
 Limit today: Souls walk within one 384 m square of the world at a time (the engine's walking window), so land much
 farther than that from where they live is seen but not yet reached on foot.
 
+## Life layers: hours, owners, zones, relationships, money
+
+The invisible systems of a town. Each is one god edit (validated, in the history, undone by `undo`); Souls perceive
+them through what they already read (`map`, `here`, `observe`, `whatson`, `calendar`) and act on them (`buy:`, `pay:`).
+```
+zone market-quarter commercial --rect 0,0,100,70   # residential | commercial | park | farm | civic | industrial | wild
+                                       # a place on the Souls' map ("market < market-quarter"); prints what suits it
+zone-suggest park                      # catalogue categories (and defs) for a use
+hours cafe --open 07:00-15:00          # opening hours (several --open; @days: --open 09:00-13:00@sat,sun; past midnight ok)
+hours market --event "concert 20:00 90 fri"   # name time [minutes] [days]: whatson lists it, the calendar posts it
+hours cafe-door --open 07:00-15:00 --follow locked@open=false/true   # a state that follows the hours (open|event|dark)
+hours square-lamp --follow on@dark=true/false                         # lamps on 19:30–06:30
+hours cafe --clear
+own cafe Ana                           # a Soul (by name), god, group:<name> or none; what stands in it is hers too
+own ana-house Ana --private            # private: only the owner (her group's members, those who work there) may open,
+access shed private|public|none        #   sit, take; others are refused with "ana-house is Ana's and private"
+currency shells · give Ben 10 · give Ben -2 · pay Ben Ana 3            # wallets never go below zero
+price bread-stall/loaf 3               # for sale: a Soul near it is offered buy:<id> (it becomes theirs)
+price cafe 2 --service "a coffee"      # a service: buying pays the owner, the café stays
+relate Ana works-at cafe · relate Ana friend Ben · relate Ben member-of group:bakers · relate Ana friend Ben --off
+layers                                 # the whole picture: clock, zones, owners, hours, prices, relations, wallets
+```
+Souls see: on the map, a place's owner, hours and who works or lives there ("Ana's; open 07:00–15:00; Ana works
+here"); in `observe`, each thing's `owner` to them ("yours", "Ana's, private", "public"), price and hours; `whatson`
+lists today's hours and events (a Saturday market only on Saturdays); `GET /v1/world/layers/me` (Soul token) gives
+their wallet, what they own and their relationships. A Soul buys with `act buy:<id>`, pays with
+`act pay:<soulId> {"amount": 2}` and prices what is theirs with `act sell:<id> {"price": 4}`. Days: the world's first
+day is a Saturday.
+
 ## Seeing and checking
 
 - `look [--at <ref>|x,z] [--from s|n|e|w|ne…|above] [--dist m] [--inside [--floor k]] [--out f.png]` —
@@ -317,6 +346,8 @@ an extra word, several options in one quoted argument); nothing was sent. Fix th
 | `architecture.unreachable` · `architecture.headroom` | the building's plan has a sealed room / too-low floor; change params (`floors`, `floorHeight`, `plan`) |
 | `occupied.by-body` · `held.by-body` | a Soul is using it; wait or build elsewhere |
 | `undo.conflict` | something later depends on it; undo that first, or fix by hand |
+| `wallet.insufficient` | the wallet has less than that (a Soul spent it); `layers` shows wallets |
+| `relation.invalid` | a relation end is not a thing, Soul or group (`thing:` names must exist) |
 
 ## Manners
 

@@ -23,6 +23,8 @@ import vocab from './vocab.json' with { type: 'json' };
 import vocab2 from './vocab-2.json' with { type: 'json' };
 import vocabW1 from './vocab-w1.json' with { type: 'json' };
 import vocabW2 from './vocab-w2.json' with { type: 'json' };
+// LAYERS: land-use zones (core/zone@1)
+import layers from './layers.json' with { type: 'json' };
 import type { DefInput } from '../schemas.ts';
 
-export const FAMILY_KITS: DefInput[] = [creatures, furniture, props, structures, plants, transport, civic, play, kitchen, work, signage, mesh, terrain, mars, littlemartians, vocab, vocab2, vocabW1, vocabW2].flat() as unknown as DefInput[];
+export const FAMILY_KITS: DefInput[] = [creatures, furniture, props, structures, plants, transport, civic, play, kitchen, work, signage, mesh, terrain, mars, littlemartians, vocab, vocab2, vocabW1, vocabW2, layers].flat() as unknown as DefInput[];

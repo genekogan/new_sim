@@ -1727,7 +1727,7 @@
     "private",
     "property"
    ],
-   "via": "OPEN: entity state field `owner` (convention), not enforced"
+   "via": "LAYERS: entity owner/access (eden-god own/access); private things refuse other Souls' actuators, seats and hands"
   },
   {
    "id": "layer.landuse",
@@ -1739,7 +1739,7 @@
     "plot",
     "lot"
    ],
-   "via": "area defs with a place component (plaza, lawn, pitch); OPEN: zoning defs",
+   "via": "LAYERS: core/zone@1 areas (eden-god zone <name> <use>; zone-suggest <use>); area defs with a place component",
    "want": [
     "zone-residential",
     "zone-market",
@@ -1766,7 +1766,7 @@
     "timetable",
     "event"
    ],
-   "via": "OPEN: places have no schedule field (R4-LIVE open item)"
+   "via": "LAYERS: entity schedule (eden-god hours --open/--event/--follow); whatson, calendar; states follow the clock"
   },
   {
    "id": "layer.economy",
@@ -1778,7 +1778,7 @@
     "trade",
     "shop"
    ],
-   "via": "OPEN: deferred by Gene (numbers shelved as dials)"
+   "via": "LAYERS (minimal): currency, prices, wallets (eden-god currency/price/give/pay; Souls buy:/pay:/sell:)"
   },
   {
    "id": "layer.relationship",
@@ -1788,7 +1788,7 @@
     "friend",
     "family"
    ],
-   "via": "Souls' own memory (edge), not the world catalogue"
+   "via": "LAYERS: relations in the world state (eden-god relate <a> <rel> <b>); Souls' own memory (edge)"
   },
   {
    "id": "layer.marker",

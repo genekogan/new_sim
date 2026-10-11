@@ -1502,6 +1502,146 @@ warnings: ${r.warnings.join("; ")}` : ""}`;
 var ENV_FLAGS = { time: "speed pause resume", weather: "kind intensity clouds wind rain fog", strike: "at", land: LAND_FLAGS };
 var ENV_BOOLS = ["pause", "resume", "preview", "force"];
 
+// lib/layers.mjs
+var RELS = ["friend", "neighbour", "family", "works-at", "lives-at", "member-of"];
+var USES = ["residential", "commercial", "park", "farm", "civic", "industrial", "wild"];
+var DAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+var hhmm = (s, what) => {
+  const m = /^(\d{1,2})(?::(\d{2}))?$/.exec(String(s).trim());
+  if (!m || Number(m[1]) > 24 || Number(m[2] ?? 0) > 59) throw new Error(`${what}: a time is HH:MM (e.g. 07:00), got "${s}"`);
+  return `${m[1].padStart(2, "0")}:${m[2] ?? "00"}`;
+};
+var days = (s, what) => {
+  if (!s) return void 0;
+  const d = String(s).toLowerCase().split(/[,/ ]+/).filter(Boolean).map((x) => x.slice(0, 3));
+  for (const x of d) if (!DAYS.includes(x)) throw new Error(`${what}: days are ${DAYS.join(",")}, got "${x}"`);
+  return d;
+};
+var list = (v) => v === void 0 ? [] : [].concat(v);
+var val = (s) => s === "true" ? true : s === "false" ? false : /^-?\d+(\.\d+)?$/.test(s) ? Number(s) : s;
+async function souls() {
+  try {
+    return ok(await call("/v1/god/layers"), "layers").souls ?? [];
+  } catch {
+    return [];
+  }
+}
+async function who(s, what = "owner") {
+  const v = String(s ?? "").trim();
+  if (!v) throw new Error(`${what}: whose? a Soul's name, god, group:<name> or none`);
+  if (v === "none") return null;
+  if (v === "god" || /^group:[a-z0-9][a-z0-9-]*$/.test(v)) return v;
+  const n = v.replace(/^soul:/, ""), all = await souls(), hit = all.find((x) => x.id === n) ?? all.find((x) => x.name.toLowerCase() === n.toLowerCase());
+  return `soul:${hit ? hit.id : n}`;
+}
+async function end(s) {
+  const v = String(s).trim();
+  if (v === "god" || v.startsWith("group:") || v.startsWith("thing:")) return v;
+  const n = v.replace(/^soul:/, ""), all = await souls(), hit = all.find((x) => x.id === n) ?? all.find((x) => x.name.toLowerCase() === n.toLowerCase());
+  if (hit || v.startsWith("soul:")) return `soul:${hit ? hit.id : n}`;
+  return `thing:${v}`;
+}
+async function edit(ops, say, note) {
+  const r = ok(await call("/v1/god/act", { body: { ops, note: note ?? say } }), "act");
+  invalidate();
+  return r.accepted ? `${say} (seq ${r.seq}; undo undoes it)` : `REFUSED: ${r.failures.map((f) => `${f.code}: ${f.detail}`).join("; ")}`;
+}
+async function hours(ref, f) {
+  if (!ref) throw new Error('hours <thing> --open 07:00-15:00 [--event "name 20:00 90 fri"] [--follow field@open=is/else]');
+  if (f.clear) return edit([{ op: "set", id: ref, schedule: null }], `${ref}: no schedule`);
+  const s = {};
+  for (const o of list(f.open)) {
+    const [span, d] = String(o).split("@");
+    const [a, b] = span.split("-");
+    if (!b) throw new Error(`--open takes from-to (07:00-15:00), optionally @days (@sat,sun), got "${o}"`);
+    s.open = [...s.open ?? [], { from: hhmm(a, "--open"), to: hhmm(b, "--open"), ...d ? { days: days(d, "--open") } : {} }];
+  }
+  for (const e of list(f.event)) {
+    const w = String(e).trim().split(/\s+/);
+    if (w.length < 2) throw new Error(`--event takes "name HH:MM [minutes] [days]", got "${e}"`);
+    const name = w[0].toLowerCase().replace(/[^a-z0-9-]+/g, "-");
+    const minutes = w[2] && /^\d+$/.test(w[2]) ? Number(w[2]) : 60;
+    const d = w[2] && !/^\d+$/.test(w[2]) ? w[2] : w[3];
+    s.events = [...s.events ?? [], { name, label: w[0].replace(/-/g, " "), at: hhmm(w[1], "--event"), minutes, ...d ? { days: days(d, "--event") } : {} }];
+  }
+  for (const x of list(f.follow)) {
+    const m = /^([a-zA-Z][\w-]*)@(open|event|dark)=([^/]+)(?:\/(.+))?$/.exec(String(x));
+    if (!m) throw new Error(`--follow takes field@open|event|dark=value[/else] (locked@open=false/true, on@dark=true/false), got "${x}"`);
+    s.follow = [...s.follow ?? [], { field: m[1], when: m[2], is: val(m[3]), ...m[4] !== void 0 ? { else: val(m[4]) } : {} }];
+  }
+  if (!Object.keys(s).length) throw new Error("hours: give --open, --event or --follow (or --clear)");
+  return edit([{ op: "set", id: ref, schedule: s }], `${ref}: ${[...(s.open ?? []).map((o) => `open ${o.from}\u2013${o.to}${o.days ? " " + o.days.join(",") : ""}`), ...(s.events ?? []).map((e) => `${e.label} ${e.at} ${e.minutes}m${e.days ? " " + e.days.join(",") : ""}`), ...(s.follow ?? []).map((x) => `${x.field} follows ${x.when}`)].join("; ")}`);
+}
+async function own(ref, whom, f) {
+  if (!ref) throw new Error("own <thing> <soul|god|group:name|none> [--private|--public]");
+  const owner = await who(whom), op = { op: "set", id: ref, owner };
+  if (f.private) op.access = "private";
+  else if (f.public) op.access = "public";
+  return edit([op], `${ref}: ${owner ? `owned by ${whom}` : "no owner"}${op.access ? `, ${op.access}` : ""}`);
+}
+async function access(ref, a) {
+  if (!["private", "public", "none"].includes(a)) throw new Error("access <thing> private|public|none");
+  return edit([{ op: "set", id: ref, access: a === "none" ? null : a }], `${ref}: ${a}`);
+}
+async function price(ref, amount, f) {
+  if (!ref || amount === void 0) throw new Error('price <thing> <amount|none> [--service "a coffee"]');
+  if (amount === "none") return edit([{ op: "set", id: ref, price: null }], `${ref}: not for sale`);
+  const n = Number(amount);
+  if (!(n >= 0)) throw new Error(`price: amount is a number \u2265 0, got "${amount}"`);
+  return edit([{ op: "set", id: ref, price: { amount: n, ...f.service ? { service: String(f.service) } : {} } }], `${ref}: ${f.service ? `${f.service} for ${n}` : `for sale at ${n}`}`);
+}
+var currency = (name) => {
+  if (!name) throw new Error("currency <name> (e.g. shells)");
+  return edit([{ op: "economy", currency: name === "none" ? null : name }], `currency: ${name}`);
+};
+async function give(whom, amount) {
+  const n = Number(amount);
+  if (!Number.isFinite(n) || n === 0) throw new Error("give <soul|group:x> <amount> (negative takes)");
+  const to = await who(whom, "give");
+  if (!to) throw new Error("give to whom?");
+  return edit([{ op: "mint", to, amount: n }], `${n > 0 ? "gave" : "took"} ${Math.abs(n)} ${n > 0 ? "to" : "from"} ${whom}`);
+}
+async function pay(from, to, amount) {
+  const n = Number(amount);
+  if (!(n > 0)) throw new Error("pay <from> <to> <amount>");
+  return edit([{ op: "pay", from: await who(from, "pay"), to: await who(to, "pay"), amount: n }], `${from} paid ${to} ${n}`);
+}
+async function zone(name, use, f) {
+  if (!name || !USES.includes(use)) throw new Error(`zone <name> <${USES.join("|")}> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],\u2026]'`);
+  const area = f.rect ? rectArea(String(f.rect)) : f.circle ? circleArea(String(f.circle)) : f.area ? JSON.parse(String(f.area)) : null;
+  if (!area) throw new Error("zone: give its outline: --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],\u2026]'");
+  const r = await edit([{ op: "place", def: "core/zone@1", name, shape: { area }, params: { use } }], `zone ${name}: ${use}`);
+  if (r.startsWith("REFUSED")) return r;
+  const s = ok(await call(`/v1/god/layers/zone-suggest?use=${use}`, { as: "none" }), "zone-suggest");
+  return `${r}
+suits: ${s.categories.map((c) => `${c.category}${c.defs.length ? ` (${c.defs.slice(0, 3).join(", ")})` : ""}`).join(" \xB7 ")}`;
+}
+async function zoneSuggest(use) {
+  if (!USES.includes(use)) throw new Error(`zone-suggest <${USES.join("|")}>`);
+  return ok(await call(`/v1/god/layers/zone-suggest?use=${use}`, { as: "none" }), "zone-suggest");
+}
+async function relate(a, rel, b, f) {
+  if (!a || !RELS.includes(rel) || !b) throw new Error(`relate <a> <${RELS.join("|")}> <b> [--off]`);
+  return edit([{ op: "relate", a: await end(a), rel, b: await end(b), on: !f.off }], `${a} ${f.off ? "no longer " : ""}${rel} ${b}`);
+}
+async function layers(f) {
+  const L = ok(await call("/v1/god/layers"), "layers");
+  if (f.json) return L;
+  const c = L.clock ? `${String(Math.floor(L.clock.minute / 60)).padStart(2, "0")}:${String(L.clock.minute % 60).padStart(2, "0")} ${DAYS[L.clock.weekday]} ${L.clock.day}` : "no clock yet";
+  const lines = [`clock ${c} \xB7 currency ${L.currency}`];
+  if (L.zones.length) lines.push(`zones: ${L.zones.map((z) => `${z.name} (${z.use})`).join(", ")}`);
+  for (const t of L.things) lines.push(`  ${t.name}: ${[t.owner ? `${t.owner}${t.access === "private" ? " (private)" : ""}` : t.access, t.price ? `${t.price.service ? t.price.service + " " : ""}${t.price.amount} ${L.currency}` : "", t.hours ?? "", ...(t.schedule?.follow ?? []).map((x) => `${x.field} follows ${x.when}`)].filter(Boolean).join(" \xB7 ")}`);
+  if (L.relations.length) lines.push(`relations: ${L.relations.map((r) => `${r.a} ${r.rel} ${r.b}`).join("; ")}`);
+  const w = Object.entries(L.wallets ?? {});
+  if (w.length) lines.push(`wallets: ${w.map(([k, v]) => `${k} ${v}`).join(", ")}`);
+  if (L.souls?.length) lines.push(`souls: ${L.souls.map((s) => s.name).join(", ")}`);
+  return lines.join("\n");
+}
+var LAYERS_FLAGS = { hours: "open event follow clear note", own: "private public", access: "", price: "service", currency: "", give: "", pay: "", zone: "rect circle area", "zone-suggest": "", relate: "off", layers: "" };
+var LAYERS_BOOLS = ["clear", "private", "public", "off"];
+var LAYERS_POS = { hours: 1, own: 2, access: 2, price: 2, currency: 1, give: 2, pay: 3, zone: 2, "zone-suggest": 1, relate: 3, layers: 0 };
+var LAYERS_HELP = `layers: hours <ref> --open 07:00-15:00[@sat,sun] [--event "market 09:00 240 sat"] [--follow locked@open=false/true | on@dark=true/false] [--clear] \xB7 own <ref> <soul|god|group:x|none> [--private|--public] \xB7 access <ref> private|public|none \xB7 price <ref> <n|none> [--service "a coffee"] \xB7 currency <name> \xB7 give <soul> <n> \xB7 pay <from> <to> <n> \xB7 zone <name> <residential|commercial|park|farm|civic|industrial|wild> --rect|--circle|--area \xB7 zone-suggest <use> \xB7 relate <a> <friend|neighbour|family|works-at|lives-at|member-of> <b> [--off] \xB7 layers`;
+
 // cli.mjs
 var SELF = (() => {
   try {
@@ -1644,10 +1784,10 @@ async function defs(q, flags2 = {}) {
   if (q && !/\s/.test(q.trim())) {
     const name = q.trim().toLowerCase().replace(/^core[/-]/, "").replace(/@\d+$/, "");
     const qs2 = new URLSearchParams({ q: name.replace(/-/g, " ") });
-    const list = ok(await call(`/v1/god/defs?${qs2}`), "defs").defs;
+    const list2 = ok(await call(`/v1/god/defs?${qs2}`), "defs").defs;
     const want = /@\d+$/.test(q) ? q.trim().replace(/^core\//, "core-") : null;
-    const hit = list.find((d) => want ? d.ref === want || d.ref === want.replace(/^core-/, "") : d.name === `core-${name}` || d.name === name);
-    if (hit && !flags2.json) return defDetail(hit, list.filter((d) => d !== hit).map((d) => d.ref.replace(/^core-/, "core/")));
+    const hit = list2.find((d) => want ? d.ref === want || d.ref === want.replace(/^core-/, "") : d.name === `core-${name}` || d.name === name);
+    if (hit && !flags2.json) return defDetail(hit, list2.filter((d) => d !== hit).map((d) => d.ref.replace(/^core-/, "core/")));
     if (hit && flags2.json) return hit;
     if (want) return `no def ${q}. \`defs ${name.replace(/-/g, " ")}\` searches the library.`;
   }
@@ -1790,7 +1930,7 @@ var HINTS = {
   "undo.conflict": "the world changed since; undo the later edit first or fix by hand"
 };
 var explainFailure = (f) => `${f.code} (op ${f.op}): ${f.detail}${f.suggest?.p ? ` \u2014 suggest p ${JSON.stringify(f.suggest.p)}` : ""}${HINTS[f.code] ? ` [${HINTS[f.code]}]` : ""}`;
-var parseKV = (list) => Object.fromEntries([].concat(list ?? []).map((kv) => {
+var parseKV = (list2) => Object.fromEntries([].concat(list2 ?? []).map((kv) => {
   const i = kv.indexOf("=");
   const k = kv.slice(0, i), v = kv.slice(i + 1);
   return [k, /^-?\d+(\.\d+)?$/.test(v) ? Number(v) : v === "true" ? true : v === "false" ? false : /^[[{]/.test(v) ? JSON.parse(v) : v];
@@ -2105,10 +2245,10 @@ async function recolor(id, color, flags2 = {}) {
 }
 async function remove(ids) {
   const v0 = view(await mirror());
-  const list = [].concat(ids).filter(Boolean).flatMap((id) => v0.get(id) ? [id] : setOf(v0, id)?.members.map((r3) => r3.path) ?? [id]);
-  if (!list.length) throw new Error("usage: remove <ref> [<ref>\u2026]");
-  const r = await act({ ops: list.map((id) => ({ op: "remove", id })) });
-  return r.accepted ? `removed ${list.join(", ")} (and what was inside)` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
+  const list2 = [].concat(ids).filter(Boolean).flatMap((id) => v0.get(id) ? [id] : setOf(v0, id)?.members.map((r3) => r3.path) ?? [id]);
+  if (!list2.length) throw new Error("usage: remove <ref> [<ref>\u2026]");
+  const r = await act({ ops: list2.map((id) => ({ op: "remove", id })) });
+  return r.accepted ? `removed ${list2.join(", ")} (and what was inside)` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
 }
 async function clone(id, flags2) {
   const o = { op: "clone", id, ...flags2.name ? { name: flags2.name } : {}, ...flags2.count ? { count: num(flags2.count) } : {}, ...flags2.step ? { step: String(flags2.step).split(",").map(Number) } : {}, ...flags2.yaw !== void 0 ? { r: num(flags2.yaw) } : {}, mode: flags2.nudge ? "nudge" : "strict" };
@@ -2424,7 +2564,7 @@ async function status() {
   const st = ok(await call("/v1/god/status"), "status");
   return `${s.world} \u2014 you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ""}; skill ${SKILL_VERSION}`;
 }
-var BOOL = /* @__PURE__ */ new Set(["float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "off", "md", "fresh", "remove", "free", "list", ...ENV_BOOLS]);
+var BOOL = /* @__PURE__ */ new Set(["float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "off", "md", "fresh", "remove", "free", "list", ...ENV_BOOLS, ...LAYERS_BOOLS]);
 var boolsFor = (cmd) => cmd === "look" ? /* @__PURE__ */ new Set([...BOOL, "inside"]) : BOOL;
 function parseFlags(argv, bools = BOOL) {
   const flags2 = {}, rest = [];
@@ -2476,9 +2616,10 @@ var FLAGS = {
   catalog: "category has tag page per",
   find: "category has tag all",
   recommend: "per",
-  taxonomy: ""
+  taxonomy: "",
+  ...LAYERS_FLAGS
 };
-var POS = { catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+var POS = { ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 var NUMERIC = /* @__PURE__ */ new Set(["dist", "count", "t", "setback", "row", "spacing", "width", "span", "radius", "sun", "clouds", "wind", "rain", "fog", "intensity", "speed", "amount", "level", "depth", "metres", "peak", "edge", "face", "steps", "side", "scale", "floor", "height", "h", "slope", "gap", "yaw"]);
 function checkArgs(cmd, f, rest) {
   const allowed = /* @__PURE__ */ new Set(["json", ...(FLAGS[cmd] ?? "").split(/\s+/).filter(Boolean)]);
@@ -2562,6 +2703,17 @@ var COMMANDS = {
     const m = await mirror({ fresh: !!f.fresh });
     return `mirror: seq ${m.seq}, ${m.rows.length} entities${m.offline ? " (offline)" : ""}`;
   },
+  hours: (r, f) => hours(r[0], f),
+  own: (r, f) => own(r[0], r[1], f),
+  access: (r) => access(r[0], r[1]),
+  price: (r, f) => price(r[0], r[1], f),
+  currency: (r) => currency(r[0]),
+  give: (r) => give(r[0], r[1]),
+  pay: (r) => pay(r[0], r[1], r[2]),
+  zone: (r, f) => zone(r[0], r[1], f),
+  "zone-suggest": (r) => zoneSuggest(r[0]),
+  relate: (r, f) => relate(r[0], r[1], r[2], f),
+  layers: (r, f) => layers(f),
   help: () => HELP
 };
 var HELP = `eden-god ${SKILL_VERSION} \u2014 god mode for one Eden world. Read SKILL.md.
@@ -2575,6 +2727,7 @@ world:  sky [--palette p --sun s] \xB7 time [19:30|7pm] [--speed h/h] [--pause|-
 pair:   register <world-url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB7 prayers [--all: answered too] \xB7 answer <id> <text> \xB7 status
 ${LAND_HELP}
 find:   catalog [--category c] [--has slot:sit|actuator:door|comp:light] [--page n] (every def, one line each) \xB7 find <words> [--category c] [--has \u2026] \xB7 recommend <what you want> \xB7 taxonomy (categories, counts, param conventions, actuators)
+${LAYERS_HELP}
 learn:  examples [name] \xB7 defs <name|core/x@1> (one def in full) \xB7 sky (palettes) \xB7 a row named stall = the set "stall"`;
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("eden-god.mjs")) {
   const [cmd, ...argv] = process.argv.slice(2);

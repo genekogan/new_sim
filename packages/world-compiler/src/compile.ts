@@ -8,8 +8,9 @@ import { hashOf } from './hash.ts';
 import { offsetPolyline, pointAlong } from '@sim/generators';
 import { WorldModel, obbOverlap, type OBB } from './model.ts';
 import { batchSchema, trustedBatchSchema, type Batch, type Entity, type Failure, type Field, type Op, type Result, type StoredDef, type Value, worldStateSchema, SKY_PALETTES } from './schemas.ts';
+import { layersStateSchema, type LayersState, type Schedule } from './layers.ts';
 
-export type Diff = { upserts: Entity[]; removes: string[]; defs: StoredDef[]; world?: Partial<WorldModel['state']>; constants?: WorldModel['constants']; tiles: string[]; answers: { prayer: string; text: string }[] };
+export type Diff = { upserts: Entity[]; removes: string[]; defs: StoredDef[]; world?: Partial<WorldModel['state']>; constants?: WorldModel['constants']; tiles: string[]; answers: { prayer: string; text: string }[]; /** LAYERS: state.layers changed (wallets, relations, currency; never sent to viewers) */ layers?: true };
 /** Body-aware edits (31 §3 rule 8): who uses an entity — a Soul seated on it, holding it, or the entity is a body.
  *  Checked for every entity in the subtree of a remove / move / set-params target; null = free. */
 export type UsesHook = (id: string) => { code: 'occupied.by-body' | 'held.by-body'; detail: string } | null;
@@ -61,6 +62,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   const diff: Diff = { upserts: [], removes: [], defs: [], tiles: [], answers: [] };
   const inverse: Op[] = [];
   const touched = new Set<string>();
+  let layersTouched = false;
   const upsert = (e: Entity) => { touched.add(e.id); };
   const resolveId = (ref: string, opIndex: number): string | null => {
     if (ref === 'world') return 'world';
@@ -113,6 +115,11 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         if (scratch.entities.size >= scratch.constants.limits.entities) { failures.push(fail(i, 'entity.limit', `${scratch.constants.limits.entities} entities`)); return; }
         const id = scratch.nextId();
         const e: Entity = { id, def: def.ref, in: { parent: parentId, ...(op.in.slot ? { slot: op.in.slot } : {}) }, by, born: tick, v: 1, ...(op.name ? { name: op.name } : {}), ...(op.p ? { p: op.p } : {}), ...(op.r !== undefined ? { r: op.r } : {}), ...(op.s !== undefined ? { s: op.s } : {}), ...(op.shape ? { shape: op.shape } : {}), ...(op.anchor ? { anchor: op.anchor } : {}), ...(Object.keys(fieldsOk.values).length ? { params: fieldsOk.values } : {}), ...(Object.keys(stateOk.values).length ? { state: stateOk.values } : {}), ...(op.seed !== undefined ? { seed: op.seed } : {}), ...(op.constraints?.length ? { constraints: op.constraints } : {}) };
+        { const bad = followProblem(def, op.schedule); if (bad) { failures.push(fail(i, 'state.invalid', bad)); return; } }
+        if (op.owner !== undefined) e.owner = op.owner;
+        if (op.access !== undefined) e.access = op.access;
+        if (op.schedule !== undefined) e.schedule = op.schedule;
+        if (op.price !== undefined) e.price = op.price;
         prepareEntity(scratch, def, e, op.params);
         const problem = admit(scratch, e, def, i, op.mode, true);
         if (problem) { failures.push(problem); return; }
@@ -179,6 +186,13 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
           next.params = { ...prev.params, ...ok.values };
         }
         if (op.constraints !== undefined) { inv.constraints = prev.constraints ?? []; next.constraints = op.constraints; }
+        // LAYERS: owner, access, schedule, price (null clears; the inverse puts back what was there, or clears)
+        if (op.schedule) { const bad = followProblem(def, op.schedule); if (bad) { failures.push(fail(i, 'state.invalid', bad)); return; } }
+        for (const k of ['owner', 'access', 'schedule', 'price'] as const) {
+          const v = op[k]; if (v === undefined) continue;
+          (inv as Record<string, unknown>)[k] = prev[k] ?? null;
+          if (v === null) delete next[k]; else (next as Record<string, unknown>)[k] = v;
+        }
         if (op.name !== undefined) {
           if (scratch.names.has(`${prev.in.parent}/${op.name}`)) { failures.push(fail(i, 'name.taken', op.name)); return; }
           inv.name = prev.name; next.name = op.name;
@@ -282,6 +296,42 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         return;
       }
       case 'answer': { diff.answers.push({ prayer: op.prayer, text: op.text }); return; }
+      // LAYERS: currency, wallets and relationships live in state.layers (made on first use; viewers never get wallets)
+      case 'economy': {
+        const L = layersOf(scratch), prev = L.currency ?? null;
+        const next = { ...L }; if (op.currency === null) delete next.currency; else next.currency = op.currency;
+        scratch.state = { ...scratch.state, layers: next }; layersTouched = true;
+        inverse.unshift({ op: 'economy', currency: prev });
+        return;
+      }
+      case 'mint': case 'pay': {
+        const L = layersOf(scratch), w = { ...L.wallets };
+        const from = op.op === 'pay' ? op.from : null, to = op.to, amount = op.amount;
+        if (from !== null && from === to) { failures.push(fail(i, 'schema', 'pay: from and to are the same wallet')); return; }
+        const after = (ref: string, d: number) => Math.round(((w[ref] ?? 0) + d) * 100) / 100;
+        if (from !== null) { const left = after(from, -amount); if (left < 0) { failures.push(fail(i, 'wallet.insufficient', `${from} has ${w[from] ?? 0}${L.currency ? ' ' + L.currency : ''}; ${amount} is more`)); return; } w[from] = left; }
+        const got = after(to, amount); if (got < 0) { failures.push(fail(i, 'wallet.insufficient', `${to} has ${w[to] ?? 0}${L.currency ? ' ' + L.currency : ''}; cannot take ${-amount}`)); return; }
+        w[to] = got;
+        for (const k of Object.keys(w)) if (w[k] === 0) delete w[k];
+        scratch.state = { ...scratch.state, layers: { ...L, wallets: w } }; layersTouched = true;
+        inverse.unshift(op.op === 'pay' ? { op: 'pay', from: to, to: from!, amount, ...(op.for ? { for: `undo: ${op.for}`.slice(0, 120) } : {}) } : { op: 'mint', to, amount: -amount });
+        return;
+      }
+      case 'relate': {
+        const end = (r: string): string | null => {
+          if (!r.startsWith('thing:')) return r;
+          const e = scratch.get(r.slice(6)); if (!e) { failures.push(fail(i, 'relation.invalid', `${r}: no such thing`)); return null; }
+          return `thing:${e.id}`;
+        };
+        const a = end(op.a), b = end(op.b); if (!a || !b) return;
+        if (a === b) { failures.push(fail(i, 'relation.invalid', 'a relation needs two different ends')); return; }
+        const L = layersOf(scratch), has = L.relations.some((x) => x.a === a && x.rel === op.rel && x.b === b);
+        if (has === op.on) return;   // already so: nothing to do, nothing to undo
+        const relations = op.on ? [...L.relations, { a, rel: op.rel, b }] : L.relations.filter((x) => !(x.a === a && x.rel === op.rel && x.b === b));
+        scratch.state = { ...scratch.state, layers: { ...L, relations } }; layersTouched = true;
+        inverse.unshift({ op: 'relate', a, rel: op.rel, b, on: !op.on });
+        return;
+      }
       case 'restore': {
         if (!opts.trusted) { failures.push(fail(i, 'schema', 'restore is internal')); return; }
         const e = op.entity; const def = scratch.resolvedDef(e.def);
@@ -302,6 +352,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   for (const id of resolved) touched.add(id);
   for (const id of touched) { const e = scratch.entities.get(id); if (e) diff.upserts.push(e); }
   diff.tiles = [...new Set(diff.tiles)];
+  if (layersTouched) diff.layers = true;
   const refused = opts.refuse?.(scratch, diff, ops);
   if (refused) return { ok: false, failures: [refused] };
   if (heldBack.length) return { ok: false, failures: [heldBack[0]] };
@@ -332,6 +383,17 @@ export function applyBatch(world: WorldModel, input: unknown, by: string, tick: 
 }
 
 // ---------- helpers ----------
+
+/** state.layers with its defaults (a world that has none gets one on the first layers op). */
+function layersOf(w: WorldModel): LayersState { return layersStateSchema.parse(w.state.layers ?? {}); }
+/** A schedule's `follow` fields must be state fields of the def, and their values valid. */
+function followProblem(def: StoredDef, s: Schedule | null | undefined): string | null {
+  for (const f of s?.follow ?? []) {
+    if (!def.state[f.field]) return `schedule.follow: ${def.name} has no state field ${f.field} (it has ${Object.keys(def.state).join(', ') || 'none'})`;
+    for (const v of [f.is, ...(f.else !== undefined ? [f.else] : [])]) { const ok = checkFields(def.state, { [f.field]: v }, false); if (!ok.ok) return `schedule.follow: ${ok.detail}`; }
+  }
+  return null;
+}
 
 /** The world's bounds [x0, z0, x1, z1] (m): the ground recipe's extent (GOD-ENV; ±extent/2 on worlds never extended). */
 export function boundsOf(w: WorldModel): [number, number, number, number] { const e = w.ground().extent; return [e[0], e[1], e[2], e[3]]; }
