@@ -61,8 +61,16 @@ function distToPath(x: number, z: number, path: [number, number][]) {
   for (let i = 1; i < path.length; i++) { const [ax, az] = path[i - 1], [bx, bz] = path[i]; const dx = bx - ax, dz = bz - az, l2 = dx * dx + dz * dz || 1; const t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / l2)); best = Math.min(best, Math.hypot(x - ax - dx * t, z - az - dz * t)); }
   return best;
 }
+/** R4-LIVE: how dark the viewer's world clock makes it (0 day … 1 night), set every frame by the live view; null before
+ *  any clock. Lamps then light at dusk and go out at dawn on their own, whatever the sky palette says. */
+let clockNight: number | null = null;
+export function setClockNight(n: number | null) { clockNight = n === null || !Number.isFinite(n) ? null : Math.max(0, Math.min(1, n)); }
 export function nightOf(model: WorldModel | null): number {
   if (!model) return 0;
+  if (clockNight !== null) return Math.max(clockNight, paletteNight(model));
+  return paletteNight(model);
+}
+function paletteNight(model: WorldModel): number {
   const sky = model.state.sky as { palette?: string; sun?: number };
   if (/night|midnight/.test(sky.palette ?? '')) return 1;
   if (/dusk|dawn|twilight|sunset/.test(sky.palette ?? '')) return 0.6;

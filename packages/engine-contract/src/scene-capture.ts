@@ -26,7 +26,8 @@ const bodySchema = z.object({
   scene: z.unknown(),
   buildings: z.array(z.object({file:z.string(),p:vec3,yaw:finite.optional(),scale:z.union([finite.positive().max(100),z.tuple([finite.positive().max(100),finite.positive().max(100),finite.positive().max(100)])]).optional()}).strict()).optional(),
   kin: z.array(z.object({model:z.string(),p:vec3,yaw:finite.optional(),radius:finite.positive().optional(),hoverHeight:finite.optional(),hover:finite.optional()}).strict()).optional(),
-  clock: z.object({origin:z.number().int().nonnegative(),dayTicks:z.number().int().positive()}).strict().nullable().optional(),
+  // origin may be negative on a god world whose owner set the time of day early in its life (R4-LIVE); the live worlds' never are
+  clock: z.object({origin:z.number().int().safe(),dayTicks:z.number().int().positive()}).strict().nullable().optional(),
   ground: z.literal('grass').optional(),
   assetRoot:z.string().regex(/^\/world-assets\/[a-z0-9][a-z0-9_-]{0,63}$/).optional(),
   shore:nativeShoreSceneV1Schema.optional(),

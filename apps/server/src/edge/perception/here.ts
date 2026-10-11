@@ -153,9 +153,10 @@ export function bodyEnd(ledger: EdgeLedger, soulId: string): {place: string | nu
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 function lightOf(hour: number, minute: number) {const t = hour * 60 + minute; return t < 330 ? 'night' : t < 420 ? 'dawn' : t < 1110 ? 'day' : t < 1200 ? 'dusk' : 'night';}
-function skyOf(w: {clouds?: number; rain?: number; wind?: number} | undefined) {
+function skyOf(w: {clouds?: number; rain?: number; wind?: number; fog?: number; kind?: string} | undefined) {
   if (!w) return null;
-  const sky = (w.rain ?? 0) > 0.3 ? 'rain' : (w.clouds ?? 0) > 0.6 ? 'overcast' : (w.clouds ?? 0) > 0.25 ? 'some cloud' : 'clear';
+  // `kind`/`fog` come only from a god world's weather (EdgeLedger.weatherNow, R4-LIVE); the live worlds' words are unchanged
+  const sky = w.kind === 'storm' ? 'thunderstorm' : (w.fog ?? 0) > 0.5 ? 'fog' : (w.rain ?? 0) > 0.3 ? 'rain' : (w.clouds ?? 0) > 0.6 ? 'overcast' : (w.clouds ?? 0) > 0.25 ? 'some cloud' : 'clear';
   const wind = (w.wind ?? 0) > 0.6 ? 'windy' : (w.wind ?? 0) > 0.3 ? 'breezy' : (w.wind ?? 0) > 0.1 ? 'light' : 'calm';
   return {sky, wind};
 }
@@ -180,7 +181,7 @@ export function compactDoHere(caps:readonly EdgeCapability[],localTargets:Readon
 export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:boolean}={}) {
   const P = new Perception(ledger, soul), tick = P.tick, me = P.me(), b = me.body, host = ledger.host;
   const day = host.living, c = day ? clockAt(tick, day.origin, day.dayTicks) : null;
-  const weather = skyOf((P.w as {env?: {weather?: {clouds: number; rain: number; wind: number}}}).env?.weather);
+  const weather = skyOf(ledger.weatherNow?.() ?? (P.w as {env?: {weather?: {clouds: number; rain: number; wind: number}}}).env?.weather);
   // my current body act and how long its timed step has left
   const open = ledger.openReceipts(soul.soulId).filter(r => (r as {channel?: string}).channel !== 'attention');
   const program = host.engine.programOf(soul.entityId), action = program ? host.engine.programAction?.(program) : null;

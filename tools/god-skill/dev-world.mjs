@@ -18,7 +18,7 @@ export async function startWorld({ slug, port, data, genesis, fresh = false, log
   if (fresh) rmSync(dataDir, { recursive: true, force: true });
   mkdirSync(dataDir, { recursive: true });
   const marsWeb = resolve(root, '.lane/mars-web');
-  const env = { ...process.env, WORLD_KEY: slug, WORLD_ID: `${slug}-1`, ENGINE: 'mars', PORT: String(port), DEV_AUTH: '1', BRAIN_MODE: 'fake', SEED_NATIVES: '0', DATA_DIR: dataDir, PUBLIC_URL: `http://127.0.0.1:${port}`, ...(existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}), ...(genesis ? { GENESIS_FILE: resolve(genesis) } : {}) };
+  const env = { ...process.env, WORLD_KEY: slug, WORLD_ID: `${slug}-1`, ENGINE: 'mars', PORT: String(port), DEV_AUTH: '1', BRAIN_MODE: 'fake', SEED_NATIVES: '0', EDGE_FADING: '1', DATA_DIR: dataDir, PUBLIC_URL: `http://127.0.0.1:${port}`, ...(existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}), ...(genesis ? { GENESIS_FILE: resolve(genesis) } : {}) };
   const out = log ? openSync(log, 'a') : 'ignore';
   const child = spawn(process.execPath, ['apps/server/src/main.ts'], { cwd: root, env, stdio: ['ignore', out, out], detached: !!log });
   const base = `http://127.0.0.1:${port}/w/${slug}`;
