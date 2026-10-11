@@ -52,7 +52,7 @@ export function prepareArtifactOverlay(options){
  }
  const indexPaths=new Set(['/',...KEYS.flatMap(k=>[`/w/${k}`,`/w/${k}/`])]);
  const cliPaths=new Set(['/eden-agent.mjs',...KEYS.map(k=>`/w/${k}/eden-agent.mjs`)]);
- const mime={'.md':'text/markdown; charset=utf-8','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.woff':'font/woff','.woff2':'font/woff2','.wasm':'application/wasm','.ico':'image/x-icon'};
+ const mime={'.md':'text/markdown; charset=utf-8','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.woff':'font/woff','.woff2':'font/woff2','.mp4':'video/mp4','.webm':'video/webm','.wasm':'application/wasm','.ico':'image/x-icon'};
  const attribution=Object.freeze({frontendSource,cliSource,webManifestSha256,cliSha256,...(guideArtifacts?{guideSource:guideArtifacts.source,guideHashes:Object.freeze(Object.fromEntries(KEYS.map(k=>[k,Object.freeze(guideHashes[k])])))}:{})});
  return Object.freeze({attribution,handle(req,res){
   if(req.method!=='GET'&&req.method!=='HEAD')return false;
