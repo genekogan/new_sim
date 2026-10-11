@@ -6,6 +6,7 @@ import {EdgeError, type EdgeSoul} from '../contract.ts';
 import {stateOf, type EdgeLedger} from '../ledger/ledger.ts';
 import {centroid,inPoly} from '../ledger/places.ts';
 import {visualFloorOffset} from './platforms.ts';
+import {humanoidDims} from '../../../../../mars/viewer/engine/bodies/humanoid.ts';
 import {buildOccluders, computeSight, lightOf, wrap, compassOf, doingOf, type EyePose, type Occluders, type Sight, type SightBody, type SightFixture, type V2} from './sight.ts';
 
 export type ViewMode = 'eyes' | 'map';
@@ -46,7 +47,7 @@ export function eyePose(body: {pose: {p: number[]; yaw: number}; body?:{family:s
   const [x, recordedY, z] = body.pose.p,y=recordedY+floorOffset, act = String(body.human?.activity ?? '');
   const datum = body.human?.shore?.datumY;
   const eyeY = body.body?.family==='floater'?y+(body.body.hoverHeight??1.45):(state === 'swimming' || act === 'swim' || act === 'tread') && Number.isFinite(datum) ? datum! + 0.25
-    : state === 'seated' ? y + 1.15 : state === 'lying' || state === 'sleeping' ? y + 0.35 : y + 1.62;
+    : state === 'seated' ? y + humanoidDims(body.body as never).seatedEyeHeight : state === 'lying' || state === 'sleeping' ? y + 0.35 : y + humanoidDims(body.body as never).eyeHeight;
   const hfov = hfovDeg * Math.PI / 180, vfov = 2 * Math.atan(Math.tan(hfov / 2) * h / w);
   return {p: [x, Math.round(eyeY * 1000) / 1000, z], yaw, pitch: PITCH, hfov, vfov};
 }
@@ -62,7 +63,7 @@ export function resolveGaze(ledger: EdgeLedger, soul: EdgeSoul, me: SightBody, g
   if (!/^[A-Za-z0-9][A-Za-z0-9._:#-]{0,120}$/.test(g)) throw new EdgeError(400, 'invalid', 'gaze must be forward, left, right, behind, a Soul id or a thing id');
   const at = (p: V2, name: string, y = 0.9) => ({mode: 'target', yaw: Math.atan2(p[1] - me.p[2], p[0] - me.p[0]), target: name, aim: [p[0], y, p[1]] as [number, number, number]});
   const near = ledger.perceivedBodies(soul.soulId, 60).find(o => o.soulId === g || o.entityId === g);
-  if (near) {const b = (ledger.host.engine.world as NativeWorld).entities[near.entityId]; if (b) return at([b.pose.p[0], b.pose.p[2]], near.name, b.pose.p[1]+visualFloorOffset(ledger,b as never)+(b.body?.family==='floater'?(b.body.hoverHeight??1.45):1.3));}
+  if (near) {const b = (ledger.host.engine.world as NativeWorld).entities[near.entityId]; if (b) return at([b.pose.p[0], b.pose.p[2]], near.name, b.pose.p[1]+visualFloorOffset(ledger,b as never)+(b.body?.family==='floater'?(b.body.hoverHeight??1.45):1.3*humanoidDims(b.body as never).scale));}
   if (ledger.host.minds.get(g)) throw new EdgeError(404, 'gaze.not-visible', 'That Soul is not near you (or is inside somewhere else), so you cannot turn to look at it.');
   const e = (ledger.host.engine.world as NativeWorld).entities[g];
   if (e && e.kind !== 'human') {
