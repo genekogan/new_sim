@@ -159,6 +159,11 @@ try {
     return { status: r.status, body: r.data.body, error: r.data.error };
   }, (r) => r.status === 200 && r.body?.params?.height === 1.92 && r.body?.params?.walkSpeed === 0.9);
   await step('B1 a walk speed above the engine cap is refused', async () => { const r = await api('/v1/edge/body', { as: 'ben', method: 'PUT', body: { look: { walkSpeed: 1.6 } } }); return { status: r.status, code: r.data.error?.code }; }, (r) => r.status === 400 && r.code === 'body.look');
+  await step('O1 Ana\'s owner (signed in) changes her look through the owner route (proposal 05): 1.62 m, slim', async () => {
+    const r = await api(`/v1/souls/${souls.ana.id}/look`, { as: 'ana-owner', method: 'PUT', body: { height: 1.62, build: 0.9 } });
+    const other = await api(`/v1/souls/${souls.ana.id}/look`, { as: 'ben-owner', method: 'PUT', body: { height: 1.9 } });
+    return { status: r.status, params: r.data.body?.params, otherOwner: other.status };
+  }, (r) => r.status === 200 && r.params?.height === 1.62 && r.params?.build === 0.9 && r.otherOwner === 403);
   if (page) { await sleep(6000); await step('V1 real wheel input zooms the camera onto Ben', async () => ({ aimedAt: await zoomTo('Ben', 4) }), (r) => r.aimedAt.length > 0); await sleep(1500); await snap('w1-ben-new-look'); }
   // both walk 16 m east at once
   const both = await step('W1 Ana and Ben walk to the east flags together; Ben walks at ≤ 0.9 m/s, Ana at today\'s ≈ 1.35', async () => {

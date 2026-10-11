@@ -1,0 +1,76 @@
+--- a/apps/server/src/edge/body/routes.ts
++++ b/apps/server/src/edge/body/routes.ts
+@@ -68,9 +68,12 @@
+     db.exec('BEGIN IMMEDIATE');try{db.prepare('INSERT OR IGNORE INTO edge_body_assets_v1 VALUES(?,?,?,?)').run(world,asset.assetId,JSON.stringify(asset),bytes);db.prepare('INSERT INTO edge_body_owners_v1(world_id,owner,asset_id,descriptor) VALUES(?,?,?,?) ON CONFLICT(world_id,owner,asset_id) DO UPDATE SET descriptor=excluded.descriptor').run(world,s.owner,asset.assetId,JSON.stringify(asset));db.exec('COMMIT');}catch(e){db.exec('ROLLBACK');throw e;}
+     return {asset};
+   }));
+-  app.put('/v1/edge/body',wrap(async c=>{
+-    const s=deps.soul(c),source=deps.db.soul(s.soulId);if(!source)throw new EdgeError(401,'unauthorized','Soul owner is unavailable');
+-    const raw=await c.req.json().catch(()=>null);if(!raw||typeof raw!=='object'||Array.isArray(raw)||Object.keys(raw).length!==1)throw new EdgeError(400,'body.assignment','Choose exactly one preset, assetId or look');
++  app.put('/v1/edge/body',wrap(async c=>{const s=deps.soul(c);return assign(s,await c.req.json().catch(()=>null),true);}));
++  // The owner's look editor (SoulCard): the same look request for one of the signed-in owner's Souls.
++  if(deps.ownerSoul)app.put('/v1/souls/:id/look',wrap(async c=>{const s=await deps.ownerSoul!(c,c.req.param('id')??'');return assign(s,{look:await c.req.json().catch(()=>null)},false);}));
++  /** Assign a body to Soul `s`: by its own token (`tokenBound`: the token must still be the one that asked) or by its owner. */
++  async function assign(s:{soulId:string;entityId:string;owner:string;name:string},raw:any,tokenBound:boolean){
++    const source=deps.db.soul(s.soulId);if(!source)throw new EdgeError(401,'unauthorized','Soul owner is unavailable');if(!raw||typeof raw!=='object'||Array.isArray(raw)||Object.keys(raw).length!==1)throw new EdgeError(400,'body.assignment','Choose exactly one preset, assetId or look');
+     let body:Entity['body']|null;
+     if(typeof raw.preset==='string'){const preset=BODY_PRESETS.find(p=>p.id===raw.preset);if(!preset)throw new EdgeError(400,'body.preset-unknown','Unknown body preset');body=preset.body;}
+     else if(typeof raw.assetId==='string'&&ASSET.test(raw.assetId)){
+@@ -82,7 +85,7 @@
+       catch(e){if(e instanceof LookError)throw new EdgeError(400,'body.look',e.message);throw e;}
+     }else throw new EdgeError(400,'body.assignment','Choose a preset, admitted assetId or look');
+     const authority=():true=>{const row=deps.db.soul(s.soulId),mind=deps.host.minds.get(s.soulId);
+-      if(!row||row.retired_at!==null||row.owner!==source.owner||row.world_id!==world||row.entity_id!==s.entityId||row.token_hash!==source.token_hash||!mind||mind.owner!==row.owner||mind.entityId!==row.entity_id)throw new EdgeError(401,'unauthorized','Soul authority changed before body assignment');
++      if(!row||row.retired_at!==null||row.owner!==source.owner||row.world_id!==world||row.entity_id!==s.entityId||(tokenBound&&row.token_hash!==source.token_hash)||!mind||mind.owner!==row.owner||mind.entityId!==row.entity_id)throw new EdgeError(401,'unauthorized','Soul authority changed before body assignment');
+       return true;};
+     authority();deps.ledger.ownerControlGrace(s.soulId);
+     const guard=():true=>{authority();
+@@ -93,11 +96,11 @@
+     guard();if(JSON.stringify(current(s.entityId))===JSON.stringify(body))return {body:current(s.entityId),changed:false};
+     const event=await deps.host.enqueueChecked('body-assignment-v1','world:body',{contract:'body-assignment/1',worldId:world,soulId:s.soulId,entityId:s.entityId,body:structuredClone(body)},guard,()=>true);
+     deps.ledger.invalidateBodies();return {body:current(s.entityId),changed:true,tick:event.tick,seq:event.seq};
+-  }));
++  }
+   app.get('/v1/edge/body/assets/:file',c=>{
+     const file=c.req.param('file');if(!/^body_[a-f0-9]{64}\.glb$/.test(file))return c.notFound();
+     const row=db.prepare('SELECT content FROM edge_body_assets_v1 WHERE world_id=? AND asset_id=?').get(world,file.slice(0,-4)) as {content:Uint8Array}|undefined;if(!row)return c.notFound();
+     return c.body(new Uint8Array(row.content),200,{'Content-Type':'model/gltf-binary','Cache-Control':'public, max-age=31536000, immutable','X-Content-Type-Options':'nosniff','Content-Security-Policy':"default-src 'none'"});
+   });
+-  addSchemaPart('body',{contract:'body/1',types:['humanoid','ceramic','floater'],limits:BODY_LIMITS,endpoints:['GET /v1/edge/body','POST /v1/edge/body/uploads (multipart model+manifest)','PUT /v1/edge/body (preset|assetId|look)'],rig:'quaternius/1',look:{def:HUMANOID_REF,choices:lookChoices,random:'{look:{random:true,seed?}}',edit:'{look:{key:value,...}} over the current look'},safeSwap:'Standing, idle, free hands and no carriers/paired/construction commitments'});
++  addSchemaPart('body',{contract:'body/1',types:['humanoid','ceramic','floater'],limits:BODY_LIMITS,endpoints:['GET /v1/edge/body','POST /v1/edge/body/uploads (multipart model+manifest)','PUT /v1/edge/body (preset|assetId|look)','PUT /v1/souls/:id/look (the owner: a look request)'],rig:'quaternius/1',look:{def:HUMANOID_REF,choices:lookChoices,random:'{look:{random:true,seed?}}',edit:'{look:{key:value,...}} over the current look'},safeSwap:'Standing, idle, free hands and no carriers/paired/construction commitments'});
+ }
+diff --git a/apps/server/src/edge/contract.ts b/apps/server/src/edge/contract.ts
+index a6488e84..d3fd1519 100644
+--- a/apps/server/src/edge/contract.ts
++++ b/apps/server/src/edge/contract.ts
+@@ -41,6 +41,8 @@ export interface EdgeLedgerHooks {
+   performBodies?(soul: EdgeSoul, capability: string, label: string, steps: {verb: string; params: Record<string, unknown>}[], clientRef?: string,effects?:unknown,admission?:ObjectBodyAdmission): Promise<{accepted: true; receipt: EdgeReceipt} | {accepted: false; code: string; reason: string}>;
+ }
+ export type EdgeCapability = {id: string; verb: string; label: string; available: boolean; target?: {id: string; kind: string}; blocked?: {code: string; reason: string}; params?: Record<string, unknown>; object?: string; action?: string};
+-export type EdgeDeps = {host: WorldHost; db: Db; souls: Souls; build?: string; soul(c: Context): EdgeSoul; ledger: EdgeLedgerHooks};
++export type EdgeDeps = {host: WorldHost; db: Db; souls: Souls; build?: string; soul(c: Context): EdgeSoul; ledger: EdgeLedgerHooks;
++  /** The signed-in owner's Soul `id` (owner routes such as PUT /v1/souls/:id/look); throws when not theirs. */
++  ownerSoul?(c: Context, id: string): Promise<EdgeSoul>};
+ export class EdgeError extends Error {readonly status: number; readonly code: string; constructor(status: number, code: string, message: string) {super(message); this.status = status; this.code = code;}}
+ export const edgeBody = <T extends object>(body: T) => ({contract: EDGE_CONTRACT, ...body});
+diff --git a/apps/server/src/http.ts b/apps/server/src/http.ts
+index 8e1533ca..18d173dc 100644
+--- a/apps/server/src/http.ts
++++ b/apps/server/src/http.ts
+@@ -27,6 +27,7 @@ import type {CandidateStationV2} from './station-v2.ts';
+ import {mountStationRoutesV2} from './station-routes-v2.ts';
+ import type {EdgeLedger} from './edge/ledger/ledger.ts';
+ import {mountEdgeRoutes,edgeSoulResolver} from './edge/routes.ts';
++import {EdgeError} from './edge/contract.ts';
+ import { mountGodRoutes } from './god/routes.ts';
+ import { mountJoinRoutes, PUBLISHED_SOUL_CLI } from './god/join.ts';
+ import type { GodMode } from './god/god.ts';
+@@ -44,7 +45,7 @@ export function buildApp(d: Deps) {
+   d.host.profileWorldPath=d.cfg.worldPath;
+   const profiles=new SoulProfiles(d.host,d.souls);
+   const bearer = (c: Context) => c.req.header('authorization')?.replace(/^Bearer\s+/i, '');
+-  if (d.edge) { if (d.edge.host !== d.host) throw new Error('edge ledger must belong to selected host'); const comms = mountEdgeRoutes(app, { host: d.host, db: d.db, souls: d.souls, build: d.cfg.build, soul: edgeSoulResolver(d.host, d.souls, bearer), ledger: d.edge }); comms.onSpectator(m => d.hub?.broadcast?.(m as never)); d.hub?.joinMessages?.push(() => comms.spectatorJoin()); d.hub?.upgradeHandlers?.push((req, socket, head) => comms.events.upgrade(req, socket, head)); }
++  if (d.edge) { if (d.edge.host !== d.host) throw new Error('edge ledger must belong to selected host'); const comms = mountEdgeRoutes(app, { host: d.host, db: d.db, souls: d.souls, build: d.cfg.build, soul: edgeSoulResolver(d.host, d.souls, bearer), ledger: d.edge, ownerSoul: async (c, id) => { try { const {u} = await profileIdentity(c); const s = ownSoul(u, id); return {soulId: s.id, entityId: s.entity_id, name: s.name, owner: s.owner}; } catch (e) { if (e instanceof ApiError) throw new EdgeError(e.status, e.code, e.message); throw e; } } }); comms.onSpectator(m => d.hub?.broadcast?.(m as never)); d.hub?.joinMessages?.push(() => comms.spectatorJoin()); d.hub?.upgradeHandlers?.push((req, socket, head) => comms.events.upgrade(req, socket, head)); }
+   const ip = (c: Context) => (c.req.header('x-forwarded-for') ?? 'local').split(',')[0].trim();
+   const requireUser = async (c: Context): Promise<UserRow> => { const u = await d.auth.userFromToken(bearer(c)); if (!u) throw new ApiError(401, 'unauthorized', 'sign in first'); return u; };
+   const requireAdmin = async (c: Context): Promise<UserRow> => { const u = await requireUser(c); if (u.role !== 'admin') throw new ApiError(403, 'forbidden', 'admin only'); return u; };
