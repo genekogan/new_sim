@@ -72,15 +72,22 @@ const ROWS = [
   { z: 50, gap: 7, eye: [0, 4, 10], names: ['pool-table', 'chess-table', 'foosball', 'arcade-cabinet', 'bookcase', 'seesaw', 'boulder', 'debris-pile', 'excavation-pit', 'cave-mouth', 'chimney-stack', 'awning', 'solar-panels', 'rail-signal', 'buffer-stop'] },
   { z: 80, gap: 15, eye: [0, 9, 26], names: ['grain-silo', 'factory-chimney', 'power-substation', 'windmill', 'storage-tank', 'gable-roof', 'hip-roof', 'flat-roof', 'dome-roof', 'station-platform', 'tram-stop', 'tram-car', 'level-crossing', 'rail-track'] },
   { z: 125, gap: 32, eye: [0, 18, 42], names: ['warehouse', 'factory', 'workshop', 'smithy', 'depot'] },
+  { z: -55, gap: 9, eye: [0, 4, 10], names: ['potted-plant', 'window-box', 'hanging-basket', 'statue', 'memorial', 'traffic-light', 'road-sign', 'milestone', 'lantern-post', 'floodlight', 'string-lights', 'stairs', 'ramp',
+    'hammock', 'cot', 'crib', 'spade', 'rake', 'watering-can', 'broom', 'manhole', 'hand-pump', 'drain-grate', 'van', 'bus', 'tractor'] },
+  { z: -100, gap: 32, eye: [0, 18, 42], names: ['town-hall', 'library', 'school', 'clinic', 'fire-station', 'post-office', 'museum'] },
 ];
 // variants and states, a row of their own
 const VARIANTS = [['boulder', 'variant=flat'], ['boulder', 'variant=split'], ['boulder', 'variant=tall'], ['ball', 'variant=beach'], ['ball', 'variant=rubber'], ['book', 'variant=open'], ['newspaper', 'variant=open'],
-  ['gable-roof', 'variant=thatch'], ['gable-roof', 'variant=metal'], ['dome-roof', 'variant=onion'], ['grain-silo', 'variant=twin'], ['storage-tank', 'variant=water'], ['litter', 'variant=cans'], ['bookcase', 'variant=half'], ['awning', 'variant=scalloped'], ['awning', 'posts=true'], ['level-crossing', 'sx=1'], ['hip-roof', 'variant=slate']];
-const AREAS = ['gravel-patch', 'sand-patch', 'mud-patch', 'snow-patch', 'dirt-patch', 'cobbles', 'paving', 'beach-strip', 'wheat-field', 'litter-scatter'];
+  ['gable-roof', 'variant=thatch'], ['gable-roof', 'variant=metal'], ['dome-roof', 'variant=onion'], ['grain-silo', 'variant=twin'], ['storage-tank', 'variant=water'], ['litter', 'variant=cans'], ['bookcase', 'variant=half'], ['awning', 'variant=scalloped'], ['awning', 'posts=true'], ['level-crossing', 'sx=1'], ['hip-roof', 'variant=slate'],
+  ['road-sign', 'variant=give-way'], ['road-sign', 'variant=speed'], ['road-sign', 'variant=warning'], ['potted-plant', 'variant=palm'], ['potted-plant', 'variant=cactus'], ['potted-plant', 'variant=flowering'],
+  ['lantern-post', 'variant=double'], ['statue', 'variant=bust'], ['van', 'variant=ice-cream'], ['stairs', 'variant=timber'], ['broom', 'variant=push']];
+const AREAS = ['gravel-patch', 'sand-patch', 'mud-patch', 'snow-patch', 'dirt-patch', 'cobbles', 'paving', 'beach-strip', 'wheat-field', 'litter-scatter', 'allotments', 'flower-garden'];
 const FINDS = [['smokestack', 'core/factory-chimney@1'], ['teeter-totter', 'core/seesaw@1'], ['streetcar', 'core/tram-car@1'], ['billiards', 'core/pool-table@1'], ['forge', 'core/smithy@1'],
   ['railroad crossing', 'core/level-crossing@1'], ['hipped roof', 'core/hip-roof@1'], ['photovoltaic', 'core/solar-panels@1'], ['cobblestones', 'core/cobbles@1'], ['hula hoop', 'core/hoop@1'],
-  ['teddy bear', 'core/teddy@1'], ['envelope', 'core/letter@1'], ['rubble', 'core/debris-pile@1'], ['a-board', 'core/sandwich-board@1'], ['grotto', 'core/cave-mouth@1']];
-const CATS = ['building.industrial', 'transport.rail', 'component.roof', 'terrain.ground', 'furniture.game', 'object.toy', 'object.media', 'layer.marker', 'layer.litter'];
+  ['teddy bear', 'core/teddy@1'], ['envelope', 'core/letter@1'], ['rubble', 'core/debris-pile@1'], ['a-board', 'core/sandwich-board@1'], ['grotto', 'core/cave-mouth@1'],
+  ['stoplight', 'core/traffic-light@1'], ['fairy lights', 'core/string-lights@1'], ['shovel', 'core/spade@1'], ['city hall', 'core/town-hall@1'], ['teeter-totter', 'core/seesaw@1'], ['camp bed', 'core/cot@1']];
+const CATS = ['building.industrial', 'transport.rail', 'component.roof', 'terrain.ground', 'furniture.game', 'object.toy', 'object.media', 'layer.marker', 'layer.litter',
+  'vegetation.potted', 'building.civic', 'public.monument', 'transport.sign', 'utility.lighting', 'component.access', 'furniture.bed', 'object.tool', 'utility.water', 'vehicle.road', 'public.park'];
 
 try {
   await boot();
@@ -94,7 +101,7 @@ try {
   await step('G1 the categories that were empty now list types (catalog by category)', async () => {
     const res = {}; for (const c of CATS) { const g = await god('catalog', '--category', c); res[c] = g.out.split('\n').filter((l) => /^core\//.test(l.trim())).length; }
     return res;
-  }, (r) => Object.values(r).every((n) => n >= 2));
+  }, (r) => Object.values(r).every((n) => n >= 3));
   await step('G2 every type places by name (showcase rows, variants, area presets)', async () => {
     const res = [];
     for (const row of ROWS) { let x = -((row.names.length - 1) * row.gap) / 2; for (const n of row.names) { const g = await god('place', n, '--at', `${x},${row.z}`, '--facing', 's', '--name', `show-${n}`, '--nudge'); res.push({ n, ok: ok(g), out: (g.out + g.err).slice(0, 160) }); x += row.gap; } }
@@ -145,7 +152,7 @@ try {
         for (let k = 0; k < 3; k++) { const x = -56 + k * 56; await look([x, 22, 10], [x, 0, -20]); await sleep(2000); await snap(`areas-${k + 1}`); }
         await look([102, 6, -20], [90, 1, -30]); await sleep(1600); await snap('railway');
         await look([97, 3, -26], [90, 1.6, -32]); await sleep(1600); await snap('tram-door');
-        await look([64, 2.5, -13], [63, 0, -20]); await sleep(1600); await snap('litter-scatter');
+        { const lx = -((AREAS.length - 1) * 14) / 2 + AREAS.indexOf('litter-scatter') * 14; await look([lx + 1, 2.5, -13], [lx, 0, -20]); } await sleep(1600); await snap('litter-scatter');
         return { errors, missing, sized: Object.keys(sizes).length };
       }, (r) => !r.errors.length && !r.missing.length);
     } finally { await browser.close(); await release(); }

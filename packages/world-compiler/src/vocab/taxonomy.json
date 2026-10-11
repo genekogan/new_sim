@@ -335,10 +335,7 @@
     "window-box"
    ],
    "want": [
-    "potted-plant",
-    "planter",
-    "window-box",
-    "hanging-basket"
+    "planter"
    ]
   },
   {
@@ -432,13 +429,6 @@
     "shrine"
    ],
    "want": [
-    "town-hall",
-    "library",
-    "school",
-    "clinic",
-    "fire-station",
-    "post-office",
-    "museum",
     "chapel",
     "temple",
     "courthouse",
@@ -550,10 +540,8 @@
    ],
    "want": [
     "park",
-    "formal-garden",
     "zen-garden",
-    "maze",
-    "allotments"
+    "maze"
    ]
   },
   {
@@ -634,9 +622,6 @@
     "arch"
    ],
    "want": [
-    "statue",
-    "obelisk",
-    "memorial",
     "arch",
     "sculpture",
     "mural"
@@ -754,10 +739,7 @@
    ],
    "want": [
     "signpost",
-    "traffic-light",
-    "stop-sign",
-    "waymarker",
-    "milestone"
+    "waymarker"
    ]
   },
   {
@@ -804,8 +786,6 @@
    "want": [
     "water-tank",
     "hydrant",
-    "manhole",
-    "drain",
     "pump-house"
    ]
   },
@@ -842,9 +822,6 @@
    ],
    "want": [
     "lamp-post",
-    "lantern-post",
-    "floodlight",
-    "string-lights",
     "bollard-light"
    ]
   },
@@ -940,9 +917,7 @@
     "lift"
    ],
    "want": [
-    "stairs",
     "spiral-stairs",
-    "ramp",
     "ladder",
     "lift"
    ]
@@ -1038,10 +1013,7 @@
    ],
    "want": [
     "bed",
-    "bunk",
-    "cot",
-    "hammock",
-    "crib"
+    "bunk"
    ]
   },
   {
@@ -1261,14 +1233,9 @@
     "ladder"
    ],
    "want": [
-    "spade",
-    "rake",
-    "watering-can",
-    "broom",
     "hammer",
     "axe",
-    "toolbox",
-    "wheelbarrow"
+    "toolbox"
    ]
   },
   {
@@ -1424,13 +1391,9 @@
    ],
    "want": [
     "car",
-    "van",
     "truck",
-    "bus",
-    "tractor",
     "forklift",
-    "scooter",
-    "ice-cream-van"
+    "scooter"
    ]
   },
   {
@@ -1658,7 +1621,6 @@
    "want": [
     "herd",
     "flock",
-    "school",
     "swarm"
    ]
   },
