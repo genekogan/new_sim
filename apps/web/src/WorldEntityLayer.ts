@@ -84,7 +84,10 @@ export class WorldEntityLayer {
     if (signal.aborted || snap.contract !== 'world/1') return;
     this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground });
     // the loading bar's total: VOCAB-MECH lazy GLBs (gen-mesh/lazy-assets.ts) — only the eager set, nearest the arrival
-    const m0 = this.model, eagerSizes = planEager(snap, (r) => m0.resolvedDef(r), (e) => { try { const p = m0.worldPose(e); return [p.x, p.z]; } catch { return null; } });
+    // lane PERF: nearest the arrival target (entity-arrival.ts frames the centre of what was built; ?at= for shots), not the origin
+    const m0 = this.model, [vx0, vz0, vx1, vz1] = this.viewBounds(), at = new URLSearchParams(location.search).get('at')?.split(',').map(Number);
+    const centre: [number, number] = at?.length === 3 && at.every(Number.isFinite) ? [at[0], at[2]] : [(vx0 + vx1) / 2, (vz0 + vz1) / 2];
+    const eagerSizes = planEager(snap, (r) => m0.resolvedDef(r), (e) => { try { const p = m0.worldPose(e); return [p.x, p.z]; } catch { return null; } }, centre);
     assetBytes.expect(Object.fromEntries(Object.entries(eagerSizes).map(([sha, n]) => [assetUrl(sha), n])));
     this.seq = snap.seq;
     this.active = true;

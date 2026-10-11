@@ -5,6 +5,7 @@ import type { ViewportInsets, WorldViewerHandle, WorldViewerState } from './Worl
 import { arrivalProgress, arrivalStage, assetDownloadProgress, heldLabel, initialPending } from './viewer-arrival.ts';
 import type { InitialWorldProgress } from './InitialWorldReadiness.ts';
 import { assetBytes, megabytes } from './asset-bytes.ts';
+import { arrivalGate } from './gen-mesh/lazy-assets.ts';
 
 /** Edge overlays are measured against World's actual viewport, never the window. */
 export function useViewerInsets(root: RefObject<HTMLDivElement | null>, visible: boolean, layout: string): ViewportInsets {
@@ -79,7 +80,10 @@ export function ViewerFrame({ handle, state, dt, navigationOpen, onNavigationCha
   // stays until they are, and steps aside when they fail: the viewer's own Retry is then the only thing to show.
   // Without such a gate (world-engine worlds) the bar follows the actual asset downloads while the card shows.
   const preparing = initialPending(initial);
-  const card = (arriving || preparing) && initial?.stage !== 'failed';
+  // lane PERF: a new world's card also waits for the GLBs nearest the arrival (gen-mesh/lazy-assets.ts, ≤ 30 s), so the
+  // first view is the world, not bare ground filling in; old worlds never plan an eager set, so this is false there
+  const assetsNear = useSyncExternalStore(arrivalGate.subscribe, arrivalGate.pending);
+  const card = (arriving || preparing || assetsNear) && initial?.stage !== 'failed';
   const [arrivalShown, setArrivalShown] = useState(true);
   useEffect(() => { if (card) { setArrivalShown(true); return; } const id = setTimeout(() => setArrivalShown(false), 700); return () => clearTimeout(id); }, [card]);
   // The bar counts bytes (asset-bytes.ts: every asset fetch, total known up front), never files; it only moves forward
@@ -149,7 +153,7 @@ export function ViewerFrame({ handle, state, dt, navigationOpen, onNavigationCha
     {arrivalShown && !blocked && initial?.stage !== 'failed' && <div className="viewer-arrival" data-done={!card} role="status" aria-live="polite">
       <div className="viewer-arrival-card"><span className="viewer-arrival-spinner" aria-hidden="true" />
         <div><p className="viewer-arrival-title">Arriving in {worldName ?? 'the world'}</p>
-          <p className="viewer-arrival-stage">{arriving ? byByte ? 'Downloading the world…' : state?.assetDownloads?.pending ? `Downloading world assets · ${state.assetDownloads.loaded} of ${state.assetDownloads.total} ready` : `${arrivalStage(reason, connecting)}…` : preparing ? byByte && progress !== null && progress < 1 ? 'Downloading the world…' : 'Preparing the world…' : 'Ready'}</p>
+          <p className="viewer-arrival-stage">{arriving ? byByte ? 'Downloading the world…' : state?.assetDownloads?.pending ? `Downloading world assets · ${state.assetDownloads.loaded} of ${state.assetDownloads.total} ready` : `${arrivalStage(reason, connecting)}…` : preparing ? byByte && progress !== null && progress < 1 ? 'Downloading the world…' : 'Preparing the world…' : assetsNear ? byByte && progress !== null && progress < 1 ? 'Downloading the world…' : 'Preparing the world…' : 'Ready'}</p>
           {progress !== null && <div className="viewer-arrival-progress"><progress aria-label="World loading progress" max={1000} value={Math.round(progress * 1000)} /><span>{inBytes ? megabytes({ loaded: Math.min(1, progress) * bytes.total, total: bytes.total }) : `${Math.round(progress * 100)}%`}</span></div>}</div></div>
     </div>}
     {followCue && !arriving && <div className="viewer-follow-hint" role="status" aria-live="polite" data-cue={followCue}>{followCue === 'follow'

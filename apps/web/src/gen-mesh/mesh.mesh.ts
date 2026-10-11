@@ -9,7 +9,7 @@
 // move the legs), so motion.ts walks, grazes, flies or swims it like a kit creature.
 import * as THREE from 'three';
 import { frameHook, instantiate, loadAsset, type ModelInstance } from './gltf-assets.ts';
-import { deferLoad, isEager, noteDeferred } from './lazy-assets.ts';
+import { assetShown, deferLoad, isEager, noteDeferred } from './lazy-assets.ts';
 import { registerMesh, type MeshBuilder } from './registry.ts';
 import { bindMotionModel, makeRig, type Gait } from './motion.ts';
 import { seedOf, type BehaviorKind } from './creatures/behavior.ts';
@@ -53,7 +53,7 @@ const meshBuilder: MeshBuilder = {
       // flat things (rugs, boards, plates a few cm thick) would z-fight with gently uneven ground: draw them
       // a hair towards the camera (the materials are shared per asset, so every copy of it gets the same)
       if (ctx.def.size.box[1] <= 0.06) inst.object.traverse((o) => { const mats = (o as THREE.Mesh).material; for (const m of Array.isArray(mats) ? mats : mats ? [mats] : []) { m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -4; } });
-      holder.add(inst.object);
+      holder.add(inst.object); assetShown(make.asset);
       if (inst.clips.length) { inst.play('Idle', Date.now() / 1000, { phase }); holder.add(clipHook()); }
       // a building cut with a `roof` group (the Mars campus pieces): hidden in the roofs-off view (?hideRoofs=1 or the
       // viewer's toggle) and while the camera is inside the building below its roof, like building/1's interior view
@@ -72,7 +72,7 @@ const meshBuilder: MeshBuilder = {
       // the asset is missing or broken: a soft placeholder of the def's size, so the place is still visible
       const [w, h, d] = ctx.def.size.box;
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), ctx.materials.get('paint', '#b0a090')); m.position.y = h / 2; m.name = 'asset missing';
-      holder.add(m);
+      holder.add(m); assetShown(make.asset);
     }); };
     if (isEager(make.asset)) load(); else { holder.add(deferLoad(make.asset, load, frameHook)); noteDeferred(); }
     holder.addEventListener('removed', () => { gone = true; inst?.dispose(); });

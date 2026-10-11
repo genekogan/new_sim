@@ -22,7 +22,9 @@ const started = new Set<string>();
 const camera = new THREE.Vector3(0, 30, 60);
 let background: ReturnType<typeof setTimeout> | null = null, running = 0;
 
-const shasOf = (d: StoredDef | undefined) => (d && d.make.kind === 'mesh' ? JSON.stringify(d.make).match(/[0-9a-f]{64}/g) ?? [] : []);
+// only the GLB the mesh half loads (make.asset): a mesh def also names its server-side `footprint` sha, which the viewer
+// never fetches; counting it held the arrival card for nothing and put phantom MB on the loading bar (lane PERF)
+const shasOf = (d: StoredDef | undefined) => { const a = d && d.make.kind === 'mesh' ? (d.make as { asset?: unknown }).asset : null; return typeof a === 'string' && /^[0-9a-f]{64}$/.test(a) ? [a] : []; };
 
 /** Choose the eager GLBs for a snapshot: nearest-first to `centre` until EAGER_BYTES. Returns the loading bar's sizes. */
 export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string, number> }, defOf: (ref: string) => StoredDef | undefined, posOf: (e: Entity) => [number, number] | null, centre: [number, number] = [0, 0]): Record<string, number> {
@@ -38,9 +40,26 @@ export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string
   const pick = new Set<string>(); let bytes = 0;
   for (const sha of order) { const n = sizes[sha] ?? 0; if (pick.size && (bytes + n > EAGER_BYTES || dist.get(sha)! > NEAR_M * 2)) continue; pick.add(sha); bytes += n; }
   eager = pick;
+  // lane PERF: the arrival card waits for these (or GATE_MS), so a new world opens with what is in front of you drawn
+  eagerLeft.clear(); for (const sha of pick) eagerLeft.add(sha);
+  gateUntil = performance.now() + GATE_MS; setTimeout(notifyGate, GATE_MS + 50); notifyGate();
   scheduleBackground();
   return Object.fromEntries(Object.entries(sizes).filter(([sha]) => pick.has(sha)));
 }
+/** The arrival gate (lane PERF): true while the eager GLBs (nearest the arrival) are not yet drawn, for at most GATE_MS.
+ *  ViewerFrame keeps the arrival card (and its byte bar) up meanwhile. Old worlds never plan, so it is always false. */
+const GATE_MS = 30_000;
+const eagerLeft = new Set<string>(); let gateUntil = 0;
+const gateListeners = new Set<() => void>();
+function notifyGate() { for (const f of gateListeners) f(); }
+export const arrivalGate = {
+  pending: (): boolean => LAZY && eagerLeft.size > 0 && performance.now() < gateUntil,
+  subscribe(fn: () => void) { gateListeners.add(fn); return () => { gateListeners.delete(fn); }; },
+  left: () => [...eagerLeft],
+};
+if (typeof window !== 'undefined') (window as unknown as { __arrivalGate?: unknown }).__arrivalGate = arrivalGate;   // probes
+/** A model is in the scene (or its placeholder, when it failed): it no longer holds the arrival card. */
+export function assetShown(sha: string) { if (eagerLeft.delete(sha) && !eagerLeft.size) notifyGate(); }
 export const isEager = (sha: string) => !LAZY || !eager || eager.has(sha) || started.has(sha);
 
 /** Defer one thing's GLB load: returns an invisible hook to add to the thing's group. `start` runs once, when the thing is

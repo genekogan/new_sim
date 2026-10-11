@@ -40,7 +40,7 @@ export function loadAsset(sha: string): Promise<GLTF> {
   const hit = cache.get(sha);
   if (hit && (hit.settled || hit.by === l)) return hit.p;
   // lane PERF (texture-budget.ts): oversized textures are fitted before upload, and uploads are paced across frames
-  const entry = { p: l.loadAsync(assetUrl(sha)).then(async (g) => { await fitTextures(g); prepare(g); await compileModel(g); await uploadTextures(g); return g; }), by: l, settled: false };
+  const entry = { p: l.loadAsync(assetUrl(sha)).then(async (g) => { const st = ((globalThis as unknown as { __assetStages?: Record<string, string> }).__assetStages ??= {}); st[sha] = 'fit'; await fitTextures(g); st[sha] = 'prepare'; prepare(g); st[sha] = 'compile'; await compileModel(g); st[sha] = 'upload'; await uploadTextures(g); st[sha] = 'done'; return g; }), by: l, settled: false };
   cache.set(sha, entry);
   entry.p.then(() => { entry.settled = true; }, (e: unknown) => {
     if (cache.get(sha) !== entry) return;
