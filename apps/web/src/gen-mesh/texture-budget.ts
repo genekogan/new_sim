@@ -24,12 +24,31 @@ let renderer: THREE.WebGLRenderer | null = null, scene: THREE.Scene | null = nul
 export function setTextureRenderer(r: THREE.WebGLRenderer | null, s: THREE.Scene | null = null, c: THREE.Camera | null = null) { renderer = r; scene = s; camera = c; }
 
 /** Compile a model's shader programs in the background (KHR_parallel_shader_compile) before it is first drawn: a new
- *  material variant otherwise blocks the frame that first draws it (~0.3 s over LM's load). */
+ *  material variant otherwise blocks the frame that first draws it (~0.3 s over LM's load). Not three's compileAsync: its
+ *  readiness poll reads `properties.get(material).currentProgram.isReady()` in its own timer and threw an uncaught
+ *  TypeError on production when LiveWorld re-mounted (the old renderer disposed, its properties gone) mid-compile. */
 export async function compileModel(g: GLTF): Promise<void> {
-  if (!renderer || !scene || !camera) return;
-  // never wait long: three's readiness poll can throw inside its own timer (a material without a program) and then its
-  // promise never settles; the model must still appear (it compiles on first draw instead)
-  try { await Promise.race([renderer.compileAsync(g.scene, camera, scene), new Promise((r) => setTimeout(r, 3000))]); } catch { /* compiled on first draw */ }
+  const r = renderer; if (!r || !scene || !camera) return;
+  try { r.compile(g.scene, camera, scene); } catch { return; /* compiled on first draw instead */ }
+  const mats = new Set<THREE.Material>();
+  g.scene.traverse((o) => { const m = (o as THREE.Mesh).material; if (m) for (const x of Array.isArray(m) ? m : [m]) mats.add(x); });
+  await waitForPrograms(r, mats, () => renderer === r);
+}
+type ProgramsOf = { properties: { get(m: object): unknown } };
+/** Resolve once every material's program reports ready, or when it cannot tell (no program: a disposed renderer), when
+ *  the renderer is no longer current, or after `timeoutMs`. Never throws, never waits forever. */
+export function waitForPrograms(r: ProgramsOf, mats: Set<object>, current: () => boolean, timeoutMs = 3000): Promise<void> {
+  const t0 = performance.now();
+  return new Promise((resolve) => {
+    const check = () => {
+      try {
+        if (!current() || performance.now() - t0 > timeoutMs) return resolve();
+        for (const m of mats) { const p = (r.properties.get(m) as { currentProgram?: { isReady?: () => boolean } } | undefined)?.currentProgram; if (!p || typeof p.isReady !== 'function' || p.isReady()) mats.delete(m); }
+      } catch { return resolve(); }
+      if (!mats.size) resolve(); else setTimeout(check, 16);
+    };
+    check();
+  });
 }
 
 /** Downscale a loaded model's oversized textures (each texture once, even when shared by several materials). */
