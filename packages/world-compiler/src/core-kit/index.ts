@@ -29,6 +29,8 @@ import vocabW3 from './vocab-w3.json' with { type: 'json' };
 import layers from './layers.json' with { type: 'json' };
 // MARSLAND-NEAR: desert near-field (tyres, tyre lines and rings, creosote scrub, tyre tracks; generators in packages/generators/src/desert.ts)
 import desert from './desert.json' with { type: 'json' };
+// MARSLAND-FAR: scenery beyond the walkable edge (core/far-land@1, core/panorama@1; packages/generators/scripts/mk-scenery-kit.ts)
+import scenery from './scenery.json' with { type: 'json' };
 import type { DefInput } from '../schemas.ts';
 
-export const FAMILY_KITS: DefInput[] = /* @__PURE__ */ [creatures, furniture, props, structures, plants, transport, civic, play, kitchen, work, signage, mesh, terrain, mars, littlemartians, vocab, vocab2, vocabW1, vocabW2, vocabW3, layers, desert].flat() as unknown as DefInput[];
+export const FAMILY_KITS: DefInput[] = /* @__PURE__ */ [creatures, furniture, props, structures, plants, transport, civic, play, kitchen, work, signage, mesh, terrain, mars, littlemartians, vocab, vocab2, vocabW1, vocabW2, vocabW3, layers, desert, scenery].flat() as unknown as DefInput[];
