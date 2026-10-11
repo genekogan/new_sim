@@ -1,0 +1,358 @@
+{
+ "schema": "furnish/1",
+ "style": "library",
+ "rooms": {
+  "reading": [
+   {
+    "name": "desk",
+    "def": [
+     "core/shop-counter@1"
+    ],
+    "try": [
+     [
+      0.8,
+      0.75,
+      "w"
+     ],
+     [
+      0.85,
+      0.6,
+      "w"
+     ]
+    ],
+    "params": {
+     "variant": "reception"
+    }
+   },
+   {
+    "name": "table-1",
+    "def": [
+     "core/long-table@1"
+    ],
+    "try": [
+     [
+      0.15,
+      0.35,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-1a",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0.15,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-1b",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.2,
+      0.55,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "table-2",
+    "def": [
+     "core/long-table@1"
+    ],
+    "try": [
+     [
+      0.44999999999999996,
+      0.35,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-2a",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.4,
+      0.15,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-2b",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.55,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "table-3",
+    "def": [
+     "core/long-table@1"
+    ],
+    "try": [
+     [
+      0.75,
+      0.35,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-3a",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.7,
+      0.15,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-3b",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.8,
+      0.55,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "armchair-1",
+    "def": [
+     "core/armchair@1"
+    ],
+    "try": [
+     [
+      0,
+      0.8,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "armchair-2",
+    "def": [
+     "core/armchair@1"
+    ],
+    "try": [
+     [
+      0.2,
+      1,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "lamp",
+    "def": [
+     "core/floor-lamp@1"
+    ],
+    "try": [
+     [
+      0,
+      1,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "shelf-s",
+    "def": [
+     "core/bookcase@1"
+    ],
+    "try": [
+     [
+      0.3,
+      1,
+      "n"
+     ]
+    ]
+   }
+  ],
+  "stacks": [
+   {
+    "name": "shelf-1",
+    "def": [
+     "core/bookcase@1"
+    ],
+    "try": [
+     [
+      0.25,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "shelf-2",
+    "def": [
+     "core/bookcase@1"
+    ],
+    "try": [
+     [
+      0.4,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "shelf-3",
+    "def": [
+     "core/bookcase@1"
+    ],
+    "try": [
+     [
+      0.55,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "shelf-4",
+    "def": [
+     "core/bookcase@1"
+    ],
+    "try": [
+     [
+      0.7,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "shelf-5",
+    "def": [
+     "core/bookcase@1"
+    ],
+    "try": [
+     [
+      0.85,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "shelf-6",
+    "def": [
+     "core/bookcase@1"
+    ],
+    "try": [
+     [
+      1,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "stack-1",
+    "def": [
+     "core/bookcase@1"
+    ],
+    "try": [
+     [
+      0.3,
+      0.75,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "stack-2",
+    "def": [
+     "core/bookcase@1"
+    ],
+    "try": [
+     [
+      0.5333333333333333,
+      0.75,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "stack-3",
+    "def": [
+     "core/bookcase@1"
+    ],
+    "try": [
+     [
+      0.7666666666666666,
+      0.75,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "stack-4",
+    "def": [
+     "core/bookcase@1"
+    ],
+    "try": [
+     [
+      0.9999999999999998,
+      0.75,
+      "n"
+     ]
+    ]
+   }
+  ],
+  "office": [
+   {
+    "name": "desk",
+    "def": [
+     "core/office-desk@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.25,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "shelf",
+    "def": [
+     "core/bookshelf@1"
+    ],
+    "try": [
+     [
+      1,
+      0.6,
+      "w"
+     ]
+    ]
+   }
+  ]
+ }
+}

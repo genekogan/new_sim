@@ -1,0 +1,271 @@
+{
+ "schema": "furnish/1",
+ "style": "police-station",
+ "rooms": {
+  "front": [
+   {
+    "name": "desk",
+    "def": [
+     "core/shop-counter@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.2,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "reception"
+    }
+   },
+   {
+    "name": "bench",
+    "def": [
+     "core/bench-seat@1"
+    ],
+    "try": [
+     [
+      0,
+      0.8,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "board",
+    "def": [
+     "core/notice-board@1"
+    ],
+    "try": [
+     [
+      1,
+      0.12,
+      "w"
+     ]
+    ]
+   },
+   {
+    "name": "plant",
+    "def": [
+     "core/potted-plant@1",
+     "core/flower-pot@1"
+    ],
+    "try": [
+     [
+      0,
+      1,
+      "s"
+     ]
+    ]
+   }
+  ],
+  "office": [
+   {
+    "name": "desk-1",
+    "def": [
+     "core/office-desk@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0.15,
+      "s"
+     ],
+     [
+      0.1,
+      0.35,
+      "s"
+     ],
+     [
+      0.1,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "desk-2",
+    "def": [
+     "core/office-desk@1"
+    ],
+    "try": [
+     [
+      0.9,
+      0.15,
+      "s"
+     ],
+     [
+      0.9,
+      0.35,
+      "s"
+     ],
+     [
+      0.9,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "desk-3",
+    "def": [
+     "core/office-desk@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0.75,
+      "s"
+     ],
+     [
+      0.1,
+      0.95,
+      "s"
+     ],
+     [
+      0.1,
+      0.6,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "desk-4",
+    "def": [
+     "core/office-desk@1"
+    ],
+    "try": [
+     [
+      0.9,
+      0.75,
+      "s"
+     ],
+     [
+      0.9,
+      0.95,
+      "s"
+     ],
+     [
+      0.9,
+      0.6,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "cabinet-1",
+    "def": [
+     "core/filing-cabinet@1"
+    ],
+    "try": [
+     [
+      1,
+      0.5,
+      "w"
+     ],
+     [
+      1,
+      1,
+      "w"
+     ],
+     [
+      0,
+      1,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "cabinet-2",
+    "def": [
+     "core/filing-cabinet@1"
+    ],
+    "try": [
+     [
+      0,
+      0.5,
+      "e"
+     ],
+     [
+      0,
+      1,
+      "e"
+     ],
+     [
+      1,
+      0.8,
+      "w"
+     ]
+    ]
+   },
+   {
+    "name": "board",
+    "def": [
+     "core/wall-board@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "corkboard"
+    }
+   }
+  ],
+  "cell": [
+   {
+    "name": "bars",
+    "def": [
+     "core/cell-bars@1"
+    ],
+    "try": [
+     [
+      0.25,
+      0.5,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "cot",
+    "def": [
+     "core/cot@1"
+    ],
+    "try": [
+     [
+      1,
+      0.5,
+      "w"
+     ],
+     [
+      0.8,
+      0.5,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "toilet",
+    "def": [
+     "core/toilet@1"
+    ],
+    "try": [
+     [
+      0.8,
+      0,
+      "s"
+     ],
+     [
+      0.8,
+      1,
+      "n"
+     ]
+    ]
+   }
+  ]
+ }
+}

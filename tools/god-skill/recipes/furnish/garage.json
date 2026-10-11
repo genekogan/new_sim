@@ -1,0 +1,253 @@
+{
+ "schema": "furnish/1",
+ "style": "garage",
+ "rooms": {
+  "workshop": [
+   {
+    "name": "lift",
+    "def": [
+     "core/car-lift@1"
+    ],
+    "try": [
+     [
+      0.35,
+      0.3,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "car",
+    "def": [
+     "core/family-car@1"
+    ],
+    "try": [
+     [
+      0.8,
+      0.55,
+      "s"
+     ],
+     [
+      0.75,
+      0.6,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "bench",
+    "def": [
+     "core/workbench@1"
+    ],
+    "try": [
+     [
+      0,
+      0.2,
+      "e"
+     ],
+     [
+      0,
+      0.5,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "toolbox",
+    "def": [
+     "core/toolbox@1"
+    ],
+    "try": [
+     [
+      0.05,
+      0.75,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "tyres",
+    "def": [
+     "core/barrel@1"
+    ],
+    "try": [
+     [
+      1,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "counter",
+    "def": [
+     "core/shop-counter@1"
+    ],
+    "try": [
+     [
+      1,
+      0.15,
+      "w"
+     ]
+    ],
+    "params": {
+     "variant": "shop"
+    },
+    "price": {
+     "amount": 30,
+     "service": "a repair"
+    }
+   }
+  ],
+  "office": [
+   {
+    "name": "desk",
+    "def": [
+     "core/office-desk@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.3,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "cabinet",
+    "def": [
+     "core/filing-cabinet@1"
+    ],
+    "try": [
+     [
+      0,
+      0,
+      "s"
+     ]
+    ]
+   }
+  ],
+  "parts": [
+   {
+    "name": "shelf-1",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "goods"
+    }
+   },
+   {
+    "name": "shelf-2",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "goods"
+    }
+   },
+   {
+    "name": "shelf-3",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0.9,
+      0,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "goods"
+    }
+   },
+   {
+    "name": "crate-1",
+    "def": [
+     "core/crate@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0.9,
+      "s"
+     ],
+     [
+      0.3,
+      0.9,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "crate-2",
+    "def": [
+     "core/crate@1"
+    ],
+    "try": [
+     [
+      0.25,
+      0.9,
+      "s"
+     ],
+     [
+      0.4,
+      0.9,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "barrel",
+    "def": [
+     "core/barrel@1"
+    ],
+    "try": [
+     [
+      0.9,
+      0.9,
+      "s"
+     ],
+     [
+      0.7,
+      0.9,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "sack",
+    "def": [
+     "core/sack@1"
+    ],
+    "try": [
+     [
+      0.75,
+      0.9,
+      "s"
+     ],
+     [
+      0.6,
+      0.9,
+      "s"
+     ]
+    ]
+   }
+  ]
+ }
+}

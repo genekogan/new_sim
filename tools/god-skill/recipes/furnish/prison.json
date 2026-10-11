@@ -1,0 +1,320 @@
+{
+ "schema": "furnish/1",
+ "style": "prison",
+ "rooms": {
+  "guardroom": [
+   {
+    "name": "desk",
+    "def": [
+     "core/office-desk@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.3,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "lockers",
+    "def": [
+     "core/lockers@1"
+    ],
+    "try": [
+     [
+      0,
+      0.5,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "cabinet",
+    "def": [
+     "core/filing-cabinet@1"
+    ],
+    "try": [
+     [
+      1,
+      0.2,
+      "w"
+     ]
+    ]
+   },
+   {
+    "name": "screen",
+    "def": [
+     "core/television@1"
+    ],
+    "try": [
+     [
+      0,
+      0.95,
+      "e"
+     ],
+     [
+      1,
+      0.95,
+      "w"
+     ]
+    ]
+   }
+  ],
+  "visiting": [
+   {
+    "name": "table-1",
+    "def": [
+     "core/round-table@1",
+     "core/table@1"
+    ],
+    "try": [
+     [
+      0.15,
+      0.5,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-1a",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.039999999999999994,
+      0.5,
+      "e"
+     ],
+     [
+      0.009999999999999981,
+      0.5,
+      "e"
+     ],
+     [
+      0.15,
+      0.33999999999999997,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-1b",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.26,
+      0.5,
+      "w"
+     ],
+     [
+      0.29000000000000004,
+      0.5,
+      "w"
+     ],
+     [
+      0.15,
+      0.66,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "table-2",
+    "def": [
+     "core/round-table@1",
+     "core/table@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.5,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-2a",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.39,
+      0.5,
+      "e"
+     ],
+     [
+      0.36,
+      0.5,
+      "e"
+     ],
+     [
+      0.5,
+      0.33999999999999997,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-2b",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.61,
+      0.5,
+      "w"
+     ],
+     [
+      0.64,
+      0.5,
+      "w"
+     ],
+     [
+      0.5,
+      0.66,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "table-3",
+    "def": [
+     "core/round-table@1",
+     "core/table@1"
+    ],
+    "try": [
+     [
+      0.85,
+      0.5,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-3a",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.74,
+      0.5,
+      "e"
+     ],
+     [
+      0.71,
+      0.5,
+      "e"
+     ],
+     [
+      0.85,
+      0.33999999999999997,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-3b",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.96,
+      0.5,
+      "w"
+     ],
+     [
+      0.99,
+      0.5,
+      "w"
+     ],
+     [
+      0.85,
+      0.66,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "vending",
+    "def": [
+     "core/vending-machine@1"
+    ],
+    "try": [
+     [
+      1,
+      1,
+      "w"
+     ]
+    ]
+   }
+  ],
+  "corridor": [],
+  "cell": [
+   {
+    "name": "bars",
+    "def": [
+     "core/cell-bars@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.78,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "bunk",
+    "def": [
+     "core/bunk@1"
+    ],
+    "try": [
+     [
+      0,
+      0.15,
+      "e"
+     ],
+     [
+      0.3,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "toilet",
+    "def": [
+     "core/toilet@1"
+    ],
+    "try": [
+     [
+      1,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "basin",
+    "def": [
+     "core/washbasin@1"
+    ],
+    "try": [
+     [
+      1,
+      0.4,
+      "w"
+     ]
+    ]
+   }
+  ]
+ }
+}

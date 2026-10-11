@@ -1064,6 +1064,19 @@
    ]
   },
   {
+   "id": "furniture.bath",
+   "label": "Bathroom fixtures",
+   "syn": [
+    "bathroom",
+    "washroom",
+    "toilet",
+    "lavatory",
+    "shower room",
+    "restroom"
+   ],
+   "want": []
+  },
+  {
    "id": "furniture.work",
    "label": "Work, study and tools",
    "syn": [

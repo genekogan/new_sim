@@ -1,0 +1,197 @@
+{
+ "schema": "furnish/1",
+ "style": "museum",
+ "rooms": {
+  "gallery": [
+   {
+    "name": "statue",
+    "def": [
+     "core/statue@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.45,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "case-1",
+    "def": [
+     "core/display-case@1"
+    ],
+    "try": [
+     [
+      0.15,
+      0,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "tall"
+    }
+   },
+   {
+    "name": "case-2",
+    "def": [
+     "core/display-case@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "tall"
+    }
+   },
+   {
+    "name": "case-3",
+    "def": [
+     "core/display-case@1"
+    ],
+    "try": [
+     [
+      0.85,
+      0,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "tall"
+    }
+   },
+   {
+    "name": "plinth-1",
+    "def": [
+     "core/display-case@1"
+    ],
+    "try": [
+     [
+      0.2,
+      0.75,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "plinth"
+    }
+   },
+   {
+    "name": "plinth-2",
+    "def": [
+     "core/display-case@1"
+    ],
+    "try": [
+     [
+      0.8,
+      0.75,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "plinth"
+    }
+   },
+   {
+    "name": "bench",
+    "def": [
+     "core/bench-seat@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.8,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "case-w",
+    "def": [
+     "core/display-case@1"
+    ],
+    "try": [
+     [
+      0,
+      0.5,
+      "e"
+     ]
+    ],
+    "params": {
+     "variant": "counter"
+    }
+   }
+  ],
+  "hall": [
+   {
+    "name": "tickets",
+    "def": [
+     "core/shop-counter@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.2,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "reception"
+    },
+    "price": {
+     "amount": 5,
+     "service": "a museum ticket"
+    }
+   },
+   {
+    "name": "gifts-1",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0,
+      0.3,
+      "e"
+     ]
+    ],
+    "params": {
+     "variant": "books"
+    }
+   },
+   {
+    "name": "gifts-2",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0,
+      0.7,
+      "e"
+     ]
+    ],
+    "params": {
+     "variant": "books"
+    }
+   },
+   {
+    "name": "bench",
+    "def": [
+     "core/bench-seat@1"
+    ],
+    "try": [
+     [
+      1,
+      0.6,
+      "w"
+     ]
+    ]
+   }
+  ]
+ }
+}

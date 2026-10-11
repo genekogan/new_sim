@@ -1,0 +1,609 @@
+{
+ "schema": "furnish/1",
+ "style": "mall",
+ "rooms": {
+  "concourse": [
+   {
+    "name": "food-counter",
+    "def": [
+     "core/shop-counter@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.15,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "cafe"
+    },
+    "price": {
+     "amount": 5,
+     "service": "a lunch"
+    }
+   },
+   {
+    "name": "table-1",
+    "def": [
+     "core/round-table@1",
+     "core/table@1"
+    ],
+    "try": [
+     [
+      0.2,
+      0.35,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-1a",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.09000000000000001,
+      0.35,
+      "e"
+     ],
+     [
+      0.06,
+      0.35,
+      "e"
+     ],
+     [
+      0.2,
+      0.18999999999999997,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-1b",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.31,
+      0.35,
+      "w"
+     ],
+     [
+      0.34,
+      0.35,
+      "w"
+     ],
+     [
+      0.2,
+      0.51,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "table-2",
+    "def": [
+     "core/round-table@1",
+     "core/table@1"
+    ],
+    "try": [
+     [
+      0.8,
+      0.35,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-2a",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.6900000000000001,
+      0.35,
+      "e"
+     ],
+     [
+      0.66,
+      0.35,
+      "e"
+     ],
+     [
+      0.8,
+      0.18999999999999997,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-2b",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.91,
+      0.35,
+      "w"
+     ],
+     [
+      0.9400000000000001,
+      0.35,
+      "w"
+     ],
+     [
+      0.8,
+      0.51,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "table-3",
+    "def": [
+     "core/round-table@1",
+     "core/table@1"
+    ],
+    "try": [
+     [
+      0.2,
+      0.55,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-3a",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.09000000000000001,
+      0.55,
+      "e"
+     ],
+     [
+      0.06,
+      0.55,
+      "e"
+     ],
+     [
+      0.2,
+      0.39,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-3b",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.31,
+      0.55,
+      "w"
+     ],
+     [
+      0.34,
+      0.55,
+      "w"
+     ],
+     [
+      0.2,
+      0.7100000000000001,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "table-4",
+    "def": [
+     "core/round-table@1",
+     "core/table@1"
+    ],
+    "try": [
+     [
+      0.8,
+      0.55,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-4a",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.6900000000000001,
+      0.55,
+      "e"
+     ],
+     [
+      0.66,
+      0.55,
+      "e"
+     ],
+     [
+      0.8,
+      0.39,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-4b",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.91,
+      0.55,
+      "w"
+     ],
+     [
+      0.9400000000000001,
+      0.55,
+      "w"
+     ],
+     [
+      0.8,
+      0.7100000000000001,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "bench-1",
+    "def": [
+     "core/bench-seat@1"
+    ],
+    "try": [
+     [
+      0.25,
+      0.85,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "bench-2",
+    "def": [
+     "core/bench-seat@1"
+    ],
+    "try": [
+     [
+      0.75,
+      0.85,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "statue",
+    "def": [
+     "core/statue@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.75,
+      "s"
+     ]
+    ]
+   }
+  ],
+  "boutique": [
+   {
+    "name": "till",
+    "def": [
+     "core/shop-counter@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.1,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "shop"
+    },
+    "price": {
+     "amount": 15,
+     "service": "some clothes"
+    }
+   },
+   {
+    "name": "rail-1",
+    "def": [
+     "core/clothes-rail@1"
+    ],
+    "try": [
+     [
+      0.4,
+      0.35,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "rail-2",
+    "def": [
+     "core/clothes-rail@1"
+    ],
+    "try": [
+     [
+      0.4,
+      0.6,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "rail-3",
+    "def": [
+     "core/clothes-rail@1"
+    ],
+    "try": [
+     [
+      0.4,
+      0.85,
+      "e"
+     ]
+    ]
+   }
+  ],
+  "bookshop": [
+   {
+    "name": "till",
+    "def": [
+     "core/shop-counter@1"
+    ],
+    "try": [
+     [
+      0.5,
+      1,
+      "n"
+     ]
+    ],
+    "params": {
+     "variant": "shop"
+    },
+    "price": {
+     "amount": 6,
+     "service": "a book"
+    }
+   },
+   {
+    "name": "shelf-1",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0.05,
+      0,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "books"
+    }
+   },
+   {
+    "name": "shelf-2",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0.49999999999999994,
+      0,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "books"
+    }
+   },
+   {
+    "name": "shelf-3",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0.95,
+      0,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "books"
+    }
+   },
+   {
+    "name": "table",
+    "def": [
+     "core/table@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.5,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "books",
+    "def": [
+     "core/book-stack@1"
+    ],
+    "on": "table"
+   }
+  ],
+  "grocer": [
+   {
+    "name": "till",
+    "def": [
+     "core/shop-counter@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.1,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "shop"
+    },
+    "price": {
+     "amount": 3,
+     "service": "a bag of fruit"
+    }
+   },
+   {
+    "name": "shelf-1",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0.3,
+      0.45,
+      "e"
+     ]
+    ],
+    "params": {
+     "variant": "groceries"
+    }
+   },
+   {
+    "name": "shelf-2",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0.3,
+      0.75,
+      "e"
+     ]
+    ],
+    "params": {
+     "variant": "groceries"
+    }
+   },
+   {
+    "name": "fridge",
+    "def": [
+     "core/drinks-fridge@1"
+    ],
+    "try": [
+     [
+      1,
+      0.6,
+      "w"
+     ]
+    ],
+    "price": {
+     "amount": 1,
+     "service": "a drink"
+    }
+   }
+  ],
+  "gift-shop": [
+   {
+    "name": "till",
+    "def": [
+     "core/shop-counter@1"
+    ],
+    "try": [
+     [
+      0.5,
+      1,
+      "n"
+     ]
+    ],
+    "params": {
+     "variant": "shop"
+    },
+    "price": {
+     "amount": 4,
+     "service": "a gift"
+    }
+   },
+   {
+    "name": "case-1",
+    "def": [
+     "core/display-case@1"
+    ],
+    "try": [
+     [
+      0.3,
+      0.35,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "case-2",
+    "def": [
+     "core/display-case@1"
+    ],
+    "try": [
+     [
+      0.7,
+      0.35,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "shelf-1",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0.15,
+      0,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "goods"
+    }
+   },
+   {
+    "name": "shelf-2",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0.85,
+      0,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "goods"
+    }
+   }
+  ]
+ }
+}

@@ -1,0 +1,265 @@
+{
+ "schema": "furnish/1",
+ "style": "bank",
+ "rooms": {
+  "banking-hall": [
+   {
+    "name": "counter-1",
+    "def": [
+     "core/shop-counter@1"
+    ],
+    "try": [
+     [
+      0.36,
+      0.1,
+      "s"
+     ],
+     [
+      0.36,
+      0.3,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "bank"
+    }
+   },
+   {
+    "name": "counter-2",
+    "def": [
+     "core/shop-counter@1"
+    ],
+    "try": [
+     [
+      0.64,
+      0.1,
+      "s"
+     ],
+     [
+      0.64,
+      0.3,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "bank"
+    }
+   },
+   {
+    "name": "bench",
+    "def": [
+     "core/bench-seat@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.8,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "plant-1",
+    "def": [
+     "core/potted-plant@1",
+     "core/flower-pot@1"
+    ],
+    "try": [
+     [
+      0,
+      1,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "plant-2",
+    "def": [
+     "core/potted-plant@1",
+     "core/flower-pot@1"
+    ],
+    "try": [
+     [
+      1,
+      1,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "rug",
+    "def": [
+     "core/rug@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.6,
+      "s"
+     ]
+    ]
+   }
+  ],
+  "vault": [
+   {
+    "name": "vault-door",
+    "def": [
+     "core/vault-door@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chest-1",
+    "def": [
+     "core/chest@1"
+    ],
+    "try": [
+     [
+      0,
+      0.5,
+      "e"
+     ],
+     [
+      0.1,
+      0.8,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "chest-2",
+    "def": [
+     "core/chest@1"
+    ],
+    "try": [
+     [
+      1,
+      0.5,
+      "w"
+     ],
+     [
+      0.9,
+      0.8,
+      "w"
+     ]
+    ]
+   }
+  ],
+  "office": [
+   {
+    "name": "desk-1",
+    "def": [
+     "core/office-desk@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0.15,
+      "s"
+     ],
+     [
+      0.1,
+      0.35,
+      "s"
+     ],
+     [
+      0.1,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "desk-2",
+    "def": [
+     "core/office-desk@1"
+    ],
+    "try": [
+     [
+      0.9,
+      0.15,
+      "s"
+     ],
+     [
+      0.9,
+      0.35,
+      "s"
+     ],
+     [
+      0.9,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "cabinet-1",
+    "def": [
+     "core/filing-cabinet@1"
+    ],
+    "try": [
+     [
+      1,
+      0.5,
+      "w"
+     ],
+     [
+      1,
+      1,
+      "w"
+     ],
+     [
+      0,
+      1,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "cabinet-2",
+    "def": [
+     "core/filing-cabinet@1"
+    ],
+    "try": [
+     [
+      0,
+      0.5,
+      "e"
+     ],
+     [
+      0,
+      1,
+      "e"
+     ],
+     [
+      1,
+      0.8,
+      "w"
+     ]
+    ]
+   },
+   {
+    "name": "board",
+    "def": [
+     "core/wall-board@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "corkboard"
+    }
+   }
+  ]
+ }
+}

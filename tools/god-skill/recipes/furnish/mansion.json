@@ -1,0 +1,693 @@
+{
+ "schema": "furnish/1",
+ "style": "mansion",
+ "rooms": {
+  "hall": [
+   {
+    "name": "rug",
+    "def": [
+     "core/rug@1"
+    ],
+    "try": [
+     [
+      0.6,
+      0.6,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "table",
+    "def": [
+     "core/round-table@1"
+    ],
+    "try": [
+     [
+      0.65,
+      0.5,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "statue",
+    "def": [
+     "core/statue@1"
+    ],
+    "try": [
+     [
+      1,
+      0.1,
+      "w"
+     ]
+    ]
+   },
+   {
+    "name": "clock",
+    "def": [
+     "core/street-clock@1",
+     "core/floor-lamp@1"
+    ],
+    "try": [
+     [
+      1,
+      0.9,
+      "w"
+     ]
+    ]
+   }
+  ],
+  "parlour": [
+   {
+    "name": "rug",
+    "def": [
+     "core/rug@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.5,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "piano",
+    "def": [
+     "core/piano@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "sofa",
+    "def": [
+     "core/sofa@1"
+    ],
+    "try": [
+     [
+      1,
+      0.5,
+      "w"
+     ]
+    ]
+   },
+   {
+    "name": "armchair-1",
+    "def": [
+     "core/armchair@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0.4,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "armchair-2",
+    "def": [
+     "core/armchair@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0.8,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "table",
+    "def": [
+     "core/round-table@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.6,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "fireplace",
+    "def": [
+     "core/fireplace@1"
+    ],
+    "try": [
+     [
+      0.5,
+      1,
+      "n"
+     ]
+    ]
+   }
+  ],
+  "library": [
+   {
+    "name": "shelf-1",
+    "def": [
+     "core/bookcase@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "shelf-2",
+    "def": [
+     "core/bookcase@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "shelf-3",
+    "def": [
+     "core/bookcase@1"
+    ],
+    "try": [
+     [
+      0.9,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "desk",
+    "def": [
+     "core/desk@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.6,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.75,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "armchair",
+    "def": [
+     "core/armchair@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0.9,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "lamp",
+    "def": [
+     "core/floor-lamp@1"
+    ],
+    "try": [
+     [
+      1,
+      1,
+      "s"
+     ]
+    ]
+   }
+  ],
+  "dining": [
+   {
+    "name": "table",
+    "def": [
+     "core/long-table@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.5,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-n-1",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.3,
+      0.3,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-n-2",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.3,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-n-3",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.7,
+      0.3,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-s-1",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.3,
+      0.7,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "chair-s-2",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.7,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "chair-s-3",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.7,
+      0.7,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "dresser",
+    "def": [
+     "core/dresser@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "bowl",
+    "def": [
+     "core/bowl@1"
+    ],
+    "on": "table"
+   }
+  ],
+  "kitchen": [
+   {
+    "name": "stove",
+    "def": [
+     "core/stove@1"
+    ],
+    "try": [
+     [
+      0.2,
+      0,
+      "s"
+     ],
+     [
+      0,
+      0.3,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "counter",
+    "def": [
+     "core/counter@1"
+    ],
+    "try": [
+     [
+      0.45,
+      0,
+      "s"
+     ],
+     [
+      0.6,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "sink",
+    "def": [
+     "core/sink@1"
+    ],
+    "try": [
+     [
+      0.7,
+      0,
+      "s"
+     ],
+     [
+      0.85,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "fridge",
+    "def": [
+     "core/fridge@1"
+    ],
+    "try": [
+     [
+      1,
+      0,
+      "s"
+     ],
+     [
+      1,
+      0.3,
+      "w"
+     ],
+     [
+      0,
+      0.6,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "table",
+    "def": [
+     "core/table@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.65,
+      "s"
+     ],
+     [
+      0.5,
+      0.8,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "bowl",
+    "def": [
+     "core/bowl@1"
+    ],
+    "on": "table"
+   },
+   {
+    "name": "chair-1",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.3,
+      0.65,
+      "e"
+     ],
+     [
+      0.4,
+      0.85,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "chair-2",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.7,
+      0.65,
+      "w"
+     ],
+     [
+      0.6,
+      0.85,
+      "n"
+     ]
+    ]
+   }
+  ],
+  "bedroom": [
+   {
+    "name": "bed",
+    "def": [
+     "core/bed@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0,
+      "s"
+     ],
+     [
+      0,
+      0.5,
+      "e"
+     ],
+     [
+      1,
+      0.5,
+      "w"
+     ],
+     [
+      0.5,
+      1,
+      "n"
+     ],
+     [
+      1,
+      1,
+      "w"
+     ],
+     [
+      0,
+      1,
+      "e"
+     ],
+     [
+      1,
+      0,
+      "w"
+     ]
+    ]
+   },
+   {
+    "name": "wardrobe",
+    "def": [
+     "core/wardrobe@1"
+    ],
+    "try": [
+     [
+      1,
+      0.9,
+      "w"
+     ],
+     [
+      0,
+      0.9,
+      "e"
+     ],
+     [
+      1,
+      0.1,
+      "w"
+     ]
+    ]
+   },
+   {
+    "name": "dresser",
+    "def": [
+     "core/dresser@1"
+    ],
+    "try": [
+     [
+      0,
+      0.85,
+      "e"
+     ],
+     [
+      1,
+      0.85,
+      "w"
+     ],
+     [
+      0,
+      0.15,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "rug",
+    "def": [
+     "core/rug@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.7,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "lamp",
+    "def": [
+     "core/floor-lamp@1"
+    ],
+    "try": [
+     [
+      0,
+      0,
+      "s"
+     ],
+     [
+      1,
+      0,
+      "s"
+     ]
+    ]
+   }
+  ],
+  "bath": [
+   {
+    "name": "toilet",
+    "def": [
+     "core/toilet@1"
+    ],
+    "try": [
+     [
+      0.15,
+      0,
+      "s"
+     ],
+     [
+      0.85,
+      0,
+      "s"
+     ],
+     [
+      0,
+      0.5,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "basin",
+    "def": [
+     "core/washbasin@1"
+    ],
+    "try": [
+     [
+      0.85,
+      0,
+      "s"
+     ],
+     [
+      0.5,
+      0,
+      "s"
+     ],
+     [
+      1,
+      0.5,
+      "w"
+     ]
+    ]
+   },
+   {
+    "name": "bath",
+    "def": [
+     "core/bathtub@1"
+    ],
+    "try": [
+     [
+      1,
+      1,
+      "w"
+     ],
+     [
+      0,
+      1,
+      "e"
+     ],
+     [
+      0.5,
+      1,
+      "n"
+     ]
+    ]
+   }
+  ]
+ }
+}

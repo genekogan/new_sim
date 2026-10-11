@@ -1,0 +1,268 @@
+{
+ "schema": "furnish/1",
+ "style": "apartment-block",
+ "rooms": {
+  "flat": [
+   {
+    "name": "bed",
+    "def": [
+     "core/bed@1"
+    ],
+    "try": [
+     [
+      0,
+      0,
+      "e"
+     ],
+     [
+      1,
+      0,
+      "w"
+     ],
+     [
+      0,
+      1,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "sofa",
+    "def": [
+     "core/sofa@1"
+    ],
+    "try": [
+     [
+      1,
+      0.6,
+      "w"
+     ],
+     [
+      0,
+      0.6,
+      "e"
+     ],
+     [
+      0.5,
+      1,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "table",
+    "def": [
+     "core/round-table@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.5,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-1",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.3,
+      0.5,
+      "e"
+     ],
+     [
+      0.5,
+      0.3,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-2",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.7,
+      0.5,
+      "w"
+     ],
+     [
+      0.5,
+      0.7,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "stove",
+    "def": [
+     "core/stove@1"
+    ],
+    "try": [
+     [
+      1,
+      1,
+      "n"
+     ],
+     [
+      0,
+      1,
+      "n"
+     ],
+     [
+      1,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "sink",
+    "def": [
+     "core/sink@1"
+    ],
+    "try": [
+     [
+      0.75,
+      1,
+      "n"
+     ],
+     [
+      0.25,
+      1,
+      "n"
+     ],
+     [
+      0.7,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "fridge",
+    "def": [
+     "core/fridge@1"
+    ],
+    "try": [
+     [
+      0.55,
+      1,
+      "n"
+     ],
+     [
+      0.5,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "toilet",
+    "def": [
+     "core/toilet@1"
+    ],
+    "try": [
+     [
+      0,
+      1,
+      "e"
+     ],
+     [
+      1,
+      1,
+      "w"
+     ],
+     [
+      0,
+      0.3,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "wardrobe",
+    "def": [
+     "core/wardrobe@1"
+    ],
+    "try": [
+     [
+      0.3,
+      0,
+      "s"
+     ],
+     [
+      0.6,
+      0,
+      "s"
+     ],
+     [
+      1,
+      0.3,
+      "w"
+     ]
+    ]
+   }
+  ],
+  "hall": [
+   {
+    "name": "mailboxes",
+    "def": [
+     "core/filing-cabinet@1"
+    ],
+    "try": [
+     [
+      1,
+      0.8,
+      "w"
+     ]
+    ]
+   },
+   {
+    "name": "plant",
+    "def": [
+     "core/potted-plant@1",
+     "core/flower-pot@1"
+    ],
+    "try": [
+     [
+      0,
+      1,
+      "e"
+     ],
+     [
+      1,
+      1,
+      "w"
+     ]
+    ]
+   }
+  ],
+  "landing": [
+   {
+    "name": "plant",
+    "def": [
+     "core/potted-plant@1",
+     "core/flower-pot@1"
+    ],
+    "try": [
+     [
+      1,
+      0.9,
+      "w"
+     ],
+     [
+      0,
+      0.9,
+      "e"
+     ]
+    ]
+   }
+  ]
+ }
+}

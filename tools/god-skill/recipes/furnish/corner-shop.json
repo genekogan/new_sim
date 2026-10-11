@@ -1,0 +1,256 @@
+{
+ "schema": "furnish/1",
+ "style": "corner-shop",
+ "rooms": {
+  "shop": [
+   {
+    "name": "counter",
+    "def": [
+     "core/shop-counter@1"
+    ],
+    "try": [
+     [
+      0.8,
+      0.75,
+      "w"
+     ],
+     [
+      0.85,
+      0.4,
+      "w"
+     ]
+    ],
+    "params": {
+     "variant": "shop"
+    },
+    "price": {
+     "amount": 2,
+     "service": "a loaf"
+    }
+   },
+   {
+    "name": "shelf-w-1",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0,
+      0.2,
+      "e"
+     ]
+    ],
+    "params": {
+     "variant": "groceries"
+    }
+   },
+   {
+    "name": "shelf-w-2",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0,
+      0.6000000000000001,
+      "e"
+     ]
+    ],
+    "params": {
+     "variant": "groceries"
+    }
+   },
+   {
+    "name": "aisle-1",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0.45,
+      0.3,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "bottles"
+    }
+   },
+   {
+    "name": "fridge",
+    "def": [
+     "core/drinks-fridge@1"
+    ],
+    "try": [
+     [
+      1,
+      0,
+      "s"
+     ],
+     [
+      0.75,
+      0,
+      "s"
+     ]
+    ],
+    "price": {
+     "amount": 1,
+     "service": "a drink"
+    }
+   },
+   {
+    "name": "case",
+    "def": [
+     "core/display-case@1"
+    ],
+    "try": [
+     [
+      0.4,
+      0.65,
+      "s"
+     ],
+     [
+      0.45,
+      0.75,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "board",
+    "def": [
+     "core/sandwich-board@1"
+    ],
+    "try": [
+     [
+      0.15,
+      1,
+      "s"
+     ]
+    ]
+   }
+  ],
+  "store": [
+   {
+    "name": "shelf-1",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "goods"
+    }
+   },
+   {
+    "name": "shelf-2",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "goods"
+    }
+   },
+   {
+    "name": "shelf-3",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0.9,
+      0,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "goods"
+    }
+   },
+   {
+    "name": "crate-1",
+    "def": [
+     "core/crate@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0.9,
+      "s"
+     ],
+     [
+      0.3,
+      0.9,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "crate-2",
+    "def": [
+     "core/crate@1"
+    ],
+    "try": [
+     [
+      0.25,
+      0.9,
+      "s"
+     ],
+     [
+      0.4,
+      0.9,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "barrel",
+    "def": [
+     "core/barrel@1"
+    ],
+    "try": [
+     [
+      0.9,
+      0.9,
+      "s"
+     ],
+     [
+      0.7,
+      0.9,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "sack",
+    "def": [
+     "core/sack@1"
+    ],
+    "try": [
+     [
+      0.75,
+      0.9,
+      "s"
+     ],
+     [
+      0.6,
+      0.9,
+      "s"
+     ]
+    ]
+   }
+  ]
+ }
+}

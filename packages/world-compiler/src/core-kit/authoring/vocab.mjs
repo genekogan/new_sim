@@ -56,10 +56,6 @@ export default [
     palette: { paint: C.red, glass: C.glass, sign: C.white, iron: C.iron, brass: C.brass }, slots: [stand('inside', [0, 0.12, 0], Math.PI)] }),
 
   // ---------------- buildings (building.commercial): a preset of the building generator
-  presetDef({ name: 'corner-shop', base: 'core/shop@1', category: 'building.commercial', synonyms: ['bodega', 'corner store', 'convenience store', 'deli', 'grocer', 'general store', 'mini-market', 'newsagent'],
-    description: 'A one-floor corner shop (7 × 8 m) with big front windows, a counter room and a storeroom. Furnish it with `furnish`; floors, size and colours are params.',
-    defaults: { floors: 1, w: 7, d: 8, wall: '#e8d6b5', trim: '#2f5d8b' }, tags: ['shop', 'building'] }),
-
   // ---------------- composition: a set (furniture.table)
   setDef({ name: 'cafe-terrace', category: 'furniture.table', synonyms: ['outdoor seating', 'terrace', 'cafe tables', 'beer garden', 'pavement cafe', 'bistro tables'],
     description: 'A café terrace: two tables under parasols with four chairs (5 × 2.5 m). Placed as one; each piece is its own thing afterwards.',

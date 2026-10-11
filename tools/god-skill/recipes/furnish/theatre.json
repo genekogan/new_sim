@@ -1,0 +1,290 @@
+{
+ "schema": "furnish/1",
+ "style": "theatre",
+ "rooms": {
+  "auditorium": [
+   {
+    "name": "stage",
+    "def": [
+     "core/stage@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "row-1-1",
+    "def": [
+     "core/theatre-seats@1"
+    ],
+    "try": [
+     [
+      0.12,
+      0.5,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "row-1-2",
+    "def": [
+     "core/theatre-seats@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.5,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "row-1-3",
+    "def": [
+     "core/theatre-seats@1"
+    ],
+    "try": [
+     [
+      0.88,
+      0.5,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "row-2-1",
+    "def": [
+     "core/theatre-seats@1"
+    ],
+    "try": [
+     [
+      0.12,
+      0.6125,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "row-2-2",
+    "def": [
+     "core/theatre-seats@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.6125,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "row-2-3",
+    "def": [
+     "core/theatre-seats@1"
+    ],
+    "try": [
+     [
+      0.88,
+      0.6125,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "row-3-1",
+    "def": [
+     "core/theatre-seats@1"
+    ],
+    "try": [
+     [
+      0.12,
+      0.725,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "row-3-2",
+    "def": [
+     "core/theatre-seats@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.725,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "row-3-3",
+    "def": [
+     "core/theatre-seats@1"
+    ],
+    "try": [
+     [
+      0.88,
+      0.725,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "row-4-1",
+    "def": [
+     "core/theatre-seats@1"
+    ],
+    "try": [
+     [
+      0.12,
+      0.8374999999999999,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "row-4-2",
+    "def": [
+     "core/theatre-seats@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.8374999999999999,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "row-4-3",
+    "def": [
+     "core/theatre-seats@1"
+    ],
+    "try": [
+     [
+      0.88,
+      0.8374999999999999,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "row-5-1",
+    "def": [
+     "core/theatre-seats@1"
+    ],
+    "try": [
+     [
+      0.12,
+      0.95,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "row-5-2",
+    "def": [
+     "core/theatre-seats@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.95,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "row-5-3",
+    "def": [
+     "core/theatre-seats@1"
+    ],
+    "try": [
+     [
+      0.88,
+      0.95,
+      "s"
+     ]
+    ]
+   }
+  ],
+  "foyer": [
+   {
+    "name": "box-office",
+    "def": [
+     "core/shop-counter@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.15,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "reception"
+    },
+    "price": {
+     "amount": 10,
+     "service": "a ticket"
+    }
+   },
+   {
+    "name": "sofa-1",
+    "def": [
+     "core/sofa@1"
+    ],
+    "try": [
+     [
+      0,
+      0.6,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "sofa-2",
+    "def": [
+     "core/sofa@1"
+    ],
+    "try": [
+     [
+      1,
+      0.6,
+      "w"
+     ]
+    ]
+   },
+   {
+    "name": "poster-1",
+    "def": [
+     "core/notice-board@1"
+    ],
+    "try": [
+     [
+      0.15,
+      1,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "poster-2",
+    "def": [
+     "core/notice-board@1"
+    ],
+    "try": [
+     [
+      0.85,
+      1,
+      "n"
+     ]
+    ]
+   }
+  ]
+ }
+}

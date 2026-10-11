@@ -1,0 +1,298 @@
+{
+ "schema": "furnish/1",
+ "style": "church",
+ "rooms": {
+  "nave": [
+   {
+    "name": "altar",
+    "def": [
+     "core/altar@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.02,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "lectern",
+    "def": [
+     "core/lectern@1"
+    ],
+    "try": [
+     [
+      0.2,
+      0.12,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "piano",
+    "def": [
+     "core/piano@1"
+    ],
+    "try": [
+     [
+      0.85,
+      0.15,
+      "w"
+     ]
+    ]
+   },
+   {
+    "name": "pew-1-1",
+    "def": [
+     "core/pew@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0.3,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "pew-1-2",
+    "def": [
+     "core/pew@1"
+    ],
+    "try": [
+     [
+      0.9,
+      0.3,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "pew-2-1",
+    "def": [
+     "core/pew@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0.42400000000000004,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "pew-2-2",
+    "def": [
+     "core/pew@1"
+    ],
+    "try": [
+     [
+      0.9,
+      0.42400000000000004,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "pew-3-1",
+    "def": [
+     "core/pew@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0.548,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "pew-3-2",
+    "def": [
+     "core/pew@1"
+    ],
+    "try": [
+     [
+      0.9,
+      0.548,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "pew-4-1",
+    "def": [
+     "core/pew@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0.672,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "pew-4-2",
+    "def": [
+     "core/pew@1"
+    ],
+    "try": [
+     [
+      0.9,
+      0.672,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "pew-5-1",
+    "def": [
+     "core/pew@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0.796,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "pew-5-2",
+    "def": [
+     "core/pew@1"
+    ],
+    "try": [
+     [
+      0.9,
+      0.796,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "pew-6-1",
+    "def": [
+     "core/pew@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0.9200000000000002,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "pew-6-2",
+    "def": [
+     "core/pew@1"
+    ],
+    "try": [
+     [
+      0.9,
+      0.9200000000000002,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "candle-l",
+    "def": [
+     "core/lantern-post@1"
+    ],
+    "try": [
+     [
+      0,
+      0.1,
+      "s"
+     ],
+     [
+      0,
+      0.2,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "candle-r",
+    "def": [
+     "core/lantern-post@1"
+    ],
+    "try": [
+     [
+      1,
+      0.1,
+      "s"
+     ],
+     [
+      1,
+      0.2,
+      "s"
+     ]
+    ]
+   }
+  ],
+  "vestry": [
+   {
+    "name": "wardrobe",
+    "def": [
+     "core/wardrobe@1"
+    ],
+    "try": [
+     [
+      0,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "table",
+    "def": [
+     "core/table@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.5,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.9,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "shelf",
+    "def": [
+     "core/bookshelf@1"
+    ],
+    "try": [
+     [
+      1,
+      0,
+      "s"
+     ],
+     [
+      0.3,
+      0,
+      "s"
+     ]
+    ]
+   }
+  ]
+ }
+}

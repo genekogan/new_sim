@@ -116,10 +116,12 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         const id = scratch.nextId();
         const e: Entity = { id, def: def.ref, in: { parent: parentId, ...(op.in.slot ? { slot: op.in.slot } : {}) }, by, born: tick, v: 1, ...(op.name ? { name: op.name } : {}), ...(op.p ? { p: op.p } : {}), ...(op.r !== undefined ? { r: op.r } : {}), ...(op.s !== undefined ? { s: op.s } : {}), ...(op.shape ? { shape: op.shape } : {}), ...(op.anchor ? { anchor: op.anchor } : {}), ...(Object.keys(fieldsOk.values).length ? { params: fieldsOk.values } : {}), ...(Object.keys(stateOk.values).length ? { state: stateOk.values } : {}), ...(op.seed !== undefined ? { seed: op.seed } : {}), ...(op.constraints?.length ? { constraints: op.constraints } : {}) };
         { const bad = followProblem(def, op.schedule); if (bad) { failures.push(fail(i, 'state.invalid', bad)); return; } }
-        if (op.owner !== undefined) e.owner = op.owner;
-        if (op.access !== undefined) e.access = op.access;
-        if (op.schedule !== undefined) e.schedule = op.schedule;
-        if (op.price !== undefined) e.price = op.price;
+        { const L = def.layers ?? {};   // VOCAB-W3: the def's LAYERS defaults, unless the op says otherwise
+          const owner = op.owner ?? L.owner, access = op.access ?? L.access, schedule = op.schedule ?? L.schedule, price = op.price ?? L.price;
+          if (owner !== undefined) e.owner = owner;
+          if (access !== undefined) e.access = access;
+          if (schedule !== undefined) e.schedule = schedule;
+          if (price !== undefined) e.price = price; }
         prepareEntity(scratch, def, e, op.params);
         const problem = admit(scratch, e, def, i, op.mode, true);
         if (problem) { failures.push(problem); return; }
@@ -129,6 +131,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         upsert(e);
         inverse.unshift({ op: 'remove', id, cascade: true });
         if (def.make.kind === 'parts') expandParts(scratch, e, def, by, tick, diff, inverse, upsert);
+        else if (def.contents?.length) expandParts(scratch, e, { ...def, make: { kind: 'parts', parts: def.contents } } as StoredDef, by, tick, diff, inverse, upsert);
         return;
       }
       case 'remove': {
@@ -434,6 +437,7 @@ function checkDef(w: WorldModel, def: Parameters<WorldModel['defineDef']>[0], i:
     const r = walk(def.make.parts, 1);
     if (r) return fail(i, 'def.expansion', r);
   }
+  for (const p of def.contents ?? []) if (!w.resolvedDef(p.def)) return fail(i, 'def.expansion', `contents ${p.id}: def ${p.def} unknown`);
   if (def.extends && !w.def(def.extends)) return fail(i, 'def.unknown', `extends ${def.extends}`);
   return null;
 }
@@ -665,7 +669,9 @@ function expandParts(w: WorldModel, root: Entity, def: StoredDef, by: string, ti
       const yaw = (typeof part.r === 'number' ? part.r : 0) + (part.repeat?.yaw ?? 0) * k;
       const name = count > 1 ? `${part.id}-${k + 1}` : part.id;
       const e: Entity = { id: w.nextId(), name, def: pdef.ref, in: { parent: parentId, ...(part.slot ? { slot: part.slot } : {}) }, by, born: tick, v: 1, ...(p ? { p } : {}), ...(part.r !== undefined || part.repeat?.yaw ? { r: Array.isArray(part.r) ? part.r : yaw } : {}), ...(part.s !== undefined ? { s: part.s } : {}), ...(Object.keys(params).length ? { params } : {}), ...(Object.keys(state).length ? { state } : {}) };
+      { const L = pdef.layers ?? {}; for (const k of ['owner', 'access', 'schedule', 'price'] as const) { const v = part[k] ?? L[k]; if (v !== undefined) (e as Record<string, unknown>)[k] = v; } }
       w.insert(e); indexAndGround(w, e, pdef, diff); upsert(e);
+      if (pdef.make.kind !== 'parts' && pdef.contents?.length && depth < 4) expandParts(w, e, { ...pdef, make: { kind: 'parts', parts: pdef.contents } } as StoredDef, by, tick, diff, inverse, upsert, depth + 1);
       if (k === 0) local[part.id] = e.id;
       if (pdef.make.kind === 'parts' && depth < 4) expandParts(w, e, pdef, by, tick, diff, inverse, upsert, depth + 1);
     }
