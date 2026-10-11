@@ -182,7 +182,7 @@ function compare(before: WorldModel, after: WorldModel, tiles: string[], upserts
   }
   const moved: LandReport['moved'] = [];
   for (const e of upserts) {
-    const was = before.entities.get(e.id); if (!was || !was.p || !e.p || e.in.parent !== 'world') continue;
+    const was = before.entities.get(e.id); if (!was || !was.p || !e.p || e.in.parent !== 'world' || after.resolvedDef(e.def)?.components.body) continue;   // Souls' bodies: the engine stands them
     const a = was.p, b = e.p, dy = (b.length === 3 ? b[1] : 0) - (a.length === 3 ? a[1] : 0), dxz = Math.hypot(b[0] - a[0], b[b.length - 1] - a[a.length - 1]);
     if (Math.abs(dy) > 0.01 || dxz > 0.01) moved.push({ id: e.id, path: after.pathOf(e.id), dy: r2(dy), dxz: r2(dxz) });
   }

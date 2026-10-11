@@ -23,7 +23,7 @@ import type { GodNav, Thing } from './nav.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
-export type GodPlace = Place & { ref: string; of: 'area' | 'water' | 'shore' | 'building' | 'room' | 'thing' | 'landmark'; entity: string };
+export type GodPlace = Place & { ref: string; of: 'area' | 'water' | 'shore' | 'building' | 'room' | 'thing' | 'landmark' | 'landform' | 'land'; entity: string };
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const SHORE = 3;                   // m: a water's bank, round it
@@ -108,6 +108,28 @@ export class GodPlaces {
       else if (t.kind === 'water' && t.area && t.area.length >= 3) out.push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'water', entity: t.id, name: t.ref, kind: 'water', polygon: t.area.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: 0 });
       else if (t.kind === 'room' && t.poly && t.poly.length >= 3) out.push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'room', entity: t.id, name: t.ref, kind: 'room', enclosed: true, polygon: t.poly.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: t.level });
     }
+    // GOD-ENV: the god's landforms are places Souls can name and climb: a mountain or hill (round its top), a range, a
+    // valley, a ditch or a cliff (a band along it), a plateau or a terrace (its area: already an area place, renamed)
+    for (const t of things) {
+      const e = m.entities.get(t.id); if (!e || e.in.parent !== 'world') continue;
+      const def = m.resolvedDef(e.def); if (!def) continue;
+      let lf: any; try { lf = m.bake(def, e.params ?? {}, e.seed ?? 0, e.shape).landform; } catch { continue; }
+      if (!lf || lf.kind === 'brush') continue;
+      const kind = shortDef(def), have = out.find((p) => p.ref === t.ref);
+      if (have) { if (have.of === 'area') { have.of = 'landform'; have.kind = kind; } continue; }
+      let poly: Vec2[] | null = null;
+      if (lf.kind === 'bump') poly = circle(t.at, Math.max(6, Number(lf.r ?? 20) * m.worldPose(e).s * 0.5));
+      else if (t.path?.length) poly = band(t.path, Math.max(2, (lf.kind === 'channel' ? Number(lf.w ?? 2) + Number(lf.edge ?? 2) / 2 : lf.kind === 'cliff' ? Number(lf.face ?? 3) + 2 : Number(lf.w ?? t.width ?? 10) / 2)));
+      if (!poly || poly.length < 3) continue;
+      out.push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'landform', entity: t.id, name: t.ref, kind, polygon: poly, level: 0 });
+    }
+    // GOD-ENV: land the god added beyond the world's first square (extend east/west/north/south): a place per side
+    { const half = m.constants.extent / 2, [x0, z0, x1, z1] = m.ground().extent, sides: [string, Vec2[]][] = [];
+      if (x1 > half + 1) sides.push(['east', [[half, z0], [x1, z0], [x1, z1], [half, z1]]]);
+      if (x0 < -half - 1) sides.push(['west', [[x0, z0], [-half, z0], [-half, z1], [x0, z1]]]);
+      if (z0 < -half - 1) sides.push(['north', [[Math.max(x0, -half), z0], [Math.min(x1, half), z0], [Math.min(x1, half), -half], [Math.max(x0, -half), -half]]]);
+      if (z1 > half + 1) sides.push(['south', [[Math.max(x0, -half), half], [Math.min(x1, half), half], [Math.min(x1, half), z1], [Math.max(x0, -half), z1]]]);
+      for (const [side, polygon] of sides) out.push({ ...base, id: `g-new-land-${side}`, ref: `new-land-${side}`, of: 'land', entity: `world:${side}`, name: `new land to the ${side}`, kind: 'land', polygon: polygon.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: 0 }); }
     // a water's shore: a band round it (where its walk ends, and where a swim starts), as Eden's bank by its pond
     for (const w of out.filter((p) => p.of === 'water')) out.push({ ...base, id: `${w.id}.shore-bank`.slice(0, 100), ref: w.ref, of: 'shore', entity: w.entity, name: `${w.ref} shore`, kind: 'shore', polygon: grow(w.polygon, SHORE), level: 0 });
     // buildings: round their ground-floor rooms (a little out, for the walls)
@@ -197,6 +219,20 @@ export class GodPlaces {
       const t = things.find((x) => x.ref === p.ref), rooms = all.filter((q) => q.of === 'room' && q.entity === p.entity).map((q) => q.ref);
       return `${article(kind)} with ${counted('room', rooms.length)} (${rooms.join(', ')}); its front door is ${t?.doorOpen ? 'open' : 'closed'}`;
     }
+    if (p.of === 'landform') {
+      const e = m.entities.get(p.entity), [cx, cz] = centroid(p.polygon), top = Math.round(m.terrain.sample(cx, cz));
+      const lf: any = (() => { try { const d = e && m.resolvedDef(e.def); return d ? m.bake(d, e!.params ?? {}, e!.seed ?? 0, e!.shape).landform : null; } catch { return null; } })();
+      if (lf?.kind === 'bump') return `${article(kind)} about ${Math.round(Math.abs(lf.h * (e ? m.worldPose(e).s : 1)))} m high and ${Math.round(2 * lf.r * (e ? m.worldPose(e).s : 1))} m across; its top is ${top} m up (walk:${p.ref} climbs to it)`;
+      if (lf?.kind === 'channel') {
+        // how deep: the ground just beyond its banks, less its floor, averaged along it
+        const path = lf.path as Vec2[], off = Number(lf.w) + Number(lf.edge) + 2; let sum = 0;
+        path.forEach(([x, z], i) => { const a = path[Math.max(0, i - 1)], c = path[Math.min(path.length - 1, i + 1)], dx = c[0] - a[0], dz = c[1] - a[1], n = Math.hypot(dx, dz) || 1; sum += (m.terrain.sample(x - (dz / n) * off, z + (dx / n) * off) + m.terrain.sample(x + (dz / n) * off, z - (dx / n) * off)) / 2 - lf.levels[i]; });
+        return `${article(kind)} cut about ${Math.round(sum / path.length)} m into the ground, ${Math.round(2 * lf.w)} m wide at the bottom and ${Math.round(Math.max(w, d))} m long`; }
+      if (lf?.kind === 'cliff') return `${article(kind)} ${Math.round(Math.abs(lf.h))} m high and ${Math.round(Math.max(w, d))} m long; the high side is to its ${lf.side > 0 ? 'left' : 'right'} walking along it`;
+      if (lf?.kind === 'ridge') return `${article(kind)} ${Math.round(Math.abs(lf.h))} m high, ${Math.round(Math.max(w, d))} m long`;
+      return `${article(kind)} about ${Math.round(w)} by ${Math.round(d)} m, ${top} m up${items.length ? `, with ${listed(items)}` : ''}`;
+    }
+    if (p.of === 'land') return `land the god added to the world, about ${Math.round(w)} by ${Math.round(d)} m${items.length ? `, with ${listed(items)}` : ', still empty'}`;
     if (p.of === 'shore') return `the bank round ${p.ref}: walk:${p.ref} ends here, and a swim starts from here`;
     if (p.of === 'water') return `${article(kind)} you can swim in, about ${Math.round(Math.max(w, d))} m across${items.length ? `, with ${listed(items)}` : ''}`;
     if (p.of === 'thing') return `${article(kind)}${p.capacity ? ` for ${p.capacity}` : ''}${items.length ? `, with ${listed(items)}` : ''}${p.enclosed ? '; indoors' : ''}`;

@@ -144,15 +144,21 @@ type Exec = {
   faceoff?: { id: string; since: number; tick: number };
 };
 
-export const walkSchema = z.strictObject({
+const walkSchemaWithin = (reach: number) => z.strictObject({
   arrivalEvidence:z.literal('navigation-arrival/1').optional(),
   actor: z.string().max(80),
-  x: z.number().min(-500).max(500),
-  z: z.number().min(-500).max(500),
+  x: z.number().min(-reach).max(reach),
+  z: z.number().min(-reach).max(reach),
   level: z.number().int().min(0).max(20).optional(),
   face: z.number().min(-7).max(7).optional(),
   speed: z.number().min(0.3).max(WALK_SPEED_CAP).optional(),
 });
+const walkSchema500 = walkSchemaWithin(500);
+let walkSchemaWide: typeof walkSchema500 | null = null;
+/** GOD-ENV: a god's (entity) world can grow past ±500 m ("extend the world east"); its server widens the reach of
+ *  walk_to to the world's bounds. Worlds that never call this (the old worlds) parse with the same ±500 schema as before. */
+export function setWalkReach(metres: number) { walkSchemaWide = metres > 500 ? walkSchemaWithin(Math.min(16000, metres)) : null; }
+export const walkSchema = z.lazy(() => walkSchemaWide ?? walkSchema500);
 
 const spatial = bodySpatial;
 

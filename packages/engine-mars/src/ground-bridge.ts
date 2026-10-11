@@ -56,7 +56,7 @@ export function groundFact(g: Ground, editSeq: number): GroundV1 { return { vers
 
 import { swimTo, shoreToward, groundTravel, inDeepWater } from '../../../mars/viewer/engine/locomotion/swim.ts';
 import { acknowledgeRelocation, humanStaticClearance, humanStaticClearanceWithOverlay, speedWithinCap, SPEED_CAPS } from '../../../mars/viewer/engine/runtime/invariants.ts';
-import { WALK_SPEED_CAP } from '../../../mars/viewer/engine/locomotion/walk.ts';
+import { WALK_SPEED_CAP, setWalkReach } from '../../../mars/viewer/engine/locomotion/walk.ts';
 import { G_SWIM, swimRootY } from '../../../mars/viewer/engine/spatial/ground.ts';
 import type { Spatial } from '../../../mars/viewer/engine/spatial/service.ts';
 import { dcos, dsin } from '../../../mars/viewer/engine/core/math.ts';
@@ -109,6 +109,8 @@ export function attachGround(rt: Rt): boolean {
   if (!fact) return false;
   const sp = rt.services.spatial as Spatial;
   sp.setGround(groundField(fact.recipeHash), rt.world, coverPoints(rt));
+  // GOD-ENV: a god's world may grow past ±500 m; walk_to reaches its bounds (only ground worlds ever get here)
+  const ext = groundRecipe(fact.recipeHash)?.extent; if (ext) setWalkReach(Math.max(500, ...ext.map((v) => Math.abs(v))));
   rt.registry = groundRegistry(rt.registry);
   rt.invariants = groundInvariants(rt.invariants);
   return true;

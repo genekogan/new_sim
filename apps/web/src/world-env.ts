@@ -26,7 +26,8 @@ export class CoverProbe {
   private at = new THREE.Vector3(Infinity, 0, 0);
   private last = 0;
   private covered = false;
-  constructor(private roots: () => THREE.Object3D[]) { this.ray.far = 40; }
+  // GOD-ENV fix: a Sprite (a flag's label) raycasts against `raycaster.camera`; without one every probe threw (a page error per frame)
+  constructor(private roots: () => THREE.Object3D[]) { this.ray.far = 40; this.ray.camera = new THREE.PerspectiveCamera(); }
   test(x: number, y: number, z: number): boolean {
     const now = performance.now();
     if (now - this.last < 400 && this.at.distanceToSquared(_p.set(x, y, z)) < 1) return this.covered;
