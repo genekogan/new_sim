@@ -33,6 +33,10 @@ echo "$BUILD" > "$OUT/BUILD"
 BUILD_ID="$BUILD" pnpm --filter @sim/web exec vite build --logLevel warn --outDir "$OUT/apps/web/dist" --emptyOutDir --base "$BASE/"
 grep -q "src=\"$BASE/assets/" "$OUT/apps/web/dist/index.html" || { echo "web build is not under $BASE/"; exit 1; }
 rsync -aL --delete "$MARS_WEB_SRC/" "$OUT/mars-web/"
+# /modular (the humanoid kit and the environment GLBs) is this commit's own copy, never whatever a lane overlay's
+# symlink pointed at when the release was assembled: a relative link into the archived tree (no second copy).
+rm -rf "$OUT/mars-web/modular"; ln -s ../mars/viewer/public/modular "$OUT/mars-web/modular"
+[ -f "$OUT/mars-web/modular/humanoid/kit.json" ] || { echo "no humanoid kit in the release"; exit 1; }
 du -sh "$OUT" | sed 's/^/   size /'
 if [ -n "$LOCAL" ]; then
   echo "assembled $BUILD in $OUT (run pnpm install --offline --frozen-lockfile --filter @sim/server... there; command in team/lanes/deploy.md)"; exit 0

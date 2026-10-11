@@ -1,11 +1,12 @@
 // Humanoid body dims (core/humanoid@2 look params, eden4 humanoid lane L10). A humanoid body may carry a composed
 // look (`body.params`, `body.model` = the look key `humanoid2-<sha16>`). Four of its params are physical:
-//   height     m, 1.55–1.95 (default 1.75): the body scales uniformly by height / 1.75 — collision radius (half of
+//   height     m, 1.65–1.85 (default 1.75): the body scales uniformly by height / 1.75 — collision radius (half of
 //              the effect, so doorways sized for today's bodies still pass), eye height and seat fit;
-//   build      0.85–1.2 (default 1): girth — collision radius (and the drawn torso/hip/limb width);
+//   build      0.92–1.1 (default 1): girth — collision radius (and the drawn torso/hip/limb width);
 //   walkSpeed  m/s, 0.9–1.4 (default 1.35): the walking speed walk_to plans with, never above WALK_SPEED_CAP 1.4
 //              (so every tick stays inside MAX_HUMAN_STEP_PER_TICK and the published speed inside SPEED_CAPS.walk);
-//   headSize   0.85–1.2 (default 1): drawn only.
+//   headSize   0.94–1.08 (default 1): drawn only.
+// The ranges are kept narrow on purpose (Gene 2026-10-11: bodies vary subtly, not as caricatures).
 // Every other param is paint. A body without params, or with all four at their defaults, is today's body exactly:
 // `humanoidProfile` returns the HUMAN_PROFILE object itself and every dim equals today's constant, so worlds that
 // never set a look plan, hash and move as before. The reach model (body/model.ts BODY_MODEL: shoulders, arms) is
@@ -15,10 +16,10 @@ import { HUMAN_PROFILE, type AgentProfile } from '../spatial/types.ts';
 
 /** Ranges of the physical look params (the def core/humanoid@2 declares the same; humanoid-dims test asserts it). */
 export const HUMANOID_DIM_RANGES = Object.freeze({
-  height: [1.55, 1.95] as const,
-  build: [0.85, 1.2] as const,
+  height: [1.65, 1.85] as const,
+  build: [0.92, 1.1] as const,
   walkSpeed: [0.9, 1.4] as const,
-  headSize: [0.85, 1.2] as const,
+  headSize: [0.94, 1.08] as const,
 });
 export type HumanoidDimKey = keyof typeof HUMANOID_DIM_RANGES;
 /** Today's body: the 1.75 m model, girth 1, HUMAN_PROFILE's 1.35 m/s, head 1. */
