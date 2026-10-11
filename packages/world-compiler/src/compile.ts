@@ -248,17 +248,37 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         for (const [k, v] of Object.entries(op.state)) if (v !== undefined) next[k] = v !== null && typeof v === 'object' ? { ...(cur[k] as object | undefined), ...v } : v;
         const merged = worldStateSchema.parse(next);
         const prevPatch: Record<string, unknown> = {}, changed: Record<string, unknown> = {};
-        for (const k of Object.keys(op.state)) { prevPatch[k] = cur[k]; changed[k] = (merged as Record<string, unknown>)[k]; }
+        for (const k of Object.keys(op.state)) {
+          prevPatch[k] = cur[k]; changed[k] = (merged as Record<string, unknown>)[k];
+          // a field the patch sets that was absent before (an optional, nullable one: time.set, weather.strike) undoes to null
+          const pv = (op.state as Record<string, unknown>)[k], was = cur[k];
+          if (pv && typeof pv === 'object' && was && typeof was === 'object') { const back = { ...(was as object) } as Record<string, unknown>; let added = false; for (const f of Object.keys(pv)) if (!(f in back)) { back[f] = null; added = true; } if (added) prevPatch[k] = back; }
+        }
         scratch.state = merged; diff.world = { ...(diff.world ?? {}), ...changed };
         inverse.unshift({ op: 'world', state: prevPatch as never });
         return;
       }
       case 'expand': {
-        if (op.extent < scratch.constants.extent) { failures.push(fail(i, 'constant.immutable', 'extent only grows')); return; }
-        scratch.constants = { ...scratch.constants, extent: op.extent };
-        const h = op.extent / 2; scratch.terrain.update({ ...scratch.ground(), extent: [-h, -h, h, h] }, []);
+        // GOD-ENV: the world's bounds are the ground recipe's extent [x0, z0, x1, z1] (a rectangle); `extent` grows the
+        // centred square (the original op), `bounds` any side. Forward: grow only. The inverse (trusted) shrinks back,
+        // refused when anything now stands in the land it would take away.
+        const old = boundsOf(scratch), oldExtent = scratch.constants.extent;
+        if (op.extent === undefined && !op.bounds) { failures.push(fail(i, 'schema', 'expand needs extent (a centred square, m) or bounds [x0, z0, x1, z1]')); return; }
+        let nb: [number, number, number, number] = op.bounds ? [...op.bounds] : [...old];
+        if (op.extent !== undefined && !op.bounds) { const h = op.extent / 2; nb = [Math.min(old[0], -h), Math.min(old[1], -h), Math.max(old[2], h), Math.max(old[3], h)]; }
+        if (!(nb[2] > nb[0] && nb[3] > nb[1]) || nb[2] - nb[0] > 16000 || nb[3] - nb[1] > 16000) { failures.push(fail(i, 'size.range', `bounds [${nb.join(', ')}]: each side 0 < … ≤ 16000 m`)); return; }
+        const shrinks = nb[0] > old[0] + 1e-9 || nb[1] > old[1] + 1e-9 || nb[2] < old[2] - 1e-9 || nb[3] < old[3] - 1e-9;
+        if (shrinks && !opts.trusted) { failures.push(fail(i, 'constant.immutable', 'the world only grows (undo an extension to take it back)')); return; }
+        if (op.extent !== undefined && op.extent < oldExtent && !opts.trusted) { failures.push(fail(i, 'constant.immutable', 'extent only grows')); return; }
+        if (shrinks) {
+          const out = [...scratch.entities.values()].find((e) => { if (e.in.parent !== 'world') return false; const b = rootBox(scratch, e); return b[0] < nb[0] - 1e-6 || b[1] < nb[1] - 1e-6 || b[2] > nb[2] + 1e-6 || b[3] > nb[3] + 1e-6; });
+          if (out) { failures.push(fail(i, 'undo.conflict', `${scratch.pathOf(out.id)} stands on the land this would take away`)); return; }
+        }
+        const extent = op.extent ?? oldExtent;   // the centred square's side; directional growth lives in the bounds
+        scratch.constants = { ...scratch.constants, extent };
+        scratch.terrain.update({ ...scratch.ground(), extent: nb }, []);
         diff.constants = scratch.constants;
-        warnings.push('expand has no inverse');
+        inverse.unshift({ op: 'expand', bounds: old, extent: oldExtent });
         return;
       }
       case 'answer': { diff.answers.push({ prayer: op.prayer, text: op.text }); return; }
@@ -278,7 +298,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
 
   if (failures.length) return { ok: false, failures: heldBack.length && heldBack[0].op <= failures[0].op ? [heldBack[0]] : failures };
   // Persistent relationships: re-solve server-maintained constraints whose refs moved or whose ground changed (33 §3.3).
-  const resolved = resolveDependents(scratch, touched, new Set(diff.removes), new Set(diff.tiles), warnings);
+  const resolved = resolveDependents(scratch, touched, new Set(diff.removes), new Set(diff.tiles), warnings, diff.tiles);
   for (const id of resolved) touched.add(id);
   for (const id of touched) { const e = scratch.entities.get(id); if (e) diff.upserts.push(e); }
   diff.tiles = [...new Set(diff.tiles)];
@@ -312,6 +332,15 @@ export function applyBatch(world: WorldModel, input: unknown, by: string, tick: 
 }
 
 // ---------- helpers ----------
+
+/** The world's bounds [x0, z0, x1, z1] (m): the ground recipe's extent (GOD-ENV; ±extent/2 on worlds never extended). */
+export function boundsOf(w: WorldModel): [number, number, number, number] { const e = w.ground().extent; return [e[0], e[1], e[2], e[3]]; }
+/** A root entity's ground-plan box [x0, z0, x1, z1]: its shape's points, or its position. */
+function rootBox(w: WorldModel, e: Entity): [number, number, number, number] {
+  const sh = e.shape as { area?: [number, number][]; path?: [number, number][] } | undefined, pts = sh?.area ?? sh?.path;
+  if (pts?.length) { let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity; for (const [x, z] of pts) { x0 = Math.min(x0, x); z0 = Math.min(z0, z); x1 = Math.max(x1, x); z1 = Math.max(z1, z); } return [x0, z0, x1, z1]; }
+  const p = w.worldPose(e); return [p.x, p.z, p.x, p.z];
+}
 
 function isBody(w: WorldModel, e: Entity): boolean { return !!w.resolvedDef(e.def)?.components.body; }
 
@@ -401,8 +430,8 @@ function admit(w: WorldModel, e: Entity, def: StoredDef, i: number, mode: 'stric
   // settle on the ground when at the root with a 2-D position
   if (e.in.parent === 'world') {
     const p = e.p ?? [0, 0];
-    const half = w.constants.extent / 2;
-    if (Math.abs(p[0]) > half || Math.abs(p[p.length - 1]) > half) return fail(i, 'extent.outside', `(${p[0]}, ${p[p.length - 1]}) is outside ±${half} m`);
+    const bb = boundsOf(w);
+    if (p[0] < bb[0] || p[0] > bb[2] || p[p.length - 1] < bb[1] || p[p.length - 1] > bb[3]) return fail(i, 'extent.outside', `(${p[0]}, ${p[p.length - 1]}) is outside the world [${bb.join(', ')}] (x0, z0, x1, z1)`);
     const floatC = e.constraints?.find((c) => c.kind === 'float') as { kind: 'float'; sink: number } | undefined;
     const anchorKind = floatC ? 'float' : (e.anchor ?? def.anchor);
     if (anchorKind === 'float') {
@@ -629,7 +658,7 @@ function crossesTiles(path: [number, number][], tiles: Set<string>, tileOf: (x: 
   return false;
 }
 /** Re-solve `float`, `facing`, `along` and ground settling for entities affected by this batch. Returns ids changed. */
-function resolveDependents(w: WorldModel, touched: Set<string>, removed: Set<string>, tiles: Set<string>, warnings: string[]): string[] {
+function resolveDependents(w: WorldModel, touched: Set<string>, removed: Set<string>, tiles: Set<string>, warnings: string[], outTiles: string[] = []): string[] {
   const changed: string[] = [];
   if (!touched.size && !tiles.size && !removed.size) return changed;
   const tileOfXZ = (x: number, z: number) => `${Math.floor(x / 64)},${Math.floor(z / 64)}`;
@@ -673,8 +702,14 @@ function resolveDependents(w: WorldModel, touched: Set<string>, removed: Set<str
     const prevP = e.p, prevR = e.r;
     const trial: Entity = { ...next, v: e.v + 1 };
     w.delete(e.id);
+    // GOD-ENV: a building re-settles on the ground as it is now, so its old foundation pad comes up first (and goes
+    // back if it cannot re-settle); a new pad is installed when the new ground needs one (as on a fresh placement)
+    const padId = `${e.id}:pad`, oldPad = w.ground().landforms.find((l) => l.id === padId) ?? null;
+    if (oldPad && trial.p) { trial.p = [trial.p[0], trial.p[trial.p.length - 1]]; for (const c of w.setLandform(null, padId)) for (const t of w.terrain.invalidate(c)) outTiles.push(t); }
     const problem = admitForResolve(w, trial, def);
-    if (problem) { w.insert(e); w.index(e.id, w.footprint(e, def)); warnings.push(`${w.pathOf(e.id)}: ${problem}`); continue; }
+    if (problem) { if (oldPad) for (const c of w.setLandform(oldPad, padId)) for (const t of w.terrain.invalidate(c)) outTiles.push(t); w.insert(e); w.index(e.id, w.footprint(e, def)); warnings.push(`${w.pathOf(e.id)}: ${problem}`); continue; }
+    const pad = (trial as Entity & { _pad?: Landform })._pad;
+    if (pad) { delete (trial as Entity & { _pad?: Landform })._pad; for (const c of w.setLandform(pad, pad.id)) for (const t of w.terrain.invalidate(c)) outTiles.push(t); }
     w.insert(trial); if (def.layer === 'solid') w.index(trial.id, w.footprint(trial, def));
     if (JSON.stringify(prevP) !== JSON.stringify(trial.p) || JSON.stringify(prevR) !== JSON.stringify(trial.r) || trial.params !== e.params) changed.push(e.id); else { w.delete(trial.id); w.insert(e); if (def.layer === 'solid') w.index(e.id, w.footprint(e, def)); }
   }

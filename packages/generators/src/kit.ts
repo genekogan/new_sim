@@ -7,7 +7,7 @@ import { materialEnum, num, slotSchema, v2, v3 } from './fields.ts';
 import type { Baked, Generator, LocalOBB, Vec3 } from './types.ts';
 
 export const KIT_PRIMITIVES = ['box', 'rbox', 'cyl', 'cone', 'capsule', 'sphere', 'wedge', 'arch', 'ring', 'torus', 'lathe', 'extrude', 'sweep'] as const;
-export const KIT_ROLES = ['body', 'head', 'neck', 'tail', 'ear.l', 'ear.r', 'eye.l', 'eye.r', 'wing.l', 'wing.r', 'leg.fl', 'leg.fr', 'leg.bl', 'leg.br', 'leg.l', 'leg.r', 'arm.l', 'arm.r', 'fin', 'beak', 'snout', 'blade', 'wheel', 'door', 'lid', 'flame', 'light'] as const;
+export const KIT_ROLES = ['body', 'head', 'neck', 'tail', 'ear.l', 'ear.r', 'eye.l', 'eye.r', 'wing.l', 'wing.r', 'leg.fl', 'leg.fr', 'leg.bl', 'leg.br', 'leg.l', 'leg.r', 'arm.l', 'arm.r', 'fin', 'beak', 'snout', 'blade', 'wheel', 'door', 'lid', 'flame', 'light', 'fill', 'screen'] as const;
 
 const shape = z.object({
   kind: z.enum(KIT_PRIMITIVES),
@@ -42,6 +42,10 @@ const shape = z.object({
   pivot: v3.optional(),
   /** Emissive glow (lamps, windows at night): 0..1. */
   glow: num.min(0).max(1).optional(),
+  /** VOCAB-MECH: include this shape only when the condition holds on the instance params (variants, condition, options):
+   *  "variant=tall", "variant=tall|wide", "condition!=new", "awning", "!awning", "floors>1". A leading `@` reads entity
+   *  state instead ("@open", "@sign=closed"): drawn by the viewer only, never a collider. */
+  when: z.string().max(80).optional(),
 });
 export type KitShape = z.infer<typeof shape>;
 
@@ -90,11 +94,30 @@ function rotatedHalf(h: Vec3, yaw = 0, pitch = 0, roll = 0): Vec3 {
   return [x, y, z];
 }
 
-export function kitPhysics(args: KitArgs): Baked {
+/** VOCAB-MECH: does a shape's `when` hold? `params` = instance params (defaults filled); `state` = entity state (viewer only;
+ *  undefined in physics, where a state condition counts as "maybe": the shape bounds the box but never collides). */
+export function kitWhen(when: string | undefined, params: Record<string, unknown> = {}, state?: Record<string, unknown>): boolean {
+  if (!when) return true;
+  return when.split('&').every((term) => {
+    let t = term.trim(); const neg = t.startsWith('!'); if (neg) t = t.slice(1).trim();
+    const fromState = t.startsWith('@'); if (fromState) t = t.slice(1); if (fromState && !state) return true;
+    const src = fromState ? state! : params;
+    const m = /^([A-Za-z][\w-]*)\s*(!=|=|>=|<=|>|<)?\s*(.*)$/.exec(t); if (!m) return true;
+    const v = src[m[1]], op = m[2], rhs = m[3];
+    let ok: boolean;
+    if (!op) ok = !!v && v !== 'none';
+    else if (op === '=' || op === '!=') { const hit = rhs.split('|').some((x) => String(v) === x.trim()); ok = op === '=' ? hit : !hit; }
+    else { const a = Number(v), b = Number(rhs); ok = op === '>' ? a > b : op === '<' ? a < b : op === '>=' ? a >= b : a <= b; }
+    return neg ? !ok : ok;
+  });
+}
+
+export function kitPhysics(args: KitArgs, params: Record<string, unknown> = {}): Baked {
   let x0 = Infinity, y0 = Infinity, z0 = Infinity, x1 = -Infinity, y1 = -Infinity, z1 = -Infinity;
   const colliders: LocalOBB[] = [];
   let tris = 0;
   for (const sh of args.shapes) {
+    if (!kitWhen(sh.when, params)) continue;
     const c = centreOf(sh), h = halfOf(sh), rh = rotatedHalf(h, sh.yaw, sh.pitch, sh.roll);
     x0 = Math.min(x0, c[0] - rh[0]); x1 = Math.max(x1, c[0] + rh[0]);
     y0 = Math.min(y0, c[1] - rh[1]); y1 = Math.max(y1, c[1] + rh[1]);
@@ -103,7 +126,7 @@ export function kitPhysics(args: KitArgs): Baked {
     const r = sh.round ?? args.round;
     tris += sh.kind === 'box' ? (r > 0.005 ? 44 : 12) : sh.kind === 'rbox' ? ((sh.segments ?? 0) >= 2 ? 300 : 44) : sh.kind === 'wedge' ? 30 : sh.kind === 'sphere' ? seg * seg : sh.kind === 'capsule' ? seg * (seg + 4) : sh.kind === 'torus' || sh.kind === 'ring' ? seg * seg * 2 : sh.kind === 'lathe' ? seg * 2 * (sh.profile?.length ?? 2) : sh.kind === 'sweep' ? seg * 2 * (sh.path?.length ?? 2) : sh.kind === 'extrude' ? (sh.polygon?.length ?? 3) * 4 : seg * 4;
     const tall = 2 * h[1] >= 0.3;
-    const collide = sh.collide ?? ((sh.kind === 'box' || sh.kind === 'rbox' || sh.kind === 'cyl' || sh.kind === 'extrude') && tall && !sh.role);
+    const collide = !sh.when?.includes('@') && (sh.collide ?? ((sh.kind === 'box' || sh.kind === 'rbox' || sh.kind === 'cyl' || sh.kind === 'extrude') && tall && !sh.role));
     if (collide) colliders.push({ c: [c[0], c[2]], half: [rh[0], rh[2]], yaw: 0, y0: c[1] - rh[1], y1: c[1] + rh[1] });
   }
   if (!Number.isFinite(x0)) { x0 = y0 = z0 = -0.5; x1 = y1 = z1 = 0.5; }
@@ -118,5 +141,5 @@ export const kitGen: Generator = {
   doc: 'A prop or creature built from rounded primitives (box, rbox, cyl, cone, capsule, sphere, wedge, arch, ring, torus, lathe, extrude, sweep). Shapes live in make.args; instance params may recolour tints.',
   params: {},
   args: kitArgs,
-  physics({ args }) { return kitPhysics(kitArgs.parse(args)); },
+  physics({ args, params }) { return kitPhysics(kitArgs.parse(args), params); },
 };

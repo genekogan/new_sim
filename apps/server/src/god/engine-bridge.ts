@@ -16,6 +16,7 @@ import type { GodMode } from './god.ts';
 import { reachProviders, seatProviders, usesProviders, type ReachEnd } from './query.ts';
 import { GodNav } from './nav.ts';
 import { GodPerceive } from './perceive.ts';
+import { GodPlaces, inPoly } from './places.ts';
 import { installWorldLore } from './world-lore.ts';
 import { installHeld } from './held.ts';
 import { installWorldClock } from './world-clock.ts';
@@ -63,14 +64,17 @@ export class EngineBridge {
   readonly nav: GodNav;
   /** F1: god-built things Souls can see, look at and read (perceive.ts). */
   readonly perceive: GodPerceive;
+  /** R4-INFO: god-built places (areas, waters, buildings and their rooms, landmarks) in the Souls' map (places.ts). */
+  readonly places: GodPlaces;
 
   constructor(o: BridgeOptions) {
     this.host = o.host; this.god = o.god; this.edge = o.edge; this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
-    this.nav = new GodNav({ model: this.god.model, version: () => this.version, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e) });
-    this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), things: () => this.nav.things(), log: (m) => this.log(m) });
-    this.god.onCommit((c) => { this.version++; if (c.by !== 'engine') this.onCommit(c.diff); });
+    this.nav = new GodNav({ model: this.god.model, version: () => this.version, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined) });
+    this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, version: () => this.version, engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m) });
+    this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), places: this.places, levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m), commit: (ops, note) => this.god.engineAct(ops as never, note) });
+    this.god.onCommit((c) => { this.version++; if (c.by !== 'engine') { this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } });
     this.host.listeners.push({
-      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); if (tick % 20 === 5) this.perceiveSync(); } },
+      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); if (tick % 20 === 5) this.perceiveSync(); if (this.rescued !== this.editTick && tick - this.editTick >= 10) this.rescueTrapped(); } },
       onApplied: (e) => { if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
     });
     reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
@@ -275,6 +279,29 @@ export class EngineBridge {
       }
     }
     return { ...spec, support: { kind: 'ground' } };
+  }
+
+  /** R4-INFO: a god edit can close furniture round a Soul standing in a room (a house turned to face a moved fountain,
+   *  a sofa moved): from where it stands no walk reaches the room's door any more, so every act refuses
+   *  route.unreachable. Once the edit is in the engine, each idle Soul standing in a room it cannot leave steps to the
+   *  room's open floor (the standing room its front door reaches; nav.ts roomGoal) — a logged edge-relocate, as the
+   *  ledger steps bodies out of solids. Only after god edits, only Souls inside rooms. */
+  private editTick = -1;
+  private rescued = -1;
+  rescueTrapped() {
+    this.rescued = this.editTick;
+    const E = this.engine as EngineV1 & { world: { entities: Record<string, any> } };
+    const rooms = this.nav.things().filter((t) => t.kind === 'room' && t.level === 0 && t.poly && t.entry);
+    if (!rooms.length) return;
+    for (const m of this.host.minds.values()) {
+      const b = E.world.entities[m.entityId], h = b?.human;
+      if (!h || (h.level ?? 0) !== 0 || h.activity === 'sit' || h.baseActivity === 'sit' || h.sleepPose || h.carrier || E.programOf(m.entityId)) continue;
+      const p: Vec2 = [b.pose.p[0], b.pose.p[2]], room = rooms.find((t) => inPoly(p[0], p[1], t.poly!)); if (!room) continue;
+      if (E.reachV1({ p, level: 0 }, { p: room.entry!.p, level: room.entry!.level }).ok) continue;
+      const goal = this.nav.goal(room, p, m.entityId); if (!goal || goal.level !== 0) continue;
+      this.log(`${m.name} was closed in by furniture in ${room.ref}: steps to open floor at (${goal.p.join(', ')})`);
+      try { void this.host.enqueue('edge-relocate', `edge:${m.soulId}`, { soulId: m.soulId, entityId: m.entityId, to: goal.p, why: `the god rearranged ${room.ref} around them: stepped to open floor` }).catch(() => { /* best effort */ }); } catch { /* clock not ready */ }
+    }
   }
 
   private perceiveSync() { try { this.perceive.sync(); } catch (e) { this.log(`perceive: ${(e as Error).message}`); } }
@@ -604,12 +631,16 @@ export class EngineBridge {
   }
   /** Engine level of a standing height at (x, z): 0 within reach of the terrain there (hills too), else a floor's level. */
   levelAt(x: number, z: number, y: number): number {
-    if (Math.abs(y - this.model.terrain.sample(x, z)) <= GROUND_BAND + 0.5) return 0;
+    // a registered floor at this height wins over the generous ground band: a raised floor 0.35–0.85 m up (the Mars
+    // bays' 0.53 m plywood, lane MARS) is its own level, not the ground under it
+    const g = this.model.terrain.sample(x, z);
+    if (Math.abs(y - g) > GROUND_BAND) { const exact = this.levels.find((l) => Math.abs(l.y - y) <= LEVEL_MATCH); if (exact) return exact.id; }
+    if (Math.abs(y - g) <= GROUND_BAND + 0.5) return 0;
     const hit = this.levels.find((l) => Math.abs(l.y - y) <= 0.6); if (hit) return hit.id;
     const below = this.levels.filter((l) => l.y <= y + 0.5).sort((a, b) => b.y - a.y)[0];
     return below?.id ?? 0;
   }
-  private levelOfY(y: number) { if (Math.abs(y) <= GROUND_BAND + 0.5) return 0; const l = this.levels.reduce<Level | null>((b, l) => (l.y <= y + 0.5 && (!b || l.y > b.y) ? l : b), null); return l?.id ?? 0; }
+  private levelOfY(y: number) { if (Math.abs(y) > GROUND_BAND) { const exact = this.levels.find((l) => Math.abs(l.y - y) <= LEVEL_MATCH); if (exact) return exact.id; } if (Math.abs(y) <= GROUND_BAND + 0.5) return 0; const l = this.levels.reduce<Level | null>((b, l) => (l.y <= y + 0.5 && (!b || l.y > b.y) ? l : b), null); return l?.id ?? 0; }
   reach(from: ReachEnd, to: ReachEnd) {
     const a = this.endOf(from), b = this.endOf(to);
     if ('error' in a) return { reachable: false, code: 'reach.bad-from', detail: a.error };
@@ -622,6 +653,9 @@ export class EngineBridge {
   // ------------------------------------------------------------------ Souls: capabilities on god things, prayers
 
   private hookEdge(L: EdgeLedger) {
+    // R4-INFO: god-built places are walkable (map, plain-words resolution, `via`), and the map follows the god's edits
+    L.placeWalkable = (id) => this.places.walkable(id);
+    L.beforeMap = () => { this.flush(); this.perceiveSync(); };
     const prev = L.worldProfile;
     L.worldProfile = (soul, caps, plans) => { prev?.(soul, caps, plans); try { this.capabilities(soul, caps, plans as never); } catch (e) { this.log(`capabilities: ${(e as Error).message}`); } };
     const act = L.act.bind(L), self = this;
@@ -669,7 +703,7 @@ export class EngineBridge {
         // resolves through the ledger's vocabulary (every word in the label) to this seat and not another bench
         const ent = this.model.entities.get(x.id), kind = ent ? this.model.resolvedDef(ent.def)?.name.replace(/^core-/, '') : undefined;
         const by = ent ? this.nav.namesNear([x.pose.p[0], x.pose.p[2]], x.id) : [];
-        const id = `sit:${x.id}`, label = `Sit on ${name(x.id)} (${kind && !name(x.id).split('/').pop()!.includes(kind) ? `a ${kind}, ` : ''}${by.length ? `by ${by.join(' and ')}; ` : ''}${d} m${levelOf(x) ? `, floor ${levelOf(x)}` : ''})`;
+        const id = `sit:${x.id}`, label = `${name(x.id)} (${kind && !name(x.id).split('/').pop()!.includes(kind) ? `a ${kind}, ` : ''}${by.length ? `by ${by.join(' and ')}; ` : ''}${d} m${levelOf(x) ? `, floor ${levelOf(x)}` : ''})`;
         // F1: a bench for two stays free while one of its seats is; the seat a Soul sits on is not free to itself
         const full = others.length >= seats || (!!u && !mine && seats <= 1);
         // seat fit (engine bodies/humanoid.ts): a body whose look sets its height sits only on seats whose top suits it

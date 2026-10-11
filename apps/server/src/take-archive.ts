@@ -27,8 +27,11 @@ export class TakeArchive {
  db:Db;worldId:string;store:ArchiveStore|null;prefix:string;
  private busy=false;private timer:NodeJS.Timeout|null=null;
  private cache:{key:string;chunks:Chunk[]}|null=null;
- constructor(db:Db,worldId:string,store:ArchiveStore|null,prefix='sim/takes'){this.db=db;this.worldId=worldId;this.store=store;this.prefix=prefix.replace(/\/+$/,'');}
- start(host:WorldHost){if(!this.store||this.timer)return;this.timer=setInterval(()=>{void this.archiveOne(host.engine.world.tick).catch(()=>console.error('[takes] archive delayed; local replay retained'));},60000);this.timer.unref();}
+ localKeepTicks:number;
+ // localKeepTicks>0 with no archive store bounds the local replay buffer (new worlds: no R2; otherwise take_chunks grows ~3 MB/min forever).
+ constructor(db:Db,worldId:string,store:ArchiveStore|null,prefix='sim/takes',localKeepTicks=0){this.db=db;this.worldId=worldId;this.store=store;this.prefix=prefix.replace(/\/+$/,'');this.localKeepTicks=localKeepTicks;}
+ pruneLocal(tick:number){if(this.store||!(this.localKeepTicks>0))return 0;return Number(this.db.db.prepare('DELETE FROM take_chunks WHERE world_id=? AND to_tick<?').run(this.worldId,tick-this.localKeepTicks).changes);}
+ start(host:WorldHost){if(this.timer)return;if(!this.store){if(this.localKeepTicks>0){this.pruneLocal(host.engine.world.tick);this.timer=setInterval(()=>{try{this.pruneLocal(host.engine.world.tick);}catch{console.error('[takes] local prune failed');}},60000);this.timer.unref();}return;}this.timer=setInterval(()=>{void this.archiveOne(host.engine.world.tick).catch(()=>console.error('[takes] archive delayed; local replay retained'));},60000);this.timer.unref();}
  stop(){if(this.timer)clearInterval(this.timer);this.timer=null;}
  async archiveOne(tick:number):Promise<boolean>{
   const work=this.archiveOneWork(tick);this.work.add(work);try{return await work;}finally{this.work.delete(work);}

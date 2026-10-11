@@ -35,24 +35,24 @@ test('unset or default dims are today\'s body exactly (same profile object, radi
 });
 
 test('height and build change radius, height, eyes and seat fit; walk speed changes the profile speed', () => {
-  const tall = humanoidDims(look({ height: 1.95, build: 1.2 })), small = humanoidDims(look({ height: 1.55, build: 0.85 }));
+  const tall = humanoidDims(look({ height: 1.85, build: 1.1 })), small = humanoidDims(look({ height: 1.65, build: 0.92 }));
   assert.ok(tall.radius > HUMAN_RADIUS && tall.radius <= HUMANOID_RADIUS_RANGE[1], `tall radius ${tall.radius}`);
   assert.ok(small.radius < HUMAN_RADIUS && small.radius >= HUMANOID_RADIUS_RANGE[0], `small radius ${small.radius}`);
-  assert.equal(dimsOf({ build: 1.1 }).radius, 0.308); assert.equal(dimsOf({ height: 1.9 }).radius, 0.292);
-  assert.equal(tall.eyeHeight, 1.805); assert.equal(small.eyeHeight, 1.435);
-  const p = humanoidProfile(look({ height: 1.9, walkSpeed: 1.0 }));
-  assert.notEqual(p, HUMAN_PROFILE); assert.equal(p.speed, 1.0); assert.equal(p.height, 1.954); assert.equal(p.radius, 0.292);
-  assert.equal(humanoidProfile(look({ height: 1.9, walkSpeed: 1.0 })), p, 'profiles are shared per dims');
-  assert.equal(humanoidProfile(look({ headSize: 1.2 })), HUMAN_PROFILE, 'head size is drawn only');
-  // seat fit scales today's 0.2–1.2 m range: a 1.1 m stool is too high for the shortest body (≤ 1.063), fine for today's
-  assert.equal(seatFitProblem(undefined, 1.1), null);
-  assert.equal(seatFitProblem(look({ height: 1.55 }), 1.1)?.code, 'seat.too-high');
-  assert.equal(seatFitProblem(look({ height: 1.95 }), 0.2)?.code, 'seat.too-low');
-  assert.equal(seatFitProblem(look({ height: 1.95 }), 0.45), null);
+  assert.equal(dimsOf({ build: 1.1 }).radius, 0.308); assert.equal(dimsOf({ height: 1.85 }).radius, 0.288);
+  assert.equal(tall.eyeHeight, 1.713); assert.equal(small.eyeHeight, 1.527);
+  const p = humanoidProfile(look({ height: 1.85, walkSpeed: 1.0 }));
+  assert.notEqual(p, HUMAN_PROFILE); assert.equal(p.speed, 1.0); assert.equal(p.height, 1.903); assert.equal(p.radius, 0.288);
+  assert.equal(humanoidProfile(look({ height: 1.85, walkSpeed: 1.0 })), p, 'profiles are shared per dims');
+  assert.equal(humanoidProfile(look({ headSize: 1.08 })), HUMAN_PROFILE, 'head size is drawn only');
+  // seat fit scales today's 0.2–1.2 m range: a 1.15 m stool is too high for the shortest body (≤ 1.131), fine for today's
+  assert.equal(seatFitProblem(undefined, 1.15), null);
+  assert.equal(seatFitProblem(look({ height: 1.65 }), 1.15)?.code, 'seat.too-high');
+  assert.equal(seatFitProblem(look({ height: 1.85 }), 0.2)?.code, 'seat.too-low');
+  assert.equal(seatFitProblem(look({ height: 1.85 }), 0.45), null);
 });
 
 test('bodyProblem accepts looks in range, refuses out-of-range dims; withBody keeps a look', () => {
-  assert.equal(bodyProblem(look({ height: 1.9, build: 1.1, walkSpeed: 1.2, hat: 'cap' })), null);
+  assert.equal(bodyProblem(look({ height: 1.85, build: 1.1, walkSpeed: 1.2, hat: 'cap' })), null);
   assert.equal(bodyProblem(look({ walkSpeed: 1.5 })), 'body.params.walkSpeed', 'never above the walk cap');
   assert.equal(bodyProblem(look({ height: 2.4 })), 'body.params.height');
   assert.equal(bodyProblem(look({ build: 'broad' })), 'body.params.build');
@@ -80,7 +80,7 @@ function walkOnce(body: Body | undefined) {
 test('walking speed: a slow body takes longer, a fast one stays under the per-tick limit; defaults walk as today', () => {
   const today = walkOnce(undefined), same = walkOnce(look({ hat: 'cap', height: 1.75, walkSpeed: 1.35 }));
   assert.equal(same.time, today.time, 'a default look walks exactly as a body without one');
-  const slow = walkOnce(look({ walkSpeed: 0.9 })), fast = walkOnce(look({ walkSpeed: 1.4, height: 1.95, build: 1.2 }));
+  const slow = walkOnce(look({ walkSpeed: 0.9 })), fast = walkOnce(look({ walkSpeed: 1.4, height: 1.85, build: 1.1 }));
   assert.ok(slow.time > today.time * 1.25, `slow ${slow.time}s vs ${today.time}s`);
   assert.ok(fast.time <= today.time, `fast ${fast.time}s vs ${today.time}s`);
   for (const r of [today, slow, fast]) {

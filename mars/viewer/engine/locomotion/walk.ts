@@ -144,15 +144,21 @@ type Exec = {
   faceoff?: { id: string; since: number; tick: number };
 };
 
-export const walkSchema = z.strictObject({
+const walkSchemaWithin = (reach: number) => z.strictObject({
   arrivalEvidence:z.literal('navigation-arrival/1').optional(),
   actor: z.string().max(80),
-  x: z.number().min(-500).max(500),
-  z: z.number().min(-500).max(500),
+  x: z.number().min(-reach).max(reach),
+  z: z.number().min(-reach).max(reach),
   level: z.number().int().min(0).max(20).optional(),
   face: z.number().min(-7).max(7).optional(),
   speed: z.number().min(0.3).max(WALK_SPEED_CAP).optional(),
 });
+const walkSchema500 = walkSchemaWithin(500);
+let walkSchemaWide: typeof walkSchema500 | null = null;
+/** GOD-ENV: a god's (entity) world can grow past ±500 m ("extend the world east"); its server widens the reach of
+ *  walk_to to the world's bounds. Worlds that never call this (the old worlds) parse with the same ±500 schema as before. */
+export function setWalkReach(metres: number) { walkSchemaWide = metres > 500 ? walkSchemaWithin(Math.min(16000, metres)) : null; }
+export const walkSchema = z.lazy(() => walkSchemaWide ?? walkSchema500);
 
 const spatial = bodySpatial;
 
@@ -807,7 +813,17 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   let into = intrusion(rt, a, cur, pl.p, r) ?? loadIntrusion(rt, a, cur, pl.p, r);
   if (into && pl.off !== bodyOff && !lagging) {
     const keep = place(ex.s, bodyOff);
-    if (dist2(cur, keep.p) <= stepMax + 1e-9 && !(intrusion(rt, a, cur, keep.p, r) ?? loadIntrusion(rt, a, cur, keep.p, r))) { pl = keep; into = null; }
+    if (dist2(cur, keep.p) <= stepMax + 1e-9 && !(intrusion(rt, a, cur, keep.p, r) ?? loadIntrusion(rt, a, cur, keep.p, r))) {
+      // Prospective reporting only: at the endpoint a held sidestep can be
+      // obstructed even though the destination itself is free. Retain the real
+      // dependency for existing wait/recovery instead of an unnamed settle.
+      if (arrived && rt.services.walkSettleWaitV1 === true) {
+        if (rt.world.entities[into]?.kind === 'human') personBlock ??= into;
+        else loadBlock ??= into;
+        ex.v = 0;
+      }
+      pl = keep; into = null;
+    }
   }
   let p = pl.p;
   ex.offset = pl.off;

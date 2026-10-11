@@ -118,6 +118,20 @@ yourself is slower, uglier and knows nothing about Souls. The order is always:
 that def in full: params with ranges and defaults, state, size, slots, rooms; several words search.
 `schema --md` (= SCHEMA.md) has every generator's params with ranges.
 
+**The catalogue (any number of types).** Every def has a category (`taxonomy` prints the tree with counts, the
+params every type may take, and the actuators) and the words people use for it:
+- `find <words>` ranks by name, synonyms ("bodega" → corner-shop, "call box" → phone-box) and category words;
+  `find --category furniture.seat`, `find --has slot:sit` (or `slot:lie`, `verb:put-on`, `actuator:door`,
+  `action:light`, `comp:light`, `param:taper`) filter by what a thing is and what it offers.
+- `catalog [--category c] [--has …] [--page n]` lists every def, one line each (ref, category, size, triangles, asset
+  bytes, {interfaces}, (params), synonyms, first sentence) — read it whole when you plan a big build.
+- `recommend <what you want>` turns an intent into picks per need and an example batch.
+- Convention params many catalogue types take (see `defs <ref>`): `sx sy sz` (stretch per axis), `taper bend skew`
+  (warp), `tint vary` (paint), `condition=new|worn|damaged|construction` (wear; construction puts a scaffold up),
+  `variant=…` (styles), and one colour param per part. Things with **actuators** (doors, lamps, fires, taps…) are
+  things Souls can open/close/lock, switch on/off, light/put out, fill/empty, play/stop; set their start state with
+  `--state '{"open":true}'`.
+
 ## Placing with relations (the solver)
 
 `place <def> [relation] [--facing …] [--name n] [--param k=v]… [--state '{…}'] [--dry]`
@@ -206,7 +220,7 @@ remove <ref> [<ref>…]                                    # and everything insi
 clone <ref> [--at ref|x,z] [--count n --step dx,dz]      # deep copy with fresh names
 select --def bench --near square --radius 30            # list; add one action to change them all:
 select --def tree --area -50,-50,50,50 --remove          #   --remove · --by dx,dz · --yaw r · --recolor #hex · --set-state '{…}' · --set-param k=v
-sky --palette golden-hour --sun 0.4 · weather --clouds 0.3 --wind 0.2 · constitution "<markdown>" · expand 2000
+sky --palette golden-hour --sun 0.4 · constitution "<markdown>" · expand 2000
 ```
 Positions are always **world** coordinates, also for things inside a house or on a table: `move
 house/lamp --near house/bed --dir e` or `--by 0.5,0` works in the world frame, and where the thing lands
@@ -216,6 +230,32 @@ root), which the answer says. **Sky**: `sky` alone shows the sky, the weather an
 half lit), `night`, `midnight` (every lamp lit), `mars-desert`, `lm-garden`; an unknown name is refused.
 `sky` keeps the weather and `weather` keeps the sky. Today the viewer's sky colour does not change
 with the palette; the palette and `--sun` light the lamps.
+
+## Time, weather and the land
+
+Every control below is one god edit: validated, in the history, undone by `undo`, seen by viewers and by Souls.
+```
+time                                   # the clock, its speed, the weather now (and the last lightning strike)
+time 19:30 | time 7pm                  # the nearest 19:30 (at most 12 h back or ahead; setting it twice changes nothing)
+time --speed 48 · time --pause · time --resume [--speed 24]   # world hours per real hour (24 = a day an hour)
+weather --kind storm --intensity 0.9   # clear | cloudy | rain | wind | fog | storm (lightning + thunder) | auto (scheduled)
+weather --rain 0.4 --fog 0.6           # channels alone = a manual mix
+strike [--at x,z|thing]                # a lightning bolt there now: viewers see the flash and hear the thunder after
+                                       # distance ÷ 343 m/s; Souls nearby hear of it in `here`
+land <verb> … [--preview]              # --preview says what would change (ground ±m, things re-grounded, bounds)
+  land raise|lower --at x,z --radius 15 --amount 4 · land flatten --at x,z --radius 8 [--level 2] · land smooth --at x,z --amount 0.6
+  land hill|mountain|knoll --at x,z --height 60 --radius 70 --name thunder-peak   (--path '[[x,z],…]' for a ridge/range)
+  land plateau --rect cx,cz,w,d --height 6 · land terrace --circle cx,cz,r [--level m | --step 2]
+  land valley --path '[[x,z],[x,z],…]' --depth 8 --width 10 · land ditch --path '[[x,z],[x,z]]' · land cliff --path '[[x,z],[x,z]]' --height 14 [--side -1]
+  land move thunder-peak --by 30,0 | --to x,z     # move a mountain (or any root thing)
+  land water pond --by 0.4 | --level 1.2          # a pond's, lake's or river's water level (its bed stays)
+  land extend east 200                            # grow the world on one side (n s e w ne …); `undo` takes it back while it is empty
+```
+Things standing where the ground changes go with it (a bench rises with a hill, a house gets a foundation pad); an
+edit that would leave something floating or buried is refused (`ground.unsettled`). Named landforms appear on the
+Souls' map ("a mountain about 60 m high…; walk:thunder-peak climbs it") and extended land as "new land to the east".
+Limit today: Souls walk within one 384 m square of the world at a time (the engine's walking window), so land much
+farther than that from where they live is seen but not yet reached on foot.
 
 ## Seeing and checking
 
@@ -265,7 +305,7 @@ an extra word, several options in one quoted argument); nothing was sent. Fix th
 | code | do this |
 |---|---|
 | `overlap.solid` | already retried with candidates/suggestion/nudge; pick another relation, `--dist`, `--free`, or remove the blocker |
-| `extent.outside` | place nearer the centre, or `expand <metres>` |
+| `extent.outside` | place nearer the centre, or `land extend <side> <metres>` |
 | `support.none` | give a 2-D position (it settles on the ground) or a parent |
 | `float.no-water` | `--float --at <lake>`: floating needs water under it (boats always float: no beached boats) |
 | `size.range` | the scale (or size) is outside what the def allows: `defs <name>` prints its `--scale` range (`fixed size` = none); use params (`w`, `d`, `height`) or another def |

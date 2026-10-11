@@ -1,0 +1,2 @@
+import test from 'node:test';import assert from 'node:assert/strict';import {nativeLifecycleFlagV1} from './world-server.mjs';
+test('native lifecycle is an explicit additive boolean flag, absent/false never activates',()=>{assert.equal(nativeLifecycleFlagV1(undefined),false);assert.equal(nativeLifecycleFlagV1(false),false);assert.equal(nativeLifecycleFlagV1(true),true);for(const x of ['true',1,null,{}])assert.throws(()=>nativeLifecycleFlagV1(x),/world.native-lifecycle-flag/);});

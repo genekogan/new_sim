@@ -26,9 +26,13 @@ test('the published handle validates canonical IDs and uses current ports after 
   });
   let port = make('a'); const handle = createWorldViewerHandle(() => port);
   assert.equal(handle.selectSoul('body-a'), false);
+  assert.equal(handle.canFollowSoul?.('soul-a'), false, 'legacy/roster-only ports cannot assert a depicted live body');
   assert.equal(handle.selectEntity('soul-a'), false);
   assert.equal(handle.selectSoul('soul-a'), true);
+  port = {...port,canFollowSoul:id=>id==='soul-a'};
+  assert.equal(handle.canFollowSoul?.('soul-a'),true);
   port = make('b');
+  assert.equal(handle.canFollowSoul?.('soul-a'),false,'readiness belongs to the current world port');
   assert.equal(handle.selectSoul('soul-a'), false);
   assert.equal(handle.selectEntity('body-b'), true);
   assert.equal(handle.selectSoul(null), true);

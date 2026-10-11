@@ -109,12 +109,14 @@ export function viewerWeatherKind(datetime: string): Kind | null {
   return pick(Object.entries(w) as [Kind, number][], hash01(day, slot * 131 + 17));
 }
 const KIND_WORDS: Record<Kind, string[]> = {clear: ['clear sky'], cloudy: ['cloudy'], rain: ['raining'], wind: ['windy'], fog: ['foggy'], storm: ['stormy', 'raining']};
-export function lightOf(datetime: string | null, weather: {clouds?: number; rain?: number; wind?: number; dust?: number} | undefined, indoors: boolean): Light {
+export function lightOf(datetime: string | null, weather: {clouds?: number; rain?: number; wind?: number; dust?: number; fog?: number; kind?: string} | undefined, indoors: boolean): Light {
   const hh = datetime ? Number(datetime.slice(11, 13)) : NaN, mm = datetime ? Number(datetime.slice(14, 16)) : NaN, m = hh * 60 + mm;
   const label: Light['label'] = !Number.isFinite(m) ? 'day' : m < 330 || m >= 1260 ? 'night' : m < 420 ? 'morning' : m < 1080 ? 'day' : m < 1170 ? 'evening' : 'dusk';
-  const kind = datetime ? viewerWeatherKind(datetime) : null, w: string[] = kind ? [...KIND_WORDS[kind]] : [];
+  // a god world's set weather (R4-LIVE: weather.kind other than auto) names itself; 'manual' reads the channels below
+  const set = weather?.kind && weather.kind !== 'auto' ? weather.kind : null;
+  const kind = set ? (set in KIND_WORDS ? set as Kind : null) : datetime ? viewerWeatherKind(datetime) : null, w: string[] = kind ? [...KIND_WORDS[kind]] : [];
   // The picture eases between slots (about a world hour at Eden's clock rate): say so rather than contradict it.
-  if (kind && datetime && Number.isFinite(m) && m % 120 < 60) {
+  if (kind && !set && datetime && Number.isFinite(m) && m % 120 < 60) {
     const before = viewerWeatherKind(new Date(Date.parse(datetime.slice(0, 19) + 'Z') - 61 * 60_000).toISOString());
     const wet = (k: Kind | null) => k === 'rain' || k === 'storm';
     if (wet(before) && !wet(kind)) w.splice(0, w.length, 'rain clearing', ...KIND_WORDS[kind].filter(x => x !== 'raining'));
@@ -123,6 +125,7 @@ export function lightOf(datetime: string | null, weather: {clouds?: number; rain
   if (!kind) {
     if ((weather?.rain ?? 0) > 0.1) w.push('raining'); else if ((weather?.clouds ?? 0) > 0.6) w.push('overcast'); else if ((weather?.clouds ?? 0) > 0.25) w.push('some cloud'); else w.push('clear sky');
     if ((weather?.wind ?? 0) > 0.5) w.push('windy');
+    if ((weather?.fog ?? 0) > 0.5) w.push('foggy');
   }
   if ((weather?.dust ?? 0) > 0.3) w.push('dusty air');
   return {clock: Number.isFinite(m) ? `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}` : null, label, dark: label === 'night' && !indoors, weather: w};

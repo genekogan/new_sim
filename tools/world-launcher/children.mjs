@@ -26,7 +26,7 @@ export class ChildPool {
    *           healthPath?: (slug: string) => string, onChange?: (slug: string) => void, pidFile?: string, idleMs?: number,
    *           maxRunning?: number, minFreeMb?: number, busy?: (slug: string) => boolean,
    *           decorate?: (c: { cmd: string, args: string[], env?: object }) => { cmd: string, args: string[], env?: object },
-   *           soulCliFile?: string | null, soulSkillFile?: string | null }} o
+   *           soulCliFile?: string | null, soulSkillFile?: string | null, soulInstructionsFile?: string | null }} o
    * maxRunning / minFreeMb: before a world boots, idle worlds are put to sleep until it fits; when none can sleep the
    * boot is refused (error.code 'capacity'). busy(slug): a world with live viewers is never put to sleep.
    */
@@ -197,15 +197,20 @@ export function defaultCommand(world, port, o) {
     WORLD_PATH: `/w/${world.slug}`,
     // the creator becomes the god by claiming at birth (launcher), never by a WORLD_OWNER_ID left in the env file
     ...(clerk ? { AUTH_PROVIDER: 'clerk', ACCOUNT_AUTH_REQUIRED: '1', ACCOUNT_REGISTRY_PATH: clerk.registryPath, INVITE_REQUIRED: '0', WORLD_OWNER_ID: '' } : {}),
+    // …except a world the operator makes for an existing account (launcher /__sim/op/create-world): born owned by it
+    ...(world.bornOwner ? { WORLD_OWNER_ID: world.bornOwner } : {}),
     // anyone signed in may join as a Soul under dev sign-in too (Clerk sets it above; edge minds: config default + production)
     ...(clerk ? {} : { INVITE_REQUIRED: '0' }),
     // Native Soul arrival/removal (lifecycle), so a Soul is made exactly as on the live worlds: the agent's create-soul,
     // and under Clerk the human's approval of it (main's accounts/). Lane P2.
     SOUL_LIFECYCLE: '1',
+    // Souls fade and are lifted up after an hour without an action (green → yellow → red → beam-up), as on /w/eden (R4-LIVE)
+    EDGE_FADING: '1',
     // Soul mode of the world's one skill (/SKILL.md) points at Codex's Soul skill (/skill.md) and CLI (/eden-agent.mjs),
     // served as is from the published files when the launcher is given them (--soul-skill, --soul-cli).
     ...(o.soulSkillFile && existsSync(o.soulSkillFile) ? { EDGE_SKILL_FILE: resolve(o.soulSkillFile) } : {}),
     ...(o.soulCliFile && existsSync(o.soulCliFile) ? { EDGE_CLI_FILE: resolve(o.soulCliFile) } : {}),
+    ...(o.soulInstructionsFile && existsSync(o.soulInstructionsFile) ? { EDGE_INSTRUCTIONS_FILE: resolve(o.soulInstructionsFile) } : {}),
     ...(marsWeb && existsSync(marsWeb) ? { MARS_WEB_DIR: marsWeb } : {}),
     ...(world.templateFile ? { GENESIS_FILE: world.templateFile } : {}),
   };

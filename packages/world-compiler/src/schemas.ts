@@ -113,6 +113,10 @@ export const defSchema = z.object({
   extends: z.string().regex(DEF_REF).optional(),
   description: z.string().max(4000).default(''),
   tags: z.array(z.string().regex(NAME)).max(32).default([]),
+  /** VOCAB-MECH: the catalogue category (a node of vocab/taxonomy.json, e.g. "building.commercial") and the words people
+   *  use for it ("bodega", "corner shop"). Optional (no default) so defs without them hash as before; search infers one. */
+  category: z.string().regex(/^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*){0,3}$/).optional(),
+  synonyms: z.array(z.string().min(2).max(40)).max(24).optional(),
   form: z.enum(['point', 'path', 'area']).default('point'),
   make: makeSchema,
   params: fieldsSchema.default({}),
@@ -190,11 +194,23 @@ export const worldConstantsSchema = z.object({
 export type WorldConstants = z.infer<typeof worldConstantsSchema>;
 
 /** Sky palettes the `world` op accepts. The viewer's lamps read night/midnight as night and dawn/dusk/sunset/twilight as half-night; the rest follow `sun`. */
+/** Weather kinds of the `world` op (R4-LIVE): 'auto' follows the live worlds' schedule; 'manual' shows the channels as set. */
+export const WEATHER_KINDS = ['auto', 'manual', 'clear', 'cloudy', 'rain', 'wind', 'fog', 'storm'] as const;
 export const SKY_PALETTES = ['clear-day', 'golden-hour', 'dawn', 'sunset', 'dusk', 'twilight', 'night', 'midnight', 'mars-desert', 'lm-garden'] as const;
+const strikeSchema = z.object({ x: num, z: num, n: z.number().int().min(1), tick: z.number().int().min(0) });
 export const worldStateSchema = z.object({
   sky: z.object({ palette: z.string().default('clear-day'), sun: num.min(0).max(1).default(0.6) }).prefault({}),
-  time: z.object({ dayTicks: z.number().int().default(72000), startTick: z.number().int().default(0) }).prefault({}),
-  weather: z.object({ clouds: num.min(0).max(1).default(0.1), wind: num.min(0).max(1).default(0.1), rain: num.min(0).max(1).default(0) }).prefault({}),
+  time: z.object({ dayTicks: z.number().int().default(72000), startTick: z.number().int().default(0),
+    /** R4-LIVE env setter: set the time of day to `hour` (0–24) once; `n` counts sets (the world clock applies each n once, moving forward). */
+    set: z.object({ hour: num.min(0).max(24), n: z.number().int().min(1) }).nullable().optional(),
+    /** The world clock stands still (the god paused time). */
+    paused: z.boolean().default(false) }).prefault({}),
+  /** `kind` 'auto' = the scheduled weather of the live worlds (a kind per 2 h slot, seeded by the day, as on /w/eden); any
+   *  other kind shows these channels as set (`setEnv` writes them from kind × intensity). 'storm' adds lightning and thunder. */
+  weather: z.object({ clouds: num.min(0).max(1).default(0.1), wind: num.min(0).max(1).default(0.1), rain: num.min(0).max(1).default(0),
+    fog: num.min(0).max(1).default(0), kind: z.enum(WEATHER_KINDS).default('auto'), intensity: num.min(0).max(1).default(1),
+    /** GOD-ENV: the god's last lightning strike (x, z at `tick`; `n` counts strikes). Viewers draw it, Souls see and hear it. */
+    strike: strikeSchema.nullable().optional() }).prefault({}),
   constitution: z.string().max(20000).default(''),
   /** What the bare ground is made of (L3): the terrain colouring reads it. */
   ground: z.object({ palette: z.enum(['grass', 'desert', 'dust', 'sand', 'snow', 'rock', 'garden']).default('grass') }).prefault({}),
@@ -203,8 +219,8 @@ export type WorldState = z.infer<typeof worldStateSchema>;
 /** A `world` op's state is a patch: no defaults (they would reset what it does not name); compile merges it per key and per field. */
 export const worldPatchSchema = z.object({
   sky: z.object({ palette: z.string(), sun: num.min(0).max(1) }).partial(),
-  time: z.object({ dayTicks: z.number().int(), startTick: z.number().int() }).partial(),
-  weather: z.object({ clouds: num.min(0).max(1), wind: num.min(0).max(1), rain: num.min(0).max(1) }).partial(),
+  time: z.object({ dayTicks: z.number().int(), startTick: z.number().int(), set: z.object({ hour: num.min(0).max(24), n: z.number().int().min(1) }).nullable(), paused: z.boolean() }).partial(),
+  weather: z.object({ clouds: num.min(0).max(1), wind: num.min(0).max(1), rain: num.min(0).max(1), fog: num.min(0).max(1), kind: z.enum(WEATHER_KINDS), intensity: num.min(0).max(1), strike: strikeSchema.nullable() }).partial(),
   constitution: z.string().max(20000),
   ground: z.object({ palette: worldStateSchema.shape.ground.unwrap().shape.palette.unwrap() }).partial(),
 }).partial();
@@ -240,7 +256,9 @@ const clone = z.object({
 });
 const define = z.object({ op: z.literal('define'), def: defSchema });
 const world = z.object({ op: z.literal('world'), state: worldPatchSchema });
-const expand = z.object({ op: z.literal('expand'), extent: num.positive().max(16000) });
+/** Grow the world: `extent` = a centred square of that side (the original form); `bounds` = [x0, z0, x1, z1] metres, any
+ *  direction (GOD-ENV: "extend the world east by 300 m"), each side ≤ 16 km. Grows only; its inverse (trusted) shrinks back. */
+const expand = z.object({ op: z.literal('expand'), extent: num.positive().max(16000).optional(), bounds: z.tuple([num, num, num, num]).optional() });
 const answer = z.object({ op: z.literal('answer'), prayer: z.string(), text: z.string().max(4000) });
 /** Internal: restore a previously removed entity verbatim (inverse of remove). Never accepted from clients. */
 const restore = z.object({ op: z.literal('restore'), entity: entitySchema });

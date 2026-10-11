@@ -40,13 +40,29 @@ import {type WeatherState,type WeatherKind,type WeatherOverride,weatherKindAt,ta
  * exact multiply/restore of Daylight-owned values. */
 export type AtmosphereFrame={seconds:number;dt:number;daylight:number|null;camera:THREE.Camera;eden:boolean;reducedMotion:boolean;
  /** World clock (ISO) when the caller has it; weather falls back to the wall clock. */
- clock?:string|null};
-export type AtmosphereInspection={active:boolean;rotor:boolean;fountainWater:number;skyClouds:number;kind:WeatherKind|null;state:WeatherState;windMaterials:number;windModes:Record<string,number>;smokeSources:number;flowers:number;meadow:number;roofs:number;water:number;harbour:boolean;scans:number;drawCalls:number};
+ clock?:string|null;
+ /** R4-LIVE: 'world' = a god-built world (new worlds): the same sky, weather, wind, birds and lamps' halos, without
+  * Eden's own fixtures (harbour lighthouse, sea fog banks, the balloon tracks, the commons fire pits). Default 'eden'. */
+ profile?:'eden'|'world';
+ /** A god world's set weather (its `world` state, kind other than 'auto'); null/undefined = the scheduled weather. */
+ weather?:SetWeather|null;
+ /** A god world's own "is this point under a roof" (Eden's are its building list). */
+ indoors?:(x:number,y:number,z:number)=>boolean};
+/** A god's weather as set (apps/server god/world-env.ts): channels 0..1; kind 'storm' brings lightning. */
+export type SetWeather={kind:string;clouds:number;rain:number;wind:number;fog:number;intensity:number};
+export type AtmosphereInspection={profile:'eden'|'world';set:boolean;lightning:number;active:boolean;rotor:boolean;fountainWater:number;skyClouds:number;kind:WeatherKind|null;state:WeatherState;windMaterials:number;windModes:Record<string,number>;smokeSources:number;flowers:number;meadow:number;roofs:number;water:number;harbour:boolean;scans:number;drawCalls:number};
 const SCAN_AT=[0,1.5,5,12,25,45];const RESCAN_EVERY=30;
 const WHITE=new THREE.Color(1,1,1);
+/** The kind a set weather draws as (its own name, or for 'manual' the nearest by its channels). */
+function setKind(w:SetWeather):WeatherKind{
+ if(w.kind!=='manual'&&w.kind!=='auto')return w.kind as WeatherKind;
+ return w.rain>.6&&w.wind>.6&&w.clouds>.9?'storm':w.rain>.3?'rain':w.fog>.5?'fog':w.wind>.7?'wind':w.clouds>.5?'cloudy':'clear';
+}
 const pulse=(u:number,c:number,w:number)=>{const x=(u-c)/w;return Math.exp(-x*x);};
 const smooth=(a:number,b:number,x:number)=>{const t=Math.max(0,Math.min(1,(x-a)/(b-a)));return t*t*(3-2*t);};
-export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:AtmosphereFrame):void;dispose():void;inspect():AtmosphereInspection}{
+export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:AtmosphereFrame):void;dispose():void;inspect():AtmosphereInspection;
+ /** R4-LIVE hook (GOD-ENV: thunder sound, a bolt): called when a lightning flash starts, with its strength and sky direction. */
+ onLightning:((strength:number,dir:THREE.Vector3)=>void)|null}{
  const override:WeatherOverride=typeof location!=='undefined'?parseWeatherOverride(location.search):null;
  const root=new THREE.Group();root.name='atmosphere (decorative; not a camera root)';root.userData.cameraTransparent=true;
  const fauna=new Fauna(),fireflies=new Fireflies(),smoke=new Smoke(),sky=new SkyDome(),rain=new Rain(),balloons=new Balloons(),halos=new Halos(),lighthouse=new Lighthouse(),fogBanks=new FogBanks();
@@ -61,6 +77,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
  const wind=new WindPatches(),motion=new MotionPatches();let sailAngle=0,ferrisAngle=0;
  const own=(o:THREE.Object3D)=>o===root;
  const state:WeatherState={cloud:0,rain:0,wind:0,fog:0,mist:0,wet:0},target:WeatherState={...state};
+ let profile:'eden'|'world'='eden',setWeather:SetWeather|null=null,indoorsOf:AtmosphereFrame['indoors']=undefined,lastFlash=0,flashCell=-1;
  let clockAt=0,clockNow=0,active=false,closed=false,initialised=false,expansionSeen=-1,scans=0,nextScan=0,kind:WeatherKind|null=null,lastFound={flowers:0,meadow:0,roofs:0,water:0,harbour:false};
  // Pixel scale for world-sized point sprites, read where the renderer is known (no allocation).
  const size=new THREE.Vector2();
@@ -78,7 +95,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   scene.traverse(o=>{if(o===root)return;const list=o.userData?.edenLightSources;if(!Array.isArray(list))return;o.updateWorldMatrix(true,false);
    for(const a of list){if(!Array.isArray(a)||a.length<3)continue;lv.set(+a[0],+a[1],+a[2]).applyMatrix4(o.matrixWorld);lightList.push([lv.x,lv.y,lv.z,String(a[3]??'lamp'),a[4]===undefined?1:+a[4]]);}});
   // The commons campfire (native fixture) and the garden fire circle publish no anchors of their own.
-  if(lightList.length)lightList.push([24,0,-7,'fire',1],[47,0,64,'fire',.8]);
+  if(lightList.length&&profile==='eden')lightList.push([24,0,-7,'fire',1],[47,0,64,'fire',.8]);
   halos.setSources(lightList);}
  function scan(seconds:number){
   wind.scan(scene,scans,scans===0?0:1,own);motion.scan(scene,own);
@@ -130,12 +147,15 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   // Stars on clear nights (clouds and fog hide them).
   sky.uniforms.uBow.value.y=(1-smooth(.05,.3,day))*(1-smooth(.3,.75,state.cloud))*(1-state.fog)*(1-state.mist*.5);sky.uniforms.uBow.value.z=frame.reducedMotion?0:frame.seconds%600;
   // Distant lightning in a storm: brief double pulses in the cloud deck only (no scene light flash), a few per minute.
-  const storm=frame.reducedMotion?0:smooth(.9,.99,state.cloud)*smooth(.8,.97,state.rain)*smooth(.65,.8,state.wind);
+  // A god's storm (R4-LIVE) is a real one: flashes as often as its intensity says, as the rain and cloud build.
+  const godStorm=setWeather?.kind==='storm'?setWeather.intensity*smooth(.5,.9,state.cloud):0;
+  const storm=frame.reducedMotion?0:Math.max(godStorm,smooth(.9,.99,state.cloud)*smooth(.8,.97,state.rain)*smooth(.65,.8,state.wind));
   let flash=0;
   if(storm>0){const cell=Math.floor(frame.seconds/9),u=frame.seconds-cell*9-hash01(cell,71)*7;
-   if(hash01(cell,72)<.55*storm&&u>0&&u<.6){flash=(pulse(u,.02,.05)+.65*pulse(u,.2,.05)+.3*pulse(u,.34,.04))*storm;
-    const a=hash01(cell,73)*Math.PI*2;sky.uniforms.uFlash.value.set(0,Math.cos(a)*.96,.28,Math.sin(a)*.96);}}
-  sky.uniforms.uFlash.value.x=flash;
+   if(hash01(cell,72)<(godStorm>0?.9:.55)*storm&&u>0&&u<.6){flash=(pulse(u,.02,.05)+.65*pulse(u,.2,.05)+.3*pulse(u,.34,.04))*storm;
+    const a=hash01(cell,73)*Math.PI*2;sky.uniforms.uFlash.value.set(0,Math.cos(a)*.96,.28,Math.sin(a)*.96);
+    if(cell!==flashCell){flashCell=cell;try{api.onLightning?.(storm,new THREE.Vector3(sky.uniforms.uFlash.value.y,sky.uniforms.uFlash.value.z,sky.uniforms.uFlash.value.w));}catch{}}}}
+  sky.uniforms.uFlash.value.x=flash;lastFlash=flash;
   // Sky bodies, dawn/dusk glow, night-sky visibility and the colour grade.
   if(frame.clock&&(Math.abs(frame.seconds-bodiesAt)>=1||Math.abs((Date.parse(frame.clock)||0)-(Date.parse(bodiesClock)||0))>60e3)){bodiesAt=frame.seconds;bodiesClock=frame.clock;bodies=skyBodies(frame.clock,bodies??undefined)??bodies;}
   if(!frame.clock)bodies=null;
@@ -165,7 +185,7 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
  const camAt=new THREE.Vector3();let mistWanted=0,rainWanted=false,covers:number[]=[];
  function forCamera(camera:THREE.Camera){
   const ortho=!!(camera as THREE.OrthographicCamera).isOrthographicCamera;camera.getWorldPosition(camAt);
-  const indoors=!ortho&&(insideBuilding(camAt.x,camAt.y,camAt.z)||underCover(covers,camAt));
+  const indoors=!ortho&&(profile==='world'?!!indoorsOf?.(camAt.x,camAt.y,camAt.z):insideBuilding(camAt.x,camAt.y,camAt.z)||underCover(covers,camAt));
   const layer=ortho?0:(indoors?.25:1)/(1+Math.max(0,camAt.y-6)/10);
   fog.density=ortho?0:.0009+(state.fog*.022+state.rain*.0055)*layer+state.cloud*.0006;
   MIST.value.x=ortho||indoors?0:mistWanted;
@@ -189,16 +209,20 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    if(closed)return;
    if(!frame.eden||override?.kind==='off'){deactivate();return;}
    const seconds=frame.seconds;
+   profile=frame.profile??'eden';setWeather=frame.weather??null;indoorsOf=frame.indoors;
    // `eden` means the expansion is in the scene this frame: scan now so wind patches compile with its pre-warm.
    if(expansionSeen<0){expansionSeen=seconds;nextScan=seconds;}
    if(seconds>=nextScan)scan(seconds);
    // Weather target from the world clock (or the review override), eased over minutes.
    // (Re)read the clock about once a second: the schedule is coarse, and this keeps frames allocation-free.
    if(!initialised||Math.abs(seconds-clockAt)>=1){clockAt=seconds;clockNow=clockMs(frame.clock)??Date.now();const hour=frame.daylight===null?null:hourOf(clockNow);
-    kind=override?.kind==='cycle'?cycleKind(seconds):override?override.kind as WeatherKind:weatherKindAt(clockNow);targetFor(kind,hour,target);
+    kind=override?.kind==='cycle'?cycleKind(seconds):override?override.kind as WeatherKind:setWeather?setKind(setWeather):weatherKindAt(clockNow);targetFor(kind,hour,target);
+    // a god's set weather: its channels exactly (morning mist kept from the kind; wet follows rain)
+    if(setWeather&&!override){target.cloud=setWeather.clouds;target.rain=setWeather.rain;target.wind=setWeather.wind;target.fog=setWeather.fog;target.wet=setWeather.rain>.1?Math.min(1,setWeather.rain*1.2):0;}
     if(!initialised&&override?.from)targetFor(override.from,hour,state);}
    const ms=clockNow;
-   if(!initialised){if(!override?.from)copyWeather(state,target);initialised=true;}else easeWeather(state,target,frame.dt*(override?.kind==='cycle'?4:1));
+   // a god's change shows in about 10–25 s (not the schedule's minutes): the god is watching it happen
+   if(!initialised){if(!override?.from)copyWeather(state,target);initialised=true;}else easeWeather(state,target,frame.dt*(override?.kind==='cycle'?4:setWeather?3.5:1));
    windDirection(seconds,ms);
    // Rooms behind lit windows switch on and off with the hour of the world clock.
    setWindowLife(frame.daylight===null?null:hourOf(ms),frame.reducedMotion?0:seconds);
@@ -220,13 +244,13 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    const butterflies=still?0:Math.max(0,Math.min(1,(day-.4)/.3))*(1-state.rain)*(1-state.cloud*.5)*(1-state.wind*.6);
    fauna.update(t,birds,butterflies,day,still?0:1);
    // the lighthouse sweeps from dusk to dawn, its beam stronger in mist and fog
-   lighthouse.update(still?0:t,Math.pow(1-day,1.5),state.fog+state.mist*.5+state.rain*.3);
+   lighthouse.update(still?0:t,profile==='eden'?Math.pow(1-day,1.5):0,state.fog+state.mist*.5+state.rain*.3);lighthouse.group.visible=profile==='eden';
    // fog banks roll over the sea in fog and mist, and on still early mornings
-   {const h=hourOf(ms),dawn=smooth(4.5,6.5,h)*(1-smooth(8.5,10.5,h));fogBanks.update(still?0:t,Math.min(1,state.fog*1.1+state.mist*.6+dawn*.45*(1-state.wind)*(1-state.rain)),WIND.value.z,WIND.value.w,state.wind,fog.color);}
+   {const h=hourOf(ms),dawn=smooth(4.5,6.5,h)*(1-smooth(8.5,10.5,h));fogBanks.update(still?0:t,profile==='world'?0:Math.min(1,state.fog*1.1+state.mist*.6+dawn*.45*(1-state.wind)*(1-state.rain)),WIND.value.z,WIND.value.w,state.wind,fog.color);}
    // the sea: swell and surf (livelier in wind; still for reduced motion)
    SURF.value.x=still?0:t;SURF.value.y=1;SURF.value.z=state.wind;
    ferrisAngle=nextFerrisAngle(ferrisAngle,frame.dt,frame.daylight===null||hourOf(ms)>=7&&hourOf(ms)<19,still);
-   if(!still){DECORATIVE_MOTION.value.set(seconds,ferrisAngle);balloons.update(t);}
+   if(!still){DECORATIVE_MOTION.value.set(seconds,ferrisAngle);balloons.update(t);}balloons.mesh.visible=profile==='eden';
    fireflies.update(t,still?0:Math.max(0,1-day*3)*(1-state.rain)*(1-state.wind*.7),fireflies.uniforms.uFly.value.z);
    smoke.update(t,still?0:1-state.rain*.5,smoke.uniforms.uSmoke.value.z,day,WIND.value.z,WIND.value.w,state.wind);
    // Autumn leaves blow through in wind (a few drift down on any breezy day).
@@ -239,7 +263,8 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    const dust=still?0:smooth(.65,.95,state.wind)*(1-smooth(.15,.4,state.wet));
    rain.update2(seconds,still?0:state.rain*spell,leaves,day,frame.camera,WIND.value.z,WIND.value.w,visualWind,Math.max(motes,dust),dust>motes?1:0);rainWanted=rain.lines.visible;
   },
-  inspect(){return {active,kind,state:{...state},rotor:motion.rotorFound,fountainWater:motion.waterFound,skyClouds:motion.skyClouds,windMaterials:wind.count,windModes:wind.modes(),smokeSources:smoke.sourceCount,flowers:lastFound.flowers,meadow:lastFound.meadow,roofs:lastFound.roofs,water:lastFound.water,harbour:lastFound.harbour,scans,drawCalls:root.children.filter(o=>o.visible).length};},
+  onLightning:null as ((strength:number,dir:THREE.Vector3)=>void)|null,
+  inspect(){return {profile,set:!!setWeather,lightning:lastFlash,active,kind,state:{...state},rotor:motion.rotorFound,fountainWater:motion.waterFound,skyClouds:motion.skyClouds,windMaterials:wind.count,windModes:wind.modes(),smokeSources:smoke.sourceCount,flowers:lastFound.flowers,meadow:lastFound.meadow,roofs:lastFound.roofs,water:lastFound.water,harbour:lastFound.harbour,scans,drawCalls:root.children.filter(o=>o.visible).length};},
   dispose(){if(closed)return;closed=true;if(review&&(globalThis as Record<string,unknown>).edenAtmosphere===api)delete (globalThis as Record<string,unknown>).edenAtmosphere;deactivate();wind.dispose();motion.dispose();fauna.dispose();balloons.dispose();fireflies.dispose();smoke.dispose();sky.dispose();rain.dispose();halos.dispose();lighthouse.dispose();fogBanks.dispose();root.removeFromParent();if(ownsFog&&scene.fog===fog)scene.fog=null;if(scene.onBeforeRender===beforeRender)scene.onBeforeRender=previousBeforeRender;},
  };
  // Review hook (only with ?weather=… or ?atmos in the URL): window.edenAtmosphere.inspect() in the console.

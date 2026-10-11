@@ -22,7 +22,9 @@ test('appearanceFromSeed is stable, complete and varied', () => {
   for (const l of looks) assert.deepEqual(L.resolveLook(l), l, 'seeded looks are canonical');
   assert.ok(new Set(looks.map(L.lookKey)).size === 200, 'no two of 200 seeds collide');
   for (const k of ['frame', 'face', 'hair', 'top', 'bottom', 'shoes', 'hat', 'glasses', 'bag', 'pattern'] as const) {
-    const seen = new Set(looks.map(l => l[k])); assert.deepEqual([...seen].sort(), [...(L.HUMANOID_PARAMS[k] as {values: string[]}).values].sort(), `every ${k} value appears`);
+    // headgear faces (and those characters' hair: hoods, a moustache) are chosen, never seeded
+    const seen = new Set(looks.map(l => l[k])), all = (L.HUMANOID_PARAMS[k] as {values: string[]}).values.filter(v => !(k === 'face' || k === 'hair') || !L.HEADGEAR_FACES.has(v));
+    assert.deepEqual([...seen].sort(), [...all].sort(), `every ${k} value appears`);
   }
   const fem = looks.filter(l => l.frame === 'fem').length; assert.ok(fem > 70 && fem < 130, `frames balanced (${fem}/200 fem)`);
 });
@@ -37,8 +39,8 @@ test('keys: equal looks share a key; presets resolve exactly; compact round-trip
 test('edits keep the rest; refusals name the field', () => {
   const e = L.editLook({preset: 'punk'}, {hair: 'bob'}); assert.equal(e.preset, 'none'); assert.equal(e.hair, 'bob'); assert.equal(e.top, 'jacket'); assert.equal(e.hair1, '#7c0f1f');
   assert.deepEqual(L.editLook(e, {preset: 'woman'}), L.resolveLook({preset: 'woman'}));
-  assert.throws(() => L.checkLook({wings: 'big'}), /unknown field wings/); assert.throws(() => L.checkLook({skin: 'red'}), /#rrggbb/); assert.throws(() => L.checkLook({headSize: 1.3}), /> 1.2/);
-  assert.throws(() => L.checkLook({walkSpeed: 1.5}), /> 1.4/); assert.throws(() => L.checkLook({height: 1.4}), /< 1.55/); assert.throws(() => L.checkLook({build: 'broad'}), /number/);
+  assert.throws(() => L.checkLook({wings: 'big'}), /unknown field wings/); assert.throws(() => L.checkLook({skin: 'red'}), /#rrggbb/); assert.throws(() => L.checkLook({headSize: 1.3}), /> 1.08/);
+  assert.throws(() => L.checkLook({walkSpeed: 1.5}), /> 1.4/); assert.throws(() => L.checkLook({height: 1.4}), /< 1.65/); assert.throws(() => L.checkLook({build: 'broad'}), /number/);
 });
 test('body records fit BODY-v1 and requests behave', () => {
   const b = L.lookBody(L.appearanceFromSeed(5)); assert.ok(bodyV1Schema.safeParse(b).success);
@@ -66,17 +68,17 @@ test('legacy migration: hash template preset; the 8 social Souls keep their pale
 test('size params: defaults are today\'s body; they combine with presets; edits keep a preset; seeds spread heights', () => {
   const d = L.resolveLook({}); assert.deepEqual([d.headSize, d.height, d.build, d.walkSpeed], [1, 1.75, 1, 1.35]);
   for (const p of L.PRESETS) assert.deepEqual(L.compactLook(L.resolveLook({preset: p, height: 1.75, walkSpeed: 1.35})), {preset: p}, 'default sizes are not stored');
-  const tall = L.resolveLook({preset: 'punk', height: 1.9, build: 1.1}); assert.equal(tall.preset, 'punk'); assert.equal(tall.top, 'jacket'); assert.equal(tall.height, 1.9);
-  assert.deepEqual(L.compactLook(tall), {preset: 'punk', height: 1.9, build: 1.1}); assert.deepEqual(L.resolveLook(L.compactLook(tall)), tall);
+  const tall = L.resolveLook({preset: 'punk', height: 1.85, build: 1.1}); assert.equal(tall.preset, 'punk'); assert.equal(tall.top, 'jacket'); assert.equal(tall.height, 1.85);
+  assert.deepEqual(L.compactLook(tall), {preset: 'punk', height: 1.85, build: 1.1}); assert.deepEqual(L.resolveLook(L.compactLook(tall)), tall);
   assert.notEqual(L.lookKey(tall), L.lookKey({preset: 'punk'}), 'sizes are part of the key');
   const slow = L.editLook({preset: 'woman'}, {walkSpeed: 1.0}); assert.equal(slow.preset, 'woman', 'a size edit keeps the preset'); assert.equal(slow.walkSpeed, 1);
   assert.deepEqual(L.editLook(slow, {preset: 'casual'}), L.resolveLook({preset: 'casual'}), 'choosing a preset is the classic look exactly');
   assert.equal(L.editLook(slow, {preset: 'casual', walkSpeed: 1.1}).walkSpeed, 1.1, 'unless the edit names sizes too');
-  assert.equal(L.resolveLook({height: 1.8049}).height, 1.8, 'heights round to 1 cm'); assert.equal(L.resolveLook({headSize: 1.1012}).headSize, 1.1);
+  assert.equal(L.resolveLook({height: 1.8049}).height, 1.8, 'heights round to 1 cm'); assert.equal(L.resolveLook({headSize: 1.0512}).headSize, 1.05);
   const looks = Array.from({length: 400}, (_, i) => L.appearanceFromSeed(i)), hs = looks.map(l => l.height), bs = looks.map(l => l.build);
-  assert.ok(Math.min(...hs) >= 1.55 && Math.max(...hs) <= 1.95 && new Set(hs).size > 15, `seeded heights ${Math.min(...hs)}–${Math.max(...hs)}`);
-  assert.ok(Math.min(...bs) >= 0.94 && Math.max(...bs) <= 1.08, 'seeded builds stay gentle'); assert.ok(looks.every(l => l.walkSpeed === 1.35), 'seeds keep today\'s walking speed');
-  const b = L.lookBody(tall); assert.ok(bodyV1Schema.safeParse(b).success); assert.equal(b.params.height, 1.9);
+  assert.ok(Math.min(...hs) >= 1.65 && Math.max(...hs) <= 1.85 && new Set(hs).size > 8, `seeded heights ${Math.min(...hs)}–${Math.max(...hs)}`);
+  assert.ok(Math.min(...bs) >= 0.97 && Math.max(...bs) <= 1.03, 'seeded builds stay subtle'); assert.ok(looks.every(l => l.walkSpeed === 1.35), 'seeds keep today\'s walking speed');
+  const b = L.lookBody(tall); assert.ok(bodyV1Schema.safeParse(b).success); assert.equal(b.params.height, 1.85);
 });
 test('the def\'s size params equal the engine\'s body dims (ranges and defaults)', async () => {
   const {HUMANOID_DIM_RANGES, HUMANOID_DEFAULT_DIMS} = await import('../../../mars/viewer/engine/bodies/humanoid.ts');

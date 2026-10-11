@@ -1,0 +1,20 @@
+# Nightly consistent copy of a launcher stage's databases (lane CLOUD): accounts.sqlite (the Clerk-linked
+# registry: who owns which world) and worlds.json, plus each world's sim.db. Online SQLite backups, safe while
+# the worlds run. Destination /srv/sim-worlds-backups/%i/<YYYYMMDD>/; see backup.mjs for retention.
+#   enable:  systemctl enable --now sim-worlds-backup@production.timer
+#   run now: systemctl start sim-worlds-backup@production.service
+[Unit]
+Description=Nightly backup of sim-worlds@%i databases
+
+[Service]
+Type=oneshot
+User=simworlds
+Group=simworlds
+Nice=10
+IOSchedulingClass=idle
+ExecStart=/usr/bin/node --no-warnings /srv/sim-worlds/%i/tools/world-launcher/deploy/backup.mjs /srv/sim-worlds-data/%i /srv/sim-worlds-backups/%i
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/sim-worlds-data/%i /srv/sim-worlds-backups
+PrivateTmp=true

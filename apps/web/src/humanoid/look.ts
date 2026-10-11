@@ -13,6 +13,10 @@ export const LOOK_KEY_PREFIX = 'humanoid2-';
 
 type EnumField = Extract<Field, {type: 'enum'}>;
 const values = (k: string) => (HUMANOID_PARAMS[k] as EnumField).values;
+/** Kit faces whose head part carries its own headgear (hat, crown, helmet, hood: kit landmark top above 1.84 m). They take
+ *  no extra hat or glasses and hide hair as a hat does; seeded looks never pick them. */
+export const HEADGEAR_FACES: ReadonlySet<string> = new Set(['farmer', 'king', 'spacesuit', 'swat', 'worker', 'woman-medieval', 'woman-witch', 'woman-worker']);
+const CLASSIC = {face: ['open', 'pierced', 'soft'], hair: ['short', 'mohawk', 'bob', 'bald']};
 export const PART_SLOTS = ['face', 'hair', 'top', 'bottom', 'shoes'] as const;
 export const PROP_SLOTS = ['hat', 'glasses', 'bag'] as const;
 export const COLOR_KEYS = ['skin', 'hair1', 'brows', 'eyes', 'top1', 'top2', 'bottom1', 'shoes1', 'soles', 'accent', 'gear'] as const;
@@ -113,8 +117,12 @@ const darken = (hex: string, k: number) => '#' + [1, 3, 5].map(i => Math.round(p
 export function appearanceFromSeed(seed: number): Look {
   const r = rng(seed);
   const frame = r() < 0.5 ? 'masc' : 'fem';
-  const hair = pickW(r, frame === 'fem' ? [['bob', 5], ['short', 2], ['mohawk', 1], ['bald', 0.5]] : [['short', 5], ['bob', 1.2], ['mohawk', 1.5], ['bald', 1.2]] as const);
-  const top = pick(r, values('top')), bottom = pick(r, values('bottom')), shoes = pick(r, values('shoes')), face = pick(r, values('face'));
+  // faces and hair follow the frame (the women's pack's on fem, the men's on masc; the classic three keep their weight);
+  // faces with built-in headgear (HEADGEAR_FACES) are chosen, never seeded; clothes mix across every character
+  const fems = (k: 'face' | 'hair') => values(k).filter(v => v.startsWith('woman-') && !HEADGEAR_FACES.has(v)), mascs = (k: 'face' | 'hair') => values(k).filter(v => !v.startsWith('woman-') && !CLASSIC[k].includes(v) && v !== 'bald' && !HEADGEAR_FACES.has(v));
+  const hair = pickW(r, frame === 'fem' ? [['bob', 4], ['short', 1.5], ['mohawk', 0.7], ['bald', 0.4], ...fems('hair').map(v => [v, 0.8] as const)] : [['short', 4], ['bob', 0.8], ['mohawk', 1.2], ['bald', 1.2], ...mascs('hair').map(v => [v, 0.8] as const)]);
+  const top = pick(r, values('top')), bottom = pick(r, values('bottom')), shoes = pick(r, values('shoes'));
+  const face = pickW(r, frame === 'fem' ? [['soft', 3], ['open', 0.6], ...fems('face').map(v => [v, 0.8] as const)] : [['open', 3], ['pierced', 1.2], ...mascs('face').map(v => [v, 0.8] as const)]);
   const hair1 = r() < 0.14 ? pick(r, DYED) : pick(r, HAIR);
   const top1 = pick(r, CLOTH); let top2 = pick(r, CLOTH); if (top2 === top1) top2 = CLOTH[(CLOTH.indexOf(top1) + 7) % CLOTH.length];
   const look: Look = {preset: 'none', frame, face, hair, top, bottom, shoes,
@@ -122,13 +130,13 @@ export function appearanceFromSeed(seed: number): Look {
     glasses: pickW(r, [['none', 6.5], ['round', 1.2], ['square', 1.2], ['shades', 1]] as const),
     bag: pickW(r, [['none', 6], ['backpack', 2], ['satchel', 1.5]] as const),
     pattern: pickW(r, [['plain', 5.5], ['stripes', 2], ['checks', 1.5], ['knit', 1]] as const),
-    headSize: Math.round((0.96 + r() * 0.08) * 200) / 200,
+    headSize: Math.round((0.98 + r() * 0.04) * 200) / 200,
     skin: pick(r, SKIN), hair1, brows: darken(hair1, 0.8), eyes: pick(r, EYES), top1, top2, bottom1: pick(r, BOTTOMS), shoes1: pick(r, SHOES), soles: pick(r, SOLES), accent: pick(r, ACCENT), gear: pick(r, GEAR),
     height: 1.75, build: 1, walkSpeed: 1.35};
-  // sizes are drawn last so the seeded parts and colours above stay what they were: a gentle spread of heights
-  // (fem frame a little shorter) and builds; the walking speed stays today's
-  look.height = round((frame === 'fem' ? 1.66 : 1.72) + (r() + r() - 1) * 0.12, 0.01);
-  look.build = round(0.94 + r() * 0.14, 0.01);
+  // sizes are drawn last so the seeded parts and colours above stay what they were: a subtle spread of heights
+  // (fem frame a little shorter; 1.65–1.81 m) and builds (0.97–1.03); the walking speed stays today's
+  look.height = round((frame === 'fem' ? 1.70 : 1.76) + (r() + r() - 1) * 0.05, 0.01);
+  look.build = round(0.97 + r() * 0.06, 0.01);
   return resolveLook(look);
 }
 

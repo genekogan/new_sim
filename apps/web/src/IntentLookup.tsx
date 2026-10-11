@@ -5,9 +5,9 @@ import {intentFeedback} from './intent-feedback.ts';
 import {useEffect,useRef,useState} from 'react';
 import type {Api} from './useSim.ts';
 import {intentLookupResponse,type IntentResponse} from './intent-response.ts';
-type Props={api:Api;worldId:string;soulId:string;ownerId:string;authorityKey:string;active:boolean;entityId?:string;diagnosticContext?:Pick<DiagnosticContext,'backendBuild'|'body'>};
+type Props={api:Api;worldId:string;soulId:string;ownerId:string;principalId?:string;authorityKey:string;active:boolean;entityId?:string;diagnosticContext?:Pick<DiagnosticContext,'backendBuild'|'body'>};
 export function IntentLookup(props:Props){return props.active?<Lookup key={JSON.stringify([props.worldId,props.soulId,props.ownerId,props.authorityKey,props.entityId])} {...props}/>:null;}
-function Lookup({api,worldId,soulId,ownerId,entityId,diagnosticContext}:Props){
+function Lookup({api,worldId,soulId,ownerId,principalId,entityId,diagnosticContext}:Props){
   const [reference,setReference]=useState(''),[result,setResult]=useState<IntentResponse|null>(null),[busy,setBusy]=useState(false);
   const [observed,setObserved]=useState<DiagnosticContext|null>(null),[checked,setChecked]=useState('');
   const alive=useRef(true),reading=useRef(false);
@@ -19,8 +19,8 @@ function Lookup({api,worldId,soulId,ownerId,entityId,diagnosticContext}:Props){
     try{
       const response=await api(`/v1/souls/${encodeURIComponent(soulId)}/intent-v2/requests/${encodeURIComponent(requestId)}`);
       if(alive.current)setObserved({worldId,soulId,entityId,...diagnosticContext,responseStatus:response.status,observedAt:new Date().toISOString()});
-      if(alive.current)setResult(intentLookupResponse(response.status,response.data,{worldId,soulId,ownerId,entityId,requestId}));
-    }catch{if(alive.current)setObserved({worldId,soulId,entityId,...diagnosticContext,responseStatus:0,observedAt:new Date().toISOString()});if(alive.current)setResult(intentLookupResponse(0,null,{worldId,soulId,ownerId,entityId,requestId}));}
+      if(alive.current)setResult(intentLookupResponse(response.status,response.data,{worldId,soulId,ownerId,principalId,entityId,requestId}));
+    }catch{if(alive.current)setObserved({worldId,soulId,entityId,...diagnosticContext,responseStatus:0,observedAt:new Date().toISOString()});if(alive.current)setResult(intentLookupResponse(0,null,{worldId,soulId,ownerId,principalId,entityId,requestId}));}
     finally{reading.current=false;if(alive.current)setBusy(false);}
   };
   return <><details className="intent-lookup"><summary>Check a previous direction</summary>
@@ -36,9 +36,9 @@ function Lookup({api,worldId,soulId,ownerId,entityId,diagnosticContext}:Props){
         <b>{intentFeedback(result.receipt).title}</b>
         <p>{intentFeedback(result.receipt).detail}</p>
         {intentFeedback(result.receipt).adaptation&&<p className="small">{intentFeedback(result.receipt).adaptation}</p>}
-        {result.receipt.phase==='understood'&&<><p className="small">Your words: “{result.receipt.revision.words}”</p>{checked&&<RequestProgress key={checked} api={api} scope={{worldId,soulId,ownerId,entityId,requestId:checked}}/>}</>}
+        {result.receipt.phase==='understood'&&<><p className="small">Your words: “{result.receipt.revision.words}”</p>{checked&&<RequestProgress key={checked} api={api} scope={{worldId,soulId,ownerId,principalId,entityId,requestId:checked}}/>}</>}
       </>}
     </div>
-    {result&&observed&&checked&&requestNeedsDiagnostics(result)&&<RequestDiagnostics key={checked} api={api} scope={{worldId,soulId,ownerId,entityId,requestId:checked}} request={null} result={result} context={observed} reference={checked}/>}
+    {result&&observed&&checked&&requestNeedsDiagnostics(result)&&<RequestDiagnostics key={checked} api={api} scope={{worldId,soulId,ownerId,principalId,entityId,requestId:checked}} request={null} result={result} context={observed} reference={checked}/>}
   </>;
 }

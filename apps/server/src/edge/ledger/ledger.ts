@@ -43,7 +43,16 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private placeListeners: ((e: {soulId: string; from: string | null; to: string | null; tick: number}) => void)[] = [];
   private providers: ((s: EdgeSoul) => EdgeCapability[])[] = [];
   /** MW: a world profile (worlds/*: Mars camp work, floater bodies) adds planned capabilities and drops ones its bodies cannot do. */
+  /** R4-LIVE (god worlds only): the weather now, for `here` and Eyes; unset on the live worlds (engine env.weather). */
+  weatherNow?: () => {clouds: number; rain: number; wind: number; fog: number; kind: string; lightning: number};
+  /** GOD-ENV: what a Soul at (x, z) perceived of the lightning in the last minute (god worlds only). */
+  lightningNear?: (x: number, z: number) => {last: string; strikes: number; nearest: number} | null;
   worldProfile?: (soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>) => void;
+  /** World-engine worlds only (god/places.ts): places walkable without being native engine regions (a god's plaza, a
+   *  room of a god's house). Unset on Eden/Mars/LM, where walkability stays `id in regions` exactly. */
+  placeWalkable?: (placeId: string) => boolean;
+  /** World-engine worlds only: called before the map is read, so a god's edit shows on the next `map`. Unset elsewhere. */
+  beforeMap?: () => void;
   private pending = new Map<string, Pending>();           // soulId → waiting act
   private lastPlace = new Map<string, string | null>();
   /** Server start (ms): metrics count world model calls only from here, not copied history. */
@@ -609,6 +618,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
         return {accepted: true, receipt: this.receipt(soul.soulId, r.id)!, ...resolved};
       }
       const r = this.insert(soul, capability, program ? 'started' : 'completed', clientRef);
+      // C9: any accepted action resets the idle clock and reclaims a faded Soul (an immediate stand:here never reached comms' touch)
+      if (!program) this.comms?.fading.touch?.(soul.soulId);
       if (program) await this.host.enqueue('edge-stop', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, receipt: r.id});
       if (program) this.update(r.id, {phase: 'completed'});
       return {accepted: true, receipt: this.receipt(soul.soulId, r.id)!, ...resolved};
@@ -837,7 +848,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     const objects = new Map((this.comms?.objects.all() ?? []).map(o => [o.id, o]));
     const around = (x: number, z: number) => {const p = this.places.containing(x, z, 0).find(q => q.parent !== null); return p ? [p.id, p.name] : [];};
     return {caps, me: me ? [me.pose.p[0], me.pose.p[2]] : null, root: root ? [...tokens(root.id), ...tokens(root.name)] : [],
-      places: all.filter(p => p.parent !== null).map(p => ({id: p.id, name: p.name, center: centroid(p.polygon), parent: p.parent, kind: p.kind, description: p.description, walkable: !!(w.regions as Record<string, unknown>)[p.id]})),
+      places: all.filter(p => p.parent !== null).map(p => ({id: p.id, name: p.name, center: centroid(p.polygon), parent: p.parent, kind: p.kind, description: p.description, walkable: !!(w.regions as Record<string, unknown>)[p.id] || !!this.placeWalkable?.(p.id)})),
       target: c => {
         const t = c.target; if (!t) return {names: [], around: [], at: null};
         if (t.kind === 'spot') {
@@ -932,7 +943,7 @@ export class EdgeLedger implements EdgeLedgerHooks {
     return {soul: {soulId, name: row.name ?? m?.name ?? soulId, description: row.description ?? null, untrusted: true}, fade: this.comms?.fading.status(soulId) ?? null, lastAcceptedAt: last.at,
       self: m ? {placePath: this.placePathOf(soulId), state: stateOf(this.host, m.entityId), activity: String(this.body(m.entityId)?.human?.activity ?? 'idle')} : null, receipts, events: events.slice(0, 30)};
   }
-  map() {const regions = (this.host.engine.world as NativeWorld).regions ?? {}; return [...this.places.byId.values()].map(p => ({id: p.id, name: p.name, kind: p.kind, enclosed: p.enclosed, capacity: p.capacity, parent: p.parent, walkable: p.id in regions, center: (p.carrier ? (() => {const e = (this.host.engine.world as NativeWorld).entities[p.carrier!.entity]; return e ? [e.pose.p[0], e.pose.p[2]] : [0, 0];})() : centroid(p.polygon)).map(v => Math.round(v * 10) / 10), ...(p.carrier ? {carrier: p.carrier.entity} : {}), starting: p.starting, ...(p.description ? {description: p.description} : {}), schedule: (p.schedule ?? []).map(s => ({id: s.id, cron: s.cron, durationMinutes: s.durationMinutes ?? null, ticketed: !!s.ticketed, label: s.label ?? null}))}));}
+  map() {this.beforeMap?.(); const regions = (this.host.engine.world as NativeWorld).regions ?? {}; return [...this.places.byId.values()].map(p => ({id: p.id, name: p.name, kind: p.kind, enclosed: p.enclosed, capacity: p.capacity, parent: p.parent, walkable: p.id in regions || !!this.placeWalkable?.(p.id), center: (p.carrier ? (() => {const e = (this.host.engine.world as NativeWorld).entities[p.carrier!.entity]; return e ? [e.pose.p[0], e.pose.p[2]] : [0, 0];})() : centroid(p.polygon)).map(v => Math.round(v * 10) / 10), ...(p.carrier ? {carrier: p.carrier.entity} : {}), starting: p.starting, ...(p.description ? {description: p.description} : {}), schedule: (p.schedule ?? []).map(s => ({id: s.id, cron: s.cron, durationMinutes: s.durationMinutes ?? null, ticketed: !!s.ticketed, label: s.label ?? null}))}));}
 
   /** PM-R055: happening (with walk capability) and a few inviting places elsewhere. Counts only, never identities;
    *  project titles are listed objects (untrusted), marks are counted. Deterministic for a given world state. */

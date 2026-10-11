@@ -21,7 +21,8 @@ export class WorldRenderedVisibility {
   /** Rays cast so far (score/seen points, clearance probes, reach legs): a
    * deterministic measure of camera work for time-slicing decisions. */
   work=0;
-  reset(){this.crowds.length=0;this.cleared.length=0;this.seenSets.length=0;this.rooms.length=0;this.preparations=0;this.roots.length=0;this.objects.length=0;this.hits.length=0;this.instances.reset();}
+  private clearDecisions(){this.crowds.length=0;this.cleared.length=0;this.seenSets.length=0;this.rooms.length=0;this.preparations=0;}
+  reset(){this.clearDecisions();this.roots.length=0;this.objects.length=0;this.hits.length=0;this.instances.reset();}
   private visible(object:THREE.Object3D,requireRoot=false){let attached=!requireRoot;for(let p:THREE.Object3D|null=object;p;p=p.parent){if(!p.visible)return false;if(requireRoot&&this.roots.includes(p))attached=true;}return attached;}
   private opaque(hit:THREE.Intersection){
     if(!this.visible(hit.object,true)||hit.object.userData.cameraTransparent===true)return false;const materials=(hit.object as THREE.Mesh).material;const material=Array.isArray(materials)?materials[hit.face?.materialIndex??0]:materials;return !!material&&material.visible&&(!material.transparent||material.opacity>=.5);}
@@ -35,6 +36,15 @@ export class WorldRenderedVisibility {
     // A hit object marked cameraTransparent is never opaque(), so it cannot change a score.
     for(const root of this.roots){root.updateWorldMatrix(true,true);root.traverse(o=>{if((o as THREE.Mesh).isMesh&&o.userData.cameraTransparent!==true&&this.visible(o)&&!seen.has(o)){seen.add(o);this.objects.push(o);}});}
     this.instances.retain(this.objects);
+  }
+  /** A fresh speech batch owns no visibility decision from the previous frame.
+   * Keep only geometry accelerators, which revalidate their inputs on every
+   * query. A replaced root set releases even those old geometry references. */
+  prepareFresh(roots:readonly THREE.Object3D[]){
+    const unique=[...new Set(roots)];
+    if(unique.length!==this.roots.length||unique.some(root=>!this.roots.includes(root)))this.reset();
+    else this.clearDecisions();
+    this.prepare(unique);
   }
   /** One synchronous read-only camera evaluation; never retained across frames. */
   // Component/fixture render poses may change before renderer.render updates
