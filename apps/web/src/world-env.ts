@@ -101,7 +101,7 @@ type ViewModel = {
   footprint(e: unknown): { c: [number, number]; half: [number, number]; y0: number; y1: number }[];
   editSeq?: number;
 };
-const IGNORE_TAGS = /^(terrain|landform|ground|path|road|water|vegetation|tree|plant|flower|rock|creature|animal|flag|marker)$/;
+const IGNORE_TAGS = /^(terrain|landform|ground|path|road|vegetation|tree|plant|flower|rock|creature|animal|flag|marker|lamp|light)$/;
 let viewsCache: { key: string; views: TourViewLike[] } | null = null;
 /** Up to 12 establishing views of what the god built: named top-level things with some size (houses, plazas, a
  *  fountain, a tower), biggest first, each seen from a seeded side at a distance that frames it (Eden's broadcast
@@ -119,7 +119,7 @@ export function godTourViews(layer: unknown, groundAt: (x: number, z: number) =>
     if (e.shape?.area) for (const [x, z] of e.shape.area) { x0 = Math.min(x0, x); x1 = Math.max(x1, x); z0 = Math.min(z0, z); z1 = Math.max(z1, z); }
     if (!Number.isFinite(x0)) continue;
     const size = Math.max(x1 - x0, z1 - z0, top);
-    if (size < 2.5) continue;
+    if (Math.max(x1 - x0, z1 - z0) < 3) continue;  // a landmark has some ground to it (not a lamp-post or a sign)
     const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, g = groundAt(cx, cz) ?? 0;
     const dist = Math.max(10, Math.min(70, size * 1.9 + 6)), a = ((hashStr(e.id) % 360) / 360) * Math.PI * 2;
     const ex = cx + Math.cos(a) * dist, ez = cz + Math.sin(a) * dist, eg = groundAt(ex, ez) ?? g;
