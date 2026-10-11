@@ -1,0 +1,87 @@
+diff --git a/apps/server/src/edge-body-migrate-looks.test.ts b/apps/server/src/edge-body-migrate-looks.test.ts
+new file mode 100644
+index 00000000..39bb0789
+--- /dev/null
++++ b/apps/server/src/edge-body-migrate-looks.test.ts
+@@ -0,0 +1,30 @@
++// L10 patch 04: the legacy-look data migration writes today's look of every plain humanoid Soul as a
++// core/humanoid@2 body, logged, replayed, idempotent; other bodies untouched; the engine body unchanged.
++import test from 'node:test';import assert from 'node:assert/strict';
++import {mkdtempSync,rmSync} from 'node:fs';import {join} from 'node:path';import {tmpdir} from 'node:os';
++import {fixture,invite,accept,factory} from '../test/native-owner-fixture.ts';
++import {WorldHost} from './world.ts';import {Db} from './db.ts';import {bodyV1Schema} from '@sim/protocol';
++import {migrateLegacyLooks,planLegacyLooks} from './edge/body/migrate-looks.ts';
++import {lookKey,resolveLook,legacyPreset} from '../../web/src/humanoid/look.ts';
++import {bodyProfile} from '../../../mars/viewer/engine/bodies/navigation.ts';
++import {HUMAN_PROFILE} from '../../../mars/viewer/engine/spatial/types.ts';
++test('MIGRATE LOOKS: plan, write through the log, idempotent, others untouched, replay keeps it',async t=>{
++ const dir=mkdtempSync(join(tmpdir(),'look-migrate-')),path=join(dir,'sim.db'),f=fixture(path,factory,{durableClockV1:true});f.brain.quiesce();
++ t.after(()=>{try{f.host.stop();}catch{}if(f.db.db.isOpen)f.db.close();rmSync(dir,{recursive:true,force:true});});
++ const rows:any[]=[];for(const owner of ['a','b','c']){await invite(f,owner);rows.push(await accept(f.host,f.souls.create('dev:'+owner,{name:'M '+owner,description:'migration test'})));}
++ const ent=(r:any)=>f.host.engine.world.entities[r.entity_id] as any;
++ // c already wears a floater: left alone
++ const floater={family:'floater',type:'ceramic',model:'verdelis',modelUrl:'/world-assets/littlemartians/characters/verdelis.glb',avatar:{kind:'body',modelUrl:'/world-assets/littlemartians/characters/verdelis.glb',bodyType:'ceramic'},radius:.35,hoverHeight:1.45} as any;
++ await accept(f.host,f.host.enqueueChecked('body-assignment-v1','world:body',{contract:'body-assignment/1',worldId:f.host.worldId,soulId:rows[2].id,entityId:rows[2].entity_id,body:floater},()=>true,()=>true));assert.equal(ent(rows[2]).body?.family,'floater');
++ const plan=planLegacyLooks(f.host,f.db);assert.deepEqual(plan.planned.map(p=>p.soulId),[rows[0].id,rows[1].id]);assert.equal(plan.skipped[0].soulId,rows[2].id);
++ for(const p of plan.planned){assert.ok(bodyV1Schema.safeParse(p.body).success);assert.equal(p.body.model,lookKey({preset:legacyPreset(p.entityId)}),'today\'s template by id hash');}
++ const dry=await migrateLegacyLooks(f.host,f.db);assert.equal(dry.migrated.length,0);assert.equal(ent(rows[0]).body,undefined,'a dry run changes nothing');
++ const seq=f.host.seq,run=await accept(f.host,migrateLegacyLooks(f.host,f.db,{dryRun:false}));
++ assert.deepEqual(run.migrated,[rows[0].id,rows[1].id]);assert.deepEqual(run.deferred,[]);assert.equal(f.host.seq,seq+2,'one logged event per Soul');
++ for(const r of rows.slice(0,2)){const b=ent(r).body;assert.deepEqual(b.params,{preset:legacyPreset(r.entity_id)});assert.deepEqual(resolveLook(b.params),resolveLook({preset:legacyPreset(r.entity_id)}));assert.equal(bodyProfile(ent(r)),HUMAN_PROFILE,'the engine body is today\'s');}
++ assert.deepEqual(ent(rows[2]).body,floater);
++ const again=await accept(f.host,migrateLegacyLooks(f.host,f.db,{dryRun:false}));assert.deepEqual(again.migrated,[]);assert.equal(again.skipped.length,3,'idempotent');
++ const kept=structuredClone(ent(rows[0]).body);f.host.saveSnapshot(true);const id=f.host.worldId,seed=f.host.seed;f.host.stop();f.db.close();
++ for(const mode of ['snapshot','genesis']){const db=new Db(path);if(mode==='genesis')db.db.exec('DELETE FROM snapshots');const h=new WorldHost(db,factory,seed,1e9,id,{durableClockV1:true});h.boot();
++  assert.deepEqual(h.engine.world.entities[rows[0].entity_id].body,kept,mode+' replay keeps the migrated look');h.stop();db.close();}
++});
+diff --git a/apps/server/src/edge/body/migrate-looks.ts b/apps/server/src/edge/body/migrate-looks.ts
+new file mode 100644
+index 00000000..dc0af61b
+--- /dev/null
++++ b/apps/server/src/edge/body/migrate-looks.ts
+@@ -0,0 +1,45 @@
++// Legacy-look data migration (L10 patch 04, needs Gene + Codex: it rewrites existing Souls' body records).
++// Every live Soul whose body is today's plain humanoid (no body field: template by id hash, palette from the
++// social-preset adapter for the 8 audited Souls) gets that exact look written as a core/humanoid@2 body
++// {family, model: look key, params}, through the ordinary logged 'body-assignment-v1' event, so replay and
++// snapshots carry it and the viewer composes it from the kit. Sizes stay today's (no height/build/walkSpeed),
++// so the engine body is unchanged (HUMAN_PROFILE). Bodies with any body field (floaters, uploads, looks) are left
++// alone; a body that is not safely standing now is deferred (run again later). Idempotent.
++import type {Entity} from '@sim/engine-contract';
++import type {Db} from '../../db.ts';
++import type {WorldHost} from '../../world.ts';
++import {lookBody, describeLook} from '../../../../web/src/humanoid/look.ts';
++import {legacyLook} from '../../../../web/src/humanoid/legacy.ts';
++
++export type LookMigrationRow = {soulId: string; entityId: string; look: string; body: NonNullable<Entity['body']>};
++export type LookMigrationResult = {planned: LookMigrationRow[]; migrated: string[]; deferred: {soulId: string; reason: string}[]; skipped: {soulId: string; reason: string}[]};
++
++/** What the migration would write (nothing is changed). `socialPresets` mirrors the viewer's humanPresets flag
++ *  (the 8 audited social Souls keep their palette only in a world that shows it today). */
++export function planLegacyLooks(host: WorldHost, db: Db, {socialPresets = false} = {}): Omit<LookMigrationResult, 'migrated' | 'deferred'> {
++  const planned: LookMigrationRow[] = [], skipped: {soulId: string; reason: string}[] = [];
++  for (const row of db.liveSouls(host.worldId)) {
++    const e = host.engine.world.entities[row.entity_id] as (Entity & {human?: {soul?: unknown}}) | undefined;
++    if (!e?.human) { skipped.push({soulId: row.id, reason: 'no body in this world'}); continue; }
++    if (e.body) { skipped.push({soulId: row.id, reason: `already has a ${e.body.family}${(e.body as {params?: unknown}).params ? ' look' : e.body.modelUrl ? ' upload' : ''} body`}); continue; }
++    const look = legacyLook(row.entity_id, typeof e.human.soul === 'string' ? e.human.soul : undefined, socialPresets);
++    planned.push({soulId: row.id, entityId: row.entity_id, look: describeLook(look), body: lookBody(look) as NonNullable<Entity['body']>});
++  }
++  return {planned, skipped};
++}
++
++/** Write the planned looks (dryRun: plan only). Each write is one logged body assignment, refused while unsafe. */
++export async function migrateLegacyLooks(host: WorldHost, db: Db, {socialPresets = false, dryRun = true} = {}): Promise<LookMigrationResult> {
++  const {planned, skipped} = planLegacyLooks(host, db, {socialPresets}), migrated: string[] = [], deferred: {soulId: string; reason: string}[] = [];
++  if (dryRun) return {planned, migrated, deferred, skipped};
++  for (const p of planned) {
++    const guard = (): true => {
++      if (host.engine.world.entities[p.entityId]?.body) throw Object.assign(Error('body changed meanwhile'), {code: 'body.changed'});
++      const issue = host.engine.bodyAssignmentProblemV1?.(p.entityId, p.body); if (issue) throw Object.assign(Error(issue), {code: issue});
++      return true;
++    };
++    try { guard(); await host.enqueueChecked('body-assignment-v1', 'world:body', {contract: 'body-assignment/1', worldId: host.worldId, soulId: p.soulId, entityId: p.entityId, body: structuredClone(p.body)}, guard, () => true); migrated.push(p.soulId); }
++    catch (e) { deferred.push({soulId: p.soulId, reason: (e as {code?: string}).code ?? (e as Error).message}); }
++  }
++  return {planned, migrated, deferred, skipped};
++}

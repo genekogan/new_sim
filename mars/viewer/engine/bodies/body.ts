@@ -4,6 +4,7 @@
 // humanoid's feet) is planned with the engine's ordinary ground collision, and it is drawn hovering
 // `hoverHeight` above that pose with a bob, tilt and yaw computed from the sampled tick (pose.ts).
 import type { Body, Entity } from '../world/types.ts';
+import { humanoidParamsProblem } from './humanoid.ts';
 
 export type BodyFamily = Body['family'];
 
@@ -37,7 +38,7 @@ export function bodyProblem(body: unknown): string | null {
   if (body === undefined) return null;
   if (!body || typeof body !== 'object' || Array.isArray(body)) return 'body.not-object';
   const b = body as Record<string, unknown>;
-  for (const k of Object.keys(b)) if (!['family', 'type', 'model', 'modelUrl', 'avatar', 'radius', 'hoverHeight'].includes(k)) return `body.unknown-field:${k}`;
+  for (const k of Object.keys(b)) if (!['family', 'type', 'model', 'modelUrl', 'avatar', 'radius', 'hoverHeight', 'params'].includes(k)) return `body.unknown-field:${k}`;
   if (b.family !== 'humanoid' && b.family !== 'floater') return 'body.family';
   if (b.type !== undefined && !(b.family==='humanoid' ? b.type==='humanoid' : b.type==='ceramic'||b.type==='floater')) return 'body.type';
   if (b.model !== undefined && (typeof b.model !== 'string' || !/^(?:[a-z0-9-]{1,64}|body_[a-f0-9]{64})$/.test(b.model))) return 'body.model';
@@ -47,7 +48,12 @@ export function bodyProblem(body: unknown): string | null {
   const inRange = (v: unknown, [lo, hi]: readonly [number, number]) => typeof v === 'number' && Number.isFinite(v) && v >= lo && v <= hi;
   if (b.radius !== undefined && !inRange(b.radius, FLOATER_RADIUS_RANGE)) return 'body.radius';
   if (b.hoverHeight !== undefined && !inRange(b.hoverHeight, FLOATER_HOVER_RANGE)) return 'body.hover-height';
-  if (b.family === 'humanoid' && (b.radius !== undefined || b.hoverHeight !== undefined || (b.model!==undefined && !b.modelUrl))) return 'body.humanoid-fields';
+  // core/humanoid@2 look: compact params with model = the look key (bodies/humanoid.ts reads the physical ones)
+  if (b.params !== undefined) {
+    if (b.family !== 'humanoid' || b.modelUrl !== undefined || b.avatar !== undefined || typeof b.model !== 'string' || !/^humanoid2-[0-9a-f]{16}$/.test(b.model)) return 'body.params';
+    const problem = humanoidParamsProblem(b.params); if (problem) return problem;
+  }
+  if (b.family === 'humanoid' && (b.radius !== undefined || b.hoverHeight !== undefined || (b.model!==undefined && !b.modelUrl && b.params === undefined))) return 'body.humanoid-fields';
   return null;
 }
 
@@ -59,7 +65,7 @@ export function withBody<T extends Entity>(e: T, body: Body): T {
   const problem = bodyProblem(body);
   if (problem) throw new Error(`${e.id}: ${problem}`);
   const copy = structuredClone(e);
-  if (body.family === 'humanoid' && !body.modelUrl) delete copy.body;
+  if (body.family === 'humanoid' && !body.modelUrl && !body.params) delete copy.body;
   else copy.body = { ...body };
   return copy;
 }

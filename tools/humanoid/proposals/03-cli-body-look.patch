@@ -1,0 +1,35 @@
+diff --git a/tools/edge-skill/SKILL.md b/tools/edge-skill/SKILL.md
+index 57e66927..fd03ce95 100644
+--- a/tools/edge-skill/SKILL.md
++++ b/tools/edge-skill/SKILL.md
+@@ -192,7 +192,7 @@ The trusted request is retained before the model reply; omitting `targets`, ackn
+ Generic owner choice requires an `identityBasis` literally present in that trusted request and equal to one of: `anyone`, `anyone nearby`, `someone`, `someone nearby`, `somebody`, `somebody nearby`, `people nearby`, `everyone nearby`, `everyone`, or `any nearby person`. A model-declared generic basis alone cannot replace named people. Outside an active owner scope, autonomous observed-ID choices remain available. This is exact-reference and literal-binding support, not general prose interpretation: pronouns, negations, roles and group/type selectors still require judgment or clarification. It does not promise that every person was selected.
+ For “talk to someone”, the live mind uses `{"converse":"start","with":"<actual nearby soulId>","identityBasis":"someone","text":"Would you like to talk?"}`. Put `identityBasis` on each person-directed `do` step, outside `params`. An approach also needs `targetSoul:{id:"<actual observed soulId>"}`. A refusal explains how to repair this structure; it grants neither acceptance nor consent.
+ 
+-`body` reads the current body/limits; `body presets` lists the default humanoid and 13 trusted Little Martians presets. `body set verdelis` selects Verdelis; `body set humanoid` resets. Changing bodies requires a safe standing state/free hands outside unsafe rides, paired activity and construction work. Read capabilities again after changing; rigid bodies glide/hover/settle/turn/look/speak but cannot sit, swim, hold hand props, hug or use human rides. Settling holds hovering position, not a seated/landed pose.
++`body` reads the current body/limits; `body presets` lists the default humanoid and 13 trusted Little Martians presets. `body look` shows your humanoid look (frame, face, hair, top, bottom, shoes, hat, glasses, bag, pattern, colours, head size, height, build, walking speed) and its choices; `body look --random [--seed N]` draws a new one; `body look --set hair=bob hat=cap top1=#356477` changes only what you name (a classic look: `--set preset=casual|punk|woman`). Sizes are part of a look: `headSize` 0.85–1.2 (drawn only), `height` 1.55–1.95 m and `build` 0.85–1.2 (your body's width when walking past others, your eye height and which seats fit you), `walkSpeed` 0.9–1.4 m/s (how fast you walk); e.g. `body look --set height=1.9 walkSpeed=1.1`. Everything else in a look is paint; your profile picture follows it. `body set verdelis` selects Verdelis; `body set humanoid` resets. Changing bodies requires a safe standing state/free hands outside unsafe rides, paired activity and construction work. Read capabilities again after changing; rigid bodies glide/hover/settle/turn/look/speak but cannot sit, swim, hold hand props, hug or use human rides. Settling holds hovering position, not a seated/landed pose.
+ 
+ ```bash
+ node eden-agent.mjs body upload sculpture.glb --type ceramic --license owned --rights-confirmed
+diff --git a/tools/edge-skill/eden-agent.mjs b/tools/edge-skill/eden-agent.mjs
+index 6900f585..64b15e35 100644
+--- a/tools/edge-skill/eden-agent.mjs
++++ b/tools/edge-skill/eden-agent.mjs
+@@ -1006,7 +1006,16 @@ export async function body(cmd,...args){
+   const id=args[0];if(!id||args.length!==1)throw new Error('usage: body set <preset|assetId>');
+   return ok(await call('/v1/edge/body',{method:'PUT',body:/^body_[a-f0-9]{64}$/.test(id)?{assetId:id}:{preset:id}}),'body');
+  }
+- if(cmd!=='upload')throw new Error('usage: body [presets|set <preset|assetId>|upload path.glb --type ceramic --license owned --rights-confirmed]');
++ if(cmd==='look'){ // core/humanoid@2: read, randomize or edit this Soul's look (paint only; same body and rig)
++  if(!args.length){const r=ok(await call('/v1/edge/body'),'body');return {look:r.look,choices:r.lookChoices};}
++  let look;const flag=args.shift();
++  if(flag==='--random'){look={random:true};if(args[0]==='--seed'){const seed=Number(args[1]);if(!Number.isInteger(seed)||seed<0)throw new Error('--seed needs a whole number');look.seed=seed;args.splice(0,2);}if(args.length)throw new Error('usage: body look --random [--seed N]');}
++  else if(flag==='--set'){look={};for(const kv of args){const i=kv.indexOf('=');if(i<1)throw new Error('usage: body look --set key=value [key=value ...]');const k=kv.slice(0,i),v=kv.slice(i+1);look[k]=['headSize','height','build','walkSpeed'].includes(k)?Number(v):v;}if(!Object.keys(look).length)throw new Error('body look --set needs key=value pairs');}
++  else if(flag==='--json'){try{look=JSON.parse(args[0]??'');}catch{throw new Error('body look --json needs a JSON object');}}
++  else throw new Error('usage: body look [--random [--seed N] | --set key=value ... | --json {...}]');
++  const r=ok(await call('/v1/edge/body',{method:'PUT',body:{look}}),'body');return {changed:r.changed,body:r.body};
++ }
++ if(cmd!=='upload')throw new Error('usage: body [presets|set <preset|assetId>|look [--random|--set k=v ...]|upload path.glb --type ceramic --license owned --rights-confirmed]');
+  const path=args.shift(),opts={};if(!path)throw new Error('body upload needs a GLB path');
+  while(args.length){const flag=args.shift();if(flag==='--rights-confirmed')opts.rightsConfirmed=true;else if(flag==='--type'||flag==='--license'){const value=args.shift();if(!value||value.startsWith('--'))throw new Error(flag+' needs a value');opts[flag.slice(2)]=value;}else throw new Error('Unknown body upload argument: '+flag);}
+  if(!['humanoid','ceramic','floater'].includes(opts.type)||!['CC0','owned'].includes(opts.license)||!opts.rightsConfirmed)throw new Error('Upload requires --type humanoid|ceramic|floater --license CC0|owned --rights-confirmed');

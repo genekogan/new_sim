@@ -4,6 +4,8 @@ import {templateFromGltf,type Template} from '../../../mars/viewer/app/engine-vi
 import {recordedBody,admittedBodyUrl} from '../../../mars/viewer/app/engine-view/recorded-body.ts';
 import {worldPath} from './world-path.ts';
 import {validateBodyRig} from '../../../mars/viewer/app/engine-view/body-rig.ts';
+import {humanoidKit} from './humanoid/compose.ts';
+import {LOOK_MODEL} from './humanoid/look.ts';
 /** Validated owner bodies remain separate from the stable built-in template choice. */
 export class WorldBodyModels{
  readonly templates=new Map<string,Template>();private pending=new Set<string>();private failed=new Set<string>();private disposed=false;
@@ -11,7 +13,13 @@ export class WorldBodyModels{
  constructor(private loader:GLTFLoader,private problem:(message:string)=>void){}
  sync(records:Readonly<Record<string,{kind:string;body?:unknown}>>,entities:Readonly<Record<string,SampledEntity>>){
   this.unresolved.clear();
-  for(const [id,e] of Object.entries(entities)){const record=records[id];if(record?.kind!=='human')continue;const b=recordedBody(record.body,e.state);if(b?.family!=='humanoid'||!b.modelUrl)continue;
+  for(const [id,e] of Object.entries(entities)){const record=records[id];if(record?.kind!=='human')continue;const b=recordedBody(record.body,e.state);if(b?.family!=='humanoid')continue;
+   // core/humanoid@2: a look composed from the shared kit, keyed by the record's model (the look key).
+   const look=(b as {params?:unknown}).params;
+   if(look&&typeof b.model==='string'&&LOOK_MODEL.test(b.model)){const key=b.model;if(this.templates.has(key))continue;this.unresolved.add(id);if(this.pending.has(key)||this.failed.has(key))continue;this.pending.add(key);
+    void humanoidKit(this.loader).template(look).then(t=>{if(!this.disposed)this.templates.set(key,t);},()=>{this.failed.add(key);if(!this.disposed)this.problem('A Soul’s chosen look could not be composed; a simple figure marks its position.');}).finally(()=>this.pending.delete(key));
+    continue;}
+   if(!b.modelUrl)continue;
    const key=admittedBodyUrl(b.modelUrl);if(!key){this.unresolved.add(id);continue;}if(this.templates.has(key))continue;this.unresolved.add(id);if(this.pending.has(key)||this.failed.has(key))continue;this.pending.add(key);
    const url=admittedBodyUrl(key,worldPath)!;
    void this.loader.loadAsync(url).then(gltf=>{if(this.disposed){disposeModel(gltf.scene);return;}try{validateBodyRig(gltf);this.templates.set(key,templateFromGltf(b.model??key,gltf));}catch(error){disposeModel(gltf.scene);throw error;}},()=>{this.failed.add(key);if(!this.disposed)this.problem('A Soul’s uploaded body could not be shown; a simple figure marks its position.');}).catch(()=>{this.failed.add(key);if(!this.disposed)this.problem('A Soul’s uploaded rig could not be shown; a simple figure marks its position.');}).finally(()=>this.pending.delete(key));

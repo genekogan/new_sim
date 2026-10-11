@@ -1,11 +1,12 @@
 // End-of-tick invariants (spec §31). They never correct anything — they
 // record violations so rehearsal reports and tests can fail loudly.
 import {isFloater,floaterBody} from '../bodies/body.ts';
+import {humanRadius} from '../bodies/humanoid.ts';
 import type { Diagnostic } from '../actions/types.ts';
 import { clearanceAt, nearestBlocker } from '../spatial/grid.ts';
 import { entityFootprint, type Spatial } from '../spatial/service.ts';
 import type { Invariant, Runtime } from './runtime.ts';
-import { def, HUMAN_RADIUS } from '../world/catalog.ts';
+import { def } from '../world/catalog.ts';
 import { angleDelta, rot2, sub2, type OBB2, type Vec2, type Vec3, hypot } from '../core/math.ts';
 import { isCarryLoad } from '../carry/formation.ts';
 import type { WorldState } from '../world/types.ts';
@@ -35,7 +36,7 @@ export function humanStaticClearanceWithOverlay(qualified:(rt:Runtime,e:import('
     const g = sp.level(e.human.level);
     if (!g) continue;
     const c = clearanceAt(g, [e.pose.p[0], e.pose.p[2]]);
-    const radius=isFloater(e)?floaterBody(e.body).radius:HUMAN_RADIUS;
+    const radius=isFloater(e)?floaterBody(e.body).radius:humanRadius(e);
     if (c < radius - TOL)
       out.push({
         code: 'collision.human-static',
@@ -57,7 +58,7 @@ export const humanHumanSeparation: Invariant = (rt: Runtime) => {
       if (a.human!.level !== b.human!.level) continue;
       if (Math.abs(a.pose.p[1] - b.pose.p[1]) > 1.0) continue;
       const d = hypot(a.pose.p[0] - b.pose.p[0], a.pose.p[2] - b.pose.p[2]);
-      const radius=(isFloater(a)?floaterBody(a.body).radius:HUMAN_RADIUS)+(isFloater(b)?floaterBody(b.body).radius:HUMAN_RADIUS);
+      const radius=(isFloater(a)?floaterBody(a.body).radius:humanRadius(a))+(isFloater(b)?floaterBody(b.body).radius:humanRadius(b));
       if (d < radius - 0.08)
         out.push({ code: 'collision.human-human', message: `${a.id} and ${b.id} overlap (${d.toFixed(2)} m apart)`, subjects: [a.id, b.id], at: a.pose.p });
     }

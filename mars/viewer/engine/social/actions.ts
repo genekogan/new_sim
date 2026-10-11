@@ -20,6 +20,7 @@ import { DT, type Runtime } from '../runtime/runtime.ts';
 import { MAX_HUMAN_STEP_PER_TICK } from '../runtime/invariants.ts';
 import type { Entity } from '../world/types.ts';
 import { HUMAN_RADIUS } from '../world/catalog.ts';
+import { humanRadius } from '../bodies/humanoid.ts';
 import type { Spatial } from '../spatial/service.ts';
 import { clearanceAt, nearestBlocker } from '../spatial/grid.ts';
 import { HUMAN_PROFILE } from '../spatial/types.ts';
@@ -126,7 +127,7 @@ function transition(rt: Runtime, ex: SlotExec, to: Vec2, dt: number): boolean {
   // The reservation remains held while waiting, so a new sitter cannot claim this slot.
   if (ex.phase === 'stand-up') for (const other of Object.values(rt.world.entities)) {
     if (other.id === a.id || !other.human || other.human.level !== a.human!.level || other.human.activity === 'sit') continue;
-    if (dist2(q,pos2(other)) < HUMAN_RADIUS * 2 + 0.02) return false;
+    if (dist2(q,pos2(other)) < humanRadius(a) + humanRadius(other) + 0.02) return false;
   }
   ex.t = nextT;
   a.pose.p[0] = q[0];

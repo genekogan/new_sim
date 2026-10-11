@@ -1,0 +1,1094 @@
+{
+ "contract": "humanoid-kit/1",
+ "version": 1,
+ "licence": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+ "slots": [
+  "skin",
+  "skinShade",
+  "hair",
+  "hairShade",
+  "brows",
+  "eyes",
+  "top1",
+  "top2",
+  "bottom",
+  "shoes",
+  "soles",
+  "accent",
+  "gear",
+  "gearDark",
+  "lens",
+  "spare"
+ ],
+ "roles": {
+  "skin": 1,
+  "cloth": 2,
+  "denim": 3,
+  "leather": 4,
+  "sole": 5,
+  "hair": 6,
+  "brow": 7,
+  "eye": 8,
+  "trinket": 9
+ },
+ "presets": {
+  "casual": {
+   "frame": "masc",
+   "face": "open",
+   "hair": "short",
+   "top": "shirt",
+   "bottom": "jeans",
+   "shoes": "sneakers",
+   "palette": {
+    "skin": [
+     0.617207,
+     0.417885,
+     0.238398
+    ],
+    "top1": [
+     0.304987,
+     0.278894,
+     0.226966
+    ],
+    "shoes": [
+     0.205079,
+     0.020289,
+     0.03434
+    ],
+    "soles": [
+     0.457522,
+     0.457522,
+     0.457522
+    ],
+    "skinShade": [
+     0.486888,
+     0.33064,
+     0.189617
+    ],
+    "brows": [
+     0.048172,
+     0.03434,
+     0.022174
+    ],
+    "hair": [
+     0.066805,
+     0.027386,
+     0.009026
+    ],
+    "eyes": [
+     0.031062,
+     0.018161,
+     0.011308
+    ],
+    "bottom": [
+     0.033105,
+     0.049707,
+     0.06301
+    ]
+   }
+  },
+  "punk": {
+   "frame": "masc",
+   "face": "pierced",
+   "hair": "mohawk",
+   "top": "jacket",
+   "bottom": "ripped",
+   "shoes": "boots",
+   "palette": {
+    "skin": [
+     0.617207,
+     0.417885,
+     0.238398
+    ],
+    "top2": [
+     0.457522,
+     0.457522,
+     0.457522
+    ],
+    "top1": [
+     0.017642,
+     0.017642,
+     0.017642
+    ],
+    "shoes": [
+     0.017642,
+     0.017642,
+     0.017642
+    ],
+    "eyes": [
+     0.031062,
+     0.018161,
+     0.011308
+    ],
+    "brows": [
+     0.048172,
+     0.03434,
+     0.022174
+    ],
+    "hairShade": [
+     0.205079,
+     0.020289,
+     0.03434
+    ],
+    "hair": [
+     0.201898,
+     0.004888,
+     0.013797
+    ],
+    "accent": [
+     0.428691,
+     0.242281,
+     0.066626
+    ],
+    "bottom": [
+     0.033105,
+     0.049707,
+     0.06301
+    ]
+   }
+  },
+  "woman": {
+   "frame": "fem",
+   "face": "soft",
+   "hair": "bob",
+   "top": "tank",
+   "bottom": "slacks",
+   "shoes": "flats",
+   "palette": {
+    "skin": [
+     0.617207,
+     0.417885,
+     0.238398
+    ],
+    "top1": [
+     0.457522,
+     0.457522,
+     0.457522
+    ],
+    "shoes": [
+     0.049707,
+     0.049707,
+     0.049707
+    ],
+    "brows": [
+     0.048172,
+     0.03434,
+     0.022174
+    ],
+    "eyes": [
+     0.031062,
+     0.018161,
+     0.011308
+    ],
+    "hair": [
+     0.259794,
+     0.17866,
+     0.062751
+    ],
+    "bottom": [
+     0.34238,
+     0.121411,
+     0.039836
+    ]
+   }
+  }
+ },
+ "frames": {
+  "masc": {
+   "rig": "rig-masc.glb",
+   "bytes": 541648,
+   "sha256": "12dd4434a772b97980c6d81bdde69f4e27e3c07326ce56e4d550a63303694c0d",
+   "bones": 62,
+   "clips": 51,
+   "channels": 3663,
+   "joints": {
+    "head": [
+     -0.00034,
+     1.58726,
+     0.04308
+    ],
+    "neck": [
+     -0.00034,
+     1.51053,
+     0.04308
+    ],
+    "chest": [
+     -0.00034,
+     1.37731,
+     0.04056
+    ],
+    "hips": [
+     -0.00034,
+     0.8941,
+     0.05976
+    ],
+    "shoulderL": [
+     0.15254,
+     1.4321,
+     0.05983
+    ],
+    "shoulderR": [
+     -0.15254,
+     1.4321,
+     0.05983
+    ]
+   },
+   "index": {
+    "head": 7,
+    "chest": 5,
+    "hips": 2,
+    "torso": 4
+   }
+  },
+  "fem": {
+   "rig": "rig-fem.glb",
+   "bytes": 541872,
+   "sha256": "c91698535a9080819f16413877b0cd18b3b4fb32f70e89e13283182255fc41d7",
+   "bones": 62,
+   "clips": 51,
+   "channels": 3663,
+   "joints": {
+    "head": [
+     -0.00034,
+     1.58726,
+     0.04308
+    ],
+    "neck": [
+     -0.00034,
+     1.51053,
+     0.04308
+    ],
+    "chest": [
+     -0.00034,
+     1.37731,
+     0.04056
+    ],
+    "hips": [
+     -0.00034,
+     1.00229,
+     0.07779
+    ],
+    "shoulderL": [
+     0.11744,
+     1.44321,
+     0.05983
+    ],
+    "shoulderR": [
+     -0.11744,
+     1.44321,
+     0.05983
+    ]
+   },
+   "index": {
+    "head": 7,
+    "chest": 5,
+    "hips": 2,
+    "torso": 4
+   }
+  }
+ },
+ "parts": {
+  "top": {
+   "shirt": {
+    "label": "Long-sleeve shirt",
+    "native": "masc",
+    "source": "Casual_2.blend (blend export)",
+    "licence": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+    "tris": 2806,
+    "verts": 5646,
+    "files": {
+     "masc": {
+      "file": "parts/top-shirt.masc.glb",
+      "bytes": 176560,
+      "sha256": "fd538199b2105380d917f7ebff18101eec42fcb327fbefeffa45814f5f080e0a"
+     },
+     "fem": {
+      "file": "parts/top-shirt.fem.glb",
+      "bytes": 176560,
+      "sha256": "c79e705bf20a4e61fde326adcfebd83d0443ab8cecf666f419f201a6280d3a22"
+     }
+    },
+    "landmarks": {
+     "masc": {
+      "min": [
+       -0.8377,
+       1.022,
+       -0.0597
+      ],
+      "max": [
+       0.8377,
+       1.5569,
+       0.1936
+      ],
+      "back": -0.0565,
+      "front": 0.1741
+     },
+     "fem": {
+      "min": [
+       -0.8303,
+       1.1238,
+       -0.0377
+      ],
+      "max": [
+       0.8303,
+       1.5419,
+       0.1975
+      ],
+      "back": -0.0377,
+      "front": 0.1943
+     }
+    }
+   },
+   "jacket": {
+    "label": "Jacket over tee",
+    "native": "masc",
+    "source": "Punk.blend (blend export)",
+    "licence": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+    "tris": 2958,
+    "verts": 5954,
+    "files": {
+     "masc": {
+      "file": "parts/top-jacket.masc.glb",
+      "bytes": 186096,
+      "sha256": "6de0614182d623905d7af00e4c03a0261a2be7755a55925720ebe37ca16cea0b"
+     },
+     "fem": {
+      "file": "parts/top-jacket.fem.glb",
+      "bytes": 186096,
+      "sha256": "a37d867dee94acd3656ee560b49c05942a20d21a0cf2bcc947a4999ef5af5d2d"
+     }
+    },
+    "landmarks": {
+     "masc": {
+      "min": [
+       -0.8377,
+       1.0008,
+       -0.0736
+      ],
+      "max": [
+       0.8377,
+       1.5999,
+       0.1936
+      ],
+      "back": -0.0509,
+      "front": 0.1741
+     },
+     "fem": {
+      "min": [
+       -0.8303,
+       1.0905,
+       -0.0448
+      ],
+      "max": [
+       0.8303,
+       1.6003,
+       0.1975
+      ],
+      "back": -0.0448,
+      "front": 0.1554
+     }
+    }
+   },
+   "tank": {
+    "label": "Tank top",
+    "native": "fem",
+    "source": "Woman_Casual.blend (blend export)",
+    "licence": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+    "tris": 2654,
+    "verts": 5338,
+    "files": {
+     "masc": {
+      "file": "parts/top-tank.masc.glb",
+      "bytes": 167016,
+      "sha256": "45d6ed18765a9059e90cca1aab0610cc1e408a9455c33a63c095e99f8df789b3"
+     },
+     "fem": {
+      "file": "parts/top-tank.fem.glb",
+      "bytes": 167016,
+      "sha256": "659bc125c6c5a4583428e7af17963ab4583deac6f2b70fc8ff6d25c44eebc812"
+     }
+    },
+    "landmarks": {
+     "masc": {
+      "min": [
+       -0.8325,
+       0.9934,
+       -0.011
+      ],
+      "max": [
+       0.8325,
+       1.5405,
+       0.1869
+      ],
+      "back": -0.0064,
+      "front": 0.1518
+     },
+     "fem": {
+      "min": [
+       -0.8251,
+       1.0938,
+       -0.0116
+      ],
+      "max": [
+       0.8251,
+       1.5405,
+       0.1899
+      ],
+      "back": -0.0054,
+      "front": 0.1888
+     }
+    }
+   }
+  },
+  "shoes": {
+   "sneakers": {
+    "label": "Sneakers",
+    "native": "masc",
+    "source": "Casual_2.blend (blend export)",
+    "licence": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+    "tris": 552,
+    "verts": 1104,
+    "files": {
+     "masc": {
+      "file": "parts/shoes-sneakers.masc.glb",
+      "bytes": 35872,
+      "sha256": "e3fac34998f11304f7ec0ca9146240454eff99f9ad4a5c237307f7aa6b43b1f6"
+     },
+     "fem": {
+      "file": "parts/shoes-sneakers.fem.glb",
+      "bytes": 35872,
+      "sha256": "88323365db3c7ba5bfa2106198619006f2a84185f06a1901b905992e3415b41c"
+     }
+    },
+    "landmarks": {
+     "masc": {
+      "min": [
+       -0.1916,
+       -0.0014,
+       -0.001
+      ],
+      "max": [
+       0.1916,
+       0.2438,
+       0.2867
+      ]
+     },
+     "fem": {
+      "min": [
+       -0.1678,
+       -0.001,
+       0
+      ],
+      "max": [
+       0.1678,
+       0.2674,
+       0.2867
+      ]
+     }
+    }
+   },
+   "boots": {
+    "label": "Boots",
+    "native": "masc",
+    "source": "Punk.blend (blend export)",
+    "licence": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+    "tris": 552,
+    "verts": 1104,
+    "files": {
+     "masc": {
+      "file": "parts/shoes-boots.masc.glb",
+      "bytes": 35864,
+      "sha256": "9de96ba3c62a488fed999341bdf712daa4a2faf382e894604e58b6de09d4f991"
+     },
+     "fem": {
+      "file": "parts/shoes-boots.fem.glb",
+      "bytes": 35860,
+      "sha256": "025e14e5dbdf1cb0f23b4b1c6075e11117e661e7b452e16d4e157ec1226749df"
+     }
+    },
+    "landmarks": {
+     "masc": {
+      "min": [
+       -0.1916,
+       -0.0042,
+       -0.001
+      ],
+      "max": [
+       0.1916,
+       0.2015,
+       0.2867
+      ]
+     },
+     "fem": {
+      "min": [
+       -0.1678,
+       -0.0038,
+       -0.0001
+      ],
+      "max": [
+       0.1678,
+       0.2252,
+       0.2867
+      ]
+     }
+    }
+   },
+   "flats": {
+    "label": "Flats",
+    "native": "fem",
+    "source": "Woman_Casual.blend (blend export)",
+    "licence": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+    "tris": 538,
+    "verts": 1082,
+    "files": {
+     "masc": {
+      "file": "parts/shoes-flats.masc.glb",
+      "bytes": 35160,
+      "sha256": "5553e0f9b2f1927e5e716484ce795ec32c8062a52bdea4ebc231511283b6c3da"
+     },
+     "fem": {
+      "file": "parts/shoes-flats.fem.glb",
+      "bytes": 35160,
+      "sha256": "fe48220ae81d8f6659a699a39c213aa603d91cb5689934813844e343e44a131f"
+     }
+    },
+    "landmarks": {
+     "masc": {
+      "min": [
+       -0.1661,
+       -0.0133,
+       -0.016
+      ],
+      "max": [
+       0.1661,
+       0.1599,
+       0.2708
+      ]
+     },
+     "fem": {
+      "min": [
+       -0.1423,
+       -0.0086,
+       -0.0152
+      ],
+      "max": [
+       0.1423,
+       0.1835,
+       0.2708
+      ]
+     }
+    }
+   }
+  },
+  "face": {
+   "open": {
+    "label": "Open face",
+    "native": "masc",
+    "source": "Casual_2.blend (blend export)",
+    "licence": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+    "tris": 496,
+    "verts": 982,
+    "files": {
+     "masc": {
+      "file": "parts/face-open.masc.glb",
+      "bytes": 32096,
+      "sha256": "8a34012b472e06e1d9d66d0d9c69eb2b57815396e678a4d8c1a27ec1a8760f3d"
+     },
+     "fem": {
+      "file": "parts/face-open.fem.glb",
+      "bytes": 32092,
+      "sha256": "a943f8387df371763b4b63d05094ec4799b17fbbe8b07e06446c4ce43958774a"
+     }
+    },
+    "landmarks": {
+     "masc": {
+      "min": [
+       -0.1071,
+       1.505,
+       -0.0621
+      ],
+      "max": [
+       0.1071,
+       1.8257,
+       0.1751
+      ],
+      "cz": 0.0721,
+      "rx": 0.1071,
+      "rz": 0.1342,
+      "eye": [
+       0,
+       1.6967,
+       0.1442
+      ],
+      "eyeX": 0.0571,
+      "templeX": 0.1071,
+      "top": 1.8257
+     },
+     "fem": {
+      "min": [
+       -0.1071,
+       1.505,
+       -0.0621
+      ],
+      "max": [
+       0.1072,
+       1.8257,
+       0.1751
+      ],
+      "cz": 0.0721,
+      "rx": 0.1072,
+      "rz": 0.1342,
+      "eye": [
+       0.0001,
+       1.6967,
+       0.1442
+      ],
+      "eyeX": 0.0571,
+      "templeX": 0.1072,
+      "top": 1.8257
+     }
+    }
+   },
+   "pierced": {
+    "label": "Pierced ears",
+    "native": "masc",
+    "source": "Punk.blend (blend export)",
+    "licence": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+    "tris": 516,
+    "verts": 1022,
+    "files": {
+     "masc": {
+      "file": "parts/face-pierced.masc.glb",
+      "bytes": 33348,
+      "sha256": "1f541aa04d6e3951ca93c9c92e27c1ed20d87aa90ebe2ee7e44c0a779e999d49"
+     },
+     "fem": {
+      "file": "parts/face-pierced.fem.glb",
+      "bytes": 33344,
+      "sha256": "65589bec02772712db54ea54c9c375dff6d5353a6f634d3c912bda0c9cc0ec78"
+     }
+    },
+    "landmarks": {
+     "masc": {
+      "min": [
+       -0.1071,
+       1.439,
+       -0.0387
+      ],
+      "max": [
+       0.1071,
+       1.7641,
+       0.1751
+      ],
+      "cz": 0.1019,
+      "rx": 0.1071,
+      "rz": 0.0782,
+      "eye": [
+       0,
+       1.6967,
+       0.1442
+      ],
+      "eyeX": 0.0571,
+      "templeX": 0.1071,
+      "top": 1.7641
+     },
+     "fem": {
+      "min": [
+       -0.1071,
+       1.439,
+       -0.0387
+      ],
+      "max": [
+       0.1072,
+       1.7641,
+       0.1751
+      ],
+      "cz": 0.1019,
+      "rx": 0.1072,
+      "rz": 0.0783,
+      "eye": [
+       0.0001,
+       1.6967,
+       0.1442
+      ],
+      "eyeX": 0.0571,
+      "templeX": 0.1072,
+      "top": 1.7641
+     }
+    }
+   },
+   "soft": {
+    "label": "Soft features",
+    "native": "fem",
+    "source": "Woman_Casual.blend (blend export)",
+    "licence": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+    "tris": 398,
+    "verts": 802,
+    "files": {
+     "masc": {
+      "file": "parts/face-soft.masc.glb",
+      "bytes": 26464,
+      "sha256": "6697edb9e82a8189dad85f31979db60b07a7a8ae39c9b8772fae1507b178de8f"
+     },
+     "fem": {
+      "file": "parts/face-soft.fem.glb",
+      "bytes": 26464,
+      "sha256": "d98db4a704e280ad48658908e70cbd5eada709ee381c37e3b669066724fb20bf"
+     }
+    },
+    "landmarks": {
+     "masc": {
+      "min": [
+       -0.0934,
+       1.5311,
+       -0.0456
+      ],
+      "max": [
+       0.0934,
+       1.7887,
+       0.1774
+      ],
+      "cz": 0.1384,
+      "rx": 0.0934,
+      "rz": 0.184,
+      "eye": [
+       -0.0001,
+       1.6911,
+       0.1464
+      ],
+      "eyeX": 0.0596,
+      "templeX": 0.0894,
+      "top": 1.7887
+     },
+     "fem": {
+      "min": [
+       -0.0934,
+       1.5384,
+       -0.0456
+      ],
+      "max": [
+       0.0934,
+       1.7887,
+       0.1774
+      ],
+      "cz": 0.1384,
+      "rx": 0.0934,
+      "rz": 0.184,
+      "eye": [
+       0,
+       1.6911,
+       0.1464
+      ],
+      "eyeX": 0.0596,
+      "templeX": 0.0894,
+      "top": 1.7887
+     }
+    }
+   }
+  },
+  "hair": {
+   "short": {
+    "label": "Short hair",
+    "native": "masc",
+    "source": "Casual_2.blend (blend export)",
+    "licence": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+    "tris": 1188,
+    "verts": 2436,
+    "files": {
+     "masc": {
+      "file": "parts/hair-short.masc.glb",
+      "bytes": 76964,
+      "sha256": "9e0b4fe746575850a1b37b9c8974e75010c30dc7c95a4ea9a6a314dc14e055e2"
+     },
+     "fem": {
+      "file": "parts/hair-short.fem.glb",
+      "bytes": 76964,
+      "sha256": "bc64122fc4d6e8d0caf7271ca9aa60a16c4c8bb9a6f7745790f73b511a5bbf30"
+     }
+    },
+    "landmarks": {
+     "masc": {
+      "min": [
+       -0.1125,
+       1.5567,
+       -0.168
+      ],
+      "max": [
+       0.1123,
+       1.8566,
+       0.1573
+      ],
+      "cz": 0.0313,
+      "rx": 0.1125,
+      "rz": 0.1282,
+      "top": 1.8566
+     },
+     "fem": {
+      "min": [
+       -0.1125,
+       1.5567,
+       -0.168
+      ],
+      "max": [
+       0.1123,
+       1.8566,
+       0.1573
+      ],
+      "cz": 0.0313,
+      "rx": 0.1125,
+      "rz": 0.1282,
+      "top": 1.8566
+     }
+    }
+   },
+   "mohawk": {
+    "label": "Mohawk",
+    "native": "masc",
+    "source": "Punk.blend (blend export)",
+    "licence": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+    "tris": 728,
+    "verts": 1484,
+    "files": {
+     "masc": {
+      "file": "parts/hair-mohawk.masc.glb",
+      "bytes": 47552,
+      "sha256": "6bc016720d18ebcc7e7eb56a68c2d9496fa789f9aec482675aee794cde6a84f6"
+     },
+     "fem": {
+      "file": "parts/hair-mohawk.fem.glb",
+      "bytes": 47552,
+      "sha256": "d9361e7da2401c63f64a908316498126c3250f48a295e2ba9852b23a0b525bba"
+     }
+    },
+    "landmarks": {
+     "masc": {
+      "min": [
+       -0.0943,
+       1.569,
+       -0.1595
+      ],
+      "max": [
+       0.0943,
+       1.9654,
+       0.2303
+      ],
+      "cz": 0.0454,
+      "rx": 0.0943,
+      "rz": 0.1137,
+      "top": 1.8257
+     },
+     "fem": {
+      "min": [
+       -0.0943,
+       1.569,
+       -0.1595
+      ],
+      "max": [
+       0.0943,
+       1.9654,
+       0.2303
+      ],
+      "cz": 0.0454,
+      "rx": 0.0943,
+      "rz": 0.1137,
+      "top": 1.8257
+     }
+    }
+   },
+   "bob": {
+    "label": "Bob",
+    "native": "fem",
+    "source": "Woman_Casual.blend (blend export)",
+    "licence": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+    "tris": 2128,
+    "verts": 4320,
+    "files": {
+     "masc": {
+      "file": "parts/hair-bob.masc.glb",
+      "bytes": 135360,
+      "sha256": "7c02d2e46c053f9658d775b083f69c688fe419a95d8621cf30229728bad0a046"
+     },
+     "fem": {
+      "file": "parts/hair-bob.fem.glb",
+      "bytes": 135356,
+      "sha256": "8b84d5fd959ab59eafb5e6985c6ea2ba241d25f3da12e691f8e951f0e31cba7a"
+     }
+    },
+    "landmarks": {
+     "masc": {
+      "min": [
+       -0.1182,
+       1.5232,
+       -0.0995
+      ],
+      "max": [
+       0.1155,
+       1.8435,
+       0.1925
+      ],
+      "cz": 0.0454,
+      "rx": 0.1182,
+      "rz": 0.1471,
+      "top": 1.8435
+     },
+     "fem": {
+      "min": [
+       -0.1182,
+       1.5232,
+       -0.0995
+      ],
+      "max": [
+       0.1155,
+       1.8435,
+       0.1925
+      ],
+      "cz": 0.0454,
+      "rx": 0.1182,
+      "rz": 0.1472,
+      "top": 1.8435
+     }
+    }
+   }
+  },
+  "bottom": {
+   "jeans": {
+    "label": "Jeans",
+    "native": "masc",
+    "source": "Casual_2.blend (blend export)",
+    "licence": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+    "tris": 734,
+    "verts": 1488,
+    "files": {
+     "masc": {
+      "file": "parts/bottom-jeans.masc.glb",
+      "bytes": 47704,
+      "sha256": "3d4e5cbf76d42acf40abccf230eccbec731c8abea736e5c22c2c125983a9d9e6"
+     },
+     "fem": {
+      "file": "parts/bottom-jeans.fem.glb",
+      "bytes": 47700,
+      "sha256": "24b04cc36c8f480e10fb39d73b9f54b279e7207580d8b72ef018c484846ee9bd"
+     }
+    },
+    "landmarks": {
+     "masc": {
+      "min": [
+       -0.1811,
+       0.1325,
+       -0.0654
+      ],
+      "max": [
+       0.1811,
+       1.0359,
+       0.1675
+      ]
+     },
+     "fem": {
+      "min": [
+       -0.1855,
+       0.156,
+       -0.0305
+      ],
+      "max": [
+       0.1855,
+       1.1472,
+       0.1294
+      ]
+     }
+    }
+   },
+   "ripped": {
+    "label": "Ripped jeans",
+    "native": "masc",
+    "source": "Punk.blend (blend export)",
+    "licence": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+    "tris": 746,
+    "verts": 1446,
+    "files": {
+     "masc": {
+      "file": "parts/bottom-ripped.masc.glb",
+      "bytes": 46604,
+      "sha256": "d8c5a43af2d0b4fa507e043dbb6943b36c7bee073b2ad2946be8e01ffb5a4232"
+     },
+     "fem": {
+      "file": "parts/bottom-ripped.fem.glb",
+      "bytes": 46604,
+      "sha256": "0dcc17722e681ceb1bc5df2bea8403e7427c8fafd563e0a8705d49af86b97486"
+     }
+    },
+    "landmarks": {
+     "masc": {
+      "min": [
+       -0.1709,
+       0.1215,
+       -0.0654
+      ],
+      "max": [
+       0.1709,
+       1.039,
+       0.1627
+      ]
+     },
+     "fem": {
+      "min": [
+       -0.184,
+       0.143,
+       -0.0301
+      ],
+      "max": [
+       0.184,
+       1.1476,
+       0.1318
+      ]
+     }
+    }
+   },
+   "slacks": {
+    "label": "Slacks",
+    "native": "fem",
+    "source": "Woman_Casual.blend (blend export)",
+    "licence": "CC0-1.0 — Quaternius, Ultimate Modular Men / Women packs (quaternius.com)",
+    "tris": 706,
+    "verts": 1426,
+    "files": {
+     "masc": {
+      "file": "parts/bottom-slacks.masc.glb",
+      "bytes": 45800,
+      "sha256": "bc50b03fb183c55bd4faee38a33f3c1b6e0f14401dfcf6e9e8640ecebe011bcd"
+     },
+     "fem": {
+      "file": "parts/bottom-slacks.fem.glb",
+      "bytes": 45796,
+      "sha256": "4f8b1d32351f7d94e40ea94a96903ae1b005b340187eb684f155291bd5853fe9"
+     }
+    },
+    "landmarks": {
+     "masc": {
+      "min": [
+       -0.2077,
+       0.1225,
+       -0.0224
+      ],
+      "max": [
+       0.2077,
+       1.0426,
+       0.1409
+      ]
+     },
+     "fem": {
+      "min": [
+       -0.1799,
+       0.1462,
+       -0.0589
+      ],
+      "max": [
+       0.1799,
+       1.1339,
+       0.1726
+      ]
+     }
+    }
+   }
+  }
+ }
+}
