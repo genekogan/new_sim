@@ -23,9 +23,10 @@ import type { GodNav, Thing } from './nav.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
-export type GodPlace = Place & { ref: string; of: 'area' | 'water' | 'building' | 'room' | 'thing' | 'landmark'; entity: string };
+export type GodPlace = Place & { ref: string; of: 'area' | 'water' | 'shore' | 'building' | 'room' | 'thing' | 'landmark'; entity: string };
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
+const SHORE = 3;                   // m: a water's bank, round it
 const LANDMARK_MIN = 1.5;          // a named point thing at least this wide (m) standing on its own is a landmark
 const NOT_LANDMARKS = /^(sign|signpost|notice-board|lamp-post|lantern|flagpole|bollard|bin|wheelie-bin|mailbox|hydrant|crate|barrel|sack|flower-pot|poster|banner|picture-frame|screen|chalkboard|power-line)$/;
 const WORDS = ['no', 'a', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
@@ -74,7 +75,7 @@ export type PlacesHost = {
 /** What is where on a god's world, as the ledger's places. */
 export class GodPlaces {
   private h: PlacesHost;
-  private cache: { key: string; list: GodPlace[]; byRef: Map<string, GodPlace> } | null = null;
+  private cache: { key: string; list: GodPlace[]; byRef: Map<string, GodPlace>; byEntity: Map<string, GodPlace> } | null = null;
   /** Ids of the places this layer put in the ledger's index (and only those: a boot place keeps its own). */
   private installed = new Set<string>();
   constructor(h: PlacesHost) { this.h = h; }
@@ -83,14 +84,18 @@ export class GodPlaces {
   /** The place a nav thing is (its walk targets it), if it is one. */
   forRef(ref: string): GodPlace | undefined { return this.index().byRef.get(ref); }
   list(): GodPlace[] { return this.index().list; }
+  /** The place a god thing itself is (a plaza, a house, a gazebo, a lone fountain): its objects stand in it. */
+  ofEntity(id: string): GodPlace | undefined { return this.index().byEntity.get(id); }
   /** Walkable (the ledger's hook): every place this layer made. */
   walkable(id: string): boolean { return this.installed.has(id); }
 
   private index() {
     const m = this.h.model, key = `${this.h.version?.() ?? m.editSeq}:${m.entities.size}`;
     if (this.cache?.key === key) return this.cache;
-    const list = this.derive(), byRef = new Map(list.map((p) => [p.ref, p]));
-    this.cache = { key, list, byRef };
+    const list = this.derive(), byRef = new Map<string, GodPlace>(), byEntity = new Map<string, GodPlace>();
+    // a thing's walk targets its place; a water's walk (to its shore) targets the shore
+    for (const p of list) { if (p.of === 'water' && byRef.has(p.ref)) continue; byRef.set(p.ref, p); if (p.of !== 'room' && p.of !== 'shore') byEntity.set(p.entity, p); }
+    this.cache = { key, list, byRef, byEntity };
     return this.cache;
   }
 
@@ -103,6 +108,8 @@ export class GodPlaces {
       else if (t.kind === 'water' && t.area && t.area.length >= 3) out.push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'water', entity: t.id, name: t.ref, kind: 'water', polygon: t.area.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: 0 });
       else if (t.kind === 'room' && t.poly && t.poly.length >= 3) out.push({ ...base, id: GodPlaces.idOf(t.ref), ref: t.ref, of: 'room', entity: t.id, name: t.ref, kind: 'room', enclosed: true, polygon: t.poly.map(([x, z]) => [r2(x), r2(z)] as Vec2), level: t.level });
     }
+    // a water's shore: a band round it (where its walk ends, and where a swim starts), as Eden's bank by its pond
+    for (const w of out.filter((p) => p.of === 'water')) out.push({ ...base, id: `${w.id}.shore-bank`.slice(0, 100), ref: w.ref, of: 'shore', entity: w.entity, name: `${w.ref} shore`, kind: 'shore', polygon: grow(w.polygon, SHORE), level: 0 });
     // buildings: round their ground-floor rooms (a little out, for the walls)
     for (const t of things) {
       if (t.kind !== 'building') continue;
@@ -190,9 +197,11 @@ export class GodPlaces {
       const t = things.find((x) => x.ref === p.ref), rooms = all.filter((q) => q.of === 'room' && q.entity === p.entity).map((q) => q.ref);
       return `${article(kind)} with ${counted('room', rooms.length)} (${rooms.join(', ')}); its front door is ${t?.doorOpen ? 'open' : 'closed'}`;
     }
+    if (p.of === 'shore') return `the bank round ${p.ref}: walk:${p.ref} ends here, and a swim starts from here`;
     if (p.of === 'water') return `${article(kind)} you can swim in, about ${Math.round(Math.max(w, d))} m across${items.length ? `, with ${listed(items)}` : ''}`;
     if (p.of === 'thing') return `${article(kind)}${p.capacity ? ` for ${p.capacity}` : ''}${items.length ? `, with ${listed(items)}` : ''}${p.enclosed ? '; indoors' : ''}`;
-    if (p.of === 'landmark') return `${article(kind)}${items.length ? `, with ${listed(items)} by it` : ''}; a landmark`;
+    if (p.of === 'landmark') { const t = things.find((x) => x.ref === p.ref), by = t ? this.h.nav.namesNear(t.at, p.entity, 2, 15) : [];
+      return `${article(kind)} standing on its own${by.length ? ` by ${listed(by)}` : ''}${items.length ? `, with ${listed(items)} round it` : ''}; a landmark`; }
     return `${article(kind)}${items.length ? ` with ${listed(items)}` : ''}, about ${Math.round(w)} by ${Math.round(d)} m`;
   }
 

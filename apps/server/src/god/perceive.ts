@@ -63,7 +63,7 @@ export type PerceiveHost = {
   namesNear(at: Vec2, except: string): string[];
   /** R4-INFO: the god-built places layer (places.ts): synced first, then each object's place is the innermost one
    *  holding it. */
-  places?: { sync(): void; placeAt(at: Vec2, level?: number): string | null };
+  places?: { sync(): void; placeAt(at: Vec2, level?: number): string | null; ofEntity(id: string): { id: string } | undefined };
   /** Engine level of a standing height (the bridge's levelAt). */
   levelAt?(x: number, z: number, y: number): number;
   log(m: string): void;
@@ -128,7 +128,7 @@ export class GodPerceive {
       const name = e.name ? m.pathOf(e.id) : `${kind} ${e.id.slice(2, 6)}`;
       const near = this.h.namesNear(at, e.id).filter((n) => n !== name).slice(0, 2);
       const level = this.h.levelAt ? this.h.levelAt(at[0], at[1], this.h.model.worldPose(e).y) : 0;
-      placed.set(e.id, { place: this.h.places?.placeAt(at, level) ?? null, level });
+      placed.set(e.id, { place: this.h.places?.ofEntity(e.id)?.id ?? this.h.places?.placeAt(at, level) ?? null, level });
       const what = `${article(kind)}${parent?.name ? ` in ${m.pathOf(parent.id)}` : ''}${near.length ? `, by ${near.join(' and ')}` : ''}`;
       out.set(e.id, { name, kind: this.kindFor(text !== null ? 'sign' : kind), description: clip(def.description || kind, 400), params: { what, text: text ?? '', near, at: [Math.round(at[0] * 100) / 100, Math.round(at[1] * 100) / 100], def: def.ref } });
       // read from in front of its face (entity frame: the front is +z, turned by the yaw)

@@ -74,10 +74,12 @@ export type Thing = {
 const r2 = (v: number) => Math.round(v * 100) / 100;
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 const SHOW = 120;            // walk capabilities offered: the nearest this many named things (plus rooms of near buildings)
-const ROOMS_WITHIN = 80;     // rooms of buildings within this many metres are offered too
+const ROOMS_WITHIN = 80;
+const STROLL_AREA = 150;     // m²: an open area this big offers a stroll through it (the ledger strolls places ≥ 250 m²)     // rooms of buildings within this many metres are offered too
 const STOP = new Set(['the', 'a', 'an', 'to', 'of', 'in', 'at', 'on']);
 const words = (s: string) => s.toLowerCase().replace(/[’']/g, '').split(/[^a-z0-9]+/).filter((w) => w && !STOP.has(w));
 
+const polyArea = (p: Vec2[]) => Math.abs(p.reduce((s, [x, z], i) => { const [x2, z2] = p[(i + 1) % p.length]; return s + x * z2 - x2 * z; }, 0)) / 2;
 function centroid(pts: Vec2[]): Vec2 { let x = 0, z = 0; for (const p of pts) { x += p[0]; z += p[1]; } return [x / pts.length, z / pts.length]; }
 function inPoly(x: number, z: number, poly: Vec2[]) { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > z) !== (zj > z) && x < ((xj - xi) * (z - zi)) / (zj - zi) + xi) c = !c; } return c; }
 /** Nearest point on a polyline (closed when `loop`). */
@@ -285,7 +287,34 @@ export class GodNav {
       // on the ground from the ground: the ledger's walk (swims and wades where the way is water); else the level walk
       const go: Step = goal.level === 0 && myLevel === 0 ? { verb: 'walk_to', params: { to: goal.p, standoff: 0 } } : { verb: 'mars:walk_to', params: { x: goal.p[0], z: goal.p[1], level: goal.level } };
       plans.set(id, { label: `Walk to ${t.ref}`, steps: [...stand, go] });
+      if (place) this.placeCapabilities(t, place, here, d, [...stand, go], myLevel, caps, plans);
     }
+  }
+  /** R4-INFO: what Eden offers at each of its places, at a god-built place too: hang out there (walk there, then spend
+   *  a while), and for an open area big enough, a stroll through it (a loop of clear stops inside it). */
+  private placeCapabilities(t: Thing, place: string, here: Vec2, d: number, go: Step[], myLevel: number, caps: EdgeCapability[], plans: Plans) {
+    const secs = { seconds: { type: 'integer', min: 1, max: 600, default: 60 } };
+    const hid = `hang-out:${t.ref}`;
+    if (!caps.some((c) => c.id === hid) && t.kind !== 'water') {
+      caps.push({ id: hid, verb: 'hang-out', label: `Hang out at ${t.ref} (${t.what}; ${Math.round(d)} m)`, target: { id: place, kind: 'place' }, available: true, params: secs });
+      plans.set(hid, { label: `Hang out at ${t.ref}`, steps: [...go, { verb: 'rest', params: { seconds: 60 } }], seconds: true });
+    }
+    const poly = t.area; if (!poly || t.kind !== 'area' || myLevel !== 0 || polyArea(poly) < STROLL_AREA) return;
+    const sid = `stroll:${t.ref}`; if (caps.some((c) => c.id === sid)) return;
+    const spots = this.strollSpots(t.ref, poly); if (spots.length < 2) return;
+    // a loop from the stop nearest me, each next the nearest not yet visited
+    const left = [...spots], route: Vec2[] = [];
+    let at = here; while (left.length) { left.sort((a, b) => Math.hypot(a[0] - at[0], a[1] - at[1]) - Math.hypot(b[0] - at[0], b[1] - at[1])); at = left.shift()!; route.push(at); }
+    caps.push({ id: sid, verb: 'stroll', label: `Stroll through ${t.ref} (a loop of ${route.length} stops)`, target: { id: place, kind: 'place' }, available: true, params: { pause: { type: 'integer', min: 0, max: 60, default: 4 } } });
+    plans.set(sid, { label: `Stroll through ${t.ref}`, steps: [...go.filter((s) => s.verb === 'stand'), ...route.flatMap((p, i) => [{ verb: 'walk_to', params: { to: p } }, ...(i < route.length - 1 ? [{ verb: 'rest', params: { seconds: 4 } }] : [])])] });
+  }
+  private strolls = new Map<string, { key: string; spots: Vec2[] }>();
+  private strollSpots(ref: string, poly: Vec2[]): Vec2[] {
+    const key = this.cache?.key ?? ''; const hit = this.strolls.get(ref); if (hit?.key === key) return hit.spots;
+    const f = (this.h.engine as unknown as { clearSpotsV1?: (p: Vec2[], n: number) => Vec2[] }).clearSpotsV1;
+    const spots = (f ? f.call(this.h.engine, poly, 5) : []).map(([x, z]) => [r2(x), r2(z)] as Vec2);
+    this.strolls.set(ref, { key, spots }); if (this.strolls.size > 200) this.strolls.clear();
+    return spots;
   }
   private label(t: Thing, d: number): string {
     const by = this.landmarks(t).map((x) => x.ref);
