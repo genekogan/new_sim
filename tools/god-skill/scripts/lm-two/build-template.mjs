@@ -205,17 +205,19 @@ const paint = (name, poly, color, material = 'dirt') => place('core/ground-paint
 
 // the land: fifteen peaks of the three ranges, the scenic caldera, the Tharsis overlook
 const peaks = layout.mountainRanges.flatMap((m) => m.peaks.map(([x, z, s, rx, rz], i) => place('core/mountain@1', `${m.id}-${i + 1}`, { p: [x, z], params: { height: Math.max(40, Math.round(m.height * s * 0.95)), radius: Math.max(60, Math.round(Math.max(rx, rz) * 1.2)), peak: 2.2 } })));
-const cal = layout.scenicLandforms[0], hill = layout.hill;
+const cal = layout.scenicLandforms[0], hill = layout.hill, HILL_TOP = 7, HILL_EDGE = 21;
 await batch('the land: the Tharsis north wall, western escarpment and eastern massif (fifteen peaks), the Olympus caldera, the Tharsis overlook and its ramp', 'land', [
   ...peaks,
   place('core/mountain@1', 'olympus-caldera', { p: [cal.at[0], cal.at[2]], params: { height: cal.height, radius: Math.max(60, cal.radius), peak: 1.4 } }),
-  place('core/plateau@1', 'tharsis-plateau', { shape: { area: rect(hill.plateau) }, params: { height: hill.top, edge: (hill.footprint[2] - hill.plateau[2]) } }),
-  place('core/footpath@1', 'tharsis-ramp', { shape: { path: [[hill.ramp.from[0], hill.ramp.from[2]], [hill.ramp.to[0], hill.ramp.to[2] + 2]], width: hill.ramp.width }, params: { material: 'dirt', width: hill.ramp.width, maxGrade: 0.3 } }),
+  // lm/map's 8 m plateau had 8 m slopes and a 24 % ramp (native links); here the hill itself is the way up, so its soft edge
+  // (inside the area) keeps every slope under the humanoid's 30° (tan 0.577): 7 m over 21 m, the flat top as authored
+  place('core/plateau@1', 'tharsis-plateau', { shape: { area: rect([hill.plateau[0] - HILL_EDGE, hill.plateau[1] - HILL_EDGE, hill.plateau[2] + HILL_EDGE, hill.plateau[3] + HILL_EDGE]) }, params: { height: HILL_TOP, edge: HILL_EDGE } }),
+  place('core/footpath@1', 'tharsis-ramp', { shape: { path: [[hill.ramp.from[0], hill.ramp.from[2]], [hill.ramp.to[0], hill.ramp.to[2]]], width: hill.ramp.width }, params: { material: 'dirt', width: hill.ramp.width } }),
 ]);
 
 // courts and gardens (lm/map's ground planes), paths, the Arium black/chalk tessellation, the glazed basins
 const P = Object.fromEntries(placesV1.map((p) => [p.id, p]));
-const MAIN = ['garden', 'madmaraca-court', 'minarete-court', 'beacon-court', 'eden-garden', 'grotto-court'];
+const MAIN = ['garden', 'madmaraca-court', 'minarete-court', 'beacon-court', 'eden-garden', 'grotto-court', 'tharsis-overlook'];
 const courtOps = MAIN.map((id) => paint(id, P[id].polygon, P[id].kind === 'garden' ? MOSS : OCHRE, P[id].kind === 'garden' ? 'moss' : 'dirt'));
 const pathOps = [[-64, 18, 64, 18, 4, 'promenade'], [0, -24, 0, 32, 6, 'beacon-walk'], [-45, 20, -45, 47, 6, 'garden-walk'], [45, 20, 45, 47, 6, 'grotto-walk']].map(([x0, z0, x1, z1, w, n]) => place('core/footpath@1', n, { shape: { path: [[x0, z0], [x1, z1]], width: w }, params: { material: 'stone', width: w } }));
 const tiles = []; for (let row = 0; row < 6; row++) for (let col = 0; col < 12; col++) { const x = -24 + col * 4, z = -9 + row * 4; tiles.push(paint(`tile-${row}-${col}`, rect([x, z, x + 3.9, z + 3.9]), (row + col) % 2 ? BASALT : CHALK, 'rock')); }
@@ -254,7 +256,7 @@ await batch('the Grotto of Painted Worlds (vault, two turquoise pools, the dry c
 // the scan courts: 96 exhibits on their pads, the central promenade and the cross walks, each viewing court named
 const rows = [...new Set(districts.map((m) => m.p[2]))].sort((a, b) => a - b);
 await batch('the scan courts: 96 exhibits of the Little Martians archive in an eight-column district, with their viewing courts', 'scan-courts', [
-  place('core/footpath@1', 'scan-promenade', { shape: { path: [[0, 60], [0, 235]], width: 2 }, params: { material: 'stone', width: 2 } }),
+  place('core/footpath@1', 'scan-promenade', { shape: { path: [[0, 88], [0, 235]], width: 2 }, params: { material: 'stone', width: 2 } }),
   ...rows.map((z, i) => place('core/footpath@1', `scan-crosswalk-${i + 1}`, { shape: { path: [[-72, z + 9.5], [72, z + 9.5]], width: 1.2 }, params: { material: 'stone', width: 1.2 } })),
   ...districts.map((m) => paint(`pad-${m.id}`, rect(m.rect ?? [m.p[0] - 8, m.p[2] - 8, m.p[0] + 8, m.p[2] + 8]), OCHRE, 'dirt')),
   ...districts.map((m) => place(LIB(exhibitName(m)), m.file, { p: [m.p[0], m.p[2]], r: m.yaw ?? 0 })),
