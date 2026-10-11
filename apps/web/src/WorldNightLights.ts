@@ -156,6 +156,11 @@ export function collectNightSources(root:THREE.Object3D):NightSource[]{
   for(const a of list){if(!Array.isArray(a)||a.length<3)continue;v.set(+a[0],+a[1],+a[2]).applyMatrix4(o.matrixWorld);const s=nightSource(v.x,v.y,v.z,String(a[3]??'lamp'),a[4]===undefined?1:+a[4]);if(s)out.push(s);}});
  return out;
 }
+/** R4-LIVE: a god (new) world paints only its own lights (none of Eden's static layout). */
+export function paintOnlySources(sources:readonly NightSource[]){
+ if(installedTexture){const data=installedTexture.image.data as Uint8Array;data.fill(0);if(sources.length)paintInto(data,sources,[]);installedTexture.needsUpdate=true;}
+ return sources.length;
+}
 /** Repaint the installed map with the static sources plus these (sources within 1 m of a static one are dropped). */
 export function paintNightSources(extra:readonly NightSource[]){
  const sources=[...EDEN_NIGHT_SOURCES];

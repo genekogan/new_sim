@@ -190,11 +190,20 @@ export const worldConstantsSchema = z.object({
 export type WorldConstants = z.infer<typeof worldConstantsSchema>;
 
 /** Sky palettes the `world` op accepts. The viewer's lamps read night/midnight as night and dawn/dusk/sunset/twilight as half-night; the rest follow `sun`. */
+/** Weather kinds of the `world` op (R4-LIVE): 'auto' follows the live worlds' schedule; 'manual' shows the channels as set. */
+export const WEATHER_KINDS = ['auto', 'manual', 'clear', 'cloudy', 'rain', 'wind', 'fog', 'storm'] as const;
 export const SKY_PALETTES = ['clear-day', 'golden-hour', 'dawn', 'sunset', 'dusk', 'twilight', 'night', 'midnight', 'mars-desert', 'lm-garden'] as const;
 export const worldStateSchema = z.object({
   sky: z.object({ palette: z.string().default('clear-day'), sun: num.min(0).max(1).default(0.6) }).prefault({}),
-  time: z.object({ dayTicks: z.number().int().default(72000), startTick: z.number().int().default(0) }).prefault({}),
-  weather: z.object({ clouds: num.min(0).max(1).default(0.1), wind: num.min(0).max(1).default(0.1), rain: num.min(0).max(1).default(0) }).prefault({}),
+  time: z.object({ dayTicks: z.number().int().default(72000), startTick: z.number().int().default(0),
+    /** R4-LIVE env setter: set the time of day to `hour` (0–24) once; `n` counts sets (the world clock applies each n once, moving forward). */
+    set: z.object({ hour: num.min(0).max(24), n: z.number().int().min(1) }).nullable().optional(),
+    /** The world clock stands still (the god paused time). */
+    paused: z.boolean().default(false) }).prefault({}),
+  /** `kind` 'auto' = the scheduled weather of the live worlds (a kind per 2 h slot, seeded by the day, as on /w/eden); any
+   *  other kind shows these channels as set (`setEnv` writes them from kind × intensity). 'storm' adds lightning and thunder. */
+  weather: z.object({ clouds: num.min(0).max(1).default(0.1), wind: num.min(0).max(1).default(0.1), rain: num.min(0).max(1).default(0),
+    fog: num.min(0).max(1).default(0), kind: z.enum(WEATHER_KINDS).default('auto'), intensity: num.min(0).max(1).default(1) }).prefault({}),
   constitution: z.string().max(20000).default(''),
   /** What the bare ground is made of (L3): the terrain colouring reads it. */
   ground: z.object({ palette: z.enum(['grass', 'desert', 'dust', 'sand', 'snow', 'rock', 'garden']).default('grass') }).prefault({}),
@@ -203,8 +212,8 @@ export type WorldState = z.infer<typeof worldStateSchema>;
 /** A `world` op's state is a patch: no defaults (they would reset what it does not name); compile merges it per key and per field. */
 export const worldPatchSchema = z.object({
   sky: z.object({ palette: z.string(), sun: num.min(0).max(1) }).partial(),
-  time: z.object({ dayTicks: z.number().int(), startTick: z.number().int() }).partial(),
-  weather: z.object({ clouds: num.min(0).max(1), wind: num.min(0).max(1), rain: num.min(0).max(1) }).partial(),
+  time: z.object({ dayTicks: z.number().int(), startTick: z.number().int(), set: z.object({ hour: num.min(0).max(24), n: z.number().int().min(1) }).nullable(), paused: z.boolean() }).partial(),
+  weather: z.object({ clouds: num.min(0).max(1), wind: num.min(0).max(1), rain: num.min(0).max(1), fog: num.min(0).max(1), kind: z.enum(WEATHER_KINDS), intensity: num.min(0).max(1) }).partial(),
   constitution: z.string().max(20000),
   ground: z.object({ palette: worldStateSchema.shape.ground.unwrap().shape.palette.unwrap() }).partial(),
 }).partial();

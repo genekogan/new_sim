@@ -61,14 +61,26 @@ export class WorldBroadcast {
   private lastPick = -Infinity;
   private emptySince: number | null = null;
   /** Set by the viewer: Soul → entity (for who is speaking) and whether Eden's town views apply. */
-  hints?: () => { soulEntity(soulId: string): string | null; eden: boolean; daylight?: number | null };
+  hints?: () => { soulEntity(soulId: string): string | null; eden: boolean; daylight?: number | null;
+    /** R4-LIVE: a god world's own establishing views (its named buildings, plazas, landmarks); Eden's when `eden`. */
+    views?: readonly TourView[] };
+  private godViews: { key: string; tour: WorldTour; views: readonly TourView[]; landmarks: readonly Landmark[] } | null = null;
+  /** The establishing views of this world: Eden's town, a god world's own landmarks, or none. */
+  private viewsOf(hints: ReturnType<NonNullable<WorldBroadcast['hints']>> | undefined): { tour: WorldTour; views: readonly TourView[]; landmarks: readonly Landmark[] } | null {
+    if (!hints) return null;
+    if (hints.eden) return { tour: this.tour, views: TOUR_VIEWS, landmarks: EDEN_LANDMARKS };
+    if (!hints.views?.length) return null;
+    const key = JSON.stringify(hints.views.map(v => [v.id, v.p, v.target]));
+    if (this.godViews?.key !== key) this.godViews = { key, tour: new WorldTour(hints.views), views: hints.views, landmarks: hints.views.map(v => ({ id: v.id, label: v.label, p: v.p, target: v.target })) };
+    return this.godViews;
+  }
 
   reset() {
     this.director.reset('live-world');this.rendered.reset();
     this.lastTick = this.lastDecisionWall = -Infinity;
     this.signature = '';
     this.semanticVersion = 0;
-    this.picker.reset(); this.tour.reset(); this.choice = null; this.lastPick = -Infinity; this.emptySince = null;
+    this.picker.reset(); this.tour.reset(); this.godViews?.tour.reset(); this.choice = null; this.lastPick = -Infinity; this.emptySince = null;
   }
 
   sample(frame: Record<string, SampledEntity>, records: Record<string, Entity>, scene: SpatialScene | null,
@@ -77,8 +89,8 @@ export class WorldBroadcast {
     if (tick < this.lastTick) this.reset(); // seek/epoch, never blend old and new scenes
     const people = Object.keys(frame).filter(id => records[id]?.kind === 'human').sort();
     if (!people.length) { // nobody here at all: the town tour (Eden), else nothing to direct
-      const hints = this.hints?.();this.lastTick = tick;
-      return hints?.eden ? this.tourShot(wallSeconds, hints.daylight ?? null, null, renderRoots) : null;
+      const hints = this.hints?.(), v = this.viewsOf(hints);this.lastTick = tick;
+      return v ? this.tourShot(wallSeconds, hints?.daylight ?? null, null, renderRoots, v.tour) : null;
     }
     // VF1: WorldDirector decides what is worth watching and for how long (4x a second; cheap, no rays).
     if (wallSeconds - this.lastPick >= .25 || !this.choice) {
@@ -86,15 +98,17 @@ export class WorldBroadcast {
       const hints = this.hints?.(), speaking = new Map<string, { thread: string; at: number }>();
       if (hints) for (const [soulId, sp] of speakingNow) { const id = hints.soulEntity(soulId); if (id && frame[id]) speaking.set(id, { thread: sp.thread, at: sp.since / 1000 }); }
       const before = this.choice?.key;
-      this.choice = this.picker.choose({ bodies: people.map(id => ({ id, p: frame[id].p, activity: frame[id].activity })), speaking, now: wallSeconds, landmarks: hints?.eden ? EDEN_LANDMARKS : [] });
+      this.choice = this.picker.choose({ bodies: people.map(id => ({ id, p: frame[id].p, activity: frame[id].activity })), speaking, now: wallSeconds, landmarks: this.viewsOf(hints)?.landmarks ?? [] });
       if (this.choice?.key !== before) { this.emptySince = null; if (this.choice?.kind === 'landmark' || before?.startsWith('landmark:')) this.director.reset('live-world'); }
     }
     const choice = this.choice;
     if (!choice) return null;
     if (choice.kind === 'landmark') { // nothing interesting: the cinematic town tour (now and then where the people are)
       this.lastTick = tick;
-      const prefer = TOUR_VIEWS.find(v => v.id === choice.landmark.id) ?? null;
-      return this.tourShot(wallSeconds, this.hints?.()?.daylight ?? null, prefer, renderRoots);
+      const hints = this.hints?.(), v = this.viewsOf(hints);
+      if (!v) { this.choice = null; return null; }
+      const prefer = v.views.find(x => x.id === choice.landmark.id) ?? null;
+      return this.tourShot(wallSeconds, hints?.daylight ?? null, prefer, renderRoots, v.tour);
     }
     const { focus, phase } = choice, members = choice.members.filter(id => frame[id]);
     // Conversations prefer the two-shot; everything else uses the readable "clear" program.
@@ -144,10 +158,10 @@ export class WorldBroadcast {
     return result ? { ...result, shot: `${choice.label}:${result.shot ?? ''}` } : result;
   }
   /** A tour pose; a new move is checked once against the drawn scenery (clear path, target in sight). */
-  private tourShot(wallSeconds: number, daylight: number | null, prefer: TourView | null, renderRoots: readonly THREE.Object3D[]) {
+  private tourShot(wallSeconds: number, daylight: number | null, prefer: TourView | null, renderRoots: readonly THREE.Object3D[], tour: WorldTour = this.tour) {
     let prepared = false;
     const ready = () => { if (!prepared) { this.rendered.prepare(renderRoots); prepared = true; } };
-    const pose = this.tour.pose(wallSeconds, { daylight, prefer,
+    const pose = tour.pose(wallSeconds, { daylight, prefer,
       clear: p => { ready(); return this.rendered.evaluate(() => this.rendered.clear(p, .8)); },
       sight: (a, b) => { ready(); const length = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]); return this.rendered.evaluate(() => this.rendered.reach(a, b)) >= Math.min(length * .6, 25); },
       open: p => { ready(); return this.rendered.evaluate(() => this.rendered.reach(p, [p[0], p[1] + 40, p[2]])) >= 39; } });

@@ -149,7 +149,32 @@ templates) are not listed; nothing old imports them except through the gates bel
 **`god/god-clerk.test.ts`**
 - Its Auth configs say `worldEngine: true`.
 
+**`edge/ledger/ledger.ts`, `edge/boot/world-places.ts`** (R4-INFO, Soul-information parity)
+- Two optional hooks on `EdgeLedger`: `placeWalkable(id)` and `beforeMap()`. Only the engine bridge sets them
+  (`god/engine-bridge.ts`, so only when `config.worldEngine`): god-built places (`god/places.ts`) count as walkable in
+  `map()`, in the vocabulary's place list and in boot-place admission (`knownBootPlaces`), and the map re-derives
+  after a god edit before it is read.
+- Old worlds: both hooks unset, so `walkable` stays `id in regions` and admission stays the native-region rule.
+  (Verified: local Eden `map` identical place-for-place to the pre-change probe; edge place/here/W1 tests pass.)
+
+**`edge/perception/here.ts`, `edge/eyes/{sight,view}.ts`, `edge/ledger/ledger.ts`, `http.ts`, `main.ts`** (R4-LIVE, env + weather)
+- `EdgeLedger.weatherNow?` (set only by `god/world-env.ts` `installWorldEnv`, i.e. when `d.god`): `here.weather` and Eyes'
+  caption read the god's weather; unset on old worlds, so their words come from engine `env.weather` / the schedule as before.
+- `http.ts`/`main.ts`: env routes (`GET /v1/world/env`, `POST /v1/god/env`) and `installWorldEnv`, both under `d.god`.
+- `ledger.ts` stop path: an immediate `stand:here` touches the fade clock (C9 "any accepted action"). **Not gated**: a fix;
+  see F4 before an old-world backend runs this tree.
+
+**`LiveWorld.tsx`, `WorldAtmosphere.ts`, `WorldBroadcast.ts`, `WorldNightLights.ts`, `gen-mesh/motion.ts`** (R4-LIVE, living view)
+- All under `newWorld`/`entityLayer.active`: atmosphere profile `'world'` + the god's weather, `GodWorldLiving` (lamps by
+  the clock, night map from god lights), broadcast `hints.views` (god landmarks/tour), arrival in broadcast when Souls
+  live there, Explore lists god landmarks. Old worlds: `profile` defaults to `'eden'`, `views` unset, `setClockNight`
+  never called (null), `paintOnlySources` never called.
+
 ### Engine (`mars/viewer/engine`, `packages/engine-mars`, `packages/protocol`, `packages/engine-contract`)
+
+**`engine-mars/src/engine.ts` `configureClock`, `engine-contract/src/scene-capture.ts`, `protocol/src/presentation.ts`** (R4-LIVE)
+- A clock `origin` may be negative (a god set the time of day early in a world's life). Every logged origin before was
+  >= 0 (clockConfig and LivingWorld never wrote one below), so old histories replay and decode unchanged.
 
 **`engine-mars/src/engine.ts`**
 - `groundV1` (`attachGround`), world-edit/1, `restoreHumanPoseV1`, humanoid@2 body dims.

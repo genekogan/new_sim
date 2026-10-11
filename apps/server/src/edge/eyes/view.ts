@@ -118,7 +118,7 @@ export function planView(ledger: EdgeLedger, soul: EdgeSoul, request: ViewReques
   const path = ledger.placePathOf(soul.soulId).filter(p => p.kind !== 'occupier'), enc = me.enclosure ? ledger.places.byId.get(me.enclosure) : undefined;
   const privacyPlaces=new Map(ledger.enclosurePlaces().map(p=>[p.id,p]));
   const containing = new Set(ledger.places.containing(me.p[0], me.p[2], me.level).filter(p=>!p.enclosed||inPoly(me.p[0],me.p[2],privacyPlaces.get(p.id)!.polygon)).map(p => p.id));
-  const light = lightOf(world.env?.datetime ?? null, world.env?.weather, me.enclosure !== null);
+  const light = lightOf(world.env?.datetime ?? null, ledger.weatherNow?.() ?? world.env?.weather, me.enclosure !== null);
   const sight = computeSight({me, pose, gaze: {mode: gaze.mode, yaw: gaze.yaw, ...(gaze.target ? {target: gaze.target} : {})}, light, place: path[0]?.name ?? null, enclosureName: enc?.name ?? null, others, fixtures, spots,
     places: ledger.enclosurePlaces(), containing, occluders: occludersOf(ledger)});
   if (request.mode === 'map') sight.alt = mapCaption(sight, me);

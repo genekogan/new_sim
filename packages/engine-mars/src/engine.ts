@@ -1553,8 +1553,10 @@ export class MarsEngine implements Engine {
     this.cfg.sleepBlockTicks = policy.sleepBlockTicks;
     this.cfg.quietSeatCourtesy = policy.quietSeatCourtesy;
   }
+  /** A negative origin (R4-LIVE: a god set the time of day on a young world) reads as more days elapsed; every logged
+   *  clock before it had origin >= 0 (clockConfig and LivingWorld never wrote one below), so replays are unchanged. */
   configureClock(clock: { origin: number; dayTicks: number }) {
-    if(!Number.isSafeInteger(clock.origin)||clock.origin<0||!Number.isSafeInteger(clock.dayTicks)||clock.dayTicks<=0)
+    if(!Number.isSafeInteger(clock.origin)||!Number.isSafeInteger(clock.dayTicks)||clock.dayTicks<=0)
       throw new TypeError('invalid render clock');
     if(this.cfg.clock?.origin===clock.origin&&this.cfg.clock?.dayTicks===clock.dayTicks){this.updateClock();return;}
     this.finishRecorder();this.cfg.clock={...clock};this.updateClock();this.startRecorder();

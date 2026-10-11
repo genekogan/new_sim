@@ -61,6 +61,7 @@ import { WorldSceneHistory } from './WorldSceneHistory.ts';
 import { apiPath, worldKey } from './world-path.ts';
 import { newWorld } from './world-kind.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
+import { GodWorldLiving, godTourViews } from './world-env.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
 import { setAssetLoader } from './gen-mesh/gltf-assets.ts';
 import { GodPanel } from './GodPanel.tsx';
@@ -183,7 +184,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   const [flagMode, setFlagMode] = useState(false); const flagModeRef = useRef(false); flagModeRef.current = flagMode;
   const [entityWorld, setEntityWorld] = useState(false);
   /** Entity worlds: the person's camera across scene re-mounts of this page (framed once, on first arrival). */
-  const entityView = useRef<{eye:[number,number,number];target:[number,number,number]}|null>(null);
+  const entityView = useRef<{eye:[number,number,number];target:[number,number,number];pending?:boolean}|null>(null);
   const context = useRef({ sim, selected, onSelect, follow, cameraMode, setCameraMode, thing, setThing, onViewerState, loading, graphicsUnavailable, viewportInsets, manualNavigation, setManualNavigation, depictionBeatAt, publishSpeechAnchors, edenExpansion, localClassroomPresentation });
   context.current = { sim, selected, onSelect, follow, cameraMode, setCameraMode, thing, setThing, onViewerState, loading, graphicsUnavailable, viewportInsets, manualNavigation, setManualNavigation, depictionBeatAt, publishSpeechAnchors, edenExpansion, localClassroomPresentation };
   const past = useRef<Past | null>(null);
@@ -279,14 +280,17 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const idleLife=new WorldIdleLife();const idleSouls:IdleSoul[]=[];let attentionTargets=new Map<string,readonly string[]>();
     const edgeItems=new WorldEdgeItems(apiPath('/v1/edge/items'));scene.add(edgeItems.group);edgeItems.start(abort.signal);  // things lying around (together/1)
     const entityLayer=new WorldEntityLayer(apiPath);scene.add(entityLayer.group);let entityWorldFramed=false;
+    const godLiving=newWorld?new GodWorldLiving(entityLayer):null;if(godLiving){scene.add(godLiving.group);(window as unknown as {__simLiving?:unknown}).__simLiving={get lights(){return godLiving.lights;},atmosphere:()=>atmosphere.inspect(),broadcastViews:()=>godTourViews(entityLayer,entityLayer.groundAt).length};}  // R4-LIVE: lamps at dusk, the god's weather, rain kept out of rooms
     // Entity worlds have no Souls to broadcast at first: frame what the god built (or ?eye=x,y,z&at=x,y,z for stable shots),
     // once, on first arrival (after the snapshot loads; never from the render loop), at a human distance (entity-arrival.ts).
     const frameEntityWorld=()=>{if(!entityLayer.active||entityWorldFramed)return;entityWorldFramed=true;const q=new URLSearchParams(location.search),eye=q.get('eye')?.split(',').map(Number),at=q.get('at')?.split(',').map(Number);
       if(eye?.length===3&&at?.length===3&&eye.every(Number.isFinite)&&at.every(Number.isFinite)){controls.target.set(at[0],at[1],at[2]);camera.position.set(eye[0],eye[1],eye[2]);}
-      else if(entityView.current){controls.target.fromArray(entityView.current.target);camera.position.fromArray(entityView.current.eye);}  // a re-mount (welcome, reconnect) keeps the person's camera
+      else if(entityView.current){controls.target.fromArray(entityView.current.target);camera.position.fromArray(entityView.current.eye);if(entityView.current.pending){camera.lookAt(controls.target);arrivalPending={eye:entityView.current.eye,target:entityView.current.target};return;}}  // a re-mount (welcome, reconnect) keeps the person's camera (and an undecided arrival stays undecided)
       else{  // the orbit target is the centre of the screen and of what was built: no panel-dependent shift (Gene: off-centre pivot on small screens)
-        const pose=entityArrivalPose(entityLayer.viewBounds(),entityLayer.entityCount,entityLayer.groundAt,camera.fov,camera.aspect,1);controls.target.fromArray(pose.target);camera.position.fromArray(pose.eye);}
+        const pose=entityArrivalPose(entityLayer.viewBounds(),entityLayer.entityCount,entityLayer.groundAt,camera.fov,camera.aspect,1);controls.target.fromArray(pose.target);camera.position.fromArray(pose.eye);
+        camera.lookAt(controls.target);arrivalPending={eye:camera.position.toArray(),target:controls.target.toArray()};return;}  // R4-LIVE: broadcast if Souls live here (decided once the welcome lists them), as on /w/eden
       camera.lookAt(controls.target);context.current.setCameraMode('manual');};
+    let arrivalPending:{eye:[number,number,number];target:[number,number,number]}|null=null,arrivalWelcome:number|null=null;
     // ?shot=1: a clean picture for `god look` (canvas over every overlay, camera from eye/at, title 'ready' once drawn).
     const shotMode=new URLSearchParams(location.search).has('shot');
     if(shotMode){const c=renderer.domElement;Object.assign(c.style,{position:'fixed',inset:'0',width:'100vw',height:'100vh',zIndex:'2147483000'});document.title='loading';}
@@ -317,7 +321,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const atmosphere=createWorldAtmosphere(scene);let atmosphereSeconds=0;const reducedMotionQuery=typeof matchMedia==='function'?matchMedia('(prefers-reduced-motion: reduce)'):null;
     const light = new Daylight(scene);
     const broadcast = new WorldBroadcast();
-    broadcast.hints=()=>({soulEntity:id=>context.current.sim.conn.replica.souls.get(id)?.entityId??null,eden:!!expansion&&!past.current,daylight:light.daylight});  // VF1/VF5: who speaks; Eden town views; time of day
+    broadcast.hints=()=>({soulEntity:id=>context.current.sim.conn.replica.souls.get(id)?.entityId??null,eden:!!expansion&&!past.current,daylight:light.daylight,...(entityLayer.active&&!expansion?{views:godTourViews(entityLayer,entityLayer.groundAt)}:{})});  // R4-LIVE: a god world's own landmarks  // VF1/VF5: who speaks; Eden town views; time of day
     const followView=new WorldFollow();
     const followMotion=new WorldFollowMotion();
     let followTick:number|null=null,followEpoch:string|null=null;
@@ -362,7 +366,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         const shot=conversationFrame(members,camera,visualObstructionRoots(),(x,z)=>cameraGround.heightAt(scene,x,z)??0);
         if(!shot)return false;groupSelection.clear();members.forEach(m=>groupSelection.add(m.id));context.current.onSelect(members[0].id);controls.target.copy(shot.target);camera.position.copy(shot.position);camera.lookAt(shot.target);controls.update();return true;
       },
-      locations:()=>expansion&&!past.current?CURATED_WORLD_LOCATIONS:depictedLocations,
+      locations:()=>expansion&&!past.current?CURATED_WORLD_LOCATIONS:entityLayer.active?[...depictedLocations,...godTourViews(entityLayer,entityLayer.groundAt).map(v=>({id:v.id,label:v.label,regionId:v.id,p:v.p,target:v.target,radius:8}))]:depictedLocations,  // R4-LIVE: Explore lists what the god built
       frameLocation:id=>{if(initialGate?.snapshot().stage!=='ready')return false;const view=controlsApi.current?.locations().find(p=>p.id===id);if(!view)return false;framing.place(camera,()=>controls,view,()=>{context.current.manualNavigation='orbit';context.current.cameraMode='manual';context.current.follow=false;context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');},()=>{rts.release();orbitPivot.cancel();navigation?.release();});return true;},
       locationPreview:id=>{if(initialGate?.snapshot().stage!=='ready')return Promise.resolve(null);const location=controlsApi.current?.locations().find(p=>p.id===id);if(!location)return Promise.resolve(null);return location.regionId?placePreviews.captureLocation(location,sceneKey??''):placePreviews.capture(id as WorldPlaceId);},
       framePlace: place => {const view=worldPlaceView(place);if(!view||!expansion||past.current)return false;framing.place(camera,()=>controls,view,()=>{context.current.manualNavigation='orbit';context.current.cameraMode='manual';context.current.follow=false;context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');},()=>{rts.release();orbitPivot.cancel();navigation?.release();});return true;},
@@ -687,7 +691,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           const clockOffset=(depictedTick-ref)*(dayTicks?86400/dayTicks:dt);
           const datetime = clock ? shiftIso(clock, clockOffset) : null;
           light.update(clock?shiftIso(clock,clockOffset,true):null);
-          light.setNightLighting(!!expansion);setNightLightStrength(expansion?light.daylight:1);houseWindows?.setNight(nightLightStrength());
+          const godLit=!!godLiving&&entityLayer.active;light.setNightLighting(!!expansion||godLit);if(!godLit)setNightLightStrength(expansion?light.daylight:1);houseWindows?.setNight(nightLightStrength());
           shown.current = { tick: depictedTick, datetime, take, entities: sampled.entities };
           brokenTake = null;
         } catch (e) {
@@ -780,6 +784,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         }
       }
       if(viewing==='follow' && at.take && !focus&&initialGate?.snapshot().stage==='ready'){navigation?.release();context.current.setCameraMode('manual');followed=null;}
+      if(arrivalPending&&s.conn.welcome&&(s.conn.replica.souls.size||(arrivalWelcome??=now)<now-4000)){const framed=arrivalPending;arrivalPending=null;if(!s.conn.replica.souls.size&&context.current.cameraMode==='broadcast'){controls.target.fromArray(framed.target);camera.position.fromArray(framed.eye);camera.lookAt(controls.target);context.current.cameraMode='manual';context.current.setCameraMode('manual');}}
       entityLayer.applyEdge(context.current.sim.edge??[]);entityLayer.update(step,now,geometry.group);  // no-ops unless this is a new (entity) world
       navigation?.update(step);
       rts.update(step);
@@ -787,7 +792,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       // Orbit click-to-centre glide; any other mode or a new gesture cancels it.
       if(viewing!=='manual'||context.current.manualNavigation!=='orbit')orbitPivot.cancel();
       orbitPivot.update(step,camera,controls.target);
-      atmosphereSeconds+=step;try{atmosphere.update({seconds:atmosphereSeconds,dt:step,daylight:light.daylight,camera,eden:!!expansion&&!past.current,reducedMotion:!!reducedMotionQuery?.matches,clock:shown.current?.datetime??null});}catch{}
+      atmosphereSeconds+=step;godLiving?.update(now,light.daylight);const godSky=godLiving&&entityLayer.active&&!expansion?godLiving.atmosphere():null;
+      try{atmosphere.update({seconds:atmosphereSeconds,dt:step,daylight:light.daylight,camera,eden:(!!expansion||!!godSky)&&!past.current,reducedMotion:!!reducedMotionQuery?.matches,clock:shown.current?.datetime??null,...(godSky?{profile:'world' as const,weather:godSky.weather,indoors:godSky.indoors}:{})});}catch{}
       if(controls.enabled)controls.update();
       if(context.current.cameraMode==='follow'&&focus){renderer.domElement.dataset.cameraShot='follow:'+(soulId?s.conn.replica.souls.get(soulId)?.entityId??'':thingId??'');const offset=followView.resolve(controls.target,camera.position.clone().sub(controls.target),visualObstructionRoots(),step);camera.position.copy(controls.target).add(offset);camera.lookAt(controls.target);}
       const area = visibleViewport(host.clientWidth, host.clientHeight, context.current.viewportInsets);
@@ -910,7 +916,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       portraits.dispose();
       orbitPivot.dispose();
       rts.dispose();
-      atmosphere.dispose();
+      atmosphere.dispose();godLiving?.dispose();
       speechLayer.dispose();
       fading.dispose();
       balloonRide.dispose();
@@ -934,7 +940,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       for (const l of labels.values()) { scene.remove(l.obj); l.obj.element.remove(); }
       labels.clear();
       people?.dispose();
-      if(entityWorldFramed)entityView.current={eye:camera.position.toArray(),target:controls.target.toArray()};  // entity worlds only: the camera survives the scene re-mount
+      if(entityWorldFramed)entityView.current={eye:camera.position.toArray(),target:controls.target.toArray(),pending:!!arrivalPending};  // entity worlds only: the camera survives the scene re-mount
       edgeItems.dispose();entityLayer.dispose();
       initialGate?.cancel();retryInitial.current=null;staticBatches.dispose();diagnostics.dispose();placePreviews.dispose();bodyModels.dispose();
       floaters.dispose();
