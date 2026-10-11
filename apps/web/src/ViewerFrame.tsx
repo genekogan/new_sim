@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 're
 import {ImportCredits} from './ImportCredits.tsx';
 import { createPortal } from 'react-dom';
 import type { ViewportInsets, WorldViewerHandle, WorldViewerState } from './WorldViewer.ts';
-import { arrivalStage, heldLabel } from './viewer-arrival.ts';
+import { arrivalProgress, arrivalStage, heldLabel, initialPending } from './viewer-arrival.ts';
+import type { InitialWorldProgress } from './InitialWorldReadiness.ts';
 
 /** Edge overlays are measured against World's actual viewport, never the window. */
 export function useViewerInsets(root: RefObject<HTMLDivElement | null>, visible: boolean, layout: string): ViewportInsets {
@@ -53,7 +54,7 @@ export function useViewerInsets(root: RefObject<HTMLDivElement | null>, visible:
 /** VF2 (Gene): one "your camera" (drag orbits, right-drag pans, scroll zooms to the pointer, WASD/QE/RF keys;
  * WorldRtsCamera), Broadcast as an on/off pill beside "● Live · time", Follow from the Soul card with a
  * "Following … ×" chip, and one camera help card (opened from the header's camera button). */
-export function ViewerFrame({ handle, state, dt, navigationOpen, onNavigationChange, worldTime, connected = true, connecting = false, worldName, followName, slots }: { handle: WorldViewerHandle | null; state: WorldViewerState | null; dt: number; navigationOpen: boolean; onNavigationChange: (open: boolean) => void; onNavigationOpen?: () => void; worldTime?: string; connected?: boolean; connecting?: boolean; worldName?: string; followName?: string | null; slots?: { status: HTMLElement | null; camera: HTMLElement | null } }) {
+export function ViewerFrame({ handle, state, dt, navigationOpen, onNavigationChange, worldTime, connected = true, connecting = false, worldName, followName, slots, initial }: { handle: WorldViewerHandle | null; state: WorldViewerState | null; dt: number; navigationOpen: boolean; onNavigationChange: (open: boolean) => void; onNavigationOpen?: () => void; worldTime?: string; connected?: boolean; connecting?: boolean; worldName?: string; followName?: string | null; slots?: { status: HTMLElement | null; camera: HTMLElement | null }; initial?: InitialWorldProgress | null }) {
   const [cameraNote, setCameraNote] = useState('');
   // DLG3 (Gene): the history scrub ("Back 1 min") is hidden for now; `?rewind` keeps it reachable for tests.
   const [rewind] = useState(() => { try { return new URLSearchParams(location.search).has('rewind'); } catch { return false; } });
@@ -73,8 +74,13 @@ export function ViewerFrame({ handle, state, dt, navigationOpen, onNavigationCha
     const id = setTimeout(() => setSettledReason(reason), blocked || /covered by controls/.test(reason) ? 0 : 4000);
     return () => clearTimeout(id);
   }, [reason, arriving, blocked]);
+  // The card also carries the initial-assets progress (the world stays hidden until those assets are ready), so it
+  // stays until they are, and steps aside when they fail: the viewer's own Retry is then the only thing to show.
+  const preparing = initialPending(initial);
+  const card = (arriving || preparing) && initial?.stage !== 'failed';
+  const progress = card ? arrivalProgress(initial) : null;
   const [arrivalShown, setArrivalShown] = useState(true);
-  useEffect(() => { if (arriving) { setArrivalShown(true); return; } const id = setTimeout(() => setArrivalShown(false), 700); return () => clearTimeout(id); }, [arriving]);
+  useEffect(() => { if (card) { setArrivalShown(true); return; } const id = setTimeout(() => setArrivalShown(false), 700); return () => clearTimeout(id); }, [card]);
   const lost = !connected && !arriving;
   const live = current && state?.presentation === 'live' && connected;
   const status = blocked && state?.shownTick == null ? 'View unavailable'
@@ -129,10 +135,11 @@ export function ViewerFrame({ handle, state, dt, navigationOpen, onNavigationCha
               onClick={() => kind === 'broadcast' ? yourCamera() : toBroadcast()}>{kind === 'broadcast' ? <><span className="viewer-broadcast-dot" aria-hidden="true" />Broadcast</> : <><span className="viewer-broadcast-icon" aria-hidden="true">↺</span>Back to broadcast</>}</button>}
       </div> : null;
   return <>
-    {arrivalShown && !blocked && <div className="viewer-arrival" data-done={!arriving} role="status" aria-live="polite">
+    {arrivalShown && !blocked && initial?.stage !== 'failed' && <div className="viewer-arrival" data-done={!card} role="status" aria-live="polite">
       <div className="viewer-arrival-card"><span className="viewer-arrival-spinner" aria-hidden="true" />
         <div><p className="viewer-arrival-title">Arriving in {worldName ?? 'the world'}</p>
-          <p className="viewer-arrival-stage">{arriving ? state?.assetDownloads?.pending ? `Downloading world assets · ${state.assetDownloads.loaded} of ${state.assetDownloads.total} ready` : `${arrivalStage(reason, connecting)}…` : 'Ready'}</p></div></div>
+          <p className="viewer-arrival-stage">{arriving ? state?.assetDownloads?.pending ? `Downloading world assets · ${state.assetDownloads.loaded} of ${state.assetDownloads.total} ready` : `${arrivalStage(reason, connecting)}…` : preparing ? 'Preparing the world…' : 'Ready'}</p>
+          {progress !== null && <div className="viewer-arrival-progress"><progress aria-label="World loading progress" max={100} value={Math.round(progress * 100)} /><span>{Math.round(progress * 100)}%{initial && initial.bytesLoaded > 0 ? ` · ${(initial.bytesLoaded / 1048576).toFixed(1)} MB` : ''}</span></div>}</div></div>
     </div>}
     {followCue && !arriving && <div className="viewer-follow-hint" role="status" aria-live="polite" data-cue={followCue}>{followCue === 'follow'
       ? coarse ? <>Following <b>{followName ?? 'a Soul'}</b> · drag to look around · × to stop</> : <>Following <b>{followName ?? 'a Soul'}</b> · drag to look around, scroll to zoom · press <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to look around freely</>

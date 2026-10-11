@@ -139,10 +139,12 @@ function cardsAt(plays: readonly PlayView[], tick: number): Map<string, PlayView
 const cardText = (p: PlayView | undefined) => (p ? `“${p.card}”${p.targetName ? ` → ${p.targetName}` : ''}` : '');
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
-export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerState, hideControls = false, embedded = false, hideSoulInfo = false, publishSpeechAnchors = false, humanPresets = false, viewportInsets, depictionBeatAt, edenExpansion = false, localClassroomPresentation }: {
+export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerState, onInitialProgress, hideControls = false, embedded = false, hideSoulInfo = false, publishSpeechAnchors = false, humanPresets = false, viewportInsets, depictionBeatAt, edenExpansion = false, localClassroomPresentation }: {
   sim: Sim; selected: string | null; onSelect(id: string | null): void;
   onViewerHandle?(handle: WorldViewerHandle | null): void;
   onViewerState?(state: WorldViewerState): void;
+  /** App shows the initial-assets progress in its own arrival card; this overlay then keeps only its backdrop and a failure's Retry. */
+  onInitialProgress?(progress: InitialWorldProgress): void;
   hideControls?: boolean;
   /** App sizes the stable world-viewer/world-viewport elements. */
   embedded?: boolean;
@@ -170,6 +172,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   const [loading, setLoading] = useState(false);
   const [initialProgress,setInitialProgress]=useState<InitialWorldProgress>({generation:0,stage:'waiting',required:0,completed:0,failed:[],bytesLoaded:0,bytesTotal:null});
   const retryInitial=useRef<(()=>void)|null>(null);
+  useEffect(()=>{onInitialProgress?.(initialProgress);},[initialProgress,onInitialProgress]);
+  const progressInCard=!!onInitialProgress&&initialProgress.stage!=='failed';
   const [assetProgress,setAssetProgress]=useState<AssetDownloadProgress>({loaded:0,total:0,failed:0,pending:0});
   const [placeCard,setPlaceCard]=useState<HoverTarget|null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -231,8 +235,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // The canvas fills its host. setSize(w, h, false) below sizes only the drawing buffer (w·dpr × h·dpr); without this the
     // canvas is laid out at buffer size, so on a 2× (Retina) screen it is twice the window and only its top-left quarter
     // shows: the view looks shifted/warped and the orbit centre sits at the bottom-right edge (Gene, 2026-10-11).
-    // Reconciled with main e8: new worlds only, so old worlds stay byte-for-byte e8 until lane OW's e8 hotfix lands there.
-    if (newWorld) { renderer.domElement.style.width = '100%'; renderer.domElement.style.height = '100%'; }
+    renderer.domElement.style.width = '100%'; renderer.domElement.style.height = '100%';
     host.appendChild(renderer.domElement);
     const onContextLost = (e: Event) => { e.preventDefault(); setGraphicsUnavailable('The 3D graphics context was lost.'); navigation?.release(); problem('The 3D view lost its graphics context; it will come back when the browser restores it.'); };
     const onContextRestored = () => setGraphicsUnavailable(null);
@@ -1074,7 +1077,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       </div>}
       <div className="world-viewport" style={{ position: 'relative', height: embedded ? undefined : 540, flex: embedded ? 1 : undefined, minHeight: 0, width: '100%', overflow: 'hidden', borderRadius: 4 }}>
         <div className="world-canvas-host" data-initial-revealed={initialProgress.stage==='ready'} data-initial-generation={initialProgress.generation} ref={mount} style={{ position: 'absolute', inset: 0, touchAction: 'none',visibility:initialProgress.stage==='ready'?'visible':'hidden' }} />
-        {initialProgress.stage!=='ready'&&<div role={initialProgress.stage==='failed'?'alert':'status'} aria-live="polite" data-initial-stage={initialProgress.stage} data-initial-generation={initialProgress.generation} className="world-initial-loading" style={{position:'absolute',inset:0,display:'grid',placeContent:'center',gap:12,background:'var(--bg, #d3c4aa)',textAlign:'center',padding:24}}><strong>{initialProgress.stage==='failed'?'The world could not be prepared':initialProgress.stage==='preparing'||initialProgress.stage==='first-frame'?'Preparing the world…':'Arriving in '+'your world'+'…'}</strong>{initialProgress.stage==='failed'?<><span>{initialProgress.failed.join(', ')} could not be prepared.</span><button onClick={()=>retryInitial.current?.()}>Retry</button></>:<><progress aria-label={initialProgress.bytesTotal!==null?"Initial assets downloaded":"Initial assets prepared"} max={initialProgress.bytesTotal??(initialProgress.required||1)} value={initialProgress.stage==='downloading'?(initialProgress.bytesTotal!==null?initialProgress.bytesLoaded:initialProgress.required?initialProgress.completed:undefined):undefined} style={{width:240}}/><span>{initialProgress.bytesLoaded>0?(initialProgress.bytesLoaded/1048576).toFixed(1)+' MB downloaded · ':''}{initialProgress.completed} of {initialProgress.required||'…'} world parts prepared</span></>}</div>}
+        {initialProgress.stage!=='ready'&&<div role={initialProgress.stage==='failed'?'alert':progressInCard?undefined:'status'} aria-live={progressInCard?undefined:'polite'} data-initial-stage={initialProgress.stage} data-initial-generation={initialProgress.generation} className="world-initial-loading" style={{position:'absolute',inset:0,display:'grid',placeContent:'center',gap:12,background:'var(--bg, #d3c4aa)',textAlign:'center',padding:24}}>{!progressInCard&&<><strong>{initialProgress.stage==='failed'?'The world could not be prepared':initialProgress.stage==='preparing'||initialProgress.stage==='first-frame'?'Preparing the world…':'Arriving in '+'your world'+'…'}</strong>{initialProgress.stage==='failed'?<><span>{initialProgress.failed.join(', ')} could not be prepared.</span><button onClick={()=>retryInitial.current?.()}>Retry</button></>:<><progress aria-label={initialProgress.bytesTotal!==null?"Initial assets downloaded":"Initial assets prepared"} max={initialProgress.bytesTotal??(initialProgress.required||1)} value={initialProgress.stage==='downloading'?(initialProgress.bytesTotal!==null?initialProgress.bytesLoaded:initialProgress.required?initialProgress.completed:undefined):undefined} style={{width:240}}/><span>{initialProgress.bytesLoaded>0?(initialProgress.bytesLoaded/1048576).toFixed(1)+' MB downloaded · ':''}{initialProgress.completed} of {initialProgress.required||'…'} world parts prepared</span></>}</>}</div>}
 
         {placeCard&&<article className="world-place-card" aria-label="Selected place"><button className="panel-close" aria-label="Close place" onClick={()=>setPlaceCard(null)}>×</button><h2>{placeCard.name}</h2>{placeCard.detail&&<p>{placeCard.detail}</p>}<p>{[...sim.conn.replica.souls.values()].filter(soul=>{const e=shown.current.entities[soul.entityId];return e&&Math.hypot(e.p[0]-placeCard.point.x,e.p[2]-placeCard.point.z)<placeCard.radius;}).map(soul=>soul.name).join(', ')||'No Souls nearby in the current frame.'}</p><button onClick={()=>{controlsApi.current?.framePoint(placeCard.point,placeCard.radius);setPlaceCard(null);}}>Go to</button></article>}
         {sceneryNotice&&<div role="status" className="world-scenery-note" style={{position:'absolute',left:12,bottom:12,maxWidth:'min(420px, calc(100% - 24px))',padding:'8px 12px',background:'rgba(238,233,221,.94)',color:'#463f32',borderRadius:6,pointerEvents:'none'}}>{sceneryNotice}</div>}

@@ -37,3 +37,22 @@ test('VF1: "Reconnecting" only after a lost open socket stays down past the grac
   assert.equal(heldLabel('Reconnecting; displaying the last recorded frame.'), 'Reconnecting…');
   assert.equal(heldLabel('No recording covers that moment; displaying the nearest recorded frame.'), 'Catching up');
 });
+
+test('Arrival card carries the initial-assets progress; nothing measurable shows no bar; failure steps aside', async () => {
+  const {arrivalProgress, initialPending} = await import('../src/viewer-arrival.ts');
+  const p = (stage: string, more: Partial<{required:number;completed:number;bytesLoaded:number;bytesTotal:number|null}> = {}) =>
+    ({generation: 1, stage, required: 0, completed: 0, failed: [], bytesLoaded: 0, bytesTotal: null, ...more}) as Parameters<typeof arrivalProgress>[0];
+  assert.equal(arrivalProgress(null), null);
+  assert.equal(arrivalProgress(p('waiting')), null);
+  assert.equal(arrivalProgress(p('downloading')), null);
+  assert.equal(arrivalProgress(p('downloading', {bytesLoaded: 25, bytesTotal: 100, required: 4, completed: 3})), 0.25);
+  assert.equal(arrivalProgress(p('downloading', {required: 4, completed: 1})), 0.25);
+  assert.equal(arrivalProgress(p('downloading', {bytesLoaded: 150, bytesTotal: 100})), 1);
+  assert.equal(arrivalProgress(p('preparing', {required: 4, completed: 4})), 1);
+  assert.equal(arrivalProgress(p('first-frame')), 1);
+  assert.equal(arrivalProgress(p('failed', {required: 1})), null);
+  assert.equal(initialPending(null), false);
+  for (const stage of ['waiting', 'downloading', 'preparing', 'first-frame', 'cancelled']) assert.equal(initialPending(p(stage)), true, stage);
+  assert.equal(initialPending(p('ready')), false);
+  assert.equal(initialPending(p('failed')), false);
+});
