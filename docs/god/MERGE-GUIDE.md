@@ -235,18 +235,30 @@ auto-merge was wrong without a conflict (`config.ts`).
 **`pnpm-lock.yaml`**
 - Resolution: ours. `pnpm install --offline --no-frozen-lockfile` changed nothing.
 
-Fixed in the same merge commit:
+Follow-up merges (same day, to keep one base):
+
+**`3f5437b5` merge `root/e8-hotfix`** (the live old-world frontend)
+- `LiveWorld.tsx`: OW's unconditional Retina line.
+- `Shell.tsx`: OW's `onInitialProgress`, with our `AccountApproval` gate.
+
+**`34762bbc` merge `root/world-engine`** (S: New Soul + Souls on new worlds; loading-card)
+- `Shell.tsx`: S's `SoulsHeader` in e8's header, new worlds only.
+- `ViewerFrame.tsx`, `viewer-arrival.ts`, `place-names.test.ts`: OW's code, plus loading-card's
+  `assetDownloadProgress` fallback when no initial gate reports.
+- After this merge, `root/world-engine` and main are both ancestors of `root/reconcile`, so both can fast-forward.
+
+Fixed in the first merge commit:
 - `base-path.ts` became robust outside Vite. Main's `soul-context-render.test.mjs` bundles the client with esbuild and
   failed on `import.meta.env`.
 - god tests: `god-clerk.test.ts` configs say `worldEngine: true`.
 
 ## 4. Flags (decide or carry)
 
-**F1. Retina canvas on old worlds**
-- Today: gated to new worlds, so old worlds are e8 including e8's 2× canvas defect at dpr 2 (seen in the walk: canvas
-  2704×1560 in a 1352×780 window, on both builds).
-- Lane OW is fixing old worlds through Codex's artifact path (`root/e8-hotfix`).
-- When that reaches main, re-merge main and delete the `if (newWorld)` around the canvas style in `LiveWorld.tsx`.
+**F1. Retina canvas on old worlds: CLOSED**
+- Lane OW's `root/e8-hotfix` (`b2f70bf4`) is the live old-world frontend since 04:51 UTC. It is merged here (`3f5437b5`):
+  - the Retina fix is unconditional, and our gate is gone;
+  - the arrival card carries the loading progress.
+- The old-world baseline for every comparison is now `b2f70bf4`, not `e8bcdcd3`.
 
 **F2. Join on new worlds**
 - e8's "New Soul" (`BringAgent`) and `AccountApproval` are hidden on new worlds, where the God panel's Join and
@@ -254,7 +266,9 @@ Fixed in the same merge commit:
 - One system eventually needs one Join flow. Converge on e8's `BringAgent` + `AccountApproval` when the God panel's
   Join matches it. Both drive the same `/v1/account/approvals` routes.
 
-**F3. Explore and MySouls on new worlds**
+**F3. Explore, MySouls and the world name on new worlds**
+- e8's Explore button labels a new world by its slug ("Explore Hello-world-2"), not its `WORLD_NAME`. Cosmetic; R4 or
+  VIS.
 - e8 moved MySouls into the explore group, which shows when `viewerHandle.frameLocation` exists.
 - New worlds have no authored places yet: check that the explore group is useful there, or hide it, in R4.
 
@@ -421,7 +435,21 @@ Gene's bar: the new system does everything the old did, and more.
   - `edge-body-cli` (5446): 1/1;
   - the 39 port-bound server test files: 256/256.
 
-**New worlds green**
+**After the follow-up merges (`34762bbc`)**
+- Old worlds against the live `b2f70bf4` (base :5411–13, head :5401–03), dpr 1 and 2:
+  - eden and littlemartians: SAME;
+  - mars: same geometry, header, New Soul dialog and errors. The only differences were live-Soul nondeterminism: a
+    drag or double-click landing on a walking Soul selects it (and fetches its profile) on either build.
+  - The comparator now ignores Soul-profile requests.
+  - Evidence: `rec-shots/old-worlds-vs-b2f70bf4/`.
+- `souls-ux` (Clerk via synthetic issuer, real Chrome): 13/13 at dpr 1 and 13/13 at dpr 2.
+- `join` clerk `/worlds`: 15/15. `launcher`: 14/14.
+- god + clerk auth + auth-ui: 53/53.
+- Web node tests: the same failure set as `b2f70bf4`.
+- New world under `/worlds`, dpr 1 and 2: canvas = window, offset 0, inputs move the camera, the header shows "Souls 0"
+  and "+ New Soul" plus the account menu, and the Join line appears (`rec-shots/new-world-worlds-prefix-34762bbc/`).
+
+**New worlds green (first merge)**
 - Ports 5420–5440:
   - `scenarios.mjs`: 30/30;
   - `party.mjs`: 16/16;

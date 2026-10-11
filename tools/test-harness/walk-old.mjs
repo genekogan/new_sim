@@ -40,6 +40,7 @@ try{for(const dpr of [1,2]){const browser=await chromium.launch({channel:'chrome
  finally{await browser.close();}}}
 finally{release();}
 writeFileSync(resolve(out,'report.json'),JSON.stringify(report,null,1));
-// side-by-side: same signature per world/dpr?
-const sig=r=>JSON.stringify({geom:r.geometry,input:r.input,newSoul:r.newSoul,buttons:r.ui.buttons,god:r.ui.godPanel,ent:r.ui.simEntity,reqs:r.requests,errors:r.errors.length});
-for(const world of worlds)for(const dpr of [1,2]){const m=report.find(r=>r.world===world&&r.dpr===dpr&&r.build==='main'),x=report.find(r=>r.world===world&&r.dpr===dpr&&r.build==='rec');console.log(world,'dpr',dpr,m&&x&&sig(m)===sig(x)?'SAME':'DIFF');if(m&&x&&sig(m)!==sig(x))console.log(' main',sig(m),'\n rec ',sig(x));}
+// side-by-side: same signature per world/dpr? (live Souls differ between two fake worlds: Soul ids are normalised;
+// a drag or double-click that lands on a walking Soul can select it instead of moving the camera, on either build)
+const sig=r=>JSON.stringify({geom:r.geometry,input:r.input,newSoul:r.newSoul&&{dialogs:r.newSoul.dialogs,afterEscape:r.newSoul.afterEscape},buttons:r.ui.buttons,god:r.ui.godPanel,ent:r.ui.simEntity,reqs:r.requests.filter(q=>!/\/edge\/public\/souls\//.test(q)),errors:r.errors.length});
+for(const world of worlds)for(const dpr of [1,2]){const [bl,cl]=Object.keys(builds);const m=report.find(r=>r.world===world&&r.dpr===dpr&&r.build===bl),x=report.find(r=>r.world===world&&r.dpr===dpr&&r.build===cl);console.log(world,'dpr',dpr,m&&x&&sig(m)===sig(x)?'SAME':'DIFF');if(m&&x&&sig(m)!==sig(x))console.log(' main',sig(m),'\n rec ',sig(x));}
