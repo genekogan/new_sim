@@ -16,6 +16,8 @@ import type { GodMode } from './god.ts';
 import { reachProviders, seatProviders, usesProviders, type ReachEnd } from './query.ts';
 import { GodNav } from './nav.ts';
 import { GodPerceive } from './perceive.ts';
+import { installWorldLore } from './world-lore.ts';
+import { config, KNOWN_WORLD_KEYS } from '../config.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -38,7 +40,7 @@ const NEAR = 60;               // capabilities: god things within this many metr
 const BODY_DEF = 'core/humanoid@1';
 const r3 = (v: number) => Math.round(v * 1000) / 1000;
 
-export type BridgeOptions = { host: WorldHost; god: GodMode; edge?: EdgeLedger; log?: (m: string) => void };
+export type BridgeOptions = { host: WorldHost; god: GodMode; edge?: EdgeLedger; log?: (m: string) => void; /** F3: new-world lore (default: any world key but eden/mars/littlemartians/toy) */ worldLore?: boolean };
 
 export class EngineBridge {
   readonly host: WorldHost; readonly god: GodMode; readonly edge?: EdgeLedger;
@@ -77,6 +79,8 @@ export class EngineBridge {
     else this.guardGod();
     this.guardPinned(hooked);
     if (this.edge) this.hookEdge(this.edge);
+    // F3: a god's new world serves its constitution (or a neutral line) as lore, never Eden's (world-lore.ts)
+    if (this.edge && (o.worldLore ?? !(KNOWN_WORLD_KEYS as readonly string[]).includes(config.worldKey))) installWorldLore(this.edge, this.god);
   }
   private get engine(): EngineV1 { return this.host.engine as unknown as EngineV1; }
   private get model(): WorldModel { return this.god.model; }
