@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./humanoid2": "./src/core-kit/humanoid2.ts",
+    "./family-kits": "./src/core-kit/index.ts"
   },
   "scripts": {
     "test": "node --test src/*.test.ts src/core-kit/*.test.ts"

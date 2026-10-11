@@ -4,22 +4,26 @@
 // The herd ticks itself while any member is on screen (world builders get no per-frame call).
 import * as THREE from 'three';
 import { scatterPoints, type Value } from '@sim/generators';
-import { CORE_KIT, defSchema, type StoredDef, type WorldModel } from '@sim/world-compiler';
-import { registerMesh } from './registry.ts';
+import { defSchema, type DefInput, type StoredDef, type WorldModel } from '@sim/world-compiler';
+import { registerMesh, type MeshCtx } from './registry.ts';
 import { creatureObject } from './creatures/creature.mesh.ts';
 import { seedOf, type BehaviorKind } from './creatures/behavior.ts';
 import { bindMotionModel, creatureStep, waterAt, worldSeconds, type Rig } from './motion.ts';
 
 const bundled = new Map<string, StoredDef>();
 let markerMaterial: THREE.MeshBasicMaterial | undefined;
-/** A core creature def by species, from the world model if present, else from the bundled kit. */
+// lane PERF2: the core kit's family defs (~1.4 MB; every creature is one) are fetched only when a herd's species is missing
+// from its world (worlds carry their core defs), as their own chunk, instead of riding in the main web bundle.
+let CORE_KIT: DefInput[] | null = null, kitLoad: Promise<unknown> | null = null;
+const loadKit = () => (kitLoad ??= import('@sim/world-compiler/family-kits').then((m) => { CORE_KIT = m.FAMILY_KITS; }, () => { kitLoad = null; }));
+/** A core creature def by species, from the world model if present, else from the core kit (once loaded; see loadKit). */
 export function speciesDef(model: WorldModel, ref: string): StoredDef | undefined {
   const inWorld = model.resolvedDef(ref) ?? model.resolvedDef(`core/${ref}@1`);
   if (inWorld) return inWorld;
   const name = ref.startsWith('core/') ? `core-${ref.slice(5).replace(/@\d+$/, '')}` : `core-${ref}`;
   let d = bundled.get(name);
   if (!d) {
-    const input = CORE_KIT.find((x) => x.name === name); if (!input) return undefined;
+    const input = CORE_KIT?.find((x) => x.name === name); if (!input) return undefined;
     d = { ...defSchema.parse(input), hash: `bundled-${name}`, ref: `${name}@1`, by: 'core', born: 0, budget: { tris: 0, bytes: 0, textures: 0 } } as StoredDef;
     bundled.set(name, d);
   }
@@ -31,10 +35,22 @@ registerMesh({
   build(ctx) {
     const e = ctx.entity; if (!e.shape || !('area' in e.shape)) return null;
     bindMotionModel(ctx.model);
-    const area = e.shape.area as [number, number][];
-    const p = ctx.params, count = Math.max(1, Math.min(60, Number(p.count ?? 3)));
+    const p = ctx.params;
     const ref = typeof p.def === 'string' && p.def ? p.def : String(p.species ?? 'dog');
-    const def = speciesDef(ctx.model, ref); if (!def) return null;
+    const def = speciesDef(ctx.model, ref);
+    if (!def) {
+      if (CORE_KIT) return null;
+      // not in the world: draw the herd once the core kit chunk is in
+      const later = new THREE.Group(); later.name = `herd ${e.name ?? e.id} (loading)`;
+      loadKit().then(() => { const d = speciesDef(ctx.model, ref); const herd = d && herdOf(ctx, d); if (herd) later.add(herd); });
+      return later;
+    }
+    return herdOf(ctx, def);
+  },
+});
+
+function herdOf(ctx: MeshCtx, def: StoredDef): THREE.Group {
+    const e = ctx.entity, area = (e.shape as { area: [number, number][] }).area, p = ctx.params, count = Math.max(1, Math.min(60, Number(p.count ?? 3)));
     const seed = e.seed ?? seedOf(e.id);
     const homes = scatterPoints(area, 1, 0.8, seed, count);
     // a herd on water swims; koi and fish always do
@@ -68,5 +84,4 @@ registerMesh({
     group.add(marker);
     tick(Date.now() / 1000);
     return group;
-  },
-});
+}
