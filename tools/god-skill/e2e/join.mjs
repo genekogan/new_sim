@@ -271,11 +271,11 @@ try {
         return { paired: r.status.paired, walk: walk.phase };
       }, (r) => r.paired && r.walk === 'completed');
       await benPage.context().close();
-      await step('P3 the god\'s Souls tab: the link to share and both Souls; clicking Ana flies to her', async () => {
+      await step('P3 the god\'s Souls tab: both Souls (the link to share is in the account menu); clicking Ana flies to her', async () => {
         const page = await open('gaia', '#join');
         await page.locator('[data-souls-tab]').waitFor({ timeout: 60_000 });
         await page.locator('[data-soul="Ben"]').waitFor({ timeout: 30_000 });
-        const link = await page.locator('[data-join-link]').innerText();
+        const link = await page.locator('[data-join-link]').getAttribute('data-join-link');  // the account menu's "Copy invite link" (lane UXFIX)
         await page.locator('[data-soul="Ana"] .gp-link').click().catch(() => {});
         await sleep(2500);
         await shot(page, '05-god-souls-tab');

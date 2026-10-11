@@ -269,7 +269,10 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     const used = new Set(s.entities.map((e) => e.def));
     for (const e of s.entities) for (const v of Object.values(e.params ?? {})) if (typeof v === 'string' && /@\d+$/.test(v) && this.model.def(v)) used.add(this.model.def(v)!.ref);
     const defs = s.defs.filter((d) => used.has(d.ref) || used.has('sha:' + d.hash) || used.has(d.ref.replace(/^core-/, 'core/')));
-    return { contract: 'world/1', worldId: this.opts.worldId, seq: s.editSeq, counter: s.seq, seed: s.seed, tick: this.opts.tick(), constants: s.constants, state: s.state, ground: s.ground, defs: defs.map(publicDef), entities: s.entities };
+    // byte size of every GLB these defs load (from the asset index), so a viewer's loading bar knows the total up front
+    const assetBytes: Record<string, number> = {};
+    for (const d of defs) for (const sha of JSON.stringify(d.make ?? null).match(/[0-9a-f]{64}/g) ?? []) { const m = this.assets.info(sha); if (m?.ext === 'glb' && m.bytes > 0) assetBytes[sha] = m.bytes; }
+    return { contract: 'world/1', worldId: this.opts.worldId, seq: s.editSeq, counter: s.seq, seed: s.seed, tick: this.opts.tick(), constants: s.constants, state: s.state, ground: s.ground, defs: defs.map(publicDef), entities: s.entities, assetBytes };
   }
   /** God sees the same plus the whole library, prayers waiting, tokens and the edit journal head. */
   godSnapshot() {
