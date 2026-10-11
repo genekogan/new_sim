@@ -59,6 +59,7 @@ import type { Sim } from './useSim.ts';
 import { decodeSceneCapturePublication } from '@sim/protocol/scene-capture';
 import { WorldSceneHistory } from './WorldSceneHistory.ts';
 import { apiPath, worldKey } from './world-path.ts';
+import { BASE } from './base-path.ts';
 import { newWorld } from './world-kind.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
 import { GodWorldLiving, godTourViews } from './world-env.ts';
@@ -413,7 +414,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     manager.onProgress=(url)=>downloads.finish(url);
     manager.onError=(url)=>downloads.finish(url,true);
     const originalStart=manager.itemStart.bind(manager);manager.itemStart=(url)=>{downloads.start(url);originalStart(url);};
-    const draco = new DRACOLoader(manager).setDecoderPath('/mars-assets/draco/');
+    const draco = new DRACOLoader(manager).setDecoderPath(BASE+'/mars-assets/draco/');
     const placePreviews=new WorldPlacePreviews(renderer,()=>[geometry.group,...(expansion?[expansion.group]:[])]);
     const loader = new GLTFLoader(manager).setDRACOLoader(draco).setMeshoptDecoder(MeshoptDecoder);
     setAssetLoader(loader);

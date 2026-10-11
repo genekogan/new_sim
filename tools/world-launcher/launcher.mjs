@@ -13,6 +13,9 @@
 //   GET  /__sim/worlds/<slug>    one world + what the launcher has seen (looks, agent, previews)
 //   GET  /__sim/launcher         children, ports, pids, restarts (diagnostics; direct local requests only)
 //   GET  /__sim/healthz          {ok, build, worlds, running, caps, memAvailableMb} (also /healthz)
+//   POST /__sim/op/create-world  operator only (direct loopback requests; anything through a reverse proxy is refused):
+//                                {name, template, owner | ownerOf, godName?} → a world born owned by an existing account
+//                                (`owner` = account id, or `ownerOf` = the slug of a world whose god it is). CLI: op.mjs
 //   /w/<slug>/*                  proxied to that world (HTTP, SSE, WebSocket); started on demand
 //
 // --base /worlds puts all of the above under one path prefix (/worlds/, /worlds/__sim/…, /worlds/w/<slug>/…,
@@ -43,6 +46,7 @@ import { connect } from 'node:net';
 import { createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { DatabaseSync } from 'node:sqlite';
 import { Registry, SLUG_RE, listTemplates, slugFor } from './registry.mjs';
 import { ChildPool } from './children.mjs';
 import { decorateCommand, memAvailableMb, productionSettings } from './production.mjs';
@@ -130,9 +134,11 @@ export async function openLauncher(cfg = {}) {
     try { const r = await fetch(`http://127.0.0.1:${awake.s.port}${wp(awake.w.slug)}/v1/account/session`, { headers: { authorization }, signal: AbortSignal.timeout(5000) }); return r.status !== 401; }
     catch { return true; }
   }
-  async function createWorld(body, authorization) {
-    if (auth && !/^Bearer\s+\S+/i.test(authorization ?? '')) return [401, { ok: false, code: 'signin-required', message: 'sign in first: a new world belongs to whoever makes it' }];
-    if (auth && !(await creatorOk(authorization))) return [401, { ok: false, code: 'signin-required', message: 'your sign-in was not accepted; sign in again' }];
+  /** `op.owner`: the operator's create (direct loopback only, below): the world is born owned by that existing account
+   *  (WORLD_OWNER_ID on its first boot only matters while it has no store yet), with no sign-in and no claim. */
+  async function createWorld(body, authorization, op = null) {
+    if (!op && auth && !/^Bearer\s+\S+/i.test(authorization ?? '')) return [401, { ok: false, code: 'signin-required', message: 'sign in first: a new world belongs to whoever makes it' }];
+    if (!op && auth && !(await creatorOk(authorization))) return [401, { ok: false, code: 'signin-required', message: 'your sign-in was not accepted; sign in again' }];
     const name = typeof body?.name === 'string' ? body.name.trim().replace(/\s+/g, ' ') : '';
     if (!name || name.length > 60) return [400, { ok: false, code: 'invalid', message: 'name: 1–60 characters' }];
     const templates = listTemplates(templatesDir);
@@ -146,7 +152,7 @@ export async function openLauncher(cfg = {}) {
     mkdirSync(registry.worldDir(slug), { recursive: true });
     registry.add(entry);
     const t0 = performance.now();
-    try { await pool.ensure(worldEnv(entry)); }
+    try { await pool.ensure(op ? { ...worldEnv(entry), bornOwner: op.owner } : worldEnv(entry)); }
     catch (e) {
       await pool.stop(slug); pool.kids.delete(slug); registry.remove(slug); rmSync(registry.worldDir(slug), { recursive: true, force: true });
       if (e.code === 'capacity') return [503, { ok: false, code: 'capacity', message: e.message }];
@@ -154,8 +160,14 @@ export async function openLauncher(cfg = {}) {
     }
     const ms = Math.round(performance.now() - t0);
     // The creator is the one god: the new world claims them now, with their own sign-in (Clerk: required).
-    let owner = null;
-    if (authorization) {
+    let owner = op ? op.owner : null;
+    if (op) {
+      const got = worldOwner(slug);
+      if (got !== op.owner) {
+        await pool.stop(slug); pool.kids.delete(slug); registry.remove(slug); rmSync(registry.worldDir(slug), { recursive: true, force: true });
+        return [500, { ok: false, code: 'owner-mismatch', message: `the new world booted owned by ${got ?? 'nobody'}, not ${op.owner}; removed` }];
+      }
+    } else if (authorization) {
       const port = pool.status(slug).port;
       const r = await fetch(`http://127.0.0.1:${port}${wp(slug)}/v1/god/claim`, { method: 'POST', headers: { authorization, 'content-type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(15_000) }).catch((e) => ({ ok: false, status: 0, json: async () => ({ message: e.message }) }));
       const d = await r.json().catch(() => ({}));
@@ -168,9 +180,39 @@ export async function openLauncher(cfg = {}) {
     // the name the creator chose to show as this world's god on the homepage (optional; never their account id or email)
     const godName = typeof body?.godName === 'string' ? body.godName.trim().replace(/\s+/g, ' ').replace(/[^\p{L}\p{N} _'.-]/gu, '').slice(0, 32) : '';
     if (owner && godName) registry.update(slug, { godName });
-    log(`created ${slug} (${t.id}) on :${pool.status(slug).port} in ${ms} ms${owner ? ', claimed by its creator' : ''}`);
+    log(`created ${slug} (${t.id}) on :${pool.status(slug).port} in ${ms} ms${op ? `, owned by ${op.owner} (operator)` : owner ? ', claimed by its creator' : ''}`);
     await refreshStats(entry);
-    return [201, { ok: true, slug, url: auth ? `${wp(slug)}/?new=1` : `${wp(slug)}/?dev=1&new=1`, bootMs: ms, claimed: !!owner, world: describe(entry) }];
+    return [201, { ok: true, slug, url: auth ? `${wp(slug)}/?new=1` : `${wp(slug)}/?dev=1&new=1`, bootMs: ms, claimed: !!owner, ...(op ? { owner } : {}), world: describe(entry) }];
+  }
+
+  // ---------- operator (direct loopback only)
+  /** The god of a world, read from its own store (read-only), or null. */
+  function worldOwner(slug) {
+    const file = join(registry.worldDir(slug), 'sim.db');
+    if (!existsSync(file)) return null;
+    const db = new DatabaseSync(file, { readOnly: true });
+    try { const r = db.prepare('SELECT body FROM world_meta_v1 WHERE world_id=?').get(`${slug}-1`); return r ? JSON.parse(r.body).owner ?? null : null; }
+    finally { db.close(); }
+  }
+  /** Under Clerk: is this an account of the shared registry (account id only; nothing else is read)? */
+  function accountExists(id) {
+    if (!auth) return true;
+    if (!existsSync(auth.child.registryPath)) return false;
+    const db = new DatabaseSync(auth.child.registryPath, { readOnly: true });
+    try { return !!db.prepare('SELECT 1 FROM provider_accounts_v1 WHERE account_id=?').get(id); }
+    finally { db.close(); }
+  }
+  async function opCreateWorld(body) {
+    let owner = typeof body?.owner === 'string' ? body.owner.trim() : '';
+    if (!owner && typeof body?.ownerOf === 'string') {
+      const of = registry.get(body.ownerOf); if (!of) return [404, { ok: false, code: 'not-found', message: `no world ${body.ownerOf}` }];
+      owner = worldOwner(of.slug) ?? '';
+      if (!owner) return [409, { ok: false, code: 'no-owner', message: `${of.slug} has no god` }];
+    }
+    if (!/^[A-Za-z0-9_:.-]{3,96}$/.test(owner)) return [400, { ok: false, code: 'invalid', message: 'owner (account id) or ownerOf (slug of a world it owns) is required' }];
+    if (!accountExists(owner)) return [404, { ok: false, code: 'no-account', message: `no account ${owner} in this launcher's account registry` }];
+    const run = creating.then(() => createWorld(body, undefined, { owner })); creating = run.catch(() => {});
+    return run;
   }
 
   // ---------- static (the web app itself; everything else comes from a world)
@@ -252,6 +294,13 @@ export async function openLauncher(cfg = {}) {
         const run = creating.then(() => createWorld(body, req.headers.authorization)); creating = run.catch(() => {});
         const out = await run; if (out[0] === 201) made.set(who, [...recent, Date.now()]);
         json(res, out[0], out[1]); return;
+      }
+      if (path === '/__sim/op/create-world' && req.method === 'POST') {
+        // operator only: a request through the reverse proxy carries x-forwarded-for and is refused
+        if (!direct(req)) { json(res, 403, { ok: false, code: 'local-only', message: 'operator commands are accepted only from this machine' }); return; }
+        const chunks = []; for await (const c of req) chunks.push(c);
+        let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
+        const out = await opCreateWorld(body); json(res, out[0], out[1]); return;
       }
       const one = path.match(/^\/__sim\/worlds\/([a-z][a-z0-9-]{0,31})(\/previews)?$/);
       if (one && req.method === 'GET') {

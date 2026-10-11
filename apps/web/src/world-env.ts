@@ -26,7 +26,7 @@ export class CoverProbe {
   private at = new THREE.Vector3(Infinity, 0, 0);
   private last = 0;
   private covered = false;
-  // GOD-ENV fix: a Sprite (a flag's label) raycasts against `raycaster.camera`; without one every probe threw (a page error per frame)
+  // a camera for sprites (labels) in the god's layer: three's Sprite.raycast needs one; label hits are skipped below
   constructor(private roots: () => THREE.Object3D[]) { this.ray.far = 40; this.ray.camera = new THREE.PerspectiveCamera(); }
   test(x: number, y: number, z: number): boolean {
     const now = performance.now();
@@ -34,7 +34,7 @@ export class CoverProbe {
     this.last = now; this.at.set(x, y, z);
     this.ray.set(this.at, this.up);
     const roots = this.roots();
-    this.covered = roots.length > 0 && this.ray.intersectObjects(roots, true).some((h) => h.object.visible && !(h.object.userData as { cameraTransparent?: boolean }).cameraTransparent);
+    this.covered = roots.length > 0 && this.ray.intersectObjects(roots, true).some((h) => h.object.visible && !(h.object as THREE.Sprite).isSprite && !(h.object.userData as { cameraTransparent?: boolean }).cameraTransparent);
     return this.covered;
   }
 }
