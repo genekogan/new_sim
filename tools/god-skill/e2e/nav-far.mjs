@@ -99,10 +99,10 @@ try {
   }, (r) => /1800×1000/.test(r.out) && r.extent[2] === 1300);
   let hut;
   await step('L2 the god builds a hut on the new land, 950 m east, and plants a flag at its door', async () => {
-    let a = await god('place', 'hut', '--at', '950,12', '--facing', '0,12', '--name', 'far-hut');
-    if (!okText(a)) a = await god('place', 'roundhouse', '--at', '950,12', '--facing', '0,12', '--name', 'far-hut');
+    let a = await god('place', 'hut', '--at', '950,12', '--facing', '0,12', '--name', 'east-hut');
+    if (!okText(a)) a = await god('place', 'roundhouse', '--at', '950,12', '--facing', '0,12', '--name', 'east-hut');
     const b = await god('flag', 'Far Hut', '--at', '942,12');
-    hut = (await api('/v1/god/snapshot', { token: godToken })).data.entities.find((e) => e.name === 'far-hut');
+    hut = (await api('/v1/god/snapshot', { token: godToken })).data.entities.find((e) => e.name === 'east-hut');
     return { a: a.raw.slice(0, 220), b: b.raw.slice(0, 200), ok: okText(a) && okText(b), hut: hut && { def: hut.def, p: hut.p } };
   }, (r) => r.ok && r.hut);
   await step('W1 Ana\'s agent sends her to the hut (walk:flag-far-hut, ~950 m: beyond the old 384 m window)', async () => {
