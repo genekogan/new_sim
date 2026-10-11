@@ -1,0 +1,38 @@
+# Lane BLOBS (2026-10-11): static blobs answered on eden2 instead of the laptop tunnel.
+# /blobs/assets/<sha[0:2]>/<sha>.<ext> is content-addressed (CATALOG-PROGRAM layout): immutable for a year.
+# Un-hashed legacy names (/browser, /modular, /mars-assets, /world-assets) are answered here ONLY when the exact
+# verified bytes are staged in /srv/sim-blobs/legacy; every other path falls through to the laptop as before.
+# /srv/sim-blobs/www/blobs is a symlink to /srv/sim-blobs; only /blobs/assets/* is reachable through it.
+(blobs) {
+  @blobs_hashed {
+    path /blobs/assets/*
+    file {
+      root /srv/sim-blobs/www
+    }
+  }
+  handle @blobs_hashed {
+    root * /srv/sim-blobs/www
+    header Cache-Control "public, max-age=31536000, immutable"
+    header Access-Control-Allow-Origin "*"
+    file_server {
+      precompressed br zstd gzip
+    }
+  }
+  handle /blobs/* {
+    header Cache-Control "no-store"
+    respond 404
+  }
+  @blobs_legacy {
+    path /browser/* /modular/* /mars-assets/* /world-assets/*
+    file {
+      root /srv/sim-blobs/legacy
+    }
+  }
+  handle @blobs_legacy {
+    root * /srv/sim-blobs/legacy
+    header Cache-Control "public, max-age=600"
+    file_server {
+      precompressed br zstd gzip
+    }
+  }
+}
