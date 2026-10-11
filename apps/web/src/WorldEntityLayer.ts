@@ -118,7 +118,7 @@ export class WorldEntityLayer {
       for (const e of d.diff.upserts) { if (this.model.entities.has(e.id)) this.model.delete(e.id); this.model.insert(e); }
       for (const e of d.diff.upserts) { const def = this.model.resolvedDef(e.def); if (def?.layer === 'solid') { try { this.model.index(e.id, this.model.footprint(e, def)); } catch { /* best effort */ } } }
       if ((d.diff as { constants?: WorldModel['constants'] }).constants) this.model.constants = (d.diff as { constants?: WorldModel['constants'] }).constants!;   // GOD-ENV: the world grew
-      if (d.ground) { const grew = JSON.stringify(d.ground.extent) !== JSON.stringify(this.model.ground().extent); this.model.terrain = new Terrain(d.ground); this.rebuildTerrain(new Set(d.diff.tiles)); this.rebuildWater(); if (grew) this.buildHorizon(); }
+      if (d.ground) { const grew = JSON.stringify(d.ground.extent) !== JSON.stringify(this.model.ground().extent); this.model.terrain = sameBase(this.model.ground(), d.ground) ? this.model.terrain.retile(d.ground, d.diff.tiles) : new Terrain(d.ground); this.rebuildTerrain(new Set(d.diff.tiles)); this.rebuildWater(); if (grew) this.buildHorizon(); }
       if (d.diff.world) { const before = JSON.stringify((this.model.state as { ground?: unknown }).ground ?? null); this.model.state = { ...this.model.state, ...d.diff.world } as WorldModel['state']; if (JSON.stringify((this.model.state as { ground?: unknown }).ground ?? null) !== before) this.rebuildTerrain(); }
       for (const e of d.diff.upserts) this.draw(e, true);
       // children ride with a moved parent: refresh their targets without easing
@@ -253,7 +253,9 @@ export class WorldEntityLayer {
     }
     for (const [key, mesh] of this.sectors) if (!wanted.has(key)) { this.terrainGroup.remove(mesh); mesh.geometry.dispose(); this.sectors.delete(key); }
     // things settle on the new ground: refresh poses of root entities (no easing)
-    if (onlyTiles) for (const e of m.entities.values()) if (e.in.parent === 'world') this.draw(e, false, !!this.drawn.get(e.id)?.world);
+    // lane PERF2: world builders (roads, areas, scatters that drape on the ground) are rebuilt only when their shape reaches a
+    // re-baked tile; a hill raised in one corner no longer rebuilds every forest and road in the world
+    if (onlyTiles) for (const e of m.entities.values()) if (e.in.parent === 'world') { const world = !!this.drawn.get(e.id)?.world; this.draw(e, false, world && reachesTiles(e, onlyTiles)); }
   }
   private sectorMesh(sx: number, sz: number, t: [number, number, number, number]): THREE.Mesh {
     const m = this.model!;
@@ -403,6 +405,21 @@ function labelSprite(text: string): THREE.Sprite {
 const _pl = new THREE.Vector3(), _pr = new THREE.Vector3(), _v3 = new THREE.Vector3();
 /** Still in a scene graph (a re-created figure leaves its old holder detached). */
 function attached(o: THREE.Object3D): boolean { let p: THREE.Object3D | null = o; for (let i = 0; p && i < 64; i++) { if (p.type === 'Scene') return true; p = p.parent; } return false; }
+/** Lane PERF2: two grounds differ only in landforms, waters or extent (what a world diff's tile list covers), so baked
+ *  tiles outside that list stay valid. A change to anything else (base, noise) re-bakes everything. */
+function reachesTiles(e: Entity, tiles: Set<string>): boolean {
+  const sh = e.shape as { path?: [number, number][]; area?: [number, number][] } | undefined;
+  const pts = sh?.area ?? sh?.path; if (!pts?.length) return true;
+  let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+  for (const [x, z] of pts) { if (x < x0) x0 = x; if (z < z0) z0 = z; if (x > x1) x1 = x; if (z > z1) z1 = z; }
+  const pad = 16;   // road and river widths, verges and scatter jitter reach past the centre line
+  for (const k of tiles) { const [tx, tz] = k.split(',').map(Number); if (tx * TILE_M <= x1 + pad && (tx + 1) * TILE_M >= x0 - pad && tz * TILE_M <= z1 + pad && (tz + 1) * TILE_M >= z0 - pad) return true; }
+  return false;
+}
+function sameBase(a: Ground, b: Ground): boolean {
+  const rest = (g: Ground) => JSON.stringify({ ...g, landforms: undefined, waters: undefined, extent: undefined, _ordered: undefined });
+  return rest(a) === rest(b);
+}
 function applyTilt(obj: THREE.Object3D, e: Entity) { if (Array.isArray(e.r)) { obj.rotation.x = e.r[1]; obj.rotation.z = e.r[2]; } }
 function disposeObject(o: THREE.Object3D) { o.traverse((c) => { const m = c as THREE.Mesh; if ((m as unknown as THREE.InstancedMesh).isInstancedMesh) (m as unknown as THREE.InstancedMesh).dispose(); }); }
 const num = (v: unknown, d: number) => (typeof v === 'number' ? v : d);

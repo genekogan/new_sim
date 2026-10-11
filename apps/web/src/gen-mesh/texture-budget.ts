@@ -34,6 +34,15 @@ export async function compileModel(g: GLTF): Promise<void> {
   g.scene.traverse((o) => { const m = (o as THREE.Mesh).material; if (m) for (const x of Array.isArray(m) ? m : [m]) mats.add(x); });
   await waitForPrograms(r, mats, () => renderer === r);
 }
+/** Same for a loose object (not in the scene; compiled against the scene's lights), e.g. a new InstancedMesh pool whose
+ *  USE_INSTANCING variant would otherwise compile on the frame that first draws it (lane PERF2). */
+export async function compileObject(o: THREE.Object3D): Promise<void> {
+  const r = renderer; if (!r || !scene || !camera) return;
+  try { r.compile(o, camera, scene); } catch { return; }
+  const mats = new Set<THREE.Material>();
+  o.traverse((x) => { const m = (x as THREE.Mesh).material; if (m) for (const y of Array.isArray(m) ? m : [m]) mats.add(y); });
+  await waitForPrograms(r, mats, () => renderer === r);
+}
 type ProgramsOf = { properties: { get(m: object): unknown } };
 /** Resolve once every material's program reports ready, or when it cannot tell (no program: a disposed renderer), when
  *  the renderer is no longer current, or after `timeoutMs`. Never throws, never waits forever. */
