@@ -11,8 +11,8 @@ import { describeEdit, steps, type Step } from './god-ui/checklist.ts';
 import { flyTo } from './god-ui/camera.ts';
 import { previewGhost, type GhostSummary } from './WorldPreviewGhost.ts';
 import { useSession } from './auth-session.ts';
-import { ApprovalCard, JoinPanel } from './god-ui/JoinPanel.tsx';
-import { approvalFromHash, landingHash } from './god-ui/join-api.ts';
+import { ApprovalCard, JoinPanel, useSoulsHere } from './god-ui/JoinPanel.tsx';
+import { approvalFromHash, landingHash, SOULS_EVENT, type SoulsAsk } from './god-ui/join-api.ts';
 import './god-ui/god-panel.css';
 
 type Tab = 'start' | 'edits' | 'flags' | 'previews' | 'souls';
@@ -107,6 +107,22 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
   const undoGroup = (group: string) => run('g:' + group, () => G.undoGroup(group), (r) => { const x = r as G.UndoResult; return x.accepted ? `Undid group “${group}” (${Array.isArray(x.reverted) ? x.reverted.length : 1} edits).` : (x.failures?.[0]?.detail ?? 'nothing undone'); });
 
   const signedIn = session.authed && !!status && status.you !== 'anonymous';
+  // the header's "New Soul" / Souls count (new worlds, Shell.tsx): open the panel on the New Soul form or the list;
+  // signed out, New Soul starts the sign-in first (the form follows once signed in)
+  const souls = useSoulsHere();
+  const [soulsAsk, setSoulsAsk] = useState<{ what: SoulsAsk; n: number } | null>(null);
+  const askRef = useRef({ owner, signedIn, hasOwner: !!status?.hasOwner, signIn });
+  askRef.current = { owner, signedIn, hasOwner: !!status?.hasOwner, signIn };
+  useEffect(() => {
+    const on = (e: Event) => {
+      const what = (e as CustomEvent<SoulsAsk>).detail === 'list' ? 'list' : 'new', a = askRef.current;
+      setOpen(true);
+      if (a.owner) setTab('souls');
+      if (what === 'new' && !a.signedIn && a.hasOwner) a.signIn();
+      setSoulsAsk((x) => ({ what, n: (x?.n ?? 0) + 1 }));
+    };
+    window.addEventListener(SOULS_EVENT, on); return () => window.removeEventListener(SOULS_EVENT, on);
+  }, []);
   const checklist: Step[] = useMemo(() => steps({ status, signedIn, edits, flags: flags.length, approvedHere, agentSeen: !!launcher?.seen.agentSeenAt, looks: launcher?.seen.looks ?? 0 }), [status, signedIn, edits, flags.length, approvedHere, launcher]);
   const done = checklist.filter((s) => s.done).length;
   const paired = !!checklist.find((s) => s.id === 'pair')?.done;
@@ -154,7 +170,7 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
               : <>{!isNew && <p>This world has no god yet. Sign in to claim it; your agent will build it.</p>}{signInButton}{signInForm}</>}
           </div>
         )}
-        {status.hasOwner && !owner && <JoinPanel signedIn={signedIn} worldName={name} base={status.base} owner={false}
+        {status.hasOwner && !owner && <JoinPanel signedIn={signedIn} worldName={name} base={status.base} owner={false} ask={soulsAsk}
           signIn={<>{signInButton}{signInForm}</>}
           account={status.you === 'visitor' ? <span className="gp-dim">Signed in as <b>{who}</b> {session.mode === 'dev' ? <button className="gp-mini" onClick={signIn}>switch name</button> : <button className="gp-mini" onClick={() => void session.logout()}>sign out</button>}</span> : null} />}
 
@@ -180,7 +196,7 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
             <div className="gp-tabs" role="tablist">
               {(['start', 'edits', 'flags', 'previews', 'souls'] as Tab[]).map((t) => (
                 <button key={t} role="tab" aria-selected={tab === t} data-tab={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
-                  {t === 'start' ? <>Start <span className="gp-count">{done}/{checklist.length}</span></> : t === 'edits' ? <>Edits</> : t === 'flags' ? <>Flags <span className="gp-count">{flags.length}</span></> : t === 'souls' ? <>Souls</> : <>Previews{previews.length ? <span className="gp-count">{previews.length}</span> : null}</>}
+                  {t === 'start' ? <>Start <span className="gp-count">{done}/{checklist.length}</span></> : t === 'edits' ? <>Edits</> : t === 'flags' ? <>Flags <span className="gp-count">{flags.length}</span></> : t === 'souls' ? <>Souls <span className="gp-count">{souls.length}</span></> : <>Previews{previews.length ? <span className="gp-count">{previews.length}</span> : null}</>}
                 </button>
               ))}
             </div>
@@ -204,7 +220,7 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
               </div>
             )}
 
-            {tab === 'souls' && <div className="gp-pane" data-souls-tab="1"><JoinPanel signedIn={signedIn} worldName={name} base={status.base} owner /></div>}
+            {tab === 'souls' && <div className="gp-pane" data-souls-tab="1"><JoinPanel signedIn={signedIn} worldName={name} base={status.base} owner ask={soulsAsk} /></div>}
 
             {tab === 'edits' && (
               <div className="gp-pane" data-edits="1">
