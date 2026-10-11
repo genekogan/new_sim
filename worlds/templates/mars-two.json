@@ -120,6 +120,28 @@
       54.506
      ],
      "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-tool-library-stair@1",
+     "name": "tool-library-stair",
+     "p": [
+      -9.341,
+      0,
+      -50.868
+     ],
+     "r": -0.21
+    },
+    {
+     "op": "place",
+     "def": "core/mars-mimos-front-glazing@1",
+     "name": "mimos-front-glazing",
+     "p": [
+      45.22,
+      0,
+      1.94
+     ],
+     "r": 0
     }
    ]
   },

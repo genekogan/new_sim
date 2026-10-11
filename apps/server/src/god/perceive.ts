@@ -17,6 +17,7 @@ import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import { actuatedState, kindActions, wrapAct } from './actuators.ts';
 import { economyOn } from './layers.ts';
+import { supportY } from './nav.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -150,7 +151,7 @@ export class GodPerceive {
       const kind = shortDef(def), parent = e.in.parent !== 'world' ? m.entities.get(e.in.parent) : undefined;
       const name = e.name ? m.pathOf(e.id) : `${kind} ${e.id.slice(2, 6)}`;
       const near = this.h.namesNear(at, e.id).filter((n) => n !== name).slice(0, 2);
-      const level = this.h.levelAt ? this.h.levelAt(at[0], at[1], this.h.model.worldPose(e).y) : 0;
+      const level = this.h.levelAt ? this.h.levelAt(at[0], at[1], supportY(this.h.model, e)) : 0;
       placed.set(e.id, { place: this.h.places?.ofEntity(e.id)?.id ?? this.h.places?.placeAt(at, level) ?? null, level });
       const what = `${article(kind)}${parent?.name ? ` in ${m.pathOf(parent.id)}` : ''}${near.length ? `, by ${near.join(' and ')}` : ''}${lay ? `; ${lay}` : ''}`;
       const wp0 = m.worldPose(e), front: Vec2 | null = acts ? [Math.round((at[0] + Math.sin(wp0.yaw) * (0.6 + def.size.box[2] * (wp0.s || 1) / 2)) * 100) / 100, Math.round((at[1] + Math.cos(wp0.yaw) * (0.6 + def.size.box[2] * (wp0.s || 1) / 2)) * 100) / 100] : null;
