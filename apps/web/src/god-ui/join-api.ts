@@ -10,13 +10,11 @@ export type MySoul = { id: string; name: string; entityId: string; hasToken: boo
 export type SoulHere = { id: string; entityId: string; name: string; since: number; active: boolean; p?: [number, number, number] };
 export type Approval = { id: string; worldId: string; agentLabel: string; name: string; description: string; mode: 'create' | 'repair'; status: 'pending' | 'creating' | 'ready' | 'refused' | 'cancelled' | 'expired'; soulId: string | null; expiresAt: number };
 
-/** The signed-in person's Souls in this world and main's per-account limit (MAX_SOULS_PER_USER); null when nobody is
- *  signed in (or the world refuses them). */
-export async function myAccount(): Promise<{ souls: MySoul[]; max: number } | null> {
+/** The signed-in person's Souls in this world; null when nobody is signed in (or the world refuses them). */
+export async function mySouls(): Promise<MySoul[] | null> {
   const headers = await userAuthHeaders(); if (!headers.authorization) return null;
-  try { const r = await fetch(apiPath('/v1/me'), { headers, cache: 'no-store' }); if (!r.ok) return null; const d = await r.json() as { souls?: MySoul[]; maxSouls?: number }; return { souls: d.souls ?? [], max: typeof d.maxSouls === 'number' ? d.maxSouls : 5 }; } catch { return null; }
+  try { const r = await fetch(apiPath('/v1/me'), { headers, cache: 'no-store' }); if (!r.ok) return null; const d = await r.json() as { souls?: MySoul[] }; return d.souls ?? []; } catch { return null; }
 }
-export async function mySouls(): Promise<MySoul[] | null> { return (await myAccount())?.souls ?? null; }
 /** Everyone who lives here (public). */
 export async function soulsHere(): Promise<SoulHere[]> {
   try { const r = await fetch(apiPath('/v1/world/souls'), { cache: 'no-store' }); return r.ok ? ((await r.json()) as { souls: SoulHere[] }).souls : []; } catch { return []; }
@@ -47,20 +45,3 @@ export const reconnectPrompt = (base: string, worldName: string, soul: { id: str
   `Read ${base}/SKILL.md and follow its Soul mode section: reconnect my Soul "${soul.name}" (${soul.id}) in the Eden world "${worldName}". Show me the approval link and I'll approve it.`;
 /** The link a god shares so friends land on the Join section. */
 export const joinLink = (base?: string) => `${worldUrl(base)}/#join`;
-
-/** The header's "New Soul" and Souls count (Shell.tsx, new worlds only) ask the god panel to open its New Soul form or
- *  the list of Souls here. A window event, so the shell needs no handle on the panel. */
-export type SoulsAsk = 'new' | 'list';
-export const SOULS_EVENT = 'sim:souls';
-export const askSouls = (what: SoulsAsk) => window.dispatchEvent(new CustomEvent<SoulsAsk>(SOULS_EVENT, { detail: what }));
-
-/** Who lives here, one shared poll for every reader on the page (header count, panel tab, list). */
-let shared: SoulHere[] = [];
-const readers = new Set<(s: SoulHere[]) => void>();
-let poll: ReturnType<typeof setInterval> | null = null;
-export async function refreshSoulsHere() { shared = await soulsHere(); for (const r of readers) r(shared); return shared; }
-export function watchSoulsHere(reader: (s: SoulHere[]) => void) {
-  readers.add(reader); reader(shared);
-  if (!poll) { void refreshSoulsHere(); poll = setInterval(() => void refreshSoulsHere(), 5000); }
-  return () => { readers.delete(reader); if (!readers.size && poll) { clearInterval(poll); poll = null; } };
-}

@@ -13,8 +13,10 @@ import { animate, hasMotion } from './gen-mesh/motion.ts';
 import { EntityInstancer, instanceable } from './EntityInstancer.ts';
 import { terrainColorFor } from './gen-mesh/ground-palette.ts';
 import { waterMaterial, waterMesh } from './gen-mesh/water.ts';
+import { assetUrl } from './gen-mesh/gltf-assets.ts';
+import { assetBytes } from './asset-bytes.ts';
 
-type Snapshot = { contract: string; worldId: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[]; tiles: Record<string, string> };
+type Snapshot = { contract: string; worldId: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[]; tiles: Record<string, string>; assetBytes?: Record<string, number> };
 type DiffMsg = { type: 'edge'; kind: 'world-diff'; seq: number; diff: { upserts: Entity[]; removes: string[]; defs: StoredDef[]; tiles: string[]; world?: Partial<WorldModel['state']> }; ground?: Ground; defs?: StoredDef[] };
 
 const SECTOR_TILES = 4;              // 4×4 tiles (256 m) per terrain mesh
@@ -79,6 +81,7 @@ export class WorldEntityLayer {
     let snap: Snapshot;
     try { const r = await fetch(this.api('/v1/world/snapshot'), { signal }); if (!r.ok) return; snap = await r.json(); } catch { return; }
     if (signal.aborted || snap.contract !== 'world/1') return;
+    assetBytes.expect(Object.fromEntries(Object.entries(snap.assetBytes ?? {}).map(([sha, n]) => [assetUrl(sha), n])));  // the loading bar's total
     this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground });
     this.seq = snap.seq;
     this.active = true;

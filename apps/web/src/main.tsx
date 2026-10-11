@@ -12,6 +12,13 @@ import {clerkHomeRoute,clerkOriginRoute,unsignedPreviewAuth} from './auth-ui.ts'
 // New worlds (world launcher, world engine): the launcher homepage and its sign-in. Old worlds never reach these.
 import { LauncherHome, type LauncherList } from './god-ui/LauncherHome.tsx';
 import {publishSession,type Session} from './auth-session.ts';
+// The arrival card's bar counts bytes: meter every asset fetch from the start; old worlds know their total up front.
+// (old worlds: initial-assets.json, made at release time by apps/web/scripts/initial-assets.mjs; a world without an
+// entry still counts in bytes, its total growing from each Content-Length; new worlds: the snapshot's assetBytes)
+import {assetBytes,installAssetMeter} from './asset-bytes.ts';
+import initialAssets from './initial-assets.json';
+import {newWorld} from './world-kind.ts';
+installAssetMeter();if(!newWorld)assetBytes.expect((initialAssets as {worlds?:Record<string,Record<string,number>>}).worlds?.[worldKey]??{});
 
 // Presentation gate only. Exact reviewed candidate builds may enable it;
 // current-owner capability/readiness and server authority remain mandatory.

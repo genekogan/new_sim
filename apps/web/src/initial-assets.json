@@ -1,0 +1,38 @@
+{
+ "contract": "initial-assets/1",
+ "origin": "https://sim.eden.art (read through a local read-only candidate server)",
+ "at": "2026-10-11T05:49:14.419Z",
+ "worlds": {
+  "eden": {
+   "/modular/environment/animated-casual.glb": 1857308,
+   "/modular/environment/animated-punk.glb": 1807856,
+   "/modular/environment/animated-woman.glb": 1917076,
+   "/modular/environment/eden-animals.glb": 1065648,
+   "/modular/environment/eden-boats-bikes.glb": 76784,
+   "/modular/environment/eden-crops.glb": 288184,
+   "/modular/environment/eden-food.glb": 64316,
+   "/modular/environment/eden-interior.glb": 3880,
+   "/modular/environment/eden-nature.glb": 397780
+  },
+  "mars": {
+   "/browser/campus.glb": 70772556,
+   "/modular/environment/animated-casual.glb": 1857308,
+   "/modular/environment/animated-punk.glb": 1807856,
+   "/modular/environment/animated-woman.glb": 1917076
+  },
+  "littlemartians": {
+   "/mars-assets/draco/draco_decoder.wasm": 192420,
+   "/modular/environment/animated-casual.glb": 1857308,
+   "/modular/environment/animated-punk.glb": 1807856,
+   "/modular/environment/animated-woman.glb": 1917076,
+   "/world-assets/littlemartians/buildings/ceramic-tower.glb": 1093356,
+   "/world-assets/littlemartians/buildings/minaret-temple.glb": 830800,
+   "/world-assets/littlemartians/characters/kin/chebel.glb": 759124,
+   "/world-assets/littlemartians/characters/kin/colors-lemuet.glb": 1148980,
+   "/world-assets/littlemartians/characters/kin/crystal-freeman.glb": 892012,
+   "/world-assets/littlemartians/characters/kin/dark-blue.glb": 1101080,
+   "/world-assets/littlemartians/characters/kin/green-brains-out.glb": 1107956,
+   "/world-assets/littlemartians/characters/kin/green-patterns-blue.glb": 927776
+  }
+ }
+}
