@@ -62,7 +62,7 @@ export class EngineBridge {
   constructor(o: BridgeOptions) {
     this.host = o.host; this.god = o.god; this.edge = o.edge; this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
     this.nav = new GodNav({ model: this.god.model, version: () => this.version, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e) });
-    this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), log: (m) => this.log(m) });
+    this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), things: () => this.nav.things(), log: (m) => this.log(m) });
     this.god.onCommit((c) => { this.version++; if (c.by !== 'engine') this.onCommit(c.diff); });
     this.host.listeners.push({
       afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); if (tick % 20 === 5) this.perceiveSync(); } },

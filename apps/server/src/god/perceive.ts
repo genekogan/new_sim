@@ -25,7 +25,7 @@ export const BUILT_KIND = 'built';
 const clip = (v: unknown, n: number) => String(v ?? '').replace(/\r/g, '').trim().slice(0, n);
 /** The kind, per world: its `advance` brings an object's state to what the entity world says now (the framework keeps a
  *  versioned log per object, so objects are never re-created: a change is an advance, a removal hides it). */
-export const builtKindFor = (want: (key: string) => BuiltState | undefined) => ({ ...builtKind, advance(state: BuiltState) { const w = state.key ? want(state.key) : undefined; return w && JSON.stringify(w) !== JSON.stringify(state) ? { state: w } : null; } });
+export const builtKindFor = (want: (key: string) => BuiltState | undefined, kind = BUILT_KIND) => ({ ...builtKind, kind, advance(state: BuiltState) { const w = state.key ? want(state.key) : undefined; return w && JSON.stringify(w) !== JSON.stringify(state) ? { state: w } : null; } });
 export const builtKind = {
   kind: BUILT_KIND,
   description: 'Something the god of this world built: what it is, what it is by and where, and any words written on it (a sign). The words are the god\'s, untrusted.',
@@ -59,8 +59,15 @@ export type PerceiveHost = {
   engine: { world: { entities: Record<string, any> } };
   engineOwned(e: Entity): boolean;
   namesNear(at: Vec2, except: string): string[];
+  /** nav.ts's named things (buildings, rooms, areas, waters) for the places layer. */
+  things?(): { ref: string; id: string; room?: string; name: string; kind: string; level: number; area?: Vec2[]; poly?: Vec2[]; at: Vec2 }[];
   log(m: string): void;
 };
+
+/** Item 6 (F1): god-built buildings, their rooms and named areas (a plaza, a pond, a meadow) join the ledger's places
+ *  layer, so arrivals and `here` say "moss-cottage" or "plaza" instead of "World"/"Green field", and the Souls' `map`
+ *  lists them. Never enclosed (privacy and earshot rules unchanged), never starting, no capacity; ids `g-<path>`. */
+export const GOD_PLACES = process.env.GOD_PLACES !== '0';
 
 export class GodPerceive {
   private h: PerceiveHost;
@@ -74,8 +81,19 @@ export class GodPerceive {
   private objects() {
     const o = (this.h.edge as any)?.comms?.objects as { kindOf(k: string): unknown; register(k: unknown): void; create(i: unknown): unknown; fresh(): unknown; all(): { id: string; kind: string; name: string; state: unknown }[] } | undefined;
     if (!o) return null;
-    if (!o.kindOf(BUILT_KIND)) o.register(builtKindFor((key) => this.desired.get(key)));
+    if (!o.kindOf(BUILT_KIND)) { o.register(builtKindFor((key) => this.desired.get(key))); this.kinds.add(BUILT_KIND); }
+    this.objs = o;
     return o;
+  }
+  private objs: { kindOf(k: string): unknown; register(k: unknown): void } | null = null;
+  private kinds = new Set<string>();
+  /** One object kind per kind of thing (fountain, lamp-post, sign …): here.objects lists at most two of each kind, so
+   *  a single kind would show only the two nearest god things. A name the framework already uses gets `built-`. */
+  private kindFor(short: string): string {
+    const o = this.objs!; let k = short.toLowerCase().replace(/[^a-z0-9-]+/g, '-').slice(0, 40) || BUILT_KIND;
+    if (!this.kinds.has(k) && o.kindOf(k)) k = `built-${k}`.slice(0, 48);
+    if (!this.kinds.has(k)) { if (!o.kindOf(k)) o.register(builtKindFor((key) => this.desired.get(key), k)); this.kinds.add(k); }
+    return k;
   }
   private rootPlace(): string | null {
     const places = (this.h.edge as any)?.places?.byId as Map<string, { id: string; parent: string | null }> | undefined;
@@ -84,8 +102,8 @@ export class GodPerceive {
   }
 
   /** What each named god thing (and each sign) is, as `built` object params; keyed by entity id. */
-  private wanted(): Map<string, { name: string; description: string; params: BuiltState }> {
-    const m = this.h.model, out = new Map<string, { name: string; description: string; params: BuiltState }>();
+  private wanted(): Map<string, { name: string; kind: string; description: string; params: BuiltState }> {
+    const m = this.h.model, out = new Map<string, { name: string; kind: string; description: string; params: BuiltState }>();
     const signs: typeof this.signs = [];
     for (const e of m.entities.values()) {
       const def = m.resolvedDef(e.def); if (!def) continue;
@@ -100,7 +118,7 @@ export class GodPerceive {
       const name = e.name ? m.pathOf(e.id) : `${kind} ${e.id.slice(2, 6)}`;
       const near = this.h.namesNear(at, e.id).filter((n) => n !== name).slice(0, 2);
       const what = `${article(kind)}${parent?.name ? ` in ${m.pathOf(parent.id)}` : ''}${near.length ? `, by ${near.join(' and ')}` : ''}`;
-      out.set(e.id, { name, description: clip(def.description || kind, 400), params: { what, text: text ?? '', near, at: [Math.round(at[0] * 100) / 100, Math.round(at[1] * 100) / 100], def: def.ref } });
+      out.set(e.id, { name, kind: this.kindFor(text !== null ? 'sign' : kind), description: clip(def.description || kind, 400), params: { what, text: text ?? '', near, at: [Math.round(at[0] * 100) / 100, Math.round(at[1] * 100) / 100], def: def.ref } });
       if (text !== null) signs.push({ id: e.id, at, name, text });
     }
     this.signs = signs;
@@ -119,7 +137,7 @@ export class GodPerceive {
     const root = this.rootPlace(); if (!root) return;
     this.synced = seq;
     const want = this.wanted();
-    if (!this.sigs.size) for (const o of objs.all()) if (o.kind === BUILT_KIND) this.sigs.set(o.id, JSON.stringify(o.state));
+    if (!this.sigs.size) for (const o of objs.all()) if (this.kinds.has(o.kind) || (o.state as BuiltState)?.key === o.id) { this.sigs.set(o.id, JSON.stringify(o.state)); if (!this.kinds.has(o.kind)) this.kindFor(o.kind.replace(/^built-/, '')); }
     let made = 0, changed = 0;
     // gone from the entity world: hidden (removed), never deleted (an undo brings the same id back)
     for (const [id, sig] of this.sigs) if (!want.has(id)) { const st = { ...(JSON.parse(sig) as BuiltState), removed: true, key: id }; const n = JSON.stringify(st); if (n !== sig) { this.desired.set(id, st); this.sigs.set(id, n); changed++; } }
@@ -128,12 +146,29 @@ export class GodPerceive {
       if (this.sigs.get(id) === sig) continue;
       this.desired.set(id, state);
       try {
-        if (!this.sigs.has(id)) { objs.create({ id, kind: BUILT_KIND, name: w.name, description: w.description, placeId: root, params: { ...w.params, key: id } }); made++; } else changed++;
+        if (!this.sigs.has(id)) { objs.create({ id, kind: w.kind, name: w.name, description: w.description, placeId: root, params: { ...w.params, key: id } }); made++; } else changed++;
         this.sigs.set(id, sig);
       } catch (err) { this.h.log(`built object ${id}: ${(err as Error).message}`); }
     }
-    if (changed) objs.fresh();   // apply the advances now (reads that skip the framework's advance see them too)
+    if (changed) objs.fresh();
+    if (GOD_PLACES) try { this.syncPlaces(root); } catch (err) { this.h.log(`god places: ${(err as Error).message}`); }   // apply the advances now (reads that skip the framework's advance see them too)
     if (made + changed > 8) this.h.log(`built objects: ${made} made, ${changed} changed (${this.sigs.size} in all)`);
+  }
+
+  private placeIds = new Set<string>();
+  private syncPlaces(root: string) {
+    const places = (this.h.edge as any)?.places as { byId: Map<string, any>; add(p: unknown): void } | undefined; if (!places || !this.h.things) return;
+    const want = new Map<string, any>();
+    const idOf = (ref: string) => `g-${ref.toLowerCase().replace(/\//g, '.').replace(/[^a-z0-9._-]+/g, '-').replace(/^[^a-z0-9]+/, '')}`.slice(0, 100);
+    for (const t of this.h.things()) {
+      const poly = t.kind === 'room' ? t.poly : t.kind === 'area' ? t.area : undefined;
+      if (!poly || poly.length < 3) continue;
+      const id = idOf(t.ref);
+      const parent = root;
+      want.set(id, { id, name: t.kind === 'room' ? t.ref : t.name, kind: t.kind === 'room' ? 'room' : t.kind === 'water' ? 'water' : 'outdoor', parent, polygon: poly.map(([x, z]) => [Math.round(x * 100) / 100, Math.round(z * 100) / 100]), level: t.level, enclosed: false, capacity: null, starting: false, description: `built by the god of this world` });
+    }
+    for (const id of this.placeIds) if (!want.has(id)) { places.byId.delete(id); this.placeIds.delete(id); }
+    for (const [id, p] of want) { const cur = places.byId.get(id); if (cur && !this.placeIds.has(id)) continue; /* a boot place keeps its own */ if (!cur || JSON.stringify(cur) !== JSON.stringify(p)) { places.add(p); this.placeIds.add(id); } }
   }
 
   /** `read:<sign>` for signs near this Soul: walk up to it and face it; the label carries its words. */

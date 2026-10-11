@@ -191,6 +191,7 @@ const idOf = async (path) => (await entity(path)).entity?.id;
 // bank and the canoe moored alongside the jetty (the god's own last fix in the rehearsal).
 const FOUNTAIN = [0, -20], SIGN = [4, -12], COTTAGE = [-16, -20], JETTY_END = [16, 15.5];
 const built = [
+  ['place', 'plaza', '--rect', '0,-18,16,14', '--name', 'plaza'],
   ['place', 'fountain', '--at', '0,-20', '--name', 'fountain'],
   ['place', 'bench', '--near', 'fountain', '--count', '2', '--facing', 'fountain', '--dist', '2.5', '--name', 'plaza-bench'],
   ['place', 'lamp-post', '--near', 'fountain', '--dir', 'e', '--dist', '4', '--name', 'fountain-lamp'],
@@ -237,8 +238,13 @@ try {
   // ---- 1. the fountain: walk there, see it, look at it
   await step('S1 CLI: act "walk to the fountain" → she walks there', async () => {
     const a = await cli('act', 'walk to the fountain'); const r = await follow(a.data);
-    return { accepted: a.data?.accepted, resolved: a.data?.resolved?.to, phase: r.phase, dist: r.end ? +Math.hypot(r.end.p[0] - FOUNTAIN[0], r.end.p[2] - FOUNTAIN[1]).toFixed(2) : null };
+    const rec = (await api(`/v1/edge/receipts/${encodeURIComponent(a.data?.receipt?.id)}`, { as: 'soul' })).data?.receipt;
+    return { accepted: a.data?.accepted, resolved: a.data?.resolved?.to, phase: r.phase, dist: r.end ? +Math.hypot(r.end.p[0] - FOUNTAIN[0], r.end.p[2] - FOUNTAIN[1]).toFixed(2) : null, endedAt: rec?.endedAt?.placePath ?? rec?.endedAt?.place };
   }, (r) => r.accepted && r.phase === 'completed' && r.dist < 4);
+  await step('S1b item 6: her arrival names the god\'s plaza (it said "World"/"field"); the Souls\' map lists it', async () => {
+    const h = await cli('here'); const m = await cli('map');
+    return { placePath: h.data?.me?.placePath, map: JSON.stringify(m.data ?? m.raw ?? '').includes('plaza') };
+  }, (r) => (r.placePath ?? []).includes('plaza') && r.map);
   await step('S2 here.objects lists the fountain, its lamp and the welcome sign as things she sees (readable)', async () => {
     const r = await cli('here'); const objs = r.data?.objects ?? [];
     return { objects: objs.map((o) => `${o.kind}:${o.name}`), has: ['fountain', 'fountain-lamp', 'welcome-sign'].filter((n) => objs.some((o) => o.name === n)) };
@@ -261,15 +267,16 @@ try {
     const o = (await cli('object', ids['welcome-sign'])).data?.object;
     return { label: res.data?.would?.label, resolved: a.data?.resolved?.to ?? a.data?.receipt?.capability, phase: r.phase, text: o?.state?.text, dist: r.end ? +Math.hypot(r.end.p[0] - SIGN[0], r.end.p[2] - SIGN[1]).toFixed(2) : null };
   }, (r) => /Welcome to Party Hill/.test(r.label ?? '') && r.resolved === `read:${ids['welcome-sign']}` && r.phase === 'completed' && /Welcome to Party Hill/.test(r.text ?? '') && r.dist < 2.5);
-  { const p = f5?.result?.dist !== undefined ? (await observe()).self.position : null; if (p) await shots([{ name: 's5-reading-the-sign', eye: [p[0] + 2.5, p[1] + 2.2, p[2] + 4], at: [SIGN[0], 1, SIGN[1]], wait: 6000 }]); }
+  { const p = f5 ? (await observe()).self.position : null; if (p) await shots([{ name: 's5-reading-the-sign', eye: [p[0] + 2.5, p[1] + 2.2, p[2] + 4], at: [SIGN[0], 1, SIGN[1]], wait: 6000 }]); }
 
   // ---- 3. the cottage's living room (furnished + the god's extra chairs)
   const f6 = await step('S6 act walk:moss-cottage/living (furnished, two extra chairs, a hearth) → resolve and act agree; she ends inside the living room', async () => {
     const res = await cli('resolve', 'walk:moss-cottage/living');
     const a = (await api('/v1/edge/act', { as: 'soul', body: { capability: 'walk:moss-cottage/living' } })).data;
     const r = await follow(a, { maxS: 200 });
-    return { resolveOk: res.data?.ok, available: res.data?.would?.available, accepted: a.accepted, code: a.code ?? r.code, phase: r.phase, room: r.room };
-  }, (r) => r.accepted && r.phase === 'completed' && r.room?.building === 'moss-cottage' && r.room.room === 'living');
+    const placePath = (await cli('here')).data?.me?.placePath;
+    return { resolveOk: res.data?.ok, available: res.data?.would?.available, accepted: a.accepted, code: a.code ?? r.code, phase: r.phase, room: r.room, placePath };
+  }, (r) => r.accepted && r.phase === 'completed' && r.room?.building === 'moss-cottage' && r.room.room === 'living' && (r.placePath ?? []).includes('moss-cottage/living'));
   { const p = f6?.end?.p ?? (await observe()).self.position; if (p) await shots([{ name: 's6-in-the-living-room-roof-hidden', eye: [p[0] + 3, p[1] + 7, p[2] + 4], at: [p[0], p[1] + 0.8, p[2]], wait: 7000, hideRoofs: true }]); }
 
   // ---- 4. the jetty, then the canoe moored alongside it
