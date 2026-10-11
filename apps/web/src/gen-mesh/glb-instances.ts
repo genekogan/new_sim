@@ -11,16 +11,19 @@
 // `?inst=0` turns it off for A/B measurement. Old worlds never reach this (mesh.mesh.ts is the entity layer's).
 import * as THREE from 'three';
 import { compileObject } from './texture-budget.ts';
+import { trackShadowProxies } from './shadow-proxy.ts';
 
 export const GLB_INSTANCING = typeof location === 'undefined' || new URLSearchParams(location.search).get('inst') !== '0';
 
-type Part = { geometry: THREE.BufferGeometry; material: THREE.Material | THREE.Material[]; castShadow: boolean; receiveShadow: boolean };
+// mirror: the part's node is mirrored (negative determinant). three picks the front face from the InstancedMesh's own matrix,
+// not per instance, so such a part's InstancedMesh carries the mirror (scale.x = -1) and its instances undo it.
+type Part = { geometry: THREE.BufferGeometry; material: THREE.Material | THREE.Material[]; castShadow: boolean; receiveShadow: boolean; mirror: boolean };
 type Member = { holder: THREE.Object3D; locals: THREE.Matrix4[]; seen: Float32Array; shown: boolean; slot: number; plain?: THREE.Object3D };
 type Pool = { key: string; parts: Part[]; meshes: THREE.InstancedMesh[]; members: Member[]; capacity: number; ready: boolean; dirty: boolean; host: Host };
 type Host = { root: THREE.Object3D; group: THREE.Group; pools: Map<string, Pool>; solos: Map<string, { holder: THREE.Object3D; object: THREE.Object3D }>; frame: number };
 
 const hosts = new WeakMap<THREE.Object3D, Host>();
-const ZERO = new THREE.Matrix4().makeScale(0, 0, 0);
+const ZERO = new THREE.Matrix4().makeScale(0, 0, 0), MIRROR = new THREE.Matrix4().makeScale(-1, 1, 1);
 const _m = new THREE.Matrix4(), _inv = new THREE.Matrix4(), _s = new THREE.Sphere(), _s2 = new THREE.Sphere();
 
 /** Top ancestor below the Scene, and the Scene; null while the holder is not in a scene. */
@@ -72,7 +75,8 @@ export function adoptInstance(sha: string, holder: THREE.Object3D, object: THREE
       return;
     }
     host.solos.delete(key);
-    pool = { key, parts: meshes.map((m) => ({ geometry: m.geometry, material: m.material, castShadow: m.castShadow, receiveShadow: m.receiveShadow })), meshes: [], members: [], capacity: 0, ready: false, dirty: true, host };
+    holder.updateWorldMatrix(true, true);
+    pool = { key, parts: meshes.map((m) => ({ geometry: m.geometry, material: m.material, castShadow: m.castShadow, receiveShadow: m.receiveShadow, mirror: m.matrixWorld.determinant() < 0 })), meshes: [], members: [], capacity: 0, ready: false, dirty: true, host };
     host.pools.set(key, pool); allPools.add(pool);
     for (const g of pool.parts) g.geometry.boundingSphere ?? g.geometry.computeBoundingSphere();
     grow(pool, 4);
@@ -80,6 +84,7 @@ export function adoptInstance(sha: string, holder: THREE.Object3D, object: THREE
     compileObject(warm).finally(() => {
       if (host.pools.get(key) !== p) return;
       for (const m of p.meshes) host.group.add(m);
+      trackShadowProxies(host.group);
       for (const mem of p.members) { mem.plain?.removeFromParent(); mem.plain = undefined; }
       p.ready = true; p.dirty = true;
     });
@@ -111,10 +116,11 @@ function grow(pool: Pool, capacity: number) {
   const old = pool.meshes;
   pool.meshes = pool.parts.map((part, k) => {
     const m = new THREE.InstancedMesh(part.geometry, part.material, capacity);
+    if (part.mirror) m.scale.x = -1;
     m.castShadow = part.castShadow; m.receiveShadow = part.receiveShadow; m.name = `glb-instances:${pool.key.slice(0, 8)}:${k}`;
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.count = 0;
     if (old[k]) { old[k].removeFromParent(); old[k].dispose(); }
-    if (pool.ready) pool.host.group.add(m);
+    if (pool.ready) { pool.host.group.add(m); trackShadowProxies(m); }
     return m;
   });
   pool.capacity = capacity;
@@ -134,7 +140,7 @@ function sync(pool: Pool) {
     if (same) for (let i = 0; i < 16; i++) if (mem.seen[i] !== e[i]) { same = false; break; }
     if (same) continue;
     mem.seen.set(e); mem.shown = true; changed = true;
-    for (let k = 0; k < pool.meshes.length; k++) { _m.multiplyMatrices(_inv, mem.holder.matrixWorld).multiply(mem.locals[k]); pool.meshes[k].setMatrixAt(mem.slot, _m); }
+    for (let k = 0; k < pool.meshes.length; k++) { _m.multiplyMatrices(_inv, mem.holder.matrixWorld).multiply(mem.locals[k]); if (pool.parts[k].mirror) _m.premultiply(MIRROR); pool.meshes[k].setMatrixAt(mem.slot, _m); }
   }
   if (!changed) return;
   pool.dirty = false;

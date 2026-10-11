@@ -15,6 +15,7 @@ import { bindMotionModel, makeRig, type Gait } from './motion.ts';
 import { seedOf, type BehaviorKind } from './creatures/behavior.ts';
 import { adoptInstance, GLB_INSTANCING } from './glb-instances.ts';
 import { lookKey } from './vocab-look.ts';
+import { trackShadowProxies } from './shadow-proxy.ts';
 
 const HIDE_ROOFS = typeof location !== 'undefined' && new URLSearchParams(location.search).has('hideRoofs') && new URLSearchParams(location.search).get('hideRoofs') !== '0';
 const MOVING = new Set(['wander', 'graze', 'fly', 'swim', 'follow']);
@@ -56,6 +57,7 @@ const meshBuilder: MeshBuilder = {
       // a hair towards the camera (the materials are shared per asset, so every copy of it gets the same)
       if (ctx.def.size.box[1] <= 0.06) inst.object.traverse((o) => { const mats = (o as THREE.Mesh).material; for (const m of Array.isArray(mats) ? mats : mats ? [mats] : []) { m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -4; } });
       holder.add(inst.object); assetShown(make.asset);
+      trackShadowProxies(inst.object);   // lane PERF2: its one shadow caster draws only in the shadow pass (shadow-proxy.ts)
       // lane PERF2: repeated static copies (no clips, no roof to hide, no motion rig, no look) share one InstancedMesh per
       // part (glb-instances.ts); the holder stays the anchor the layer eases, carries and removes
       if (GLB_INSTANCING && !inst.clips.length && !b && !lookKey(ctx) && !inst.object.getObjectByName('roof')) adoptInstance(make.asset, holder, inst.object);
