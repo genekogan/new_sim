@@ -490,3 +490,10 @@ Items with too little data are left alone, so the score never punishes something
 9. **G4 renders:** a few dollars of GPU is fine. G4 is a continuous gate, not a one-time event: every new or changed item
    is rendered and checked.
 10. **LAYERS fields:** keep them as inert fields, clearly marked inert, so coding agents don't treat them as live.
+
+### Follow-ups (Gene, 2026-10-11 ~20:20 UTC)
+- **Q2, licences:** our own assets are **CC0**. Restricted third-party assets still get recorded (licence and source) and
+  are kept from redistribution.
+- **Q9, G4:** spending on **Modal** GPUs to catch up the initial renders is approved. G4 then runs as a continuous gate.
+- **Delivery (raised by Gene):** move blobs to fast CDN storage with real caching. The first measurement: Mars's 67 MB
+  `/browser/campus.glb` comes from the laptop through the tunnel at ~3.9 MB/s (about 18 s) with no Cache-Control header.
