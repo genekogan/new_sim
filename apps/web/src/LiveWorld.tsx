@@ -220,6 +220,10 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.domElement.setAttribute('aria-label', 'Live 3D view of the world');
     renderer.domElement.style.display = 'block';
+    // The canvas fills its host. setSize(w, h, false) below sizes only the drawing buffer (w·dpr × h·dpr); without this the
+    // canvas is laid out at buffer size, so on a 2× (Retina) screen it is twice the window and only its top-left quarter
+    // shows: the view looks shifted/warped and the orbit centre sits at the bottom-right edge (Gene, 2026-10-11).
+    renderer.domElement.style.width = '100%'; renderer.domElement.style.height = '100%';
     host.appendChild(renderer.domElement);
     const onContextLost = (e: Event) => { e.preventDefault(); setGraphicsUnavailable('The 3D graphics context was lost.'); navigation?.release(); problem('The 3D view lost its graphics context; it will come back when the browser restores it.'); };
     const onContextRestored = () => setGraphicsUnavailable(null);
