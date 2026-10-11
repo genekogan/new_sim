@@ -200,8 +200,8 @@ try {
         await look(page, [70, 26, 70], [3, 22, -30]); await page.waitForTimeout(1500);
         await page.evaluate(() => window.__simLiving.holdLightning(9000));
         const n0 = (await page.evaluate(() => window.__simLiving.lightning())).heard;
-        const s = await god('strike', '--at', '6,-34');
-        const r = await waitFor(page, async () => { const l = await page.evaluate(() => window.__simLiving.lightning()); return { ok: l.heard > n0 && l.bolts > 0, ...l }; }, 15000, 100);
+        const t0 = Date.now(), s = await god('strike', '--at', '6,-34');
+        const r = await waitFor(page, async () => { const l = await page.evaluate(() => window.__simLiving.lightning()); return { ok: l.heard > n0 && l.bolts > 0 && l.last.some((h) => h.god && h.at >= t0), ...l }; }, 15000, 100);
         await page.waitForTimeout(200); await snap(page, `v2-bolt-plaza-${d}`);
         const last = r.last.find((h) => h.god) ?? r.last[r.last.length - 1];
         return { strike: s.raw, ...r, lastHeard: last };
