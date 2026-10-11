@@ -249,7 +249,9 @@ const clone = z.object({
 });
 const define = z.object({ op: z.literal('define'), def: defSchema });
 const world = z.object({ op: z.literal('world'), state: worldPatchSchema });
-const expand = z.object({ op: z.literal('expand'), extent: num.positive().max(16000) });
+/** Grow the world: `extent` = a centred square of that side (the original form); `bounds` = [x0, z0, x1, z1] metres, any
+ *  direction (GOD-ENV: "extend the world east by 300 m"), each side ≤ 16 km. Grows only; its inverse (trusted) shrinks back. */
+const expand = z.object({ op: z.literal('expand'), extent: num.positive().max(16000).optional(), bounds: z.tuple([num, num, num, num]).optional() });
 const answer = z.object({ op: z.literal('answer'), prayer: z.string(), text: z.string().max(4000) });
 /** Internal: restore a previously removed entity verbatim (inverse of remove). Never accepted from clients. */
 const restore = z.object({ op: z.literal('restore'), entity: entitySchema });

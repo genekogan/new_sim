@@ -1364,6 +1364,96 @@ function schemaMarkdown(s) {
   return L.join("\n");
 }
 
+// lib/env.mjs
+var pt = (v, what) => {
+  if (v === void 0 || v === true) return void 0;
+  const s = String(v);
+  if (/^\s*-?\d+(\.\d+)?\s*,\s*-?\d+(\.\d+)?\s*$/.test(s)) return s.split(",").map(Number);
+  if (/^\s*-?\d/.test(s)) throw new Error(`--${what} takes x,z or a thing's name, got "${s}"`);
+  return s;
+};
+var json = (v, what) => {
+  try {
+    return JSON.parse(String(v));
+  } catch {
+    throw new Error(`--${what} takes JSON like '[[x,z],[x,z]]'`);
+  }
+};
+var pct = (x) => `${Math.round(x * 100)}%`;
+function envText(e) {
+  const w = e.weather, t = e.time;
+  const sky2 = w.kind === "storm" ? `thunderstorm (${pct(w.intensity)})` : `${w.kind}${w.scheduled ? " (scheduled)" : ""}`;
+  return `${t.clock ?? "?"} ${t.datetime ? t.datetime.slice(0, 10) : ""} \xB7 ${t.paused ? "time paused" : `time \xD7${t.timeScale} (world hours per real hour)`} \xB7 ${sky2}: clouds ${pct(w.clouds)}, rain ${pct(w.rain)}, wind ${pct(w.wind)}, fog ${pct(w.fog)}${w.lightning ? `, lightning ${pct(w.lightning)}` : ""}${e.strike ? ` \xB7 last strike ${e.strike.ago}s ago at ${e.strike.x}, ${e.strike.z}` : ""}`;
+}
+async function env(body, what) {
+  const r = ok(await call("/v1/god/env", { body }), what);
+  if (r.accepted === false) return `REFUSED: ${r.failures.map((f) => `${f.code}: ${f.detail}`).join("; ")}`;
+  return `${envText(r.env)} (seq ${r.seq})`;
+}
+async function time(rest, f) {
+  const body = {};
+  if (rest[0] && rest[0] !== "now") body.timeOfDay = /^\d+(\.\d+)?$/.test(rest[0]) ? Number(rest[0]) : rest.join(" ");
+  if (f.speed !== void 0) body.timeScale = num(f.speed);
+  if (f.pause) body.timeScale = 0;
+  if (f.resume) body.timeScale = f.speed !== void 0 ? num(f.speed) : 24;
+  if (!Object.keys(body).length) return envText(ok(await call("/v1/world/env", { as: "none" }), "env"));
+  return env(body, "time");
+}
+async function weather(f) {
+  const w = {};
+  if (f.kind !== void 0) w.kind = String(f.kind);
+  for (const k of ["intensity", "clouds", "wind", "rain", "fog"]) if (f[k] !== void 0) {
+    const x = num(f[k]);
+    if (!(x >= 0 && x <= 1)) throw new Error(`--${k} is 0\u20261`);
+    w[k] = x;
+  }
+  if (!Object.keys(w).length) return envText(ok(await call("/v1/world/env", { as: "none" }), "env"));
+  if (!w.kind && ["clouds", "wind", "rain", "fog"].some((k) => w[k] !== void 0)) w.kind = "manual";
+  return env({ weather: w }, "weather");
+}
+async function strike(f) {
+  const r = ok(await call("/v1/god/strike", { body: { ...f.at !== void 0 ? { at: pt(f.at, "at") } : {} } }), "strike");
+  if (r.accepted === false) return `REFUSED: ${r.failures.map((x) => `${x.code}: ${x.detail}`).join("; ")}`;
+  return `lightning strikes ${r.strike.x}, ${r.strike.z}${r.strike.near ? ` (by ${r.strike.near})` : ""}; thunder follows ${r.strike.delayNote} (seq ${r.seq})`;
+}
+var LAND_FLAGS = "at radius amount level height peak edge step path area rect circle width depth side face steps by to toward metres bounds name preview force note group";
+var LAND_HELP = `land <verb> \u2026 [--preview] (every land edit is one undoable god edit; --preview shows what it would do)
+  raise|lower|smooth|flatten --at x,z|thing [--radius m] [--amount m (smooth 0\u20261)] [--level m]
+  knoll|hill|mountain --at x,z|thing [--height m] [--radius m] [--peak 1 round\u20263 alpine] [--name n]   (--path '[[x,z],\u2026]' = a ridge/range)
+  plateau|terrace --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],\u2026]' [--height m | --level m | --step m]
+  valley|ditch --path '[[x,z],\u2026]' [--depth m] [--width m] [--edge m]      cliff --path '[[x,z],\u2026]' --height m [--side 1|-1]
+  move <thing> --by dx,dz | --to x,z|thing      water <pond|lake|river> --level m | --by m      extend <n|s|e|w|ne\u2026> <metres>`;
+async function land(rest, f) {
+  const [verb, a, b] = rest;
+  if (!verb) return LAND_HELP;
+  const body = { verb };
+  if (f.at !== void 0) body.at = pt(f.at, "at");
+  for (const k of ["radius", "amount", "level", "height", "peak", "edge", "step", "width", "depth", "side", "face", "steps", "metres"]) if (f[k] !== void 0) body[k] = num(f[k]);
+  if (f.path !== void 0) body.path = json(f.path, "path");
+  if (f.area !== void 0) body.area = json(f.area, "area");
+  if (f.rect !== void 0) body.area = rectArea(f.rect);
+  if (f.circle !== void 0) body.area = circleArea(f.circle);
+  if (f.bounds !== void 0) body.bounds = String(f.bounds).split(",").map(Number);
+  if (f.to !== void 0) body.to = pt(f.to, "to");
+  if (f.by !== void 0) body.by = /,/.test(String(f.by)) ? String(f.by).split(",").map(Number) : num(f.by);
+  for (const k of ["name", "note", "group", "toward"]) if (f[k] !== void 0) body[k] = String(f[k]);
+  if (f.preview) body.preview = true;
+  if (f.force) body.force = true;
+  if (verb === "extend") {
+    if (a && !body.toward) body.toward = a;
+    if (b !== void 0 && body.metres === void 0) body.metres = num(b);
+  } else if (a !== void 0) {
+    if (["move", "water"].includes(verb)) body.ref = a;
+    else if (body.at === void 0) body.at = pt(a, "at");
+  }
+  const r = ok(await call("/v1/god/land", { body }), "land");
+  if (f.json) return r;
+  return `${r.accepted ? "" : "REFUSED: "}${r.says}${r.warnings?.length ? `
+warnings: ${r.warnings.join("; ")}` : ""}`;
+}
+var ENV_FLAGS = { time: "speed pause resume", weather: "kind intensity clouds wind rain fog", strike: "at", land: LAND_FLAGS };
+var ENV_BOOLS = ["pause", "resume", "preview", "force"];
+
 // cli.mjs
 var SELF = (() => {
   try {
@@ -1415,11 +1505,11 @@ async function map(opts = {}) {
   const lines = [];
   lines.push(`# ${s.worldId} \u2014 ${s.constants.extent} m square (\xB1${s.constants.extent / 2}), ground ${s.constants.ground}, seq ${s.seq}${m.offline ? " (OFFLINE: cached)" : ""}`);
   lines.push(`sky ${s.state.sky.palette}, ${s.entities.length} entities, ${s.library.length} defs, ${s.prayers.length} prayers waiting, undo ${s.undoable ?? "-"} / redo ${s.redoable ?? "-"}${load().group ? `, group "${load().group}"` : ""}`);
-  const land = s.ground.landforms.filter((l) => !l.id.endsWith(":pad"));
+  const land2 = s.ground.landforms.filter((l) => !l.id.endsWith(":pad"));
   const nameOf = (id) => v.byId.get(id)?.path ?? id;
-  if (land.length) {
+  if (land2.length) {
     lines.push("## terrain");
-    for (const l of land) lines.push(`- ${nameOf(l.id)}: ${l.kind}${l.kind === "bump" ? ` at (${r2(l.c[0])}, ${r2(l.c[1])}) r ${r2(l.r)} h ${r2(l.h)}` : l.kind === "ridge" ? ` along ${l.path.length} pts w ${l.w} h ${l.h}` : l.h !== void 0 ? ` h ${l.h}` : ""}`);
+    for (const l of land2) lines.push(`- ${nameOf(l.id)}: ${l.kind}${l.kind === "bump" ? ` at (${r2(l.c[0])}, ${r2(l.c[1])}) r ${r2(l.r)} h ${r2(l.h)}` : l.kind === "ridge" ? ` along ${l.path.length} pts w ${l.w} h ${l.h}` : l.h !== void 0 ? ` h ${l.h}` : ""}`);
   }
   if (s.ground.waters.length) {
     lines.push("## water");
@@ -1998,20 +2088,6 @@ set with: sky --palette <name> [--sun 0\u20261]`;
   const r = await act({ ops: [{ op: "world", state: { sky: { ...st.sky ?? {}, palette, sun }, ...st.weather ? { weather: st.weather } : {} } }] });
   return r.accepted ? `${skyText({ ...st, sky: { palette, sun } })} (seq ${r.seq})` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
 }
-async function weather(flags2 = {}) {
-  const st = await worldState();
-  const w = { ...st.weather ?? {} };
-  let any = false;
-  for (const k of ["clouds", "wind", "rain"]) if (flags2[k] !== void 0) {
-    const x = num(flags2[k]);
-    if (!(x >= 0 && x <= 1)) throw new Error(`--${k} is 0\u20261`);
-    w[k] = x;
-    any = true;
-  }
-  if (!any) return skyText(st);
-  const r = await act({ ops: [{ op: "world", state: { weather: w, ...st.sky ? { sky: st.sky } : {} } }] });
-  return r.accepted ? `${skyText({ ...st, weather: w })} (seq ${r.seq})` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
-}
 async function constitution(text) {
   return act({ ops: [{ op: "world", state: { constitution: text } }] });
 }
@@ -2212,8 +2288,8 @@ async function importWorld(file, flags2 = {}) {
   }
   return out.join("\n");
 }
-async function define(json) {
-  const def = typeof json === "string" ? JSON.parse(existsSync4(json) ? readFileSync4(json, "utf8") : json) : json;
+async function define(json2) {
+  const def = typeof json2 === "string" ? JSON.parse(existsSync4(json2) ? readFileSync4(json2, "utf8") : json2) : json2;
   if (def.make?.kind === "gen" && !def.params) {
     const g = (await schema()).generators?.find((x) => x.id === def.make.gen);
     if (g && Object.keys(g.params).length) def.params = g.params;
@@ -2221,8 +2297,8 @@ async function define(json) {
   const r = await act({ ops: [{ op: "define", def: { schema: "def/1", ...def } }] }, `define ${def.name}`);
   return r.accepted ? `defined ${def.name}@${def.version ?? 1} \u2014 place it with: place ${def.name}@${def.version ?? 1} --at \u2026` : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
 }
-async function defineKit(json, flags2 = {}) {
-  const k = typeof json === "string" ? JSON.parse(existsSync4(json) ? readFileSync4(json, "utf8") : json) : json;
+async function defineKit(json2, flags2 = {}) {
+  const k = typeof json2 === "string" ? JSON.parse(existsSync4(json2) ? readFileSync4(json2, "utf8") : json2) : json2;
   if (!k.name || !Array.isArray(k.shapes)) throw new Error("define-kit needs {name, shapes:[\u2026]} (see SKILL.md, kit primitives in SCHEMA.md)");
   const similar = ok(await call(`/v1/god/defs?q=${encodeURIComponent(k.name.replace(/[-_.]/g, " "))}`), "defs").defs.slice(0, 5).map((d) => d.ref.replace(/^core-/, "core/"));
   const ext = (sh) => {
@@ -2298,7 +2374,7 @@ async function status() {
   const st = ok(await call("/v1/god/status"), "status");
   return `${s.world} \u2014 you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ""}; skill ${SKILL_VERSION}`;
 }
-var BOOL = /* @__PURE__ */ new Set(["float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "off", "md", "fresh", "remove", "free", "list"]);
+var BOOL = /* @__PURE__ */ new Set(["float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "off", "md", "fresh", "remove", "free", "list", ...ENV_BOOLS]);
 var boolsFor = (cmd) => cmd === "look" ? /* @__PURE__ */ new Set([...BOOL, "inside"]) : BOOL;
 function parseFlags(argv, bools = BOOL) {
   const flags2 = {}, rest = [];
@@ -2333,7 +2409,7 @@ var FLAGS = {
   recolor: "part",
   clone: "name count step yaw at offset nudge note",
   sky: "palette sun list",
-  weather: "clouds wind rain",
+  ...ENV_FLAGS,
   group: "off",
   undo: "group",
   map: "all",
@@ -2348,8 +2424,8 @@ var FLAGS = {
   act: "note",
   prayers: "all"
 };
-var POS = { place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
-var NUMERIC = /* @__PURE__ */ new Set(["dist", "count", "t", "setback", "row", "spacing", "width", "span", "radius", "sun", "clouds", "wind", "rain", "scale", "floor", "height", "h", "slope", "gap", "yaw"]);
+var POS = { time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+var NUMERIC = /* @__PURE__ */ new Set(["dist", "count", "t", "setback", "row", "spacing", "width", "span", "radius", "sun", "clouds", "wind", "rain", "fog", "intensity", "speed", "amount", "level", "depth", "metres", "peak", "edge", "face", "steps", "side", "scale", "floor", "height", "h", "slope", "gap", "yaw"]);
 function checkArgs(cmd, f, rest) {
   const allowed = /* @__PURE__ */ new Set(["json", ...(FLAGS[cmd] ?? "").split(/\s+/).filter(Boolean)]);
   for (const [k, v] of Object.entries(f)) {
@@ -2359,7 +2435,7 @@ function checkArgs(cmd, f, rest) {
       if (x === true && !BOOL.has(k) && !(cmd === "look" && k === "inside") && !(cmd === "undo" && k === "group") && !(k === "free")) throw new Error(`--${k} needs a value`);
       if (NUMERIC.has(k) && x !== true && !Number.isFinite(Number(x))) throw new Error(`--${k} takes a number, got "${x}"`);
       if (k === "param" && (typeof x !== "string" || !/^[A-Za-z][\w-]*=/.test(x))) throw new Error(`--param takes key=value (one per --param), got "${x}"`);
-      if ((k === "by" || k === "step") && !/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(String(x))) throw new Error(`--${k} takes dx,dz (e.g. --${k} 1.5,-2), got "${x}"`);
+      if ((k === "by" || k === "step") && cmd !== "land" && !/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(String(x))) throw new Error(`--${k} takes dx,dz (e.g. --${k} 1.5,-2), got "${x}"`);
       if (k === "grid" && !/^\d+[x×]\d+$/.test(String(x))) throw new Error(`--grid takes WxH (e.g. 3x2), got "${x}"`);
     }
   }
@@ -2413,6 +2489,9 @@ var COMMANDS = {
   examples: (r) => examples(r[0]),
   sky: (r, f) => sky(f),
   weather: (r, f) => weather(f),
+  time: (r, f) => time(r, f),
+  strike: (r, f) => strike(f),
+  land: (r, f) => land(r, f),
   constitution: (r) => constitution(r.join(" ")),
   expand: (r) => expand(r[0]),
   flags,
@@ -2434,8 +2513,9 @@ shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen \xB7 set <ref> --param k=v --state '{\u2026}' \xB7 recolor <ref> #hex \xB7 remove <ref>\u2026 \xB7 clone <ref> [--at] [--count n --step dx,dz] \xB7 select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> \xB7 group --off \xB7 undo [--group name] \xB7 redo
 batch:  plan '<batch>' \xB7 preview '<batch>' \xB7 act '<batch>' \xB7 dryrun '<batch>'
-world:  sky [--palette p --sun s] \xB7 weather --clouds c --wind w --rain r \xB7 constitution <md> \xB7 expand <m> \xB7 export [file] \xB7 import <genesis.json> \xB7 define <def.json> \xB7 define-kit <kit.json> \xB7 furnish <house>[/room]
+world:  sky [--palette p --sun s] \xB7 time [19:30|7pm] [--speed h/h] [--pause|--resume] \xB7 weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] \xB7 strike [--at x,z|thing] \xB7 constitution <md> \xB7 expand <m> \xB7 export [file] \xB7 import <genesis.json> \xB7 define <def.json> \xB7 define-kit <kit.json> \xB7 furnish <house>[/room]
 pair:   register <world-url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB7 prayers [--all: answered too] \xB7 answer <id> <text> \xB7 status
+${LAND_HELP}
 learn:  examples [name] \xB7 defs <name|core/x@1> (one def in full) \xB7 sky (palettes) \xB7 a row named stall = the set "stall"`;
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("eden-god.mjs")) {
   const [cmd, ...argv] = process.argv.slice(2);
@@ -2545,6 +2625,5 @@ export {
   terrain,
   undo,
   view,
-  weather,
   where
 };

@@ -162,7 +162,7 @@ function layout(w: WorldModel, o: { area?: [number, number, number, number]; max
     if (b.baked.rooms?.length) { const f = String((e.params as Record<string, unknown> | undefined)?.front ?? (b.def.params as Record<string, { default?: unknown }> | undefined)?.front?.default ?? 's'); row.front = round(pose.yaw + (({ s: 0, e: Math.PI / 2, n: Math.PI, w: -Math.PI / 2 } as Record<string, number>)[f] ?? 0)); }
     rows.push(row);
   }
-  return { seq: w.editSeq, extent: w.constants.extent, entities: rows };
+  return { seq: w.editSeq, extent: w.constants.extent, bounds: w.ground().extent, entities: rows };
 }
 
 // ---------------------------------------------------------------- bake
@@ -395,8 +395,8 @@ function nearestOn(path: Vec2[], q: Vec2): Vec2 {
 // ---------------------------------------------------------------- free plots
 
 function findFree(w: WorldModel, f: NonNullable<QueryInput['free']>) {
-  const [sw, sd] = f.size, maxSlope = f.maxSlope ?? 0.25, half = w.constants.extent / 2 - Math.max(sw, sd);
-  const centre = f.near ?? [0, 0], radius = Math.min(f.radius ?? 120, half * 2), want = Math.min(f.count ?? 3, 12);
+  const [sw, sd] = f.size, maxSlope = f.maxSlope ?? 0.25, m = Math.max(sw, sd), gb = w.ground().extent, bb = [gb[0] + m, gb[1] + m, gb[2] - m, gb[3] - m];   // GOD-ENV: the world's bounds
+  const centre = f.near ?? [0, 0], radius = Math.min(f.radius ?? 120, Math.max(bb[2] - bb[0], bb[3] - bb[1])), want = Math.min(f.count ?? 3, 12);
   const found: { at: [number, number]; y: number; slope: number; dist: number }[] = [];
   // paved ways and squares are not building plots (roads, paths, plazas, pitches, parking): point-in tests
   const paved: ((x: number, z: number) => boolean)[] = [];
@@ -413,7 +413,7 @@ function findFree(w: WorldModel, f: NonNullable<QueryInput['free']>) {
     for (let k = -r; k <= r && found.length < want; k++) for (const [dx, dz] of r === 0 ? [[0, 0]] : [[k, -r], [k, r], [-r, k], [r, k]]) {
       if (found.length >= want) break;
       const x = centre[0] + dx * step, z = centre[1] + dz * step;
-      if (Math.abs(x) > half || Math.abs(z) > half) continue;
+      if (x < bb[0] || x > bb[2] || z < bb[1] || z > bb[3]) continue;
       const corners: [number, number][] = [[x - sw / 2, z - sd / 2], [x + sw / 2, z - sd / 2], [x + sw / 2, z + sd / 2], [x - sw / 2, z + sd / 2], [x, z]];
       const ys = corners.map(([a, c]) => w.terrain.sample(a, c));
       const slope = (Math.max(...ys) - Math.min(...ys)) / Math.max(sw, sd);

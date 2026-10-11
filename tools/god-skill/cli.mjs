@@ -15,6 +15,7 @@ const SELF = (() => { try { return fileURLToPath(import.meta.url); } catch { ret
 import { selectRows } from './lib/select.mjs';
 import { PALETTE_LIST } from './lib/sky.mjs';
 import { schemaMarkdown } from './lib/schema-md.mjs';
+import { time as envTime, weather as envWeather, strike as envStrike, land as envLand, ENV_FLAGS, ENV_BOOLS, LAND_HELP } from './lib/env.mjs';
 export { schemaMarkdown };
 
 export const SKILL_VERSION = '1.0';
@@ -450,16 +451,6 @@ export async function sky(flags = {}) {
   const r = await act({ ops: [{ op: 'world', state: { sky: { ...(st.sky ?? {}), palette, sun }, ...(st.weather ? { weather: st.weather } : {}) } }] });
   return r.accepted ? `${skyText({ ...st, sky: { palette, sun } })} (seq ${r.seq})` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
 }
-/** weather [--clouds 0…1] [--wind 0…1] [--rain 0…1]: no flags = show it. The sky is kept. */
-export async function weather(flags = {}) {
-  const st = await worldState();
-  const w = { ...(st.weather ?? {}) };
-  let any = false;
-  for (const k of ['clouds', 'wind', 'rain']) if (flags[k] !== undefined) { const x = num(flags[k]); if (!(x >= 0 && x <= 1)) throw new Error(`--${k} is 0…1`); w[k] = x; any = true; }
-  if (!any) return skyText(st);
-  const r = await act({ ops: [{ op: 'world', state: { weather: w, ...(st.sky ? { sky: st.sky } : {}) } }] });
-  return r.accepted ? `${skyText({ ...st, weather: w })} (seq ${r.seq})` : `REFUSED: ${r.failures.map(explainFailure).join('; ')}`;
-}
 export async function constitution(text) { return act({ ops: [{ op: 'world', state: { constitution: text } }] }); }
 export async function expand(extent) { return act({ ops: [{ op: 'expand', extent: num(extent) }] }); }
 
@@ -655,7 +646,7 @@ export async function status() { const s = load(); const st = ok(await call('/v1
 
 // ---------------------------------------------------------------- cli
 /** Flags that never take a value (the next word stays a positional argument). */
-const BOOL = new Set(['float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'off', 'md', 'fresh', 'remove', 'free', 'list']);
+const BOOL = new Set(['float', 'dry', 'plan', 'nudge', 'json', 'all', 'keep', 'hide-roofs', 'stop', 'off', 'md', 'fresh', 'remove', 'free', 'list', ...ENV_BOOLS]);
 const boolsFor = (cmd) => (cmd === 'look' ? new Set([...BOOL, 'inside']) : BOOL);
 export function parseFlags(argv, bools = BOOL) {
   const flags = {}, rest = [];
@@ -680,11 +671,11 @@ const FLAGS = {
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`, terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
   move: `${REL} by in local nudge note dry plan`, look: 'at from dist inside floor keep out span height width h hide-roofs stop', defs: 'tag all', where: 'at offset', free: 'near radius count slope',
   select: 'def tag name in area near radius all remove by set-state set-param recolor yaw part note', set: 'state param name constraints note', recolor: 'part', clone: 'name count step yaw at offset nudge note',
-  sky: 'palette sun list', weather: 'clouds wind rain', group: 'off', undo: 'group', map: 'all', furnish: 'style dry group', 'define-kit': 'dry', register: 'identity', mirror: 'fresh', export: 'name', import: 'group', flag: 'at offset', schema: 'md', act: 'note', prayers: 'all',
+  sky: 'palette sun list', ...ENV_FLAGS, group: 'off', undo: 'group', map: 'all', furnish: 'style dry group', 'define-kit': 'dry', register: 'identity', mirror: 'fresh', export: 'name', import: 'group', flag: 'at offset', schema: 'md', act: 'note', prayers: 'all',
 };
 // how many positional words each command takes (Infinity: free text or a list)
-const POS = { place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
-const NUMERIC = new Set(['dist', 'count', 't', 'setback', 'row', 'spacing', 'width', 'span', 'radius', 'sun', 'clouds', 'wind', 'rain', 'scale', 'floor', 'height', 'h', 'slope', 'gap', 'yaw']);
+const POS = { time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, 'define-kit': 1, act: 1, dryrun: 1, plan: 1, preview: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+const NUMERIC = new Set(['dist', 'count', 't', 'setback', 'row', 'spacing', 'width', 'span', 'radius', 'sun', 'clouds', 'wind', 'rain', 'fog', 'intensity', 'speed', 'amount', 'level', 'depth', 'metres', 'peak', 'edge', 'face', 'steps', 'side', 'scale', 'floor', 'height', 'h', 'slope', 'gap', 'yaw']);
 /** Refuse what the CLI cannot read: unknown options, missing values, extra words, non-numbers. */
 export function checkArgs(cmd, f, rest) {
   const allowed = new Set(['json', ...(FLAGS[cmd] ?? '').split(/\s+/).filter(Boolean)]);
@@ -695,7 +686,7 @@ export function checkArgs(cmd, f, rest) {
       if (x === true && !BOOL.has(k) && !(cmd === 'look' && k === 'inside') && !(cmd === 'undo' && k === 'group') && !(k === 'free')) throw new Error(`--${k} needs a value`);
       if (NUMERIC.has(k) && x !== true && !Number.isFinite(Number(x))) throw new Error(`--${k} takes a number, got "${x}"`);
       if (k === 'param' && (typeof x !== 'string' || !/^[A-Za-z][\w-]*=/.test(x))) throw new Error(`--param takes key=value (one per --param), got "${x}"`);
-      if ((k === 'by' || k === 'step') && !/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(String(x))) throw new Error(`--${k} takes dx,dz (e.g. --${k} 1.5,-2), got "${x}"`);
+      if ((k === 'by' || k === 'step') && cmd !== 'land' && !/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(String(x))) throw new Error(`--${k} takes dx,dz (e.g. --${k} 1.5,-2), got "${x}"`);
       if (k === 'grid' && !/^\d+[x×]\d+$/.test(String(x))) throw new Error(`--grid takes WxH (e.g. 3x2), got "${x}"`);
     }
   }
@@ -712,7 +703,7 @@ export const COMMANDS = {
   select: (r, f) => select(f), group: (r, f) => group(r[0], f), undo: (r, f) => undo(f), redo, history: (r, f) => history(r[0] ? Number(r[0]) : 20, f), resolve: (r, f) => resolveCmd(r, f),
   look: (r, f) => look(f), 'look-keeper': (r) => keeper(r[0], Number(r[1])), 'look-shot': async (r) => { const res = await shoot(JSON.parse(r[0])); console.log(JSON.stringify(res)); process.exit(0); }, export: (r, f) => exportWorld(r[0], f), import: (r, f) => importWorld(r[0], f), define: (r) => define(readArg(r)), 'define-kit': (r, f) => defineKit(readArg(r), f),
   furnish: (r, f) => furnish(r[0], f), gallery, examples: (r) => examples(r[0]),
-  sky: (r, f) => sky(f), weather: (r, f) => weather(f), constitution: (r) => constitution(r.join(' ')), expand: (r) => expand(r[0]),
+  sky: (r, f) => sky(f), weather: (r, f) => envWeather(f), time: (r, f) => envTime(r, f), strike: (r, f) => envStrike(f), land: (r, f) => envLand(r, f), constitution: (r) => constitution(r.join(' ')), expand: (r) => expand(r[0]),
   flags, flag: (r, f) => flag(r.join(' '), f), prayers: (r, f) => prayers(f), answer: (r) => answer(r[0], r.slice(1).join(' ')), stream: (r) => stream(r[0] ? Number(r[0]) : 60),
   follow: (r) => follow(r[0] ? Number(r[0]) : 3600, (e) => console.log(`${e.event} ${e.data?.seq ?? ''}`)), mirror: async (r, f) => { const m = await mirror({ fresh: !!f.fresh }); return `mirror: seq ${m.seq}, ${m.rows.length} entities${m.offline ? ' (offline)' : ''}`; },
   help: () => HELP,
@@ -724,8 +715,9 @@ shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen · set <ref> --param k=v --state '{…}' · recolor <ref> #hex · remove <ref>… · clone <ref> [--at] [--count n --step dx,dz] · select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> · group --off · undo [--group name] · redo
 batch:  plan '<batch>' · preview '<batch>' · act '<batch>' · dryrun '<batch>'
-world:  sky [--palette p --sun s] · weather --clouds c --wind w --rain r · constitution <md> · expand <m> · export [file] · import <genesis.json> · define <def.json> · define-kit <kit.json> · furnish <house>[/room]
+world:  sky [--palette p --sun s] · time [19:30|7pm] [--speed h/h] [--pause|--resume] · weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] · strike [--at x,z|thing] · constitution <md> · expand <m> · export [file] · import <genesis.json> · define <def.json> · define-kit <kit.json> · furnish <house>[/room]
 pair:   register <world-url> · pair · flags · flag <label> --at x,z · prayers [--all: answered too] · answer <id> <text> · status
+${LAND_HELP}
 learn:  examples [name] · defs <name|core/x@1> (one def in full) · sky (palettes) · a row named stall = the set "stall"`;
 
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('eden-god.mjs')) {
