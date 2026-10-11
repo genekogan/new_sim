@@ -139,7 +139,9 @@ type Exec = {
    * `makeWay` with `clearOf`): walk to `spot`, wait there until `clearOf(goal)` holds (the formation no
    * longer needs the goal), then replan to the goal.
    */
-  detour?: { spot: Vec2; level: number; by: string; blockers?: string[]; clearOf?: (q: Vec2) => boolean; landing?: {y:number;radius:number}; stage: 'pending' | 'going' | 'waiting' };
+  detour?: { spot: Vec2; level: number; by: string; blockers?: string[]; clearOf?: (q: Vec2) => boolean; landing?: {y:number;radius:number}; stage: 'pending' | 'going' | 'waiting'; faceoff?: boolean };
+  /** Entity worlds: the walker this one has stood face to face with (each blocked by the other) since `since`, as of `tick`. */
+  faceoff?: { id: string; since: number; tick: number };
 };
 
 export const walkSchema = z.strictObject({
@@ -510,7 +512,9 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     return stepLink(rt, ex, a, activeLeg, dt);
   }
   if (ex.detour?.stage === 'pending') {
-    const r = planWalk(rt, a, { level: ex.detour.level, p: ex.detour.spot }, ex.profile);
+    const by = ex.detour.faceoff ? rt.world.entities[ex.detour.by] : undefined;
+    const r = by ? sp.routeAround(rt.world, ex.profile, { level: a.human!.level, p: [a.pose.p[0], a.pose.p[2]] }, { level: ex.detour.level, p: ex.detour.spot }, [{ id: by.id, p: [by.pose.p[0], by.pose.p[2]] }])
+      : planWalk(rt, a, { level: ex.detour.level, p: ex.detour.spot }, ex.profile);
     if (r.ok) {
       releaseAll(rt, ex);
       ex.route = r.route;
@@ -586,7 +590,8 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
   const r = ex.profile.radius;
   // traffic: need the next narrow interval before entering it
   let yieldTo: string | null = null;
-  for (const n of ex.narrows) {
+  // stepping aside out of a face-off: the walk to the spot is the way out of the single-file stretch, never queued on it
+  for (const n of ex.detour?.faceoff && ex.detour.stage === 'going' ? [] : ex.narrows) {
     if (ex.s > n.s1 + r + 0.2) {
       if (ex.held.has(n.res)) {
         const e = traffic(rt).get(n.res);
@@ -897,6 +902,7 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
     // a wait that has lasted RELEASE_AFTER on both sides (a transient one resolves as before: every pin unchanged).
     const y = yieldsOf(rt)[personBlock];
     if (ex.held.size && y && y.to === ex.actor && rt.tick - y.tick <= 1 && rt.tick - y.since >= RELEASE_AFTER && (ex.still ?? 0) >= RELEASE_AFTER) releaseAll(rt, ex);
+    if (rt.world.entityPhysicsV1) resolveFaceoff(rt, ex, personBlock);
     makeWay(rt, personBlock, pointAt(ex, ex.total));
     if (!ex.cancelTo && occupant(rt, a, ex.goal.p, ex.profile.radius, true, ex.goal.level) === personBlock)
       return blockedWait(rt, ex.id, ex.actor, [personBlock], { code: 'walk.goal-occupied', message: `${ex.actor}'s destination overlaps ${personBlock}'s supported sleep space`, subjects: [ex.actor, personBlock] });
@@ -1168,6 +1174,62 @@ export function makeWay(rt: Runtime, who: string, keepClear: Vec2, clearOf?: { b
     // Multiple blocked movers may nudge the same idle person in one tick, even after a refusal.
     if (!rt.records.has(id)) { const move = rt.submit('walk_to', { actor: who, x: best[0], z: best[1] }, { id }); move.internalCause = 'traffic.make-way'; }
   }
+}
+
+/** Ticks two walkers may stand face to face, each blocked by the other, before one steps aside (1 s). */
+export const FACEOFF_TICKS = 20;
+/**
+ * Entity worlds (god-built, `world.entityPhysicsV1`): two walkers face to face, each blocked by the other — in a
+ * cottage doorway or a furnished room that is one single-file stretch, where the yielder is already inside the passage
+ * and cannot give way by stepping to the side of it, and routing round the other finds nothing (Party Hill, 2026-10-10:
+ * ~2.5 min, W47's release only swapping the two roles every 3 s). After FACEOFF_TICKS one of them steps aside to the
+ * nearest free spot clear of the other's remaining way (`makeWay` with `clearOf`), waits there until the other has
+ * passed, then walks on: first the one yielding the passage (or, two plain person-waits, the later id); if that one
+ * finds no spot within 3·FACEOFF_TICKS, the other. Mars/Eden/LM native worlds (no entity physics) are unchanged.
+ */
+function resolveFaceoff(rt: Runtime, ex: Exec, who: string) {
+  const f = ex.faceoff;
+  ex.faceoff = f && f.id === who && f.tick >= rt.tick - 1 ? { ...f, tick: rt.tick } : { id: who, since: rt.tick, tick: rt.tick };
+  const waited = rt.tick - ex.faceoff.since;
+  if (waited < FACEOFF_TICKS) return;
+  const ot = rt.world.entities[who]?.human?.task, orec = ot ? rt.records.get(ot) : undefined, oex = ot ? walkExecs(rt).get(ot) : undefined;
+  if (!oex || orec?.status !== 'blocked' || !orec.diagnostic?.subjects?.includes(ex.actor) || oex.detour || ex.detour) return;
+  const first = orec.diagnostic.code === 'traffic.yield' || ex.actor < who ? who : ex.actor;
+  const mover = waited < 3 * FACEOFF_TICKS ? first : first === who ? ex.actor : who;
+  const forEx = mover === who ? ex : oex, moverEx = mover === who ? oex : ex;
+  const m = rt.world.entities[mover], o = rt.world.entities[forEx.actor];
+  if (!m?.human || m.human.grip) return;
+  const g = spatial(rt, mover).level(m.human.level);
+  if (!g) return;
+  const test = clearOfWay(rt, forEx, moverEx.profile.radius), r = moverEx.profile.radius;
+  const from: Vec2 = [m.pose.p[0], m.pose.p[2]];
+  // nearest free spot first; it must be reachable going round the other body (not through it, as a plain plan would)
+  const spots: { q: Vec2; d: number }[] = [];
+  for (let k = 0; k < 16; k++) for (const d of [0.8, 1.2, 1.6, 2.2, 3.0, 4.0]) {
+    const q = add2(from, scale2(rot2([1, 0], (k * Math.PI) / 8), d));
+    if (clearanceAt(g, q) < r + 0.05 || occupant(rt, m, q, r + 0.1) || !test(q)) continue;
+    spots.push({ q, d });
+  }
+  spots.sort((a, b) => a.d - b.d);
+  const around = [{ id: o.id, p: [o.pose.p[0], o.pose.p[2]] as Vec2 }];
+  for (const { q } of spots.slice(0, 12)) {
+    const rr = spatial(rt, mover).routeAround(rt.world, moverEx.profile, { level: m.human.level, p: from }, { level: m.human.level, p: q }, around);
+    if (!rr.ok || rr.route.length > 6) continue;
+    moverEx.detour = { spot: q, level: m.human.level, by: forEx.actor, blockers: [forEx.actor], clearOf: test, stage: 'pending', faceoff: true };
+    return;
+  }
+}
+
+/** `q` is clear of what is left of `forEx`'s way (or that walk is over): a body of radius `r` there does not touch it. */
+function clearOfWay(rt: Runtime, forEx: Exec, r: number) {
+  return (q: Vec2) => {
+    if (walkExecs(rt).get(forEx.id) !== forEx || forEx.detour) return true;
+    const need = r + forEx.profile.radius + 0.1;
+    for (let s = forEx.s; ; s = Math.min(forEx.total, s + 0.2)) {
+      if (dist2(q, pointAt(forEx, s)) < need) return false;
+      if (s >= forEx.total) return true;
+    }
+  };
 }
 
 /** The straight way from `from` to `q` never brings `me` closer to a person or carried-load disc it is (or would be) touching. */
