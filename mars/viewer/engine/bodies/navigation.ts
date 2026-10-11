@@ -4,10 +4,12 @@ import type {Runtime} from '../runtime/runtime.ts';
 import {Spatial} from '../spatial/service.ts';
 import {FloatPlanner,floaterProfile} from './float.ts';
 import {isFloater,floaterBody} from './body.ts';
+import {humanoidProfile} from './humanoid.ts';
 import type {Entity} from '../world/types.ts';
-import {HUMAN_PROFILE} from '../spatial/types.ts';
 const cache=new WeakMap<Runtime,{base:Spatial;baseId:string;spatial:Spatial}>();
-export function bodyProfile(actor:Entity){return isFloater(actor)?floaterProfile(floaterBody(actor.body)):HUMAN_PROFILE;}
+/** A body's movement profile: a floater's; a humanoid's look (height/build/walkSpeed, bodies/humanoid.ts), which is
+ *  HUMAN_PROFILE itself for every body without those params. */
+export function bodyProfile(actor:Entity){return isFloater(actor)?floaterProfile(floaterBody(actor.body)):humanoidProfile(actor.body);}
 export function bodySpatial(rt:Runtime,actorId?:string):Spatial{
  const base=rt.services.spatial as Spatial;
  if(!actorId||!isFloater(rt.world.entities[actorId])||base.ground)return base;

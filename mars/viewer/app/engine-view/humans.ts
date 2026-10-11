@@ -1044,7 +1044,7 @@ export class HumanViews {
         const rest = clipProbe(t, body === 'seat' ? 'Sitting_Idle_Loop' : 'GroundSit_Idle_Loop', 0);
         const seat = body === 'ground-seat' ? GROUND_SEAT : v.seat;
         if (rest) {
-          seatShift += wgt * k * (seat + PELVIS - rest.hip.y); seatW += wgt;
+          seatShift += wgt * k * (seat + PELVIS * (v.rig.template.bodyScale ?? 1) - rest.hip.y); seatW += wgt;
           // The clip sits its pelvis behind its standing origin. The native seat
           // point owns the pelvis, not that old origin: otherwise the shins pass
           // through the plank's front. Translate the fitted seated layout,
@@ -1744,7 +1744,7 @@ function sitPose(v: View, w: number, ground: number) {
     return _hip.distanceTo(_knee);
   });
   const hipY = legs.reduce((s, l) => s + l.upper.getWorldPosition(_hip).y, 0) / legs.length;
-  const drop = Math.max(0, hipY - (ground + v.seat + PELVIS)) * w;
+  const drop = Math.max(0, hipY - (ground + v.seat + PELVIS * (v.rig.template.bodyScale ?? 1))) * w; // a composed look's thighs scale with its height
   v.spine.body.getWorldPosition(_c);
   _c.y -= drop;
   place(v.spine.body, _c.clone());

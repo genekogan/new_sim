@@ -17,7 +17,7 @@ test('CLI body look: show, seeded random, set parts and colours, classic preset,
   const run=async(...args:string[])=>{const {stdout}=await promisify(execFile)(process.execPath,[cli,'body','look',...args],{cwd:dir,timeout:30000,maxBuffer:256*1024});assert.ok(!stdout.includes(credential.token));return JSON.parse(stdout);};
   const shown=await run();assert.equal(shown.look,null);assert.deepEqual(shown.choices.glasses,['none','round','square','shades']);
   const random=await run('--random','--seed','11');assert.equal(random.body.model,lookKey(appearanceFromSeed(11)));
-  const set=await run('--set','hat=sunhat','top1=#356477','headScale=1.05');assert.equal(set.body.params.hat,'sunhat');assert.equal(set.body.params.top1,'#356477');assert.equal(set.body.params.headScale,1.05);
+  const set=await run('--set','hat=sunhat','top1=#356477','headSize=1.05');assert.equal(set.body.params.hat,'sunhat');assert.equal(set.body.params.top1,'#356477');assert.equal(set.body.params.headSize,1.05);
   assert.equal(set.body.params.top,appearanceFromSeed(11).top,'unnamed parts are kept');
   const now=await run();assert.equal(now.look.hat,'sunhat');
   const classic=await run('--set','preset=punk');assert.deepEqual(classic.body.params,{preset:'punk'});

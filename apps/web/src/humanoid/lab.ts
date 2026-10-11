@@ -3,6 +3,7 @@
 //   presets  today's GLB templates (left) and the composed presets (right), casual / punk / woman
 //   parity   one body, fixed pose and camera: &preset=casual|punk|woman&src=legacy|kit (screenshot diff)
 //   picker   the Soul-facing look picker (LookPicker) with live preview and icon
+//   sizes    head size / height / build variants of one preset before a 1.75 m mark (&preset=…, &walk=1)
 // window.__lab reports readiness and budgets (draw calls, triangles, textures, programs, kit bytes, keys).
 import * as THREE from 'three';
 import {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
@@ -102,7 +103,7 @@ async function showcase() {
     ? [[{hat: 'cap'}, {hat: 'beanie'}, {hat: 'sunhat'}, {glasses: 'round'}, {glasses: 'square'}, {glasses: 'shades'}], [{bag: 'backpack'}, {bag: 'satchel'}, {pattern: 'stripes'}, {pattern: 'checks'}, {pattern: 'knit'}, {hair: 'mohawk', hat: 'cap'}]]
     : set === 'parts'
       ? (['masc', 'fem'] as const).map(frame => (['short', 'mohawk', 'bob', 'bald'] as const).flatMap((hair): Partial<Look>[] => [{frame, hair, face: hair === 'bob' ? 'soft' : hair === 'mohawk' ? 'pierced' : 'open'}]).concat([{frame, top: 'jacket', bottom: 'slacks'}, {frame, top: 'tank', bottom: 'ripped'}]))
-      : (['masc', 'fem'] as const).map(frame => (['shirt', 'jacket', 'tank'] as const).flatMap((top): Partial<Look>[] => [{frame, top, bottom: top === 'tank' ? 'slacks' : top === 'jacket' ? 'ripped' : 'jeans', shoes: top === 'tank' ? 'flats' : top === 'jacket' ? 'boots' : 'sneakers', top2: '#e8e4dc', bottom1: top === 'tank' ? '#9e6238' : '#333f47'}]).concat([{frame, headScale: 0.9}, {frame, headScale: 1.1}, {frame, face: 'soft', hair: 'bob', top: 'tank', bottom: 'slacks'}]));
+      : (['masc', 'fem'] as const).map(frame => (['shirt', 'jacket', 'tank'] as const).flatMap((top): Partial<Look>[] => [{frame, top, bottom: top === 'tank' ? 'slacks' : top === 'jacket' ? 'ripped' : 'jeans', shoes: top === 'tank' ? 'flats' : top === 'jacket' ? 'boots' : 'sneakers', top2: '#e8e4dc', bottom1: top === 'tank' ? '#9e6238' : '#333f47'}]).concat([{frame, headSize: 0.9}, {frame, headSize: 1.1}, {frame, face: 'soft', hair: 'bob', top: 'tank', bottom: 'slacks'}]));
   const entries: {id: string; rig: Rig; label: string}[] = [];
   for (const [r, row] of rows.entries()) for (const [c, edit] of row.entries()) {
     const look = {...base, ...edit}, n = rows.flat().length, i = rows.slice(0, r).flat().length + c, gap = head ? 0.62 : 0.9;
@@ -157,11 +158,29 @@ async function parity() {
   camera.position.set(0, 1.25, 3.3); camera.lookAt(0, 0.92, 0);
   Object.assign(lab, stats()); renderer.render(scene, camera);
 }
+/** The size params: today's preset beside heights, builds and head sizes, before a 1.75 m mark (&walk=1: mid-stride). */
+async function sizes() {
+  const base = (q.get('preset') ?? 'casual') as typeof PRESETS[number], walk = q.get('walk') === '1';
+  const row: [string, Partial<Look>][] = [['1.55 m', {height: 1.55}], ['1.65 m', {height: 1.65}], ['today', {}], ['1.85 m', {height: 1.85}], ['1.95 m', {height: 1.95}],
+    ['build 0.85', {build: 0.85}], ['build 1.2', {build: 1.2}], ['head 0.85', {headSize: 0.85}], ['head 1.2', {headSize: 1.2}], ['1.95 m, 1.2, head 1.1', {height: 1.95, build: 1.2, headSize: 1.1}]];
+  const mark = new THREE.Mesh(new THREE.BoxGeometry(row.length * 0.85 + 0.6, 0.01, 0.01), new THREE.MeshBasicMaterial({color: '#7a6f5a'})); mark.position.set(0, 1.75, -0.5); scene.add(mark);
+  const entries: {id: string; rig: Rig; label: string}[] = [], dims: Record<string, unknown>[] = [];
+  for (const [i, [label, edit]] of row.entries()) {
+    const t = await kit.template({preset: base, ...edit}), r = place(t, (i - (row.length - 1) / 2) * 0.85, 0, 0.3, 0.4);
+    if (walk) { r.idle.setEffectiveWeight(0); r.walk.setEffectiveWeight(1); r.walk.time = 0.3; r.mixer.update(0); }
+    r.holder.updateMatrixWorld(true);
+    const top = new THREE.Box3().setFromObject(r.holder).max.y, sh = r.model.getObjectByName('UpperArmL')!.getWorldPosition(new THREE.Vector3()).y;
+    dims.push({label, crown: +top.toFixed(3), shoulder: +sh.toFixed(3), bodyScale: t.bodyScale ?? 1, clipWalkSpeed: +t.walkSpeed.toFixed(3)});
+    entries.push({id: `size-${i}`, rig: r, label});
+  }
+  camera.position.set(0, 1.25, 9.6); camera.lookAt(0, 1.0, 0);
+  Object.assign(lab, stats(), {dims}); lab.icons = await portraits(entries); renderer.render(scene, camera);
+}
 async function picker() {
   const {mountLookPicker} = await import('./LookPicker.tsx');
   document.body.classList.add('picker'); renderer.domElement.style.display = 'none';
   const initial = q.get('look') ? JSON.parse(q.get('look')!) : appearanceFromSeed(Number(q.get('seed') ?? 11));
   await new Promise<void>(done => mountLookPicker(document.getElementById('picker')!, {kit, initial, onState: (s: Record<string, unknown>) => { Object.assign(lab, s); done(); }}));
 }
-try { await ({grid, presets, parity, picker, showcase, social} as Record<string, () => Promise<void>>)[mode](); lab.ready = true; }
+try { await ({grid, presets, parity, picker, showcase, social, sizes} as Record<string, () => Promise<void>>)[mode](); lab.ready = true; }
 catch (e) { lab.error = e instanceof Error ? e.message : String(e); console.error(e); }

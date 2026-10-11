@@ -25,7 +25,15 @@ export type Template = {
   /** Ground speed (m/s) of the library locomotion clips at timeScale 1 (clip-library.ts), when present. */
   jogSpeed?: number;
   sprintSpeed?: number;
+  /** Uniform body scale of a composed core/humanoid@2 look (height / 1.75; engine bodies/humanoid.ts); absent = 1. */
+  bodyScale?: number;
 };
+
+/** A composed look's body scale (its `height` / PERSON_HEIGHT); 1 for every other model. */
+export function bodyScaleOf(gltf: Pick<GLTF, 'scene'>): number {
+  const h = (gltf.scene.userData as { humanoid?: { look?: { height?: unknown } } }).humanoid?.look?.height;
+  return typeof h === 'number' && Number.isFinite(h) && h > 0 ? h / PERSON_HEIGHT : 1;
+}
 
 export type Rig = {
   holder: THREE.Group; // engine pose goes here (position, rotation.y = -yaw)
@@ -79,8 +87,8 @@ export async function loadTemplates(signal: AbortSignal, resources: ThreeResourc
 
 /** Validated owner GLBs use the same canonical rig fitting and locomotion measurements. */
 export function templateFromGltf(name:string,gltf:GLTF,appearance?:TemplateAppearance):Template{
- const arms=fitArms(gltf),jog=measureWalk(gltf,'Jog_Fwd_Loop'),sprint=measureWalk(gltf,'Sprint_Loop');
- return {name,gltf,arms,...measureWalk(gltf),...(appearance?{appearance}:{}),...(jog.found?{jogSpeed:jog.walkSpeed}:{}),...(sprint.found?{sprintSpeed:sprint.walkSpeed}:{})};
+ const arms=fitArms(gltf),jog=measureWalk(gltf,'Jog_Fwd_Loop'),sprint=measureWalk(gltf,'Sprint_Loop'),bodyScale=bodyScaleOf(gltf);
+ return {name,gltf,arms,...measureWalk(gltf),...(appearance?{appearance}:{}),...(jog.found?{jogSpeed:jog.walkSpeed}:{}),...(sprint.found?{sprintSpeed:sprint.walkSpeed}:{}),...(bodyScale!==1?{bodyScale}:{})};
 }
 
 /** A composed body (humanoid@2 kit: one shared rig + parts) as a template: same fit/fitArms/measureWalk. */
@@ -99,6 +107,7 @@ function clip(gltf: GLTF, name: string) {
  * stand at BODY_MODEL.shoulderHeight (the body model; POSES.md). The bounding box alone (1.75 m to the
  * top) would make the punk rig's body 7 % smaller than the others (its hair spikes count as height):
  * fitted by shoulders, the crowns are at ≈ 1.75 (woman), 1.77 (casual) and 1.88 m (punk, hair tips).
+ * A composed look with a `height` stands bodyScaleOf × that tall (shoulders and everything else scale with it).
  */
 function fit(gltf: GLTF,appearance?:TemplateAppearance) {
   const model = clone(gltf.scene);
@@ -123,7 +132,7 @@ function fit(gltf: GLTF,appearance?:TemplateAppearance) {
   if (sh[0] !== undefined && sh[1] !== undefined) {
     const shoulder=(sh[0]+sh[1])/2;
     if(!Number.isFinite(shoulder)||shoulder<1e-5)throw Error('Body shoulders must stand above its feet');
-    scale *= BODY_MODEL.shoulderHeight / shoulder;
+    scale *= BODY_MODEL.shoulderHeight * bodyScaleOf(gltf) / shoulder;
     place();
   }
   return { model, mixer, idle, walk, extra, scale,...(actorAppearance?{appearance:actorAppearance}:{}) };
@@ -143,6 +152,7 @@ function fit(gltf: GLTF,appearance?:TemplateAppearance) {
  */
 function fitArms(gltf: GLTF) {
   const { model, mixer } = fit(gltf);
+  const armLength = BODY_MODEL.armLength * bodyScaleOf(gltf); // a composed look's arm scales with its height
   model.updateMatrixWorld(true);
   const w = (n: string) => model.getObjectByName(n)?.getWorldPosition(new THREE.Vector3());
   const out: { k: number; before: number }[] = [];
@@ -153,11 +163,11 @@ function fitArms(gltf: GLTF) {
     const a = s.distanceTo(e), fw = wr.clone().sub(e), h = m.clone().sub(wr).multiplyScalar(0.5);
     if(![a,fw.length(),h.length()].every(v=>Number.isFinite(v)&&v>1e-5))throw Error('Body arm chain is collapsed');
     const len = (k: number) => k * a + fw.clone().multiplyScalar(k).add(h).length();
-    if(len(.5)>BODY_MODEL.armLength||len(3)<BODY_MODEL.armLength)throw Error('Body arm proportions cannot fit the canonical reach');
+    if(len(.5)>armLength||len(3)<armLength)throw Error('Body arm proportions cannot fit the canonical reach');
     let lo = 0.5, hi = 3;
     for (let i = 0; i < 60; i++) {
       const mid = (lo + hi) / 2;
-      if (len(mid) < BODY_MODEL.armLength) lo = mid;
+      if (len(mid) < armLength) lo = mid;
       else hi = mid;
     }
     const k = (lo + hi) / 2;

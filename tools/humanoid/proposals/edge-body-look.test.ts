@@ -10,7 +10,7 @@ async function setup(t:any){const dir=mkdtempSync(join(tmpdir(),'body-look-')),p
  const ledger=new EdgeLedger(f.host,f.db,undefined,{ambient:false}),app=new Hono();mountEdgeRoutes(app,{host:f.host,db:f.db,souls:f.souls,ledger,soul:edgeSoulResolver(f.host,f.souls,c=>c.req.header('authorization')?.replace(/^Bearer /,''))});
  const req=async(s:any,url:string,data?:unknown,method=data===undefined?'GET':'POST')=>app.request('/v1/edge/'+url,{method,headers:{authorization:'Bearer '+s.token,...(data===undefined?{}:{'content-type':'application/json'})},...(data===undefined?{}:{body:JSON.stringify(data)})});
  return {f,path,ss,req};}
-const put=(w:any,s:any,look:unknown)=>accept(w.f.host,w.req(s,'body',{look},'PUT'));
+const put=(w:any,s:any,look:unknown)=>accept(w.f.host,w.req(s,'body',{look},'PUT')) as Promise<Response>;
 test('LOOK: edit over today\'s look, seeded random, preset, refusals, schema, other owner untouched, replay',async t=>{
  const w=await setup(t),[a,b]=w.ss,ent=(s:any)=>w.f.host.engine.world.entities[s.row.entity_id];
  const g=await (await w.req(a,'body')).json();if(g.lookDef===undefined){t.skip('needs the L10 routes/engine patches (tools/humanoid/patches)');return;}assert.equal(g.look,null);assert.equal(g.lookDef,'core/humanoid@2');assert.deepEqual(g.lookChoices.hat,['none','cap','beanie','sunhat']);
@@ -26,7 +26,7 @@ test('LOOK: edit over today\'s look, seeded random, preset, refusals, schema, ot
  const r4=await put(w,a,{preset:'woman'});assert.equal(r4.status,200);assert.deepEqual((await r4.json()).body.params,{preset:'woman'});
  // refusals: unknown key, bad value, mixed random, two assignment kinds; nothing changes
  const before=structuredClone(ent(a).body),seq=w.f.host.seq;
- for(const [look,code] of [[{wings:'big'},'body.look'],[{hair:'purple'},'body.look'],[{headScale:2},'body.look'],[{random:true,hat:'cap'},'body.look'],['cap','body.look']] as const){
+ for(const [look,code] of [[{wings:'big'},'body.look'],[{hair:'purple'},'body.look'],[{headSize:2},'body.look'],[{random:true,hat:'cap'},'body.look'],['cap','body.look']] as const){
   const r=await put(w,a,look);assert.equal(r.status,400,JSON.stringify(look));assert.equal((await r.json()).error.code,code);}
  const both=await w.req(a,'body',{look:{hat:'cap'},preset:'humanoid'},'PUT');assert.equal(both.status,400);
  assert.deepEqual(ent(a).body,before);assert.equal(w.f.host.seq,seq,'refused looks admit no world input');

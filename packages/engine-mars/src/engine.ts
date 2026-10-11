@@ -69,6 +69,7 @@ import type { Spatial } from '../../../mars/viewer/engine/spatial/service.ts';
 import type {NativeBoatControlsV1} from '@sim/engine-contract';
 import type {BodyLocationV1} from '@sim/engine-contract';
 import {bodyProblem} from '../../../mars/viewer/engine/bodies/body.ts';
+import {humanRadius} from '../../../mars/viewer/engine/bodies/humanoid.ts';
 import type {Body} from '../../../mars/viewer/engine/world/types.ts';
 import {renderPlatformsV1Schema,type RenderPlatformsV1} from '@sim/engine-contract';
 import {officeStairGuardsV1Schema,type OfficeStairGuardsV1} from '@sim/engine-contract';
@@ -780,10 +781,10 @@ export class MarsEngine implements Engine {
     const e=this.ents[id],h=e?.human;if(!h)return 'body.not-found';
     if(!this.free(id)||this.actorBorrowed(id)||h.task||h.grip||h.on||h.riding||h.carrier||h.boatPassenger||h.boatTransit||h.sleepPose||h.shore||h.together||h.partner||h.holding||h.prop||h.baseActivity==='sit'||!['idle','wait'].includes(h.activity))return 'body.safe-standing-required';
     if(Object.values(this.ents).some((o:any)=>o.support?.kind==='in-hand'&&o.support.by===id))return 'body.safe-standing-required';
-    const radius=body?.family==='floater'?(body.radius??.35):HUMAN_RADIUS;
+    const radius=body?.family==='floater'?(body.radius??.35):humanRadius({body:body??undefined});
     const spatial=this.rt.services.spatial as Spatial;spatial.sync(this.rt.world);const grid=spatial.level(h.level);
     if(!grid||clearanceAt(grid,[e.pose.p[0],e.pose.p[2]])<radius)return 'body.no-clearance';
-    if(Object.values(this.ents).some((o:any)=>o.id!==id&&o.kind==='human'&&o.human?.level===h.level&&hypot(o.pose.p[0]-e.pose.p[0],o.pose.p[2]-e.pose.p[2])<radius+(o.body?.family==='floater'?(o.body.radius??.35):HUMAN_RADIUS)))return 'body.no-clearance';
+    if(Object.values(this.ents).some((o:any)=>o.id!==id&&o.kind==='human'&&o.human?.level===h.level&&hypot(o.pose.p[0]-e.pose.p[0],o.pose.p[2]-e.pose.p[2])<radius+humanRadius(o)))return 'body.no-clearance';
     return null;
   }
   assignBodyV1(id:string,body:Body|null):boolean {

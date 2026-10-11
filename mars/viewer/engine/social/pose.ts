@@ -12,6 +12,7 @@ import type { ActionDef, Diagnostic } from '../actions/types.ts';
 import type { Runtime } from '../runtime/runtime.ts';
 import { dcos, dsin, heading, hypot, type Vec2 } from '../core/math.ts';
 import { HUMAN_RADIUS } from '../world/catalog.ts';
+import { seatFitProblem } from '../bodies/humanoid.ts';
 import type { Spatial } from '../spatial/service.ts';
 import { clearanceAt } from '../spatial/grid.ts';
 
@@ -77,6 +78,8 @@ function admission(rt: Runtime, p: Params): Diagnostic | null {
   const a = rt.world.entities[p.actor], h = a?.human;
   if (!h || a.kind !== 'human') return issue('not-human', `${p.actor} is not a person`, [p.actor]);
   if (h.grip || h.riding || h.on || h.shore || h.carrier || h.sleepPose || (h as { boatPassenger?: unknown }).boatPassenger) return issue('occupied-support', 'Leave the climb, load, water, ride or mat first.', [p.actor]);
+  // seat fit (bodies/humanoid.ts): a scenery seat's top must suit the body's height (today's body: 0.2–1.2 m, the schema's range)
+  if (p.seatHeight !== undefined && !LYING.has(p.activity)) { const fit = seatFitProblem(a.body, p.seatHeight); if (fit) return issue(fit.code.replace('.', '-'), `This seat does not fit your body: ${fit.message}.`, [p.actor]); }
   // together/1: a grouped pose may start while someone's make-way nudge steps this body aside (it settles first)
   if (rt.holder('actor:' + p.actor).some((id) => rt.records.get(id)?.verb === 'walk_to' && !(p.group && nudge(id)))) return issue('not-still', 'Finish walking first.', [p.actor]);
   const seated = h.activity === 'sit' || (h.baseActivity === 'sit' && OVERLAY.has(h.activity));

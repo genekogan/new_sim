@@ -4,7 +4,7 @@ const id=z.string().min(1).max(100).regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/);
 const url=z.string().regex(/^\/(?:w\/[a-z0-9-]+\/)?(?:v1\/edge\/body\/assets\/body_[a-f0-9]{64}\.glb|world-assets\/littlemartians\/characters\/[a-z0-9-]+\.glb)$/);
 /** core/humanoid@2 look params (compact: only non-default keys). Values are checked against the def by the
  *  server (apps/web/src/humanoid/look.ts); here only their shape. `model` is then the look's template key. */
-const lookParams=z.record(z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]{0,31}$/),z.union([z.string().max(32),z.number().finite()])).refine(p=>Object.keys(p).length<=24,'at most 24 look params');
+const lookParams=z.record(z.string().regex(/^[a-zA-Z][a-zA-Z0-9_-]{0,31}$/),z.union([z.string().max(32),z.number().finite()])).refine(p=>Object.keys(p).length<=32,'at most 32 look params');
 const LOOK_MODEL=/^humanoid2-[0-9a-f]{16}$/;
 export const bodyV1Schema=z.strictObject({
   family:z.enum(['humanoid','floater']),type:z.enum(['humanoid','ceramic','floater']).optional(),

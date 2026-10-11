@@ -20,6 +20,7 @@ import { installWorldLore } from './world-lore.ts';
 import { installHeld } from './held.ts';
 import { installWorldClock } from './world-clock.ts';
 import { config, KNOWN_WORLD_KEYS } from '../config.ts';
+import { seatFitProblem } from '../../../../mars/viewer/engine/bodies/humanoid.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -671,7 +672,10 @@ export class EngineBridge {
         const id = `sit:${x.id}`, label = `Sit on ${name(x.id)} (${kind && !name(x.id).split('/').pop()!.includes(kind) ? `a ${kind}, ` : ''}${by.length ? `by ${by.join(' and ')}; ` : ''}${d} m${levelOf(x) ? `, floor ${levelOf(x)}` : ''})`;
         // F1: a bench for two stays free while one of its seats is; the seat a Soul sits on is not free to itself
         const full = others.length >= seats || (!!u && !mine && seats <= 1);
-        const block = mine ? { code: 'seat.yours', reason: `You are sitting on ${name(x.id)} already; stand:here to get up.` } : full ? { code: 'seat.taken', reason: `${(others.length ? others : [u!.body]).map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} sitting there.` } : null;
+        // seat fit (engine bodies/humanoid.ts): a body whose look sets its height sits only on seats whose top suits it
+        const tops = (asset.slots as { kind: string; p?: number[] }[]).filter((s) => s.kind === 'seat').map((s) => s.p?.[1]).filter((y): y is number => typeof y === 'number' && Number.isFinite(y));
+        const misfit = tops.length && tops.every((y) => seatFitProblem(me.body, y)) ? seatFitProblem(me.body, tops[0]) : null;
+        const block = mine ? { code: 'seat.yours', reason: `You are sitting on ${name(x.id)} already; stand:here to get up.` } : full ? { code: 'seat.taken', reason: `${(others.length ? others : [u!.body]).map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} sitting there.` } : misfit ? { code: misfit.code, reason: `${name(x.id)} does not fit your body: ${misfit.message}.` } : null;
         caps.push({ id, verb: 'sit', label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: 60 } } });
         plans.set(id, { label, steps: [{ verb: 'sit', params: { on: x.id, seconds: 60 } }], seconds: true });
       }

@@ -19,20 +19,27 @@ export const COLOR_KEYS = ['skin', 'hair1', 'brows', 'eyes', 'top1', 'top2', 'bo
 export type Look = {
   preset: 'none' | 'casual' | 'punk' | 'woman'; frame: 'masc' | 'fem';
   face: string; hair: string; top: string; bottom: string; shoes: string;
-  hat: string; glasses: string; bag: string; pattern: 'plain' | 'stripes' | 'checks' | 'knit'; headScale: number;
+  hat: string; glasses: string; bag: string; pattern: 'plain' | 'stripes' | 'checks' | 'knit';
+  /** Physical/size params (engine bodies/humanoid.ts): head size (drawn only), height m, build (girth), walking speed m/s. */
+  headSize: number; height: number; build: number; walkSpeed: number;
   skin: string; hair1: string; brows: string; eyes: string; top1: string; top2: string; bottom1: string; shoes1: string; soles: string; accent: string; gear: string;
 };
 export const PRESETS = ['casual', 'punk', 'woman'] as const;
+/** The size params: they combine with a preset (a classic look can be taller, broader or walk slower). */
+export const SIZE_KEYS = ['headSize', 'height', 'build', 'walkSpeed'] as const;
+type SizeKey = typeof SIZE_KEYS[number];
+const SIZE_STEP: Record<SizeKey, number> = {headSize: 0.005, height: 0.01, build: 0.01, walkSpeed: 0.01};
+const round = (v: number, step: number) => +(Math.round(v / step) * step).toFixed(4);
 export type Preset = typeof PRESETS[number];
 
 /** Legacy looks as explicit params (sRGB hex of the shipped GLBs' baseColorFactor). The viewer uses the kit's
  *  exact linear factors while `preset` is set; these hex values are what an owner edits from. */
 export const PRESET_LOOKS: Readonly<Record<Preset, Omit<Look, 'preset'>>> = Object.freeze({
-  casual: {frame: 'masc', face: 'open', hair: 'short', top: 'shirt', bottom: 'jeans', shoes: 'sneakers', hat: 'none', glasses: 'none', bag: 'none', pattern: 'plain', headScale: 1,
+  casual: {frame: 'masc', face: 'open', hair: 'short', top: 'shirt', bottom: 'jeans', shoes: 'sneakers', hat: 'none', glasses: 'none', bag: 'none', pattern: 'plain', headSize: 1, height: 1.75, build: 1, walkSpeed: 1.35,
     skin: '#cead86', hair1: '#492e18', brows: '#3e3429', eyes: '#31251c', top1: '#969083', top2: '#b4b4b4', bottom1: '#333f47', shoes1: '#7d2734', soles: '#b4b4b4', accent: '#af8749', gear: '#3c5a6e'},
-  punk: {frame: 'masc', face: 'pierced', hair: 'mohawk', top: 'jacket', bottom: 'ripped', shoes: 'boots', hat: 'none', glasses: 'none', bag: 'none', pattern: 'plain', headScale: 1,
+  punk: {frame: 'masc', face: 'pierced', hair: 'mohawk', top: 'jacket', bottom: 'ripped', shoes: 'boots', hat: 'none', glasses: 'none', bag: 'none', pattern: 'plain', headSize: 1, height: 1.75, build: 1, walkSpeed: 1.35,
     skin: '#cead86', hair1: '#7c0f1f', brows: '#3e3429', eyes: '#31251c', top1: '#242424', top2: '#b4b4b4', bottom1: '#333f47', shoes1: '#242424', soles: '#242424', accent: '#af8749', gear: '#3c5a6e'},
-  woman: {frame: 'fem', face: 'soft', hair: 'bob', top: 'tank', bottom: 'slacks', shoes: 'flats', hat: 'none', glasses: 'none', bag: 'none', pattern: 'plain', headScale: 1,
+  woman: {frame: 'fem', face: 'soft', hair: 'bob', top: 'tank', bottom: 'slacks', shoes: 'flats', hat: 'none', glasses: 'none', bag: 'none', pattern: 'plain', headSize: 1, height: 1.75, build: 1, walkSpeed: 1.35,
     skin: '#cead86', hair1: '#8b7547', brows: '#3e3429', eyes: '#31251c', top1: '#b4b4b4', top2: '#b4b4b4', bottom1: '#9e6238', shoes1: '#3f3f3f', soles: '#3f3f3f', accent: '#af8749', gear: '#3c5a6e'},
 });
 
@@ -40,25 +47,26 @@ export class LookError extends Error {}
 /** Validate a (partial) params object against the def; unknown keys and bad values are refused. */
 export function checkLook(params: unknown): Partial<Look> {
   if (!params || typeof params !== 'object' || Array.isArray(params)) throw new LookError('look must be an object');
-  if (Object.keys(params).length > 24) throw new LookError('look has at most 24 keys');
+  if (Object.keys(params).length > 32) throw new LookError('look has at most 32 keys');
   const r = checkFields(HUMANOID_PARAMS as Record<string, Field>, params as Record<string, Value>, false);
   if (!r.ok) throw new LookError(r.detail);
   return r.values as Partial<Look>;
 }
 /** Full look: defaults filled, a preset expanded to its exact parts and colours (preset kept as the marker that
- *  the kit's exact legacy palette applies), headScale rounded to 0.005 so keys are stable. */
+ *  the kit's exact legacy palette applies; the size params still apply), sizes rounded so keys are stable. */
 export function resolveLook(params: unknown): Look {
   const p = checkLook(params ?? {});
   const filled = checkFields(HUMANOID_PARAMS as Record<string, Field>, p as Record<string, Value>, true);
   if (!filled.ok) throw new LookError(filled.detail);
   const v = filled.values as unknown as Look;
-  if (v.preset !== 'none') return {preset: v.preset, ...PRESET_LOOKS[v.preset]};
-  return {...v, headScale: Math.round(v.headScale * 200) / 200};
+  const size = Object.fromEntries(SIZE_KEYS.map(k => [k, round(v[k], SIZE_STEP[k])])) as Record<SizeKey, number>;
+  if (v.preset !== 'none') return {preset: v.preset, ...PRESET_LOOKS[v.preset], ...size};
+  return {...v, ...size};
 }
 /** The minimal stored form: only keys that differ from the def defaults (a preset look stores just `preset`). */
 export function compactLook(look: Look): Partial<Look> {
-  if (look.preset !== 'none') return {preset: look.preset};
   const out: Record<string, Value> = {};
+  if (look.preset !== 'none') { out.preset = look.preset; for (const k of SIZE_KEYS) if (look[k] !== HUMANOID_PARAMS[k].default) out[k] = look[k]; return out as Partial<Look>; }
   for (const [k, f] of Object.entries(HUMANOID_PARAMS)) if ((look as Record<string, unknown>)[k] !== f.default) out[k] = (look as Record<string, Value>)[k];
   return out as Partial<Look>;
 }
@@ -66,12 +74,16 @@ export function compactLook(look: Look): Partial<Look> {
 export function lookKey(params: unknown): string {
   return LOOK_KEY_PREFIX + sha256Hex(stableStringify(resolveLook(params))).slice(0, 16);
 }
-/** Apply owner edits on top of a current look: a preset is expanded first, so editing one part keeps the rest. */
+/** Apply owner edits on top of a current look: a preset is expanded first, so editing one part keeps the rest.
+ *  Size edits (head size, height, build, walking speed) keep a preset; choosing a preset keeps the current sizes. */
 export function editLook(current: unknown, edits: unknown): Look {
   const base = resolveLook(current ?? {}), e = checkLook(edits);
-  if (e.preset && e.preset !== 'none') return resolveLook({preset: e.preset});
+  const sizes = Object.fromEntries(SIZE_KEYS.map(k => [k, base[k]]));
+  if (e.preset && e.preset !== 'none') return resolveLook({...sizes, ...pickSizes(e), preset: e.preset});
+  if (base.preset !== 'none' && Object.keys(e).every(k => (SIZE_KEYS as readonly string[]).includes(k))) return resolveLook({preset: base.preset, ...sizes, ...e});
   return resolveLook({...base, preset: 'none', ...e});
 }
+const pickSizes = (e: Partial<Look>) => Object.fromEntries(SIZE_KEYS.filter(k => e[k] !== undefined).map(k => [k, e[k]]));
 
 // ---------- seeded looks ----------
 
@@ -109,8 +121,13 @@ export function appearanceFromSeed(seed: number): Look {
     glasses: pickW(r, [['none', 6.5], ['round', 1.2], ['square', 1.2], ['shades', 1]] as const),
     bag: pickW(r, [['none', 6], ['backpack', 2], ['satchel', 1.5]] as const),
     pattern: pickW(r, [['plain', 5.5], ['stripes', 2], ['checks', 1.5], ['knit', 1]] as const),
-    headScale: Math.round((0.96 + r() * 0.08) * 200) / 200,
-    skin: pick(r, SKIN), hair1, brows: darken(hair1, 0.8), eyes: pick(r, EYES), top1, top2, bottom1: pick(r, BOTTOMS), shoes1: pick(r, SHOES), soles: pick(r, SOLES), accent: pick(r, ACCENT), gear: pick(r, GEAR)};
+    headSize: Math.round((0.96 + r() * 0.08) * 200) / 200,
+    skin: pick(r, SKIN), hair1, brows: darken(hair1, 0.8), eyes: pick(r, EYES), top1, top2, bottom1: pick(r, BOTTOMS), shoes1: pick(r, SHOES), soles: pick(r, SOLES), accent: pick(r, ACCENT), gear: pick(r, GEAR),
+    height: 1.75, build: 1, walkSpeed: 1.35};
+  // sizes are drawn last so the seeded parts and colours above stay what they were: a gentle spread of heights
+  // (fem frame a little shorter) and builds; the walking speed stays today's
+  look.height = round((frame === 'fem' ? 1.66 : 1.72) + (r() + r() - 1) * 0.12, 0.01);
+  look.build = round(0.94 + r() * 0.14, 0.01);
   return resolveLook(look);
 }
 
@@ -165,7 +182,8 @@ export function paletteOf(look: Look, legacy?: Partial<Record<Slot, readonly num
 }
 /** Short human summary for CLI/panel output. */
 export function describeLook(look: Look): string {
-  if (look.preset !== 'none') return `preset ${look.preset}`;
+  const size = [look.height !== 1.75 ? `${look.height.toFixed(2)} m` : '', look.build < 0.97 ? 'slim' : look.build > 1.03 ? 'broad' : '', look.headSize !== 1 ? `head ${Math.round(look.headSize * 100)} %` : '', look.walkSpeed !== 1.35 ? `walks ${look.walkSpeed.toFixed(2)} m/s` : ''].filter(Boolean);
+  if (look.preset !== 'none') return `preset ${look.preset}${size.length ? ', ' + size.join(', ') : ''}`;
   const extras = [look.hat !== 'none' ? look.hat : '', look.glasses !== 'none' ? `${look.glasses} glasses` : '', look.bag !== 'none' ? look.bag : '', look.pattern !== 'plain' ? `${look.pattern} top` : ''].filter(Boolean);
-  return `${look.frame} frame, ${look.face} face, ${look.hair} hair, ${look.top}, ${look.bottom}, ${look.shoes}${extras.length ? ', ' + extras.join(', ') : ''}`;
+  return `${look.frame} frame, ${look.face} face, ${look.hair} hair, ${look.top}, ${look.bottom}, ${look.shoes}${extras.length ? ', ' + extras.join(', ') : ''}${size.length ? ', ' + size.join(', ') : ''}`;
 }
