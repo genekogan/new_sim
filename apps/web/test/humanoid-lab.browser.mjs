@@ -12,7 +12,10 @@ assert.ok([4985, 4988, 4989].includes(Number(new URL(base).port)), 'lane L10 por
 const outArg = process.argv.indexOf('--out'), out = outArg > 0 ? process.argv[outArg + 1] : ROOT + '.lane/t2';
 mkdirSync(out, {recursive: true});
 const {chromium} = createRequire(ROOT + 'mars/viewer/package.json')('@playwright/test');
-const browser = await chromium.launch({channel: 'chrome', headless: true, args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist']});
+const {chromeLease} = await import(ROOT + 'tools/god-skill/lib/chrome-lease.mjs');
+const release = await chromeLease('L10-humanoid-lab');
+// real GPU (Metal through ANGLE), never swiftshader (MERGES.md 08:55)
+const browser = await chromium.launch({channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist']});
 const results = {}, ok = (name, v, detail) => { assert.ok(v, `${name}: ${JSON.stringify(detail)}`); results[name] = detail ?? true; console.log('ok', name, detail === undefined ? '' : JSON.stringify(detail)); };
 async function open(query, w = 1600, h = 1000) {
   const page = await browser.newPage({viewport: {width: w, height: h + 200}}), errors = [];
@@ -80,4 +83,4 @@ try {
       ok(`social Soul ${id} pixel diff < 0.5 %`, diff / (a.length / 4) < 0.005, {differing: diff, pct: +(100 * diff / (a.length / 4)).toFixed(3)});
     }
   }
-} finally { await browser.close(); writeFileSync(`${out}/humanoid-lab-results.json`, JSON.stringify(results, null, 1)); }
+} finally { await browser.close(); release(); writeFileSync(`${out}/humanoid-lab-results.json`, JSON.stringify(results, null, 1)); }
