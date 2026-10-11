@@ -39,6 +39,9 @@ export class Hub {
   epoch = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   build = 'dev';
   private lastTakeTick = -1;
+  /** Take recordings (take_chunks) are a pose-keyframe cache, off by default (TAKES_PERSIST=1 turns them on).
+   * The engine's in-memory live buffer still feeds new viewers; the event log rebuilds a world. */
+  persistTakes = process.env.TAKES_PERSIST === '1';
   host: WorldHost; auth: Auth; db: Db;
   private lifecycleSouls?:Souls;
   private station?:CandidateStationV1;
@@ -74,7 +77,9 @@ export class Hub {
         if (!chunks.length) return;
         for (const chunk of chunks) {
           const ref=(chunk.take as {renderSceneRef?:{hash:string}}).renderSceneRef;
-          db.saveTake(host.worldId,chunk,ref&&!db.hasRenderSceneCapture(host.worldId,ref.hash)?host.engine.takeScene?.(ref.hash):undefined);
+          const scene=ref&&!db.hasRenderSceneCapture(host.worldId,ref.hash)?host.engine.takeScene?.(ref.hash):undefined;
+          if(this.persistTakes)db.saveTake(host.worldId,chunk,scene);
+          else if(scene)db.saveRenderSceneCapture(host.worldId,scene);
         }
         this.lastTakeTick = chunks.at(-1)!.toTick;
         if (chunks.length) this.broadcast({t: 'takes', serverTick: tick, chunks});

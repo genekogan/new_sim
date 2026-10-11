@@ -9,7 +9,9 @@ if (!/^[a-z][a-z0-9-]{0,31}$/.test(worldKey)) throw new Error('invalid WORLD_KEY
 /** Worlds with authored content and their own factories; any other key is an entity world (ENABLE_WORLD_ENGINE) on the green field. */
 export const KNOWN_WORLD_KEYS = ['toy', 'mars', 'littlemartians', 'eden'] as const;
 export const config = {
-  archiveTakes: env.ARCHIVE_TAKES === '1',
+  /** Take recordings (take_chunks + the R2 take archive) are a pose-keyframe cache, not the source of truth: off by default. */
+  takesPersist: env.TAKES_PERSIST === '1',
+  archiveTakes: env.ARCHIVE_TAKES === '1' && env.TAKES_PERSIST === '1',
   r2: {account:env.R2_ACCOUNT_ID,bucket:env.R2_BUCKET,endpoint:env.R2_ENDPOINT,access:env.R2_ACCESS_KEY_ID,secret:env.R2_SECRET_ACCESS_KEY,prefix:env.R2_PREFIX??'sim'},
   worldKey,
   /** God mode + entity world (spec eden4/28): on for every non-authored key, or by explicit flag. */

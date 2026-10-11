@@ -69,6 +69,13 @@ export class Db {
       this.db.exec('COMMIT');
     } catch(error) {this.db.exec('ROLLBACK');throw error;}
   }
+  /** Stores only the public render scene a live take references (tiny, one row per
+   * scene hash). Used when take recordings are off (TAKES_PERSIST unset) so
+   * /v1/scenes/:hash still resolves for live viewers. */
+  saveRenderSceneCapture(worldId:string,scene:RenderSceneCaptureV1) {
+    const captured=parseRenderSceneCapture(scene);
+    this.db.prepare('INSERT OR IGNORE INTO render_scene_captures VALUES (?,?,?)').run(worldId,captured.ref.hash,JSON.stringify(captured));
+  }
   /** Public rendering data only, scoped to the selected world and verified on
    * read. Retained separately from take pruning and independent of live code. */
   renderSceneCapture(worldId:string,hash:string):RenderSceneCaptureV1|undefined {
