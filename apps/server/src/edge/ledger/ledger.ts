@@ -43,6 +43,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
   private placeListeners: ((e: {soulId: string; from: string | null; to: string | null; tick: number}) => void)[] = [];
   private providers: ((s: EdgeSoul) => EdgeCapability[])[] = [];
   /** MW: a world profile (worlds/*: Mars camp work, floater bodies) adds planned capabilities and drops ones its bodies cannot do. */
+  /** R4-LIVE (god worlds only): the weather now, for `here` and Eyes; unset on the live worlds (engine env.weather). */
+  weatherNow?: () => {clouds: number; rain: number; wind: number; fog: number; kind: string; lightning: number};
   worldProfile?: (soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>) => void;
   private pending = new Map<string, Pending>();           // soulId → waiting act
   private lastPlace = new Map<string, string | null>();

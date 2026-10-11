@@ -45,7 +45,7 @@ export const scenePublicationSchema = z.object({
   }).passthrough().nullable(),
   buildings: z.array(z.object({ file: z.string(), p: vec3, yaw: finite.optional() }).passthrough()).optional(),
   kin: z.array(z.object({ model: z.string(), p: vec3, yaw: finite.optional(), radius: finite.positive().optional(), hoverHeight: finite.optional() }).passthrough()).optional(),
-  clock: z.object({ origin: tick, dayTicks: tick.positive() }).nullable().optional(),
+  clock: z.object({ origin: z.number().int().safe() /* negative on a god world whose time of day was set early (R4-LIVE) */, dayTicks: tick.positive() }).nullable().optional(),
   ground: z.literal('grass').optional(),
 }).passthrough();
 export type ScenePublication = z.infer<typeof scenePublicationSchema>;
