@@ -27,6 +27,8 @@ import vocabW2 from './vocab-w2.json' with { type: 'json' };
 import vocabW3 from './vocab-w3.json' with { type: 'json' };
 // LAYERS: land-use zones (core/zone@1)
 import layers from './layers.json' with { type: 'json' };
+// MARSLAND-FAR: scenery beyond the walkable edge (core/far-land@1, core/panorama@1; packages/generators/scripts/mk-scenery-kit.ts)
+import scenery from './scenery.json' with { type: 'json' };
 import type { DefInput } from '../schemas.ts';
 
-export const FAMILY_KITS: DefInput[] = /* @__PURE__ */ [creatures, furniture, props, structures, plants, transport, civic, play, kitchen, work, signage, mesh, terrain, mars, littlemartians, vocab, vocab2, vocabW1, vocabW2, vocabW3, layers].flat() as unknown as DefInput[];
+export const FAMILY_KITS: DefInput[] = /* @__PURE__ */ [creatures, furniture, props, structures, plants, transport, civic, play, kitchen, work, signage, mesh, terrain, mars, littlemartians, vocab, vocab2, vocabW1, vocabW2, vocabW3, layers, scenery].flat() as unknown as DefInput[];

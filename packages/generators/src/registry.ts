@@ -6,10 +6,11 @@ import { boxGen, lakeGen, landformGen, scatterGen } from './basic.ts';
 import { buildingGen, stairsGen } from './building.ts';
 import { kitGen } from './kit.ts';
 import { PATH_GENERATORS } from './paths.ts';
+import { SCENERY_GENERATORS } from './scenery.ts';
 import type { Generator } from './types.ts';
 
 export const GENERATORS: Record<string, Generator> = Object.fromEntries(
-  [boxGen, landformGen, lakeGen, scatterGen, kitGen, buildingGen, stairsGen, animalsGen, ...PATH_GENERATORS, ...AREA_GENERATORS].map((g) => [g.id, g]),
+  [boxGen, landformGen, lakeGen, scatterGen, kitGen, buildingGen, stairsGen, animalsGen, ...PATH_GENERATORS, ...AREA_GENERATORS, ...SCENERY_GENERATORS].map((g) => [g.id, g]),
 );
 export function registerGenerator(g: Generator) { GENERATORS[g.id] = g; }
 export function generator(id: string): Generator | undefined { return GENERATORS[id]; }
