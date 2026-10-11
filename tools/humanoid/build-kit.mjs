@@ -60,19 +60,30 @@ const FRAMES = {masc: 'casual', fem: 'woman'}; // frame → shipped GLB that def
 // hair by name; the largest other material of a part is its main colour, the next its accent).
 const slug = name => name.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '').toLowerCase();
 const nameOf = file => file.replace(/\.glb$/, '');
+// A character's skinned part node → its kit part (Head/Body/Legs/Feet). Some packs name legs "Pants" and carry extras:
+// a backpack is worn with the top; hand-held weapons (Pistol) are not looks and are left out (null).
+const SUFFIX_ALIAS = {Pants: 'Legs', Backpack: 'Body', Pistol: null};
+const partSuffix = holder => { const s = holder.slice(holder.lastIndexOf('_') + 1); return s in SUFFIX_ALIAS ? SUFFIX_ALIAS[s] : s; };
 const autoFrames = existsSync(PARTS_DIR + 'frames.json') ? JSON.parse(readFileSync(PARTS_DIR + 'frames.json', 'utf8')) : {};
 function autoCharacter(source, g) {
   const id = slug(source), bySuffix = {};
-  g.scene.traverse(o => { if (!o.isSkinnedMesh) return; const holder = o.parent && !o.parent.isBone && o.parent.name !== 'CharacterArmature' ? o.parent.name : o.name, suffix = holder.slice(holder.lastIndexOf('_') + 1);
+  g.scene.traverse(o => { if (!o.isSkinnedMesh) return; const holder = o.parent && !o.parent.isBone && o.parent.name !== 'CharacterArmature' ? o.parent.name : o.name, suffix = partSuffix(holder);
+    if (!suffix) return;
     (bySuffix[suffix] ??= {})[o.material.name] = (bySuffix[suffix][o.material.name] ?? 0) + o.geometry.attributes.position.count; });
   const partMaterials = {};
   for (const [suffix, mats] of Object.entries(bySuffix)) {
     const out = partMaterials[suffix] = {}, rest = [];
-    for (const [m] of Object.entries(mats).sort((a, b) => b[1] - a[1])) {
+    const sorted = Object.entries(mats).sort((a, b) => b[1] - a[1]);
+    const HAIR = /hair|beard|mustache|moustache/i;
+    // Heads whose hair is named by its colour (the women's pack: Red, Pink, DarkBrown): the largest non-skin head
+    // material of at least 1000 vertices is the hair. Eyes there are tiny colour-named materials (Brown:48).
+    // A tiny "Hair_*" (≤ 128 vertices) is the eyebrows.
+    const hairByColour = suffix === 'Head' && !sorted.some(([m, n]) => HAIR.test(m) && n > 128) ? sorted.find(([m, n]) => !/skin/i.test(m) && n >= 1000 && !/^(sci|swat|visor|grey|gold)/i.test(m))?.[0] : null;
+    for (const [m, n] of sorted) {
       if (/skin/i.test(m)) out[m] = /dark/i.test(m) ? ['skinShade', 'skin', .62] : ['skin', 'skin', .62];
-      else if (/brow/i.test(m)) out[m] = ['brows', 'brow', .82];
-      else if (/^eye/i.test(m)) out[m] = ['eyes', 'eye', .22];
-      else if (suffix === 'Head' && /hair|beard|mustache|moustache/i.test(m)) out[m] = ['hair', 'hair', .58, 'hair'];
+      else if (/eyebrow|^brows?$/i.test(m) || (suffix === 'Head' && HAIR.test(m) && n <= 128)) out[m] = ['brows', 'brow', .82];
+      else if (/^eye/i.test(m) || (suffix === 'Head' && /^brown$/i.test(m) && n <= 128)) out[m] = ['eyes', 'eye', .22]; // the women's pack names its eyes "Brown"
+      else if (suffix === 'Head' && (HAIR.test(m) || m === hairByColour)) out[m] = ['hair', 'hair', .58, 'hair'];
       else rest.push(m);
     }
     const main = {Head: [['accent', 'trinket', .36]], Body: [['top1', 'cloth', .88], ['top2', 'cloth', .88]], Legs: [['bottom', 'cloth', .9], ['top2', 'cloth', .88]], Feet: [['shoes', 'leather', .6], ['soles', 'sole', .9]]}[suffix] ?? [];
@@ -149,6 +160,11 @@ const quantWeights = (w4) => { // uint8 weights summing to exactly 255 (largest 
   for (let k = 0; left > 0; k++, left--) q[order[k % 4][1]]++;
   return q;
 };
+// Source bone name → frame bone index (names as three.js sanitizes them: dots dropped).
+// neutral_bone is the glTF exporter's holder for unweighted vertices (a belt and pouch, already in bind space): they
+// ride the Hips unchanged.
+const BONE_ALIAS = {HandL: 'WristL', HandR: 'WristR', neutral_bone: 'Hips'}, NEUTRAL = new Set(['neutral_bone']);
+const frameBone = (frame, name) => { const n = frames[frame].names; const j = n.indexOf(name); return j >= 0 ? j : n.indexOf(BONE_ALIAS[name] ?? ''); };
 const repose = (from, to) => from.ib.map((ibFrom, j) => new THREE.Matrix4().copy(frames[to].ib[j]).invert().multiply(ibFrom));
 
 const skipped = [];
@@ -156,15 +172,20 @@ for (const source of extra) CHARACTERS.push(autoCharacter(source, await load(PAR
 for (const ch of CHARACTERS) {
   const file = PARTS_DIR + ch.source + '.glb', g = existsSync(file) ? await load(file) : shipped[ch.shipped];
   if (ch.auto) { // an automatic character whose skeleton is not one of the two frames' bind poses is skipped, named
-    let bad = null; g.scene.traverse(o => { if (bad || !o.isSkinnedMesh) return; o.skeleton.bones.forEach((b, i) => { const j = frames[ch.frame].names.indexOf(b.name); if (j < 0) bad = 'bone ' + b.name; else if (o.skeleton.boneInverses[i].elements.some((v, k) => Math.abs(v - frames[ch.frame].ib[j].elements[k]) > 1e-4)) bad ??= 'bind pose of ' + b.name; }); });
-    if (bad) { skipped.push(`${ch.source}: ${bad} differs from frame ${ch.frame}`); continue; }
+    // Same bones in the same bind pose: used as is. Otherwise (the Ultimate Modular Women pack: 51 bones, Hand for Wrist,
+    // three finger joints, its own proportions) every bone must map to a frame bone by name (BONE_ALIAS); the skin is
+    // then re-posed into the frame's bind pose at load (v' = Σ w · inv(IB_frame)·IB_source · v) and rides the frame's rig.
+    let bad = null, unmapped = null; g.scene.traverse(o => { if (unmapped || !o.isSkinnedMesh) return; o.skeleton.bones.forEach((b, i) => { const j = frameBone(ch.frame, b.name); if (j < 0) unmapped = 'bone ' + b.name; else if (o.skeleton.boneInverses[i].elements.some((v, k) => Math.abs(v - frames[ch.frame].ib[j].elements[k]) > 1e-4)) bad ??= 'bind pose of ' + b.name; }); });
+    if (unmapped) { skipped.push(`${ch.source}: ${unmapped} has no bone in frame ${ch.frame}`); continue; }
+    ch.retarget = !!bad;
   }
-  const via = existsSync(file) ? 'blend export' : 'shipped GLB';
+  const via = existsSync(file) ? (ch.retarget ? 'blend export, re-posed to the frame' : 'blend export') : 'shipped GLB';
   const groups = new Map(); // part node suffix → [skinned meshes]
   g.scene.traverse(o => {
     if (!o.isSkinnedMesh) return;
     const holder = o.parent && !o.parent.isBone && o.parent.name !== 'CharacterArmature' ? o.parent.name : o.name;
-    const suffix = holder.slice(holder.lastIndexOf('_') + 1);
+    const suffix = ch.auto ? partSuffix(holder) : holder.slice(holder.lastIndexOf('_') + 1);
+    if (!suffix) return;
     if (!ch.parts[suffix]) throw Error(`${ch.source}: unknown part node ${holder}`);
     if (!groups.has(suffix)) groups.set(suffix, []); groups.get(suffix).push(o);
   });
@@ -177,12 +198,19 @@ for (const ch of CHARACTERS) {
     for (const m of pick) {
       const def = ch.partMaterials?.[suffix]?.[m.material.name] ?? ch.materials[m.material.name];
       const geo = m.geometry, base = pos.length / 3, sk = m.skeleton;
-      const remap = sk.bones.map(b => { const i = frames[ch.frame].names.indexOf(b.name); if (i < 0) throw Error('unknown bone ' + b.name); return i; });
-      // the source skin must be the native frame's bind pose (within float noise)
-      sk.boneInverses.forEach((ib, i) => { const ref = frames[ch.frame].ib[remap[i]]; if (ib.elements.some((v, k) => Math.abs(v - ref.elements[k]) > 1e-4)) throw Error(`${ch.source}: bind pose of ${sk.bones[i].name} differs from frame ${ch.frame}`); });
+      const remap = sk.bones.map(b => { const i = frameBone(ch.frame, b.name); if (i < 0) throw Error('unknown bone ' + b.name); return i; });
+      // the source skin must be the native frame's bind pose (within float noise), unless it is re-posed (retarget)
+      if (!ch.retarget) sk.boneInverses.forEach((ib, i) => { const ref = frames[ch.frame].ib[remap[i]]; if (ib.elements.some((v, k) => Math.abs(v - ref.elements[k]) > 1e-4)) throw Error(`${ch.source}: bind pose of ${sk.bones[i].name} differs from frame ${ch.frame}`); });
+      const RT = ch.retarget ? sk.boneInverses.map((ib, i) => NEUTRAL.has(sk.bones[i].name) ? new THREE.Matrix4() : new THREE.Matrix4().copy(frames[ch.frame].ib[remap[i]]).invert().multiply(ib)) : null;
       const P = geo.attributes.position, N = geo.attributes.normal, J = geo.attributes.skinIndex, W = geo.attributes.skinWeight;
+      const rv = new THREE.Vector3(), rn = new THREE.Vector3(), ra = new THREE.Vector3(), ran = new THREE.Vector3(), rm3 = new THREE.Matrix3();
       for (let i = 0; i < P.count; i++) {
-        pos.push(P.getX(i), P.getY(i), P.getZ(i)); nor.push(N.getX(i), N.getY(i), N.getZ(i));
+        if (RT) {
+          ra.set(0, 0, 0); ran.set(0, 0, 0);
+          for (const [jj, ww] of [[J.getX(i), W.getX(i)], [J.getY(i), W.getY(i)], [J.getZ(i), W.getZ(i)], [J.getW(i), W.getW(i)]]) { if (!ww) continue;
+            ra.addScaledVector(rv.set(P.getX(i), P.getY(i), P.getZ(i)).applyMatrix4(RT[jj]), ww); ran.addScaledVector(rn.set(N.getX(i), N.getY(i), N.getZ(i)).applyMatrix3(rm3.getNormalMatrix(RT[jj])), ww); }
+          ran.normalize(); pos.push(ra.x, ra.y, ra.z); nor.push(ran.x, ran.y, ran.z);
+        } else { pos.push(P.getX(i), P.getY(i), P.getZ(i)); nor.push(N.getX(i), N.getY(i), N.getZ(i)); }
         joi.push(remap[J.getX(i)], remap[J.getY(i)], remap[J.getZ(i)], remap[J.getW(i)]); wei.push(W.getX(i), W.getY(i), W.getZ(i), W.getW(i));
         info.push(S(def[0]), ROLE[def[1]], Math.round(def[2] * 255), def[4] ?? 0);
       }

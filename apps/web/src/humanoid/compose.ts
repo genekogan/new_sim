@@ -6,7 +6,7 @@ import * as THREE from 'three';
 import type {GLTFLoader} from 'three/addons/loaders/GLTFLoader.js';
 import {clone as cloneSkinned} from 'three/addons/utils/SkeletonUtils.js';
 import {templateFromParts, type Template} from '../../../../mars/viewer/app/engine-view/people.ts';
-import {resolveLook, lookKey, paletteOf, type Look, type Slot} from './look.ts';
+import {resolveLook, lookKey, paletteOf, HEADGEAR_FACES, type Look, type Slot} from './look.ts';
 import {humanoidMaterial} from './material.ts';
 import {hatPieces, glassesPieces, bagPieces, skinned, type HeadFit} from './props.ts';
 
@@ -148,8 +148,10 @@ export class HumanoidKit {
       const hair = look.hair === 'bald' ? null : await this.part('hair', look.hair, look.frame);
       const lf = m.parts.face[look.face].landmarks[look.frame], lh = hair ? m.parts.hair[look.hair].landmarks[look.frame] : null;
       const fit: HeadFit = {cz: (lh ?? lf).cz!, rx: Math.max(lf.rx!, lh?.rx ?? 0), rz: Math.max(lf.rz!, lh?.rz ?? 0), top: Math.max(lf.top!, lh?.top ?? 0), eye: lf.eye!, eyeX: lf.eyeX!, templeX: lf.templeX ?? lf.rx!};
-      const pieces = [...hatPieces(look.hat as Look['hat'], fit, fr.index.head), ...glassesPieces(look.glasses as Look['glasses'], fit, fr.index.head)].map(skinned);
-      const geo = mergeParts([face, ...(hair ? [look.hat !== 'none' ? withoutFlag(hair, HIDE_UNDER_HAT) : hair] : []), ...pieces]);
+      // a face with its own headgear takes no extra hat or glasses (HEADGEAR_FACES); glasses need the face's eye line
+      const gear = HEADGEAR_FACES.has(look.face);
+      const pieces = gear ? [] : [...hatPieces(look.hat as Look['hat'], fit, fr.index.head), ...(lf.eye ? glassesPieces(look.glasses as Look['glasses'], fit, fr.index.head) : [])].map(skinned);
+      const geo = mergeParts([face, ...(hair ? [look.hat !== 'none' || gear ? withoutFlag(hair, HIDE_UNDER_HAT) : hair] : []), ...pieces]);
       return scaleHead(geo, look.headSize, fr.joints.head, fr.index.head);
     })());
     return p;
