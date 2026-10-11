@@ -160,6 +160,16 @@ try {
     return { ...r, state: (await ent('phone-box'))?.state, history: h.out.slice(0, 900) };
   }, (r) => r.phase === 'completed' && r.state?.open === true);
 
+  // the 30 pilot types, in a row each (props and fixtures at x 4 m apart; buildings and sets on their own row)
+  const PILOT = ['door', 'window', 'desk-lamp', 'fireplace', 'phone-box', 'traffic-cone', 'kiosk', 'market-stall', 'wind-turbine', 'power-pole', 'water-tower', 'recycling-bins', 'postbox', 'parking-meter', 'drinking-fountain', 'newspaper-stand', 'street-clock', 'bike-shelter', 'scaffold-tower', 'road-barrier', 'cement-mixer', 'skip', 'television', 'radio', 'candle', 'chest'];
+  const BIG = ['corner-shop', 'cafe', 'bakery', 'cafe-terrace'];
+  await step('G3 every pilot type places by name in a showcase row (26 props/fixtures + 3 shop presets + the terrace set)', async () => {
+    const res = []; let x = -60;
+    for (const n of PILOT) { const g = await god('place', n, '--at', `${x},40`, '--facing', 's', '--name', `show-${n}`, '--nudge'); res.push({ n, ok: g.code === 0 && !/REFUSED|Error/i.test(g.out + g.err), out: (g.out + g.err).slice(0, 160) }); x += 5; }
+    x = -40; for (const n of BIG) { const g = await god('place', n, '--at', `${x},62`, '--facing', 's', '--name', `show-${n}`, '--nudge'); res.push({ n, ok: g.code === 0 && !/REFUSED|Error/i.test(g.out + g.err), out: (g.out + g.err).slice(0, 160) }); x += 22; }
+    return { placed: res.filter((r) => r.ok).length, failed: res.filter((r) => !r.ok) };
+  }, (r) => r.placed === 30);
+
   // ---------- the viewer: real Chrome (GPU), the lease
   if (chromium && !args['no-viewer']) for (const dpr of dprs) {
     const release = await chromeLease('vocab-mech-e2e').catch(() => null);
@@ -185,11 +195,12 @@ try {
         return { ...s, errors };
       }, (r) => r?.active && !errors.length);
       await step(`V2[${d}] close-ups: the open glazed door (worn), the fire out, the open phone box`, async () => {
+        if ((await ent('blue-door'))?.state?.open !== true) { await ana.act(`object:${door.id}:unlock`); await ana.act(`object:${door.id}:open`); await sleep(1500); }
         await look([1.5, 1.8, -0.5], [0, 1.1, -4]); await sleep(1200); await snap('v2-door-open');
         await look([-4.2, 1.5, -2.2], [-5, 0.6, -5]); await sleep(1200); await snap('v2-fire-out');
         await look([6.5, 2, -1.8], [5, 1.3, -5]); await sleep(1200); await snap('v2-phonebox-open');
-        return { errors };
-      }, (r) => !r.errors.length);
+        return { errors, door: (await ent('blue-door'))?.state };
+      }, (r) => !r.errors.length && r.door?.open === true);
       await step(`V3[${d}] params: a stretched + tapered cone beside a plain one, a round stretched window, a phone box under construction`, async () => {
         await look([-2.5, 1.2, 5.5], [-2.5, 0.5, 3]); await sleep(1200); await snap('v3-cones');
         await look([-8, 1.4, -2], [-8, 0.9, -5]); await sleep(1200); await snap('v3-round-window');
@@ -198,7 +209,13 @@ try {
         await look([12, 4, 10], [9, 0.7, 5]); await sleep(1500); await snap('v3-terrace');
         return { errors };
       }, (r) => !r.errors.length);
+      await step(`V5[${d}] the showcase: all 30 pilot types in rows (four shots along the row, one of the shops)`, async () => {
+        for (const [i, x] of [-50, -25, 0, 25, 50].entries()) { await look([x, 7, 62], [x, 1.5, 40]); await sleep(1800); await snap(`v5-row-${i + 1}`); }
+        await look([0, 14, 88], [0, 2, 62]); await sleep(2500); await snap('v5-shops');
+        return { errors };
+      }, (r) => !r.errors.length);
       await step(`V4[${d}] Ana closes the phone box: the viewer redraws it closed (state through the world diff)`, async () => {
+        if ((await ent('phone-box'))?.state?.open !== true) { await ana.act(`object:${box.id}:open`); await sleep(800); }   // a second dpr pass finds it closed
         const r = await ana.act(`object:${box.id}:close`); await sleep(1500);
         await look([6.5, 2, -1.8], [5, 1.3, -5]); await sleep(800); await snap('v4-phonebox-closed');
         return { ...r, errors };

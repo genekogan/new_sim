@@ -18,7 +18,8 @@ export const rbox = (at, size, c, o = {}) => ({ kind: 'rbox', at: v(at), size: v
 export const cbox = (at, size, c, o = {}) => ({ __cbox: true, at, size, c, o });
 function resolveCbox(sh, kitRound) {
   if (!sh.__cbox) return sh;
-  const { at, size, c } = sh, [w, h, d] = size, { round: _r, ...o } = sh.o;
+  // a cbox inside withRole carries its role and pivot (VOCAB-2 found the door leaf stayed shut without this)
+  const { at, size, c } = sh, [w, h, d] = size, { round: _r, ...o } = { ...sh.o, ...(sh.role ? { role: sh.role, pivot: sh.pivot } : {}) };
   if (o.pitch || o.roll) return rbox(at, size, c, { round: Math.min(0.03, kitRound), ...o });
   if (Math.min(w, h, d) < 0.012) return box(at, size, c, o);
   const b = Math.min(kitRound, 0.03);

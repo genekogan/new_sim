@@ -52,6 +52,13 @@ Prefer kit/2: it is code (tiny to deliver: 0 asset bytes), recolourable, and the
   vegetation/component 1500, vehicle 1200, utility 2000, building/public/transport/terrain/water 6000.
 - Colours via tint keys (`'paint'`, `'frame'` …) with a palette; every tint key becomes a colour param (paint slots).
   Use the Eden palettes in the family files (warm stone, oak, sage, cream, iron); avoid pure primaries.
+- Def fields that are enums: `layer` = solid · surface · volume · decor (decor = small, never blocks); `anchor` = base ·
+  center · conform · drape · float. Component shapes (e.g. `readable: { pages }`, `spin: { axis, rpm, role }`,
+  `container: { capacity }`) are in `componentsSchema`, `packages/world-compiler/src/schemas.ts`.
+- Primitive gotchas: `cyl(at, r, h, c, { r2 })` — `r` is the bottom radius, `r2` the top; `extrude` lays its polygon
+  in x/z and extrudes up `h` — to stand a trapezoid upright use `pitch: -Math.PI / 2` (polygon z becomes height,
+  thickness goes towards −z). Parts in a role (`withRole`) move together about the role's pivot; a role with `spin`
+  stops while its actuator is off (`on: false` / `playing: false`).
 
 ## 4. Parameters: the conventions
 Every catalogue type declares its params with ranges and defaults; the compiler refuses anything outside them
@@ -111,7 +118,8 @@ instrument, workstation, boardGame, venue, carrier, place, water, stairs, ramp (
 3. `node packages/world-compiler/src/core-kit/authoring/build.mjs` — writes the JSON, measures real triangles, runs the
    **lint** (`vocab.lintDef`: category known, description, numeric params ranged with defaults inside, conventions
    typed right, actions use declared state, slots fit the category, tri budget). It exits 1 on any error.
-4. Look at it: `node tools/god-skill/scripts/thumbs.mjs --port <yours> --q "<name>" --limit 3` (real Chrome via the
+4. Look at it: `node tools/god-skill/scripts/thumbs.mjs --port <yours> --q "<name>" --limit 3` (`--q` is a search,
+   one name at a time; it re-renders whatever matches) (real Chrome via the
    lease; PNGs in `.lane/thumbs/`), and for variants/states place them in a dev world and screenshot (see the e2e).
    Fix what looks wrong; never ship a type you have not looked at.
 5. Tests: `node --test apps/server/src/god/catalog.test.ts` (it lints every def with a category). Add an e2e step only

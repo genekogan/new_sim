@@ -322,7 +322,7 @@ export function lintDef(d: VocabDef, o: { tris?: number; requireCategory?: boole
   if (within(cat, 'furniture.seat') && !i.slots.some((s) => s.startsWith('sit'))) warnings.push('a seat with no seat slot: Souls cannot sit on it');
   if (within(cat, 'furniture.bed') && !i.slots.some((s) => s.startsWith('lie'))) warnings.push('a bed with no bed slot');
   if (within(cat, 'furniture.table') && !i.verbs.includes('put-on')) warnings.push('a table with no surface slot');
-  if (within(cat, 'building') && !i.verbs.includes('inside') && !(d.components ?? {} as Record<string, unknown>).place && d.make.kind !== 'parts') warnings.push('a building with no rooms or place: Souls cannot enter it');
+  if (within(cat, 'building') && !(d as { extends?: string }).extends && !i.verbs.includes('inside') && !(d.components ?? {} as Record<string, unknown>).place && d.make.kind !== 'parts') warnings.push('a building with no rooms or place: Souls cannot enter it');
   const tris = o.tris ?? d.budget?.tris ?? 0, budget = triBudget(cat);
   if (tris > budget) errors.push(`${tris} triangles over the ${cat} budget ${budget}`);
   if (!(d.synonyms?.length) && d.category) warnings.push('no synonyms: add the words people use for it (bodega, corner shop …)');

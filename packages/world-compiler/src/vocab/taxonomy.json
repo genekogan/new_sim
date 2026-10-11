@@ -1,119 +1,1898 @@
 {
-  "schema": "taxonomy/1",
-  "doc": "The catalogue's category tree (VOCAB-MECH). Every def has one category (def.category, else inferred by vocab/infer.ts). `syn` are words a god may use for the category; `want` lists the types a full catalogue should hold there (workers induct them); `via` says which mechanism serves a world layer that is not a def.",
-  "nodes": [
-    { "id": "terrain", "label": "Terrain and ground", "syn": ["land", "ground", "landscape", "topography"] },
-    { "id": "terrain.landform", "label": "Landforms", "syn": ["hill", "mountain", "valley", "cliff", "mound", "ridge", "dune"], "want": ["knoll", "hill", "mountain", "plateau", "valley", "cliff", "ridge", "dune", "crater", "canyon", "mesa", "terrace"] },
-    { "id": "terrain.rock", "label": "Rocks and stone", "syn": ["boulder", "stone", "pebble", "outcrop", "crag"], "want": ["boulder", "rock-pile", "outcrop", "standing-stone", "scree", "pebbles", "stepping-stones"] },
-    { "id": "terrain.ground", "label": "Ground covers and surfaces", "syn": ["surface", "floor", "paving", "soil", "dirt", "sand", "gravel", "mud", "snow"], "want": ["lawn", "gravel-patch", "sand-patch", "mud-patch", "snow-patch", "dirt-patch", "paving", "cobbles", "boardwalk", "puddle"] },
-    { "id": "terrain.cave", "label": "Caves and hollows", "syn": ["cave", "grotto", "tunnel", "burrow"], "want": ["cave-mouth", "grotto", "tunnel", "sinkhole"] },
-
-    { "id": "water", "label": "Water", "syn": ["aquatic", "wet"] },
-    { "id": "water.body", "label": "Still water", "syn": ["lake", "pond", "pool", "lagoon", "sea", "ocean", "reservoir"], "want": ["pond", "lake", "pool", "lagoon", "sea", "reservoir", "swimming-pool"] },
-    { "id": "water.flow", "label": "Flowing water", "syn": ["river", "stream", "creek", "brook", "canal", "waterfall"], "want": ["river", "stream", "canal", "waterfall", "rapids", "spring"] },
-    { "id": "water.feature", "label": "Water features", "syn": ["fountain", "well", "basin", "trough", "birdbath"], "want": ["fountain", "well", "trough", "birdbath", "water-tap", "drinking-fountain", "rain-barrel", "pump"] },
-    { "id": "water.shore", "label": "Shores and waterside", "syn": ["beach", "shore", "bank", "jetty", "dock", "marsh", "wetland"], "want": ["beach", "pier", "jetty", "marsh", "reeds", "sea-wall", "slipway", "buoy"] },
-
-    { "id": "vegetation", "label": "Vegetation", "syn": ["plant", "plants", "greenery", "flora"] },
-    { "id": "vegetation.tree", "label": "Trees", "syn": ["tree", "oak", "pine", "birch", "willow", "palm", "conifer", "fruit-tree"], "want": ["oak", "pine", "birch", "willow", "palm", "apple-tree", "cherry-tree", "maple", "cypress", "dead-tree", "sapling"] },
-    { "id": "vegetation.shrub", "label": "Shrubs and hedges", "syn": ["bush", "shrub", "hedge", "topiary"], "want": ["bush", "hedge", "topiary", "rose-bush", "berry-bush"] },
-    { "id": "vegetation.flower", "label": "Flowers and ground plants", "syn": ["flower", "flowers", "wildflower", "fern", "grass", "reeds", "weeds"], "want": ["wildflowers", "tulips", "sunflower", "fern", "tall-grass", "lily-pad", "ivy"] },
-    { "id": "vegetation.crop", "label": "Crops and produce", "syn": ["crop", "vegetable", "veg", "harvest", "fruit", "field"], "want": ["wheat", "corn", "carrot", "lettuce", "tomato", "pumpkin", "vineyard-row", "orchard-row", "hay-bale"] },
-    { "id": "vegetation.cover", "label": "Planted areas", "syn": ["forest", "woods", "meadow", "garden", "orchard", "woodland"], "want": ["forest", "meadow", "garden-bed", "orchard", "vineyard", "flower-bed", "allotment"] },
-    { "id": "vegetation.fungus", "label": "Fungi, moss and desert plants", "syn": ["mushroom", "toadstool", "moss", "cactus", "succulent", "lichen"], "want": ["mushroom", "moss-mat", "cactus", "succulent"] },
-    { "id": "vegetation.potted", "label": "Potted plants", "syn": ["planter", "pot", "houseplant", "window-box"], "want": ["potted-plant", "planter", "window-box", "hanging-basket"] },
-
-    { "id": "building", "label": "Buildings", "syn": ["building", "house", "structure", "architecture"] },
-    { "id": "building.residential", "label": "Residential", "syn": ["house", "home", "cottage", "cabin", "apartment", "flat", "villa", "hut", "dwelling", "townhouse", "bungalow"], "want": ["cottage", "townhouse", "apartment-block", "cabin", "villa", "bungalow", "row-house", "treehouse", "tent", "yurt", "houseboat"] },
-    { "id": "building.commercial", "label": "Commercial", "syn": ["shop", "store", "bodega", "corner-shop", "cafe", "bar", "pub", "restaurant", "bakery", "market", "kiosk", "hotel", "office", "bank"], "want": ["corner-shop", "cafe", "bakery", "pub", "restaurant", "market-hall", "kiosk", "hotel", "office-block", "bank", "pharmacy", "petrol-station", "barber"] },
-    { "id": "building.civic", "label": "Civic and religious", "syn": ["town-hall", "library", "school", "hospital", "clinic", "police", "fire-station", "post-office", "museum", "chapel", "church", "temple", "mosque", "shrine"], "want": ["town-hall", "library", "school", "clinic", "fire-station", "post-office", "museum", "chapel", "temple", "courthouse", "community-hall"] },
-    { "id": "building.industrial", "label": "Industrial", "syn": ["factory", "warehouse", "workshop", "mill", "depot", "smithy", "foundry", "plant"], "want": ["warehouse", "workshop", "factory", "windmill", "watermill", "smithy", "depot", "silo", "chimney"] },
-    { "id": "building.agricultural", "label": "Agricultural", "syn": ["barn", "farm", "stable", "coop", "greenhouse", "silo", "granary", "shed"], "want": ["barn", "stable", "chicken-coop", "greenhouse", "silo", "granary", "farmhouse", "pigsty", "beehive"] },
-    { "id": "building.shelter", "label": "Shelters and pavilions", "syn": ["gazebo", "pavilion", "pergola", "kiosk", "shelter", "canopy", "tent", "bandstand", "dome", "tower", "lighthouse"], "want": ["gazebo", "pavilion", "pergola", "bandstand", "canopy", "tent", "lighthouse", "watchtower"] },
-
-    { "id": "public", "label": "Recreation and public space", "syn": ["public", "recreation", "leisure", "park"] },
-    { "id": "public.square", "label": "Squares and plazas", "syn": ["plaza", "square", "piazza", "forecourt", "courtyard"], "want": ["plaza", "courtyard", "market-square"] },
-    { "id": "public.park", "label": "Parks and gardens", "syn": ["park", "garden", "green", "common"], "want": ["park", "formal-garden", "zen-garden", "maze", "allotments"] },
-    { "id": "public.play", "label": "Playgrounds and fairs", "syn": ["playground", "swing", "slide", "seesaw", "sandpit", "carousel", "ferris-wheel", "fair"], "want": ["swings", "slide", "see-saw", "sandpit", "climbing-frame", "carousel", "ferris-wheel", "trampoline"] },
-    { "id": "public.sport", "label": "Sport", "syn": ["pitch", "court", "field", "goal", "track", "gym"], "want": ["football-pitch", "basketball-court", "tennis-court", "goal", "running-track", "skate-ramp", "ping-pong-table"] },
-    { "id": "public.venue", "label": "Venues and stages", "syn": ["stage", "podium", "amphitheatre", "theatre", "cinema", "arena"], "want": ["stage", "podium", "amphitheatre", "outdoor-cinema", "dance-floor"] },
-    { "id": "public.monument", "label": "Monuments and art", "syn": ["statue", "monument", "sculpture", "obelisk", "memorial", "art", "totem", "arch"], "want": ["statue", "obelisk", "memorial", "arch", "sculpture", "mural"] },
-
-    { "id": "transport", "label": "Transportation", "syn": ["transport", "transit", "travel"] },
-    { "id": "transport.road", "label": "Roads and streets", "syn": ["road", "street", "lane", "avenue", "highway", "track"], "want": ["road", "street", "lane", "roundabout", "crossing", "speed-bump"] },
-    { "id": "transport.path", "label": "Paths and walkways", "syn": ["path", "footpath", "trail", "walkway", "sidewalk", "pavement", "steps"], "want": ["footpath", "trail", "boardwalk", "garden-steps", "stepping-stones"] },
-    { "id": "transport.rail", "label": "Rail", "syn": ["rail", "railway", "train", "tram", "track"], "want": ["rail-track", "station-platform", "tram-stop", "level-crossing"] },
-    { "id": "transport.bridge", "label": "Bridges and crossings", "syn": ["bridge", "footbridge", "viaduct", "ford"], "want": ["footbridge", "arched-bridge", "stepping-stones", "ford"] },
-    { "id": "transport.stop", "label": "Stops, stations and parking", "syn": ["bus-stop", "station", "parking", "car-park", "bike-rack", "dock", "harbour", "airfield", "helipad"], "want": ["bus-stop", "bike-rack", "parking-bay", "taxi-rank", "harbour", "helipad", "ticket-booth"] },
-    { "id": "transport.sign", "label": "Traffic and wayfinding", "syn": ["signpost", "traffic-light", "road-sign", "waymarker"], "want": ["signpost", "traffic-light", "stop-sign", "waymarker", "milestone"] },
-
-    { "id": "utility", "label": "Utilities", "syn": ["utility", "infrastructure", "services"] },
-    { "id": "utility.power", "label": "Power", "syn": ["power", "electric", "solar", "wind-turbine", "pylon", "generator", "battery"], "want": ["solar-panel", "wind-turbine", "power-pole", "pylon", "generator", "substation", "battery-bank"] },
-    { "id": "utility.water", "label": "Water supply and drainage", "syn": ["pipe", "tank", "water-tower", "drain", "hydrant", "manhole", "pump"], "want": ["water-tower", "water-tank", "hydrant", "manhole", "drain", "pump-house"] },
-    { "id": "utility.waste", "label": "Waste", "syn": ["bin", "trash", "rubbish", "litter", "recycling", "dumpster", "compost", "skip"], "want": ["litter-bin", "recycling-bins", "dumpster", "compost-heap", "skip"] },
-    { "id": "utility.lighting", "label": "Street lighting", "syn": ["streetlight", "street-light", "street-lamp", "lamp-post", "lamppost", "lantern", "floodlight"], "want": ["lamp-post", "lantern-post", "floodlight", "string-lights", "bollard-light"] },
-    { "id": "utility.comms", "label": "Communications", "syn": ["antenna", "mast", "phone-box", "mailbox", "postbox", "satellite-dish"], "want": ["phone-box", "postbox", "antenna-mast", "satellite-dish", "wifi-hotspot"] },
-
-    { "id": "component", "label": "Building components", "syn": ["component", "part", "element", "module"] },
-    { "id": "component.wall", "label": "Walls and fences", "syn": ["wall", "fence", "railing", "hedge-wall", "partition", "gate"], "want": ["wall-segment", "picket-fence", "railing", "garden-wall", "gate", "partition"] },
-    { "id": "component.roof", "label": "Roofs", "syn": ["roof", "gable", "dome", "awning", "canopy", "thatch"], "want": ["gable-roof", "hip-roof", "flat-roof", "dome-roof", "awning", "chimney-stack"] },
-    { "id": "component.opening", "label": "Doors and windows", "syn": ["door", "window", "gate", "hatch", "shutter", "arch"], "want": ["door", "double-door", "window", "round-window", "shutters", "hatch", "garage-door"] },
-    { "id": "component.access", "label": "Stairs, ramps and ladders", "syn": ["stairs", "staircase", "ramp", "ladder", "steps", "elevator", "lift"], "want": ["stairs", "spiral-stairs", "ramp", "ladder", "lift"] },
-    { "id": "component.structure", "label": "Floors, columns and frames", "syn": ["floor", "column", "pillar", "beam", "platform", "deck", "scaffold", "foundation"], "want": ["platform", "column", "beam", "deck", "scaffold", "porch"] },
-
-    { "id": "furniture", "label": "Furniture and equipment", "syn": ["furniture", "furnishing", "equipment"] },
-    { "id": "furniture.seat", "label": "Seating", "syn": ["seat", "chair", "bench", "sofa", "couch", "stool", "armchair", "pew", "throne", "deckchair"], "want": ["chair", "armchair", "sofa", "stool", "bench", "park-bench", "deckchair", "rocking-chair", "beanbag", "pew"] },
-    { "id": "furniture.table", "label": "Tables and desks", "syn": ["table", "desk", "counter", "bar", "workbench"], "want": ["table", "round-table", "desk", "coffee-table", "picnic-table", "counter", "bar-counter"] },
-    { "id": "furniture.bed", "label": "Beds", "syn": ["bed", "bunk", "cot", "hammock", "futon", "crib"], "want": ["bed", "bunk", "cot", "hammock", "crib"] },
-    { "id": "furniture.storage", "label": "Storage", "syn": ["shelf", "shelves", "bookshelf", "wardrobe", "cupboard", "cabinet", "dresser", "chest", "drawers", "locker"], "want": ["bookshelf", "wardrobe", "cupboard", "dresser", "chest", "locker", "coat-rack"] },
-    { "id": "furniture.kitchen", "label": "Kitchen and appliances", "syn": ["stove", "oven", "fridge", "sink", "kitchen", "cooker", "appliance", "washing-machine"], "want": ["stove", "fridge", "sink", "oven", "kitchen-counter", "washing-machine", "dishwasher"] },
-    { "id": "furniture.work", "label": "Work, study and tools", "syn": ["workbench", "easel", "anvil", "loom", "lab", "computer", "whiteboard", "chalkboard"], "want": ["workbench", "easel", "anvil", "loom", "computer-desk", "whiteboard", "lab-bench"] },
-    { "id": "furniture.music", "label": "Music and media", "syn": ["piano", "instrument", "drum", "guitar", "radio", "tv", "television", "speaker", "jukebox"], "want": ["piano", "drum-kit", "guitar", "radio", "television", "jukebox", "gramophone"] },
-    { "id": "furniture.lighting", "label": "Indoor lighting", "syn": ["lamp", "floor-lamp", "chandelier", "candle", "lantern", "fireplace", "hearth"], "want": ["floor-lamp", "desk-lamp", "chandelier", "candle", "fireplace", "brazier"] },
-    { "id": "furniture.decor", "label": "Rugs and decor", "syn": ["rug", "carpet", "curtain", "mirror", "painting", "clock", "vase"], "want": ["rug", "painting", "mirror", "clock", "vase", "curtain"] },
-    { "id": "furniture.game", "label": "Games and play equipment", "syn": ["chess", "board-game", "pool-table", "arcade", "foosball"], "want": ["chess-table", "pool-table", "foosball", "arcade-cabinet", "dartboard"] },
-
-    { "id": "object", "label": "Small objects and street fixtures", "syn": ["object", "item", "thing", "prop"] },
-    { "id": "object.tableware", "label": "Tableware and drink", "syn": ["cup", "mug", "plate", "bowl", "glass", "teapot", "kettle", "bottle", "jug"], "want": ["cup", "mug", "plate", "bowl", "glass", "teapot", "bottle", "jug"] },
-    { "id": "object.food", "label": "Food", "syn": ["food", "bread", "loaf", "cake", "pie", "fruit", "meal", "pastry"], "want": ["loaf", "pie", "cake", "fruit-bowl", "pizza", "sandwich"] },
-    { "id": "object.tool", "label": "Tools", "syn": ["tool", "hammer", "spade", "shovel", "rake", "saw", "axe", "broom", "watering-can", "wheelbarrow", "ladder"], "want": ["spade", "rake", "watering-can", "broom", "hammer", "axe", "toolbox", "wheelbarrow"] },
-    { "id": "object.container", "label": "Containers", "syn": ["box", "crate", "barrel", "sack", "basket", "bucket", "jar", "chest", "pallet"], "want": ["crate", "barrel", "sack", "basket", "bucket", "jar", "chest", "pallet"] },
-    { "id": "object.media", "label": "Books, papers and media", "syn": ["book", "books", "newspaper", "map", "letter", "scroll", "poster", "photo"], "want": ["book", "book-stack", "newspaper", "scroll", "map", "letter"] },
-    { "id": "object.sign", "label": "Signs and boards", "syn": ["sign", "board", "notice", "noticeboard", "banner", "flag", "menu", "chalkboard", "poster"], "want": ["sign", "noticeboard", "banner", "flag", "menu-board", "shop-sign"] },
-    { "id": "object.street", "label": "Street fixtures", "syn": ["bollard", "hydrant", "mailbox", "postbox", "bin", "bike-rack", "planter", "phone-box", "parking-meter", "drinking-fountain"], "want": ["bollard", "hydrant", "postbox", "bike-rack", "parking-meter", "newspaper-stand", "drinking-fountain", "tree-guard"] },
-    { "id": "object.decor", "label": "Decorations", "syn": ["decoration", "ornament", "lantern", "bunting", "wreath", "vase", "candle"], "want": ["bunting", "paper-lantern", "wreath", "garden-gnome", "wind-chime"] },
-    { "id": "object.toy", "label": "Toys and play things", "syn": ["toy", "ball", "kite", "doll", "teddy"], "want": ["ball", "kite", "teddy", "toy-blocks", "hoop"] },
-    { "id": "object.art", "label": "Art pieces", "syn": ["ceramic", "scan", "artwork", "head", "exhibit"], "want": [] },
-
-    { "id": "vehicle", "label": "Vehicles", "syn": ["vehicle", "transport", "ride"] },
-    { "id": "vehicle.road", "label": "Road vehicles", "syn": ["car", "van", "truck", "bus", "taxi", "tractor", "forklift", "scooter", "motorbike"], "want": ["car", "van", "truck", "bus", "tractor", "forklift", "scooter", "ice-cream-van"] },
-    { "id": "vehicle.cycle", "label": "Bicycles and carts", "syn": ["bike", "bicycle", "cart", "wagon", "rickshaw", "pram", "cargo-bike"], "want": ["bicycle", "cargo-bike", "cart", "wagon", "pram", "handcart"] },
-    { "id": "vehicle.water", "label": "Boats", "syn": ["boat", "rowboat", "canoe", "kayak", "sailboat", "ferry", "ship", "raft", "dinghy"], "want": ["rowing-boat", "canoe", "sailboat", "raft", "ferry", "pedalo"] },
-    { "id": "vehicle.air", "label": "Air", "syn": ["balloon", "airship", "plane", "helicopter", "glider", "zeppelin"], "want": ["hot-air-balloon", "airship", "glider", "helicopter"] },
-    { "id": "vehicle.rail", "label": "Rail vehicles", "syn": ["train", "tram", "carriage", "locomotive", "trolley"], "want": ["tram", "train", "mine-cart"] },
-
-    { "id": "living", "label": "Living things", "syn": ["animal", "animals", "creature", "living", "wildlife", "fauna"] },
-    { "id": "living.pet", "label": "Pets", "syn": ["pet", "dog", "cat", "puppy", "kitten"], "want": ["dog", "cat", "rabbit", "hamster", "parrot"] },
-    { "id": "living.farm", "label": "Farm animals", "syn": ["livestock", "farm-animal", "cow", "sheep", "pig", "goat", "horse", "chicken", "llama"], "want": ["cow", "sheep", "pig", "goat", "horse", "chicken", "llama", "donkey"] },
-    { "id": "living.wild", "label": "Wild animals", "syn": ["wild", "deer", "fox", "rabbit", "squirrel", "hedgehog", "bear"], "want": ["deer", "fox", "rabbit", "squirrel", "hedgehog", "frog", "butterfly", "bee"] },
-    { "id": "living.bird", "label": "Birds", "syn": ["bird", "duck", "goose", "swan", "pigeon", "gull", "crow", "owl"], "want": ["duck", "goose", "swan", "pigeon", "gull", "crow", "owl", "songbird"] },
-    { "id": "living.fish", "label": "Fish and water life", "syn": ["fish", "koi", "carp", "frog", "turtle", "crab"], "want": ["koi", "turtle", "frog", "crab", "jellyfish"] },
-    { "id": "living.character", "label": "Characters", "syn": ["character", "person", "figure", "npc", "kin", "martian"], "want": [] },
-    { "id": "living.group", "label": "Herds and flocks", "syn": ["herd", "flock", "school", "swarm", "pack"], "want": ["herd", "flock", "school", "swarm"] },
-
-    { "id": "layer", "label": "World layers and changing state", "syn": ["layer", "state", "system"] },
-    { "id": "layer.weather", "label": "Weather", "syn": ["weather", "rain", "wind", "fog", "storm", "lightning", "snow"], "via": "env op: POST /v1/god/env, eden-god weather/strike" },
-    { "id": "layer.lighting", "label": "Lighting and time", "syn": ["daylight", "night", "time", "sky", "dusk", "dawn"], "via": "env op: eden-god time/sky; light components and the on/off actuator" },
-    { "id": "layer.sound", "label": "Sound", "syn": ["sound", "noise", "music", "ambience"], "via": "OPEN: no sound component yet (thunder only)", "want": ["ambient-sound-emitter", "bell", "speaker"] },
-    { "id": "layer.wear", "label": "Wear and condition", "syn": ["wear", "worn", "old", "weathered", "damage", "damaged", "broken", "ruin"], "via": "the `condition` param convention (new/worn/damaged/construction)" },
-    { "id": "layer.litter", "label": "Litter and mess", "syn": ["litter", "mess", "rubbish", "debris", "leaves"], "via": "small object defs scattered with a scatter component", "want": ["litter-scatter", "leaf-litter", "debris-pile"] },
-    { "id": "layer.construction", "label": "Construction", "syn": ["construction", "building-site", "scaffolding", "crane"], "via": "condition=construction (scaffold look) + construction props", "want": ["scaffold", "crane", "cement-mixer", "traffic-cone", "barrier"] },
-    { "id": "layer.ownership", "label": "Ownership", "syn": ["owner", "owned", "private", "property"], "via": "OPEN: entity state field `owner` (convention), not enforced" },
-    { "id": "layer.landuse", "label": "Land use and zones", "syn": ["zone", "district", "land-use", "plot", "lot"], "via": "area defs with a place component (plaza, lawn, pitch); OPEN: zoning defs", "want": ["zone-residential", "zone-market", "plot-marker"] },
-    { "id": "layer.navigation", "label": "Navigation", "syn": ["navigation", "route", "wayfinding", "map"], "via": "places (R4-INFO) + paths + signposts" },
-    { "id": "layer.schedule", "label": "Schedules", "syn": ["schedule", "opening-hours", "timetable", "event"], "via": "OPEN: places have no schedule field (R4-LIVE open item)" },
-    { "id": "layer.economy", "label": "Economy", "syn": ["economy", "price", "money", "trade", "shop"], "via": "OPEN: deferred by Gene (numbers shelved as dials)" },
-    { "id": "layer.relationship", "label": "Relationships", "syn": ["relationship", "friend", "family"], "via": "Souls' own memory (edge), not the world catalogue" },
-    { "id": "layer.marker", "label": "Markers and regions", "syn": ["marker", "region", "spawn", "flag"], "want": ["region-marker", "spawn-point"] }
-  ]
+ "schema": "taxonomy/1",
+ "doc": "The catalogue's category tree (VOCAB-MECH). Every def has one category (def.category, else inferred by vocab/infer.ts). `syn` are words a god may use for the category; `want` lists the types a full catalogue should hold there (workers induct them); `via` says which mechanism serves a world layer that is not a def.",
+ "nodes": [
+  {
+   "id": "terrain",
+   "label": "Terrain and ground",
+   "syn": [
+    "land",
+    "ground",
+    "landscape",
+    "topography"
+   ]
+  },
+  {
+   "id": "terrain.landform",
+   "label": "Landforms",
+   "syn": [
+    "hill",
+    "mountain",
+    "valley",
+    "cliff",
+    "mound",
+    "ridge",
+    "dune"
+   ],
+   "want": [
+    "knoll",
+    "hill",
+    "mountain",
+    "plateau",
+    "valley",
+    "cliff",
+    "ridge",
+    "dune",
+    "crater",
+    "canyon",
+    "mesa",
+    "terrace"
+   ]
+  },
+  {
+   "id": "terrain.rock",
+   "label": "Rocks and stone",
+   "syn": [
+    "boulder",
+    "stone",
+    "pebble",
+    "outcrop",
+    "crag"
+   ],
+   "want": [
+    "boulder",
+    "rock-pile",
+    "outcrop",
+    "standing-stone",
+    "scree",
+    "pebbles",
+    "stepping-stones"
+   ]
+  },
+  {
+   "id": "terrain.ground",
+   "label": "Ground covers and surfaces",
+   "syn": [
+    "surface",
+    "floor",
+    "paving",
+    "soil",
+    "dirt",
+    "sand",
+    "gravel",
+    "mud",
+    "snow"
+   ],
+   "want": [
+    "lawn",
+    "gravel-patch",
+    "sand-patch",
+    "mud-patch",
+    "snow-patch",
+    "dirt-patch",
+    "paving",
+    "cobbles",
+    "boardwalk",
+    "puddle"
+   ]
+  },
+  {
+   "id": "terrain.cave",
+   "label": "Caves and hollows",
+   "syn": [
+    "cave",
+    "grotto",
+    "tunnel",
+    "burrow"
+   ],
+   "want": [
+    "cave-mouth",
+    "grotto",
+    "tunnel",
+    "sinkhole"
+   ]
+  },
+  {
+   "id": "water",
+   "label": "Water",
+   "syn": [
+    "aquatic",
+    "wet"
+   ]
+  },
+  {
+   "id": "water.body",
+   "label": "Still water",
+   "syn": [
+    "lake",
+    "pond",
+    "pool",
+    "lagoon",
+    "sea",
+    "ocean",
+    "reservoir"
+   ],
+   "want": [
+    "pond",
+    "lake",
+    "pool",
+    "lagoon",
+    "sea",
+    "reservoir",
+    "swimming-pool"
+   ]
+  },
+  {
+   "id": "water.flow",
+   "label": "Flowing water",
+   "syn": [
+    "river",
+    "stream",
+    "creek",
+    "brook",
+    "canal",
+    "waterfall"
+   ],
+   "want": [
+    "river",
+    "stream",
+    "canal",
+    "waterfall",
+    "rapids",
+    "spring"
+   ]
+  },
+  {
+   "id": "water.feature",
+   "label": "Water features",
+   "syn": [
+    "fountain",
+    "well",
+    "basin",
+    "trough",
+    "birdbath"
+   ],
+   "want": [
+    "fountain",
+    "well",
+    "trough",
+    "birdbath",
+    "water-tap",
+    "rain-barrel",
+    "pump"
+   ]
+  },
+  {
+   "id": "water.shore",
+   "label": "Shores and waterside",
+   "syn": [
+    "beach",
+    "shore",
+    "bank",
+    "jetty",
+    "dock",
+    "marsh",
+    "wetland"
+   ],
+   "want": [
+    "beach",
+    "pier",
+    "jetty",
+    "marsh",
+    "reeds",
+    "sea-wall",
+    "slipway",
+    "buoy"
+   ]
+  },
+  {
+   "id": "vegetation",
+   "label": "Vegetation",
+   "syn": [
+    "plant",
+    "plants",
+    "greenery",
+    "flora"
+   ]
+  },
+  {
+   "id": "vegetation.tree",
+   "label": "Trees",
+   "syn": [
+    "tree",
+    "oak",
+    "pine",
+    "birch",
+    "willow",
+    "palm",
+    "conifer",
+    "fruit-tree"
+   ],
+   "want": [
+    "oak",
+    "pine",
+    "birch",
+    "willow",
+    "palm",
+    "apple-tree",
+    "cherry-tree",
+    "maple",
+    "cypress",
+    "dead-tree",
+    "sapling"
+   ]
+  },
+  {
+   "id": "vegetation.shrub",
+   "label": "Shrubs and hedges",
+   "syn": [
+    "bush",
+    "shrub",
+    "hedge",
+    "topiary"
+   ],
+   "want": [
+    "bush",
+    "hedge",
+    "topiary",
+    "rose-bush",
+    "berry-bush"
+   ]
+  },
+  {
+   "id": "vegetation.flower",
+   "label": "Flowers and ground plants",
+   "syn": [
+    "flower",
+    "flowers",
+    "wildflower",
+    "fern",
+    "grass",
+    "reeds",
+    "weeds"
+   ],
+   "want": [
+    "wildflowers",
+    "tulips",
+    "sunflower",
+    "fern",
+    "tall-grass",
+    "lily-pad",
+    "ivy"
+   ]
+  },
+  {
+   "id": "vegetation.crop",
+   "label": "Crops and produce",
+   "syn": [
+    "crop",
+    "vegetable",
+    "veg",
+    "harvest",
+    "fruit",
+    "field"
+   ],
+   "want": [
+    "wheat",
+    "corn",
+    "carrot",
+    "lettuce",
+    "tomato",
+    "pumpkin",
+    "vineyard-row",
+    "orchard-row",
+    "hay-bale"
+   ]
+  },
+  {
+   "id": "vegetation.cover",
+   "label": "Planted areas",
+   "syn": [
+    "forest",
+    "woods",
+    "meadow",
+    "garden",
+    "orchard",
+    "woodland"
+   ],
+   "want": [
+    "forest",
+    "meadow",
+    "garden-bed",
+    "orchard",
+    "vineyard",
+    "flower-bed",
+    "allotment"
+   ]
+  },
+  {
+   "id": "vegetation.fungus",
+   "label": "Fungi, moss and desert plants",
+   "syn": [
+    "mushroom",
+    "toadstool",
+    "moss",
+    "cactus",
+    "succulent",
+    "lichen"
+   ],
+   "want": [
+    "mushroom",
+    "moss-mat",
+    "cactus",
+    "succulent"
+   ]
+  },
+  {
+   "id": "vegetation.potted",
+   "label": "Potted plants",
+   "syn": [
+    "planter",
+    "pot",
+    "houseplant",
+    "window-box"
+   ],
+   "want": [
+    "potted-plant",
+    "planter",
+    "window-box",
+    "hanging-basket"
+   ]
+  },
+  {
+   "id": "building",
+   "label": "Buildings",
+   "syn": [
+    "building",
+    "house",
+    "structure",
+    "architecture"
+   ]
+  },
+  {
+   "id": "building.residential",
+   "label": "Residential",
+   "syn": [
+    "house",
+    "home",
+    "cottage",
+    "cabin",
+    "apartment",
+    "flat",
+    "villa",
+    "hut",
+    "dwelling",
+    "townhouse",
+    "bungalow"
+   ],
+   "want": [
+    "cottage",
+    "townhouse",
+    "apartment-block",
+    "cabin",
+    "villa",
+    "bungalow",
+    "row-house",
+    "treehouse",
+    "tent",
+    "yurt",
+    "houseboat"
+   ]
+  },
+  {
+   "id": "building.commercial",
+   "label": "Commercial",
+   "syn": [
+    "shop",
+    "store",
+    "bodega",
+    "corner-shop",
+    "cafe",
+    "bar",
+    "pub",
+    "restaurant",
+    "bakery",
+    "market",
+    "kiosk",
+    "hotel",
+    "office",
+    "bank"
+   ],
+   "want": [
+    "pub",
+    "restaurant",
+    "market-hall",
+    "hotel",
+    "office-block",
+    "bank",
+    "pharmacy",
+    "petrol-station",
+    "barber"
+   ]
+  },
+  {
+   "id": "building.civic",
+   "label": "Civic and religious",
+   "syn": [
+    "town-hall",
+    "library",
+    "school",
+    "hospital",
+    "clinic",
+    "police",
+    "fire-station",
+    "post-office",
+    "museum",
+    "chapel",
+    "church",
+    "temple",
+    "mosque",
+    "shrine"
+   ],
+   "want": [
+    "town-hall",
+    "library",
+    "school",
+    "clinic",
+    "fire-station",
+    "post-office",
+    "museum",
+    "chapel",
+    "temple",
+    "courthouse",
+    "community-hall"
+   ]
+  },
+  {
+   "id": "building.industrial",
+   "label": "Industrial",
+   "syn": [
+    "factory",
+    "warehouse",
+    "workshop",
+    "mill",
+    "depot",
+    "smithy",
+    "foundry",
+    "plant"
+   ],
+   "want": [
+    "warehouse",
+    "workshop",
+    "factory",
+    "windmill",
+    "watermill",
+    "smithy",
+    "depot",
+    "silo",
+    "chimney"
+   ]
+  },
+  {
+   "id": "building.agricultural",
+   "label": "Agricultural",
+   "syn": [
+    "barn",
+    "farm",
+    "stable",
+    "coop",
+    "greenhouse",
+    "silo",
+    "granary",
+    "shed"
+   ],
+   "want": [
+    "barn",
+    "stable",
+    "chicken-coop",
+    "greenhouse",
+    "silo",
+    "granary",
+    "farmhouse",
+    "pigsty",
+    "beehive"
+   ]
+  },
+  {
+   "id": "building.shelter",
+   "label": "Shelters and pavilions",
+   "syn": [
+    "gazebo",
+    "pavilion",
+    "pergola",
+    "kiosk",
+    "shelter",
+    "canopy",
+    "tent",
+    "bandstand",
+    "dome",
+    "tower",
+    "lighthouse"
+   ],
+   "want": [
+    "gazebo",
+    "pavilion",
+    "pergola",
+    "bandstand",
+    "canopy",
+    "tent",
+    "lighthouse",
+    "watchtower"
+   ]
+  },
+  {
+   "id": "public",
+   "label": "Recreation and public space",
+   "syn": [
+    "public",
+    "recreation",
+    "leisure",
+    "park"
+   ]
+  },
+  {
+   "id": "public.square",
+   "label": "Squares and plazas",
+   "syn": [
+    "plaza",
+    "square",
+    "piazza",
+    "forecourt",
+    "courtyard"
+   ],
+   "want": [
+    "plaza",
+    "courtyard",
+    "market-square"
+   ]
+  },
+  {
+   "id": "public.park",
+   "label": "Parks and gardens",
+   "syn": [
+    "park",
+    "garden",
+    "green",
+    "common"
+   ],
+   "want": [
+    "park",
+    "formal-garden",
+    "zen-garden",
+    "maze",
+    "allotments"
+   ]
+  },
+  {
+   "id": "public.play",
+   "label": "Playgrounds and fairs",
+   "syn": [
+    "playground",
+    "swing",
+    "slide",
+    "seesaw",
+    "sandpit",
+    "carousel",
+    "ferris-wheel",
+    "fair"
+   ],
+   "want": [
+    "swings",
+    "slide",
+    "see-saw",
+    "sandpit",
+    "climbing-frame",
+    "carousel",
+    "ferris-wheel",
+    "trampoline"
+   ]
+  },
+  {
+   "id": "public.sport",
+   "label": "Sport",
+   "syn": [
+    "pitch",
+    "court",
+    "field",
+    "goal",
+    "track",
+    "gym"
+   ],
+   "want": [
+    "football-pitch",
+    "basketball-court",
+    "tennis-court",
+    "goal",
+    "running-track",
+    "skate-ramp",
+    "ping-pong-table"
+   ]
+  },
+  {
+   "id": "public.venue",
+   "label": "Venues and stages",
+   "syn": [
+    "stage",
+    "podium",
+    "amphitheatre",
+    "theatre",
+    "cinema",
+    "arena"
+   ],
+   "want": [
+    "stage",
+    "podium",
+    "amphitheatre",
+    "outdoor-cinema",
+    "dance-floor"
+   ]
+  },
+  {
+   "id": "public.monument",
+   "label": "Monuments and art",
+   "syn": [
+    "statue",
+    "monument",
+    "sculpture",
+    "obelisk",
+    "memorial",
+    "art",
+    "totem",
+    "arch"
+   ],
+   "want": [
+    "statue",
+    "obelisk",
+    "memorial",
+    "arch",
+    "sculpture",
+    "mural"
+   ]
+  },
+  {
+   "id": "transport",
+   "label": "Transportation",
+   "syn": [
+    "transport",
+    "transit",
+    "travel"
+   ]
+  },
+  {
+   "id": "transport.road",
+   "label": "Roads and streets",
+   "syn": [
+    "road",
+    "street",
+    "lane",
+    "avenue",
+    "highway",
+    "track"
+   ],
+   "want": [
+    "road",
+    "street",
+    "lane",
+    "roundabout",
+    "crossing",
+    "speed-bump"
+   ]
+  },
+  {
+   "id": "transport.path",
+   "label": "Paths and walkways",
+   "syn": [
+    "path",
+    "footpath",
+    "trail",
+    "walkway",
+    "sidewalk",
+    "pavement",
+    "steps"
+   ],
+   "want": [
+    "footpath",
+    "trail",
+    "boardwalk",
+    "garden-steps",
+    "stepping-stones"
+   ]
+  },
+  {
+   "id": "transport.rail",
+   "label": "Rail",
+   "syn": [
+    "rail",
+    "railway",
+    "train",
+    "tram",
+    "track"
+   ],
+   "want": [
+    "rail-track",
+    "station-platform",
+    "tram-stop",
+    "level-crossing"
+   ]
+  },
+  {
+   "id": "transport.bridge",
+   "label": "Bridges and crossings",
+   "syn": [
+    "bridge",
+    "footbridge",
+    "viaduct",
+    "ford"
+   ],
+   "want": [
+    "footbridge",
+    "arched-bridge",
+    "stepping-stones",
+    "ford"
+   ]
+  },
+  {
+   "id": "transport.stop",
+   "label": "Stops, stations and parking",
+   "syn": [
+    "bus-stop",
+    "station",
+    "parking",
+    "car-park",
+    "bike-rack",
+    "dock",
+    "harbour",
+    "airfield",
+    "helipad"
+   ],
+   "want": [
+    "bus-stop",
+    "bike-rack",
+    "parking-bay",
+    "taxi-rank",
+    "harbour",
+    "helipad",
+    "ticket-booth"
+   ]
+  },
+  {
+   "id": "transport.sign",
+   "label": "Traffic and wayfinding",
+   "syn": [
+    "signpost",
+    "traffic-light",
+    "road-sign",
+    "waymarker"
+   ],
+   "want": [
+    "signpost",
+    "traffic-light",
+    "stop-sign",
+    "waymarker",
+    "milestone"
+   ]
+  },
+  {
+   "id": "utility",
+   "label": "Utilities",
+   "syn": [
+    "utility",
+    "infrastructure",
+    "services"
+   ]
+  },
+  {
+   "id": "utility.power",
+   "label": "Power",
+   "syn": [
+    "power",
+    "electric",
+    "solar",
+    "wind-turbine",
+    "pylon",
+    "generator",
+    "battery"
+   ],
+   "want": [
+    "solar-panel",
+    "pylon",
+    "generator",
+    "substation",
+    "battery-bank"
+   ]
+  },
+  {
+   "id": "utility.water",
+   "label": "Water supply and drainage",
+   "syn": [
+    "pipe",
+    "tank",
+    "water-tower",
+    "drain",
+    "hydrant",
+    "manhole",
+    "pump"
+   ],
+   "want": [
+    "water-tank",
+    "hydrant",
+    "manhole",
+    "drain",
+    "pump-house"
+   ]
+  },
+  {
+   "id": "utility.waste",
+   "label": "Waste",
+   "syn": [
+    "bin",
+    "trash",
+    "rubbish",
+    "litter",
+    "recycling",
+    "dumpster",
+    "compost",
+    "skip"
+   ],
+   "want": [
+    "litter-bin",
+    "dumpster",
+    "compost-heap"
+   ]
+  },
+  {
+   "id": "utility.lighting",
+   "label": "Street lighting",
+   "syn": [
+    "streetlight",
+    "street-light",
+    "street-lamp",
+    "lamp-post",
+    "lamppost",
+    "lantern",
+    "floodlight"
+   ],
+   "want": [
+    "lamp-post",
+    "lantern-post",
+    "floodlight",
+    "string-lights",
+    "bollard-light"
+   ]
+  },
+  {
+   "id": "utility.comms",
+   "label": "Communications",
+   "syn": [
+    "antenna",
+    "mast",
+    "phone-box",
+    "mailbox",
+    "postbox",
+    "satellite-dish"
+   ],
+   "want": [
+    "antenna-mast",
+    "satellite-dish",
+    "wifi-hotspot"
+   ]
+  },
+  {
+   "id": "component",
+   "label": "Building components",
+   "syn": [
+    "component",
+    "part",
+    "element",
+    "module"
+   ]
+  },
+  {
+   "id": "component.wall",
+   "label": "Walls and fences",
+   "syn": [
+    "wall",
+    "fence",
+    "railing",
+    "hedge-wall",
+    "partition",
+    "gate"
+   ],
+   "want": [
+    "wall-segment",
+    "picket-fence",
+    "railing",
+    "garden-wall",
+    "gate",
+    "partition"
+   ]
+  },
+  {
+   "id": "component.roof",
+   "label": "Roofs",
+   "syn": [
+    "roof",
+    "gable",
+    "dome",
+    "awning",
+    "canopy",
+    "thatch"
+   ],
+   "want": [
+    "gable-roof",
+    "hip-roof",
+    "flat-roof",
+    "dome-roof",
+    "awning",
+    "chimney-stack"
+   ]
+  },
+  {
+   "id": "component.opening",
+   "label": "Doors and windows",
+   "syn": [
+    "door",
+    "window",
+    "gate",
+    "hatch",
+    "shutter",
+    "arch"
+   ],
+   "want": [
+    "double-door",
+    "round-window",
+    "shutters",
+    "hatch",
+    "garage-door"
+   ]
+  },
+  {
+   "id": "component.access",
+   "label": "Stairs, ramps and ladders",
+   "syn": [
+    "stairs",
+    "staircase",
+    "ramp",
+    "ladder",
+    "steps",
+    "elevator",
+    "lift"
+   ],
+   "want": [
+    "stairs",
+    "spiral-stairs",
+    "ramp",
+    "ladder",
+    "lift"
+   ]
+  },
+  {
+   "id": "component.structure",
+   "label": "Floors, columns and frames",
+   "syn": [
+    "floor",
+    "column",
+    "pillar",
+    "beam",
+    "platform",
+    "deck",
+    "scaffold",
+    "foundation"
+   ],
+   "want": [
+    "platform",
+    "column",
+    "beam",
+    "deck",
+    "porch"
+   ]
+  },
+  {
+   "id": "furniture",
+   "label": "Furniture and equipment",
+   "syn": [
+    "furniture",
+    "furnishing",
+    "equipment"
+   ]
+  },
+  {
+   "id": "furniture.seat",
+   "label": "Seating",
+   "syn": [
+    "seat",
+    "chair",
+    "bench",
+    "sofa",
+    "couch",
+    "stool",
+    "armchair",
+    "pew",
+    "throne",
+    "deckchair"
+   ],
+   "want": [
+    "chair",
+    "armchair",
+    "sofa",
+    "stool",
+    "bench",
+    "park-bench",
+    "deckchair",
+    "rocking-chair",
+    "beanbag",
+    "pew"
+   ]
+  },
+  {
+   "id": "furniture.table",
+   "label": "Tables and desks",
+   "syn": [
+    "table",
+    "desk",
+    "counter",
+    "bar",
+    "workbench"
+   ],
+   "want": [
+    "table",
+    "round-table",
+    "desk",
+    "coffee-table",
+    "picnic-table",
+    "counter",
+    "bar-counter"
+   ]
+  },
+  {
+   "id": "furniture.bed",
+   "label": "Beds",
+   "syn": [
+    "bed",
+    "bunk",
+    "cot",
+    "hammock",
+    "futon",
+    "crib"
+   ],
+   "want": [
+    "bed",
+    "bunk",
+    "cot",
+    "hammock",
+    "crib"
+   ]
+  },
+  {
+   "id": "furniture.storage",
+   "label": "Storage",
+   "syn": [
+    "shelf",
+    "shelves",
+    "bookshelf",
+    "wardrobe",
+    "cupboard",
+    "cabinet",
+    "dresser",
+    "chest",
+    "drawers",
+    "locker"
+   ],
+   "want": [
+    "bookshelf",
+    "wardrobe",
+    "cupboard",
+    "dresser",
+    "locker",
+    "coat-rack"
+   ]
+  },
+  {
+   "id": "furniture.kitchen",
+   "label": "Kitchen and appliances",
+   "syn": [
+    "stove",
+    "oven",
+    "fridge",
+    "sink",
+    "kitchen",
+    "cooker",
+    "appliance",
+    "washing-machine"
+   ],
+   "want": [
+    "stove",
+    "fridge",
+    "sink",
+    "oven",
+    "kitchen-counter",
+    "washing-machine",
+    "dishwasher"
+   ]
+  },
+  {
+   "id": "furniture.work",
+   "label": "Work, study and tools",
+   "syn": [
+    "workbench",
+    "easel",
+    "anvil",
+    "loom",
+    "lab",
+    "computer",
+    "whiteboard",
+    "chalkboard"
+   ],
+   "want": [
+    "workbench",
+    "easel",
+    "anvil",
+    "loom",
+    "computer-desk",
+    "whiteboard",
+    "lab-bench"
+   ]
+  },
+  {
+   "id": "furniture.music",
+   "label": "Music and media",
+   "syn": [
+    "piano",
+    "instrument",
+    "drum",
+    "guitar",
+    "radio",
+    "tv",
+    "television",
+    "speaker",
+    "jukebox"
+   ],
+   "want": [
+    "piano",
+    "drum-kit",
+    "guitar",
+    "jukebox",
+    "gramophone"
+   ]
+  },
+  {
+   "id": "furniture.lighting",
+   "label": "Indoor lighting",
+   "syn": [
+    "lamp",
+    "floor-lamp",
+    "chandelier",
+    "candle",
+    "lantern",
+    "fireplace",
+    "hearth"
+   ],
+   "want": [
+    "floor-lamp",
+    "chandelier",
+    "brazier"
+   ]
+  },
+  {
+   "id": "furniture.decor",
+   "label": "Rugs and decor",
+   "syn": [
+    "rug",
+    "carpet",
+    "curtain",
+    "mirror",
+    "painting",
+    "clock",
+    "vase"
+   ],
+   "want": [
+    "rug",
+    "painting",
+    "mirror",
+    "clock",
+    "vase",
+    "curtain"
+   ]
+  },
+  {
+   "id": "furniture.game",
+   "label": "Games and play equipment",
+   "syn": [
+    "chess",
+    "board-game",
+    "pool-table",
+    "arcade",
+    "foosball"
+   ],
+   "want": [
+    "chess-table",
+    "pool-table",
+    "foosball",
+    "arcade-cabinet",
+    "dartboard"
+   ]
+  },
+  {
+   "id": "object",
+   "label": "Small objects and street fixtures",
+   "syn": [
+    "object",
+    "item",
+    "thing",
+    "prop"
+   ]
+  },
+  {
+   "id": "object.tableware",
+   "label": "Tableware and drink",
+   "syn": [
+    "cup",
+    "mug",
+    "plate",
+    "bowl",
+    "glass",
+    "teapot",
+    "kettle",
+    "bottle",
+    "jug"
+   ],
+   "want": [
+    "cup",
+    "mug",
+    "plate",
+    "bowl",
+    "glass",
+    "teapot",
+    "bottle",
+    "jug"
+   ]
+  },
+  {
+   "id": "object.food",
+   "label": "Food",
+   "syn": [
+    "food",
+    "bread",
+    "loaf",
+    "cake",
+    "pie",
+    "fruit",
+    "meal",
+    "pastry"
+   ],
+   "want": [
+    "loaf",
+    "pie",
+    "cake",
+    "fruit-bowl",
+    "pizza",
+    "sandwich"
+   ]
+  },
+  {
+   "id": "object.tool",
+   "label": "Tools",
+   "syn": [
+    "tool",
+    "hammer",
+    "spade",
+    "shovel",
+    "rake",
+    "saw",
+    "axe",
+    "broom",
+    "watering-can",
+    "wheelbarrow",
+    "ladder"
+   ],
+   "want": [
+    "spade",
+    "rake",
+    "watering-can",
+    "broom",
+    "hammer",
+    "axe",
+    "toolbox",
+    "wheelbarrow"
+   ]
+  },
+  {
+   "id": "object.container",
+   "label": "Containers",
+   "syn": [
+    "box",
+    "crate",
+    "barrel",
+    "sack",
+    "basket",
+    "bucket",
+    "jar",
+    "chest",
+    "pallet"
+   ],
+   "want": [
+    "crate",
+    "barrel",
+    "sack",
+    "basket",
+    "bucket",
+    "jar",
+    "pallet"
+   ]
+  },
+  {
+   "id": "object.media",
+   "label": "Books, papers and media",
+   "syn": [
+    "book",
+    "books",
+    "newspaper",
+    "map",
+    "letter",
+    "scroll",
+    "poster",
+    "photo"
+   ],
+   "want": [
+    "book",
+    "book-stack",
+    "newspaper",
+    "scroll",
+    "map",
+    "letter"
+   ]
+  },
+  {
+   "id": "object.sign",
+   "label": "Signs and boards",
+   "syn": [
+    "sign",
+    "board",
+    "notice",
+    "noticeboard",
+    "banner",
+    "flag",
+    "menu",
+    "chalkboard",
+    "poster"
+   ],
+   "want": [
+    "sign",
+    "noticeboard",
+    "banner",
+    "flag",
+    "menu-board",
+    "shop-sign"
+   ]
+  },
+  {
+   "id": "object.street",
+   "label": "Street fixtures",
+   "syn": [
+    "bollard",
+    "hydrant",
+    "mailbox",
+    "postbox",
+    "bin",
+    "bike-rack",
+    "planter",
+    "phone-box",
+    "parking-meter",
+    "drinking-fountain"
+   ],
+   "want": [
+    "bollard",
+    "hydrant",
+    "bike-rack",
+    "tree-guard"
+   ]
+  },
+  {
+   "id": "object.decor",
+   "label": "Decorations",
+   "syn": [
+    "decoration",
+    "ornament",
+    "lantern",
+    "bunting",
+    "wreath",
+    "vase",
+    "candle"
+   ],
+   "want": [
+    "bunting",
+    "paper-lantern",
+    "wreath",
+    "garden-gnome",
+    "wind-chime"
+   ]
+  },
+  {
+   "id": "object.toy",
+   "label": "Toys and play things",
+   "syn": [
+    "toy",
+    "ball",
+    "kite",
+    "doll",
+    "teddy"
+   ],
+   "want": [
+    "ball",
+    "kite",
+    "teddy",
+    "toy-blocks",
+    "hoop"
+   ]
+  },
+  {
+   "id": "object.art",
+   "label": "Art pieces",
+   "syn": [
+    "ceramic",
+    "scan",
+    "artwork",
+    "head",
+    "exhibit"
+   ],
+   "want": []
+  },
+  {
+   "id": "vehicle",
+   "label": "Vehicles",
+   "syn": [
+    "vehicle",
+    "transport",
+    "ride"
+   ]
+  },
+  {
+   "id": "vehicle.road",
+   "label": "Road vehicles",
+   "syn": [
+    "car",
+    "van",
+    "truck",
+    "bus",
+    "taxi",
+    "tractor",
+    "forklift",
+    "scooter",
+    "motorbike"
+   ],
+   "want": [
+    "car",
+    "van",
+    "truck",
+    "bus",
+    "tractor",
+    "forklift",
+    "scooter",
+    "ice-cream-van"
+   ]
+  },
+  {
+   "id": "vehicle.cycle",
+   "label": "Bicycles and carts",
+   "syn": [
+    "bike",
+    "bicycle",
+    "cart",
+    "wagon",
+    "rickshaw",
+    "pram",
+    "cargo-bike"
+   ],
+   "want": [
+    "bicycle",
+    "cargo-bike",
+    "cart",
+    "wagon",
+    "pram",
+    "handcart"
+   ]
+  },
+  {
+   "id": "vehicle.water",
+   "label": "Boats",
+   "syn": [
+    "boat",
+    "rowboat",
+    "canoe",
+    "kayak",
+    "sailboat",
+    "ferry",
+    "ship",
+    "raft",
+    "dinghy"
+   ],
+   "want": [
+    "rowing-boat",
+    "canoe",
+    "sailboat",
+    "raft",
+    "ferry",
+    "pedalo"
+   ]
+  },
+  {
+   "id": "vehicle.air",
+   "label": "Air",
+   "syn": [
+    "balloon",
+    "airship",
+    "plane",
+    "helicopter",
+    "glider",
+    "zeppelin"
+   ],
+   "want": [
+    "hot-air-balloon",
+    "airship",
+    "glider",
+    "helicopter"
+   ]
+  },
+  {
+   "id": "vehicle.rail",
+   "label": "Rail vehicles",
+   "syn": [
+    "train",
+    "tram",
+    "carriage",
+    "locomotive",
+    "trolley"
+   ],
+   "want": [
+    "tram",
+    "train",
+    "mine-cart"
+   ]
+  },
+  {
+   "id": "living",
+   "label": "Living things",
+   "syn": [
+    "animal",
+    "animals",
+    "creature",
+    "living",
+    "wildlife",
+    "fauna"
+   ]
+  },
+  {
+   "id": "living.pet",
+   "label": "Pets",
+   "syn": [
+    "pet",
+    "dog",
+    "cat",
+    "puppy",
+    "kitten"
+   ],
+   "want": [
+    "dog",
+    "cat",
+    "rabbit",
+    "hamster",
+    "parrot"
+   ]
+  },
+  {
+   "id": "living.farm",
+   "label": "Farm animals",
+   "syn": [
+    "livestock",
+    "farm-animal",
+    "cow",
+    "sheep",
+    "pig",
+    "goat",
+    "horse",
+    "chicken",
+    "llama"
+   ],
+   "want": [
+    "cow",
+    "sheep",
+    "pig",
+    "goat",
+    "horse",
+    "chicken",
+    "llama",
+    "donkey"
+   ]
+  },
+  {
+   "id": "living.wild",
+   "label": "Wild animals",
+   "syn": [
+    "wild",
+    "deer",
+    "fox",
+    "rabbit",
+    "squirrel",
+    "hedgehog",
+    "bear"
+   ],
+   "want": [
+    "deer",
+    "fox",
+    "rabbit",
+    "squirrel",
+    "hedgehog",
+    "frog",
+    "butterfly",
+    "bee"
+   ]
+  },
+  {
+   "id": "living.bird",
+   "label": "Birds",
+   "syn": [
+    "bird",
+    "duck",
+    "goose",
+    "swan",
+    "pigeon",
+    "gull",
+    "crow",
+    "owl"
+   ],
+   "want": [
+    "duck",
+    "goose",
+    "swan",
+    "pigeon",
+    "gull",
+    "crow",
+    "owl",
+    "songbird"
+   ]
+  },
+  {
+   "id": "living.fish",
+   "label": "Fish and water life",
+   "syn": [
+    "fish",
+    "koi",
+    "carp",
+    "frog",
+    "turtle",
+    "crab"
+   ],
+   "want": [
+    "koi",
+    "turtle",
+    "frog",
+    "crab",
+    "jellyfish"
+   ]
+  },
+  {
+   "id": "living.character",
+   "label": "Characters",
+   "syn": [
+    "character",
+    "person",
+    "figure",
+    "npc",
+    "kin",
+    "martian"
+   ],
+   "want": []
+  },
+  {
+   "id": "living.group",
+   "label": "Herds and flocks",
+   "syn": [
+    "herd",
+    "flock",
+    "school",
+    "swarm",
+    "pack"
+   ],
+   "want": [
+    "herd",
+    "flock",
+    "school",
+    "swarm"
+   ]
+  },
+  {
+   "id": "layer",
+   "label": "World layers and changing state",
+   "syn": [
+    "layer",
+    "state",
+    "system"
+   ]
+  },
+  {
+   "id": "layer.weather",
+   "label": "Weather",
+   "syn": [
+    "weather",
+    "rain",
+    "wind",
+    "fog",
+    "storm",
+    "lightning",
+    "snow"
+   ],
+   "via": "env op: POST /v1/god/env, eden-god weather/strike"
+  },
+  {
+   "id": "layer.lighting",
+   "label": "Lighting and time",
+   "syn": [
+    "daylight",
+    "night",
+    "time",
+    "sky",
+    "dusk",
+    "dawn"
+   ],
+   "via": "env op: eden-god time/sky; light components and the on/off actuator"
+  },
+  {
+   "id": "layer.sound",
+   "label": "Sound",
+   "syn": [
+    "sound",
+    "noise",
+    "music",
+    "ambience"
+   ],
+   "via": "OPEN: no sound component yet (thunder only)",
+   "want": [
+    "ambient-sound-emitter",
+    "bell",
+    "speaker"
+   ]
+  },
+  {
+   "id": "layer.wear",
+   "label": "Wear and condition",
+   "syn": [
+    "wear",
+    "worn",
+    "old",
+    "weathered",
+    "damage",
+    "damaged",
+    "broken",
+    "ruin"
+   ],
+   "via": "the `condition` param convention (new/worn/damaged/construction)"
+  },
+  {
+   "id": "layer.litter",
+   "label": "Litter and mess",
+   "syn": [
+    "litter",
+    "mess",
+    "rubbish",
+    "debris",
+    "leaves"
+   ],
+   "via": "small object defs scattered with a scatter component",
+   "want": [
+    "litter-scatter",
+    "leaf-litter",
+    "debris-pile"
+   ]
+  },
+  {
+   "id": "layer.construction",
+   "label": "Construction",
+   "syn": [
+    "construction",
+    "building-site",
+    "scaffolding",
+    "crane"
+   ],
+   "via": "condition=construction (scaffold look) + construction props",
+   "want": [
+    "crane"
+   ]
+  },
+  {
+   "id": "layer.ownership",
+   "label": "Ownership",
+   "syn": [
+    "owner",
+    "owned",
+    "private",
+    "property"
+   ],
+   "via": "OPEN: entity state field `owner` (convention), not enforced"
+  },
+  {
+   "id": "layer.landuse",
+   "label": "Land use and zones",
+   "syn": [
+    "zone",
+    "district",
+    "land-use",
+    "plot",
+    "lot"
+   ],
+   "via": "area defs with a place component (plaza, lawn, pitch); OPEN: zoning defs",
+   "want": [
+    "zone-residential",
+    "zone-market",
+    "plot-marker"
+   ]
+  },
+  {
+   "id": "layer.navigation",
+   "label": "Navigation",
+   "syn": [
+    "navigation",
+    "route",
+    "wayfinding",
+    "map"
+   ],
+   "via": "places (R4-INFO) + paths + signposts"
+  },
+  {
+   "id": "layer.schedule",
+   "label": "Schedules",
+   "syn": [
+    "schedule",
+    "opening-hours",
+    "timetable",
+    "event"
+   ],
+   "via": "OPEN: places have no schedule field (R4-LIVE open item)"
+  },
+  {
+   "id": "layer.economy",
+   "label": "Economy",
+   "syn": [
+    "economy",
+    "price",
+    "money",
+    "trade",
+    "shop"
+   ],
+   "via": "OPEN: deferred by Gene (numbers shelved as dials)"
+  },
+  {
+   "id": "layer.relationship",
+   "label": "Relationships",
+   "syn": [
+    "relationship",
+    "friend",
+    "family"
+   ],
+   "via": "Souls' own memory (edge), not the world catalogue"
+  },
+  {
+   "id": "layer.marker",
+   "label": "Markers and regions",
+   "syn": [
+    "marker",
+    "region",
+    "spawn",
+    "flag"
+   ],
+   "want": [
+    "region-marker",
+    "spawn-point"
+   ]
+  }
+ ]
 }
