@@ -14,6 +14,7 @@ import { makeApi, useSim, type Sim } from './useSim.ts';
 import { BrainPanel, BroadcastPanel, NarrativePanel } from './BrainPanels.tsx';
 import { AdminPanel } from './AdminPanel.tsx';
 import { SoulHome } from './SoulHome.tsx';
+import {WorldAccountControls} from './AccountMenu.tsx';
 import {SoulAccount} from './SoulAccount.tsx';
 import { ArchPanel } from './Arch.tsx';
 import {LocalIntegrationNotice,LocalConnectionHelp,DebugPanel} from './LocalIntegration.tsx';
@@ -36,8 +37,8 @@ import {AUTH_UI,configuredSignIn} from './auth-ui.ts';
 import { BacklogPanel, HeardPanel, LibraryPanel, NotebookPanel, SentencesPanel, ThingsPanel, VocabularyPanel } from './Grammar.tsx';
 
 export type AuthCtx = {
-  ready: boolean; authed: boolean; label: string | null; signInUrl?:string;
-  login(): void; logout(): Promise<void> | void; getToken(): Promise<string | null>;
+  ready: boolean; authed: boolean; label: string | null; avatarUrl?:string|null; signInUrl?:string;
+  login(): void; logout(returnUrl?:string): Promise<void> | void; getToken(): Promise<string | null>;
   debug: { privyUserId: string | null; accountIdentity?:string|null; wallet: unknown; linked: unknown[] };
 };
 type Cfg = { authProvider?:'clerk'|'privy'|'none';clerkPublishableKey?:string;clerkIssuer?:string;privyAppId: string; publicUrl: string; worldId: string; authReady: boolean; devAuth: boolean; accountAuthRequired?:boolean; inviteRequired?: boolean; build?: string; localIntegrationMetadataPath?:string };
@@ -92,7 +93,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   const receiveHandle = useCallback((handle: WorldViewerHandle | null) => setViewerHandle(handle), []);
   const receiveState = useCallback((state: WorldViewerState) => setViewerState(state), []);
   useApprovalFollow(approvalFollow,approvalScope,auth.authed,viewerHandle,viewerState,followed=>{setApprovalFollow(null);if(followed)setApprovalId(null);});
-  const placePreview=useCallback((place:EdenTourPlace)=>viewerHandle?.placePreview?.(place)??Promise.resolve(null),[viewerHandle]);
+  const placePreview=useCallback((place:EdenTourPlace)=>viewerHandle?.locationPreview?.(place)??Promise.resolve(null),[viewerHandle]);
   const openNavigation = useCallback(() => setPanelOpen(false), []);
   const viewportInsets = useViewerInsets(frame, !advanced && panelOpen, `${advanced}:${navigationOpen}:${tab}:${selected}`);
   const currentMe=approvedMe(auth,sim.me);
@@ -119,7 +120,9 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   const mine = new Set(currentMe?.souls ?? []);
   const inspect = (id: string | null) => { setSelected(id); if (id) revealPanel(); };
   const edenExpansion=edenExperienceEnabled(location.hostname,worldPath,cfg.worldId,sim.conn.welcome?.worldId,qualifiedEdenWorlds);
-  const tourHandle=viewerHandle as (WorldViewerHandle & {framePlace?(place:EdenTourPlace):boolean})|null;
+  const tourHandle=viewerHandle;
+  const exploreLocations=viewerHandle?.locations?.()??[];
+  const exploreName=worldKey==='littlemartians'?'Little Martians':worldKey[0].toUpperCase()+worldKey.slice(1);
   const localClassroomPresentation=classroomProjection(edenExpansion,sim.conn.welcome?.worldId,Object.hasOwn(r.entities,classroomScreenEntityId),viewerState?.presentation==='live'&&!viewerState.loading&&!viewerState.unavailableReason,lessonIndex,cfg.worldId);
   const openAccount = () => { setAdvanced(false); setPairCode(null); setTab('my soul'); revealPanel(); };
   return (
@@ -135,17 +138,13 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
         <span className={st.state === 'open' ? 'ok' : 'dim'}>{st.state === 'open' ? '● Connected' : 'Connecting…'}</span>
         </>}
         {!advanced&&<div className="hud-status" ref={setStatusSlot}/>}
-        {!advanced&&edenExpansion&&viewerState?.presentation==='live'&&!viewerState.loading&&!viewerState.unavailableReason&&tourHandle?.framePlace&&<EdenTour presence={explorePresence(sim.edge??[])} room={viewerState?.room} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} onOpen={()=>{viewerHandle?.releaseInput?.();setNavigationOpen(false);}} onSoul={id=>{if(!viewerHandle?.selectSoul(id))return false;return viewerHandle.frameSouls?.([id])??false;}} preview={placePreview} onView={place=>{const viewed=tourHandle.framePlace?.(place)??false;if(viewed){setPanelOpen(false);setNavigationOpen(false);}return viewed;}}/>}
+        {!advanced&&viewerState?.presentation==='live'&&!viewerState.loading&&!viewerState.unavailableReason&&tourHandle?.frameLocation&&<div className="hud-explore-group"><EdenTour worldName={exploreName} locations={exploreLocations} presence={explorePresence(sim.edge??[],r.souls.keys())} room={viewerState?.room} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} onOpen={()=>{viewerHandle?.releaseInput?.();setNavigationOpen(false);}} onSoul={id=>{if(!viewerHandle?.selectSoul(id))return false;return viewerHandle.frameSouls?.([id])??false;}} preview={placePreview} onView={place=>{const viewed=tourHandle.frameLocation?.(place)??false;if(viewed){setPanelOpen(false);setNavigationOpen(false);}return viewed;}}/><MySouls ids={ownedIds} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} select={inspect}/></div>}
         {!advanced&&<div className="hud-camera-row"><div className="hud-camera-slot" ref={setCameraSlot}/><button className="hud-camera" aria-label="Camera controls" aria-expanded={navigationOpen} title="Camera controls" onClick={()=>setNavigationOpen(o=>!o)}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6.5h3l1.4-2h5.2l1.4 2h3v9.5H3z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><circle cx="10" cy="11" r="3" fill="none" stroke="currentColor" strokeWidth="1.5"/></svg></button></div>}
         <LocalIntegrationNotice source={cfg.localIntegrationMetadataPath}/>{AUTH_UI&&<LocalConnectionHelp devAuth={cfg.devAuth}/>}
         <div className="hud-actions">
-          {!advanced&&<MySouls ids={ownedIds} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} select={inspect}/>}
-          {signinEnabled&&auth.authed&&<button onClick={openAccount}>Account</button>}
           {advanced&&<a className="world-back" href="#watch" onClick={e => { e.preventDefault(); setAdvanced(false); setPairCode(null); setTab('watch'); history.replaceState(null, '', '#watch'); }}>← Back to the world</a>}
-          {!signinEnabled ? null : !auth.ready ? <span className="dim">Signing in…</span> : auth.authed
-            ? <button onClick={() => void auth.logout()}>Sign out</button>
-            : auth.signInUrl?<a className="primary" href={auth.signInUrl}>Sign in at sim.eden.art</a>:<button className="primary" onClick={auth.login}>Sign in</button>}
-          {!advanced&&<BringAgent auth={auth} requireAuth={cfg.accountAuthRequired===true}/>}
+          <WorldAccountControls signinEnabled={signinEnabled} accountAuthRequired={cfg.accountAuthRequired} auth={auth} newSoul={!advanced&&<BringAgent key={cfg.worldId??location.pathname} auth={auth} requireAuth={cfg.accountAuthRequired===true}/>}/>
+
         </div>
       </header>
       <aside id="soul-panel" tabIndex={-1} className="human-panel" hidden={advanced || !panelOpen || tab === 'my soul'} aria-label="Selected Soul">

@@ -48,7 +48,7 @@ export function openClientMemory(directory,{scope,now=()=>new Date().toISOString
    memory.remember(value);
   },
   factualOutcomes(){return memory.factualOutcomes();},
-  retrieve(frame,attempt,{recall=false}={}){return memory.retrieve({day:now().slice(0,10),recall,...(frame?.me?.place?{place:frame.me.place}:{}),people:[...new Set([...(frame?.near??[]).map(p=>p.id),...(state.speakers??[])])].slice(0,8),...(attempt?{attempt}:{})})+'\n## Owner schedule — bounded local notes\n'+readFileSync(safe(join(root,'memory','schedule.md')),'utf8').split('\n').slice(0,20).join('\n').slice(0,3000);},
+  retrieve(frame,attempt,{recall=false,readingRecall=false}={}){return memory.retrieve({day:now().slice(0,10),recall,readingRecall,...(frame?.me?.place?{place:frame.me.place}:{}),people:[...new Set([...(frame?.near??[]).map(p=>p.id),...(state.speakers??[])])].slice(0,8),...(attempt?{attempt}:{})})+'\n## Owner schedule — bounded local notes\n'+readFileSync(safe(join(root,'memory','schedule.md')),'utf8').split('\n').slice(0,20).join('\n').slice(0,3000);},
  };
  return api;
 }
