@@ -89,3 +89,17 @@
   .gp-mini { color: #a9c6ee; }
 }
 .gp-ghostbar .gp-ghostmsg { white-space: normal; } .gp-ghostbar i { color: #c9c8bf; }
+/* P6: one obvious next step */
+.gp-next { margin: 2px 0 10px; }
+.gp-pane .gp-next { background: #eef6ef; border-left: 3px solid #2d8a4e; padding: 7px 10px 2px; border-radius: 0 8px 8px 0; }
+.gp-next > b { display: block; font-size: 13.5px; }
+.gp-next p { margin: 3px 0 4px; }
+.gp-next .gp-md { border-top: 0; padding-top: 0; }
+.gp-pairs .gp-dim { display: block; font-size: 12px; }
+.gp-more { margin: 6px 0 2px; }
+.gp-more > summary { cursor: pointer; color: #75756d; font-size: 12.5px; }
+.gp-more[open] > summary { margin-bottom: 4px; }
+@media (prefers-color-scheme: dark) {
+  .gp-pane .gp-next { background: #1f3326; }
+  .gp-more > summary { color: #9b9b92; }
+}

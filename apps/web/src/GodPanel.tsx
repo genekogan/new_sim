@@ -97,15 +97,19 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
       <button className="gp-btn gp-primary" data-signin-go="1" type="submit">Sign in</button>
     </form>
   );
-  const who = session.label ?? 'you';
-  const claim = () => run('claim', G.claim, () => 'This world is yours. Pair your agent next.');
-  const approve = (code: string) => run(code, async () => { await G.approve(code); localStorage.setItem(PAIRED_KEY, '1'); setApprovedHere(true); if (hashCode === code) history.replaceState(null, '', location.pathname + location.search); }, () => `Approved ${code}. Your agent now holds god mode here.`);
+  const signInButton = session.mode === 'clerk' && !session.ready ? <p className="gp-dim">Signing in…</p>
+    : session.mode === 'clerk' && session.label && !session.authed ? <p className="gp-dim">Signed in as <b>{session.label}</b>; connecting your account to this world…</p>
+    : !naming && <button className="gp-btn gp-primary" data-signin="1" onClick={signIn}>Sign in</button>;
+  const who = (session.label ?? 'you').replace(/^dev:/, '');
+  const claim = () => run('claim', G.claim, () => 'This world is yours.');
+  const approve = (code: string) => run(code, async () => { await G.approve(code); localStorage.setItem(PAIRED_KEY, '1'); setApprovedHere(true); if (hashCode === code) history.replaceState(null, '', location.pathname + location.search); }, () => `Approved. Your agent is now this world's god.`);
   const undoRedo = (which: 'undo' | 'redo') => run(which, () => (which === 'undo' ? G.undo() : G.redo()), (r) => { const x = r as G.UndoResult; return x.accepted ? `${which === 'undo' ? 'Undid' : 'Redid'} edit ${x.reverted}.` : (x.failures?.[0]?.detail ?? `nothing to ${which}`); });
   const undoGroup = (group: string) => run('g:' + group, () => G.undoGroup(group), (r) => { const x = r as G.UndoResult; return x.accepted ? `Undid group “${group}” (${Array.isArray(x.reverted) ? x.reverted.length : 1} edits).` : (x.failures?.[0]?.detail ?? 'nothing undone'); });
 
   const signedIn = session.authed && !!status && status.you !== 'anonymous';
   const checklist: Step[] = useMemo(() => steps({ status, signedIn, edits, flags: flags.length, approvedHere, agentSeen: !!launcher?.seen.agentSeenAt, looks: launcher?.seen.looks ?? 0 }), [status, signedIn, edits, flags.length, approvedHere, launcher]);
   const done = checklist.filter((s) => s.done).length;
+  const paired = !!checklist.find((s) => s.id === 'pair')?.done;
   const recent = useMemo(() => (edits ?? []).slice().sort((a, b) => b.seq - a.seq).slice(0, 8), [edits]);
   const canUndo = (edits ?? []).some((e) => !e.undone && e.kind !== 'undo' && e.ops.length > 0);
   // one "undo group" per group, on its newest row that undo would still revert
@@ -141,31 +145,25 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
         {launcher?.world.templateName && <div className="gp-dim gp-sub">from <i>{launcher.world.templateName}</i>{launcher.world.createdAt ? <> · made {ago(launcher.world.createdAt)}</> : null}</div>}
 
         {approvalId && <ApprovalCard id={approvalId} signedIn={signedIn} onDone={() => setApprovalId(null)} />}
-        {status.you === 'anonymous' && (
-          <div className="gp-block">
-            {isNew && !status.hasOwner && <p className="gp-hello">Your new world is ready. Whoever claims it first becomes its god, so sign in and claim it now.</p>}
-            <p>{status.hasOwner ? 'This world already has a god. Watch, or sign in if it is yours.' : 'This world has no god yet. Sign in to claim it; your agent will build it.'}</p>
-            {session.mode === 'clerk' && !session.ready ? <p className="gp-dim">Signing in…</p>
-              : session.mode === 'clerk' && session.label && !session.authed ? <p className="gp-dim">Signed in as <b>{session.label}</b>; connecting your account to this world…</p>
-              : !naming && <button className="gp-btn gp-primary" data-signin="1" onClick={signIn}>{session.signInUrl ? `Sign in at ${new URL(session.signInUrl).host}` : 'Sign in'}</button>}
-            {signInForm}
+        {!status.hasOwner && !owner && (
+          <div className="gp-block gp-next">
+            {isNew && status.you !== 'claimant' && <p className="gp-hello">Your new world is ready. Whoever claims it first becomes its god, so sign in and claim it now.</p>}
+            {status.you === 'claimant'
+              ? <><p>Signed in as <b>{who}</b>. Nobody owns this world yet: claim it, and your agent builds it.</p>
+                <button className="gp-btn gp-primary" data-claim="1" disabled={busy === 'claim'} onClick={claim}>{busy === 'claim' ? 'Claiming…' : 'Become its god'}</button></>
+              : <>{!isNew && <p>This world has no god yet. Sign in to claim it; your agent will build it.</p>}{signInButton}{signInForm}</>}
           </div>
         )}
-        {status.you === 'claimant' && (
-          <div className="gp-block">
-            <p>Signed in as <b>{who}</b>. Nobody owns this world yet.</p>
-            <button className="gp-btn gp-primary" data-claim="1" disabled={busy === 'claim'} onClick={claim}>{busy === 'claim' ? 'Claiming…' : 'Become its god'}</button>
-          </div>
-        )}
-        {status.you === 'visitor' && <div className="gp-block"><p>Signed in as <b>{who}</b>. Another account owns this world; you can watch, or live here as a Soul.</p>{session.mode === 'dev' ? (!naming && <button className="gp-btn" onClick={signIn}>Switch name</button>) : <button className="gp-btn" onClick={() => void session.logout()}>Sign out</button>}{signInForm}</div>}
-        {!owner && <JoinPanel signedIn={signedIn} worldName={name} base={status.base} owner={false} />}
+        {status.hasOwner && !owner && <JoinPanel signedIn={signedIn} worldName={name} base={status.base} owner={false}
+          signIn={<>{signInButton}{signInForm}</>}
+          account={status.you === 'visitor' ? <span className="gp-dim">Signed in as <b>{who}</b> {session.mode === 'dev' ? <button className="gp-mini" onClick={signIn}>switch name</button> : <button className="gp-mini" onClick={() => void session.logout()}>sign out</button>}</span> : null} />}
 
         {owner && (
           <>
             {hashCode && !status.pending.some((p) => p.code === hashCode) && <p className="gp-bad">Pairing request <code>{hashCode}</code> is not pending (expired, or already approved).</p>}
             {status.pending.length > 0 && (
               <div className="gp-pairs" data-pairing="1">
-                <b>Your agent asks to be this world's god</b>
+                <b>Your agent asks to be this world's god</b><span className="gp-dim">Check the code matches what your agent shows, then approve.</span>
                 {status.pending.map((p) => (
                   <div key={p.code} className="gp-row">
                     <span><code className="gp-code-big">{p.code}</code> {p.agent} <span className="gp-dim">({Math.max(1, Math.round(p.expiresIn / 60))} min)</span></span>
@@ -174,29 +172,34 @@ export function GodPanel({ flagMode, onFlagMode }: { flagMode: boolean; onFlagMo
                 ))}
               </div>
             )}
-            <div className="gp-tools">
+            {paired && <div className="gp-tools">
               <button className="gp-btn" data-undo="1" disabled={!canUndo || busy === 'undo'} onClick={() => undoRedo('undo')} title="Undo the newest edit">↶ Undo</button>
               <button className="gp-btn" data-redo="1" disabled={busy === 'redo'} onClick={() => undoRedo('redo')} title="Redo the newest undone edit">↷ Redo</button>
               <button className={'gp-btn' + (flagMode ? ' gp-armed' : '')} data-flag-button="1" aria-pressed={flagMode} onClick={() => onFlagMode(!flagMode)} title="Drop a labelled flag: a reference point your agent can build around (or Alt+click the ground)">⚑ {flagMode ? 'click the ground…' : 'Drop a flag'}</button>
-            </div>
+            </div>}
             <div className="gp-tabs" role="tablist">
               {(['start', 'edits', 'flags', 'previews', 'souls'] as Tab[]).map((t) => (
                 <button key={t} role="tab" aria-selected={tab === t} data-tab={t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
-                  {t === 'start' ? <>First steps <span className="gp-count">{done}/{checklist.length}</span></> : t === 'edits' ? <>Edits</> : t === 'flags' ? <>Flags <span className="gp-count">{flags.length}</span></> : t === 'souls' ? <>Souls</> : <>Previews{previews.length ? <span className="gp-count">{previews.length}</span> : null}</>}
+                  {t === 'start' ? <>Start <span className="gp-count">{done}/{checklist.length}</span></> : t === 'edits' ? <>Edits</> : t === 'flags' ? <>Flags <span className="gp-count">{flags.length}</span></> : t === 'souls' ? <>Souls</> : <>Previews{previews.length ? <span className="gp-count">{previews.length}</span> : null}</>}
                 </button>
               ))}
             </div>
 
             {tab === 'start' && (
               <div className="gp-pane">
+                <div className="gp-next" data-next-step={paired ? 'build' : 'pair'}>
+                  {paired
+                    ? <><b>Your agent is this world's god.</b><p>Ask it for things: “a cottage by the pond”, “hills to the east”, “undo that”. Friends can join from the Souls tab.</p><p className="gp-dim">Another agent or folder? Give it the same line:</p></>
+                    : <><b>Next: give your agent this line</b><p className="gp-dim">Paste it to Claude Code, Codex or any agent you use. It sets itself up and shows a code here: press Approve.</p></>}
+                  <Markdown source={'```paste-to-your-agent\n' + G.godPrompt(status.base) + '\n```'} />
+                </div>
                 <ol className="gp-steps" data-checklist="1">
                   {checklist.map((s) => <li key={s.id} data-step={s.id} data-done={s.done ? '1' : '0'} className={s.done ? 'done' : ''}><span className="gp-tick" aria-hidden="true">{s.done ? '✓' : ''}</span><span><b>{s.label}</b>{!s.done && <span className="gp-hint">{s.hint}</span>}</span></li>)}
                 </ol>
-                {welcome ? <Markdown source={welcome} skipFirstHeading /> : <p className="gp-dim">Loading the welcome…</p>}
+                <details className="gp-more"><summary>More about god mode</summary>{welcome ? <Markdown source={welcome} skipFirstHeading /> : <p className="gp-dim">Loading…</p>}</details>
                 <div className="gp-files">
                   <a className="gp-btn" href={apiPath('/SKILL.md')} target="_blank" rel="noreferrer" title="This world's one skill: God mode and Soul mode">SKILL.md</a>
                   <a className="gp-btn" href={apiPath('/god/eden-god.mjs')} download>eden-god.mjs</a>
-                  <a className="gp-btn" href={apiPath('/v1/god/welcome')} target="_blank" rel="noreferrer">welcome.md</a>
                 </div>
               </div>
             )}

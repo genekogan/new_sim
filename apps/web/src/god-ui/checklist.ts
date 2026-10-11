@@ -29,12 +29,12 @@ export function steps(ev: Evidence): Step[] {
   // a flag of your own: the template's flags do not count (fallback: any flag, when the journal is unknown)
   const flagged = ev.edits ? ev.edits.some((e) => e.kind === 'edit' && !isGenesis(e) && !e.undone && e.ops.some(isFlagOp)) : ev.flags > 0;
   return [
-    { id: 'signin', label: 'Sign in', done: ev.signedIn, hint: 'A local name; use the same one when you come back.' },
-    { id: 'claim', label: 'Claim the world', done: owner, hint: 'The first person to claim an unowned world becomes its god.' },
-    { id: 'pair', label: 'Pair your agent', done: agents, hint: 'Run the commands below in a fresh folder; approve the code that appears here.' },
-    { id: 'flag', label: 'Drop a flag', done: flagged, hint: 'A named reference point: “⚑ drop a flag”, then click the ground.' },
+    { id: 'signin', label: 'Sign in', done: ev.signedIn, hint: 'So this world knows you when you come back.' },
+    { id: 'claim', label: 'Claim the world', done: owner, hint: 'Whoever claims an unowned world first becomes its god.' },
+    { id: 'pair', label: 'Connect your agent', done: agents, hint: 'Paste the line above to your agent, then press Approve when its code appears here.' },
+    { id: 'flag', label: 'Drop a flag', done: flagged, hint: 'A named spot your agent can build around: ⚑ Drop a flag, then click the ground.' },
     { id: 'build', label: 'First build', done: built, hint: 'Ask your agent for something: “a cottage by the pond”.' },
-    { id: 'look', label: 'First look', done: ev.looks > 0, hint: 'node eden-god.mjs look — your agent sees what it built.' },
+    { id: 'look', label: 'First look', done: ev.looks > 0, hint: 'Ask your agent to take a look at what it built.' },
   ];
 }
 

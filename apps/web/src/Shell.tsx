@@ -26,6 +26,10 @@ import {BringAgent} from './BringAgent.tsx';
 import {worldClockAt,worldTimeText} from './world-clock.ts';
 import type { WorldViewerHandle, WorldViewerState } from './WorldViewer.ts';
 import { worldKey } from './world-path.ts';
+import { BASE } from './base-path.ts';
+// A world made with "New world" (the world launcher): its god panel carries sign-in, claim and Join as a Soul, so the
+// legacy Soul/account setup is hidden there. The existing worlds (root build, these keys) are unchanged.
+const launcherWorld = BASE !== '' || !['eden', 'mars', 'littlemartians', 'toy'].includes(worldKey);
 import { SpendPanel } from './Spend.tsx';
 import {soulFragment,soulFromFragment} from './soul-link.ts';
 import {AUTH_UI,configuredSignIn} from './auth-ui.ts';
@@ -131,10 +135,10 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
         {!advanced&&<div className="hud-status" ref={setStatusSlot}/>}
         {!advanced&&edenExpansion&&viewerState?.presentation==='live'&&!viewerState.loading&&!viewerState.unavailableReason&&tourHandle?.framePlace&&<EdenTour presence={explorePresence(sim.edge??[])} room={viewerState?.room} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} onOpen={()=>{viewerHandle?.releaseInput?.();setNavigationOpen(false);}} onSoul={id=>{if(!viewerHandle?.selectSoul(id))return false;return viewerHandle.frameSouls?.([id])??false;}} preview={placePreview} onView={place=>{const viewed=tourHandle.framePlace?.(place)??false;if(viewed){setPanelOpen(false);setNavigationOpen(false);}return viewed;}}/>}
         {!advanced&&<div className="hud-camera-row"><div className="hud-camera-slot" ref={setCameraSlot}/><button className="hud-camera" aria-label="Camera controls" aria-expanded={navigationOpen} title="Camera controls" onClick={()=>setNavigationOpen(o=>!o)}><svg viewBox="0 0 20 20" aria-hidden="true"><path d="M3 6.5h3l1.4-2h5.2l1.4 2h3v9.5H3z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round"/><circle cx="10" cy="11" r="3" fill="none" stroke="currentColor" strokeWidth="1.5"/></svg></button></div>}
-        <LocalIntegrationNotice source={cfg.localIntegrationMetadataPath}/>{AUTH_UI&&<LocalConnectionHelp devAuth={cfg.devAuth}/>}
+        {!launcherWorld&&<LocalIntegrationNotice source={cfg.localIntegrationMetadataPath}/>}{AUTH_UI&&!launcherWorld&&<LocalConnectionHelp devAuth={cfg.devAuth}/>}
         <div className="hud-actions">
           {!advanced&&<MySouls ids={pinnedIds} souls={r.souls} present={new Set([...r.souls.values()].filter(s=>r.entities[s.entityId]).map(s=>s.id))} select={id=>{inspect(id);if(viewerHandle?.selectSoul(id))viewerHandle.setCameraMode('follow');}}/>}
-          {AUTH_UI&&<button disabled={auth.authed&&!currentMe} onClick={() => { const id = currentMe?.souls[0]; if (id) { inspect(id); setTab('watch'); setAdvanced(false); } else openAccount(); }}>Your Soul</button>}
+          {AUTH_UI&&!launcherWorld&&<button disabled={auth.authed&&!currentMe} onClick={() => { const id = currentMe?.souls[0]; if (id) { inspect(id); setTab('watch'); setAdvanced(false); } else openAccount(); }}>Your Soul</button>}
           {advanced&&<a className="world-back" href="#watch" onClick={e => { e.preventDefault(); setAdvanced(false); setPairCode(null); setTab('watch'); history.replaceState(null, '', '#watch'); }}>← Back to the world</a>}
           {!signinEnabled ? null : !auth.ready ? <span className="dim">Signing in…</span> : auth.authed
             ? <button onClick={() => void auth.logout()}>Sign out</button>

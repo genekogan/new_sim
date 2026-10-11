@@ -102,13 +102,15 @@ export async function openLauncher(cfg = {}) {
       const r = await fetch(`http://127.0.0.1:${st.port}${wp(w.slug)}/v1/god/status`, { signal: AbortSignal.timeout(1500) });
       if (!r.ok) return;
       const s = await r.json();
-      stats.set(w.slug, { at: Date.now(), god: !!s.hasOwner, entities: s.entities, seq: s.seq });
-      if (w.god !== !!s.hasOwner || w.entities !== s.entities) registry.update(w.slug, { god: !!s.hasOwner, entities: s.entities, seq: s.seq });
+      // who lives here (the public list the world page shows): the homepage's Souls count
+      const souls = await fetch(`http://127.0.0.1:${st.port}${wp(w.slug)}/v1/world/souls`, { signal: AbortSignal.timeout(1500) }).then((x) => (x.ok ? x.json() : null)).then((d) => (Array.isArray(d?.souls) ? d.souls.length : null)).catch(() => null);
+      stats.set(w.slug, { at: Date.now(), god: !!s.hasOwner, entities: s.entities, seq: s.seq, souls: souls ?? prev?.souls ?? w.souls ?? null });
+      if (w.god !== !!s.hasOwner || w.entities !== s.entities || (souls !== null && w.souls !== souls)) registry.update(w.slug, { god: !!s.hasOwner, entities: s.entities, seq: s.seq, ...(souls !== null ? { souls } : {}) });
     } catch { /* busy; keep the cached numbers */ }
   }
   const describe = (w) => {
     const st = pool.status(w.slug), s = stats.get(w.slug), t = listTemplates(templatesDir).find((x) => x.id === w.template);
-    return { key: w.slug, worldKey: w.slug, slug: w.slug, name: w.name, basePath: wp(w.slug), configPath: `${wp(w.slug)}/v1/config`, url: auth ? `${wp(w.slug)}/` : `${wp(w.slug)}/?dev=1`, template: w.template, templateName: t?.name ?? (w.template === 'empty' ? 'Empty plain' : w.template), createdAt: w.createdAt, owner: w.owner ?? null, god: s?.god ?? w.god ?? false, entities: s?.entities ?? w.entities ?? null, seq: s?.seq ?? w.seq ?? null, status: st.status, restarts: st.restarts ?? 0 };
+    return { key: w.slug, worldKey: w.slug, slug: w.slug, name: w.name, basePath: wp(w.slug), configPath: `${wp(w.slug)}/v1/config`, url: auth ? `${wp(w.slug)}/` : `${wp(w.slug)}/?dev=1`, template: w.template, templateName: t?.name ?? (w.template === 'empty' ? 'Empty plain' : w.template), createdAt: w.createdAt, owner: w.owner ?? null, god: s?.god ?? w.god ?? false, entities: s?.entities ?? w.entities ?? null, seq: s?.seq ?? w.seq ?? null, souls: s?.souls ?? w.souls ?? null, godName: (s?.god ?? w.god) ? (w.godName ?? null) : null, status: st.status, restarts: st.restarts ?? 0 };
   };
   async function worldsJson() {
     await Promise.all(registry.worlds.map(refreshStats));
@@ -159,6 +161,9 @@ export async function openLauncher(cfg = {}) {
         return [r.status === 403 ? 403 : 401, { ok: false, code: 'signin-required', message: `the new world could not make you its god: ${d.message ?? r.status}; sign in again and retry` }];
       } else log(`created ${slug} unclaimed: the creator's dev sign-in was refused (${r.status})`);
     }
+    // the name the creator chose to show as this world's god on the homepage (optional; never their account id or email)
+    const godName = typeof body?.godName === 'string' ? body.godName.trim().replace(/\s+/g, ' ').replace(/[^\p{L}\p{N} _'.-]/gu, '').slice(0, 32) : '';
+    if (owner && godName) registry.update(slug, { godName });
     log(`created ${slug} (${t.id}) on :${pool.status(slug).port} in ${ms} ms${owner ? ', claimed by its creator' : ''}`);
     await refreshStats(entry);
     return [201, { ok: true, slug, url: auth ? `${wp(slug)}/?new=1` : `${wp(slug)}/?dev=1&new=1`, bootMs: ms, claimed: !!owner, world: describe(entry) }];

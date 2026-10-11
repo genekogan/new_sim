@@ -3,11 +3,10 @@
 // As on the live worlds: one line for your agent (SKILL.md, Soul mode) → its Soul CLI asks for the Soul (`create-soul`,
 // or `pair-soul` to reconnect) → under Clerk it prints #approve/<id> → Approve here → its `approval wait` connects.
 // Dev sign-in (local test worlds): the agent makes the Soul itself, no approval.
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { CopyButton } from './markdown.tsx';
 import { flyTo } from './camera.ts';
 import * as J from './join-api.ts';
-import { apiPath } from '../world-path.ts';
 import { useSession } from '../auth-session.ts';
 import './join.css';
 
@@ -34,61 +33,75 @@ export function SoulsHere({ souls, mine }: { souls: J.SoulHere[]; mine: Set<stri
 function Prompt({ text, note }: { text: string; note: string }) {
   return (
     <div className="jp-code" data-join-line="1">
-      <p>Paste this to your agent (Claude Code, Codex…):</p>
-      <div className="gp-code"><div className="gp-code-bar"><span>to your agent</span><CopyButton text={text} /></div><pre><code data-join-prompt="1">{text}</code></pre></div>
-      <p className="gp-dim">{note} The skill: <a href={apiPath('/SKILL.md')} target="_blank" rel="noreferrer">SKILL.md</a>.</p>
+      <div className="gp-code"><div className="gp-code-bar"><span>paste to your agent</span><CopyButton text={text} /></div><pre><code data-join-prompt="1">{text}</code></pre></div>
+      <p className="gp-dim">{note}</p>
     </div>
   );
 }
 
-export function JoinPanel({ signedIn, worldName, base, owner }: { signedIn: boolean; worldName: string; base: string; owner: boolean }) {
+export function JoinPanel({ signedIn, worldName, base, owner, signIn, account }: { signedIn: boolean; worldName: string; base: string; owner: boolean; signIn?: ReactNode; account?: ReactNode }) {
   const session = useSession();
-  const account = session.mode !== 'dev';   // Clerk: the agent's request comes back here as an approval link
+  const approvals = session.mode !== 'dev';   // Clerk: the agent's request comes back here as an approval link
   const [here, setHere] = useState<J.SoulHere[]>([]);
   const [mine, setMine] = useState<J.MySoul[] | null>(null);
   const [name, setName] = useState('');
-  const [line, setLine] = useState<{ text: string; note: string } | null>(null);
+  const [line, setLine] = useState<{ text: string; note: string; join?: boolean } | null>(null);
   const ref = useRef<HTMLDivElement>(null);
 
   const refresh = useCallback(async () => { const [h, m] = await Promise.all([J.soulsHere(), signedIn ? J.mySouls() : Promise.resolve(null)]); setHere(h); setMine(m); }, [signedIn]);
   useEffect(() => { void refresh(); const t = setInterval(() => void refresh(), 5000); return () => clearInterval(t); }, [refresh]);
   useEffect(() => { if (J.landingHash === '#join') ref.current?.scrollIntoView({ block: 'nearest' }); }, []);
 
-  const approveNote = account ? 'Your agent installs the Soul CLI and asks for your Soul. It gives you a link: open it here, signed in, and press Approve.' : 'This is a local test world: your agent makes the Soul itself, no approval needed.';
+  const approveNote = approvals ? 'Your agent sets itself up and shows you a link. Open it here and press Approve. Your Soul then appears below.' : 'This is a local test world: your agent makes your Soul by itself. It appears below.';
   const mineIds = new Set((mine ?? []).map((s) => s.id));
   const nameOk = !name.trim() || /^[\p{L}\p{N} _'-]{2,32}$/u.test(name.trim());
+  const hasSoul = !!mine && mine.length > 0;
+  // the Soul arrived: the “make my Soul” line has done its job
+  useEffect(() => { if (hasSoul && line?.join) setLine(null); }, [hasSoul, line?.join]);
+
+  const yours = signedIn && hasSoul && (
+    <div className="jp-mine" data-my-souls={mine!.length}>
+      {mine!.map((s) => (
+        <div key={s.id} className="gp-row" data-my-soul={s.name}>
+          <span>Your Soul <b>{s.name}</b> {s.hasToken ? <span className="jp-ok">agent connected</span> : <span className="gp-dim">no agent connected</span>}</span>
+          {approvals && <button className="gp-btn gp-small" data-reconnect-soul={s.name} onClick={() => setLine({ text: J.reconnectPrompt(base, worldName, s), note: approveNote })} title="For a new agent folder: you approve it here">Reconnect</button>}
+        </div>
+      ))}
+    </div>
+  );
+  const form = signedIn && mine && (!hasSoul || !approvals) && (
+    <form className="jp-form" data-join-form="1" onSubmit={(e) => { e.preventDefault(); if (nameOk) setLine({ text: J.joinPrompt(base, worldName, name.trim() || undefined), note: approveNote, join: true }); }}>
+      <label>Your Soul's name, if you like<input data-soul-name="1" value={name} maxLength={32} onChange={(e) => setName(e.target.value)} placeholder="e.g. Ana" autoComplete="off" /></label>
+      <button className="gp-btn gp-primary" data-join-go="1" type="submit" disabled={!nameOk}>Join as a Soul</button>
+    </form>
+  );
+  const souls = <><b className="jp-sub">Souls here <span className="gp-count">{here.length}</span></b><SoulsHere souls={here} mine={mineIds} /></>;
+
+  if (owner) return (
+    <div className="jp" data-join="1" ref={ref} id="join">
+      <p className="jp-intro">Friends join as Souls: bodies here that their own agents move. Send them this link; anyone signed in can join.</p>
+      <div className="jp-share"><code data-join-link="1">{J.joinLink(base)}</code><CopyButton text={J.joinLink(base)} label="copy link" /></div>
+      {souls}
+      {yours}
+      {(form || line) && <details className="gp-more jp-self"><summary>Live here yourself, as a Soul</summary>{form}{line && <Prompt text={line.text} note={line.note} />}</details>}
+    </div>
+  );
 
   return (
     <div className="jp" data-join="1" ref={ref} id="join">
-      {owner
-        ? <p className="gp-dim jp-intro">Friends join as Souls: bodies in this world that their own agents move. Share this link; anyone signed in can join.</p>
-        : <><b className="jp-title">Join this world as a Soul</b><p className="gp-dim jp-intro">A Soul is your body here. Your own agent (Claude Code, Codex…) moves it: it walks, sits, picks things up, and prays to the god. It's free: your agent does the thinking.</p></>}
-      {owner && <div className="jp-share"><code data-join-link="1">{J.joinLink(base)}</code><CopyButton text={J.joinLink(base)} label="copy link" /></div>}
-
-      {!signedIn && !owner && <p className="gp-dim" data-join-signin="1">Sign in (above), then ask your agent for your Soul.</p>}
-
-      {signedIn && mine && mine.length > 0 && (
-        <div className="jp-mine" data-my-souls={mine.length}>
-          {mine.map((s) => (
-            <div key={s.id} className="gp-row" data-my-soul={s.name}>
-              <span>Your Soul <b>{s.name}</b> {s.hasToken ? <span className="jp-ok">agent connected</span> : <span className="gp-dim">no agent connected</span>}</span>
-              {account && <button className="gp-btn gp-small" data-reconnect-soul={s.name} onClick={() => setLine({ text: J.reconnectPrompt(base, worldName, s), note: approveNote })} title="For a new agent folder: you approve it here">Reconnect</button>}
-            </div>
-          ))}
-        </div>
-      )}
-
-      {signedIn && mine && (mine.length === 0 || !account) && (
-        <form className="jp-form" data-join-form="1" onSubmit={(e) => { e.preventDefault(); if (nameOk) setLine({ text: J.joinPrompt(base, worldName, name.trim() || undefined), note: approveNote }); }}>
-          <label>Your Soul's name <span className="gp-dim">(or let your agent ask you)</span><input data-soul-name="1" value={name} maxLength={32} onChange={(e) => setName(e.target.value)} placeholder="e.g. Ana" autoComplete="off" /></label>
-          <button className="gp-btn gp-primary" data-join-go="1" type="submit" disabled={!nameOk}>Get the line for my agent</button>
-        </form>
-      )}
-
-      {line && <Prompt text={line.text} note={line.note} />}
-
-      <b className="jp-sub">Souls here <span className="gp-count">{here.length}</span></b>
-      <SoulsHere souls={here} mine={mineIds} />
+      <b className="jp-title">Join this world as a Soul</b>
+      <p className="gp-dim jp-intro">Your Soul is your body here, moved by your own agent (Claude Code, Codex…). It walks, sits, talks and prays to the god. Free: your agent does the thinking.</p>
+      <ol className="jp-steps">
+        <li data-done={signedIn ? '1' : '0'}>
+          {signedIn ? <>{account ?? <span className="gp-dim">Signed in</span>}</> : <div data-join-signin="1">{signIn}</div>}
+        </li>
+        <li data-done={hasSoul ? '1' : '0'} className={signedIn ? '' : 'jp-later'}>
+          {hasSoul ? yours : <><span>Get one line for your agent</span>{form}</>}
+          {line && <Prompt text={line.text} note={line.note} />}
+        </li>
+        {approvals && !hasSoul && <li className={line ? '' : 'jp-later'}><span>Approve the link your agent shows you</span></li>}
+      </ol>
+      {souls}
     </div>
   );
 }
@@ -107,7 +120,7 @@ export function ApprovalCard({ id, signedIn, onDone }: { id: string; signedIn: b
   return (
     <div className="gp-pairs jp-approval" data-approval={id} data-approval-status={a?.status ?? ''}>
       <b>Your agent asks to {a?.mode === 'create' ? 'make and move a Soul' : 'move your Soul'}</b>
-      {!signedIn && <p>Sign in (above) with the account that owns the Soul to review this request.</p>}
+      {!signedIn && <p>Sign in (below) with the account that owns the Soul to review this request.</p>}
       {a && <p><b>{a.name}</b>{a.soulId ? <span className="gp-dim"> · {a.soulId}</span> : null}<br /><span className="gp-dim">agent: {a.agentLabel} (its own label)</span></p>}
       {a?.status === 'pending' && <>
         <p className="gp-dim">The agent can perceive, act and edit this Soul's profile. Signing out doesn't revoke it.</p>
