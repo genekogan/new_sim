@@ -197,7 +197,7 @@ try {
         return { ...r, mode, audio: (await page.evaluate(() => window.__simLiving.lightning())).audio, errors };
       }, (r) => r?.ok && r.audio === 'running' && r.mode === 'manual' && !r.errors.length);
       await step(`V2[${d}] the god strikes by the plaza: a bolt from the cloud to the ground, the scene flashes, the thunder is scheduled after distance ÷ 343 m/s`, async () => {
-        await look(page, [40, 26, 40], [0, 6, -20]); await page.waitForTimeout(1500);
+        await look(page, [70, 26, 70], [3, 22, -30]); await page.waitForTimeout(1500);
         await page.evaluate(() => window.__simLiving.holdLightning(9000));
         const n0 = (await page.evaluate(() => window.__simLiving.lightning())).heard;
         const s = await god('strike', '--at', '6,-34');

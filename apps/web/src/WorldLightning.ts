@@ -32,7 +32,7 @@ export class WorldLightning {
   /** Inspection (e2e screenshots): keep the bolts drawn, at full brightness, until this time (performance.now() ms). */
   holdUntil = 0;
   private core = new THREE.MeshBasicMaterial({ color: 0xf4f7ff, transparent: true, opacity: 1, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false });
-  private glow = new THREE.MeshBasicMaterial({ color: 0x9db4ff, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false });
+  private glow = new THREE.MeshBasicMaterial({ color: 0x9db4ff, transparent: true, opacity: 0.22, blending: THREE.AdditiveBlending, depthWrite: false, fog: false, toneMapped: false });
 
   constructor(private layer: LayerLike) {
     this.group.name = 'god-lightning';
@@ -60,11 +60,11 @@ export class WorldLightning {
       // the return strokes: bright, dim, bright again, fading
       const k = reducedMotion ? 1 - age / BOLT_LIFE : (age < 0.07 ? 1 : age < 0.12 ? 0.25 : age < 0.2 ? 0.95 : age < 0.26 ? 0.2 : 0.7) * (1 - age / BOLT_LIFE);
       b.group.visible = k > 0.05;
-      b.group.children.forEach((c, i) => { ((c as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = (i % 2 ? 0.2 : 1) * Math.min(1, k * 1.3); });
-      b.light.intensity = 2500 * b.power * k;
+      b.group.children.forEach((c, i) => { ((c as THREE.Mesh).material as THREE.MeshBasicMaterial).opacity = (i % 2 ? 0.22 : 1) * Math.min(1, k * 1.3); });
+      b.light.intensity = 600 * b.power * k;
     }
-    this.flashLevel = performance.now() < this.holdUntil ? Math.max(this.flashLevel, 0.8) : Math.max(0, this.flashLevel - dt * 5.5);
-    this.flash.intensity = Math.min(1.2, this.flashLevel * 0.6) * (reducedMotion ? 0.5 : 1);
+    this.flashLevel = performance.now() < this.holdUntil ? 0.9 : Math.max(0, this.flashLevel - dt * 5.5);
+    this.flash.intensity = Math.min(0.7, this.flashLevel * 0.35) * (reducedMotion ? 0.5 : 1);
   }
 
   private fire(s: Strike, camera: THREE.Camera, reducedMotion: boolean) {
@@ -83,20 +83,20 @@ export class WorldLightning {
     const strand = (p: THREE.Vector3[], radius: number) => {
       const path = new THREE.CurvePath<THREE.Vector3>(); for (let i = 1; i < p.length; i++) path.add(new THREE.LineCurve3(p[i - 1], p[i]));
       bolt.add(new THREE.Mesh(new THREE.TubeGeometry(path, p.length * 2, radius, 5, false), this.core));
-      bolt.add(new THREE.Mesh(new THREE.TubeGeometry(path, p.length * 2, radius * 4, 6, false), this.glow));
+      bolt.add(new THREE.Mesh(new THREE.TubeGeometry(path, p.length * 2, radius * 3.5, 6, false), this.glow));
     };
-    strand(pts, 0.28 * (0.7 + 0.5 * s.power));
+    strand(pts, 0.45 * (0.7 + 0.5 * s.power));
     // branches off the upper two thirds
     const branches = 2 + Math.floor(r() * 3);
     for (let b = 0; b < branches; b++) {
       const from = pts[2 + Math.floor(r() * (N * 0.6))], dir = new THREE.Vector3(r() - 0.5, -0.5 - r() * 0.5, r() - 0.5).normalize(), len = 25 + r() * 45, bp = [from.clone()];
       for (let i = 1; i <= 7; i++) bp.push(from.clone().addScaledVector(dir, (len * i) / 7).add(new THREE.Vector3((r() - 0.5) * 7, (r() - 0.5) * 2, (r() - 0.5) * 7)));
-      strand(bp, 0.12);
+      strand(bp, 0.18);
     }
     const light = new THREE.PointLight(0xcfd9ff, 0, 900, 1.4); light.position.set(s.x, gy + 30, s.z);
     this.group.add(bolt); this.group.add(light);
     this.bolts.push({ group: bolt, light, born: performance.now() / 1000, seed: s.tick, power: s.power });
-    this.flashLevel = Math.min(reducedMotion ? 1.2 : 3.2, this.flashLevel + 2.4 * s.power);
+    this.flashLevel = Math.min(2, this.flashLevel + 1.6 * s.power);
     // thunder: after the distance at the speed of sound, louder and sharper the nearer
     const cam = camera.position, dist = Math.hypot(cam.x - s.x, cam.y - gy, cam.z - s.z), delay = dist / SOUND_MPS;
     const gain = Math.max(0.04, Math.min(1, 1 / (1 + dist / 260))) * (0.6 + 0.4 * s.power);
