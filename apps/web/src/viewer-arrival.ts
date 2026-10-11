@@ -53,3 +53,8 @@ export function arrivalProgress(initial: InitialWorldProgress | null | undefined
   if (initial.required > 0) return Math.min(1, Math.max(0, initial.completed / initial.required));
   return null;
 }
+
+/** Without an initial gate, the bar follows the actual asset downloads (finished of started) while any are pending. */
+export function assetDownloadProgress(d: { loaded: number; failed: number; total: number; pending: number } | null | undefined): number | null {
+  return d && d.pending > 0 && d.total > 0 ? Math.min(1, Math.max(0, (d.loaded + d.failed) / d.total)) : null;
+}

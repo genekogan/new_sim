@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 're
 import {ImportCredits} from './ImportCredits.tsx';
 import { createPortal } from 'react-dom';
 import type { ViewportInsets, WorldViewerHandle, WorldViewerState } from './WorldViewer.ts';
-import { arrivalProgress, arrivalStage, heldLabel, initialPending } from './viewer-arrival.ts';
+import { arrivalProgress, arrivalStage, assetDownloadProgress, heldLabel, initialPending } from './viewer-arrival.ts';
 import type { InitialWorldProgress } from './InitialWorldReadiness.ts';
 
 /** Edge overlays are measured against World's actual viewport, never the window. */
@@ -76,9 +76,10 @@ export function ViewerFrame({ handle, state, dt, navigationOpen, onNavigationCha
   }, [reason, arriving, blocked]);
   // The card also carries the initial-assets progress (the world stays hidden until those assets are ready), so it
   // stays until they are, and steps aside when they fail: the viewer's own Retry is then the only thing to show.
+  // Without such a gate (world-engine worlds) the bar follows the actual asset downloads while the card shows.
   const preparing = initialPending(initial);
   const card = (arriving || preparing) && initial?.stage !== 'failed';
-  const progress = card ? arrivalProgress(initial) : null;
+  const progress = !card ? null : initial ? arrivalProgress(initial) : arriving ? assetDownloadProgress(state?.assetDownloads) : null;
   const [arrivalShown, setArrivalShown] = useState(true);
   useEffect(() => { if (card) { setArrivalShown(true); return; } const id = setTimeout(() => setArrivalShown(false), 700); return () => clearTimeout(id); }, [card]);
   const lost = !connected && !arriving;

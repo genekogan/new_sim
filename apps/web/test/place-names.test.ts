@@ -55,4 +55,8 @@ test('Arrival card carries the initial-assets progress; nothing measurable shows
   for (const stage of ['waiting', 'downloading', 'preparing', 'first-frame', 'cancelled']) assert.equal(initialPending(p(stage)), true, stage);
   assert.equal(initialPending(p('ready')), false);
   assert.equal(initialPending(p('failed')), false);
+  const {assetDownloadProgress} = await import('../src/viewer-arrival.ts');
+  assert.equal(assetDownloadProgress(undefined), null);
+  assert.equal(assetDownloadProgress({loaded: 3, failed: 0, total: 3, pending: 0}), null);
+  assert.equal(assetDownloadProgress({loaded: 2, failed: 1, total: 6, pending: 3}), 0.5);
 });
