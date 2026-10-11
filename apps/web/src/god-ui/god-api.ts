@@ -107,3 +107,6 @@ export async function previews(): Promise<PreviewRow[]> {
     return r.ok ? (await r.json()).previews : [];
   } catch { return []; }
 }
+
+/** The one line the god pastes to their agent (the same line the world's welcome gives). */
+export const godPrompt = (base: string) => `Read ${base || location.origin + apiPath('')}/SKILL.md and follow its God mode section: you are the god of this world.`;

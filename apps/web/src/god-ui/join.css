@@ -28,3 +28,17 @@
   .jp-code { background: #1f3326; }
   .jp-you { background: #23324a; color: #a9c6ee; }
 }
+/* P6: the visitor's three steps */
+.jp-steps { margin: 6px 0 4px; padding-left: 20px; display: grid; gap: 8px; }
+.jp-steps > li { padding-left: 2px; }
+.jp-steps > li::marker { font-weight: 700; color: #2d8a4e; }
+.jp-steps > li > span:first-child { font-weight: 600; }
+.jp-steps > li .gp-btn { margin-top: 5px; }
+.jp-steps > li[data-done="1"]::marker { content: '✓  '; }
+.jp-steps > li.jp-later { color: #9a9a92; }
+.jp-steps > li.jp-later::marker { color: #b9b9b0; }
+.jp-steps .jp-form { margin-top: 5px; }
+.jp-steps .jp-mine { margin: 0; }
+.jp-self { margin-top: 10px; }
+@media (prefers-color-scheme: dark) { .jp-steps > li.jp-later { color: #7d7d75; } }
+.jp-steps > li > div[data-join-signin] .gp-btn { margin-top: 0; }
