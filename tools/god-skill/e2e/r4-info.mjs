@@ -149,8 +149,8 @@ try {
   }, (r) => r.phase === 'completed' && r.placePath?.[0] === 'plaza' && /^plaza < /.test(r.where ?? ''));
   await step('I4 observe here.objects in the plaza: the fountain, its lamp and the sign with placeId g-plaza and here=true, nearest first; the cottage\'s furniture (behind walls) is not listed; here.objects lists the free benches', async () => {
     const o = (await ana.run('observe')).data, h = (await ana.run('here')).data, objs = o?.here?.objects ?? [];
-    return { objects: objs.map((x) => `${x.name}@${x.placeId}${x.here ? '*' : ''} ${x.dist}m`), fountain: byName(objs, 'fountain'), furniture: objs.filter((x) => /moss-cottage\//.test(x.name)).length, sorted: objs.every((x, i) => !i || (objs[i - 1].dist ?? 0) <= (x.dist ?? 0)), seats: (h?.objects ?? []).filter((x) => x.kind === 'seat').map((x) => `${x.name} free=${x.free}`) };
-  }, (r) => r.fountain?.placeId === 'g-plaza' && r.fountain.here === true && r.furniture === 0 && r.sorted && r.seats.length >= 2);
+    return { objects: objs.map((x) => `${x.name}@${x.placeId}${x.here ? '*' : ''} ${x.dist}m`), fountain: byName(objs, 'fountain'), furniture: objs.filter((x) => /moss-cottage\//.test(x.name)).length, doHere: (o?.doHere ?? []).map((c) => c.id), sorted: objs.every((x, i) => !i || (objs[i - 1].dist ?? 0) <= (x.dist ?? 0)), seats: (h?.objects ?? []).filter((x) => x.kind === 'seat').map((x) => `${x.name} free=${x.free}`) };
+  }, (r) => r.fountain?.placeId === 'g-plaza' && r.fountain.here === true && r.furniture === 0 && r.sorted && r.seats.length >= 2 && !r.doHere.some((id) => id.startsWith('pick-up:')) && !r.objects.some((x) => x.startsWith('plaza@')));
 
   // ---- 3. two Souls: social affordances, speech, a conversation
   await step('S1 Ben: act "walk to the plaza" (plain words) → he arrives by Ana; observe lists Ana and offers hug:/high-five:/dance-with:/follow:<Ana>', async () => {
@@ -158,6 +158,10 @@ try {
     const near = (o?.here?.souls ?? []).find((s) => s.soulId === ids.ana), offers = (o?.doHere ?? []).map((c) => c.id);
     return { ...r, where: o?.me?.where, near: near ? { name: near.name, distance: near.distance, placeId: near.placeId } : null, social: ['hug', 'high-five', 'dance-with', 'follow'].filter((v) => offers.includes(`${v}:${ids.ana}`)) };
   }, (r) => r.phase === 'completed' && r.near?.placeId === 'g-plaza' && r.social.length === 4);
+  await step('S1b Ana\'s events (wait) tell her Ben arrived in the plaza (an arrival naming the god\'s place)', async () => {
+    const w = (await ana.run('wait', '2')).data, ev = (w?.events ?? []).filter((e) => e.kind === 'arrival');
+    return { arrivals: ev.map((e) => ({ place: e.placeId ?? e.place, who: e.soul?.name ?? e.from ?? e.who })) };
+  }, (r) => r.arrivals.some((a) => a.place === 'g-plaza' && /Ben/.test(JSON.stringify(a))));
   await step('S2 Ana says something; Ben (in earshot) hears it in his events (wait), with the place it was said in', async () => {
     await ben.run('wait', '1');
     const s = (await ana.run('say', 'Hello Ben, have you seen the fountain?')).data;
@@ -179,6 +183,11 @@ try {
     const { path: _p, ...rest } = r;
     return { ...rest, where: o?.me?.where, near: (h?.near ?? []).map((x) => x.name), exits: (h?.exits ?? []).map((x) => x.walk), objects: (o?.here?.objects ?? []).map((x) => `${x.name}@${x.placeId}`) };
   }, (r) => r.phase === 'completed' && /^moss-cottage\/living < moss-cottage < /.test(r.where ?? '') && !r.near.includes('Ben') && r.objects.some((x) => /living-table@g-moss-cottage\.living/.test(x)) && r.exits.includes('walk:plaza'));
+
+  await step('S5 Ben\'s events tell him Ana left the plaza (a departure naming it)', async () => {
+    const w = (await ben.run('wait', '2')).data, ev = (w?.events ?? []).filter((e) => e.kind === 'departure');
+    return { departures: ev.map((e) => ({ place: e.placeId ?? e.place, who: e.soul?.name ?? e.from ?? e.who })) };
+  }, (r) => r.departures.some((a) => a.place === 'g-plaza' && /Ana/.test(JSON.stringify(a))));
 
   // ---- 5. the god edits; the Souls' next reads show it
   await step('G1 the god lays out a garden (a lawn) east of the plaza and moves the fountain out onto the green, south-west of the pond', async () => {

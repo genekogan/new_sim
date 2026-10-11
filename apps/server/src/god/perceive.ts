@@ -123,6 +123,8 @@ export class GodPerceive {
       if (!e.name && text === null) continue;
       // seats and things to carry are perceived as seats and items already
       if (c.seat || c.carryable) continue;
+      // R4-INFO: ground the god laid out (a plaza, a lawn, a pond, a road) is a place to be in (places.ts), not a thing
+      { const sh = e.shape as { area?: unknown; path?: unknown } | undefined; if (GOD_PLACES && this.h.places && def.form !== 'point' && e.in.parent === 'world' && sh && text === null) continue; }
       const at = this.at(e, def); if (!at) continue;
       const kind = shortDef(def), parent = e.in.parent !== 'world' ? m.entities.get(e.in.parent) : undefined;
       const name = e.name ? m.pathOf(e.id) : `${kind} ${e.id.slice(2, 6)}`;

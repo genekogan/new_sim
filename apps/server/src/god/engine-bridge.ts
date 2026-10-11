@@ -676,7 +676,7 @@ export class EngineBridge {
         // resolves through the ledger's vocabulary (every word in the label) to this seat and not another bench
         const ent = this.model.entities.get(x.id), kind = ent ? this.model.resolvedDef(ent.def)?.name.replace(/^core-/, '') : undefined;
         const by = ent ? this.nav.namesNear([x.pose.p[0], x.pose.p[2]], x.id) : [];
-        const id = `sit:${x.id}`, label = `Sit on ${name(x.id)} (${kind && !name(x.id).split('/').pop()!.includes(kind) ? `a ${kind}, ` : ''}${by.length ? `by ${by.join(' and ')}; ` : ''}${d} m${levelOf(x) ? `, floor ${levelOf(x)}` : ''})`;
+        const id = `sit:${x.id}`, label = `${name(x.id)} (${kind && !name(x.id).split('/').pop()!.includes(kind) ? `a ${kind}, ` : ''}${by.length ? `by ${by.join(' and ')}; ` : ''}${d} m${levelOf(x) ? `, floor ${levelOf(x)}` : ''})`;
         // F1: a bench for two stays free while one of its seats is; the seat a Soul sits on is not free to itself
         const full = others.length >= seats || (!!u && !mine && seats <= 1);
         // seat fit (engine bodies/humanoid.ts): a body whose look sets its height sits only on seats whose top suits it
@@ -686,7 +686,8 @@ export class EngineBridge {
         caps.push({ id, verb: 'sit', label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: 60 } } });
         plans.set(id, { label, steps: [{ verb: 'sit', params: { on: x.id, seconds: 60 } }], seconds: true });
       }
-      if (asset.category === 'item' && x.support?.kind !== 'in-hand' && !held) {
+      // R4-INFO: an item behind walls (a bowl in a house, seen from the plaza) is not offered: perception is per enclosure
+      if (asset.category === 'item' && x.support?.kind !== 'in-hand' && !held && this.sameEnclosure(soul, x)) {
         const id = `pick-up:${x.id}`, label = `Pick up ${name(x.id)} (${d} m${levelOf(x) ? `, floor ${levelOf(x)}` : ''})`;
         caps.push({ id, verb: 'pick-up', label, target: { id: x.id, kind: 'item' }, available: true });
         plans.set(id, { label, steps: [...stand, ...approach(x), { verb: 'mars:take_item', params: { item: x.id, hand: 'right' } }] });
@@ -700,6 +701,11 @@ export class EngineBridge {
       }
     }
     this.sitHere(caps, plans, here);
+  }
+  /** The thing stands in the Soul's enclosure (both outdoors, or the same room). */
+  private sameEnclosure(soul: EdgeSoul, x: any): boolean {
+    const L = this.edge; if (!L) return true;
+    try { return L.enclosureAtPoint(x.pose.p[0], x.pose.p[2], this.levelOfY(x.pose.p[1])) === L.enclosureOf(soul.soulId); } catch { return true; }
   }
   /** Bodies sitting on a god-built seat fixture (any of its seat slots). */
   seatTakers(id: string): string[] {
