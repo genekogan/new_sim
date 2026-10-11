@@ -13,8 +13,10 @@ import { animate, hasMotion } from './gen-mesh/motion.ts';
 import { EntityInstancer, instanceable } from './EntityInstancer.ts';
 import { terrainColorFor } from './gen-mesh/ground-palette.ts';
 import { waterMaterial, waterMesh } from './gen-mesh/water.ts';
+import { assetUrl } from './gen-mesh/gltf-assets.ts';
+import { assetBytes } from './asset-bytes.ts';
 
-type Snapshot = { contract: string; worldId: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[]; tiles: Record<string, string> };
+type Snapshot = { contract: string; worldId: string; seq: number; counter?: number; seed?: string; constants: WorldModel['constants']; state: WorldModel['state']; ground: Ground; defs: StoredDef[]; entities: Entity[]; tiles: Record<string, string>; assetBytes?: Record<string, number> };
 type DiffMsg = { type: 'edge'; kind: 'world-diff'; seq: number; diff: { upserts: Entity[]; removes: string[]; defs: StoredDef[]; tiles: string[]; world?: Partial<WorldModel['state']> }; ground?: Ground; defs?: StoredDef[] };
 
 const SECTOR_TILES = 4;              // 4×4 tiles (256 m) per terrain mesh
@@ -79,6 +81,7 @@ export class WorldEntityLayer {
     let snap: Snapshot;
     try { const r = await fetch(this.api('/v1/world/snapshot'), { signal }); if (!r.ok) return; snap = await r.json(); } catch { return; }
     if (signal.aborted || snap.contract !== 'world/1') return;
+    assetBytes.expect(Object.fromEntries(Object.entries(snap.assetBytes ?? {}).map(([sha, n]) => [assetUrl(sha), n])));  // the loading bar's total
     this.model = WorldModel.fromSnapshot({ constants: snap.constants, state: snap.state, seed: snap.seed ?? 'viewer', seq: snap.counter ?? 0, editSeq: snap.seq, defs: snap.defs, entities: snap.entities, ground: snap.ground });
     this.seq = snap.seq;
     this.active = true;
@@ -107,7 +110,8 @@ export class WorldEntityLayer {
       for (const id of d.diff.removes) { this.model.delete(id); this.undraw(id); }
       for (const e of d.diff.upserts) { if (this.model.entities.has(e.id)) this.model.delete(e.id); this.model.insert(e); }
       for (const e of d.diff.upserts) { const def = this.model.resolvedDef(e.def); if (def?.layer === 'solid') { try { this.model.index(e.id, this.model.footprint(e, def)); } catch { /* best effort */ } } }
-      if (d.ground) { this.model.terrain = new Terrain(d.ground); this.rebuildTerrain(new Set(d.diff.tiles)); this.rebuildWater(); }
+      if ((d.diff as { constants?: WorldModel['constants'] }).constants) this.model.constants = (d.diff as { constants?: WorldModel['constants'] }).constants!;   // GOD-ENV: the world grew
+      if (d.ground) { const grew = JSON.stringify(d.ground.extent) !== JSON.stringify(this.model.ground().extent); this.model.terrain = new Terrain(d.ground); this.rebuildTerrain(new Set(d.diff.tiles)); this.rebuildWater(); if (grew) this.buildHorizon(); }
       if (d.diff.world) { const before = JSON.stringify((this.model.state as { ground?: unknown }).ground ?? null); this.model.state = { ...this.model.state, ...d.diff.world } as WorldModel['state']; if (JSON.stringify((this.model.state as { ground?: unknown }).ground ?? null) !== before) this.rebuildTerrain(); }
       for (const e of d.diff.upserts) this.draw(e, true);
       // children ride with a moved parent: refresh their targets without easing
@@ -202,8 +206,8 @@ export class WorldEntityLayer {
   /** Height for the camera clamp and anything else that asks; null outside the extent. */
   groundAt = (x: number, z: number): number | null => {
     if (!this.model) return null;
-    const half = this.model.constants.extent / 2;
-    if (Math.abs(x) > half || Math.abs(z) > half) return null;
+    const [bx0, bz0, bx1, bz1] = this.model.ground().extent;   // GOD-ENV: the world's bounds
+    if (x < bx0 || x > bx1 || z < bz0 || z > bz1) return null;
     const y = this.model.terrain.sample(x, z);
     const w = waterLevel(this.model.ground(), x, z);
     return w !== null && w > y ? w : y;
@@ -225,11 +229,11 @@ export class WorldEntityLayer {
   // ---------- terrain ----------
 
   private rebuildTerrain(onlyTiles?: Set<string>) {
-    const m = this.model!; const half = m.constants.extent / 2;
-    const t0 = Math.floor(-half / TILE_M), t1 = Math.ceil(half / TILE_M) - 1;
-    const s0 = Math.floor(t0 / SECTOR_TILES), s1 = Math.floor(t1 / SECTOR_TILES);
+    const m = this.model!; const [bx0, bz0, bx1, bz1] = m.ground().extent;   // GOD-ENV: bounds, a rectangle once extended
+    const tx0 = Math.floor(bx0 / TILE_M), tx1 = Math.ceil(bx1 / TILE_M) - 1, tz0 = Math.floor(bz0 / TILE_M), tz1 = Math.ceil(bz1 / TILE_M) - 1;
+    const sx0 = Math.floor(tx0 / SECTOR_TILES), sx1 = Math.floor(tx1 / SECTOR_TILES), sz0 = Math.floor(tz0 / SECTOR_TILES), sz1 = Math.floor(tz1 / SECTOR_TILES);
     const wanted = new Set<string>();
-    for (let sz = s0; sz <= s1; sz++) for (let sx = s0; sx <= s1; sx++) {
+    for (let sz = sz0; sz <= sz1; sz++) for (let sx = sx0; sx <= sx1; sx++) {
       const key = `${sx},${sz}`; wanted.add(key);
       if (onlyTiles && this.sectors.has(key)) {
         let touched = false;
@@ -237,17 +241,17 @@ export class WorldEntityLayer {
         if (!touched) continue;
       }
       const old = this.sectors.get(key); if (old) { this.terrainGroup.remove(old); old.geometry.dispose(); }
-      const mesh = this.sectorMesh(sx, sz, t0, t1);
+      const mesh = this.sectorMesh(sx, sz, [tx0, tz0, tx1, tz1]);
       this.sectors.set(key, mesh); this.terrainGroup.add(mesh);
     }
     for (const [key, mesh] of this.sectors) if (!wanted.has(key)) { this.terrainGroup.remove(mesh); mesh.geometry.dispose(); this.sectors.delete(key); }
     // things settle on the new ground: refresh poses of root entities (no easing)
     if (onlyTiles) for (const e of m.entities.values()) if (e.in.parent === 'world') this.draw(e, false, !!this.drawn.get(e.id)?.world);
   }
-  private sectorMesh(sx: number, sz: number, t0: number, t1: number): THREE.Mesh {
+  private sectorMesh(sx: number, sz: number, t: [number, number, number, number]): THREE.Mesh {
     const m = this.model!;
-    const tx0 = Math.max(t0, sx * SECTOR_TILES), tz0 = Math.max(t0, sz * SECTOR_TILES);
-    const tx1 = Math.min(t1, sx * SECTOR_TILES + SECTOR_TILES - 1), tz1 = Math.min(t1, sz * SECTOR_TILES + SECTOR_TILES - 1);
+    const tx0 = Math.max(t[0], sx * SECTOR_TILES), tz0 = Math.max(t[1], sz * SECTOR_TILES);
+    const tx1 = Math.min(t[2], sx * SECTOR_TILES + SECTOR_TILES - 1), tz1 = Math.min(t[3], sz * SECTOR_TILES + SECTOR_TILES - 1);
     const x0 = tx0 * TILE_M, z0 = tz0 * TILE_M, w = (tx1 - tx0 + 1) * TILE_M, d = (tz1 - tz0 + 1) * TILE_M;
     const nx = w / TERRAIN_STEP, nz = d / TERRAIN_STEP;
     const pos = new Float32Array((nx + 1) * (nz + 1) * 3), col = new Float32Array((nx + 1) * (nz + 1) * 3);
@@ -287,8 +291,8 @@ export class WorldEntityLayer {
       this.waterGroup.add(mesh);
     }
     if (g.seaLevel !== undefined) {
-      const half = this.model!.constants.extent / 2;
-      const seaGeo = new THREE.PlaneGeometry(half * 8, half * 8); seaGeo.rotateX(-Math.PI / 2); seaGeo.translate(0, g.seaLevel - WATER_SINK_M, 0);
+      const [bx0, bz0, bx1, bz1] = g.extent, half = Math.max(bx1 - bx0, bz1 - bz0) / 2;
+      const seaGeo = new THREE.PlaneGeometry(half * 8, half * 8); seaGeo.rotateX(-Math.PI / 2); seaGeo.translate((bx0 + bx1) / 2, g.seaLevel - WATER_SINK_M, (bz0 + bz1) / 2);
       const sea = waterMesh(seaGeo, waterMaterial(), 'entity-sea');
       this.waterGroup.add(sea);
     }
@@ -296,16 +300,18 @@ export class WorldEntityLayer {
   /** A ring of low hills beyond the extent so the edge of the world is a horizon, not a cliff. */
   private buildHorizon() {
     if (this.horizon) { this.group.remove(this.horizon); this.horizon.geometry.dispose(); }
-    const m = this.model!; const half = m.constants.extent / 2;
-    const inner = half * 1.02, outer = half * 3.2, segs = 96, rings = 6;
+    // GOD-ENV: round the world's bounds (a rectangle once extended): each spoke starts at the bounds' edge in its direction
+    const m = this.model!; const [bx0, bz0, bx1, bz1] = m.ground().extent, cx = (bx0 + bx1) / 2, cz = (bz0 + bz1) / 2, hx = (bx1 - bx0) / 2, hz = (bz1 - bz0) / 2, half = Math.max(hx, hz);
+    const edge = (a: number) => Math.min(Math.abs(Math.cos(a)) > 1e-6 ? hx / Math.abs(Math.cos(a)) : Infinity, Math.abs(Math.sin(a)) > 1e-6 ? hz / Math.abs(Math.sin(a)) : Infinity);
+    const segs = 96, rings = 6;
     const pos: number[] = [], col: number[] = [], idx: number[] = [];
     const c = new THREE.Color();
     const seed = hashSeed(m.seed);
     for (let r = 0; r <= rings; r++) for (let s = 0; s <= segs; s++) {
-      const a = (s / segs) * Math.PI * 2, radius = inner + (outer - inner) * (r / rings);
+      const a = (s / segs) * Math.PI * 2, d = edge(a), inner = d + half * 0.02, outer = d + half * 2.2, radius = inner + (outer - inner) * (r / rings);
       const f = r / rings, bump = Math.sin(a * 7 + seed) * 0.5 + Math.sin(a * 13 + seed * 1.7) * 0.3 + Math.sin(a * 29 + seed * 0.3) * 0.2;
-      const h = r === 0 ? m.terrain.sample(Math.cos(a) * (half - 1), Math.sin(a) * (half - 1)) : m.constants.base + Math.max(0, bump) * half * 0.25 * Math.sin(Math.PI * f) + f * 8;
-      pos.push(Math.cos(a) * radius, h, Math.sin(a) * radius);
+      const h = r === 0 ? m.terrain.sample(cx + Math.cos(a) * (d - 1), cz + Math.sin(a) * (d - 1)) : m.constants.base + Math.max(0, bump) * half * 0.25 * Math.sin(Math.PI * f) + f * 8;
+      pos.push(cx + Math.cos(a) * radius, h, cz + Math.sin(a) * radius);
       c.set(0x6f8f6a).lerp(new THREE.Color(0x9fb3c8), f * 0.9); col.push(c.r, c.g, c.b);
     }
     for (let r = 0; r < rings; r++) for (let s = 0; s < segs; s++) { const a = r * (segs + 1) + s, b = a + 1, cc = a + segs + 1, d = cc + 1; idx.push(a, b, cc, b, d, cc); }

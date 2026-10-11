@@ -96,10 +96,17 @@ async function presets() {
   camera.position.set(0, 1.6, 7.4); camera.lookAt(0, 0.95, 0);
   Object.assign(lab, stats()); lab.icons = await portraits(entries); renderer.render(scene, camera);
 }
-/** Rows of looks for close inspection: &set=props|parts|frames (a base look varied one key at a time). */
+/** Rows of looks for close inspection: &set=props|parts|frames (a base look varied one key at a time) | characters. */
 async function showcase() {
   const set = q.get('set') ?? 'props', head = q.get('zoom') === 'head', base: Partial<Look> = {...appearanceFromSeed(Number(q.get('seed') ?? 5)), hat: 'none', glasses: 'none', bag: 'none', pattern: 'plain'};
-  const rows: Partial<Look>[][] = set === 'props'
+  // &set=characters: every kit character whole (its own face, hair, top, bottom, shoes), six per row
+  const characters = async (): Promise<Partial<Look>[][]> => {
+    const parts = (await (await fetch(new URL('../../modular/humanoid/kit.json', location.href))).json()).parts as Record<string, Record<string, {native: 'masc' | 'fem'}>>;
+    const hand: Record<string, Partial<Look>> = {shirt: {face: 'open', hair: 'short', bottom: 'jeans', shoes: 'sneakers'}, jacket: {face: 'pierced', hair: 'mohawk', bottom: 'ripped', shoes: 'boots'}, tank: {face: 'soft', hair: 'bob', bottom: 'slacks', shoes: 'flats'}};
+    const all = Object.entries(parts.top).map(([id, p]) => ({frame: p.native, top: id, ...(hand[id] ?? {face: id, hair: parts.hair[id] ? id : 'bald', bottom: id, shoes: id})}) as Partial<Look>);
+    const out: Partial<Look>[][] = []; for (let i = 0; i < all.length; i += 6) out.push(all.slice(i, i + 6)); return out;
+  };
+  const rows: Partial<Look>[][] = set === 'characters' ? await characters() : set === 'props'
     ? [[{hat: 'cap'}, {hat: 'beanie'}, {hat: 'sunhat'}, {glasses: 'round'}, {glasses: 'square'}, {glasses: 'shades'}], [{bag: 'backpack'}, {bag: 'satchel'}, {pattern: 'stripes'}, {pattern: 'checks'}, {pattern: 'knit'}, {hair: 'mohawk', hat: 'cap'}]]
     : set === 'parts'
       ? (['masc', 'fem'] as const).map(frame => (['short', 'mohawk', 'bob', 'bald'] as const).flatMap((hair): Partial<Look>[] => [{frame, hair, face: hair === 'bob' ? 'soft' : hair === 'mohawk' ? 'pierced' : 'open'}]).concat([{frame, top: 'jacket', bottom: 'slacks'}, {frame, top: 'tank', bottom: 'ripped'}]))

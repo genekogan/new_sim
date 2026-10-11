@@ -12,7 +12,7 @@
 //   (Chrome lease, real GPU): a stranger's Join section, ben's line for his agent, his agent joins, the god's Souls tab.
 //
 //   node tools/god-skill/e2e/join.mjs [--mode clerk|dev] [--base /worlds] [--port 5225] [--range 5226-5229] [--keep] [--no-shots]
-//        [--soul-cli <eden-agent.mjs>] [--soul-skill <SKILL.md>]   (default: the frozen published 5e478f8a copies)
+//        [--soul-cli <eden-agent.mjs>] [--soul-skill <SKILL.md>]   (default: the launcher's pinned 1.9 copies, tools/world-launcher/soul/)
 //
 // Report under .lane/e2e-join/<stamp>-<mode>/ (report.json, REPORT.md, PNGs). $0: edge minds, fake brain.
 import { execFile, spawn } from 'node:child_process';
@@ -28,9 +28,9 @@ const here = dirname(fileURLToPath(import.meta.url));
 const root = resolve(here, '../../..');
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : []).filter(Boolean));
 const MODE = args.mode === 'dev' ? 'dev' : 'clerk';
-const PUBLISHED = '<team>/previews/20261010-restoration-auth/release-5e478f8a';
-const SOUL_CLI = resolve(typeof args['soul-cli'] === 'string' ? args['soul-cli'] : `${PUBLISHED}/bundle/eden-agent.mjs`);
-const SOUL_SKILL = resolve(typeof args['soul-skill'] === 'string' ? args['soul-skill'] : `${PUBLISHED}/input/tools/edge-skill/SKILL.md`);
+const SOUL_DIR = fileURLToPath(new URL('../../world-launcher/soul/', import.meta.url));
+const SOUL_CLI = resolve(typeof args['soul-cli'] === 'string' ? args['soul-cli'] : `${SOUL_DIR}eden-agent.mjs`);
+const SOUL_SKILL = resolve(typeof args['soul-skill'] === 'string' ? args['soul-skill'] : `${SOUL_DIR}skill.md`);
 const stamp = new Date().toISOString().replace(/[:.]/g, '-');
 const port = Number(args.port ?? 5225);
 const range = typeof args.range === 'string' ? args.range : '5226-5229';
@@ -144,7 +144,7 @@ if (MODE === 'dev' && !args['no-shots']) try { chromium = createRequire(resolve(
 const ids = {};
 let gaiaDir = '', ana = null;
 try {
-  await step('L0 the published Soul CLI and skill are at hand (frozen 5e478f8a copies)', async () => ({ cli: existsSync(SOUL_CLI), skill: existsSync(SOUL_SKILL), bytes: existsSync(SOUL_CLI) ? readFileSync(SOUL_CLI).length : 0 }), (r) => r.cli && r.skill);
+  await step('L0 the published Soul CLI and skill are at hand (pinned 1.9 copies)', async () => ({ cli: existsSync(SOUL_CLI), skill: existsSync(SOUL_SKILL), bytes: existsSync(SOUL_CLI) ? readFileSync(SOUL_CLI).length : 0 }), (r) => r.cli && r.skill);
   await until('the launcher', async () => (await fetch(`${origin}${BASE}/__sim/worlds.json`)).ok, 60_000);
   const worldName = `Join Party ${stamp.slice(11, 16).replace('-', '')}`;
   await step(`L1 gaia makes a new world (Empty plain)${MODE === 'clerk' ? ', signed in with Clerk: the god at birth' : ''}`, async () => {
@@ -155,9 +155,10 @@ try {
   }, (r) => r.slug && r.you === 'owner' && r.base === `${origin}${BASE}/w/${r.slug}`);
   await step('L2 launcher worlds: edge minds, no invitations, native arrivals; the published Soul CLI and skill served as is', async () => {
     const cfg = (await api('/v1/config')).data, edge = await api('/v1/edge/schema');
-    const cli = await (await fetch(`${base}/eden-agent.mjs`)).text(), soulSkill = await (await fetch(`${base}/skill.md`)).text();
-    return { auth: cfg.authProvider, devAuth: cfg.devAuth, accountApproval: cfg.accountApproval?.contract ?? null, inviteRequired: cfg.inviteRequired, edge: edge.status, cliSame: cli === readFileSync(SOUL_CLI, 'utf8'), skillVersion: soulSkill.match(/version: "([\d.]+)"/)?.[1] };
-  }, (r) => r.inviteRequired === false && r.edge === 200 && r.cliSame && r.skillVersion === '1.9' && (MODE === 'dev' ? r.devAuth === true : r.auth === 'clerk' && r.devAuth === false && r.accountApproval === 'account-soul-approval/1'));
+    const cli = await (await fetch(`${base}/eden-agent.mjs`)).text(), soulSkill = await (await fetch(`${base}/skill.md`)).text(), instr = await (await fetch(`${base}/instructions.md`)).text();
+    return { auth: cfg.authProvider, devAuth: cfg.devAuth, accountApproval: cfg.accountApproval?.contract ?? null, inviteRequired: cfg.inviteRequired, edge: edge.status, cliSame: cli === readFileSync(SOUL_CLI, 'utf8'), skillVersion: soulSkill.match(/version: "([\d.]+)"/)?.[1],
+      skillHere: soulSkill.includes(`This world is **${base}**`) && !/\{\{/.test(soulSkill), instructions: instr.startsWith(`# Create a Soul in ${worldName}`) && instr.includes(`World: ${base}`) && !/\{\{/.test(instr) };
+  }, (r) => r.inviteRequired === false && r.edge === 200 && r.cliSame && r.skillVersion === '1.9' && r.skillHere && r.instructions && (MODE === 'dev' ? r.devAuth === true : r.auth === 'clerk' && r.devAuth === false && r.accountApproval === 'account-soul-approval/1'));
   await step('K1 ONE skill at /SKILL.md: God mode and Soul mode, each alone; Soul mode points at this world\'s CLI copy and Soul skill', async () => {
     skill = await (await fetch(`${base}/SKILL.md`)).text();
     const god = section('God mode'), soul = section('Soul mode');
@@ -238,6 +239,10 @@ try {
         await page.waitForFunction(() => window.__simEntity?.layer?.active === true, null, { timeout: PAGE_MS }).catch(() => {});
         await page.evaluate(() => { const w = window.__simEntity; if (!w) return; w.controls.target.set(-2, 1, 8); w.camera.position.set(-16, 11, 30); w.camera.lookAt(w.controls.target); }).catch(() => {});
         await sleep(3500);
+        // #join also opens New Soul's copy-the-prompt dialog (e8's, on every world; lane UXFIX): note it, close it
+        const dialog = page.locator('.bring-agent');
+        page.newSoulDialog = await dialog.isVisible() ? (await dialog.innerText()).replace(/\s+/g, ' ') : null;
+        if (page.newSoulDialog) { await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'detached' }); }
         return page;
       };
       await step('P0 a stranger (not signed in) sees the Join section and who lives here', async () => {
@@ -258,8 +263,8 @@ try {
         await benPage.locator('[data-join-line] .gp-copy').click();
         const clip = await benPage.evaluate(() => navigator.clipboard.readText().catch(() => null));
         await shot(benPage, '03-ben-line');
-        return { benLine, clip };
-      }, (r) => r.benLine.includes(`${base}/SKILL.md`) && /Soul mode/.test(r.benLine) && r.benLine.includes('"Ben"') && (r.clip === null || r.clip === r.benLine));
+        return { benLine, clip, newSoulDialog: benPage.newSoulDialog };
+      }, (r) => r.newSoulDialog?.includes(`${base}/instructions.md`) && r.benLine.includes(`${base}/SKILL.md`) && /Soul mode/.test(r.benLine) && r.benLine.includes('"Ben"') && (r.clip === null || r.clip === r.benLine));
       await step('P2 ben\'s agent reads the line, follows Soul mode, and walks to the garden', async () => {
         const url = benLine.match(/Read (\S+\/SKILL\.md)/)?.[1], name = benLine.match(/make my Soul "([^"]+)"/)?.[1];
         if (url !== `${base}/SKILL.md`) throw new Error('the line does not name this world\'s skill');
@@ -271,11 +276,11 @@ try {
         return { paired: r.status.paired, walk: walk.phase };
       }, (r) => r.paired && r.walk === 'completed');
       await benPage.context().close();
-      await step('P3 the god\'s Souls tab: the link to share and both Souls; clicking Ana flies to her', async () => {
+      await step('P3 the god\'s Souls tab: both Souls (the link to share is in the account menu); clicking Ana flies to her', async () => {
         const page = await open('gaia', '#join');
         await page.locator('[data-souls-tab]').waitFor({ timeout: 60_000 });
         await page.locator('[data-soul="Ben"]').waitFor({ timeout: 30_000 });
-        const link = await page.locator('[data-join-link]').innerText();
+        const link = await page.locator('[data-join-link]').getAttribute('data-join-link');  // the account menu's "Copy invite link" (lane UXFIX)
         await page.locator('[data-soul="Ana"] .gp-link').click().catch(() => {});
         await sleep(2500);
         await shot(page, '05-god-souls-tab');

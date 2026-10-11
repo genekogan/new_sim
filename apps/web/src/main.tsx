@@ -12,6 +12,13 @@ import {clerkHomeRoute,clerkOriginRoute,unsignedPreviewAuth} from './auth-ui.ts'
 // New worlds (world launcher, world engine): the launcher homepage and its sign-in. Old worlds never reach these.
 import { LauncherHome, type LauncherList } from './god-ui/LauncherHome.tsx';
 import {publishSession,type Session} from './auth-session.ts';
+// The arrival card's bar counts bytes: meter every asset fetch from the start; old worlds know their total up front.
+// (old worlds: initial-assets.json, made at release time by apps/web/scripts/initial-assets.mjs; a world without an
+// entry still counts in bytes, its total growing from each Content-Length; new worlds: the snapshot's assetBytes)
+import {assetBytes,installAssetMeter} from './asset-bytes.ts';
+import initialAssets from './initial-assets.json';
+import {newWorld} from './world-kind.ts';
+installAssetMeter();if(!newWorld)assetBytes.expect((initialAssets as {worlds?:Record<string,Record<string,number>>}).worlds?.[worldKey]??{});
 
 // Presentation gate only. Exact reviewed candidate builds may enable it;
 // current-owner capability/readiness and server authority remain mandatory.
@@ -91,7 +98,7 @@ function WorldList(){
  })();return()=>{active=false;};},[local]);
  if(launcher)return <LauncherRoot list={launcher}/>;
  const card=(key:string,name:string,description:string)=>served?.has(key)?<a href={'/w/'+key}><h2>{name}</h2><p>{description}</p><span>enter world →</span></a>:<article aria-disabled="true" style={{border:'1px solid var(--line)',borderRadius:12,padding:18}}><h2>{name}</h2><p>{description}</p><span className="dim">{served?'Not connected to this site':'Checking connection…'}</span></article>;
- return <main className="world-list"><h1>Sim</h1><p>Persistent worlds. Open one to watch, meet its Souls, or give yours direction.</p><div className="world-cards">{card('eden','Eden','Our shared playground. Meet its Souls and see what develops.')}{card('mars','Mars','The 2026 camp, shared places and pallet-rack construction.')}{card('littlemartians','Little Martians','Floating ceramic characters and enterable glazed buildings.')}</div>{!local&&<p><a href="/l/mars">Mars Lab</a> · <a href="/l/littlemartians">Little Martians snapshot</a> · <a href="/l/eden">Eden snapshot</a></p>}</main>;
+ return <main className="world-list"><h1>Sim</h1><p>Persistent worlds. Open one to watch, meet its Souls, or give yours direction.</p><div className="world-cards">{card('eden','Eden','Our shared playground. Meet its Souls and see what develops.')}{card('mars','Mars','The 2026 camp, shared places and pallet-rack construction.')}{card('littlemartians','Little Martians','Floating ceramic characters and enterable glazed buildings.')}</div>{!local&&<p><a href="/worlds/">New world</a> · <a href="/l/mars">Mars Lab</a> · <a href="/l/littlemartians">Little Martians snapshot</a> · <a href="/l/eden">Eden snapshot</a></p>}</main>;
 }
 
 /** The launcher homepage: Clerk when the launcher serves Clerk worlds (creating a world needs a signed-in creator), else the local name. */

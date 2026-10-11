@@ -33,3 +33,12 @@ test('archives are world isolated and recent replay needs no network',async()=>{
 test('staging and production archives cannot share object keys',async()=>{
  const f=fixture();try{f.fill(0);await f.archive.archiveOne(6000);f.db.db.exec('DELETE FROM take_archives');const staged=new TakeArchive(f.db,'w',f.store,'test/staging');await staged.archiveOne(6000);assert.equal(f.objects.size,2);assert.ok(f.objects.has('test/w/0.json.gz'));assert.ok(f.objects.has('test/staging/w/0.json.gz'));}finally{f.db.close();}
 });
+test('without R2, a bounded local buffer prunes old replay (new worlds); unbounded by default (old worlds)',()=>{
+ const f=fixture();try{f.fill(0);f.fill(1);
+  assert.equal(new TakeArchive(f.db,'w',null).pruneLocal(12000),0);
+  const bounded=new TakeArchive(f.db,'w',null,'test',6000);
+  assert.equal(bounded.pruneLocal(12000),299);
+  assert.equal(f.db.takes('w',0,12000,1000).chunks.length,301);
+  assert.equal(new TakeArchive(f.db,'w',f.store,'test',6000).pruneLocal(18000),0);
+ }finally{f.db.close();}
+});

@@ -20,6 +20,8 @@ import {FloaterCards} from './floaters.ts';
 import { worldDefinition } from './world-config.ts';
 import { GodMode } from './god/god.ts';
 import { installEngineBridge } from './god/engine-bridge.ts';
+import { installWorldEnv } from './god/world-env.ts';
+import { installLightning } from './god/lightning.ts';
 import { GroundHost, installGroundCapabilities, loadGroundRecipes } from './god/ground-host.ts';
 import { stripWorldRequestPath } from './world-request-path.ts';
 import {edenCoreRequested,edenHistoryFactory,installEdenCore,settleEmptyEden,drainEdenThought,installEdenLifeV1,installEdenExpansionV1} from './eden-bootstrap.ts';
@@ -107,7 +109,7 @@ const stripWorldPath = (url: string | undefined) => stripWorldRequestPath(url, c
 server.on('upgrade', req => { req.url = stripWorldPath(req.url); });
 hub = new Hub(server, host, auth, db,edenCore?souls:undefined);
 hub.brain = brain; hub.build = config.build;
-const takes=new TakeArchive(db,host.worldId,config.archiveTakes?r2Store(config):null,`${config.r2.prefix}/takes`); if(host.engine.takeChunks)takes.start(host);
+const takes=new TakeArchive(db,host.worldId,config.archiveTakes?r2Store(config):null,`${config.r2.prefix}/takes`,config.worldEngine?Number(process.env.TAKES_LOCAL_KEEP_TICKS??72000):0); if(host.engine.takeChunks)takes.start(host);
 // Edge worlds mount EDGE-CONTRACT-v1; PLACE_DATA names a PLACE-DATA-v1 file (else places derive from native regions).
 const edge = config.mindDriver === 'edge' ? new EdgeLedger(host, db, process.env.PLACE_DATA ? JSON.parse(readFileSync(process.env.PLACE_DATA, 'utf8')) : undefined) : undefined;
 if (edge && host.engine.configureRuntimePolicy && host.enableQuietStallReleaseV1) void host.enableQuietStallReleaseV1().then(async () => { await host.enableYieldTimeoutV1?.(); await host.enableSpreadV2?.(); });
@@ -119,6 +121,8 @@ const groundHost = god && (host.engine as unknown as {installGroundV1?:unknown})
 if (groundHost && edge) installGroundCapabilities(edge as never, god!, host);
 // Stage B (lane L9): Souls live among god-built things — entity physics into the engine, fixtures usable, bodies as entities.
 if (god && config.engine === 'mars' && process.env.ENTITY_BRIDGE !== '0') installEngineBridge({ host, god, edge });
+if (god) installWorldEnv(host, god, edge);  // R4-LIVE: Souls perceive the god's weather
+if (god) installLightning(god, edge, () => host.engine.world.tick);  // GOD-ENV: Souls see the bolts and hear the thunder
 if (god) console.log(`[god] entity world ready: ${god.model.entities.size} entities, ${new Set(god.model.defs.values()).size} defs, owner ${god.owner ?? '(unclaimed)'}`);
 const app = buildApp({ cfg: config, db, host, auth, hub, brain, souls, takes, intentV2, edge, god });
 const listener = getRequestListener(app.fetch);

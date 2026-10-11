@@ -1,9 +1,10 @@
-import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
 import {ImportCredits} from './ImportCredits.tsx';
 import { createPortal } from 'react-dom';
 import type { ViewportInsets, WorldViewerHandle, WorldViewerState } from './WorldViewer.ts';
 import { arrivalProgress, arrivalStage, assetDownloadProgress, heldLabel, initialPending } from './viewer-arrival.ts';
 import type { InitialWorldProgress } from './InitialWorldReadiness.ts';
+import { assetBytes, megabytes } from './asset-bytes.ts';
 
 /** Edge overlays are measured against World's actual viewport, never the window. */
 export function useViewerInsets(root: RefObject<HTMLDivElement | null>, visible: boolean, layout: string): ViewportInsets {
@@ -79,9 +80,18 @@ export function ViewerFrame({ handle, state, dt, navigationOpen, onNavigationCha
   // Without such a gate (world-engine worlds) the bar follows the actual asset downloads while the card shows.
   const preparing = initialPending(initial);
   const card = (arriving || preparing) && initial?.stage !== 'failed';
-  const progress = !card ? null : initial ? arrivalProgress(initial) : arriving ? assetDownloadProgress(state?.assetDownloads) : null;
   const [arrivalShown, setArrivalShown] = useState(true);
   useEffect(() => { if (card) { setArrivalShown(true); return; } const id = setTimeout(() => setArrivalShown(false), 700); return () => clearTimeout(id); }, [card]);
+  // The bar counts bytes (asset-bytes.ts: every asset fetch, total known up front), never files; it only moves forward
+  // and is full once the world is ready. Without a byte total yet, the older measures stand in.
+  const bytes = useSyncExternalStore(assetBytes.subscribe.bind(assetBytes), () => assetBytes.snapshot());
+  // new worlds learn their total from the snapshot a moment after the first downloads start: no bar until then
+  const inBytes = bytes.known && bytes.total > 0, byByte = card && inBytes;
+  const measured = !card ? (arrivalShown ? 1 : null) : initial && (initial.stage === 'preparing' || initial.stage === 'first-frame') ? 1
+    : byByte ? bytes.loaded / bytes.total : bytes.total > 0 && !bytes.known ? null : initial ? arrivalProgress(initial) : arriving ? assetDownloadProgress(state?.assetDownloads) : null;
+  const peak = useRef(0);  // a file fetched again after an abort restarts its count: the bar (and its MB) hold, never step back
+  if (!card) peak.current = 0;
+  const progress = measured === null ? null : card ? (peak.current = Math.max(peak.current, Math.min(1, measured))) : measured;
   const lost = !connected && !arriving;
   const live = current && state?.presentation === 'live' && connected;
   const status = blocked && state?.shownTick == null ? 'View unavailable'
@@ -139,8 +149,8 @@ export function ViewerFrame({ handle, state, dt, navigationOpen, onNavigationCha
     {arrivalShown && !blocked && initial?.stage !== 'failed' && <div className="viewer-arrival" data-done={!card} role="status" aria-live="polite">
       <div className="viewer-arrival-card"><span className="viewer-arrival-spinner" aria-hidden="true" />
         <div><p className="viewer-arrival-title">Arriving in {worldName ?? 'the world'}</p>
-          <p className="viewer-arrival-stage">{arriving ? state?.assetDownloads?.pending ? `Downloading world assets · ${state.assetDownloads.loaded} of ${state.assetDownloads.total} ready` : `${arrivalStage(reason, connecting)}…` : preparing ? 'Preparing the world…' : 'Ready'}</p>
-          {progress !== null && <div className="viewer-arrival-progress"><progress aria-label="World loading progress" max={100} value={Math.round(progress * 100)} /><span>{Math.round(progress * 100)}%{initial && initial.bytesLoaded > 0 ? ` · ${(initial.bytesLoaded / 1048576).toFixed(1)} MB` : ''}</span></div>}</div></div>
+          <p className="viewer-arrival-stage">{arriving ? byByte ? 'Downloading the world…' : state?.assetDownloads?.pending ? `Downloading world assets · ${state.assetDownloads.loaded} of ${state.assetDownloads.total} ready` : `${arrivalStage(reason, connecting)}…` : preparing ? byByte && progress !== null && progress < 1 ? 'Downloading the world…' : 'Preparing the world…' : 'Ready'}</p>
+          {progress !== null && <div className="viewer-arrival-progress"><progress aria-label="World loading progress" max={1000} value={Math.round(progress * 1000)} /><span>{inBytes ? megabytes({ loaded: Math.min(1, progress) * bytes.total, total: bytes.total }) : `${Math.round(progress * 100)}%`}</span></div>}</div></div>
     </div>}
     {followCue && !arriving && <div className="viewer-follow-hint" role="status" aria-live="polite" data-cue={followCue}>{followCue === 'follow'
       ? coarse ? <>Following <b>{followName ?? 'a Soul'}</b> · drag to look around · × to stop</> : <>Following <b>{followName ?? 'a Soul'}</b> · drag to look around, scroll to zoom · press <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to look around freely</>

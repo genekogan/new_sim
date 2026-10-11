@@ -36,7 +36,7 @@ export class GroundHost {
   constructor(db: Db, host: WorldHost, god: GodMode) {
     this.db = db; this.host = host; this.god = god;
     ensureGroundTable(db);
-    god.onCommit((c) => { if (c.diff.tiles.length || c.diff.world) this.sync(c.seq); });
+    god.onCommit((c) => { if (c.diff.tiles.length || c.diff.world || c.diff.constants) this.sync(c.seq); });   // constants: the bounds grew (GOD-ENV)
     this.sync(god.model.editSeq);
   }
   private get engine(): Engine { return this.host.engine as unknown as Engine; }

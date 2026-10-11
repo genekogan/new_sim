@@ -45,7 +45,8 @@ templates) are not listed; nothing old imports them except through the gates bel
   - publishes the session (`auth-session.ts`) for the God panel and Join;
   - hides `LocalIntegrationNotice`, `LocalConnectionHelp` and e8's `AccountApproval` dialog (the God panel owns
     `#approve/<id>` there);
-  - drops `BringAgent` "New Soul" (Join lives in the God panel; lane S adds `SoulsHeader`);
+  - New Soul = e8's `BringAgent` copy-the-prompt dialog on all worlds (lane UXFIX, `cc9bef0f`; S's `SoulsHeader`
+    is gone); new worlds add **Copy invite link** to the account menu (`AccountMenu.tsx` `inviteUrl`);
   - shows local dev sign-in (`configuredSignIn(cfg, true)`).
 - Adds `AuthCtx.mode`.
 - Old worlds: e8 Shell. (Verified: identical header, buttons, dialogs and requests.)
@@ -107,6 +108,11 @@ templates) are not listed; nothing old imports them except through the gates bel
 **`package.json`, `tsconfig.json`**
 - Workspace deps (`@sim/generators`, `@sim/ground`, `@sim/world-compiler`), and the `@types/three` position.
 
+**`LiveWorld.tsx`, `WorldEntityLayer.ts`, `world-env.ts`** (GOD-ENV, lightning + world bounds)
+- `LiveWorld.tsx`: `WorldLightning` (bolt, flash, WebAudio thunder) created only when `newWorld`; `__simLiving.lightning`.
+- `WorldEntityLayer.ts` (active only on new worlds): terrain sectors, `groundAt`, sea plane and horizon read the ground
+  recipe's bounds (a rectangle once the god extends the world) instead of ±extent/2; a diff's `constants` is applied.
+
 ### Server (`apps/server`)
 
 **`auth.ts`**
@@ -149,7 +155,38 @@ templates) are not listed; nothing old imports them except through the gates bel
 **`god/god-clerk.test.ts`**
 - Its Auth configs say `worldEngine: true`.
 
+**`edge/ledger/ledger.ts`, `edge/boot/world-places.ts`** (R4-INFO, Soul-information parity)
+- Two optional hooks on `EdgeLedger`: `placeWalkable(id)` and `beforeMap()`. Only the engine bridge sets them
+  (`god/engine-bridge.ts`, so only when `config.worldEngine`): god-built places (`god/places.ts`) count as walkable in
+  `map()`, in the vocabulary's place list and in boot-place admission (`knownBootPlaces`), and the map re-derives
+  after a god edit before it is read.
+- Old worlds: both hooks unset, so `walkable` stays `id in regions` and admission stays the native-region rule.
+  (Verified: local Eden `map` identical place-for-place to the pre-change probe; edge place/here/W1 tests pass.)
+
+**`edge/perception/here.ts`, `edge/eyes/{sight,view}.ts`, `edge/ledger/ledger.ts`, `http.ts`, `main.ts`** (R4-LIVE, env + weather)
+- `EdgeLedger.weatherNow?` (set only by `god/world-env.ts` `installWorldEnv`, i.e. when `d.god`): `here.weather` and Eyes'
+  caption read the god's weather; unset on old worlds, so their words come from engine `env.weather` / the schedule as before.
+- `http.ts`/`main.ts`: env routes (`GET /v1/world/env`, `POST /v1/god/env`) and `installWorldEnv`, both under `d.god`.
+- `ledger.ts` stop path: an immediate `stand:here` touches the fade clock (C9 "any accepted action"). **Not gated**: a fix;
+  see F4 before an old-world backend runs this tree.
+
+**`LiveWorld.tsx`, `WorldAtmosphere.ts`, `WorldBroadcast.ts`, `WorldNightLights.ts`, `gen-mesh/motion.ts`** (R4-LIVE, living view)
+- All under `newWorld`/`entityLayer.active`: atmosphere profile `'world'` + the god's weather, `GodWorldLiving` (lamps by
+  the clock, night map from god lights), broadcast `hints.views` (god landmarks/tour), arrival in broadcast when Souls
+  live there, Explore lists god landmarks. Old worlds: `profile` defaults to `'eden'`, `views` unset, `setClockNight`
+  never called (null), `paintOnlySources` never called.
+
+**`edge/perception/here.ts`, `edge/ledger/ledger.ts`, `main.ts`, `god/ground-host.ts`, `god/query.ts`, `god/god.ts`** (GOD-ENV)
+- `EdgeLedger.lightningNear?` (set only by `god/lightning.ts` `installLightning`, under `god`): `here.weather.lightning`;
+  unset on old worlds, so their `here` is unchanged. `main.ts` installs it under `if (god)`.
+- god files only: bounds-aware tiles/free plots, `ground` published with a `constants` diff, ground-host re-logs on growth;
+  new routes `POST /v1/god/land`, `POST /v1/god/strike` (god token).
+
 ### Engine (`mars/viewer/engine`, `packages/engine-mars`, `packages/protocol`, `packages/engine-contract`)
+
+**`engine-mars/src/engine.ts` `configureClock`, `engine-contract/src/scene-capture.ts`, `protocol/src/presentation.ts`** (R4-LIVE)
+- A clock `origin` may be negative (a god set the time of day early in a world's life). Every logged origin before was
+  >= 0 (clockConfig and LivingWorld never wrote one below), so old histories replay and decode unchanged.
 
 **`engine-mars/src/engine.ts`**
 - `groundV1` (`attachGround`), world-edit/1, `restoreHumanPoseV1`, humanoid@2 body dims.
@@ -186,6 +223,16 @@ templates) are not listed; nothing old imports them except through the gates bel
 
 CLI and skill (`tools/edge-skill/*`), proxy (`tools/core/multiworld/*`) and the account modules: **main's bytes,
 untouched.**
+
+**`mars/viewer/engine/locomotion/walk.ts`, `packages/engine-mars/src/ground-bridge.ts`** (GOD-ENV)
+- `walkSchema` is `z.lazy` over the same ±500 m schema; `setWalkReach` widens x/z to the ground recipe's bounds, called
+  only from `attachGround` (ground/god worlds). Old worlds never call it: same schema, same messages, same replay.
+- Not changed, documented: the ground nav window (`spatial/tiled.ts` MAX_WINDOW_TILES = 6, grows only) is one 384 m
+  square shared by every body, so Souls cannot walk farther than that from where the window started (needs the nav owner).
+
+**`packages/world-compiler` `compile.ts`/`schemas.ts`** (GOD-ENV; new-world package): `expand` takes `bounds` and has an
+inverse (trusted shrink, refused while anything stands there); re-settled buildings get/lose foundation pads; undoing a
+`world` op nulls optional fields it added; `weather.strike`. `lightning.ts`: deterministic strikes.
 
 ## 3. Conflict report (merge `dfb4669a`)
 
@@ -242,7 +289,8 @@ Follow-up merges (same day, to keep one base):
 - `Shell.tsx`: OW's `onInitialProgress`, with our `AccountApproval` gate.
 
 **`34762bbc` merge `root/world-engine`** (S: New Soul + Souls on new worlds; loading-card)
-- `Shell.tsx`: S's `SoulsHeader` in e8's header, new worlds only.
+- `Shell.tsx`: S's `SoulsHeader` in e8's header, new worlds only (removed again by UXFIX `cc9bef0f`: New Soul =
+  e8 `BringAgent` on all worlds; new worlds add Copy invite link to the account menu).
 - `ViewerFrame.tsx`, `viewer-arrival.ts`, `place-names.test.ts`: OW's code, plus loading-card's
   `assetDownloadProgress` fallback when no initial gate reports.
 - After this merge, `root/world-engine` and main are both ancestors of `root/reconcile`, so both can fast-forward.
@@ -261,8 +309,8 @@ Fixed in the first merge commit:
 - The old-world baseline for every comparison is now `b2f70bf4`, not `e8bcdcd3`.
 
 **F2. Join on new worlds**
-- e8's "New Soul" (`BringAgent`) and `AccountApproval` are hidden on new worlds, where the God panel's Join and
-  `#approve` card serve.
+- e8's "New Soul" (`BringAgent`) serves all worlds (UXFIX). e8's `AccountApproval` is hidden on new worlds, where the
+  God panel's `#approve` card serves.
 - One system eventually needs one Join flow. Converge on e8's `BringAgent` + `AccountApproval` when the God panel's
   Join matches it. Both drive the same `/v1/account/approvals` routes.
 

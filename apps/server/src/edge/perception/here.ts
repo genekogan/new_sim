@@ -153,9 +153,10 @@ export function bodyEnd(ledger: EdgeLedger, soulId: string): {place: string | nu
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 function lightOf(hour: number, minute: number) {const t = hour * 60 + minute; return t < 330 ? 'night' : t < 420 ? 'dawn' : t < 1110 ? 'day' : t < 1200 ? 'dusk' : 'night';}
-function skyOf(w: {clouds?: number; rain?: number; wind?: number} | undefined) {
+function skyOf(w: {clouds?: number; rain?: number; wind?: number; fog?: number; kind?: string} | undefined) {
   if (!w) return null;
-  const sky = (w.rain ?? 0) > 0.3 ? 'rain' : (w.clouds ?? 0) > 0.6 ? 'overcast' : (w.clouds ?? 0) > 0.25 ? 'some cloud' : 'clear';
+  // `kind`/`fog` come only from a god world's weather (EdgeLedger.weatherNow, R4-LIVE); the live worlds' words are unchanged
+  const sky = w.kind === 'storm' ? 'thunderstorm' : (w.fog ?? 0) > 0.5 ? 'fog' : (w.rain ?? 0) > 0.3 ? 'rain' : (w.clouds ?? 0) > 0.6 ? 'overcast' : (w.clouds ?? 0) > 0.25 ? 'some cloud' : 'clear';
   const wind = (w.wind ?? 0) > 0.6 ? 'windy' : (w.wind ?? 0) > 0.3 ? 'breezy' : (w.wind ?? 0) > 0.1 ? 'light' : 'calm';
   return {sky, wind};
 }
@@ -180,7 +181,7 @@ export function compactDoHere(caps:readonly EdgeCapability[],localTargets:Readon
 export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:boolean}={}) {
   const P = new Perception(ledger, soul), tick = P.tick, me = P.me(), b = me.body, host = ledger.host;
   const day = host.living, c = day ? clockAt(tick, day.origin, day.dayTicks) : null;
-  const weather = skyOf((P.w as {env?: {weather?: {clouds: number; rain: number; wind: number}}}).env?.weather);
+  const weather = skyOf(ledger.weatherNow?.() ?? (P.w as {env?: {weather?: {clouds: number; rain: number; wind: number}}}).env?.weather);
   // my current body act and how long its timed step has left
   const open = ledger.openReceipts(soul.soulId).filter(r => (r as {channel?: string}).channel !== 'attention');
   const program = host.engine.programOf(soul.entityId), action = program ? host.engine.programAction?.(program) : null;
@@ -226,7 +227,7 @@ export function hereFrame(ledger: EdgeLedger, soul: EdgeSoul,options:{doHere?:bo
     .map(x => ({to: x.p.id, name: x.p.name, dir: compassPoint(compassOf(x.at[0] - P.pos![0], x.at[1] - P.pos![1])), walk: x.c.id, eta: '~' + durationWord(walkSeconds(x.d * 1.25))})) : [];
   const frame = {
     tick, ...(c ? {clock: `${String(c.hour).padStart(2, '0')}:${String(c.minute).padStart(2, '0')}`, day: WEEKDAYS[new Date(c.datetime).getUTCDay()], light: lightOf(c.hour, c.minute)} : {}),
-    ...(weather ? {weather} : {}),
+    ...(weather ? {weather: (() => {const l = P.pos ? ledger.lightningNear?.(P.pos[0], P.pos[1]) : null; return l ? {...weather, lightning: l} : weather;})()} : {}),
     me: {soulId:soul.soulId,name:host.minds.get(soul.soulId)?.name??soul.name,profileRevision:host.profileFact(soul.soulId)?.revision??0,place: me.place, placePath: me.placePath, pos: me.pos, heading: me.heading, facing: compassPoint(me.heading), posture: me.posture, body:P.w.entities[soul.entityId]?.body??{family:'humanoid'}, ...(me.seat ? {seat: me.seat} : {}),
       activity: {kind: activityKind, ...(endsIn ? {endsIn} : {})},
       ...(gaze ? {gaze: {kind: gaze.kind, ...(gaze.target ? {at: nameOfEntity(gaze.target)} : gaze.at && P.pos ? {bearing: P.bearing(gaze.at)} : {})}} : {}),
