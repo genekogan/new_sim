@@ -30,13 +30,13 @@ if [ ! -f /etc/sim-worlds/production.conf ]; then
 # /etc/sim-worlds/production-auth.env is a PLACEHOLDER path: Codex or Gene provisions it (CLERK_PUBLISHABLE_KEY,
 # CLERK_ISSUER_URL=https://clerk.eden.art, CLERK_AUTHORIZED_PARTIES=https://sim.eden.art; no secret key). Each world's node
 # loads it by path (--env-file); the launcher only reads the publishable key and issuer. Never copied from /opt/eden3.
-SIM_WORLDS_ARGS=--base /worlds --port 4620 --range 4621-4659 --data /srv/sim-worlds-data/production --public-origin https://sim.eden.art --auth-env /etc/sim-worlds/production-auth.env --max-worlds 60 --max-running 24 --min-free-mb 2500 --world-heap-mb 768 --create-limit 6 --mars-web /srv/sim-worlds/production/mars-web --eager 4 --soul-cli /srv/sim-worlds/soul/eden-agent.mjs --soul-skill /srv/sim-worlds/soul/SKILL.md
+SIM_WORLDS_ARGS=--base /worlds --port 4620 --range 4621-4659 --data /srv/sim-worlds-data/production --public-origin https://sim.eden.art --auth-env /etc/sim-worlds/production-auth.env --max-worlds 60 --max-running 24 --min-free-mb 2500 --world-heap-mb 768 --create-limit 6 --mars-web /srv/sim-worlds/production/mars-web --eager 4
 CONF
 fi
 chown root:simworlds /etc/sim-worlds/*.conf && chmod 640 /etc/sim-worlds/*.conf
-# Soul CLI + skill (Codex's frozen files, copied in by path by whoever releases; missing files just mean the worlds
-# serve none) and the nightly backup destination.
-install -d -o simworlds -g simworlds -m 750 /srv/sim-worlds/soul /srv/sim-worlds-backups
+# The Soul CLI 1.9 and its guides ship inside each release (tools/world-launcher/soul/, pinned by sha in SOURCES.json),
+# so no --soul-* flags are needed. Nightly backup destination:
+install -d -o simworlds -g simworlds -m 750 /srv/sim-worlds-backups
 
 install -m 644 "$UNIT_SRC" /etc/systemd/system/sim-worlds@.service
 install -d /etc/systemd/system/sim-worlds@staging.service.d /etc/systemd/system/sim-worlds@production.service.d
