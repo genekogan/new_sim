@@ -7,6 +7,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, X0 } from './v3.mjs';
 import { ROOMS, ROOM_AT } from './layout.mjs';
+import { orientOp, BEARING } from './frame.mjs';
 
 const P = JSON.parse(readFileSync(join(ROOT, 'worlds/core-assets/mars/placements.json'), 'utf8')).placements;
 const DEFS = new Map(JSON.parse(readFileSync(join(ROOT, 'packages/world-compiler/src/core-kit/mars.json'), 'utf8')).map((d) => [`core/${d.name.slice(5)}@1`, d]));
@@ -69,10 +70,10 @@ const T = {
   schema: 'genesis/1',
   name: 'Mars two',
   description: 'The Mars College 2026 campus in the new engine, built from the library (core/mars-* defs any god can place): Mimos and the Chiba kitchen and dining hall laid out as Gene corrected them (the L-shaped Mimos with the raised main and the glazed tea room, the outdoor gap, the kitchen west of the diner with its perimeter counters, sinks and prep table, the two northeast shower bays), Chiba with the auditorium, the Dojo, Tool camp, the Freeside compound, the west rack building, and every van, bus, trailer, toilet and hut where the reference (sim.mars.college, 2026) has them. Furniture is the reference\'s own: Souls sit on the sofas, chairs, stools and bus seats and put things on the tables and counters.',
-  constants: { extent: 320, ground: 'land', limits: { budget: { tris: 200000, bytes: 6000000, texPx: 2048 } } },
+  constants: { extent: 1200, ground: 'land', limits: { budget: { tris: 200000, bytes: 6000000, texPx: 2048 } } },
   state: {
     constitution: '# Mars two\nThe Mars College 2026 campus on the low Sonoran desert by the Salton Sea: Mimos (the café and lounge), the Chiba kitchen and dining hall, the Chiba auditorium, the Dojo, Tool camp and the Freeside compound.\n\nRebuilt in the new engine from the 2026 reference with Gene\'s Mimos and kitchen corrections.',
-    sky: { palette: 'mars-desert', sun: 0.8 }, weather: { clouds: 0.05, wind: 0.3, rain: 0 }, ground: { palette: 'desert' },
+    sky: { palette: 'mars-desert', sun: 0.8 }, weather: { kind: 'manual', clouds: 0.05, wind: 0.25, rain: 0, fog: 0 }, ground: { palette: 'desert' },
   },
   batches: [
     { note: 'the campus buildings (Mimos, the Chiba kitchen and dining hall, the showers as Gene corrected them; Chiba, Dojo, Tool camp, Freeside, the west racks)', group: 'campus', ops: ops.campus },
@@ -84,5 +85,8 @@ const T = {
     { note: 'the site: vans, buses, trailers, RVs, toilets, huts, the forklift, OG', group: 'site', ops: ops.site },
   ],
 };
+// MARSLAND: the world frame is geographic (frame.mjs): every root-level placement turns about the Mimos origin, which
+// becomes the world's (0, 0); parent-local placements are unchanged.
+for (const b of T.batches) b.ops = b.ops.map(orientOp);
 writeFileSync(join(ROOT, 'worlds/templates/mars-two.json'), JSON.stringify(T, null, 1) + '\n');
 console.log(`mars-two.json: ${T.batches.reduce((n, b) => n + b.ops.length, 0)} ops (${Object.entries(ops).map(([k, v]) => `${k} ${v.length}`).join(', ')})`);

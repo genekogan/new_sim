@@ -25,6 +25,7 @@ import type { Link, Obstacle, SpatialScene } from '../../../mars/viewer/engine/s
 import type { KinPlacement } from '../../../mars/viewer/app/engine-view/floaters.ts';
 import type { Take } from '../../../mars/viewer/engine/take/types.ts';
 import { solarPosition } from '../../../mars/viewer/engine/env/sun.ts';
+import { siteNorthOffset } from './site-north.ts';
 import {createEdenDaylight} from './atmosphere/visual-transitions.ts';
 import { daylightFactors } from '../../../mars/viewer/engine/env/daylight.ts';
 import { fitNearPlane } from '../../../mars/viewer/lib/depth-fit.ts';
@@ -461,7 +462,7 @@ export class Daylight {
 
   /** Preserve renderer-derived millisecond precision; second bins freeze sunlight between samples. */
   update(datetime: string | null) {
-    const key = datetime ?? 'none';
+    const key = datetime ? `${datetime}|${siteNorthOffset()}` : 'none';
     if (key === this.key) return;
     this.key = key;
     if (!datetime) { // no clock yet: a soft midday so the camp reads
@@ -474,7 +475,7 @@ export class Daylight {
       return;
     }
     let pos;
-    try { pos = solarPosition(datetime); } catch { return; }
+    try { pos = solarPosition(datetime, undefined, undefined, siteNorthOffset()); } catch { return; }
     const original = daylightFactors(pos.elevationDeg);
     const f=this.nightLighting?this.edenDaylight(datetime,original):original;
     this.daylightFactor=f.daylight;
