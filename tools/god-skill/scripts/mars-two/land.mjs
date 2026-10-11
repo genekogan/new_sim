@@ -16,8 +16,8 @@ export const NEAR_OPS = [
   { op: 'place', def: 'core/tire-ring@1', name: 'tire-ring', p: TIRE_RING.p, r: TIRE_RING.r, params: { rx: TIRE_RING.rx, rz: TIRE_RING.rz } },
   { op: 'place', def: 'core/tire-tracks@1', name: 'race-track-tracks', shape: { area: [[-250, -230], [-80, -230], [-80, 20], [-250, 20]] }, params: { count: 70 } },
   { op: 'place', def: 'core/tire-tracks@1', name: 'camp-tracks', shape: { area: [[-80, -180], [160, -180], [160, 80], [-80, 80]] }, params: { count: 40 } },
-  { op: 'place', def: 'core/desert-scrub@1', name: 'creosote-scrub', shape: { area: [[-600, -600], [600, -600], [600, 600], [-600, 600]] }, params: { toward: 'se', gradient: 0.6, clear: [[CAMP[0], CAMP[1], 120], [TIRE_RING.p[0], TIRE_RING.p[1], 45]] } },
-  { op: 'place', def: 'core/desert-scrub@1', name: 'scrub-toward-the-wash', shape: { area: [[300, -600], [600, -600], [600, 600], [300, 600]] }, params: { density: 0.004, toward: 'e' } },
+  { op: 'place', def: 'core/desert-scrub@1', name: 'creosote-scrub', shape: { area: [[-600, -600], [600, -600], [600, 600], [-600, 600]] }, params: { density: 0.0008, toward: 'se', gradient: 0.6, clear: [[CAMP[0], CAMP[1], 120], [TIRE_RING.p[0], TIRE_RING.p[1], 45]] } },
+  { op: 'place', def: 'core/desert-scrub@1', name: 'scrub-toward-the-wash', shape: { area: [[300, -600], [600, -600], [600, 600], [300, 600]] }, params: { density: 0.002, toward: 'e' } },
 ];
 // Beyond the walkable edge (lane MARSLAND-FAR): the 111 with its poles, the wash and its delta, the levee band, the salt
 // flats and beach, the Salton Sea; the mountain ranges as a camera-following panorama. Unnamed: they are not places.
