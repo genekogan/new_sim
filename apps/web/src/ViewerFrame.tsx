@@ -89,7 +89,7 @@ export function ViewerFrame({ handle, state, dt, navigationOpen, onNavigationCha
   const inBytes = bytes.known && bytes.total > 0, byByte = card && inBytes;
   const measured = !card ? (arrivalShown ? 1 : null) : initial && (initial.stage === 'preparing' || initial.stage === 'first-frame') ? 1
     : byByte ? bytes.loaded / bytes.total : bytes.total > 0 && !bytes.known ? null : initial ? arrivalProgress(initial) : arriving ? assetDownloadProgress(state?.assetDownloads) : null;
-  const peak = useRef(0);
+  const peak = useRef(0);  // a file fetched again after an abort restarts its count: the bar (and its MB) hold, never step back
   if (!card) peak.current = 0;
   const progress = measured === null ? null : card ? (peak.current = Math.max(peak.current, Math.min(1, measured))) : measured;
   const lost = !connected && !arriving;
@@ -150,7 +150,7 @@ export function ViewerFrame({ handle, state, dt, navigationOpen, onNavigationCha
       <div className="viewer-arrival-card"><span className="viewer-arrival-spinner" aria-hidden="true" />
         <div><p className="viewer-arrival-title">Arriving in {worldName ?? 'the world'}</p>
           <p className="viewer-arrival-stage">{arriving ? byByte ? 'Downloading the world…' : state?.assetDownloads?.pending ? `Downloading world assets · ${state.assetDownloads.loaded} of ${state.assetDownloads.total} ready` : `${arrivalStage(reason, connecting)}…` : preparing ? byByte && progress !== null && progress < 1 ? 'Downloading the world…' : 'Preparing the world…' : 'Ready'}</p>
-          {progress !== null && <div className="viewer-arrival-progress"><progress aria-label="World loading progress" max={1000} value={Math.round(progress * 1000)} /><span>{inBytes ? megabytes(progress >= 1 ? { loaded: bytes.total, total: bytes.total } : bytes) : `${Math.round(progress * 100)}%`}</span></div>}</div></div>
+          {progress !== null && <div className="viewer-arrival-progress"><progress aria-label="World loading progress" max={1000} value={Math.round(progress * 1000)} /><span>{inBytes ? megabytes({ loaded: Math.min(1, progress) * bytes.total, total: bytes.total }) : `${Math.round(progress * 100)}%`}</span></div>}</div></div>
     </div>}
     {followCue && !arriving && <div className="viewer-follow-hint" role="status" aria-live="polite" data-cue={followCue}>{followCue === 'follow'
       ? coarse ? <>Following <b>{followName ?? 'a Soul'}</b> · drag to look around · × to stop</> : <>Following <b>{followName ?? 'a Soul'}</b> · drag to look around, scroll to zoom · press <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> to look around freely</>

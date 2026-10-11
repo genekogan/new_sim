@@ -238,6 +238,10 @@ try {
         await page.waitForFunction(() => window.__simEntity?.layer?.active === true, null, { timeout: PAGE_MS }).catch(() => {});
         await page.evaluate(() => { const w = window.__simEntity; if (!w) return; w.controls.target.set(-2, 1, 8); w.camera.position.set(-16, 11, 30); w.camera.lookAt(w.controls.target); }).catch(() => {});
         await sleep(3500);
+        // #join also opens New Soul's copy-the-prompt dialog (e8's, on every world; lane UXFIX): note it, close it
+        const dialog = page.locator('.bring-agent');
+        page.newSoulDialog = await dialog.isVisible() ? (await dialog.innerText()).replace(/\s+/g, ' ') : null;
+        if (page.newSoulDialog) { await page.keyboard.press('Escape'); await dialog.waitFor({ state: 'detached' }); }
         return page;
       };
       await step('P0 a stranger (not signed in) sees the Join section and who lives here', async () => {
@@ -258,8 +262,8 @@ try {
         await benPage.locator('[data-join-line] .gp-copy').click();
         const clip = await benPage.evaluate(() => navigator.clipboard.readText().catch(() => null));
         await shot(benPage, '03-ben-line');
-        return { benLine, clip };
-      }, (r) => r.benLine.includes(`${base}/SKILL.md`) && /Soul mode/.test(r.benLine) && r.benLine.includes('"Ben"') && (r.clip === null || r.clip === r.benLine));
+        return { benLine, clip, newSoulDialog: benPage.newSoulDialog };
+      }, (r) => r.newSoulDialog?.includes(`${base}/instructions.md`) && r.benLine.includes(`${base}/SKILL.md`) && /Soul mode/.test(r.benLine) && r.benLine.includes('"Ben"') && (r.clip === null || r.clip === r.benLine));
       await step('P2 ben\'s agent reads the line, follows Soul mode, and walks to the garden', async () => {
         const url = benLine.match(/Read (\S+\/SKILL\.md)/)?.[1], name = benLine.match(/make my Soul "([^"]+)"/)?.[1];
         if (url !== `${base}/SKILL.md`) throw new Error('the line does not name this world\'s skill');
