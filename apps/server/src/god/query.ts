@@ -17,6 +17,8 @@ export type ReachFn = (from: ReachEnd, to: ReachEnd) => unknown;
 export const reachProviders = new WeakMap<WorldModel, ReachFn>();
 /** Who is using an entity right now (a Soul seated on it, holding it); registered by the engine bridge. */
 export const usesProviders = new WeakMap<WorldModel, (id: string) => unknown>();
+/** F1: Souls sitting on a thing's seat slots now ({slot, soul}); registered by the engine bridge. */
+export const seatProviders = new WeakMap<WorldModel, (id: string) => { slot: string; soul: string }[]>();
 
 export type QueryInput = {
   points?: [number, number][];
@@ -61,7 +63,7 @@ export function runQuery(w: WorldModel, q: QueryInput) {
         rooms: baked.rooms?.map((r) => ({ id: r.id, name: r.name, floor: r.floor })) ?? [],
         openings: baked.openings?.map((o) => ({ id: o.id, kind: o.kind, level: o.level, state: o.state })) ?? [],
         links: baked.links?.map((l) => ({ id: l.id, kind: l.kind, from: l.from, to: l.to })) ?? [],
-        slots: baked.slots.map((s) => ({ id: s.id, kind: s.kind, capacity: s.capacity, used: [...(w.children.get(e.id) ?? [])].filter((c) => w.entities.get(c)?.in.slot === s.id).length })),
+        slots: baked.slots.map((s) => ({ id: s.id, kind: s.kind, capacity: s.capacity, used: [...(w.children.get(e.id) ?? [])].filter((c) => w.entities.get(c)?.in.slot === s.id).length + (s.kind === 'seat' ? (seatProviders.get(w)?.(e.id) ?? []).filter((x) => x.slot === s.id).length : 0) })),
         children: [...(w.children.get(e.id) ?? [])].map((c) => w.pathOf(c)),
         constraints: e.constraints ?? [],
         ...(usesProviders.get(w) ? { usedBy: usesProviders.get(w)!(e.id) } : {}),
@@ -127,7 +129,8 @@ function slotWorld(w: WorldModel, e: Entity, baked: Baked) {
   return baked.slots.map((s) => {
     const [x, z] = toWorld(pose, s.p[0], s.p[2]);
     const occ = kids.filter((k) => k.in.slot === s.id);
-    return { id: s.id, kind: s.kind, p: [x, round(pose.y + s.p[1] * pose.s), z], yaw: round(pose.yaw + s.yaw), capacity: s.capacity, used: occ.length, occupants: occ.slice(0, 64).map((k) => k.name ?? k.id), ...(s.floor !== undefined ? { floor: s.floor } : {}), ...(s.polygon ? { polygon: s.polygon.map(([a, b]) => toWorld(pose, s.p[0] + a, s.p[2] + b)), local: s.polygon } : {}), ...(s.accepts && Object.keys(s.accepts).length ? { accepts: s.accepts } : {}), ...(s.label ? { label: s.label } : {}) };
+    const souls = s.kind === 'seat' ? (seatProviders.get(w)?.(e.id) ?? []).filter((x) => x.slot === s.id).map((x) => x.soul) : [];
+    return { id: s.id, kind: s.kind, p: [x, round(pose.y + s.p[1] * pose.s), z], yaw: round(pose.yaw + s.yaw), capacity: s.capacity, used: occ.length + souls.length, occupants: [...souls, ...occ.slice(0, 64).map((k) => k.name ?? k.id)], ...(s.floor !== undefined ? { floor: s.floor } : {}), ...(s.polygon ? { polygon: s.polygon.map(([a, b]) => toWorld(pose, s.p[0] + a, s.p[2] + b)), local: s.polygon } : {}), ...(s.accepts && Object.keys(s.accepts).length ? { accepts: s.accepts } : {}), ...(s.label ? { label: s.label } : {}) };
   });
 }
 

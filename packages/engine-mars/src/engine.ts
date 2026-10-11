@@ -1417,6 +1417,12 @@ export class MarsEngine implements Engine {
     for(const slot of fixtureSlots(this.rt,e)){const r=slot.claimedBy?this.rt.records.get(slot.claimedBy):undefined;const actor=r?.params?.actor;if(typeof actor==='string'&&this.ents[actor]?.human)return {body:actor,how:'occupied'};}
     return null;
   }
+  /** world-edit/1 read (F1): who sits on which seat slot of a fixture now (`seat-1` → the body's id). */
+  seatOccupantsV1(id:string):{slot:string;body:string}[]{
+    const e=this.ents[id];if(!e)return [];const out:{slot:string;body:string}[]=[];
+    for(const slot of fixtureSlots(this.rt,e)){if(slot.kind!=='seat')continue;const r=slot.claimedBy?this.rt.records.get(slot.claimedBy):undefined;const actor=r?.params?.actor;if(typeof actor==='string'&&this.ents[actor]?.human)out.push({slot:slot.id.slice(id.length+1),body:actor});}
+    return out;
+  }
   /** world-edit/1 read: whether a body of the default human profile can walk from one standing point to another
    *  (levels included, stairs and doors as the planner sees them), and how far. Pure read. */
   reachV1(from:{p:[number,number];level?:number},to:{p:[number,number];level?:number}):{ok:true;length:number;legs:number;levels:number[]}|{ok:false;code:string;message:string}{

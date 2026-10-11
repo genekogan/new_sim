@@ -20,9 +20,12 @@ type Plans = Map<string, { label: string; steps: Step[]; seconds?: boolean }>;
 type Engine = {
   world: { tick: number; entities: Record<string, any> };
   standableNearV1(at: Vec2, level?: number, except?: string, minClear?: number, maxRing?: number): Vec2 | null;
+  reachV1?(from: { p: Vec2; level?: number }, to: { p: Vec2; level?: number }): { ok: boolean };
 };
 export type NavHost = {
   model: WorldModel;
+  /** Changes when anything but a body's pose changed (the engine bridge's version); else the model's editSeq. */
+  version?: () => number;
   engine: Engine;
   /** Engine level of a standing height at (x, z): 0 on the ground (any terrain height), else a floor's level. */
   levelAt(x: number, z: number, y: number): number;
@@ -60,6 +63,10 @@ export type Thing = {
   doorOpen?: boolean;
   /** Has a seat (sit:<id> is offered near it). */
   seat?: boolean;
+  /** Piers, decks, bridges: standing points ON the deck, preferred in order (F1). */
+  deck?: Vec2[];
+  /** Rooms: where the building is entered from outside (its front door's approach), for the reachability check. */
+  entry?: { p: Vec2; level: number };
 };
 
 const r2 = (v: number) => Math.round(v * 100) / 100;
@@ -97,12 +104,12 @@ export class GodNav {
   things(): Thing[] { return this.index().things; }
   thing(ref: string): Thing | undefined { return this.index().byRef.get(ref); }
   private index() {
-    const m = this.h.model, key = `${m.editSeq}:${m.entities.size}`;
+    const m = this.h.model, key = `${this.h.version?.() ?? m.editSeq}:${m.entities.size}`;
     if (this.cache?.key === key) return this.cache;
     const things: Thing[] = [], waters = new Map(m.ground().waters.map((w: any) => [w.id, w]));
     for (const e of m.entities.values()) {
       if (!e.name) continue;
-      const def = m.resolvedDef(e.def); if (!def || def.components.body || e.def.includes('flag') || this.h.engineOwned(e)) continue;
+      const def = m.resolvedDef(e.def); if (!def || def.components.body || /^core[-/]flag@/.test(e.def) || this.h.engineOwned(e)) continue;
       try { things.push(...this.describe(e, def, waters.get(e.id))); } catch { /* one odd thing never hides the rest */ }
     }
     const byRef = new Map<string, Thing>();
@@ -124,7 +131,10 @@ export class GodNav {
       const width = Number(water?.w ?? water?.width ?? sh?.width ?? 3);
       const at = area ? centroid(area) : path ? path[Math.floor(path.length / 2)] : [wp.x, wp.z] as Vec2;
       const kind: ThingKind = water ? 'water' : area ? 'area' : 'path';
-      return [{ ...base, ref, kind, what: article(kind0), at, level: 0, ...(area ? { area } : {}), ...(path ? { path, width } : {}) }];
+      // F1: a pier, a deck or a bridge is walked ONTO: its end platform (a pier's `end` stand), else the middle of its
+      // deck — not the nearest point of its line, which is the shore end
+      const deck = !water && def.components.floor ? [...baked.slots.filter((x) => x.kind === 'stand').map((x) => [r3(x.p[0]), r3(x.p[2])] as Vec2), ...(area ? [centroid(area)] : path ? [path[Math.floor(path.length / 2)], ...(path.length === 2 ? [[(path[0][0] + path[1][0]) / 2, (path[0][1] + path[1][1]) / 2] as Vec2] : [])] : [])] : [];
+      return [{ ...base, ref, kind, what: article(kind0), at: deck[0] ?? at, level: 0, ...(area ? { area } : {}), ...(path ? { path, width } : {}), ...(deck.length ? { deck } : {}) }];
     }
     const y = wp.y, level = this.h.levelAt(wp.x, wp.z, y);
     // buildings: rooms (ground floor first), a door approach from outside
@@ -157,7 +167,7 @@ export class GodNav {
         const rname = r.name ?? r.id, floor = r.floor ?? 0;
         roomRefs.push(rref);
         out.push({ id: e.id, room: r.id, ref: rref, name: `${e.name}/${r.id}`, kind: 'room', what: `${rname} of ${e.name}${floor ? `, floor ${floor}` : ''}`,
-          words: [...new Set([...words(r.id), ...words(rname), ...base.words, 'room', 'inside'])], at, level: this.h.levelAt(at[0], at[1], ry), poly });
+          words: [...new Set([...words(r.id), ...words(rname), ...base.words, 'room', 'inside'])], at, level: this.h.levelAt(at[0], at[1], ry), poly, ...(stands[0] ? { entry: { p: stands[0], level } } : {}) });
       }
       // the room the front door opens into goes first (the entrance)
       if (front) { const fa = toWorld(front.at[0], front.at[1]); roomRefs.sort((a, b) => { const A = out.find((t) => t.ref === a)!, B = out.find((t) => t.ref === b)!; return (A.level - B.level) || (polyDist(A.poly!, fa) - polyDist(B.poly!, fa)); }); }
@@ -185,7 +195,7 @@ export class GodNav {
   goal(t: Thing, me: Vec2, except?: string): { p: Vec2; level: number } | null {
     const E = this.h.engine, tick = E.world.tick;
     // a Soul-dependent goal (the shore nearest me, the nearest point of a road) is never cached
-    const mine = t.kind === 'water' || t.kind === 'path' || (t.stands?.length ?? 0) > 1;
+    const mine = t.kind === 'water' || (t.kind === 'path' && !t.deck?.length) || (t.stands?.length ?? 0) > 1;
     const key = `${t.ref}|${mine ? `${Math.round(me[0])},${Math.round(me[1])}` : ''}`;
     const hit = this.goals.get(key); if (hit && tick - hit.tick < 50) return hit.goal;
     const near = (at: Vec2, level: number, ring = 24) => { const p = E.standableNearV1(at, level, except, 0.4, ring); return p ? { p: [r2(p[0]), r2(p[1])] as Vec2, level } : null; };
@@ -197,12 +207,14 @@ export class GodNav {
         : (() => { const n: Vec2 = [-edge.dir[1], edge.dir[0]], side = Math.sign((me[0] - edge.q[0]) * n[0] + (me[1] - edge.q[1]) * n[1]) || 1; return [n[0] * side, n[1] * side] as Vec2; })();
       const off = t.area ? 1.5 : (t.width ?? 3) / 2 + 1.5;
       goal = near([edge.q[0] + away[0] * off, edge.q[1] + away[1] * off], 0, 16);
+    } else if (t.deck?.length) {
+      for (const d of t.deck) { goal = near(d, 0, 6); if (goal) break; }
     } else if (t.kind === 'path') {
       goal = near(nearestOn(t.path!, me, false).q, 0, 16);
     } else if (t.kind === 'area') {
       goal = inPoly(me[0], me[1], t.area!) ? near(me, 0, 8) : near(t.at, 0, 40);
     } else if (t.kind === 'room') {
-      goal = near(t.at, t.level, 40);
+      goal = this.roomGoal(t, near);
     } else if (t.kind === 'building' && t.inside && t.doorOpen) {
       // in at the front door: standing room just inside it (the room it opens into); else its approach outside
       goal = near(t.inside, 0, 4);
@@ -216,6 +228,38 @@ export class GodNav {
     this.goals.set(key, { tick, key, goal });
     return goal;
   }
+
+  /** F1: a room's goal is standing room inside it that the front door reaches (furniture can close off its middle):
+   *  its centre if reachable, else the reachable spot inside nearest the centre; null (and `blocked`) when furniture
+   *  closes the whole room off. Cached per world version (furniture moves only with edits). */
+  private roomGoal(t: Thing, near: (at: Vec2, level: number, ring?: number) => { p: Vec2; level: number } | null): { p: Vec2; level: number } | null {
+    const E = this.h.engine;
+    const centre = near(t.at, t.level, 40);
+    if (!t.entry || !E.reachV1) return centre;
+    const key = `${this.cache?.key}|${t.ref}`, hit = this.rooms.get(key); if (hit !== undefined) return hit;
+    const reach = (p: Vec2) => { const r = E.reachV1!({ p: t.entry!.p, level: t.entry!.level }, { p, level: t.level }); return r.ok; };
+    let goal: { p: Vec2; level: number } | null = null;
+    if (centre && inPoly(centre.p[0], centre.p[1], t.poly ?? []) && reach(centre.p)) goal = centre;
+    else if (t.poly?.length) {
+      // a 0.6 m lattice over the room, nearest the centre first; a dozen route checks at most
+      const xs = t.poly.map((p) => p[0]), zs = t.poly.map((p) => p[1]), cand: Vec2[] = [];
+      for (let x = Math.min(...xs) + 0.3; x < Math.max(...xs); x += 0.6) for (let z = Math.min(...zs) + 0.3; z < Math.max(...zs); z += 0.6) if (inPoly(x, z, t.poly)) cand.push([x, z]);
+      cand.sort((a, b) => Math.hypot(a[0] - t.at[0], a[1] - t.at[1]) - Math.hypot(b[0] - t.at[0], b[1] - t.at[1]));
+      const tried = new Set<string>();
+      for (const c of cand) {
+        if (tried.size >= 14) break;
+        const q = near(c, t.level, 3); if (!q || !inPoly(q.p[0], q.p[1], t.poly)) continue;
+        const k = `${q.p[0]},${q.p[1]}`; if (tried.has(k)) continue; tried.add(k);
+        if (reach(q.p)) { goal = q; break; }
+      }
+    }
+    this.rooms.set(key, goal); if (this.rooms.size > 200) this.rooms.clear();
+    if (!goal) this.blocked.set(t.ref, `Nothing inside ${t.ref} can be reached from its front door right now: furniture closes the way in.`); else this.blocked.delete(t.ref);
+    return goal;
+  }
+  private rooms = new Map<string, { p: Vec2; level: number } | null>();
+  /** Why a thing has no goal (shown as the capability's blocked reason). */
+  readonly blocked = new Map<string, string>();
 
   // ------------------------------------------------------------------ capabilities
 
@@ -232,7 +276,7 @@ export class GodNav {
       const id = `walk:${t.ref}`; if (caps.some((c) => c.id === id)) continue;
       const goal = this.goal(t, here, soul.entityId), where = this.label(t, Math.round(d));
       const cap: EdgeCapability = { id, verb: 'walk', label: where, target: { id: t.id, kind: 'object' }, available: !!goal,
-        ...(goal ? {} : { blocked: { code: 'place.no-standing-room', reason: `There is no clear standing room at ${t.ref} right now.` } }) };
+        ...(goal ? {} : { blocked: this.blocked.has(t.ref) ? { code: 'route.unreachable', reason: this.blocked.get(t.ref)! } : { code: 'place.no-standing-room', reason: `There is no clear standing room at ${t.ref} right now.` } }) };
       caps.push(cap);
       if (!goal) continue;
       const stand: Step[] = seated ? [{ verb: 'stand', params: {} }] : [];

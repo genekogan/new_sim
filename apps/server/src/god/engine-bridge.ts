@@ -8,13 +8,14 @@
 // Fastest working path on the engine's existing structures (nav/1-style static scene re-base, CATALOG fixtures);
 // the per-tile patch follows L8's tiled Spatial.
 import { applyBatch, plan, type Diff, type Entity, type Failure, type Op, type Result, type StoredDef, type WorldModel } from '@sim/world-compiler';
-import { assetFromDef, assetIdFor, isFixtureDef, nearestSurfaceSlot, nextEntityPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
+import { assetFromDef, assetIdFor, isFixtureDef, isFloatingDef, nearestSurfaceSlot, nextEntityPhysics, withLinkApproaches, type DefFacts, type EntityPhysicsV1, type FixtureSpecV1, type WorldEditV1 } from '@sim/engine-mars';
 import type { WorldHost } from '../world.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { GodMode } from './god.ts';
-import { reachProviders, usesProviders, type ReachEnd } from './query.ts';
+import { reachProviders, seatProviders, usesProviders, type ReachEnd } from './query.ts';
 import { GodNav } from './nav.ts';
+import { GodPerceive } from './perceive.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -47,20 +48,28 @@ export class EngineBridge {
   private levels: Level[] = [];
   private reconciled = false;
   private writeBackBusy = false;
+  private refusedPose = new Set<string>();
+  /** Bumped by every god edit and by engine edits of things other than bodies (a Soul moving a bowl), not by a body's
+   *  pose: what nav and perceive re-derive on. */
+  private version = 0;
   private log: (m: string) => void;
   stats = { edits: 0, entities: 0, writeBacks: 0, refusals: 0, bodies: 0, lastMs: 0 };
   /** P4: Souls walk to god-built named things (nav.ts). */
   readonly nav: GodNav;
+  /** F1: god-built things Souls can see, look at and read (perceive.ts). */
+  readonly perceive: GodPerceive;
 
   constructor(o: BridgeOptions) {
     this.host = o.host; this.god = o.god; this.edge = o.edge; this.log = o.log ?? ((m) => console.log(`[bridge] ${m}`));
-    this.nav = new GodNav({ model: this.god.model, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e) });
-    this.god.onCommit((c) => { if (c.by !== 'engine') this.onCommit(c.diff); });
+    this.nav = new GodNav({ model: this.god.model, version: () => this.version, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e) });
+    this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), things: () => this.nav.things(), log: (m) => this.log(m) });
+    this.god.onCommit((c) => { this.version++; if (c.by !== 'engine') this.onCommit(c.diff); });
     this.host.listeners.push({
-      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); } },
+      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); if (tick % 20 === 5) this.perceiveSync(); } },
       onApplied: (e) => { if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
     });
     reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
+    seatProviders.set(this.god.model, (id) => { const f = (this.engine as unknown as { seatOccupantsV1?: (id: string) => { slot: string; body: string }[] }).seatOccupantsV1; return f ? f.call(this.engine, id).map((x) => ({ slot: x.slot, soul: this.soulName(x.body) })) : []; });
     usesProviders.set(this.god.model, (id) => { const u = this.usesOf(id); return u ? { soul: u.soul, body: u.body, how: u.how, thing: this.model.pathOf(u.id) } : null; });
     // body-aware edits: the compiler hook when GodMode has it (lead patch 5), else wrap its entry points
     const hooked = 'bodies' in (this.god as object);
@@ -153,7 +162,9 @@ export class EngineBridge {
     const part: Part = {};
     if (isFixtureDef(def)) {
       const facts = factsOf(def, baked, wp.s);
-      const aid = assetIdFor(facts, JSON.stringify(e.params ?? {}));
+      // a floating boat's asset carries no obstacle (catalog-adapter isFloatingDef): a new id, so worlds that registered
+      // the old one (an obstacle) are sent the new one
+      const aid = assetIdFor(facts, JSON.stringify(e.params ?? {}) + (isFloatingDef(def) ? '|afloat' : ''));
       if (!known[aid] && !assets[aid]) assets[aid] = assetFromDef(aid, facts);
       part.fixture = this.fixtureSpec(e, def, aid, (assets[aid] ?? known[aid]) as any, wp);
       return part;
@@ -218,7 +229,20 @@ export class EngineBridge {
       }
       if (l.to.level > 0) (part.surfaces ??= []).push({ id: `${l.id}:head`, level: l.to.level, y: l.to.y, obb: { c: [r3(l.to.p[0] - d[0] * 0.25), r3(l.to.p[1] - d[1] * 0.25)], half: [0.35, r3(l.width / 2)], yaw: l.heading }, label: `${this.model.pathOf(e.id)} ${lid} head`.slice(0, 100) });
     }
-    return part.solids || part.surfaces || part.links ? withLinkApproaches(part) : null;
+    // F1: a decoration (a fountain, a lamp, a sign, a statue, a house) is also a fixture Souls perceive: views list it,
+    // `look` finds it. No slots and no obstacle of its own: its solids above are what blocks, exactly as before.
+    if (this.seenOnly(e, def)) {
+      const facts = factsOf(def, baked, wp.s), aid = assetIdFor(facts, JSON.stringify(e.params ?? {}) + '|seen');
+      if (!known[aid] && !assets[aid]) assets[aid] = assetFromDef(aid, facts, { seen: true });
+      part.fixture = { def: aid, kind: 'fixture', label: (e.name ?? def.name.replace(/^core-/, '')).replace(/-/g, ' '), p: [r3(wp.x), r3(wp.y), r3(wp.z)], yaw: r3(-wp.yaw), support: { kind: 'ground' } };
+    }
+    if (part.solids || part.surfaces || part.links) withLinkApproaches(part);
+    return part.solids || part.surfaces || part.links || part.fixture ? part : null;
+  }
+  /** A god-built point thing that is not otherwise an engine fixture or item, and not a creature, a body or a flag. */
+  seenOnly(e: Entity, def: StoredDef): boolean {
+    const c = def.components as Record<string, unknown>;
+    return def.form === 'point' && !isFixtureDef(def) && !c.body && !c.behavior && !c.hover && !/^core[-/]flag@/.test(e.def) && e.in.parent !== undefined && !this.engineOwned(e);
   }
 
   private fixtureSpec(e: Entity, def: StoredDef, asset: string, a: { surfaceSlots?: { id: string; local: [number, number, number] }[]; category: string }, wp: { x: number; y: number; z: number; yaw: number }): FixtureSpecV1 {
@@ -242,11 +266,14 @@ export class EngineBridge {
     return { ...spec, support: { kind: 'ground' } };
   }
 
+  private perceiveSync() { try { this.perceive.sync(); } catch (e) { this.log(`perceive: ${(e as Error).message}`); } }
+
   // ------------------------------------------------------------------ engine → entity world
 
   /** Trusted engine edit: journaled (by 'engine', never undone by the god), published to viewers, not echoed back. */
   engineAct(ops: Op[], note: string): Result {
     const god = this.god as any;
+    if ((ops as { id?: string }[]).some((o) => !o.id || !this.model.resolvedDef(this.model.entities.get(o.id)?.def ?? '')?.components.body)) this.version++;
     if (typeof god.engineAct === 'function') {
       const r = god.engineAct(ops, note) as Result;
       if (r.accepted) this.noteSent(ops);
@@ -299,6 +326,8 @@ export class EngineBridge {
           ops.push({ op: 'move', id, in: { parent: s.on, ...(slot ? { slot: slotId } : {}) }, p: want, r: r3(-(x.pose.yaw) - pp.yaw), mode: 'strict' } as Op);
         } else if (s?.kind === 'ground') {
           if (e.in.parent === 'world') { const p = e.p ?? [0, 0]; if (Math.hypot(p[0] - x.pose.p[0], p[p.length - 1] - x.pose.p[2]) < 0.05) continue; }
+          // a thing the god stood in a room, on a pier's end or a balcony stays in it until a Soul moves it away
+          else { const wp = this.model.worldPose(e); if (Math.hypot(wp.x - x.pose.p[0], wp.z - x.pose.p[2]) < 0.05) continue; }
           ops.push({ op: 'move', id, in: { parent: 'world' }, p: [r3(x.pose.p[0]), r3(x.pose.p[2])], r: r3(-x.pose.yaw), mode: 'strict' } as Op);
         }
       }
@@ -310,11 +339,31 @@ export class EngineBridge {
         const moving = (b.human.speed ?? 0) > 0.05 || b.human.activity === 'walk';
         if (d > (moving ? 2 : 0.15)) ops.push({ op: 'move', id, p: [r3(b.pose.p[0]), r3(b.pose.p[1]), r3(b.pose.p[2])], r: r3(-b.pose.yaw), mode: 'strict' } as Op);
       }
+      // F1: every Soul's body entity follows its engine body once it comes to rest (a walk's end, a seat), so the god's
+      // map and snapshot show where Souls are and what they sit on (one engine edit per stop, none while walking)
+      for (const [id, b] of Object.entries(this.engine.world.entities) as [string, any][]) {
+        if (!b?.human || bodies.has(id) || holders.has(id)) continue;
+        const e = this.model.entities.get(id); if (!e || e.in.parent !== 'world') continue;
+        if ((b.human.speed ?? 0) > 0.05 || ['walk', 'wade', 'swim', 'tread', 'sit-down', 'stand-up'].includes(b.human.activity)) continue;
+        const have = e.p ?? [0, 0, 0], d = Math.hypot((have[0] ?? 0) - b.pose.p[0], (have.length === 3 ? have[1] : 0) - b.pose.p[1], (have[have.length - 1] ?? 0) - b.pose.p[2]);
+        if (d > 0.4) ops.push({ op: 'move', id, p: [r3(b.pose.p[0]), r3(b.pose.p[1]), r3(b.pose.p[2])], r: r3(-b.pose.yaw), mode: 'strict' } as Op);
+      }
       if (!ops.length) return;
       for (const op of ops) {
+        { const o = op as { id: string; p?: number[] }; if (this.refusedPose.has(`${o.id}@${o.p?.join(',')}`)) continue; }
         const r = this.engineAct([op], `engine: ${describeOp(op, this.model)}`);
         if (r.accepted) this.stats.writeBacks++;
-        else this.log(`write-back refused for ${(op as { id: string }).id}: ${JSON.stringify(r.failures).slice(0, 200)}`);
+        else {
+          // a body's pose refused (it sits inside a bench's footprint): try once more letting the compiler nudge it, and
+          // never retry the same refused pose
+          const o = op as { id: string; p?: number[]; mode?: string }, key = `${o.id}@${o.p?.join(',')}`;
+          if (this.model.resolvedDef(this.model.entities.get(o.id)?.def ?? '')?.components.body) {
+            const r2 = this.engineAct([{ ...(op as object), mode: 'nudge' } as Op], `engine: ${describeOp(op, this.model)}`);
+            if (r2.accepted) { this.stats.writeBacks++; continue; }
+            this.refusedPose.add(key); if (this.refusedPose.size > 500) this.refusedPose.clear();
+          }
+          this.log(`write-back refused for ${o.id}: ${JSON.stringify(r.failures).slice(0, 200)}`);
+        }
       }
     } finally { this.writeBackBusy = false; }
   }
@@ -584,6 +633,7 @@ export class EngineBridge {
   /** Capabilities on god-placed things near this Soul: sit on chairs, pick up items, put them on tables; and pray. */
   capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>) {
     try { this.nav.capabilities(soul, caps, plans); } catch (e) { this.log(`nav capabilities: ${(e as Error).message}`); }
+    try { this.perceive.capabilities(soul, caps, plans); } catch (e) { this.log(`perceive capabilities: ${(e as Error).message}`); }
     caps.push({ id: 'pray', verb: 'pray', label: 'Pray to the god of this world (params: {"text": "…"}); answers come back under GET /v1/god/prayers/mine', available: true, params: { text: { type: 'string', maxLength: 2000 } } });
     const ents = this.engine.world.entities, me = ents[soul.entityId]; if (!me?.human) return;
     const here: Vec2 = [me.pose.p[0], me.pose.p[2]];
@@ -603,12 +653,16 @@ export class EngineBridge {
       const d = Math.round(Math.hypot(x.pose.p[0] - here[0], x.pose.p[2] - here[1]));
       if (asset.slots?.some((s) => s.kind === 'seat')) {
         const u = this.engine.bodyUsesV1(x.id), mine = u?.body === soul.entityId;
+        const seats = asset.slots.filter((s) => s.kind === 'seat').length, taken = this.seatTakers(x.id), others = taken.filter((b) => b !== soul.entityId);
         // what it is and what it is by (P4): "Sit on e_… (a bench, by pond; 12 m)" — so "sit on the bench by the pond"
         // resolves through the ledger's vocabulary (every word in the label) to this seat and not another bench
         const ent = this.model.entities.get(x.id), kind = ent ? this.model.resolvedDef(ent.def)?.name.replace(/^core-/, '') : undefined;
         const by = ent ? this.nav.namesNear([x.pose.p[0], x.pose.p[2]], x.id) : [];
         const id = `sit:${x.id}`, label = `Sit on ${name(x.id)} (${kind && !name(x.id).split('/').pop()!.includes(kind) ? `a ${kind}, ` : ''}${by.length ? `by ${by.join(' and ')}; ` : ''}${d} m${levelOf(x) ? `, floor ${levelOf(x)}` : ''})`;
-        caps.push({ id, verb: 'sit', label, target: { id: x.id, kind: 'object' }, available: !u || mine, ...(u && !mine ? { blocked: { code: 'seat.taken', reason: `${this.soulName(u.body)} is sitting there.` } } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: 60 } } });
+        // F1: a bench for two stays free while one of its seats is; the seat a Soul sits on is not free to itself
+        const full = others.length >= seats || (!!u && !mine && seats <= 1);
+        const block = mine ? { code: 'seat.yours', reason: `You are sitting on ${name(x.id)} already; stand:here to get up.` } : full ? { code: 'seat.taken', reason: `${(others.length ? others : [u!.body]).map((b) => this.soulName(b)).join(' and ')} ${others.length > 1 ? 'are' : 'is'} sitting there.` } : null;
+        caps.push({ id, verb: 'sit', label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: 60 } } });
         plans.set(id, { label, steps: [{ verb: 'sit', params: { on: x.id, seconds: 60 } }], seconds: true });
       }
       if (asset.category === 'item' && x.support?.kind !== 'in-hand' && !held) {
@@ -624,6 +678,25 @@ export class EngineBridge {
         if (free) plans.set(id, { label, steps: [...stand, ...approach(x), { verb: 'mars:put_item', params: { item: held.id, surfaceSlot: `${x.id}#${free.id}` } }] });
       }
     }
+    this.sitHere(caps, plans, here);
+  }
+  /** Bodies sitting on a god-built seat fixture (any of its seat slots). */
+  seatTakers(id: string): string[] {
+    const e = this.engine as unknown as { seatOccupantsV1?: (id: string) => { slot: string; body: string }[] };
+    if (e.seatOccupantsV1) return e.seatOccupantsV1.call(this.engine, id).map((x) => x.body);
+    const u = this.engine.bodyUsesV1(id); return u?.how === 'occupied' ? [u.body] : [];
+  }
+  /** F1: the ledger lists `sit:here` before the world profile adds god-built seats, so it says "no free seat within
+   *  30 m" beside free benches. Point it at the nearest free god-built seat instead (the same plan as its sit:<id>). */
+  private sitHere(caps: EdgeCapability[], plans: Map<string, { label: string; steps: { verb: string; params: Record<string, unknown> }[]; seconds?: boolean }>, here: Vec2) {
+    const i = caps.findIndex((c) => c.id === 'sit:here'); if (i < 0 || caps[i].target) return;
+    const ents = this.engine.world.entities;
+    const best = caps.filter((c) => c.verb === 'sit' && c.id !== 'sit:here' && c.available && c.target && ents[c.target.id]?.tags?.includes('entity-world') && plans.has(c.id))
+      .map((c) => ({ c, d: Math.hypot(ents[c.target!.id].pose.p[0] - here[0], ents[c.target!.id].pose.p[2] - here[1]) })).filter((x) => x.d <= 30).sort((a, b) => a.d - b.d || (a.c.id < b.c.id ? -1 : 1))[0];
+    if (!best) return;
+    const plan = plans.get(best.c.id)!;
+    caps[i] = { ...caps[i], label: `Sit down on the nearest free seat (${best.c.label.replace(/^Sit on /, '')})`, target: best.c.target, available: true };
+    plans.set('sit:here', { label: 'Sit down', steps: structuredClone(plan.steps), seconds: true });
   }
 }
 
