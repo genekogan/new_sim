@@ -187,3 +187,20 @@ Arm bones scaled to 0.62 m from 1.34 m shoulders (the engine model is the same r
   (no elbow routing around a joist); `hip.prone` 0.10 and the 6 cm foot are stated.
 - Release is not blended in the engine (hands clear when a holder lets go; the renderer's 0.4 s posture blend
   returns them).
+
+## Humanoid looks: head size, height, build, walking speed (eden4 L10, 2026-10-11)
+A humanoid may carry a `core/humanoid@2` look (`body.params`, `body.model` = its look key; engine
+`bodies/humanoid.ts`). Four params are physical; **unset or at their defaults the body is this model exactly**
+(`bodyProfile` returns `HUMAN_PROFILE` itself, radius 0.28, eyes 1.62 m, seats 0.2–1.2 m):
+
+| param | range (default) | engine | renderer |
+|---|---|---|---|
+| `height` | 1.55–1.95 m (1.75) | scale s = h / 1.75: radius × (0.5 + 0.5 s), profile height 1.8 s, eye 1.62 s (seated 1.15 s), seat fit 0.2 s – 1.2 s m (`pose.seat-too-high/-low`; god-built seats blocked in the sit capability) | the whole rig × s: shoulders 1.34 s, arms 0.62 s (`fitArms`), walk stride × s (no foot slide), sit pelvis × s |
+| `build` | 0.85–1.2 (1) | radius × build, clamped 0.24–0.32 m (a 0.9 m door still passes) | trunk and limbs widened by skin weight in bind space (hands, feet, head unchanged) |
+| `walkSpeed` | 0.9–1.4 m/s (1.35) | `walk_to`'s profile speed; ≤ `WALK_SPEED_CAP`, so the per-tick step (≤ 0.07 m) and the published speed stay inside `MAX_HUMAN_STEP_PER_TICK` / `SPEED_CAPS.walk` | the Walk clip plays at speed / stride speed |
+| `headSize` | 0.85–1.2 (1) | none | head (and hat/glasses) scaled about the Head joint |
+
+Radius feeds `humanStaticClearance`, `humanHumanSeparation`, the stand-up clearance and body assignment.
+**Not scaled:** this file's reach model (shoulders, arm, prone, hand-up, eating) stays the one 1.75 m body. A
+taller rig reaches the engine's hand points with slack; a 1.55 m rig (arms 0.55 m) can fall short of the highest
+ones and its arm then hangs (reach honesty). Per-body reach is Stage B5 work. Tests: `test/humanoid-dims.test.ts`.
