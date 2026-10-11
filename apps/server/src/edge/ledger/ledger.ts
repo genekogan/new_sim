@@ -611,6 +611,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
         return {accepted: true, receipt: this.receipt(soul.soulId, r.id)!, ...resolved};
       }
       const r = this.insert(soul, capability, program ? 'started' : 'completed', clientRef);
+      // C9: any accepted action resets the idle clock and reclaims a faded Soul (an immediate stand:here never reached comms' touch)
+      if (!program) this.comms?.fading.touch?.(soul.soulId);
       if (program) await this.host.enqueue('edge-stop', `edge:${soul.soulId}`, {soulId: soul.soulId, entityId: soul.entityId, receipt: r.id});
       if (program) this.update(r.id, {phase: 'completed'});
       return {accepted: true, receipt: this.receipt(soul.soulId, r.id)!, ...resolved};
