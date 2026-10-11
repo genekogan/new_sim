@@ -28,7 +28,7 @@ import {mountStationRoutesV2} from './station-routes-v2.ts';
 import type {EdgeLedger} from './edge/ledger/ledger.ts';
 import {mountEdgeRoutes,edgeSoulResolver} from './edge/routes.ts';
 import { mountGodRoutes } from './god/routes.ts';
-import { mountJoinRoutes, PUBLISHED_SOUL_CLI } from './god/join.ts';
+import { mountJoinRoutes, PUBLISHED_SOUL_CLI, safeWorldName } from './god/join.ts';
 import type { GodMode } from './god/god.ts';
 import { intentArrivalReadError,intentHistoryReadError,intentTransportError, intentLookupError, type IntentControlV2, type IntentIdentityV2 } from './intent-control.ts';
 
@@ -145,7 +145,7 @@ export function buildApp(d: Deps) {
   const skill = (c: Context) => c.text(skillText(baseOf(c)), 200, { 'content-type': 'text/markdown; charset=utf-8', 'cache-control': 'public, max-age=60' });
   app.get('/skill.md', skill);
   app.get('/instructions.md',c=>{if(!d.cfg.instructionsFile)return c.json({ok:false,code:'instructions-unavailable'},503);
-    try{const text=readFileSync(d.cfg.instructionsFile,'utf8').replaceAll('{{BASE}}',baseOf(c)).replaceAll('{{WORLD}}',(d.cfg.worldKey==='littlemartians'?'Little Martians':d.cfg.worldKey[0].toUpperCase()+d.cfg.worldKey.slice(1)));return c.text(text,200,{'content-type':'text/markdown; charset=utf-8','cache-control':'public, max-age=60'});}
+    try{const text=readFileSync(d.cfg.instructionsFile,'utf8').replaceAll('{{BASE}}',baseOf(c)).replaceAll('{{WORLD}}',d.god?safeWorldName(worldName):(d.cfg.worldKey==='littlemartians'?'Little Martians':d.cfg.worldKey[0].toUpperCase()+d.cfg.worldKey.slice(1)));return c.text(text,200,{'content-type':'text/markdown; charset=utf-8','cache-control':'public, max-age=60'});}
     catch{return c.json({ok:false,code:'instructions-unavailable'},503);}
   });
   app.get('/eden-agent.mjs', c => { if (!d.cfg.cliFile) throw new ApiError(404, 'not-found', 'no agent CLI is published on this world'); let js: string; try { js = readFileSync(d.cfg.cliFile, 'utf8'); } catch { throw new ApiError(404, 'not-found', 'agent CLI unavailable'); } return c.body(js, 200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'public, max-age=60' }); });

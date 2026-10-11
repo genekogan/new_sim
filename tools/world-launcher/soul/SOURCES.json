@@ -1,0 +1,10 @@
+{
+  "what": "The Soul CLI and Soul guides every launcher world serves (/eden-agent.mjs, /skill.md, /instructions.md). Exact copies, never forks.",
+  "cli": { "file": "eden-agent.mjs", "version": "1.9", "sha256": "bb53a105f26e12a2e33cf7aeda8c4628b93a68948d7165b3b4da64a6643e0e0d",
+    "from": "<team>/pm-integration/client-viewer-clean-release-20261010/publication-20be-001/eden-agent.mjs", "source": "4fdb39d2dcc2b237f7b4aca997a8b756300122fe" },
+  "skill": { "file": "skill.md", "sha256": "9cd46f039d4ad4cc40229e05babcddd3daca254add4a6dbbbe8d898e11e2fad8",
+    "from": "git show 4fdb39d2:tools/edge-skill/SKILL.md", "note": "template; the world fills {{BASE}}. Rendered for /w/eden it is byte-identical to publication-20be-001/guides/eden/skill.md (sha 1a46d2d8…)" },
+  "instructions": { "file": "instructions.md", "sha256": "d3f3b21647f6ba6bdd942783faf3e5b1276a16c461aa2374b88d0801a3c0a95c",
+    "from": "git show 4fdb39d2:tools/edge-skill/INSTRUCTIONS.md", "note": "template; the world fills {{BASE}} and {{WORLD}}. Rendered for /w/eden it is byte-identical to publication-20be-001/guides/eden/instructions.md (sha b786da36…)" },
+  "appendix": "The per-world entry skill (/SKILL.md: God mode + Soul mode) stays tools/world-skill/SKILL.md; its Soul mode points here."
+}
