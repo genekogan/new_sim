@@ -171,12 +171,13 @@ try {
       return { ...r, buyOffer: offer?.label, buy: buy?.accepted ?? buy?.code ?? buy, bought: buy?.result?.bought ?? buy?.receipt?.result?.bought, before, after };
     }, (r) => r.sat && r.accepted === true && r.buy === true && JSON.stringify(r.after) !== JSON.stringify(r.before));
     const SITS = [[ana, 'house', (e) => e.name === 'living-sofa', 'the living-room sofa'], [ana, 'church', (e) => /^nave-pew/.test(e.name), 'a pew'],
-      [ben, 'school', (e) => /^classroom-1-desk/.test(e.name), 'a pupil desk'], [ben, 'hospital', (e) => e.name === 'consulting-bed', 'a hospital bed edge']];
+      [ben, 'school', (e) => /^classroom-1-chair/.test(e.name), 'a pupil\'s chair'], [ben, 'hospital', (e) => /^reception-wait/.test(e.name), 'a waiting bench in reception']];
     for (const [cli, b, pred, label] of SITS) await step(`S2 ${cli === ana ? 'Ana' : 'Ben'} walks into the ${b} and sits on ${label}`, () => sitIn(cli, b, pred, label), (r) => r.sat && r.accepted === true);
     await step('S3 Ben walks to the police station and opens a cell door (an actuator inside a furnished building); the world records it', async () => {
       const bars = childOf('police-station', (e) => /^cell-\d-bars|cell-bars/.test(e.name) || /-bars$/.test(e.name));
-      await ben.run('act', `walk:police-station/${bars?.in?.slot}`); await ben.run('wait', '120');
-      await until(async () => ({ ok: (await caps(ben)).some((c) => c.id === `object:${bars?.id}:open`) }), 60_000, 1500);
+      // the cell is closed off by its own bars: open them from the office side
+      await ben.run('act', 'walk:police-station/office');
+      await until(async () => { const h = (await ben.run('here')).data?.me; return { ok: /police-station\/office|g-police-station\.office/.test(JSON.stringify(h?.placePath ?? h?.place ?? '')) }; }, 120_000, 2000);
       const r = (await ben.run('act', `object:${bars?.id}:open`, '{}', '--force')).data;
       const st = await until(async () => { const e = (await api(`/v1/world/entities/${bars?.id}`)).data?.entity; return { ok: e?.state?.open === true, state: e?.state }; }, 60_000, 1500);
       return { bars: bars?.name, act: r?.accepted ?? r?.code, open: st?.ok, state: st?.state };
