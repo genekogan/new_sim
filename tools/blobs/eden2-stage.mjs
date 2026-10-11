@@ -19,8 +19,9 @@ const link = (from, to) => { mkdirSync(dirname(to), { recursive: true, mode: 0o7
 const rows = readFileSync(0, 'utf8').split('\n').filter(Boolean).map((l) => l.split('\t'));
 const out = [];
 for (const [want, pub, src] of rows) {
-  if (!/^[a-f0-9]{64}$/.test(want) || !/^\/[A-Za-z0-9_./-]+$/.test(pub) || pub.includes('..')) throw Error('bad row ' + pub);
-  const ext = extname(pub).toLowerCase(); const store = join(ROOT, 'assets', want.slice(0, 2), want + ext);
+  const storeOnly = pub.startsWith('-.'); // `-.glb`: content-addressed store only, no legacy name
+  if (!/^[a-f0-9]{64}$/.test(want) || !(storeOnly || /^\/[A-Za-z0-9_./-]+$/.test(pub)) || pub.includes('..')) throw Error('bad row ' + pub);
+  const ext = extname(storeOnly ? 'x' + pub.slice(1) : pub).toLowerCase(); const store = join(ROOT, 'assets', want.slice(0, 2), want + ext);
   if (!existsSync(store)) { const b = readFileSync(src); if (sha(b) !== want) throw Error('source hash differs: ' + src); put(store, b); }
   else if (sha(readFileSync(store)) !== want) throw Error('store hash differs: ' + store);
   const side = [];
@@ -31,8 +32,8 @@ for (const [want, pub, src] of rows) {
     if (!existsSync(store + '.zst')) execFileSync('zstd', ['-19', '-T4', '-q', '-f', store, '-o', store + '.zst']), chmodSync(store + '.zst', 0o644);
     side.push('.br', '.gz', '.zst');
   }
-  link(store, join(ROOT, 'legacy', pub)); for (const s of side) link(store + s, join(ROOT, 'legacy', pub) + s);
+  if (!storeOnly) { link(store, join(ROOT, 'legacy', pub)); for (const s of side) link(store + s, join(ROOT, 'legacy', pub) + s); }
   out.push({ pub, store: store.slice(ROOT.length), bytes: statSync(store).size, ...Object.fromEntries(side.map((s) => [s.slice(1), statSync(store + s).size])) });
 }
-writeFileSync(join(ROOT, 'STAGED.json'), JSON.stringify({ at: new Date().toISOString(), files: out }, null, 1));
+writeFileSync(join(ROOT, `STAGED-${Date.now()}.json`), JSON.stringify({ at: new Date().toISOString(), files: out }, null, 1));
 console.log(JSON.stringify({ staged: out.length, bytes: out.reduce((n, r) => n + r.bytes, 0), big: out.filter((r) => r.bytes > 1e6).map((r) => [r.pub, r.bytes, r.br, r.zst, r.gz]) }));
