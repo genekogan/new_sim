@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { ROOT, X0 } from './v3.mjs';
 import { ROOMS, ROOM_AT } from './layout.mjs';
 import { orientOp, BEARING } from './frame.mjs';
+import { NEAR_OPS, FAR_OPS } from './land.mjs';
 
 const P = JSON.parse(readFileSync(join(ROOT, 'worlds/core-assets/mars/placements.json'), 'utf8')).placements;
 const DEFS = new Map(JSON.parse(readFileSync(join(ROOT, 'packages/world-compiler/src/core-kit/mars.json'), 'utf8')).map((d) => [`core/${d.name.slice(5)}@1`, d]));
@@ -73,7 +74,7 @@ const T = {
   constants: { extent: 1200, ground: 'land', limits: { budget: { tris: 200000, bytes: 6000000, texPx: 2048 } } },
   state: {
     constitution: '# Mars two\nThe Mars College 2026 campus on the low Sonoran desert by the Salton Sea: Mimos (the café and lounge), the Chiba kitchen and dining hall, the Chiba auditorium, the Dojo, Tool camp and the Freeside compound.\n\nRebuilt in the new engine from the 2026 reference with Gene\'s Mimos and kitchen corrections.',
-    sky: { palette: 'mars-desert', sun: 0.8 }, weather: { kind: 'manual', clouds: 0.05, wind: 0.25, rain: 0, fog: 0 }, ground: { palette: 'desert' },
+    sky: { palette: 'mars-desert', sun: 0.8 }, weather: { kind: 'clear', clouds: 0.05, wind: 0.25, rain: 0, fog: 0 }, ground: { palette: 'playa' },
   },
   batches: [
     { note: 'the campus buildings (Mimos, the Chiba kitchen and dining hall, the showers as Gene corrected them; Chiba, Dojo, Tool camp, Freeside, the west racks)', group: 'campus', ops: ops.campus },
@@ -88,5 +89,7 @@ const T = {
 // MARSLAND: the world frame is geographic (frame.mjs): every root-level placement turns about the Mimos origin, which
 // becomes the world's (0, 0); parent-local placements are unchanged.
 for (const b of T.batches) b.ops = b.ops.map(orientOp);
+// MARSLAND: the land around it, already in the world frame (land.mjs)
+T.batches.push({ note: 'the land: the playa, the tyre ring of the old race track west of camp, tyre tracks, creosote scrub; beyond the edge the 111, the wash, the salt flats, the Salton Sea and the mountains', group: 'land', ops: [...NEAR_OPS, ...FAR_OPS] });
 writeFileSync(join(ROOT, 'worlds/templates/mars-two.json'), JSON.stringify(T, null, 1) + '\n');
 console.log(`mars-two.json: ${T.batches.reduce((n, b) => n + b.ops.length, 0)} ops (${Object.entries(ops).map(([k, v]) => `${k} ${v.length}`).join(', ')})`);

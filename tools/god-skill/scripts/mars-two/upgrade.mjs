@@ -43,7 +43,7 @@ const tplPath = (o) => (o.in ? `${o.in.parent}/${o.name}` : o.name);
 const tplNames = new Set(tplOps.map(tplPath));
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const mimos = have.get('mimos');
-const oldFrame = mimos && Math.hypot(mimos.p[0], mimos.p[mimos.p.length - 1]) > 20;   // the old frame's Mimos is at x ≈ 47
+const oldFrame = !!mimos && Math.abs(mimos.p[0] - 46.88) < 3 && Math.abs(mimos.p[mimos.p.length - 1] + 2.46) < 3;   // the old frame: Mimos at (46.88, −2.46)
 
 const ops = [];
 // 1. bounds

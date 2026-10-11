@@ -7,8 +7,8 @@
 // 33° toward −Z, i.e. the Mimos plan's north points to true bearing ≈ 82°).
 //
 // The world (template) frame is geographic, as the engine's god tools and Souls read it: north = −z, east = +x, metres,
-// origin = the Mimos origin (V3 x 48, z 0). Every root-level placement is turned by YAW about that origin and shifted to
-// (0, 0); things inside a parent (rooms, tables) are parent-local and unchanged, so all of Gene's Mimos / kitchen /
+// origin = 30 m south of the Mimos origin (V3 x 48, z 0). Every root-level placement is turned by YAW about the Mimos
+// origin and shifted so that it lands on MIMOS_WORLD; things inside a parent (rooms, tables) are parent-local and unchanged, so all of Gene's Mimos / kitchen /
 // shower corrections and every internal relation stay exactly as built.
 //
 // Yaw convention (engine rotY): a local direction (x, z) turns to (x cos + z sin, −x sin + z cos); an entity's r adds YAW.
@@ -19,13 +19,16 @@
 export const BEARING = Number(process.env.MARS_BEARING ?? 90);   // true compass bearing (°) of the Mimos plan's "north" (V3 −z); env only for experiments
 export const YAW = -BEARING * Math.PI / 180;     // the turn that brings it to true north
 export const OLD_ORIGIN = [48, 0];               // Mimos origin in the V3 build frame (x, z)
+// …and in the world frame: 30 m north of the world's (0, 0), so the world's origin, where the engine puts arriving Souls
+// (GREEN_FIELD arrival [0, 0]), is open playa south-east of Chiba's solar face, not inside Mimos's walls.
+export const MIMOS_WORLD = [0, -30];
 const c = Math.cos(YAW), s = Math.sin(YAW);
 const r3 = (v) => Math.round(v * 1000) / 1000;
 
 /** Build-frame (x, z) → world (x, z). */
-export const toWorld = (x, z) => { const dx = x - OLD_ORIGIN[0], dz = z - OLD_ORIGIN[1]; return [r3(dx * c + dz * s), r3(-dx * s + dz * c)]; };
+export const toWorld = (x, z) => { const dx = x - OLD_ORIGIN[0], dz = z - OLD_ORIGIN[1]; return [r3(dx * c + dz * s + MIMOS_WORLD[0]), r3(-dx * s + dz * c + MIMOS_WORLD[1])]; };
 /** World (x, z) → build frame (x, z). */
-export const toBuild = (x, z) => [r3(x * c - z * s + OLD_ORIGIN[0]), r3(x * s + z * c + OLD_ORIGIN[1])];
+export const toBuild = (x, z) => { x -= MIMOS_WORLD[0]; z -= MIMOS_WORLD[1]; return [r3(x * c - z * s + OLD_ORIGIN[0]), r3(x * s + z * c + OLD_ORIGIN[1])]; };
 /** A 3-vector [x, y, z] in the build frame → world. */
 export const toWorld3 = (p) => { const [x, z] = toWorld(p[0], p[2]); return [x, p[1], z]; };
 /** Mimos-plan (N, E) → world (x, z). */
@@ -39,7 +42,7 @@ export function orientOp(op) {
 }
 /** The 2026 drone's take-off point (its telemetry's home) in the world frame: fitted by matching DJI_0012 (EXIF GPS and
  *  FlightYaw) and the video frames against renders (drone.mjs). */
-export const HOME_WORLD = [7.6, -5.3];
+export const HOME_WORLD = [-9.5, -35];
 /** A build-frame offset (dx, dz) turned into the world frame (no translation). */
 export const rot = (dx, dz) => [r3(dx * c + dz * s), r3(-dx * s + dz * c)];
 /** World point p [x, y, z] plus a build-frame offset [dx, dy, dz] (cameras placed "east of" a Soul in Gene's plan terms). */
