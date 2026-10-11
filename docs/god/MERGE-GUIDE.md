@@ -235,7 +235,7 @@ auto-merge was wrong without a conflict (`config.ts`).
 **`pnpm-lock.yaml`**
 - Resolution: ours. `pnpm install --offline --no-frozen-lockfile` changed nothing.
 
-Later fixes, in the second commit:
+Fixed in the same merge commit:
 - `base-path.ts` became robust outside Vite. Main's `soul-context-render.test.mjs` bundles the client with esbuild and
   failed on `import.meta.env`.
 - god tests: `god-clerk.test.ts` configs say `worldEngine: true`.
@@ -309,10 +309,22 @@ Never bind 4930–4970, 4986 or 4987 on this laptop: they are the production wri
 - Safe run: `TEST_BODY_CLI_PORT=5446 node --test apps/server/src/edge-body-cli.test.ts`. This env override was added
   on this branch; it refuses 4930–4970.
 
-**Full server suite (`pnpm test`)**
-- Several of the above are still defaults.
-- **Never run it on the laptop.** Run it off the laptop (debt: Modal or a remapped harness), or with both env vars set
-  plus a port audit (`grep -rn "49[3-7][0-9]" apps/server/src/*.test.ts`).
+**Every other server test with a fixed port**
+- The fixed ports are in 4952–4959 (`camp-station-era`, `client-station`, `clock-frontier-wire`, `intent-*`,
+  `lifecycle-*`, `me-live`, …).
+- Never run them bare on the laptop. Run them under the **port-remap preload**
+  (`tools/test-harness/port-remap.mjs`):
+  - every `listen()`/`connect()` on 4930–4969 moves to `PORT_REMAP_BASE + (port − 4930)`;
+  - 4970/4986/4987 throw;
+  - the preload re-injects itself into children, even children spawned with a hand-built env.
+- The full suite, safely:
+  ```
+  NODE_OPTIONS="--import=$PWD/tools/test-harness/port-remap.mjs" PORT_REMAP_BASE=5400 TEST_MARS_PORT=5445 \
+    TEST_BODY_CLI_PORT=5446 node --test --test-concurrency=1 apps/server/src/*.test.ts
+  ```
+- Proven on the 39 port-bound files: 256/256. Lesson: `mars.test.ts` spawns its fixture with an env that drops
+  `NODE_OPTIONS`; before the child re-injection existed, its child tried port 4950 and exited on `EADDRINUSE`.
+  Always set `TEST_MARS_PORT` as well.
 
 **`tools/core/multiworld/*` (`local-worlds.mjs`, `world-server.mjs`, `public-cli-acceptance.mjs`, ...)**
 - Hard-coded: 4950–4970 by design (Codex's local release topology).
@@ -400,6 +412,47 @@ Gene's bar: the new system does everything the old did, and more.
 - `.tsx` (bundled): 12/14 on both.
 - Server: `account-clerk-auth` 3/3 (main's) + `-worlds` 4/4; god 37/37.
 
+**Engine and CLI**
+- engine-mars: 222/222.
+- mars/viewer engine (`test:mars`, including the byte-hash determinism tests): 1585 pass, 0 fail.
+- CLI/client (`test:client`, main's bytes): 247/247.
+- Under port remap:
+  - `mars.test` (5445): 4/4;
+  - `edge-body-cli` (5446): 1/1;
+  - the 39 port-bound server test files: 256/256.
+
 **New worlds green**
-- See lane REC status (`team/lanes/rec.md`) for scenarios, party, souls-r2, join clerk `/worlds` and launcher results
-  on ports 5420–5440.
+- Ports 5420–5440:
+  - `scenarios.mjs`: 30/30;
+  - `party.mjs`: 16/16;
+  - `souls-r2.mjs`: 37/37;
+  - `join.mjs --mode clerk --base /worlds`: 15/15;
+  - `launcher.mjs`: 14/14.
+- Real-input walk of a new world under `/worlds` (launcher :5441, a `--base /worlds/` build, dev sign-in), at dpr 1
+  and 2:
+  - home → New world, by real clicks and typing;
+  - arrival;
+  - canvas CSS = window, with buffer 1352×780 at dpr 1 and 2704×1560 at dpr 2 (the Retina fix holds);
+  - view offset 0,0 (a centred projection);
+  - drag, wheel, hold W and double-click each move the camera;
+  - God panel → Souls → "Live here yourself" → name → "Join as a Soul" gives the paste line;
+  - no page errors and no HTTP ≥ 400.
+- Evidence: `<team>/lanes/rec-shots/new-world-worlds-prefix/`.
+
+**Old-world data safety**
+- `tools/test-harness/history-boot-compare.mjs`:
+  - production Mars (1.4 GB) and LM (308 MB) histories copied read-only;
+  - booted check-only on main `b2e273a2` and on this branch.
+- Result: identical tick, head, stateHash and rules for both:
+  - Mars: tick 2140014, head 1351;
+  - LM: tick 2142033, head 3322.
+- Both boot from a snapshot with 0 replayed events, so this proves boot compatibility, not stepping. The stepping
+  determinism comes from `test:mars` above.
+- Eden (14 GB) is left to the one validation (V8).
+
+## 9. Shape for main
+
+- `root/reconcile` contains main `b2e273a2` (the merge's second parent), so **main can fast-forward** to it, or to any
+  later integration commit built on it.
+- Lanes merge into `root/reconcile`, never into main directly. The lead fast-forwards main once the one validation
+  (`tools/test-harness/one-validation.sh`, plan at the top of `team/lanes/rec.md`) passes.
