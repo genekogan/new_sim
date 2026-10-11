@@ -62,8 +62,8 @@ export async function openVerifiedProxy(module,descriptor,mode,isCancelled=()=>f
  }catch(e){if(proxy){await proxy.close();e.ownProxyClosed=true;}throw e;}
 }
 // Small injectable recovery seam: production uses pinned modules and system probes.
-export async function openWithRecovery({module,descriptor,mode,rollbackDescriptor,loadRecovery,ensureRecoverySafe,startup,isCancelled,onFailure}){
- try{return{proxy:await openVerifiedProxy(module,descriptor,mode,isCancelled,startup),fallback:false};}
+export async function openWithRecovery({module,loadPrimary,descriptor,mode,rollbackDescriptor,loadRecovery,ensureRecoverySafe,startup,isCancelled,onFailure}){
+ try{const primary=loadPrimary?await loadPrimary():module;return{proxy:await openVerifiedProxy(primary,descriptor,mode,isCancelled,startup),fallback:false};}
  catch(error){
   await onFailure(error);if(mode!=='start'||isCancelled())throw error;
   ensureRecoverySafe();const recovery=await loadRecovery();
@@ -82,8 +82,7 @@ export async function runProxyOperation(planPin,goPin){
  const startup=()=>startupAllowed(checked.go,{cancelled});
  try{
   const pgid=Number(execFileSync('/bin/ps',['-p',String(process.pid),'-o','pgid='],{encoding:'utf8'}).trim());check(pgid===process.pid&&!checked.protectedPGIDs.includes(pgid),'proxy requires its own detached process group');
-  pinned(plan.proxyModule);const module=await import(pathToFileURL(plan.proxyModule.path).href);startup();
-  const opened=await openWithRecovery({module,descriptor:checked.descriptor,mode:plan.mode,rollbackDescriptor:checked.rollbackDescriptor,isCancelled:()=>cancelled,startup,
+  const opened=await openWithRecovery({loadPrimary:async()=>{pinned(plan.proxyModule);return import(pathToFileURL(plan.proxyModule.path).href);},descriptor:checked.descriptor,mode:plan.mode,rollbackDescriptor:checked.rollbackDescriptor,isCancelled:()=>cancelled,startup,
    onFailure:error=>record('FIRST-STARTUP-FAILURE.json',{pid:process.pid,error:error.message,ownProxyClosed:error.ownProxyClosed===true}),
    ensureRecoverySafe:()=>{check(systemProbe.vacant(4970),'failed startup left listener; fallback refused');checkProtectedProcesses(plan);},
    loadRecovery:async()=>{pinned(plan.baseline.proxyModule);return import(pathToFileURL(plan.baseline.proxyModule.path).href);}});

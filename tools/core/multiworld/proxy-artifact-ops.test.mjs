@@ -17,5 +17,5 @@ test('startup failure or expiry records first failure then restores onlycurrent5
  const result=await openWithRecovery(args);assert.equal(result.fallback,true);assert.equal(failedClosed,1);assert.equal(recoveryClosed,0);assert.equal(failures,1);assert.equal(loads,1);
  loads=0;await assert.rejects(()=>openWithRecovery({...args,isCancelled:()=>true}),/cancelled/);assert.equal(loads,0);
  await assert.rejects(()=>openWithRecovery({...args,ensureRecoverySafe:()=>{throw Error('listener occupied');}}),/occupied/);assert.equal(loads,0);
- const expired=await openWithRecovery({...args,startup:()=>startupAllowed(f.go,{now:f.now+121000})});assert.equal(expired.fallback,true);assert.equal(loads,1);await expired.proxy.close();await result.proxy.close();assert.equal(recoveryClosed,2);
+ const missing=await openWithRecovery({...args,loadPrimary:async()=>{throw Error('import failure');}});assert.equal(missing.fallback,true);await missing.proxy.close();loads=0;const expired=await openWithRecovery({...args,startup:()=>startupAllowed(f.go,{now:f.now+121000})});assert.equal(expired.fallback,true);assert.equal(loads,1);await expired.proxy.close();await result.proxy.close();assert.equal(recoveryClosed,3);
 });
