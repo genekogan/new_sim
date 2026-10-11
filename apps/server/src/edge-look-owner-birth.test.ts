@@ -26,7 +26,7 @@ test('OWNER LOOK: PUT /v1/souls/:id/look sets the owner\'s Soul look; another ow
  const edge=new EdgeLedger(f.host,f.db,undefined,{ambient:false});
  const {config}=await import('./config.ts');
  const app:Hono=buildApp({cfg:{...config,...(cfg as object)} as never,db:f.db,host:f.host,auth:f.auth,brain:f.brain,souls:f.souls,edge,hub:{refreshMe(){},clients:new Map(),joinMessages:[],upgradeHandlers:[]} as unknown as Hub});
- const put=(owner:string,look:unknown)=>accept(f.host,app.request(`/v1/souls/${a.id}/look`,{method:'PUT',headers:{host:'127.0.0.1:5733',authorization:`Bearer dev:${owner}`,'content-type':'application/json'},body:JSON.stringify(look)}));
+ const put=(owner:string,look:unknown)=>accept(f.host,Promise.resolve(app.request(`/v1/souls/${a.id}/look`,{method:"PUT",headers:{host:"127.0.0.1:5733",authorization:`Bearer dev:${owner}`,"content-type":"application/json"},body:JSON.stringify(look)})));
  const r=await put('a',{random:true,seed:5});assert.equal(r.status,200,await r.clone().text());
  const body=f.host.engine.world.entities[a.entity_id].body as {model:string};assert.match(body.model,LOOK_MODEL);
  const denied=await put('b',{hat:'cap'});assert.equal(denied.status,403,await denied.clone().text());
