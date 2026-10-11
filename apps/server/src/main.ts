@@ -28,6 +28,7 @@ import {edenCoreRequested,edenHistoryFactory,installEdenCore,settleEmptyEden,dra
 import {IntentControlV2} from './intent-control.ts';
 import {EdgeLedger} from './edge/ledger/ledger.ts';
 import {readFileSync} from 'node:fs';
+import {installBirthLooks} from './god/birth-look.ts';
 
 /** Seeded only into a world with no live Souls, so it is never empty. */
 const NATIVES: { name: string; description: string }[] = [
@@ -121,6 +122,7 @@ const groundHost = god && (host.engine as unknown as {installGroundV1?:unknown})
 if (groundHost && edge) installGroundCapabilities(edge as never, god!, host);
 // Stage B (lane L9): Souls live among god-built things — entity physics into the engine, fixtures usable, bodies as entities.
 if (god && config.engine === 'mars' && process.env.ENTITY_BRIDGE !== '0') installEngineBridge({ host, god, edge });
+if (god && process.env.BIRTH_LOOKS !== '0') installBirthLooks(host, edge);  // lane LOOKS: new Souls in new worlds get a varied kit look
 if (god) installWorldEnv(host, god, edge);  // R4-LIVE: Souls perceive the god's weather
 if (god) installLightning(god, edge, () => host.engine.world.tick);  // GOD-ENV: Souls see the bolts and hear the thunder
 if (god) console.log(`[god] entity world ready: ${god.model.entities.size} entities, ${new Set(god.model.defs.values()).size} defs, owner ${god.owner ?? '(unclaimed)'}`);

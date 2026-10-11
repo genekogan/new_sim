@@ -1084,7 +1084,16 @@ export async function body(cmd,...args){
   const id=args[0];if(!id||args.length!==1)throw new Error('usage: body set <preset|assetId>');
   return ok(await call('/v1/edge/body',{method:'PUT',body:/^body_[a-f0-9]{64}$/.test(id)?{assetId:id}:{preset:id}}),'body');
  }
- if(cmd!=='upload')throw new Error('usage: body [presets|set <preset|assetId>|upload path.glb --type ceramic --license owned --rights-confirmed]');
+ if(cmd==='look'){ // core/humanoid@2: read, randomize or edit this Soul's look (paint only; same body and rig)
+  if(!args.length){const r=ok(await call('/v1/edge/body'),'body');return {look:r.look,choices:r.lookChoices};}
+  let look;const flag=args.shift();
+  if(flag==='--random'){look={random:true};if(args[0]==='--seed'){const seed=Number(args[1]);if(!Number.isInteger(seed)||seed<0)throw new Error('--seed needs a whole number');look.seed=seed;args.splice(0,2);}if(args.length)throw new Error('usage: body look --random [--seed N]');}
+  else if(flag==='--set'){look={};for(const kv of args){const i=kv.indexOf('=');if(i<1)throw new Error('usage: body look --set key=value [key=value ...]');const k=kv.slice(0,i),v=kv.slice(i+1);look[k]=['headSize','height','build','walkSpeed'].includes(k)?Number(v):v;}if(!Object.keys(look).length)throw new Error('body look --set needs key=value pairs');}
+  else if(flag==='--json'){try{look=JSON.parse(args[0]??'');}catch{throw new Error('body look --json needs a JSON object');}}
+  else throw new Error('usage: body look [--random [--seed N] | --set key=value ... | --json {...}]');
+  const r=ok(await call('/v1/edge/body',{method:'PUT',body:{look}}),'body');return {changed:r.changed,body:r.body};
+ }
+ if(cmd!=='upload')throw new Error('usage: body [presets|set <preset|assetId>|look [--random|--set k=v ...]|upload path.glb --type ceramic --license owned --rights-confirmed]');
  const path=args.shift(),opts={};if(!path)throw new Error('body upload needs a GLB path');
  while(args.length){const flag=args.shift();if(flag==='--rights-confirmed')opts.rightsConfirmed=true;else if(flag==='--type'||flag==='--license'){const value=args.shift();if(!value||value.startsWith('--'))throw new Error(flag+' needs a value');opts[flag.slice(2)]=value;}else throw new Error('Unknown body upload argument: '+flag);}
  if(!['humanoid','ceramic','floater'].includes(opts.type)||!['CC0','owned'].includes(opts.license)||!opts.rightsConfirmed)throw new Error('Upload requires --type humanoid|ceramic|floater --license CC0|owned --rights-confirmed');
