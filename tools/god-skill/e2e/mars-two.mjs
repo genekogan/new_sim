@@ -242,16 +242,17 @@ try {
     const want = ['walk:mimos', 'walk:mimos/main', 'walk:mimos/main-south', 'walk:mimos/floor', 'walk:kitchen', 'walk:kitchen/working-kitchen', 'walk:kitchen/dining-hall', 'walk:showers'];
     return { ok: want.every((w) => c.includes(w)), missing: want.filter((w) => !c.includes(w)), walks: c.filter((x) => x.startsWith('walk:')).length };
   }, 30000), (r) => r?.ok);
-  await step('S1 the Soul CLI (unchanged) sees them: observe → canDo has walk:mimos/floor and walk:kitchen/working-kitchen', async () => {
-    const r = await cli('observe'); const ids_ = (r.data?.canDo?.available ?? []).map((c) => c.id);
-    return { code: r.code, has: ids_.filter((x) => ['walk:mimos/floor', 'walk:kitchen/working-kitchen'].includes(x)), err: r.stderr || r.raw };
-  }, (r) => r.code === 0 && r.has.length === 2);
+  await step('S1 the Soul CLI (unchanged) sees them: its map lists the rooms mimos/main, mimos/floor, kitchen/working-kitchen, kitchen/dining-hall, showers/shower-1', async () => {
+    const r = await cli('map'); const names = (r.data?.places ?? []).map((p) => p.name);
+    const want = ['mimos/main', 'mimos/floor', 'kitchen/working-kitchen', 'kitchen/dining-hall', 'showers/shower-1'];
+    return { code: r.code, places: names.length, missing: want.filter((w) => !names.includes(w)), err: r.stderr || r.raw };
+  }, (r) => r.code === 0 && r.missing.length === 0);
 
-  const m1 = await step('S2 CLI: act "walk to Mimos" → walk:mimos; she walks to its door', async () => {
+  const m1 = await step('S2 CLI: act "walk to Mimos" → walk:mimos; she walks round to its open front and in, into main south', async () => {
     const a = await cli('act', 'walk to Mimos'); const r = await follow(a.data, { maxS: 300 });
     return { cli: { accepted: a.data?.accepted, resolved: a.data?.resolved, reason: a.data?.reason }, phase: r.phase, code: r.code, reason: r.reason, end: r.end, room: r.room, walked: +walked(r.samples).toFixed(1) };
-  }, (r) => r.cli.accepted && /walk:mimos/.test(r.cli.resolved?.to ?? '') && r.phase === 'completed');
-  const m2 = await step('S3 walk:mimos/floor → up the rear stair, across the raised main, down the three risers, through the pass-through racks into the tea room', async () => {
+  }, (r) => r.cli.accepted && /walk:mimos/.test(r.cli.resolved?.to ?? '') && r.phase === 'completed' && r.room?.room === 'main-south');
+  const m2 = await step('S3 walk:mimos/floor → from main south through the pass-through racks into the tea room (Mimos floor)', async () => {
     const r = await walkTo('walk:mimos/floor'); return { ...r, inFloor: inRoom(r.end?.p, 'mimos/floor') };
   }, (r) => r.accepted && r.phase === 'completed' && r.inFloor);
   { const p = m2?.end?.p; if (p) await shots([{ name: 's3-in-mimos-floor', eye: [p[0] - 2.4, 1.9, p[2] - 0.6], at: [p[0] + 2, 0.7, p[2] + 0.6], wait: 5000 }]); }
@@ -263,6 +264,12 @@ try {
   const m4 = await step('S5 walk:mimos/main → she stands, climbs the risers to the raised main (.53 m)', async () => {
     const r = await walkTo('walk:mimos/main'); return { ...r, inMain: inRoom(r.end?.p, 'mimos/main'), y: r.end?.p?.[1] };
   }, (r) => r.accepted && r.phase === 'completed' && r.inMain && r.y > 0.45);
+  await step('S5b the raised main has two ways down and up: the rear stair (out the rear alcove door) and the three risers onto main south — god reach, both ways', async () => {
+    const q = async (from, to) => (await api('/v1/god/query', { body: { reach: { from, to } } })).data.reach;
+    const main = [X0 - 2.75, 0.53, -4.6], rear = [X0 - 2.75, -7.9], south = [X0 - 2.0, 1.3];
+    const r = { downRear: await q(main, rear), upRear: await q(rear, main), downRisers: await q(main, south), upRisers: await q(south, main) };
+    return Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v?.reachable ? `${v.length} m via levels ${v.levels}` : v?.code]));
+  }, (r) => Object.values(r).every((v) => /levels/.test(v)));
   await step('S6 sit on the red sofa (#12) in the raised main', async () => {
     const c = (await capList()).find((x) => x.verb === 'sit' && /red.sofa/.test(`${x.id} ${x.label}`));
     const r = c ? await sitOn(c.id) : { accepted: false, reason: 'no sit capability for the red sofa' };

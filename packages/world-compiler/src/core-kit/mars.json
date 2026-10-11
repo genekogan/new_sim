@@ -3612,7 +3612,7 @@
   "schema": "def/1",
   "name": "core-mars-chiba",
   "version": 1,
-  "description": "Chiba, the big rack-and-plywood building of the Mars College campus: the auditorium with solar panels and the mural, the gallery hall and its stairs, as the 2026 reference draws them. 0 rooms, 73 wall/solid colliders, 0 stairs. 85279 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "Chiba, the big rack-and-plywood building of the Mars College campus: the auditorium with solar panels and the mural, the gallery hall and its stairs, as the 2026 reference draws them. 0 rooms, 118 wall/solid colliders, 0 stairs. 85279 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -3629,7 +3629,7 @@
    "kind": "mesh",
    "asset": "2f5f5aba17fa8783d85d60bb520f662d568360e1754e69f022b7a5f67913edd6",
    "collide": "box",
-   "footprint": "db86e8d6dcb4482f245545113d99061e192806ce58ad5dfd1ffc40505710e1b7"
+   "footprint": "3f0f1c1ee9ecd2620950f0d93aff121dd817ea90813aceea9c22b3656d290dd0"
   },
   "size": {
    "box": [
@@ -3661,7 +3661,7 @@
   "schema": "def/1",
   "name": "core-mars-mimos",
   "version": 1,
-  "description": "Mimos, the 2026 Mars College café and lounge as Gene corrected it (north up): an L of Mimos main (the west longitudinal section; its northern part a raised wooden floor at 0.53 m with the coffee counter on the west wall and the study table at the north wall, its southern part at ground level) and Mimos floor, the short southeast arm with flooring throughout, the honey sofa beneath the posters on its north wall and the low tea table near its south wall. The pallet racks between main and floor are pass-through; the northeast of the L is outdoors. Rear alcove door with a stair at the north; three risers from main south up to the raised floor. 3 rooms, 37 wall/solid colliders, 2 stairs. 3507 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "Mimos, the 2026 Mars College café and lounge as Gene corrected it (north up): an L of Mimos main (the west longitudinal section; its northern part a raised wooden floor at 0.53 m with the coffee counter on the west wall and the study table at the north wall, its southern part at ground level) and Mimos floor, the short southeast arm with flooring throughout, the honey sofa beneath the posters on its north wall and the low tea table near its south wall. The pallet racks between main and floor are pass-through; the northeast of the L is outdoors. Rear alcove door with a stair at the north; three risers from main south up to the raised floor. 3 rooms, 40 wall/solid colliders, 2 stairs. 3507 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -3678,7 +3678,7 @@
    "kind": "mesh",
    "asset": "d53fd74301d181fa503e3fbbbb2fc05dd25865d8354f258d928dfd051e7e0147",
    "collide": "box",
-   "footprint": "7bca6f1e2320f895f77fe5c9aebb2a22e933d26780b1b2e5f7ee5fbd6456a7f7"
+   "footprint": "e3a3a668d7506145f0a263bc5fc05d6ad0f62e31ba1166cb19c6bf5d3cad12d7"
   },
   "size": {
    "box": [
@@ -3776,34 +3776,47 @@
     "id": "floor",
     "kind": "room",
     "p": [
-     2.95,
+     1.37,
      0.2403,
-     3.0087
+     3.559
     ],
     "yaw": 0,
     "floor": 0,
     "polygon": [
      [
-      -1.83,
-      -1.3
+      -0.25,
+      -1.8503
      ],
      [
-      1.83,
-      -1.3
+      3.41,
+      -1.8503
      ],
      [
-      1.83,
-      1.3
+      3.41,
+      0.7497
      ],
      [
-      -1.83,
-      1.3
+      -0.25,
+      0.7497
      ]
     ],
     "height": 2.4,
     "accepts": {},
     "capacity": 64,
     "label": "Mimos floor (glazed tea room, honey sofa under the posters)"
+   },
+   {
+    "id": "rear-door",
+    "kind": "stand",
+    "p": [
+     -1.63,
+     0.24,
+     -5.291
+    ],
+    "yaw": 0,
+    "accepts": {},
+    "capacity": 8,
+    "label": "Outside the rear alcove door, at the foot of the rear stair"
    }
   ]
  },
@@ -3827,7 +3840,7 @@
    "kind": "mesh",
    "asset": "56e684f0e5ef388c0b9e5d47c6e74bdd655f4dcbb3f177b624a48c4eac1e871a",
    "collide": "box",
-   "footprint": "806c70fd59b661d452542e312501dc4e4acecae05fced9a342fb7c1f7cc3fa8f"
+   "footprint": "8fb5d0d1acc8432d4e5182b252976de0f17e4fb9dbd708a4e0125d74c89c6eb1"
   },
   "size": {
    "box": [
@@ -3920,6 +3933,19 @@
     "accepts": {},
     "capacity": 64,
     "label": "Dining hall (diner: blue wall, bus seats)"
+   },
+   {
+    "id": "entrance",
+    "kind": "stand",
+    "p": [
+     2.016,
+     0.24,
+     5.853
+    ],
+    "yaw": 0,
+    "accepts": {},
+    "capacity": 8,
+    "label": "Outside the blue diner door, at the foot of the diner steps"
    }
   ]
  },
@@ -4089,7 +4115,7 @@
   "schema": "def/1",
   "name": "core-mars-tool-camp",
   "version": 1,
-  "description": "The north workshops: Tool camp and the northeast library, with their benches and stock. 0 rooms, 18 wall/solid colliders, 0 stairs. 109767 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "The north workshops: Tool camp and the northeast library, with their benches and stock. 0 rooms, 94 wall/solid colliders, 0 stairs. 109767 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -4104,7 +4130,7 @@
    "kind": "mesh",
    "asset": "bd01efaf78e4f631a047be140856c64449b56330ecc0b52936a41f1d61b90e66",
    "collide": "box",
-   "footprint": "b44c6da9302e2b3d8b96f29c25cefb85f80bed7313d5bbc185d96e9819c3791b"
+   "footprint": "60da26256ecc339a3b4b3af9b9e8d461fd2e6023678b8b32b8a569cc7c1bd609"
   },
   "size": {
    "box": [
@@ -4136,7 +4162,7 @@
   "schema": "def/1",
   "name": "core-mars-freeside",
   "version": 1,
-  "description": "The northeast compound: Freeside, the living house with the reused LIBRARY facade, its completed kitchen enclosure, Bodywork/CoLab with the roof access. 0 rooms, 96 wall/solid colliders, 0 stairs. 155396 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "The northeast compound: Freeside, the living house with the reused LIBRARY facade, its completed kitchen enclosure, Bodywork/CoLab with the roof access. 0 rooms, 119 wall/solid colliders, 0 stairs. 155396 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -4152,7 +4178,7 @@
    "kind": "mesh",
    "asset": "3c099e40c734831b5872cab249ba570e13d088a16748750c1f9418ee353f05eb",
    "collide": "box",
-   "footprint": "c0cdd237cfe25ae6df607a9f98d2eb5a98f275c767c21d4855e36f829b0ae323"
+   "footprint": "ea6de87c94e4e4860d00689dc65d26a5cc844962e24674dc95b6663db544c4bd"
   },
   "size": {
    "box": [
@@ -4184,7 +4210,7 @@
   "schema": "def/1",
   "name": "core-mars-west-racks",
   "version": 1,
-  "description": "The west rack building at the far west of the campus. 0 rooms, 27 wall/solid colliders, 0 stairs. 4519 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "The west rack building at the far west of the campus. 0 rooms, 46 wall/solid colliders, 0 stairs. 4519 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -4198,7 +4224,7 @@
    "kind": "mesh",
    "asset": "b189a3fc963b166052d7aabcfdc8ded9dbf852a4deccd9f1ddc48e366df7fdd9",
    "collide": "box",
-   "footprint": "1aaa1ce0f4d422186a721dcdad4f77fd7562efdc996145c2c46c80041370c34b"
+   "footprint": "8698d1adfb26292cdeb446ab8707a5896f54010bf48432322348c0959457277d"
   },
   "size": {
    "box": [

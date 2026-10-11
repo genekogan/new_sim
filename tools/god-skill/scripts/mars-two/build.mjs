@@ -25,7 +25,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { ROOT, readV3, indexNodes, cut, v3ToLocal, mul, rotY, translate, xz, X0, minRect, nodePoints, rectOverlap } from './v3.mjs';
-import { ROOMS, WALLS, DOORS, STAIRS, RAISED } from './layout.mjs';
+import { ROOMS, WALLS, DOORS, STAIRS, RAISED, ENTRANCES, TERRACES, ROOM_AT } from './layout.mjs';
 
 const { measureGlb, footprintToBaked } = await import(join(ROOT, 'apps/server/src/god/assets.ts'));
 const OUT = join(ROOT, 'worlds/core-assets/mars');
@@ -133,12 +133,15 @@ const wallObb = (id, n0, n1, e0, e1, y0, y1, o) => ({ id, kind: 'wall', obb: { c
 // obstacles from mesh contents: things standing on the floor a body could walk into (not roofs, floors, high beams)
 function contentObstacles(rs, o, floorY = 0) {
   const out = [];
-  const solid = rs.filter((r) => r.y0 < floorY + 1.7 && r.y1 > floorY + 0.25 && !/Roofs and upper floors/.test(r.layer ?? '') && !/rug|mat floor|floor slab|plywood floor|cable|bulb|globe|festoon|string|lens/i.test(r.kind ?? '') && (r.n1 - r.n0) * (r.e1 - r.e0) < 40);
+  // (floors, treads and thresholds are walked: the footprint's floors and links carry them; an open door leaf swings: people push past it, so it is drawn but never an obstacle — the diner's blue door leaf
+  // and bus seat #20 otherwise sealed the dining hall off from its own door)
+  const solid = rs.filter((r) => r.y0 < floorY + 1.7 && r.y1 > floorY + 0.25 && !/Roofs and upper floors|Timber, floors and stairs/.test(r.layer ?? '') && !/rug|mat floor|floor slab|plywood floor|cable|bulb|globe|festoon|string|lens/i.test(r.kind ?? '') && !/door.*leaf|open .*door|door open/i.test(`${r.name ?? ''} ${r.kind ?? ''}`) && (r.n1 - r.n0) * (r.e1 - r.e0) < 40);
   for (const [k, g] of clusters(solid, 0.03, () => '', true).entries()) {
     const R = groupRect(g); if (R.half[0] < 0.02 && R.half[1] < 0.02) continue;
-    // a big sparse cluster (a fence line, a long rack run): one box per member instead
+    // a sparse cluster (a fence line, a rack bay's posts and beams with an open door leaf against them): one box per
+    // member instead — merged, Mimos's rear alcove became a 1.9 × 1 m block across its own door
     const area = 4 * R.half[0] * R.half[1], sum = g.reduce((s, r) => s + Math.max(0.01, 4 * rectOf(r).half[0] * rectOf(r).half[1]), 0);
-    const parts = area > 6 && sum < area * 0.5 ? g.map((r) => [rectOf(r), r.y0, r.y1]) : [[R, Math.min(...g.map((r) => r.y0)), Math.max(...g.map((r) => r.y1))]];
+    const parts = area > 0.6 && sum < area * 0.5 ? g.map((r) => [rectOf(r), r.y0, r.y1]) : [[R, Math.min(...g.map((r) => r.y0)), Math.max(...g.map((r) => r.y1))]];
     parts.forEach(([q, y0, y1], j) => out.push({ id: `obj-${k}${parts.length > 1 ? '.' + j : ''}`, kind: 'solid', obb: { c: [r4(q.c[0] - o[0]), r4(q.c[1] - o[2])], half: [r4(Math.max(0.03, q.half[0])), r4(Math.max(0.03, q.half[1]))], yaw: r4(-q.yaw) }, y0: r4(Math.max(floorY, y0) - o[1]), y1: r4(Math.min(y1, floorY + 2.2) - o[1]) }));
   }
   return out;
@@ -149,7 +152,8 @@ function authoredFootprint(b, o, box, contents) {
   const obstacles = [...(WALLS[b] ?? []).map(([id, ...a]) => wallObb(id, ...a, o)), ...contents];
   const portals = (DOORS[b] ?? []).map(([id, n, e, nn, ne_, w, y0, y1]) => ({ id, kind: y0 > 1 ? 'window' : 'door', level: y0 > 0.35 && y0 < 1 ? 1 : 0, center: [r4(e + X0 - o[0]), r4((y0 + y1) / 2 - o[1]), r4(-n - o[2])], normal: [ne_, 0, -nn], width: w, y0: r4(y0 - o[1]), y1: r4(y1 - o[1]) }));
   const links = (STAIRS[b] ?? []).map(([id, a, z, w]) => ({ id, kind: 'stairs', width: w, from: { level: a[2] > 0.35 ? 1 : 0, y: r4(a[2] - o[1]) }, to: { level: z[2] > 0.35 ? 1 : 0, y: r4(z[2] - o[1]) }, path: [a, z].map(([n, e, y]) => [r4(e + X0 - o[0]), r4(y - o[1]), r4(-n - o[2])]) }));
-  return { schema: 'lm-building-footprint/1', id: `mars-${b}`, name: b, bounds: { min: [-box[0] / 2, 0, -box[2] / 2], max: [box[0] / 2, box[1], box[2] / 2] }, levels: [{ id: 0, y: 0 }, { id: 1, y: RAISED }], rooms, obstacles, portals, links };
+  const terraces = (TERRACES[b] ?? []).map(([id, n0, n1, e0, e1, y]) => ({ id, level: y > 0.35 ? 1 : 0, y: r4(y - o[1]), polygon: [[e0, -n1], [e1, -n1], [e1, -n0], [e0, -n0]].map(([e, z]) => [r4(e + X0 - o[0]), r4(z - o[2])]) }));
+  return { schema: 'lm-building-footprint/1', id: `mars-${b}`, name: b, bounds: { min: [-box[0] / 2, 0, -box[2] / 2], max: [box[0] / 2, box[1], box[2] / 2] }, levels: [{ id: 0, y: 0 }, { id: 1, y: RAISED }], rooms, obstacles, portals, links, ...(terraces.length ? { terraces } : {}) };
 }
 
 // ------------------------------------------------------------------ build
@@ -277,7 +281,13 @@ for (const [b, rs] of byB) {
   const fpSha = record(fpBytes, join(OUT, `${b}.footprint.json`), 'footprint', { baked, name: `mars-${b}-footprint` });
   const asset = record(piece.bytes, join(OUT, `${b}.glb`), 'mesh', { name: `mars-${b}`, footprint: fpSha });
   const d = def(b, { overlaps: ['mars-campus'], description: `${B.desc} ${baked.rooms.length} rooms, ${baked.colliders.length} wall/solid colliders, ${baked.links.length} stairs. ${piece.tris} triangles.`, tags: B.tags, asset, footprint: fpSha, box: piece.box, scale: [1, 1] });
-  if (baked.slots.length) d.slots = baked.slots;
+  if (baked.slots.length) d.slots = baked.slots.map((sl) => {
+    const at = ROOM_AT[b]?.[sl.id]; if (!at || sl.kind !== 'room') return sl;
+    // re-anchor the room slot at its standing point; its outline stays where it is (relative to the new origin)
+    const p = [r3(at[1] + X0 - o[0]), sl.p[1], r3(-at[0] - o[2])], dx = p[0] - sl.p[0], dz = p[2] - sl.p[2];
+    return { ...sl, p, polygon: sl.polygon.map(([x, z]) => [r4(x - dx), r4(z - dz)]) };
+  });
+  if (ENTRANCES[b]) { const [id, n, e, label] = ENTRANCES[b]; d.slots = [...(d.slots ?? []), { id, kind: 'stand', p: [r3(e + X0 - o[0]), r3(-o[1]), r3(-n - o[2])], yaw: 0, accepts: {}, capacity: 8, label }]; }
   d.components = { ...d.components, place: { kind: 'building', enclosed: !!B.authored } };
   defs.push(d);
   placements.push({ def: `core/mars-${b}@1`, cat: 'building', building: b, p: o.map(r3), r: 0 });

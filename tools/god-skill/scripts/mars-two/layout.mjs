@@ -40,12 +40,18 @@ export const WALLS = {
     ['poster-wall', 0.75, 0.85, 0, 3.66, 0, 2.9],
     // the arm's east end: the sloping plexiglass's timber frame (V3 chiba wood 1445–1450)
     ['arm-east', -1.99, 0.75, 3.66, 3.76, 0, 2.6],
-    // G: the southern front is the sloping plexiglass across main south and the arm
-    ['south-glazing', -1.99, -1.89, -4.73, 3.76, 0, 2.6],
-    // G: the raised floor's ending is a real boundary: a step riser, open only at the stair
-    ['riser-w', 0.04, 0.14, -4.73, -3.45, 0, RAISED + 0.05], ['riser-e', 0.04, 0.14, -2.2, 0, 0, RAISED + 0.05],
-    // the raised floor's body: nobody stands under it (its top is the floor on level 1); open where the stairs come up
-    ['under-main-w', 0.14, 5.88, -4.68, -3.4, 0, RAISED - 0.01], ['under-main-e', 0.14, 5.88, -2.2, -0.05, 0, RAISED - 0.01], ['under-main-mid', 0.65, 5.25, -3.4, -2.2, 0, RAISED - 0.01],
+    // G: the southern front is the sloping plexiglass (V3: its timber-framed panels over the arm, wood 0648–0650, and the
+    // panel at E −0.83…0.41, wood 0656); main south's front west of it is open in V3 — Mimos's ground-level way in from
+    // the Chiba hall (the handover's "Mimos front: … actual openings")
+    ['south-glazing', -1.99, -1.89, -0.83, 3.76, 0, 2.6],
+    // G: the raised floor's ending is a real boundary: a step riser, open only where the internal stair's landing joins it
+    ['riser-w', 0.04, 0.14, -4.73, -2.47, 0, RAISED + 0.05], ['riser-e', 0.04, 0.14, -1.81, 0, 0, RAISED + 0.05],
+    // F (handover floorAndAccessReference, V3 "mimos-main-raised-entry"): the three risers climb EAST along main south to a
+    // raised landing (N −0.65…0.09, E −2.47…−1.81; its floor reaches over the riser tops for the planner's turn) that joins the raised floor; its south and east faces are risers too
+    ['landing-s', -0.75, -0.65, -2.47, -1.71, 0, RAISED + 0.05], ['landing-e', -0.65, 0.04, -1.81, -1.71, 0, RAISED + 0.05],
+    ['under-landing', -0.65, 0.04, -2.42, -1.81, 0, RAISED - 0.01],
+    // the raised floor's body: nobody stands under it (its top is the floor on level 1); open where the rear stair comes up
+    ['under-main-w', 0.14, 5.88, -4.68, -3.4, 0, RAISED - 0.01], ['under-main-e', 0.14, 5.88, -2.2, -0.05, 0, RAISED - 0.01], ['under-main-mid', 0.14, 5.25, -3.4, -2.2, 0, RAISED - 0.01],
   ],
   kitchen: [
     // the diner's east wall: the photographed blue wall, full length (bus seats against it)
@@ -76,6 +82,7 @@ export const WALLS = {
 /** Doors (portals): [id, N, E, normalN, normalE, width, y0, y1]. `entrance` is what nav calls the front door. */
 export const DOORS = {
   mimos: [
+    ['entrance-front', -1.94, -2.78, -1, 0, 3.8, 0, 2.6],            // F: the open front of main south (no V3 glazing there)
     ['entrance-rear', 5.98, -2.75, 1, 0, 0.9, RAISED, 2.6],          // F: the rear alcove door (photo c49422, V3 pale door)
   ],
   kitchen: [
@@ -89,16 +96,35 @@ export const DOORS = {
   ],
 };
 
+/** A room's standing point (its slot origin, where "go into <room>" ends) when its centre is furniture: [N, E].
+ *  Mimos floor's middle is the tea table, the clothing rack and the stools; its point is just inside the pass-through
+ *  from main south. (Furniture in a room is placed relative to this point.) */
+export const ROOM_AT = { mimos: { floor: [-1.1, 0.25] } };
+
+/** Floor patches that are not rooms: [id, N0, N1, E0, E1, y]. */
+export const TERRACES = {
+  // F: the raised landing at the top of Mimos's internal stair (handover "mimos-source-visible-internal-landing-top")
+  mimos: [['main-landing', -0.75, 0.3, -2.6, -1.71, RAISED]],
+};
+
+/** Where a Soul told "walk to <building>" goes when its doors are all up on the raised floor: a stand slot outside, at the
+ *  foot of the steps up to the door (nav's front-door approach). [id, N, E, label]. */
+export const ENTRANCES = {
+  mimos: ['rear-door', 7.75, -2.75, 'Outside the rear alcove door, at the foot of the rear stair'],
+  kitchen: ['entrance', -3.95, -5.62, 'Outside the blue diner door, at the foot of the diner steps'],
+};
+
 /** Stairs: [id, from [N, E, y], to [N, E, y], width]. */
 export const STAIRS = {
   mimos: [
-    // F: V3's three ordinary risers (0.177 m) from main south up to the raised main
-    ['main-step', [-1.15, -2.83, 0], [0.55, -2.83, RAISED], 0.9],
+    // F: V3's three ordinary risers (0.177 m), climbing east along main south (treads at E −3.05, −2.83, −2.60, N −0.42)
+    // onto the raised landing, which opens north onto the raised main (0.9 m wide for the planner: V3's treads are 0.7)
+    ['main-step', [-0.42, -3.46, 0], [-0.32, -2.45, RAISED], 0.9],
     // F: V3's visible rear stair from the camp ground up to the rear alcove door
     ['rear-stair', [7.3, -2.75, 0], [5.5, -2.75, RAISED], 0.9],
   ],
   kitchen: [
     // F: steps from the ground up to the blue entry door and the red front door (the Chiba hall floor south of them)
-    ['diner-step', [-3.55, -5.62, 0], [-1.45, -5.62, RAISED], 0.94],
+    ['diner-step', [-3.55, -5.62, 0], [-1.2, -5.62, RAISED], 0.94],
   ],
 };
