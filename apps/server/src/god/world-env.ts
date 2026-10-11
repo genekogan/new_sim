@@ -3,7 +3,8 @@
 //
 //   setEnv(god, { timeOfDay: 19.5 | '19:30', timeScale: 24, weather: { kind: 'storm', intensity: 0.8, wind: 0.9, fog: 0.2 } })
 //
-// - timeOfDay: the clock moves FORWARD to that hour (world-clock.ts applies it once; time never runs back).
+// - timeOfDay: the clock moves to the NEAREST occurrence of that hour, at most 12 h back or forward (world-clock.ts
+//   applies it once per set; GOD-ENV: repeated sets of one hour no longer advance the calendar day).
 // - timeScale: world hours per real hour (24 = one world day per real hour, the default; 1 = real time; 0 = paused).
 // - weather.kind: 'auto' = the live worlds' scheduled weather (a kind per 2 h slot, seeded by the day, exactly as /w/eden
 //   draws it); 'clear' | 'cloudy' | 'rain' | 'wind' | 'fog' | 'storm' set the channels from the kind × intensity (storm =

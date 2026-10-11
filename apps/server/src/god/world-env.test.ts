@@ -22,6 +22,12 @@ test('envClockConfig moves the clock forward to the hour, once per set, and paus
   const b = envClockConfig(36000, { dayTicks: 72000, paused: false, set: { hour: 7, n: 2 } }, { ...a }).dayConfig; // 20:00 → 07:00 next day
   assert.ok(Math.abs(hourAt(36000, b) - 7) < 1e-6);
   assert.ok((36000 - b.origin) / 72000 > (36000 - a.origin) / 72000, 'forward, never back');
+  // GOD-ENV: the nearest occurrence — setting the hour it already is (or just was) stays on the same day
+  const again = envClockConfig(37000, { dayTicks: 72000, paused: false, set: { hour: 7, n: 3 } }, { ...b }).dayConfig; // 07:20 now
+  assert.ok(Math.abs(hourAt(37000, again) - 7) < 1e-6);
+  assert.ok(Math.abs((37000 - again.origin) / 72000 - (36000 - b.origin) / 72000) < 1e-6, 'repeated set of 07:00 does not advance the day');
+  const nearBack = envClockConfig(37000, { dayTicks: 72000, paused: false, set: { hour: 3, n: 4 } }, { ...b }).dayConfig;   // 07:20 → 03:00 (4 h back, not 20 h on)
+  assert.ok(Math.abs((37000 - nearBack.origin) / 72000 - ((37000 - b.origin) / 72000 - (4 + 1 / 3) / 24)) < 1e-6, 'nearest: 4 h back');
   const same = envClockConfig(40000, { dayTicks: 72000, paused: false, set: { hour: 7, n: 2 } }, b).dayConfig; // already applied: continuous
   assert.ok(Math.abs(hourAt(40000, same) - hourAt(40000, b)) < 1e-3);
   const p = envClockConfig(40000, { dayTicks: 72000, paused: true, set: { hour: 7, n: 2 } }, b).dayConfig;
