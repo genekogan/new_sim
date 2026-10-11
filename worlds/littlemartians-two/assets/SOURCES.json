@@ -1,0 +1,1808 @@
+{
+ "schema": "lm-two-sources/1",
+ "lmMapCommit": "953613972438611c336b4cb5733390e47aed3290",
+ "assets": {
+  "scan-madmaraca": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/scan-madmaraca.glb",
+   "sourceSha256": "add6c2474556640e7efa515362bad8d03d63eddf643865646508f671906c8d21",
+   "sha256": "89777204026c33e802aac6a3ad9e9d4c01c31e7221509940b12d95ff2eba698b",
+   "before": {
+    "tris": 94206,
+    "bytes": 10395364
+   },
+   "after": {
+    "tris": 76000,
+    "bytes": 1060032
+   },
+   "targets": {
+    "tris": 76000,
+    "texPx": 2048
+   }
+  },
+  "exhibit-pupila-corridor": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-pupila-corridor.glb",
+   "sourceSha256": "0933a81a79df05ec39206b78d3fbba3bee55550136a92ce07a7e2083c6a4c5bc",
+   "sha256": "cfb9dd3129a42b2524c53faf0803283995cb36f766f1fe977699843854089ec9",
+   "before": {
+    "tris": 49999,
+    "bytes": 11360704
+   },
+   "after": {
+    "tris": 30054,
+    "bytes": 2487984
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-china-buddha": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-china-buddha.glb",
+   "sourceSha256": "5d4602d5ef0b1427cc107c67afe35063b250e0a7cac00ad77306ff39dc8c2ceb",
+   "sha256": "163cd1f39090a4b8165d61be94d3046c1e076909d7bcb46f4a3f4c253b07244d",
+   "before": {
+    "tris": 221575,
+    "bytes": 1327388
+   },
+   "after": {
+    "tris": 29705,
+    "bytes": 554480
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "scan-minarete": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/scan-minarete.glb",
+   "sourceSha256": "3efe19341d00bdd2e59b38368f095b50fa95360ea0c439042b3fce8b21ed0f38",
+   "sha256": "c7151b2ffcb97bbb1d58cb181b5ac40993f8e9eb8e85b3890ef05649d9e0e08d",
+   "before": {
+    "tris": 100000,
+    "bytes": 12960892
+   },
+   "after": {
+    "tris": 76000,
+    "bytes": 2379804
+   },
+   "targets": {
+    "tris": 76000,
+    "texPx": 2048
+   }
+  },
+  "scan-celadon-tower": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/scan-celadon-tower.glb",
+   "sourceSha256": "2851c50d6a979c6c5e66df868f17b6a74a794efb60f1694d49b1b27b44d46035",
+   "sha256": "473d35b6b62505c8d5d5ab2fc2a4f6ccfe5c0206985eeadeebb2ac5299884534",
+   "before": {
+    "tris": 100000,
+    "bytes": 14291160
+   },
+   "after": {
+    "tris": 76000,
+    "bytes": 2147272
+   },
+   "targets": {
+    "tris": 76000,
+    "texPx": 2048
+   }
+  },
+  "exhibit-minarete-portal": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-minarete-portal.glb",
+   "sourceSha256": "968119f6e7c05ff3683f7846d5e9c62bec807a92a93f2dd11183034cc9780909",
+   "sha256": "4c54391da491e338a2495bd2cee0a6f7b5309cbcf3e06407fc489e2da6d24c10",
+   "before": {
+    "tris": 49998,
+    "bytes": 8295912
+   },
+   "after": {
+    "tris": 29999,
+    "bytes": 733836
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-chapel-composition": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-chapel-composition.glb",
+   "sourceSha256": "a3ef02b8bf0e73728ba2f406c1e1b038a39f79ae0a4fadf79724412de48a4143",
+   "sha256": "7f697cb67042de6924add8e3d9d2c259c25610ba9550414e8acc7a3ee7e79a50",
+   "before": {
+    "tris": 50000,
+    "bytes": 10514604
+   },
+   "after": {
+    "tris": 29733,
+    "bytes": 1751448
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-american-base-old": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-american-base-old.glb",
+   "sourceSha256": "f2cc4f93745e1cce166b92099769ec9d34302ed04d779d7497a0f0a75b02f7ab",
+   "sha256": "a5a8c82a139db065f29940ddb0b90d20d26dbffaea6995f15953189a138d3a8f",
+   "before": {
+    "tris": 303572,
+    "bytes": 1341272
+   },
+   "after": {
+    "tris": 29998,
+    "bytes": 438308
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-asian-art-museum": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-asian-art-museum.glb",
+   "sourceSha256": "e6f14f628a96397ba42b06c111d5162303f3d440242348e7dc7a92d8153fecdb",
+   "sha256": "538fd217246f4dabd34cbc8c41a73a81ee4d7690049e49ee875b6c3ef82642c2",
+   "before": {
+    "tris": 190225,
+    "bytes": 942744
+   },
+   "after": {
+    "tris": 29971,
+    "bytes": 399344
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-fey-castle": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-fey-castle.glb",
+   "sourceSha256": "29d437d2f802890abeabb1e4e63ba8bd485be1e64250b411ec13c363d4d39f3e",
+   "sha256": "0a5cbf4c94b02206fbdc21e0bc973950d6bef72575cc85759341c28549412e74",
+   "before": {
+    "tris": 299158,
+    "bytes": 1465712
+   },
+   "after": {
+    "tris": 29997,
+    "bytes": 500212
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-graffiti-abandoned-room": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-graffiti-abandoned-room.glb",
+   "sourceSha256": "b15e254c00813d62bfe21cdd3dda461d3251c2d066cfc9106df312619ba17e8e",
+   "sha256": "6729d00ae532c4da2e4f31483005afa76edf80002148e6a14f168c99ce534096",
+   "before": {
+    "tris": 108771,
+    "bytes": 875180
+   },
+   "after": {
+    "tris": 29985,
+    "bytes": 396012
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-randy2": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-randy2.glb",
+   "sourceSha256": "f42fc7562d3d0e5b4f17b03603a44c4efc70ba5fc61d48156de83a4ff984de45",
+   "sha256": "c73c4533a64273c8720258a970c56e764f580ed793c4f03ca41d45ab33e548c5",
+   "before": {
+    "tris": 197567,
+    "bytes": 3601048
+   },
+   "after": {
+    "tris": 29682,
+    "bytes": 1658920
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-randy3": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-randy3.glb",
+   "sourceSha256": "2c8da38467732520bb36af67364e60c8d5cb6296602dc1d71104a34cbb5c6a8d",
+   "sha256": "c081d49d0acf8dfa144d01765aa7652ed22c10c09a2f11d18759e808e47a7293",
+   "before": {
+    "tris": 125667,
+    "bytes": 4467612
+   },
+   "after": {
+    "tris": 29643,
+    "bytes": 2179016
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-forte-sao-filipe-chapel": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-forte-sao-filipe-chapel.glb",
+   "sourceSha256": "8f087d955aeca89a426c0d8144738ff7bfb395b00ff3a93157ee2950e1f1aae3",
+   "sha256": "24c40d27fcd500cf4eebdd3a3d2a4ea98c0faad44bc7d9a40ce9e75e67b4d219",
+   "before": {
+    "tris": 38060,
+    "bytes": 4764944
+   },
+   "after": {
+    "tris": 29973,
+    "bytes": 1787344
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-forte-sao-filipe-corner": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-forte-sao-filipe-corner.glb",
+   "sourceSha256": "894f55787d1f9ffa7247f0b5ae7e07b4a8b3c9367eab2dae77114d23eebc3fdd",
+   "sha256": "5faf8c183d8b3f143bb7073769f9c025b500c4d0c646047768abb6765c794f17",
+   "before": {
+    "tris": 92111,
+    "bytes": 1095452
+   },
+   "after": {
+    "tris": 29984,
+    "bytes": 437708
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-forte-sao-filipe-corner3": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-forte-sao-filipe-corner3.glb",
+   "sourceSha256": "88ef0a28aaa50a5ab97b76be5c2f1f2f3ca29b15c281aa4f97100dcc6f96e935",
+   "sha256": "df1a82b81e4c048a586ca9b3477d17b95cb35e6ecb5e7638e7d0c2b6f3a706ce",
+   "before": {
+    "tris": 51577,
+    "bytes": 1209824
+   },
+   "after": {
+    "tris": 29998,
+    "bytes": 492468
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-forte-sao-filipe-corridor": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-forte-sao-filipe-corridor.glb",
+   "sourceSha256": "6d3c7aa1b94bb191523d9c0ed1a04387c6b1fbd2273dfd4f558413ea53542a26",
+   "sha256": "d54d60cf0b1bc94953914b84ed53cb5fc514e1184fdc0eab0e8697307402c7d1",
+   "before": {
+    "tris": 61375,
+    "bytes": 933784
+   },
+   "after": {
+    "tris": 29997,
+    "bytes": 419848
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-forte-sao-filipe-open": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-forte-sao-filipe-open.glb",
+   "sourceSha256": "d685074a4a33d45349189321accdd7786d1a3ea54b0516e52f79557e8e2e0fe1",
+   "sha256": "a8cbd65e59f995c6e7a3a96d605e96878aa2805a922d70d23e685df5e185e374",
+   "before": {
+    "tris": 41912,
+    "bytes": 6870924
+   },
+   "after": {
+    "tris": 29980,
+    "bytes": 2191032
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-lisbon-archways-corridor": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-lisbon-archways-corridor.glb",
+   "sourceSha256": "4676ea0659260b8eda2adf2460a91bd9e454a4e8d675ee406748d36386c55b54",
+   "sha256": "2ec5a187cf1be208da75687fed247347746e0d7e00f3af2a684be7e52b28ba8a",
+   "before": {
+    "tris": 66754,
+    "bytes": 864836
+   },
+   "after": {
+    "tris": 29990,
+    "bytes": 408444
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-moorish-entrance": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-moorish-entrance.glb",
+   "sourceSha256": "7131899ef821eb23cfb07c64d89de109bbfd1e4830f6e1315df220c45d31f8fb",
+   "sha256": "fb56c859f38311dc946d4798ed3bfd5aa016b7966b9d797ebd1e0ceda8707ab9",
+   "before": {
+    "tris": 52245,
+    "bytes": 889220
+   },
+   "after": {
+    "tris": 29997,
+    "bytes": 398304
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-moorish-castle-top": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-moorish-castle-top.glb",
+   "sourceSha256": "5213a7bf72245659a5557ad946f613f9b8930c0347c1d5704a314ef605e70f48",
+   "sha256": "9f89741650de2c950c10250b508e4e7962a557f2dbdf749a552ce84de8b7f9b7",
+   "before": {
+    "tris": 41432,
+    "bytes": 838008
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 387344
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-museu-azulejo-corridor": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-museu-azulejo-corridor.glb",
+   "sourceSha256": "3e569ceec81e893c038c77e8eb461238df54051f104df33f56f56a69c6359e7e",
+   "sha256": "70d966b924f479d7ca1d30ef1380409fb792dda7984126554b90cd82d17caefa",
+   "before": {
+    "tris": 38023,
+    "bytes": 921052
+   },
+   "after": {
+    "tris": 29997,
+    "bytes": 433212
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-museu-azulejo-main": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-museu-azulejo-main.glb",
+   "sourceSha256": "9ef8cd4b9b47dd5bdd5cc0810d95940625b3bd0a83b97a3d7e4656d4d7918536",
+   "sha256": "41de05216b5538cf2077b2bb93156797bf546d7511f42cc1d72f0aaf697dd837",
+   "before": {
+    "tris": 45608,
+    "bytes": 1154660
+   },
+   "after": {
+    "tris": 29997,
+    "bytes": 509336
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-museu-azulejo-quad": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-museu-azulejo-quad.glb",
+   "sourceSha256": "e095c5bf8c6a6dee57e331b3ea117741e56e677cace98fb7a36fec250744281a",
+   "sha256": "128621da4c757774ae1d1f5ba43b5d4816a951b0551b8504a52eb8bd15640a0d",
+   "before": {
+    "tris": 130293,
+    "bytes": 922932
+   },
+   "after": {
+    "tris": 29955,
+    "bytes": 406504
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-quinta-tower-curly": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-quinta-tower-curly.glb",
+   "sourceSha256": "0251fa53d7fb9bfef69af4150fbc88f1cf53ab729796aab51f15884156989777",
+   "sha256": "1f193ded64a8e29318b3ca568e65fa620b78a048c8d4afc236f2304e042e5b66",
+   "before": {
+    "tris": 59772,
+    "bytes": 4874672
+   },
+   "after": {
+    "tris": 29943,
+    "bytes": 1714356
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-quinta-fonte": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-quinta-fonte.glb",
+   "sourceSha256": "51dc5dcb89fafb79799728c434a63c8c23bf15bb553c151d41b0b7a00bd03c14",
+   "sha256": "80ae569a463f965fead9f592c6c57fa97a3cd6efe3b20c4fe8bd5ddeb5e64b47",
+   "before": {
+    "tris": 117948,
+    "bytes": 657796
+   },
+   "after": {
+    "tris": 29994,
+    "bytes": 312844
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-quinta-corredor-escada": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-quinta-corredor-escada.glb",
+   "sourceSha256": "e089deddf4b113e97d8fa67e87353287c945f9379f95c79b65d33f2ac8dd94f6",
+   "sha256": "862899fe82a8eb9f98b29977c320a559e9c038c0228282f9a09d17603fa33a06",
+   "before": {
+    "tris": 109542,
+    "bytes": 1151828
+   },
+   "after": {
+    "tris": 29958,
+    "bytes": 459256
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-quinta-palacio-interior": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-quinta-palacio-interior.glb",
+   "sourceSha256": "192c7ed02448e72acd0f55be89b6a964aef8f784584b83de866f3eb5107f0283",
+   "sha256": "9811095c8ce2c65cf99ec58fd384f28e5db72d02bb0520add477dfbcc5369adf",
+   "before": {
+    "tris": 180161,
+    "bytes": 1342356
+   },
+   "after": {
+    "tris": 29945,
+    "bytes": 510632
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-quinta-poco": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-quinta-poco.glb",
+   "sourceSha256": "f3fba8644bdce96e3ffa45cb05bde6993f527df1cc233bc65c4c83e8ca3fcb80",
+   "sha256": "f1ac82f3378347d1df211a7877b1b2a17bb74a365a4b27d023371f2a42bc7c67",
+   "before": {
+    "tris": 68385,
+    "bytes": 596588
+   },
+   "after": {
+    "tris": 29988,
+    "bytes": 323184
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-rua-fado": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-rua-fado.glb",
+   "sourceSha256": "a0bbabc57a10817bfd72c50982b90121215aa95e853a372ad47b8980e4141a91",
+   "sha256": "e9bab61d9ca183780dfdbae56dd00343a86939ee96e15bf3694d138019081875",
+   "before": {
+    "tris": 67041,
+    "bytes": 4558064
+   },
+   "after": {
+    "tris": 29863,
+    "bytes": 1740452
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-setubal-casa-escadas": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-setubal-casa-escadas.glb",
+   "sourceSha256": "3235e33a56c6219ade1e0e27d9f839fbf5179c9ca7139e564652b0e63fa1b15a",
+   "sha256": "ff3d5e5a0c2d83302ddb5185465313e6da4c2b204b17e16f6d23e66af7e59bee",
+   "before": {
+    "tris": 53249,
+    "bytes": 2688756
+   },
+   "after": {
+    "tris": 29985,
+    "bytes": 1176376
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-se-entrada": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-se-entrada.glb",
+   "sourceSha256": "31f2fd7d1887f463622cef3aed83a24437675ba869c87e5cd7242310b2bfbd0f",
+   "sha256": "44ea7ba030c1d88e8cf8f3e322135cd8135b70b8673be93c24f7985a82198fa7",
+   "before": {
+    "tris": 57065,
+    "bytes": 562012
+   },
+   "after": {
+    "tris": 29997,
+    "bytes": 319484
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-gruta-m-republica": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-gruta-m-republica.glb",
+   "sourceSha256": "af9e4035ca3c46829c39872f01c5546e719344ededcd8fb842e8922be3e452b0",
+   "sha256": "7a299c2bf992f6345242795c3cea14dbdbed9bea372530b937b11b015411ca82",
+   "before": {
+    "tris": 59431,
+    "bytes": 6942476
+   },
+   "after": {
+    "tris": 29936,
+    "bytes": 2599828
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-camel-sculpture": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-camel-sculpture.glb",
+   "sourceSha256": "57f25ba593f831053a5d3db9c470e3edeb309a51badd854ec0f42024f5b8adb2",
+   "sha256": "68043f3fb2b3419656ffe068de5318a221f8c086361ee55ea2333af40edf8a13",
+   "before": {
+    "tris": 249974,
+    "bytes": 2453052
+   },
+   "after": {
+    "tris": 16784,
+    "bytes": 1164232
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-gold-rust-buddha": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-gold-rust-buddha.glb",
+   "sourceSha256": "7cf0c8d386ce535e554803d24feeeb521bb690eab0b2a1694a969fec27cc67dd",
+   "sha256": "e6eafc3322e551ceadc9221eef47f6709d6665d47597a44e1b94fc76ea92a31d",
+   "before": {
+    "tris": 249822,
+    "bytes": 1880752
+   },
+   "after": {
+    "tris": 29769,
+    "bytes": 525416
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-golden-gate-park-tree": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-golden-gate-park-tree.glb",
+   "sourceSha256": "2481170662a46ec4febc21867a04ed2802c195d3bd77bed3d0f7b4f7b34f4052",
+   "sha256": "3bf248f5da4d6c44f52939d6f4fae94940bb157c94981aba72bc286744532c49",
+   "before": {
+    "tris": 125293,
+    "bytes": 3350860
+   },
+   "after": {
+    "tris": 29414,
+    "bytes": 1706036
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-golden-woman-standing": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-golden-woman-standing.glb",
+   "sourceSha256": "1903e515ac56bfe03ef44a688c2cff64bf18a5b4d42dfe9aefac5ca9553e1706",
+   "sha256": "07a868a6593060bc27ccbbd8514df70eff0bcd6945840fe239d82ce8c1fca0c4",
+   "before": {
+    "tris": 268539,
+    "bytes": 2085656
+   },
+   "after": {
+    "tris": 29823,
+    "bytes": 880444
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-greenman-altar": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-greenman-altar.glb",
+   "sourceSha256": "f83b135d9c99a504517a0df0f07240f65b2c3492a717ba77a60ba0d65c286093",
+   "sha256": "776d990ea2dad4fceb6f7f31e532f7d4aab8976bb1abaa6e4e9aeea8d9e01de3",
+   "before": {
+    "tris": 439142,
+    "bytes": 3994544
+   },
+   "after": {
+    "tris": 29821,
+    "bytes": 1126344
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-met-greek-mural": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-met-greek-mural.glb",
+   "sourceSha256": "c1dce421a5c602bf55a71069cd8f20173caf8344df764d716bbc2e3c46e8f53c",
+   "sha256": "d4f8808c1c7934a5c8b357ce7a3761c6a9ddc0fcb9692a88b3370808d72f1c2d",
+   "before": {
+    "tris": 29355,
+    "bytes": 285980
+   },
+   "after": {
+    "tris": 29355,
+    "bytes": 221312
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-poly-01": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-poly-01.glb",
+   "sourceSha256": "114a4f084fe3e22f0f9dda6342bb89982017f9b7022337fe8b2bd0cba8b5f3e6",
+   "sha256": "c16f01927ba2368257a1fc16722406f3c6eb2aeaaf1a31d8703dee95cdde5e8d",
+   "before": {
+    "tris": 8743,
+    "bytes": 148908
+   },
+   "after": {
+    "tris": 8743,
+    "bytes": 99576
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-poly-10": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-poly-10.glb",
+   "sourceSha256": "a2f93e2c9c34ea1546241fcd2bac47f838070686d2a0d454d522c1ed55299201",
+   "sha256": "c7e40e72ac6023592278ec08d3c30e91a57979d169e24906c58841a28a40a6c1",
+   "before": {
+    "tris": 40887,
+    "bytes": 190388
+   },
+   "after": {
+    "tris": 29999,
+    "bytes": 201352
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-poly-12": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-poly-12.glb",
+   "sourceSha256": "20aa95ffb526c8f1bd8f098f7a8473a9f1269c19cf4951e55da2b2ecc275d2fe",
+   "sha256": "4d8a81898b4c6d4d67af69e0bc20f48400e6912d0c8e4bdc72a846a898a09138",
+   "before": {
+    "tris": 60243,
+    "bytes": 342224
+   },
+   "after": {
+    "tris": 29989,
+    "bytes": 249292
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-poly-13": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-poly-13.glb",
+   "sourceSha256": "36353018bba2ce07680a4a53bf0a58531530cd586212c4569e25b2947288a94d",
+   "sha256": "7bd5b7139926e5192ed7d396ee0a938906665947be3617cf3bc28514a544ca14",
+   "before": {
+    "tris": 33524,
+    "bytes": 315720
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 251020
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-poly-14": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-poly-14.glb",
+   "sourceSha256": "3457de08ac7260743ba71db9c24a64328e18a8486c71ae61381165c9eb70024a",
+   "sha256": "8a390557de27f84decbb463b629311454bb0ac8a50ed6b65acd3d8f329312a9b",
+   "before": {
+    "tris": 47228,
+    "bytes": 255312
+   },
+   "after": {
+    "tris": 29998,
+    "bytes": 208352
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-poly-15": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-poly-15.glb",
+   "sourceSha256": "f18d2c6b2b60a70688a701d5aad15e6a24dccc4cc224a3be4302be3723ef2ead",
+   "sha256": "b5d036bf926487c6c27dc98a96ff953ef93c14b4529e5075e1a364775c48c6c8",
+   "before": {
+    "tris": 109831,
+    "bytes": 551824
+   },
+   "after": {
+    "tris": 29989,
+    "bytes": 290148
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-poly-17": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-poly-17.glb",
+   "sourceSha256": "28b08f84ee3f84927497e70d31ddc35161fb03a1a3c2a60608864b0000dbbc36",
+   "sha256": "6eef7bfc9db9cdd7bd430273e15ca36be411cefafed0b84a91e9bf605834da65",
+   "before": {
+    "tris": 5341,
+    "bytes": 123956
+   },
+   "after": {
+    "tris": 5341,
+    "bytes": 76724
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-poly-18": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-poly-18.glb",
+   "sourceSha256": "8bc7f64049ea85048eb50b6b8bbc9edbc04bd869535270083d8e3696ee2c8fdc",
+   "sha256": "56030cb59d8ee4a28c5d6c0a9310e429165b8862b67cb2c88d81466eb56ccc2a",
+   "before": {
+    "tris": 35743,
+    "bytes": 1392268
+   },
+   "after": {
+    "tris": 29999,
+    "bytes": 631876
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-poly-19": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-poly-19.glb",
+   "sourceSha256": "a4c7077032a4ae7799a6bd0fe7f3d2a5161e7fcc9e4a9dffa67e952ecd755de3",
+   "sha256": "528160c9006ea30a047d11efbc78a57fdf81de866d5738959f151560ad8f68bf",
+   "before": {
+    "tris": 123160,
+    "bytes": 483696
+   },
+   "after": {
+    "tris": 29990,
+    "bytes": 260588
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-poly-02": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-poly-02.glb",
+   "sourceSha256": "9f6a860093448a6d4017b5da7d716fd5b5d6aa4fab89b05e723df5361cd35065",
+   "sha256": "765e64cc3a76460de2443c0f468f195487f38d4629cfb25c3147512585ddd1af",
+   "before": {
+    "tris": 90465,
+    "bytes": 452812
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 271524
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-poly-05": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-poly-05.glb",
+   "sourceSha256": "cf43ecb91f25fca5e380ee5d21fb74dccdd61af71e9ae8e5034f9386dd6d35ba",
+   "sha256": "8d7d1747ba53485254c41a95502ad77790093edd40a6af0d554db360159c2857",
+   "before": {
+    "tris": 54895,
+    "bytes": 272488
+   },
+   "after": {
+    "tris": 29999,
+    "bytes": 239152
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-poly-06": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-poly-06.glb",
+   "sourceSha256": "0b53e45d60a53348a6bc7d441fcebc1ce8209fd3d1077b0489fdd1283015cdfb",
+   "sha256": "b967c9460eb5974f589beb4f16487bb766219d8e76514228a4aaa712f18b8771",
+   "before": {
+    "tris": 3052,
+    "bytes": 118024
+   },
+   "after": {
+    "tris": 3052,
+    "bytes": 57240
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-poly-07": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-poly-07.glb",
+   "sourceSha256": "667a52414fe4698c4affb0712f173ae8cb001c2e798e7ae00896eafddfd8878a",
+   "sha256": "3391214c4aa4ede6e0650cbab0863200a1ac5ece21fe541d5076c16cd616846a",
+   "before": {
+    "tris": 115641,
+    "bytes": 451084
+   },
+   "after": {
+    "tris": 29997,
+    "bytes": 263072
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-poly-08": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-poly-08.glb",
+   "sourceSha256": "273b5b76975b318cee15c171a5d2c8ccf3e6854def380cb2b91de99d24a75cb5",
+   "sha256": "e1933993c3a9557f681a5acfcfa8a049f1ce10c47f150909b2cbdf412019ab4d",
+   "before": {
+    "tris": 79259,
+    "bytes": 725028
+   },
+   "after": {
+    "tris": 29997,
+    "bytes": 358616
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-poly-09": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-poly-09.glb",
+   "sourceSha256": "1715d76e603a4b52bc62521a38cd46f2cdad82c1655dd4e7834635a002cb4379",
+   "sha256": "e9a870d0782e6485138ae79da003ba2a1074483253da716e84d43d3ed96139c9",
+   "before": {
+    "tris": 91123,
+    "bytes": 426884
+   },
+   "after": {
+    "tris": 29959,
+    "bytes": 257160
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-two-warriors": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-two-warriors.glb",
+   "sourceSha256": "408ce06829fb3f60444bec06dd36e39fa9c493ca0f2e2cb4cc62f0c521f139fb",
+   "sha256": "6eacf406f9280d327b56dd6d812f84fa2172e5f745a3ae3423f2db35de805ed9",
+   "before": {
+    "tris": 249958,
+    "bytes": 3379876
+   },
+   "after": {
+    "tris": 23789,
+    "bytes": 1674032
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-567d4f0b818f": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-567d4f0b818f.glb",
+   "sourceSha256": "01e5a092da75be2126ed6daecd3eab1405557c367561cb48407df8f2a1d83321",
+   "sha256": "6de0af8cbedcca425cf8e0afadd4abacf38947a44d1a65f8aa16b42e2046d85e",
+   "before": {
+    "tris": 100000,
+    "bytes": 3811080
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 632980
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-b538ebb36278": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-b538ebb36278.glb",
+   "sourceSha256": "2655f942ac087fe561e7ba2f81afa6b671c21aef0ae68635ca3573f5865f1c4d",
+   "sha256": "69545bcd1d835d653aa2985fc875a6a308c38030cfd5600e59b4f0e39d68d5b2",
+   "before": {
+    "tris": 69934,
+    "bytes": 2933916
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 646696
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-a17ce660742d": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-a17ce660742d.glb",
+   "sourceSha256": "1256c903b7dd400222c939b4e15ea1650ab248ff1abec5cbbe585ba758228578",
+   "sha256": "c397dbce9588bd9be4bd8b28ada89bacd4747f80e56f4a61033a90f571e51eca",
+   "before": {
+    "tris": 41596,
+    "bytes": 2012696
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 577652
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-72c8fc2f1538": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-72c8fc2f1538.glb",
+   "sourceSha256": "05be89d6408a8e25430f3f866d5989c09e5fc252bbde50ffcf63b10e21c9e459",
+   "sha256": "bf258b01ddb1c33370d2d2e1197504c57f05aeac79fbb72b0fe16db0195d8722",
+   "before": {
+    "tris": 50000,
+    "bytes": 1898560
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 492552
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-0f69fd943fc1": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-0f69fd943fc1.glb",
+   "sourceSha256": "e89edd0e66f77342fede2495e02b924dee3e0edc543e5ed043a20cabac61f43b",
+   "sha256": "44acdf42fb02d25aa52c53fa020d1fdf70674583b372c6c898ab70c7a91c8b39",
+   "before": {
+    "tris": 49094,
+    "bytes": 1907748
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 576308
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-4a96b139a014": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-4a96b139a014.glb",
+   "sourceSha256": "052c57674dd51a1315a6600d24eb7c876d19ea2f6e1735bea80d4d5bb358c175",
+   "sha256": "a50b00d0c2822ab0e4394e8529f510171669897de39141577e523aa3a15f17fd",
+   "before": {
+    "tris": 54846,
+    "bytes": 6521696
+   },
+   "after": {
+    "tris": 29974,
+    "bytes": 454340
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-976ab0a7145b": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-976ab0a7145b.glb",
+   "sourceSha256": "0eb65b41521bf5070e260c23cf392bc13c656fd19b7b9c1bbbe013e4d5e33434",
+   "sha256": "63e181c508ded62ebdc45206a76662025dbf4e12c85b5251c4ac9a7fe06887d1",
+   "before": {
+    "tris": 65612,
+    "bytes": 2811572
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 571604
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-09868169ab2d": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-09868169ab2d.glb",
+   "sourceSha256": "7867c1bcd78df493bb49dcbfc2a5b40b8d2adddede42344162440d99e961fd42",
+   "sha256": "ee4ca930b24bcede51184f95203d33a29a0e6ef3821a03ea8eb0560658a13403",
+   "before": {
+    "tris": 57934,
+    "bytes": 6850272
+   },
+   "after": {
+    "tris": 29744,
+    "bytes": 443136
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-e946e0e729d0": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-e946e0e729d0.glb",
+   "sourceSha256": "56e6bcd7d887eea697f4993886d5b4a2964dddef96d61b30244d59a1e704b1d7",
+   "sha256": "93119f1b37a3cdb27ce61e4279391ee0a2783fbb006f857ac9f57dcc4721370a",
+   "before": {
+    "tris": 93934,
+    "bytes": 3518392
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 598092
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-94727a7e61b6": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-94727a7e61b6.glb",
+   "sourceSha256": "8b75045ed451199398e1d3bce884ed866454f8bfba004eab3ec956dc159d26d3",
+   "sha256": "5eec933a6032dcb5a15de30d4c1ccbf4de4d181dbde7784213bb04c52090f9aa",
+   "before": {
+    "tris": 43038,
+    "bytes": 1635040
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 479440
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-36ac56b5a6f4": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-36ac56b5a6f4.glb",
+   "sourceSha256": "60b5dfd65a62276209b6a85b49aa5ae9d11403ad247659e16b42075e7f4d0888",
+   "sha256": "3171593dd2aab812af9b68996216951adc1f22352a5a6aaeda5b236f1402bf5a",
+   "before": {
+    "tris": 54848,
+    "bytes": 1930912
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 475276
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-45bcc42c2c58": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-45bcc42c2c58.glb",
+   "sourceSha256": "8ada196d77906793715d85d9137418f1edd13f880af3b4a67f5cfeafb6e6ae8c",
+   "sha256": "66112439cab9581371ab6bfe2359f063b91c6cd63021dd980bc855553e781662",
+   "before": {
+    "tris": 33650,
+    "bytes": 1618440
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 648768
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-c78fc73ba916": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-c78fc73ba916.glb",
+   "sourceSha256": "12239ed78974bd2acd0a78ea485d077a468d4c2870feca1dad4c5cd8962fff58",
+   "sha256": "e7d7e9d9b7a1dec9733a89a75564343671cca740aa5dd41df6f64cb89f07a148",
+   "before": {
+    "tris": 58920,
+    "bytes": 2415552
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 533068
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-1af1c89dd0f6": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-1af1c89dd0f6.glb",
+   "sourceSha256": "67f20e9d3519dbfa6b3090f1a12beb84ee8cc485e72d4af2a33b3bd70bcf42e0",
+   "sha256": "e37b07e9a6d2cb7818a70bb39f6f3748791b60c540230c9bdbc9bc954f7e1382",
+   "before": {
+    "tris": 49552,
+    "bytes": 2223800
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 569092
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-368878f9b157": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-368878f9b157.glb",
+   "sourceSha256": "ad5038eacf99460b4ae46a4a998bdf4e14bbcf6a44059ff3eebd7abda01eb771",
+   "sha256": "a0038b18f260ff2d0655af872316e016c5d0af6523c230c6e51d59e6905c115d",
+   "before": {
+    "tris": 61618,
+    "bytes": 2620424
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 577080
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-7d0669742c10": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-7d0669742c10.glb",
+   "sourceSha256": "824911a8231b0611b00d7992c84e545c3d45f5eefe861153b14a04a1b746e711",
+   "sha256": "963251da62397f6f87b114acbcc6061d937be4a3b5b53d1312aac8d00a485dce",
+   "before": {
+    "tris": 68246,
+    "bytes": 2928264
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 680140
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-ee1676f5c3bc": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-ee1676f5c3bc.glb",
+   "sourceSha256": "d9cca8ff37c92ce4abf6d1367fe018455943bba10f607217fa43e9e6e6f6d355",
+   "sha256": "a6d75beffc2cee33412c2f12f6c8fbf75cc37942e6ac4441234bf9a8110c0d87",
+   "before": {
+    "tris": 62120,
+    "bytes": 2643836
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 588152
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-16b887532619": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-16b887532619.glb",
+   "sourceSha256": "31a9b190308a27f349dfe6ceed32bc88b3f226f756f3c371869f61554f75cc13",
+   "sha256": "98b5e811f409823458f6a8cec00970518b42164599761e1e1d964ab86088bfa1",
+   "before": {
+    "tris": 32132,
+    "bytes": 1303072
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 292816
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-02ceabbff643": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-02ceabbff643.glb",
+   "sourceSha256": "816e8686778473beef203393cc090d428076c28de62d3c4a61676948bcd88f79",
+   "sha256": "d803fb2e6b85f88ea681eefb0f5c4c3be7bc0ab521985981159a7034f745d1fa",
+   "before": {
+    "tris": 48692,
+    "bytes": 5975592
+   },
+   "after": {
+    "tris": 29780,
+    "bytes": 544576
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-731f06fdb7e6": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-731f06fdb7e6.glb",
+   "sourceSha256": "dfadcb3b4295728f5db0161be440e56174b4f3e4c2ac2a27f11f51a68510df0f",
+   "sha256": "423b2865e614f43ec385af7367cdc0173dc1166f297cd24ec65db030701da071",
+   "before": {
+    "tris": 69476,
+    "bytes": 2639624
+   },
+   "after": {
+    "tris": 29999,
+    "bytes": 399140
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-b0941d82d98c": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-b0941d82d98c.glb",
+   "sourceSha256": "8ff67114dc17405b761d198732ea397ffe1a93654acdf972ab68c02a01b15bf8",
+   "sha256": "64d1f80b1cf16566aea177221a822eae468e56e6e884ceaccab8dc8d05a9acdc",
+   "before": {
+    "tris": 38540,
+    "bytes": 4932840
+   },
+   "after": {
+    "tris": 29899,
+    "bytes": 581752
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-0d01c1b00980": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-0d01c1b00980.glb",
+   "sourceSha256": "e9109b2a10f01227886b65eb6ad8d172ce7b4a7d606107970f14fac47b984726",
+   "sha256": "51cab4ecf47d1b37fc8476dfae98f4f4f6d2888bc30a125bc421d13748e01c57",
+   "before": {
+    "tris": 67628,
+    "bytes": 2873576
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 612492
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-af1046536b8a": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-af1046536b8a.glb",
+   "sourceSha256": "7ac9030fc9da1427977149b54e19550801566524b9957319ac9fe0f12003cb06",
+   "sha256": "03b16b01c9cb29bb384a882ef8f8daba5b4019cde0e3d8f914736cb49df1c346",
+   "before": {
+    "tris": 49518,
+    "bytes": 1900256
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 544256
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-97ddf86c47f9": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-97ddf86c47f9.glb",
+   "sourceSha256": "3719efb5d71d67c1ed07be3ea656bdfdf3c9370110341766bfea9fd2568d4d1d",
+   "sha256": "3ec4995926b0c6a162d787f47aa361cacf2c902342955cfda625d4fe3947cb92",
+   "before": {
+    "tris": 55804,
+    "bytes": 831992
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 486288
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-566ced3e91e1": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-566ced3e91e1.glb",
+   "sourceSha256": "681308a5eb173f60ce8aa03be3512aaa8ed63e69ee9b1ae0972ea50676c7f4ae",
+   "sha256": "050547e5d5287ad747f0f8aea2aa6c8bb6067200c52d26a61f2e41696f317056",
+   "before": {
+    "tris": 37200,
+    "bytes": 1543432
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 493696
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-77e7e7424358": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-77e7e7424358.glb",
+   "sourceSha256": "4194743feee24d613c9ccbdca2c07db4221e0da0c9ecb0ec50874166686f771b",
+   "sha256": "680ef38962d6dbe9c0b9fb034a4be49d9bb944bab2de3fb6ffb85b24cda0ae44",
+   "before": {
+    "tris": 33970,
+    "bytes": 1429912
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 473040
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-c780e53b578a": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-c780e53b578a.glb",
+   "sourceSha256": "0eb5fa4441de09abde90f1f9f6c5f20b3c366940b7a732787198e7b69ebd39a0",
+   "sha256": "73aaa7f0503941d62bc050f007cd68c4b7d2f1e48a4821672b3abcbad12c7391",
+   "before": {
+    "tris": 96924,
+    "bytes": 3974916
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 765588
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-88ba2b863400": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-88ba2b863400.glb",
+   "sourceSha256": "ba788885f6999cdb83b899dd21d41b026a9b224f9daa9636536990791cdae4b0",
+   "sha256": "c8a2e682f0ea0afb0cad42446f99524a3c46baf8e0da613d91fd6ab10f53b42a",
+   "before": {
+    "tris": 49516,
+    "bytes": 6029244
+   },
+   "after": {
+    "tris": 29962,
+    "bytes": 513456
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-c92a3b231c79": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-c92a3b231c79.glb",
+   "sourceSha256": "e18b961a25cd7d990f32a5bf12bdfc951142aa2534f45a78e67ea4601214c1d4",
+   "sha256": "2a443fd33fce74f1eaaff3f6543999a36e3c69adf14b20788380d401120bf6d6",
+   "before": {
+    "tris": 49092,
+    "bytes": 6008520
+   },
+   "after": {
+    "tris": 29795,
+    "bytes": 547712
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-66009eb80cef": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-66009eb80cef.glb",
+   "sourceSha256": "46f7fc73c24f8d9ce9a1a545282c34f3e52cf12ec6e82c93e83682d06a54e680",
+   "sha256": "0dde72b535648fe3b1644417fd83485725f0f32abcff0db565cd1ff6ce088bba",
+   "before": {
+    "tris": 50298,
+    "bytes": 1950512
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 579708
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-9207a5e1c4b1": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-9207a5e1c4b1.glb",
+   "sourceSha256": "136bb86fa2b0800464e453569e9e60e2ebc9ff3e826ae0b0c4805be9dd1afcb8",
+   "sha256": "273909d7072041dcd9b0ced25709d257dbc8b72725a074864b03a18916b98f1a",
+   "before": {
+    "tris": 53546,
+    "bytes": 1959864
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 532392
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-6c113bb8ae2e": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-6c113bb8ae2e.glb",
+   "sourceSha256": "878025cc74c388bd7b06010095c0a0f15813defe88cfcea965fa58e51aad7edf",
+   "sha256": "0bdc103d46c3b1516f92c64ac5485141d306df18d382e98bb0db63644f5fc7e9",
+   "before": {
+    "tris": 57934,
+    "bytes": 2014548
+   },
+   "after": {
+    "tris": 29998,
+    "bytes": 486992
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-fabce0b97897": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-fabce0b97897.glb",
+   "sourceSha256": "8e2aa1d356d0c25fd64d3736657cb7e3942f4fa0a630ed9b91a84fad002fbd10",
+   "sha256": "68b6afff9e1a6bc17b1cbd5d54f2659183fc8ca432484c8cb08ed93b2a0a5fdd",
+   "before": {
+    "tris": 81906,
+    "bytes": 3623244
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 859148
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-5f5e4a9284a4": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-5f5e4a9284a4.glb",
+   "sourceSha256": "83e069aa9f4339bd271bf76fe3fd2fabd6ea637e690d7d3445f60c6d520ecbfc",
+   "sha256": "3189fed53c9fbe240178e6e741ce4f14c9e1f5e67e08273dd820ffe5c5500f01",
+   "before": {
+    "tris": 100000,
+    "bytes": 3772784
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 604000
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-0b40c69c8244": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-0b40c69c8244.glb",
+   "sourceSha256": "626c716e94b86da938573b07af320978d7d428be5200f924f12f8a4203e156b7",
+   "sha256": "0324e2cf7b145cc994e2c8443a2aaaa3cea1edc600583d9208bbfc445f20cfe1",
+   "before": {
+    "tris": 50296,
+    "bytes": 6136680
+   },
+   "after": {
+    "tris": 29984,
+    "bytes": 550636
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-f3f642ac7b15": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-f3f642ac7b15.glb",
+   "sourceSha256": "5f77554d8e27f0896590818200cd2f21ed683de9c49c6dc944376bc35a41e082",
+   "sha256": "5a54d87ef195cd5387d5fa483dc0aabac2e76508feb218e6d78b5aa008db2fa7",
+   "before": {
+    "tris": 48700,
+    "bytes": 1946528
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 584412
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-40a9797026a2": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-40a9797026a2.glb",
+   "sourceSha256": "a8f25d0b9ad07f8534d9023d29aeba48a687ca9cfe88b55c053a2693fb8614bd",
+   "sha256": "c617d4e105970ff937e68994fae7a6469e75aeeec663d31002213fd7f3c5033b",
+   "before": {
+    "tris": 100000,
+    "bytes": 4036300
+   },
+   "after": {
+    "tris": 29998,
+    "bytes": 803172
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-5f63a6fe6100": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-5f63a6fe6100.glb",
+   "sourceSha256": "6e49791c6681695f328fa431e7d8c8f7544863f90bcc214cd99afa89a9d60f73",
+   "sha256": "aa5a84f24b076b665f4a40848a078196c878941577259e845f234efe081cd28c",
+   "before": {
+    "tris": 86020,
+    "bytes": 3741192
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 837032
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-935874799be2": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-935874799be2.glb",
+   "sourceSha256": "b26813225b6b8145499b4a6fe30bfd611fe37b51640f7dfe385a18f5ffdc88fd",
+   "sha256": "f9d39cf0158aa598aa2d0d80cd3c243c6451bbeacfaa869c8a40723374959777",
+   "before": {
+    "tris": 91256,
+    "bytes": 3951976
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 870420
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-a4a6b8bad1e8": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-a4a6b8bad1e8.glb",
+   "sourceSha256": "f624ba6a5fe4d741ec9e54ba89529bdaf3e06a184982a48be46dd8a6c322e5a3",
+   "sha256": "0d6016931731138785e018d4ac053cb8ca63da5fde4fbf69902c54651b129b34",
+   "before": {
+    "tris": 100000,
+    "bytes": 4095060
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 812280
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-0734a4679321": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-0734a4679321.glb",
+   "sourceSha256": "70f0f27acaffe2d47e4200a7ce66c767aab5ccba4894558c097043fd6c8668d6",
+   "sha256": "eeccf92d7fbb4306584319a5c1d1617fbe354f39989437ac4a344bc6aef5d91f",
+   "before": {
+    "tris": 59348,
+    "bytes": 2034368
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 474104
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-317a837144b2": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-317a837144b2.glb",
+   "sourceSha256": "44c0e452f1cdf044af680ab49520130bff939c8221806d710b1144954afd9126",
+   "sha256": "37453ef3d479cf245a28e6b601da03f00582f71bff10b06f76ec9e8be44174b9",
+   "before": {
+    "tris": 99999,
+    "bytes": 3796252
+   },
+   "after": {
+    "tris": 29999,
+    "bytes": 626420
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-2bb4733c464d": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-2bb4733c464d.glb",
+   "sourceSha256": "bc98a89390686cc22b30fede6d9a8438ec83c27a953fb9c786825c0c34b5e73d",
+   "sha256": "67cfdaab32b3aa17cad29d931636080e4d3a388410f2339d6e90559f075b69cb",
+   "before": {
+    "tris": 93378,
+    "bytes": 3512672
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 579948
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "exhibit-drive-c30ab0ea1037": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/buildings/exhibit-drive-c30ab0ea1037.glb",
+   "sourceSha256": "06abe986be901b5c766b2d40bbe2460d0dc64dc49b965733deef8aac4b4f359c",
+   "sha256": "b20718c22a5be943e10721052457a199f24c7734392120125d3c7fa7901e57b9",
+   "before": {
+    "tris": 90488,
+    "bytes": 772892
+   },
+   "after": {
+    "tris": 30000,
+    "bytes": 379404
+   },
+   "targets": {
+    "tris": 30000,
+    "texPx": 1024
+   }
+  },
+  "character-verdelis": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/characters/verdelis.glb",
+   "sourceSha256": "881d7f5c6096cf25bd3422e82f017ab2192f729acbce3d2bc980776c816b0daa",
+   "sha256": "da4cd44e97317f060e1fa1f1e41d08b10184e9a17af0129414629750f589421a",
+   "before": {
+    "tris": 19479,
+    "bytes": 2076432
+   },
+   "after": {
+    "tris": 19479,
+    "bytes": 1528864
+   },
+   "targets": {
+    "tris": 40000,
+    "texPx": 2048
+   }
+  },
+  "character-kalama": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/characters/kalama.glb",
+   "sourceSha256": "753f3163a6929fdf31598b34df557d04548fa28319e5cdbfd36755bf07938e73",
+   "sha256": "ccbc447473f579abe12a32c2ba8d8f3a373315ff25e3509357d832f9773e7e78",
+   "before": {
+    "tris": 17230,
+    "bytes": 1386044
+   },
+   "after": {
+    "tris": 17230,
+    "bytes": 1442456
+   },
+   "targets": {
+    "tris": 40000,
+    "texPx": 2048
+   }
+  },
+  "character-kweku": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/characters/kweku.glb",
+   "sourceSha256": "9216edfb03807cd95f1cfa5f046ecbf217e395fb207d8d72884ed8532aae36c5",
+   "sha256": "21200d03b44ad3c5e74727216f48a7c9452f7e3eb531d17546e57e57279555c8",
+   "before": {
+    "tris": 30815,
+    "bytes": 1014384
+   },
+   "after": {
+    "tris": 30815,
+    "bytes": 1110952
+   },
+   "targets": {
+    "tris": 40000,
+    "texPx": 2048
+   }
+  },
+  "character-mycos": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/characters/mycos.glb",
+   "sourceSha256": "411eac1f3b7a71830c80305bfe787976c0864f782e433232c73170b59bad08bf",
+   "sha256": "abb4963aa46021a262464985dfc47ee5d8386811b431ba2a89204c264d8d2db7",
+   "before": {
+    "tris": 28820,
+    "bytes": 939644
+   },
+   "after": {
+    "tris": 28820,
+    "bytes": 1033572
+   },
+   "targets": {
+    "tris": 40000,
+    "texPx": 2048
+   }
+  },
+  "character-ada": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/characters/ada.glb",
+   "sourceSha256": "d072646e5562ea694fb749d85b43eda419822311679537d49a74df02a20ff02c",
+   "sha256": "a6bfbbfeddab3e727a2498a0c29a01aa6c5089d23afc7685788d68ae068efb1b",
+   "before": {
+    "tris": 26816,
+    "bytes": 952780
+   },
+   "after": {
+    "tris": 26816,
+    "bytes": 1029388
+   },
+   "targets": {
+    "tris": 40000,
+    "texPx": 2048
+   }
+  },
+  "character-shuijing": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/characters/shuijing.glb",
+   "sourceSha256": "b1cb50299458e144eef76098bd54ff38fb1e8c910df020efd65ce753e51e754c",
+   "sha256": "bdfaba8553dd65dbcb9fe29006b7b60513d56138f8b8b0a104e5418ece78ad62",
+   "before": {
+    "tris": 31642,
+    "bytes": 916388
+   },
+   "after": {
+    "tris": 31642,
+    "bytes": 994636
+   },
+   "targets": {
+    "tris": 40000,
+    "texPx": 2048
+   }
+  },
+  "character-nyx": {
+   "source": "lm/map@953613972438611c336b4cb5733390e47aed3290:worlds/littlemartians/characters/nyx.glb",
+   "sourceSha256": "ab9dbab637ffb11b9f1ab40feb1767ac561948e8651310e18a0bd5431db7e8eb",
+   "sha256": "e4f151920919c4c95a867e71a2d9347dda77a1bc26fc4805bddac97a9df7a638",
+   "before": {
+    "tris": 40524,
+    "bytes": 1041840
+   },
+   "after": {
+    "tris": 40000,
+    "bytes": 1148684
+   },
+   "targets": {
+    "tris": 40000,
+    "texPx": 2048
+   }
+  }
+ }
+}
