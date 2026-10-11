@@ -555,3 +555,11 @@ Gene's bar: the new system does everything the old did, and more.
   later integration commit built on it.
 - Lanes merge into `root/reconcile`, never into main directly. The lead fast-forwards main once the one validation
   (`tools/test-harness/one-validation.sh`, plan at the top of `team/lanes/rec.md`) passes.
+
+### UXFIX2 (2026-10-11, root/uxfix2 7a7f61be)
+- `god-ui/JoinPanel.tsx` is now only the god's Souls tab. On new worlds, visitors get no god-panel card, except on
+  `#approve/<id>` links, which show the approval card (and Sign in). As on /w/eden, the header's New Soul (e8 BringAgent) is
+  the only join path.
+- On new worlds Shell reads the display name from `/v1/god/status` (`WORLD_NAME`) for Explore, the header and the New Soul
+  prompt; `BringAgent` takes an optional `worldName`. Old worlds are unchanged.
+- The launcher home omits the god line when an owned world has no god name.
