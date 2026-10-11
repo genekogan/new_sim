@@ -542,10 +542,10 @@ types.push(
 
 // ---------------------------------------------------------------- civic
 const CIV = { category: 'building.civic', tags: ['civic'] };
-const CLASSROOM = [it('board', 'wall-board', '0.5,0,s', { params: { variant: 'whiteboard' } }), it('teacher', 'office-desk', '0.2,0.12,n 0.8,0.12,n'), ...grid('desk', 'school-desk', 4, 3, 0.15, 0.85, 0.45, 0.95, 'n'), it('shelf', 'bookcase', '1,0.6,w 0,0.6,e'), it('lockers', 'lockers', '0,0.9,e 1,0.95,w')];
+const CLASSROOM = [it('board', 'wall-board', '0.5,0,s', { params: { variant: 'whiteboard' } }), it('teacher', 'office-desk', '0.2,0.12,n 0.8,0.12,n'), ...grid('desk', 'school-desk', 3, 3, 0.2, 0.8, 0.3, 0.95, 'n'), it('shelf', 'bookcase', '1,0.6,w 0,0.6,e'), it('lockers', 'lockers', '0,0.9,e 1,0.95,w')];
 types.push(
   furnished({ ...CIV, name: 'school', synonyms: ['schoolhouse', 'primary school', 'secondary school', 'academy', 'college', 'classrooms', 'high school'],
-    description: 'A furnished two-storey school (20 × 12 m): four classrooms of twelve pupil desks facing a whiteboard and the teacher\'s desk, a corridor with side entrances, a staff room, an office, washrooms and a library upstairs. Open weekdays 8:30–15:30.',
+    description: 'A furnished two-storey school (20 × 12 m): four classrooms of nine pupil desks facing a whiteboard and the teacher\'s desk, a corridor with side entrances, a staff room, an office, washrooms and a library upstairs. Open weekdays 8:30–15:30.',
     params: { w: 20, d: 12, floors: 2, floorHeight: 3.4, roof: 'gable', roofPitch: 22, material: 'brick', wall: '#b5704f', trim: '#f0e6d0', roofColor: '#5a3e2e', porch: 0, windows: 0.75 },
     plan: plan([{ rooms: [['classroom-1', 0, 5, 10, 12], ['classroom-2', 10, 5, 20, 12], ['hall', 0, 3, 20, 5], ['staffroom', 0, 0, 7, 3], ['washroom', 7, 0, 12, 3], ['office', 12, 0, 20, 3]],
       doors: [['hall', 'classroom-1', 0.85], ['hall', 'classroom-2', 0.15], ['hall', 'staffroom', 0.7], ['hall', 'washroom'], ['hall', 'office']], ext: [['hall', 'w', 0.5, 1.4], ['hall', 'e', 0.5, 1.4], ['classroom-1', 's', 0.5]] },
@@ -601,7 +601,7 @@ types.push(
     description: 'A furnished stone church (10 × 18 m, a tall nave): rows of pews facing an altar with candles, a lectern and a piano at the front, and a vestry behind. Open 8–20; a service on Sundays at 10:00.',
     params: { w: 10, d: 18, floors: 1, floorHeight: 5, roof: 'gable', roofPitch: 45, material: 'stone', wall: '#e9e4da', trim: '#8f877a', roofColor: '#4f5a60', porch: 2, windows: 0.5 },
     plan: plan([{ rooms: [['nave', 0, 3, 10, 18], ['vestry', 0, 0, 10, 3]], doors: [['nave', 'vestry', 0.85]], ext: [['nave', 's', 0.5, 1.8]] }]),
-    recipe: { nave: [it('altar', 'altar', '0.5,0.02,s'), it('lectern', 'lectern', '0.2,0.12,s'), it('piano', 'piano', '0.85,0.15,w'), ...grid('pew', 'pew', 2, 6, 0.1, 0.9, 0.3, 0.92, 'n'), it('candle-l', 'lantern-post', '0,0.1,s 0,0.2,s'), it('candle-r', 'lantern-post', '1,0.1,s 1,0.2,s')],
+    recipe: { nave: [it('altar', 'altar', '0.5,0.02,s'), it('lectern', 'lectern', '0.2,0.12,s'), it('piano', 'piano', '0.85,0.15,w'), ...grid('pew', 'pew', 2, 6, 0.1, 0.9, 0.3, 0.92, 'n'), it('lamp-l', 'floor-lamp', '0,0.1,s 0,0.2,s'), it('lamp-r', 'floor-lamp', '1,0.1,s 1,0.2,s')],
       vestry: [it('wardrobe', 'wardrobe', '0,0,s'), it('table', 'table', '0.5,0.5,s'), it('chair', 'chair', '0.5,0.9,n'), it('shelf', 'bookshelf', '1,0,s 0.3,0,s')] },
     layers: { owner: 'god', schedule: { ...HOURS('08:00', '20:00'), events: [{ name: 'service', label: 'Sunday service', at: '10:00', minutes: 60, days: ['sun'] }] } } }),
   furnished({ ...CIV, name: 'prison', synonyms: ['jail', 'gaol', 'penitentiary', 'lock-up', 'detention centre', 'correctional facility'],
@@ -619,10 +619,10 @@ types.push(
 const REC = { category: 'public.venue', tags: ['recreation'] };
 types.push(
   furnished({ ...REC, category: 'building.civic', name: 'theatre', synonyms: ['theater', 'playhouse', 'opera house', 'auditorium', 'cinema', 'concert hall', 'music hall'],
-    description: 'A furnished theatre (16 × 22 m, a tall floor): an auditorium of fifteen rows of tip-up seats facing a stage with curtains, and a foyer with a box office (a ticket costs 10). A show every night at 19:30.',
+    description: 'A furnished theatre (16 × 22 m, a tall floor): an auditorium of twelve rows of tip-up seats (48 seats) facing a stage with curtains, and a foyer with a box office (a ticket costs 10). A show every night at 19:30.',
     params: { w: 16, d: 22, floors: 1, floorHeight: 5, roof: 'gable', roofPitch: 24, material: 'brick', wall: '#8a3f3a', trim: '#e8dcc4', roofColor: '#3f4446', porch: 2, windows: 0.2 },
     plan: plan([{ rooms: [['auditorium', 0, 0, 16, 16], ['foyer', 0, 16, 16, 22]], doors: [['foyer', 'auditorium', 0.2], ['foyer', 'auditorium', 0.8]], ext: [['foyer', 's', 0.5, 2]] }]),
-    recipe: { auditorium: [it('stage', 'stage', '0.5,0,s'), ...grid('row', 'theatre-seats', 3, 5, 0.12, 0.88, 0.5, 0.95, 's')],
+    recipe: { auditorium: [it('stage', 'stage', '0.5,0,s'), ...grid('row', 'theatre-seats', 3, 4, 0.12, 0.88, 0.5, 0.95, 'n')],
       foyer: [counter('box-office', 'reception', '0.5,0.15,s', { amount: 10, service: 'a ticket' }), it('sofa-1', 'sofa', '0,0.6,e'), it('sofa-2', 'sofa', '1,0.6,w'), it('poster-1', 'notice-board', '0.15,1,n'), it('poster-2', 'notice-board', '0.85,1,n')] },
     layers: { owner: 'god', schedule: { open: [{ from: '18:00', to: '23:00' }], events: [{ name: 'show', label: 'Tonight\'s show', at: '19:30', minutes: 120 }] } } }),
   furnished({ ...REC, category: 'building.civic', name: 'museum', synonyms: ['gallery', 'art gallery', 'exhibition hall', 'museum building', 'collection', 'heritage centre'],

@@ -199,9 +199,9 @@
     ]
    },
    {
-    "name": "candle-l",
+    "name": "lamp-l",
     "def": [
-     "core/lantern-post@1"
+     "core/floor-lamp@1"
     ],
     "try": [
      [
@@ -217,9 +217,9 @@
     ]
    },
    {
-    "name": "candle-r",
+    "name": "lamp-r",
     "def": [
-     "core/lantern-post@1"
+     "core/floor-lamp@1"
     ],
     "try": [
      [

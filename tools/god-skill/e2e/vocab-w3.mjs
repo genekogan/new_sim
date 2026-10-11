@@ -90,7 +90,8 @@ const ROWS = [
 ];
 const only = typeof args.only === 'string' ? new Set(args.only.split(',')) : null;
 const PLACED = [];
-for (const r of ROWS) { let x = -150; for (const n of r.names) { const d = defOf(n), w = d.size.box[0]; if (!only || only.has(n)) PLACED.push({ n, x: x + w / 2, z: r.z }); x += w + 8; } }
+// rows centred on the origin (Souls are born near 0,0; walk:<place> is offered within ~100 m)
+for (const r of ROWS) { const ns = r.names.filter((n) => !only || only.has(n)); const tot = ns.reduce((a, n) => a + defOf(n).size.box[0] + 8, -8); let x = -tot / 2; for (const n of ns) { const w = defOf(n).size.box[0]; PLACED.push({ n, x: x + w / 2, z: r.z }); x += w + 8; } }
 if (!only || only.has('stadium')) PLACED.push({ n: 'stadium', x: 0, z: 190 });
 const FINDS = [['block of flats', 'apartment-block'], ['pub', 'bar'], ['gas station', 'petrol-station'], ['firehouse', 'fire-station'], ['gaol', 'prison'], ['loo', 'toilet'], ['gondola', 'shop-shelving'],
   ['vitrine', 'display-case'], ['tombstone', 'gravestone'], ['grandstand', 'bleachers'], ['tip-up seats', 'theatre-seats'], ['trailer home', 'mobile-home'], ['manor', 'mansion'], ['playhouse', 'theatre'],
@@ -148,35 +149,41 @@ try {
     /** walk into the building, then sit on the piece (its own sit capability), then stand up */
     const sitIn = async (cli, b, pred, label) => {
       const seat = childOf(b, pred); if (!seat) return { b, label, error: 'no such piece' };
-      const walk = (await cli.run('act', `walk:${b}`)).data;
+      // a furnished building is offered room by room (walk:<building>/<room>): walk into the piece's room, wait to arrive
+      const room = seat.in?.slot ?? ents.find((e) => e.id === seat.in?.parent)?.in?.slot;
+      const walk = (await cli.run('act', `walk:${b}/${room}`)).data;
+      await cli.run('wait', '120');
       await until(async () => ({ ok: (await caps(cli)).some((c) => c.id === `sit:${seat.id}`) }), 90_000, 1500);
       const cap = (await caps(cli)).find((c) => c.id === `sit:${seat.id}`);
-      const act = (await cli.run('act', `sit:${seat.id}`, '{"seconds":30}')).data;
+      const act = (await cli.run('act', `sit:${seat.id}`, '{"seconds":30}', '--force')).data;
       const sat = await until(async () => { const o = await observe(cli); const me = o?.self ?? o?.me ?? o; return { ok: /"activity":"sit"/.test(JSON.stringify(o ?? {})), activity: me?.activity, at: me?.position ?? me?.pos }; }, 150_000, 1500);
-      await cli.run('act', 'stand:here').catch(() => {});
+      await cli.run('act', 'stand:here', '{}', '--force').catch(() => {}); await cli.run('wait', '30');
       return { b, label, seat: seat.name, walk: walk?.accepted ?? walk?.code, offered: cap ? cap.label : null, accepted: act?.accepted ?? act?.code, sat: !!sat?.ok, activity: sat?.activity };
     };
     await step('S1 Ana walks into the café and sits at a table; then buys a coffee at the counter (wallets move)', async () => {
       const r = await sitIn(ana, 'cafe', (e) => /^cafe-chair/.test(e.name), 'a café chair');
       const counter = childOf('cafe', (e) => e.name === 'cafe-counter');
       const offer = (await caps(ana)).find((c) => c.id === `buy:${counter?.id}`);
-      if (offer && !offer.available) { await ana.run('act', `walk:cafe`); }
+
       const before = (await api('/v1/world/layers/me', { token: ana.token() })).data?.wallet;
       const buy = (await ana.run('act', `buy:${counter?.id}`)).data;
       const after = (await api('/v1/world/layers/me', { token: ana.token() })).data?.wallet;
       return { ...r, buyOffer: offer?.label, buy: buy?.accepted ?? buy?.code ?? buy, bought: buy?.result?.bought ?? buy?.receipt?.result?.bought, before, after };
-    }, (r) => r.sat && r.buy === true && JSON.stringify(r.after) !== JSON.stringify(r.before));
+    }, (r) => r.sat && r.accepted === true && r.buy === true && JSON.stringify(r.after) !== JSON.stringify(r.before));
     const SITS = [[ana, 'house', (e) => e.name === 'living-sofa', 'the living-room sofa'], [ana, 'church', (e) => /^nave-pew/.test(e.name), 'a pew'],
-      [ben, 'school', (e) => /^classroom-1-desk/.test(e.name), 'a pupil desk'], [ben, 'theatre', (e) => /^auditorium-row/.test(e.name), 'the stalls'], [ben, 'hospital', (e) => e.name === 'consulting-bed', 'a hospital bed edge']];
-    for (const [cli, b, pred, label] of SITS) await step(`S2 ${cli === ana ? 'Ana' : 'Ben'} walks into the ${b} and sits on ${label}`, () => sitIn(cli, b, pred, label), (r) => r.sat);
+      [ben, 'school', (e) => /^classroom-1-desk/.test(e.name), 'a pupil desk'], [ben, 'hospital', (e) => e.name === 'consulting-bed', 'a hospital bed edge']];
+    for (const [cli, b, pred, label] of SITS) await step(`S2 ${cli === ana ? 'Ana' : 'Ben'} walks into the ${b} and sits on ${label}`, () => sitIn(cli, b, pred, label), (r) => r.sat && r.accepted === true);
     await step('S3 Ben walks to the police station and opens a cell door (an actuator inside a furnished building); the world records it', async () => {
       const bars = childOf('police-station', (e) => /^cell-\d-bars|cell-bars/.test(e.name) || /-bars$/.test(e.name));
-      await ben.run('act', 'walk:police-station');
+      await ben.run('act', `walk:police-station/${bars?.in?.slot}`); await ben.run('wait', '120');
       await until(async () => ({ ok: (await caps(ben)).some((c) => c.id === `object:${bars?.id}:open`) }), 60_000, 1500);
       const r = (await ben.run('act', `object:${bars?.id}:open`, '{}', '--force')).data;
       const st = await until(async () => { const e = (await api(`/v1/world/entities/${bars?.id}`)).data?.entity; return { ok: e?.state?.open === true, state: e?.state }; }, 60_000, 1500);
       return { bars: bars?.name, act: r?.accepted ?? r?.code, open: st?.ok, state: st?.state };
     }, (r) => r.open);
+    // last: a seated Soul in a full row of theatre seats may not get up again (see the report)
+    await step('S4 Ben walks into the theatre and sits in the stalls', () => sitIn(ben, 'theatre', (e) => /^auditorium-row/.test(e.name), 'the stalls'), (r) => r.sat && r.accepted === true);
+
   }
 
   if (chromium && !args['no-viewer']) for (const dpr of dprs) {
@@ -211,7 +218,7 @@ try {
         }
         await view({ hideRoofs: false, cut: null });
         // eye level inside a few main rooms
-        for (const [n, eye, at] of [['cafe', [2.8, 1.6, 2.4], [-2, 1.0, -1.5]], ['church', [0, 1.7, 7.5], [0, 1.2, -5]], ['school', [-1, 1.6, 5.4], [-5, 1.0, 1.5]], ['theatre', [0, 1.7, 5.5], [0, 1.4, -8]], ['bar', [3.6, 1.6, 3.4], [-2, 1.0, -1]], ['house', [3.4, 1.6, 3.4], [-2, 0.8, 0]]]) {
+        for (const [n, eye, at] of [['cafe', [2.8, 1.6, 2.4], [-2, 1.0, -1.5]], ['church', [0, 1.7, 7.5], [0, 1.2, -5]], ['school', [-1, 1.6, 5.4], [-5, 1.0, 1.5]], ['theatre', [0, 1.8, 2.5], [0, 1.4, -9]], ['bar', [3.6, 1.6, 3.4], [-2, 1.0, -1]], ['house', [3.4, 1.6, 3.4], [-2, 0.8, 0]]]) {
           const p = PLACED.find((q) => q.n === n); if (!p) continue;
           await look([p.x + eye[0], eye[1], p.z + eye[2]], [p.x + at[0], at[1], p.z + at[2]]); await sleep(1500); await snap(`eye-${n}`);
         }
