@@ -21,7 +21,7 @@ export function worldForPath(path='/'){
 // replacement cannot change this proxy's artifact authority. No API interception.
 export function prepareArtifactOverlay(options){
  if(options===undefined)return null;
- const {webDir,webManifest,webManifestSha256,cliFile,cliSha256,frontendSource,cliSource}=options;
+ const {webDir,webManifest,webManifestSha256,cliFile,cliSha256,frontendSource,cliSource,guideArtifacts}=options;
  const hash=bytes=>createHash('sha256').update(bytes).digest('hex');
  const sha=value=>typeof value==='string'&&/^[a-f0-9]{64}$/.test(value);
  if(![webDir,webManifest,cliFile].every(v=>typeof v==='string'&&v.startsWith('/'))||!sha(webManifestSha256)||!sha(cliSha256)||![frontendSource,cliSource].every(v=>typeof v==='string'&&/^[a-f0-9]{40}$/.test(v)))throw Error('artifact overlay requires exact paths, hashes and source pins');
@@ -38,23 +38,36 @@ export function prepareArtifactOverlay(options){
  const index=bytes.get('index.html').toString('utf8');
  for(const match of index.matchAll(/(?:src|href)=["']([^"']+)["']/g)){const url=match[1];if(!url.startsWith('/assets/')||!bytes.has(url.slice(1)))throw Error('artifact index dependency is not manifest-listed');}
  const cli=boundedRead(cliFile,32*1024*1024);if(hash(cli)!==cliSha256)throw Error('artifact CLI hash differs');
+ const guideRoutes=new Map(),guideHashes={};
+ if(guideArtifacts!==undefined){
+  if(!guideArtifacts||guideArtifacts.source!==cliSource||!guideArtifacts.worlds||Object.keys(guideArtifacts.worlds).sort().join('|')!==[...KEYS].sort().join('|'))throw Error('all selected-world guides must match CLI source');
+  let origin;
+  for(const key of KEYS){const row=guideArtifacts.worlds[key];let url;try{url=new URL(row?.worldURL);}catch{throw Error('guide world URL invalid');}
+   if(url.protocol!=='https:'||url.pathname!==`/w/${key}`||url.search||url.hash||url.username||url.password||row.worldURL!==url.origin+url.pathname||origin&&origin!==url.origin)throw Error('guide world URL binding differs');origin=url.origin;
+   guideHashes[key]={};
+   for(const kind of ['skill','instructions']){const pin=row[kind];if(!pin||typeof pin.path!=='string'||!pin.path.startsWith('/')||!sha(pin.sha256)||!Number.isSafeInteger(pin.bytes)||pin.bytes<1||pin.bytes>1024*1024)throw Error('guide artifact pin invalid');const data=boundedRead(pin.path,1024*1024);if(data.length!==pin.bytes||hash(data)!==pin.sha256)throw Error('guide artifact bytes differ');const text=data.toString('utf8');if(!text.includes(row.worldURL)||text.includes('{{BASE}}')||text.includes('{{WORLD}}'))throw Error('guide world URL is unrendered');guideHashes[key][kind+'Sha256']=pin.sha256;
+    guideRoutes.set(`/w/${key}/${kind}.md`,data);if(kind==='skill')guideRoutes.set(`/w/${key}/v1/skill.md`,data);if(key==='eden'){guideRoutes.set(`/${kind}.md`,data);if(kind==='skill')guideRoutes.set('/v1/skill.md',data);}
+   }
+  }
+ }
  const indexPaths=new Set(['/',...KEYS.flatMap(k=>[`/w/${k}`,`/w/${k}/`])]);
  const cliPaths=new Set(['/eden-agent.mjs',...KEYS.map(k=>`/w/${k}/eden-agent.mjs`)]);
- const mime={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.woff':'font/woff','.woff2':'font/woff2','.wasm':'application/wasm','.ico':'image/x-icon'};
- const attribution=Object.freeze({frontendSource,cliSource,webManifestSha256,cliSha256});
+ const mime={'.md':'text/markdown; charset=utf-8','.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.mjs':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml','.png':'image/png','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.woff':'font/woff','.woff2':'font/woff2','.wasm':'application/wasm','.ico':'image/x-icon'};
+ const attribution=Object.freeze({frontendSource,cliSource,webManifestSha256,cliSha256,...(guideArtifacts?{guideSource:guideArtifacts.source,guideHashes:Object.freeze(Object.fromEntries(KEYS.map(k=>[k,Object.freeze(guideHashes[k])])))}:{})});
  return Object.freeze({attribution,handle(req,res){
   if(req.method!=='GET'&&req.method!=='HEAD')return false;
   // Inspect raw spelling before URL normalization; traversal never gets an index.
   const rawPath=req.url.split('?')[0];
-  if(!indexPaths.has(rawPath)&&!cliPaths.has(rawPath)&&!/^\/(?:w\/(?:eden|mars|littlemartians)\/)?assets(?:\/|$)/.test(rawPath))return false;
+  if(!indexPaths.has(rawPath)&&!cliPaths.has(rawPath)&&!guideRoutes.has(rawPath)&&!/^\/(?:w\/(?:eden|mars|littlemartians)\/)?assets(?:\/|$)/.test(rawPath))return false;
   let decoded;try{decoded=decodeURIComponent(rawPath);}catch{res.writeHead(400).end();return true;}
   if(decoded.includes('\\')||decoded.includes('\0')||decoded.split('/').some(p=>p==='.'||p==='..')){res.writeHead(400).end();return true;}
   const path=rawPath;let name,data,cache;
   if(indexPaths.has(path)){name='index.html';data=bytes.get(name);cache='no-cache';}
   else if(cliPaths.has(path)){name='eden-agent.mjs';data=cli;cache='public, max-age=60';}
+  else if(guideRoutes.has(path)){name='guide.md';data=guideRoutes.get(path);cache='public, max-age=60';}
   else{const asset=path.replace(/^\/w\/(?:eden|mars|littlemartians)(?=\/assets\/)/,'').slice(1);if(asset.startsWith('assets/')&&bytes.has(asset)){name=asset;data=bytes.get(asset);cache='public, max-age=31536000, immutable';}}
   if(!data)return false;
-  res.writeHead(200,{'Content-Type':mime[extname(name)]||'application/octet-stream','Content-Length':data.length,'Cache-Control':cache,'X-Sim-Frontend-Source':frontendSource,'X-Sim-CLI-Source':cliSource,'X-Sim-Artifact-Manifest':webManifestSha256});res.end(req.method==='HEAD'?undefined:data);return true;
+  res.writeHead(200,{'Content-Type':mime[extname(name)]||'application/octet-stream','Content-Length':data.length,'Cache-Control':cache,'X-Sim-Frontend-Source':frontendSource,'X-Sim-CLI-Source':cliSource,'X-Sim-Artifact-Manifest':webManifestSha256,...(name==='guide.md'?{'X-Sim-Guide-Source':guideArtifacts.source}:{})});res.end(req.method==='HEAD'?undefined:data);return true;
  }});
 }
 export function isWorldsPath(path='/'){const raw=path.split('?')[0];return raw==='/worlds'||raw.startsWith('/worlds/');}
@@ -82,7 +95,9 @@ export function worldProxyHandlers({worlds,worldsUpstreamPort=null,identities=ne
 }
 // Preserve the reviewed HTTP-only fixture/consumer API.
 export const worldProxyRequestHandler=options=>worldProxyHandlers(options).http;
-export async function openWorldProxy({port=4966,worlds,exposure='local',expectedWorldIds,expectedBuild,artifactOverlay,worldsUpstreamPort=null}){
+export function listenWorldProxy(server,port,beforeListen){return new Promise((yes,no)=>{const result=beforeListen?.();if(result!==undefined)throw Error('beforeListen must return void synchronously');server.once('error',no);server.listen(port,'127.0.0.1',yes);});}
+export async function openWorldProxy({port=4966,worlds,exposure='local',expectedWorldIds,expectedBuild,artifactOverlay,worldsUpstreamPort=null,beforeListen}){
+ if(beforeListen!==undefined&&typeof beforeListen!=='function')throw Error('beforeListen must be a trusted synchronous function');
  if(worldsUpstreamPort!==null&&worldsUpstreamPort!==5340)throw Error('worlds upstream must be explicit local5340 or null');
  const publicPreview=exposure==='shared-preview';if(!['local','shared-preview'].includes(exposure))throw Error('explicit proxy exposure required');
  if(!Number.isInteger(port)||!(port>=4963&&port<=4969||publicPreview&&port===4970)||!worlds||KEYS.some(k=>!Number.isInteger(worlds[k])||!(worlds[k]>=4950&&worlds[k]<=4969||k==='eden'&&worlds[k]===4970)))throw Error('explicit local world ports and private proxy4963..4969 required');
@@ -95,7 +110,7 @@ export async function openWorldProxy({port=4966,worlds,exposure='local',expected
  const server=createServer(handlers.http);
  server.on('connection',socket=>{sockets.add(socket);socket.on('close',()=>sockets.delete(socket));});
  server.on('upgrade',handlers.upgrade);
- await new Promise((yes,no)=>{server.once('error',no);server.listen(port,'127.0.0.1',yes);});
+ await listenWorldProxy(server,port,beforeListen);
  return{server,artifactAttribution:overlay?.attribution??null,url:`http://127.0.0.1:${port}`,close:async()=>{closing=true;const done=new Promise(r=>server.close(r));for(const socket of sockets)socket.destroy();await done;}};
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(resolve(process.argv[1])).href){
