@@ -501,27 +501,12 @@ const litterKit = [
 // ======================================================================= batch 2: thickening the thinnest categories
 const CIVIC = { category: 'building.civic', tags: ['building', 'civic'] };
 const civicPresets = [
-  presetDef({ ...CIVIC, name: 'town-hall', base: 'core/hall@1', synonyms: ['city hall', 'council house', 'guildhall', 'municipal building', 'mairie', 'village hall'],
-    description: 'A stone town hall (16 × 12 m, two tall floors) with a hipped roof, a columned porch and many windows; the council chamber and offices of a town. Size, floors and colours are params.',
-    defaults: { w: 16, d: 12, floors: 2, floorHeight: 4.2, roof: 'hip', roofPitch: 28, material: 'stone', wall: '#d8cfbd', trim: '#8a7a5a', roofColor: C.slate, porch: 2.5, windows: 0.6 } }),
-  presetDef({ ...CIVIC, name: 'library', base: 'core/hall@1', synonyms: ['public library', 'reading room', 'book house', 'archive', 'athenaeum'],
-    description: 'A brick public library (14 × 10 m, one tall floor) with a gable roof and tall windows; a quiet reading hall for shelves and tables. Furnish it with bookcases. Size and colours are params.',
-    defaults: { w: 14, d: 10, floors: 1, floorHeight: 5, roof: 'gable', roofPitch: 32, material: 'brick', wall: '#a8664a', trim: C.cream, roofColor: '#4a4f52', porch: 1.5, windows: 0.55 } }),
-  presetDef({ ...CIVIC, name: 'school', base: 'core/hall@1', synonyms: ['schoolhouse', 'primary school', 'academy', 'classroom building', 'college', 'kindergarten'],
-    description: 'A two-floor brick school (20 × 12 m) with rows of big classroom windows and a low-pitched roof; classrooms and a hall inside. Size, floors and colours are params.',
-    defaults: { w: 20, d: 12, floors: 2, floorHeight: 3.6, roof: 'gable', roofPitch: 22, material: 'brick', wall: '#b5704f', trim: '#f0e6d0', roofColor: '#5a3e2e', porch: 1.5, windows: 0.75 } }),
   presetDef({ ...CIVIC, name: 'clinic', base: 'core/shop@1', synonyms: ['doctor', 'surgery', 'health centre', 'medical centre', 'infirmary', 'hospital'],
     description: 'A white plaster clinic (10 × 9 m, one floor) with a flat roof and a front porch; a waiting room and consulting rooms for a doctor. Size and colours are params.',
     defaults: { w: 10, d: 9, floors: 1, floorHeight: 3.2, roof: 'flat', material: 'plaster', wall: '#f2f0ea', trim: '#3f8a7a', roofColor: '#9aa0a0', porch: 1.5, windows: 0.5 } }),
-  presetDef({ ...CIVIC, name: 'fire-station', base: 'core/barn@1', synonyms: ['firehouse', 'fire hall', 'fire brigade', 'engine house', 'fire department'],
-    description: 'A red-brick fire station (12 × 14 m) with tall engine-bay doors under a deep front canopy and a crew floor above. Size and colours are params.',
-    defaults: { w: 12, d: 14, floors: 2, floorHeight: 4.5, roof: 'flat', material: 'brick', wall: '#a8402e', trim: C.cream, roofColor: '#4a4a48', porch: 2.5, windows: 0.35 } }),
   presetDef({ ...CIVIC, name: 'post-office', base: 'core/shop@1', synonyms: ['post office', 'mail office', 'postal counter', 'sorting office', 'po'],
     description: 'A small post office (8 × 9 m, two floors) with a shop-front counter room and a red-trimmed porch; post letters and parcels here. Pair it with a postbox. Size and colours are params.',
     defaults: { w: 8, d: 9, floors: 2, floorHeight: 3, roof: 'gable', roofPitch: 35, material: 'plaster', wall: '#efe3c8', trim: C.red, roofColor: '#7a3d2e', porch: 1.2, windows: 0.5 } }),
-  presetDef({ ...CIVIC, name: 'museum', base: 'core/hall@1', synonyms: ['gallery', 'art gallery', 'exhibition hall', 'collection', 'heritage centre'],
-    description: 'A stately stone museum (22 × 16 m, one tall 5 m floor) with a flat roof, a deep porch and few windows; galleries for exhibits. Size and colours are params.',
-    defaults: { w: 22, d: 16, floors: 1, floorHeight: 5, roof: 'flat', material: 'stone', wall: '#e4dccb', trim: '#9a8a6a', roofColor: '#8a8478', porch: 3, windows: 0.25 } }),
 ];
 const POT = { category: 'vegetation.potted', tags: ['plant', 'potted'] };
 const leafy = (n, y, r, t) => Array.from({ length: n }, (_, i) => { const a = i * 2.39996; return sph([r * Math.cos(a) * 0.6, y + (i % 3) * r * 0.25, r * Math.sin(a) * 0.6], r * 0.55, t, { seg: 5, scale: [1, 0.8, 1] }); });

@@ -1,0 +1,355 @@
+{
+ "schema": "furnish/1",
+ "style": "bar",
+ "rooms": {
+  "bar": [
+   {
+    "name": "bar",
+    "def": [
+     "core/shop-counter@1"
+    ],
+    "try": [
+     [
+      0.55,
+      0,
+      "s"
+     ],
+     [
+      0.55,
+      0.1,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "bar"
+    },
+    "price": {
+     "amount": 4,
+     "service": "a pint"
+    }
+   },
+   {
+    "name": "stool-1",
+    "def": [
+     "core/stool@1"
+    ],
+    "try": [
+     [
+      0.42,
+      0.3,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "stool-2",
+    "def": [
+     "core/stool@1"
+    ],
+    "try": [
+     [
+      0.55,
+      0.3,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "stool-3",
+    "def": [
+     "core/stool@1"
+    ],
+    "try": [
+     [
+      0.68,
+      0.3,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "pool",
+    "def": [
+     "core/pool-table@1"
+    ],
+    "try": [
+     [
+      0.75,
+      0.75,
+      "s"
+     ],
+     [
+      0.7,
+      0.8,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "darts",
+    "def": [
+     "core/dartboard@1"
+    ],
+    "try": [
+     [
+      0,
+      0.4,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "table-1",
+    "def": [
+     "core/round-table@1",
+     "core/table@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.55,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-1a",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.39,
+      0.55,
+      "e"
+     ],
+     [
+      0.36,
+      0.55,
+      "e"
+     ],
+     [
+      0.5,
+      0.39,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-1b",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.61,
+      0.55,
+      "w"
+     ],
+     [
+      0.64,
+      0.55,
+      "w"
+     ],
+     [
+      0.5,
+      0.7100000000000001,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "table-2",
+    "def": [
+     "core/round-table@1",
+     "core/table@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0.9,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-2a",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.39,
+      0.9,
+      "e"
+     ],
+     [
+      0.36,
+      0.9,
+      "e"
+     ],
+     [
+      0.5,
+      0.74,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-2b",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.61,
+      0.9,
+      "w"
+     ],
+     [
+      0.64,
+      0.9,
+      "w"
+     ],
+     [
+      0.5,
+      1.06,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "jukebox",
+    "def": [
+     "core/arcade-cabinet@1",
+     "core/radio@1"
+    ],
+    "try": [
+     [
+      1,
+      0.25,
+      "w"
+     ]
+    ]
+   }
+  ],
+  "cellar": [
+   {
+    "name": "barrel-1",
+    "def": [
+     "core/barrel@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "barrel-2",
+    "def": [
+     "core/barrel@1"
+    ],
+    "try": [
+     [
+      0.3666666666666667,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "barrel-3",
+    "def": [
+     "core/barrel@1"
+    ],
+    "try": [
+     [
+      0.6333333333333333,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "barrel-4",
+    "def": [
+     "core/barrel@1"
+    ],
+    "try": [
+     [
+      0.9000000000000001,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "crate-1",
+    "def": [
+     "core/crate@1"
+    ],
+    "try": [
+     [
+      0.6,
+      1,
+      "s"
+     ],
+     [
+      0.6,
+      0.6,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "crate-2",
+    "def": [
+     "core/crate@1"
+    ],
+    "try": [
+     [
+      0.8,
+      1,
+      "s"
+     ],
+     [
+      0.8,
+      0.6,
+      "s"
+     ]
+    ]
+   }
+  ],
+  "washroom": [
+   {
+    "name": "toilet",
+    "def": [
+     "core/toilet@1"
+    ],
+    "try": [
+     [
+      0.3,
+      0,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "basin",
+    "def": [
+     "core/washbasin@1"
+    ],
+    "try": [
+     [
+      0.85,
+      0,
+      "s"
+     ]
+    ]
+   }
+  ]
+ }
+}

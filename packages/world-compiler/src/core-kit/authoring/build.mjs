@@ -10,7 +10,7 @@ import { defSchema } from '../../schemas.ts';
 import { lintDef, triBudget, categoryOf } from '../../vocab/index.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
-const FAMILIES = ['creatures', 'furniture', 'props', 'plants', 'transport', 'civic', 'play', 'kitchen', 'work', 'signage', 'vocab', 'vocab-2', 'vocab-w1', 'vocab-w2'];
+const FAMILIES = ['creatures', 'furniture', 'props', 'plants', 'transport', 'civic', 'play', 'kitchen', 'work', 'signage', 'vocab', 'vocab-2', 'vocab-w1', 'vocab-w2', 'vocab-w3'];
 const check = process.argv.includes('--check');
 
 // real triangle counts from the viewer's own kit builder

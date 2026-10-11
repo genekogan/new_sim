@@ -1,0 +1,137 @@
+{
+ "schema": "furnish/1",
+ "style": "cabin",
+ "rooms": {
+  "cabin": [
+   {
+    "name": "bed",
+    "def": [
+     "core/bed@1"
+    ],
+    "try": [
+     [
+      0,
+      0,
+      "e"
+     ],
+     [
+      1,
+      0,
+      "w"
+     ]
+    ]
+   },
+   {
+    "name": "hearth",
+    "def": [
+     "core/hearth@1"
+    ],
+    "try": [
+     [
+      0.6,
+      0,
+      "s"
+     ],
+     [
+      1,
+      0.5,
+      "w"
+     ]
+    ]
+   },
+   {
+    "name": "table",
+    "def": [
+     "core/table@1"
+    ],
+    "try": [
+     [
+      0.75,
+      0.65,
+      "s"
+     ],
+     [
+      0.5,
+      0.6,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chair-1",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.55,
+      0.65,
+      "e"
+     ]
+    ]
+   },
+   {
+    "name": "chair-2",
+    "def": [
+     "core/chair@1"
+    ],
+    "try": [
+     [
+      0.95,
+      0.65,
+      "w"
+     ]
+    ]
+   },
+   {
+    "name": "armchair",
+    "def": [
+     "core/armchair@1"
+    ],
+    "try": [
+     [
+      0.15,
+      0.8,
+      "e"
+     ],
+     [
+      0.3,
+      0.7,
+      "n"
+     ]
+    ]
+   },
+   {
+    "name": "rug",
+    "def": [
+     "core/rug@1"
+    ],
+    "try": [
+     [
+      0.4,
+      0.55,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "chest",
+    "def": [
+     "core/chest@1"
+    ],
+    "try": [
+     [
+      0.05,
+      0.5,
+      "e"
+     ],
+     [
+      0.3,
+      0,
+      "s"
+     ]
+    ]
+   }
+  ]
+ }
+}

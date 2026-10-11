@@ -83,7 +83,7 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
       if (it.on) {
         const host = named[it.on];
         if (!host) { dropped.push({ name, why: `no ${it.on} to put it on` }); continue; }
-        ops.push({ op: 'place', def: ref, name, in: { parent: host.tmp, slot: it.slot ?? 'top' } });
+        ops.push({ op: 'place', def: ref, name, in: { parent: host.tmp, slot: it.slot ?? 'top' }, ...(it.params ? { params: it.params } : {}), ...(it.price ? { price: it.price } : {}) });
         placed.push({ name, def: ref, room: room.id, on: it.on });
         continue;
       }
@@ -114,7 +114,7 @@ export function furnishBatch(model, buildingId, style, opts = {}) {
       taken.push({ floor: room.floor, box, solid: ib.box[1] > 0.06 });
       const tmp = `$f${ops.length}`.slice(0, 25);
       named[it.name ?? 'item'] = { tmp };
-      ops.push({ op: 'place', tmp, def: ref, name, in: { parent: b.id, slot: room.id }, p: [r3(at[0] - room.origin[0]), 0, r3(at[1] - room.origin[1])], r: r3(yaw) });
+      ops.push({ op: 'place', tmp, def: ref, name, in: { parent: b.id, slot: room.id }, p: [r3(at[0] - room.origin[0]), 0, r3(at[1] - room.origin[1])], r: r3(yaw), ...(it.params ? { params: it.params } : {}), ...(it.price ? { price: it.price } : {}) });
       placed.push({ name, def: ref, room: room.id });
     }
   }

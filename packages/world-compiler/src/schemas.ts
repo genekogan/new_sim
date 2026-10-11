@@ -99,6 +99,8 @@ export const partSchema = z.object({
   when: z.string().max(80).optional(),
   /** Repeat the part `count` times, stepping by [dx, dz] (and yaw) each time; ids get -1, -2, … */
   repeat: z.object({ count: z.union([z.number().int().min(1).max(64), z.string().max(40)]), step: v2.default([1, 0]), yaw: num.default(0) }).optional(),
+  /** VOCAB-W3: LAYERS defaults the part's entity starts with (a café counter's price, a hall's opening hours). */
+  owner: ownerRef.optional(), access: z.enum(ACCESS).optional(), schedule: scheduleSchema.optional(), price: priceSchema.optional(),
 });
 export type Part = z.infer<typeof partSchema>;
 
@@ -137,6 +139,11 @@ export const defSchema = z.object({
   /** Local box in metres (x width, y height, z depth) at scale 1, and the allowed uniform-scale range. */
   size: z.object({ box: v3, scale: z.tuple([num.positive(), num.positive()]).default([1, 1]) }),
   overlaps: z.array(z.string()).max(32).default([]),
+  /** VOCAB-W3: things placed with it, each its own entity afterwards (a furnished building: the beds, tables and
+   *  counters in its rooms, `slot` = the room id). Same shape as prefab parts. Optional, so other defs hash as before. */
+  contents: z.array(partSchema).max(256).optional(),
+  /** VOCAB-W3: LAYERS defaults a placed entity starts with unless the place op says otherwise (the god overrides with `set`). */
+  layers: z.object({ owner: ownerRef.optional(), access: z.enum(ACCESS).optional(), schedule: scheduleSchema.optional(), price: priceSchema.optional() }).optional(),
   /** Filled by the compiler at define time; never trusted from input. */
   budget: z.object({ tris: z.number().int(), bytes: z.number().int(), textures: z.number().int() }).optional(),
 });

@@ -1,0 +1,201 @@
+{
+ "schema": "furnish/1",
+ "style": "petrol-station",
+ "rooms": {
+  "kiosk": [
+   {
+    "name": "till",
+    "def": [
+     "core/shop-counter@1"
+    ],
+    "try": [
+     [
+      0.55,
+      0.2,
+      "s"
+     ],
+     [
+      0.5,
+      0.4,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "shop"
+    },
+    "price": {
+     "amount": 2,
+     "service": "a snack"
+    }
+   },
+   {
+    "name": "shelf-1",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0,
+      0.5,
+      "e"
+     ]
+    ],
+    "params": {
+     "variant": "groceries"
+    }
+   },
+   {
+    "name": "fridge",
+    "def": [
+     "core/drinks-fridge@1"
+    ],
+    "try": [
+     [
+      0.35,
+      0,
+      "s"
+     ]
+    ],
+    "price": {
+     "amount": 1,
+     "service": "a drink"
+    }
+   },
+   {
+    "name": "vending",
+    "def": [
+     "core/vending-machine@1"
+    ],
+    "try": [
+     [
+      1,
+      1,
+      "w"
+     ]
+    ]
+   }
+  ],
+  "store": [
+   {
+    "name": "shelf-1",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "goods"
+    }
+   },
+   {
+    "name": "shelf-2",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0.5,
+      0,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "goods"
+    }
+   },
+   {
+    "name": "shelf-3",
+    "def": [
+     "core/shop-shelving@1"
+    ],
+    "try": [
+     [
+      0.9,
+      0,
+      "s"
+     ]
+    ],
+    "params": {
+     "variant": "goods"
+    }
+   },
+   {
+    "name": "crate-1",
+    "def": [
+     "core/crate@1"
+    ],
+    "try": [
+     [
+      0.1,
+      0.9,
+      "s"
+     ],
+     [
+      0.3,
+      0.9,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "crate-2",
+    "def": [
+     "core/crate@1"
+    ],
+    "try": [
+     [
+      0.25,
+      0.9,
+      "s"
+     ],
+     [
+      0.4,
+      0.9,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "barrel",
+    "def": [
+     "core/barrel@1"
+    ],
+    "try": [
+     [
+      0.9,
+      0.9,
+      "s"
+     ],
+     [
+      0.7,
+      0.9,
+      "s"
+     ]
+    ]
+   },
+   {
+    "name": "sack",
+    "def": [
+     "core/sack@1"
+    ],
+    "try": [
+     [
+      0.75,
+      0.9,
+      "s"
+     ],
+     [
+      0.6,
+      0.9,
+      "s"
+     ]
+    ]
+   }
+  ]
+ }
+}

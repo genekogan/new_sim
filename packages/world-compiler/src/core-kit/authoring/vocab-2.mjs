@@ -12,9 +12,6 @@ const withRole = (role, pivot, shapes) => dslWithRole(role, pivot, shapes).map((
 
 export default [
   // ---------------- building.commercial: presets of the shop generator
-  presetDef({ name: 'cafe', base: 'core/shop@1', category: 'building.commercial', synonyms: ['coffee shop', 'café', 'tea room', 'bistro', 'coffee house', 'espresso bar'],
-    description: 'A one-floor café (8 × 7 m) with big front windows, a front room for tables and a back storeroom; warm walls and a terracotta roof. Furnish it with `furnish`; floors, size and colours are params.',
-    defaults: { floors: 1, w: 8, d: 7, wall: '#efd2a8', trim: '#7a3d2e', roofColor: '#b0583a', porch: 1.5 }, tags: ['shop', 'building', 'food'] }),
   presetDef({ name: 'bakery', base: 'core/shop@1', category: 'building.commercial', synonyms: ['bakehouse', 'patisserie', 'boulangerie', 'bread shop', 'cake shop', 'baker'],
     description: 'A one-floor bakery (6 × 8 m) with a shop window, a counter room and a back bakehouse; cream walls and honey trim. Furnish it with `furnish`; floors, size and colours are params.',
     defaults: { floors: 1, w: 6, d: 8, wall: '#f3e3c6', trim: '#b8913f', roofColor: '#8a4a32' }, tags: ['shop', 'building', 'food'] }),
