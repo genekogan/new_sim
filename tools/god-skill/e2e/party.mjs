@@ -261,13 +261,13 @@ try {
   }, (r) => r.name === 'fountain' && /fountain/.test(r.what ?? ''));
 
   // ---- 2. the sign
-  const f5 = await step('S5 CLI: act "read the welcome-sign" → read:<sign> (its words in the label); she walks up and faces it; `object` gives the text', async () => {
+  const f5 = await step('S5 CLI: act "read the welcome-sign" → read:<sign> (its words in the label); she walks round to its face and faces it; `object` gives the text', async () => {
     const res = await cli('resolve', 'read the welcome-sign');
     const a = await cli('act', 'read the welcome-sign'); const r = await follow(a.data);
     const o = (await cli('object', ids['welcome-sign'])).data?.object;
-    return { label: res.data?.would?.label, resolved: a.data?.resolved?.to ?? a.data?.receipt?.capability, phase: r.phase, text: o?.state?.text, dist: r.end ? +Math.hypot(r.end.p[0] - SIGN[0], r.end.p[2] - SIGN[1]).toFixed(2) : null };
-  }, (r) => /Welcome to Party Hill/.test(r.label ?? '') && r.resolved === `read:${ids['welcome-sign']}` && r.phase === 'completed' && /Welcome to Party Hill/.test(r.text ?? '') && r.dist < 2.5);
-  { const p = f5 ? (await observe()).self.position : null; if (p) await shots([{ name: 's5-reading-the-sign', eye: [p[0] + 2.5, p[1] + 2.2, p[2] + 4], at: [SIGN[0], 1, SIGN[1]], wait: 6000 }]); }
+    return { label: res.data?.would?.label, resolved: a.data?.resolved?.to ?? a.data?.receipt?.capability, phase: r.phase, text: o?.state?.text, dist: r.end ? +Math.hypot(r.end.p[0] - SIGN[0], r.end.p[2] - SIGN[1]).toFixed(2) : null, inFront: r.end ? r.end.p[2] > SIGN[1] + 0.5 : null };
+  }, (r) => /Welcome to Party Hill/.test(r.label ?? '') && r.resolved === `read:${ids['welcome-sign']}` && r.phase === 'completed' && /Welcome to Party Hill/.test(r.text ?? '') && r.dist < 2.5 && r.inFront);
+  { const p = f5 ? (await observe()).self.position : null; if (p) await shots([{ name: 's5-reading-the-sign', eye: [p[0] + 1.5, p[1] + 2, p[2] + 4], at: [SIGN[0], 1, SIGN[1]], wait: 6000 }]); }
 
   // ---- 3. the cottage's living room (furnished + the god's extra chairs)
   const f6 = await step('S6 act walk:moss-cottage/living (furnished, two extra chairs, a hearth) → resolve and act agree; she ends inside the living room', async () => {

@@ -75,7 +75,7 @@ export class GodPerceive {
   private sigs = new Map<string, string>();
   /** What each `built` object's state should be now (its kind's advance reads this). */
   private desired = new Map<string, BuiltState>();
-  private signs: { id: string; at: Vec2; name: string; text: string }[] = [];
+  private signs: { id: string; at: Vec2; front: Vec2; name: string; text: string }[] = [];
   constructor(h: PerceiveHost) { this.h = h; }
 
   private objects() {
@@ -119,7 +119,8 @@ export class GodPerceive {
       const near = this.h.namesNear(at, e.id).filter((n) => n !== name).slice(0, 2);
       const what = `${article(kind)}${parent?.name ? ` in ${m.pathOf(parent.id)}` : ''}${near.length ? `, by ${near.join(' and ')}` : ''}`;
       out.set(e.id, { name, kind: this.kindFor(text !== null ? 'sign' : kind), description: clip(def.description || kind, 400), params: { what, text: text ?? '', near, at: [Math.round(at[0] * 100) / 100, Math.round(at[1] * 100) / 100], def: def.ref } });
-      if (text !== null) signs.push({ id: e.id, at, name, text });
+      // read from in front of its face (entity frame: the front is +z, turned by the yaw)
+      if (text !== null) { const wp = m.worldPose(e), d = 1.4; signs.push({ id: e.id, at, front: [at[0] + Math.sin(wp.yaw) * d, at[1] + Math.cos(wp.yaw) * d], name, text }); }
     }
     this.signs = signs;
     return out;
@@ -183,7 +184,7 @@ export class GodPerceive {
       const words = s.text.replace(/\s*\n\s*/g, ' / ');
       const label = `Read ${s.name} (a sign, ${Math.round(d)} m): "${words.length > 160 ? words.slice(0, 157) + '…' : words}"`;
       caps.push({ id, verb: 'read', label, target: { id: s.id, kind: 'object' }, available: true });
-      plans.set(id, { label: `Read ${s.name}`, steps: [...(seated ? [{ verb: 'stand', params: {} }] : []), ...(d > 2 ? [{ verb: 'walk_to', params: { to: s.at, standoff: 1.4 } }] : []), { verb: 'wave', params: { at: s.id, seconds: 1 } }] });
+      plans.set(id, { label: `Read ${s.name}`, steps: [...(seated ? [{ verb: 'stand', params: {} }] : []), ...(Math.hypot(s.front[0] - here[0], s.front[1] - here[1]) > 0.8 ? [{ verb: 'walk_to', params: { to: s.front, standoff: 0 } }] : []), { verb: 'wave', params: { at: s.id, seconds: 1 } }] });
     }
   }
 }
