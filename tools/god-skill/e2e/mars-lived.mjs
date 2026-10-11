@@ -241,7 +241,9 @@ try {
     ben: [{ do: 'walk', to: 'mimos/main', check: (p) => inRoom(p, 'mimos/main') && p[1] > 0.45 }, { do: 'sit', match: /red.sofa/, check: (p) => inRoom(p, 'mimos/main') }],
     cleo: [{ do: 'walk', to: 'kitchen/working-kitchen', check: inKitchen }, { do: 'take', match: /bowl/, check: inKitchen }],
     dev: [{ do: 'walk', to: 'kitchen/dining-hall', check: inDiner }, { do: 'sit', match: /bus-seat-21/, check: inDiner }],
-    eli: [{ do: 'sit', match: /tool.library.floor.cushion|floor.cushion/, maxS: 420, check: (p) => p && Math.abs(p[1] - LOFT_Y) < 0.35 }],
+    // MARSLAND: Souls now arrive on the open playa south-east of Chiba (world 0, 0), ~90 m from Tool camp, beyond what a
+    // Soul's capabilities list from there: Eli walks over to Tool camp first
+    eli: [{ do: 'walk', to: 'tool-camp', maxS: 420 }, { do: 'sit', match: /tool.library.floor.cushion|floor.cushion/, maxS: 420, check: (p) => p && Math.abs(p[1] - LOFT_Y) < 0.35 }],
   }), allOk);
   report.morning = m && brief(m);
   const m2 = await step('D2 Ben comes down off the raised main by the risers, through the pass-through pallet racks into the tea room, and takes a tea stool beside Ana', () => day({

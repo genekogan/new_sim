@@ -56,7 +56,7 @@ ops.push({ op: 'world', state: { ...(st.sky ? { sky: st.sky } : {}), ...(st.weat
 const roots = snap.entities.filter((e) => e.in.parent === 'world' && !/^soul|body/.test(e.def ?? '') && e.by !== 'engine');
 const target = new Map();
 for (const e of roots) {
-  const t = tplOps.find((o) => !o.in && o.name === e.name);
+  const t = e.name ? tplOps.find((o) => !o.in && o.name === e.name) : tplOps.find((o) => !o.in && !o.name && o.def.replace("/", "-") === e.def);
   const p0 = e.p, y = p0.length === 3 ? p0[1] : undefined;
   let p, r;
   if (t) { p = t.p.length === 3 ? t.p : (y !== undefined ? [t.p[0], y, t.p[1]] : t.p); r = t.r ?? 0; }
@@ -69,7 +69,11 @@ if (target.size > 1) for (const { e } of target.values()) { const p = e.p.map((v
 for (const { e, p, r } of target.values()) ops.push({ op: 'move', id: e.id, p, r, mode: 'strict' });
 // 4. new things
 let placed = 0;
-for (const o of tplOps) if (!have.has(tplPath(o))) { const { group, ...op } = o; ops.push(op); placed++; }
+const defsHere = new Set(snap.entities.map((e) => e.def));
+for (const o of tplOps) {
+  if (o.name ? have.has(tplPath(o)) : defsHere.has(o.def.replace('/', '-'))) continue;   // unnamed (the far land, the panorama): one per def
+  const { group, ...op } = o; ops.push(op); placed++;
+}
 
 console.log(`${base}: ${snap.entities.length} things (${oldFrame ? 'old frame' : 'geographic frame'}); ops: expand ${want > now ? `${now}→${want}` : 'no'}, world 1, moves ${target.size} (${target.size > 1 ? '2 phases' : '1'}), places ${placed}; not in the template (kept, turned with the campus): ${roots.filter((e) => !tplNames.has(e.name)).map((e) => e.name ?? e.id).join(', ') || 'none'}`);
 // batches of ≤ 256 ops (the edit schema's limit): bounds + world, the moves out, the moves home, then the new things

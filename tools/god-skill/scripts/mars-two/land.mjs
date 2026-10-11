@@ -6,7 +6,10 @@
 // tyre tracks around it, sparse creosote scrub (bare around camp, thicker toward the south and east).
 // Far (beyond the edge, non-walkable): the 111, the wash, the levee band, salt flats, the Salton Sea, the mountains —
 // see FAR_OPS (core/far-land, core/panorama).
-const CAMP = [24, -53];                          // middle of the campus
+import { MARS_FAR_LAND, MARS_PANORAMA } from '../../e2e/marsland-far-data.mjs';
+
+const CAMP = [24, -53];
+const CHIBA = [-11.1, -30.2];                    // the far data's origin (lane MARSLAND-FAR: campus frame centred on Chiba)                          // middle of the campus
 export const TIRE_RING = { p: [-170, -104], rx: 52, rz: 104, r: -0.087 };   // its north end leans a little east (satellite)
 
 export const NEAR_OPS = [
@@ -16,4 +19,9 @@ export const NEAR_OPS = [
   { op: 'place', def: 'core/desert-scrub@1', name: 'creosote-scrub', shape: { area: [[-600, -600], [600, -600], [600, 600], [-600, 600]] }, params: { toward: 'se', gradient: 0.6, clear: [[CAMP[0], CAMP[1], 120], [TIRE_RING.p[0], TIRE_RING.p[1], 45]] } },
   { op: 'place', def: 'core/desert-scrub@1', name: 'scrub-toward-the-wash', shape: { area: [[300, -600], [600, -600], [600, 600], [300, 600]] }, params: { density: 0.004, toward: 'e' } },
 ];
-export const FAR_OPS = [];
+// Beyond the walkable edge (lane MARSLAND-FAR): the 111 with its poles, the wash and its delta, the levee band, the salt
+// flats and beach, the Salton Sea; the mountain ranges as a camera-following panorama. Unnamed: they are not places.
+export const FAR_OPS = [
+  { op: 'place', def: 'core/far-land@1', p: CHIBA, params: MARS_FAR_LAND },
+  { op: 'place', def: 'core/panorama@1', p: CHIBA, params: MARS_PANORAMA },
+];
