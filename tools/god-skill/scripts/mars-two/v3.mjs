@@ -63,7 +63,9 @@ export function crush(doc, { ratio = 0.25, minTris = 300, error = 0.02 } = {}) {
     const key = new Map(), P = [], I = new Uint32Array(n), v = [0, 0, 0];
     for (let k = 0; k < n; k++) { const vi = idx ? idx.getScalar(k) : k; pos.getElement(vi, v); const h = `${Math.round(v[0] * 1e5)},${Math.round(v[1] * 1e5)},${Math.round(v[2] * 1e5)}`; let j = key.get(h); if (j === undefined) { j = P.length / 3; key.set(h, j); P.push(v[0], v[1], v[2]); if (uv) { uv.getElement(vi, u); U.push(u[0], u[1]); } } I[k] = j; }
     const F = new Float32Array(P), target = Math.max(36, Math.floor((n * ratio) / 3) * 3);
-    const [out] = MeshoptSimplifier.simplifySloppy(I, F, 3, null, target, error);
+    let [out] = MeshoptSimplifier.simplifySloppy(I, F, 3, null, target, error);
+    // (FURN: a part the error bound collapses to almost nothing gets a larger target, not its full CAD resolution back)
+    for (let t = target * 2, k = 0; out.length < 36 && k < 6 && t < n; t *= 2, k++) [out] = MeshoptSimplifier.simplifySloppy(I, F, 3, null, t, error);
     if (out.length < 36 || out.length >= n) continue;
     const pa = new Float32Array(out.length * 3), na = new Float32Array(out.length * 3), ta = uv ? new Float32Array(out.length * 2) : null;
     for (let t = 0; t < out.length; t += 3) {
@@ -90,7 +92,7 @@ export function crush(doc, { ratio = 0.25, minTris = 300, error = 0.02 } = {}) {
  * `tex` px, simplified when over `maxTris`, meshopt-compressed. Returns the bytes and the offset that was removed
  * (`shift`, in the frame), so the caller can place the def where the piece was.
  */
-export async function cut(src, nodeIdx, { name, frame = v3ToLocal(0, 0), tex = 512, maxTris = 60000, compress = true, simplify = null, roof = null } = {}) {
+export async function cut(src, nodeIdx, { name, frame = v3ToLocal(0, 0), tex = 512, maxTris = 60000, compress = true, simplify = null, roof = null, world = null, maxError = 0.01 } = {}) {
   const nodes = src.doc.getRoot().listNodes();
   const pickedIdx = nodeIdx.filter((i) => nodes[i]?.getMesh()), picked = pickedIdx.map((i) => nodes[i]);
   const doc = new core.Document();
@@ -100,7 +102,8 @@ export async function cut(src, nodeIdx, { name, frame = v3ToLocal(0, 0), tex = 5
   // when the camera is inside (mesh.mesh.ts); meshes are joined per material within each group
   const scene = doc.createScene(name), body = doc.createNode('body'), top = doc.createNode('roof');
   scene.addChild(body); scene.addChild(top);
-  const mats = picked.map((n) => mul(frame, n.getWorldMatrix()));
+  // `world`: a corrected world matrix for some nodes (V3 index → matrix), e.g. a rug the reference stood on its edge
+  const mats = picked.map((n, k) => mul(frame, world?.get(pickedIdx[k]) ?? n.getWorldMatrix()));
   const tmp = doc.createScene('bounds'), probe = [];
   picked.forEach((n, k) => { const q = doc.createNode('p').setMesh(map.get(n.getMesh())).setMatrix(mats[k]); tmp.addChild(q); probe.push(q); });
   const b = fn.getBounds(tmp);
@@ -114,7 +117,17 @@ export async function cut(src, nodeIdx, { name, frame = v3ToLocal(0, 0), tex = 5
   await doc.transform(fn.dedup(), fn.prune(), fn.join({ keepNamed: false }), fn.weld(), fn.prune());
   const tris = () => doc.getRoot().listMeshes().reduce((s, m) => s + m.listPrimitives().reduce((t, p) => t + Math.floor((p.getIndices()?.getCount() ?? p.getAttribute('POSITION').getCount()) / 3), 0), 0);
   const t0 = tris();
-  if (t0 > maxTris) { await MeshoptSimplifier.ready; await doc.transform(fn.simplify({ simplifier: MeshoptSimplifier, ratio: maxTris / t0, error: 0.01, lockBorder: false }), fn.prune()); }
+  if (t0 > maxTris) { await MeshoptSimplifier.ready; await doc.transform(fn.simplify({ simplifier: MeshoptSimplifier, ratio: maxTris / t0, error: maxError, lockBorder: false }), fn.prune()); }
+  // FURN: simplification can drop a piece's outermost vertices (Freeside lost 2.1 m on its west side). The viewer fits a
+  // mesh by its own bounds (centred on x/z, base on y = 0), so re-centre on what is left and move the origin with it —
+  // otherwise the whole building draws offset from its footprint and furniture (Freeside was 1.07 m west).
+  const nb = fn.getBounds(scene), d = [(nb.min[0] + nb.max[0]) / 2, nb.min[1], (nb.min[2] + nb.max[2]) / 2];
+  // (only a visible offset, over 2 cm: smaller ones leave released pieces byte-identical)
+  if (Math.hypot(d[0], d[2]) > 0.02 || Math.abs(d[1]) > 0.02) {
+    for (const g of scene.listChildren()) g.setTranslation([-d[0], -d[1], -d[2]]);
+    shift[0] += d[0]; shift[1] += d[1]; shift[2] += d[2];
+    b.min = [nb.min[0] - d[0], nb.min[1] - d[1], nb.min[2] - d[2]]; b.max = [nb.max[0] - d[0], nb.max[1] - d[1], nb.max[2] - d[2]];
+  }
   await doc.transform(fn.textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [tex, tex], quality: 80 }));
   if (compress) { await MeshoptEncoder.ready; await doc.transform(fn.reorder({ encoder: MeshoptEncoder }), fn.quantize(), fn.meshopt({ encoder: MeshoptEncoder, level: 'medium' })); }
   const bufs = doc.getRoot().listBuffers();
