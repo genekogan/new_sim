@@ -45,6 +45,8 @@ export class EdgeLedger implements EdgeLedgerHooks {
   /** MW: a world profile (worlds/*: Mars camp work, floater bodies) adds planned capabilities and drops ones its bodies cannot do. */
   /** R4-LIVE (god worlds only): the weather now, for `here` and Eyes; unset on the live worlds (engine env.weather). */
   weatherNow?: () => {clouds: number; rain: number; wind: number; fog: number; kind: string; lightning: number};
+  /** GOD-ENV: what a Soul at (x, z) perceived of the lightning in the last minute (god worlds only). */
+  lightningNear?: (x: number, z: number) => {last: string; strikes: number; nearest: number} | null;
   worldProfile?: (soul: EdgeSoul, caps: EdgeCapability[], plans: Map<string, {label: string; steps: Program['steps']; seconds?: boolean; stop?: boolean}>) => void;
   /** World-engine worlds only (god/places.ts): places walkable without being native engine regions (a god's plaza, a
    *  room of a god's house). Unset on Eden/Mars/LM, where walkability stays `id in regions` exactly. */

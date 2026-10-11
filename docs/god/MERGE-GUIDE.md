@@ -108,6 +108,11 @@ templates) are not listed; nothing old imports them except through the gates bel
 **`package.json`, `tsconfig.json`**
 - Workspace deps (`@sim/generators`, `@sim/ground`, `@sim/world-compiler`), and the `@types/three` position.
 
+**`LiveWorld.tsx`, `WorldEntityLayer.ts`, `world-env.ts`** (GOD-ENV, lightning + world bounds)
+- `LiveWorld.tsx`: `WorldLightning` (bolt, flash, WebAudio thunder) created only when `newWorld`; `__simLiving.lightning`.
+- `WorldEntityLayer.ts` (active only on new worlds): terrain sectors, `groundAt`, sea plane and horizon read the ground
+  recipe's bounds (a rectangle once the god extends the world) instead of ±extent/2; a diff's `constants` is applied.
+
 ### Server (`apps/server`)
 
 **`auth.ts`**
@@ -171,6 +176,12 @@ templates) are not listed; nothing old imports them except through the gates bel
   live there, Explore lists god landmarks. Old worlds: `profile` defaults to `'eden'`, `views` unset, `setClockNight`
   never called (null), `paintOnlySources` never called.
 
+**`edge/perception/here.ts`, `edge/ledger/ledger.ts`, `main.ts`, `god/ground-host.ts`, `god/query.ts`, `god/god.ts`** (GOD-ENV)
+- `EdgeLedger.lightningNear?` (set only by `god/lightning.ts` `installLightning`, under `god`): `here.weather.lightning`;
+  unset on old worlds, so their `here` is unchanged. `main.ts` installs it under `if (god)`.
+- god files only: bounds-aware tiles/free plots, `ground` published with a `constants` diff, ground-host re-logs on growth;
+  new routes `POST /v1/god/land`, `POST /v1/god/strike` (god token).
+
 ### Engine (`mars/viewer/engine`, `packages/engine-mars`, `packages/protocol`, `packages/engine-contract`)
 
 **`engine-mars/src/engine.ts` `configureClock`, `engine-contract/src/scene-capture.ts`, `protocol/src/presentation.ts`** (R4-LIVE)
@@ -212,6 +223,16 @@ templates) are not listed; nothing old imports them except through the gates bel
 
 CLI and skill (`tools/edge-skill/*`), proxy (`tools/core/multiworld/*`) and the account modules: **main's bytes,
 untouched.**
+
+**`mars/viewer/engine/locomotion/walk.ts`, `packages/engine-mars/src/ground-bridge.ts`** (GOD-ENV)
+- `walkSchema` is `z.lazy` over the same ±500 m schema; `setWalkReach` widens x/z to the ground recipe's bounds, called
+  only from `attachGround` (ground/god worlds). Old worlds never call it: same schema, same messages, same replay.
+- Not changed, documented: the ground nav window (`spatial/tiled.ts` MAX_WINDOW_TILES = 6, grows only) is one 384 m
+  square shared by every body, so Souls cannot walk farther than that from where the window started (needs the nav owner).
+
+**`packages/world-compiler` `compile.ts`/`schemas.ts`** (GOD-ENV; new-world package): `expand` takes `bounds` and has an
+inverse (trusted shrink, refused while anything stands there); re-settled buildings get/lose foundation pads; undoing a
+`world` op nulls optional fields it added; `weather.strike`. `lightning.ts`: deterministic strikes.
 
 ## 3. Conflict report (merge `dfb4669a`)
 

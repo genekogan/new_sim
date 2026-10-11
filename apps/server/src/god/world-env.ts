@@ -3,7 +3,8 @@
 //
 //   setEnv(god, { timeOfDay: 19.5 | '19:30', timeScale: 24, weather: { kind: 'storm', intensity: 0.8, wind: 0.9, fog: 0.2 } })
 //
-// - timeOfDay: the clock moves FORWARD to that hour (world-clock.ts applies it once; time never runs back).
+// - timeOfDay: the clock moves to the NEAREST occurrence of that hour, at most 12 h back or forward (world-clock.ts
+//   applies it once per set; GOD-ENV: repeated sets of one hour no longer advance the calendar day).
 // - timeScale: world hours per real hour (24 = one world day per real hour, the default; 1 = real time; 0 = paused).
 // - weather.kind: 'auto' = the live worlds' scheduled weather (a kind per 2 h slot, seeded by the day, exactly as /w/eden
 //   draws it); 'clear' | 'cloudy' | 'rain' | 'wind' | 'fog' | 'storm' set the channels from the kind × intensity (storm =
@@ -20,6 +21,7 @@ import type { GodMode } from './god.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import { viewerWeatherKind } from '../edge/eyes/sight.ts';
 import { ApiError } from '../souls.ts';
+import { recentStrikes } from './lightning.ts';
 
 export type WeatherKind = (typeof WEATHER_KINDS)[number];
 export type EnvInput = {
@@ -113,6 +115,8 @@ export function envView(host: WorldHost, god: GodMode) {
     contract: 'world-env/1',
     time: { datetime, clock: datetime ? datetime.slice(11, 16) : null, paused, timeScale: paused ? 0 : round((24 * 3600 * 20) / dayTicks), dayTicks, set: t.set ?? null },
     weather: weatherNow(god.model.state, datetime),
+    // GOD-ENV: the last lightning strike of the last minute (the storm's or the god's)
+    ...(() => { const tick = host.engine.world.tick, l = recentStrikes(god, tick).pop(); return l ? { strike: { x: l.x, z: l.z, tick: l.tick, ago: Math.round((tick - l.tick) / 20), god: !!l.god } } : {}; })(),
     setter: 'POST /v1/god/env { timeOfDay?, timeScale?, weather?: { kind?, intensity?, wind?, fog?, clouds?, rain? } } (god token)',
   };
 }

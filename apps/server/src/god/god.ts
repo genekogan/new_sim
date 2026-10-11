@@ -245,7 +245,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   private publish(seq: number, tick: number, diff: Diff, by: WorldDiffMessage['by']) {
     const referenced = new Map<string, StoredDef>();
     for (const e of diff.upserts) for (let ref: string | undefined = e.def; ref; ref = referenced.get(ref)?.extends) { const d = this.model.def(ref); if (!d || referenced.has(ref)) break; referenced.set(ref, d); }
-    const m: WorldDiffMessage = { type: 'edge', kind: 'world-diff', seq, tick, at: Date.now(), diff, by, defs: [...referenced.values()].map(publicDef), ...(diff.tiles.length ? { ground: this.model.ground() } : {}) };
+    const m: WorldDiffMessage = { type: 'edge', kind: 'world-diff', seq, tick, at: Date.now(), diff, by, defs: [...referenced.values()].map(publicDef), ...(diff.tiles.length || diff.constants ? { ground: this.model.ground() } : {}) };
     try { this.opts.emit(m); } catch { /* viewers are best-effort */ }
     this.push('diff', m);
   }
@@ -280,15 +280,15 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     return { ...pub, library: [...new Set(this.model.defs.values())].map(publicDef), owner: this.owner, prayers: this.store.prayers({ unanswered: true, limit: 50 }), undoable: this.store.undoable()?.seq ?? null, redoable: this.store.redoable()?.seq ?? null, tokens: this.store.tokens().length };
   }
   tileHashes(): Record<string, string> {
-    const half = this.model.constants.extent / 2;
-    const [a, b] = tileOf(-half, -half), [c, d] = tileOf(half - 1e-6, half - 1e-6);
+    const bb = this.model.ground().extent;   // GOD-ENV: the world's bounds (a rectangle once extended)
+    const [a, b] = tileOf(bb[0], bb[1]), [c, d] = tileOf(bb[2] - 1e-6, bb[3] - 1e-6);
     const out: Record<string, string> = {};
     for (let tz = b; tz <= d; tz++) for (let tx = a; tx <= c; tx++) out[`${tx},${tz}`] = this.model.terrain.hash(tx, tz);
     return out;
   }
   tile(tx: number, tz: number): Float32Array | null {
-    const half = this.model.constants.extent / 2;
-    if (tx * TILE_M >= half || (tx + 1) * TILE_M <= -half || tz * TILE_M >= half || (tz + 1) * TILE_M <= -half) return null;
+    const bb = this.model.ground().extent;
+    if (tx * TILE_M >= bb[2] || (tx + 1) * TILE_M <= bb[0] || tz * TILE_M >= bb[3] || (tz + 1) * TILE_M <= bb[1]) return null;
     return this.model.terrain.tile(tx, tz);
   }
 

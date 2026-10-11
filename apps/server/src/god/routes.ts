@@ -10,6 +10,8 @@ import type { GodMode } from './god.ts';
 import { godSchema } from './schema.ts';
 import { runQuery } from './query.ts';
 import { mountAssetRoutes } from './assets.ts';
+import { mountLandRoutes } from './land.ts';
+import { mountLightningRoutes } from './lightning.ts';
 import { schemaMarkdown } from '../../../../tools/god-skill/lib/schema-md.mjs';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -36,6 +38,8 @@ export function mountGodRoutes(app: Hono, d: GodDeps) {
   const body = async (c: Context) => { try { return await c.req.json(); } catch { throw new ApiError(400, 'bad-json', 'body must be JSON'); } };
   // assets (GET /assets/<sha>.<ext>, POST /v1/god/assets) and the catalog (GET /v1/god/defs?q=, /v1/god/defs/<ref>[/thumb.png]): L5
   mountAssetRoutes(app, { god: d.god, requireGod, store: d.god.assets });
+  mountLandRoutes(app, { god: d.god, requireGod });
+  mountLightningRoutes(app, { god: d.god, requireGod, tick: () => d.god.opts.tick() });   // GOD-ENV: POST /v1/god/strike   // GOD-ENV: POST /v1/god/land (raise, mountain, valley, move, water, extend …)
 
   // ---- public reads (the renderer's view of the world; Gene: topology and placements are public)
   app.get('/v1/world/snapshot', (c) => c.json(d.god.publicSnapshot(), 200, noStore));
