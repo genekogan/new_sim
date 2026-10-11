@@ -45,7 +45,8 @@ templates) are not listed; nothing old imports them except through the gates bel
   - publishes the session (`auth-session.ts`) for the God panel and Join;
   - hides `LocalIntegrationNotice`, `LocalConnectionHelp` and e8's `AccountApproval` dialog (the God panel owns
     `#approve/<id>` there);
-  - drops `BringAgent` "New Soul" (Join lives in the God panel; lane S adds `SoulsHeader`);
+  - New Soul = e8's `BringAgent` copy-the-prompt dialog on all worlds (lane UXFIX, `cc9bef0f`; S's `SoulsHeader`
+    is gone); new worlds add **Copy invite link** to the account menu (`AccountMenu.tsx` `inviteUrl`);
   - shows local dev sign-in (`configuredSignIn(cfg, true)`).
 - Adds `AuthCtx.mode`.
 - Old worlds: e8 Shell. (Verified: identical header, buttons, dialogs and requests.)
@@ -242,7 +243,8 @@ Follow-up merges (same day, to keep one base):
 - `Shell.tsx`: OW's `onInitialProgress`, with our `AccountApproval` gate.
 
 **`34762bbc` merge `root/world-engine`** (S: New Soul + Souls on new worlds; loading-card)
-- `Shell.tsx`: S's `SoulsHeader` in e8's header, new worlds only.
+- `Shell.tsx`: S's `SoulsHeader` in e8's header, new worlds only (removed again by UXFIX `cc9bef0f`: New Soul =
+  e8 `BringAgent` on all worlds; new worlds add Copy invite link to the account menu).
 - `ViewerFrame.tsx`, `viewer-arrival.ts`, `place-names.test.ts`: OW's code, plus loading-card's
   `assetDownloadProgress` fallback when no initial gate reports.
 - After this merge, `root/world-engine` and main are both ancestors of `root/reconcile`, so both can fast-forward.
@@ -261,8 +263,8 @@ Fixed in the first merge commit:
 - The old-world baseline for every comparison is now `b2f70bf4`, not `e8bcdcd3`.
 
 **F2. Join on new worlds**
-- e8's "New Soul" (`BringAgent`) and `AccountApproval` are hidden on new worlds, where the God panel's Join and
-  `#approve` card serve.
+- e8's "New Soul" (`BringAgent`) serves all worlds (UXFIX). e8's `AccountApproval` is hidden on new worlds, where the
+  God panel's `#approve` card serves.
 - One system eventually needs one Join flow. Converge on e8's `BringAgent` + `AccountApproval` when the God panel's
   Join matches it. Both drive the same `/v1/account/approvals` routes.
 

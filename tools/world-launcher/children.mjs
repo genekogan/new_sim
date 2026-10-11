@@ -197,6 +197,8 @@ export function defaultCommand(world, port, o) {
     WORLD_PATH: `/w/${world.slug}`,
     // the creator becomes the god by claiming at birth (launcher), never by a WORLD_OWNER_ID left in the env file
     ...(clerk ? { AUTH_PROVIDER: 'clerk', ACCOUNT_AUTH_REQUIRED: '1', ACCOUNT_REGISTRY_PATH: clerk.registryPath, INVITE_REQUIRED: '0', WORLD_OWNER_ID: '' } : {}),
+    // …except a world the operator makes for an existing account (launcher /__sim/op/create-world): born owned by it
+    ...(world.bornOwner ? { WORLD_OWNER_ID: world.bornOwner } : {}),
     // anyone signed in may join as a Soul under dev sign-in too (Clerk sets it above; edge minds: config default + production)
     ...(clerk ? {} : { INVITE_REQUIRED: '0' }),
     // Native Soul arrival/removal (lifecycle), so a Soul is made exactly as on the live worlds: the agent's create-soul,
