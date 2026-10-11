@@ -192,9 +192,16 @@ export class GodLayers {
   capabilities(soul: EdgeSoul, caps: EdgeCapability[], plans: Plans, here: Vec2 | null) {
     // ownership on the bridge's own caps: seats, hands and surfaces of private things
     for (const c of caps) {
+      // a walk into a private building or room of someone else's (walk:ana-house, walk:ana-house/living)
+      if (c.verb === 'walk' && c.id.startsWith('walk:')) {
+        const ref = c.id.slice(5), e = this.m.get(ref) ?? (ref.includes('/') ? this.m.get(ref.slice(0, ref.lastIndexOf('/'))) : undefined);
+        const r = e && this.enclosed(e) ? this.refusal(e.id, soul) : null;
+        if (r) { c.available = false; (c as any).blocked = r; plans.delete(c.id); }   // private says more than any other block
+        continue;
+      }
       if (!c.target || !this.m.entities.has(c.target.id) || !['sit', 'pick-up', 'put-on'].includes(c.verb)) continue;
       const r = this.refusal(c.target.id, soul) ?? (c.verb === 'pick-up' ? this.forSale(c.target.id, soul) : null);
-      if (r && c.available !== false) { c.available = false; (c as any).blocked = r; plans.delete(c.id); }
+      if (r) { c.available = false; (c as any).blocked = r; plans.delete(c.id); }
     }
     if (!here) return;
     const mine = this.walletOf(soul);
@@ -212,6 +219,8 @@ export class GodLayers {
       caps.push({ id: `pay:${b.soulId}`, verb: 'pay', label: `Pay ${b.name} (params: {"amount": n}; you have ${this.money(mine.amount)})`, target: { id: b.soulId, kind: 'soul' }, available: mine.amount > 0, ...(mine.amount > 0 ? {} : { blocked: { code: 'wallet.insufficient', reason: `You have no ${this.currency()}.` } }), params: { amount: { type: 'number', min: 0.01, max: mine.amount || 1 } } } as EdgeCapability);
     }
   }
+  /** A building (it has rooms): walking into a private one is refused; open ground (a private garden) is not fenced by words. */
+  private enclosed(e: Entity): boolean { const d = this.m.resolvedDef(e.def); if (!d) return false; try { return (this.m.bake(d, e.params ?? {}, e.seed ?? 0, e.shape).rooms?.length ?? 0) > 0; } catch { return false; } }
   private forSale(id: string, soul: { soulId: string; name: string }): Refusal | null {
     const e = this.m.entities.get(id); if (!e?.price || e.price.service) return null;
     if (this.isOf(this.ownership(id)?.owner ?? 'god', soul)) return null;
@@ -219,7 +228,7 @@ export class GodLayers {
   }
 
   /** `buy:<id>`, `pay:<soul>` (params.amount), `sell:<id>` (params.price; 0 or none takes it off sale). */
-  act(soul: EdgeSoul, capability: string, params: Record<string, unknown>, here: Vec2 | null): { accepted: true; result: Record<string, unknown> } | { accepted: false; code: string; reason: string } {
+  act(soul: EdgeSoul, capability: string, params: Record<string, unknown>, here: Vec2 | null = null): { accepted: true; result: Record<string, unknown> } | { accepted: false; code: string; reason: string } {
     const no = (code: string, reason: string) => ({ accepted: false as const, code, reason });
     const [verb, ...rest] = capability.split(':'), arg = rest.join(':');
     const me = this.walletOf(soul), merge: Op[] = me.alias ? [{ op: 'pay', from: me.alias, to: me.key, amount: this.m.state.layers!.wallets[me.alias] } as Op] : [];

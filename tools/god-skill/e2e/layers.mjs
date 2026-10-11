@@ -132,6 +132,7 @@ try {
     ['place', 'loaf', '--on', 'bread-stall', '--name', 'loaf'],
     ['place', 'lamp-post', '--at', '0,10', '--name', 'square-lamp'],
     ['place', 'cottage', '--at', '-20,80', '--name', 'ana-house'],
+    ['place', 'bench', '--at', '28,-6', '--name', 'ana-bench'],
   ];
   await step('G1 the god builds the town: a market plaza with two stalls, a café, its door, Ana\'s back door (her stall store), a loaf on the bread stall, a lamp, Ana\'s house', async () => {
     const res = []; for (const c of built) { const g = await god(...c); res.push({ cmd: c.slice(0, 2).join(' ') + ' ' + c[c.length - 1], ok: godOk(g), out: godOk(g) ? undefined : g.out.slice(0, 200) + g.err }); }
@@ -180,7 +181,7 @@ try {
   // ---- 3. ownership, relationships, economy
   await step('O1 the god makes Ana the café\'s owner (she works there; her house and back door are hers, private), a friend of Ben; the loaf is hers, for 3 shells; Ben gets 10, Ana 2', async () => {
     const res = [
-      await god('own', 'cafe', 'Ana'), await god('own', 'ana-back-door', 'Ana', '--private'), await god('own', 'ana-house', 'Ana', '--private'),
+      await god('own', 'cafe', 'Ana'), await god('own', 'ana-back-door', 'Ana', '--private'), await god('own', 'ana-house', 'Ana', '--private'), await god('own', 'ana-bench', 'Ana', '--private'),
       await god('own', 'bread-stall/loaf', 'Ana'), await god('price', 'bread-stall/loaf', '3'), await god('currency', 'shells'),
       await god('give', 'Ben', '10'), await god('give', 'Ana', '2'),
       await god('relate', 'Ana', 'works-at', 'cafe'), await god('relate', 'Ana', 'lives-at', 'ana-house'), await god('relate', 'Ana', 'friend', 'Ben'),
@@ -226,6 +227,10 @@ try {
     const o = (await api('/v1/edge/observe', { token: tokenOf(ben) })).data, seen = o?.here?.objects?.find((x) => x.id === door.id);
     return { cap: c && { available: c.available, code: c.blocked?.code, reason: c.blocked?.reason }, accepted: r?.accepted, code: r?.code, reason: r?.reason, open: after?.state?.open ?? false, seenOwner: seen?.owner };
   }, (r) => r.cap?.available === false && r.cap.code === 'object.private' && /Ana's and private/.test(r.cap.reason ?? '') && r.accepted === false && r.open === false && r.seenOwner === "Ana's, private");
+  await step('P1b private things of Ana\'s refuse Ben\'s other uses: sitting on her bench, walking into her house (object.private); an unowned stall stays usable', async () => {
+    const bench = await entity('ana-bench'), cs = await caps(ben), sit = cs.find((x) => x.id === `sit:${bench.id}`), walk = cs.find((x) => x.id === 'walk:ana-house'), stall = cs.find((x) => x.id === 'walk:bread-stall');
+    return { sit: sit && { available: sit.available, code: sit.blocked?.code }, walk: walk && { available: walk.available, code: walk.blocked?.code, reason: walk.blocked?.reason }, stall: stall?.available };
+  }, (r) => r.sit?.available === false && r.sit.code === 'object.private' && r.walk?.available === false && r.walk.code === 'object.private' && r.stall !== false);
   await step('P2 Ana can: she walks over to the market and opens her back door (walks up, reaches out); it is open in the world', async () => {
     await ana.act('walk:market');
     const door = await entity('ana-back-door'), c = (await caps(ana)).find((x) => x.id === `object:${door.id}:open`);
