@@ -21,7 +21,8 @@ function terrain(): Ground {
   g.waters.push({ id: 'pond', area: pondArea, level: 0 }, { id: 'lake', area: lakeArea, level: 0 });
   return g;
 }
-const fact = groundFact(terrain(), 4);
+// ground-paged.test.ts runs this whole file again on paged navigation (lane NAV)
+const fact = groundFact(terrain(), 4, { paged: process.env.GROUND_PAGED === '1' });
 const field = groundField(fact.recipeHash);
 
 function world(seed = 'ground'): Engine & { installGroundV1(f: unknown): { installed: boolean; settled: string[] } } {
@@ -68,8 +69,9 @@ test('a cliff is refused with a precise code; deep water refuses walking; the ed
   assert.match(String((cliff as { code?: string })?.code), /ground\.cliff/, JSON.stringify(cliff));
   const lake = run(e, [{ verb: 'walk_to', params: { to: [-70, -20] } }]).end;
   assert.equal(lake?.code, 'ground.deep-water', JSON.stringify(lake));
-  const far = run(e, [{ verb: 'walk_to', params: { to: [499, 0] } }]).end;
-  assert.ok(far?.kind === 'failed' && /^ground\./.test(far.code ?? ''), JSON.stringify(far));
+  // the old 384 m window refuses a walk to the far edge ('ground.too-far'); paged navigation (lane NAV) plans it
+  if (process.env.GROUND_PAGED === '1') assert.equal(e.canPerform({ actor: 'h_ada', label: 'far', steps: [{ verb: 'walk_to', params: { to: [499, 0] } }] }), null);
+  else { const far = run(e, [{ verb: 'walk_to', params: { to: [499, 0] } }]).end; assert.ok(far?.kind === 'failed' && /^ground\./.test(far.code ?? ''), JSON.stringify(far)); }
 });
 
 test('wading the pond edge: the walker crosses shallow water, standing on the bed, activity wade', () => {

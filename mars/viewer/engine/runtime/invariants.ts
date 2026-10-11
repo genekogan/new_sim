@@ -33,7 +33,7 @@ export function humanStaticClearanceWithOverlay(qualified:(rt:Runtime,e:import('
     // people on the rack structure (`human.on`: a frame climb or beam walkway) are checked by construction/frame.ts frameAccessOk
     // activities/1 overlays on a seat (read, play-piano…) keep the seated exemption (baseActivity 'sit'; social/pose.ts)
     if (e.kind !== 'human' || !e.human || e.human.on || e.human.carrier || e.human.activity.startsWith('climb') || SEATED_ACTIVITIES.has(e.human.activity) || (e.human.baseActivity === 'sit' && (POSE_OVERLAY_SET.has(e.human.activity) || (!!e.human.prop && (e.human.activity === 'eat' || e.human.activity === 'drink')))) || qualified(rt,e)) continue;
-    const g = sp.level(e.human.level);
+    const g = sp.levelAt(e.human.level, [e.pose.p[0], e.pose.p[2]]);
     if (!g) continue;
     const c = clearanceAt(g, [e.pose.p[0], e.pose.p[2]]);
     const radius=isFloater(e)?floaterBody(e.body).radius:humanRadius(e);

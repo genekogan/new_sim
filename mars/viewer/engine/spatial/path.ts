@@ -12,7 +12,8 @@ export type Place = { level: number; p: Vec2 };
 export type WalkLeg = { kind: 'walk'; level: number; points: Vec2[]; minClearance: number };
 export type LinkLeg = { kind: 'link'; link: Link; ascending: boolean };
 export type Leg = WalkLeg | LinkLeg;
-export type Route = { legs: Leg[]; length: number; expanded: number };
+/** `rest` (paged ground worlds only, spatial/tiled.ts pagedRoute): the route is a first chunk; the walk goes on to `rest`. */
+export type Route = { legs: Leg[]; length: number; expanded: number; rest?: Place };
 export type RouteResult = { ok: true; route: Route } | { ok: false; diagnostic: Diagnostic };
 
 const SQ2 = Math.SQRT2;

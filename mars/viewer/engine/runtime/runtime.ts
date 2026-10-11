@@ -197,6 +197,7 @@ export class Runtime {
     const parsed = { data: params };
     const prof = this.prof;
     const t0 = prof ? prof.now() : 0;
+    this.focus(parsed.data);
     const plan = def.plan(this, parsed.data);
     if (prof) prof.add(`${verb}.plan`, prof.now() - t0);
     if (!plan.ok) return this.fail(rec, plan.diagnostic);
@@ -262,6 +263,13 @@ export class Runtime {
     return rec;
   }
 
+  /** Paged ground worlds (spatial/service.ts focusOn): the navigation window faces the actor whose action runs; elsewhere a no-op. */
+  private focus(params: unknown) {
+    const sp = this.services.spatial as { focusOn?: (w: WorldState, actor: string | undefined) => void } | undefined;
+    const actor = (params as { actor?: unknown } | null | undefined)?.actor;
+    if (sp?.focusOn && typeof actor === 'string') sp.focusOn(this.world, actor);
+  }
+
   /** Advance one fixed tick: step live actions in submission order, then check invariants. */
   step() {
     this.world.tick++;
@@ -270,6 +278,7 @@ export class Runtime {
       if (!this.live.has(l.rec.id)) continue; // finished earlier this tick (e.g. cancelled with its failed parent)
       const prof = this.prof;
       const t0 = prof ? prof.now() : 0;
+      this.focus(l.rec.params);
       const r = l.def.step(this, l.exec, DT);
       if (prof) prof.add(`${l.rec.verb}.step`, prof.now() - t0);
       // Keep an existing persistent diagnostic stable until every mover has published this tick.

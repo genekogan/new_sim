@@ -93,8 +93,8 @@ export function regionSlots(rt: Runtime, r: SocialRegion): Slot[] {
   const level = r.level ?? 0;
   const sp = rt.services.spatial as Spatial | undefined;
   sp?.sync(rt.world);
-  const g = sp?.level(level);
   const c = centroid(r.polygon);
+  const g = sp?.levelAt(level, c);
   const fwd = sub2(L.focus, c);
   const yawF = dist2(L.focus, c) > 1e-9 ? heading(fwd) : 0; // rows face +fwd
   // polygon extent in the (along fwd, across) frame
@@ -239,8 +239,8 @@ export function seatApproach(rt: Runtime, s: Slot): Vec2 | Diagnostic {
   const d = CATALOG[e.def];
   const sp = rt.services.spatial as Spatial | undefined;
   sp?.sync(rt.world);
-  const g = sp?.level(s.level);
   const c: Vec2 = [e.pose.p[0], e.pose.p[2]];
+  const g = sp?.levelAt(s.level, c);
   const local = rot2(sub2(s.p, c), -e.pose.yaw);
   const half: Vec2 = [d.size[0] / 2, d.size[2] / 2];
   const tried: { p: Vec2; cl: number }[] = [];

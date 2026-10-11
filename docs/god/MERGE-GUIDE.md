@@ -563,3 +563,19 @@ Gene's bar: the new system does everything the old did, and more.
 - On new worlds Shell reads the display name from `/v1/god/status` (`WORLD_NAME`) for Explore, the header and the New Soul
   prompt; `BringAgent` takes an optional `worldName`. Old worlds are unchanged.
 - The launcher home omits the god line when an owned world has no god name.
+
+### NAV (2026-10-11, root/nav) — Souls walk the whole ground
+- Gate: the ground fact `groundV1.nav = 'paged/1'`. Only the god `GroundHost` logs it (`NAV_PAGED=0` turns that off);
+  a god world standing on the old window adopts it with one new fact. Worlds without it (eden `+eg/1`, mars,
+  littlemartians, every old journal) run the old 384 m grow-only window byte-for-byte.
+- `spatial/tiled.ts` + `service.ts`: paged worlds face a set of small windows (body neighbourhoods + walk remainders,
+  `clusterRects`), not one window. `level()`/`grids`/`scene` are the *faced* window's: `Runtime` faces the actor of the
+  action it plans or steps (`focusOn`, a no-op elsewhere), `bodySpatial` faces the walker, and point queries ask
+  `levelAt(level, point)` (invariants, seat approaches, slot layouts, social moves, wander, engine nav/1 reads, pose
+  recovery). Non-paged `levelAt` ≡ `level`. Mars-only activity code (construction, carry, paired-walk, group activities)
+  still reads `level(0)` = the actor's window — fine for actor-local reads, not for far points; none runs on god worlds.
+- Routes on paged worlds are chunks (`route.rest`); `walk.ts` plans the next chunk 6 m before the end. Epoch moves with
+  the static world only; single-file passages are named by `narrowIdOf` (window-independent).
+- `walk.ts`: the walk_to schema is read per use (`get schema()`); GOD-ENV's `z.lazy` memoised the first world's reach.
+- `tiled.ts` composite blocker tables are filled on first read (same values; shared by old ground worlds).
+- e2e: `tools/god-skill/e2e/nav-far.mjs` (new); `nav.mjs` (P4) unchanged and 13/13 on paged nav.

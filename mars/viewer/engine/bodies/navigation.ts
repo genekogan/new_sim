@@ -12,6 +12,7 @@ const cache=new WeakMap<Runtime,{base:Spatial;baseId:string;spatial:Spatial}>();
 export function bodyProfile(actor:Entity){return isFloater(actor)?floaterProfile(floaterBody(actor.body)):humanoidProfile(actor.body);}
 export function bodySpatial(rt:Runtime,actorId?:string):Spatial{
  const base=rt.services.spatial as Spatial;
+ if(base.ground?.paged)base.focusOn(rt.world,actorId);
  if(!actorId||!isFloater(rt.world.entities[actorId])||base.ground)return base;
  let found=cache.get(rt);
  if(!found||found.base!==base||found.baseId!==base.baseId){

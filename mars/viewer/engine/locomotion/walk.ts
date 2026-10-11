@@ -18,7 +18,7 @@ import { pointInObb, add2, angleDelta, clamp, cross2, dist2, dot2, heading, len2
 import type { ActionDef, Diagnostic, StepResult } from '../actions/types.ts';
 import { DT, type Runtime } from '../runtime/runtime.ts';
 import type { Entity } from '../world/types.ts';
-import { entityFootprint, type AroundPerson } from '../spatial/service.ts';
+import { entityFootprint, narrowIdOf, type AroundPerson } from '../spatial/service.ts';
 import { cellOf, clearanceAt, nearestBlocker, segmentClearance, type LevelGrid } from '../spatial/grid.ts';
 import { PLAN_MARGIN, type Leg, type LinkLeg, type Route, type WalkLeg } from '../spatial/path.ts';
 import { smoothPolyline, type PathSeg } from './spline.ts';
@@ -158,7 +158,9 @@ let walkSchemaWide: typeof walkSchema500 | null = null;
 /** GOD-ENV: a god's (entity) world can grow past ±500 m ("extend the world east"); its server widens the reach of
  *  walk_to to the world's bounds. Worlds that never call this (the old worlds) parse with the same ±500 schema as before. */
 export function setWalkReach(metres: number) { walkSchemaWide = metres > 500 ? walkSchemaWithin(Math.min(16000, metres)) : null; }
-export const walkSchema = z.lazy(() => walkSchemaWide ?? walkSchema500);
+/** The walk_to schema now (lane NAV: read on every use — a `z.lazy` memoises its first schema, so a world widened after the
+ *  process's first walk kept ±500 m). */
+export const walkSchemaNow = () => walkSchemaWide ?? walkSchema500;
 
 const spatial = bodySpatial;
 
@@ -212,7 +214,7 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
   verb: 'walk_to',
   description:
     'Walk a person to (x, z) on a level (default: current level) along a planned corridor route, using completed stairs between levels. Fails with a diagnostic if no route exists.',
-  schema: walkSchema,
+  get schema() { return walkSchemaNow(); },
   reservations: (_w, p) => [{ resource: `actor:${p.actor}`, mode: 'exclusive' }],
   plan(rt, p) {
     const a = actorOf(rt, p.actor);
@@ -232,6 +234,8 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
       speed: p.speed ?? bodyProfile(a).speed, profile: bodyProfile(a), route, leg: 0, segs: [], total: 0, s: 0, v: 0,
       offset: 0, narrows: [], held: new Set(), climbT: 0, epoch: spatial(rt,p.actor).epoch, replans: 0, phase: 'walk', side: 0, stuck: 0, turning: false, plannedAround: {}, peopleReplans: 0, pushes: 0,
     };
+    // paged ground: the walk is registered first, so the window covering its chunk is there when the leg is smoothed
+    if (spatial(rt, p.actor).ground?.paged) { walkExecs(rt).set(id, ex); enterLeg(rt, ex); return ex; }
     enterLeg(rt, ex);
     walkExecs(rt).set(id, ex);
     return ex;
@@ -283,6 +287,7 @@ export const walkTo: ActionDef<WalkParams, Route, Exec> = {
 
 function enterLeg(rt: Runtime, ex: Exec) {
   const leg = ex.route.legs[ex.leg];
+  { const sp = spatial(rt, ex.actor); if (sp.ground?.paged) { sp.sync(rt.world); sp.focusOn(rt.world, ex.actor); } }
   ex.s = 0;
   // every leg starts at the body's actual position (replans start from the offset pose), so any
   // lateral passing offset of the previous corridor must not carry over (it would teleport the body)
@@ -312,6 +317,20 @@ function enterLeg(rt: Runtime, ex: Exec) {
   }
 }
 
+/** Paged ground: plan the next chunk when the walker is this close (m) to the end of the current one (it never stops). */
+const CHUNK_AHEAD_M = 6;
+/** Paged ground: follow on with the next chunk toward `route.rest`; a failure ends the walk (null: walking on). */
+function nextChunk(rt: Runtime, ex: Exec, a: Entity): StepResult | null {
+  const r = planWalk(rt, a, ex.route.rest!, ex.profile);
+  if (!r.ok) { releaseAll(rt, ex); return { status: 'failed', diagnostic: { ...r.diagnostic, subjects: [ex.actor, ...(r.diagnostic.subjects ?? [])] } }; }
+  releaseAll(rt, ex);
+  ex.route = r.route;
+  ex.around = undefined;
+  ex.leg = 0;
+  enterLeg(rt, ex);
+  return null;
+}
+
 /** Every point of the route's first `upTo` metres (sampled every 0.3 m on walk legs) passes `ok`. */
 function routeHeadClear(route: Route, ok: (q: Vec2) => boolean, upTo: number): boolean {
   let s = 0;
@@ -333,14 +352,16 @@ function routeHeadClear(route: Route, ok: (q: Vec2) => boolean, upTo: number): b
 function findNarrows(rt: Runtime, ex: Exec, leg: WalkLeg): Narrow[] {
   const sp = spatial(rt,ex.actor);
   const g = sp.level(leg.level)!;
-  const lab = sp.narrow(leg.level, ex.profile.radius);
+  // paged ground: passages named by their own first cell (window-independent), found by flood fill along the leg only
+  const paged = !!sp.ground?.paged, lab = paged ? null : sp.narrow(leg.level, ex.profile.radius);
   const out: Narrow[] = [];
   let cur: Narrow | null = null;
   for (let s = 0; s <= ex.total + 1e-9; s += g.cell * 0.5) {
     const p = pointAt(ex, s);
     const c = cellOf(g, p);
-    const comp = c >= 0 ? lab[c] : -1;
-    const res = comp >= 0 ? `narrow:${sp.epoch}:${leg.level}:${comp}` : null;
+    let res: string | null;
+    if (lab) { const comp = c >= 0 ? lab[c] : -1; res = comp >= 0 ? `narrow:${sp.epoch}:${leg.level}:${comp}` : null; }
+    else { const id = c >= 0 ? narrowIdOf(g, ex.profile.radius, c) : null; res = id ? `narrow:${sp.epoch}:${leg.level}:${id}` : null; }
     if (res && (!cur || cur.res !== res)) {
       if (cur) out.push(cur);
       cur = { res, s0: s, s1: s, entry: p, dir: tangentAt(ex, s) };
@@ -588,6 +609,11 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
       if (moved && ex.route.legs[ex.leg].kind === 'walk') ex.narrows = findNarrows(rt, ex, ex.route.legs[ex.leg] as WalkLeg);
       ex.replanWait++;
     }
+  }
+  // paged ground (spatial/tiled.ts pagedRoute): a few metres before the end of a chunk, the next one is planned from here
+  if (ex.route.rest && !ex.detour && !ex.cancelTo && ex.leg === ex.route.legs.length - 1 && ex.route.legs[ex.leg].kind === 'walk' && ex.total - ex.s < CHUNK_AHEAD_M) {
+    const c = nextChunk(rt, ex, a);
+    if (c) return c;
   }
   const leg = ex.route.legs[ex.leg];
   if (leg.kind === 'link') return stepLink(rt, ex, a, leg, dt);
@@ -945,6 +971,7 @@ function stepWalk(rt: Runtime, ex: Exec, dt: number): StepResult {
       enterLeg(rt, ex);
       return { status: 'running', phase: ex.phase };
     }
+    if (ex.route.rest && !ex.detour && !ex.cancelTo) { const c = nextChunk(rt, ex, a); if (c) return c; return { status: 'running', phase: ex.phase }; }
     if (ex.detour?.stage === 'going') {
       releaseAll(rt, ex);
       ex.detour.stage = 'waiting';
