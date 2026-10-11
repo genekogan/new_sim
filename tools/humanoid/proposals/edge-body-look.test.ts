@@ -4,6 +4,7 @@ import {mkdtempSync,rmSync} from 'node:fs';import {join} from 'node:path';import
 import {fixture,invite,accept,factory} from '../test/native-owner-fixture.ts';import {EdgeLedger} from './edge/ledger/ledger.ts';import {mountEdgeRoutes,edgeSoulResolver} from './edge/routes.ts';import {Hono} from 'hono';
 import {WorldHost} from './world.ts';import {Db} from './db.ts';import {bodyV1Schema} from '@sim/protocol';
 import {lookKey,resolveLook,appearanceFromSeed,legacyPreset,compactLook} from '../../web/src/humanoid/look.ts';
+import {bodyProfile} from '../../../mars/viewer/engine/bodies/navigation.ts';
 async function setup(t:any){const dir=mkdtempSync(join(tmpdir(),'body-look-')),path=join(dir,'sim.db'),f=fixture(path,factory,{durableClockV1:true});f.brain.quiesce();
  t.after(()=>{f.host.stop();if(f.db.db.isOpen)f.db.close();rmSync(dir,{recursive:true,force:true});});const ss:any[]=[];
  for(const owner of ['a','b']){await invite(f,owner);const row=await accept(f.host,f.souls.create('dev:'+owner,{name:'Look '+owner,description:'scripted look test'}));const p=f.souls.pairCode(row,'http://127.0.0.1:4958'),token=f.souls.pairExchange(p.code,'scripted').token;ss.push({row,token,soul:{soulId:row.id,entityId:row.entity_id,name:row.name,owner:row.owner}});}
@@ -24,9 +25,13 @@ test('LOOK: edit over today\'s look, seeded random, preset, refusals, schema, ot
  const r2=await put(w,a,{random:true,seed:42});assert.equal(r2.status,200);assert.deepEqual((await r2.json()).body,{family:'humanoid',model:lookKey(appearanceFromSeed(42)),params:compactLook(appearanceFromSeed(42))});
  const r3=await put(w,a,{random:true});assert.equal(r3.status,200);assert.match((await r3.json()).body.model,/^humanoid2-[0-9a-f]{16}$/);
  const r4=await put(w,a,{preset:'woman'});assert.equal(r4.status,200);assert.deepEqual((await r4.json()).body.params,{preset:'woman'});
+ // sizes: a taller, broader, slower body is a different engine body (radius, profile speed); the preset stays
+ const r6=await put(w,a,{height:1.9,build:1.1,walkSpeed:1.0});assert.equal(r6.status,200,await r6.clone().text());const b6=(await r6.json()).body;
+ assert.deepEqual(b6.params,{preset:'woman',height:1.9,build:1.1,walkSpeed:1});assert.deepEqual(ent(a).body,b6);
+ const prof=bodyProfile(ent(a) as never);assert.equal(prof.speed,1);assert.ok(prof.radius>0.3&&prof.radius<=0.32,String(prof.radius));assert.equal(bodyProfile(ent(b) as never).speed,1.35,'the other Soul walks as before');
  // refusals: unknown key, bad value, mixed random, two assignment kinds; nothing changes
  const before=structuredClone(ent(a).body),seq=w.f.host.seq;
- for(const [look,code] of [[{wings:'big'},'body.look'],[{hair:'purple'},'body.look'],[{headSize:2},'body.look'],[{random:true,hat:'cap'},'body.look'],['cap','body.look']] as const){
+ for(const [look,code] of [[{wings:'big'},'body.look'],[{hair:'purple'},'body.look'],[{headSize:2},'body.look'],[{walkSpeed:1.5},'body.look'],[{height:2.3},'body.look'],[{random:true,hat:'cap'},'body.look'],['cap','body.look']] as const){
   const r=await put(w,a,look);assert.equal(r.status,400,JSON.stringify(look));assert.equal((await r.json()).error.code,code);}
  const both=await w.req(a,'body',{look:{hat:'cap'},preset:'humanoid'},'PUT');assert.equal(both.status,400);
  assert.deepEqual(ent(a).body,before);assert.equal(w.f.host.seq,seq,'refused looks admit no world input');

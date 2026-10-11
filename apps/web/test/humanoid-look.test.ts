@@ -70,7 +70,8 @@ test('size params: defaults are today\'s body; they combine with presets; edits 
   assert.deepEqual(L.compactLook(tall), {preset: 'punk', height: 1.9, build: 1.1}); assert.deepEqual(L.resolveLook(L.compactLook(tall)), tall);
   assert.notEqual(L.lookKey(tall), L.lookKey({preset: 'punk'}), 'sizes are part of the key');
   const slow = L.editLook({preset: 'woman'}, {walkSpeed: 1.0}); assert.equal(slow.preset, 'woman', 'a size edit keeps the preset'); assert.equal(slow.walkSpeed, 1);
-  const swap = L.editLook(slow, {preset: 'casual'}); assert.equal(swap.preset, 'casual'); assert.equal(swap.walkSpeed, 1, 'choosing a preset keeps the sizes');
+  assert.deepEqual(L.editLook(slow, {preset: 'casual'}), L.resolveLook({preset: 'casual'}), 'choosing a preset is the classic look exactly');
+  assert.equal(L.editLook(slow, {preset: 'casual', walkSpeed: 1.1}).walkSpeed, 1.1, 'unless the edit names sizes too');
   assert.equal(L.resolveLook({height: 1.8049}).height, 1.8, 'heights round to 1 cm'); assert.equal(L.resolveLook({headSize: 1.1012}).headSize, 1.1);
   const looks = Array.from({length: 400}, (_, i) => L.appearanceFromSeed(i)), hs = looks.map(l => l.height), bs = looks.map(l => l.build);
   assert.ok(Math.min(...hs) >= 1.55 && Math.max(...hs) <= 1.95 && new Set(hs).size > 15, `seeded heights ${Math.min(...hs)}–${Math.max(...hs)}`);

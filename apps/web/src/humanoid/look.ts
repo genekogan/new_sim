@@ -75,11 +75,12 @@ export function lookKey(params: unknown): string {
   return LOOK_KEY_PREFIX + sha256Hex(stableStringify(resolveLook(params))).slice(0, 16);
 }
 /** Apply owner edits on top of a current look: a preset is expanded first, so editing one part keeps the rest.
- *  Size edits (head size, height, build, walking speed) keep a preset; choosing a preset keeps the current sizes. */
+ *  Size edits (head size, height, build, walking speed) keep a preset; choosing a preset is that classic look exactly
+ *  (today's sizes) unless the same edit names sizes too. */
 export function editLook(current: unknown, edits: unknown): Look {
   const base = resolveLook(current ?? {}), e = checkLook(edits);
   const sizes = Object.fromEntries(SIZE_KEYS.map(k => [k, base[k]]));
-  if (e.preset && e.preset !== 'none') return resolveLook({...sizes, ...pickSizes(e), preset: e.preset});
+  if (e.preset && e.preset !== 'none') return resolveLook({...pickSizes(e), preset: e.preset});
   if (base.preset !== 'none' && Object.keys(e).every(k => (SIZE_KEYS as readonly string[]).includes(k))) return resolveLook({preset: base.preset, ...sizes, ...e});
   return resolveLook({...base, preset: 'none', ...e});
 }
