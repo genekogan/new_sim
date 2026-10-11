@@ -16,6 +16,9 @@
 //   POST /__sim/op/create-world  operator only (direct loopback requests; anything through a reverse proxy is refused):
 //                                {name, template, owner | ownerOf, godName?} → a world born owned by an existing account
 //                                (`owner` = account id, or `ownerOf` = the slug of a world whose god it is). CLI: op.mjs
+//   POST /__sim/op/register-fork operator only: {slug: eden|mars|littlemartians, descriptor, accounts?} → serve a copy of an
+//                                old world (already in <data>/worlds/<slug>/sim.db) under <base>/w/<slug> (fork-world.mjs)
+//   POST /__sim/op/remove-fork   operator only: {slug} → stop and unregister a fork (its data stays)
 //   /w/<slug>/*                  proxied to that world (HTTP, SSE, WebSocket); started on demand
 //
 // --base /worlds puts all of the above under one path prefix (/worlds/, /worlds/__sim/…, /worlds/w/<slug>/…,
@@ -47,8 +50,8 @@ import { createReadStream, existsSync, mkdirSync, readFileSync, rmSync, statSync
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
-import { Registry, SLUG_RE, listTemplates, slugFor } from './registry.mjs';
-import { ChildPool } from './children.mjs';
+import { FORK_SLUGS, Registry, SLUG_RE, listTemplates, slugFor } from './registry.mjs';
+import { ChildPool, defaultCommand, forkCommand } from './children.mjs';
 import { decorateCommand, memAvailableMb, productionSettings } from './production.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -96,8 +99,8 @@ export async function openLauncher(cfg = {}) {
   const seen = new Map();
   const seenOf = (slug) => { let s = seen.get(slug); if (!s) { s = { looks: registry.get(slug)?.looks ?? 0, lastLookAt: registry.get(slug)?.lastLookAt ?? null, agentSeenAt: registry.get(slug)?.agentSeenAt ?? null, previews: [] }; seen.set(slug, s); } return s; };
   const stats = new Map();   // slug → { at, god, entities, seq }
-  const pool = new ChildPool({ root, range, logDir: join(dataDir, 'logs'), pidFile: join(dataDir, 'children.json'), idleMs: cfg.idleMs, marsWebDir, publicOrigin, auth: auth?.child, soulCliFile: resolve(cfg.soulCli ?? SOUL.cli), soulSkillFile: resolve(cfg.soulSkill ?? SOUL.skill), soulInstructionsFile: resolve(cfg.soulInstructions ?? SOUL.instructions), command: cfg.command, healthPath: (s) => `${wp(s)}/healthz`,
-    maxRunning: prod.maxRunning, minFreeMb: prod.minFreeMb, busy: (slug) => (live.get(slug) ?? 0) > 0, decorate: (c) => decorateCommand({ ...c, env: { ...c.env, WEB_DIR: webDir } }, prod), /* worlds serve the same web build, with its --base */ onChange: (slug) => { const s = pool.status(slug); if (s.port && registry.get(slug) && registry.get(slug).port !== s.port) registry.update(slug, { port: s.port }); } });
+  const pool = new ChildPool({ root, range, logDir: join(dataDir, 'logs'), pidFile: join(dataDir, 'children.json'), idleMs: cfg.idleMs, marsWebDir, publicOrigin, auth: auth?.child, soulCliFile: resolve(cfg.soulCli ?? SOUL.cli), soulSkillFile: resolve(cfg.soulSkill ?? SOUL.skill), soulInstructionsFile: resolve(cfg.soulInstructions ?? SOUL.instructions), command: cfg.command ?? ((w, p, o) => (w.fork ? forkCommand : defaultCommand)(w, p, o)), healthPath: (s) => `${wp(s)}/healthz`,
+    maxRunning: prod.maxRunning, minFreeMb: prod.minFreeMb, busy: (slug) => (live.get(slug) ?? 0) > 0, decorate: (c) => { const d = decorateCommand({ ...c, env: { ...c.env, WEB_DIR: webDir } }, prod); if (d.env.SIM_FORK) d.env.NODE_OPTIONS = `--max-old-space-size=${cfg.forkHeapMb ?? 1536}`; return d; }, /* worlds serve the same web build, with its --base */ onChange: (slug) => { const s = pool.status(slug); if (s.port && registry.get(slug) && registry.get(slug).port !== s.port) registry.update(slug, { port: s.port }); } });
   const worldEnv = (w) => ({ ...w, dataDir: registry.worldDir(w.slug), templateFile: w.template && w.template !== 'empty' ? listTemplates(templatesDir).find((t) => t.id === w.template)?.file ?? null : null });
 
   // ---------- reads
@@ -215,6 +218,37 @@ export async function openLauncher(cfg = {}) {
     return run;
   }
 
+  // ---------- operator: forks of the old worlds (lane FORKS). Only FORK_SLUGS, only from this machine, only onto a
+  // copy of the world's database already in <data>/worlds/<slug>/sim.db; never created empty and never deleted here.
+  async function opRegisterFork(body) {
+    const slug = typeof body?.slug === 'string' ? body.slug : '';
+    if (!FORK_SLUGS.includes(slug)) return [400, { ok: false, code: 'invalid', message: `slug: one of ${FORK_SLUGS.join(', ')}` }];
+    if (registry.get(slug)) return [409, { ok: false, code: 'exists', message: `${slug} is already registered` }];
+    if (!auth) return [409, { ok: false, code: 'needs-clerk', message: 'forks sign in with Clerk (start the launcher with --auth-env)' }];
+    const descriptor = typeof body?.descriptor === 'string' ? body.descriptor : '';
+    const accounts = typeof body?.accounts === 'string' ? body.accounts : join(dataDir, 'forks', 'accounts.sqlite');
+    for (const [k, f] of Object.entries({ descriptor, accounts })) if (!f.startsWith('/') || !existsSync(f)) return [400, { ok: false, code: 'invalid', message: `${k}: an existing absolute path` }];
+    if (resolve(accounts) === resolve(auth.child.registryPath)) return [400, { ok: false, code: 'invalid', message: "a fork keeps the old worlds' account registry, never the launcher's" }];
+    let d; try { d = JSON.parse(readFileSync(descriptor, 'utf8')); } catch (e) { return [400, { ok: false, code: 'invalid', message: `descriptor: ${e.message}` }]; }
+    if ((d.worldKey ?? 'eden') !== slug) return [400, { ok: false, code: 'invalid', message: `descriptor is for ${d.worldKey ?? 'eden'}, not ${slug}` }];
+    if (!existsSync(join(registry.worldDir(slug), 'sim.db'))) return [409, { ok: false, code: 'no-data', message: `copy the world first: ${join(registry.worldDir(slug), 'sim.db')}` }];
+    const name = typeof body?.name === 'string' && body.name.trim() ? body.name.trim().slice(0, 60) : ({ eden: 'Eden', mars: 'Mars', littlemartians: 'Little Martians' })[slug];
+    const entry = { slug, name, template: 'fork', fork: { of: slug, descriptor, accounts }, port: null, createdAt: Date.now() };
+    registry.add(entry);
+    const t0 = performance.now();
+    try { await pool.ensure(worldEnv(entry), { timeoutMs: 180_000 }); }
+    catch (e) { await pool.stop(slug); pool.kids.delete(slug); registry.remove(slug); return [500, { ok: false, code: 'boot-failed', message: `${e.message} (registration undone; data kept)` }]; }
+    log(`registered fork ${slug} on :${pool.status(slug).port} in ${Math.round(performance.now() - t0)} ms`);
+    return [201, { ok: true, slug, url: `${wp(slug)}/`, bootMs: Math.round(performance.now() - t0), world: describe(entry) }];
+  }
+  async function opRemoveFork(body) {
+    const w = registry.get(typeof body?.slug === 'string' ? body.slug : '');
+    if (!w?.fork) return [404, { ok: false, code: 'not-found', message: 'no fork by that slug' }];
+    await pool.stop(w.slug); pool.kids.delete(w.slug); registry.remove(w.slug);
+    log(`removed fork ${w.slug} (data kept in ${registry.worldDir(w.slug)})`);
+    return [200, { ok: true, slug: w.slug, dataKept: registry.worldDir(w.slug) }];
+  }
+
   // ---------- static (the web app itself; everything else comes from a world)
   function serveFile(res, file, cache) {
     let st; try { st = statSync(file); } catch { return false; }
@@ -301,6 +335,13 @@ export async function openLauncher(cfg = {}) {
         const chunks = []; for await (const c of req) chunks.push(c);
         let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
         const out = await opCreateWorld(body); json(res, out[0], out[1]); return;
+      }
+      const forkOp = path.match(/^\/__sim\/op\/(register|remove)-fork$/)?.[1];
+      if (forkOp && req.method === 'POST') {
+        if (!direct(req)) { json(res, 403, { ok: false, code: 'local-only', message: 'operator commands are accepted only from this machine' }); return; }
+        const chunks = []; for await (const c of req) chunks.push(c);
+        let body; try { body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { json(res, 400, { ok: false, code: 'bad-json' }); return; }
+        const out = await (forkOp === 'register' ? opRegisterFork(body) : opRemoveFork(body)); json(res, out[0], out[1]); return;
       }
       const one = path.match(/^\/__sim\/worlds\/([a-z][a-z0-9-]{0,31})(\/previews)?$/);
       if (one && req.method === 'GET') {

@@ -14,6 +14,12 @@ const RESERVED = new Set(['toy', 'mars', 'littlemartians', 'eden', 'assets', 'wo
  * Names that would land under an existing release's world (`/w/mars*`, `/w/eden*` …) get a `my-`
  * prefix ("Mars" → my-mars, "Eden Garden" → my-eden-garden), so no Caddy glob can mis-route them.
  */
+/**
+ * Old worlds an operator may fork under the launcher's base (op register-fork), and only these: the one exception to
+ * RESERVED. Public creation still maps these names to my-<name> (slugFor below), so nobody else can take them.
+ */
+export const FORK_SLUGS = Object.freeze(['eden', 'mars', 'littlemartians']);
+
 export function slugFor(name, taken = new Set()) {
   let base = String(name ?? '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase()
     .replace(/['’]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
