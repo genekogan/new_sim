@@ -410,7 +410,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     let planting:ReturnType<typeof createCurrentProvisionsUnderstory>=null,plantingFailed=false;
     let connectedDressing:ReturnType<typeof createCurrentSocialDressingOwner>=null,connectedDressingFailed=false;
     const clearConnectedDressing=()=>{const owner=connectedDressing;connectedDressing=null;connectedDressingFailed=false;try{owner?.dispose();}catch{problem('Some greenery could not be shown; keeping the original scenery.');}};
-    const visualObstructionRoots=()=>worldCameraRenderRoots(geometry.group,people?.obstructionRoots()??[],[planting?.group,connectedDressing?.group,expansion?.group]);
+    const visualObstructionRoots=()=>worldCameraRenderRoots(geometry.group,people?.obstructionRoots()??[],[planting?.group,connectedDressing?.group,expansion?.group,entityLayer.active?entityLayer.group:null]);  // new worlds: god-built terrain/things are what double-click and the camera hit (else the y=0 plane, inside hills)
     let nativeBoat:NonNullable<ConstructorParameters<typeof TakePeople>[1]>['nativeBoat'];
     let sceneKey:string|null=null,sceneRequest=0,sceneRetryAt=0,sceneReason:string|null=null;
     const sceneryStatus=(reason:string|null)=>{sceneReason=reason;setSceneryNotice(reason);};
