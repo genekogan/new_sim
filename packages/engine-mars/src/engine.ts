@@ -855,8 +855,8 @@ export class MarsEngine implements Engine {
       e.human.level = level; e.human.activity = 'idle'; e.human.speed = 0; delete e.human.shore; acknowledgeRelocation(this.rt, id); return true;
     };
     const [x0, y0, z0] = pose.p, level = Number.isInteger(pose.level) ? pose.level! : 0;
-    if (level > 0) { const g = spatial.level(level); if (g && clearanceAt(g, [x0, z0]) >= HUMAN_RADIUS && free(x0, z0, level)) return land([r3(x0), r3(y0), r3(z0)], level); }
-    const grid = spatial.level(0); if (!grid) return false;
+    if (level > 0) { const g = spatial.levelAt(level, [x0, z0]); if (g && clearanceAt(g, [x0, z0]) >= HUMAN_RADIUS && free(x0, z0, level)) return land([r3(x0), r3(y0), r3(z0)], level); }
+    const grid = spatial.levelAt(0, [x0, z0]); if (!grid) return false;
     const f = this.rt.world.groundV1 ? spatial.ground?.field : undefined;
     const ok = (x: number, z: number) => clearanceAt(grid, [x, z]) >= HUMAN_RADIUS && free(x, z, 0) && (!f || f.medium(x, z) <= 1);
     for (let ring = 0; ring <= 80; ring++) { const n = Math.max(1, ring * 8); for (let k = 0; k < n; k++) {

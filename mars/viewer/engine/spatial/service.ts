@@ -3,16 +3,16 @@
 // clearance queries. Construction mutates entities; the next query sees the
 // new topology (spec §10 "construction must alter future navigation").
 import { hashOf } from '../core/hash.ts';
-import { dcos, dsin, rot2, type OBB2, type Vec2 } from '../core/math.ts';
+import { dcos, dsin, hypot, rot2, type OBB2, type Vec2 } from '../core/math.ts';
 import type { Entity, WorldState } from '../world/types.ts';
 import { CATALOG, def } from '../world/catalog.ts';
-import { buildStaticGrids, buildGrids, gridsWithObstacles, StaticRaster, updateGrids, type GridSet } from './grid.ts';
+import { buildStaticGrids, buildGrids, gridsWithObstacles, StaticRaster, updateGrids, type GridSet, type LevelGrid } from './grid.ts';
 import { findRoute, prepareCorridor, type Place, type RouteOpts, type RouteResult } from './path.ts';
 import type { AgentProfile, Link, Obstacle, SpatialScene, Surface } from './types.ts';
 import type { Profiler } from '../runtime/profile.ts';
 import { sleepEnvelope, SLEEP_BODY_MARGIN } from '../activities/sleep.ts';
 import { sceneForWorld, worldBaseId } from './edits.ts';
-import { GroundNav, groundRoute, rectOf, type TileRect } from './tiled.ts';
+import { FINE_LRU, GroundNav, PAGED_DIRECT_M, clusterRects, groundRoute, pagedRoute, rectOf, type TileRect } from './tiled.ts';
 import type { GroundField } from './ground.ts';
 
 /** Phases in which a component physically occupies space as a static obstacle. */
@@ -150,6 +150,17 @@ export class Spatial {
    */
   ground?: GroundNav;
   private groundDirty = false;
+  /**
+   * Paged ground (lane NAV; `ground.paged`): the windows the engine faces — one per cluster of nearby bodies and their
+   * walk chunks (tiled.ts clusterRects) — with each one's grids (built when first faced) and scene (its bounds), and which
+   * cluster each body's own neighbourhood lies in. `scene` / `grids` are the focused window's: the actor being stepped
+   * (Runtime focuses it), or the body an invariant checks (`levelOf`).
+   */
+  private pages: { rects: TileRect[]; key: string; sets: (GridSet | null)[]; scenes: SpatialScene[]; all: SpatialScene } | null = null;
+  private focusIdx = 0;
+  private focusActor?: string;
+  /** Paged: the bounds [x0, z0, x1, z1] (m) of what remains of every walk in progress (the ground bridge reads services.walkExecs). */
+  pagedCover?: () => [number, number, number, number][];
 
   constructor(base: SpatialScene, opts: { cell?: number; contributors?: Contributor[]; baseId?: string; planner?: 'exact' | 'corridor'; incremental?: boolean; source?: { scene: SpatialScene; id: string } } = {}) {
     this.base = base;
@@ -186,10 +197,11 @@ export class Spatial {
    * Enter (or leave, with null) ground mode on `field`, the window covering `points` (bodies, active goals). The next sync
    * rebuilds the grids and advances the navigation epoch, so walkers replan on the new ground.
    */
-  setGround(field: GroundField | null, world: WorldState, points: Vec2[] = []): void {
+  setGround(field: GroundField | null, world: WorldState, points: Vec2[] = [], opts: { paged?: boolean } = {}): void {
     const prev = this.ground;
-    this.ground = field ? new GroundNav(field, this.cell) : undefined;
-    if (this.ground) {
+    this.ground = field ? new GroundNav(field, this.cell, opts) : undefined;
+    this.pages = null;
+    if (this.ground && !this.ground.paged) {
       if (prev?.window) this.ground.include(prev.window);
       for (const p of points) this.ground.include(rectOf([p]));
       if (!this.ground.window) this.ground.include(rectOf([[0, 0]]));
@@ -203,7 +215,9 @@ export class Spatial {
 
   /** Ground mode: grow the window to cover `r` (resync on growth). False when the window would be too big. */
   groundInclude(world: WorldState, r: TileRect): boolean {
-    const g = this.ground!, res = g.include(r);
+    const g = this.ground!;
+    if (g.paged) return true;
+    const res = g.include(r);
     if (res === 'too-big') return false;
     if (res === 'grown') { this.groundDirty = true; this.sync(world); }
     return true;
@@ -253,6 +267,7 @@ export class Spatial {
   /** Ground mode sync: the same scene composition, grids from the tiled ground over the window (spatial/tiled.ts). */
   private syncGround(world: WorldState): boolean {
     const g = this.ground!;
+    if (g.paged) return this.syncPaged(world);
     // every body on level 0 stays inside the window (a body outside it would read clearance 0)
     for (const id in world.entities) {
       const e = world.entities[id];
@@ -291,6 +306,108 @@ export class Spatial {
     this.epoch++;
     this.aroundCache.clear();
     return true;
+  }
+
+  /** Paged ground sync: the windows from the bodies and walk chunks now; rebuild when they or the static world changed. */
+  private syncPaged(world: WorldState): boolean {
+    const g = this.ground!, ext = g.extentTiles(), units: TileRect[] = [];
+    const clip = (r: TileRect) => { const q: TileRect = [Math.max(r[0], ext[0]), Math.max(r[1], ext[1]), Math.min(r[2], ext[2]), Math.min(r[3], ext[3])]; if (q[0] <= q[2] && q[1] <= q[3]) units.push(q); };
+    for (const id in world.entities) { const e = world.entities[id]; if (e.kind === 'human' && e.human) clip(rectOf([[e.pose.p[0], e.pose.p[2]]])); }
+    for (const b of this.pagedCover?.() ?? []) clip(rectOf([[b[0], b[1]], [b[2], b[3]]], 4));
+    if (!units.length) clip(rectOf([[0, 0]]));
+    const rects = clusterRects(units), key = rects.map((r) => r.join(',')).join(';');
+    const changed = this.navChanged(world);
+    if (!changed && this.scene && this.pages && this.pages.key === key) return false;
+    const obstacles: Obstacle[] = [...this.base.obstacles];
+    const surfaces: Surface[] = [...this.base.surfaces];
+    const links: Link[] = [...this.base.links];
+    const levels = this.base.levels.some((l) => l.id === 0) ? [...this.base.levels] : [{ id: 0, y: 0, label: 'ground' }, ...this.base.levels];
+    for (const e of Object.values(world.entities)) {
+      if (!isStatic(e)) continue;
+      const f = entityFootprint(e);
+      obstacles.push({ id: e.id, obb: f.obb, y0: f.y0, y1: f.y1, kind: 'component', label: e.label ?? def(e.def).label });
+    }
+    for (const c of this.contributors) {
+      const r = c(world, this.base);
+      if (r.obstacles) obstacles.push(...r.obstacles);
+      if (r.surfaces) for (const s of r.surfaces) {
+        surfaces.push(s);
+        if (!levels.some((l) => l.id === s.level)) levels.push({ id: s.level, y: s.y, label: s.label ?? `level ${s.level}` });
+      }
+      if (r.links) links.push(...r.links);
+    }
+    const all: SpatialScene = { bounds: g.boundsOf(rects[0]), levels, surfaces, obstacles, links };
+    if (changed || !this.scene) {
+      const own = new Set((this.source?.scene ?? this.base).surfaces.map((x) => x.id));
+      g.setFloors(surfaces.filter((x) => x.level === 0 && !own.has(x.id)));
+      g.setSolids(obstacles);
+    }
+    let tiles = 0;
+    for (const r of rects) tiles += (r[2] - r[0] + 1) * (r[3] - r[1] + 1);
+    g.fineMax = Math.max(FINE_LRU, tiles + 8); g.composedMax = rects.length + 4;
+    // a window whose rect is unchanged keeps its grids when the static world did not change
+    const old = !changed && this.pages ? new Map(this.pages.rects.map((r, i) => [r.join(','), this.pages!.sets[i]])) : null;
+    this.pages = { rects, key, sets: rects.map((r) => old?.get(r.join(',')) ?? null), scenes: rects.map((r) => ({ ...all, bounds: g.boundsOf(r) })), all };
+    // the navigation epoch moves with the static world only: windows hold the same tiles wherever they lie, so a walk's
+    // corridor, smoothing and single-file passages (narrowId: window-independent names) stay valid when windows move
+    if (changed || !this.scene) { this.epoch++; this.aroundCache.clear(); }
+    this.focusPage(this.focusActor && world.entities[this.focusActor] ? this.pageAt([world.entities[this.focusActor].pose.p[0], world.entities[this.focusActor].pose.p[2]]) : 0, true);
+    return true;
+  }
+
+  /** Paged: the window holding `p` — the first whose rect holds p's whole neighbourhood, else the first holding p. */
+  private pageAt(p: Vec2): number {
+    const rs = this.pages!.rects, u = rectOf([p]), t = rectOf([p], 0);
+    let any = -1;
+    for (let i = 0; i < rs.length; i++) {
+      const r = rs[i];
+      if (r[0] <= u[0] && r[1] <= u[1] && r[2] >= u[2] && r[3] >= u[3]) return i;
+      if (any < 0 && r[0] <= t[0] && r[1] <= t[1] && r[2] >= t[2] && r[3] >= t[3]) any = i;
+    }
+    return any < 0 ? 0 : any;
+  }
+
+  private focusPage(i: number, force = false) {
+    const pg = this.pages!;
+    if (!force && i === this.focusIdx && this.grids === pg.sets[i]) return;
+    this.focusIdx = i;
+    let set = pg.sets[i];
+    if (!set) {
+      const build = () => this.ground!.gridsOver(pg.rects[i], pg.all);
+      set = pg.sets[i] = this.prof ? this.prof.time('spatial.sync.grids', build) : build();
+      if (this.planner === 'corridor') prepareCorridor(set);
+    }
+    this.scene = pg.scenes[i];
+    this.grids = set;
+  }
+
+  /** Paged ground: face the window of `actorId` (its body); other worlds: nothing. */
+  focusOn(world: WorldState, actorId: string | undefined): void {
+    if (!this.ground?.paged || !actorId) return;
+    const e = world.entities[actorId];
+    if (!e) return;
+    this.focusActor = actorId;
+    if (!this.pages) { this.sync(world); return; }
+    this.focusPage(this.pageAt([e.pose.p[0], e.pose.p[2]]));
+  }
+
+  /** The grid of `level` that covers (x, z) (paged ground: that point's window, now faced); other worlds: level(id). */
+  levelAt(id: number, p: Vec2) {
+    if (this.ground?.paged && this.pages) {
+      const i = this.pageAt(p), r = this.pages.rects[i], tx = Math.floor(p[0] / 64), tz = Math.floor(p[1] / 64);
+      // a point no window holds (a recovery target, a far arrival): its own small window, the engine's focus unchanged
+      if (tx < r[0] || tx > r[2] || tz < r[1] || tz > r[3]) return this.ground.gridsOver(rectOf([p]), this.pages.all).levels.get(id);
+      this.focusPage(i);
+    }
+    return this.grids.levels.get(id);
+  }
+
+  /** Paged ground diagnostics: the windows (tile rects) and the bytes their built grids hold. */
+  pagesInfo(): { rects: TileRect[]; built: number; bytes: number } | null {
+    if (!this.pages) return null;
+    let bytes = 0, built = 0;
+    for (const set of this.pages.sets) if (set) { built++; for (const g of set.levels.values()) bytes += g.free.byteLength + g.clearance.byteLength + g.nx * g.nz * 4; }
+    return { rects: this.pages.rects, built, bytes };
   }
 
   /**
@@ -359,7 +476,7 @@ export class Spatial {
   private gridsAroundNow(world: WorldState, people: AroundPerson[]): { scene: SpatialScene; grids: GridSet } {
     this.sync(world);
     const placed = people.flatMap((q) => aroundObstacle(world, q));
-    const key = `${this.epoch}|${placed.map(({ o, foot }) => `${o.id}@${o.obb.c[0]},${o.obb.c[1]},${o.obb.half[0]},${o.obb.half[1]},${o.obb.yaw},${o.y0},${o.y1},${foot ?? ''}`).join(';')}`;
+    const key = `${this.epoch}|${this.ground?.paged && this.pages ? `${this.pages.rects[this.focusIdx].join(',')}|` : ''}${placed.map(({ o, foot }) => `${o.id}@${o.obb.c[0]},${o.obb.c[1]},${o.obb.half[0]},${o.obb.half[1]},${o.obb.yaw},${o.y0},${o.y1},${foot ?? ''}`).join(';')}`;
     let hit = this.aroundCache.get(key);
     if (hit) {
       this.aroundCache.delete(key);
@@ -390,6 +507,15 @@ export class Spatial {
   /** One-off route treating standing people as temporary obstacles (a walker blocked by someone not moving). */
   routeAround(world: WorldState, profile: AgentProfile, start: Place, goal: Place, people: AroundPerson[], explainUnusable?: (linkId: string) => boolean): RouteResult {
     const run = () => {
+      // paged ground: a far goal is approached a chunk at a time (the people only matter near the walker)
+      let rest: Place | undefined;
+      if (this.ground?.paged && start.level === 0 && goal.level === 0 && hypot(goal.p[0] - start.p[0], goal.p[1] - start.p[1]) > PAGED_DIRECT_M) {
+        this.sync(world);
+        const c = pagedRoute(this.ground, this.scene, profile, start, goal, {});
+        if (!c.ok) return c;
+        const end = c.route.rest ? (c.route.legs.at(-1) as { points?: Vec2[] } | undefined)?.points?.at(-1) : undefined;
+        if (end) { rest = c.route.rest; goal = { level: 0, p: end }; }
+      }
       const { scene, grids } = (this.ground && start.level === 0 && goal.level === 0 && this.groundAround(world, start, goal, people)) || this.gridsAround(world, people);
       // a people-avoidance replan fails often (walled in, a pocket cut off): prove it early (path.ts proveUnreachable);
       // a failure names the people / loads behind it (path.ts nameObstacles: the walker's fewer-obstacles fallback)
@@ -398,7 +524,8 @@ export class Spatial {
       // 1 m away (it steps out of the gap first) instead of failing 'route.start-blocked'
       const opts: RouteOpts = { proveUnreachable: this.proveUnreachable, explainUnusable, nameObstacles: (id) => ids.has(id), startTolerance: AROUND_START_TOL };
       if (this.planner !== 'exact') opts.planner = this.planner;
-      return findRoute(grids, scene, profile, start, goal, opts);
+      const res = findRoute(grids, scene, profile, start, goal, opts);
+      return rest && res.ok ? { ok: true as const, route: { ...res.route, rest } } : res;
     };
     return this.prof ? this.prof.time('spatial.routeAround', run) : run();
   }
@@ -450,6 +577,36 @@ export class Spatial {
     return lab;
   }
 }
+
+/**
+ * Paged ground: the single-file component (as narrow(): 4-connected cells with r ≤ clearance < 2r + margin) holding cell
+ * `c` of the faced window's `level` grid, named by its first cell in global lattice order — the same name in every window
+ * that holds the whole component, so walkers in different windows queue for the same passage. Flood-filled on demand
+ * (memoised per grid) instead of labelling the whole window. Null when `c` is not single-file.
+ */
+export function narrowIdOf(g: LevelGrid, r: number, c: number, margin = 0.15): string | null {
+  const cl = g.clearance, hi = 2 * r + margin, v = cl[c];
+  if (!(v >= r && v < hi)) return null;
+  let byR = narrowIds.get(cl);
+  if (!byR) narrowIds.set(cl, (byR = new Map()));
+  const sub = `${r}:${margin}`;
+  let m = byR.get(sub);
+  if (!m) byR.set(sub, (m = new Map()));
+  const hit = m.get(c);
+  if (hit !== undefined) return hit;
+  const nx = g.nx, n = cl.length, cells = [c], seen = new Set([c]);
+  let best = c;
+  for (let q = 0; q < cells.length; q++) {
+    const k = cells[q], i = k % nx;
+    if (k < best) best = k;
+    const nb = [i + 1 < nx ? k + 1 : -1, i > 0 ? k - 1 : -1, k + nx < n ? k + nx : -1, k >= nx ? k - nx : -1];
+    for (const t of nb) { if (t < 0 || seen.has(t)) continue; const w = cl[t]; if (w >= r && w < hi) { seen.add(t); cells.push(t); } }
+  }
+  const id = `${g.ox + (best % nx)},${g.oz + Math.floor(best / nx)}`;
+  for (const k of cells) m.set(k, id);
+  return id;
+}
+const narrowIds = new WeakMap<Float32Array, Map<string, Map<number, string>>>();
 
 /** narrow() labels per clearance array (never mutated after it is built; PLANNING_BUDGET.md §6). */
 const narrowLabels = new WeakMap<Float32Array, Map<string, Int32Array>>();

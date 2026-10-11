@@ -14,7 +14,8 @@ export const MEDIUM_NAMES = ['walk', 'wade', 'swim', 'steep', 'outside'] as cons
 export type GroundMediumName = (typeof MEDIUM_NAMES)[number];
 
 /** logged rules fact `groundV1`: which ground recipe the world stands on (resolved by hash; replay re-derives every height). */
-export type GroundV1 = { version: 'ground/1'; recipeHash: string; editSeq: number };
+/** `nav: 'paged/1'` (lane NAV): Souls walk the whole ground (spatial/tiled.ts paged windows); absent: the 384 m window. */
+export type GroundV1 = { version: 'ground/1'; recipeHash: string; editSeq: number; nav?: 'paged/1' };
 
 export interface GroundField {
   /** The recipe hash (world.groundV1.recipeHash). */

@@ -49,7 +49,7 @@ function fieldOf(g: Ground, id: string): GroundField {
 }
 
 /** The fact payload for a recipe (registers it). */
-export function groundFact(g: Ground, editSeq: number): GroundV1 { return { version: 'ground/1', recipeHash: registerGroundRecipe(g), editSeq }; }
+export function groundFact(g: Ground, editSeq: number, opts: { paged?: boolean } = {}): GroundV1 { return { version: 'ground/1', recipeHash: registerGroundRecipe(g), editSeq, ...(opts.paged ? { nav: 'paged/1' as const } : {}) }; }
 
 
 // ---------------------------------------------------------------- the engine side
@@ -103,12 +103,39 @@ function coverPoints(rt: Rt): [number, number][] {
   return pts;
 }
 
+/** Paged: the bounds of what remains of every walk in progress (walk.ts execs in services.walkExecs; carry's sub-walks too). */
+const coverMemo = new WeakMap<object, Map<number, [number, number, number, number]>>();
+function pagedCover(rt: Rt): [number, number, number, number][] {
+  const out: [number, number, number, number][] = [];
+  const execs = rt.services.walkExecs as Map<string, { route: { legs: any[] }; leg: number }> | undefined;
+  if (execs) for (const ex of execs.values()) {
+    let byLeg = coverMemo.get(ex.route);
+    if (!byLeg) coverMemo.set(ex.route, (byLeg = new Map()));
+    let b = byLeg.get(ex.leg);
+    if (!b) {
+      let x0 = Infinity, z0 = Infinity, x1 = -Infinity, z1 = -Infinity;
+      const add = (x: number, z: number) => { if (x < x0) x0 = x; if (x > x1) x1 = x; if (z < z0) z0 = z; if (z > z1) z1 = z; };
+      for (let k = ex.leg; k < ex.route.legs.length; k++) {
+        const l = ex.route.legs[k];
+        if (l.kind === 'walk') for (const q of l.points) add(q[0], q[1]);
+        else if (l.link) { add(l.link.from.p[0], l.link.from.p[1]); add(l.link.to.p[0], l.link.to.p[1]); }
+      }
+      b = [x0, z0, x1, z1]; byLeg.set(ex.leg, b);
+    }
+    if (b[0] <= b[2]) out.push(b);
+  }
+  return out;
+}
+
 /** Enter ground mode for the world's `groundV1` (create, restore, install). No fact: nothing changes. */
 export function attachGround(rt: Rt): boolean {
   const fact = rt.world.groundV1 as GroundV1 | undefined;
   if (!fact) return false;
   const sp = rt.services.spatial as Spatial;
-  sp.setGround(groundField(fact.recipeHash), rt.world, coverPoints(rt));
+  const paged = fact.nav === 'paged/1';
+  // paged (lane NAV): the windows follow every body and the rest of every walk chunk in progress (restored with the execs)
+  sp.pagedCover = paged ? () => pagedCover(rt) : undefined;
+  sp.setGround(groundField(fact.recipeHash), rt.world, coverPoints(rt), { paged });
   // GOD-ENV: a god's world may grow past ±500 m; walk_to reaches its bounds (only ground worlds ever get here)
   const ext = groundRecipe(fact.recipeHash)?.extent; if (ext) setWalkReach(Math.max(500, ...ext.map((v) => Math.abs(v))));
   rt.registry = groundRegistry(rt.registry);
@@ -138,7 +165,7 @@ export function settleBodies(rt: Rt): string[] {
   return moved;
 }
 
-const factSchemaOk = (f: any): f is GroundV1 => !!f && f.version === 'ground/1' && typeof f.recipeHash === 'string' && /^[0-9a-f]{16}$/.test(f.recipeHash) && Number.isInteger(f.editSeq) && f.editSeq >= 0;
+const factSchemaOk = (f: any): f is GroundV1 => !!f && f.version === 'ground/1' && typeof f.recipeHash === 'string' && /^[0-9a-f]{16}$/.test(f.recipeHash) && Number.isInteger(f.editSeq) && f.editSeq >= 0 && (f.nav === undefined || f.nav === 'paged/1');
 /** Why a groundV1 fact cannot be installed (pure), or null. */
 export function previewGroundV1(fact: unknown): { code: string; message: string } | null {
   if (!factSchemaOk(fact)) return { code: 'ground.bad-fact', message: '{version:"ground/1", recipeHash:<16 hex>, editSeq:int} required' };
@@ -149,8 +176,8 @@ export function previewGroundV1(fact: unknown): { code: string; message: string 
 export function installGroundV1(rt: Rt, fact: GroundV1): { installed: boolean; settled: string[] } {
   const issue = previewGroundV1(fact); if (issue) throw new Error(issue.code);
   const prev = rt.world.groundV1 as GroundV1 | undefined;
-  if (prev?.recipeHash === fact.recipeHash) { if (prev.editSeq !== fact.editSeq) rt.world.groundV1 = { ...fact }; return { installed: false, settled: [] }; }
-  rt.world.groundV1 = { version: 'ground/1', recipeHash: fact.recipeHash, editSeq: fact.editSeq };
+  if (prev?.recipeHash === fact.recipeHash && prev.nav === fact.nav) { if (prev.editSeq !== fact.editSeq) rt.world.groundV1 = { ...fact }; return { installed: false, settled: [] }; }
+  rt.world.groundV1 = { version: 'ground/1', recipeHash: fact.recipeHash, editSeq: fact.editSeq, ...(fact.nav ? { nav: fact.nav } : {}) };
   attachGround(rt);
   return { installed: true, settled: settleBodies(rt) };
 }

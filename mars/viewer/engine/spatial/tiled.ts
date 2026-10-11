@@ -47,17 +47,24 @@ const rectBounds = (r: TileRect): [number, number, number, number] => [r[0] * GR
 const obstacleKey = (o: Obstacle) => `${o.id}|${o.obb.c[0]},${o.obb.c[1]},${o.obb.half[0]},${o.obb.half[1]},${o.obb.yaw}|${o.y0},${o.y1}`;
 function fnv(s: string, h = 0x811c9dc5): number { for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619) >>> 0; return h; }
 
-/** LevelGrid.blockers over a composite: per-cell indices into an id table (diagnostics only). */
+/**
+ * LevelGrid.blockers over a composite: per-cell indices into an id table (diagnostics only). The table is filled from the
+ * tiles on first use (most composites are never asked), so composing costs only the copies of `free` and `clearance`.
+ */
 class ComposedBlockers extends Map<number, string> {
-  private cells: Int32Array; private ids: string[]; private n = 0;
-  constructor(cells: Int32Array, ids: string[]) { super(); this.cells = cells; this.ids = ids; for (let i = 0; i < cells.length; i++) if (cells[i] >= 0) this.n++; }
-  override get size() { return this.n; }
+  private _cells: Int32Array | null = null; private ids: string[] = []; private n = 0; private fill: (() => { cells: Int32Array; ids: string[] }) | null;
+  constructor(fill: () => { cells: Int32Array; ids: string[] }) { super(); this.fill = fill; }
+  private get cells(): Int32Array {
+    if (!this._cells) { const f = this.fill!(); this.fill = null; this._cells = f.cells; this.ids = f.ids; for (let i = 0; i < f.cells.length; i++) if (f.cells[i] >= 0) this.n++; }
+    return this._cells;
+  }
+  override get size() { void this.cells; return this.n; }
   override get(i: number) { const k = this.cells[i]; return k >= 0 ? this.ids[k] : undefined; }
   override has(i: number) { return this.cells[i] >= 0; }
-  override set(i: number, id: string): this { let k = this.ids.indexOf(id); if (k < 0) { k = this.ids.length; this.ids.push(id); } if (this.cells[i] < 0) this.n++; this.cells[i] = k; return this; }
-  override delete(i: number) { if (!(this.cells[i] >= 0)) return false; this.cells[i] = -1; this.n--; return true; }
+  override set(i: number, id: string): this { const cells = this.cells; let k = this.ids.indexOf(id); if (k < 0) { k = this.ids.length; this.ids.push(id); } if (cells[i] < 0) this.n++; cells[i] = k; return this; }
+  override delete(i: number) { const cells = this.cells; if (!(cells[i] >= 0)) return false; cells[i] = -1; this.n--; return true; }
   override clear() { this.cells.fill(-1); this.n = 0; }
-  override *entries(): MapIterator<[number, string]> { for (let i = 0; i < this.cells.length; i++) if (this.cells[i] >= 0) yield [i, this.ids[this.cells[i]]]; }
+  override *entries(): MapIterator<[number, string]> { const cells = this.cells; for (let i = 0; i < cells.length; i++) if (cells[i] >= 0) yield [i, this.ids[cells[i]]]; }
   override *keys(): MapIterator<number> { for (const [i] of this.entries()) yield i; }
   override *values(): MapIterator<string> { for (const [, v] of this.entries()) yield v; }
   override [Symbol.iterator]() { return this.entries(); }
@@ -122,9 +129,18 @@ export class GroundNav {
   stats = { fineBuilds: 0, fineHits: 0, composites: 0, coarseExpanded: 0 };
   private fine = new Map<string, FineTile>();
   private composed = new Map<string, LevelGrid>();
+  /**
+   * Paged navigation (lane NAV, worlds whose ground fact says `nav: 'paged/1'`): no single grow-only window. The engine
+   * faces a set of small windows (Spatial clusters, one per group of nearby bodies and their current walk chunks), routes
+   * are planned a chunk (one coarse hop) at a time, and the tile caches are sized to what the windows hold. Off: as before.
+   */
+  readonly paged: boolean;
+  /** Fine tiles kept (paged: at least the windows' tiles); composites kept. */
+  fineMax = FINE_LRU;
+  composedMax = 4;
 
-  constructor(field: GroundField, cell = 0.1) {
-    this.base = this.field = field; this.cell = cell;
+  constructor(field: GroundField, cell = 0.1, opts: { paged?: boolean } = {}) {
+    this.base = this.field = field; this.cell = cell; this.paged = !!opts.paged;
     this.per = Math.round(GROUND_TILE_M / cell);
     if (Math.abs(this.per * cell - GROUND_TILE_M) > 1e-9) throw new Error('ground: the cell must divide the 64 m tile');
     this.apron = Math.round(FINE_APRON_M / cell);
@@ -265,7 +281,7 @@ export class GroundNav {
       t.blk.set(blk.subarray(src, src + per), j * per);
     }
     this.fine.set(key, t);
-    while (this.fine.size > FINE_LRU) this.fine.delete(this.fine.keys().next().value!);
+    while (this.fine.size > this.fineMax) this.fine.delete(this.fine.keys().next().value!);
     return t;
   }
 
@@ -278,24 +294,32 @@ export class GroundNav {
     const memo = this.composed.get(ckey);
     if (memo) { this.composed.delete(ckey); this.composed.set(ckey, memo); return memo; }
     const { per, cell } = this, ntx = r[2] - r[0] + 1, ntz = r[3] - r[1] + 1, nx = ntx * per, nz = ntz * per;
-    const free = new Uint8Array(nx * nz), clearance = new Float32Array(nx * nz), cells = new Int32Array(nx * nz).fill(-1), ids: string[] = [], idOf = new Map<string, number>();
+    const free = new Uint8Array(nx * nz), clearance = new Float32Array(nx * nz), parts: { ft: { blk: Int16Array; ids: string[] }; gx: number; gz: number }[] = [];
     for (const t of tiles) {
       const ft = this.fineTile(t.tx, t.tz, t.rel, t.key), gx = (t.tx - r[0]) * per, gz = (t.tz - r[1]) * per;
-      const map = ft.ids.map((id) => { let k = idOf.get(id); if (k === undefined) { k = ids.length; ids.push(id); idOf.set(id, k); } return k; });
+      parts.push({ ft: { blk: ft.blk, ids: ft.ids }, gx, gz });
       for (let j = 0; j < per; j++) {
         const dst = (gz + j) * nx + gx, src = j * per;
         free.set(ft.free.subarray(src, src + per), dst);
         clearance.set(ft.clearance.subarray(src, src + per), dst);
-        for (let i = 0; i < per; i++) { const b = ft.blk[src + i]; if (b >= 0) cells[dst + i] = map[b]; }
       }
     }
+    // blocker ids per cell, in the same order as before (tiles row-major, each tile's own table), built when first read
+    const fillBlockers = () => {
+      const cells = new Int32Array(nx * nz).fill(-1), ids: string[] = [], idOf = new Map<string, number>();
+      for (const { ft, gx, gz } of parts) {
+        const map = ft.ids.map((id) => { let k = idOf.get(id); if (k === undefined) { k = ids.length; ids.push(id); idOf.set(id, k); } return k; });
+        for (let j = 0; j < per; j++) { const dst = (gz + j) * nx + gx, src = j * per; for (let i = 0; i < per; i++) { const b = ft.blk[src + i]; if (b >= 0) cells[dst + i] = map[b]; } }
+      }
+      return { cells, ids };
+    };
     const ox = r[0] * per, oz = r[1] * per;
     const lat = latticeOf(rectBounds(r), cell);
     if (lat.ox !== ox || lat.oz !== oz || lat.nx !== nx || lat.nz !== nz) throw new Error('ground: tile lattice mismatch');
-    const grid: LevelGrid = { level: 0, y: 0, cell, nx, nz, ox, oz, x0: ox * cell, z0: oz * cell, free, clearance, blockers: new ComposedBlockers(cells, ids) };
+    const grid: LevelGrid = { level: 0, y: 0, cell, nx, nz, ox, oz, x0: ox * cell, z0: oz * cell, free, clearance, blockers: new ComposedBlockers(fillBlockers) };
     this.stats.composites++;
     this.composed.set(ckey, grid);
-    while (this.composed.size > 4) this.composed.delete(this.composed.keys().next().value!);
+    while (this.composed.size > this.composedMax) this.composed.delete(this.composed.keys().next().value!);
     return grid;
   }
 
@@ -305,6 +329,19 @@ export class GroundNav {
     levels.set(0, this.compose(this.window!, scene.obstacles));
     const upper = scene.levels.filter((l) => l.id !== 0);
     if (upper.length) for (const [id, g] of buildGrids({ ...scene, levels: upper }, this.cell).levels) levels.set(id, g);
+    return { cell: this.cell, levels };
+  }
+
+  /**
+   * Paged: all levels over a tile rect, on the rect's own lattice — level 0 composed from tiles, each upper level (a deck,
+   * a floor) that has a surface reaching the rect built flat over it (so multi-level routes and walkers on upper floors
+   * see the same lattice as level 0).
+   */
+  gridsOver(r: TileRect, scene: SpatialScene): GridSet {
+    const levels = new Map<number, LevelGrid>(), b = rectBounds(r);
+    levels.set(0, this.compose(r, scene.obstacles));
+    const upper = scene.levels.filter((l) => l.id !== 0 && scene.surfaces.some((s) => s.level === l.id && touches(s.obb, b)));
+    if (upper.length) for (const [id, g] of buildGrids({ ...scene, bounds: b, levels: upper }, this.cell).levels) levels.set(id, g);
     return { cell: this.cell, levels };
   }
 
@@ -356,6 +393,34 @@ export class GroundNav {
     cellsOut.reverse();
     return cellsOut.map((k) => [bx0 + (k % W) + 0.5, bz0 + Math.floor(k / W) + 0.5] as Vec2);
   }
+}
+
+/** Whether an obb's bounding box meets the bounds [x0, z0, x1, z1]. */
+function touches(o: { c: Vec2; half: Vec2; yaw: number }, b: [number, number, number, number]): boolean {
+  let ax = Infinity, az = Infinity, bx = -Infinity, bz = -Infinity;
+  for (const [x, z] of obbCorners(o)) { if (x < ax) ax = x; if (x > bx) bx = x; if (z < az) az = z; if (z > bz) bz = z; }
+  return bx >= b[0] && ax <= b[2] && bz >= b[1] && az <= b[3];
+}
+
+/**
+ * Paged windows: unit rects (a body's neighbourhood, a walker's chunk) merged while two share a tile and their union
+ * stays ≤ `max` tiles a side. Canonical: sorted first, then merged greedily, so the same set of units always gives the
+ * same windows (live and restored engines agree).
+ */
+export function clusterRects(units: TileRect[], max = MAX_WINDOW_TILES): TileRect[] {
+  const cmp = (p: TileRect, q: TileRect) => p[0] - q[0] || p[1] - q[1] || p[2] - q[2] || p[3] - q[3];
+  const rs = units.map((u) => [...u] as TileRect).sort(cmp).filter((u, i, a) => i === 0 || cmp(u, a[i - 1]) !== 0);
+  for (let merged = true; merged;) {
+    merged = false;
+    for (let i = 0; i < rs.length && !merged; i++) for (let j = i + 1; j < rs.length; j++) {
+      const p = rs[i], q = rs[j];
+      if (p[0] > q[2] || q[0] > p[2] || p[1] > q[3] || q[1] > p[3]) continue;
+      const u = unionRect(p, q);
+      if (u[2] - u[0] + 1 > max || u[3] - u[1] + 1 > max) continue;
+      rs[i] = u; rs.splice(j, 1); merged = true; break;
+    }
+  }
+  return rs.sort(cmp);
 }
 
 function boxesOf(obstacles: Obstacle[]): Float64Array {
@@ -413,6 +478,7 @@ const slopeDeg = (s: number) => Math.round((datan2(s, 1) * 180) / Math.PI);
 
 /** The hierarchical walk planner for ground worlds. `include` grows the engine window (false: too big). */
 export function groundRoute(nav: GroundNav, scene: SpatialScene, profile: AgentProfile, start: Place, goal: Place, opts: RouteOpts, include: (r: TileRect) => boolean, windowGrids: () => GridSet): RouteResult {
+  if (nav.paged) return pagedRoute(nav, scene, profile, start, goal, opts);
   const f = nav.field;
   if (start.level !== 0 || goal.level !== 0) {
     if (!include(rectOf([start.p, goal.p]))) return failR('ground.too-far', `(${fmt(goal.p)}) is too far to plan in one walk; walk part of the way first`, goal);
@@ -456,6 +522,49 @@ export function groundRoute(nav: GroundNav, scene: SpatialScene, profile: AgentP
     from = { level: 0, p: end ?? target.p };
   }
   return { ok: true, route: { legs, length, expanded } };
+}
+
+/** Paged: start and goal this close (m) are routed in one go (any levels); farther, a chunk at a time on level 0. */
+export const PAGED_DIRECT_M = 72;
+
+/**
+ * Paged planner (lane NAV): the coarse path proves the whole way (and names what is in the way, as groundRoute), but only
+ * its first hop is planned fine; the route then carries `rest` (the real goal) and the walker plans the next chunk before
+ * it reaches the end of this one. A goal on another level is approached on level 0 until it is within PAGED_DIRECT_M.
+ */
+export function pagedRoute(nav: GroundNav, scene: SpatialScene, profile: AgentProfile, start: Place, goal: Place, opts: RouteOpts): RouteResult {
+  const f = nav.field, direct = hypot(goal.p[0] - start.p[0], goal.p[1] - start.p[1]) <= PAGED_DIRECT_M;
+  if (start.level !== 0 || goal.level !== 0) {
+    if (direct) { const r = rectOf([start.p, goal.p]); return findRoute(nav.gridsOver(r, scene), { ...scene, bounds: rectBounds(r) }, profile, start, goal, opts); }
+    if (start.level !== 0) return failR('ground.too-far', `(${fmt(goal.p)}) is too far to plan from an upper floor; walk down first`, goal);
+  } else {
+    const goalIssue = groundGoalIssue(f, goal.p);
+    if (goalIssue) return goalIssue;
+  }
+  const sm = f.medium(start.p[0], start.p[1]);
+  if (sm === G_SWIM) return failR('ground.in-water', `you are swimming (${fmt(start.p)}); swim to the shore before walking`, start);
+  const path = nav.coarsePath(start.p, goal.p, WALK_COST) ?? nav.coarsePath(start.p, goal.p, WALK_COST, 160, 2_000_000);
+  if (!path) {
+    const alt = nav.coarsePath(start.p, goal.p, EXPLAIN_COST, 96);
+    if (alt) for (const q of alt) {
+      const m = coarseMedium(f, q[0], q[1]);
+      if (m === G_STEEP) return failR('ground.cliff', `no footpath to (${fmt(goal.p)}): ground steeper than ${slopeDeg(f.maxSlope)}° (a cliff) is in the way at (${fmt(q)})`, { level: 0, p: q });
+      if (m === G_SWIM) return failR('ground.deep-water', `no footpath to (${fmt(goal.p)}): water deeper than ${f.wadeMax} m is in the way at (${fmt(q)}); swim across or go round`, { level: 0, p: q });
+    }
+    return failR('ground.unreachable', `no way on foot from (${fmt(start.p)}) to (${fmt(goal.p)})`, goal);
+  }
+  // the first hop (as groundRoute cuts them); the last one ends at the goal itself
+  let acc = 0, k = 1;
+  for (; k < path.length; k++) { acc += hypot(path[k][0] - path[k - 1][0], path[k][1] - path[k - 1][1]); if (acc >= HOP_M && k < path.length - 4) break; }
+  const last = k >= path.length && goal.level === 0, target: Vec2 = last ? goal.p : path[Math.min(k, path.length - 1)];
+  const r = rectOf([start.p, target, ...path.slice(1, k + 1)]);
+  const grids: GridSet = { cell: nav.cell, levels: new Map([[0, nav.compose(r, scene.obstacles)]]) };
+  const res = findRoute(grids, { ...scene, bounds: rectBounds(r), links: [] }, profile, start, { level: 0, p: target }, last ? opts : { ...opts, goalTolerance: 2.5 });
+  if (!res.ok || last) return res;
+  // length: this chunk's, plus the coarse path's remainder (an estimate of the whole walk, e.g. routeEstimateV1)
+  let more = 0;
+  for (let j = Math.min(k, path.length - 1) + 1; j < path.length; j++) more += hypot(path[j][0] - path[j - 1][0], path[j][1] - path[j - 1][1]);
+  return { ok: true, route: { ...res.route, length: res.route.length + more, rest: goal } };
 }
 
 function appendLeg(legs: Leg[], leg: Leg) {
