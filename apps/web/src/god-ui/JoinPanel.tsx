@@ -117,7 +117,7 @@ export function ApprovalCard({ id, signedIn, onDone }: { id: string; signedIn: b
   useEffect(() => { if (a?.status !== 'creating') return; const t = setInterval(() => void check(), 3000); return () => clearInterval(t); }, [a?.status, check]);
   return (
     <div className="gp-pairs jp-approval" data-approval={id} data-approval-status={a?.status ?? ''}>
-      <b>Your agent asks to {a?.mode === 'create' ? 'make and move a Soul' : 'move your Soul'}</b>
+      <b>Your agent asks to {a?.mode === 'create' ? 'create a Soul for you' : a?.mode === 'repair' ? 'connect to your Soul' : 'create or connect a Soul'}</b>
       {!signedIn && <p>Sign in (below) with the account that owns the Soul to review this request.</p>}
       {a && <p><b>{a.name}</b>{a.soulId ? <span className="gp-dim"> · {a.soulId}</span> : null}<br /><span className="gp-dim">agent: {a.agentLabel} (its own label)</span></p>}
       {a?.status === 'pending' && <>

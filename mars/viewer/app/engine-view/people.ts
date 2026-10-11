@@ -7,6 +7,7 @@ import type { GLTF } from 'three/addons/loaders/GLTFLoader.js';
 import { ThreeResources, loadGltf } from '../../lib/three-resources.ts';
 import { BODY_MODEL } from './rig.ts';
 import {collectTemplateAppearance,transferActorAppearance,type TemplateAppearance,type ActorAppearance} from './human-appearance.ts';
+import {BASE} from '../../../../apps/web/src/base-path.ts';
 
 export const PEOPLE = ['casual', 'punk', 'woman'] as const;
 export const PERSON_HEIGHT = 1.75;
@@ -62,8 +63,9 @@ export type ExtraClip='wave'|'run'|'interact'|'idleNeutral';
 const EXTRA_CLIPS:Record<ExtraClip,string>={wave:'Wave',run:'Run',interact:'Interact',idleNeutral:'Idle_Neutral'};
 
 /** The served character GLB (cache tag bumped whenever the GLBs change). Exactly one pinned URL expression: the
- *  PM build maps it to its own model directory. */
-const characterUrl = (name: string) => `/modular/environment/animated-${name}.glb?v=ual-1`;
+ *  PM build maps it to its own model directory. Under the app's prefix (BASE '/worlds' on a prefixed build, '' at the
+ *  root) so a prefixed page never asks the other release on the origin for its art. */
+const characterUrl = (name: string) => `${BASE}/modular/environment/animated-${name}.glb?v=ual-1`;
 /** Directory the character GLBs are served from; other imported models (eden-imports) are served beside them. */
 export const MODEL_DIR = characterUrl('').replace(/animated-\.glb.*$/, '');
 
