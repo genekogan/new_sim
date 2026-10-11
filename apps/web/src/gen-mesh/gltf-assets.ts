@@ -18,6 +18,8 @@ import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { apiPath } from '../world-path.ts';
 import { BASE } from '../base-path.ts';
+import { mergeStatic } from './static-merge.ts';
+import { compileModel, fitTextures, uploadTextures } from './texture-budget.ts';
 
 let shared: GLTFLoader | null = null;
 /** LiveWorld may hand over its own loader (download progress, one Draco worker pool). */
@@ -37,7 +39,8 @@ export function loadAsset(sha: string): Promise<GLTF> {
   const l = loader();
   const hit = cache.get(sha);
   if (hit && (hit.settled || hit.by === l)) return hit.p;
-  const entry = { p: l.loadAsync(assetUrl(sha)).then((g) => { prepare(g); return g; }), by: l, settled: false };
+  // lane PERF (texture-budget.ts): oversized textures are fitted before upload, and uploads are paced across frames
+  const entry = { p: l.loadAsync(assetUrl(sha)).then(async (g) => { const st = ((globalThis as unknown as { __assetStages?: Record<string, string> }).__assetStages ??= {}); st[sha] = 'fit'; await fitTextures(g); st[sha] = 'prepare'; prepare(g); st[sha] = 'compile'; await compileModel(g); st[sha] = 'upload'; await uploadTextures(g); st[sha] = 'done'; return g; }), by: l, settled: false };
   cache.set(sha, entry);
   entry.p.then(() => { entry.settled = true; }, (e: unknown) => {
     if (cache.get(sha) !== entry) return;
@@ -59,6 +62,8 @@ function prepare(g: GLTF) {
       if (m.geometry.attributes.color) { mat.vertexColors = true; if (!mat.metalnessMap) mat.metalness = 0; if (!mat.roughnessMap) mat.roughness = Math.max(mat.roughness, 0.8); mat.needsUpdate = true; }
     }
   });
+  // lane PERF: a static model's many nodes/materials become a few merged meshes (static-merge.ts)
+  try { const r = mergeStatic(g.scene, g.animations.length > 0); if (r) g.userData.merged = r; } catch (e) { console.warn('static merge skipped', e); }
   const box = new THREE.Box3().setFromObject(g.scene, true);
   g.userData.bounds = box.isEmpty() ? new THREE.Box3(new THREE.Vector3(-0.5, 0, -0.5), new THREE.Vector3(0.5, 1, 0.5)) : box;
 }

@@ -22,25 +22,53 @@ const started = new Set<string>();
 const camera = new THREE.Vector3(0, 30, 60);
 let background: ReturnType<typeof setTimeout> | null = null, running = 0;
 
-const shasOf = (d: StoredDef | undefined) => (d && d.make.kind === 'mesh' ? JSON.stringify(d.make).match(/[0-9a-f]{64}/g) ?? [] : []);
+// only the GLB the mesh half loads (make.asset): a mesh def also names its server-side `footprint` sha, which the viewer
+// never fetches; counting it held the arrival card for nothing and put phantom MB on the loading bar (lane PERF)
+const shasOf = (d: StoredDef | undefined) => { const a = d && d.make.kind === 'mesh' ? (d.make as { asset?: unknown }).asset : null; return typeof a === 'string' && /^[0-9a-f]{64}$/.test(a) ? [a] : []; };
 
 /** Choose the eager GLBs for a snapshot: nearest-first to `centre` until EAGER_BYTES. Returns the loading bar's sizes. */
-export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string, number> }, defOf: (ref: string) => StoredDef | undefined, posOf: (e: Entity) => [number, number] | null, centre: [number, number] = [0, 0]): Record<string, number> {
+export function planEager(snap: { entities: Entity[]; assetBytes?: Record<string, number> }, defOf: (ref: string) => StoredDef | undefined, posOf: (e: Entity) => [number, number] | null, centre: [number, number] = [0, 0], eye?: [number, number]): Record<string, number> {
+  // lane PERF: with the arrival eye known, rank by how big a thing looks from it: distance from the eye over the thing's
+  // size, for things in front (a 60° half-cone towards the centre); things behind the camera come last. Measured on
+  // littlemartians-two at 60 Mbit/s: nearest-the-centre left the foreground bare, nearest-the-eye the plaza's towers.
+  const fx = centre[0] - (eye?.[0] ?? 0), fz = centre[1] - (eye?.[1] ?? 0), fl = Math.hypot(fx, fz) || 1;
+  const score = (x: number, z: number) => {
+    if (!eye) return Math.hypot(x - centre[0], z - centre[1]);
+    const dx = x - eye[0], dz = z - eye[1], d = Math.hypot(dx, dz);
+    return d < 15 || (dx * fx + dz * fz) / (d * fl) > 0.5 ? d : d + 1000;
+  };
   const sizes = snap.assetBytes ?? {};
   if (!LAZY) { eager = null; return sizes; }
-  const dist = new Map<string, number>();
+  const dist = new Map<string, number>(), rank = new Map<string, number>();
   for (const e of snap.entities) {
-    const shas = shasOf(defOf(e.def)); if (!shas.length) continue;
-    const p = posOf(e), d = p ? Math.hypot(p[0] - centre[0], p[1] - centre[1]) : 1e9;
-    for (const sha of shas) dist.set(sha, Math.min(dist.get(sha) ?? Infinity, d));
+    const def = defOf(e.def), shas = shasOf(def); if (!shas.length) continue;
+    const p = posOf(e), d = p ? score(p[0], p[1]) : 1e9, size = Math.max(1, ...((def?.size?.box as number[] | undefined) ?? [1]).map((v) => v * (e.s ?? 1)));
+    for (const sha of shas) { dist.set(sha, Math.min(dist.get(sha) ?? Infinity, d)); rank.set(sha, Math.min(rank.get(sha) ?? Infinity, eye ? d / size : d)); }
   }
-  const order = [...dist.keys()].sort((a, b) => dist.get(a)! - dist.get(b)!);
+  const order = [...rank.keys()].sort((a, b) => rank.get(a)! - rank.get(b)!);
   const pick = new Set<string>(); let bytes = 0;
   for (const sha of order) { const n = sizes[sha] ?? 0; if (pick.size && (bytes + n > EAGER_BYTES || dist.get(sha)! > NEAR_M * 2)) continue; pick.add(sha); bytes += n; }
   eager = pick;
+  // lane PERF: the arrival card waits for these (or GATE_MS), so a new world opens with what is in front of you drawn
+  eagerLeft.clear(); for (const sha of pick) eagerLeft.add(sha);
+  gateUntil = performance.now() + GATE_MS; setTimeout(notifyGate, GATE_MS + 50); notifyGate();
   scheduleBackground();
   return Object.fromEntries(Object.entries(sizes).filter(([sha]) => pick.has(sha)));
 }
+/** The arrival gate (lane PERF): true while the eager GLBs (nearest the arrival) are not yet drawn, for at most GATE_MS.
+ *  ViewerFrame keeps the arrival card (and its byte bar) up meanwhile. Old worlds never plan, so it is always false. */
+const GATE_MS = 30_000;
+const eagerLeft = new Set<string>(); let gateUntil = 0;
+const gateListeners = new Set<() => void>();
+function notifyGate() { for (const f of gateListeners) f(); }
+export const arrivalGate = {
+  pending: (): boolean => LAZY && eagerLeft.size > 0 && performance.now() < gateUntil,
+  subscribe(fn: () => void) { gateListeners.add(fn); return () => { gateListeners.delete(fn); }; },
+  left: () => [...eagerLeft],
+};
+if (typeof window !== 'undefined') (window as unknown as { __arrivalGate?: unknown }).__arrivalGate = arrivalGate;   // probes
+/** A model is in the scene (or its placeholder, when it failed): it no longer holds the arrival card. */
+export function assetShown(sha: string) { if (eagerLeft.delete(sha) && !eagerLeft.size) notifyGate(); }
 export const isEager = (sha: string) => !LAZY || !eager || eager.has(sha) || started.has(sha);
 
 /** Defer one thing's GLB load: returns an invisible hook to add to the thing's group. `start` runs once, when the thing is
@@ -48,13 +76,15 @@ export const isEager = (sha: string) => !LAZY || !eager || eager.has(sha) || sta
 export function deferLoad(sha: string, start: () => void, makeHook: (fn: (cam: THREE.Camera) => void) => THREE.Object3D): THREE.Object3D {
   let done = false;
   const at = new THREE.Vector3();
-  const go = () => { if (done) return; done = true; started.add(sha); start(); };
+  // once started the hook has done its job: leave the scene (lane PERF: one no-op draw fewer per thing, every frame)
+  const go = () => { if (done) return; done = true; started.add(sha); start(); queueMicrotask(() => hook.removeFromParent()); };
   const entry = { start: go, at };
   const list = waiting.get(sha) ?? []; list.push(entry); waiting.set(sha, list);
   const hook = makeHook((cam) => {
     if (done) return;
     hook.getWorldPosition(at); camera.copy(cam.position);
-    if (started.has(sha) || at.distanceTo(cam.position) < NEAR_M) go();
+    // while the arrival card waits on the eager set, the rest waits too: the eager GLBs get the whole link (lane PERF)
+    if (started.has(sha) || (at.distanceTo(cam.position) < NEAR_M && !arrivalGate.pending())) go();
   });
   hook.addEventListener('removed', () => { done = true; const l = waiting.get(sha); if (l) { const i = l.indexOf(entry); if (i >= 0) l.splice(i, 1); if (!l.length) waiting.delete(sha); } });
   return hook;
@@ -65,6 +95,7 @@ function scheduleBackground() {
   if (background) clearTimeout(background);
   background = setTimeout(function tick() {
     background = null;
+    if (arrivalGate.pending()) { background = setTimeout(tick, 500); return; }
     while (running < BACKGROUND_PARALLEL && waiting.size) {
       let best: string | null = null, bd = Infinity;
       for (const [sha, list] of waiting) for (const w of list) { const d = w.at.lengthSq() ? w.at.distanceTo(camera) : 1e9; if (d < bd) { bd = d; best = sha; } }

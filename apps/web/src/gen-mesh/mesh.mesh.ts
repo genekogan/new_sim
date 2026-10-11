@@ -9,7 +9,7 @@
 // move the legs), so motion.ts walks, grazes, flies or swims it like a kit creature.
 import * as THREE from 'three';
 import { frameHook, instantiate, loadAsset, type ModelInstance } from './gltf-assets.ts';
-import { deferLoad, isEager, noteDeferred } from './lazy-assets.ts';
+import { assetShown, deferLoad, isEager, noteDeferred } from './lazy-assets.ts';
 import { registerMesh, type MeshBuilder } from './registry.ts';
 import { bindMotionModel, makeRig, type Gait } from './motion.ts';
 import { seedOf, type BehaviorKind } from './creatures/behavior.ts';
@@ -34,7 +34,9 @@ const meshBuilder: MeshBuilder = {
       const gait: Gait = b.kind === 'fly' ? 'bird-fly' : b.kind === 'swim' ? 'fish-swim' : 'none';
       holder.userData.rig = makeRig(holder, { gait, kind: b.kind as BehaviorKind, speed: b.speed ?? 1, radius: b.radius ?? 6, follow: b.ref, seed: ctx.entity.seed ?? seedOf(ctx.entity.id), model: ctx.model, species: ctx.def.name.replace(/^core-|-pack$/g, ''), box: ctx.def.size.box as [number, number, number] });
     }
-    holder.add(frameHook(() => {
+    // lane PERF: the clip hook is added once the model is in and only if it has clips (a static model costs no per-frame
+    // hook draw; mars-two had 166 of them)
+    const clipHook = () => frameHook(() => {
       if (!inst || !inst.clips.length) return;
       const t = Date.now() / 1000;
       holder.getWorldPosition(now);
@@ -43,7 +45,7 @@ const meshBuilder: MeshBuilder = {
       stillFor = moved ? 0 : stillFor + 1;
       const walking = !!behavior && MOVING.has(behavior) && stillFor < 3;   // a few frames of grace across easing jitter
       inst.play(behavior === 'fly' ? 'Fly' : behavior === 'swim' ? 'Swim' : walking ? 'Walk' : 'Idle', t, { phase });
-    }));
+    });
     // VOCAB-MECH: GLBs outside the eager set load when the thing comes near the camera or in the background (lazy-assets.ts)
     const load = () => { loadAsset(make.asset).then((gltf) => {
       if (gone) return;
@@ -51,8 +53,8 @@ const meshBuilder: MeshBuilder = {
       // flat things (rugs, boards, plates a few cm thick) would z-fight with gently uneven ground: draw them
       // a hair towards the camera (the materials are shared per asset, so every copy of it gets the same)
       if (ctx.def.size.box[1] <= 0.06) inst.object.traverse((o) => { const mats = (o as THREE.Mesh).material; for (const m of Array.isArray(mats) ? mats : mats ? [mats] : []) { m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -4; } });
-      holder.add(inst.object);
-      if (inst.clips.length) inst.play('Idle', Date.now() / 1000, { phase });
+      holder.add(inst.object); assetShown(make.asset);
+      if (inst.clips.length) { inst.play('Idle', Date.now() / 1000, { phase }); holder.add(clipHook()); }
       // a building cut with a `roof` group (the Mars campus pieces): hidden in the roofs-off view (?hideRoofs=1 or the
       // viewer's toggle) and while the camera is inside the building below its roof, like building/1's interior view
       const roof = inst.object.getObjectByName('roof');
@@ -70,7 +72,7 @@ const meshBuilder: MeshBuilder = {
       // the asset is missing or broken: a soft placeholder of the def's size, so the place is still visible
       const [w, h, d] = ctx.def.size.box;
       const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), ctx.materials.get('paint', '#b0a090')); m.position.y = h / 2; m.name = 'asset missing';
-      holder.add(m);
+      holder.add(m); assetShown(make.asset);
     }); };
     if (isEager(make.asset)) load(); else { holder.add(deferLoad(make.asset, load, frameHook)); noteDeferred(); }
     holder.addEventListener('removed', () => { gone = true; inst?.dispose(); });

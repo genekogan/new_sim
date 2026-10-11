@@ -65,7 +65,7 @@ import { WorldEntityLayer } from './WorldEntityLayer.ts';
 import { GodWorldLiving, godTourViews } from './world-env.ts';
 import { WorldLightning } from './WorldLightning.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
-import { setAssetLoader } from './gen-mesh/gltf-assets.ts';
+import { setAssetLoader } from './gen-mesh/gltf-assets.ts';import { AdaptiveResolution } from './adaptive-resolution.ts';import { setTextureRenderer } from './gen-mesh/texture-budget.ts';
 import { GodPanel } from './GodPanel.tsx';
 import { ensureToken as ensureGodToken } from './god-ui/god-api.ts';
 import { WorldPreviewGhost } from './WorldPreviewGhost.ts';
@@ -231,6 +231,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       return () => abort.abort();
     }
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    const adaptive=newWorld?new AdaptiveResolution(renderer,devicePixelRatio):null;if(adaptive)(window as unknown as {__simAdaptive?:unknown}).__simAdaptive=adaptive;  // lane PERF: new worlds step the pixel ratio down on a slow GPU
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.domElement.setAttribute('aria-label', 'Live 3D view of the world');
@@ -417,7 +418,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const draco = new DRACOLoader(manager).setDecoderPath(BASE+'/mars-assets/draco/');
     const placePreviews=new WorldPlacePreviews(renderer,()=>[geometry.group,...(expansion?[expansion.group]:[])]);
     const loader = new GLTFLoader(manager).setDRACOLoader(draco).setMeshoptDecoder(MeshoptDecoder);
-    setAssetLoader(loader);
+    setAssetLoader(loader);if(newWorld){setTextureRenderer(renderer,scene,camera);MeshoptDecoder.useWorkers?.(2);renderer.debug.checkShaderErrors=false;}  // lane PERF: paced GLB texture uploads, meshopt decoding in 2 workers, no sync link-status reads (new worlds only)
     const floaters = new FloaterView(scene, { baseUrl: '/world-assets/littlemartians/characters/', loader });
     const bodyModels=new WorldBodyModels(loader,problem);
     let capturedPlatforms:readonly PlatformFloor[]|null=null;
@@ -836,7 +837,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       expansion?.wallFrames.update(camera,expansion.group.visible&&!past.current);
       // Initial required attachments are prepared together, never per GLB.
       if((!initialGate||initialGate.snapshot().stage==='ready')&&batchEnabled&&(batchGeometry!==geometry||batchRevision!==geometry.staticRenderRevision))void prepareStaticRendering();
-      const draw=()=>{diagnostics.beginRender(renderer);try{if(!eyes?.render())renderer.render(scene,camera);}finally{diagnostics.endRender();}};
+      if(adaptive&&entityLayer.active&&!eyes)adaptive.frame(now);const draw=()=>{diagnostics.beginRender(renderer);try{if(!eyes?.render())renderer.render(scene,camera);}finally{diagnostics.endRender();}};
       if(batchEnabled)staticBatches.withRender(draw);else draw();
       shadowDetail?.restore();
       idleLife.restore();
