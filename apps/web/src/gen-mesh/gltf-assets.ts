@@ -17,27 +17,34 @@ import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { apiPath } from '../world-path.ts';
+import { BASE } from '../base-path.ts';
 
 let shared: GLTFLoader | null = null;
 /** LiveWorld may hand over its own loader (download progress, one Draco worker pool). */
 export function setAssetLoader(loader: GLTFLoader) { shared = loader; }
 function loader(): GLTFLoader {
-  return (shared ??= new GLTFLoader().setDRACOLoader(new DRACOLoader().setDecoderPath('/mars-assets/draco/')).setMeshoptDecoder(MeshoptDecoder));
+  return (shared ??= new GLTFLoader().setDRACOLoader(new DRACOLoader().setDecoderPath(BASE + '/mars-assets/draco/')).setMeshoptDecoder(MeshoptDecoder));
 }
 /** URL of a stored asset (served immutable by the world's server). */
 export const assetUrl = (sha: string, ext = 'glb') => apiPath(`/assets/${sha}.${ext}`);
 
-const cache = new Map<string, Promise<GLTF>>();
+const cache = new Map<string, { p: Promise<GLTF>; by: GLTFLoader; settled: boolean }>();
 const failed = new Set<string>();
-/** Load (once) and parse a GLB by sha. Rejects on 404 or a parse error; a failure is retried after 30 s. */
+/** Load (once) and parse a GLB by sha. Rejects on 404 or a parse error; a failure is retried after 30 s.
+ *  A load still in flight on a loader that has since been replaced (LiveWorld re-mounts its scene on a new welcome and
+ *  aborts the old scene's LoadingManager) is not reused, and its abort is not a failure: the new scene loads it again. */
 export function loadAsset(sha: string): Promise<GLTF> {
-  let p = cache.get(sha);
-  if (!p) {
-    p = loader().loadAsync(assetUrl(sha)).then((g) => { prepare(g); return g; });
-    cache.set(sha, p);
-    p.catch(() => { failed.add(sha); setTimeout(() => { cache.delete(sha); failed.delete(sha); }, 30_000); });
-  }
-  return p;
+  const l = loader();
+  const hit = cache.get(sha);
+  if (hit && (hit.settled || hit.by === l)) return hit.p;
+  const entry = { p: l.loadAsync(assetUrl(sha)).then((g) => { prepare(g); return g; }), by: l, settled: false };
+  cache.set(sha, entry);
+  entry.p.then(() => { entry.settled = true; }, (e: unknown) => {
+    if (cache.get(sha) !== entry) return;
+    if ((e as { name?: string })?.name === 'AbortError' || entry.by !== loader()) { cache.delete(sha); return; }
+    entry.settled = true; failed.add(sha); setTimeout(() => { if (cache.get(sha) === entry) cache.delete(sha); failed.delete(sha); }, 30_000);
+  });
+  return entry.p;
 }
 export function assetFailed(sha: string) { return failed.has(sha); }
 
