@@ -138,6 +138,11 @@ try {
   await page.locator('[data-join]').waitFor({ timeout: 120_000 });
   if (!(await page.locator('[data-join-form]').isVisible())) await page.locator('summary', { hasText: 'Live here yourself' }).click();  // the owner's own Soul sits behind this disclosure
   await page.locator('[data-join-form]').waitFor({ timeout: 30_000 });
+  // typing W/A/S/D into a panel input types letters and leaves the camera alone
+  await page.waitForFunction(() => !!window.__simCamera, null, { timeout: 60_000 });
+  const before = await cam(); await page.locator('[data-soul-name]').click(); await page.keyboard.type('wasd', { delay: 120 }); await sleep(500);
+  const after = await cam(), typed = await page.locator('[data-soul-name]').inputValue();
+  check('typing w/a/s/d in a panel input types them and does not move the camera', typed === 'wasd' && moved(before, after) < 0.01, { typed, moved: moved(before, after) });
   await page.locator('[data-soul-name]').fill('Gene');
   await page.locator('[data-join-go]').click();
   const line = await page.locator('[data-join-prompt]').innerText();
