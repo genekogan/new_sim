@@ -1,7 +1,9 @@
+import {ALL_OPTIONAL_APPEARANCE_PROFILES,optionalAppearanceProfilesForVerifiedCapture,type OptionalAppearanceProfiles} from './optional-appearance-profiles.ts';
 import {historyTakePath,historyTakePage} from './WorldTakeTransport.ts';
 import {WorldAuthoredBoundaries} from './WorldAuthoredBoundaries.ts';
 import {exploreRoom} from './explore-data.ts';
 import {RendererDiagnostics} from './RendererDiagnostics.ts';
+import {StaticBatchOwner} from './rendering/StaticBatchOwner.ts';
 import {AssetDownloads,type AssetDownloadProgress} from './AssetDownloads.ts';
 import {WorldPlacePreviews} from './WorldPlacePreviews.ts';
 import {constrainOfficeGuardCamera,officeGuardsFromPublication} from './WorldOfficeGuards.ts';
@@ -13,7 +15,7 @@ import {WorldHover,type HoverTarget} from './WorldHover.ts';
 import {EDEN_VIEWER_PLACES} from './WorldEdenPlaceData.ts';
 import {WorldSoulAvatars} from './SoulAvatars.ts';
 import {edenExpansionCapture} from './WorldEdenActivation.ts';
-import {worldPlaceView,type WorldPlaceId} from './WorldPlaces.ts';
+import {worldPlaceView,CURATED_WORLD_LOCATIONS,type WorldPlaceId} from './WorldPlaces.ts';
 import {createWorldEdenExpansion} from './WorldEdenExpansion.ts';
 import type {LocalClassroomPresentation} from './WorldClassroomPresentation.ts';
 import {WorldFollow} from './WorldFollow.ts';
@@ -42,7 +44,10 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { TakePeople } from '../../../mars/viewer/app/engine-view/take-replay.ts';
-import { loadTemplates } from '../../../mars/viewer/app/engine-view/people.ts';
+import { loadTemplates,PEOPLE } from '../../../mars/viewer/app/engine-view/people.ts';
+import {templateNameFor} from '../../../mars/viewer/app/engine-view/humans.ts';
+import {depictedWorldLocations,type WorldLocation} from './WorldLocations.ts';
+import {InitialWorldReadiness,successfulInitialLookup,initialAssetRoot,type InitialWorldProgress} from './InitialWorldReadiness.ts';
 import { FloaterView, KinScenery } from '../../../mars/viewer/app/engine-view/floaters.ts';
 import { floaterBody } from '../../../mars/viewer/engine/bodies/index.ts';
 import { ThreeResources } from '../../../mars/viewer/lib/three-resources.ts';
@@ -54,6 +59,7 @@ import type { Sim } from './useSim.ts';
 import { decodeSceneCapturePublication } from '@sim/protocol/scene-capture';
 import { WorldSceneHistory } from './WorldSceneHistory.ts';
 import { apiPath, worldKey } from './world-path.ts';
+import { newWorld } from './world-kind.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
 import { entityArrivalPose } from './entity-arrival.ts';
 import { setAssetLoader } from './gen-mesh/gltf-assets.ts';
@@ -68,7 +74,7 @@ import { placeWorldLabels, type LabelBox, type LabelOffset } from './WorldLabels
 import {projectSpeechAnchors,type SpeechAnchorPoint} from './WorldSpeechAnchors.ts';
 import {paintSpeakingDot} from './dialogue-speaking.ts';
 import {WorldGames} from './WorldGames.ts';
-import {parsePlatformFloors,type PlatformFloor} from '../../../mars/viewer/lib/platform-floor.ts';
+import {parsePlatformFloors,platformFloorOffset,type PlatformFloor} from '../../../mars/viewer/lib/platform-floor.ts';
 import {WorldPlatforms} from './WorldPlatforms.ts';
 import {cameraGround,cameraGroundSampler} from './WorldCameraGround.ts';
 import {WorldRenderedVisibility} from './WorldRenderedVisibility.ts';
@@ -133,10 +139,12 @@ function cardsAt(plays: readonly PlayView[], tick: number): Map<string, PlayView
 const cardText = (p: PlayView | undefined) => (p ? `“${p.card}”${p.targetName ? ` → ${p.targetName}` : ''}` : '');
 const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
-export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerState, hideControls = false, embedded = false, hideSoulInfo = false, publishSpeechAnchors = false, humanPresets = false, viewportInsets, depictionBeatAt, edenExpansion = false, localClassroomPresentation }: {
+export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerState, onInitialProgress, hideControls = false, embedded = false, hideSoulInfo = false, publishSpeechAnchors = false, humanPresets = false, viewportInsets, depictionBeatAt, edenExpansion = false, localClassroomPresentation }: {
   sim: Sim; selected: string | null; onSelect(id: string | null): void;
   onViewerHandle?(handle: WorldViewerHandle | null): void;
   onViewerState?(state: WorldViewerState): void;
+  /** App shows the initial-assets progress in its own arrival card; this overlay then keeps only its backdrop and a failure's Retry. */
+  onInitialProgress?(progress: InitialWorldProgress): void;
   hideControls?: boolean;
   /** App sizes the stable world-viewer/world-viewport elements. */
   embedded?: boolean;
@@ -162,6 +170,10 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   const [, refreshPlayback] = useState(0);
   const [draft, setDraft] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [initialProgress,setInitialProgress]=useState<InitialWorldProgress>({generation:0,stage:'waiting',required:0,completed:0,failed:[],bytesLoaded:0,bytesTotal:null});
+  const retryInitial=useRef<(()=>void)|null>(null);
+  useEffect(()=>{onInitialProgress?.(initialProgress);},[initialProgress,onInitialProgress]);
+  const progressInCard=!!onInitialProgress&&initialProgress.stage!=='failed';
   const [assetProgress,setAssetProgress]=useState<AssetDownloadProgress>({loaded:0,total:0,failed:0,pending:0});
   const [placeCard,setPlaceCard]=useState<HoverTarget|null>(null);
   const [note, setNote] = useState<string | null>(null);
@@ -186,7 +198,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     stateSignature.current = signature; context.current.onViewerState(state);
   };
   const seeking = useRef<AbortController | null>(null);
-  const controlsApi = useRef<{ overview(): void; frameSouls(ids:readonly string[]):boolean; framePoint(point:THREE.Vector3,radius:number):void; framePlace(place:WorldPlaceId): boolean; placePreview(place:WorldPlaceId):Promise<string|null>; focusSelected(): boolean; reset(): boolean; releaseInput(): void; move(delta: CameraMove): boolean; inputOwned(): boolean } | null>(null);
+  const controlsApi = useRef<{ overview(): void; frameSouls(ids:readonly string[]):boolean; framePoint(point:THREE.Vector3,radius:number):void; locations():readonly WorldLocation[];frameLocation(id:string):boolean;locationPreview(id:string):Promise<string|null>;framePlace(place:WorldPlaceId): boolean; placePreview(place:WorldPlaceId):Promise<string|null>; focusSelected(): boolean; reset(): boolean; releaseInput(): void; move(delta: CameraMove): boolean; inputOwned(): boolean } | null>(null);
   const playbackCommands = useRef<{ seek(tick: number): Promise<void>; live(): void; setPlaying(playing: boolean): boolean } | null>(null);
   const commitTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -236,6 +248,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     host.appendChild(labels2d.domElement);
 
     const scene = new THREE.Scene();
+    const staticBatches=new StaticBatchOwner(scene),batchEnabled=new URLSearchParams(location.search).get('staticBatches')!=='0';
+    let batchGeometry:WorldGeometry|null=null,batchRevision=-1,batchGeneration=0;
     // Far plane covers the whole ±900 m terrain from anywhere in Eden: a nearer far plane slices the distant
     // ranges and the slice moves with the camera (ridges seemed to rise and recede). Depth precision is set by near.
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 2400);
@@ -276,8 +290,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     // ?shot=1: a clean picture for `god look` (canvas over every overlay, camera from eye/at, title 'ready' once drawn).
     const shotMode=new URLSearchParams(location.search).has('shot');
     if(shotMode){const c=renderer.domElement;Object.assign(c.style,{position:'fixed',inset:'0',width:'100vw',height:'100vh',zIndex:'2147483000'});document.title='loading';}
-    void entityLayer.start(abort.signal).then(()=>{frameEntityWorld();setEntityWorld(entityLayer.active);if(shotMode)setTimeout(()=>{document.title=entityLayer.active?'ready':'no-entity-world';(window as unknown as {__shotReady?:boolean}).__shotReady=true;},Math.max(2500,Number(new URLSearchParams(location.search).get('settle')??'3000')));});
-    const gw=window as unknown as {__simGhost?:WorldPreviewGhost};const ghost=gw.__simGhost??(gw.__simGhost=new WorldPreviewGhost(apiPath));scene.add(ghost.group);  // ?preview=<id> ghosts (GodPanel drives it; one ghost per page, whoever makes it first)
+    void (newWorld ? entityLayer.start(abort.signal) : Promise.resolve()).then(()=>{frameEntityWorld();setEntityWorld(entityLayer.active);if(shotMode)setTimeout(()=>{document.title=entityLayer.active?'ready':'no-entity-world';(window as unknown as {__shotReady?:boolean}).__shotReady=true;},Math.max(2500,Number(new URLSearchParams(location.search).get('settle')??'3000')));});
+    const gw=window as unknown as {__simGhost?:WorldPreviewGhost};const ghost=gw.__simGhost??(gw.__simGhost=new WorldPreviewGhost(apiPath));if(newWorld)scene.add(ghost.group);  // ?preview=<id> ghosts (GodPanel drives it; one ghost per page, whoever makes it first)
     // Alt+click on the ground drops a labelled flag (a core/flag entity) the god can refer to as flag:<label>.
     // Owner authority: this world's god token, minted with the page's signed-in person (Clerk in production, a local name in dev).
     const godMint=()=>ensureGodToken().catch(()=>null);
@@ -293,7 +307,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       const r=await fetch(apiPath('/v1/god/act'),{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:JSON.stringify({ops:[{op:'place',def:'core/flag@1',name,p:[Math.round(hit.point.x*10)/10,Math.round(hit.point.z*10)/10],state:{label}}],note:'flag from the website'})});
       const d=await r.json().catch(()=>null);if(!d?.accepted)problem(`Flag refused: ${d?.failures?.[0]?.code??r.status} ${d?.failures?.[0]?.detail??''}`);
     };
-    renderer.domElement.addEventListener('click',onFlagClick);(window as unknown as {__simEntity?:unknown}).__simEntity={layer:entityLayer,camera,get controls(){return controls;},scene,renderer,stats:()=>({draws:renderer.info.render.calls,tris:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,instances:entityLayer.instancer.instances,instanceDraws:entityLayer.instancer.draws,entities:entityLayer.entityCount})};  // the entity world (god mode), when this world has one
+    renderer.domElement.addEventListener('click',onFlagClick);if(newWorld)(window as unknown as {__simEntity?:unknown}).__simEntity={layer:entityLayer,camera,get controls(){return controls;},scene,renderer,stats:()=>({draws:renderer.info.render.calls,tris:renderer.info.render.triangles,geometries:renderer.info.memory.geometries,textures:renderer.info.memory.textures,instances:entityLayer.instancer.instances,instanceDraws:entityLayer.instancer.draws,entities:entityLayer.entityCount})};  // the entity world (god mode), when this world has one
     const games=new WorldGames();scene.add(games.group);
     const platformDraw=new WorldPlatforms();scene.add(platformDraw.group);
     const placeActivity=new WorldPlaceActivity();scene.add(placeActivity.group);
@@ -317,6 +331,14 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     let shadowDetail:WorldShadowDetail|null=null;
     const clearExpansion=()=>{shadowDetail?.dispose();shadowDetail=null;houseWindows?.dispose();houseWindows=null;expansion?.dispose();expansion=null;refreshCameraGround();};
     let geometry = new WorldGeometry(null);
+    // Called by the finite initial gate after required attachments and appearances.
+    const prepareStaticRendering=async()=>{
+      if(!batchEnabled)return;
+      const revision=geometry.staticRenderRevision;
+      if(batchGeometry===geometry&&batchRevision===revision)return;
+      batchGeometry=geometry;batchRevision=revision;
+      await staticBatches.prepare(geometry.staticRenderRoots(),{generation:++batchGeneration,signal:abort.signal,budgetPolicy:'partial-cells/1'}).catch(()=>{});
+    };
     scene.add(geometry.group);
     const groupSelection=new Set<string>();
     const framing=new WorldPlaceCamera();let followed: string | null = null;
@@ -340,6 +362,9 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         const shot=conversationFrame(members,camera,visualObstructionRoots(),(x,z)=>cameraGround.heightAt(scene,x,z)??0);
         if(!shot)return false;groupSelection.clear();members.forEach(m=>groupSelection.add(m.id));context.current.onSelect(members[0].id);controls.target.copy(shot.target);camera.position.copy(shot.position);camera.lookAt(shot.target);controls.update();return true;
       },
+      locations:()=>expansion&&!past.current?CURATED_WORLD_LOCATIONS:depictedLocations,
+      frameLocation:id=>{if(initialGate?.snapshot().stage!=='ready')return false;const view=controlsApi.current?.locations().find(p=>p.id===id);if(!view)return false;framing.place(camera,()=>controls,view,()=>{context.current.manualNavigation='orbit';context.current.cameraMode='manual';context.current.follow=false;context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');},()=>{rts.release();orbitPivot.cancel();navigation?.release();});return true;},
+      locationPreview:id=>{if(initialGate?.snapshot().stage!=='ready')return Promise.resolve(null);const location=controlsApi.current?.locations().find(p=>p.id===id);if(!location)return Promise.resolve(null);return location.regionId?placePreviews.captureLocation(location,sceneKey??''):placePreviews.capture(id as WorldPlaceId);},
       framePlace: place => {const view=worldPlaceView(place);if(!view||!expansion||past.current)return false;framing.place(camera,()=>controls,view,()=>{context.current.manualNavigation='orbit';context.current.cameraMode='manual';context.current.follow=false;context.current.setManualNavigation('orbit');context.current.setCameraMode('manual');},()=>{rts.release();orbitPivot.cancel();navigation?.release();});return true;},
       releaseInput: () => {rts.release();navigation?.release();},
       move: delta => navigation?.move(delta) ?? false,
@@ -394,17 +419,20 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(!abort.signal.aborted&&meta?.contract==='eden-edge/1'&&meta.active===true&&meta.provenance?.contract==='render-platforms/1'&&typeof meta.worldId==='string')currentPlatforms={worldId:meta.worldId,platforms:parsePlatformFloors(meta.platforms)};
     }).catch(()=>{});
     const kin = new KinScenery(scene, { baseUrl: '/world-assets/littlemartians/characters/', loader });
-    let templatesFailed = false, templates: Awaited<ReturnType<typeof loadTemplates>> = [];
-    void loadTemplates(abort.signal, resources,{appearances:humanPresets,onAsset:(name,phase)=>{if(phase==='start')downloads.start('person:'+name);else downloads.finish('person:'+name,phase==='failed');}}).then((t) => { templates = t; people?.setTemplates(t); }).catch(() => {
-      if (abort.signal.aborted) return;
-      templatesFailed = true;
-      problem('The people models could not be loaded, so people are shown as simple figures.');
-    });
+    let templates: Awaited<ReturnType<typeof loadTemplates>> = Object.assign([],{stableOrder:PEOPLE});
+    type TemplateLoad={promise:Promise<void>;resolve:()=>void;reject:(error:Error)=>void;failed:boolean};
+    const templateLoads=new Map<string,TemplateLoad>();
+    const beginTemplate=(name:string)=>{let resolve!:()=>void,reject!:(error:Error)=>void;const promise=new Promise<void>((yes,no)=>{resolve=yes;reject=no;});void promise.catch(()=>{});templateLoads.set(name,{promise,resolve,reject,failed:false});};
+    PEOPLE.forEach(beginTemplate);
+    const templateOptions={appearances:humanPresets,onTemplate:(template:typeof templates[number])=>{const i=templates.findIndex(t=>t.name===template.name);if(i>=0)templates[i]=template;else templates.push(template);people?.setTemplates(templates);},onAsset:(name:string,phase:'start'|'loaded'|'failed')=>{if(phase==='start')downloads.start('person:'+name);else{downloads.finish('person:'+name,phase==='failed');const entry=templateLoads.get(name)!;if(phase==='loaded')entry.resolve();else{entry.failed=true;entry.reject(Error('Required person model '+name+' could not be loaded.'));}}}};
+    void loadTemplates(abort.signal,resources,templateOptions).catch(()=>{});
+    const requireTemplate=async(name:string)=>{if(templates.some(t=>t.name===name))return;if(templateLoads.get(name)?.failed){beginTemplate(name);void loadTemplates(abort.signal,resources,{...templateOptions,names:[name]}).catch(()=>{});}await templateLoads.get(name)!.promise;};
 
     // Current unbound live viewers retain their observed layout. Historical
     // bound segments load their verified base; old unbound history uses neutral ground.
     let dayTicks: number | null = null;
     let base: ReturnType<typeof parseSceneInfo>['scene'] = null, sceneSettled = false, people: TakePeople | null = null;
+    let appearanceProfiles=ALL_OPTIONAL_APPEARANCE_PROFILES;
     let publication:unknown=null,restMarkers:ReturnType<typeof createPublishedRestMarkers>=null;
     let newcomerMarkers:ReturnType<typeof createPublishedNewcomerMarkers>=null,newcomerMarkersFailed=false;
     const clearNewcomerMarkers=()=>{const owner=newcomerMarkers;newcomerMarkers=null;newcomerMarkersFailed=false;try{owner?.dispose();}catch{if(!abort.signal.aborted)problem('Some sleeping-area scenery could not be shown; keeping the original ground.');}};
@@ -416,13 +444,21 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const clearConnectedDressing=()=>{const owner=connectedDressing;connectedDressing=null;connectedDressingFailed=false;try{owner?.dispose();}catch{problem('Some greenery could not be shown; keeping the original scenery.');}};
     const visualObstructionRoots=()=>worldCameraRenderRoots(geometry.group,people?.obstructionRoots()??[],[planting?.group,connectedDressing?.group,expansion?.group,entityLayer.active?entityLayer.group:null]);  // new worlds: god-built terrain/things are what double-click and the camera hit (else the y=0 plane, inside hills)
     let nativeBoat:NonNullable<ConstructorParameters<typeof TakePeople>[1]>['nativeBoat'];
+    let locationRegions:unknown=null,depictedLocations:readonly WorldLocation[]=[];
     let sceneKey:string|null=null,sceneRequest=0,sceneRetryAt=0,sceneReason:string|null=null;
+    let initialGeneration=0,initialGate:InitialWorldReadiness|null=null,initialSnapshot=false,preparingGeneration=0,initialBodyIds:readonly string[]=[];
+    const newInitialGate=()=>{initialGate?.cancel();const generation=++initialGeneration;initialSnapshot=false;preparingGeneration=0;initialBodyIds=[];const gate=new InitialWorldReadiness(generation,progress=>{if(!abort.signal.aborted&&initialGate===gate)setInitialProgress(progress);});initialGate=gate;setInitialProgress(gate.snapshot());retryInitial.current=()=>{if(initialGate===gate){preparingGeneration=0;gate.retry();}};return gate;};
+
     const sceneryStatus=(reason:string|null)=>{sceneReason=reason;setSceneryNotice(reason);};
     const sceneHistory=new WorldSceneHistory(context.current.sim.conn.welcome?.worldId??'',async(hash,signal)=>{
       const response=await fetch(apiPath('/v1/scenes/'+hash),{signal});
       if(!response.ok)throw Error('Recorded scenery unavailable');return response.json();
     },decodeSceneCapturePublication);
-    const installScene=(info:ReturnType<typeof parseSceneInfo>,verifiedPublication?:unknown)=>{
+    const installScene=(info:ReturnType<typeof parseSceneInfo>,verifiedPublication?:unknown,profiles:OptionalAppearanceProfiles=ALL_OPTIONAL_APPEARANCE_PROFILES)=>{
+      staticBatches.reset();batchGeometry=null;batchRevision=-1;
+      speechVisibility.reset();
+      const gate=newInitialGate();locationRegions=null;depictedLocations=[];placePreviews.invalidate();
+      appearanceProfiles=profiles;
       nativeSocialDraw.reset(people);
       clearExpansion();expansionFailed=false;
       clearConnectedDressing();
@@ -439,27 +475,24 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if((verifiedPublication as {body?:{scene?:{social?:{version?:unknown}}}}|undefined)?.body?.scene?.social?.version==='social-eden/1')try{socialPaths=createNativeSocialPaths(verifiedPublication,true);if(socialPaths)scene.add(socialPaths.group);}catch{}
       if(base)framing.initial(()=>overview(geometry.bounds));
       kin.place(info.kin);sceneSettled=true;
-      const owner=geometry;
-      if(info.backdrop)void owner.addBackdrop(info.backdrop,loader).then(ok=>{if(!ok&&!abort.signal.aborted&&owner===geometry)problem('The campus model could not be shown; its plain navigation walls remain visible.');});
-      if(info.buildings.length){const buildingRoot=info.assetRoot?Promise.resolve(info.assetRoot):fetch(apiPath('/v1/worldmeta'),{signal:abort.signal}).then(r=>r.ok?r.json():null).then(meta=>typeof meta?.assetRoot==='string'?meta.assetRoot:undefined).catch(()=>undefined);
-      void buildingRoot.then(assetRoot=>{if(assetRoot)owner.setAssetRoot(assetRoot);return owner.addBuildings(info.buildings,loader);}).then(failed=>{
-        if(failed.length&&!abort.signal.aborted&&owner===geometry)problem('Some buildings could not be shown; their plain walls are drawn instead.');
-      });}
+      const owner=geometry,assetBytes=(url:string,event:ProgressEvent)=>gate.download(url,event.loaded,event.lengthComputable?event.total:null);
+      if(info.backdrop)gate.require('Campus',async()=>{if(!await owner.addBackdrop(info.backdrop!,loader,assetBytes))throw Error('The campus model could not be loaded.');});
+      if(info.kin.length)gate.require('Local characters',()=>kin.readyInitial());
+      if(info.buildings.length){const buildingRoot=successfulInitialLookup(()=>info.assetRoot?Promise.resolve(info.assetRoot):fetch(apiPath('/v1/worldmeta'),{signal:abort.signal}).then(initialAssetRoot));
+      for(const [index,building] of info.buildings.entries())gate.require('Building '+(index+1)+': '+building.file,async()=>{const assetRoot=await buildingRoot();if(assetRoot)owner.setAssetRoot(assetRoot);const failed=await owner.addBuildings([building],loader,assetBytes);if(failed.length)throw Error('Required building could not be loaded.');});}
     };
     let currentScene:Promise<ReturnType<typeof parseSceneInfo>>|null=null;
-    const currentLayout=()=>currentScene??= (async()=>{
-      for(let attempt=0;!abort.signal.aborted;attempt++){
-        try{const response=await fetch(apiPath('/v1/scene'),{signal:abort.signal});if(!response.ok)throw Error('Layout unavailable');const info=parseSceneInfo(await response.json());setProblems(p=>p.filter(x=>!x.startsWith('The layout of the world')));return info;}
-        catch{if(abort.signal.aborted)break;if(sceneKey==='current-unbound'){installScene(parseSceneInfo(null));sceneryStatus('The scenery is loading; showing people on plain ground.');renderer.domElement.dataset.sceneBinding='current-unbound-waiting';}if(attempt===1)problem('The layout of the world could not be loaded yet; still trying.');await new Promise<void>(r=>{const timer=setTimeout(done,Math.min(30000,2000*2**attempt));function done(){clearTimeout(timer);abort.signal.removeEventListener('abort',done);r();}abort.signal.addEventListener('abort',done,{once:true});});}
-      }return parseSceneInfo(null);
-    })();
+    const currentLayout=()=>currentScene??=(async()=>{const response=await fetch(apiPath('/v1/scene'),{signal:abort.signal});if(!response.ok)throw Error('Layout unavailable');return parseSceneInfo(await response.json());})();
+    const failLayout=(reason:string)=>{initialGate?.cancel();sceneSettled=false;sceneRetryAt=Infinity;renderer.domElement.dataset.sceneBinding='unavailable';sceneryStatus(reason);setInitialProgress({generation:initialGeneration,stage:'failed',required:1,completed:0,failed:['World layout'],bytesLoaded:0,bytesTotal:null});retryInitial.current=()=>{sceneRequest++;sceneKey=null;currentScene=null;sceneRetryAt=0;setInitialProgress({generation:initialGeneration,stage:'waiting',required:0,completed:0,failed:[],bytesLoaded:0,bytesTotal:null});};};
     const ensureScene=(chunk:Chunk,history:boolean,now:number)=>{
       const reference=(chunk.take as Take&{renderSceneRef?:unknown}).renderSceneRef;
       const ref=reference as {contract?:unknown;hash?:unknown;rulesVersion?:unknown}|undefined;
       const mismatch=reference!==undefined&&ref?.rulesVersion!==chunk.take.rulesVersion;
       const key=reference===undefined?(history?'history-unbound':'current-unbound'):JSON.stringify([ref?.contract,ref?.hash,ref?.rulesVersion,mismatch]);
       if(key===sceneKey&&(sceneSettled||now<sceneRetryAt))return sceneSettled;
-      const request=++sceneRequest;sceneKey=key;sceneRetryAt=Infinity;sceneSettled=false;
+      const request=++sceneRequest;sceneKey=key;sceneRetryAt=Infinity;sceneSettled=false;initialGate?.cancel();setInitialProgress({generation:initialGeneration,stage:'waiting',required:0,completed:0,failed:[],bytesLoaded:0,bytesTotal:null});
+      staticBatches.reset();batchGeometry=null;batchRevision=-1;
+      speechVisibility.reset();
       nativeSocialDraw.reset(people);
       clearSocialPaths();
       clearConnectedDressing();
@@ -473,12 +506,12 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       const active=()=>!abort.signal.aborted&&request===sceneRequest;
       if(reference===undefined){
         const pending=history?Promise.resolve(parseSceneInfo(null)):currentLayout();
-        void pending.then(info=>{if(!active())return;installScene(info);sceneryStatus(history?'This recording does not identify its scenery; showing people on plain ground.':null);renderer.domElement.dataset.sceneBinding=history?'unbound-history':'current-unbound';});
-      }else if(mismatch){sceneryStatus('The scenery reference does not match this recording.');sceneRetryAt=now+5000;renderer.domElement.dataset.sceneBinding='unavailable';}
+        void pending.then(info=>{if(!active())return;installScene(info);sceneryStatus(history?'This recording does not identify its scenery; showing people on plain ground.':null);renderer.domElement.dataset.sceneBinding=history?'unbound-history':'current-unbound';}).catch(()=>{if(active())failLayout('The world layout could not be loaded. Retry to try again.');});
+      }else if(mismatch){failLayout('The scenery reference does not match this recording.');}
       else void sceneHistory.resolve(reference).then(result=>{
         if(!active())return;
-        if(result.status==='bound'){installScene(result.info,result.publication);sceneryStatus(null);renderer.domElement.dataset.sceneHash=result.ref.hash;renderer.domElement.dataset.sceneBinding='bound';}
-        else if(result.status!=='stale'){sceneryStatus(result.reason);sceneRetryAt=performance.now()+5000;renderer.domElement.dataset.sceneBinding='unavailable';}
+        if(result.status==='bound'){installScene(result.info,result.publication,optionalAppearanceProfilesForVerifiedCapture(result.publication,context.current.sim.conn.welcome?.worldId??'',result.ref));sceneryStatus(null);renderer.domElement.dataset.sceneHash=result.ref.hash;renderer.domElement.dataset.sceneBinding='bound';}
+        else if(result.status!=='stale'){failLayout(result.reason);}
       });
       return false;
     };
@@ -590,14 +623,14 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
             restMarkers?.setTake(take);
             if(!newcomerMarkers&&!newcomerMarkersFailed&&publication){const choice=publishedNewcomerSelection(context.current.sim.conn.welcome?.worldId??'',(take as Take&{renderSceneRef?:unknown}).renderSceneRef);if(choice)try{newcomerMarkers=createPublishedNewcomerMarkers(publication,take,choice,{enabled:true});if(newcomerMarkers)scene.add(newcomerMarkers.group);}catch{newcomerMarkersFailed=true;problem('Some sleeping-area scenery could not be shown; keeping the original ground.');}}
             if(newcomerMarkers)try{newcomerMarkers.setTake(take);}catch{clearNewcomerMarkers();newcomerMarkersFailed=true;problem('Some sleeping-area scenery could not be shown; keeping the original ground.');}
-            if(!planting&&!plantingFailed&&publication){
+            if(!planting&&!plantingFailed&&publication&&appearanceProfiles.understory){
               let createPlanting:typeof createCurrentProvisionsUnderstory|undefined;
               try{if(inspectCurrentProvisionsUnderstory(publication,take,{enabled:true}))createPlanting=createCurrentProvisionsUnderstory;else if(inspectLiveKitchenUnderstory(publication,take,{enabled:true}))createPlanting=createLiveKitchenUnderstory;else if(inspectLiveFoodShoreUnderstory(publication,take,{enabled:true}))createPlanting=createLiveFoodShoreUnderstory;else if(inspectLiveSocialUnderstory(publication,take,{enabled:true}))createPlanting=createLiveSocialUnderstory;else if(inspectLiveFoodBUnderstory(publication,take,{enabled:true}))createPlanting=createLiveFoodBUnderstory;}catch{}
               if(createPlanting)try{planting=createPlanting(publication,take,{enabled:true});if(planting)scene.add(planting.group);}catch{plantingFailed=true;problem('Some planting could not be shown; keeping the original scenery.');}
             }
             if(planting)try{planting.setTake(take);}catch{const failed=planting;planting=null;plantingFailed=true;try{failed.dispose();}catch{}problem('Some planting could not be shown; keeping the original scenery.');}
             // Eligibility reserves the whole recorded chunk; never rehash it per display frame.
-            if(publication&&!connectedDressingFailed){
+            if(publication&&!connectedDressingFailed&&appearanceProfiles.understory){
               if(!connectedDressing)try{connectedDressing=createCurrentSocialDressingOwner(publication,take,true);if(connectedDressing)scene.add(connectedDressing.group);}catch{connectedDressingFailed=true;}
               else try{connectedDressing.setTake(take);}catch{clearConnectedDressing();connectedDressingFailed=true;}
             }
@@ -616,13 +649,16 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           const floors=capturedPlatforms??(!past.current&&currentPlatforms&&currentPlatforms.worldId===s.conn.welcome?.worldId?currentPlatforms.platforms:[]);
           platformDraw.set(floors,base?.levels.find(l=>l.id===0)?.y??0,!!expansion&&!past.current);
           people.setPlatformFloors(floors,base?.levels.find(l=>l.id===0)?.y??0);
+          if(locationRegions!==take.finalState.regions){locationRegions=take.finalState.regions;depictedLocations=depictedWorldLocations(take.finalState.regions,base?.levels??[],(x,z,y)=>platformFloorOffset(floors,x,z,y,base?.levels.find(l=>l.id===0)?.y??0));}
           const beat=worldDepictionBeat(context.current.depictionBeatAt,s.conn.welcome?.worldId,take,depictedTick,past.current?'history':'live',pick.exact);
           const sampled = people.show(local * take.dt, depictedTick * dt,beat);
           games.update(sampled.entities,depictedTick);
           bodyModels.sync(records,sampled.entities);
           const sampledFloaters=new Map(Object.entries(sampled.entities).flatMap(([id,e])=>{const body=recordedBody(records[id]?.body,e.state);if(body?.family!=='floater')return [];const url=admittedBodyUrl(body.modelUrl,apiPath('').replace(/\/$/,''));return [[id,{...body,...(url?{modelUrl:url}:{})} as NonNullable<Entity['body']>]] as [string,NonNullable<Entity['body']>][];}));
           floaters.sync(sampledFloaters);
-          nativeSocialDraw.update(people,publication,take,records,sampled);
+          if(initialGate&&!initialSnapshot){const gate=initialGate;initialSnapshot=true;const initialRecords=structuredClone(records),initialEntities=structuredClone(sampled.entities),floaterIds=[...sampledFloaters.keys()];initialBodyIds=Object.keys(initialEntities).filter(id=>initialRecords[id]?.kind==='human');const names=new Set<string>();for(const [id,e]of Object.entries(initialEntities)){if(initialRecords[id]?.kind!=='human')continue;const body=recordedBody(initialRecords[id]?.body,e.state);if(body?.family==='floater'||body?.modelUrl)continue;names.add(templateNameFor(id,PEOPLE));}for(const name of names)gate.require('Person '+name,()=>requireTemplate(name));gate.require('Initial Soul bodies',()=>bodyModels.readyInitial(initialRecords,initialEntities));if(floaterIds.length)gate.require('Initial ceramic bodies',async()=>{floaters.retryInitial(floaterIds);await floaters.readyInitial(floaterIds);});gate.seal();}
+
+          nativeSocialDraw.update(people,publication,take,records,sampled,appearanceProfiles.nativeSocial);
           geometry?.setRecordedFixtures(sampled.entities,records);
           geometry?.setViewTime(depictedTick*take.dt);
           const expansionWanted=edenExpansionCapture(!!context.current.edenExpansion,s.conn.welcome?.worldId,expansionSceneInfo,publication,!!past.current);
@@ -637,7 +673,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
             const seen = new Set<string>();
             for (const [id, e] of Object.entries(sampled.entities)) {
               const rec = records[id];
-              if(rec?.kind!=='human'||recordedBody(rec.body,e.state)?.family==='floater'||!(bodyModels.unresolved.has(id)||templatesFailed&&!recordedBody(rec.body,e.state)?.modelUrl))continue;
+              if(rec?.kind!=='human'||recordedBody(rec.body,e.state)?.family==='floater'||!(bodyModels.unresolved.has(id)||!templates.some(t=>t.name===templateNameFor(id,PEOPLE))&&!recordedBody(rec.body,e.state)?.modelUrl))continue;
               seen.add(id);const hidden=people.bodyObject(id);if(hidden)hidden.visible=false;
               let m = standIns.getObjectByName(id) as THREE.Mesh | undefined;
               if (!m) { m = new THREE.Mesh(standInGeometry, standInMaterial); m.name = id; m.castShadow = true; standIns.add(m); }
@@ -743,8 +779,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
           }
         }
       }
-      if(viewing==='follow' && at.take && !focus){navigation?.release();context.current.setCameraMode('manual');followed=null;}
-      entityLayer.applyEdge(context.current.sim.edge??[]);entityLayer.update(step,now,geometry.group);
+      if(viewing==='follow' && at.take && !focus&&initialGate?.snapshot().stage==='ready'){navigation?.release();context.current.setCameraMode('manual');followed=null;}
+      entityLayer.applyEdge(context.current.sim.edge??[]);entityLayer.update(step,now,geometry.group);  // no-ops unless this is a new (entity) world
       navigation?.update(step);
       rts.update(step);
       hover.update(now);
@@ -788,8 +824,10 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       if(expansion){shadowDetail??=new WorldShadowDetail(expansion.group);shadowDetail.apply(camera.position);}
       eyes?.aim();
       expansion?.wallFrames.update(camera,expansion.group.visible&&!past.current);
-      if(!eyes?.render())renderer.render(scene,camera);
-      if(diagnostics.enabled)diagnostics.sample(renderer,now,performance.now()-now,expansion?.wallFrames.inspection()??[]);
+      // Initial required attachments are prepared together, never per GLB.
+      if((!initialGate||initialGate.snapshot().stage==='ready')&&batchEnabled&&(batchGeometry!==geometry||batchRevision!==geometry.staticRenderRevision))void prepareStaticRendering();
+      const draw=()=>{diagnostics.beginRender(renderer);try{if(!eyes?.render())renderer.render(scene,camera);}finally{diagnostics.endRender();}};
+      if(batchEnabled)staticBatches.withRender(draw);else draw();
       shadowDetail?.restore();
       idleLife.restore();
       fading.restore();
@@ -812,7 +850,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         l.leader.style.height=`${Math.hypot(offset.dx,offset.dy)}px`;
         l.leader.style.transform=`rotate(${Math.atan2(offset.dx,-offset.dy)}rad)`;
       }
-      if (!renderer.getContext().isContextLost()) drawnTick.current = at.take ? at.tick : null;
+      if(initialGate?.attached&&preparingGeneration!==initialGate.generation){const gate=initialGate;preparingGeneration=gate.generation;const prepared=(async()=>{await people?.appearancesSettled(new Set(initialBodyIds));if(abort.signal.aborted||initialGate!==gate||!gate.attached)return;await prepareStaticRendering();if(abort.signal.aborted||initialGate!==gate||!gate.attached)return;await(typeof renderer.compileAsync==='function'?renderer.compileAsync(scene,camera):Promise.resolve(renderer.compile(scene,camera)));})();void prepared.then(()=>{if(!abort.signal.aborted&&initialGate===gate)gate.preparationComplete(gate.generation);},()=>{if(!abort.signal.aborted&&initialGate===gate)gate.preparationFailed('Rendering preparation');});}
+      if (!renderer.getContext().isContextLost()) {if(at.take&&initialGate?.snapshot().stage==='first-frame')initialGate.firstFrame(initialGate.generation);drawnTick.current = at.take&&initialGate?.snapshot().stage==='ready' ? at.tick : null;}
       // A paused seek is a discrete displayed moment. Publish its first drawn
       // frame immediately; moving playback retains the existing 250ms cadence.
       const pausedFrameChanged = !!past.current && !past.current.playing &&
@@ -826,18 +865,20 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         }):[];
         let speechAnchors:ReturnType<typeof projectSpeechAnchors>|undefined;
         if(context.current.publishSpeechAnchors)try{
-          speechVisibility.prepare(visualObstructionRoots());
+          speechVisibility.prepareFresh(visualObstructionRoots());
           speechAnchors=projectSpeechAnchors(points,camera,host.clientWidth,host.clientHeight,area,p=>speechVisibility.score({position:camera.position.toArray(),target:[...p],fov:camera.fov},['anchor'],{anchor:{p:[...p],yaw:0,points:[[...p]]}})===1);
-        }catch{speechAnchors=[];}finally{speechVisibility.reset();}
+        }catch{speechAnchors=[];speechVisibility.reset();}
+        else speechVisibility.reset();
         emitState(viewerPresentation({room:context.current.edenExpansion?exploreRoom(camera.position.toArray(),EDEN_VIEWER_PLACES,s.conn.replica.souls,at.entities):null,assetDownloads:downloads.snapshot(),soulIds:[...groupSelection],
           drawnTick: drawnTick.current, history: !!past.current, playing: past.current?.playing ?? false,
           cameraMode: viewing, manualNavigation: context.current.manualNavigation, inputOwned: navigation?.inputOwned ?? false, soulId, entityId: soulId ? s.conn.replica.souls.get(soulId)?.entityId ?? null : thingId,
-          loading: context.current.loading || (!at.take && renderer.domElement.dataset.sceneBinding!=='unavailable'),
+          loading: initialGate?.snapshot().stage!=='ready'||context.current.loading || (!at.take && renderer.domElement.dataset.sceneBinding!=='unavailable'),
           unavailableReason: context.current.graphicsUnavailable ?? sceneReason ?? (!area ? 'The world view is covered by controls or has no visible area.' : brokenTake ? 'A recorded moment could not be drawn.' : frameGap ? 'No recording covers that moment; displaying the nearest recorded frame.' : !at.take ? 'Waiting for a recorded world frame.' : connectionLost(s.conn) && !past.current ? 'Reconnecting; displaying the last recorded frame.' : null),
           speechAnchors,
         }));
       }
 
+      if(diagnostics.enabled)diagnostics.sample(renderer,now,performance.now()-now,expansion?.wallFrames.inspection()??[],batchEnabled?staticBatches.inspection():null);
     };
 
     // click (not drag) to select a Soul, a thing, or a kin
@@ -851,7 +892,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const onUp = (e: PointerEvent) => {
       if (!down || Math.hypot(e.clientX - down.x, e.clientY - down.y) > 6) { down = null; return; }
       down = null;
-      if (e.altKey || flagModeRef.current) return;  // a flag drop (onFlagClick), not a selection: no place card over the god panel
+      if (entityLayer.active && (e.altKey || flagModeRef.current)) return;  // a flag drop (onFlagClick), not a selection: no place card over the god panel
       const target=hover.pick(e.clientX,e.clientY);if(target)inspectHover(target);else{setPlaceCard(null);context.current.setThing(null);}
 
     };
@@ -876,7 +917,8 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       placeActivity.dispose();
       try{nativeSocialDraw.dispose(people);}catch{problem('Some fixture scenery could not be released.');}
       clearConnectedDressing();
-      abort.abort();
+      abort.abort();manager.abort();
+      speechVisibility.reset();
       cancelAnimationFrame(frame);
       resize.disconnect();
       renderer.domElement.removeEventListener('pointerdown', onDown);
@@ -894,7 +936,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       people?.dispose();
       if(entityWorldFramed)entityView.current={eye:camera.position.toArray(),target:controls.target.toArray()};  // entity worlds only: the camera survives the scene re-mount
       edgeItems.dispose();entityLayer.dispose();
-      diagnostics.dispose();placePreviews.dispose();bodyModels.dispose();
+      initialGate?.cancel();retryInitial.current=null;staticBatches.dispose();diagnostics.dispose();placePreviews.dispose();bodyModels.dispose();
       floaters.dispose();
       kin.dispose();
       sceneRequest++;sceneHistory.dispose();
@@ -978,12 +1020,19 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       resetView: () => controlsApi.current?.reset() ?? false,
       releaseInput: () => controlsApi.current?.releaseInput(),
       moveCamera: delta => controlsApi.current?.move(delta) ?? false,
+      locations:()=>controlsApi.current?.locations()??[],
+      frameLocation:id=>controlsApi.current?.frameLocation(id)??false,
+      locationPreview:id=>controlsApi.current?.locationPreview(id)??Promise.resolve(null),
       framePlace: place => controlsApi.current?.framePlace(place) ?? false,
       frameSouls: ids => controlsApi.current?.frameSouls(ids) ?? false,
       frameAll: () => { context.current.setCameraMode('manual'); controlsApi.current?.overview(); },
       placePreview: place => controlsApi.current?.placePreview(place) ?? Promise.resolve(null),
       focusSelected: () => { const found = controlsApi.current?.focusSelected() ?? false; if (found) context.current.setCameraMode('manual'); return found; },
       hasSoul: id => context.current.sim.conn.replica.souls.has(id),
+      canFollowSoul: id => {
+        const c=context.current,soul=c.sim.conn.replica.souls.get(id);
+        return !past.current&&!c.loading&&!c.graphicsUnavailable&&!!shown.current.take&&!!soul&&!!shown.current.entities[soul.entityId];
+      },
       hasEntity: id => !!shown.current.entities[id],
       select: (soulId, entityId) => { context.current.onSelect(soulId); context.current.setThing(entityId); },
       seek: tick => playbackCommands.current?.seek(tick) ?? Promise.resolve(),
@@ -1003,7 +1052,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
   const soul = selected ? r.souls.get(selected) : undefined;
   const cards = cardsAt(sim.plays, s.tick);
   return (
-    <section className="wide world-viewer" data-world-viewer="1" style={embedded ? { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, position: 'relative' } : { position: 'relative' }}>
+    <section className="wide world-viewer" data-world-viewer="1" style={embedded ? { display: 'flex', flexDirection: 'column', height: '100%', minHeight: 0, ...(entityWorld ? { position: 'relative' as const } : {}) } : (entityWorld ? { position: 'relative' } : undefined)}>
       {entityWorld && <GodPanel flagMode={flagMode} onFlagMode={setFlagMode} />}
       {!hideControls && <div className="row">
         <h2 style={{ margin: 0 }}>World</h2>
@@ -1027,7 +1076,9 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
         </>}
       </div>}
       <div className="world-viewport" style={{ position: 'relative', height: embedded ? undefined : 540, flex: embedded ? 1 : undefined, minHeight: 0, width: '100%', overflow: 'hidden', borderRadius: 4 }}>
-        <div className="world-canvas-host" ref={mount} style={{ position: 'absolute', inset: 0, touchAction: 'none' }} />
+        <div className="world-canvas-host" data-initial-revealed={initialProgress.stage==='ready'} data-initial-generation={initialProgress.generation} ref={mount} style={{ position: 'absolute', inset: 0, touchAction: 'none',visibility:initialProgress.stage==='ready'?'visible':'hidden' }} />
+        {initialProgress.stage!=='ready'&&<div role={initialProgress.stage==='failed'?'alert':progressInCard?undefined:'status'} aria-live={progressInCard?undefined:'polite'} data-initial-stage={initialProgress.stage} data-initial-generation={initialProgress.generation} className="world-initial-loading" style={{position:'absolute',inset:0,display:'grid',placeContent:'center',gap:12,background:'var(--bg, #d3c4aa)',textAlign:'center',padding:24}}>{!progressInCard&&<><strong>{initialProgress.stage==='failed'?'The world could not be prepared':initialProgress.stage==='preparing'||initialProgress.stage==='first-frame'?'Preparing the world…':'Arriving in '+'your world'+'…'}</strong>{initialProgress.stage==='failed'?<><span>{initialProgress.failed.join(', ')} could not be prepared.</span><button onClick={()=>retryInitial.current?.()}>Retry</button></>:<><progress aria-label={initialProgress.bytesTotal!==null?"Initial assets downloaded":"Initial assets prepared"} max={initialProgress.bytesTotal??(initialProgress.required||1)} value={initialProgress.stage==='downloading'?(initialProgress.bytesTotal!==null?initialProgress.bytesLoaded:initialProgress.required?initialProgress.completed:undefined):undefined} style={{width:240}}/><span>{initialProgress.bytesLoaded>0?(initialProgress.bytesLoaded/1048576).toFixed(1)+' MB downloaded · ':''}{initialProgress.completed} of {initialProgress.required||'…'} world parts prepared</span></>}</>}</div>}
+
         {placeCard&&<article className="world-place-card" aria-label="Selected place"><button className="panel-close" aria-label="Close place" onClick={()=>setPlaceCard(null)}>×</button><h2>{placeCard.name}</h2>{placeCard.detail&&<p>{placeCard.detail}</p>}<p>{[...sim.conn.replica.souls.values()].filter(soul=>{const e=shown.current.entities[soul.entityId];return e&&Math.hypot(e.p[0]-placeCard.point.x,e.p[2]-placeCard.point.z)<placeCard.radius;}).map(soul=>soul.name).join(', ')||'No Souls nearby in the current frame.'}</p><button onClick={()=>{controlsApi.current?.framePoint(placeCard.point,placeCard.radius);setPlaceCard(null);}}>Go to</button></article>}
         {sceneryNotice&&<div role="status" className="world-scenery-note" style={{position:'absolute',left:12,bottom:12,maxWidth:'min(420px, calc(100% - 24px))',padding:'8px 12px',background:'rgba(238,233,221,.94)',color:'#463f32',borderRadius:6,pointerEvents:'none'}}>{sceneryNotice}</div>}
         {(soul ? !hideSoulInfo : !!thing) && <InfoPanel sim={sim} soul={soul ?? null} thing={thing} shown={s} card={soul ? cardText(cards.get(soul.id)) : ''} past={!!p} close={() => { setThing(null); if (soul) onSelect(null); }} />}

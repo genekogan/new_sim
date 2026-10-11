@@ -231,7 +231,6 @@ export function buildApp(d: Deps) {
   app.patch('/v1/souls/:id/profile',async c=>{c.header('Cache-Control','no-store');const {u,guard}=await profileIdentity(c);const result=await profiles.update(u.id,c.req.param('id'),await body(c),guard);d.hub.refreshMe(u.id);return c.json({ok:true,profile:result});});
   app.post('/v1/souls/:id/photo',async c=>{c.header('Cache-Control','no-store');const {u,guard}=await profileIdentity(c);const result=await profiles.photo(u.id,c.req.param('id'),await body(c),guard);d.hub.refreshMe(u.id);return c.json({ok:true,profile:result});});
   app.get('/v1/souls/:id/profile-photo/:hash',c=>{const bytes=profiles.photoBytes(c.req.param('id'),c.req.param('hash'));return bytes?c.body(bytes as never,200,{'Content-Type':'image/png','X-Content-Type-Options':'nosniff','Cache-Control':'public, max-age=31536000, immutable'}):c.json({ok:false,code:'not-found'},404);});
-  // The verified provider account behind a browser session (Clerk): the web client checks it against its own session.
   app.get('/v1/account/session',async c=>{
     c.header('Cache-Control','no-store');
     const account=await d.auth.accountFromToken(bearer(c));if(!account)throw new ApiError(401,'account-signin-required','Sign in first.');

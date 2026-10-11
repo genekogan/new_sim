@@ -68,6 +68,23 @@ function matOf(rt: Runtime, id: string): Mat | Diagnostic {
     return issue('mat-shape', `${id} must be a rectangular 3–4 m by 1.2–2 m ground mat with its first edge along the body`, [id]);
   return { area, yaw, anchor: add2(centre, rot2([0.35, 0], yaw)) };
 }
+// Derived only: sync replaces the scene/increments epoch when static edits or
+// movable components change it. Do not cache support, people or actor state.
+const obstacleClearance = new WeakMap<Spatial, { scene: Spatial['scene']; epoch: number; entries: Map<string, string | null> }>();
+function firstMatObstacle(sp: Spatial, mat: Mat, box: OBB2): string | null {
+  let cache = obstacleClearance.get(sp);
+  if (!cache || cache.scene !== sp.scene || cache.epoch !== sp.epoch) {
+    cache = { scene: sp.scene, epoch: sp.epoch, entries: new Map() };
+    obstacleClearance.set(sp, cache);
+  }
+  const key = JSON.stringify([box.c, box.half, box.yaw, mat.area.c, mat.area.half, mat.area.yaw]);
+  if (cache.entries.has(key)) return cache.entries.get(key)!;
+  let blocker: string | null = null;
+  for (const o of sp.scene.obstacles) if (o.y1 > 0.005 && o.y0 < HUMAN_PROFILE.height && obbOverlap(box, o.obb, 0.03)) { blocker = o.id; break; }
+  if (cache.entries.size >= 128) cache.entries.delete(cache.entries.keys().next().value!);
+  cache.entries.set(key, blocker);
+  return blocker;
+}
 function clearance(rt: Runtime, p: SleepParams, mat: Mat): Diagnostic | undefined {
   const sp = rt.services.spatial as Spatial | undefined;
   if (!sp) return issue('spatial', `${p.mat} needs a spatial scene to prove ground support`, [p.actor, p.mat]);
@@ -79,8 +96,8 @@ function clearance(rt: Runtime, p: SleepParams, mat: Mat): Diagnostic | undefine
   const corners = obbCorners(box);
   if (!corners.every(q => pointInObb(q, mat.area, 1e-7)) || !sp.scene.surfaces.some(s => s.level === 0 && Math.abs(s.y) < 1e-6 && corners.every(q => pointInObb(q, s.obb, 1e-7))))
     return issue('unsupported', `${p.mat} lacks one continuous ground support rectangle under ${p.actor}'s full lie/rise envelope`, [p.actor, p.mat]);
-  for (const o of sp.scene.obstacles) if (o.y1 > 0.005 && o.y0 < HUMAN_PROFILE.height && obbOverlap(box, o.obb, 0.03))
-    return issue('blocked', `${o.id} intersects ${p.actor}'s full lie/rise envelope on ${p.mat}`, [p.actor, p.mat, o.id]);
+  const blocker = firstMatObstacle(sp, mat, box);
+  if (blocker !== null) return issue('blocked', `${blocker} intersects ${p.actor}'s full lie/rise envelope on ${p.mat}`, [p.actor, p.mat, blocker]);
   for (const e of Object.values(rt.world.entities)) {
     if (!e.human || e.id === p.actor || e.human.level !== 0 || Math.abs(e.pose.p[1]) > 1) continue;
     const occupied = sleepEnvelope(e);

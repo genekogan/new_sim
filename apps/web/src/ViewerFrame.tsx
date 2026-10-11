@@ -2,7 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from 're
 import {ImportCredits} from './ImportCredits.tsx';
 import { createPortal } from 'react-dom';
 import type { ViewportInsets, WorldViewerHandle, WorldViewerState } from './WorldViewer.ts';
-import { arrivalProgress, arrivalStage, assetDownloadProgress, heldLabel, initialPending, type InitialWorldProgress } from './viewer-arrival.ts';
+import { arrivalProgress, arrivalStage, assetDownloadProgress, heldLabel, initialPending } from './viewer-arrival.ts';
+import type { InitialWorldProgress } from './InitialWorldReadiness.ts';
 
 /** Edge overlays are measured against World's actual viewport, never the window. */
 export function useViewerInsets(root: RefObject<HTMLDivElement | null>, visible: boolean, layout: string): ViewportInsets {

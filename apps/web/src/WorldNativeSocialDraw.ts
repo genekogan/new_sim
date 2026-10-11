@@ -26,7 +26,8 @@ export class WorldNativeSocialDraw {
     this.publication=undefined;this.publicationCopy=undefined;this.take=null;this.records=null;this.source=null;
     this.controller?.reset();
   }
-  update(people:TakePeople,publication:unknown,take:Take,records:Record<string,Entity>,frame:TakeFrame){
+  update(people:TakePeople,publication:unknown,take:Take,records:Record<string,Entity>,frame:TakeFrame,enabled=true){
+    if(!enabled){if(this.publication!==undefined)this.reset(people);people.setFixtureDrawReplacement(null);return;}
     if(this.closed||!this.controller){people.setFixtureDrawReplacement(null);return;}
     try{
       if(publication!==this.publication||take!==this.take||records!==this.records){

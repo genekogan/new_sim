@@ -67,9 +67,9 @@ const characterUrl = (name: string) => `/modular/environment/animated-${name}.gl
 /** Directory the character GLBs are served from; other imported models (eden-imports) are served beside them. */
 export const MODEL_DIR = characterUrl('').replace(/animated-\.glb.*$/, '');
 
-export async function loadTemplates(signal: AbortSignal, resources: ThreeResources,options?:{appearances?:boolean;onAsset?:(name:string,phase:'start'|'loaded'|'failed')=>void}): Promise<Template[]> {
+export async function loadTemplates(signal: AbortSignal, resources: ThreeResources,options?:{appearances?:boolean;onAsset?:(name:string,phase:'start'|'loaded'|'failed')=>void;names?:readonly string[];onTemplate?:(template:Template)=>void}): Promise<Template[]> {
   return Promise.all(
-    PEOPLE.map(async (name) => {
+    PEOPLE.filter(name=>!options?.names||options.names.includes(name)).map(async (name) => {
       const report=(phase:'start'|'loaded'|'failed')=>{try{options?.onAsset?.(name,phase);}catch{/* Optional download reporting cannot prevent a model load. */}};
       report('start');
       try{
@@ -79,7 +79,7 @@ export async function loadTemplates(signal: AbortSignal, resources: ThreeResourc
         const sha=Array.from(new Uint8Array(digest),b=>b.toString(16).padStart(2,'0')).join('');
         if(!signal.aborted)appearance=await collectTemplateAppearance(gltf,name,sha);
       }:undefined);
-      const template=templateFromGltf(name,gltf,appearance);report('loaded');return template;
+      const template=templateFromGltf(name,gltf,appearance);options?.onTemplate?.(template);report('loaded');return template;
       }catch(error){report('failed');throw error;}
     }),
   );

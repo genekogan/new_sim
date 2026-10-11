@@ -1,0 +1,10228 @@
+{
+ "schema": "genesis/1",
+ "name": "Little Martians (Arium)",
+ "description": "The newer Little Martians world from the Arium work: Vanessa Rosa's original Madmaraca, Minarete and celadon scans around a ceramic commons with the Arium's black-and-chalk floor; gallery and garden courts, the painted grotto, the Tharsis overlook under Martian ranges and the Olympus caldera; 96 scan exhibits from the Little Martians archive; the kin and the seven cast heads. Rebuilt in god mode from lm/map 953613972438.",
+ "source": {
+  "branch": "lm/map",
+  "commit": "953613972438611c336b4cb5733390e47aed3290",
+  "proof": "<team>/proofs/littlemartians-map/22/",
+  "builder": "tools/god-skill/scripts/lm-two/build-template.mjs"
+ },
+ "constants": {
+  "extent": 800,
+  "ground": "land"
+ },
+ "state": {
+  "constitution": "# Little Martians\n- The Ceramic Commons joins Vanessa's original Madmaraca library sculpture, Minarete Temple and celadon beacon. Each inhabitant chooses where to glide, meet or rest.\n- The gallery courts invite shared stories and looking at the glazes. Verdelis's Eden Garden is a cultivated oasis; the painted grotto is a place for quiet observation.\n- Tharsis Overlook is reached by its broad earthen ramp. Mountain slopes and the distant volcanic caldera are scenic; no Soul is offered an unqualified climb or scan interior.\n- Ceramic kin currently placed in the garden are scenery. Ceramic models may become custom Soul bodies when separately instantiated; eligibility does not create a new Soul by itself.\n\nSouls are welcome on the ceramic ground; the sculptures, mountain slopes and scan interiors are to be looked at, not climbed.",
+  "time": {
+   "dayTicks": 72000,
+   "startTick": 0
+  },
+  "sky": {
+   "palette": "lm-garden",
+   "sun": 0.55
+  },
+  "ground": {
+   "palette": "desert"
+  }
+ },
+ "places": [
+  {
+   "id": "lm-world",
+   "name": "Little Martians Ceramic World",
+   "kind": "outdoor",
+   "entity": "flag:arrival"
+  },
+  {
+   "id": "garden",
+   "name": "Ceramic Commons",
+   "kind": "garden",
+   "entity": "garden"
+  },
+  {
+   "id": "madmaraca-court",
+   "name": "Madmaraca Gallery Court",
+   "kind": "gallery",
+   "entity": "madmaraca-court"
+  },
+  {
+   "id": "minarete-court",
+   "name": "Minarete Sky Court",
+   "kind": "pavilion",
+   "entity": "minarete-court"
+  },
+  {
+   "id": "beacon-court",
+   "name": "Celadon Beacon Court",
+   "kind": "outdoor",
+   "entity": "beacon-court"
+  },
+  {
+   "id": "eden-garden",
+   "name": "Verdelis's Eden Garden",
+   "kind": "garden",
+   "entity": "eden-garden"
+  },
+  {
+   "id": "grotto-court",
+   "name": "Grotto of Painted Worlds",
+   "kind": "gallery",
+   "entity": "grotto-court"
+  },
+  {
+   "id": "tharsis-overlook",
+   "name": "Tharsis Overlook",
+   "kind": "outdoor",
+   "entity": "tharsis-overlook"
+  },
+  {
+   "id": "minarete-passage",
+   "name": "Original Minarete Ground Arch",
+   "kind": "pavilion",
+   "entity": "minarete-passage"
+  },
+  {
+   "id": "celadon-passage",
+   "name": "Original Celadon Beacon Arch",
+   "kind": "pavilion",
+   "entity": "celadon-passage"
+  },
+  {
+   "id": "tower-l0",
+   "name": "Auxiliary Ceramic Tower ground hall",
+   "kind": "room",
+   "entity": "auxiliary-tower/tower-l0"
+  },
+  {
+   "id": "tower-l1",
+   "name": "Auxiliary Ceramic Tower second room",
+   "kind": "room",
+   "entity": "auxiliary-tower/tower-l1"
+  },
+  {
+   "id": "tower-l2",
+   "name": "Auxiliary Ceramic Tower third room",
+   "kind": "room",
+   "entity": "auxiliary-tower/tower-l2"
+  },
+  {
+   "id": "tower-l3",
+   "name": "Auxiliary Ceramic Tower lantern room",
+   "kind": "room",
+   "entity": "auxiliary-tower/tower-l3"
+  },
+  {
+   "id": "temple-l0",
+   "name": "Auxiliary Minaret Temple pavilion",
+   "kind": "room",
+   "entity": "auxiliary-temple/temple-l0"
+  },
+  {
+   "id": "temple-l1",
+   "name": "Auxiliary Minaret Temple body hall",
+   "kind": "room",
+   "entity": "auxiliary-temple/temple-l1"
+  },
+  {
+   "id": "temple-l2",
+   "name": "Auxiliary Minaret Temple upper hall",
+   "kind": "room",
+   "entity": "auxiliary-temple/temple-l2"
+  },
+  {
+   "id": "scan-minarete-portal",
+   "name": "Minarete Spiral Portal Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-minarete-portal"
+  },
+  {
+   "id": "scan-pupila-corridor",
+   "name": "Pupila Tiled Corridor Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-pupila-corridor"
+  },
+  {
+   "id": "scan-chapel-composition",
+   "name": "Tiled Chapel Composition Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-chapel-composition"
+  },
+  {
+   "id": "scan-american-base-old",
+   "name": "American base (old) Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-american-base-old"
+  },
+  {
+   "id": "scan-asian-art-museum",
+   "name": "Asian Art Museum SF Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-asian-art-museum"
+  },
+  {
+   "id": "scan-fey-castle",
+   "name": "Fey Castle Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-fey-castle"
+  },
+  {
+   "id": "scan-graffiti-abandoned-room",
+   "name": "Graffiti — abandoned room in the open Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-graffiti-abandoned-room"
+  },
+  {
+   "id": "scan-randy2",
+   "name": "Randy #2 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-randy2"
+  },
+  {
+   "id": "scan-randy3",
+   "name": "Randy #3 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-randy3"
+  },
+  {
+   "id": "scan-forte-sao-filipe-chapel",
+   "name": "Forte de São Filipe — chapel Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-forte-sao-filipe-chapel"
+  },
+  {
+   "id": "scan-forte-sao-filipe-corner",
+   "name": "Forte de São Filipe — corner Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-forte-sao-filipe-corner"
+  },
+  {
+   "id": "scan-forte-sao-filipe-corner3",
+   "name": "Forte de São Filipe — corner 3 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-forte-sao-filipe-corner3"
+  },
+  {
+   "id": "scan-forte-sao-filipe-corridor",
+   "name": "Forte de São Filipe — corridor Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-forte-sao-filipe-corridor"
+  },
+  {
+   "id": "scan-forte-sao-filipe-open",
+   "name": "Forte de São Filipe — open ramparts Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-forte-sao-filipe-open"
+  },
+  {
+   "id": "scan-lisbon-archways-corridor",
+   "name": "Lisbon — archways corridor Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-lisbon-archways-corridor"
+  },
+  {
+   "id": "scan-moorish-entrance",
+   "name": "Moorish castle — entrance Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-moorish-entrance"
+  },
+  {
+   "id": "scan-moorish-castle-top",
+   "name": "Moorish castle — top Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-moorish-castle-top"
+  },
+  {
+   "id": "scan-museu-azulejo-corridor",
+   "name": "Museu Nacional do Azulejo — corridor Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-museu-azulejo-corridor"
+  },
+  {
+   "id": "scan-museu-azulejo-main",
+   "name": "Museu Nacional do Azulejo — main Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-museu-azulejo-main"
+  },
+  {
+   "id": "scan-museu-azulejo-quad",
+   "name": "Museu Nacional do Azulejo — quad Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-museu-azulejo-quad"
+  },
+  {
+   "id": "scan-quinta-tower-curly",
+   "name": "Quinta — curly tower Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-quinta-tower-curly"
+  },
+  {
+   "id": "scan-quinta-fonte",
+   "name": "Quinta — fountain Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-quinta-fonte"
+  },
+  {
+   "id": "scan-quinta-corredor-escada",
+   "name": "Quinta — long stair corridor Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-quinta-corredor-escada"
+  },
+  {
+   "id": "scan-quinta-palacio-interior",
+   "name": "Quinta — palace interior Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-quinta-palacio-interior"
+  },
+  {
+   "id": "scan-quinta-poco",
+   "name": "Quinta — well (poço) Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-quinta-poco"
+  },
+  {
+   "id": "scan-rua-fado",
+   "name": "Rua do Fado — street Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-rua-fado"
+  },
+  {
+   "id": "scan-setubal-casa-escadas",
+   "name": "Setúbal — staircase house Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-setubal-casa-escadas"
+  },
+  {
+   "id": "scan-se-entrada",
+   "name": "Sé cathedral — entrance Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-se-entrada"
+  },
+  {
+   "id": "scan-gruta-m-republica",
+   "name": "Gruta — Morro da República Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-gruta-m-republica"
+  },
+  {
+   "id": "scan-camel-sculpture",
+   "name": "Camel sculpture (NeRF) Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-camel-sculpture"
+  },
+  {
+   "id": "scan-china-buddha",
+   "name": "China Buddha (NeRF) Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-china-buddha"
+  },
+  {
+   "id": "scan-gold-rust-buddha",
+   "name": "Gold-rust Buddha (NeRF) Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-gold-rust-buddha"
+  },
+  {
+   "id": "scan-golden-gate-park-tree",
+   "name": "Golden Gate Park tree (NeRF) Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-golden-gate-park-tree"
+  },
+  {
+   "id": "scan-golden-woman-standing",
+   "name": "Golden woman, standing (NeRF) Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-golden-woman-standing"
+  },
+  {
+   "id": "scan-greenman-altar",
+   "name": "Green Man altar sculpture (NeRF) Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-greenman-altar"
+  },
+  {
+   "id": "scan-met-greek-mural",
+   "name": "MET — Greek mural Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-met-greek-mural"
+  },
+  {
+   "id": "scan-poly-01",
+   "name": "SF polycam scan #1 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-poly-01"
+  },
+  {
+   "id": "scan-poly-10",
+   "name": "SF polycam scan #10 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-poly-10"
+  },
+  {
+   "id": "scan-poly-12",
+   "name": "SF polycam scan #12 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-poly-12"
+  },
+  {
+   "id": "scan-poly-13",
+   "name": "SF polycam scan #13 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-poly-13"
+  },
+  {
+   "id": "scan-poly-14",
+   "name": "SF polycam scan #14 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-poly-14"
+  },
+  {
+   "id": "scan-poly-15",
+   "name": "SF polycam scan #15 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-poly-15"
+  },
+  {
+   "id": "scan-poly-17",
+   "name": "SF polycam scan #17 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-poly-17"
+  },
+  {
+   "id": "scan-poly-18",
+   "name": "SF polycam scan #18 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-poly-18"
+  },
+  {
+   "id": "scan-poly-19",
+   "name": "SF polycam scan #19 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-poly-19"
+  },
+  {
+   "id": "scan-poly-02",
+   "name": "SF polycam scan #2 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-poly-02"
+  },
+  {
+   "id": "scan-poly-05",
+   "name": "SF polycam scan #5 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-poly-05"
+  },
+  {
+   "id": "scan-poly-06",
+   "name": "SF polycam scan #6 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-poly-06"
+  },
+  {
+   "id": "scan-poly-07",
+   "name": "SF polycam scan #7 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-poly-07"
+  },
+  {
+   "id": "scan-poly-08",
+   "name": "SF polycam scan #8 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-poly-08"
+  },
+  {
+   "id": "scan-poly-09",
+   "name": "SF polycam scan #9 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-poly-09"
+  },
+  {
+   "id": "scan-two-warriors",
+   "name": "Two warriors (NeRF) Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-two-warriors"
+  },
+  {
+   "id": "scan-drive-567d4f0b818f",
+   "name": "femina Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-567d4f0b818f"
+  },
+  {
+   "id": "scan-drive-b538ebb36278",
+   "name": "flower  Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-b538ebb36278"
+  },
+  {
+   "id": "scan-drive-a17ce660742d",
+   "name": "open mouth Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-a17ce660742d"
+  },
+  {
+   "id": "scan-drive-72c8fc2f1538",
+   "name": "verdelis longplant Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-72c8fc2f1538"
+  },
+  {
+   "id": "scan-drive-0f69fd943fc1",
+   "name": "poly12 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-0f69fd943fc1"
+  },
+  {
+   "id": "scan-drive-4a96b139a014",
+   "name": "pillan Viewing Court",
+   "kind": "gallery",
+   "entity": "exhibit-drive-4a96b139a014"
+  },
+  {
+   "id": "scan-drive-976ab0a7145b",
+   "name": "guanyin5 Viewing Court",
+   "kind": "gallery",
+   "entity": "exhibit-drive-976ab0a7145b"
+  },
+  {
+   "id": "scan-drive-09868169ab2d",
+   "name": "vestige Viewing Court",
+   "kind": "gallery",
+   "entity": "exhibit-drive-09868169ab2d"
+  },
+  {
+   "id": "scan-drive-e946e0e729d0",
+   "name": "Xenanthro Viewing Court",
+   "kind": "gallery",
+   "entity": "exhibit-drive-e946e0e729d0"
+  },
+  {
+   "id": "scan-drive-94727a7e61b6",
+   "name": "poly15 Viewing Court",
+   "kind": "gallery",
+   "entity": "exhibit-drive-94727a7e61b6"
+  },
+  {
+   "id": "scan-drive-36ac56b5a6f4",
+   "name": "poly8 Viewing Court",
+   "kind": "gallery",
+   "entity": "exhibit-drive-36ac56b5a6f4"
+  },
+  {
+   "id": "scan-drive-45bcc42c2c58",
+   "name": "poly9 Viewing Court",
+   "kind": "gallery",
+   "entity": "exhibit-drive-45bcc42c2c58"
+  },
+  {
+   "id": "scan-drive-c78fc73ba916",
+   "name": "caboclus Viewing Court",
+   "kind": "gallery",
+   "entity": "exhibit-drive-c78fc73ba916"
+  },
+  {
+   "id": "scan-drive-1af1c89dd0f6",
+   "name": "serpent Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-1af1c89dd0f6"
+  },
+  {
+   "id": "scan-drive-368878f9b157",
+   "name": "conga Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-368878f9b157"
+  },
+  {
+   "id": "scan-drive-7d0669742c10",
+   "name": "colorful Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-7d0669742c10"
+  },
+  {
+   "id": "scan-drive-ee1676f5c3bc",
+   "name": "Mycologus Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-ee1676f5c3bc"
+  },
+  {
+   "id": "scan-drive-16b887532619",
+   "name": "poly16 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-16b887532619"
+  },
+  {
+   "id": "scan-drive-02ceabbff643",
+   "name": "Pyrogeode Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-02ceabbff643"
+  },
+  {
+   "id": "scan-drive-731f06fdb7e6",
+   "name": "laughting fatman Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-731f06fdb7e6"
+  },
+  {
+   "id": "scan-drive-b0941d82d98c",
+   "name": "eclip Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-b0941d82d98c"
+  },
+  {
+   "id": "scan-drive-0d01c1b00980",
+   "name": "africa basket Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-0d01c1b00980"
+  },
+  {
+   "id": "scan-drive-af1046536b8a",
+   "name": "poly13 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-af1046536b8a"
+  },
+  {
+   "id": "scan-drive-97ddf86c47f9",
+   "name": "solara Viewing Court",
+   "kind": "gallery",
+   "entity": "exhibit-drive-97ddf86c47f9"
+  },
+  {
+   "id": "scan-drive-566ced3e91e1",
+   "name": "poly3 Viewing Court",
+   "kind": "gallery",
+   "entity": "exhibit-drive-566ced3e91e1"
+  },
+  {
+   "id": "scan-drive-77e7e7424358",
+   "name": "poly5 Viewing Court",
+   "kind": "gallery",
+   "entity": "exhibit-drive-77e7e7424358"
+  },
+  {
+   "id": "scan-drive-c780e53b578a",
+   "name": "goldentower Viewing Court",
+   "kind": "gallery",
+   "entity": "exhibit-drive-c780e53b578a"
+  },
+  {
+   "id": "scan-drive-88ba2b863400",
+   "name": "Thaloc Viewing Court",
+   "kind": "gallery",
+   "entity": "exhibit-drive-88ba2b863400"
+  },
+  {
+   "id": "scan-drive-c92a3b231c79",
+   "name": "Astraflora Viewing Court",
+   "kind": "gallery",
+   "entity": "exhibit-drive-c92a3b231c79"
+  },
+  {
+   "id": "scan-drive-66009eb80cef",
+   "name": "poly14 Viewing Court",
+   "kind": "gallery",
+   "entity": "exhibit-drive-66009eb80cef"
+  },
+  {
+   "id": "scan-drive-9207a5e1c4b1",
+   "name": "poly4 Viewing Court",
+   "kind": "gallery",
+   "entity": "exhibit-drive-9207a5e1c4b1"
+  },
+  {
+   "id": "scan-drive-6c113bb8ae2e",
+   "name": "poly10 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-6c113bb8ae2e"
+  },
+  {
+   "id": "scan-drive-fabce0b97897",
+   "name": "tower2 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-fabce0b97897"
+  },
+  {
+   "id": "scan-drive-5f5e4a9284a4",
+   "name": "greece vase Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-5f5e4a9284a4"
+  },
+  {
+   "id": "scan-drive-0b40c69c8244",
+   "name": "terraqua Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-0b40c69c8244"
+  },
+  {
+   "id": "scan-drive-f3f642ac7b15",
+   "name": "poly6 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-f3f642ac7b15"
+  },
+  {
+   "id": "scan-drive-40a9797026a2",
+   "name": "rhino Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-40a9797026a2"
+  },
+  {
+   "id": "scan-drive-5f63a6fe6100",
+   "name": "guardian colorful Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-5f63a6fe6100"
+  },
+  {
+   "id": "scan-drive-935874799be2",
+   "name": "ganesha small Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-935874799be2"
+  },
+  {
+   "id": "scan-drive-a4a6b8bad1e8",
+   "name": "tower wine Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-a4a6b8bad1e8"
+  },
+  {
+   "id": "scan-drive-0734a4679321",
+   "name": "poly7 Viewing Court",
+   "kind": "gallery",
+   "entity": "scan-drive-0734a4679321"
+  },
+  {
+   "id": "scan-drive-317a837144b2",
+   "name": "orange vase Viewing Court",
+   "kind": "gallery",
+   "entity": "exhibit-drive-317a837144b2"
+  },
+  {
+   "id": "scan-drive-2bb4733c464d",
+   "name": "dragon vase Viewing Court",
+   "kind": "gallery",
+   "entity": "exhibit-drive-2bb4733c464d"
+  },
+  {
+   "id": "scan-drive-c30ab0ea1037",
+   "name": "bichroma Viewing Court",
+   "kind": "gallery",
+   "entity": "exhibit-drive-c30ab0ea1037"
+  }
+ ],
+ "batches": [
+  {
+   "note": "the land: the Tharsis north wall, western escarpment and eastern massif (fifteen peaks), the Olympus caldera, the Tharsis overlook and its ramp",
+   "group": "land",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/mountain@1",
+     "name": "tharsis-north-wall-1",
+     "p": [
+      -260,
+      -250
+     ],
+     "params": {
+      "height": 118,
+      "radius": 84,
+      "peak": 2.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/mountain@1",
+     "name": "tharsis-north-wall-2",
+     "p": [
+      -160,
+      -290
+     ],
+     "params": {
+      "height": 147,
+      "radius": 102,
+      "peak": 2.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/mountain@1",
+     "name": "tharsis-north-wall-3",
+     "p": [
+      -65,
+      -245
+     ],
+     "params": {
+      "height": 106,
+      "radius": 74,
+      "peak": 2.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/mountain@1",
+     "name": "tharsis-north-wall-4",
+     "p": [
+      45,
+      -275
+     ],
+     "params": {
+      "height": 135,
+      "radius": 96,
+      "peak": 2.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/mountain@1",
+     "name": "tharsis-north-wall-5",
+     "p": [
+      170,
+      -265
+     ],
+     "params": {
+      "height": 125,
+      "radius": 108,
+      "peak": 2.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/mountain@1",
+     "name": "tharsis-north-wall-6",
+     "p": [
+      280,
+      -250
+     ],
+     "params": {
+      "height": 103,
+      "radius": 78,
+      "peak": 2.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/mountain@1",
+     "name": "western-escarpment-1",
+     "p": [
+      -235,
+      -115
+     ],
+     "params": {
+      "height": 95,
+      "radius": 84,
+      "peak": 2.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/mountain@1",
+     "name": "western-escarpment-2",
+     "p": [
+      -270,
+      -15
+     ],
+     "params": {
+      "height": 85,
+      "radius": 96,
+      "peak": 2.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/mountain@1",
+     "name": "western-escarpment-3",
+     "p": [
+      -220,
+      100
+     ],
+     "params": {
+      "height": 100,
+      "radius": 96,
+      "peak": 2.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/mountain@1",
+     "name": "eastern-massif-1",
+     "p": [
+      235,
+      -100
+     ],
+     "params": {
+      "height": 109,
+      "radius": 108,
+      "peak": 2.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/mountain@1",
+     "name": "eastern-massif-2",
+     "p": [
+      270,
+      30
+     ],
+     "params": {
+      "height": 119,
+      "radius": 86,
+      "peak": 2.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/mountain@1",
+     "name": "eastern-massif-3",
+     "p": [
+      230,
+      130
+     ],
+     "params": {
+      "height": 83,
+      "radius": 84,
+      "peak": 2.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/mountain@1",
+     "name": "olympus-caldera",
+     "p": [
+      0,
+      -105
+     ],
+     "params": {
+      "height": 42,
+      "radius": 60,
+      "peak": 1.4
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/plateau@1",
+     "name": "tharsis-plateau",
+     "shape": {
+      "area": [
+       [
+        -29,
+        41
+       ],
+       [
+        29,
+        41
+       ],
+       [
+        29,
+        99
+       ],
+       [
+        -29,
+        99
+       ]
+      ]
+     },
+     "params": {
+      "height": 7,
+      "edge": 21
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "tharsis-ramp",
+     "shape": {
+      "path": [
+       [
+        0,
+        31
+       ],
+       [
+        0,
+        64
+       ]
+      ],
+      "width": 6
+     },
+     "params": {
+      "material": "dirt",
+      "width": 6
+     }
+    }
+   ]
+  },
+  {
+   "note": "the ceramic commons, the gallery and garden courts, the stone walks, the black and chalk tessellation of the Arium floor, four glazed basins",
+   "group": "courts",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "garden",
+     "shape": {
+      "area": [
+       [
+        -25,
+        12
+       ],
+       [
+        25,
+        12
+       ],
+       [
+        25,
+        32
+       ],
+       [
+        -25,
+        32
+       ]
+      ]
+     },
+     "params": {
+      "material": "moss",
+      "color": "#1a6142",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "madmaraca-court",
+     "shape": {
+      "area": [
+       [
+        -64,
+        3
+       ],
+       [
+        -28,
+        3
+       ],
+       [
+        -28,
+        26
+       ],
+       [
+        -64,
+        26
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "minarete-court",
+     "shape": {
+      "area": [
+       [
+        28,
+        3
+       ],
+       [
+        64,
+        3
+       ],
+       [
+        64,
+        26
+       ],
+       [
+        28,
+        26
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "beacon-court",
+     "shape": {
+      "area": [
+       [
+        -12,
+        -24
+       ],
+       [
+        12,
+        -24
+       ],
+       [
+        12,
+        -10
+       ],
+       [
+        -12,
+        -10
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "eden-garden",
+     "shape": {
+      "area": [
+       [
+        -65,
+        36
+       ],
+       [
+        -25,
+        36
+       ],
+       [
+        -25,
+        58
+       ],
+       [
+        -65,
+        58
+       ]
+      ]
+     },
+     "params": {
+      "material": "moss",
+      "color": "#1a6142",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "grotto-court",
+     "shape": {
+      "area": [
+       [
+        25,
+        36
+       ],
+       [
+        65,
+        36
+       ],
+       [
+        65,
+        58
+       ],
+       [
+        25,
+        58
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tharsis-overlook",
+     "shape": {
+      "area": [
+       [
+        -8,
+        62
+       ],
+       [
+        8,
+        62
+       ],
+       [
+        8,
+        78
+       ],
+       [
+        -8,
+        78
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "promenade",
+     "shape": {
+      "path": [
+       [
+        -64,
+        18
+       ],
+       [
+        64,
+        18
+       ]
+      ],
+      "width": 4
+     },
+     "params": {
+      "material": "stone",
+      "width": 4
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "beacon-walk",
+     "shape": {
+      "path": [
+       [
+        0,
+        -24
+       ],
+       [
+        0,
+        32
+       ]
+      ],
+      "width": 6
+     },
+     "params": {
+      "material": "stone",
+      "width": 6
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "garden-walk",
+     "shape": {
+      "path": [
+       [
+        -45,
+        20
+       ],
+       [
+        -45,
+        47
+       ]
+      ],
+      "width": 6
+     },
+     "params": {
+      "material": "stone",
+      "width": 6
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "grotto-walk",
+     "shape": {
+      "path": [
+       [
+        45,
+        20
+       ],
+       [
+        45,
+        47
+       ]
+      ],
+      "width": 6
+     },
+     "params": {
+      "material": "stone",
+      "width": 6
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-0-0",
+     "shape": {
+      "area": [
+       [
+        -24,
+        -9
+       ],
+       [
+        -20.1,
+        -9
+       ],
+       [
+        -20.1,
+        -5.1
+       ],
+       [
+        -24,
+        -5.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-0-1",
+     "shape": {
+      "area": [
+       [
+        -20,
+        -9
+       ],
+       [
+        -16.1,
+        -9
+       ],
+       [
+        -16.1,
+        -5.1
+       ],
+       [
+        -20,
+        -5.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-0-2",
+     "shape": {
+      "area": [
+       [
+        -16,
+        -9
+       ],
+       [
+        -12.1,
+        -9
+       ],
+       [
+        -12.1,
+        -5.1
+       ],
+       [
+        -16,
+        -5.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-0-3",
+     "shape": {
+      "area": [
+       [
+        -12,
+        -9
+       ],
+       [
+        -8.1,
+        -9
+       ],
+       [
+        -8.1,
+        -5.1
+       ],
+       [
+        -12,
+        -5.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-0-4",
+     "shape": {
+      "area": [
+       [
+        -8,
+        -9
+       ],
+       [
+        -4.1,
+        -9
+       ],
+       [
+        -4.1,
+        -5.1
+       ],
+       [
+        -8,
+        -5.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-0-5",
+     "shape": {
+      "area": [
+       [
+        -4,
+        -9
+       ],
+       [
+        -0.10000000000000009,
+        -9
+       ],
+       [
+        -0.10000000000000009,
+        -5.1
+       ],
+       [
+        -4,
+        -5.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-0-6",
+     "shape": {
+      "area": [
+       [
+        0,
+        -9
+       ],
+       [
+        3.9,
+        -9
+       ],
+       [
+        3.9,
+        -5.1
+       ],
+       [
+        0,
+        -5.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-0-7",
+     "shape": {
+      "area": [
+       [
+        4,
+        -9
+       ],
+       [
+        7.9,
+        -9
+       ],
+       [
+        7.9,
+        -5.1
+       ],
+       [
+        4,
+        -5.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-0-8",
+     "shape": {
+      "area": [
+       [
+        8,
+        -9
+       ],
+       [
+        11.9,
+        -9
+       ],
+       [
+        11.9,
+        -5.1
+       ],
+       [
+        8,
+        -5.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-0-9",
+     "shape": {
+      "area": [
+       [
+        12,
+        -9
+       ],
+       [
+        15.9,
+        -9
+       ],
+       [
+        15.9,
+        -5.1
+       ],
+       [
+        12,
+        -5.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-0-10",
+     "shape": {
+      "area": [
+       [
+        16,
+        -9
+       ],
+       [
+        19.9,
+        -9
+       ],
+       [
+        19.9,
+        -5.1
+       ],
+       [
+        16,
+        -5.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-0-11",
+     "shape": {
+      "area": [
+       [
+        20,
+        -9
+       ],
+       [
+        23.9,
+        -9
+       ],
+       [
+        23.9,
+        -5.1
+       ],
+       [
+        20,
+        -5.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-1-0",
+     "shape": {
+      "area": [
+       [
+        -24,
+        -5
+       ],
+       [
+        -20.1,
+        -5
+       ],
+       [
+        -20.1,
+        -1.1
+       ],
+       [
+        -24,
+        -1.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-1-1",
+     "shape": {
+      "area": [
+       [
+        -20,
+        -5
+       ],
+       [
+        -16.1,
+        -5
+       ],
+       [
+        -16.1,
+        -1.1
+       ],
+       [
+        -20,
+        -1.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-1-2",
+     "shape": {
+      "area": [
+       [
+        -16,
+        -5
+       ],
+       [
+        -12.1,
+        -5
+       ],
+       [
+        -12.1,
+        -1.1
+       ],
+       [
+        -16,
+        -1.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-1-3",
+     "shape": {
+      "area": [
+       [
+        -12,
+        -5
+       ],
+       [
+        -8.1,
+        -5
+       ],
+       [
+        -8.1,
+        -1.1
+       ],
+       [
+        -12,
+        -1.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-1-4",
+     "shape": {
+      "area": [
+       [
+        -8,
+        -5
+       ],
+       [
+        -4.1,
+        -5
+       ],
+       [
+        -4.1,
+        -1.1
+       ],
+       [
+        -8,
+        -1.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-1-5",
+     "shape": {
+      "area": [
+       [
+        -4,
+        -5
+       ],
+       [
+        -0.10000000000000009,
+        -5
+       ],
+       [
+        -0.10000000000000009,
+        -1.1
+       ],
+       [
+        -4,
+        -1.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-1-6",
+     "shape": {
+      "area": [
+       [
+        0,
+        -5
+       ],
+       [
+        3.9,
+        -5
+       ],
+       [
+        3.9,
+        -1.1
+       ],
+       [
+        0,
+        -1.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-1-7",
+     "shape": {
+      "area": [
+       [
+        4,
+        -5
+       ],
+       [
+        7.9,
+        -5
+       ],
+       [
+        7.9,
+        -1.1
+       ],
+       [
+        4,
+        -1.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-1-8",
+     "shape": {
+      "area": [
+       [
+        8,
+        -5
+       ],
+       [
+        11.9,
+        -5
+       ],
+       [
+        11.9,
+        -1.1
+       ],
+       [
+        8,
+        -1.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-1-9",
+     "shape": {
+      "area": [
+       [
+        12,
+        -5
+       ],
+       [
+        15.9,
+        -5
+       ],
+       [
+        15.9,
+        -1.1
+       ],
+       [
+        12,
+        -1.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-1-10",
+     "shape": {
+      "area": [
+       [
+        16,
+        -5
+       ],
+       [
+        19.9,
+        -5
+       ],
+       [
+        19.9,
+        -1.1
+       ],
+       [
+        16,
+        -1.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-1-11",
+     "shape": {
+      "area": [
+       [
+        20,
+        -5
+       ],
+       [
+        23.9,
+        -5
+       ],
+       [
+        23.9,
+        -1.1
+       ],
+       [
+        20,
+        -1.1
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-2-0",
+     "shape": {
+      "area": [
+       [
+        -24,
+        -1
+       ],
+       [
+        -20.1,
+        -1
+       ],
+       [
+        -20.1,
+        2.9
+       ],
+       [
+        -24,
+        2.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-2-1",
+     "shape": {
+      "area": [
+       [
+        -20,
+        -1
+       ],
+       [
+        -16.1,
+        -1
+       ],
+       [
+        -16.1,
+        2.9
+       ],
+       [
+        -20,
+        2.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-2-2",
+     "shape": {
+      "area": [
+       [
+        -16,
+        -1
+       ],
+       [
+        -12.1,
+        -1
+       ],
+       [
+        -12.1,
+        2.9
+       ],
+       [
+        -16,
+        2.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-2-3",
+     "shape": {
+      "area": [
+       [
+        -12,
+        -1
+       ],
+       [
+        -8.1,
+        -1
+       ],
+       [
+        -8.1,
+        2.9
+       ],
+       [
+        -12,
+        2.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-2-4",
+     "shape": {
+      "area": [
+       [
+        -8,
+        -1
+       ],
+       [
+        -4.1,
+        -1
+       ],
+       [
+        -4.1,
+        2.9
+       ],
+       [
+        -8,
+        2.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-2-5",
+     "shape": {
+      "area": [
+       [
+        -4,
+        -1
+       ],
+       [
+        -0.10000000000000009,
+        -1
+       ],
+       [
+        -0.10000000000000009,
+        2.9
+       ],
+       [
+        -4,
+        2.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-2-6",
+     "shape": {
+      "area": [
+       [
+        0,
+        -1
+       ],
+       [
+        3.9,
+        -1
+       ],
+       [
+        3.9,
+        2.9
+       ],
+       [
+        0,
+        2.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-2-7",
+     "shape": {
+      "area": [
+       [
+        4,
+        -1
+       ],
+       [
+        7.9,
+        -1
+       ],
+       [
+        7.9,
+        2.9
+       ],
+       [
+        4,
+        2.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-2-8",
+     "shape": {
+      "area": [
+       [
+        8,
+        -1
+       ],
+       [
+        11.9,
+        -1
+       ],
+       [
+        11.9,
+        2.9
+       ],
+       [
+        8,
+        2.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-2-9",
+     "shape": {
+      "area": [
+       [
+        12,
+        -1
+       ],
+       [
+        15.9,
+        -1
+       ],
+       [
+        15.9,
+        2.9
+       ],
+       [
+        12,
+        2.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-2-10",
+     "shape": {
+      "area": [
+       [
+        16,
+        -1
+       ],
+       [
+        19.9,
+        -1
+       ],
+       [
+        19.9,
+        2.9
+       ],
+       [
+        16,
+        2.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-2-11",
+     "shape": {
+      "area": [
+       [
+        20,
+        -1
+       ],
+       [
+        23.9,
+        -1
+       ],
+       [
+        23.9,
+        2.9
+       ],
+       [
+        20,
+        2.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-3-0",
+     "shape": {
+      "area": [
+       [
+        -24,
+        3
+       ],
+       [
+        -20.1,
+        3
+       ],
+       [
+        -20.1,
+        6.9
+       ],
+       [
+        -24,
+        6.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-3-1",
+     "shape": {
+      "area": [
+       [
+        -20,
+        3
+       ],
+       [
+        -16.1,
+        3
+       ],
+       [
+        -16.1,
+        6.9
+       ],
+       [
+        -20,
+        6.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-3-2",
+     "shape": {
+      "area": [
+       [
+        -16,
+        3
+       ],
+       [
+        -12.1,
+        3
+       ],
+       [
+        -12.1,
+        6.9
+       ],
+       [
+        -16,
+        6.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-3-3",
+     "shape": {
+      "area": [
+       [
+        -12,
+        3
+       ],
+       [
+        -8.1,
+        3
+       ],
+       [
+        -8.1,
+        6.9
+       ],
+       [
+        -12,
+        6.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-3-4",
+     "shape": {
+      "area": [
+       [
+        -8,
+        3
+       ],
+       [
+        -4.1,
+        3
+       ],
+       [
+        -4.1,
+        6.9
+       ],
+       [
+        -8,
+        6.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-3-5",
+     "shape": {
+      "area": [
+       [
+        -4,
+        3
+       ],
+       [
+        -0.10000000000000009,
+        3
+       ],
+       [
+        -0.10000000000000009,
+        6.9
+       ],
+       [
+        -4,
+        6.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-3-6",
+     "shape": {
+      "area": [
+       [
+        0,
+        3
+       ],
+       [
+        3.9,
+        3
+       ],
+       [
+        3.9,
+        6.9
+       ],
+       [
+        0,
+        6.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-3-7",
+     "shape": {
+      "area": [
+       [
+        4,
+        3
+       ],
+       [
+        7.9,
+        3
+       ],
+       [
+        7.9,
+        6.9
+       ],
+       [
+        4,
+        6.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-3-8",
+     "shape": {
+      "area": [
+       [
+        8,
+        3
+       ],
+       [
+        11.9,
+        3
+       ],
+       [
+        11.9,
+        6.9
+       ],
+       [
+        8,
+        6.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-3-9",
+     "shape": {
+      "area": [
+       [
+        12,
+        3
+       ],
+       [
+        15.9,
+        3
+       ],
+       [
+        15.9,
+        6.9
+       ],
+       [
+        12,
+        6.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-3-10",
+     "shape": {
+      "area": [
+       [
+        16,
+        3
+       ],
+       [
+        19.9,
+        3
+       ],
+       [
+        19.9,
+        6.9
+       ],
+       [
+        16,
+        6.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-3-11",
+     "shape": {
+      "area": [
+       [
+        20,
+        3
+       ],
+       [
+        23.9,
+        3
+       ],
+       [
+        23.9,
+        6.9
+       ],
+       [
+        20,
+        6.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-4-0",
+     "shape": {
+      "area": [
+       [
+        -24,
+        7
+       ],
+       [
+        -20.1,
+        7
+       ],
+       [
+        -20.1,
+        10.9
+       ],
+       [
+        -24,
+        10.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-4-1",
+     "shape": {
+      "area": [
+       [
+        -20,
+        7
+       ],
+       [
+        -16.1,
+        7
+       ],
+       [
+        -16.1,
+        10.9
+       ],
+       [
+        -20,
+        10.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-4-2",
+     "shape": {
+      "area": [
+       [
+        -16,
+        7
+       ],
+       [
+        -12.1,
+        7
+       ],
+       [
+        -12.1,
+        10.9
+       ],
+       [
+        -16,
+        10.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-4-3",
+     "shape": {
+      "area": [
+       [
+        -12,
+        7
+       ],
+       [
+        -8.1,
+        7
+       ],
+       [
+        -8.1,
+        10.9
+       ],
+       [
+        -12,
+        10.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-4-4",
+     "shape": {
+      "area": [
+       [
+        -8,
+        7
+       ],
+       [
+        -4.1,
+        7
+       ],
+       [
+        -4.1,
+        10.9
+       ],
+       [
+        -8,
+        10.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-4-5",
+     "shape": {
+      "area": [
+       [
+        -4,
+        7
+       ],
+       [
+        -0.10000000000000009,
+        7
+       ],
+       [
+        -0.10000000000000009,
+        10.9
+       ],
+       [
+        -4,
+        10.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-4-6",
+     "shape": {
+      "area": [
+       [
+        0,
+        7
+       ],
+       [
+        3.9,
+        7
+       ],
+       [
+        3.9,
+        10.9
+       ],
+       [
+        0,
+        10.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-4-7",
+     "shape": {
+      "area": [
+       [
+        4,
+        7
+       ],
+       [
+        7.9,
+        7
+       ],
+       [
+        7.9,
+        10.9
+       ],
+       [
+        4,
+        10.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-4-8",
+     "shape": {
+      "area": [
+       [
+        8,
+        7
+       ],
+       [
+        11.9,
+        7
+       ],
+       [
+        11.9,
+        10.9
+       ],
+       [
+        8,
+        10.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-4-9",
+     "shape": {
+      "area": [
+       [
+        12,
+        7
+       ],
+       [
+        15.9,
+        7
+       ],
+       [
+        15.9,
+        10.9
+       ],
+       [
+        12,
+        10.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-4-10",
+     "shape": {
+      "area": [
+       [
+        16,
+        7
+       ],
+       [
+        19.9,
+        7
+       ],
+       [
+        19.9,
+        10.9
+       ],
+       [
+        16,
+        10.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-4-11",
+     "shape": {
+      "area": [
+       [
+        20,
+        7
+       ],
+       [
+        23.9,
+        7
+       ],
+       [
+        23.9,
+        10.9
+       ],
+       [
+        20,
+        10.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-5-0",
+     "shape": {
+      "area": [
+       [
+        -24,
+        11
+       ],
+       [
+        -20.1,
+        11
+       ],
+       [
+        -20.1,
+        14.9
+       ],
+       [
+        -24,
+        14.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-5-1",
+     "shape": {
+      "area": [
+       [
+        -20,
+        11
+       ],
+       [
+        -16.1,
+        11
+       ],
+       [
+        -16.1,
+        14.9
+       ],
+       [
+        -20,
+        14.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-5-2",
+     "shape": {
+      "area": [
+       [
+        -16,
+        11
+       ],
+       [
+        -12.1,
+        11
+       ],
+       [
+        -12.1,
+        14.9
+       ],
+       [
+        -16,
+        14.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-5-3",
+     "shape": {
+      "area": [
+       [
+        -12,
+        11
+       ],
+       [
+        -8.1,
+        11
+       ],
+       [
+        -8.1,
+        14.9
+       ],
+       [
+        -12,
+        14.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-5-4",
+     "shape": {
+      "area": [
+       [
+        -8,
+        11
+       ],
+       [
+        -4.1,
+        11
+       ],
+       [
+        -4.1,
+        14.9
+       ],
+       [
+        -8,
+        14.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-5-5",
+     "shape": {
+      "area": [
+       [
+        -4,
+        11
+       ],
+       [
+        -0.10000000000000009,
+        11
+       ],
+       [
+        -0.10000000000000009,
+        14.9
+       ],
+       [
+        -4,
+        14.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-5-6",
+     "shape": {
+      "area": [
+       [
+        0,
+        11
+       ],
+       [
+        3.9,
+        11
+       ],
+       [
+        3.9,
+        14.9
+       ],
+       [
+        0,
+        14.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-5-7",
+     "shape": {
+      "area": [
+       [
+        4,
+        11
+       ],
+       [
+        7.9,
+        11
+       ],
+       [
+        7.9,
+        14.9
+       ],
+       [
+        4,
+        14.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-5-8",
+     "shape": {
+      "area": [
+       [
+        8,
+        11
+       ],
+       [
+        11.9,
+        11
+       ],
+       [
+        11.9,
+        14.9
+       ],
+       [
+        8,
+        14.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-5-9",
+     "shape": {
+      "area": [
+       [
+        12,
+        11
+       ],
+       [
+        15.9,
+        11
+       ],
+       [
+        15.9,
+        14.9
+       ],
+       [
+        12,
+        14.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-5-10",
+     "shape": {
+      "area": [
+       [
+        16,
+        11
+       ],
+       [
+        19.9,
+        11
+       ],
+       [
+        19.9,
+        14.9
+       ],
+       [
+        16,
+        14.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#1c1118",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "tile-5-11",
+     "shape": {
+      "area": [
+       [
+        20,
+        11
+       ],
+       [
+        23.9,
+        11
+       ],
+       [
+        23.9,
+        14.9
+       ],
+       [
+        20,
+        14.9
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#dbd4c2",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/pond@1",
+     "name": "glazed-basin-north-west",
+     "shape": {
+      "area": [
+       [
+        -28,
+        -20
+       ],
+       [
+        -12,
+        -20
+       ],
+       [
+        -12,
+        -10
+       ],
+       [
+        -28,
+        -10
+       ]
+      ]
+     },
+     "params": {
+      "depth": 0.6,
+      "edge": 1
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/pond@1",
+     "name": "glazed-basin-north-east",
+     "shape": {
+      "area": [
+       [
+        12,
+        -20
+       ],
+       [
+        28,
+        -20
+       ],
+       [
+        28,
+        -10
+       ],
+       [
+        12,
+        -10
+       ]
+      ]
+     },
+     "params": {
+      "depth": 0.6,
+      "edge": 1
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/pond@1",
+     "name": "glazed-basin-south-west",
+     "shape": {
+      "area": [
+       [
+        -27,
+        36
+       ],
+       [
+        -11,
+        36
+       ],
+       [
+        -11,
+        46
+       ],
+       [
+        -27,
+        46
+       ]
+      ]
+     },
+     "params": {
+      "depth": 0.6,
+      "edge": 1
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/pond@1",
+     "name": "glazed-basin-south-east",
+     "shape": {
+      "area": [
+       [
+        11,
+        36
+       ],
+       [
+        27,
+        36
+       ],
+       [
+        27,
+        46
+       ],
+       [
+        11,
+        46
+       ]
+      ]
+     },
+     "params": {
+      "depth": 0.6,
+      "edge": 1
+     }
+    }
+   ]
+  },
+  {
+   "note": "Vanessa's three original ceramic scans: Madmaraca, Minarete, the Celadon beacon (with their measured ground arches); the auxiliary ceramic tower and minaret temple",
+   "group": "landmarks",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/lm-madmaraca@1",
+     "name": "madmaraca",
+     "p": [
+      -45,
+      -20
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-minarete@1",
+     "name": "minarete",
+     "p": [
+      42,
+      -20
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-celadon-beacon@1",
+     "name": "celadon-beacon",
+     "p": [
+      0,
+      -37
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "minarete-passage",
+     "shape": {
+      "area": [
+       [
+        41,
+        -27.4
+       ],
+       [
+        43,
+        -27.4
+       ],
+       [
+        43,
+        -12.6
+       ],
+       [
+        41,
+        -12.6
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#7a5a48",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "celadon-passage",
+     "shape": {
+      "area": [
+       [
+        -1,
+        -44.5
+       ],
+       [
+        1,
+        -44.5
+       ],
+       [
+        1,
+        -29.5
+       ],
+       [
+        -1,
+        -29.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#7a5a48",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ceramic-tower@1",
+     "name": "auxiliary-tower",
+     "p": [
+      -46,
+      16
+     ],
+     "r": 0,
+     "s": 0.5
+    },
+    {
+     "op": "place",
+     "def": "core/minaret-temple@1",
+     "name": "auxiliary-temple",
+     "p": [
+      46,
+      16
+     ],
+     "r": 0,
+     "s": 0.5
+    }
+   ]
+  },
+  {
+   "note": "the Grotto of Painted Worlds (vault, two turquoise pools, the dry causeway), the glazed garden plants, three gallery panels",
+   "group": "grotto-garden",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/lm-grotto-vault@1",
+     "name": "painted-grotto",
+     "p": [
+      45,
+      48
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/pond@1",
+     "name": "grotto-pool-1",
+     "shape": {
+      "area": [
+       [
+        31,
+        43
+       ],
+       [
+        38,
+        43
+       ],
+       [
+        38,
+        51
+       ],
+       [
+        31,
+        51
+       ]
+      ]
+     },
+     "params": {
+      "depth": 0.8,
+      "edge": 0.6
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/pond@1",
+     "name": "grotto-pool-2",
+     "shape": {
+      "area": [
+       [
+        52,
+        43
+       ],
+       [
+        59,
+        43
+       ],
+       [
+        59,
+        51
+       ],
+       [
+        52,
+        51
+       ]
+      ]
+     },
+     "params": {
+      "depth": 0.8,
+      "edge": 0.6
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "grotto-causeway",
+     "shape": {
+      "area": [
+       [
+        40,
+        40
+       ],
+       [
+        50,
+        40
+       ],
+       [
+        50,
+        54
+       ],
+       [
+        40,
+        54
+       ]
+      ]
+     },
+     "params": {
+      "material": "rock",
+      "color": "#3a2c30",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "glazed-plant-w1",
+     "p": [
+      -30,
+      37
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "glazed-plant-w2",
+     "p": [
+      -34,
+      37
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "glazed-plant-w3",
+     "p": [
+      -38,
+      37
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "glazed-plant-w4",
+     "p": [
+      -42,
+      37
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "glazed-plant-w5",
+     "p": [
+      -46,
+      37
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "glazed-plant-w6",
+     "p": [
+      -50,
+      37
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "glazed-plant-w7",
+     "p": [
+      -54,
+      37
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "glazed-plant-w8",
+     "p": [
+      -30,
+      53
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "glazed-plant-w9",
+     "p": [
+      -34,
+      53
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "glazed-plant-w10",
+     "p": [
+      -38,
+      53
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "glazed-plant-w11",
+     "p": [
+      -42,
+      53
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "glazed-plant-w12",
+     "p": [
+      -46,
+      53
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "glazed-plant-w13",
+     "p": [
+      -50,
+      53
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "glazed-plant-w14",
+     "p": [
+      -54,
+      53
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "glazed-plant-e1",
+     "p": [
+      30,
+      37
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "glazed-plant-e2",
+     "p": [
+      34,
+      37
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "glazed-plant-e3",
+     "p": [
+      38,
+      37
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "glazed-plant-e7",
+     "p": [
+      54,
+      37
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "overlook-plant-1",
+     "p": [
+      -6,
+      76.5
+     ],
+     "r": 0,
+     "s": 0.8
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "overlook-plant-2",
+     "p": [
+      -3,
+      76.5
+     ],
+     "r": 0,
+     "s": 0.8
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "overlook-plant-3",
+     "p": [
+      0,
+      76.5
+     ],
+     "r": 0,
+     "s": 0.8
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "overlook-plant-4",
+     "p": [
+      3,
+      76.5
+     ],
+     "r": 0,
+     "s": 0.8
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glazed-plant@1",
+     "name": "overlook-plant-5",
+     "p": [
+      6,
+      76.5
+     ],
+     "r": 0,
+     "s": 0.8
+    },
+    {
+     "op": "place",
+     "def": "core/lm-panel-forest-illustration@1",
+     "name": "panel-forest-illustration",
+     "p": [
+      -44,
+      59
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/lm-panel-geometric-pattern@1",
+     "name": "panel-geometric-pattern",
+     "p": [
+      44,
+      55.6
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/lm-panel-receding-archways@1",
+     "name": "panel-receding-archways",
+     "p": [
+      58,
+      30
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/flower-bed@1",
+     "name": "verdelis-bed-1",
+     "p": [
+      -60,
+      41
+     ],
+     "params": {
+      "leaf": "#3f8f5a",
+      "soil": "#4a2c26"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/flower-bed@1",
+     "name": "verdelis-bed-2",
+     "p": [
+      -52,
+      41
+     ],
+     "params": {
+      "leaf": "#3f8f5a",
+      "soil": "#4a2c26"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/flower-bed@1",
+     "name": "verdelis-bed-3",
+     "p": [
+      -36,
+      47
+     ],
+     "params": {
+      "leaf": "#3f8f5a",
+      "soil": "#4a2c26"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/flower-bed@1",
+     "name": "verdelis-bed-4",
+     "p": [
+      -60,
+      55
+     ],
+     "params": {
+      "leaf": "#3f8f5a",
+      "soil": "#4a2c26"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/flower-bed@1",
+     "name": "verdelis-bed-5",
+     "p": [
+      -36,
+      55
+     ],
+     "params": {
+      "leaf": "#3f8f5a",
+      "soil": "#4a2c26"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/mushrooms-red-pack@1",
+     "name": "verdelis-mushrooms-1",
+     "p": [
+      -57,
+      46
+     ],
+     "s": 2.5
+    },
+    {
+     "op": "place",
+     "def": "core/mushrooms-tan-pack@1",
+     "name": "verdelis-mushrooms-2",
+     "p": [
+      -33,
+      42
+     ],
+     "s": 2.5
+    },
+    {
+     "op": "place",
+     "def": "core/mushrooms-red-pack@1",
+     "name": "verdelis-mushrooms-3",
+     "p": [
+      -48,
+      56
+     ],
+     "s": 2.5
+    },
+    {
+     "op": "place",
+     "def": "core/mushrooms-tan-pack@1",
+     "name": "verdelis-mushrooms-4",
+     "p": [
+      -27,
+      50
+     ],
+     "s": 2.5
+    }
+   ]
+  },
+  {
+   "note": "the scan courts: 96 exhibits of the Little Martians archive in an eight-column district, with their viewing courts (1)",
+   "group": "scan-courts",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "scan-promenade",
+     "shape": {
+      "path": [
+       [
+        0,
+        88
+       ],
+       [
+        0,
+        235
+       ]
+      ],
+      "width": 2
+     },
+     "params": {
+      "material": "stone",
+      "width": 2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "scan-crosswalk-1w",
+     "shape": {
+      "path": [
+       [
+        -72,
+        93.5
+       ],
+       [
+        -30,
+        93.5
+       ]
+      ],
+      "width": 1.2
+     },
+     "params": {
+      "material": "stone",
+      "width": 1.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "scan-crosswalk-1e",
+     "shape": {
+      "path": [
+       [
+        30,
+        93.5
+       ],
+       [
+        72,
+        93.5
+       ]
+      ],
+      "width": 1.2
+     },
+     "params": {
+      "material": "stone",
+      "width": 1.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "scan-crosswalk-2",
+     "shape": {
+      "path": [
+       [
+        -72,
+        101.5
+       ],
+       [
+        72,
+        101.5
+       ]
+      ],
+      "width": 1.2
+     },
+     "params": {
+      "material": "stone",
+      "width": 1.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "scan-crosswalk-3",
+     "shape": {
+      "path": [
+       [
+        -72,
+        109.5
+       ],
+       [
+        72,
+        109.5
+       ]
+      ],
+      "width": 1.2
+     },
+     "params": {
+      "material": "stone",
+      "width": 1.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "scan-crosswalk-4",
+     "shape": {
+      "path": [
+       [
+        -72,
+        121.5
+       ],
+       [
+        72,
+        121.5
+       ]
+      ],
+      "width": 1.2
+     },
+     "params": {
+      "material": "stone",
+      "width": 1.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "scan-crosswalk-5",
+     "shape": {
+      "path": [
+       [
+        -72,
+        139.5
+       ],
+       [
+        72,
+        139.5
+       ]
+      ],
+      "width": 1.2
+     },
+     "params": {
+      "material": "stone",
+      "width": 1.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "scan-crosswalk-6",
+     "shape": {
+      "path": [
+       [
+        -72,
+        157.5
+       ],
+       [
+        72,
+        157.5
+       ]
+      ],
+      "width": 1.2
+     },
+     "params": {
+      "material": "stone",
+      "width": 1.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "scan-crosswalk-7",
+     "shape": {
+      "path": [
+       [
+        -72,
+        175.5
+       ],
+       [
+        72,
+        175.5
+       ]
+      ],
+      "width": 1.2
+     },
+     "params": {
+      "material": "stone",
+      "width": 1.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "scan-crosswalk-8",
+     "shape": {
+      "path": [
+       [
+        -72,
+        193.5
+       ],
+       [
+        72,
+        193.5
+       ]
+      ],
+      "width": 1.2
+     },
+     "params": {
+      "material": "stone",
+      "width": 1.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "scan-crosswalk-9",
+     "shape": {
+      "path": [
+       [
+        -72,
+        211.5
+       ],
+       [
+        72,
+        211.5
+       ]
+      ],
+      "width": 1.2
+     },
+     "params": {
+      "material": "stone",
+      "width": 1.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/footpath@1",
+     "name": "scan-crosswalk-10",
+     "shape": {
+      "path": [
+       [
+        -72,
+        229.5
+       ],
+       [
+        72,
+        229.5
+       ]
+      ],
+      "width": 1.2
+     },
+     "params": {
+      "material": "stone",
+      "width": 1.2
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-minarete-portal",
+     "shape": {
+      "area": [
+       [
+        -71,
+        104
+       ],
+       [
+        -55,
+        104
+       ],
+       [
+        -55,
+        120
+       ],
+       [
+        -71,
+        120
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-pupila-corridor",
+     "shape": {
+      "area": [
+       [
+        -53,
+        104
+       ],
+       [
+        -37,
+        104
+       ],
+       [
+        -37,
+        120
+       ],
+       [
+        -53,
+        120
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-chapel-composition",
+     "shape": {
+      "area": [
+       [
+        -35,
+        104
+       ],
+       [
+        -19,
+        104
+       ],
+       [
+        -19,
+        120
+       ],
+       [
+        -35,
+        120
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-american-base-old",
+     "shape": {
+      "area": [
+       [
+        -17,
+        104
+       ],
+       [
+        -1,
+        104
+       ],
+       [
+        -1,
+        120
+       ],
+       [
+        -17,
+        120
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-asian-art-museum",
+     "shape": {
+      "area": [
+       [
+        1,
+        104
+       ],
+       [
+        17,
+        104
+       ],
+       [
+        17,
+        120
+       ],
+       [
+        1,
+        120
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-fey-castle",
+     "shape": {
+      "area": [
+       [
+        19,
+        104
+       ],
+       [
+        35,
+        104
+       ],
+       [
+        35,
+        120
+       ],
+       [
+        19,
+        120
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-graffiti-abandoned-room",
+     "shape": {
+      "area": [
+       [
+        37,
+        104
+       ],
+       [
+        53,
+        104
+       ],
+       [
+        53,
+        120
+       ],
+       [
+        37,
+        120
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-randy2",
+     "shape": {
+      "area": [
+       [
+        55,
+        104
+       ],
+       [
+        71,
+        104
+       ],
+       [
+        71,
+        120
+       ],
+       [
+        55,
+        120
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-randy3",
+     "shape": {
+      "area": [
+       [
+        -71,
+        122
+       ],
+       [
+        -55,
+        122
+       ],
+       [
+        -55,
+        138
+       ],
+       [
+        -71,
+        138
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-forte-sao-filipe-chapel",
+     "shape": {
+      "area": [
+       [
+        -53,
+        122
+       ],
+       [
+        -37,
+        122
+       ],
+       [
+        -37,
+        138
+       ],
+       [
+        -53,
+        138
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-forte-sao-filipe-corner",
+     "shape": {
+      "area": [
+       [
+        -35,
+        122
+       ],
+       [
+        -19,
+        122
+       ],
+       [
+        -19,
+        138
+       ],
+       [
+        -35,
+        138
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-forte-sao-filipe-corner3",
+     "shape": {
+      "area": [
+       [
+        -17,
+        122
+       ],
+       [
+        -1,
+        122
+       ],
+       [
+        -1,
+        138
+       ],
+       [
+        -17,
+        138
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-forte-sao-filipe-corridor",
+     "shape": {
+      "area": [
+       [
+        1,
+        122
+       ],
+       [
+        17,
+        122
+       ],
+       [
+        17,
+        138
+       ],
+       [
+        1,
+        138
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-forte-sao-filipe-open",
+     "shape": {
+      "area": [
+       [
+        19,
+        122
+       ],
+       [
+        35,
+        122
+       ],
+       [
+        35,
+        138
+       ],
+       [
+        19,
+        138
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-lisbon-archways-corridor",
+     "shape": {
+      "area": [
+       [
+        37,
+        122
+       ],
+       [
+        53,
+        122
+       ],
+       [
+        53,
+        138
+       ],
+       [
+        37,
+        138
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-moorish-entrance",
+     "shape": {
+      "area": [
+       [
+        55,
+        122
+       ],
+       [
+        71,
+        122
+       ],
+       [
+        71,
+        138
+       ],
+       [
+        55,
+        138
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-moorish-castle-top",
+     "shape": {
+      "area": [
+       [
+        -71,
+        140
+       ],
+       [
+        -55,
+        140
+       ],
+       [
+        -55,
+        156
+       ],
+       [
+        -71,
+        156
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-museu-azulejo-corridor",
+     "shape": {
+      "area": [
+       [
+        -53,
+        140
+       ],
+       [
+        -37,
+        140
+       ],
+       [
+        -37,
+        156
+       ],
+       [
+        -53,
+        156
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-museu-azulejo-main",
+     "shape": {
+      "area": [
+       [
+        -35,
+        140
+       ],
+       [
+        -19,
+        140
+       ],
+       [
+        -19,
+        156
+       ],
+       [
+        -35,
+        156
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-museu-azulejo-quad",
+     "shape": {
+      "area": [
+       [
+        -17,
+        140
+       ],
+       [
+        -1,
+        140
+       ],
+       [
+        -1,
+        156
+       ],
+       [
+        -17,
+        156
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-quinta-tower-curly",
+     "shape": {
+      "area": [
+       [
+        1,
+        140
+       ],
+       [
+        17,
+        140
+       ],
+       [
+        17,
+        156
+       ],
+       [
+        1,
+        156
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-quinta-fonte",
+     "shape": {
+      "area": [
+       [
+        19,
+        140
+       ],
+       [
+        35,
+        140
+       ],
+       [
+        35,
+        156
+       ],
+       [
+        19,
+        156
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-quinta-corredor-escada",
+     "shape": {
+      "area": [
+       [
+        37,
+        140
+       ],
+       [
+        53,
+        140
+       ],
+       [
+        53,
+        156
+       ],
+       [
+        37,
+        156
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-quinta-palacio-interior",
+     "shape": {
+      "area": [
+       [
+        55,
+        140
+       ],
+       [
+        71,
+        140
+       ],
+       [
+        71,
+        156
+       ],
+       [
+        55,
+        156
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-quinta-poco",
+     "shape": {
+      "area": [
+       [
+        -71,
+        158
+       ],
+       [
+        -55,
+        158
+       ],
+       [
+        -55,
+        174
+       ],
+       [
+        -71,
+        174
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-rua-fado",
+     "shape": {
+      "area": [
+       [
+        -53,
+        158
+       ],
+       [
+        -37,
+        158
+       ],
+       [
+        -37,
+        174
+       ],
+       [
+        -53,
+        174
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-setubal-casa-escadas",
+     "shape": {
+      "area": [
+       [
+        -35,
+        158
+       ],
+       [
+        -19,
+        158
+       ],
+       [
+        -19,
+        174
+       ],
+       [
+        -35,
+        174
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-se-entrada",
+     "shape": {
+      "area": [
+       [
+        -17,
+        158
+       ],
+       [
+        -1,
+        158
+       ],
+       [
+        -1,
+        174
+       ],
+       [
+        -17,
+        174
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-gruta-m-republica",
+     "shape": {
+      "area": [
+       [
+        1,
+        158
+       ],
+       [
+        17,
+        158
+       ],
+       [
+        17,
+        174
+       ],
+       [
+        1,
+        174
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-camel-sculpture",
+     "shape": {
+      "area": [
+       [
+        19,
+        158
+       ],
+       [
+        35,
+        158
+       ],
+       [
+        35,
+        174
+       ],
+       [
+        19,
+        174
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-china-buddha",
+     "shape": {
+      "area": [
+       [
+        37,
+        158
+       ],
+       [
+        53,
+        158
+       ],
+       [
+        53,
+        174
+       ],
+       [
+        37,
+        174
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-gold-rust-buddha",
+     "shape": {
+      "area": [
+       [
+        55,
+        158
+       ],
+       [
+        71,
+        158
+       ],
+       [
+        71,
+        174
+       ],
+       [
+        55,
+        174
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-golden-gate-park-tree",
+     "shape": {
+      "area": [
+       [
+        -71,
+        176
+       ],
+       [
+        -55,
+        176
+       ],
+       [
+        -55,
+        192
+       ],
+       [
+        -71,
+        192
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-golden-woman-standing",
+     "shape": {
+      "area": [
+       [
+        -53,
+        176
+       ],
+       [
+        -37,
+        176
+       ],
+       [
+        -37,
+        192
+       ],
+       [
+        -53,
+        192
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-greenman-altar",
+     "shape": {
+      "area": [
+       [
+        -35,
+        176
+       ],
+       [
+        -19,
+        176
+       ],
+       [
+        -19,
+        192
+       ],
+       [
+        -35,
+        192
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-met-greek-mural",
+     "shape": {
+      "area": [
+       [
+        -17,
+        176
+       ],
+       [
+        -1,
+        176
+       ],
+       [
+        -1,
+        192
+       ],
+       [
+        -17,
+        192
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-poly-01",
+     "shape": {
+      "area": [
+       [
+        1,
+        176
+       ],
+       [
+        17,
+        176
+       ],
+       [
+        17,
+        192
+       ],
+       [
+        1,
+        192
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-poly-10",
+     "shape": {
+      "area": [
+       [
+        19,
+        176
+       ],
+       [
+        35,
+        176
+       ],
+       [
+        35,
+        192
+       ],
+       [
+        19,
+        192
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-poly-12",
+     "shape": {
+      "area": [
+       [
+        37,
+        176
+       ],
+       [
+        53,
+        176
+       ],
+       [
+        53,
+        192
+       ],
+       [
+        37,
+        192
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-poly-13",
+     "shape": {
+      "area": [
+       [
+        55,
+        176
+       ],
+       [
+        71,
+        176
+       ],
+       [
+        71,
+        192
+       ],
+       [
+        55,
+        192
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-poly-14",
+     "shape": {
+      "area": [
+       [
+        -71,
+        194
+       ],
+       [
+        -55,
+        194
+       ],
+       [
+        -55,
+        210
+       ],
+       [
+        -71,
+        210
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-poly-15",
+     "shape": {
+      "area": [
+       [
+        -53,
+        194
+       ],
+       [
+        -37,
+        194
+       ],
+       [
+        -37,
+        210
+       ],
+       [
+        -53,
+        210
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-poly-17",
+     "shape": {
+      "area": [
+       [
+        -35,
+        194
+       ],
+       [
+        -19,
+        194
+       ],
+       [
+        -19,
+        210
+       ],
+       [
+        -35,
+        210
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-poly-18",
+     "shape": {
+      "area": [
+       [
+        -17,
+        194
+       ],
+       [
+        -1,
+        194
+       ],
+       [
+        -1,
+        210
+       ],
+       [
+        -17,
+        210
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-poly-19",
+     "shape": {
+      "area": [
+       [
+        1,
+        194
+       ],
+       [
+        17,
+        194
+       ],
+       [
+        17,
+        210
+       ],
+       [
+        1,
+        210
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-poly-02",
+     "shape": {
+      "area": [
+       [
+        19,
+        194
+       ],
+       [
+        35,
+        194
+       ],
+       [
+        35,
+        210
+       ],
+       [
+        19,
+        210
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-poly-05",
+     "shape": {
+      "area": [
+       [
+        37,
+        194
+       ],
+       [
+        53,
+        194
+       ],
+       [
+        53,
+        210
+       ],
+       [
+        37,
+        210
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-poly-06",
+     "shape": {
+      "area": [
+       [
+        55,
+        194
+       ],
+       [
+        71,
+        194
+       ],
+       [
+        71,
+        210
+       ],
+       [
+        55,
+        210
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-poly-07",
+     "shape": {
+      "area": [
+       [
+        -71,
+        212
+       ],
+       [
+        -55,
+        212
+       ],
+       [
+        -55,
+        228
+       ],
+       [
+        -71,
+        228
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-poly-08",
+     "shape": {
+      "area": [
+       [
+        -53,
+        212
+       ],
+       [
+        -37,
+        212
+       ],
+       [
+        -37,
+        228
+       ],
+       [
+        -53,
+        228
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-poly-09",
+     "shape": {
+      "area": [
+       [
+        -35,
+        212
+       ],
+       [
+        -19,
+        212
+       ],
+       [
+        -19,
+        228
+       ],
+       [
+        -35,
+        228
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-two-warriors",
+     "shape": {
+      "area": [
+       [
+        -17,
+        212
+       ],
+       [
+        -1,
+        212
+       ],
+       [
+        -1,
+        228
+       ],
+       [
+        -17,
+        228
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-567d4f0b818f",
+     "shape": {
+      "area": [
+       [
+        -71,
+        81
+       ],
+       [
+        -65,
+        81
+       ],
+       [
+        -65,
+        87
+       ],
+       [
+        -71,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-b538ebb36278",
+     "shape": {
+      "area": [
+       [
+        -63,
+        81
+       ],
+       [
+        -57,
+        81
+       ],
+       [
+        -57,
+        87
+       ],
+       [
+        -63,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-a17ce660742d",
+     "shape": {
+      "area": [
+       [
+        -55,
+        81
+       ],
+       [
+        -49,
+        81
+       ],
+       [
+        -49,
+        87
+       ],
+       [
+        -55,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-72c8fc2f1538",
+     "shape": {
+      "area": [
+       [
+        -47,
+        81
+       ],
+       [
+        -41,
+        81
+       ],
+       [
+        -41,
+        87
+       ],
+       [
+        -47,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-0f69fd943fc1",
+     "shape": {
+      "area": [
+       [
+        -39,
+        81
+       ],
+       [
+        -33,
+        81
+       ],
+       [
+        -33,
+        87
+       ],
+       [
+        -39,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-1af1c89dd0f6",
+     "shape": {
+      "area": [
+       [
+        33,
+        81
+       ],
+       [
+        39,
+        81
+       ],
+       [
+        39,
+        87
+       ],
+       [
+        33,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-368878f9b157",
+     "shape": {
+      "area": [
+       [
+        41,
+        81
+       ],
+       [
+        47,
+        81
+       ],
+       [
+        47,
+        87
+       ],
+       [
+        41,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-7d0669742c10",
+     "shape": {
+      "area": [
+       [
+        49,
+        81
+       ],
+       [
+        55,
+        81
+       ],
+       [
+        55,
+        87
+       ],
+       [
+        49,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-ee1676f5c3bc",
+     "shape": {
+      "area": [
+       [
+        57,
+        81
+       ],
+       [
+        63,
+        81
+       ],
+       [
+        63,
+        87
+       ],
+       [
+        57,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-16b887532619",
+     "shape": {
+      "area": [
+       [
+        65,
+        81
+       ],
+       [
+        71,
+        81
+       ],
+       [
+        71,
+        87
+       ],
+       [
+        65,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-02ceabbff643",
+     "shape": {
+      "area": [
+       [
+        -71,
+        89
+       ],
+       [
+        -65,
+        89
+       ],
+       [
+        -65,
+        95
+       ],
+       [
+        -71,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-731f06fdb7e6",
+     "shape": {
+      "area": [
+       [
+        -63,
+        89
+       ],
+       [
+        -57,
+        89
+       ],
+       [
+        -57,
+        95
+       ],
+       [
+        -63,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-b0941d82d98c",
+     "shape": {
+      "area": [
+       [
+        -55,
+        89
+       ],
+       [
+        -49,
+        89
+       ],
+       [
+        -49,
+        95
+       ],
+       [
+        -55,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-0d01c1b00980",
+     "shape": {
+      "area": [
+       [
+        -47,
+        89
+       ],
+       [
+        -41,
+        89
+       ],
+       [
+        -41,
+        95
+       ],
+       [
+        -47,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-af1046536b8a",
+     "shape": {
+      "area": [
+       [
+        -39,
+        89
+       ],
+       [
+        -33,
+        89
+       ],
+       [
+        -33,
+        95
+       ],
+       [
+        -39,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-6c113bb8ae2e",
+     "shape": {
+      "area": [
+       [
+        33,
+        89
+       ],
+       [
+        39,
+        89
+       ],
+       [
+        39,
+        95
+       ],
+       [
+        33,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-fabce0b97897",
+     "shape": {
+      "area": [
+       [
+        41,
+        89
+       ],
+       [
+        47,
+        89
+       ],
+       [
+        47,
+        95
+       ],
+       [
+        41,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-5f5e4a9284a4",
+     "shape": {
+      "area": [
+       [
+        49,
+        89
+       ],
+       [
+        55,
+        89
+       ],
+       [
+        55,
+        95
+       ],
+       [
+        49,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-0b40c69c8244",
+     "shape": {
+      "area": [
+       [
+        57,
+        89
+       ],
+       [
+        63,
+        89
+       ],
+       [
+        63,
+        95
+       ],
+       [
+        57,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-f3f642ac7b15",
+     "shape": {
+      "area": [
+       [
+        65,
+        89
+       ],
+       [
+        71,
+        89
+       ],
+       [
+        71,
+        95
+       ],
+       [
+        65,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-40a9797026a2",
+     "shape": {
+      "area": [
+       [
+        -71,
+        97
+       ],
+       [
+        -65,
+        97
+       ],
+       [
+        -65,
+        103
+       ],
+       [
+        -71,
+        103
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-5f63a6fe6100",
+     "shape": {
+      "area": [
+       [
+        -63,
+        97
+       ],
+       [
+        -57,
+        97
+       ],
+       [
+        -57,
+        103
+       ],
+       [
+        -63,
+        103
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-935874799be2",
+     "shape": {
+      "area": [
+       [
+        -55,
+        97
+       ],
+       [
+        -49,
+        97
+       ],
+       [
+        -49,
+        103
+       ],
+       [
+        -55,
+        103
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-a4a6b8bad1e8",
+     "shape": {
+      "area": [
+       [
+        -47,
+        97
+       ],
+       [
+        -41,
+        97
+       ],
+       [
+        -41,
+        103
+       ],
+       [
+        -47,
+        103
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "pad-drive-0734a4679321",
+     "shape": {
+      "area": [
+       [
+        -39,
+        97
+       ],
+       [
+        -33,
+        97
+       ],
+       [
+        -33,
+        103
+       ],
+       [
+        -39,
+        103
+       ]
+      ]
+     },
+     "params": {
+      "material": "dirt",
+      "color": "#a1633d",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-minarete-portal@1",
+     "name": "exhibit-minarete-portal",
+     "p": [
+      -63,
+      112
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-pupila-corridor@1",
+     "name": "exhibit-pupila-corridor",
+     "p": [
+      -45,
+      112
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-chapel-composition@1",
+     "name": "exhibit-chapel-composition",
+     "p": [
+      -27,
+      112
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-american-base-old@1",
+     "name": "exhibit-american-base-old",
+     "p": [
+      -9,
+      112
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-asian-art-museum@1",
+     "name": "exhibit-asian-art-museum",
+     "p": [
+      9,
+      112
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-fey-castle@1",
+     "name": "exhibit-fey-castle",
+     "p": [
+      27,
+      112
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-graffiti-abandoned-room@1",
+     "name": "exhibit-graffiti-abandoned-room",
+     "p": [
+      45,
+      112
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-randy2@1",
+     "name": "exhibit-randy2",
+     "p": [
+      63,
+      112
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-randy3@1",
+     "name": "exhibit-randy3",
+     "p": [
+      -63,
+      130
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-forte-sao-filipe-chapel@1",
+     "name": "exhibit-forte-sao-filipe-chapel",
+     "p": [
+      -45,
+      130
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-forte-sao-filipe-corner@1",
+     "name": "exhibit-forte-sao-filipe-corner",
+     "p": [
+      -27,
+      130
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-forte-sao-filipe-corner3@1",
+     "name": "exhibit-forte-sao-filipe-corner3",
+     "p": [
+      -9,
+      130
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-forte-sao-filipe-corridor@1",
+     "name": "exhibit-forte-sao-filipe-corridor",
+     "p": [
+      9,
+      130
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-forte-sao-filipe-open@1",
+     "name": "exhibit-forte-sao-filipe-open",
+     "p": [
+      27,
+      130
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-lisbon-archways-corridor@1",
+     "name": "exhibit-lisbon-archways-corridor",
+     "p": [
+      45,
+      130
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-moorish-entrance@1",
+     "name": "exhibit-moorish-entrance",
+     "p": [
+      63,
+      130
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-moorish-castle-top@1",
+     "name": "exhibit-moorish-castle-top",
+     "p": [
+      -63,
+      148
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-museu-azulejo-corridor@1",
+     "name": "exhibit-museu-azulejo-corridor",
+     "p": [
+      -45,
+      148
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-museu-azulejo-main@1",
+     "name": "exhibit-museu-azulejo-main",
+     "p": [
+      -27,
+      148
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-museu-azulejo-quad@1",
+     "name": "exhibit-museu-azulejo-quad",
+     "p": [
+      -9,
+      148
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-quinta-tower-curly@1",
+     "name": "exhibit-quinta-tower-curly",
+     "p": [
+      9,
+      148
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-quinta-fonte@1",
+     "name": "exhibit-quinta-fonte",
+     "p": [
+      27,
+      148
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-quinta-corredor-escada@1",
+     "name": "exhibit-quinta-corredor-escada",
+     "p": [
+      45,
+      148
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-quinta-palacio-interior@1",
+     "name": "exhibit-quinta-palacio-interior",
+     "p": [
+      63,
+      148
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-quinta-poco@1",
+     "name": "exhibit-quinta-poco",
+     "p": [
+      -63,
+      166
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-rua-fado@1",
+     "name": "exhibit-rua-fado",
+     "p": [
+      -45,
+      166
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-setubal-casa-escadas@1",
+     "name": "exhibit-setubal-casa-escadas",
+     "p": [
+      -27,
+      166
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-se-entrada@1",
+     "name": "exhibit-se-entrada",
+     "p": [
+      -9,
+      166
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-gruta-m-republica@1",
+     "name": "exhibit-gruta-m-republica",
+     "p": [
+      9,
+      166
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-camel-sculpture@1",
+     "name": "exhibit-camel-sculpture",
+     "p": [
+      27,
+      166
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-china-buddha@1",
+     "name": "exhibit-china-buddha",
+     "p": [
+      45,
+      166
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-gold-rust-buddha@1",
+     "name": "exhibit-gold-rust-buddha",
+     "p": [
+      63,
+      166
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-golden-gate-park-tree@1",
+     "name": "exhibit-golden-gate-park-tree",
+     "p": [
+      -63,
+      184
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-golden-woman-standing@1",
+     "name": "exhibit-golden-woman-standing",
+     "p": [
+      -45,
+      184
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-greenman-altar@1",
+     "name": "exhibit-greenman-altar",
+     "p": [
+      -27,
+      184
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-met-greek-mural@1",
+     "name": "exhibit-met-greek-mural",
+     "p": [
+      -9,
+      184
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-poly-01@1",
+     "name": "exhibit-poly-01",
+     "p": [
+      9,
+      184
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-poly-10@1",
+     "name": "exhibit-poly-10",
+     "p": [
+      27,
+      184
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-poly-12@1",
+     "name": "exhibit-poly-12",
+     "p": [
+      45,
+      184
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-poly-13@1",
+     "name": "exhibit-poly-13",
+     "p": [
+      63,
+      184
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-poly-14@1",
+     "name": "exhibit-poly-14",
+     "p": [
+      -63,
+      202
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-poly-15@1",
+     "name": "exhibit-poly-15",
+     "p": [
+      -45,
+      202
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-poly-17@1",
+     "name": "exhibit-poly-17",
+     "p": [
+      -27,
+      202
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-poly-18@1",
+     "name": "exhibit-poly-18",
+     "p": [
+      -9,
+      202
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-poly-19@1",
+     "name": "exhibit-poly-19",
+     "p": [
+      9,
+      202
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-poly-02@1",
+     "name": "exhibit-poly-02",
+     "p": [
+      27,
+      202
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-poly-05@1",
+     "name": "exhibit-poly-05",
+     "p": [
+      45,
+      202
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-poly-06@1",
+     "name": "exhibit-poly-06",
+     "p": [
+      63,
+      202
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-poly-07@1",
+     "name": "exhibit-poly-07",
+     "p": [
+      -63,
+      220
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-poly-08@1",
+     "name": "exhibit-poly-08",
+     "p": [
+      -45,
+      220
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-poly-09@1",
+     "name": "exhibit-poly-09",
+     "p": [
+      -27,
+      220
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-scan-two-warriors@1",
+     "name": "exhibit-two-warriors",
+     "p": [
+      -9,
+      220
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-regency-femina@1",
+     "name": "exhibit-drive-567d4f0b818f",
+     "p": [
+      -68,
+      84
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-regency-flower@1",
+     "name": "exhibit-drive-b538ebb36278",
+     "p": [
+      -60,
+      84
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-regency-open-mouth@1",
+     "name": "exhibit-drive-a17ce660742d",
+     "p": [
+      -52,
+      84
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-ceramic-verdelis-longplant@1",
+     "name": "exhibit-drive-72c8fc2f1538",
+     "p": [
+      -44,
+      84
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-poly12@1",
+     "name": "exhibit-drive-0f69fd943fc1",
+     "p": [
+      -36,
+      84
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-pillan@1",
+     "name": "exhibit-drive-4a96b139a014",
+     "p": [
+      -28,
+      84
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-museum-guanyin5@1",
+     "name": "exhibit-drive-976ab0a7145b",
+     "p": [
+      -20,
+      84
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-vestige@1",
+     "name": "exhibit-drive-09868169ab2d",
+     "p": [
+      -12,
+      84
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-regency-xenanthro@1",
+     "name": "exhibit-drive-e946e0e729d0",
+     "p": [
+      -4,
+      84
+     ],
+     "r": 0
+    }
+   ]
+  },
+  {
+   "note": "the scan courts: 96 exhibits of the Little Martians archive in an eight-column district, with their viewing courts (2)",
+   "group": "scan-courts",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/lm-glitch-poly15@1",
+     "name": "exhibit-drive-94727a7e61b6",
+     "p": [
+      4,
+      84
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-poly8@1",
+     "name": "exhibit-drive-36ac56b5a6f4",
+     "p": [
+      12,
+      84
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-poly9@1",
+     "name": "exhibit-drive-45bcc42c2c58",
+     "p": [
+      20,
+      84
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-regency-caboclus@1",
+     "name": "exhibit-drive-c78fc73ba916",
+     "p": [
+      28,
+      84
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-regency-serpent@1",
+     "name": "exhibit-drive-1af1c89dd0f6",
+     "p": [
+      36,
+      84
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-regency-conga@1",
+     "name": "exhibit-drive-368878f9b157",
+     "p": [
+      44,
+      84
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-regency-colorful@1",
+     "name": "exhibit-drive-7d0669742c10",
+     "p": [
+      52,
+      84
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-regency-mycologus@1",
+     "name": "exhibit-drive-ee1676f5c3bc",
+     "p": [
+      60,
+      84
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-poly16@1",
+     "name": "exhibit-drive-16b887532619",
+     "p": [
+      68,
+      84
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-pyrogeode@1",
+     "name": "exhibit-drive-02ceabbff643",
+     "p": [
+      -68,
+      92
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-museum-laughting-fatman@1",
+     "name": "exhibit-drive-731f06fdb7e6",
+     "p": [
+      -60,
+      92
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-eclip@1",
+     "name": "exhibit-drive-b0941d82d98c",
+     "p": [
+      -52,
+      92
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-museum-africa-basket@1",
+     "name": "exhibit-drive-0d01c1b00980",
+     "p": [
+      -44,
+      92
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-poly13@1",
+     "name": "exhibit-drive-af1046536b8a",
+     "p": [
+      -36,
+      92
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-solara@1",
+     "name": "exhibit-drive-97ddf86c47f9",
+     "p": [
+      -28,
+      92
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-poly3@1",
+     "name": "exhibit-drive-566ced3e91e1",
+     "p": [
+      -20,
+      92
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-poly5@1",
+     "name": "exhibit-drive-77e7e7424358",
+     "p": [
+      -12,
+      92
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-museum-goldentower@1",
+     "name": "exhibit-drive-c780e53b578a",
+     "p": [
+      -4,
+      92
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-thaloc@1",
+     "name": "exhibit-drive-88ba2b863400",
+     "p": [
+      4,
+      92
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-astraflora@1",
+     "name": "exhibit-drive-c92a3b231c79",
+     "p": [
+      12,
+      92
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-poly14@1",
+     "name": "exhibit-drive-66009eb80cef",
+     "p": [
+      20,
+      92
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-poly4@1",
+     "name": "exhibit-drive-9207a5e1c4b1",
+     "p": [
+      28,
+      92
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-poly10@1",
+     "name": "exhibit-drive-6c113bb8ae2e",
+     "p": [
+      36,
+      92
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-museum-tower2@1",
+     "name": "exhibit-drive-fabce0b97897",
+     "p": [
+      44,
+      92
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-museum-greece-vase@1",
+     "name": "exhibit-drive-5f5e4a9284a4",
+     "p": [
+      52,
+      92
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-terraqua@1",
+     "name": "exhibit-drive-0b40c69c8244",
+     "p": [
+      60,
+      92
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-poly6@1",
+     "name": "exhibit-drive-f3f642ac7b15",
+     "p": [
+      68,
+      92
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-museum-rhino@1",
+     "name": "exhibit-drive-40a9797026a2",
+     "p": [
+      -68,
+      100
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-museum-guardian-colorful@1",
+     "name": "exhibit-drive-5f63a6fe6100",
+     "p": [
+      -60,
+      100
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-museum-ganesha-small@1",
+     "name": "exhibit-drive-935874799be2",
+     "p": [
+      -52,
+      100
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-museum-tower-wine@1",
+     "name": "exhibit-drive-a4a6b8bad1e8",
+     "p": [
+      -44,
+      100
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-poly7@1",
+     "name": "exhibit-drive-0734a4679321",
+     "p": [
+      -36,
+      100
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-museum-orange-vase@1",
+     "name": "exhibit-drive-317a837144b2",
+     "p": [
+      -28,
+      100
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-museum-dragon-vase@1",
+     "name": "exhibit-drive-2bb4733c464d",
+     "p": [
+      -20,
+      100
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/lm-glitch-bichroma@1",
+     "name": "exhibit-drive-c30ab0ea1037",
+     "p": [
+      -12,
+      100
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-minarete-portal",
+     "shape": {
+      "area": [
+       [
+        -66,
+        119
+       ],
+       [
+        -60,
+        119
+       ],
+       [
+        -60,
+        120.5
+       ],
+       [
+        -66,
+        120.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-pupila-corridor",
+     "shape": {
+      "area": [
+       [
+        -48,
+        119
+       ],
+       [
+        -42,
+        119
+       ],
+       [
+        -42,
+        120.5
+       ],
+       [
+        -48,
+        120.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-chapel-composition",
+     "shape": {
+      "area": [
+       [
+        -30,
+        119
+       ],
+       [
+        -24,
+        119
+       ],
+       [
+        -24,
+        120.5
+       ],
+       [
+        -30,
+        120.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-american-base-old",
+     "shape": {
+      "area": [
+       [
+        -12,
+        119
+       ],
+       [
+        -6,
+        119
+       ],
+       [
+        -6,
+        120.5
+       ],
+       [
+        -12,
+        120.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-asian-art-museum",
+     "shape": {
+      "area": [
+       [
+        6,
+        119
+       ],
+       [
+        12,
+        119
+       ],
+       [
+        12,
+        120.5
+       ],
+       [
+        6,
+        120.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-fey-castle",
+     "shape": {
+      "area": [
+       [
+        24,
+        119
+       ],
+       [
+        30,
+        119
+       ],
+       [
+        30,
+        120.5
+       ],
+       [
+        24,
+        120.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-graffiti-abandoned-room",
+     "shape": {
+      "area": [
+       [
+        42,
+        119
+       ],
+       [
+        48,
+        119
+       ],
+       [
+        48,
+        120.5
+       ],
+       [
+        42,
+        120.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-randy2",
+     "shape": {
+      "area": [
+       [
+        60,
+        119
+       ],
+       [
+        66,
+        119
+       ],
+       [
+        66,
+        120.5
+       ],
+       [
+        60,
+        120.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-randy3",
+     "shape": {
+      "area": [
+       [
+        -66,
+        137
+       ],
+       [
+        -60,
+        137
+       ],
+       [
+        -60,
+        138.5
+       ],
+       [
+        -66,
+        138.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-forte-sao-filipe-chapel",
+     "shape": {
+      "area": [
+       [
+        -48,
+        137
+       ],
+       [
+        -42,
+        137
+       ],
+       [
+        -42,
+        138.5
+       ],
+       [
+        -48,
+        138.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-forte-sao-filipe-corner",
+     "shape": {
+      "area": [
+       [
+        -30,
+        137
+       ],
+       [
+        -24,
+        137
+       ],
+       [
+        -24,
+        138.5
+       ],
+       [
+        -30,
+        138.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-forte-sao-filipe-corner3",
+     "shape": {
+      "area": [
+       [
+        -12,
+        137
+       ],
+       [
+        -6,
+        137
+       ],
+       [
+        -6,
+        138.5
+       ],
+       [
+        -12,
+        138.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-forte-sao-filipe-corridor",
+     "shape": {
+      "area": [
+       [
+        6,
+        137
+       ],
+       [
+        12,
+        137
+       ],
+       [
+        12,
+        138.5
+       ],
+       [
+        6,
+        138.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-forte-sao-filipe-open",
+     "shape": {
+      "area": [
+       [
+        24,
+        137
+       ],
+       [
+        30,
+        137
+       ],
+       [
+        30,
+        138.5
+       ],
+       [
+        24,
+        138.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-lisbon-archways-corridor",
+     "shape": {
+      "area": [
+       [
+        42,
+        137
+       ],
+       [
+        48,
+        137
+       ],
+       [
+        48,
+        138.5
+       ],
+       [
+        42,
+        138.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-moorish-entrance",
+     "shape": {
+      "area": [
+       [
+        60,
+        137
+       ],
+       [
+        66,
+        137
+       ],
+       [
+        66,
+        138.5
+       ],
+       [
+        60,
+        138.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-moorish-castle-top",
+     "shape": {
+      "area": [
+       [
+        -66,
+        155
+       ],
+       [
+        -60,
+        155
+       ],
+       [
+        -60,
+        156.5
+       ],
+       [
+        -66,
+        156.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-museu-azulejo-corridor",
+     "shape": {
+      "area": [
+       [
+        -48,
+        155
+       ],
+       [
+        -42,
+        155
+       ],
+       [
+        -42,
+        156.5
+       ],
+       [
+        -48,
+        156.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-museu-azulejo-main",
+     "shape": {
+      "area": [
+       [
+        -30,
+        155
+       ],
+       [
+        -24,
+        155
+       ],
+       [
+        -24,
+        156.5
+       ],
+       [
+        -30,
+        156.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-museu-azulejo-quad",
+     "shape": {
+      "area": [
+       [
+        -12,
+        155
+       ],
+       [
+        -6,
+        155
+       ],
+       [
+        -6,
+        156.5
+       ],
+       [
+        -12,
+        156.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-quinta-tower-curly",
+     "shape": {
+      "area": [
+       [
+        6,
+        155
+       ],
+       [
+        12,
+        155
+       ],
+       [
+        12,
+        156.5
+       ],
+       [
+        6,
+        156.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-quinta-fonte",
+     "shape": {
+      "area": [
+       [
+        24,
+        155
+       ],
+       [
+        30,
+        155
+       ],
+       [
+        30,
+        156.5
+       ],
+       [
+        24,
+        156.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-quinta-corredor-escada",
+     "shape": {
+      "area": [
+       [
+        42,
+        155
+       ],
+       [
+        48,
+        155
+       ],
+       [
+        48,
+        156.5
+       ],
+       [
+        42,
+        156.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-quinta-palacio-interior",
+     "shape": {
+      "area": [
+       [
+        60,
+        155
+       ],
+       [
+        66,
+        155
+       ],
+       [
+        66,
+        156.5
+       ],
+       [
+        60,
+        156.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-quinta-poco",
+     "shape": {
+      "area": [
+       [
+        -66,
+        173
+       ],
+       [
+        -60,
+        173
+       ],
+       [
+        -60,
+        174.5
+       ],
+       [
+        -66,
+        174.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-rua-fado",
+     "shape": {
+      "area": [
+       [
+        -48,
+        173
+       ],
+       [
+        -42,
+        173
+       ],
+       [
+        -42,
+        174.5
+       ],
+       [
+        -48,
+        174.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-setubal-casa-escadas",
+     "shape": {
+      "area": [
+       [
+        -30,
+        173
+       ],
+       [
+        -24,
+        173
+       ],
+       [
+        -24,
+        174.5
+       ],
+       [
+        -30,
+        174.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-se-entrada",
+     "shape": {
+      "area": [
+       [
+        -12,
+        173
+       ],
+       [
+        -6,
+        173
+       ],
+       [
+        -6,
+        174.5
+       ],
+       [
+        -12,
+        174.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-gruta-m-republica",
+     "shape": {
+      "area": [
+       [
+        6,
+        173
+       ],
+       [
+        12,
+        173
+       ],
+       [
+        12,
+        174.5
+       ],
+       [
+        6,
+        174.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-camel-sculpture",
+     "shape": {
+      "area": [
+       [
+        24,
+        173
+       ],
+       [
+        30,
+        173
+       ],
+       [
+        30,
+        174.5
+       ],
+       [
+        24,
+        174.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-china-buddha",
+     "shape": {
+      "area": [
+       [
+        42,
+        173
+       ],
+       [
+        48,
+        173
+       ],
+       [
+        48,
+        174.5
+       ],
+       [
+        42,
+        174.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-gold-rust-buddha",
+     "shape": {
+      "area": [
+       [
+        60,
+        173
+       ],
+       [
+        66,
+        173
+       ],
+       [
+        66,
+        174.5
+       ],
+       [
+        60,
+        174.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-golden-gate-park-tree",
+     "shape": {
+      "area": [
+       [
+        -66,
+        191
+       ],
+       [
+        -60,
+        191
+       ],
+       [
+        -60,
+        192.5
+       ],
+       [
+        -66,
+        192.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-golden-woman-standing",
+     "shape": {
+      "area": [
+       [
+        -48,
+        191
+       ],
+       [
+        -42,
+        191
+       ],
+       [
+        -42,
+        192.5
+       ],
+       [
+        -48,
+        192.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-greenman-altar",
+     "shape": {
+      "area": [
+       [
+        -30,
+        191
+       ],
+       [
+        -24,
+        191
+       ],
+       [
+        -24,
+        192.5
+       ],
+       [
+        -30,
+        192.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-met-greek-mural",
+     "shape": {
+      "area": [
+       [
+        -12,
+        191
+       ],
+       [
+        -6,
+        191
+       ],
+       [
+        -6,
+        192.5
+       ],
+       [
+        -12,
+        192.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-poly-01",
+     "shape": {
+      "area": [
+       [
+        6,
+        191
+       ],
+       [
+        12,
+        191
+       ],
+       [
+        12,
+        192.5
+       ],
+       [
+        6,
+        192.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-poly-10",
+     "shape": {
+      "area": [
+       [
+        24,
+        191
+       ],
+       [
+        30,
+        191
+       ],
+       [
+        30,
+        192.5
+       ],
+       [
+        24,
+        192.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-poly-12",
+     "shape": {
+      "area": [
+       [
+        42,
+        191
+       ],
+       [
+        48,
+        191
+       ],
+       [
+        48,
+        192.5
+       ],
+       [
+        42,
+        192.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-poly-13",
+     "shape": {
+      "area": [
+       [
+        60,
+        191
+       ],
+       [
+        66,
+        191
+       ],
+       [
+        66,
+        192.5
+       ],
+       [
+        60,
+        192.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-poly-14",
+     "shape": {
+      "area": [
+       [
+        -66,
+        209
+       ],
+       [
+        -60,
+        209
+       ],
+       [
+        -60,
+        210.5
+       ],
+       [
+        -66,
+        210.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-poly-15",
+     "shape": {
+      "area": [
+       [
+        -48,
+        209
+       ],
+       [
+        -42,
+        209
+       ],
+       [
+        -42,
+        210.5
+       ],
+       [
+        -48,
+        210.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-poly-17",
+     "shape": {
+      "area": [
+       [
+        -30,
+        209
+       ],
+       [
+        -24,
+        209
+       ],
+       [
+        -24,
+        210.5
+       ],
+       [
+        -30,
+        210.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-poly-18",
+     "shape": {
+      "area": [
+       [
+        -12,
+        209
+       ],
+       [
+        -6,
+        209
+       ],
+       [
+        -6,
+        210.5
+       ],
+       [
+        -12,
+        210.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-poly-19",
+     "shape": {
+      "area": [
+       [
+        6,
+        209
+       ],
+       [
+        12,
+        209
+       ],
+       [
+        12,
+        210.5
+       ],
+       [
+        6,
+        210.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-poly-02",
+     "shape": {
+      "area": [
+       [
+        24,
+        209
+       ],
+       [
+        30,
+        209
+       ],
+       [
+        30,
+        210.5
+       ],
+       [
+        24,
+        210.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-poly-05",
+     "shape": {
+      "area": [
+       [
+        42,
+        209
+       ],
+       [
+        48,
+        209
+       ],
+       [
+        48,
+        210.5
+       ],
+       [
+        42,
+        210.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-poly-06",
+     "shape": {
+      "area": [
+       [
+        60,
+        209
+       ],
+       [
+        66,
+        209
+       ],
+       [
+        66,
+        210.5
+       ],
+       [
+        60,
+        210.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-poly-07",
+     "shape": {
+      "area": [
+       [
+        -66,
+        227
+       ],
+       [
+        -60,
+        227
+       ],
+       [
+        -60,
+        228.5
+       ],
+       [
+        -66,
+        228.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-poly-08",
+     "shape": {
+      "area": [
+       [
+        -48,
+        227
+       ],
+       [
+        -42,
+        227
+       ],
+       [
+        -42,
+        228.5
+       ],
+       [
+        -48,
+        228.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-poly-09",
+     "shape": {
+      "area": [
+       [
+        -30,
+        227
+       ],
+       [
+        -24,
+        227
+       ],
+       [
+        -24,
+        228.5
+       ],
+       [
+        -30,
+        228.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-two-warriors",
+     "shape": {
+      "area": [
+       [
+        -12,
+        227
+       ],
+       [
+        -6,
+        227
+       ],
+       [
+        -6,
+        228.5
+       ],
+       [
+        -12,
+        228.5
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-567d4f0b818f",
+     "shape": {
+      "area": [
+       [
+        -69.5,
+        86
+       ],
+       [
+        -66.5,
+        86
+       ],
+       [
+        -66.5,
+        87
+       ],
+       [
+        -69.5,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-b538ebb36278",
+     "shape": {
+      "area": [
+       [
+        -61.5,
+        86
+       ],
+       [
+        -58.5,
+        86
+       ],
+       [
+        -58.5,
+        87
+       ],
+       [
+        -61.5,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-a17ce660742d",
+     "shape": {
+      "area": [
+       [
+        -53.5,
+        86
+       ],
+       [
+        -50.5,
+        86
+       ],
+       [
+        -50.5,
+        87
+       ],
+       [
+        -53.5,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-72c8fc2f1538",
+     "shape": {
+      "area": [
+       [
+        -45.5,
+        86
+       ],
+       [
+        -42.5,
+        86
+       ],
+       [
+        -42.5,
+        87
+       ],
+       [
+        -45.5,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-0f69fd943fc1",
+     "shape": {
+      "area": [
+       [
+        -37.5,
+        86
+       ],
+       [
+        -34.5,
+        86
+       ],
+       [
+        -34.5,
+        87
+       ],
+       [
+        -37.5,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-1af1c89dd0f6",
+     "shape": {
+      "area": [
+       [
+        34.5,
+        86
+       ],
+       [
+        37.5,
+        86
+       ],
+       [
+        37.5,
+        87
+       ],
+       [
+        34.5,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-368878f9b157",
+     "shape": {
+      "area": [
+       [
+        42.5,
+        86
+       ],
+       [
+        45.5,
+        86
+       ],
+       [
+        45.5,
+        87
+       ],
+       [
+        42.5,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-7d0669742c10",
+     "shape": {
+      "area": [
+       [
+        50.5,
+        86
+       ],
+       [
+        53.5,
+        86
+       ],
+       [
+        53.5,
+        87
+       ],
+       [
+        50.5,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-ee1676f5c3bc",
+     "shape": {
+      "area": [
+       [
+        58.5,
+        86
+       ],
+       [
+        61.5,
+        86
+       ],
+       [
+        61.5,
+        87
+       ],
+       [
+        58.5,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-16b887532619",
+     "shape": {
+      "area": [
+       [
+        66.5,
+        86
+       ],
+       [
+        69.5,
+        86
+       ],
+       [
+        69.5,
+        87
+       ],
+       [
+        66.5,
+        87
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-02ceabbff643",
+     "shape": {
+      "area": [
+       [
+        -69.5,
+        94
+       ],
+       [
+        -66.5,
+        94
+       ],
+       [
+        -66.5,
+        95
+       ],
+       [
+        -69.5,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-731f06fdb7e6",
+     "shape": {
+      "area": [
+       [
+        -61.5,
+        94
+       ],
+       [
+        -58.5,
+        94
+       ],
+       [
+        -58.5,
+        95
+       ],
+       [
+        -61.5,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-b0941d82d98c",
+     "shape": {
+      "area": [
+       [
+        -53.5,
+        94
+       ],
+       [
+        -50.5,
+        94
+       ],
+       [
+        -50.5,
+        95
+       ],
+       [
+        -53.5,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-0d01c1b00980",
+     "shape": {
+      "area": [
+       [
+        -45.5,
+        94
+       ],
+       [
+        -42.5,
+        94
+       ],
+       [
+        -42.5,
+        95
+       ],
+       [
+        -45.5,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-af1046536b8a",
+     "shape": {
+      "area": [
+       [
+        -37.5,
+        94
+       ],
+       [
+        -34.5,
+        94
+       ],
+       [
+        -34.5,
+        95
+       ],
+       [
+        -37.5,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-6c113bb8ae2e",
+     "shape": {
+      "area": [
+       [
+        34.5,
+        94
+       ],
+       [
+        37.5,
+        94
+       ],
+       [
+        37.5,
+        95
+       ],
+       [
+        34.5,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-fabce0b97897",
+     "shape": {
+      "area": [
+       [
+        42.5,
+        94
+       ],
+       [
+        45.5,
+        94
+       ],
+       [
+        45.5,
+        95
+       ],
+       [
+        42.5,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-5f5e4a9284a4",
+     "shape": {
+      "area": [
+       [
+        50.5,
+        94
+       ],
+       [
+        53.5,
+        94
+       ],
+       [
+        53.5,
+        95
+       ],
+       [
+        50.5,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-0b40c69c8244",
+     "shape": {
+      "area": [
+       [
+        58.5,
+        94
+       ],
+       [
+        61.5,
+        94
+       ],
+       [
+        61.5,
+        95
+       ],
+       [
+        58.5,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-f3f642ac7b15",
+     "shape": {
+      "area": [
+       [
+        66.5,
+        94
+       ],
+       [
+        69.5,
+        94
+       ],
+       [
+        69.5,
+        95
+       ],
+       [
+        66.5,
+        95
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-40a9797026a2",
+     "shape": {
+      "area": [
+       [
+        -69.5,
+        102
+       ],
+       [
+        -66.5,
+        102
+       ],
+       [
+        -66.5,
+        103
+       ],
+       [
+        -69.5,
+        103
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-5f63a6fe6100",
+     "shape": {
+      "area": [
+       [
+        -61.5,
+        102
+       ],
+       [
+        -58.5,
+        102
+       ],
+       [
+        -58.5,
+        103
+       ],
+       [
+        -61.5,
+        103
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-935874799be2",
+     "shape": {
+      "area": [
+       [
+        -53.5,
+        102
+       ],
+       [
+        -50.5,
+        102
+       ],
+       [
+        -50.5,
+        103
+       ],
+       [
+        -53.5,
+        103
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-a4a6b8bad1e8",
+     "shape": {
+      "area": [
+       [
+        -45.5,
+        102
+       ],
+       [
+        -42.5,
+        102
+       ],
+       [
+        -42.5,
+        103
+       ],
+       [
+        -45.5,
+        103
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/ground-paint@1",
+     "name": "scan-drive-0734a4679321",
+     "shape": {
+      "area": [
+       [
+        -37.5,
+        102
+       ],
+       [
+        -34.5,
+        102
+       ],
+       [
+        -34.5,
+        103
+       ],
+       [
+        -37.5,
+        103
+       ]
+      ]
+     },
+     "params": {
+      "material": "sand",
+      "color": "#c49a6c",
+      "edge": 0
+     }
+    }
+   ]
+  },
+  {
+   "note": "the six ceramic kin hovering in their row; the seven cast heads at home in the courts",
+   "group": "ceramics",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/kin-green-patterns-blue@1",
+     "name": "kin-green-patterns-blue",
+     "p": [
+      -12,
+      24
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/kin-chebel@1",
+     "name": "kin-chebel",
+     "p": [
+      -7,
+      24
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/kin-colors-lemuet@1",
+     "name": "kin-colors-lemuet",
+     "p": [
+      -2,
+      24
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/kin-crystal-freeman@1",
+     "name": "kin-crystal-freeman",
+     "p": [
+      3,
+      24
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/kin-dark-blue@1",
+     "name": "kin-dark-blue",
+     "p": [
+      8,
+      24
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/kin-green-brains-out@1",
+     "name": "kin-green-brains-out",
+     "p": [
+      13,
+      24
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/lm-verdelis@1",
+     "name": "verdelis",
+     "p": [
+      -45,
+      46
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/lm-kalama@1",
+     "name": "kalama",
+     "p": [
+      38,
+      10
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/lm-kweku@1",
+     "name": "kweku",
+     "p": [
+      -40,
+      9
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/lm-mycos@1",
+     "name": "mycos",
+     "p": [
+      -53,
+      51
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/lm-ada@1",
+     "name": "ada",
+     "p": [
+      45,
+      50
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/lm-shuijing@1",
+     "name": "shuijing",
+     "p": [
+      -6,
+      -16
+     ],
+     "r": 3.141592653589793
+    },
+    {
+     "op": "place",
+     "def": "core/lm-nyx@1",
+     "name": "nyx",
+     "p": [
+      0,
+      72
+     ],
+     "r": 3.141592653589793
+    }
+   ]
+  },
+  {
+   "note": "flags: the places a newcomer can walk to by name",
+   "group": "flags",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/flag@1",
+     "name": "arrival",
+     "p": [
+      0,
+      18
+     ],
+     "state": {
+      "label": "Little Martians Ceramic World (arrival)"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/flag@1",
+     "name": "ceramic-commons",
+     "p": [
+      0,
+      26
+     ],
+     "state": {
+      "label": "Ceramic Commons"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/flag@1",
+     "name": "madmaraca-gallery",
+     "p": [
+      -40,
+      12
+     ],
+     "state": {
+      "label": "Madmaraca Gallery Court"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/flag@1",
+     "name": "minarete-sky-court",
+     "p": [
+      38,
+      12
+     ],
+     "state": {
+      "label": "Minarete Sky Court"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/flag@1",
+     "name": "celadon-beacon-court",
+     "p": [
+      8,
+      -20
+     ],
+     "state": {
+      "label": "Celadon Beacon Court"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/flag@1",
+     "name": "verdelis-eden-garden",
+     "p": [
+      -40,
+      44
+     ],
+     "state": {
+      "label": "Verdelis's Eden Garden"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/flag@1",
+     "name": "grotto-of-painted-worlds",
+     "p": [
+      45,
+      36
+     ],
+     "state": {
+      "label": "Grotto of Painted Worlds"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/flag@1",
+     "name": "overlook-summit",
+     "p": [
+      0,
+      70
+     ],
+     "state": {
+      "label": "Tharsis Overlook"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/flag@1",
+     "name": "scan-courts",
+     "p": [
+      3,
+      82
+     ],
+     "state": {
+      "label": "The scan courts"
+     }
+    }
+   ]
+  }
+ ]
+}
