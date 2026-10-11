@@ -169,7 +169,10 @@ const def = (name, d) => ({
   make: { kind: 'mesh', asset: d.asset, collide: d.layer === 'decor' ? 'none' : 'box', ...(d.footprint ? { footprint: d.footprint } : {}) },
   size: { box: d.box.map((v) => Math.max(0.05, r3(v))), scale: d.scale ?? [0.5, 2] },
   layer: d.layer ?? 'solid', anchor: 'base',
-  ...(d.slots ? { slots: d.slots } : {}), ...(d.components ? { components: d.components } : {}), ...(d.overlaps ? { overlaps: d.overlaps } : {}),
+  ...(d.slots ? { slots: d.slots } : {}),
+  // placed where the reference has it, at its own height (footings below the ground stay below it: no terrain pad)
+  components: { ...(d.components ?? {}), foundation: { kind: 'none' } },
+  ...(d.overlaps ? { overlaps: d.overlaps } : {}),
 });
 
 // 1. furniture and items (cut first: the buildings exclude them)
@@ -260,7 +263,7 @@ for (const r of rows) { if (taken.has(r.i)) continue; const b = buildingOf(r); i
 for (const [b, rs] of byB) {
   if (only && !only.test(b)) continue;
   const B = BUILDINGS[b];
-  const piece = await cut(src, rs.filter((r) => Math.max(r.n1 - r.n0, r.e1 - r.e0, r.y1 - r.y0) > 0.08 || r.tris < 200).map((r) => r.i), { name: b, tex: 512, maxTris: 70000, simplify: { ratio: 0.25, error: 0.02, minTris: 150 } });
+  const piece = await cut(src, rs.filter((r) => Math.max(r.n1 - r.n0, r.e1 - r.e0, r.y1 - r.y0) > 0.08 || r.tris < 200).map((r) => r.i), { name: b, tex: 512, maxTris: 70000, simplify: { ratio: 0.25, error: 0.02, minTris: 150 }, roof: (i) => { const r = byI.get(i); return /Roofs and upper floors/.test(r.layer ?? '') || /roof|ceiling|canopy|joist|rafter/i.test(`${r.kind ?? ''} ${r.asm ?? ''}`) || r.y0 > 2.5; } });
   const o = piece.shift;   // mars-two position of the def's base centre
   const floorY = B.authored ? 0 : 0;
   // Chiba's contents never reach into Mimos, the kitchen or the showers (their own footprints say what is there)
@@ -275,7 +278,7 @@ for (const [b, rs] of byB) {
   const asset = record(piece.bytes, join(OUT, `${b}.glb`), 'mesh', { name: `mars-${b}`, footprint: fpSha });
   const d = def(b, { overlaps: ['mars-campus'], description: `${B.desc} ${baked.rooms.length} rooms, ${baked.colliders.length} wall/solid colliders, ${baked.links.length} stairs. ${piece.tris} triangles.`, tags: B.tags, asset, footprint: fpSha, box: piece.box, scale: [1, 1] });
   if (baked.slots.length) d.slots = baked.slots;
-  d.components = { place: { kind: 'building', enclosed: !!B.authored } };
+  d.components = { ...d.components, place: { kind: 'building', enclosed: !!B.authored } };
   defs.push(d);
   placements.push({ def: `core/mars-${b}@1`, cat: 'building', building: b, p: o.map(r3), r: 0 });
   console.log(`building ${b}: ${rs.length} nodes, ${piece.trisBefore}→${piece.tris} tris, ${(piece.bytes.byteLength / 1024).toFixed(0)} KB, ${baked.rooms.length} rooms, ${baked.colliders.length} colliders`);

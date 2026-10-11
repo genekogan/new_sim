@@ -90,21 +90,28 @@ export function crush(doc, { ratio = 0.25, minTris = 300, error = 0.02 } = {}) {
  * `tex` px, simplified when over `maxTris`, meshopt-compressed. Returns the bytes and the offset that was removed
  * (`shift`, in the frame), so the caller can place the def where the piece was.
  */
-export async function cut(src, nodeIdx, { name, frame = v3ToLocal(0, 0), tex = 512, maxTris = 60000, compress = true, simplify = null } = {}) {
+export async function cut(src, nodeIdx, { name, frame = v3ToLocal(0, 0), tex = 512, maxTris = 60000, compress = true, simplify = null, roof = null } = {}) {
   const nodes = src.doc.getRoot().listNodes();
-  const picked = nodeIdx.map((i) => nodes[i]).filter((n) => n && n.getMesh());
+  const pickedIdx = nodeIdx.filter((i) => nodes[i]?.getMesh()), picked = pickedIdx.map((i) => nodes[i]);
   const doc = new core.Document();
   doc.createBuffer();
   const map = fn.copyToDocument(doc, src.doc, picked.map((n) => n.getMesh()));
-  const scene = doc.createScene(name), root = doc.createNode(name);
-  scene.addChild(root);
-  for (const n of picked) root.addChild(doc.createNode(n.getName()).setMesh(map.get(n.getMesh())).setMatrix(mul(frame, n.getWorldMatrix())));
-  const b = fn.getBounds(scene);
+  // two groups: the body, and `roof` (roofs, ceilings, upper floors), which the viewer hides for the roofs-off view and
+  // when the camera is inside (mesh.mesh.ts); meshes are joined per material within each group
+  const scene = doc.createScene(name), body = doc.createNode('body'), top = doc.createNode('roof');
+  scene.addChild(body); scene.addChild(top);
+  const mats = picked.map((n) => mul(frame, n.getWorldMatrix()));
+  const tmp = doc.createScene('bounds'), probe = [];
+  picked.forEach((n, k) => { const q = doc.createNode('p').setMesh(map.get(n.getMesh())).setMatrix(mats[k]); tmp.addChild(q); probe.push(q); });
+  const b = fn.getBounds(tmp);
+  for (const q of probe) q.dispose(); tmp.dispose();
   const shift = [(b.min[0] + b.max[0]) / 2, b.min[1], (b.min[2] + b.max[2]) / 2];
-  root.setTranslation([-shift[0], -shift[1], -shift[2]]);
+  const T = translate(-shift[0], -shift[1], -shift[2]);
+  picked.forEach((n, k) => (roof?.(pickedIdx[k]) ? top : body).addChild(doc.createNode(n.getName()).setMesh(map.get(n.getMesh())).setMatrix(mul(T, mats[k]))));
+  if (!top.listChildren().length) top.dispose();
   doc.getRoot().getAsset().generator = 'eden mars-two v3 split (gltf-transform)';
   if (simplify) { await MeshoptSimplifier.ready; await doc.transform(fn.dedup()); crush(doc, simplify); await doc.transform(fn.prune()); }
-  await doc.transform(fn.dedup(), fn.prune(), fn.flatten(), fn.join({ keepNamed: false }), fn.weld(), fn.prune());
+  await doc.transform(fn.dedup(), fn.prune(), fn.join({ keepNamed: false }), fn.weld(), fn.prune());
   const tris = () => doc.getRoot().listMeshes().reduce((s, m) => s + m.listPrimitives().reduce((t, p) => t + Math.floor((p.getIndices()?.getCount() ?? p.getAttribute('POSITION').getCount()) / 3), 0), 0);
   const t0 = tris();
   if (t0 > maxTris) { await MeshoptSimplifier.ready; await doc.transform(fn.simplify({ simplifier: MeshoptSimplifier, ratio: maxTris / t0, error: 0.01, lockBorder: false }), fn.prune()); }

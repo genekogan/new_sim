@@ -13,6 +13,7 @@ import { registerMesh, type MeshBuilder } from './registry.ts';
 import { bindMotionModel, makeRig, type Gait } from './motion.ts';
 import { seedOf, type BehaviorKind } from './creatures/behavior.ts';
 
+const HIDE_ROOFS = typeof location !== 'undefined' && new URLSearchParams(location.search).has('hideRoofs') && new URLSearchParams(location.search).get('hideRoofs') !== '0';
 const MOVING = new Set(['wander', 'graze', 'fly', 'swim', 'follow']);
 const hashPhase = (s: string) => { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return ((h >>> 0) % 10000) / 1000; };
 
@@ -50,6 +51,18 @@ const meshBuilder: MeshBuilder = {
       if (ctx.def.size.box[1] <= 0.06) inst.object.traverse((o) => { const mats = (o as THREE.Mesh).material; for (const m of Array.isArray(mats) ? mats : mats ? [mats] : []) { m.polygonOffset = true; m.polygonOffsetFactor = -2; m.polygonOffsetUnits = -4; } });
       holder.add(inst.object);
       if (inst.clips.length) inst.play('Idle', Date.now() / 1000, { phase });
+      // a building cut with a `roof` group (the Mars campus pieces): hidden in the roofs-off view (?hideRoofs=1 or the
+      // viewer's toggle) and while the camera is inside the building below its roof, like building/1's interior view
+      const roof = inst.object.getObjectByName('roof');
+      if (roof) {
+        const [w, h, d] = ctx.def.size.box, inv = new THREE.Matrix4(), cam = new THREE.Vector3();
+        holder.add(frameHook((camera) => {
+          const live = (globalThis as { __buildingView?: { hideRoofs?: boolean } }).__buildingView;
+          let off = live?.hideRoofs ?? HIDE_ROOFS;
+          if (!off) { inv.copy(holder.matrixWorld).invert(); cam.setFromMatrixPosition(camera.matrixWorld).applyMatrix4(inv); off = Math.abs(cam.x) < w / 2 && Math.abs(cam.z) < d / 2 && cam.y < h * 0.8 && cam.y > -1; }
+          roof.visible = !off;
+        }));
+      }
     }).catch(() => {
       if (gone) return;
       // the asset is missing or broken: a soft placeholder of the def's size, so the place is still visible

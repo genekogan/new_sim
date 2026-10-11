@@ -17,7 +17,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "e7ba1b85e16db3ce508143b2d550879fc5f93b7de655646ca3a12dd48526edef",
+   "asset": "a83027b69977a9f2436f5066cdd5ad1d027b3ffae9205f83c2220b35bc7ea408",
    "collide": "box"
   },
   "size": {
@@ -58,6 +58,9 @@
   "components": {
    "surface": {
     "height": 0.927
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -82,7 +85,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "2d09f068b8a73ef038ba2da936472de841ab9adf7fa2626184534aba4bc4879e",
+   "asset": "3d27563bb8d237e9838f17a71af3aaf67c45d8c6ce3072e72e3d220136f86104",
    "collide": "box"
   },
   "size": {
@@ -123,6 +126,9 @@
   "components": {
    "surface": {
     "height": 0.035
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -147,7 +153,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "dfcc396199bee2c2ec5192c48358d385e35836f998f95a8fa7f4e6cd25041593",
+   "asset": "f2389e99f8f88f876455c67256500b27996e05683c8bc45c8cebf98f8d6c68f6",
    "collide": "box"
   },
   "size": {
@@ -188,6 +194,9 @@
   "components": {
    "surface": {
     "height": 0.948
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -212,7 +221,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "c8eaebe85a2abb3d96441e8de6cfe6154c6a7af3e602eb688bad7c87002d317a",
+   "asset": "4b114c513072ef016c274efddd2d3ea5ae8089842c7c981c06b5843f64462f72",
    "collide": "box"
   },
   "size": {
@@ -253,6 +262,9 @@
   "components": {
    "surface": {
     "height": 0.883
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -277,7 +289,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "7b252e1a163a1a28d542345e60c7f0507e5b2f209d33a98018d0bd43caefe247",
+   "asset": "ed8f8e111aba1162914ab9471ae88924417a582b2fadd68f6bf226521f40943a",
    "collide": "box"
   },
   "size": {
@@ -318,6 +330,9 @@
   "components": {
    "surface": {
     "height": 0.93
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -342,7 +357,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "d3fd06cad5adafd1b63fb6ed0cac3d13af1286552697ebe6506154a25651a2be",
+   "asset": "c147d81212b8dea87c9e78f0b66a00989317f2ecd636635f2a08a59dcf8e458d",
    "collide": "box"
   },
   "size": {
@@ -383,6 +398,9 @@
   "components": {
    "surface": {
     "height": 0.04
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -407,7 +425,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "ea1dcdfab9e653cf281d6b4724626cff440caa1cf4ec246f75c49696cb86741f",
+   "asset": "7d0997ee84e2faa1a06f8b8e443522d6d42c480953b27ba89cd207e76f5f1492",
    "collide": "box"
   },
   "size": {
@@ -448,6 +466,9 @@
   "components": {
    "surface": {
     "height": 0.93
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -470,7 +491,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "8d7ede94bdb70f5f0a1e98e937f8a15d69bbabfc4e246f06667667eb5b7eb3c0",
+   "asset": "275ddcae51ce0e2c9aabd0f57c6208ce18db70432261f38ae2f68bcdbc875073",
    "collide": "none"
   },
   "size": {
@@ -493,6 +514,9 @@
    },
    "container": {
     "capacity": 1
+   },
+   "foundation": {
+    "kind": "none"
    }
   }
  },
@@ -513,7 +537,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "98882a75b94a82a5568e1a09020289bd99cbb2ed1277002d14f456b307a5cc51",
+   "asset": "09a059783e853afc1ffb845414fe3b62f61e906fb5e4d541073651cb3a076f38",
    "collide": "box"
   },
   "size": {
@@ -532,6 +556,9 @@
   "components": {
    "container": {
     "capacity": 20
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -555,7 +582,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "833c070014852a6f0ad293d0ff5e27aa3ada9fbfabe210303f7ed930fcdb9bae",
+   "asset": "deccb92404562fadf9d993677d3cd481aef1ead298d303870b308b7cb0163e1b",
    "collide": "box"
   },
   "size": {
@@ -574,6 +601,9 @@
   "components": {
    "container": {
     "capacity": 20
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -598,7 +628,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "fc1d3112376584be0e0726d77f970dba7f7129fe5cc6dd0c291a24a4140df13d",
+   "asset": "f4c1cabffd5c858bed3db1619ba006f81680404cd205a9b0549316f960e48c46",
    "collide": "box"
   },
   "size": {
@@ -653,6 +683,9 @@
   "components": {
    "seat": {
     "height": 1.22
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -677,7 +710,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "2833f41c0ef36dcd8d44ee419682fbe5e6c8200bbd0c6629285b3962bc271f99",
+   "asset": "143c559a70a9cea3e51899c0b65414b33ba9f32c733a18856fd8e2c12aa0c5aa",
    "collide": "box"
   },
   "size": {
@@ -732,6 +765,9 @@
   "components": {
    "seat": {
     "height": 1.22
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -756,7 +792,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "7496efeec9e3feac6d7a23de9ffd3e5952c43b16ab70e4a73993d001e5f68e75",
+   "asset": "7d65f8ab9aad03d9d1bb119290555566c94e8fce592af9214f6e265a82ff0411",
    "collide": "box"
   },
   "size": {
@@ -811,6 +847,9 @@
   "components": {
    "seat": {
     "height": 1.22
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -835,7 +874,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "68b47a9309a7f2aea50561dee82ca111ff5035b5e3f0cb2e185bca4256872b5c",
+   "asset": "a0fd2ef98c8d1aacb19e36fdf9fd113f209f53c0df4e118ec0e475b7534a81a2",
    "collide": "box"
   },
   "size": {
@@ -890,6 +929,9 @@
   "components": {
    "seat": {
     "height": 1.22
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -912,7 +954,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "c9b7586320286c3f862a3038c516e5f611e34556cc9988715f602f4d31342f81",
+   "asset": "03a9de1fe067d60e5392d82a7b1359e89fffec4a69415c3adae854b3806fbf93",
    "collide": "box"
   },
   "size": {
@@ -953,6 +995,9 @@
   "components": {
    "surface": {
     "height": 0.783
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -976,7 +1021,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "5e8fc529b39ce9d09a4e513267b3d5cfd51ae3bb9e68af1cfd5ffccca1215f3c",
+   "asset": "bc693eb4473b37b0625575e108727772ad8bf04466e36531ac145064dc33c3ca",
    "collide": "box"
   },
   "size": {
@@ -995,6 +1040,9 @@
   "components": {
    "container": {
     "capacity": 20
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -1017,7 +1065,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "351689f90f53e6a1312c941fa1ba1416b8330802bd89f9e3a5b72b25e4e1b00a",
+   "asset": "77b5bd47b95c78ec042039b363619adcac42a7aee36df1786a5ba7f01cb2abef",
    "collide": "none"
   },
   "size": {
@@ -1040,6 +1088,9 @@
    },
    "container": {
     "capacity": 1
+   },
+   "foundation": {
+    "kind": "none"
    }
   }
  },
@@ -1059,7 +1110,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "7f87eb167d079d6f5469a4b333b36e29d015ec831938c6c0b86c2d02d3fd0953",
+   "asset": "6ef8558ffd22c40c8453a675bc729125a704be5850a774750c94db66ab79d57f",
    "collide": "box"
   },
   "size": {
@@ -1100,6 +1151,9 @@
   "components": {
    "surface": {
     "height": 0.045
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -1123,7 +1177,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "d6754a181aab957c0650d831f0b24298375fc77a9a1af1ad2da80672f1ead314",
+   "asset": "d5e0bbd1d80a77749d2887af1eca83ad1521b2ab9898dad50b2faba5f0e41c95",
    "collide": "none"
   },
   "size": {
@@ -1146,6 +1200,9 @@
    },
    "container": {
     "capacity": 1
+   },
+   "foundation": {
+    "kind": "none"
    }
   }
  },
@@ -1166,7 +1223,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "1bfd0e881961f81a4dbdd52ab0088250db7ebe283f073ebf83a1a32e02027d79",
+   "asset": "12807bc330169dbc95c88e55b5f7ae94c70da1b265130dd55942ce18bdfd43d4",
    "collide": "none"
   },
   "size": {
@@ -1189,6 +1246,9 @@
    },
    "container": {
     "capacity": 1
+   },
+   "foundation": {
+    "kind": "none"
    }
   }
  },
@@ -1208,7 +1268,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "7414cceaf1d5baf5581d3b9ebf5cca258ba23773740c83387f56cb4113af9b0c",
+   "asset": "d7bec26249375a710e827b37d5ad21ad172d0d081014f62b09443be7eb2ea801",
    "collide": "box"
   },
   "size": {
@@ -1249,6 +1309,9 @@
   "components": {
    "surface": {
     "height": 0.923
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -1272,7 +1335,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "476bbd8821b5adef33fb79234e5e79b04584f656f551aac0c8e2f6b65bb0cddc",
+   "asset": "6d4a679e202d80676e0ae9d850bd37b812a1757bc0c7b75a201f2151568b95d8",
    "collide": "box"
   },
   "size": {
@@ -1291,6 +1354,9 @@
   "components": {
    "container": {
     "capacity": 20
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -1313,7 +1379,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "ba8795623a3db968b0aefa2be005779867ec92dbd06dd378db319a6962e7bef5",
+   "asset": "cd76ede56f33a677ddbcd9e3638d6fd8258ded012a7a7aea08ea85318cec9f5e",
    "collide": "box"
   },
   "size": {
@@ -1354,6 +1420,9 @@
   "components": {
    "surface": {
     "height": 0.523
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -1376,7 +1445,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "57f1f4ef14240f51ef8e637b4aff76509da395109ebb3c7d39333d7e52877843",
+   "asset": "256807ccba0ceea3ae053ba5d7fa1635d5dcd6a811e0d74187b24f7ce270163c",
    "collide": "none"
   },
   "size": {
@@ -1399,6 +1468,9 @@
    },
    "container": {
     "capacity": 1
+   },
+   "foundation": {
+    "kind": "none"
    }
   }
  },
@@ -1419,7 +1491,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "289b38c868ec87221b6db6142684d41604dbb1577a09ca8ee06db1eafc851005",
+   "asset": "0ca4790ec7966af3a22c7d90baae994c924af3337dbf8c6797f906ad589d7581",
    "collide": "none"
   },
   "size": {
@@ -1442,6 +1514,9 @@
    },
    "container": {
     "capacity": 1
+   },
+   "foundation": {
+    "kind": "none"
    }
   }
  },
@@ -1462,7 +1537,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "289b38c868ec87221b6db6142684d41604dbb1577a09ca8ee06db1eafc851005",
+   "asset": "0ca4790ec7966af3a22c7d90baae994c924af3337dbf8c6797f906ad589d7581",
    "collide": "none"
   },
   "size": {
@@ -1485,6 +1560,9 @@
    },
    "container": {
     "capacity": 1
+   },
+   "foundation": {
+    "kind": "none"
    }
   }
  },
@@ -1504,7 +1582,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "80e8eceb04c93ac8bdab9e08db40c0a8848d1b9c9190e07df3728f6366818925",
+   "asset": "09e14cd3cd1e807d46f75e3a2191b7940494b56c1232e49566deb7b91caa6ec7",
    "collide": "box"
   },
   "size": {
@@ -1542,6 +1620,9 @@
   "components": {
    "seat": {
     "height": 0.488
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -1564,7 +1645,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "4710e152e82fa36e644ff060e74b49bc5ad62fb2bae7b1a228ad6f022618b934",
+   "asset": "1d96b9ea65a02d4971c4e903d7ee38f814db6889a6f6f6b7637b5d2906a2b8d8",
    "collide": "box"
   },
   "size": {
@@ -1605,6 +1686,9 @@
   "components": {
    "surface": {
     "height": 0.758
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -1627,7 +1711,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "5d36fe6ef8f59ae9c9ebe0c1bb57fa14d6c51706ff60d24d7d9beee3b432c5ef",
+   "asset": "e0f66c54cc30c1d704399ff64285fac480e91bfdc01a07b7abbd94b7f4358862",
    "collide": "box"
   },
   "size": {
@@ -1665,6 +1749,9 @@
   "components": {
    "seat": {
     "height": 0.995
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -1687,7 +1774,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "4dcc52a38cf035d79a10a1f1f142db994dcecf202612d4dcd2333e5e1a75877f",
+   "asset": "6b02580aab0dd91309179a9327483b10056cdac8b7b0cf383b593ccbbc519c36",
    "collide": "box"
   },
   "size": {
@@ -1725,6 +1812,9 @@
   "components": {
    "seat": {
     "height": 0.488
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -1748,7 +1838,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "8edd7c29ab32bf4fe2e66266888080e204cfe2566c74f391967d9756eba1fa77",
+   "asset": "f7f10f7858ab70b5fbf7ad24eec1f5db7b721291f919b9c4f9a98ebebcd4d907",
    "collide": "none"
   },
   "size": {
@@ -1771,6 +1861,9 @@
    },
    "container": {
     "capacity": 1
+   },
+   "foundation": {
+    "kind": "none"
    }
   }
  },
@@ -1791,7 +1884,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "d03c05049a6962c96c45eae34ea96f8faba8a82ce786db1a13490d587db6950f",
+   "asset": "379aba564fcdad14b8e50bc789c0fc7ab750e42b80a6576a71da852e5bef5076",
    "collide": "none"
   },
   "size": {
@@ -1814,6 +1907,9 @@
    },
    "container": {
     "capacity": 1
+   },
+   "foundation": {
+    "kind": "none"
    }
   }
  },
@@ -1833,7 +1929,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "f897823aa9148f203d5a84586b7bde38590625c36ec99989a6fcf4584a46755b",
+   "asset": "f2f5420310a627ca24fd6097b0bdb0c32fab9cae42edf1bffdfceaefbe6a972e",
    "collide": "box"
   },
   "size": {
@@ -1871,6 +1967,9 @@
   "components": {
    "seat": {
     "height": 0.866
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -1893,7 +1992,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "ddfd6b0853212b023dfc74facd72f42b9da4739384d53944bb862de58f58f202",
+   "asset": "4f73100188f2224593f29d3a6b5e734ec410994a17ea2f168df0fda3aca0b13e",
    "collide": "box"
   },
   "size": {
@@ -1931,6 +2030,9 @@
   "components": {
    "seat": {
     "height": 0.3
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -1953,7 +2055,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "7e7f1dfd5b67c5ca85fa48c2f3449ed800f6d39cce2e8e17fbefedd7358c564b",
+   "asset": "5de556b7fee18e285d1462110f39559c4b14ce99045544cd5618ef771e8c6bb9",
    "collide": "box"
   },
   "size": {
@@ -1991,6 +2093,9 @@
   "components": {
    "seat": {
     "height": 0.3
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -2013,7 +2118,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "7e7f1dfd5b67c5ca85fa48c2f3449ed800f6d39cce2e8e17fbefedd7358c564b",
+   "asset": "5de556b7fee18e285d1462110f39559c4b14ce99045544cd5618ef771e8c6bb9",
    "collide": "box"
   },
   "size": {
@@ -2051,6 +2156,9 @@
   "components": {
    "seat": {
     "height": 0.3
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -2074,7 +2182,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "3775ea975939f59e1de2ecf52dce4b2d8a1a3021d583ed3587878597491d4b13",
+   "asset": "7b335881b70dbe940280e9b57e9ae5ad4aa5a27b9659531b558041fde5ac2877",
    "collide": "box"
   },
   "size": {
@@ -2163,6 +2271,9 @@
   "components": {
    "seat": {
     "height": 0.505
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -2186,7 +2297,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "7facea662a264af6a2358e56e92fd790fcd0893763faea9bb7add0d92ef3f619",
+   "asset": "ce392976fedf3f00bb6297cde8d47fd8acf3d12b104f797f156c2a4d610d5673",
    "collide": "box"
   },
   "size": {
@@ -2275,6 +2386,9 @@
   "components": {
    "seat": {
     "height": 0.505
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -2297,7 +2411,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "514d84ff91db8c3b3b4b1a7e8f925380c5d27b078c9eb85ceb562e53c673afee",
+   "asset": "202d0ac742455e66526dcd4562af1adc34e7fdc7335b7ff32f9939952009fbb9",
    "collide": "box"
   },
   "size": {
@@ -2335,6 +2449,9 @@
   "components": {
    "seat": {
     "height": 0.41
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -2357,7 +2474,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "a5c3079a7c76ff37011bafa6fd802567cf8150a9178bdc6d0d8a111df7c9572b",
+   "asset": "40e9dd937faacf079aa83edc4fd1815e93269a3ce88359d401b46d607eb9a438",
    "collide": "box"
   },
   "size": {
@@ -2395,6 +2512,9 @@
   "components": {
    "seat": {
     "height": 0.46
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -2417,7 +2537,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "360da9d9e9a50802f1c330494f871b8309d4d608a1d9afb6a71db7c406b41e38",
+   "asset": "c24c422c5e725b9f57e3d90979f62faddab3296e2facccb96a64620319043b89",
    "collide": "box"
   },
   "size": {
@@ -2455,6 +2575,9 @@
   "components": {
    "seat": {
     "height": 0.46
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -2477,7 +2600,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "6716fed427897719fa2d47ccb47cfd34f123e201208294f5079df421baa5b8ec",
+   "asset": "ba98c365adc45c190e8458c12c23496e8ffd948212af27693c9a9aae8f48aeb7",
    "collide": "box"
   },
   "size": {
@@ -2515,6 +2638,9 @@
   "components": {
    "seat": {
     "height": 0.46
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -2537,7 +2663,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "0d1e6189f05d209bf3098c0971622b58aec3eac34452be58f69c147c3513896c",
+   "asset": "5e44acce6c10659ec9cc90247983adcb0444fa604fbf4eef4f0355e3d7333a3c",
    "collide": "box"
   },
   "size": {
@@ -2575,6 +2701,9 @@
   "components": {
    "seat": {
     "height": 0.18
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -2597,7 +2726,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "fe0145bf1e39767d76b6a5e2245baa4d4410d0bae3d688869d5c6619824698b5",
+   "asset": "9dfbe6cab501c69e97921234a1cb40061e197ed2e85301a95378ef125cd88378",
    "collide": "box"
   },
   "size": {
@@ -2635,6 +2764,9 @@
   "components": {
    "seat": {
     "height": 0.18
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -2657,7 +2789,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "d1a2d8703a2061ce81335ba1e36e24679444c49270a54c55d549b14d07c7c5a2",
+   "asset": "b5130b7430f5a89ba2eca1bec63aeaed10cfbc59888d9352622f3ca8436844e1",
    "collide": "box"
   },
   "size": {
@@ -2695,6 +2827,9 @@
   "components": {
    "seat": {
     "height": 0.18
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -2717,7 +2852,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "48367173ce78641b3f62d82bf57236ab592e4feec56281a6eed4b5bc8078da09",
+   "asset": "315eb744b03fa6a7c3efd7a6f8b72287c5789466831129a7dd2a67dce741546a",
    "collide": "box"
   },
   "size": {
@@ -2755,6 +2890,9 @@
   "components": {
    "seat": {
     "height": 0.18
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -2778,7 +2916,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "ab3de418cdf62ca5d4f96c41149f7a041dc64c7433dca5243d4765b3132a39c8",
+   "asset": "857684a0ad683b150f0d2cc098424dedc8fdb28736db66b1bf9e0f986bf3ec52",
    "collide": "box"
   },
   "size": {
@@ -2850,6 +2988,9 @@
   "components": {
    "seat": {
     "height": 0.56
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -2872,7 +3013,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "c16183da2baf5cb962b72efc7afc9efaf9aaa868205b9cf9f9cb09252c4639d4",
+   "asset": "8b880f9d569c76ca27eebaa552dbdedd4af73c10f66680601269701fc5c0f8a9",
    "collide": "box"
   },
   "size": {
@@ -2913,6 +3054,9 @@
   "components": {
    "surface": {
     "height": -1.127
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -2935,7 +3079,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "d2801cf2635bcbaafc1d6e6b9c2db97a834ac3645efd49f4664206d297a1c548",
+   "asset": "e2e6edb8a2fe84723f8e5b3e71b1829d30b4c4d770d72cd5cba8d46b6931dfe0",
    "collide": "box"
   },
   "size": {
@@ -2973,6 +3117,9 @@
   "components": {
    "seat": {
     "height": 0.41
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -2995,7 +3142,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "3079f4e4756504e69320103f7100cc2c12bf82876a0ddedab05ebde9260f1bf1",
+   "asset": "0377f4847be5290d219b5162938167429ff03d8b6a1dce1aaf4bcff8054a212b",
    "collide": "box"
   },
   "size": {
@@ -3036,6 +3183,9 @@
   "components": {
    "surface": {
     "height": -3.248
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -3058,7 +3208,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "fa98266aa0bbb76014e91a5c7b908e5655f670927c4693ccc0e0a0c3144d2a98",
+   "asset": "f578def4a53eb17cb41f15c1e9d1c7197c8aab229c534ab3c19524dc07efa5e1",
    "collide": "box"
   },
   "size": {
@@ -3099,6 +3249,9 @@
   "components": {
    "surface": {
     "height": 1.008
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -3121,7 +3274,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "70c0c05234ff88693dcf674f328f5107c717577174fcd64d461d5aa05f4b4d8e",
+   "asset": "0bdcfbea1b505702365f8201012d852d3d2b72683ce5ae5d7d368d469157d6aa",
    "collide": "box"
   },
   "size": {
@@ -3159,6 +3312,9 @@
   "components": {
    "seat": {
     "height": 0.445
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -3181,7 +3337,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "cbb2f32afbb3fe2d17afbc55b3747b49430a3eeabd48f544e9bc7fd89d9a1974",
+   "asset": "1bbb3d1e7af506ba193a797bde22ddff7a9371b7e214e2fdece970319d5e1c5f",
    "collide": "box"
   },
   "size": {
@@ -3219,6 +3375,9 @@
   "components": {
    "seat": {
     "height": 0.555
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -3241,7 +3400,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "f16bd081f6560d98f3bb225d3af3f8f1736b7e40a01ee796bcabc8c668a35dc7",
+   "asset": "30c289d10f343d1558bcdc9fcd8645a041625b77afb02cb9778a6c250597bd44",
    "collide": "box"
   },
   "size": {
@@ -3279,6 +3438,9 @@
   "components": {
    "seat": {
     "height": 0.445
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -3301,7 +3463,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "1ae3a38f2d915d305d519cc32c76f07ca3fabdcf23d6ecb906cb1e48d21879f0",
+   "asset": "d6713529302154ac53a68df343721191dcc0569a33bfceaba292f95b9dd065ba",
    "collide": "box"
   },
   "size": {
@@ -3339,6 +3501,9 @@
   "components": {
    "seat": {
     "height": 0.445
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -3362,7 +3527,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "3df241b06ed1da163640c2bfa15be6d6a3b6732f107be9a897079ff3c4258881",
+   "asset": "39ce54239b5f92b0afd2d3757b43d3531abcd9e0a8b42e84305f1428c843e4ff",
    "collide": "box"
   },
   "size": {
@@ -3434,6 +3599,9 @@
   "components": {
    "seat": {
     "height": 0.3
+   },
+   "foundation": {
+    "kind": "none"
    }
   },
   "overlaps": [
@@ -3444,7 +3612,7 @@
   "schema": "def/1",
   "name": "core-mars-chiba",
   "version": 1,
-  "description": "Chiba, the big rack-and-plywood building of the Mars College campus: the auditorium with solar panels and the mural, the gallery hall and its stairs, as the 2026 reference draws them. 0 rooms, 73 wall/solid colliders, 0 stairs. 85273 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "Chiba, the big rack-and-plywood building of the Mars College campus: the auditorium with solar panels and the mural, the gallery hall and its stairs, as the 2026 reference draws them. 0 rooms, 73 wall/solid colliders, 0 stairs. 85279 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -3459,7 +3627,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "71a0128d51165e6587d8fe3c86c4dad5bca53975b0baa76222a7421dd706ed79",
+   "asset": "2f5f5aba17fa8783d85d60bb520f662d568360e1754e69f022b7a5f67913edd6",
    "collide": "box",
    "footprint": "db86e8d6dcb4482f245545113d99061e192806ce58ad5dfd1ffc40505710e1b7"
   },
@@ -3476,21 +3644,24 @@
   },
   "layer": "solid",
   "anchor": "base",
-  "overlaps": [
-   "mars-campus"
-  ],
   "components": {
+   "foundation": {
+    "kind": "none"
+   },
    "place": {
     "kind": "building",
     "enclosed": false
    }
-  }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
  },
  {
   "schema": "def/1",
   "name": "core-mars-mimos",
   "version": 1,
-  "description": "Mimos, the 2026 Mars College café and lounge as Gene corrected it (north up): an L of Mimos main (the west longitudinal section; its northern part a raised wooden floor at 0.53 m with the coffee counter on the west wall and the study table at the north wall, its southern part at ground level) and Mimos floor, the short southeast arm with flooring throughout, the honey sofa beneath the posters on its north wall and the low tea table near its south wall. The pallet racks between main and floor are pass-through; the northeast of the L is outdoors. Rear alcove door with a stair at the north; three risers from main south up to the raised floor. 3 rooms, 34 wall/solid colliders, 2 stairs. 3507 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "Mimos, the 2026 Mars College café and lounge as Gene corrected it (north up): an L of Mimos main (the west longitudinal section; its northern part a raised wooden floor at 0.53 m with the coffee counter on the west wall and the study table at the north wall, its southern part at ground level) and Mimos floor, the short southeast arm with flooring throughout, the honey sofa beneath the posters on its north wall and the low tea table near its south wall. The pallet racks between main and floor are pass-through; the northeast of the L is outdoors. Rear alcove door with a stair at the north; three risers from main south up to the raised floor. 3 rooms, 37 wall/solid colliders, 2 stairs. 3507 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -3505,9 +3676,9 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "9354046378f26f04139b0f4445d189f1e593b6f334f461adb605dc3e34a5ebe9",
+   "asset": "d53fd74301d181fa503e3fbbbb2fc05dd25865d8354f258d928dfd051e7e0147",
    "collide": "box",
-   "footprint": "e248e96f2bf12f7197713c0c399f0a8faf2f277f5abf2d38a7f6ee4753be9489"
+   "footprint": "7bca6f1e2320f895f77fe5c9aebb2a22e933d26780b1b2e5f7ee5fbd6456a7f7"
   },
   "size": {
    "box": [
@@ -3522,6 +3693,15 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   },
+   "place": {
+    "kind": "building",
+    "enclosed": true
+   }
+  },
   "overlaps": [
    "mars-campus"
   ],
@@ -3625,19 +3805,13 @@
     "capacity": 64,
     "label": "Mimos floor (glazed tea room, honey sofa under the posters)"
    }
-  ],
-  "components": {
-   "place": {
-    "kind": "building",
-    "enclosed": true
-   }
-  }
+  ]
  },
  {
   "schema": "def/1",
   "name": "core-mars-kitchen",
   "version": 1,
-  "description": "The Chiba kitchen and dining hall, immediately west of Mimos main and as long as it (Gene's correction): the west bay is the working kitchen (perimeter counters along the west wall returning on the north and south, the sinks in the north counter, the long stainless prep table in the middle, the food-service window on the south edge), the east bay is the dining hall with the blue wall and the bus seats along its east wall. Raised plywood floor at 0.53 m; steps up to the blue entry door. 2 rooms, 15 wall/solid colliders, 1 stairs. 5305 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "The Chiba kitchen and dining hall, immediately west of Mimos main and as long as it (Gene's correction): the west bay is the working kitchen (perimeter counters along the west wall returning on the north and south, the sinks in the north counter, the long stainless prep table in the middle, the food-service window on the south edge), the east bay is the dining hall with the blue wall and the bus seats along its east wall. Raised plywood floor at 0.53 m; steps up to the blue entry door. 2 rooms, 19 wall/solid colliders, 1 stairs. 5305 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -3651,9 +3825,9 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "21a499f041d5751cef681f956b20fdc8f9f54aa3db6a99566ec4ade872d54d75",
+   "asset": "56e684f0e5ef388c0b9e5d47c6e74bdd655f4dcbb3f177b624a48c4eac1e871a",
    "collide": "box",
-   "footprint": "0119d6bd6811adbeeff849d98473211080eea56b67a3a905331b2da34264c733"
+   "footprint": "806c70fd59b661d452542e312501dc4e4acecae05fced9a342fb7c1f7cc3fa8f"
   },
   "size": {
    "box": [
@@ -3668,6 +3842,15 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   },
+   "place": {
+    "kind": "building",
+    "enclosed": true
+   }
+  },
   "overlaps": [
    "mars-campus"
   ],
@@ -3738,13 +3921,7 @@
     "capacity": 64,
     "label": "Dining hall (diner: blue wall, bus seats)"
    }
-  ],
-  "components": {
-   "place": {
-    "kind": "building",
-    "enclosed": true
-   }
-  }
+  ]
  },
  {
   "schema": "def/1",
@@ -3763,7 +3940,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "8ea483a5be91f0bac812c03c41f6abbb39c04c1bff839ed447ed9fd2fc61426f",
+   "asset": "92ab958127e81ff4ee804bc1964f1d3aae8968ceada865ebe15373c8f336c43c",
    "collide": "box",
    "footprint": "67ddb2f41e5205b80ce6db4ce3d9057a78c080def45d3c97743e5b1deb5e79cd"
   },
@@ -3780,6 +3957,15 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   },
+   "place": {
+    "kind": "building",
+    "enclosed": true
+   }
+  },
   "overlaps": [
    "mars-campus"
   ],
@@ -3850,13 +4036,7 @@
     "capacity": 64,
     "label": "Shower bay 2 (northeast bay)"
    }
-  ],
-  "components": {
-   "place": {
-    "kind": "building",
-    "enclosed": true
-   }
-  }
+  ]
  },
  {
   "schema": "def/1",
@@ -3875,7 +4055,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "885f98228426b287545fdb52b3245cd3fc5c3cb41d615c6ff1f5c224ea546816",
+   "asset": "c3f2a1fd01fac241c3548cdaea01b140ab96f5ea108d8edc7842f77021222ff7",
    "collide": "box",
    "footprint": "4905bd2412b552b8f4d17fa5ffe22c068f0481e70df5fcb31872af8829d040a1"
   },
@@ -3892,15 +4072,18 @@
   },
   "layer": "solid",
   "anchor": "base",
-  "overlaps": [
-   "mars-campus"
-  ],
   "components": {
+   "foundation": {
+    "kind": "none"
+   },
    "place": {
     "kind": "building",
     "enclosed": false
    }
-  }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
  },
  {
   "schema": "def/1",
@@ -3919,7 +4102,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "aa19cdb6c956d7213dabb1ef7ac5874ced5b615dfd11f7cb00ed4ae43c31e943",
+   "asset": "bd01efaf78e4f631a047be140856c64449b56330ecc0b52936a41f1d61b90e66",
    "collide": "box",
    "footprint": "b44c6da9302e2b3d8b96f29c25cefb85f80bed7313d5bbc185d96e9819c3791b"
   },
@@ -3936,15 +4119,18 @@
   },
   "layer": "solid",
   "anchor": "base",
-  "overlaps": [
-   "mars-campus"
-  ],
   "components": {
+   "foundation": {
+    "kind": "none"
+   },
    "place": {
     "kind": "building",
     "enclosed": false
    }
-  }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
  },
  {
   "schema": "def/1",
@@ -3964,7 +4150,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "790ae0b6e90f1edfdfbba348d5d71ddd2f624b430e3a64ff2c87093ceda44fb3",
+   "asset": "3c099e40c734831b5872cab249ba570e13d088a16748750c1f9418ee353f05eb",
    "collide": "box",
    "footprint": "c0cdd237cfe25ae6df607a9f98d2eb5a98f275c767c21d4855e36f829b0ae323"
   },
@@ -3981,15 +4167,18 @@
   },
   "layer": "solid",
   "anchor": "base",
-  "overlaps": [
-   "mars-campus"
-  ],
   "components": {
+   "foundation": {
+    "kind": "none"
+   },
    "place": {
     "kind": "building",
     "enclosed": false
    }
-  }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
  },
  {
   "schema": "def/1",
@@ -4007,7 +4196,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "765a5a4e94590dc776317c8e97ded7474c50f0fa6b3e36e64b069933891c01d3",
+   "asset": "b189a3fc963b166052d7aabcfdc8ded9dbf852a4deccd9f1ddc48e366df7fdd9",
    "collide": "box",
    "footprint": "1aaa1ce0f4d422186a721dcdad4f77fd7562efdc996145c2c46c80041370c34b"
   },
@@ -4024,15 +4213,18 @@
   },
   "layer": "solid",
   "anchor": "base",
-  "overlaps": [
-   "mars-campus"
-  ],
   "components": {
+   "foundation": {
+    "kind": "none"
+   },
    "place": {
     "kind": "building",
     "enclosed": false
    }
-  }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
  },
  {
   "schema": "def/1",
@@ -4050,7 +4242,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "83cd0129c3a700c651d5066d5f7115bc676e49e7af041cb3958880ae00410e52",
+   "asset": "895e69d39f4d3ccf5836509c61b6de5067d2322b033ec633ceb960408d2a2f95",
    "collide": "box"
   },
   "size": {
@@ -4066,6 +4258,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4086,7 +4283,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "48f6f3ade91b7bdf9b61070ac6eda5ce5c995f0ca924fd18a06d858b3bd6f770",
+   "asset": "30ab77cb2a63224bd960cb7d4761d2db1c545b83a5e40f6190374d91e9258f2d",
    "collide": "box"
   },
   "size": {
@@ -4102,6 +4299,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4122,7 +4324,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "e36d4fff84519936a5423257fbbd8b3d9d00a5bd5398a399e2e0f0453e7214ac",
+   "asset": "082482e2c6a81745d90a7044e6058da0e026d380f46575455766d14446c7c354",
    "collide": "box"
   },
   "size": {
@@ -4138,6 +4340,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4157,7 +4364,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "1758ea6d8dc9dc64574b22e29fad1259f26f128156de53608a63a6da31ee5377",
+   "asset": "86ce0f357d5038f7ce8a5d1447465198005182b89066be9baabab7bc583f6733",
    "collide": "box"
   },
   "size": {
@@ -4173,6 +4380,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4193,7 +4405,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "b8aa37e6ca226c7cf96bde3d7ca3802c9c58b05e97bb074eef99285bd051d86a",
+   "asset": "a18863e2f64aa9623ecf0436c5d1ed0f031d4a7f02d0ab893d482fe4b5436a0d",
    "collide": "box"
   },
   "size": {
@@ -4209,6 +4421,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4229,7 +4446,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "9ba250fa6da75a0da10941272aba652db77905efa8cad4468e724ac2db0a2bb6",
+   "asset": "38a5f85ccfbc7bb01c5fa02e9520d5be6ccf7f6ba49154611501fcb08d3ce838",
    "collide": "box"
   },
   "size": {
@@ -4245,6 +4462,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4265,7 +4487,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "1bb3fe0de775c7ddf78b7c2f5d962beccb47344880e88e745590c517372e2a27",
+   "asset": "d1e7a5e6f7559bb9d189ce0bd221add9d5a4d6d57cca2fa46e0d259c84c765f5",
    "collide": "box"
   },
   "size": {
@@ -4281,6 +4503,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4301,7 +4528,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "ec91ab82615c8042323baa4368217767804806470dc900253a44dbf8b576b80a",
+   "asset": "b3feb302a3bdefcb376c7830400648c8ee25f77a73e32c090da7d5a5b4cf575b",
    "collide": "box"
   },
   "size": {
@@ -4317,6 +4544,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4336,7 +4568,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "b5539def200804452d80bf98ea9f10770de0fc11c0a80cb68947ed915c576797",
+   "asset": "a4b8b5655ca937d57a27faad4465dfd8d2e8a191f64af153849d52796d820020",
    "collide": "box"
   },
   "size": {
@@ -4352,6 +4584,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4371,7 +4608,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "0300df1f96613e5873753066b8978aef4c6291b7a435fbc67a67529bc298c733",
+   "asset": "9e840a6802e4097f82571eadbe29f5740b5851dab0a0f52dea47c354acad4ff7",
    "collide": "box"
   },
   "size": {
@@ -4387,6 +4624,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4407,7 +4649,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "43ef4065ab2f8087534ef9b335ff51f8afc3628dab4cbb94e2669b6941d579d9",
+   "asset": "219aba825d3d90d736fcb1852f56456438c34550fdedd1552a780834bf6a3b56",
    "collide": "box"
   },
   "size": {
@@ -4423,6 +4665,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4443,7 +4690,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "80eccde863a8ce6fab7b5339aa7e42969ef5c8d3b6ef7cc91db30b4cc15c2bae",
+   "asset": "1bbc2e9d83cd4c81fc3abafddc5a2c3c43e8d790c01fa11b3d5dd9bcd1ff4c56",
    "collide": "box"
   },
   "size": {
@@ -4459,6 +4706,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4478,7 +4730,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "325760eb115ae23663b5edde9d3f38fbc0617c79823c800bdc9a6060f0f785f0",
+   "asset": "ee2767143db082f10f3a129604e9e8478bbb4a9e272ef75d3548365a32733e71",
    "collide": "none"
   },
   "size": {
@@ -4494,6 +4746,11 @@
   },
   "layer": "decor",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4514,7 +4771,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "9ec11168f82f0e31a6e163a7cce086a3905ba0916923034fc2757fd05e8dc5e6",
+   "asset": "7914db97e97232204bdd67cdfc6225b13ac0e2dcaf3b535e8a949e42ac6c39eb",
    "collide": "box"
   },
   "size": {
@@ -4530,6 +4787,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4549,7 +4811,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "93e6747236c0a6d692e21311a25ecd44aed1660d6f4522b6c63d7b6ed337276c",
+   "asset": "68e8510c9e857a97644e1f5509f33658b2644134a4d8b2f90ad095ddcbda5455",
    "collide": "box"
   },
   "size": {
@@ -4565,6 +4827,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4584,7 +4851,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "3392dcbb801c1795172a36e66fcca38c6568aa3ddcfe072d2d31d401ef1467b1",
+   "asset": "443f076c6727cc7b1bf902c603d7961c1259000e12ccae35b1cc083e1150dbae",
    "collide": "box"
   },
   "size": {
@@ -4600,6 +4867,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4619,7 +4891,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "b2bf535afd7318b153ddda0b3fe784832e5a7ef6d27e672717bd452ab6686018",
+   "asset": "4c14748de437a1fd45d437247ed12b0c063ef55bcbc91c27e59e6f9e6d6d6b52",
    "collide": "box"
   },
   "size": {
@@ -4635,6 +4907,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4654,7 +4931,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "1361cc9e4e3988bfba3f80132b5011515781c2322e57776dc29a32ed8ea8772d",
+   "asset": "d69f756c1f1d7fcfea73b7479622efbf393b0354b9f6f07313aa502e24b7d4e2",
    "collide": "box"
   },
   "size": {
@@ -4670,6 +4947,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4689,7 +4971,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "ac988f3db1646cba31851e3b57e8a4890ad4c66f8321f77ac1982f0acd4ce8cb",
+   "asset": "cc081d236252a9ebe253c23380d36f8f1c3ab852d82f085f994a928afe2f70ba",
    "collide": "box"
   },
   "size": {
@@ -4705,6 +4987,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4725,7 +5012,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "a56cf5a21bc262844a2b1c2493de680aa0aa2bbf38f7548ede6163f17e2b0c0b",
+   "asset": "59f96a3353aafe6bade8bd3e67e6e42010dce92f96d7a1830ca9010636a2e00e",
    "collide": "box"
   },
   "size": {
@@ -4741,6 +5028,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4760,7 +5052,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "3fa4442157490483505952c8259f473966d11ceadecfcf13e31faa370b25770c",
+   "asset": "50189240549eb64d8094e5585a717daa01f4ebdcabbfaa363ce62a841c33334b",
    "collide": "box"
   },
   "size": {
@@ -4776,6 +5068,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4795,7 +5092,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "8fb2d246434118de64e43a3295f40b98bc640b590d24f6aa654335fe5a6760a9",
+   "asset": "b51502b9e854a422bc69ef963ed023968c2660546f261de0719caff5145e3bb6",
    "collide": "box"
   },
   "size": {
@@ -4811,6 +5108,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4830,7 +5132,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "df92616a35dc790ff31af72851ccf521cddf588c611b68a8b509455005e76ad6",
+   "asset": "e015efae2a58b39139743bfb3c08e8aaff13a6b99da7f4633cc3dbf2fcb542ab",
    "collide": "box"
   },
   "size": {
@@ -4846,6 +5148,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4865,7 +5172,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "81308a109fc6e2e17840ddaf77994387aa34829f68b6263769c62c18fd6e4685",
+   "asset": "e9a60569b153d0be5f856de84ea511e53f6cb9c67ff340676ae3c2fe0c2f3d30",
    "collide": "box"
   },
   "size": {
@@ -4881,6 +5188,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4900,7 +5212,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "78d523e3107aa75a70272e39e5a4fa93a35fdf2c782bcc47663f0d09c086288f",
+   "asset": "d9acaf7a7b596295e60b2fa605d3fa2f063c7e5d55edcd893ee8b03f1a2ebdf9",
    "collide": "box"
   },
   "size": {
@@ -4916,6 +5228,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4935,7 +5252,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "37c19260f5546c75eb29d05a15ecec9cbf8f15f2322499b97aadcc502cbc279c",
+   "asset": "911915bffb985b6e96a633158a62701bedd4e9754fc108bef432819355e35484",
    "collide": "box"
   },
   "size": {
@@ -4951,6 +5268,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -4970,7 +5292,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "91547ad67346f452fb438b777f66c93d71ac268cacef389516a5dcda48bfa2b1",
+   "asset": "3de1321846c61d29b53568cbe198a8c3125fc147eda6c068703f9f0c29e48031",
    "collide": "box"
   },
   "size": {
@@ -4986,6 +5308,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -5005,7 +5332,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "f53294b36a1e28044195ed24b7ae5d64dc9eb57269ce06e20da348c251efc4a9",
+   "asset": "f196e4ffd0a680e44b638851c951e9519b53a2c98842105afc6c4c550d94be78",
    "collide": "box"
   },
   "size": {
@@ -5021,6 +5348,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -5040,7 +5372,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "843d7bf66ee754cc52949a86b9c184e92f9adb4dd83432a6ad5bfae505825766",
+   "asset": "3e78ed8d33d2dc67f1f691a363ad891fc8cd5652895de3fe7c5182107efd6f3d",
    "collide": "box"
   },
   "size": {
@@ -5056,6 +5388,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -5075,7 +5412,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "f79450f7958ae899b0c78f4995ea13890f94fa1ec7121f22f05a8bcc506e2a14",
+   "asset": "6638be91b1ca61d13465417e0192714a0ee592e73a43e9d3529f1885ca0a04c5",
    "collide": "box"
   },
   "size": {
@@ -5091,6 +5428,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -5110,7 +5452,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "3960765928e5f4d1cf227a51d3d668382476084a972938308b17eaf03813a2ae",
+   "asset": "78e5116c9fdb2dd7e9c7b768681f8976d0ee5a90f4b60be4dd3072c0d73209f6",
    "collide": "box"
   },
   "size": {
@@ -5126,6 +5468,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -5145,7 +5492,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "bae727832771aaabf9457a0f0d4b7f483abe571ccf49cd90315484a23ae46478",
+   "asset": "561db86ed5c3dd66fe8f65373193f24449a27a228347d0e2df59eff2004d376e",
    "collide": "box"
   },
   "size": {
@@ -5161,6 +5508,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -5182,7 +5534,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "4f38b9d3bc0c1662d515938538f8b04e3da919541469ebee82dfcf0abf183bcb",
+   "asset": "e85f73fb1eeb8ca00acb1d1c4d010db4bd588c8562a397e4f9e822325d8e561d",
    "collide": "box"
   },
   "size": {
@@ -5198,6 +5550,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -5219,7 +5576,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "a32e9c451f7c1bcb5a7a0a0a5def4a354de841aec9548e0fe806617f16e65bf7",
+   "asset": "3b3140d4a0ce1e0810bc12516f23c8ea4f63addce6c9fc7cb9ae0694a23c6f53",
    "collide": "box"
   },
   "size": {
@@ -5235,6 +5592,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -5254,7 +5616,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "bf985ba6f58c8df588c519a751319b72b90ce6bf5a615d108f47cd1ada1b6891",
+   "asset": "0258cf9b7a29e5efed4a9059dc43a3ea6407eabe115413fd345c9af517778a39",
    "collide": "box"
   },
   "size": {
@@ -5270,6 +5632,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -5289,7 +5656,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "edd9a946e4176200256498601bbb458ba60eefaaab571f479cf94193bd42842b",
+   "asset": "1e471c15979989e8f053d196ddb2b5cd55e812c05bc47620d5fa114500f30d10",
    "collide": "box"
   },
   "size": {
@@ -5305,6 +5672,11 @@
   },
   "layer": "solid",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]
@@ -5324,7 +5696,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "2d595efe6cf8071b889f3c8fb78fce158d001316ba68302b1c3039afe3996e69",
+   "asset": "b9c9d48b2c9e271e64d3c81d1d33c3a170c6ba4c68e0b4ee212124b02024db10",
    "collide": "none"
   },
   "size": {
@@ -5340,6 +5712,11 @@
   },
   "layer": "decor",
   "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
   "overlaps": [
    "mars-campus"
   ]

@@ -49,13 +49,8 @@ for (const it of P.filter((p) => p.cat === 'item')) {
   const t = tables.find(({ f, def }) => { const [w, , d] = def.size.box, top = at(f)[1] + (def.slots?.[0]?.p?.[1] ?? 0); return Math.abs(it.p[0] - at(f)[0]) <= w / 2 && Math.abs(it.p[2] - at(f)[2]) <= d / 2 && Math.abs(it.p[1] - top) < 0.08; });
   ops.items.push(t ? { op: 'place', def: it.def, name, in: { parent: t.path, slot: 'top' }, p: [r3(it.p[0] - at(t.f)[0]), 0, r3(it.p[2] - at(t.f)[2])] } : { op: 'place', def: it.def, name, p: it.p });
 }
-// outdoor named places (flags) Souls can walk to by name; buildings and their rooms are named by the entities
-const flag = (name, x, z, label) => ops.places.push({ op: 'place', def: 'core/flag@1', name, p: [x, z], state: { label } });
-flag('mimos-outdoor-gap', 1.8 + X0, -3.3, 'Mimos outdoor gap (northeast of the L, outdoors)');
-flag('mimos-rear-steps', -3.25 + X0, -7.6, 'Mimos rear steps (the way in at the north)');
-flag('kitchen-steps', -5.62 + X0, 4.2, 'Kitchen steps (up to the diner\'s blue door)');
-flag('field', 28.5, 0, 'The field (chairs and the teal sofa west of Chiba)');
-
+// Named places are the buildings and their rooms (walk:mimos, walk:mimos/floor, walk:kitchen/dining-hall …); their labels
+// carry the aliases (Chiba kitchen, diner, tea room). No flags: their labels draw through walls (VIS backlog).
 const T = {
   schema: 'genesis/1',
   name: 'Mars two',
@@ -66,17 +61,12 @@ const T = {
     sky: { palette: 'mars-desert', sun: 0.8 }, weather: { clouds: 0.05, wind: 0.3, rain: 0 }, ground: { palette: 'desert' },
   },
   batches: [
-    { note: 'the land: desert floor with the Chocolate Mountains to the north-east and low hills to the north', group: 'land', ops: [
-      { op: 'place', def: 'core/hill@1', name: 'north-hills', p: [-40, -150], params: { height: 8, radius: 40 } },
-      { op: 'place', def: 'core/hill@1', name: 'chocolate-mountains', p: [140, -140], params: { height: 14, radius: 30 } },
-    ] },
     { note: 'the campus buildings (Mimos, the Chiba kitchen and dining hall, the showers as Gene corrected them; Chiba, Dojo, Tool camp, Freeside, the west racks)', group: 'campus', ops: ops.campus },
     { note: 'Mimos furniture: the coffee counter (#1), the tea table (#2), the study table (#3) and its chairs (#4–7), the papasan (#8), the tea stools (#9–11), the red sofa (#12), the honey sofa beneath the posters (#13), the cream recliner (#14)', group: 'mimos', ops: ops.mimos },
     { note: 'the kitchen and dining hall: perimeter counters with the sinks, the prep table (#15), the fridges and freezer (#18, #19, #29), the bus seats (#20–25) and blue tables (#26–28)', group: 'kitchen', ops: ops.kitchen },
     { note: 'Chiba and the field: the auditorium sofas, folding chairs, tier cushions, the presenter box, the classroom table and desk; the field chairs and the teal sofa', group: 'chiba', ops: ops.chiba },
     { note: 'things to carry: the prep mixing bowls and stock pot, the tea kettle and cups, the study mugs', group: 'items', ops: ops.items },
     { note: 'the site: vans, buses, trailers, RVs, toilets, huts, the forklift, OG', group: 'site', ops: ops.site },
-    { note: 'named outdoor places', group: 'places', ops: ops.places },
   ],
 };
 writeFileSync(join(ROOT, 'worlds/templates/mars-two.json'), JSON.stringify(T, null, 1) + '\n');

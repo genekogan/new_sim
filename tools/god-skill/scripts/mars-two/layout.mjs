@@ -44,6 +44,8 @@ export const WALLS = {
     ['south-glazing', -1.99, -1.89, -4.73, 3.76, 0, 2.6],
     // G: the raised floor's ending is a real boundary: a step riser, open only at the stair
     ['riser-w', 0.04, 0.14, -4.73, -3.45, 0, RAISED + 0.05], ['riser-e', 0.04, 0.14, -2.2, 0, 0, RAISED + 0.05],
+    // the raised floor's body: nobody stands under it (its top is the floor on level 1); open where the stairs come up
+    ['under-main-w', 0.14, 5.88, -4.68, -3.4, 0, RAISED - 0.01], ['under-main-e', 0.14, 5.88, -2.2, -0.05, 0, RAISED - 0.01], ['under-main-mid', 0.65, 5.25, -3.4, -2.2, 0, RAISED - 0.01],
   ],
   kitchen: [
     // the diner's east wall: the photographed blue wall, full length (bus seats against it)
@@ -59,6 +61,9 @@ export const WALLS = {
     ['south-mid', -1.99, -1.89, -7.62, -6.1, 0, 2.9], ['south-e', -1.99, -1.89, -5.14, -4.73, 0, 2.9],
     // under the raised floor: its south edge between the doors is closed to the ground
     ['south-red-sill', -1.99, -1.89, -8.25, -7.62, 0, RAISED - 0.05], ['south-blue-sill', -1.99, -1.89, -6.1, -5.14, 0, RAISED - 0.05],
+    // the raised floors' body (open where the diner steps come up through the blue door)
+    ['under-kitchen', -1.84, 5.92, -11.73, -7.62, 0, RAISED - 0.01], ['under-diner', -1.35, 5.92, -7.6, -4.75, 0, RAISED - 0.01],
+    ['under-diner-sw', -1.84, -1.35, -7.6, -6.15, 0, RAISED - 0.01], ['under-diner-se', -1.84, -1.35, -5.1, -4.75, 0, RAISED - 0.01],
   ],
   showers: [
     ['s1-west', 5.92, 8.36, -0.03, 0.05, 0, 2.27], ['s1-north', 8.31, 8.36, 0, 2.44, 0, 2.27], ['s1-east', 5.92, 8.36, 2.39, 2.47, 0, 2.27],

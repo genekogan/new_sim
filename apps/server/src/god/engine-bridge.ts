@@ -604,12 +604,16 @@ export class EngineBridge {
   }
   /** Engine level of a standing height at (x, z): 0 within reach of the terrain there (hills too), else a floor's level. */
   levelAt(x: number, z: number, y: number): number {
-    if (Math.abs(y - this.model.terrain.sample(x, z)) <= GROUND_BAND + 0.5) return 0;
+    // a registered floor at this height wins over the generous ground band: a raised floor 0.35–0.85 m up (the Mars
+    // bays' 0.53 m plywood, lane MARS) is its own level, not the ground under it
+    const g = this.model.terrain.sample(x, z);
+    if (Math.abs(y - g) > GROUND_BAND) { const exact = this.levels.find((l) => Math.abs(l.y - y) <= LEVEL_MATCH); if (exact) return exact.id; }
+    if (Math.abs(y - g) <= GROUND_BAND + 0.5) return 0;
     const hit = this.levels.find((l) => Math.abs(l.y - y) <= 0.6); if (hit) return hit.id;
     const below = this.levels.filter((l) => l.y <= y + 0.5).sort((a, b) => b.y - a.y)[0];
     return below?.id ?? 0;
   }
-  private levelOfY(y: number) { if (Math.abs(y) <= GROUND_BAND + 0.5) return 0; const l = this.levels.reduce<Level | null>((b, l) => (l.y <= y + 0.5 && (!b || l.y > b.y) ? l : b), null); return l?.id ?? 0; }
+  private levelOfY(y: number) { if (Math.abs(y) > GROUND_BAND) { const exact = this.levels.find((l) => Math.abs(l.y - y) <= LEVEL_MATCH); if (exact) return exact.id; } if (Math.abs(y) <= GROUND_BAND + 0.5) return 0; const l = this.levels.reduce<Level | null>((b, l) => (l.y <= y + 0.5 && (!b || l.y > b.y) ? l : b), null); return l?.id ?? 0; }
   reach(from: ReachEnd, to: ReachEnd) {
     const a = this.endOf(from), b = this.endOf(to);
     if ('error' in a) return { reachable: false, code: 'reach.bad-from', detail: a.error };

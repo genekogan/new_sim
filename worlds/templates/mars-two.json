@@ -30,38 +30,6 @@
  },
  "batches": [
   {
-   "note": "the land: desert floor with the Chocolate Mountains to the north-east and low hills to the north",
-   "group": "land",
-   "ops": [
-    {
-     "op": "place",
-     "def": "core/hill@1",
-     "name": "north-hills",
-     "p": [
-      -40,
-      -150
-     ],
-     "params": {
-      "height": 8,
-      "radius": 40
-     }
-    },
-    {
-     "op": "place",
-     "def": "core/hill@1",
-     "name": "chocolate-mountains",
-     "p": [
-      140,
-      -140
-     ],
-     "params": {
-      "height": 14,
-      "radius": 30
-     }
-    }
-   ]
-  },
-  {
    "note": "the campus buildings (Mimos, the Chiba kitchen and dining hall, the showers as Gene corrected them; Chiba, Dojo, Tool camp, Freeside, the west racks)",
    "group": "campus",
    "ops": [
@@ -1589,60 +1557,6 @@
       56.676
      ],
      "r": 2.9322
-    }
-   ]
-  },
-  {
-   "note": "named outdoor places",
-   "group": "places",
-   "ops": [
-    {
-     "op": "place",
-     "def": "core/flag@1",
-     "name": "mimos-outdoor-gap",
-     "p": [
-      49.8,
-      -3.3
-     ],
-     "state": {
-      "label": "Mimos outdoor gap (northeast of the L, outdoors)"
-     }
-    },
-    {
-     "op": "place",
-     "def": "core/flag@1",
-     "name": "mimos-rear-steps",
-     "p": [
-      44.75,
-      -7.6
-     ],
-     "state": {
-      "label": "Mimos rear steps (the way in at the north)"
-     }
-    },
-    {
-     "op": "place",
-     "def": "core/flag@1",
-     "name": "kitchen-steps",
-     "p": [
-      42.38,
-      4.2
-     ],
-     "state": {
-      "label": "Kitchen steps (up to the diner's blue door)"
-     }
-    },
-    {
-     "op": "place",
-     "def": "core/flag@1",
-     "name": "field",
-     "p": [
-      28.5,
-      0
-     ],
-     "state": {
-      "label": "The field (chairs and the teal sofa west of Chiba)"
-     }
     }
    ]
   }
