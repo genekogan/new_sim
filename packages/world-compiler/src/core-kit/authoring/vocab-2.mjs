@@ -1,11 +1,14 @@
 // VOCAB-MECH pilot, worker 2: catalogue types inducted by following docs/god/VOCAB.md (see vocab.mjs for exemplars).
 // Origin on the floor at the footprint centre, front +z, metres; Eden palettes; budgets per category (vocab.triBudget).
-import { box, cbox, cone, cyl, extrude, lathe, limb, sph, stand, surface, shelf, socket, sweep, tor, withRole } from './dsl.mjs';
+import { box, cbox, cone, cyl, extrude, lathe, limb, sph, stand, surface, shelf, socket, sweep, tor, withRole as dslWithRole } from './dsl.mjs';
 import { presetDef, vocabDef } from './vocab-dsl.mjs';
 
 const C = { stone: '#b9b3a6', concrete: '#a9a49a', oak: '#9a6b43', walnut: '#5e3d27', pine: '#c79a63', iron: '#3b3d40', steel: '#8a8f94', brass: '#b8913f', cream: '#f2ead8',
   red: '#c23a2b', glass: '#bcd9e0', flame: '#ffb347', white: '#f4f2ec', sage: '#3f6b5c', terracotta: '#c46a43', mustard: '#d9a63a', teal: '#2f6b6b', soot: '#2b2623', orange: '#f07c2a' };
 const PI = Math.PI;
+// dsl.mjs withRole puts role/pivot on the shape, but a cbox is a placeholder that resolveCbox rebuilds from its `o`
+// (dropping top-level role/pivot), so a cbox inside a role would not move. Put them in `o` for cboxes.
+const withRole = (role, pivot, shapes) => dslWithRole(role, pivot, shapes).map((s) => (s.__cbox ? { ...s, o: { ...s.o, role: s.role, pivot: s.pivot } } : s));
 
 export default [
   // ---------------- building.commercial: presets of the shop generator
