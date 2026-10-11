@@ -105,7 +105,7 @@ test('actual Hub hello negotiates explicitly and leaves old/raw clients and pers
 });
 
 test('actual public HTTP history/live takes negotiate only the exact query; original full chunks stay unchanged',async t=>{
- const f=await local(t),app=buildApp({cfg:f.souls.cfg,db:f.db,host:f.host,auth:f.auth,hub:f.hub,brain:f.brain,souls:f.souls,takes:{read:async()=>({chunks:f.m.chunks,more:true})} as any});
+ const f=await local(t),app=buildApp({cfg:{...f.souls.cfg,takesPersist:true},db:f.db,host:f.host,auth:f.auth,hub:f.hub,brain:f.brain,souls:f.souls,takes:{read:async()=>({chunks:f.m.chunks,more:true})} as any});
  const before=JSON.stringify(f.m.chunks);
  for(const path of ['/v1/takes','/v1/take'])for(const offer of ['', '?takeTransport=unknown','?takeTransport='+encodeURIComponent(TAKE_BOUNDARY_WIRE_V1)]){
   const response=await app.request(path+offer);assert.equal(response.status,200);const result:any=await response.json();

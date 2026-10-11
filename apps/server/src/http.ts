@@ -131,7 +131,8 @@ export function buildApp(d: Deps) {
   const takeReply=(c:Context,value:unknown)=>c.req.query('takeTransport')===TAKE_BOUNDARY_WIRE_V1
     ?c.body(stringifyTakeBoundaryWireV1(value),200,{'Content-Type':'application/json; charset=UTF-8','Cache-Control':'no-store'})
     :c.json(value as never,200,{'Cache-Control':'no-store'});
-  app.get('/v1/takes', async c => { const from=intQ(c,'from',0,0,Number.MAX_SAFE_INTEGER),to=intQ(c,'to',d.host.engine.world.tick,0,Number.MAX_SAFE_INTEGER),limit=intQ(c,'limit',120,1,120); const takes=d.takes?await d.takes.read(from,to,limit):d.db.takes(d.host.worldId,from,to,limit); return takeReply(c,{serverTick:d.host.engine.world.tick,...takes}); });
+  app.get('/v1/takes', async c => { const from=intQ(c,'from',0,0,Number.MAX_SAFE_INTEGER),to=intQ(c,'to',d.host.engine.world.tick,0,Number.MAX_SAFE_INTEGER),limit=intQ(c,'limit',120,1,120); // Recordings off (default): only the engine's in-memory live buffer exists; older moments answer empty.
+    const takes=!d.cfg.takesPersist?{chunks:(d.host.engine.takeChunks?.(from)??[]).filter(k=>k.fromTick<to).slice(0,limit),next:null}:d.takes?await d.takes.read(from,to,limit):d.db.takes(d.host.worldId,from,to,limit); return takeReply(c,{serverTick:d.host.engine.world.tick,...takes}); });
   app.get('/v1/take', c => takeReply(c,{ serverTick: d.host.engine.world.tick, chunks: d.host.engine.takeChunks?.(intQ(c, 'after', -1, -1, Number.MAX_SAFE_INTEGER)) ?? [] }));
   app.get('/v1/kernel', (c) => c.json(d.host.kernelView()));
   app.get('/v1/plays', (c) => c.json({ plays: d.host.recentPlays.slice(-intQ(c, 'limit', 60, 1, 200)) }));
