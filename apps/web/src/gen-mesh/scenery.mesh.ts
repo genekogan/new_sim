@@ -120,7 +120,8 @@ function withDetail(m: THREE.MeshStandardMaterial) {
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform sampler2D uFarNoise;\nuniform float uFarNoiseOn;\nvarying vec4 vFarDetail;\nvarying vec2 vFarXZ;')
       .replace('#include <color_fragment>', `#include <color_fragment>
       if (uFarNoiseOn > 0.5 && vFarDetail.a > 0.001) {
-        float n1 = texture2D(uFarNoise, vFarXZ * (1.0 / 173.0)).r, n2 = texture2D(uFarNoise, vFarXZ * (1.0 / 41.0) + 0.37).b, n3 = texture2D(uFarNoise, vFarXZ * (1.0 / 13.0) + 0.71).g;
+        vec2 q1 = mat2(0.866, 0.5, -0.5, 0.866) * vFarXZ, q2 = mat2(0.6, -0.8, 0.8, 0.6) * vFarXZ;   // rotated taps: no lattice-aligned blocks
+        float n1 = texture2D(uFarNoise, vFarXZ * (1.0 / 173.0)).r, n2 = texture2D(uFarNoise, q1 * (1.0 / 41.0) + 0.37).b, n3 = texture2D(uFarNoise, q2 * (1.0 / 13.0) + 0.71).g;
         float n = n1 * 0.5 + n2 * 0.38 + n3 * 0.12;
         diffuseColor.rgb = mix(diffuseColor.rgb, vFarDetail.rgb, smoothstep(0.46, 0.64, n) * vFarDetail.a);
         diffuseColor.rgb *= 1.0 + (n3 - 0.5) * 0.1 * vFarDetail.a;
