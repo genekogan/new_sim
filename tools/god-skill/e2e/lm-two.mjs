@@ -271,7 +271,7 @@ try {
     { name: 'overview-souls', eye: [0, 95, 125], at: [0, 0, 0], wait: 8000 },
     { name: 'ana-in-the-scan-courts', ...close(pos.ana, 4, 7), wait: 8000 },
     { name: 'ben-in-the-celadon-arch', ...close(pos.ben, 0.5, 9, 2), wait: 8000 },
-    { name: 'compose-new-verdelis-plant-castle', eye: [-100, 9, 52], at: [-114, 2, 46], wait: 8000 },
+    { name: 'compose-new-verdelis-plant-castle', eye: [-108, 5, 26], at: [-113, 2, 48], wait: 8000 },
   ]);
 } catch (e) {
   report.failures.push({ name: 'harness', error: String(e?.stack ?? e) });

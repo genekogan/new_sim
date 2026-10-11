@@ -255,12 +255,17 @@ await batch('the Grotto of Painted Worlds (vault, two turquoise pools, the dry c
 
 // the scan courts: 96 exhibits on their pads, the central promenade and the cross walks, each viewing court named
 const rows = [...new Set(districts.map((m) => m.p[2]))].sort((a, b) => a - b);
+// the hill's south slope runs under the first row: ground paint and graded walks stay off it (they would cut the slope)
+const HILL = [hill.plateau[0] - HILL_EDGE, hill.plateau[1] - HILL_EDGE, hill.plateau[2] + HILL_EDGE, hill.plateau[3] + HILL_EDGE];
+const onHill = ([x0, z0, x1, z1]) => x1 > HILL[0] + 1 && x0 < HILL[2] - 1 && z1 > HILL[1] + 1 && z0 < HILL[3] - 1;
+const padOf = (m) => m.rect ?? [m.p[0] - 8, m.p[2] - 8, m.p[0] + 8, m.p[2] + 8];
+const courtOnHill = (m) => onHill(padOf(m));
 await batch('the scan courts: 96 exhibits of the Little Martians archive in an eight-column district, with their viewing courts', 'scan-courts', [
   place('core/footpath@1', 'scan-promenade', { shape: { path: [[0, 88], [0, 235]], width: 2 }, params: { material: 'stone', width: 2 } }),
-  ...rows.map((z, i) => place('core/footpath@1', `scan-crosswalk-${i + 1}`, { shape: { path: [[-72, z + 9.5], [72, z + 9.5]], width: 1.2 }, params: { material: 'stone', width: 1.2 } })),
-  ...districts.map((m) => paint(`pad-${m.id}`, rect(m.rect ?? [m.p[0] - 8, m.p[2] - 8, m.p[0] + 8, m.p[2] + 8]), OCHRE, 'dirt')),
+  ...rows.flatMap((z, i) => (onHill([-72, z + 9, 72, z + 10]) ? [[-72, HILL[0] - 1, 'w'], [HILL[2] + 1, 72, 'e']] : [[-72, 72, '']]).map(([a, b, k]) => place('core/footpath@1', `scan-crosswalk-${i + 1}${k}`, { shape: { path: [[a, z + 9.5], [b, z + 9.5]], width: 1.2 }, params: { material: 'stone', width: 1.2 } }))),
+  ...districts.filter((m) => !courtOnHill(m)).map((m) => paint(`pad-${m.id}`, rect(padOf(m)), OCHRE, 'dirt')),
   ...districts.map((m) => place(LIB(exhibitName(m)), m.file, { p: [m.p[0], m.p[2]], r: m.yaw ?? 0 })),
-  ...districts.map((m) => P[`scan-${m.id}`] ? paint(`scan-${m.id}`, P[`scan-${m.id}`].polygon, '#c49a6c', 'sand') : null).filter(Boolean),
+  ...districts.map((m) => P[`scan-${m.id}`] && !courtOnHill(m) ? paint(`scan-${m.id}`, P[`scan-${m.id}`].polygon, '#c49a6c', 'sand') : null).filter(Boolean),
 ]);
 
 // the kin row and the seven cast heads (ceramic scenery; Souls bring their own bodies)
@@ -275,8 +280,10 @@ const FLAGS = [['arrival', [0, 18], 'Little Martians Ceramic World (arrival)'], 
 await batch('flags: the places a newcomer can walk to by name', 'flags', FLAGS.map(([n, p, label]) => place('core/flag@1', n, { p, state: { label } })));
 
 // ---------------------------------------------------------------- the 113 places → entity paths (old ids kept)
+const HILL_COURT = Object.fromEntries(districts.filter(courtOnHill).map((m) => [`scan-${m.id}`, m.file]));
 const ROOM = Object.fromEntries(aliases.map((a) => [a.place, a.place.startsWith('tower') ? `auxiliary-tower/${a.place}` : `auxiliary-temple/${a.place}`]));
-const placeMap = placesV1.map((p) => ({ id: p.id, name: p.name, kind: p.kind, entity: p.id === 'lm-world' ? 'flag:arrival' : ROOM[p.id] ?? p.id }));
+const placeMap = placesV1.map((p) => ({ id: p.id, name: p.name, kind: p.kind, entity: p.id === 'lm-world' ? 'flag:arrival' : ROOM[p.id] ?? (HILL_COURT[p.id] ?? p.id) }));
+// viewing courts on the hill's slope are the exhibit itself (a Soul walks to its front)
 
 // ---------------------------------------------------------------- 5. the template and the asset index
 const snap = await api('/v1/god/snapshot').catch(() => null);
