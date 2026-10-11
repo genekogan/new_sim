@@ -1,0 +1,2014 @@
+{
+ "schema": "mars-two-placements/1",
+ "frame": "mars-two: x = east, z = south (north up), metres; Mimos origin at x 48, z 0",
+ "placements": [
+  {
+   "def": "core/mars-prep-table@1",
+   "cat": "table",
+   "building": "kitchen",
+   "nums": [
+    15
+   ],
+   "ids": [
+    "kitchen-details-commissary-steel-prep-top-adf6bee9",
+    "kitchen-details-commissary-steel-lower-shelf-142d67b0",
+    "kitchen-details-commissary-steel-table-leg-1d4118b7",
+    "kitchen-details-commissary-steel-table-leg-1e699409",
+    "kitchen-details-commissary-steel-table-leg-d6fcb2fd",
+    "kitchen-details-commissary-steel-table-leg-2d7b0c3b",
+    "kitchen-details-orange-utility-bucket-270c624c"
+   ],
+   "p": [
+    38.325,
+    0.53,
+    -2.035
+   ],
+   "r": 0,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-sink-counter-lip@1",
+   "cat": "table",
+   "building": "kitchen",
+   "nums": [],
+   "ids": [
+    "kitchen-details-kitchen-rear-sink-counter-lip-66d1f9ab"
+   ],
+   "p": [
+    38.665,
+    1.442,
+    -5.89
+   ],
+   "r": 0,
+   "floorY": 1.442
+  },
+  {
+   "def": "core/mars-sink-counter-lip-2@1",
+   "cat": "table",
+   "building": "kitchen",
+   "nums": [],
+   "ids": [
+    "kitchen-details-kitchen-rear-sink-counter-lip-97185cf7",
+    "kitchen-details-kitchen-rear-sink-faucet-stem-cae7823d",
+    "kitchen-details-kitchen-rear-sink-faucet-spout-42792473",
+    "kitchen-details-kitchen-rear-sink-faucet-stem-2389ce01",
+    "kitchen-details-kitchen-rear-sink-faucet-spout-bd56d867",
+    "kitchen-details-kitchen-rear-sink-grounded-cabinet-leg-ec923a81",
+    "kitchen-details-kitchen-rear-sink-grounded-cabinet-leg-c3d858c1",
+    "kitchen-details-commissary-tray-cart-post-88add978",
+    "kitchen-details-commissary-tray-cart-caster-f3cc56fa"
+   ],
+   "p": [
+    38.515,
+    0.53,
+    -4.83
+   ],
+   "r": 0,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-exterior-serving-shelf@1",
+   "cat": "table",
+   "building": "kitchen",
+   "nums": [],
+   "ids": [
+    "kitchen-details-kitchen-source-exterior-serving-shelf-640ba6a3",
+    "kitchen-details-kitchen-source-front-serving-lower-plywood-26e04c6d",
+    "kitchen-details-kitchen-continued-wood-counter-leg-cdbf1e5c",
+    "kitchen-details-kitchen-continued-wood-counter-leg-6afe9619",
+    "kitchen-details-kitchen-serving-return-timber-leg-6896eec8",
+    "kitchen-details-kitchen-serving-return-timber-leg-a2b66cda",
+    "kitchen-details-kitchen-serving-return-timber-leg-8b7d1e0e"
+   ],
+   "p": [
+    38.055,
+    0.53,
+    1.665
+   ],
+   "r": 0,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-perimeter-counter@1",
+   "cat": "table",
+   "building": "kitchen",
+   "nums": [],
+   "ids": [
+    "kitchen-details-kitchen-source-continued-left-perimeter-counter-top-1d475684",
+    "kitchen-details-commissary-longitudinal-backsplash-cb6fc4d7",
+    "kitchen-details-commissary-tray-cart-post-47836761",
+    "kitchen-details-commissary-tray-cart-post-ebdeb167",
+    "kitchen-details-commissary-tray-cart-shelf-344ac943",
+    "kitchen-details-commissary-tray-cart-shelf-c3315e68",
+    "kitchen-details-commissary-tray-cart-shelf-b0cf28fb",
+    "kitchen-details-commissary-tray-cart-shelf-47276eda",
+    "kitchen-details-commissary-tray-cart-shelf-8e983f45",
+    "kitchen-details-commissary-tray-cart-caster-ba3045f9",
+    "kitchen-details-commissary-tray-cart-caster-0b58607f",
+    "kitchen-details-kitchen-continued-wood-counter-leg-22c71136"
+   ],
+   "p": [
+    36.893,
+    0.53,
+    -2.035
+   ],
+   "r": 0,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-serving-inside-counter-retur@1",
+   "cat": "table",
+   "building": "kitchen",
+   "nums": [],
+   "ids": [
+    "kitchen-details-kitchen-source-serving-inside-counter-return-1a704ba1"
+   ],
+   "p": [
+    38.325,
+    1.42,
+    1.55
+   ],
+   "r": 0,
+   "floorY": 1.42
+  },
+  {
+   "def": "core/mars-north-perimeter-counter-retu@1",
+   "cat": "table",
+   "building": "kitchen",
+   "nums": [],
+   "ids": [
+    "kitchen-details-north-counter-return",
+    "kitchen-details-commissary-tray-cart-post-aac11b6e",
+    "kitchen-details-commissary-tray-cart-caster-c937e2b8",
+    "kitchen-details-north-return-leg-4"
+   ],
+   "p": [
+    38.325,
+    0.53,
+    -5.25
+   ],
+   "r": 0,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-stored-stock-pot@1",
+   "cat": "item",
+   "building": "kitchen",
+   "nums": [],
+   "ids": [
+    "kitchen-details-stored-stock-pot-923202f4"
+   ],
+   "p": [
+    38.525,
+    0.775,
+    -1.705
+   ],
+   "r": 0,
+   "floorY": 0.775
+  },
+  {
+   "def": "core/mars-commercial-fridge@1",
+   "cat": "cold",
+   "building": "kitchen",
+   "nums": [
+    18
+   ],
+   "ids": [
+    "kitchen-details-commercial-refrigerator-cabinet-89c6237e",
+    "kitchen-details-commercial-refrigerator-handle-2547ce98",
+    "kitchen-details-commercial-refrigerator-handle-a706c88b",
+    "kitchen-details-commercial-refrigerator-upper-machinery-72779ef7"
+   ],
+   "p": [
+    39.849,
+    0.53,
+    -4.585
+   ],
+   "r": 0,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-chest-freezer@1",
+   "cat": "cold",
+   "building": "kitchen",
+   "nums": [
+    19
+   ],
+   "ids": [
+    "kitchen-details-commissary-chest-freezer-db2523ea",
+    "kitchen-details-commissary-freezer-lid-2d787408"
+   ],
+   "p": [
+    39.815,
+    0.53,
+    0.615
+   ],
+   "r": 0,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-bus-seat@1",
+   "cat": "seat",
+   "building": "kitchen",
+   "nums": [
+    20
+   ],
+   "ids": [
+    "kitchen-details-diner-gray-bus-seat-back-08c63ea2",
+    "kitchen-details-diner-reupholstered-bus-cushion-fdfb6bc2",
+    "kitchen-details-diner-bolted-seat-support-5ccafe49",
+    "kitchen-details-diner-seat-bolt-plate-5201b2fd",
+    "kitchen-details-diner-bolted-seat-support-d5141768",
+    "kitchen-details-diner-seat-bolt-plate-8e92dd0c"
+   ],
+   "p": [
+    42.435,
+    0.53,
+    0.014
+   ],
+   "r": 3.1416,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-bus-seat-2@1",
+   "cat": "seat",
+   "building": "kitchen",
+   "nums": [
+    21,
+    22
+   ],
+   "ids": [
+    "kitchen-details-diner-gray-bus-seat-back-86187f12",
+    "kitchen-details-diner-reupholstered-bus-cushion-1aa6c287",
+    "kitchen-details-diner-bolted-seat-support-48ceb718",
+    "kitchen-details-diner-seat-bolt-plate-84e109ec",
+    "kitchen-details-diner-bolted-seat-support-376c7555",
+    "kitchen-details-diner-seat-bolt-plate-981128d9",
+    "kitchen-details-diner-gray-bus-seat-back-4c4e1938",
+    "kitchen-details-diner-reupholstered-bus-cushion-c636f5bc",
+    "kitchen-details-diner-bolted-seat-support-12100fa9",
+    "kitchen-details-diner-seat-bolt-plate-23929995",
+    "kitchen-details-diner-bolted-seat-support-b015cc30",
+    "kitchen-details-diner-seat-bolt-plate-f88d31ac"
+   ],
+   "p": [
+    42.435,
+    0.53,
+    -1.135
+   ],
+   "r": 0,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-bus-seat-3@1",
+   "cat": "seat",
+   "building": "kitchen",
+   "nums": [
+    23,
+    24
+   ],
+   "ids": [
+    "kitchen-details-diner-gray-bus-seat-back-10e52994",
+    "kitchen-details-diner-reupholstered-bus-cushion-9e99ad28",
+    "kitchen-details-diner-bolted-seat-support-e46335e5",
+    "kitchen-details-diner-seat-bolt-plate-b4d71e41",
+    "kitchen-details-diner-bolted-seat-support-65a5ff22",
+    "kitchen-details-diner-seat-bolt-plate-faf3ff0e",
+    "kitchen-details-diner-gray-bus-seat-back-b3ae23b6",
+    "kitchen-details-diner-reupholstered-bus-cushion-90e11dad",
+    "kitchen-details-diner-bolted-seat-support-b3b1a9b6",
+    "kitchen-details-diner-seat-bolt-plate-0fb4bf1a",
+    "kitchen-details-diner-bolted-seat-support-42f8652d",
+    "kitchen-details-diner-seat-bolt-plate-5bd55221"
+   ],
+   "p": [
+    42.435,
+    0.53,
+    -3.435
+   ],
+   "r": 0,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-bus-seat-4@1",
+   "cat": "seat",
+   "building": "kitchen",
+   "nums": [
+    25
+   ],
+   "ids": [
+    "kitchen-details-diner-gray-bus-seat-back-7ce81f0a",
+    "kitchen-details-diner-reupholstered-bus-cushion-908f2232",
+    "kitchen-details-diner-bolted-seat-support-c91cb36f",
+    "kitchen-details-diner-seat-bolt-plate-6fa3e41b",
+    "kitchen-details-diner-bolted-seat-support-5615ecc4",
+    "kitchen-details-diner-seat-bolt-plate-251e85c0"
+   ],
+   "p": [
+    42.435,
+    0.53,
+    -5.234
+   ],
+   "r": 0,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-diner-table@1",
+   "cat": "table",
+   "building": "kitchen",
+   "nums": [
+    26
+   ],
+   "ids": [
+    "kitchen-details-diner-blue-pedestal-tabletop-6f4fde0b",
+    "kitchen-details-diner-blue-outer-pedestal-6656466a"
+   ],
+   "p": [
+    42.475,
+    0.53,
+    -0.415
+   ],
+   "r": 0,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-diner-table@1",
+   "cat": "table",
+   "building": "kitchen",
+   "nums": [
+    27
+   ],
+   "ids": [
+    "kitchen-details-diner-blue-pedestal-tabletop-189b50ba",
+    "kitchen-details-diner-blue-outer-pedestal-c66ed659"
+   ],
+   "p": [
+    42.475,
+    0.53,
+    -2.035
+   ],
+   "r": 0,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-diner-table@1",
+   "cat": "table",
+   "building": "kitchen",
+   "nums": [
+    28
+   ],
+   "ids": [
+    "kitchen-details-diner-blue-pedestal-tabletop-b7c1c84a",
+    "kitchen-details-diner-blue-outer-pedestal-1a8f77e9"
+   ],
+   "p": [
+    42.475,
+    0.53,
+    -4.485
+   ],
+   "r": 0,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-white-fridge@1",
+   "cat": "cold",
+   "building": "kitchen",
+   "nums": [
+    29
+   ],
+   "ids": [
+    "kitchen-details-kitchen-white-refrigerator-carcass-4fec2aef",
+    "kitchen-details-kitchen-white-refrigerator-handle-07d6a007",
+    "kitchen-details-kitchen-white-refrigerator-handle-4edd006f"
+   ],
+   "p": [
+    39.756,
+    0.53,
+    -0.485
+   ],
+   "r": 0,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-fridge-top-electric-kettle@1",
+   "cat": "item",
+   "building": "kitchen",
+   "nums": [],
+   "ids": [
+    "kitchen-details-kitchen-fridge-top-electric-kettle-4c5cf351"
+   ],
+   "p": [
+    39.835,
+    2.49,
+    -0.565
+   ],
+   "r": 0,
+   "floorY": 2.49
+  },
+  {
+   "def": "core/mars-dry-goods-long-shelf@1",
+   "cat": "table",
+   "building": "kitchen",
+   "nums": [],
+   "ids": [
+    "kitchen-details-kitchen-dry-goods-long-shelf-0eedc5b2",
+    "kitchen-details-kitchen-dry-goods-tub-203f6b84",
+    "kitchen-details-kitchen-dry-goods-tub-lid-93aa2359",
+    "kitchen-details-kitchen-dry-goods-tub-6277844b",
+    "kitchen-details-kitchen-dry-goods-tub-lid-a9dd23a7",
+    "kitchen-details-kitchen-dry-goods-tub-43c4b5b5",
+    "kitchen-details-kitchen-dry-goods-tub-lid-ffe15d9c",
+    "kitchen-details-kitchen-dry-goods-tub-aa2620c9",
+    "kitchen-details-kitchen-dry-goods-tub-lid-c32bedb8",
+    "kitchen-details-kitchen-dry-goods-tub-c6139873",
+    "kitchen-details-kitchen-dry-goods-tub-lid-b618c5ff",
+    "kitchen-details-kitchen-dry-goods-tub-3d5b6286"
+   ],
+   "p": [
+    36.685,
+    2.277,
+    -1.535
+   ],
+   "r": 0,
+   "floorY": 2.277
+  },
+  {
+   "def": "core/mars-prep-mixing-bowl@1",
+   "cat": "item",
+   "building": "kitchen",
+   "nums": [],
+   "ids": [
+    "kitchen-details-kitchen-prep-mixing-bowl-a3c731cd",
+    "kitchen-details-kitchen-prep-chopping-board-35ea1fed"
+   ],
+   "p": [
+    38.549,
+    1.457,
+    -2.595
+   ],
+   "r": 0,
+   "floorY": 1.457
+  },
+  {
+   "def": "core/mars-prep-mixing-bowl-2@1",
+   "cat": "item",
+   "building": "kitchen",
+   "nums": [],
+   "ids": [
+    "kitchen-details-kitchen-prep-mixing-bowl-71eefb37",
+    "kitchen-details-kitchen-prep-mixing-bowl-2d41e482",
+    "kitchen-details-kitchen-prep-chopping-board-c20feccd"
+   ],
+   "p": [
+    38.326,
+    1.457,
+    -1.59
+   ],
+   "r": 0,
+   "floorY": 1.457
+  },
+  {
+   "def": "core/mars-coffee-counter@1",
+   "cat": "table",
+   "building": "mimos",
+   "nums": [
+    1
+   ],
+   "ids": [
+    "mimos-details-table-top-b2fe6fe5",
+    "mimos-details-table-leg-18d2c9ba",
+    "mimos-details-table-leg-70c32530",
+    "mimos-details-table-leg-5a7998d9",
+    "mimos-details-table-leg-d73a83bf",
+    "mimos-details-mimos-espresso-machine-body-37b31e67",
+    "mimos-details-mimos-espresso-metal-face-9a4ae293",
+    "mimos-details-mimos-espresso-drip-tray-40b4c8ca",
+    "mimos-details-mimos-portafilter-handle-676a380e",
+    "mimos-details-mimos-grinder-base-752df719",
+    "mimos-details-mimos-grinder-hopper-2ee553a7",
+    "mimos-details-mimos-gravity-water-filter-07a514f8"
+   ],
+   "p": [
+    43.688,
+    0.53,
+    -2.594
+   ],
+   "r": 0,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-red-mini-refrigerator@1",
+   "cat": "cold",
+   "building": "mimos",
+   "nums": [],
+   "ids": [
+    "mimos-details-mimos-red-mini-refrigerator-f3cc0ca6",
+    "mimos-details-mimos-mini-refrigerator-handle-60f11cc9"
+   ],
+   "p": [
+    43.658,
+    0.53,
+    -0.65
+   ],
+   "r": 0,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-tea-table@1",
+   "cat": "table",
+   "building": "mimos",
+   "nums": [
+    2
+   ],
+   "ids": [
+    "mimos-details-table-top-44330a62",
+    "mimos-details-table-leg-ce49afc8",
+    "mimos-details-table-leg-0802c38c",
+    "mimos-details-table-leg-152a63f9",
+    "mimos-details-table-leg-b07a1625",
+    "mimos-details-mimos-low-table-gray-cloth-bf68fac4"
+   ],
+   "p": [
+    49.62,
+    0,
+    1.08
+   ],
+   "r": 0,
+   "floorY": 0
+  },
+  {
+   "def": "core/mars-table-kettle@1",
+   "cat": "item",
+   "building": "mimos",
+   "nums": [],
+   "ids": [
+    "mimos-details-mimos-table-kettle-92fbeaa2",
+    "mimos-details-mimos-kettle-handle-8363f87a"
+   ],
+   "p": [
+    49.85,
+    0.55,
+    1.08
+   ],
+   "r": 0,
+   "floorY": 0.55
+  },
+  {
+   "def": "core/mars-table-cup@1",
+   "cat": "item",
+   "building": "mimos",
+   "nums": [],
+   "ids": [
+    "mimos-details-mimos-table-cup-52fb0883"
+   ],
+   "p": [
+    49.22,
+    0.55,
+    1.08
+   ],
+   "r": 0,
+   "floorY": 0.55
+  },
+  {
+   "def": "core/mars-table-cup-2@1",
+   "cat": "item",
+   "building": "mimos",
+   "nums": [],
+   "ids": [
+    "mimos-details-mimos-table-cup-32745800"
+   ],
+   "p": [
+    49.5,
+    0.55,
+    1.08
+   ],
+   "r": 0,
+   "floorY": 0.55
+  },
+  {
+   "def": "core/mars-study-chair@1",
+   "cat": "seat",
+   "building": "mimos",
+   "nums": [
+    7
+   ],
+   "ids": [
+    "mimos-home-mimos-study-chair-seat-4389a56e",
+    "mimos-home-mimos-chair-grounded-leg-54eba1d1",
+    "mimos-home-mimos-chair-grounded-leg-351824cb",
+    "mimos-home-mimos-chair-grounded-leg-8ff81ee1",
+    "mimos-home-mimos-chair-grounded-leg-8479085f",
+    "mimos-home-mimos-chair-back-upright-acbb2395",
+    "mimos-home-mimos-chair-back-upright-5be23ca5",
+    "mimos-home-mimos-ladder-chair-back-slat-1ccffc04",
+    "mimos-home-mimos-ladder-chair-back-slat-86eef1b9",
+    "mimos-home-mimos-ladder-chair-back-slat-8dc57f8f"
+   ],
+   "p": [
+    47.65,
+    0.53,
+    -4.77
+   ],
+   "r": -1.5708,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-study-table@1",
+   "cat": "table",
+   "building": "mimos",
+   "nums": [
+    3
+   ],
+   "ids": [
+    "mimos-home-mimos-folding-study-tabletop-3afd93b0",
+    "mimos-home-mimos-study-table-leg-8d649f7d",
+    "mimos-home-mimos-study-table-leg-fdb2df6c",
+    "mimos-home-mimos-study-table-leg-6e9d0dec",
+    "mimos-home-mimos-study-table-leg-fe4ecdfd",
+    "mimos-home-mimos-folding-table-diagonal-f8881b43",
+    "mimos-home-mimos-folding-table-diagonal-f1d9d786",
+    "mimos-home-mimos-study-book-stack-8d709f35",
+    "mimos-home-mimos-study-book-stack-740a7520",
+    "mimos-home-mimos-study-book-stack-9b8535af",
+    "mimos-home-mimos-study-book-stack-9b8535af-2",
+    "mimos-home-mimos-study-book-stack-cb11ebd2"
+   ],
+   "p": [
+    46.6,
+    0.53,
+    -4.75
+   ],
+   "r": 0,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-study-chair@1",
+   "cat": "seat",
+   "building": "mimos",
+   "nums": [
+    4
+   ],
+   "ids": [
+    "mimos-home-mimos-study-chair-seat-99fc63e3",
+    "mimos-home-mimos-chair-grounded-leg-16b1564b",
+    "mimos-home-mimos-chair-grounded-leg-b88ff616",
+    "mimos-home-mimos-chair-grounded-leg-a94439aa",
+    "mimos-home-mimos-chair-grounded-leg-603f2237",
+    "mimos-home-mimos-chair-back-upright-5962f356",
+    "mimos-home-mimos-chair-back-upright-c3c97929",
+    "mimos-home-mimos-ladder-chair-back-slat-ebe4c318",
+    "mimos-home-mimos-ladder-chair-back-slat-aa5d3c01",
+    "mimos-home-mimos-ladder-chair-back-slat-b50940c3"
+   ],
+   "p": [
+    45.95,
+    0.53,
+    -4.13
+   ],
+   "r": -3.1416,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-study-chair-2@1",
+   "cat": "seat",
+   "building": "mimos",
+   "nums": [
+    5
+   ],
+   "ids": [
+    "mimos-home-mimos-study-chair-seat-fa4fb879",
+    "mimos-home-mimos-chair-grounded-leg-1cf267d2",
+    "mimos-home-mimos-chair-grounded-leg-7785f01f",
+    "mimos-home-mimos-chair-grounded-leg-c43c5a9e",
+    "mimos-home-mimos-chair-grounded-leg-65c8ab13",
+    "mimos-home-mimos-chair-back-upright-2a68e841",
+    "mimos-home-mimos-chair-back-upright-c6cb2cb5",
+    "mimos-home-mimos-perforated-chair-back-slat-8be672a4",
+    "mimos-home-mimos-perforated-chair-back-slat-969abf8b",
+    "mimos-home-mimos-perforated-chair-back-slat-3f4d9d64",
+    "mimos-home-mimos-perforated-chair-back-slat-f3f4f655",
+    "mimos-home-mimos-perforated-chair-back-slat-34876fcf"
+   ],
+   "p": [
+    47.08,
+    0.53,
+    -4.13
+   ],
+   "r": 3.1416,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-study-chair-3@1",
+   "cat": "seat",
+   "building": "mimos",
+   "nums": [
+    6
+   ],
+   "ids": [
+    "mimos-home-mimos-study-chair-seat-6353bb9a",
+    "mimos-home-mimos-chair-grounded-leg-b19ae719",
+    "mimos-home-mimos-chair-grounded-leg-59b3e14f",
+    "mimos-home-mimos-chair-grounded-leg-4291b078",
+    "mimos-home-mimos-chair-grounded-leg-11327806",
+    "mimos-home-mimos-chair-back-upright-3c11d3fc",
+    "mimos-home-mimos-chair-back-upright-24da1377",
+    "mimos-home-mimos-ladder-chair-back-slat-8000135e",
+    "mimos-home-mimos-ladder-chair-back-slat-5779a9d9",
+    "mimos-home-mimos-ladder-chair-back-slat-b080371b"
+   ],
+   "p": [
+    46.85,
+    0.53,
+    -5.38
+   ],
+   "r": 0,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-ceramic-mug@1",
+   "cat": "item",
+   "building": "mimos",
+   "nums": [],
+   "ids": [
+    "mimos-home-mimos-study-ceramic-mug-29e42070",
+    "mimos-home-mimos-study-mug-coffee-767c9545",
+    "mimos-home-mimos-study-mug-bottom-f3867594",
+    "mimos-home-mimos-study-mug-handle-34cbc825"
+   ],
+   "p": [
+    47.271,
+    1.29,
+    -4.75
+   ],
+   "r": 0,
+   "floorY": 1.29
+  },
+  {
+   "def": "core/mars-ceramic-mug-2@1",
+   "cat": "item",
+   "building": "mimos",
+   "nums": [],
+   "ids": [
+    "mimos-home-mimos-study-ceramic-mug-c8942583",
+    "mimos-home-mimos-study-mug-coffee-cd7b1a8a",
+    "mimos-home-mimos-study-mug-bottom-5d84cb73",
+    "mimos-home-mimos-study-mug-handle-968acb96"
+   ],
+   "p": [
+    47.471,
+    1.29,
+    -4.75
+   ],
+   "r": 0,
+   "floorY": 1.29
+  },
+  {
+   "def": "core/mars-papasan@1",
+   "cat": "seat",
+   "building": "mimos",
+   "nums": [
+    8
+   ],
+   "ids": [
+    "mimos-home-mimos-papasan-cane-pedestal-a2fdf441",
+    "mimos-home-mimos-papasan-round-cane-rim-9d4a1dba",
+    "mimos-home-mimos-papasan-broad-brown-cushion-87ca6359",
+    "mimos-home-mimos-papasan-curved-brown-back-7fd13c30",
+    "mimos-home-mimos-papasan-cane-spoke-c8257c72",
+    "mimos-home-mimos-papasan-cane-spoke-11660dc5",
+    "mimos-home-mimos-papasan-cane-spoke-aba097fb",
+    "mimos-home-mimos-papasan-cane-spoke-9a2274d7",
+    "mimos-home-mimos-papasan-cane-spoke-4cf41eee",
+    "mimos-home-mimos-papasan-cane-spoke-fac59383",
+    "mimos-home-mimos-papasan-cane-spoke-9f8fad29",
+    "mimos-home-mimos-papasan-cane-spoke-671a0a80"
+   ],
+   "p": [
+    51.05,
+    0,
+    1.25
+   ],
+   "r": 0,
+   "floorY": 0
+  },
+  {
+   "def": "core/mars-tea-stool@1",
+   "cat": "seat",
+   "building": "mimos",
+   "nums": [
+    9
+   ],
+   "ids": [
+    "mimos-home-mimos-glazed-tea-table-stool-e29cda3f",
+    "mimos-home-mimos-tea-stool-grounded-leg-d185c871",
+    "mimos-home-mimos-tea-stool-grounded-leg-2f647b6d",
+    "mimos-home-mimos-tea-stool-grounded-leg-92bcfea1"
+   ],
+   "p": [
+    48.65,
+    0,
+    1.05
+   ],
+   "r": 0,
+   "floorY": 0
+  },
+  {
+   "def": "core/mars-tea-stool-2@1",
+   "cat": "seat",
+   "building": "mimos",
+   "nums": [
+    10
+   ],
+   "ids": [
+    "mimos-home-mimos-glazed-tea-table-stool-508812ef",
+    "mimos-home-mimos-tea-stool-grounded-leg-926e469f",
+    "mimos-home-mimos-tea-stool-grounded-leg-edb3dddf",
+    "mimos-home-mimos-tea-stool-grounded-leg-aadef3cd"
+   ],
+   "p": [
+    49.45,
+    0,
+    0.56
+   ],
+   "r": 0,
+   "floorY": 0
+  },
+  {
+   "def": "core/mars-tea-stool-3@1",
+   "cat": "seat",
+   "building": "mimos",
+   "nums": [
+    11
+   ],
+   "ids": [
+    "mimos-home-mimos-glazed-tea-table-stool-1b91df1a",
+    "mimos-home-mimos-tea-stool-grounded-leg-1c2a6e94",
+    "mimos-home-mimos-tea-stool-grounded-leg-9ad2ec7f",
+    "mimos-home-mimos-tea-stool-grounded-leg-d57e5042"
+   ],
+   "p": [
+    49.55,
+    0,
+    1.65
+   ],
+   "r": 0,
+   "floorY": 0
+  },
+  {
+   "def": "core/mars-red-sofa@1",
+   "cat": "seat",
+   "building": "mimos",
+   "nums": [
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12,
+    12
+   ],
+   "ids": [
+    "mimos-source-west-entry-sofa-mimos-source-sofa-plinth-0d3d9d85",
+    "mimos-source-west-entry-sofa-mimos-source-sofa-back-db991a69",
+    "mimos-source-west-entry-sofa-mimos-source-sofa-rounded-arm-a3db5730",
+    "mimos-source-west-entry-sofa-mimos-source-sofa-rounded-arm-f17d6ec7",
+    "mimos-source-west-entry-sofa-mimos-sofa-separate-cushion-aa30dee6",
+    "mimos-source-west-entry-sofa-mimos-sofa-separate-cushion-fbd7901c",
+    "mimos-source-west-entry-sofa-mimos-sofa-separate-cushion-4521d78d",
+    "mimos-source-west-entry-sofa-mimos-sofa-short-feet-4160743e",
+    "mimos-source-west-entry-sofa-mimos-sofa-short-feet-93903501",
+    "mimos-source-west-entry-sofa-mimos-sofa-short-feet-da4147cb",
+    "mimos-source-west-entry-sofa-mimos-sofa-short-feet-a35b4dfe"
+   ],
+   "p": [
+    44.693,
+    0.53,
+    -1.35
+   ],
+   "r": 1.5708,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-honey-sofa@1",
+   "cat": "seat",
+   "building": "mimos",
+   "nums": [
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13,
+    13
+   ],
+   "ids": [
+    "mimos-source-east-back-sofa-mimos-source-sofa-plinth-0d3d9d85",
+    "mimos-source-east-back-sofa-mimos-source-sofa-back-db991a69",
+    "mimos-source-east-back-sofa-mimos-source-sofa-rounded-arm-a3db5730",
+    "mimos-source-east-back-sofa-mimos-source-sofa-rounded-arm-f17d6ec7",
+    "mimos-source-east-back-sofa-mimos-sofa-separate-cushion-aa30dee6",
+    "mimos-source-east-back-sofa-mimos-sofa-separate-cushion-fbd7901c",
+    "mimos-source-east-back-sofa-mimos-sofa-separate-cushion-4521d78d",
+    "mimos-source-east-back-sofa-mimos-sofa-short-feet-4160743e",
+    "mimos-source-east-back-sofa-mimos-sofa-short-feet-93903501",
+    "mimos-source-east-back-sofa-mimos-sofa-short-feet-da4147cb",
+    "mimos-source-east-back-sofa-mimos-sofa-short-feet-a35b4dfe"
+   ],
+   "p": [
+    49.48,
+    0,
+    -0.277
+   ],
+   "r": 0,
+   "floorY": 0
+  },
+  {
+   "def": "core/mars-cream-recliner@1",
+   "cat": "seat",
+   "building": "mimos",
+   "nums": [
+    14,
+    14,
+    14,
+    14,
+    14
+   ],
+   "ids": [
+    "mimos-cream-recliner-mimos-cream-recliner-low-base-e0b10178",
+    "mimos-cream-recliner-mimos-cream-recliner-cushion-2cd1ba2a",
+    "mimos-cream-recliner-mimos-cream-recliner-padded-back-2c076d47",
+    "mimos-cream-recliner-mimos-cream-recliner-arm-95cc5563",
+    "mimos-cream-recliner-mimos-cream-recliner-arm-95b6ea6e"
+   ],
+   "p": [
+    47.385,
+    0.53,
+    -1.9
+   ],
+   "r": -1.5708,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-black-folding-chair@1",
+   "cat": "seat",
+   "building": "chiba",
+   "nums": [],
+   "ids": [
+    "auditorium-2026-furnishings-auditorium-loose-black-folding-chair-seat-8378cc8c",
+    "auditorium-2026-furnishings-auditorium-folding-chair-back-9413b79a",
+    "auditorium-2026-furnishings-auditorium-folding-chair-crossed-steel-leg-ba484c92",
+    "auditorium-2026-furnishings-auditorium-folding-chair-crossed-steel-leg-17d2cd82",
+    "auditorium-2026-furnishings-auditorium-folding-chair-crossed-steel-leg-463b985b",
+    "auditorium-2026-furnishings-auditorium-folding-chair-crossed-steel-leg-a74b969f"
+   ],
+   "p": [
+    50.072,
+    3.021,
+    15.99
+   ],
+   "r": 1.5708,
+   "floorY": 3.021
+  },
+  {
+   "def": "core/mars-black-folding-chair-2@1",
+   "cat": "seat",
+   "building": "chiba",
+   "nums": [],
+   "ids": [
+    "auditorium-2026-furnishings-auditorium-loose-black-folding-chair-seat-99517c8b",
+    "auditorium-2026-furnishings-auditorium-folding-chair-back-5a5e3395",
+    "auditorium-2026-furnishings-auditorium-folding-chair-crossed-steel-leg-f92c4002",
+    "auditorium-2026-furnishings-auditorium-folding-chair-crossed-steel-leg-823ad2f2",
+    "auditorium-2026-furnishings-auditorium-folding-chair-crossed-steel-leg-c2906337",
+    "auditorium-2026-furnishings-auditorium-folding-chair-crossed-steel-leg-a9cfb75b"
+   ],
+   "p": [
+    52.972,
+    1.878,
+    14.04
+   ],
+   "r": 1.5708,
+   "floorY": 1.878
+  },
+  {
+   "def": "core/mars-black-folding-chair-3@1",
+   "cat": "seat",
+   "building": "chiba",
+   "nums": [],
+   "ids": [
+    "auditorium-2026-furnishings-auditorium-loose-black-folding-chair-seat-e7028400",
+    "auditorium-2026-furnishings-auditorium-folding-chair-back-cec40614",
+    "auditorium-2026-furnishings-auditorium-folding-chair-crossed-steel-leg-5bd29702",
+    "auditorium-2026-furnishings-auditorium-folding-chair-crossed-steel-leg-e4e129f2",
+    "auditorium-2026-furnishings-auditorium-folding-chair-crossed-steel-leg-7f439c0b",
+    "auditorium-2026-furnishings-auditorium-folding-chair-crossed-steel-leg-7e1e8e0f"
+   ],
+   "p": [
+    54.122,
+    1.497,
+    15.99
+   ],
+   "r": 1.5708,
+   "floorY": 1.497
+  },
+  {
+   "def": "core/mars-tier@1",
+   "cat": "seat",
+   "building": "chiba",
+   "nums": [],
+   "ids": [
+    "auditorium-2026-furnishings-auditorium-loose-tier-cushion-218bd4b0"
+   ],
+   "p": [
+    56.035,
+    0.742,
+    14.39
+   ],
+   "r": 0,
+   "floorY": 0.742
+  },
+  {
+   "def": "core/mars-tier-2@1",
+   "cat": "seat",
+   "building": "chiba",
+   "nums": [],
+   "ids": [
+    "auditorium-2026-furnishings-auditorium-loose-tier-cushion-afc636be"
+   ],
+   "p": [
+    55.025,
+    1.123,
+    15.54
+   ],
+   "r": 0,
+   "floorY": 1.123
+  },
+  {
+   "def": "core/mars-tier-3@1",
+   "cat": "seat",
+   "building": "chiba",
+   "nums": [],
+   "ids": [
+    "auditorium-2026-furnishings-auditorium-loose-tier-cushion-284f5359"
+   ],
+   "p": [
+    54.005,
+    1.504,
+    13.89
+   ],
+   "r": 0,
+   "floorY": 1.504
+  },
+  {
+   "def": "core/mars-tier-4@1",
+   "cat": "seat",
+   "building": "chiba",
+   "nums": [],
+   "ids": [
+    "auditorium-2026-furnishings-auditorium-loose-tier-cushion-eaff020f"
+   ],
+   "p": [
+    51.975,
+    2.266,
+    14.94
+   ],
+   "r": 0,
+   "floorY": 2.266
+  },
+  {
+   "def": "core/mars-sofa-short-foot@1",
+   "cat": "seat",
+   "building": "chiba",
+   "nums": [],
+   "ids": [
+    "auditorium-2026-furnishings-auditorium-sofa-short-foot-7d47ce7f",
+    "auditorium-2026-furnishings-auditorium-sofa-short-foot-0a330a9c",
+    "auditorium-2026-furnishings-auditorium-sofa-short-foot-8461b5fe",
+    "auditorium-2026-furnishings-auditorium-sofa-short-foot-c57f5965",
+    "auditorium-2026-furnishings-auditorium-adjacent-navy-sofa-base-015496e2",
+    "auditorium-2026-furnishings-auditorium-adjacent-navy-sofa-back-0525770d",
+    "auditorium-2026-furnishings-auditorium-navy-sofa-arm-0e4a8195",
+    "auditorium-2026-furnishings-auditorium-navy-sofa-arm-d5b66d04",
+    "auditorium-2026-furnishings-auditorium-sofa-pale-throw-cushion-940a7ea8"
+   ],
+   "p": [
+    51.712,
+    0.373,
+    11.44
+   ],
+   "r": 1.5708,
+   "floorY": 0.373
+  },
+  {
+   "def": "core/mars-sofa-short-foot@1",
+   "cat": "seat",
+   "building": "chiba",
+   "nums": [],
+   "ids": [
+    "auditorium-2026-furnishings-auditorium-sofa-short-foot-7b7b681f",
+    "auditorium-2026-furnishings-auditorium-sofa-short-foot-f4b8a6bc",
+    "auditorium-2026-furnishings-auditorium-sofa-short-foot-657f637c",
+    "auditorium-2026-furnishings-auditorium-sofa-short-foot-e57f9253",
+    "auditorium-2026-furnishings-auditorium-adjacent-navy-sofa-base-40a02f34",
+    "auditorium-2026-furnishings-auditorium-adjacent-navy-sofa-back-494b0be5",
+    "auditorium-2026-furnishings-auditorium-navy-sofa-arm-249d28ab",
+    "auditorium-2026-furnishings-auditorium-navy-sofa-arm-a966ce4e",
+    "auditorium-2026-furnishings-auditorium-sofa-pale-throw-cushion-fba6ff35"
+   ],
+   "p": [
+    54.062,
+    0.373,
+    11.44
+   ],
+   "r": 1.5708,
+   "floorY": 0.373
+  },
+  {
+   "def": "core/mars-cream-tablecloth@1",
+   "cat": "table",
+   "building": "chiba",
+   "nums": [],
+   "ids": [
+    "auditorium-2026-furnishings-auditorium-cream-tablecloth-top-df716d8e",
+    "auditorium-2026-furnishings-auditorium-presenter-laptop-base-3f75f119",
+    "auditorium-2026-furnishings-auditorium-presenter-laptop-display-82fcf775"
+   ],
+   "p": [
+    57.565,
+    1.127,
+    14.92
+   ],
+   "r": 0,
+   "floorY": 1.127
+  },
+  {
+   "def": "core/mars-presenter-timber-box@1",
+   "cat": "seat",
+   "building": "chiba",
+   "nums": [],
+   "ids": [
+    "auditorium-2026-furnishings-auditorium-presenter-timber-box-seat-30ecdfbd"
+   ],
+   "p": [
+    57.435,
+    0.373,
+    15.88
+   ],
+   "r": 0,
+   "floorY": 0.373
+  },
+  {
+   "def": "core/mars-classroom-table@1",
+   "cat": "table",
+   "building": "chiba",
+   "nums": [],
+   "ids": [
+    "chiba-gallery-life-chiba-upper-northwest-classroom-table-dfa6cca2",
+    "chiba-gallery-life-chiba-classroom-folding-table-leg-ecd99802",
+    "chiba-gallery-life-chiba-classroom-folding-table-leg-17d16799",
+    "chiba-gallery-life-chiba-classroom-folding-table-leg-fd5216eb",
+    "chiba-gallery-life-chiba-classroom-folding-table-leg-9d0ffe60",
+    "chiba-gallery-life-chiba-classroom-laptop-base-13ab4f0c",
+    "chiba-gallery-life-chiba-classroom-laptop-base-538b060b"
+   ],
+   "p": [
+    48.035,
+    3.248,
+    18.69
+   ],
+   "r": 0,
+   "floorY": 3.248
+  },
+  {
+   "def": "core/mars-marzipan-desk@1",
+   "cat": "table",
+   "building": "chiba",
+   "nums": [],
+   "ids": [
+    "chiba-gallery-life-marzipan-upper-west-desk-aa9255bd",
+    "chiba-gallery-life-marzipan-desk-timber-legs-1dc3e52d",
+    "chiba-gallery-life-marzipan-desk-timber-legs-33301571",
+    "chiba-gallery-life-marzipan-desk-timber-legs-3815c9b1",
+    "chiba-gallery-life-marzipan-desk-timber-legs-71607d4d",
+    "chiba-gallery-life-marzipan-desk-laptop-base-0e3118fb",
+    "chiba-gallery-life-marzipan-desk-laptop-back-4c884291",
+    "chiba-gallery-life-marzipan-desk-book-stack-de46461a",
+    "chiba-gallery-life-marzipan-desk-book-stack-f991a17b",
+    "chiba-gallery-life-marzipan-desk-book-stack-f965011f",
+    "chiba-gallery-life-marzipan-desk-book-stack-f965011f-2",
+    "chiba-gallery-life-marzipan-desk-book-stack-a2f54dce"
+   ],
+   "p": [
+    56.735,
+    3.248,
+    10
+   ],
+   "r": 0,
+   "floorY": 3.248
+  },
+  {
+   "def": "core/mars-field-chair@1",
+   "cat": "seat",
+   "building": "chiba",
+   "nums": [],
+   "ids": [],
+   "p": [
+    27.986,
+    0.02,
+    2.606
+   ],
+   "r": 1.9897,
+   "floorY": 0.02
+  },
+  {
+   "def": "core/mars-field-chair-2@1",
+   "cat": "seat",
+   "building": "chiba",
+   "nums": [],
+   "ids": [],
+   "p": [
+    28.084,
+    -0.09,
+    0.013
+   ],
+   "r": 2.1642,
+   "floorY": -0.09
+  },
+  {
+   "def": "core/mars-field-chair-3@1",
+   "cat": "seat",
+   "building": "chiba",
+   "nums": [],
+   "ids": [],
+   "p": [
+    27.711,
+    0.02,
+    -2.191
+   ],
+   "r": 0.925,
+   "floorY": 0.02
+  },
+  {
+   "def": "core/mars-field-chair-4@1",
+   "cat": "seat",
+   "building": "chiba",
+   "nums": [],
+   "ids": [],
+   "p": [
+    29.608,
+    0.02,
+    3.188
+   ],
+   "r": 2.5656,
+   "floorY": 0.02
+  },
+  {
+   "def": "core/mars-field-teal-sofa@1",
+   "cat": "seat",
+   "building": "chiba",
+   "nums": [],
+   "ids": [],
+   "p": [
+    27.388,
+    0.09,
+    -3.803
+   ],
+   "r": 1.3265,
+   "floorY": 0.09
+  },
+  {
+   "def": "core/mars-chiba@1",
+   "cat": "building",
+   "building": "chiba",
+   "p": [
+    47.77,
+    0,
+    11.12
+   ],
+   "r": 0
+  },
+  {
+   "def": "core/mars-mimos@1",
+   "cat": "building",
+   "building": "mimos",
+   "p": [
+    46.88,
+    -0.24,
+    -2.459
+   ],
+   "r": 0
+  },
+  {
+   "def": "core/mars-kitchen@1",
+   "cat": "building",
+   "building": "kitchen",
+   "p": [
+    40.364,
+    -0.24,
+    -1.903
+   ],
+   "r": 0
+  },
+  {
+   "def": "core/mars-showers@1",
+   "cat": "building",
+   "building": "showers",
+   "p": [
+    50.44,
+    0,
+    -8.36
+   ],
+   "r": 0
+  },
+  {
+   "def": "core/mars-dojo@1",
+   "cat": "building",
+   "building": "dojo",
+   "p": [
+    19.654,
+    0.16,
+    -67.466
+   ],
+   "r": 0
+  },
+  {
+   "def": "core/mars-tool-camp@1",
+   "cat": "building",
+   "building": "tool-camp",
+   "p": [
+    -6.959,
+    0,
+    -44.344
+   ],
+   "r": 0
+  },
+  {
+   "def": "core/mars-freeside@1",
+   "cat": "building",
+   "building": "freeside",
+   "p": [
+    51.477,
+    -0.154,
+    -85.187
+   ],
+   "r": 0
+  },
+  {
+   "def": "core/mars-west-racks@1",
+   "cat": "building",
+   "building": "west-racks",
+   "p": [
+    -57.393,
+    -0.248,
+    54.506
+   ],
+   "r": 0
+  },
+  {
+   "def": "core/mars-vehicle-1@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    34.566,
+    0.027,
+    -10.607
+   ],
+   "r": 0.0228
+  },
+  {
+   "def": "core/mars-vehicle-2@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    29.997,
+    0.274,
+    17.003
+   ],
+   "r": -1.1215
+  },
+  {
+   "def": "core/mars-vehicle-3@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    23.414,
+    0.131,
+    17.254
+   ],
+   "r": -1.2
+  },
+  {
+   "def": "core/mars-shelter-1@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    100.882,
+    1.098,
+    28.548
+   ],
+   "r": 2.0114
+  },
+  {
+   "def": "core/mars-vehicle-4@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -28.703,
+    0.16,
+    -97.16
+   ],
+   "r": 1.123
+  },
+  {
+   "def": "core/mars-vehicle-5@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    72.445,
+    0.084,
+    -39.394
+   ],
+   "r": -0.2017
+  },
+  {
+   "def": "core/mars-vehicle-6@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    91.433,
+    0.055,
+    -19.617
+   ],
+   "r": -0.8666
+  },
+  {
+   "def": "core/mars-vehicle-7@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -27.63,
+    0.101,
+    -28.739
+   ],
+   "r": -0.0725
+  },
+  {
+   "def": "core/mars-shelter-2@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -50.456,
+    0.167,
+    11.648
+   ],
+   "r": 1.0933
+  },
+  {
+   "def": "core/mars-shelter-3@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    56.807,
+    0.167,
+    -39.791
+   ],
+   "r": 1.9717
+  },
+  {
+   "def": "core/mars-vehicle-8@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -56.067,
+    0.107,
+    21.475
+   ],
+   "r": 0.9832
+  },
+  {
+   "def": "core/mars-vehicle-9@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -27.503,
+    0,
+    41.834
+   ],
+   "r": -0.3362
+  },
+  {
+   "def": "core/mars-site-object-1@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    96.993,
+    1.304,
+    26.635
+   ],
+   "r": 0.4406
+  },
+  {
+   "def": "core/mars-vehicle-10@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    52.228,
+    0.07,
+    -26.741
+   ],
+   "r": 0.4551
+  },
+  {
+   "def": "core/mars-shelter-4@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -61.2,
+    0.126,
+    -71.461
+   ],
+   "r": 1.3063
+  },
+  {
+   "def": "core/mars-shelter-5@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -58.135,
+    0.166,
+    -71.192
+   ],
+   "r": 1.2592
+  },
+  {
+   "def": "core/mars-toilet-1@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -56.365,
+    0,
+    -38.025
+   ],
+   "r": -0.5563
+  },
+  {
+   "def": "core/mars-boat-1@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -31.747,
+    0,
+    29.403
+   ],
+   "r": -0.0721
+  },
+  {
+   "def": "core/mars-site-object-2@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    16.796,
+    0.185,
+    12.642
+   ],
+   "r": 1.5681
+  },
+  {
+   "def": "core/mars-site-object-2@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    16.794,
+    0.17,
+    14.002
+   ],
+   "r": 1.5681
+  },
+  {
+   "def": "core/mars-toilet-1@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    60.765,
+    0,
+    64.985
+   ],
+   "r": -1.2282
+  },
+  {
+   "def": "core/mars-site-object-2@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    18.468,
+    0.074,
+    12.636
+   ],
+   "r": 1.5681
+  },
+  {
+   "def": "core/mars-site-object-2@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    16.949,
+    0.174,
+    11.249
+   ],
+   "r": 1.5681
+  },
+  {
+   "def": "core/mars-vehicle-6@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    95.117,
+    0.055,
+    -3.042
+   ],
+   "r": -1.0604
+  },
+  {
+   "def": "core/mars-vehicle-6@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    86.153,
+    0.055,
+    -28.108
+   ],
+   "r": -0.4722
+  },
+  {
+   "def": "core/mars-vehicle-6@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    93.541,
+    0.055,
+    -11.025
+   ],
+   "r": -0.9958
+  },
+  {
+   "def": "core/mars-vehicle-6@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    80.601,
+    0.055,
+    -33.596
+   ],
+   "r": 2.816
+  },
+  {
+   "def": "core/mars-vehicle-11@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -8.09,
+    0.14,
+    -112.088
+   ],
+   "r": 0.4054
+  },
+  {
+   "def": "core/mars-shelter-6@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    105.852,
+    0.173,
+    41.696
+   ],
+   "r": -1.5473
+  },
+  {
+   "def": "core/mars-shelter-7@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    84.823,
+    0.166,
+    -64.546
+   ],
+   "r": 1.3848
+  },
+  {
+   "def": "core/mars-colab-hut-1@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    91.361,
+    0.16,
+    -63.711
+   ],
+   "r": 1.3133
+  },
+  {
+   "def": "core/mars-colab-hut-2@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    97.817,
+    0.16,
+    -61.629
+   ],
+   "r": 1.3129
+  },
+  {
+   "def": "core/mars-colab-hut-2@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    111.642,
+    0.16,
+    -58.24
+   ],
+   "r": 1.3129
+  },
+  {
+   "def": "core/mars-colab-hut-2@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    104.72,
+    0.16,
+    -60.307
+   ],
+   "r": 1.3129
+  },
+  {
+   "def": "core/mars-colab-hut-2@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    78.915,
+    0.16,
+    -66.299
+   ],
+   "r": 1.2278
+  },
+  {
+   "def": "core/mars-boat-2@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -32.804,
+    3.299,
+    29.844
+   ],
+   "r": 3.0722
+  },
+  {
+   "def": "core/mars-og-ground-1@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -44.737,
+    0,
+    52.953
+   ],
+   "r": 2.9322
+  },
+  {
+   "def": "core/mars-og-clubhouse-1@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -50.007,
+    0.16,
+    53.064
+   ],
+   "r": 2.9322
+  },
+  {
+   "def": "core/mars-og-clubhouse-2@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -53.802,
+    0.16,
+    55.352
+   ],
+   "r": 1.3614
+  },
+  {
+   "def": "core/mars-og-clubhouse-3@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -52.455,
+    0.17,
+    54.309
+   ],
+   "r": 1.3614
+  },
+  {
+   "def": "core/mars-og-clubhouse-4@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -52.684,
+    0.42,
+    58.598
+   ],
+   "r": 2.9322
+  },
+  {
+   "def": "core/mars-og-kitchen-1@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -49.213,
+    0.16,
+    59.824
+   ],
+   "r": 2.9322
+  },
+  {
+   "def": "core/mars-og-kitchen-2@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -49.426,
+    1.549,
+    60.063
+   ],
+   "r": 2.9322
+  },
+  {
+   "def": "core/mars-forklift-1@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    19.662,
+    0,
+    -44.818
+   ],
+   "r": 0.6406
+  },
+  {
+   "def": "core/mars-forklift-2@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    19.297,
+    0.655,
+    -44.546
+   ],
+   "r": 0.9543
+  },
+  {
+   "def": "core/mars-og-east-life-1@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -46.426,
+    0.02,
+    51.041
+   ],
+   "r": 2.9322
+  },
+  {
+   "def": "core/mars-og-east-life-2@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -47.297,
+    0.011,
+    50.087
+   ],
+   "r": 2.9322
+  },
+  {
+   "def": "core/mars-og-east-life-2@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -46.319,
+    0.011,
+    50.295
+   ],
+   "r": 2.9322
+  },
+  {
+   "def": "core/mars-og-east-life-2@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -45.341,
+    0.011,
+    50.503
+   ],
+   "r": 2.9322
+  },
+  {
+   "def": "core/mars-og-east-life-3@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -47.292,
+    3.034,
+    53.311
+   ],
+   "r": 2.9322
+  },
+  {
+   "def": "core/mars-og-east-life-3@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -47.381,
+    3.034,
+    53.731
+   ],
+   "r": 2.9322
+  },
+  {
+   "def": "core/mars-og-east-life-3@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -47.471,
+    3.034,
+    54.152
+   ],
+   "r": 2.9322
+  },
+  {
+   "def": "core/mars-og-east-life-3@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -47.56,
+    3.034,
+    54.573
+   ],
+   "r": 2.9322
+  },
+  {
+   "def": "core/mars-og-east-life-3@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -47.649,
+    3.034,
+    54.993
+   ],
+   "r": 2.9322
+  },
+  {
+   "def": "core/mars-og-east-life-3@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -47.739,
+    3.034,
+    55.414
+   ],
+   "r": 2.9322
+  },
+  {
+   "def": "core/mars-og-east-life-3@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -47.828,
+    3.034,
+    55.834
+   ],
+   "r": 2.9322
+  },
+  {
+   "def": "core/mars-og-east-life-3@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -47.918,
+    3.034,
+    56.255
+   ],
+   "r": 2.9322
+  },
+  {
+   "def": "core/mars-og-east-life-3@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -48.007,
+    3.034,
+    56.676
+   ],
+   "r": 2.9322
+  }
+ ]
+}

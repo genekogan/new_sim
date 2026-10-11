@@ -223,6 +223,10 @@ for (const k of KIN) {
   defs.push(base({ name: `kin-${k}`, description: `${info?.name ?? k}: a ceramic Little Martians kin head (scenery, not a Soul), hovering about a metre up. ${info?.lore?.canon ?? ''}`.trim(), tags: ['kin', 'head', 'ceramic', 'littlemartians', 'sculpture', 'floater'], license: LM_LICENSE, source: src, scale: [0.25, 4], layer: 'decor', components: { hover: { height: 0.9, bob: 0.08, period: 6 } } }, sha, m.box.map((v) => v * kk)));
 }
 
+// The Mars 2026 campus pieces (tools/god-skill/scripts/mars-two/build.mjs writes them and their part index; their defs
+// live in core-kit/mars.json). Merged here so regenerating the packs keeps them.
+const MARS_PART = join(root, 'worlds/core-assets/mars/index.part.json');
+if (existsSync(MARS_PART)) Object.assign(index.assets, JSON.parse(readFileSync(MARS_PART, 'utf8')).assets);
 const indexText = JSON.stringify(index, null, 1) + '\n';
 const meshText = JSON.stringify(defs, null, 1) + '\n';
 if (check) {

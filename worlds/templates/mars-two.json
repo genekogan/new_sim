@@ -1,0 +1,1650 @@
+{
+ "schema": "genesis/1",
+ "name": "Mars two",
+ "description": "The Mars College 2026 campus in the new engine, built from the library (core/mars-* defs any god can place): Mimos and the Chiba kitchen and dining hall laid out as Gene corrected them (the L-shaped Mimos with the raised main and the glazed tea room, the outdoor gap, the kitchen west of the diner with its perimeter counters, sinks and prep table, the two northeast shower bays), Chiba with the auditorium, the Dojo, Tool camp, the Freeside compound, the west rack building, and every van, bus, trailer, toilet and hut where the reference (sim.mars.college, 2026) has them. Furniture is the reference's own: Souls sit on the sofas, chairs, stools and bus seats and put things on the tables and counters.",
+ "constants": {
+  "extent": 320,
+  "ground": "land",
+  "limits": {
+   "budget": {
+    "tris": 200000,
+    "bytes": 6000000,
+    "texPx": 2048
+   }
+  }
+ },
+ "state": {
+  "constitution": "# Mars two\nThe Mars College 2026 campus on the low Sonoran desert by the Salton Sea: Mimos (the café and lounge), the Chiba kitchen and dining hall, the Chiba auditorium, the Dojo, Tool camp and the Freeside compound.\n\nRebuilt in the new engine from the 2026 reference with Gene's Mimos and kitchen corrections.",
+  "sky": {
+   "palette": "mars-desert",
+   "sun": 0.8
+  },
+  "weather": {
+   "clouds": 0.05,
+   "wind": 0.3,
+   "rain": 0
+  },
+  "ground": {
+   "palette": "desert"
+  }
+ },
+ "batches": [
+  {
+   "note": "the land: desert floor with the Chocolate Mountains to the north-east and low hills to the north",
+   "group": "land",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/hill@1",
+     "name": "north-hills",
+     "p": [
+      -40,
+      -150
+     ],
+     "params": {
+      "height": 8,
+      "radius": 40
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/hill@1",
+     "name": "chocolate-mountains",
+     "p": [
+      140,
+      -140
+     ],
+     "params": {
+      "height": 14,
+      "radius": 30
+     }
+    }
+   ]
+  },
+  {
+   "note": "the campus buildings (Mimos, the Chiba kitchen and dining hall, the showers as Gene corrected them; Chiba, Dojo, Tool camp, Freeside, the west racks)",
+   "group": "campus",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/mars-chiba@1",
+     "name": "chiba",
+     "p": [
+      47.77,
+      0,
+      11.12
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-mimos@1",
+     "name": "mimos",
+     "p": [
+      46.88,
+      -0.24,
+      -2.459
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-kitchen@1",
+     "name": "kitchen",
+     "p": [
+      40.364,
+      -0.24,
+      -1.903
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-showers@1",
+     "name": "showers",
+     "p": [
+      50.44,
+      0,
+      -8.36
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-dojo@1",
+     "name": "dojo",
+     "p": [
+      19.654,
+      0.16,
+      -67.466
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-tool-camp@1",
+     "name": "tool-camp",
+     "p": [
+      -6.959,
+      0,
+      -44.344
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-freeside@1",
+     "name": "freeside",
+     "p": [
+      51.477,
+      -0.154,
+      -85.187
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-west-racks@1",
+     "name": "west-racks",
+     "p": [
+      -57.393,
+      -0.248,
+      54.506
+     ],
+     "r": 0
+    }
+   ]
+  },
+  {
+   "note": "Mimos furniture: the coffee counter (#1), the tea table (#2), the study table (#3) and its chairs (#4–7), the papasan (#8), the tea stools (#9–11), the red sofa (#12), the honey sofa beneath the posters (#13), the cream recliner (#14)",
+   "group": "mimos",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/mars-coffee-counter@1",
+     "name": "coffee-counter-1",
+     "in": {
+      "parent": "mimos",
+      "slot": "main"
+     },
+     "p": [
+      -1.947,
+      0.411
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-red-mini-refrigerator@1",
+     "name": "red-mini-refrigerator",
+     "in": {
+      "parent": "mimos",
+      "slot": "main"
+     },
+     "p": [
+      -1.977,
+      2.355
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-tea-table@1",
+     "name": "tea-table-2",
+     "in": {
+      "parent": "mimos",
+      "slot": "floor"
+     },
+     "p": [
+      -0.21,
+      0.53
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-study-chair@1",
+     "name": "study-chair-7",
+     "in": {
+      "parent": "mimos",
+      "slot": "main"
+     },
+     "p": [
+      2.015,
+      -1.765
+     ],
+     "r": -1.5708
+    },
+    {
+     "op": "place",
+     "def": "core/mars-study-table@1",
+     "name": "study-table-3",
+     "in": {
+      "parent": "mimos",
+      "slot": "main"
+     },
+     "p": [
+      0.965,
+      -1.745
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-study-chair@1",
+     "name": "study-chair-4",
+     "in": {
+      "parent": "mimos",
+      "slot": "main"
+     },
+     "p": [
+      0.315,
+      -1.125
+     ],
+     "r": -3.1416
+    },
+    {
+     "op": "place",
+     "def": "core/mars-study-chair-2@1",
+     "name": "study-chair-5",
+     "in": {
+      "parent": "mimos",
+      "slot": "main"
+     },
+     "p": [
+      1.445,
+      -1.125
+     ],
+     "r": 3.1416
+    },
+    {
+     "op": "place",
+     "def": "core/mars-study-chair-3@1",
+     "name": "study-chair-6",
+     "in": {
+      "parent": "mimos",
+      "slot": "main"
+     },
+     "p": [
+      1.215,
+      -2.375
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-papasan@1",
+     "name": "papasan-8",
+     "in": {
+      "parent": "mimos",
+      "slot": "floor"
+     },
+     "p": [
+      1.22,
+      0.7
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-tea-stool@1",
+     "name": "tea-stool-9",
+     "in": {
+      "parent": "mimos",
+      "slot": "floor"
+     },
+     "p": [
+      -1.18,
+      0.5
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-tea-stool-2@1",
+     "name": "tea-stool-10",
+     "in": {
+      "parent": "mimos",
+      "slot": "floor"
+     },
+     "p": [
+      -0.38,
+      0.01
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-tea-stool-3@1",
+     "name": "tea-stool-11",
+     "in": {
+      "parent": "mimos",
+      "slot": "floor"
+     },
+     "p": [
+      -0.28,
+      1.1
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-red-sofa@1",
+     "name": "red-sofa-12",
+     "in": {
+      "parent": "mimos",
+      "slot": "main"
+     },
+     "p": [
+      -0.942,
+      1.655
+     ],
+     "r": 1.5708
+    },
+    {
+     "op": "place",
+     "def": "core/mars-honey-sofa@1",
+     "name": "honey-sofa-13",
+     "in": {
+      "parent": "mimos",
+      "slot": "floor"
+     },
+     "p": [
+      -0.35,
+      -0.827
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-cream-recliner@1",
+     "name": "cream-recliner-14",
+     "in": {
+      "parent": "mimos",
+      "slot": "main"
+     },
+     "p": [
+      1.75,
+      1.105
+     ],
+     "r": -1.5708
+    }
+   ]
+  },
+  {
+   "note": "the kitchen and dining hall: perimeter counters with the sinks, the prep table (#15), the fridges and freezer (#18, #19, #29), the bus seats (#20–25) and blue tables (#26–28)",
+   "group": "kitchen",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/mars-prep-table@1",
+     "name": "prep-table-15",
+     "in": {
+      "parent": "kitchen",
+      "slot": "working-kitchen"
+     },
+     "p": [
+      0,
+      0
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-sink-counter-lip@1",
+     "name": "sink-counter-lip",
+     "p": [
+      38.665,
+      1.442,
+      -5.89
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-sink-counter-lip-2@1",
+     "name": "sink-counter-lip-2",
+     "in": {
+      "parent": "kitchen",
+      "slot": "working-kitchen"
+     },
+     "p": [
+      0.19,
+      -2.795
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-exterior-serving-shelf@1",
+     "name": "exterior-serving-shelf",
+     "in": {
+      "parent": "kitchen",
+      "slot": "working-kitchen"
+     },
+     "p": [
+      -0.27,
+      3.7
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-perimeter-counter@1",
+     "name": "perimeter-counter",
+     "in": {
+      "parent": "kitchen",
+      "slot": "working-kitchen"
+     },
+     "p": [
+      -1.432,
+      0
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-serving-inside-counter-retur@1",
+     "name": "serving-inside-counter-retur",
+     "p": [
+      38.325,
+      1.42,
+      1.55
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-north-perimeter-counter-retu@1",
+     "name": "north-perimeter-counter-retu",
+     "in": {
+      "parent": "kitchen",
+      "slot": "working-kitchen"
+     },
+     "p": [
+      0,
+      -3.215
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-commercial-fridge@1",
+     "name": "commercial-fridge-18",
+     "in": {
+      "parent": "kitchen",
+      "slot": "working-kitchen"
+     },
+     "p": [
+      1.524,
+      -2.55
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-chest-freezer@1",
+     "name": "chest-freezer-19",
+     "in": {
+      "parent": "kitchen",
+      "slot": "working-kitchen"
+     },
+     "p": [
+      1.49,
+      2.65
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-bus-seat@1",
+     "name": "bus-seat-20",
+     "in": {
+      "parent": "kitchen",
+      "slot": "dining-hall"
+     },
+     "p": [
+      0.608,
+      2.049
+     ],
+     "r": 3.1416
+    },
+    {
+     "op": "place",
+     "def": "core/mars-bus-seat-2@1",
+     "name": "bus-seat-21",
+     "in": {
+      "parent": "kitchen",
+      "slot": "dining-hall"
+     },
+     "p": [
+      0.608,
+      0.9
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-bus-seat-3@1",
+     "name": "bus-seat-23",
+     "in": {
+      "parent": "kitchen",
+      "slot": "dining-hall"
+     },
+     "p": [
+      0.608,
+      -1.4
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-bus-seat-4@1",
+     "name": "bus-seat-25",
+     "in": {
+      "parent": "kitchen",
+      "slot": "dining-hall"
+     },
+     "p": [
+      0.608,
+      -3.199
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-diner-table@1",
+     "name": "diner-table-26",
+     "in": {
+      "parent": "kitchen",
+      "slot": "dining-hall"
+     },
+     "p": [
+      0.648,
+      1.62
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-diner-table@1",
+     "name": "diner-table-27",
+     "in": {
+      "parent": "kitchen",
+      "slot": "dining-hall"
+     },
+     "p": [
+      0.648,
+      0
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-diner-table@1",
+     "name": "diner-table-28",
+     "in": {
+      "parent": "kitchen",
+      "slot": "dining-hall"
+     },
+     "p": [
+      0.648,
+      -2.45
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-white-fridge@1",
+     "name": "white-fridge-29",
+     "in": {
+      "parent": "kitchen",
+      "slot": "working-kitchen"
+     },
+     "p": [
+      1.431,
+      1.55
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-dry-goods-long-shelf@1",
+     "name": "dry-goods-long-shelf",
+     "p": [
+      36.685,
+      2.277,
+      -1.535
+     ],
+     "r": 0
+    }
+   ]
+  },
+  {
+   "note": "Chiba and the field: the auditorium sofas, folding chairs, tier cushions, the presenter box, the classroom table and desk; the field chairs and the teal sofa",
+   "group": "chiba",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/mars-black-folding-chair@1",
+     "name": "black-folding-chair",
+     "p": [
+      50.072,
+      3.021,
+      15.99
+     ],
+     "r": 1.5708
+    },
+    {
+     "op": "place",
+     "def": "core/mars-black-folding-chair-2@1",
+     "name": "black-folding-chair-2",
+     "p": [
+      52.972,
+      1.878,
+      14.04
+     ],
+     "r": 1.5708
+    },
+    {
+     "op": "place",
+     "def": "core/mars-black-folding-chair-3@1",
+     "name": "black-folding-chair-3",
+     "p": [
+      54.122,
+      1.497,
+      15.99
+     ],
+     "r": 1.5708
+    },
+    {
+     "op": "place",
+     "def": "core/mars-tier@1",
+     "name": "tier",
+     "p": [
+      56.035,
+      0.742,
+      14.39
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-tier-2@1",
+     "name": "tier-2",
+     "p": [
+      55.025,
+      1.123,
+      15.54
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-tier-3@1",
+     "name": "tier-3",
+     "p": [
+      54.005,
+      1.504,
+      13.89
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-tier-4@1",
+     "name": "tier-4",
+     "p": [
+      51.975,
+      2.266,
+      14.94
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-sofa-short-foot@1",
+     "name": "sofa-short-foot",
+     "p": [
+      51.712,
+      0.373,
+      11.44
+     ],
+     "r": 1.5708
+    },
+    {
+     "op": "place",
+     "def": "core/mars-sofa-short-foot@1",
+     "name": "sofa-short-foot-2",
+     "p": [
+      54.062,
+      0.373,
+      11.44
+     ],
+     "r": 1.5708
+    },
+    {
+     "op": "place",
+     "def": "core/mars-cream-tablecloth@1",
+     "name": "cream-tablecloth",
+     "p": [
+      57.565,
+      1.127,
+      14.92
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-presenter-timber-box@1",
+     "name": "presenter-timber-box",
+     "p": [
+      57.435,
+      0.373,
+      15.88
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-classroom-table@1",
+     "name": "classroom-table",
+     "p": [
+      48.035,
+      3.248,
+      18.69
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-marzipan-desk@1",
+     "name": "marzipan-desk",
+     "p": [
+      56.735,
+      3.248,
+      10
+     ],
+     "r": 0
+    },
+    {
+     "op": "place",
+     "def": "core/mars-field-chair@1",
+     "name": "field-chair",
+     "p": [
+      27.986,
+      0.02,
+      2.606
+     ],
+     "r": 1.9897
+    },
+    {
+     "op": "place",
+     "def": "core/mars-field-chair-2@1",
+     "name": "field-chair-2",
+     "p": [
+      28.084,
+      -0.09,
+      0.013
+     ],
+     "r": 2.1642
+    },
+    {
+     "op": "place",
+     "def": "core/mars-field-chair-3@1",
+     "name": "field-chair-3",
+     "p": [
+      27.711,
+      0.02,
+      -2.191
+     ],
+     "r": 0.925
+    },
+    {
+     "op": "place",
+     "def": "core/mars-field-chair-4@1",
+     "name": "field-chair-4",
+     "p": [
+      29.608,
+      0.02,
+      3.188
+     ],
+     "r": 2.5656
+    },
+    {
+     "op": "place",
+     "def": "core/mars-field-teal-sofa@1",
+     "name": "field-teal-sofa",
+     "p": [
+      27.388,
+      0.09,
+      -3.803
+     ],
+     "r": 1.3265
+    }
+   ]
+  },
+  {
+   "note": "things to carry: the prep mixing bowls and stock pot, the tea kettle and cups, the study mugs",
+   "group": "items",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/mars-stored-stock-pot@1",
+     "name": "stored-stock-pot",
+     "p": [
+      38.525,
+      0.775,
+      -1.705
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/mars-fridge-top-electric-kettle@1",
+     "name": "fridge-top-electric-kettle",
+     "p": [
+      39.835,
+      2.49,
+      -0.565
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/mars-prep-mixing-bowl@1",
+     "name": "prep-mixing-bowl",
+     "in": {
+      "parent": "kitchen/prep-table-15",
+      "slot": "top"
+     },
+     "p": [
+      0.224,
+      0,
+      -0.56
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/mars-prep-mixing-bowl-2@1",
+     "name": "prep-mixing-bowl-2",
+     "in": {
+      "parent": "kitchen/prep-table-15",
+      "slot": "top"
+     },
+     "p": [
+      0.001,
+      0,
+      0.445
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/mars-table-kettle@1",
+     "name": "table-kettle",
+     "in": {
+      "parent": "mimos/tea-table-2",
+      "slot": "top"
+     },
+     "p": [
+      0.23,
+      0,
+      0
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/mars-table-cup@1",
+     "name": "table-cup",
+     "in": {
+      "parent": "mimos/tea-table-2",
+      "slot": "top"
+     },
+     "p": [
+      -0.4,
+      0,
+      0
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/mars-table-cup-2@1",
+     "name": "table-cup-2",
+     "in": {
+      "parent": "mimos/tea-table-2",
+      "slot": "top"
+     },
+     "p": [
+      -0.12,
+      0,
+      0
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/mars-ceramic-mug@1",
+     "name": "ceramic-mug",
+     "in": {
+      "parent": "mimos/study-table-3",
+      "slot": "top"
+     },
+     "p": [
+      0.671,
+      0,
+      0
+     ]
+    },
+    {
+     "op": "place",
+     "def": "core/mars-ceramic-mug-2@1",
+     "name": "ceramic-mug-2",
+     "in": {
+      "parent": "mimos/study-table-3",
+      "slot": "top"
+     },
+     "p": [
+      0.871,
+      0,
+      0
+     ]
+    }
+   ]
+  },
+  {
+   "note": "the site: vans, buses, trailers, RVs, toilets, huts, the forklift, OG",
+   "group": "site",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/mars-vehicle-1@1",
+     "name": "vehicle",
+     "p": [
+      34.566,
+      0.027,
+      -10.607
+     ],
+     "r": 0.0228
+    },
+    {
+     "op": "place",
+     "def": "core/mars-vehicle-2@1",
+     "name": "vehicle-2",
+     "p": [
+      29.997,
+      0.274,
+      17.003
+     ],
+     "r": -1.1215
+    },
+    {
+     "op": "place",
+     "def": "core/mars-vehicle-3@1",
+     "name": "vehicle-3",
+     "p": [
+      23.414,
+      0.131,
+      17.254
+     ],
+     "r": -1.2
+    },
+    {
+     "op": "place",
+     "def": "core/mars-shelter-1@1",
+     "name": "shelter",
+     "p": [
+      100.882,
+      1.098,
+      28.548
+     ],
+     "r": 2.0114
+    },
+    {
+     "op": "place",
+     "def": "core/mars-vehicle-4@1",
+     "name": "vehicle-4",
+     "p": [
+      -28.703,
+      0.16,
+      -97.16
+     ],
+     "r": 1.123
+    },
+    {
+     "op": "place",
+     "def": "core/mars-vehicle-5@1",
+     "name": "vehicle-5",
+     "p": [
+      72.445,
+      0.084,
+      -39.394
+     ],
+     "r": -0.2017
+    },
+    {
+     "op": "place",
+     "def": "core/mars-vehicle-6@1",
+     "name": "vehicle-6",
+     "p": [
+      91.433,
+      0.055,
+      -19.617
+     ],
+     "r": -0.8666
+    },
+    {
+     "op": "place",
+     "def": "core/mars-vehicle-7@1",
+     "name": "vehicle-7",
+     "p": [
+      -27.63,
+      0.101,
+      -28.739
+     ],
+     "r": -0.0725
+    },
+    {
+     "op": "place",
+     "def": "core/mars-shelter-2@1",
+     "name": "shelter-2",
+     "p": [
+      -50.456,
+      0.167,
+      11.648
+     ],
+     "r": 1.0933
+    },
+    {
+     "op": "place",
+     "def": "core/mars-shelter-3@1",
+     "name": "shelter-3",
+     "p": [
+      56.807,
+      0.167,
+      -39.791
+     ],
+     "r": 1.9717
+    },
+    {
+     "op": "place",
+     "def": "core/mars-vehicle-8@1",
+     "name": "vehicle-8",
+     "p": [
+      -56.067,
+      0.107,
+      21.475
+     ],
+     "r": 0.9832
+    },
+    {
+     "op": "place",
+     "def": "core/mars-vehicle-9@1",
+     "name": "vehicle-9",
+     "p": [
+      -27.503,
+      0,
+      41.834
+     ],
+     "r": -0.3362
+    },
+    {
+     "op": "place",
+     "def": "core/mars-site-object-1@1",
+     "name": "site-object",
+     "p": [
+      96.993,
+      1.304,
+      26.635
+     ],
+     "r": 0.4406
+    },
+    {
+     "op": "place",
+     "def": "core/mars-vehicle-10@1",
+     "name": "vehicle-10",
+     "p": [
+      52.228,
+      0.07,
+      -26.741
+     ],
+     "r": 0.4551
+    },
+    {
+     "op": "place",
+     "def": "core/mars-shelter-4@1",
+     "name": "shelter-4",
+     "p": [
+      -61.2,
+      0.126,
+      -71.461
+     ],
+     "r": 1.3063
+    },
+    {
+     "op": "place",
+     "def": "core/mars-shelter-5@1",
+     "name": "shelter-5",
+     "p": [
+      -58.135,
+      0.166,
+      -71.192
+     ],
+     "r": 1.2592
+    },
+    {
+     "op": "place",
+     "def": "core/mars-toilet-1@1",
+     "name": "toilet",
+     "p": [
+      -56.365,
+      0,
+      -38.025
+     ],
+     "r": -0.5563
+    },
+    {
+     "op": "place",
+     "def": "core/mars-boat-1@1",
+     "name": "boat",
+     "p": [
+      -31.747,
+      0,
+      29.403
+     ],
+     "r": -0.0721
+    },
+    {
+     "op": "place",
+     "def": "core/mars-site-object-2@1",
+     "name": "site-object-2",
+     "p": [
+      16.796,
+      0.185,
+      12.642
+     ],
+     "r": 1.5681
+    },
+    {
+     "op": "place",
+     "def": "core/mars-site-object-2@1",
+     "name": "site-object-3",
+     "p": [
+      16.794,
+      0.17,
+      14.002
+     ],
+     "r": 1.5681
+    },
+    {
+     "op": "place",
+     "def": "core/mars-toilet-1@1",
+     "name": "toilet-2",
+     "p": [
+      60.765,
+      0,
+      64.985
+     ],
+     "r": -1.2282
+    },
+    {
+     "op": "place",
+     "def": "core/mars-site-object-2@1",
+     "name": "site-object-4",
+     "p": [
+      18.468,
+      0.074,
+      12.636
+     ],
+     "r": 1.5681
+    },
+    {
+     "op": "place",
+     "def": "core/mars-site-object-2@1",
+     "name": "site-object-5",
+     "p": [
+      16.949,
+      0.174,
+      11.249
+     ],
+     "r": 1.5681
+    },
+    {
+     "op": "place",
+     "def": "core/mars-vehicle-6@1",
+     "name": "vehicle-11",
+     "p": [
+      95.117,
+      0.055,
+      -3.042
+     ],
+     "r": -1.0604
+    },
+    {
+     "op": "place",
+     "def": "core/mars-vehicle-6@1",
+     "name": "vehicle-12",
+     "p": [
+      86.153,
+      0.055,
+      -28.108
+     ],
+     "r": -0.4722
+    },
+    {
+     "op": "place",
+     "def": "core/mars-vehicle-6@1",
+     "name": "vehicle-13",
+     "p": [
+      93.541,
+      0.055,
+      -11.025
+     ],
+     "r": -0.9958
+    },
+    {
+     "op": "place",
+     "def": "core/mars-vehicle-6@1",
+     "name": "vehicle-14",
+     "p": [
+      80.601,
+      0.055,
+      -33.596
+     ],
+     "r": 2.816
+    },
+    {
+     "op": "place",
+     "def": "core/mars-vehicle-11@1",
+     "name": "vehicle-15",
+     "p": [
+      -8.09,
+      0.14,
+      -112.088
+     ],
+     "r": 0.4054
+    },
+    {
+     "op": "place",
+     "def": "core/mars-shelter-6@1",
+     "name": "shelter-6",
+     "p": [
+      105.852,
+      0.173,
+      41.696
+     ],
+     "r": -1.5473
+    },
+    {
+     "op": "place",
+     "def": "core/mars-shelter-7@1",
+     "name": "shelter-7",
+     "p": [
+      84.823,
+      0.166,
+      -64.546
+     ],
+     "r": 1.3848
+    },
+    {
+     "op": "place",
+     "def": "core/mars-colab-hut-1@1",
+     "name": "colab-hut",
+     "p": [
+      91.361,
+      0.16,
+      -63.711
+     ],
+     "r": 1.3133
+    },
+    {
+     "op": "place",
+     "def": "core/mars-colab-hut-2@1",
+     "name": "colab-hut-2",
+     "p": [
+      97.817,
+      0.16,
+      -61.629
+     ],
+     "r": 1.3129
+    },
+    {
+     "op": "place",
+     "def": "core/mars-colab-hut-2@1",
+     "name": "colab-hut-3",
+     "p": [
+      111.642,
+      0.16,
+      -58.24
+     ],
+     "r": 1.3129
+    },
+    {
+     "op": "place",
+     "def": "core/mars-colab-hut-2@1",
+     "name": "colab-hut-4",
+     "p": [
+      104.72,
+      0.16,
+      -60.307
+     ],
+     "r": 1.3129
+    },
+    {
+     "op": "place",
+     "def": "core/mars-colab-hut-2@1",
+     "name": "colab-hut-5",
+     "p": [
+      78.915,
+      0.16,
+      -66.299
+     ],
+     "r": 1.2278
+    },
+    {
+     "op": "place",
+     "def": "core/mars-boat-2@1",
+     "name": "boat-2",
+     "p": [
+      -32.804,
+      3.299,
+      29.844
+     ],
+     "r": 3.0722
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-ground-1@1",
+     "name": "og-ground",
+     "p": [
+      -44.737,
+      0,
+      52.953
+     ],
+     "r": 2.9322
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-clubhouse-1@1",
+     "name": "og-clubhouse",
+     "p": [
+      -50.007,
+      0.16,
+      53.064
+     ],
+     "r": 2.9322
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-clubhouse-2@1",
+     "name": "og-clubhouse-2",
+     "p": [
+      -53.802,
+      0.16,
+      55.352
+     ],
+     "r": 1.3614
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-clubhouse-3@1",
+     "name": "og-clubhouse-3",
+     "p": [
+      -52.455,
+      0.17,
+      54.309
+     ],
+     "r": 1.3614
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-clubhouse-4@1",
+     "name": "og-clubhouse-4",
+     "p": [
+      -52.684,
+      0.42,
+      58.598
+     ],
+     "r": 2.9322
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-kitchen-1@1",
+     "name": "og-kitchen",
+     "p": [
+      -49.213,
+      0.16,
+      59.824
+     ],
+     "r": 2.9322
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-kitchen-2@1",
+     "name": "og-kitchen-2",
+     "p": [
+      -49.426,
+      1.549,
+      60.063
+     ],
+     "r": 2.9322
+    },
+    {
+     "op": "place",
+     "def": "core/mars-forklift-1@1",
+     "name": "forklift",
+     "p": [
+      19.662,
+      0,
+      -44.818
+     ],
+     "r": 0.6406
+    },
+    {
+     "op": "place",
+     "def": "core/mars-forklift-2@1",
+     "name": "forklift-2",
+     "p": [
+      19.297,
+      0.655,
+      -44.546
+     ],
+     "r": 0.9543
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-east-life-1@1",
+     "name": "og-east-life",
+     "p": [
+      -46.426,
+      0.02,
+      51.041
+     ],
+     "r": 2.9322
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-east-life-2@1",
+     "name": "og-east-life-2",
+     "p": [
+      -47.297,
+      0.011,
+      50.087
+     ],
+     "r": 2.9322
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-east-life-2@1",
+     "name": "og-east-life-3",
+     "p": [
+      -46.319,
+      0.011,
+      50.295
+     ],
+     "r": 2.9322
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-east-life-2@1",
+     "name": "og-east-life-4",
+     "p": [
+      -45.341,
+      0.011,
+      50.503
+     ],
+     "r": 2.9322
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-east-life-3@1",
+     "name": "og-east-life-5",
+     "p": [
+      -47.292,
+      3.034,
+      53.311
+     ],
+     "r": 2.9322
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-east-life-3@1",
+     "name": "og-east-life-6",
+     "p": [
+      -47.381,
+      3.034,
+      53.731
+     ],
+     "r": 2.9322
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-east-life-3@1",
+     "name": "og-east-life-7",
+     "p": [
+      -47.471,
+      3.034,
+      54.152
+     ],
+     "r": 2.9322
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-east-life-3@1",
+     "name": "og-east-life-8",
+     "p": [
+      -47.56,
+      3.034,
+      54.573
+     ],
+     "r": 2.9322
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-east-life-3@1",
+     "name": "og-east-life-9",
+     "p": [
+      -47.649,
+      3.034,
+      54.993
+     ],
+     "r": 2.9322
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-east-life-3@1",
+     "name": "og-east-life-10",
+     "p": [
+      -47.739,
+      3.034,
+      55.414
+     ],
+     "r": 2.9322
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-east-life-3@1",
+     "name": "og-east-life-11",
+     "p": [
+      -47.828,
+      3.034,
+      55.834
+     ],
+     "r": 2.9322
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-east-life-3@1",
+     "name": "og-east-life-12",
+     "p": [
+      -47.918,
+      3.034,
+      56.255
+     ],
+     "r": 2.9322
+    },
+    {
+     "op": "place",
+     "def": "core/mars-og-east-life-3@1",
+     "name": "og-east-life-13",
+     "p": [
+      -48.007,
+      3.034,
+      56.676
+     ],
+     "r": 2.9322
+    }
+   ]
+  },
+  {
+   "note": "named outdoor places",
+   "group": "places",
+   "ops": [
+    {
+     "op": "place",
+     "def": "core/flag@1",
+     "name": "mimos-outdoor-gap",
+     "p": [
+      49.8,
+      -3.3
+     ],
+     "state": {
+      "label": "Mimos outdoor gap (northeast of the L, outdoors)"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/flag@1",
+     "name": "mimos-rear-steps",
+     "p": [
+      44.75,
+      -7.6
+     ],
+     "state": {
+      "label": "Mimos rear steps (the way in at the north)"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/flag@1",
+     "name": "kitchen-steps",
+     "p": [
+      42.38,
+      4.2
+     ],
+     "state": {
+      "label": "Kitchen steps (up to the diner's blue door)"
+     }
+    },
+    {
+     "op": "place",
+     "def": "core/flag@1",
+     "name": "field",
+     "p": [
+      28.5,
+      0
+     ],
+     "state": {
+      "label": "The field (chairs and the teal sofa west of Chiba)"
+     }
+    }
+   ]
+  }
+ ]
+}
