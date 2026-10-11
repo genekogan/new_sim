@@ -3,6 +3,745 @@
  "frame": "mars-two: x = east, z = south (north up), metres; Mimos origin at x 48, z 0",
  "placements": [
   {
+   "def": "core/mars-mimos-coffee-table@1",
+   "cat": "table",
+   "building": "mimos",
+   "nums": [],
+   "ids": [
+    "mimos-open-l-mimos-occupied-west-shared-coffee-tabletop-67299bfd",
+    "mimos-open-l-mimos-west-coffee-table-short-leg-a6a6f470",
+    "mimos-open-l-mimos-west-coffee-table-short-leg-03c415ba",
+    "mimos-open-l-mimos-west-coffee-table-short-leg-de205d36",
+    "mimos-open-l-mimos-west-coffee-table-short-leg-d8909c4c"
+   ],
+   "p": [
+    46.45,
+    0.53,
+    -1.9
+   ],
+   "r": 0,
+   "floorY": 0.53
+  },
+  {
+   "def": "core/mars-coffee-table-ceramic-cup@1",
+   "cat": "item",
+   "building": "mimos",
+   "nums": [],
+   "ids": [
+    "mimos-open-l-mimos-west-coffee-table-ceramic-cup-9deb1861"
+   ],
+   "p": [
+    46.43,
+    1.099,
+    -1.41
+   ],
+   "r": 0,
+   "floorY": 1.099
+  },
+  {
+   "def": "core/mars-coffee-table-ceramic-cup@1",
+   "cat": "item",
+   "building": "mimos",
+   "nums": [],
+   "ids": [
+    "mimos-open-l-mimos-west-coffee-table-ceramic-cup-3ed6891d"
+   ],
+   "p": [
+    46.59,
+    1.099,
+    -1.65
+   ],
+   "r": 0,
+   "floorY": 1.099
+  },
+  {
+   "def": "core/mars-coffee-table-ceramic-cup@1",
+   "cat": "item",
+   "building": "mimos",
+   "nums": [],
+   "ids": [
+    "mimos-open-l-mimos-west-coffee-table-ceramic-cup-52c7e406"
+   ],
+   "p": [
+    46.43,
+    1.099,
+    -1.89
+   ],
+   "r": 0,
+   "floorY": 1.099
+  },
+  {
+   "def": "core/mars-coffee-table-ceramic-cup@1",
+   "cat": "item",
+   "building": "mimos",
+   "nums": [],
+   "ids": [
+    "mimos-open-l-mimos-west-coffee-table-ceramic-cup-3e225f92"
+   ],
+   "p": [
+    46.59,
+    1.099,
+    -2.13
+   ],
+   "r": 0,
+   "floorY": 1.099
+  },
+  {
+   "def": "core/mars-tool-library-bookshelf-timber@1",
+   "cat": "table",
+   "building": "tool-camp",
+   "nums": [],
+   "ids": [
+    "tool-2026-library-tool-library-bookshelf-upright-ce122bc8",
+    "tool-2026-library-tool-library-bookshelf-upright-6c360b2f",
+    "tool-2026-library-tool-library-bookshelf-timber-shelf-0d61b836",
+    "tool-2026-library-tool-library-bookshelf-timber-shelf-ef5ea17d",
+    "tool-2026-library-tool-library-bookshelf-timber-shelf-e3b84d23",
+    "tool-2026-library-tool-library-bookshelf-timber-shelf-29bb4410",
+    "tool-2026-library-tool-library-bookshelf-timber-shelf-5cf80218",
+    "tool-2026-library-tool-library-native-book-spines-c73776-4dee96b5"
+   ],
+   "p": [
+    -12.743,
+    2.857,
+    -57.209
+   ],
+   "r": 0,
+   "floorY": 2.857
+  },
+  {
+   "def": "core/mars-tool-library-low-table@1",
+   "cat": "table",
+   "building": "tool-camp",
+   "nums": [],
+   "ids": [
+    "tool-2026-library-tool-library-low-table-leg-3663614b",
+    "tool-2026-library-tool-library-low-table-leg-6528e6c4",
+    "tool-2026-library-tool-library-low-table-leg-69aeb83a",
+    "tool-2026-library-tool-library-low-table-leg-3b646317",
+    "tool-2026-library-tool-library-black-inset-table-panel-422642a8",
+    "tool-2026-library-tool-library-black-inset-table-panel-05750462",
+    "tool-2026-library-tool-library-black-inset-table-panel-6f4a5a6b",
+    "tool-2026-library-tool-library-coffee-table-book-stack-731689e8",
+    "tool-2026-library-tool-library-coffee-table-book-stack-86cc1ddf",
+    "tool-2026-library-tool-library-coffee-table-book-stack-86cc1ddf-2",
+    "tool-2026-library-tool-library-coffee-table-book-stack-10460976",
+    "tool-2026-library-tool-library-coffee-table-book-stack-10460976-2"
+   ],
+   "p": [
+    -13.069,
+    2.857,
+    -55.687
+   ],
+   "r": 0,
+   "floorY": 2.857
+  },
+  {
+   "def": "core/mars-tool-library-floor@1",
+   "cat": "seat",
+   "building": "tool-camp",
+   "nums": [],
+   "ids": [
+    "tool-2026-library-tool-library-pale-floor-cushion-91328077"
+   ],
+   "p": [
+    -13.921,
+    2.857,
+    -55.05
+   ],
+   "r": 0,
+   "floorY": 2.857
+  },
+  {
+   "def": "core/mars-tool-library-floor-2@1",
+   "cat": "seat",
+   "building": "tool-camp",
+   "nums": [],
+   "ids": [
+    "tool-2026-library-tool-library-pale-floor-cushion-e761cc67"
+   ],
+   "p": [
+    -12.601,
+    2.857,
+    -54.768
+   ],
+   "r": 0,
+   "floorY": 2.857
+  },
+  {
+   "def": "core/mars-tool-library-floor-3@1",
+   "cat": "seat",
+   "building": "tool-camp",
+   "nums": [],
+   "ids": [
+    "tool-2026-library-tool-library-pale-floor-cushion-9334f818"
+   ],
+   "p": [
+    -13.587,
+    2.857,
+    -56.615
+   ],
+   "r": 0,
+   "floorY": 2.857
+  },
+  {
+   "def": "core/mars-tool-library-floor-4@1",
+   "cat": "seat",
+   "building": "tool-camp",
+   "nums": [],
+   "ids": [
+    "tool-2026-library-tool-library-pale-floor-cushion-1e8a0128"
+   ],
+   "p": [
+    -12.266,
+    2.857,
+    -56.333
+   ],
+   "r": 0,
+   "floorY": 2.857
+  },
+  {
+   "def": "core/mars-tool-ground-bench-lower@1",
+   "cat": "table",
+   "building": "tool-camp",
+   "nums": [],
+   "ids": [
+    "tool-2026-library-tool-ground-bench-lower-storage-shelf-10867e8c"
+   ],
+   "p": [
+    -14.28,
+    0.422,
+    -50.014
+   ],
+   "r": 0,
+   "floorY": 0.422
+  },
+  {
+   "def": "core/mars-tool-bench-vise@1",
+   "cat": "table",
+   "building": "tool-camp",
+   "nums": [],
+   "ids": [
+    "tool-2026-library-tool-bench-vise-base-5b72b552",
+    "tool-2026-library-tool-bench-vise-jaws-31503656",
+    "tool-2026-library-tool-bench-vise-spindle-e0349a6e"
+   ],
+   "p": [
+    -15.364,
+    1.218,
+    -49.995
+   ],
+   "r": 0,
+   "floorY": 1.218
+  },
+  {
+   "def": "core/mars-tool-workshop-folding-table@1",
+   "cat": "table",
+   "building": "tool-camp",
+   "nums": [],
+   "ids": [
+    "tool-2026-library-tool-workshop-folding-table-4d28908a",
+    "tool-2026-library-tool-workshop-folding-table-leg-09883e9c",
+    "tool-2026-library-tool-workshop-folding-table-leg-9c7f0bd9",
+    "tool-2026-library-tool-workshop-folding-table-leg-6b5691ed",
+    "tool-2026-library-tool-workshop-folding-table-leg-d4132b12"
+   ],
+   "p": [
+    -11.073,
+    0.422,
+    -47.08
+   ],
+   "r": 0,
+   "floorY": 0.422
+  },
+  {
+   "def": "core/mars-freeside-hydro-cart-chrome@1",
+   "cat": "prop",
+   "building": "freeside",
+   "nums": [],
+   "ids": [
+    "freeside-north-hydro-cart-freeside-hydro-cart-chrome-upright-cef7f76f",
+    "freeside-north-hydro-cart-freeside-hydro-cart-caster-de926c93",
+    "freeside-north-hydro-cart-freeside-hydro-cart-chrome-upright-1cca75dc",
+    "freeside-north-hydro-cart-freeside-hydro-cart-caster-c471d3cc",
+    "freeside-north-hydro-cart-freeside-hydro-cart-chrome-upright-f530d59a",
+    "freeside-north-hydro-cart-freeside-hydro-cart-caster-7bdbbf2a",
+    "freeside-north-hydro-cart-freeside-hydro-cart-chrome-upright-472d58af",
+    "freeside-north-hydro-cart-freeside-hydro-cart-caster-d3b9750b",
+    "freeside-north-hydro-cart-freeside-hydro-cart-shelf-side-rail-1e0bcfed",
+    "freeside-north-hydro-cart-freeside-hydro-cart-shelf-side-rail-8f2f1a0e",
+    "freeside-north-hydro-cart-freeside-hydro-wire-shelf-cross-rod-33c62330",
+    "freeside-north-hydro-cart-freeside-hydro-wire-shelf-cross-rod-a1419f2d"
+   ],
+   "p": [
+    41.605,
+    0,
+    -98.825
+   ],
+   "r": 0,
+   "floorY": 0
+  },
+  {
+   "def": "core/mars-freeside-lime-sofa@1",
+   "cat": "seat",
+   "building": "freeside",
+   "nums": [],
+   "ids": [
+    "freeside-2026-observed-details-freeside-lime-sofa-base-4e87ee3f",
+    "freeside-2026-observed-details-freeside-lime-sofa-back-44ba1d4a",
+    "freeside-2026-observed-details-freeside-lime-sofa-arm-0a042d1b",
+    "freeside-2026-observed-details-freeside-lime-sofa-arm-1babac2f",
+    "freeside-2026-observed-details-freeside-open-mic-sofa-short-grounded-foot-1bd32407",
+    "freeside-2026-observed-details-freeside-open-mic-sofa-short-grounded-foot-93ff6a0c",
+    "freeside-2026-observed-details-freeside-open-mic-sofa-short-grounded-foot-f6c21466",
+    "freeside-2026-observed-details-freeside-open-mic-sofa-short-grounded-foot-40ab0719"
+   ],
+   "p": [
+    51.729,
+    0,
+    -71.533
+   ],
+   "r": 0.1222,
+   "floorY": 0
+  },
+  {
+   "def": "core/mars-freeside-mattress@1",
+   "cat": "seat",
+   "building": "freeside",
+   "nums": [],
+   "ids": [
+    "freeside-2026-observed-details-freeside-open-mic-pale-mattress-f24b3a97"
+   ],
+   "p": [
+    51.842,
+    -0.01,
+    -70.574
+   ],
+   "r": 0,
+   "floorY": -0.01
+  },
+  {
+   "def": "core/mars-freeside-mattress-2@1",
+   "cat": "seat",
+   "building": "freeside",
+   "nums": [],
+   "ids": [
+    "freeside-2026-observed-details-freeside-open-mic-pale-mattress-8b26bb2d"
+   ],
+   "p": [
+    55.108,
+    -0.01,
+    -71.058
+   ],
+   "r": 0,
+   "floorY": -0.01
+  },
+  {
+   "def": "core/mars-freeside-speaker@1",
+   "cat": "prop",
+   "building": "freeside",
+   "nums": [],
+   "ids": [
+    "freeside-2026-observed-details-freeside-open-mic-speaker-71bd2814",
+    "freeside-2026-observed-details-open-mic-speaker-tripod-mast-4be4d13f",
+    "freeside-2026-observed-details-open-mic-speaker-tripod-foot-1d2b83a5",
+    "freeside-2026-observed-details-open-mic-speaker-tripod-foot-c1239eb6",
+    "freeside-2026-observed-details-open-mic-speaker-tripod-foot-f3e379c6"
+   ],
+   "p": [
+    57.194,
+    -0.02,
+    -73.233
+   ],
+   "r": 0,
+   "floorY": -0.024
+  },
+  {
+   "def": "core/mars-freeside-speaker-2@1",
+   "cat": "prop",
+   "building": "freeside",
+   "nums": [],
+   "ids": [
+    "freeside-2026-observed-details-freeside-open-mic-speaker-622e8de1",
+    "freeside-2026-observed-details-open-mic-speaker-tripod-mast-1d7bd488",
+    "freeside-2026-observed-details-open-mic-speaker-tripod-foot-09c7497a",
+    "freeside-2026-observed-details-open-mic-speaker-tripod-foot-71bc599f"
+   ],
+   "p": [
+    57.659,
+    -0.02,
+    -69.34
+   ],
+   "r": 0,
+   "floorY": -0.024
+  },
+  {
+   "def": "core/mars-dj-table@1",
+   "cat": "table",
+   "building": "freeside",
+   "nums": [],
+   "ids": [
+    "freeside-2026-observed-details-open-mic-dj-table-top-f44f7065",
+    "freeside-2026-observed-details-open-mic-speaker-tripod-foot-29e3dbbb",
+    "freeside-2026-observed-details-open-mic-dj-laptop-base-2559fb0d"
+   ],
+   "p": [
+    57.618,
+    -0.02,
+    -68.965
+   ],
+   "r": 0,
+   "floorY": -0.024
+  },
+  {
+   "def": "core/mars-folding-chair@1",
+   "cat": "seat",
+   "building": "freeside",
+   "nums": [],
+   "ids": [
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-back-195483e0",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-back-41d0c4b3"
+   ],
+   "p": [
+    58.208,
+    0.7,
+    -70.892
+   ],
+   "r": 0,
+   "floorY": 0.7
+  },
+  {
+   "def": "core/mars-folding-table@1",
+   "cat": "table",
+   "building": "freeside",
+   "nums": [],
+   "ids": [
+    "freeside-2026-observed-details-open-mic-portable-folding-table-c608fab8",
+    "freeside-2026-observed-details-open-mic-table-slender-legs-1c60d2c7",
+    "freeside-2026-observed-details-open-mic-table-slender-legs-ea9c691f",
+    "freeside-2026-observed-details-open-mic-table-slender-legs-3eda1536",
+    "freeside-2026-observed-details-open-mic-table-slender-legs-7338d96e"
+   ],
+   "p": [
+    57.779,
+    0.15,
+    -71.371
+   ],
+   "r": 0,
+   "floorY": 0.15
+  },
+  {
+   "def": "core/mars-folding-chair-2@1",
+   "cat": "seat",
+   "building": "freeside",
+   "nums": [],
+   "ids": [
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-seat-19831f89",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-d688505d",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-bf66bd89",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-991cdbe0",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-cd10e400"
+   ],
+   "p": [
+    57.846,
+    0.143,
+    -72.436
+   ],
+   "r": 0,
+   "floorY": 0.143
+  },
+  {
+   "def": "core/mars-folding-chair-3@1",
+   "cat": "seat",
+   "building": "freeside",
+   "nums": [],
+   "ids": [
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-back-fa23759c"
+   ],
+   "p": [
+    58.025,
+    0.7,
+    -72.456
+   ],
+   "r": 0,
+   "floorY": 0.7
+  },
+  {
+   "def": "core/mars-folding-chair-2@1",
+   "cat": "seat",
+   "building": "freeside",
+   "nums": [],
+   "ids": [
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-seat-a0ec9773",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-2f755ed4",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-f91d6404",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-63e469ba",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-e981e6ca"
+   ],
+   "p": [
+    57.968,
+    0.143,
+    -71.393
+   ],
+   "r": 0,
+   "floorY": 0.143
+  },
+  {
+   "def": "core/mars-folding-chair-2@1",
+   "cat": "seat",
+   "building": "freeside",
+   "nums": [],
+   "ids": [
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-seat-fb186a84",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-4d6b3a03",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-1dd3cb3f",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-110c6e15",
+    "freeside-2026-observed-details-open-mic-performer-folding-chair-crossed-leg-7c7ead21"
+   ],
+   "p": [
+    58.09,
+    0.143,
+    -70.35
+   ],
+   "r": 0,
+   "floorY": 0.143
+  },
+  {
+   "def": "core/mars-colab-taupe-sofa@1",
+   "cat": "seat",
+   "building": "freeside",
+   "nums": [],
+   "ids": [
+    "colab-2026-roof-access-colab-photographed-taupe-sofa-base-4627af3e",
+    "colab-2026-roof-access-colab-photographed-taupe-sofa-back-87c110f7",
+    "colab-2026-roof-access-colab-taupe-sofa-arm-177a4bb8",
+    "colab-2026-roof-access-colab-taupe-sofa-arm-c38bf81d",
+    "colab-2026-roof-access-colab-sofa-cushion-b61a38d8",
+    "colab-2026-roof-access-colab-sofa-cushion-8865bf5a",
+    "colab-2026-roof-access-colab-sofa-cushion-7528d0e8",
+    "colab-2026-roof-access-colab-sofa-foot-40b3c635",
+    "colab-2026-roof-access-colab-sofa-foot-1b875aac",
+    "colab-2026-roof-access-colab-sofa-foot-f61811a3",
+    "colab-2026-roof-access-colab-sofa-foot-9ea07082"
+   ],
+   "p": [
+    57.475,
+    0.345,
+    -80.998
+   ],
+   "r": 2.8449,
+   "floorY": 0.345
+  },
+  {
+   "def": "core/mars-colab-drawer-coffee@1",
+   "cat": "table",
+   "building": "freeside",
+   "nums": [],
+   "ids": [
+    "colab-2026-roof-access-colab-brown-drawer-coffee-tabletop-ea8b3e95",
+    "colab-2026-roof-access-colab-coffee-table-foot-f1531a25",
+    "colab-2026-roof-access-colab-coffee-table-foot-f0f41a1c",
+    "colab-2026-roof-access-colab-coffee-table-foot-a71584b4",
+    "colab-2026-roof-access-colab-coffee-table-foot-f8ab956d",
+    "colab-2026-roof-access-colab-coffee-table-drawer-front-e52bce78",
+    "colab-2026-roof-access-colab-coffee-table-drawer-handle-68e5a1b2",
+    "colab-2026-roof-access-colab-coffee-table-drawer-front-e3f07572",
+    "colab-2026-roof-access-colab-coffee-table-drawer-handle-371fcf46",
+    "colab-2026-roof-access-colab-coffee-table-drawer-front-96b7f28e",
+    "colab-2026-roof-access-colab-coffee-table-drawer-handle-ca314328"
+   ],
+   "p": [
+    57.856,
+    0.345,
+    -82.256
+   ],
+   "r": 0,
+   "floorY": 0.345
+  },
+  {
+   "def": "core/mars-colab-floor-lamp@1",
+   "cat": "prop",
+   "building": "freeside",
+   "nums": [],
+   "ids": [
+    "colab-2026-roof-access-colab-source-white-side-floor-lamp-shade-7199ebc2",
+    "colab-2026-roof-access-colab-source-slender-lamp-stand-2cdb6db3"
+   ],
+   "p": [
+    55.758,
+    0.29,
+    -81.571
+   ],
+   "r": 0,
+   "floorY": 0.29
+  },
+  {
+   "def": "core/mars-griddle-cart@1",
+   "cat": "prop",
+   "building": "site",
+   "nums": [],
+   "ids": [
+    "og-ground-details-griddle-cooktop-52e7a7cb",
+    "og-ground-details-griddle-cart-leg-3660f2e8",
+    "og-ground-details-griddle-caster-51737a75",
+    "og-ground-details-griddle-cart-leg-f1058b97",
+    "og-ground-details-griddle-caster-8596b9b6",
+    "og-ground-details-griddle-cart-leg-6d7c0c30",
+    "og-ground-details-griddle-caster-2ff70a89",
+    "og-ground-details-griddle-cart-leg-afd4f0bf",
+    "og-ground-details-griddle-caster-bfa9a2d2",
+    "og-ground-details-og-griddle-source-white-propane-tank-7f2a0ee1",
+    "og-ground-details-griddle-lower-shelf-wire-82e4e9d8",
+    "og-ground-details-griddle-lower-shelf-wire-d762e544"
+   ],
+   "p": [
+    -44.743,
+    0,
+    52.971
+   ],
+   "r": 0,
+   "floorY": 0
+  },
+  {
+   "def": "core/mars-clubhouse-sofa@1",
+   "cat": "seat",
+   "building": "site",
+   "nums": [],
+   "ids": [
+    "og-clubhouse-details-clubhouse-sofa-seat-8a09e899",
+    "og-clubhouse-details-clubhouse-sofa-back-81ce768f",
+    "og-clubhouse-details-clubhouse-sofa-arm-2b0b39be",
+    "og-clubhouse-details-clubhouse-sofa-arm-a8c7daeb"
+   ],
+   "p": [
+    -52.866,
+    0.42,
+    54.223
+   ],
+   "r": -1.7977,
+   "floorY": 0.42
+  },
+  {
+   "def": "core/mars-clubhouse-low-blue-table@1",
+   "cat": "table",
+   "building": "site",
+   "nums": [],
+   "ids": [
+    "og-clubhouse-details-clubhouse-low-blue-table-top-5a00e464",
+    "og-clubhouse-details-clubhouse-blue-table-slab-leg-badad120",
+    "og-clubhouse-details-clubhouse-blue-table-slab-leg-2866ac07"
+   ],
+   "p": [
+    -52.245,
+    0.17,
+    54.272
+   ],
+   "r": 0,
+   "floorY": 0.17
+  },
+  {
+   "def": "core/mars-clubhouse-sofa@1",
+   "cat": "seat",
+   "building": "site",
+   "nums": [],
+   "ids": [
+    "og-clubhouse-details-clubhouse-sofa-seat-a4811ccf",
+    "og-clubhouse-details-clubhouse-sofa-back-319851d2",
+    "og-clubhouse-details-clubhouse-sofa-arm-7c384720",
+    "og-clubhouse-details-clubhouse-sofa-arm-3345622b"
+   ],
+   "p": [
+    -52.684,
+    0.42,
+    58.598
+   ],
+   "r": 2.9147,
+   "floorY": 0.42
+  },
+  {
+   "def": "core/mars-og-worktop@1",
+   "cat": "table",
+   "building": "site",
+   "nums": [],
+   "ids": [
+    "og-kitchen-details-og-kitchen-worktop-2065192b",
+    "og-kitchen-details-og-kitchen-worktop-89b8ba2a",
+    "og-kitchen-details-og-sink-worktop-edge-2d0a2d2c",
+    "og-kitchen-details-og-sink-worktop-edge-fd4e70a3",
+    "og-kitchen-details-og-counter-support-4d050706",
+    "og-kitchen-details-og-counter-support-bf906cfb",
+    "og-kitchen-details-og-sink-basin-bottom-b36e2678",
+    "og-kitchen-details-og-sink-basin-side-21b7262d",
+    "og-kitchen-details-og-sink-basin-side-189f6034",
+    "og-kitchen-details-og-sink-basin-side-ee4d3f5a",
+    "og-kitchen-details-og-sink-basin-side-281417a6",
+    "og-kitchen-details-og-closed-green-camp-stove-727abdb2"
+   ],
+   "p": [
+    -49.213,
+    0.16,
+    59.824
+   ],
+   "r": 0,
+   "floorY": 0.16
+  },
+  {
+   "def": "core/mars-og-east-folding-dinner-table@1",
+   "cat": "table",
+   "building": "site",
+   "nums": [],
+   "ids": [],
+   "p": [
+    -46.426,
+    0.02,
+    51.041
+   ],
+   "r": 0,
+   "floorY": 0.02
+  },
+  {
+   "def": "core/mars-og-east-folding-chair@1",
+   "cat": "seat",
+   "building": "site",
+   "nums": [],
+   "ids": [],
+   "p": [
+    -47.297,
+    0.011,
+    50.087
+   ],
+   "r": -0.2094,
+   "floorY": 0.011
+  },
+  {
+   "def": "core/mars-og-east-folding-chair-2@1",
+   "cat": "seat",
+   "building": "site",
+   "nums": [],
+   "ids": [],
+   "p": [
+    -46.319,
+    0.011,
+    50.295
+   ],
+   "r": -0.2094,
+   "floorY": 0.011
+  },
+  {
+   "def": "core/mars-og-east-folding-chair@1",
+   "cat": "seat",
+   "building": "site",
+   "nums": [],
+   "ids": [],
+   "p": [
+    -45.341,
+    0.011,
+    50.503
+   ],
+   "r": -0.2094,
+   "floorY": 0.011
+  },
+  {
    "def": "core/mars-prep-table@1",
    "cat": "table",
    "building": "kitchen",
@@ -116,7 +855,7 @@
    "floorY": 0.53
   },
   {
-   "def": "core/mars-serving-inside-counter-retur@1",
+   "def": "core/mars-serving-inside-counter-return@1",
    "cat": "table",
    "building": "kitchen",
    "nums": [],
@@ -132,7 +871,7 @@
    "floorY": 1.42
   },
   {
-   "def": "core/mars-north-perimeter-counter-retu@1",
+   "def": "core/mars-north-perimeter-counter-return@1",
    "cat": "table",
    "building": "kitchen",
    "nums": [],
@@ -570,7 +1309,7 @@
    "floorY": 0.55
   },
   {
-   "def": "core/mars-table-cup-2@1",
+   "def": "core/mars-table-cup@1",
    "cat": "item",
    "building": "mimos",
    "nums": [],
@@ -744,7 +1483,7 @@
    "floorY": 1.29
   },
   {
-   "def": "core/mars-ceramic-mug-2@1",
+   "def": "core/mars-ceramic-mug@1",
    "cat": "item",
    "building": "mimos",
    "nums": [],
@@ -957,7 +1696,7 @@
    "floorY": 0.53
   },
   {
-   "def": "core/mars-black-folding-chair@1",
+   "def": "core/mars-folding-chair-4@1",
    "cat": "seat",
    "building": "chiba",
    "nums": [],
@@ -978,7 +1717,7 @@
    "floorY": 3.021
   },
   {
-   "def": "core/mars-black-folding-chair-2@1",
+   "def": "core/mars-folding-chair-5@1",
    "cat": "seat",
    "building": "chiba",
    "nums": [],
@@ -999,7 +1738,7 @@
    "floorY": 1.878
   },
   {
-   "def": "core/mars-black-folding-chair-3@1",
+   "def": "core/mars-folding-chair-6@1",
    "cat": "seat",
    "building": "chiba",
    "nums": [],
@@ -1084,7 +1823,7 @@
    "floorY": 2.266
   },
   {
-   "def": "core/mars-sofa-short-foot@1",
+   "def": "core/mars-navy-sofa@1",
    "cat": "seat",
    "building": "chiba",
    "nums": [],
@@ -1108,7 +1847,7 @@
    "floorY": 0.373
   },
   {
-   "def": "core/mars-sofa-short-foot@1",
+   "def": "core/mars-navy-sofa@1",
    "cat": "seat",
    "building": "chiba",
    "nums": [],
@@ -1166,7 +1905,7 @@
    "floorY": 0.373
   },
   {
-   "def": "core/mars-classroom-table@1",
+   "def": "core/mars-classroom-folding-table@1",
    "cat": "table",
    "building": "chiba",
    "nums": [],
@@ -1188,7 +1927,7 @@
    "floorY": 3.248
   },
   {
-   "def": "core/mars-marzipan-desk@1",
+   "def": "core/mars-marzipan-desk-laptop@1",
    "cat": "table",
    "building": "chiba",
    "nums": [],
@@ -1357,7 +2096,7 @@
    "p": [
     51.477,
     -0.154,
-    -85.187
+    -85.198
    ],
    "r": 0
   },
@@ -1773,9 +2512,9 @@
    "cat": "site",
    "building": "site",
    "p": [
-    -44.737,
-    0,
-    52.953
+    -44.726,
+    0.64,
+    52.903
    ],
    "r": 2.9322
   },
@@ -1802,40 +2541,29 @@
    "r": 1.3614
   },
   {
-   "def": "core/mars-og-clubhouse-3@1",
-   "cat": "site",
-   "building": "site",
-   "p": [
-    -52.455,
-    0.17,
-    54.309
-   ],
-   "r": 1.3614
-  },
-  {
-   "def": "core/mars-og-clubhouse-4@1",
-   "cat": "site",
-   "building": "site",
-   "p": [
-    -52.684,
-    0.42,
-    58.598
-   ],
-   "r": 2.9322
-  },
-  {
    "def": "core/mars-og-kitchen-1@1",
    "cat": "site",
    "building": "site",
    "p": [
-    -49.213,
-    0.16,
-    59.824
+    -48.264,
+    1.1,
+    60.173
    ],
-   "r": 2.9322
+   "r": 1.3614
   },
   {
    "def": "core/mars-og-kitchen-2@1",
+   "cat": "site",
+   "building": "site",
+   "p": [
+    -48.791,
+    1.095,
+    59.811
+   ],
+   "r": 1.131
+  },
+  {
+   "def": "core/mars-og-kitchen-3@1",
    "cat": "site",
    "building": "site",
    "p": [
@@ -1872,50 +2600,6 @@
    "cat": "site",
    "building": "site",
    "p": [
-    -46.426,
-    0.02,
-    51.041
-   ],
-   "r": 2.9322
-  },
-  {
-   "def": "core/mars-og-east-life-2@1",
-   "cat": "site",
-   "building": "site",
-   "p": [
-    -47.297,
-    0.011,
-    50.087
-   ],
-   "r": 2.9322
-  },
-  {
-   "def": "core/mars-og-east-life-2@1",
-   "cat": "site",
-   "building": "site",
-   "p": [
-    -46.319,
-    0.011,
-    50.295
-   ],
-   "r": 2.9322
-  },
-  {
-   "def": "core/mars-og-east-life-2@1",
-   "cat": "site",
-   "building": "site",
-   "p": [
-    -45.341,
-    0.011,
-    50.503
-   ],
-   "r": 2.9322
-  },
-  {
-   "def": "core/mars-og-east-life-3@1",
-   "cat": "site",
-   "building": "site",
-   "p": [
     -47.292,
     3.034,
     53.311
@@ -1923,7 +2607,7 @@
    "r": 2.9322
   },
   {
-   "def": "core/mars-og-east-life-3@1",
+   "def": "core/mars-og-east-life-1@1",
    "cat": "site",
    "building": "site",
    "p": [
@@ -1934,7 +2618,7 @@
    "r": 2.9322
   },
   {
-   "def": "core/mars-og-east-life-3@1",
+   "def": "core/mars-og-east-life-1@1",
    "cat": "site",
    "building": "site",
    "p": [
@@ -1945,7 +2629,7 @@
    "r": 2.9322
   },
   {
-   "def": "core/mars-og-east-life-3@1",
+   "def": "core/mars-og-east-life-1@1",
    "cat": "site",
    "building": "site",
    "p": [
@@ -1956,7 +2640,7 @@
    "r": 2.9322
   },
   {
-   "def": "core/mars-og-east-life-3@1",
+   "def": "core/mars-og-east-life-1@1",
    "cat": "site",
    "building": "site",
    "p": [
@@ -1967,7 +2651,7 @@
    "r": 2.9322
   },
   {
-   "def": "core/mars-og-east-life-3@1",
+   "def": "core/mars-og-east-life-1@1",
    "cat": "site",
    "building": "site",
    "p": [
@@ -1978,7 +2662,7 @@
    "r": 2.9322
   },
   {
-   "def": "core/mars-og-east-life-3@1",
+   "def": "core/mars-og-east-life-1@1",
    "cat": "site",
    "building": "site",
    "p": [
@@ -1989,7 +2673,7 @@
    "r": 2.9322
   },
   {
-   "def": "core/mars-og-east-life-3@1",
+   "def": "core/mars-og-east-life-1@1",
    "cat": "site",
    "building": "site",
    "p": [
@@ -2000,7 +2684,7 @@
    "r": 2.9322
   },
   {
-   "def": "core/mars-og-east-life-3@1",
+   "def": "core/mars-og-east-life-1@1",
    "cat": "site",
    "building": "site",
    "p": [

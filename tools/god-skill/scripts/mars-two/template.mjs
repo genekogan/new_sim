@@ -36,12 +36,12 @@ const pos = new Map(bld.map((b) => [b.building, b.p]));
 // rooms of the authored buildings in the mars-two frame (x = E + X0, z = −N)
 const roomAt = (b, x, z, y) => (ROOMS[b] ?? []).find(([, , n0, n1, e0, e1, ry]) => x >= e0 + X0 - 0.02 && x <= e1 + X0 + 0.02 && -z >= n0 - 0.02 && -z <= n1 + 0.02 && Math.abs(y - ry) < 0.2);
 
-const ops = { campus: [], site: [], mimos: [], kitchen: [], chiba: [], items: [], places: [] };
+const ops = { campus: [], site: [], mimos: [], kitchen: [], chiba: [], more: [], items: [], places: [] };
 for (const b of bld) ops.campus.push({ op: 'place', def: b.def, name: b.building, p: b.p, r: 0 });
 for (const s of P.filter((p) => p.cat === 'site')) ops.site.push({ op: 'place', def: s.def, name: uniq(short(s.def)), p: s.p, r: s.r });
 
 const tables = [];
-for (const f of P.filter((p) => p.cat === 'seat' || p.cat === 'table' || p.cat === 'cold')) {
+for (const f of P.filter((p) => p.cat === 'seat' || p.cat === 'table' || p.cat === 'cold' || p.cat === 'prop')) {
   const num = f.nums?.[0], name = uniq(num ? `${NUM[num] ?? short(f.def)}-${num}` : short(f.def));
   if (MOVE[num]) { f.orig = f.p; f.p = f.p.map((v, i) => r3(v + MOVE[num][i])); }
   const room = roomAt(f.building, f.p[0], f.p[2], f.p[1]);
@@ -50,7 +50,7 @@ for (const f of P.filter((p) => p.cat === 'seat' || p.cat === 'table' || p.cat =
     const [id, , n0, n1, e0, e1] = room, at = ROOM_AT[f.building]?.[id], cx = at ? at[1] + X0 : (e0 + e1) / 2 + X0, cz = at ? -at[0] : -(n0 + n1) / 2;
     op = { op: 'place', def: f.def, name, in: { parent: f.building, slot: id }, p: [r3(f.p[0] - cx), r3(f.p[2] - cz)], r: f.r };
   } else op = { op: 'place', def: f.def, name, p: f.p, r: f.r };
-  (ops[f.building] ?? ops.chiba).push(op);
+  ((f.building !== 'site' && ops[f.building]) || ops.more).push(op);
   if (f.cat === 'table') tables.push({ f, name, path: room ? `${f.building}/${name}` : name, def: DEFS.get(f.def) });
 }
 for (const it of P.filter((p) => p.cat === 'item')) {
@@ -77,6 +77,7 @@ const T = {
     { note: 'Mimos furniture: the coffee counter (#1), the tea table (#2), the study table (#3) and its chairs (#4–7), the papasan (#8), the tea stools (#9–11), the red sofa (#12), the honey sofa beneath the posters (#13), the cream recliner (#14)', group: 'mimos', ops: ops.mimos },
     { note: 'the kitchen and dining hall: perimeter counters with the sinks, the prep table (#15), the fridges and freezer (#18, #19, #29), the bus seats (#20–25) and blue tables (#26–28)', group: 'kitchen', ops: ops.kitchen },
     { note: 'Chiba and the field: the auditorium sofas, folding chairs, tier cushions, the presenter box, the classroom table and desk; the field chairs and the teal sofa', group: 'chiba', ops: ops.chiba },
+    { note: 'the rest of the furnished campus: Freeside (open-mic room, lime sofa, spool tables, hydro cart), CoLab (taupe sofa, drawer coffee table, floor lamp), the Tool library and workshop, OG (clubhouse sofa and table, the east dinner table and chairs, the kitchen)', group: 'more', ops: ops.more },
     { note: 'things to carry: the prep mixing bowls and stock pot, the tea kettle and cups, the study mugs', group: 'items', ops: ops.items },
     { note: 'the site: vans, buses, trailers, RVs, toilets, huts, the forklift, OG', group: 'site', ops: ops.site },
   ],

@@ -1,6 +1,2062 @@
 [
  {
   "schema": "def/1",
+  "name": "core-mars-mimos-coffee-table",
+  "version": 1,
+  "description": "mimos coffee table from the Mars 2026 campus: a 0.82 × 1.7 m top at 0.57 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "table",
+   "surface"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "2b9f558631ef9b1a16e23a5df193409bfa54e287b28054cb5636f3c45d7e94e4",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.82,
+    0.57,
+    1.7
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "top",
+    "kind": "surface",
+    "p": [
+     0,
+     0.57,
+     0
+    ],
+    "yaw": 0,
+    "height": 0.57,
+    "accepts": {
+     "maxSize": [
+      1,
+      0.6,
+      1
+     ],
+     "maxMass": 20
+    },
+    "capacity": 14
+   }
+  ],
+  "components": {
+   "surface": {
+    "height": 0.57
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-coffee-table-ceramic-cup",
+  "version": 1,
+  "description": "coffee table ceramic cup from the Mars 2026 campus (carryable). Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "kitchen",
+   "item",
+   "cup",
+   "mug"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "6ffb160f3fff18ec798fef3067a9db5daff2ca11546a541d25e6b66964a57d4f",
+   "collide": "none"
+  },
+  "size": {
+   "box": [
+    0.09,
+    0.085,
+    0.086
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "decor",
+  "anchor": "base",
+  "components": {
+   "carryable": {
+    "mass": 0.6,
+    "grips": 1
+   },
+   "container": {
+    "capacity": 1
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-tool-library-bookshelf-timber",
+  "version": 1,
+  "description": "tool library bookshelf timber from the Mars 2026 campus: a 3.065 × 0.94 m top at 1.895 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "table",
+   "surface"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "cf03bccc99b90ef42318f11f09731bed275a6ae7de1fe1e7b9780c0f0f6f5130",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    3.065,
+    1.9,
+    0.94
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "top",
+    "kind": "surface",
+    "p": [
+     0,
+     1.895,
+     0
+    ],
+    "yaw": 0,
+    "height": 1.895,
+    "accepts": {
+     "maxSize": [
+      1,
+      0.6,
+      1
+     ],
+     "maxMass": 20
+    },
+    "capacity": 29
+   }
+  ],
+  "components": {
+   "surface": {
+    "height": 1.895
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-tool-library-low-table",
+  "version": 1,
+  "description": "tool library low table from the Mars 2026 campus: a 2.77 × 1.324 m top at -2.857 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "table",
+   "surface"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "c49c54790ba94a27e3f1c2c2d8ec73d03e2553072d7a8276eea083593c0a5e95",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    2.77,
+    0.66,
+    1.324
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "top",
+    "kind": "surface",
+    "p": [
+     0,
+     -2.857,
+     0
+    ],
+    "yaw": 0,
+    "height": -2.857,
+    "accepts": {
+     "maxSize": [
+      1,
+      0.6,
+      1
+     ],
+     "maxMass": 20
+    },
+    "capacity": 37
+   }
+  ],
+  "components": {
+   "surface": {
+    "height": -2.857
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-tool-library-floor",
+  "version": 1,
+  "description": "tool library floor from the Mars 2026 campus: 1 seat at 0.09 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "seat",
+   "chair"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "d5257d953af237f3cf287a68c56f0a38fc54bd518ed00dc8a5434be23af70346",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.489,
+    0.09,
+    0.489
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "seat",
+    "kind": "seat",
+    "p": [
+     0,
+     0.09,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.09,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   }
+  ],
+  "components": {
+   "seat": {
+    "height": 0.09
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-tool-library-floor-2",
+  "version": 1,
+  "description": "tool library floor 2 from the Mars 2026 campus: 1 seat at 0.09 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "seat",
+   "chair"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "d5257d953af237f3cf287a68c56f0a38fc54bd518ed00dc8a5434be23af70346",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.489,
+    0.09,
+    0.489
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "seat",
+    "kind": "seat",
+    "p": [
+     0,
+     0.09,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.09,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   }
+  ],
+  "components": {
+   "seat": {
+    "height": 0.09
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-tool-library-floor-3",
+  "version": 1,
+  "description": "tool library floor 3 from the Mars 2026 campus: 1 seat at 0.09 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "seat",
+   "chair"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "d5257d953af237f3cf287a68c56f0a38fc54bd518ed00dc8a5434be23af70346",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.489,
+    0.09,
+    0.489
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "seat",
+    "kind": "seat",
+    "p": [
+     0,
+     0.09,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.09,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   }
+  ],
+  "components": {
+   "seat": {
+    "height": 0.09
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-tool-library-floor-4",
+  "version": 1,
+  "description": "tool library floor 4 from the Mars 2026 campus: 1 seat at 0.09 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "seat",
+   "chair"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "d5257d953af237f3cf287a68c56f0a38fc54bd518ed00dc8a5434be23af70346",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.489,
+    0.09,
+    0.489
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "seat",
+    "kind": "seat",
+    "p": [
+     0,
+     0.09,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.09,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   }
+  ],
+  "components": {
+   "seat": {
+    "height": 0.09
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-tool-ground-bench-lower",
+  "version": 1,
+  "description": "tool ground bench lower from the Mars 2026 campus: a 3.076 × 1.292 m top at 0.04 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "table",
+   "surface"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "47f70c178e5a8a75e5f91ccccd71914921093512498a769a4103400d4c23efbc",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    3.076,
+    0.05,
+    1.292
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "top",
+    "kind": "surface",
+    "p": [
+     0,
+     0.04,
+     0
+    ],
+    "yaw": 0,
+    "height": 0.04,
+    "accepts": {
+     "maxSize": [
+      1,
+      0.6,
+      1
+     ],
+     "maxMass": 20
+    },
+    "capacity": 40
+   }
+  ],
+  "components": {
+   "surface": {
+    "height": 0.04
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-tool-bench-vise",
+  "version": 1,
+  "description": "tool bench vise from the Mars 2026 campus: a 0.408 × 0.218 m top at 0.214 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "table",
+   "surface"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "8b72fad2c46ca683d19b13b617d452019b0725dc2ed437fc71e63044cc6d761e",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.408,
+    0.214,
+    0.218
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "top",
+    "kind": "surface",
+    "p": [
+     0,
+     0.214,
+     0
+    ],
+    "yaw": 0,
+    "height": 0.214,
+    "accepts": {
+     "maxSize": [
+      1,
+      0.6,
+      1
+     ],
+     "maxMass": 20
+    },
+    "capacity": 4
+   }
+  ],
+  "components": {
+   "surface": {
+    "height": 0.214
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-tool-workshop-folding-table",
+  "version": 1,
+  "description": "tool workshop folding table from the Mars 2026 campus: a 1.915 × 1.1 m top at 0.77 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "table",
+   "surface"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "4214d7ae1c80f5a28ccbc94fd827a7df0313607a2353f0a0cf28f302b729727b",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    1.915,
+    0.77,
+    1.1
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "top",
+    "kind": "surface",
+    "p": [
+     0,
+     0.77,
+     0
+    ],
+    "yaw": 0,
+    "height": 0.77,
+    "accepts": {
+     "maxSize": [
+      1,
+      0.6,
+      1
+     ],
+     "maxMass": 20
+    },
+    "capacity": 21
+   }
+  ],
+  "components": {
+   "surface": {
+    "height": 0.77
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-freeside-hydro-cart-chrome",
+  "version": 1,
+  "description": "freeside hydro cart chrome from the Mars 2026 campus. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "prop",
+   "garden",
+   "hydroponics",
+   "cart"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "bfd7a74fe44bb1a4ecf8d8aef161ba817cd48e00b01ae89a3ab7e424a78af972",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.82,
+    1.87,
+    1.482
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-freeside-lime-sofa",
+  "version": 1,
+  "description": "freeside lime sofa from the Mars 2026 campus: 3 seats at 0.33 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "seat",
+   "sofa",
+   "couch"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "8b67a6648f63d1dbe8bb78bcaa359ce98c46cfbf3e63c7be22ec1dfefa8bfe16",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    2.205,
+    0.805,
+    0.882
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "seat-1",
+    "kind": "seat",
+    "p": [
+     -0.735,
+     0.33,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.33,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   },
+   {
+    "id": "seat-2",
+    "kind": "seat",
+    "p": [
+     0,
+     0.33,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.33,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   },
+   {
+    "id": "seat-3",
+    "kind": "seat",
+    "p": [
+     0.735,
+     0.33,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.33,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   }
+  ],
+  "components": {
+   "seat": {
+    "height": 0.33
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-freeside-mattress",
+  "version": 1,
+  "description": "freeside mattress from the Mars 2026 campus: 1 seat at 0.14 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "seat",
+   "chair"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "990be9312a104127517d1afcdfb65410a24189933071a80a167134e125819b5f",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    2.207,
+    0.14,
+    1.277
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "seat",
+    "kind": "seat",
+    "p": [
+     0,
+     0.14,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.14,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   }
+  ],
+  "components": {
+   "seat": {
+    "height": 0.14
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-freeside-mattress-2",
+  "version": 1,
+  "description": "freeside mattress 2 from the Mars 2026 campus: 1 seat at 0.14 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "seat",
+   "chair"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "8973fa5e5a0d9432cac27effca6a87f4c9737b0a628850fc0483a5cba32a5702",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    1.76,
+    0.14,
+    1.225
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "seat",
+    "kind": "seat",
+    "p": [
+     0,
+     0.14,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.14,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   }
+  ],
+  "components": {
+   "seat": {
+    "height": 0.14
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-freeside-speaker",
+  "version": 1,
+  "description": "freeside speaker from the Mars 2026 campus. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "prop",
+   "speaker",
+   "music"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "80927087e8a4da668ac80270ce8b06f18fe75190a95b50c4263b7864c12b90fd",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.664,
+    1.69,
+    0.718
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-freeside-speaker-2",
+  "version": 1,
+  "description": "freeside speaker 2 from the Mars 2026 campus. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "prop",
+   "speaker",
+   "music"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "651ebc4914436a0f58e56403a282bf749ed72865f0bde8272ccd53d2b57176ab",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.664,
+    1.69,
+    0.56
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-dj-table",
+  "version": 1,
+  "description": "dj table from the Mars 2026 campus: a 0.873 × 1.268 m top at 0.857 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "table",
+   "surface"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "804d7bb970e0ac049944236285a5e25844edd59c18a142d12b671502fbb50c69",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.873,
+    0.879,
+    1.268
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "top",
+    "kind": "surface",
+    "p": [
+     0,
+     0.857,
+     0
+    ],
+    "yaw": 0,
+    "height": 0.857,
+    "accepts": {
+     "maxSize": [
+      1,
+      0.6,
+      1
+     ],
+     "maxMass": 20
+    },
+    "capacity": 11
+   }
+  ],
+  "components": {
+   "surface": {
+    "height": 0.857
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-folding-chair",
+  "version": 1,
+  "description": "folding chair from the Mars 2026 campus: 1 seat at 0.3 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "seat",
+   "chair"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "bd6bdef16a58f2ce755c641e7256e53a1d1db9910f253b0e703a96d1b8988411",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.194,
+    0.34,
+    1.443
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "seat",
+    "kind": "seat",
+    "p": [
+     0,
+     0.3,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.3,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   }
+  ],
+  "components": {
+   "seat": {
+    "height": 0.3
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-folding-table",
+  "version": 1,
+  "description": "folding table from the Mars 2026 campus: a 0.799 × 1.465 m top at 0.7 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "table",
+   "surface"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "c2b3414ab95f1a8198b5094b3c9c1b441471a465e541b82b940f13d73c17508c",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.799,
+    0.7,
+    1.465
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "top",
+    "kind": "surface",
+    "p": [
+     0,
+     0.7,
+     0
+    ],
+    "yaw": 0,
+    "height": 0.7,
+    "accepts": {
+     "maxSize": [
+      1,
+      0.6,
+      1
+     ],
+     "maxMass": 20
+    },
+    "capacity": 12
+   }
+  ],
+  "components": {
+   "surface": {
+    "height": 0.7
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-folding-chair-2",
+  "version": 1,
+  "description": "folding chair 2 from the Mars 2026 campus: 1 seat at 0.444 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "seat",
+   "chair"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "107dfbf3861351bc3f47d0e1fd8c0bbc82d737fcc06bf508b093390a9c8a9e4f",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.444,
+    0.444,
+    0.444
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "seat",
+    "kind": "seat",
+    "p": [
+     0,
+     0.444,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.444,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   }
+  ],
+  "components": {
+   "seat": {
+    "height": 0.444
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-folding-chair-3",
+  "version": 1,
+  "description": "folding chair 3 from the Mars 2026 campus: 1 seat at 0.3 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "seat",
+   "chair"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "6dff4fe500332e694493f03b74c08fed2c40f8b649b4c3457baa5033ef833d40",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.071,
+    0.34,
+    0.4
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "seat",
+    "kind": "seat",
+    "p": [
+     0,
+     0.3,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.3,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   }
+  ],
+  "components": {
+   "seat": {
+    "height": 0.3
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-colab-taupe-sofa",
+  "version": 1,
+  "description": "colab taupe sofa from the Mars 2026 campus: 4 seats at 0.495 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "seat",
+   "sofa",
+   "couch"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "9eb4cfd2c41c456b11616c0548331aad6e4d990db4e289948496aad21a2b30f1",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    2.761,
+    0.845,
+    0.899
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "seat-1",
+    "kind": "seat",
+    "p": [
+     -1.035,
+     0.495,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.495,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   },
+   {
+    "id": "seat-2",
+    "kind": "seat",
+    "p": [
+     -0.345,
+     0.495,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.495,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   },
+   {
+    "id": "seat-3",
+    "kind": "seat",
+    "p": [
+     0.345,
+     0.495,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.495,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   },
+   {
+    "id": "seat-4",
+    "kind": "seat",
+    "p": [
+     1.035,
+     0.495,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.495,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   }
+  ],
+  "components": {
+   "seat": {
+    "height": 0.495
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-colab-drawer-coffee",
+  "version": 1,
+  "description": "colab drawer coffee from the Mars 2026 campus: a 1.841 × 1.356 m top at 0.545 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "table",
+   "surface"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "bceb6e1620ac2cd47d7867349bde76fbbfddd993387b1151a9ddf29dccd53194",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    1.841,
+    0.545,
+    1.356
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "top",
+    "kind": "surface",
+    "p": [
+     0,
+     0.545,
+     0
+    ],
+    "yaw": 0,
+    "height": 0.545,
+    "accepts": {
+     "maxSize": [
+      1,
+      0.6,
+      1
+     ],
+     "maxMass": 20
+    },
+    "capacity": 25
+   }
+  ],
+  "components": {
+   "surface": {
+    "height": 0.545
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-colab-floor-lamp",
+  "version": 1,
+  "description": "colab floor lamp from the Mars 2026 campus. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "prop",
+   "lamp",
+   "light"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "02b0ca2eda8cdc15c31011d0b60ca5bf94c6a6155c6f8b90b597c874c23acadb",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.337,
+    1.51,
+    0.224
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-griddle-cart",
+  "version": 1,
+  "description": "griddle cart from the Mars 2026 campus. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "prop",
+   "garden",
+   "hydroponics",
+   "cart"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "416b16dc8f29a6baa7abcf6553b5f9995ea02e9304fe8598613a7d14bb3237ca",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    1.146,
+    0.95,
+    0.801
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-clubhouse-sofa",
+  "version": 1,
+  "description": "clubhouse sofa from the Mars 2026 campus: 3 seats at 0.3 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "seat",
+   "sofa",
+   "couch"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "5790c919b94645b7c59c7120d619e5d0125552e982bd0b58e4dc8d7d16e882c0",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    1.682,
+    0.75,
+    0.833
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "seat-1",
+    "kind": "seat",
+    "p": [
+     -0.561,
+     0.3,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.3,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   },
+   {
+    "id": "seat-2",
+    "kind": "seat",
+    "p": [
+     0,
+     0.3,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.3,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   },
+   {
+    "id": "seat-3",
+    "kind": "seat",
+    "p": [
+     0.561,
+     0.3,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.3,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   }
+  ],
+  "components": {
+   "seat": {
+    "height": 0.3
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-clubhouse-low-blue-table",
+  "version": 1,
+  "description": "clubhouse low blue table from the Mars 2026 campus: a 1.36 × 0.905 m top at 0.62 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "table",
+   "surface"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "530795dd1e993a2b31b63ae973511c532e89275350c3eb56548be4f05c3eb99d",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    1.36,
+    0.62,
+    0.905
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "top",
+    "kind": "surface",
+    "p": [
+     0,
+     0.62,
+     0
+    ],
+    "yaw": 0,
+    "height": 0.62,
+    "accepts": {
+     "maxSize": [
+      1,
+      0.6,
+      1
+     ],
+     "maxMass": 20
+    },
+    "capacity": 12
+   }
+  ],
+  "components": {
+   "surface": {
+    "height": 0.62
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-og-worktop",
+  "version": 1,
+  "description": "og worktop from the Mars 2026 campus: a 2.878 × 1.237 m top at 0.935 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "table",
+   "surface",
+   "kitchen",
+   "counter"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "d096bb0dad76f841640e28b6002cb049b9b3a85619dd9d3cfd34fa632bbe1422",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    2.878,
+    1.055,
+    1.237
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "top",
+    "kind": "surface",
+    "p": [
+     0,
+     0.935,
+     0
+    ],
+    "yaw": 0,
+    "height": 0.935,
+    "accepts": {
+     "maxSize": [
+      1,
+      0.6,
+      1
+     ],
+     "maxMass": 20
+    },
+    "capacity": 36
+   }
+  ],
+  "components": {
+   "surface": {
+    "height": 0.935
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-og-east-folding-dinner-table",
+  "version": 1,
+  "description": "og east folding dinner table from the Mars 2026 campus: a 1.299 × 0.836 m top at 0.73 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "table",
+   "surface"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "15dea0338862baf2b1308a73f7d7ce1d781718c2d2fccbf31d6b280057319a50",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    1.299,
+    0.73,
+    0.836
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "top",
+    "kind": "surface",
+    "p": [
+     0,
+     0.73,
+     0
+    ],
+    "yaw": 0,
+    "height": 0.73,
+    "accepts": {
+     "maxSize": [
+      1,
+      0.6,
+      1
+     ],
+     "maxMass": 20
+    },
+    "capacity": 11
+   }
+  ],
+  "components": {
+   "surface": {
+    "height": 0.73
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-og-east-folding-chair",
+  "version": 1,
+  "description": "og east folding chair from the Mars 2026 campus: 1 seat at 0.447 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "seat",
+   "chair"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "ea9ea0c999cbb9f1fdb8e42f83b710cfae37b2f0cda0ea78294f867d390b8806",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.43,
+    0.974,
+    0.424
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "seat",
+    "kind": "seat",
+    "p": [
+     0,
+     0.447,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.447,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   }
+  ],
+  "components": {
+   "seat": {
+    "height": 0.447
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-og-east-folding-chair-2",
+  "version": 1,
+  "description": "og east folding chair 2 from the Mars 2026 campus: 1 seat at 0.447 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "furniture",
+   "seat",
+   "chair"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "ad03c607adc7df4a759dba7287b90ceaa905f998c10c3b053602dc5d25bb8553",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.43,
+    0.974,
+    0.424
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "slots": [
+   {
+    "id": "seat",
+    "kind": "seat",
+    "p": [
+     0,
+     0.447,
+     0.1
+    ],
+    "yaw": 0,
+    "height": 0.447,
+    "accepts": {
+     "tags": [
+      "body"
+     ]
+    },
+    "capacity": 1
+   }
+  ],
+  "components": {
+   "seat": {
+    "height": 0.447
+   },
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
   "name": "core-mars-prep-table",
   "version": 1,
   "description": "prep table from the Mars 2026 campus: a 1.15 × 2.3 m top at 0.927 m Souls put things on. Mars number #15 (handover stable ids). Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
@@ -341,9 +2397,9 @@
  },
  {
   "schema": "def/1",
-  "name": "core-mars-serving-inside-counter-retur",
+  "name": "core-mars-serving-inside-counter-return",
   "version": 1,
-  "description": "serving inside counter retur from the Mars 2026 campus: a 4.12 × 0.6 m top at 0.04 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "serving inside counter return from the Mars 2026 campus: a 4.12 × 0.6 m top at 0.04 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -357,7 +2413,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "c147d81212b8dea87c9e78f0b66a00989317f2ecd636635f2a08a59dcf8e458d",
+   "asset": "4d249fd75452d379aac8252984f6b8bb9af4cfaf070a8d2de7a7e358119ad5a8",
    "collide": "box"
   },
   "size": {
@@ -409,9 +2465,9 @@
  },
  {
   "schema": "def/1",
-  "name": "core-mars-north-perimeter-counter-retu",
+  "name": "core-mars-north-perimeter-counter-return",
   "version": 1,
-  "description": "north perimeter counter retu from the Mars 2026 campus: a 4.12 × 1.34 m top at 0.93 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "north perimeter counter return from the Mars 2026 campus: a 4.12 × 1.34 m top at 0.93 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -425,7 +2481,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "7d0997ee84e2faa1a06f8b8e443522d6d42c480953b27ba89cd207e76f5f1492",
+   "asset": "c376b3cd857babdaa7e0b8c805ccd780dc6dcd598cedd53cef6d881918b89292",
    "collide": "box"
   },
   "size": {
@@ -1522,52 +3578,6 @@
  },
  {
   "schema": "def/1",
-  "name": "core-mars-table-cup-2",
-  "version": 1,
-  "description": "table cup 2 from the Mars 2026 campus (carryable). Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
-  "tags": [
-   "mars",
-   "mars-campus",
-   "mesh",
-   "kitchen",
-   "item",
-   "cup",
-   "mug"
-  ],
-  "form": "point",
-  "make": {
-   "kind": "mesh",
-   "asset": "0ca4790ec7966af3a22c7d90baae994c924af3337dbf8c6797f906ad589d7581",
-   "collide": "none"
-  },
-  "size": {
-   "box": [
-    0.09,
-    0.075,
-    0.09
-   ],
-   "scale": [
-    0.5,
-    2
-   ]
-  },
-  "layer": "decor",
-  "anchor": "base",
-  "components": {
-   "carryable": {
-    "mass": 0.6,
-    "grips": 1
-   },
-   "container": {
-    "capacity": 1
-   },
-   "foundation": {
-    "kind": "none"
-   }
-  }
- },
- {
-  "schema": "def/1",
   "name": "core-mars-study-chair",
   "version": 1,
   "description": "study chair from the Mars 2026 campus: 1 seat at 0.488 m. Mars number #7 (handover stable ids). Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
@@ -1839,52 +3849,6 @@
   "make": {
    "kind": "mesh",
    "asset": "f7f10f7858ab70b5fbf7ad24eec1f5db7b721291f919b9c4f9a98ebebcd4d907",
-   "collide": "none"
-  },
-  "size": {
-   "box": [
-    0.133,
-    0.085,
-    0.09
-   ],
-   "scale": [
-    0.5,
-    2
-   ]
-  },
-  "layer": "decor",
-  "anchor": "base",
-  "components": {
-   "carryable": {
-    "mass": 0.6,
-    "grips": 1
-   },
-   "container": {
-    "capacity": 1
-   },
-   "foundation": {
-    "kind": "none"
-   }
-  }
- },
- {
-  "schema": "def/1",
-  "name": "core-mars-ceramic-mug-2",
-  "version": 1,
-  "description": "ceramic mug 2 from the Mars 2026 campus (carryable). Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
-  "tags": [
-   "mars",
-   "mars-campus",
-   "mesh",
-   "kitchen",
-   "item",
-   "cup",
-   "mug"
-  ],
-  "form": "point",
-  "make": {
-   "kind": "mesh",
-   "asset": "379aba564fcdad14b8e50bc789c0fc7ab750e42b80a6576a71da852e5bef5076",
    "collide": "none"
   },
   "size": {
@@ -2460,9 +4424,9 @@
  },
  {
   "schema": "def/1",
-  "name": "core-mars-black-folding-chair",
+  "name": "core-mars-folding-chair-4",
   "version": 1,
-  "description": "black folding chair from the Mars 2026 campus: 1 seat at 0.46 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "folding chair 4 from the Mars 2026 campus: 1 seat at 0.46 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -2474,7 +4438,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "40e9dd937faacf079aa83edc4fd1815e93269a3ce88359d401b46d607eb9a438",
+   "asset": "c068ea234c5855caeca7cf72851d40023e79f13577cf63ac7915ac19b9727968",
    "collide": "box"
   },
   "size": {
@@ -2523,9 +4487,9 @@
  },
  {
   "schema": "def/1",
-  "name": "core-mars-black-folding-chair-2",
+  "name": "core-mars-folding-chair-5",
   "version": 1,
-  "description": "black folding chair 2 from the Mars 2026 campus: 1 seat at 0.46 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "folding chair 5 from the Mars 2026 campus: 1 seat at 0.46 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -2537,7 +4501,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "c24c422c5e725b9f57e3d90979f62faddab3296e2facccb96a64620319043b89",
+   "asset": "55dfbe34d467ec94ca713df97a23b41939fee877644f1539eda96845942232af",
    "collide": "box"
   },
   "size": {
@@ -2586,9 +4550,9 @@
  },
  {
   "schema": "def/1",
-  "name": "core-mars-black-folding-chair-3",
+  "name": "core-mars-folding-chair-6",
   "version": 1,
-  "description": "black folding chair 3 from the Mars 2026 campus: 1 seat at 0.46 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "folding chair 6 from the Mars 2026 campus: 1 seat at 0.46 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -2600,7 +4564,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "ba98c365adc45c190e8458c12c23496e8ffd948212af27693c9a9aae8f48aeb7",
+   "asset": "fdd8fa8c38adcbe099f79fc99e7f096ddf79f63197051175cc1ef3bc64ad45bb",
    "collide": "box"
   },
   "size": {
@@ -2901,9 +4865,9 @@
  },
  {
   "schema": "def/1",
-  "name": "core-mars-sofa-short-foot",
+  "name": "core-mars-navy-sofa",
   "version": 1,
-  "description": "sofa short foot from the Mars 2026 campus: 3 seats at 0.56 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "navy sofa from the Mars 2026 campus: 3 seats at 0.56 m. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -2916,7 +4880,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "857684a0ad683b150f0d2cc098424dedc8fdb28736db66b1bf9e0f986bf3ec52",
+   "asset": "e78f0eeeffcb4700840e470a353341ee0ad60b62dd5c75a95653dd0d9244b81e",
    "collide": "box"
   },
   "size": {
@@ -3128,9 +5092,9 @@
  },
  {
   "schema": "def/1",
-  "name": "core-mars-classroom-table",
+  "name": "core-mars-classroom-folding-table",
   "version": 1,
-  "description": "classroom table from the Mars 2026 campus: a 1.8 × 0.76 m top at -3.248 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "classroom folding table from the Mars 2026 campus: a 1.8 × 0.76 m top at 0.71 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -3142,7 +5106,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "0377f4847be5290d219b5162938167429ff03d8b6a1dce1aaf4bcff8054a212b",
+   "asset": "838a272573ddfe0d22a4bc2b6d9b501848a1919c53919e1074dbbb13f5265d86",
    "collide": "box"
   },
   "size": {
@@ -3164,11 +5128,11 @@
     "kind": "surface",
     "p": [
      0,
-     -3.248,
+     0.71,
      0
     ],
     "yaw": 0,
-    "height": -3.248,
+    "height": 0.71,
     "accepts": {
      "maxSize": [
       1,
@@ -3182,7 +5146,7 @@
   ],
   "components": {
    "surface": {
-    "height": -3.248
+    "height": 0.71
    },
    "foundation": {
     "kind": "none"
@@ -3194,9 +5158,9 @@
  },
  {
   "schema": "def/1",
-  "name": "core-mars-marzipan-desk",
+  "name": "core-mars-marzipan-desk-laptop",
   "version": 1,
-  "description": "marzipan desk from the Mars 2026 campus: a 1.7 × 0.78 m top at 1.008 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "marzipan desk laptop from the Mars 2026 campus: a 1.7 × 0.78 m top at 1.008 m Souls put things on. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -3208,7 +5172,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "f578def4a53eb17cb41f15c1e9d1c7197c8aab229c534ab3c19524dc07efa5e1",
+   "asset": "f81adc0203eddb9d39cdcd67301d47456b890674fa21350f37db6f4ff82b3f36",
    "collide": "box"
   },
   "size": {
@@ -3661,7 +5625,7 @@
   "schema": "def/1",
   "name": "core-mars-mimos",
   "version": 1,
-  "description": "Mimos, the 2026 Mars College café and lounge as Gene corrected it (north up): an L of Mimos main (the west longitudinal section; its northern part a raised wooden floor at 0.53 m with the coffee counter on the west wall and the study table at the north wall, its southern part at ground level) and Mimos floor, the short southeast arm with flooring throughout, the honey sofa beneath the posters on its north wall and the low tea table near its south wall. The pallet racks between main and floor are pass-through; the northeast of the L is outdoors. Rear alcove door with a stair at the north; three risers from main south up to the raised floor. 3 rooms, 40 wall/solid colliders, 2 stairs. 3507 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "Mimos, the 2026 Mars College café and lounge as Gene corrected it (north up): an L of Mimos main (the west longitudinal section; its northern part a raised wooden floor at 0.53 m with the coffee counter on the west wall and the study table at the north wall, its southern part at ground level) and Mimos floor, the short southeast arm with flooring throughout, the honey sofa beneath the posters on its north wall and the low tea table near its south wall. The pallet racks between main and floor are pass-through; the northeast of the L is outdoors. Rear alcove door with a stair at the north; three risers from main south up to the raised floor. 3 rooms, 31 wall/solid colliders, 2 stairs. 3367 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -3676,9 +5640,9 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "d53fd74301d181fa503e3fbbbb2fc05dd25865d8354f258d928dfd051e7e0147",
+   "asset": "c09c4afe5bbecd83dbd25068cdf726436a27e05c1eecdafa58f32060dd4cdbcb",
    "collide": "box",
-   "footprint": "e3a3a668d7506145f0a263bc5fc05d6ad0f62e31ba1166cb19c6bf5d3cad12d7"
+   "footprint": "28ce4acd56aa6bd15cdeeea3e8d7a2b22a69c840b28580bad2c5342b4f369a7b"
   },
   "size": {
    "box": [
@@ -4115,7 +6079,7 @@
   "schema": "def/1",
   "name": "core-mars-tool-camp",
   "version": 1,
-  "description": "The north workshops: Tool camp and the northeast library, with their benches and stock. 0 rooms, 94 wall/solid colliders, 0 stairs. 109767 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "The north workshops: Tool camp and the northeast library, with their benches and stock. 0 rooms, 89 wall/solid colliders, 0 stairs. 109109 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -4128,9 +6092,9 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "bd01efaf78e4f631a047be140856c64449b56330ecc0b52936a41f1d61b90e66",
+   "asset": "43ef65f815ba8017a5a7af14d2aa028cec1e8feed3f3898f6ba0c88ce4cb8425",
    "collide": "box",
-   "footprint": "60da26256ecc339a3b4b3af9b9e8d461fd2e6023678b8b32b8a569cc7c1bd609"
+   "footprint": "256fe5ffe0b1c2fce16a0465c7747aadb251cfe5ca2fc8ace96f8c22066305e0"
   },
   "size": {
    "box": [
@@ -4162,7 +6126,7 @@
   "schema": "def/1",
   "name": "core-mars-freeside",
   "version": 1,
-  "description": "The northeast compound: Freeside, the living house with the reused LIBRARY facade, its completed kitchen enclosure, Bodywork/CoLab with the roof access. 0 rooms, 119 wall/solid colliders, 0 stairs. 155396 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "The northeast compound: Freeside, the living house with the reused LIBRARY facade, its completed kitchen enclosure, Bodywork/CoLab with the roof access. 0 rooms, 108 wall/solid colliders, 0 stairs. 153645 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -4176,15 +6140,15 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "3c099e40c734831b5872cab249ba570e13d088a16748750c1f9418ee353f05eb",
+   "asset": "fbb9e2d864152a3e471e091375ebf4c019234ed1f2e3431519e1d514cbc42b42",
    "collide": "box",
-   "footprint": "ea6de87c94e4e4860d00689dc65d26a5cc844962e24674dc95b6663db544c4bd"
+   "footprint": "4ba7b189ec8537181367452f1982cc18ce0575a5400b3a0e30f08e493708b859"
   },
   "size": {
    "box": [
     24.478,
     4.614,
-    33.712
+    33.691
    ],
    "scale": [
     1,
@@ -4210,7 +6174,7 @@
   "schema": "def/1",
   "name": "core-mars-west-racks",
   "version": 1,
-  "description": "The west rack building at the far west of the campus. 0 rooms, 46 wall/solid colliders, 0 stairs. 4519 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "The west rack building at the far west of the campus. 0 rooms, 45 wall/solid colliders, 0 stairs. 4519 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -4224,7 +6188,7 @@
    "kind": "mesh",
    "asset": "b189a3fc963b166052d7aabcfdc8ded9dbf852a4deccd9f1ddc48e366df7fdd9",
    "collide": "box",
-   "footprint": "8698d1adfb26292cdeb446ab8707a5896f54010bf48432322348c0959457277d"
+   "footprint": "172a93af1054f945c145698851815f0c0b0e8df29d4213043b91509e089d1d97"
   },
   "size": {
    "box": [
@@ -5267,7 +7231,7 @@
   "schema": "def/1",
   "name": "core-mars-og-ground-1",
   "version": 1,
-  "description": "A og ground on the Mars 2026 campus (1.05 × 0.632 m, 0.95 m high), as the reference draws it. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "A og ground on the Mars 2026 campus (1.05 × 0.465 m, 0.265 m high), as the reference draws it. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -5278,21 +7242,21 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "911915bffb985b6e96a633158a62701bedd4e9754fc108bef432819355e35484",
-   "collide": "box"
+   "asset": "65f2ead28a54c819e901909ca3557abfe0921365c91c171086ccce446567e523",
+   "collide": "none"
   },
   "size": {
    "box": [
     1.05,
-    0.95,
-    0.632
+    0.265,
+    0.465
    ],
    "scale": [
     0.5,
     2
    ]
   },
-  "layer": "solid",
+  "layer": "decor",
   "anchor": "base",
   "components": {
    "foundation": {
@@ -5385,89 +7349,9 @@
  },
  {
   "schema": "def/1",
-  "name": "core-mars-og-clubhouse-3",
-  "version": 1,
-  "description": "A og clubhouse on the Mars 2026 campus (1.67 × 1.645 m, 1 m high), as the reference draws it. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
-  "tags": [
-   "mars",
-   "mars-campus",
-   "mesh",
-   "site",
-   "og-clubhouse"
-  ],
-  "form": "point",
-  "make": {
-   "kind": "mesh",
-   "asset": "3e78ed8d33d2dc67f1f691a363ad891fc8cd5652895de3fe7c5182107efd6f3d",
-   "collide": "box"
-  },
-  "size": {
-   "box": [
-    1.67,
-    1,
-    1.645
-   ],
-   "scale": [
-    0.5,
-    2
-   ]
-  },
-  "layer": "solid",
-  "anchor": "base",
-  "components": {
-   "foundation": {
-    "kind": "none"
-   }
-  },
-  "overlaps": [
-   "mars-campus"
-  ]
- },
- {
-  "schema": "def/1",
-  "name": "core-mars-og-clubhouse-4",
-  "version": 1,
-  "description": "A og clubhouse on the Mars 2026 campus (1.67 × 0.805 m, 0.75 m high), as the reference draws it. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
-  "tags": [
-   "mars",
-   "mars-campus",
-   "mesh",
-   "site",
-   "og-clubhouse"
-  ],
-  "form": "point",
-  "make": {
-   "kind": "mesh",
-   "asset": "6638be91b1ca61d13465417e0192714a0ee592e73a43e9d3529f1885ca0a04c5",
-   "collide": "box"
-  },
-  "size": {
-   "box": [
-    1.67,
-    0.75,
-    0.805
-   ],
-   "scale": [
-    0.5,
-    2
-   ]
-  },
-  "layer": "solid",
-  "anchor": "base",
-  "components": {
-   "foundation": {
-    "kind": "none"
-   }
-  },
-  "overlaps": [
-   "mars-campus"
-  ]
- },
- {
-  "schema": "def/1",
   "name": "core-mars-og-kitchen-1",
   "version": 1,
-  "description": "A og kitchen on the Mars 2026 campus (2.8 × 0.67 m, 1.447 m high), as the reference draws it. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "description": "A og kitchen on the Mars 2026 campus (0.229 × 0.033 m, 0.249 m high), as the reference draws it. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
    "mars",
    "mars-campus",
@@ -5478,21 +7362,21 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "78e5116c9fdb2dd7e9c7b768681f8976d0ee5a90f4b60be4dd3072c0d73209f6",
-   "collide": "box"
+   "asset": "9db1c937fa1f422b1f7da2d4399f94ccbfa0332b2654877aff553ecdb75c2cfa",
+   "collide": "none"
   },
   "size": {
    "box": [
-    2.8,
-    1.447,
-    0.67
+    0.229,
+    0.249,
+    0.05
    ],
    "scale": [
     0.5,
     2
    ]
   },
-  "layer": "solid",
+  "layer": "decor",
   "anchor": "base",
   "components": {
    "foundation": {
@@ -5506,6 +7390,46 @@
  {
   "schema": "def/1",
   "name": "core-mars-og-kitchen-2",
+  "version": 1,
+  "description": "A og kitchen on the Mars 2026 campus (0.39 × 0.39 m, 0.513 m high), as the reference draws it. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
+  "tags": [
+   "mars",
+   "mars-campus",
+   "mesh",
+   "site",
+   "og-kitchen"
+  ],
+  "form": "point",
+  "make": {
+   "kind": "mesh",
+   "asset": "af16a19eacc452d0e84db73758c1ac9ebe367af759355a5b698343d71d8ecbaa",
+   "collide": "box"
+  },
+  "size": {
+   "box": [
+    0.39,
+    0.513,
+    0.39
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "layer": "solid",
+  "anchor": "base",
+  "components": {
+   "foundation": {
+    "kind": "none"
+   }
+  },
+  "overlaps": [
+   "mars-campus"
+  ]
+ },
+ {
+  "schema": "def/1",
+  "name": "core-mars-og-kitchen-3",
   "version": 1,
   "description": "A og kitchen on the Mars 2026 campus (1.418 × 0.123 m, 0.596 m high), as the reference draws it. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [
@@ -5630,86 +7554,6 @@
  {
   "schema": "def/1",
   "name": "core-mars-og-east-life-1",
-  "version": 1,
-  "description": "A og east life on the Mars 2026 campus (1.2 × 0.6 m, 0.73 m high), as the reference draws it. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
-  "tags": [
-   "mars",
-   "mars-campus",
-   "mesh",
-   "site",
-   "og-east-life"
-  ],
-  "form": "point",
-  "make": {
-   "kind": "mesh",
-   "asset": "0258cf9b7a29e5efed4a9059dc43a3ea6407eabe115413fd345c9af517778a39",
-   "collide": "box"
-  },
-  "size": {
-   "box": [
-    1.2,
-    0.73,
-    0.6
-   ],
-   "scale": [
-    0.5,
-    2
-   ]
-  },
-  "layer": "solid",
-  "anchor": "base",
-  "components": {
-   "foundation": {
-    "kind": "none"
-   }
-  },
-  "overlaps": [
-   "mars-campus"
-  ]
- },
- {
-  "schema": "def/1",
-  "name": "core-mars-og-east-life-2",
-  "version": 1,
-  "description": "A og east life on the Mars 2026 campus (0.43 × 0.424 m, 0.974 m high), as the reference draws it. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
-  "tags": [
-   "mars",
-   "mars-campus",
-   "mesh",
-   "site",
-   "og-east-life"
-  ],
-  "form": "point",
-  "make": {
-   "kind": "mesh",
-   "asset": "1e471c15979989e8f053d196ddb2b5cd55e812c05bc47620d5fa114500f30d10",
-   "collide": "box"
-  },
-  "size": {
-   "box": [
-    0.43,
-    0.974,
-    0.424
-   ],
-   "scale": [
-    0.5,
-    2
-   ]
-  },
-  "layer": "solid",
-  "anchor": "base",
-  "components": {
-   "foundation": {
-    "kind": "none"
-   }
-  },
-  "overlaps": [
-   "mars-campus"
-  ]
- },
- {
-  "schema": "def/1",
-  "name": "core-mars-og-east-life-3",
   "version": 1,
   "description": "A og east life on the Mars 2026 campus (3.66 × 0.045 m, 0.11 m high), as the reference draws it. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene's Oct 10 corrections).",
   "tags": [

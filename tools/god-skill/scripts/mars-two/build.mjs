@@ -70,14 +70,22 @@ function buildingOf(r) {
 // Assemblies whose things are furniture / items Souls use (the rest of those assemblies stays in the building mesh).
 const FURN_ASM = /^(mimos-home|mimos-details|mimos-source-west-entry-sofa|mimos-source-east-back-sofa|mimos-cream-recliner|kitchen-details|auditorium-2026-furnishings|chiba-gallery-life|chiba-field-seating|field-chair|field-teal-sofa)/;
 const STRUCT = /wall|door|partition|jamb|header|window|glazing|pier|sill|hatch|fascia|cable|bulb|socket|globe|festoon|string|cleat|patch|pegboard|gong|sign|gallery|screen|panel|batten|seam|drape|runner|installation|portrait|projector|partition|rug|whiteboard|marker|bracket|backing|lens|light/i;
-const SEAT = /chair|stool|sofa|recliner|papasan|bus seat|bus cushion|box seat|tier cushion|seat/i;
-const TABLE = /table ?top|tabletop|counter|prep top|desk|worktop|serving shelf|long shelf|sink counter/i;
+const SEAT = /chair|stool|sofa|recliner|papasan|bus seat|bus cushion|box seat|tier cushion|floor cushion|mattress|seat/i;
+const TABLE = /table ?top|tabletop|counter|prep top|desk|worktop|serving shelf|long shelf|sink counter|dinner table|folding table|DJ table|bench|timber shelf/i;
 const COLD = /refrigerator|freezer|fridge/i;
-const ITEM = /mixing bowl|stock pot|table cup|table kettle|kettle handle|ceramic mug|study mug|chopping board|electric kettle/i;
+const ITEM = /mixing bowl|stock pot|table cup|table kettle|kettle handle|ceramic mug|ceramic cup|study mug|chopping board|electric kettle/i;
 
+// Furniture parity with sim.mars.college (its add2026Details recipe is in V3): the rest of the campus's furnished rooms —
+// CoLab, Freeside's open-mic room and hydro cart, the OG clubhouse / east table / kitchen, the Tool library and workshop,
+// Mimos's west coffee table — are cut out as library defs too (not left inside the building and site meshes).
+const MORE_ASM = /^(colab-2026-roof-access|freeside-2026-observed-details|freeside-north-hydro-cart|og-clubhouse-details|og-east-life|og-kitchen-details|og-ground-details|tool-2026-library)$/;
+const MORE_KIND = /sofa|chair|table|stool|cushion|mattress|shel(f|ves)|bench|stove|sink|speaker|lamp|spool|cart|vise|net pot|griddle|counter|DJ|laptop|cup|book|basin|worktop/i;
 function furnitureRows() {
-  return rows.filter((r) => r.asm && FURN_ASM.test(r.asm) && !STRUCT.test(r.kind ?? '') && r.y1 > 0.02 && topOf(r) !== 'people');
+  return rows.filter((r) => r.asm && !STRUCT.test(r.kind ?? '') && r.y1 > 0.02 && topOf(r) !== 'people' && FURN_ASM.test(r.asm));
 }
+const isMore = (r) => r.asm && r.y1 > 0.02 && topOf(r) !== 'people' && (!STRUCT.test(r.kind ?? '') || /table panel/i.test(r.kind ?? ''))
+  && ((MORE_ASM.test(r.asm) && r.layer === 'Interior details' && MORE_KIND.test(`${r.kind ?? ''} ${r.name ?? ''}`))
+    || (r.asm === 'mimos-open-l' && /west coffee table|coffee tablet/i.test(`${r.kind ?? ''} ${r.name ?? ''}`)));
 // connected objects: boxes that overlap (2 cm tolerance), never across buildings
 function clusters(list, tol = 0.02, key = () => '', oriented = false) {
   const parent = list.map((_, i) => i), find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
@@ -102,6 +110,8 @@ function classify(rs) {
   if (COLD.test(kinds)) return { cat: 'cold', kinds, nums };
   if (SEAT.test(kinds) && !/table ?top|tabletop|prep top/i.test(kinds)) return { cat: 'seat', kinds, nums };
   if (TABLE.test(kinds) || /table/i.test(kinds)) return { cat: 'table', kinds, nums };
+  // a free-standing thing that is none of those (a floor lamp, a speaker on its tripod, the hydro cart, a camp stove)
+  if (/lamp|speaker|cart|stove|vise|spool|net pot/i.test(kinds)) return { cat: 'prop', kinds, nums };
   return { cat: 'decor', kinds, nums };
 }
 // facing of a seat: from its back toward its middle
@@ -119,8 +129,14 @@ function facingOf(rs) {
 function nameOf(rs, cat) {
   const num = rs.map((r) => NUMBERED.get(r.comp) ?? NUMBERED.get(r.asm)).find(Boolean);
   if (num) return NUMBER_NAMES[num.number];
-  const k = (rs.find((r) => (cat === 'seat' ? SEAT : cat === 'table' ? TABLE : cat === 'cold' ? COLD : ITEM).test(r.kind ?? '')) ?? rs[0]).kind ?? rs[0].name;
-  return k.toLowerCase().replace(/\b(mimos|kitchen|diner|auditorium|chiba|source|photographed|commissary|native|fitted|loose|adjacent|continued|upper|northwest|west|left|right|rear|front|study|shared|photo)\b/g, ' ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').replace(/-(top|cabinet|carcass|cushion|base|seat|back|plinth|tabletop|body)$/g, '').slice(0, 28) || cat;
+  const re = cat === 'seat' ? SEAT : cat === 'table' ? TABLE : cat === 'cold' ? COLD : cat === 'prop' ? /lamp|speaker|cart|stove|vise|spool|net pot/i : ITEM;
+  // the part that names the object: a top / seat / body before a leg or a foot
+  const cand = rs.filter((r) => re.test(r.kind ?? '')), main = cand.find((r) => /top|seat|base|body|shade|cushion|mattress/i.test(r.kind ?? '') && !/leg|foot|feet/i.test(r.kind ?? '')) ?? cand[0] ?? rs[0];
+  if (cat === 'table' && /west coffee table|shared coffee tablet/i.test(main.kind ?? '')) return 'mimos-coffee-table';
+  let n = (main.kind ?? main.name).toLowerCase().replace(/\b(mimos|kitchen|diner|auditorium|chiba|source|photographed|commissary|native|fitted|loose|adjacent|continued|upper|northwest|west|left|right|rear|front|study|shared|photo|observed|occupied|separate|grounded|slender|short|performer|open mic|portable|draped|black|pale|brown|white|side)\b/g, ' ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+  for (let i = 0; i < 3; i++) n = n.replace(/-(top|cabinet|carcass|cushion|base|seat|back|plinth|tabletop|body|leg|legs|foot|feet|arm|core|rail|upright|frame|crossed|mast|shade|stand|panel|edge|support|bottom|side)$/g, '');
+  if (n.length > 30) n = n.slice(0, 30).replace(/-[^-]*$/, '');
+  return n || cat;
 }
 
 // A shape signature in an object's own frame (dedups repeated chairs, stools, bus seats, tables, vans), tolerant to
@@ -182,9 +198,28 @@ const def = (name, d) => ({
 // 1. furniture and items (cut first: the buildings exclude them)
 const taken = new Set(), furnBoxes = [];
 const furn = furnitureRows();
-const SEATF = /chair|stool|sofa|recliner|papasan|bus seat|bus cushion|seat|tier cushion|throw cushion|box seat/i;
+const SEATF = /chair|stool|sofa|recliner|papasan|bus seat|bus cushion|seat|tier cushion|throw cushion|floor cushion|mattress|box seat/i;
 const TOPF = /table ?top|tabletop|counter top|counter return|counter lip|prep top|desk$|long shelf|serving shelf|inside counter/i;
 const groups = [];
+// the rest of the campus's furniture: parts of one object (a folding chair's seat, back and crossed legs; a table's legs,
+// inset panels and the books on it) lie a few cm apart in the recipe, so they are joined with a wider tolerance
+// the rest of the campus's furniture: parts of one object lie a few cm apart (a folding chair's seat, back and crossed
+// legs; a table's legs, inset panels and the books on it), and neighbouring objects touch (three chairs in a row by a
+// folding table). Join by overlap with a wider tolerance, split seats from tables, then split each family at its
+// anchors (a chair's seat, a sofa's base, a table's top, a mattress, a speaker…): every other part goes to the nearest.
+const ANCHOR = /chair seat|sofa seat|sofa base|tabletop|table top|\bmattress\b|floor cushion|speaker$|lamp shade|vise base|dinner table$|folding table$|camp stove/i;
+const more = rows.filter(isMore);
+for (const g0 of clusters(more, 0.08, (r) => `${buildingOf(r)}|${ITEM.test(r.kind ?? '') ? 'item' : ''}`)) {
+  const fam = (r) => (SEATF.test(r.kind ?? '') ? 's' : 't');
+  for (const f of ['s', 't']) {
+    const g = g0.filter((r) => fam(r) === f); if (!g.length) continue;
+    const anchors = g.filter((r) => ANCHOR.test(r.kind ?? ''));
+    if (anchors.length < 2) { groups.push(g); continue; }
+    const by = new Map(anchors.map((t) => [t.i, [t]]));
+    for (const r of g) { if (by.has(r.i)) continue; let best = anchors[0], bd = Infinity; for (const t of anchors) { const d = Math.hypot(t.cn - r.cn, t.ce - r.ce); if (d < bd) { bd = d; best = t; } } by.get(best.i).push(r); }
+    groups.push(...by.values());
+  }
+}
 for (const g0 of clusters(furn, 0.05, (r) => `${buildingOf(r)}|${ITEM.test(r.kind ?? '') ? 'item' : ''}`)) {
   // a chair tucked under a table: split seats from the rest, then re-cluster each
   const fam = (r) => (SEATF.test(r.kind ?? '') || /chair|sofa|recliner|papasan|stool|bus seat/i.test(r.asm ?? '') ? 's' : 't');
@@ -209,7 +244,8 @@ for (const g of groups) {
   const cx = (b.e0 + b.e1) / 2 + X0, cz = -(b.n0 + b.n1) / 2;
   const frame = mul(rotY(-yaw), mul(translate(-cx, 0, -cz), v3ToLocal(0, 0)));
   // shape signature: the source meshes and their frames (dedups the repeated chairs, stools, bus seats, tables)
-  const sig = sigOf(g, frame);
+  // (identical small items — the cups on a table — are one kind however they are turned)
+  const sig = c.cat === 'item' ? sha256(JSON.stringify(['item', g.map((r) => (r.kind ?? '').replace(/[-_ ]?\d+$/, '')).sort(), [b.e1 - b.e0, b.y1 - b.y0, b.n1 - b.n0].map((v) => Math.round(v * 50)).sort()])) : sigOf(g, frame);
   let base = nameOf(g, c.cat);
   let dname = kinds.get(sig);
   const piece = await cut(src, g.map((r) => r.i), { name: base, frame, tex: 256, maxTris: 4000 });
@@ -237,6 +273,9 @@ for (const g of groups) {
       } else if (c.cat === 'cold') {
         components = { container: { capacity: 20 } }; tags = ['kitchen', 'fridge', 'cold', 'container'];
         description = `${dname.replace(/-/g, ' ')} from the Mars 2026 kitchen.${numbered}`;
+      } else if (c.cat === 'prop') {
+        components = {}; tags = ['furniture', 'prop', ...(/lamp/i.test(c.kinds) ? ['lamp', 'light'] : /speaker/i.test(c.kinds) ? ['speaker', 'music'] : /stove/i.test(c.kinds) ? ['kitchen', 'stove'] : /cart|net pot/i.test(c.kinds) ? ['garden', 'hydroponics', 'cart'] : [])];
+        description = `${dname.replace(/-/g, ' ')} from the Mars 2026 campus.${numbered}`;
       } else {
         components = { carryable: { mass: 0.6, grips: 1 }, container: { capacity: 1 } }; tags = ['kitchen', 'item', ...(/bowl/i.test(c.kinds) ? ['bowl', 'food'] : /pot/i.test(c.kinds) ? ['pot'] : /cup|mug/i.test(c.kinds) ? ['cup', 'mug'] : /kettle/i.test(c.kinds) ? ['kettle'] : ['board'])]; layer = 'decor';
         description = `${dname.replace(/-/g, ' ')} from the Mars 2026 campus (carryable).${numbered}`;
@@ -295,7 +334,7 @@ for (const [b, rs] of byB) {
 }
 
 // 3. site objects (vehicles, trailers, toilets, OG, forklift, tents…)
-const site = rows.filter((r) => buildingOf(r) === 'site' && r.y1 > 0.05 && r.y0 > -0.3 && (r.n1 - r.n0) < 40 && (r.e1 - r.e0) < 40);
+const site = rows.filter((r) => !taken.has(r.i) && buildingOf(r) === 'site' && r.y1 > 0.05 && r.y0 > -0.3 && (r.n1 - r.n0) < 40 && (r.e1 - r.e0) < 40);
 const objs = clusters(site, 0.03, () => '', true).filter((g) => { const b = boxOf(g); return b.y1 - b.y0 > 0.15 || (b.n1 - b.n0) * (b.e1 - b.e0) > 1; });
 const siteKinds = new Map(), siteSig = new Map();
 let nSite = 0;
