@@ -8,6 +8,7 @@ import {clone as cloneSkinned} from 'three/addons/utils/SkeletonUtils.js';
 import {templateFromParts, type Template} from '../../../../mars/viewer/app/engine-view/people.ts';
 import {resolveLook, lookKey, paletteOf, HEADGEAR_FACES, type Look, type Slot} from './look.ts';
 import {humanoidMaterial} from './material.ts';
+import {BASE} from '../base-path.ts';
 import {hatPieces, glassesPieces, bagPieces, skinned, type HeadFit} from './props.ts';
 
 type Landmarks = {min: number[]; max: number[]; cz?: number; rx?: number; rz?: number; top?: number; eye?: [number, number, number]; eyeX?: number; templeX?: number; back?: number; front?: number};
@@ -17,7 +18,8 @@ export type KitManifest = {contract: 'humanoid-kit/1'; version: number; slots: s
   parts: Record<string, Record<string, PartEntry>>; presets: Record<string, {palette: Partial<Record<Slot, number[]>>}>};
 /** A frame's rig: armature, bind inverses, clips, and per bone its rest joint and its first child joint (kit space). */
 type Rig = {root: THREE.Object3D; ib: THREE.Matrix4[]; clips: THREE.AnimationClip[]; names: string[]; joints: THREE.Vector3[]; ends: (THREE.Vector3 | null)[]};
-export const KIT_URL = '/modular/humanoid/';
+// under the app's prefix: at sim.eden.art/worlds the root /modular/* belongs to the other release, which has no kit
+export const KIT_URL = `${BASE}/modular/humanoid/`;
 const HIDE_UNDER_HAT = 1;
 const ARM_TRACK = /^(LowerArm|Wrist)[LR]\.position$/;
 
