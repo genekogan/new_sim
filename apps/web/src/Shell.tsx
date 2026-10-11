@@ -23,6 +23,7 @@ import { LiveWorld } from './LiveWorld.tsx';
 import { SoulFocus } from './SoulFocus.tsx';
 import {approvedMe,authIdentity} from './auth-projection.ts';
 import { useViewerInsets, ViewerFrame } from './ViewerFrame.tsx';
+import type { InitialWorldProgress } from './InitialWorldReadiness.ts';
 import {connectionLost} from './viewer-arrival.ts';
 import {BringAgent} from './BringAgent.tsx';
 import {AccountApproval} from './AccountApproval.tsx';
@@ -92,6 +93,7 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   const [viewerState, setViewerState] = useState<WorldViewerState | null>(null);
   const receiveHandle = useCallback((handle: WorldViewerHandle | null) => setViewerHandle(handle), []);
   const receiveState = useCallback((state: WorldViewerState) => setViewerState(state), []);
+  const [initialProgress, setInitialProgress] = useState<InitialWorldProgress | null>(null);
   useApprovalFollow(approvalFollow,approvalScope,auth.authed,viewerHandle,viewerState,followed=>{setApprovalFollow(null);if(followed)setApprovalId(null);});
   const placePreview=useCallback((place:EdenTourPlace)=>viewerHandle?.locationPreview?.(place)??Promise.resolve(null),[viewerHandle]);
   const openNavigation = useCallback(() => setPanelOpen(false), []);
@@ -128,9 +130,9 @@ export function Shell({ cfg, auth, arrivalEnabled=false,humanPresetsEnabled=true
   return (
     <div ref={frame} className={`human-world ${advanced ? 'has-advanced' : ''}`}>
       {approvalId&&!approvalFollow&&<AccountApproval key={JSON.stringify([privatePanelKey,approvalId])} id={approvalId} worldId={cfg.worldId} worldUrl={location.origin+worldPath} worldName={worldKey==='littlemartians'?'Little Martians':worldKey[0].toUpperCase()+worldKey.slice(1)} auth={auth} api={api} onClose={()=>{setApprovalId(null);history.replaceState(null,'',location.pathname+location.search+'#watch');}} onReady={id=>{setSelected(id);setApprovalFollow({soulId:id,scope:approvalScope});setAdvanced(false);setTab('watch');setPanelOpen(true);}}/>}
-      <div className="world-scene"><LiveWorld sim={sim} selected={selected} onSelect={inspect} embedded {...{edenExpansion,localClassroomPresentation,publishSpeechAnchors:!advanced,humanPresets:humanPresetsEnabled&&edenExpansion}} hideControls={!advanced} hideSoulInfo={!advanced} viewportInsets={viewportInsets} onViewerHandle={receiveHandle} onViewerState={receiveState} /></div>
+      <div className="world-scene"><LiveWorld sim={sim} selected={selected} onSelect={inspect} embedded {...{edenExpansion,localClassroomPresentation,publishSpeechAnchors:!advanced,humanPresets:humanPresetsEnabled&&edenExpansion}} hideControls={!advanced} hideSoulInfo={!advanced} viewportInsets={viewportInsets} onViewerHandle={receiveHandle} onViewerState={receiveState} onInitialProgress={advanced ? undefined : setInitialProgress} /></div>
       <WorldSpeechOverlay root={frame} sim={sim} state={viewerState} active={!advanced} handle={viewerHandle}/>
-      {!advanced && <ViewerFrame handle={viewerHandle} state={viewerState} dt={sim.conn.welcome?.dt ?? 0.05} navigationOpen={navigationOpen} onNavigationChange={setNavigationOpen} onNavigationOpen={openNavigation} worldTime={worldTimeText(worldClockAt((sim as Sim&{takes?:{chunks?:unknown[]}|null}).takes?.chunks,viewerState?.shownTick))} connected={!connectionLost(sim.conn)} connecting={!sim.conn.welcome} worldName={worldKey === 'littlemartians' ? 'Little Martians' : worldKey[0].toUpperCase() + worldKey.slice(1)} followName={viewerState?.cameraMode === 'follow' ? r.souls.get(viewerState.selection.soulId ?? '')?.name ?? null : null} slots={{ status: statusSlot, camera: cameraSlot }} />}
+      {!advanced && <ViewerFrame handle={viewerHandle} state={viewerState} dt={sim.conn.welcome?.dt ?? 0.05} navigationOpen={navigationOpen} onNavigationChange={setNavigationOpen} onNavigationOpen={openNavigation} worldTime={worldTimeText(worldClockAt((sim as Sim&{takes?:{chunks?:unknown[]}|null}).takes?.chunks,viewerState?.shownTick))} connected={!connectionLost(sim.conn)} connecting={!sim.conn.welcome} worldName={worldKey === 'littlemartians' ? 'Little Martians' : worldKey[0].toUpperCase() + worldKey.slice(1)} followName={viewerState?.cameraMode === 'follow' ? r.souls.get(viewerState.selection.soulId ?? '')?.name ?? null : null} slots={{ status: statusSlot, camera: cameraSlot }} initial={initialProgress} />}
       <header className={`world-hud${advanced ? '' : ' slim'}`}>
         {advanced && <>
         <a href="/" className="world-home">SIM</a>
