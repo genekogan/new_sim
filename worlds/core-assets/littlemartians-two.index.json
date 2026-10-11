@@ -1,0 +1,3610 @@
+{
+ "schema": "core-assets/1",
+ "note": "littlemartians-two: the Arium-era Little Martians art, measured by the god import path (POST /v1/god/assets) in tools/god-skill/scripts/lm-two/build-template.mjs. Licence per asset.",
+ "assets": {
+  "0324e2cf7b145cc994e2c8443a2aaaa3cea1edc600583d9208bbfc445f20cfe1": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29984,
+   "bytes": 550636,
+   "textures": 3,
+   "texPx": 1024,
+   "box": [
+    1.078,
+    1.791,
+    2
+   ],
+   "min": [
+    -0.539,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "Mesh_0.001"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-0b40c69c8244",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-0b40c69c8244.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-0b40c69c8244.glb"
+  },
+  "03b16b01c9cb29bb384a882ef8f8daba5b4019cde0e3d8f914736cb49df1c346": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 544256,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.13,
+    1.288,
+    2
+   ],
+   "min": [
+    -0.565,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-af1046536b8a",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-af1046536b8a.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-af1046536b8a.glb"
+  },
+  "050547e5d5287ad747f0f8aea2aa6c8bb6067200c52d26a61f2e41696f317056": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 493696,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.202,
+    1.17,
+    2
+   ],
+   "min": [
+    -0.601,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-566ced3e91e1",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-566ced3e91e1.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-566ced3e91e1.glb"
+  },
+  "07a868a6593060bc27ccbbd8514df70eff0bcd6945840fe239d82ce8c1fca0c4": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29823,
+   "bytes": 880444,
+   "textures": 10,
+   "texPx": 1024,
+   "box": [
+    1.58,
+    4.499,
+    1.385
+   ],
+   "min": [
+    -0.789,
+    0,
+    -0.693
+   ],
+   "animations": [],
+   "nodes": [
+    "material0009",
+    "material0008",
+    "material0007",
+    "material0006",
+    "material0005",
+    "material0004",
+    "material0003",
+    "material0002",
+    "material0001",
+    "material0000"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-golden-woman-standing",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-golden-woman-standing.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-golden-woman-standing.glb"
+  },
+  "0a136aeb0ddaade103ce625d7d4c295789be513a822d8553dea9df73270a4c74": {
+   "ext": "json",
+   "kind": "footprint",
+   "tris": 0,
+   "bytes": 1013,
+   "textures": 0,
+   "texPx": 0,
+   "box": [
+    14.4672,
+    32,
+    12.6719
+   ],
+   "baked": {
+    "box": [
+     14.4672,
+     32,
+     12.6719
+    ],
+    "colliders": [
+     {
+      "c": [
+       -4.12,
+       0
+      ],
+      "half": [
+       3.12,
+       6.34
+      ],
+      "yaw": 0,
+      "y0": 0,
+      "y1": 32,
+      "tag": "minarete-scan-envelope-west"
+     },
+     {
+      "c": [
+       4.12,
+       0
+      ],
+      "half": [
+       3.12,
+       6.34
+      ],
+      "yaw": 0,
+      "y0": 0,
+      "y1": 32,
+      "tag": "minarete-scan-envelope-east"
+     },
+     {
+      "c": [
+       0,
+       0
+      ],
+      "half": [
+       7.23,
+       6.34
+      ],
+      "yaw": 0,
+      "y0": 2.25,
+      "y1": 32,
+      "tag": "minarete-scan-envelope-overhead"
+     }
+    ],
+    "surfaces": [],
+    "openings": [],
+    "links": [],
+    "rooms": [],
+    "slots": [],
+    "notes": [
+     "footprint scan-minarete-arch: 0 rooms, 0 openings, 0 links (0 shafts, float-only), 3 wall/solid colliders"
+    ]
+   },
+   "name": "minarete-temple-footprint",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/scan-minarete.glb",
+   "path": "worlds/littlemartians-two/assets/scan-minarete.footprint.json"
+  },
+  "0a5cbf4c94b02206fbdc21e0bc973950d6bef72575cc85759341c28549412e74": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29997,
+   "bytes": 500212,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    11.966,
+    8.295,
+    10.649
+   ],
+   "min": [
+    -5.999,
+    0.005,
+    -5.315
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_materials_unlit",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-fey-castle",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-fey-castle.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-fey-castle.glb"
+  },
+  "0bdc103d46c3b1516f92c64ac5485141d306df18d382e98bb0db63644f5fc7e9": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29998,
+   "bytes": 486992,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.116,
+    1.183,
+    2
+   ],
+   "min": [
+    -0.558,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-6c113bb8ae2e",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-6c113bb8ae2e.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-6c113bb8ae2e.glb"
+  },
+  "0d6016931731138785e018d4ac053cb8ca63da5fde4fbf69902c54651b129b34": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 812280,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.362,
+    2.6,
+    1.363
+   ],
+   "min": [
+    -0.681,
+    0,
+    -0.681
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-a4a6b8bad1e8",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-a4a6b8bad1e8.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-a4a6b8bad1e8.glb"
+  },
+  "0dde72b535648fe3b1644417fd83485725f0f32abcff0db565cd1ff6ce088bba": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 579708,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.082,
+    1.29,
+    2
+   ],
+   "min": [
+    -0.541,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-66009eb80cef",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-66009eb80cef.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-66009eb80cef.glb"
+  },
+  "128621da4c757774ae1d1f5ba43b5d4816a951b0551b8504a52eb8bd15640a0d": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29955,
+   "bytes": 406504,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    11.99,
+    4.639,
+    9.016
+   ],
+   "min": [
+    -5.999,
+    0.023,
+    -4.503
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-museu-azulejo-quad",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-museu-azulejo-quad.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-museu-azulejo-quad.glb"
+  },
+  "163cd1f39090a4b8165d61be94d3046c1e076909d7bcb46f4a3f4c253b07244d": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29705,
+   "bytes": 554480,
+   "textures": 5,
+   "texPx": 1024,
+   "box": [
+    2.976,
+    4.499,
+    2.319
+   ],
+   "min": [
+    -1.488,
+    0,
+    -1.16
+   ],
+   "animations": [],
+   "nodes": [
+    "material0004",
+    "material0003",
+    "material0002",
+    "material0001",
+    "material0000"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-china-buddha",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-china-buddha.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-china-buddha.glb"
+  },
+  "1f193ded64a8e29318b3ca568e65fa620b78a048c8d4afc236f2304e042e5b66": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29943,
+   "bytes": 1714356,
+   "textures": 8,
+   "texPx": 1024,
+   "box": [
+    5.753,
+    12,
+    8.519
+   ],
+   "min": [
+    -2.876,
+    0,
+    -4.259
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-quinta-tower-curly",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-quinta-tower-curly.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-quinta-tower-curly.glb"
+  },
+  "21200d03b44ad3c5e74727216f48a7c9452f7e3eb531d17546e57e57279555c8": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30815,
+   "bytes": 1110952,
+   "textures": 4,
+   "texPx": 2048,
+   "box": [
+    0.053,
+    0.056,
+    0.091
+   ],
+   "min": [
+    -0.027,
+    -0.028,
+    -0.045
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "kweku-ceramic-head",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/characters/kweku.glb",
+   "path": "worlds/littlemartians-two/assets/character-kweku.glb"
+  },
+  "24c40d27fcd500cf4eebdd3a3d2a4ea98c0faad44bc7d9a40ce9e75e67b4d219": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29973,
+   "bytes": 1787344,
+   "textures": 8,
+   "texPx": 1024,
+   "box": [
+    10.189,
+    3.418,
+    12
+   ],
+   "min": [
+    -5.095,
+    0,
+    -6
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-forte-sao-filipe-chapel",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-forte-sao-filipe-chapel.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-forte-sao-filipe-chapel.glb"
+  },
+  "273909d7072041dcd9b0ced25709d257dbc8b72725a074864b03a18916b98f1a": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 532392,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1,
+    1.2,
+    2
+   ],
+   "min": [
+    -0.5,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-9207a5e1c4b1",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-9207a5e1c4b1.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-9207a5e1c4b1.glb"
+  },
+  "2a443fd33fce74f1eaaff3f6543999a36e3c69adf14b20788380d401120bf6d6": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29795,
+   "bytes": 547712,
+   "textures": 3,
+   "texPx": 1024,
+   "box": [
+    1.325,
+    1.532,
+    2
+   ],
+   "min": [
+    -0.663,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "Mesh_0.007"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-c92a3b231c79",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-c92a3b231c79.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-c92a3b231c79.glb"
+  },
+  "2ec5a187cf1be208da75687fed247347746e0d7e00f3af2a684be7e52b28ba8a": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29990,
+   "bytes": 408444,
+   "textures": 2,
+   "texPx": 1024,
+   "box": [
+    4.959,
+    2.745,
+    11.987
+   ],
+   "min": [
+    -2.48,
+    0,
+    -5.996
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-lisbon-archways-corridor",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-lisbon-archways-corridor.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-lisbon-archways-corridor.glb"
+  },
+  "3171593dd2aab812af9b68996216951adc1f22352a5a6aaeda5b236f1402bf5a": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 475276,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.243,
+    1.216,
+    2
+   ],
+   "min": [
+    -0.621,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-36ac56b5a6f4",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-36ac56b5a6f4.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-36ac56b5a6f4.glb"
+  },
+  "3189fed53c9fbe240178e6e741ce4f14c9e1f5e67e08273dd820ffe5c5500f01": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 604000,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.407,
+    2.6,
+    1.323
+   ],
+   "min": [
+    -0.704,
+    0,
+    -0.662
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-5f5e4a9284a4",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-5f5e4a9284a4.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-5f5e4a9284a4.glb"
+  },
+  "3391214c4aa4ede6e0650cbab0863200a1ac5ece21fe541d5076c16cd616846a": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29997,
+   "bytes": 263072,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    1.949,
+    4.498,
+    4.304
+   ],
+   "min": [
+    -0.975,
+    0,
+    -2.152
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-poly-07",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-07.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-poly-07.glb"
+  },
+  "37453ef3d479cf245a28e6b601da03f00582f71bff10b06f76ec9e8be44174b9": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29999,
+   "bytes": 626420,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.999,
+    2.22,
+    1.986
+   ],
+   "min": [
+    -1,
+    0,
+    -0.993
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-317a837144b2",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-317a837144b2.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-317a837144b2.glb"
+  },
+  "3bf248f5da4d6c44f52939d6f4fae94940bb157c94981aba72bc286744532c49": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29414,
+   "bytes": 1706036,
+   "textures": 25,
+   "texPx": 1024,
+   "box": [
+    12,
+    4.171,
+    8.201
+   ],
+   "min": [
+    -6,
+    0,
+    -4.087
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization",
+    "KHR_texture_transform"
+   ],
+   "name": "exhibit-golden-gate-park-tree",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-golden-gate-park-tree.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-golden-gate-park-tree.glb"
+  },
+  "3ec4995926b0c6a162d787f47aa361cacf2c902342955cfda625d4fe3947cb92": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 486288,
+   "textures": 3,
+   "texPx": 1024,
+   "box": [
+    1.167,
+    1.78,
+    2
+   ],
+   "min": [
+    -0.583,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "Mesh_0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-97ddf86c47f9",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-97ddf86c47f9.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-97ddf86c47f9.glb"
+  },
+  "3f9a130fc303eb353c75844dc44e48ffc73d2676f821fb8e1af096b256683617": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 38,
+   "bytes": 189644,
+   "textures": 1,
+   "texPx": 1536,
+   "box": [
+    6.5,
+    5.2,
+    0.5
+   ],
+   "min": [
+    -3.25,
+    0,
+    -0.3
+   ],
+   "animations": [],
+   "nodes": [
+    "frame",
+    "picture"
+   ],
+   "extensions": [
+    "EXT_texture_webp"
+   ],
+   "name": "gallery-panel-receding-archways",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/landscape.glb (embedded \"Receding archways\")",
+   "path": "worlds/littlemartians-two/assets/panel-receding-archways.glb"
+  },
+  "41de05216b5538cf2077b2bb93156797bf546d7511f42cc1d72f0aaf697dd837": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29997,
+   "bytes": 509336,
+   "textures": 2,
+   "texPx": 1024,
+   "box": [
+    5.606,
+    3.292,
+    12
+   ],
+   "min": [
+    -2.804,
+    0,
+    -6
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-museu-azulejo-main",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-museu-azulejo-main.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-museu-azulejo-main.glb"
+  },
+  "423b2865e614f43ec385af7367cdc0173dc1166f297cd24ec65db030701da071": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29999,
+   "bytes": 399140,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    2,
+    1.901,
+    1.577
+   ],
+   "min": [
+    -1,
+    0,
+    -0.789
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-731f06fdb7e6",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-731f06fdb7e6.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-731f06fdb7e6.glb"
+  },
+  "44acdf42fb02d25aa52c53fa020d1fdf70674583b372c6c898ab70c7a91c8b39": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 576308,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.128,
+    1.15,
+    2
+   ],
+   "min": [
+    -0.564,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-0f69fd943fc1",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-0f69fd943fc1.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-0f69fd943fc1.glb"
+  },
+  "44ea7ba030c1d88e8cf8f3e322135cd8135b70b8673be93c24f7985a82198fa7": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29997,
+   "bytes": 319484,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    9.77,
+    12,
+    9.441
+   ],
+   "min": [
+    -4.885,
+    0,
+    -4.72
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-se-entrada",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-se-entrada.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-se-entrada.glb"
+  },
+  "473d35b6b62505c8d5d5ab2fc2a4f6ccfe5c0206985eeadeebb2ac5299884534": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 76000,
+   "bytes": 2147272,
+   "textures": 4,
+   "texPx": 2048,
+   "box": [
+    13.69,
+    30,
+    12.855
+   ],
+   "min": [
+    -6.845,
+    0,
+    -6.428
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "footprint": "cdda8c4d00f480401820f1cdd44ef99b062b56bd276c8c164d354760083ba058",
+   "name": "celadon-beacon",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/scan-celadon-tower.glb",
+   "path": "worlds/littlemartians-two/assets/scan-celadon-tower.glb"
+  },
+  "4c54391da491e338a2495bd2cee0a6f7b5309cbcf3e06407fc489e2da6d24c10": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29999,
+   "bytes": 733836,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    5.406,
+    12,
+    5.533
+   ],
+   "min": [
+    -2.703,
+    0,
+    -2.767
+   ],
+   "animations": [],
+   "nodes": [
+    "textured.001",
+    "Mesh_0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-minarete-portal",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-minarete-portal.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-minarete-portal.glb"
+  },
+  "4d8a81898b4c6d4d67af69e0bc20f48400e6912d0c8e4bdc72a846a898a09138": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29989,
+   "bytes": 249292,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    3.094,
+    4.5,
+    3.067
+   ],
+   "min": [
+    -1.547,
+    0,
+    -1.533
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-poly-12",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-12.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-poly-12.glb"
+  },
+  "51cab4ecf47d1b37fc8476dfae98f4f4f6d2888bc30a125bc421d13748e01c57": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 612492,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.219,
+    2.6,
+    1.215
+   ],
+   "min": [
+    -0.61,
+    0,
+    -0.608
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-0d01c1b00980",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-0d01c1b00980.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-0d01c1b00980.glb"
+  },
+  "528160c9006ea30a047d11efbc78a57fdf81de866d5738959f151560ad8f68bf": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29990,
+   "bytes": 260588,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    4.848,
+    4.499,
+    4.914
+   ],
+   "min": [
+    -2.424,
+    0.001,
+    -2.451
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-poly-19",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-19.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-poly-19.glb"
+  },
+  "538fd217246f4dabd34cbc8c41a73a81ee4d7690049e49ee875b6c3ef82642c2": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29971,
+   "bytes": 399344,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    11.28,
+    3.925,
+    11.995
+   ],
+   "min": [
+    -5.666,
+    0.007,
+    -5.999
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_materials_unlit",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-asian-art-museum",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-asian-art-museum.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-asian-art-museum.glb"
+  },
+  "56030cb59d8ee4a28c5d6c0a9310e429165b8862b67cb2c88d81466eb56ccc2a": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29999,
+   "bytes": 631876,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    0.993,
+    4.5,
+    1.542
+   ],
+   "min": [
+    -0.496,
+    0,
+    -0.771
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-poly-18",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-18.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-poly-18.glb"
+  },
+  "5a54d87ef195cd5387d5fa483dc0aabac2e76508feb218e6d78b5aa008db2fa7": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 584412,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.069,
+    1.287,
+    2
+   ],
+   "min": [
+    -0.535,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-f3f642ac7b15",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-f3f642ac7b15.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-f3f642ac7b15.glb"
+  },
+  "5eec933a6032dcb5a15de30d4c1ccbf4de4d181dbde7784213bb04c52090f9aa": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 479440,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.249,
+    1.417,
+    2
+   ],
+   "min": [
+    -0.625,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-94727a7e61b6",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-94727a7e61b6.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-94727a7e61b6.glb"
+  },
+  "5faf8c183d8b3f143bb7073769f9c025b500c4d0c646047768abb6765c794f17": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29984,
+   "bytes": 437708,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    7.854,
+    12,
+    10.545
+   ],
+   "min": [
+    -3.927,
+    0,
+    -5.273
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-forte-sao-filipe-corner",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-forte-sao-filipe-corner.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-forte-sao-filipe-corner.glb"
+  },
+  "63e181c508ded62ebdc45206a76662025dbf4e12c85b5251c4ac9a7fe06887d1": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 571604,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.715,
+    2.6,
+    0.956
+   ],
+   "min": [
+    -0.857,
+    0,
+    -0.478
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-976ab0a7145b",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-976ab0a7145b.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-976ab0a7145b.glb"
+  },
+  "64d1f80b1cf16566aea177221a822eae468e56e6e884ceaccab8dc8d05a9acdc": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29899,
+   "bytes": 581752,
+   "textures": 3,
+   "texPx": 1024,
+   "box": [
+    1.504,
+    1.546,
+    2
+   ],
+   "min": [
+    -0.752,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "Mesh_0.016"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-b0941d82d98c",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-b0941d82d98c.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-b0941d82d98c.glb"
+  },
+  "66112439cab9581371ab6bfe2359f063b91c6cd63021dd980bc855553e781662": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 648768,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.061,
+    1.133,
+    2
+   ],
+   "min": [
+    -0.53,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-45bcc42c2c58",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-45bcc42c2c58.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-45bcc42c2c58.glb"
+  },
+  "6729d00ae532c4da2e4f31483005afa76edf80002148e6a14f168c99ce534096": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29985,
+   "bytes": 396012,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    11.969,
+    3.307,
+    7.844
+   ],
+   "min": [
+    -6,
+    0,
+    -3.914
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_materials_unlit",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-graffiti-abandoned-room",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-graffiti-abandoned-room.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-graffiti-abandoned-room.glb"
+  },
+  "67cfdaab32b3aa17cad29d931636080e4d3a388410f2339d6e90559f075b69cb": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 579948,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.906,
+    2.6,
+    1.952
+   ],
+   "min": [
+    -0.953,
+    0,
+    -0.976
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-2bb4733c464d",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-2bb4733c464d.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-2bb4733c464d.glb"
+  },
+  "68043f3fb2b3419656ffe068de5318a221f8c086361ee55ea2333af40edf8a13": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 16784,
+   "bytes": 1164232,
+   "textures": 13,
+   "texPx": 1024,
+   "box": [
+    3.969,
+    4.478,
+    1.995
+   ],
+   "min": [
+    -1.985,
+    0,
+    -0.997
+   ],
+   "animations": [],
+   "nodes": [
+    "material0012",
+    "material0011",
+    "material0010",
+    "material0009",
+    "material0008",
+    "material0007",
+    "material0006",
+    "material0005",
+    "material0004",
+    "material0003",
+    "material0002",
+    "material0001",
+    "material0000"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-camel-sculpture",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-camel-sculpture.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-camel-sculpture.glb"
+  },
+  "680ef38962d6dbe9c0b9fb034a4be49d9bb944bab2de3fb6ffb85b24cda0ae44": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 473040,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.727,
+    1.44,
+    2
+   ],
+   "min": [
+    -0.864,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-77e7e7424358",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-77e7e7424358.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-77e7e7424358.glb"
+  },
+  "68b6afff9e1a6bc17b1cbd5d54f2659183fc8ca432484c8cb08ed93b2a0a5fdd": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 859148,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.247,
+    2.6,
+    1.193
+   ],
+   "min": [
+    -0.623,
+    0,
+    -0.596
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-fabce0b97897",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-fabce0b97897.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-fabce0b97897.glb"
+  },
+  "69545bcd1d835d653aa2985fc875a6a308c38030cfd5600e59b4f0e39d68d5b2": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 646696,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.592,
+    2.6,
+    1.799
+   ],
+   "min": [
+    -0.796,
+    0,
+    -0.899
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-b538ebb36278",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-b538ebb36278.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-b538ebb36278.glb"
+  },
+  "6de0af8cbedcca425cf8e0afadd4abacf38947a44d1a65f8aa16b42e2046d85e": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 632980,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.656,
+    2.6,
+    1.787
+   ],
+   "min": [
+    -0.828,
+    0,
+    -0.894
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-567d4f0b818f",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-567d4f0b818f.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-567d4f0b818f.glb"
+  },
+  "6eacf406f9280d327b56dd6d812f84fa2172e5f745a3ae3423f2db35de805ed9": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 23789,
+   "bytes": 1674032,
+   "textures": 21,
+   "texPx": 1024,
+   "box": [
+    4.25,
+    4.5,
+    1.402
+   ],
+   "min": [
+    -2.124,
+    0,
+    -0.685
+   ],
+   "animations": [],
+   "nodes": [
+    "material0020",
+    "material0019",
+    "material0018",
+    "material0017",
+    "material0016",
+    "material0015",
+    "material0014",
+    "material0013",
+    "material0012",
+    "material0011",
+    "material0010",
+    "material0009",
+    "material0008",
+    "material0007",
+    "material0006",
+    "material0005",
+    "material0004",
+    "material0003",
+    "material0002",
+    "material0001",
+    "material0000"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-two-warriors",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-two-warriors.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-two-warriors.glb"
+  },
+  "6eef7bfc9db9cdd7bd430273e15ca36be411cefafed0b84a91e9bf605834da65": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 5341,
+   "bytes": 76724,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    1.795,
+    4.5,
+    3.044
+   ],
+   "min": [
+    -0.898,
+    0,
+    -1.522
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-poly-17",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-17.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-poly-17.glb"
+  },
+  "70d966b924f479d7ca1d30ef1380409fb792dda7984126554b90cd82d17caefa": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29997,
+   "bytes": 433212,
+   "textures": 2,
+   "texPx": 1024,
+   "box": [
+    5.078,
+    3.947,
+    12
+   ],
+   "min": [
+    -2.539,
+    0,
+    -6
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-museu-azulejo-corridor",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-museu-azulejo-corridor.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-museu-azulejo-corridor.glb"
+  },
+  "73aaa7f0503941d62bc050f007cd68c4b7d2f1e48a4821672b3abcbad12c7391": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 765588,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.252,
+    2.6,
+    1.263
+   ],
+   "min": [
+    -0.626,
+    0,
+    -0.631
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-c780e53b578a",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-c780e53b578a.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-c780e53b578a.glb"
+  },
+  "765e64cc3a76460de2443c0f468f195487f38d4629cfb25c3147512585ddd1af": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 271524,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    2.107,
+    4.5,
+    2.129
+   ],
+   "min": [
+    -1.054,
+    0,
+    -1.065
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-poly-02",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-02.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-poly-02.glb"
+  },
+  "776d990ea2dad4fceb6f7f31e532f7d4aab8976bb1abaa6e4e9aeea8d9e01de3": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29821,
+   "bytes": 1126344,
+   "textures": 13,
+   "texPx": 1024,
+   "box": [
+    2.314,
+    4.499,
+    2.073
+   ],
+   "min": [
+    -1.145,
+    0,
+    -1.039
+   ],
+   "animations": [],
+   "nodes": [
+    "material0027",
+    "material0026",
+    "material0018",
+    "material0016",
+    "material0012",
+    "material0011",
+    "material0008",
+    "material0007",
+    "material0006",
+    "material0005",
+    "material0002",
+    "material0001",
+    "material0000"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-greenman-altar",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-greenman-altar.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-greenman-altar.glb"
+  },
+  "7a299c2bf992f6345242795c3cea14dbdbed9bea372530b937b11b015411ca82": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29936,
+   "bytes": 2599828,
+   "textures": 11,
+   "texPx": 1024,
+   "box": [
+    7.698,
+    4.717,
+    11.978
+   ],
+   "min": [
+    -3.844,
+    0.008,
+    -6
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-gruta-m-republica",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-gruta-m-republica.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-gruta-m-republica.glb"
+  },
+  "7bd5b7139926e5192ed7d396ee0a938906665947be3617cf3bc28514a544ca14": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 251020,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    4.439,
+    4.5,
+    3.812
+   ],
+   "min": [
+    -2.219,
+    0,
+    -1.906
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-poly-13",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-13.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-poly-13.glb"
+  },
+  "7f697cb67042de6924add8e3d9d2c259c25610ba9550414e8acc7a3ee7e79a50": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29733,
+   "bytes": 1751448,
+   "textures": 8,
+   "texPx": 1024,
+   "box": [
+    5.143,
+    4.164,
+    11.977
+   ],
+   "min": [
+    -2.579,
+    0.001,
+    -5.998
+   ],
+   "animations": [],
+   "nodes": [
+    "Mesh_0.001"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-chapel-composition",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-chapel-composition.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-chapel-composition.glb"
+  },
+  "80ae569a463f965fead9f592c6c57fa97a3cd6efe3b20c4fe8bd5ddeb5e64b47": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29994,
+   "bytes": 312844,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    9.718,
+    7.841,
+    11.982
+   ],
+   "min": [
+    -4.862,
+    0.013,
+    -5.996
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-quinta-fonte",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-quinta-fonte.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-quinta-fonte.glb"
+  },
+  "862899fe82a8eb9f98b29977c320a559e9c038c0228282f9a09d17603fa33a06": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29958,
+   "bytes": 459256,
+   "textures": 2,
+   "texPx": 1024,
+   "box": [
+    5.955,
+    6.182,
+    11.996
+   ],
+   "min": [
+    -2.978,
+    0.003,
+    -5.996
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-quinta-corredor-escada",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-quinta-corredor-escada.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-quinta-corredor-escada.glb"
+  },
+  "89777204026c33e802aac6a3ad9e9d4c01c31e7221509940b12d95ff2eba698b": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 76000,
+   "bytes": 1060032,
+   "textures": 1,
+   "texPx": 2048,
+   "box": [
+    21.106,
+    26,
+    22.677
+   ],
+   "min": [
+    -10.553,
+    0,
+    -11.338
+   ],
+   "animations": [],
+   "nodes": [
+    "textured"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "madmaraca-ceramic-library",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/scan-madmaraca.glb",
+   "path": "worlds/littlemartians-two/assets/scan-madmaraca.glb"
+  },
+  "8a390557de27f84decbb463b629311454bb0ac8a50ed6b65acd3d8f329312a9b": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29998,
+   "bytes": 208352,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    2.178,
+    4.5,
+    2.193
+   ],
+   "min": [
+    -1.089,
+    0,
+    -1.096
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-poly-14",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-14.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-poly-14.glb"
+  },
+  "8d7d1747ba53485254c41a95502ad77790093edd40a6af0d554db360159c2857": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29999,
+   "bytes": 239152,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    3.231,
+    4.5,
+    3.226
+   ],
+   "min": [
+    -1.616,
+    0,
+    -1.613
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-poly-05",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-05.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-poly-05.glb"
+  },
+  "93119f1b37a3cdb27ce61e4279391ee0a2783fbb006f857ac9f57dcc4721370a": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 598092,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.973,
+    1.385,
+    2
+   ],
+   "min": [
+    -0.987,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-e946e0e729d0",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-e946e0e729d0.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-e946e0e729d0.glb"
+  },
+  "963251da62397f6f87b114acbcc6061d937be4a3b5b53d1312aac8d00a485dce": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 680140,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.733,
+    2.6,
+    1.959
+   ],
+   "min": [
+    -0.867,
+    0,
+    -0.979
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-7d0669742c10",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-7d0669742c10.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-7d0669742c10.glb"
+  },
+  "9811095c8ce2c65cf99ec58fd384f28e5db72d02bb0520add477dfbcc5369adf": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29945,
+   "bytes": 510632,
+   "textures": 2,
+   "texPx": 1024,
+   "box": [
+    7.52,
+    4.581,
+    11.988
+   ],
+   "min": [
+    -3.763,
+    0.005,
+    -5.988
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-quinta-palacio-interior",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-quinta-palacio-interior.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-quinta-palacio-interior.glb"
+  },
+  "98b5e811f409823458f6a8cec00970518b42164599761e1e1d964ab86088bfa1": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 292816,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.214,
+    1.267,
+    2
+   ],
+   "min": [
+    -0.607,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-16b887532619",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-16b887532619.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-16b887532619.glb"
+  },
+  "9f89741650de2c950c10250b508e4e7962a557f2dbdf749a552ce84de8b7f9b7": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 387344,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    6.761,
+    5.226,
+    12
+   ],
+   "min": [
+    -3.381,
+    0,
+    -6
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-moorish-castle-top",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-moorish-castle-top.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-moorish-castle-top.glb"
+  },
+  "a0038b18f260ff2d0655af872316e016c5d0af6523c230c6e51d59e6905c115d": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 577080,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.686,
+    1.834,
+    2
+   ],
+   "min": [
+    -0.843,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-368878f9b157",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-368878f9b157.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-368878f9b157.glb"
+  },
+  "a50b00d0c2822ab0e4394e8529f510171669897de39141577e523aa3a15f17fd": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29974,
+   "bytes": 454340,
+   "textures": 3,
+   "texPx": 1024,
+   "box": [
+    1.531,
+    1.695,
+    2
+   ],
+   "min": [
+    -0.765,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "Mesh_0.006"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-4a96b139a014",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-4a96b139a014.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-4a96b139a014.glb"
+  },
+  "a5a8c82a139db065f29940ddb0b90d20d26dbffaea6995f15953189a138d3a8f": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29998,
+   "bytes": 438308,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    7.332,
+    2.003,
+    12
+   ],
+   "min": [
+    -3.666,
+    0.003,
+    -6
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_materials_unlit",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-american-base-old",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-american-base-old.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-american-base-old.glb"
+  },
+  "a6bfbbfeddab3e727a2498a0c29a01aa6c5089d23afc7685788d68ae068efb1b": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 26816,
+   "bytes": 1029388,
+   "textures": 4,
+   "texPx": 2048,
+   "box": [
+    0.299,
+    0.382,
+    0.535
+   ],
+   "min": [
+    -0.149,
+    -0.191,
+    -0.268
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "ada-ceramic-head",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/characters/ada.glb",
+   "path": "worlds/littlemartians-two/assets/character-ada.glb"
+  },
+  "a6d75beffc2cee33412c2f12f6c8fbf75cc37942e6ac4441234bf9a8110c0d87": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 588152,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.384,
+    1.359,
+    2
+   ],
+   "min": [
+    -0.692,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-ee1676f5c3bc",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-ee1676f5c3bc.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-ee1676f5c3bc.glb"
+  },
+  "a8cbd65e59f995c6e7a3a96d605e96878aa2805a922d70d23e685df5e185e374": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29980,
+   "bytes": 2191032,
+   "textures": 9,
+   "texPx": 1024,
+   "box": [
+    11.338,
+    3.967,
+    12
+   ],
+   "min": [
+    -5.669,
+    0,
+    -6
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-forte-sao-filipe-open",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-forte-sao-filipe-open.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-forte-sao-filipe-open.glb"
+  },
+  "aa5a84f24b076b665f4a40848a078196c878941577259e845f234efe081cd28c": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 837032,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    0.759,
+    2.6,
+    1.43
+   ],
+   "min": [
+    -0.38,
+    0,
+    -0.715
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-5f63a6fe6100",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-5f63a6fe6100.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-5f63a6fe6100.glb"
+  },
+  "abb4963aa46021a262464985dfc47ee5d8386811b431ba2a89204c264d8d2db7": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 28820,
+   "bytes": 1033572,
+   "textures": 4,
+   "texPx": 2048,
+   "box": [
+    0.445,
+    0.433,
+    0.636
+   ],
+   "min": [
+    -0.222,
+    -0.216,
+    -0.318
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "mycos-ceramic-head",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/characters/mycos.glb",
+   "path": "worlds/littlemartians-two/assets/character-mycos.glb"
+  },
+  "b20718c22a5be943e10721052457a199f24c7734392120125d3c7fa7901e57b9": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 379404,
+   "textures": 3,
+   "texPx": 1024,
+   "box": [
+    0.916,
+    1.802,
+    2
+   ],
+   "min": [
+    -0.458,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "Mesh_0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-c30ab0ea1037",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-c30ab0ea1037.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-c30ab0ea1037.glb"
+  },
+  "b5d036bf926487c6c27dc98a96ff953ef93c14b4529e5075e1a364775c48c6c8": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29989,
+   "bytes": 290148,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    2.159,
+    4.498,
+    2.005
+   ],
+   "min": [
+    -1.079,
+    0.001,
+    -1.003
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-poly-15",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-15.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-poly-15.glb"
+  },
+  "b967c9460eb5974f589beb4f16487bb766219d8e76514228a4aaa712f18b8771": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 3052,
+   "bytes": 57240,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    3.856,
+    4.5,
+    3.91
+   ],
+   "min": [
+    -1.928,
+    0,
+    -1.955
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-poly-06",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-06.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-poly-06.glb"
+  },
+  "b9de4b10a30f1510fde0f6fff3ba411f3653d939bf78289c773697d70f701f80": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 38,
+   "bytes": 180468,
+   "textures": 1,
+   "texPx": 1536,
+   "box": [
+    6.5,
+    5.2,
+    0.5
+   ],
+   "min": [
+    -3.25,
+    0,
+    -0.3
+   ],
+   "animations": [],
+   "nodes": [
+    "frame",
+    "picture"
+   ],
+   "extensions": [
+    "EXT_texture_webp"
+   ],
+   "name": "gallery-panel-forest-illustration",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/landscape.glb (embedded \"Forest illustration\")",
+   "path": "worlds/littlemartians-two/assets/panel-forest-illustration.glb"
+  },
+  "bdfaba8553dd65dbcb9fe29006b7b60513d56138f8b8b0a104e5418ece78ad62": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 31642,
+   "bytes": 994636,
+   "textures": 4,
+   "texPx": 2048,
+   "box": [
+    0.262,
+    0.255,
+    0.435
+   ],
+   "min": [
+    -0.131,
+    -0.128,
+    -0.218
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "shuijing-ceramic-head",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/characters/shuijing.glb",
+   "path": "worlds/littlemartians-two/assets/character-shuijing.glb"
+  },
+  "bf258b01ddb1c33370d2d2e1197504c57f05aeac79fbb72b0fe16db0195d8722": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 492552,
+   "textures": 3,
+   "texPx": 1024,
+   "box": [
+    1.232,
+    2.6,
+    1.241
+   ],
+   "min": [
+    -0.616,
+    0,
+    -0.621
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-72c8fc2f1538",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-72c8fc2f1538.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-72c8fc2f1538.glb"
+  },
+  "c081d49d0acf8dfa144d01765aa7652ed22c10c09a2f11d18759e808e47a7293": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29643,
+   "bytes": 2179016,
+   "textures": 11,
+   "texPx": 1024,
+   "box": [
+    11.999,
+    7.247,
+    11.288
+   ],
+   "min": [
+    -5.999,
+    0.003,
+    -5.66
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-randy3",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-randy3.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-randy3.glb"
+  },
+  "c16f01927ba2368257a1fc16722406f3c6eb2aeaaf1a31d8703dee95cdde5e8d": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 8743,
+   "bytes": 99576,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    3.385,
+    4.5,
+    3.047
+   ],
+   "min": [
+    -1.692,
+    0,
+    -1.524
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-poly-01",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-01.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-poly-01.glb"
+  },
+  "c397dbce9588bd9be4bd8b28ada89bacd4747f80e56f4a61033a90f571e51eca": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 577652,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    0.868,
+    1.118,
+    2
+   ],
+   "min": [
+    -0.434,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-a17ce660742d",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-a17ce660742d.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-a17ce660742d.glb"
+  },
+  "c617d4e105970ff937e68994fae7a6469e75aeeec663d31002213fd7f3c5033b": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29998,
+   "bytes": 803172,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.414,
+    1.308,
+    2
+   ],
+   "min": [
+    -0.707,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-40a9797026a2",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-40a9797026a2.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-40a9797026a2.glb"
+  },
+  "c7151b2ffcb97bbb1d58cb181b5ac40993f8e9eb8e85b3890ef05649d9e0e08d": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 76000,
+   "bytes": 2379804,
+   "textures": 4,
+   "texPx": 2048,
+   "box": [
+    14.466,
+    32,
+    12.673
+   ],
+   "min": [
+    -7.233,
+    0,
+    -6.337
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "footprint": "0a136aeb0ddaade103ce625d7d4c295789be513a822d8553dea9df73270a4c74",
+   "name": "minarete-temple",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/scan-minarete.glb",
+   "path": "worlds/littlemartians-two/assets/scan-minarete.glb"
+  },
+  "c73c4533a64273c8720258a970c56e764f580ed793c4f03ca41d45ab33e548c5": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29682,
+   "bytes": 1658920,
+   "textures": 8,
+   "texPx": 1024,
+   "box": [
+    11.952,
+    7.509,
+    11.648
+   ],
+   "min": [
+    -6,
+    0.02,
+    -5.83
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-randy2",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-randy2.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-randy2.glb"
+  },
+  "c7e40e72ac6023592278ec08d3c30e91a57979d169e24906c58841a28a40a6c1": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29999,
+   "bytes": 201352,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    1.709,
+    4.5,
+    1.737
+   ],
+   "min": [
+    -0.854,
+    0,
+    -0.868
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-poly-10",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-10.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-poly-10.glb"
+  },
+  "c8a2e682f0ea0afb0cad42446f99524a3c46baf8e0da613d91fd6ab10f53b42a": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29962,
+   "bytes": 513456,
+   "textures": 3,
+   "texPx": 1024,
+   "box": [
+    0.96,
+    1.702,
+    2
+   ],
+   "min": [
+    -0.48,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "Mesh_0.008"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-88ba2b863400",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-88ba2b863400.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-88ba2b863400.glb"
+  },
+  "ccbc447473f579abe12a32c2ba8d8f3a373315ff25e3509357d832f9773e7e78": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 17230,
+   "bytes": 1442456,
+   "textures": 4,
+   "texPx": 2048,
+   "box": [
+    0.063,
+    0.051,
+    0.087
+   ],
+   "min": [
+    -0.026,
+    -0.009,
+    -0.062
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "kalama-ceramic-head",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/characters/kalama.glb",
+   "path": "worlds/littlemartians-two/assets/character-kalama.glb"
+  },
+  "cdda8c4d00f480401820f1cdd44ef99b062b56bd276c8c164d354760083ba058": {
+   "ext": "json",
+   "kind": "footprint",
+   "tris": 0,
+   "bytes": 1032,
+   "textures": 0,
+   "texPx": 0,
+   "box": [
+    13.6891,
+    30,
+    12.8554
+   ],
+   "baked": {
+    "box": [
+     13.6891,
+     30,
+     12.8554
+    ],
+    "colliders": [
+     {
+      "c": [
+       -3.92,
+       0
+      ],
+      "half": [
+       2.92,
+       6.43
+      ],
+      "yaw": 0,
+      "y0": 0,
+      "y1": 30,
+      "tag": "celadon-tower-scan-envelope-west"
+     },
+     {
+      "c": [
+       3.92,
+       0
+      ],
+      "half": [
+       2.92,
+       6.43
+      ],
+      "yaw": 0,
+      "y0": 0,
+      "y1": 30,
+      "tag": "celadon-tower-scan-envelope-east"
+     },
+     {
+      "c": [
+       0,
+       0
+      ],
+      "half": [
+       6.84,
+       6.43
+      ],
+      "yaw": 0,
+      "y0": 2.25,
+      "y1": 30,
+      "tag": "celadon-tower-scan-envelope-overhead"
+     }
+    ],
+    "surfaces": [],
+    "openings": [],
+    "links": [],
+    "rooms": [],
+    "slots": [],
+    "notes": [
+     "footprint scan-celadon-tower-arch: 0 rooms, 0 openings, 0 links (0 shafts, float-only), 3 wall/solid colliders"
+    ]
+   },
+   "name": "celadon-beacon-footprint",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/scan-celadon-tower.glb",
+   "path": "worlds/littlemartians-two/assets/scan-celadon-tower.footprint.json"
+  },
+  "cfb9dd3129a42b2524c53faf0803283995cb36f766f1fe977699843854089ec9": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30054,
+   "bytes": 2487984,
+   "textures": 10,
+   "texPx": 1024,
+   "box": [
+    5.782,
+    2.177,
+    11.889
+   ],
+   "min": [
+    -2.858,
+    0.011,
+    -5.996
+   ],
+   "animations": [],
+   "nodes": [
+    "Mesh_0",
+    "Mesh_0.001"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-pupila-corridor",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-pupila-corridor.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-pupila-corridor.glb"
+  },
+  "d4f8808c1c7934a5c8b357ce7a3761c6a9ddc0fcb9692a88b3370808d72f1c2d": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29355,
+   "bytes": 221312,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    3.991,
+    4.5,
+    7.676
+   ],
+   "min": [
+    -1.996,
+    0,
+    -3.838
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-met-greek-mural",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-met-greek-mural.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-met-greek-mural.glb"
+  },
+  "d54d60cf0b1bc94953914b84ed53cb5fc514e1184fdc0eab0e8697307402c7d1": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29997,
+   "bytes": 419848,
+   "textures": 2,
+   "texPx": 1024,
+   "box": [
+    4.239,
+    3.049,
+    11.989
+   ],
+   "min": [
+    -2.119,
+    0,
+    -5.99
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-forte-sao-filipe-corridor",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-forte-sao-filipe-corridor.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-forte-sao-filipe-corridor.glb"
+  },
+  "d803fb2e6b85f88ea681eefb0f5c4c3be7bc0ab521985981159a7034f745d1fa": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29780,
+   "bytes": 544576,
+   "textures": 3,
+   "texPx": 1024,
+   "box": [
+    1.128,
+    1.652,
+    2
+   ],
+   "min": [
+    -0.564,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "Mesh_0.009"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-02ceabbff643",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-02ceabbff643.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-02ceabbff643.glb"
+  },
+  "da4cd44e97317f060e1fa1f1e41d08b10184e9a17af0129414629750f589421a": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 19479,
+   "bytes": 1528864,
+   "textures": 3,
+   "texPx": 2048,
+   "box": [
+    1.688,
+    2.504,
+    2.671
+   ],
+   "min": [
+    -0.911,
+    -0.926,
+    -1.336
+   ],
+   "animations": [],
+   "nodes": [
+    "textured"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "verdelis-ceramic-head",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/characters/verdelis.glb",
+   "path": "worlds/littlemartians-two/assets/character-verdelis.glb"
+  },
+  "df1a82b81e4c048a586ca9b3477d17b95cb35e6ecb5e7638e7d0c2b6f3a706ce": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29998,
+   "bytes": 492468,
+   "textures": 2,
+   "texPx": 1024,
+   "box": [
+    7.833,
+    3.497,
+    12
+   ],
+   "min": [
+    -3.917,
+    0,
+    -6
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-forte-sao-filipe-corner3",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-forte-sao-filipe-corner3.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-forte-sao-filipe-corner3.glb"
+  },
+  "e1933993c3a9557f681a5acfcfa8a049f1ce10c47f150909b2cbdf412019ab4d": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29997,
+   "bytes": 358616,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    4.365,
+    4.5,
+    2.678
+   ],
+   "min": [
+    -2.182,
+    0,
+    -1.339
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-poly-08",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-08.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-poly-08.glb"
+  },
+  "e37b07e9a6d2cb7818a70bb39f6f3748791b60c540230c9bdbc9bc954f7e1382": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 569092,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.1,
+    1.342,
+    2
+   ],
+   "min": [
+    -0.55,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-1af1c89dd0f6",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-1af1c89dd0f6.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-1af1c89dd0f6.glb"
+  },
+  "e4f151920919c4c95a867e71a2d9347dda77a1bc26fc4805bddac97a9df7a638": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 40000,
+   "bytes": 1148684,
+   "textures": 4,
+   "texPx": 2048,
+   "box": [
+    0.049,
+    0.055,
+    0.088
+   ],
+   "min": [
+    -0.024,
+    -0.027,
+    -0.044
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "nyx-ceramic-head",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/characters/nyx.glb",
+   "path": "worlds/littlemartians-two/assets/character-nyx.glb"
+  },
+  "e6eafc3322e551ceadc9221eef47f6709d6665d47597a44e1b94fc76ea92a31d": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29769,
+   "bytes": 525416,
+   "textures": 11,
+   "texPx": 1024,
+   "box": [
+    3.154,
+    4.493,
+    3.264
+   ],
+   "min": [
+    -1.544,
+    0.001,
+    -1.636
+   ],
+   "animations": [],
+   "nodes": [
+    "material0018",
+    "material0013",
+    "material0012",
+    "material0011",
+    "material0010",
+    "material0009",
+    "material0005",
+    "material0003",
+    "material0002",
+    "material0001",
+    "material0000"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-gold-rust-buddha",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-gold-rust-buddha.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-gold-rust-buddha.glb"
+  },
+  "e7d7e9d9b7a1dec9733a89a75564343671cca740aa5dd41df6f64cb89f07a148": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 533068,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.022,
+    1.717,
+    2
+   ],
+   "min": [
+    -0.511,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-c78fc73ba916",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-c78fc73ba916.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-c78fc73ba916.glb"
+  },
+  "e9a870d0782e6485138ae79da003ba2a1074483253da716e84d43d3ed96139c9": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29959,
+   "bytes": 257160,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    1.625,
+    4.499,
+    4.622
+   ],
+   "min": [
+    -0.813,
+    0.001,
+    -2.311
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-poly-09",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-poly-09.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-poly-09.glb"
+  },
+  "e9bab61d9ca183780dfdbae56dd00343a86939ee96e15bf3694d138019081875": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29863,
+   "bytes": 1740452,
+   "textures": 10,
+   "texPx": 1024,
+   "box": [
+    3.326,
+    2.193,
+    11.995
+   ],
+   "min": [
+    -1.663,
+    0.003,
+    -6
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-rua-fado",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-rua-fado.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-rua-fado.glb"
+  },
+  "ee4ca930b24bcede51184f95203d33a29a0e6ef3821a03ea8eb0560658a13403": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29744,
+   "bytes": 443136,
+   "textures": 3,
+   "texPx": 1024,
+   "box": [
+    1.361,
+    1.39,
+    2
+   ],
+   "min": [
+    -0.681,
+    0.001,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "Mesh_0.012"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-09868169ab2d",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-09868169ab2d.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-09868169ab2d.glb"
+  },
+  "eeccf92d7fbb4306584319a5c1d1617fbe354f39989437ac4a344bc6aef5d91f": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 474104,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    1.161,
+    1.28,
+    2
+   ],
+   "min": [
+    -0.581,
+    0,
+    -1
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-0734a4679321",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-0734a4679321.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-0734a4679321.glb"
+  },
+  "f1ac82f3378347d1df211a7877b1b2a17bb74a365a4b27d023371f2a42bc7c67": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29988,
+   "bytes": 323184,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    11.985,
+    9.885,
+    9.647
+   ],
+   "min": [
+    -5.985,
+    0,
+    -4.823
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-quinta-poco",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-quinta-poco.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-quinta-poco.glb"
+  },
+  "f9d39cf0158aa598aa2d0d80cd3c243c6451bbeacfaa869c8a40723374959777": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 30000,
+   "bytes": 870420,
+   "textures": 4,
+   "texPx": 1024,
+   "box": [
+    0.962,
+    2.6,
+    1.751
+   ],
+   "min": [
+    -0.481,
+    0,
+    -0.876
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-drive-935874799be2",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-drive-935874799be2.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-drive-935874799be2.glb"
+  },
+  "fa861c75b054316622d516b0f68bbf85c9ccdaa379e73fa2102a4ad732272a90": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 38,
+   "bytes": 136924,
+   "textures": 1,
+   "texPx": 1536,
+   "box": [
+    6.5,
+    5.2,
+    0.5
+   ],
+   "min": [
+    -3.25,
+    0,
+    -0.3
+   ],
+   "animations": [],
+   "nodes": [
+    "frame",
+    "picture"
+   ],
+   "extensions": [
+    "EXT_texture_webp"
+   ],
+   "name": "gallery-panel-geometric-pattern",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/landscape.glb (embedded \"Geometric pattern\")",
+   "path": "worlds/littlemartians-two/assets/panel-geometric-pattern.glb"
+  },
+  "fb56c859f38311dc946d4798ed3bfd5aa016b7966b9d797ebd1e0ceda8707ab9": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29997,
+   "bytes": 398304,
+   "textures": 1,
+   "texPx": 1024,
+   "box": [
+    9.65,
+    8.071,
+    11.998
+   ],
+   "min": [
+    -4.848,
+    0,
+    -5.998
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-moorish-entrance",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-moorish-entrance.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-moorish-entrance.glb"
+  },
+  "ff3d5e5a0c2d83302ddb5185465313e6da4c2b204b17e16f6d23e66af7e59bee": {
+   "ext": "glb",
+   "kind": "mesh",
+   "tris": 29985,
+   "bytes": 1176376,
+   "textures": 7,
+   "texPx": 1024,
+   "box": [
+    11.698,
+    12,
+    11.112
+   ],
+   "min": [
+    -5.849,
+    0,
+    -5.556
+   ],
+   "animations": [],
+   "nodes": [
+    "node-0"
+   ],
+   "extensions": [
+    "EXT_meshopt_compression",
+    "EXT_texture_webp",
+    "KHR_mesh_quantization"
+   ],
+   "name": "exhibit-setubal-casa-escadas",
+   "license": "Vanessa Rosa (Little Martians); private to this project — not for redistribution outside it without the artist's permission",
+   "source": "lm/map@953613972438 worlds/littlemartians/buildings/exhibit-setubal-casa-escadas.glb",
+   "path": "worlds/littlemartians-two/assets/exhibit-setubal-casa-escadas.glb"
+  }
+ }
+}

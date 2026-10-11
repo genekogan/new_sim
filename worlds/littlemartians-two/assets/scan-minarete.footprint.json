@@ -1,0 +1,67 @@
+{
+ "schema": "lm-building-footprint/1",
+ "id": "scan-minarete-arch",
+ "bounds": {
+  "min": [
+   -7.233623957702567,
+   0,
+   -6.335945287715209
+  ],
+  "max": [
+   7.233623957702567,
+   32,
+   6.335945287715209
+  ]
+ },
+ "obstacles": [
+  {
+   "id": "minarete-scan-envelope-west",
+   "obb": {
+    "c": [
+     -4.12,
+     0
+    ],
+    "half": [
+     3.12,
+     6.34
+    ],
+    "yaw": 0
+   },
+   "y0": 0,
+   "y1": 32
+  },
+  {
+   "id": "minarete-scan-envelope-east",
+   "obb": {
+    "c": [
+     4.12,
+     0
+    ],
+    "half": [
+     3.12,
+     6.34
+    ],
+    "yaw": 0
+   },
+   "y0": 0,
+   "y1": 32
+  },
+  {
+   "id": "minarete-scan-envelope-overhead",
+   "obb": {
+    "c": [
+     0,
+     0
+    ],
+    "half": [
+     7.23,
+     6.34
+    ],
+    "yaw": 0
+   },
+   "y0": 2.25,
+   "y1": 32
+  }
+ ],
+ "note": "Measured ground arch from 953613972438 worlds/littlemartians/buildings/minarete-passage.validation.json: a 2 m wide, 2.25 m clear passage north–south through the scan; the rest of the envelope is conservative."
+}
