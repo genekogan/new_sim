@@ -17,6 +17,7 @@ import { reachProviders, seatProviders, usesProviders, type ReachEnd } from './q
 import { GodNav } from './nav.ts';
 import { GodPerceive } from './perceive.ts';
 import { installWorldLore } from './world-lore.ts';
+import { installHeld } from './held.ts';
 import { config, KNOWN_WORLD_KEYS } from '../config.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
@@ -79,6 +80,8 @@ export class EngineBridge {
     else this.guardGod();
     this.guardPinned(hooked);
     if (this.edge) this.hookEdge(this.edge);
+    // F3: a god thing in a Soul's hand shows as held (observe, receipts) and can be put down (held.ts)
+    if (this.edge) installHeld(this.edge, { engine: this.host.engine as never, model: this.model, minds: this.host.minds });
     // F3: a god's new world serves its constitution (or a neutral line) as lore, never Eden's (world-lore.ts)
     if (this.edge && (o.worldLore ?? !(KNOWN_WORLD_KEYS as readonly string[]).includes(config.worldKey))) installWorldLore(this.edge, this.god);
   }
