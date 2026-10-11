@@ -9,7 +9,7 @@
 # --filter @sim/server... inside it). Default: the dir named in $RUNTIME/<stage>.release (one line; the lead writes it
 # when releasing, so a restart never silently picks up another release).
 #
-# The Soul CLI 1.9 (sha bb53a105…) and its guides come from the release's own tools/world-launcher/soul/ (pinned copies;
+# The Soul CLI 1.9 + body look (sha 40cc21a6…) and its guides come from the release's own tools/world-launcher/soul/ (pinned copies;
 # SOURCES.json), so no --soul-* flags are needed. The process runs in the foreground (exec), cwd = the release.
 # production = :5340 (sim.eden.art/worlds via proxy :4970), staging = :5300 (localhost only).
 set -euo pipefail
