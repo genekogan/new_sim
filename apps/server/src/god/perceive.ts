@@ -77,6 +77,7 @@ export const GOD_PLACES = process.env.GOD_PLACES !== '0';
 export class GodPerceive {
   private h: PerceiveHost;
   private synced = -1;
+  private placesSynced = -1;
   private sigs = new Map<string, string>();
   /** What each `built` object's state should be now (its kind's advance reads this). */
   private desired = new Map<string, BuiltState>();
@@ -148,11 +149,11 @@ export class GodPerceive {
   /** Bring the `built` objects in line with the entity world (cheap when nothing was edited since the last call). */
   sync(force = false) {
     const seq = this.h.version?.() ?? this.h.model.editSeq; if (!force && seq === this.synced) return;
+    // the places first (an object's place is the innermost one holding it); a world without objects has places too
+    if (GOD_PLACES && seq !== this.placesSynced) { this.placesSynced = seq; try { this.h.places?.sync(); } catch (err) { this.h.log(`god places: ${(err as Error).message}`); } }
     const objs = this.objects(); if (!objs) return;
     const root = this.rootPlace(); if (!root) return;
     this.synced = seq;
-    // the places first (an object's place is the innermost one holding it)
-    if (GOD_PLACES) try { this.h.places?.sync(); } catch (err) { this.h.log(`god places: ${(err as Error).message}`); }
     const want = this.wanted();
     if (!this.sigs.size) for (const o of objs.all()) if (this.kinds.has(o.kind) || (o.state as BuiltState)?.key === o.id) { this.sigs.set(o.id, JSON.stringify(o.state)); if (!this.kinds.has(o.kind)) this.kindFor(o.kind.replace(/^built-/, '')); }
     let made = 0, changed = 0;

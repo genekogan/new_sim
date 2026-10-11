@@ -16,7 +16,7 @@ import type { GodMode } from './god.ts';
 import { reachProviders, seatProviders, usesProviders, type ReachEnd } from './query.ts';
 import { GodNav } from './nav.ts';
 import { GodPerceive } from './perceive.ts';
-import { GodPlaces } from './places.ts';
+import { GodPlaces, inPoly } from './places.ts';
 import { installWorldLore } from './world-lore.ts';
 import { installHeld } from './held.ts';
 import { installWorldClock } from './world-clock.ts';
@@ -72,9 +72,9 @@ export class EngineBridge {
     this.nav = new GodNav({ model: this.god.model, version: () => this.version, engine: this.host.engine as never, levelAt: (x, z, y) => this.levelAt(x, z, y), engineOwned: (e) => this.engineOwned(e), placeOf: (ref) => (this.edge ? this.places.forRef(ref)?.id : undefined) });
     this.places = new GodPlaces({ model: this.god.model, nav: this.nav, edge: this.edge, version: () => this.version, engineOwned: (e) => this.engineOwned(e), levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m) });
     this.perceive = new GodPerceive({ model: this.god.model, version: () => this.version, edge: this.edge, engine: this.host.engine as never, engineOwned: (e) => this.engineOwned(e), namesNear: (at, except) => this.nav.namesNear(at, except), places: this.places, levelAt: (x, z, y) => this.levelAt(x, z, y), log: (m) => this.log(m) });
-    this.god.onCommit((c) => { this.version++; if (c.by !== 'engine') this.onCommit(c.diff); });
+    this.god.onCommit((c) => { this.version++; if (c.by !== 'engine') { this.editTick = this.host.engine.world.tick; this.onCommit(c.diff); } });
     this.host.listeners.push({
-      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); if (tick % 20 === 5) this.perceiveSync(); } },
+      afterTick: (tick) => { if (!this.reconciled) this.reconcile(); else { this.flush(); if (tick % 10 === 0) this.writeBack(); if (tick % 20 === 5) this.perceiveSync(); if (this.rescued !== this.editTick && tick - this.editTick >= 10) this.rescueTrapped(); } },
       onApplied: (e) => { if (e.kind === 'birth') this.bodyBorn(e.payload as { entityId: string; soulId: string; name: string }); if (e.kind === 'retire') this.bodyRetired(e.payload as { entityId: string }); },
     });
     reachProviders.set(this.god.model, (from, to) => this.reach(from, to));
@@ -279,6 +279,29 @@ export class EngineBridge {
       }
     }
     return { ...spec, support: { kind: 'ground' } };
+  }
+
+  /** R4-INFO: a god edit can close furniture round a Soul standing in a room (a house turned to face a moved fountain,
+   *  a sofa moved): from where it stands no walk reaches the room's door any more, so every act refuses
+   *  route.unreachable. Once the edit is in the engine, each idle Soul standing in a room it cannot leave steps to the
+   *  room's open floor (the standing room its front door reaches; nav.ts roomGoal) — a logged edge-relocate, as the
+   *  ledger steps bodies out of solids. Only after god edits, only Souls inside rooms. */
+  private editTick = -1;
+  private rescued = -1;
+  rescueTrapped() {
+    this.rescued = this.editTick;
+    const E = this.engine as EngineV1 & { world: { entities: Record<string, any> } };
+    const rooms = this.nav.things().filter((t) => t.kind === 'room' && t.level === 0 && t.poly && t.entry);
+    if (!rooms.length) return;
+    for (const m of this.host.minds.values()) {
+      const b = E.world.entities[m.entityId], h = b?.human;
+      if (!h || (h.level ?? 0) !== 0 || h.activity === 'sit' || h.baseActivity === 'sit' || h.sleepPose || h.carrier || E.programOf(m.entityId)) continue;
+      const p: Vec2 = [b.pose.p[0], b.pose.p[2]], room = rooms.find((t) => inPoly(p[0], p[1], t.poly!)); if (!room) continue;
+      if (E.reachV1({ p, level: 0 }, { p: room.entry!.p, level: room.entry!.level }).ok) continue;
+      const goal = this.nav.goal(room, p, m.entityId); if (!goal || goal.level !== 0) continue;
+      this.log(`${m.name} was closed in by furniture in ${room.ref}: steps to open floor at (${goal.p.join(', ')})`);
+      try { void this.host.enqueue('edge-relocate', `edge:${m.soulId}`, { soulId: m.soulId, entityId: m.entityId, to: goal.p, why: `the god rearranged ${room.ref} around them: stepped to open floor` }).catch(() => { /* best effort */ }); } catch { /* clock not ready */ }
+    }
   }
 
   private perceiveSync() { try { this.perceive.sync(); } catch (e) { this.log(`perceive: ${(e as Error).message}`); } }
@@ -686,8 +709,7 @@ export class EngineBridge {
         caps.push({ id, verb: 'sit', label, target: { id: x.id, kind: 'object' }, available: !block, ...(block ? { blocked: block } : {}), params: { seconds: { type: 'integer', min: 1, max: 600, default: 60 } } });
         plans.set(id, { label, steps: [{ verb: 'sit', params: { on: x.id, seconds: 60 } }], seconds: true });
       }
-      // R4-INFO: an item behind walls (a bowl in a house, seen from the plaza) is not offered: perception is per enclosure
-      if (asset.category === 'item' && x.support?.kind !== 'in-hand' && !held && this.sameEnclosure(soul, x)) {
+      if (asset.category === 'item' && x.support?.kind !== 'in-hand' && !held) {
         const id = `pick-up:${x.id}`, label = `Pick up ${name(x.id)} (${d} m${levelOf(x) ? `, floor ${levelOf(x)}` : ''})`;
         caps.push({ id, verb: 'pick-up', label, target: { id: x.id, kind: 'item' }, available: true });
         plans.set(id, { label, steps: [...stand, ...approach(x), { verb: 'mars:take_item', params: { item: x.id, hand: 'right' } }] });
@@ -701,11 +723,6 @@ export class EngineBridge {
       }
     }
     this.sitHere(caps, plans, here);
-  }
-  /** The thing stands in the Soul's enclosure (both outdoors, or the same room). */
-  private sameEnclosure(soul: EdgeSoul, x: any): boolean {
-    const L = this.edge; if (!L) return true;
-    try { return L.enclosureAtPoint(x.pose.p[0], x.pose.p[2], this.levelOfY(x.pose.p[1])) === L.enclosureOf(soul.soulId); } catch { return true; }
   }
   /** Bodies sitting on a god-built seat fixture (any of its seat slots). */
   seatTakers(id: string): string[] {

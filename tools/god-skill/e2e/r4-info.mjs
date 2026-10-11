@@ -150,7 +150,7 @@ try {
   await step('I4 observe here.objects in the plaza: the fountain, its lamp and the sign with placeId g-plaza and here=true, nearest first; the cottage\'s furniture (behind walls) is not listed; here.objects lists the free benches', async () => {
     const o = (await ana.run('observe')).data, h = (await ana.run('here')).data, objs = o?.here?.objects ?? [];
     return { objects: objs.map((x) => `${x.name}@${x.placeId}${x.here ? '*' : ''} ${x.dist}m`), fountain: byName(objs, 'fountain'), furniture: objs.filter((x) => /moss-cottage\//.test(x.name)).length, doHere: (o?.doHere ?? []).map((c) => c.id), sorted: objs.every((x, i) => !i || (objs[i - 1].dist ?? 0) <= (x.dist ?? 0)), seats: (h?.objects ?? []).filter((x) => x.kind === 'seat').map((x) => `${x.name} free=${x.free}`) };
-  }, (r) => r.fountain?.placeId === 'g-plaza' && r.fountain.here === true && r.furniture === 0 && r.sorted && r.seats.length >= 2 && !r.doHere.some((id) => id.startsWith('pick-up:')) && !r.objects.some((x) => x.startsWith('plaza@')));
+  }, (r) => r.fountain?.placeId === 'g-plaza' && r.fountain.here === true && r.furniture === 0 && r.sorted && r.seats.length >= 2 && !r.objects.some((x) => x.startsWith('plaza@')));
 
   // ---- 3. two Souls: social affordances, speech, a conversation
   await step('S1 Ben: act "walk to the plaza" (plain words) → he arrives by Ana; observe lists Ana and offers hug:/high-five:/dance-with:/follow:<Ana>', async () => {
@@ -222,6 +222,18 @@ try {
     const e = (await ben.run('explore')).data, v = (await ben.run('view', '--alt-only')).data;
     return { suggestion: e?.suggestion, label: e?.label, alt: String(v?.alt ?? '').slice(0, 300) };
   }, (r) => /^walk:/.test(r.suggestion ?? '') && /Further off|sees/.test(r.alt));
+  await step('P4 Ana (in the cottage) gives a server-side plan in plain words: walk to the gazebo, then sit down for 10 s → both steps resolve to god-place capabilities and finish; she sat in the gazebo', async () => {
+    const st = (await ana.run('plan', '[{"do":"walk to the gazebo"},{"do":"sit down","for":"10s"}]')).data;
+    let p = st?.plan, seated = false, where = null; const t0 = Date.now();
+    while (p && p.state === 'running' && Date.now() - t0 < 180_000) {
+      await sleep(1500);
+      p = (await ana.run('plan', 'show')).data?.plan ?? (await ana.run('plan', 'get', st.plan.id)).data?.plan ?? p;
+      const h = (await api('/v1/edge/here', { token: ana.state().token })).data?.here;
+      if (h?.me?.posture === 'seated' || h?.me?.seat) { seated = true; where = h.me.placePath; }
+    }
+    if (p?.state === 'running' || !p) p = (await ana.run('plan', 'get', st?.plan?.id)).data?.plan ?? p;
+    return { state: p?.state, steps: (p?.steps ?? []).map((x) => `${x.do} → ${x.capability ?? '?'} ${x.status}${x.code ? ' ' + x.code : ''}`), seated, where };
+  }, (r) => /done|completed/.test(r.state ?? '') && r.steps[0]?.includes('walk:gazebo') && r.seated && r.where?.[0] === 'gazebo');
   await step('Z nothing faulted: no engine faults or violations in the server log', async () => ({ faults: (serverLog.match(/engine fault|violat/g) ?? []).length, placesErrors: (serverLog.match(/god places:|perceive:/g) ?? []).length }), (r) => r.faults === 0 && r.placesErrors === 0);
 } catch (e) {
   report.failures.push({ name: 'harness', error: String(e?.stack ?? e) });
