@@ -51,7 +51,7 @@ export function recommend(defs: StoredDef[], intent: string, per = 3) {
   function pick(h: { def: StoredDef; score: number; why: string[] }) { return { ref: publicRef(h.def), cat: vocab.categoryOf(h.def as never), score: h.score, why: h.why }; }
 }
 
-export type CatalogDeps = { god: GodMode; requireGod: (c: Context) => void; store: AssetStore; library: () => StoredDef[] };
+export type CatalogDeps = { god: GodMode; requireGod: (c: Context) => void; store: AssetStore; library: () => StoredDef[]; ownDefs?: () => StoredDef[] };
 export function mountCatalogRoutes(app: Hono, d: CatalogDeps) {
   // the viewer's snapshot carries every def in use (kit shape lists): ~1.6 KB per type raw, ~0.3 KB gzipped. Compress it
   // (and the catalogue) when the client asks; registered before mountGodRoutes' own snapshot route, so it wraps it.
@@ -63,6 +63,16 @@ export function mountCatalogRoutes(app: Hono, d: CatalogDeps) {
   app.get('/v1/god/catalog', (c) => {
     d.requireGod(c);
     const f = facetsOf(c), per = Math.min(2000, Math.max(1, Number(c.req.query('per') ?? 500) || 500)), page = Math.max(1, Number(c.req.query('page') ?? 1) || 1);
+    if (d.god.catalog) {
+      const catalog = d.god.catalog, local = (vocab.facetFilter((d.ownDefs?.() ?? []) as never[], f) as unknown as StoredDef[]);
+      const rows = [...catalog.list(f).map((h) => h.row), ...catalogRows(local, d.store)].sort((a, b) => a.cat.localeCompare(b.cat) || a.ref.localeCompare(b.ref));
+      const tag = `"cat-${catalog.version}-${createHash('sha256').update(JSON.stringify([local.map((d) => d.hash), f, per, page, c.req.query('format') ?? ''])).digest('hex').slice(0, 12)}"`;
+      const headers = { etag: tag, 'cache-control': 'private, max-age=0, must-revalidate' };
+      if ((c.req.header('if-none-match') ?? '').replace(/^W\//, '') === tag) return c.body(null, 304, headers);
+      const slice = rows.slice((page - 1) * per, page * per), pages = Math.max(1, Math.ceil(rows.length / per));
+      if (c.req.query('format') === 'lines') return c.text([`# catalog ${rows.length} defs, page ${page}/${pages}`, ...slice.map(vocab.manifestLine)].join('\n') + '\n', 200, headers);
+      return c.json({ count: rows.length, page, pages, per, facets: f, rows: slice }, 200, headers);
+    }
     const all = d.library(), defs = vocab.facetFilter(all as never[], f) as unknown as StoredDef[];
     const tag = etagOf(all, JSON.stringify([f, per, page, c.req.query('format') ?? '']));
     const headers = { etag: tag, 'cache-control': 'private, max-age=0, must-revalidate' };
@@ -74,12 +84,35 @@ export function mountCatalogRoutes(app: Hono, d: CatalogDeps) {
   });
   app.get('/v1/god/catalog/taxonomy', (c) => {
     d.requireGod(c);
-    return c.json({ categories: vocab.categoryCounts(d.library() as never[]), conventions: vocab.CONVENTIONS, actuators: Object.fromEntries(Object.entries(vocab.ACTUATORS).map(([k, a]) => [k, { field: a.field, doc: a.doc }])), slotVerbs: vocab.SLOT_VERBS }, 200, noStore);
+    return c.json({ categories: d.god.catalog?.taxonomy() ?? vocab.categoryCounts(d.library() as never[]), conventions: vocab.CONVENTIONS, actuators: Object.fromEntries(Object.entries(vocab.ACTUATORS).map(([k, a]) => [k, { field: a.field, doc: a.doc }])), slotVerbs: vocab.SLOT_VERBS }, 200, noStore);
+  });
+  app.get('/v1/god/catalog/t0', (c) => {
+    d.requireGod(c);
+    if (!d.god.catalog) return c.json({ available: false }, 200, noStore);
+    const catalog = d.god.catalog, t0 = catalog.t0(), etag = `"t0-${catalog.version}"`;
+    if (c.req.header('if-none-match') === etag) return c.body(null, 304, { etag });
+    return c.text(t0.text, 200, { etag, 'cache-control': 'private, max-age=0, must-revalidate' });
   });
   app.get('/v1/god/recommend', (c) => {
     d.requireGod(c);
     const intent = (c.req.query('intent') ?? c.req.query('q') ?? '').slice(0, 400);
     if (!intent.trim()) throw new ApiError(400, 'invalid', 'intent=<what you want to make>');
+    if (d.god.catalog) {
+      const per = Math.min(8, Math.max(1, Number(c.req.query('per') ?? 3) || 3)), needs: { for: string; picks: { ref: string; cat: string; score: number; why: string[] }[] }[] = [];
+      const words = intent.toLowerCase().split(/[^a-z0-9-]+/).filter(Boolean), used = new Set<number>();
+      for (let i = 0; i + 1 < words.length; i++) {
+        if (STOP.has(words[i]) || STOP.has(words[i + 1])) continue;
+        const phrase = `${words[i]} ${words[i + 1]}`, hits = d.god.catalog.find(phrase, { k: per });
+        if (hits[0]?.why.length >= 2) { needs.push({ for: phrase, picks: hits.map((h) => ({ ref: h.row.ref, cat: h.row.cat, score: h.score, why: h.why })) }); used.add(i); used.add(i + 1); i++; }
+      }
+      for (let i = 0; i < words.length; i++) if (!used.has(i) && !STOP.has(words[i]) && words[i].length >= 3) {
+        const hits = d.god.catalog.find(words[i], { k: per });
+        if (hits.length) { needs.push({ for: words[i], picks: hits.map((h) => ({ ref: h.row.ref, cat: h.row.cat, score: h.score, why: h.why })) }); used.add(i); }
+      }
+      const seen = new Set<string>(), ops = needs.flatMap((n) => n.picks.slice(0, 1)).filter((h) => !seen.has(h.ref) && seen.add(h.ref))
+        .flatMap((h) => { const def = d.god.model.resolvedDef(h.ref); return def ? [exampleOp(def)] : []; });
+      return c.json({ intent, needs, example: { ops }, unmatched: words.filter((w, i) => !used.has(i) && !STOP.has(w) && w.length >= 3) }, 200, noStore);
+    }
     return c.json(recommend(d.library(), intent, Math.min(8, Math.max(1, Number(c.req.query('per') ?? 3) || 3))), 200, noStore);
   });
   // thumbnails by content (the def hash): immutable, so a catalogue page of hundreds of thumbs is fetched once per browser

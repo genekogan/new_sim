@@ -8,3 +8,6 @@ export * from './measure.ts';
 export * from './gates.ts';
 export * from './import-core.ts';
 export * from './serving.ts';
+export * from './findability.ts';
+export * from './compat.ts';
+export * from './build.ts';

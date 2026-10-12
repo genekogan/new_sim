@@ -17,7 +17,7 @@ import { def2to1 } from './def1to2.ts';
 import { bigClass, type Contract } from './contract.ts';
 import { assetLookup, measure, shapeFor, type Measured } from './measure.ts';
 
-export type GateId = 'G1' | 'G2' | 'G3';
+export type GateId = 'G1' | 'G2' | 'G3' | 'G5';
 export type GateOutcome = { gate: GateId; ok: boolean; errors: string[]; warnings: string[]; numbers: Record<string, number> };
 export type Subject = { item: Item1; def2: Def2; grandfathered?: boolean };
 
@@ -82,8 +82,7 @@ export function sweep(d: Def2): { label: string; params: Record<string, unknown>
   return out.slice(0, 48);
 }
 
-const lib = coreLibrary();
-function world(): WorldModel { const w = new WorldModel({ constants: { ground: 'land', extent: 1000 }, seed: 'g3', assets: assetLookup }); w.library = lib; return w; }
+function world(): WorldModel { const w = new WorldModel({ constants: { ground: 'land', extent: 1000 }, seed: 'g3', assets: assetLookup }); w.library = coreLibrary(); return w; }
 
 export async function g3(s: Subject, opts: { measureBounds?: boolean } = {}): Promise<GateOutcome> {
   const errors: string[] = [], warnings: string[] = [];

@@ -32,6 +32,9 @@ importers:
       '@sim/brain':
         specifier: workspace:*
         version: link:../../packages/brain
+      '@sim/catalog':
+        specifier: workspace:*
+        version: link:../../packages/catalog
       '@sim/engine-contract':
         specifier: workspace:*
         version: link:../../packages/engine-contract

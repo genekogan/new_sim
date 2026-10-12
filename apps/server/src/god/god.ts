@@ -12,6 +12,8 @@ import { ApiError } from '../souls.ts';
 import { WorldStore, type EditRow, type PrayerRow } from './store.ts';
 import { AssetStore, defaultAssetDir } from './assets.ts';
 import { deferredOp } from './layers.ts';
+import { RegistryCatalog } from '@sim/catalog';
+import { registryCatalog } from './registry-catalog.ts';
 
 const PAIR_TTL = 15 * 60_000;
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -49,6 +51,7 @@ export class GodMode {
   readonly store: WorldStore;
   readonly assets: AssetStore;
   model: WorldModel;
+  catalog: RegistryCatalog | null;
   owner: string | null;
   private pairings = new Map<string, Pairing>();
   private commitListeners: CommitListener[] = [];
@@ -73,7 +76,9 @@ export class GodMode {
     // (libraryRef), never copied into a world. A world stores only the defs it uses, adopted (pinned by hash) the first
     // time something is placed from them; its own stored hashes always win, so old worlds resolve exactly as before and
     // new core types appear in every world at zero cost.
-    const library = opts.library === undefined ? coreLibrary() : opts.library;
+    const meta = this.store.meta(), owner = meta ? meta.owner : opts.ownerId;
+    const library = opts.library === undefined ? registryCatalog(owner) ?? coreLibrary() : opts.library;
+    this.catalog = library instanceof RegistryCatalog ? library : null;
     const loaded = this.store.load(this.assets.lookup, library);
     if (loaded) { this.model = loaded.model; this.owner = loaded.owner; }
     else {
@@ -89,7 +94,14 @@ export class GodMode {
 
   /** The owner is the first approving user when the world has none yet; afterwards only that user (or an admin). */
   canApprove(user: { id: string; role: string }): boolean { return user.role === 'admin' || !this.owner || this.owner === user.id; }
-  claim(user: { id: string }) { if (!this.owner) { this.owner = user.id; this.store.setOwner(this.model, this.owner); } }
+  claim(user: { id: string }) {
+    if (!this.owner) {
+      this.owner = user.id; this.store.setOwner(this.model, this.owner);
+      if (this.opts.library === undefined && this.catalog) {
+        this.catalog = registryCatalog(this.owner); this.model.library = this.catalog;
+      }
+    }
+  }
   godFromToken(token: string | undefined): boolean { return !!token && token.startsWith('god_') && this.store.hasToken(hashToken(token)); }
 
   pairStart(agent: string | undefined, base: string) {
@@ -282,6 +294,12 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
     // LAYERS: wallets are private (the god's GET /v1/god/layers and each Soul's /v1/world/layers/me have them)
     const state = s.state.layers ? { ...s.state, layers: { ...s.state.layers, wallets: {} } } : s.state;
     return { contract: 'world/1', worldId: this.opts.worldId, seq: s.editSeq, counter: s.seq, seed: s.seed, tick: this.opts.tick(), constants: s.constants, state, ground: s.ground, defs: defs.map(publicDef), entities: s.entities, assetBytes };
+  }
+  /** Demand logging is outside the catalogue registry. Keep only a bounded set of misses in this world's DB. */
+  recordFindMiss(query: string) {
+    this.db.db.exec('CREATE TABLE IF NOT EXISTS god_find_misses_v1 (world_id TEXT NOT NULL, at INTEGER NOT NULL, query TEXT NOT NULL, PRIMARY KEY(world_id, at, query)) WITHOUT ROWID');
+    this.db.db.prepare('INSERT OR IGNORE INTO god_find_misses_v1 VALUES (?,?,?)').run(this.opts.worldId, Date.now(), query.slice(0, 400));
+    this.db.db.prepare('DELETE FROM god_find_misses_v1 WHERE world_id=? AND (at,query) NOT IN (SELECT at,query FROM god_find_misses_v1 WHERE world_id=? ORDER BY at DESC,query LIMIT 1000)').run(this.opts.worldId, this.opts.worldId);
   }
   /** God sees the same plus the whole library, prayers waiting, tokens and the edit journal head. */
   godSnapshot() {

@@ -2,11 +2,12 @@
 // One instance can be shared by every world's model with the same licence context. No model calls, no catalogue copy.
 import { hashOf, vocab, type DefLibrary, type StoredDef } from '@sim/world-compiler';
 import { Registry, RegistryError, type Channel, type IndexEntry } from './registry.ts';
-import { item1Schema, type Item1 } from './schema.ts';
+import { item1Schema, REDISTRIBUTABLE, type Item1 } from './schema.ts';
+import { facetsOf } from './import-core.ts';
 import { hotSet, renderT0, TieredLibrary } from './tiers.ts';
 import { buildLexicalIndex, lexical, type Index, type Doc } from './embed.ts';
 
-export type ServingOptions = { channel?: Channel; hot?: number; ownerIsGene?: boolean; export?: boolean };
+export type ServingOptions = { channel?: Channel; hot?: number; ownerIsGene?: boolean; export?: boolean; pollMs?: number };
 export type CatalogHit = { entry: IndexEntry; item: Item1; row: vocab.ManifestRow; score: number; why: string[] };
 
 export class RegistryCatalog implements DefLibrary {
@@ -18,6 +19,9 @@ export class RegistryCatalog implements DefLibrary {
   private index: Index = buildLexicalIndex([]);
   private tiered!: TieredLibrary;
   private context: ServingOptions;
+  private managed = new Set<string>();
+  private checkedAt = 0;
+  lastError: string | null = null;
   readonly registry: Registry;
   constructor(registry: Registry, options: ServingOptions = {}) {
     this.registry = registry;
@@ -28,17 +32,30 @@ export class RegistryCatalog implements DefLibrary {
   get version() { this.refresh(); return String(this.seq); }
   get channel() { return this.context.channel ?? 'stable'; }
   /** Build the new view completely before replacing the last good snapshot. A bad publication never half-loads. */
-  refresh(): boolean {
+  refresh(force = false): boolean {
+    if (!force && this.seq !== undefined && Date.now() - this.checkedAt < (this.context.pollMs ?? 0)) return false;
+    this.checkedAt = Date.now();
+    try { return this.loadSnapshot(); }
+    catch (error) {
+      if (this.seq === undefined) throw error;
+      this.lastError = String(error);
+      return false; // Keep the last good complete snapshot available to worlds.
+    }
+  }
+  private loadSnapshot(): boolean {
     const seq = this.registry.pointers()[this.channel];
     if (seq === this.seq) return false;
     if (seq === null) throw new RegistryError('registry.empty', `no ${this.channel} snapshot`);
-    const entries = this.registry.current(this.channel).filter((e) => this.registry.offerable(e, this.context));
+    if (!this.registry.seqs(this.channel).includes(seq)) throw new RegistryError('registry.missing-index', `${this.channel}/${seq}`);
+    const snapshot = this.registry.snapshot(this.channel, seq);
+    const managed = new Set(snapshot.flatMap((e) => [`${e.id}@${e.major}`, ...e.aliases]));
+    const entries = snapshot.filter((e) => this.registry.offerable(e, this.context));
     const items = new Map<string, Item1>(), rows = new Map<string, vocab.ManifestRow>();
     for (const e of entries) {
       const it = item1Schema.parse(this.registry.item(e.id, e.major, e.rev, e.itemHash));
       if (it.id !== e.id || it.major !== e.major || it.rev !== e.rev || (e.itemHash && hashOf(it) !== e.itemHash))
         throw new RegistryError('registry.invalid-item', `${e.id}@${e.major} does not match its index`);
-      if (it.licence.redistribute !== e.redistribute)
+      if (it.licence.redistribute !== e.redistribute || it.licence.redistribute !== REDISTRIBUTABLE[it.licence.spdx])
         throw new RegistryError('registry.invalid-licence', `${e.id}@${e.major} index differs from its licence`);
       const ref = `${e.id}@${e.major}`;
       // P0 indexes have no compact row. Convert once without retaining/parsing engine StoredDefs.
@@ -46,6 +63,7 @@ export class RegistryCatalog implements DefLibrary {
         { bytes: it.budgets.bytes.assets, publicRef: ref });
       items.set(ref, it);
       rows.set(ref, { ...row, ref, cat: it.text.category, syn: it.text.synonyms, doc: it.text.first.slice(0, 100), tris: it.budgets.tris.lod0 });
+      if (!e.facets) e.facets = facetsOf(this.registry.def1(e.def1Hash!) as StoredDef);
     }
     const hot = hotSet([...items.values()], this.context.hot ?? 300);
     const docs: Doc[] = entries.map((e) => {
@@ -55,9 +73,15 @@ export class RegistryCatalog implements DefLibrary {
     });
     const index = buildLexicalIndex(docs), tiered = new TieredLibrary(this.registry, hot, this.channel, entries);
     this.entries = entries; this.items = items; this.rows = rows; this.index = index; this.tiered = tiered; this.seq = seq;
+    this.managed = managed;
+    this.lastError = null;
     return true;
   }
   get(key: string): StoredDef | undefined { this.refresh(); return this.tiered.get(key); }
+  manages(ref: string) { this.refresh(); return this.managed.has(ref); }
+  details(ref: string): CatalogHit | undefined {
+    return this.list().find((h) => h.row.ref === ref || h.entry.aliases.includes(ref) || h.entry.def1Hash === ref.replace(/^sha:/, ''));
+  }
   all(): readonly StoredDef[] { this.refresh(); return this.tiered.all(); }
   stats() { this.refresh(); return { seq: this.seq, offered: this.entries.length, ...this.tiered.stats, ...this.tiered.inMemory() }; }
   t0() { this.refresh(); return renderT0([...this.items.values()], hotSet([...this.items.values()], this.context.hot ?? 300)); }
@@ -88,12 +112,12 @@ function matches(h: CatalogHit, f: vocab.Facets) {
   const { row: r, item: it } = h;
   return (!f.category || r.cat === f.category || r.cat.startsWith(f.category + '.')) && (!f.form || r.form === f.form)
     && (!f.tag || r.tags.includes(f.tag)) && (f.has ?? []).every((facet) => {
-      if (facet.startsWith('slot:')) return r.ifc.split(' ').some((s) => s === facet.slice(5) || s.startsWith(facet.slice(5) + ':'));
-      if (facet.startsWith('action:')) return it.affords.includes(facet.slice(7));
+      const engineFacet = facet.includes(':') ? facet : `verb:${facet}`;
+      if (h.entry.facets?.includes(engineFacet)) return true;
       if (facet.startsWith('sound:')) return it.sound?.kinds.includes(facet.slice(6));
       if (facet.startsWith('behavior:')) return it.behaviour?.kind === facet.slice(9);
       if (facet === 'sound') return !!it.sound;
       if (facet === 'behavior') return !!it.behaviour;
-      return it.affords.includes(facet);
+      return false;
     });
 }

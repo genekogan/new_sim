@@ -41,11 +41,19 @@ export function assetMeta(sha: string): AssetMeta | undefined {
 /** The compiler's asset lookup over the same indexes (footprint sidecars give buildings their walls and rooms). */
 export const assetLookup: AssetLookup = (sha: string) => { const m = assetMeta(sha); return m ? ({ tris: m.tris, bytes: m.bytes, textures: m.textures, box: m.box, ...(m.baked ? { baked: m.baked } : {}) } as ReturnType<AssetLookup>) : undefined; };
 
-const probe = new WorldModel({ constants: { ground: 'land', extent: 1000 }, seed: 'measure', assets: assetLookup });
-probe.library = coreLibrary();
+let probe: WorldModel | null = null;
+function measurementWorld() {
+  if (!probe) {
+    probe = new WorldModel({ constants: { ground: 'land', extent: 1000 }, seed: 'measure', assets: assetLookup });
+    probe.library = coreLibrary();
+  }
+  return probe;
+}
 
 export async function measure(d: StoredDef, params?: Record<string, unknown>): Promise<Measured> {
-  const r = probe.resolvedDef(d.ref) ?? d;
+  const world = measurementWorld().fork();
+  world.defs.set(d.ref, d); // Measure this revision, including custom defs, rather than an older seed revision.
+  const r = world.resolvedDef(d.ref) ?? d;
   const defaults = Object.fromEntries(Object.entries(r.params ?? {}).filter(([, f]) => (f as { default?: unknown }).default !== undefined).map(([k, f]) => [k, (f as { default: unknown }).default]));
   const p = { ...defaults, ...(params ?? {}) };
   if (r.make.kind === 'gen' && r.make.gen === 'kit/2') {
@@ -64,7 +72,7 @@ export async function measure(d: StoredDef, params?: Record<string, unknown>): P
     const m = assetMeta(r.make.asset);
     return { tris: m?.tris ?? r.budget?.tris ?? 0, draws: 0, materials: 0, assetBytes: m?.bytes ?? r.budget?.bytes ?? 0, textures: m?.textures ?? r.budget?.textures ?? 0, texturePx: m?.texPx ?? 0, how: m ? 'asset-meta' : 'estimate', ...(m?.min ? { box: { min: m.min, max: [m.min[0] + m.box[0], m.min[1] + m.box[1], m.min[2] + m.box[2]] as [number, number, number] } } : {}) };
   }
-  let tris = 0; try { tris = probe.bake(r, p as never, 0, r.form === 'point' ? undefined : shapeFor(r)).tris; } catch { /* a bake that needs a world; G3 reports it */ }
+  let tris = 0; try { tris = world.bake(r, p as never, 0, r.form === 'point' ? undefined : shapeFor(r)).tris; } catch { /* a bake that needs a world; G3 reports it */ }
   return { tris, draws: 0, materials: 0, assetBytes: 0, textures: 0, texturePx: 0, how: 'estimate' };
 }
 

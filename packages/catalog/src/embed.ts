@@ -36,7 +36,7 @@ export type Index = {
   model: 'lsa-1'; dim: number; trigram: number; ids: string[]; lines: string[];
   feats: string[]; idf: Float64Array; V: Float32Array;     // feats × dim: query fold-in
   docs: Int8Array; scale: Float32Array;                   // ids × dim, int8 per row (row scale)
-  bm25: { rows: Map<number, number>[]; avg: number; df: Float64Array };
+  bm25: { rows: Map<number, number>[]; avg: number; df: Float64Array; lengths: Float64Array; postings: Map<number, { r: number; tf: number }[]> };
   bytes: number; ms: number;
 };
 
@@ -102,7 +102,9 @@ export function buildIndex(docs: Doc[], opts: { dim?: number; trigram?: number }
   // BM25 over the word features only (the lexical half of the fusion)
   const wdf = new Float64Array(m); const brow = bags.map((b) => { const r = new Map<number, number>(); for (const [f, tf] of b) if (f.startsWith('w:')) { const j = featIx.get(f)!; r.set(j, tf); } for (const j of r.keys()) wdf[j]++; return r; });
   const avg = brow.reduce((a, r) => a + [...r.values()].reduce((x, y) => x + y, 0), 0) / n;
-  const idx: Index = { model: 'lsa-1', dim, trigram, ids: docs.map((d) => d.id), lines: docs.map((d) => d.line ?? d.id), feats: [...featIx.keys()], idf, V, docs: docsQ, scale, bm25: { rows: brow, avg, df: wdf }, bytes: 0, ms: 0 };
+  const lengths = Float64Array.from(brow, (row) => [...row.values()].reduce((a, b) => a + b, 0)), postings = new Map<number, { r: number; tf: number }[]>();
+  brow.forEach((row, r) => { for (const [j, tf] of row) { const hits = postings.get(j) ?? []; hits.push({ r, tf }); postings.set(j, hits); } });
+  const idx: Index = { model: 'lsa-1', dim, trigram, ids: docs.map((d) => d.id), lines: docs.map((d) => d.line ?? d.id), feats: [...featIx.keys()], idf, V, docs: docsQ, scale, bm25: { rows: brow, avg, df: wdf, lengths, postings }, bytes: 0, ms: 0 };
   idx.bytes = V.byteLength + docsQ.byteLength + scale.byteLength + idf.byteLength + idx.feats.reduce((a, f) => a + f.length + 1, 0);
   idx.ms = Math.round(performance.now() - t0);
   return idx;
@@ -128,13 +130,17 @@ export function semantic(idx: Index, q: string): { i: number; s: number }[] {
 /** BM25 (k1 1.2, b 0.75) over word features. */
 export function lexical(idx: Index, q: string): { i: number; s: number; why: string[] }[] {
   const fi = fIx(idx), n = idx.ids.length, qs = [...new Set(tokens(q))];
-  const out: { i: number; s: number; why: string[] }[] = [];
-  idx.bm25.rows.forEach((row, r) => {
-    let s = 0; const why: string[] = []; const len = [...row.values()].reduce((a, b) => a + b, 0);
-    for (const t of qs) { const j = fi.get('w:' + t); if (j === undefined) continue; const tf = row.get(j); if (!tf) continue; const idf = Math.log(1 + (n - idx.bm25.df[j] + 0.5) / (idx.bm25.df[j] + 0.5)); s += idf * (tf * 2.2) / (tf + 1.2 * (0.25 + 0.75 * len / idx.bm25.avg)); why.push(t); }
-    if (s > 0) out.push({ i: r, s, why });
-  });
-  return out.sort((a, b) => b.s - a.s);
+  const scores = new Map<number, { i: number; s: number; why: string[] }>();
+  for (const t of qs) {
+    const j = fi.get('w:' + t); if (j === undefined) continue;
+    const idf = Math.log(1 + (n - idx.bm25.df[j] + 0.5) / (idx.bm25.df[j] + 0.5));
+    for (const { r, tf } of idx.bm25.postings.get(j) ?? []) {
+      const hit = scores.get(r) ?? { i: r, s: 0, why: [] };
+      hit.s += idf * (tf * 2.2) / (tf + 1.2 * (0.25 + 0.75 * idx.bm25.lengths[r] / idx.bm25.avg));
+      hit.why.push(t); scores.set(r, hit);
+    }
+  }
+  return [...scores.values()].sort((a, b) => b.s - a.s || a.i - b.i);
 }
 /** Lexical, semantic, or both fused by reciprocal rank (k = 60; lexical weighted 1, semantic 1). */
 export function search(idx: Index, q: string, opts: { k?: number; mode?: 'lexical' | 'semantic' | 'fused' | string } = {}): Hit[] {
@@ -152,18 +158,23 @@ import type { Registry } from './registry.ts';
 export function docsOf(reg: Registry, ch: 'stable' | 'candidate' = 'stable'): Doc[] {
   return reg.current(ch).map((e) => { const it = reg.item(e.id, e.major, e.rev, e.itemHash)!; return { id: `${e.id}@${e.major}`, title: it.text.title, synonyms: it.text.synonyms, category: it.text.category, affords: it.affords, first: it.text.first, description: it.text.description, line: e.line }; });
 }
-const cache = new Map<string, Index>();
+const cache = new Map<string, { seq: number | null; index: Index }>();
 export async function buildEmbeddings(reg: Registry, o: { model?: string; run?: string } = {}) {
   if (o.model && o.model !== 'lsa-1') throw new Error(`embedder ${o.model} is not installed (P0 ships lsa-1; see docs/god/CATALOG-P0.md §3)`);
   const idx = buildIndex(docsOf(reg));
   const seq = reg.pointers().stable;
   reg.log({ op: 'embed', run: o.run, model: idx.model, dim: idx.dim, items: idx.ids.length, bytes: idx.bytes, ms: idx.ms, stable: seq });
-  cache.set(reg.root, idx);
+  cache.set(reg.root, { seq, index: idx });
   return { model: idx.model, dim: idx.dim, items: idx.ids.length, features: idx.feats.length, bytes: idx.bytes, ms: idx.ms, stable: seq };
 }
 export async function find(reg: Registry, q: string, o: { k?: number; mode?: string } = {}) {
-  let idx = cache.get(reg.root); if (!idx) { idx = buildIndex(docsOf(reg)); cache.set(reg.root, idx); }
-  return search(idx, q, o);
+  const seq = reg.pointers().stable, lexicalOnly = o.mode === 'lexical';
+  let cached = cache.get(reg.root);
+  if (!cached || cached.seq !== seq || (!lexicalOnly && cached.index.dim === 0)) {
+    cached = { seq, index: lexicalOnly ? buildLexicalIndex(docsOf(reg)) : buildIndex(docsOf(reg)) };
+    cache.set(reg.root, cached);
+  }
+  return search(cached.index, q, o);
 }
 
 // ------------------------------------------------------------------ external sentence vectors (pluggable embedders)

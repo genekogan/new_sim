@@ -85,6 +85,19 @@ export async function buildCoreItems(opts: { at?: string; run?: string; contract
 
 export const lineOf = (item: Item1) => `${item.id}@${item.major} [${item.text.category}] ${item.text.title}${item.affords.length ? ` {${item.affords.slice(0, 6).join(' ')}}` : ''}${item.text.synonyms.length ? ` aka ${item.text.synonyms.slice(0, 6).join(',')}` : ''} — ${item.text.first.slice(0, 90)}`;
 
+/** Precomputed engine facets; browsing never needs to load the def. */
+export function facetsOf(d: StoredDef): string[] {
+  const i = vocab.interfacesOf(d as never);
+  return [...new Set([
+    ...d.slots.flatMap((s) => [`slot:${s.kind}`, `slot:${vocab.SLOT_VERBS[s.kind] ?? s.kind}`]),
+    ...i.verbs.map((v) => `verb:${v}`), ...i.actions.flatMap((v) => [`action:${v}`, `verb:${v}`]),
+    ...i.states.map((v) => `state:${v}`), ...i.components.flatMap((v) => [`comp:${v}`, `component:${v}`]),
+    ...Object.keys(d.params).map((v) => `param:${v}`),
+    ...Object.keys(vocab.ACTUATORS).filter((v) => vocab.hasFacet(d as never, `actuator:${v}`)).map((v) => `actuator:${v}`),
+    `form:${d.form}`, `make:${d.make.kind}`, ...(d.make.kind === 'gen' ? [`make:${d.make.gen}`] : []),
+  ])].sort();
+}
+
 /** Write items + defs (def/2 and the def/1 engine view) to the registry and publish them to both channels. */
 export function writeCore(reg: Registry, items: { item: Item1; up: Upgrade; def: StoredDef }[], run: string, tierOf: (it: Item1) => Item1['tier'] = () => 'cold') {
   const entries: IndexEntry[] = [];
@@ -97,7 +110,7 @@ export function writeCore(reg: Registry, items: { item: Item1; up: Upgrade; def:
     reg.putItem(it);
     const row = vocab.manifestRow(def as never, { bytes: it.budgets.bytes.assets, publicRef: `${it.id}@${it.major}` });
     row.tris = it.budgets.tris.lod0;
-    entries.push({ id: it.id, major: it.major, rev: it.rev, itemHash: hashOf(it), status: it.status, tier: it.tier, aliases: it.aliases, def1Hash: def.hash, line: lineOf(it), redistribute: it.licence.redistribute, row });
+    entries.push({ id: it.id, major: it.major, rev: it.rev, itemHash: hashOf(it), status: it.status, tier: it.tier, aliases: it.aliases, def1Hash: def.hash, line: lineOf(it), redistribute: it.licence.redistribute, row, facets: facetsOf(def) });
   }
   const s = reg.publish('stable', entries, run), c = reg.publish('candidate', entries, run);
   reg.log({ op: 'import-core', run, items: entries.length, stable: s, candidate: c });

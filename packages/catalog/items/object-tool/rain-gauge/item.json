@@ -1,0 +1,16 @@
+{
+  "text": {
+    "title": "Rain gauge",
+    "first": "A hollow marked rain gauge, 34 cm high, for a weather station; carry it or use it as an empty display vessel.",
+    "description": "A hollow glass cylinder on a green base with five graduation marks, for measuring rainfall and collecting rainwater. Souls can carry it. It stays empty: rainfall does not automatically fill it.",
+    "category": "object.tool",
+    "synonyms": ["rainfall meter", "precipitation gauge", "weather measuring cylinder"],
+    "heldOut": ["measure outdoor rainfall", "collect rainwater"]
+  },
+  "licence": {
+    "spdx": "CC0-1.0",
+    "redistribute": true,
+    "source": "https://github.com/genekogan/sim/tree/main/packages/catalog/items/object-tool/rain-gauge"
+  },
+  "author": "catalog-worker"
+}

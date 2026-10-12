@@ -17,7 +17,7 @@ import { def2Schema, item1Schema, type Def2, type Item1 } from './schema.ts';
 
 export const CHANNELS = ['stable', 'candidate'] as const;
 export type Channel = (typeof CHANNELS)[number];
-export type IndexEntry = { id: string; major: number; rev: string; itemHash?: string; status: Item1['status']; tier: Item1['tier']; aliases: string[]; def1Hash?: string; line: string; redistribute: boolean; row?: import('@sim/world-compiler').vocab.ManifestRow };
+export type IndexEntry = { id: string; major: number; rev: string; itemHash?: string; status: Item1['status']; tier: Item1['tier']; aliases: string[]; def1Hash?: string; line: string; redistribute: boolean; row?: import('@sim/world-compiler').vocab.ManifestRow; facets?: string[] };
 export type Pointers = Record<Channel, number | null>;
 export class RegistryError extends Error { readonly code: string; constructor(code: string, msg: string) { super(`${code}: ${msg}`); this.code = code; } }
 

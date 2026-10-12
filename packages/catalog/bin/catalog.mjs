@@ -12,7 +12,7 @@
 //   find <words> --registry <dir> [--k 10] [--mode lexical|semantic|fused]   retrieval, top k with why (default: the best
 //                                            measured mode, lexical, until a sentence model beats it on eval/intents.json)
 import { resolve } from 'node:path';
-import { writeFileSync } from 'node:fs';
+import { writeFileSync, readFileSync, mkdirSync } from 'node:fs';
 
 const argv = process.argv.slice(2);
 const cmd = argv[0];
@@ -23,6 +23,38 @@ const reg = () => new C.Registry(resolve(String(flags.registry ?? '.lane/registr
 const run = String(flags.run ?? `${cmd}-${new Date().toISOString().replace(/[:.]/g, '-')}`);
 
 switch (cmd) {
+  case 'build': {
+    const receipt = flags.receipt ? JSON.parse(readFileSync(String(flags.receipt), 'utf8')) : undefined;
+    const intents = JSON.parse(readFileSync(new URL('../eval/intents.json', import.meta.url), 'utf8')).intents;
+    const built = await C.buildItem(pos[0], reg(), { run, receipt, intents });
+    const out = resolve(String(flags.out ?? `.lane/build/${built.item.id.replace('/', '_')}@${built.item.major}`));
+    mkdirSync(out, { recursive: true });
+    for (const [name, value] of Object.entries({ build: built, item: built.item, def2: built.def2, 'engine-defs': [built.engine], gates: built.gates })) writeFileSync(`${out}/${name}.json`, JSON.stringify(value, null, 2) + '\n');
+    console.log(JSON.stringify({ ok: built.ok, ref: `${built.item.id}@${built.item.major}`, rev: built.item.rev, def1Hash: built.item.def1Hash, out, gates: built.gates.map(({ gate, ok, errors }) => ({ gate, ok, errors })) }, null, 1));
+    if (flags.publish && built.ok) console.log(JSON.stringify(C.publishItem(reg(), built, run)));
+    process.exitCode = built.ok ? 0 : 1;
+    break;
+  }
+  case 'publish': {
+    const built = JSON.parse(readFileSync(pos[0], 'utf8'));
+    console.log(JSON.stringify(C.publishItem(reg(), built, run), null, 1)); break;
+  }
+  case 'compat': {
+    const r = reg(), oldDef = r.def(pos[0]), next = r.def(pos[1]);
+    if (!oldDef || !next) throw new Error('compat needs two stored def/2 rev hashes');
+    const result = C.compatibility(oldDef, next); console.log(JSON.stringify(result, null, 1)); process.exitCode = result.compatible ? 0 : 1; break;
+  }
+  case 'eval': {
+    const r = reg(), existing = r.current('stable').map((e) => r.item(e.id, e.major, e.rev, e.itemHash));
+    const intents = JSON.parse(readFileSync(new URL('../eval/intents.json', import.meta.url), 'utf8')).intents;
+    let bad = 0;
+    for (const ref of pos) {
+      const e = r.resolve(ref, String(flags.channel ?? 'stable')); if (!e) throw new Error(`no item ${ref}`);
+      const report = C.g5(r.item(e.id, e.major, e.rev, e.itemHash), existing, intents); if (!report.ok) bad++;
+      console.log(JSON.stringify({ ref, ...report }, null, 1));
+    }
+    process.exitCode = bad ? 1 : 0; break;
+  }
   case 'contract': {
     const c = C.engineContract();
     if (flags.write) { writeFileSync(C.CONTRACT_FILE, JSON.stringify(c, null, 2) + '\n'); console.log(`wrote ${C.CONTRACT_FILE.pathname}`); }
