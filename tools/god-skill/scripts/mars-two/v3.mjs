@@ -7,6 +7,7 @@
 // - mars-two frame (the new world): north up = −z, east = +x, ground y = 0, metres. X = E + X0, Z = −N, where (N, E) are
 //   metres north/east of the Mimos origin. Every building of the campus is aligned with these axes (the rack grid).
 import { createRequire } from 'node:module';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -41,7 +42,36 @@ export function v3ToLocal(ox = 0, oz = 0) {
 export async function readV3() {
   const io = new core.NodeIO().registerExtensions(ext.ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
   const doc = await io.read(V3_GLB);
+  applyRefDelta(doc);
   return { io, doc };
+}
+
+// PARITY: the corrected sim.mars.college source build (7d9688f) moved some V3 pieces (the kitchen prep table, the Mimos
+// papasan and clothing rack): ref-7d9688f-delta.json (ref-delta.mjs) holds their world matrices there; each node's local
+// matrix is set so its world matrix is the reference's.
+export const REF_DELTA = join(ROOT, 'tools/god-skill/scripts/mars-two/ref-7d9688f-delta.json');
+export function inv4(m) {
+  const [a00, a01, a02, a03, a10, a11, a12, a13, a20, a21, a22, a23, a30, a31, a32, a33] = m;
+  const b00 = a00 * a11 - a01 * a10, b01 = a00 * a12 - a02 * a10, b02 = a00 * a13 - a03 * a10, b03 = a01 * a12 - a02 * a11, b04 = a01 * a13 - a03 * a11, b05 = a02 * a13 - a03 * a12;
+  const b06 = a20 * a31 - a21 * a30, b07 = a20 * a32 - a22 * a30, b08 = a20 * a33 - a23 * a30, b09 = a21 * a32 - a22 * a31, b10 = a21 * a33 - a23 * a31, b11 = a22 * a33 - a23 * a32;
+  const d = 1 / (b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06);
+  return [(a11 * b11 - a12 * b10 + a13 * b09) * d, (a02 * b10 - a01 * b11 - a03 * b09) * d, (a31 * b05 - a32 * b04 + a33 * b03) * d, (a22 * b04 - a21 * b05 - a23 * b03) * d,
+    (a12 * b08 - a10 * b11 - a13 * b07) * d, (a00 * b11 - a02 * b08 + a03 * b07) * d, (a32 * b02 - a30 * b05 - a33 * b01) * d, (a20 * b05 - a22 * b02 + a23 * b01) * d,
+    (a10 * b10 - a11 * b08 + a13 * b06) * d, (a01 * b08 - a00 * b10 - a03 * b06) * d, (a30 * b04 - a31 * b02 + a33 * b00) * d, (a21 * b02 - a20 * b04 - a23 * b00) * d,
+    (a11 * b07 - a10 * b09 - a12 * b06) * d, (a00 * b09 - a01 * b07 + a02 * b06) * d, (a31 * b01 - a30 * b03 - a32 * b00) * d, (a20 * b03 - a21 * b01 + a22 * b00) * d];
+}
+function applyRefDelta(doc) {
+  if (!existsSync(REF_DELTA)) return 0;
+  const { nodes } = JSON.parse(readFileSync(REF_DELTA, 'utf8'));
+  let n = 0;
+  for (const node of doc.getRoot().listNodes()) {
+    if (!node.getMesh()) continue;
+    const d = nodes[`${node.getName()}|${node.getExtras()?.component_id ?? null}`]; if (!d) continue;
+    const parent = node.getParentNode(), local = parent ? mul(inv4(parent.getWorldMatrix()), d.m) : d.m;
+    node.setMatrix(local); n++;
+  }
+  if (n !== Object.keys(nodes).length) throw new Error(`ref delta: ${n} of ${Object.keys(nodes).length} nodes found in V3`);
+  return n;
 }
 
 export const mul = (a, b) => { const o = new Array(16).fill(0); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k]; return o; };

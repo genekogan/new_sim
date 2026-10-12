@@ -712,7 +712,7 @@
    "floorY": 0.011
   },
   {
-   "def": "core/mars-prep-table@1",
+   "def": "core/mars-prep-table@2",
    "cat": "table",
    "building": "kitchen",
    "nums": [
@@ -730,7 +730,7 @@
    "p": [
     38.325,
     0.53,
-    -2.035
+    -0.65
    ],
    "r": 0,
    "floorY": 0.53
@@ -860,7 +860,7 @@
    "floorY": 0.53
   },
   {
-   "def": "core/mars-stored-stock-pot@1",
+   "def": "core/mars-stored-stock-pot@2",
    "cat": "item",
    "building": "kitchen",
    "nums": [],
@@ -870,7 +870,7 @@
    "p": [
     38.525,
     0.775,
-    -1.705
+    -0.32
    ],
    "r": 0,
    "floorY": 0.775
@@ -1142,7 +1142,7 @@
    "floorY": 2.277
   },
   {
-   "def": "core/mars-prep-mixing-bowl@1",
+   "def": "core/mars-prep-mixing-bowl@2",
    "cat": "item",
    "building": "kitchen",
    "nums": [],
@@ -1153,13 +1153,13 @@
    "p": [
     38.549,
     1.457,
-    -2.595
+    -1.21
    ],
    "r": 0,
    "floorY": 1.457
   },
   {
-   "def": "core/mars-prep-mixing-bowl-2@1",
+   "def": "core/mars-prep-mixing-bowl-2@2",
    "cat": "item",
    "building": "kitchen",
    "nums": [],
@@ -1171,7 +1171,7 @@
    "p": [
     38.326,
     1.457,
-    -1.59
+    -0.205
    ],
    "r": 0,
    "floorY": 1.457
@@ -1472,7 +1472,7 @@
    "floorY": 1.29
   },
   {
-   "def": "core/mars-papasan@1",
+   "def": "core/mars-papasan@2",
    "cat": "seat",
    "building": "mimos",
    "nums": [
@@ -1497,8 +1497,8 @@
     0,
     1.25
    ],
-   "r": 0,
-   "floorY": 0
+   "r": -1.5708,
+   "floorY": -0.152
   },
   {
    "def": "core/mars-tea-stool@1",
@@ -2009,9 +2009,9 @@
    "nums": [],
    "ids": [],
    "p": [
-    36.6,
+    36.615,
     1.46,
-    -0.25
+    0.35
    ],
    "r": 0,
    "floorY": 0.53
@@ -2023,9 +2023,9 @@
    "nums": [],
    "ids": [],
    "p": [
-    36.6,
+    36.615,
     1.46,
-    0.45
+    0.9
    ],
    "r": 0,
    "floorY": 0.53
@@ -2064,7 +2064,7 @@
    "r": 0
   },
   {
-   "def": "core/mars-showers@1",
+   "def": "core/mars-showers@2",
    "cat": "building",
    "building": "showers",
    "p": [
@@ -2427,7 +2427,7 @@
    "r": 0.4054
   },
   {
-   "def": "core/mars-shelter-6@1",
+   "def": "core/mars-shelter-6@2",
    "cat": "site",
    "building": "site",
    "p": [

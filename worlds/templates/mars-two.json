@@ -70,7 +70,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-showers@1",
+     "def": "core/mars-showers@2",
      "name": "showers",
      "p": [
       8.36,
@@ -279,7 +279,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-papasan@1",
+     "def": "core/mars-papasan@2",
      "name": "papasan-8",
      "in": {
       "parent": "mimos",
@@ -289,7 +289,7 @@
       2.8,
       0.15
      ],
-     "r": 0
+     "r": -1.5708
     },
     {
      "op": "place",
@@ -383,7 +383,7 @@
    "ops": [
     {
      "op": "place",
-     "def": "core/mars-prep-table@1",
+     "def": "core/mars-prep-table@2",
      "name": "prep-table-15",
      "in": {
       "parent": "kitchen",
@@ -391,7 +391,7 @@
      },
      "p": [
       -0.2,
-      0
+      1.385
      ],
      "r": 0
     },
@@ -1250,10 +1250,10 @@
     },
     {
      "op": "place",
-     "def": "core/mars-stored-stock-pot@1",
+     "def": "core/mars-stored-stock-pot@2",
      "name": "stored-stock-pot",
      "p": [
-      1.705,
+      0.32,
       0.775,
       -39.475
      ],
@@ -1272,7 +1272,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-prep-mixing-bowl@1",
+     "def": "core/mars-prep-mixing-bowl@2",
      "name": "prep-mixing-bowl",
      "in": {
       "parent": "kitchen/prep-table-15",
@@ -1286,7 +1286,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-prep-mixing-bowl-2@1",
+     "def": "core/mars-prep-mixing-bowl-2@2",
      "name": "prep-mixing-bowl-2",
      "in": {
       "parent": "kitchen/prep-table-15",
@@ -1377,9 +1377,9 @@
       "slot": "top"
      },
      "p": [
-      -0.293,
+      -0.278,
       0,
-      1.785
+      2.385
      ]
     },
     {
@@ -1391,9 +1391,9 @@
       "slot": "top"
      },
      "p": [
-      -0.293,
+      -0.278,
       0,
-      2.485
+      2.935
      ]
     }
    ]
@@ -1712,7 +1712,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-shelter-6@1",
+     "def": "core/mars-shelter-6@2",
      "name": "shelter-6",
      "p": [
       -41.696,

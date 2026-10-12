@@ -25,7 +25,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { ROOT, readV3, indexNodes, cut, v3ToLocal, mul, rotY, translate, xz, X0, minRect, nodePoints, rectOverlap, NORTH, EAST, O, core, ext, MeshoptEncoder } from './v3.mjs';
+import { ROOT, readV3, indexNodes, cut, v3ToLocal, mul, rotY, translate, xz, X0, minRect, nodePoints, rectOverlap, NORTH, EAST, O, core, ext, MeshoptEncoder, inv4 } from './v3.mjs';
 import { ROOMS, WALLS, DOORS, STAIRS, RAISED, ENTRANCES, TERRACES, ROOM_AT, LOFTS, LOFT_Y, FIXTURES, STAIR_RUN, REPLACED } from './layout.mjs';
 
 const { measureGlb, footprintToBaked } = await import(join(ROOT, 'apps/server/src/god/assets.ts'));
@@ -39,8 +39,57 @@ const LICENSE = 'Mars College (Gene Kogan); campus CAD and the 2026 photographic
 const SOURCE = 'V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene\'s Oct 10 corrections)';
 const RAW_FLOOR = 0.53;
 
+// PARITY: what the corrected sim.mars.college source build (7d9688f, layers 1+2 of Gene's target) draws differently from
+// V3, beyond the moved nodes readV3 already takes from ref-7d9688f-delta.json (team/lanes/marsland-parity.md):
+// - the shower bays in the Mars kit's plywood (its plywood tones carry the kitchen plywood photo, tinted #ead8b7), not flat tan;
+// - the donor glazing transparent_panel-0067's sliver north of the outdoor gap, which crossed shower bay 1's doorway, removed;
+// - Mimos floor's continuous dark ground mat (Gene: "Mimos floor, with flooring throughout"), N −1.85…0.75, E 0…3.66;
+// - Chiba's solar panels near-black glass as the 2026 drone shows them (solar2's navy cells read pale grey under the sky).
+const PLYWOOD_JPG = '<mars-campus-repo>/viewer/public/modular/textures/kitchen-plywood-sample.jpg';   // read-only
+const lin = (hex) => [0, 2, 4].map((i) => Math.pow(parseInt(hex.slice(1 + i, 3 + i), 16) / 255, 2.2));
+function parityFixes(doc) {
+  const root = doc.getRoot(), nodes = root.listNodes(), kind = (n) => n.getExtras()?.kind ?? '';
+  // showers: one plywood material for walls, piers, headers, slabs and roofs (kit.ts Kit.mat)
+  const showerMats = new Set(nodes.filter((n) => n.getMesh() && /^Shower /.test(kind(n))).flatMap((n) => n.getMesh().listPrimitives().map((p) => p.getMaterial())));
+  if (existsSync(PLYWOOD_JPG) && showerMats.size) {
+    const tex = doc.createTexture('kitchen-plywood-sample').setImage(readFileSync(PLYWOOD_JPG)).setMimeType('image/jpeg').setURI('kitchen-plywood-sample.jpg');
+    for (const m of showerMats) m.setBaseColorTexture(tex).setBaseColorFactor([...lin('#ead8b7'), 1]).setRoughnessFactor(0.86).setMetallicFactor(0);
+  } else console.warn('parity: no plywood texture source; showers stay plain');
+  // the glass sliver: triangles of transparent_panel-0067 lying wholly north of the outdoor gap (n ≥ 5.9), east of main
+  for (const n of nodes.filter((q) => q.getName() === 'transparent_panel-0067' && q.getMesh())) {
+    const W = n.getWorldMatrix(), v = [0, 0, 0];
+    for (const p of n.getMesh().listPrimitives()) {
+      const pos = p.getAttribute('POSITION'), idx = p.getIndices(), cnt = idx ? idx.getCount() : pos.getCount(), keep = [];
+      for (let t = 0; t < cnt; t += 3) {
+        const vs = [0, 1, 2].map((k) => idx ? idx.getScalar(t + k) : t + k);
+        const out = vs.every((vi) => { pos.getElement(vi, v); const x = W[0] * v[0] + W[4] * v[1] + W[8] * v[2] + W[12], z = W[2] * v[0] + W[6] * v[1] + W[10] * v[2] + W[14]; const dx = x - O[0], dz = z - O[1]; return dx * NORTH[0] + dz * NORTH[1] >= 5.9 && dx * EAST[0] + dz * EAST[1] > 0.012; });
+        if (!out) keep.push(...vs);
+      }
+      if (keep.length < cnt) p.setIndices(doc.createAccessor().setType('SCALAR').setArray(new Uint32Array(keep)).setBuffer(root.listBuffers()[0]));
+    }
+  }
+  // Mimos floor's ground mat: a dark mat over the arm's ground (the reference: 'Mimos southeast continuous ground mat floor', #55564d)
+  {
+    const N0 = -1.85, N1 = 0.75, E0 = 0, E1 = 3.66, Y0 = -0.16, Y1 = -0.16 + 0.025;
+    const at = (n, e) => [O[0] + n * NORTH[0] + e * EAST[0], O[1] + n * NORTH[1] + e * EAST[1]];
+    const P = [], I = [], Nn = [], quad = (a, b, c, d, nrm) => { const k = P.length / 3; for (const q of [a, b, c, d]) { P.push(...q); Nn.push(...nrm); } I.push(k, k + 1, k + 2, k, k + 2, k + 3); };
+    const c = [[N0, E0], [N0, E1], [N1, E1], [N1, E0]].map(([n, e]) => at(n, e));
+    const top = c.map(([x, z]) => [x, Y1, z]), bot = c.map(([x, z]) => [x, Y0, z]);
+    quad(top[0], top[1], top[2], top[3], [0, 1, 0]);   // (counter-clockwise seen from above: N × E points down in V3's x, z)
+    for (let s = 0; s < 4; s++) { const a = s, b = (s + 1) % 4, dx = c[b][0] - c[a][0], dz = c[b][1] - c[a][1], l = Math.hypot(dx, dz); quad(bot[a], bot[b], top[b], top[a], [dz / l, 0, -dx / l]); }
+    const buf = root.listBuffers()[0];
+    const mat = doc.createMaterial('Mimos southeast continuous ground mat').setBaseColorFactor([...lin('#55564d'), 1]).setRoughnessFactor(0.95).setMetallicFactor(0).setDoubleSided(true);
+    const prim = doc.createPrimitive().setAttribute('POSITION', doc.createAccessor().setType('VEC3').setArray(new Float32Array(P)).setBuffer(buf)).setAttribute('NORMAL', doc.createAccessor().setType('VEC3').setArray(new Float32Array(Nn)).setBuffer(buf)).setIndices(doc.createAccessor().setType('SCALAR').setArray(new Uint32Array(I)).setBuffer(buf)).setMaterial(mat);
+    const node = doc.createNode('Mimos southeast continuous ground mat floor').setMesh(doc.createMesh('mimos-ground-mat').addPrimitive(prim)).setExtras({ assembly_id: 'mimos-open-l', kind: 'Mimos southeast continuous ground mat floor', layer: 'Timber, floors and stairs', component_id: 'parity-mimos-ground-mat' });
+    node.setMatrix(inv4(nodes[2].getWorldMatrix())); nodes[2].addChild(node);   // under Chiba (TOP index 2), where the reference's Mimos parts are
+  }
+  // Chiba's solar panels: near-black glass
+  for (const m of root.listMaterials()) if (m.getName() === 'solar2') m.setBaseColorFactor([0.16, 0.16, 0.19, 1]).setRoughnessFactor(0.3);
+}
+
 console.time('read');
 const src = await readV3();
+parityFixes(src.doc);
 const rows = indexNodes(src);
 console.timeEnd('read');
 const byI = new Map(rows.map((r) => [r.i, r]));
@@ -343,9 +392,11 @@ async function extraPiece(dname, d, get) {
   const ids = (list) => list.map((n) => raw.byId.get(`cad_component-${n}`)).filter((i) => i !== undefined);
   const crushIt = { ratio: 0.035, error: 0.3, minTris: 60 };
   const APPLIANCES = [
+    // PARITY: where the corrected source build (7d9688f) stands them: n −.35 / −.90 on the west perimeter counter (e −11.385),
+    // south of the longitudinal backsplash (at n .25 the cooker stood inside it)
     // (the CAD's screws, rivets, feet and trims — hundreds of triangles each — are left out; each part is crushed to its share of ≤ 400)
-    ['rice-cooker', '0831 0834 0835 0838 0839 0847 2941', 'A stainless rice cooker with its black lid (the Mars kitchen, 2026).', ['rice', 'cooker', 'appliance'], 3.0, [36.6, -0.25], 0.09],
-    ['water-urn', '0854 0859 0860 0861', 'The two-tier water urn with its tap the Mars kitchen kept on the counter (2026).', ['water', 'urn', 'dispenser', 'drink'], 4.0, [36.6, 0.45], 0.03],
+    ['rice-cooker', '0831 0834 0835 0838 0839 0847 2941', 'A stainless rice cooker with its black lid (the Mars kitchen, 2026).', ['rice', 'cooker', 'appliance'], 3.0, [36.615, 0.35], 0.09],
+    ['water-urn', '0854 0859 0860 0861', 'The two-tier water urn with its tap the Mars kitchen kept on the counter (2026).', ['water', 'urn', 'dispenser', 'drink'], 4.0, [36.615, 0.9], 0.03],
   ];
   const counter = placements.find((q) => q.building === 'kitchen' && q.def === 'core/mars-perimeter-counter@1');
   const cdef = defs.find((x) => x.name === 'core-mars-perimeter-counter'), topY = counter.p[1] + cdef.slots[0].p[1];
