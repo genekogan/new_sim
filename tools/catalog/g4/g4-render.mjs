@@ -115,15 +115,15 @@ for (const j of jobs) {
   results.push(rec);
   if (!j.placed) continue;
   const ent = (await api(`/v1/world/entities/${j.name}`)).data, pose = ent?.pose, eid = ent?.entity?.id ?? null;
+  const at = j.d.exampleShape ? j.p : pose ? [pose.x, pose.y, pose.z] : j.p;
   // Lazy GLBs load only near the camera. Move there before waiting; a timeout is a failure, never a baseline.
-  await page.evaluate((at) => { const s = window.__simEntity; s.camera.position.set(at[0] - 3, at[1] + 3, at[2] + 4); s.controls.target.set(...at); s.controls.update?.(); }, pose ? [pose.x, pose.y, pose.z] : j.p);
+  await page.evaluate((at) => { const s = window.__simEntity; s.camera.position.set(at[0] - 3, at[1] + 3, at[2] + 4); s.controls.target.set(...at); s.controls.update?.(); }, at);
   await page.waitForFunction((id) => {
-    const L = window.__simEntity.layer, dr = L.drawn.get(id);
-    if (!dr) return false;
-    let pending = false;
+    const L = window.__simEntity.layer;
+    let pending = false, found = false;
     const belongs = (key) => { for (let e = L.model.entities.get(key), n = 0; e && n < 12; e = L.model.entities.get(e.in.parent), n++) if (e.id === id) return true; return false; };
-    for (const [key, d] of L.drawn) if (belongs(key)) d.obj.traverse((o) => { if (o.name.startsWith('mesh ') && !o.getObjectByName('asset') && !o.getObjectByName('asset missing')) pending = true; });
-    return !pending;
+    for (const [key, d] of L.drawn) if (belongs(key)) { found = true; d.obj.traverse((o) => { if (o.name.startsWith('mesh ') && !o.getObjectByName('asset') && !o.getObjectByName('asset missing')) pending = true; }); }
+    return found && !pending;
   }, eid, { timeout: 30000 }).catch(() => { rec.note = 'drawable/asset load timeout'; });
   for (const [view, k] of Object.entries(VIEWS)) {
     let [bw, bh, bd] = j.d.size.box;
@@ -139,7 +139,6 @@ for (const j of jobs) {
           for (const m of pool.meshes) { const start = slot * 16, saved = m.instanceMatrix.array.slice(start, start + 16); matrices.push([m, start, saved]); m.instanceMatrix.array.fill(0, start, start + 16); m.instanceMatrix.needsUpdate = true; }
         } else if (d.obj?.visible) { d.obj.visible = false; hidden.push(d.obj); }
       };
-      for (const [key, other] of L.drawn) if (!belongs(key) && !String(other.obj?.name).includes('pond')) hide(key, other);
       let missingAsset = false; for (const [, d] of targets) d.obj.traverse((o) => { if (o.name === 'asset missing') missingAsset = true; });
       try {
       const c = o && !dr.world ? [o.position.x, o.position.y + fb.h / 2, o.position.z] : fb.at, yaw = o && !dr.world ? o.rotation.y : fb.yaw;
@@ -147,6 +146,7 @@ for (const j of jobs) {
       const eye = [c[0] + (k[0] * cy + k[2] * sy) / n * dist, c[1] + k[1] / n * dist, c[2] + (-k[0] * sy + k[2] * cy) / n * dist];
       s.controls.target.set(c[0], c[1], c[2]); s.camera.position.set(eye[0], eye[1], eye[2]); s.camera.lookAt(s.controls.target); s.controls.update?.();
       await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+      for (const [key, other] of L.drawn) if (!belongs(key) && !String(other.obj?.name).includes('pond')) hide(key, other);
       const cam = s.camera, v = cam.position.clone().set(c[0], c[1], c[2]), dcam = cam.position.distanceTo(v); v.project(cam);
       const src = s.renderer.domElement, W = src.width, H = src.height;
       const rpx = (fb.r / Math.max(0.01, dcam)) / Math.tan(cam.fov * Math.PI / 360) * (H / 2), side = Math.max(40, Math.min(Math.min(W, H), rpx * 2.3));
@@ -174,7 +174,7 @@ for (const j of jobs) {
       return { live: targets.length > 0, missingAsset, moving: !!dr?.motion, png: cv.toDataURL('image/png'), top: +top.toFixed(3), dark: +(dark / total).toFixed(3), cover, grey, rgb };
       } finally { for (const h of hidden) h.visible = true; for (const [m, start, saved] of matrices) { m.instanceMatrix.array.set(saved, start); m.instanceMatrix.needsUpdate = true; } }
     }, a);
-    const shotArgs = [eid, { at: pose ? [pose.x, pose.y + bh / 2, pose.z] : [j.p[0], bh / 2, j.p[2]], h: bh, r: Math.hypot(bw, bh, bd) * 0.5, yaw: pose?.yaw ?? 0 }, k];
+    const shotArgs = [eid, { at: [at[0], at[1] + bh / 2, at[2]], h: bh, r: Math.hypot(bw, bh, bd) * 0.5, yaw: pose?.yaw ?? 0 }, k];
     const shot = await shoot(shotArgs);
     // the noise floor: the default's first view shot again 0.5 s later (animated rigs, wind, water move between shots)
     if (view === 'front-left' && j.label === 'default') { await new Promise((r) => setTimeout(r, 500)); rec.again = (await shoot(shotArgs)).grey; }

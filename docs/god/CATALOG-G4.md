@@ -44,6 +44,7 @@ node tools/catalog/g4/g4-render.mjs --port 6102 --defs tools/catalog/g4/candidat
 ```
 
 It defines candidates through the dev world's God API before selecting them.
-For Modal, the reviewed candidate file must be included in the bundle, then
-pass `--defs tools/catalog/g4/candidate.json`. Outside-tree paths are refused.
+For Modal, run `bundle.sh /tmp/g4-bundle.tar.gz <reviewed-candidate.json>` then
+pass `--defs .lane/g4/candidate-defs.json`. The bundler validates the def-array
+shape and adds it at this known path. Outside-tree paths are refused.
 Full core catchup (`--all`) cannot be combined with candidate definitions.
