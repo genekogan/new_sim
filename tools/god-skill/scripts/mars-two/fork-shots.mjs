@@ -11,7 +11,7 @@ import { chromeLease } from '<worktrees>/root-world-engine/tools/god-skill/lib/c
 const { chromium } = createRequire('<worktrees>/root-world-engine/mars/viewer/package.json')('@playwright/test');
 const args = process.argv.slice(2), flag = (k, d) => { const i = args.indexOf(`--${k}`); return i >= 0 ? args.splice(i, 2)[1] : d; };
 const bool = (k) => { const i = args.indexOf(`--${k}`); if (i >= 0) { args.splice(i, 1); return true; } return false; };
-const dayFrom = Number(flag('day-from', 9)), dayTo = Number(flag('day-to', 15)), dayWaitMin = Number(flag('day-wait', 0)), dpr = Number(flag('dpr', 1)), tag = flag('tag', 'fork'), only = flag('only', null), settle = Number(flag('settle', 9000)), raw = bool('raw');
+const dayFrom = Number(flag('day-from', 9)), dayTo = Number(flag('day-to', 15)), dayWaitMin = Number(flag('day-wait', 0)), dpr = Number(flag('dpr', 1)), tag = flag('tag', 'fork'), only = flag('only', null), settle = Number(flag('settle', 9000)), raw = bool('raw'), set = flag('set', 'build'), W = Number(flag('w', set === 'build' ? 1352 : 1600)), H = Number(flag('h', set === 'build' ? 780 : 900));
 const [url, out] = args; mkdirSync(out, { recursive: true });
 const O = [2.05645, -8.92635], NO = [0.4264952019559668, -0.9044898245467106], EA = [0.9044898245467106, 0.4264952019559668];
 /** build frame → fork frame (y unchanged: V3 y = y − 0.16, the backdrop lifts it by 0.16). */
@@ -36,6 +36,26 @@ export const VIEWS = {
   'look-east-wash': { eye: [60, 40, 0], at: [60, 0, -500] },
   'drone-high': { eye: [260, 160, 120], at: [40, 0, 0] },
 };
+// FURN/SRC's sim.mars.college camera set (team/lanes/marsland-shots/furn/source-v2/shots.mjs), in the viewer (V3) frame:
+// the same cameras as the live release-43 and local 7d9688f reference shots there (1600x900), for side-by-side sheets.
+const AT3 = [2.05645, -8.92635], A3 = -Math.atan2(0.4265, 0.9045) + Math.PI / 2;
+const ne = (n, e, y) => [AT3[0] + Math.cos(A3) * n + Math.sin(A3) * e, y, AT3[1] - Math.sin(A3) * n + Math.cos(A3) * e];
+const m2 = (x, y, z) => ne(-z, x - 48, y - 0.16);
+export const SRC2 = {
+  'mimos-out': [ne(-7.5, 7.0, 3.6), ne(1.5, -1.5, 0.8)], 'mimos-main': [m2(46.0, 2.3, 0.4), m2(45.5, 0.9, -4.5)],
+  'mimos-coffee': [m2(47.2, 2.0, -1.0), m2(43.6, 1.2, -3.2)], 'mimos-floor': [m2(47.6, 1.9, -0.2), m2(50.5, 0.6, 0.6)],
+  'kitchen-west': [m2(38.5, 2.4, 1.2), m2(38.3, 1.0, -5)], 'kitchen-counter': [m2(39.4, 2.0, 1.4), m2(36.6, 1.3, -0.4)],
+  'kitchen-app': [ne(-1.05, -10.55, 2.02), ne(3.6, -9.40, 1.30)], 'diner-east': [m2(41.2, 2.2, -5.6), m2(43, 0.9, 1.0)],
+  showers: [ne(1.2, 4.6, 1.8), ne(8.4, 1.8, 1.0)], 'showers-nw': [ne(13.5, -2.5, 2.4), ne(9.0, 2.6, 0.9)],
+  'showers-high': [m2(56, 6, -2), m2(50, 0.5, -8)], 'chiba-south': [ne(-12, 34, 9), ne(-12, -2, 3)],
+  campus: [m2(70, 34, 40), m2(44, 0, 2)], 'sun-topdown': [ne(-13.0, -2, 55), ne(-11.5, -2, 0)],
+};
+const v3ToFork = ([x, y, z]) => [x + 40, y + 0.16, z - 30];
+// MARSLAND's drone set (drone.mjs: the 2026 DJI poses in the mars-two world frame) moved into the fork frame
+// (WorldMarsForkLand.ts toForkXZ), for drone | mars-two | fork sheets.
+const m2ToFork = ([x, y, z]) => [AT3[0] + 40 + x * 0.4264952019559668 + (z + 30) * 0.9044898245467106, y, AT3[1] - 30 - x * 0.9044898245467106 + (z + 30) * 0.4264952019559668];
+if (set === 'drone') { const { VIEWS: D, pose } = await import('./drone.mjs'); for (const k of Object.keys(VIEWS)) delete VIEWS[k]; for (const [k, v] of Object.entries(D)) { const p = pose(v); VIEWS[k] = { fork: [m2ToFork(p.eye), m2ToFork(p.at)] }; } }
+if (set === 'src2') { for (const k of Object.keys(VIEWS)) delete VIEWS[k]; for (const [k, [e, a]] of Object.entries(SRC2)) VIEWS[k] = { fork: [v3ToFork(e), v3ToFork(a)] }; }
 const names = Object.keys(VIEWS).filter((n) => (only ? new RegExp(only).test(n) : true));
 const probe = () => {
   const st = { main: null, pose: null, errors: [] }; globalThis.__fk = st;
@@ -54,11 +74,16 @@ const probe = () => {
     }
   });
 };
+// The Mars clock: datetime = 2026-10-03T06:00Z + tick × 1.2 s (dayTicks 72000 at 20 ticks/s: a day per real hour); the
+// page reads that clock as the site wall clock (the Z hour is the hour it shows and lights). --day-wait N: poll the public take (no Chrome lease held) up to N minutes
+// until the world hour is in [day-from, day-to).
+const worldHour = async () => { const j = await (await fetch(new URL('v1/take', url.endsWith('/') ? url : url + '/'))).json(); return ((j.serverTick / 3000 + 6) % 24 + 24) % 24; };
+for (let t = Date.now(); dayWaitMin > 0 && Date.now() - t < dayWaitMin * 60000;) { const h = await worldHour(); if (h >= dayFrom && h < dayTo) break; console.log('world hour', h.toFixed(2), 'waiting for', dayFrom); await new Promise((r) => setTimeout(r, 20000)); }
 const release = await chromeLease('marsland-fork');
 const report = { url, dpr, raw, views: {} };
 try {
   const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
-  const ctx = await b.newContext({ viewport: { width: 1352, height: 780 }, deviceScaleFactor: dpr });
+  const ctx = await b.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: dpr });
   if (raw) await ctx.route(/campus-owner-|\/blobs\/assets\/70\//, (route) => route.fulfill({ status: 404, body: '' }));
   const page = await ctx.newPage();
   const errs = [], fetched = [];
@@ -70,13 +95,11 @@ try {
   await page.waitForFunction(() => document.querySelector('.world-canvas-host')?.getAttribute('data-initial-revealed') === 'true', null, { timeout: 90000 }).catch(() => {});
   report.revealedMs = Date.now() - t0;
   await page.waitForTimeout(settle);
-  // the world clock runs a day an hour (dayTicks 72000): --day-wait N waits up to N minutes for a daylight hour
   const hourNow = () => page.evaluate(() => { const m = document.querySelector('header')?.textContent.match(/(\d+):(\d+)\s*([ap])m/); return m ? (Number(m[1]) % 12) + (m[3] === 'p' ? 12 : 0) + Number(m[2]) / 60 : null; });
-  for (let t = Date.now(); dayWaitMin > 0 && Date.now() - t < dayWaitMin * 60000;) { const h = await hourNow(); if (h !== null && h >= dayFrom && h < dayTo) break; await page.waitForTimeout(20000); }
-  report.clockHour = await hourNow();
+  report.clockHour = await hourNow(); report.worldHour = await worldHour();
   await page.addStyleTag({ content: 'header, .viewer-arrival, aside, nav, [class*="toast"] { visibility: hidden !important; }' });
   for (const n of names) {
-    const v = VIEWS[n], eye = r(toFork(v.eye)), at = r(toFork(v.at));
+    const v = VIEWS[n], eye = r(v.fork ? v.fork[0] : toFork(v.eye)), at = r(v.fork ? v.fork[1] : toFork(v.at));
     await page.evaluate(([p, t]) => { globalThis.__fk.pose = { p, t }; }, [eye, at]);
     await page.waitForTimeout(2500);
     const file = `${out}/${n}-${tag}${dpr !== 1 ? `@${dpr}x` : ''}.png`;

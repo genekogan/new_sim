@@ -86,7 +86,7 @@ export type ForkLand = {
   stats: { entities: number; drawn: string[]; tris: number };
   /** For the atmosphere: the template's set weather (clear desert) and no roofs (the fork's campus has its own). */
   atmosphere(): { weather: SetWeather | null; indoors: (x: number, y: number, z: number) => boolean };
-  /** Hide what layer 3 replaces in the old-world view: the sand outside the camp, its cliff ring and the camp's flat floor. */
+  /** Hide what layer 3 replaces in the old-world view: the sand outside the camp, the old desert dressing and the camp's flat floor. */
   dress(camp: THREE.Object3D): number;
   dispose(): void;
 };
@@ -121,7 +121,11 @@ export function createForkLand(groundY = 0): ForkLand {
       camp.traverse((o) => {
         const m = o as THREE.Mesh;
         const flatGround = m.isMesh && (m.geometry as THREE.PlaneGeometry)?.type === 'PlaneGeometry' && Math.abs(m.rotation.x + Math.PI / 2) < 1e-6 && m.position.y <= 0.05;
-        if (o.name === 'mars desert ridge' || o.name === 'outside-ground' || (flatGround && o.parent === camp)) { o.visible = false; hidden++; }
+        // the old desert dressing (cliff ring, a 110 m ring of shrubs and stones, water totes, a container) is the old
+        // world's fiction; the drone's scrub comes from the template (it keeps 120 m around the campus bare). Its pile
+        // pads and build-site stakes ('mars desert marks', added later) stay.
+        const oldDressing = o.parent?.name === 'mars desert' && o.name !== 'mars desert marks';
+        if (oldDressing || o.name === 'outside-ground' || (flatGround && o.parent === camp)) { o.visible = false; hidden++; }
       });
       return hidden;
     },

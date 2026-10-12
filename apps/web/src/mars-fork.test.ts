@@ -48,7 +48,7 @@ test('land: the template land batch is accepted; the panorama bearings turn by t
   assert.deepEqual([...new Set(defs)], ['core-desert-scrub@1', 'core-far-land@1', 'core-panorama@1', 'core-tire-ring@1', 'core-tire-tracks@1']);
 });
 
-test('land: every land entity draws; the old view\'s cliff ring, outside sand and flat camp floor are hidden', () => {
+test('land: every land entity draws; the old desert dressing, outside sand and flat camp floor are hidden, the camp marks stay', () => {
   const land = createForkLand(0);
   assert.equal(land.stats.drawn.length, land.stats.entities);
   assert.ok(land.stats.tris > 20000 && land.stats.tris < 800000, `tris ${land.stats.tris}`);   // instanced scrub/tyres counted per instance
@@ -57,7 +57,8 @@ test('land: every land entity draws; the old view\'s cliff ring, outside sand an
   const a = land.atmosphere(); assert.equal(a.weather?.kind, 'clear'); assert.equal(a.indoors(0, 0, 0), false);
   const camp = new THREE.Group(), floor = new THREE.Mesh(new THREE.PlaneGeometry(10, 10)), wall = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1)), ridge = new THREE.Mesh(), outside = new THREE.Mesh(new THREE.PlaneGeometry(1, 1));
   floor.rotation.x = -Math.PI / 2; floor.position.y = -0.01; ridge.name = 'mars desert ridge'; outside.name = 'outside-ground'; outside.rotation.x = -Math.PI / 2;
-  const desert = new THREE.Group(); desert.add(ridge); camp.add(floor, wall, desert, outside);
-  assert.equal(land.dress(camp), 3);
-  assert.ok(!floor.visible && !ridge.visible && !outside.visible && wall.visible);
+  const desert = new THREE.Group(), shrubs = new THREE.Mesh(), marks = new THREE.Group(); desert.name = 'mars desert'; marks.name = 'mars desert marks';
+  desert.add(ridge, shrubs, marks); camp.add(floor, wall, desert, outside);
+  assert.equal(land.dress(camp), 4);
+  assert.ok(!floor.visible && !ridge.visible && !shrubs.visible && !outside.visible && wall.visible && marks.visible && desert.visible);
 });
