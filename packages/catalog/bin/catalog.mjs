@@ -9,7 +9,8 @@
 //   resolve <ref> --registry <dir> [--channel stable]
 //   tiers --registry <dir> [--hot N]         hot/cold split (writes tiers/<seq>.json)
 //   embed --registry <dir> [--model <id>]    build the embedding index (local model; no paid API)
-//   find <words> --registry <dir> [--k 10]   retrieval: lexical + embedding fused, top k with why
+//   find <words> --registry <dir> [--k 10] [--mode lexical|semantic|fused]   retrieval, top k with why (default: the best
+//                                            measured mode, lexical, until a sentence model beats it on eval/intents.json)
 import { resolve } from 'node:path';
 import { writeFileSync } from 'node:fs';
 
@@ -61,6 +62,6 @@ switch (cmd) {
   case 'resolve': console.log(JSON.stringify(reg().resolve(pos[0], String(flags.channel ?? 'stable')), null, 1)); break;
   case 'tiers': { const T = await import('../src/tiers.ts'); console.log(JSON.stringify(T.writeTiers(reg(), { hot: Number(flags.hot ?? 300), run }), null, 1)); break; }
   case 'embed': { const E = await import('../src/embed.ts'); console.log(JSON.stringify(await E.buildEmbeddings(reg(), { model: flags.model ? String(flags.model) : undefined, run }), null, 1)); break; }
-  case 'find': { const E = await import('../src/embed.ts'); const hits = await E.find(reg(), pos.join(' '), { k: Number(flags.k ?? 10), mode: String(flags.mode ?? 'fused') }); for (const h of hits) console.log(`${h.score.toFixed(3)}  ${h.line}  ‹${h.why.join(' ')}›`); break; }
+  case 'find': { const E = await import('../src/embed.ts'); const hits = await E.find(reg(), pos.join(' '), { k: Number(flags.k ?? 10), mode: String(flags.mode ?? 'lexical') }); for (const h of hits) console.log(`${h.score.toFixed(3)}  ${h.line}  ‹${h.why.join(' ')}›`); break; }
   default: console.log('usage: catalog contract|import-core|gate|channels|promote|rollback|yank|resolve|tiers|embed|find  (see the header of this file)'); process.exit(cmd ? 2 : 0);
 }
