@@ -56,5 +56,6 @@ def main(out: str, skip: str = "V7,V8"):
     data = run.remote(skip)
     os.makedirs(out, exist_ok=True)
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as t:
-        t.extractall(out, filter="data")
+        try: t.extractall(out, filter="data")
+        except TypeError: t.extractall(out)  # Python < 3.12 (no extraction filters); the archive is our own suite output
     print(f"results in {out}/out (SUMMARY: {out}/out/suite/SUMMARY.tsv)")
