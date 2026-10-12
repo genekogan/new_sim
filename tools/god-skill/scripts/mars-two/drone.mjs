@@ -34,11 +34,11 @@ export const VIEWS = {
   // DJI_0033 (2026-03-30 09:37): 67.5 m up, FlightYaw −38.3°
   still33: { src: 'stills/DJI_0033.jpg', gps: [33.36082180555556, -115.7121291388889], h: 67.5, heading: -38.3, horizon: 120 },
   f001: { frame: 1, heading: 319, horizon: 128 },
-  f040: { frame: 40, heading: 358, horizon: 138 },
+  f040: { frame: 40, heading: 354, horizon: 138, nudge: [5, -8] },
   f094: { frame: 94, heading: 336, horizon: 125 },
   f035: { frame: 35, heading: 228, horizon: 140 },
   f033: { frame: 33, heading: 182, horizon: 140 },
-  f117: { frame: 117, heading: 302, horizon: 128 },
+  f117: { frame: 117, heading: 300, horizon: 128, nudge: [0, 14] },
   f017: { frame: 17, heading: 95, horizon: 70 },
   f080: { frame: 80, heading: 350, horizon: 72 },
   f060: { frame: 60, heading: 175, horizon: 20 },
@@ -48,7 +48,8 @@ export function pose(v) {
   let rel, h;
   if (v.gps) { rel = fromGps(v.gps[0], v.gps[1]); h = v.h; }
   else { const t = (v.frame - 1) * 4, r = tel[t]; rel = [r[3] - HOME_REL[0], r[4] - HOME_REL[1]]; h = r[6]; }
-  const eye = [HOME_WORLD[0] + rel[0], h + 0.3, HOME_WORLD[1] - rel[1]];
+  // nudge: a per-view eye shift (world m, x east / z south) for the video's 4-decimal GPS (±5 m) and the take-off fit (±10 m)
+  const n = v.nudge ?? [0, 0], eye = [HOME_WORLD[0] + rel[0] + n[0], h + 0.3, HOME_WORLD[1] - rel[1] + n[1]];
   const pitch = Math.atan((H / 2 - v.horizon) / F), hd = v.heading * Math.PI / 180, d = 200;
   const at = [eye[0] + Math.sin(hd) * Math.cos(pitch) * d, eye[1] - Math.sin(pitch) * d, eye[2] - Math.cos(hd) * Math.cos(pitch) * d];
   return { eye, at, rel, h, pitchDeg: pitch * 180 / Math.PI };
