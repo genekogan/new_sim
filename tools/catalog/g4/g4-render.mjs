@@ -20,6 +20,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { gateExit } from './checks.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => (a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : null)).filter(Boolean));
@@ -46,7 +47,11 @@ await god('/v1/god/act', { body: { ops: [{ op: 'world', state: { time: { set: { 
 const toRef = (r) => r.replace(/^eden\//, 'core/').replace(/^lm\//, 'core/lm-').replace(/^mars\//, 'core/mars-');
 const defOf = async (ref) => { const r = await god(`/v1/god/defs/${encodeURIComponent(ref)}`); return r.status === 200 ? { ...r.data.def, publicRef: r.data.publicRef } : null; };
 let picks;
-if (args.items) picks = (await Promise.all(String(args.items).split(',').map((r) => defOf(toRef(r.trim()))))).filter(Boolean);
+if (args.items) {
+  const refs = String(args.items).split(',').map((r) => toRef(r.trim()));
+  picks = await Promise.all(refs.map(defOf));
+  if (picks.some((d) => !d)) throw new Error(`G4 missing requested refs: ${refs.filter((_, i) => !picks[i]).join(', ')}`);
+}
 else {
   // the whole manifest (one row per item), then a deterministic spread of drawable point items across it
   const rows = (await god('/v1/god/catalog?per=2000&format=json')).data.rows;
@@ -63,12 +68,14 @@ const shotsOf = (d) => {
   return list;
 };
 const jobs = picks.flatMap((d) => shotsOf(d).map((s) => ({ d, ...s })));
+if (!jobs.length) throw new Error('G4 selected no drawable items');
 console.log(`G4: ${picks.length} items, ${jobs.length} variants/states, 4 views each → ${jobs.length * 4} renders`);
 
 // place every job on a 40 m grid (one batch per item so a refusal stays local)
 // each job's spot is a hash of (item, variant) on a 40 m grid, so the same picture has the same surroundings whatever
 // else the run renders (other items are also hidden while one is shot)
 const GRID = 40, CELLS = 22, used = new Set();
+if (jobs.length > CELLS * CELLS) throw new Error(`G4 has ${jobs.length} jobs for ${CELLS * CELLS} cells; split the item list into batches`);
 const h32 = (str) => { let h = 2166136261; for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return h; };
 jobs.forEach((j, i) => { j.name = `g${i}`; let c = h32(`${j.d.publicRef}|${j.label}`) % (CELLS * CELLS); while (used.has(c)) c = (c + 1) % (CELLS * CELLS); used.add(c); j.p = [((c % CELLS) - CELLS / 2) * GRID, 0, (Math.floor(c / CELLS) - CELLS / 2) * GRID]; });
 const water = jobs.filter((j) => j.d.anchor === 'float');
@@ -82,7 +89,8 @@ for (const j of jobs) {
 const { chromium } = createRequire(resolve(root, 'mars/viewer/package.json'))('@playwright/test');
 let release = () => {};
 if (!args['no-lease']) { const { chromeLease } = await import('../../god-skill/lib/chrome-lease.mjs'); release = await chromeLease('catrun-g4'); }
-const gpuArgs = process.platform === 'linux' ? ['--ignore-gpu-blocklist', '--use-angle=vulkan', '--enable-features=Vulkan', '--disable-vulkan-surface', '--enable-unsafe-swiftshader=false'] : ['--ignore-gpu-blocklist'];
+const angle = String(args.angle ?? 'vulkan');
+const gpuArgs = process.platform === 'linux' ? ['--no-sandbox', '--ignore-gpu-blocklist', `--use-angle=${angle}`, ...(angle === 'vulkan' ? ['--enable-features=Vulkan', '--disable-vulkan-surface'] : [])] : ['--ignore-gpu-blocklist'];
 const browser = await chromium.launch({ ...(args.chrome ? { executablePath: String(args.chrome) } : { channel: 'chrome' }), headless: true, args: gpuArgs });
 const page = await (await browser.newContext({ viewport: { width: 900, height: 900 } })).newPage();
 page.setDefaultTimeout(600_000);
@@ -187,9 +195,10 @@ for (const [id, recs] of items) {
       if (v.dark > 0.35) warnings.push(`${r.label}/${view}: dark (${Math.round(v.dark * 100)} % near-black)`);
       if (baseDir) {
         const bf = join(baseDir, id.replace(/[/@]/g, '_'), `${r.label.replace(/[^a-z0-9=._-]/gi, '_')}-${view}.json`);
-        if (args.approve) { mkdirSync(dirname(bf), { recursive: true }); writeFileSync(bf, JSON.stringify({ grey: v.grey })); }
-        else if (existsSync(bf)) { const s = ssim(v.grey, JSON.parse(readFileSync(bf, 'utf8')).grey); numbers[`ssim:${r.label}/${view}`] = +s.toFixed(3); if (s < floor) errors.push(`${r.label}/${view}: ssim ${s.toFixed(3)} < ${floor.toFixed(3)} vs baseline`); }
-        else warnings.push(`${r.label}/${view}: no baseline`);
+        if (!args.approve) {
+          if (existsSync(bf)) { const s = ssim(v.grey, JSON.parse(readFileSync(bf, 'utf8')).grey); numbers[`ssim:${r.label}/${view}`] = +s.toFixed(3); if (s < floor) errors.push(`${r.label}/${view}: ssim ${s.toFixed(3)} < ${floor.toFixed(3)} vs baseline`); }
+          else errors.push(`${r.label}/${view}: no baseline`);
+        }
       }
     }
     if (r !== def && def.placed && r.placed) {
@@ -199,6 +208,11 @@ for (const [id, recs] of items) {
       if (!state && d < 2) errors.push(`${r.label}: looks the same as the default (mean diff ${d.toFixed(2)})`);
       if (state && d < 1) warnings.push(`${r.label}: the state draws no visible change (mean diff ${d.toFixed(2)})`);
     }
+  }
+  // A failed machine look check must never become an approved reference image.
+  if (baseDir && args.approve && !errors.length) for (const r of recs) for (const [view, v] of Object.entries(r.views)) {
+    const bf = join(baseDir, id.replace(/[/@]/g, '_'), `${r.label.replace(/[^a-z0-9=._-]/gi, '_')}-${view}.json`);
+    mkdirSync(dirname(bf), { recursive: true }); writeFileSync(bf, JSON.stringify({ grey: v.grey }));
   }
   report.items.push({ id, ok: errors.length === 0, errors, warnings, numbers, variants: recs.map((r) => r.label), views: recs.flatMap((r) => Object.entries(r.views).map(([view, v]) => ({ label: r.label, view, file: v.file, top: v.top, dark: v.dark }))) });
 }
@@ -210,4 +224,4 @@ writeFileSync(join(out, 'sheet.html'), `<!doctype html><meta charset="utf-8"><ti
 const bad = report.items.filter((i) => !i.ok).length;
 console.log(`G4: ${report.items.length} items, ${bad} failing, ${results.reduce((a, r) => a + Object.keys(r.views).length, 0)} renders in ${(report.ms / 1000).toFixed(1)} s on ${gpu}\n  report ${join(out, 'report.json')}\n  sheet  ${join(out, 'sheet.html')}`);
 for (const it of report.items.filter((i) => !i.ok)) console.log(`  ✖ ${it.id}: ${it.errors.join('; ')}`);
-stop(); process.exit(0);
+stop(); process.exit(gateExit(report));

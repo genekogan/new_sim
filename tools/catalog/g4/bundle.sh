@@ -5,6 +5,6 @@
 set -euo pipefail
 root="$(cd "$(dirname "$0")/../../.." && pwd)"; out="${1:?out.tar.gz}"
 cd "$root"
-git ls-files -z | grep -zv -E '^(mars/viewer/public/|mars/viewer/e2e/|mars/docs/|worlds/littlemartians|docs/|tools/floaters/)' \
+git ls-files -z | grep -zv -E '^(mars/viewer/public/|mars/viewer/e2e/|mars/docs/|worlds/littlemartians/assets/|docs/|tools/floaters/)' \
   | tar --null -czf "$out" -T - apps/web/dist
 ls -lh "$out" | awk '{print $5, $9}'

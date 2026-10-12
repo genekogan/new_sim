@@ -8,15 +8,14 @@
 #
 # Auth: uses the Modal CLI's active profile (never read or print its token file). Cost: an L4 is ~$0.80/h; 20 items
 # x ~4 variants x 4 views takes a few minutes, so a run is cents; the image builds once and is cached.
-import io, os, subprocess, tarfile, time, pathlib
+import io, os, subprocess, tarfile, time, pathlib, sys
 import modal
 
 GPU = os.environ.get("G4_GPU", "L4")
 image = (
-    modal.Image.debian_slim(python_version="3.11")
+    modal.Image.from_registry("node:22-bookworm", add_python="3.12")
     .apt_install("curl", "ca-certificates", "gnupg", "fonts-liberation", "libvulkan1", "libegl1", "libgl1", "xz-utils")
     .run_commands(
-        "curl -fsSL https://deb.nodesource.com/setup_22.x | bash - && apt-get install -y nodejs",
         "curl -fsSL -o /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb && apt-get install -y /tmp/chrome.deb && rm /tmp/chrome.deb",
         "npm i -g pnpm@10.27.0",
     )
@@ -32,8 +31,12 @@ def render(bundle: bytes, argv: list[str]) -> bytes:
         t.extractall("/repo", filter="data")
     subprocess.run("pnpm install --no-frozen-lockfile --ignore-scripts >/tmp/install.log 2>&1 || (tail -40 /tmp/install.log; exit 1)", shell=True, cwd="/repo", check=True)
     subprocess.run("nvidia-smi --query-gpu=name,driver_version --format=csv,noheader || true", shell=True)
-    cmd = ["node", "tools/catalog/g4/g4-render.mjs", "--port", "6002", "--no-lease", "--chrome", "/usr/bin/google-chrome", "--out", "/tmp/g4", *argv]
-    r = subprocess.run(cmd, cwd="/repo")
+    cmd = ["node", "tools/catalog/g4/g4-render.mjs", "--port", "6102", "--no-lease", "--chrome", "/usr/bin/google-chrome", "--out", "/tmp/g4", *argv]
+    r = subprocess.run(cmd, cwd="/repo", timeout=3000)
+    if r.returncode:
+        log = pathlib.Path("/tmp/g4/server.log")
+        if log.exists():
+            print(log.read_text()[-8000:], flush=True)
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as t:
         if os.path.isdir("/tmp/g4"):
@@ -43,13 +46,24 @@ def render(bundle: bytes, argv: list[str]) -> bytes:
 
 
 @app.local_entrypoint()
-def main(bundle: str, sample: int = 20, items: str = "", out: str = ""):
+def main(bundle: str, sample: int = 20, items: str = "", out: str = "", angle: str = "vulkan"):
     argv = ["--items", items] if items else ["--sample", str(sample)]
+    argv += ["--angle", angle]
     stamp = time.strftime("%Y-%m-%dT%H-%M-%S")
     dest = pathlib.Path(out or f".lane/g4/modal-{stamp}")
     t0 = time.time()
     data = render.remote(pathlib.Path(bundle).read_bytes(), argv)
     dest.mkdir(parents=True, exist_ok=True)
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as t:
-        t.extractall(dest, filter="data")
+        # Local Modal CLI can still use Python 3.11.0, before extraction filters were backported.
+        # Results contain regular files/directories only; refuse links and traversal before the compatibility path.
+        for member in t.getmembers():
+            target = (dest / member.name).resolve()
+            if not target.is_relative_to(dest.resolve()) or not (member.isfile() or member.isdir()):
+                raise ValueError(f"unsafe G4 result member: {member.name}")
+        try:
+            t.extractall(dest, filter="data")
+        except TypeError:
+            t.extractall(dest)
     print(f"G4 on Modal ({GPU}): {time.time() - t0:.0f} s; results in {dest}/g4 (exit {(dest / 'g4' / 'exit-code').read_text()})")
+    sys.exit(int((dest / "g4" / "exit-code").read_text()))
