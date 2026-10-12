@@ -19,7 +19,7 @@ DESCRIPTORS=<team>/pm-integration/auth-account-20261009/runtime-modern-context-p
 cd "$ROOT" || exit 1
 step() {  # step <id> <seconds> <command…>
   local id="$1" t="$2"; shift 2
-  case ",$SKIP," in *",${id%%-*},"*) echo -e "$id\tSKIP\t0\t-" >> "$SUM"; return;; esac
+  case ",$SKIP," in *",${id%%-*},"*|*",$id,"*) echo -e "$id\tSKIP\t0\t-" >> "$SUM"; return;; esac
   local s=$(date +%s); echo "== $id: $*"
   perl -e 'alarm shift; exec @ARGV' "$t" "$@" > "$OUT/$id.log" 2>&1; local rc=$?
   echo -e "$id\t$rc\t$(( $(date +%s) - s ))\t$OUT/$id.log" >> "$SUM"; tail -n 3 "$OUT/$id.log" | cut -c1-240
@@ -46,7 +46,20 @@ step V3-launcher-unit 1200 node --test --test-concurrency=1 tools/world-launcher
 step V4-web 900 bash -c 'cd apps/web && node --test --test-concurrency=1 $(ls src/*.test.* src/**/*.test.* test/*.test.* 2>/dev/null | grep -v "\.tsx$" | sort -u)'
 step V4-web-baseline 900 bash -c "cd $BASELINE/apps/web && node --test --test-concurrency=1 \$(ls src/*.test.* src/**/*.test.* test/*.test.* 2>/dev/null | grep -v '\.tsx$' | sort -u)"
 # V5 the FULL server suite, on the laptop, safely: every Codex-era port remapped, overrides set, serial
-step V5-server-full 3600 env NODE_OPTIONS="$REMAP" PORT_REMAP_BASE=5400 TEST_MARS_PORT=5445 TEST_BODY_CLI_PORT=5446 bash -c 'cd apps/server && node --test --test-concurrency=1 src/*.test.ts src/god/*.test.ts'
+server_tests() {
+  local tree="$1"; shift
+  cd "$tree/apps/server" || return 1
+  local files=()
+  if [ -n "${SERVER_TEST_FILES:-}" ]; then read -r -a files <<< "$SERVER_TEST_FILES";
+  else files=(src/*.test.ts src/god/*.test.ts); fi
+  env NODE_OPTIONS="$REMAP" PORT_REMAP_BASE=5400 TEST_MARS_PORT=5445 TEST_BODY_CLI_PORT=5446 node --test --test-concurrency=1 "${files[@]}"
+}
+export -f server_tests
+export REMAP
+step V5-server-full 3600 bash -c 'server_tests "$1"' _ "$ROOT"
+if [ -n "${SERVER_TEST_FILES:-}" ] && [ "$BASELINE" != "$ROOT" ]; then
+  step V5-server-baseline 3600 bash -c 'server_tests "$1"' _ "$BASELINE"
+fi
 [ -z "$(busy)" ] || echo "WARNING: listeners left in 5400-5449 after V5" | tee -a "$OUT/V5-server-full.log"
 # V6 new worlds: god + Soul e2es (real servers, fake minds, $0), Clerk via synthetic issuer, under /worlds
 step V6-scenarios 1500 node tools/god-skill/e2e/scenarios.mjs --port 5420

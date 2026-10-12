@@ -6,6 +6,7 @@
 # the test ports can't collide with anything. Returns /out as a tarball that remote-suite.sh unpacks into <outDir>.
 import io
 import os
+import re
 import subprocess
 import tarfile
 
@@ -48,8 +49,11 @@ bash /work/head/tools/test-harness/one-validation.sh /out/suite --baseline "$BAS
 
 
 @app.function(image=image, cpu=8.0, memory=16384, timeout=4 * 3600)
-def run(skip: str) -> bytes:
-    subprocess.run(["bash", "-c", INNER], env={**os.environ, "SKIP": skip, "CI": "1"}, check=False)
+def run(skip: str, server_files: str = "") -> bytes:
+    files = server_files.split()
+    if any(not re.fullmatch(r"src/(?:god/)?[A-Za-z0-9_.-]+\.test\.ts", f) for f in files):
+        raise ValueError("server files must be src[/god]/<name>.test.ts")
+    subprocess.run(["bash", "-c", INNER], env={**os.environ, "SKIP": skip, "SERVER_TEST_FILES": " ".join(files), "CI": "1"}, check=False)
     buf = io.BytesIO()
     with tarfile.open(fileobj=buf, mode="w:gz") as t:
         t.add("/out", arcname="out")
@@ -57,8 +61,8 @@ def run(skip: str) -> bytes:
 
 
 @app.local_entrypoint()
-def main(out: str, skip: str = "V7,V8"):
-    data = run.remote(skip)
+def main(out: str, skip: str = "V7,V8", server_files: str = ""):
+    data = run.remote(skip, server_files)
     os.makedirs(out, exist_ok=True)
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as t:
         try: t.extractall(out, filter="data")

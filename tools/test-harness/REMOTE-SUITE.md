@@ -25,3 +25,7 @@
   installed (1.5.2) and `modal profile current` answers `edenartlab`.
 - **Smoke test** (install + preflight only, a few minutes):
   `tools/test-harness/remote-suite.sh /tmp/rs-smoke --baseline-ref none --skip V1,V2,V3,V4,V5,V6,V7,V8`
+
+For bounded server failure reproduction, pass `--server-files "src/foo.test.ts src/god/bar.test.ts"`
+and `--skip V1,V2,V3,V4,V6,V7,V8`. This runs only those files, serially, on both candidate and baseline.
+For package proof alone, skip the other exact V3 IDs: `--skip V1,V2,V3-mars-engine,V3-client-cli,V3-launcher-unit,V4,V5,V6,V7,V8`.
