@@ -80,7 +80,7 @@ export async function generateInstalledCommons(){
   db.db.prepare('DELETE FROM snapshots WHERE world_id=?').run(INSTALLED_COMMONS_WORLD);
   const genesis=new WorldHost(db,factory,seed,1e9,INSTALLED_COMMONS_WORLD);assert.equal(genesis.boot().from,'genesis');
   assert.equal(genesis.engine.stateHash(),bodyHash);assert.equal(kernelHash(genesis.kernel),meaningHash);
-  const cfg={...config,worldId:INSTALLED_COMMONS_WORLD,worldKey:'eden',worldPath:'/w/eden',brainMode:'fake' as const,budgetUsdPerDay:0,typesafeKey:undefined,anthropicKey:undefined,privyAppId:'',privyAppSecret:''};
+  const cfg={...config,takesPersist:true,worldId:INSTALLED_COMMONS_WORLD,worldKey:'eden',worldPath:'/w/eden',brainMode:'fake' as const,budgetUsdPerDay:0,typesafeKey:undefined,anthropicKey:undefined,privyAppId:'',privyAppSecret:''};
   const auth=new Auth(cfg,db),brain={midContext:()=>({options:[]})} as unknown as Brain,souls=new Souls(genesis,db,brain,cfg);
   const app=buildApp({cfg,db,host:genesis,auth,brain,souls,hub:{refreshMe(){},clients:new Map()} as unknown as Hub});
   async function anonymous(p:string){const r=await app.request(p,{headers:{host:'127.0.0.1:4956'}});assert.equal(r.status,200);assert.equal(r.headers.get('cache-control'),'no-store');return r.json();}

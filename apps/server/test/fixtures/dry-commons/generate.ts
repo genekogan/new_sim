@@ -71,7 +71,7 @@ export async function generateDryCommons() {
     assert.equal(boot.from,'snapshot');assert.equal(restored.engine.stateHash(),bodyHash);assert.equal(kernelHash(restored.kernel),meaningHash);
     const replay=replayFromGenesis(factory,COMMONS_SEED,db.events(COMMONS_WORLD),200,{includeHeadEvents:true});
     assert.equal(replay.engine.stateHash(),bodyHash);assert.equal(kernelHash(replay.kernel),meaningHash);
-    const cfg={...config,worldId:COMMONS_WORLD,worldKey:'eden',worldPath:'/w/eden',brainMode:'fake' as const,
+    const cfg={...config,takesPersist:true,worldId:COMMONS_WORLD,worldKey:'eden',worldPath:'/w/eden',brainMode:'fake' as const,
       budgetUsdPerDay:0,typesafeKey:undefined,anthropicKey:undefined,privyAppId:'',privyAppSecret:''};
     const auth=new Auth(cfg,db),brain={midContext:()=>({options:[]})} as unknown as Brain;
     const souls=new Souls(restored,db,brain,cfg);

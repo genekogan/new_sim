@@ -94,7 +94,7 @@ export async function generateStationFixture(){
     const restarted=new CandidateStationV1(restored);assert.equal(restarted.view().fresh,false);
     const restart=await acceptStationFixture(restored,restarted.record());assert.equal(restart.fresh,true);
     assert.equal(restart.station!.epoch,beforeSnapshot.station.epoch);assert.equal(restart.cue!.cueId,beforeSnapshot.cues.at(-1)!.cueId);
-    const cfg={...config,worldId,brainMode:'fake' as const,budgetUsdPerDay:0,typesafeKey:undefined,anthropicKey:undefined,privyAppId:'',privyAppSecret:''};
+    const cfg={...config,takesPersist:true,worldId,brainMode:'fake' as const,budgetUsdPerDay:0,typesafeKey:undefined,anthropicKey:undefined,privyAppId:'',privyAppSecret:''};
     const auth=new Auth(cfg,db),brain={mode:'fake',callsToday:0,spentToday:0,budget:0,inflight:new Map(),jevMsAvg:0,camera:null,ticker:[],narratives:new Map(),midContext:()=>({options:[]})} as unknown as Brain;
     const souls=new Souls(restored,db,brain,cfg);server=createServer();hub=new Hub(server,restored,auth,db,undefined,restarted);hub.brain=brain;
     const app=buildApp({cfg,db,host:restored,auth,brain,souls,hub,station:restarted});server.on('request',getRequestListener(app.fetch));
