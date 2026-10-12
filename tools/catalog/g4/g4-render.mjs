@@ -81,10 +81,14 @@ else {
   const n = Number(args.sample ?? 20), step = Math.max(1, Math.floor(drawable.length / n));
   picks = (await Promise.all(drawable.filter((_, i) => i % step === 0).slice(0, n).map((r) => defOf(r.ref)))).filter((d) => d && !d.components?.body);
 }
-const gaps = picks.filter((d) => unsupported(d)).map((d) => ({ id: d.publicRef, ok: false, status: 'unqualified', errors: [unsupported(d)], warnings: [], numbers: {}, variants: [], views: [] }));
+const gaps = picks.filter((d) => unsupported(d)).map((d) => ({ id: d.publicRef, defHash: d.hash, ok: false, status: 'unqualified', errors: [unsupported(d)], warnings: [], numbers: {}, variants: [], views: [] }));
 picks = picks.filter((d) => !unsupported(d));
 const jobs = picks.flatMap((d) => shotsOf(d).map((s) => ({ d, ...s })));
-if (!jobs.length) throw new Error('G4 selected no drawable items');
+if (!jobs.length) {
+  writeFileSync(join(out, 'report.json'), JSON.stringify({ run, gpu: null, base, approval: 'none', items: gaps, reason: 'No supported visual fixture; GPU qualification was not attempted' }, null, 2));
+  writeFileSync(join(out, 'sheet.html'), '<!doctype html><meta charset="utf-8"><title>G4 unqualified</title><p>No supported visual fixture. See report.json for every requested item.</p>');
+  stop(); process.exit(3);
+}
 console.log(`G4: ${picks.length} items, ${jobs.length} variants/states, 4 views each → ${jobs.length * 4} renders`);
 
 // place every job on a bounded 100 m grid (one batch per item so a refusal stays local)

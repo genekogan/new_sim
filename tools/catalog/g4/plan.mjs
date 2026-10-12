@@ -25,7 +25,7 @@ export function planBatches(defs, maxJobs = 72) {
     const ref = toRef(d.publicRef ?? d.ref);
     if (seen.has(ref)) throw new Error(`duplicate catalogue ref: ${ref}`); seen.add(ref);
     const reason = unsupported(d);
-    if (reason) { gaps.push({ id: ref, ok: false, status: 'unqualified', errors: [reason], warnings: [], views: [], variants: [] }); continue; }
+    if (reason) { gaps.push({ id: ref, defHash: d.hash, ok: false, status: 'unqualified', errors: [reason], warnings: [], views: [], variants: [] }); continue; }
     const n = shotsOf(d).length;
     // Never truncate variants or overflow grid cells to force a pass.
     if (n > maxJobs) { gaps.push({ id: ref, ok: false, status: 'unqualified', errors: [`${n} jobs exceeds batch capacity ${maxJobs}; a dedicated fixture is required`], warnings: [], views: [], variants: [] }); continue; }
