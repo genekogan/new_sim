@@ -282,6 +282,6 @@ test('schema: machine-readable verbs, plan grammar, event kinds and limits (publ
     assert.ok(body.endpoints.some((e: any) => e.path === '/v1/edge/events' && e.produces === 'text/event-stream'));
     assert.equal(body.body.contract,'body/1');
     assert.equal(Object.keys(body.act.verbOutcomes).length,body.act.verbs.length);
-    assert.ok(JSON.stringify(body).length < 16_000, 'small enough to fetch once per session');
+    assert.ok(Buffer.byteLength(JSON.stringify(body), 'utf8') < 16_000, 'small enough to fetch once per session');
   } finally { f.destroy(); }
 });
