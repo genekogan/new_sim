@@ -415,7 +415,8 @@ function isRoof(b, r) {
 // FURN: per-node corrections to the reference. Mimos's Portuguese love posters (the poster wall Gene placed on the tea
 // room's north side) read mirrored from the room: V3 carries their texture upside down, so the quad is flipped top to bottom.
 const WORLD_FIX = { mimos: new Map() };
-for (const r of rows) if (/Portuguese love posters/.test(r.kind ?? '')) WORLD_FIX.mimos.set(r.i, mul(NODES[r.i].getWorldMatrix(), [1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]));
+// MARSFIX: the MIMOS cutout sign and the framed gallery are photo quads of the same kind (they read upside down otherwise)
+for (const r of rows) if (/Portuguese love posters|Mimos photographed (cutout sign|framed gallery)/.test(r.kind ?? '')) WORLD_FIX.mimos.set(r.i, mul(NODES[r.i].getWorldMatrix(), [1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]));
 // (MARSFIX: the burgundy rug lies flat in the corrected source itself; no per-node fix)
 const byB = new Map();
 for (const r of rows) { if (taken.has(r.i)) continue; const b = buildingOf(r); if (b === 'people' || b === 'site') continue; if ((r.y1 < 0.02 || r.y0 < -0.3) && !WORLD_FIX[b]?.has(r.i)) continue; if (!byB.has(b)) byB.set(b, []); byB.get(b).push(r); }

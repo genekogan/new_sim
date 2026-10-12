@@ -5670,7 +5670,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "890bd75138e4eb66cc2f1d6aa4fe74565ee2eb6ea71adfd1317eaa053efd6125",
+   "asset": "0fa5319922c9ac05e8ec1c894f13492c7f5697e6e43a0a5a3389faa1c5178c39",
    "collide": "box",
    "footprint": "ded8451db3e217609bff9bbdcab84a861225990b9a5cf5cac039cd693d62fa9c"
   },

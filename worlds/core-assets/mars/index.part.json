@@ -5111,7 +5111,7 @@
    "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
    "source": "the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass)"
   },
-  "890bd75138e4eb66cc2f1d6aa4fe74565ee2eb6ea71adfd1317eaa053efd6125": {
+  "0fa5319922c9ac05e8ec1c894f13492c7f5697e6e43a0a5a3389faa1c5178c39": {
    "ext": "glb",
    "kind": "mesh",
    "path": "worlds/core-assets/mars/mimos.glb",
