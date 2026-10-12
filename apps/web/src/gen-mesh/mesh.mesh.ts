@@ -63,15 +63,14 @@ const meshBuilder: MeshBuilder = {
       if (GLB_INSTANCING && !inst.clips.length && !b && !lookKey(ctx) && !inst.object.getObjectByName('roof')) adoptInstance(make.asset, holder, inst.object);
       if (inst.clips.length) { inst.play('Idle', Date.now() / 1000, { phase }); holder.add(clipHook()); }
       // a building cut with a `roof` group (the Mars campus pieces): hidden in the roofs-off view (?hideRoofs=1 or the
-      // viewer's toggle) and while the camera is inside the building below its roof, like building/1's interior view
+      // viewer's toggle). PARITY: not when the camera is inside — sim.mars.college keeps every ceiling, and its rooms are
+      // in the roofs' shadow (Chiba's whole roof had vanished from the auditorium, the gallery and the diner, which then
+      // stood in full sun under the open sky)
       const roof = inst.object.getObjectByName('roof');
       if (roof) {
-        const [w, h, d] = ctx.def.size.box, inv = new THREE.Matrix4(), cam = new THREE.Vector3();
-        holder.add(frameHook((camera) => {
+        holder.add(frameHook(() => {
           const live = (globalThis as { __buildingView?: { hideRoofs?: boolean } }).__buildingView;
-          let off = live?.hideRoofs ?? HIDE_ROOFS;
-          if (!off) { inv.copy(holder.matrixWorld).invert(); cam.setFromMatrixPosition(camera.matrixWorld).applyMatrix4(inv); off = Math.abs(cam.x) < w / 2 && Math.abs(cam.z) < d / 2 && cam.y < h * 0.8 && cam.y > -1; }
-          roof.visible = !off;
+          roof.visible = !(live?.hideRoofs ?? HIDE_ROOFS);
         }));
       }
     }).catch(() => {
