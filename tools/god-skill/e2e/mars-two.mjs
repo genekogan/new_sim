@@ -20,6 +20,8 @@
 //   node tools/god-skill/e2e/nav.mjs [--port 5260] [--keep] [--no-shots]
 //
 // Harness from souls-r2.mjs. Report under .lane/e2e-nav/<stamp>/.
+import { toWorld, toBuild, rot } from '../scripts/mars-two/frame.mjs';
+import { ROOMS as LAYOUT_ROOMS } from '../scripts/mars-two/layout.mjs';
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -188,9 +190,15 @@ const minDist = (s, q) => Math.min(...s.map((x) => Math.hypot(x.p[0] - q[0], x.p
 
 // ================================================================ the scenario
 // mars-two frame: x = east, z = south; Mimos origin (48, 0). Rooms (Gene's correction, layout.mjs):
+// MARSLAND: the world frame is geographic (tools/god-skill/scripts/mars-two/frame.mjs): the campus is turned about the Mimos
+// origin, which is the world's (0, 0). Rooms stay rectangles in the build frame (x = E + 48, z = −N); positions are
+// mapped back with toBuild, absolute points forward with toWorld, camera offsets turned with rot.
 const X0 = 48, R = (n0, n1, e0, e1) => ({ x0: e0 + X0, x1: e1 + X0, z0: -n1, z1: -n0 });
-const ROOMS = { 'mimos/main': R(0.09, 5.92, -4.73, 0), 'mimos/main-south': R(-1.85, 0.09, -4.73, 0), 'mimos/floor': R(-1.85, 0.75, 0, 3.66), 'kitchen/working-kitchen': R(-1.85, 5.92, -11.735, -7.615), 'kitchen/dining-hall': R(-1.85, 5.92, -7.615, -4.73), 'showers/shower-1': R(5.92, 8.36, 0, 2.44), 'showers/shower-2': R(8.36, 10.8, 2.44, 4.88) };
-const inRoom = (p, k) => { const r = ROOMS[k]; return p && p[0] >= r.x0 - 0.1 && p[0] <= r.x1 + 0.1 && p[2] >= r.z0 - 0.1 && p[2] <= r.z1 + 0.1; };
+const ofs = (p, dx, y, dz) => { const [x, z] = rot(dx, dz); return [p[0] + x, y, p[2] + z]; };
+const W3 = (x, y, z) => { const [a, b] = toWorld(x, z); return [a, y, b]; };
+// MARSFIX: the rooms are layout.mjs's (Gene's words in true compass on the CAD's own bays)
+const ROOMS = Object.fromEntries(Object.entries(LAYOUT_ROOMS).flatMap(([b, list]) => list.map(([id, , n0, n1, e0, e1]) => [`${b}/${id}`, R(n0, n1, e0, e1)])));
+const inRoom = (p, k) => { const r = ROOMS[k]; if (!p) return false; const [x, z] = toBuild(p[0], p[2]); return x >= r.x0 - 0.1 && x <= r.x1 + 0.1 && z >= r.z0 - 0.1 && z <= r.z1 + 0.1; };
 const T = JSON.parse((await import('node:fs')).readFileSync(resolve(root, 'worlds/templates/mars-two.json'), 'utf8'));
 const placed = T.batches.flatMap((b) => b.ops).filter((o) => o.op === 'place');
 let soul = null, bootMs = 0;
@@ -206,23 +214,23 @@ try {
     const defs = new Set(ents.map((e) => e.def)); const mars = [...defs].filter((d) => /^core[-/]mars-/.test(d));
     return { entities: ents.length, marsDefs: mars.length, missing: placed.filter((o) => !ents.some((e) => e.name === o.name)).map((o) => o.name).slice(0, 10) };
   }, (r) => r.entities >= placed.length && r.missing.length === 0 && r.marsDefs >= 80);
-  await step('G2 Gene\'s Mimos: the L of main (raised north at .53 m, ground south) and the floor arm (flooring, ground), the outdoor gap has no room, the poster wall closes the arm on the north, three risers and a rear stair', async () => {
+  await step('G2 Gene\'s Mimos (true compass): the L of main (raised north at .53 m, ground south) and the floor (south-east, flooring), the outdoor north-east has no room, the poster wall closes the floor on the north, three risers', async () => {
     const d = (await api('/v1/god/query', { body: { describe: 'mimos' } })).data.describe;
     const rooms = Object.fromEntries((d?.rooms ?? []).map((r) => [r.id, r]));
-    const gap = (await api('/v1/god/query', { body: { where: [X0 + 1.8, -3.3] } })).data.where;
+    const gap = (await api('/v1/god/query', { body: { where: toWorld(X0 - 8.0, -4.0) } })).data.where;   // N 4, E −8: the outdoor north-east
     return { rooms: Object.keys(rooms), stairs: (d?.stairs ?? d?.links ?? []).length, gapRoom: gap?.room ?? null, desc: JSON.stringify(d?.rooms ?? []).slice(0, 400) };
   }, (r) => ['main', 'main-south', 'floor'].every((k) => r.rooms.includes(k)) && !r.gapRoom);
   await step('G3 Gene\'s kitchen: west bay working kitchen, east bay dining hall, same north-south extent as Mimos main; the showers are two bays touching at a corner', async () => {
     const k = (await api('/v1/god/query', { body: { describe: 'kitchen' } })).data.describe, s = (await api('/v1/god/query', { body: { describe: 'showers' } })).data.describe;
     return { kitchen: (k?.rooms ?? []).map((r) => r.id), showers: (s?.rooms ?? []).map((r) => r.id) };
   }, (r) => r.kitchen.includes('working-kitchen') && r.kitchen.includes('dining-hall') && r.showers.length === 2);
-  await step('G4 the numbered objects stand where the corrections put them (#1 west wall raised main, #2 arm near its south wall, #13 arm north wall, #15 central kitchen, #20–28 diner east wall)', async () => {
+  await step('G4 the numbered objects stand where the corrections put them (#1 west wall raised main, #2 Mimos floor near the glazing, #13 floor north wall, #12 the lounge, #15 central kitchen, #20–28 diner east wall)', async () => {
     const at = async (name) => { const d = (await api('/v1/god/query', { body: { describe: name } })).data.describe; const w = d ? (await api('/v1/god/query', { body: { where: [d.pose.x, d.pose.z] } })).data.where : null; return { room: w?.room, p: d ? [d.pose.x, d.pose.y, d.pose.z] : null }; };
-    const want = { 'mimos/coffee-counter-1': 'main', 'mimos/tea-table-2': 'floor', 'mimos/honey-sofa-13': 'floor', 'mimos/red-sofa-12': 'main', 'kitchen/prep-table-15': 'working-kitchen', 'kitchen/bus-seat-20': 'dining-hall', 'kitchen/diner-table-26': 'dining-hall', 'kitchen/commercial-fridge-18': 'working-kitchen', 'kitchen/chest-freezer-19': 'working-kitchen', 'kitchen/white-fridge-29': 'working-kitchen' };
+    const want = { 'mimos/coffee-counter-1': 'main', 'mimos/tea-table-2': 'floor', 'mimos/honey-sofa-13': 'floor', 'mimos/red-sofa-12': 'main-south', 'kitchen/prep-table-15': 'working-kitchen', 'kitchen/bus-seat-20': 'dining-hall', 'kitchen/diner-table-26': 'dining-hall', 'kitchen/commercial-fridge-18': 'working-kitchen', 'kitchen/chest-freezer-19': 'working-kitchen', 'kitchen/white-fridge-29': 'working-kitchen' };
     const got = {}; for (const [n, room] of Object.entries(want)) { const a = await at(n); got[n] = { room: a.room?.room ?? null, want: room }; }
     return { got, bad: Object.entries(got).filter(([, v]) => v.room !== v.want).map(([k]) => k) };
   }, (r) => r.bad.length === 0);
-  await shots([{ name: 'g-campus', eye: [70, 34, 40], at: [44, 0, 2], wait: 6000 }, { name: 'g-mimos-kitchen-roofs-off', eye: [46, 13, 9], at: [44, 0.5, -2], wait: 4000, hideRoofs: true }]);
+  await shots([{ name: 'g-campus', eye: W3(70, 34, 40), at: W3(44, 0, 2), wait: 6000 }, { name: 'g-mimos-kitchen-roofs-off', eye: W3(52, 14, 7), at: W3(42, 0.5, -1), wait: 4000, hideRoofs: true }]);
 
   // ======================== SOUL
   await step('S0 an owner is invited and creates a Soul "Ana"; the owner pairs an agent, which gets a Soul token', async () => {
@@ -255,26 +263,26 @@ try {
   const m2 = await step('S3 walk:mimos/floor → from main south through the pass-through racks into the tea room (Mimos floor)', async () => {
     const r = await walkTo('walk:mimos/floor'); return { ...r, inFloor: inRoom(r.end?.p, 'mimos/floor') };
   }, (r) => r.accepted && r.phase === 'completed' && r.inFloor);
-  { const p = m2?.end?.p; if (p) await shots([{ name: 's3-in-mimos-floor', eye: [p[0] - 2.4, 1.9, p[2] - 0.6], at: [p[0] + 2, 0.7, p[2] + 0.6], wait: 5000 }]); }
+  { const p = m2?.end?.p; if (p) await shots([{ name: 's3-in-mimos-floor', eye: ofs(p, -2.4, 1.9, -0.6), at: ofs(p, 2, 0.7, 0.6), wait: 5000 }]); }
   const m3 = await step('S4 CLI: act "sit on the honey sofa" → #13 beneath the posters; she sits', async () => {
     const a = await cli('act', 'sit on the honey sofa', '{"seconds":600}'); const r = await follow(a.data, { maxS: 200, until: (me) => me.activity === 'sit' });
     return { cli: { accepted: a.data?.accepted, resolved: a.data?.resolved, reason: a.data?.reason }, end: r.end, inFloor: inRoom(r.end?.p, 'mimos/floor') };
   }, (r) => r.cli.accepted && /^sit:/.test(r.cli.resolved?.to ?? '') && r.end?.activity === 'sit' && r.inFloor);
-  { const p = m3?.end?.p; if (p) await shots([{ name: 's4-on-the-honey-sofa', eye: [p[0] + 0.4, 1.7, p[2] + 2.6], at: [p[0], 0.7, p[2] - 0.5], wait: 5000 }]); }
+  { const p = m3?.end?.p; if (p) await shots([{ name: 's4-on-the-honey-sofa', eye: ofs(p, 0.4, 1.7, 2.6), at: ofs(p, 0, 0.7, -0.5), wait: 5000 }]); }
   const m4 = await step('S5 walk:mimos/main → she stands, climbs the risers to the raised main (.53 m)', async () => {
     const r = await walkTo('walk:mimos/main'); return { ...r, inMain: inRoom(r.end?.p, 'mimos/main'), y: r.end?.p?.[1] };
   }, (r) => r.accepted && r.phase === 'completed' && r.inMain && r.y > 0.45);
-  await step('S5b the raised main has two ways down and up: the rear stair (out the rear alcove door) and the three risers onto main south — god reach, both ways', async () => {
+  await step('S5b the raised main is reached both ways by the three risers from main south, and main south from the yard through the front door — god reach', async () => {
     const q = async (from, to) => (await api('/v1/god/query', { body: { reach: { from, to } } })).data.reach;
-    const main = [X0 - 2.75, 0.53, -4.6], rear = [X0 - 2.75, -7.9], south = [X0 - 2.0, 1.3];
-    const r = { downRear: await q(main, rear), upRear: await q(rear, main), downRisers: await q(main, south), upRisers: await q(south, main) };
+    const main = W3(X0 - 6.6, 0.53, -1.45), yard = toWorld(X0 + 1.9, 2.6), south = toWorld(X0 - 2.8, -1.5);
+    const r = { downRisers: await q(main, south), upRisers: await q(south, main), inFront: await q(yard, south), outFront: await q(south, yard) };
     return Object.fromEntries(Object.entries(r).map(([k, v]) => [k, v?.reachable ? `${v.length} m via levels ${v.levels}` : v?.code]));
   }, (r) => Object.values(r).every((v) => /levels/.test(v)));
-  await step('S6 sit on the red sofa (#12) in the raised main', async () => {
+  await step('S6 sit on the red sofa (#12) in the lounge of main south', async () => {
     const c = (await capList()).find((x) => x.verb === 'sit' && /red.sofa/.test(`${x.id} ${x.label}`));
     const r = c ? await sitOn(c.id) : { accepted: false, reason: 'no sit capability for the red sofa' };
-    return { cap: c?.id, ...r, inMain: inRoom(r.end?.p, 'mimos/main') };
-  }, (r) => r.accepted && r.end?.activity === 'sit' && r.inMain);
+    return { cap: c?.id, ...r, inLounge: inRoom(r.end?.p, 'mimos/main-south') };
+  }, (r) => r.accepted && r.end?.activity === 'sit' && r.inLounge);
   const k1 = await step('S7 CLI: act "walk to the kitchen" → into the Chiba kitchen (out of Mimos, round to the diner steps, up through the blue door)', async () => {
     const a = await cli('act', 'walk to the kitchen'); const r = await follow(a.data, { maxS: 300 });
     let room = r.room;
@@ -282,7 +290,7 @@ try {
     if (!inRoom(r.end?.p, 'kitchen/working-kitchen')) { const w = await walkTo('walk:kitchen/working-kitchen'); return { cli: { accepted: a.data?.accepted, resolved: a.data?.resolved }, then: w, inKitchen: inRoom(w.end?.p, 'kitchen/working-kitchen'), y: w.end?.p?.[1] }; }
     return { cli: { accepted: a.data?.accepted, resolved: a.data?.resolved }, phase: r.phase, end: r.end, room, inKitchen: true, y: r.end?.p?.[1] };
   }, (r) => r.cli?.accepted && r.inKitchen && r.y > 0.45);
-  { const p = k1?.then?.end?.p ?? k1?.end?.p; if (p) await shots([{ name: 's7-in-the-kitchen', eye: [p[0] + 0.3, 2.3, p[2] + 2.8], at: [p[0], 1.0, p[2] - 3], wait: 5000 }]); }
+  { const p = k1?.then?.end?.p ?? k1?.end?.p; if (p) await shots([{ name: 's7-in-the-kitchen', eye: ofs(p, 0.3, 2.3, 2.8), at: ofs(p, 0, 1.0, -3), wait: 5000 }]); }
   await step('S8 kitchen use: she takes a mixing bowl from the prep table (#15)', async () => {
     const c = (await capList()).filter((x) => /take|pick/.test(x.verb ?? x.id) && /bowl/.test(`${x.id} ${x.label}`));
     if (!c.length) return { accepted: false, caps: (await capList()).filter((x) => /bowl|take/.test(`${x.id} ${x.label}`)).map((x) => x.id).slice(0, 12) };
@@ -302,14 +310,14 @@ try {
     const r = c ? await sitOn(c.id) : { accepted: false, reason: 'no bus-seat sit capability' };
     return { cap: c?.id, ...r, inDiner: inRoom(r.end?.p, 'kitchen/dining-hall') };
   }, (r) => r.accepted && r.end?.activity === 'sit' && r.inDiner);
-  { const p = d1?.end?.p; if (p) await shots([{ name: 's10-in-a-bus-seat', eye: [p[0] - 2.2, 2.0, p[2] + 2.2], at: [p[0] + 0.8, 0.9, p[2] - 0.5], wait: 5000 }]); }
-  await step('S11 walk:showers → to the two northeast shower bays', async () => { const r = await walkTo('walk:showers'); return r; }, (r) => r.accepted && r.phase === 'completed');
+  { const p = d1?.end?.p; if (p) await shots([{ name: 's10-in-a-bus-seat', eye: ofs(p, -2.2, 2.0, 2.2), at: ofs(p, 0.8, 0.9, -0.5), wait: 5000 }]); }
+  await step('S11 walk:showers → to the two shower bays north-east of Mimos main', async () => { const r = await walkTo('walk:showers'); return r; }, (r) => r.accepted && r.phase === 'completed');
   // ---- physics traps from the handover, as cases
   await step('T1 trap: the raised floor\'s ending is a real step — the Soul never stands on level 0 inside raised main, nor on the raised floor outside it', async () => {
     const o = await observe(); return { at: o.self?.position };
   }, () => true);
   await step('T2 trap: the honey sofa\'s seats are reachable from the front (the poster wall behind it is not crossed) — S4 sat her there', async () => ({ ok: !!m3?.end && m3.end.activity === 'sit' }), (r) => r.ok);
-  await step('T3 trap: the pass-through racks between main and the arm do not wall the arm off (S3 went main → floor)', async () => ({ ok: !!m2?.inFloor }), (r) => r.ok);
+  await step('T3 trap: the pass-through racks between main and Mimos floor do not wall the floor off (S3 went main → floor)', async () => ({ ok: !!m2?.inFloor }), (r) => r.ok);
   await step('T4 nothing faulted: no engine faults or violations in the server log', async () => ({ faults: (serverLog.match(/engine fault|violat/g) ?? []).length }), (r) => r.faults === 0);
   void m1; void m4;
 } catch (e) {

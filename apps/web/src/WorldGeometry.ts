@@ -22,6 +22,7 @@ import { recordedTakeSchema, recordedTakeChunkSchema } from '@sim/protocol';
 import type { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import {StaticRootRegistry} from './rendering/StaticRootRegistry.ts';
 import {dequantizeBackdrop} from './WorldBackdropDequantize.ts';
+import {backdropCandidates} from './mars-fork.ts';
 /** Lane BLOBS: legacy backdrop URL (pinned in the server's scene) -> the same campus re-encoded smaller (quantized +
  * WebP + meshopt filters; tools/blobs/shrink-campus.mjs, checked by tools/blobs/compare-campus.mjs), content-addressed
  * and immutable at /blobs/assets/<sha[0:2]>/<sha>.glb on sim.eden.art. */
@@ -32,6 +33,7 @@ import type { Link, Obstacle, SpatialScene } from '../../../mars/viewer/engine/s
 import type { KinPlacement } from '../../../mars/viewer/app/engine-view/floaters.ts';
 import type { Take } from '../../../mars/viewer/engine/take/types.ts';
 import { solarPosition } from '../../../mars/viewer/engine/env/sun.ts';
+import { siteNorthOffset } from './site-north.ts';
 import {createEdenDaylight} from './atmosphere/visual-transitions.ts';
 import { daylightFactors } from '../../../mars/viewer/engine/env/daylight.ts';
 import { fitNearPlane } from '../../../mars/viewer/lib/depth-fit.ts';
@@ -297,8 +299,10 @@ export class WorldGeometry {
 
   /** Plain campus walls hide only after the authored mesh loads; navigation remains authoritative. */
   async addBackdrop(backdrop:MarsBackdrop,loader:GLTFLoader,onProgress?:(url:string,event:ProgressEvent)=>void):Promise<boolean>{
-    try{const alias=BACKDROP_BLOBS[backdrop.url];let gltf;
-      if(alias){try{gltf=await loader.loadAsync(alias,event=>onProgress?.(alias,event));}catch{gltf=undefined;}}  // lane BLOBS: the smaller hashed copy on eden2; the legacy name is the fallback (local dev has no /blobs)
+    try{const urls=backdropCandidates(backdrop.url,BACKDROP_BLOBS[backdrop.url]);let gltf;
+      // lane BLOBS: the smaller hashed copy on eden2; the legacy name is the fallback (local dev has no /blobs)
+      // MARSLAND-FORK: the Mars fork tries its corrected campus first (mars-fork.ts)
+      for(const url of urls.slice(0,-1)){try{gltf=await loader.loadAsync(url,event=>onProgress?.(url,event));break;}catch{gltf=undefined;}}
       gltf??=await loader.loadAsync(backdrop.url,event=>onProgress?.(backdrop.url,event));
       if(this.disposed){disposeTree(gltf.scene);return false;}const root=gltf.scene;dequantizeBackdrop(root);root.name='mars-campus-backdrop';root.position.fromArray(backdrop.at);applyBackdropVisibility(root,backdrop.hide);root.traverse(o=>{if(o instanceof THREE.Mesh)o.castShadow=o.receiveShadow=true;});this.buildings.add(root);this.staticRoots.register(root,gltf.animations);for(const m of this.prisms)if(m.name.startsWith('scene:campus:'))m.visible=false;return true;}catch{return false;}
   }
@@ -471,7 +475,7 @@ export class Daylight {
 
   /** Preserve renderer-derived millisecond precision; second bins freeze sunlight between samples. */
   update(datetime: string | null) {
-    const key = datetime ?? 'none';
+    const key = datetime ? `${datetime}|${siteNorthOffset()}` : 'none';
     if (key === this.key) return;
     this.key = key;
     if (!datetime) { // no clock yet: a soft midday so the camp reads
@@ -484,7 +488,7 @@ export class Daylight {
       return;
     }
     let pos;
-    try { pos = solarPosition(datetime); } catch { return; }
+    try { pos = solarPosition(datetime, undefined, undefined, siteNorthOffset()); } catch { return; }
     const original = daylightFactors(pos.elevationDeg);
     const f=this.nightLighting?this.edenDaylight(datetime,original):original;
     this.daylightFactor=f.daylight;

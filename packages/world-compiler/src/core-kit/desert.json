@@ -1,0 +1,586 @@
+[
+ {
+  "schema": "def/1",
+  "version": 1,
+  "name": "core-tire",
+  "description": "An old black car tyre half-buried in the ground (about 0.62 m across): upright and sunk by `burial`, lying flat, or leaning. Decor, no collider: Souls step over it.",
+  "tags": [
+   "prop",
+   "tire",
+   "tyre",
+   "desert",
+   "junk",
+   "decor"
+  ],
+  "synonyms": [
+   "tyre",
+   "old tire",
+   "car tire",
+   "rubber tire"
+  ],
+  "form": "point",
+  "anchor": "base",
+  "layer": "decor",
+  "make": {
+   "kind": "gen",
+   "gen": "tire/1"
+  },
+  "size": {
+   "box": [
+    0.62,
+    0.42,
+    0.21
+   ],
+   "scale": [
+    0.6,
+    2.5
+   ]
+  },
+  "params": {
+   "diameter": {
+    "type": "number",
+    "min": 0.3,
+    "max": 1.6,
+    "default": 0.62,
+    "doc": "tyre outer diameter (m)"
+   },
+   "burial": {
+    "type": "number",
+    "min": 0,
+    "max": 0.9,
+    "default": 0.35,
+    "doc": "fraction of the diameter sunk into the ground (upright tyres)"
+   },
+   "pose": {
+    "type": "enum",
+    "values": [
+     "upright",
+     "flat",
+     "leaning"
+    ],
+    "default": "upright"
+   },
+   "color": {
+    "type": "color",
+    "default": "#1d1c1b",
+    "doc": "rubber colour"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "version": 1,
+  "name": "core-tire-line",
+  "description": "A line of old tyres along a path, half-buried, with spacing jitter, gaps, clusters, strays off the line; a closed path (first point = last) makes a ring with loose heaps inside. One instanced mesh. Decor: Souls walk across.",
+  "tags": [
+   "tire",
+   "tyre",
+   "line",
+   "boundary",
+   "desert",
+   "decor",
+   "race-track"
+  ],
+  "synonyms": [
+   "tyre line",
+   "tire border",
+   "tire wall"
+  ],
+  "form": "path",
+  "anchor": "drape",
+  "layer": "decor",
+  "make": {
+   "kind": "gen",
+   "gen": "tire-line/1"
+  },
+  "size": {
+   "box": [
+    20,
+    0.62,
+    20
+   ]
+  },
+  "params": {
+   "diameter": {
+    "type": "number",
+    "min": 0.3,
+    "max": 1.6,
+    "default": 0.62,
+    "doc": "tyre outer diameter (m)"
+   },
+   "burial": {
+    "type": "number",
+    "min": 0,
+    "max": 0.9,
+    "default": 0.35,
+    "doc": "fraction of the diameter sunk into the ground (upright tyres)"
+   },
+   "spacing": {
+    "type": "number",
+    "min": 0.5,
+    "max": 30,
+    "default": 1.5,
+    "doc": "mean distance between tyres along the line (m)"
+   },
+   "jitter": {
+    "type": "number",
+    "min": 0,
+    "max": 0.9,
+    "default": 0.35,
+    "doc": "spacing randomness (fraction)"
+   },
+   "gaps": {
+    "type": "number",
+    "min": 0,
+    "max": 0.6,
+    "default": 0.08,
+    "doc": "chance a slot starts a gap"
+   },
+   "gapMax": {
+    "type": "int",
+    "min": 1,
+    "max": 20,
+    "default": 4,
+    "doc": "longest gap, in slots"
+   },
+   "clusters": {
+    "type": "number",
+    "min": 0,
+    "max": 0.6,
+    "default": 0.07,
+    "doc": "chance a slot holds a cluster"
+   },
+   "clusterMax": {
+    "type": "int",
+    "min": 2,
+    "max": 8,
+    "default": 4,
+    "doc": "most tyres in a cluster"
+   },
+   "strays": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.05,
+    "doc": "stray tyres per line tyre, tossed off the line"
+   },
+   "strayDist": {
+    "type": "number",
+    "min": 1,
+    "max": 60,
+    "default": 12,
+    "doc": "how far strays land from the line (m)"
+   },
+   "innerClusters": {
+    "type": "int",
+    "min": 0,
+    "max": 20,
+    "default": 2,
+    "doc": "loose heaps of 3–6 tyres inside a closed line"
+   },
+   "flat": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.1,
+    "doc": "share of tyres lying flat (the rest upright, a few leaning)"
+   },
+   "color": {
+    "type": "color",
+    "default": "#1d1c1b",
+    "doc": "rubber colour"
+   },
+   "closed": {
+    "type": "bool",
+    "doc": "force closed/open (default: closed when the path ends where it starts)"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "version": 1,
+  "name": "core-tire-ring",
+  "description": "An elliptical ring of old half-buried tyres around its point, like an abandoned dirt race track: semi-axes rx (local x) and rz (local z), turned with the entity (r). Gaps, clusters, strays and heaps inside, all from the seed. One instanced mesh; decor, Souls walk across.",
+  "tags": [
+   "tire",
+   "tyre",
+   "ring",
+   "race-track",
+   "desert",
+   "decor",
+   "landmark"
+  ],
+  "synonyms": [
+   "tire circle",
+   "tyre ring",
+   "race track",
+   "tire track ring"
+  ],
+  "form": "point",
+  "anchor": "drape",
+  "layer": "decor",
+  "make": {
+   "kind": "gen",
+   "gen": "tire-ring/1"
+  },
+  "size": {
+   "box": [
+    112,
+    0.62,
+    202
+   ]
+  },
+  "params": {
+   "rx": {
+    "type": "number",
+    "min": 3,
+    "max": 195,
+    "default": 55,
+    "doc": "semi-axis along local x (m)"
+   },
+   "rz": {
+    "type": "number",
+    "min": 3,
+    "max": 195,
+    "default": 100,
+    "doc": "semi-axis along local z (m)"
+   },
+   "diameter": {
+    "type": "number",
+    "min": 0.3,
+    "max": 1.6,
+    "default": 0.62,
+    "doc": "tyre outer diameter (m)"
+   },
+   "burial": {
+    "type": "number",
+    "min": 0,
+    "max": 0.9,
+    "default": 0.35,
+    "doc": "fraction of the diameter sunk into the ground (upright tyres)"
+   },
+   "spacing": {
+    "type": "number",
+    "min": 0.5,
+    "max": 30,
+    "default": 1.5,
+    "doc": "mean distance between tyres along the line (m)"
+   },
+   "jitter": {
+    "type": "number",
+    "min": 0,
+    "max": 0.9,
+    "default": 0.35,
+    "doc": "spacing randomness (fraction)"
+   },
+   "gaps": {
+    "type": "number",
+    "min": 0,
+    "max": 0.6,
+    "default": 0.08,
+    "doc": "chance a slot starts a gap"
+   },
+   "gapMax": {
+    "type": "int",
+    "min": 1,
+    "max": 20,
+    "default": 4,
+    "doc": "longest gap, in slots"
+   },
+   "clusters": {
+    "type": "number",
+    "min": 0,
+    "max": 0.6,
+    "default": 0.07,
+    "doc": "chance a slot holds a cluster"
+   },
+   "clusterMax": {
+    "type": "int",
+    "min": 2,
+    "max": 8,
+    "default": 4,
+    "doc": "most tyres in a cluster"
+   },
+   "strays": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.05,
+    "doc": "stray tyres per line tyre, tossed off the line"
+   },
+   "strayDist": {
+    "type": "number",
+    "min": 1,
+    "max": 60,
+    "default": 12,
+    "doc": "how far strays land from the line (m)"
+   },
+   "innerClusters": {
+    "type": "int",
+    "min": 0,
+    "max": 20,
+    "default": 2,
+    "doc": "loose heaps of 3–6 tyres inside a closed line"
+   },
+   "flat": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.1,
+    "doc": "share of tyres lying flat (the rest upright, a few leaning)"
+   },
+   "color": {
+    "type": "color",
+    "default": "#1d1c1b",
+    "doc": "rubber colour"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "version": 1,
+  "name": "core-creosote",
+  "description": "A creosote bush: a rounded open clump of small dark olive leaf clusters on thin grey stems, 0.3–3 m (default 1 m); three shapes (variant 0 round, 1 low and wide, 2 tall vase). Decor, no collider.",
+  "tags": [
+   "plant",
+   "bush",
+   "shrub",
+   "creosote",
+   "desert",
+   "decor"
+  ],
+  "synonyms": [
+   "creosote bush",
+   "desert shrub",
+   "larrea",
+   "greasewood"
+  ],
+  "form": "point",
+  "anchor": "base",
+  "layer": "decor",
+  "make": {
+   "kind": "gen",
+   "gen": "creosote/1"
+  },
+  "size": {
+   "box": [
+    1.4,
+    1,
+    1.3
+   ],
+   "scale": [
+    0.5,
+    2
+   ]
+  },
+  "params": {
+   "height": {
+    "type": "number",
+    "min": 0.3,
+    "max": 3,
+    "default": 1
+   },
+   "variant": {
+    "type": "int",
+    "min": 0,
+    "max": 2,
+    "default": 0
+   },
+   "color": {
+    "type": "color",
+    "default": "#56603f",
+    "doc": "leaf colour"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "version": 1,
+  "name": "core-desert-scrub",
+  "description": "Sparse desert scrub over an area: creosote bushes (three shapes, 0.4–1.6 m) and dry grass tufts that follow the playa drainage veins; low density (default one bush per ~670 m²), optionally denser toward a side; keeps off buildings and roads and out of `clear` circles. Five instanced meshes for any size. Decor.",
+  "tags": [
+   "cover",
+   "plant",
+   "scrub",
+   "desert",
+   "ecology",
+   "creosote",
+   "grass"
+  ],
+  "synonyms": [
+   "desert brush",
+   "creosote scrub",
+   "sagebrush",
+   "chaparral"
+  ],
+  "form": "area",
+  "anchor": "drape",
+  "layer": "decor",
+  "make": {
+   "kind": "gen",
+   "gen": "desert-scrub/1"
+  },
+  "size": {
+   "box": [
+    200,
+    1.6,
+    200
+   ]
+  },
+  "params": {
+   "density": {
+    "type": "number",
+    "min": 0,
+    "max": 0.2,
+    "default": 0.0015,
+    "doc": "bushes per m² on average (0.0015 ≈ one per 670 m²)"
+   },
+   "grass": {
+    "type": "number",
+    "min": 0,
+    "max": 20,
+    "default": 3,
+    "doc": "grass tufts per bush"
+   },
+   "toward": {
+    "type": "enum",
+    "values": [
+     "none",
+     "n",
+     "ne",
+     "e",
+     "se",
+     "s",
+     "sw",
+     "w",
+     "nw"
+    ],
+    "default": "none",
+    "doc": "denser toward this side of the area (engine north = −z)"
+   },
+   "gradient": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.6,
+    "doc": "how much denser (1 = from none at one side to double at the other)"
+   },
+   "veins": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.6,
+    "doc": "how much plants follow the playa drainage veins"
+   },
+   "cluster": {
+    "type": "number",
+    "min": 0,
+    "max": 1,
+    "default": 0.35,
+    "doc": "0 even … 1 clumped"
+   },
+   "minHeight": {
+    "type": "number",
+    "min": 0.2,
+    "max": 3,
+    "default": 0.4
+   },
+   "maxHeight": {
+    "type": "number",
+    "min": 0.2,
+    "max": 3,
+    "default": 1.6
+   },
+   "minSpacing": {
+    "type": "number",
+    "min": 0.5,
+    "max": 30,
+    "default": 2.5,
+    "doc": "between bushes (m)"
+   },
+   "clear": {
+    "type": "json",
+    "doc": "[[x, z, r], …] circles kept bare (a camp, a plaza)"
+   }
+  }
+ },
+ {
+  "schema": "def/1",
+  "version": 1,
+  "name": "core-tire-tracks",
+  "description": "Faint vehicle tracks on dirt or playa: pairs of slightly darker lines wandering over the area in arcs, S-bends and a few donuts, fading in and out. A ground marking (one mesh), walkable.",
+  "tags": [
+   "ground-paint",
+   "tracks",
+   "desert",
+   "decor",
+   "terrain"
+  ],
+  "synonyms": [
+   "tyre tracks",
+   "tire marks",
+   "wheel ruts",
+   "car tracks"
+  ],
+  "form": "area",
+  "anchor": "drape",
+  "layer": "decor",
+  "make": {
+   "kind": "gen",
+   "gen": "tire-tracks/1"
+  },
+  "size": {
+   "box": [
+    100,
+    0.05,
+    100
+   ]
+  },
+  "params": {
+   "count": {
+    "type": "int",
+    "min": 0,
+    "max": 400,
+    "default": 60,
+    "doc": "number of tracks"
+   },
+   "minLength": {
+    "type": "number",
+    "min": 5,
+    "max": 1000,
+    "default": 40
+   },
+   "maxLength": {
+    "type": "number",
+    "min": 5,
+    "max": 2000,
+    "default": 180
+   },
+   "curl": {
+    "type": "number",
+    "min": 0,
+    "max": 2,
+    "default": 0.5,
+    "doc": "how much tracks bend and loop"
+   },
+   "gauge": {
+    "type": "number",
+    "min": 0.8,
+    "max": 3,
+    "default": 1.6,
+    "doc": "wheel-track distance (m)"
+   },
+   "lineWidth": {
+    "type": "number",
+    "min": 0.05,
+    "max": 1,
+    "default": 0.24
+   },
+   "color": {
+    "type": "color",
+    "default": "#979080",
+    "doc": "track colour (a little darker than the ground)"
+   }
+  }
+ }
+]

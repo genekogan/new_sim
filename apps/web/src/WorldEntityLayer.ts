@@ -45,6 +45,8 @@ export class WorldEntityLayer {
   readonly instancer = new EntityInstancer();
   get entityCount() { return this.model?.entities.size ?? 0; }
   private horizon: THREE.Mesh | null = null;
+  /** MARSLAND-FAR: entities whose def is tagged `horizon` (core/far-land@1, core/panorama@1) replace the green ring. */
+  private horizonBy = new Set<string>();
   private hiddenBase = new WeakSet<THREE.Object3D>();
   /** Viewer B7: things a body carries (entity parent = a body entity) by body id; they ride that figure's animated hand. */
   private held = new Map<string, string>();
@@ -129,6 +131,7 @@ export class WorldEntityLayer {
   update(dt: number, nowMs: number, baseGround?: THREE.Object3D) {
     this.now = nowMs;
     if (!this.active) return;
+    if (this.horizon) this.horizon.visible = this.horizonBy.size === 0;
     if (nowMs - this.lastSeqCheck > 20_000 && this.signal) {  // cheap heartbeat: did we miss anything while the socket was down?
       this.lastSeqCheck = nowMs;
       void fetch(this.api('/v1/world/seq'), { signal: this.signal }).then((r) => (r.ok ? r.json() : null)).then((j: { seq: number } | null) => { if (j && j.seq !== this.seq) void this.resync(); }).catch(() => {});
@@ -336,6 +339,7 @@ export class WorldEntityLayer {
   private draw(e: Entity, ease: boolean, force = false) {
     const m = this.model!; const def = m.resolvedDef(e.def);
     if (!def) return;
+    if (def.tags.includes('horizon')) this.horizonBy.add(e.id); else this.horizonBy.delete(e.id);
     const parent = e.in.parent !== 'world' ? m.entities.get(e.in.parent) : undefined;
     if (parent && m.resolvedDef(parent.def)?.components.body) this.held.set(e.id, parent.id); else this.held.delete(e.id);
     const existing = this.drawn.get(e.id);
@@ -367,7 +371,7 @@ export class WorldEntityLayer {
     this.drawn.set(e.id, { ...(instKey ? { inst: instKey, settled: false } : {}), obj: built, from, to, t0: this.now, dur: ease ? EASE_IN_S : 0.001, defHash, world: isWorld, ...(hasMotion(def) ? { motion: { entity: e, def, yaw: wp.yaw } } : {}) });
   }
   private undraw(id: string) {
-    this.held.delete(id);
+    this.held.delete(id); this.horizonBy.delete(id);
     const d = this.drawn.get(id); if (!d || d.removing) return;
     d.removing = true; d.settled = false; d.from = { p: d.obj.position.clone(), s: d.obj.scale.x }; d.to = { p: d.obj.position.clone().add(new THREE.Vector3(0, 2, 0)), s: 0.01 }; d.t0 = this.now; d.dur = EASE_OUT_S;
   }

@@ -772,7 +772,9 @@ export class EngineBridge {
         const taken = new Set(Object.values(ents).filter((o: any) => o.support?.kind === 'resting-on' && o.support.on === x.id).map((o: any) => o.support.slot));
         // MARSLIVED: the free place nearest the Soul (the first free one was often on a table's far side, against a
         // counter: "put the cup on the prep table" failed as unreachable while the near end was free)
-        const yw = x.pose.yaw ?? 0, at = (sl: { local?: number[] }) => { const l = sl.local ?? [0, 0, 0]; return [x.pose.p[0] + l[0] * Math.cos(yw) + l[2] * Math.sin(yw), x.pose.p[2] - l[0] * Math.sin(yw) + l[2] * Math.cos(yw)]; };
+        // MARSLAND: engine poses carry the negated three.js yaw (fixtureSpec registers yaw: −wp.yaw); turn the slot's local
+        // offset with the entity's own (three.js) yaw, or a turned table's places are mirrored and the far one is chosen
+        const yw = -(x.pose.yaw ?? 0), at = (sl: { local?: number[] }) => { const l = sl.local ?? [0, 0, 0]; return [x.pose.p[0] + l[0] * Math.cos(yw) + l[2] * Math.sin(yw), x.pose.p[2] - l[0] * Math.sin(yw) + l[2] * Math.cos(yw)]; };
         const free = (asset.surfaceSlots as { id: string; local?: number[] }[]).filter((s) => !taken.has(s.id)).sort((a, b) => { const pa = at(a), pb = at(b); return Math.hypot(pa[0] - here[0], pa[1] - here[1]) - Math.hypot(pb[0] - here[0], pb[1] - here[1]); })[0];
         const id = `put-on:${x.id}`, label = `Put ${name(held.id)} on ${name(x.id)} (${d} m)`;
         caps.push({ id, verb: 'put-on', label, target: { id: x.id, kind: 'object' }, available: !!free, ...(free ? {} : { blocked: { code: 'surface.full', reason: `${name(x.id)} has no free place.` } }) });
