@@ -55,7 +55,7 @@ def render(bundle: bytes, argv: list[str]) -> bytes:
 
 
 @app.local_entrypoint()
-def main(bundle: str, sample: int = 20, items: str = "", out: str = "", angle: str = "vulkan", all: bool = False, batch_jobs: int = 72, defs: str = ""):
+def main(bundle: str, sample: int = 20, items: str = "", out: str = "", angle: str = "vulkan", all: bool = False, batch_jobs: int = 72, defs: str = "", variants: str = "", busy: int = 0):
     argv = ["--all", "--batch-jobs", str(batch_jobs)] if all else (["--items", items] if items else ["--sample", str(sample)])
     if all and items:
         argv += ["--items", items]
@@ -67,6 +67,14 @@ def main(bundle: str, sample: int = 20, items: str = "", out: str = "", angle: s
             raise ValueError("--defs must name a reviewed file inside the bundle")
         argv = ["--defs", defs] + (["--items", items] if items else [])
     argv += ["--angle", angle]
+    if variants:
+        if all:
+            raise ValueError('--variants is a targeted regression option, not full catchup')
+        argv += ["--variants", variants]
+    if busy:
+        if all:
+            raise ValueError('--busy is a targeted regression option, not full catchup')
+        argv += ["--busy", str(busy)]
     stamp = time.strftime("%Y-%m-%dT%H-%M-%S")
     dest = pathlib.Path(out or f".lane/g4/modal-{stamp}")
     t0 = time.time()

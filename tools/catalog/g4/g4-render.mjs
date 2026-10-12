@@ -4,11 +4,11 @@
 // GPU (tools/catalog/g4/g4_modal.py runs this same script inside the container). NEVER software rendering: the run
 // aborts if WebGL reports SwiftShader / llvmpipe / a software rasterizer.
 //
-//   node tools/catalog/g4/g4-render.mjs --port 6002 [--items eden/chair@1,eden/dumpster@1 | --sample 20] [--out .lane/g4/<run>]
+//   node tools/catalog/g4/g4-render.mjs --port 6102 [--items eden/chair@1,eden/dumpster@1 | --sample 20] [--out .lane/g4/<run>]
 //          [--baseline <dir>] [--approve] [--chrome <path>] [--no-lease] [--url http://127.0.0.1:6002/w/g4 (an already running world)]
 //
-// For each item: the default, up to 3 enum variants (the `variant` param first) and each actuator's "on" state, every one
-// placed alone on a 40 m grid in a fresh world with fixed light (11:00, clock paused, clear weather), shot from 4 fixed
+// For each item: the default, all independent enum alternatives (the `variant` param first) and each actuator's "on" state, every one
+// placed alone on a 100 m grid in a fresh world with fixed light (11:00, clock paused, clear weather), shot from 4 fixed
 // views (front-left, front-right, back, above) at a distance fitted to the def's box, 256 × 256.
 // Machine look checks (each a number, so a regression is a number that moved):
 //   blank       one colour covers > 90 % of the crop (nothing drew)
@@ -21,7 +21,7 @@ import { createRequire } from 'node:module';
 import { dirname, resolve, join, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gateExit, viewErrors } from './checks.mjs';
-import { toRef, shotsOf, unsupported, allocateGrid, fixturePort } from './plan.mjs';
+import { toRef, shotsOf, unsupported, allocateGrid, fixturePort, nonvisualClaim } from './plan.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => (a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : null)).filter(Boolean));
@@ -83,7 +83,9 @@ else {
 }
 const gaps = picks.filter((d) => unsupported(d)).map((d) => ({ id: d.publicRef, defHash: d.hash, ok: false, status: 'unqualified', errors: [unsupported(d)], warnings: [], numbers: {}, variants: [], views: [] }));
 picks = picks.filter((d) => !unsupported(d));
-const jobs = picks.flatMap((d) => shotsOf(d).map((s) => ({ d, ...s })));
+const selected = args.variants ? new Set(String(args.variants).split(',')) : null;
+const jobs = picks.flatMap((d) => shotsOf(d).filter((s) => !selected || s.label === 'default' || selected.has(s.label)).map((s) => ({ d, ...s })));
+if (selected) for (const label of selected) if (!jobs.some((j) => j.label === label)) throw new Error(`G4 requested unknown variant: ${label}`);
 if (!jobs.length) {
   writeFileSync(join(out, 'report.json'), JSON.stringify({ run, gpu: null, base, approval: 'none', items: gaps, reason: 'No supported visual fixture; GPU qualification was not attempted' }, null, 2));
   writeFileSync(join(out, 'sheet.html'), '<!doctype html><meta charset="utf-8"><title>G4 unqualified</title><p>No supported visual fixture. See report.json for every requested item.</p>');
@@ -108,6 +110,12 @@ for (const d of picks) {
     const single = await god('/v1/god/act', { body: { ops: [placeOp(j)] } });
     j.placed = !!single.data?.accepted; if (!j.placed) j.refused = single.data?.failures?.[0];
   }
+}
+const busy = Number(args.busy ?? 0);
+if (!Number.isInteger(busy) || busy < 0 || busy > 64) throw new Error('--busy must be 0..64');
+if (busy) {
+  const r = await god('/v1/god/act', { body: { ops: Array.from({ length: busy }, (_, i) => ({ op: 'place', def: 'core/box@1', name: `busy-${i}`, p: [-440 + (i % 8) * 40, 0, -440 + Math.floor(i / 8) * 40], params: { w: 3, h: 6, d: 3, color: i % 2 ? '#9944cc' : '#aa2222' }, mode: 'nudge' })) } });
+  if (!r.data?.accepted) throw new Error(`busy context refused: ${JSON.stringify(r.data?.failures)}`);
 }
 
 // ---------------------------------------------------------------- Chrome on a real GPU
@@ -155,6 +163,7 @@ for (const j of jobs) {
       const targets = [...L.drawn].filter(([key]) => belongs(key));
       // Instance placeholders are empty Object3Ds. Hide their actual matrices, including all prefab children.
       const hidden = [], matrices = [];
+      const originalBackground = s.scene.background, originalFog = s.scene.fog;
       const hide = (key, d) => {
         if (d.inst) { const pool = L.instancer.pools.get(d.inst), slot = pool?.slots.get(key); if (slot === undefined) return;
           for (const m of pool.meshes) { const start = slot * 16, saved = m.instanceMatrix.array.slice(start, start + 16); matrices.push([m, start, saved]); m.instanceMatrix.array.fill(0, start, start + 16); m.instanceMatrix.needsUpdate = true; }
@@ -167,6 +176,11 @@ for (const j of jobs) {
       const eye = [c[0] + (k[0] * cy + k[2] * sy) / n * dist, c[1] + k[1] / n * dist, c[2] + (-k[0] * sy + k[2] * cy) / n * dist];
       s.controls.target.set(c[0], c[1], c[2]); s.camera.position.set(eye[0], eye[1], eye[2]); s.camera.lookAt(s.controls.target); s.controls.update?.();
       await new Promise((res) => requestAnimationFrame(() => requestAnimationFrame(res)));
+      // A fixed analytical backdrop prevents terrain/sky differences between grid cells from passing identical variants.
+      const hideObject = (o) => { if (o?.visible) { o.visible = false; hidden.push(o); } };
+      for (const g of [L.terrainGroup, L.waterGroup, L.horizon]) hideObject(g);
+      for (const root of s.scene.children) if (root !== L.group) root.traverse((o) => { if (o.isMesh || o.isSprite || o.isLine || o.isPoints) hideObject(o); });
+      s.scene.background = L.lib.get('paint', '#808080').color.clone(); s.scene.fog = null;
       for (const [key, other] of L.drawn) if (!belongs(key) && !String(other.obj?.name).includes('pond')) hide(key, other);
       const cam = s.camera, v = cam.position.clone().set(c[0], c[1], c[2]), dcam = cam.position.distanceTo(v); v.project(cam);
       const src = s.renderer.domElement, W = src.width, H = src.height;
@@ -193,7 +207,7 @@ for (const j of jobs) {
         cover = +(changed / total).toFixed(4);
       }
       return { live: targets.length > 0, missingAsset, moving: !!dr?.motion, png: cv.toDataURL('image/png'), top: +top.toFixed(3), dark: +(dark / total).toFixed(3), cover, grey, rgb };
-      } finally { for (const h of hidden) h.visible = true; for (const [m, start, saved] of matrices) { m.instanceMatrix.array.set(saved, start); m.instanceMatrix.needsUpdate = true; } }
+      } finally { s.scene.background = originalBackground; s.scene.fog = originalFog; for (const h of hidden) h.visible = true; for (const [m, start, saved] of matrices) { m.instanceMatrix.array.set(saved, start); m.instanceMatrix.needsUpdate = true; } }
     }, a);
     const shotArgs = [eid, { at: [at[0], at[1] + bh / 2, at[2]], h: bh, r: Math.hypot(bw, bh, bd) * 0.5, yaw: pose?.yaw ?? 0 }, k];
     const shot = await shoot(shotArgs);
@@ -221,9 +235,9 @@ const mad = (a, b) => a.reduce((s, v, i) => s + Math.abs(v - b[i]), 0) / a.lengt
 const baseDir = args.baseline ? resolve(String(args.baseline)) : null;
 const items = new Map();
 for (const r of results) { const l = items.get(r.id) ?? []; l.push(r); items.set(r.id, l); }
-const report = { run, gpu, base, fixture: { soulBridge: args.url ? 'external world' : false, fakeMinds: true }, ms: 0, approval: args.approve ? 'explicit per-item baseline write requested' : 'none', items: [...gaps] };
+const report = { run, gpu, base, comparison: 'fixed-backdrop/1', selection: { targeted: !!selected, labels: selected ? [...selected] : null }, fixture: { soulBridge: args.url ? 'external world' : false, fakeMinds: true, busy }, ms: 0, approval: args.approve ? 'explicit per-item baseline write requested' : 'none', items: [...gaps] };
 for (const [id, recs] of items) {
-  const errors = [], warnings = [], numbers = {};
+  const errors = [], warnings = [], numbers = {}, unqualifiedClaims = [];
   const def = recs[0];
   // pass mark: 0.85, or below the item's own shot-to-shot noise (self-SSIM − 0.05) when it moves by itself
   const self = def.again && def.views['front-left'] ? ssim(def.views['front-left'].grey, def.again) : 1;
@@ -240,7 +254,7 @@ for (const [id, recs] of items) {
       if (baseDir) {
         const bf = join(baseDir, id.replace(/[/@]/g, '_'), `${r.label.replace(/[^a-z0-9=._-]/gi, '_')}-${view}.json`);
         if (!args.approve) {
-          if (existsSync(bf)) { const s = ssim(v.grey, JSON.parse(readFileSync(bf, 'utf8')).grey); numbers[`ssim:${r.label}/${view}`] = +s.toFixed(3); if (s < floor) errors.push(`${r.label}/${view}: ssim ${s.toFixed(3)} < ${floor.toFixed(3)} vs baseline`); }
+          if (existsSync(bf)) { const baseline = JSON.parse(readFileSync(bf, 'utf8')); if (baseline.comparison !== 'fixed-backdrop/1') { errors.push(`${r.label}/${view}: unqualified baseline comparison method`); continue; } const s = ssim(v.grey, baseline.grey); numbers[`ssim:${r.label}/${view}`] = +s.toFixed(3); if (s < floor) errors.push(`${r.label}/${view}: ssim ${s.toFixed(3)} < ${floor.toFixed(3)} vs baseline`); }
           else errors.push(`${r.label}/${view}: no baseline`);
         }
       }
@@ -249,23 +263,25 @@ for (const [id, recs] of items) {
       const d = Object.keys(r.views).reduce((s, view) => s + mad(r.views[view].rgb, def.views[view].rgb), 0) / Object.keys(r.views).length;
       numbers[`diff:${r.label}`] = +d.toFixed(2);
       const state = /^(on|open|lit|playing|level)=/.test(r.label);
-      if (!state && d < 2) errors.push(`${r.label}: looks the same as the default (mean diff ${d.toFixed(2)})`);
+      const claim = nonvisualClaim(r.label);
+      if (claim) unqualifiedClaims.push({ label: r.label, reason: claim });
+      else if (!state && d < 2) errors.push(`${r.label}: looks the same as the default (mean diff ${d.toFixed(2)})`);
       if (state && d < 1) warnings.push(`${r.label}: the state draws no visible change (mean diff ${d.toFixed(2)})`);
     }
   }
   // A failed machine look check must never become an approved reference image.
-  if (baseDir && args.approve && !errors.length) for (const r of recs) for (const [view, v] of Object.entries(r.views)) {
+  if (baseDir && args.approve && !errors.length && !unqualifiedClaims.length) for (const r of recs) for (const [view, v] of Object.entries(r.views)) {
     const bf = join(baseDir, id.replace(/[/@]/g, '_'), `${r.label.replace(/[^a-z0-9=._-]/gi, '_')}-${view}.json`);
-    mkdirSync(dirname(bf), { recursive: true }); writeFileSync(bf, JSON.stringify({ grey: v.grey }));
+    mkdirSync(dirname(bf), { recursive: true }); writeFileSync(bf, JSON.stringify({ grey: v.grey, comparison: 'fixed-backdrop/1', defHash: def.defHash, gpu, run }));
   }
-  report.items.push({ id, defHash: def.defHash, ok: errors.length === 0, errors, warnings, numbers, variants: recs.map((r) => r.label), views: recs.flatMap((r) => Object.entries(r.views).map(([view, v]) => ({ label: r.label, view, file: v.file, live: v.live, cover: v.cover, missingAsset: v.missingAsset, top: v.top, dark: v.dark }))) });
+  report.items.push({ id, defHash: def.defHash, ok: errors.length === 0 && unqualifiedClaims.length === 0, visualOk: errors.length === 0, ...(unqualifiedClaims.length ? { status: 'unqualified', unqualifiedClaims } : {}), errors, warnings, numbers, variants: recs.map((r) => r.label), views: recs.flatMap((r) => Object.entries(r.views).map(([view, v]) => ({ label: r.label, view, file: v.file, live: v.live, cover: v.cover, missingAsset: v.missingAsset, top: v.top, dark: v.dark }))) });
 }
 report.ms = Math.round(performance.now() - t0);
 writeFileSync(join(out, 'report.json'), JSON.stringify(report, null, 1));
 // contact sheet for the review queue
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-writeFileSync(join(out, 'sheet.html'), `<!doctype html><meta charset="utf-8"><title>G4 ${run}</title><style>body{font:13px system-ui;background:#111;color:#ddd;margin:16px}h2{font-size:14px;margin:18px 0 4px}.ok{color:#7c7}.bad{color:#f77}img{width:128px;height:128px;margin:1px;border-radius:3px}.row{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.lbl{width:120px;color:#999}</style><h1>G4 ${esc(run)} · ${esc(gpu)}</h1>${report.items.map((it) => `<h2 class="${it.ok ? 'ok' : 'bad'}">${esc(it.id)} ${it.ok ? 'ok' : '✖ ' + esc(it.errors.join('; '))}</h2>${[...new Set(it.views.map((v) => v.label))].map((l) => `<div class="row"><span class="lbl">${esc(l)}</span>${it.views.filter((v) => v.label === l).map((v) => `<img src="${esc(v.file.replace(out + '/', ''))}" title="${esc(v.view)} top ${v.top} dark ${v.dark}">`).join('')}</div>`).join('')}`).join('')}`);
+writeFileSync(join(out, 'sheet.html'), `<!doctype html><meta charset="utf-8"><title>G4 ${run}</title><style>body{font:13px system-ui;background:#111;color:#ddd;margin:16px}h2{font-size:14px;margin:18px 0 4px}.ok{color:#7c7}.bad{color:#f77}img{width:128px;height:128px;margin:1px;border-radius:3px}.row{display:flex;flex-wrap:wrap;align-items:center;gap:6px}.lbl{width:120px;color:#999}</style><h1>G4 ${esc(run)} · ${esc(gpu)}</h1>${report.items.map((it) => `<h2 class="${it.ok ? 'ok' : 'bad'}">${esc(it.id)} ${it.ok ? 'ok' : '✖ ' + esc([...it.errors, ...(it.unqualifiedClaims ?? []).map((c) => `${c.label}: unqualified — ${c.reason}`)].join('; '))}</h2>${[...new Set(it.views.map((v) => v.label))].map((l) => `<div class="row"><span class="lbl">${esc(l)}</span>${it.views.filter((v) => v.label === l).map((v) => `<img src="${esc(v.file.replace(out + '/', ''))}" title="${esc(v.view)} top ${v.top} dark ${v.dark}">`).join('')}</div>`).join('')}`).join('')}`);
 const bad = report.items.filter((i) => !i.ok).length;
 console.log(`G4: ${report.items.length} items, ${bad} failing, ${results.reduce((a, r) => a + Object.keys(r.views).length, 0)} renders in ${(report.ms / 1000).toFixed(1)} s on ${gpu}\n  report ${join(out, 'report.json')}\n  sheet  ${join(out, 'sheet.html')}`);
-for (const it of report.items.filter((i) => !i.ok)) console.log(`  ✖ ${it.id}: ${it.errors.join('; ')}`);
+for (const it of report.items.filter((i) => !i.ok)) console.log(`  ✖ ${it.id}: ${[...it.errors, ...(it.unqualifiedClaims ?? []).map((c) => `${c.label}: unqualified — ${c.reason}`)].join('; ')}`);
 stop(); process.exit(gateExit(report));
