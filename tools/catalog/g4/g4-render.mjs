@@ -85,9 +85,17 @@ console.log(`G4: ${picks.length} items, ${jobs.length} variants/states, 4 views 
 allocateGrid(jobs);
 const water = jobs.filter((j) => j.d.anchor === 'float');
 if (water.length) await god('/v1/god/act', { body: { ops: water.map((j, k) => ({ op: 'place', def: 'core/pond@1', name: `w${k}`, p: [0, 0, 0], params: { depth: 3 }, shape: { area: [[j.p[0] - 12, j.p[2] - 12], [j.p[0] + 12, j.p[2] - 12], [j.p[0] + 12, j.p[2] + 12], [j.p[0] - 12, j.p[2] + 12]] } })) } });
-for (const j of jobs) {
-  const r = await god('/v1/god/act', { body: { ops: [{ op: 'place', def: j.d.publicRef, name: j.name, p: j.p, mode: 'nudge', ...(j.d.exampleShape ? { shape: Object.fromEntries(Object.entries(j.d.exampleShape).map(([k, v]) => [k, Array.isArray(v) ? v.map(([x, z]) => [x + j.p[0], z + j.p[2]]) : v])) } : {}), ...(Object.keys(j.params).length ? { params: j.params } : {}), ...(Object.keys(j.state).length ? { state: j.state } : {}) }] } });
-  j.placed = !!r.data?.accepted; if (!j.placed) j.refused = r.data?.failures?.[0];
+const placeOp = (j) => ({ op: 'place', def: j.d.publicRef, name: j.name, p: j.p, mode: 'nudge', ...(j.d.exampleShape ? { shape: Object.fromEntries(Object.entries(j.d.exampleShape).map(([k, v]) => [k, Array.isArray(v) ? v.map(([x, z]) => [x + j.p[0], z + j.p[2]]) : v])) } : {}), ...(Object.keys(j.params).length ? { params: j.params } : {}), ...(Object.keys(j.state).length ? { state: j.state } : {}) });
+for (const d of picks) {
+  const local = jobs.filter((j) => j.d === d);
+  console.log(`G4 placing ${d.publicRef}: ${local.length} jobs`);
+  // One runtime/bridge rebuild per item, not per alternative. On refusal, retain each job's actual result.
+  const r = await god('/v1/god/act', { body: { ops: local.map(placeOp) } });
+  if (r.data?.accepted) for (const j of local) j.placed = true;
+  else for (const j of local) {
+    const single = await god('/v1/god/act', { body: { ops: [placeOp(j)] } });
+    j.placed = !!single.data?.accepted; if (!j.placed) j.refused = single.data?.failures?.[0];
+  }
 }
 
 // ---------------------------------------------------------------- Chrome on a real GPU
