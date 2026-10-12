@@ -262,7 +262,7 @@ export class EngineBridge {
   /** A god-built point thing that is not otherwise an engine fixture or item, and not a creature, a body or a flag. */
   seenOnly(e: Entity, def: StoredDef): boolean {
     const c = def.components as Record<string, unknown>;
-    return def.form === 'point' && !isFixtureDef(def) && !c.body && !c.behavior && !c.hover && !/^core[-/]flag@/.test(e.def) && e.in.parent !== undefined && !this.engineOwned(e);
+    return def.form === 'point' && !isFixtureDef(def) && !c.body && !c.behavior && !c.hover && !/^core[-/]flag@/.test(def.ref) && e.in.parent !== undefined && !this.engineOwned(e);
   }
 
   private fixtureSpec(e: Entity, def: StoredDef, asset: string, a: { surfaceSlots?: { id: string; local: [number, number, number] }[]; category: string }, wp: { x: number; y: number; z: number; yaw: number }): FixtureSpecV1 {

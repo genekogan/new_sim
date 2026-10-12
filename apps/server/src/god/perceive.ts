@@ -156,7 +156,7 @@ export class GodPerceive {
     for (const e of m.entities.values()) {
       const def = m.resolvedDef(e.def); if (!def) continue;
       const c = def.components as Record<string, unknown>;
-      if (c.body || c.behavior || c.hover || /^core[-/]flag@/.test(e.def) || this.h.engineOwned(e)) continue;
+      if (c.body || c.behavior || c.hover || /^core[-/]flag@/.test(def.ref) || this.h.engineOwned(e)) continue;
       const text = signText(e, def), acts = this.h.commit ? def.actions.length > 0 : false;
       // LAYERS: an owned, priced or scheduled thing is seen as such (a loaf for sale, Ana's door, the café's hours)
       const lay = layersOn && (e.owner || e.access || e.price || e.schedule) ? this.h.layers!.tag(e) : '';

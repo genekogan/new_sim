@@ -2,7 +2,7 @@
 // registry and published to `stable` (they are already live in worlds) and `candidate`. Grandfathered: their G1–G3
 // results are recorded as run now, but a failure does not unpublish anything; it queues a fix (the report lists them).
 import { readFileSync, readdirSync } from 'node:fs';
-import { coreLibrary, sha256Hex, stableStringify, hashOf, vocab, type StoredDef } from '@sim/world-compiler';
+import { coreLibrary, sha256Hex, stableStringify, hashOf, vocab, WorldModel, type StoredDef, type DefLibrary } from '@sim/world-compiler';
 import { def1to2, def2to1, def1Hash, def2Hash, type Upgrade } from './def1to2.ts';
 import { idOf, aliasesOf, namespaceOf } from './ids.ts';
 import { REDISTRIBUTABLE, item1Schema, type Item1 } from './schema.ts';
@@ -43,15 +43,17 @@ export const AFFORDS = (d: StoredDef) => { const i = vocab.interfacesOf(d as nev
 export type ImportRow = { id: string; ref: string; rev: string; def1Hash: string; filled: number; actuators: string[]; gates: GateOutcome[]; licence: string; family: string; tris: number; how: string };
 
 /** An item/1 (+ its def/2 upgrade and measurements) for one def/1, as a worker or import-core would write it. */
-export async function makeItem(d: StoredDef, o: { at: string; run: string; contract: Contract; family?: string; source?: string; author: string; status?: Item1['status']; synonyms?: string[] }): Promise<{ item: Item1; up: Upgrade; measured: Awaited<ReturnType<typeof measure>> }> {
+export async function makeItem(d: StoredDef, o: { at: string; run: string; contract: Contract; family?: string; source?: string; author: string; status?: Item1['status']; synonyms?: string[]; library?: DefLibrary }): Promise<{ item: Item1; up: Upgrade; measured: Awaited<ReturnType<typeof measure>> }> {
   const up = def1to2(d), id = idOf(d.name), rev = def2Hash(up.def2);
-  const m = await measure(d);
+  const m = await measure(d, undefined, o.library);
+  const effective = new WorldModel({constants: {ground: 'land', extent: 1000}, seed: 'item'}); effective.library = o.library ?? coreLibrary(); effective.defs.set('sha:' + d.hash, d);
+  const resolved = effective.resolvedDef('sha:' + d.hash) ?? d;
   const route = d.extends ? 'preset' : d.make.kind === 'mesh' ? 'glb' : d.make.kind === 'parts' || d.contents?.length ? 'set' : d.make.kind === 'gen' && d.make.gen === 'kit/2' ? 'kit' : d.make.kind === 'gen' ? 'generator' : 'kit';
   const cat = up.text.category;
   const item: Item1 = item1Schema.parse({
     schema: 'item/1', id, major: d.version, rev, status: o.status ?? 'stable', aliases: aliasesOf(d.name, d.version), def1Hash: d.hash,
     text: { title: up.text.title, first: up.text.first, description: up.text.description, category: cat, synonyms: o.synonyms ?? up.text.synonyms },
-    affords: AFFORDS(d),
+    affords: AFFORDS(resolved),
     ...(d.components.sound ? { sound: { kinds: [String((d.components.sound as { kind?: string }).kind ?? 'sound')] } } : {}),
     ...(d.components.behavior ? { behaviour: { kind: String((d.components.behavior as { kind?: string }).kind ?? 'behavior') } } : {}),
     budgets: { tris: { lod0: m.tris }, draws: m.draws, materials: m.materials, bytes: { def: Buffer.byteLength(stableStringify(up.def2)), assets: m.assetBytes, textures: m.textures }, texturePx: m.texturePx, limit: `${cat}: ${vocab.triBudget(cat)} t`, measured: m.how },

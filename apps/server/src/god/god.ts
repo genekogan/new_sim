@@ -304,7 +304,9 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   /** God sees the same plus the whole library, prayers waiting, tokens and the edit journal head. */
   godSnapshot() {
     const pub = this.publicSnapshot();
-    return { ...pub, library: this.model.allDefs().map(publicDef), libraryRef: this.model.library ? libraryRef(this.model.library) : null, owner: this.owner, prayers: this.store.prayers({ unanswered: true, limit: 50 }), undoable: this.store.undoable()?.seq ?? null, redoable: this.store.redoable()?.seq ?? null, tokens: this.store.tokens().length };
+    return { ...pub, library: this.model.allDefs().map(publicDef), libraryRef: this.model.library ? libraryRef(this.model.library) : null,
+      ...(this.catalog ? { exportBlockedHashes: pub.defs.filter((d) => !this.catalog!.canExport(d.hash)).map((d) => d.hash) } : {}),
+      owner: this.owner, prayers: this.store.prayers({ unanswered: true, limit: 50 }), undoable: this.store.undoable()?.seq ?? null, redoable: this.store.redoable()?.seq ?? null, tokens: this.store.tokens().length };
   }
   tileHashes(): Record<string, string> {
     const bb = this.model.ground().extent;   // GOD-ENV: the world's bounds (a rectangle once extended)

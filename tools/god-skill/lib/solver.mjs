@@ -201,7 +201,7 @@ export function solve(v, thing, rel) {
       if (sh?.path) {
         const a = sh.path[0], b = sh.path[sh.path.length - 1];
         const nearerEnd = () => (Math.hypot(a[0] - Q.x, a[1] - Q.z) <= Math.hypot(b[0] - Q.x, b[1] - Q.z) ? [r2(a[0]), r2(a[1])] : [r2(b[0]), r2(b[1])]);
-        if (ENDS_ONLY.test(P.row.def)) return nearerEnd();
+        if (ENDS_ONLY.test(v.def(P.row.def)?.ref ?? P.row.def)) return nearerEnd();
         const q = nearestOnPath(sh.path, [Q.x, Q.z]);
         if (Math.hypot(q.p[0] - a[0], q.p[1] - a[1]) < 3 || Math.hypot(q.p[0] - b[0], q.p[1] - b[1]) < 3) return nearerEnd();
         // join a road at its edge (half a metre in), a river at its middle
@@ -433,7 +433,7 @@ export function solve(v, thing, rel) {
     // around an area (a pond, a plaza): just outside its rim, not its bounding box
     const rim = shapeOf?.area ? (u) => rayExit(shapeOf.area, [R.x, R.z], u) : null;
     const gap = rel.dist !== undefined ? Number(rel.dist) : Math.max(1.5, Math.min(6, Math.max(hw, hd)));
-    const start = rel.dir && compassKey(rel.dir) ? COMPASS[compassKey(rel.dir)] : R.kind === 'entity' && R.row.form === 'point' && !isFlagDef(R.row.def) ? dirOfYaw(R.yaw) : COMPASS.s;
+    const start = rel.dir && compassKey(rel.dir) ? COMPASS[compassKey(rel.dir)] : R.kind === 'entity' && R.row.form === 'point' && !isFlagDef(v.def(R.row.def)?.ref ?? R.row.def) ? dirOfYaw(R.yaw) : COMPASS.s;
     const a0 = Math.atan2(start[0], start[1]);
     const items = [];
     const placed = [];

@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Hono } from 'hono';
-import { coreLibrary, hashOf } from '@sim/world-compiler';
+import { coreLibrary, hashOf, WorldModel } from '@sim/world-compiler';
 import { Registry, RegistryCatalog, makeItem, writeCore, loadContract, lineOf } from '@sim/catalog';
 import { Db } from '../db.ts';
 import { GodMode } from './god.ts';
@@ -80,4 +80,39 @@ test('text publication invalidates ETags while reloads preserve placed snapshots
     assert.equal(JSON.stringify(loaded.publicSnapshot()), snapshot);
     assert.equal(db.db.prepare('SELECT COUNT(*) n FROM world_edits_v1').get()!.n, rows);
   } finally { db.close(); }
+});
+
+test('current named revisions coexist, reload and survive yank/rollback without rebinding old entities', async () => {
+  const reg = new Registry(join(dir, 'revisions'));
+  const publish = async (color: string) => {
+    const w = new WorldModel({ constants: { ground: 'land', extent: 1000 }, seed: 'revision' });
+    const def = w.defineDef({ schema: 'def/1', name: 'core-revision-box', version: 1, form: 'point', layer: 'solid', anchor: 'base', size: { box: [1, 1, 1] },
+      make: { kind: 'gen', gen: 'kit/2', args: { shapes: [{ kind: 'box', at: [0, .5, 0], size: [1, 1, 1], color }], round: 0 } } }, 'core', 0);
+    const {item, up} = await makeItem(def, {at: new Date().toISOString(), run: 'revision', author: 'test', contract: loadContract()});
+    writeCore(reg, [{def, item, up}], 'revision'); return def.hash;
+  };
+  const old = await publish('#336699'), firstSeq = reg.pointers().stable!;
+  const db = new Db(':memory:'), catalog = new RegistryCatalog(reg, {hot: 0});
+  let god = new GodMode(db, {worldId: 'revisions', ownerId: 'owner', tick: () => 1, emit: () => {}, library: catalog, assetDir: join(dir, 'revision-assets')});
+  const place = (name: string, x: number) => god.act({ops: [{op: 'place', def: 'eden/revision-box@1', name, p: [x, 0]}]});
+  try {
+    assert.ok(place('old', 0).accepted);
+    const next = await publish('#885533');
+    assert.ok(place('new', 3).accepted);
+    assert.equal(god.model.get('old')!.def, 'sha:' + old);
+    assert.equal(god.model.get('new')!.def, 'sha:' + next);
+    assert.equal(god.publicSnapshot().defs.length, 2);
+    god = new GodMode(db, {...god.opts, library: catalog});
+    assert.equal(god.model.def(god.model.get('old')!.def)!.hash, old);
+    assert.equal(god.model.def(god.model.get('new')!.def)!.hash, next);
+    reg.yank('eden/revision-box', 1, 'yank', 'test');
+    assert.equal(place('yanked', 6).accepted, false);
+    assert.equal(god.model.def(god.model.get('new')!.def)!.hash, next);
+    reg.rollback('stable', 'rollback', firstSeq);
+    assert.ok(place('rolled-back', 6).accepted);
+    assert.equal(god.model.get('rolled-back')!.def, 'sha:' + old);
+    assert.equal(god.model.get('new')!.def, 'sha:' + next);
+    assert.ok(god.undo().accepted); assert.ok(god.redo().accepted);
+    assert.equal(god.model.get('rolled-back')!.def, 'sha:' + old);
+  } finally {db.close();}
 });

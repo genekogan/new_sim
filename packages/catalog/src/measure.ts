@@ -3,7 +3,7 @@
 // use the asset store's measured facts (def.budget, filled by the compiler from the GLB at define time). Generator defs
 // fall back to the physics bake's triangle estimate.
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
-import type { StoredDef, AssetLookup } from '@sim/world-compiler';
+import type { StoredDef, AssetLookup, DefLibrary } from '@sim/world-compiler';
 import { WorldModel, coreLibrary } from '@sim/world-compiler';
 
 export type Measured = { tris: number; draws: number; materials: number; assetBytes: number; textures: number; texturePx: number; box?: { min: [number, number, number]; max: [number, number, number] }; how: 'kit' | 'asset-meta' | 'estimate' };
@@ -50,8 +50,9 @@ function measurementWorld() {
   return probe;
 }
 
-export async function measure(d: StoredDef, params?: Record<string, unknown>): Promise<Measured> {
+export async function measure(d: StoredDef, params?: Record<string, unknown>, library?: DefLibrary): Promise<Measured> {
   const world = measurementWorld().fork();
+  if (library) world.library = library;
   world.defs.set(d.ref, d); // Measure this revision, including custom defs, rather than an older seed revision.
   const r = world.resolvedDef(d.ref) ?? d;
   const defaults = Object.fromEntries(Object.entries(r.params ?? {}).filter(([, f]) => (f as { default?: unknown }).default !== undefined).map(([k, f]) => [k, (f as { default: unknown }).default]));

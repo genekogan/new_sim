@@ -11,7 +11,7 @@
 //                          enum value: compiles; built bounds inside the declared box; nothing > 2 cm below y = 0;
 //                          not floating unless anchored float/center; an enterable thing has wall segments, not one
 //                          solid block; every seat/bed/stand slot has a standable approach point outside its colliders
-import { WorldModel, applyBatch, coreLibrary, hashOf, stableStringify, vocab, type StoredDef, type DefInput } from '@sim/world-compiler';
+import { WorldModel, applyBatch, coreLibrary, hashOf, stableStringify, vocab, type StoredDef, type DefInput, type DefLibrary } from '@sim/world-compiler';
 import { def2Schema, item1Schema, REDISTRIBUTABLE, type Def2, type Item1 } from './schema.ts';
 import { def2to1 } from './def1to2.ts';
 import { bigClass, type Contract } from './contract.ts';
@@ -19,7 +19,7 @@ import { assetLookup, measure, shapeFor, type Measured } from './measure.ts';
 
 export type GateId = 'G1' | 'G2' | 'G3' | 'G5';
 export type GateOutcome = { gate: GateId; ok: boolean; errors: string[]; warnings: string[]; numbers: Record<string, number> };
-export type Subject = { item: Item1; def2: Def2; grandfathered?: boolean };
+export type Subject = { item: Item1; def2: Def2; grandfathered?: boolean; library?: DefLibrary };
 
 // ------------------------------------------------------------------ G1
 
@@ -88,6 +88,7 @@ export async function g3(s: Subject, opts: { measureBounds?: boolean } = {}): Pr
   const errors: string[] = [], warnings: string[] = [];
   const view = def2to1(s.def2, { description: s.item.text.description, category: s.item.text.category, synonyms: s.item.text.synonyms }) as DefInput;
   const w = world();
+  if (s.library) w.library = s.library;
   const def = w.defineDef(view, 'catalog', 0);
   const ref = def.ref, r = w.resolvedDef(ref)!;
   // things that float (boats, buoys) are tested on water: a pond under the origin first
@@ -117,7 +118,7 @@ export async function g3(s: Subject, opts: { measureBounds?: boolean } = {}): Pr
   }
   // drawn bounds (kit: the viewer's own geometry; mesh: the measured GLB) against the declared box and the floor
   let m: Measured | undefined;
-  if (opts.measureBounds !== false && r.form === 'point') m = await measure(def);
+  if (opts.measureBounds !== false && r.form === 'point') m = await measure(def, undefined, s.library);
   if (m?.box && r.form === 'point') {
     const [x0, y0, z0] = m.box.min, [x1, y1, z1] = m.box.max, tol = 0.12;
     const w0 = x1 - x0, h0 = y1 - y0, d0 = z1 - z0;
@@ -139,8 +140,9 @@ export async function g3(s: Subject, opts: { measureBounds?: boolean } = {}): Pr
 /** Run G1–G3 in order; stops at the first failing gate unless `all`. */
 export async function runGates(s: Subject, contract: Contract, opts: { all?: boolean } = {}): Promise<{ ok: boolean; outcomes: GateOutcome[]; measured: Measured }> {
   const view = def2to1(s.def2, { description: s.item.text.description, category: s.item.text.category, synonyms: s.item.text.synonyms });
-  const probe = world(); const sd: StoredDef = probe.defineDef(view, 'catalog', 0);
-  const m = await measure(sd);
+  const probe = world(); if (s.library) probe.library = s.library;
+  const sd: StoredDef = probe.defineDef(view, 'catalog', 0);
+  const m = await measure(sd, undefined, s.library);
   const outcomes: GateOutcome[] = [];
   const o1 = g1(s, contract); outcomes.push(o1); if (!o1.ok && !opts.all) return { ok: false, outcomes, measured: m };
   const o2 = g2(s, m, contract); outcomes.push(o2); if (!o2.ok && !opts.all) return { ok: false, outcomes, measured: m };

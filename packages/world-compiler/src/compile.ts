@@ -103,7 +103,8 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         return;
       }
       case 'place': {
-        const def = scratch.resolvedDef(op.def);
+        const placedRef = scratch.library?.placementRef?.(op.def);
+        const def = placedRef === null ? undefined : scratch.resolvedDef(placedRef ?? op.def);
         if (!def) { failures.push(fail(i, 'def.unknown', op.def)); return; }
         const parentId = resolveId(op.in.parent, i); if (!parentId) return;
         if (op.name && scratch.names.has(`${parentId}/${op.name}`)) { failures.push(fail(i, 'name.taken', op.name)); return; }
@@ -115,6 +116,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
         if (scratch.entities.size >= scratch.constants.limits.entities) { failures.push(fail(i, 'entity.limit', `${scratch.constants.limits.entities} entities`)); return; }
         const id = scratch.nextId();
         const e: Entity = { id, def: def.ref, in: { parent: parentId, ...(op.in.slot ? { slot: op.in.slot } : {}) }, by, born: tick, v: 1, ...(op.name ? { name: op.name } : {}), ...(op.p ? { p: op.p } : {}), ...(op.r !== undefined ? { r: op.r } : {}), ...(op.s !== undefined ? { s: op.s } : {}), ...(op.shape ? { shape: op.shape } : {}), ...(op.anchor ? { anchor: op.anchor } : {}), ...(Object.keys(fieldsOk.values).length ? { params: fieldsOk.values } : {}), ...(Object.keys(stateOk.values).length ? { state: stateOk.values } : {}), ...(op.seed !== undefined ? { seed: op.seed } : {}), ...(op.constraints?.length ? { constraints: op.constraints } : {}) };
+        if (scratch.library?.placementRef || op.def.startsWith('sha:')) e.def = 'sha:' + def.hash;
         { const bad = followProblem(def, op.schedule); if (bad) { failures.push(fail(i, 'state.invalid', bad)); return; } }
         { const L = def.layers ?? {};   // VOCAB-W3: the def's LAYERS defaults, unless the op says otherwise
           const owner = op.owner ?? L.owner, access = op.access ?? L.access, schedule = op.schedule ?? L.schedule, price = op.price ?? L.price;
@@ -664,7 +666,8 @@ function expandParts(w: WorldModel, root: Entity, def: StoredDef, by: string, ti
   const rp = root.params ?? {};
   for (const part of def.make.parts) {
     if (part.when !== undefined && !truthy(evaluate(part.when, rp))) continue;
-    const pdef = w.resolvedDef(part.def); if (!pdef) continue;
+    const placedRef = w.library?.placementRef?.(part.def);
+    const pdef = placedRef === null ? undefined : w.resolvedDef(placedRef ?? part.def); if (!pdef) continue;
     const count = part.repeat ? Math.max(0, Math.min(64, Math.round(Number(typeof part.repeat.count === 'number' ? part.repeat.count : evaluate(part.repeat.count, rp)) || 0))) : 1;
     for (let k = 0; k < count; k++) {
       const params = Object.fromEntries(Object.entries(part.params ?? {}).map(([key, v]) => [key, substitute(v, rp)]));
@@ -676,6 +679,7 @@ function expandParts(w: WorldModel, root: Entity, def: StoredDef, by: string, ti
       const yaw = (typeof part.r === 'number' ? part.r : 0) + (part.repeat?.yaw ?? 0) * k;
       const name = count > 1 ? `${part.id}-${k + 1}` : part.id;
       const e: Entity = { id: w.nextId(), name, def: pdef.ref, in: { parent: parentId, ...(part.slot ? { slot: part.slot } : {}) }, by, born: tick, v: 1, ...(p ? { p } : {}), ...(part.r !== undefined || part.repeat?.yaw ? { r: Array.isArray(part.r) ? part.r : yaw } : {}), ...(part.s !== undefined ? { s: part.s } : {}), ...(Object.keys(params).length ? { params } : {}), ...(Object.keys(state).length ? { state } : {}) };
+      if (w.library?.placementRef || part.def.startsWith('sha:')) e.def = 'sha:' + pdef.hash;
       { const L = pdef.layers ?? {}; for (const k of ['owner', 'access', 'schedule', 'price'] as const) { const v = part[k] ?? L[k]; if (v !== undefined) (e as Record<string, unknown>)[k] = v; } }
       w.insert(e); indexAndGround(w, e, pdef, diff); upsert(e);
       if (pdef.make.kind !== 'parts' && pdef.contents?.length && depth < 4) expandParts(w, e, { ...pdef, make: { kind: 'parts', parts: pdef.contents } } as StoredDef, by, tick, diff, inverse, upsert, depth + 1);

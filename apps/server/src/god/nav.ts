@@ -127,7 +127,7 @@ export class GodNav {
     const things: Thing[] = [], waters = new Map(m.ground().waters.map((w: any) => [w.id, w]));
     for (const e of m.entities.values()) {
       if (!e.name) continue;
-      const def = m.resolvedDef(e.def); if (!def || def.components.body || /^core[-/]flag@/.test(e.def) || this.h.engineOwned(e)) continue;
+      const def = m.resolvedDef(e.def); if (!def || def.components.body || /^core[-/]flag@/.test(def.ref) || this.h.engineOwned(e)) continue;
       try { things.push(...this.describe(e, def, waters.get(e.id))); } catch { /* one odd thing never hides the rest */ }
     }
     const byRef = new Map<string, Thing>();

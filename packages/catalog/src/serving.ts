@@ -21,6 +21,8 @@ export class RegistryCatalog implements DefLibrary {
   private context: ServingOptions;
   private managed = new Set<string>();
   private checkedAt = 0;
+  private exportPointers = '';
+  private exportPermissions = new Map<string, boolean>();
   lastError: string | null = null;
   readonly registry: Registry;
   constructor(registry: Registry, options: ServingOptions = {}) {
@@ -78,7 +80,24 @@ export class RegistryCatalog implements DefLibrary {
     return true;
   }
   get(key: string): StoredDef | undefined { this.refresh(); return this.tiered.get(key); }
+  placementRef(key: string): string | null | undefined {
+    this.refresh();
+    const d = this.tiered.get(key);
+    return d ? 'sha:' + d.hash : this.managed.has(key) ? null : undefined;
+  }
   manages(ref: string) { this.refresh(); return this.managed.has(ref); }
+  /** Historical revisions keep their licence after yank or channel rollback. Used only for explicit export metadata. */
+  canExport(hash: string): boolean {
+    const pointers = JSON.stringify(this.registry.pointers());
+    if (pointers !== this.exportPointers) {
+      const permissions = new Map<string, boolean>();
+      for (const channel of ['stable', 'candidate'] as const) for (const seq of this.registry.seqs(channel))
+        for (const entry of this.registry.snapshot(channel, seq)) if (entry.def1Hash)
+          permissions.set(entry.def1Hash, (permissions.get(entry.def1Hash) ?? true) && entry.redistribute);
+      this.exportPermissions = permissions; this.exportPointers = pointers;
+    }
+    return this.exportPermissions.get(hash) ?? true;
+  }
   details(ref: string): CatalogHit | undefined {
     return this.list().find((h) => h.row.ref === ref || h.entry.aliases.includes(ref) || h.entry.def1Hash === ref.replace(/^sha:/, ''));
   }

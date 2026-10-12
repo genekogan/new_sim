@@ -187,7 +187,7 @@ export class GodPlaces {
     const m = this.h.model, L = this.h.layers!;
     for (const p of out) {
       const e = m.entities.get(p.entity); if (!e) continue;
-      if (/^core[-/]zone@/.test(e.def)) { p.kind = `${String(e.params?.use ?? 'residential')} zone`; const rest = p.description?.includes(' with ') ? p.description.split(' with ').slice(1).join(' with ') : ''; p.description = `a ${p.kind} the god drew${rest ? `, with ${rest}` : ''}`; }
+      if (/^core[-/]zone@/.test(m.def(e.def)?.ref ?? e.def)) { p.kind = `${String(e.params?.use ?? 'residential')} zone`; const rest = p.description?.includes(' with ') ? p.description.split(' with ').slice(1).join(' with ') : ''; p.description = `a ${p.kind} the god drew${rest ? `, with ${rest}` : ''}`; }
       const extra = [L.tag(e), L.peopleAt(e.id)].filter(Boolean).join('; ');
       if (extra && p.of !== 'shore') p.description = `${p.description ?? ''}; ${extra}`.slice(0, 600);
     }
@@ -223,7 +223,7 @@ export class GodPlaces {
       if (e.id === p.entity) continue;
       const def = m.resolvedDef(e.def); if (!def) continue;
       const c = def.components as Record<string, unknown>;
-      if (c.body || /^core[-/]flag@/.test(e.def) || this.h.engineOwned(e)) continue;
+      if (c.body || /^core[-/]flag@/.test(def.ref) || this.h.engineOwned(e)) continue;
       const sh = e.shape as { area?: Vec2[]; path?: Vec2[] } | undefined;
       if (def.form !== 'point' && e.in.parent === 'world' && sh) continue;            // areas, roads, waters are places or ground
       const wp = m.worldPose(e); if (!inPoly(wp.x, wp.z, p.polygon)) continue;

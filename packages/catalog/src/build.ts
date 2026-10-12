@@ -12,6 +12,20 @@ import { runGates, type GateOutcome } from './gates.ts';
 import { g5, type Intent } from './findability.ts';
 import { compatibility } from './compat.ts';
 import { Registry, RegistryError, type IndexEntry } from './registry.ts';
+import { RegistryCatalog } from './serving.ts';
+
+/** New content freezes inherited and furnished dependencies before hashing; seed imports retain original hashes. */
+export function pinDependencies(input: Def2, registry: Registry): Def2 {
+  const pin = (ref: string) => {
+    const entry = registry.resolve(ref.replace(/^sha:/, ''));
+    if (!entry?.def1Hash || entry.status === 'yanked') throw new RegistryError('catalog.dependency', `dependency ${ref} is not stable`);
+    if (!entry.redistribute) throw new RegistryError('catalog.licence', `public content cannot depend on restricted ${ref}`);
+    return 'sha:' + entry.def1Hash;
+  };
+  return def2Schema.parse({...input, ...(input.extends ? {extends: pin(input.extends)} : {}),
+    ...(input.make.kind === 'parts' ? {make: {...input.make, parts: input.make.parts.map((part) => ({...part, def: pin(part.def)}))}} : {}),
+    ...(input.contents ? {contents: input.contents.map((part) => ({...part, def: pin(part.def)}))} : {})});
+}
 
 export type RenderReceipt = { gpu: string; selection?: { targeted?: boolean }; items: { id: string; defHash: string; ok: boolean; views: { label: string; view: string; file: string }[]; errors?: string[] }[] };
 export type BuiltItem = { item: Item1; def2: Def2; engine: DefInput; entry: IndexEntry; gates: (GateOutcome | { gate: 'G4'; ok: boolean; errors: string[]; warnings: string[]; numbers: Record<string, number> })[]; ok: boolean };
@@ -23,17 +37,19 @@ export async function buildItem(directory: string, registry: Registry, options: 
   if (!exported || !['def/1', 'def/2'].includes(exported.schema)) throw new Error('src.mjs must default-export a def/1 or def/2');
   if (!/^core-[a-z0-9][a-z0-9-]*$/.test(exported.name)) throw new Error('core catalogue source names must start with core-');
   const scratch = new WorldModel({ constants: { ground: 'land', extent: 1000 }, seed: 'catalog-build' });
-  const def2 = exported.schema === 'def/2' ? def2Schema.parse(exported) : def1to2(scratch.defineDef(exported, 'core', 0)).def2;
+  const def2 = pinDependencies(exported.schema === 'def/2' ? def2Schema.parse(exported) : def1to2(scratch.defineDef(exported, 'core', 0)).def2, registry);
+  const library = registry.pointers().stable ? new RegistryCatalog(registry, {hot: 0}) : undefined;
+  if (library) scratch.library = library;
   // New catalogue defs have no human text in their engine hash. P0 seed defs retain their original hashes forever.
   const { layers: _inert, ...engine } = def2to1(def2, { description: '' });
   const stored = scratch.defineDef(engine, 'core', 0);
   const at = options.at ?? new Date().toISOString();
-  const base = await makeItem(stored, { at, run: options.run, author: 'catalog-worker', contract: loadContract(), status: 'draft' });
+  const base = await makeItem(stored, { at, run: options.run, author: 'catalog-worker', contract: loadContract(), status: 'draft', library });
   const item = item1Schema.parse({ ...base.item, rev: def2Hash(def2), text: { ...base.item.text, ...metadata.text },
     licence: metadata.licence, provenance: { ...base.item.provenance, sourceHash: sha256Hex(source), author: metadata.author ?? 'catalog-worker', tool: 'catalog build' } });
   if (item.licence.spdx !== 'CC0-1.0' || !item.licence.redistribute || !item.id.startsWith('eden/')) throw new Error('central authoring is core-only CC0; pack imports remain the explicit import-core route');
   if (!item.licence.source) throw new Error('CC0 authoring must record its source');
-  const gates: BuiltItem['gates'] = (await runGates({ item, def2 }, loadContract(), { all: true })).outcomes;
+  const gates: BuiltItem['gates'] = (await runGates({ item, def2, library }, loadContract(), { all: true })).outcomes;
   const previous = registry.resolve(`${item.id}@${item.major}`), oldDef = previous && registry.def(previous.rev);
   if (oldDef) {
     const compat = compatibility(oldDef, def2);

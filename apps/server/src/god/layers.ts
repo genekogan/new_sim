@@ -312,7 +312,7 @@ export class GodLayers {
   /** The public layer view (no wallets): currency, zones, schedules, prices, owners, relationships. */
   publicView() {
     const econ = economyOn(), things = [...this.m.entities.values()].filter((e) => e.owner || e.access || e.schedule || (econ && e.price));
-    const zones = [...this.m.entities.values()].filter((e) => /^core-zone@/.test(e.def) || e.def === 'core/zone@1').map((e) => ({ id: e.id, name: e.name ? this.m.pathOf(e.id) : e.id, use: e.params?.use ?? 'residential' }));
+    const zones = [...this.m.entities.values()].filter((e) => /^core[-/]zone@/.test(this.m.def(e.def)?.ref ?? e.def)).map((e) => ({ id: e.id, name: e.name ? this.m.pathOf(e.id) : e.id, use: e.params?.use ?? 'residential' }));
     return {
       contract: 'layers/1', ...(econ ? { currency: this.currency() } : {}), clock: this.clock(),
       zones,

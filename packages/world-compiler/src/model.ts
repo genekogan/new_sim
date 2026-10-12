@@ -14,7 +14,10 @@ export type AssetLookup = (hash: string) => AssetInfo | undefined;
 /** CATRUN: a process-wide, read-only, content-addressed def library (the core kit). A world resolves refs it does not
  *  store itself through it, and a def enters the world's own store (pinned by hash) the first time it is used
  *  (`adopt`). Keys: "name@v", "core/<x>@v", "sha:<hash>". Built once per process (library.ts). */
-export type DefLibrary = { readonly id: string; readonly version: string; get(key: string): StoredDef | undefined; all(): readonly StoredDef[] };
+export type DefLibrary = { readonly id: string; readonly version: string; get(key: string): StoredDef | undefined; all(): readonly StoredDef[];
+  /** Current catalogue revision for a new placement. Null refuses an unavailable managed name; undefined keeps local refs. */
+  placementRef?(key: string): string | null | undefined;
+};
 /** Catalogue ids (CATALOG-PROGRAM P0) are aliases of the core refs worlds already use: `eden/<x>@v` → `core/<x>@v`,
  *  `lm/<x>@v` → `core/lm-<x>@v`, `mars/<x>@v` → `core/mars-<x>@v`. Other refs pass through. */
 export const aliasRef = (ref: string) => { const m = /^(eden|lm|mars)\/(.+)$/.exec(ref); return m ? `core/${m[1] === 'eden' ? '' : m[1] + '-'}${m[2]}` : ref; };
