@@ -25,9 +25,9 @@ export const { MeshoptEncoder, MeshoptSimplifier } = mo;
 // fork-backdrop.mjs (campus-owner-<rev>.raw.glb, the same GLB frame as V3). The old V3 export (the first, rotated
 // reading) stays readable with MARS_TWO_SRC=v3 (then PARITY's 7d9688f delta applies, as before).
 export const OLD_V3_GLB = '<team>/scratch/mars-mimos-binding-20261010/visible-access-export-v3/scene_7d4cac4af33bb32cd069a248611b6dd3fdc2ce072bc77e3f2f336ea5df028b76.glb';
-export const SOURCE_REV = 'a5376c10cfab';
-export const V3_GLB = process.env.MARS_TWO_SRC === 'v3' ? OLD_V3_GLB : (process.env.MARS_TWO_SRC || '<team>/scratch/mars-truecompass-20261012/campus-owner-a5376c10cfab.raw.glb');
-export const V3_SHA = process.env.MARS_TWO_SRC === 'v3' ? '7d4cac4af33bb32cd069a248611b6dd3fdc2ce072bc77e3f2f336ea5df028b76' : 'b52044bb96ec9e472d04900fa1150af82ede94341731f5046da2e2520f0bd250';
+export const SOURCE_REV = '076d458a3d8e';
+export const V3_GLB = process.env.MARS_TWO_SRC === 'v3' ? OLD_V3_GLB : (process.env.MARS_TWO_SRC || '<team>/scratch/mars-truecompass-20261012/campus-owner-076d458a3d8e.raw.glb');
+export const V3_SHA = process.env.MARS_TWO_SRC === 'v3' ? '7d4cac4af33bb32cd069a248611b6dd3fdc2ce072bc77e3f2f336ea5df028b76' : 'e2031784a6469c13396b1b2db9fec1ba0abd01e49191ad2e541bb30d3454c299';
 export const O = [2.05645, -8.92635];                       // Mimos native origin [42.05645, .53, -38.92635] minus the backdrop's [40, ., -30]
 export const NORTH = [0.4264952019559668, -0.9044898245467106];
 export const EAST = [0.9044898245467106, 0.4264952019559668];

@@ -3699,7 +3699,7 @@
   "form": "point",
   "make": {
    "kind": "mesh",
-   "asset": "0f46697b4a6ca7bd48818da75ebfdefe1d5fcac4849aa49438afb9e346012f21",
+   "asset": "2b88aad6559282c4fc7ddb40fcfd2210e0b56e2e5de252920fa56355b56dbd5e",
    "collide": "box"
   },
   "size": {
@@ -5655,7 +5655,7 @@
   "schema": "def/1",
   "name": "core-mars-mimos",
   "version": 2,
-  "description": "Mimos, the 2026 Mars College café and lounge as Gene corrected it (true compass): an L of Mimos main (the west longitudinal bay; its northern sections a raised wooden floor at 0.53 m with the coffee counter and the MIMOS sign on the west wall and the study table at the north wall, its southern section at ground level, the lounge before the glazing) and Mimos floor, the south-east tea room with flooring throughout, the honey sofa beneath the posters on its north wall and the low tea table near the glazing. The sloping plexiglass with its brown drape fronts both on the south; the pallet racks between main and floor are pass-through; the north-east of the L is outdoors. Door at the glazing's west end; three risers from main south up to the raised floor. 3 rooms, 39 wall/solid colliders, 1 stairs. 4378 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass).",
+  "description": "Mimos, the 2026 Mars College café and lounge as Gene corrected it (true compass): an L of Mimos main (the west longitudinal bay; its northern sections a raised wooden floor at 0.53 m with the coffee counter and the MIMOS sign on the west wall and the study table at the north wall, its southern section at ground level, the lounge before the glazing) and Mimos floor, the south-east tea room with flooring throughout, the honey sofa beneath the posters on its north wall and the low tea table near the glazing. The sloping plexiglass with its brown drape fronts both on the south; the pallet racks between main and floor are pass-through; the north-east of the L is outdoors. Door at the glazing's west end; three risers from main south up to the raised floor. 3 rooms, 38 wall/solid colliders, 1 stairs. 4378 triangles. Licence: Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project. Source: the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass).",
   "tags": [
    "mars",
    "mars-campus",
@@ -5672,7 +5672,7 @@
    "kind": "mesh",
    "asset": "890bd75138e4eb66cc2f1d6aa4fe74565ee2eb6ea71adfd1317eaa053efd6125",
    "collide": "box",
-   "footprint": "79c9ed2b70389b7842cc41c0517c8c64835066ffef4f9c8d5ae6c142ddb39617"
+   "footprint": "ded8451db3e217609bff9bbdcab84a861225990b9a5cf5cac039cd693d62fa9c"
   },
   "size": {
    "box": [

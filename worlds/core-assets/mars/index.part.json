@@ -1571,12 +1571,12 @@
    "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
    "source": "the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass)"
   },
-  "0f46697b4a6ca7bd48818da75ebfdefe1d5fcac4849aa49438afb9e346012f21": {
+  "2b88aad6559282c4fc7ddb40fcfd2210e0b56e2e5de252920fa56355b56dbd5e": {
    "ext": "glb",
    "kind": "mesh",
    "path": "worlds/core-assets/mars/papasan.glb",
    "tris": 1152,
-   "bytes": 15472,
+   "bytes": 15404,
    "textures": 0,
    "texPx": 0,
    "box": [
@@ -4249,12 +4249,12 @@
    "source": "the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass)",
    "footprint": "02b8be54e62818d1e124acd93a88f52b5cc2e1101c8c6627604bb3e04f73b1f6"
   },
-  "79c9ed2b70389b7842cc41c0517c8c64835066ffef4f9c8d5ae6c142ddb39617": {
+  "ded8451db3e217609bff9bbdcab84a861225990b9a5cf5cac039cd693d62fa9c": {
    "ext": "json",
    "kind": "footprint",
    "path": "worlds/core-assets/mars/mimos.footprint.json",
    "tris": 0,
-   "bytes": 9769,
+   "bytes": 9564,
    "textures": 0,
    "texPx": 0,
    "box": [
@@ -4439,20 +4439,6 @@
      },
      {
       "c": [
-       0.1492,
-       3.722
-      ],
-      "half": [
-       0.5105,
-       0.0381
-      ],
-      "yaw": -0.0027,
-      "y0": 0.4083,
-      "y1": 2.4403,
-      "tag": "obj-2"
-     },
-     {
-      "c": [
        -7.1883,
        3.6934
       ],
@@ -4463,7 +4449,7 @@
       "yaw": -0.0027,
       "y0": 0.4083,
       "y1": 2.4403,
-      "tag": "obj-3"
+      "tag": "obj-2"
      },
      {
       "c": [
@@ -4477,7 +4463,7 @@
       "yaw": -0.0027,
       "y0": 0.4083,
       "y1": 2.4403,
-      "tag": "obj-4"
+      "tag": "obj-3"
      },
      {
       "c": [
@@ -4491,7 +4477,7 @@
       "yaw": 1.5681,
       "y0": 0.2403,
       "y1": 2.4403,
-      "tag": "obj-5"
+      "tag": "obj-4"
      },
      {
       "c": [
@@ -4505,7 +4491,7 @@
       "yaw": -0.0027,
       "y0": 0.2403,
       "y1": 2.4403,
-      "tag": "obj-6"
+      "tag": "obj-5"
      },
      {
       "c": [
@@ -4519,7 +4505,7 @@
       "yaw": 1.5681,
       "y0": 0.2403,
       "y1": 2.4403,
-      "tag": "obj-7"
+      "tag": "obj-6"
      },
      {
       "c": [
@@ -4533,7 +4519,7 @@
       "yaw": 1.5681,
       "y0": 0.2403,
       "y1": 2.4403,
-      "tag": "obj-8"
+      "tag": "obj-7"
      },
      {
       "c": [
@@ -4547,7 +4533,7 @@
       "yaw": 1.5681,
       "y0": 0.2403,
       "y1": 2.4403,
-      "tag": "obj-9"
+      "tag": "obj-8"
      },
      {
       "c": [
@@ -4561,7 +4547,7 @@
       "yaw": 1.5681,
       "y0": 0.2403,
       "y1": 2.4403,
-      "tag": "obj-10"
+      "tag": "obj-9"
      },
      {
       "c": [
@@ -4575,7 +4561,7 @@
       "yaw": 1.5681,
       "y0": 0.2403,
       "y1": 2.4403,
-      "tag": "obj-11"
+      "tag": "obj-10"
      },
      {
       "c": [
@@ -4589,7 +4575,7 @@
       "yaw": 1.5681,
       "y0": 0.2403,
       "y1": 2.4403,
-      "tag": "obj-12.0"
+      "tag": "obj-11.0"
      },
      {
       "c": [
@@ -4603,7 +4589,7 @@
       "yaw": 1.5681,
       "y0": 0.2403,
       "y1": 2.4403,
-      "tag": "obj-12.1"
+      "tag": "obj-11.1"
      },
      {
       "c": [
@@ -4617,7 +4603,7 @@
       "yaw": -0.0027,
       "y0": 1.8107,
       "y1": 2.4403,
-      "tag": "obj-12.2"
+      "tag": "obj-11.2"
      },
      {
       "c": [
@@ -4631,7 +4617,7 @@
       "yaw": -0.0027,
       "y0": 1.4796,
       "y1": 1.5238,
-      "tag": "obj-12.3"
+      "tag": "obj-11.3"
      },
      {
       "c": [
@@ -4645,7 +4631,7 @@
       "yaw": -0.0027,
       "y0": 0.294,
       "y1": 1.3157,
-      "tag": "obj-12.4"
+      "tag": "obj-11.4"
      },
      {
       "c": [
@@ -4659,7 +4645,7 @@
       "yaw": 0,
       "y0": 1.4503,
       "y1": 2.0903,
-      "tag": "obj-12.5"
+      "tag": "obj-11.5"
      },
      {
       "c": [
@@ -4673,7 +4659,7 @@
       "yaw": 0,
       "y0": 0.7703,
       "y1": 2.4403,
-      "tag": "obj-13"
+      "tag": "obj-12"
      },
      {
       "c": [
@@ -4687,7 +4673,7 @@
       "yaw": 0,
       "y0": 1.7203,
       "y1": 2.4403,
-      "tag": "obj-14"
+      "tag": "obj-13"
      },
      {
       "c": [
@@ -4701,7 +4687,7 @@
       "yaw": 0,
       "y0": 1.4503,
       "y1": 2.0903,
-      "tag": "obj-17"
+      "tag": "obj-16"
      },
      {
       "c": [
@@ -4715,7 +4701,7 @@
       "yaw": 0,
       "y0": 1.4503,
       "y1": 2.0903,
-      "tag": "obj-18"
+      "tag": "obj-17"
      },
      {
       "c": [
@@ -4729,7 +4715,7 @@
       "yaw": 0,
       "y0": 1.4503,
       "y1": 2.0903,
-      "tag": "obj-19"
+      "tag": "obj-18"
      },
      {
       "c": [
@@ -4743,7 +4729,7 @@
       "yaw": 0,
       "y0": 1.4503,
       "y1": 2.0903,
-      "tag": "obj-20"
+      "tag": "obj-19"
      },
      {
       "c": [
@@ -4757,7 +4743,7 @@
       "yaw": 0,
       "y0": 1.4503,
       "y1": 2.0903,
-      "tag": "obj-21"
+      "tag": "obj-20"
      },
      {
       "c": [
@@ -4771,7 +4757,7 @@
       "yaw": 0,
       "y0": 1.4503,
       "y1": 2.0903,
-      "tag": "obj-22"
+      "tag": "obj-21"
      },
      {
       "c": [
@@ -4785,7 +4771,7 @@
       "yaw": 0,
       "y0": 1.4503,
       "y1": 2.0903,
-      "tag": "obj-23"
+      "tag": "obj-22"
      },
      {
       "c": [
@@ -4799,7 +4785,7 @@
       "yaw": 0,
       "y0": 1.4503,
       "y1": 2.0903,
-      "tag": "obj-24"
+      "tag": "obj-23"
      },
      {
       "c": [
@@ -4813,7 +4799,7 @@
       "yaw": 0.18,
       "y0": 0.3903,
       "y1": 1.3903,
-      "tag": "obj-25"
+      "tag": "obj-24"
      }
     ],
     "surfaces": [
@@ -5118,7 +5104,7 @@
      }
     ],
     "notes": [
-     "footprint mars-mimos: 3 rooms, 1 openings, 1 links (0 shafts, float-only), 39 wall/solid colliders"
+     "footprint mars-mimos: 3 rooms, 1 openings, 1 links (0 shafts, float-only), 38 wall/solid colliders"
     ]
    },
    "name": "mars-mimos-footprint",
@@ -5153,7 +5139,7 @@
    "name": "mars-mimos",
    "license": "Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project",
    "source": "the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene's Oct 10 corrections in true compass)",
-   "footprint": "79c9ed2b70389b7842cc41c0517c8c64835066ffef4f9c8d5ae6c142ddb39617"
+   "footprint": "ded8451db3e217609bff9bbdcab84a861225990b9a5cf5cac039cd693d62fa9c"
   },
   "9f72094b1009209bfbb949075e59a2f998324a56746c662bf2283af1f6320ac4": {
    "ext": "json",
