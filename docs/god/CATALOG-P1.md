@@ -73,5 +73,12 @@ imports and rollback rehearsal, not a shortcut for workers.
   to coexist. Only an isolated copy was patched/tested. Apply-ready patch and six-assertion rehearsal are linked in
   `team/lanes/cx-catalog.md`; server name→hash normalization follows that integration. Inheritance revision pinning
   also needs qualification. Do not deploy registry serving before this gap is resolved.
-- No real-user dpr1/2 walkthrough or production registry install yet. Mars holds the Chrome lease and the release
-  boundary; CDN waits for Gene's `R2 ready: <domain>`. Nothing in this checkpoint changes either public site.
+- Real Chrome on NVIDIA L4 passed shared scenarios30/30 and stranger-style mouse/keyboard/menu input at dpr1/2
+  on a disposable local Modal launcher. The private review artifact passed real controls/export at both ratios.
+  Earlier failed attempts are preserved; each receipt pins its tested source. This does not qualify Gene's actual
+  Clerk sign-in, a live Soul join or either public site. Browser receipts are linked in `team/lanes/cx-catalog.md`.
+- G4 catchup accounted768 items, captured750, emitted11,604 audited PNGs:656 raw machine passes,94 alerts and
+  18 unqualified. No baseline approvals. Backdrop/variant diagnostic fixes have targeted regression proof; body,
+  invisible/shared-terrain, opaque glass/opening/SSIM and loader-readiness coverage still need qualification.
+- No production registry install. Mars holds the local Chrome lease and release boundary; CDN waits for Gene's
+  `R2 ready: <domain>`. Nothing in this checkpoint changes either public site.
