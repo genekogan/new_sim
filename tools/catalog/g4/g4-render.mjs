@@ -20,7 +20,7 @@ import { mkdirSync, writeFileSync, readFileSync, existsSync, realpathSync } from
 import { createRequire } from 'node:module';
 import { dirname, resolve, join, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { gateExit } from './checks.mjs';
+import { gateExit, viewErrors } from './checks.mjs';
 import { toRef, shotsOf, unsupported, allocateGrid, fixturePort } from './plan.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
@@ -233,11 +233,9 @@ for (const [id, recs] of items) {
     if (r.note) errors.push(`${r.label}: ${r.note}`);
     if (!r.placed) { errors.push(`${r.label}: refused ${r.refused?.code ?? ''} ${String(r.refused?.detail ?? '').slice(0, 80)}`); continue; }
     for (const [view, v] of Object.entries(r.views)) {
-      if (!v.live || v.cover === null) errors.push(`${r.label}/${view}: unqualified (no isolated drawable entity)`);
-      if (v.missingAsset) errors.push(`${r.label}/${view}: missing asset placeholder`);
+      errors.push(...viewErrors(v, `${r.label}/${view}`));
       // nothing drew: the object covers < 0.3 % of its own crop (or, when it is instanced and cannot be hidden, one colour fills > 97 %)
-      if (v.cover !== null && v.cover !== undefined) { numbers[`cover:${r.label}/${view}`] = v.cover; if (v.cover < 0.003) errors.push(`${r.label}/${view}: blank (object covers ${(v.cover * 100).toFixed(2)} % of the view)`); }
-      else if (v.top > 0.97) errors.push(`${r.label}/${view}: blank (${Math.round(v.top * 100)} % one colour)`);
+      if (v.cover !== null && v.cover !== undefined) numbers[`cover:${r.label}/${view}`] = v.cover;
       if (v.dark > 0.35) warnings.push(`${r.label}/${view}: dark (${Math.round(v.dark * 100)} % near-black)`);
       if (baseDir) {
         const bf = join(baseDir, id.replace(/[/@]/g, '_'), `${r.label.replace(/[^a-z0-9=._-]/gi, '_')}-${view}.json`);
