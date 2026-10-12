@@ -44,5 +44,7 @@ printf '[Service]\nMemoryHigh=2500M\nMemoryMax=3G\n' > /etc/systemd/system/sim-w
 printf '[Service]\nMemoryHigh=5G\nMemoryMax=6G\n' > /etc/systemd/system/sim-worlds@production.service.d/10-memory.conf
 install -m 644 "$HERE/sim-worlds-backup@.service" /etc/systemd/system/sim-worlds-backup@.service
 install -m 644 "$HERE/sim-worlds-backup@.timer" /etc/systemd/system/sim-worlds-backup@.timer
+install -m 644 "$HERE/sim-worlds-health@.service" /etc/systemd/system/sim-worlds-health@.service
+install -m 644 "$HERE/sim-worlds-health@.timer" /etc/systemd/system/sim-worlds-health@.timer
 systemctl daemon-reload
-echo "installed: user simworlds, /srv/sim-worlds{,-data}, /etc/sim-worlds/{staging,production}.conf, sim-worlds@.service, sim-worlds-backup@.{service,timer} (nothing started)"
+echo "installed: user simworlds, /srv/sim-worlds{,-data}, /etc/sim-worlds/{staging,production}.conf, sim-worlds@.service, sim-worlds-{backup,health}@.{service,timer} (nothing started)"
