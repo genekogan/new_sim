@@ -23,10 +23,12 @@ def run(bundle: bytes, source: str, input_only: bool = False, dpr: int = 0, revi
         archive.extractall(root, filter="data")
     subprocess.run(["pnpm", "install", "--no-frozen-lockfile", "--ignore-scripts"], cwd=root, stdout=subprocess.DEVNULL, check=True)
     if not review_only:
+        subprocess.run(["pnpm", "--filter", "@sim/web", "build"], cwd=root, stdout=subprocess.DEVNULL, check=True)
         subprocess.run(["pnpm", "--filter", "@sim/web", "exec", "vite", "build", "--base", "/worlds/", "--outDir", "/repo/.lane/web-worlds", "--emptyOutDir"], cwd=root, stdout=subprocess.DEVNULL, check=True)
     out = pathlib.Path("/proof")
     out.mkdir()
-    env = {**__import__("os").environ, "P1_SOURCE_SHA": source, "P1_PROOF_DPR": str(dpr) if dpr else ""}
+    env = {**__import__("os").environ, "P1_SOURCE_SHA": source, "P1_PROOF_DPR": str(dpr) if dpr else "",
+           "CATALOG_REGISTRY_DIR": "/repo/.lane/registry", "CATALOG_CHANNEL": "stable"}
     commands = [
         ("scenarios", ["node", "--import", "./tools/catalog/gpu-chrome.mjs", "tools/god-skill/e2e/scenarios.mjs", "--port", "6120"]),
         ("input", ["node", "tools/catalog/p1-browser-proof.mjs", "/proof/input"]),

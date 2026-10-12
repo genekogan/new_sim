@@ -5,13 +5,16 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
+import {Registry} from '../../packages/catalog/src/index.ts';
 const root = resolve(new URL('../..', import.meta.url).pathname), out = resolve(process.argv[2] ?? '.lane/p1-browser-proof');
 mkdirSync(out, { recursive: true });
 const { chromium } = createRequire(new URL('../../mars/viewer/package.json', import.meta.url))('@playwright/test');
 const env = { ...process.env, BRAIN_MODE: 'fake', SEED_NATIVES: '0', CATALOG_REGISTRY_DIR: process.env.CATALOG_REGISTRY_DIR ?? resolve(root, '.lane/registry'), CATALOG_CHANNEL: process.env.CATALOG_CHANNEL ?? 'candidate' };
 const origin = 'http://127.0.0.1:6110';
-const server = spawn(process.execPath, ['tools/catalog/proof-launcher.mjs', `${out}/data`], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
-let log = ''; server.stdout.on('data', (data) => { log += data; }); server.stderr.on('data', (data) => { log += data; });
+let log = '';
+const start = () => { const child = spawn(process.execPath, ['tools/catalog/proof-launcher.mjs', `${out}/data`], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] }); child.stdout.on('data', (data) => { log += data; }); child.stderr.on('data', (data) => { log += data; }); return child; };
+let server = start();
+const registry = new Registry(env.CATALOG_REGISTRY_DIR);
 const report = { source: process.env.P1_SOURCE_SHA ?? 'unknown', realm: 'disposable local launcher in Modal', runs: [] };
 const dprs = process.env.P1_PROOF_DPR ? [Number(process.env.P1_PROOF_DPR)] : [1, 2];
 if (dprs.some((value) => ![1, 2].includes(value))) throw new Error('proof dpr must be 1 or 2');
@@ -58,6 +61,19 @@ try {
         const placed = await api('/v1/god/act', { ops: [{ op: 'place', def: 'eden/rain-gauge@1', name: 'rain-gauge', p: [0, 0, 0] }] }, token);
         run.checks.place = placed.status === 200 && placed.data.accepted;
         if (!run.checks.place) throw new Error('candidate placement failed');
+        const entry = registry.resolve('eden/rain-gauge@1', env.CATALOG_CHANNEL);
+        const snapshot = (await api('/v1/world/snapshot', undefined, token)).data;
+        run.checks.shaPinned = snapshot.entities.find((e) => e.name === 'rain-gauge')?.def === 'sha:' + entry.def1Hash;
+        const seq = registry.pointers()[env.CATALOG_CHANNEL];
+        registry.yank('eden/rain-gauge', 1, 'browser-release-yank', 'disposable release rehearsal');
+        for (let i = 0; i < 80; i++) { const result = await api('/v1/god/defs?q=rainfall%20meter&compact=1', undefined, token); if (!result.data.defs.some((d) => d.ref === 'eden/rain-gauge@1')) {run.checks.yankFind=true;break;} await new Promise(done=>setTimeout(done,100)); }
+        const refused = await api('/v1/god/act', {ops:[{op:'place',def:'eden/rain-gauge@1',name:'yanked',p:[3,0]}]}, token);
+        run.checks.yankPlace = refused.data.accepted === false;
+        run.checks.yankPreserves = (await api('/v1/world/snapshot', undefined, token)).data.entities.find((e)=>e.name==='rain-gauge')?.def === 'sha:' + entry.def1Hash;
+        registry.rollback(env.CATALOG_CHANNEL, 'browser-release-rollback', seq);
+        for (let i = 0; i < 80; i++) { const result = await api('/v1/god/defs?q=rainfall%20meter&compact=1', undefined, token); if (result.data.defs[0]?.ref === 'eden/rain-gauge@1') {run.checks.rollbackFind=true;break;} await new Promise(done=>setTimeout(done,100)); }
+        const restored = await api('/v1/god/act', {ops:[{op:'place',def:'eden/rain-gauge@1',name:'after-rollback',p:[3,0]}]}, token);
+        run.checks.rollbackPlace = restored.data.accepted === true;
       } else run.checks.reload = (await api('/v1/world/snapshot', undefined, token)).data.entities.some((entity) => entity.name === 'rain-gauge');
       await page.waitForTimeout(1000);
       const canvas = page.locator('canvas[aria-label="Live 3D view of the world"]');
@@ -93,6 +109,11 @@ try {
       writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 2));
       await context.close();
     } finally { await browser.close(); }
+    if (dpr !== dprs.at(-1)) {
+      const exited = new Promise(done=>server.once('exit',done)); server.kill(); await exited;
+      server = start();
+      for (let i=0;i<600;i++) {if(server.exitCode!==null)throw Error('launcher restart failed');try{if((await fetch(origin+'/worlds/__sim/healthz')).ok)break;}catch{}await new Promise(done=>setTimeout(done,100));}
+    }
   }
   report.ok = report.runs.length === dprs.length && report.runs.every((run) => Object.values(run.checks).every(Boolean));
   writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 2));
