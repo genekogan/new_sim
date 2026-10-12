@@ -1,0 +1,18 @@
+#!/bin/bash
+# Keep raw Node TAP/spec output and propagate failures across every package.
+set -u
+rc=0
+for p in engine-mars world-compiler generators ground kernel brain engine-toy engine-contract; do
+  echo "## $p"
+  (
+    cd "packages/$p" || exit 1
+    shopt -s nullglob
+    files=(src/*.test.ts src/core-kit/*.test.ts)
+    [ ${#files[@]} -gt 0 ] || { echo "no test files for $p"; exit 1; }
+    node --test --test-concurrency=4 "${files[@]}"
+  )
+  package_rc=$?
+  echo "## $p exit=$package_rc"
+  [ "$package_rc" -eq 0 ] || rc=1
+done
+exit "$rc"

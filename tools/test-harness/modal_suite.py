@@ -30,10 +30,15 @@ cat /in/REFS.txt
 prep() {  # prep <tgz> <dir>: unpack, make it a git repo (one-validation's V0 reads HEAD), install deps
   mkdir -p "$2" && tar xzf "$1" -C "$2" && cd "$2" || return 1
   git init -q -b main && git add -A && git -c user.email=suite@local -c user.name=suite commit -qm "$(basename "$2")"
+  if [ -f /in/historical-inputs.pack ]; then
+    git index-pack --stdin < /in/historical-inputs.pack || return 1
+  fi
   pnpm install --frozen-lockfile > "/out/install-$(basename "$2").log" 2>&1; local rc=$?
   echo "install $(basename "$2") rc=$rc"; tail -n 3 "/out/install-$(basename "$2").log"
+  return "$rc"
 }
 mkdir -p /out
+cp /in/historical-inputs.pack.json /out/ 2>/dev/null || true
 prep /in/head.tgz /work/head || exit 1
 BASE=/work/head
 if [ -f /in/base.tgz ]; then prep /in/base.tgz /work/base && BASE=/work/base; fi

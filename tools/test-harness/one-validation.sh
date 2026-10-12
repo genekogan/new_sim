@@ -38,7 +38,7 @@ step V1-types 1200 pnpm -r exec tsc --noEmit -p .
 step V2-build-root 900 pnpm --filter @sim/web build
 step V2-build-worlds 900 bash -c "cd apps/web && npx vite build --base /worlds/ --outDir $ROOT/.lane/web-worlds --emptyOutDir"
 # V3 package and engine suites (no ports)
-step V3-packages 2400 bash -c 'for p in engine-mars world-compiler generators ground kernel brain engine-toy engine-contract; do echo "## $p"; (cd packages/$p && node --test --test-concurrency=4 $(ls src/*.test.ts src/core-kit/*.test.ts 2>/dev/null)) 2>&1 | grep -E "^ℹ (tests|pass|fail)|^✖"; done'
+step V3-packages 2400 bash tools/test-harness/package-suite.sh
 step V3-mars-engine 2400 bash -c 'cd mars/viewer && node --test --test-concurrency=4 engine/test/*.test.ts'
 step V3-client-cli 1800 node --test --test-concurrency=1 tools/edge-skill/*.test.mjs tools/client-eval/*.test.mjs
 step V3-launcher-unit 1200 node --test --test-concurrency=1 tools/world-launcher/launcher.test.mjs tools/world-launcher/launcher-auth.test.mjs   # lane ports 5210-5259

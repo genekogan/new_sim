@@ -15,6 +15,7 @@ command -v modal >/dev/null || { echo "modal CLI not found: pip install modal &&
 [ -z "$(git -C "$ROOT" status --porcelain --untracked-files=no)" ] || echo "note: uncommitted changes are NOT shipped (git archive $REF)"
 STAGE="$(mktemp -d)"; trap 'rm -rf "$STAGE"' EXIT
 git -C "$ROOT" archive --format=tar.gz -o "$STAGE/head.tgz" "$REF"
+(cd "$ROOT" && node tools/test-harness/historical-inputs.mjs "$REF" "$STAGE/historical-inputs.pack")
 { echo "head $REF $(git -C "$ROOT" rev-parse "$REF")"; } > "$STAGE/REFS.txt"
 if [ "$BASE" != none ]; then git -C "$ROOT" archive --format=tar.gz -o "$STAGE/base.tgz" "$BASE"; echo "baseline $BASE $(git -C "$ROOT" rev-parse "$BASE")" >> "$STAGE/REFS.txt"; fi
 cat "$STAGE/REFS.txt"; mkdir -p "$OUT"; cp "$STAGE/REFS.txt" "$OUT/"
