@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {solarPosition} from '../../../../mars/viewer/engine/env/sun.ts';
+import {siteNorthOffset} from '../site-north.ts';
 import {daylightFactors} from '../../../../mars/viewer/engine/env/daylight.ts';
 /** Sky bodies for the dome (presentation only): the sun's true direction (Daylight clamps its light above the
  * horizon), the moon (phase from the synodic month, placed where the sun stood `elongation/15` hours earlier,
@@ -27,7 +28,8 @@ export function skyBodies(iso:string,out?:SkyBodies):SkyBodies|null{
  const ms=civilMs(iso);if(ms===null)return null;
  let s,m,a,b;
  const phase=moonPhase(ms),elong=phase*360;
- try{s=solarPosition(iso);m=solarPosition(civilIso(ms-elong/15*3600e3));a=solarPosition(civilIso(ms-3*3600e3));b=solarPosition(civilIso(ms+3*3600e3));}catch{return null;}
+ const no=siteNorthOffset(),sp=(t:string)=>solarPosition(t,undefined,undefined,no);  // MARSLAND: the scene's north (site-north.ts)
+ try{s=sp(iso);m=sp(civilIso(ms-elong/15*3600e3));a=sp(civilIso(ms-3*3600e3));b=sp(civilIso(ms+3*3600e3));}catch{return null;}
  if(![s,m,a,b].every(p=>p.direction.every(Number.isFinite)))return null;
  const o=out??{sun:new THREE.Vector3(),moon:new THREE.Vector3(),phase:0,illumination:0,sunElevation:0,warmth:0,blueHour:0,starRotation:new THREE.Matrix3()};
  vec(s.direction,o.sun);vec(m.direction,o.moon);o.phase=phase;o.illumination=.5*(1-Math.cos(phase*2*Math.PI));

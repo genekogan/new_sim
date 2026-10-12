@@ -7,9 +7,11 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { ROOT, X0 } from './v3.mjs';
 import { ROOMS, ROOM_AT } from './layout.mjs';
+import { orientOp, BEARING } from './frame.mjs';
+import { NEAR_OPS, FAR_OPS } from './land.mjs';
 
 const P = JSON.parse(readFileSync(join(ROOT, 'worlds/core-assets/mars/placements.json'), 'utf8')).placements;
-const DEFS = new Map(JSON.parse(readFileSync(join(ROOT, 'packages/world-compiler/src/core-kit/mars.json'), 'utf8')).map((d) => [`core/${d.name.slice(5)}@1`, d]));
+const DEFS = new Map(JSON.parse(readFileSync(join(ROOT, 'packages/world-compiler/src/core-kit/mars.json'), 'utf8')).map((d) => [`core/${d.name.slice(5)}@${d.version ?? 1}`, d]));
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const NUM = { 1: 'coffee-counter', 2: 'tea-table', 3: 'study-table', 4: 'study-chair', 5: 'study-chair', 6: 'study-chair', 7: 'study-chair', 8: 'papasan', 9: 'tea-stool', 10: 'tea-stool', 11: 'tea-stool', 12: 'red-sofa', 13: 'honey-sofa', 14: 'cream-recliner', 15: 'prep-table', 18: 'commercial-fridge', 19: 'chest-freezer', 20: 'bus-seat', 21: 'bus-seat', 22: 'bus-seat', 23: 'bus-seat', 24: 'bus-seat', 25: 'bus-seat', 26: 'diner-table', 27: 'diner-table', 28: 'diner-table', 29: 'white-fridge' };
 
@@ -26,10 +28,10 @@ const NUM = { 1: 'coffee-counter', 2: 'tea-table', 3: 'study-table', 4: 'study-c
 // prep table #15 (with its bowls and pot) 0.2 m west, so the aisle past the Chiba rack post at E −8.4 is a body wide.
 // The tea stool #9 0.25 m east, to the tea table's west end, clear of the way in from main south.
 const MOVE = { 9: [0.25, 0, 0], 3: [0.1, 0, 0], 4: [0.1, 0, 0], 5: [0.1, 0, 0], 6: [0.1, 0, 0], ...Object.fromEntries([20, 21, 22, 23, 24, 25, 26, 27, 28].map((n) => [n, [0, 0, -0.3]])), 29: [-0.8, 0, 0], 19: [-0.6, 0, 0], 15: [-0.2, 0, 0] };
-const MOVE_ITEM = { 'core/mars-fridge-top-electric-kettle@1': [-0.8, 0, 0] };
+const MOVE_ITEM = { 'core/mars-fridge-top-electric-kettle': [-0.8, 0, 0] };
 const used = new Set();
 const uniq = (base) => { let n = base, k = 2; while (used.has(n)) n = `${base}-${k++}`; used.add(n); return n; };
-const short = (def) => def.replace(/^core\/mars-/, '').replace(/@1$/, '').replace(/-\d+$/, '');
+const short = (def) => def.replace(/^core\/mars-/, '').replace(/@\d+$/, '').replace(/-\d+$/, '');
 const bld = P.filter((p) => p.cat === 'building');
 const pos = new Map(bld.map((b) => [b.building, b.p]));
 
@@ -60,7 +62,7 @@ for (const it of P.filter((p) => p.cat === 'item')) {
   // on the table it stands on (its top slot), else where it is
   const at = (f) => f.orig ?? f.p;
   const t = tables.find(({ f, def }) => { const [w, , d] = def.size.box, top = at(f)[1] + (def.slots?.[0]?.p?.[1] ?? 0); return Math.abs(it.p[0] - at(f)[0]) <= w / 2 && Math.abs(it.p[2] - at(f)[2]) <= d / 2 && Math.abs(it.p[1] - top) < 0.08; });
-  const p = MOVE_ITEM[it.def] ? it.p.map((v, i) => r3(v + MOVE_ITEM[it.def][i])) : it.p;
+  const mv = MOVE_ITEM[it.def.replace(/@\d+$/, '')], p = mv ? it.p.map((v, i) => r3(v + mv[i])) : it.p;
   ops.items.push(t ? { op: 'place', def: it.def, name, in: { parent: t.path, slot: 'top' }, p: [r3(it.p[0] - at(t.f)[0]), 0, r3(it.p[2] - at(t.f)[2])] } : { op: 'place', def: it.def, name, p });
 }
 // Named places are the buildings and their rooms (walk:mimos, walk:mimos/floor, walk:kitchen/dining-hall …); their labels
@@ -69,10 +71,10 @@ const T = {
   schema: 'genesis/1',
   name: 'Mars two',
   description: 'The Mars College 2026 campus in the new engine, built from the library (core/mars-* defs any god can place): Mimos and the Chiba kitchen and dining hall laid out as Gene corrected them (the L-shaped Mimos with the raised main and the glazed tea room, the outdoor gap, the kitchen west of the diner with its perimeter counters, sinks and prep table, the two northeast shower bays), Chiba with the auditorium, the Dojo, Tool camp, the Freeside compound, the west rack building, and every van, bus, trailer, toilet and hut where the reference (sim.mars.college, 2026) has them. Furniture is the reference\'s own: Souls sit on the sofas, chairs, stools and bus seats and put things on the tables and counters.',
-  constants: { extent: 320, ground: 'land', limits: { budget: { tris: 200000, bytes: 6000000, texPx: 2048 } } },
+  constants: { extent: 1200, ground: 'land', limits: { budget: { tris: 200000, bytes: 6000000, texPx: 2048 } } },
   state: {
     constitution: '# Mars two\nThe Mars College 2026 campus on the low Sonoran desert by the Salton Sea: Mimos (the café and lounge), the Chiba kitchen and dining hall, the Chiba auditorium, the Dojo, Tool camp and the Freeside compound.\n\nRebuilt in the new engine from the 2026 reference with Gene\'s Mimos and kitchen corrections.',
-    sky: { palette: 'mars-desert', sun: 0.8 }, weather: { clouds: 0.05, wind: 0.3, rain: 0 }, ground: { palette: 'desert' },
+    sky: { palette: 'mars-desert', sun: 0.8 }, weather: { kind: 'clear', clouds: 0.05, wind: 0.25, rain: 0, fog: 0 }, ground: { palette: 'playa' },
   },
   batches: [
     { note: 'the campus buildings (Mimos, the Chiba kitchen and dining hall, the showers as Gene corrected them; Chiba, Dojo, Tool camp, Freeside, the west racks)', group: 'campus', ops: ops.campus },
@@ -84,5 +86,10 @@ const T = {
     { note: 'the site: vans, buses, trailers, RVs, toilets, huts, the forklift, OG', group: 'site', ops: ops.site },
   ],
 };
+// MARSLAND: the world frame is geographic (frame.mjs): every root-level placement turns about the Mimos origin, which
+// becomes the world's (0, 0); parent-local placements are unchanged.
+for (const b of T.batches) b.ops = b.ops.map(orientOp);
+// MARSLAND: the land around it, already in the world frame (land.mjs)
+T.batches.push({ note: 'the land: the playa, the tyre ring of the old race track west of camp, tyre tracks, creosote scrub; beyond the edge the 111, the wash, the salt flats, the Salton Sea and the mountains', group: 'land', ops: [...NEAR_OPS, ...FAR_OPS] });
 writeFileSync(join(ROOT, 'worlds/templates/mars-two.json'), JSON.stringify(T, null, 1) + '\n');
 console.log(`mars-two.json: ${T.batches.reduce((n, b) => n + b.ops.length, 0)} ops (${Object.entries(ops).map(([k, v]) => `${k} ${v.length}`).join(', ')})`);

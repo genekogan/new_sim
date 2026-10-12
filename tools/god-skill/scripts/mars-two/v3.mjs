@@ -7,6 +7,7 @@
 // - mars-two frame (the new world): north up = −z, east = +x, ground y = 0, metres. X = E + X0, Z = −N, where (N, E) are
 //   metres north/east of the Mimos origin. Every building of the campus is aligned with these axes (the rack grid).
 import { createRequire } from 'node:module';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -41,7 +42,36 @@ export function v3ToLocal(ox = 0, oz = 0) {
 export async function readV3() {
   const io = new core.NodeIO().registerExtensions(ext.ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
   const doc = await io.read(V3_GLB);
+  applyRefDelta(doc);
   return { io, doc };
+}
+
+// PARITY: the corrected sim.mars.college source build (7d9688f) moved some V3 pieces (the kitchen prep table, the Mimos
+// papasan and clothing rack): ref-7d9688f-delta.json (ref-delta.mjs) holds their world matrices there; each node's local
+// matrix is set so its world matrix is the reference's.
+export const REF_DELTA = join(ROOT, 'tools/god-skill/scripts/mars-two/ref-7d9688f-delta.json');
+export function inv4(m) {
+  const [a00, a01, a02, a03, a10, a11, a12, a13, a20, a21, a22, a23, a30, a31, a32, a33] = m;
+  const b00 = a00 * a11 - a01 * a10, b01 = a00 * a12 - a02 * a10, b02 = a00 * a13 - a03 * a10, b03 = a01 * a12 - a02 * a11, b04 = a01 * a13 - a03 * a11, b05 = a02 * a13 - a03 * a12;
+  const b06 = a20 * a31 - a21 * a30, b07 = a20 * a32 - a22 * a30, b08 = a20 * a33 - a23 * a30, b09 = a21 * a32 - a22 * a31, b10 = a21 * a33 - a23 * a31, b11 = a22 * a33 - a23 * a32;
+  const d = 1 / (b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06);
+  return [(a11 * b11 - a12 * b10 + a13 * b09) * d, (a02 * b10 - a01 * b11 - a03 * b09) * d, (a31 * b05 - a32 * b04 + a33 * b03) * d, (a22 * b04 - a21 * b05 - a23 * b03) * d,
+    (a12 * b08 - a10 * b11 - a13 * b07) * d, (a00 * b11 - a02 * b08 + a03 * b07) * d, (a32 * b02 - a30 * b05 - a33 * b01) * d, (a20 * b05 - a22 * b02 + a23 * b01) * d,
+    (a10 * b10 - a11 * b08 + a13 * b06) * d, (a01 * b08 - a00 * b10 - a03 * b06) * d, (a30 * b04 - a31 * b02 + a33 * b00) * d, (a21 * b02 - a20 * b04 - a23 * b00) * d,
+    (a11 * b07 - a10 * b09 - a12 * b06) * d, (a00 * b09 - a01 * b07 + a02 * b06) * d, (a31 * b01 - a30 * b03 - a32 * b00) * d, (a20 * b03 - a21 * b01 + a22 * b00) * d];
+}
+function applyRefDelta(doc) {
+  if (!existsSync(REF_DELTA)) return 0;
+  const { nodes } = JSON.parse(readFileSync(REF_DELTA, 'utf8'));
+  let n = 0;
+  for (const node of doc.getRoot().listNodes()) {
+    if (!node.getMesh()) continue;
+    const d = nodes[`${node.getName()}|${node.getExtras()?.component_id ?? null}`]; if (!d) continue;
+    const parent = node.getParentNode(), local = parent ? mul(inv4(parent.getWorldMatrix()), d.m) : d.m;
+    node.setMatrix(local); n++;
+  }
+  if (n !== Object.keys(nodes).length) throw new Error(`ref delta: ${n} of ${Object.keys(nodes).length} nodes found in V3`);
+  return n;
 }
 
 export const mul = (a, b) => { const o = new Array(16).fill(0); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) for (let k = 0; k < 4; k++) o[c * 4 + r] += a[k * 4 + r] * b[c * 4 + k]; return o; };
@@ -63,7 +93,9 @@ export function crush(doc, { ratio = 0.25, minTris = 300, error = 0.02 } = {}) {
     const key = new Map(), P = [], I = new Uint32Array(n), v = [0, 0, 0];
     for (let k = 0; k < n; k++) { const vi = idx ? idx.getScalar(k) : k; pos.getElement(vi, v); const h = `${Math.round(v[0] * 1e5)},${Math.round(v[1] * 1e5)},${Math.round(v[2] * 1e5)}`; let j = key.get(h); if (j === undefined) { j = P.length / 3; key.set(h, j); P.push(v[0], v[1], v[2]); if (uv) { uv.getElement(vi, u); U.push(u[0], u[1]); } } I[k] = j; }
     const F = new Float32Array(P), target = Math.max(36, Math.floor((n * ratio) / 3) * 3);
-    const [out] = MeshoptSimplifier.simplifySloppy(I, F, 3, null, target, error);
+    let [out] = MeshoptSimplifier.simplifySloppy(I, F, 3, null, target, error);
+    // (FURN: a part the error bound collapses to almost nothing gets a larger target, not its full CAD resolution back)
+    for (let t = target * 2, k = 0; out.length < 36 && k < 6 && t < n; t *= 2, k++) [out] = MeshoptSimplifier.simplifySloppy(I, F, 3, null, t, error);
     if (out.length < 36 || out.length >= n) continue;
     const pa = new Float32Array(out.length * 3), na = new Float32Array(out.length * 3), ta = uv ? new Float32Array(out.length * 2) : null;
     for (let t = 0; t < out.length; t += 3) {
@@ -90,7 +122,7 @@ export function crush(doc, { ratio = 0.25, minTris = 300, error = 0.02 } = {}) {
  * `tex` px, simplified when over `maxTris`, meshopt-compressed. Returns the bytes and the offset that was removed
  * (`shift`, in the frame), so the caller can place the def where the piece was.
  */
-export async function cut(src, nodeIdx, { name, frame = v3ToLocal(0, 0), tex = 512, maxTris = 60000, compress = true, simplify = null, roof = null } = {}) {
+export async function cut(src, nodeIdx, { name, frame = v3ToLocal(0, 0), tex = 512, maxTris = 60000, compress = true, simplify = null, roof = null, world = null, maxError = 0.01 } = {}) {
   const nodes = src.doc.getRoot().listNodes();
   const pickedIdx = nodeIdx.filter((i) => nodes[i]?.getMesh()), picked = pickedIdx.map((i) => nodes[i]);
   const doc = new core.Document();
@@ -100,7 +132,8 @@ export async function cut(src, nodeIdx, { name, frame = v3ToLocal(0, 0), tex = 5
   // when the camera is inside (mesh.mesh.ts); meshes are joined per material within each group
   const scene = doc.createScene(name), body = doc.createNode('body'), top = doc.createNode('roof');
   scene.addChild(body); scene.addChild(top);
-  const mats = picked.map((n) => mul(frame, n.getWorldMatrix()));
+  // `world`: a corrected world matrix for some nodes (V3 index → matrix), e.g. a rug the reference stood on its edge
+  const mats = picked.map((n, k) => mul(frame, world?.get(pickedIdx[k]) ?? n.getWorldMatrix()));
   const tmp = doc.createScene('bounds'), probe = [];
   picked.forEach((n, k) => { const q = doc.createNode('p').setMesh(map.get(n.getMesh())).setMatrix(mats[k]); tmp.addChild(q); probe.push(q); });
   const b = fn.getBounds(tmp);
@@ -114,7 +147,17 @@ export async function cut(src, nodeIdx, { name, frame = v3ToLocal(0, 0), tex = 5
   await doc.transform(fn.dedup(), fn.prune(), fn.join({ keepNamed: false }), fn.weld(), fn.prune());
   const tris = () => doc.getRoot().listMeshes().reduce((s, m) => s + m.listPrimitives().reduce((t, p) => t + Math.floor((p.getIndices()?.getCount() ?? p.getAttribute('POSITION').getCount()) / 3), 0), 0);
   const t0 = tris();
-  if (t0 > maxTris) { await MeshoptSimplifier.ready; await doc.transform(fn.simplify({ simplifier: MeshoptSimplifier, ratio: maxTris / t0, error: 0.01, lockBorder: false }), fn.prune()); }
+  if (t0 > maxTris) { await MeshoptSimplifier.ready; await doc.transform(fn.simplify({ simplifier: MeshoptSimplifier, ratio: maxTris / t0, error: maxError, lockBorder: false }), fn.prune()); }
+  // FURN: simplification can drop a piece's outermost vertices (Freeside lost 2.1 m on its west side). The viewer fits a
+  // mesh by its own bounds (centred on x/z, base on y = 0), so re-centre on what is left and move the origin with it —
+  // otherwise the whole building draws offset from its footprint and furniture (Freeside was 1.07 m west).
+  const nb = fn.getBounds(scene), d = [(nb.min[0] + nb.max[0]) / 2, nb.min[1], (nb.min[2] + nb.max[2]) / 2];
+  // (only a visible offset, over 2 cm: smaller ones leave released pieces byte-identical)
+  if (Math.hypot(d[0], d[2]) > 0.02 || Math.abs(d[1]) > 0.02) {
+    for (const g of scene.listChildren()) g.setTranslation([-d[0], -d[1], -d[2]]);
+    shift[0] += d[0]; shift[1] += d[1]; shift[2] += d[2];
+    b.min = [nb.min[0] - d[0], nb.min[1] - d[1], nb.min[2] - d[2]]; b.max = [nb.max[0] - d[0], nb.max[1] - d[1], nb.max[2] - d[2]];
+  }
   await doc.transform(fn.textureCompress({ encoder: sharp, targetFormat: 'webp', resize: [tex, tex], quality: 80 }));
   if (compress) { await MeshoptEncoder.ready; await doc.transform(fn.reorder({ encoder: MeshoptEncoder }), fn.quantize(), fn.meshopt({ encoder: MeshoptEncoder, level: 'medium' })); }
   const bufs = doc.getRoot().listBuffers();

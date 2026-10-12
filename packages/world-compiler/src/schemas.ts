@@ -229,7 +229,7 @@ export const worldStateSchema = z.object({
     strike: strikeSchema.nullable().optional() }).prefault({}),
   constitution: z.string().max(20000).default(''),
   /** What the bare ground is made of (L3): the terrain colouring reads it. */
-  ground: z.object({ palette: z.enum(['grass', 'desert', 'dust', 'sand', 'snow', 'rock', 'garden']).default('grass') }).prefault({}),
+  ground: z.object({ palette: z.enum(['grass', 'desert', 'dust', 'sand', 'snow', 'rock', 'garden', 'playa']).default('grass') }).prefault({}),
   /** LAYERS: currency, wallets, relationships. Absent until a layers op (economy, mint, pay, relate) makes it. */
   layers: layersStateSchema.optional(),
 });

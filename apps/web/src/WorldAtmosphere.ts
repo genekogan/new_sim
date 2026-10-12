@@ -11,6 +11,7 @@ import {findAnchors,underCover} from './atmosphere/finder.ts';
 import {insideBuilding} from './atmosphere/indoors.ts';
 import {installAtmosphereChunks,ATMOS,MIST,SHEEN,NOISE_MAP} from './atmosphere/chunks.ts';
 import {SkyDome} from './atmosphere/sky.ts';
+import {skyLook,type SkyLook} from './atmosphere/palettes.ts';
 import {MotionPatches,ROTOR,RIPPLE,SKY_OBJECTS} from './atmosphere/motion.ts';
 import {Rain} from './atmosphere/rain.ts';
 import {Halos} from './atmosphere/halos.ts';
@@ -107,6 +108,8 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   let landing:readonly number[]|null=null;
   scene.traverse(o=>{const p=o.userData?.edenBalloonLanding;if(!landing&&Array.isArray(p)&&p.length===3&&p.every(Number.isFinite)){o.updateWorldMatrix(true,false);const w=new THREE.Vector3(...p as [number,number,number]).applyMatrix4(o.matrixWorld);landing=w.toArray();}});
   balloons.setLanding(landing);
+  // MARSLAND-FAR: a god world's sky palette (GodWorldLiving publishes state.sky.palette on its group)
+  let pal:unknown=null;scene.traverse(o=>{if(pal===null&&typeof o.userData?.edenSkyPalette==='string')pal=o.userData.edenSkyPalette;});palLook=skyLook(pal);
   collectLights();
   scans++;const since=seconds-expansionSeen;nextScan=expansionSeen+(scans<SCAN_AT.length?SCAN_AT[scans]:since+RESCAN_EVERY);
  }
@@ -131,6 +134,8 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
    cTmp.copy(cGrey).lerp(WHITE,.55);if(lights.sunLight)cTmp.multiply(cWarm.copy(WHITE).lerp(lights.sunLight.color,.85).multiplyScalar(1.12));
    sky.uniforms.uCloudLit.value.copy(cGrey).multiplyScalar(1.12).lerp(cTmp,Math.min(1,day*1.4));
    sky.uniforms.uCloudShade.value.copy(cGrey).multiplyScalar(.88-.24*day);
+   // MARSLAND-FAR: a palette's own sky by day (clouds and fog fade it back to the weathered default)
+   if(palLook){const k=day*(1-.85*state.cloud)*(1-state.fog);sky.uniforms.uZenith.value.lerp(palLook.zenith,k);sky.uniforms.uHorizon.value.lerp(palLook.horizon,k);fog.color.lerp(palLook.horizon,k*.6);}
   }
   // Fog is a ground layer: looking down from high up (overview) passes through less of it.
   mistWanted=Math.min(1,state.mist+state.fog*.35);
@@ -187,14 +192,14 @@ export function createWorldAtmosphere(scene:THREE.Scene):{update(frame:Atmospher
   const ortho=!!(camera as THREE.OrthographicCamera).isOrthographicCamera;camera.getWorldPosition(camAt);
   const indoors=!ortho&&(profile==='world'?!!indoorsOf?.(camAt.x,camAt.y,camAt.z):insideBuilding(camAt.x,camAt.y,camAt.z)||underCover(covers,camAt));
   const layer=ortho?0:(indoors?.25:1)/(1+Math.max(0,camAt.y-6)/10);
-  fog.density=ortho?0:.0009+(state.fog*.022+state.rain*.0055)*layer+state.cloud*.0006;
+  fog.density=ortho?0:.0009*(palLook?.fog??1)+(state.fog*.022+state.rain*.0055)*layer+state.cloud*.0006;
   MIST.value.x=ortho||indoors?0:mistWanted;
   sky.uniforms.uBow.value.w=Math.min(.9,state.fog*.9*layer+state.rain*.25);
   // No rain, leaves or motes for a camera indoors / under a roof (they are camera-local and would fall through ceilings).
   rain.lines.visible=rainWanted&&!ortho&&!indoors;rain.uniforms.uCam.value.copy(camAt);
   sky.mesh.visible=skyWanted&&!ortho;if(!ortho){sky.mesh.position.copy(camAt);sky.mesh.updateMatrix();sky.mesh.updateMatrixWorld(true);}
  }
- let skyWanted=false;
+ let skyWanted=false,palLook:SkyLook|null=null;
  // Capture the callback value; disposal restores this exact function, and invocation below supplies its Scene receiver.
  const previousBeforeRender=Reflect.get(scene,'onBeforeRender') as THREE.Object3D['onBeforeRender'];
  const beforeRender:THREE.Object3D['onBeforeRender']=function(this:THREE.Object3D,renderer,s,camera,geometry,material,group){

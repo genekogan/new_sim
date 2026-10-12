@@ -22,9 +22,10 @@
 // - Site objects: everything else on the campus (vans, buses, trailers, RVs, toilets, the forklift, OG, tents…) as one
 //   def per connected object, deduplicated by shape.
 import { createHash } from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
 import { join, relative } from 'node:path';
-import { ROOT, readV3, indexNodes, cut, v3ToLocal, mul, rotY, translate, xz, X0, minRect, nodePoints, rectOverlap } from './v3.mjs';
+import { ROOT, readV3, indexNodes, cut, v3ToLocal, mul, rotY, translate, xz, X0, minRect, nodePoints, rectOverlap, NORTH, EAST, O, core, ext, MeshoptEncoder, inv4 } from './v3.mjs';
 import { ROOMS, WALLS, DOORS, STAIRS, RAISED, ENTRANCES, TERRACES, ROOM_AT, LOFTS, LOFT_Y, FIXTURES, STAIR_RUN, REPLACED } from './layout.mjs';
 
 const { measureGlb, footprintToBaked } = await import(join(ROOT, 'apps/server/src/god/assets.ts'));
@@ -36,9 +37,59 @@ const r3 = (v) => Math.round(v * 1000) / 1000;
 const r4 = (v) => Math.round(v * 10000) / 10000;
 const LICENSE = 'Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project';
 const SOURCE = 'V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene\'s Oct 10 corrections)';
+const RAW_FLOOR = 0.53;
+
+// PARITY: what the corrected sim.mars.college source build (7d9688f, layers 1+2 of Gene's target) draws differently from
+// V3, beyond the moved nodes readV3 already takes from ref-7d9688f-delta.json (team/lanes/marsland-parity.md):
+// - the shower bays in the Mars kit's plywood (its plywood tones carry the kitchen plywood photo, tinted #ead8b7), not flat tan;
+// - the donor glazing transparent_panel-0067's sliver north of the outdoor gap, which crossed shower bay 1's doorway, removed;
+// - Mimos floor's continuous dark ground mat (Gene: "Mimos floor, with flooring throughout"), N −1.85…0.75, E 0…3.66;
+// - Chiba's solar panels near-black glass as the 2026 drone shows them (solar2's navy cells read pale grey under the sky).
+const PLYWOOD_JPG = '<mars-campus-repo>/viewer/public/modular/textures/kitchen-plywood-sample.jpg';   // read-only
+const lin = (hex) => [0, 2, 4].map((i) => Math.pow(parseInt(hex.slice(1 + i, 3 + i), 16) / 255, 2.2));
+function parityFixes(doc) {
+  const root = doc.getRoot(), nodes = root.listNodes(), kind = (n) => n.getExtras()?.kind ?? '';
+  // showers: one plywood material for walls, piers, headers, slabs and roofs (kit.ts Kit.mat)
+  const showerMats = new Set(nodes.filter((n) => n.getMesh() && /^Shower /.test(kind(n))).flatMap((n) => n.getMesh().listPrimitives().map((p) => p.getMaterial())));
+  if (existsSync(PLYWOOD_JPG) && showerMats.size) {
+    const tex = doc.createTexture('kitchen-plywood-sample').setImage(readFileSync(PLYWOOD_JPG)).setMimeType('image/jpeg').setURI('kitchen-plywood-sample.jpg');
+    for (const m of showerMats) m.setBaseColorTexture(tex).setBaseColorFactor([...lin('#ead8b7'), 1]).setRoughnessFactor(0.86).setMetallicFactor(0);
+  } else console.warn('parity: no plywood texture source; showers stay plain');
+  // the glass sliver: triangles of transparent_panel-0067 lying wholly north of the outdoor gap (n ≥ 5.9), east of main
+  for (const n of nodes.filter((q) => q.getName() === 'transparent_panel-0067' && q.getMesh())) {
+    const W = n.getWorldMatrix(), v = [0, 0, 0];
+    for (const p of n.getMesh().listPrimitives()) {
+      const pos = p.getAttribute('POSITION'), idx = p.getIndices(), cnt = idx ? idx.getCount() : pos.getCount(), keep = [];
+      for (let t = 0; t < cnt; t += 3) {
+        const vs = [0, 1, 2].map((k) => idx ? idx.getScalar(t + k) : t + k);
+        const out = vs.every((vi) => { pos.getElement(vi, v); const x = W[0] * v[0] + W[4] * v[1] + W[8] * v[2] + W[12], z = W[2] * v[0] + W[6] * v[1] + W[10] * v[2] + W[14]; const dx = x - O[0], dz = z - O[1]; return dx * NORTH[0] + dz * NORTH[1] >= 5.9 && dx * EAST[0] + dz * EAST[1] > 0.012; });
+        if (!out) keep.push(...vs);
+      }
+      if (keep.length < cnt) p.setIndices(doc.createAccessor().setType('SCALAR').setArray(new Uint32Array(keep)).setBuffer(root.listBuffers()[0]));
+    }
+  }
+  // Mimos floor's ground mat: a dark mat over the arm's ground (the reference: 'Mimos southeast continuous ground mat floor', #55564d)
+  {
+    const N0 = -1.85, N1 = 0.75, E0 = 0, E1 = 3.66, Y0 = -0.16, Y1 = -0.16 + 0.025;
+    const at = (n, e) => [O[0] + n * NORTH[0] + e * EAST[0], O[1] + n * NORTH[1] + e * EAST[1]];
+    const P = [], I = [], Nn = [], quad = (a, b, c, d, nrm) => { const k = P.length / 3; for (const q of [a, b, c, d]) { P.push(...q); Nn.push(...nrm); } I.push(k, k + 1, k + 2, k, k + 2, k + 3); };
+    const c = [[N0, E0], [N0, E1], [N1, E1], [N1, E0]].map(([n, e]) => at(n, e));
+    const top = c.map(([x, z]) => [x, Y1, z]), bot = c.map(([x, z]) => [x, Y0, z]);
+    quad(top[0], top[1], top[2], top[3], [0, 1, 0]);   // (counter-clockwise seen from above: N × E points down in V3's x, z)
+    for (let s = 0; s < 4; s++) { const a = s, b = (s + 1) % 4, dx = c[b][0] - c[a][0], dz = c[b][1] - c[a][1], l = Math.hypot(dx, dz); quad(bot[a], bot[b], top[b], top[a], [dz / l, 0, -dx / l]); }
+    const buf = root.listBuffers()[0];
+    const mat = doc.createMaterial('Mimos southeast continuous ground mat').setBaseColorFactor([...lin('#55564d'), 1]).setRoughnessFactor(0.95).setMetallicFactor(0).setDoubleSided(true);
+    const prim = doc.createPrimitive().setAttribute('POSITION', doc.createAccessor().setType('VEC3').setArray(new Float32Array(P)).setBuffer(buf)).setAttribute('NORMAL', doc.createAccessor().setType('VEC3').setArray(new Float32Array(Nn)).setBuffer(buf)).setIndices(doc.createAccessor().setType('SCALAR').setArray(new Uint32Array(I)).setBuffer(buf)).setMaterial(mat);
+    const node = doc.createNode('Mimos southeast continuous ground mat floor').setMesh(doc.createMesh('mimos-ground-mat').addPrimitive(prim)).setExtras({ assembly_id: 'mimos-open-l', kind: 'Mimos southeast continuous ground mat floor', layer: 'Timber, floors and stairs', component_id: 'parity-mimos-ground-mat' });
+    node.setMatrix(inv4(nodes[2].getWorldMatrix())); nodes[2].addChild(node);   // under Chiba (TOP index 2), where the reference's Mimos parts are
+  }
+  // Chiba's solar panels: near-black glass
+  for (const m of root.listMaterials()) if (m.getName() === 'solar2') m.setBaseColorFactor([0.16, 0.16, 0.19, 1]).setRoughnessFactor(0.3);
+}
 
 console.time('read');
 const src = await readV3();
+parityFixes(src.doc);
 const rows = indexNodes(src);
 console.timeEnd('read');
 const byI = new Map(rows.map((r) => [r.i, r]));
@@ -80,8 +131,11 @@ const ITEM = /mixing bowl|stock pot|table cup|table kettle|kettle handle|ceramic
 // Mimos's west coffee table — are cut out as library defs too (not left inside the building and site meshes).
 const MORE_ASM = /^(colab-2026-roof-access|freeside-2026-observed-details|freeside-north-hydro-cart|og-clubhouse-details|og-east-life|og-kitchen-details|og-ground-details|tool-2026-library)$/;
 const MORE_KIND = /sofa|chair|table|stool|cushion|mattress|shel(f|ves)|bench|stove|sink|speaker|lamp|spool|cart|vise|net pot|griddle|counter|DJ|laptop|cup|book|basin|worktop/i;
+// FURN: the auditorium's projector table with its projector and purple runner is a table Souls can use (STRUCT's
+// projector / runner / drape words had left it inside Chiba's mesh)
+const KEEP = /auditorium projector table|auditorium white projector|projector lens facing existing screen|auditorium purple (table runner|runner drape)/i;
 function furnitureRows() {
-  return rows.filter((r) => r.asm && !STRUCT.test(r.kind ?? '') && r.y1 > 0.02 && topOf(r) !== 'people' && FURN_ASM.test(r.asm));
+  return rows.filter((r) => r.asm && (!STRUCT.test(r.kind ?? '') || KEEP.test(r.kind ?? '')) && r.y1 > 0.02 && topOf(r) !== 'people' && FURN_ASM.test(r.asm));
 }
 const isMore = (r) => r.asm && r.y1 > 0.02 && topOf(r) !== 'people' && (!STRUCT.test(r.kind ?? '') || /table panel/i.test(r.kind ?? ''))
   && ((MORE_ASM.test(r.asm) && r.layer === 'Interior details' && MORE_KIND.test(`${r.kind ?? ''} ${r.name ?? ''}`))
@@ -133,6 +187,7 @@ function nameOf(rs, cat) {
   // the part that names the object: a top / seat / body before a leg or a foot
   const cand = rs.filter((r) => re.test(r.kind ?? '')), main = cand.find((r) => /top|seat|base|body|shade|cushion|mattress/i.test(r.kind ?? '') && !/leg|foot|feet/i.test(r.kind ?? '')) ?? cand[0] ?? rs[0];
   if (cat === 'table' && /west coffee table|shared coffee tablet/i.test(main.kind ?? '')) return 'mimos-coffee-table';
+  if (cat === 'table' && /projector table/i.test(main.kind ?? '')) return 'projector-table';
   let n = (main.kind ?? main.name).toLowerCase().replace(/\b(mimos|kitchen|diner|auditorium|chiba|source|photographed|commissary|native|fitted|loose|adjacent|continued|upper|northwest|west|left|right|rear|front|study|shared|photo|observed|occupied|separate|grounded|slender|short|performer|open mic|portable|draped|black|pale|brown|white|side)\b/g, ' ').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   for (let i = 0; i < 3; i++) n = n.replace(/-(top|cabinet|carcass|cushion|base|seat|back|plinth|tabletop|body|leg|legs|foot|feet|arm|core|rail|upright|frame|crossed|mast|shade|stand|panel|edge|support|bottom|side)$/g, '');
   if (/floor-cushion|floor$/.test(n) && /cushion/i.test(main.kind ?? '')) n = n.replace(/-floor$/, '-floor-cushion');
@@ -182,6 +237,12 @@ function authoredFootprint(b, o, box, contents) {
 // ------------------------------------------------------------------ build
 mkdirSync(OUT, { recursive: true });
 const index = {}, defs = [], placements = [], written = new Set();
+// FURN: worlds made from a released mars-two keep their defs (name@version) and the asset shas those name; a rebuilt
+// piece must not orphan them (Gene's my-mars-college-2026, made at e6613f11, names three footprints MARSLIVED rebuilt
+// under the same names). versions.json lists the released commits: every asset of theirs this build no longer writes
+// is kept byte-exact under legacy/ and stays in the index.
+const VER = join(OUT, 'versions.json');
+const ledger = existsSync(VER) ? JSON.parse(readFileSync(VER, 'utf8')) : { schema: 'mars-def-versions/1', releases: [], defs: {} };
 const record = (bytes, file, kind, extra) => {
   const sha = sha256(bytes), path = relative(ROOT, file);
   writeFileSync(file, bytes); written.add(file);
@@ -266,11 +327,15 @@ for (const g of groups) {
     if (!only || only.test(dname)) {
       const file = join(OUT, `${dname}.glb`), asset = record(piece.bytes, file, 'mesh', { name: `mars-${dname}` });
       const [w, h, d] = piece.box;
-      const top = (re) => Math.max(...g.filter((r) => re.test(r.kind ?? '')).map((r) => r.y1), 0) - b.y0;
+      // (FURN: only parts that match; none matching → 0, never "0 − the piece's floor height": the Tool library low
+      // table's top read −2.857 m and the auditorium cloth −1.127 m, so things put on them sank through the floor)
+      const top = (re) => { const ys = g.filter((r) => re.test(r.kind ?? '')).map((r) => r.y1 - b.y0); return ys.length ? Math.max(0, ...ys) : 0; };
+      // (seats keep their released heights: Souls' routes around the tea stools and the booths were planned with them)
+      const seatTop = (re) => Math.max(...g.filter((r) => re.test(r.kind ?? '')).map((r) => r.y1), 0) - b.y0;
       let slots, components, tags = [], description, layer = 'solid';
       const numbered = c.nums.length ? ` Mars number #${c.nums.join(', #')} (handover stable ids).` : '';
       if (c.cat === 'seat') {
-        const sh = r3(Math.min(h, Math.max(0.3, top(/seat|cushion|plinth|base|pedestal|rim/i) || 0.45)));
+        const sh = r3(Math.min(h, Math.max(0.3, seatTop(/seat|cushion|plinth|base|pedestal|rim/i) || 0.45)));
         const n = /sofa|bench|bus/i.test(c.kinds) ? Math.max(1, Math.min(4, Math.round(w / 0.65))) : 1;
         slots = Array.from({ length: n }, (_, i) => ({ id: n === 1 ? 'seat' : `seat-${i + 1}`, kind: 'seat', p: [r3((i - (n - 1) / 2) * (w / n)), sh, r3(Math.min(0.1, d / 4))], yaw: 0, height: sh, accepts: { tags: ['body'] }, capacity: 1 }));
         components = { seat: { height: sh } }; tags = ['furniture', 'seat', ...(/sofa/i.test(c.kinds) ? ['sofa', 'couch'] : /stool/i.test(c.kinds) ? ['stool'] : /bus/i.test(c.kinds) ? ['bench', 'booth', 'diner'] : ['chair'])];
@@ -300,6 +365,48 @@ for (const g of groups) {
 }
 console.log(`furniture/items: ${nFurn} placed, ${kinds.size} kinds`);
 
+// 1b. FURN: things sim.mars.college shows that V3 lost or never cut out.
+// - The old kitchen's rice cooker and two-tier water urn (the sim.mars.college kitchen, the raw 2026 campus CAD). Gene's
+//   kitchen correction rebuilt the counters and left them out; they go back on the corrected west perimeter counter.
+const RAW_GLB = '<mars-campus-repo>/viewer/public/browser/campus.glb';   // sha 675f4beb… (read-only)
+const RAW_SOURCE = 'raw Mars 2026 campus CAD (campus.glb sha 675f4beb…, ~/Mars campus-2026-reconstruction), the sim.mars.college kitchen';
+async function extraPiece(dname, d, get) {
+  // rebuild from the source when it is here; else keep the bytes already built (the raw CAD is not in the repo)
+  const file = join(OUT, `${dname}.glb`);
+  let piece = await get();
+  if (!piece && existsSync(file)) { const bytes = readFileSync(file); const m = measureGlb(bytes); piece = { bytes, box: [m.box[0], m.box[1], m.box[2]], tris: m.tris }; }
+  if (!piece) throw new Error(`${dname}: no source and no previous build`);
+  const asset = record(piece.bytes, file, 'mesh', { name: `mars-${dname}` });
+  defs.push(def(dname, { ...d, asset, box: piece.box }));
+  console.log(`extra ${dname}: ${piece.tris} tris, box ${piece.box.map(r3).join(' × ')}`);
+  return piece;
+}
+{
+  let raw = null;
+  if (existsSync(RAW_GLB)) {
+    const mo = await import(join(ROOT, 'node_modules/.pnpm/meshoptimizer@1.3.0/node_modules/meshoptimizer/index.js')); await mo.MeshoptDecoder.ready;
+    const io = new core.NodeIO().registerExtensions(ext.ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder, 'meshopt.decoder': mo.MeshoptDecoder });
+    raw = { doc: await io.read(RAW_GLB) };
+    raw.byId = new Map(raw.doc.getRoot().listNodes().map((n, i) => [n.getExtras()?.component_id ?? n.getName(), i]));
+  }
+  const ids = (list) => list.map((n) => raw.byId.get(`cad_component-${n}`)).filter((i) => i !== undefined);
+  const crushIt = { ratio: 0.035, error: 0.3, minTris: 60 };
+  const APPLIANCES = [
+    // PARITY: where the corrected source build (7d9688f) stands them: n −.35 / −.90 on the west perimeter counter (e −11.385),
+    // south of the longitudinal backsplash (at n .25 the cooker stood inside it)
+    // (the CAD's screws, rivets, feet and trims — hundreds of triangles each — are left out; each part is crushed to its share of ≤ 400)
+    ['rice-cooker', '0831 0834 0835 0838 0839 0847 2941', 'A stainless rice cooker with its black lid (the Mars kitchen, 2026).', ['rice', 'cooker', 'appliance'], 3.0, [36.615, 0.35], 0.09],
+    ['water-urn', '0854 0859 0860 0861', 'The two-tier water urn with its tap the Mars kitchen kept on the counter (2026).', ['water', 'urn', 'dispenser', 'drink'], 4.0, [36.615, 0.9], 0.03],
+  ];
+  const counter = placements.find((q) => q.building === 'kitchen' && q.def === 'core/mars-perimeter-counter@1');
+  const cdef = defs.find((x) => x.name === 'core-mars-perimeter-counter'), topY = counter.p[1] + cdef.slots[0].p[1];
+  for (const [dname, list, description, tags, mass, [x, z], ratio] of APPLIANCES) {
+    await extraPiece(dname, { description: `${description} Carryable; it stands on a counter's top slot. Source: ${RAW_SOURCE}.`, tags: ['kitchen', 'item', ...tags], layer: 'decor', components: { carryable: { mass, grips: 2 }, container: { capacity: 1 } }, scale: [0.5, 2] },
+      async () => raw && cut(raw, ids(list.split(' ')), { name: dname, tex: 128, maxTris: 400, maxError: 0.05, simplify: { ...crushIt, ratio } }));
+    placements.push({ def: `core/mars-${dname}@1`, cat: 'item', building: 'kitchen', nums: [], ids: [], p: [x, r3(topY), z], r: 0, floorY: RAW_FLOOR });
+  }
+}
+
 // 2. buildings
 const BUILDINGS = {
   mimos: { label: 'Mimos', tags: ['building', 'cafe', 'lounge', 'tea', 'study', 'mimos'], desc: 'Mimos, the 2026 Mars College café and lounge as Gene corrected it (north up): an L of Mimos main (the west longitudinal section; its northern part a raised wooden floor at 0.53 m with the coffee counter on the west wall and the study table at the north wall, its southern part at ground level) and Mimos floor, the short southeast arm with flooring throughout, the honey sofa beneath the posters on its north wall and the low tea table near its south wall. The pallet racks between main and floor are pass-through; the northeast of the L is outdoors. Rear alcove door with a stair at the north; three risers from main south up to the raised floor.', authored: true },
@@ -311,12 +418,37 @@ const BUILDINGS = {
   freeside: { label: 'Freeside compound', tags: ['building', 'compound', 'freeside', 'colab', 'workshop'], desc: 'The northeast compound: Freeside, the living house with the reused LIBRARY facade, its completed kitchen enclosure, Bodywork/CoLab with the roof access.' },
   'west-racks': { label: 'West rack building', tags: ['building', 'rack', 'shelter'], desc: 'The west rack building at the far west of the campus.' },
 };
+// The `roof` group hides in the roofs-off view and while the camera is inside the building (mesh.mesh.ts). FURN: only
+// what is really above the rooms people use: Chiba's roof (not its gallery floor at 3–3.5 m, the gallery's furniture,
+// its string lights and screens), the Tool library loft's roof (not the loft floor, whiteboard and books at 2.86 m),
+// Mimos's and the kitchen's low ceilings. Lights, facade ornaments and anything named after an assembly that merely
+// contains the word "roof" (CoLab's whole front, `colab-2026-roof-access`) stay in the body.
+const ROOF_Y = { chiba: 5.9, 'tool-camp': 4.4, dojo: 4.3, freeside: 2.45, 'west-racks': 2.9, mimos: 3.1, kitchen: 3.1, showers: 2.3 };
+const NEVER_ROOF = /globe|bulb|festoon|string|light cable|socket|lamp|facade|wheel|triangle|ornament|sign/i;
+function isRoof(b, r) {
+  const k = `${r.kind ?? ''} ${r.name ?? ''}`;
+  if (NEVER_ROOF.test(k)) return false;
+  const roofish = /Roofs and upper floors/.test(r.layer ?? '') || /roof|ceiling|canopy|rafter/i.test(k);
+  return r.y0 >= (ROOF_Y[b] ?? 2.5) - (roofish ? 0.15 : 0);
+}
+// FURN: per-node corrections to the reference. Mimos's Portuguese love posters (the poster wall Gene placed on the tea
+// room's north side) read mirrored from the room: V3 carries their texture upside down, so the quad is flipped top to bottom.
+const WORLD_FIX = { mimos: new Map() };
+for (const r of rows) if (/Portuguese love posters/.test(r.kind ?? '')) WORLD_FIX.mimos.set(r.i, mul(NODES[r.i].getWorldMatrix(), [1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]));
+// The burgundy rug of the study corner: V3's correction stood it on its edge (a 2.8 m tall carpet, which the row filter
+// then dropped as "below ground"). Laid flat in Mimos's mesh, long side east–west, under the study table #3 and its
+// chairs (mars-two x 46.62, z −4.75 on the raised floor). Part of the floor, not a thing: as an entity it changed Souls'
+// routes through main (mars-lived D3).
+for (const r of rows) if (/burgundy floor rug/i.test(r.kind ?? '')) {
+  const N = 4.75, E = 46.62 - X0, at = [O[0] + N * NORTH[0] + E * EAST[0], O[1] + N * NORTH[1] + E * EAST[1]];
+  WORLD_FIX.mimos.set(r.i, [EAST[0], 0, EAST[1], 0, NORTH[0], 0, NORTH[1], 0, 0, 1, 0, 0, at[0], 0.385, at[1], 1]);
+}
 const byB = new Map();
-for (const r of rows) { if (taken.has(r.i)) continue; const b = buildingOf(r); if (b === 'people' || b === 'site') continue; if (r.y1 < 0.02 || r.y0 < -0.3) continue; if (!byB.has(b)) byB.set(b, []); byB.get(b).push(r); }
+for (const r of rows) { if (taken.has(r.i)) continue; const b = buildingOf(r); if (b === 'people' || b === 'site') continue; if ((r.y1 < 0.02 || r.y0 < -0.3) && !WORLD_FIX[b]?.has(r.i)) continue; if (!byB.has(b)) byB.set(b, []); byB.get(b).push(r); }
 for (const [b, rs] of byB) {
   if (only && !only.test(b)) continue;
   const B = BUILDINGS[b];
-  const piece = await cut(src, rs.filter((r) => Math.max(r.n1 - r.n0, r.e1 - r.e0, r.y1 - r.y0) > 0.08 || r.tris < 200).map((r) => r.i), { name: b, tex: 512, maxTris: 70000, simplify: { ratio: 0.25, error: 0.02, minTris: 150 }, roof: (i) => { const r = byI.get(i); return /Roofs and upper floors/.test(r.layer ?? '') || /roof|ceiling|canopy|joist|rafter/i.test(`${r.kind ?? ''} ${r.asm ?? ''}`) || r.y0 > 2.5; } });
+  const piece = await cut(src, rs.filter((r) => Math.max(r.n1 - r.n0, r.e1 - r.e0, r.y1 - r.y0) > 0.08 || r.tris < 200).map((r) => r.i), { name: b, tex: 512, maxTris: 70000, simplify: { ratio: 0.25, error: 0.02, minTris: 150 }, roof: (i) => isRoof(b, byI.get(i)), world: WORLD_FIX[b] });
   const o = piece.shift;   // mars-two position of the def's base centre
   const floorY = B.authored ? 0 : 0;
   // Chiba's contents never reach into Mimos, the kitchen or the showers (their own footprints say what is there)
@@ -401,7 +533,37 @@ for (const [name, defName, building, p, r] of FIXTURES) {
 }
 
 if (!only) {
-  for (const f of readdirSync(OUT)) { const p = join(OUT, f); if (/\.(glb|json)$/.test(f) && !written.has(p) && !/^(index\.part|placements)\.json$/.test(f)) rmSync(p); }
+  // legacy assets (see VER above): byte-exact under legacy/<sha16>.<ext>, listed in legacy/index.json and merged here
+  const LEG = join(OUT, 'legacy'), legFile = join(LEG, 'index.json');
+  mkdirSync(LEG, { recursive: true });
+  const had = existsSync(legFile) ? JSON.parse(readFileSync(legFile, 'utf8')).assets : {}, legacy = {};
+  const git = (ref, path) => execFileSync('git', ['-C', ROOT, 'show', `${ref}:${path}`], { maxBuffer: 1 << 28 });
+  for (const ref of ledger.releases ?? []) {
+    const rel = JSON.parse(git(ref, relative(ROOT, join(OUT, 'index.part.json'))).toString()).assets;
+    for (const [sha, m] of Object.entries(rel)) {
+      if (index[sha] || legacy[sha] || /^worlds\/core-assets\/mars\/legacy\//.test(m.path)) continue;
+      const f = join(LEG, `${sha.slice(0, 16)}.${m.ext}`);
+      if (!(had[sha] && existsSync(f))) { const bytes = git(ref, m.path); if (sha256(bytes) !== sha) throw new Error(`legacy ${m.path}@${ref}: sha mismatch`); writeFileSync(f, bytes); }
+      legacy[sha] = { ...m, path: relative(ROOT, f) };
+    }
+  }
+  for (const f of readdirSync(LEG)) if (f !== 'index.json' && !Object.values(legacy).some((m) => m.path.endsWith(`/${f}`))) rmSync(join(LEG, f));
+  for (const [sha, m] of Object.entries(legacy)) if (!index[sha]) index[sha] = m;
+  writeFileSync(legFile, JSON.stringify({ schema: 'core-assets-part/1', note: 'Mars assets earlier mars-two releases name and the current build no longer writes; generated by build.mjs; never delete an entry a released world may still name', assets: Object.fromEntries(Object.entries(legacy).sort()) }, null, 1) + '\n');
+  // def versions (versions.json): a def whose content differs from every version a world may already hold gets a new
+  // version, so old worlds keep theirs and the template places the new one. Released versions are never reused;
+  // the newest unreleased version is overwritten while the content keeps changing between releases.
+  const canon = (d) => sha256(JSON.stringify({ ...d, description: undefined, version: undefined }));
+  const vOf = new Map();
+  for (const d of defs) {
+    const h = canon(d), list = (ledger.defs[d.name] ??= []);
+    let e = list.find((x) => x.hash === h);
+    if (!e) { const last = list[list.length - 1]; if (last && !last.released) { last.hash = h; e = last; } else { e = { v: Math.max(0, ...list.map((x) => x.v)) + 1, hash: h }; list.push(e); } }
+    d.version = e.v; vOf.set(d.name, e.v);
+  }
+  for (const pl of placements) { const n = pl.def.replace(/^core\//, 'core-').replace(/@\d+$/, ''); pl.def = pl.def.replace(/@\d+$/, `@${vOf.get(n) ?? 1}`); }
+  writeFileSync(VER, JSON.stringify(ledger, null, 1) + '\n');
+  for (const f of readdirSync(OUT)) { const p = join(OUT, f); if (/\.(glb|json)$/.test(f) && !written.has(p) && !/^(index\.part|placements|versions)\.json$/.test(f)) rmSync(p); }
   writeFileSync(join(OUT, 'index.part.json'), JSON.stringify({ schema: 'core-assets-part/1', note: 'Mars 2026 campus pieces; generated by tools/god-skill/scripts/mars-two/build.mjs; merged into worlds/core-assets/index.json by import-packs.mjs', assets: index }, null, 1) + '\n');
   writeFileSync(KIT, JSON.stringify(defs, null, 1) + '\n');
   writeFileSync(join(OUT, 'placements.json'), JSON.stringify({ schema: 'mars-two-placements/1', frame: 'mars-two: x = east, z = south (north up), metres; Mimos origin at x 48, z 0', placements }, null, 1) + '\n');

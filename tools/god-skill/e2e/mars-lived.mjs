@@ -16,6 +16,7 @@
 //   node tools/god-skill/e2e/mars-lived.mjs [--port 5874] [--keep] [--no-shots]
 //
 // Harness from mars-two.mjs. Report under .lane/e2e-mars-lived/<stamp>/.
+import { toWorld, toBuild, rot } from '../scripts/mars-two/frame.mjs';
 import { spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync, existsSync, readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -120,8 +121,11 @@ async function shots(list) {
 // mars-two frame: x = east, z = south; Mimos origin (48, 0). Room rectangles (layout.mjs, N/E → x = E + 48, z = −N).
 const X0 = 48, R = (n0, n1, e0, e1) => ({ x0: e0 + X0, x1: e1 + X0, z0: -n1, z1: -n0 });
 const ROOMS = { 'mimos/main': R(0.09, 5.92, -4.73, 0), 'mimos/main-south': R(-1.85, 0.09, -4.73, 0), 'mimos/floor': R(-1.85, 0.75, 0, 3.66), 'kitchen/working-kitchen': R(-1.85, 5.92, -11.735, -7.615), 'kitchen/dining-hall': R(-1.85, 5.92, -7.615, -4.73) };
-const inRoom = (p, k) => { const r = ROOMS[k]; return !!p && p[0] >= r.x0 - 0.15 && p[0] <= r.x1 + 0.15 && p[2] >= r.z0 - 0.15 && p[2] <= r.z1 + 0.15; };
-const LOFT_Y = 2.857, LOFT = [-13.07, -55.69];
+const inRoom = (p, k) => { const r = ROOMS[k]; if (!p) return false; const [x, z] = toBuild(p[0], p[2]); return x >= r.x0 - 0.15 && x <= r.x1 + 0.15 && z >= r.z0 - 0.15 && z <= r.z1 + 0.15; };
+// MARSLAND: the world frame is geographic (scripts/mars-two/frame.mjs); build-frame points map with toWorld/W3, offsets turn with rot
+const ofs = (p, dx, y, dz) => { const [x, z] = rot(dx, dz); return [p[0] + x, y, p[2] + z]; };
+const W3 = (x, y, z) => { const [a, b] = toWorld(x, z); return [a, y, b]; };
+const LOFT_Y = 2.857, LOFT = [-13.07, -55.69], LOFTW = W3(LOFT[0], LOFT_Y, LOFT[1]);
 const PEOPLE = [
   { key: 'ana', name: 'Ana', description: 'a Mars College resident who starts the day with tea in Mimos' },
   { key: 'ben', name: 'Ben', description: 'studies on the raised floor in Mimos, then joins friends in the tea room' },
@@ -197,10 +201,10 @@ try {
     const st = (await query({ describe: 'tool-library-stair' })).describe, gl = (await query({ describe: 'mimos-front-glazing' })).describe;
     // (right after boot the engine is still taking the template in: ask again for up to a minute)
     const reach = async (from, to) => { let r; for (let i = 0; i < 60; i++) { r = (await query({ reach: { from, to } })).reach; if (r?.reachable) break; await sleep(1000); } return r?.reachable ? { m: r.length, levels: r.levels } : { code: r?.code }; };
-    const TERRACE = [-9.5, LOFT_Y, -54.92];
-    const up = await reach([-9.6, -46.5], TERRACE), down = await reach(TERRACE, [-9.6, -46.5]);
-    const inMimos = await reach([45.22, 4.0], [45.5, 1.0]), mainToFloor = await reach([45.6, 0.53, -3], [48.25, 1.35]);
-    const dinerNorth = await reach([41.3, 0.53, -1.5], [41.0, 0.53, -5.0]);
+    const TERRACE = W3(-9.5, LOFT_Y, -54.92);
+    const up = await reach(toWorld(-9.6, -46.5), TERRACE), down = await reach(TERRACE, toWorld(-9.6, -46.5));
+    const inMimos = await reach(toWorld(45.22, 4.0), toWorld(45.5, 1.0)), mainToFloor = await reach(W3(45.6, 0.53, -3), toWorld(48.25, 1.35));
+    const dinerNorth = await reach(W3(41.3, 0.53, -1.5), W3(41.0, 0.53, -5.0));
     return { stair: st ? [st.pose.x, st.pose.z] : null, glazing: gl ? [gl.pose.x, gl.pose.z] : null, up, down, inMimos, mainToFloor, dinerNorth };
   }, (r) => r.stair && r.glazing && r.up.levels?.includes(2) && r.down.levels?.includes(2) && r.inMimos.m < 9 && r.mainToFloor.m < 12 && r.dinerNorth.m < 6);
   await step('G2 the default world has no economy: the god\'s currency and relate are refused (layers.deferred); ownership still works (dry run)', async () => {
@@ -237,7 +241,9 @@ try {
     ben: [{ do: 'walk', to: 'mimos/main', check: (p) => inRoom(p, 'mimos/main') && p[1] > 0.45 }, { do: 'sit', match: /red.sofa/, check: (p) => inRoom(p, 'mimos/main') }],
     cleo: [{ do: 'walk', to: 'kitchen/working-kitchen', check: inKitchen }, { do: 'take', match: /bowl/, check: inKitchen }],
     dev: [{ do: 'walk', to: 'kitchen/dining-hall', check: inDiner }, { do: 'sit', match: /bus-seat-21/, check: inDiner }],
-    eli: [{ do: 'sit', match: /tool.library.floor.cushion|floor.cushion/, maxS: 420, check: (p) => p && Math.abs(p[1] - LOFT_Y) < 0.35 }],
+    // MARSLAND: Souls now arrive on the open playa south-east of Chiba (world 0, 0), ~90 m from Tool camp, beyond what a
+    // Soul's capabilities list from there: Eli walks over to Tool camp first
+    eli: [{ do: 'walk', to: 'tool-camp', maxS: 420 }, { do: 'sit', match: /tool.library.floor.cushion|floor.cushion/, maxS: 420, check: (p) => p && Math.abs(p[1] - LOFT_Y) < 0.35 }],
   }), allOk);
   report.morning = m && brief(m);
   const m2 = await step('D2 Ben comes down off the raised main by the risers, through the pass-through pallet racks into the tea room, and takes a tea stool beside Ana', () => day({
@@ -253,13 +259,13 @@ try {
   const P = (k) => report.souls[k]?.at(-1)?.end;
   // ---- Souls in Mimos, the kitchen and the diner (roofs off, from above the room, and inside at eye height)
   {
-    const a = P('ana') ?? [49.8, 0, 0.4], c = P('cleo') ?? [38.3, 0.53, -2], d = P('dev') ?? [42.9, 0.53, -3];
+    const a = P('ana') ?? W3(49.8, 0, 0.4), c = P('cleo') ?? W3(38.3, 0.53, -2), d = P('dev') ?? W3(42.9, 0.53, -3);
     await shots([
-      { name: 'mimos-tea-room', eye: [a[0] + 3.2, 4.2, a[2] + 4.6], at: [a[0] - 0.6, 0.6, a[2] - 0.6], hideRoofs: true },
-      { name: 'mimos-inside', eye: [a[0] - 2.6, 1.7, a[2] + 0.9], at: [a[0] + 1.5, 0.7, a[2] - 0.2] },
-      { name: 'kitchen', eye: [c[0] + 1.2, 4.6, c[2] + 4.2], at: [c[0], 0.9, c[2] - 0.8], hideRoofs: true },
-      { name: 'diner', eye: [d[0] - 2.6, 4.4, d[2] + 3.6], at: [d[0] + 0.6, 0.9, d[2] - 0.6], hideRoofs: true },
-      { name: 'loft', eye: [LOFT[0] + 6.5, 6.5, LOFT[1] + 7.5], at: [LOFT[0] + 1.5, 2.4, LOFT[1] + 1.5], hideRoofs: true },
+      { name: 'mimos-tea-room', eye: ofs(a, 3.2, 4.2, 4.6), at: ofs(a, -0.6, 0.6, -0.6), hideRoofs: true },
+      { name: 'mimos-inside', eye: ofs(a, -2.6, 1.7, 0.9), at: ofs(a, 1.5, 0.7, -0.2) },
+      { name: 'kitchen', eye: ofs(c, 1.2, 4.6, 4.2), at: [c[0], 0.9, c[2] - 0.8], hideRoofs: true },
+      { name: 'diner', eye: ofs(d, -2.6, 4.4, 3.6), at: ofs(d, 0.6, 0.9, -0.6), hideRoofs: true },
+      { name: 'loft', eye: ofs(LOFTW, 6.5, 6.5, 7.5), at: ofs(LOFTW, 1.5, 2.4, 1.5), hideRoofs: true },
     ]);
   }
 
@@ -281,7 +287,7 @@ try {
     eli: [{ do: 'walk', to: 'kitchen/dining-hall', maxS: 420, check: inDiner }, { do: 'say', text: 'The library loft has a stair now.', heard: true }],
   }), allOk);
   report.lunch = m4 && brief(m4);
-  { const d = P('cleo') ?? [42.9, 0.53, -3]; await shots([{ name: 'diner-lunch', eye: [d[0] - 2.8, 4.6, d[2] + 3.8], at: [d[0] + 0.6, 0.9, d[2] - 1.2], hideRoofs: true }]); }
+  { const d = P('cleo') ?? W3(42.9, 0.53, -3); await shots([{ name: 'diner-lunch', eye: ofs(d, -2.8, 4.6, 3.8), at: ofs(d, 0.6, 0.9, -1.2), hideRoofs: true }]); }
 
   await step('W the day ran for at least twenty world-minutes', async () => { const c1 = await clock(); return { from: c0, to: c1, minutes: +(worldMinute(c1) - worldMinute(c0)).toFixed(0) }; }, (r) => r.minutes >= 20);
   await step('T nothing faulted: no engine faults or violations in the server log', async () => ({ faults: (serverLog.match(/engine fault|violat/g) ?? []).length }), (r) => r.faults === 0);

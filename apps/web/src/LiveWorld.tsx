@@ -61,6 +61,8 @@ import { WorldSceneHistory } from './WorldSceneHistory.ts';
 import { apiPath, worldKey } from './world-path.ts';
 import { BASE } from './base-path.ts';
 import { newWorld } from './world-kind.ts';
+import { marsFork } from './mars-fork.ts';
+import type { ForkLand } from './WorldMarsForkLand.ts';
 import { WorldEntityLayer } from './WorldEntityLayer.ts';
 import { GodWorldLiving, godTourViews } from './world-env.ts';
 import { WorldLightning } from './WorldLightning.ts';
@@ -322,7 +324,10 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
     const fading=new WorldFadingLayer();scene.add(fading.group);let fadedOut=new Set<string>();const fadeOverride=parseFadeOverride(location.search),fadeSince=new Map<string,number>();
     // Balloon ride: Core's ride state (edge frames) or a native carrier; ?ride=Alice,Bob previews a flight locally.
     const balloonRide=new WorldBalloonRide();scene.add(balloonRide.group);const rideOverride=parseRideOverride(location.search),rideStart=performance.now();
-    const atmosphere=createWorldAtmosphere(scene);let atmosphereSeconds=0;const reducedMotionQuery=typeof matchMedia==='function'?matchMedia('(prefers-reduced-motion: reduce)'):null;
+    const atmosphere=createWorldAtmosphere(scene);
+    // MARSLAND-FORK: the Mars fork (/worlds/w/mars) draws the mars-two template's drone surroundings and its desert sky (lazy: only the fork loads the kit)
+    let forkLand:ForkLand|null=null,forkLandLoad:Promise<void>|null=null;
+    const dressForkLand=(camp:THREE.Object3D)=>{if(!marsFork)return;forkLandLoad??=import('./WorldMarsForkLand.ts').then(m=>{if(abort.signal.aborted)return;forkLand=m.createForkLand(0);scene.add(forkLand.group);(window as unknown as {__simForkLand?:unknown}).__simForkLand=forkLand.stats;},e=>console.warn('mars fork land could not be drawn',e));void forkLandLoad.then(()=>forkLand?.dress(camp));};let atmosphereSeconds=0;const reducedMotionQuery=typeof matchMedia==='function'?matchMedia('(prefers-reduced-motion: reduce)'):null;
     const light = new Daylight(scene);
     const broadcast = new WorldBroadcast();
     broadcast.hints=()=>({soulEntity:id=>context.current.sim.conn.replica.souls.get(id)?.entityId??null,eden:!!expansion&&!past.current,daylight:light.daylight,...(entityLayer.active&&!expansion?{views:godTourViews(entityLayer,entityLayer.groundAt)}:{})});  // R4-LIVE: a god world's own landmarks  // VF1/VF5: who speaks; Eden town views; time of day
@@ -477,7 +482,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       people?.dispose();people=null;applied=null;
       base=info.scene;nativeBoat=info.shore?.metadata.boat&&info.shore.appearance?{layout:info.shore.metadata.boat.layout,proposal:info.shore.appearance.boat}:undefined;dayTicks=info.clock?.dayTicks??null;broadcast.reset();followView.reset();followed=null;
       capturedPlatforms=info.platforms??null;
-      geometry.dispose();geometry=new WorldGeometry(base,info.ground,info.commons,info.shore,info.assetRoot);scene.add(geometry.group);light.fit(geometry.bounds);light.setCommonsReadability(geometry.hasAuthoredCommons);
+      geometry.dispose();geometry=new WorldGeometry(base,info.ground,info.commons,info.shore,info.assetRoot);scene.add(geometry.group);light.fit(geometry.bounds);light.setCommonsReadability(geometry.hasAuthoredCommons);dressForkLand(geometry.group);  // MARSLAND-FORK: layer 3 around the Mars fork
       // Cosmetic paths require the verified full public capture and exact Core
       // social layout. Unknown/legacy scenes retain their original appearance.
       if((verifiedPublication as {body?:{scene?:{social?:{version?:unknown}}}}|undefined)?.body?.scene?.social?.version==='social-eden/1')try{socialPaths=createNativeSocialPaths(verifiedPublication,true);if(socialPaths)scene.add(socialPaths.group);}catch{}
@@ -796,7 +801,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       // Orbit click-to-centre glide; any other mode or a new gesture cancels it.
       if(viewing!=='manual'||context.current.manualNavigation!=='orbit')orbitPivot.cancel();
       orbitPivot.update(step,camera,controls.target);
-      atmosphereSeconds+=step;godLiving?.update(now,light.daylight);const godSky=godLiving&&entityLayer.active&&!expansion?godLiving.atmosphere():null;
+      atmosphereSeconds+=step;godLiving?.update(now,light.daylight);const godSky=godLiving&&entityLayer.active&&!expansion?godLiving.atmosphere():forkLand&&!expansion?forkLand.atmosphere():null;
       try{atmosphere.update({seconds:atmosphereSeconds,dt:step,daylight:light.daylight,camera,eden:(!!expansion||!!godSky)&&!past.current,reducedMotion:!!reducedMotionQuery?.matches,clock:shown.current?.datetime??null,...(godSky?{profile:'world' as const,weather:godSky.weather,indoors:godSky.indoors}:{})});}catch{}
       try{godLightning?.update(shown.current?.tick??NaN,camera,step,!!reducedMotionQuery?.matches);}catch{}
       if(controls.enabled)controls.update();
@@ -921,7 +926,7 @@ export function LiveWorld({ sim, selected, onSelect, onViewerHandle, onViewerSta
       portraits.dispose();
       orbitPivot.dispose();
       rts.dispose();
-      atmosphere.dispose();godLiving?.dispose();godLightning?.dispose();
+      atmosphere.dispose();forkLand?.dispose();godLiving?.dispose();godLightning?.dispose();
       speechLayer.dispose();
       fading.dispose();
       balloonRide.dispose();

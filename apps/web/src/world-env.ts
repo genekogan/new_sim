@@ -71,6 +71,8 @@ export class GodWorldLiving {
     setNightLightStrength(daylight);
     if (nowMs - this.checkedAt < 500) return;
     this.checkedAt = nowMs;
+    // MARSLAND-FAR: the sky palette, for the atmosphere's scene scan (atmosphere/palettes.ts)
+    this.group.userData.edenSkyPalette = (entityWorldState(this.layer) as { sky?: { palette?: string } } | null)?.sky?.palette ?? null;
     const m = this.model; if (!m) return;
     const sources: NightSource[] = [], marks: [number, number, number, string, number][] = [];
     for (const e of m.entities.values()) {
