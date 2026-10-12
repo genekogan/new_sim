@@ -44,6 +44,12 @@ export class Objects {
     return (this.core.db.prepare('SELECT body FROM edge_comms_objects WHERE world_id = ? ORDER BY id').all(this.core.worldId) as {body: string}[]).map(r => JSON.parse(r.body) as ObjectRecord);
   }
 
+  /** Original creation input; private provenance survives actions and process restarts. */
+  creationParams(id: string): Record<string, unknown> | undefined {
+    const row = this.core.db.prepare("SELECT params FROM edge_comms_object_log WHERE world_id=? AND object_id=? AND action='create' ORDER BY version DESC LIMIT 1").get(this.core.worldId, id) as {params: string} | undefined;
+    return row ? JSON.parse(row.params) : undefined;
+  }
+
   /** Create (or keep, if it exists) an object instance. Seeded by Ledger/World/steward. */
   create(input: {id: string; kind: string; name: string; description?: string; placeId: string; params?: Record<string, unknown>}): ObjectRecord {
     if (!OBJECT_ID.test(input.id)) throw new Error('object id must match ^[a-z0-9][a-z0-9._-]{0,99}$');
@@ -54,7 +60,9 @@ export class Objects {
       if (existing) return existing;
       const state = kind.initial(input.params ?? {}, this.timeCtx());
       checkState(kind, state);
-      const o: ObjectRecord = {id: input.id, kind: input.kind, name: input.name.slice(0, 100), description: (input.description ?? kind.description).slice(0, 4000), placeId: input.placeId, version: 1, state, createdAt: this.core.now()};
+      // Removing a projection retains its audit log; restoring it must continue that version sequence.
+      const prior = this.core.db.prepare('SELECT MAX(version) AS version FROM edge_comms_object_log WHERE world_id=? AND object_id=?').get(this.core.worldId, input.id) as {version: number | null};
+      const o: ObjectRecord = {id: input.id, kind: input.kind, name: input.name.slice(0, 100), description: (input.description ?? kind.description).slice(0, 4000), placeId: input.placeId, version: (prior.version ?? 0) + 1, state, createdAt: this.core.now()};
       this.save(o); this.log(o, null, 'create', input.params ?? {});
       return o;
     });

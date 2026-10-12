@@ -21,6 +21,7 @@ import type { EdgeCapability, EdgeSoul } from '../edge/contract.ts';
 import type { EdgeLedger } from '../edge/ledger/ledger.ts';
 import { hashOf } from '@sim/world-compiler';
 import { ApiError } from '../souls.ts';
+import type { Objects } from '../edge/comms/objects/framework.ts';
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Vec2 = [number, number];
@@ -48,6 +49,9 @@ export function deferredOp(batch: unknown): { op: number; code: string; detail: 
 export const TRADE_REACH = 30;
 /** Calendar items are posted this many world minutes ahead. */
 const CAL_HORIZON = 24 * 60;
+// Reserved schedule-projection namespace plus its author marker: never prune steward/native calendar objects.
+const godCalendar = (o: { id: string; kind: string; state: unknown }) => o.kind === 'calendar-item' && /^cal-g[0-9a-f]{12}$/.test(o.id) && (o.state as { proposedBy?: string } | null)?.proposedBy === 'the god of this world';
+const calendarId = (entity: string, event: string, date: string) => `cal-g${hashOf([entity, event, date]).slice(0, 12)}`;
 
 export type LayersHost = {
   model: WorldModel;
@@ -71,7 +75,8 @@ export class GodLayers {
 
   private get m() { return this.h.model; }
   /** Is this world using any layer at all? (cheap) */
-  active(): boolean { if (this.m.state.layers) return true; for (const e of this.m.entities.values()) if (e.owner || e.schedule || e.price || e.access) return true; return false; }
+  active(): boolean { if (this.m.state.layers) return true; for (const e of this.m.entities.values()) if (e.owner || e.schedule || e.price || e.access) return true; return this.calendarObjects()?.all().some(godCalendar) ?? false; }
+  private calendarObjects(): Pick<Objects, 'create' | 'kindOf' | 'all' | 'remove' | 'creationParams'> | undefined { return (this.h.edge as any)?.comms?.objects; }
 
   // ---------- the clock ----------
 
@@ -86,7 +91,6 @@ export class GodLayers {
   /** One clock step (the bridge calls it every couple of seconds): states that follow schedules, calendar items. */
   step(): { changed: number; posted: number } {
     const scheduled = [...this.m.entities.values()].filter((e) => e.schedule);
-    if (!scheduled.length) return { changed: 0, posted: 0 };
     const c = this.clock(); if (!c) return { changed: 0, posted: 0 };
     const ops: Op[] = [], notes: string[] = [];
     for (const e of scheduled) {
@@ -112,9 +116,21 @@ export class GodLayers {
 
   /** Each scheduled event within the next day goes on the calendar once (ids from the thing, the event and the date). */
   private postCalendar(scheduled: Entity[], c: WorldClock): number {
-    const objs = (this.h.edge as any)?.comms?.objects as { create(i: unknown): { id: string }; kindOf(k: string): unknown; all(): { id: string }[] } | undefined;
+    const objs = this.calendarObjects();
     if (!objs?.kindOf('calendar-item')) return 0;
-    const have = new Set(objs.all().map((o) => o.id));
+    const all = objs.all(), have = new Set(all.map((o) => o.id)), keep = new Set<string>();
+    // Keep surviving sources, including their interest/reminder state. New entries carry private provenance
+    // in the existing creation log, so changing the clock does not change their identity. Pre-fix entries
+    // have only startsAtTick; retain the old deterministic date fallback for those records.
+    const liveEvents = new Set(scheduled.flatMap(e => (e.schedule?.events ?? []).map(ev => JSON.stringify([e.id, ev.name]))));
+    const living = this.h.living()!, legacyDates = new Set<string>();
+    for (const o of all.filter(godCalendar)) {
+      const source = objs.creationParams(o.id)?.godSchedule as {entity?: string; event?: string; date?: string} | undefined;
+      if (source && typeof source.entity === 'string' && typeof source.event === 'string' && typeof source.date === 'string' && calendarId(source.entity, source.event, source.date) === o.id) {
+        if (liveEvents.has(JSON.stringify([source.entity, source.event]))) keep.add(o.id);
+      } else legacyDates.add(clockAt((o.state as { startsAtTick: number }).startsAtTick, living.origin, living.dayTicks).datetime.slice(0, 10));
+    }
+    for (const e of scheduled) for (const ev of e.schedule?.events ?? []) for (const date of legacyDates) keep.add(calendarId(e.id, ev.name, date));
     let posted = 0;
     for (const e of scheduled) for (const ev of e.schedule?.events ?? []) {
       const at = minutesOf(ev.at);
@@ -122,14 +138,15 @@ export class GodLayers {
         const until = at - c.minute + dayAhead * 1440; if (until < -ev.minutes || until > CAL_HORIZON) continue;
         const weekday = (c.weekday + dayAhead) % 7; if (ev.days?.length && !ev.days.includes((['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const)[weekday])) continue;
         const date = new Date(Date.parse(c.day + 'T00:00:00Z') + dayAhead * 86400_000).toISOString().slice(0, 10);
-        const id = `cal-g${hashOf([e.id, ev.name, date]).slice(0, 12)}`; if (have.has(id)) continue;
+        const id = calendarId(e.id, ev.name, date); keep.add(id); if (have.has(id)) continue;
         const place = this.h.placeOf?.(e), title = (ev.label ?? ev.name).slice(0, 80);
         try {
-          objs.create({ id, kind: 'calendar-item', name: title, placeId: place?.id ?? 'world', params: { title, description: `${title} at ${place?.name ?? this.m.pathOf(e.id)}, ${ev.at} for ${ev.minutes} minutes (the god's schedule)`, placeId: place?.id ?? '', placeName: place?.name ?? this.m.pathOf(e.id), proposedBy: 'the god of this world', startsAtTick: Math.round(c.tick + until * c.ticksPerMinute), durationTicks: Math.max(1, Math.round(ev.minutes * c.ticksPerMinute)) } });
+          objs.create({ id, kind: 'calendar-item', name: title, placeId: place?.id ?? 'world', params: { godSchedule: { entity: e.id, event: ev.name, date }, title, description: `${title} at ${place?.name ?? this.m.pathOf(e.id)}, ${ev.at} for ${ev.minutes} minutes (the god's schedule)`, placeId: place?.id ?? '', placeName: place?.name ?? this.m.pathOf(e.id), proposedBy: 'the god of this world', startsAtTick: Math.round(c.tick + until * c.ticksPerMinute), durationTicks: Math.max(1, Math.round(ev.minutes * c.ticksPerMinute)) } });
           posted++; have.add(id);
         } catch (err) { this.h.log(`calendar ${id}: ${(err as Error).message}`); }
       }
     }
+    for (const o of all) if (godCalendar(o) && !keep.has(o.id)) objs.remove(o.id);
     return posted;
   }
 
