@@ -37,7 +37,67 @@ they remain explicit gaps. Baseline approval, SSIM comparisons with reviewed
 baselines, opaque-glass analysis, claimed-opening visual checks, pairwise variant
 comparison and complete actuator semantics remain distinct qualification work.
 The current renderer only compares each alternative against the default and
-warns when actuator state has no visible effect.
+warns when actuator state has no visible effect. Sound/behavior enums are
+explicit `unqualifiedClaims`; a static image cannot qualify their semantics.
+They are neither visual-difference passes nor proven content defects.
+
+Current comparisons use `fixed-backdrop/1`: after each frame update, terrain,
+water, horizon and external scene geometry are hidden and the background/fog
+are held constant for the capture. Item geometry, materials and lights are
+retained; all visibility and background state are restored afterward. This is
+an analytical fixture, not a production appearance change. Earlier world-
+background baselines are rejected rather than silently mixed with this method.
+
+## Measured catchup and its holds (2026-10-12)
+
+The original full catchup remains pinned to source **b3525c85** and
+`core@33f2559934df9a4d`: **768/768 refs accounted, 750 captured, 656 machine
+passes, 94 failures, 18 explicit unqualified refs**, 43 NVIDIA L4 Vulkan batches,
+11,604 PNGs, exit 2, 2,667 s including setup/return. No missing, duplicate or
+unexpected refs. The file audit verifies every captured engine hash, four-view
+set, PNG dimensions and file hash. Evidence:
+`<worktrees>/cx-g4/.lane/g4/modal-full-visual/g4/` — `report.json`,
+`plan.json`, `audit.json`, `failure-summary.json`, `review-holds.json`, `sheet.html`.
+
+**These are unapproved historical machine scores.** The original comparison
+included terrain pixels and passed unchanged supermarket `style=barn` at 4.46,
+despite an earlier sample failing it at 1.89. All 290 refs with enum-difference
+claims remain held pending capture under the repaired method. No full rerun was
+performed after discovering this; the original report was not rewritten.
+
+Failure classes overlap: 73 refs triggered same-variant alerts, 17 blank-crop
+alerts, 12 drawable timeouts and one missing-drawable alert. They are not 94
+proven content defects. The old run has 259 sound/behavior claims across 37
+items that require nonvisual qualification. Five timed-out Mars stools/cushions
+are visibly present in their captures: loaded GLB instances can remove the
+`asset` child the readiness heuristic expects. This remains a harness hold,
+not a Mars content edit. Six Kin captures remain blank; reedbed lacks an
+isolatable drawable. Body/semantic/shared-terrain fixtures are still required.
+
+The repaired comparison has a bounded regression proof, not another full run:
+
+| context | unchanged supermarket barn (must fail) | blue dumpster (must pass) | captures |
+|---|---:|---:|---:|
+| sparse | 0.15 | 4.43 | 32 |
+| 48 extra boxes | 0.15 | 4.45 | 32 |
+
+Both used real NVIDIA L4 Vulkan. Sound wind and bird perch were explicitly
+unqualified; both commands retained exit 2. Evidence:
+`.lane/g4/modal-fixed-sparse/g4`, `.lane/g4/modal-fixed-busy-2/g4`, and
+`.lane/g4/regression-proof.json` in the same worktree. The initial busy fixture
+was refused for an overlapping extra box and is preserved separately.
+
+Recheck the saved proof without GPU spend:
+
+```sh
+node tools/catalog/g4/regression-check.mjs .lane/g4/modal-fixed-sparse/g4/report.json .lane/g4/modal-fixed-busy-2/g4/report.json
+```
+
+For future targeted diagnostics, Modal accepts `--variants <labels>` and
+`--busy 48`. These are deliberately partial captures, reported as
+`selection.targeted`; they must not be used as full item publication receipts.
+The full catchup runner refuses automatic `--approve`. No baseline was approved
+in this work, and no DPR-2 stranger or production walkthrough was performed.
 
 For unpublished candidates, place a reviewed JSON array of `def/1` inputs inside
 the worktree, and run:
