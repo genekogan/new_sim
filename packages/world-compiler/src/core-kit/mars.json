@@ -7500,14 +7500,20 @@
   "params": {
    "rise": {
     "type": "number",
+    "min": 0.3,
+    "max": 12,
     "default": 2.857
    },
    "run": {
     "type": "number",
+    "min": 0.5,
+    "max": 20,
     "default": 4.2
    },
    "width": {
     "type": "number",
+    "min": 0.6,
+    "max": 6,
     "default": 0.9
    },
    "material": {
