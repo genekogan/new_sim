@@ -354,6 +354,13 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   const resolved = resolveDependents(scratch, touched, new Set(diff.removes), new Set(diff.tiles), warnings, diff.tiles);
   for (const id of resolved) touched.add(id);
   for (const id of touched) { const e = scratch.entities.get(id); if (e) diff.upserts.push(e); }
+  // CATRUN: a def this batch uses that only the shared library holds enters the world's own store, pinned by hash
+  // (with its `extends` chain and any def named by a param), so the world keeps exactly what it placed.
+  if (scratch.library) {
+    const adopt = (ref: string | undefined) => { for (let r = ref, n = 0; r && n < 9; n++) { const got = scratch.adopt(r); if (got) diff.defs.push(got); r = scratch.def(r)?.extends; } };
+    for (const d of [...diff.defs]) adopt(d.extends);
+    for (const e of diff.upserts) { adopt(e.def); for (const v of Object.values(e.params ?? {})) if (typeof v === 'string' && /@\d+$/.test(v)) adopt(v); }
+  }
   diff.tiles = [...new Set(diff.tiles)];
   if (layersTouched) diff.layers = true;
   const refused = opts.refuse?.(scratch, diff, ops);

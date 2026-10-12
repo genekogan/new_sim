@@ -11,6 +11,13 @@ export type OBB = { c: [number, number]; half: [number, number]; yaw: number; y0
 /** `baked`: physics of a footprint sidecar (asset store, L5), already in the def's metres. */
 export type AssetInfo = { tris: number; bytes: number; textures: number; box: [number, number, number]; baked?: Pick<Baked, 'colliders' | 'slots'> & Partial<Pick<Baked, 'surfaces' | 'openings' | 'links' | 'rooms' | 'notes'>> };
 export type AssetLookup = (hash: string) => AssetInfo | undefined;
+/** CATRUN: a process-wide, read-only, content-addressed def library (the core kit). A world resolves refs it does not
+ *  store itself through it, and a def enters the world's own store (pinned by hash) the first time it is used
+ *  (`adopt`). Keys: "name@v", "core/<x>@v", "sha:<hash>". Built once per process (library.ts). */
+export type DefLibrary = { readonly id: string; readonly version: string; get(key: string): StoredDef | undefined; all(): readonly StoredDef[] };
+/** Catalogue ids (CATALOG-PROGRAM P0) are aliases of the core refs worlds already use: `eden/<x>@v` → `core/<x>@v`,
+ *  `lm/<x>@v` → `core/lm-<x>@v`, `mars/<x>@v` → `core/mars-<x>@v`. Other refs pass through. */
+export const aliasRef = (ref: string) => { const m = /^(eden|lm|mars)\/(.+)$/.exec(ref); return m ? `core/${m[1] === 'eden' ? '' : m[1] + '-'}${m[2]}` : ref; };
 
 export class WorldModel {
   constants: WorldConstants;
@@ -18,7 +25,9 @@ export class WorldModel {
   seed: string;
   seq = 0;            // entity counter (ids)
   editSeq = 0;        // committed batches
-  defs = new Map<string, StoredDef>();      // by ref ("name@v") and by "sha:<hash>"
+  defs = new Map<string, StoredDef>();      // by ref ("name@v") and by "sha:<hash>": the defs this world stores
+  /** The shared library behind `defs` (null = the world stores everything it can resolve, as before CATRUN). */
+  library: DefLibrary | null = null;
   entities = new Map<string, Entity>();
   children = new Map<string, Set<string>>();
   names = new Map<string, string>();        // `${parent}/${name}` → id
@@ -47,6 +56,8 @@ export class WorldModel {
     const hash = hashOf(hashable);
     const existing = this.defs.get('sha:' + hash);
     if (existing) return existing;
+    const shared = this.library?.get('sha:' + hash);
+    if (shared) return this.store(shared, true);
     const ref = `${def.name}@${def.version}`;
     const stored: StoredDef = { ...def, budget: def.budget ?? { tris: 0, bytes: 0, textures: 0 }, hash, ref, by, born };
     this.defs.set('sha:' + hash, stored);
@@ -54,10 +65,32 @@ export class WorldModel {
     if (ref.startsWith('core-')) this.defs.set('core/' + ref.slice(5), stored);
     return stored;
   }
-  def(ref: string): StoredDef | undefined { return this.defs.get(ref); }
+  /** The world's own def for a ref, else the shared library's (the world's pinned hash always wins). */
+  def(ref: string): StoredDef | undefined { const k = aliasRef(ref); return this.defs.get(k) ?? this.library?.get(k); }
+  /** True when the world itself stores this ref (not only the shared library). */
+  owns(ref: string): boolean { return this.defs.has(aliasRef(ref)); }
+  /** Every def this world can resolve: its own, plus the library's whose ref it does not shadow. */
+  allDefs(): StoredDef[] {
+    const own = [...new Set(this.defs.values())];
+    if (!this.library) return own;
+    const refs = new Set(own.map((d) => d.ref));
+    return [...own, ...this.library.all().filter((d) => !refs.has(d.ref))];
+  }
+  /** Copy a library def into the world's own store (pinned by hash). Returns it when it was newly adopted. */
+  adopt(ref: string): StoredDef | undefined {
+    const k = aliasRef(ref);
+    if (this.defs.has(k)) return undefined;
+    const d = this.library?.get(k); if (!d) return undefined;
+    this.store(d); return d;
+  }
+  private store(d: StoredDef, takeRef = false): StoredDef {
+    this.defs.set('sha:' + d.hash, d);
+    if (takeRef || !this.defs.has(d.ref)) { this.defs.set(d.ref, d); if (d.ref.startsWith('core-')) this.defs.set('core/' + d.ref.slice(5), d); }
+    return d;
+  }
   /** Follow `extends` to merge params defaults/components/slots. Child overrides parent field-by-field. */
   resolvedDef(ref: string, depth = 0): StoredDef | undefined {
-    const d = this.defs.get(ref);
+    const d = this.def(ref);
     if (!d) return d;
     const base = d.extends && depth <= 8 ? this.resolvedDef(d.extends, depth + 1) : undefined;
     const r = base ? { ...base, ...d, params: { ...base.params, ...d.params }, state: { ...base.state, ...d.state }, components: { ...base.components, ...d.components }, slots: d.slots.length ? d.slots : base.slots, actions: d.actions.length ? d.actions : base.actions, make: d.make.kind === 'none' && base.make.kind !== 'none' ? base.make : d.make } : d;
@@ -241,7 +274,7 @@ export class WorldModel {
   fork(): WorldModel {
     const w = Object.create(WorldModel.prototype) as WorldModel;
     const self = this as unknown as Record<string, unknown>, out = w as unknown as Record<string, unknown>;
-    w.constants = this.constants; w.state = this.state; w.seed = this.seed; w.seq = this.seq; w.editSeq = this.editSeq; w.assets = this.assets;
+    w.constants = this.constants; w.state = this.state; w.seed = this.seed; w.seq = this.seq; w.editSeq = this.editSeq; w.assets = this.assets; w.library = this.library;
     w.defs = new Map(this.defs); w.entities = new Map(this.entities); w.names = new Map(this.names);
     w.children = new Map([...this.children].map(([k, v]) => [k, new Set(v)]));
     out.bakes = self.bakes;  // keyed by content hash: safe to share
@@ -257,8 +290,9 @@ export class WorldModel {
       defs: [...new Set(this.defs.values())].sort((a, b) => (a.ref < b.ref ? -1 : 1)), entities: [...this.entities.values()].sort((a, b) => (a.id < b.id ? -1 : 1)), ground: this.terrain.ground,
     };
   }
-  static fromSnapshot(s: ReturnType<WorldModel['snapshot']>, assets?: AssetLookup): WorldModel {
+  static fromSnapshot(s: ReturnType<WorldModel['snapshot']>, assets?: AssetLookup, library?: DefLibrary | null): WorldModel {
     const w = new WorldModel({ constants: s.constants, seed: s.seed, state: s.state, assets });
+    w.library = library ?? null;
     w.seq = s.seq; w.editSeq = s.editSeq;
     for (const d of s.defs) { w.defs.set('sha:' + d.hash, d); w.defs.set(d.ref, d); if (d.ref.startsWith('core-')) w.defs.set('core/' + d.ref.slice(5), d); }
     w.terrain = new Terrain(s.ground);

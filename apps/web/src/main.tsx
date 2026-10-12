@@ -18,7 +18,8 @@ import {publishSession,type Session} from './auth-session.ts';
 import {assetBytes,installAssetMeter} from './asset-bytes.ts';
 import initialAssets from './initial-assets.json';
 import {newWorld} from './world-kind.ts';
-installAssetMeter();if(!newWorld)assetBytes.expect((initialAssets as {worlds?:Record<string,Record<string,number>>}).worlds?.[worldKey]??{});
+import {forkInitialAssets} from './mars-fork.ts';
+installAssetMeter();if(!newWorld)assetBytes.expect(forkInitialAssets((initialAssets as {worlds?:Record<string,Record<string,number>>}).worlds?.[worldKey]??{}));  // MARSLAND-FORK: the Mars fork's own campus
 
 // Presentation gate only. Exact reviewed candidate builds may enable it;
 // current-owner capability/readiness and server authority remain mandatory.

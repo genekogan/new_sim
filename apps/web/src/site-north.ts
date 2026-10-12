@@ -4,8 +4,10 @@
 // sun rises in +x (east) and stands in +z (south) at noon.
 import { NORTH_AZIMUTH_OFFSET } from '../../../mars/viewer/engine/env/sun.ts';
 import { newWorld } from './world-kind.ts';
+import { marsFork, MARS_2026_NORTH_OFFSET } from './mars-fork.ts';
 
-let offset = newWorld ? 0 : NORTH_AZIMUTH_OFFSET;
+// MARSLAND-FORK: the operator's Mars fork (/worlds/w/mars) uses the 2026 site bearing, so Chiba's panels face south.
+let offset = newWorld ? 0 : marsFork ? MARS_2026_NORTH_OFFSET : NORTH_AZIMUTH_OFFSET;
 /** Degrees added to a compass azimuth before projecting to x/z (sun.ts convention). */
 export const siteNorthOffset = () => offset;
 export function setSiteNorthOffset(deg: number) { offset = deg; }

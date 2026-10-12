@@ -33,14 +33,14 @@ export class WorldStore {
     return r ? (JSON.parse(r.body) as Meta) : null;
   }
   /** Load the model, or null when this world has never been initialised. */
-  load(assets?: ConstructorParameters<typeof WorldModel>[0]['assets']): { model: WorldModel; owner: string | null } | null {
+  load(assets?: ConstructorParameters<typeof WorldModel>[0]['assets'], library?: WorldModel['library']): { model: WorldModel; owner: string | null } | null {
     const meta = this.meta(); if (!meta) return null;
     const defs = (this.db.db.prepare('SELECT body FROM world_defs_v1 WHERE world_id=?').all(this.worldId) as { body: string }[]).map((r) => JSON.parse(r.body) as StoredDef);
     const entities = (this.db.db.prepare('SELECT body FROM world_entities_v1 WHERE world_id=?').all(this.worldId) as { body: string }[]).map((r) => JSON.parse(r.body) as Entity);
-    const model = WorldModel.fromSnapshot({ constants: meta.constants, state: meta.state, seed: meta.seed, seq: meta.seq, editSeq: meta.editSeq, defs, entities, ground: meta.ground }, assets);
+    const model = WorldModel.fromSnapshot({ constants: meta.constants, state: meta.state, seed: meta.seed, seq: meta.seq, editSeq: meta.editSeq, defs, entities, ground: meta.ground }, assets, library);
     return { model, owner: meta.owner };
   }
-  /** First write: constants, seed, the core kit. */
+  /** First write: constants, seed, and any defs the model already stores (none from the shared library: CATRUN). */
   init(model: WorldModel, owner: string | null) {
     this.tx(() => {
       this.writeMeta(model, owner);

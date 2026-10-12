@@ -1,0 +1,18 @@
+# Host disk/memory check for eden2 (lane OPS2): writes /srv/sim-worlds-data/%i/host-health.{json,log}.
+#   enable:  systemctl enable --now sim-worlds-health@production.timer
+#   run now: systemctl start sim-worlds-health@production.service
+#   alerts:  tail /srv/sim-worlds-data/production/host-health.log   (also `hostOk` in /worlds/__sim/healthz)
+[Unit]
+Description=Disk/memory check for the sim-worlds@%i host
+
+[Service]
+Type=oneshot
+User=simworlds
+Group=simworlds
+Nice=10
+ExecStart=/usr/bin/node --no-warnings /srv/sim-worlds/%i/tools/world-launcher/deploy/host-health.mjs /srv/sim-worlds-data/%i
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/sim-worlds-data/%i
+PrivateTmp=true
