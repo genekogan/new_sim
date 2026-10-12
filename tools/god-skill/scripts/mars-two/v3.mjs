@@ -20,8 +20,14 @@ export const sharp = createRequire(join(ROOT, 'node_modules/.pnpm/sharp@0.35.4_@
 const mo = await import(join(ROOT, 'node_modules/.pnpm/meshoptimizer@1.3.0/node_modules/meshoptimizer/index.js'));
 export const { MeshoptEncoder, MeshoptSimplifier } = mo;
 
-export const V3_GLB = '<team>/scratch/mars-mimos-binding-20261010/visible-access-export-v3/scene_7d4cac4af33bb32cd069a248611b6dd3fdc2ce072bc77e3f2f336ea5df028b76.glb';
-export const V3_SHA = '7d4cac4af33bb32cd069a248611b6dd3fdc2ce072bc77e3f2f336ea5df028b76';
+// MARSFIX: the reference is now the corrected sim.mars.college source itself in TRUE compass (mars-src-fix a5376c1:
+// release 43's campus.glb + add2026Details with Gene's Oct-10 corrections on the CAD's own north–south bays), exported by
+// fork-backdrop.mjs (campus-owner-<rev>.raw.glb, the same GLB frame as V3). The old V3 export (the first, rotated
+// reading) stays readable with MARS_TWO_SRC=v3 (then PARITY's 7d9688f delta applies, as before).
+export const OLD_V3_GLB = '<team>/scratch/mars-mimos-binding-20261010/visible-access-export-v3/scene_7d4cac4af33bb32cd069a248611b6dd3fdc2ce072bc77e3f2f336ea5df028b76.glb';
+export const SOURCE_REV = 'a5376c10cfab';
+export const V3_GLB = process.env.MARS_TWO_SRC === 'v3' ? OLD_V3_GLB : (process.env.MARS_TWO_SRC || '<team>/scratch/mars-truecompass-20261012/campus-owner-a5376c10cfab.raw.glb');
+export const V3_SHA = process.env.MARS_TWO_SRC === 'v3' ? '7d4cac4af33bb32cd069a248611b6dd3fdc2ce072bc77e3f2f336ea5df028b76' : 'b52044bb96ec9e472d04900fa1150af82ede94341731f5046da2e2520f0bd250';
 export const O = [2.05645, -8.92635];                       // Mimos native origin [42.05645, .53, -38.92635] minus the backdrop's [40, ., -30]
 export const NORTH = [0.4264952019559668, -0.9044898245467106];
 export const EAST = [0.9044898245467106, 0.4264952019559668];
@@ -42,7 +48,7 @@ export function v3ToLocal(ox = 0, oz = 0) {
 export async function readV3() {
   const io = new core.NodeIO().registerExtensions(ext.ALL_EXTENSIONS).registerDependencies({ 'meshopt.encoder': MeshoptEncoder });
   const doc = await io.read(V3_GLB);
-  applyRefDelta(doc);
+  if (V3_GLB === OLD_V3_GLB) applyRefDelta(doc);
   return { io, doc };
 }
 

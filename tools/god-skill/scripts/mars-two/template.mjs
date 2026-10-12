@@ -27,8 +27,8 @@ const NUM = { 1: 'coffee-counter', 2: 'tea-table', 3: 'study-table', 4: 'study-c
 // and the kitchen, sealing the working kitchen off: #29 0.8 m and #19 0.6 m west, inside the kitchen bay; the central
 // prep table #15 (with its bowls and pot) 0.2 m west, so the aisle past the Chiba rack post at E −8.4 is a body wide.
 // The tea stool #9 0.25 m east, to the tea table's west end, clear of the way in from main south.
-const MOVE = { 9: [0.25, 0, 0], 3: [0.1, 0, 0], 4: [0.1, 0, 0], 5: [0.1, 0, 0], 6: [0.1, 0, 0], ...Object.fromEntries([20, 21, 22, 23, 24, 25, 26, 27, 28].map((n) => [n, [0, 0, -0.3]])), 29: [-0.8, 0, 0], 19: [-0.6, 0, 0], 15: [-0.2, 0, 0] };
-const MOVE_ITEM = { 'core/mars-fridge-top-electric-kettle': [-0.8, 0, 0] };
+const MOVE = {};   // MARSFIX: the first reading's fit nudges (study set, booths, fridges, prep table, stool) no longer apply: the true-compass source places them clear
+const MOVE_ITEM = {};
 const used = new Set();
 const uniq = (base) => { let n = base, k = 2; while (used.has(n)) n = `${base}-${k++}`; used.add(n); return n; };
 const short = (def) => def.replace(/^core\/mars-/, '').replace(/@\d+$/, '').replace(/-\d+$/, '');

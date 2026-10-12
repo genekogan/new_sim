@@ -40,20 +40,9 @@
      "def": "core/mars-chiba@2",
      "name": "chiba",
      "p": [
-      -11.12,
+      -14.755,
       0,
       -30.23
-     ],
-     "r": -1.571
-    },
-    {
-     "op": "place",
-     "def": "core/mars-mimos@2",
-     "name": "mimos",
-     "p": [
-      2.459,
-      -0.24,
-      -31.12
      ],
      "r": -1.571
     },
@@ -62,9 +51,20 @@
      "def": "core/mars-kitchen@2",
      "name": "kitchen",
      "p": [
-      1.903,
+      -5.477,
+      0,
+      -35.428
+     ],
+     "r": -1.571
+    },
+    {
+     "op": "place",
+     "def": "core/mars-mimos@2",
+     "name": "mimos",
+     "p": [
+      2.097,
       -0.24,
-      -37.636
+      -33.989
      ],
      "r": -1.571
     },
@@ -73,9 +73,9 @@
      "def": "core/mars-showers@2",
      "name": "showers",
      "p": [
-      8.36,
+      4.49,
       0,
-      -27.56
+      -44.175
      ],
      "r": -1.571
     },
@@ -133,17 +133,6 @@
       -87.341
      ],
      "r": -1.781
-    },
-    {
-     "op": "place",
-     "def": "core/mars-mimos-front-glazing@1",
-     "name": "mimos-front-glazing",
-     "p": [
-      -1.94,
-      0,
-      -32.78
-     ],
-     "r": -1.571
     }
    ]
   },
@@ -153,127 +142,127 @@
    "ops": [
     {
      "op": "place",
-     "def": "core/mars-mimos-coffee-table@1",
+     "def": "core/mars-mimos-coffee-table@2",
      "name": "mimos-coffee-table",
      "in": {
       "parent": "mimos",
-      "slot": "main"
+      "slot": "main-south"
      },
      "p": [
-      0.815,
-      1.105
+      1.503,
+      1.41
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-coffee-counter@1",
+     "def": "core/mars-coffee-counter@2",
      "name": "coffee-counter-1",
      "in": {
       "parent": "mimos",
       "slot": "main"
      },
      "p": [
-      -1.947,
-      0.411
+      -2.044,
+      2.592
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-red-mini-refrigerator@1",
+     "def": "core/mars-red-mini-refrigerator@2",
      "name": "red-mini-refrigerator",
      "in": {
       "parent": "mimos",
       "slot": "main"
      },
      "p": [
-      -1.977,
-      2.355
+      -0.1,
+      2.622
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-tea-table@1",
+     "def": "core/mars-tea-table@2",
      "name": "tea-table-2",
      "in": {
       "parent": "mimos",
       "slot": "floor"
      },
      "p": [
-      1.37,
-      -0.02
+      4.125,
+      -1.138
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-study-chair@1",
-     "name": "study-chair-7",
-     "in": {
-      "parent": "mimos",
-      "slot": "main"
-     },
-     "p": [
-      2.015,
-      -1.765
-     ],
-     "r": -1.5708
-    },
-    {
-     "op": "place",
-     "def": "core/mars-study-table@1",
+     "def": "core/mars-study-table@2",
      "name": "study-table-3",
      "in": {
       "parent": "mimos",
       "slot": "main"
      },
      "p": [
-      1.065,
-      -1.745
+      -3.915,
+      0.9
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-study-chair@1",
+     "def": "core/mars-study-chair@2",
      "name": "study-chair-4",
      "in": {
       "parent": "mimos",
       "slot": "main"
      },
      "p": [
-      0.415,
-      -1.125
+      -3.295,
+      1.55
      ],
-     "r": -3.1416
+     "r": 1.5708
     },
     {
      "op": "place",
-     "def": "core/mars-study-chair-2@1",
+     "def": "core/mars-study-chair-2@2",
      "name": "study-chair-5",
      "in": {
       "parent": "mimos",
       "slot": "main"
      },
      "p": [
-      1.545,
-      -1.125
+      -3.295,
+      0.42
      ],
-     "r": 3.1416
+     "r": 1.5708
     },
     {
      "op": "place",
-     "def": "core/mars-study-chair-3@1",
+     "def": "core/mars-study-chair-3@2",
      "name": "study-chair-6",
      "in": {
       "parent": "mimos",
       "slot": "main"
      },
      "p": [
-      1.315,
-      -2.375
+      -4.545,
+      0.9
+     ],
+     "r": -1.5708
+    },
+    {
+     "op": "place",
+     "def": "core/mars-study-chair@2",
+     "name": "study-chair-7",
+     "in": {
+      "parent": "mimos",
+      "slot": "main"
+     },
+     "p": [
+      -3.935,
+      -0.15
      ],
      "r": 0
     },
@@ -283,95 +272,95 @@
      "name": "papasan-8",
      "in": {
       "parent": "mimos",
-      "slot": "floor"
+      "slot": "main-south"
      },
      "p": [
-      2.8,
-      0.15
+      4.4,
+      0.05
      ],
      "r": -1.5708
     },
     {
      "op": "place",
-     "def": "core/mars-tea-stool@1",
+     "def": "core/mars-tea-stool@2",
      "name": "tea-stool-9",
      "in": {
       "parent": "mimos",
       "slot": "floor"
      },
      "p": [
-      0.65,
-      -0.05
+      4.095,
+      -0.168
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-tea-stool-2@1",
+     "def": "core/mars-tea-stool-2@2",
      "name": "tea-stool-10",
      "in": {
       "parent": "mimos",
       "slot": "floor"
      },
      "p": [
-      1.2,
-      -0.54
+      3.605,
+      -0.968
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-tea-stool-3@1",
+     "def": "core/mars-tea-stool-3@2",
      "name": "tea-stool-11",
      "in": {
       "parent": "mimos",
       "slot": "floor"
      },
      "p": [
-      1.3,
-      0.55
+      4.695,
+      -1.068
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-red-sofa@1",
+     "def": "core/mars-red-sofa@2",
      "name": "red-sofa-12",
      "in": {
       "parent": "mimos",
-      "slot": "main"
+      "slot": "main-south"
      },
      "p": [
-      -0.942,
-      1.655
+      0.195,
+      1.96
      ],
      "r": 1.5708
     },
     {
      "op": "place",
-     "def": "core/mars-honey-sofa@1",
+     "def": "core/mars-honey-sofa@2",
      "name": "honey-sofa-13",
      "in": {
       "parent": "mimos",
       "slot": "floor"
      },
      "p": [
-      1.23,
-      -1.377
+      -1.645,
+      -0.985
      ],
-     "r": 0
+     "r": 1.5708
     },
     {
      "op": "place",
-     "def": "core/mars-cream-recliner@1",
+     "def": "core/mars-cream-recliner@2",
      "name": "cream-recliner-14",
      "in": {
       "parent": "mimos",
-      "slot": "main"
+      "slot": "main-south"
      },
      "p": [
-      1.75,
-      1.105
+      2.887,
+      1.41
      ],
      "r": -1.5708
     }
@@ -390,239 +379,228 @@
       "slot": "working-kitchen"
      },
      "p": [
-      -0.2,
-      1.385
+      2.36,
+      -0.968
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-sink-counter-lip@1",
+     "def": "core/mars-sink-counter-lip@2",
      "name": "sink-counter-lip",
      "p": [
-      5.89,
+      -6.978,
       1.442,
-      -39.335
+      -41.705
      ],
      "r": -1.571
     },
     {
      "op": "place",
-     "def": "core/mars-sink-counter-lip-2@1",
+     "def": "core/mars-sink-counter-lip-2@2",
      "name": "sink-counter-lip-2",
      "in": {
       "parent": "kitchen",
       "slot": "working-kitchen"
      },
      "p": [
-      0.19,
-      -2.795
+      -2.303,
+      -1.086
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-exterior-serving-shelf@1",
-     "name": "exterior-serving-shelf",
-     "in": {
-      "parent": "kitchen",
-      "slot": "working-kitchen"
-     },
-     "p": [
-      -0.27,
-      3.7
-     ],
-     "r": 0
-    },
-    {
-     "op": "place",
-     "def": "core/mars-perimeter-counter@1",
+     "def": "core/mars-perimeter-counter@2",
      "name": "perimeter-counter",
      "in": {
       "parent": "kitchen",
       "slot": "working-kitchen"
      },
      "p": [
-      -1.432,
-      0
+      1.083,
+      0.472
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-serving-inside-counter-return@1",
-     "name": "serving-inside-counter-return",
-     "p": [
-      -1.55,
-      1.42,
-      -39.675
-     ],
-     "r": -1.571
-    },
-    {
-     "op": "place",
-     "def": "core/mars-north-perimeter-counter-return@1",
+     "def": "core/mars-north-perimeter-counter-return@2",
      "name": "north-perimeter-counter-return",
      "in": {
       "parent": "kitchen",
       "slot": "working-kitchen"
      },
      "p": [
-      0,
-      -3.215
+      -3.435,
+      -0.85
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-commercial-fridge@1",
+     "def": "core/mars-commercial-fridge@2",
      "name": "commercial-fridge-18",
      "in": {
       "parent": "kitchen",
       "slot": "working-kitchen"
      },
      "p": [
-      1.524,
-      -2.55
+      -1.805,
+      -2.264
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-chest-freezer@1",
+     "def": "core/mars-chest-freezer@2",
      "name": "chest-freezer-19",
      "in": {
       "parent": "kitchen",
       "slot": "working-kitchen"
      },
      "p": [
-      0.89,
-      2.65
+      5.714,
+      -2.23
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-bus-seat@1",
+     "def": "core/mars-bus-seat@2",
      "name": "bus-seat-20",
      "in": {
       "parent": "kitchen",
       "slot": "dining-hall"
      },
      "p": [
-      0.608,
-      1.749
+      1.831,
+      -1.715
      ],
-     "r": 3.1416
+     "r": -1.5708
     },
     {
      "op": "place",
-     "def": "core/mars-bus-seat-2@1",
+     "def": "core/mars-bus-seat-2@2",
      "name": "bus-seat-21",
      "in": {
       "parent": "kitchen",
       "slot": "dining-hall"
      },
      "p": [
-      0.608,
-      0.6
+      0.682,
+      -1.715
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-bus-seat-3@1",
+     "def": "core/mars-bus-seat-3@2",
      "name": "bus-seat-23",
      "in": {
       "parent": "kitchen",
       "slot": "dining-hall"
      },
      "p": [
-      0.608,
-      -1.7
+      -1.618,
+      -1.715
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-bus-seat-4@1",
+     "def": "core/mars-bus-seat-4@2",
      "name": "bus-seat-25",
      "in": {
       "parent": "kitchen",
       "slot": "dining-hall"
      },
      "p": [
-      0.608,
-      -3.499
+      -3.417,
+      -1.715
      ],
-     "r": 0
+     "r": 1.5708
     },
     {
      "op": "place",
-     "def": "core/mars-diner-table@1",
+     "def": "core/mars-diner-table@2",
      "name": "diner-table-26",
      "in": {
       "parent": "kitchen",
       "slot": "dining-hall"
      },
      "p": [
-      0.648,
-      1.32
+      1.402,
+      -1.755
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-diner-table@1",
+     "def": "core/mars-diner-table@2",
      "name": "diner-table-27",
      "in": {
       "parent": "kitchen",
       "slot": "dining-hall"
      },
      "p": [
-      0.648,
-      -0.3
+      -0.218,
+      -1.755
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-diner-table@1",
+     "def": "core/mars-diner-table@2",
      "name": "diner-table-28",
      "in": {
       "parent": "kitchen",
       "slot": "dining-hall"
      },
      "p": [
-      0.648,
-      -2.75
+      -2.668,
+      -1.755
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-white-fridge@1",
+     "def": "core/mars-white-fridge@2",
      "name": "white-fridge-29",
      "in": {
       "parent": "kitchen",
       "slot": "working-kitchen"
      },
      "p": [
-      0.631,
-      1.55
+      4.124,
+      -2.171
      ],
      "r": 0
     },
     {
      "op": "place",
-     "def": "core/mars-dry-goods-long-shelf@1",
+     "def": "core/mars-dry-goods-long-shelf@2",
      "name": "dry-goods-long-shelf",
      "p": [
-      1.535,
+      -8.83,
       2.277,
-      -41.315
+      -36.297
      ],
      "r": -1.571
+    },
+    {
+     "op": "place",
+     "def": "core/mars-exterior-serving-shelf@2",
+     "name": "exterior-serving-shelf",
+     "in": {
+      "parent": "kitchen",
+      "slot": "working-kitchen"
+     },
+     "p": [
+      7.42,
+      -0.634
+     ],
+     "r": 0
     }
    ]
   },
@@ -632,7 +610,7 @@
    "ops": [
     {
      "op": "place",
-     "def": "core/mars-folding-chair-2@1",
+     "def": "core/mars-folding-chair-2@2",
      "name": "folding-chair-4",
      "p": [
       -15.99,
@@ -643,7 +621,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-folding-chair-3@1",
+     "def": "core/mars-folding-chair-3@2",
      "name": "folding-chair-5",
      "p": [
       -14.04,
@@ -654,7 +632,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-folding-chair-4@1",
+     "def": "core/mars-folding-chair-4@2",
      "name": "folding-chair-6",
      "p": [
       -15.99,
@@ -665,7 +643,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-tier@1",
+     "def": "core/mars-tier@2",
      "name": "tier",
      "p": [
       -14.39,
@@ -676,7 +654,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-tier-2@1",
+     "def": "core/mars-tier-2@2",
      "name": "tier-2",
      "p": [
       -15.54,
@@ -687,7 +665,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-tier-3@1",
+     "def": "core/mars-tier-3@2",
      "name": "tier-3",
      "p": [
       -13.89,
@@ -698,7 +676,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-tier-4@1",
+     "def": "core/mars-tier-4@2",
      "name": "tier-4",
      "p": [
       -14.94,
@@ -709,7 +687,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-navy-sofa@1",
+     "def": "core/mars-navy-sofa@2",
      "name": "navy-sofa",
      "p": [
       -11.44,
@@ -720,7 +698,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-navy-sofa@1",
+     "def": "core/mars-navy-sofa@2",
      "name": "navy-sofa-2",
      "p": [
       -11.44,
@@ -742,7 +720,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-presenter-timber-box@1",
+     "def": "core/mars-presenter-timber-box@2",
      "name": "presenter-timber-box",
      "p": [
       -15.88,
@@ -753,7 +731,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-classroom-folding-table@1",
+     "def": "core/mars-classroom-folding-table@2",
      "name": "classroom-folding-table",
      "p": [
       -18.69,
@@ -764,7 +742,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-marzipan-desk-laptop@1",
+     "def": "core/mars-marzipan-desk-laptop@2",
      "name": "marzipan-desk-laptop",
      "p": [
       -10,
@@ -775,7 +753,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-field-chair@1",
+     "def": "core/mars-field-chair@2",
      "name": "field-chair",
      "p": [
       -2.606,
@@ -786,7 +764,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-field-chair-2@1",
+     "def": "core/mars-field-chair-2@2",
      "name": "field-chair-2",
      "p": [
       -0.013,
@@ -797,7 +775,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-field-chair-3@1",
+     "def": "core/mars-field-chair-3@2",
      "name": "field-chair-3",
      "p": [
       2.191,
@@ -808,7 +786,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-field-chair-4@1",
+     "def": "core/mars-field-chair-4@2",
      "name": "field-chair-4",
      "p": [
       -3.188,
@@ -819,7 +797,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-field-teal-sofa@1",
+     "def": "core/mars-field-teal-sofa@2",
      "name": "field-teal-sofa",
      "p": [
       3.803,
@@ -836,7 +814,7 @@
    "ops": [
     {
      "op": "place",
-     "def": "core/mars-tool-library-bookshelf-timber@1",
+     "def": "core/mars-tool-library-bookshelf-timber@2",
      "name": "tool-library-bookshelf-timber",
      "p": [
       57.209,
@@ -858,7 +836,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-tool-library-floor-cushion@1",
+     "def": "core/mars-tool-library-floor-cushion@2",
      "name": "tool-library-floor-cushion",
      "p": [
       55.05,
@@ -869,7 +847,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-tool-library-floor-cushion-2@1",
+     "def": "core/mars-tool-library-floor-cushion-2@2",
      "name": "tool-library-floor-cushion-2",
      "p": [
       54.768,
@@ -880,7 +858,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-tool-library-floor-cushion-3@1",
+     "def": "core/mars-tool-library-floor-cushion-3@2",
      "name": "tool-library-floor-cushion-3",
      "p": [
       56.615,
@@ -891,7 +869,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-tool-library-floor-cushion-4@1",
+     "def": "core/mars-tool-library-floor-cushion-4@2",
      "name": "tool-library-floor-cushion-4",
      "p": [
       56.333,
@@ -902,7 +880,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-tool-ground-bench-lower@1",
+     "def": "core/mars-tool-ground-bench-lower@2",
      "name": "tool-ground-bench-lower",
      "p": [
       50.014,
@@ -913,7 +891,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-tool-bench-vise@1",
+     "def": "core/mars-tool-bench-vise@2",
      "name": "tool-bench-vise",
      "p": [
       49.995,
@@ -924,7 +902,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-tool-workshop-folding-table@1",
+     "def": "core/mars-tool-workshop-folding-table@2",
      "name": "tool-workshop-folding-table",
      "p": [
       47.08,
@@ -935,7 +913,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-freeside-hydro-cart-chrome@1",
+     "def": "core/mars-freeside-hydro-cart-chrome@2",
      "name": "freeside-hydro-cart-chrome",
      "p": [
       98.825,
@@ -946,7 +924,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-freeside-lime-sofa@1",
+     "def": "core/mars-freeside-lime-sofa@2",
      "name": "freeside-lime-sofa",
      "p": [
       71.533,
@@ -957,7 +935,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-freeside-mattress@1",
+     "def": "core/mars-freeside-mattress@2",
      "name": "freeside-mattress",
      "p": [
       70.574,
@@ -968,7 +946,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-freeside-mattress-2@1",
+     "def": "core/mars-freeside-mattress-2@2",
      "name": "freeside-mattress-2",
      "p": [
       71.058,
@@ -979,7 +957,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-freeside-speaker@1",
+     "def": "core/mars-freeside-speaker@2",
      "name": "freeside-speaker",
      "p": [
       73.233,
@@ -990,7 +968,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-freeside-speaker-2@1",
+     "def": "core/mars-freeside-speaker-2@2",
      "name": "freeside-speaker-2",
      "p": [
       69.34,
@@ -1001,7 +979,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-dj-table@1",
+     "def": "core/mars-dj-table@2",
      "name": "dj-table",
      "p": [
       68.965,
@@ -1012,7 +990,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-folding-chair@1",
+     "def": "core/mars-folding-chair@2",
      "name": "folding-chair",
      "p": [
       71.393,
@@ -1023,7 +1001,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-folding-chair@1",
+     "def": "core/mars-folding-chair@2",
      "name": "folding-chair-2",
      "p": [
       70.35,
@@ -1034,7 +1012,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-folding-table@1",
+     "def": "core/mars-folding-table@2",
      "name": "folding-table",
      "p": [
       71.371,
@@ -1045,7 +1023,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-folding-chair@1",
+     "def": "core/mars-folding-chair@2",
      "name": "folding-chair-3",
      "p": [
       72.436,
@@ -1056,7 +1034,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-colab-taupe-sofa@1",
+     "def": "core/mars-colab-taupe-sofa@2",
      "name": "colab-taupe-sofa",
      "p": [
       80.998,
@@ -1067,7 +1045,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-colab-drawer-coffee@1",
+     "def": "core/mars-colab-drawer-coffee@2",
      "name": "colab-drawer-coffee",
      "p": [
       82.256,
@@ -1078,7 +1056,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-colab-floor-lamp@1",
+     "def": "core/mars-colab-floor-lamp@2",
      "name": "colab-floor-lamp",
      "p": [
       81.571,
@@ -1089,7 +1067,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-griddle-cart@1",
+     "def": "core/mars-griddle-cart@2",
      "name": "griddle-cart",
      "p": [
       -52.971,
@@ -1100,7 +1078,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-clubhouse-sofa@1",
+     "def": "core/mars-clubhouse-sofa@2",
      "name": "clubhouse-sofa",
      "p": [
       -54.223,
@@ -1111,7 +1089,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-clubhouse-low-blue-table@1",
+     "def": "core/mars-clubhouse-low-blue-table@2",
      "name": "clubhouse-low-blue-table",
      "p": [
       -54.272,
@@ -1122,7 +1100,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-clubhouse-sofa@1",
+     "def": "core/mars-clubhouse-sofa@2",
      "name": "clubhouse-sofa-2",
      "p": [
       -58.598,
@@ -1133,7 +1111,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-worktop@1",
+     "def": "core/mars-og-worktop@2",
      "name": "og-worktop",
      "p": [
       -59.824,
@@ -1144,7 +1122,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-east-folding-chair@1",
+     "def": "core/mars-og-east-folding-chair@2",
      "name": "og-east-folding-chair",
      "p": [
       -50.295,
@@ -1155,7 +1133,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-east-folding-dinner-table@1",
+     "def": "core/mars-og-east-folding-dinner-table@2",
      "name": "og-east-folding-dinner-table",
      "p": [
       -51.041,
@@ -1166,7 +1144,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-east-folding-chair-2@1",
+     "def": "core/mars-og-east-folding-chair-2@2",
      "name": "og-east-folding-chair-2",
      "p": [
       -50.087,
@@ -1177,7 +1155,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-east-folding-chair-2@1",
+     "def": "core/mars-og-east-folding-chair-2@2",
      "name": "og-east-folding-chair-3",
      "p": [
       -50.503,
@@ -1194,7 +1172,7 @@
    "ops": [
     {
      "op": "place",
-     "def": "core/mars-coffee-table-ceramic-cup@1",
+     "def": "core/mars-coffee-table-ceramic-cup@2",
      "name": "coffee-table-ceramic-cup",
      "in": {
       "parent": "mimos/mimos-coffee-table",
@@ -1208,7 +1186,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-coffee-table-ceramic-cup@1",
+     "def": "core/mars-coffee-table-ceramic-cup@2",
      "name": "coffee-table-ceramic-cup-2",
      "in": {
       "parent": "mimos/mimos-coffee-table",
@@ -1222,7 +1200,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-coffee-table-ceramic-cup@1",
+     "def": "core/mars-coffee-table-ceramic-cup@2",
      "name": "coffee-table-ceramic-cup-3",
      "in": {
       "parent": "mimos/mimos-coffee-table",
@@ -1236,7 +1214,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-coffee-table-ceramic-cup@1",
+     "def": "core/mars-coffee-table-ceramic-cup@2",
      "name": "coffee-table-ceramic-cup-4",
      "in": {
       "parent": "mimos/mimos-coffee-table",
@@ -1253,20 +1231,20 @@
      "def": "core/mars-stored-stock-pot@2",
      "name": "stored-stock-pot",
      "p": [
-      0.32,
+      -7,
       0.775,
-      -39.475
+      -35.31
      ],
      "r": -1.571
     },
     {
      "op": "place",
-     "def": "core/mars-fridge-top-electric-kettle@1",
+     "def": "core/mars-fridge-top-electric-kettle@2",
      "name": "fridge-top-electric-kettle",
      "p": [
-      0.565,
+      -5.9,
       2.49,
-      -38.965
+      -33.956
      ],
      "r": -1.571
     },
@@ -1279,9 +1257,9 @@
       "slot": "top"
      },
      "p": [
-      0.224,
+      -0.56,
       0,
-      -0.56
+      -0.206
      ]
     },
     {
@@ -1293,79 +1271,79 @@
       "slot": "top"
      },
      "p": [
-      0.001,
+      0.445,
       0,
-      0.445
+      0.017
      ]
     },
     {
      "op": "place",
-     "def": "core/mars-table-kettle@1",
+     "def": "core/mars-table-kettle@2",
      "name": "table-kettle",
      "in": {
       "parent": "mimos/tea-table-2",
       "slot": "top"
      },
      "p": [
-      0.23,
       0,
-      0
+      0,
+      -0.23
      ]
     },
     {
      "op": "place",
-     "def": "core/mars-table-cup@1",
+     "def": "core/mars-table-cup@2",
      "name": "table-cup",
      "in": {
       "parent": "mimos/tea-table-2",
       "slot": "top"
      },
      "p": [
-      -0.4,
       0,
-      0
+      0,
+      0.4
      ]
     },
     {
      "op": "place",
-     "def": "core/mars-table-cup@1",
+     "def": "core/mars-table-cup@2",
      "name": "table-cup-2",
      "in": {
       "parent": "mimos/tea-table-2",
       "slot": "top"
      },
      "p": [
-      -0.12,
       0,
-      0
+      0,
+      0.12
      ]
     },
     {
      "op": "place",
-     "def": "core/mars-ceramic-mug@1",
+     "def": "core/mars-ceramic-mug@2",
      "name": "ceramic-mug",
      "in": {
       "parent": "mimos/study-table-3",
       "slot": "top"
      },
      "p": [
-      0.671,
       0,
-      0
+      0,
+      -0.671
      ]
     },
     {
      "op": "place",
-     "def": "core/mars-ceramic-mug@1",
+     "def": "core/mars-ceramic-mug@2",
      "name": "ceramic-mug-2",
      "in": {
       "parent": "mimos/study-table-3",
       "slot": "top"
      },
      "p": [
-      0.871,
       0,
-      0
+      0,
+      -0.871
      ]
     },
     {
@@ -1377,9 +1355,9 @@
       "slot": "top"
      },
      "p": [
-      -0.278,
+      2.962,
       0,
-      2.385
+      0.263
      ]
     },
     {
@@ -1391,9 +1369,9 @@
       "slot": "top"
      },
      "p": [
-      -0.278,
+      3.642,
       0,
-      2.935
+      0.313
      ]
     }
    ]
@@ -1580,7 +1558,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-toilet-1@1",
+     "def": "core/mars-toilet-1@2",
      "name": "toilet",
      "p": [
       38.025,
@@ -1591,7 +1569,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-boat-1@1",
+     "def": "core/mars-boat-1@2",
      "name": "boat",
      "p": [
       -29.403,
@@ -1624,7 +1602,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-toilet-1@1",
+     "def": "core/mars-toilet-1@2",
      "name": "toilet-2",
      "p": [
       -64.985,
@@ -1734,7 +1712,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-colab-hut-1@1",
+     "def": "core/mars-colab-hut-1@2",
      "name": "colab-hut",
      "p": [
       63.711,
@@ -1745,7 +1723,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-colab-hut-2@1",
+     "def": "core/mars-colab-hut-2@2",
      "name": "colab-hut-2",
      "p": [
       61.629,
@@ -1756,7 +1734,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-colab-hut-2@1",
+     "def": "core/mars-colab-hut-2@2",
      "name": "colab-hut-3",
      "p": [
       58.24,
@@ -1767,7 +1745,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-colab-hut-2@1",
+     "def": "core/mars-colab-hut-2@2",
      "name": "colab-hut-4",
      "p": [
       60.307,
@@ -1778,7 +1756,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-colab-hut-2@1",
+     "def": "core/mars-colab-hut-2@2",
      "name": "colab-hut-5",
      "p": [
       66.299,
@@ -1789,7 +1767,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-boat-2@1",
+     "def": "core/mars-boat-2@2",
      "name": "boat-2",
      "p": [
       -29.844,
@@ -1800,7 +1778,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-ground-1@1",
+     "def": "core/mars-og-ground-1@2",
      "name": "og-ground",
      "p": [
       -52.903,
@@ -1811,7 +1789,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-clubhouse-1@1",
+     "def": "core/mars-og-clubhouse-1@2",
      "name": "og-clubhouse",
      "p": [
       -53.064,
@@ -1822,7 +1800,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-clubhouse-2@1",
+     "def": "core/mars-og-clubhouse-2@2",
      "name": "og-clubhouse-2",
      "p": [
       -55.352,
@@ -1833,7 +1811,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-kitchen-1@1",
+     "def": "core/mars-og-kitchen-1@2",
      "name": "og-kitchen",
      "p": [
       -60.173,
@@ -1844,7 +1822,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-kitchen-2@1",
+     "def": "core/mars-og-kitchen-2@2",
      "name": "og-kitchen-2",
      "p": [
       -59.811,
@@ -1855,7 +1833,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-kitchen-3@1",
+     "def": "core/mars-og-kitchen-3@2",
      "name": "og-kitchen-3",
      "p": [
       -60.063,
@@ -1866,7 +1844,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-forklift-1@1",
+     "def": "core/mars-forklift-1@2",
      "name": "forklift",
      "p": [
       44.818,
@@ -1877,7 +1855,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-forklift-2@1",
+     "def": "core/mars-forklift-2@2",
      "name": "forklift-2",
      "p": [
       44.546,
@@ -1888,7 +1866,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-east-life-1@1",
+     "def": "core/mars-og-east-life-1@2",
      "name": "og-east-life",
      "p": [
       -53.311,
@@ -1899,7 +1877,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-east-life-1@1",
+     "def": "core/mars-og-east-life-1@2",
      "name": "og-east-life-2",
      "p": [
       -53.731,
@@ -1910,7 +1888,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-east-life-1@1",
+     "def": "core/mars-og-east-life-1@2",
      "name": "og-east-life-3",
      "p": [
       -54.152,
@@ -1921,7 +1899,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-east-life-1@1",
+     "def": "core/mars-og-east-life-1@2",
      "name": "og-east-life-4",
      "p": [
       -54.573,
@@ -1932,7 +1910,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-east-life-1@1",
+     "def": "core/mars-og-east-life-1@2",
      "name": "og-east-life-5",
      "p": [
       -54.993,
@@ -1943,7 +1921,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-east-life-1@1",
+     "def": "core/mars-og-east-life-1@2",
      "name": "og-east-life-6",
      "p": [
       -55.414,
@@ -1954,7 +1932,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-east-life-1@1",
+     "def": "core/mars-og-east-life-1@2",
      "name": "og-east-life-7",
      "p": [
       -55.834,
@@ -1965,7 +1943,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-east-life-1@1",
+     "def": "core/mars-og-east-life-1@2",
      "name": "og-east-life-8",
      "p": [
       -56.255,
@@ -1976,7 +1954,7 @@
     },
     {
      "op": "place",
-     "def": "core/mars-og-east-life-1@1",
+     "def": "core/mars-og-east-life-1@2",
      "name": "og-east-life-9",
      "p": [
       -56.676,

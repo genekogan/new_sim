@@ -36,7 +36,7 @@ const sha256 = (b) => createHash('sha256').update(b).digest('hex');
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const r4 = (v) => Math.round(v * 10000) / 10000;
 const LICENSE = 'Mars College (Gene Kogan); campus CAD and the 2026 photographic recipe; private to this project';
-const SOURCE = 'V3 Mars 2026 campus (scene_7d4cac4a…glb, Codex Mars handover 2026-10-10, Gene\'s Oct 10 corrections)';
+const SOURCE = 'the Mars 2026 campus as the corrected sim.mars.college source draws it (mars-src-fix a5376c1: release 43 + Gene\'s Oct 10 corrections in true compass)';
 const RAW_FLOOR = 0.53;
 
 // PARITY: what the corrected sim.mars.college source build (7d9688f, layers 1+2 of Gene's target) draws differently from
@@ -55,34 +55,8 @@ function parityFixes(doc) {
     const tex = doc.createTexture('kitchen-plywood-sample').setImage(readFileSync(PLYWOOD_JPG)).setMimeType('image/jpeg').setURI('kitchen-plywood-sample.jpg');
     for (const m of showerMats) m.setBaseColorTexture(tex).setBaseColorFactor([...lin('#ead8b7'), 1]).setRoughnessFactor(0.86).setMetallicFactor(0);
   } else console.warn('parity: no plywood texture source; showers stay plain');
-  // the glass sliver: triangles of transparent_panel-0067 lying wholly north of the outdoor gap (n ≥ 5.9), east of main
-  for (const n of nodes.filter((q) => q.getName() === 'transparent_panel-0067' && q.getMesh())) {
-    const W = n.getWorldMatrix(), v = [0, 0, 0];
-    for (const p of n.getMesh().listPrimitives()) {
-      const pos = p.getAttribute('POSITION'), idx = p.getIndices(), cnt = idx ? idx.getCount() : pos.getCount(), keep = [];
-      for (let t = 0; t < cnt; t += 3) {
-        const vs = [0, 1, 2].map((k) => idx ? idx.getScalar(t + k) : t + k);
-        const out = vs.every((vi) => { pos.getElement(vi, v); const x = W[0] * v[0] + W[4] * v[1] + W[8] * v[2] + W[12], z = W[2] * v[0] + W[6] * v[1] + W[10] * v[2] + W[14]; const dx = x - O[0], dz = z - O[1]; return dx * NORTH[0] + dz * NORTH[1] >= 5.9 && dx * EAST[0] + dz * EAST[1] > 0.012; });
-        if (!out) keep.push(...vs);
-      }
-      if (keep.length < cnt) p.setIndices(doc.createAccessor().setType('SCALAR').setArray(new Uint32Array(keep)).setBuffer(root.listBuffers()[0]));
-    }
-  }
-  // Mimos floor's ground mat: a dark mat over the arm's ground (the reference: 'Mimos southeast continuous ground mat floor', #55564d)
-  {
-    const N0 = -1.85, N1 = 0.75, E0 = 0, E1 = 3.66, Y0 = -0.16, Y1 = -0.16 + 0.025;
-    const at = (n, e) => [O[0] + n * NORTH[0] + e * EAST[0], O[1] + n * NORTH[1] + e * EAST[1]];
-    const P = [], I = [], Nn = [], quad = (a, b, c, d, nrm) => { const k = P.length / 3; for (const q of [a, b, c, d]) { P.push(...q); Nn.push(...nrm); } I.push(k, k + 1, k + 2, k, k + 2, k + 3); };
-    const c = [[N0, E0], [N0, E1], [N1, E1], [N1, E0]].map(([n, e]) => at(n, e));
-    const top = c.map(([x, z]) => [x, Y1, z]), bot = c.map(([x, z]) => [x, Y0, z]);
-    quad(top[0], top[1], top[2], top[3], [0, 1, 0]);   // (counter-clockwise seen from above: N × E points down in V3's x, z)
-    for (let s = 0; s < 4; s++) { const a = s, b = (s + 1) % 4, dx = c[b][0] - c[a][0], dz = c[b][1] - c[a][1], l = Math.hypot(dx, dz); quad(bot[a], bot[b], top[b], top[a], [dz / l, 0, -dx / l]); }
-    const buf = root.listBuffers()[0];
-    const mat = doc.createMaterial('Mimos southeast continuous ground mat').setBaseColorFactor([...lin('#55564d'), 1]).setRoughnessFactor(0.95).setMetallicFactor(0).setDoubleSided(true);
-    const prim = doc.createPrimitive().setAttribute('POSITION', doc.createAccessor().setType('VEC3').setArray(new Float32Array(P)).setBuffer(buf)).setAttribute('NORMAL', doc.createAccessor().setType('VEC3').setArray(new Float32Array(Nn)).setBuffer(buf)).setIndices(doc.createAccessor().setType('SCALAR').setArray(new Uint32Array(I)).setBuffer(buf)).setMaterial(mat);
-    const node = doc.createNode('Mimos southeast continuous ground mat floor').setMesh(doc.createMesh('mimos-ground-mat').addPrimitive(prim)).setExtras({ assembly_id: 'mimos-open-l', kind: 'Mimos southeast continuous ground mat floor', layer: 'Timber, floors and stairs', component_id: 'parity-mimos-ground-mat' });
-    node.setMatrix(inv4(nodes[2].getWorldMatrix())); nodes[2].addChild(node);   // under Chiba (TOP index 2), where the reference's Mimos parts are
-  }
+  // (MARSFIX: the glass-sliver cut and the authored ground mat were for the first, rotated reading; the true-compass
+  //  source keeps the whole sloping glazing and draws Mimos floor's mat itself)
   // Chiba's solar panels: near-black glass
   for (const m of root.listMaterials()) if (m.getName() === 'solar2') m.setBaseColorFactor([0.16, 0.16, 0.19, 1]).setRoughnessFactor(0.3);
 }
@@ -102,18 +76,24 @@ const groupRect = (rs) => minRect(rs.flatMap((r) => { const q = rectOf(r), c = M
 const X = (r) => [r.e0 + X0, r.e1 + X0], Z = (r) => [-r.n1, -r.n0];
 
 // ------------------------------------------------------------------ who belongs where
-const TOP = { 2: 'chiba', 8158: 'chiba', 2724: 'dojo', 3014: 'tool-camp', 4047: 'freeside', 7962: 'west-racks', 6121: 'people' };
+// the campus's top-level groups, found by name (a re-export renumbers nodes)
+const TOP_NAMES = { 'Chiba': 'chiba', 'Chiba · west stair approach and roof transfer': 'chiba', 'North_rack_building': 'dojo', 'North_workshops': 'tool-camp', 'Northeast_compound': 'freeside', 'West_rack_building': 'west-racks', 'People_•_generic_movable_context': 'people' };
+const TOP = Object.fromEntries(src.doc.getRoot().listNodes().map((n, i) => [i, TOP_NAMES[n.getName()]]).filter(([i, b]) => b && (src.doc.getRoot().listNodes()[i].getParentNode()?.getName() ?? 'Scene').match(/Scene|Editable_campus/)));
+if (Object.values(TOP).filter((b) => b === 'chiba').length !== 2) throw new Error(`top-level groups not found by name: ${JSON.stringify(TOP)}`);
 const topOf = (r) => { for (const a of r.anc) if (TOP[a]) return TOP[a]; return TOP[r.i] ?? 'site'; };
 const inRect = (r, n0, n1, e0, e1) => r.cn >= n0 && r.cn <= n1 && r.ce >= e0 && r.ce <= e1;
+// MARSFIX (true compass, layout.mjs): Mimos = the bays N −1.65…5.92 (with the sloping glazing to E 3.8), kitchen and
+// diner = the two bays west of it (N −9.3…−1.65, the ground storey under the Chiba gallery); the showers north-east.
+const MIMOS_RECT = [-1.9, 6.1, -11.8, 3.8], KITCHEN_RECT = [-9.35, -1.7, -11.8, -0.45], SHOWERS_RECT = [2.0, 7.0, -16.7, -11.7];
 function buildingOf(r) {
   const t = topOf(r);
   if (t !== 'chiba') return t;
   const a = r.asm ?? '';
   if (a.startsWith('mimos-northeast-shower')) return 'showers';
   if (a === 'kitchen-details') return 'kitchen';
-  if (a.startsWith('mimos-')) return a === 'mimos-open-l' && r.ce < -4.73 ? 'kitchen' : 'mimos';
-  if (inRect(r, -1.85, 5.95, -4.73, 3.7)) return 'mimos';
-  if (inRect(r, -1.85, 5.95, -11.8, -4.73)) return 'kitchen';
+  if (a.startsWith('mimos-')) return r.cn < -1.7 && r.ce < 0.5 ? 'kitchen' : 'mimos';
+  if (inRect(r, ...MIMOS_RECT)) return 'mimos';
+  if (inRect(r, ...KITCHEN_RECT) && r.y1 < 3.3) return 'kitchen';
   return 'chiba';
 }
 
@@ -392,12 +372,13 @@ async function extraPiece(dname, d, get) {
   const ids = (list) => list.map((n) => raw.byId.get(`cad_component-${n}`)).filter((i) => i !== undefined);
   const crushIt = { ratio: 0.035, error: 0.3, minTris: 60 };
   const APPLIANCES = [
-    // PARITY: where the corrected source build (7d9688f) stands them: n −.35 / −.90 on the west perimeter counter (e −11.385),
-    // south of the longitudinal backsplash (at n .25 the cooker stood inside it)
+    // MARSFIX: where the true-compass source (a5376c1) stands them, on the west perimeter counter (N −8.9; E −3.96 / −3.28)
     // (the CAD's screws, rivets, feet and trims — hundreds of triangles each — are left out; each part is crushed to its share of ≤ 400)
-    ['rice-cooker', '0831 0834 0835 0838 0839 0847 2941', 'A stainless rice cooker with its black lid (the Mars kitchen, 2026).', ['rice', 'cooker', 'appliance'], 3.0, [36.615, 0.35], 0.09],
-    ['water-urn', '0854 0859 0860 0861', 'The two-tier water urn with its tap the Mars kitchen kept on the counter (2026).', ['water', 'urn', 'dispenser', 'drink'], 4.0, [36.615, 0.9], 0.03],
+    ['rice-cooker', '0831 0834 0835 0838 0839 0847 2941', 'A stainless rice cooker with its black lid (the Mars kitchen, 2026).', ['rice', 'cooker', 'appliance'], 3.0, [44.045, 8.885], 0.09],
+    ['water-urn', '0854 0859 0860 0861', 'The two-tier water urn with its tap the Mars kitchen kept on the counter (2026).', ['water', 'urn', 'dispenser', 'drink'], 4.0, [44.725, 8.935], 0.03],
   ];
+  // the export carries the CAD appliances too (restore2026KitchenAppliances): they are these extra pieces, not mesh
+  for (const r of rows) if (/^cad_component-(0831|0834|0835|0838|0839|0847|2941|0854|0859|0860|0861)$/.test(r.comp ?? '')) taken.add(r.i);
   const counter = placements.find((q) => q.building === 'kitchen' && q.def === 'core/mars-perimeter-counter@1');
   const cdef = defs.find((x) => x.name === 'core-mars-perimeter-counter'), topY = counter.p[1] + cdef.slots[0].p[1];
   for (const [dname, list, description, tags, mass, [x, z], ratio] of APPLIANCES) {
@@ -409,9 +390,9 @@ async function extraPiece(dname, d, get) {
 
 // 2. buildings
 const BUILDINGS = {
-  mimos: { label: 'Mimos', tags: ['building', 'cafe', 'lounge', 'tea', 'study', 'mimos'], desc: 'Mimos, the 2026 Mars College café and lounge as Gene corrected it (north up): an L of Mimos main (the west longitudinal section; its northern part a raised wooden floor at 0.53 m with the coffee counter on the west wall and the study table at the north wall, its southern part at ground level) and Mimos floor, the short southeast arm with flooring throughout, the honey sofa beneath the posters on its north wall and the low tea table near its south wall. The pallet racks between main and floor are pass-through; the northeast of the L is outdoors. Rear alcove door with a stair at the north; three risers from main south up to the raised floor.', authored: true },
-  kitchen: { label: 'Chiba kitchen and dining hall', tags: ['building', 'kitchen', 'diner', 'dining', 'chiba'], desc: 'The Chiba kitchen and dining hall, immediately west of Mimos main and as long as it (Gene\'s correction): the west bay is the working kitchen (perimeter counters along the west wall returning on the north and south, the sinks in the north counter, the long stainless prep table in the middle, the food-service window on the south edge), the east bay is the dining hall with the blue wall and the bus seats along its east wall. Raised plywood floor at 0.53 m; steps up to the blue entry door.', authored: true },
-  showers: { label: 'Mimos showers', tags: ['building', 'shower', 'bath', 'mimos'], desc: 'The two wooden shower bays offset diagonally northeast of Mimos main, touching at a corner (Gene\'s correction; no rear deck).', authored: true },
+  mimos: { label: 'Mimos', tags: ['building', 'cafe', 'lounge', 'tea', 'study', 'mimos'], desc: 'Mimos, the 2026 Mars College café and lounge as Gene corrected it (true compass): an L of Mimos main (the west longitudinal bay; its northern sections a raised wooden floor at 0.53 m with the coffee counter and the MIMOS sign on the west wall and the study table at the north wall, its southern section at ground level, the lounge before the glazing) and Mimos floor, the south-east tea room with flooring throughout, the honey sofa beneath the posters on its north wall and the low tea table near the glazing. The sloping plexiglass with its brown drape fronts both on the south; the pallet racks between main and floor are pass-through; the north-east of the L is outdoors. Door at the glazing\'s west end; three risers from main south up to the raised floor.', authored: true },
+  kitchen: { label: 'Chiba kitchen and dining hall', tags: ['building', 'kitchen', 'diner', 'dining', 'chiba'], desc: 'The Chiba kitchen and dining hall under the Chiba gallery, immediately west of Mimos main and as long as it (Gene\'s correction, true compass): the west bay is the working kitchen (perimeter counter along the west wall returning on the north with the twin sinks under the windows and on the south with the food-service window, the long stainless prep table in the middle, the commercial fridge, white fridge and chest freezer on its east side), the east bay is the dining hall with the blue wall and the bus seats along its east wall. Raised plywood floor at 0.53 m; steps up to the blue entry door on the south.', authored: true },
+  showers: { label: 'Mimos showers', tags: ['building', 'shower', 'bath', 'mimos'], desc: 'The two wooden shower bays offset diagonally north-east of Mimos main\'s north-east corner, touching at a corner, doors on the south (Gene\'s correction; no continuous rear structure).', authored: true },
   chiba: { label: 'Chiba', tags: ['building', 'auditorium', 'hall', 'gallery', 'chiba', 'venue'], desc: 'Chiba, the big rack-and-plywood building of the Mars College campus: the auditorium with solar panels and the mural, the gallery hall and its stairs, as the 2026 reference draws them.' },
   dojo: { label: 'Dojo', tags: ['building', 'dojo', 'gym', 'rack'], desc: 'The north rack building, the Dojo, with its 2026 interior.' },
   'tool-camp': { label: 'Tool camp', tags: ['building', 'workshop', 'library', 'tools'], desc: 'The north workshops: Tool camp and the northeast library, with their benches and stock.' },
@@ -435,14 +416,7 @@ function isRoof(b, r) {
 // room's north side) read mirrored from the room: V3 carries their texture upside down, so the quad is flipped top to bottom.
 const WORLD_FIX = { mimos: new Map() };
 for (const r of rows) if (/Portuguese love posters/.test(r.kind ?? '')) WORLD_FIX.mimos.set(r.i, mul(NODES[r.i].getWorldMatrix(), [1, 0, 0, 0, 0, -1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]));
-// The burgundy rug of the study corner: V3's correction stood it on its edge (a 2.8 m tall carpet, which the row filter
-// then dropped as "below ground"). Laid flat in Mimos's mesh, long side east–west, under the study table #3 and its
-// chairs (mars-two x 46.62, z −4.75 on the raised floor). Part of the floor, not a thing: as an entity it changed Souls'
-// routes through main (mars-lived D3).
-for (const r of rows) if (/burgundy floor rug/i.test(r.kind ?? '')) {
-  const N = 4.75, E = 46.62 - X0, at = [O[0] + N * NORTH[0] + E * EAST[0], O[1] + N * NORTH[1] + E * EAST[1]];
-  WORLD_FIX.mimos.set(r.i, [EAST[0], 0, EAST[1], 0, NORTH[0], 0, NORTH[1], 0, 0, 1, 0, 0, at[0], 0.385, at[1], 1]);
-}
+// (MARSFIX: the burgundy rug lies flat in the corrected source itself; no per-node fix)
 const byB = new Map();
 for (const r of rows) { if (taken.has(r.i)) continue; const b = buildingOf(r); if (b === 'people' || b === 'site') continue; if ((r.y1 < 0.02 || r.y0 < -0.3) && !WORLD_FIX[b]?.has(r.i)) continue; if (!byB.has(b)) byB.set(b, []); byB.get(b).push(r); }
 for (const [b, rs] of byB) {
@@ -452,7 +426,7 @@ for (const [b, rs] of byB) {
   const o = piece.shift;   // mars-two position of the def's base centre
   const floorY = B.authored ? 0 : 0;
   // Chiba's contents never reach into Mimos, the kitchen or the showers (their own footprints say what is there)
-  const own = (r) => (b !== 'chiba' || !(inRect(r, -1.95, 6.0, -11.8, 3.7) || inRect(r, 5.9, 10.9, -0.1, 4.95)))
+  const own = (r) => (b !== 'chiba' || !(inRect(r, ...MIMOS_RECT) || inRect(r, ...KITCHEN_RECT) || inRect(r, ...SHOWERS_RECT)))
     // what stands on or against a cut-out piece of furniture (the espresso machine on the counter) is that furniture's business
     && !furnBoxes.some((f) => r.n0 < f.n1 + 0.08 && f.n0 - 0.08 < r.n1 && r.e0 < f.e1 + 0.08 && f.e0 - 0.08 < r.e1 && r.y0 < f.y1 + 0.3 && f.y0 < r.y1);
   const replaced = (r) => (REPLACED[b] ?? []).some(([n0, n1, e0, e1]) => inRect(r, n0, n1, e0, e1));
