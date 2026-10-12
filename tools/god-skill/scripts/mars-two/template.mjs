@@ -15,19 +15,12 @@ const DEFS = new Map(JSON.parse(readFileSync(join(ROOT, 'packages/world-compiler
 const r3 = (v) => Math.round(v * 1000) / 1000;
 const NUM = { 1: 'coffee-counter', 2: 'tea-table', 3: 'study-table', 4: 'study-chair', 5: 'study-chair', 6: 'study-chair', 7: 'study-chair', 8: 'papasan', 9: 'tea-stool', 10: 'tea-stool', 11: 'tea-stool', 12: 'red-sofa', 13: 'honey-sofa', 14: 'cream-recliner', 15: 'prep-table', 18: 'commercial-fridge', 19: 'chest-freezer', 20: 'bus-seat', 21: 'bus-seat', 22: 'bus-seat', 23: 'bus-seat', 24: 'bus-seat', 25: 'bus-seat', 26: 'diner-table', 27: 'diner-table', 28: 'diner-table', 29: 'white-fridge' };
 
-// Gene's corrections (2026-10-10) are in the V3 fit itself: #1 on main's west wall in the raised north, #2 near the
-// arm's south wall, #3 at main's north wall in front of the whiteboard (photo DSCF/IMG: the whiteboard is between the
-// table and the wall), #13 on the arm's north poster wall, the kitchen west of the diner with its U of counters, the
-// bus seats on the diner's east wall.
-// One fit nudge (the handover: furniture coordinates are fits, not a survey): the study table #3 and its chairs #4–6
-// (with the mugs on it) 0.1 m east, so a Soul coming down off the rear stair's head has room past the table's corner;
-// the diner's east-wall booths #20–28 0.3 m north (all together), so there is standing room inside the blue door.
-// #12's place, which Gene left unfinished, stays V3's inference.
-// The white fridge #29 (with the kettle on it) and the chest freezer #19 stood ON the open bay line between the diner
-// and the kitchen, sealing the working kitchen off: #29 0.8 m and #19 0.6 m west, inside the kitchen bay; the central
-// prep table #15 (with its bowls and pot) 0.2 m west, so the aisle past the Chiba rack post at E −8.4 is a body wide.
-// The tea stool #9 0.25 m east, to the tea table's west end, clear of the way in from main south.
-const MOVE = {};   // MARSFIX: the first reading's fit nudges (study set, booths, fridges, prep table, stool) no longer apply: the true-compass source places them clear
+// Gene's corrections (2026-10-10, true compass) are in the source itself: #1 on main's west wall in the raised north, #2 in
+// Mimos floor near the glazing, #3 at main's north wall before the whiteboard, #13 on Mimos floor's north poster wall, the
+// kitchen west of the diner with its counters, the bus seats on the diner's east wall.
+// MARSFIX: the first reading's fit nudges (study set, booths, fridges, prep table, a tea stool) are gone: the true-compass
+// source stands every piece clear (mars-src-fix 076d458; e2e mars-two / mars-lived walk them).
+const MOVE = {};
 const MOVE_ITEM = {};
 const used = new Set();
 const uniq = (base) => { let n = base, k = 2; while (used.has(n)) n = `${base}-${k++}`; used.add(n); return n; };
