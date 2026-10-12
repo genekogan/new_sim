@@ -16,7 +16,7 @@ app = modal.App("eden-catalog-p1-proof", image=image)
 
 
 @app.function(gpu="L4", timeout=1800, memory=8192, cpu=4)
-def run(bundle: bytes, source: str) -> bytes:
+def run(bundle: bytes, source: str, input_only: bool = False) -> bytes:
     root = pathlib.Path("/repo")
     root.mkdir()
     with tarfile.open(fileobj=io.BytesIO(bundle), mode="r:gz") as archive:
@@ -30,6 +30,8 @@ def run(bundle: bytes, source: str) -> bytes:
         ("scenarios", ["node", "--import", "./tools/catalog/gpu-chrome.mjs", "tools/god-skill/e2e/scenarios.mjs", "--port", "6120"]),
         ("input", ["node", "tools/catalog/p1-browser-proof.mjs", "/proof/input"]),
     ]
+    if input_only:
+        commands = [commands[1]]
     codes = {}
     for name, command in commands:
         with (out / f"{name}.log").open("w") as log:
@@ -38,7 +40,8 @@ def run(bundle: bytes, source: str) -> bytes:
         print(f"{name}: exit{result.returncode}", flush=True)
     # Shared suite proof files are ordinary fixture data; preserve them, no live DB is copied.
     import shutil
-    shutil.copytree(root / ".lane/e2e", out / "scenarios", dirs_exist_ok=True)
+    if (root / ".lane/e2e").exists():
+        shutil.copytree(root / ".lane/e2e", out / "scenarios", dirs_exist_ok=True)
     (out / "codes.json").write_text(__import__("json").dumps({"source": source, "codes": codes}))
     buffer = io.BytesIO()
     with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
@@ -47,8 +50,8 @@ def run(bundle: bytes, source: str) -> bytes:
 
 
 @app.local_entrypoint()
-def main(bundle: str, source: str, out: str):
-    data = run.remote(pathlib.Path(bundle).read_bytes(), source)
+def main(bundle: str, source: str, out: str, input_only: bool = False):
+    data = run.remote(pathlib.Path(bundle).read_bytes(), source, input_only)
     target = pathlib.Path(out)
     target.mkdir(parents=True, exist_ok=True)
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as archive:

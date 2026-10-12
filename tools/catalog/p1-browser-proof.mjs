@@ -10,7 +10,7 @@ mkdirSync(out, { recursive: true });
 const { chromium } = createRequire(new URL('../../mars/viewer/package.json', import.meta.url))('@playwright/test');
 const env = { ...process.env, BRAIN_MODE: 'fake', SEED_NATIVES: '0', CATALOG_REGISTRY_DIR: resolve(root, '.lane/registry'), CATALOG_CHANNEL: 'candidate' };
 const origin = 'http://127.0.0.1:6110';
-const server = spawn(process.execPath, ['tools/world-launcher/launcher.mjs', '--port', '6110', '--range', '6111-6119', '--data', `${out}/data`, '--base', '/worlds', '--web', '.lane/web-worlds', '--dev-auth'], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
+const server = spawn(process.execPath, ['tools/catalog/proof-launcher.mjs', `${out}/data`], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
 let log = ''; server.stdout.on('data', (data) => { log += data; }); server.stderr.on('data', (data) => { log += data; });
 const report = { source: process.env.P1_SOURCE_SHA ?? 'unknown', realm: 'disposable local launcher in Modal', runs: [] };
 const camera = () => { const s = window.__simEntity; return s ? s.camera.position.toArray() : null; };
@@ -33,6 +33,7 @@ try {
         await page.goto(origin + '/worlds/', { waitUntil: 'domcontentloaded' });
         await page.locator('[data-new-world]').first().click();
         await page.locator('[data-world-name]').fill('Catalogue probe');
+        await page.locator('[data-template="empty"] input').check();
         const godName = page.locator('[data-god-name]'); if (await godName.isVisible().catch(() => false)) await godName.fill('Probe');
         await page.screenshot({ path: `${out}/home-dpr${dpr}.png` });
         await page.locator('[data-create]').click();
@@ -49,9 +50,11 @@ try {
       const token = minted.data.token; // Ephemeral fixture token; never printed or persisted.
       const found = await api('/v1/god/defs?q=rainfall%20meter&compact=1', undefined, token);
       run.checks.find = found.status === 200 && found.data.defs[0]?.ref === 'eden/rain-gauge@1';
+      if (!run.checks.find) throw new Error('candidate registry find failed');
       if (dpr === 1) {
         const placed = await api('/v1/god/act', { ops: [{ op: 'place', def: 'eden/rain-gauge@1', name: 'rain-gauge', p: [0, 0, 0] }] }, token);
         run.checks.place = placed.status === 200 && placed.data.accepted;
+        if (!run.checks.place) throw new Error('candidate placement failed');
       } else run.checks.reload = (await api('/v1/world/snapshot', undefined, token)).data.entities.some((entity) => entity.name === 'rain-gauge');
       await page.waitForTimeout(1000);
       const canvas = page.locator('canvas[aria-label="Live 3D view of the world"]');
@@ -65,7 +68,8 @@ try {
       await page.mouse.dblclick(580, 540); await page.waitForTimeout(2000); run.checks.doubleClick = different(d, await page.evaluate(camera));
       await page.screenshot({ path: `${out}/world-dpr${dpr}.png` });
       // Current join front door: the shared header's New Soul opens the agent connection prompt.
-      const newSoul = page.getByRole('button', { name: /New Soul/i }).first();
+      await page.locator('.account-avatar').click();
+      const newSoul = page.locator('.bring-agent-open').first();
       await newSoul.click(); await page.waitForTimeout(300);
       const bodyText = await page.locator('body').innerText();
       run.checks.joinPrompt = /agent|skill\.md|connect/i.test(bodyText);
