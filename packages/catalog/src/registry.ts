@@ -10,14 +10,14 @@
 // Every file but channels.json and ledger.jsonl is write-once: writing different bytes to an existing path throws
 // `registry.immutable`. A rollback is one pointer write. A yank writes a new snapshot; worlds that placed the item keep
 // it (they pin the hash and blobs are never deleted). P0 keeps it on local disk; the same layout goes to R2 (docs/god/CDN.md).
-import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync, appendFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, readdirSync, renameSync, writeFileSync, appendFileSync, linkSync, unlinkSync, rmdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { hashOf, stableStringify } from '@sim/world-compiler';
 import { def2Schema, item1Schema, type Def2, type Item1 } from './schema.ts';
 
 export const CHANNELS = ['stable', 'candidate'] as const;
 export type Channel = (typeof CHANNELS)[number];
-export type IndexEntry = { id: string; major: number; rev: string; status: Item1['status']; tier: Item1['tier']; aliases: string[]; def1Hash?: string; line: string; redistribute: boolean };
+export type IndexEntry = { id: string; major: number; rev: string; itemHash?: string; status: Item1['status']; tier: Item1['tier']; aliases: string[]; def1Hash?: string; line: string; redistribute: boolean; row?: import('@sim/world-compiler').vocab.ManifestRow };
 export type Pointers = Record<Channel, number | null>;
 export class RegistryError extends Error { readonly code: string; constructor(code: string, msg: string) { super(`${code}: ${msg}`); this.code = code; } }
 
@@ -32,8 +32,16 @@ export class Registry {
     const p = join(this.root, rel);
     if (existsSync(p)) { if (readFileSync(p, 'utf8') !== body) throw new RegistryError('registry.immutable', `${rel} exists with other content`); return 'same'; }
     mkdirSync(dirname(p), { recursive: true });
-    const tmp = `${p}.tmp-${process.pid}`; writeFileSync(tmp, body); renameSync(tmp, p);
-    return 'new';
+    const tmp = `${p}.tmp-${process.pid}`; writeFileSync(tmp, body, { flag: 'wx' });
+    try {
+      // link is atomic and never replaces an existing blob, even when two workers publish together.
+      try { linkSync(tmp, p); return 'new'; }
+      catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
+        if (readFileSync(p, 'utf8') !== body) throw new RegistryError('registry.immutable', `${rel} exists with other content`);
+        return 'same';
+      }
+    } finally { unlinkSync(tmp); }
   }
   private read<T>(rel: string): T | null { const p = join(this.root, rel); return existsSync(p) ? (JSON.parse(readFileSync(p, 'utf8')) as T) : null; }
 
@@ -47,13 +55,28 @@ export class Registry {
   putItem(item: Item1): string {
     const it = item1Schema.parse(item);
     if (!existsSync(join(this.root, `defs/${it.rev}.json`))) throw new RegistryError('registry.missing-def', `${it.id}@${it.major} rev ${it.rev.slice(0, 12)} has no def`);
-    const rel = `items/${it.id}/${it.major}/${it.rev}.json`; this.writeOnce(rel, canon(it)); return rel;
+    // Item metadata has its own content hash. Text/review/gates may change without changing the world-pinned def.
+    const rel = `items/${it.id}/${it.major}/${it.rev}/${hashOf(it)}.json`;
+    this.writeOnce(rel, canon(it));
+    // Keep the first P0-compatible record immutable; new index snapshots explicitly pin itemHash.
+    const legacy = `items/${it.id}/${it.major}/${it.rev}.json`;
+    if (!existsSync(join(this.root, legacy))) this.writeOnce(legacy, canon(it));
+    return rel;
   }
-  item(id: string, major: number, rev: string): Item1 | null { return this.read<Item1>(`items/${id}/${major}/${rev}.json`); }
+  item(id: string, major: number, rev: string, itemHash?: string): Item1 | null { return this.read<Item1>(itemHash ? `items/${id}/${major}/${rev}/${itemHash}.json` : `items/${id}/${major}/${rev}.json`); }
 
   // ---------------------------------------------------------------- channels
   pointers(): Pointers { return this.read<Pointers>('channels.json') ?? { stable: null, candidate: null }; }
   private setPointers(p: Pointers) { const f = join(this.root, 'channels.json'), tmp = `${f}.tmp-${process.pid}`; writeFileSync(tmp, canon(p)); renameSync(tmp, f); }
+  private mutate<T>(fn: () => T): T {
+    const lock = join(this.root, '.publish-lock');
+    try { mkdirSync(lock); }
+    catch (e) {
+      if ((e as NodeJS.ErrnoException).code === 'EEXIST') throw new RegistryError('registry.busy', 'another publisher holds .publish-lock; retry after it completes');
+      throw e;
+    }
+    try { return fn(); } finally { rmdirSync(lock); }
+  }
   seqs(ch: Channel): number[] { const d = join(this.root, 'index', ch); return existsSync(d) ? readdirSync(d).filter((f) => /^\d+\.json$/.test(f)).map((f) => Number(f.slice(0, -5))).sort((a, b) => a - b) : []; }
   snapshot(ch: Channel, seq: number | null = this.pointers()[ch]): IndexEntry[] { return seq === null ? [] : (this.read<IndexEntry[]>(`index/${ch}/${seq}.json`) ?? []); }
   /** What a channel serves now (yanked entries kept in the index for provenance, but not offered). */
@@ -72,7 +95,10 @@ export class Registry {
 
   /** Publish entries into a channel: a new immutable snapshot = the current one with these (id, major) replaced or added. */
   publish(ch: Channel, entries: IndexEntry[], run: string): number {
-    for (const e of entries) if (!this.item(e.id, e.major, e.rev)) throw new RegistryError('registry.missing-item', `${e.id}@${e.major} ${e.rev.slice(0, 12)}`);
+    return this.mutate(() => this.publishLocked(ch, entries, run));
+  }
+  private publishLocked(ch: Channel, entries: IndexEntry[], run: string): number {
+    for (const e of entries) if (!this.item(e.id, e.major, e.rev, e.itemHash)) throw new RegistryError('registry.missing-item', `${e.id}@${e.major} ${e.rev.slice(0, 12)}`);
     const key = (e: IndexEntry) => `${e.id}@${e.major}`;
     const next = new Map(this.snapshot(ch).map((e) => [key(e), e]));
     for (const e of entries) next.set(key(e), e);
@@ -80,21 +106,26 @@ export class Registry {
   }
   /** Promote candidate entries (all, or the given ids) to stable, marking them stable. */
   promote(ids: string[] | 'all', run: string): number {
+    return this.mutate(() => {
     const pick = this.current('candidate').filter((e) => ids === 'all' || ids.includes(e.id) || ids.includes(`${e.id}@${e.major}`));
     if (!pick.length) throw new RegistryError('registry.nothing', 'no candidate entries match');
-    return this.publish('stable', pick.map((e) => ({ ...e, status: 'stable' as const })), run);
+    return this.publishLocked('stable', pick.map((e) => ({ ...e, status: 'stable' as const })), run);
+    });
   }
   /** Repoint a channel to its previous snapshot: one write, effective on the next poll. */
   rollback(ch: Channel, run: string, to?: number): number {
+    return this.mutate(() => {
     const cur = this.pointers()[ch], seqs = this.seqs(ch);
     const target = to ?? [...seqs].reverse().find((s) => cur !== null && s < cur);
     if (target === undefined || !seqs.includes(target)) throw new RegistryError('registry.nothing', `no earlier ${ch} snapshot`);
     const p = this.pointers(); p[ch] = target; this.setPointers(p);
     this.log({ op: 'rollback', run, channel: ch, from: cur, to: target });
     return target;
+    });
   }
   /** Yank: gone from search and new placement in every channel; worlds that placed it keep it (they pin its hash). */
   yank(id: string, major: number, run: string, reason: string): number[] {
+    return this.mutate(() => {
     const out: number[] = [];
     for (const ch of CHANNELS) {
       const snap = this.snapshot(ch); const hit = snap.some((e) => e.id === id && e.major === major && e.status !== 'yanked');
@@ -102,6 +133,7 @@ export class Registry {
     }
     if (!out.length) throw new RegistryError('registry.nothing', `${id}@${major} is not offered`);
     return out;
+    });
   }
 
   // ---------------------------------------------------------------- resolution

@@ -61,7 +61,7 @@ export function renderT0(items: Item1[], hot: Set<string>): { text: string; byte
 /** Compute tiers for the current stable snapshot and record them (tiers/<seq>.json is write-once like every snapshot). */
 export function writeTiers(reg: Registry, o: { hot?: number; run?: string } = {}) {
   const entries = reg.current('stable');
-  const items = entries.map((e) => reg.item(e.id, e.major, e.rev)!).filter(Boolean);
+  const items = entries.map((e) => reg.item(e.id, e.major, e.rev, e.itemHash)!).filter(Boolean);
   const hot = hotSet(items, o.hot ?? 300), t0 = renderT0(items, hot);
   const seq = reg.pointers().stable!;
   const rec = { seq, hot: [...hot].sort(), cold: items.length - hot.size, t0 };
@@ -82,10 +82,10 @@ export class TieredLibrary implements DefLibrary {
   private scratch = new WorldModel({ constants: { ground: 'land', extent: 1000 }, seed: 'tiered' });
   readonly stats = { hot: 0, promoted: 0, loads: 0, bytesLoaded: 0 };
   private reg: Registry;
-  constructor(reg: Registry, hot: Set<string>, channel: 'stable' | 'candidate' = 'stable') {
+  constructor(reg: Registry, hot: Set<string>, channel: 'stable' | 'candidate' = 'stable', entries = reg.current(channel)) {
     this.reg = reg; this.id = `registry:${channel}`; this.version = String(reg.pointers()[channel]);
-    for (const e of reg.current(channel)) { for (const a of e.aliases) this.keys.set(a, e); this.keys.set(`${e.id}@${e.major}`, e); if (e.def1Hash) this.keys.set('sha:' + e.def1Hash, e); }
-    for (const e of reg.current(channel)) if (hot.has(e.id)) { this.load(e); this.stats.hot++; }
+    for (const e of entries) { for (const a of e.aliases) this.keys.set(a, e); this.keys.set(`${e.id}@${e.major}`, e); if (e.def1Hash) this.keys.set('sha:' + e.def1Hash, e); }
+    for (const e of entries) if (hot.has(e.id)) { this.load(e); this.stats.hot++; }
     this.stats.promoted = 0; this.stats.loads = 0;
   }
   private load(e: IndexEntry): StoredDef | undefined {

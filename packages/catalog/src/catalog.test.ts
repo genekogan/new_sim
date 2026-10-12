@@ -91,8 +91,9 @@ test('registry: content-addressed, write-once, channels; publish, promote, rollb
     // a candidate-only change, promoted
     const d2 = { ...items[0].up.def2, size: { ...items[0].up.def2.size, scale: [0.5, 3] as [number, number] } };
     const rev2 = reg.putDef(d2);
-    reg.putItem({ ...items[0].item, rev: rev2, status: 'candidate', supersedes: [bench.rev] });
-    reg.publish('candidate', [{ ...bench, rev: rev2, status: 'candidate' }], 'r2');
+    const nextItem = { ...items[0].item, rev: rev2, status: 'candidate' as const, supersedes: [bench.rev] };
+    reg.putItem(nextItem);
+    reg.publish('candidate', [{ ...bench, rev: rev2, itemHash: hashOf(nextItem), status: 'candidate' }], 'r2');
     assert.equal(reg.resolve('eden/bench@1', 'stable')!.rev, bench.rev);
     assert.equal(reg.resolve('eden/bench@1', 'candidate')!.rev, rev2);
     const s3 = reg.promote(['eden/bench'], 'r3');

@@ -2,7 +2,7 @@
 // registry and published to `stable` (they are already live in worlds) and `candidate`. Grandfathered: their G1–G3
 // results are recorded as run now, but a failure does not unpublish anything; it queues a fix (the report lists them).
 import { readFileSync, readdirSync } from 'node:fs';
-import { coreLibrary, sha256Hex, stableStringify, vocab, type StoredDef } from '@sim/world-compiler';
+import { coreLibrary, sha256Hex, stableStringify, hashOf, vocab, type StoredDef } from '@sim/world-compiler';
 import { def1to2, def2to1, def1Hash, def2Hash, type Upgrade } from './def1to2.ts';
 import { idOf, aliasesOf, namespaceOf } from './ids.ts';
 import { REDISTRIBUTABLE, item1Schema, type Item1 } from './schema.ts';
@@ -95,7 +95,9 @@ export function writeCore(reg: Registry, items: { item: Item1; up: Upgrade; def:
     if (def1Hash(view) !== def.hash) throw new Error(`import-core: ${def.ref} does not round-trip (def/1 ${def1Hash(view).slice(0, 12)} ≠ ${def.hash.slice(0, 12)})`);
     reg.putDef1(def.hash, view);
     reg.putItem(it);
-    entries.push({ id: it.id, major: it.major, rev: it.rev, status: it.status, tier: it.tier, aliases: it.aliases, def1Hash: def.hash, line: lineOf(it), redistribute: it.licence.redistribute });
+    const row = vocab.manifestRow(def as never, { bytes: it.budgets.bytes.assets, publicRef: `${it.id}@${it.major}` });
+    row.tris = it.budgets.tris.lod0;
+    entries.push({ id: it.id, major: it.major, rev: it.rev, itemHash: hashOf(it), status: it.status, tier: it.tier, aliases: it.aliases, def1Hash: def.hash, line: lineOf(it), redistribute: it.licence.redistribute, row });
   }
   const s = reg.publish('stable', entries, run), c = reg.publish('candidate', entries, run);
   reg.log({ op: 'import-core', run, items: entries.length, stable: s, candidate: c });

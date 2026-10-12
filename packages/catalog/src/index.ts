@@ -7,3 +7,4 @@ export * from './registry.ts';
 export * from './measure.ts';
 export * from './gates.ts';
 export * from './import-core.ts';
+export * from './serving.ts';

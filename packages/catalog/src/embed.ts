@@ -81,7 +81,7 @@ function jacobi(A0: Float64Array, n: number) {
 }
 
 export function buildIndex(docs: Doc[], opts: { dim?: number; trigram?: number } = {}): Index {
-  const t0 = performance.now(), dim = Math.min(opts.dim ?? Number(process.env.LSA_DIM ?? 128), docs.length - 1), trigram = opts.trigram ?? Number(process.env.LSA_TRIGRAM ?? 0.1);
+  const t0 = performance.now(), dim = Math.max(0, Math.min(opts.dim ?? Number(process.env.LSA_DIM ?? 128), docs.length - 1)), trigram = opts.trigram ?? Number(process.env.LSA_TRIGRAM ?? 0.1);
   const bags = docs.map((d) => features(d, trigram));
   const featIx = new Map<string, number>();
   for (const b of bags) for (const f of b.keys()) if (!featIx.has(f)) featIx.set(f, featIx.size);
@@ -93,7 +93,7 @@ export function buildIndex(docs: Doc[], opts: { dim?: number; trigram?: number }
     for (const [f, tf] of b) { const j = featIx.get(f)!; ix[i] = j; vx[i] = (1 + Math.log(tf + 1)) * idf[j]; nn += vx[i] ** 2; i++; }
     nn = Math.sqrt(nn) || 1; for (let t = 0; t < vx.length; t++) vx[t] /= nn; return [ix, vx];
   });
-  const { U, sigma } = svd(rows, m, dim);
+  const { U, sigma } = dim > 0 ? svd(rows, m, dim) : { U: new Float64Array(0), sigma: new Float64Array(0) };
   // V = Aᵀ U Σ⁻¹ (features × dim) for query fold-in; docs = U Σ, int8 per row
   const V = new Float32Array(m * dim);
   rows.forEach(([ix, vx], r) => { for (let t = 0; t < ix.length; t++) for (let c = 0; c < dim; c++) V[ix[t] * dim + c] += (vx[t] * U[r * dim + c]) / sigma[c]; });
@@ -109,6 +109,8 @@ export function buildIndex(docs: Doc[], opts: { dim?: number; trigram?: number }
 }
 
 export type Hit = { id: string; line: string; score: number; why: string[] };
+/** Lexical serving needs no SVD, model download or per-query model call. */
+export const buildLexicalIndex = (docs: Doc[]): Index => buildIndex(docs, { dim: 0, trigram: 0 });
 const featIndexCache = new WeakMap<Index, Map<string, number>>();
 const fIx = (idx: Index) => { let m = featIndexCache.get(idx); if (!m) { m = new Map(idx.feats.map((f, i) => [f, i])); featIndexCache.set(idx, m); } return m; };
 
@@ -148,7 +150,7 @@ export function search(idx: Index, q: string, opts: { k?: number; mode?: 'lexica
 // ------------------------------------------------------------------ registry glue (CLI: catalog embed / find)
 import type { Registry } from './registry.ts';
 export function docsOf(reg: Registry, ch: 'stable' | 'candidate' = 'stable'): Doc[] {
-  return reg.current(ch).map((e) => { const it = reg.item(e.id, e.major, e.rev)!; return { id: `${e.id}@${e.major}`, title: it.text.title, synonyms: it.text.synonyms, category: it.text.category, affords: it.affords, first: it.text.first, description: it.text.description, line: e.line }; });
+  return reg.current(ch).map((e) => { const it = reg.item(e.id, e.major, e.rev, e.itemHash)!; return { id: `${e.id}@${e.major}`, title: it.text.title, synonyms: it.text.synonyms, category: it.text.category, affords: it.affords, first: it.text.first, description: it.text.description, line: e.line }; });
 }
 const cache = new Map<string, Index>();
 export async function buildEmbeddings(reg: Registry, o: { model?: string; run?: string } = {}) {

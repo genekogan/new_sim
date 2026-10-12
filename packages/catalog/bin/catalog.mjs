@@ -47,7 +47,7 @@ switch (cmd) {
     for (const ref of pos) {
       const e = r.resolve(ref, String(flags.channel ?? 'stable'));
       if (!e) { console.log(`${ref}: not found`); bad++; continue; }
-      const item = r.item(e.id, e.major, e.rev), def2 = r.def(e.rev);
+      const item = r.item(e.id, e.major, e.rev, e.itemHash), def2 = r.def(e.rev);
       const o = await C.runGates({ item, def2, grandfathered: !!item.tests.gates.G1?.grandfathered }, contract, { all: true });
       if (!o.ok) bad++;
       console.log(`${e.id}@${e.major} ${o.ok ? 'PASS' : 'FAIL'}`);
