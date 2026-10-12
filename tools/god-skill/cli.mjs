@@ -8,6 +8,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, appendFileSync } fr
 import { resolve } from 'node:path';
 import { call, load, num, ok, r2, save, sleep } from './lib/state.mjs';
 import { mirror, view, normDef, follow, invalidate } from './lib/mirror.mjs';
+import { exportGenesis } from './lib/export.mjs';
 import { solve, refPoint, centreOf, compassOfYaw, rectArea, circleArea, compassKey, COMPASS, setOf, relocate, frameOf, slotTarget, isFlagDef } from './lib/solver.mjs';
 import { camera, shoot, keeper, stopKeeper } from './lib/look.mjs';
 import { spawnSync } from 'node:child_process';
@@ -545,34 +546,11 @@ export async function look(flags = {}) {
 /** export [file]: the world as a genesis/1 template (defines + places in dependency order). */
 export async function exportWorld(file, flags = {}) {
   const s = await snapshot();
-  const byId = new Map(s.entities.map((e) => [e.id, e]));
-  const lib = new Map(s.library.map((d) => [d.ref, d]));
-  const defOf = (ref) => lib.get(ref) ?? lib.get(ref.replace(/^core\//, 'core-')) ?? null;
-  const prefabChild = (e) => { for (let p = byId.get(e.in.parent); p; p = byId.get(p.in.parent)) if (defOf(p.def)?.make?.kind === 'parts') return true; return false; };
-  const custom = [...new Set(s.entities.map((e) => e.def))].map(defOf).filter((d) => d && d.by !== 'core' && !d.ref.startsWith('core-'));
-  const order = []; const seen = new Set();
-  const byPathE = new Map(s.entities.map((e) => [pathOf(byId, e), e]));
-  // dependency order: parents first, then whatever a constraint refers to (facing/along/near/inside refs)
-  const visit = (e, depth = 0) => { if (seen.has(e.id) || depth > 64) return; seen.add(e.id); const par = byId.get(e.in.parent); if (par) visit(par, depth + 1); for (const c of e.constraints ?? []) { const ref = c.ref && (byPathE.get(c.ref) ?? byPathE.get(c.ref.slice(0, c.ref.lastIndexOf('/')))); if (ref && ref.id !== e.id) visit(ref, depth + 1); } order.push(e); };
-  for (const e of s.entities) visit(e);
-  const tmp = new Map(order.map((e, i) => [e.id, `$e${i}`]));
-  const ops = order.filter((e) => !prefabChild(e)).map((e) => {
-    const o = { op: 'place', tmp: tmp.get(e.id), def: e.def, ...(e.name ? { name: e.name } : {}) };
-    if (e.in.parent !== 'world') o.in = { parent: tmp.get(e.in.parent), ...(e.in.slot ? { slot: e.in.slot } : {}) };
-    if (e.p) o.p = e.in.parent === 'world' && e.p.length === 3 && !(e.anchor === 'float') ? [e.p[0], e.p[2]] : e.p;
-    for (const k of ['r', 's', 'shape', 'anchor', 'params', 'state', 'seed', 'constraints']) if (e[k] !== undefined) o[k] = e[k];
-    if (o.anchor === 'float' && o.p?.length === 3) o.p = [o.p[0], o.p[2]];
-    return o;
-  });
-  const batches = [];
-  if (custom.length) batches.push({ note: 'defs', ops: custom.map(({ hash: _h, ref: _r, born: _b, budget: _bu, by: _by, ...d }) => ({ op: 'define', def: d })) });
-  for (let i = 0; i < ops.length; i += 200) batches.push({ note: `things ${i + 1}–${Math.min(ops.length, i + 200)}`, ops: ops.slice(i, i + 200) });
-  // tmp ids are per batch: a child whose parent is in an earlier batch needs the parent's path instead
-  for (let b = 0; b < batches.length; b++) { const local = new Set(batches[b].ops.map((o) => o.tmp).filter(Boolean)); for (const o of batches[b].ops) if (o.in?.parent?.startsWith('$') && !local.has(o.in.parent)) { const pe = order[Number(o.in.parent.slice(2))]; o.in.parent = pathOf(byId, pe); } }
-  const g = { schema: 'genesis/1', name: flags.name ?? s.worldId, description: `exported from ${s.worldId} at seq ${s.seq}`, constants: { extent: s.constants.extent, ground: s.constants.ground, ...(s.constants.seaLevel !== undefined ? { seaLevel: s.constants.seaLevel } : {}) }, state: { sky: s.state.sky, weather: s.state.weather, ...(s.state.constitution ? { constitution: s.state.constitution } : {}) }, batches };
+  const g = exportGenesis(s, flags);
   const out = resolve(file ?? `${s.worldId}.genesis.json`);
   writeFileSync(out, JSON.stringify(g, null, 1));
-  return `exported ${ops.length} things${custom.length ? ` and ${custom.length} defs` : ''} in ${batches.length} batches to ${out}`;
+  const ops = g.batches.flatMap((b) => b.ops), things = ops.filter((op) => op.op === 'place').length, defs = ops.filter((op) => op.op === 'define').length;
+  return `exported ${things} things${defs ? ` and ${defs} defs` : ''} in ${g.batches.length} batches to ${out}`;
 }
 const pathOf = (byId, e) => { const parts = []; for (let c = e; c; c = byId.get(c.in.parent)) parts.unshift(c.name ?? c.id); return parts.join('/'); };
 /** import <genesis.json>: apply a template's batches to this world, each atomic (group "import" unless the batch says). */
