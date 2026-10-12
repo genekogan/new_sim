@@ -17,6 +17,19 @@ const worlds = only.length ? only : ['eden', 'mars', 'littlemartians']; const W 
 const SETTLE = Number(process.env.SETTLE_MS ?? 15000);
 const DPRS = (process.env.DPRS ?? '1,2').split(',').map(Number);
 const PREFIX = process.env.FORK_PREFIX ?? '/worlds';
+// LOCAL_DIST=<a web build made with --base /worlds/>: the fork page's HTML and /worlds/assets/* come from that local
+// build (Playwright routes), everything else (API, socket, blobs) from the real fork; checks a client fix before release.
+const LOCAL_DIST = process.env.LOCAL_DIST ? resolve(process.env.LOCAL_DIST) : null;
+const { readFileSync, existsSync } = await import('node:fs');
+const MIME = { js: 'text/javascript', css: 'text/css', html: 'text/html', mp4: 'video/mp4', json: 'application/json', wasm: 'application/wasm', png: 'image/png', svg: 'image/svg+xml', woff2: 'font/woff2' };
+async function localRoutes(ctx) {
+  if (!LOCAL_DIST) return;
+  await ctx.route((u) => u.pathname.startsWith(PREFIX + '/assets/') || /^\/worlds\/w\/[a-z][a-z0-9-]*\/$/.test(u.pathname), (route) => {
+    const u = new URL(route.request().url()); const f = u.pathname.startsWith(PREFIX + '/assets/') ? resolve(LOCAL_DIST, u.pathname.slice(PREFIX.length + 1)) : resolve(LOCAL_DIST, 'index.html');
+    if (!existsSync(f)) return route.continue();
+    return route.fulfill({ status: 200, contentType: MIME[f.split('.').pop()] ?? 'application/octet-stream', body: readFileSync(f) });
+  });
+}
 const probe = () => {
   const st = { cur: { draws: 0, tris: 0 }, last: { draws: 0, tris: 0 }, frames: 0, scenes: [], renderers: [], main: null, pose: null };
   globalThis.__fk = st;
@@ -80,7 +93,7 @@ try {
         for (const side of ['live', 'fork']) {
           const url = `${origin}${side === 'live' ? '' : PREFIX}/w/${world}/`;
           const ctx = await browser.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: dpr });
-          await ctx.addInitScript(probe); const page = await ctx.newPage();
+          await ctx.addInitScript(probe); if (side === 'fork') await localRoutes(ctx); const page = await ctx.newPage();
           const reqs = [], errors = [], consoleErrors = [], host = new URL(origin).host;
           page.on('pageerror', (e) => errors.push(String(e).slice(0, 200)));
           page.on('console', (m) => { if (m.type() === 'error' || m.type() === 'warning') consoleErrors.push(`${m.type()}: ${m.text().slice(0, 200)}`); });
