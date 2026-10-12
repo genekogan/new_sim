@@ -16,13 +16,14 @@ app = modal.App("eden-catalog-p1-proof", image=image)
 
 
 @app.function(gpu="L4", timeout=1800, memory=8192, cpu=4)
-def run(bundle: bytes, source: str, input_only: bool = False, dpr: int = 0) -> bytes:
+def run(bundle: bytes, source: str, input_only: bool = False, dpr: int = 0, review_only: bool = False) -> bytes:
     root = pathlib.Path("/repo")
     root.mkdir()
     with tarfile.open(fileobj=io.BytesIO(bundle), mode="r:gz") as archive:
         archive.extractall(root, filter="data")
     subprocess.run(["pnpm", "install", "--no-frozen-lockfile", "--ignore-scripts"], cwd=root, stdout=subprocess.DEVNULL, check=True)
-    subprocess.run(["pnpm", "--filter", "@sim/web", "exec", "vite", "build", "--base", "/worlds/", "--outDir", "/repo/.lane/web-worlds", "--emptyOutDir"], cwd=root, stdout=subprocess.DEVNULL, check=True)
+    if not review_only:
+        subprocess.run(["pnpm", "--filter", "@sim/web", "exec", "vite", "build", "--base", "/worlds/", "--outDir", "/repo/.lane/web-worlds", "--emptyOutDir"], cwd=root, stdout=subprocess.DEVNULL, check=True)
     out = pathlib.Path("/proof")
     out.mkdir()
     env = {**__import__("os").environ, "P1_SOURCE_SHA": source, "P1_PROOF_DPR": str(dpr) if dpr else ""}
@@ -32,6 +33,8 @@ def run(bundle: bytes, source: str, input_only: bool = False, dpr: int = 0) -> b
     ]
     if input_only:
         commands = [commands[1]]
+    if review_only:
+        commands = [("review", ["node", "tools/catalog/review-browser-proof.mjs", "/proof/review"])]
     codes = {}
     for name, command in commands:
         with (out / f"{name}.log").open("w") as log:
@@ -50,8 +53,8 @@ def run(bundle: bytes, source: str, input_only: bool = False, dpr: int = 0) -> b
 
 
 @app.local_entrypoint()
-def main(bundle: str, source: str, out: str, input_only: bool = False, dpr: int = 0):
-    data = run.remote(pathlib.Path(bundle).read_bytes(), source, input_only, dpr)
+def main(bundle: str, source: str, out: str, input_only: bool = False, dpr: int = 0, review_only: bool = False):
+    data = run.remote(pathlib.Path(bundle).read_bytes(), source, input_only, dpr, review_only)
     target = pathlib.Path(out)
     target.mkdir(parents=True, exist_ok=True)
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as archive:
