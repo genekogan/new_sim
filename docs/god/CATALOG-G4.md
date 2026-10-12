@@ -12,7 +12,10 @@ modal run tools/catalog/g4/g4_modal.py --bundle /tmp/g4-bundle.tar.gz --all --ou
 ```
 
 `g4-batch.mjs` uses fresh fake-mind worlds on port 6102, sequential batches of
-at most 72 jobs (hard grid capacity 81). All enum alternatives are tested
+at most 72 jobs (hard grid capacity 81). The render-only fixtures use the existing
+`ENTITY_BRIDGE=0` switch to avoid rebuilding Soul navigation for thousands of
+alternatives; compiler admission and visual snapshots remain active. G4 does not
+qualify Soul physics/navigation. All enum alternatives are tested
 individually, plus default and actuator states. This is not the Cartesian
 product of parameter settings. Path/area placement uses the API's example
 shape, translated into world coordinates. Prefab children and instance matrices

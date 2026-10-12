@@ -33,7 +33,14 @@ const t0 = performance.now();
 
 // ---------------------------------------------------------------- the world
 let base = args.url ? String(args.url) : null, child = null;
-if (!base) { const { startWorld } = await import('../../god-skill/dev-world.mjs'); ({ child, base } = await startWorld({ slug: 'g4', port, fresh: true, log: join(out, 'server.log') })); }
+if (!base) {
+  const { startWorld } = await import('../../god-skill/dev-world.mjs');
+  // G4 has no Souls: the visual snapshot/compiler stays active, but Soul nav rebuilds are G3/G6 work.
+  // Use the existing fixture switch; never change a running world's bridge.
+  const before = process.env.ENTITY_BRIDGE; process.env.ENTITY_BRIDGE = '0';
+  try { ({ child, base } = await startWorld({ slug: 'g4', port, fresh: true, log: join(out, 'server.log') })); }
+  finally { if (before === undefined) delete process.env.ENTITY_BRIDGE; else process.env.ENTITY_BRIDGE = before; }
+}
 const stop = () => { try { child?.kill(); } catch { /* gone */ } };
 process.on('exit', stop);
 const api = async (path, { body, token } = {}) => {
@@ -209,7 +216,7 @@ const mad = (a, b) => a.reduce((s, v, i) => s + Math.abs(v - b[i]), 0) / a.lengt
 const baseDir = args.baseline ? resolve(String(args.baseline)) : null;
 const items = new Map();
 for (const r of results) { const l = items.get(r.id) ?? []; l.push(r); items.set(r.id, l); }
-const report = { run, gpu, base, ms: 0, approval: args.approve ? 'explicit per-item baseline write requested' : 'none', items: [...gaps] };
+const report = { run, gpu, base, fixture: { soulBridge: args.url ? 'external world' : false, fakeMinds: true }, ms: 0, approval: args.approve ? 'explicit per-item baseline write requested' : 'none', items: [...gaps] };
 for (const [id, recs] of items) {
   const errors = [], warnings = [], numbers = {};
   const def = recs[0];
