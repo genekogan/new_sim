@@ -1,6 +1,10 @@
 // Pure G4 planning: every ref has either a bounded render job or an explicit qualification gap.
 export const toRef = (r) => r.replace(/^eden\//, 'core/').replace(/^lm\//, 'core/lm-').replace(/^mars\//, 'core/mars-').replace(/^core-/, 'core/');
 export const ACT = { power: ['on', true], door: ['open', true], ignite: ['lit', true], play: ['playing', true], fill: ['level', 1] };
+export function fixturePort(port) {
+  if (!Number.isInteger(port) || port < 6100 || port > 6299) throw new Error('G4 fixture port must be in 6100..6299');
+  return port;
+}
 export function shotsOf(d) {
   const list = [{ label: 'default', params: {}, state: {} }];
   const enums = Object.entries(d.params ?? {}).filter(([, f]) => f.type === 'enum').sort(([a], [b]) => a.localeCompare(b));

@@ -1,9 +1,13 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { allocateGrid, coverageOf, planBatches, shotsOf, unsupported } from './plan.mjs';
+import { allocateGrid, coverageOf, planBatches, shotsOf, unsupported, fixturePort } from './plan.mjs';
 import { coreLibrary } from '../../../packages/world-compiler/src/library.ts';
 import { WorldModel } from '../../../packages/world-compiler/src/model.ts';
 const def = (i, extra = {}) => ({ publicRef: `core/item-${i}@1`, make: { kind: 'gen', gen: 'box/1' }, params: {}, ...extra });
+test('G4 fixtures refuse protected and out-of-range laptop ports before spawning', () => {
+  assert.equal(fixturePort(6102), 6102);
+  for (const p of [4930, 4963, 4970, 6002, 6300, NaN]) assert.throws(() => fixturePort(p), /6100/);
+});
 test('768 refs and over 484 jobs are bounded and accounted exactly once', () => {
   const ds = Array.from({ length: 768 }, (_, i) => def(i, { params: { variant: { type: 'enum', default: 'a', values: ['a', 'b', 'c'] } } }));
   const p = planBatches(ds);

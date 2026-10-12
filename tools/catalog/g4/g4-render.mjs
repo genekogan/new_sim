@@ -21,11 +21,12 @@ import { createRequire } from 'node:module';
 import { dirname, resolve, join, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gateExit } from './checks.mjs';
-import { toRef, shotsOf, unsupported, allocateGrid } from './plan.mjs';
+import { toRef, shotsOf, unsupported, allocateGrid, fixturePort } from './plan.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => (a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : null)).filter(Boolean));
-const port = Number(args.port ?? 6002);
+const port = fixturePort(Number(args.port ?? 6102));
+if (args.url) { const url = new URL(String(args.url)); if (!['localhost', '127.0.0.1', '[::1]'].includes(url.hostname)) throw new Error('--url must be an owned local G4 fixture'); fixturePort(Number(url.port)); }
 const run = `g4-${new Date().toISOString().replace(/[:.]/g, '-')}`;
 const out = resolve(String(args.out ?? join(root, '.lane/g4', run)));
 mkdirSync(out, { recursive: true });
