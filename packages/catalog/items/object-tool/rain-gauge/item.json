@@ -2,7 +2,7 @@
   "text": {
     "title": "Rain gauge",
     "first": "A hollow marked rain gauge, 34 cm high, for a weather station; carry it or use it as an empty display vessel.",
-    "description": "A hollow glass cylinder on a green base with five graduation marks, for measuring rainfall and collecting rainwater. Souls can carry it. It stays empty: rainfall does not automatically fill it.",
+    "description": "An empty hollow glass cylinder on a green base with five graduation marks. Souls can carry it. It depicts a tool for measuring rainfall and collecting rainwater; no measurement or automatic filling is simulated.",
     "category": "object.tool",
     "synonyms": ["rainfall meter", "precipitation gauge", "weather measuring cylinder"],
     "heldOut": ["measure outdoor rainfall", "collect rainwater"]

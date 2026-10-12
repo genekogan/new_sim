@@ -8,7 +8,7 @@ import { createRequire } from 'node:module';
 const root = resolve(new URL('../..', import.meta.url).pathname), out = resolve(process.argv[2] ?? '.lane/p1-browser-proof');
 mkdirSync(out, { recursive: true });
 const { chromium } = createRequire(new URL('../../mars/viewer/package.json', import.meta.url))('@playwright/test');
-const env = { ...process.env, BRAIN_MODE: 'fake', SEED_NATIVES: '0', CATALOG_REGISTRY_DIR: resolve(root, '.lane/registry'), CATALOG_CHANNEL: 'candidate' };
+const env = { ...process.env, BRAIN_MODE: 'fake', SEED_NATIVES: '0', CATALOG_REGISTRY_DIR: process.env.CATALOG_REGISTRY_DIR ?? resolve(root, '.lane/registry'), CATALOG_CHANNEL: process.env.CATALOG_CHANNEL ?? 'candidate' };
 const origin = 'http://127.0.0.1:6110';
 const server = spawn(process.execPath, ['tools/catalog/proof-launcher.mjs', `${out}/data`], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
 let log = ''; server.stdout.on('data', (data) => { log += data; }); server.stderr.on('data', (data) => { log += data; });

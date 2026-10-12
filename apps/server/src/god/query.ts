@@ -94,7 +94,8 @@ export function runQuery(w: WorldModel, q: QueryInput) {
   }
   if (q.prepare) {
     const ref = q.prepare.def.includes('@') || q.prepare.def.startsWith('sha:') ? q.prepare.def : `core/${q.prepare.def}@1`;
-    const def = w.resolvedDef(ref);
+    const placed = w.library?.placementRef?.(ref);
+    const def = placed === null ? undefined : w.resolvedDef(placed ?? ref);
     if (!def) out.prepare = { error: `def.unknown ${ref}` };
     else if (def.make.kind !== 'gen') out.prepare = null;
     else { try { out.prepare = prepareFor(def.make.gen, queryOf(w), q.prepare.shape, (q.prepare.params ?? {}) as never); } catch (e) { out.prepare = { error: String((e as Error).message ?? e) }; } }
@@ -169,7 +170,8 @@ function layout(w: WorldModel, o: { area?: [number, number, number, number]; max
 
 function bakeDef(w: WorldModel, b: NonNullable<QueryInput['bake']>) {
   const ref = b.def.includes('@') || b.def.startsWith('sha:') ? b.def : `core/${b.def}@1`;
-  const def = w.resolvedDef(ref);
+  const placed = w.library?.placementRef?.(ref);
+  const def = placed === null ? undefined : w.resolvedDef(placed ?? ref);
   if (!def) return { error: `def.unknown ${ref}` };
   const params: Record<string, unknown> = {};
   for (const [k, f] of Object.entries(def.params)) if ((f as { default?: unknown }).default !== undefined) params[k] = (f as { default?: unknown }).default;

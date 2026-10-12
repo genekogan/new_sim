@@ -41,6 +41,10 @@ test('cold search and pages do not load engine defs; use pins one exact engine h
 test('licence context allows Gene to use restricted art, and still refuses its export', () => {
   assert.equal(new RegistryCatalog(reg, { ownerIsGene: true }).list().length, 5);
   assert.equal(new RegistryCatalog(reg, { ownerIsGene: true, export: true }).list().length, 4);
+  const catalog = new RegistryCatalog(reg, {ownerIsGene: true});
+  const restricted = catalog.list().find((h) => !h.entry.redistribute)!;
+  assert.equal(catalog.canExport(restricted.entry.def1Hash!), false);
+  assert.equal(catalog.canExport(imports[0].def.hash), true);
 });
 
 test('text update publishes with identical def hashes; rollback and yank affect live resolution, stored worlds stay pinned', () => {

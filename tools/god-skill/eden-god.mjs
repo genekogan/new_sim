@@ -331,7 +331,7 @@ function solve(v, thing, rel) {
       if (sh?.path) {
         const a2 = sh.path[0], b2 = sh.path[sh.path.length - 1];
         const nearerEnd = () => Math.hypot(a2[0] - Q.x, a2[1] - Q.z) <= Math.hypot(b2[0] - Q.x, b2[1] - Q.z) ? [r22(a2[0]), r22(a2[1])] : [r22(b2[0]), r22(b2[1])];
-        if (ENDS_ONLY.test(P.row.def)) return nearerEnd();
+        if (ENDS_ONLY.test(v.def?.(P.row.def)?.ref ?? P.row.def)) return nearerEnd();
         const q = nearestOnPath(sh.path, [Q.x, Q.z]);
         if (Math.hypot(q.p[0] - a2[0], q.p[1] - a2[1]) < 3 || Math.hypot(q.p[0] - b2[0], q.p[1] - b2[1]) < 3) return nearerEnd();
         const inset = P.row.layer === "surface" ? Math.max(0, (sh.width ?? 4) / 2 - 0.5) : 0, u2 = norm([Q.x - q.p[0], Q.z - q.p[1]]);
@@ -605,7 +605,7 @@ function solve(v, thing, rel) {
     }
     const rim = shapeOf?.area ? (u) => rayExit(shapeOf.area, [R.x, R.z], u) : null;
     const gap2 = rel.dist !== void 0 ? Number(rel.dist) : Math.max(1.5, Math.min(6, Math.max(hw, hd)));
-    const start = rel.dir && compassKey(rel.dir) ? COMPASS[compassKey(rel.dir)] : R.kind === "entity" && R.row.form === "point" && !isFlagDef(R.row.def) ? dirOfYaw(R.yaw) : COMPASS.s;
+    const start = rel.dir && compassKey(rel.dir) ? COMPASS[compassKey(rel.dir)] : R.kind === "entity" && R.row.form === "point" && !isFlagDef(v.def?.(R.row.def)?.ref ?? R.row.def) ? dirOfYaw(R.yaw) : COMPASS.s;
     const a0 = Math.atan2(start[0], start[1]);
     const items2 = [];
     const placed = [];
@@ -992,14 +992,15 @@ function view(m) {
   const byId = new Map(m.rows.map((r) => [r.id, r]));
   const byPath = new Map(m.rows.map((r) => [r.path, r]));
   const lib = /* @__PURE__ */ new Map();
-  for (const d of m.snapshot.library ?? []) {
+  for (const d of [...m.snapshot.library ?? [], ...m.snapshot.defs ?? []]) {
+    lib.set("sha:" + d.hash, d);
     lib.set(d.ref, d);
     if (d.ref.startsWith("core-")) lib.set("core/" + d.ref.slice(5), d);
   }
   const get = (ref) => {
     if (!ref) return null;
     const r = String(ref).replace(/^flag:/, "");
-    return byId.get(r) ?? byPath.get(r) ?? m.rows.find((x) => x.name === r && x.parent === m.rows.find((p) => p.id === x.parent)?.id) ?? m.rows.find((x) => x.name === r) ?? m.rows.find((x) => isFlagDef(x.def) && m.snapshot.entities.find((e) => e.id === x.id)?.state?.label === r) ?? null;
+    return byId.get(r) ?? byPath.get(r) ?? m.rows.find((x) => x.name === r && x.parent === m.rows.find((p) => p.id === x.parent)?.id) ?? m.rows.find((x) => x.name === r) ?? m.rows.find((x) => isFlagDef(lib.get(x.def)?.ref ?? x.def) && m.snapshot.entities.find((e) => e.id === x.id)?.state?.label === r) ?? null;
   };
   const entity = (id) => m.snapshot.entities.find((e) => e.id === id) ?? null;
   const children = (id) => m.rows.filter((r) => r.parent === id);
@@ -1035,6 +1036,111 @@ async function follow(seconds = 3600, onEvent = () => {
   } catch {
   }
   return { ended: true };
+}
+
+// lib/export.mjs
+var isRef = (v) => typeof v === "string" && (/^sha:[0-9a-f]{64}$/.test(v) || /@\d+$/.test(v));
+var inputOf = ({ hash, ref, born, budget, by, ...input }) => input;
+var pathOf = (byId, entity) => {
+  const parts = [];
+  for (let e = entity; e; e = byId.get(e.in.parent)) parts.unshift(e.name ?? e.id);
+  return parts.join("/");
+};
+function exportGenesis(snapshot2, { name } = {}) {
+  const s = snapshot2, byId = new Map(s.entities.map((e) => [e.id, e]));
+  const library = /* @__PURE__ */ new Map();
+  for (const d of [...s.library ?? [], ...s.defs ?? []]) {
+    library.set(d.ref, d);
+    if (d.hash) library.set("sha:" + d.hash, d);
+    if (d.ref?.startsWith("core-")) library.set("core/" + d.ref.slice(5), d);
+  }
+  const defOf = (ref) => library.get(ref) ?? null;
+  const blocked = new Set(s.exportBlockedHashes ?? []);
+  const checked = /* @__PURE__ */ new Set(), emitted = /* @__PURE__ */ new Set(), definitions = [], visiting = /* @__PURE__ */ new Set();
+  const dependencies = (d) => {
+    const refs = [];
+    if (d.extends) refs.push(d.extends);
+    const walk = (value, key) => {
+      if (isRef(value) && (key === "def" || key === "of" || key === "extends")) refs.push(value);
+      else if (Array.isArray(value)) value.forEach((v) => walk(v, key));
+      else if (value && typeof value === "object") for (const [k, v] of Object.entries(value)) walk(v, k);
+    };
+    walk(d.make);
+    walk(d.contents);
+    walk(d.components);
+    return [...new Set(refs)];
+  };
+  const check = (d) => {
+    if (checked.has(d.hash ?? d.ref)) return;
+    checked.add(d.hash ?? d.ref);
+    if (blocked.has(d.hash) || [...JSON.stringify(d.make ?? null).matchAll(/[0-9a-f]{64}/g)].some(([hash]) => blocked.has(hash)))
+      throw new Error(`export restricted: ${d.ref} cannot be redistributed`);
+    for (const ref of dependencies(d)) {
+      const dep = defOf(ref);
+      if (dep) check(dep);
+    }
+  };
+  const emit = (ref, required = false) => {
+    const d = defOf(ref);
+    if (!d) {
+      if (required) throw new Error(`export missing pinned definition: ${ref}`);
+      return;
+    }
+    check(d);
+    const portable = required || ref.startsWith("sha:") || d.by !== "core" && !d.ref.startsWith("core-");
+    if (!portable || emitted.has(d.hash ?? d.ref)) return;
+    const key = d.hash ?? d.ref;
+    if (visiting.has(key)) throw new Error(`export cyclic definition dependency: ${d.ref}`);
+    visiting.add(key);
+    for (const dependency of dependencies(d)) emit(dependency, true);
+    visiting.delete(key);
+    emitted.add(key);
+    definitions.push(inputOf(d));
+  };
+  for (const e of s.entities) {
+    emit(e.def, e.def.startsWith("sha:"));
+    for (const value of Object.values(e.params ?? {})) if (isRef(value)) emit(value, value.startsWith("sha:"));
+  }
+  const prefabChild = (e) => {
+    for (let p = byId.get(e.in.parent); p; p = byId.get(p.in.parent)) if (defOf(p.def)?.make?.kind === "parts") return true;
+    return false;
+  };
+  const order = [], seen = /* @__PURE__ */ new Set(), byPath = new Map(s.entities.map((e) => [pathOf(byId, e), e]));
+  const visit = (e, depth = 0) => {
+    if (seen.has(e.id) || depth > 64) return;
+    seen.add(e.id);
+    const parent = byId.get(e.in.parent);
+    if (parent) visit(parent, depth + 1);
+    for (const c of e.constraints ?? []) {
+      const related = c.ref && (byPath.get(c.ref) ?? byPath.get(c.ref.slice(0, c.ref.lastIndexOf("/"))));
+      if (related && related.id !== e.id) visit(related, depth + 1);
+    }
+    order.push(e);
+  };
+  s.entities.forEach((e) => visit(e));
+  const tmp = new Map(order.map((e, i) => [e.id, `$e${i}`]));
+  const ops = order.filter((e) => !prefabChild(e)).map((e) => {
+    const op = { op: "place", tmp: tmp.get(e.id), def: e.def, ...e.name ? { name: e.name } : {} };
+    if (e.in.parent !== "world") op.in = { parent: tmp.get(e.in.parent), ...e.in.slot ? { slot: e.in.slot } : {} };
+    if (e.p) op.p = e.in.parent === "world" && e.p.length === 3 && e.anchor !== "float" ? [e.p[0], e.p[2]] : e.p;
+    for (const key of ["r", "s", "shape", "anchor", "params", "state", "seed", "constraints"]) if (e[key] !== void 0) op[key] = e[key];
+    if (op.anchor === "float" && op.p?.length === 3) op.p = [op.p[0], op.p[2]];
+    return op;
+  });
+  const batches = definitions.length ? [{ note: "defs", ops: definitions.map((def) => ({ op: "define", def })) }] : [];
+  for (let i = 0; i < ops.length; i += 200) batches.push({ note: `things ${i + 1}\u2013${Math.min(ops.length, i + 200)}`, ops: ops.slice(i, i + 200) });
+  for (const batch of batches) {
+    const local = new Set(batch.ops.map((op) => op.tmp).filter(Boolean));
+    for (const op of batch.ops) if (op.in?.parent?.startsWith("$") && !local.has(op.in.parent)) op.in.parent = pathOf(byId, order[Number(op.in.parent.slice(2))]);
+  }
+  return {
+    schema: "genesis/1",
+    name: name ?? s.worldId,
+    description: `exported from ${s.worldId} at seq ${s.seq}`,
+    constants: { extent: s.constants.extent, ground: s.constants.ground, ...s.constants.seaLevel !== void 0 ? { seaLevel: s.constants.seaLevel } : {} },
+    state: { sky: s.state.sky, weather: s.state.weather, ...s.state.constitution ? { constitution: s.state.constitution } : {} },
+    batches
+  };
 }
 
 // lib/look.mjs
@@ -1356,7 +1462,7 @@ function selectRows(v, f = {}) {
   } else if (!f.all) rows = rows.filter((r) => r.parent === "world");
   if (f.def) {
     const d = String(f.def);
-    rows = rows.filter((r) => r.def.includes(d) || r.def.replace(/^core-/, "core/").includes(d));
+    rows = rows.filter((r) => r.def.includes(d) || (v.def?.(r.def)?.ref ?? r.def).replace(/^core-/, "core/").includes(d));
   }
   if (f.tag) rows = rows.filter((r) => (r.tags ?? []).includes(String(f.tag)));
   if (f.name) {
@@ -1372,7 +1478,7 @@ function selectRows(v, f = {}) {
     const rad = Number(f.radius ?? 20);
     rows = rows.filter((r) => r.id !== c.row?.id && Math.hypot(r.pose[0] - c.x, r.pose[2] - c.z) <= rad);
   }
-  if (!f.flags) rows = rows.filter((r) => !isFlagDef(r.def) || f.def === "flag");
+  if (!f.flags) rows = rows.filter((r) => !isFlagDef(v.def?.(r.def)?.ref ?? r.def) || f.def === "flag");
   return rows;
 }
 
@@ -1703,7 +1809,7 @@ async function map(opts = {}) {
     lines.push("## water");
     for (const w of s.ground.waters) lines.push(`- ${nameOf(w.id)}: level ${w.level}`);
   }
-  const roots = v.rows.filter((r) => r.parent === "world" && !isFlagDef(r.def));
+  const roots = v.rows.filter((r) => r.parent === "world" && !isFlagDef(v.def(r.def)?.ref ?? r.def));
   const limit = opts.all ? Infinity : 120;
   if (roots.length) {
     lines.push(`## things (${roots.length} at the root${roots.length > limit ? `; first ${limit}, --all for every one` : ""})`);
@@ -1713,7 +1819,7 @@ async function map(opts = {}) {
       lines.push(`- ${r.path} [${r.def.replace(/^core-/, "core/")}]${shape}${r.form === "point" && !r.shape ? ` ${r2(r.box[0])}\xD7${r2(r.box[2])} m` : ""}${kids.length ? ` \u2014 ${kids.length} inside: ${kids.slice(0, 8).map((k) => k.name ?? k.id).join(", ")}${kids.length > 8 ? "\u2026" : ""}` : ""}`);
     }
   }
-  const fl = v.rows.filter((r) => isFlagDef(r.def));
+  const fl = v.rows.filter((r) => isFlagDef(v.def(r.def)?.ref ?? r.def));
   if (fl.length) {
     lines.push("## flags (refer to them as flag:<name>)");
     for (const r of fl) lines.push(`- flag:${r.name} "${v.entity(r.id)?.state?.label ?? ""}" at (${r.pose[0]}, ${r.pose[2]})`);
@@ -2374,7 +2480,7 @@ async function look(flags2 = {}) {
       span = flags2.span ? num(flags2.span) : 40;
     }
   } else {
-    const roots = v.rows.filter((r) => r.parent === "world" && !isFlagDef(r.def) && !(r.shape && r.aabb[2] - r.aabb[0] > m.extent * 0.6));
+    const roots = v.rows.filter((r) => r.parent === "world" && !isFlagDef(v.def(r.def)?.ref ?? r.def) && !(r.shape && r.aabb[2] - r.aabb[0] > m.extent * 0.6));
     if (!roots.length) {
       target = [0, 0, 0];
       span = 160;
@@ -2406,58 +2512,12 @@ async function look(flags2 = {}) {
 }
 async function exportWorld(file, flags2 = {}) {
   const s = await snapshot();
-  const byId = new Map(s.entities.map((e) => [e.id, e]));
-  const lib = new Map(s.library.map((d) => [d.ref, d]));
-  const defOf = (ref) => lib.get(ref) ?? lib.get(ref.replace(/^core\//, "core-")) ?? null;
-  const prefabChild = (e) => {
-    for (let p = byId.get(e.in.parent); p; p = byId.get(p.in.parent)) if (defOf(p.def)?.make?.kind === "parts") return true;
-    return false;
-  };
-  const custom = [...new Set(s.entities.map((e) => e.def))].map(defOf).filter((d) => d && d.by !== "core" && !d.ref.startsWith("core-"));
-  const order = [];
-  const seen = /* @__PURE__ */ new Set();
-  const byPathE = new Map(s.entities.map((e) => [pathOf(byId, e), e]));
-  const visit = (e, depth = 0) => {
-    if (seen.has(e.id) || depth > 64) return;
-    seen.add(e.id);
-    const par = byId.get(e.in.parent);
-    if (par) visit(par, depth + 1);
-    for (const c of e.constraints ?? []) {
-      const ref = c.ref && (byPathE.get(c.ref) ?? byPathE.get(c.ref.slice(0, c.ref.lastIndexOf("/"))));
-      if (ref && ref.id !== e.id) visit(ref, depth + 1);
-    }
-    order.push(e);
-  };
-  for (const e of s.entities) visit(e);
-  const tmp = new Map(order.map((e, i) => [e.id, `$e${i}`]));
-  const ops = order.filter((e) => !prefabChild(e)).map((e) => {
-    const o = { op: "place", tmp: tmp.get(e.id), def: e.def, ...e.name ? { name: e.name } : {} };
-    if (e.in.parent !== "world") o.in = { parent: tmp.get(e.in.parent), ...e.in.slot ? { slot: e.in.slot } : {} };
-    if (e.p) o.p = e.in.parent === "world" && e.p.length === 3 && !(e.anchor === "float") ? [e.p[0], e.p[2]] : e.p;
-    for (const k of ["r", "s", "shape", "anchor", "params", "state", "seed", "constraints"]) if (e[k] !== void 0) o[k] = e[k];
-    if (o.anchor === "float" && o.p?.length === 3) o.p = [o.p[0], o.p[2]];
-    return o;
-  });
-  const batches = [];
-  if (custom.length) batches.push({ note: "defs", ops: custom.map(({ hash: _h, ref: _r, born: _b, budget: _bu, by: _by, ...d }) => ({ op: "define", def: d })) });
-  for (let i = 0; i < ops.length; i += 200) batches.push({ note: `things ${i + 1}\u2013${Math.min(ops.length, i + 200)}`, ops: ops.slice(i, i + 200) });
-  for (let b = 0; b < batches.length; b++) {
-    const local = new Set(batches[b].ops.map((o) => o.tmp).filter(Boolean));
-    for (const o of batches[b].ops) if (o.in?.parent?.startsWith("$") && !local.has(o.in.parent)) {
-      const pe = order[Number(o.in.parent.slice(2))];
-      o.in.parent = pathOf(byId, pe);
-    }
-  }
-  const g = { schema: "genesis/1", name: flags2.name ?? s.worldId, description: `exported from ${s.worldId} at seq ${s.seq}`, constants: { extent: s.constants.extent, ground: s.constants.ground, ...s.constants.seaLevel !== void 0 ? { seaLevel: s.constants.seaLevel } : {} }, state: { sky: s.state.sky, weather: s.state.weather, ...s.state.constitution ? { constitution: s.state.constitution } : {} }, batches };
+  const g = exportGenesis(s, flags2);
   const out = resolve2(file ?? `${s.worldId}.genesis.json`);
   writeFileSync5(out, JSON.stringify(g, null, 1));
-  return `exported ${ops.length} things${custom.length ? ` and ${custom.length} defs` : ""} in ${batches.length} batches to ${out}`;
+  const ops = g.batches.flatMap((b) => b.ops), things = ops.filter((op) => op.op === "place").length, defs2 = ops.filter((op) => op.op === "define").length;
+  return `exported ${things} things${defs2 ? ` and ${defs2} defs` : ""} in ${g.batches.length} batches to ${out}`;
 }
-var pathOf = (byId, e) => {
-  const parts = [];
-  for (let c = e; c; c = byId.get(c.in.parent)) parts.unshift(c.name ?? c.id);
-  return parts.join("/");
-};
 async function importWorld(file, flags2 = {}) {
   const g = JSON.parse(readFileSync4(file, "utf8"));
   if (g.schema !== "genesis/1") throw new Error("import: file must be genesis/1");
@@ -2541,7 +2601,7 @@ async function gallery() {
 }
 async function flags() {
   const v = view(await mirror());
-  return v.rows.filter((r) => isFlagDef(r.def)).map((r) => ({ name: `flag:${r.name}`, label: v.entity(r.id)?.state?.label ?? "", at: [r.pose[0], r.pose[2]] }));
+  return v.rows.filter((r) => isFlagDef(v.def(r.def)?.ref ?? r.def)).map((r) => ({ name: `flag:${r.name}`, label: v.entity(r.id)?.state?.label ?? "", at: [r.pose[0], r.pose[2]] }));
 }
 async function flag(label, f) {
   const v = view(await mirror());

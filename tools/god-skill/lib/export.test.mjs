@@ -23,6 +23,8 @@ test('same-major SHA revisions export exact bytes and import both hashes', () =>
   }
   assert.equal(destination.def('sha:' + a.hash).hash, a.hash);
   assert.equal(destination.def('sha:' + b.hash).hash, b.hash);
+  assert.equal(destination.def(destination.get('one').def).hash, a.hash);
+  assert.equal(destination.def(destination.get('two').def).hash, b.hash);
   assert.equal(JSON.stringify(s), before, 'export is pure');
   assert.equal(g.state.layers, undefined);
   for (const op of operations(g).filter((o) => o.op === 'define'))

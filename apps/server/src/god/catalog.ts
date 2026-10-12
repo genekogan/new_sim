@@ -110,7 +110,7 @@ export function mountCatalogRoutes(app: Hono, d: CatalogDeps) {
         if (hits.length) { needs.push({ for: words[i], picks: hits.map((h) => ({ ref: h.row.ref, cat: h.row.cat, score: h.score, why: h.why })) }); used.add(i); }
       }
       const seen = new Set<string>(), ops = needs.flatMap((n) => n.picks.slice(0, 1)).filter((h) => !seen.has(h.ref) && seen.add(h.ref))
-        .flatMap((h) => { const def = d.god.model.resolvedDef(h.ref); return def ? [exampleOp(def)] : []; });
+        .flatMap((h) => { const ref = d.god.catalog!.placementRef(h.ref); const def = ref ? d.god.model.resolvedDef(ref) : undefined; return def ? [exampleOp(def)] : []; });
       return c.json({ intent, needs, example: { ops }, unmatched: words.filter((w, i) => !used.has(i) && !STOP.has(w) && w.length >= 3) }, 200, noStore);
     }
     return c.json(recommend(d.library(), intent, Math.min(8, Math.max(1, Number(c.req.query('per') ?? 3) || 3))), 200, noStore);
