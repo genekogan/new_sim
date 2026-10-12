@@ -84,7 +84,7 @@ const report = { url, dpr, raw, views: {} };
 try {
   const b = await chromium.launch({ channel: 'chrome', headless: true, args: ['--ignore-gpu-blocklist'] });
   const ctx = await b.newContext({ viewport: { width: W, height: H }, deviceScaleFactor: dpr });
-  if (raw) await ctx.route(/campus-owner-|\/blobs\/assets\/70\//, (route) => route.fulfill({ status: 404, body: '' }));
+  if (raw) await ctx.route(/campus-owner-|\/blobs\/assets\/(70|06)\//, (route) => route.fulfill({ status: 404, body: '' }));
   const page = await ctx.newPage();
   const errs = [], fetched = [];
   page.on('pageerror', (e) => errs.push(String(e).slice(0, 300)));

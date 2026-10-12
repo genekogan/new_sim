@@ -11,15 +11,15 @@ import { worldKey } from './world-path.ts';
 export const marsFork = BASE !== '' && worldKey === 'mars';
 
 /** Layers 1 + 2 baked into one static campus GLB in /browser/campus.glb's own frame (same `at`, same hide rules):
- *  tools/god-skill/scripts/mars-two/fork-backdrop.mjs, from the Mars viewer source 7d9688f (release 43 + Gene's
- *  corrections) on release 43's campus.glb, BLOBS-encoded. `blob` is the content-addressed copy on eden2
+ *  tools/god-skill/scripts/mars-two/fork-backdrop.mjs, from the Mars viewer source c8179e8 (release 43 + Gene's
+ *  corrections, the sim.mars.college deploy candidate) on release 43's campus.glb, BLOBS-encoded. `blob` is the content-addressed copy on eden2
  *  (/srv/sim-blobs); `local` is the same file under the fork server's marsWebDir (local runs have no /blobs). */
 export const MARS_FORK_BACKDROP = Object.freeze({
-  source: '7d9688f1676e70962e2da25845fb3a3ac22b3756',
-  sha256: '70f0cfff5b1848208afb545ad951deaaafb553ac4a915ee94afbbc8e52d2bfa2',
-  bytes: 44615448,
-  blob: '/blobs/assets/70/70f0cfff5b1848208afb545ad951deaaafb553ac4a915ee94afbbc8e52d2bfa2.glb',
-  local: '/browser/campus-owner-7d9688f1676e.glb',
+  source: 'c8179e81ce6d6b23809e012c48fd5956901da81b',
+  sha256: '064a2541a2010ca9adfcc65a9b3c3635775a7a11ebf7ee7a4b1599c6e02117d9',
+  bytes: 44616736,
+  blob: '/blobs/assets/06/064a2541a2010ca9adfcc65a9b3c3635775a7a11ebf7ee7a4b1599c6e02117d9.glb',
+  local: '/browser/campus-owner-c8179e81ce6d.glb',
 });
 /** The campus GLB the server's scene names (mars-2026-map/1); only this one is replaced. */
 const CAMPUS_2026 = '/browser/campus.glb?v=20260922b';
