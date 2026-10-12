@@ -30,8 +30,13 @@ echo "== assemble $BUILD"
 rm -rf "$OUT"; mkdir -p "$OUT"
 git archive HEAD | tar -x -C "$OUT"
 echo "$BUILD" > "$OUT/BUILD"
-BUILD_ID="$BUILD" pnpm --filter @sim/web exec vite build --logLevel warn --outDir "$OUT/apps/web/dist" --emptyOutDir --base "$BASE/"
+# The Eden experience (connected growing world, atmosphere, presets) is pinned to the qualified Eden world id, exactly as
+# the laptop's old-world build pins it (hotfix-integration-00x WEB-MANIFEST.json flags); the /worlds/w/eden fork runs that
+# world id. Without it the fork drew only the bare commons (lane FORKFIX). New worlds have other ids: unaffected.
+EDEN_WORLDS="${VITE_EDEN_EXPERIENCE_WORLD_IDS-pm-preview-eden-20261005}"
+BUILD_ID="$BUILD" VITE_EDEN_EXPERIENCE_WORLD_IDS="$EDEN_WORLDS" pnpm --filter @sim/web exec vite build --logLevel warn --outDir "$OUT/apps/web/dist" --emptyOutDir --base "$BASE/"
 grep -q "src=\"$BASE/assets/" "$OUT/apps/web/dist/index.html" || { echo "web build is not under $BASE/"; exit 1; }
+[ -z "$EDEN_WORLDS" ] || grep -qs "${EDEN_WORLDS%%,*}" "$OUT"/apps/web/dist/assets/Shell-*.js || { echo "web build lacks the Eden experience pin ($EDEN_WORLDS)"; exit 1; }
 rsync -aL --delete "$MARS_WEB_SRC/" "$OUT/mars-web/"
 # /modular (the humanoid kit and the environment GLBs) is this commit's own copy, never whatever a lane overlay's
 # symlink pointed at when the release was assembled: a relative link into the archived tree (no second copy).
