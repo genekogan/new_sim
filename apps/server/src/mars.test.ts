@@ -72,9 +72,10 @@ else {
   });
 
   // ---------------------------------------------------------------- a real server process on the Mars engine
-  const PORT = Number(process.env.TEST_MARS_PORT ?? 4950); // CI retains its original isolated default.
+  // Default sits outside 4930-4970 (the laptop's release listeners); override with TEST_MARS_PORT.
+  const PORT = Number(process.env.TEST_MARS_PORT ?? 5445);
   assert.ok(Number.isInteger(PORT) && PORT >= 1024 && PORT <= 65535,'explicit valid fixture port');
-  if(process.env.TEST_MARS_PORT)assert.ok(![4950,4963,4964,4970].includes(PORT),'local override cannot target release listeners');
+  assert.ok(PORT < 4930 || PORT > 4970,'TEST_MARS_PORT must be outside 4930-4970 (release listeners)');
   const BASE = `http://127.0.0.1:${PORT}`;
   let proc: ChildProcess;let fixtureReady=false;
   const fixtureBuild=`isolated-mars-test-${process.pid}`,connections=new Set<Connection>();

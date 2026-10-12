@@ -334,7 +334,7 @@ export function mountLayerRoutes(app: import('hono').Hono, d: { god: { model: Wo
   app.get('/v1/god/layers/zone-suggest', (c) => {
     const use = c.req.query('use') ?? '', cats = ZONE_SUGGEST[use];
     if (!cats) return c.json({ error: { code: 'invalid', message: `use is one of ${Object.keys(ZONE_SUGGEST).join(', ')}` } }, 400);
-    const defs = [...new Set(d.god.model.defs.values())].filter((x) => x.name.startsWith('core-'));
+    const defs = d.god.model.allDefs().filter((x) => x.name.startsWith('core-'));
     return c.json({ use, categories: cats.map((cat) => ({ category: cat, defs: defs.filter((x) => { const k = d.categoryOf(x); return k === cat || k.startsWith(cat + '.'); }).slice(0, 6).map((x) => x.ref.replace(/^core-/, 'core/')) })) }, 200, { 'cache-control': 'public, max-age=60' });
   });
 }

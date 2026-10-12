@@ -5,7 +5,7 @@
 // viewers (hub) and to gods (SSE).
 import { randomBytes } from 'node:crypto';
 import { TILE_M, tileOf } from '@sim/ground';
-import { CORE_KIT, WorldModel, applyBatch, plan, type Diff, type Op, type Result, type StoredDef, type UsesHook, type PlanOptions } from '@sim/world-compiler';
+import { WorldModel, coreLibrary, libraryRef, applyBatch, plan, type Diff, type Op, type Result, type StoredDef, type UsesHook, type PlanOptions } from '@sim/world-compiler';
 import { hashToken } from '../auth.ts';
 import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
@@ -38,6 +38,8 @@ export type GodOptions = {
   genesis?: Genesis;
   /** Content-addressed asset files (default $ASSET_DIR or <DATA_DIR>/../assets), shared by every world on the box. */
   assetDir?: string;
+  /** The shared def library (default: the process's core library; null = none, for tests of a bare world). */
+  library?: import('@sim/world-compiler').DefLibrary | null;
 };
 
 /** genesis/1: constants, state and ordered batches that build a world from nothing (spec 29 §4.5). */
@@ -67,16 +69,16 @@ export class GodMode {
     this.db = db; this.opts = opts;
     this.store = new WorldStore(db, opts.worldId);
     this.assets = new AssetStore({ dir: opts.assetDir ?? defaultAssetDir(), db, worldId: opts.worldId });
-    const loaded = this.store.load(this.assets.lookup);
-    if (loaded) {
-      this.model = loaded.model; this.owner = loaded.owner;
-      // a newer release may add core defs: make them available to older worlds (existing hashes are untouched)
-      const added = CORE_KIT.filter((d) => !this.model.def(`${d.name}@${d.version ?? 1}`)).map((d) => this.model.defineDef(d, 'core', 0));
-      if (added.length) this.store.commit(this.model, this.owner, { upserts: [], removes: [], defs: added, tiles: [], answers: [] }, { seq: this.model.editSeq, by: 'core', at: Date.now(), note: `core kit: +${added.map((d) => d.ref).join(', ')}`, ops: [], inverse: [], kind: 'edit' });
-    }
+    // CATRUN (engine fix i): the core kit is one shared, content-addressed library per process, referenced by version
+    // (libraryRef), never copied into a world. A world stores only the defs it uses, adopted (pinned by hash) the first
+    // time something is placed from them; its own stored hashes always win, so old worlds resolve exactly as before and
+    // new core types appear in every world at zero cost.
+    const library = opts.library === undefined ? coreLibrary() : opts.library;
+    const loaded = this.store.load(this.assets.lookup, library);
+    if (loaded) { this.model = loaded.model; this.owner = loaded.owner; }
     else {
       this.model = new WorldModel({ constants: { ground: 'land', extent: 1000, ...opts.constants, ...opts.genesis?.constants } as never, seed: opts.seed ?? `${opts.worldId}:genesis`, assets: this.assets.lookup });
-      for (const d of CORE_KIT) this.model.defineDef(d, 'core', 0);
+      this.model.library = library;
       this.owner = opts.ownerId;
       this.store.init(this.model, this.owner);
       if (opts.genesis) this.applyGenesis(opts.genesis);
@@ -284,7 +286,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   /** God sees the same plus the whole library, prayers waiting, tokens and the edit journal head. */
   godSnapshot() {
     const pub = this.publicSnapshot();
-    return { ...pub, library: [...new Set(this.model.defs.values())].map(publicDef), owner: this.owner, prayers: this.store.prayers({ unanswered: true, limit: 50 }), undoable: this.store.undoable()?.seq ?? null, redoable: this.store.redoable()?.seq ?? null, tokens: this.store.tokens().length };
+    return { ...pub, library: this.model.allDefs().map(publicDef), libraryRef: this.model.library ? libraryRef(this.model.library) : null, owner: this.owner, prayers: this.store.prayers({ unanswered: true, limit: 50 }), undoable: this.store.undoable()?.seq ?? null, redoable: this.store.redoable()?.seq ?? null, tokens: this.store.tokens().length };
   }
   tileHashes(): Record<string, string> {
     const bb = this.model.ground().extent;   // GOD-ENV: the world's bounds (a rectangle once extended)
