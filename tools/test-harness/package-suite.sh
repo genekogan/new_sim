@@ -2,7 +2,9 @@
 # Keep raw Node TAP/spec output and propagate failures across every package.
 set -u
 rc=0
-for p in engine-mars world-compiler generators ground kernel brain engine-toy engine-contract; do
+packages=(engine-mars world-compiler generators ground kernel brain engine-toy engine-contract)
+[ ! -d packages/catalog/src ] || packages+=(catalog)
+for p in "${packages[@]}"; do
   echo "## $p"
   (
     cd "packages/$p" || exit 1
