@@ -88,7 +88,14 @@ switch (cmd) {
     process.exit(bad ? 1 : 0);
   }
   case 'channels': { const r = reg(); const p = r.pointers(); console.log(JSON.stringify({ pointers: p, stable: r.current('stable').length, candidate: r.current('candidate').length, seqs: { stable: r.seqs('stable'), candidate: r.seqs('candidate') } }, null, 1)); break; }
-  case 'promote': console.log(reg().promote(pos.length ? pos : 'all', run)); break;
+  case 'promote': {
+    const r = reg(), ids = pos.length ? pos : r.current('candidate').filter((e) => e.status === 'candidate').map((e) => `${e.id}@${e.major}`);
+    console.log(C.promoteChecked(r, ids, run)); break;
+  }
+  case 'review-import': {
+    if (!flags.by) throw new Error('--by <reviewer> is required');
+    console.log(C.applyReviews(reg(), JSON.parse(readFileSync(pos[0], 'utf8')), String(flags.by), run)); break;
+  }
   case 'rollback': console.log(reg().rollback(String(flags.channel ?? 'stable'), run, flags.to ? Number(flags.to) : undefined)); break;
   case 'yank': { const [ref] = pos; const m = /^(.+)@(\d+)$/.exec(ref); console.log(reg().yank(m[1], Number(m[2]), run, String(flags.reason ?? 'unspecified'))); break; }
   case 'resolve': console.log(JSON.stringify(reg().resolve(pos[0], String(flags.channel ?? 'stable')), null, 1)); break;

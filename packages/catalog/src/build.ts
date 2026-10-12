@@ -64,7 +64,10 @@ export async function buildItem(directory: string, registry: Registry, options: 
 /** Store validated artifacts and move candidate only. Stable promotion remains a distinct reviewed operation. */
 export function publishItem(registry: Registry, built: BuiltItem, run: string) {
   if (!built.ok || ['G1', 'G2', 'G3', 'G4', 'G5'].some((name) => !built.gates.some((gate) => gate.gate === name && gate.ok))) throw new RegistryError('catalog.gates', 'G1–G5 must pass before candidate publication');
-  const item = item1Schema.parse({ ...built.item, status: 'candidate' });
+  const previousEntry = registry.resolve(`${built.item.id}@${built.item.major}`, 'candidate');
+  const previous = previousEntry && registry.item(previousEntry.id, previousEntry.major, previousEntry.rev, previousEntry.itemHash);
+  const hold = previous?.rev === built.item.rev && ['fix', 'reject'].includes(previous.review?.verdict ?? '') ? previous.review : undefined;
+  const item = item1Schema.parse({ ...built.item, status: 'candidate', ...(hold ? { review: hold } : {}) });
   if (hashOf(built.def2) !== item.rev) throw new RegistryError('catalog.hash', 'built def does not match the item');
   if (def1Hash(built.engine) !== built.entry.def1Hash || built.entry.def1Hash !== item.def1Hash || built.entry.id !== item.id || built.entry.major !== item.major || built.entry.rev !== item.rev)
     throw new RegistryError('catalog.hash', 'built engine/index does not match the item');

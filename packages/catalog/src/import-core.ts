@@ -89,10 +89,10 @@ export const lineOf = (item: Item1) => `${item.id}@${item.major} [${item.text.ca
 export function facetsOf(d: StoredDef): string[] {
   const i = vocab.interfacesOf(d as never);
   return [...new Set([
-    ...d.slots.flatMap((s) => [`slot:${s.kind}`, `slot:${vocab.SLOT_VERBS[s.kind] ?? s.kind}`]),
+    ...(d.slots ?? []).flatMap((s) => [`slot:${s.kind}`, `slot:${vocab.SLOT_VERBS[s.kind] ?? s.kind}`]),
     ...i.verbs.map((v) => `verb:${v}`), ...i.actions.flatMap((v) => [`action:${v}`, `verb:${v}`]),
     ...i.states.map((v) => `state:${v}`), ...i.components.flatMap((v) => [`comp:${v}`, `component:${v}`]),
-    ...Object.keys(d.params).map((v) => `param:${v}`),
+    ...Object.keys(d.params ?? {}).map((v) => `param:${v}`),
     ...Object.keys(vocab.ACTUATORS).filter((v) => vocab.hasFacet(d as never, `actuator:${v}`)).map((v) => `actuator:${v}`),
     `form:${d.form}`, `make:${d.make.kind}`, ...(d.make.kind === 'gen' ? [`make:${d.make.gen}`] : []),
   ])].sort();
