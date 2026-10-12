@@ -18,9 +18,10 @@
 // Writes <out>/<id>/<variant>/<view>.png, <out>/report.json, and a contact sheet <out>/sheet.html for the review queue.
 import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
-import { dirname, resolve, join } from 'node:path';
+import { dirname, resolve, join, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gateExit } from './checks.mjs';
+import { toRef, shotsOf, unsupported, allocateGrid } from './plan.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => (a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : null)).filter(Boolean));
@@ -43,12 +44,24 @@ const token = (await api('/v1/god/mint', { body: { label: 'g4' } })).data.token;
 const god = (p, o = {}) => api(p, { ...o, token });
 await god('/v1/god/act', { body: { ops: [{ op: 'world', state: { time: { set: { hour: 11, n: 1 }, paused: true }, weather: { kind: 'clear', clouds: 0, wind: 0, rain: 0, fog: 0 } } }], note: 'g4: fixed light' } });
 
+// Optional unpublished candidate defs, reviewed and bundled from a file within this worktree.
+let candidateRefs = null;
+if (args.defs) {
+  const file = resolve(root, String(args.defs)), rel = relative(root, file);
+  if (rel.startsWith('..') || isAbsolute(rel)) throw new Error('--defs must be inside the worktree');
+  const defs = JSON.parse(readFileSync(file, 'utf8'));
+  if (!Array.isArray(defs) || !defs.length || defs.some((d) => d.schema !== 'def/1')) throw new Error('--defs expects a nonempty array of def/1 inputs');
+  for (const def of defs) {
+    const response = await god('/v1/god/act', { body: { ops: [{ op: 'define', def }], note: 'G4 unpublished candidate fixture' } });
+    if (!response.data?.accepted) throw new Error(`G4 candidate definition refused: ${def.name}: ${JSON.stringify(response.data?.failures)}`);
+  }
+  candidateRefs = defs.map((d) => d.name.startsWith('core-') ? toRef(`${d.name}@${d.version ?? 1}`) : `${d.name}@${d.version ?? 1}`);
+}
 // ---------------------------------------------------------------- which items
-const toRef = (r) => r.replace(/^eden\//, 'core/').replace(/^lm\//, 'core/lm-').replace(/^mars\//, 'core/mars-');
-const defOf = async (ref) => { const r = await god(`/v1/god/defs/${encodeURIComponent(ref)}`); return r.status === 200 ? { ...r.data.def, publicRef: r.data.publicRef } : null; };
+const defOf = async (ref) => { const r = await god(`/v1/god/defs/${encodeURIComponent(ref)}`); return r.status === 200 ? { ...r.data.def, publicRef: r.data.publicRef, exampleShape: r.data.example?.ops?.[0]?.shape } : null; };
 let picks;
-if (args.items) {
-  const refs = String(args.items).split(',').map((r) => toRef(r.trim()));
+if (args.items || candidateRefs) {
+  const refs = args.items ? String(args.items).split(',').map((r) => toRef(r.trim())) : candidateRefs;
   picks = await Promise.all(refs.map(defOf));
   if (picks.some((d) => !d)) throw new Error(`G4 missing requested refs: ${refs.filter((_, i) => !picks[i]).join(', ')}`);
 }
@@ -59,29 +72,20 @@ else {
   const n = Number(args.sample ?? 20), step = Math.max(1, Math.floor(drawable.length / n));
   picks = (await Promise.all(drawable.filter((_, i) => i % step === 0).slice(0, n).map((r) => defOf(r.ref)))).filter((d) => d && !d.components?.body);
 }
-const ACT = { power: ['on', true], door: ['open', true], ignite: ['lit', true], play: ['playing', true], fill: ['level', 1] };
-const shotsOf = (d) => {
-  const list = [{ label: 'default', params: {}, state: {} }];
-  const enums = Object.entries(d.params ?? {}).filter(([, f]) => f.type === 'enum').sort(([a], [b]) => (a === 'variant' ? -1 : b === 'variant' ? 1 : 0));
-  for (const [k, f] of enums) for (const v of f.values) { if (list.length >= 4) break; if (v !== (f.default ?? f.values[0])) list.push({ label: `${k}=${v}`, params: { [k]: v }, state: {} }); }
-  for (const [, [field, val]] of Object.entries(ACT)) if (d.state?.[field] && d.state[field].default !== val) list.push({ label: `${field}=${val}`, params: {}, state: { [field]: val } });
-  return list;
-};
+const gaps = picks.filter((d) => unsupported(d)).map((d) => ({ id: d.publicRef, ok: false, status: 'unqualified', errors: [unsupported(d)], warnings: [], numbers: {}, variants: [], views: [] }));
+picks = picks.filter((d) => !unsupported(d));
 const jobs = picks.flatMap((d) => shotsOf(d).map((s) => ({ d, ...s })));
 if (!jobs.length) throw new Error('G4 selected no drawable items');
 console.log(`G4: ${picks.length} items, ${jobs.length} variants/states, 4 views each → ${jobs.length * 4} renders`);
 
-// place every job on a 40 m grid (one batch per item so a refusal stays local)
-// each job's spot is a hash of (item, variant) on a 40 m grid, so the same picture has the same surroundings whatever
+// place every job on a bounded 100 m grid (one batch per item so a refusal stays local)
+// each job's spot is a hash of (item, variant), so the same picture has the same surroundings whatever
 // else the run renders (other items are also hidden while one is shot)
-const GRID = 40, CELLS = 22, used = new Set();
-if (jobs.length > CELLS * CELLS) throw new Error(`G4 has ${jobs.length} jobs for ${CELLS * CELLS} cells; split the item list into batches`);
-const h32 = (str) => { let h = 2166136261; for (const ch of str) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619) >>> 0; } return h; };
-jobs.forEach((j, i) => { j.name = `g${i}`; let c = h32(`${j.d.publicRef}|${j.label}`) % (CELLS * CELLS); while (used.has(c)) c = (c + 1) % (CELLS * CELLS); used.add(c); j.p = [((c % CELLS) - CELLS / 2) * GRID, 0, (Math.floor(c / CELLS) - CELLS / 2) * GRID]; });
+allocateGrid(jobs);
 const water = jobs.filter((j) => j.d.anchor === 'float');
 if (water.length) await god('/v1/god/act', { body: { ops: water.map((j, k) => ({ op: 'place', def: 'core/pond@1', name: `w${k}`, p: [0, 0, 0], params: { depth: 3 }, shape: { area: [[j.p[0] - 12, j.p[2] - 12], [j.p[0] + 12, j.p[2] - 12], [j.p[0] + 12, j.p[2] + 12], [j.p[0] - 12, j.p[2] + 12]] } })) } });
 for (const j of jobs) {
-  const r = await god('/v1/god/act', { body: { ops: [{ op: 'place', def: j.d.publicRef, name: j.name, p: j.p, mode: 'nudge', ...(Object.keys(j.params).length ? { params: j.params } : {}), ...(Object.keys(j.state).length ? { state: j.state } : {}) }] } });
+  const r = await god('/v1/god/act', { body: { ops: [{ op: 'place', def: j.d.publicRef, name: j.name, p: j.p, mode: 'nudge', ...(j.d.exampleShape ? { shape: Object.fromEntries(Object.entries(j.d.exampleShape).map(([k, v]) => [k, Array.isArray(v) ? v.map(([x, z]) => [x + j.p[0], z + j.p[2]]) : v])) } : {}), ...(Object.keys(j.params).length ? { params: j.params } : {}), ...(Object.keys(j.state).length ? { state: j.state } : {}) }] } });
   j.placed = !!r.data?.accepted; if (!j.placed) j.refused = r.data?.failures?.[0];
 }
 
@@ -99,7 +103,7 @@ await page.goto(`${base}?dev=1&shot=1&weather=clear&eye=${first.p[0] - 3},2,${fi
 await page.waitForFunction(() => document.title === 'ready' || document.title === 'no-entity-world', null, { polling: 1000 });
 const gpu = await page.evaluate(() => { const gl = window.__simEntity.renderer.getContext(); const ext = gl.getExtension('WEBGL_debug_renderer_info'); return ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER); });
 console.log(`G4 renderer: ${gpu}`);
-if (/swiftshader|llvmpipe|software|softpipe/i.test(gpu)) { console.error('G4 refuses software rendering (never swiftshader): no GPU in this browser'); await browser.close(); release(); process.exit(3); }
+if (/swiftshader|llvmpipe|software|softpipe/i.test(gpu) || (process.platform === 'linux' && !/NVIDIA/i.test(gpu))) { console.error('G4 refuses software rendering (never swiftshader): no GPU in this browser'); await browser.close(); release(); process.exit(3); }
 
 // deterministic pictures: the entity layer's clock stands still at a fixed instant (eases finished, motion and clips at
 // one phase), so a re-render compares like with like; the self-SSIM floor below covers whatever still moves
@@ -107,19 +111,38 @@ await page.evaluate(() => { const L = window.__simEntity.layer; if (!L.__g4) { c
 const VIEWS = { 'front-left': [-0.55, 0.42, 0.8], 'front-right': [0.55, 0.42, 0.8], back: [0.3, 0.45, -0.85], above: [-0.2, 1.4, 0.35] };
 const results = [];
 for (const j of jobs) {
-  const rec = { id: j.d.publicRef, label: j.label, placed: j.placed, refused: j.refused, views: {} };
+  const rec = { id: j.d.publicRef, defHash: j.d.hash, label: j.label, placed: j.placed, refused: j.refused, views: {} };
   results.push(rec);
   if (!j.placed) continue;
   const ent = (await api(`/v1/world/entities/${j.name}`)).data, pose = ent?.pose, eid = ent?.entity?.id ?? null;
-  // wait until this entity's GLB (if any) has loaded
-  await page.waitForFunction((name) => { let ready = true; window.__simEntity.layer.group.traverse((o) => { if (o.name === name && !o.getObjectByName('asset') && !o.getObjectByName('asset missing')) ready = false; }); return ready; }, `mesh ${j.d.name}`, { timeout: 120_000 }).catch(() => { rec.note = 'asset load timeout'; });
+  // Lazy GLBs load only near the camera. Move there before waiting; a timeout is a failure, never a baseline.
+  await page.evaluate((at) => { const s = window.__simEntity; s.camera.position.set(at[0] - 3, at[1] + 3, at[2] + 4); s.controls.target.set(...at); s.controls.update?.(); }, pose ? [pose.x, pose.y, pose.z] : j.p);
+  await page.waitForFunction((id) => {
+    const L = window.__simEntity.layer, dr = L.drawn.get(id);
+    if (!dr) return false;
+    let pending = false;
+    const belongs = (key) => { for (let e = L.model.entities.get(key), n = 0; e && n < 12; e = L.model.entities.get(e.in.parent), n++) if (e.id === id) return true; return false; };
+    for (const [key, d] of L.drawn) if (belongs(key)) d.obj.traverse((o) => { if (o.name.startsWith('mesh ') && !o.getObjectByName('asset') && !o.getObjectByName('asset missing')) pending = true; });
+    return !pending;
+  }, eid, { timeout: 30000 }).catch(() => { rec.note = 'drawable/asset load timeout'; });
   for (const [view, k] of Object.entries(VIEWS)) {
-    const [bw, bh, bd] = j.d.size.box;
+    let [bw, bh, bd] = j.d.size.box;
+    if (j.d.exampleShape) { const pts = j.d.exampleShape.area ?? j.d.exampleShape.path; bw = Math.max(...pts.map((p) => p[0])) - Math.min(...pts.map((p) => p[0])); bd = Math.max(j.d.exampleShape.width ?? 1, Math.max(...pts.map((p) => p[1])) - Math.min(...pts.map((p) => p[1]))); }
     const shoot = (a) => page.evaluate(async ([id, fb, k]) => {
-      const s = window.__simEntity, dr = s.layer.drawn.get(id), o = dr && !dr.inst ? dr.obj : null;
-      const hidden = []; for (const [oid, other] of s.layer.drawn) if (oid !== id && other.obj && other.obj.visible && !String(other.obj.name).includes('pond')) { other.obj.visible = false; hidden.push(other.obj); }
+      const s = window.__simEntity, L = s.layer, dr = L.drawn.get(id), o = dr?.obj;
+      const belongs = (key) => { for (let e = L.model.entities.get(key), n = 0; e && n < 12; e = L.model.entities.get(e.in.parent), n++) if (e.id === id) return true; return false; };
+      const targets = [...L.drawn].filter(([key]) => belongs(key));
+      // Instance placeholders are empty Object3Ds. Hide their actual matrices, including all prefab children.
+      const hidden = [], matrices = [];
+      const hide = (key, d) => {
+        if (d.inst) { const pool = L.instancer.pools.get(d.inst), slot = pool?.slots.get(key); if (slot === undefined) return;
+          for (const m of pool.meshes) { const start = slot * 16, saved = m.instanceMatrix.array.slice(start, start + 16); matrices.push([m, start, saved]); m.instanceMatrix.array.fill(0, start, start + 16); m.instanceMatrix.needsUpdate = true; }
+        } else if (d.obj?.visible) { d.obj.visible = false; hidden.push(d.obj); }
+      };
+      for (const [key, other] of L.drawn) if (!belongs(key) && !String(other.obj?.name).includes('pond')) hide(key, other);
+      let missingAsset = false; for (const [, d] of targets) d.obj.traverse((o) => { if (o.name === 'asset missing') missingAsset = true; });
       try {
-      const c = o ? [o.position.x, o.position.y + fb.h / 2, o.position.z] : fb.at, yaw = o ? o.rotation.y : fb.yaw;
+      const c = o && !dr.world ? [o.position.x, o.position.y + fb.h / 2, o.position.z] : fb.at, yaw = o && !dr.world ? o.rotation.y : fb.yaw;
       const dist = Math.max(2.4, fb.r * 2.6), n = Math.hypot(...k), cy = Math.cos(yaw), sy = Math.sin(yaw);
       const eye = [c[0] + (k[0] * cy + k[2] * sy) / n * dist, c[1] + k[1] / n * dist, c[2] + (-k[0] * sy + k[2] * cy) / n * dist];
       s.controls.target.set(c[0], c[1], c[2]); s.camera.position.set(eye[0], eye[1], eye[2]); s.camera.lookAt(s.controls.target); s.controls.update?.();
@@ -141,16 +164,15 @@ for (const j of jobs) {
       const t2 = document.createElement('canvas'); t2.width = t2.height = 32; const t2g = t2.getContext('2d'); t2g.drawImage(cv, 0, 0, 32, 32); const rgb = [...t2g.getImageData(0, 0, 32, 32).data].filter((_, i) => i % 4 !== 3);
       // coverage: how much of the crop is the object itself (hide it, render the same view again, count changed pixels)
       let cover = null;
-      if (o) {
-        o.visible = false; s.renderer.render(s.scene, cam);
+      if (targets.length) {
+        for (const [key, d] of targets) hide(key, d); s.renderer.render(s.scene, cam);
         const cv2 = document.createElement('canvas'); cv2.width = cv2.height = 256; const g2 = cv2.getContext('2d'); g2.drawImage(src, x0, y0, side, side, 0, 0, 256, 256);
-        o.visible = true;
         const bg = g2.getImageData(0, 0, 256, 256).data; let changed = 0;
         for (let i = 0; i < bg.length; i += 4) if (Math.abs(bg[i] - px256[i]) + Math.abs(bg[i + 1] - px256[i + 1]) + Math.abs(bg[i + 2] - px256[i + 2]) > 36) changed++;
         cover = +(changed / total).toFixed(4);
       }
-      return { live: !!o, moving: !!dr?.motion, png: cv.toDataURL('image/png'), top: +top.toFixed(3), dark: +(dark / total).toFixed(3), cover, grey, rgb };
-      } finally { for (const h of hidden) h.visible = true; }
+      return { live: targets.length > 0, missingAsset, moving: !!dr?.motion, png: cv.toDataURL('image/png'), top: +top.toFixed(3), dark: +(dark / total).toFixed(3), cover, grey, rgb };
+      } finally { for (const h of hidden) h.visible = true; for (const [m, start, saved] of matrices) { m.instanceMatrix.array.set(saved, start); m.instanceMatrix.needsUpdate = true; } }
     }, a);
     const shotArgs = [eid, { at: pose ? [pose.x, pose.y + bh / 2, pose.z] : [j.p[0], bh / 2, j.p[2]], h: bh, r: Math.hypot(bw, bh, bd) * 0.5, yaw: pose?.yaw ?? 0 }, k];
     const shot = await shoot(shotArgs);
@@ -159,7 +181,7 @@ for (const j of jobs) {
     const dir = join(out, rec.id.replace(/[/@]/g, '_'), rec.label.replace(/[^a-z0-9=._-]/gi, '_')); mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, `${view}.png`), Buffer.from(shot.png.split(',')[1], 'base64'));
     rec.moving = rec.moving || shot.moving;
-    rec.views[view] = { live: shot.live, top: shot.top, dark: shot.dark, cover: shot.cover, grey: shot.grey, rgb: shot.rgb, file: join(dir, `${view}.png`) };
+    rec.views[view] = { live: shot.live, missingAsset: shot.missingAsset, top: shot.top, dark: shot.dark, cover: shot.cover, grey: shot.grey, rgb: shot.rgb, file: join(dir, `${view}.png`) };
   }
 }
 await browser.close(); release();
@@ -178,7 +200,7 @@ const mad = (a, b) => a.reduce((s, v, i) => s + Math.abs(v - b[i]), 0) / a.lengt
 const baseDir = args.baseline ? resolve(String(args.baseline)) : null;
 const items = new Map();
 for (const r of results) { const l = items.get(r.id) ?? []; l.push(r); items.set(r.id, l); }
-const report = { run, gpu, base, ms: 0, items: [] };
+const report = { run, gpu, base, ms: 0, approval: args.approve ? 'explicit per-item baseline write requested' : 'none', items: [...gaps] };
 for (const [id, recs] of items) {
   const errors = [], warnings = [], numbers = {};
   const def = recs[0];
@@ -187,8 +209,11 @@ for (const [id, recs] of items) {
   // creatures wander and animate on the server between runs: a looser mark (0.7) for anything with motion
   const floor = def.moving ? 0.7 : Math.min(0.85, self - 0.05); numbers.selfSsim = +self.toFixed(3); if (def.moving) numbers.moving = 1;
   for (const r of recs) {
+    if (r.note) errors.push(`${r.label}: ${r.note}`);
     if (!r.placed) { errors.push(`${r.label}: refused ${r.refused?.code ?? ''} ${String(r.refused?.detail ?? '').slice(0, 80)}`); continue; }
     for (const [view, v] of Object.entries(r.views)) {
+      if (!v.live || v.cover === null) errors.push(`${r.label}/${view}: unqualified (no isolated drawable entity)`);
+      if (v.missingAsset) errors.push(`${r.label}/${view}: missing asset placeholder`);
       // nothing drew: the object covers < 0.3 % of its own crop (or, when it is instanced and cannot be hidden, one colour fills > 97 %)
       if (v.cover !== null && v.cover !== undefined) { numbers[`cover:${r.label}/${view}`] = v.cover; if (v.cover < 0.003) errors.push(`${r.label}/${view}: blank (object covers ${(v.cover * 100).toFixed(2)} % of the view)`); }
       else if (v.top > 0.97) errors.push(`${r.label}/${view}: blank (${Math.round(v.top * 100)} % one colour)`);
@@ -214,7 +239,7 @@ for (const [id, recs] of items) {
     const bf = join(baseDir, id.replace(/[/@]/g, '_'), `${r.label.replace(/[^a-z0-9=._-]/gi, '_')}-${view}.json`);
     mkdirSync(dirname(bf), { recursive: true }); writeFileSync(bf, JSON.stringify({ grey: v.grey }));
   }
-  report.items.push({ id, ok: errors.length === 0, errors, warnings, numbers, variants: recs.map((r) => r.label), views: recs.flatMap((r) => Object.entries(r.views).map(([view, v]) => ({ label: r.label, view, file: v.file, top: v.top, dark: v.dark }))) });
+  report.items.push({ id, defHash: def.defHash, ok: errors.length === 0, errors, warnings, numbers, variants: recs.map((r) => r.label), views: recs.flatMap((r) => Object.entries(r.views).map(([view, v]) => ({ label: r.label, view, file: v.file, live: v.live, cover: v.cover, missingAsset: v.missingAsset, top: v.top, dark: v.dark }))) });
 }
 report.ms = Math.round(performance.now() - t0);
 writeFileSync(join(out, 'report.json'), JSON.stringify(report, null, 1));

@@ -31,9 +31,17 @@ def render(bundle: bytes, argv: list[str]) -> bytes:
         t.extractall("/repo", filter="data")
     subprocess.run("pnpm install --no-frozen-lockfile --ignore-scripts >/tmp/install.log 2>&1 || (tail -40 /tmp/install.log; exit 1)", shell=True, cwd="/repo", check=True)
     subprocess.run("nvidia-smi --query-gpu=name,driver_version --format=csv,noheader || true", shell=True)
-    cmd = ["node", "tools/catalog/g4/g4-render.mjs", "--port", "6102", "--no-lease", "--chrome", "/usr/bin/google-chrome", "--out", "/tmp/g4", *argv]
-    r = subprocess.run(cmd, cwd="/repo", timeout=3000)
-    if r.returncode:
+    full = "--all" in argv
+    argv = [a for a in argv if a != "--all"]
+    cmd = ["node", "tools/catalog/g4/g4-batch.mjs" if full else "tools/catalog/g4/g4-render.mjs", "--port", "6102", "--no-lease", "--chrome", "/usr/bin/google-chrome", "--out", "/tmp/g4", *argv]
+    try:
+        r = subprocess.run(cmd, cwd="/repo", timeout=3000)
+        code = r.returncode
+    except subprocess.TimeoutExpired:
+        # Preserve the last completed coverage report; the timeout must not look like a passing run.
+        code = 3
+        print("G4 exceeded 3000s catchup budget; preserving incomplete evidence", flush=True)
+    if code:
         log = pathlib.Path("/tmp/g4/server.log")
         if log.exists():
             print(log.read_text()[-8000:], flush=True)
@@ -41,13 +49,22 @@ def render(bundle: bytes, argv: list[str]) -> bytes:
     with tarfile.open(fileobj=buf, mode="w:gz") as t:
         if os.path.isdir("/tmp/g4"):
             t.add("/tmp/g4", arcname="g4")
-        info = tarfile.TarInfo("g4/exit-code"); data = str(r.returncode).encode(); info.size = len(data); t.addfile(info, io.BytesIO(data))
+        info = tarfile.TarInfo("g4/exit-code"); data = str(code).encode(); info.size = len(data); t.addfile(info, io.BytesIO(data))
     return buf.getvalue()
 
 
 @app.local_entrypoint()
-def main(bundle: str, sample: int = 20, items: str = "", out: str = "", angle: str = "vulkan"):
-    argv = ["--items", items] if items else ["--sample", str(sample)]
+def main(bundle: str, sample: int = 20, items: str = "", out: str = "", angle: str = "vulkan", all: bool = False, batch_jobs: int = 72, defs: str = ""):
+    argv = ["--all", "--batch-jobs", str(batch_jobs)] if all else (["--items", items] if items else ["--sample", str(sample)])
+    if all and items:
+        argv += ["--items", items]
+    if defs:
+        if all:
+            raise ValueError("candidate --defs uses the single-item renderer, not full core catchup")
+        candidate = pathlib.PurePosixPath(defs)
+        if candidate.is_absolute() or ".." in candidate.parts:
+            raise ValueError("--defs must name a reviewed file inside the bundle")
+        argv = ["--defs", defs] + (["--items", items] if items else [])
     argv += ["--angle", angle]
     stamp = time.strftime("%Y-%m-%dT%H-%M-%S")
     dest = pathlib.Path(out or f".lane/g4/modal-{stamp}")
