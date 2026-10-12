@@ -12,7 +12,7 @@ export const EDIT_SCHEMA = 'edit/1';
 
 export { ID, NAME, value, fieldSchema, fieldsSchema, slotKind, slotSchema, materialEnum } from '@sim/generators';
 export type { Value, Field, FieldInput, Slot, Material } from '@sim/generators';
-export const DEF_REF = /^(core\/[a-z0-9][a-z0-9._-]*@\d+|sha:[0-9a-f]{16,64}|[a-z0-9][a-z0-9._-]*@\d+)$/;
+export const DEF_REF = /^((?:core|eden|lm|mars)\/[a-z0-9][a-z0-9._-]*@\d+|sha:[0-9a-f]{16,64}|[a-z0-9][a-z0-9._-]*@\d+)$/;
 
 // ---------- defs ----------
 

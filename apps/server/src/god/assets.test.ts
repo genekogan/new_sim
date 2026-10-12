@@ -95,7 +95,7 @@ test('store: content-addressed, measured, budgets refused at ingest, shared acro
 
 test('core assets: every core mesh def resolves to a file and a measured lookup', () => {
   const f = fixture();
-  const meshDefs = [...new Set(f.god.model.defs.values())].filter((d) => d.make.kind === 'mesh');
+  const meshDefs = f.god.model.allDefs().filter((d) => d.make.kind === 'mesh');
   assert.ok(meshDefs.length >= 80, `${meshDefs.length} core mesh defs`);
   for (const d of meshDefs) {
     const sha = (d.make as { asset: string }).asset;

@@ -34,7 +34,7 @@ void (null as unknown as Context);
 test('taxonomy covers Gene\'s list and every core def has a known category', () => {
   for (const top of ['terrain', 'water', 'vegetation', 'building.residential', 'building.commercial', 'building.civic', 'building.industrial', 'building.agricultural', 'public', 'transport', 'utility', 'component', 'furniture', 'object', 'vehicle', 'living', 'layer.weather', 'layer.wear', 'layer.construction', 'layer.ownership', 'layer.landuse', 'layer.schedule', 'layer.economy']) assert.ok(vocab.CATEGORIES.has(top), top);
   const { god } = fixture();
-  for (const d of new Set(god.model.defs.values())) assert.ok(vocab.CATEGORIES.has(vocab.categoryOf(d as never)), d.name);
+  for (const d of god.model.allDefs()) assert.ok(vocab.CATEGORIES.has(vocab.categoryOf(d as never)), d.name);
 });
 
 test('faceted search: category subtree, has=slot:sit, actuators; synonyms and category words', async () => {
@@ -57,7 +57,7 @@ test('faceted search: category subtree, has=slot:sit, actuators; synonyms and ca
 
 test('catalog manifest: one line per def, paged, ETag 304; taxonomy lists empty categories; recommend', async () => {
   const { get, god } = fixture();
-  const n = new Set(god.model.defs.values()).size;
+  const n = god.model.allDefs().length;
   const lines = await get('/v1/god/catalog?format=lines&per=100');
   assert.equal(lines.status, 200);
   const body = lines.text.trim().split('\n');
@@ -98,7 +98,7 @@ test('conventions: a stretched def bakes stretched physics; lint passes for ever
   const cone = god.model.resolvedDef('core/traffic-cone@1')!;
   const plain = god.model.bake(cone, {}, 0), tall = god.model.bake(cone, { sy: 1.5, sx: 0.8 }, 0);
   assert.ok(Math.abs(tall.box[1] - plain.box[1] * 1.5) < 1e-9 && Math.abs(tall.box[0] - plain.box[0] * 0.8) < 1e-9);
-  for (const d of new Set(god.model.defs.values())) if (d.category) assert.deepEqual(vocab.lintDef(d as never).errors, [], d.name);
+  for (const d of god.model.allDefs()) if (d.category) assert.deepEqual(vocab.lintDef(d as never).errors, [], d.name);
   // out of range is refused by the compiler with the range
   const bad = god.act({ ops: [{ op: 'place', def: 'core/traffic-cone@1', p: [3, 3], params: { sy: 3 } }] });
   assert.equal(bad.accepted, false); assert.match(JSON.stringify(bad), /params\.invalid/);
