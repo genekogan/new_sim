@@ -13,7 +13,7 @@ import { g5, type Intent } from './findability.ts';
 import { compatibility } from './compat.ts';
 import { Registry, RegistryError, type IndexEntry } from './registry.ts';
 
-export type RenderReceipt = { gpu: string; items: { id: string; defHash: string; ok: boolean; views: { label: string; view: string; file: string }[]; errors?: string[] }[] };
+export type RenderReceipt = { gpu: string; selection?: { targeted?: boolean }; items: { id: string; defHash: string; ok: boolean; views: { label: string; view: string; file: string }[]; errors?: string[] }[] };
 export type BuiltItem = { item: Item1; def2: Def2; engine: DefInput; entry: IndexEntry; gates: (GateOutcome | { gate: 'G4'; ok: boolean; errors: string[]; warnings: string[]; numbers: Record<string, number> })[]; ok: boolean };
 
 export async function buildItem(directory: string, registry: Registry, options: { run: string; at?: string; receipt?: RenderReceipt; intents?: Intent[] } ): Promise<BuiltItem> {
@@ -47,7 +47,8 @@ export async function buildItem(directory: string, registry: Registry, options: 
     if (stored.state[field] && stored.state[field].default !== value) expected.push(`${field}=${value}`);
   const fourViews = ['front-left', 'front-right', 'back', 'above'];
   const complete = rendered && expected.every((label) => fourViews.every((view) => rendered.views.some((v) => v.label === label && v.view === view && !!v.file)));
-  const renderErrors = !receipt || !rendered ? ['G4 needs a render receipt for this exact engine hash']
+  const renderErrors = receipt?.selection?.targeted ? ['G4 targeted diagnostics are not full publication receipts']
+    : !receipt || !rendered ? ['G4 needs a render receipt for this exact engine hash']
     : !receipt.gpu || /swiftshader|llvmpipe|software|softpipe/i.test(receipt.gpu) ? ['G4 requires hardware rendering']
     : !rendered.ok || !complete ? ['G4 render checks failed or required variant/state views are missing', ...(rendered.errors ?? [])] : [];
   gates.push({ gate: 'G4', ok: !renderErrors.length, errors: renderErrors, warnings: [], numbers: { views: rendered?.views.length ?? 0 } });

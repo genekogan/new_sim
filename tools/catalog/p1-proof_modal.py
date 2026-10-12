@@ -16,7 +16,7 @@ app = modal.App("eden-catalog-p1-proof", image=image)
 
 
 @app.function(gpu="L4", timeout=1800, memory=8192, cpu=4)
-def run(bundle: bytes, source: str, input_only: bool = False) -> bytes:
+def run(bundle: bytes, source: str, input_only: bool = False, dpr: int = 0) -> bytes:
     root = pathlib.Path("/repo")
     root.mkdir()
     with tarfile.open(fileobj=io.BytesIO(bundle), mode="r:gz") as archive:
@@ -25,7 +25,7 @@ def run(bundle: bytes, source: str, input_only: bool = False) -> bytes:
     subprocess.run(["pnpm", "--filter", "@sim/web", "exec", "vite", "build", "--base", "/worlds/", "--outDir", "/repo/.lane/web-worlds", "--emptyOutDir"], cwd=root, stdout=subprocess.DEVNULL, check=True)
     out = pathlib.Path("/proof")
     out.mkdir()
-    env = {**__import__("os").environ, "P1_SOURCE_SHA": source}
+    env = {**__import__("os").environ, "P1_SOURCE_SHA": source, "P1_PROOF_DPR": str(dpr) if dpr else ""}
     commands = [
         ("scenarios", ["node", "--import", "./tools/catalog/gpu-chrome.mjs", "tools/god-skill/e2e/scenarios.mjs", "--port", "6120"]),
         ("input", ["node", "tools/catalog/p1-browser-proof.mjs", "/proof/input"]),
@@ -50,8 +50,8 @@ def run(bundle: bytes, source: str, input_only: bool = False) -> bytes:
 
 
 @app.local_entrypoint()
-def main(bundle: str, source: str, out: str, input_only: bool = False):
-    data = run.remote(pathlib.Path(bundle).read_bytes(), source, input_only)
+def main(bundle: str, source: str, out: str, input_only: bool = False, dpr: int = 0):
+    data = run.remote(pathlib.Path(bundle).read_bytes(), source, input_only, dpr)
     target = pathlib.Path(out)
     target.mkdir(parents=True, exist_ok=True)
     with tarfile.open(fileobj=io.BytesIO(data), mode="r:gz") as archive:

@@ -46,6 +46,7 @@ test('an item directory builds, gates and publishes without shared-source edits;
 test('G4 receipt cannot be borrowed from a different def or repeated copies of one view', async () => {
   const built = await buildItem(sourceDir, reg, options);
   for (const receipt of [
+    { gpu: 'NVIDIA fixture', selection: { targeted: true }, items: [{ id: built.entry.aliases[0], defHash: built.entry.def1Hash!, ok: true, views: ['front-left', 'front-right', 'back', 'above'].map((view) => ({ label: 'default', view, file: `${view}.png` })) }] },
     { gpu: 'NVIDIA fixture', items: [{ id: built.entry.aliases[0], defHash: 'f'.repeat(64), ok: true, views: [] }] },
     { gpu: 'NVIDIA fixture', items: [{ id: built.entry.aliases[0], defHash: built.entry.def1Hash!, ok: true, views: Array(4).fill({ label: 'default', view: 'front-left', file: 'same.png' }) }] },
   ]) assert.equal((await buildItem(sourceDir, reg, { ...options, receipt })).gates.find((g) => g.gate === 'G4')!.ok, false);

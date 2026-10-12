@@ -13,6 +13,8 @@ const origin = 'http://127.0.0.1:6110';
 const server = spawn(process.execPath, ['tools/catalog/proof-launcher.mjs', `${out}/data`], { cwd: root, env, stdio: ['ignore', 'pipe', 'pipe'] });
 let log = ''; server.stdout.on('data', (data) => { log += data; }); server.stderr.on('data', (data) => { log += data; });
 const report = { source: process.env.P1_SOURCE_SHA ?? 'unknown', realm: 'disposable local launcher in Modal', runs: [] };
+const dprs = process.env.P1_PROOF_DPR ? [Number(process.env.P1_PROOF_DPR)] : [1, 2];
+if (dprs.some((value) => ![1, 2].includes(value))) throw new Error('proof dpr must be 1 or 2');
 const camera = () => { const s = window.__simEntity; return s ? s.camera.position.toArray() : null; };
 const different = (a, b) => !!(a && b) && a.some((value, i) => Math.abs(value - b[i]) > 0.01);
 let worldUrl;
@@ -22,7 +24,7 @@ try {
     try { if ((await fetch(origin + '/worlds/__sim/healthz')).ok) break; } catch {}
     await new Promise((done) => setTimeout(done, 100));
   }
-  for (const dpr of [1, 2]) {
+  for (const dpr of dprs) {
     const browser = await chromium.launch({ channel: 'chrome', headless: true });
     try {
       const context = await browser.newContext({ viewport: { width: 1352, height: 780 }, deviceScaleFactor: dpr, acceptDownloads: true });
@@ -40,7 +42,8 @@ try {
         await page.waitForURL(/\/worlds\/w\//, { timeout: 120000 }); const created = new URL(page.url()); created.search = ''; created.hash = ''; worldUrl = created.href;
       } else await page.goto(worldUrl, { waitUntil: 'domcontentloaded' });
       await page.waitForFunction(() => !!window.__simEntity?.layer.active, null, { timeout: 120000 });
-      await page.waitForTimeout(2500);
+      await page.locator('.viewer-arrival').waitFor({ state: 'hidden', timeout: 120000 });
+      await page.waitForTimeout(500);
       const api = async (path, body, token = 'dev:catalogue-probe') => {
         const response = await fetch(worldUrl.replace(/\/$/, '') + path, { method: body ? 'POST' : 'GET', headers: { authorization: `Bearer ${token}`, ...(body ? { 'content-type': 'application/json' } : {}) }, body: body ? JSON.stringify(body) : undefined });
         return { status: response.status, data: await response.json() };
@@ -51,7 +54,7 @@ try {
       const found = await api('/v1/god/defs?q=rainfall%20meter&compact=1', undefined, token);
       run.checks.find = found.status === 200 && found.data.defs[0]?.ref === 'eden/rain-gauge@1';
       if (!run.checks.find) throw new Error('candidate registry find failed');
-      if (dpr === 1) {
+      if (report.runs.length === 0) {
         const placed = await api('/v1/god/act', { ops: [{ op: 'place', def: 'eden/rain-gauge@1', name: 'rain-gauge', p: [0, 0, 0] }] }, token);
         run.checks.place = placed.status === 200 && placed.data.accepted;
         if (!run.checks.place) throw new Error('candidate placement failed');
@@ -61,7 +64,9 @@ try {
       run.geometry = await canvas.evaluate((element) => ({ css: [element.clientWidth, element.clientHeight], buffer: [element.width, element.height], dpr: devicePixelRatio }));
       run.checks.retina = run.geometry.buffer[0] === run.geometry.css[0] * dpr && run.geometry.buffer[1] === run.geometry.css[1] * dpr;
       const a = await page.evaluate(camera);
-      await page.mouse.move(550, 500); await page.mouse.down(); await page.mouse.move(700, 450, { steps: 10 }); await page.mouse.up(); await page.waitForTimeout(700);
+      await page.mouse.move(550, 500); await page.mouse.down(); await page.waitForTimeout(150);
+      for (let i = 1; i <= 10; i++) { await page.mouse.move(550 + i * 15, 500 - i * 5); await page.waitForTimeout(50); }
+      await page.mouse.up(); await page.waitForTimeout(700);
       const b = await page.evaluate(camera); run.checks.drag = different(a, b);
       await page.mouse.wheel(0, -500); await page.waitForTimeout(1000); const c = await page.evaluate(camera); run.checks.wheel = different(b, c);
       await page.keyboard.down('w'); await page.waitForTimeout(900); await page.keyboard.up('w'); await page.waitForTimeout(400); const d = await page.evaluate(camera); run.checks.keys = different(c, d);
@@ -89,7 +94,7 @@ try {
       await context.close();
     } finally { await browser.close(); }
   }
-  report.ok = report.runs.length === 2 && report.runs.every((run) => Object.values(run.checks).every(Boolean));
+  report.ok = report.runs.length === dprs.length && report.runs.every((run) => Object.values(run.checks).every(Boolean));
   writeFileSync(`${out}/report.json`, JSON.stringify(report, null, 2));
   console.log(JSON.stringify({ ok: report.ok, runs: report.runs.map(({ dpr, checks }) => ({ dpr, checks })), out }));
   process.exitCode = report.ok ? 0 : 1;
