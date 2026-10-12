@@ -11,7 +11,9 @@ import { gateExit } from './checks.mjs';
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const args = Object.fromEntries(process.argv.slice(2).map((a, i, all) => a.startsWith('--') ? [a.slice(2), all[i + 1]?.startsWith('--') || all[i + 1] === undefined ? true : all[i + 1]] : null).filter(Boolean));
 if (args.approve) throw new Error('Batch catchup never approves baselines. Review per-item evidence explicitly.');
-const out = resolve(String(args.out ?? join(root, '.lane/g4/full'))); mkdirSync(out, { recursive: true });
+const out = resolve(String(args.out ?? join(root, '.lane/g4/full')));
+if (existsSync(join(out, 'report.json'))) throw new Error('G4 output already has evidence; choose a fresh --out directory');
+mkdirSync(out, { recursive: true });
 const lib = coreLibrary(), model = new WorldModel({ constants: { ground: 'land' }, seed: 'g4-plan' }); model.library = lib;
 let defs = lib.all().map((d) => model.resolvedDef(d.ref));
 if (args.items) { const refs = String(args.items).split(',').map(toRef); const byRef = new Map(defs.map((d) => [toRef(d.ref), d])); defs = refs.map((ref) => { if (!byRef.has(ref)) throw new Error(`missing ref ${ref}`); return byRef.get(ref); }); }
@@ -20,6 +22,8 @@ writeFileSync(join(out, 'plan.json'), JSON.stringify({ schema: 'g4-plan/1', libr
 console.log(`G4 full coverage: ${plan.requested.length} refs, ${plan.batches.length} batches, ${plan.gaps.length} explicit unqualified refs`);
 if (args['plan-only']) process.exit(0);
 const items = [...plan.gaps], batches = []; let infrastructure = false;
+const save = () => writeFileSync(join(out, 'report.json'), JSON.stringify({ schema: 'g4-coverage/1', approval: 'none: machine catchup only', library: `${lib.id}@${lib.version}`, gpu: batches.map((b) => b.gpu).filter(Boolean).join('; '), coverage: coverageOf(plan.requested, items), batches, items }, null, 1));
+save();
 for (const [i, refs] of plan.batches.entries()) {
   const dir = join(out, `batch-${String(i + 1).padStart(3, '0')}`); mkdirSync(dir, { recursive: true });
   const argv = ['tools/catalog/g4/g4-render.mjs', '--port', String(args.port ?? 6102), '--out', dir, '--items', refs.join(',')];
@@ -31,13 +35,12 @@ for (const [i, refs] of plan.batches.entries()) {
   const reportFile = join(dir, 'report.json');
   const report = existsSync(reportFile) ? JSON.parse(readFileSync(reportFile, 'utf8')) : null;
   const code = report ? gateExit(report) : 3;
-  if (child.status === 3 || child.status === null || code === 3) infrastructure = true;
+  if (![0, 2].includes(child.status) || code === 3) infrastructure = true;
   batches.push({ batch: i + 1, refs, exit: child.status, gateExit: code, gpu: report?.gpu ?? null, report: relative(out, reportFile) });
   if (report) items.push(...report.items.map((item) => ({ ...item, batch: i + 1, views: item.views.map((v) => ({ ...v, file: join(`batch-${String(i + 1).padStart(3, '0')}`, relative(dir, v.file)) })) })));
   else for (const id of refs) items.push({ id, ok: false, status: 'unqualified', errors: ['batch failed before report; see render.log'], views: [], variants: [], batch: i + 1 });
-  const coverage = coverageOf(plan.requested, items);
   // Persist after every batch, including failures. An interrupted run is visibly incomplete.
-  writeFileSync(join(out, 'report.json'), JSON.stringify({ schema: 'g4-coverage/1', approval: 'none: machine catchup only', library: `${lib.id}@${lib.version}`, gpu: batches.map((b) => b.gpu).filter(Boolean).join('; '), coverage, batches, items }, null, 1));
+  save();
   // Continue item failures, stop infrastructure faults; remaining refs stay missing.
   if (infrastructure) break;
 }

@@ -24,7 +24,7 @@ image = (
 app = modal.App("eden-catalog-g4", image=image)
 
 
-@app.function(gpu=GPU, timeout=3600, memory=8192, cpu=4)
+@app.function(gpu=GPU, timeout=6000, memory=8192, cpu=4)
 def render(bundle: bytes, argv: list[str]) -> bytes:
     os.makedirs("/repo", exist_ok=True)
     with tarfile.open(fileobj=io.BytesIO(bundle), mode="r:gz") as t:
@@ -35,12 +35,13 @@ def render(bundle: bytes, argv: list[str]) -> bytes:
     argv = [a for a in argv if a != "--all"]
     cmd = ["node", "tools/catalog/g4/g4-batch.mjs" if full else "tools/catalog/g4/g4-render.mjs", "--port", "6102", "--no-lease", "--chrome", "/usr/bin/google-chrome", "--out", "/tmp/g4", *argv]
     try:
-        r = subprocess.run(cmd, cwd="/repo", timeout=3000)
+        # Full catchup has ~12k views; cap GPU residence at 90 minutes (a few dollars on L4).
+        r = subprocess.run(cmd, cwd="/repo", timeout=5400 if full else 3000)
         code = r.returncode
     except subprocess.TimeoutExpired:
         # Preserve the last completed coverage report; the timeout must not look like a passing run.
         code = 3
-        print("G4 exceeded 3000s catchup budget; preserving incomplete evidence", flush=True)
+        print("G4 exceeded render time budget; preserving incomplete evidence", flush=True)
     if code:
         log = pathlib.Path("/tmp/g4/server.log")
         if log.exists():

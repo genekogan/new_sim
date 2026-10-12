@@ -16,7 +16,7 @@
 //   same        a variant's colour thumbnail differs from the default's by < 2.0 (mean abs, 0–255): "variants all green"
 //   ssim        per view against the approved baseline (--baseline); < 0.85 fails (re-approve with --approve)
 // Writes <out>/<id>/<variant>/<view>.png, <out>/report.json, and a contact sheet <out>/sheet.html for the review queue.
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, realpathSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname, resolve, join, relative, isAbsolute } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -47,7 +47,8 @@ await god('/v1/god/act', { body: { ops: [{ op: 'world', state: { time: { set: { 
 // Optional unpublished candidate defs, reviewed and bundled from a file within this worktree.
 let candidateRefs = null;
 if (args.defs) {
-  const file = resolve(root, String(args.defs)), rel = relative(root, file);
+  if (!String(args.defs).endsWith('.json')) throw new Error('--defs must name a JSON file');
+  const file = realpathSync(resolve(root, String(args.defs))), rel = relative(realpathSync(root), file);
   if (rel.startsWith('..') || isAbsolute(rel)) throw new Error('--defs must be inside the worktree');
   const defs = JSON.parse(readFileSync(file, 'utf8'));
   if (!Array.isArray(defs) || !defs.length || defs.some((d) => d.schema !== 'def/1')) throw new Error('--defs expects a nonempty array of def/1 inputs');
