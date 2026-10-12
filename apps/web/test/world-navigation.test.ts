@@ -136,6 +136,50 @@ test('actual OrbitControls release discards a held drag and damping while preser
 });
 
 
+for(const ending of ['pointerup','pointercancel','lostpointercapture'] as const){
+ test(`first Broadcast orbit drag continues through takeover and resets on ${ending}`,()=>{
+  const f=fixture();f.nav.dispose();f.context.mode='broadcast';f.context.navigation='orbit';
+  let controls=createWorldOrbitControls(f.camera,f.canvas as never,f.target,f.context),releases=0;
+  const nav=new WorldNavigation(f.canvas as never,f.camera,()=>controls.target,()=>f.context,()=>{
+    releases++;const target=controls.target.clone();controls.dispose();controls=createWorldOrbitControls(f.camera,f.canvas as never,target,f.context);
+  });
+  const move=(x:number)=>{const e=new Event('pointermove',{cancelable:true});Object.assign(e,{pointerId:8,pointerType:'mouse',clientX:x,clientY:100,button:0});f.doc.dispatchEvent(e);};
+  try{
+   nav.sync();f.event('pointerdown',{pointerId:8,clientX:100,clientY:100});move(110);
+   const first=f.camera.position.clone();assert.equal(f.canvas.hasPointerCapture(8),true);
+   f.context.mode='manual';assert.equal(nav.sync(),true,'handover is acknowledged even while release is deferred');
+   nav.update(.016);assert.equal(releases,0);assert.equal(nav.inputOwned,true);assert.equal(f.canvas.hasPointerCapture(8),true);
+   move(250);assert.ok(f.camera.position.distanceTo(first)>.1,'the same held drag must keep orbiting after its first movement');
+   const stopped=f.camera.position.clone();if(ending==='lostpointercapture')f.canvas.releasePointerCapture(8);f.event(ending,{pointerId:8});assert.equal(releases,1);assert.equal(nav.inputOwned,false);
+   assert.equal(f.canvas.hasPointerCapture(8),false);assert.equal(controls.zoomToCursor,true,'deferred recreation installs Manual settings');
+   move(350);for(let i=0;i<20;i++)controls.update();close(f.camera.position.distanceTo(stopped),0);
+  }finally{nav.dispose();controls.dispose();}
+ });
+}
+
+for(const boundary of ['lifecycle','follow','free','blur'] as const){
+ test(`${boundary} still immediately releases an active Broadcast orbit handover`,()=>{
+  const f=fixture();try{
+   f.context.mode='broadcast';f.context.navigation='orbit';f.nav.sync();f.event('pointerdown',{pointerId:8});
+   f.context.mode='manual';f.nav.sync();const before=f.released();assert.equal(f.nav.inputOwned,true);
+   if(boundary==='lifecycle')f.context.lifecycle='mars:epoch2:soul1:present:live';
+   if(boundary==='follow')f.context.mode='follow';
+   if(boundary==='free')f.context.navigation='free';
+   if(boundary==='blur')f.canvas.blur();else f.nav.sync();
+   assert.equal(f.released(),before+1);assert.equal(f.nav.inputOwned,false);
+   f.event('pointerup',{pointerId:8});assert.equal(f.released(),before+1,'cancelled deferred release does not run again');
+  }finally{f.nav.dispose();}
+ });
+}
+
+test('a lifecycle change during Broadcast to Manual never defers release',()=>{
+ const f=fixture();try{
+  f.context.mode='broadcast';f.context.navigation='orbit';f.nav.sync();f.event('pointerdown');const before=f.released();
+  f.context.mode='manual';f.context.lifecycle='mars:epoch2:soul1:present:live';assert.equal(f.nav.sync(),true);
+  assert.equal(f.released(),before+1);assert.equal(f.nav.inputOwned,false);
+ }finally{f.nav.dispose();}
+});
+
 test('actual OrbitControls accepts head tilt and a Follow handover without applying old drag/damping',()=>{
  const f=fixture();f.nav.dispose();Object.assign(f.doc,{querySelector:()=>null});f.context.mode='follow';f.context.navigation='orbit';
  let controls=createWorldOrbitControls(f.camera,f.canvas as never,f.target,f.context);

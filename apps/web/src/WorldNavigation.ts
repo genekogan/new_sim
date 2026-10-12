@@ -57,7 +57,8 @@ export class WorldNavigation {
   private pointers=new Map<number,{x:number;y:number;type:string;look:boolean}>();
   private owned=false;
   private composing=false;
-  private previousLifecycle='';
+  private previousContext:NavigationContext|null=null;
+  private deferredOrbitRelease=false;
   private disposed=false;
   private releasing=false;
   private listeners: [EventTarget,string,EventListener,AddEventListenerOptions?][]=[];
@@ -99,9 +100,9 @@ export class WorldNavigation {
       // Two fingers pan; wheel/trackpad dolly and explicit moveCamera cover zoom.
       else if(this.free()&&p.type==='touch'&&this.pointers.size===2){this.move({right:-dx*.01,up:dy*.01});event.preventDefault();}
     });
-    const end=(event:PointerEvent)=>{const pointer=this.pointers.get(event.pointerId);this.pointers.delete(event.pointerId);if(pointer?.look&&canvas.hasPointerCapture(event.pointerId))canvas.releasePointerCapture(event.pointerId);};
+    const end=(event:PointerEvent)=>{const pointer=this.pointers.get(event.pointerId);this.pointers.delete(event.pointerId);if((pointer?.look||this.deferredOrbitRelease)&&canvas.hasPointerCapture(event.pointerId))canvas.releasePointerCapture(event.pointerId);this.finishOrbitHandover();};
     listen(canvas,'pointerup',end);listen(canvas,'pointercancel',end);
-    listen(canvas,'lostpointercapture',(event:PointerEvent)=>{this.pointers.delete(event.pointerId);});
+    listen(canvas,'lostpointercapture',(event:PointerEvent)=>{this.pointers.delete(event.pointerId);this.finishOrbitHandover();});
     listen(canvas,'wheel',(event:WheelEvent)=>{
       if(!this.free()||event.ctrlKey||event.metaKey)return;
       event.preventDefault();this.move({forward:-event.deltaY*(event.deltaMode === 1 ? .12 : event.deltaMode === 2 ? 2 : .006)});
@@ -113,9 +114,23 @@ export class WorldNavigation {
   get inputOwned(){return this.owned;}
   private setOwned(value:boolean){if(this.owned===value)return;this.owned=value;this.onOwnership(value);}
   private free(){const c=this.context();return !this.disposed&&this.owned&&c.mode==='manual'&&c.navigation==='free';}
-  sync(preserveFocus=false){const c=this.context(),key=`${c.mode}:${c.navigation}:${c.lifecycle}`,changed=!!this.previousLifecycle&&key!==this.previousLifecycle;if(changed)this.release(!preserveFocus);this.previousLifecycle=key;return changed;}
+  sync(preserveFocus=false){
+    const c=this.context(),previous=this.previousContext;
+    const changed=!!previous&&(c.mode!==previous.mode||c.navigation!==previous.navigation||c.lifecycle!==previous.lifecycle);
+    if(changed){
+      // The first orbit drag takes Broadcast over at its movement threshold. Recreating controls
+      // there loses their pointerdown; keep that gesture, then discard its damping when it ends.
+      const orbitHandover=previous.mode==='broadcast'&&c.mode==='manual'&&previous.navigation==='orbit'&&c.navigation==='orbit'
+        &&previous.lifecycle===c.lifecycle&&this.pointers.size>0;
+      if(orbitHandover)this.deferredOrbitRelease=true;
+      else this.release(!preserveFocus);
+    }
+    this.previousContext={...c};return changed;
+  }
+  private finishOrbitHandover(){if(this.deferredOrbitRelease&&!this.pointers.size)this.release(false);}
   release(blur=true){
     if(this.releasing)return;this.releasing=true;
+    this.deferredOrbitRelease=false;
     this.keys.clear();this.setOwned(false);
     for(const id of this.pointers.keys())if(this.canvas.hasPointerCapture(id))this.canvas.releasePointerCapture(id);
     this.pointers.clear();
