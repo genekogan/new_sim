@@ -76,3 +76,4 @@ for (const key of worlds) {
   console.log(key, report.worlds[key].same ? 'SAME' : 'DIFF', JSON.stringify({ baseline: b, candidate: c, errors: [runs.baseline.stderr, runs.candidate.stderr].filter(Boolean).map((s) => s.slice(-400)) }));
 }
 writeFileSync(join(out, 'history-boot-compare.json'), JSON.stringify(report, null, 1));
+if (Object.values(report.worlds).some(world => !world.same)) process.exitCode = 1;
