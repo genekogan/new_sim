@@ -32,11 +32,18 @@ const report = { port, range, startedAt: new Date().toISOString(), steps: [], sh
 const t = () => performance.now();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const run = promisify(execFile);
-const PAGE_MS = Number(args["page-ms"] ?? 600_000);   // the machine runs many lanes; page loads can take minutes
+const PAGE_MS = Number(args["page-ms"] ?? 30_000);
 
 async function step(name, fn, expect) {
   const t0 = t(); let result, error;
-  try { result = await fn(); } catch (e) { error = String(e?.message ?? e).split('\n')[0]; }
+  try { result = await fn(); } catch (e) {
+    const details = String(e?.message ?? e); error = details.split('\n')[0];
+    if (!report.failures.length) {
+      writeFileSync(join(out, 'first-failure.log'), details);
+      const file = join(out, 'first-failure.png');
+      try { await page.screenshot({ path: file, timeout: 5000 }); report.shots.push(file); } catch { /* preserve original failure */ }
+    }
+  }
   const ms = t() - t0, ok = !error && (expect ? !!expect(result) : true);
   report.steps.push({ name, ms: Math.round(ms), ok, result: brief(result), error });
   if (!ok) report.failures.push({ name, result: brief(result), error });
@@ -172,6 +179,9 @@ try {
   }, (r) => r.accepted && r.drawn);
 
   await step('the Edits tab lists it with its note and group; undo and redo from the panel', async () => {
+    // Pairing leaves God controls open over the Edits tab. Dismiss it as a person would before clicking behind it.
+    await page.keyboard.press('Escape');
+    await page.locator('[data-god-bolt-panel]').waitFor({ state: 'hidden', timeout: 5000 });
     await page.locator('[data-tab="edits"]').click();
     await page.locator('[data-edits] li', { hasText: 'a red barn by the orchard' }).waitFor();
     await shot('07-edits');
