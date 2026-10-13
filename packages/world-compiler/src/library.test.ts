@@ -98,7 +98,7 @@ test('library: defining a def identical to a library one pins the library record
 test('library: pack namespaces alias too: lm/<x>@v → core/lm-<x>@v, mars/<x>@v → core/mars-<x>@v', () => {
   const w = bare();
   const lm = lib.all().find((d) => d.name.startsWith('core-lm-'))!, mars = lib.all().find((d) => d.name.startsWith('core-mars-'))!;
-  assert.equal(w.def(`lm/${lm.name.slice(8)}@1`), lm);
-  assert.equal(w.def(`mars/${mars.name.slice(10)}@1`), mars);
+  assert.equal(w.def(`lm/${lm.name.slice(8)}@${lm.version}`), lm);
+  assert.equal(w.def(`mars/${mars.name.slice(10)}@${mars.version}`), mars);
   assert.equal(w.def('eden/no-such-thing@1'), undefined);
 });
