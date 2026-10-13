@@ -5,7 +5,7 @@
 // viewers (hub) and to gods (SSE).
 import { randomBytes } from 'node:crypto';
 import { TILE_M, tileOf } from '@sim/ground';
-import { WorldModel, coreLibrary, libraryRef, applyBatch, plan, type Diff, type Op, type Result, type StoredDef, type UsesHook, type PlanOptions } from '@sim/world-compiler';
+import { WorldModel, definitionRefs, coreLibrary, libraryRef, applyBatch, plan, type Diff, type Op, type Result, type StoredDef, type UsesHook, type PlanOptions } from '@sim/world-compiler';
 import { hashToken } from '../auth.ts';
 import type { Db } from '../db.ts';
 import { ApiError } from '../souls.ts';
@@ -283,11 +283,12 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   /** What a viewer (or anyone) may read: constants, state, every entity, the defs in use, the ground recipe. */
   publicSnapshot() {
     const s = this.model.snapshot();
-    const used = new Set(s.entities.map((e) => e.def));
-    for (const e of s.entities) for (const v of Object.values(e.params ?? {})) if (typeof v === 'string' && (/@\d+$/.test(v) || /^sha:[0-9a-f]{64}$/.test(v)) && this.model.def(v)) used.add('sha:' + this.model.def(v)!.hash);
-    // VOCAB-MECH: a def that extends another (a preset) needs its base to draw: follow the chain
-    for (const ref of [...used]) for (let d = this.model.def(ref), n = 0; d?.extends && n < 8; d = this.model.def(d.extends), n++) { const b = this.model.def(d.extends); if (b) used.add(b.ref); }
-    const defs = s.defs.filter((d) => used.has(d.ref) || used.has('sha:' + d.hash) || used.has(d.ref.replace(/^core-/, 'core/')));
+    const used = new Set<string>(), pending = s.entities.flatMap(e => [e.def, ...definitionRefs(e.params)]);
+    while (pending.length) {
+      const d = this.model.def(pending.pop()!); if (!d || used.has(d.hash)) continue; used.add(d.hash);
+      pending.push(...definitionRefs({extends:d.extends,make:d.make,contents:d.contents,params:d.params,components:d.components}));
+    }
+    const defs = s.defs.filter(d => used.has(d.hash));
     // byte size of every GLB these defs load (from the asset index), so a viewer's loading bar knows the total up front
     const assetBytes: Record<string, number> = {};
     for (const d of defs) for (const sha of JSON.stringify(d.make ?? null).match(/[0-9a-f]{64}/g) ?? []) { const m = this.assets.info(sha); if (m?.ext === 'glb' && m.bytes > 0) assetBytes[sha] = m.bytes; }

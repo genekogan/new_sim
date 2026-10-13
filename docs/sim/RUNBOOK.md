@@ -1,6 +1,26 @@
 # Runbook — Sim on eden2
 
-## Current October 10 publication (supersedes historical previews below)
+## October 12 convergence release procedure
+
+Use the exact qualified source/artifact receipt under `<team>/reviews/` for current identity. Root `/w/*`
+worlds remain laptop-hosted behind the existing eden2 SSH proxy; `/worlds` uses `sim-worlds@production` on eden2.
+Both surfaces must select artifacts from the same Git commit. Do not infer deployment from a checkout HEAD.
+
+Catalogue entity-world services opt in with `CATALOG_REGISTRY_DIR` pointing to a sealed published registry,
+`CATALOG_CHANNEL=stable` and the explicitly verified `CATALOG_GENE_OWNER_ID`. These are public configuration,
+not credentials. Pass existing Clerk settings by env-file path; never copy credentials into Git or reports.
+Stage the exact source before production; check every registered world boots and preserve previous code links.
+
+For the three original writers, preserve descriptors, databases, accepted events, current/retired Soul IDs,
+accounts and auth settings. Normal-close the exact verified writers, seal whole-data backups, and use fresh
+hash-pinned plan/GO plus the reviewed `convergence-world-run.mjs` readiness guard. Promote the proxy only after
+all three READY receipts. Rollback changes code on the latest accepted data, never restores older history.
+
+Cloud sessions do not inherit this computer's ignored data, local credentials, live writers or SSH tunnel.
+GitHub parity supplies source only. Deployment from cloud requires separately configured, scoped deployment
+authority and the same qualification/closure procedure; it is not currently automatic on push.
+
+## Historical October 10 publication
 
 Public sim.eden.art currently proxies to laptop4970 via eden2 loopback4505 SSH.
 Artifact-only frontend/CLI/guide source e8bcdcd3, backend5e478f8a unchanged.

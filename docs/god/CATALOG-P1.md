@@ -1,6 +1,8 @@
-# P1 implementation checkpoint
+# P1 operational catalogue
 
-This is a local candidate implementation, not a deployed release. `CATALOG-PROGRAM.md` remains the binding contract.
+`CATALOG-PROGRAM.md` remains the binding contract. Release identity and actual deployment qualification are recorded
+in the external convergence receipt under `<team>/reviews/`; this document describes the integrated code, not
+an assertion that an arbitrary checkout has been deployed.
 
 ## Registry serving
 
@@ -40,7 +42,8 @@ node packages/catalog/bin/catalog.mjs build packages/catalog/items/object-tool/r
 Publish moves **candidate only**, after G1–G5 pass. G4 must name the exact engine hash and every required variant/state
 view on hardware rendering. G5 checks title, two synonyms, two held-out queries, all existing winning first-hit words
 and the standing 94-intent regression set. Held-out words are not indexed. Existing lexical misses remain reported;
-sentence-model dependency/download still requires the approval described in CATALOG-HANDOFF.
+the evaluated sentence model remains unshipped: fusion improved the 94-intent score to 82/94, below the required
+90% floor. No model download or embedding service is needed by this release.
 
 `compat <old-rev> <new-rev>` flags major changes: narrowed/removed params, enums, slots/state/actions/actuators, >10% box
 change, anchor/form changes. Breaking changes under the same major fail the build.
@@ -61,7 +64,22 @@ explicit recorded review, or an established low-risk category/interaction, 48h a
 G7 is not yet built, so automatic promotion is currently blocked. The lower-level Registry API remains for controlled
 imports and rollback rehearsal, not a shortcut for workers.
 
-## Verified local milestones and remaining gates
+## Integrated release behaviour and remaining gates
+
+- New registry placements, inheritance, prefab parts and reference-valued defaults are pinned to exact hashes.
+  Two revisions of one major coexist; journal reload and portable export retain dependency closure. Unknown hashes
+  are denied, yanked names stop new placements, and already accepted permitted hashes remain readable.
+- Standard launcher creation verifies the configured signed-in account before genesis. Restricted templates are
+  available only to the explicitly configured Gene owner; request-body ownership is not authority.
+- `tools/catalog/prepare-release-registry.mjs` constructs a fresh unpublished seed and pins its dependency graph,
+  preserving the original seed snapshot. It imports only an actual exact-hash hardware-render PM review and then
+  promotes that reviewed item. Changed seed hashes retain G4 holds, not inherited visual approval.
+- Rain gauge is a display vessel, not simulated measurement or filling. Source → candidate → reviewed stable →
+  yank → rollback, launcher restart, reload and browser controls have isolated NVIDIA L4 proofs at dpr1/2.
+- Automatic promotion/G7, CDN publication and remaining seed visual-review holds are not delivered by P1.
+  No KTX2 variants or semantic model are enabled. CDN still waits for Gene's `R2 ready: <domain>`.
+
+## Historical lane checkpoint (not current release authority)
 
 - Rain gauge: 192 triangles, zero asset bytes, G1–G5 pass; exact-hash NVIDIA L4 render with four nonempty views,
   visually inspected; local candidate sequence2. No stable/public publication.

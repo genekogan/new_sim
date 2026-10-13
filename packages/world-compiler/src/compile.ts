@@ -6,7 +6,7 @@ import { footprintOf, padFor, settle, waterLevelAt, SKIRT_MAX_M as SKIRT_MAX, ty
 import { prepareFor, queryOf } from '@sim/generators';
 import { hashOf } from './hash.ts';
 import { offsetPolyline, pointAlong } from '@sim/generators';
-import { WorldModel, obbOverlap, type OBB } from './model.ts';
+import { WorldModel, definitionRefs, obbOverlap, type OBB } from './model.ts';
 import { batchSchema, trustedBatchSchema, type Batch, type Entity, type Failure, type Field, type Op, type Result, type StoredDef, type Value, worldStateSchema, SKY_PALETTES } from './schemas.ts';
 import { layersStateSchema, type LayersState, type Schedule } from './layers.ts';
 
@@ -359,9 +359,14 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   // CATRUN: a def this batch uses that only the shared library holds enters the world's own store, pinned by hash
   // (with its `extends` chain and any def named by a param), so the world keeps exactly what it placed.
   if (scratch.library) {
-    const adopt = (ref: string | undefined) => { for (let r = ref, n = 0; r && n < 9; n++) { const got = scratch.adopt(r); if (got) diff.defs.push(got); r = scratch.def(r)?.extends; } };
-    for (const d of [...diff.defs]) adopt(d.extends);
-    for (const e of diff.upserts) { adopt(e.def); for (const v of Object.values(e.params ?? {})) if (typeof v === 'string' && (/@\d+$/.test(v) || /^sha:[0-9a-f]{64}$/.test(v))) adopt(v); }
+    const pending = [...diff.upserts.flatMap(e => [e.def, ...definitionRefs(e.params)]),
+      ...diff.defs.flatMap(d => definitionRefs({extends:d.extends,make:d.make,contents:d.contents,params:d.params,components:d.components}))];
+    const seen = new Set<string>();
+    while (pending.length) {
+      const ref = pending.pop()!; if (seen.has(ref)) continue; seen.add(ref);
+      const got = scratch.adopt(ref); if (got) diff.defs.push(got);
+      const d = scratch.def(ref); if (d) pending.push(...definitionRefs({extends:d.extends,make:d.make,contents:d.contents,params:d.params,components:d.components}));
+    }
   }
   diff.tiles = [...new Set(diff.tiles)];
   if (layersTouched) diff.layers = true;

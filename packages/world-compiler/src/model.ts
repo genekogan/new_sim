@@ -22,6 +22,17 @@ export type DefLibrary = { readonly id: string; readonly version: string; get(ke
  *  `lm/<x>@v` → `core/lm-<x>@v`, `mars/<x>@v` → `core/mars-<x>@v`. Other refs pass through. */
 export const aliasRef = (ref: string) => { const m = /^(eden|lm|mars)\/(.+)$/.exec(ref); return m ? `core/${m[1] === 'eden' ? '' : m[1] + '-'}${m[2]}` : ref; };
 
+/** Definition references in structural data, including nested palettes and reference-valued defaults. */
+export function definitionRefs(value: unknown): string[] {
+  const refs = new Set<string>();
+  const walk = (v: unknown) => {
+    if (typeof v === 'string' && /^(?:sha:[0-9a-f]{64}|(?:(?:core|eden|lm|mars)\/)?[a-z0-9][a-z0-9._-]*@\d+)$/.test(v)) refs.add(v);
+    else if (Array.isArray(v)) v.forEach(walk);
+    else if (v && typeof v === 'object') Object.values(v).forEach(walk);
+  };
+  walk(value); return [...refs];
+}
+
 export class WorldModel {
   constants: WorldConstants;
   state: WorldState;

@@ -1039,7 +1039,7 @@ async function follow(seconds = 3600, onEvent = () => {
 }
 
 // lib/export.mjs
-var isRef = (v) => typeof v === "string" && (/^sha:[0-9a-f]{64}$/.test(v) || /@\d+$/.test(v));
+var isRef = (v) => typeof v === "string" && /^(?:sha:[0-9a-f]{64}|(?:(?:core|eden|lm|mars)\/)?[a-z0-9][a-z0-9._-]*@\d+)$/.test(v);
 var inputOf = ({ hash, ref, born, budget, by, ...input }) => input;
 var pathOf = (byId, entity) => {
   const parts = [];
@@ -1061,13 +1061,14 @@ function exportGenesis(snapshot2, { name } = {}) {
     const refs = [];
     if (d.extends) refs.push(d.extends);
     const walk = (value, key) => {
-      if (isRef(value) && (key === "def" || key === "of" || key === "extends")) refs.push(value);
+      if (isRef(value) && (value.startsWith("sha:") || key === "def" || key === "of" || key === "extends" || defOf(value))) refs.push(value);
       else if (Array.isArray(value)) value.forEach((v) => walk(v, key));
       else if (value && typeof value === "object") for (const [k, v] of Object.entries(value)) walk(v, k);
     };
     walk(d.make);
     walk(d.contents);
     walk(d.components);
+    walk(d.params);
     return [...new Set(refs)];
   };
   const check = (d) => {
@@ -1099,7 +1100,12 @@ function exportGenesis(snapshot2, { name } = {}) {
   };
   for (const e of s.entities) {
     emit(e.def, e.def.startsWith("sha:"));
-    for (const value of Object.values(e.params ?? {})) if (isRef(value)) emit(value, value.startsWith("sha:"));
+    const params = (value) => {
+      if (isRef(value)) emit(value, value.startsWith("sha:"));
+      else if (Array.isArray(value)) value.forEach(params);
+      else if (value && typeof value === "object") Object.values(value).forEach(params);
+    };
+    params(e.params);
   }
   const prefabChild = (e) => {
     for (let p = byId.get(e.in.parent); p; p = byId.get(p.in.parent)) if (defOf(p.def)?.make?.kind === "parts") return true;
