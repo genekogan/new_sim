@@ -23,6 +23,7 @@ export class RegistryCatalog implements DefLibrary {
   private checkedAt = 0;
   private exportPointers = '';
   private exportPermissions = new Map<string, boolean>();
+  private historical = new Map<string, IndexEntry>();
   lastError: string | null = null;
   readonly registry: Registry;
   constructor(registry: Registry, options: ServingOptions = {}) {
@@ -73,30 +74,73 @@ export class RegistryCatalog implements DefLibrary {
       return { id: `${e.id}@${e.major}`, title: it.text.title, synonyms: it.text.synonyms, category: it.text.category,
         affords: it.affords, first: it.text.first, description: it.text.description, line: e.line };
     });
-    const index = buildLexicalIndex(docs), tiered = new TieredLibrary(this.registry, hot, this.channel, entries);
+    const index = buildLexicalIndex(docs), tiered = new TieredLibrary(this.registry, hot, this.channel, entries, (hash) => this.historicalEntry(hash));
     this.entries = entries; this.items = items; this.rows = rows; this.index = index; this.tiered = tiered; this.seq = seq;
     this.managed = managed;
     this.lastError = null;
     return true;
   }
-  get(key: string): StoredDef | undefined { this.refresh(); return this.tiered.get(key); }
+  get(key: string): StoredDef | undefined {
+    this.refresh();
+    if (/^sha:[0-9a-f]{64}$/.test(key) && !this.historicalEntry(key.slice(4))) return undefined;
+    return this.tiered.get(key);
+  }
+  private historicalEntry(hash: string) {
+    this.refreshHistory();
+    const e = this.historical.get(hash);
+    return e && ((this.exportPermissions.get(hash) ?? false) || (this.context.ownerIsGene && !this.context.export)) ? e : undefined;
+  }
   placementRef(key: string): string | null | undefined {
     this.refresh();
-    const d = this.tiered.get(key);
+    const d = this.get(key);
     return d ? 'sha:' + d.hash : this.managed.has(key) ? null : undefined;
   }
   manages(ref: string) { this.refresh(); return this.managed.has(ref); }
   /** Historical revisions keep their licence after yank or channel rollback. Used only for explicit export metadata. */
   canExport(hash: string): boolean {
-    const pointers = JSON.stringify(this.registry.pointers());
+    this.refreshHistory();
+    return this.exportPermissions.get(hash) ?? true; // World-local definitions have no registry redistribution restriction.
+  }
+  private refreshHistory() {
+    const pointers = JSON.stringify([this.registry.pointers(), this.registry.seqs('stable').length, this.registry.seqs('candidate').length]);
     if (pointers !== this.exportPointers) {
-      const permissions = new Map<string, boolean>();
-      for (const channel of ['stable', 'candidate'] as const) for (const seq of this.registry.seqs(channel))
-        for (const entry of this.registry.snapshot(channel, seq)) if (entry.def1Hash)
-          permissions.set(entry.def1Hash, (permissions.get(entry.def1Hash) ?? true) && entry.redistribute);
-      this.exportPermissions = permissions; this.exportPointers = pointers;
+      const permissions = new Map<string, boolean>(), historical = new Map<string, IndexEntry>();
+      for (const channel of ['stable', 'candidate'] as const) for (const seq of this.registry.seqs(channel)) {
+        const entries = this.registry.snapshot(channel, seq), byRef = new Map<string, IndexEntry>();
+        for (const e of entries) for (const ref of [`${e.id}@${e.major}`, ...e.aliases, `sha:${e.def1Hash}`]) byRef.set(ref, e);
+        const done = new Map<string, boolean>(), visiting = new Set<string>();
+        const allowed = (e: IndexEntry): boolean => {
+          const hash = e.def1Hash!; if (done.has(hash)) return done.get(hash)!;
+          if (permissions.get(hash) === false) return false;
+          if (visiting.has(hash)) return false;
+          visiting.add(hash);
+          const item = this.registry.item(e.id, e.major, e.rev, e.itemHash);
+          let ok = !!item && item.id === e.id && item.major === e.major && item.rev === e.rev && (!e.itemHash || hashOf(item) === e.itemHash)
+            && item.licence.redistribute === e.redistribute && item.licence.redistribute === REDISTRIBUTABLE[item.licence.spdx] && e.redistribute;
+          const raw = this.registry.def1(hash) as Record<string, unknown> | null;
+          const refs: string[] = [];
+          const walk = (v: unknown) => {
+            if (typeof v === 'string' && (/^sha:[0-9a-f]{64}$/.test(v) || /^(core[/-]|eden\/|mars\/|lm\/)[a-z0-9._-]+@\d+$/.test(v))) refs.push(v);
+            else if (Array.isArray(v)) v.forEach(walk);
+            else if (v && typeof v === 'object') Object.values(v).forEach(walk);
+          };
+          if (raw) for (const key of ['extends', 'make', 'contents', 'params', 'components']) walk(raw[key]);
+          for (const ref of refs) {
+            const dependency = byRef.get(ref) ?? (ref.startsWith('sha:') ? historical.get(ref.slice(4)) : undefined);
+            if (!dependency || !allowed(dependency)) ok = false;
+          }
+          visiting.delete(hash); done.set(hash, ok); return ok;
+        };
+        for (const e of entries) if (e.def1Hash) {
+          const item = this.registry.item(e.id, e.major, e.rev, e.itemHash);
+          if (!item || item.id !== e.id || item.major !== e.major || item.rev !== e.rev || (e.itemHash && hashOf(item) !== e.itemHash)
+            || item.licence.redistribute !== e.redistribute || item.licence.redistribute !== REDISTRIBUTABLE[item.licence.spdx]) continue;
+          historical.set(e.def1Hash, e);
+          permissions.set(e.def1Hash, (permissions.get(e.def1Hash) ?? true) && allowed(e));
+        }
+      }
+      this.historical = historical; this.exportPermissions = permissions; this.exportPointers = pointers;
     }
-    return this.exportPermissions.get(hash) ?? true;
   }
   details(ref: string): CatalogHit | undefined {
     return this.list().find((h) => h.row.ref === ref || h.entry.aliases.includes(ref) || h.entry.def1Hash === ref.replace(/^sha:/, ''));

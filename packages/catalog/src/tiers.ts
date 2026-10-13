@@ -82,7 +82,9 @@ export class TieredLibrary implements DefLibrary {
   private scratch = new WorldModel({ constants: { ground: 'land', extent: 1000 }, seed: 'tiered' });
   readonly stats = { hot: 0, promoted: 0, loads: 0, bytesLoaded: 0 };
   private reg: Registry;
-  constructor(reg: Registry, hot: Set<string>, channel: 'stable' | 'candidate' = 'stable', entries = reg.current(channel)) {
+  private historical?: (hash: string) => IndexEntry | undefined;
+  constructor(reg: Registry, hot: Set<string>, channel: 'stable' | 'candidate' = 'stable', entries = reg.current(channel), historical?: (hash: string) => IndexEntry | undefined) {
+    this.historical = historical;
     this.reg = reg; this.id = `registry:${channel}`; this.version = String(reg.pointers()[channel]);
     for (const e of entries) { for (const a of e.aliases) this.keys.set(a, e); this.keys.set(`${e.id}@${e.major}`, e); if (e.def1Hash) this.keys.set('sha:' + e.def1Hash, e); }
     for (const e of entries) if (hot.has(e.id)) { this.load(e); this.stats.hot++; }
@@ -98,7 +100,7 @@ export class TieredLibrary implements DefLibrary {
     this.live.set(e.def1Hash, d); return d;
   }
   get(key: string): StoredDef | undefined {
-    const e = this.keys.get(key); if (!e) return undefined;
+    const e = this.keys.get(key) ?? (/^sha:[0-9a-f]{64}$/.test(key) ? this.historical?.(key.slice(4)) : undefined); if (!e) return undefined;
     const was = e.def1Hash ? this.live.has(e.def1Hash) : true;
     const d = this.load(e); if (d && !was) this.stats.promoted++;
     return d;

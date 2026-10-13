@@ -12,3 +12,4 @@ export * from './findability.ts';
 export * from './compat.ts';
 export * from './build.ts';
 export * from './review.ts';
+export * from './pin-seed.ts';
