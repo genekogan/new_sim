@@ -284,7 +284,7 @@ Prayers from Souls queue for you: \`node eden-god.mjs prayers\`, \`answer <id> <
   publicSnapshot() {
     const s = this.model.snapshot();
     const used = new Set(s.entities.map((e) => e.def));
-    for (const e of s.entities) for (const v of Object.values(e.params ?? {})) if (typeof v === 'string' && /@\d+$/.test(v) && this.model.def(v)) used.add(this.model.def(v)!.ref);
+    for (const e of s.entities) for (const v of Object.values(e.params ?? {})) if (typeof v === 'string' && (/@\d+$/.test(v) || /^sha:[0-9a-f]{64}$/.test(v)) && this.model.def(v)) used.add('sha:' + this.model.def(v)!.hash);
     // VOCAB-MECH: a def that extends another (a preset) needs its base to draw: follow the chain
     for (const ref of [...used]) for (let d = this.model.def(ref), n = 0; d?.extends && n < 8; d = this.model.def(d.extends), n++) { const b = this.model.def(d.extends); if (b) used.add(b.ref); }
     const defs = s.defs.filter((d) => used.has(d.ref) || used.has('sha:' + d.hash) || used.has(d.ref.replace(/^core-/, 'core/')));

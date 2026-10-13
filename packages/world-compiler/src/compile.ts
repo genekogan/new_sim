@@ -361,7 +361,7 @@ export function plan(world: WorldModel, input: unknown, by: string, tick: number
   if (scratch.library) {
     const adopt = (ref: string | undefined) => { for (let r = ref, n = 0; r && n < 9; n++) { const got = scratch.adopt(r); if (got) diff.defs.push(got); r = scratch.def(r)?.extends; } };
     for (const d of [...diff.defs]) adopt(d.extends);
-    for (const e of diff.upserts) { adopt(e.def); for (const v of Object.values(e.params ?? {})) if (typeof v === 'string' && /@\d+$/.test(v)) adopt(v); }
+    for (const e of diff.upserts) { adopt(e.def); for (const v of Object.values(e.params ?? {})) if (typeof v === 'string' && (/@\d+$/.test(v) || /^sha:[0-9a-f]{64}$/.test(v))) adopt(v); }
   }
   diff.tiles = [...new Set(diff.tiles)];
   if (layersTouched) diff.layers = true;
