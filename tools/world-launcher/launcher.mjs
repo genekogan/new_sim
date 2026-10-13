@@ -52,6 +52,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 import { FORK_SLUGS, Registry, SLUG_RE, listTemplates, slugFor } from './registry.mjs';
 import { ChildPool, defaultCommand, forkCommand } from './children.mjs';
+import { verifiedCreator } from './creator-auth.mjs';
 import { decorateCommand, memAvailableMb, productionSettings } from './production.mjs';
 // The host check's last result, if the sim-worlds-health timer runs; stale (>30 min) counts as not ok.
 function hostHealth(dataDir) {
@@ -134,18 +135,12 @@ export async function openLauncher(cfg = {}) {
 
   // ---------- create
   let creating = Promise.resolve();
-  /** Under Clerk, cheaply refuse a bad creator token before booting anything (when some world is awake to ask). */
-  async function creatorOk(authorization) {
-    const awake = registry.worlds.map((w) => ({ w, s: pool.status(w.slug) })).find((x) => x.s.status === 'running');
-    if (!awake) return true;  // nobody to ask yet: the claim after boot decides
-    try { const r = await fetch(`http://127.0.0.1:${awake.s.port}${wp(awake.w.slug)}/v1/account/session`, { headers: { authorization }, signal: AbortSignal.timeout(5000) }); return r.status !== 401; }
-    catch { return true; }
-  }
   /** `op.owner`: the operator's create (direct loopback only, below): the world is born owned by that existing account
    *  (WORLD_OWNER_ID on its first boot only matters while it has no store yet), with no sign-in and no claim. */
   async function createWorld(body, authorization, op = null) {
     if (!op && auth && !/^Bearer\s+\S+/i.test(authorization ?? '')) return [401, { ok: false, code: 'signin-required', message: 'sign in first: a new world belongs to whoever makes it' }];
-    if (!op && auth && !(await creatorOk(authorization))) return [401, { ok: false, code: 'signin-required', message: 'your sign-in was not accepted; sign in again' }];
+    const creator = !op && auth ? await verifiedCreator(authorization, auth.child, publicOrigin, root) : null;
+    if (!op && auth && !creator) return [401, { ok: false, code: 'signin-required', message: 'your sign-in was not accepted; sign in again' }];
     const name = typeof body?.name === 'string' ? body.name.trim().replace(/\s+/g, ' ') : '';
     if (!name || name.length > 60) return [400, { ok: false, code: 'invalid', message: 'name: 1–60 characters' }];
     const templates = listTemplates(templatesDir);
@@ -159,7 +154,8 @@ export async function openLauncher(cfg = {}) {
     mkdirSync(registry.worldDir(slug), { recursive: true });
     registry.add(entry);
     const t0 = performance.now();
-    try { await pool.ensure(op ? { ...worldEnv(entry), bornOwner: op.owner } : worldEnv(entry)); }
+    const bornOwner = op?.owner ?? creator;
+    try { await pool.ensure(bornOwner ? { ...worldEnv(entry), bornOwner } : worldEnv(entry)); }
     catch (e) {
       await pool.stop(slug); pool.kids.delete(slug); registry.remove(slug); rmSync(registry.worldDir(slug), { recursive: true, force: true });
       if (e.code === 'capacity') return [503, { ok: false, code: 'capacity', message: e.message }];
@@ -178,7 +174,7 @@ export async function openLauncher(cfg = {}) {
       const port = pool.status(slug).port;
       const r = await fetch(`http://127.0.0.1:${port}${wp(slug)}/v1/god/claim`, { method: 'POST', headers: { authorization, 'content-type': 'application/json' }, body: '{}', signal: AbortSignal.timeout(15_000) }).catch((e) => ({ ok: false, status: 0, json: async () => ({ message: e.message }) }));
       const d = await r.json().catch(() => ({}));
-      if (r.ok) owner = d.owner ?? null;
+      if (r.ok && (!creator || d.owner === creator)) owner = d.owner ?? null;
       else if (auth) {
         await pool.stop(slug); pool.kids.delete(slug); registry.remove(slug); rmSync(registry.worldDir(slug), { recursive: true, force: true });
         return [r.status === 403 ? 403 : 401, { ok: false, code: 'signin-required', message: `the new world could not make you its god: ${d.message ?? r.status}; sign in again and retry` }];

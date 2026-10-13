@@ -1,4 +1,4 @@
-// node --test tools/world-launcher/op.test.mjs — the operator's create-world (lane RELEASE ports: proxy 5640, children 5641–5645).
+// node --test tools/world-launcher/op.test.mjs — the operator's create-world (lane RELEASE ports: proxy 6230, children 6231–6235).
 // A stand-in world writes its owner into sim.db the way GodMode does on first boot (WORLD_OWNER_ID), then runs fake-world.
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -10,7 +10,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { openLauncher } from './launcher.mjs';
 import { defaultCommand } from './children.mjs';
 
-const PORT = 5640, RANGE = [5641, 5645];
+const PORT = 6230, RANGE = [6231, 6235];
 const dir = mkdtempSync(join(tmpdir(), 'launcher-op-test-'));
 const templatesDir = join(dir, 'templates'); mkdirSync(templatesDir);
 writeFileSync(join(templatesDir, 'arium.json'), JSON.stringify({ schema: 'genesis/1', name: 'Arium', description: 'x', batches: [] }));

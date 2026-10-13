@@ -1,16 +1,16 @@
 // node --test tools/world-launcher/launcher-auth.test.mjs
-// The launcher in Clerk mode with real Sim world processes (fake minds, $0) on lane P1's ports: proxy :5219,
-// children 5210–5218. A synthetic Clerk issuer: the children get it from a test env file by path, plus a
+// The launcher in Clerk mode with real Sim world processes (fake minds, $0) on lane ports: proxy :6139,
+// children 6130–6138. A synthetic Clerk issuer: the children get it from a test env file by path, plus a
 // test-only preload that serves its JWKS (no network, no provider keys).
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readdirSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { openLauncher } from './launcher.mjs';
 import { clerkKeys, ISSUER, PUBLISHABLE_KEY } from '../../apps/server/test/clerk-fixture.ts';
 
-const PORT = 5219, RANGE = [5210, 5218], ORIGIN = `http://127.0.0.1:${PORT}`;
+const PORT = 6139, RANGE = [6130, 6138], ORIGIN = `http://127.0.0.1:${PORT}`;
 const dir = mkdtempSync(join(tmpdir(), 'launcher-auth-test-'));
 const templatesDir = join(dir, 'templates'); mkdirSync(templatesDir);
 const preload = new URL('../../apps/server/test/clerk-jwks-preload.mjs', import.meta.url).pathname;
@@ -38,17 +38,17 @@ test('Clerk launcher: homepage gets only the public Clerk settings; creating nee
   assert.equal((await getJson('/__sim/worlds.json')).worlds.length, 0);
 });
 
-test('Clerk launcher: a dev token cannot make a world (refused by the new world, which is then removed)', async () => {
+test('Clerk launcher: a dev token cannot allocate a first world', async () => {
   const r = await create('Dev World', 'dev:gene');
-  assert.equal(r.status, 401); assert.match((await r.json()).message, /could not make you its god/);
+  assert.equal(r.status, 401); assert.match((await r.json()).message, /sign-in was not accepted/);
   assert.equal((await getJson('/__sim/worlds.json')).worlds.length, 0);
-  assert.deepEqual(readdirSync(join(dir, 'data', 'worlds')).filter((d) => d.startsWith('dev-world')), []);
+  assert.deepEqual(existsSync(join(dir, 'data', 'worlds')) ? readdirSync(join(dir, 'data', 'worlds')).filter((d) => d.startsWith('dev-world')) : [], []);
 });
 
 test('Clerk launcher: the signed-in creator is the god at birth; others are visitors; dev tokens are nobody', { timeout: 240_000 }, async () => {
   const alice = await sign('user_alice'), bob = await sign('user_bob');
   const r = await create('Alice Hollow', alice);
-  assert.equal(r.status, 201); const made = await r.json();
+  const made = await r.json(); assert.equal(r.status, 201, JSON.stringify(made));
   assert.equal(made.claimed, true); assert.equal(made.url, `/w/${made.slug}/?new=1`);
   const base = `/w/${made.slug}`;
   const cfg = await getJson(`${base}/v1/config`);
