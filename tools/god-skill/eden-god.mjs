@@ -586,24 +586,50 @@ function solve(v, thing, rel) {
     }
     const faces = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([a, b]) => rot(hb.yaw, a, b));
     const nrm = faces.sort((a, b) => b[0] * u[0] + b[1] * u[1] - (a[0] * u[0] + a[1] * u[1]))[0];
-    const yaw2 = finalYaw(0, 0, yawOf(nrm[0], nrm[1]));
+    const yaw2 = r22(finalYaw(0, 0, yawOf(nrm[0], nrm[1])));
     const meB = mine(0, 0, yaw2);
     const dist = extentAlong(hb, nrm) + extentAlong(meB, nrm) + Number(rel.gap ?? 0.05);
     const n = Number(rel.count ?? rel.row ?? 1);
     const tang = [-nrm[1], nrm[0]];
-    const myW = extentAlong(meB, tang) * 2, step = myW + Number(rel.gap ?? 0.3);
-    const items2 = [];
+    const myW = extentAlong(meB, tang) * 2, step = myW + Number(rel.gap ?? 0.3), wallHalf = extentAlong(hb, tang);
+    const number = (key) => {
+      const value = rel[key];
+      if (Array.isArray(value) || typeof value === "boolean" || String(value).trim() === "" || !Number.isFinite(Number(value))) throw new Error(`--against --${key} takes one finite number`);
+      return Number(value);
+    };
+    if (rel.offset !== void 0 && rel.t !== void 0) throw new Error("--against takes --offset or --t, not both");
+    const t = rel.t !== void 0 ? number("t") : void 0;
+    if (t !== void 0 && (t < 0 || t > 1)) throw new Error("--against --t must be between 0 and 1");
+    const offset = rel.offset !== void 0 ? number("offset") : t !== void 0 ? (t - 0.5) * 2 * wallHalf : 0;
+    const limit = wallHalf - myW / 2;
+    const doorZones = (host.doors ?? []).filter((d) => d.out && (d.level ?? 0) === 0).map((d) => {
+      const f = dirOfYaw(d.yaw);
+      return { id: d.id, c: [d.at[0] + f[0] * 1.25, d.at[1] + f[1] * 1.25], half: [d.width / 2 + 0.35, 1.25], yaw: d.yaw };
+    });
+    const items2 = [], placed = [];
+    let keptDoor = null;
     for (let k = 0; k < n; k++) {
-      const off = (k - (n - 1) / 2) * step;
-      const x = hb.c[0] + nrm[0] * dist + tang[0] * off, z = hb.c[1] + nrm[1] * dist + tang[1] * off;
+      const off = offset + (k - (n - 1) / 2) * step;
+      if (Math.abs(off) > limit + 1e-6) throw new Error(`--against --offset/--t places item ${k + 1} beyond ${host.path}'s side; its centre must be within ${r22(Math.max(0, limit))} m of the side centre`);
       const cands = [];
-      for (const slide of [0, 1, -1, 2, -2]) {
-        const xx = x + tang[0] * slide * (myW + 0.3), zz = z + tang[1] * slide * (myW + 0.3);
-        if (slide && !free(xx, zz, yaw2)) continue;
-        cands.push(pose(xx, zz, yaw2, { note: `against ${host.path}'s ${compassOfYaw(yawOf(nrm[0], nrm[1]))} side${slide ? " (slid along it)" : ""}`, constraints: [{ kind: "near", ref: host.path, dist: 0.5 }] }));
+      for (const slide of steps(2 * wallHalf, 0.25)) {
+        const along = off + slide;
+        if (Math.abs(along) > limit + 1e-6) continue;
+        const x = r22(hb.c[0] + nrm[0] * dist + tang[0] * along), z = r22(hb.c[1] + nrm[1] * dist + tang[1] * along), b = mine(x, z, r22(yaw2));
+        const door = doorZones.find((dz) => obbHit(b, dz));
+        if (door) {
+          keptDoor = door.id;
+          continue;
+        }
+        if (solid && blockers(v, b, skip, 0).length || placed.some((p) => obbHit(b, p, 0.1))) continue;
+        cands.push(pose(x, z, yaw2, { note: `against ${host.path}'s ${compassOfYaw(yawOf(nrm[0], nrm[1]))} side, ${r22(along)} m along from centre${slide ? ` (slid along it by ${r22(slide)} m)` : ""}`, constraints: [{ kind: "near", ref: host.path, dist: 0.5 }] }));
+        if (cands.length >= 5) break;
       }
+      if (!cands.length) throw new Error(`no clear place against ${host.path}'s side within the wall; doorways and obstacles must stay clear${keptDoor ? ` (doorway ${keptDoor})` : ""}`);
+      placed.push(mine(cands[0].p[0], cands[0].p[1], cands[0].r));
       items2.push({ candidates: cands });
     }
+    if (keptDoor) notes.push(`kept ${host.path}'s doorway ${keptDoor} clear`);
     return { items: items2, notes };
   }
   if (rel.between) {
@@ -909,6 +935,14 @@ function solveInRoom(v, host, room, thing, rel, ctx) {
     if (items.length < n) notes.push(`only ${items.length} of ${n} fit ${what} in ${label}`);
     return { items, notes };
   };
+  if (rel.at !== void 0) {
+    if (rel.wall || rel.corner || n !== 1) throw new Error("--inside --at takes one exact world point; omit --wall, --corner and --count > 1");
+    const p = refPoint(v, rel.at, rel.offset), local = toLocal(F, p.x, p.z).map(r22);
+    if (!inPoly(local[0], local[1], poly)) throw new Error(`requested --at (${p.x}, ${p.z}) is outside room ${label}`);
+    const ly2 = yawAt(local[0], local[1], baseYaw !== void 0 ? baseYaw - F.RY : 0), reason = why(local[0], local[1], ly2);
+    if (reason) throw new Error(`cannot place at requested world point (${p.x}, ${p.z}) in ${label}: ${reason}`);
+    return { items: [{ candidates: [at(local[0], local[1], ly2, `at world (${p.x}, ${p.z})`)] }], notes };
+  }
   const fL = dirOfYaw((host.front ?? host.pose[3]) - F.PY);
   const dirWord = (w) => {
     const rd = sideDir(w, fL);
@@ -1275,13 +1309,15 @@ function findPlaywright() {
   }
   return null;
 }
-function camera({ target, span, from = "s", dist, inside = false, height }) {
+function camera({ target, span, from = "s", dist, inside = false, height, tight = false }) {
   const key = from === "above" || from === "top" ? "above" : compassKey(from) ?? "s";
-  const d = dist ?? Math.max(16, span * (inside ? 1 : 1.2) + 8);
+  const d = dist ?? (tight ? span * 1.2 : Math.max(16, span * (inside ? 1 : 1.2) + 8));
   const el = key === "above" ? 1.35 : inside ? 0.95 : 0.5;
   const u = key === "above" ? [0, 0.08] : COMPASS[key];
-  const eye = [target[0] + u[0] * Math.cos(el) * d, target[1] + (height ?? Math.sin(el) * d), target[2] + u[1] * Math.cos(el) * d];
-  return { eye: eye.map((v) => Math.round(v * 10) / 10), at: target.map((v) => Math.round(v * 10) / 10), from: key };
+  const at = target.map((v) => Math.round(v * 10) / 10), origin = tight ? at : target;
+  const eye = [origin[0] + u[0] * Math.cos(el) * d, origin[1] + (height ?? Math.sin(el) * d), origin[2] + u[1] * Math.cos(el) * d];
+  const precision = tight ? 1e6 : 10;
+  return { eye: eye.map((v) => Math.round(v * precision) / precision), at, from: key };
 }
 var freePort = () => new Promise((res, rej) => {
   const s = createServer();
@@ -1364,26 +1400,30 @@ function stopKeeper() {
   rmSync2(KEEPER, { force: true });
   return k ? `stopped the look keeper (pid ${k.pid})` : "no look keeper running";
 }
-async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = null, span = 0, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 6e5), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }) {
+async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = null, span = 0, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 6e5), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }, runtime = {}) {
   mkdirSync2(dirname(resolve(out)), { recursive: true });
-  const t0 = Date.now();
-  const pw = findPlaywright();
+  const now = runtime.now ?? Date.now, wait = runtime.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  const t0 = now();
+  const pw = runtime.pw ?? findPlaywright();
   if (!pw) {
     if (keep) throw new Error("look --keep needs a Playwright package (npm i playwright-core here) and npx could not fetch one; look without --keep works");
-    const q = new URLSearchParams({ shot: "1", eye: eye.join(","), at: at.join(","), ...hideRoofs ? { hideRoofs: "1", ...cut !== null ? { cut: String(cut) } : {} } : {} });
-    const r = spawnSync("npx", ["-y", "playwright-core@1", "screenshot", "--channel", "chrome", "--wait-for-timeout", "30000", "--viewport-size", "1024,640", `${worldUrl}?${q}`, resolve(out)], { stdio: "pipe", encoding: "utf8", timeout: timeoutMs });
+    const q2 = new URLSearchParams({ shot: "1", eye: eye.join(","), at: at.join(","), ...hideRoofs ? { hideRoofs: "1", ...cut !== null ? { cut: String(cut) } : {} } : {} });
+    const r = spawnSync("npx", ["-y", "playwright-core@1", "screenshot", "--channel", "chrome", "--wait-for-timeout", "30000", "--viewport-size", "1024,640", `${worldUrl}?${q2}`, resolve(out)], { stdio: "pipe", encoding: "utf8", timeout: timeoutMs });
     if (r.status !== 0) throw new Error(`look: no Playwright found and npx playwright-core failed: ${(r.stderr || r.stdout || "").slice(0, 300)}. Install one (npm i -g playwright-core) and Google Chrome`);
-    return { file: resolve(out), ms: Date.now() - t0, via: "npx playwright-core screenshot" };
+    return { file: resolve(out), ms: now() - t0, via: "npx playwright-core screenshot" };
   }
   let page, browser, release = () => {
   };
+  const q = new URLSearchParams({ shot: "1", eye: eye.join(","), at: at.join(","), settle: "1500", ...hideRoofs ? { hideRoofs: "1", ...cut !== null ? { cut: String(cut) } : {} } : {} });
   if (keep) {
-    const k = await ensureKeeper(worldUrl, cliPath ?? process.argv[1]);
+    const k = await (runtime.ensureKeeper ?? ensureKeeper)(worldUrl, cliPath ?? process.argv[1]);
     browser = await pw.chromium.connectOverCDP(`http://127.0.0.1:${k.port}`, { timeout: 6e4 });
     page = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(worldUrl));
     if (!page) throw new Error("look: the keeper has no world tab; run `look --stop` and look again");
+    const current = new URL(page.url()).searchParams;
+    if (!current.has("eye") || !current.has("at")) await page.goto(`${worldUrl}?${q}`, { waitUntil: "commit", timeout: timeoutMs });
   } else {
-    release = await chromeLease2("eden-god look");
+    release = await (runtime.lease ?? chromeLease2)("eden-god look");
     browser = await pw.chromium.launch({ channel: "chrome", headless: true, args: GL_ARGS }).catch((e) => {
       release();
       throw new Error(`look: cannot start Chrome (${String(e.message).split("\n")[0]}); install Google Chrome`);
@@ -1391,28 +1431,28 @@ async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = null, sp
     const ctx = await browser.newContext({ viewport: { width, height } });
     await ctx.addInitScript(PRESERVE);
     page = await ctx.newPage();
-    const q = new URLSearchParams({ shot: "1", eye: eye.join(","), at: at.join(","), settle: "1500", ...hideRoofs ? { hideRoofs: "1", ...cut !== null ? { cut: String(cut) } : {} } : {} });
     await page.goto(`${worldUrl}?${q}`, { waitUntil: "commit", timeout: timeoutMs });
   }
   try {
-    const deadline = Date.now() + timeoutMs;
+    const deadline = now() + timeoutMs;
     let state = null, stable = 0, lastDrawn = -1;
-    while (Date.now() < deadline) {
+    while (now() < deadline) {
       state = await page.evaluate((want) => {
         const w = window.__simEntity;
         if (!w?.layer?.active) return { ready: false, why: document.title === "no-entity-world" ? "no entity world on this page" : "loading the viewer" };
         const drawn = w.layer.drawn;
-        const now = w.layer.now ?? performance.now();
-        const easing = drawn ? [...drawn.values()].filter((d) => (now - d.t0) / 1e3 < d.dur).length : 0;
-        return { ready: (!want || (drawn?.size ?? 0) >= Math.floor(want * 0.6)) && easing === 0, drawn: drawn?.size ?? null, want, easing, shotReady: !!window.__shotReady };
+        const now2 = w.layer.now ?? performance.now();
+        const easing = drawn ? [...drawn.values()].filter((d) => (now2 - d.t0) / 1e3 < d.dur).length : 0;
+        return { ready: !!window.__shotReady && (!want || (drawn?.size ?? 0) >= Math.floor(want * 0.6)) && easing === 0, drawn: drawn?.size ?? null, want, easing, shotReady: !!window.__shotReady };
       }, expect).catch((e) => ({ ready: false, why: String(e.message).slice(0, 80) }));
       if (state.ready && state.drawn === lastDrawn) stable++;
       else stable = 0;
       lastDrawn = state.drawn ?? -1;
       if (state.ready && stable >= 2) break;
       if (state.why === "no entity world on this page") throw new Error("look: this world has no entity layer");
-      await new Promise((r) => setTimeout(r, 1e3));
+      await wait(1e3);
     }
+    if (!state?.ready || stable < 2) throw new Error(`look: viewer did not initialize and settle before timeout (${JSON.stringify(state)})`);
     const frames = await page.evaluate(([e0, a, roofs, cutAt, fitSpan]) => new Promise((res) => {
       const w = window.__simEntity;
       let e = e0;
@@ -1421,6 +1461,8 @@ async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = null, sp
         const need2 = fitSpan / 2 / Math.tan(Math.min(v, h) / 2) * 1.05, d = [e0[0] - a[0], e0[1] - a[1], e0[2] - a[2]], len = Math.hypot(...d) || 1;
         if (len < need2) e = d.map((c, i) => a[i] + c / len * need2);
       }
+      const eyeDistance = Math.hypot(...e.map((c, i) => c - a[i]));
+      if (!e.every(Number.isFinite) || !a.every(Number.isFinite) || !Number.isFinite(eyeDistance) || eyeDistance <= Math.max(0, w.camera.near ?? 0)) throw Error("Requested look camera is within the viewer near clipping plane");
       window.__buildingView = roofs ? { hideRoofs: true, cut: cutAt } : { hideRoofs: false, cut: null };
       w.controls.target.set(a[0], a[1], a[2]);
       w.camera.position.set(e[0], e[1], e[2]);
@@ -1456,21 +1498,25 @@ async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = null, sp
       let n = 0;
       const t = performance.now();
       const tick = () => {
-        if (++n >= 4 || performance.now() - t > 12e4) res({ n, ms: Math.round(performance.now() - t), roofsHidden: hidden.length, eye: e.map((c) => Math.round(c * 10) / 10) });
+        if (++n >= 4 || performance.now() - t > 12e4) res({ n, ms: Math.round(performance.now() - t), roofsHidden: hidden.length, eye: e, at: a });
         else requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
     }), [eye, at, hideRoofs, cut, span]);
     await page.waitForTimeout(settleMs);
-    const data = await page.evaluate(() => {
-      const c = [...document.querySelectorAll("canvas")].sort((a, b) => b.width * b.height - a.width * a.height)[0];
-      const d = c ? c.toDataURL("image/png") : null;
-      window.__lookRestore?.();
-      return d;
-    });
+    const data = await page.evaluate(({ eye: eye2, at: at2 }) => {
+      try {
+        const w = window.__simEntity, close = (v, want) => v?.toArray().every((c2, i) => Number.isFinite(c2) && Math.abs(c2 - want[i]) <= 1e-4);
+        if (!window.__shotReady || !close(w?.camera?.position, eye2) || !close(w?.controls?.target, at2)) throw Error("look: requested camera changed before capture; retry the shot");
+        const c = [...document.querySelectorAll("canvas")].sort((a, b) => b.width * b.height - a.width * a.height)[0];
+        return c ? c.toDataURL("image/png") : null;
+      } finally {
+        window.__lookRestore?.();
+      }
+    }, frames);
     if (!data) throw new Error("look: no canvas on the page");
     writeFileSync4(resolve(out), Buffer.from(data.split(",")[1], "base64"));
-    return { file: resolve(out), ms: Date.now() - t0, state, frames, via: keep ? "keeper" : "chrome" };
+    return { file: resolve(out), ms: now() - t0, state, frames, via: keep ? "keeper" : "chrome" };
   } finally {
     if (!keep) {
       await browser.close().catch(() => {
@@ -2291,7 +2337,10 @@ async function commitItems(v, def, info, flags2, params, items, notes, { op = "p
     return msg + (fixes.some((x) => x.length) ? `
   tried: ${fixes.flat().join("; ")}` : "");
   }
-  if (flags2.dry || flags2.plan) return flags2.json ? { dry: true, ops, notes } : [`dry run OK (nothing built): ${ops.length} op(s)`, ...ops.map((o) => "  " + JSON.stringify(o))].join("\n");
+  if (flags2.dry || flags2.plan) {
+    const tells = flags2.against ? [...notes, ...items.map((it, k) => it.candidates[choice[k]].note)] : notes;
+    return flags2.json ? { dry: true, ops, notes: tells } : [`dry run OK (nothing built): ${ops.length} op(s)`, ...ops.map((o) => "  " + JSON.stringify(o)), ...tells.map((note) => `  note: ${note}`)].join("\n");
+  }
   const res = await act({ ops, ...flags2.group ? { group: flags2.group } : {} }, flags2.note);
   if (!res.accepted) return `REFUSED at commit: ${res.failures.map(explainFailure).join("; ")}`;
   if (flags2.json) return { ...res, ops };
@@ -2554,11 +2603,12 @@ async function select(flags2 = {}) {
   const res = await act({ ops: ops.slice(0, 256) }, flags2.note ?? `bulk ${flags2.remove ? "remove" : "edit"} of ${rows.length}`);
   return res.accepted ? `${flags2.remove ? "removed" : "changed"} ${ops.length} thing(s) in one batch (seq ${res.seq})${ops.length > 256 ? " \u2014 first 256 only; run again" : ""}` : `REFUSED: ${res.failures.map(explainFailure).join("; ")}`;
 }
-async function look(flags2 = {}) {
-  if (flags2.stop) return stopKeeper();
-  const m = await mirror();
-  const v = view(m);
-  let target, span;
+function lookFrame(v, extent, flags2 = {}) {
+  for (const key of ["dist", "span"]) if (flags2[key] !== void 0 && (Array.isArray(flags2[key]) || typeof flags2[key] === "boolean" || String(flags2[key]).trim() === "" || !Number.isFinite(Number(flags2[key])) || Number(flags2[key]) <= 0)) {
+    throw Error(`look --${key} takes one finite positive number`);
+  }
+  const dist = flags2.dist !== void 0 ? num(flags2.dist) : void 0, explicitSpan = flags2.span !== void 0;
+  let target, span, coordinate = false;
   if (flags2.at) {
     const p = refPoint(v, flags2.at);
     if (p.kind === "entity") {
@@ -2567,10 +2617,11 @@ async function look(flags2 = {}) {
       span = Math.max(x1 - x0, z1 - z0, 4);
     } else {
       target = [p.x, 0, p.z];
-      span = flags2.span ? num(flags2.span) : 40;
+      span = 40;
+      coordinate = true;
     }
   } else {
-    const roots = v.rows.filter((r) => r.parent === "world" && !isFlagDef(v.def(r.def)?.ref ?? r.def) && !(r.shape && r.aabb[2] - r.aabb[0] > m.extent * 0.6));
+    const roots = v.rows.filter((r) => r.parent === "world" && !isFlagDef(v.def(r.def)?.ref ?? r.def) && !(r.shape && r.aabb[2] - r.aabb[0] > extent * 0.6));
     if (!roots.length) {
       target = [0, 0, 0];
       span = 160;
@@ -2580,14 +2631,27 @@ async function look(flags2 = {}) {
       span = Math.max(30, x1 - x0, z1 - z0);
     }
   }
+  if (explicitSpan) span = num(flags2.span);
+  return {
+    target,
+    span,
+    dist,
+    fitSpan: flags2.inside || coordinate && dist !== void 0 && !explicitSpan ? 0 : span,
+    tight: explicitSpan && dist === void 0 && !flags2.inside
+  };
+}
+async function look(flags2 = {}) {
+  if (flags2.stop) return stopKeeper();
+  const m = await mirror();
+  const v = view(m);
+  const { target, span, dist, fitSpan, tight } = lookFrame(v, m.extent, flags2);
   if (target[1] === 0 || flags2.at === void 0 || !Number.isFinite(target[1])) {
     const g = (await query({ points: [[target[0], target[2]]] })).points[0];
     target[1] = Math.max(g.y, g.y + (g.water > 0 ? g.water : 0));
   }
-  if (flags2.span) span = num(flags2.span);
-  const cam = camera({ target, span, from: flags2.from ?? "s", dist: flags2.dist ? num(flags2.dist) : void 0, inside: !!flags2.inside, height: flags2.height ? num(flags2.height) : void 0 });
+  const cam = camera({ target, span, from: flags2.from ?? "s", dist, tight, inside: !!flags2.inside, height: flags2.height ? num(flags2.height) : void 0 });
   const out = resolve2(flags2.out ?? `looks/look-${(/* @__PURE__ */ new Date()).toISOString().replace(/[:.]/g, "-").slice(0, 19)}.png`);
-  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags2.inside || flags2["hide-roofs"] || flags2.floor !== void 0), cut: flags2.floor !== void 0 ? num(flags2.floor) : null, span: flags2.inside ? 0 : span, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags2.keep, ...flags2.width ? { width: num(flags2.width) } : {}, ...flags2.h ? { height: num(flags2.h) } : {} };
+  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags2.inside || flags2["hide-roofs"] || flags2.floor !== void 0), cut: flags2.floor !== void 0 ? num(flags2.floor) : null, span: fitSpan, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags2.keep, ...flags2.width ? { width: num(flags2.width) } : {}, ...flags2.h ? { height: num(flags2.h) } : {} };
   let shot;
   if (!flags2.keep) shot = await shoot(args);
   else {
@@ -2781,6 +2845,7 @@ function checkArgs(cmd, f, rest) {
     for (const x of [].concat(v)) {
       if (x === true && !BOOL.has(k) && !(cmd === "look" && k === "inside") && !(cmd === "undo" && k === "group") && !(k === "free")) throw new Error(`--${k} needs a value`);
       if (NUMERIC.has(k) && x !== true && !Number.isFinite(Number(x))) throw new Error(`--${k} takes a number, got "${x}"`);
+      if (cmd === "look" && ["dist", "span"].includes(k) && (Array.isArray(v) || x === true || String(x).trim() === "" || Number(x) <= 0)) throw new Error(`look --${k} takes one finite positive number`);
       if (k === "param" && (typeof x !== "string" || !/^[A-Za-z][\w-]*=/.test(x))) throw new Error(`--param takes key=value (one per --param), got "${x}"`);
       if ((k === "by" || k === "step") && cmd !== "land" && !/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(String(x))) throw new Error(`--${k} takes dx,dz (e.g. --${k} 1.5,-2), got "${x}"`);
       if (k === "grid" && !/^\d+[x×]\d+$/.test(String(x))) throw new Error(`--grid takes WxH (e.g. 3x2), got "${x}"`);
@@ -2872,8 +2937,10 @@ var COMMANDS = {
   help: () => HELP
 };
 var HELP = `eden-god ${SKILL_VERSION} \u2014 god mode for one Eden world. Read SKILL.md.
-read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] \xB7 map \xB7 defs <words> \xB7 describe <ref> \xB7 where <x,z|ref> \xB7 free WxD [--near ref] \xB7 look [--at ref] [--from s|n|e|w|above] [--inside [--floor k]] \xB7 history \xB7 resolve \xB7 schema [--md]
-build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--wall back|front|left|right|n\u2026] [--corner back-left|\u2026] | --on table|pier|house/balcony [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--scale s (defs <name> shows its range)] [--dry]
+read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] \xB7 map \xB7 defs <words> \xB7 describe <ref> \xB7 where <x,z|ref> \xB7 free WxD [--near ref] \xB7 look [--at ref|x,z] [--from s|n|e|w|above] [--dist m] [--span m] [--inside [--floor k]] \xB7 history \xB7 resolve \xB7 schema [--md]
+look:   --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane.
+build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--at x,z] [--wall back|front|left|right|n\u2026] [--corner back-left|\u2026] | --on table|pier|house/balcony [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] [--offset m|--t 0..1] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--scale s (defs <name> shows its range)] [--dry]
+place:  --against offset is signed metres from the side centre (positive toward e/s/w/n on n/e/s/w sides; rotated sides follow their face tangent). --t runs from 0 to 1 along the full side. Doorways/obstacles cause a reported slide within the side or a refusal. --inside --at uses a world point, including --offset dx,dz; outside, blocked, or conflicting wall/corner/count requests are refused.
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],\u2026]' \xB7 place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],\u2026]'
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen \xB7 set <ref> --param k=v --state '{\u2026}' \xB7 recolor <ref> #hex \xB7 remove <ref>\u2026 \xB7 clone <ref> [--at] [--count n --step dx,dz] \xB7 select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> \xB7 group --off \xB7 undo [--group name] \xB7 redo
@@ -2962,6 +3029,7 @@ export {
   history,
   importWorld,
   look,
+  lookFrame,
   map,
   mint,
   mirror,

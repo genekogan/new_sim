@@ -364,7 +364,10 @@ async function commitItems(v, def, info, flags, params, items, notes, { op = 'pl
     if (flags.json) return { accepted: false, failures: r.failures, ops };
     return msg + (fixes.some((x) => x.length) ? `\n  tried: ${fixes.flat().join('; ')}` : '');
   }
-  if (flags.dry || flags.plan) return flags.json ? { dry: true, ops, notes } : [`dry run OK (nothing built): ${ops.length} op(s)`, ...ops.map((o) => '  ' + JSON.stringify(o))].join('\n');
+  if (flags.dry || flags.plan) {
+    const tells = flags.against ? [...notes, ...items.map((it, k) => it.candidates[choice[k]].note)] : notes;
+    return flags.json ? { dry: true, ops, notes: tells } : [`dry run OK (nothing built): ${ops.length} op(s)`, ...ops.map((o) => '  ' + JSON.stringify(o)), ...tells.map((note) => `  note: ${note}`)].join('\n');
+  }
   const res = await act({ ops, ...(flags.group ? { group: flags.group } : {}) }, flags.note);
   if (!res.accepted) return `REFUSED at commit: ${res.failures.map(explainFailure).join('; ')}`;
   if (flags.json) return { ...res, ops };
@@ -547,25 +550,38 @@ export async function select(flags = {}) {
 }
 
 // ---------------------------------------------------------------- look
-/** look [--at ref|x,z] [--from n|e|s|w|ne…|above] [--dist m] [--inside] [--out file]: a screenshot to read. */
-export async function look(flags = {}) {
-  if (flags.stop) return stopKeeper();
-  const m = await mirror(); const v = view(m);
-  let target, span;
+/** Resolve ordinary look framing without HTTP or folder state. */
+export function lookFrame(v, extent, flags = {}) {
+  for (const key of ['dist', 'span']) if (flags[key] !== undefined &&
+    (Array.isArray(flags[key]) || typeof flags[key] === 'boolean' || String(flags[key]).trim() === '' || !Number.isFinite(Number(flags[key])) || Number(flags[key]) <= 0)) {
+    throw Error(`look --${key} takes one finite positive number`);
+  }
+  const dist = flags.dist !== undefined ? num(flags.dist) : undefined, explicitSpan = flags.span !== undefined;
+  let target, span, coordinate = false;
   if (flags.at) {
     const p = refPoint(v, flags.at);
     if (p.kind === 'entity') { const [x0, z0, x1, z1] = p.row.aabb; target = [p.x, p.row.y?.[0] ?? p.row.pose[1], p.z]; span = Math.max(x1 - x0, z1 - z0, 4); }
-    else { target = [p.x, 0, p.z]; span = flags.span ? num(flags.span) : 40; }
+    else { target = [p.x, 0, p.z]; span = 40; coordinate = true; }
   } else {
-    const roots = v.rows.filter((r) => r.parent === 'world' && !isFlagDef(v.def(r.def)?.ref ?? r.def) && !(r.shape && r.aabb[2] - r.aabb[0] > m.extent * 0.6));
+    const roots = v.rows.filter((r) => r.parent === 'world' && !isFlagDef(v.def(r.def)?.ref ?? r.def) && !(r.shape && r.aabb[2] - r.aabb[0] > extent * 0.6));
     if (!roots.length) { target = [0, 0, 0]; span = 160; }
     else { const x0 = Math.min(...roots.map((r) => r.aabb[0])), z0 = Math.min(...roots.map((r) => r.aabb[1])), x1 = Math.max(...roots.map((r) => r.aabb[2])), z1 = Math.max(...roots.map((r) => r.aabb[3])); target = [(x0 + x1) / 2, 0, (z0 + z1) / 2]; span = Math.max(30, x1 - x0, z1 - z0); }
   }
+  if (explicitSpan) span = num(flags.span);
+  // A coordinate has no object to fit. Only an explicit span can override its requested distance.
+  // Named entities/sets retain auto-fit; an explicit span is always a minimum fit outside rooms.
+  return { target, span, dist, fitSpan: flags.inside || (coordinate && dist !== undefined && !explicitSpan) ? 0 : span,
+    tight: explicitSpan && dist === undefined && !flags.inside };
+}
+/** look [--at ref|x,z] [--from n|e|s|w|ne…|above] [--dist m] [--span m] [--inside] [--out file]: a screenshot to read. */
+export async function look(flags = {}) {
+  if (flags.stop) return stopKeeper();
+  const m = await mirror(); const v = view(m);
+  const { target, span, dist, fitSpan, tight } = lookFrame(v, m.extent, flags);
   if (target[1] === 0 || flags.at === undefined || !Number.isFinite(target[1])) { const g = (await query({ points: [[target[0], target[2]]] })).points[0]; target[1] = Math.max(g.y, g.y + (g.water > 0 ? g.water : 0)); }
-  if (flags.span) span = num(flags.span);
-  const cam = camera({ target, span, from: flags.from ?? 's', dist: flags.dist ? num(flags.dist) : undefined, inside: !!flags.inside, height: flags.height ? num(flags.height) : undefined });
+  const cam = camera({ target, span, from: flags.from ?? 's', dist, tight, inside: !!flags.inside, height: flags.height ? num(flags.height) : undefined });
   const out = resolve(flags.out ?? `looks/look-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)}.png`);
-  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags.inside || flags['hide-roofs'] || flags.floor !== undefined), cut: flags.floor !== undefined ? num(flags.floor) : null, span: flags.inside ? 0 : span, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
+  const args = { worldUrl: load().world, eye: cam.eye, at: cam.at, out, hideRoofs: !!(flags.inside || flags['hide-roofs'] || flags.floor !== undefined), cut: flags.floor !== undefined ? num(flags.floor) : null, span: fitSpan, expect: m.snapshot.entities.length, cliPath: SELF, keep: !!flags.keep, ...(flags.width ? { width: num(flags.width) } : {}), ...(flags.h ? { height: num(flags.h) } : {}) };
   let shot;
   if (!flags.keep) shot = await shoot(args);
   else {
@@ -707,6 +723,7 @@ export function checkArgs(cmd, f, rest) {
     for (const x of [].concat(v)) {
       if (x === true && !BOOL.has(k) && !(cmd === 'look' && k === 'inside') && !(cmd === 'undo' && k === 'group') && !(k === 'free')) throw new Error(`--${k} needs a value`);
       if (NUMERIC.has(k) && x !== true && !Number.isFinite(Number(x))) throw new Error(`--${k} takes a number, got "${x}"`);
+      if (cmd === 'look' && ['dist', 'span'].includes(k) && (Array.isArray(v) || x === true || String(x).trim() === '' || Number(x) <= 0)) throw new Error(`look --${k} takes one finite positive number`);
       if (k === 'param' && (typeof x !== 'string' || !/^[A-Za-z][\w-]*=/.test(x))) throw new Error(`--param takes key=value (one per --param), got "${x}"`);
       if ((k === 'by' || k === 'step') && cmd !== 'land' && !/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(String(x))) throw new Error(`--${k} takes dx,dz (e.g. --${k} 1.5,-2), got "${x}"`);
       if (k === 'grid' && !/^\d+[x×]\d+$/.test(String(x))) throw new Error(`--grid takes WxH (e.g. 3x2), got "${x}"`);
@@ -735,8 +752,10 @@ export const COMMANDS = {
   help: () => HELP,
 };
 const HELP = `eden-god ${SKILL_VERSION} — god mode for one Eden world. Read SKILL.md.
-read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] · map · defs <words> · describe <ref> · where <x,z|ref> · free WxD [--near ref] · look [--at ref] [--from s|n|e|w|above] [--inside [--floor k]] · history · resolve · schema [--md]
-build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--wall back|front|left|right|n…] [--corner back-left|…] | --on table|pier|house/balcony [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--scale s (defs <name> shows its range)] [--dry]
+read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] · map · defs <words> · describe <ref> · where <x,z|ref> · free WxD [--near ref] · look [--at ref|x,z] [--from s|n|e|w|above] [--dist m] [--span m] [--inside [--floor k]] · history · resolve · schema [--md]
+look:   --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane.
+build:  place <def> --at x,z|ref | --near ref [--dist m] [--dir ne] [--count n] | --inside house/room [--at x,z] [--wall back|front|left|right|n…] [--corner back-left|…] | --on table|pier|house/balcony [--count n] | --along road [--t 0.3] [--side left|right|both] [--offset m] [--row n --gap g] | --against ref[.n] [--offset m|--t 0..1] | --between a b | --free   [--facing ref|n|e|s|w] [--float] [--row n|--grid WxH --gap g] [--name n] [--param k=v] [--scale s (defs <name> shows its range)] [--dry]
+place:  --against offset is signed metres from the side centre (positive toward e/s/w/n on n/e/s/w sides; rotated sides follow their face tangent). --t runs from 0 to 1 along the full side. Doorways/obstacles cause a reported slide within the side or a refusal. --inside --at uses a world point, including --offset dx,dz; outside, blocked, or conflicting wall/corner/count requests are refused.
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],…]' · place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],…]'
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen · set <ref> --param k=v --state '{…}' · recolor <ref> #hex · remove <ref>… · clone <ref> [--at] [--count n --step dx,dz] · select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> · group --off · undo [--group name] · redo

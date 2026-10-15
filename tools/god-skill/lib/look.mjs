@@ -52,13 +52,16 @@ export function findPlaywright() {
 }
 
 /** Camera for a target box: from a compass side (or above), at a distance that frames it. */
-export function camera({ target, span, from = 's', dist, inside = false, height }) {
+export function camera({ target, span, from = 's', dist, inside = false, height, tight = false }) {
   const key = from === 'above' || from === 'top' ? 'above' : compassKey(from) ?? 's';
-  const d = dist ?? Math.max(16, span * (inside ? 1.0 : 1.2) + 8);
+  const d = dist ?? (tight ? span * 1.2 : Math.max(16, span * (inside ? 1.0 : 1.2) + 8));
   const el = key === 'above' ? 1.35 : inside ? 0.95 : 0.5;            // elevation (radians)
   const u = key === 'above' ? [0, 0.08] : COMPASS[key];
-  const eye = [target[0] + u[0] * Math.cos(el) * d, target[1] + (height ?? Math.sin(el) * d), target[2] + u[1] * Math.cos(el) * d];
-  return { eye: eye.map((v) => Math.round(v * 10) / 10), at: target.map((v) => Math.round(v * 10) / 10), from: key };
+  const at = target.map((v) => Math.round(v * 10) / 10), origin = tight ? at : target;
+  const eye = [origin[0] + u[0] * Math.cos(el) * d, origin[1] + (height ?? Math.sin(el) * d), origin[2] + u[1] * Math.cos(el) * d];
+  // Preserve ordinary target rounding; small explicit spans need finer eye precision to avoid collapse.
+  const precision = tight ? 1e6 : 10;
+  return { eye: eye.map((v) => Math.round(v * precision) / precision), at, from: key };
 }
 
 const freePort = () => new Promise((res, rej) => { const s = createServer(); s.unref(); s.on('error', rej); s.listen(Number(process.env.EDEN_GOD_LOOK_PORT ?? 0), '127.0.0.1', () => { const p = s.address().port; s.close(() => res(p)); }); });
@@ -98,49 +101,55 @@ async function ensureKeeper(worldUrl, cliPath) {
 export function stopKeeper() { const k = readKeeper(); if (k?.pid) try { process.kill(k.pid); } catch { /* gone */ } rmSync(KEEPER, { force: true }); return k ? `stopped the look keeper (pid ${k.pid})` : 'no look keeper running'; }
 
 /** Take the picture. Returns { file, ms, state, via }. */
-export async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = null, span = 0, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 600_000), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }) {
+export async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = null, span = 0, expect = 0, timeoutMs = Number(process.env.EDEN_GOD_LOOK_TIMEOUT_MS ?? 600_000), settleMs = 800, cliPath, keep = false, width = 1024, height = 640 }, runtime = {}) {
   mkdirSync(dirname(resolve(out)), { recursive: true });
-  const t0 = Date.now();
-  const pw = findPlaywright();
+  const now = runtime.now ?? Date.now, wait = runtime.sleep ?? ((ms) => new Promise((r) => setTimeout(r, ms)));
+  const t0 = now();
+  const pw = runtime.pw ?? findPlaywright();
   if (!pw) {
     if (keep) throw new Error('look --keep needs a Playwright package (npm i playwright-core here) and npx could not fetch one; look without --keep works');
     const q = new URLSearchParams({ shot: '1', eye: eye.join(','), at: at.join(','), ...(hideRoofs ? { hideRoofs: '1', ...(cut !== null ? { cut: String(cut) } : {}) } : {}) });
     const r = spawnSync('npx', ['-y', 'playwright-core@1', 'screenshot', '--channel', 'chrome', '--wait-for-timeout', '30000', '--viewport-size', '1024,640', `${worldUrl}?${q}`, resolve(out)], { stdio: 'pipe', encoding: 'utf8', timeout: timeoutMs });
     if (r.status !== 0) throw new Error(`look: no Playwright found and npx playwright-core failed: ${(r.stderr || r.stdout || '').slice(0, 300)}. Install one (npm i -g playwright-core) and Google Chrome`);
-    return { file: resolve(out), ms: Date.now() - t0, via: 'npx playwright-core screenshot' };
+    return { file: resolve(out), ms: now() - t0, via: 'npx playwright-core screenshot' };
   }
   let page, browser, release = () => {};
+  const q = new URLSearchParams({ shot: '1', eye: eye.join(','), at: at.join(','), settle: '1500', ...(hideRoofs ? { hideRoofs: '1', ...(cut !== null ? { cut: String(cut) } : {}) } : {}) });
   if (keep) {
-    const k = await ensureKeeper(worldUrl, cliPath ?? process.argv[1]);
+    const k = await (runtime.ensureKeeper ?? ensureKeeper)(worldUrl, cliPath ?? process.argv[1]);
     browser = await pw.chromium.connectOverCDP(`http://127.0.0.1:${k.port}`, { timeout: 60_000 });
     page = browser.contexts().flatMap((c) => c.pages()).find((p) => p.url().startsWith(worldUrl));
     if (!page) throw new Error('look: the keeper has no world tab; run `look --stop` and look again');
+    // A newly started (or older) keeper has only ?shot=1. Give the viewer its initial camera too,
+    // so its own delayed arrival framing cannot overwrite the first requested shot.
+    const current = new URL(page.url()).searchParams;
+    if (!current.has('eye') || !current.has('at')) await page.goto(`${worldUrl}?${q}`, { waitUntil: 'commit', timeout: timeoutMs });
   } else {
-    release = await chromeLease('eden-god look');
+    release = await (runtime.lease ?? chromeLease)('eden-god look');
     browser = await pw.chromium.launch({ channel: 'chrome', headless: true, args: GL_ARGS }).catch((e) => { release(); throw new Error(`look: cannot start Chrome (${String(e.message).split('\n')[0]}); install Google Chrome`); });
     const ctx = await browser.newContext({ viewport: { width, height } });
     await ctx.addInitScript(PRESERVE);
     page = await ctx.newPage();
-    const q = new URLSearchParams({ shot: '1', eye: eye.join(','), at: at.join(','), settle: '1500', ...(hideRoofs ? { hideRoofs: '1', ...(cut !== null ? { cut: String(cut) } : {}) } : {}) });
     await page.goto(`${worldUrl}?${q}`, { waitUntil: 'commit', timeout: timeoutMs });
   }
   try {
-  const deadline = Date.now() + timeoutMs;
+  const deadline = now() + timeoutMs;
   let state = null, stable = 0, lastDrawn = -1;
-  while (Date.now() < deadline) {
+  while (now() < deadline) {
     state = await page.evaluate((want) => {
       const w = window.__simEntity; if (!w?.layer?.active) return { ready: false, why: document.title === 'no-entity-world' ? 'no entity world on this page' : 'loading the viewer' };
       const drawn = w.layer.drawn; const now = w.layer.now ?? performance.now();
       const easing = drawn ? [...drawn.values()].filter((d) => (now - d.t0) / 1000 < d.dur).length : 0;
       // terrain-only entities (hills, lakes) are not drawn as things: most of `want` is enough
-      return { ready: (!want || (drawn?.size ?? 0) >= Math.floor(want * 0.6)) && easing === 0, drawn: drawn?.size ?? null, want, easing, shotReady: !!window.__shotReady };
+      return { ready: !!window.__shotReady && (!want || (drawn?.size ?? 0) >= Math.floor(want * 0.6)) && easing === 0, drawn: drawn?.size ?? null, want, easing, shotReady: !!window.__shotReady };
     }, expect).catch((e) => ({ ready: false, why: String(e.message).slice(0, 80) }));
     if (state.ready && state.drawn === lastDrawn) stable++; else stable = 0;
     lastDrawn = state.drawn ?? -1;
     if (state.ready && stable >= 2) break;
     if (state.why === 'no entity world on this page') throw new Error('look: this world has no entity layer');
-    await new Promise((r) => setTimeout(r, 1000));
+    await wait(1000);
   }
+  if (!state?.ready || stable < 2) throw new Error(`look: viewer did not initialize and settle before timeout (${JSON.stringify(state)})`);
   const frames = await page.evaluate(([e0, a, roofs, cutAt, fitSpan]) => new Promise((res) => {
     const w = window.__simEntity;
     // back the camera off until `fitSpan` metres fit the frame at this camera's real field of view
@@ -150,6 +159,8 @@ export async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = n
       const need = (fitSpan / 2) / Math.tan(Math.min(v, h) / 2) * 1.05, d = [e0[0] - a[0], e0[1] - a[1], e0[2] - a[2]], len = Math.hypot(...d) || 1;
       if (len < need) e = d.map((c, i) => a[i] + (c / len) * need);
     }
+    const eyeDistance = Math.hypot(...e.map((c, i) => c - a[i]));
+    if (!e.every(Number.isFinite) || !a.every(Number.isFinite) || !Number.isFinite(eyeDistance) || eyeDistance <= Math.max(0, w.camera.near ?? 0)) throw Error('Requested look camera is within the viewer near clipping plane');
     // L2's interior view: roofs (and the storeys above `cut`) off for every building
     window.__buildingView = roofs ? { hideRoofs: true, cut: cutAt } : { hideRoofs: false, cut: null };
     w.controls.target.set(a[0], a[1], a[2]); w.camera.position.set(e[0], e[1], e[2]); w.camera.lookAt(w.controls.target); w.controls.update?.();
@@ -163,12 +174,19 @@ export async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = n
     window.__lookRestore = () => { for (const o of hidden) o.visible = true; };
     const canvas = document.querySelector('canvas');
     if (canvas) { const keep = new Set(); for (let n = canvas; n; n = n.parentElement) keep.add(n); for (const n of keep) for (const c of n.children ?? []) if (!keep.has(c)) c.style.visibility = 'hidden'; }
-    let n = 0; const t = performance.now(); const tick = () => { if (++n >= 4 || performance.now() - t > 120000) res({ n, ms: Math.round(performance.now() - t), roofsHidden: hidden.length, eye: e.map((c) => Math.round(c * 10) / 10) }); else requestAnimationFrame(tick); }; requestAnimationFrame(tick);
+    let n = 0; const t = performance.now(); const tick = () => { if (++n >= 4 || performance.now() - t > 120000) res({ n, ms: Math.round(performance.now() - t), roofsHidden: hidden.length, eye: e, at: a }); else requestAnimationFrame(tick); }; requestAnimationFrame(tick);
   }), [eye, at, hideRoofs, cut, span]);
   await page.waitForTimeout(settleMs);
-  const data = await page.evaluate(() => { const c = [...document.querySelectorAll('canvas')].sort((a, b) => b.width * b.height - a.width * a.height)[0]; const d = c ? c.toDataURL('image/png') : null; window.__lookRestore?.(); return d; });
+  const data = await page.evaluate(({ eye, at }) => {
+    try {
+      const w = window.__simEntity, close = (v, want) => v?.toArray().every((c, i) => Number.isFinite(c) && Math.abs(c - want[i]) <= 1e-4);
+      if (!window.__shotReady || !close(w?.camera?.position, eye) || !close(w?.controls?.target, at)) throw Error('look: requested camera changed before capture; retry the shot');
+      const c = [...document.querySelectorAll('canvas')].sort((a, b) => b.width * b.height - a.width * a.height)[0];
+      return c ? c.toDataURL('image/png') : null;
+    } finally { window.__lookRestore?.(); }
+  }, frames);
   if (!data) throw new Error('look: no canvas on the page');
   writeFileSync(resolve(out), Buffer.from(data.split(',')[1], 'base64'));
-  return { file: resolve(out), ms: Date.now() - t0, state, frames, via: keep ? 'keeper' : 'chrome' };
+  return { file: resolve(out), ms: now() - t0, state, frames, via: keep ? 'keeper' : 'chrome' };
   } finally { if (!keep) { await browser.close().catch(() => {}); release(); } }
 }

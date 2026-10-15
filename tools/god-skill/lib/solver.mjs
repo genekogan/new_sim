@@ -376,20 +376,49 @@ export function solve(v, thing, rel) {
     // snap to the host's nearest face normal
     const faces = [[1, 0], [-1, 0], [0, 1], [0, -1]].map(([a, b]) => rot(hb.yaw, a, b));
     const nrm = faces.sort((a, b) => (b[0] * u[0] + b[1] * u[1]) - (a[0] * u[0] + a[1] * u[1]))[0];
-    const yaw = finalYaw(0, 0, yawOf(nrm[0], nrm[1]));
+    const yaw = r2(finalYaw(0, 0, yawOf(nrm[0], nrm[1])));
     const meB = mine(0, 0, yaw);
     const dist = extentAlong(hb, nrm) + extentAlong(meB, nrm) + Number(rel.gap ?? 0.05);
     const n = Number(rel.count ?? rel.row ?? 1);
     const tang = [-nrm[1], nrm[0]];
-    const myW = extentAlong(meB, tang) * 2, step = myW + Number(rel.gap ?? 0.3);
-    const items = [];
+    const myW = extentAlong(meB, tang) * 2, step = myW + Number(rel.gap ?? 0.3), wallHalf = extentAlong(hb, tang);
+    const number = (key) => {
+      const value = rel[key];
+      if (Array.isArray(value) || typeof value === 'boolean' || String(value).trim() === '' || !Number.isFinite(Number(value))) throw new Error(`--against --${key} takes one finite number`);
+      return Number(value);
+    };
+    if (rel.offset !== undefined && rel.t !== undefined) throw new Error('--against takes --offset or --t, not both');
+    const t = rel.t !== undefined ? number('t') : undefined;
+    if (t !== undefined && (t < 0 || t > 1)) throw new Error('--against --t must be between 0 and 1');
+    const offset = rel.offset !== undefined ? number('offset') : t !== undefined ? (t - 0.5) * 2 * wallHalf : 0;
+    const limit = wallHalf - myW / 2;
+    const doorZones = (host.doors ?? []).filter((d) => d.out && (d.level ?? 0) === 0).map((d) => {
+      const f = dirOfYaw(d.yaw);
+      return { id: d.id, c: [d.at[0] + f[0] * 1.25, d.at[1] + f[1] * 1.25], half: [d.width / 2 + 0.35, 1.25], yaw: d.yaw };
+    });
+    const items = [], placed = [];
+    let keptDoor = null;
     for (let k = 0; k < n; k++) {
-      const off = (k - (n - 1) / 2) * step;
-      const x = hb.c[0] + nrm[0] * dist + tang[0] * off, z = hb.c[1] + nrm[1] * dist + tang[1] * off;
+      const off = offset + (k - (n - 1) / 2) * step;
+      if (Math.abs(off) > limit + 1e-6) throw new Error(`--against --offset/--t places item ${k + 1} beyond ${host.path}'s side; its centre must be within ${r2(Math.max(0, limit))} m of the side centre`);
       const cands = [];
-      for (const slide of [0, 1, -1, 2, -2]) { const xx = x + tang[0] * slide * (myW + 0.3), zz = z + tang[1] * slide * (myW + 0.3); if (slide && !free(xx, zz, yaw)) continue; cands.push(pose(xx, zz, yaw, { note: `against ${host.path}'s ${compassOfYaw(yawOf(nrm[0], nrm[1]))} side${slide ? ' (slid along it)' : ''}`, constraints: [{ kind: 'near', ref: host.path, dist: 0.5 }] })); }
+      for (const slide of steps(2 * wallHalf, 0.25)) {
+        const along = off + slide;
+        if (Math.abs(along) > limit + 1e-6) continue;
+        const x = r2(hb.c[0] + nrm[0] * dist + tang[0] * along), z = r2(hb.c[1] + nrm[1] * dist + tang[1] * along), b = mine(x, z, r2(yaw));
+        const door = doorZones.find((dz) => obbHit(b, dz));
+        if (door) { keptDoor = door.id; continue; }
+        // --against already sets the requested wall gap. Adding free()'s 5 cm margin again
+        // would reject a flush pose after the CLI's centimetre/yaw quantization.
+        if ((solid && blockers(v, b, skip, 0).length) || placed.some((p) => obbHit(b, p, 0.1))) continue;
+        cands.push(pose(x, z, yaw, { note: `against ${host.path}'s ${compassOfYaw(yawOf(nrm[0], nrm[1]))} side, ${r2(along)} m along from centre${slide ? ` (slid along it by ${r2(slide)} m)` : ''}`, constraints: [{ kind: 'near', ref: host.path, dist: 0.5 }] }));
+        if (cands.length >= 5) break;
+      }
+      if (!cands.length) throw new Error(`no clear place against ${host.path}'s side within the wall; doorways and obstacles must stay clear${keptDoor ? ` (doorway ${keptDoor})` : ''}`);
+      placed.push(mine(cands[0].p[0], cands[0].p[1], cands[0].r));
       items.push({ candidates: cands });
     }
+    if (keptDoor) notes.push(`kept ${host.path}'s doorway ${keptDoor} clear`);
     return { items, notes };
   }
 
@@ -636,6 +665,16 @@ function solveInRoom(v, host, room, thing, rel, ctx) {
     if (items.length < n) notes.push(`only ${items.length} of ${n} fit ${what} in ${label}`);
     return { items, notes };
   };
+  // --at is a world point even when the resulting entity belongs to a room slot.
+  // An exact request must never silently fall back to the room's centre or a free lattice spot.
+  if (rel.at !== undefined) {
+    if (rel.wall || rel.corner || n !== 1) throw new Error('--inside --at takes one exact world point; omit --wall, --corner and --count > 1');
+    const p = refPoint(v, rel.at, rel.offset), local = toLocal(F, p.x, p.z).map(r2);
+    if (!inPoly(local[0], local[1], poly)) throw new Error(`requested --at (${p.x}, ${p.z}) is outside room ${label}`);
+    const ly = yawAt(local[0], local[1], baseYaw !== undefined ? baseYaw - F.RY : 0), reason = why(local[0], local[1], ly);
+    if (reason) throw new Error(`cannot place at requested world point (${p.x}, ${p.z}) in ${label}: ${reason}`);
+    return { items: [{ candidates: [at(local[0], local[1], ly, `at world (${p.x}, ${p.z})`)] }], notes };
+  }
   const fL = dirOfYaw((host.front ?? host.pose[3]) - F.PY);
   const dirWord = (w) => { const rd = sideDir(w, fL); if (rd) return rd; const k = compassKey(w); if (k) return norm(unrot(F.PY, COMPASS[k][0], COMPASS[k][1])); return null; };
   const round = !isRect;
