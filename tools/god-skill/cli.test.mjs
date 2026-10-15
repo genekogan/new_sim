@@ -1,10 +1,14 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { SKILL_VERSION, COMMANDS, answer, checkArgs, commit, explainFailure, preview, request, status, undo, verifyUse } from './cli.mjs';
-import { view } from './lib/mirror.mjs';
+import { view, invalidate, mirror } from './lib/mirror.mjs';
+import { build, group, act, dryrun, importWorld, parseFlags, parseMassing } from './cli.mjs';
+import { buildSuffix, call, claimFile, load, save } from './lib/state.mjs';
+import { createServer } from 'node:http';
+import { spawn } from 'node:child_process';
 
 function fixture(t, data) {
   const cwd = process.cwd(), originalFetch = globalThis.fetch, dir = mkdtempSync(join(tmpdir(), 'god-cli-offline-')), calls = [];
@@ -134,4 +138,343 @@ test('mirror preserves the active named definition when only an older hash-pinne
   const old = { hash: 'old', ref: 'post@1' }, active = { hash: 'active', ref: 'post@1' };
   const v = view({ rows: [], snapshot: { defs: [old], library: [active], entities: [] } });
   assert.equal(v.def('post@1'), active); assert.equal(v.def('sha:old'), old);
+});
+
+const steps = ['shell', 'roof and tower', 'openings', 'interior', 'furnish'];
+const localBuild = () => ({ id: 'church', lease: 'l_1234abcd', n: 1, label: 'shell', steps });
+const serverBuild = (patch = {}) => ({ id: 'church', title: 'Black stone church', plan: { steps }, site: { at: [0, 0], size: [40, 16], yaw: 0 }, massing: [{ name: 'nave', at: [0, 0], size: [22, 10], h: 12, parts: 0 }], roots: [], claims: [], status: 'active', step: { n: 1, label: 'shell' }, current: null, next: { n: 2, label: 'roof and tower' }, ...patch });
+const echo = (body, patch = {}) => ({ id: body.build?.id ?? 'church', status: 'active', rev: 2, group: body.group ?? 'church', step: { n: body.build?.step ?? 1, label: body.build?.label ?? 'shell' }, ...patch });
+
+// Only real network in these tests: ephemeral HTTP listeners bound to 127.0.0.1.
+// The handler is a wire fixture, not any Sim service or model provider.
+async function buildFixture(t, handler = () => null) {
+  const cwd = process.cwd(), previousClaim = process.env.EDEN_GOD_CLAIM;
+  const dir = mkdtempSync(join(tmpdir(), 'god-build-stub-')), calls = [];
+  delete process.env.EDEN_GOD_CLAIM;
+  const snapshot = { worldId: 'stub', constants: { extent: 200, ground: 'flat' }, seq: 1, buildsRev: 1, state: { sky: { palette: 'day' } }, entities: [], library: [], defs: [], prayers: [], ground: { landforms: [], waters: [] }, builds: [serverBuild()] };
+  const server = createServer(async (req, res) => {
+    try {
+      let raw = ''; for await (const part of req) raw += part;
+      const c = { method: req.method, path: req.url, raw, body: raw ? JSON.parse(raw) : undefined };
+      calls.push(c);
+      let reply = await handler(c, calls);
+      if (!reply) {
+        if (c.path === '/v1/god/builds' && c.method === 'POST') reply = { ok: true, build: serverBuild({ id: c.body.id, title: c.body.title, plan: { steps: c.body.steps }, site: c.body.site, massing: c.body.massing }), lease: 'l_1234abcd' };
+        else if (c.path === '/v1/god/builds') reply = { now: 10, rev: 1, open: [serverBuild()], recent: [] };
+        else if (c.path.endsWith('/resume')) reply = { ok: true, build: serverBuild(), lease: 'l_7654abcd' };
+        else if (c.path.endsWith('/claims')) reply = { ok: true, build: serverBuild(), claim: { id: 'c_1234abcd', part: c.body.part, step: { n: 1, label: 'shell' }, status: 'held' } };
+        else if (c.path.startsWith('/v1/god/builds/')) reply = { ok: true, build: serverBuild({ status: c.path.endsWith('/done') ? 'done' : c.path.endsWith('/abandon') ? 'abandoned' : 'active' }) };
+        else if (c.path === '/v1/world/seq') reply = { seq: 1, builds: 1 };
+        else if (c.path === '/v1/god/snapshot') reply = snapshot;
+        else if (c.path === '/v1/god/status') reply = { you: 'god', entities: 0, seq: 1, builds: [{ id: 'church', status: 'paused' }] };
+        else if (c.path === '/v1/god/query') reply = c.body.furnish ? { furnish: { ops: [{ op: 'set', id: 'church', state: { paint: '#fff' } }], notes: [], rooms: [] } } : { layout: { entities: [] } };
+        else reply = { accepted: true, seq: 2, reverted: [1], ...(c.body?.build ? { build: echo(c.body) } : {}) };
+      }
+      res.writeHead(reply.httpStatus ?? 200, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(reply.data ?? reply));
+    } catch (e) { res.writeHead(500); res.end(JSON.stringify({ error: e.message })); }
+  });
+  for (;;) {
+    await new Promise((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve); });
+    const p = server.address().port;
+    if (p < 4930 || p > 4970) break;
+    await new Promise((resolve) => server.close(resolve));
+  }
+  process.chdir(dir); invalidate();
+  save({ world: `http://127.0.0.1:${server.address().port}`, token: 'fixture-only' });
+  t.after(async () => {
+    process.chdir(cwd); invalidate();
+    if (previousClaim === undefined) delete process.env.EDEN_GOD_CLAIM; else process.env.EDEN_GOD_CLAIM = previousClaim;
+    await new Promise((resolve) => { server.close(resolve); server.closeAllConnections(); });
+    rmSync(dir, { recursive: true, force: true });
+  });
+  return { calls, dir, snapshot };
+}
+const startFlags = () => ({ title: 'Black stone church', steps: steps.join(','), at: '0,0', size: '40,16', mass: 'nave 0,0 22x10 h12 gable; tower -13,0 6x6 h30 pyramid' });
+
+test('build start sends one request with massing; step makes none; next act injects current progress', async t => {
+  const { calls } = await buildFixture(t);
+  const flags = startFlags(), parsed = parseFlags(['start', 'church', '--steps', 'a,b']);
+  checkArgs('build', parsed.flags, parsed.rest);
+  assert.match(await COMMANDS.build(['start', 'church'], flags), /every edit now carries build church, step 1\/5 shell/);
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].body.massing[1], { name: 'tower', at: [-13, 0], size: [6, 6], h: 30, roof: 'pyramid' });
+  assert.deepEqual(load().build, { ...localBuild(), status: 'active' });
+  await act({ ops: [{ op: 'remove', id: 'wall' }] });
+  assert.deepEqual(calls[1].body.build, { id: 'church', lease: 'l_1234abcd', step: 1, label: 'shell' });
+  assert.equal(calls[1].body.group, undefined);
+  const count = calls.length;
+  assert.match(await COMMANDS.build(['step']), /step 2\/5: roof and tower/);
+  assert.equal(calls.length, count);
+  await act({ ops: [{ op: 'remove', id: 'roof' }], group: 'roof' });
+  assert.equal(calls.at(-1).body.build.step, 2);
+  assert.equal(calls.at(-1).body.group, 'roof');
+});
+
+test('build start resolves named sites and offsets in world metres, and reads brief files', async t => {
+  const { calls, snapshot } = await buildFixture(t, c => c.path === '/v1/god/query' ? { layout: { entities: [{ id: 'flag1', name: 'knoll', path: 'knoll', parent: 'world', pose: [20, 0, 30, 0, 1], def: 'core/flag@1' }] } } : null);
+  snapshot.entities = [{ id: 'flag1', state: { label: 'knoll' } }];
+  writeFileSync('brief.txt', 'A public nave and tower');
+  await build('start', ['church'], { ...startFlags(), at: 'flag:knoll', offset: '2,-3', yaw: '1.5707963267948966', brief: 'brief.txt', root: 'old-chapel' });
+  const req = calls.find(c => c.path === '/v1/god/builds');
+  assert.deepEqual(req.body.site, { at: [22, 27], size: [40, 16], yaw: Math.PI / 2 });
+  assert.equal(req.body.brief, 'A public nave and tower'); assert.equal(req.body.root, 'old-chapel');
+});
+
+test('preview and dryrun carry build; sealed preview commit sends only preview/clientRef', async t => {
+  const { calls } = await buildFixture(t); save({ build: localBuild(), group: 'church/roof' });
+  await preview({ ops: [{ op: 'remove', id: 'roof' }] });
+  await dryrun({ ops: [{ op: 'remove', id: 'roof' }] });
+  await commit('sealed-preview');
+  for (const c of calls.slice(0, 2)) { assert.equal(c.body.build.id, 'church'); assert.equal(c.body.group, 'church/roof'); }
+  assert.deepEqual(Object.keys(calls[2].body).sort(), ['clientRef', 'preview']);
+  assert.equal(calls[2].body.preview, 'sealed-preview');
+});
+
+test('direct layers acts inherit build/group and add a <=25 byte progress suffix', async t => {
+  const { calls } = await buildFixture(t); save({ build: localBuild(), group: 'church/interior' });
+  const text = await COMMANDS.access(['pew', 'public'], {});
+  assert.match(text, / \[church 1\/5 shell\]$/);
+  assert.equal(calls.length, 1); assert.equal(calls[0].body.build.id, 'church');
+  assert.equal(calls[0].body.group, 'church/interior');
+  const suffix = buildSuffix(echo({ build: { id: 'church', step: 3, label: 'roof' } }), localBuild());
+  assert.equal(Buffer.byteLength(' ' + suffix), 18);
+  assert.ok(Buffer.byteLength(' ' + buildSuffix({ id: 'a'.repeat(40), step: { n: 999, label: 'b'.repeat(60) } }, { id: 'a'.repeat(40), steps: Array(24) })) <= 25);
+});
+
+test('world/answer-only batches, imports, env/land/strike and --no-build skip injection', async t => {
+  const { calls } = await buildFixture(t); save({ build: localBuild(), group: 'church/subgroup' });
+  await act({ ops: [{ op: 'world', state: { sky: {} } }, { op: 'answer', prayer: 'p', text: 'yes' }] });
+  await answer('p', 'yes');
+  await COMMANDS.sky([], { palette: 'clear-day' });
+  for (const p of ['env', 'land', 'strike']) await call('/v1/god/' + p, { body: { value: 1 } });
+  await COMMANDS.act(['{"ops":[{"op":"remove","id":"wall"}]}'], { 'no-build': true });
+  writeFileSync('world.json', JSON.stringify({ schema: 'genesis/1', batches: [{ ops: [{ op: 'remove', id: 'wall' }] }] }));
+  await importWorld('world.json');
+  for (const c of calls) assert.equal(c.body?.build, undefined, c.path);
+  assert.equal(calls.at(-1).body.group, 'import');
+  assert.deepEqual(load().build, localBuild());
+  await act({ ops: [{ op: 'remove', id: 'wall' }] });
+  assert.equal(calls.at(-1).body.build.id, 'church', 'the bypass does not leak to the next command');
+});
+
+test('missing build echo warns once across commands and refused acts never imply completion', async t => {
+  const { calls } = await buildFixture(t, c => c.path === '/v1/god/act' ? { accepted: true, seq: 1 } : null);
+  save({ build: localBuild() });
+  const warn = console.error, warnings = []; console.error = s => warnings.push(s); t.after(() => { console.error = warn; });
+  await act({ ops: [{ op: 'remove', id: 'x' }] });
+  await act({ ops: [{ op: 'remove', id: 'y' }] });
+  assert.deepEqual(warnings, ['this server does not record builds; progress is not shown']);
+  assert.equal(calls.length, 2); assert.equal(load().buildEchoWarned, true);
+});
+
+test('lease refusal carries server identity/time and a concrete resume command', async t => {
+  await buildFixture(t, c => c.path === '/v1/god/act' ? { accepted: false, failures: [{ op: 0, code: 'build.lease', detail: 'church was resumed by Ada at 2026-10-15T12:00:00Z' }] } : null);
+  save({ build: localBuild() });
+  const result = await COMMANDS.set(['wall'], { name: 'north-wall' });
+  assert.match(result, /resumed by Ada at 2026-10-15T12:00:00Z/);
+  assert.match(result, /build resume church.*before editing/);
+  assert.equal(load().build.id, 'church');
+});
+
+test('group --off clears only the subgroup; pause keeps state; done clears build and group', async t => {
+  const { calls } = await buildFixture(t); save({ build: localBuild() });
+  await group('roof'); assert.equal(load().group, 'church/roof');
+  await group(undefined, { off: true }); assert.equal(load().group, undefined); assert.equal(load().build.id, 'church');
+  await build('pause', ['waiting for review']);
+  assert.deepEqual(calls.at(-1).body, { lease: 'l_1234abcd', note: 'waiting for review' });
+  assert.equal(load().build.id, 'church');
+  await group('finish'); await build('done', ['nave, tower, pews'], { force: true });
+  assert.deepEqual(calls.at(-1).body, { summary: 'nave, tower, pews', force: true });
+  assert.equal(load().build, undefined); assert.equal(load().group, undefined);
+});
+
+test('abandon clears state only after success and reports partial undo on refusal', async t => {
+  let refuse = true;
+  const { calls } = await buildFixture(t, c => c.path.endsWith('/abandon') && refuse ? { ok: false, failures: [{ op: 0, code: 'build.undo-incomplete', detail: 'edit 9 conflicts' }], reverted: [10], notReverted: [9] } : null);
+  save({ build: localBuild(), group: 'church/roof' });
+  const result = await build('abandon', [], { undo: true, force: true });
+  assert.match(result, /undone edits: 10; not undone edits: 9/);
+  assert.equal(load().build.id, 'church'); assert.equal(load().group, 'church/roof');
+  assert.deepEqual(calls.at(-1).body, { undo: true, force: true });
+  refuse = false; await build('abandon', [], { undo: true });
+  assert.equal(load().build, undefined); assert.equal(load().group, undefined);
+});
+
+test('resume reconstructs local progress from server and prints unfinished step, roots, claims, masses and next', async t => {
+  const current = { n: 3, label: 'openings', batches: 2, firstSeq: 40, lastSeq: 41, recent: [{ seq: 41, note: 'north door' }] };
+  const b = serverBuild({ step: { n: 3, label: 'openings' }, current, roots: [{ id: 'e_church', path: 'church' }], claims: [{ id: 'c_11111111', part: 'tower', status: 'held' }], massing: [{ name: 'nave', parts: 7 }], next: { n: 4, label: 'interior' } });
+  const { calls } = await buildFixture(t, c => c.path.endsWith('/resume') ? { ok: true, build: b, lease: 'l_99999999', current, next: b.next, massing: b.massing } : null);
+  save({ build: localBuild(), group: 'stale-group' });
+  const text = await build('resume', ['church'], { take: true });
+  assert.deepEqual(calls[0].body, { lease: 'l_1234abcd', take: true }); assert.equal(calls.length, 1);
+  assert.equal(load().build.n, 3); assert.equal(load().build.lease, 'l_99999999'); assert.equal(load().group, undefined);
+  for (const pattern of [/3\/5 openings IN PROGRESS/, /2 batches, last seq 41/, /41: north door/, /nave 7 parts/, /c_11111111 tower/, /next: 4\/5 interior/, /first: describe church/]) assert.match(text, pattern);
+  await build('step'); assert.equal(calls.length, 1); assert.equal(load().build.n, 4);
+});
+
+test('claim bootstrap, per-claim steps, local guards, group undo and release never rewrite lead state', async t => {
+  const { calls } = await buildFixture(t); save({ build: localBuild(), group: 'church/lead' });
+  const original = readFileSync('.eden-god.json', 'utf8');
+  assert.match(await build('claim', ['east-aisle'], { root: 'church/east-aisle' }), /EDEN_GOD_CLAIM=c_1234abcd/);
+  assert.deepEqual(calls.at(-1).body, { part: 'east-aisle', root: 'church/east-aisle' });
+  assert.equal(readFileSync('.eden-god.json', 'utf8'), original);
+  process.env.EDEN_GOD_CLAIM = 'c_1234abcd';
+  await build('step', ['pews']);
+  const count = calls.length;
+  await assert.rejects(build('resume', ['church']), /take the lead lease/);
+  await assert.rejects(undo(), /undo --group church\/east-aisle/);
+  assert.equal(calls.length, count);
+  await act({ ops: [{ op: 'remove', id: 'pew' }] });
+  assert.deepEqual(calls.at(-1).body.build, { id: 'church', claim: 'c_1234abcd', step: 2, label: 'pews' });
+  await undo({ group: 'church/east-aisle' }); assert.equal(calls.at(-1).body.build.claim, 'c_1234abcd');
+  await build('release', [], { done: true }); assert.deepEqual(calls.at(-1).body, { done: true });
+  assert.equal(load().build, null);
+  assert.equal(readFileSync('.eden-god.json', 'utf8'), original);
+  assert.equal(JSON.parse(readFileSync(claimFile('c_1234abcd'), 'utf8')).build, null);
+});
+
+test('claim overrides a local claim and independent subprocesses keep all twenty step updates', async t => {
+  const { dir, calls } = await buildFixture(t); save({ build: localBuild() });
+  const original = readFileSync('.eden-god.json', 'utf8'), moduleURL = new URL('./cli.mjs', import.meta.url).href;
+  const run = cid => new Promise((resolve, reject) => {
+    const source = `import {build} from ${JSON.stringify(moduleURL)}; for(let i=0;i<20;i++) await build('step');`;
+    const child = spawn(process.execPath, ['--input-type=module', '-e', source], { cwd: dir, env: { ...process.env, EDEN_GOD_CLAIM: cid }, stdio: ['ignore', 'pipe', 'pipe'] });
+    let err = ''; child.stderr.on('data', d => { err += d; }); child.on('error', reject); child.on('exit', code => code ? reject(new Error(err)) : resolve());
+  });
+  const ids = Array.from({ length: 8 }, (_, i) => `c_${i.toString(16).padStart(8, '0')}`);
+  await Promise.all(ids.map(run));
+  for (const cid of ids) { const s = JSON.parse(readFileSync(claimFile(cid), 'utf8')); assert.equal(s.build.n, 21); assert.equal(s.build.claim, cid); assert.equal(s.build.lease, undefined); }
+  process.env.EDEN_GOD_CLAIM = ids[1]; save({ build: { ...load().build, claim: ids[0] } });
+  // The environment is authoritative even if a stale local file names a different claim.
+  assert.equal(load().build.claim, ids[1]);
+  assert.equal(calls.length, 0); assert.equal(readFileSync('.eden-god.json', 'utf8'), original);
+  assert.equal(readdirSync('.').filter(f => f.endsWith('.tmp')).length, 0);
+  for (const file of ['.eden-god.json', ...ids.map(claimFile)]) assert.equal(statSync(file).mode & 0o777, 0o600);
+});
+
+test('undo/redo bodies carry active progress, and accepted done echo clears state only when closed', async t => {
+  let close = false;
+  const { calls } = await buildFixture(t, c => c.path === '/v1/god/act' ? { accepted: true, seq: 3, build: echo(c.body, { status: close ? 'done' : 'active' }) } : null);
+  save({ build: localBuild(), group: 'church/roof' });
+  await undo({ group: 'church/roof' }); await COMMANDS.redo();
+  for (const c of calls) assert.equal(c.body.build.lease, 'l_1234abcd');
+  await act({ ops: [{ op: 'remove', id: 'old' }], build: { id: 'church', lease: 'l_1234abcd', done: true } });
+  assert.equal(load().build.id, 'church', 'other live claims may keep a done:true build open');
+  close = true; await act({ ops: [{ op: 'remove', id: 'old' }], build: { id: 'church', lease: 'l_1234abcd', done: true } });
+  assert.equal(load().build, undefined); assert.equal(load().group, undefined);
+});
+
+test('429 waits and resends identical bytes including clientRef/build; ordinary refusals are single requests', async t => {
+  const { calls } = await buildFixture(t, (c, all) => c.path === '/v1/god/act' && all.length === 1 ? { httpStatus: 429, data: { retryAfterMs: 2 } } : null);
+  save({ build: localBuild() });
+  await act({ ops: [{ op: 'remove', id: 'roof' }] });
+  assert.equal(calls.length, 2); assert.equal(calls[0].raw, calls[1].raw);
+  assert.ok(calls[0].body.clientRef); assert.equal(calls[0].body.build.step, 1);
+});
+
+test('status/map headers use server build status; mirror refreshes on builds rev without an edit seq change', async t => {
+  let rev = 1;
+  const { calls, snapshot } = await buildFixture(t, c => c.path === '/v1/world/seq' ? { seq: 1, builds: rev } : null);
+  save({ build: { ...localBuild(), n: 3, label: 'roof' } });
+  assert.match(await status(), /build church 3\/5 roof \(paused, lead: you\)/);
+  assert.match(await COMMANDS.map(), /build church 3\/5 roof \(active, lead: you\)/);
+  const count = calls.filter(c => c.path === '/v1/god/snapshot').length;
+  rev = 2; snapshot.buildsRev = 2; snapshot.builds[0].status = 'paused';
+  assert.match(await COMMANDS.map(), /build church 3\/5 roof \(paused, lead: you\)/);
+  assert.equal(calls.filter(c => c.path === '/v1/god/snapshot').length, count + 1);
+  assert.equal(statSync('.eden-god.cache.json').mode & 0o777, 0o600);
+  assert.equal(readdirSync('.').filter(f => f.endsWith('.tmp')).length, 0);
+});
+
+test('invalid build options/masses refuse locally before any HTTP request', async t => {
+  const { calls } = await buildFixture(t);
+  for (const f of [{ steps: true }, { steps: 'a,,b' }, { size: ',3' }, { at: '1,no' }, { offset: '1,no' }, { title: true }, { mass: 'nave 0,0 0x10 h12' }, { mass: 'nave 0,0 10x10 h121' }, { mass: 'nave 0,0 10x10 h12 tent' }, { mass: true }, { steps: ['a', 'b'] }]) await assert.rejects(build('start', ['church'], { ...startFlags(), ...f }));
+  assert.throws(() => parseMassing(Array(9).fill('0,0 1x1 h1').join(';')), /at most 8/);
+  assert.throws(() => checkArgs('build', { plan: true }, ['start', 'church']), /no option --plan/);
+  await assert.rejects(build('step', [], { mass: 'ignored' }), /no option --mass/);
+  await assert.rejects(build('resume', ['church'], { take: 'c_11111111' }), /takes no value/);
+  assert.equal(calls.length, 0);
+});
+
+test('claim replay preserves pending local steps, subgroup and warning state', async t => {
+  const { calls } = await buildFixture(t); save({ build: localBuild() });
+  await build('claim', ['east-aisle'], { root: 'church/east-aisle' });
+  process.env.EDEN_GOD_CLAIM = 'c_1234abcd';
+  await build('step', ['finish south pews']); await group('pews'); save({ buildEchoWarned: true });
+  const before = readFileSync(claimFile('c_1234abcd'), 'utf8');
+  delete process.env.EDEN_GOD_CLAIM;
+  await build('claim', ['east-aisle'], { root: 'church/east-aisle' });
+  assert.equal(readFileSync(claimFile('c_1234abcd'), 'utf8'), before);
+  assert.equal(calls.length, 2);
+});
+
+test('a sealed preview with claim done:true clears only that claim without adding commit metadata', async t => {
+  const { calls } = await buildFixture(t, c => c.path === '/v1/god/preview' ? { accepted: true, id: 'pv-claim-done' } : c.path === '/v1/god/act' ? { accepted: true, seq: 5, build: echo(c.body, { claim: 'c_1234abcd' }) } : null);
+  save({ build: localBuild() }); const lead = readFileSync('.eden-god.json', 'utf8');
+  process.env.EDEN_GOD_CLAIM = 'c_1234abcd';
+  await preview({ ops: [{ op: 'remove', id: 'old-pew' }], build: { id: 'church', claim: 'c_1234abcd', step: 1, done: true } });
+  assert.ok(load().buildPreviews['pv-claim-done']);
+  await commit('pv-claim-done');
+  assert.deepEqual(Object.keys(calls.at(-1).body).sort(), ['clientRef', 'preview']);
+  assert.equal(load().build, null); assert.equal(load().buildPreviews, undefined);
+  assert.equal(readFileSync('.eden-god.json', 'utf8'), lead);
+});
+
+test('explicit completion of a different claim does not clear this process claim', async t => {
+  await buildFixture(t); save({ build: localBuild() }); process.env.EDEN_GOD_CLAIM = 'c_1234abcd';
+  await act({ ops: [{ op: 'remove', id: 'old-pew' }], build: { id: 'church', claim: 'c_22222222', done: true } });
+  assert.equal(load().build.claim, 'c_1234abcd');
+});
+
+test('furnish keeps the explicit subgroup for server mapping and carries build progress', async t => {
+  const { calls } = await buildFixture(t, c => c.path === '/v1/god/query' && c.body.layout ? { layout: { entities: [{ id: 'e_church', name: 'church', path: 'church', parent: 'world', pose: [0, 0, 0, 0, 1] }] } } : null);
+  save({ build: localBuild() });
+  const text = await COMMANDS.furnish(['church'], { style: 'chapel', group: 'interior' });
+  assert.match(text, /\[church 1\/5 shell\]$/);
+  assert.equal(calls.at(-1).body.group, 'interior'); assert.equal(calls.at(-1).body.build.id, 'church');
+});
+
+test('fractional/signed numeric site syntax is resolved locally without mirror requests', async t => {
+  const { calls } = await buildFixture(t);
+  await build('start', ['church'], { ...startFlags(), at: '.5,+1', offset: '-.25,+.5' });
+  assert.equal(calls.length, 1); assert.deepEqual(calls[0].body.site.at, [0.25, 1.5]);
+});
+
+test('closed build show reports history without telling the operator to finish or advance it', async t => {
+  await buildFixture(t, c => c.path === '/v1/god/builds/church' ? { ok: true, build: serverBuild({ status: 'done', current: { n: 5, label: 'furnish', batches: 1, lastSeq: 9, recent: [] }, next: { n: 6, label: 'extra' } }) } : null);
+  const text = await build('show', ['church']);
+  assert.match(text, /church: Black stone church \(done\)/);
+  assert.doesNotMatch(text, /IN PROGRESS|finish it first|next:/);
+});
+
+test('accepted remote edits never enter transport recovery when local state finalization fails', async t => {
+  const { calls } = await buildFixture(t, c => {
+    if (c.path === '/v1/god/act') { writeFileSync('.eden-god.json', '{malformed'); return { accepted: true, seq: 9, build: echo(c.body) }; }
+  });
+  save({ build: localBuild() });
+  await assert.rejects(act({ ops: [{ op: 'remove', id: 'old' }] }), SyntaxError);
+  assert.equal(calls.length, 1);
+});
+
+test('downloadable bundle runs the build lifecycle and global bypass against only the local stub', async t => {
+  const { calls, dir } = await buildFixture(t);
+  const executable = new URL('./eden-god.mjs', import.meta.url).pathname;
+  const cli = args => new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [executable, ...args], { cwd: dir, env: { ...process.env, EDEN_GOD_TRACE: '', EDEN_GOD_TIMING: '' }, stdio: ['ignore', 'pipe', 'pipe'] });
+    let stdout = '', stderr = ''; child.stdout.on('data', d => { stdout += d; }); child.stderr.on('data', d => { stderr += d; });
+    child.on('error', reject); child.on('exit', code => code ? reject(new Error(stderr)) : resolve({ stdout, stderr }));
+  });
+  const start = await cli(['build', 'start', 'church', '--title', 'Church', '--steps', 'shell,roof,interior', '--at', '0,0', '--size', '40,16', '--mass', 'nave 0,0 22x10 h5 gable']);
+  assert.match(start.stdout, /every edit now carries build church, step 1\/3 shell/);
+  assert.equal(calls.length, 1);
+  await cli(['build', 'step']); assert.equal(calls.length, 1);
+  const batch = '{"ops":[{"op":"remove","id":"old"}]}';
+  const edit = await cli(['act', batch]);
+  assert.equal(calls.at(-1).body.build.step, 2);
+  assert.equal(edit.stderr.trim(), '[church 2/3 roof]');
+  const jsonEdit = await cli(['act', batch, '--json']);
+  assert.equal(JSON.parse(jsonEdit.stdout).accepted, true); assert.equal(jsonEdit.stderr, '');
+  await cli(['act', batch, '--no-build']); assert.equal(calls.at(-1).body.build, undefined);
+  await cli(['build', 'done', 'all listed items exist']); assert.equal(load().build, undefined);
 });

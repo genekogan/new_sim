@@ -69,13 +69,16 @@ world is `http://127.0.0.1:4990/w/<slug>`. Copy it from the browser rather than 
 
 ## The loop
 
+0. For anything bigger than one object, `build start`: site, title, 3–6 `--steps`, and `--mass` boxes for the main volumes (site-local metres).
 1. `map` — the whole world as structure: terrain, water, every root thing with pose and contents,
    flags, prayers. It is complete and exact; plan from it.
 2. `find <words>` / `defs <words>` — see what already exists and what it offers (see below).
 3. `place <def> <relations>` — the solver turns relations into a pose, dry-runs it, steps around
    collisions, commits, and tells you what it did.
+   Use `build step` between stages; edits carry it.
 4. **`look` after a meaningful step** — then open the PNG it names. Fix what looks wrong.
 5. `undo` (or `undo --group <name>`) when something went wrong; `history` shows the journal.
+6. `build done` (or `build abandon`); `done:true` can ride on the last edit's `build` field.
 
 Build in **small batches the audience can watch arrive** (a house, then its furniture, then the
 garden), not one giant batch. Put one request's edits in a `group` so it can be reviewed and undone whole.
@@ -86,7 +89,8 @@ The owner is waiting; a fast, honest, complete answer beats an endlessly polishe
 
 1. **List what was asked** before you build: each named thing, each material or colour, each use ("walk in", "sit").
    That list is your definition of done; nothing else is.
-2. **Show a first look early**: as soon as the main form stands, `look` and tell the owner.
+2. **Show a first look early**: give `--mass` at `build start`; `look` and tell the owner within about 2 minutes.
+   Look again after the first real step.
 3. **Check the asked-for uses with what the world tells you**: `describe` (rooms, doors, "reachable from outside",
    seat slots and who sits there) and `where`. `verify-use` (a probe resident that walks in and sits, see *Making
    things usable*) is an optional extra check; it is never a reason to keep rebuilding something that already works.
@@ -421,6 +425,8 @@ about 5–10 s (`--from` walks the whole way and takes longer); one probe per wo
 
 ## Submitting, previewing and recovering
 
+- Edits carry the build id and step; retries never count twice. `build resume <id>` restores server state:
+  finish its `current` step before `build step`. `--no-build` skips automatic metadata.
 - Every write the CLI sends carries a fresh request id (`clientRef`). The server stores each accepted edit's
   receipt with it, so a lost answer is recoverable: the CLI looks the id up, and resends the identical request
   only when the server says it never arrived. A message ending "check `request <id>`" means the outcome is still
@@ -462,6 +468,12 @@ an extra word, several options in one quoted argument); nothing was sent. Fix th
 | `undo.conflict` | something later depends on it; undo that first, or fix by hand |
 | `wallet.insufficient` | the wallet has less than that (a Soul spent it); `layers` shows wallets |
 | `relation.invalid` | a relation end is not a thing, Soul or group (`thing:` names must exist) |
+| `build.claim` · `build.claimed` | stay in your claim; wait for another holder to release its scope |
+| `build.lease` · `build.leased` | `build resume <id>`; wait for the live lead; `--take` only when it has stopped |
+| other `build.*` | follow the named fix; `build show <id>` lists state and claims |
+| `site.under-construction` | finish the build before residents use it |
+| `architecture.sealed` | preserve another entrance or clear the named approach |
+| `budget.world` · `budget.region` | use field/measured/limit/fix to reduce or spread construction |
 
 ## Manners
 
@@ -480,7 +492,7 @@ prayer then **leaves** `prayers` (the Soul sees your answer). `prayers --all` sh
 too, with what you said. `map` and `status` count the waiting ones. Interpret prayers under the
 world's constitution (`constitution "<markdown>"` sets it; Souls can read it).
 
-## Six worked examples
+## Seven worked examples
 
 `examples` lists them; `examples <name>` prints its transcript (every command with the answer it got)
 and saves `examples/<name>.log` and `.mjs` here (also served at `<world-url>/god/examples/<name>.log`).
@@ -553,3 +565,26 @@ place well --free --near lane --name village-well
 resolve                                          # every kept relation still holds?
 look --at hill --from s
 ```
+
+**7. A church, massing first** (`church-massing.mjs`)
+```
+build start church --title "Black stone church" --steps "shell,roof and tower,openings,interior,furnish" --at 0,0 --size 40,16 --mass "nave 0,0 22x10 h5 gable; tower -15,0 6x6 h30 pyramid"
+look --at 0,0 --span 44               # massing is visible from start; tell the owner
+act shell.json                       # actual chapel walls, rooms and entrance
+look --at church --span 44            # inspect the first real step
+build step
+act roof-and-tower.json
+build step
+act openings.json                    # remove + replacement belong in one batch
+build step
+act interior.json
+build step
+furnish church --style chapel --group interior
+describe church                      # default use check; verify-use is optional
+build done "nave, tower, furnished interior"
+```
+The script supplies the batches. Massing is ≤8 site-local boxes, not grey entities to remove later.
+In a fresh folder, `build resume church` reports the unfinished `current` step, recent edits, roots,
+massing part counts and `next`. Finish `current` before advancing.
+For help: `build claim east-aisle --root church/east-aisle`; give the helper its printed
+`EDEN_GOD_CLAIM=c_…`. It keeps its own step file and ends with `build release --done`.

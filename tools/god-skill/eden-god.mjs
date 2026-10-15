@@ -3,30 +3,103 @@
 // Single file, no dependencies: download it next to SKILL.md and run `node eden-god.mjs help`.
 
 // lib/state.mjs
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync, renameSync, unlinkSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 var STATE = ".eden-god.json";
-var load = () => existsSync(STATE) ? JSON.parse(readFileSync(STATE, "utf8")) : {};
-var save = (patch) => {
-  const s = { ...load(), ...patch };
-  for (const k of Object.keys(s)) if (s[k] === void 0) delete s[k];
-  writeFileSync(STATE, JSON.stringify(s, null, 2) + "\n", { mode: 384 });
-  return s;
+var read = (file) => existsSync(file) ? JSON.parse(readFileSync(file, "utf8")) : {};
+var claimFile = (id) => {
+  if (!/^c_[0-9a-f]{8}$/.test(id)) throw new Error("EDEN_GOD_CLAIM must be c_ followed by eight hexadecimal digits");
+  return `.eden-god.claim-${id}.json`;
 };
+function atomicWrite(file, text) {
+  const temp = `${file}.${process.pid}.${randomUUID()}.tmp`;
+  try {
+    writeFileSync(temp, text, { mode: 384, flag: "wx" });
+    renameSync(temp, file);
+  } finally {
+    try {
+      unlinkSync(temp);
+    } catch (e) {
+      if (e.code !== "ENOENT") throw e;
+    }
+  }
+}
+function load() {
+  const s = read(STATE), cid = process.env.EDEN_GOD_CLAIM;
+  if (!cid) return s;
+  const local = read(claimFile(cid)), b = s.build;
+  const merged = { ...s, group: void 0, build: b ? { id: b.id, claim: cid, n: 1, label: b.steps?.[0] ?? "step 1", steps: b.steps } : void 0, ...local };
+  if (merged.build) {
+    const { lease, ...build3 } = merged.build;
+    merged.build = { ...build3, claim: cid };
+  }
+  return merged;
+}
+function save(patch) {
+  const file = process.env.EDEN_GOD_CLAIM ? claimFile(process.env.EDEN_GOD_CLAIM) : STATE;
+  const s = { ...read(file), ...patch };
+  for (const k of Object.keys(s)) if (s[k] === void 0) delete s[k];
+  if (process.env.EDEN_GOD_CLAIM && Object.hasOwn(patch, "build") && !patch.build) s.build = null;
+  atomicWrite(file, JSON.stringify(s, null, 2) + "\n");
+  return load();
+}
+var context = new AsyncLocalStorage();
+var OUTPUT_SUFFIX = /* @__PURE__ */ Symbol("build output suffix");
+var withoutBuild = (run) => context.run({ ...context.getStore(), noBuild: true }, run);
+function withBuildOptions(flags2, run) {
+  const ctx = { noBuild: !!flags2["no-build"] };
+  return context.run(ctx, () => {
+    const finish = (out2) => {
+      if (ctx.suffix && !flags2.json) {
+        if (typeof out2 === "string") return `${out2} ${ctx.suffix}`;
+        if (out2 && typeof out2 === "object") Object.defineProperty(out2, OUTPUT_SUFFIX, { value: ctx.suffix, configurable: true });
+      }
+      return out2;
+    };
+    const out = run();
+    return out?.then ? out.then(finish) : finish(out);
+  });
+}
+function buildSuffix(echo, b = load().build) {
+  if (!echo) return "";
+  const step = echo.step ?? {}, of = b?.id === echo.id ? b.steps?.length : void 0;
+  const n = `${step.n ?? b?.n ?? 1}${of ? "/" + of : ""}`;
+  const id = String(echo.id).slice(0, 8), room = Math.max(0, 24 - id.length - n.length - 4);
+  return `[${id} ${n}${room ? " " + String(step.label ?? b?.label ?? "").replace(/[^\x20-\x7e]/g, "?").slice(0, room) : ""}]`;
+}
+function buildHeader(b = load().build, server) {
+  if (!b) return "";
+  return `build ${b.id} ${b.n}/${b.steps?.length ?? "?"} ${b.label} (${server?.status ?? b.status ?? "active"}, ${b.claim ? `claim: ${b.part ?? b.claim}` : "lead: you"})`;
+}
 var need = (s, k, hint) => {
   if (!s[k]) throw new Error(`${k} missing. ${hint}`);
   return s[k];
 };
 var sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 var EDIT_PATHS = /* @__PURE__ */ new Set(["/v1/god/act", "/v1/god/env", "/v1/god/land", "/v1/god/strike", "/v1/god/undo", "/v1/god/redo", "/v1/god/answer"]);
-async function call(path, { body, method, as = "god", timeoutMs = Number(process.env.EDEN_GOD_TIMEOUT_MS ?? 18e4) } = {}) {
+async function call(path, { body, method, as = "god", noBuild = false, timeoutMs = Number(process.env.EDEN_GOD_TIMEOUT_MS ?? 18e4) } = {}) {
   const s = load(), world = need(s, "world", "Run: node eden-god.mjs register <world-url>"), headers = { "content-type": "application/json" };
   if (as === "god" && s.token) headers.authorization = `Bearer ${s.token}`;
   if (as === "owner" && s.identity) headers.authorization = `Bearer ${s.identity}`;
   const verb = method ?? (body ? "POST" : "GET"), pathname = path.split("?")[0];
+  const batchPath = ["/v1/god/act", "/v1/god/preview", "/v1/god/dryrun"].includes(pathname);
+  const revertPath = ["/v1/god/undo", "/v1/god/redo"].includes(pathname);
+  const sealed = body && Object.hasOwn(body, "preview");
+  const worldOnly = Array.isArray(body?.ops) && body.ops.every((o) => ["world", "answer"].includes(o.op));
+  const carries = as === "god" && verb !== "GET" && (batchPath || revertPath) && !sealed && !noBuild && !context.getStore()?.noBuild && !worldOnly;
+  if (carries) {
+    body = { ...body };
+    if (!body.build && s.build) {
+      const b = s.build;
+      body.build = { id: b.id, ...b.claim ? { claim: b.claim } : { lease: b.lease }, step: b.n, label: b.label };
+    }
+    if (batchPath && body.group === void 0 && s.group) body.group = s.group;
+  } else if (batchPath && !sealed && body?.group === void 0 && s.group && !s.build) body = { ...body, group: s.group };
   const clientRef = as === "god" && verb !== "GET" && EDIT_PATHS.has(pathname) ? randomUUID() : void 0;
   const payload = body || clientRef ? JSON.stringify(clientRef ? { ...body, clientRef } : body) : void 0;
   const recoverable = clientRef && pathname === "/v1/god/act" && verb === "POST";
+  let waited = 0;
   async function send(requestPath, requestMethod, requestBody, deadline = timeoutMs) {
     const t0 = Date.now();
     const r = await fetch(world + requestPath, { method: requestMethod, headers, body: requestBody, signal: AbortSignal.timeout(deadline) });
@@ -38,20 +111,54 @@ async function call(path, { body, method, as = "god", timeoutMs = Number(process
     } catch {
       data = { raw: text.slice(0, 400) };
     }
+    if (r.status === 429 && requestMethod !== "GET" && EDIT_PATHS.has(requestPath.split("?")[0])) {
+      const delay = Number(data.retryAfterMs);
+      if (Number.isFinite(delay) && delay >= 0 && waited < 6e4) {
+        const ms = Math.max(1, Math.min(delay, 3e4, 6e4 - waited));
+        waited += ms;
+        await sleep(ms);
+        return send(requestPath, requestMethod, requestBody, deadline);
+      }
+    }
     return { status: r.status, data };
   }
+  const finish = (r) => {
+    const b = body?.build, data = r.data;
+    if (as === "god" && pathname === "/v1/god/preview" && data?.accepted && data.id && b?.claim && b.done) {
+      const previews = Object.entries(load().buildPreviews ?? {}).slice(-19);
+      save({ buildPreviews: { ...Object.fromEntries(previews), [data.id]: { id: b.id, claim: b.claim } } });
+    }
+    if (as !== "god" || !(pathname === "/v1/god/act" || revertPath) || !data?.accepted) return r;
+    if (b && !data.build && !s.buildEchoWarned) {
+      console.error("this server does not record builds; progress is not shown");
+      save({ buildEchoWarned: true });
+    }
+    if (data.build) {
+      const ctx = context.getStore();
+      if (ctx) ctx.suffix = buildSuffix(data.build, s.build);
+      const current = load().build;
+      if (current?.id === data.build.id) {
+        const sealedDone = body?.preview && load().buildPreviews?.[body.preview];
+        const claimDone = current.claim && (b?.done && b.claim === current.claim || sealedDone?.id === current.id && sealedDone.claim === current.claim);
+        if (["done", "abandoned"].includes(data.build.status) || claimDone) save({ build: void 0, group: void 0, buildPreviews: void 0 });
+        else save({ build: { ...current, status: data.build.status } });
+      }
+    }
+    return r;
+  };
   const lost = (e) => {
     const slow = /timeout|abort/i.test(`${e?.name} ${e?.message}`);
     const detail = slow ? `the world did not answer within ${Math.round(timeoutMs / 1e3)} s` : String(e?.message ?? e);
     const advice = recoverable ? ` Check \`request ${clientRef}\` before issuing a new edit; its outcome is unresolved.` : clientRef ? " This endpoint has no receipt recovery; verify the world before issuing it again." : "";
     return { status: 0, data: { ok: false, code: slow ? "slow" : "unreachable", ...clientRef ? { clientRef } : {}, message: detail + advice } };
   };
-  let failure;
+  let failure, response;
   try {
-    return await send(path, verb, payload);
+    response = await send(path, verb, payload);
   } catch (e) {
     failure = e;
   }
+  if (response) return finish(response);
   if (!recoverable) return lost(failure);
   const lookup = async () => send(`/v1/god/requests/${encodeURIComponent(clientRef)}`, "GET", void 0, Math.min(timeoutMs, 1e4));
   const receiptResult = (r) => r.status === 200 && r.data?.result?.accepted === true ? { status: 200, data: { ...r.data.result, replayed: true } } : null;
@@ -62,18 +169,20 @@ async function call(path, { body, method, as = "god", timeoutMs = Number(process
     return lost(failure);
   }
   const recovered = receiptResult(receipt);
-  if (recovered) return recovered;
+  if (recovered) return finish(recovered);
   if (receipt.status !== 404) return lost(failure);
   try {
-    return await send(path, verb, payload);
+    response = await send(path, verb, payload);
   } catch (e) {
     failure = e;
   }
+  if (response) return finish(response);
   try {
-    return receiptResult(await lookup()) ?? lost(failure);
+    receipt = await lookup();
   } catch {
     return lost(failure);
   }
+  return finish(receiptResult(receipt) ?? lost(failure));
 }
 var ok = (r, what) => {
   if (r.status >= 200 && r.status < 300) return r.data;
@@ -135,11 +244,11 @@ async function taxonomy(flags2 = {}) {
 }
 
 // cli.mjs
-import { readFileSync as readFileSync4, writeFileSync as writeFileSync5, existsSync as existsSync4, mkdirSync as mkdirSync3, appendFileSync } from "node:fs";
+import { readFileSync as readFileSync4, writeFileSync as writeFileSync4, existsSync as existsSync4, mkdirSync as mkdirSync3, appendFileSync } from "node:fs";
 import { resolve as resolve2 } from "node:path";
 
 // lib/mirror.mjs
-import { existsSync as existsSync2, readFileSync as readFileSync2, writeFileSync as writeFileSync2 } from "node:fs";
+import { existsSync as existsSync2, readFileSync as readFileSync2 } from "node:fs";
 
 // lib/solver.mjs
 var COMPASS = { n: [0, -1], s: [0, 1], e: [1, 0], w: [-1, 0], ne: [Math.SQRT1_2, -Math.SQRT1_2], nw: [-Math.SQRT1_2, -Math.SQRT1_2], se: [Math.SQRT1_2, Math.SQRT1_2], sw: [-Math.SQRT1_2, Math.SQRT1_2] };
@@ -1022,7 +1131,7 @@ function readCache() {
 }
 function writeCache(c) {
   try {
-    writeFileSync2(CACHE, JSON.stringify(c), { mode: 384 });
+    atomicWrite(CACHE, JSON.stringify(c));
   } catch {
   }
 }
@@ -1031,7 +1140,7 @@ async function mirror({ fresh = false } = {}) {
   if (memo && memo.world === world && !fresh) {
     const s = await call("/v1/world/seq", { as: "none", timeoutMs: 5e3 });
     if (s.status === 0) return { ...memo, offline: true };
-    if (s.data.seq === memo.seq) return memo;
+    if (s.data.seq === memo.seq && s.data.builds === memo.buildsRev) return memo;
   }
   const cached = memo?.world === world ? memo : readCache();
   const seqR = await call("/v1/world/seq", { as: "none", timeoutMs: 5e3 });
@@ -1042,7 +1151,7 @@ async function mirror({ fresh = false } = {}) {
     }
     throw new Error(`world unreachable (${seqR.data.message}) and no cached mirror`);
   }
-  if (!fresh && cached && cached.world === world && cached.seq === seqR.data.seq) {
+  if (!fresh && cached && cached.world === world && cached.seq === seqR.data.seq && cached.buildsRev === seqR.data.builds) {
     memo = cached;
     return cached;
   }
@@ -1056,7 +1165,7 @@ function invalidate() {
   memo = null;
 }
 function build(world, snapshot2, layout) {
-  return { world, seq: snapshot2.seq, at: Date.now(), extent: snapshot2.constants.extent, snapshot: snapshot2, rows: layout.entities };
+  return { world, seq: snapshot2.seq, buildsRev: snapshot2.buildsRev, at: Date.now(), extent: snapshot2.constants.extent, snapshot: snapshot2, rows: layout.entities };
 }
 function view(m) {
   const byId = new Map(m.rows.map((r) => [r.id, r]));
@@ -1221,21 +1330,21 @@ function exportGenesis(snapshot2, { name } = {}) {
 
 // lib/look.mjs
 import { spawn, spawnSync } from "node:child_process";
-import { existsSync as existsSync3, mkdirSync as mkdirSync2, readFileSync as readFileSync3, writeFileSync as writeFileSync4, rmSync as rmSync2, statSync as statSync2, utimesSync } from "node:fs";
+import { existsSync as existsSync3, mkdirSync as mkdirSync2, readFileSync as readFileSync3, writeFileSync as writeFileSync3, rmSync as rmSync2, statSync as statSync2, utimesSync } from "node:fs";
 import { createRequire } from "node:module";
 import { createServer } from "node:net";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 // lib/chrome-lease.mjs
-import { mkdirSync, rmSync, statSync, writeFileSync as writeFileSync3 } from "node:fs";
+import { mkdirSync, rmSync, statSync, writeFileSync as writeFileSync2 } from "node:fs";
 var LEASE = "/tmp/eden-chrome-lease";
 async function chromeLease(holder = "unknown", { waitMs = 20 * 6e4, staleMs = 15 * 6e4 } = {}) {
   const t0 = Date.now();
   for (; ; ) {
     try {
       mkdirSync(LEASE);
-      writeFileSync3(`${LEASE}/holder`, `${holder} ${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
+      writeFileSync2(`${LEASE}/holder`, `${holder} ${process.pid} ${(/* @__PURE__ */ new Date()).toISOString()}
 `);
       break;
     } catch {
@@ -1351,7 +1460,7 @@ async function keeper(worldUrl, port) {
   await ctx.addInitScript(PRESERVE);
   const page = await ctx.newPage();
   await page.goto(`${worldUrl}?shot=1`, { waitUntil: "commit", timeout: 6e5 });
-  writeFileSync4(KEEPER, JSON.stringify({ world: worldUrl, port, pid: process.pid, at: Date.now() }));
+  writeFileSync3(KEEPER, JSON.stringify({ world: worldUrl, port, pid: process.pid, at: Date.now() }));
   for (; ; ) {
     await new Promise((r) => setTimeout(r, 3e4));
     let last = 0;
@@ -1515,7 +1624,7 @@ async function shoot({ worldUrl, eye, at, out, hideRoofs = false, cut = null, sp
       }
     }, frames);
     if (!data) throw new Error("look: no canvas on the page");
-    writeFileSync4(resolve(out), Buffer.from(data.split(",")[1], "base64"));
+    writeFileSync3(resolve(out), Buffer.from(data.split(",")[1], "base64"));
     return { file: resolve(out), ms: now() - t0, state, frames, via: keep ? "keeper" : "chrome" };
   } finally {
     if (!keep) {
@@ -1889,6 +1998,7 @@ async function map(opts = {}) {
   const lines = [];
   lines.push(`# ${s.worldId} \u2014 ${s.constants.extent} m square (\xB1${s.constants.extent / 2}), ground ${s.constants.ground}, seq ${s.seq}${m.offline ? " (OFFLINE: cached)" : ""}`);
   lines.push(`sky ${s.state.sky.palette}, ${s.entities.length} entities, ${s.library.length} defs, ${s.prayers.length} prayers waiting, undo ${s.undoable ?? "-"} / redo ${s.redoable ?? "-"}${load().group ? `, group "${load().group}"` : ""}`);
+  if (load().build) lines.push(buildHeader(load().build, s.builds?.find((b) => b.id === load().build.id)));
   const land2 = s.ground.landforms.filter((l) => !l.id.endsWith(":pad"));
   const nameOf = (id) => v.byId.get(id)?.path ?? id;
   if (land2.length) {
@@ -2113,20 +2223,16 @@ async function freePlots(size, flags2 = {}) {
   const r = (await query({ free: { size: [w, d], near: [near.x, near.z], radius: flags2.radius ? num(flags2.radius) : 150, count: flags2.count ? num(flags2.count) : 4, maxSlope: flags2.slope ? num(flags2.slope) : 0.25 } })).free;
   return flags2.json ? r : r.length ? r.map((f) => `- (${f.at.join(", ")}) y ${f.y}, slope ${f.slope}, ${f.dist} m from (${near.x}, ${near.z})`).join("\n") : "no free plot of that size within the radius";
 }
-var withGroup = (batch) => {
-  const g = load().group;
-  return g && !batch.group ? { ...batch, group: g } : batch;
-};
 async function act(batch, note) {
-  const r = ok(await call("/v1/god/act", { body: withGroup({ ...batch, ...note ? { note } : {} }) }), "act");
+  const r = ok(await call("/v1/god/act", { body: { ...batch, ...note ? { note } : {} } }), "act");
   invalidate();
   return r;
 }
 async function dryrun(batch) {
-  return ok(await call("/v1/god/dryrun", { body: withGroup(batch) }), "dryrun");
+  return ok(await call("/v1/god/dryrun", { body: batch }), "dryrun");
 }
 async function preview(batch) {
-  const r = ok(await call("/v1/god/preview", { body: withGroup(typeof batch === "string" ? JSON.parse(batch) : batch) }), "preview");
+  const r = ok(await call("/v1/god/preview", { body: typeof batch === "string" ? JSON.parse(batch) : batch }), "preview");
   return r.accepted ? { ...r, url: `${load().world}?preview=${r.id}`, commit: `node eden-god.mjs commit ${r.id}`, tell: `Preview ${r.id}: open ${load().world}?preview=${r.id} to see the ghost; run \`node eden-god.mjs commit ${r.id}\` to build it.` } : r;
 }
 async function commit(id) {
@@ -2146,6 +2252,23 @@ async function planBatch(batch) {
   return `would be accepted: ${r.diff.upserts} things placed/changed, ${r.diff.removes} removed${r.diff.defs.length ? `, defines ${r.diff.defs.join(", ")}` : ""}${r.diff.tiles ? `, ${r.diff.tiles} terrain tiles` : ""}${r.warnings.length ? `; warnings: ${r.warnings.join("; ")}` : ""}`;
 }
 var HINTS = {
+  "build.unknown": "`build` lists sites; start a new build or check its id",
+  "build.closed": "start a new build with a new id",
+  "build.exists": "pick a new id or `build resume <id>`",
+  "build.limit": "finish or abandon a build, or release a claim",
+  "build.site": "move or shrink the site or mass",
+  "build.group": "drop the subgroup or carry the build",
+  "build.lease": "the lease changed; run `build resume <id>` before editing",
+  "build.leased": "the lead is live; wait or ask it to stop; --take only when it has stopped",
+  "build.claim": "edit only under the claim root / inside its region",
+  "build.claimed": "another live claim owns this part; wait or ask for release",
+  "build.claim-unknown": "`build show` lists claims; the claim was released or taken",
+  "build.claims-open": "release live claims, or use --force",
+  "build.undo-incomplete": "the build stays open; inspect notReverted before trying again",
+  "site.under-construction": "finish the build before residents use it",
+  "architecture.sealed": "preserve another entrance or clear the named approach",
+  "budget.world": "use field/measured/limit/fix to reduce or spread construction",
+  "budget.region": "use field/measured/limit/fix to reduce or spread construction",
   "overlap.solid": "something solid is there; the server suggests a spot (suggest.p) \u2014 the solver already tried it; try --near with --dist, --free, or remove the blocker",
   "support.none": "nothing to rest on; give a parent or a 2-D p so it settles on the ground",
   "extent.outside": "outside the world; `expand <metres>` grows it, or place nearer the centre",
@@ -2167,7 +2290,7 @@ var HINTS = {
   "constraint.unsatisfied": "the constraint cannot hold (its ref is gone or impossible)",
   "undo.conflict": "the world changed since; undo the later edit first or fix by hand"
 };
-var explainFailure = (f) => `${f.code} (op ${f.op}): ${f.detail}${f.field ? ` \u2014 field ${f.field}` : ""}${f.fix ? ` \u2014 fix: ${f.fix}` : ""}${f.suggest?.p ? ` \u2014 suggest p ${JSON.stringify(f.suggest.p)}` : ""}${HINTS[f.code] ? ` [${HINTS[f.code]}]` : ""}`;
+var explainFailure = (f) => `${f.code} (op ${f.op}): ${f.detail}${f.field ? ` \u2014 field ${f.field}` : ""}${f.fix ? ` \u2014 fix: ${f.fix}` : ""}${f.suggest?.p ? ` \u2014 suggest p ${JSON.stringify(f.suggest.p)}` : ""}${HINTS[f.code] ? ` [${HINTS[f.code]}]` : ""}${f.code === "build.lease" && load().build ? `; run \`build resume ${load().build.id}\` before editing` : ""}`;
 var parseKV = (list2) => Object.fromEntries([].concat(list2 ?? []).map((kv) => {
   const i = kv.indexOf("=");
   const k = kv.slice(0, i), v = kv.slice(i + 1);
@@ -2525,17 +2648,160 @@ async function constitution(text) {
 async function expand(extent) {
   return act({ ops: [{ op: "expand", extent: num(extent) }] });
 }
+var BUILD_API = {
+  path: (id, action) => `/v1/god/builds${id ? "/" + encodeURIComponent(id) : ""}${action ? "/" + action : ""}`,
+  local: (r) => {
+    const b = r.build, step = r.current ?? b.current ?? b.step;
+    return { id: b.id, lease: r.lease, n: step?.n || 1, label: step?.label || b.plan.steps[0], steps: b.plan.steps, status: b.status };
+  },
+  claim: (b, c) => ({ id: b.id, claim: c.id, part: c.part, n: c.step?.n || 1, label: c.step?.label || b.plan.steps[0], steps: b.plan.steps, status: b.status })
+};
+var buildPair = (s, what) => {
+  if (typeof s !== "string" || s.split(",").some((v) => !v.trim())) throw new Error(`${what} needs two numbers`);
+  return dxdz(s, what);
+};
+function parseMassing(text) {
+  if (text === void 0) return [];
+  if (typeof text !== "string" || !text.trim()) throw new Error("--mass needs volumes: nave 0,0 22x10 h12 gable");
+  const masses = text.split(";").map((s) => {
+    const fields = s.trim().split(/\s+/), name = fields[0]?.includes(",") ? void 0 : fields.shift();
+    if (name && !/^[a-z0-9][a-z0-9-]{0,18}$/.test(name)) throw new Error("mass names must be slugs of at most 19 characters");
+    const [at, size, height, roof, ...extra] = fields;
+    if (!size || !/^h.+/.test(height ?? "") || extra.length || roof && !["flat", "gable", "pyramid"].includes(roof)) throw new Error("mass: use name x,z wxd h12 [flat|gable|pyramid]");
+    const box = buildPair(size.replace(/[x×]/, ","), "mass size"), h = num(height.slice(1));
+    if (box.some((v) => v <= 0) || h < 0.5 || h > 120) throw new Error("mass size must be positive; height is 0.5..120 m");
+    return { ...name ? { name } : {}, at: buildPair(at, "mass at"), size: box, h, ...roof ? { roof } : {} };
+  });
+  if (masses.length > 8) throw new Error("at most 8 massing volumes");
+  return masses;
+}
+async function buildSite(f) {
+  if (f.at === void 0 || f.size === void 0) throw new Error("build needs --at <ref|x,z> --size w,d");
+  const size = buildPair(f.size, "--size");
+  if (size.some((n) => n < 1 || n > 200)) throw new Error("site size is 1..200 m on each side");
+  if (f.offset !== void 0) buildPair(f.offset, "--offset");
+  const numeric = typeof f.at === "string" && f.at.includes(",");
+  const [x, z] = numeric ? buildPair(f.at, "--at") : [];
+  const [dx, dz] = f.offset ? buildPair(f.offset, "--offset") : [0, 0];
+  const p = numeric ? { x: x + dx, z: z + dz } : refPoint(view(await mirror()), f.at, f.offset);
+  return { at: [p.x, p.z], size, yaw: f.yaw === void 0 ? 0 : num(f.yaw) };
+}
+function buildReport(r) {
+  if (r.open) return [...r.open.map((b2) => `${b2.id}: ${b2.status}, ${b2.step?.n ?? 1}/${b2.plan?.steps.length ?? "?"} ${b2.step?.label ?? ""}`), ...r.recent.map((b2) => `${b2.id}: ${b2.status}`), buildHeader()].filter(Boolean).join("\n") || "no builds";
+  const b = r.build, steps2 = b.plan.steps, current = r.current ?? b.current, open = ["active", "paused"].includes(b.status);
+  const lines = [`${b.id}: ${b.title} (${b.status}); site ${fmtP(b.site.at)} ${b.site.size.join("\xD7")} m, yaw ${b.site.yaw ?? 0}`, `steps: ${steps2.map((s, i) => `${i + 1} ${s}`).join("; ")}`];
+  if (current) {
+    lines.push(`step ${current.n}/${steps2.length} ${current.label}${open ? " IN PROGRESS" : ""}: ${current.batches} batches, last seq ${current.lastSeq ?? "none"}${open ? " \u2014 finish it first" : ""}`);
+    for (const e of current.recent ?? []) lines.push(`  seq ${e.seq}: ${e.note ?? ""}`);
+  } else lines.push(`step ${b.step?.n ?? 1}/${steps2.length} ${b.step?.label ?? steps2[0]}: no committed batches reported${open ? "; inspect and finish it first" : ""}`);
+  lines.push(`roots: ${b.roots.map((x) => x.path ?? x.id ?? x).join(", ") || "none yet"}`);
+  lines.push(`massing: ${(r.massing ?? b.massing).map((m, i) => `${m.name ?? i + 1} ${m.parts ?? 0} parts`).join(", ") || "none"}`);
+  lines.push(`claims: ${b.claims.map((c) => `${c.id} ${c.part} (${c.status}${c.holder?.label ? ", " + c.holder.label : ""})`).join("; ") || "none"}`);
+  const next = r.next ?? b.next;
+  if (next && open) lines.push(`next: ${next.n}/${steps2.length} ${next.label}`);
+  const root = b.roots[0];
+  if (root) lines.push(`first: describe ${root.path ?? root.id ?? root}`);
+  if (load().build?.id === b.id) lines.push(`local: ${buildHeader()}`);
+  return lines.join("\n");
+}
+async function build2(sub = "show", args = [], f = {}) {
+  const s = load(), b = s.build, arg = args[0];
+  const options = { start: "title steps at offset size yaw mass brief root", step: "", show: "", resume: "take", claim: "root at offset size yaw take", release: "done", pause: "", done: "force", abandon: "undo force" };
+  if (!Object.hasOwn(options, sub)) throw new Error("build: start|step|show|resume|claim|release|pause|done|abandon");
+  if (args.length > (["release", "abandon"].includes(sub) ? 0 : 1)) throw new Error(`build ${sub}: too many arguments`);
+  for (const [k, v] of Object.entries(f)) {
+    if (!["json", "no-build", ...options[sub].split(" ")].includes(k)) throw new Error(`build ${sub} has no option --${k}`);
+    if (Array.isArray(v)) throw new Error(`build ${sub} --${k} takes one value`);
+  }
+  if (sub === "resume" && f.take !== void 0 && f.take !== true) throw new Error("build resume --take takes no value");
+  if ((process.env.EDEN_GOD_CLAIM || b?.claim) && ["start", "resume", "claim", "done", "abandon"].includes(sub)) throw new Error(`claim holders cannot build ${sub}${sub === "resume" ? ": it would take the lead lease" : "; edit your claim, then build release --done"}`);
+  if (sub === "step") {
+    if (!b) throw new Error("no current build; build start or build resume first");
+    if (b.n >= 999) throw new Error("build step cannot exceed 999");
+    const n = b.n + 1, label = arg ?? b.steps[n - 1] ?? `step ${n}`;
+    if (typeof label !== "string" || !label.trim() || label.length > 60) throw new Error("step label is 1..60 characters");
+    save({ build: { ...b, n, label } });
+    return `step ${n}/${b.steps.length}: ${label} (rides on your next edit)`;
+  }
+  if (sub === "show") {
+    const r3 = ok(await call(BUILD_API.path(arg)), "build show");
+    if (r3.ok === false) return `REFUSED: ${r3.failures.map(explainFailure).join("; ")}`;
+    return f.json ? r3 : buildReport(r3);
+  }
+  let id, action, body;
+  if (sub === "start") {
+    if (!/^[a-z0-9][a-z0-9-]{0,39}$/.test(arg ?? "")) throw new Error("build start needs an id (slug, at most 40 characters)");
+    if (typeof f.title !== "string" || !f.title.trim() || f.title.length > 80) throw new Error("build start needs --title (1..80 characters)");
+    if (typeof f.steps !== "string") throw new Error("build start needs --steps shell,roof,interior");
+    const steps2 = f.steps.split(",").map((x) => x.trim());
+    if (steps2.length > 24 || steps2.some((x) => !x || x.length > 60)) throw new Error("--steps needs 1..24 labels, each 1..60 characters");
+    const massing = parseMassing(f.mass), site = await buildSite(f);
+    const brief = f.brief === void 0 ? void 0 : existsSync4(f.brief) ? readFileSync4(f.brief, "utf8") : f.brief;
+    if (brief !== void 0 && (typeof brief !== "string" || brief.length > 4e3)) throw new Error("--brief is at most 4000 characters");
+    body = { id: arg, title: f.title, steps: steps2, site, massing, ...brief !== void 0 ? { brief } : {}, ...f.root ? { root: f.root } : {} };
+  } else if (sub === "resume") {
+    if (!arg) throw new Error("usage: build resume <id> [--take]");
+    id = arg;
+    action = "resume";
+    body = { ...b?.id === id && b.lease ? { lease: b.lease } : {}, ...f.take ? { take: true } : {} };
+  } else {
+    id = b?.id;
+    if (!id) throw new Error("no current build; build resume <id> first");
+    if (sub === "claim") {
+      if (!/^[a-z0-9][a-z0-9-]{0,18}$/.test(arg ?? "")) throw new Error("build claim needs a part slug (at most 19 characters)");
+      if (f.take !== void 0 && (typeof f.take !== "string" || !/^c_[0-9a-f]{8}$/.test(f.take))) throw new Error("build claim --take needs a claim id");
+      const region = f.at !== void 0 || f.size !== void 0 ? await buildSite(f) : void 0;
+      if (!f.root && !region) throw new Error("build claim needs --root <path> or --at <ref> --size w,d");
+      action = "claims";
+      body = { part: arg, ...f.root ? { root: f.root } : {}, ...region ? { region } : {}, ...f.take ? { take: f.take } : {} };
+    } else if (sub === "release") {
+      if (!b.claim) throw new Error("build release needs EDEN_GOD_CLAIM or a local claim");
+      action = `claims/${encodeURIComponent(b.claim)}/release`;
+      body = f.done ? { done: true } : {};
+    } else if (sub === "pause") {
+      action = sub;
+      body = { ...b.lease ? { lease: b.lease } : {}, ...arg ? { note: arg } : {} };
+    } else if (sub === "done") {
+      action = sub;
+      body = { ...arg ? { summary: arg } : {}, ...f.force ? { force: true } : {} };
+    } else if (sub === "abandon") {
+      action = sub;
+      body = { ...f.undo ? { undo: true } : {}, ...f.force ? { force: true } : {} };
+    } else throw new Error("build: start|step|show|resume|claim|release|pause|done|abandon");
+  }
+  const r = ok(await call(BUILD_API.path(id, action), { body }), `build ${sub}`);
+  if (!r.ok) return f.json ? r : `REFUSED: ${r.failures.map(explainFailure).join("; ")}${r.notReverted ? `; undone edits: ${r.reverted?.join(", ") || "none"}; not undone edits: ${r.notReverted.join(", ")}` : ""}`;
+  if (sub === "start" || sub === "resume") save({ build: BUILD_API.local(r), group: void 0, buildEchoWarned: void 0, buildPreviews: void 0 });
+  if (sub === "claim") {
+    const file = claimFile(r.claim.id), previous = existsSync4(file) ? JSON.parse(readFileSync4(file, "utf8")) : null;
+    if (previous?.build?.id !== r.build.id || previous.build.claim !== r.claim.id) atomicWrite(file, JSON.stringify({ build: BUILD_API.claim(r.build, r.claim) }, null, 2) + "\n");
+    return f.json ? r : `${r.claim.id}: ${r.claim.part}; sub-agent: export EDEN_GOD_CLAIM=${r.claim.id}; edit only your scope, then build release --done`;
+  }
+  if (["release", "done", "abandon"].includes(sub)) save({ build: void 0, group: void 0, buildPreviews: void 0 });
+  invalidate();
+  if (f.json) return r;
+  if (sub === "start") return `${buildReport(r)}
+every edit now carries build ${r.build.id}, step 1/${r.build.plan.steps.length} ${r.build.plan.steps[0]}`;
+  if (sub === "resume") return buildReport(r);
+  return `${id}: ${sub === "release" ? "claim released" : r.build.status}${r.build.abandoned?.undo ? `; undone edits: ${r.build.abandoned.undo.reverted.join(", ") || "none"}; not undone edits: ${r.build.abandoned.undo.notReverted.join(", ") || "none"}` : ""}`;
+}
 async function group(name, flags2 = {}) {
+  const b = load().build;
   if (flags2.off || name === "off" || name === "-") {
     save({ group: void 0 });
-    return "no current group";
+    return b ? `no subgroup; edits still carry build ${b.id}` : "no current group";
   }
   if (!name) return load().group ? `current group: ${load().group}` : "no current group";
-  save({ group: String(name).slice(0, 60) });
-  return `current group: ${name} (every edit until \`group --off\`; undo it all with \`undo --group ${name}\`)`;
+  const g = (b ? String(name) === b.id || String(name).startsWith(b.id + "/") ? name : `${b.id}/${name}` : String(name)).slice(0, 60);
+  save({ group: g });
+  return `current group: ${g} (every edit until \`group --off\`; undo it all with \`undo --group ${g}\`)`;
 }
 async function undo(flags2 = {}) {
   const g = flags2.group === true ? load().group : flags2.group;
+  if ((process.env.EDEN_GOD_CLAIM || load().build?.claim) && !g) {
+    const b = load().build;
+    throw new Error(`a plain undo reverts anyone's newest edit; use \`undo --group ${b?.id ?? "<build>"}/${b?.part ?? "<part>"}\``);
+  }
   const r = ok(await call(`/v1/god/undo${g ? `?group=${encodeURIComponent(g)}` : ""}`, { method: "POST" }), "undo");
   invalidate();
   if (g) {
@@ -2668,11 +2934,11 @@ async function exportWorld(file, flags2 = {}) {
   const s = await snapshot();
   const g = exportGenesis(s, flags2);
   const out = resolve2(file ?? `${s.worldId}.genesis.json`);
-  writeFileSync5(out, JSON.stringify(g, null, 1));
+  writeFileSync4(out, JSON.stringify(g, null, 1));
   const ops = g.batches.flatMap((b) => b.ops), things = ops.filter((op) => op.op === "place").length, defs2 = ops.filter((op) => op.op === "define").length;
   return `exported ${things} things${defs2 ? ` and ${defs2} defs` : ""} in ${g.batches.length} batches to ${out}`;
 }
-async function importWorld(file, flags2 = {}) {
+var importWorld = (file, flags2 = {}) => withoutBuild(async () => {
   const g = JSON.parse(readFileSync4(file, "utf8"));
   if (g.schema !== "genesis/1") throw new Error("import: file must be genesis/1");
   const out = [];
@@ -2691,7 +2957,7 @@ async function importWorld(file, flags2 = {}) {
     if (!r.accepted) break;
   }
   return out.join("\n");
-}
+});
 async function define(json2) {
   const def = typeof json2 === "string" ? JSON.parse(existsSync4(json2) ? readFileSync4(json2, "utf8") : json2) : json2;
   if (def.make?.kind === "gen" && !def.params) {
@@ -2734,7 +3000,7 @@ async function furnish(ref, flags2 = {}) {
   const r = await act({ ops: f.ops, ...flags2.group ? { group: flags2.group } : {} }, `furnish ${ref}`);
   return r.accepted ? [`furnished ${ref}: ${summarizeOps(f.ops)} (seq ${r.seq})`, ...lines].join("\n") : `REFUSED: ${r.failures.map(explainFailure).join("; ")}`;
 }
-var EXAMPLES = { hamlet: "a hamlet in 8 commands: knoll, cottage, pond + bench, trees, well + lamps, a dog", "two-floor-house": "a townhouse furnished, an upstairs bedroom by hand, look --inside --floor 1", "river-bridge": "a lake, a river to the south edge, roads that bridge it", "market-square": "a plaza, a row of stalls, benches, lamps, a fountain", "forest-edge": "a woodland, a meadow, a track along the edge, deer", "hillside-village": "a hill, a road up it, cottages along it, a chapel, door paths" };
+var EXAMPLES = { hamlet: "a hamlet in 8 commands: knoll, cottage, pond + bench, trees, well + lamps, a dog", "two-floor-house": "a townhouse furnished, an upstairs bedroom by hand, look --inside --floor 1", "river-bridge": "a lake, a river to the south edge, roads that bridge it", "market-square": "a plaza, a row of stalls, benches, lamps, a fountain", "forest-edge": "a woodland, a meadow, a track along the edge, deer", "hillside-village": "a hill, a road up it, cottages along it, a chapel, door paths", "church-massing": "a church: site and massing first, then shell, roof and tower, openings, interior, furnishing" };
 async function examples(name) {
   if (!name) return ["worked examples (each = the exact commands a god agent typed and the answers it got):", ...Object.entries(EXAMPLES).map(([k, d]) => `- ${k}: ${d}`), `read one: examples <name>  (saves examples/<name>.log and .mjs here; also served at ${load().world}/god/examples/<name>.log)`].join("\n");
   if (!EXAMPLES[name]) throw new Error(`no example ${name}; examples: ${Object.keys(EXAMPLES).join(", ")}`);
@@ -2744,7 +3010,7 @@ async function examples(name) {
     const r = await fetch(`${load().world}/god/examples/${name}.${ext}`);
     if (!r.ok) throw new Error(`the world did not serve ${name}.${ext} (${r.status})`);
     const t = await r.text();
-    writeFileSync5(`examples/${name}.${ext}`, t);
+    writeFileSync4(`examples/${name}.${ext}`, t);
     if (ext === "log") out.push(t);
   }
   return `${out[0].trim()}
@@ -2777,9 +3043,9 @@ async function status() {
   const s = load();
   const st = ok(await call("/v1/god/status"), "status");
   const v = st.versions;
-  return `${s.world} \u2014 you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ""}; skill ${SKILL_VERSION}${v ? `; server protocol ${v.protocol}, schema ${v.schema}, skill ${v.skill}, source ${v.source}` : ""}`;
+  return `${s.world} \u2014 you are ${st.you}; ${st.entities} entities, seq ${st.seq}${s.group ? `; group "${s.group}"` : ""}${s.build ? `; ${buildHeader(s.build, st.builds?.find((b) => b.id === s.build.id))}` : ""}; skill ${SKILL_VERSION}${v ? `; server protocol ${v.protocol}, schema ${v.schema}, skill ${v.skill}, source ${v.source}` : ""}`;
 }
-var BOOL = /* @__PURE__ */ new Set(["float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "off", "md", "fresh", "remove", "free", "list", ...ENV_BOOLS, ...LAYERS_BOOLS]);
+var BOOL = /* @__PURE__ */ new Set(["no-build", "done", "force", "undo", "float", "dry", "plan", "nudge", "json", "all", "keep", "hide-roofs", "stop", "off", "md", "fresh", "remove", "free", "list", ...ENV_BOOLS, ...LAYERS_BOOLS]);
 var boolsFor = (cmd) => cmd === "look" ? /* @__PURE__ */ new Set([...BOOL, "inside"]) : BOOL;
 function parseFlags(argv, bools = BOOL) {
   const flags2 = {}, rest = [];
@@ -2802,6 +3068,7 @@ function parseFlags(argv, bools = BOOL) {
 }
 var REL = "at offset near around dist dir count facing yaw against between along t side setback inside corner wall on row grid gap spacing float from to via width across span free radius";
 var FLAGS = {
+  build: "title steps at offset size yaw mass brief root take done force undo",
   "verify-use": "seat from uses",
   place: `${REL} path area rect circle name param state scale dry plan nudge group note`,
   terrain: `${REL} path area rect circle name param state scale dry plan nudge group note`,
@@ -2835,16 +3102,16 @@ var FLAGS = {
   taxonomy: "",
   ...LAYERS_FLAGS
 };
-var POS = { "verify-use": 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
+var POS = { build: 2, "verify-use": 1, ...LAYERS_POS, catalog: 0, taxonomy: 0, time: 2, strike: 0, land: 3, place: 1, terrain: 1, move: 1, set: 1, recolor: 2, clone: 1, describe: 1, where: 1, free: 1, look: 0, sky: 0, weather: 0, select: 0, group: 1, undo: 0, redo: 0, history: 1, map: 0, furnish: 1, mint: 1, pair: 1, register: 2, status: 0, flags: 0, prayers: 0, schema: 0, snapshot: 0, examples: 1, expand: 1, import: 1, export: 1, define: 1, "define-kit": 1, act: 1, dryrun: 1, plan: 1, preview: 1, commit: 1, request: 1, query: 1, stream: 1, follow: 1, mirror: 0, gallery: 0, help: 1 };
 var NUMERIC = /* @__PURE__ */ new Set(["dist", "count", "t", "setback", "row", "spacing", "width", "span", "radius", "sun", "clouds", "wind", "rain", "fog", "intensity", "speed", "amount", "level", "depth", "metres", "peak", "edge", "face", "steps", "side", "scale", "floor", "height", "h", "slope", "gap", "yaw"]);
 function checkArgs(cmd, f, rest) {
-  const allowed = /* @__PURE__ */ new Set(["json", ...(FLAGS[cmd] ?? "").split(/\s+/).filter(Boolean)]);
+  const allowed = /* @__PURE__ */ new Set(["json", "no-build", ...(FLAGS[cmd] ?? "").split(/\s+/).filter(Boolean)]);
   for (const [k, v] of Object.entries(f)) {
     if (/\s/.test(k)) throw new Error(`cannot read "--${k}\u2026": several options arrived as ONE argument (a quoted string or an unsplit shell variable). Give each option separately, e.g. --param floors=1 --param w=8`);
     if (!allowed.has(k)) throw new Error(`${cmd} has no option --${k}. Its options: ${[...allowed].map((x) => "--" + x).join(" ")}`);
     for (const x of [].concat(v)) {
-      if (x === true && !BOOL.has(k) && !(cmd === "look" && k === "inside") && !(cmd === "undo" && k === "group") && !(k === "free")) throw new Error(`--${k} needs a value`);
-      if (NUMERIC.has(k) && x !== true && !Number.isFinite(Number(x))) throw new Error(`--${k} takes a number, got "${x}"`);
+      if (x === true && !BOOL.has(k) && !(cmd === "build" && k === "take") && !(cmd === "look" && k === "inside") && !(cmd === "undo" && k === "group") && !(k === "free")) throw new Error(`--${k} needs a value`);
+      if (NUMERIC.has(k) && !(cmd === "build" && k === "steps") && x !== true && !Number.isFinite(Number(x))) throw new Error(`--${k} takes a number, got "${x}"`);
       if (cmd === "look" && ["dist", "span"].includes(k) && (Array.isArray(v) || x === true || String(x).trim() === "" || Number(x) <= 0)) throw new Error(`look --${k} takes one finite positive number`);
       if (k === "param" && (typeof x !== "string" || !/^[A-Za-z][\w-]*=/.test(x))) throw new Error(`--param takes key=value (one per --param), got "${x}"`);
       if ((k === "by" || k === "step") && cmd !== "land" && !/^-?\d+(\.\d+)?,-?\d+(\.\d+)?$/.test(String(x))) throw new Error(`--${k} takes dx,dz (e.g. --${k} 1.5,-2), got "${x}"`);
@@ -2856,6 +3123,7 @@ function checkArgs(cmd, f, rest) {
 }
 var readArg = (r) => r[0] !== void 0 ? existsSync4(r[0]) && !r[0].trim().startsWith("{") ? readFileSync4(r[0], "utf8") : r[0] : readFileSync4(0, "utf8");
 var COMMANDS = {
+  build: (r, f) => build2(r[0], r.slice(1), f),
   "verify-use": (r, f) => verifyUse(r[0], f),
   register: (r, f) => register(r[0], r[1] ?? f.identity),
   pair: (r) => pair(r[0]),
@@ -2936,6 +3204,7 @@ var COMMANDS = {
   layers: (r, f) => layers(f),
   help: () => HELP
 };
+for (const [name, fn] of Object.entries(COMMANDS)) COMMANDS[name] = (r = [], f = {}) => withBuildOptions(f, () => fn(r, f));
 var HELP = `eden-god ${SKILL_VERSION} \u2014 god mode for one Eden world. Read SKILL.md.
 read:   verify-use <target> [--seat ref] [--from ref|x,z] [--uses enter,sit] \xB7 map \xB7 defs <words> \xB7 describe <ref> \xB7 where <x,z|ref> \xB7 free WxD [--near ref] \xB7 look [--at ref|x,z] [--from s|n|e|w|above] [--dist m] [--span m] [--inside [--floor k]] \xB7 history \xB7 resolve \xB7 schema [--md]
 look:   --dist controls coordinate views; --span is a minimum fit and may require more distance. Explicit --span alone tightens the view; named things/sets auto-fit by default. Both take one finite positive number; the viewer refuses a camera within its near clipping plane.
@@ -2944,6 +3213,7 @@ place:  --against offset is signed metres from the side centre (positive toward 
 shapes: place <path-def> --from ref --to ref [--via x,z] [--width w] | --path '[[x,z],\u2026]' \xB7 place <area-def> --rect cx,cz,w,d | --circle cx,cz,r | --area '[[x,z],\u2026]'
 edit:   move <ref> <relations>|--by dx,dz|--in pier/end|house/kitchen \xB7 set <ref> --param k=v --state '{\u2026}' \xB7 recolor <ref> #hex \xB7 remove <ref>\u2026 \xB7 clone <ref> [--at] [--count n --step dx,dz] \xB7 select [filters] [--remove|--by|--recolor|--set-state|--set-param]
 groups: group <name> \xB7 group --off \xB7 undo [--group name] \xB7 redo
+site:   build start <id> --title "\u2026" --steps "shell,roof,interior" --at ref|x,z --size w,d [--offset dx,dz] [--yaw radians] [--mass "nave 0,0 22x10 h12 gable"] [--brief file|text] [--root path] \xB7 build step [label] \xB7 build [show [id]] \xB7 build resume <id> [--take] \xB7 build claim <part> [--root path | --at ref --size w,d] [--take c_\u2026] \xB7 build release [--done] \xB7 build pause [note] \xB7 build done [summary] [--force] \xB7 build abandon [--undo] [--force]. Global --no-build skips automatic metadata.
 batch:  plan '<batch>' \xB7 preview '<batch>' \xB7 commit <preview-id> \xB7 act '<batch>' \xB7 dryrun '<batch>' \xB7 request <clientRef>
 world:  sky [--palette p --sun s] \xB7 time [19:30|7pm] [--speed h/h] [--pause|--resume] \xB7 weather [--kind storm|rain|fog|wind|cloudy|clear|auto] [--intensity i] [--clouds --wind --rain --fog] \xB7 strike [--at x,z|thing] \xB7 constitution <md> \xB7 expand <m> \xB7 export [file] \xB7 import <genesis.json> \xB7 define <def.json> \xB7 define-kit <kit.json> \xB7 furnish <house>[/room]
 pair:   register <world-url> \xB7 pair \xB7 flags \xB7 flag <label> --at x,z \xB7 prayers [--all: answered too] \xB7 answer <id> <text> \xB7 status
@@ -2989,7 +3259,10 @@ ${HELP}`);
   Promise.resolve(fn(rest, f)).then((out) => {
     record(out);
     if (typeof out === "string") console.log(out);
-    else console.log(JSON.stringify(out, null, 2));
+    else {
+      console.log(JSON.stringify(out, null, 2));
+      if (!f.json && out?.[OUTPUT_SUFFIX]) console.error(out[OUTPUT_SUFFIX]);
+    }
     if (process.env.EDEN_GOD_TIMING) console.error(`(${Date.now() - t0} ms)`);
   }).catch((e) => {
     record(null, String(e.message ?? e));
@@ -2998,6 +3271,7 @@ ${HELP}`);
   });
 }
 export {
+  BUILD_API,
   COMMANDS,
   COMPASS,
   EXAMPLES,
@@ -3006,6 +3280,7 @@ export {
   act,
   answer,
   bakeInfo,
+  build2 as build,
   checkArgs,
   clone,
   commit,
@@ -3037,6 +3312,7 @@ export {
   move,
   pair,
   parseFlags,
+  parseMassing,
   place,
   planBatch,
   prayers,
