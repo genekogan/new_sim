@@ -306,7 +306,8 @@ function glowStep(obj: THREE.Object3D, e: Entity, model: WorldModel | null, t: n
   if (off && !ud.glowOff) { ud.glowOff = true; for (const m of ud.glow) { const mat = (m.material as THREE.MeshStandardMaterial).clone(); mat.emissiveIntensity = 0; m.material = mat; } }
   if (off) return;
   const night = nightOf(model), level = 0.25 + 1.4 * night + 0.03 * Math.sin(t * 3);
-  for (const m of ud.glow) (m.material as THREE.MeshStandardMaterial).emissiveIntensity = level;
+  // K1 / XP1: retain v2's per-shape glow level through the day/night multiplier.
+  for (const m of ud.glow) { const mat = m.material as THREE.MeshStandardMaterial; mat.emissiveIntensity = level * (mat.userData.kitGlowIntensity ?? 1); }
 }
 
 function pointInPoly(px: number, pz: number, poly: [number, number][]) { let inside = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > pz) !== (zj > pz) && px < ((xj - xi) * (pz - zi)) / (zj - zi) + xi) inside = !inside; } return inside; }

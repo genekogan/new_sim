@@ -363,6 +363,11 @@ place birdbath@1 --near garden
 yaw/pitch/roll 0 with its axes: red = +x east, blue = +z front/south, white dot = `at`). The def's frame: metres,
 y = 0 is the ground it stands on, +y up, front faces +z.
 
+Kit programs add `repeat`, `radial`, `mirror`, `from`/`to`, `arch.pointed`, `outline:"lancet"` and numeric `$params` arithmetic. Use declared numeric defaults and `box:[w,h,d]` with `define-kit`. Limits: 96 authored entries, 512 expanded shapes, 80k tris. Snippets and field details: `<world>/god/examples/kit-helpers.mjs` (`limb`/`mirror` too).
+```json
+{"kind":"box","at":[0,"$height/2",0],"size":[1,"$height",1],"repeat":{"n":3,"step":[2,0,0]}}
+```
+
 | primitive | at yaw/pitch/roll 0 |
 |---|---|
 | box, rbox | centred on `at`; `size` = [x, y, z]; rbox edges rounded (`round` 0.04; `0` halves the triangles) |
@@ -374,6 +379,12 @@ y = 0 is the ground it stands on, +y up, front faces +z.
 | lathe | profile `[[radius, y], …]` (≥ 2 points) revolved about +y, measured up from `at` |
 | extrude | top-view polygon `[[x, z], …]` raised from `at.y` by `h`; **`"pitch": -1.5708` stands it upright** (its +z becomes +y: a lancet panel); `+1.5708` sends it into the ground |
 | sweep | a tube of radius `r` along a 3-D `path`, relative to `at` |
+
+Kit contract `v` (in kit JSON or `make.args`, separate from def `version`) defaults to legacy `1`.
+Use `v:2` for arcs on lathe/sphere/cyl/cone/arch, four glow levels and metal finish;
+unused shape fields refuse with a fix. Extrude `holes` are interior polygons. `loft` uses
+`polygon` at y=0 and `top` at y=`h`, matching vertex count/winding. Sweep `profile` is a
+closed 2-D cross-section instead of `r`; omit a repeated endpoint. These keep box colliders.
 
 So a 1 m box standing on the ground is `"at":[0,0.5,0]` (at y 0 it is half buried). Each shape also takes `yaw`/`pitch`/
 `roll`, `scale`, `segments` (≤ 16), `material` or `color`, optional `tint` (a palette key the instance can recolour),

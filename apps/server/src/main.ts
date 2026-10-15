@@ -29,6 +29,11 @@ import {IntentControlV2} from './intent-control.ts';
 import {EdgeLedger} from './edge/ledger/ledger.ts';
 import {readFileSync} from 'node:fs';
 import {installBirthLooks} from './god/birth-look.ts';
+import { setKitViewerContract } from '@sim/generators';
+
+// K1 / NT5: new kit fields are admitted only with the viewer that can draw them.
+try { setKitViewerContract(JSON.parse(readFileSync(join(config.webDir, 'kit-contract.json'), 'utf8'))); }
+catch { setKitViewerContract(null); }
 
 /** Seeded only into a world with no live Souls, so it is never empty. */
 const NATIVES: { name: string; description: string }[] = [

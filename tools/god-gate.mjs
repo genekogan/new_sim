@@ -18,10 +18,17 @@ const suites = [
   ['world-compiler', test([...files('packages/world-compiler/src', '.test.ts'), ...files('packages/world-compiler/src/core-kit', '.test.ts')])],
   ['catalog', test(files('packages/catalog/src', '.test.ts'))],
   ['generators', test(files('packages/generators/src', '.test.ts'))],
+  // K1 / NT5: offline kit semantics always run; recorded pixel captures can gate the same command.
+  ['kit-mesh', test(['apps/web/src/gen-mesh/kit.mesh.test.ts'])],
+  ['gallery-diff', test(['tools/god-skill/scripts/gallery-diff.test.mjs'])],
   ['CLI-lib', test([...files('tools/god-skill', '.test.mjs'), ...files('tools/god-skill/lib', '.test.mjs')])],
   ...['server', 'world-compiler', 'generators'].map(name => [`tsc-${name}`, ['node_modules/typescript/bin/tsc', '--noEmit', '-p', name === 'server' ? 'apps/server' : `packages/${name}`]]),
   ['skill-build', ['tools/god-skill/build.mjs', '--check']],
 ];
+if (process.env.GOD_GALLERY_BEFORE || process.env.GOD_GALLERY_AFTER) {
+  if (!process.env.GOD_GALLERY_BEFORE || !process.env.GOD_GALLERY_AFTER) throw new Error('set both GOD_GALLERY_BEFORE and GOD_GALLERY_AFTER');
+  suites.push(['gallery-pixels', ['tools/god-skill/scripts/gallery-diff.mjs', process.env.GOD_GALLERY_BEFORE, process.env.GOD_GALLERY_AFTER, ...(process.env.GOD_GALLERY_ALLOW ? [process.env.GOD_GALLERY_ALLOW] : [])]]);
+} else console.log('gallery-pixels: NOT RUN (set GOD_GALLERY_BEFORE and GOD_GALLERY_AFTER to recorded galleries)');
 console.log(`god-gate node=${node} logs=${dir}`);
 const results = [];
 for (const [name, args] of suites) {
